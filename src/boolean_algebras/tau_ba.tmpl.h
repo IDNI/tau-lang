@@ -137,13 +137,13 @@ auto normalize(const tau_ba<BAs...>& fm) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_syntactic_one(const tau_ba<BAs...>& fm) {
-	return tree<node<BAs...>>::get(fm.nso_rr.main) == tree<node<BAs...>>::_T();
+	return tree<node<BAs...>>::get(fm.nso_rr.main).equals_T();
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_syntactic_zero(const tau_ba<BAs...>& fm) {
-	return tree<node<BAs...>>::get(fm.nso_rr.main) == tree<node<BAs...>>::_F();
+	return tree<node<BAs...>>::get(fm.nso_rr.main).equals_F();
 }
 
 template <typename... BAs>
@@ -162,12 +162,13 @@ auto tau_splitter_one() {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm) {
-	using tau = tree<node<BAs...>>;
-	auto simp_fm = apply_rr_to_formula<node<BAs...>>(fm.nso_rr);
+	using node = idni::tau_lang::node<BAs...>;
+	using tau = tree<node>;
+	auto simp_fm = apply_rr_to_formula<node>(fm.nso_rr);
 	if (!simp_fm) return false;
-	if (tau::get(simp_fm).find_top(is<node<BAs...>, tau::ref>))
+	if (tau::get(simp_fm).find_top(is<node, tau::ref>))
 		return false;
-	auto vars = get_free_vars_from_nso<node<BAs...>>(simp_fm);
+	auto vars = get_free_vars_from_nso<node>(simp_fm);
 	for (const auto& v : vars) {
 		const auto& t = tau::get(v);
 		if (!(t.only_child_tree().is(tau::io_var)
@@ -200,7 +201,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref tau_ba_factory<BAs...>::binding(const std::string& source) {
 	if (auto p = parse(source); p)
-		return ba_constants_binder<tau_ba_t, BAs...>::instance()
+		return ba_constants_binder<node<tau_ba_t, BAs...>>::instance()
 							.bind(p.value(), "tau");
 	return nullptr;
 }

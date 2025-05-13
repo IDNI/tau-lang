@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "tau.h"
+// including instead of #include "tau.h" to avoid errors in a generated tau.h
+#include "boolean_algebras/sbf_ba.h"
 
 // common helpers to be included in test_*_helpers.h after defining bas_pack macro
 
@@ -9,8 +10,8 @@ namespace idni::tau_lang {
 using bnode = node<bas_pack>;
 using tau = tree<bnode>;
 using tt = tau::traverser;
-using bac = ba_constants<bas_pack>;
-using bacb = ba_constants_binder<bas_pack>;
+using bac = ba_constants<bnode>;
+using bacb = ba_constants_binder<bnode>;
 
 tau::parse_options parse_library() {
 	static tau::parse_options opts(

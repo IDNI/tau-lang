@@ -74,7 +74,7 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
 		if (is_io_initial<node>(io_vars[i])) continue;
 		quantifiable_o_vars.insert(i);
 	}
-	typename tau::subtree_set cache;
+	subtree_set<node> cache;
 	for (int_t pos : quantifiable_o_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({
@@ -101,7 +101,7 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 		if (is_io_initial<node>(io_vars[i])) continue;
 		quantifiable_i_vars.insert(i);
 	}
-	typename tau::subtree_set cache;
+	subtree_set<node> cache;
 	for (int_t pos : quantifiable_i_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({
@@ -169,8 +169,7 @@ bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 
 template <NodeType node>
 tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point) {
-	using tau = tree<node>;
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	for (size_t i = 0; i < io_vars.size(); ++i)
 		changes[io_vars[i]] =
 				transform_io_var<node>(io_vars[i], time_point);
@@ -182,7 +181,7 @@ std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 	const trefs& io_vars, int_t time_point, auto& pholder_to_st)
 {
 	using tau = tree<node>;
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
 		auto new_io_var = transform_io_var<node>(io_vars[i],time_point);
 		changes[io_vars[i]] = new_io_var;
@@ -190,7 +189,8 @@ std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point);
 	c_pholder = tau::build_bf_eq(tau::get(tau::bf, c_pholder));
 	pholder_to_st.emplace(c_pholder, rewriter::replace<node>(st, changes));
-	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes), c_pholder);
+	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes),
+					 c_pholder);
 	return std::make_pair(new_fm, c_pholder);
 }
 
@@ -201,7 +201,7 @@ tref build_step(tref original_fm, tref prev_fm, const trefs &io_vars,
 	using tau = tree<node>;
 	// Use build_initial_step otherwise
 	DBG(assert(step_num > 0);)
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
 		auto new_io_var = transform_io_var<node>(
 					io_vars[i], time_point + step_num);
@@ -227,7 +227,7 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 	using tau = tree<node>;
 	// Use build_initial_step otherwise
 	DBG(assert(step_num > 0);)
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
 		auto new_io_var = transform_io_var<node>(
 					io_vars[i], time_point + step_num);
@@ -399,7 +399,7 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	const trefs& io_vars, const auto& initials, int_t time_point)
 {
 	using tau = tree<node>;
-	typename tau::subtree_map pholder_to_st;
+	subtree_map<node, tref> pholder_to_st;
 	auto [chi_prev, cache] = build_initial_step_chi<node>(
 		chi_base, st, io_vars, time_point, pholder_to_st);
 
@@ -441,7 +441,7 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 			is_child<node, tau::io_var>);
 	int_t lookback = get_lookback_after_normalization<node>(current_io_vars);
 
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	// Get time positions which are higher than highest_init_cond and transform back to
 	// time variable depending on t
 	for (tref io_var : current_io_vars) {
@@ -504,7 +504,7 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 			flag_initials);
 	};
 	flag_initials = tau::_T();
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	// transform constraints to their respective output streams and add required conditions
 	// We make the variable static so that we can transform different parts of the formula independently
 	static size_t ctn_id = 0;
@@ -791,7 +791,7 @@ tref add_st_ctn(tref st, const int_t timepoint, const int_t steps) {
 	tref st_ctn = tau::_T();
 	trefs io_vars = tau::get(st).select_top(is_child<node, tau::io_var>);
 	for (int_t s = 0; s <= steps; ++s) {
-		typename tau::subtree_map changes;
+		subtree_map<node, tref> changes;
 		for (size_t i = 0; i < io_vars.size(); ++i) {
 			tref new_io_var = 
 				transform_io_var<node>(io_vars[i], timepoint + s);
@@ -974,7 +974,8 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 	using tau = tree<node>;
 	DBG(assert(get_dnf_wff_clauses<node>(fm).size() == 1);)
 #ifdef TAU_CACHE
-	static std::map<std::pair<tau_<node>, int_t>, tau_<node>> cache;
+	static std::map<std::pair<tref, int_t>, tref,
+		subtree_pair_equality<node, int_t>> cache;
 	if (auto it = cache.find(std::make_pair(fm, start_time));
 		it != cache.end()) return it->second;
 #endif // TAU_CACHE

@@ -24,7 +24,7 @@ private:
 
 #ifdef HOOK_LOGGING_ENABLED
 	static void log(const char* msg, const node& v, const tref* ch,
-							size_t len, tref r);
+			size_t len, tref r, bool track_each_call = false);
 #endif // HOOK_LOGGING
 
 	// helpers

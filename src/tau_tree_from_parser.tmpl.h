@@ -228,7 +228,8 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 template <NodeType node>
 tref tree<node>::get(const tau_parser::tree& pt) {
-	return get<ba_constants_binder>(ba_constants_binder::instance(), pt);
+	return get<ba_constants_binder<node>>(
+				ba_constants_binder<node>::instance(), pt);
 }
 
 //------------------------------------------------------------------------------
@@ -248,8 +249,8 @@ tref tree<node>::get(binder& bind, tau_parser::result& result) {
 
 template <NodeType node>
 tref tree<node>::get(tau_parser::result& result) {
-	return tree<node>::get<ba_constants_binder>(
-		ba_constants_binder::instance(), result);
+	return tree<node>::get<ba_constants_binder<node>>(
+		ba_constants_binder<node>::instance(), result);
 }
 
 template <NodeType node>
@@ -264,8 +265,9 @@ tref tree<node>::get(binder& bind, const std::string& source,
 
 template <NodeType node>
 tref tree<node>::get(const std::string& source, parse_options options) {
-	ba_constants_binder binder(options.named_constants);
-	return tree<node>::get<ba_constants_binder>(binder, source, options);
+	ba_constants_binder<node> binder(options.named_constants);
+	return tree<node>::get<ba_constants_binder<node>>(
+						binder, source, options);
 }
 
 template <NodeType node>
@@ -277,8 +279,9 @@ tref tree<node>::get(binder& bind, std::istream& is, parse_options options) {
 
 template <NodeType node>
 tref tree<node>::get(std::istream& is, parse_options options) {
-	ba_constants_binder binder(options.named_constants);
-	return tree<node>::get<ba_constants_binder>(binder, is, options);
+	ba_constants_binder<node> binder(options.named_constants);
+	return tree<node>::get<ba_constants_binder<node>>(
+						binder, is, options);
 }
 
 template <NodeType node>
@@ -294,8 +297,9 @@ template <NodeType node>
 tref tree<node>::get_from_file(const std::string& filename,
 	parse_options options)
 {
-	ba_constants_binder binder(options.named_constants);
-	return tree<node>::get<ba_constants_binder>(binder, filename, options);
+	ba_constants_binder<node> binder(options.named_constants);
+	return tree<node>::get<ba_constants_binder<node>>(
+						binder, filename, options);
 }
 
 template <NodeType node>
@@ -381,8 +385,8 @@ rewriter::builder get_builder(binder& bind, const std::string& source){
 
 template <NodeType node>
 rewriter::builder get_builder(const std::string& source) {
-	return get_builder<node, typename node::ba_constants_binder>(
-		node::ba_constants_binder::instance(), source);
+	return get_builder<node, ba_constants_binder<node>>(
+				ba_constants_binder<node>::instance(), source);
 }
 
 template <NodeType node>
@@ -410,8 +414,8 @@ rewriter::library get_rules(binder& bind, const std::string& str) {
 
 template <NodeType node>
 rewriter::library get_rules(const std::string& str) {
-	return get_rules<node, typename node::ba_constants_binder>(
-		node::ba_constants_binder::instance(), str);
+	return get_rules<node, ba_constants_binder<node>>(
+				ba_constants_binder<node>::instance(), str);
 }
 
 template <NodeType node>
@@ -431,8 +435,8 @@ rewriter::library get_library(binder& bind, const std::string& str) {
 
 template <NodeType node>
 rewriter::library get_library(const std::string& str) {
-	return get_library<node, typename node::ba_constants_binder>(
-		node::ba_constants_binder::instance(), str);
+	return get_library<node, ba_constants_binder<node>>(
+				ba_constants_binder<node>::instance(), str);
 }
 
 

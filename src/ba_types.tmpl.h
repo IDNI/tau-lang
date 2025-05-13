@@ -10,9 +10,8 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // BA types
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-size_t ba_types<BAs...>::type_id(size_t type_sid) {
+template <NodeType node>
+size_t ba_types<node>::type_id(size_t type_sid) {
 	if (types.empty()) types.push_back(string_id("untyped")),
 			type_names_map.emplace(types.back(), 0);
 	if (auto it = type_names_map.find(type_sid);
@@ -21,44 +20,41 @@ size_t ba_types<BAs...>::type_id(size_t type_sid) {
 		types.push_back(type_sid), types.size() - 1;
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-size_t ba_types<BAs...>::type_id(const std::string& name) {
+template <NodeType node>
+size_t ba_types<node>::type_id(const std::string& name) {
 	// TODO properly initialize types with "untyped" as first element
 	return type_id(string_id(name));
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-const std::string& ba_types<BAs...>::type_name(size_t tid) {
+template <NodeType node>
+const std::string& ba_types<node>::type_name(size_t tid) {
 	if (tid >= types.size()) tid = 0;
 	return string_from_id(types[tid]);
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::ostream& ba_types<BAs...>::print_type(std::ostream& os, size_t tid) {
+template <NodeType node>
+std::ostream& ba_types<node>::print_type(std::ostream& os, size_t tid) {
 	return os << type_name(tid);
 }
 
 template <NodeType node>
 size_t get_ba_type_id(size_t ba_type_sid) {
-	return  node::ba_types::type_id(ba_type_sid);
+	return  ba_types<node>::type_id(ba_type_sid);
 }
 
 template <NodeType node>
 size_t get_ba_type_id(const std::string& ba_type_name) {
-	return node::ba_types::type_id(ba_type_name);
+	return ba_types<node>::type_id(ba_type_name);
 }
 
 template <NodeType node>
 std::string get_ba_type_name(size_t ba_type_id) {
-	return node::ba_types::type_name(ba_type_id);
+	return ba_types<node>::type_name(ba_type_id);
 }
 
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id) {
-	return node::ba_types::print_type(os, ba_type_id);
+	return ba_types<node>::print_type(os, ba_type_id);
 }
 
 } // idni::tau_lang namespace

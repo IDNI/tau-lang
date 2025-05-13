@@ -189,9 +189,7 @@ struct reduce_deprecated {
 	tt operator()(const tt& t) const;
 
 private:
-	using subtree_set = tau::subtree_set;
-	using subtree_map = tau::subtree_map;
-	using literals = subtree_set;
+	using literals = subtree_set<node>;
 
 	void get_literals(tref clause, literals& lits) const;
 
@@ -200,14 +198,15 @@ private:
 	std::pair<literals, literals> get_positive_negative_literals(
 		tref clause) const;
 
-	subtree_set get_dnf_clauses(tref n, subtree_set clauses = {}) const;
+	subtree_set<node> get_dnf_clauses(tref n,
+					subtree_set<node> clauses = {}) const;
 
 	tref build_dnf_clause_from_literals(const literals& positives,
 					const literals& negatives) const;
 
 	tref to_minterm(tref clause) const;
 
-	tref build_dnf_from_clauses(const subtree_set& clauses) const;
+	tref build_dnf_from_clauses(const subtree_set<node>& clauses) const;
 
 	tref simplify(tref form) const;
 };
@@ -276,7 +275,8 @@ void join_paths(std::vector<std::vector<int_t>>& paths);
 template <NodeType node>
 auto lex_var_comp = [](tref x, tref y) {
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref, tref>, bool> cache;
+	static std::map<std::pair<tref, tref>, bool,
+		subtree_pair_equality<node, tref>> cache;
 	if (auto it = cache.find({x,y}); it != cache.end())
 		return it->second;
 #endif // TAU_CACHE
@@ -284,8 +284,7 @@ auto lex_var_comp = [](tref x, tref y) {
 	auto xx = tree<node>::get(x).to_str();
 	auto yy = tree<node>::get(y).to_str();
 #ifdef TAU_CACHE
-	std::pair<tref,tref> p(x,y);
-	return cache.emplace(move(p), xx < yy).first->second;
+	return cache.emplace(std::make_pair(x, y), xx < yy).first->second;
 #endif // TAU_CACHE
 	return xx < yy;
 };
@@ -557,14 +556,13 @@ template <NodeType node>
 struct to_snf_step {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	using subtree_set = typename tau::subtree_set;
 	using bas_variant = typename tau::bas_variant;
 
 	using constant = bas_variant;
-	using vars = subtree_set;
-	using exponent = subtree_set;
+	using vars = subtree_set<node>;
+	using exponent = subtree_set<node>;
 	using literal = tref;
-	using literals = subtree_set;
+	using literals = subtree_set<node>;
 	using partition = std::map<exponent, literals>;
 	using bdd_path = std::pair<partition /* positive */, partition /* negatives */>;
 

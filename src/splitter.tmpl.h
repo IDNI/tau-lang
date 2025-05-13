@@ -47,7 +47,7 @@ tref split(tref fm, typename node<BAs...>::type fm_type, bool is_cnf,
 	case splitter_type::middle: {
 		// Remove half of the clause
 		size_t window = mem.size() / 2;
-		typename tau::subtree_map changes;
+		subtree_map<node, tref> changes;
 		for (size_t j = 0; j < window; ++j) {
 			size_t idx = (i + j) % mem.size();
 			if (check_temps && has_temporary_io_var<node>(mem[idx]))
@@ -235,7 +235,8 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 			DBG(assert(tau::get(eq)[1][0].is(tau::bf_f));)
 			const auto& f = tau::get(eq)[0];
 			size_t type_f = f.get_ba_type();
-			typename tau::subtree_set free_vars = get_free_vars_from_nso<node>(fm);
+			subtree_set<node> free_vars
+					= get_free_vars_from_nso<node>(fm);
 			for (tref c : constants) {
 				// First check that types match
 				size_t type_c = tau::get(c).get_ba_type();

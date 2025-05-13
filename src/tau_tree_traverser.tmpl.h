@@ -151,7 +151,7 @@ const typename tree<node>::template extractor<typename tree<node>::bas_variant>
 	tree<node>::traverser::ba_constant =
 		typename tree<node>::template extractor<bas_variant>(
 			[](const traverser& t) -> bas_variant {
-				return ba_constants::get(
+				return ba_constants<node>::get(
 					t.value_tree().get_ba_constant_id());
 			});
 

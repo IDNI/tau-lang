@@ -5,6 +5,7 @@
 
 #include "tau_tree.h"
 #include "splitter_types.h"
+#include "splitter.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //

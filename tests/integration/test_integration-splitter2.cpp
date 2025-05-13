@@ -4,9 +4,12 @@
 #include "test_tau_helpers.h"
 
 TEST_SUITE("configuration") {
-	// TEST_CASE("logging") {
-	// 	logging::trace();
-	// }
+
+#ifdef DEBUG
+	TEST_CASE("logging") {
+		logging::trace();
+	}
+#endif // DEBUG
 
 	TEST_CASE("bdd initialization") {
 		bdd_init<Bool>();

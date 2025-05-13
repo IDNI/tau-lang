@@ -64,7 +64,7 @@ template <NodeType node>
 int_t get_max_initial(const trefs& io_vars);
 
 template <NodeType node>
-typename tree<node>::subtree_set get_free_vars_from_nso(tref n);
+subtree_set<node> get_free_vars_from_nso(tref n);
 
 template <NodeType node>
 bool has_temp_var(tref n);
@@ -95,6 +95,18 @@ bool has_open_tau_fm_in_constant(tref fm);
 #define LOG_CHANNEL_NAME "tau_tree"
 
 namespace idni::tau_lang {
+
+template <typename node>
+struct subtree_bool_bool_tuple_equality {
+	bool operator()(const std::tuple<tref, bool, bool>& a,
+			const std::tuple<tref, bool, bool>& b) const
+	{
+		return lcrs_tree<node>::subtree_less(std::get<0>(a),
+						     std::get<0>(b))
+			&& std::get<1>(a) < std::get<1>(b)
+			&& std::get<2>(a) < std::get<2>(b);
+	};
+};
 
 // -----------------------------------------------------------------------------
 // Tau tree templates implementation
@@ -521,7 +533,7 @@ size_t tree<node>::get_num() const {
 
 template <NodeType node>
 tref tree<node>::get(const node::bas_variant& c, size_t type) {
-	return node::ba_constants_binder::instance().bind(c, type);
+	return ba_constants_binder<node>::instance().bind(c, type);
 }
 
 template <NodeType node>
@@ -533,7 +545,7 @@ size_t tree<node>::get_ba_constant_id() const {
 template <NodeType node>
 tree<node>::bas_variant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
-	return ba_constants::get(data());
+	return ba_constants<node>::get(data());
 }
 
 template <NodeType node>

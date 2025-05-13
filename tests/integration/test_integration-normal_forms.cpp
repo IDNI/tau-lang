@@ -4,9 +4,13 @@
 #include "test_Bool_helpers.h"
 
 TEST_SUITE("configuration") {
+
+#ifdef DEBUG
 	TEST_CASE("trace logging") {
 		logging::trace();
 	}
+#endif // DEBUG
+
 }
 
 TEST_SUITE("normal forms: snf for wff") {

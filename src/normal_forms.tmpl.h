@@ -246,7 +246,7 @@ tref normalize_ba(tref fm) {
 // TODO (VERY_HIGH) properly implement it
 template <NodeType node, node::type type>
 tref reduce_deprecated<node, type>::operator()(tref form) const {
-	subtree_map changes;
+	subtree_map<node, tref> changes;
 	// for all type dnfs do...
 	for (tref dnf : tau::get(form).select_top(is<node, type>)) {
 		auto simplified = simplify(dnf);
@@ -321,9 +321,8 @@ std::pair<typename reduce_deprecated<node, type>::literals,
 }
 
 template <NodeType node, node::type type>
-typename reduce_deprecated<node, type>::subtree_set
-	reduce_deprecated<node, type>::get_dnf_clauses(
-		tref n, subtree_set clauses) const
+subtree_set<node> reduce_deprecated<node, type>::get_dnf_clauses(
+					tref n, subtree_set<node> clauses) const
 {
 	if constexpr (type == tau::bf)
 		if (auto check = tt(n) | tau::bf_or; check)
@@ -409,7 +408,7 @@ tref reduce_deprecated<node, type>::to_minterm(tref clause) const {
 
 template <NodeType node, node::type type>
 tref reduce_deprecated<node, type>::build_dnf_from_clauses(
-	const subtree_set& clauses) const
+	const subtree_set<node>& clauses) const
 {
 	if (clauses.empty()) {
 		if constexpr (type == tau::bf) {
@@ -426,7 +425,7 @@ tref reduce_deprecated<node, type>::build_dnf_from_clauses(
 }
 template <NodeType node, node::type type>
 tref reduce_deprecated<node, type>::simplify(tref form) const {
-	subtree_set clauses;
+	subtree_set<node> clauses;
 	LOG_DEBUG_I_F("-- Begin simplifying of ", form);
 	for (tref clause : get_dnf_clauses(form))
 		if (tref dnf = to_minterm(clause); dnf) clauses.insert(dnf);
@@ -489,7 +488,7 @@ tref onf_wff<node>::operator()(tref n) const {
 	auto [var, nn] = get_inner_quantified_wff<node>(n);
 	// We assume that the formula is in DNF. In particular nn is in DNF
 	// For each disjunct calculate the onf
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	bool no_disjunction = true;
 	for (tref disjunct_ref : tau::get(nn).select_all(is<node, tau::wff_or>))
 	{
@@ -516,7 +515,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 	};
 	const auto& t = tau::get(n);
 	tref eq = t.find_bottom(is<node, tau::bf_eq>);
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	if (eq && tau::get(eq)[0].find_top(has_var)) {
 		const auto& eq_v = tau::get(eq);
 		DBG(assert(eq_v[1][0].is(tau::bf_f));)
@@ -687,7 +686,7 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 	// 	is_child<node>(n, tau::variable) ||
 	// 		is_child<node>(n, tau::uconst_name);};
 	auto cvars = tau::get(fm).select_all(is_var);
-	typename tau::subtree_set cur_vars(
+	subtree_set<node> cur_vars(
 		std::make_move_iterator(cvars.begin()),
 		std::make_move_iterator(cvars.end()));
 
@@ -806,7 +805,8 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 	const auto& t = tau::get(fm);
 	DBG(assert(t.is(tau::bf));)
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref, bool>, tref> cache;
+	static std::map<std::pair<tref, bool>, tref,
+		subtree_pair_equality<node, bool>> cache;
 	if (auto it = cache.find(std::make_pair(fm, make_paths_disjoint));
 		it != cache.end()) return trace(it->second);
 #endif //TAU_CACHE
@@ -823,8 +823,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 	// Resulting DNF - make it ordered for consistency
 	// Key is coefficient, value is possible variable assignments for coefficient
 	// unordered_tau_map<std::vector<std::vector<int_t>>, BAs...> dnf;
-	std::map<tref, std::vector<std::vector<int_t>>,
-		typename tau::subtree_equality> dnf;
+	subtree_map<node, std::vector<std::vector<int_t>>> dnf;
 
 	if (assign_and_reduce<node>(fm, vars, i, dnf, is_var, 0)) {
 		assert(dnf.size() == 1);
@@ -883,7 +882,7 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
 	LOG_TRACE_I_F("bf reduce canonical: ", fm);
-	std::map<tref, tref, typename tau::subtree_equality> changes = {};
+	subtree_map<node, tref> changes = {};
 	for (tref bf : t.select_top(is<node, tau::bf>)) {
 		tref dnf = bf_boole_normal_form<node>(bf);
 		if (dnf != bf) changes[bf] = dnf;
@@ -1004,7 +1003,7 @@ std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
 	using tau = tree<node>;
 	std::vector<std::vector<int_t>> paths;
 	// unordered_tau_map<int_t, BAs...> var_pos;
-	std::map<tref, int_t, typename tau::subtree_equality> var_pos;
+	subtree_map<node, int_t> var_pos;
 	for (int_t k = 0; k < (int_t) vars.size(); ++k)
 		var_pos.emplace(vars[k], k);
 	for (tref clause : get_leaves<node>(new_fm, is_cnf
@@ -1090,7 +1089,7 @@ tref sort_var(tref var) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
 	// static unordered_tau_map<tref, BAs...> cache;
-	static typename tau::subtree_map cache;
+	static subtree_map<node, tref> cache;
 	if (auto it = cache.find(var); it != end(cache))
 		return it->second;
 #endif // TAU_CACHE
@@ -1140,7 +1139,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	if (wff) {
 		LOG_TRACE_I_F("dnf_cnf_to_bdd / mnf: ", new_fm);
 		// Make equalities canonical
-		typename tau::subtree_map changes;
+		subtree_map<node, tref> changes;
 		trefs eqs = tau::get(new_fm)
 			.select_top(is_child<node, tau::bf_eq>);
 		for (tref eq : eqs) {
@@ -1190,7 +1189,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 #ifdef DEBUG
 	std::stringstream ss;
 	for (tref v : vars)
-		ss << "\t\t\t\t(I) var: " << TAU_TO_STR(v) << "\n";
+		ss << "\t\t\t\t(I) var: \t" << TAU_TO_STR(v) << "\n";
 	for (const auto& p : paths) {
 		ss << "\t\t\t\t(I) path:\t";
 		for (const auto& i : p) ss << i << " ";
@@ -1206,7 +1205,7 @@ tref group_dnf_expression(tref fm) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
 	// static unordered_tau_map<tref, BAs...> cache;
-	static typename tau::subtree_map cache;
+	static subtree_map<node, tref> cache;
 	if (auto it = cache.find(fm); it != end(cache)) return it->second;
 #endif // TAU_CACHE
 	LOG_DEBUG_I("Begin group_dnf_expression");
@@ -1366,7 +1365,8 @@ tref reduce(tref fm, size_t type, bool is_cnf,
 	// 	tref,
 	// 	std::hash<std::tuple<tref, bool, bool>>,
 	// 	tuple_struc_equal<bool, bool, BAs...>> cache;
-	static std::map<std::tuple<tref, bool, bool>, tref> cache;
+	static std::map<std::tuple<tref, bool, bool>, tref,
+		subtree_bool_bool_tuple_equality<node>> cache;
 	if (auto it = cache.find(std::make_tuple(
 					fm, all_reductions, enable_sort));
 		it != end(cache)) return it->second;
@@ -1395,19 +1395,20 @@ tref reduce(tref fm, size_t type, bool is_cnf,
 	}
 
 	auto reduced_fm = build_reduced_formula<node>(paths, vars, is_cnf, wff);
+	LOG_TRACE_I("End reduce");
+	LOG_TRACE_F_F("Reduced formula: ", reduced_fm);
 #ifdef TAU_CACHE
 	return cache.emplace(std::make_tuple(
 		fm, all_reductions, enable_sort), reduced_fm).first->second;
 #endif // TAU_CACHE
-	LOG_TRACE_I("End reduce");
-	LOG_TRACE_F_F("Reduced formula: ", reduced_fm);
 	return reduced_fm;
 }
 
 template <NodeType node>
 tref reduce_terms(tref fm, bool with_sorting) {
 	using tau = tree<node>;
-	typename tau::subtree_map changes = {};
+	LOG_TRACE_I_F("reduce_terms: ", fm);
+	subtree_map<node, tref> changes = {};
 	for (const auto& bf : tau::get(fm)
 		.select_top(is<node, tau::bf>))
 	{
@@ -1415,8 +1416,14 @@ tref reduce_terms(tref fm, bool with_sorting) {
 		dnf = reduce<node>(dnf, tau::bf, false, true, with_sorting);
 		if (dnf != bf) changes[bf] = dnf;
 	}
-	if (changes.empty()) return fm;
-	else return rewriter::replace<node>(fm, changes);
+
+	if (changes.empty()) {
+		LOG_TRACE_I_F("reduce_terms result: (no change) ", fm);
+		return fm;
+	}
+	fm = rewriter::replace<node>(fm, changes);
+	LOG_TRACE_I_F("reduce_terms result: ", fm);
+	return fm;
 }
 
 // Apply equalities across clauses for further simplifications
@@ -1443,7 +1450,7 @@ tref apply_eqs_across_clauses(tref fm) {
 	}
 	if (eq_reductions.empty() && neq_reductions.empty()) return fm;
 	tref new_fm = nullptr;
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	for (tref clause : clauses) {
 		auto neqs = tau::get(clause)
 			.select_top(is_child<node, tau::bf_neq>);
@@ -1513,8 +1520,7 @@ std::vector<std::vector<int_t>> wff_to_bdd(tref fm, auto& vars) {
 	else pushed_in_fm = tt(fm) | (tau_f<node>) unsqueeze_wff<node>
 				   | (tau_f<node>) to_mnf<node> | tt::ref;
 	std::vector<int_t> i(vars.size());
-	std::map<tref, std::vector<std::vector<int_t>>,
-		typename tau::subtree_equality> dnf;
+	subtree_map<node, std::vector<std::vector<int_t>>> dnf;
 	// dnf empty means false and and size 1 with empty paths means true
 	assign_and_reduce<node>(pushed_in_fm, vars, i, dnf,
 					is_wff_bdd_var<node>, 0, true);
@@ -1702,7 +1708,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	auto new_vars = tau::get(clause).select_top(is_wff_bdd_var<node>);
 
 	// unordered_tau_map<size_t, BAs...> var_to_idx;
-	std::map<tref, size_t, typename tau::subtree_equality> var_to_idx;
+	subtree_map<node, size_t> var_to_idx;
 	for (size_t i = 0; i < vars.size(); ++i) var_to_idx.emplace(vars[i], i);
 
 	for (tref v : new_vars) {
@@ -1880,7 +1886,8 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 	// std::cout << "squeezed_fm: " << squeezed_fm << "\n";
 	LOG_DEBUG_F_F("Formula in DNF: ", squeezed_fm);
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref, bool>, tref> cache;
+	static std::map<std::pair<tref, bool>, tref,
+		subtree_pair_equality<node, bool>> cache;
 	if (auto it = cache.find(std::make_pair(squeezed_fm, to_cnf));
 			it != end(cache)) return it->second;
 #endif // TAU_CACHE
@@ -1979,13 +1986,13 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 				{
 					auto res = to_cnf ? tau::_F()
 							  : tau::_T();
-#ifdef TAU_CACHE
-					return cache.emplace(
-						make_pair(squeezed_fm, to_cnf),
-							res).first->second;
-#endif // TAU_CACHE
 					LOG_DEBUG_I("End reduce_across_bfs");
 					LOG_DEBUG_F_F("res: ", res);
+#ifdef TAU_CACHE
+					return cache.emplace(std::make_pair(
+							squeezed_fm, to_cnf),
+						res).first->second;
+#endif // TAU_CACHE
 					return res;
 				}
 				has_simp = true;
@@ -2390,7 +2397,7 @@ tref extract_sometimes (tref fm) {
 template <NodeType node>
 tref extract_always (tref fm) {
 	using tau = tree<node>;
-	typename tau::subtree_map l_changes = {};
+	subtree_map<node, tref> l_changes = {};
 	// Collect remaining nested "sometimes" formulas
 	trefs sometimes_extractions = {};
 	const auto& t = tau::get(fm);
@@ -2450,7 +2457,7 @@ tref extract_always (tref fm) {
 template <NodeType node>
 tref push_sometimes_always_in(tref fm, auto& visited) {
 	using tau = tree<node>;
-	typename tau::subtree_map g_changes = {};
+	subtree_map<node, tref> g_changes = {};
 	for (tref st : tau::get(fm).select_top_until(
 		is_child<node, tau::wff_sometimes>,
 		is_child<node, tau::wff_always>))
@@ -2528,7 +2535,7 @@ template <NodeType node>
 tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
 	using tau = tree<node>;
 	if (shift <= 0) return fm;
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	for (tref io_var : io_vars) {
 		// Skip initial conditions
 		if (is_io_initial<node>(io_var)) continue;
@@ -2546,7 +2553,7 @@ template <NodeType node>
 tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
 	using tau = tree<node>;
 	if (shift <= 0) return fm;
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	for (tref io_var : io_vars) {
 		if (!is_io_initial<node>(io_var)) continue;
 		int_t tp = get_io_time_point<node>(io_var);
@@ -2565,7 +2572,7 @@ tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
 template <NodeType node>
 tref pull_always_out(tref fm) {
 	using tau = tree<node>;
-	typename tau::subtree_map l_changes = {};
+	subtree_map<node, tref> l_changes = {};
 	std::vector<tref> collected_always_fms;
 	// Collect all always statments in the clause fm
 	// by analyzing conjuncts
@@ -2628,7 +2635,7 @@ tref pull_always_out(tref fm) {
 template <NodeType node>
 tref pull_sometimes_always_out(tref fm) {
 	using tau = tree<node>;
-	typename tau::subtree_map changes = {};
+	subtree_map<node, tref> changes = {};
 	trefs collected_no_temp_fms;
 	tref pure_always_clause = nullptr;
 	// Collect all disjuncts which have temporal variables and call pull_always_out on the others
@@ -2709,7 +2716,7 @@ tref sometimes_always_normalization<node>::operator()(tref fm) const {
 			return reduce_across_bfs<node>(fm, false);
 	// Delete all always/sometimes if they scope no temporal variable
 	auto temps = tau::get(fm).select_top(st_aw);
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	for (tref temp : temps) {
 		if (!has_temp_var<node>(temp))
 			changes.emplace(temp, tau::trim2(temp));
@@ -3007,7 +3014,8 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 	scoped_fm = reduce_across_bfs<node>(scoped_fm, false);
 
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref,tref>, tref> cache;
+	static std::map<std::pair<tref, tref>, tref,
+		subtree_pair_equality<node, tref>> cache;
 	if (auto it = cache.find(std::make_pair(inner_fm, scoped_fm));
 		it != end(cache)) return it->second;
 #endif // TAU_CACHE
@@ -3087,7 +3095,8 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 	scoped_fm = reduce_across_bfs<node>(scoped_fm, true);
 // Add cache after reductions; reductions are cached as well
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref,tref>, tref> cache;
+	static std::map<std::pair<tref, tref>, tref,
+		subtree_pair_equality<node, tref>> cache;
 	if (auto it = cache.find(std::make_pair(inner_fm, scoped_fm));
 		it != end(cache)) return it->second;
 #endif // TAU_CACHE
@@ -3199,8 +3208,9 @@ tref eliminate_quantifiers(tref fm) {
 							inner_fm, scoped_fm);
 	};
 	// unordered_tau_set<BAs...> excluded_nodes;
-	typename tau::subtree_set excluded_nodes;
+	subtree_set<node> excluded_nodes;
 	auto push_quantifiers = [&excluded_nodes](tref n) {
+		// static size_t counter = 0; DBG(assert(counter++ < 12);)
 		if (is_child<node>(n, tau::wff_ex)) {
 			LOG_DEBUG_I_F_DUMP("push_quantifiers existential:", n);
 			tref pushed = push_existential_quantifier_one<node>(n);
@@ -3280,7 +3290,7 @@ std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm) {
 		return { wff_remove_existential<node>(q, scoped_fm), true };
 	// Check if all atomic fms are negative or if all are positive
 	// static unordered_tau_set<BAs...> mixed_eqs;
-	static typename tau::subtree_set mixed_eqs;
+	static subtree_set<node> mixed_eqs;
 	if (mixed_eqs.contains(scoped_fm)) return { scoped_fm, false };
 	bool all_atm_fm_neq = true, all_atm_fm_eq = true;
 	auto check_atm_fms = [&all_atm_fm_neq, &all_atm_fm_eq, &q](tref n) {
@@ -3323,7 +3333,7 @@ template <NodeType node>
 tref anti_prenex(const tref& fm) {
 	using tau = tree<node>;
 	// unordered_tau_set<BAs...> excluded_nodes, quant_vars;
-	typename tau::subtree_set excluded_nodes, quant_vars;
+	subtree_set<node> excluded_nodes, quant_vars;
 	auto anti_prenex_step = [&excluded_nodes](tref n) {
 		if (is_child_quantifier<node>(n)) {
 			// std::cout << "Start anti_prenex_step\n";
@@ -3458,11 +3468,11 @@ tref anti_prenex(const tref& fm) {
 
 template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val) {
-	using tau = tree<node>;
-	assert(!is<node>(val, tau::bf));
+	DBG(using tau = tree<node>;)
+	DBG(assert(!is<node>(val, tau::bf));)
 	auto free_vars = get_free_vars_from_nso<node>(fm);
 	if (free_vars.size()) {
-		typename tau::subtree_map free_var_assgm;
+		subtree_map<node, tref> free_var_assgm;
 		for (tref free_var : free_vars)
 			free_var_assgm.emplace(free_var, val);
 		return rewriter::replace<node>(fm, free_var_assgm);
@@ -3485,7 +3495,7 @@ tref to_snf_step<node>::operator()(tref form) const {
 	{
 		// we call the recursive method traverse to traverse all the paths
 		// of the BDD.
-		subtree_set remaining(literals.begin(), literals.end());
+		subtree_set<node> remaining(literals.begin(), literals.end());
 		bdd_path path;
 		return tt(traverse(path, remaining, form))
 			| bf_reduce_canonical<node>()
@@ -3560,8 +3570,7 @@ tref to_snf_step<node>::traverse(const bdd_path& path,
 {
 	// we only cache results in release mode
 #ifdef TAU_CACHE
-	static std::map<std::tuple<bdd_path, literals, tau_<BAs...>>,
-			tau_<BAs...>> cache;
+	static std::map<std::tuple<bdd_path, literals, tref>, tref> cache;
 	if (auto it = cache.find({path, remaining, form});
 		it != cache.end()) return it->second;
 #endif // TAU_CACHE
@@ -3582,7 +3591,7 @@ tref to_snf_step<node>::traverse(const bdd_path& path,
 	if (tau::get(f).equals_F() && tau::get(t).equals_F()) {
 		// we only cache results in release mode
 #ifdef TAU_CACHE
-		cache[{path, remaining, form}] = tau::_F();
+		cache[{ path, remaining, form }] = tau::_F();
 #endif // TAU_CACHE
 		return tau::_F();
 	}
@@ -3605,14 +3614,14 @@ tref to_snf_step<node>::traverse(const bdd_path& path,
 
 	if (tau::get(f_snf).equals_F()) {
 #ifdef TAU_CACHE
-		cache[{path, remaining, form}] = t_snf;
+		cache[{ path, remaining, form }] = t_snf;
 #endif // TAU_CACHE
 		return t_snf;
 	}
 
 	if (tau::get(t_snf).equals_F()) {
 #ifdef TAU_CACHE
-		cache[{path, remaining, form}] = f_snf;
+		cache[{ path, remaining, form }] = f_snf;
 #endif // TAU_CACHE
 		return f_snf;
 	}
@@ -3620,7 +3629,7 @@ tref to_snf_step<node>::traverse(const bdd_path& path,
 	tref result = tau::build_wff_or(t_snf, f_snf);
 	// we only cache results in release mode
 #ifdef TAU_CACHE
-	cache[{path, remaining, form}] = result;
+	cache[{ path, remaining, form }] = result;
 #endif // TAU_CACHE
 	return result;
 }
@@ -3676,7 +3685,7 @@ tref to_snf_step<node>::squeeze_positives(const literals& positives,
 		first_cte, [&](tref l, tref r) {
 			auto l_cte = get_constant(l), r_cte = get_constant(r);
 			if (l_cte && r_cte)
-				return node::ba_constants_binder::instance()
+				return ba_constants_binder<node>::instance()
 					.bind(std::visit(_or,
 						l_cte.value(), r_cte.value()),
 						tau::get(l).get_ba_type());

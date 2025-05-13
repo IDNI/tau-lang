@@ -15,8 +15,7 @@ tref infer_ba_types(tref n);
 // -----------------------------------------------------------------------------
 // BA types
 //   contains type map of BA types
-template <typename... BAs>
-requires BAsPack<BAs...>
+template <NodeType node>
 struct ba_types {
 	// get the type id from the type name string id
 	static size_t type_id(size_t ba_type_sid);
@@ -53,6 +52,7 @@ std::string get_ba_type_name(size_t ba_type_id);
 // print the type name to the stream
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);
+
 
 } // namespace idni::tau_lang
 

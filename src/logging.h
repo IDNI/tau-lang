@@ -45,7 +45,7 @@
 namespace idni::tau_lang {
 
 // uncomment to compile in logging for hooks
-// #define HOOK_LOGGING_ENABLED 1
+#define HOOK_LOGGING_ENABLED 1
 // uncomment to compile in logging for pretty printer
 // #define PRETTY_PRINTER_LOGGING_ENABLED 1
 
@@ -53,36 +53,36 @@ namespace idni::tau_lang {
 // INFO, WARNING and ERROR messages are not filtered by channel
 // comment or uncomment as desired
 static constexpr const char* LOG_ENABLED_CHANNELS [] = {
-	// "nso_ba",
-	// "sbf_ba",
-	// "tau_ba",
-	// "ba_types",
-	// "ba_types_inference",
-	// "ba_constants",
-	// "ba_constants_binder",
-	// "execution",
-	// "hooks",
-	// "interpreter",
+	"nso_ba",
+	"sbf_ba",
+	"tau_ba",
+	"ba_types",
+	"ba_types_inference",
+	"ba_constants",
+	"ba_constants_binder",
+	"execution",
+	"hooks",
+	"interpreter",
 	"normal_forms",
-	// "assign_and_reduce",
-	// "reduce_deprecated",
-	// "to_snf",
+	"assign_and_reduce",
+	"reduce_deprecated",
+	"to_snf",
 	"normalizer",
-	// "nso_rr",
-	// "ref_types_inference",
-	// "repl_evaluator",
-	// "satisfiability",
-	// "solver",
-	// "splitter",
-	// "tau_tree",
-	// "builders",
-	// "extractors",
-	// "from_parser",
-	// "node",
-	// "printers",
-	// "queries",
-	// "traverser",
-	// "types",
+	"nso_rr",
+	"ref_types_inference",
+	"repl_evaluator",
+	"satisfiability",
+	"solver",
+	"splitter",
+	"tau_tree",
+	"builders",
+	"extractors",
+	"from_parser",
+	"node",
+	"printers",
+	"queries",
+	"traverser",
+	"types",
 };
 
 // -----------------------------------------------------------------------------

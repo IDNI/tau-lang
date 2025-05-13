@@ -11,7 +11,7 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref tree<node>::apply_builder(const rewriter::builder& b, trefs n) {
-	typename tree<node>::subtree_map changes;
+	subtree_map<node, tref> changes;
 	trefs vars = (tt(b.first->get()) || capture).values();
 	for (size_t i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
 	return rewriter::replace<node>(b.second->get(), changes);
@@ -436,7 +436,7 @@ tref build_bf_f_type(const std::string& type) {
 
 template <NodeType node>
 tref build_ba_constant(typename node::bas_variant v, size_t ba_tid) {
-	return node::ba_constants_binder::instance().bind(v, ba_tid);
+	return ba_constants_binder<node>::instance().bind(v, ba_tid);
 }
 
 template <NodeType node>

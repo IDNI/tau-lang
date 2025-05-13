@@ -12,10 +12,9 @@ namespace idni::tau_lang {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "ba_constants"
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::pair<size_t, size_t> ba_constants<BAs...>::get(
-	const std::variant<BAs...>& b, size_t ba_type)
+template <NodeType node>
+std::pair<size_t, size_t> ba_constants<node>::get(
+	const bas_variant& b, size_t ba_type)
 {
 	LOG_TRACE_I("ba_constants::get: " << b << " " << ba_type);
 	size_t constant_id = get(b);
@@ -23,82 +22,72 @@ std::pair<size_t, size_t> ba_constants<BAs...>::get(
 	return *(ba_type_map.emplace(constant_id, ba_type).first);
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::pair<size_t, size_t> ba_constants<BAs...>::get(
-	const std::variant<BAs...>& b, const std::string& ba_type_name)
+template <NodeType node>
+std::pair<size_t, size_t> ba_constants<node>::get(
+	const bas_variant& b, const std::string& ba_type_name)
 {
 	// DBG(std::cout << "BAC get: " << b << " " << type_name << "\n";)
-	return get(b, ba_types<BAs...>::type_id(ba_type_name));
+	return get(b, get_ba_type_id<node>(ba_type_name));
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::variant<BAs...> ba_constants<BAs...>::get(size_t constant_id) {
+template <NodeType node>
+typename ba_constants<node>::bas_variant ba_constants<node>::get(
+	size_t constant_id)
+{
 	// std::cout << "BAC get: " << constant_id << " " << C.size() << "\n";
 	DBG(assert(constant_id > 0);)
 	DBG(assert(constant_id < C.size());)
 	return C[constant_id];
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
+template <NodeType node>
 template <typename BA>
-requires OneOfBAs<BA, BAs...>
-BA ba_constants<BAs...>::get(size_t constant_id) {
+BA ba_constants<node>::get(size_t constant_id) {
 	DBG(assert(constant_id > 0);)
 	DBG(assert(constant_id < C.size());)
 	DBG(assert((is<BA>(constant_id)));)
 	return std::get<BA>(C[constant_id]);
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
+template <NodeType node>
 template <typename BA>
-requires OneOfBAs<BA, BAs...>
-BA ba_constants<BAs...>::get(tref t) {
+BA ba_constants<node>::get(tref t) {
 	DBG(assert(t != nullptr);)
-	return get<BA>(tree<node<BAs...>>::get(t).get_ba_constant_id());
+	return get<BA>(tree<node>::get(t).get_ba_constant_id());
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
+template <NodeType node>
 template <typename BA>
-requires OneOfBAs<BA, BAs...>
-bool ba_constants<BAs...>::is(size_t constant_id) {
+bool ba_constants<node>::is(size_t constant_id) {
 	DBG(assert(constant_id > 0);)
 	DBG(assert(constant_id < C.size());)
 	return std::holds_alternative<BA>(C[constant_id]);
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-size_t ba_constants<BAs...>::type_of(size_t constant_id) {
+template <NodeType node>
+size_t ba_constants<node>::type_of(size_t constant_id) {
 	DBG(assert(constant_id > 0);)
 	DBG(assert(constant_id < C.size());)
 	return ba_type_map.at(constant_id);
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::ostream& ba_constants<BAs...>::print(std::ostream& os, size_t constant_id) {
-	return ba_types<BAs...>::print_type(
+template <NodeType node>
+std::ostream& ba_constants<node>::print(std::ostream& os, size_t constant_id) {
+	return ba_types<node>::print_type(
 		print_constant(os, constant_id) << " : ", type_of(constant_id));
 }
 
 // print the constant value to the stream
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::ostream& ba_constants<BAs...>::print_constant(std::ostream& os, size_t constant_id) {
-	std::variant<BAs...> v = get(constant_id);
+template <NodeType node>
+std::ostream& ba_constants<node>::print_constant(std::ostream& os, size_t constant_id) {
+	bas_variant v = get(constant_id);
 	return os << "{ " << v << " }";
 }
 
 // -----------------------------------------------------------------------------
 // internal insertion of a constant into the pool
-template <typename... BAs>
-requires BAsPack<BAs...>
-size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
+template <NodeType node>
+size_t ba_constants<node>::get(const bas_variant& b) {
 	// TODO better initialization of C
 	// currently reserves 0 position for null by just copying first inserted element
 	if (C.empty()) C.push_back(b);
@@ -116,92 +105,75 @@ size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "ba_constants_binder"
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-ba_constants_binder<BAs...>::ba_constants_binder() {
-	static_assert(sizeof...(BAs) > 0,
-		"Empty template parameter pack not allowed");
-}
+template <NodeType node>
+ba_constants_binder<node>::ba_constants_binder() {}
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-ba_constants_binder<BAs...>::ba_constants_binder(
+template <NodeType node>
+ba_constants_binder<node>::ba_constants_binder(
 	const std::map<std::string, std::pair<size_t, size_t>>& named_constants)
-	: named_constants(named_constants)
-{
-	static_assert(sizeof...(BAs) > 0,
-		"Empty template parameter pack not allowed");
-}
+	: named_constants(named_constants) {}
 
 // binds the constant to a tree from BA constant variant and type name string
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
+template <NodeType node>
+tref ba_constants_binder<node>::bind(const bas_variant& constant,
 	const std::string& type_name)
 {
-	static_assert(sizeof...(BAs) > 0,
-		"Empty template parameter pack not allowed");
 	LOG_TRACE_I("ba_constants_binder::bind: "
 				<< constant << " " << type_name);
-	return tree<node<BAs...>>::get_ba_constant(
-				ba_constants<BAs...>::get(constant, type_name));
+	return tree<node>::get_ba_constant(
+				ba_constants<node>::get(constant, type_name));
 }
 
 // binds the constant to a tree from BA constant variant and type name string
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
+template <NodeType node>
+tref ba_constants_binder<node>::bind(const bas_variant& constant,
 	size_t type_id)
 {
-	static_assert(sizeof...(BAs) > 0,
-		"Empty template parameter pack not allowed");
 	LOG_TRACE_I("ba_constants_binder::bind: " << constant << " "
-		<< type_id << " " << get_ba_type_name<node<BAs...>>(type_id));
-	return tree<node<BAs...>>::get_ba_constant(
-				ba_constants<BAs...>::get(constant, type_id));
+		<< type_id << " " << get_ba_type_name<node>(type_id));
+	return tree<node>::get_ba_constant(
+				ba_constants<node>::get(constant, type_id));
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref ba_constants_binder<BAs...>::operator()(const std::string& src,
+template <NodeType node>
+tref ba_constants_binder<node>::operator()(const std::string& src,
 	const std::string& type_name)
 {
 	// named binding
 	if (auto it = named_constants.find(src);
 		it != named_constants.end())
 	{
-		tref n = tree<node<BAs...>>::get_ba_constant(it->second);
-		tree<node<BAs...>>::get(n).dump(std::cout << "tr: ") << "\n";
+		tref n = tree<node>::get_ba_constant(it->second);
+		tree<node>::get(n).dump(std::cout << "tr: ") << "\n";
 		LOG_TRACE_I("ba_constants_binder::operator() named binding: `"
-			<< src << "` constant: `" << tree<node<BAs...>>::get(n)
+			<< src << "` constant: `" << tree<node>::get(n)
 			<< "` cid: " << it->second.first << " tid: "
 			<< it->second.second << " "
-			<< ba_types<BAs...>::type_name(it->second.second));
+			<< get_ba_type_name<node>(it->second.second));
 		return n;
 	}
 
 	// factory binding
 	static const std::string untyped = "untyped";
 	error = false;
-	auto n = nso_factory<BAs...>::instance().binding(src,
+	auto n = node::nso_factory::instance().binding(src,
 				type_name.empty() ? untyped : type_name);
 	if (!n) return error = true, nullptr;
 
 	// debug info
-	const auto& t = tree<node<BAs...>>::get(n);
+	const auto& t = tree<node>::get(n);
 	size_t cid = t.get_ba_constant_id();
-	size_t tid = ba_constants<BAs...>::type_of(cid);
+	size_t tid = ba_constants<node>::type_of(cid);
 	LOG_TRACE_I("ba_constants_binder::operator() factory binding: `"
 		<< src << " constant: `" << t << "`"
 		<< "` cid: " << cid << " tid: " << tid << " "
-		<< ba_types<BAs...>::type_name(tid));
+		<< get_ba_type_name<node>(tid));
 	return n;
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-ba_constants_binder<BAs...>& ba_constants_binder<BAs...>::instance() {
-	static ba_constants_binder<BAs...> binder;
+template <NodeType node>
+ba_constants_binder<node>& ba_constants_binder<node>::instance() {
+	static ba_constants_binder<node> binder;
 	return binder;
 }
 

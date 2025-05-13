@@ -13,7 +13,8 @@ tref normalizer_step(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 #ifdef TAU_CACHE
-	static unordered_tau_map<tref, BAs...> cache;
+	// static unordered_tau_map<node, tref> cache;
+	static subtree_map<node, tref> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 
@@ -39,7 +40,8 @@ tref normalize_non_temp(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 #ifdef TAU_CACHE
-	static unordered_tau_map<tref, BAs...> cache;
+	// static unordered_tau_map<node, tref> cache;
+	static subtree_map<node, tref> cache;
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	tref result = tt(fm)
@@ -371,7 +373,7 @@ tref normalize_with_temp_simp(tref fm) {
 		}
 
 		// Replace always and sometimes parts by T
-		typename tau::subtree_map changes;
+		subtree_map<node, tref> changes;
 		for (tref aw : aw_parts) changes.emplace(aw, tau::_T());
 		for (tref st : st_parts) changes.emplace(st, tau::_T());
 		tref new_clause = rewriter::replace<node>(clause, changes);
@@ -444,7 +446,7 @@ tref build_shift_from_shift(tref shift, size_t step) {
 	auto num = tt(shift) | tau::num;
 	auto offset = num | tt::num;
 	if (step == offset) return tt(shift) | tau::capture | tt::ref;
-	typename tau::subtree_map changes{
+	subtree_map<node, tref> changes{
 		{ num.value(), tau::get_num(step - offset) }};
 	return rewriter::replace<node>(shift, changes);
 }
@@ -453,7 +455,7 @@ template <NodeType node>
 tref build_main_step(tref form, size_t step) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	for (tref offsets : tau::get(form).select_top(is<node, tau::offsets>)) {
 		auto shift = tt(offsets) | tau::shift;
 		if (!shift.has_value()) continue;
@@ -497,7 +499,7 @@ tref bf_normalizer_with_rec_relation(const rr &bf) {
 template <NodeType node>
 tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 	using tau = tree<node>;
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	trefs ofs; // create offsets node
 	ofs.push_back(tau::get(tau::offset, tau::get_integer(i)));
 	for (size_t o = 1; o < offset_arity; ++o)
@@ -774,7 +776,7 @@ struct fixed_point_transformer {
 		return fallback | tt::only_child | tt::ref;
 	}
 
-	typename tau::subtree_map changes;
+	subtree_map<node, tref> changes;
 	rr defs;
 	ref_types<node> types;
 };
