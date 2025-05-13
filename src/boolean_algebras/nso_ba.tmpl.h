@@ -4,6 +4,10 @@
 #include "queries.h"
 #include "z3++.h"
 
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif // DEBUG
+
 namespace idni::tau_lang {
 
 using namespace z3;
@@ -295,6 +299,7 @@ bool is_one(const tau<BAs...>& l) {
 // We overload the == operator for tau in order to account for typed constants
 template <typename... BAs>
 bool operator==(const tau<BAs...>& l, const tau<BAs...>& r) {
+
 	if (r == nullptr && l == nullptr) return true;
 	if (r == nullptr || l == nullptr) return false;
 
