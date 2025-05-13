@@ -331,13 +331,13 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
-	typename tau::subtree_map changes = { { thiz, with } };
+	subtree_map<node, tref> changes = { { thiz, with } };
 
 	auto free_vars_thiz = get_free_vars_from_nso<node>(thiz);
 	auto free_vars_with = get_free_vars_from_nso<node>(with);
 	trefs var_stack = {};
 	auto var_id = get_new_var_id<node>(in);
-	typename tau::subtree_set marked_quants;
+	subtree_set<node> marked_quants;
 
 	// A variable should only be replaced if it is not quantified
 	auto quantified_vars_skipper = [&](tref x) {

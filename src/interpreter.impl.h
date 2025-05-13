@@ -589,7 +589,7 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 
 	DBG(LOG_TRACE << "compute_system/clause: " << TAU_TO_STR(clause);)
 
-	typename tau::subtree_set pending_atomic_fms;
+	subtree_set<node> pending_atomic_fms;
 	for (tref atomic_fm : tau::get(clause).select_top(is_atomic_fm)) {
 		DBG(LOG_TRACE << "compute_system/atomic_fm " << TAU_TO_STR(atomic_fm);)
 		pending_atomic_fms.emplace(atomic_fm);

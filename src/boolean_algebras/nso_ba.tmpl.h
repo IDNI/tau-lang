@@ -17,7 +17,7 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	auto bf_constant_and = [](const auto& lt, const auto& rt) {
 		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
 						&& lt.get_ba_type() > 0);)
-		return ba_constants_binder<BAs...>::instance().bind(
+		return ba_constants_binder<node<BAs...>>::instance().bind(
 			lt.get_ba_constant() & rt.get_ba_constant(),
 			lt.get_ba_type());
 	};
@@ -51,7 +51,7 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	auto bf_constant_or = [](const auto& lt, const auto& rt) {
 		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
 						&& lt.get_ba_type() > 0);)
-		return ba_constants_binder<BAs...>::instance().bind(
+		return ba_constants_binder<node<BAs...>>::instance().bind(
 			lt.get_ba_constant() | rt.get_ba_constant(),
 			lt.get_ba_type());
 	};
@@ -76,7 +76,7 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 
 	auto bf_constant_neg = [](const auto& lt) {
 		DBG(assert(lt.get_ba_type() > 0);)
-		return ba_constants_binder<BAs...>::instance().bind(
+		return ba_constants_binder<node<BAs...>>::instance().bind(
 			~lt.get_ba_constant(), lt.get_ba_type());
 	};
 
@@ -106,7 +106,7 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	auto bf_constant_xor = [](const auto& lt, const auto& rt) {
 		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
 						&& lt.get_ba_type() > 0);)
-		return ba_constants_binder<BAs...>::instance().bind(
+		return ba_constants_binder<node<BAs...>>::instance().bind(
 			lt.get_ba_constant() ^ rt.get_ba_constant(),
 			lt.get_ba_type());
 	};
@@ -241,8 +241,8 @@ const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
 		return splitter(t, st);
 	};
 	DBG(assert(t.is_ba_constant());)
-	return tree<node<BAs...>>::get(ba_constants_binder<BAs...>::instance()
-		.bind(std::visit(_splitter, t.get_ba_constant()),
+	return tree<node<BAs...>>::get(ba_constants_binder<node<BAs...>>
+		::instance().bind(std::visit(_splitter, t.get_ba_constant()),
 			t.get_ba_type()));
 }
 

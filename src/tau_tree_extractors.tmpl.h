@@ -79,7 +79,7 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 		const auto& t = tau::get(n);
 		if (t.is(branch)) return true;
 		if (t.child_is(branch)) return true;
-		LOG_TRACE_I("adding leave: " << t.to_str());
+		LOG_TRACE_I("adding leaf: " << t.to_str());
 		return leaves.push_back(n), false;
 	};
 	pre_order<node>(n).visit(add_leave);
@@ -91,7 +91,7 @@ trefs get_leaves(tref n, typename node::type branch) {
 	trefs leaves;
 	get_leaves<node>(n, branch, leaves);
 	LOG_TRACE_I("got leaves: " << leaves.size());
-	for (tref l : leaves) LOG_TRACE_F_F("leave: ", l);
+	for (tref l : leaves) LOG_TRACE_F_F("leaf: ", l);
 	return leaves;
 }
 
@@ -212,11 +212,11 @@ int_t get_max_initial(const trefs& io_vars) {
 }
 
 template <NodeType node>
-typename tree<node>::subtree_set get_free_vars_from_nso(tref n) {
+subtree_set<node> get_free_vars_from_nso(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	LOG_TRACE_I_F("Begin get_free_vars_from_nso of ", n);
-	typename tau::subtree_set free_vars;
+	subtree_set<node> free_vars;
 	LOG_TRACE_I_F("End get_free_vars_from_nso", n);
 	auto collector = [&free_vars](tref n) {
 		const auto& t = tau::get(n);

@@ -9,7 +9,7 @@ namespace idni::tau_lang {
 
 // represents a solution  of variables to values.
 template <NodeType node>
-using assignment = typename tree<node>::subtree_map;
+using assignment = subtree_map<node, tref>;
 
 // A system represent a clause to be solved. It maps the different
 // equations of the clause according to its type.
@@ -29,7 +29,7 @@ template <NodeType node>
 struct finputs {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	using bac = node::ba_constants;
+	using bac = ba_constants<node>;
 
 	finputs() = delete;
 	finputs(typed_io_vars inputs);
@@ -45,10 +45,9 @@ struct finputs {
 	size_t type_of(tref var) const;
 
 	// map of var name node to a type id
-	std::map<tref, size_t> types;
+	subtree_map<node, size_t> types;
 	// map of var name node to a stream
-	std::map<tref, std::optional<std::ifstream>,
-		typename tau::subtree_equality> streams;
+	subtree_map<node, std::optional<std::ifstream>> streams;
 
 	size_t time_point = 0;
 };
@@ -57,7 +56,7 @@ template <NodeType node>
 struct foutputs {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	using bac = node::ba_constants;
+	using bac = ba_constants<node>;
 
 	foutputs() = delete;
 	foutputs(typed_io_vars outputs);
@@ -70,10 +69,9 @@ struct foutputs {
 	size_t type_of(tref var) const;
 
 	// map of var name node to a type id
-	std::map<tref, size_t> types;
+	subtree_map<node, size_t> types;
 	// map of var name node to a stream
-	std::map<tref, std::optional<std::ofstream>,
-		typename tau::subtree_equality> streams;
+	subtree_map<node, std::optional<std::ofstream>> streams;
 };
 
 template <NodeType node, typename in_t, typename out_t>

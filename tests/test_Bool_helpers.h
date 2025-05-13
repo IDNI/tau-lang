@@ -24,7 +24,7 @@ struct nso_factory<Bool> {
 		if (type_name != "bool") return nullptr;
 		auto opt = parse(src, type_name);
 		if (!opt.has_value()) return nullptr;
-		return ba_constants_binder<Bool>::instance()
+		return ba_constants_binder<node<Bool>>::instance()
 						.bind(opt.value(), "bool");
 	}
 

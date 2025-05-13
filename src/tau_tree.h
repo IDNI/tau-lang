@@ -18,26 +18,14 @@ namespace idni::tau_lang {
 template <typename... BAs>
 concept BAsPack = sizeof...(BAs) > 0;
 
-template <typename BA, typename... BAs>
-using is_one_of = std::disjunction<std::is_same<BA, BAs>...>;
-
-template <typename BA, typename... BAs>
-concept OneOfBAs = is_one_of<BA, BAs...>::value;
-
 template <typename N>
 concept NodeType = requires { // Node Type has to provide
-	// alias for the packed variant type
-	typename N::bas_variant;
-	// alias for the ba_constants pool type
-	typename N::ba_constants;
-	// alias for the ba_constants_binder type
-	typename N::ba_constants_binder;
-	// alias for the ba_types_checker_and_propagator type
-	typename N::ba_types_checker_and_propagator;
-	// alias for the tau_ba type
-	typename N::tau_ba_t;
-	// alias for the node type
+	// node type
 	typename N::type;
+	// type aliases for the packed variant types
+	typename N::nso_factory;
+	typename N::bas_variant;
+	typename N::tau_ba_t;
 	// nt is convertible to size_t
 	{ std::declval<N>().nt } -> std::convertible_to<size_t>;
 	// data is convertible to size_t
@@ -52,14 +40,12 @@ concept NodeType = requires { // Node Type has to provide
 struct rr;
 struct rr_sig;
 template <NodeType node> struct ref_types;
+template <NodeType node> struct ba_types;
+template <NodeType node> struct ba_constants;
+template <NodeType node> struct ba_constants_binder;
 template <NodeType node> struct get_hook;
 template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
-template <typename... BAs> requires BAsPack<BAs...> struct ba_types;
-template <typename... BAs> requires BAsPack<BAs...> struct ba_constants;
-template <typename... BAs> requires BAsPack<BAs...> struct ba_constants_binder;
-template <typename... BAs> requires BAsPack<BAs...>
-					struct ba_types_checker_and_propagator;
 
 // -----------------------------------------------------------------------------
 // Tau tree node (tau_tree_node.tmpl.h)
@@ -82,19 +68,10 @@ struct node {
 	using node_t = node<BAs...>;
 	using type = tau_parser::nonterminal;
 
-	// alias for nso_factory<BAs...>
-	using nso_factory = idni::tau_lang::nso_factory<BAs...>;
 	// alias for recreation of the packed variant
 	using bas_variant = std::variant<BAs...>;
-	// alias for ba_types<BAs...> pool
-	using ba_types = idni::tau_lang::ba_types<BAs...>;
-	// alias for ba_constants<BAs...> pool
-	using ba_constants = idni::tau_lang::ba_constants<BAs...>;
-	// alias for ba_constants_binder<BAs...>
-	using ba_constants_binder = idni::tau_lang::ba_constants_binder<BAs...>;
-	// alias for ba_types_checker_and_propagator<BAs...>
-	using ba_types_checker_and_propagator =
-			idni::tau_lang::ba_types_checker_and_propagator<BAs...>;
+	// alias for nso_factory<BAs...>
+	using nso_factory = idni::tau_lang::nso_factory<BAs...>;
 	// alias for tau_ba<BAs...>
 	using tau_ba_t = idni::tau_lang::tau_ba<BAs...>;
 
@@ -195,11 +172,6 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	using node = N;
 	using parse_tree = tau_parser::tree;
 	using bas_variant = node::bas_variant;
-	using ba_types = node::ba_types;
-	using ba_constants = node::ba_constants;
-	using ba_constants_binder = node::ba_constants_binder;
-	using ba_types_checker_and_propagator
-					= node::ba_types_checker_and_propagator;
 
 	inline static bool use_hooks = true; 
 
@@ -655,6 +627,12 @@ bool is_child_quantifier(tref n);
 
 template <NodeType node>
 bool is_temporal_quantifier(tref n);
+
+template <NodeType node> 
+bool is_ba_element(tref n);
+
+template <NodeType node> 
+bool is_uconst(tref n);
 
 template <NodeType node> 
 bool is_io_var(tref n);

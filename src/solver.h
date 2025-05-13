@@ -58,7 +58,7 @@ using equation = tref;
  * @brief Alias for a set of tau tree nodes.
  */
 template <NodeType node>
-using equations = std::set<tref, typename tree<node>::subtree_equality>;
+using equations = subtree_set<node>;
 
 /**
  * @typedef equation_system
@@ -66,30 +66,28 @@ using equations = std::set<tref, typename tree<node>::subtree_equality>;
  */
 template<NodeType node>
 using equation_system = std::pair<std::optional<equality>,
-	std::set<inequality, typename tree<node>::subtree_equality>>;
+				  std::set<inequality, subtree_equality<node>>>;
 
 /**
  * @typedef inequality_system
  * @brief Alias for a set of inequalities.
  */
 template<NodeType node>	
-using inequality_system = std::set<inequality,
-				typename tree<node>::subtree_equality>;
+using inequality_system = subtree_set<node>;
 
 /**
  * @typedef minterm_system
  * @brief Alias for a set of inequalities.
  */
 template<NodeType node>
-using minterm_system = std::set<inequality,
-				typename tree<node>::subtree_equality>;
+using minterm_system = subtree_set<node>;
 
 /**
  * @typedef solution
  * @brief Alias for a map of variables to tau templates.
  */
 template<NodeType node>
-using solution = std::map<var, tref, typename tree<node>::subtree_equality>;
+using solution = subtree_map<node, tref>;
 
 /**
  * @enum solver_mode

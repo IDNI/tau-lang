@@ -95,7 +95,7 @@ void build_input(const std::string& name,
 			get_ba_type_id<bnode>(type));
 
 		if (assgn.size() <= t) {
-			typename tau::subtree_map a;
+			subtree_map<node, tref> a;
 			a.emplace(in_var, v_const);
 			assgn.emplace_back(std::move(a));
 		} else assgn[t].emplace(in_var, v_const);
@@ -370,9 +370,11 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 
 TEST_SUITE("configuration") {
 
+#ifdef DEBUG
 	TEST_CASE("logging") {
 		logging::trace();
 	}
+#endif // DEBUG
 
 	TEST_CASE("bdd initialization") {
 		bdd_init<Bool>();

@@ -49,6 +49,17 @@ bool is_temporal_quantifier(tref n) {
 }
 
 template <NodeType node> 
+bool is_ba_element(tref n) {
+	return tree<node>::get(n).is(node::type::bf_constant)
+		|| tree<node>::get(n).is(node::type::variable);
+}
+
+template <NodeType node> 
+bool is_uconst(tref n) {
+	return tree<node>::get(n).is(node::type::uconst_name);
+}
+
+template <NodeType node> 
 bool is_io_var(tref n) {
 	return tree<node>::get(n).is_input_variable()
 		|| tree<node>::get(n).is_output_variable();

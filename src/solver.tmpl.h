@@ -543,7 +543,7 @@ tref get_constant(minterm m) {
 }
 
 template <NodeType node>
-typename tree<node>::subtree_set get_exponent(tref n) {
+subtree_set<node> get_exponent(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto is_bf_literal = [](tref n) -> bool {
@@ -553,7 +553,7 @@ typename tree<node>::subtree_set get_exponent(tref n) {
 	};
 	// FIXME convert vars to a set
 	trefs all_vs = tau::get(n).select_top(is_bf_literal);
-	return typename tree<node>::subtree_set(all_vs.begin(), all_vs.end());
+	return subtree_set<node>(all_vs.begin(), all_vs.end());
 }
 
 template <NodeType node>

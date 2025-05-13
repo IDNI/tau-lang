@@ -120,10 +120,13 @@ constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
 template <typename... BAs>
 requires BAsPack<BAs...>
 auto node<BAs...>::operator<=>(const node& that) const {
+	// if (hash != that.hash) return hash    <=> that.hash;
 	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
 	if (term != that.term) return C(term) <=> C(that.term);
 	if (ba   != that.ba)   return C(ba)   <=> C(that.ba);
 	if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
+	// if (tree<node>::is_string_nt(nt))
+	// 	return string_from_id(data) <=> string_from_id(that.data);
 	return C(data) <=> C(that.data);
 }
 #undef C
@@ -170,7 +173,10 @@ constexpr size_t node<BAs...>::hashit() const {
 	hash_combine(seed, static_cast<bool>(term));
 	hash_combine(seed, ba);
 	hash_combine(seed, static_cast<bool>(ext));
-	hash_combine(seed, data);
+	// if (tree<node>::is_string_nt(nt))
+	// 	hash_combine(seed, string_from_id(data));
+	// else
+		hash_combine(seed, data);
 	return seed;
 }
 

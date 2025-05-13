@@ -10,7 +10,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
 	if (v.nt == tau::bf || v.nt == tau::wff || v.nt == tau::shift) {
-		HOOK_LOGGING(log("HOOK", v, ch, len, r);)
+		HOOK_LOGGING(log("- HOOK -", v, ch, len, r, true);)
 	}
 	tref ret = nullptr;
 	if      (v.nt == tau::bf)    ret = term(v, ch, len, r);
@@ -22,7 +22,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	}
 #ifdef HOOK_LOGGING_ENABLED
 	// log("RESULT", v, ch, len, r);
-	LOG_TRACE << "(H) -- RESULT           " << TAU_DUMP_TO_STR(ret);
+	LOG_TRACE << "(H) -- RESULT  " << TAU_DUMP_TO_STR(ret);
 #endif // HOOK_LOGGING_ENABLED
 	DBG(auto type = tau::get(ret).get_type();)
 	DBG(assert(type == tau::bf || type == tau::wff || type == tau::shift);)
@@ -32,9 +32,8 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 #ifdef HOOK_LOGGING_ENABLED
 template <NodeType node>
 void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
-	size_t len, [[maybe_unused]] tref r)
+	size_t len, [[maybe_unused]] tref r, bool track_each_call)
 {
-	static constexpr bool track_each_call = false;
 	if (!track_each_call) return;
 	std::stringstream ss;
 	ss << "(H) [" << msg << "] ";
@@ -1046,14 +1045,14 @@ tref get_hook<node>::wff_equiv([[maybe_unused]] const node& v, const tref* ch,
 		return tau::get(tau::_T(), r);
 	}
 	//RULE(WFF_EQUIV_SIMPLIFY_5, "$X <-> ! $X ::= F.")
-	if (auto negated = arg2_fm(ch)() | tau::wff_neg | tau::wff;
-		negated && negated.value() == arg1_fm(ch)) {
+	if (auto negated = tt(arg2_fm(ch)) | tau::wff_neg | tau::wff;
+		negated && tau::get(negated.value()) == arg1_fm(ch)) {
 		HOOK_LOGGING(applied("$X <-> ! $X ::= F.");)
 		return tau::get(tau::_F(), r);
 	}
 	//RULE(WFF_EQUIV_SIMPLIFY_6, "! $X <-> $X ::= F.")
-	if (auto negated = arg1_fm(ch)() | tau::wff_neg | tau::wff;
-		negated && negated.value() == arg2_fm(ch)) {
+	if (auto negated = tt(arg1_fm(ch)) | tau::wff_neg | tau::wff;
+		negated && tau::get(negated.value()) == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("! $X <-> $X ::= F.");)
 		return tau::get(tau::_F(), r);
 	}
@@ -1088,9 +1087,11 @@ tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 	//RULE(BF_DEF_SIMPLIFY_N, "$X < 1 ::= $X' != 0.")
 	if (arg2(ch).is(tau::bf_t)) {
 		HOOK_LOGGING(applied("$X < 1 ::= $X' != 0.");)
-		return tau::get(tau::build_bf_neq(tau::build_bf_neg(arg1_fm(ch).get())), r);
+		return tau::get(tau::build_bf_neq(
+			tau::build_bf_neg(arg1_fm(ch).get())), r);
 	}
-	return tau::get(tau::build_bf_lt(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+	return tau::get(tau::build_bf_lt(arg1_fm(ch).get(),
+					 arg2_fm(ch).get()), r);
 }
 
 template <NodeType node>

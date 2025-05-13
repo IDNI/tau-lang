@@ -11,36 +11,33 @@ namespace idni::tau_lang {
 // BA constants
 // static pool of BA constants
 //   implements tref operator()(constant_source, type_name) binding interface
-template <typename... BAs>
-requires BAsPack<BAs...>
+template <NodeType node>
 struct ba_constants {
+	using bas_variant = typename node::bas_variant;
+
 	// pair of constant id and type id
 	using typed_constant = std::pair<size_t, size_t>;
 
 	// insert the constant value of a type name to the pool
-	static typed_constant get(const std::variant<BAs...>& b,
+	static typed_constant get(const bas_variant& b,
 				const std::string& ba_type_name);
 
 	// insert the constant value of a type id to the pool
-	static typed_constant get(const std::variant<BAs...>& b,
-				size_t ba_type);
+	static typed_constant get(const bas_variant& b, size_t ba_type);
 
 	// get the constant variant value by constant id
-	static std::variant<BAs...> get(size_t constant_id);
+	static bas_variant get(size_t constant_id);
 
 	// std::get<BA> shortcut from constant id
 	template <typename BA>
-	requires OneOfBAs<BA, BAs...>
 	static BA get(size_t constant_id);
 
 	// std::get<BA> shortcut from constant tree node
 	template <typename BA>
-	requires OneOfBAs<BA, BAs...>
 	static BA get(tref t);
 
 	// check if the constant id is of a BA type
 	template <typename BA>
-	requires OneOfBAs<BA, BAs...>
 	static bool is(size_t constant_id);
 
 	// get the type id from the constant id
@@ -53,9 +50,9 @@ struct ba_constants {
 
 private:
 	// internal insertion of a constant into the pool
-	static size_t get(const std::variant<BAs...>& b);
+	static size_t get(const bas_variant& b);
 
-	inline static std::vector<std::variant<BAs...>> C;     // pool of constants
+	inline static std::vector<bas_variant> C;     // pool of constants
 	inline static std::map<size_t, size_t> ba_type_map;       // constant_id -> ba_type id
 };
 
@@ -63,9 +60,10 @@ private:
 // BA constants binder
 // - create custom nso_factory<BA> specialization for your BA type for factory binding
 // - and/or provide map of named constants for named binding
-template <typename... BAs>
-requires BAsPack<BAs...>
+template <NodeType node>
 struct ba_constants_binder {
+	using bas_variant = typename node::bas_variant;
+
 	// constant id and ba type id
 	using typed_constant = std::pair<size_t, size_t>;
 
@@ -79,16 +77,16 @@ struct ba_constants_binder {
 	ba_constants_binder(const named_constants_map& named_constants);
 
 	// binds the constant of a type into a tree, usually called from nso_factory
-	tref bind(const std::variant<BAs...>& constant, const std::string& ba_type_name);
+	tref bind(const bas_variant& constant, const std::string& ba_type_name);
 
 	// binds the constant of a type into a tree, usually called internally
-	tref bind(const std::variant<BAs...>& constant, size_t ba_type);
+	tref bind(const bas_variant& constant, size_t ba_type);
 
 	// binder interface operator
 	tref operator()(const std::string& src, const std::string& ba_type_name);
 
 	// singleton instance for factory binding
-	static ba_constants_binder<BAs...>& instance();
+	static ba_constants_binder<node>& instance();
 
 	// if binding fails, error is set to true
 	bool error = false;
