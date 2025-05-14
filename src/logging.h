@@ -49,6 +49,11 @@ namespace idni::tau_lang {
 // uncomment to compile in logging for pretty printer
 // #define PRETTY_PRINTER_LOGGING_ENABLED 1
 
+// uncomment to print file paths with a line number in the log
+// #define LOG_LINE_PATHS 1
+// uncomment to print file names with a line number in the log
+// #define LOG_LINES 1
+
 // list of enabled channels for TRACE and DEBUG messages
 // INFO, WARNING and ERROR messages are not filtered by channel
 // comment or uncomment as desired
@@ -105,6 +110,17 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 
 // -----------------------------------------------------------------------------
 
+// Configure the value of a printed file (w or w/o paths) and line number printing in trace and debug messages
+#if LOG_LINE_PATHS
+#	define LOG_LINE_VALUE         << LOG_LINE_PATH << "\t"
+#else
+#	if LOG_LINES
+#		define LOG_LINE_VALUE << LOG_LINE << "\t"
+#	else
+#		define LOG_LINE_VALUE // empty
+#	endif
+#endif
+
 // Logging stream for error messages. Prepends message with "(Error) "
 #define LOG_ERROR         BOOST_LOG_TRIVIAL(error)
 
@@ -118,12 +134,12 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 // locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
 #define LOG_DEBUG         BOOST_LOG_STREAM_SEV( \
 				logging::get_channel_logger(LOG_CHANNEL_NAME), \
-				boost::log::trivial::debug)
+				boost::log::trivial::debug) LOG_LINE_VALUE
 // Logging stream for trace messages. Prepends message with "(trace) [channel] "
 // locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
 #define LOG_TRACE         BOOST_LOG_STREAM_SEV( \
 				logging::get_channel_logger(LOG_CHANNEL_NAME), \
-				boost::log::trivial::trace)
+				boost::log::trivial::trace) LOG_LINE_VALUE
 
 // Logging helper macros
 
@@ -228,7 +244,9 @@ struct logging {
 			case trivial::info: break; // no prefix
 			case trivial::trace: // (severity) [channel] message
 			case trivial::debug:
-				ss << "(" << *sev << ") [" << (rec[channel_attr]
+				ss << "(" << (*sev == trivial::trace
+					? "Trace" : "Debug") << ") ";
+				ss << "[" << (rec[channel_attr]
 					? *rec[channel_attr] : "global") <<"] ";
 				while (ss.tellp() < 32) ss << " "; // padding
 				break;
