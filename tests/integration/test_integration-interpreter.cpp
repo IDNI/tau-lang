@@ -126,15 +126,17 @@ inline bool matches_output(const auto& assm, const auto& memory) {
 		if (val == nullptr) continue;
 		if (auto it = memory.find(var); it != memory.end()) {
 			if (!are_bf_equal<bnode>(it->second, val)) {
-				std::cout << "(Error) " << TAU_TO_STR(it->second) << " != " << TAU_TO_STR(val) << "\n";
+				LOG_ERROR << LOG_FM(it->second)
+						<< " != " << LOG_FM(val);
 #ifdef DEBUG
-				std::cout << "first:\n" << TAU_DUMP_TO_STR(it->second) << "\n";
-				std::cout << "second:\n" << TAU_DUMP_TO_STR(val) << "\n";
+				LOG_INFO << "first:\n"
+						<< LOG_FM_DUMP(it->second);
+				LOG_INFO << "second:\n" << LOG_FM_DUMP(val);
 #endif // DEBUG
 				return false;
 			}
 		} else {
-			std::cout << "(Error) " << TAU_TO_STR(var) << " not found\n";
+			LOG_ERROR << TAU_TO_STR(var) << " not found";
 			return false;
 		}
 	}

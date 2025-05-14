@@ -9,12 +9,13 @@ template <NodeType node>
 tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
-	if (v.nt == tau::bf || v.nt == tau::wff || v.nt == tau::shift) {
-		HOOK_LOGGING(log("- HOOK   -", v, ch, len, r, true);)
-	}
+	HOOK_LOGGING(
+		if (v.nt == tau::bf || v.nt == tau::wff || v.nt == tau::shift)
+			log("- HOOK    -", v, ch, len, r, true);)
+
 	tref ret = nullptr;
-	if      (v.nt == tau::bf)    ret = term(v, ch, len, r);
-	else if (v.nt == tau::wff)   ret = wff(v, ch, len, r);
+	if      (v.nt == tau::bf)    ret = term( v, ch, len, r);
+	else if (v.nt == tau::wff)   ret = wff(  v, ch, len, r);
 	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
 	else {
 		// HOOK_LOGGING(log("RESULT unchanged", v, ch, len, r);)
@@ -22,8 +23,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	}
 #ifdef HOOK_LOGGING_ENABLED
 	// log("RESULT", v, ch, len, r);
-	LOG_TRACE << "(H) [- RESULT -]"
-		  << "                " << TAU_DUMP_TO_STR(ret);
+	LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);
 #endif // HOOK_LOGGING_ENABLED
 	DBG(auto type = tau::get(ret).get_type();)
 	DBG(assert(type == tau::bf || type == tau::wff || type == tau::shift);)
@@ -37,15 +37,15 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 {
 	if (!track_each_call) return;
 	std::stringstream ss;
-	ss << "(H) [" << msg << "] ";
-	while (ss.tellp() < 32) ss << " ";
-	ss << v;
+	ss << "[" << msg << "] ";
+	// while (ss.tellp() < 8) ss << " ";
+	ss << LOG_NT(v.nt);
 	if (len) {
 		ss << " \t[";
 		for (size_t i = 0; i < len; ++i) {
 			ss << (i ? ", " : "") // << ch[i] << " "
-				<< tau::get(ch[i]).value << "( "
-				<< tau::get(ch[i]).to_str() << " )";
+				<< LOG_NT(tau::get(ch[i]).value.nt) << "( "
+				<< LOG_FM(ch[i]) << " )";
 			// if (tau::get(ch[i]).r) ss << " >> " << tau::get(ch[i]).r;
 		}
 		ss << "]";
@@ -54,7 +54,8 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 	LOG_TRACE << ss.str();
 }
 void applied(const std::string& rule) {
-	LOG_TRACE << "(H) -- Rule applied: " << rule;
+	LOG_TRACE << "[- " << LOG_BRIGHT("APPLIED") << " -] "
+				<< LOG_RULE_COLOR << rule << TC.CLEAR();
 }
 #endif // HOOK_LOGGING_ENABLED
 
@@ -203,64 +204,64 @@ tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("1 | 1 := 1. (BF_SIMPLIFY_ONE_00)");)
+		HOOK_LOGGING(applied("1 | 1 := 1.");)
 		return _1(v, ch, len, r); }
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("0 | 0 := 0. (BF_SIMPLIFY_ONE_01)");)
+		HOOK_LOGGING(applied("0 | 0 := 0.");)
 		return _0(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_02, "1 | 0 := 1.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("1 | 0 := 1. (BF_SIMPLIFY_ONE_02)");)
+		HOOK_LOGGING(applied("1 | 0 := 1.");)
 		return _1(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_03, "0 | 1 := 1.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("0 | 1 := 1. (BF_SIMPLIFY_ONE_03)");)
+		HOOK_LOGGING(applied("0 | 1 := 1.");)
 		return _1(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_0, "1 | $X := 1.")
 	if (arg1(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("1 | $X := 1. (BF_SIMPLIFY_ONE_0)");)
+		HOOK_LOGGING(applied("1 | $X := 1.");)
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_1, "$X | 1 := 1.")
 	if (arg2(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("$X | 1 := 1. (BF_SIMPLIFY_ONE_1)");)
+		HOOK_LOGGING(applied("$X | 1 := 1.");)
 		return tau::get(arg2_fm(ch).get(), r);
 	}
 	//RULE(BF_SIMPLIFY_ZERO_2, "0 | $X := $X.")
 	if (arg1(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("0 | $X := $X. (BF_SIMPLIFY_ZERO_2)");)
+		HOOK_LOGGING(applied("0 | $X := $X.");)
 		return tau::get(arg2_fm(ch).get(), r);
 	}
 	//RULE(BF_SIMPLIFY_ZERO_3, "$X | 0 := $X.")
 	if (arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("$X | 0 := $X. (BF_SIMPLIFY_ZERO_3)");)
+		HOOK_LOGGING(applied("$X | 0 := $X.");)
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_1, "$X | $X := $X.")
 	if (arg1_fm(ch) == arg2_fm(ch)) {
-		HOOK_LOGGING(applied("$X | $X := $X. (BF_SIMPLIFY_SELF_1)");)
+		HOOK_LOGGING(applied("$X | $X := $X.");)
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(BF_CALLBACK_OR, "{ $X } | { $Y } := bf_or_cb $X $Y.")
 	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant()) {
-		HOOK_LOGGING(applied("{ $X } | { $Y } := bf_or_cb $X $Y. (BF_CALLBACK_OR)");)
+		HOOK_LOGGING(applied("{ $X } | { $Y } := bf_or_cb $X $Y.");)
 		return cte_or(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_3, "$X | $X' := 1.")
 	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
 			negated && negated.value_tree() == arg1_fm(ch))
 	{
-		HOOK_LOGGING(applied("$X | $X' := 1. (BF_SIMPLIFY_SELF_3)");)
+		HOOK_LOGGING(applied("$X | $X' := 1.");)
 		return tau::get(tau::_1(), r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_5, "$X' | $X := 1.")
 	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
 			negated && negated.value_tree() == arg2_fm(ch))
 	{
-		HOOK_LOGGING(applied("$X' | $X := 1. (BF_SIMPLIFY_SELF_5)");)
+		HOOK_LOGGING(applied("$X' | $X := 1.");)
 		return tau::get(tau::_1(), r);
 	}
 	return tau::get_raw(v, ch, len, r);
@@ -275,67 +276,67 @@ tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 & 1 := 1.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("1 & 1 := 1. (BF_SIMPLIFY_ONE_00)");)
+		HOOK_LOGGING(applied("1 & 1 := 1.");)
 		return _1(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_01, "0 & 0 := 0.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("0 & 0 := 0. (BF_SIMPLIFY_ONE_01)");)
+		HOOK_LOGGING(applied("0 & 0 := 0.");)
 		return _0(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_02, "1 & 0 := 0.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("1 & 0 := 0. (BF_SIMPLIFY_ONE_02)");)
+		HOOK_LOGGING(applied("1 & 0 := 0.");)
 		return _0(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_03, "0 & 1 := 0.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("0 & 1 := 0. (BF_SIMPLIFY_ONE_03)");)
+		HOOK_LOGGING(applied("0 & 1 := 0.");)
 		return _0(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_2, "1 & $X := $X.")
 	if (arg1(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("1 & $X := $X. (BF_SIMPLIFY_ONE_2)");)
+		HOOK_LOGGING(applied("1 & $X := $X.");)
 		return tau::get(arg2_fm(ch).get(), r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_3, "$X & 1 := $X.")
 	if (arg2(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("$X & 1 := $X. (BF_SIMPLIFY_ONE_3)");)
+		HOOK_LOGGING(applied("$X & 1 := $X.");)
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(BF_SIMPLIFY_ZERO_0, "0 & $X := 0.")
 	if (arg1(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("0 & $X := 0. (BF_SIMPLIFY_ZERO_0)");)
+		HOOK_LOGGING(applied("0 & $X := 0.");)
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(BF_SIMPLIFY_ZERO_1, "$X & 0 := 0.")
 	if (arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("$X & 0 := 0. (BF_SIMPLIFY_ZERO_1)");)
+		HOOK_LOGGING(applied("$X & 0 := 0.");)
 		return tau::get(arg2_fm(ch).get(), r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_0, "$X & $X := $X.")
 	if (arg1_fm(ch) == arg2_fm(ch)) {
-		HOOK_LOGGING(applied("$X & $X := $X. (BF_SIMPLIFY_SELF_0)");)
+		HOOK_LOGGING(applied("$X & $X := $X.");)
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
 	if (arg1(ch).is_ba_constant()
 		&& arg2(ch).is_ba_constant()) {
-		HOOK_LOGGING(applied("{ $X } & { $Y } := bf_and_cb $X $Y. (BF_CALLBACK_AND)");)
+		HOOK_LOGGING(applied("{ $X } & { $Y } := bf_and_cb $X $Y.");)
 		return cte_and(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_2, "$X & $X' := 0.")
 	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
 			negated && negated.value_tree() == arg1_fm(ch))
 	{
-		HOOK_LOGGING(applied("$X & $X' := 0. (BF_SIMPLIFY_SELF_2)");)
+		HOOK_LOGGING(applied("$X & $X' := 0.");)
 		return tau::get(tau::_0(), r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_4, "$X' & $X := 0.")
 	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
 			negated && negated.value_tree() == arg2_fm(ch))
 	{
-		HOOK_LOGGING(applied("$X' & $X := 0. (BF_SIMPLIFY_SELF_4)");)
+		HOOK_LOGGING(applied("$X' & $X := 0.");)
 		return tau::get(tau::_0(), r);
 	}
 	return tau::get_raw(v, ch, len, r);
@@ -350,7 +351,7 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 	if (auto neg_one = logic_operator(ch)() | tau::bf | tau::bf_t;
 		neg_one && logic_operator(ch).is(tau::bf_neg))
 	{
-		HOOK_LOGGING(applied("1' := 0. (BF_SIMPLIFY_ONE_4)");)
+		HOOK_LOGGING(applied("1' := 0.");)
 		size_t type = neg_one.value_tree().get_ba_type();
 		return type > 0 ? _0_typed(type, r)
 			: tau::get(tau::_0(), r);
@@ -359,7 +360,7 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 	if (auto neg_zero = logic_operator(ch)() | tau::bf | tau::bf_f;
 		neg_zero && logic_operator(ch).is(tau::bf_neg))
 	{
-		HOOK_LOGGING(applied("0' := 1. (BF_SIMPLIFY_ZERO_4)");)
+		HOOK_LOGGING(applied("0' := 1.");)
 		size_t type = neg_zero.value_tree().get_ba_type();
 		return type > 0 ? _1_typed(type, r)
 			: tau::get(tau::_1(), r);
@@ -368,12 +369,12 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 	if (auto double_neg = logic_operator(ch)() | tau::bf | tau::bf_neg;
 		double_neg && logic_operator(ch).is(tau::bf_neg))
 	{
-		HOOK_LOGGING(applied("$X'' :=  $X. (BF_ELIM_DOUBLE_NEGATION_0)");)
+		HOOK_LOGGING(applied("$X'' :=  $X.");)
 		return tau::get(double_neg.value_tree().first(), r);
 	}
 	//RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
 	if (arg1(ch).is_ba_constant()) {
-		HOOK_LOGGING(applied("{ $X }' := bf_neg_cb $X. (BF_CALLBACK_NEG)");)
+		HOOK_LOGGING(applied("{ $X }' := bf_neg_cb $X.");)
 		return cte_neg(v, ch, len, r);
 	}
 	return tau::get_raw(v, ch, len, r);
@@ -388,22 +389,22 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 ^ 1 := 0.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("1 ^ 1 := 0. (BF_SIMPLIFY_ONE_00)");)
+		HOOK_LOGGING(applied("1 ^ 1 := 0.");)
 		return _0(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_01, "0 ^ 0 := 0.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("0 ^ 0 := 0. (BF_SIMPLIFY_ONE_01)");)
+		HOOK_LOGGING(applied("0 ^ 0 := 0.");)
 		return _0(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_02, "1 ^ 0 := 1.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("1 ^ 0 := 1. (BF_SIMPLIFY_ONE_02)");)
+		HOOK_LOGGING(applied("1 ^ 0 := 1.");)
 		return _1(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_03, "0 ^ 1 := 1.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("0 ^ 1 := 1. (BF_SIMPLIFY_ONE_03)");)
+		HOOK_LOGGING(applied("0 ^ 1 := 1.");)
 		return _1(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_ONE_N, "1 ^ $X := $X'.")

@@ -7,22 +7,15 @@
 //  LOG_DEBUG   << "msg";         // "(debug) [channel] msg"
 //  LOG_TRACE   << "msg";         // "(trace) [channel] msg"
 
-// Logging macros:
-//  LOG_DEBUG_I("msg");           // "(debug) [channel] (I) -- msg";
-//  LOG_DEBUG_T("msg");           // "(debug) [channel] (T) -- msg";
-//  LOG_DEBUG_I_F("msg", fm);     // "(debug) [channel] (I) msg " << TAU_TO_STR(fm);
-//  LOG_DEBUG_I_F_DUMP("msg", fm) // "(debug) [channel] (I) msg " << TAU_DUMP_TO_STR(fm);
-//  LOG_DEBUG_F(fm);              // "(debug) [channel] (F) " << TAU_TO_STR(fm);
-//  LOG_DEBUG_F_DUMP(fm);         // "(debug) [channel] (F) " << TAU_DUMP_TO_STR(fm);
-//  LOG_DEBUG_RR(nso_rr);         // "(debug) [channel] (RR) -- " << to_str<node>(fm);
-
-//  LOG_TRACE_I("msg");           // "(trace) [channel] (I) -- msg";
-//  LOG_TRACE_T("msg");           // "(trace) [channel] (T) -- msg";
-//  LOG_TRACE_I_F("msg", fm);     // "(trace) [channel] (I) msg " << TAU_TO_STR(fm);
-//  LOG_TRACE_I_F_DUMP("msg", fm) // "(trace) [channel] (I) msg " << TAU_DUMP_TO_STR(fm);
-//  LOG_TRACE_F(fm);              // "(trace) [channel] (F) " << TAU_TO_STR(fm);
-//  LOG_TRACE_F_DUMP(fm);         // "(trace) [channel] (F) " << TAU_DUMP_TO_STR(fm);
-//  LOG_TRACE_RR(nso_rr);         // "(trace) [channel] (RR) -- " << to_str<node>(fm);
+// Color printers for various data types
+//  LOG_BRIGHT(m)     // LOG_BRIGHT_COLOR << m << TC.CLEAR()
+//  LOG_NT(nt)        // LOG_NT_COLOR << node::name(nt)             <<TC.CLEAR()
+//  LOG_RULE(r)       // LOG_RULE_COLOR << to_str<node>(r)          <<TC.CLEAR()
+//  LOG_BA(c)         // LOG_BA_COLOR << c                          <<TC.CLEAR()
+//  LOG_BA_TYPE(tid)  // LOG_BA_COLOR << get_ba_type_name<node>(tid)<<TC.CLEAR()
+//  LOG_FM(fm)        // LOG_FM_COLOR << TAU_TO_STR(fm)             <<TC.CLEAR()
+//  LOG_FM_DUMP(fm)   // LOG_FM_COLOR << TAU_DUMP_TO_STR(fm)        <<TC.CLEAR()
+//  LOG_RR(nso_rr)    // LOG_FM_COLOR << to_str<node>(fm)           <<TC.CLEAR()
 
 // Logging current file and line:
 //   LOG_TRACE << LOG_LINE_PATH << "msg"; // (trace) [channel] /path/to/file.h:123 msg
@@ -41,6 +34,8 @@
 #include <boost/log/utility/setup/console.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/expressions.hpp>
+
+#include "utility/term_colors.h"
 
 namespace idni::tau_lang {
 
@@ -148,48 +143,35 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 // LOG_TRACE << LOG_LINE_PATH << "message";
 #define LOG_LINE                 __FILE_NAME__ << ":" << __LINE__ << " "
 
-// info: (I) -- message
-#define LOG_TRACE_I(m)           LOG_TRACE << "(I) -- " << m
-#define LOG_DEBUG_I(m)           LOG_DEBUG << "(I) -- " << m
+// Colors used in logging
+#define LOG_BRIGHT_COLOR        TC(idni::term::color::WHITE, \
+				   idni::term::color::BRIGHT)
+#define LOG_ERROR_COLOR         TC(idni::term::color::RED, \
+				   idni::term::color::BRIGHT)
+#define LOG_WARNING_COLOR       TC(idni::term::color::YELLOW, \
+				   idni::term::color::BRIGHT)
+#define LOG_CHANNEL_COLOR       TC(idni::term::color::CYAN)
+#define LOG_NT_COLOR            TC(idni::term::color::GREEN)
+#define LOG_FM_COLOR            LOG_BRIGHT_COLOR
+#define LOG_BA_COLOR            TC(idni::term::color::CYAN)
+#define LOG_RULE_COLOR          TC(idni::term::color::YELLOW)
 
-// info: (I) -- message with a formula
-#define LOG_TRACE_I_F(m, f)      LOG_TRACE << "(I) -- " <<m<< " "<<TAU_TO_STR(f)
-#define LOG_DEBUG_I_F(m, f)      LOG_DEBUG << "(I) -- " <<m<< " "<<TAU_TO_STR(f)
-
-// info: (I) -- message with a formula dump
-#define LOG_TRACE_I_F_DUMP(m, f) LOG_TRACE << "(I) -- " <<m<< " "<<TAU_TO_STR(f)
-#define LOG_DEBUG_I_F_DUMP(m, f) LOG_DEBUG << "(I) -- " <<m<< " "<<TAU_TO_STR(f)
-
-// type inference: (T) -- message
-#define LOG_TRACE_T(m)           LOG_TRACE << "(T) -- " << m
-#define LOG_DEBUG_T(m)           LOG_DEBUG << "(T) -- " << m
-
-// formula: (F) formula
-#define LOG_TRACE_F(f)           LOG_TRACE << "(F) " << TAU_TO_STR(f)
-#define LOG_DEBUG_F(f)           LOG_DEBUG << "(F) " << TAU_TO_STR(f)
-
-// formula: (F) formula dump
-#define LOG_TRACE_F_DUMP(f)      LOG_TRACE << "(F) " << TAU_DUMP_TO_STR(f)
-#define LOG_DEBUG_F_DUMP(f)      LOG_DEBUG << "(F) " << TAU_DUMP_TO_STR(f)
-
-// formula: (F) -- message with a formula
-#define LOG_TRACE_F_F(m, f)      LOG_TRACE << "(F) -- "<<m<<" "<<TAU_TO_STR(f)
-#define LOG_DEBUG_F_F(m, f)      LOG_DEBUG << "(F) -- "<<m<<" "<<TAU_TO_STR(f)
-
-// formula: (F) -- messages with a formula
-#define LOG_TRACE_F_F_DUMP(m, f) LOG_TRACE<<"(F) -- "<<m<<" "<<TAU_DUMP_TO_STR(f)
-#define LOG_DEBUG_F_F_DUMP(m, f) LOG_DEBUG<<"(F) -- "<<m<<" "<<TAU_DUMP_TO_STR(f)
-
-// spec/rrs: (RR) -- specs
-#define LOG_TRACE_RR(r)          LOG_TRACE << "(RR) -- " << to_str<node>(r)
-#define LOG_DEBUG_RR(r)          LOG_DEBUG << "(RR) -- " << to_str<node>(r)
-
+// Logging helper macros for various types to use appropriate colors
+#define LOG_BRIGHT(m)    LOG_BRIGHT_COLOR << m                      <<TC.CLEAR()
+#define LOG_NT(nt)       LOG_NT_COLOR << node::name(nt)             <<TC.CLEAR()
+#define LOG_RULE(r)      LOG_RULE_COLOR << to_str<node>(r)          <<TC.CLEAR()
+#define LOG_BA(c)        LOG_BA_COLOR << c                          <<TC.CLEAR()
+#define LOG_BA_TYPE(tid) LOG_BA_COLOR << get_ba_type_name<node>(tid)<<TC.CLEAR()
+#define LOG_FM(fm)       LOG_FM_COLOR << tau::get(fm).to_str()      <<TC.CLEAR()
+#define LOG_FM_DUMP(fm)  LOG_FM_COLOR << tau::get(fm).to_str()      <<TC.CLEAR() \
+				<<" \t#\t"<< tau::get(fm).print_in_line_to_str()
+#define LOG_RR(nso_rr)   LOG_FM_COLOR << to_str<node>(nso_rr)       <<TC.CLEAR()
 
 // -----------------------------------------------------------------------------
 
 BOOST_LOG_ATTRIBUTE_KEYWORD(channel_attr, "Channel", std::string)
-BOOST_LOG_ATTRIBUTE_KEYWORD(severity,
-				"Severity", boost::log::trivial::severity_level)
+BOOST_LOG_ATTRIBUTE_KEYWORD(severity,     "Severity",
+			    boost::log::trivial::severity_level)
 
 struct logging {
 	// set filter to trace level
@@ -239,17 +221,26 @@ struct logging {
 			if (auto sev = rec[trivial::severity];sev) switch (*sev)
 			{
 			case trivial::fatal: break; // not used
-			case trivial::error:   ss << "(Error) ";   break;
-			case trivial::warning: ss << "(Warning) "; break;
+			case trivial::error:
+				ss << "(" << LOG_ERROR_COLOR << "Error"
+					<< TC.CLEAR()<<") "; break;
+			case trivial::warning:
+				ss << "(" << LOG_WARNING_COLOR << "Warning"
+					<< TC.CLEAR()<<") "; break;
 			case trivial::info: break; // no prefix
 			case trivial::trace: // (severity) [channel] message
 			case trivial::debug:
-				ss << "(" << (*sev == trivial::trace
-					? "Trace" : "Debug") << ") ";
-				ss << "[" << (rec[channel_attr]
-					? *rec[channel_attr] : "global") <<"] ";
-				while (ss.tellp() < 32) ss << " "; // padding
-				break;
+			{
+				ss << "(" << LOG_BRIGHT((*sev == trivial::trace
+						? "Trace" : "Debug")) << ") ";
+				std::string ch = rec[channel_attr]
+						? *rec[channel_attr] : "global";
+				ss << "[" << LOG_CHANNEL_COLOR << ch
+					<< TC.CLEAR() << "] ";
+				size_t padding = ch.size() < 21
+							? 21 - ch.size() : 0;
+				for (size_t i = 0; i < padding; ++i) ss << " ";
+			} break;
 			}
 			os << ss.str() << rec[expressions::smessage];
 		};

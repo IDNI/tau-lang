@@ -587,11 +587,11 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 			|| is_child<node, tau::bf_neq>(n);
 	};
 
-	DBG(LOG_TRACE << "compute_system/clause: " << TAU_TO_STR(clause);)
+	DBG(LOG_TRACE << "compute_system/clause: " << LOG_FM(clause);)
 
 	subtree_set<node> pending_atomic_fms;
 	for (tref atomic_fm : tau::get(clause).select_top(is_atomic_fm)) {
-		DBG(LOG_TRACE << "compute_system/atomic_fm " << TAU_TO_STR(atomic_fm);)
+		DBG(LOG_TRACE << "compute_system/atomic_fm " << LOG_FM(atomic_fm);)
 		pending_atomic_fms.emplace(atomic_fm);
 	}
 	system sys;
@@ -721,9 +721,9 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 	tref fm, const size_t start_time)
 {
 	for (tref clause : get_dnf_wff_clauses<node>(fm)) {
-		DBG(LOG_TRACE << "compute_systems/clause: " << TAU_TO_STR(clause);)
+		DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
 		tref executable = transform_to_execution<node>(clause, start_time, true);
-		DBG(LOG_TRACE << "compute_systems/executable: " << TAU_TO_STR(executable);)
+		DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
 		if (tau::get(executable).equals_F()) continue;
 		// Make sure that no constant time position is smaller than 0
 		trefs io_vars = tau::get(executable).select_top(
@@ -786,17 +786,17 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 		return;
 	}
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
-	LOG_TRACE << "update/shifted_update: " << TAU_TO_STR(shifted_update) << "\n";
+	LOG_TRACE << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 
 	// The constant time positions in original_spec need to be replaced
 	// by present assignments from memory and already executed sometimes statements need to be removed
 	tref current_spec = rewriter::replace<node>(original_spec, memory);
-	LOG_DEBUG << "update/current_spec: " << TAU_TO_STR(current_spec) << "\n";
+	LOG_DEBUG << "update/current_spec: " << LOG_FM(current_spec) << "\n";
 
 	// TODO: current_spec = remove_happend_sometimes(current_spec);
 
 	tref new_raw_spec = pointwise_revision(current_spec, shifted_update, time_point);
-	LOG_DEBUG << "update/new_spec: " << TAU_TO_STR(new_raw_spec) << "\n";
+	LOG_DEBUG << "update/new_spec: " << LOG_FM(new_raw_spec) << "\n";
 	// std::cout << "update/new_spec: " << new_raw_spec << "\n";
 	if (tau::get(new_raw_spec).equals_F()) {
 		LOG_WARNING << "No updated performed: updated specification is unsat\n";
@@ -842,7 +842,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 		const tref new_spec = clause;
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
-		LOG_TRACE << "pwr/new_spec: " << TAU_TO_STR(new_spec) << "\n";
+		LOG_TRACE << "pwr/new_spec: " << LOG_FM(new_spec) << "\n";
 		if (!is_tau_formula_sat<node>(new_spec, start_time))
 			continue;
 
@@ -869,7 +869,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 				build_wff_and<node>(upd_sometime));
 
 			LOG_TRACE << "pwr/new_spec_pointwise: "
-				<< TAU_TO_STR(new_spec_pointwise) << "\n";
+				<< LOG_FM(new_spec_pointwise) << "\n";
 			if (!is_tau_formula_sat<node>(new_spec_pointwise, start_time))
 				return new_spec;
 		} else new_spec_pointwise = new_spec;
@@ -882,7 +882,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 				build_wff_and<node>(spec_sometimes));
 
 		LOG_TRACE << "pwr/new_spec_pointwise_sometimes: "
-			<< TAU_TO_STR(new_spec_pointwise_sometimes) << "\n";
+			<< LOG_FM(new_spec_pointwise_sometimes) << "\n";
 		if (!is_tau_formula_sat<node>(new_spec_pointwise_sometimes, start_time))
 			return normalizer_step<node>(new_spec_pointwise);
 

@@ -16,9 +16,10 @@ template <NodeType node>
 std::pair<size_t, size_t> ba_constants<node>::get(
 	const bas_variant& b, size_t ba_type)
 {
-	LOG_TRACE_I("ba_constants::get: " << b << " " << ba_type);
+	LOG_TRACE << "get: " << LOG_BA(b) << " " << LOG_BA_TYPE(ba_type);
 	size_t constant_id = get(b);
-	LOG_TRACE_I("constant_id: " << constant_id << " ba_type: " << ba_type);
+	LOG_TRACE << "constant_id: " << constant_id
+		  << " ba_type: "    << LOG_BA_TYPE(ba_type);
 	return *(ba_type_map.emplace(constant_id, ba_type).first);
 }
 
@@ -26,7 +27,6 @@ template <NodeType node>
 std::pair<size_t, size_t> ba_constants<node>::get(
 	const bas_variant& b, const std::string& ba_type_name)
 {
-	// DBG(std::cout << "BAC get: " << b << " " << type_name << "\n";)
 	return get(b, get_ba_type_id<node>(ba_type_name));
 }
 
@@ -79,7 +79,9 @@ std::ostream& ba_constants<node>::print(std::ostream& os, size_t constant_id) {
 
 // print the constant value to the stream
 template <NodeType node>
-std::ostream& ba_constants<node>::print_constant(std::ostream& os, size_t constant_id) {
+std::ostream& ba_constants<node>::print_constant(std::ostream& os,
+	size_t constant_id)
+{
 	bas_variant v = get(constant_id);
 	return os << "{ " << v << " }";
 }
@@ -118,8 +120,7 @@ template <NodeType node>
 tref ba_constants_binder<node>::bind(const bas_variant& constant,
 	const std::string& type_name)
 {
-	LOG_TRACE_I("ba_constants_binder::bind: "
-				<< constant << " " << type_name);
+	LOG_TRACE << "bind: " << LOG_BA(constant) << " " << LOG_BA(type_name);
 	return tree<node>::get_ba_constant(
 				ba_constants<node>::get(constant, type_name));
 }
@@ -129,8 +130,7 @@ template <NodeType node>
 tref ba_constants_binder<node>::bind(const bas_variant& constant,
 	size_t type_id)
 {
-	LOG_TRACE_I("ba_constants_binder::bind: " << constant << " "
-		<< type_id << " " << get_ba_type_name<node>(type_id));
+	LOG_TRACE << "bind: " << LOG_BA(constant) << " " <<LOG_BA_TYPE(type_id);
 	return tree<node>::get_ba_constant(
 				ba_constants<node>::get(constant, type_id));
 }
@@ -139,35 +139,27 @@ template <NodeType node>
 tref ba_constants_binder<node>::operator()(const std::string& src,
 	const std::string& type_name)
 {
+	using tau = tree<node>;
 	// named binding
 	if (auto it = named_constants.find(src);
 		it != named_constants.end())
 	{
 		tref n = tree<node>::get_ba_constant(it->second);
 		tree<node>::get(n).dump(std::cout << "tr: ") << "\n";
-		LOG_TRACE_I("ba_constants_binder::operator() named binding: `"
-			<< src << "` constant: `" << tree<node>::get(n)
-			<< "` cid: " << it->second.first << " tid: "
-			<< it->second.second << " "
-			<< get_ba_type_name<node>(it->second.second));
+		LOG_TRACE << "operator() named binding: `" << src << "` "
+						<< "constant: " << LOG_FM(n);
 		return n;
 	}
 
 	// factory binding
 	static const std::string untyped = "untyped";
 	error = false;
-	auto n = node::nso_factory::instance().binding(src,
-				type_name.empty() ? untyped : type_name);
+	auto n = node::nso_factory::instance().binding(src, type_name.empty()
+							? untyped : type_name);
 	if (!n) return error = true, nullptr;
 
-	// debug info
-	const auto& t = tree<node>::get(n);
-	size_t cid = t.get_ba_constant_id();
-	size_t tid = ba_constants<node>::type_of(cid);
-	LOG_TRACE_I("ba_constants_binder::operator() factory binding: `"
-		<< src << " constant: `" << t << "`"
-		<< "` cid: " << cid << " tid: " << tid << " "
-		<< get_ba_type_name<node>(tid));
+	LOG_TRACE  << "operator() factory binding: `" << src << "`"
+						<< " constant: " << LOG_FM(n);
 	return n;
 }
 

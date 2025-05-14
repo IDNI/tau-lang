@@ -5,7 +5,6 @@
 
 #include <cstddef>
 #include <variant>
-#include <algorithm>
 #ifdef DEBUG
 #	include <cxxabi.h>
 #endif
@@ -30,9 +29,6 @@
 // common std::hash templates and specializations
 #include "../external/parser/src/defs.h"
 
-#define pfst(x) (*(x).begin())
-#define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
-
 // following macros work only if tau type is defined
 // helper macro for pretty printing a tau tree tref into std::cout
 #define TAU_PRINT(ref) (tau::get(ref).print(std::cout))
@@ -54,28 +50,6 @@
 #define TAU_DUMP_TO_STR(ref) (tau::get(ref).dump_to_str())
 
 namespace idni::tau_lang {
-
-using sym_t = int_t;
-
-template <typename B>
-struct zero {
-	bool operator()(const B&) const;
-};
-
-template <typename B>
-struct one {
-	bool operator()(const B&) const;
-};
-
-template <typename T, typename V>
-bool has(const T& t, const V& v) {
-	return t.find(v) != t.end();
-}
-
-template <typename T, typename V>
-bool hasv(const T& t, const V& v) {
-	return std::find(t.begin(), t.end(), v) != t.end();
-}
 
 // helper to get size of a type pack
 template <typename... Pack>
