@@ -240,7 +240,7 @@ tref tree<node>::get(binder& bind, tau_parser::result& result) {
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
-		LOG_ERROR << msg << "\n";
+		LOG_ERROR << "[tau] " << msg << "\n";
 		return nullptr; // Syntax error
 	}
 	auto pt = parse_tree::get(result.get_shaped_tree2());

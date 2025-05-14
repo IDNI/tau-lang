@@ -2,6 +2,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "solver.h"
 
 auto splitter_one_bdd() {
 	using bnode = idni::tau_lang::node<sbf_ba>;

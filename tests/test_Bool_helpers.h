@@ -12,10 +12,8 @@ namespace idni::tau_lang {
 template<>
 struct nso_factory<Bool> {
 
-	optional<variant<Bool>> parse(
-		const string& src, const string) const
-	{
-		if (src == "true") return Bool(true);
+	optional<variant<Bool>> parse(const string& src, const string) const {
+		if (src == "true")  return Bool(true);
 		if (src == "false") return Bool(false);
 		return {};
 	}

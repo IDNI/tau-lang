@@ -807,7 +807,7 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		if (opt.error_quits
 			|| msg.find("Syntax Error: Unexpected end")!=0)
 		{
-			LOG_ERROR << msg << "\n";
+			LOG_ERROR << "[repl] " << msg << "\n";
 			return fail();
 		}
 		return nullptr; // Unexpected eof, continue with reading input

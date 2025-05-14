@@ -11,9 +11,19 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...>::tau_ba(rewriter::rules& rec_relations, htree::sp main)
 		: nso_rr({ rec_relations, main }) {}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...>::tau_ba(htree::sp main) : nso_rr({main}) {}
+tau_ba<BAs...>::tau_ba(rewriter::rules& rec_relations, tref main)
+		: nso_rr({ rec_relations, tau::geth(main) }) {}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+tau_ba<BAs...>::tau_ba(htree::sp main) : nso_rr({ main }) {}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+tau_ba<BAs...>::tau_ba(tref main) : nso_rr({ tau::geth(main) }) {}
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -128,7 +138,7 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-auto normalize(const tau_ba<BAs...>& fm) {
+tau_ba<BAs...> normalize(const tau_ba<BAs...>& fm) {
 	tref res = apply_rr_to_formula<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
 	res = simp_tau_unsat_valid<node<BAs...>>(res);
 	return tau_ba<BAs...>(tree<node<BAs...>>::geth(res));
@@ -148,15 +158,15 @@ bool is_syntactic_zero(const tau_ba<BAs...>& fm) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-auto splitter(const tau_ba<BAs...>& fm, splitter_type st) {
+tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
 	auto s = tau_splitter<BAs...>(normalizer<node<BAs...>>(fm.nso_rr), st);
 	return tau_ba<BAs...>(tree<node<BAs...>>::geth(s));
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-auto tau_splitter_one() {
-	return tau_bad_splitter<BAs...>();
+tau_ba<BAs...> tau_splitter_one() {
+	return tau_ba<BAs...>(tau_bad_splitter<BAs...>());
 }
 
 template <typename... BAs>
@@ -187,7 +197,7 @@ std::optional<std::variant<tau_ba<BAs...>, BAs...>>
 	using parse_options = typename tau::parse_options;
 	// parse source
 	parse_options opts; opts.start = tau::tau_constant_source;
-	auto source = tau::get(src, opts);
+	tref source = tau::get(src, opts);
 	if (!source) return {};
 	auto nso_rr = get_nso_rr<node<BAs...>>(source);
 	if (!nso_rr) return {};
@@ -211,9 +221,7 @@ requires BAsPack<BAs...>
 std::variant<tau_ba<BAs...>, BAs...> tau_ba_factory<BAs...>::splitter_one()
 	const
 {
-	return std::variant<tau_ba_t, BAs...>(
-		tau_ba<BAs...>(tree<node<BAs...>>::geth(
-						tau_splitter_one<BAs...>())));
+	return std::variant<tau_ba_t, BAs...>(tau_splitter_one<BAs...>());
 }
 
 template <typename... BAs>

@@ -28,21 +28,21 @@ namespace idni::tau_lang {
 // nso_factory for tests with <sbf_ba, Bool>
 template<>
 struct nso_factory<sbf_ba, Bool> {
-	optional<variant<sbf_ba, Bool>> parse(
-		const string&, const string) const
-	{
+	using node = idni::tau_lang::node<sbf_ba, Bool>;
+
+	optional<variant<sbf_ba, Bool>> parse(const string&, const string)const{
 		throw logic_error("not implemented");
 	}
 
 	tref binding(const string& src, const string& type_name) const {
-		
 		if (type_name == "sbf") {
 			if (auto opt = sbf_ba_factory<sbf_ba, Bool>::instance()
-						.parse(src); opt.has_value()) 
-				return ba_constants_binder<sbf_ba, Bool>
-					::instance().bind(opt.value(), "sbf");
+						.parse(src); opt.has_value())
+				return ba_constants_binder<node>::instance()
+						.bind(opt.value(), "sbf");
 		} else if (type_name == "bool")
-			return nso_factory<Bool>::instance().binding(src, "bool");
+				return nso_factory<Bool>::instance()
+						.binding(src, "bool");
 		return nullptr;
 	}
 
@@ -100,9 +100,10 @@ struct sbf_ba_Bool_constants_fixture {
 
 TEST_SUITE("sbf_ba and Bool BAs") {
 	TEST_CASE_FIXTURE(sbf_ba_Bool_constants_fixture, "sbf_ba, Bool") {
-		using bac = ba_constants<sbf_ba, Bool>;
-		using bacb = ba_constants_binder<sbf_ba, Bool>;
-		using tau = tree<node<sbf_ba, Bool>>;
+		using bnode = node<sbf_ba, Bool>;
+		using tau = tree<bnode>;
+		using bac = ba_constants<bnode>;
+		using bacb = ba_constants_binder<bnode>;
 
 		tref t_ref = bacb::instance().bind(Bool(true),  "bool");
 		tref f_ref = bacb::instance().bind(Bool(false), "bool");

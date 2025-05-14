@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-// including instead of #include "tau.h" to avoid errors in a generated tau.h
+// including instead of #include "tau.h" to avoid errors pointing to the generated tau.h
+#include "boolean_algebras/nso_ba.h"
 #include "boolean_algebras/sbf_ba.h"
 
 // common helpers to be included in test_*_helpers.h after defining bas_pack macro

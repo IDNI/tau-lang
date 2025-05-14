@@ -1,32 +1,32 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 // Logging streams:
-//  LOG_ERROR   << "message";      // "(Error) message"
-//  LOG_WARNING << "message";      // "(Warning) message"
-//  LOG_INFO    << "message";      // "message"
-//  LOG_DEBUG   << "message";      // "(debug) [channel] log message"
-//  LOG_TRACE   << "message";      // "(trace) [channel] log message"
+//  LOG_ERROR   << "msg";         // "(Error) msg"
+//  LOG_WARNING << "msg";         // "(Warning) msg"
+//  LOG_INFO    << "msg";         // "msg"
+//  LOG_DEBUG   << "msg";         // "(debug) [channel] msg"
+//  LOG_TRACE   << "msg";         // "(trace) [channel] msg"
 
 // Logging macros:
-//  LOG_DEBUG_I("message");        // "(debug) [channel] (I) -- message";
-//  LOG_DEBUG_T("message");        // "(debug) [channel] (T) -- message";
-//  LOG_DEBUG_F(fm);               // "(debug) [channel] (F) " << TAU_TO_STR(fm);
-//  LOG_DEBUG_F_DUMP(fm);          // "(debug) [channel] (F) " << TAU_DUMP_TO_STR(fm);
-//  LOG_DEBUG_MF("message", fm);   // "(debug) [channel] (F) message " << TAU_TO_STR(fm);
-//  LOG_DEBUG_MF_DUMP("message", fm)//"(debug) [channel] (F) message " << TAU_DUMP_TO_STR(fm);
+//  LOG_DEBUG_I("msg");           // "(debug) [channel] (I) -- msg";
+//  LOG_DEBUG_T("msg");           // "(debug) [channel] (T) -- msg";
+//  LOG_DEBUG_I_F("msg", fm);     // "(debug) [channel] (I) msg " << TAU_TO_STR(fm);
+//  LOG_DEBUG_I_F_DUMP("msg", fm) // "(debug) [channel] (I) msg " << TAU_DUMP_TO_STR(fm);
+//  LOG_DEBUG_F(fm);              // "(debug) [channel] (F) " << TAU_TO_STR(fm);
+//  LOG_DEBUG_F_DUMP(fm);         // "(debug) [channel] (F) " << TAU_DUMP_TO_STR(fm);
+//  LOG_DEBUG_RR(nso_rr);         // "(debug) [channel] (RR) -- " << to_str<node>(fm);
 
-//  LOG_TRACE_I("message");        // "(trace) [channel] (I) -- message";
-//  LOG_TRACE_T("message");        // "(trace) [channel] (T) -- message";
-//  LOG_TRACE_F(fm);               // "(trace) [channel] (F) " << TAU_TO_STR(fm);
-//  LOG_TRACE_F_DUMP(fm);          // "(trace) [channel] (F) " << TAU_DUMP_TO_STR(fm);
-//  LOG_TRACE_MF("message", fm);   // "(trace) [channel] (F) message " << TAU_TO_STR(fm);
-//  LOG_TRACE_MF_DUMP("message", fm)//"(trace) [channel] (F) message " << TAU_DUMP_TO_STR(fm);
+//  LOG_TRACE_I("msg");           // "(trace) [channel] (I) -- msg";
+//  LOG_TRACE_T("msg");           // "(trace) [channel] (T) -- msg";
+//  LOG_TRACE_I_F("msg", fm);     // "(trace) [channel] (I) msg " << TAU_TO_STR(fm);
+//  LOG_TRACE_I_F_DUMP("msg", fm) // "(trace) [channel] (I) msg " << TAU_DUMP_TO_STR(fm);
+//  LOG_TRACE_F(fm);              // "(trace) [channel] (F) " << TAU_TO_STR(fm);
+//  LOG_TRACE_F_DUMP(fm);         // "(trace) [channel] (F) " << TAU_DUMP_TO_STR(fm);
+//  LOG_TRACE_RR(nso_rr);         // "(trace) [channel] (RR) -- " << to_str<node>(fm);
 
 // Logging current file and line:
-//   LOG_TRACE << LOG_LINE_PATH << "message";
-//       (trace) [channel] /path/to/file.h:123 message
-//   LOG_TRACE << LOG_LINE << "message";
-//       (trace) [channel] file.h:123 message
+//   LOG_TRACE << LOG_LINE_PATH << "msg"; // (trace) [channel] /path/to/file.h:123 msg
+//   LOG_TRACE << LOG_LINE << "msg";      // (trace) [channel] file.h:123 msg
 
 // TODO (LOW) maybe allow to set a list of enabled channels (addition to --severity trace or debug)
 // TODO (LOW) multiple channels for various warnings and allow user to filter them

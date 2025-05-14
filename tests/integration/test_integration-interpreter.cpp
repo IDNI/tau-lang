@@ -4,6 +4,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "interpreter.h"
 
 std::string random_file(const std::string& extension = ".out", const std::string prefix = "/tmp/") {
 	// define the characters to use in the random string
@@ -95,7 +96,7 @@ void build_input(const std::string& name,
 			get_ba_type_id<bnode>(type));
 
 		if (assgn.size() <= t) {
-			subtree_map<node, tref> a;
+			subtree_map<bnode, tref> a;
 			a.emplace(in_var, v_const);
 			assgn.emplace_back(std::move(a));
 		} else assgn[t].emplace(in_var, v_const);
