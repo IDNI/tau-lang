@@ -13,6 +13,7 @@ set(TESTS
 	rules-wff_parsing
 	sbf_ba_parsing
 	tau_tree_from_parser
+	tau_tree_printers
 	traversal
 	variant_ba
 )
