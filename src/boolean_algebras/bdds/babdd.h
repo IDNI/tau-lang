@@ -1459,4 +1459,10 @@ bool
 
 } // namespace idni::tau_lang
 
+#undef neg_to_odd
+#undef hash_pair
+#undef hash_tri
+#undef hash_upair
+#undef hash_utri
+
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BABDD_H__

@@ -90,4 +90,6 @@ private:
 
 #include "hooks.tmpl.h"
 
+#undef HOOK_LOGGING
+
 #endif // __IDNI__TAU__HOOKS_H__
