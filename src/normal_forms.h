@@ -81,6 +81,8 @@ RULE(WFF_SQUEEZE_NEGATIVES_0, "$X != 0 || $Y != 0 ::= $X | $Y != 0.")
 
 RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
+#undef RULE
+
 template <NodeType node>
 static auto& push_neg_for_snf() {
 	static auto instance = tree<node>::get_library(

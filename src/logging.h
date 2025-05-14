@@ -50,9 +50,9 @@ namespace idni::tau_lang {
 // #define PRETTY_PRINTER_LOGGING_ENABLED 1
 
 // uncomment to print file paths with a line number in the log
-// #define LOG_LINE_PATHS 1
+// #define TAU_LOG_LINE_PATHS 1
 // uncomment to print file names with a line number in the log
-// #define LOG_LINES 1
+// #define TAU_LOG_LINES 1
 
 // list of enabled channels for TRACE and DEBUG messages
 // INFO, WARNING and ERROR messages are not filtered by channel
@@ -111,10 +111,10 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 // -----------------------------------------------------------------------------
 
 // Configure the value of a printed file (w or w/o paths) and line number printing in trace and debug messages
-#if LOG_LINE_PATHS
+#if TAU_LOG_LINE_PATHS
 #	define LOG_LINE_VALUE         << LOG_LINE_PATH << "\t"
 #else
-#	if LOG_LINES
+#	if TAU_LOG_LINES
 #		define LOG_LINE_VALUE << LOG_LINE << "\t"
 #	else
 #		define LOG_LINE_VALUE // empty

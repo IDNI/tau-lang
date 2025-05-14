@@ -25,6 +25,7 @@ set(TAU_HEADERS
 	boolean_algebras/nso_ba.h
 	boolean_algebras/tau_ba.h
 	boolean_algebras/sbf_ba.h
+	undefs.h           # undefines implementation macros
 )
 
 set(TAU_SOURCES
