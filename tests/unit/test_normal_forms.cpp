@@ -3,16 +3,6 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
-TEST_SUITE("configuration") {
-
-#ifdef DEBUG
-	TEST_CASE("set trace logging level") {
-		logging::trace();
-	}
-#endif // DEBUG
-
-}
-
 TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: T") {
