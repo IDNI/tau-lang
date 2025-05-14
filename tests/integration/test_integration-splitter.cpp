@@ -3,16 +3,6 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-TEST_SUITE("configuration") {
-
-#ifdef DEBUG
-	TEST_CASE("set trace logging level") {
-		logging::trace();
-	}
-#endif // DEBUG
-
-}
-
 TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_1") {
 		const char *sample = "xyz = 0.";

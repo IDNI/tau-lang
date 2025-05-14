@@ -371,12 +371,6 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 
 TEST_SUITE("configuration") {
 
-#ifdef DEBUG
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-#endif // DEBUG
-
 	TEST_CASE("bdd initialization") {
 		bdd_init<Bool>();
 	}

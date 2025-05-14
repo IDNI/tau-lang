@@ -265,10 +265,6 @@ TEST_SUITE("minterm_inequality_system_range") {
 
 TEST_SUITE("configuration") {
 
-	// TEST_CASE("logging") {
-	// 	logging::trace()
-	// }
-
 	TEST_CASE("bdd initialization") {
 		bdd_init<Bool>();
 	}
@@ -563,10 +559,6 @@ TEST_SUITE("solve_system") {
 			{ " w'z|wz' != 0.", "xy' != 0.", "yz' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
-
-	// TEST_CASE("trace:on") {
-	// 	logging::trace();
-	// }
 
 	// increasing monotonicity (2)
 	//
