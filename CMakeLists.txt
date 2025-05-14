@@ -21,6 +21,8 @@ include(FetchContent)
 
 option(TAU_MEASURE                 "Measure tau performance"               OFF)
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
+option(LOG_LINES                   "Log line numbers"                      OFF)
+option(LOG_LINE_PATHS              "Log line paths"                        OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
 option(TAU_BUILD_DOC               "Build documentation"                   OFF)
 option(TAU_BUILD_STATIC_LIBRARY    "Build static library"                  OFF)
@@ -134,6 +136,8 @@ endif()
 set(TAU_DEFINITIONS
 	TAU_MEASURE
 	TAU_CACHE
+	LOG_LINES
+	LOG_LINE_PATHS
 )
 
 message(STATUS "TAU_MEASURE: ${TAU_MEASURE}")
