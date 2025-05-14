@@ -181,10 +181,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	std::vector<size_t> hl_path;
 	size_t depth = 0;
-	std::unordered_map<tref, size_t> chpos;
 	std::unordered_set<tref> wraps, indented, highlighted;
-	char bf_and_arg1_last_char_written = 0;
-	typename node::type last_quant_nt = start;
+	char last_written_char = 0;
+	typename node::type last_quant_nt = nul;
+	std::unordered_map<tref, size_t> chpos; // child positions if tracked
 
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
@@ -332,194 +332,193 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		else return hl_path.push_back(nt), os << it->second, true;
 	};
 
-	auto get_bf_and_arg1_last_char = [&](const auto& bf_and_arg1) {
-		std::stringstream ss;
-		bool is_hilight = pretty_printer_highlighting;
-		if (is_hilight) pretty_printer_highlighting = false;
-		bf_and_arg1.print(ss);
-		if (is_hilight) pretty_printer_highlighting = true;
-		auto str = ss.str();
-		bf_and_arg1_last_char_written = str[str.size()-1];
-	};
-
-	auto get_nt = [](tref n) {
-		if (n) return get(n).get_type();
-		return nul;
+	auto out = [&](const auto& what) {
+		std::stringstream ss; std::string str = (ss << what, ss.str());
+		if (str.size()) last_written_char = str[str.size()-1];
+#ifdef PRETTY_PRINTER_LOGGING_ENABLED
+		std::cerr << "<" << str << ">";
+#endif
+		os << str;
 	};
 
 	auto on_enter = [&](tref ref, tref parent) {
 		const auto& t = get(ref);
+		size_t nt = t.get_type();
+		size_t pnt = parent ? get(parent).get_type() : nul;
 #ifdef PRETTY_PRINTER_LOGGING_ENABLED
-		std::cerr << "[" << t.get_type_name() << "]";
+		std::cerr << "[" << node::name(nt)
+			  << " " << node::name(pnt) << "]";
 		// t.print_in_line(std::cerr << "<") << ">";
 #endif
-		size_t nt = t.get_type();
-		auto track_chpos = [&]() { chpos[ref] = 0; };
-
 		if (inc_indent(nt)) indented.insert(ref);
 		if (syntax_highlight(nt)) highlighted.insert(ref);
 
+		// track the position of the child for on_between
+		auto track_chpos = [&]() { chpos[ref] = 0; };
+
 		switch (nt) {
-			case bf_and:     get_bf_and_arg1_last_char(t[0]); break;
-			case bf_f:              os << '0'; break;
-			case bf_t:              os << '1'; break;
-			case wff_f:             os << 'F'; break;
-			case wff_t:             os << 'T'; break;
-			case wff_neg:           os << "!"; break;
-			case first_sym:         os << "first"; break;
-			case last_sym:          os << "last"; break;
-			case fp_fallback:       os << " fallback "; break;
+			case bf_f:              out('0'); break;
+			case bf_t:              out('1'); break;
+			case wff_f:             out('F'); break;
+			case wff_t:             out('T'); break;
+			case wff_neg:           out("!"); break;
+			case first_sym:         out("first"); break;
+			case last_sym:          out("last"); break;
+			case fp_fallback:       out(" fallback "); break;
 			// wraps
 			case builder_head:
-			case ref_args:          os << "("; break;
+			case ref_args:          out("("); break;
 			case constraint:
-			case offsets:           os << "["; break;
-			case offset:            if (get_nt(parent) == io_var)
-							os << "[";
+			case offsets:           out("["); break;
+			case offset:            if (pnt == io_var) out("[");
 						break;
-			case bf_splitter:       os << "S("; break;
+			case bf_splitter:       out("S("); break;
 			case bf_constant:	ba_constants<node>::print(os,
 							t.get_ba_constant_id());
 						break;
 			case wff:
 			case bf:
 				if (parent && is_to_wrap(t.first_tree()
-					.get_type(), get_nt(parent)))
+					.get_type(), pnt))
 				{
-					wraps.insert(ref), os << "(";
+					wraps.insert(ref), out("(");
 					if (static_cast<node::type>(nt) == wff)
 							depth++, break_line();
 				}
 				break;
 
 			case wff_all:
-				if (last_quant_nt == wff_all) os << ", ";
-				else last_quant_nt = wff_all, os << "all ";
+				if (last_quant_nt == wff_all) out(", ");
+				else last_quant_nt = wff_all, out("all ");
 				break;
 			case wff_ex:				
-				if (last_quant_nt == wff_ex) os << ", ";
-				else last_quant_nt = wff_ex, os << "ex ";
+				if (last_quant_nt == wff_ex) out(", ");
+				else last_quant_nt = wff_ex, out("ex ");
 				break;
 
-			case wff_sometimes:     os << "sometimes "; break;
-			case wff_always:        os << "always "; break;
+			case wff_sometimes:     out("sometimes "); break;
+			case wff_always:        out("always "); break;
 
-			case bf_builder_body:   os << " =: "; break;
-			case wff_builder_body:  os << " =:: "; break;
+			case bf_builder_body:   out(" =: "); break;
+			case wff_builder_body:  out(" =:: "); break;
 
-			case rel_history:       os << "%-"; break;
-			case abs_history:       os << "%"; break;
-			case dnf_cmd:           os << "dnf "; break;
-			case cnf_cmd:           os << "cnf "; break;
-			case anf_cmd:           os << "anf "; break;
-			case nnf_cmd:           os << "nnf "; break;
-			case pnf_cmd:           os << "pnf "; break;
-			case mnf_cmd:           os << "mnf "; break;
-			case snf_cmd:           os << "snf "; break;
-			case onf_cmd:           os << "onf "; break;
+			case rel_history:       out("%-"); break;
+			case abs_history:       out("%"); break;
+			case dnf_cmd:           out("dnf "); break;
+			case cnf_cmd:           out("cnf "); break;
+			case anf_cmd:           out("anf "); break;
+			case nnf_cmd:           out("nnf "); break;
+			case pnf_cmd:           out("pnf "); break;
+			case mnf_cmd:           out("mnf "); break;
+			case snf_cmd:           out("snf "); break;
+			case onf_cmd:           out("onf "); break;
 			case def_print_cmd:
 			case def_rr_cmd:
-			case def_list_cmd:      os << "def"; break;
-			case history_list_cmd:  os << "history"; break;
+			case def_list_cmd:      out("def"); break;
+			case history_list_cmd:  out("history"); break;
 			case history_print_cmd:
-			case history_store_cmd: os << "history "; break;
-			case get_cmd:           os << "get"; break;
-			case set_cmd:           os << "set "; break;
-			case toggle_cmd:        os << "toggle "; break;
-			case quit_cmd:          os << "quit"; break;
-			case version_cmd:       os << "version"; break;
-			case clear_cmd:         os << "clear"; break;
-			case help_cmd:          os << "help"; break;
-			case file_cmd:          os << "file"; break;
-			case valid_cmd:         os << "valid "; break;
-			case sat_cmd:           os << "sat "; break;
-			case unsat_cmd:         os << "unsat "; break;
-			case solve_cmd:         os << "solve "; break;
-			case run_cmd:           os << "run "; break;
-			case normalize_cmd:     os << "normalize "; break;
+			case history_store_cmd: out("history "); break;
+			case get_cmd:           out("get"); break;
+			case set_cmd:           out("set "); break;
+			case toggle_cmd:        out("toggle "); break;
+			case quit_cmd:          out("quit"); break;
+			case version_cmd:       out("version"); break;
+			case clear_cmd:         out("clear"); break;
+			case help_cmd:          out("help"); break;
+			case file_cmd:          out("file"); break;
+			case valid_cmd:         out("valid "); break;
+			case sat_cmd:           out("sat "); break;
+			case unsat_cmd:         out("unsat "); break;
+			case solve_cmd:         out("solve "); break;
+			case run_cmd:           out("run "); break;
+			case normalize_cmd:     out("normalize "); break;
 			case inst_cmd:          track_chpos();
-						os << "instantiate "; break;
+						out("instantiate "); break;
 			case subst_cmd:         track_chpos();
-						os << "substitute "; break;
+						out("substitute "); break;
 			case wff_conditional:   track_chpos(); break;
 			default:
 				if (is_string_nt(nt)) {
-					if (nt == uconst_name) os << "<";
-					os << string_from_id(t.data());
-					if (nt == uconst_name) os << ">";
+					if (nt == uconst_name) out("<");
+					out(string_from_id(t.data()));
+					if (nt == uconst_name) out(">");
 				}
-				else if (is_digital_nt(nt)) os << t.data();
-				else if (t.is_integer()) os << t.get_integer();
+				else if (is_digital_nt(nt)) out(t.data());
+				else if (t.is_integer()) out(t.get_integer());
 		}
 		return true;
 	};
 	auto on_between = [&](tref left, tref parent) {
 		if (parent == nullptr) return true;
-		const auto& t = get(parent);
+		const auto& t = get(left), p = get(parent);
+		size_t pnt = p.get_type();
 #ifdef PRETTY_PRINTER_LOGGING_ENABLED
-		std::cerr << "[|" << t.get_type_name() << "] \n";
+		size_t nt = t.get_type();
+		std::cerr << "[|" << node::name(nt)
+			  << " "  << node::name(pnt) << "] \n";
 #endif
+		// increment the position of the child
 		auto inc_chpos = [&chpos, &parent]() { return chpos[parent]++;};
+		// clear tracking of the child position
 		auto chpos_end = [&chpos, &parent]() { chpos.erase(parent); };
 
-		size_t nt = t.get_type();
-		switch (nt) {
+		switch (pnt) {
 			case bf_and:
-				if (isdigit(bf_and_arg1_last_char_written)
-					|| t[0].is(tau::bf_constant))
-						os << " ";
+				if (isdigit(last_written_char)
+					|| t.is(tau::bf_constant))
+						out(" ");
 				break;
-			case bf_or:             os << "|"; break;
-			case bf_xor:            os << "+"; break;
-			case bf_eq:             os << " = "; break;
-			case bf_neq:            os << " != "; break;
-			case bf_lteq:           os << " <= "; break;
-			case bf_nlteq:          os << " !<= "; break;
-			case bf_gt:             os << " > "; break;
-			case bf_ngt:            os << " !> "; break;
-			case bf_gteq:           os << " >= "; break;
-			case bf_ngteq:          os << " !>= "; break;
-			case bf_lt:             os << " < "; break;
-			case bf_nlt:            os << " !< "; break;
+			case bf_or:             out("|"); break;
+			case bf_xor:            out("+"); break;
+			case bf_eq:             out(" = "); break;
+			case bf_neq:            out(" != "); break;
+			case bf_lteq:           out(" <= "); break;
+			case bf_nlteq:          out(" !<= "); break;
+			case bf_gt:             out(" > "); break;
+			case bf_ngt:            out(" !> "); break;
+			case bf_gteq:           out(" >= "); break;
+			case bf_ngteq:          out(" !>= "); break;
+			case bf_lt:             out(" < "); break;
+			case bf_nlt:            out(" !< "); break;
 
-			case ctn_neq:           os << " != "; break;
-			case ctn_eq:            os << " = "; break;
-			case ctn_gteq:          os << " >= "; break;
-			case ctn_gt:            os << " > "; break;
-			case ctn_lteq:          os << " <= "; break;
-			case ctn_lt:            os << " < "; break;
+			case ctn_neq:           out(" != "); break;
+			case ctn_eq:            out(" = "); break;
+			case ctn_gteq:          out(" >= "); break;
+			case ctn_gt:            out(" > "); break;
+			case ctn_lteq:          out(" <= "); break;
+			case ctn_lt:            out(" < "); break;
 
-			case wff_and:           os << " && "; break;
-			case wff_or:            os << " || "; break;
-			case wff_xor:           os << " ^ "; break;
-			case wff_imply:         os << " -> "; break;
-			case wff_equiv:         os << " <-> "; break;
+			case wff_and:           out(" && "); break;
+			case wff_or:            out(" || "); break;
+			case wff_xor:           out(" ^ "); break;
+			case wff_imply:         out(" -> "); break;
+			case wff_equiv:         out(" <-> "); break;
 
-			case bf_interval:       os << " <= "; break;
+			case bf_interval:       out(" <= "); break;
 
-			case rec_relation:      os << " := "; break;
-			case wff_rule:          os << " ::= "; break;
-			case bf_rule:           os << " := "; break;
-			case shift:             os << "-"; break;
-			case bf_constant:       os << " : "; break;
+			case rec_relation:      out(" := "); break;
+			case wff_rule:          out(" ::= "); break;
+			case bf_rule:           out(" := "); break;
+			case shift:             out("-"); break;
+			case bf_constant:       out(" : "); break;
 
 			case wff_all:
 			case wff_ex:
-				if (!tau::get(left).right_sibling_tree()
-					.child_is(last_quant_nt)) os << " ";
+				if (!t.right_sibling_tree()
+					.child_is(last_quant_nt)) out(" ");
 				break;
 
-			case cli:               os << ". "; break;
+			case cli:               out(". "); break;
 			case wff_conditional:
-				if (inc_chpos()) chpos_end(), os << " : ";
-				else os << " ? ";
+				if (inc_chpos()) chpos_end(), out(" : ");
+				else out(" ? ");
 				break;
 
 			case inst_cmd:
 			case subst_cmd:
 				switch (inc_chpos()) {
-					case 1: os << " ["; break;
-					case 2: os << " / "; break;
+					case 1: out(" ["); break;
+					case 2: out(" / "); break;
 					case 3: chpos_end(); break;
 				}
 		};
@@ -527,35 +526,33 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	};
 	auto on_leave = [&](tref ref, tref parent) {
 		const auto& t = get(ref);
+		size_t nt = t.get_type(),
+			pnt = parent ? get(parent).get_type() : nul;
 #ifdef PRETTY_PRINTER_LOGGING_ENABLED
-		std::cerr << "\n\t[/" << t.get_type_name();
-		if (parent)
-			std::cerr << " " << node::name(get_nt(parent));
-		std::cerr << "]";
+		std::cerr << "\n\t[/" << node::name(nt)
+			  << " "      << node::name(pnt) << "]";
 #endif
 		// t.print_tree( << "leaving: ") << "\n";
-		size_t nt = t.get_type();
 		switch (nt) {
-			case bf_neg:            os << "'"; break;
+			case bf_neg:            out("'"); break;
 			case main: 
 			case builder:
 			case rec_relation:
 			case wff_rule:
-			case bf_rule:           os << "."; break;
+			case bf_rule:           out("."); break;
 			case constraint:
 			case offsets:
 			case inst_cmd:
-			case subst_cmd:         os << "]"; break;
-			case offset:            if (get_nt(parent) == io_var)
-							os << "]";
+			case subst_cmd:         out("]"); break;
+			case offset:            if (pnt == io_var) out("]");
 						break;
 			case bf_splitter:
 			case builder_head:
-			case ref_args:          os << ")"; break;
+			case ref_args:          out(")"); break;
 			case bf:
 			case wff:
 				if (wraps.find(ref) != wraps.end()) {
-					wraps.erase(ref), os << ")";
+					wraps.erase(ref), out(")");
 					if (static_cast<node::type>(nt) == wff)
 							depth--, break_line();
 				}

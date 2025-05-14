@@ -267,6 +267,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		trefs neqs = tau::get(clause)
 				.select_top(is<node, tau::bf_neq>);
 		for (tref neq : neqs) {
+			LOG_TRACE_F_F("neq: ", neq);
 			DBG(assert(tau::get(neq)[0][1].is(tau::bf_f));)
 			const auto& f = tau::get(neq)[0];
 			size_t type_f = f.get_ba_type();

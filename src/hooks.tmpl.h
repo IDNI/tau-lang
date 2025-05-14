@@ -10,7 +10,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
 	if (v.nt == tau::bf || v.nt == tau::wff || v.nt == tau::shift) {
-		HOOK_LOGGING(log("- HOOK -", v, ch, len, r, true);)
+		HOOK_LOGGING(log("- HOOK   -", v, ch, len, r, true);)
 	}
 	tref ret = nullptr;
 	if      (v.nt == tau::bf)    ret = term(v, ch, len, r);
@@ -22,7 +22,8 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	}
 #ifdef HOOK_LOGGING_ENABLED
 	// log("RESULT", v, ch, len, r);
-	LOG_TRACE << "(H) -- RESULT  " << TAU_DUMP_TO_STR(ret);
+	LOG_TRACE << "(H) [- RESULT -]"
+		  << "                " << TAU_DUMP_TO_STR(ret);
 #endif // HOOK_LOGGING_ENABLED
 	DBG(auto type = tau::get(ret).get_type();)
 	DBG(assert(type == tau::bf || type == tau::wff || type == tau::shift);)

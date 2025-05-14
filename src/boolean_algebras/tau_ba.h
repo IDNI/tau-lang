@@ -37,11 +37,26 @@ struct tau_ba {
 	tau_ba(rewriter::rules& rec_relations, htree::sp main);
 
 	/**
+	 * @brief Constructor initializing tau_ba with recursive relations and main tau_nso_t.
+	 *
+	 * @param rec_relations Reference to rules of tau_nso_t.
+	 * @param main Reference to main tau_nso_t.
+	 */
+	tau_ba(rewriter::rules& rec_relations, tref main);
+
+	/**
 	 * @brief Constructor initializing tau_ba with main tau_nso_t.
 	 *
 	 * @param main Reference to main tau_nso_t.
 	 */
 	tau_ba(htree::sp main);
+
+	/**
+	 * @brief Constructor initializing tau_ba with main tau_nso_t.
+	 *
+	 * @param main Reference to main tau_nso_t.
+	 */
+	tau_ba(tref main);
 
 	/**
 	 * @brief Three-way comparison operator.
@@ -185,7 +200,7 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other);
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
-auto normalize(const tau_ba<BAs...>& fm);
+tau_ba<BAs...> normalize(const tau_ba<BAs...>& fm);
 
 /**
  * @brief Splits the given tau_ba based on splitter type.
@@ -197,7 +212,7 @@ auto normalize(const tau_ba<BAs...>& fm);
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
-auto splitter(const tau_ba<BAs...>& fm, splitter_type st);
+tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st);
 
 /**
  * @brief Splits tau_ba into one.
@@ -207,7 +222,7 @@ auto splitter(const tau_ba<BAs...>& fm, splitter_type st);
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
-auto tau_splitter_one();
+tau_ba<BAs...> tau_splitter_one();
 
 /**
  * @brief Checks if the tau_ba is closed.

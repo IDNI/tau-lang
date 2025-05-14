@@ -66,7 +66,7 @@ std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(sbf_parser::error::info_lvl::INFO_BASIC);
-		LOG_ERROR << msg << "\n";
+		LOG_ERROR << "[sbf] " << msg << "\n";
 		return {}; // Syntax error
 	}
 	auto t = sbf_parser::tree::traverser(result.get_shaped_tree2())

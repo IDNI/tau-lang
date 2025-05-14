@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
 	ba_constants
-	bindings
+	ba_constants_binder
 	bool
 	hbdd
 	normal_forms
@@ -12,17 +12,9 @@ set(TESTS
 	rules-wff_execution
 	rules-wff_parsing
 	sbf_ba_parsing
-	tau_parser
+	tau_tree_from_parser
 	traversal
 	variant_ba
-
-	# empty tests?
-	# interpreter
-	# normalizer
-	# tau
-
-	# obsoleted
-	# builders       # covered code is not used anymore
 )
 
 foreach(X IN LISTS TESTS)
