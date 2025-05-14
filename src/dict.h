@@ -9,6 +9,8 @@
 
 namespace idni::tau_lang {
 
+using sym_t = int_t;
+
 // bdd var dict
 sym_t dict(const char*);
 sym_t dict(const std::string&);

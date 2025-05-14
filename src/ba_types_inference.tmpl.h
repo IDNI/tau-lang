@@ -14,10 +14,10 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref infer_ba_types(tref n) {
 	using tau = tree<node>;
-	LOG_TRACE_T("Infer BA types"); LOG_TRACE_F(n);
+	LOG_TRACE << "Infer BA types" << LOG_FM(n);
 	static ba_types_inference<node> infer;
 	tref nn = infer(n);
-	LOG_TRACE_T("Inferred BA types"); LOG_TRACE_F(nn);
+	LOG_TRACE << "Inferred BA types" << LOG_FM(nn);
 	return n;
 }
 
@@ -27,17 +27,17 @@ tref infer_ba_types(tref n) {
 template <NodeType node>
 tref ba_types_inference<node>::operator()(tref n) {
 	if (disabled) return n;
-	LOG_TRACE_T("BA type check and propagate"); LOG_TRACE_F(n);
+	LOG_TRACE << "BA type check and propagate: " << LOG_FM(n);
 	ts.clear(), untyped_n = 0;
 	var_scopes_t vscids; size_t tsid = 0;
 	tref x = add_scope_ids(n, vscids, 0, tsid);
 	if (x == nullptr) return nullptr;
 
-	LOG_TRACE_T("BA type scoped"); LOG_TRACE_F(x);
-	for (auto& [var, tid] : ts) LOG_TRACE_T("\t"
-		<< get_ba_type_name<node>(tid) << " \t ( "
-		<< TAU_TO_STR(var) << ")");
-	LOG_TRACE_T("check_and_propagate BA types");
+	LOG_TRACE << "BA type scoped: " << LOG_FM(x);
+	for (auto& [var, tid] : ts) LOG_TRACE << "\t"
+		<< LOG_BA_TYPE(tid) << " \t ( " << LOG_FM(var) <<")";
+	LOG_TRACE << "check_and_propagate BA types";
+
 	auto nn = check_and_propagate(x);
 	if (!nn) return nullptr;
 
@@ -46,21 +46,20 @@ tref ba_types_inference<node>::operator()(tref n) {
 	bool once_more = false;
 	for (auto& [var, tid] : ts) if (tid == 0) {
 		ts[var] = dflt;
-		LOG_TRACE_T("setting default type: "
-			<< get_ba_type_name<node>(dflt) << " to "
-			<< TAU_TO_STR(var));
+		LOG_TRACE << "setting default type: "
+			<< LOG_BA_TYPE(dflt) << " to " <<LOG_FM(var);
 		once_more = true;
 	}
 	if (once_more) {
-		LOG_TRACE_T("check_and_propagate "
-				<< "BA types once more with default type");
+		LOG_TRACE << "check_and_propagate "
+				<< "BA types once more with default type";
 		untyped_n = 0;
 		nn = check_and_propagate(x);
 		if (!nn) return nullptr;
 	}
 
 	tref r = remove_scope_ids(x);
-	LOG_TRACE_T("transformed BA types"); LOG_TRACE_F(r);
+	LOG_TRACE << "Transformed BA types: " << LOG_FM(r);
 	ts.clear();
 	return r;
 }
@@ -80,7 +79,7 @@ template <NodeType node>
 tref ba_types_inference<node>::add_scope_ids(
 	tref n, var_scopes_t& vscids, size_t csid, size_t& tsid)
 {
-	LOG_TRACE_T("replace_types_with_scope_ids: "); LOG_TRACE_F(n);
+	LOG_TRACE << "replace_types_with_scope_ids: " << LOG_FM(n);
 	// ptree(std::cout << "tree: ", n) << "\n";
 	const auto vsid = [this, &vscids](tref var) {
 		size_t v = get_var_name_sid<node>(var);
@@ -95,7 +94,7 @@ tref ba_types_inference<node>::add_scope_ids(
 	const auto transform_element = [this, &csid, &tsid, &vsid](
 		tref el, size_t nt) -> tref
 	{
-		LOG_TRACE_T("transform element"); LOG_TRACE_F(el);
+		LOG_TRACE << "transform element: " << LOG_FM(el);
 
 		static const size_t temporal = get_ba_type_id<node>("_temporal");
 		auto is_io = is_io_var<node>(el);
@@ -138,7 +137,7 @@ tref ba_types_inference<node>::add_scope_ids(
 			}
 		}
 		ts[get_var_key_node(r)] = get_ba_type_id<node>(t);
-		LOG_TRACE_T("transformed element"); LOG_TRACE_F(r);
+		LOG_TRACE << "transformed element: " << LOG_FM(r);
 		return r;
 	};
 	const auto transformer = [&](tref el) -> tref{
@@ -152,13 +151,13 @@ tref ba_types_inference<node>::add_scope_ids(
 			auto main = tt(el) | tau::main | tt::ref;
 			for (tref r : rrs.values()) {
 				var_scopes_t nvscids;
-				// LOG_TRACE_T("replacing rec_relation");
+				// LOG_TRACE << "replacing rec_relation";
 				tref x = add_scope_ids(r, nvscids, csid,++tsid);
 				if (x == nullptr) return nullptr;
 				rrch.push_back(x);
 			}
 			var_scopes_t nvscids;
-			// LOG_TRACE_T("replacing main");
+			// LOG_TRACE << "replacing main";
 			tref x = add_scope_ids(main, nvscids, csid, ++tsid);
 			if (x == nullptr) return nullptr;
 			ch.push_back(x);
@@ -182,7 +181,7 @@ tref ba_types_inference<node>::add_scope_ids(
 			tref x = add_scope_ids(t.second(), vscids, csid, tsid);
 			if (x == nullptr) return nullptr;
 			tref r = tau::get(t.value, { v, x });
-			// LOG_TRACE_T("quant replaced"); LOG_TRACE_F(r);
+			// LOG_TRACE << "quant replaced: " << LOG_FM(r);
 			return r;
 		}
 		case tau::bf_constant:
@@ -193,7 +192,7 @@ tref ba_types_inference<node>::add_scope_ids(
 		return el;
 	};
 	auto r = pre_order<node>(n).apply_until_change(transformer);
-	LOG_TRACE_T("added scope ids"); LOG_TRACE_F(r);
+	LOG_TRACE << "added scope ids: " << LOG_FM(r);
 	return r;
 }
 
@@ -223,9 +222,8 @@ tref ba_types_inference<node>::check_and_propagate(tref n) {
 			case tau::wff_ex:
 			case tau::wff_all:
 				// check and propagate q_var sub scope first
-				LOG_TRACE_T("check and propagate"
-					<< " quantifier subscope");
-				LOG_TRACE_F(el);
+				LOG_TRACE << "check and propagate quantifier "
+					<< "subscope: " << LOG_FM(el);
 				check_and_propagate(tau::get(el).second());
 				return false;
 			default: break;
@@ -237,10 +235,10 @@ tref ba_types_inference<node>::check_and_propagate(tref n) {
 	size_t untyped_n0;
 	do {
 		untyped_n0 = untyped_n;
-		// LOG_TRACE_T("untyped_n0"); LOG_TRACE_F(untyped_n0);
+		// LOG_TRACE << "untyped_n0: " << LOG_FM(untyped_n0);
 		pre_order<node>(n).visit(checker_and_propagator);
 		if (err) return nullptr; // type mismatch
-		// LOG_TRACE_T("untyped_n"); LOG_TRACE_F(untyped_n);
+		// LOG_TRACE << "untyped_n: " << LOG_FM(untyped_n);
 	} while (untyped_n0 != untyped_n);
 	return n;
 }
@@ -279,8 +277,7 @@ bool ba_types_inference<node>::propagate(tref n) {
 			tref key = get_var_key_node(el);
 			if (ts[key] == 0) {
 				LOG_TRACE << "(T) propagating type: "
-					<< get_ba_type_name<node>(t) << " to "
-					<< TAU_TO_STR(el);
+					<< LOG_BA_TYPE(t) << " to "<<LOG_FM(el);
 				ts[key] = t;
 				untyped_n--;
 			}
@@ -296,14 +293,13 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 	const auto transformer = [this](const auto& el) {
 		if (is_ba_element<node>(el)) {
 			tref key = get_var_key_node(el);
-			LOG_TRACE << "(T) transformer of ba_element: "
-							<< TAU_TO_STR(el);
+			LOG_TRACE << "transformer of ba_element: " <<LOG_FM(el);
 			for (auto& [k, v] : ts) {
-				LOG_TRACE << "(T) ident: " << TAU_TO_STR(key)
+				LOG_TRACE << "ident: " << LOG_FM(key)
 					<< (key == k ? " == " : " != ")
-					<< k << " : " << v;
+					<< LOG_FM(k) << " : " << LOG_BA_TYPE(v);
 			}
-			LOG_TRACE << "(T) type: " << ts.at(key);
+			LOG_TRACE << "type: " << LOG_BA_TYPE(ts.at(key));
 			const auto& t = tau::get(el);
 			trefs ch{ t.first() };
 			if (t.is(tau::bf_constant)) ch.push_back(

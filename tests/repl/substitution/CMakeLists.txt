@@ -27,7 +27,7 @@ add_repl_test(substitution_cmd_wff4 "ex x x=0 && y=0. x=0. s %1[y=0 / %2]" ": ex
 
 add_repl_test(substitution_cmd_wff6 "(x=0 || (w=0 && z=0)) && z=0. b=0. s %1[z=0 / %2]" ": \\(x=0 || w=0 && b=0\\) && b=0")
 
-add_repl_test(substitution_cmd_wff7 "x=0 && y=0. 0. s %1[x=0 / %2]" "\\(Error\\) Argument has a wrong type")
+add_repl_test(substitution_cmd_wff7 "x=0 && y=0. 0. s %1[x=0 / %2]" "Argument has a wrong type")
 
 add_repl_test(substitution_cmd_wff8 "s (ex x x=0 && y=0) && x=0 [y=0/x=0]" ": \\(ex x2 x2 = 0 && x = 0\\) && x = 0")
 
@@ -40,6 +40,6 @@ add_repl_test(substitution_cmd_wff11 "s ex x ex x x=0 && y=0 [y=0/x=0]" ": ex x2
 
 add_repl_test(substitution_cmd_wff12 "s (ex x x=0 && y=0) && x=0 [y/x]" ": \\(ex x2 x2 = 0 && x = 0\\) && x = 0")
 
-add_repl_test(substitution_cmd_wff13 "s (ex x x=0 && y=0) && x=0 [y/x=0]" "\\(Error\\) Invalid argument")
+add_repl_test(substitution_cmd_wff13 "s (ex x x=0 && y=0) && x=0 [y/x=0]" "Invalid argument")
 
-add_repl_test(substitution_cmd_wff14 "s (ex x x=0 && y=0) && x=0 [y=0/x]" "\\(Error\\) Invalid argument")
+add_repl_test(substitution_cmd_wff14 "s (ex x x=0 && y=0) && x=0 [y=0/x]" "Invalid argument")

@@ -1,13 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+// undefine Tau Language Framework preprocessor macros
+
 // defs.h
 
 #undef GIT_DESCRIBED
 #undef GIT_COMMIT_HASH
 #undef GIT_BRANCH
-
-#undef pfst
-#undef hasbc
 
 #undef TAU_PRINT
 #undef TAU_PRINT_TREE
@@ -32,31 +31,34 @@
 #undef HOOK_LOGGING_ENABLED
 #undef PRETTY_PRINTER_LOGGING_ENABLED
 
+#undef LOG_CHANNEL_NAME
 #undef LOG_LINE_VALUE
+
 #undef LOG_ERROR
 #undef LOG_WARNING
 #undef LOG_INFO
 #undef LOG_DEBUG
 #undef LOG_TRACE
-#undef LOG_CHANNEL_NAME
+
 #undef LOG_LINE_PATH
 #undef LOG_LINE
-#undef LOG_TRACE_I
-#undef LOG_DEBUG_I
-#undef LOG_TRACE_I_F
-#undef LOG_DEBUG_I_F
-#undef LOG_TRACE_I_F_DUMP
-#undef LOG_DEBUG_I_F_DUMP
-#undef LOG_TRACE_T
-#undef LOG_DEBUG_T
-#undef LOG_TRACE_F
-#undef LOG_DEBUG_F
-#undef LOG_TRACE_F_DUMP
-#undef LOG_DEBUG_F_DUMP
-#undef LOG_TRACE_F_F
-#undef LOG_DEBUG_F_F
-#undef LOG_TRACE_F_F_DUMP
-#undef LOG_DEBUG_F_F_DUMP
-#undef LOG_TRACE_RR
-#undef LOG_DEBUG_RR
+
+#undef LOG_BRIGHT_COLOR
+#undef LOG_ERROR_COLOR
+#undef LOG_WARNING_COLOR
+#undef LOG_CHANNEL_COLOR
+#undef LOG_NT_COLOR
+#undef LOG_FM_COLOR
+#undef LOG_BA_COLOR
+#undef LOG_RULE_COLOR
+
+#undef LOG_BRIGHT
+#undef LOG_NT
+#undef LOG_RULE
+#undef LOG_BA
+#undef LOG_BA_TYPE
+#undef LOG_FM
+#undef LOG_FM_DUMP
+#undef LOG_RR
+
 

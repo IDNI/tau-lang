@@ -79,7 +79,7 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 		const auto& t = tau::get(n);
 		if (t.is(branch)) return true;
 		if (t.child_is(branch)) return true;
-		LOG_TRACE_I("adding leaf: " << t.to_str());
+		LOG_TRACE << "adding leaf: " << LOG_FM(n);
 		return leaves.push_back(n), false;
 	};
 	pre_order<node>(n).visit(add_leave);
@@ -90,36 +90,36 @@ trefs get_leaves(tref n, typename node::type branch) {
 	using tau = tree<node>;
 	trefs leaves;
 	get_leaves<node>(n, branch, leaves);
-	LOG_TRACE_I("got leaves: " << leaves.size());
-	for (tref l : leaves) LOG_TRACE_F_F("leaf: ", l);
+	LOG_TRACE << "got leaves: " << leaves.size();
+	for (tref l : leaves) LOG_TRACE << "leaf: " << LOG_FM(l);
 	return leaves;
 }
 
 template <NodeType node>
 trefs get_dnf_wff_clauses(tref n) {
 	using tau = tree<node>;
-	LOG_TRACE_I_F("getting dnf wff clauses for ", n);
+	LOG_TRACE << "getting dnf wff clauses for " << LOG_FM(n);
 	return get_leaves<node>(n, tau::wff_or);
 }
 
 template <NodeType node>
 trefs get_dnf_bf_clauses(tref n) {
 	using tau = tree<node>;
-	LOG_TRACE_I_F("getting dnf bf clauses for ", n);
+	LOG_TRACE << "getting dnf bf clauses for " << LOG_FM(n);
 	return get_leaves<node>(n, tau::bf_or);
 }
 
 template <NodeType node>
 trefs get_cnf_wff_clauses(tref n) {
 	using tau = tree<node>;
-	LOG_TRACE_I_F("getting cnf wff clauses for ", n);
+	LOG_TRACE << "getting cnf wff clauses for " << LOG_FM(n);
 	return get_leaves<node>(n, tau::wff_and);
 }
 
 template <NodeType node>
 trefs get_cnf_bf_clauses(tref n) {
 	using tau = tree<node>;
-	LOG_TRACE_I_F("getting cnf bf clauses for ", n);
+	LOG_TRACE << "getting cnf bf clauses for " << LOG_FM(n);
 	return get_leaves<node>(n, tau::bf_and);
 }
 
@@ -215,9 +215,9 @@ template <NodeType node>
 subtree_set<node> get_free_vars_from_nso(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	LOG_TRACE_I_F("Begin get_free_vars_from_nso of ", n);
+	LOG_TRACE << "Begin get_free_vars_from_nso of " << LOG_FM(n);
 	subtree_set<node> free_vars;
-	LOG_TRACE_I_F("End get_free_vars_from_nso", n);
+	LOG_TRACE << "End get_free_vars_from_nso" << LOG_FM(n);
 	auto collector = [&free_vars](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_all) || t.is(tau::wff_ex)) {
@@ -226,7 +226,8 @@ subtree_set<node> get_free_vars_from_nso(tref n) {
 			if (var) if (auto it = free_vars.find(var);
 				it != free_vars.end())
 			{
-				LOG_TRACE_I_F("removing quantified var:", var);
+				LOG_TRACE << "removing quantified var: "
+								<< LOG_FM(var);
 				free_vars.erase(it);
 			}
 		} else if (is_var_or_capture<node>(n)) {
@@ -238,8 +239,9 @@ subtree_set<node> get_free_vars_from_nso(tref n) {
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
-						LOG_TRACE_I_F("removing var: ",
-							offset_child.value());
+						LOG_TRACE << "removing var: "
+							<< LOG_FM(offset_child
+								.value());
 						free_vars.erase(it);
 					}
 				} else if (offset_child.value_tree().is(tau::shift)) {
@@ -247,13 +249,14 @@ subtree_set<node> get_free_vars_from_nso(tref n) {
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
-						LOG_TRACE_I_F("removing var: ",
-							offset_child.value());
+						LOG_TRACE << "removing var: "
+							<< LOG_FM(offset_child
+								.value());
 						free_vars.erase(it);
 					}
 				}
 			}
-			LOG_TRACE_I_F("inserting var: ", n);
+			LOG_TRACE << "inserting var: " << LOG_FM(n);
 			free_vars.insert(n);
 		}
 	};

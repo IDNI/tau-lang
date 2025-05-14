@@ -267,7 +267,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		trefs neqs = tau::get(clause)
 				.select_top(is<node, tau::bf_neq>);
 		for (tref neq : neqs) {
-			LOG_TRACE_F_F("neq: ", neq);
+			LOG_TRACE << "neq: " << LOG_FM(neq);
 			DBG(assert(tau::get(neq)[0][1].is(tau::bf_f));)
 			const auto& f = tau::get(neq)[0];
 			size_t type_f = f.get_ba_type();
@@ -315,7 +315,7 @@ requires BAsPack<BAs...>
 tref tau_splitter(tref fm, splitter_type st) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
-	LOG_DEBUG_I("Start of tau_splitter"); LOG_DEBUG_F(fm);
+	LOG_DEBUG << "Start of tau_splitter" << LOG_FM(fm);
 	// First we decide if we deal with a temporal formula
 	if (!has_temp_var<node>(fm))
 		return nso_tau_splitter<BAs...>(fm, st).first;
@@ -328,7 +328,8 @@ tref tau_splitter(tref fm, splitter_type st) {
 			auto [splitter, type] = nso_tau_splitter<BAs...>(
 					tau::get(spec)[0].first(), st, clause);
 			if (type != splitter_type::bad) {
-				LOG_TRACE_I_F("Splitter of spec: ", splitter);
+				LOG_TRACE << "Splitter of spec: "
+							<< LOG_FM(splitter);
 				good_splitter = true;
 				splitter = is_aw
 					? tau::build_wff_always(splitter)

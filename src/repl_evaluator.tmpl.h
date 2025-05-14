@@ -42,7 +42,7 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 	if (mem_id) idx = mem_id | tt::num;
 	// LOG_TRACE << "get_history_index idx: " << idx
 	// 	<< "       relative? " << is_relative << "    "
-	// 	<< TAU_TO_STR(n.value());
+	// 	<< LOG_FM(n.value());
 	if ((is_relative && idx >= size)
 		|| (!is_relative && (idx == 0 || idx > size)))
 	{
@@ -459,7 +459,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
 	// as we would get a formula in dnf already. However, we would need to
 	// kept the application of definitionsand call the computation of phi/chi infinity
-	DBG(LOG_DEBUG << "run_cmd/applied: " << TAU_TO_STR(applied);)
+	DBG(LOG_DEBUG << "run_cmd/applied: " << LOG_FM(applied);)
 
 	// -------------------------------------------------------------
 	// TODO: remove once type inference is ready
@@ -653,8 +653,8 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 		return;
 	}
 
-	DBG(LOG_TRACE << "lgrs_cmd/applied: " << TAU_TO_STR(applied) << "\n";)
-	DBG(LOG_TRACE << "lgrs_cmd/equality: " << TAU_TO_STR(equality) << "\n";)
+	DBG(LOG_TRACE << "lgrs_cmd/applied: " << LOG_FM(applied) << "\n";)
+	DBG(LOG_TRACE << "lgrs_cmd/equality: " << LOG_FM(equality) << "\n";)
 
 	auto solution = lgrs<node>(applied);
 	if (!solution) { std::cout << "no solution\n"; return; }
@@ -732,7 +732,6 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
-	if (definitions.size() == 0) std::cout << "Definitions: empty\n";
 	auto num = command | tau::num;
 	if (!num) return;
 	auto i = num | tt::num;

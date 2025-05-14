@@ -68,7 +68,7 @@ bool normalize_and_check(const char* sample,
 	tref result = normalizer<bnode>(nso_rr.value());
 	if (!result) return expect_fail;
 
-	LOG_DEBUG << "(T) Normalized result: " << TAU_TO_STR(result);
+	LOG_DEBUG << "(T) Normalized result: " << LOG_FM(result);
 
 	return tau::get(result).child_is(nt) != expect_fail;
 }

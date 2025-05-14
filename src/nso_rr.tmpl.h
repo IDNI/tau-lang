@@ -27,15 +27,15 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 #endif // TAU_MEASURE
 
 	try {
-		DBG(LOG_TRACE << "try to apply rule: " << to_str<node>(r);)
 		auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
 							r, n, is_capture);
 #ifdef DEBUG
 		if (n != nn) {
 			using tau = tree<node>;
 			LOG_TRACE << "--------------------------------";
+			LOG_TRACE << "rule:       " << LOG_RULE(r);
 			LOG_TRACE << "applied to: " << TAU_TO_STR(n);
-			LOG_TRACE << "result:     " << TAU_TO_STR(nn);
+			LOG_TRACE << "result:     " << LOG_FM(nn);
 			LOG_TRACE << "--------------------------------";
 		}
 #endif // DEBUG

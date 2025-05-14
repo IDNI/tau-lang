@@ -37,11 +37,11 @@ std::optional<typename node::type> ref_types<node>::get(
 	auto fpopt = fpcall(s);
 	if (fpopt) s = fpopt.value();
 	if (auto it = types_.find(s); it != types_.end()) {
-		LOG_TRACE_T("Looking for type of " << s << " found "
-						<< node::name(it->second));
+		LOG_TRACE << "Looking for type of " << s << " found "
+						<< node::name(it->second);
 		return { it->second };
 	}
-	LOG_TRACE_T("Looking for type of " << sig << " failed");
+	LOG_TRACE << "Looking for type of " << sig << " failed";
 	return {};
 }
 
@@ -72,14 +72,14 @@ std::optional<rr_sig>  ref_types<node>::fpcall(const rr_sig& fp_sig) const {
 
 template <NodeType node>
 void ref_types<node>::done(const rr_sig& sig) {
-	LOG_TRACE_T("ref type done " << sig);
+	LOG_TRACE << "ref type done " << sig;
 	todo_.erase(sig), done_.insert(sig);
 }
 
 template <NodeType node>
 void ref_types<node>::todo(const rr_sig& sig) {
 	if (done_.contains(sig) || todo_.contains(sig)) return;
-	LOG_TRACE_T("ref type todo " << sig);
+	LOG_TRACE << "ref type todo " << sig;
 	todo_.insert(sig);
 }
 
@@ -105,8 +105,8 @@ bool ref_types<node>::add(tref n, node::type t) {
 		r = r_as_child.value();
 	auto sig = get_rr_sig<node>(r);
 	if (auto fp_sig = fpcall(sig); fp_sig) { // if fp_call
-		LOG_TRACE_T("FP call "  << fp_sig.value() << " for "
-					<< sig << "() : " << node::name(t));
+		LOG_TRACE << "FP call " << fp_sig.value() << " for "
+					<< sig << "() : " << node::name(t);
 		sig = fp_sig.value(); // use actual relation's sig
 	}
 	typename node::type new_type = t;
@@ -122,8 +122,8 @@ bool ref_types<node>::add(tref n, node::type t) {
 			errors_.insert(err.str()), false;
 	} else {
 		types_[sig] = new_type, done(sig);
-		LOG_TRACE_T("Found type of " << sig << "() : "
-					     << node::name(types_[sig]));
+		LOG_TRACE << "Found type of " << sig << "() : "
+					      << node::name(types_[sig]);
 		return true;
 	}
 	return false;
@@ -171,7 +171,8 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 	ref_types<node>& ts)
 {
 	using tau = tree<node>;
-	LOG_DEBUG_I("Begin ref type inferrence"); LOG_DEBUG_RR(nso_rr);
+	LOG_DEBUG << "Begin ref type inferrence";
+	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	static auto get_nt_type = [](tref r) -> typename node::type {
                 return tree<node>::get(r).get_type();
 	};
@@ -191,14 +192,14 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
                         tref body = r.second->get();
 			// check type of the right side
 			typename node::type t = get_nt_type(body);
-			// LOG_TRACE_T(r.second << " is " << node::name(t));
+			// LOG_TRACE << r.second << " is " << node::name(t);
 			if (t == tau::ref) {
 				// right side is unresolved ref
 				if (auto topt = ts.get(get_rr_sig<node>(body));
 					topt.has_value())
 				{
 					t = topt.value();
-					// LOG_TRACE_T("updating right side")
+					// LOG_TRACE << "updating right side"
 					// 	<< r.second;
 					update_ref(body, t);
 					changed = true;
@@ -208,7 +209,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 			if (t == tau::bf || t == tau::wff) {
 				if (get_nt_type(head) == tau::ref) {
 					// left side is unresolved ref
-					// LOG_TRACE_T("updating left side")
+					// LOG_TRACE << "updating left side"
 					// 	<< r.first;
 					ts.add(head, t);
 					update_ref(head, t);
@@ -223,7 +224,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 					auto topt = ts.get(get_rr_sig<node>(head));
 					if (topt.has_value()) { // if we know
 						t = topt.value(); // update
-						// LOG_TRACE_T("updating left side")
+						// LOG_TRACE << "updating left side"
 						// 	<< r.first;
 						ts.done(get_rr_sig<node>(head));
 						update_ref(head, t);
@@ -232,7 +233,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 				}
 				// left side is bf or wff, update capture
 				if (t == tau::bf || t == tau::wff) {
-					// LOG_TRACE_T("updating capture")
+					// LOG_TRACE << "updating capture"
 					// 	<< r.second;
 					body = tau::get(t, body);
 				}
@@ -243,12 +244,12 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 	// infer main if unresolved ref
 	if (nn.main) {
 		auto t = get_nt_type(nn.main->get());
-		// LOG_TRACE_T("main (" << t.to_str() << ") is " << node::name(t));
+		// LOG_TRACE << "main (" << t.to_str() << ") is " << node::name(t);
 		if (t == tau::ref) {
 			// main is an unresolved ref
 			if (auto topt = ts.get(get_rr_sig<node>(nn.main->get())); topt) {
 				t = topt.value();
-				// LOG_TRACE_T("updating main: " << TAU_TO_STR(nn.main));
+				// LOG_TRACE << "updating main: " << LOG_FM(nn.main);
 				update_ref(nn.main->get(), t);
 			}
 		}
@@ -263,8 +264,8 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 		LOG_ERROR << "Unknown ref type for:" << ss.str();
 		return {};
 	}
-	LOG_DEBUG_I("End ref type inferrence");
-	if (nso_rr != nn) LOG_DEBUG_RR(nn);
+	LOG_DEBUG << "End ref type inferrence";
+	if (nso_rr != nn) LOG_DEBUG << "Result: " << LOG_RR(nn);
 	return { nn };
 }
 
