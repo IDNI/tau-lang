@@ -1,6 +1,13 @@
 #!/bin/bash
 
+VERBOSE=""
 BUILD_TYPE="${1:-Release}"
+
+if [ "$2" = "-v" ]; then
+	VERBOSE="1"
+	shift
+fi
+
 case "${BUILD_TYPE}" in
 	"Debug")
 		SUFFIX="Debug"
@@ -47,12 +54,12 @@ fi
 if [ -z $NINJA_BIN ]; then
 	echo "Using make build system"
 	cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
-	cmake --build . -- -j5
+	cmake --build . -- -j5 ${VERBOSE:+VERBOSE=1}
 	STATUS=$?
 else
 	echo "Using Ninja build system"
 	cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
-	ninja
+	ninja ${VERBOSE:+-v}
 	STATUS=$?
 fi
 
