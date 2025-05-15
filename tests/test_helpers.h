@@ -88,13 +88,3 @@ bool normalize_and_check(const char* sample, const std::string& expected) {
 }
 
 } // namespace idni::tau_lang
-
-#ifdef TAU_LOG_TRACE_TESTS
-
-TEST_SUITE("logging configuration") {
-	TEST_CASE("set trace logging severity") {
-		logging::trace();
-	}
-}
-
-#endif // TAU_LOG_TRACE_TESTS
