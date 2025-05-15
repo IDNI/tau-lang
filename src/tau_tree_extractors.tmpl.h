@@ -35,15 +35,17 @@ rewriter::rules get_rec_relations(tref rrs) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	rewriter::rules x;
-	auto t = tt(rrs);
+	DBG(LOG_TRACE << "get_rec_relations: " << LOG_FM_DUMP(rrs);)
+	auto t = tt(rrs) ;
 	if (t.is(tau::rec_relation))
 		return x.emplace_back(tau::geth(t.value_tree().first()),
 					tau::geth(t.value_tree().second())), x;
-	if (t.is(tau::spec)) t = t | tau::rec_relations;
+	if (t.is(tau::start)) t = t | tau::spec | tau::rec_relations;
+	else if (t.is(tau::spec)) t = t | tau::rec_relations;
 	t = t || tau::rec_relation;
-	for (auto& r : t())
-		x.emplace_back(r | tt::first | tt::handle,
-				r | tt::second | tt::handle);
+	for (auto& r : t()) x.emplace_back(r | tt::first  | tt::handle,
+					   r | tt::second | tt::handle);
+	DBG(LOG_TRACE << "get_rec_relations result: " << x.size();)
 	return x;
 }
 
@@ -51,6 +53,7 @@ template <NodeType node>
 std::optional<rr> get_nso_rr(tref r, bool wo_inference) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(r);)
 	const auto& t = tau::get(r);
 	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
 	if (t.is(tau::rec_relation))
@@ -59,8 +62,15 @@ std::optional<rr> get_nso_rr(tref r, bool wo_inference) {
 			? tt(r) | tau::main
 			: tt(r) | tau::spec | tau::main) | tau::wff | tt::ref;
 	rewriter::rules rules = get_rec_relations<node>(r);
-	if (wo_inference) return { { rules, tau::geth(main_fm) } };
-	return get_nso_rr<node>(rules, main_fm);
+	DBG(LOG_TRACE << "rules: " << rules.size();)
+	auto nso_rr = wo_inference
+			? std::optional<rr>{ { rules, tau::geth(main_fm) } }
+			: get_nso_rr<node>(rules, main_fm);
+#ifdef DEBUG
+	if (nso_rr) LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr.value());
+	else LOG_TRACE << "get_nso_rr result: no value";
+#endif
+	return nso_rr;
 }
 
 template <NodeType node>
