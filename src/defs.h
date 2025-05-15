@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <variant>
 #ifdef DEBUG
-#	include <cxxabi.h>
+#	include <cxxabi.h>     // unmangle symbol names for debugging
 #endif
 
 //-----------------------------------------------------------------------------
@@ -29,7 +29,11 @@
 // common std::hash templates and specializations
 #include "../external/parser/src/defs.h"
 
-// following macros work only if tau type is defined
+// -----------------------------------------------------------------------------
+// following macros work only if `tau` type is defined
+// `using tau = tree<node<BAs...>;` where `BAs...` is a pack of Boolean Algebras)
+// `ref` is a tree pointer reference `tref`, or shared pointer handle `htree::sp` 
+
 // helper macro for pretty printing a tau tree tref into std::cout
 #define TAU_PRINT(ref) (tau::get(ref).print(std::cout))
 // helper macro for printing a tau tree tref into std::cout

@@ -185,10 +185,15 @@ struct logging {
 	// set filter to print error messages
 	inline static void error()  { set_filter(boost::log::trivial::error);  }
 
+	inline static boost::log::trivial::severity_level level() {
+		return set_level;
+	}
+
 	// set filter to a specific level
 	inline static void set_filter(boost::log::trivial::severity_level level)
 	{
 		using namespace boost::log;
+		set_level = level;
 		core::get()->set_filter([level](const attribute_value_set& rec){
 			auto sev = rec[trivial::severity];
 			if (!sev || *sev < level) return false;
@@ -263,6 +268,9 @@ struct logging {
 					keywords::channel = channel_name));
 		return loggers[channel_name];
 	}
+
+private:
+	inline static boost::log::trivial::severity_level set_level;
 };
 
 // static initialization of the logging system 
