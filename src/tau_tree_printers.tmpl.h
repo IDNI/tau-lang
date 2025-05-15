@@ -499,6 +499,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case rec_relation:      out(" := "); break;
 			case wff_rule:          out(" ::= "); break;
 			case bf_rule:           out(" := "); break;
+			case offsets:           out(", "); break;
 			case shift:             out("-"); break;
 			case bf_constant:       out(" : "); break;
 
