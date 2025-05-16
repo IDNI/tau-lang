@@ -6,22 +6,31 @@
 bool test_ref_types(const char* rec_relation,
 	const std::string& expected_error = "", bool expect_fail = false)
 {
+	using node = bnode;
+	DBG(LOG_INFO << "Ref type inference test input: `"
+		<< rec_relation << "`");
 	auto nso_rr = get_nso_rr(rec_relation, true);
 	if (!nso_rr.has_value()) return false;
+	DBG(LOG_INFO << "Infer types for:\n" << LOG_RR(nso_rr.value());)
 
 	ref_types<bnode> ts(nso_rr.value());
-	nso_rr = infer_ref_types<bnode>(nso_rr.value(), ts);
+	auto nso_rr_inferred = infer_ref_types<bnode>(nso_rr.value(), ts);
 	bool fail = !ts.ok();
 
 	if (!expect_fail) expect_fail = expected_error != "";
-	// std::cerr << "fail: " << fail << " expect_fail: " << expect_fail << "\n";
+	if (fail != expect_fail) {
+		LOG_ERROR << (fail ? "failed" : "success") <<" but expected to "
+			<< (expect_fail ? "fail" : "be successful") << ". # "
+			<< expected_error;
+		LOG_TRACE << "for spec: " << LOG_RR(nso_rr.value());
+	}
 	if (fail) { // type checking or inference error 
 		if (expected_error == "Unknown") {
 			if (ts.unresolved().size()) {
-				// std::cerr << "Unresolved not empty\n";
+				LOG_ERROR << "Unresolved not empty";
 				return expect_fail;
 			} else {
-				// std::cerr << "Unresolved empty\n";
+				LOG_ERROR << "Unresolved empty";
 				return false;
 			}
 		}
@@ -30,12 +39,12 @@ bool test_ref_types(const char* rec_relation,
 				return expect_fail;
 		return false;
 	} else {
-		tref normalized = normalizer<bnode>(nso_rr.value());
+		tref normalized = normalizer<bnode>(nso_rr_inferred.value());
 		if (normalized == nullptr) {
-			// std::cerr << "normalizer failed\n";
+			LOG_ERROR << "normalizer failed\n";
 			return expect_fail;
 		} else if (!tau::get(normalized).child_is(tau::wff_t)) {
-			// std::cerr << "not T " << expect_fail << "\n";
+			LOG_ERROR << "not T " << expect_fail << "\n";
 			return expect_fail;
 		}
 	}
