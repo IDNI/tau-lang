@@ -8,6 +8,9 @@ namespace idni::tau_lang {
 
 using namespace z3;
 
+static auto BV = z3_context.bv_sort(64);
+static auto BOOL = z3_context.bool_sort();
+
 // deactivated for the moment
 //static bool _signed = false;
 
@@ -312,12 +315,5 @@ std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form) {
 	z3::solver solver(z3_context);
 	return solve_z3(form, solver);
 }
-
-template<typename...BAs>
-tau<BAs...> normalize_z3(const tau<BAs...>& form) {
-	// TODO (HIGH) implement
-	return form;
-}
-
 
 } // namespace idni::tau_lang

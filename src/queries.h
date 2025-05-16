@@ -34,6 +34,37 @@ bool is_z3_node(const tau<BAs...>& n) {
 	return is_z3_node<BAs...>(n->value);
 }
 
+template <typename... BAs>
+auto is_z3_constant = [](const tau<BAs...>& n) {
+	return std::holds_alternative<z3::expr>(n->child[0]->value);
+};
+
+template <typename... BAs>
+auto is_z3_literal = [](const tau<BAs...>& n) {
+	return is_child_non_terminal<tau_parser::z3_eq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::z3_neq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::z3_less_equal, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::z3_nleq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::z3_greater, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::z3_ngreater, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::z3_greater_equal, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::z3_ngeq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::z3_less, BAs...>(n);
+};
+
+template <typename... BAs>
+auto is_tau_literal = [](const tau<BAs...>& n) {
+	return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bf_less_equal, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bf_nleq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bf_greater, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bf_ngreater, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bf_greater_equal, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bf_ngeq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bf_less, BAs...>(n);
+};
+
 // check if a node is a non terminal node
 template <typename... BAs>
 bool is_non_terminal_node(const rewriter::node<tau_sym<BAs...>>& s) {
@@ -206,8 +237,6 @@ template <typename... BAs>
 static const auto is_regular_or_temporal_quantifier = [](const tau<BAs...>& n) {
 	return is_quantifier<BAs...>(n) || is_temporal_quantifier<BAs...>(n);
 };
-
-
 
 template <typename... BAs>
 using is_var_or_capture_t = decltype(is_var_or_capture<BAs...>);

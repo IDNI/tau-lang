@@ -8,6 +8,7 @@
 
 #include "boolean_algebras/nso_ba.h"
 #include "execution.h"
+#include "base_bas/z3.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -3003,6 +3004,179 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 	return res;
 }
 
+
+template<typename... BAs>
+bool is_z3_quantifier(const tau<BAs...>& fm) {
+	return is_quantifier<BAs...>(fm)
+		&& (fm
+			| only_child_extractor<BAs...> /* all or or */
+			| tau_parser::q_vars
+			| only_child_extractor<BAs...>).has_value(); /* only one var allowed */
+/*	if (fm->child.size() != 2 || fm->child[1]->child.size() != 1) return false;
+	auto type = fm->child[1]->child[0]->value;
+	if (!std::holds_alternative<tau_source_sym>(type)
+		||  !get<tau_source_sym>(type).nt()) return false;
+	auto check = get<tau_source_sym>(type).n();
+	return is_quantifier<BAs...>(fm)
+		&& check == tau_parser::bv_type;*/
+}
+
+template<typename... BAs>
+std::vector<tau<BAs...>> get_z3_variables(const tau<BAs...>& fm) {
+	auto is_z3_var = [](const auto& n) {
+		return is_non_terminal<tau_parser::z3, BAs...>(n)
+			&& is_child_non_terminal<tau_parser::variable, BAs...>(n);
+	};
+	return select_top(fm, is_z3_var);
+}
+
+template<typename... BAs>
+std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_conjunctions(const tau<BAs...>& fm) {
+	tau<BAs...> z3_literals = _T<BAs...>;
+	tau<BAs...> tau_literals = _T<BAs...>;
+	tau<BAs...> z3_constants = _T<BAs...>;
+	auto collect = [&z3_literals, &tau_literals, &z3_constants](const auto& n) {
+		if (is_z3_literal<BAs...>(n)) {
+			z3_literals = build_wff_and(z3_literals, n);
+			return true;
+		} else if (is_z3_constant<BAs...>(n)) {
+			z3_constants = build_wff_and(z3_constants, n);
+			return true;
+		} else if (is_tau_literal<BAs...>(n)) {
+			tau_literals = build_wff_and(tau_literals, n);
+			return true;
+		}
+		return false;
+	};
+	select_top(fm, collect);
+	return std::make_tuple(z3_literals, z3_constants, tau_literals);
+}
+
+template<typename... BAs>
+std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_disjunctions(const tau<BAs...>& fm) {
+	tau<BAs...> z3_literals = _F<BAs...>;
+	tau<BAs...> tau_literals = _F<BAs...>;
+	tau<BAs...> z3_constants = _F<BAs...>;
+	auto collect = [&z3_literals, &tau_literals, &z3_constants](const auto& n) {
+		if (is_z3_literal<BAs...>(n)) {
+			z3_literals = build_wff_or(z3_literals, n);
+			return true;
+		} else if (is_z3_constant<BAs...>(n)) {
+			z3_constants = build_wff_or(z3_constants, n);
+			return true;
+		} else if (is_tau_literal<BAs...>(n)) {
+			tau_literals = build_wff_or(tau_literals, n);
+			return true;
+		}
+		return false;
+	};
+	select_top(fm, collect);
+	return std::make_tuple(z3_literals, z3_constants, tau_literals);
+}
+
+template<typename... BAs>
+auto build_z3_var(const tau<BAs...>& fm) {
+	std::string name = make_string<tau_node_terminal_extractor_t<BAs...>,tau<BAs...>>(
+		tau_node_terminal_extractor<BAs...>, fm);
+	return z3_context.bv_const(name.c_str() ,64);
+}
+
+template<typename... BAs>
+auto build_z3_skolem_func(const std::vector<tau<BAs...>>& vars) {
+	z3::sort_vector z3_vars_sorts(z3_context);
+	z3::expr_vector z3_vars_vec(z3_context);
+	std::map<tau<BAs...>, z3::expr> z3_vars_map;
+	for (size_t i = 0; i < vars.size(); i++) {
+		z3_vars_sorts.push_back(BV);
+		auto z3_var = build_z3_var(vars[i]);
+		z3_vars_vec.push_back(z3_var);
+		z3_vars_map.emplace(vars[i], z3_var);
+	}
+	auto skloem_func = z3_context.function("skolem", z3_vars_sorts, BOOL);
+	return std::make_tuple(skloem_func(z3_vars_vec), z3_vars_map, z3_vars_vec);
+}
+
+template<typename... BAs>
+tau<BAs...> eliminate_z3_existential_quantifier_from_clause(const tau<BAs...>& qvar, const tau<BAs...>& scoped_fm) {
+	auto z3_vars = get_z3_variables(scoped_fm);
+	if (auto it = find(z3_vars.begin(), z3_vars.end(), qvar); it != z3_vars.end()) {
+		// remove qvar from variables to be used in skolem function
+		z3_vars.erase(it);
+		// get z3 quantified variable and skolem function
+		auto z3_qvar = build_z3_var(qvar);
+		auto [z3_skolem_func, z3_vars_map, z3_vars_vec] = build_z3_skolem_func(z3_vars);
+		// split the clause into its constituents
+		auto [z3_literals, z3_constants, tau_literals] = split_clause_in_conjunctions(scoped_fm);
+		// get z3 expr from tau_literals
+		auto z3_tau_literals = eval_z3(tau_literals, z3_vars_map);
+		// replace quantified var by skolem function
+		auto z3_inner_fm = z3_tau_literals.replace(z3_qvar, z3_skolem_func);
+		z3::solver s(z3_context);
+		s.add(
+			forall(
+				z3_qvar,
+				z3::ite( /* if then else */
+					z3_inner_fm,
+					z3_skolem_func == z3_context.bool_val(true),
+					z3_skolem_func == z3_context.bool_val(false)
+				)
+			)
+		);
+		// check if the formula is satisfiable
+		if (s.check() == z3::sat) {
+			// get the model
+			auto m = s.get_model();
+			// get the value of the skolem function
+			auto z3_expr = m.eval(z3_skolem_func);
+			auto z3_tau_expr = make_node<tau_sym<BAs...>>(z3_expr, {});
+			return build_wff_and(z3_constants, build_wff_and(tau_literals, z3_tau_expr));
+		} else {
+			return _F<BAs...>;
+		}
+	}
+	return scoped_fm;
+}
+
+template<typename... BAs>
+tau<BAs...> eliminate_z3_existential_quantifier(const tau<BAs...>& qvar, const tau<BAs...>& scoped_fm) {
+	//; one Bool free var
+	//; all x x & y = 1
+	//; ite stands for if-then-else
+
+	//(declare-fun f (Bool) Bool)
+	//(assert (forall ((y Bool)) (ite (forall ((x Bool)) (= (and y x) true)) (= (f y) true) (= (f y) false))))
+	//(check-sat)
+	//(get-model)
+	//(reset)
+
+	auto reduced_scoped_fm = reduce_across_bfs(scoped_fm, false);
+	tau<BAs...> eliminated = _T<BAs...>;
+	for (const auto& clause : get_leaves(reduced_scoped_fm, tau_parser::wff_or)) {
+		eliminated = build_wff_or(eliminated, eliminate_z3_existential_quantifier_from_clause<BAs...>(qvar, clause));
+	}
+	return eliminated;
+}
+
+template<typename... BAs>
+tau<BAs...> eliminate_z3_universal_quantifier(const tau<BAs...>& qvar, const tau<BAs...>& scoped_fm) {
+	// all x ... <-> not (ex x not)
+	return build_wff_neg(eliminate_z3_existential_quantifier<BAs...>(qvar, build_wff_neg(scoped_fm)));
+}
+
+template<typename... BAs>
+tau<BAs...> eliminate_z3_quantifier(const tau<BAs...>& inner_fm) {
+	if (is_z3_quantifier<BAs...>(inner_fm)) {
+		auto scoped_fm = trim(inner_fm)->child[1];
+		auto qvar = trim2(inner_fm);
+		if (is_child_non_terminal(tau_parser::wff_ex, inner_fm)) {
+			return eliminate_z3_existential_quantifier<BAs...>(qvar, scoped_fm);
+		} else if (is_child_non_terminal(tau_parser::wff_all, inner_fm)) {
+			return eliminate_z3_universal_quantifier<BAs...>(qvar, scoped_fm);
+		}
+	}
+	return inner_fm;
+}
+
 // Pushes all universal and existential quantifiers as deep as possible into the formula
 // and then eliminate them, returning a quantifier free formula
 template<typename... BAs>
@@ -3010,6 +3184,8 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	// Lambda is applied to nodes of fm in post order after quantifiers have
 	// been pushed in
 	auto elim_quant = [](const tau<BAs...>& inner_fm) -> tau<BAs...> {
+		// call z3 quantifier elimination if it is a z3 quantifier
+		if (is_z3_quantifier(inner_fm)) return eliminate_z3_quantifier(inner_fm);
 		// Find out if current node is a quantifier
 		bool is_ex_quant;
 		if (is_child_non_terminal(tau_parser::wff_ex, inner_fm))
@@ -3066,6 +3242,9 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	// Push quantifiers in during pre-order traversal
 	// and eliminate quantifiers during the traversal back up (post-order)
 	auto push_and_elim = [&elim_quant, &push_quantifiers, visit](const tau<BAs...>& n) {
+		// TODO (HIGH) if the variable is a z3 variable and the quantified formula
+		// doesn't conatins it, we can remove the quantifier
+
 		if (is_child_quantifier<BAs...>(n)) {
 			return pre_order(n).template
 			apply_unique<MemorySlotPre::eliminate_quantifiers_m>(
