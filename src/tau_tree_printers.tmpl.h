@@ -490,7 +490,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (pnt) {
 			case bf_and:
 				if (isdigit(last_written_char)
-					|| t.is(tau::bf_constant))
+					|| t.child_is(tau::bf_constant))
 						out(" ");
 				break;
 			case bf_or:             out("|"); break;
