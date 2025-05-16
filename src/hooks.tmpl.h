@@ -490,6 +490,15 @@ tau<BAs...> make_node_hook_wff_or(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
+tau<BAs...> make_node_hook_z3_literal(const tau_parser::nonterminal nt, const rewriter::node<tau_sym<BAs...>>& n) {
+	return wrap(tau_parser::wff, {
+		wrap(nt, {
+			logic_operator(n)->child[0],
+			logic_operator(n)->child[1]})});
+}
+
+
+template <typename... BAs>
 tau<BAs...> make_node_hook_wff_neg(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
 	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
@@ -500,8 +509,27 @@ tau<BAs...> make_node_hook_wff_neg(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
 	if (auto double_neg = first_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff; double_neg)
 		return double_neg.value();
-	if (is_non_terminal<tau_parser::constraint>(first_argument_expression(n))) {
+	if (is_non_terminal<tau_parser::constraint>(first_argument_expression(n)))
 		return make_node_hook_ctn_neg(first_argument_expression(n));
+	switch (get_non_terminal_node(logic_operator(n))) {
+		case tau_parser::z3_eq:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_neq, n);
+		case tau_parser::z3_neq:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_eq, n);
+		case tau_parser::z3_less_equal:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_nleq, n);
+		case tau_parser::z3_nleq:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_less_equal, n);
+		case tau_parser::z3_greater_equal:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_ngeq, n);
+		case tau_parser::z3_ngeq:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_greater_equal, n);
+		case tau_parser::z3_less:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_nless, n);
+		case tau_parser::z3_greater:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_ngreater, n);
+		case tau_parser::z3_ngreater:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_greater, n);
 	}
 	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 }
@@ -1041,6 +1069,7 @@ tau<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n) {
 			return make_node_hook_wff_ngeq<BAs...>(n);
 		case tau_parser::bf_interval:
 			return make_node_hook_wff_interval<BAs...>(n);
+		// TODO (HIGH) add simplification hooks for z3 operators
 		default: return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	}
 }
