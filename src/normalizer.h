@@ -14,7 +14,7 @@ namespace idni::tau_lang {
 
 // ref offset info. first is offset type (num/capture/shift/variable)
 // and second is value of num, rr_dict id of capture or 0 for shift and variable
-using offset_t = std::pair<size_t, size_t>;
+using offset_t = std::pair<tau_parser::nonterminal, size_t>;
 
 template <NodeType node>
 tref normalizer_step(tref form);

@@ -71,12 +71,6 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 					nt = bf; break;
 				case bf_and_nosep:
 					nt = bf_and; break;
-				// offset or ref_arg variable -> capture
-				case variable:
-					if (parent_nt == offsets
-						|| parent_nt == ref_arg)
-							nt = capture;
-					break;
 				default: break;
 			}
 			return static_cast<type>(nt);

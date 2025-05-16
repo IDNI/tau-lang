@@ -17,6 +17,8 @@ std::optional<rr> infer_ref_types(const rr& nso_rr);
 template <NodeType node>
 std::optional<rr> infer_ref_types(const rr& nso_rr, ref_types<node>& ts);
 
+// -----------------------------------------------------------------------------
+
 // rr name-id dict
 static inline std::vector<std::string> rr_v{ "dummy" };
 static inline std::map<std::string, size_t> rr_m{};
@@ -58,7 +60,6 @@ struct ref_types {
 	template <NodeType NT>
 	friend std::optional<rr> infer_ref_types(const rr& nso_rr,
 						ref_types<NT>& ts);
-
 
 	ref_types(const rr& nso_rr);
 	// returns false if any error or unresolved ref

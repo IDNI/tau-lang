@@ -111,15 +111,17 @@ template <NodeType node>
 std::pair<rr_sig, std::vector<offset_t>> get_ref_info(tref ref) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	//ptree<BAs...>(std::cout << "ref? ", ref) << "\n";
+	LOG_TRACE << "get_ref_info: " << LOG_FM_DUMP(ref);
 	std::pair<rr_sig, std::vector<offset_t>>
 					ret{ get_rr_sig<node>(ref), {} };
 	auto offsets = tt(ref) | tau::offsets || tau::offset;
-	//LOG_DEBUG << "(T) -- get_ref " << ref << " " << ret.first << " offsets.size: " << offsets.size();
+	LOG_TRACE << "get ref " << LOG_RR_SIG(ret.first) << " offsets.size: " << offsets.size();
 	for (auto offset : offsets()) {
-		auto t = offset | tt::only_child | tt::Tree;
-		size_t nt = t.get_type();
-		if (nt == tau::integer) ret.second.emplace_back(nt, t.data());
+		const auto& t = offset[0];
+		int_t d = 0;
+		if (t.is_integer()) d = t.get_integer();
+		else if (t.get_type() == tau::capture) d = t.data();
+		ret.second.emplace_back(t.get_type(), d);
 		break; // consider only first offset for now
 		// TODO (LOW) support multiindex offsets
 		// need to find a canonical way of enumeration first
@@ -481,11 +483,12 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 template <NodeType node>
 tref bf_normalizer_with_rec_relation(const rr &bf) {
 	using tt = typename tree<node>::traverser;
+	rr rr_ = transform_ref_args_to_captures<node>(bf);
 	LOG_DEBUG << "Begin calculate recurrence relation";
-	auto main = calculate_all_fixed_points<node>(bf);
+	auto main = calculate_all_fixed_points<node>(rr_);
 	if (!main) return nullptr;
 	tref bf_unfolded = tt(main) | repeat_all<node, step<node>>(
-					step<node>(bf.rec_relations)) | tt::ref;
+					step<node>(rr_.rec_relations)) |tt::ref;
 	LOG_DEBUG << "End calculate recurrence relation";
 
 	LOG_DEBUG << "Begin Boolean function normalizer";
@@ -499,6 +502,8 @@ tref bf_normalizer_with_rec_relation(const rr &bf) {
 template <NodeType node>
 tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 	using tau = tree<node>;
+	LOG_TRACE << "Begin build_enumerated_main_step: " << LOG_FM_DUMP(form)
+		<< " step: " << i << " offset arity: " << offset_arity;
 	subtree_map<node, tref> changes;
 	trefs ofs; // create offsets node
 	ofs.push_back(tau::get(tau::offset, tau::get_integer(i)));
@@ -506,7 +511,11 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 		ofs.push_back(tau::get(tau::offset, tau::get_integer(0)));
 
 	// create enumerated replacement
-	const auto& t = tau::get(form).only_child_tree();
+	const auto& t = tau::get(form)[0][0];
+	LOG_TRACE << "t: " << LOG_FM_DUMP(t.get());
+	LOG_TRACE << "t.value: " << t.value;
+	LOG_TRACE << "t[0]: " << LOG_FM(t.first());
+	LOG_TRACE << "t[1]: " << LOG_FM(t.second());
 	changes[t.get()] = tau::get(t.value,
 		{ t.first(), tau::get(tau::offsets, ofs), t.second() },
 		t.right_sibling());
@@ -518,6 +527,7 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 template <NodeType node>
 bool is_valid(const rr& nso_rr) {
 	using tau = tree<node>;
+	LOG_TRACE << "-- is_valid: " << LOG_RR(nso_rr);
 	for (tref main_offsets : tau::get(nso_rr.main)
 		.select_all(is<node,tau::offsets>)) if (tau::get(main_offsets)
 			.find_top(is<node, tau::capture>))
@@ -540,14 +550,14 @@ bool is_valid(const rr& nso_rr) {
 		if (left.second.size() == 0) continue; // no offsets
 		// take only first offset for consideration
 		offset_t ho = left.second.front();
-		//LOG_DEBUG << "(T) -- head offset " << ho.first << " / " << ho.second;
+		LOG_TRACE << "head offset " << LOG_NT(ho.first) << " / " << ho.second;
 		for (tref ref : tau::get(r.second)
 			.select_all(is<node, tau::ref>))
 		{
 			auto right = get_ref_info<node>(ref);
 			if (right.second.size() == 0) continue; // no offsets
 			auto& bo = right.second.front();
-			//LOG_DEBUG << "(T) -- body offset " << bo.first << " / " << bo.second;
+			LOG_TRACE << "body offset " << LOG_NT(bo.first) << " / " << bo.second;
 			if (ho.first == tau::integer) {
 				if (bo.first == tau::capture) {
 					LOG_ERROR << "Recurrence relation "
@@ -568,13 +578,14 @@ bool is_valid(const rr& nso_rr) {
 			}
 		}
 	}
-	//LOG_DEBUG << "(I) -- Recurrence relation is well founded";
+	LOG_TRACE << "-- Recurrence relation is valid";
 	return true;
 }
 
 template <NodeType node>
 bool is_well_founded(const rr& nso_rr) {
 	using tau = tree<node>;
+	LOG_TRACE << "-- is_well_founded: " << LOG_RR(nso_rr);
 	std::unordered_map<rr_sig, std::set<rr_sig>> graph;
 	std::unordered_map<rr_sig, bool> visited, visiting;
 	std::function<bool(rr_sig)> is_cyclic = [&](const rr_sig& sig) {
@@ -589,6 +600,7 @@ bool is_well_founded(const rr& nso_rr) {
 	};
 	bool has_relative_rule = false;
 	for (size_t ri = 0; ri != nso_rr.rec_relations.size(); ++ri) {
+		LOG_TRACE <<"rec relation "<<LOG_RULE(nso_rr.rec_relations[ri]);
 		const auto& r = nso_rr.rec_relations[ri];
 		auto left = get_ref_info<node>(get_ref<node>(r.first->get()));
 		for (const auto& [ot, _] : left.second)
@@ -597,14 +609,14 @@ bool is_well_founded(const rr& nso_rr) {
 		if (left.second.size() == 0) continue; // no offsets
 		// take only first offset for consideration
 		offset_t ho = left.second.front();
-		//LOG_DEBUG << "(T) -- head offset " << ho.first << " / " << ho.second;
+		LOG_TRACE << "head offset " << LOG_NT(ho.first) << " / " << ho.second;
 		for (const auto& ref : tau::get(r.second).select_all(
 			is<node, tau::ref>))
 		{
 			auto right = get_ref_info<node>(ref);
 			if (right.second.size() == 0) continue; // no offsets
 			auto& bo = right.second.front();
-			//LOG_DEBUG << "(T) -- body offset " << bo.first << " / " << bo.second;
+			LOG_TRACE << "body offset " << LOG_NT(bo.first) << " / " << bo.second;
 			if (ho == bo) graph[left.first].insert(right.first);
 		}
 		visited[left.first]  = false;
@@ -808,11 +820,12 @@ tref apply_rr_to_formula(const rr& nso_rr) {
 	using tt = typename tree<node>::traverser;
 	LOG_DEBUG << "Start apply_rr_to_formula";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
-	tref main = calculate_all_fixed_points<node>(nso_rr);
+	rr rr_ = transform_ref_args_to_captures<node>(nso_rr);
+	tref main = calculate_all_fixed_points<node>(rr_);
 	if (!main) return nullptr;
 	// Substitute function and recurrence relation definitions
 	tref new_main = main
-		| repeat_all<node, step<node>>(step<node>(nso_rr.rec_relations))
+		| repeat_all<node, step<node>>(step<node>(rr_.rec_relations))
 		| tt::ref;
 	LOG_DEBUG << "End apply_rr_to_formula";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
