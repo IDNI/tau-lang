@@ -9,24 +9,17 @@ template <NodeType node>
 tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
-	HOOK_LOGGING(
-		if (v.nt == tau::bf || v.nt == tau::wff || v.nt == tau::shift)
+	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift)
 			log("- HOOK    -", v, ch, len, r, true);)
-
 	tref ret = nullptr;
 	if      (v.nt == tau::bf)    ret = term( v, ch, len, r);
 	else if (v.nt == tau::wff)   ret = wff(  v, ch, len, r);
 	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
-	else {
-		// HOOK_LOGGING(log("RESULT unchanged", v, ch, len, r);)
-		return tau::get_raw(v, ch, len, r);
-	}
-#ifdef HOOK_LOGGING_ENABLED
-	// log("RESULT", v, ch, len, r);
-	LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);
-#endif // HOOK_LOGGING_ENABLED
-	DBG(auto type = tau::get(ret).get_type();)
-	DBG(assert(type == tau::bf || type == tau::wff || type == tau::shift);)
+	else return tau::get_raw(v, ch, len, r);
+
+	HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM(ret);)
+	DBG(typename node::type nt = tau::get(ret).get_type();)
+	DBG(assert(nt == tau::bf || nt == tau::wff || nt == tau::shift);)
 	return ret;
 }
 
@@ -38,19 +31,14 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 	if (!track_each_call) return;
 	std::stringstream ss;
 	ss << "[" << msg << "] ";
-	// while (ss.tellp() < 8) ss << " ";
 	ss << LOG_NT(v.nt);
 	if (len) {
 		ss << " \t[";
-		for (size_t i = 0; i < len; ++i) {
-			ss << (i ? ", " : "") // << ch[i] << " "
-				<< LOG_NT(tau::get(ch[i]).value.nt) << "( "
-				<< LOG_FM(ch[i]) << " )";
-			// if (tau::get(ch[i]).r) ss << " >> " << tau::get(ch[i]).r;
-		}
+		for (size_t i = 0; i < len; ++i)
+			ss <<(i ? ", " : "")<<LOG_NT(tau::get(ch[i]).get_type())
+				<< "(" << LOG_FM(ch[i]) << ")";
 		ss << "]";
 	}
-	// if (r) ss << " >> " << r;
 	LOG_TRACE << ss.str();
 }
 void applied(const std::string& rule) {
@@ -61,27 +49,16 @@ void applied(const std::string& rule) {
 
 template <NodeType node>
 const tree<node>& get_hook<node>::arg1(const tref* ch) {
-	// std::cout << "arg1: ";
-	// TAU_DUMP(ch[0]) << "\n\t" << std::flush;
-	// TAU_DUMP(tau::get(ch[0])[0].first()) << std::endl;
 	return tau::get(ch[0])[0][0];
 }
 
 template <NodeType node>
 const tree<node>& get_hook<node>::arg2(const tref* ch) {
-	// std::cout << "arg2: ";
-	// TAU_DUMP(ch[0]) << "\n\t " << std::flush;
-	// TAU_DUMP(tau::get(ch[0]).second()) << "\n\t " << std::flush;
-	// TAU_DUMP(tau::get(ch[0])[1].first()) << std::endl;
 	return tau::get(ch[0])[1][0];
 }
 
 template <NodeType node>
 const tree<node>& get_hook<node>::arg3(const tref* ch) {
-	// std::cout << "arg3: ";
-	// TAU_DUMP(ch[0]) << "\n\t" << std::flush;
-	// TAU_DUMP(tau::get(ch[0]).third()) << "\n\t " << std::flush;
-	// TAU_DUMP(tau::get(ch[0])[2].first()) << std::endl;
 	return tau::get(ch[0])[2][0];
 }
 
@@ -477,7 +454,7 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 
 template <NodeType node>
 tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
+	[[maybe_unused]] size_t len, tref right)
 {
 	HOOK_LOGGING(log("cte_or", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
@@ -490,7 +467,7 @@ tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
 
 template <NodeType node>
 tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
+	[[maybe_unused]] size_t len, tref right)
 {
 	HOOK_LOGGING(log("cte_and", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
@@ -503,7 +480,7 @@ tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
 
 template <NodeType node>
 tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
+	[[maybe_unused]] size_t len, tref right)
 {
 	HOOK_LOGGING(log("cte_xor", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
@@ -516,7 +493,7 @@ tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
 
 template <NodeType node>
 tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
+	[[maybe_unused]] size_t len, tref right)
 {
 	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
