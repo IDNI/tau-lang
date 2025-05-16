@@ -28,8 +28,8 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	using tau = tree<node<BAs...>>;
 	os << tau::node::name(n.nt);
 #ifdef DEBUG
-	if (bool print_nt_ids = false; print_nt_ids) os << "(" << n.nt << ")";
-	if (bool print_is_term = false; print_is_term && n.term) os << "*";
+	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
+	if (bool print_is_term = true; print_is_term && n.term) os << "*";
 	if (n.data) os << "[" << n.data << "]";
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
@@ -66,18 +66,6 @@ std::ostream& print(std::ostream& os, const rewriter::rule& r) {
 }
 
 template <NodeType node>
-std::ostream& dump(std::ostream& os, const rewriter::rule& r) {
-	return (tree<node>::get(r.first).dump(os) << " := ",
-			tree<node>::get(r.second).dump(os) << ".");
-}
-
-template <NodeType node>
-std::string dump_to_str(const rewriter::rule& r) {
-	std::stringstream ss;
-	return dump<node>(ss, r), ss.str();
-}
-
-template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rules& rs) {
 	for (const auto& r : rs) print<node>(os, r) << " ";
 	return os;
@@ -106,6 +94,43 @@ template <NodeType node>
 std::string to_str(const rr& rr_) {
 	std::stringstream ss;
 	return print<node>(ss, rr_), ss.str();
+}
+
+template <NodeType node>
+std::ostream& dump(std::ostream& os, const rewriter::rule& r) {
+	return (tree<node>::get(r.first).dump(os) << " := ",
+			tree<node>::get(r.second).dump(os) << ".");
+}
+
+template <NodeType node>
+std::ostream& dump(std::ostream& os, const rewriter::rules& rs) {
+	for (const auto& r : rs) dump<node>(os, r);
+	return os;
+}
+
+template <NodeType node>
+std::ostream& dump(std::ostream& os, const rr& rr_) {
+	dump<node>(os, rr_.rec_relations);
+	if (rr_.main) tree<node>::get(rr_.main).dump(os);
+	return os;
+}
+
+template <NodeType node>
+std::string dump_to_str(const rewriter::rule& r) {
+	std::stringstream ss;
+	return dump<node>(ss, r), ss.str();
+}
+
+template <NodeType node>
+std::string dump_to_str(const rewriter::rules& rs) {
+	std::stringstream ss;
+	return dump<node>(ss, rs), ss.str();
+}
+
+template <NodeType node>
+std::string dump_to_str(const rr& rr_) {
+	std::stringstream ss;
+	return dump<node>(ss, rr_), ss.str();
 }
 
 inline std::ostream& operator<<(std::ostream& os, const rr_sig& s) {
