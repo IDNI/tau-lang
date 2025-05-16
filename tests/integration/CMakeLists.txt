@@ -20,6 +20,7 @@ set(TESTS
 	quantifiers
 	wff_hooks
 	bf_hooks
+	z3_hooks
 	interpreter
 )
 

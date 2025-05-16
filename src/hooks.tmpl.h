@@ -511,7 +511,7 @@ tau<BAs...> make_node_hook_wff_neg(const rewriter::node<tau_sym<BAs...>>& n) {
 		return double_neg.value();
 	if (is_non_terminal<tau_parser::constraint>(first_argument_expression(n)))
 		return make_node_hook_ctn_neg(first_argument_expression(n));
-	switch (get_non_terminal_node(logic_operator(n))) {
+	switch (get_non_terminal_node(first_argument_formula(n))) {
 		case tau_parser::z3_eq:
 			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_neq, n);
 		case tau_parser::z3_neq:
