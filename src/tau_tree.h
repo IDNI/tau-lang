@@ -594,7 +594,18 @@ template <NodeType node>
 std::string to_str(const rr& rr_);
 
 template <NodeType node>
+std::ostream& dump(std::ostream& os, const rewriter::rule& r);
+template <NodeType node>
+std::ostream& dump(std::ostream& os, const rewriter::rules& rs);
+template <NodeType node>
+std::ostream& dump(std::ostream& os, const rr& rr_);
+
+template <NodeType node>
 std::string dump_to_str(const rewriter::rule& r);
+template <NodeType node>
+std::string dump_to_str(const rewriter::rules& rs);
+template <NodeType node>
+std::string dump_to_str(const rr& rr_);
 
 
 std::ostream& operator<<(std::ostream& os, const rr_sig& s);

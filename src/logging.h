@@ -205,6 +205,9 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 // LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
 #define LOG_RR(nso_rr)   LOG_FM_COLOR << to_str<node>(nso_rr)       <<TC.CLEAR()
 
+// LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
+#define LOG_RR_DUMP(nso_rr)  LOG_FM_COLOR<<dump_to_str<node>(nso_rr)<<TC.CLEAR()
+
 // -----------------------------------------------------------------------------
 
 BOOST_LOG_ATTRIBUTE_KEYWORD(channel_attr, "Channel", std::string)
