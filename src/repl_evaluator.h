@@ -178,7 +178,7 @@ private:
 	typed_io_vars inputs;
 	typed_io_vars outputs;
 	bool error = false;
-	idni::term::colors TC{};
+	term::colors TC{};
 };
 
 } //idni::tau_lang namespace

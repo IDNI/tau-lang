@@ -18,20 +18,19 @@ namespace idni::tau_lang {
 template <typename... BAs>
 concept BAsPack = sizeof...(BAs) > 0;
 
-template <typename N>
+template <typename node>
 concept NodeType = requires { // Node Type has to provide
 	// node type
-	typename N::type;
+	typename node::type;
 	// type aliases for the packed variant types
-	typename N::nso_factory;
-	typename N::bas_variant;
-	typename N::tau_ba_t;
+	typename node::bas_variant;
+	typename node::nso_factory;
 	// nt is convertible to size_t
-	{ std::declval<N>().nt } -> std::convertible_to<size_t>;
+	{ std::declval<node>().nt } -> std::convertible_to<size_t>;
 	// data is convertible to size_t
-	{ std::declval<N>().data } -> std::convertible_to<size_t>;
+	{ std::declval<node>().data } -> std::convertible_to<size_t>;
 	// hashit is convertible to size_t
-	// { std::declval<N>().hashit() } -> std::convertible_to<size_t>;
+	// { std::declval<node>().hashit() } -> std::convertible_to<size_t>;
 };
 
 // -----------------------------------------------------------------------------
@@ -71,9 +70,7 @@ struct node {
 	// alias for recreation of the packed variant
 	using bas_variant = std::variant<BAs...>;
 	// alias for nso_factory<BAs...>
-	using nso_factory = idni::tau_lang::nso_factory<BAs...>;
-	// alias for tau_ba<BAs...>
-	using tau_ba_t = idni::tau_lang::tau_ba<BAs...>;
+	using nso_factory = tau_lang::nso_factory<BAs...>;
 
 	using T = size_t; // just to simplify changes or templating it later
 
@@ -155,7 +152,7 @@ struct node {
 // Tree is usually created by static get calls either manually or transformed
 // from a tau parse tree
 //
-// - inherits tree API from lcrs_tree<N>
+// - inherits tree API from lcrs_tree<node>
 // - provides traverser (tt) API for simple traversal and extraction
 // - provides tau tree builders
 // - provides type aliases for further usage:
@@ -165,12 +162,12 @@ struct node {
 //     - parse_options = tau_parser::parse_options
 //
 
-template <NodeType N>
-struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
-	using base_t = idni::lcrs_tree<N>;
-	using tau = tree<N>;
-	using node = N;
+template <NodeType node>
+struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
+	using node_type = node;
+	using base_t = lcrs_tree<node>;
 	using parse_tree = tau_parser::tree;
+	using tau = tree<node>;
 	using bas_variant = node::bas_variant;
 
 	inline static bool use_hooks = true; 
@@ -445,9 +442,6 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	// wraps this node by a traverser
 	traverser operator()() const;
 
-	// shortcut alias used mostly internally
-	using tt = traverser;
-
 	// ---------------------------------------------------------------------
 	// builder (tau_tree_builders.tmpl.h)
 
@@ -461,14 +455,14 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref _1_trimmed();
 	static tref _F_trimmed();
 	static tref _T_trimmed();
-	static const tree<N>& get_0();
-	static const tree<N>& get_1();
-	static const tree<N>& get_F();
-	static const tree<N>& get_T();
-	static const tree<N>& get_0_trimmed();
-	static const tree<N>& get_1_trimmed();
-	static const tree<N>& get_F_trimmed();
-	static const tree<N>& get_T_trimmed();
+	static const tree<node>& get_0();
+	static const tree<node>& get_1();
+	static const tree<node>& get_F();
+	static const tree<node>& get_T();
+	static const tree<node>& get_0_trimmed();
+	static const tree<node>& get_1_trimmed();
+	static const tree<node>& get_F_trimmed();
+	static const tree<node>& get_T_trimmed();
 
 	// TODO (LOW) this could be somehow easily generatable by parser_gen
 	// or maybe create simple builder api, maybe with >> operator
@@ -563,6 +557,10 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		const std::string& io_var_node, size_t shift, std::string t = "t");
 	static tref build_out_var_at_t_minus_indexed(
 		size_t index, size_t shift, std::string t = "t");
+
+private:
+	using tt = traverser;
+
 };
 
 // -----------------------------------------------------------------------------

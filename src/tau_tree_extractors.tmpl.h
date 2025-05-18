@@ -97,7 +97,6 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 
 template <NodeType node>
 trefs get_leaves(tref n, typename node::type branch) {
-	using tau = tree<node>;
 	trefs leaves;
 	get_leaves<node>(n, branch, leaves);
 	LOG_TRACE << "got leaves: " << leaves.size();
@@ -244,7 +243,9 @@ subtree_set<node> get_free_vars_from_nso(tref n) {
 			if (auto offset_child = t() | tau::io_var | tau::offset
 				| tt::only_child; offset_child)
 			{
-				if (is_var_or_capture<node>(offset_child.value())) {
+				if (is_var_or_capture<node>(
+					offset_child.value()))
+				{
 					tref var = offset_child | tt::ref;
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
@@ -254,8 +255,11 @@ subtree_set<node> get_free_vars_from_nso(tref n) {
 								.value());
 						free_vars.erase(it);
 					}
-				} else if (offset_child.value_tree().is(tau::shift)) {
-					tref var = offset_child | tt::first | tt::ref;
+				} else if (offset_child.value_tree()
+								.is(tau::shift))
+				{
+					tref var = offset_child
+						| tt::first | tt::ref;
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
@@ -296,7 +300,8 @@ bool has_open_tau_fm_in_constant(tref fm) {
 	for (tref c : consts) {
 		auto ba_const = tt(c) | tau::bf_constant | tt::ba_constant;
 		if (!std::visit(_closed, ba_const)) {
-			LOG_ERROR << "A Tau formula constant must be closed: " << ba_const;
+			LOG_ERROR << "A Tau formula constant must be closed: "
+								<< ba_const;
 			return true;
 		}
 	}

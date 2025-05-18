@@ -650,7 +650,6 @@ std::optional<minterm_system<node>> make_minterm_system_disjoint(
 	const minterm_system<node>& sys, const solver_options& options)
 {
 #ifdef DEBUG
-	using tau = tree<node>;
 	LOG_TRACE << "make_minterm_system_disjoint/system: ";
 	for (minterm t : sys) LOG_TRACE << LOG_FM(t);
 #endif // DEBUG
@@ -744,7 +743,6 @@ std::optional<solution<node>> solve_inequality_system(
 	// using tthe above solve method.
 
 #ifdef DEBUG
-	using tau = tree<node>;
 	LOG_TRACE << "solve_inequality_system/system: ";
 	for (inequality t : system) LOG_TRACE << LOG_FM(t);
 	#endif // DEBUG

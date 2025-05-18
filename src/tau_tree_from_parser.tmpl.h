@@ -298,7 +298,7 @@ tref tree<node>::get_from_file(const std::string& filename,
 
 template <NodeType node>
 rewriter::builder tree<node>::get_builder(tref ref) {
-	return idni::tau_lang::get_builder<node>(ref);
+	return tau_lang::get_builder<node>(ref);
 }
 
 template <NodeType node>
@@ -306,44 +306,44 @@ template <typename binder>
 rewriter::builder tree<node>::get_builder(binder& bind,
 	const std::string& source)
 {
-	return idni::tau_lang::get_builder<node, binder>(bind, source);
+	return tau_lang::get_builder<node, binder>(bind, source);
 }
 
 template <NodeType node>
 rewriter::builder tree<node>::get_builder(const std::string& source) {
-	return idni::tau_lang::get_builder<node>(source);
+	return tau_lang::get_builder<node>(source);
 }
 
 template <NodeType node>
 rewriter::rules tree<node>::get_rules(tref ref) {
-	return idni::tau_lang::get_rules<node>(ref);
+	return tau_lang::get_rules<node>(ref);
 }
 
 template <NodeType node>
 template <typename binder>
 rewriter::rules tree<node>::get_rules(binder& bind, const std::string& source) {
-	return idni::tau_lang::get_rules<node, binder>(bind, source);
+	return tau_lang::get_rules<node, binder>(bind, source);
 }
 
 template <NodeType node>
 rewriter::rules tree<node>::get_rules(const std::string& source) {
-	return idni::tau_lang::get_rules<node>(source);
+	return tau_lang::get_rules<node>(source);
 }
 
 template <NodeType node>
 rewriter::library tree<node>::get_library(tref ref) {
-	return idni::tau_lang::get_library<node>(ref);
+	return tau_lang::get_library<node>(ref);
 }
 
 template <NodeType node>
 template <typename binder>
 rewriter::library tree<node>::get_library(binder& bind, const std::string& str){
-	return idni::tau_lang::get_library<node, binder>(bind, str);
+	return tau_lang::get_library<node, binder>(bind, str);
 }
 
 template <NodeType node>
 rewriter::library tree<node>::get_library(const std::string& str) {
-	return idni::tau_lang::get_library<node>(str);
+	return tau_lang::get_library<node>(str);
 }
 
 template <NodeType node>

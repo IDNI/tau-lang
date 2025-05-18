@@ -8,10 +8,11 @@
 namespace idni::tau_lang {
 
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
-#define TC_STATUS_OUTPUT TC(color::GREEN, color::BG_LIGHT_CYAN, color::BRIGHT)
-#define TC_ERROR         TC(color::RED,   color::BRIGHT)
-#define TC_PROMPT        TC(color::WHITE, color::BRIGHT)
-#define TC_OUTPUT        TC.GREEN()
+#define TC_STATUS_OUTPUT TC(term::color::GREEN, term::color::BG_LIGHT_CYAN, \
+							term::color::BRIGHT)
+#define TC_ERROR         TC(term::color::RED,   term::color::BRIGHT)
+#define TC_PROMPT        TC(term::color::WHITE, term::color::BRIGHT)
+#define TC_OUTPUT        TC.GREEN() // TODO: change to term::color::GREEN()
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -1078,14 +1079,12 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::string repl_evaluator<BAs...>::prompt() {
-	using namespace boost::log;
-	using namespace idni::term;
 	std::stringstream ss;
 	if (opt.status) {
 		std::stringstream status;
 		if (H.size()) status << " " << TC_STATUS_OUTPUT << "%"
 			<< H.size() << TC.CLEAR() << TC_STATUS;
-		if (opt.severity != trivial::info)
+		if (opt.severity != boost::log::trivial::info)
 			status << " " << to_string(opt.severity);
 		if (status.tellp()) ss << TC_STATUS << "["
 			<< status.str() << " ]" << TC.CLEAR() << " ";

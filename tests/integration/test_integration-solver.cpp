@@ -5,7 +5,7 @@
 #include "solver.h"
 
 auto splitter_one_bdd() {
-	using bnode = idni::tau_lang::node<sbf_ba>;
+	using bnode = node<sbf_ba>;
 	static sbf_ba_factory<sbf_ba> factory;
 	return build_bf_ba_constant<bnode>(factory.splitter_one(),
 					get_ba_type_id<bnode>("sbf"));
@@ -343,7 +343,7 @@ TEST_SUITE("lgrs") {
 TEST_SUITE("solve_minterm_system") {
 
 	bool test_solve_minterm_system(const std::vector<std::string> minterms) {
-		using bnode = idni::tau_lang::node<sbf_ba>;
+		using bnode = node<sbf_ba>;
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
@@ -378,7 +378,7 @@ TEST_SUITE("solve_minterm_system") {
 TEST_SUITE("solve_inequality_system") {
 
 	bool test_solve_inequality_system(const std::vector<std::string> inequalities) {
-		using bnode = idni::tau_lang::node<sbf_ba>;
+		using bnode = node<sbf_ba>;
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
@@ -466,7 +466,7 @@ TEST_SUITE("solve_system") {
 	bool test_solve_system(const std::string equality,
 			const std::vector<std::string> inequalities)
 	{
-		using bnode = idni::tau_lang::node<sbf_ba>;
+		using bnode = node<sbf_ba>;
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG

@@ -158,8 +158,8 @@ struct bdd_reference {
 
 	static size_t hash(const bdd_reference x) {
 		size_t seed = 0;
-		idni::hash_combine(seed, x.id + x.in);
-		idni::hash_combine(seed, x.shift + x.out);
+		hash_combine(seed, x.id + x.in);
+		hash_combine(seed, x.shift + x.out);
 		return seed;
 	}
 };

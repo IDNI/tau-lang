@@ -172,7 +172,7 @@ tau_ba<BAs...> tau_splitter_one() {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm) {
-	using node = idni::tau_lang::node<BAs...>;
+	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	auto simp_fm = apply_rr_to_formula<node>(fm.nso_rr);
 	if (!simp_fm) return false;

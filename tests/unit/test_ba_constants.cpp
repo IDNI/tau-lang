@@ -28,7 +28,7 @@ namespace idni::tau_lang {
 // nso_factory for tests with <sbf_ba, Bool>
 template<>
 struct nso_factory<sbf_ba, Bool> {
-	using node = idni::tau_lang::node<sbf_ba, Bool>;
+	using node = tau_lang::node<sbf_ba, Bool>;
 
 	optional<variant<sbf_ba, Bool>> parse(const string&, const string)const{
 		throw logic_error("not implemented");

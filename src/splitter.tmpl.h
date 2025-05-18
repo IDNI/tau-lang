@@ -265,10 +265,9 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		}
 		// check for inequality parts
 		trefs neqs = tau::get(clause)
-				.select_top(is<node, tau::bf_neq>);
+					.select_top(is<node, tau::bf_neq>);
 		for (tref neq : neqs) {
-			LOG_TRACE << "neq: " << LOG_FM(neq);
-			DBG(assert(tau::get(neq)[0][1].is(tau::bf_f));)
+			DBG(assert(tau::get(neq)[1].child_is(tau::bf_f));)
 			const auto& f = tau::get(neq)[0];
 			size_t type_f = f.get_ba_type();
 			for (tref c : constants) {
@@ -315,7 +314,7 @@ requires BAsPack<BAs...>
 tref tau_splitter(tref fm, splitter_type st) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
-	LOG_DEBUG << "Start of tau_splitter" << LOG_FM(fm);
+	LOG_DEBUG << "-- Start of tau_splitter for " << LOG_FM(fm);
 	// First we decide if we deal with a temporal formula
 	if (!has_temp_var<node>(fm))
 		return nso_tau_splitter<BAs...>(fm, st).first;
