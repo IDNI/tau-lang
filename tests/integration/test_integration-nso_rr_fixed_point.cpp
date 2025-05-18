@@ -3,7 +3,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
-bool fp_test(const char* sample, typename bnode::type nt, bool expect_fail = false) {
+bool fp_test(const char* sample, typename node_t::type nt, bool expect_fail = false) {
 	return normalize_and_check(sample, nt, expect_fail);
 }
 
@@ -15,7 +15,7 @@ bool fp_test_T(const char* sample) {
 	return fp_test(sample, tau::wff_t);
 }
 
-bool fp_test_fail(const char* sample, typename bnode::type nt) {
+bool fp_test_fail(const char* sample, typename node_t::type nt) {
 	return fp_test(sample, nt, true);
 }
 

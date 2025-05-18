@@ -1348,4 +1348,4 @@ tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
 	return nullptr; // Return error
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

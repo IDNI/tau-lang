@@ -44,9 +44,9 @@ bool test(const test_case& tc) {
 	bool fail = false;
 	auto nso_rr = get_nso_rr(sample.c_str());
 	if (!nso_rr.has_value()) return fail;
-	auto got = to_str<bnode>(nso_rr.value());
+	auto got = to_str<node_t>(nso_rr.value());
 	if (got != exp) fail = true;
-	tref norm = normalizer<bnode>(nso_rr.value());
+	tref norm = normalizer<node_t>(nso_rr.value());
 	auto ngot = tau::get(norm).to_str();
 	if (fail || ngot != nexp) fail = true,
 		cout << tc << "\n\tgot:      \"" << got

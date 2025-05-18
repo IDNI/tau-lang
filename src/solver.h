@@ -188,7 +188,7 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 template <NodeType node>
 std::optional<solution<node>> solve(tref form, const solver_options& options);
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang
 
 #include "solver.tmpl.h"
 #endif // __IDNI__TAU__SOLVER_H__

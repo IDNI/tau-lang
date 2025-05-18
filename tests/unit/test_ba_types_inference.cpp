@@ -4,7 +4,7 @@
 #include "test_Bool_helpers.h"
 
 tref infer(const char* sample) {
-	return infer_ba_types<bnode>(tau::get(sample));
+	return infer_ba_types<node_t>(tau::get(sample));
 }
 
 bool expect_infer_fail(const char* sample) {
@@ -12,15 +12,15 @@ bool expect_infer_fail(const char* sample) {
 }
 
 bool are_all_typed_as(tref n, const std::string& type) {
-	size_t tid = get_ba_type_id<bnode>(type);
+	size_t tid = get_ba_type_id<node_t>(type);
 	auto are_all_trefs_typed = [&](const trefs& ts) {
 		for (tref t : ts)
 			if (tau::get(t).get_ba_type() != tid) return false;
 		return true;
 	};
 	const auto& t = tau::get(n);
-	return are_all_trefs_typed(t.select_all(is<bnode, tau::bf_constant>))
-	    && are_all_trefs_typed(t.select_all(is<bnode, tau::variable>));
+	return are_all_trefs_typed(t.select_all(is<node_t, tau::bf_constant>))
+	    && are_all_trefs_typed(t.select_all(is<node_t, tau::variable>));
 }
 
 TEST_SUITE("constant types") {

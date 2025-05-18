@@ -1009,4 +1009,4 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 	return {};
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

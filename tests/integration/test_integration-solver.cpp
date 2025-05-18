@@ -5,10 +5,10 @@
 #include "solver.h"
 
 auto splitter_one_bdd() {
-	using bnode = node<sbf_ba>;
+	using node = tau_lang::node<sbf_ba>;
 	static sbf_ba_factory<sbf_ba> factory;
-	return build_bf_ba_constant<bnode>(factory.splitter_one(),
-					get_ba_type_id<bnode>("sbf"));
+	return build_bf_ba_constant<node>(factory.splitter_one(),
+					get_ba_type_id<node>("sbf"));
 }
 
 template <NodeType node>
@@ -30,26 +30,26 @@ TEST_SUITE("minterm_iterator") {
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
-		minterm_iterator<bnode> it(fm);
+		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
 #endif // DEBUG
-		CHECK ( ++it == minterm_iterator<bnode>::end );
+		CHECK ( ++it == minterm_iterator<node_t>::end );
 	}
 
 	TEST_CASE("with two vars") {
 		const char* sample = "x | y = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
-		minterm_iterator<bnode> it(fm);
+		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
 #endif // DEBUG
 		size_t n = 1;
-		while (it++ != minterm_iterator<bnode>::end) {
+		while (it++ != minterm_iterator<node_t>::end) {
 #ifdef DEBUG
 			std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
 #endif // DEBUG
@@ -61,14 +61,14 @@ TEST_SUITE("minterm_iterator") {
 		std::cout << "------------------------------------------------------\n";
 		const char* sample = "x | y | z = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
-		minterm_iterator<bnode> it(fm);
+		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
 #endif // DEBUG
 		size_t n = 1;
-		while (it++ != minterm_iterator<bnode>::end) {
+		while (it++ != minterm_iterator<node_t>::end) {
 #ifdef DEBUG
 			std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
 #endif // DEBUG
@@ -83,7 +83,7 @@ TEST_SUITE("minterm_range") {
 	TEST_CASE("one var") {
 		const char* sample = "x = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
-		minterm_range<bnode> rng(fm);
+		minterm_range<node_t> rng(fm);
 		CHECK ( rng.begin() != rng.end() );
 		CHECK ( ++rng.begin() == rng.end() );
 	}
@@ -91,7 +91,7 @@ TEST_SUITE("minterm_range") {
 	TEST_CASE("two var") {
 		const char* sample = "x | y = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
-		minterm_range<bnode> rng(fm);
+		minterm_range<node_t> rng(fm);
 		size_t n = 0; for ([[gnu::unused]] const auto& i : rng) n++;
 		CHECK ( n == 3 );
 	}
@@ -99,7 +99,7 @@ TEST_SUITE("minterm_range") {
 	TEST_CASE("three var") {
 		const char* sample = "x | y | z = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
-		minterm_range<bnode> rng(fm);
+		minterm_range<node_t> rng(fm);
 		size_t n = 0; for ([[gnu::unused]] const auto& i : rng) n++;
 		CHECK ( n == 7 );
 	}
@@ -108,77 +108,77 @@ TEST_SUITE("minterm_range") {
 TEST_SUITE("minterm_inequality_system_iterator") {
 
 	TEST_CASE("no inequality") {
-		inequality_system<bnode> sys;
-		minterm_inequality_system_iterator<bnode> it(sys);
-		CHECK ( (it == minterm_inequality_system_iterator<bnode>::end) );
+		inequality_system<node_t> sys;
+		minterm_inequality_system_iterator<node_t> it(sys);
+		CHECK ( (it == minterm_inequality_system_iterator<node_t>::end) );
 	}
 
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
 		tref fm = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm);
-		minterm_inequality_system_iterator<bnode> it(sys);
-		CHECK ( ++it == minterm_inequality_system_iterator<bnode>::end );
+		inequality_system<node_t> sys; sys.insert(fm);
+		minterm_inequality_system_iterator<node_t> it(sys);
+		CHECK ( ++it == minterm_inequality_system_iterator<node_t>::end );
 	}
 
 	TEST_CASE("one inequality with two vars") {
 		const char* sample = "x | y != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
 		tref fm = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm);
-		minterm_inequality_system_iterator<bnode> it(sys);
+		inequality_system<node_t> sys; sys.insert(fm);
+		minterm_inequality_system_iterator<node_t> it(sys);
 		size_t n = 1;
-		while (it++ != minterm_inequality_system_iterator<bnode>::end) n++;
+		while (it++ != minterm_inequality_system_iterator<node_t>::end) n++;
 		CHECK ( n == 3 );
 	}
 
 	TEST_CASE("one inequality with three vars") {
 		const char* sample = "x | y | z != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
 		tref fm = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm);
-		minterm_inequality_system_iterator<bnode> it(sys);
-		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<bnode>::end) n++;
+		inequality_system<node_t> sys; sys.insert(fm);
+		minterm_inequality_system_iterator<node_t> it(sys);
+		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<node_t>::end) n++;
 		CHECK ( n == 7 );
 	}
 
 	TEST_CASE("two inequalities with one var") {
 		const char* sample1 = "a != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x != 0.";
-		nso_rr = get_nso_rr<bnode>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
 		tref fm2 = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm1); sys.insert(fm2);
-		minterm_inequality_system_iterator<bnode> it(sys);
-		CHECK ( ++it == minterm_inequality_system_iterator<bnode>::end );
+		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
+		minterm_inequality_system_iterator<node_t> it(sys);
+		CHECK ( ++it == minterm_inequality_system_iterator<node_t>::end );
 	}
 
 	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a | b != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x | y != 0.";
-		nso_rr = get_nso_rr<bnode>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
 		tref fm2 = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm1); sys.insert(fm2);
-		minterm_inequality_system_iterator<bnode> it(sys);
+		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
+		minterm_inequality_system_iterator<node_t> it(sys);
 		size_t n = 1;
-		while (it++ != minterm_inequality_system_iterator<bnode>::end) n++;
+		while (it++ != minterm_inequality_system_iterator<node_t>::end) n++;
 		CHECK ( n == 9 );
 	}
 
 	TEST_CASE("two inequalities with three vars") {
 		const char* sample1 = "a | b |c != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x | y | z!= 0.";
-		nso_rr = get_nso_rr<bnode>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
 		tref fm2 = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm1); sys.insert(fm2);
-		minterm_inequality_system_iterator<bnode> it(sys);
-		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<bnode>::end) n++;
+		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
+		minterm_inequality_system_iterator<node_t> it(sys);
+		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<node_t>::end) n++;
 		CHECK ( n == 49 );
 	}
 }
@@ -186,77 +186,77 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 TEST_SUITE("minterm_inequality_system_range") {
 
 	TEST_CASE("no inequality") {
-		inequality_system<bnode> sys;
-		minterm_inequality_system_range<bnode> range(sys);
+		inequality_system<node_t> sys;
+		minterm_inequality_system_range<node_t> range(sys);
 		size_t n = 0; for ([[gnu::unused]] auto& i : range) n++;
 		CHECK ( n == 0 );
 	}
 
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
 		tref fm = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm);
-		minterm_inequality_system_range<bnode> range(sys);
+		inequality_system<node_t> sys; sys.insert(fm);
+		minterm_inequality_system_range<node_t> range(sys);
 		size_t n = 0; for ([[gnu::unused]] auto& i : range) n++;
 		CHECK ( n == 1 );
 	}
 
 	TEST_CASE("one inequality with two vars") {
 		const char* sample = "x | y != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
 		tref fm = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm);
-		minterm_inequality_system_range<bnode> range(sys);
+		inequality_system<node_t> sys; sys.insert(fm);
+		minterm_inequality_system_range<node_t> range(sys);
 		size_t n = 0; for ([[gnu::unused]] auto& i : range) n++;
 		CHECK ( n == 3 );
 	}
 
 	TEST_CASE("one inequality with three vars") {
 		const char* sample = "x | y | z != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample));
 		tref fm = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm);
-		minterm_inequality_system_range<bnode> range(sys);
+		inequality_system<node_t> sys; sys.insert(fm);
+		minterm_inequality_system_range<node_t> range(sys);
 		size_t n = 0; for ([[gnu::unused]] auto& i : range) n++;
 		CHECK ( n == 7 );
 	}
 
 	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x != 0.";
-		nso_rr = get_nso_rr<bnode>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
 		tref fm2 = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm1); sys.insert(fm2);
-		minterm_inequality_system_range<bnode> range(sys);
+		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
+		minterm_inequality_system_range<node_t> range(sys);
 		size_t n = 0; for ([[gnu::unused]] auto& i : range) n++;
 		CHECK ( n == 1 );
 	}
 
 	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a | b != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x | y != 0.";
-		nso_rr = get_nso_rr<bnode>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
 		tref fm2 = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm1); sys.insert(fm2);
-		minterm_inequality_system_range<bnode> range(sys);
+		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
+		minterm_inequality_system_range<node_t> range(sys);
 		size_t n = 0; for ([[gnu::unused]] auto& i : range) n++;
 		CHECK ( n == 9 );
 	}
 
 	TEST_CASE("three inequalities with two vars") {
 		const char* sample1 = "a | b | c != 0.";
-		auto nso_rr = get_nso_rr<bnode>(tau::get(sample1));
+		auto nso_rr = get_nso_rr<node_t>(tau::get(sample1));
 		tref fm1 = nso_rr.value().main->get();
 		const char* sample2 = "x | y | z!= 0.";
-		nso_rr = get_nso_rr<bnode>(tau::get(sample2));
+		nso_rr = get_nso_rr<node_t>(tau::get(sample2));
 		tref fm2 = nso_rr.value().main->get();
-		inequality_system<bnode> sys; sys.insert(fm1); sys.insert(fm2);
-		minterm_inequality_system_range<bnode> range(sys);
+		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
+		minterm_inequality_system_range<node_t> range(sys);
 		size_t n = 0; for ([[gnu::unused]] auto& i : range) n++;
 		CHECK ( n == 49 );
 	}
@@ -276,9 +276,9 @@ TEST_SUITE("find_solution") {
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
-		tref equation = get_nso_rr<bnode>(tau::get(src)).value().main->get();
-		auto solution = find_solution<bnode>(equation);
-		return ( check_solution<bnode>(equation, solution.value()));
+		tref equation = get_nso_rr<node_t>(tau::get(src)).value().main->get();
+		auto solution = find_solution<node_t>(equation);
+		return ( check_solution<node_t>(equation, solution.value()));
 	}
 
 	TEST_CASE("one var: x = 0.") {
@@ -324,9 +324,9 @@ TEST_SUITE("lgrs") {
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
-		tref equation = get_nso_rr<bnode>(tau::get(src)).value().main->get();
-		auto solution = lgrs<bnode>(equation);
-		return ( check_solution<bnode>(equation, solution.value()) );
+		tref equation = get_nso_rr<node_t>(tau::get(src)).value().main->get();
+		auto solution = lgrs<node_t>(equation);
+		return ( check_solution<node_t>(equation, solution.value()) );
 	}
 
 	TEST_CASE("two var: x | y = 0.") {
@@ -343,21 +343,21 @@ TEST_SUITE("lgrs") {
 TEST_SUITE("solve_minterm_system") {
 
 	bool test_solve_minterm_system(const std::vector<std::string> minterms) {
-		using bnode = node<sbf_ba>;
+		using node_t = node_t<sbf_ba>;
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
-		minterm_system<bnode> system;
+		minterm_system<node_t> system;
 		for (const auto& mt : minterms) system.insert(
-				get_nso_rr<bnode>(tau::get(mt)).value().main->get());
+				get_nso_rr<node_t>(tau::get(mt)).value().main->get());
 		solver_options options = {
 			.splitter_one = splitter_one_bdd(),
 			.mode = solver_mode::general
 		};
-		auto solution = solve_minterm_system<bnode>(system, options);
+		auto solution = solve_minterm_system<node_t>(system, options);
 		bool check = true;
 		for (tref equation : system)
-			check = check ? check_solution<bnode>(
+			check = check ? check_solution<node_t>(
 					equation, solution.value()) : false;
 		return check;
 	}
@@ -378,13 +378,13 @@ TEST_SUITE("solve_minterm_system") {
 TEST_SUITE("solve_inequality_system") {
 
 	bool test_solve_inequality_system(const std::vector<std::string> inequalities) {
-		using bnode = node<sbf_ba>;
+		using node = tau_lang::node<sbf_ba>;
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
-		inequality_system<bnode> system;
+		inequality_system<node_t> system;
 		for (const auto& ineq : inequalities) {
-			system.insert(get_nso_rr<bnode>(tau::get(ineq)).value().main->get());
+			system.insert(get_nso_rr<node_t>(tau::get(ineq)).value().main->get());
 		}
 
 		// setting the proper options
@@ -393,10 +393,10 @@ TEST_SUITE("solve_inequality_system") {
 			.mode = solver_mode::general
 		};
 
-		auto solution = solve_inequality_system<bnode>(system, options);
+		auto solution = solve_inequality_system<node_t>(system, options);
 		bool check = true;
 		for (tref equation : system)
-			check = check ? check_solution<bnode>(
+			check = check ? check_solution<node_t>(
 					equation, solution.value()) : false;
 		return check;
 	}
@@ -466,20 +466,20 @@ TEST_SUITE("solve_system") {
 	bool test_solve_system(const std::string equality,
 			const std::vector<std::string> inequalities)
 	{
-		using bnode = node<sbf_ba>;
+		using node = tau_lang::node<sbf_ba>;
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
-		equation_system<bnode> system;
-		if (equality.size() != 0) system.first = get_nso_rr<bnode>(tau::get(equality)).value().main->get();
+		equation_system<node_t> system;
+		if (equality.size() != 0) system.first = get_nso_rr<node_t>(tau::get(equality)).value().main->get();
 #ifdef DEBUG
 		if (system.first)
 			std::cout << "test_solve_system/system.first: " << system.first.value() << "\n";
 #endif // DEBUG
 		for (const auto& ineq : inequalities) {
-			system.second.insert(get_nso_rr<bnode>(tau::get(ineq)).value().main->get());
+			system.second.insert(get_nso_rr<node_t>(tau::get(ineq)).value().main->get());
 #ifdef DEBUG
-			std::cout << "test_solve_system/system.second: " << tau::get(get_nso_rr<bnode>(tau::get(ineq)).value().main).dump_to_str() << "\n";
+			std::cout << "test_solve_system/system.second: " << tau::get(get_nso_rr<node_t>(tau::get(ineq)).value().main).dump_to_str() << "\n";
 #endif // DEBUG
 		}
 
@@ -490,7 +490,7 @@ TEST_SUITE("solve_system") {
 		};
 
 		// calling the solver function
-		auto solution = solve_system<bnode>(system, options);
+		auto solution = solve_system<node_t>(system, options);
 
 #ifdef DEBUG
 		// if (solution)
@@ -498,11 +498,11 @@ TEST_SUITE("solve_system") {
 #endif // DEBUG
 		auto copy = solution.value();
 		bool check = system.first
-			? check_solution<bnode>(system.first.value(), copy)
+			? check_solution<node_t>(system.first.value(), copy)
 			: false;
 		for (const auto& equation: system.second) {
 			auto copy = solution.value();
-			check = check && check_solution<bnode>(equation, copy);
+			check = check && check_solution<node_t>(equation, copy);
 		}
 		return check;
 	}
@@ -605,14 +605,14 @@ TEST_SUITE("solve") {
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
-		tref form = get_nso_rr<bnode>(tau::get(system)).value().main->get();
-		auto solution = solve<bnode>(form, options);
-		return solution ? check_solution<bnode>(form, solution.value()) : false;
+		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
+		auto solution = solve<node_t>(form, options);
+		return solution ? check_solution<node_t>(form, solution.value()) : false;
 	}
 
 	bool test_solve_min(const std::string system, const std::string type = "") {
 		solver_options options = {
-			.splitter_one = bnode::nso_factory::instance().splitter_one(type),
+			.splitter_one = node_t::nso_factory::instance().splitter_one(type),
 			.mode = solver_mode::minimum
 		};
 		return test_solve(system, options);
@@ -620,7 +620,7 @@ TEST_SUITE("solve") {
 
 	bool test_solve_max(const std::string system, const std::string type = "") {
 		solver_options options = {
-			.splitter_one = bnode::nso_factory::instance().splitter_one(type),
+			.splitter_one = node_t::nso_factory::instance().splitter_one(type),
 			.mode = solver_mode::maximum
 		};
 		return test_solve(system, options);
@@ -628,7 +628,7 @@ TEST_SUITE("solve") {
 
 	bool test_solve(const std::string system, const std::string type = "") {
 		solver_options options = {
-			.splitter_one = bnode::nso_factory::instance().splitter_one(type),
+			.splitter_one = node_t::nso_factory::instance().splitter_one(type),
 			.mode = solver_mode::general
 		};
 		return test_solve(system, options);

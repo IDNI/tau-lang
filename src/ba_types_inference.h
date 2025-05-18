@@ -46,7 +46,7 @@ private:
 };
 
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang
 
 #include "ba_types_inference.tmpl.h"
 
