@@ -604,4 +604,4 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	return os;
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

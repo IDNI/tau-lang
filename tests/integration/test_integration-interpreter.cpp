@@ -28,9 +28,9 @@ std::string random_file(const std::string& extension = ".out", const std::string
 struct output_console {
 	output_console() = default;
 	output_console(const std::string& type)
-		: _type(get_ba_type_id<bnode>(type)) {}
+		: _type(get_ba_type_id<node_t>(type)) {}
 
-	bool write(const assignment<bnode>& outputs) const {
+	bool write(const assignment<node_t>& outputs) const {
 		// for each stream in out.streams, write the value from the solution
 		for (const auto& [var, value]: outputs)
 			std::cout << var << " := " << value << "\n";
@@ -43,32 +43,32 @@ struct output_console {
 		if (!streams.contains(v)) streams.emplace(v, v);
 	}
 
-	assignment<bnode> streams;
-	size_t _type = get_ba_type_id<bnode>("sbf");
+	assignment<node_t> streams;
+	size_t _type = get_ba_type_id<node_t>("sbf");
 };
 
 struct input_vector {
 
 	input_vector() = default;
-	input_vector(std::vector<assignment<bnode>>& inputs) : inputs(
+	input_vector(std::vector<assignment<node_t>>& inputs) : inputs(
 		std::move(inputs)) {}
 	input_vector(const std::string& type)
-		: _type(get_ba_type_id<bnode>(type)) {}
-	input_vector(std::vector<assignment<bnode>>& inputs,
+		: _type(get_ba_type_id<node_t>(type)) {}
+	input_vector(std::vector<assignment<node_t>>& inputs,
 		const std::string& type) : inputs(std::move(inputs)),
-			_type(get_ba_type_id<bnode>(type)) {}
+			_type(get_ba_type_id<node_t>(type)) {}
 
-	std::optional<assignment<bnode>> get() const {
-		if (inputs.empty()) return { assignment<bnode>{} };
+	std::optional<assignment<node_t>> get() const {
+		if (inputs.empty()) return { assignment<node_t>{} };
 		if (current == inputs.size()) return {};
 		return inputs[current];
 	}
 
-	std::pair<std::optional<assignment<bnode>>, bool> read(
+	std::pair<std::optional<assignment<node_t>>, bool> read(
 		const auto&, const size_t)
 	{
-		if (inputs.empty()) return { assignment<bnode>{}, false };
-		if (current >= inputs.size()) return { assignment<bnode>{}, false };
+		if (inputs.empty()) return { assignment<node_t>{}, false };
+		if (current >= inputs.size()) return { assignment<node_t>{}, false };
 		return { inputs[current++], false };
 	}
 
@@ -78,10 +78,10 @@ struct input_vector {
 		if (!streams.contains(v)) streams.emplace(v, v);
 	}
 
-	std::vector<assignment<bnode>> inputs;
-	assignment<bnode> streams;
+	std::vector<assignment<node_t>> inputs;
+	assignment<node_t> streams;
 	size_t current = 0;
-	size_t _type = get_ba_type_id<bnode>("sbf");
+	size_t _type = get_ba_type_id<node_t>("sbf");
 };
 
 void build_input(const std::string& name,
@@ -90,13 +90,13 @@ void build_input(const std::string& name,
 {
 	size_t t = 0;
 	for (const auto& val : values) {
-		auto in_var = build_in_var_at_n<bnode>(name, t);
-		auto v = bnode::nso_factory::instance().parse(val, type);
-		auto v_const = build_bf_ba_constant<bnode>(v.value(),
-			get_ba_type_id<bnode>(type));
+		auto in_var = build_in_var_at_n<node_t>(name, t);
+		auto v = node_t::nso_factory::instance().parse(val, type);
+		auto v_const = build_bf_ba_constant<node_t>(v.value(),
+			get_ba_type_id<node_t>(type));
 
 		if (assgn.size() <= t) {
-			subtree_map<bnode, tref> a;
+			subtree_map<node_t, tref> a;
 			a.emplace(in_var, v_const);
 			assgn.emplace_back(std::move(a));
 		} else assgn[t].emplace(in_var, v_const);
@@ -108,13 +108,13 @@ void build_output(const std::string& name, const std::vector<std::string>& value
 		const std::string& type, auto& assgn) {
 	size_t t = 0;
 	for (const auto& val : values) {
-		auto out_var = build_out_var_at_n<bnode>(name, t);
+		auto out_var = build_out_var_at_n<node_t>(name, t);
 		if (val.empty()) {
 			assgn.emplace(out_var, nullptr);
 		} else {
-			auto v = bnode::nso_factory::instance().parse(val, type);
-			auto v_const = build_bf_ba_constant<bnode>(v.value(),
-				get_ba_type_id<bnode>(type));
+			auto v = node_t::nso_factory::instance().parse(val, type);
+			auto v_const = build_bf_ba_constant<node_t>(v.value(),
+				get_ba_type_id<node_t>(type));
 			assgn.emplace(out_var, v_const);
 		}
 		++t;
@@ -125,7 +125,7 @@ inline bool matches_output(const auto& assm, const auto& memory) {
 	for (const auto& [var, val] : assm) {
 		if (val == nullptr) continue;
 		if (auto it = memory.find(var); it != memory.end()) {
-			if (!are_bf_equal<bnode>(it->second, val)) {
+			if (!are_bf_equal<node_t>(it->second, val)) {
 				LOG_ERROR << LOG_FM(it->second)
 						<< " != " << LOG_FM(val);
 #ifdef DEBUG
@@ -144,7 +144,7 @@ inline bool matches_output(const auto& assm, const auto& memory) {
 }
 
 tref create_spec(const char* spec) {
-	return get_nso_rr<bnode>(tau::get(spec)).value().main->get();
+	return get_nso_rr<node_t>(tau::get(spec)).value().main->get();
 }
 
 TEST_SUITE("Execution") {
@@ -153,13 +153,13 @@ TEST_SUITE("Execution") {
 		auto spec = create_spec("o1[t] = i1[t].");
 		std::vector<std::string> i1 = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
 		std::vector<std::string> o1 = i1;
-		std::vector<assignment<bnode>> assgn_in;
-		assignment<bnode> assgn_out;
+		std::vector<assignment<node_t>> assgn_in;
+		assignment<node_t> assgn_out;
 		build_input("i1", i1, "tau", assgn_in);
 		build_output("o1", o1, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<bnode>(spec, ins, outs, 3);
+		auto i = run<node_t>(spec, ins, outs, 3);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -180,15 +180,15 @@ TEST_SUITE("Execution") {
 			"", "", "T", "<:x> = 0", "<:x> = 0 && <:y> = 0",
 			"<:x> = 0 && <:y> = 0 && <:z> = 0"
 		};
-		std::vector<assignment<bnode>> assgn_in;
-		assignment<bnode> assgn_out;
+		std::vector<assignment<node_t>> assgn_in;
+		assignment<node_t> assgn_out;
 		build_input("i1", i1, "tau", assgn_in);
 		build_input("i2", i2, "tau", assgn_in);
 		build_output("o1", o1, "tau", assgn_out);
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<bnode>(spec, ins, outs, 6);
+		auto i = run<node_t>(spec, ins, outs, 6);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -205,14 +205,14 @@ TEST_SUITE("Execution") {
 		std::vector<std::string> o3 = {
 			"", "", "", "<:x> = 0 && <:y> = 0", "<:x> = 0 && <:y> = 0"
 		};
-		std::vector<assignment<bnode>> assgn_in;
-		assignment<bnode> assgn_out;
+		std::vector<assignment<node_t>> assgn_in;
+		assignment<node_t> assgn_out;
 		build_input("i1", i1, "tau", assgn_in);
 		build_output("o3", o3, "tau", assgn_out);
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<bnode>(spec, ins, outs, 5);
+		auto i = run<node_t>(spec, ins, outs, 5);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -231,15 +231,15 @@ TEST_SUITE("Execution") {
 		std::vector<std::string> o3 = {
 			"", "T", "T", "T"
 		};
-		std::vector<assignment<bnode>> assgn_in;
-		assignment<bnode> assgn_out;
+		std::vector<assignment<node_t>> assgn_in;
+		assignment<node_t> assgn_out;
 		build_input("i1", i1, "tau", assgn_in);
 		build_output("o3", o3, "tau", assgn_out);
 		build_output("o2", o2, "tau", assgn_out);
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<bnode>(spec, ins, outs, 4);
+		auto i = run<node_t>(spec, ins, outs, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -255,14 +255,14 @@ TEST_SUITE("Execution") {
 		std::vector<std::string> o1 = {
 			"F", "F", "F", "F",
 		};
-		std::vector<assignment<bnode>> assgn_in;
-		assignment<bnode> assgn_out;
+		std::vector<assignment<node_t>> assgn_in;
+		assignment<node_t> assgn_out;
 		build_input("i1", i1, "tau", assgn_in);
 		build_output("o1", o1, "tau", assgn_out);
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<bnode>(spec, ins, outs, 4);
+		auto i = run<node_t>(spec, ins, outs, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -278,20 +278,20 @@ TEST_SUITE("Execution") {
 		std::vector<std::string> o1 = {
 			"F", "F", "T", "T",
 		};
-		std::vector<assignment<bnode>> assgn_in;
-		assignment<bnode> assgn_out;
+		std::vector<assignment<node_t>> assgn_in;
+		assignment<node_t> assgn_out;
 		build_input("i1", i1, "tau", assgn_in);
 		build_output("o1", o1, "tau", assgn_out);
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<bnode>(spec, ins, outs, 4);
+		auto i = run<node_t>(spec, ins, outs, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 }
 
 
-std::optional<assignment<bnode>> run_test(const char* sample,
+std::optional<assignment<node_t>> run_test(const char* sample,
 	input_vector& inputs, output_console& outputs, const size_t& times)
 {
 	tref spec = create_spec(sample);
@@ -301,7 +301,7 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 	std::cout << "run_test/sample: " << sample << "\n";
 #endif // DEBUG
 
-	auto intprtr = interpreter<bnode, input_vector, output_console>
+	auto intprtr = interpreter<node_t, input_vector, output_console>
 				::make_interpreter(spec, inputs, outputs);
 	if (intprtr) {
 		// we read the inputs only once (they are always empty in this test suite)
@@ -334,7 +334,7 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 			std::cout << "run_test/output[" << i << "]: ";
 			for (const auto& [var, value]: out.value()) {
 				std::cout << TAU_TO_STR(var) << " <- " << TAU_TO_STR(value) << " ... ";
-				if (tref io_var = tau::get(value).find_top(is<bnode, tau::io_var>); io_var) {
+				if (tref io_var = tau::get(value).find_top(is<node_t, tau::io_var>); io_var) {
 					std::cout << "run_test/output[" << i << "]: unexpected io_var " << TAU_TO_STR(io_var) << "\n";
 					intprtr.value().memory.clear();
 					break;
@@ -349,7 +349,7 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 	return {};
 }
 
-std::optional<assignment<bnode>> run_test(const char* sample,
+std::optional<assignment<node_t>> run_test(const char* sample,
 		const size_t& times, const std::string& type = "sbf")
 {
 	input_vector inputs(type);
@@ -357,14 +357,14 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 	return run_test(sample, inputs, outputs, times);
 }
 
-std::optional<assignment<bnode>> run_test(const char* sample,
+std::optional<assignment<node_t>> run_test(const char* sample,
 	input_vector& inputs, const size_t& times)
 {
 	output_console outputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
-std::optional<assignment<bnode>> run_test(const char* sample,
+std::optional<assignment<node_t>> run_test(const char* sample,
 	output_console& outputs, const size_t& times)
 {
 	input_vector inputs;
@@ -565,11 +565,11 @@ TEST_SUITE("only outputs") {
 TEST_SUITE("with inputs and outputs") {
 
 	input_vector build_i1_inputs(trefs values) {
-		std::vector<assignment<bnode>> assignments;
+		std::vector<assignment<node_t>> assignments;
 		size_t t = 0;
 		for (tref value : values) {
-			assignment<bnode> assignment;
-			assignment[build_in_var_at_n_indexed<bnode>(1, t)] = value;
+			assignment<node_t> assignment;
+			assignment[build_in_var_at_n_indexed<node_t>(1, t)] = value;
 			assignments.push_back(assignment);
 			++t;
 		}
@@ -611,10 +611,10 @@ TEST_SUITE("test inputs") {
 
 	TEST_CASE("reading from file with sbf inputs") {
 		typed_io_vars input_map;
-		tref var = build_var_name_indexed<bnode>(1);
-		input_map[get_var_name_sid<bnode>(var)] = {
-			get_typed_stream<bnode>("sbf", "integration/test_files/sbf-alternating_zeros_and_ones-length_10.in") };
-		finputs<bnode> inputs(input_map);
+		tref var = build_var_name_indexed<node_t>(1);
+		input_map[get_var_name_sid<node_t>(var)] = {
+			get_typed_stream<node_t>("sbf", "integration/test_files/sbf-alternating_zeros_and_ones-length_10.in") };
+		finputs<node_t> inputs(input_map);
 		CHECK ( inputs.type_of(var) > 0 );
 		for (size_t i = 0; i < 10; ++i) {
 			auto in = inputs.read();
@@ -629,10 +629,10 @@ TEST_SUITE("test inputs") {
 
 	TEST_CASE("reading from file with tau program inputs") {
 		typed_io_vars input_map;
-		tref var = build_var_name_indexed<bnode>(1);
-		input_map[get_var_name_sid<bnode>(var)] = {
-			get_typed_stream<bnode>("tau", "integration/test_files/tau-alternating_zeros_and_ones-length_10.in") };
-		finputs<bnode> inputs(input_map);
+		tref var = build_var_name_indexed<node_t>(1);
+		input_map[get_var_name_sid<node_t>(var)] = {
+			get_typed_stream<node_t>("tau", "integration/test_files/tau-alternating_zeros_and_ones-length_10.in") };
+		finputs<node_t> inputs(input_map);
 		CHECK ( inputs.type_of(var) > 0 );
 		for (size_t i = 0; i < 10; ++i) {
 			auto in = inputs.read();
@@ -650,19 +650,19 @@ TEST_SUITE("test outputs") {
 
 	TEST_CASE("writing to file") {
 		typed_io_vars output_map;
-		tref var = build_var_name_indexed<bnode>(1);
-		size_t var_sid = get_var_name_sid<bnode>(var);
-		tref var_0 = build_out_var_at_n_indexed<bnode>(1, 0);
+		tref var = build_var_name_indexed<node_t>(1);
+		size_t var_sid = get_var_name_sid<node_t>(var);
+		tref var_0 = build_out_var_at_n_indexed<node_t>(1, 0);
 
 		output_map[var_sid] = {
-			get_typed_stream<bnode>("sbf", random_file()) };
+			get_typed_stream<node_t>("sbf", random_file()) };
 
 #ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var_sid].second << "\n";
 #endif // DEBUG
 
-		foutputs<bnode> outputs(output_map);
-		assignment<bnode> output = { { var_0, tau::_1() } };
+		foutputs<node_t> outputs(output_map);
+		assignment<node_t> output = { { var_0, tau::_1() } };
 
 		CHECK( outputs.type_of(var) > 0 );
 		CHECK ( outputs.write(output) );
@@ -670,24 +670,24 @@ TEST_SUITE("test outputs") {
 
 	TEST_CASE("writing to files: two outputs") {
 		typed_io_vars output_map;
-		tref var1 = build_var_name_indexed<bnode>(1);
-		tref var2 = build_var_name_indexed<bnode>(2);
-		size_t var1_sid = get_var_name_sid<bnode>(var1);
-		size_t var2_sid = get_var_name_sid<bnode>(var2);
-		tref var1_0 = build_out_var_at_n<bnode>(var1, 0);
-		tref var2_0 = build_out_var_at_n<bnode>(var2, 0);
+		tref var1 = build_var_name_indexed<node_t>(1);
+		tref var2 = build_var_name_indexed<node_t>(2);
+		size_t var1_sid = get_var_name_sid<node_t>(var1);
+		size_t var2_sid = get_var_name_sid<node_t>(var2);
+		tref var1_0 = build_out_var_at_n<node_t>(var1, 0);
+		tref var2_0 = build_out_var_at_n<node_t>(var2, 0);
 		output_map[var1_sid] = {
-			get_typed_stream<bnode>("sbf", random_file()) };
+			get_typed_stream<node_t>("sbf", random_file()) };
 		output_map[var2_sid] = {
-			get_typed_stream<bnode>("sbf", random_file()) };
+			get_typed_stream<node_t>("sbf", random_file()) };
 
 #ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_sid].second << "\n";
 #endif // DEBUG
 
-		foutputs<bnode> outputs(output_map);
-		assignment<bnode> output = {
+		foutputs<node_t> outputs(output_map);
+		assignment<node_t> output = {
 			{ var1_0, tau::_1() },
 			{ var2_0, tau::_0() }
 		};
@@ -699,24 +699,24 @@ TEST_SUITE("test outputs") {
 
 	TEST_CASE("writing to files: completing outputs") {
 		typed_io_vars output_map;
-		auto var1 = build_var_name_indexed<bnode>(1);
-		auto var2 = build_var_name_indexed<bnode>(2);
-		size_t var1_sid = get_var_name_sid<bnode>(var1);
-		size_t var2_sid = get_var_name_sid<bnode>(var2);
-		auto var1_0 = build_out_var_at_n<bnode>(var1, 0);
-		auto var2_1 = build_out_var_at_n<bnode>(var2, 1);
+		auto var1 = build_var_name_indexed<node_t>(1);
+		auto var2 = build_var_name_indexed<node_t>(2);
+		size_t var1_sid = get_var_name_sid<node_t>(var1);
+		size_t var2_sid = get_var_name_sid<node_t>(var2);
+		auto var1_0 = build_out_var_at_n<node_t>(var1, 0);
+		auto var2_1 = build_out_var_at_n<node_t>(var2, 1);
 		output_map[var1_sid] = {
-			get_typed_stream<bnode>("sbf", random_file()) };
+			get_typed_stream<node_t>("sbf", random_file()) };
 		output_map[var2_sid] = {
-			get_typed_stream<bnode>("sbf", random_file()) };
+			get_typed_stream<node_t>("sbf", random_file()) };
 
 #ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_sid].second << "\n";
 #endif // DEBUG
 
-		foutputs<bnode> outputs(output_map);
-		assignment<bnode> output = {
+		foutputs<node_t> outputs(output_map);
+		assignment<node_t> output = {
 			{ var1_0, tau::_1() },
 			{ var2_1, tau::_1() }
 		};

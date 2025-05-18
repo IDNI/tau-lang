@@ -31,7 +31,6 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 							r, n, is_capture);
 #ifdef DEBUG
 		if (n != nn) {
-			using tau = tree<node>;
 			LOG_TRACE << "--------------------------------";
 			LOG_TRACE << "rule:       " << LOG_RULE(r);
 			LOG_TRACE << "applied to: " << TAU_TO_STR(n);

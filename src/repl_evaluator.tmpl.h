@@ -1449,4 +1449,4 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 #undef TC_PROMPT
 #undef TC_OUTPUT
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

@@ -180,4 +180,4 @@ constexpr size_t node<BAs...>::hashit() const {
 	return seed;
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

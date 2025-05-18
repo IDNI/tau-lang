@@ -17,16 +17,16 @@ TEST_SUITE("normal forms: mnf for wffs") {
 	TEST_CASE("simple case: T") {
 		const char* sample = "T.";
 		tref fm = tau::get(tau::get(sample))
-			.find_top(is<tau::node, tau::wff>);
-		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
+			.find_top(is<node_t, tau::wff>);
+		fm = to_mnf<node_t>(reduce_across_bfs<node_t>(fm, false));
 		CHECK( tau::get(fm)[0].is(tau::wff_t) );
 	}
 
 	TEST_CASE("simple case: F") {
 		const char* sample = "F.";
 		tref fm = tau::get(tau::get(sample))
-			.find_top(is<tau::node, tau::wff>);
-		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
+			.find_top(is<node_t, tau::wff>);
+		fm = to_mnf<node_t>(reduce_across_bfs<node_t>(fm, false));
 		CHECK( tau::get(fm)[0].is(tau::wff_f) );
 	}
 
@@ -34,7 +34,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		tref result = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
+		tref result = to_mnf<node_t>(reduce_across_bfs<node_t>(fm, false));
 		CHECK( fm == result );
 	}
 
@@ -43,9 +43,9 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
-		trefs check_eq  = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
-		trefs check_neg = tau::get(fm).select_all(is<tau::node, tau::wff_neg>);
+		fm = to_mnf<node_t>(reduce_across_bfs<node_t>(fm, false));
+		trefs check_eq  = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
+		trefs check_neg = tau::get(fm).select_all(is<node_t, tau::wff_neg>);
 		CHECK( check_eq.size() == 1 );
 		CHECK( check_neg.size() == 1 );
 	}
@@ -54,9 +54,9 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 && Y = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
-		trefs check_and = tau::get(fm).select_all(is<tau::node, tau::wff_and>);
-		trefs check_eq = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
+		fm = to_mnf<node_t>(reduce_across_bfs<node_t>(fm, false));
+		trefs check_and = tau::get(fm).select_all(is<node_t, tau::wff_and>);
+		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		CHECK( check_and.size() == 1 );
 		CHECK( check_eq.size() == 2 );
 	}
@@ -65,10 +65,10 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X != 0 && Y != 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
-		trefs check_eq = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
-		trefs check_neg = tau::get(fm).select_all(is<tau::node, tau::wff_neg>);
-		trefs check_and = tau::get(fm).select_all(is<tau::node, tau::wff_and>);
+		fm = to_mnf<node_t>(reduce_across_bfs<node_t>(fm, false));
+		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
+		trefs check_neg = tau::get(fm).select_all(is<node_t, tau::wff_neg>);
+		trefs check_and = tau::get(fm).select_all(is<node_t, tau::wff_and>);
 		CHECK( check_eq.size() == 2 );
 		CHECK( check_neg.size() == 2 );
 		CHECK( check_and.size() == 1 );
@@ -78,9 +78,9 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 || Y = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
-		trefs check_eq = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
-		trefs check_or = tau::get(fm).select_all(is<tau::node, tau::wff_or>);
+		fm = to_mnf<node_t>(reduce_across_bfs<node_t>(fm, false));
+		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
+		trefs check_or = tau::get(fm).select_all(is<node_t, tau::wff_or>);
 		CHECK( check_eq.size() == 2 );
 		CHECK( check_or.size() == 1 );
 	}
@@ -94,7 +94,7 @@ TEST_SUITE("normal forms: bf_reduce_canonical") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff
-			| bf_reduce_canonical<bnode>() | tt::ref;
+			| bf_reduce_canonical<node_t>() | tt::ref;
 		CHECK( tau::get(fm) == tau::get_T() );
 	}
 
@@ -120,7 +120,7 @@ TEST_SUITE("normal forms: snf_bf") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff
-			| tt::f(snf_bf<bnode>) | tt::ref;
+			| tt::f(snf_bf<node_t>) | tt::ref;
 		CHECK( tau::get(fm) == tau::get_T() );
 	}
 }
@@ -131,7 +131,7 @@ TEST_SUITE("normal forms: dnf_bf") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tau::bf_eq
-			| tau::bf | tt::f(to_dnf<bnode, false>) | tt::ref;
+			| tau::bf | tt::f(to_dnf<node_t, false>) | tt::ref;
 		CHECK( tau::get(fm) == tau::get_0() );
 	}
 

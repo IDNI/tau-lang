@@ -30,28 +30,29 @@
 #include "../external/parser/src/defs.h"
 
 // -----------------------------------------------------------------------------
-// following macros work only if `tau` type is defined
-// `using tau = tree<node<BAs...>;` where `BAs...` is a pack of Boolean Algebras)
-// `ref` is a tree pointer reference `tref`, or shared pointer handle `htree::sp` 
+// following macros work only if `node` type alias is defined
+// `using node = tau_lang::node<BAs...>;` where `BAs...` is a pack of Boolean Algebras)
+// argument `ref` is a tree pointer reference `tref`,
+// or shared pointer handle `htree::sp` 
 
 // helper macro for pretty printing a tau tree tref into std::cout
-#define TAU_PRINT(ref) (tau::get(ref).print(std::cout))
+#define TAU_PRINT(ref) (tree<node>::get(ref).print(std::cout))
 // helper macro for printing a tau tree tref into std::cout
-#define TAU_PRINT_TREE(ref) (tau::get(ref).print_tree(std::cout))
+#define TAU_PRINT_TREE(ref) (tree<node>::get(ref).print_tree(std::cout))
 // helper macro for dumping a tau tree tref into std::cout
-#define TAU_DUMP(ref) (tau::get(ref).dump(std::cout))
+#define TAU_DUMP(ref) (tree<node>::get(ref).dump(std::cout))
 // helper macro for pretty printing a tau tree tref into to stream
-#define TAU_PRINT_TO(ref, to) (tau::get(ref).print(to))
+#define TAU_PRINT_TO(ref, to) (tree<node>::get(ref).print(to))
 // helper macro for printing a tau tree tref into to stream
-#define TAU_PRINT_TREE_TO(ref, to) (tau::get(ref).print_tree(to))
+#define TAU_PRINT_TREE_TO(ref, to) (tree<node>::get(ref).print_tree(to))
 // helper macro for dumping a tau tree tref into to stream
-#define TAU_DUMP_TO(ref, to) (tau::get(ref).dump(to))
+#define TAU_DUMP_TO(ref, to) (tree<node>::get(ref).dump(to))
 // helper macro for pretty printing a tau tree tref into a string
-#define TAU_TO_STR(ref) (tau::get(ref).to_str())
+#define TAU_TO_STR(ref) (tree<node>::get(ref).to_str())
 // helper macro for printing a tau tree tref into a string
-#define TAU_TREE_TO_STR(ref) (tau::get(ref).tree_to_str())
+#define TAU_TREE_TO_STR(ref) (tree<node>::get(ref).tree_to_str())
 // helper macro for printing a tau tree tref into a string
-#define TAU_DUMP_TO_STR(ref) (tau::get(ref).dump_to_str())
+#define TAU_DUMP_TO_STR(ref) (tree<node>::get(ref).dump_to_str())
 
 namespace idni::tau_lang {
 

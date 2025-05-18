@@ -310,4 +310,4 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 	return pre_order<node>(n).apply_until_change(transformer);
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

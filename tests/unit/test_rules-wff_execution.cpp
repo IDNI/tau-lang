@@ -6,7 +6,7 @@
 std::tuple<tref, tref, tref> test_rule(const std::string& rule_str) {
         auto tau_rule = tau::get_rules(rule_str)[0];
 	auto [matcher, body] = tau_rule;
-	tref result = nso_rr_apply<bnode>(tau_rule, matcher->get());
+	tref result = nso_rr_apply<node_t>(tau_rule, matcher->get());
 	return { matcher->get(), body->get(), result };
 }
 

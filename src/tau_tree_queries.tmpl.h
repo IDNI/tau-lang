@@ -118,4 +118,4 @@ auto visit_wff = [](tref n) static {
 // 	return true;
 // };
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

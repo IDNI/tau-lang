@@ -9,7 +9,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		auto nso_rr = get_nso_rr("( i1[t] = o1[t] ).");
 		CHECK( nso_rr.has_value() );
 		if (!nso_rr.has_value()) return;
-		tref result = normalizer<bnode>(nso_rr.value());
+		tref result = normalizer<node_t>(nso_rr.value());
 		auto check1 = tt(result) | tau::wff_f;
 		auto check2 = tt(result) | tau::wff_t;
 		CHECK( !check1.has_value() );

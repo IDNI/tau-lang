@@ -380,4 +380,4 @@ tref tau_splitter(tref fm, splitter_type st) {
 	}
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

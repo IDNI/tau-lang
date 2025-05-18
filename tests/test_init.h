@@ -15,8 +15,6 @@ namespace idni::tau_lang {}
 using namespace idni;
 using namespace idni::tau_lang;
 
-namespace testing = doctest;
-
 int main(int argc, char** argv) {
 	DBG(std::cout << "Logging severity level: " << logging::level() << "\n";)
 #ifdef TAU_LOG_TRACE_TESTS

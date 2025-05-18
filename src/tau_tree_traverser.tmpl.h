@@ -378,4 +378,4 @@ void tree<node>::traverser::set_values(const trefs& refs) {
 	has_value_ = values_.size();
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

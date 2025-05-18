@@ -283,7 +283,7 @@ tref build_out_var_at_t_minus(const std::string& var_name, size_t shift, std::st
 template <NodeType node>
 tref build_out_var_at_t_minus_indexed(size_t index, size_t shift, std::string t = "t");
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang
 
 #include "tau_tree_builders.tmpl.h"
 

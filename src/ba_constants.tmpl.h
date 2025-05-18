@@ -168,4 +168,4 @@ ba_constants_binder<node>& ba_constants_binder<node>::instance() {
 	return binder;
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

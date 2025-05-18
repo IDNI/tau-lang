@@ -72,7 +72,7 @@ bool has_temp_var(tref n);
 template <NodeType node>
 bool has_open_tau_fm_in_constant(tref fm);
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang
 
 #include "dict.h"  // string_id and string_from_id
 #include "rr.h"    // recurrence relations structure
@@ -553,4 +553,4 @@ size_t tree<node>::get_ba_type() const {
 	return this->value.ba;
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

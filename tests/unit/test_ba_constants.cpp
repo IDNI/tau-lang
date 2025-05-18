@@ -100,10 +100,10 @@ struct sbf_ba_Bool_constants_fixture {
 
 TEST_SUITE("sbf_ba and Bool BAs") {
 	TEST_CASE_FIXTURE(sbf_ba_Bool_constants_fixture, "sbf_ba, Bool") {
-		using bnode = node<sbf_ba, Bool>;
-		using tau = tree<bnode>;
-		using bac = ba_constants<bnode>;
-		using bacb = ba_constants_binder<bnode>;
+		using node = node<sbf_ba, Bool>;
+		using tau = tree<node>;
+		using bac = ba_constants<node>;
+		using bacb = ba_constants_binder<node>;
 
 		tref t_ref = bacb::instance().bind(Bool(true),  "bool");
 		tref f_ref = bacb::instance().bind(Bool(false), "bool");

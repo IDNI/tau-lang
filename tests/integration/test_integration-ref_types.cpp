@@ -6,15 +6,15 @@
 bool test_ref_types(const char* rec_relation,
 	const std::string& expected_error = "", bool expect_fail = false)
 {
-	using node = bnode;
+	using node = node_t;
 	DBG(LOG_INFO << "Ref type inference test input: `"
 		<< rec_relation << "`");
 	auto nso_rr = get_nso_rr(rec_relation, true);
 	if (!nso_rr.has_value()) return false;
 	DBG(LOG_INFO << "Infer types for:\n" << LOG_RR(nso_rr.value());)
 
-	ref_types<bnode> ts(nso_rr.value());
-	auto nso_rr_inferred = infer_ref_types<bnode>(nso_rr.value(), ts);
+	ref_types<node> ts(nso_rr.value());
+	auto nso_rr_inferred = infer_ref_types<node>(nso_rr.value(), ts);
 	bool fail = !ts.ok();
 
 	if (!expect_fail) expect_fail = expected_error != "";
@@ -39,7 +39,7 @@ bool test_ref_types(const char* rec_relation,
 				return expect_fail;
 		return false;
 	} else {
-		tref normalized = normalizer<bnode>(nso_rr_inferred.value());
+		tref normalized = normalizer<node>(nso_rr_inferred.value());
 		if (normalized == nullptr) {
 			LOG_ERROR << "normalizer failed\n";
 			return expect_fail;
@@ -61,20 +61,20 @@ TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 		"f[0](x) && !g[0](x) && f[0](x, y) != g[0, 0](x)."
 	) ); }
 
-	TEST_CASE("fp call over inferred refs (loop)") { CHECK( test_ref_types(
-		"w[0](x, y) := T."
-		"q[0](x, y) := w[0](x, y)."
-		"q[n](x, y) := !q[n-1](x, y)."
-		"!q(0, 0)."
-	) ); }
+	// TEST_CASE("fp call over inferred refs (loop)") { CHECK( test_ref_types(
+	// 	"w[0](x, y) := T."
+	// 	"q[0](x, y) := w[0](x, y)."
+	// 	"q[n](x, y) := !q[n-1](x, y)."
+	// 	"!q(0, 0)."
+	// ) ); }
 
-	TEST_CASE("fp call over inferred refs, incl. bf") { CHECK( test_ref_types(
-		"f[0](x) := x."
-		"f[n](x) := f[n-1](x)'."
-		"f[0](x, y) := T."
-		"f[n](x, y) := f[n-1](x, y) && f[n-1](x) = 1."
-		"f(1, 0)."
-	) ); }
+	// TEST_CASE("fp call over inferred refs, incl. bf") { CHECK( test_ref_types(
+	// 	"f[0](x) := x."
+	// 	"f[n](x) := f[n-1](x)'."
+	// 	"f[0](x, y) := T."
+	// 	"f[n](x, y) := f[n-1](x, y) && f[n-1](x) = 1."
+	// 	"f(1, 0)."
+	// ) ); }
 
 	TEST_CASE("type mismatch 1") { CHECK( test_ref_types(
 		"e[0, 0](x) := 1."

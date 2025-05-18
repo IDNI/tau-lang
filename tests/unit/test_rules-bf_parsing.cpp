@@ -3,7 +3,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
-bool test_rule(const std::string& sample, typename bnode::type rule_type) {
+bool test_rule(const std::string& sample, typename node_t::type rule_type) {
 	auto lib = tt(tau::get(sample, parse_library()));
 	auto check = lib | tau::rules | tau::rule | rule_type;
 	return check.has_value();

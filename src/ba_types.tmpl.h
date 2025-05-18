@@ -57,4 +57,4 @@ std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id) {
 	return ba_types<node>::print_type(os, ba_type_id);
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang
