@@ -147,30 +147,31 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 // Colors used in logging
 
 // used for LOG_BRIGHT and pretty printed formulas, specs
-#define LOG_BRIGHT_COLOR        TC(idni::term::color::WHITE, \
-						idni::term::color::BRIGHT)
+#define LOG_BRIGHT_COLOR        TC(term::color::WHITE, \
+					term::color::BRIGHT)
 
 // color for Error messages (only the word "Error" is colored)
-#define LOG_ERROR_COLOR         TC(idni::term::color::RED, \
-						idni::term::color::BRIGHT)
+#define LOG_ERROR_COLOR         TC(term::color::RED, \
+					term::color::BRIGHT)
 
 // color for Warning messages (only the "Warning" is colored)
-#define LOG_WARNING_COLOR       TC(idni::term::color::YELLOW, \
-						idni::term::color::BRIGHT)
+#define LOG_WARNING_COLOR       TC(term::color::YELLOW, \
+					term::color::BRIGHT)
 
 // color for logging channel name
-#define LOG_CHANNEL_COLOR       TC(idni::term::color::CYAN)
+#define LOG_CHANNEL_COLOR       TC(term::color::CYAN)
 
 // color for formulas and specs
 #define LOG_FM_COLOR            LOG_BRIGHT_COLOR
+
 // color for nonterminal / node types
-#define LOG_NT_COLOR            TC(idni::term::color::GREEN)
+#define LOG_NT_COLOR            TC(term::color::GREEN)
 
 // color for constants and ba types
-#define LOG_BA_COLOR            TC(idni::term::color::CYAN)
+#define LOG_BA_COLOR            TC(term::color::CYAN)
 
 // color for rules
-#define LOG_RULE_COLOR          TC(idni::term::color::YELLOW)
+#define LOG_RULE_COLOR          TC(term::color::YELLOW)
 
 // -----------------------------------------------------------------------------
 // Logging helper macros for various types to use appropriate colors
@@ -183,7 +184,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 //                                               or `tau_parser::nonterminal`
 #define LOG_NT(nt)       LOG_NT_COLOR << node::name(nt)             <<TC.CLEAR()
 
-
+// LOG_NT_COLOR escapes in a stream for `rr_sig` (recurrence relation signature)
 #define LOG_RR_SIG(sig)  LOG_NT_COLOR << sig                        <<TC.CLEAR()
 
 // LOG_RULE_COLOR escapes in a stream for rewriter or recurrence relation def
@@ -197,10 +198,10 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 #define LOG_BA(c)        LOG_BA_COLOR << c                          <<TC.CLEAR()
 
 // LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` pretty print
-#define LOG_FM(fm)       LOG_FM_COLOR << tau::get(fm).to_str()      <<TC.CLEAR()
+#define LOG_FM(fm)       LOG_FM_COLOR <<tree<node>::get(fm).to_str()<<TC.CLEAR()
 // LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` pretty print
 //                      and then followed by nodes tree printed in a line
-#define LOG_FM_DUMP(fm)  LOG_FM_COLOR << tau::get(fm).to_str()      <<TC.CLEAR() \
+#define LOG_FM_DUMP(fm)  LOG_FM_COLOR <<tree<node>::get(fm).to_str()<<TC.CLEAR() \
 				<<" \t#\t"<< tau::get(fm).print_in_line_to_str()
 // LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
 #define LOG_RR(nso_rr)   LOG_FM_COLOR << to_str<node>(nso_rr)       <<TC.CLEAR()

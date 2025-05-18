@@ -795,7 +795,6 @@ struct fixed_point_transformer {
 
 template <NodeType node>
 tref calculate_all_fixed_points(const rr& nso_rr) {
-	using tau = tree<node>;
 	// get types and do type checks and validation
 	ref_types<node> types(nso_rr);
 	if (!types.ok() || !is_valid<node>(nso_rr)) return nullptr;
@@ -836,7 +835,6 @@ tref apply_rr_to_formula(const rr& nso_rr) {
 template <NodeType node>
 tref normalizer(const rr& nso_rr) {
 	// IDEA extract this to an operator| overload
-	using tau = tree<node>;
 
 	LOG_DEBUG << "Begin normalizer";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);

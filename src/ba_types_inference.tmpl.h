@@ -13,7 +13,6 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref infer_ba_types(tref n) {
-	using tau = tree<node>;
 	LOG_TRACE << "Infer BA types" << LOG_FM(n);
 	static ba_types_inference<node> infer;
 	tref nn = infer(n);

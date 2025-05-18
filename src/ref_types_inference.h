@@ -9,7 +9,7 @@
 
 namespace idni::tau_lang {
 
-template <NodeType N>
+template <NodeType node>
 struct ref_types;
 
 template <NodeType node>
@@ -50,16 +50,15 @@ struct std::hash<idni::tau_lang::rr_sig> {
 namespace idni::tau_lang {
 
 // manages information about refs resolved/unresolved types and fp calls
-template <NodeType N>
+template <NodeType node>
 struct ref_types {
-	using node = N;
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	template <NodeType NT>
+	template <NodeType N>
 	friend std::optional<rr> infer_ref_types(const rr& nso_rr);
-	template <NodeType NT>
+	template <NodeType N>
 	friend std::optional<rr> infer_ref_types(const rr& nso_rr,
-						ref_types<NT>& ts);
+						ref_types<N>& ts);
 
 	ref_types(const rr& nso_rr);
 	// returns false if any error or unresolved ref

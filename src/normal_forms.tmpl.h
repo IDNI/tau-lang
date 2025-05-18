@@ -203,7 +203,6 @@ tref squeeze_wff_neg(tref fm) {
 
 template <NodeType node>
 tref to_nnf(tref fm) {
-	using tau = tree<node>;
 	LOG_TRACE << "to_nnf: " << LOG_FM(fm);
 	auto result = push_negation_in<node>(fm);
 	LOG_TRACE << "to_nnf result: " << LOG_FM(result);

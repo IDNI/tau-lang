@@ -399,7 +399,6 @@ template <NodeType node>
 std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	const trefs& io_vars, const auto& initials, int_t time_point)
 {
-	using tau = tree<node>;
 	subtree_map<node, tref> pholder_to_st;
 	auto [chi_prev, cache] = build_initial_step_chi<node>(
 		chi_base, st, io_vars, time_point, pholder_to_st);

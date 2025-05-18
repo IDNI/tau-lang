@@ -139,7 +139,6 @@ template <NodeType node>
 tref ba_constants_binder<node>::operator()(const std::string& src,
 	const std::string& type_name)
 {
-	using tau = tree<node>;
 	// named binding
 	if (auto it = named_constants.find(src);
 		it != named_constants.end())

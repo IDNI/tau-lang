@@ -25,8 +25,9 @@ requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
-	using tau = tree<node<BAs...>>;
-	os << tau::node::name(n.nt);
+	using node = node<BAs...>;
+	using tau = tree<node>;
+	os << node::name(n.nt);
 #ifdef DEBUG
 	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
 	if (bool print_is_term = true; print_is_term && n.term) os << "*";
@@ -34,10 +35,11 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::bf_constant)
-		os << " { " << ba_constants<node<BAs...>>::get(n.data) << " } : "
-		<< get_ba_type_name<node<BAs...>>(n.ba);
+		os << " { " << ba_constants<node>::get(n.data) << " } : "
+						<< get_ba_type_name<node>(n.ba);
 	else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
-	else if (n.nt == tau::uconst_name) os << "<" << string_from_id(n.data) << ">";
+	else if (n.nt == tau::uconst_name)
+		os << "<" << string_from_id(n.data) << ">";
 	else if (tau::is_string_nt(n.nt))
 		os << " { \"" << string_from_id(n.data) << "\" }";
 	// else if (n.ext) os << "{EXT}";
@@ -336,19 +338,19 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	};
 
 	static const std::map<size_t, std::string> hl_colors = {
-		{ bf,            idni::TC.LIGHT_GREEN() },
-		{ variable,      idni::TC.WHITE() },
-		{ capture,       idni::TC.BLUE() },
-		{ wff_all,       idni::TC.MAGENTA() },
-		{ wff_ex,        idni::TC.LIGHT_MAGENTA() },
+		{ bf,            TC.LIGHT_GREEN() },
+		{ variable,      TC.WHITE() },
+		{ capture,       TC.BLUE() },
+		{ wff_all,       TC.MAGENTA() },
+		{ wff_ex,        TC.LIGHT_MAGENTA() },
 
-		{ rec_relation,  idni::TC.YELLOW() },
-		{ constraint,    idni::TC.LIGHT_MAGENTA() },
-		{ io_var,        idni::TC.WHITE() },
-		{ bf_constant,   idni::TC.LIGHT_CYAN() }
+		{ rec_relation,  TC.YELLOW() },
+		{ constraint,    TC.LIGHT_MAGENTA() },
+		{ io_var,        TC.WHITE() },
+		{ bf_constant,   TC.LIGHT_CYAN() }
 
-		// { rule,          idni::TC.BG_YELLOW() },
-		// { builder,       idni::TC.BG_LIGHT_YELLOW() }
+		// { rule,          TC.BG_YELLOW() },
+		// { builder,       TC.BG_LIGHT_YELLOW() }
 	};
 	auto syntax_highlight = [&](size_t nt) {
 		if (!pretty_printer_highlighting) return false;

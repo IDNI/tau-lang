@@ -4,8 +4,6 @@
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/variant_ba.h"
 
-using namespace idni::tau_lang;
-
 TEST_SUITE("variant Boolen algebra") {
 
 	TEST_CASE("variant Bool == Bool") {
