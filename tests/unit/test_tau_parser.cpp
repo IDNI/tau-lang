@@ -1232,7 +1232,7 @@ TEST_SUITE("parsing z3 expressions") {
 	}
 }
 
-TEST_SUITE("parsing z3 formulas") {
+TEST_SUITE("parsing z3 literals") {
 
 	TEST_CASE("z3_eq") {
 		const char* sample = "Z =_ Z";
