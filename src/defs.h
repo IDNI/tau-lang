@@ -63,7 +63,7 @@ constexpr size_t Pack_size = std::variant_size<std::variant<Pack...>>::value;
 // helper to get bitsize required for size of a type pack
 template <typename... Pack>
 constexpr size_t Pack_bitsize = Pack_size<Pack...> <= 1 ? 1 : 
-                (sizeof(size_t) * 8 - __builtin_clzl(Pack_size<Pack...> - 1));
+        (sizeof(size_t) * 8 - __builtin_clzl(Pack_size<Pack...> - 1) + 1);
 
 } // namespace idni::tau_lang
 
