@@ -34,6 +34,7 @@ const typename tree<node>::template extractor<tref>
 	tree<node>::traverser::ref =
 		typename tree<node>::template extractor<tref>(
 			[](const traverser& t) -> tref {
+				if (!t.has_value()) return nullptr;
 				return t.value();
 			});
 
