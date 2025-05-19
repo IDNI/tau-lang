@@ -862,7 +862,23 @@ TEST_SUITE("parsing variables") {
 		auto types = select_top(frml, is_non_terminal<tau_parser::bv_type, Bool>);
 		CHECK( types.size() == 3 );
 	}
+}
 
+TEST_SUITE("parsing z3 formulas") {
+
+	TEST_CASE("all x (x =_ 0)") {
+		const char* sample = "all x (x =_ 0).";
+		auto src = make_tau_source(sample); //, { .start = tau_parser::wff });
+		auto fml = make_nso_rr_using_factory<sbf_ba>(src);
+		CHECK( fml.has_value() );
+	}
+
+	TEST_CASE("all x :bv[0] (x =_ 0)") {
+		const char* sample = "all x:bv[0] (x =_ 0).";
+		auto src = make_tau_source(sample); //, { .start = tau_parser::wff });
+		auto fml = make_nso_rr_using_factory<sbf_ba>(src);
+		CHECK( fml.has_value() );
+	}
 }
 
 TEST_SUITE("parsing captures") {
