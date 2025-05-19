@@ -762,6 +762,22 @@ TEST_SUITE("parsing variables") {
 		CHECK( !var.has_value() );
 	}
 
+	TEST_CASE("regular z3/bv typed variable") {
+		const char* sample = "x:bv[0]";
+		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type | tau_parser::bv_type;
+		CHECK( var.has_value() );
+	}
+
+	TEST_CASE("io z3 typed variable") {
+		const char* sample = "i1:bv[0]";
+		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type | tau_parser::bv_type;
+		CHECK( var.has_value() );
+	}
+
 	TEST_CASE("quantified typed variable") {
 		const char* sample = "x:sbf";
 		auto src = make_tau_source(sample, { .start = tau_parser::q_var });
@@ -828,6 +844,25 @@ TEST_SUITE("parsing variables") {
 		auto types = select_top(frml, is_non_terminal<tau_parser::type, Bool>);
 		CHECK( types.size() == 2 );
 	}
+
+	TEST_CASE("quantified bv typed variable") {
+		// if we have the same type we only get one
+		const char* sample = "x:bv[0], y:bv[1], z:bv[2], w:bv[3]";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_vars });
+		auto frml = make_statement(src);
+		auto types = select_top(frml, is_non_terminal<tau_parser::bv_type, Bool>);
+		CHECK( types.size() == 4 );
+	}
+
+	TEST_CASE("quantified bv typed variable") {
+		// if we have the same type we only get one
+		const char* sample = "x:bv[0], y:bv[1], z:bv[2], w:bv[0]";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_vars });
+		auto frml = make_statement(src);
+		auto types = select_top(frml, is_non_terminal<tau_parser::bv_type, Bool>);
+		CHECK( types.size() == 3 );
+	}
+
 }
 
 TEST_SUITE("parsing captures") {
