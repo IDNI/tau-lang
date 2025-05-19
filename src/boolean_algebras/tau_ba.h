@@ -23,7 +23,6 @@ namespace idni::tau_lang {
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct tau_ba {
-	using tau_ba_t = tau_ba<BAs...>;
 	using node = tau_lang::node<BAs...>;
 	using tau_ba_node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tau_lang::tree<node>;
@@ -61,49 +60,49 @@ struct tau_ba {
 	/**
 	 * @brief Three-way comparison operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the comparison.
 	 */
-	auto operator<=>(const tau_ba_t&) const;
+	auto operator<=>(const tau_ba<BAs...>&) const;
 
 	/**
 	 * @brief Bitwise NOT operator.
 	 *
 	 * @return Result of the bitwise NOT operation.
 	 */
-	tau_ba_t operator~() const;
+	tau_ba<BAs...> operator~() const;
 
 	/**
 	 * @brief Bitwise AND operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the bitwise AND operation.
 	 */
-	tau_ba_t operator&(const tau_ba_t& other) const;
+	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const;
 
 	/**
 	 * @brief Bitwise OR operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the bitwise OR operation.
 	 */
-	tau_ba_t operator|(const tau_ba_t& other) const;
+	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const;
 
 	/**
 	 * @brief Addition operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the addition operation.
 	 */
-	tau_ba_t operator+(const tau_ba_t& other) const;
+	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const;
 
 	/**
 	 * @brief Bitwise XOR operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the bitwise XOR operation.
 	 */
-	tau_ba_t operator^(const tau_ba_t& other) const;
+	tau_ba<BAs...> operator^(const tau_ba<BAs...>& other) const;
 
 	/**
 	 * @brief Checks if the tau_ba is zero.
@@ -236,13 +235,6 @@ requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm);
 
 /**
- * @brief Alias for tau_spec.
- *
- * @tparam BAs Variadic template parameters.
- */
-using tau_spec = rr;
-
-/**
  * @brief Template struct representing a tau_ba_factory.
  *
  * @tparam BAs Variadic template parameters.
@@ -250,30 +242,21 @@ using tau_spec = rr;
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct tau_ba_factory {
-	using tau_ba_t = tau_ba<BAs...>;
-
 	/**
 	 * @brief Parses the given source string into tau_nso_t.
 	 *
 	 * @param src Reference to the source string.
 	 * @return Parsed tau_nso_t or std::nullopt if parsing fails.
 	 */
-	std::optional<std::variant<tau_ba_t, BAs...>> parse(const std::string& src);
-
-	/**
-	 * @brief Binds the given tau_nso_t.
-	 *
-	 * @param n Reference to tau_nso_t.
-	 * @return Bound tau_nso_t.
-	 */
-	tref binding(const std::string& src);
+	std::optional<constant_with_type<tau_ba<BAs...>, BAs...>> parse(
+		const std::string& constant_source);
 
 	/**
 	 * @brief Splits one.
 	 *
 	 * @return Variant containing the splitter of one in the given BA.
 	 */
-	std::variant<tau_ba_t, BAs...> splitter_one() const;
+	constant_with_type<tau_ba<BAs...>, BAs...> splitter_one() const;
 
 	/**
 	 * @brief Converts one to string.
@@ -291,12 +274,16 @@ struct tau_ba_factory {
 	 */
 	std::string zero(std::string&) const;
 
-
+	/**
+	 * @brief Returns the instance of the tau_ba_factory.
+	 *
+	 * @return Instance of the tau_ba_factory.
+	 */
 	static tau_ba_factory<BAs...>& instance();
 
 };
 
-// << for printing tau_ba's form
+// << for printing tau_ba's nso rr
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs);

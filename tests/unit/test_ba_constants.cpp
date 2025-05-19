@@ -5,21 +5,17 @@
 
 TEST_SUITE("Bool BA") {
 	TEST_CASE("Bool") {
-		tref t_ref = bacb::instance().bind(Bool(true),  "bool");
-		tref f_ref = bacb::instance().bind(Bool(false), "bool");
+		tref t_ref = tau::get_ba_constant(Bool(true),  "bool");
+		tref f_ref = tau::get_ba_constant(Bool(false), "bool");
 		size_t t = tau::get(t_ref).get_ba_constant_id();
 		size_t f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 1 );
 		CHECK( f == 2 );
-		CHECK( bac::is<Bool>(t) );
-		CHECK( bac::is<Bool>(f) );
 		CHECK( bac::get(t) != bac::get(f) );
 		CHECK( bac::get(t) == variant<Bool>(Bool(true)) );
 		CHECK( bac::get(t) != variant<Bool>(Bool(false)) );
 		CHECK( bac::get(f) == variant<Bool>(Bool(false)) );
 		CHECK( bac::get(f) != variant<Bool>(Bool(true)) );
-		CHECK( bac::get<Bool>(t) == Bool(true) );
-		CHECK( bac::get<Bool>(f) == Bool(false) );
 	}
 }
 
@@ -30,20 +26,32 @@ template<>
 struct nso_factory<sbf_ba, Bool> {
 	using node = tau_lang::node<sbf_ba, Bool>;
 
-	optional<variant<sbf_ba, Bool>> parse(const string&, const string)const{
-		throw logic_error("not implemented");
+	optional<constant_with_type<sbf_ba, Bool>> parse_sbf_ba(
+		const string& constant_source) const
+	{
+		auto r = sbf_ba_factory<sbf_ba, Bool>::instance()
+						.parse(constant_source);
+		if (!r) return {};
+		return constant_with_type<sbf_ba, Bool>{
+			std::get<sbf_ba>(r.value().first), "sbf" };
 	}
 
-	tref binding(const string& src, const string& type_name) const {
-		if (type_name == "sbf") {
-			if (auto opt = sbf_ba_factory<sbf_ba, Bool>::instance()
-						.parse(src); opt.has_value())
-				return ba_constants_binder<node>::instance()
-						.bind(opt.value(), "sbf");
-		} else if (type_name == "bool")
-				return nso_factory<Bool>::instance()
-						.binding(src, "bool");
-		return nullptr;
+	optional<constant_with_type<sbf_ba, Bool>> parse_Bool(
+		const string& constant_source) const
+	{
+		auto r = nso_factory<Bool>::instance()
+						.parse(constant_source, "bool");
+		if (!r) return {};
+		return constant_with_type<sbf_ba, Bool>{
+			std::get<Bool>(r.value().first), "bool" };
+	}
+
+	optional<constant_with_type<sbf_ba, Bool>> parse(
+		const string& constant_source, const string type_name) const
+	{
+		if (type_name == "sbf")
+			return parse_sbf_ba(constant_source);
+		else    return parse_Bool(constant_source);
 	}
 
 	vector<string> types() const { return { "sbf", "bool" }; }
@@ -54,12 +62,12 @@ struct nso_factory<sbf_ba, Bool> {
 
 	string zero(const string) const { throw logic_error("not implemented");}
 
-	tref splitter_one(const string) const {
+	constant_with_type<sbf_ba, Bool> splitter_one(const string) const {
 		throw logic_error("not implemented");
 	}
 
 	// There is no tau_ba
-	optional<Bool> unpack_tau_ba(const variant<Bool>&) const { return {}; }
+	optional<tt> unpack_tau_ba(const variant<Bool>&) const { return {}; }
 
 	static nso_factory<sbf_ba, Bool>& instance() {
 		static nso_factory<sbf_ba, Bool> factory;
@@ -76,8 +84,7 @@ struct sbf_ba_Bool_constants_fixture {
 	template <typename BA>
 	BA get_sbf_Bool(const std::string& src, const std::string&) {
 		if (auto opt = sbf_ba_factory<sbf_ba>::instance().parse(src);
-				opt.has_value())
-			return std::get<BA>(opt.value());
+			opt) return std::get<BA>(opt.value().first);
 		assert(false);
 		return BA();
 	}
@@ -103,42 +110,29 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		using node = node<sbf_ba, Bool>;
 		using tau = tree<node>;
 		using bac = ba_constants<node>;
-		using bacb = ba_constants_binder<node>;
 
-		tref t_ref = bacb::instance().bind(Bool(true),  "bool");
-		tref f_ref = bacb::instance().bind(Bool(false), "bool");
+		tref t_ref = tau::get_ba_constant(Bool(true),  "bool");
+		tref f_ref = tau::get_ba_constant(Bool(false), "bool");
 		size_t t = tau::get(t_ref).get_ba_constant_id();
 		size_t f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 1 );
 		CHECK( f == 2 );
-		CHECK( bac::is<Bool>(t) );
-		CHECK( bac::is<Bool>(f) );
-		CHECK( !bac::is<sbf_ba>(t) );
-		CHECK( !bac::is<sbf_ba>(f) );
 		CHECK( bac::get(t) != bac::get(f) );
 		CHECK( bac::get(t) == variant<sbf_ba, Bool>(Bool(true)) );
 		CHECK( bac::get(t) != variant<sbf_ba, Bool>(Bool(false)) );
 		CHECK( bac::get(f) == variant<sbf_ba, Bool>(Bool(false)) );
 		CHECK( bac::get(f) != variant<sbf_ba, Bool>(Bool(true)) );
-		CHECK( bac::get<Bool>(t) == Bool(true) );
-		CHECK( bac::get<Bool>(f) == Bool(false) );
 
-		t_ref = bacb::instance().bind(sbf_t, "sbf");
-		f_ref = bacb::instance().bind(sbf_f, "sbf");
+		t_ref = tau::get_ba_constant(sbf_t, "sbf");
+		f_ref = tau::get_ba_constant(sbf_f, "sbf");
 		t = tau::get(t_ref).get_ba_constant_id();
 		f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 3 );
 		CHECK( f == 4 );
-		CHECK( bac::is<sbf_ba>(t) );
-		CHECK( bac::is<sbf_ba>(f) );
-		CHECK( !bac::is<Bool>(t) );
-		CHECK( !bac::is<Bool>(f) );
 		CHECK( bac::get(t) != bac::get(f) );
 		CHECK( bac::get(t) == variant<sbf_ba, Bool>(sbf_t) );
 		CHECK( bac::get(t) != variant<sbf_ba, Bool>(sbf_f) );
 		CHECK( bac::get(f) == variant<sbf_ba, Bool>(sbf_f) );
 		CHECK( bac::get(f) != variant<sbf_ba, Bool>(sbf_t) );
-		CHECK( bac::get<sbf_ba>(t) == sbf_t );
-		CHECK( bac::get<sbf_ba>(f) == sbf_f );
 	}
 }

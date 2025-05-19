@@ -12,8 +12,6 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 size_t ba_types<node>::type_id(size_t type_sid) {
-	if (types.empty()) types.push_back(string_id("untyped")),
-			type_names_map.emplace(types.back(), 0);
 	if (auto it = type_names_map.find(type_sid);
 		it != type_names_map.end()) return it->second;
 	return type_names_map.emplace(type_sid, types.size()),

@@ -231,7 +231,7 @@ tref normalize_ba(tref fm) {
 		auto c = t.get_ba_constant();
 		auto nc = normalize_ba<node>(c);
 		if (c == nc) return n;
-		return tau::get(nc, t.get_ba_type());
+		return tau::get_ba_constant(nc, t.get_ba_type());
 	};
 	tref r = pre_order<node>(fm).template apply_unique_until_change<
 					MemorySlotPre::normalize_ba_m>(norm_ba);
@@ -3681,10 +3681,10 @@ tref to_snf_step<node>::squeeze_positives(const literals& positives,
 		first_cte, [&](tref l, tref r) {
 			auto l_cte = get_constant(l), r_cte = get_constant(r);
 			if (l_cte && r_cte)
-				return ba_constants_binder<node>::instance()
-					.bind(std::visit(_or,
-						l_cte.value(), r_cte.value()),
-						tau::get(l).get_ba_type());
+				return tau::get_ba_constant(
+					std::visit(_or, l_cte.value(),
+							r_cte.value()),
+					tau::get(l).get_ba_type());
 			return l;
 		});
 

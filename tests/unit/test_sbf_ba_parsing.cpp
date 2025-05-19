@@ -7,7 +7,7 @@ variant<tau_ba<sbf_ba>, sbf_ba> parse(const char* src) {
 	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
 	auto parsed = bf.parse(src);
 	assert(parsed.has_value());
-	return parsed.value();
+	return parsed.value().first;
 }
 
 sbf_ba parse_and_unpack(const char* src) {

@@ -611,8 +611,9 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 
 	// setting solver options
 	solver_options options = {
-		.splitter_one = node::nso_factory::instance()
-			.splitter_one(get_ba_type_name<node>(type)),
+		.splitter_one = tau::get_ba_constant(
+			node::nso_factory::instance()
+				.splitter_one(get_ba_type_name<node>(type))),
 		.mode = get_solver_cmd_mode<node>(n.value()),
 		.type = get_ba_type_name<node>(type)
 	};

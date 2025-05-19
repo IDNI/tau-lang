@@ -94,7 +94,7 @@ void build_input(const std::string& name,
 	for (const auto& val : values) {
 		auto in_var = build_in_var_at_n<node_t>(name, t);
 		auto v = node_t::nso_factory::instance().parse(val, type);
-		auto v_const = build_bf_ba_constant<node_t>(v.value(),
+		auto v_const = tau::get_ba_constant(v.value().first,
 			get_ba_type_id<node_t>(type));
 
 		if (assgn.size() <= t) {
@@ -115,7 +115,7 @@ void build_output(const std::string& name, const std::vector<std::string>& value
 			assgn.emplace(out_var, nullptr);
 		} else {
 			auto v = node_t::nso_factory::instance().parse(val, type);
-			auto v_const = build_bf_ba_constant<node_t>(v.value(),
+			auto v_const = tau::get_ba_constant(v.value().first,
 				get_ba_type_id<node_t>(type));
 			assgn.emplace(out_var, v_const);
 		}
@@ -124,6 +124,7 @@ void build_output(const std::string& name, const std::vector<std::string>& value
 }
 
 inline bool matches_output(const auto& assm, const auto& memory) {
+	using node = node_t;
 	for (const auto& [var, val] : assm) {
 		if (val == nullptr) continue;
 		if (auto it = memory.find(var); it != memory.end()) {
@@ -313,6 +314,7 @@ std::optional<assignment<node_t>> run_test(const char* sample,
 			auto in = inputs.get();
 
 #ifdef DEBUG
+			using node = node_t;
 			std::cout << "run_test/input[" << i << "]: ";
 			if (in.has_value()) {
 				for (const auto& [var, value] : in.value())

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
 	ba_constants
-	ba_constants_binder
+	ba_types_inference
 	bool
 	hbdd
 	normal_forms

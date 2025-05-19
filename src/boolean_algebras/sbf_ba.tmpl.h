@@ -56,11 +56,13 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 }
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
+std::optional<constant_with_type<BAs...>> sbf_ba_factory<BAs...>::parse(
 	const std::string& src)
 {
 	// check source cache
 	auto sid = dict(src);
+	if (auto cn = cache.find(sid); cn != cache.end())
+		return constant_with_type<BAs...>{ cn->second, "sbf" };
 	auto result = sbf_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
 		auto msg = result.parse_error
@@ -71,29 +73,21 @@ std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	auto t = sbf_parser::tree::traverser(result.get_shaped_tree2())
 							| sbf_parser::sbf;
 	auto v = t.has_value() ? sbf_eval_node(t) : bdd_handle<Bool>::hfalse;
-	return cache.emplace(src, std::variant<BAs...>{ v }).first->second;
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref sbf_ba_factory<BAs...>::binding(const std::string& source) {
-	// std::cout << "sbf_ba_factory::binding `" << source << "`\n";
-	if (auto p = parse(source); p)
-		return ba_constants_binder<node<BAs...>>::instance()
-							.bind(p.value(), "sbf");
-	return nullptr;
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
-	return std::variant<BAs...>(bdd_splitter_one<Bool>());
+	return constant_with_type<BAs...>{
+		cache.emplace(sid, std::variant<BAs...>{ v }).first->second,
+		"sbf" };
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::string sbf_ba_factory<BAs...>::zero() const {
 	return "0";
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+constant_with_type<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
+	return { std::variant<BAs...>(bdd_splitter_one<Bool>()), "sbf" };
 }
 
 template <typename... BAs>
@@ -105,23 +99,14 @@ sbf_ba_factory<BAs...>& sbf_ba_factory<BAs...>::instance() {
 
 // ---------------------------------------------------------------------
 
-std::optional<std::variant<sbf_ba>> nso_factory<sbf_ba>::parse(
+std::optional<constant_with_type<sbf_ba>> nso_factory<sbf_ba>::parse(
 	const std::string& src, const std::string)
 {
 	return bf.parse(src);
 }
 
-tref nso_factory<sbf_ba>::binding(const std::string& n, const std::string&) {
-	return bf.binding(n);
-}
-
 std::vector<std::string> nso_factory<sbf_ba>::types() const {
 	return { "sbf" };
-}
-
-tref nso_factory<sbf_ba>::splitter_one() const {
-	return ba_constants_binder<node<sbf_ba>>::instance()
-						.bind(bf.splitter_one(), "sbf");
 }
 
 std::string nso_factory<sbf_ba>::default_type() const {
@@ -136,9 +121,16 @@ std::string nso_factory<sbf_ba>::zero(const std::string) const {
 	return "0";
 }
 
-tref nso_factory<sbf_ba>::unpack_tau_ba(const std::variant<sbf_ba>&) const {
-	// There is no tau_ba present
-	return nullptr;
+constant_with_type<sbf_ba> nso_factory<sbf_ba>::splitter_one()
+	const
+{
+	return bf.splitter_one();
+}
+
+std::optional<rr> nso_factory<sbf_ba>::unpack_tau_ba(
+	const std::variant<sbf_ba>&) const
+{
+	return {}; // There is no tau_ba present
 }
 
 nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
@@ -148,19 +140,13 @@ nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
 
 nso_factory<sbf_ba>::nso_factory() {};
 
-std::optional<std::variant<tau_ba<sbf_ba>, sbf_ba>>
+std::optional<constant_with_type<tau_ba<sbf_ba>, sbf_ba>>
 	nso_factory<tau_ba<sbf_ba>, sbf_ba>::parse(
-	const std::string& src, const std::string type_name)
+		const std::string& constant_source,
+		const std::string type_name)
 {
-	if (type_name == "sbf")	return bf().parse(src);
-	return tf().parse(src);
-}
-
-tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::binding(const std::string& n,
-	const std::string type_name)
-{
-	if (type_name == "sbf") return bf().binding(n);
-	return tf().binding(n);
+	return type_name == "sbf" ? bf().parse(constant_source)
+				  : tf().parse(constant_source);
 }
 
 std::vector<std::string> nso_factory<tau_ba<sbf_ba>, sbf_ba>::types() const {
@@ -183,23 +169,20 @@ std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::zero(
 	return type_name == "sbf" ? "0" : "F";
 }
 
-tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
-	const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const
+constant_with_type<tau_ba<sbf_ba>, sbf_ba>
+	nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
+		const std::string type_name) const
 {
-	if (!std::holds_alternative<tau_ba<sbf_ba>>(v))
-		return {};
-	const auto unpacked = std::get<tau_ba<sbf_ba>>(v);
-	return unpacked.nso_rr.main->get();
+	return (type_name == "sbf") ? bf().splitter_one()
+				    : tf().splitter_one();
 }
 
-tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
-	const std::string type_name) const
+std::optional<rr> nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
+	const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const
 {
-	if (type_name=="sbf")
-		return ba_constants_binder<node<tau_ba<sbf_ba>, sbf_ba>>
-			::instance().bind(bf().splitter_one(), "sbf");
-	else return ba_constants_binder<node<tau_ba<sbf_ba>, sbf_ba>>
-			::instance().bind(tf().splitter_one(), "tau");
+	if (!std::holds_alternative<tau_ba<sbf_ba>>(v)) return {};
+	const auto unpacked = std::get<tau_ba<sbf_ba>>(v);
+	return { unpacked.nso_rr };
 }
 
 nso_factory<tau_ba<sbf_ba>, sbf_ba>&

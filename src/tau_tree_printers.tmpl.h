@@ -36,10 +36,11 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 		os << " " << LOG_BA_TYPE(n.ba);
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
-	else if (n.nt == tau::bf_constant)
-		os << " { " << ba_constants<node>::get(n.data) << " } : "
-						<< get_ba_type_name<node>(n.ba);
-	else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
+	else if (n.nt == tau::bf_constant) {
+		if (n.ba) os << " { " << ba_constants<node>::get(n.data)
+				<< " } : " << get_ba_type_name<node>(n.ba);
+		else os << " { " << dict(n.data) << " } : untyped";
+	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name)
 		os << "<" << dict(n.data) << ">";
 	else if (tau::is_string_nt(n.nt))
@@ -402,9 +403,19 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offset:            if (pnt == io_var) out("[");
 						break;
 			case bf_splitter:       out("S("); break;
-			case bf_constant:	ba_constants<node>::print(os,
-							t.get_ba_constant_id());
-						break;
+			case bf_constant:
+				if (t.get_ba_type() > 0) {
+					out("{ ");
+					out(tau::get(ref).get_ba_constant());
+					out(" } : ");
+					out(t.get_ba_type_name());
+				} else {
+					out("{ ");
+					out(dict(t.data()));
+					out(" } : untyped");
+				}
+				break;
+			case scope_id: out(" _"), out(t.data()), out("_"); break;
 			case wff:
 			case bf:
 				if (parent && is_to_wrap(t.first_tree()

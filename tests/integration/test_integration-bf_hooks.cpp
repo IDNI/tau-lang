@@ -32,6 +32,7 @@ TEST_SUITE("bf operator hooks") {
 		tref tau_expected = tau::get(expected, parse_bf());
 
 #ifdef DEBUG
+		using node = node_t;
 		cout << "sample: " << string(sample) << " expected: ";
 		if (tau_expected == 0) cout << "nullptr";
 		else cout << TAU_DUMP_TO_STR(tau_expected);

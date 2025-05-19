@@ -199,11 +199,12 @@ template <NodeType node>
 tref build_bf_f_type(const std::string& type);
 
 template <NodeType node>
-tref build_ba_constant(typename node::bas_variant v, size_t ba_tid);
+tref build_ba_constant(const typename node::constant& constant,
+                       size_t ba_type_id);
 
 template <NodeType node>
-tref build_bf_ba_constant(typename node::bas_variant v, size_t ba_tid,
-        tref r = nullptr);
+tref build_bf_ba_constant(const typename node::constant& constant,
+                          size_t ba_type_id, tref right = nullptr);
 
 template <NodeType node>
 tref build_bf_uconst(const std::string& name1, const std::string& name2);

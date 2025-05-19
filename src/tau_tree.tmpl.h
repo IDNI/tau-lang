@@ -274,20 +274,54 @@ tref tree<node>::get_integer(int_t n) {
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant(size_t c) {
-	return get_ba_constant(c, 0);
+tref tree<node>::get_ba_constant(
+	const constant& constant, const std::string& type_name)
+{
+	return ba_constants<node>::get(constant,
+				       get_ba_type_id<node>(type_name));
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant(size_t c, size_t tid) {
-	auto x = node::ba_constant(c, tid);
-	// LOG_TRACE << " -- get_ba_constant: `" << x << "`";
+tref tree<node>::get_ba_constant(const constant& constant, size_t ba_type_id)
+{
+	return ba_constants<node>::get(constant, ba_type_id);
+}
+
+template <NodeType node>
+tref tree<node>::get_ba_constant(const std::string& constant_source,
+	const std::string type_name)
+{
+	LOG_TRACE<<" -- get_ba_constant: `"<<constant_source<<"` : "<<type_name;
+	tref result = ba_constants<node>::get(constant_source, type_name);
+	LOG_TRACE << " -- ba_constants:" << ba_constants<node>::dump_to_str();
+	return result;
+}
+
+template <NodeType node>
+tref tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
+	node x = node::ba_constant(constant_id, ba_type_id);
+	LOG_TRACE << " -- get_ba_constant(" << constant_id << " = "
+		<< LOG_BA(ba_constants<node>::get(constant_id))
+		<< ", " << ba_type_id << " = "
+		<< LOG_BA(tau_lang::get_ba_type_name<node>(ba_type_id))
+		<< "): `" << x << "`";
 	return get(x);
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant(const std::pair<size_t, size_t>& typed_const) {
-	return get_ba_constant(typed_const.first, typed_const.second);
+tref tree<node>::get_ba_constant(
+	const std::pair<constant, std::string>& typed_const)
+{
+	return get_ba_constant(typed_const.first,
+			       get_ba_type_id<node>(typed_const.second));
+}
+
+template <NodeType node>
+tref tree<node>::get_ba_constant(
+	const std::optional<std::pair<constant, std::string>>& typed_const)
+{
+	if (!typed_const) return nullptr;
+	return get_ba_constant(typed_const.value());
 }
 
 // -----------------------------------------------------------------------------
@@ -465,16 +499,16 @@ template <NodeType node>
 bool tree<node>::is_input_variable() const {
 	auto x = tt(*this);
 	if (x.is(bf)) x = x | variable;
-	if (x.is(variable)) x = x | io_var;
-	return x.is(io_var) && (x | tt::data) == 1;
+	if (x && x.is(variable)) x = x | io_var;
+	return x && x.is(io_var) && (x | tt::data) == 1;
 }
 
 template <NodeType node>
 bool tree<node>::is_output_variable() const {
 	auto x = tt(*this);
 	if (x.is(bf)) x = x | variable;
-	if (x.is(variable)) x = x | io_var;
-	return x.is(io_var) && (x | tt::data) == 2;
+	if (x && x.is(variable)) x = x | io_var;
+	return x && x.is(io_var) && (x | tt::data) == 2;
 }
 
 template <NodeType node>
@@ -532,18 +566,13 @@ size_t tree<node>::get_num() const {
 }
 
 template <NodeType node>
-tref tree<node>::get(const node::bas_variant& c, size_t type) {
-	return ba_constants_binder<node>::instance().bind(c, type);
-}
-
-template <NodeType node>
 size_t tree<node>::get_ba_constant_id() const {
 	DBG(assert(is_ba_constant());)
 	return this->value.data;
 }
 
 template <NodeType node>
-tree<node>::bas_variant tree<node>::get_ba_constant() const {
+tree<node>::constant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
 	return ba_constants<node>::get(data());
 }

@@ -404,6 +404,9 @@ template <NodeType node>
 tref build_bf_neg(tref l) {
 	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
+	LOG_TRACE << "build_bf_neg";
+	DBG(LOG_TRACE << "l: " << LOG_FM_DUMP(l);)
+	DBG(LOG_TRACE << "bf_neg: " << LOG_FM_DUMP(tau::get(tau::bf_neg, l));)
 	return tau::get(tau::bf, tau::get(tau::bf_neg, l));
 }
 
@@ -435,20 +438,23 @@ tref build_bf_f_type(const std::string& type) {
 }
 
 template <NodeType node>
-tref build_ba_constant(typename node::bas_variant v, size_t ba_tid) {
-	return ba_constants_binder<node>::instance().bind(v, ba_tid);
-}
-
-template <NodeType node>
-tref build_bf_ba_constant(typename node::bas_variant v, size_t ba_tid, tref r) {
-	using tau = tree<node>;
-	return tau::get(tau::bf, build_ba_constant<node>(v, ba_tid), r);
-}
-
-template <NodeType node>
-tref build_bf_uconst(const std::string& n1,
-	const std::string& n2)
+tref build_ba_constant(const typename node::constant& constant,
+		       size_t ba_type_id)
 {
+	return tree<node>::get_ba_constant(constant, ba_type_id);
+}
+
+template <NodeType node>
+tref build_bf_ba_constant(const typename node::constant& constant,
+	size_t ba_type_id, tref right)
+{
+	using tau = tree<node>;
+	return tau::get(tau::bf,
+		tau::get_ba_constant(constant, ba_type_id), right);
+}
+
+template <NodeType node>
+tref build_bf_uconst(const std::string& n1, const std::string& n2) {
 	using tau = tree<node>;
 	return tau::get(tau::bf, tau::get(tau::variable,
 			tau::get(tau::uconst_name, n1 + ":" + n2)));
@@ -897,20 +903,22 @@ tref tree<node>::build_bf_f_type(size_t ba_tid) {
 }
 
 template <NodeType node>
-tref tree<node>::build_bf_f_type(const std::string& type) {
-	return tau_lang::build_bf_f_type<node>(get_ba_type_id<node>(type));
+tref tree<node>::build_bf_f_type(const std::string& type_name) {
+	return tau_lang::build_bf_f_type<node>(get_ba_type_id<node>(type_name));
 }
 
 template <NodeType node>
-tref tree<node>::build_ba_constant(node::bas_variant v, size_t ba_tid) {
-	return tau_lang::build_ba_constant<node>(v, ba_tid);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_ba_constant(node::bas_variant v, size_t ba_tid,
-	tref r)
+tref tree<node>::build_ba_constant(const constant& constant,
+	size_t ba_type_id)
 {
-	return tau_lang::build_bf_ba_constant<node>(v, ba_tid, r);
+	return tau_lang::build_ba_constant<node>(constant, ba_type_id);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_ba_constant(const constant& constant,
+	size_t ba_type_id, tref right)
+{
+	return tau_lang::build_bf_ba_constant<node>(constant, ba_type_id,right);
 }
 
 template <NodeType node>

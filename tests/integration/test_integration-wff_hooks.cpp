@@ -8,6 +8,7 @@ bool check_hook(const char* sample, const char* expected) {
 	tref tau_expected = tau::get(expected, parse_wff());
 
 #ifdef DEBUG
+	using node = node_t;
 	std::cout << "sample: " << string(sample) << " expected: ";
 	if (tau_expected == 0) cout << "nullptr";
 	else cout << TAU_DUMP_TO_STR(tau_expected);

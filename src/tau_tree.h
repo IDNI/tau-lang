@@ -23,7 +23,7 @@ concept NodeType = requires { // Node Type has to provide
 	// node type
 	typename node::type;
 	// type aliases for the packed variant types
-	typename node::bas_variant;
+	typename node::constant;
 	typename node::nso_factory;
 	// nt is convertible to size_t
 	{ std::declval<node>().nt } -> std::convertible_to<size_t>;
@@ -41,7 +41,6 @@ struct rr_sig;
 template <NodeType node> struct ref_types;
 template <NodeType node> struct ba_types;
 template <NodeType node> struct ba_constants;
-template <NodeType node> struct ba_constants_binder;
 template <NodeType node> struct get_hook;
 template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
@@ -68,7 +67,7 @@ struct node {
 	using type = tau_parser::nonterminal;
 
 	// alias for recreation of the packed variant
-	using bas_variant = std::variant<BAs...>;
+	using constant = std::variant<BAs...>;
 	// alias for nso_factory<BAs...>
 	using nso_factory = tau_lang::nso_factory<BAs...>;
 
@@ -160,8 +159,6 @@ struct node {
 //     - tau = tree<node<BAs...>>
 //     - node = node<BAs...>
 //     - parse_tree = tau_parser::tree
-//     - parse_options = tau_parser::parse_options
-//
 
 template <NodeType node>
 struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
@@ -169,7 +166,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	using base_t = lcrs_tree<node>;
 	using parse_tree = tau_parser::tree;
 	using tau = tree<node>;
-	using bas_variant = node::bas_variant;
+	using constant = node::constant;
+
+	struct get_options; // fwd
 
 	inline static bool use_hooks = true; 
 
@@ -184,9 +183,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static htree::sp geth(const tree& n);
 
 	// creation (transformation) from tau_parser::tree
-	template <typename binder>
-	static tref get(binder& bind, const tau_parser::tree& t);
-	static tref get(const tau_parser::tree& t);
+	static tref get(const tau_parser::tree& t, get_options options = {});
 
 	// get node with children without triggering hooks
 	static tref get_raw(const node& v, const tref* ch = nullptr,
@@ -214,26 +211,40 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref get(const node::type& nt); // terminal / leaf
 	static tref get(const node::type& nt, tref ch); // with single child
 	static tref get(const node::type& nt, tref ch1, tref ch2); // with two children
-	static tref get(const node::type& nt, const tref* ch, size_t len, tref r = nullptr);
-	static tref get(const node::type& nt, const trefs& ch, tref r = nullptr); // with vector of children
+	static tref get(const node::type& nt, const tref* ch, size_t len,
+							tref r = nullptr);
+	static tref get(const node::type& nt, const trefs& ch,
+			tref r = nullptr); // with vector of children
 	static tref get(const node::type& nt, // with initializer list of children
 					const std::initializer_list<tref>& ch, tref r = nullptr);
 	static tref get(const node::type& nt, const std::string& str); // with string
 
 	// terminals
-	// creates a ba_constant node from it's value and ba type id
-	static tref get(const node::bas_variant& c, size_t ba_type_id);
-	// creates a ba_constant node from constant_id untyped
-	static tref get_ba_constant(size_t constant_id);
-	// creates a ba_constant node from constant_id and ba type id
-	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
-	// creates a ba_constant node from a pair of constant_id and ba_type_id
-	static tref get_ba_constant(const std::pair<size_t, size_t>& typed_const);
 	// creates a num node from a number n
 	static tref get_num(size_t n);
 	// creates an integer node from an integer i
 	static tref get_integer(int_t i);
 
+	// constants
+	// creates a ba_constant node from it's value and ba type name
+	static tref get_ba_constant(const constant& constant,
+				    const std::string& type_name);
+	// creates a ba_constant node from it's value and ba type id
+	static tref get_ba_constant(const constant& constant,
+				    size_t ba_type_id);
+	// creates a ba_constant node from constant source and type name
+	static tref get_ba_constant(const std::string& constant_source,
+				    const std::string type_name = "");
+	// creates a ba_constant node from constant_id and ba type id
+	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
+	// creates a ba_constant node from a pair of constant_id and ba_type_id
+	static tref get_ba_constant(const std::pair<constant, std::string>&
+								typed_const);
+	// creates a ba_constant node from a pair of constant_id and ba_type_id
+	static tref get_ba_constant(
+		const std::optional<std::pair<constant, std::string>>&
+								typed_const);
+	// children
 	size_t children_size() const;
 
 	bool get_children(tref *ch, size_t& len) const;
@@ -302,58 +313,35 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	int_t get_integer() const;
 	size_t get_num() const;
 	size_t get_ba_constant_id() const;
-	bas_variant get_ba_constant() const;
+	constant get_ba_constant() const;
 	size_t get_ba_type() const;
 	const std::string& get_ba_type_name() const;
 
 	// ---------------------------------------------------------------------
 	// from parser (tau_tree_from_parser.tmpl.h)
 
-	struct parse_options : public tau_parser::parse_options {
+	struct get_options {
+		tau_parser::parse_options parse;
 		std::map<std::string, std::pair<size_t, size_t>>
-							named_constants{}; 
-		parse_options();
-		parse_options(const parse_options&);
-		parse_options(const tau_parser::parse_options& opts);
+							named_constants{};
+		bool infer_ba_types = true;
 	};
 
 	// creation from parser result or parser input (string, stream, file)
-	static tref get(tau_parser::result& result);
-	static tref get(const std::string& str, parse_options options = {});
-	static tref get(std::istream& is, parse_options options = {});
+	static tref get(tau_parser::result& result, get_options options = {});
+	static tref get(const std::string& str, get_options options = {});
+	static tref get(std::istream& is, get_options options = {});
 	static tref get_from_file(const std::string& filename,
-						parse_options options = {});
-
-	// with binder
-	template <typename binder>
-	static tref get(binder& bind, tau_parser::result& result);
-	template <typename binder>
-	static tref get(binder& bind, const std::string& str,
-						parse_options options = {});
-	template <typename binder>
-	static tref get(binder& bind, std::istream& is,
-						parse_options options = {});
-	template <typename binder>
-	static tref get_from_file(binder& bind, const std::string& filename,
-						parse_options options = {});
+						get_options options = {});
 
 	// builders
 	static rewriter::builder get_builder(tref ref);
-	template <typename binder>	
-	static rewriter::builder get_builder(binder& bind,
-						const std::string& source);
 	static rewriter::builder get_builder(const std::string& source);
 
 	static rewriter::rules get_rules(tref r);
-	template <typename binder>
-	static rewriter::rules get_rules(binder& bind,
-						const std::string& source);
 	static rewriter::library get_rules(const std::string& source);
 
 	static rewriter::rules get_library(tref r);
-	template <typename binder>
-	static rewriter::library get_library(binder& bind,
-						const std::string& source);
 	static rewriter::library get_library(const std::string& source);
 
 	// ---------------------------------------------------------------------
@@ -409,7 +397,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		static const extractor<size_t>              data;
 		static const extractor<size_t>              ba_constant_id;
 		static const extractor<size_t>              ba_type;
-		static const extractor<bas_variant>         ba_constant;
+		static const extractor<constant>            ba_constant;
 		// children
 		static const extractor<traverser>           only_child;
 		static const extractor<traverser>           first;
@@ -418,8 +406,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		static const extractor<traverser>           fourth;
 		static const extractor<traverser>           children;
 		static const extractor<tref_range<node>>    children_range;
-		static const extractor<
-				tree_range<tree<node>>>     children_trees_range;
+		static const
+			extractor<tree_range<tree<node>>>   children_trees_range;
 		// (tref) -> tref function tt:f wrapper	
 		static const extractor<traverser> f(const auto& fn);
 
@@ -523,9 +511,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_t_type(const std::string& type);
 	static tref build_bf_f_type(size_t ba_tid);
 	static tref build_bf_f_type(const std::string& type);
-	static tref build_ba_constant(node::bas_variant v, size_t ba_tid);
-	static tref build_bf_ba_constant(
-		node::bas_variant v, size_t ba_tid, tref r);
+	static tref build_ba_constant(const constant& constant,
+				      size_t ba_type_id);
+	static tref build_bf_ba_constant(const constant& constant,
+					 size_t ba_type_id, tref right);
 	static tref build_bf_uconst(
 		const std::string& name1, const std::string& name2);
 	static tref build_var_name(size_t sid);
@@ -671,22 +660,16 @@ bool contains(tref fm, tref sub_fm);
 
 template <NodeType node>
 rewriter::builder get_builder(tref n);
-template <NodeType node, typename binder>
-rewriter::builder get_builder(binder& bind, const std::string& source);
 template <NodeType node>
 rewriter::builder get_builder(const std::string& source);
 
 template <NodeType node>
 rewriter::rules get_rules(tref r);
-template <NodeType node, typename binder>
-rewriter::rules get_rules(binder& bind, const std::string& source);
 template <NodeType node>
 rewriter::rules get_rules(const std::string& source);
 
 template <NodeType node>
 rewriter::rules get_library(tref r);
-template <NodeType node, typename binder>
-rewriter::library get_library(binder& bind, const std::string& source);
 template <NodeType node>
 rewriter::library get_library(const std::string& source);
 

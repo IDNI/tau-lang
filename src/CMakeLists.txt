@@ -35,7 +35,7 @@ set(TAU_SOURCES
 	../external/parser/src/utility/charclasses.cpp
 	../external/parser/src/utility/term.cpp
 	boolean_algebras/bool_ba.cpp
-	dict.cpp
+	boolean_algebras/bdds/var_dict.cpp
 )
 
 set(CLI_SOURCES

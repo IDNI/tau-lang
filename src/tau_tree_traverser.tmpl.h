@@ -148,10 +148,10 @@ const typename tree<node>::template extractor<size_t>
 			});
 
 template <NodeType node>
-const typename tree<node>::template extractor<typename tree<node>::bas_variant>
+const typename tree<node>::template extractor<typename tree<node>::constant>
 	tree<node>::traverser::ba_constant =
-		typename tree<node>::template extractor<bas_variant>(
-			[](const traverser& t) -> bas_variant {
+		typename tree<node>::template extractor<constant>(
+			[](const traverser& t) -> constant {
 				return ba_constants<node>::get(
 					t.value_tree().get_ba_constant_id());
 			});

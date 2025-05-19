@@ -12,32 +12,30 @@ namespace idni::tau_lang {
 template<>
 struct nso_factory<Bool> {
 
-	optional<variant<Bool>> parse(const string& src, const string) const {
-		if (src == "true")  return Bool(true);
-		if (src == "false") return Bool(false);
+	optional<constant_with_type<Bool>> parse(
+		const string& constant_source, const string) const
+	{
+		if (constant_source == "1" || constant_source == "true")
+			return constant_with_type<Bool>{ Bool(true), "bool" };
+		if (constant_source == "0" || constant_source == "false")
+			return constant_with_type<Bool>{ Bool(false), "bool" };
 		return {};
-	}
-
-	tref binding(const string& src, const string& type_name) const {
-		if (type_name != "bool") return nullptr;
-		auto opt = parse(src, type_name);
-		if (!opt.has_value()) return nullptr;
-		return ba_constants_binder<node<Bool>>::instance()
-						.bind(opt.value(), "bool");
 	}
 
 	vector<string> types() const { return { "bool" }; }
 
 	string default_type() const { return "bool"; }
 
-	string one(const string) const { return "true"; }
+	string one(const string) const { return "1"; }
 
-	string zero(const string) const { return "false"; }
+	string zero(const string) const { return "0"; }
 
-	tref splitter_one(const string) const { return nullptr; }
+	constant_with_type<Bool> splitter_one(const string) const {
+		return { Bool(true), "bool" };
+	}
 
 	// There is no tau_ba
-	optional<Bool> unpack_tau_ba(const variant<Bool>&) const { return {}; }
+	optional<rr> unpack_tau_ba(const variant<Bool>&) const { return {}; }
 
 	static nso_factory<Bool>& instance() {
 		static nso_factory<Bool> factory;
