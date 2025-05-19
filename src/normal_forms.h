@@ -558,9 +558,8 @@ template <NodeType node>
 struct to_snf_step {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	using bas_variant = typename tau::bas_variant;
+	using constant = typename node::constant;
 
-	using constant = bas_variant;
 	using vars = subtree_set<node>;
 	using exponent = subtree_set<node>;
 	using literal = tref;
@@ -573,25 +572,25 @@ struct to_snf_step {
 private:
 
 	static constexpr auto _or = overloaded(
-		[]<typename T>(const T& l, const T& r) -> bas_variant {
+		[]<typename T>(const T& l, const T& r) -> constant {
 			return l | r;
 		},
-		[](const auto&, const auto&) -> bas_variant {
+		[](const auto&, const auto&) -> constant {
 			throw std::logic_error("wrong types");
 		});
 	static constexpr auto _and = overloaded(
-		[]<typename T>(const T& l, const T& r) -> bas_variant {
+		[]<typename T>(const T& l, const T& r) -> constant {
 			return l & r;
 		},
-		[](const auto&, const auto&) -> bas_variant {
+		[](const auto&, const auto&) -> constant {
 			throw std::logic_error("wrong types");
 		});
 
 	static constexpr auto _neg = overloaded(
-		[]<typename T>(const T& l) -> bas_variant {
+		[]<typename T>(const T& l) -> constant {
 			return ~l;
 		},
-		[](const auto&) -> bas_variant {
+		[](const auto&) -> constant {
 			throw std::logic_error("wrong types");
 		});
 

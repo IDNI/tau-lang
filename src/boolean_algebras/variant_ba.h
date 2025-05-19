@@ -77,10 +77,10 @@ bool operator==(const std::variant<BAs...>& l, const bool& r) {
 }
 
 template <NodeType node>
-typename node::bas_variant normalize_ba(const typename node::bas_variant& elem){
+typename node::constant normalize_ba(const typename node::constant& elem){
 	return std::visit(overloaded(
 		[](const auto& el) {
-			return typename node::bas_variant(normalize(el));
+			return typename node::constant(normalize(el));
 		}
 	), elem);
 }

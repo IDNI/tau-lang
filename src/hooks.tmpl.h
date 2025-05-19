@@ -34,9 +34,12 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 	ss << LOG_NT(v.nt);
 	if (len) {
 		ss << " \t[";
-		for (size_t i = 0; i < len; ++i)
+		for (size_t i = 0; i < len; ++i) {
+			assert(ch[i] != nullptr);
+			ss << "<" << ch[i] << ">";
 			ss <<(i ? ", " : "")<<LOG_NT(tau::get(ch[i]).get_type())
 				<< "(" << LOG_FM(ch[i]) << ")";
+		}
 		ss << "]";
 	}
 	LOG_TRACE << ss.str();
@@ -437,17 +440,18 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 	HOOK_LOGGING(log("cte", v, ch, len, right);)
 	if (len == 1 && tau::get(ch[0]).is_ba_constant()) {
 		const auto& l = tau::get(ch[0]);
-		size_t typed = l.get_ba_type();
-		if (is_syntactic_zero(l.get_ba_constant()))
-			return tau::get(typed
-				? tau::get(tau::bf, tau::get_raw(
-					node::ba_typed(tau::bf_f, typed)))
-				: tau::_0(), right);
-		else if (is_syntactic_one(l.get_ba_constant()))
-			return tau::get(typed
-				? tau::get(tau::bf, tau::get_raw(
-					node::ba_typed(tau::bf_t, typed)))
-				: tau::_1(), right);
+		if (size_t typed = l.get_ba_type(); typed > 0) {
+			if (is_syntactic_zero(l.get_ba_constant()))
+				return tau::get(typed
+					? tau::get(tau::bf, tau::get_raw(
+						node::ba_typed(tau::bf_f, typed)))
+					: tau::_0(), right);
+			else if (is_syntactic_one(l.get_ba_constant()))
+				return tau::get(typed
+					? tau::get(tau::bf, tau::get_raw(
+						node::ba_typed(tau::bf_t, typed)))
+					: tau::_1(), right);
+		}
 	}
 	return tau::get_raw(v, ch, len, right);
 }

@@ -19,29 +19,25 @@ using node_t = tau_lang::node<bas_pack>;
 using tau = tree<node_t>;
 using tt = tau::traverser;
 using bac = ba_constants<node_t>;
-using bacb = ba_constants_binder<node_t>;
 
-tau::parse_options parse_library() {
-	static tau::parse_options opts(
-		tau_parser::parse_options{ .start = tau::library });
+tau::get_options parse_library() {
+	static tau::get_options opts{ .parse = { .start = tau::library },
+		.infer_ba_types = false };
 	return opts;
 }
 
-tau::parse_options parse_bf() {
-	static tau::parse_options opts(
-		tau_parser::parse_options{ .start = tau::bf });
+tau::get_options parse_bf() {
+	static tau::get_options opts{ .parse = { .start = tau::bf } };
 	return opts;
 }
 
-tau::parse_options parse_wff() {
-	static tau::parse_options opts(
-		tau_parser::parse_options{ .start = tau::bf });
+tau::get_options parse_wff() {
+	static tau::get_options opts{ .parse = { .start = tau::bf } };
 	return opts;
 }
 
-tau::parse_options parse_rec_relations() {
-	static tau::parse_options opts(
-		tau_parser::parse_options{ .start = tau::rec_relations });
+tau::get_options parse_rec_relations() {
+	static tau::get_options opts{ .parse = { .start = tau::rec_relations } };
 	return opts;
 }
 

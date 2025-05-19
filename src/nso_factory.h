@@ -12,6 +12,10 @@
 
 namespace idni::tau_lang {
 
+template <typename... BAs>
+requires BAsPack<BAs...>
+using constant_with_type = std::pair<std::variant<BAs...>, std::string>;
+
 /**
  * Factory for creating and manipulating tau objects.
  * - interface" for creating custom BA types by adding nso_factory<YourBA>
@@ -23,20 +27,14 @@ struct nso_factory {
 
 	/**
 	 * Parses the given string into a tau object.
-	 * @param input The string to parse.
+	 * @param constant_source The string to parse.
 	 * @param options Optional parse options.
-	 * @return The parsed tau object, or std::nullopt if parsing fails.
+	 * @return A pair with the parsed constant and the string type name
 	 */
-	std::optional<std::variant<BAs...>> parse(const std::string& input,
-					const std::string options = "") const;
-
-	/**
-	 * Binds the given tau object with the specified type.
-	 * @param n The tau object source to bind.
-	 * @param type_name The type to bind with (string_id(type_name)).
-	 * @return The bound tau object.
-	 */
-	tref binding(const std::string& n, const std::string& type_name) const;
+	std::optional<constant_with_type<BAs...>> parse(
+		const std::string& constant_source,
+		const std::string type_name,
+		const std::string options = "") const;
 
 	/**
 	 * Returns a vector of available types.
@@ -66,17 +64,18 @@ struct nso_factory {
 
 	/**
 	 * Returns a tau object representing a splitter with one.
-	 * @param type Optional type name.
-	 * @return The splitter tau object.
+	 * @param ba_type Optional type name.
+	 * @return The splitter constant.
 	 */
-	tref splitter_one(const std::string type = "") const;
+	constant_with_type<BAs...> splitter_one(
+		const std::string type_name = "") const;
 
 	/**
 	 * Returns the tau formula stored in the variant, if present
-	 * @param v Variant for formula extraction
-	 * @return Extracted formula if present
+	 * @param constant Variant for formula extraction
+	 * @return Extracted tau_ba spec if present
 	 */
-	tref unpack_tau_ba(const std::variant<BAs...>& v);
+	std::optional<rr> unpack_tau_ba(const std::variant<BAs...>& constant);
 
 	/**
 	 * Returns the singleton instance of the factory.

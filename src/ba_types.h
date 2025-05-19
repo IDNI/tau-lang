@@ -30,8 +30,11 @@ struct ba_types {
 	static std::ostream& print_type(std::ostream& os, size_t ba_type);
 
 private:
-	inline static std::vector<size_t> types;               // type_sids (index = ba_type id)
-	inline static std::map<size_t, size_t> type_names_map; // type_sid -> ba_type id
+	// type_sids (index = ba_type id)
+	inline static std::vector<size_t> types { dict("untyped") };
+	// type_sid -> ba_type id
+	inline static std::map<size_t, size_t> type_names_map{
+		{ dict("untyped"), 0 } };
 };
 
 // -----------------------------------------------------------------------------

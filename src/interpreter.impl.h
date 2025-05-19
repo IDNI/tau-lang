@@ -93,7 +93,7 @@ std::optional<assignment<node>> finputs<node>::read() {
 			return {};
 		}
 		current[var] =
-			build_bf_ba_constant<node>(cnst.value(), types[var]);
+			tau::get_ba_constant(cnst.value().first, types[var]);
 	}
 	time_point += 1;
 	return current;
@@ -145,7 +145,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 			return {};
 		}
 		tref wrapped_const = build_bf_ba_constant<node>(
-						cnst.value(), it->second);
+					cnst.value().first, it->second);
 		// Check that the input is a closed formula
 		if (has_open_tau_fm_in_constant<node>(wrapped_const))
 			return {};
@@ -745,8 +745,9 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 		if (!tau::get(constraints).equals_T()) {
 			// setting proper options for the solver
 			solver_options options = {
-				.splitter_one = node::nso_factory::instance()
-							.splitter_one(""),
+				.splitter_one = tau::get_ba_constant(
+					node::nso_factory::instance()
+							.splitter_one("")),
 				.mode = solver_mode::general
 			};
 
@@ -898,8 +899,8 @@ solution_with_max_update(tref spec) {
 	auto get_solution = [](const auto& fm) {
 		// setting proper options for the solver
 		solver_options options = {
-			.splitter_one = node::nso_factory::instance()
-							.splitter_one(""),
+			.splitter_one = tau::get_ba_constant(
+				node::nso_factory::instance().splitter_one("")),
 			.mode = solver_mode::general
 		};
 		// solve the given system of equations
@@ -984,7 +985,11 @@ template <NodeType node>
 std::optional<tref> unpack_tau_constant(tref constant) {
 	const auto& c = tree<node>::get(constant);
 	if (!c.is_ba_constant()) return {};
-	return node::nso_factory::instance().unpack_tau_ba(c.get_ba_constant());
+	auto opt_rr = node::nso_factory::instance()
+				.unpack_tau_ba(c.get_ba_constant());
+	if (!opt_rr) return {};
+	// TODO (QUESTION) why is here only tref of main needed? are spec rules already applied?
+	return { opt_rr.value().main->get() };
 }
 
 template <NodeType node, typename in_t, typename out_t>

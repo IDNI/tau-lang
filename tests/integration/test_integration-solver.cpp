@@ -6,11 +6,10 @@
 #	include "solver.h"
 #endif
 
-auto splitter_one_bdd() {
+tref splitter_one_bdd() {
 	using node = tau_lang::node<sbf_ba>;
 	static sbf_ba_factory<sbf_ba> factory;
-	return build_bf_ba_constant<node>(factory.splitter_one(),
-					get_ba_type_id<node>("sbf"));
+	return tree<node>::get_ba_constant(factory.splitter_one());
 }
 
 template <NodeType node>
@@ -29,11 +28,13 @@ bool check_solution(tref eq, const solution<node>& sol) {
 
 TEST_SUITE("minterm_iterator") {
 
+
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
+		using node = node_t;
 		std::cout << "------------------------------------------------------\n";
 		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
@@ -46,6 +47,7 @@ TEST_SUITE("minterm_iterator") {
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
+		using node = node_t;
 		std::cout << "------------------------------------------------------\n";
 		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
@@ -65,6 +67,7 @@ TEST_SUITE("minterm_iterator") {
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
+		using node = node_t;
 		std::cout << "------------------------------------------------------\n";
 		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
@@ -345,7 +348,6 @@ TEST_SUITE("lgrs") {
 TEST_SUITE("solve_minterm_system") {
 
 	bool test_solve_minterm_system(const std::vector<std::string> minterms) {
-		using node_t = node_t<sbf_ba>;
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
@@ -380,14 +382,13 @@ TEST_SUITE("solve_minterm_system") {
 TEST_SUITE("solve_inequality_system") {
 
 	bool test_solve_inequality_system(const std::vector<std::string> inequalities) {
-		using node = tau_lang::node<sbf_ba>;
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
 		inequality_system<node_t> system;
-		for (const auto& ineq : inequalities) {
-			system.insert(get_nso_rr<node_t>(tau::get(ineq)).value().main->get());
-		}
+		for (const auto& ineq : inequalities)
+			system.insert(get_nso_rr<node_t>(
+				tau::get(ineq)).value().main->get());
 
 		// setting the proper options
 		solver_options options = {
@@ -468,7 +469,6 @@ TEST_SUITE("solve_system") {
 	bool test_solve_system(const std::string equality,
 			const std::vector<std::string> inequalities)
 	{
-		using node = tau_lang::node<sbf_ba>;
 #ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
@@ -614,7 +614,9 @@ TEST_SUITE("solve") {
 
 	bool test_solve_min(const std::string system, const std::string type = "") {
 		solver_options options = {
-			.splitter_one = node_t::nso_factory::instance().splitter_one(type),
+			.splitter_one = tau::get_ba_constant(
+				node_t::nso_factory::instance()
+					.splitter_one(type)),
 			.mode = solver_mode::minimum
 		};
 		return test_solve(system, options);
@@ -622,7 +624,9 @@ TEST_SUITE("solve") {
 
 	bool test_solve_max(const std::string system, const std::string type = "") {
 		solver_options options = {
-			.splitter_one = node_t::nso_factory::instance().splitter_one(type),
+			.splitter_one = tau::get_ba_constant(
+				node_t::nso_factory::instance()
+					.splitter_one(type)),
 			.mode = solver_mode::maximum
 		};
 		return test_solve(system, options);
@@ -630,7 +634,9 @@ TEST_SUITE("solve") {
 
 	bool test_solve(const std::string system, const std::string type = "") {
 		solver_options options = {
-			.splitter_one = node_t::nso_factory::instance().splitter_one(type),
+			.splitter_one = tau::get_ba_constant(
+				node_t::nso_factory::instance()
+					.splitter_one(type)),
 			.mode = solver_mode::general
 		};
 		return test_solve(system, options);

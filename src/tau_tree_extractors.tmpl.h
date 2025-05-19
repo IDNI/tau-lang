@@ -145,13 +145,19 @@ tref get_var_name_node(tref var) {
 	using tt = tau::traverser;
 	auto v = tt(var);
 	if (v.is(tau::var_name)) return var;
+	// TODO: refactor
 	if (auto vn = v | tau::var_name; vn) return vn.value();
 	if (auto vn = v | tau::io_var | tau::var_name; vn) return vn.value();
+	if (auto vn = v | tau::uconst_name; vn) return vn.value();
+	if (auto vn = v | tau::variable | tau::var_name; vn) return vn.value();
 	if (auto vn = v | tau::variable | tau::io_var | tau::var_name;
 		vn) return vn.value();
+	if (auto vn = v | tau::variable | tau::uconst_name; vn) return vn.value();
 	if (auto vn = v | tau::bf | tau::variable | tau::var_name;
 		vn) return vn.value();
 	if (auto vn = v | tau::bf | tau::variable | tau::io_var | tau::var_name;
+		vn) return vn.value();
+	if (auto vn = v | tau::bf | tau::variable | tau::uconst_name;
 		vn) return vn.value();
 	return nullptr;
 }
