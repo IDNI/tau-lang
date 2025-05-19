@@ -46,11 +46,16 @@
 #include <fstream>
 #include <sstream>
 
+#ifdef DEBUG
 // including nso_ba, sbf_ba and interpreter directly instead of 
 // #include "tau.h" to avoid error lines pointing to a generated tau.h
-#include "boolean_algebras/nso_ba.h"
-#include "boolean_algebras/sbf_ba.h"
-#include "interpreter.h"
+#	include "boolean_algebras/nso_ba.h"
+#	include "boolean_algebras/sbf_ba.h"
+#	include "interpreter.h"
+#else
+#	include "tau.h"
+#endif // DEBUG
+
 
 #include "repl_evaluator.h"
 #include "utility/cli.h"

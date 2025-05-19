@@ -1,8 +1,15 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+#ifdef DEBUG
 // including instead of #include "tau.h" to avoid errors pointing to the generated tau.h
-#include "boolean_algebras/nso_ba.h"
-#include "boolean_algebras/sbf_ba.h"
+#	include "boolean_algebras/nso_ba.h"
+#	include "boolean_algebras/sbf_ba.h"
+#else
+#	include "tau.h"
+#endif // DEBUG
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "testing"
 
 // common helpers to be included in test_*_helpers.h after defining bas_pack macro
 

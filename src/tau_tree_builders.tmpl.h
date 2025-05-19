@@ -1055,4 +1055,4 @@ tref tree<node>::build_out_var_at_t_minus_indexed(
 	return tau_lang::build_out_var_at_t_minus_indexed<node>(index, shift, t);
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang
