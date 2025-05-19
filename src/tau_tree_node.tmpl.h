@@ -18,9 +18,9 @@ node<BAs...> node<BAs...>::retype(size_t new_nt) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr node<BAs...> node<BAs...>::ba_constant(size_t v, size_t ba_tid) {
-	// LOG_TRACE << " -- node::ba_constant: " << v << " " << ba_tid;
-	return node(type::bf_constant, v, true /* is_term */, ba_tid);
+node<BAs...> node<BAs...>::ba_retype(size_t new_ba) const {
+	return node(nt, data, term, new_ba, ext);
+}
 }
 
 template <typename... BAs>
@@ -120,6 +120,9 @@ constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
 template <typename... BAs>
 requires BAsPack<BAs...>
 auto node<BAs...>::operator<=>(const node& that) const {
+	if (nt_bits != that.nt_bits)     return nt_bits <=> that.nt_bits;
+	if (ba_bits != that.ba_bits)     return ba_bits <=> that.ba_bits;
+	if (data_bits != that.data_bits) return data_bits <=> that.data_bits;	
 	// if (hash != that.hash) return hash    <=> that.hash;
 	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
 	if (term != that.term) return C(term) <=> C(that.term);
@@ -153,6 +156,9 @@ constexpr bool node<BAs...>::operator>=(const node& that) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator==(const node& that) const {
+	if (nt_bits != that.nt_bits
+		|| ba_bits != that.ba_bits
+		|| data_bits != that.data_bits) return false;
 	if (nt == type::bf_f && that.nt == type::bf_f) // 0 - ignore ba type if any untyped
 		return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
 	if (nt == type::bf_t && that.nt == type::bf_t) // 1 - ignore ba type if any untyped

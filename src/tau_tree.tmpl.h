@@ -553,4 +553,9 @@ size_t tree<node>::get_ba_type() const {
 	return this->value.ba;
 }
 
+template <NodeType node>
+const std::string& tree<node>::get_ba_type_name() const {
+	return ba_types<node>::type_name(this->get_ba_type());
+}
+
 } // namespace idni::tau_lang

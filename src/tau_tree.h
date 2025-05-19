@@ -103,6 +103,7 @@ struct node {
 			size_t ba_type = 0, size_t ext = 0) noexcept;
 
 	node retype(size_t new_nt) const;
+	node ba_retype(size_t new_ba) const;
 
 	// factory for a ba constant node
 	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
@@ -303,6 +304,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	size_t get_ba_constant_id() const;
 	bas_variant get_ba_constant() const;
 	size_t get_ba_type() const;
+	const std::string& get_ba_type_name() const;
 
 	// ---------------------------------------------------------------------
 	// from parser (tau_tree_from_parser.tmpl.h)
