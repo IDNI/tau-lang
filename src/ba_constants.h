@@ -47,6 +47,8 @@ struct ba_constants {
 	static std::ostream& print(std::ostream& os, size_t constant_id);
 	// print the constant value to the stream
 	static std::ostream& print_constant(std::ostream& os, size_t constant_id);
+	static std::ostream& dump(std::ostream& os);
+	static std::string dump_to_str();
 
 private:
 	// internal insertion of a constant into the pool

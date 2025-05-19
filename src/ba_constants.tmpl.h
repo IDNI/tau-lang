@@ -168,4 +168,18 @@ ba_constants_binder<node>& ba_constants_binder<node>::instance() {
 	return binder;
 }
 
+template <NodeType node>
+std::ostream& ba_constants<node>::dump(std::ostream& os) {
+	for (size_t i = 0; i < C.size(); ++i) {
+		os << "\nconstant_id: " << i + 1 << " " << LOG_BA(C[i]);
+	}
+	return os << "\n";
+}
+
+template <NodeType node>
+std::string ba_constants<node>::dump_to_str() {
+	std::stringstream ss;
+	return dump(ss), ss.str();
+}
+
 } // namespace idni::tau_lang
