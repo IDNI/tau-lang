@@ -4,7 +4,9 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "interpreter.h"
+#ifdef DEBUG // in release it is included with tau.h
+#	include "interpreter.h"
+#endif
 
 std::string random_file(const std::string& extension = ".out", const std::string prefix = "/tmp/") {
 	// define the characters to use in the random string

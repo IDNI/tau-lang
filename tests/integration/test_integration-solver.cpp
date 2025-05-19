@@ -2,7 +2,9 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "solver.h"
+#ifdef DEBUG // in release it is included with tau.h
+#	include "solver.h"
+#endif
 
 auto splitter_one_bdd() {
 	using node = tau_lang::node<sbf_ba>;

@@ -82,7 +82,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 	"printers",
 	"queries",
 	"traverser",
-	"types",
+	"testing"
 };
 
 // -----------------------------------------------------------------------------
