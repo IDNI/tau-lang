@@ -4,22 +4,24 @@
 #define __IDNI__TAU__DICT_H__
 
 #include <string>
-
-#include "defs.h"
+#include <vector>
+#include <map>
 
 namespace idni::tau_lang {
 
-using sym_t = int_t;
+inline static vector<string> S{ "" };                // strings
+inline static map<string, size_t> SM{ { "", 0 } };   // string -> id map
 
-// bdd var dict
-sym_t dict(const char*);
-sym_t dict(const std::string&);
-const char* dict(sym_t);
-bool has(sym_t);
+inline size_t dict(const std::string& s) {
+	if (auto it = SM.find(s); it != SM.end()) return it->second;
+	return SM.emplace(s, S.size()), S.push_back(s), S.size() - 1;
+}
 
-// tau strings dict
-const std::string& string_from_id(size_t id);
-size_t string_id(const std::string& s);
+inline const std::string& dict(size_t id) {
+	DBG(assert(id <= S.size());)
+	return S[id];
+}
+
 
 } // namespace idni::tau_lang
 
