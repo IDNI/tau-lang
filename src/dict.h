@@ -7,10 +7,13 @@
 #include <vector>
 #include <map>
 
+// -----------------------------------------------------------------------------
+// dict - string <-> size_t map
+
 namespace idni::tau_lang {
 
-inline static vector<string> S{ "" };                // strings
-inline static map<string, size_t> SM{ { "", 0 } };   // string -> id map
+inline static std::vector<std::string> S{ "" };                // strings
+inline static std::map<std::string, size_t> SM{ { "", 0 } };   // string -> id map
 
 inline size_t dict(const std::string& s) {
 	if (auto it = SM.find(s); it != SM.end()) return it->second;
@@ -21,7 +24,6 @@ inline const std::string& dict(size_t id) {
 	DBG(assert(id <= S.size());)
 	return S[id];
 }
-
 
 } // namespace idni::tau_lang
 
