@@ -74,7 +74,7 @@ bool has_open_tau_fm_in_constant(tref fm);
 
 } // namespace idni::tau_lang
 
-#include "dict.h"  // string_id and string_from_id
+#include "dict.h"  // string pool accessed with dict() functions
 #include "rr.h"    // recurrence relations structure
 
 #include "tau_tree_builders.h"
@@ -257,7 +257,7 @@ tref tree<node>::get(const node::type& nt,
 
 template <NodeType node>
 tref tree<node>::get(const node::type& nt, const std::string& s) {
-	return get(node(nt, string_id(s)));
+	return get(node(nt, dict(s)));
 }
 
 //------------------------------------------------------------------------------
@@ -516,7 +516,7 @@ const std::string& tree<node>::get_type_name() const {
 template <NodeType node>
 const std::string& tree<node>::get_string() const {
 	DBG(assert(is_string());)
-	return string_from_id(this->value.data);
+	return dict(this->value.data);
 }
 
 template <NodeType node>

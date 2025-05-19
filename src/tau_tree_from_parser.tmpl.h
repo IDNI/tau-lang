@@ -47,9 +47,8 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 	bool error = false;
 
 	auto transformer = [&](tref t, tref parent) {
-		// DBG(std::stringstream ss;)
 		// DBG(LOG_TRACE << " -- transforming: "
-		// 	<< (parse_tree::get(t).print(ss), ss.str());)
+		// 	<< (parse_tree::get(t).print_to_str());) //, ss.str());)
 
 		if (m_ex(t)) return true; // already transformed
 		const auto& ptr = parse_tree::get(t); // get parse tree node

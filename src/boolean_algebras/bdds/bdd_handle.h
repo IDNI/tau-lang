@@ -4,7 +4,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BDD_HANDLE_H__
 
 #include "babdd.h"
-#include "dict.h"
+#include "var_dict.h"
 #include "splitter_types.h"
 
 namespace idni::tau_lang {
@@ -646,8 +646,8 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 		std::stringstream t;
 		if (!(c.first == true)) t << '{' << c.first << '}';
 		for (int_t v : c.second)
-			if (v < 0) s.insert(std::string(dict(-v)) + "'");
-			else s.insert(dict(v));
+			if (v < 0) s.insert(std::string(var_dict(-v)) + "'");
+			else s.insert(var_dict(v));
 		bool first = true;
 		for (auto& x : s) {
 			if (!first) t << " "; else first = false;
