@@ -14,7 +14,7 @@ template <NodeType node>
 typed_stream get_typed_stream(const std::string& type,
 				const std::string& filename)
 {
-	return std::make_pair(get_ba_type_id<node>(type), string_id(filename));
+	return std::make_pair(get_ba_type_id<node>(type), dict(filename));
 }
 
 // -----------------------------------------------------------------------------
@@ -28,11 +28,11 @@ finputs<node>::finputs(typed_io_vars inputs) {
 		this->types[var] = desc.first;
 		this->streams[var] = desc.second == 0
 			? std::optional<std::ifstream>()
-			: std::ifstream(string_from_id(desc.second));
+			: std::ifstream(dict(desc.second));
 		if (this->streams[var]
 			&& !this->streams[var].value().is_open())
 				LOG_ERROR << "Failed to open input file: '"
-					<< string_from_id(desc.second) << "'";
+					<< dict(desc.second) << "'";
 	}
 }
 
@@ -56,11 +56,11 @@ void finputs<node>::add_input(tref var, size_t type_sid, size_t filename_sid) {
 		types.emplace(var, type_sid);
 		streams.emplace(var, filename_sid == 0
 			? std::optional<std::ifstream>()
-			: std::ifstream(string_from_id(filename_sid)));
+			: std::ifstream(dict(filename_sid)));
 		if (this->streams[var]
 			&& !this->streams[var].value().is_open())
 				LOG_ERROR << "Failed to open input file: '"
-					<< string_from_id(filename_sid) << "'";
+					<< dict(filename_sid) << "'";
 	}
 }
 
@@ -179,7 +179,7 @@ foutputs<node>::foutputs(typed_io_vars outputs) {
 		this->types[var] = desc.first;
 		this->streams[var] = desc.second == 0
 			? std::optional<std::ofstream>()
-			: std::ofstream(string_from_id(desc.second));
+			: std::ofstream(dict(desc.second));
 	}
 }
 
@@ -201,7 +201,7 @@ void foutputs<node>::add_output(tref var, size_t type_sid, size_t filename_sid) 
 		types.emplace(var, type_sid);
 		streams.emplace(var, filename_sid == 0
 			? std::optional<std::ofstream>()
-			: std::ofstream(string_from_id(filename_sid)));
+			: std::ofstream(dict(filename_sid)));
 	}
 }
 

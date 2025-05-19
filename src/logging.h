@@ -194,15 +194,23 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 // LOG_BA_COLOR escapes in a stream for `size_t` BA type id
 #define LOG_BA_TYPE(tid) LOG_BA_COLOR << get_ba_type_name<node>(tid)<<TC.CLEAR()
 
+// LOG_BA_COLOR escapes in a stream for `size_t` BA type id with the id
+#define LOG_BA_TYPE_DUMP(tid) LOG_BA_TYPE(tid) << "(" << tid << ")"
+
 // LOG_BA_COLOR escapes in a stream (constants or other elements representing ba constants or ba types)
 #define LOG_BA(c)        LOG_BA_COLOR << c                          <<TC.CLEAR()
 
 // LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` pretty print
 #define LOG_FM(fm)       LOG_FM_COLOR <<tree<node>::get(fm).to_str()<<TC.CLEAR()
+
 // LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` pretty print
 //                      and then followed by nodes tree printed in a line
 #define LOG_FM_DUMP(fm)  LOG_FM_COLOR <<tree<node>::get(fm).to_str()<<TC.CLEAR() \
-				<<" \t#\t"<< tau::get(fm).print_in_line_to_str()
+			<<" \t#\t"<< tree<node>::get(fm).print_in_line_to_str()
+
+// LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` tree print
+#define LOG_FM_TREE(fm)  LOG_FM_COLOR<<tree<node>::get(fm).tree_to_str()<<TC.CLEAR()
+
 // LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
 #define LOG_RR(nso_rr)   LOG_FM_COLOR << to_str<node>(nso_rr)       <<TC.CLEAR()
 

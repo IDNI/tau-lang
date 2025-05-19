@@ -129,7 +129,7 @@ auto node<BAs...>::operator<=>(const node& that) const {
 	if (ba   != that.ba)   return C(ba)   <=> C(that.ba);
 	if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
 	// if (tree<node>::is_string_nt(nt))
-	// 	return string_from_id(data) <=> string_from_id(that.data);
+	// 	return dict(data) <=> dict(that.data);
 	return C(data) <=> C(that.data);
 }
 #undef C
@@ -180,7 +180,7 @@ constexpr size_t node<BAs...>::hashit() const {
 	hash_combine(seed, ba);
 	hash_combine(seed, static_cast<bool>(ext));
 	// if (tree<node>::is_string_nt(nt))
-	// 	hash_combine(seed, string_from_id(data));
+	// 	hash_combine(seed, dict(data));
 	// else
 		hash_combine(seed, data);
 	return seed;

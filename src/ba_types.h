@@ -47,7 +47,7 @@ size_t get_ba_type_id(const std::string& ba_type_name);
 
 // get the type name from the type map id
 template <NodeType node>
-std::string get_ba_type_name(size_t ba_type_id);
+const std::string& get_ba_type_name(size_t ba_type_id);
 
 // print the type name to the stream
 template <NodeType node>

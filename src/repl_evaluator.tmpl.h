@@ -718,15 +718,15 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	else std::cout << "IO variables:\n";
 	for (auto& [var_sid, desc] : inputs) {
 		auto file = desc.second == 0 ? "console"
-			: "ifile(\"" + string_from_id(desc.second) + "\")";
+			: "ifile(\"" + dict(desc.second) + "\")";
 		std::cout << "\t" << get_ba_type_name<node>(desc.first) << " "
-				<< string_from_id(var_sid) << " = " << file << "\n";
+				<< dict(var_sid) << " = " << file << "\n";
 	}
 	for (auto& [var_sid, desc] : outputs) {
 		auto file = desc.second == 0 ? "console"
-			: "ofile(\"" + string_from_id(desc.second) + "\")";
+			: "ofile(\"" + dict(desc.second) + "\")";
 		std::cout << "\t" << get_ba_type_name<node>(desc.first) << " "
-				<< string_from_id(var_sid) << " = " << file << "\n";
+				<< dict(var_sid) << " = " << file << "\n";
 	}
 }
 
@@ -759,7 +759,7 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
 		if (type_name == t) {
 			size_t var_sid = command | tau::var_name | tt::data;
 			inputs[var_sid] = {
-				get_ba_type_id<node>(t), string_id(fn) };
+				get_ba_type_id<node>(t), dict(fn) };
 			return;
 		}
 	}
@@ -781,7 +781,7 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
 		if (type_name == t) {
 			size_t var_sid = command | tau::var_name | tt::data;
 			outputs[var_sid] = {
-				get_ba_type_id<node>(t), string_id(fn) };
+				get_ba_type_id<node>(t), dict(fn) };
 			return;
 		}
 	}

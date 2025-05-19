@@ -16,7 +16,7 @@
 #include <cmath>
 #include <algorithm>
 
-#include "dict.h"
+#include "var_dict.h"
 #include "boolean_algebras/bool_ba.h"
 
 namespace idni::tau_lang {
@@ -536,7 +536,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
-		dict(v>0?v:-v);
+		var_dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
 
@@ -1089,7 +1089,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
-		dict(v>0?v:-v);
+		var_dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
 

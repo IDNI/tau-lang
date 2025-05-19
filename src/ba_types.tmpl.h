@@ -23,13 +23,13 @@ size_t ba_types<node>::type_id(size_t type_sid) {
 template <NodeType node>
 size_t ba_types<node>::type_id(const std::string& name) {
 	// TODO properly initialize types with "untyped" as first element
-	return type_id(string_id(name));
+	return type_id(dict(name));
 }
 
 template <NodeType node>
 const std::string& ba_types<node>::type_name(size_t tid) {
 	if (tid >= types.size()) tid = 0;
-	return string_from_id(types[tid]);
+	return dict(types[tid]);
 }
 
 template <NodeType node>
@@ -48,7 +48,7 @@ size_t get_ba_type_id(const std::string& ba_type_name) {
 }
 
 template <NodeType node>
-std::string get_ba_type_name(size_t ba_type_id) {
+const std::string& get_ba_type_name(size_t ba_type_id) {
 	return ba_types<node>::type_name(ba_type_id);
 }
 

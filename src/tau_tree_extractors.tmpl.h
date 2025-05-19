@@ -14,7 +14,7 @@ template <NodeType node>
 size_t get_type_sid(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	static size_t untyped_sid = string_id("untyped");
+	static size_t untyped_sid = dict("untyped");
 	if (auto t = tt(n) | tau::type; t) return t | tt::data;
 	return untyped_sid;
 }

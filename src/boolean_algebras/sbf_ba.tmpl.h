@@ -26,7 +26,7 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	case type::variable: {
 		// get var id from var node's terminals
 		auto var_name = n | tt::terminals;
-		auto v = dict(var_name);
+		auto v = var_dict(var_name);
 		// use cached var if exists
 		if (auto cn = var_cache.find(v);
 			cn != var_cache.end())
@@ -60,8 +60,7 @@ std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	const std::string& src)
 {
 	// check source cache
-	if (auto cn = cache.find(src); cn != cache.end())
-		return cn->second;
+	auto sid = dict(src);
 	auto result = sbf_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
 		auto msg = result.parse_error

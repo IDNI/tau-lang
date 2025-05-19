@@ -41,9 +41,9 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 						<< get_ba_type_name<node>(n.ba);
 	else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name)
-		os << "<" << string_from_id(n.data) << ">";
+		os << "<" << dict(n.data) << ">";
 	else if (tau::is_string_nt(n.nt))
-		os << " { \"" << string_from_id(n.data) << "\" }";
+		os << " { \"" << dict(n.data) << "\" }";
 	// else if (n.ext) os << "{EXT}";
 	return os;
 }
@@ -469,7 +469,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			default:
 				if (is_string_nt(nt)) {
 					if (nt == uconst_name) out("<");
-					out(string_from_id(t.data()));
+					out(dict(t.data()));
 					if (nt == uconst_name) out(">");
 				}
 				else if (is_digital_nt(nt)) out(t.data());
