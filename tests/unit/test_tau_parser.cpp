@@ -697,7 +697,137 @@ TEST_SUITE("parsing rewriting rules") {
 }
 
 TEST_SUITE("parsing variables") {
-	// done inderectly
+
+	TEST_CASE("regular bf typed variable") {
+		const char* sample = "x:sbf";
+		auto src = make_tau_source(sample, { .start = tau_parser::bf });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( var.has_value() );
+	}
+
+	TEST_CASE("regular bf untyped variable") {
+		const char* sample = "x";
+		auto src = make_tau_source(sample, { .start = tau_parser::bf });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( !var.has_value() );
+	}
+
+	TEST_CASE("io bf typed variable") {
+		const char* sample = "i1:sbf";
+		auto src = make_tau_source(sample, { .start = tau_parser::bf });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( var.has_value() );
+	}
+
+	TEST_CASE("io bf untyped variable") {
+		const char* sample = "i1";
+		auto src = make_tau_source(sample, { .start = tau_parser::bf });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( !var.has_value() );
+	}
+
+	TEST_CASE("regular z3 typed variable") {
+		const char* sample = "x:sbf";
+		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( var.has_value() );
+	}
+
+	TEST_CASE("regular z3 untyped variable") {
+		const char* sample = "x";
+		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( !var.has_value() );
+	}
+
+	TEST_CASE("io z3 typed variable") {
+		const char* sample = "i1:sbf";
+		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( var.has_value() );
+	}
+
+	TEST_CASE("io z3 untyped variable") {
+		const char* sample = "i1";
+		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( !var.has_value() );
+	}
+
+	TEST_CASE("quantified typed variable") {
+		const char* sample = "x:sbf";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_var });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( var.has_value() );
+	}
+
+	TEST_CASE("quantified untyped variable") {
+		const char* sample = "x";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_var });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type;
+		CHECK( !var.has_value() );
+	}
+
+	TEST_CASE("quantified typed variables") {
+		const char* sample = "x:sbf, y:tau";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_vars });
+		auto frml = make_statement(src);
+		auto types = select_top(frml, is_non_terminal<tau_parser::type, Bool>);
+		CHECK( types.size() == 2 );
+	}
+
+	TEST_CASE("quantified typed variables") {
+		// if we have the same type we only get one
+		const char* sample = "x:sbf, y:sbf";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_vars });
+		auto frml = make_statement(src);
+		auto types = select_top(frml, is_non_terminal<tau_parser::type, Bool>);
+		CHECK( types.size() == 1 );
+	}
+
+	TEST_CASE("quantified untyped variables") {
+		const char* sample = "x, y";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_vars });
+		auto frml = make_statement(src);
+		auto types = select_top(frml, is_non_terminal<tau_parser::type, Bool>);
+		CHECK( types.size() == 0 );
+	}
+
+	TEST_CASE("quantified untyped/typed variable") {
+		const char* sample = "x:sbf, y, z:tau";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_vars });
+		auto frml = make_statement(src);
+		auto types = select_top(frml, is_non_terminal<tau_parser::type, Bool>);
+		CHECK( types.size() == 2 );
+	}
+
+	TEST_CASE("quantified untyped/typed variable") {
+		// if we have the same type we only get one
+		const char* sample = "x:sbf, y, z:sbf";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_vars });
+		auto frml = make_statement(src);
+		auto types = select_top(frml, is_non_terminal<tau_parser::type, Bool>);
+		CHECK( types.size() == 1 );
+	}
+
+	TEST_CASE("quantified untyped/typed variable") {
+		// if we have the same type we only get one
+		const char* sample = "x:sbf, y, z:sbf, w:tau";
+		auto src = make_tau_source(sample, { .start = tau_parser::q_vars });
+		auto frml = make_statement(src);
+		auto types = select_top(frml, is_non_terminal<tau_parser::type, Bool>);
+		CHECK( types.size() == 2 );
+	}
 }
 
 TEST_SUITE("parsing captures") {
