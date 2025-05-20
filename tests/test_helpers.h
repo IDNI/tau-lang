@@ -41,7 +41,7 @@ tau::get_options parse_rec_relations() {
 	return opts;
 }
 
-std::optional<rr> get_bf_nso_rr(const char* rec, const char* sample) {
+std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* sample) {
 	rewriter::rules rrs = get_rec_relations<node_t>(
 			tau::get(rec, parse_rec_relations()));
 	tref main_fm = tau::get(sample, parse_bf());
@@ -49,8 +49,13 @@ std::optional<rr> get_bf_nso_rr(const char* rec, const char* sample) {
 	return get_nso_rr<node_t>(rrs, main_fm);
 }
 
-std::optional<rr> get_nso_rr(const char* sample, bool wo_inference = false) {
-	return get_nso_rr<node_t>(tau::get(sample), wo_inference);
+std::optional<rr<node_t>> get_nso_rr(const char* sample,
+	bool wo_inference = false)
+{
+	LOG_TRACE << "get_nso_rr: " << sample;
+	tref spec = tau::get(sample);
+	assert(spec != nullptr);
+	return get_nso_rr<node_t>(spec, wo_inference);
 }
 
 bool get_nso_rr_and_check(const char* sample, typename node_t::type nt){

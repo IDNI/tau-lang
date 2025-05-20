@@ -50,7 +50,7 @@ rewriter::rules get_rec_relations(tref rrs) {
 }
 
 template <NodeType node>
-std::optional<rr> get_nso_rr(tref r, bool wo_inference) {
+std::optional<rr<node>> get_nso_rr(tref r, bool wo_inference) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(r);)
@@ -64,7 +64,7 @@ std::optional<rr> get_nso_rr(tref r, bool wo_inference) {
 	rewriter::rules rules = get_rec_relations<node>(r);
 	DBG(LOG_TRACE << "rules: " << rules.size();)
 	auto nso_rr = wo_inference
-			? std::optional<rr>{ { rules, tau::geth(main_fm) } }
+			? std::optional<rr<node>>{ { rules, tau::geth(main_fm) } }
 			: get_nso_rr<node>(rules, main_fm);
 #ifdef DEBUG
 	if (nso_rr) LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr.value());
@@ -74,7 +74,7 @@ std::optional<rr> get_nso_rr(tref r, bool wo_inference) {
 }
 
 template <NodeType node>
-std::optional<rr> get_nso_rr(const rewriter::rules& rules,
+std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules,
 	tref main_fm)
 {
 	return infer_ref_types<node>({ rules, tree<node>::geth(main_fm) });

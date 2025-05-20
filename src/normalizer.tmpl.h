@@ -481,9 +481,9 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 
 // Normalizes a Boolean function in which recurrence relations are present
 template <NodeType node>
-tref bf_normalizer_with_rec_relation(const rr &bf) {
+tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
 	using tt = typename tree<node>::traverser;
-	rr rr_ = transform_ref_args_to_captures<node>(bf);
+	rr<node> rr_ = transform_ref_args_to_captures<node>(bf);
 	LOG_DEBUG << "Begin calculate recurrence relation";
 	auto main = calculate_all_fixed_points<node>(rr_);
 	if (!main) return nullptr;
@@ -525,7 +525,7 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 }
 
 template <NodeType node>
-bool is_valid(const rr& nso_rr) {
+bool is_valid(const rr<node>& nso_rr) {
 	using tau = tree<node>;
 	LOG_TRACE << "-- is_valid: " << LOG_RR(nso_rr);
 	for (tref main_offsets : tau::get(nso_rr.main)
@@ -583,7 +583,7 @@ bool is_valid(const rr& nso_rr) {
 }
 
 template <NodeType node>
-bool is_well_founded(const rr& nso_rr) {
+bool is_well_founded(const rr<node>& nso_rr) {
 	using tau = tree<node>;
 	LOG_TRACE << "-- is_well_founded: " << LOG_RR(nso_rr);
 	std::unordered_map<rr_sig, std::set<rr_sig>> graph;
@@ -637,7 +637,7 @@ bool is_well_founded(const rr& nso_rr) {
 }
 
 template <NodeType node>
-tref calculate_fixed_point(const rr& nso_rr,
+tref calculate_fixed_point(const rr<node>& nso_rr,
 	tref form, typename node::type nt, size_t offset_arity,
 	tref fallback)
 {
@@ -738,7 +738,7 @@ struct fixed_point_transformer {
 	using tt = tau::traverser;
 	using type = typename node::type;
 
-	fixed_point_transformer(const rr& defs,
+	fixed_point_transformer(const rr<node>& defs,
 		const ref_types<node>& types) : defs(defs), types(types) {}
 
 	tref operator()(tref n) {
@@ -789,12 +789,12 @@ struct fixed_point_transformer {
 	}
 
 	subtree_map<node, tref> changes;
-	rr defs;
+	rr<node> defs;
 	ref_types<node> types;
 };
 
 template <NodeType node>
-tref calculate_all_fixed_points(const rr& nso_rr) {
+tref calculate_all_fixed_points(const rr<node>& nso_rr) {
 	// get types and do type checks and validation
 	ref_types<node> types(nso_rr);
 	if (!types.ok() || !is_valid<node>(nso_rr)) return nullptr;
@@ -815,11 +815,11 @@ tref calculate_all_fixed_points(const rr& nso_rr) {
 // This function applies the recurrence relations the formula comes with to
 // the formula
 template <NodeType node>
-tref apply_rr_to_formula(const rr& nso_rr) {
+tref apply_rr_to_formula(const rr<node>& nso_rr) {
 	using tt = typename tree<node>::traverser;
 	LOG_DEBUG << "Start apply_rr_to_formula";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
-	rr rr_ = transform_ref_args_to_captures<node>(nso_rr);
+	rr<node> rr_ = transform_ref_args_to_captures<node>(nso_rr);
 	tref main = calculate_all_fixed_points<node>(rr_);
 	if (!main) return nullptr;
 	// Substitute function and recurrence relation definitions
@@ -833,7 +833,7 @@ tref apply_rr_to_formula(const rr& nso_rr) {
 
 // REVIEW (HIGH) review overall execution
 template <NodeType node>
-tref normalizer(const rr& nso_rr) {
+tref normalizer(const rr<node>& nso_rr) {
 	// IDEA extract this to an operator| overload
 
 	LOG_DEBUG << "Begin normalizer";

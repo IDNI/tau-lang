@@ -74,29 +74,29 @@ template <NodeType node>
 tref bf_normalizer_without_rec_relation(tref bf);
 
 template <NodeType node>
-tref bf_normalizer_with_rec_relation(const rr &bf);
+tref bf_normalizer_with_rec_relation(const rr<node> &bf);
 
 template <NodeType node>
 tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity);
 
 template <NodeType node>
-bool is_valid(const rr& nso_rr);
+bool is_valid(const rr<node>& nso_rr);
 
 template <NodeType node>
-bool is_well_founded(const rr& nso_rr);
+bool is_well_founded(const rr<node>& nso_rr);
 
 template <NodeType node>
-tref calculate_fixed_point(const rr& nso_rr, tref form, typename node::type t,
+tref calculate_fixed_point(const rr<node>& nso_rr, tref form, typename node::type t,
 	size_t offset_arity, tref fallback);
 
 template <NodeType node>
-tref calculate_all_fixed_points(const rr& recrel);
+tref calculate_all_fixed_points(const rr<node>& recrel);
 
 template <NodeType node>
-tref apply_rr_to_formula (const rr& nso_rr);
+tref apply_rr_to_formula (const rr<node>& nso_rr);
 
 template <NodeType node>
-tref normalizer(const rr& fm);
+tref normalizer(const rr<node>& fm);
 
 template <NodeType node>
 tref normalizer(tref fm);

@@ -165,7 +165,7 @@ private:
 	tref get_wff(tref n) const;
 
 	// get nso rr from a provided spec or formula and add definitions to it
-	std::optional<rr> get_nso_rr_with_defs(const tt& spec) const;
+	std::optional<rr<node>> get_nso_rr_with_defs(const tt& spec) const;
 
 	// apply definitions and rrs to a provided spec or formula
 	tref apply_rr_to_nso_rr_with_defs(const tt& spec) const;

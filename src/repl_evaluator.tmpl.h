@@ -89,8 +89,8 @@ void repl_evaluator<BAs...>::print_history(const htree::sp& mem, const size_t id
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<rr> repl_evaluator<BAs...>::get_nso_rr_with_defs(const tt& spec) const {
-	rr nso_rr{ nullptr };
+std::optional<rr<node>> repl_evaluator<BAs...>::get_nso_rr_with_defs(const tt& spec) const {
+	rr<node> nso_rr{ nullptr };
 	auto check = get_type_and_arg(spec);
 	if (!check) return {};
 	auto [type, value] = check.value();
@@ -99,13 +99,13 @@ std::optional<rr> repl_evaluator<BAs...>::get_nso_rr_with_defs(const tt& spec) c
 			if (auto x = get_nso_rr<node>(spec.value()); x)
 				nso_rr = x.value();
 			else return {};
-		} else nso_rr = rr(tau::geth(spec.value()));
+		} else nso_rr = rr<node>(tau::geth(spec.value()));
 		nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 			definitions.begin(), definitions.end());
 		if (auto infr = infer_ref_types<node>(nso_rr); infr)
 			return infr.value();
 		else return {};
-	} else return rr(tau::geth(spec.value()));
+	} else return rr<node>(tau::geth(spec.value()));
 	return {};
 }
 
@@ -425,7 +425,7 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	tref arg = n[1].get();
 	auto opt_nso_rr = get_nso_rr_with_defs(arg);
 	if (!opt_nso_rr || !opt_nso_rr.value().main) return invalid_argument();
-	rr nso_rr = opt_nso_rr.value();
+	rr<node> nso_rr = opt_nso_rr.value();
 	const auto& main = tau::get(nso_rr.main);
 	bool contains_ref = contains(main.get(), tau::ref);
 	if (!main.is(tau::bf)) return normalizer<node>(nso_rr);
@@ -670,7 +670,7 @@ tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	tref arg = n[1].get();
 	auto opt_nso_rr = get_nso_rr_with_defs(arg);
 	if (!opt_nso_rr || !opt_nso_rr.value().main) return invalid_argument();
-	rr nso_rr = opt_nso_rr.value();
+	rr<node> nso_rr = opt_nso_rr.value();
 	const auto& main = tau::get(nso_rr.main);
 	if (main.is(tau::bf)) return invalid_argument();
 	tref normalized_fm = normalizer<node>(nso_rr);
@@ -683,7 +683,7 @@ tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	tref arg = n[1].get();
 	auto opt_nso_rr = get_nso_rr_with_defs(arg);
 	if (!opt_nso_rr || !opt_nso_rr.value().main) return invalid_argument();
-	rr nso_rr = opt_nso_rr.value();
+	rr<node> nso_rr = opt_nso_rr.value();
 	const auto& main = tau::get(nso_rr.main);
 	if (main.is(tau::bf)) return invalid_argument();
 	tref normalized_fm = normalizer<node>(nso_rr);

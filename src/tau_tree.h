@@ -573,31 +573,28 @@ std::ostream& print(std::ostream& os, const rewriter::rule& r);
 template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rules& rs);
 template <NodeType node>
-std::ostream& print(std::ostream& os, const rr& rr_);
+std::ostream& print(std::ostream& os, const rr<node>& rr_);
 
 template <NodeType node>
 std::string to_str(const rewriter::rule& r);
 template <NodeType node>
 std::string to_str(const rewriter::rules& rs);
 template <NodeType node>
-std::string to_str(const rr& rr_);
+std::string to_str(const rr<node>& rr_);
 
 template <NodeType node>
 std::ostream& dump(std::ostream& os, const rewriter::rule& r);
 template <NodeType node>
 std::ostream& dump(std::ostream& os, const rewriter::rules& rs);
 template <NodeType node>
-std::ostream& dump(std::ostream& os, const rr& rr_);
+std::ostream& dump(std::ostream& os, const rr<node>& rr_);
 
 template <NodeType node>
 std::string dump_to_str(const rewriter::rule& r);
 template <NodeType node>
 std::string dump_to_str(const rewriter::rules& rs);
 template <NodeType node>
-std::string dump_to_str(const rr& rr_);
-
-
-std::ostream& operator<<(std::ostream& os, const rr_sig& s);
+std::string dump_to_str(const rr<node>& rr_);
 
 // -----------------------------------------------------------------------------
 // queries (tau_tree_queries.tmpl.h)
