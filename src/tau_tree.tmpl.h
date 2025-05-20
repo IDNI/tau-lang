@@ -8,6 +8,12 @@ namespace idni::tau_lang {
 // Tau tree implementation declarations
 // -----------------------------------------------------------------------------
 
+struct rr_sig;
+template <NodeType node> struct ref_types;
+template <NodeType node> struct ba_types;
+template <NodeType node> struct ba_constants;
+template <NodeType node> struct get_hook;
+
 // -----------------------------------------------------------------------------
 // various extractors (tau_tree_extractors.tmpl.h)
 template <NodeType node>
@@ -74,8 +80,9 @@ bool has_open_tau_fm_in_constant(tref fm);
 
 } // namespace idni::tau_lang
 
-#include "dict.h"  // string pool accessed with dict() functions
-#include "rr.h"    // recurrence relations structure
+#include "dict.h"      // string pool accessed with dict() functions
+#include "rr.h"        // recurrence relations structure
+#include "ba_types.h"  // ba types dictionary
 
 #include "tau_tree_builders.h"
 
