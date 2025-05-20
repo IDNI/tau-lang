@@ -135,10 +135,7 @@ constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
 }
 template <typename... BAs>
 requires BAsPack<BAs...>
-auto node<BAs...>::operator<=>(const node& that) const {
-	if (nt_bits != that.nt_bits)     return nt_bits <=> that.nt_bits;
-	if (ba_bits != that.ba_bits)     return ba_bits <=> that.ba_bits;
-	if (data_bits != that.data_bits) return data_bits <=> that.data_bits;	
+std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	// if (hash != that.hash) return hash    <=> that.hash;
 	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
 	if (term != that.term) return C(term) <=> C(that.term);
@@ -172,9 +169,6 @@ constexpr bool node<BAs...>::operator>=(const node& that) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator==(const node& that) const {
-	if (nt_bits != that.nt_bits
-		|| ba_bits != that.ba_bits
-		|| data_bits != that.data_bits) return false;
 	if (nt == type::bf_f && that.nt == type::bf_f) // 0 - ignore ba type if any untyped
 		return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
 	if (nt == type::bf_t && that.nt == type::bf_t) // 1 - ignore ba type if any untyped

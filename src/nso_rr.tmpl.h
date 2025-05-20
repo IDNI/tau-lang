@@ -72,7 +72,7 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 }
 
 template <NodeType node>
-rr transform_ref_args_to_captures(const rr& nso_rr) {
+rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	using tau = tree<node>;
 	LOG_TRACE << "-- transform_ref_args_to_captures: " << LOG_RR(nso_rr);
 	auto transformer = [](tref n) -> tref {
@@ -93,7 +93,7 @@ rr transform_ref_args_to_captures(const rr& nso_rr) {
 		if (n != h->get()) return tau::geth(n);
 		return h;
 	};
-	rr ret(nso_rr);
+	rr<node> ret(nso_rr);
 	for (auto& r : ret.rec_relations) r.first = transform(r.first),
 					  r.second = transform(r.second);
 	ret.main = transform(ret.main);

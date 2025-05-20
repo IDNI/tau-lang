@@ -27,7 +27,7 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n);
 // this has to be called before rr apply or before calculating fixed points in normalizer 
 // TODO find better place for this? maybe normalization?
 template <NodeType node>
-rr transform_ref_args_to_captures(const rr& nso_rr);
+rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr);
 
 } // namespace idni::tau_lang
 

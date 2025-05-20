@@ -121,7 +121,7 @@ struct tau_ba {
 	/**
 	 * @brief Type equivalent to tau_spec<BAs...>.
 	 */
-	const rr nso_rr;
+	const rr<tau_ba_node> nso_rr;
 
 private:
 	// /**

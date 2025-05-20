@@ -77,7 +77,7 @@ std::ostream& print(std::ostream& os, const rewriter::rules& rs) {
 }
 
 template <NodeType node>
-std::ostream& print(std::ostream& os, const rr& rr_) {
+std::ostream& print(std::ostream& os, const rr<node>& rr_) {
 	print<node>(os, rr_.rec_relations);
 	if (rr_.main) os << tree<node>::get(rr_.main);
 	return os;
@@ -96,7 +96,7 @@ std::string to_str(const rewriter::rules& rs) {
 }
 
 template <NodeType node>
-std::string to_str(const rr& rr_) {
+std::string to_str(const rr<node>& rr_) {
 	std::stringstream ss;
 	return print<node>(ss, rr_), ss.str();
 }
@@ -114,7 +114,7 @@ std::ostream& dump(std::ostream& os, const rewriter::rules& rs) {
 }
 
 template <NodeType node>
-std::ostream& dump(std::ostream& os, const rr& rr_) {
+std::ostream& dump(std::ostream& os, const rr<node>& rr_) {
 	dump<node>(os, rr_.rec_relations);
 	if (rr_.main) tree<node>::get(rr_.main).dump(os);
 	return os;
@@ -133,14 +133,9 @@ std::string dump_to_str(const rewriter::rules& rs) {
 }
 
 template <NodeType node>
-std::string dump_to_str(const rr& rr_) {
+std::string dump_to_str(const rr<node>& rr_) {
 	std::stringstream ss;
 	return dump<node>(ss, rr_), ss.str();
-}
-
-inline std::ostream& operator<<(std::ostream& os, const rr_sig& s) {
-	return os << rr_dict(s.name)
-				<< "[" << s.offset_arity << "]/" << s.arg_arity;
 }
 
 template <NodeType node>

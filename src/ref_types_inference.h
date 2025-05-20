@@ -13,9 +13,9 @@ template <NodeType node>
 struct ref_types;
 
 template <NodeType node>
-std::optional<rr> infer_ref_types(const rr& nso_rr);
+std::optional<rr<node>> infer_ref_types(const rr<node>& nso_rr);
 template <NodeType node>
-std::optional<rr> infer_ref_types(const rr& nso_rr, ref_types<node>& ts);
+std::optional<rr<node>> infer_ref_types(const rr<node>& nso_rr, ref_types<node>& ts);
 
 // -----------------------------------------------------------------------------
 
@@ -55,12 +55,12 @@ struct ref_types {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	template <NodeType N>
-	friend std::optional<rr> infer_ref_types(const rr& nso_rr);
+	friend std::optional<rr<N>> infer_ref_types(const rr<N>& nso_rr);
 	template <NodeType N>
-	friend std::optional<rr> infer_ref_types(const rr& nso_rr,
+	friend std::optional<rr<N>> infer_ref_types(const rr<N>& nso_rr,
 						ref_types<N>& ts);
 
-	ref_types(const rr& nso_rr);
+	ref_types(const rr<node>& nso_rr);
 	// returns false if any error or unresolved ref
 	bool ok() const;
 	// returns set of errors
@@ -78,7 +78,7 @@ private:
 	// add sig with type t, and if it's already typed, check it equals to t
 	bool add(tref n, typename node::type t);
 	bool get_types(tref n, bool def = false);
-	bool get_ref_types(const rr& nso_rr);
+	bool get_ref_types(const rr<node>& nso_rr);
 	std::unordered_map<rr_sig, rr_sig> fpcalls_;
 	std::unordered_map<rr_sig, typename node::type> types_;
 	std::set<rr_sig> done_, todo_;

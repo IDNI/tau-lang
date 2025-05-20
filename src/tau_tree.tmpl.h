@@ -20,9 +20,9 @@ template <NodeType node>
 rewriter::rules get_rec_relations(tref r);
 
 template <NodeType node>
-std::optional<rr> get_nso_rr(tref ref, bool wo_inference = false);
+std::optional<rr<node>> get_nso_rr(tref ref, bool wo_inference = false);
 template <NodeType node>
-std::optional<rr> get_nso_rr(const rewriter::rules& rules, tref main_fm);
+std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules, tref main_fm);
 
 template <NodeType node>
 void get_leaves(tref n, typename node::type branch, trefs& leaves);
@@ -584,7 +584,7 @@ size_t tree<node>::get_ba_type() const {
 
 template <NodeType node>
 const std::string& tree<node>::get_ba_type_name() const {
-	return ba_types<node>::type_name(this->get_ba_type());
+	return ba_types<node>::name(this->get_ba_type());
 }
 
 } // namespace idni::tau_lang

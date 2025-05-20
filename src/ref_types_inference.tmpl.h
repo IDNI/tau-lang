@@ -7,8 +7,10 @@
 
 namespace idni::tau_lang {
 
+std::ostream& operator<<(std::ostream& os, const rr_sig& s);
+
 template <NodeType node>
-ref_types<node>::ref_types(const rr& nso_rr) { get_ref_types(nso_rr); }
+ref_types<node>::ref_types(const rr<node>& nso_rr) { get_ref_types(nso_rr); }
 
 // returns false if any error or unresolved ref
 template <NodeType node>
@@ -147,7 +149,7 @@ bool ref_types<node>::get_types(tref n, bool def) {
 }
 
 template <NodeType node>
-bool ref_types<node>::get_ref_types(const rr& nso_rr) {
+bool ref_types<node>::get_ref_types(const rr<node>& nso_rr) {
 	// get types from relations' heads if any
 	for (const auto& r : nso_rr.rec_relations)
 		get_types(r.first->get(), true); // true since these are defs
@@ -162,13 +164,15 @@ bool ref_types<node>::get_ref_types(const rr& nso_rr) {
 // rec relations ref type checking and inference
 
 template <NodeType node>
-std::optional<rr> infer_ref_types(const rr& nso_rr) {
+std::optional<rr<node>> infer_ref_types(const rr<node>& nso_rr) {
 	ref_types<node> ts(nso_rr);
-	return infer_ref_types(nso_rr, ts);
+	return infer_ref_types<node>(nso_rr, ts);
 }
 
 template <NodeType node>
-std::optional<rr> infer_ref_types(const rr& nso_rr, ref_types<node>& ts) {
+std::optional<rr<node>> infer_ref_types(const rr<node>& nso_rr,
+	ref_types<node>& ts)
+{
 	using tau = tree<node>;
 	LOG_DEBUG << "-- Begin ref type inferrence --";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
@@ -180,7 +184,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr, ref_types<node>& ts) {
 		LOG_TRACE << "updated ref: " << LOG_FM(r);
 		return r;
 	};
-	rr nn = nso_rr;
+	rr<node> nn = nso_rr;
 	// inference loop
 	bool changed;
 	do {
@@ -274,6 +278,11 @@ std::optional<rr> infer_ref_types(const rr& nso_rr, ref_types<node>& ts) {
 	if (nso_rr != nn) LOG_DEBUG << "Result: " << LOG_RR(nn);
 	LOG_DEBUG << "-- End ref type inferrence --";
 	return { nn };
+}
+
+inline std::ostream& operator<<(std::ostream& os, const rr_sig& s) {
+	return os << rr_dict(s.name)
+				<< "[" << s.offset_arity << "]/" << s.arg_arity;
 }
 
 } // namespace idni::tau_lang
