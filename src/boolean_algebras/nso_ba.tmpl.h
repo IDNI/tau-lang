@@ -190,10 +190,15 @@ bool operator!=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 // In this comparison typed and non-typed Tau constants are considered different
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::weak_ordering operator<=>(const tree<node<BAs...>>& lt,
+std::weak_ordering operator<=>(
+	const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
-	return lt <=> rt;
+	if (tree<node<BAs...>>::subtree_equals(lt.get(), rt.get()))
+		return std::weak_ordering::equivalent;
+	return tree<node<BAs...>>::subtree_less(lt.get(), rt.get())
+		? std::weak_ordering::less
+		: std::weak_ordering::greater;
 }
 
 // We list all ordering operators explicitly
