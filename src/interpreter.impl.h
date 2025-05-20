@@ -982,14 +982,12 @@ trefs interpreter<node, in_t, out_t>::appear_within_lookback(const trefs& vars){
 }
 
 template <NodeType node>
-std::optional<tref> unpack_tau_constant(tref constant) {
+tref unpack_tau_constant(tref constant) {
 	const auto& c = tree<node>::get(constant);
 	if (!c.is_ba_constant()) return {};
-	auto opt_rr = node::nso_factory::instance()
+	tref main = node::nso_factory::instance()
 				.unpack_tau_ba(c.get_ba_constant());
-	if (!opt_rr) return {};
-	// TODO (QUESTION) why is here only tref of main needed? are spec rules already applied?
-	return { opt_rr.value().main->get() };
+	return main;
 }
 
 template <NodeType node, typename in_t, typename out_t>
