@@ -42,13 +42,16 @@ struct ba_constants {
 
 	// get the constant variant value from a constant_node
 	static constant get(tref constant_node);
+
+	// dump the constant pool to a stream
 	static std::ostream& dump(std::ostream& os);
+
+	// dump the constant pool to a string
 	static std::string dump_to_str();
 
 private:
 	inline static std::vector<constant> C;  // pool of constants
-	inline static trefs T;                  // pool of constant trefs
-	// inline static std::map<size_t, size_t> ba_type_map; // constant_id -> ba_type id
+	inline static trefs T;                  // pool of constant tree nodes with type info
 };
 
 } // namespace idni::tau_lang
