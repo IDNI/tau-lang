@@ -27,21 +27,18 @@ concept NodeType = requires { // Node Type has to provide
 	typename node::nso_factory;
 	// nt is convertible to size_t
 	{ std::declval<node>().nt } -> std::convertible_to<size_t>;
+	// term is convertible to bool
+	{ std::declval<node>().term } -> std::convertible_to<bool>;
+	// ba is convertible to size_t
+	{ std::declval<node>().ba } -> std::convertible_to<size_t>;
 	// data is convertible to size_t
 	{ std::declval<node>().data } -> std::convertible_to<size_t>;
-	// hashit is convertible to size_t
-	// { std::declval<node>().hashit() } -> std::convertible_to<size_t>;
 };
 
 // -----------------------------------------------------------------------------
 // forward declarations
 
-struct rr;
-struct rr_sig;
-template <NodeType node> struct ref_types;
-template <NodeType node> struct ba_types;
-template <NodeType node> struct ba_constants;
-template <NodeType node> struct get_hook;
+template <NodeType node> struct rr;
 template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
 
@@ -130,13 +127,14 @@ struct node {
 	constexpr T extension() const noexcept;
 
 	// comparison operators
-	auto operator<=>(const node& that) const;
-	constexpr bool operator<(const node& that) const;
-	constexpr bool operator<=(const node& that) const;
-	constexpr bool operator>(const node& that) const;
-	constexpr bool operator>=(const node& that) const;
-	constexpr auto operator==(const node& that) const;
-	constexpr auto operator!=(const node& that) const;
+	std::weak_ordering operator<=>(const node& that) const;
+	constexpr bool     operator<  (const node& that) const;
+	constexpr bool     operator<= (const node& that) const;
+	constexpr bool     operator>  (const node& that) const;
+	constexpr bool     operator>= (const node& that) const;
+	constexpr auto     operator== (const node& that) const;
+	constexpr auto     operator!= (const node& that) const;
+
 	// hash function
 	constexpr size_t hashit() const;
 };
