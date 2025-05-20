@@ -17,7 +17,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
 	else return tau::get_raw(v, ch, len, r);
 
-	HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM(ret);)
+	HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
 	DBG(typename node::type nt = tau::get(ret).get_type();)
 	DBG(assert(nt == tau::bf || nt == tau::wff || nt == tau::shift);)
 	return ret;
@@ -226,7 +226,9 @@ tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(BF_CALLBACK_OR, "{ $X } | { $Y } := bf_or_cb $X $Y.")
-	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant()) {
+	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant()
+		&& arg1(ch).get_ba_type() > 0 && arg2(ch).get_ba_type() > 0)
+	{
 		HOOK_LOGGING(applied("{ $X } | { $Y } := bf_or_cb $X $Y.");)
 		return cte_or(v, ch, len, r);
 	}
@@ -300,8 +302,9 @@ tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
-	if (arg1(ch).is_ba_constant()
-		&& arg2(ch).is_ba_constant()) {
+	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant()
+		&& arg1(ch).get_ba_type() > 0 && arg2(ch).get_ba_type() > 0)
+	{
 		HOOK_LOGGING(applied("{ $X } & { $Y } := bf_and_cb $X $Y.");)
 		return cte_and(v, ch, len, r);
 	}
@@ -353,7 +356,7 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 		return tau::get(double_neg.value_tree().first(), r);
 	}
 	//RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
-	if (arg1(ch).is_ba_constant()) {
+	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0) {
 		HOOK_LOGGING(applied("{ $X }' := bf_neg_cb $X.");)
 		return cte_neg(v, ch, len, r);
 	}
@@ -427,7 +430,9 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 		return _1(v, ch, len, r);
 	}
 	//RULE(BF_CALLBACK_XOR, "{ $X } ^ { $Y } := bf_xor_cb $X $Y.")
-	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant()) {
+	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant()
+		&& arg1(ch).get_ba_type() > 0 && arg2(ch).get_ba_type() > 0)
+	{
 		HOOK_LOGGING(applied("{ $X } ^ { $Y } := bf_xor_cb $X $Y.");)
 		return cte_xor(v, ch, len, r);
 	}
@@ -441,16 +446,22 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 	if (len == 1 && tau::get(ch[0]).is_ba_constant()) {
 		const auto& l = tau::get(ch[0]);
 		if (size_t typed = l.get_ba_type(); typed > 0) {
-			if (is_syntactic_zero(l.get_ba_constant()))
+			HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
+			if (is_syntactic_zero(l.get_ba_constant())) {
+				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
+				HOOK_LOGGING(applied("is_syntactic_zero");)
 				return tau::get(typed
-					? tau::get(tau::bf, tau::get_raw(
-						node::ba_typed(tau::bf_f, typed)))
+					? tau::get(tau::get(tau::bf, tau::get_raw(
+						node::ba_typed(tau::bf_f, typed))), right)
 					: tau::_0(), right);
-			else if (is_syntactic_one(l.get_ba_constant()))
+			} else if (is_syntactic_one(l.get_ba_constant())) {
+				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
+				HOOK_LOGGING(applied("is_syntactic_one");)
 				return tau::get(typed
-					? tau::get(tau::bf, tau::get_raw(
-						node::ba_typed(tau::bf_t, typed)))
+					? tau::get(tau::get(tau::bf, tau::get_raw(
+						node::ba_typed(tau::bf_t, typed))), right)
 					: tau::_1(), right);
+			}
 		}
 	}
 	return tau::get_raw(v, ch, len, right);
@@ -783,7 +794,9 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 		return _T(v, ch, len, r);
 	}
 	//RULE(BF_DEF_SIMPLIFY_N, "{c} = 0 ::= ...."): this should never happen
-	if (arg1(ch).is_ba_constant() && arg2(ch).is(tau::bf_f)) {
+	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0
+		&& arg2(ch).is(tau::bf_f))
+	{
 		HOOK_LOGGING(applied("{c} = 0 ::= ....");)
 		return wff_eq_cte(v, ch, len, r);
 	}
@@ -829,7 +842,9 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 		return _F(v, ch, len, r);
 	}
 	//RULE(BF_DEF_SIMPLIFY_N, "{c} = 0 ::= ....")
-	if(arg1(ch).is_ba_constant() && arg2(ch).is(tau::bf_f)) {
+	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0
+		&& arg2(ch).is(tau::bf_f))
+	{
 		HOOK_LOGGING(applied("{c} = 0 ::= ....");)
 		return tau::get(wff_neq_cte(v, ch, len, r), r);
 	}
