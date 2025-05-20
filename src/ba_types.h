@@ -8,26 +8,27 @@
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
-// ba and ref types inference (tau_tree_types.tmpl.h)
+// ba type checking and propagation
 template <NodeType node>
 tref infer_ba_types(tref n);
 
 // -----------------------------------------------------------------------------
 // BA types
 //   contains type map of BA types
+// is templated by NodeType to scope it to the specific BAs... packed node tree
 template <NodeType node>
 struct ba_types {
 	// get the type id from the type name string id
-	static size_t type_id(size_t ba_type_sid);
+	static size_t id(size_t ba_type_sid);
 
 	// get the type id from the type name
-	static size_t type_id(const std::string& ba_type_name);
+	static size_t id(const std::string& ba_type_name);
 
 	// get the type name from the type map id
-	static const std::string& type_name(size_t ba_type);
+	static const std::string& name(size_t ba_type);
 
 	// print the type name to the stream
-	static std::ostream& print_type(std::ostream& os, size_t ba_type);
+	static std::ostream& print(std::ostream& os, size_t ba_type);
 
 private:
 	// type_sids (index = ba_type id)
