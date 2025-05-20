@@ -42,8 +42,12 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	// get tau tree node instance from parse tree node ref
 	auto m_get = [&m](tref t) { return get(m.at(t)); };
 
-	std::string src; // source of the current constant
+	size_t src = 0; // source dict id of the current constant
 	bool error = false;
+
+	std::map<size_t, tref> named_constants; // dict named constant names
+	for (auto& [cn, c] : options.named_constants)
+		named_constants[dict(cn)] = c;
 
 	auto transformer = [&](tref t, tref parent) {
 		// DBG(LOG_TRACE << " -- transforming: "
@@ -130,6 +134,33 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 		tref x = nullptr; // result of node transformation
 
+		// takes already transformed bf_constant node and binds it
+		auto process_bf_constant =
+			[&src, &error, &named_constants](tref x) -> tref
+		{
+			// LOG_TRACE << "binding: " << src << " " << get_type_sid<node>(x);
+			size_t ba_type_id = get_ba_type_id<node>(
+						get_type_sid<node>(x));
+			if (ba_type_id == 0) {
+				auto it = named_constants.find(src);
+				if (it != named_constants.end()) {
+					LOG_TRACE << "named bound: "
+						<< LOG_FM(it->second);
+					return it->second;
+				}
+			}
+			tref n = get_ba_constant(dict(src),
+					ba_types<node>::name(ba_type_id));
+			src = 0;
+			if (n == nullptr || n == x)
+				return error = true, nullptr;
+			LOG_TRACE << (ba_type_id == 0 ? "un" : "") << "bound: "
+								<< LOG_FM(n);
+			if (get(n).get_ba_type() == 0)
+				return error = true, nullptr;
+			return n;
+		};
+
 		switch (nt) {
 			// tau tree terminals
 			case digits: // preprocess digits
@@ -152,7 +183,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 			// preprocess source node
 			case source:
-				src = ptr.get_terminals();
+				src = dict(ptr.get_terminals());
 				DBG(LOG_TRACE << "BA constant source: `"
 							<< src << "`");
 				x = nullptr;
@@ -182,17 +213,10 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 				}
 				x = getx(ch);
 
-				// call binder on a transformed bf_constant node
-				if (nt == bf_constant) {
-					// LOG_TRACE << "transform calling binder: " << src << " " << get_type_sid<node>(x);
-					if (src.empty()) break; // capture?
-					size_t type_sid = get_type_sid<node>(x);
-					tref nn = get_ba_constant(src,
-								dict(type_sid));
-					src = "";
-					if (nn == nullptr || nn == x)
-						return error = true, false;
-					x = nn;
+				// process constant from a transformed node
+				if (nt == bf_constant && src) {
+					x = process_bf_constant(x);
+					if (x == nullptr) return false;
 				}
 				break;
 		}

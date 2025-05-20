@@ -320,8 +320,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	struct get_options {
 		tau_parser::parse_options parse;
-		std::map<std::string, std::pair<size_t, size_t>>
-							named_constants{};
+		std::map<std::string, tref> named_constants{};
 		bool infer_ba_types = true;
 	};
 
