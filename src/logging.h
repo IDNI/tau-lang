@@ -39,20 +39,41 @@
 
 namespace idni::tau_lang {
 
-// uncomment to compile in logging for hooks
-#define HOOK_LOGGING_ENABLED 1
-// uncomment to compile in logging for pretty printer
+// Uncomment to compile in logging for hooks.
+// "hooks" must be listed in LOG_ENABLED_CHANNELS to pass the channel filter.
+//
+#define HOOK_LOGGING_ENABLED
+
+// Uncomment to compile in logging for pretty printer
+// If enabled it prints information about traversing nodes.
+// It prints to std::cerr to view cout and cerr in a split screen in parallel
+//  
 // #define PRETTY_PRINTER_LOGGING_ENABLED 1
 
-// uncomment to print file paths with a line number in the log
+// Uncomment or use -D to print file paths with a line number in the log
+//
 // #define TAU_LOG_LINE_PATHS
-// uncomment to print file names with a line number in the log
+
+// Uncomment or use -D to print file names with a line number in the log
+//
 // #define TAU_LOG_LINES
 
-// list of enabled channels for TRACE and DEBUG messages
-// INFO, WARNING and ERROR messages are not filtered by channel
-// comment or uncomment as desired
-static constexpr const char* LOG_ENABLED_CHANNELS [] = {
+// Uncomment or use -D to enable LOG_DEBUG and LOG_TRACE messages in RELEASE.
+// This enables channel filtering by a following LOG_ENABLED_CHANNEL list
+// for non-DEBUG builds. This list is also used in DEBUG builds by default.
+// Otherwise the list of enabled channels is empty.
+//
+// #define TAU_LOG_CHANNELS
+
+// List of enabled channels for TRACE and DEBUG messages.
+// They are disabled in RELEASE unless TAU_LOG_CHANNELS is defined.
+//
+// INFO, WARNING and ERROR messages are not filtered by channel.
+//
+// Comment or uncomment as desired.
+//
+#if defined(DEBUG) || defined(TAU_LOG_CHANNELS)
+static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"nso_ba",
 	"sbf_ba",
 	"tau_ba",
@@ -60,7 +81,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 	"ba_types_inference",
 	"ba_constants",
 	"execution",
-	// "hooks",
+	"hooks",
 	"interpreter",
 	"normal_forms",
 	"assign_and_reduce",
@@ -74,16 +95,18 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 	"solver",
 	"splitter",
 	"tau_tree",
-	// "builders",
-	// "extractors",
+	"builders",
+	"extractors",
 	"from_parser",
 	"node",
-	// "printers",
+	"printers",
 	"queries",
 	"traverser",
 	"testing"
 };
-
+#else // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS) else
+static constexpr const char* LOG_ENABLED_CHANNELS[] = {};
+#endif // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS)
 // -----------------------------------------------------------------------------
 // Logging channels
 
@@ -208,13 +231,24 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 			<<" \t#\t"<< tree<node>::get(fm).print_in_line_to_str()
 
 // LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` tree print
-#define LOG_FM_TREE(fm)  LOG_FM_COLOR<<tree<node>::get(fm).tree_to_str()<<TC.CLEAR()
+#define LOG_FM_TREE(fm)  LOG_FM_COLOR << tree<node>::get(fm).tree_to_str() \
+								    <<TC.CLEAR()
 
 // LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
 #define LOG_RR(nso_rr)   LOG_FM_COLOR << to_str<node>(nso_rr)       <<TC.CLEAR()
 
 // LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
 #define LOG_RR_DUMP(nso_rr)  LOG_FM_COLOR<<dump_to_str<node>(nso_rr)<<TC.CLEAR()
+
+// outputs tabs to pad up to the trace/debug messages beginning for new lines in log msgs
+#define LOG_PADDING      "\t\t\t\t"
+
+// outputs padding + one tab indentation for indenting of new lines in log msgs
+#define LOG_INDENT       LOG_PADDING << "\t"
+#define LOG_INDENT1      LOG_INDENT
+
+// outputs padding + two tabs indentation for indenting of new lines in log msgs
+#define LOG_INDENT2      LOG_PADDING << "\t\t"
 
 // -----------------------------------------------------------------------------
 

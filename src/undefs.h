@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-// undefine Tau Language Framework preprocessor macros
+// undefine Tau Language Framework macros used in implementation
 
 // defs.h
 
@@ -47,18 +47,24 @@
 #undef LOG_ERROR_COLOR
 #undef LOG_WARNING_COLOR
 #undef LOG_CHANNEL_COLOR
-#undef LOG_NT_COLOR
 #undef LOG_FM_COLOR
+#undef LOG_NT_COLOR
 #undef LOG_BA_COLOR
 #undef LOG_RULE_COLOR
 
 #undef LOG_BRIGHT
 #undef LOG_NT
+#undef LOG_RR_SIG
 #undef LOG_RULE
-#undef LOG_BA
 #undef LOG_BA_TYPE
+#undef LOG_BA_TYPE_DUMP
+#undef LOG_BA
 #undef LOG_FM
 #undef LOG_FM_DUMP
+#undef LOG_FM_TREE
 #undef LOG_RR
-
-
+#undef LOG_RR_DUMP
+#undef LOG_PADDING
+#undef LOG_INDENT
+#undef LOG_INDENT1
+#undef LOG_INDENT2
