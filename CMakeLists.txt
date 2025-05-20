@@ -24,6 +24,7 @@ option(TAU_MEASURE                 "Measure tau performance"               OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
 option(TAU_LOG_LINES               "Log file and line numbers"             OFF)
 option(TAU_LOG_LINE_PATHS          "Log file with a path and line numbers" OFF)
+option(TAU_LOG_CHANNELS            "Enable Debug and Trace logging channels" OFF)
 option(TAU_LOG_TRACE_TESTS         "Trace logging severity for tests"      OFF)
 option(TAU_BUILD_DOC               "Build documentation"                   OFF)
 option(TAU_BUILD_STATIC_LIBRARY    "Build static library"                  OFF)
@@ -44,6 +45,7 @@ set_property(CACHE TAU_MEASURE                 PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_CACHE                   PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_LOG_LINES               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_LOG_LINE_PATHS          PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_LOG_CHANNELS            PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_LOG_TRACE_TESTS         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_DOC               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
@@ -148,6 +150,7 @@ set(TAU_DEFINITIONS
 	TAU_CACHE
 	TAU_LOG_LINES
 	TAU_LOG_LINE_PATHS
+	TAU_LOG_CHANNELS
 )
 
 message(STATUS "PARSER_MEASURE: ${PARSER_MEASURE}")
@@ -155,6 +158,7 @@ message(STATUS "TAU_MEASURE: ${TAU_MEASURE}")
 message(STATUS "TAU_CACHE: ${TAU_CACHE}")
 message(STATUS "TAU_LOG_LINES: ${TAU_LOG_LINES}")
 message(STATUS "TAU_LOG_LINE_PATHS: ${TAU_LOG_LINE_PATHS}")
+message(STATUS "TAU_LOG_CHANNELS: ${TAU_LOG_CHANNELS}")
 message(STATUS "TAU_LOG_TRACE_TESTS: ${TAU_LOG_TRACE_TESTS}")
 message(STATUS "TAU_BUILD_STATIC_LIBRARY: ${TAU_BUILD_STATIC_LIBRARY}")
 message(STATUS "TAU_BUILD_SHARED_LIBRARY: ${TAU_BUILD_SHARED_LIBRARY}")
