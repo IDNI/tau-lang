@@ -127,10 +127,8 @@ constant_with_type<sbf_ba> nso_factory<sbf_ba>::splitter_one()
 	return bf.splitter_one();
 }
 
-std::optional<rr> nso_factory<sbf_ba>::unpack_tau_ba(
-	const std::variant<sbf_ba>&) const
-{
-	return {}; // There is no tau_ba present
+tref nso_factory<sbf_ba>::unpack_tau_ba(const std::variant<sbf_ba>&) const {
+	return nullptr; // There is no tau_ba present
 }
 
 nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
@@ -177,12 +175,12 @@ constant_with_type<tau_ba<sbf_ba>, sbf_ba>
 				    : tf().splitter_one();
 }
 
-std::optional<rr> nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
-	const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const
+tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
+		const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const
 {
 	if (!std::holds_alternative<tau_ba<sbf_ba>>(v)) return {};
 	const auto unpacked = std::get<tau_ba<sbf_ba>>(v);
-	return { unpacked.nso_rr };
+	return unpacked.nso_rr.main->get();
 }
 
 nso_factory<tau_ba<sbf_ba>, sbf_ba>&

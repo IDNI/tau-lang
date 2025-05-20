@@ -35,7 +35,7 @@ struct nso_factory<Bool> {
 	}
 
 	// There is no tau_ba
-	optional<rr> unpack_tau_ba(const variant<Bool>&) const { return {}; }
+	tref unpack_tau_ba(const variant<Bool>&) const { return nullptr; }
 
 	static nso_factory<Bool>& instance() {
 		static nso_factory<Bool> factory;

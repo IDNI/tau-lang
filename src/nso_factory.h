@@ -75,7 +75,7 @@ struct nso_factory {
 	 * @param constant Variant for formula extraction
 	 * @return Extracted tau_ba spec if present
 	 */
-	std::optional<rr> unpack_tau_ba(const std::variant<BAs...>& constant);
+	tref unpack_tau_ba(const std::variant<BAs...>& constant);
 
 	/**
 	 * Returns the singleton instance of the factory.
