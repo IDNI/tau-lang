@@ -83,14 +83,14 @@ tau_ba<BAs...> tau_ba<BAs...>::operator^(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool tau_ba<BAs...>::is_zero() const {
-	auto normalized = normalizer<tau_ba_node>(nso_rr);
+	tref normalized = normalizer<tau_ba_node>(nso_rr);
 	return !is_tau_formula_sat<node>(normalized);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool tau_ba<BAs...>::is_one() const {
-	auto normalized = normalizer<tau_ba_node>(nso_rr);
+	tref normalized = normalizer<tau_ba_node>(nso_rr);
 	return is_tau_impl<node>(tau::_T(), normalized);
 }
 
@@ -141,27 +141,28 @@ requires BAsPack<BAs...>
 tau_ba<BAs...> normalize(const tau_ba<BAs...>& fm) {
 	tref result =
 		apply_rr_to_formula<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
-	result = simp_tau_unsat_valid<node<BAs...>>(result);
-	return tau_ba<BAs...>(tree<node<BAs...>>::geth(result));
+	result = simp_tau_unsat_valid<node<tau_ba<BAs...>, BAs...>>(result);
+	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(result));
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_syntactic_one(const tau_ba<BAs...>& fm) {
-	return tree<node<BAs...>>::get(fm.nso_rr.main).equals_T();
+	return tree<node<tau_ba<BAs...>, BAs...>>::get(fm.nso_rr.main).equals_T();
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_syntactic_zero(const tau_ba<BAs...>& fm) {
-	return tree<node<BAs...>>::get(fm.nso_rr.main).equals_F();
+	return tree<node<tau_ba<BAs...>, BAs...>>::get(fm.nso_rr.main).equals_F();
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
-	tref s = tau_splitter<BAs...>(normalizer<node<BAs...>>(fm.nso_rr), st);
-	return tau_ba<BAs...>(tree<node<BAs...>>::geth(s));
+	tref s = tau_splitter<BAs...>(
+		normalizer<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr), st);
+	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(s));
 }
 
 template <typename... BAs>
@@ -173,7 +174,7 @@ tau_ba<BAs...> tau_splitter_one() {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm) {
-	using node = tau_lang::node<BAs...>;
+	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
 	auto simp_fm = apply_rr_to_formula<node>(fm.nso_rr);
 	if (!simp_fm) return false;
@@ -194,13 +195,14 @@ requires BAsPack<BAs...>
 std::optional<constant_with_type<tau_ba<BAs...>, BAs...>>
 	tau_ba_factory<BAs...>::parse(const std::string& src)
 {
-	using tau = tree<node<BAs...>>;
+	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
+	using tau = tree<node>;
 	// parse source
 	typename tau::get_options opts{ .parse = {
 					.start = tau::tau_constant_source } };
 	tref source = tau::get(src, opts);
 	if (!source) return {};
-	auto nso_rr = get_nso_rr<node<BAs...>>(source);
+	auto nso_rr = get_nso_rr<node>(source);
 	if (!nso_rr) return {};
 	// compute final result
 	return constant_with_type<tau_ba<BAs...>, BAs...>{
@@ -241,7 +243,7 @@ tau_ba_factory<BAs...>& tau_ba_factory<BAs...>::instance() {
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs) {
-	return print<node<BAs...>>(os, rs.nso_rr);
+	return print<node<tau_ba<BAs...>, BAs...>>(os, rs.nso_rr);
 }
 
 } // namespace idni::tau_lang
