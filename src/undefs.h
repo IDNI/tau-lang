@@ -64,6 +64,7 @@
 #undef LOG_FM_TREE
 #undef LOG_RR
 #undef LOG_RR_DUMP
+#undef LOG_SPLITTER
 #undef LOG_PADDING
 #undef LOG_INDENT
 #undef LOG_INDENT1
