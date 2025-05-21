@@ -67,19 +67,21 @@ tref ba_types_inference<node>::operator()(tref n) {
 		LOG_TRACE << dump_to_str();
 		LOG_TRACE << id << "-- Setting default type: "
 			<< LOG_BA_TYPE(dflt) << " to " << LOG_FM(var);
-		tref bound = tau::get_ba_constant_from_source(
-			tau::get(var).data(), dflt);
-		if (bound == nullptr) {
-			LOG_TRACE << dump_to_str();
-			LOG_ERROR << "Failed to bind default type: "
+		if (tau::get(var).is(tau::bf_constant)) {
+			tref bound = tau::get_ba_constant_from_source(
+						tau::get(var).data(), dflt);
+			if (bound == nullptr) {
+				LOG_TRACE << dump_to_str();
+				LOG_ERROR << "Failed to bind default type: "
 				<< LOG_BA_TYPE(dflt) << " to " << LOG_FM(var);
-			return nullptr;
+				return nullptr;
+			LOG_TRACE << dump_to_str();
+			LOG_TRACE << id << "-- Resolved to a default type: "
+								<< LOG_FM(bound);
+			defaulted[var] = bound;
+			LOG_TRACE << dump_to_str();
+			}
 		}
-		LOG_TRACE << dump_to_str();
-		LOG_TRACE << id << "-- Resolved to a default type: "
-							<< LOG_FM(bound);
-		defaulted[var] = bound;
-		LOG_TRACE << dump_to_str();
 	}
 
 	LOG_TRACE << id << LOG_SPLITTER;
