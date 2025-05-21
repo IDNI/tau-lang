@@ -36,6 +36,28 @@ std::ostream& ba_types<node>::print(std::ostream& os, size_t tid) {
 }
 
 template <NodeType node>
+std::ostream& ba_types<node>::dump(std::ostream& os) {
+	LOG_TRACE << "BA types pool(" << types.size() << "):\n";
+	os << "BA types pool(" << types.size() << "):\n";
+	for (size_t i = 0; i < types.size(); ++i) {
+		LOG_TRACE << "type: " << i+1;
+		LOG_TRACE << "val:  " << dict(types[i]);
+		os << LOG_INDENT << "type: "
+			<< i+1 << " " << dict(types[i]) << "\n";
+	}
+	return os;
+}
+
+template <NodeType node>
+std::string ba_types<node>::dump_to_str() {
+	std::stringstream ss;
+	return dump(ss), ss.str();
+}
+
+// -----------------------------------------------------------------------------
+// functional API to ba_types
+
+template <NodeType node>
 size_t get_ba_type_id(size_t ba_type_sid) {
 	return  ba_types<node>::id(ba_type_sid);
 }

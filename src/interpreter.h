@@ -159,7 +159,7 @@ private:
 };
 
 template <NodeType node>
-std::optional<tref> unpack_tau_constant(tref constant);
+tref unpack_tau_constant(tref constant);
 
 template <NodeType node, typename in_t, typename out_t>
 std::optional<interpreter<node, in_t, out_t>> run(tref form,

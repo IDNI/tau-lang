@@ -284,6 +284,8 @@ template <NodeType node>
 tref tree<node>::get_ba_constant(
 	const constant& constant, const std::string& type_name)
 {
+	LOG_TRACE << " -- get ba_constant(constant constant, string type_name): `"
+		<< LOG_BA(constant) << "`, " << LOG_BA(type_name);
 	return ba_constants<node>::get(constant,
 				       get_ba_type_id<node>(type_name));
 }
@@ -291,6 +293,8 @@ tref tree<node>::get_ba_constant(
 template <NodeType node>
 tref tree<node>::get_ba_constant(const constant& constant, size_t ba_type_id)
 {
+	LOG_TRACE << " -- get ba_constant(constant constant, size_t ba_type_id): `"
+		<< LOG_BA(constant) << "`, " << LOG_BA_TYPE(ba_type_id);
 	return ba_constants<node>::get(constant, ba_type_id);
 }
 
@@ -299,6 +303,8 @@ tref tree<node>::get_ba_constant(
 	const std::string& constant_source,
 	const std::string  type_name)
 {
+	LOG_TRACE << " -- get ba_constant(string constant_source, string type_name): `"
+		<< constant_source << "`, " << LOG_BA(type_name);
 	return get_ba_constant_from_source(dict(constant_source),
 		get_ba_type_id<node>(type_name));
 }
@@ -308,15 +314,15 @@ tref tree<node>::get_ba_constant_from_source(
 	size_t constant_source_sid,
 	size_t ba_type_id)
 {
-	LOG_TRACE << " -- get ba_constant(size_t sid, size_t tid): `"
+	LOG_TRACE << " -- get ba_constant_from_source(size_t sid, size_t tid): `"
 				<< dict(constant_source_sid) << "`, "
-				<< LOG_BA_TYPE(ba_type_id);
+				<< LOG_BA_TYPE(ba_type_id) << " " << ba_type_id;
 
 	if (ba_type_id == 0)
 		LOG_TRACE << " -- untyped: " << dict(constant_source_sid);
 	else LOG_TRACE << " -- typed: " << ba_types<node>::name(ba_type_id);
 
-	tref r =  ba_type_id == 0
+	tref r = ba_type_id == 0
 		? get( // untyped contains source sid
 			node::ba_constant(constant_source_sid, ba_type_id))
 		: get_ba_constant(
@@ -332,19 +338,18 @@ tref tree<node>::get_ba_constant_from_source(
 
 template <NodeType node>
 tref tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
-	node x = node::ba_constant(constant_id, ba_type_id);
-	LOG_TRACE << " -- get_ba_constant(" << constant_id << " = "
-		<< LOG_BA(ba_constants<node>::get(constant_id))
-		<< ", " << ba_type_id << " = "
-		<< LOG_BA(tau_lang::get_ba_type_name<node>(ba_type_id))
-		<< "): `" << x << "`";
-	return get(x);
+	LOG_TRACE << " -- get_ba_constant(size_t constant_id, size_t ba_type_id): `"
+		<< LOG_BA(ba_constants<node>::get(constant_id)) << "`, "
+		<< LOG_BA_TYPE(ba_type_id);
+	return get_ba_constant(ba_constants<node>::get(constant_id), ba_type_id);
 }
 
 template <NodeType node>
 tref tree<node>::get_ba_constant(
 	const std::pair<constant, std::string>& typed_const)
 {
+	LOG_TRACE << " -- get_ba_constant(pair<constant, string>): `"
+		<< LOG_BA(typed_const.first) << "`, " << LOG_BA(typed_const.second);
 	return get_ba_constant(typed_const.first,
 			       get_ba_type_id<node>(typed_const.second));
 }
@@ -353,6 +358,8 @@ template <NodeType node>
 tref tree<node>::get_ba_constant(
 	const std::optional<std::pair<constant, std::string>>& typed_const)
 {
+	if (!typed_const) LOG_TRACE 
+		<< "get_ba_constant(optional): nullptr";
 	if (!typed_const) return nullptr;
 	return get_ba_constant(typed_const.value());
 }
