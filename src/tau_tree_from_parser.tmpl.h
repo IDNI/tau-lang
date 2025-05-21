@@ -22,9 +22,10 @@ namespace idni::tau_lang {
 //
 // Transformer runs post_order search of a parse tree.
 // When a node is reached, all its children are already transformed and stored
-// in the map `m` - parse tree node ref -> tau tree node ref.
-// each node needs to be transformed (usually just value is copied) and
-// children has to be remapped through the map.
+// in the map `m` of: parse tree node ref -> tau tree node ref.
+//
+// Transformation of a node is basically copying a node's value and recreating
+// the node with children remapped through the map.
 //
 // See default in the transformer's switch for example of usual transformation.
 //
@@ -50,8 +51,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 		named_constants[dict(cn)] = c;
 
 	auto transformer = [&](tref t, tref parent) {
-		// DBG(LOG_TRACE << " -- transforming: "
-		// 	<< (parse_tree::get(t).print_to_str());) //, ss.str());)
+		DBG(LOG_TRACE << " -- transforming: "
+			      << (parse_tree::get(t).print_to_str());)
 
 		if (m_ex(t)) return true; // already transformed
 		const auto& ptr = parse_tree::get(t); // get parse tree node
@@ -89,10 +90,10 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 		// helper to create a new node with current node type and provided children
 		auto getx = [&nt, &is_term, &ba_type](const auto& ch) -> tref {
-			// std::cout << "getx: " << node::name(nt) << " is_term: " << is_term << "\n";
-			// std::cout << "ch.size: " << ch.size() << "\n";
+			LOG_TRACE << "getx: " << LOG_NT(nt) << " is_term: " << is_term << "\n";
+			LOG_TRACE << "ch.size: " << ch.size() << "\n";
 			auto n = node(nt, 0, is_term, ba_type);
-			// if (nt != node::constant)std::cout << "getx node:" << n << "\n";
+			// if (nt != node::constant) std::cout << "getx node:" << n << "\n";
 			return get(n, ch);
 		};
 		// helper to create a new node with current node type and provided data
@@ -134,14 +135,21 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 		tref x = nullptr; // result of node transformation
 
-		// takes already transformed bf_constant node and binds it
+		// takes already transformed bf_constant parser tree node, ie.
+		// it takes tau tree bf_constant node with type
+		// and processes it:
+		// - check if they are named constants
+		// - if not call get_ba_constant() which stores them in the pool
+		//   and returns the bound constant node
 		auto process_bf_constant =
 			[&src, &error, &named_constants](tref x) -> tref
 		{
 			// LOG_TRACE << "binding: " << src << " " << get_type_sid<node>(x);
+			// get type id from type subnode (or 0 = untyped)
 			size_t ba_type_id = get_ba_type_id<node>(
 						get_type_sid<node>(x));
-			if (ba_type_id == 0) {
+			if (ba_type_id == 0) { // untyped
+				// check if it's a named constant
 				auto it = named_constants.find(src);
 				if (it != named_constants.end()) {
 					LOG_TRACE << "named bound: "
@@ -149,15 +157,13 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 					return it->second;
 				}
 			}
-			tref n = get_ba_constant(dict(src),
-					ba_types<node>::name(ba_type_id));
+			// get the bound constant node
+			tref n = get_ba_constant_from_source(src, ba_type_id);
 			src = 0;
 			if (n == nullptr || n == x)
 				return error = true, nullptr;
 			LOG_TRACE << (ba_type_id == 0 ? "un" : "") << "bound: "
 								<< LOG_FM(n);
-			if (get(n).get_ba_type() == 0)
-				return error = true, nullptr;
 			return n;
 		};
 
@@ -185,7 +191,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			case source:
 				src = dict(ptr.get_terminals());
 				DBG(LOG_TRACE << "BA constant source: `"
-							<< src << "`");
+							<< dict(src) << "`");
 				x = nullptr;
 				break;
 
@@ -201,7 +207,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			default:
 				if (is_string_nt(nt)) {
 					x = getx_data(
-                                                dict(ptr.get_terminals()));
+						dict(ptr.get_terminals()));
 					break;
 				}
 
@@ -211,13 +217,14 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 					DBG(assert(c != nullptr && m_ex(c));)
 					if (m_ref(c)) ch.push_back(m_ref(c));
 				}
+				// DBG(for (auto c : ch) LOG_TRACE << "child: " << LOG_FM_DUMP(c);)
 				x = getx(ch);
 
 				// process constant from a transformed node
-				if (nt == bf_constant && src) {
-					x = process_bf_constant(x);
-					if (x == nullptr) return false;
-				}
+				if (nt == bf_constant && src)
+					if (x = process_bf_constant(x);
+						x == nullptr)
+							return false;
 				break;
 		}
 

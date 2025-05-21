@@ -214,7 +214,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {};
 #define LOG_RULE(r)      LOG_RULE_COLOR << to_str<node>(r)          <<TC.CLEAR()
 
 // LOG_BA_COLOR escapes in a stream for `size_t` BA type id
-#define LOG_BA_TYPE(tid) LOG_BA_COLOR << get_ba_type_name<node>(tid)<<TC.CLEAR()
+#define LOG_BA_TYPE(tid) LOG_BA_COLOR << ba_types<node>::name(tid)  <<TC.CLEAR()
 
 // LOG_BA_COLOR escapes in a stream for `size_t` BA type id with the id
 #define LOG_BA_TYPE_DUMP(tid) LOG_BA_TYPE(tid) << "(" << tid << ")"

@@ -14,34 +14,11 @@ template <NodeType node>
 struct ba_constants {
 	using constant = typename node::constant;
 
-	// insert the constant from a constant source and type name
-	// and return tree node
-	static tref get(const std::string& constant_source,
-			const std::string& type_name);
-
-	// insert the constant from a constant source and type id
-	// and return tree node
-	static tref get(const std::string& constant_source,
-			size_t type_id);
-
-	// insert the constant from a constant source string id and type id
-	// and return tree node
-	static tref get(size_t constant_source_sid,
-			size_t type_id);
-
-	// insert the constant value of a type name to the pool
-	// and return tree node
-	static tref get(const constant& constant,
-			const std::string& type_name);
-
 	// insert the constant value of a type id to the pool
 	static tref get(const constant& constant, size_t type_id);
 
 	// get the constant variant value by constant id
 	static constant get(size_t constant_id);
-
-	// get the constant variant value from a constant_node
-	static constant get(tref constant_node);
 
 	// dump the constant pool to a stream
 	static std::ostream& dump(std::ostream& os);
