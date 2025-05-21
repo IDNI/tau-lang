@@ -28,8 +28,8 @@ tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 	node n = node::ba_constant(constant_id, type_id);
 	// LOG_TRACE << "node::ba_constant: " << n;
 	tref r = tree<node>::get(n);
-	const auto& t = tree<node>::get(r);
 	T.push_back(r);
+	// const auto& t = tree<node>::get(r);
 	// LOG_TRACE << "node from tree:    " << t.value;
 	LOG_TRACE << "-- returning pooled constant: " << LOG_FM(r);
 	return r;

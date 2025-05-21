@@ -18,6 +18,9 @@ struct ba_types_inference {
 	tref operator()(tref n);
 	tref operator()(const tt& n);
 private:
+	// helper to get the proper key node for a variable
+	tref get_var_key_node(tref n) const;
+
 	// removes type info from constants and vars and adds their scope_id
 	// used as a preparation (first) step before type checking and propagation
 	// vscids = vars scope ids
@@ -29,8 +32,6 @@ private:
 	// checks and propagates types within the scope (global or quantifier)
 	tref check_and_propagate(tref n);
 
-	// helper to get the key node for a variable
-	tref get_var_key_node(tref n) const;
 	// check appearance of a single type in all BA elems, then propagate it
 	bool propagate(tref n);
 
@@ -40,9 +41,13 @@ private:
 
 	void clear();
 
-	std::map<size_t, size_t> vars; // var_sid_id -> var_scope_id
-	subtree_map<node, size_t> ts; // node -> ba_type_id
+	std::map<size_t, size_t>  vars;     // var_sid_id -> var_scope_id
+	subtree_map<node, size_t> types;    // node -> ba_type_id
+	subtree_map<node, tref>   resolved; // untyped node -> resolved node
 	size_t untyped_n = 0;
+
+	std::ostream& dump(std::ostream& os) const;
+	std::string dump_to_str() const;
 };
 
 

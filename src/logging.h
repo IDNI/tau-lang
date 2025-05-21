@@ -240,6 +240,10 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {};
 // LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
 #define LOG_RR_DUMP(nso_rr)  LOG_FM_COLOR<<dump_to_str<node>(nso_rr)<<TC.CLEAR()
 
+// LOG_SPLITTER adds a LOG_WARNING_COLOR escaped dash separater
+#define LOG_SPLITTER     LOG_WARNING_COLOR<<"---------------------------------"\
+	"----------------------------------------------------------"<<TC.CLEAR()
+
 // outputs tabs to pad up to the trace/debug messages beginning for new lines in log msgs
 #define LOG_PADDING      "\t\t\t\t"
 

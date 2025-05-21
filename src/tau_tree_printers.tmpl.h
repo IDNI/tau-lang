@@ -367,6 +367,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	};
 
 	auto on_enter = [&](tref ref, tref parent) {
+		DBG(assert(ref != nullptr);)
 		const auto& t = get(ref);
 		size_t nt = t.get_type();
 		size_t pnt = parent ? get(parent).get_type() : nul;
