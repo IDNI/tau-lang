@@ -295,13 +295,39 @@ tref tree<node>::get_ba_constant(const constant& constant, size_t ba_type_id)
 }
 
 template <NodeType node>
-tref tree<node>::get_ba_constant(const std::string& constant_source,
-	const std::string type_name)
+tref tree<node>::get_ba_constant(
+	const std::string& constant_source,
+	const std::string  type_name)
 {
-	LOG_TRACE<<" -- get_ba_constant: `"<<constant_source<<"` : "<<type_name;
-	tref result = ba_constants<node>::get(constant_source, type_name);
-	LOG_TRACE << " -- ba_constants:" << ba_constants<node>::dump_to_str();
-	return result;
+	return get_ba_constant_from_source(dict(constant_source),
+		get_ba_type_id<node>(type_name));
+}
+
+template <NodeType node>
+tref tree<node>::get_ba_constant_from_source(
+	size_t constant_source_sid,
+	size_t ba_type_id)
+{
+	LOG_TRACE << " -- get ba_constant(size_t sid, size_t tid): `"
+				<< dict(constant_source_sid) << "`, "
+				<< LOG_BA_TYPE(ba_type_id);
+
+	if (ba_type_id == 0)
+		LOG_TRACE << " -- untyped: " << dict(constant_source_sid);
+	else LOG_TRACE << " -- typed: " << ba_types<node>::name(ba_type_id);
+
+	tref r =  ba_type_id == 0
+		? get( // untyped contains source sid
+			node::ba_constant(constant_source_sid, ba_type_id))
+		: get_ba_constant(
+				node::nso_factory::instance().parse(
+					dict(constant_source_sid),
+					ba_types<node>::name(ba_type_id)));
+	if (r == nullptr) LOG_ERROR << "Parsing constant `"
+		<< dict(constant_source_sid) << "` failed for type `"
+		<< ba_types<node>::name(ba_type_id) << "`.";
+	else LOG_TRACE << " -- result: " << LOG_FM(r);
+	return r;
 }
 
 template <NodeType node>

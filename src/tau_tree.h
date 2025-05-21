@@ -233,11 +233,14 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	// creates a ba_constant node from constant source and type name
 	static tref get_ba_constant(const std::string& constant_source,
 				    const std::string type_name = "");
+	// creates a ba_constant node from constant source dict id and ba type id
+	static tref get_ba_constant_from_source(size_t constant_source_sid,
+				    size_t ba_type_id);
 	// creates a ba_constant node from constant_id and ba type id
 	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
 	// creates a ba_constant node from a pair of constant_id and ba_type_id
-	static tref get_ba_constant(const std::pair<constant, std::string>&
-								typed_const);
+	static tref get_ba_constant(const std::pair<constant,
+				    std::string>& typed_const);
 	// creates a ba_constant node from a pair of constant_id and ba_type_id
 	static tref get_ba_constant(
 		const std::optional<std::pair<constant, std::string>>&
