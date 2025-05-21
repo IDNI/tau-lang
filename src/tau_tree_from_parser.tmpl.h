@@ -51,8 +51,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 		named_constants[dict(cn)] = c;
 
 	auto transformer = [&](tref t, tref parent) {
-		DBG(LOG_TRACE << " -- transforming: "
-			      << (parse_tree::get(t).print_to_str());)
+		// DBG(LOG_TRACE << " -- transforming: "
+		// 	      << (parse_tree::get(t).print_to_str());)
 
 		if (m_ex(t)) return true; // already transformed
 		const auto& ptr = parse_tree::get(t); // get parse tree node

@@ -30,6 +30,10 @@ struct ba_types {
 	// print the type name to the stream
 	static std::ostream& print(std::ostream& os, size_t ba_type);
 
+	static std::ostream& dump(std::ostream& os);
+
+	static std::string dump_to_str();
+
 private:
 	// type_sids (index = ba_type id)
 	inline static std::vector<size_t> types { dict("untyped") };

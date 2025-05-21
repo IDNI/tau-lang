@@ -1032,12 +1032,12 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 			if (it != output.value().end() && !tau::get(it->second)
 				.equals_0())
 			{
-				if (auto update = unpack_tau_constant<node>(
-					it->second); update)
+				if (tref update = unpack_tau_constant<node>(
+					it->second); update != nullptr)
 				{
 					LOG_TRACE << "update: "
-						<< update.value() << "\n";
-					intrprtr.update(update.value());
+						<< update << "\n";
+					intrprtr.update(update);
 				}
 			}
 		}

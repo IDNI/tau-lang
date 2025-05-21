@@ -27,15 +27,13 @@ requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_constant(
 	size_t constant_id, size_t ba_type_id)
 {
-	LOG_TRACE << " -- node::ba_constant: "
-		<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
-	LOG_TRACE << " -- node::bitsizes: " << node::nt_bits << "/1/"
-		  << node::ba_bits << "/1/" << node::data_bits;
+	// LOG_TRACE << " -- node::ba_constant: constant_id: "
+	// 	<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
+	// LOG_TRACE << " -- node::bitsizes: " << node::nt_bits << "/1/"
+	// 	  << node::ba_bits << "/1/" << node::data_bits;
 	auto n = node(type::bf_constant, constant_id,
 		    true /* is_term */, ba_type_id);
-	LOG_TRACE << " -- node::ba_constant result:" << n;
-	LOG_TRACE << " -- node::ba_constant result ba_type: "
-					<< LOG_BA_TYPE_DUMP(n.ba);
+	// LOG_TRACE << " -- node::ba_constant result:" << n;
 	return n;
 }
 

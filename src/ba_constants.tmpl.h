@@ -16,7 +16,7 @@ template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 	LOG_TRACE << "-- get(constant, type_id): "
 		<< LOG_BA(constant) << ", " << LOG_BA_TYPE(type_id);
-	LOG_TRACE << ba_constants<node>::dump_to_str();
+	// LOG_TRACE << dump_to_str();
 	// TODO optimize
 	for (size_t i = 0; i < C.size(); ++i) if (C[i] == constant) {
 		LOG_TRACE << "-- returning already pooled: "
@@ -26,9 +26,10 @@ tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 	C.push_back(constant);
 	size_t constant_id = C.size();
 	node n = node::ba_constant(constant_id, type_id);
-	// LOG_TRACE << "node::ba_constant: " << n;
 	tref r = tree<node>::get(n);
 	T.push_back(r);
+	// LOG_TRACE << "node constant: " << n;
+	// LOG_TRACE << dump_to_str();
 	// const auto& t = tree<node>::get(r);
 	// LOG_TRACE << "node from tree:    " << t.value;
 	LOG_TRACE << "-- returning pooled constant: " << LOG_FM(r);

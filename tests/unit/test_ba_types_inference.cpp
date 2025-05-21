@@ -32,12 +32,6 @@ bool are_all_typed_as(tref n, const std::string& type) {
 	    && are_all_trefs_typed(t.select_all(is<node, tau::variable>));
 }
 
-TEST_SUITE("configuration") {
-	TEST_CASE("disable hooks") {
-		tau::use_hooks = false;
-	}
-}
-
 TEST_SUITE("constant types") {
 	TEST_CASE("all typed") {
 		auto n = infer("{ 0 } : bool = { 1 } : bool & { 0 } : bool.");

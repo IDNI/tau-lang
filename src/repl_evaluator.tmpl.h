@@ -89,7 +89,9 @@ void repl_evaluator<BAs...>::print_history(const htree::sp& mem, const size_t id
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<rr<node>> repl_evaluator<BAs...>::get_nso_rr_with_defs(const tt& spec) const {
+std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
+	repl_evaluator<BAs...>::get_nso_rr_with_defs(const tt& spec) const
+{
 	rr<node> nso_rr{ nullptr };
 	auto check = get_type_and_arg(spec);
 	if (!check) return {};
