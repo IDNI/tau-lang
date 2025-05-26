@@ -35,7 +35,7 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 	if (len) {
 		ss << " \t[";
 		for (size_t i = 0; i < len; ++i) {
-			assert(ch[i] != nullptr);
+			DBG(assert(ch[i] != nullptr);)
 			ss << "<" << ch[i] << ">";
 			ss <<(i ? ", " : "")<<LOG_NT(tau::get(ch[i]).get_type())
 				<< "(" << LOG_FM(ch[i]) << ")";
@@ -97,36 +97,26 @@ const tree<node>& get_hook<node>::quantified_formula(const tref* ch) {
 
 template <NodeType node>
 tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
+	HOOK_LOGGING(LOG_TRACE << "_0_typed " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_f, ba_type), 0, 0);
 	return tau::get_raw(node(tau::bf), &x, 1, r);
 }
 
 template <NodeType node>
 tref get_hook<node>::_1_typed(size_t ba_type, tref r) {
+	HOOK_LOGGING(LOG_TRACE << "_1_typed " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_t, ba_type), 0, 0);
 	return tau::get_raw(node(tau::bf), &x, 1, r);
-}
-
-template <NodeType node>
-tref get_hook<node>::_F_typed(size_t ba_type, tref r) {
-	tref x = tau::get_raw(node::ba_typed(tau::wff_f, ba_type), 0, 0);
-	return tau::get_raw(node(tau::wff), &x, 1, r);
-}
-
-template <NodeType node>
-tref get_hook<node>::_T_typed(size_t ba_type, tref r) {
-	tref x = tau::get_raw(node::ba_typed(tau::wff_t, ba_type), 0, 0);
-	return tau::get_raw(node(tau::wff), &x, 1, r);
 }
 
 template <NodeType node>
 tref get_hook<node>::_0(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_0", v, ch, len, r);)
 	size_t type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	if (type_l == type_r && type_l) return _0_typed(type_l, r);
-	if (type_l == type_r)           return tau::get(tau::_0(), r);
-	if (type_l && !type_r)          return _0_typed(type_l, r);
-	if (!type_l && type_r)          return _0_typed(type_r, r);
+	if (type_l == type_r && type_l >  0) return _0_typed(type_l, r);
+	if (type_l == type_r)                return tau::get(tau::_0(), r);
+	if (type_l >  0      && type_r == 0) return _0_typed(type_l, r);
+	if (type_l == 0      && type_r >  0) return _0_typed(type_r, r);
 	return tau::get_raw(v, ch, len, r);
 }
 
@@ -134,10 +124,10 @@ template <NodeType node>
 tref get_hook<node>::_1(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_1", v, ch, len, r);)
 	size_t type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	if (type_l == type_r && type_l) return _1_typed(type_l, r);
-	if (type_l == type_r)           return tau::get(tau::_1(), r);
-	if (type_l && !type_r)          return _1_typed(type_l, r);
-	if (!type_l && type_r)          return _1_typed(type_r, r);
+	if (type_l == type_r && type_l >  0) return _1_typed(type_l, r);
+	if (type_l == type_r)                return tau::get(tau::_1(), r);
+	if (type_l >  0      && type_r == 0) return _1_typed(type_l, r);
+	if (type_l == 0      && type_r >  0) return _1_typed(type_r, r);
 	return tau::get_raw(v, ch, len, r);
 }
 
@@ -145,10 +135,10 @@ template <NodeType node>
 tref get_hook<node>::_F(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_F", v, ch, len, r);)
 	auto type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	if ((type_l == type_r && type_l)
+	if ((type_l == type_r && type_l > 0)
 		|| (type_l == type_r)
-		|| (type_l && !type_r)
-		|| (!type_l && type_r)) return tau::get(tau::_F(), r);
+		|| (type_l >  0   && type_r == 0)
+		|| (type_l == 0   && type_r > 0)) return tau::get(tau::_F(), r);
 	return tau::get_raw(v, ch, len, r);
 }
 
@@ -156,17 +146,25 @@ template <NodeType node>
 tref get_hook<node>::_T(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_T", v, ch, len, r);)
 	auto type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	if ((type_l == type_r && type_l)
+	if ((type_l == type_r && type_l > 0)
 		|| (type_l == type_r)
-		|| (type_l && !type_r)
-		|| (!type_l && type_r)) return tau::get(tau::_T(), r);
+		|| (type_l >  0   && type_r == 0)
+		|| (type_l == 0   && type_r > 0)) return tau::get(tau::_T(), r);
 	return tau::get_raw(v, ch, len, r);
 }
 
 template <NodeType node>
 tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("term", v, ch, len, r);)
-	DBG(assert(len == 1));
+#ifdef DEBUG
+	if (len != 1) {
+		LOG_TRACE << "term: " << LOG_NT(v.nt) << " len: " << len;
+		for (size_t i = 0; i < len; ++i) {
+			LOG_TRACE << "ch[" << i << "]: " << LOG_FM(ch[i]);
+		}
+	}
+#endif
+	DBG(assert(len == 1);)
 	switch (tau::get(ch[0]).get_type()) {
 	case tau::bf_or:       return term_or(v, ch, len, r);
 	case tau::bf_and:      return term_and(v, ch, len, r);

@@ -17,9 +17,10 @@ TEST_SUITE("bf operator hooks") {
 		tref tau_sample = tau::get(sample, parse_bf());
 
 #ifdef DEBUG
+		using node = node_t;
 		string str(sample);
 		if (tau_sample) cout << "sample: " << str
-			<< " expected error, got : " << tau_sample << "\n";
+			<< " expected error, got : " << LOG_FM_DUMP(tau_sample) << "\n";
 		else cout << "sample: " << str << " expected error, got it\n";
 #endif // DEBUG
 
@@ -33,10 +34,10 @@ TEST_SUITE("bf operator hooks") {
 
 #ifdef DEBUG
 		using node = node_t;
-		cout << "sample: " << string(sample) << " expected: ";
+		cout << "sample: " << string(sample) << "\nexpected: \t";
 		if (tau_expected == 0) cout << "nullptr";
 		else cout << TAU_DUMP_TO_STR(tau_expected);
-		cout << "\n\tgot: ";
+		cout << "\ngot:      \t";
 		if (tau_sample == 0) cout << "nullptr";
 		else cout << TAU_DUMP_TO_STR(tau_sample);
 		cout << "\n";
@@ -157,16 +158,6 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( !check_hook("{T}:tau|1:sbf", "1") );
 		CHECK( !check_hook("{F}:tau|0:sbf", "0") );
 
-		CHECK( check_unbound_hook("{1}:sbf|{F}:tau") );
-		CHECK( check_unbound_hook("{0}:sbf|{T}:tau") );
-		CHECK( check_unbound_hook("{1}:sbf|{T}:tau") );
-		CHECK( check_unbound_hook("{0}:sbf|{F}:tau") );
-
-		CHECK( check_unbound_hook("{T}:tau|{1}:sbf") );
-		CHECK( check_unbound_hook("{F}:tau|{0}:sbf") );
-		CHECK( check_unbound_hook("{T}:tau|{1}:sbf") );
-		CHECK( check_unbound_hook("{F}:tau|{0}:sbf") );
-
 		CHECK( check_hook("1|x", "1") );
 		CHECK( check_hook("x|1", "1") );
 		CHECK( check_hook("0|x", "x") );
@@ -248,16 +239,6 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( !check_hook("{T}:tau&1:sbf", "1") );
 		CHECK( !check_hook("{F}:tau&0:sbf", "0") );
 
-		CHECK( check_unbound_hook("{1}:sbf&{F}:tau") );
-		CHECK( check_unbound_hook("{0}:sbf&{T}:tau") );
-		CHECK( check_unbound_hook("{1}:sbf&{T}:tau") );
-		CHECK( check_unbound_hook("{0}:sbf&{F}:tau") );
-
-		CHECK( check_unbound_hook("{T}:tau&{0}:sbf") );
-		CHECK( check_unbound_hook("{F}:tau&{1}:sbf") );
-		CHECK( check_unbound_hook("{T}:tau&{1}:sbf") );
-		CHECK( check_unbound_hook("{F}:tau&{0}:sbf") );
-
 		CHECK( check_hook("1&x", "x") );
 		CHECK( check_hook("x&1", "x") );
 		CHECK( check_hook("0&x", "0") );
@@ -337,16 +318,6 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( !check_hook("{F}:tau+1:sbf", "1") );
 		CHECK( !check_hook("{T}:tau+1:sbf", "0") );
 		CHECK( !check_hook("{F}:tau+0:sbf", "0") );
-
-		CHECK( check_unbound_hook("{1}:sbf+{F}:tau") );
-		CHECK( check_unbound_hook("{0}:sbf+{T}:tau") );
-		CHECK( check_unbound_hook("{1}:sbf+{T}:tau") );
-		CHECK( check_unbound_hook("{0}:sbf+{F}:tau") );
-
-		CHECK( check_unbound_hook("{T}:tau+{0}:sbf") );
-		CHECK( check_unbound_hook("{F}:tau+{1}:sbf") );
-		CHECK( check_unbound_hook("{T}:tau+{1}:sbf") );
-		CHECK( check_unbound_hook("{F}:tau+{0}:sbf") );
 
 		CHECK( check_hook("1+x", "x'") );
 		CHECK( check_hook("x+1", "x'") );

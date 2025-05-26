@@ -85,6 +85,11 @@ constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
 {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
+	// LOG_TRACE << "node created:" << LOG_NT(nt)
+	// 	<< " data: " << data
+	// 	<< " is_term: " << is_term
+	// 	<< " ba_type: " << LOG_BA_TYPE(ba_type)
+	// 	<< " node: `" << *this << "`";
 }
 
 template <typename... BAs>
@@ -167,10 +172,10 @@ constexpr bool node<BAs...>::operator>=(const node& that) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator==(const node& that) const {
-	if (nt == type::bf_f && that.nt == type::bf_f) // 0 - ignore ba type if any untyped
-		return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
-	if (nt == type::bf_t && that.nt == type::bf_t) // 1 - ignore ba type if any untyped
-		return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
+	// if (nt == type::bf_f && that.nt == type::bf_f) // 0 - ignore ba type if any untyped
+	// 	return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
+	// if (nt == type::bf_t && that.nt == type::bf_t) // 1 - ignore ba type if any untyped
+	// 	return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
 	return nt == that.nt && term == that.term && ba == that.ba
 			&& ext == that.ext && data == that.data;
 }

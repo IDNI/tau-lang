@@ -449,8 +449,8 @@ tref build_bf_ba_constant(const typename node::constant& constant,
 	size_t ba_type_id, tref right)
 {
 	using tau = tree<node>;
-	return tau::get(tau::bf,
-		tau::get_ba_constant(constant, ba_type_id), right);
+	return tau::get(tau::bf, {
+		tau::get_ba_constant(constant, ba_type_id) }, right);
 }
 
 template <NodeType node>

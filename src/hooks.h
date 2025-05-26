@@ -41,8 +41,6 @@ private:
 	// hooks
 	static tref _0_typed(size_t ba_type, tref r);
 	static tref _1_typed(size_t ba_type, tref r);
-	static tref _F_typed(size_t ba_type, tref r);
-	static tref _T_typed(size_t ba_type, tref r);
 	static tref _0(const node& v, const tref* ch, size_t len, tref r);
 	static tref _1(const node& v, const tref* ch, size_t len, tref r);
 	static tref _F(const node& v, const tref* ch, size_t len, tref r);

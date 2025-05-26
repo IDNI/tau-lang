@@ -32,7 +32,7 @@ tau::get_options parse_bf() {
 }
 
 tau::get_options parse_wff() {
-	static tau::get_options opts{ .parse = { .start = tau::bf } };
+	static tau::get_options opts{ .parse = { .start = tau::wff } };
 	return opts;
 }
 

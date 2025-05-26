@@ -197,8 +197,13 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 			case bf_t:
 			case bf_f:
-				ba_type = get_ba_type_id<node>(
-							get_type_sid<node>(x));
+				if (bool typed = ptr.first() != nullptr; typed){
+					ba_type = get_ba_type_id<node>(
+						tau::get(m_ref(ptr.first()))
+							.data());
+					LOG_TRACE << "ba_type: "
+						  << LOG_BA_TYPE(ba_type);
+				}
 				x = getx_data(0);
 				break;
 
