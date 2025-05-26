@@ -51,7 +51,9 @@ bool is_temporal_quantifier(tref n) {
 template <NodeType node> 
 bool is_ba_element(tref n) {
 	return tree<node>::get(n).is(node::type::bf_constant)
-		|| tree<node>::get(n).is(node::type::variable);
+		|| tree<node>::get(n).is(node::type::variable)
+		|| tree<node>::get(n).is(node::type::bf_t)
+		|| tree<node>::get(n).is(node::type::bf_f);
 }
 
 template <NodeType node> 

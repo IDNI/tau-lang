@@ -539,6 +539,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case ref_args:
 			case offsets:           out(", "); break;
 			case shift:             out("-"); break;
+			case variable:
 			case bf_constant:       out(" : "); break;
 
 			case wff_all:

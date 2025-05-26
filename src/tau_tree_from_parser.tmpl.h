@@ -210,6 +210,13 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			// case variable: x = process_var(x); // break;
 
 			default:
+				if (nt == variable && ptr.second()) {
+					ba_type = get_ba_type_id<node>(
+						tau::get(m_ref(ptr.second()))
+							.data());
+					LOG_TRACE << "ba_type: "
+						  << LOG_BA_TYPE(ba_type);
+				}
 				if (is_string_nt(nt)) {
 					x = getx_data(
 						dict(ptr.get_terminals()));
