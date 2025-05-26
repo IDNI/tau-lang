@@ -96,7 +96,6 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	rr<node> ret(nso_rr);
 	for (auto& r : ret.rec_relations) r.first = transform(r.first),
 					  r.second = transform(r.second);
-	ret.main = transform(ret.main);
 	LOG_TRACE << "-- transform_ref_args_to_captures result: " << LOG_RR_DUMP(ret);
 	return ret;
 }
