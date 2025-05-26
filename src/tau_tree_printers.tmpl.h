@@ -32,8 +32,9 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
 	if (bool print_is_term = true; print_is_term && n.term) os << "*";
 	if (n.data) os << "[" << n.data << "]";
-	if (bool print_ba_type = true; print_ba_type && n.nt == tau::variable)
-		os << " " << LOG_BA_TYPE(n.ba);
+	if (bool print_ba_type = true;
+		print_ba_type && n.term && n.nt != tau::bf)
+						os << " " << LOG_BA_TYPE(n.ba);
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::bf_constant) {
