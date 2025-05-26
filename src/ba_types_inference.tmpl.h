@@ -257,6 +257,10 @@ tref ba_types_inference<node>::add_scope_ids(
 		case tau::bf_constant:
 		case tau::variable:
 			return transform_element(el, nt);
+		case tau::bf_f:
+		case tau::bf_t:
+			types[get_var_key_node(el)] = tau::get(el).get_ba_type();
+			break;
 		default: break;
 		}
 		return el;
@@ -306,7 +310,7 @@ tref ba_types_inference<node>::check_and_propagate(tref n) {
 	do {
 		untyped_n0 = untyped_n;
 		// LOG_TRACE << "untyped_n0: " << LOG_FM(untyped_n0);
-		pre_order<node>(n).visit(checker_and_propagator);
+		pre_order<node>(n).visit_unique(checker_and_propagator);
 		if (err) return nullptr; // type mismatch
 		// LOG_TRACE << "untyped_n: " << LOG_FM(untyped_n);
 	} while (untyped_n0 != untyped_n);
@@ -327,9 +331,9 @@ tref ba_types_inference<node>::get_var_key_node(tref n) const {
 // check appearance of a single type in all BA elems, then propagate it
 template <NodeType node>
 bool ba_types_inference<node>::propagate(tref n) {
-	// LOG_TRACE << dump_to_str();
-	// LOG_TRACE << LOG_SPLITTER;
-	LOG_TRACE << "-- Propagate: " << LOG_FM(n);
+	LOG_TRACE << dump_to_str();
+	LOG_TRACE << LOG_SPLITTER;
+	LOG_TRACE << "-- Propagate: " << LOG_FM_DUMP(n);
 	static const size_t temporal = get_ba_type_id<node>("_temporal");
 	// collect types from BA elements
 	std::set<size_t> collected;
@@ -337,9 +341,9 @@ bool ba_types_inference<node>::propagate(tref n) {
 	for (tref el : els) {
 		tref key = get_var_key_node(el);
 		if (types[key] != 0 && types[key] != temporal) {
-			// LOG_TRACE << "Collecting types from: " << LOG_FM(el);
-			// LOG_TRACE << "key:        " << LOG_FM(key);
-			// LOG_TRACE << "types[key]: " << LOG_BA_TYPE_DUMP(types[key]);
+			LOG_TRACE << "Collecting types from: " << LOG_FM_DUMP(el);
+			LOG_TRACE << "key:        " << LOG_FM_DUMP(key);
+			LOG_TRACE << "types[key]: " << LOG_BA_TYPE(types[key]);
 			collected.insert(types[key]);
 			if (collected.size() > 1) { // multiple types found, error
 				auto it = collected.begin();
@@ -359,27 +363,44 @@ bool ba_types_inference<node>::propagate(tref n) {
 				<< ", propagating from node: " << LOG_FM_DUMP(el);
 			tref key = get_var_key_node(el);
 			DBG(assert(key));
-			// if (!key) LOG_TRACE << "key is nullptr";
-			// else LOG_TRACE << "key:        " << LOG_FM_DUMP(key);
-			// LOG_TRACE      << "types[key]: "
-			// 			<< LOG_BA_TYPE_DUMP(types[key]);
+			if (!key) LOG_TRACE << "key is nullptr";
+			else LOG_TRACE << "key:        " << LOG_FM_DUMP(key);
+			LOG_TRACE      << "types[key]: "
+						<< LOG_BA_TYPE_DUMP(types[key]);
 			const auto& kt = tau::get(key);
 			if (kt.get_ba_type() == 0)
 			{
 				LOG_TRACE << "-- Propagating type: "
-					<< LOG_BA_TYPE(t) << " to "<<LOG_FM(el);
-				// factory bind newly typed constant
-				tref bound = tau::get_ba_constant(
-						dict(kt.data()),
-						get_ba_type_name<node>(t));
-				if (bound == nullptr) return false;
-				LOG_TRACE << "bound after type resolved: "
-							<< LOG_FM(bound);
-				if (types.find(bound) == types.end())
-					untyped_n--;
-				types[key] = t;
-				types[bound] = t;
-				resolved[key] = bound;
+					<< LOG_BA_TYPE(t) << " to "<<LOG_FM_DUMP(el);
+				tref r;
+				const auto& elt = tau::get(el);
+				auto nt = elt.get_type();
+				if (nt == tau::bf_constant) {
+					// factory bind newly typed constant
+					tref bound = tau::get_ba_constant(
+							dict(kt.data()),
+							get_ba_type_name<node>(t));
+					if (bound == nullptr) return false;
+					LOG_TRACE << "bound after type resolved: "
+								<< LOG_FM(bound);
+					r = bound;
+				}
+				else if (nt == tau::variable) {
+					// retype var
+					r = bintree<node>::get(
+						elt.value.ba_retype(t),
+						elt.first(),
+						elt.right_sibling());
+				}
+				else if (nt == tau::bf_f || nt == tau::bf_t) {
+					// retype bf_t or bf_f
+					r = tau::get(node::ba_typed(nt, t));
+				}
+				LOG_TRACE << "resolved: " << LOG_FM_DUMP(r);
+				if (types.find(r) == types.end()) untyped_n--;
+				types[key]    = t;
+				types[r]      = t;
+				resolved[key] = r;
 			}
 		}
 	}
@@ -393,7 +414,8 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 	LOG_TRACE << "-- Remove scope ids: " << LOG_FM_DUMP(n);
 	const auto transformer = [this](tref el) {
 		if (is_ba_element<node>(el)) {
-			LOG_TRACE << "transformer of ba_element: " <<LOG_FM_DUMP(el);
+			LOG_TRACE << "-- Transformer of ba_element: "
+							<< LOG_FM_DUMP(el);
 			tref key = get_var_key_node(el);
 			if (!key) LOG_TRACE << "key is nullptr";
 			else LOG_TRACE << "key: " << LOG_FM_DUMP(key);
@@ -405,18 +427,23 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 			LOG_TRACE <<"tid:  " << t.get_ba_type();
 			if (t.is(tau::bf_constant)) {
 				if (el != key && t.get_ba_type() == 0) {
-					LOG_TRACE << "-- propagated: "
-						<< LOG_FM_DUMP(key);
+					LOG_TRACE << "-- Propagated: "
+							<< LOG_FM_DUMP(key);
 					return key;
 				}
 				tref new_el = tau::build_ba_constant(
 					t.get_ba_constant(),
 					t.get_ba_type());
-				LOG_TRACE << "-- transformed: "
-					<<LOG_FM_DUMP(new_el);
+				LOG_TRACE << "-- Transformed: "
+							<< LOG_FM_DUMP(new_el);
 				return new_el;
 			}
-			return tau::get(t.value, t.first());
+			tref r;
+			if (t.is(tau::variable))
+				r = tau::get(t.value, t.first());
+			else r = tau::get(t.value);
+			LOG_TRACE << "-- Transformed: "	<< LOG_FM_DUMP(r);
+			return r;
 		}
 		return el;
 	};
@@ -425,12 +452,12 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 
 template <NodeType node>
 std::ostream& ba_types_inference<node>::dump(std::ostream& os) const {
-	os << "BA types[" << types.size() << "]:\n";
-	for (const auto& [key, tid] : types) os << LOG_INDENT << LOG_FM(key)
-						<< " : " << (tid) << "\n";
+	os << "BA inference types[" << types.size() << "]:\n";
+	for (const auto& [key, tid] : types) os << LOG_INDENT << LOG_FM_DUMP(key)
+						<< " : " << LOG_BA_TYPE(tid) << "\n";
 	os << LOG_PADDING << "  Resolved[" << resolved.size() << "]:\n";
 	for (const auto& [key, val] : resolved)
-		os << LOG_INDENT << LOG_FM(key) << " -> " << LOG_FM(val) <<"\n";
+		os << LOG_INDENT << LOG_FM_DUMP(key) << " -> " << LOG_FM_DUMP(val) <<"\n";
 	return os;
 }
 

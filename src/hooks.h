@@ -37,7 +37,7 @@ private:
 	static inline const tree<node>& logic_operator(const tref* ch);
 	static inline const tree<node>& quantifier(const tref* ch);
 	static inline const tree<node>& quantified_formula(const tref* ch);
-
+	static inline bool check_type_mismatch(const tref* ch);
 	// hooks
 	static tref _0_typed(size_t ba_type, tref r);
 	static tref _1_typed(size_t ba_type, tref r);
