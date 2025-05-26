@@ -32,7 +32,7 @@ tref ba_types_inference<node>::operator()(tref n) {
 	static size_t counter = 0;
 	counter++;
 	std::string id = "[" + LOG_BRIGHT_COLOR + std::to_string(counter)
-						 + TC.CLEAR() + "] ";
+						+ TC.CLEAR() + "] ";
 	LOG_TRACE << id << LOG_SPLITTER;
 	LOG_TRACE << id << LOG_BRIGHT("BA type check and propagation: ")
 							<< LOG_FM_DUMP(n);
@@ -147,9 +147,9 @@ tref ba_types_inference<node>::add_scope_ids(
 {
 	LOG_TRACE << "-- Add_scope_ids: " << LOG_FM(n);
 	// ptree(std::cout << "tree: ", n) << "\n";
-	const auto vsid = [this, &vscids](tref var) {
+	const auto vsid = [this, &vscids](tref var) -> size_t {
 		size_t v = get_var_name_sid<node>(var);
-		if (vscids.find(v) == vscids.end()) vscids[v] = 0;
+		if (vscids.find(v) == vscids.end()) return 0;
 		return vscids[v];
 	};
 	const auto inc_vsid = [this, &vscids](tref var) {
@@ -243,11 +243,11 @@ tref ba_types_inference<node>::add_scope_ids(
 		}
 		case tau::wff_ex:
 		case tau::wff_all: {
+			inc_vsid(t.first());
 			// ptree(std::cout << "quant: ", el->child[0]) << "\n";
 			tref v = transform_element(t.first(), tau::variable);
 			if (v == nullptr) return nullptr;
 			// ptree(std::cout << "quant var: ", v) << "\n";
-			inc_vsid(get_var_key_node(v));
 			tref x = add_scope_ids(t.second(), vscids, csid, tsid);
 			if (x == nullptr) return nullptr;
 			tref r = tau::get(t.value, { v, x });
