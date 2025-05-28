@@ -18,8 +18,8 @@ struct ba_types_inference {
 	tref operator()(tref n);
 	tref operator()(const tt& n);
 private:
-	// helper to get the proper key node for a variable
-	tref get_var_key_node(tref n) const;
+	// helper to get the proper identifying key node for a BA element
+	tref get_el_key(tref n) const;
 
 	// removes type info from constants and vars and adds their scope_id
 	// used as a preparation (first) step before type checking and propagation

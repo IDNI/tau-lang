@@ -99,10 +99,11 @@ template <NodeType node>
 bool get_hook<node>::check_type_mismatch(const tref* ch) {
 	std::set<size_t> types;
 	for (tref c : tau::get(ch[0]).children()) {
-		if (tau::get(c)[0].get_ba_type() > 0)
-			types.insert(tau::get(c)[0].get_ba_type());
+		const auto& t = tau::get(c)[0];
+		if (t.get_ba_type() > 0 || !(t.is(tau::bf_t) || t.is(tau::bf_f)))
+			types.insert(t.get_ba_type());
 		if (types.size() > 1) {
-			HOOK_LOGGING(applied("type mismatch. skipping hook");)
+			HOOK_LOGGING(applied("type mismatch or unresolved yet. skipping hook");)
 			return true;
 		}
 	}
@@ -127,8 +128,8 @@ template <NodeType node>
 tref get_hook<node>::_0(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_0", v, ch, len, r);)
 	size_t type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	if (type_l == type_r && type_l >  0) return _0_typed(type_l, r);
-	if (type_l == type_r)                return tau::get(tau::_0(), r);
+	// if (type_l == type_r && type_l >  0) return _0_typed(type_l, r);
+	if (type_l == type_r)                return _0_typed(type_l, r);
 	if (type_l >  0      && type_r == 0) return _0_typed(type_l, r);
 	if (type_l == 0      && type_r >  0) return _0_typed(type_r, r);
 	return tau::get_raw(v, ch, len, r);
@@ -138,8 +139,8 @@ template <NodeType node>
 tref get_hook<node>::_1(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("_1", v, ch, len, r);)
 	size_t type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
-	if (type_l == type_r && type_l >  0) return _1_typed(type_l, r);
-	if (type_l == type_r)                return tau::get(tau::_1(), r);
+	// if (type_l == type_r && type_l >  0) return _1_typed(type_l, r);
+	if (type_l == type_r)                return _1_typed(type_l, r);
 	if (type_l >  0      && type_r == 0) return _1_typed(type_l, r);
 	if (type_l == 0      && type_r >  0) return _1_typed(type_r, r);
 	return tau::get_raw(v, ch, len, r);
@@ -193,6 +194,9 @@ template <NodeType node>
 tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
 	HOOK_LOGGING(log("term_or", v, ch, len, r);)
 	DBG(assert(len == 1));
+
+	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
@@ -266,6 +270,9 @@ tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 {
 	HOOK_LOGGING(log("term_and", v, ch, len, r);)
 	DBG(assert(len == 1));
+
+	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 & 1 := 1.")
@@ -380,6 +387,9 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 {
 	HOOK_LOGGING(log("term_xor", v, ch, len, r);)
 	DBG(assert(len == 1));
+
+	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 ^ 1 := 0.")

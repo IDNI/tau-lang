@@ -639,6 +639,7 @@ tree<node>::constant tree<node>::get_ba_constant() const {
 
 template <NodeType node>
 size_t tree<node>::get_ba_type() const {
+	if (this->value.nt == bf) return child_tree(0).get_ba_type();
 	return this->value.ba;
 }
 

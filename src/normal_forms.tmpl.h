@@ -1042,7 +1042,7 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 	for (const auto& path : paths) {
 		if (path.empty()) continue;
 		bool first_var = true;
-		tref var_path = is_cnf ? (wff ? tau::_F() : tau::_0())
+		tref var_path = is_cnf  ? (wff ? tau::_F() : tau::_0())
 					: (wff ? tau::_T() : tau::_1());
 	for (size_t k = 0; k < vars.size(); ++k) {
 		DBG(assert(path.size() == vars.size());)
