@@ -91,11 +91,11 @@ constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
 {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
-	LOG_TRACE << "node created:" << LOG_NT(nt)
-		<< " data: " << data
-		<< " is_term: " << is_term
-		<< " ba_type: " << LOG_BA_TYPE(ba_type)
-		<< " node: `" << *this << "`";
+	// LOG_TRACE << "node created:" << LOG_NT(nt)
+	// 	<< " data: " << data
+	// 	<< " is_term: " << is_term
+	// 	<< " ba_type: " << LOG_BA_TYPE(ba_type)
+	// 	<< " node: `" << *this << "`";
 }
 
 template <typename... BAs>

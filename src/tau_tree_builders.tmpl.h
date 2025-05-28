@@ -48,49 +48,49 @@ const tree<node>& get_0() {
 template <NodeType node>
 const tree<node>& get_1() {
 	using tau = tree<node>;
-	static htree::sp cached = tau::geth(tau::get(tau::bf, _1_trimmed<node>()));
+	static htref cached = tau::geth(tau::get(tau::bf, _1_trimmed<node>()));
 	return tau::get(cached);
 }
 
 template <NodeType node>
 const tree<node>& get_F() {
 	using tau = tree<node>;
-	static htree::sp cached = tau::geth(tau::get(tau::wff, _F_trimmed<node>()));
+	static htref cached = tau::geth(tau::get(tau::wff, _F_trimmed<node>()));
 	return tau::get(cached);
 }
 
 template <NodeType node>
 const tree<node>& get_T() {
 	using tau = tree<node>;
-	static htree::sp cached = tau::geth(tau::get(tau::wff, _T_trimmed<node>()));
+	static htref cached = tau::geth(tau::get(tau::wff, _T_trimmed<node>()));
 	return tau::get(cached);
 }
 
 template <NodeType node>
 const tree<node>& get_0_trimmed() {
 	using tau = tree<node>;
-	static htree::sp cached = tau::geth(tau::get(tau::bf_f));
+	static htref cached = tau::geth(tau::get(tau::bf_f));
 	return tau::get(cached);
 }
 
 template <NodeType node>
 const tree<node>& get_1_trimmed() {
 	using tau = tree<node>;
-	static htree::sp cached = tau::geth(tau::get(tau::bf_t));
+	static htref cached = tau::geth(tau::get(tau::bf_t));
 	return tau::get(cached);
 }
 
 template <NodeType node>
 const tree<node>& get_F_trimmed() {
 	using tau = tree<node>;
-	static htree::sp cached = tau::geth(tau::get(tau::wff_f));
+	static htref cached = tau::geth(tau::get(tau::wff_f));
 	return tau::get(cached);
 }
 
 template <NodeType node>
 const tree<node>& get_T_trimmed() {
 	using tau = tree<node>;
-	static htree::sp cached = tau::geth(tau::get(tau::wff_t));
+	static htref cached = tau::geth(tau::get(tau::wff_t));
 	return tau::get(cached);
 }
 

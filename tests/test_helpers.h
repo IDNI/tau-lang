@@ -37,7 +37,7 @@ tau::get_options parse_wff() {
 }
 
 tau::get_options parse_rec_relations() {
-	static tau::get_options opts{ .parse = { .start = tau::rec_relations } };
+	static tau::get_options opts{ .parse = { .start = tau::definitions } };
 	return opts;
 }
 

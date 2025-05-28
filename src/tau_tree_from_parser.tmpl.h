@@ -92,8 +92,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 		// helper to create a new node with current node type and provided children
 		auto getx = [&nt, &is_term, &ba_type](const auto& ch) -> tref {
-			LOG_TRACE << "getx: " << LOG_NT(nt) << " is_term: " << is_term << "\n";
-			LOG_TRACE << "ch.size: " << ch.size() << "\n";
+			// LOG_TRACE << "getx: " << LOG_NT(nt) << " is_term: " << is_term << "\n";
+			// LOG_TRACE << "ch.size: " << ch.size() << "\n";
 			auto n = node(nt, 0, is_term, ba_type);
 			// if (nt != node::constant) std::cout << "getx node:" << n << "\n";
 			return get(n, ch);

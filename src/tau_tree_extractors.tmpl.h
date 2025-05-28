@@ -76,12 +76,13 @@ bool get_io_defs(spec_context<node>& ctx, tref code) {
 }
 
 template <NodeType node>
-htref resolve_io_vars(spec_context<node>& ctx, tref r) {
+tref resolve_io_vars(spec_context<node>& ctx, tref fm) {
+	LOG_TRACE << "resolve_io_vars - fm: " << LOG_FM_DUMP(fm);
 	using tau = tree<node>;
-	auto resolve = [&ctx](tref r) {
-		const auto& t = tau::get(r);
+	auto resolve = [&ctx](tref n) {
+		const auto& t = tau::get(n);
 		if (t.is(tau::io_var)) {
-			size_t var_sid = get_var_name_sid<node>(r);
+			size_t var_sid = get_var_name_sid<node>(n);
 			for (const auto& [in_var_sid, def] : ctx.inputs)
 				if (var_sid == in_var_sid)
 					return t.replace_value(
@@ -90,11 +91,13 @@ htref resolve_io_vars(spec_context<node>& ctx, tref r) {
 				if (var_sid == out_var_sid)
 					return t.replace_value(
 						t.value.replace_data(2));
-			LOG_ERROR << "Undefined IO variable: " << TAU_TO_STR(r);
+			// LOG_ERROR << "Undefined IO variable: " << TAU_TO_STR(n);
 		}
-		return r;
+		return n;
 	};
-	return tau::geth(pre_order<node>(r).apply_unique(resolve));
+	tref resolved = pre_order<node>(fm).apply_unique(resolve);
+	LOG_TRACE << "resolve_io_vars - resolved: " << LOG_FM_DUMP(resolved);
+	return resolved;
 }
 
 template <NodeType node>
@@ -103,20 +106,22 @@ rewriter::rules get_rec_relations(spec_context<node>& ctx, tref rrs) {
 	using tt = tau::traverser;
 	rewriter::rules x;
 	DBG(LOG_TRACE << "get_rec_relations: " << LOG_FM_DUMP(rrs);)
-	auto t = tt(rrs) ;
-	if (t.is(tau::rec_relation)) {
-		x.emplace_back( resolve_io_vars<node>(ctx, t | tt::first  | tt::ref),
-				resolve_io_vars<node>(ctx, t | tt::second | tt::ref));
-		return x;
-	}
+	auto t = tt(rrs);
+
+	auto resolve_in_formula = [&x, &ctx](tt& t) {
+		x.emplace_back(t | tt::first  | tt::handle,
+			tau::geth(resolve_io_vars<node>(ctx,
+			       			t | tt::second | tt::ref)));
+	};
+
+	if (t.is(tau::rec_relation)) return resolve_in_formula(t), x;
 	if (t.is(tau::start)) t = t | tau::spec | tau::definitions;
 	else if (t.is(tau::spec))  t = t | tau::definitions;
 	else if (t.is(tau::tau_constant_source)) t = t | tau::rec_relations;
 	t = t || tau::rec_relation;
-	for (auto& r : t())
-		x.emplace_back( resolve_io_vars<node>(ctx, r | tt::first  | tt::ref),
-				resolve_io_vars<node>(ctx, r | tt::second | tt::ref));
-	DBG(LOG_TRACE << "get_rec_relations result: " << x.size();)
+	for (auto& r : t()) resolve_in_formula(r);
+
+	DBG(LOG_TRACE << "get_rec_relations number of defs: " << x.size();)
 	return x;
 }
 
@@ -133,16 +138,18 @@ std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r, bool wo_infe
 	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(r);)
 	const auto& t = tau::get(r).is(tau::start) ? tau::get(r)[0]
 						   : tau::get(r);
+	r = t.get();
 	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
 	if (t.is(tau::rec_relation))
 		return { { get_rec_relations<node>(ctx, r), (htref) nullptr } };
-	if (t.is(tau::spec)) if (!get_io_defs<node>(ctx, r)) return {};
-	htref main_fm = resolve_io_vars<node>(ctx, tt(r) | tau::main
+	if (t.is(tau::spec)) get_io_defs<node>(ctx, r);
+	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(r);
+	tref main_fm = resolve_io_vars<node>(ctx, tt(r) | tau::main
 							| tau::wff | tt::ref);
 	rewriter::rules rules = get_rec_relations<node>(ctx, r);
 	DBG(LOG_TRACE << "rules: " << rules.size();)
 	auto nso_rr = wo_inference
-			? std::optional<rr<node>>{ { rules, main_fm } }
+			? std::optional<rr<node>>{ { rules, tau::geth(main_fm) } }
 			: get_nso_rr<node>(rules, main_fm);
 #ifdef DEBUG
 	if (nso_rr) LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr.value());
