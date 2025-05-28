@@ -95,7 +95,7 @@ cli::options tau_options() {
 	return opts;
 }
 
-int error(const string& s) { LOG_ERROR << "" << s; return 1; }
+int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
 int run_tau_spec(string spec_file, bool charvar, bool exp) {
 	string src = "";
@@ -121,7 +121,7 @@ int run_tau_spec(string spec_file, bool charvar, bool exp) {
 }
 
 void welcome() {
-	LOG_INFO << "Welcome to the " << full_version << " by IDNI AG.\n"
+	TAU_LOG_INFO << "Welcome to the " << full_version << " by IDNI AG.\n"
 		<< "This product is protected by patents and copyright."
 			" By using this product, you agree to the license terms."
 			" To view the license run \"tau --license\".\n\n"

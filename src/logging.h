@@ -8,14 +8,14 @@
 //  LOG_TRACE   << "msg";         // "(trace) [channel] msg"
 
 // Color printers for various data types
-//  LOG_BRIGHT(m)     // LOG_BRIGHT_COLOR << m << TC.CLEAR()
-//  LOG_NT(nt)        // LOG_NT_COLOR << node::name(nt)             <<TC.CLEAR()
-//  LOG_RULE(r)       // LOG_RULE_COLOR << to_str<node>(r)          <<TC.CLEAR()
-//  LOG_BA(c)         // LOG_BA_COLOR << c                          <<TC.CLEAR()
-//  LOG_BA_TYPE(tid)  // LOG_BA_COLOR << get_ba_type_name<node>(tid)<<TC.CLEAR()
-//  LOG_FM(fm)        // LOG_FM_COLOR << TAU_TO_STR(fm)             <<TC.CLEAR()
-//  LOG_FM_DUMP(fm)   // LOG_FM_COLOR << TAU_DUMP_TO_STR(fm)        <<TC.CLEAR()
-//  LOG_RR(nso_rr)    // LOG_FM_COLOR << to_str<node>(fm)           <<TC.CLEAR()
+//  LOG_BRIGHT(m)     // TAU_LOG_BRIGHT_COLOR << m << TC.CLEAR()
+//  LOG_NT(nt)        // TAU_LOG_NT_COLOR << node::name(nt)             <<TC.CLEAR()
+//  LOG_RULE(r)       // TAU_LOG_RULE_COLOR << to_str<node>(r)          <<TC.CLEAR()
+//  LOG_BA(c)         // TAU_LOG_BA_COLOR << c                          <<TC.CLEAR()
+//  LOG_BA_TYPE(tid)  // TAU_LOG_BA_COLOR << get_ba_type_name<node>(tid)<<TC.CLEAR()
+//  LOG_FM(fm)        // TAU_LOG_FM_COLOR << TAU_TO_STR(fm)             <<TC.CLEAR()
+//  LOG_FM_DUMP(fm)   // TAU_LOG_FM_COLOR << TAU_DUMP_TO_STR(fm)        <<TC.CLEAR()
+//  LOG_RR(nso_rr)    // TAU_LOG_FM_COLOR << to_str<node>(fm)           <<TC.CLEAR()
 
 // Logging current file and line:
 //   LOG_TRACE << LOG_LINE_PATH << "msg"; // (trace) [channel] /path/to/file.h:123 msg
@@ -59,7 +59,7 @@ namespace idni::tau_lang {
 // #define TAU_LOG_LINES
 
 // Uncomment or use -D to enable LOG_DEBUG and LOG_TRACE messages in RELEASE.
-// This enables channel filtering by a following LOG_ENABLED_CHANNEL list
+// This enables channel filtering by a following LOG_ENABLED_CHANNELS list
 // for non-DEBUG builds. This list is also used in DEBUG builds by default.
 // Otherwise the list of enabled channels is empty.
 //
@@ -105,7 +105,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"testing"
 };
 #else // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS) else
-static constexpr const char* LOG_ENABLED_CHANNELS[] = {};
+static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 #endif // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS)
 // -----------------------------------------------------------------------------
 // Logging channels
@@ -129,130 +129,161 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {};
 
 // Configure the value of a printed file (w or w/o paths) and line number printing in trace and debug messages
 #ifdef TAU_LOG_LINE_PATHS
-#	define LOG_LINE_VALUE         << LOG_LINE_PATH << "\t"
+#	define TAU_LOG_LINE_VALUE         << TAU_LOG_LINE_PATH << "\t"
 #else
 #	ifdef TAU_LOG_LINES
-#		define LOG_LINE_VALUE << LOG_LINE << "\t"
+#		define TAU_LOG_LINE_VALUE << TAU_LOG_LINE << "\t"
 #	else
-#		define LOG_LINE_VALUE // empty
+#		define TAU_LOG_LINE_VALUE // empty
 #	endif
 #endif
 
 // Logging stream for error messages. Prepends message with "(Error) "
-#define LOG_ERROR         BOOST_LOG_TRIVIAL(error)
-
+#define TAU_LOG_ERROR     BOOST_LOG_TRIVIAL(error)
+#define LOG_ERROR         TAU_LOG_ERROR
 // Logging stream for warning messages. Prepends message with "(Warning) "
-#define LOG_WARNING       BOOST_LOG_TRIVIAL(warning)
+#define TAU_LOG_WARNING   BOOST_LOG_TRIVIAL(warning)
+#define LOG_WARNING       TAU_LOG_WARNING
 
 // Logging stream for info messages. Doesn't prepend anything
-#define LOG_INFO          BOOST_LOG_TRIVIAL(info)
+#define TAU_LOG_INFO      BOOST_LOG_TRIVIAL(info)
+#define LOG_INFO          TAU_LOG_INFO
 
 // Logging stream for debug messages. Prepends message with "(debug) [channel] "
 // locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
-#define LOG_DEBUG         BOOST_LOG_STREAM_SEV( \
+#define TAU_LOG_DEBUG     BOOST_LOG_STREAM_SEV( \
 				logging::get_channel_logger(LOG_CHANNEL_NAME), \
-				boost::log::trivial::debug) LOG_LINE_VALUE
+				boost::log::trivial::debug) TAU_LOG_LINE_VALUE
+#define LOG_DEBUG         TAU_LOG_DEBUG
 // Logging stream for trace messages. Prepends message with "(trace) [channel] "
 // locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
-#define LOG_TRACE         BOOST_LOG_STREAM_SEV( \
+#define TAU_LOG_TRACE     BOOST_LOG_STREAM_SEV( \
 				logging::get_channel_logger(LOG_CHANNEL_NAME), \
-				boost::log::trivial::trace) LOG_LINE_VALUE
+				boost::log::trivial::trace) TAU_LOG_LINE_VALUE
+#define LOG_TRACE         TAU_LOG_TRACE
 
 // Logging helper macros
 
 // LOG_TRACE << LOG_LINE_PATH << "message";
-#define LOG_LINE_PATH            __FILE__      << ":" << __LINE__ << " "
-// LOG_TRACE << LOG_LINE_PATH << "message";
-#define LOG_LINE                 __FILE_NAME__ << ":" << __LINE__ << " "
+#define TAU_LOG_LINE_PATH        __FILE__      << ":" << __LINE__ << " "
+#define LOG_LINE_PATH            TAU_LOG_LINE_PATH
+// LOG_TRACE << LOG_LINE << "message";
+#define TAU_LOG_LINE             __FILE_NAME__ << ":" << __LINE__ << " "
+#define LOG_LINE                 TAU_LOG_LINE
 
 // -----------------------------------------------------------------------------
 // Colors used in logging
 
 // used for LOG_BRIGHT and pretty printed formulas, specs
-#define LOG_BRIGHT_COLOR        TC(term::color::WHITE, \
+#define TAU_LOG_BRIGHT_COLOR        TC(term::color::WHITE, \
 					term::color::BRIGHT)
+#define LOG_BRIGHT_COLOR            TAU_LOG_BRIGHT_COLOR
 
 // color for Error messages (only the word "Error" is colored)
-#define LOG_ERROR_COLOR         TC(term::color::RED, \
+#define TAU_LOG_ERROR_COLOR         TC(term::color::RED, \
 					term::color::BRIGHT)
+#define LOG_ERROR_COLOR             TAU_LOG_ERROR_COLOR
 
 // color for Warning messages (only the "Warning" is colored)
-#define LOG_WARNING_COLOR       TC(term::color::YELLOW, \
+#define TAU_LOG_WARNING_COLOR       TC(term::color::YELLOW, \
 					term::color::BRIGHT)
-
+#define LOG_WARNING_COLOR           TAU_LOG_WARNING_COLOR
 // color for logging channel name
-#define LOG_CHANNEL_COLOR       TC(term::color::CYAN)
+#define TAU_LOG_CHANNEL_COLOR       TC(term::color::CYAN)
+#define LOG_CHANNEL_COLOR           TAU_LOG_CHANNEL_COLOR
 
 // color for formulas and specs
-#define LOG_FM_COLOR            LOG_BRIGHT_COLOR
+#define TAU_LOG_FM_COLOR            TAU_LOG_BRIGHT_COLOR
+#define LOG_FM_COLOR                TAU_LOG_FM_COLOR
 
 // color for nonterminal / node types
-#define LOG_NT_COLOR            TC(term::color::GREEN)
+#define TAU_LOG_NT_COLOR            TC(term::color::GREEN)
+#define LOG_NT_COLOR                TAU_LOG_NT_COLOR
 
 // color for constants and ba types
-#define LOG_BA_COLOR            TC(term::color::CYAN)
+#define TAU_LOG_BA_COLOR            TC(term::color::CYAN)
+#define LOG_BA_COLOR                TAU_LOG_BA_COLOR
 
 // color for rules
-#define LOG_RULE_COLOR          TC(term::color::YELLOW)
+#define TAU_LOG_RULE_COLOR          TC(term::color::YELLOW)
+#define LOG_RULE_COLOR              TAU_LOG_RULE_COLOR
 
 // -----------------------------------------------------------------------------
 // Logging helper macros for various types to use appropriate colors
 // They have to be used with `ostream`, ie. after `<<`
 
 // LOG_BRIGHT_COLOR escapes in a stream for any element we want to make bright
-#define LOG_BRIGHT(m)    LOG_BRIGHT_COLOR << m                      <<TC.CLEAR()
+#define TAU_LOG_BRIGHT(m)    TAU_LOG_BRIGHT_COLOR << m              <<TC.CLEAR()
+#define LOG_BRIGHT(m)        TAU_LOG_BRIGHT(m)
 
 // LOG_NT_COLOR escapes in a stream for `size_t` or `node::type`
 //                                               or `tau_parser::nonterminal`
-#define LOG_NT(nt)       LOG_NT_COLOR << node::name(nt)             <<TC.CLEAR()
+#define TAU_LOG_NT(nt)       TAU_LOG_NT_COLOR << node::name(nt)     <<TC.CLEAR()
+#define LOG_NT(nt)           TAU_LOG_NT(nt)
 
 // LOG_NT_COLOR escapes in a stream for `rr_sig` (recurrence relation signature)
-#define LOG_RR_SIG(sig)  LOG_NT_COLOR << sig                        <<TC.CLEAR()
+#define TAU_LOG_RR_SIG(sig)  TAU_LOG_NT_COLOR << sig                <<TC.CLEAR()
+#define LOG_RR_SIG(sig)      TAU_LOG_RR_SIG(sig)
 
 // LOG_RULE_COLOR escapes in a stream for rewriter or recurrence relation def
 // requires type node alias to be defined
-#define LOG_RULE(r)      LOG_RULE_COLOR << to_str<node>(r)          <<TC.CLEAR()
+#define TAU_LOG_RULE(r)      TAU_LOG_RULE_COLOR << to_str<node>(r)  <<TC.CLEAR()
+#define LOG_RULE(r)          TAU_LOG_RULE(r)
 
 // LOG_BA_COLOR escapes in a stream for `size_t` BA type id
-#define LOG_BA_TYPE(tid) LOG_BA_COLOR << ba_types<node>::name(tid)  <<TC.CLEAR()
+#define TAU_LOG_BA_TYPE(tid) TAU_LOG_BA_COLOR << ba_types<node>::name(tid) \
+								    <<TC.CLEAR()
+#define LOG_BA_TYPE(tid)     TAU_LOG_BA_TYPE(tid)
 
 // LOG_BA_COLOR escapes in a stream for `size_t` BA type id with the id
-#define LOG_BA_TYPE_DUMP(tid) LOG_BA_TYPE(tid) << "(" << tid << ")"
+#define TAU_LOG_BA_TYPE_DUMP(tid) TAU_LOG_BA_TYPE(tid) << "(" << tid << ")"
+#define LOG_BA_TYPE_DUMP(tid)     TAU_LOG_BA_TYPE_DUMP(tid)
 
 // LOG_BA_COLOR escapes in a stream (constants or other elements representing ba constants or ba types)
-#define LOG_BA(c)        LOG_BA_COLOR << c                          <<TC.CLEAR()
+#define TAU_LOG_BA(c)        TAU_LOG_BA_COLOR << c                  <<TC.CLEAR()
+#define LOG_BA(c)            TAU_LOG_BA(c)
 
 // LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` pretty print
-#define LOG_FM(fm)       LOG_FM_COLOR <<tree<node>::get(fm).to_str()<<TC.CLEAR()
+#define TAU_LOG_FM(fm)       TAU_LOG_FM_COLOR << tree<node>::get(fm).to_str() \
+								    <<TC.CLEAR()
+#define LOG_FM(fm)           TAU_LOG_FM(fm)
 
 // LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` pretty print
 //                      and then followed by nodes tree printed in a line
-#define LOG_FM_DUMP(fm)  LOG_FM_COLOR <<tree<node>::get(fm).to_str()<<TC.CLEAR() \
-			<<" \t#\t"<< tree<node>::get(fm).print_in_line_to_str()
+#define TAU_LOG_FM_DUMP(fm)  TAU_LOG_FM_COLOR <<tree<node>::get(fm).to_str() \
+	<< TC.CLEAR() << " \t#\t" << tree<node>::get(fm).print_in_line_to_str()
+#define LOG_FM_DUMP(fm)      TAU_LOG_FM_DUMP(fm)
 
 // LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` tree print
-#define LOG_FM_TREE(fm)  LOG_FM_COLOR << tree<node>::get(fm).tree_to_str() \
+#define TAU_LOG_FM_TREE(fm)  TAU_LOG_FM_COLOR<<tree<node>::get(fm).tree_to_str() \
 								    <<TC.CLEAR()
+#define LOG_FM_TREE(fm)      TAU_LOG_FM_TREE(fm)
 
 // LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
-#define LOG_RR(nso_rr)   LOG_FM_COLOR << to_str<node>(nso_rr)       <<TC.CLEAR()
+#define TAU_LOG_RR(nso_rr)   TAU_LOG_FM_COLOR <<to_str<node>(nso_rr)<<TC.CLEAR()
+#define LOG_RR(nso_rr)       TAU_LOG_RR(nso_rr)
 
 // LOG_FM_COLOR escapes in a stream for `rr` (recurrence relation)
-#define LOG_RR_DUMP(nso_rr)  LOG_FM_COLOR<<dump_to_str<node>(nso_rr)<<TC.CLEAR()
+#define TAU_LOG_RR_DUMP(nso_rr)  TAU_LOG_FM_COLOR<<dump_to_str<node>(nso_rr) \
+								    <<TC.CLEAR()
+#define LOG_RR_DUMP(nso_rr)      TAU_LOG_RR_DUMP(nso_rr)
 
 // LOG_SPLITTER adds a LOG_WARNING_COLOR escaped dash separater
-#define LOG_SPLITTER     LOG_WARNING_COLOR<<"---------------------------------"\
+#define TAU_LOG_SPLITTER     TAU_LOG_WARNING_COLOR<<"-------------------------"\
 	"----------------------------------------------------------"<<TC.CLEAR()
+#define LOG_SPLITTER         TAU_LOG_SPLITTER
 
 // outputs tabs to pad up to the trace/debug messages beginning for new lines in log msgs
-#define LOG_PADDING      "\t\t\t\t"
+#define TAU_LOG_PADDING      "\t\t\t\t"
+#define LOG_PADDING          TAU_LOG_PADDING
 
 // outputs padding + one tab indentation for indenting of new lines in log msgs
-#define LOG_INDENT       LOG_PADDING << "\t"
-#define LOG_INDENT1      LOG_INDENT
-
-// outputs padding + two tabs indentation for indenting of new lines in log msgs
-#define LOG_INDENT2      LOG_PADDING << "\t\t"
+#define TAU_LOG_INDENT       TAU_LOG_PADDING << "\t"
+#define LOG_INDENT           TAU_LOG_INDENT
+#define TAU_LOG_INDENT1      TAU_LOG_INDENT
+#define LOG_INDENT1          TAU_LOG_INDENT
+#define TAU_LOG_INDENT2      TAU_LOG_INDENT << "\t"
+#define LOG_INDENT2          TAU_LOG_INDENT2
 
 // -----------------------------------------------------------------------------
 

@@ -23,7 +23,7 @@ void repl_evaluator<BAs...>::not_implemented_yet() {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::invalid_argument() const {
-	LOG_ERROR << "Invalid argument\n";
+	TAU_LOG_ERROR << "Invalid argument\n";
 	return nullptr;
 }
 
@@ -41,9 +41,9 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 	auto mem_id = n | mem_type | tau::history_id;
 	size_t idx = 0;
 	if (mem_id) idx = mem_id | tt::num;
-	// LOG_TRACE << "get_history_index idx: " << idx
+	// TAU_LOG_TRACE << "get_history_index idx: " << idx
 	// 	<< "       relative? " << is_relative << "    "
-	// 	<< LOG_FM(n.value());
+	// 	<< TAU_LOG_FM(n.value());
 	if ((is_relative && idx >= size)
 		|| (!is_relative && (idx == 0 || idx > size)))
 	{
@@ -55,7 +55,7 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 		}
 		return {};
 	}
-	// LOG_TRACE << "get_history_index result: "
+	// TAU_LOG_TRACE << "get_history_index result: "
 	// 	<< (is_relative ? size - idx - 1 : idx - 1);
 	return { is_relative ? size - idx - 1 : idx - 1 };
 }
@@ -67,7 +67,7 @@ repl_evaluator<BAs...>::history_ref repl_evaluator<BAs...>::history_retrieve(
 {
 	if (auto pos = get_history_index(n, H.size(), silent); pos.has_value())
 		return { { H[pos.value()], pos.value() } };
-	LOG_ERROR << "History location does not exist\n";
+	TAU_LOG_ERROR << "History location does not exist\n";
 	return {};
 }
 
@@ -158,18 +158,18 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_(typename node::type nt, tref n,
 	bool suppress_error) const
 {
-	// LOG_TRACE << "get_/n: " << node::name(nt) << "        " << TAU_DUMP_TO_STR(n);
+	// TAU_LOG_TRACE << "get_/n: " << node::name(nt) << "        " << TAU_DUMP_TO_STR(n);
 	if (tau::get(n).is(nt)) return n;
 	else if (tau::get(n).is(tau::history)) {
 		if (auto check = history_retrieve(n); check) {
 			const auto& h = check.value().first;
 			if (tau::get(h).is(nt)) return h->get();
 			else if (!suppress_error)
-				LOG_ERROR << "Argument has a wrong type";
+				TAU_LOG_ERROR << "Argument has a wrong type";
 			return nullptr;
 		}
 	}
-	if (!suppress_error) LOG_ERROR << "Argument has a wrong type";
+	if (!suppress_error) TAU_LOG_ERROR << "Argument has a wrong type";
 	return nullptr;
 }
 
@@ -312,9 +312,9 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	tref arg1 = n | tt::second | tt::ref;
 	tref arg2 = n | tt::third  | tt::ref;
 	tref arg3 = n | tt::fourth | tt::ref;
-	// LOG_TRACE << "subst_cmd arg1: " << TAU_DUMP_TO_STR(arg1);
-	// LOG_TRACE << "subst_cmd arg2: " << TAU_DUMP_TO_STR(arg2);
-	// LOG_TRACE << "subst_cmd arg3: " << TAU_DUMP_TO_STR(arg3);
+	// TAU_LOG_TRACE << "subst_cmd arg1: " << TAU_DUMP_TO_STR(arg1);
+	// TAU_LOG_TRACE << "subst_cmd arg2: " << TAU_DUMP_TO_STR(arg2);
+	// TAU_LOG_TRACE << "subst_cmd arg3: " << TAU_DUMP_TO_STR(arg3);
 	// Since the history command cannot be type-checked we do it here
 	// First try to get bf
 	tref in = get_bf(arg1, true);
@@ -331,7 +331,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	else thiz = get_wff(arg2), with = get_wff(arg3);
 	// Check for correct argument types
 	if (!thiz || !in || !with) {
-		LOG_ERROR << "Invalid argument\n";
+		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
 	subtree_map<node, tref> changes = { { thiz, with } };
@@ -462,7 +462,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
 	// as we would get a formula in dnf already. However, we would need to
 	// kept the application of definitionsand call the computation of phi/chi infinity
-	DBG(LOG_DEBUG << "run_cmd/applied: " << LOG_FM(applied);)
+	DBG(TAU_LOG_DEBUG << "run_cmd/applied: " << TAU_LOG_FM(applied);)
 
 	// -------------------------------------------------------------
 	// TODO: remove once type inference is ready
@@ -505,7 +505,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		}
 
 		if (has_real_free_vars) {
-			LOG_ERROR << "The following variable(s) must be "
+			TAU_LOG_ERROR << "The following variable(s) must be "
 				<< "quantified and cannot appear free: "
 				<< ss.str() << "\n";
 			return;
@@ -607,7 +607,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	// getting the type
 	size_t type = get_solver_cmd_type<node>(n.value());
 	if (type == 0) {
-		LOG_ERROR << "Invalid type\n";
+		TAU_LOG_ERROR << "Invalid type\n";
 		return;
 	}
 
@@ -625,11 +625,11 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		arg = tau::get(arg).right_sibling();
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (!applied) {
-		LOG_ERROR << "Invalid argument(s)\n";
+		TAU_LOG_ERROR << "Invalid argument(s)\n";
 		return;
 	}
 
-	DBG(LOG_TRACE << "solve_cmd/applied: " << applied << "\n";)
+	DBG(TAU_LOG_TRACE << "solve_cmd/applied: " << applied << "\n";)
 
 	auto solution = solve<node>(applied, options);
 	if (!solution) { std::cout << "no solution\n"; return; }
@@ -643,7 +643,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	// getting the type
 	size_t type = get_solver_cmd_type<node>(n.value());
 	if (type == 0) {
-		LOG_ERROR << "Invalid type\n";
+		TAU_LOG_ERROR << "Invalid type\n";
 		return;
 	}
 
@@ -653,12 +653,12 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	tref equality = tt(applied) | tau::bf_eq | tt::ref;
 	if (!applied || !equality) {
-		LOG_ERROR << "Invalid argument(s)\n";
+		TAU_LOG_ERROR << "Invalid argument(s)\n";
 		return;
 	}
 
-	DBG(LOG_TRACE << "lgrs_cmd/applied: " << LOG_FM(applied) << "\n";)
-	DBG(LOG_TRACE << "lgrs_cmd/equality: " << LOG_FM(equality) << "\n";)
+	DBG(TAU_LOG_TRACE << "lgrs_cmd/applied: " << TAU_LOG_FM(applied) << "\n";)
+	DBG(TAU_LOG_TRACE << "lgrs_cmd/equality: " << TAU_LOG_FM(equality) << "\n";)
 
 	auto solution = lgrs<node>(applied);
 	if (!solution) { std::cout << "no solution\n"; return; }
@@ -743,7 +743,7 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 		print<node>(std::cout, definitions[i-1]) << "\n";
 		return;
 	}
-	LOG_ERROR << "Definition [" << i << "] does not exist\n";
+	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
 	return;
 }
 
@@ -766,7 +766,7 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
 			return;
 		}
 	}
-	LOG_ERROR << "Invalid type " << type_name << "\n";
+	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
 }
 
 template <typename... BAs>
@@ -788,7 +788,7 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
 			return;
 		}
 	}
-	LOG_ERROR << "Invalid type " << type_name << "\n";
+	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -810,7 +810,7 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		if (opt.error_quits
 			|| msg.find("Syntax Error: Unexpected end")!=0)
 		{
-			LOG_ERROR << "[repl] " << msg << "\n";
+			TAU_LOG_ERROR << "[repl] " << msg << "\n";
 			return fail();
 		}
 		return nullptr; // Unexpected eof, continue with reading input
@@ -835,7 +835,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "indent")            return indenting_opt;
 	if (x == "d" || x == "debug"
 		|| x == "dbg")               return debug_opt;
-	LOG_ERROR << "Invalid option: " << x << "\n";
+	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
 
@@ -854,7 +854,7 @@ inline std::optional<boost::log::trivial::severity_level>
 	if (v == "d" || v == "debug") return { boost::log::trivial::debug };
 	if (v == "t" || v == "trace") return { boost::log::trivial::trace };
 	if (v == "i" || v == "info")  return { boost::log::trivial::info };
-	LOG_ERROR << "Invalid severity value: " << v
+	TAU_LOG_ERROR << "Invalid severity value: " << v
 		<< " (only error, info, debug or trace are allowed)\n";
 	return {};
 }
@@ -889,7 +889,7 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	if (o == invalid_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
-		LOG_ERROR << "Debug option not available in release build\n";
+		TAU_LOG_ERROR << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG
@@ -902,7 +902,7 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::set_cmd(const tt& n) {
 	repl_option o = get_opt<node>(n);
 	auto ov = n | tau::option_value;
-	if (!ov) { LOG_ERROR << "Invalid value\n"; return; }
+	if (!ov) { TAU_LOG_ERROR << "Invalid value\n"; return; }
 	set_cmd(o, ov | tt::string);
 	get_cmd(n);
 }
@@ -914,7 +914,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
-		LOG_ERROR << "Debug option not available\n";
+		TAU_LOG_ERROR << "Debug option not available\n";
 		return;
 	}
 #endif // DEBUG
@@ -923,7 +923,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 			|| v == "y" || v == "yes") opt = true;
 		else if (v == "f" || v == "false" || v == "off" || v == "0"
 			|| v == "n" || v == "no") opt = false;
-		else LOG_ERROR << "Invalid value\n";
+		else TAU_LOG_ERROR << "Invalid value\n";
 		return opt;
 	};
 	static std::map<repl_option, std::function<void()>> setters = {
@@ -968,7 +968,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
-		LOG_ERROR << "Debug option not available\n";
+		TAU_LOG_ERROR << "Debug option not available\n";
 		return;
 	}
 #endif // DEBUG
@@ -981,7 +981,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case highlighting_opt: update_fn(pretty_printer_highlighting); break;
 	case indenting_opt:    update_fn(pretty_printer_indenting); break;
 	case status_opt:       update_fn(opt.status); break;
-	default: LOG_ERROR << "Invalid option\n", error = true; return;
+	default: TAU_LOG_ERROR << "Invalid option\n", error = true; return;
 	}
 }
 
@@ -1057,7 +1057,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::comment:            break;
 	// error handling
 	default: error = true; std::cout << std::endl;
-		LOG_ERROR << "Unknown command";
+		TAU_LOG_ERROR << "Unknown command";
 	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
