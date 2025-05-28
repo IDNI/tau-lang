@@ -1,30 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-// undefine Tau Language Framework macros used in implementation
+// undefines of Tau Language Framework macros used in implementation
 
 // defs.h
 
 #undef GIT_DESCRIBED
 #undef GIT_COMMIT_HASH
 #undef GIT_BRANCH
-
-#undef TAU_PRINT
-#undef TAU_PRINT_TREE
-#undef TAU_DUMP
-#undef TAU_PRINT_TO
-#undef TAU_PRINT_TREE_TO
-#undef TAU_DUMP_TO
-#undef TAU_TO_STR
-#undef TAU_TREE_TO_STR
-#undef TAU_DUMP_TO_STR
-
-// repl_evaluator.tmpl.h
-
-#undef TC_STATUS
-#undef TC_STATUS_OUTPUT
-#undef TC_ERROR
-#undef TC_PROMPT
-#undef TC_OUTPUT
 
 // logging.h
 
