@@ -90,7 +90,7 @@ void repl_evaluator<BAs...>::print_history(const htree::sp& mem, const size_t id
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
-	repl_evaluator<BAs...>::get_nso_rr_with_defs(const tt& spec) const
+	repl_evaluator<BAs...>::get_nso_rr_with_defs(const tt& spec)
 {
 	rr<node> nso_rr{ nullptr };
 	auto check = get_type_and_arg(spec);
@@ -98,7 +98,7 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 	auto [type, value] = check.value();
 	if (contains(spec.value(), tau::ref)) {
 		if (type == tau::spec) {
-			if (auto x = get_nso_rr<node>(spec.value()); x)
+			if (auto x = get_nso_rr<node>(ctx, spec.value()); x)
 				nso_rr = x.value();
 			else return {};
 		} else nso_rr = rr<node>(tau::geth(spec.value()));
@@ -113,7 +113,7 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::apply_rr_to_nso_rr_with_defs(const tt& spec) const {
+tref repl_evaluator<BAs...>::apply_rr_to_nso_rr_with_defs(const tt& spec) {
 	auto nso_rr = get_nso_rr_with_defs(spec);
 	if (!nso_rr) return {};
 	return apply_rr_to_formula<node>(nso_rr.value());
@@ -472,19 +472,19 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	trefs eqs = tau::get(applied).select_top(atomic);
 	for (tref eq : eqs) {
 		// If find type, type all io_vars found in eq if not present yet
-		size_t type = get_ba_type<node>(eq);
-		if (type == 0) continue;
+		size_t tid = get_ba_type<node>(eq);
+		if (tid == 0) continue; // untyped
 		trefs out_vars = tau::get(eq).select_top(is_output_var<node>);
 		for (tref out_var : out_vars) {
 			size_t var_sid = get_var_name_sid<node>(out_var);
-			if (auto it = outputs.find(var_sid); it == outputs.end())
-				outputs.emplace(var_sid, typed_stream{ type, 0 });
+			if (auto it = ctx.outputs.find(var_sid); it == ctx.outputs.end())
+				ctx.outputs.emplace(var_sid, typed_stream{ tid, 0 });
 		}
 		trefs in_vars = tau::get(eq).select_top(is_input_var<node>);
 		for (tref in_var : in_vars) {
 			size_t var_sid = get_var_name_sid<node>(in_var);
-			if (auto it = inputs.find(var_sid); it == inputs.end())
-				inputs.emplace(var_sid, typed_stream{ type, 0 });
+			if (auto it = ctx.inputs.find(var_sid); it == ctx.inputs.end())
+				ctx.inputs.emplace(var_sid, typed_stream{ tid, 0 });
 		}
 	}
 	// -------------------------------------------------------------
@@ -520,7 +520,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	typed_io_vars current_inputs;
 	for (tref var : in_vars) {
 		size_t var_sid = get_var_name_sid<node>(var);
-		if (auto it = inputs.find(var_sid); it != inputs.end())
+		if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end())
 			current_inputs[var_sid] = it->second;
 	}
 	auto ins = finputs<node>(current_inputs);
@@ -533,7 +533,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	typed_io_vars current_outputs;
 	for (tref var : out_vars) {
 		size_t var_sid = get_var_name_sid<node>(var);
-		if (auto it = outputs.find(var_sid); it != outputs.end())
+		if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end())
 			current_outputs[var_sid] = it->second;
 	}
 	auto outs = foutputs<node>(current_outputs);
@@ -716,21 +716,7 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	for (size_t i = 0; i < definitions.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
 			<< to_str<node>(definitions[i]) << "\n";
-	if (inputs.size() == 0 && outputs.size() == 0)
-		std::cout << "IO variables: empty\n";
-	else std::cout << "IO variables:\n";
-	for (auto& [var_sid, desc] : inputs) {
-		auto file = desc.second == 0 ? "console"
-			: "ifile(\"" + dict(desc.second) + "\")";
-		std::cout << "\t" << get_ba_type_name<node>(desc.first) << " "
-				<< dict(var_sid) << " = " << file << "\n";
-	}
-	for (auto& [var_sid, desc] : outputs) {
-		auto file = desc.second == 0 ? "console"
-			: "ofile(\"" + dict(desc.second) + "\")";
-		std::cout << "\t" << get_ba_type_name<node>(desc.first) << " "
-				<< dict(var_sid) << " = " << file << "\n";
-	}
+	std::cout << ctx;
 }
 
 template <typename... BAs>
@@ -750,45 +736,20 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
-	std::string fn;
-	auto type_name = command | tau::type | tt::string;
-	if (auto file_name = command
-			| tau::input_stream
-			| tau::q_file_name
-			| tt::string; !file_name.empty()) fn = file_name;
-	else fn = ""; // default input (std::cin)
-
-	for (auto& t : node::nso_factory::instance().types()) {
-		if (type_name == t) {
-			size_t var_sid = command | tau::var_name | tt::data;
-			inputs[var_sid] = {
-				get_ba_type_id<node>(t), dict(fn) };
-			return;
-		}
+	if (!get_io_def<node>(command | tt::only_child | tt::ref, ctx.inputs)) {
+		error = true;
+		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
 	}
-	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
 }
+
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
-	std::string fn;
-	std::string type_name = command | tau::type | tt::string;
-	if (auto file_name = command
-			| tau::output_stream
-			| tau::q_file_name
-			| tt::string; !file_name.empty()) fn = file_name;
-	else fn = ""; // default output (std::cout)
-
-	for (auto& t : node::nso_factory::instance().types()) {
-		if (type_name == t) {
-			size_t var_sid = command | tau::var_name | tt::data;
-			outputs[var_sid] = {
-				get_ba_type_id<node>(t), dict(fn) };
-			return;
-		}
+	if (!get_io_def<node>(command | tt::only_child | tt::ref, ctx.outputs)){
+		error = true;
+		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
 	}
-	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.

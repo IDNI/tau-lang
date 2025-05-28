@@ -36,7 +36,7 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 		ss << " \t[";
 		for (size_t i = 0; i < len; ++i) {
 			DBG(assert(ch[i] != nullptr);)
-			ss << "<" << ch[i] << ">";
+			// ss << "<" << ch[i] << ">";
 			ss <<(i ? ", " : "")<<LOG_NT(tau::get(ch[i]).get_type())
 				<< "(" << LOG_FM(ch[i]) << ")";
 		}

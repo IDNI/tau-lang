@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "tau_tree.h"
+#include "interpreter_types.h"
 
 namespace idni::tau_lang {
 
@@ -23,12 +24,26 @@ template <NodeType node>
 rr_sig get_rr_sig(tref n);
 
 template <NodeType node>
+bool get_io_def(tref def, io_defs<node>& in_or_out_defs);
+
+template <NodeType node>
+bool get_io_defs(spec_context<node>& ctx, tref code);
+
+template <NodeType node>
+rewriter::rules get_rec_relations(spec_context<node>& ctx, tref r);
+template <NodeType node>
 rewriter::rules get_rec_relations(tref r);
 
+template <NodeType node>
+std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref ref,
+				   bool wo_inference = false);
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(tref ref, bool wo_inference = false);
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules, tref main_fm);
+template <NodeType node>
+std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules,
+				   const htref& main_fm);
 
 template <NodeType node>
 void get_leaves(tref n, typename node::type branch, trefs& leaves);
@@ -183,6 +198,11 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 template <NodeType node>
 tref tree<node>::get(tref n, tref r) {
 	return base_t::get(n, r);
+}
+
+template <NodeType node>
+tref tree<node>::replace_value(const node& v) const {
+	return base_t::replace_value(v);
 }
 
 template <NodeType node>

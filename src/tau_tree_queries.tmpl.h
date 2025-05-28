@@ -63,8 +63,9 @@ bool is_uconst(tref n) {
 
 template <NodeType node> 
 bool is_io_var(tref n) {
-	return tree<node>::get(n).is_input_variable()
-		|| tree<node>::get(n).is_output_variable();
+	return tree<node>::get(n).is(node::type::io_var)
+		|| (tree<node>::get(n).is(node::type::variable)
+			&& tree<node>::get(n).child_is(node::type::io_var));
 }
 
 template <NodeType node> 
