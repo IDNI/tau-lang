@@ -165,18 +165,17 @@ private:
 	tref get_wff(tref n) const;
 
 	// get nso rr from a provided spec or formula and add definitions to it
-	std::optional<rr<node>> get_nso_rr_with_defs(const tt& spec) const;
+	std::optional<rr<node>> get_nso_rr_with_defs(const tt& spec);
 
 	// apply definitions and rrs to a provided spec or formula
-	tref apply_rr_to_nso_rr_with_defs(const tt& spec) const;
+	tref apply_rr_to_nso_rr_with_defs(const tt& spec);
 
 	std::vector<history> H;
 	options opt{};
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 	rewriter::rules definitions;
-	typed_io_vars inputs;
-	typed_io_vars outputs;
+	spec_context<node> ctx; // input and output definitions
 	bool error = false;
 	term::colors TC{};
 };

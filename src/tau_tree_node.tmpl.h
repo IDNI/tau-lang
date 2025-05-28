@@ -24,6 +24,12 @@ node<BAs...> node<BAs...>::ba_retype(size_t new_ba) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+node<BAs...> node<BAs...>::replace_data(size_t new_data) const {
+	return node(nt, new_data, term, ba, ext);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_constant(
 	size_t constant_id, size_t ba_type_id)
 {
@@ -85,11 +91,11 @@ constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
 {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
-	// LOG_TRACE << "node created:" << LOG_NT(nt)
-	// 	<< " data: " << data
-	// 	<< " is_term: " << is_term
-	// 	<< " ba_type: " << LOG_BA_TYPE(ba_type)
-	// 	<< " node: `" << *this << "`";
+	LOG_TRACE << "node created:" << LOG_NT(nt)
+		<< " data: " << data
+		<< " is_term: " << is_term
+		<< " ba_type: " << LOG_BA_TYPE(ba_type)
+		<< " node: `" << *this << "`";
 }
 
 template <typename... BAs>

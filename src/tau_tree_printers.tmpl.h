@@ -46,7 +46,13 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 		os << "<" << dict(n.data) << ">";
 	else if (tau::is_string_nt(n.nt))
 		os << " { \"" << dict(n.data) << "\" }";
-	// else if (n.ext) os << "{EXT}";
+ 	// else if (n.ext) os << "{EXT}";
+	if (n.nt == tau::io_var) {
+		if (n.data == 1) os << " IN";
+		else if (n.data == 2) os << " OUT";
+		else os << " I/O";
+	}
+
 	return os;
 }
 
@@ -63,6 +69,26 @@ std::ostream& operator<<(std::ostream& os,
 	if (tt.values().size() == 1) return os << tree<node>::get(tt.value());
 	for (const auto& c : tt.values()) os << tree<node>::get(c) << "\n";
 	return os << "\n\n";
+}
+
+template <NodeType node>
+std::ostream& operator<<(std::ostream& os, const spec_context<node>& ctx) {
+        os << "IO variables:";
+        if (ctx.inputs.size() == 0 && ctx.outputs.size() == 0) os << " none";
+        os << "\n";
+        auto print_io = [&](size_t var_sid, const auto& s, bool output){
+                os << "\t" << dict(var_sid) << " : "
+                        << get_ba_type_name<node>(s.first) << " = "
+                        << (output ? "out" : "in") << " "
+                        << (s.second == 0 ? "console"
+                                : "file(\"" + dict(s.second) + "\")")
+                        << "\n";
+        };
+        for (const auto& [var_sid, desc] : ctx.inputs)
+                print_io(var_sid, desc, false);
+        for (const auto& [var_sid, desc] : ctx.outputs)
+                print_io(var_sid, desc, true);
+	return os;
 }
 
 template <NodeType node>

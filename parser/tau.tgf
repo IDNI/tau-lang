@@ -10,11 +10,16 @@ start                  => spec _.
 
 # start symbol posibilities:
 # spec, inputs, library, builder, tau_constant_source, cli (bellow)
-spec                   => rec_relations _ wff:main _ '.'.
-rec_relations          => (_ rec_relation _ '.')*.
+spec                   => definitions _ wff:main _ '.'.
+definitions            => (_ (ref_relation | input_def | output_def) _ '.')*.
+ref_relations          => (_ rec_relation _ '.')*.
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
-ref                    => sym [offsets] ref_args
-                                                [ _ "fallback" __ fp_fallback ].
+input_def              => io_var_name [ typed ] _ '=' _ "in"    __ stream.
+output_def             => io_var_name [ typed ] _ '=' _ "out" [ __ stream ].
+stream                 => "file" _ '(' _ q_file_name  _ ')'
+                        | "console":console_sym
+                        . # in the future tcp, udp,...
+ref                    => sym [offsets] ref_args [_ "fallback" __ fp_fallback].
 fp_fallback            => "first":first_sym | "last":last_sym
                         | capture | ref | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
@@ -109,7 +114,8 @@ src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'
 variable               => (uconst | io_var | var_name) [ typed ].
 var_name[charvar]      => (alpha & ~'T' & ~'F') digit*.
 var_name[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
-io_var                 => var_name '[' offset ']'.
+io_var                 => io_var_name '[' offset ']'.
+io_var_name            => chars.
 uconst                 => '<' _ ([ chars _ ] ':' _ chars):uconst_name _ '>'.
 
 # quantifier variables
@@ -184,10 +190,6 @@ cli_command            =>
         | ("mnf":mnf_sym __ nf_cmd_arg)                       :mnf_cmd
         | ("snf":snf_sym __ nf_cmd_arg)                       :snf_cmd
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
-# rec relations
-        | (("defs" | "definitions"):def_sym)                  :def_list_cmd
-        | (                         def_sym __ num)           :def_print_cmd
-        |                           rec_relation              :def_rr_cmd
 # qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
@@ -197,9 +199,12 @@ cli_command            =>
         | ("enable" :enable_sym  __ option_name)              :enable_cmd
         | ("disable":disable_sym __ option_name)              :disable_cmd
         | ("toggle" :toggle_sym  __ option_name)              :toggle_cmd
-# i/o stream definitions
-        | (type __ var_name _ '=' _ input_stream)             :def_input_cmd
-        | (type __ var_name _ '=' _ output_stream)            :def_output_cmd
+# definitions (rec relations and i/o defs)
+        | (("defs" | "definitions"):def_sym)                  :def_list_cmd
+        | (                         def_sym __ num)           :def_print_cmd
+        |                           rec_relation              :def_rr_cmd
+        |                           input_def                 :def_input_cmd
+        |                           output_def                :def_output_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ history)       :history_print_cmd
@@ -212,13 +217,6 @@ solve_option           => "--" (solver_mode | type).
 solver_mode            => ("minimum" | "min"):solver_mode_minimum
                         | ("maximum" | "max"):solver_mode_maximum.
 
-# input/output streams
-input_stream           =>
-        # in the future itcp, iudp,...
-        ("ifile" _ '(' _ q_file_name  _ ')') | "console":console_sym.
-output_stream          =>
-        # in the future otcp, oudp,...
-        ("ofile" _ '(' _ q_file_name  _ ')') | console_sym.
 q_file_name            => '"' file_name '"'.
 file_name              => printable+.
 option_name            => alnum+.
@@ -265,8 +263,8 @@ history        => ( "%"
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, integer, source, capture, var_name, uconst_name, type,
-        file_name, ctnvar, option_name, option_value.
+        sym, digits, integer, source, capture, var_name, io_var_name,
+        uconst_name, type, file_name, ctnvar, option_name, option_value.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, typed, q_var, src_c, uconst,

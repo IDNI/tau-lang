@@ -74,6 +74,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 					nt = bf; break;
 				case bf_and_nosep:
 					nt = bf_and; break;
+				case io_var_name:
+					nt = var_name; break;
 				default: break;
 			}
 			return static_cast<type>(nt);
@@ -108,8 +110,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 		// q_vars transformation (ex x,y to ex x ex y)
 		auto process_quantifier_vars = [&ptr, &m_get, &getx]() -> tref {
-			const auto& q_vars = m_get(ptr[0]);
-			const auto& wff_expr = m_get(ptr[1]);
+			const auto& q_vars = m_get(ptr.first());
+			const auto& wff_expr = m_get(ptr.second());
 			trefs vars = q_vars.get_children();
 			if (vars.empty()) // TODO (LOW) is this even reachable?
 				return getx(trefs{ q_vars.get(), wff_expr.get() });
@@ -216,6 +218,17 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 							.data());
 					LOG_TRACE << "ba_type: "
 						  << LOG_BA_TYPE(ba_type);
+				} else if (nt == input_def || nt == output_def) {
+					if (ptr[0].has_right_sibling()
+						&& ptr[0].right_sibling_tree()
+						.is(static_cast<size_t>(tau::type)))
+					{
+						ba_type = get_ba_type_id<node>(
+							tau::get(m_ref(ptr.second()))
+								.data());
+						LOG_TRACE << "ba_type: "
+								<< LOG_BA_TYPE(ba_type);
+					}
 				}
 				if (is_string_nt(nt)) {
 					x = getx_data(

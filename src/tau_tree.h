@@ -100,6 +100,7 @@ struct node {
 
 	node retype(size_t new_nt) const;
 	node ba_retype(size_t new_ba) const;
+	node replace_data(size_t new_data) const;
 
 	// factory for a ba constant node
 	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
@@ -189,6 +190,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	// get node with updated right sibling
 	static tref get(tref n, tref r);
+
+	// get a copy with new value
+	tref replace_value(const node& v) const;
 
 	// creation with tref children
 	static tref get(const node& v); // leaf

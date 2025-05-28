@@ -90,6 +90,19 @@ tref ba_types_inference<node>::operator()(tref n) {
 			defaulted[key] = bound;
 			LOG_TRACE << dump_to_str();
 		}
+		else if (tau::get(key).is(tau::variable)) {
+			// tref res = bintree<node>::get(
+			// 	tau::get(key).value.ba_retype(dflt),
+			// 	tau::get(key).first(),
+			// 	tau::get(key).right_sibling());
+			// defaulted[key] = res;
+		}
+		else if (tau::get(key).is(tau::bf_f)
+			|| tau::get(key).is(tau::bf_t))
+		{
+			// defaulted[key] = tau::get(
+			// 		tau::get(key).value.ba_retype(dflt));
+		}
 	}
 
 	LOG_TRACE << id << LOG_SPLITTER;
@@ -98,9 +111,9 @@ tref ba_types_inference<node>::operator()(tref n) {
 		LOG_TRACE << id << "-- Check and propagate "
 				<< "BA types once more with default type";
 
-		for (auto& [key, bound] : defaulted) {
-			types[bound] = dflt;
-			resolved[key] = bound;
+		for (auto& [key, res] : defaulted) {
+			types[res] = dflt;
+			resolved[key] = res;
 		}
 
 		// LOG_TRACE << dump_to_str();
@@ -186,6 +199,10 @@ tref ba_types_inference<node>::add_scope_ids(
 		}
 		if (ch0) ch.push_back(ch0);
 		bool is_constant = nt == tau::bf_constant;
+		LOG_TRACE << "is_global: " << is_global;
+		LOG_TRACE << "is_constant: " << is_constant;
+		LOG_TRACE << "is_io: " << is_io;
+
 		if (!is_global && !is_constant) {
 			size_t scope_id = is_constant ? csid : vsid(el);
 			ch.push_back(tau::get(node(tau::scope_id, scope_id)));
@@ -372,7 +389,6 @@ bool ba_types_inference<node>::propagate(tref n) {
 			{
 				LOG_TRACE << "-- Propagating type: "
 					<< LOG_BA_TYPE(t) << " to "<<LOG_FM_DUMP(el);
-				tref r;
 				const auto& elt = tau::get(el);
 				auto nt = elt.get_type();
 				if (nt == tau::bf_constant) {
@@ -383,24 +399,18 @@ bool ba_types_inference<node>::propagate(tref n) {
 					if (bound == nullptr) return false;
 					LOG_TRACE << "bound after type resolved: "
 								<< LOG_FM(bound);
-					r = bound;
+					types[key]    = t;
+					types[bound]  = t;
+					resolved[key] = bound;
+					if (types.find(bound) == types.end()) untyped_n--;
 				}
-				else if (nt == tau::variable) {
-					// retype var
-					r = bintree<node>::get(
-						elt.value.ba_retype(t),
-						elt.first(),
-						elt.right_sibling());
+				else {
+					types[key] = t;
+					LOG_TRACE << "resolved: "
+						<< LOG_FM_DUMP(key)
+						<< " -> " << LOG_BA_TYPE(t);
+					continue;
 				}
-				else if (nt == tau::bf_f || nt == tau::bf_t) {
-					// retype bf_t or bf_f
-					r = tau::get(node::ba_typed(nt, t));
-				}
-				LOG_TRACE << "resolved: " << LOG_FM_DUMP(r);
-				if (types.find(r) == types.end()) untyped_n--;
-				types[key]    = t;
-				types[r]      = t;
-				resolved[key] = r;
 			}
 		}
 	}
@@ -438,10 +448,10 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 							<< LOG_FM_DUMP(new_el);
 				return new_el;
 			}
-			tref r;
-			if (t.is(tau::variable))
-				r = tau::get(t.value, t.first());
-			else r = tau::get(t.value);
+			node nv = t.value.ba_retype(types.at(key));
+			tref r = t.is(tau::variable)
+						? tau::get(nv, t.first())
+						: tau::get(nv);
 			LOG_TRACE << "-- Transformed: "	<< LOG_FM_DUMP(r);
 			return r;
 		}
