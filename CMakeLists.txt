@@ -197,6 +197,16 @@ else()
 endif()
 
 #
+# Adding CVC5
+#
+find_library(CVC5
+	NAMES cvc5
+	HINTS /usr/lib)
+add_library(CVC5 SHARED IMPORTED)
+set_target_properties(CVC5 PROPERTIES IMPORTED_LOCATION "${CVC5}")
+set(CVC5_LIB "CVC5")
+
+#
 # Generate C++ parser from TGF if requested
 #
 if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
