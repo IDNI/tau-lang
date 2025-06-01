@@ -40,16 +40,16 @@ auto is_z3_constant = [](const tau<BAs...>& n) {
 };
 
 template <typename... BAs>
-auto is_z3_literal = [](const tau<BAs...>& n) {
-	return is_child_non_terminal<tau_parser::z3_eq, BAs...>(n)
-		|| is_child_non_terminal<tau_parser::z3_neq, BAs...>(n)
-		|| is_child_non_terminal<tau_parser::z3_less_equal, BAs...>(n)
-		|| is_child_non_terminal<tau_parser::z3_nleq, BAs...>(n)
-		|| is_child_non_terminal<tau_parser::z3_greater, BAs...>(n)
-		|| is_child_non_terminal<tau_parser::z3_ngreater, BAs...>(n)
-		|| is_child_non_terminal<tau_parser::z3_greater_equal, BAs...>(n)
-		|| is_child_non_terminal<tau_parser::z3_ngeq, BAs...>(n)
-		|| is_child_non_terminal<tau_parser::z3_less, BAs...>(n);
+auto is_bv_literal = [](const tau<BAs...>& n) {
+	return is_child_non_terminal<tau_parser::bv_eq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bv_neq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bv_less_equal, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bv_nleq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bv_greater, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bv_ngreater, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bv_greater_equal, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bv_ngeq, BAs...>(n)
+		|| is_child_non_terminal<tau_parser::bv_less, BAs...>(n);
 };
 
 template <typename... BAs>

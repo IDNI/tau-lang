@@ -698,7 +698,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	}
 
 	// TODO (HIGH) remove this check once evrything is enabled
-	if (find_top(n, is_non_terminal<tau_parser::z3, tau_ba<BAs...>, BAs...>).has_value()) {
+	if (find_top(n, is_non_terminal<tau_parser::bv, tau_ba<BAs...>, BAs...>).has_value()) {
 		BOOST_LOG_TRIVIAL(error) << "(Error) mixed tau and z3 formulas not enabled yet";
 		return;
 	}
@@ -819,7 +819,7 @@ std::optional<tau_nso<BAs...>>
 	}
 
 	// TODO (HIGH) remove this check once evrything is enabled
-	if (find_top(n, is_non_terminal<tau_parser::z3, tau_ba<BAs...>, BAs...>).has_value()) {
+	if (find_top(n, is_non_terminal<tau_parser::bv, tau_ba<BAs...>, BAs...>).has_value()) {
 		BOOST_LOG_TRIVIAL(error) << "(Error) mixed tau and z3 formulas not enabled yet";
 		return {};
 	}

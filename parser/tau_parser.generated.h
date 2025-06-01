@@ -23,16 +23,16 @@ inline std::vector<std::string> symbol_names{
 	"__E_wff_27", "wff_equiv", "__E_wff_28", "wff_or", "__E_wff_29", "wff_xor", "__E_wff_30", "wff_and", "__E_wff_31", "wff_neg", 
 	"__E_wff_32", "wff_t", "wff_f", "bf_interval", "__E_wff_33", "bf_eq", "__E_wff_34", "bf_neq", "__E_wff_35", "bf_less_equal", 
 	"__E_wff_36", "bf_nleq", "__E_wff_37", "bf_greater", "__E_wff_38", "bf_ngreater", "__E_wff_39", "bf_greater_equal", "__E_wff_40", "bf_ngeq", 
-	"__E_wff_41", "bf_less", "__E_wff_42", "bf_nless", "__E_wff_43", "z3_eq", "__E_wff_44", "z3", "z3_neq", "__E_wff_45", 
-	"z3_less_equal", "__E_wff_46", "z3_nleq", "__E_wff_47", "z3_greater", "__E_wff_48", "z3_ngreater", "__E_wff_49", "z3_greater_equal", "__E_wff_50", 
-	"z3_ngeq", "__E_wff_51", "z3_less", "__E_wff_52", "z3_nless", "__E_wff_53", "bf_parenthesis", "__E_bf_54", "bf_constant", "variable", 
+	"__E_wff_41", "bf_less", "__E_wff_42", "bf_nless", "__E_wff_43", "bv_eq", "__E_wff_44", "bv", "bv_neq", "__E_wff_45", 
+	"bv_less_equal", "__E_wff_46", "bv_nleq", "__E_wff_47", "bv_greater", "__E_wff_48", "bv_ngreater", "__E_wff_49", "bv_greater_equal", "__E_wff_50", 
+	"bv_ngeq", "__E_wff_51", "bv_less", "__E_wff_52", "bv_nless", "__E_wff_53", "bf_parenthesis", "__E_bf_54", "bf_constant", "variable", 
 	"bf_splitter", "__E_bf_55", "bf_ref", "bf_or", "__E_bf_56", "bf_xor", "__E_bf_57", "bf_t", "__E_bf_58", "__E___E_bf_58_59", 
 	"type", "bf_f", "__E_bf_60", "__E___E_bf_60_61", "bf_and", "__E_bf_62", "__E___E_bf_62_63", "bf_neg", "__E_bf_64", "bf_neg_oprnd", 
-	"__E___E_bf_64_65", "bf_and_nosep", "__E_bf_66", "bf_and_nosep_1st_oprnd", "__E___E_bf_66_67", "bf_and_nosep_2nd_oprnd", "__E___E_bf_66_68", "z3_parenthesis", "__E_z3_69", "z3_checked", 
-	"__E_z3_70", "z3_neg", "z3_add", "__E_z3_71", "z3_sub", "__E_z3_72", "z3_mul", "__E_z3_73", "z3_div", "__E_z3_74", 
-	"z3_mod", "__E_z3_75", "z3_nand", "__E_z3_76", "z3_and", "__E_z3_77", "z3_nor", "__E_z3_78", "z3_or", "__E_z3_79", 
-	"z3_xnor", "__E_z3_80", "z3_xor", "__E_z3_81", "z3_rotate_left", "__E_z3_82", "num", "z3_rotate_right", "__E_z3_83", "z3_min", 
-	"__E_z3_84", "z3_max", "__E_z3_85", "bitvector", "bits", "__E_bitvector_86", "bv_type", "__E_bitvector_87", "hexnum", "__E_bitvector_88", 
+	"__E___E_bf_64_65", "bf_and_nosep", "__E_bf_66", "bf_and_nosep_1st_oprnd", "__E___E_bf_66_67", "bf_and_nosep_2nd_oprnd", "__E___E_bf_66_68", "bv_parenthesis", "__E_bv_69", "bv_checked", 
+	"__E_bv_70", "bv_neg", "bv_add", "__E_bv_71", "bv_sub", "__E_bv_72", "bv_mul", "__E_bv_73", "bv_div", "__E_bv_74", 
+	"bv_mod", "__E_bv_75", "bv_nand", "__E_bv_76", "bv_and", "__E_bv_77", "bv_nor", "__E_bv_78", "bv_or", "__E_bv_79", 
+	"bv_xnor", "__E_bv_80", "bv_xor", "__E_bv_81", "bv_rotate_left", "__E_bv_82", "num", "bv_rotate_right", "__E_bv_83", "bv_min", 
+	"__E_bv_84", "bv_max", "__E_bv_85", "bitvector", "bits", "__E_bitvector_86", "bv_type", "__E_bitvector_87", "hexnum", "__E_bitvector_88", 
 	"__E_bits_89", "__E_bits_90", "__E_hexnum_91", "ctn_neq", "__E_constraint_92", "ctnvar", "ctn_eq", "__E_constraint_93", "ctn_greater_equal", "__E_constraint_94", 
 	"ctn_greater", "__E_constraint_95", "ctn_less_equal", "__E_constraint_96", "ctn_less", "__E_constraint_97", "__E_variable_98", "__E_variable_99", "__E_variable_100", "__E_variable_101", 
 	"__E_variable_102", "__E_variable_103", "__E_variable_104", "io_var", "__E_variable_105", "in", "out", "__E_variable_106", "uninterpreted_constant", "in_var_name", 
@@ -425,65 +425,65 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(113), (NT(114)));
 //G144: wff(14)              => bf_nless(113).
 	p(NT(14), (NT(113)));
-//G145: __E_wff_44(116)      => z3(117) _(11) '=' '_' _(11) z3(117).
+//G145: __E_wff_44(116)      => bv(117) _(11) '=' '_' _(11) bv(117).
 	p(NT(116), (NT(117)+NT(11)+T(3)+T(35)+NT(11)+NT(117)));
-//G146: z3_eq(115)           => __E_wff_44(116).
+//G146: bv_eq(115)           => __E_wff_44(116).
 	p(NT(115), (NT(116)));
-//G147: wff(14)              => z3_eq(115).
+//G147: wff(14)              => bv_eq(115).
 	p(NT(14), (NT(115)));
-//G148: __E_wff_45(119)      => z3(117) _(11) '!' '=' '_' _(11) z3(117).
+//G148: __E_wff_45(119)      => bv(117) _(11) '!' '=' '_' _(11) bv(117).
 	p(NT(119), (NT(117)+NT(11)+T(32)+T(3)+T(35)+NT(11)+NT(117)));
-//G149: z3_neq(118)          => __E_wff_45(119).
+//G149: bv_neq(118)          => __E_wff_45(119).
 	p(NT(118), (NT(119)));
-//G150: wff(14)              => z3_neq(118).
+//G150: wff(14)              => bv_neq(118).
 	p(NT(14), (NT(118)));
-//G151: __E_wff_46(121)      => z3(117) _(11) '<' '=' '_' _(11) z3(117).
+//G151: __E_wff_46(121)      => bv(117) _(11) '<' '=' '_' _(11) bv(117).
 	p(NT(121), (NT(117)+NT(11)+T(20)+T(3)+T(35)+NT(11)+NT(117)));
-//G152: z3_less_equal(120)   => __E_wff_46(121).
+//G152: bv_less_equal(120)   => __E_wff_46(121).
 	p(NT(120), (NT(121)));
-//G153: wff(14)              => z3_less_equal(120).
+//G153: wff(14)              => bv_less_equal(120).
 	p(NT(14), (NT(120)));
-//G154: __E_wff_47(123)      => z3(117) _(11) '!' '<' '=' '_' _(11) z3(117).
+//G154: __E_wff_47(123)      => bv(117) _(11) '!' '<' '=' '_' _(11) bv(117).
 	p(NT(123), (NT(117)+NT(11)+T(32)+T(20)+T(3)+T(35)+NT(11)+NT(117)));
-//G155: z3_nleq(122)         => __E_wff_47(123).
+//G155: bv_nleq(122)         => __E_wff_47(123).
 	p(NT(122), (NT(123)));
-//G156: wff(14)              => z3_nleq(122).
+//G156: wff(14)              => bv_nleq(122).
 	p(NT(14), (NT(122)));
-//G157: __E_wff_48(125)      => z3(117) _(11) '>' '_' _(11) z3(117).
+//G157: __E_wff_48(125)      => bv(117) _(11) '>' '_' _(11) bv(117).
 	p(NT(125), (NT(117)+NT(11)+T(21)+T(35)+NT(11)+NT(117)));
-//G158: z3_greater(124)      => __E_wff_48(125).
+//G158: bv_greater(124)      => __E_wff_48(125).
 	p(NT(124), (NT(125)));
-//G159: wff(14)              => z3_greater(124).
+//G159: wff(14)              => bv_greater(124).
 	p(NT(14), (NT(124)));
-//G160: __E_wff_49(127)      => z3(117) _(11) '!' '>' '_' _(11) z3(117).
+//G160: __E_wff_49(127)      => bv(117) _(11) '!' '>' '_' _(11) bv(117).
 	p(NT(127), (NT(117)+NT(11)+T(32)+T(21)+T(35)+NT(11)+NT(117)));
-//G161: z3_ngreater(126)     => __E_wff_49(127).
+//G161: bv_ngreater(126)     => __E_wff_49(127).
 	p(NT(126), (NT(127)));
-//G162: wff(14)              => z3_ngreater(126).
+//G162: wff(14)              => bv_ngreater(126).
 	p(NT(14), (NT(126)));
-//G163: __E_wff_50(129)      => z3(117) _(11) '>' '=' '_' _(11) z3(117).
+//G163: __E_wff_50(129)      => bv(117) _(11) '>' '=' '_' _(11) bv(117).
 	p(NT(129), (NT(117)+NT(11)+T(21)+T(3)+T(35)+NT(11)+NT(117)));
-//G164: z3_greater_equal(128) => __E_wff_50(129).
+//G164: bv_greater_equal(128) => __E_wff_50(129).
 	p(NT(128), (NT(129)));
-//G165: wff(14)              => z3_greater_equal(128).
+//G165: wff(14)              => bv_greater_equal(128).
 	p(NT(14), (NT(128)));
-//G166: __E_wff_51(131)      => z3(117) _(11) '!' '>' '=' '_' _(11) z3(117).
+//G166: __E_wff_51(131)      => bv(117) _(11) '!' '>' '=' '_' _(11) bv(117).
 	p(NT(131), (NT(117)+NT(11)+T(32)+T(21)+T(3)+T(35)+NT(11)+NT(117)));
-//G167: z3_ngeq(130)         => __E_wff_51(131).
+//G167: bv_ngeq(130)         => __E_wff_51(131).
 	p(NT(130), (NT(131)));
-//G168: wff(14)              => z3_ngeq(130).
+//G168: wff(14)              => bv_ngeq(130).
 	p(NT(14), (NT(130)));
-//G169: __E_wff_52(133)      => z3(117) _(11) '<' '_' _(11) z3(117).
+//G169: __E_wff_52(133)      => bv(117) _(11) '<' '_' _(11) bv(117).
 	p(NT(133), (NT(117)+NT(11)+T(20)+T(35)+NT(11)+NT(117)));
-//G170: z3_less(132)         => __E_wff_52(133).
+//G170: bv_less(132)         => __E_wff_52(133).
 	p(NT(132), (NT(133)));
-//G171: wff(14)              => z3_less(132).
+//G171: wff(14)              => bv_less(132).
 	p(NT(14), (NT(132)));
-//G172: __E_wff_53(135)      => z3(117) _(11) '!' '<' '_' _(11) z3(117).
+//G172: __E_wff_53(135)      => bv(117) _(11) '!' '<' '_' _(11) bv(117).
 	p(NT(135), (NT(117)+NT(11)+T(32)+T(20)+T(35)+NT(11)+NT(117)));
-//G173: z3_nless(134)        => __E_wff_53(135).
+//G173: bv_nless(134)        => __E_wff_53(135).
 	p(NT(134), (NT(135)));
-//G174: wff(14)              => z3_nless(134).
+//G174: wff(14)              => bv_nless(134).
 	p(NT(14), (NT(134)));
 //G175: wff(14)              => capture(20).
 	p(NT(14), (NT(20)));
@@ -615,115 +615,115 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(21), (NT(161)));
 //G239: bf(21)               => capture(20).
 	p(NT(21), (NT(20)));
-//G240: __E_z3_69(168)       => '(' _(11) z3(117) _(11) ')'.
+//G240: __E_bv_69(168)       => '(' _(11) bv(117) _(11) ')'.
 	p(NT(168), (T(15)+NT(11)+NT(117)+NT(11)+T(16)));
-//G241: z3_parenthesis(167)  => __E_z3_69(168).
+//G241: bv_parenthesis(167)  => __E_bv_69(168).
 	p(NT(167), (NT(168)));
-//G242: z3(117)              => z3_parenthesis(167).
+//G242: bv(117)              => bv_parenthesis(167).
 	p(NT(117), (NT(167)));
-//G243: __E_z3_70(170)       => '[' z3(117) ']'.
+//G243: __E_bv_70(170)       => '[' bv(117) ']'.
 	p(NT(170), (T(24)+NT(117)+T(25)));
-//G244: z3_checked(169)      => __E_z3_70(170).
+//G244: bv_checked(169)      => __E_bv_70(170).
 	p(NT(169), (NT(170)));
-//G245: z3(117)              => z3_checked(169).
+//G245: bv(117)              => bv_checked(169).
 	p(NT(117), (NT(169)));
-//G246: z3(117)              => variable(139).
+//G246: bv(117)              => variable(139).
 	p(NT(117), (NT(139)));
-//G247: z3_neg(171)          => z3(117).
+//G247: bv_neg(171)          => bv(117).
 	p(NT(171), (NT(117)));
-//G248: z3(117)              => '~' _(11) z3_neg(171).
+//G248: bv(117)              => '~' _(11) bv_neg(171).
 	p(NT(117), (T(41)+NT(11)+NT(171)));
-//G249: __E_z3_71(173)       => z3(117) _(11) '+' _(11) z3(117).
+//G249: __E_bv_71(173)       => bv(117) _(11) '+' _(11) bv(117).
 	p(NT(173), (NT(117)+NT(11)+T(37)+NT(11)+NT(117)));
-//G250: z3_add(172)          => __E_z3_71(173).
+//G250: bv_add(172)          => __E_bv_71(173).
 	p(NT(172), (NT(173)));
-//G251: z3(117)              => z3_add(172).
+//G251: bv(117)              => bv_add(172).
 	p(NT(117), (NT(172)));
-//G252: __E_z3_72(175)       => z3(117) _(11) '-' _(11) z3(117).
+//G252: __E_bv_72(175)       => bv(117) _(11) '-' _(11) bv(117).
 	p(NT(175), (NT(117)+NT(11)+T(28)+NT(11)+NT(117)));
-//G253: z3_sub(174)          => __E_z3_72(175).
+//G253: bv_sub(174)          => __E_bv_72(175).
 	p(NT(174), (NT(175)));
-//G254: z3(117)              => z3_sub(174).
+//G254: bv(117)              => bv_sub(174).
 	p(NT(117), (NT(174)));
-//G255: __E_z3_73(177)       => z3(117) _(11) '*' _(11) z3(117).
+//G255: __E_bv_73(177)       => bv(117) _(11) '*' _(11) bv(117).
 	p(NT(177), (NT(117)+NT(11)+T(42)+NT(11)+NT(117)));
-//G256: z3_mul(176)          => __E_z3_73(177).
+//G256: bv_mul(176)          => __E_bv_73(177).
 	p(NT(176), (NT(177)));
-//G257: z3(117)              => z3_mul(176).
+//G257: bv(117)              => bv_mul(176).
 	p(NT(117), (NT(176)));
-//G258: __E_z3_74(179)       => z3(117) _(11) '/' _(11) z3(117).
+//G258: __E_bv_74(179)       => bv(117) _(11) '/' _(11) bv(117).
 	p(NT(179), (NT(117)+NT(11)+T(43)+NT(11)+NT(117)));
-//G259: z3_div(178)          => __E_z3_74(179).
+//G259: bv_div(178)          => __E_bv_74(179).
 	p(NT(178), (NT(179)));
-//G260: z3(117)              => z3_div(178).
+//G260: bv(117)              => bv_div(178).
 	p(NT(117), (NT(178)));
-//G261: __E_z3_75(181)       => z3(117) _(11) '%' _(11) z3(117).
+//G261: __E_bv_75(181)       => bv(117) _(11) '%' _(11) bv(117).
 	p(NT(181), (NT(117)+NT(11)+T(44)+NT(11)+NT(117)));
-//G262: z3_mod(180)          => __E_z3_75(181).
+//G262: bv_mod(180)          => __E_bv_75(181).
 	p(NT(180), (NT(181)));
-//G263: z3(117)              => z3_mod(180).
+//G263: bv(117)              => bv_mod(180).
 	p(NT(117), (NT(180)));
-//G264: __E_z3_76(183)       => z3(117) _(11) '!' '&' _(11) z3(117).
+//G264: __E_bv_76(183)       => bv(117) _(11) '!' '&' _(11) bv(117).
 	p(NT(183), (NT(117)+NT(11)+T(32)+T(31)+NT(11)+NT(117)));
-//G265: z3_nand(182)         => __E_z3_76(183).
+//G265: bv_nand(182)         => __E_bv_76(183).
 	p(NT(182), (NT(183)));
-//G266: z3(117)              => z3_nand(182).
+//G266: bv(117)              => bv_nand(182).
 	p(NT(117), (NT(182)));
-//G267: __E_z3_77(185)       => z3(117) _(11) '&' _(11) z3(117).
+//G267: __E_bv_77(185)       => bv(117) _(11) '&' _(11) bv(117).
 	p(NT(185), (NT(117)+NT(11)+T(31)+NT(11)+NT(117)));
-//G268: z3_and(184)          => __E_z3_77(185).
+//G268: bv_and(184)          => __E_bv_77(185).
 	p(NT(184), (NT(185)));
-//G269: z3(117)              => z3_and(184).
+//G269: bv(117)              => bv_and(184).
 	p(NT(117), (NT(184)));
-//G270: __E_z3_78(187)       => z3(117) _(11) '!' '|' _(11) z3(117).
+//G270: __E_bv_78(187)       => bv(117) _(11) '!' '|' _(11) bv(117).
 	p(NT(187), (NT(117)+NT(11)+T(32)+T(29)+NT(11)+NT(117)));
-//G271: z3_nor(186)          => __E_z3_78(187).
+//G271: bv_nor(186)          => __E_bv_78(187).
 	p(NT(186), (NT(187)));
-//G272: z3(117)              => z3_nor(186).
+//G272: bv(117)              => bv_nor(186).
 	p(NT(117), (NT(186)));
-//G273: __E_z3_79(189)       => z3(117) _(11) '|' _(11) z3(117).
+//G273: __E_bv_79(189)       => bv(117) _(11) '|' _(11) bv(117).
 	p(NT(189), (NT(117)+NT(11)+T(29)+NT(11)+NT(117)));
-//G274: z3_or(188)           => __E_z3_79(189).
+//G274: bv_or(188)           => __E_bv_79(189).
 	p(NT(188), (NT(189)));
-//G275: z3(117)              => z3_or(188).
+//G275: bv(117)              => bv_or(188).
 	p(NT(117), (NT(188)));
-//G276: __E_z3_80(191)       => z3(117) _(11) '!' '(' '+' ')' _(11) z3(117).
+//G276: __E_bv_80(191)       => bv(117) _(11) '!' '(' '+' ')' _(11) bv(117).
 	p(NT(191), (NT(117)+NT(11)+T(32)+T(15)+T(37)+T(16)+NT(11)+NT(117)));
-//G277: z3_xnor(190)         => __E_z3_80(191).
+//G277: bv_xnor(190)         => __E_bv_80(191).
 	p(NT(190), (NT(191)));
-//G278: z3(117)              => z3_xnor(190).
+//G278: bv(117)              => bv_xnor(190).
 	p(NT(117), (NT(190)));
-//G279: __E_z3_81(193)       => z3(117) _(11) '(' '+' ')' _(11) z3(117).
+//G279: __E_bv_81(193)       => bv(117) _(11) '(' '+' ')' _(11) bv(117).
 	p(NT(193), (NT(117)+NT(11)+T(15)+T(37)+T(16)+NT(11)+NT(117)));
-//G280: z3_xor(192)          => __E_z3_81(193).
+//G280: bv_xor(192)          => __E_bv_81(193).
 	p(NT(192), (NT(193)));
-//G281: z3(117)              => z3_xor(192).
+//G281: bv(117)              => bv_xor(192).
 	p(NT(117), (NT(192)));
-//G282: __E_z3_82(195)       => z3(117) _(11) '<' '<' _(11) num(196).
+//G282: __E_bv_82(195)       => bv(117) _(11) '<' '<' _(11) num(196).
 	p(NT(195), (NT(117)+NT(11)+T(20)+T(20)+NT(11)+NT(196)));
-//G283: z3_rotate_left(194)  => __E_z3_82(195).
+//G283: bv_rotate_left(194)  => __E_bv_82(195).
 	p(NT(194), (NT(195)));
-//G284: z3(117)              => z3_rotate_left(194).
+//G284: bv(117)              => bv_rotate_left(194).
 	p(NT(117), (NT(194)));
-//G285: __E_z3_83(198)       => z3(117) _(11) '>' '>' _(11) num(196).
+//G285: __E_bv_83(198)       => bv(117) _(11) '>' '>' _(11) num(196).
 	p(NT(198), (NT(117)+NT(11)+T(21)+T(21)+NT(11)+NT(196)));
-//G286: z3_rotate_right(197) => __E_z3_83(198).
+//G286: bv_rotate_right(197) => __E_bv_83(198).
 	p(NT(197), (NT(198)));
-//G287: z3(117)              => z3_rotate_right(197).
+//G287: bv(117)              => bv_rotate_right(197).
 	p(NT(117), (NT(197)));
-//G288: __E_z3_84(200)       => 'm' 'i' 'n' __(27) z3(117) __(27) z3(117).
+//G288: __E_bv_84(200)       => 'm' 'i' 'n' __(27) bv(117) __(27) bv(117).
 	p(NT(200), (T(18)+T(10)+T(45)+NT(27)+NT(117)+NT(27)+NT(117)));
-//G289: z3_min(199)          => __E_z3_84(200).
+//G289: bv_min(199)          => __E_bv_84(200).
 	p(NT(199), (NT(200)));
-//G290: z3(117)              => z3_min(199).
+//G290: bv(117)              => bv_min(199).
 	p(NT(117), (NT(199)));
-//G291: __E_z3_85(202)       => 'm' 'a' 'x' __(27) z3(117) __(27) z3(117).
+//G291: __E_bv_85(202)       => 'm' 'a' 'x' __(27) bv(117) __(27) bv(117).
 	p(NT(202), (T(18)+T(5)+T(27)+NT(27)+NT(117)+NT(27)+NT(117)));
-//G292: z3_max(201)          => __E_z3_85(202).
+//G292: bv_max(201)          => __E_bv_85(202).
 	p(NT(201), (NT(202)));
-//G293: z3(117)              => z3_max(201).
+//G293: bv(117)              => bv_max(201).
 	p(NT(117), (NT(201)));
-//G294: z3(117)              => bitvector(203).
+//G294: bv(117)              => bitvector(203).
 	p(NT(117), (NT(203)));
 //G295: __E_bitvector_86(205) => _(11) ':' _(11) bv_type(206) _(11).
 	p(NT(205), (NT(11)+T(2)+NT(11)+NT(206)+NT(11)));
@@ -1620,16 +1620,16 @@ struct tau_parser : public idni::parser<char, char> {
 		__E_wff_27, wff_equiv, __E_wff_28, wff_or, __E_wff_29, wff_xor, __E_wff_30, wff_and, __E_wff_31, wff_neg, 
 		__E_wff_32, wff_t, wff_f, bf_interval, __E_wff_33, bf_eq, __E_wff_34, bf_neq, __E_wff_35, bf_less_equal, 
 		__E_wff_36, bf_nleq, __E_wff_37, bf_greater, __E_wff_38, bf_ngreater, __E_wff_39, bf_greater_equal, __E_wff_40, bf_ngeq, 
-		__E_wff_41, bf_less, __E_wff_42, bf_nless, __E_wff_43, z3_eq, __E_wff_44, z3, z3_neq, __E_wff_45, 
-		z3_less_equal, __E_wff_46, z3_nleq, __E_wff_47, z3_greater, __E_wff_48, z3_ngreater, __E_wff_49, z3_greater_equal, __E_wff_50, 
-		z3_ngeq, __E_wff_51, z3_less, __E_wff_52, z3_nless, __E_wff_53, bf_parenthesis, __E_bf_54, bf_constant, variable, 
+		__E_wff_41, bf_less, __E_wff_42, bf_nless, __E_wff_43, bv_eq, __E_wff_44, bv, bv_neq, __E_wff_45, 
+		bv_less_equal, __E_wff_46, bv_nleq, __E_wff_47, bv_greater, __E_wff_48, bv_ngreater, __E_wff_49, bv_greater_equal, __E_wff_50, 
+		bv_ngeq, __E_wff_51, bv_less, __E_wff_52, bv_nless, __E_wff_53, bf_parenthesis, __E_bf_54, bf_constant, variable, 
 		bf_splitter, __E_bf_55, bf_ref, bf_or, __E_bf_56, bf_xor, __E_bf_57, bf_t, __E_bf_58, __E___E_bf_58_59, 
 		type, bf_f, __E_bf_60, __E___E_bf_60_61, bf_and, __E_bf_62, __E___E_bf_62_63, bf_neg, __E_bf_64, bf_neg_oprnd, 
-		__E___E_bf_64_65, bf_and_nosep, __E_bf_66, bf_and_nosep_1st_oprnd, __E___E_bf_66_67, bf_and_nosep_2nd_oprnd, __E___E_bf_66_68, z3_parenthesis, __E_z3_69, z3_checked, 
-		__E_z3_70, z3_neg, z3_add, __E_z3_71, z3_sub, __E_z3_72, z3_mul, __E_z3_73, z3_div, __E_z3_74, 
-		z3_mod, __E_z3_75, z3_nand, __E_z3_76, z3_and, __E_z3_77, z3_nor, __E_z3_78, z3_or, __E_z3_79, 
-		z3_xnor, __E_z3_80, z3_xor, __E_z3_81, z3_rotate_left, __E_z3_82, num, z3_rotate_right, __E_z3_83, z3_min, 
-		__E_z3_84, z3_max, __E_z3_85, bitvector, bits, __E_bitvector_86, bv_type, __E_bitvector_87, hexnum, __E_bitvector_88, 
+		__E___E_bf_64_65, bf_and_nosep, __E_bf_66, bf_and_nosep_1st_oprnd, __E___E_bf_66_67, bf_and_nosep_2nd_oprnd, __E___E_bf_66_68, bv_parenthesis, __E_bv_69, bv_checked, 
+		__E_bv_70, bv_neg, bv_add, __E_bv_71, bv_sub, __E_bv_72, bv_mul, __E_bv_73, bv_div, __E_bv_74, 
+		bv_mod, __E_bv_75, bv_nand, __E_bv_76, bv_and, __E_bv_77, bv_nor, __E_bv_78, bv_or, __E_bv_79, 
+		bv_xnor, __E_bv_80, bv_xor, __E_bv_81, bv_rotate_left, __E_bv_82, num, bv_rotate_right, __E_bv_83, bv_min, 
+		__E_bv_84, bv_max, __E_bv_85, bitvector, bits, __E_bitvector_86, bv_type, __E_bitvector_87, hexnum, __E_bitvector_88, 
 		__E_bits_89, __E_bits_90, __E_hexnum_91, ctn_neq, __E_constraint_92, ctnvar, ctn_eq, __E_constraint_93, ctn_greater_equal, __E_constraint_94, 
 		ctn_greater, __E_constraint_95, ctn_less_equal, __E_constraint_96, ctn_less, __E_constraint_97, __E_variable_98, __E_variable_99, __E_variable_100, __E_variable_101, 
 		__E_variable_102, __E_variable_103, __E_variable_104, io_var, __E_variable_105, in, out, __E_variable_106, uninterpreted_constant, in_var_name, 

@@ -730,49 +730,49 @@ TEST_SUITE("parsing variables") {
 		CHECK( !var.has_value() );
 	}
 
-	TEST_CASE("regular z3 typed variable") {
+	TEST_CASE("regular bv typed variable") {
 		const char* sample = "x:sbf";
-		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto src = make_tau_source(sample, { .start = tau_parser::bv });
 		auto frml = make_statement(src);
 		auto var = frml | tau_parser::variable | tau_parser::type;
 		CHECK( var.has_value() );
 	}
 
-	TEST_CASE("regular z3 untyped variable") {
+	TEST_CASE("regular bv untyped variable") {
 		const char* sample = "x";
-		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto src = make_tau_source(sample, { .start = tau_parser::bv });
 		auto frml = make_statement(src);
 		auto var = frml | tau_parser::variable | tau_parser::type;
 		CHECK( !var.has_value() );
 	}
 
-	TEST_CASE("io z3 typed variable") {
+	TEST_CASE("io bv typed variable") {
 		const char* sample = "i1:sbf";
-		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto src = make_tau_source(sample, { .start = tau_parser::bv });
 		auto frml = make_statement(src);
 		auto var = frml | tau_parser::variable | tau_parser::type;
 		CHECK( var.has_value() );
 	}
 
-	TEST_CASE("io z3 untyped variable") {
+	TEST_CASE("io bv untyped variable") {
 		const char* sample = "i1";
-		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto src = make_tau_source(sample, { .start = tau_parser::bv });
 		auto frml = make_statement(src);
 		auto var = frml | tau_parser::variable | tau_parser::type;
 		CHECK( !var.has_value() );
 	}
 
-	TEST_CASE("regular z3/bv typed variable") {
+	TEST_CASE("regular bv typed variable") {
 		const char* sample = "x:bv[0]";
-		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto src = make_tau_source(sample, { .start = tau_parser::bv });
 		auto frml = make_statement(src);
 		auto var = frml | tau_parser::variable | tau_parser::type | tau_parser::bv_type;
 		CHECK( var.has_value() );
 	}
 
-	TEST_CASE("io z3 typed variable") {
+	TEST_CASE("io bv typed variable") {
 		const char* sample = "i1:bv[0]";
-		auto src = make_tau_source(sample, { .start = tau_parser::z3 });
+		auto src = make_tau_source(sample, { .start = tau_parser::bv });
 		auto frml = make_statement(src);
 		auto var = frml | tau_parser::variable | tau_parser::type | tau_parser::bv_type;
 		CHECK( var.has_value() );
@@ -864,7 +864,7 @@ TEST_SUITE("parsing variables") {
 	}
 }
 
-TEST_SUITE("parsing z3 formulas") {
+TEST_SUITE("parsing bv formulas") {
 
 	TEST_CASE("all x (x =_ 0)") {
 		const char* sample = "all x (x =_ 0).";
@@ -1217,12 +1217,12 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 }
 
-TEST_SUITE("parsing z3 expressions") {
+TEST_SUITE("parsing bv expressions") {
 
 	TEST_CASE("variable") {
 		const char* sample = "Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
 			| tau_parser::variable;
@@ -1232,157 +1232,157 @@ TEST_SUITE("parsing z3 expressions") {
 	TEST_CASE("neg") {
 		const char* sample = "~Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_neg;
+			| tau_parser::bv_neg;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("add") {
 		const char* sample = "Z + Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_add;
+			| tau_parser::bv_add;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("sub") {
 		const char* sample = "Z - Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_sub;
+			| tau_parser::bv_sub;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("mul") {
 		const char* sample = "Z * Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_mul;
+			| tau_parser::bv_mul;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("div") {
 		const char* sample = "Z / Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_div;
+			| tau_parser::bv_div;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("mod") {
 		const char* sample = "Z % Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_mod;
+			| tau_parser::bv_mod;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("and") {
 		const char* sample = "Z & Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_and;
+			| tau_parser::bv_and;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("nand") {
 		const char* sample = "Z !& Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_nand;
+			| tau_parser::bv_nand;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("or") {
 		const char* sample = "Z | Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_or;
+			| tau_parser::bv_or;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("nor") {
 		const char* sample = "Z !| Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_nor;
+			| tau_parser::bv_nor;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("xor") {
 		const char* sample = "Z (+) Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_xor;
+			| tau_parser::bv_xor;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("xnor") {
 		const char* sample = "Z !(+) Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_xnor;
+			| tau_parser::bv_xnor;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("rotate left") {
 		const char* sample = "Z << 1";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_rotate_left;
+			| tau_parser::bv_rotate_left;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("rotate right") {
 		const char* sample = "Z >> 1";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_rotate_right;
+			| tau_parser::bv_rotate_right;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("parenthesis") {
 		const char* sample = "(Z)";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
 			| tau_parser::variable;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("number") {
+	TEST_CASE("z3 number") {
 		const char* sample = "1234";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src)
 			| tau_parser::bitvector
 			| optional_value_extractor<tau<Bool>>;
@@ -1390,10 +1390,10 @@ TEST_SUITE("parsing z3 expressions") {
 		CHECK( std::holds_alternative<z3::expr>(check) );
 	}
 
-	TEST_CASE("bits") {
+	TEST_CASE("z3 bits") {
 		const char* sample = "#b01010101";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src)
 			| tau_parser::bitvector
 			| optional_value_extractor<tau<Bool>>;
@@ -1401,10 +1401,10 @@ TEST_SUITE("parsing z3 expressions") {
 		CHECK( std::holds_alternative<z3::expr>(check) );
 	}
 
-	TEST_CASE("hexnum") {
+	TEST_CASE("z3 hexnum") {
 		const char* sample = "#x0FFFFFFFF";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src)
 			| tau_parser::bitvector
 			| optional_value_extractor<tau<Bool>>;
@@ -1413,283 +1413,283 @@ TEST_SUITE("parsing z3 expressions") {
 	}
 }
 
-TEST_SUITE("parsing z3 literals") {
+TEST_SUITE("parsing bv literals") {
 
-	TEST_CASE("z3_eq") {
+	TEST_CASE("bv_eq") {
 		const char* sample = "Z =_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_eq;
+			| tau_parser::bv_eq;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_neq") {
+	TEST_CASE("bv_neq") {
 		const char* sample = "Z !=_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_neq;
+			| tau_parser::bv_neq;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_less_equal") {
+	TEST_CASE("bv_less_equal") {
 		const char* sample = "Z <=_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_less_equal;
+			| tau_parser::bv_less_equal;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_nleq") {
+	TEST_CASE("bv_nleq") {
 		const char* sample = "Z !<=_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_nleq;
+			| tau_parser::bv_nleq;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_greater") {
+	TEST_CASE("bv_greater") {
 		const char* sample = "Z >_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_greater;
+			| tau_parser::bv_greater;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_ngreater") {
+	TEST_CASE("bv_ngreater") {
 		const char* sample = "Z !>_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_ngreater;
+			| tau_parser::bv_ngreater;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_greater_equal") {
+	TEST_CASE("bv_greater_equal") {
 		const char* sample = "Z >=_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_greater_equal;
+			| tau_parser::bv_greater_equal;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_ngeq") {
+	TEST_CASE("bv_ngeq") {
 		const char* sample = "Z !>=_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_ngeq;
+			| tau_parser::bv_ngeq;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_less") {
+	TEST_CASE("bv_less") {
 		const char* sample = "Z <_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_less;
+			| tau_parser::bv_less;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_nless") {
+	TEST_CASE("bv_nless") {
 		const char* sample = "Z !<_ Z";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_nless;
+			| tau_parser::bv_nless;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_parenthesis") {
+	TEST_CASE("bv_parenthesis") {
 		const char* sample = "(Z)";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		// no checvk needed, we just need to parse properly
 	}
 
-	TEST_CASE("z3_variable") {
+	TEST_CASE("bv_variable") {
 		const char* sample = "Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
 			| tau_parser::variable;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_neg") {
+	TEST_CASE("bv_neg") {
 		const char* sample = "~Z";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_neg;
+			| tau_parser::bv_neg;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_add") {
+	TEST_CASE("bv_add") {
 		const char* sample = "Z + Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_add;
+			| tau_parser::bv_add;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_sub") {
+	TEST_CASE("bv_sub") {
 		const char* sample = "Z - Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_sub;
+			| tau_parser::bv_sub;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_mul") {
+	TEST_CASE("bv_mul") {
 		const char* sample = "Z * Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_mul;
+			| tau_parser::bv_mul;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_div") {
+	TEST_CASE("bv_div") {
 		const char* sample = "Z / Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_div;
+			| tau_parser::bv_div;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_mod") {
+	TEST_CASE("bv_mod") {
 		const char* sample = "Z % Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_mod;
+			| tau_parser::bv_mod;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_and") {
+	TEST_CASE("bv_and") {
 		const char* sample = "Z & Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_and;
+			| tau_parser::bv_and;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_nand") {
+	TEST_CASE("bv_nand") {
 		const char* sample = "Z !& Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_nand;
+			| tau_parser::bv_nand;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_or") {
+	TEST_CASE("bv_or") {
 		const char* sample = "Z | Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_or;
+			| tau_parser::bv_or;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_nor") {
+	TEST_CASE("bv_nor") {
 		const char* sample = "Z !| Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_nor;
+			| tau_parser::bv_nor;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_xor") {
+	TEST_CASE("bv_xor") {
 		const char* sample = "Z (+) Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_xor;
+			| tau_parser::bv_xor;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_xnor") {
+	TEST_CASE("bv_xnor") {
 		const char* sample = "Z !(+) Y";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_xnor;
+			| tau_parser::bv_xnor;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_rotate_left") {
+	TEST_CASE("bv_rotate_left") {
 		const char* sample = "Z << 1";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_rotate_left;
+			| tau_parser::bv_rotate_left;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_rotate_right") {
+	TEST_CASE("bv_rotate_right") {
 		const char* sample = "Z >> 1";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_rotate_right;
+			| tau_parser::bv_rotate_right;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_max") {
+	TEST_CASE("bv_max") {
 		const char* sample = "max 1 2";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_max;
+			| tau_parser::bv_max;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_min") {
+	TEST_CASE("bv_min") {
 		const char* sample = "min 1 2";
 		auto src = make_tau_source(sample, {
-						.start = tau_parser::z3 });
+						.start = tau_parser::bv });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_min;
+			| tau_parser::bv_min;
 		CHECK( check.has_value() );
 	}
 }
