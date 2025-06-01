@@ -512,26 +512,26 @@ tau<BAs...> make_node_hook_wff_neg(const rewriter::node<tau_sym<BAs...>>& n) {
 	if (is_non_terminal<tau_parser::constraint>(first_argument_expression(n)))
 		return make_node_hook_ctn_neg(first_argument_expression(n));
 	switch (get_non_terminal_node(first_argument_expression(n))) {
-		case tau_parser::z3_eq:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_neq, n);
-		case tau_parser::z3_neq:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_eq, n);
-		case tau_parser::z3_less_equal:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_nleq, n);
-		case tau_parser::z3_nleq:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_less_equal, n);
-		case tau_parser::z3_greater_equal:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_ngeq, n);
-		case tau_parser::z3_ngeq:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_greater_equal, n);
-		case tau_parser::z3_less:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_nless, n);
-		case tau_parser::z3_nless:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_less, n);
-		case tau_parser::z3_greater:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_ngreater, n);
-		case tau_parser::z3_ngreater:
-			return make_node_hook_z3_literal<BAs...>(tau_parser::z3_greater, n);
+		case tau_parser::bv_eq:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_neq, n);
+		case tau_parser::bv_neq:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_eq, n);
+		case tau_parser::bv_less_equal:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_nleq, n);
+		case tau_parser::bv_nleq:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_less_equal, n);
+		case tau_parser::bv_greater_equal:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_ngeq, n);
+		case tau_parser::bv_ngeq:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_greater_equal, n);
+		case tau_parser::bv_less:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_nless, n);
+		case tau_parser::bv_nless:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_less, n);
+		case tau_parser::bv_greater:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_ngreater, n);
+		case tau_parser::bv_ngreater:
+			return make_node_hook_z3_literal<BAs...>(tau_parser::bv_greater, n);
 	}
 	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 }

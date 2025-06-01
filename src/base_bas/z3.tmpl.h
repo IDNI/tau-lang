@@ -45,7 +45,7 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars,
 	switch (nt) {
 		// due to hooks we should consider wff_t or bf_t
 		case tau_parser::wff:
-		case tau_parser::z3: {
+		case tau_parser::bv: {
 			auto expr = eval_z3(form->child[0], vars, checked);
 			return expr;
 		}
@@ -89,136 +89,136 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars,
 			vars.emplace(form, x);
 			return x;
 		}
-		case tau_parser::z3_checked: {
+		case tau_parser::bv_checked: {
 			return eval_z3(form->child[0], vars, true);
 		}
-		case tau_parser::z3_eq: {
+		case tau_parser::bv_eq: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l == r;
 		};
-		case tau_parser::z3_neq: {
+		case tau_parser::bv_neq: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l != r;
 		}
-		case tau_parser::z3_less_equal: {
+		case tau_parser::bv_less_equal: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l <= r;
 		}
-		case tau_parser::z3_nleq: {
+		case tau_parser::bv_nleq: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return !(l <= r);
 		}
-		case tau_parser::z3_greater: {
+		case tau_parser::bv_greater: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l > r;
 		}
-		case tau_parser::z3_ngreater: {
+		case tau_parser::bv_ngreater: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return !(l > r);
 		}
-		case tau_parser::z3_greater_equal: {
+		case tau_parser::bv_greater_equal: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l >= r;
 		}
-		case tau_parser::z3_ngeq: {
+		case tau_parser::bv_ngeq: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return !(l >= r);
 		}
-		case tau_parser::z3_less: {
+		case tau_parser::bv_less: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l < r;
 		}
-		case tau_parser::z3_nless: {
+		case tau_parser::bv_nless: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return !(l < r);
 		}
-		case tau_parser::z3_neg: {
+		case tau_parser::bv_neg: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			return -l;
 		}
-		case tau_parser::z3_add: {
+		case tau_parser::bv_add: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l + r;
 		}
-		case tau_parser::z3_sub: {
+		case tau_parser::bv_sub: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l - r;
 		}
-		case tau_parser::z3_mul: {
+		case tau_parser::bv_mul: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l * r;
 		}
-		case tau_parser::z3_div: {
+		case tau_parser::bv_div: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l / r;
 		}
-		case tau_parser::z3_mod: {
+		case tau_parser::bv_mod: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l % r;
 		}
-		case tau_parser::z3_and: {
+		case tau_parser::bv_and: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l & r;
 		}
-		case tau_parser::z3_nand: {
+		case tau_parser::bv_nand: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return nand(l, r);
 		}
-		case tau_parser::z3_or: {
+		case tau_parser::bv_or: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l | r;
 		}
-		case tau_parser::z3_nor: {
+		case tau_parser::bv_nor: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return nor(l, r);
 		}
-		case tau_parser::z3_xor: {
+		case tau_parser::bv_xor: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return l ^ r;
 		}
-		case tau_parser::z3_xnor: {
+		case tau_parser::bv_xnor: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return xnor(l, r);
 		}
-		case tau_parser::z3_min: {
+		case tau_parser::bv_min: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return min(l, r);
 		}
-		case tau_parser::z3_max: {
+		case tau_parser::bv_max: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto r = eval_z3(form->child[1], vars, checked);
 			return max(l, r);
 		}
-		case tau_parser::z3_rotate_left: {
+		case tau_parser::bv_rotate_left: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto value = make_string(tau_node_terminal_extractor<BAs...>, form->child[1]);
 			// this is the type of rotate_left
 			unsigned int ul = std::stoul(value);
 			return l.rotate_left(ul);
 		}
-		case tau_parser::z3_rotate_right: {
+		case tau_parser::bv_rotate_right: {
 			auto l = eval_z3(form->child[0], vars, checked);
 			auto value = make_string(tau_node_terminal_extractor<BAs...>, form->child[1]);
 			// this is the type of rotate_left

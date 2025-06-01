@@ -3006,7 +3006,7 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 
 
 template<typename... BAs>
-bool is_z3_quantifier(const tau<BAs...>& fm) {
+bool is_bv_quantifier(const tau<BAs...>& fm) {
 	return is_quantifier<BAs...>(fm)
 		&& (fm
 			| only_child_extractor<BAs...> /* all or or */
@@ -3022,9 +3022,9 @@ bool is_z3_quantifier(const tau<BAs...>& fm) {
 }
 
 template<typename... BAs>
-std::vector<tau<BAs...>> get_z3_variables(const tau<BAs...>& fm) {
+std::vector<tau<BAs...>> get_bv_variables(const tau<BAs...>& fm) {
 	auto is_z3_var = [](const auto& n) {
-		return is_non_terminal<tau_parser::z3, BAs...>(n)
+		return is_non_terminal<tau_parser::bv, BAs...>(n)
 			&& is_child_non_terminal<tau_parser::variable, BAs...>(n);
 	};
 	return select_top(fm, is_z3_var);
@@ -3036,7 +3036,7 @@ std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_conjunctions(c
 	tau<BAs...> tau_literals = _T<BAs...>;
 	tau<BAs...> z3_constants = _T<BAs...>;
 	auto collect = [&z3_literals, &tau_literals, &z3_constants](const auto& n) {
-		if (is_z3_literal<BAs...>(n)) {
+		if (is_bv_literal<BAs...>(n)) {
 			z3_literals = build_wff_and(z3_literals, n);
 			return true;
 		} else if (is_z3_constant<BAs...>(n)) {
@@ -3058,7 +3058,7 @@ std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_disjunctions(c
 	tau<BAs...> tau_literals = _F<BAs...>;
 	tau<BAs...> z3_constants = _F<BAs...>;
 	auto collect = [&z3_literals, &tau_literals, &z3_constants](const auto& n) {
-		if (is_z3_literal<BAs...>(n)) {
+		if (is_bv_literal<BAs...>(n)) {
 			z3_literals = build_wff_or(z3_literals, n);
 			return true;
 		} else if (is_z3_constant<BAs...>(n)) {
@@ -3098,7 +3098,7 @@ auto build_z3_skolem_func(const std::vector<tau<BAs...>>& vars) {
 
 template<typename... BAs>
 tau<BAs...> eliminate_z3_existential_quantifier_from_clause(const tau<BAs...>& qvar, const tau<BAs...>& scoped_fm) {
-	auto z3_vars = get_z3_variables(scoped_fm);
+	auto z3_vars = get_bv_variables(scoped_fm);
 	if (auto it = find(z3_vars.begin(), z3_vars.end(), qvar); it != z3_vars.end()) {
 		// remove qvar from variables to be used in skolem function
 		z3_vars.erase(it);
@@ -3165,7 +3165,7 @@ tau<BAs...> eliminate_z3_universal_quantifier(const tau<BAs...>& qvar, const tau
 
 template<typename... BAs>
 tau<BAs...> eliminate_z3_quantifier(const tau<BAs...>& inner_fm) {
-	if (is_z3_quantifier<BAs...>(inner_fm)) {
+	if (is_bv_quantifier<BAs...>(inner_fm)) {
 		auto scoped_fm = trim(inner_fm)->child[1];
 		auto qvar = trim2(inner_fm);
 		if (is_child_non_terminal(tau_parser::wff_ex, inner_fm)) {
@@ -3185,7 +3185,7 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	// been pushed in
 	auto elim_quant = [](const tau<BAs...>& inner_fm) -> tau<BAs...> {
 		// call z3 quantifier elimination if it is a z3 quantifier
-		if (is_z3_quantifier(inner_fm)) return eliminate_z3_quantifier(inner_fm);
+		if (is_bv_quantifier(inner_fm)) return eliminate_z3_quantifier(inner_fm);
 		// Find out if current node is a quantifier
 		bool is_ex_quant;
 		if (is_child_non_terminal(tau_parser::wff_ex, inner_fm))
