@@ -11,6 +11,7 @@
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
 using namespace boost::log;
+using namespace z3;
 
 namespace testing = doctest;
 
@@ -23,7 +24,7 @@ TEST_SUITE("configuration") {
 
 TEST_SUITE("sample z3 programs") {
 
-	/*TEST_CASE("sample") {
+	TEST_CASE("sample") {
 		// (declare-const x (_ BitVec 32))
 		// (declare-const y (_ BitVec 32))
 		// (assert (= (bvadd x y) #x00000004))
@@ -193,7 +194,7 @@ TEST_SUITE("sample z3 programs") {
 
 			CHECK( s.get_model().eval(f_y(y)) != c.bool_val(false) );
 			CHECK( s.get_model().eval(f_y(y)) != c.bool_val(true) );
-		}*/
+		}
 
 	TEST_CASE("eliminating two variables") {
 		//	(declare-fun f_y_z ((_ BitVec 2)) Bool)
@@ -255,7 +256,7 @@ TEST_SUITE("sample z3 programs") {
 
 	}
 
-	/*TEST_CASE("eliminating two variables (y2)") {
+	TEST_CASE("eliminating two variables (y2)") {
 		//	(declare-fun f_y_z ((_ BitVec 2)) Bool)
 		//	(assert (forall ((y (_ BitVec 2))) (ite (forall ((x (_ BitVec 2))) (= (bvor y x z) #b00)) (= (f_y_z y) true) (= (f_y_z y) false))))
 		//	(check-sat)
@@ -310,5 +311,5 @@ TEST_SUITE("sample z3 programs") {
 			<< s << "\n"
 			<< s.check() << "\n"
 			<< s.get_model().eval(f_z(z)) << "\n";
-	}*/
+	}
 }
