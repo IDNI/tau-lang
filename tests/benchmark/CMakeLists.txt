@@ -13,6 +13,7 @@ endfunction()
 set(BENCHMARK_TESTS
 	wff_normalization
 	interpreter
+	cvc5
 )
 
 # adding benchmark tests
