@@ -41,7 +41,7 @@ TEST_SUITE("configuration") {
 	}
 }
 
-TEST_SUITE("z3 operator hooks") {
+TEST_SUITE("bv operator hooks") {
 
 	TEST_CASE("!") {
 		CHECK( check_hook("!(a =_ b)", "a !=_ b") );
