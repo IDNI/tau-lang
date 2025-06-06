@@ -1,4 +1,4 @@
-![The TAU logo](/docs/images/tau_logo.png)
+![The TAU logo](/docs/images/tau_banner.png)
 
 | Build type | Status                                                                                     |
 |------------|--------------------------------------------------------------------------------------------|
