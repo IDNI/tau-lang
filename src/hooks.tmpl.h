@@ -1072,7 +1072,7 @@ tau<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n) {
 			return make_node_hook_wff_ngeq<BAs...>(n);
 		case tau_parser::bf_interval:
 			return make_node_hook_wff_interval<BAs...>(n);
-		// TODO (HIGH) add simplification hooks for z3 operators
+		// TODO (HIGH) add simplification hooks for bv operators
 		default: return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	}
 }
@@ -1118,7 +1118,7 @@ tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
 
 template <typename... BAs>
 tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
-	if (is_z3_node(n.child[0])) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+	if (is_bv_node(n.child[0])) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	// apply numerical simplifications
 	using p = tau_parser;
 	// get bitvector size, just 32 bits for now

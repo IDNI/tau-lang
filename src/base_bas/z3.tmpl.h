@@ -229,7 +229,7 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars,
 		}
 		default: {
 			#ifdef DEBUG
-			BOOST_LOG_TRIVIAL(error) << "(Error) unknow z3 non-terminal: " << nt;
+			BOOST_LOG_TRIVIAL(error) << "(Error) unknow bv non-terminal: " << nt;
 			#endif // DEBUG
 		}
 	}
@@ -246,7 +246,7 @@ bool is_z3_formula_sat(const tau<BAs...>& form) {
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(info)
-		<< "(Info) z3 solver\n" << solver;
+		<< "(Info) bv solver\n" << solver;
 	#endif // DEBUG
 
 	auto result = solver.check() == z3::sat;
@@ -254,11 +254,11 @@ bool is_z3_formula_sat(const tau<BAs...>& form) {
 	#ifdef DEBUG
 	if (result) {
 		BOOST_LOG_TRIVIAL(info)
-			<< "(Info) z3 system is sat\n"
-			<< "(Info) z3 model\n" << solver.get_model();
+			<< "(Info) bv system is sat\n"
+			<< "(Info) bv model\n" << solver.get_model();
 	} else {
 		BOOST_LOG_TRIVIAL(info)
-			<< "(Info) z3 system is unsat\n";
+			<< "(Info) bv system is unsat\n";
 	}
 	#endif // DEBUG
 
@@ -275,7 +275,7 @@ std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form, z3::solver& so
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(info)
-	<< "(Info) z3 solver\n" << solver;
+	<< "(Info) bv solver\n" << solver;
 	#endif // DEBUG
 
 	auto result = solver.check();
@@ -284,8 +284,8 @@ std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form, z3::solver& so
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(info)
-			<< "(Info) z3 system is sat\n"
-			<< "(Info) z3 model\n" << solver.get_model();
+			<< "(Info) bv system is sat\n"
+			<< "(Info) bv model\n" << solver.get_model();
 		#endif // DEBUG
 
 		solution<BAs...> s;
@@ -300,7 +300,7 @@ std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form, z3::solver& so
 			} else {
 
 				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(info) << "(Info) z3 system is unsat";
+				BOOST_LOG_TRIVIAL(info) << "(Info) bv system is unsat";
 				#endif // DEBUG
 
 			}

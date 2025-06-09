@@ -21,22 +21,22 @@ bool is_non_terminal_node(const tau_sym<BAs...>& s) {
 }
 
 template <typename... BAs>
-bool is_z3_node(const tau_sym<BAs...>& s) {
+bool is_bv_node(const tau_sym<BAs...>& s) {
 	return std::holds_alternative<cvc5::Term>(s);
 }
 
 template <typename... BAs>
-bool is_z3_node(const rewriter::node<tau_sym<BAs...>>& s) {
-	return is_z3_node(s.value);
+bool is_bv_node(const rewriter::node<tau_sym<BAs...>>& s) {
+	return is_bv_node(s.value);
 }
 
 template <typename... BAs>
-bool is_z3_node(const tau<BAs...>& n) {
-	return is_z3_node<BAs...>(n->value);
+bool is_bv_node(const tau<BAs...>& n) {
+	return is_bv_node<BAs...>(n->value);
 }
 
 template <typename... BAs>
-auto is_z3_constant = [](const tau<BAs...>& n) {
+auto is_bv_constant = [](const tau<BAs...>& n) {
 	return std::holds_alternative<cvc5::Term>(n->child[0]->value);
 };
 

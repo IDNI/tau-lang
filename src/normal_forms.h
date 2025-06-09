@@ -3024,24 +3024,24 @@ bool is_bv_quantifier(const tau<BAs...>& fm) {
 
 template<typename... BAs>
 std::vector<tau<BAs...>> get_bv_variables(const tau<BAs...>& fm) {
-	auto is_z3_var = [](const auto& n) {
+	auto is_bv_var = [](const auto& n) {
 		return is_non_terminal<tau_parser::bv, BAs...>(n)
 			&& is_child_non_terminal<tau_parser::variable, BAs...>(n);
 	};
-	return select_top(fm, is_z3_var);
+	return select_top(fm, is_bv_var);
 }
 
 template<typename... BAs>
 std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_conjunctions(const tau<BAs...>& fm) {
-	tau<BAs...> z3_literals = _T<BAs...>;
+	tau<BAs...> bv_literals = _T<BAs...>;
 	tau<BAs...> tau_literals = _T<BAs...>;
-	tau<BAs...> z3_constants = _T<BAs...>;
-	auto collect = [&z3_literals, &tau_literals, &z3_constants](const auto& n) {
+	tau<BAs...> bv_constants = _T<BAs...>;
+	auto collect = [&bv_literals, &tau_literals, &bv_constants](const auto& n) {
 		if (is_bv_literal<BAs...>(n)) {
-			z3_literals = build_wff_and(z3_literals, n);
+			bv_literals = build_wff_and(bv_literals, n);
 			return true;
-		} else if (is_z3_constant<BAs...>(n)) {
-			z3_constants = build_wff_and(z3_constants, n);
+		} else if (is_bv_constant<BAs...>(n)) {
+			bv_constants = build_wff_and(bv_constants, n);
 			return true;
 		} else if (is_tau_literal<BAs...>(n)) {
 			tau_literals = build_wff_and(tau_literals, n);
@@ -3050,20 +3050,20 @@ std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_conjunctions(c
 		return false;
 	};
 	select_top(fm, collect);
-	return std::make_tuple(z3_literals, z3_constants, tau_literals);
+	return std::make_tuple(bv_literals, bv_constants, tau_literals);
 }
 
 template<typename... BAs>
 std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_disjunctions(const tau<BAs...>& fm) {
-	tau<BAs...> z3_literals = _F<BAs...>;
+	tau<BAs...> bv_literals = _F<BAs...>;
 	tau<BAs...> tau_literals = _F<BAs...>;
-	tau<BAs...> z3_constants = _F<BAs...>;
-	auto collect = [&z3_literals, &tau_literals, &z3_constants](const auto& n) {
+	tau<BAs...> bv_constants = _F<BAs...>;
+	auto collect = [&bv_literals, &tau_literals, &bv_constants](const auto& n) {
 		if (is_bv_literal<BAs...>(n)) {
-			z3_literals = build_wff_or(z3_literals, n);
+			bv_literals = build_wff_or(bv_literals, n);
 			return true;
-		} else if (is_z3_constant<BAs...>(n)) {
-			z3_constants = build_wff_or(z3_constants, n);
+		} else if (is_bv_constant<BAs...>(n)) {
+			bv_constants = build_wff_or(bv_constants, n);
 			return true;
 		} else if (is_tau_literal<BAs...>(n)) {
 			tau_literals = build_wff_or(tau_literals, n);
@@ -3072,7 +3072,7 @@ std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_disjunctions(c
 		return false;
 	};
 	select_top(fm, collect);
-	return std::make_tuple(z3_literals, z3_constants, tau_literals);
+	return std::make_tuple(bv_literals, bv_constants, tau_literals);
 }
 
 template<typename... BAs>

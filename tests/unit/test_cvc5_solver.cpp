@@ -300,7 +300,7 @@ TEST_SUITE("z3_solve simple") {
 	}*/
 }
 
-/*TEST_SUITE("z3 overflow/underflow") {
+/*TEST_SUITE("bv overflow/underflow") {
 
 	TEST_CASE("multiplication overflow") {
 		const char* sample = "X =_ [4294967296 * 8589934592]"; // 2^32 + 2^33
