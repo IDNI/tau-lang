@@ -3,6 +3,8 @@
 #ifndef __TEST_HELPERS_H__
 #define __TEST_HELPERS_H__
 
+#include <cvc5/cvc5.h>
+
 #include "runtime.h"
 #include "hooks.h"
 #include "nso_rr.h"
@@ -108,7 +110,8 @@ std::ostream& print_tau(std::ostream &os, tau<Bool> n, size_t l = 0) {
 	std::visit(overloaded {
 		[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
 		[&os](std::variant<Bool> v) { if (auto b = std::get<0>(v); b.b) os << "true"; else os << "false"; },
-		[&os](size_t v) { os << v; }
+		[&os](size_t v) { os << v; },
+		[&os](auto v) { os << v; }
 	}, n->value);
 	for (auto& d : n->child) print_tau(os, d, l + 1);
 	os << "}";
@@ -123,7 +126,8 @@ std::ostream& pretty_print_tau(std::ostream &os, tau<Bool> n, size_t l = 0) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
 			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...bdd..."; },
-		[&os](size_t v) { os << v; }
+		[&os](size_t v) { os << v; },
+		[&os](auto v) { os << v; }
 	}, n->value);
 	for (auto& d : n->child) pretty_print_tau(os, d, l + 1);
 	return os;

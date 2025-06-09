@@ -22,7 +22,6 @@
 #include <numeric>
 
 #include "../parser/tau_parser.generated.h"
-#include "z3++.h"
 #include "init_log.h"
 #include "splitter_types.h"
 #include "parser.h"
@@ -54,7 +53,7 @@ using sp_tau_source_node = rewriter::sp_node<idni::lit<char, char>>;
 // node type for the tau language related programs, libraries and
 // specifications trees.
 template <typename... BAs>
-using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, z3::expr, size_t>;
+using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, cvc5::Term, size_t>;
 
 // Compares two std::variant objects lhs and rhs. The contained values are compared
 // (using the corresponding operator of T) only if both lhs and rhs contain values
@@ -64,7 +63,7 @@ using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, z3::expr, siz
 template <typename... BAs>
 std::strong_ordering operator<=>(const tau_sym<BAs...>& lhs, const tau_sym<BAs...>& rhs) {
 	return std::visit(overloaded(
-		[](const z3::expr& l, const z3::expr& r) -> std::strong_ordering { return std::addressof(l) <=> std::addressof(r); },
+		[](const cvc5::Term& l, const cvc5::Term& r) -> std::strong_ordering { return std::addressof(l) <=> std::addressof(r); },
 		[]<typename T>(const T& l, const T& r) -> std::strong_ordering { return l <=> r; },
 		[](const auto&, const auto&) -> std::strong_ordering { throw std::logic_error("wrong types"); }
 	), lhs, rhs);

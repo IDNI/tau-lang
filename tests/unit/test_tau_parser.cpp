@@ -1387,7 +1387,7 @@ TEST_SUITE("parsing bv expressions") {
 			| tau_parser::bitvector
 			| optional_value_extractor<tau<Bool>>;
 		auto check = expr->child[0]->value;
-		CHECK( std::holds_alternative<z3::expr>(check) );
+		CHECK( std::holds_alternative<cvc5::Term>(check) );
 	}
 
 	TEST_CASE("z3 bits") {
@@ -1398,7 +1398,7 @@ TEST_SUITE("parsing bv expressions") {
 			| tau_parser::bitvector
 			| optional_value_extractor<tau<Bool>>;
 		auto check = expr->child[0]-> value;
-		CHECK( std::holds_alternative<z3::expr>(check) );
+		CHECK( std::holds_alternative<cvc5::Term>(check) );
 	}
 
 	TEST_CASE("z3 hexnum") {
@@ -1409,7 +1409,7 @@ TEST_SUITE("parsing bv expressions") {
 			| tau_parser::bitvector
 			| optional_value_extractor<tau<Bool>>;
 		auto check = expr->child[0]-> value;
-		CHECK( std::holds_alternative<z3::expr>(check) );
+		CHECK( std::holds_alternative<cvc5::Term>(check) );
 	}
 }
 

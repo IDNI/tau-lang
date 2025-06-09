@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "base_bas/z3.h"
+//#include "base_bas/z3.h"
+#include "base_bas/cvc5.h"
 
 namespace idni::tau_lang {
 
@@ -666,7 +667,7 @@ void print_z3_solver_cmd_solution(std::optional<solution<BAs...>>& solution) {
 
 	std::cout << "solution: {\n";
 	for (auto [var, value]: solution.value()) {
-		auto ull = std::get<z3::expr>(value->child[0]->value).as_uint64();
+		auto ull = std::get<cvc5::Term>(value->child[0]->value);
 		std::cout << "\t" << var << " := " << ull << "\n";
 	}
 	std::cout << "}\n";
@@ -688,7 +689,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	auto equations = n->child.back();
 	if (is_z3_formula(equations)) {
 		try {
-			auto solution = solve_z3(equations);
+			auto solution = solve_cvc5(equations);
 			if (!solution) { std::cout << "no solution\n"; return; }
 			else print_z3_solver_cmd_solution(solution);
 		} catch (std::exception&) {
@@ -809,7 +810,7 @@ std::optional<tau_nso<BAs...>>
 	auto arg = n->child[1];
 	if (is_z3_formula(arg)) {
 		try {
-			return is_z3_formula_sat(arg)
+			return is_cvc5_formula_sat(arg)
 				? _T<tau_ba_t, BAs...>
 				: _F<tau_ba_t, BAs...>;
 		 } catch (std::exception&) {

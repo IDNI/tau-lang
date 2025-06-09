@@ -4,7 +4,8 @@
 
 #include "normal_forms.h"
 #include "splitter.h"
-#include "base_bas/z3.h"
+//#include "base_bas/z3.h"
+#include <cvc5/cvc5.h>
 
 #ifdef DEBUG
 #include "debug_helpers.h"

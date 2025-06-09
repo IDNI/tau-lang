@@ -16,7 +16,8 @@
 #include <iostream>
 #include <vector>
 
-#include "z3++.h"
+//#include "z3++.h"
+#include <cvc5/cvc5.h>
 
 #define pfst(x) (*(x).begin())
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
@@ -39,12 +40,14 @@ template<typename T, typename V> bool hasv(const T& t, const V& v) {
 	return std::find(t.begin(), t.end(), v) != t.end();
 }
 
-template <>
+// In cvc5, hashing is properly defined
+
+/*template <>
 struct std::hash<z3::expr> {
 	size_t operator()(const z3::expr& e) const {
 		return e.hash();
 	}
-};
+};*/
 
 //auto operator<=>(const z3::expr& e1, const z3::expr& e2) {
 //	return std::addressof(e1) <=> std::addressof(e2);

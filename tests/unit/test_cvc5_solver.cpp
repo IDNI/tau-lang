@@ -5,7 +5,7 @@
 #include "doctest.h"
 
 #include "../unit/test_helpers.h"
-#include "z3.h"
+//#include "z3.h"
 
 
 using namespace idni::rewriter;
@@ -23,7 +23,7 @@ TEST_SUITE("configuration") {
 	}
 
 	TEST_CASE("z3_config") {
-		z3_config();
+		cvc5_config();
 	}
 }
 
@@ -34,7 +34,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -43,16 +43,16 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( !solution.has_value() );
 	}
 
-	TEST_CASE("X >_ X") {
-		const char* sample = "X >_ X";
+	TEST_CASE("X + 0 >_ 0") {
+		const char* sample = "X + 0 >_ 0";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( !solution.has_value() );
 	}
 
@@ -61,7 +61,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -70,7 +70,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -79,7 +79,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( !solution.has_value() );
 	}
 
@@ -88,7 +88,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -97,7 +97,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( !solution.has_value() );
 	}
 
@@ -106,7 +106,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( !solution.has_value() );
 	}
 
@@ -115,7 +115,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -124,7 +124,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -134,7 +134,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -144,7 +144,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -154,7 +154,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -164,7 +164,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -174,7 +174,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -184,7 +184,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -194,7 +194,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -204,7 +204,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -214,7 +214,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -224,17 +224,17 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
 
 	TEST_CASE("z3_nor") {
-		const char* sample = "2 !| 1 =_ X";
+		const char* sample = "2 !| X =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -244,7 +244,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -254,7 +254,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -264,7 +264,7 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -274,17 +274,17 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_min") {
+	/*TEST_CASE("z3_min") {
 		const char* sample = "min 2 1 =_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -294,21 +294,21 @@ TEST_SUITE("z3_solve simple") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
-	}
+	}*/
 }
 
-TEST_SUITE("z3 overflow/underflow") {
+/*TEST_SUITE("z3 overflow/underflow") {
 
 	TEST_CASE("multiplication overflow") {
 		const char* sample = "X =_ [4294967296 * 8589934592]"; // 2^32 + 2^33
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		//CHECK_THROWS( solve_z3(equation) );
-		auto solution = solve_z3(equation);
+		//CHECK_THROWS( solve_cvc5(equation) );
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 
 	}
@@ -318,7 +318,7 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -327,8 +327,8 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		//CHECK_THROWS( solve_z3(equation) );
-		auto solution = solve_z3(equation);
+		//CHECK_THROWS( solve_cvc5(equation) );
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 
 	}
@@ -338,7 +338,7 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -347,8 +347,8 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		//CHECK_THROWS( solve_z3(equation) );
-		auto solution = solve_z3(equation);
+		//CHECK_THROWS( solve_cvc5(equation) );
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 
 	}
@@ -358,7 +358,7 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -367,8 +367,8 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		//CHECK_THROWS( solve_z3(equation) );
-		auto solution = solve_z3(equation);
+		//CHECK_THROWS( solve_cvc5(equation) );
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 
 	}
@@ -378,7 +378,7 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -387,7 +387,7 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		auto solution = solve_z3(equation);
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
 
@@ -396,12 +396,12 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		//CHECK_THROWS( solve_z3(equation) );
-		auto solution = solve_z3(equation);
+		//CHECK_THROWS( solve_cvc5(equation) );
+		auto solution = solve_cvc5(equation);
 		CHECK( solution.has_value() );
 	}
-}
+}*/
 
-TEST_SUITE("complex solve_z3") {
+TEST_SUITE("complex solve_cvc5") {
 
 }

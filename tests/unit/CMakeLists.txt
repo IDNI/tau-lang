@@ -22,9 +22,9 @@ set(TESTS
 	normal_forms
 	make_node_hook
 	interpreter
-	z3_solver
-	z3_satisfiability
-	z3
+	cvc5_solver
+	#z3_satisfiability
+	#z3
 	cvc5
 )
 

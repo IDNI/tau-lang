@@ -4,7 +4,8 @@
 
 #include "nso_rr.h"
 #include "builders.h"
-#include "base_bas/z3.h"
+//#include "base_bas/z3.h"
+#include "base_bas/cvc5.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -1134,12 +1135,12 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 	switch (nt) {
 		case p::num : {
 			int64_t ull = std::stoull(value);
-			auto bv = z3_context.bv_val(ull, size);
+			auto bv = cvc5_solver.mkBitVector(size, ull);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
 		case p::bits : {
-			auto bv = z3_context.bv_val(value.c_str(), size);
+			auto bv = cvc5_solver.mkBitVector(size, value.c_str(), 2);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
@@ -1148,7 +1149,7 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 			std::istringstream converter { value };
 			int64_t ull = 0;
 		    converter >> std::hex >> ull;
-			auto bv = z3_context.bv_val(ull, size);
+			auto bv = cvc5_solver.mkBitVector(size, ull);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}

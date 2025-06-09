@@ -1,0 +1,43 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
+#ifndef __CVC5_H__
+#define __CVC5_H__
+
+#include "nso_rr.h"
+
+namespace idni::tau_lang {
+
+static cvc5::Solver cvc5_solver;
+
+
+static void cvc5_config() {
+	// configure the solver
+	cvc5_solver.setOption("produce-models", "true");
+	//cvc5_solver.setOption("incremental", "true");
+	cvc5_solver.setLogic("BV");
+}
+
+template<typename...BAs>
+using var = tau<BAs...>;
+
+template<typename...BAs>
+using solution = std::map<var<BAs...>, tau<BAs...>>;
+
+template <typename...BAs>
+cvc5::Term eval_cvc5(const tau<BAs...>& form, std::map<tau<BAs...>,	cvc5::Term>& vars,
+	std::map<tau<BAs...>, cvc5::Term>& free_vars, bool checked = false);
+
+template <typename...BAs>
+bool is_cvc5_formula_sat(const tau<BAs...>& form);
+
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_cvc5(const tau<BAs...>& form, cvc5::Solver& solver);
+
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_cvc5(const tau<BAs...>& form);
+
+} // namespace idni::tau_lang
+
+#include "cvc5.tmpl.h"
+
+#endif // __CVC5_H__
