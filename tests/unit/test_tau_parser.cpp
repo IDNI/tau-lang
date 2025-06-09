@@ -1379,7 +1379,7 @@ TEST_SUITE("parsing bv expressions") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3 number") {
+	TEST_CASE("bv number") {
 		const char* sample = "1234";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::bv });
@@ -1390,7 +1390,7 @@ TEST_SUITE("parsing bv expressions") {
 		CHECK( std::holds_alternative<cvc5::Term>(check) );
 	}
 
-	TEST_CASE("z3 bits") {
+	TEST_CASE("bv bits") {
 		const char* sample = "#b01010101";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::bv });
@@ -1401,7 +1401,7 @@ TEST_SUITE("parsing bv expressions") {
 		CHECK( std::holds_alternative<cvc5::Term>(check) );
 	}
 
-	TEST_CASE("z3 hexnum") {
+	TEST_CASE("bv hexnum") {
 		const char* sample = "#x0FFFFFFFF";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::bv });

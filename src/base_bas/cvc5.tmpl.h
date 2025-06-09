@@ -316,7 +316,7 @@ Term eval_cvc5(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::
 		}
 		default: {
 			#ifdef DEBUG
-			BOOST_LOG_TRIVIAL(error) << "(Error) unknow z3 non-terminal: " << nt;
+			BOOST_LOG_TRIVIAL(error) << "(Error) unknow bv non-terminal: " << nt;
 			#endif // DEBUG
 		}
 	}
@@ -342,11 +342,11 @@ bool is_cvc5_formula_sat(const tau<BAs...>& form) {
 	}
 	if (result) {
 		BOOST_LOG_TRIVIAL(info)
-			<< "(Info) z3 system is sat\n"
-			<< "(Info) z3 model\n" << cvc5_solver.getModel({ BV }, vvars);
+			<< "(Info) bv system is sat\n"
+			<< "(Info) bv model\n" << cvc5_solver.getModel({ BV }, vvars);
 	} else {
 		BOOST_LOG_TRIVIAL(info)
-			<< "(Info) z3 system is unsat\n";
+			<< "(Info) bv system is unsat\n";
 	}
 	#endif // DEBUG
 
@@ -385,7 +385,7 @@ std::optional<solution<BAs...>> solve_cvc5(const tau<BAs...>& form) {
 	} else {
 
 		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(info) << "(Info) z3 system is unsat";
+		BOOST_LOG_TRIVIAL(info) << "(Info) bv system is unsat";
 		#endif // DEBUG
 	}
 	return {};
