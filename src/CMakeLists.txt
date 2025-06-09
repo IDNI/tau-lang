@@ -1,15 +1,6 @@
 set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
-	../external/parser/src/characters.h
-	../external/parser/src/charclasses.h
-	../external/parser/src/defs.h
-	../external/parser/src/devhelpers.h
-	../external/parser/src/forest.h
-	../external/parser/src/parser.h
-	../external/parser/src/parser.tmpl.h
-	../external/parser/src/recoders.h
-	../external/parser/src/tgf.h
 	../parser/sbf_parser.generated.h
 	../parser/tau_parser.generated.h
 	boolean_algebras/bdds/babdd.h
@@ -42,11 +33,6 @@ set(TAU_HEADERS
 )
 
 set(TAU_SOURCES
-	../external/parser/src/characters.cpp
-	../external/parser/src/charclasses.cpp
-	../external/parser/src/parser.cpp
-	../external/parser/src/recoders.cpp
-	../external/parser/src/term.cpp
 	boolean_algebras/bool_ba.cpp
 	dict.cpp
 	nso_rr.cpp
@@ -54,7 +40,6 @@ set(TAU_SOURCES
 
 set(CLI_SOURCES
 	main.cpp
-	../external/parser/src/cli.cpp
 )
 
 #
