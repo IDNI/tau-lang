@@ -40,7 +40,7 @@ auto is_bv_constant = [](const tau<BAs...>& n) {
 	return std::holds_alternative<cvc5::Term>(n->child[0]->value);
 };
 
-template <typename... BAs>
+/*template <typename... BAs>
 bool is_cvc5_node(const tau_sym<BAs...>& s) {
 	return std::holds_alternative<cvc5::Term>(s);
 }
@@ -58,7 +58,7 @@ bool is_cvc5_node(const tau<BAs...>& n) {
 template <typename... BAs>
 auto is_cvc5_constant = [](const tau<BAs...>& n) {
 	return std::holds_alternative<cvc5::Term>(n->child[0]->value);
-};
+};*/
 
 template <typename... BAs>
 auto is_bv_literal = [](const tau<BAs...>& n) {
