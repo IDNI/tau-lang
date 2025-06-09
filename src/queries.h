@@ -4,6 +4,7 @@
 #define __QUERIES_H__
 
 #include "nso_rr.h"
+
 namespace idni::tau_lang {
 
 template <typename... BAs>
@@ -21,7 +22,7 @@ bool is_non_terminal_node(const tau_sym<BAs...>& s) {
 
 template <typename... BAs>
 bool is_z3_node(const tau_sym<BAs...>& s) {
-	return std::holds_alternative<z3::expr>(s);
+	return std::holds_alternative<cvc5::Term>(s);
 }
 
 template <typename... BAs>
@@ -36,7 +37,27 @@ bool is_z3_node(const tau<BAs...>& n) {
 
 template <typename... BAs>
 auto is_z3_constant = [](const tau<BAs...>& n) {
-	return std::holds_alternative<z3::expr>(n->child[0]->value);
+	return std::holds_alternative<cvc5::Term>(n->child[0]->value);
+};
+
+template <typename... BAs>
+bool is_cvc5_node(const tau_sym<BAs...>& s) {
+	return std::holds_alternative<cvc5::Term>(s);
+}
+
+template <typename... BAs>
+bool is_cvc5_node(const rewriter::node<tau_sym<BAs...>>& s) {
+	return is_cvc5_node(s.value);
+}
+
+template <typename... BAs>
+bool is_cvc5_node(const tau<BAs...>& n) {
+	return is_cvc5_node<BAs...>(n->value);
+}
+
+template <typename... BAs>
+auto is_cvc5_constant = [](const tau<BAs...>& n) {
+	return std::holds_alternative<cvc5::Term>(n->child[0]->value);
 };
 
 template <typename... BAs>

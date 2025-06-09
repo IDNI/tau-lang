@@ -14,7 +14,6 @@
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
-using namespace z3;
 
 rr<tau<sbf_ba>> sbf_make_nso_rr(const std::string& src) {
 	auto sample_src = make_tau_source(src);
@@ -49,7 +48,7 @@ std::ostream& print_tau(std::ostream &os, tau<sbf_ba> n, size_t l = 0) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
 			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...sbf..."; },
-		[&os](z3::expr v) { os << v; },
+		[&os](cvc5::Term v) { os << v; },
 	}, n->value);
 	for (auto& d : n->child) print_tau(os, d, l + 1);
 	os << "}";
@@ -64,7 +63,7 @@ std::ostream& pretty_print_tau(std::ostream &os, tau<sbf_ba> n, size_t l = 0) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
 			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...sbf..."; },
-		[&os](z3::expr v) { os << v; },
+		[&os](cvc5::Term v) { os << v; },
 	}, n->value);
 	for (auto& d : n->child) pretty_print_tau(os, d, l + 1);
 	return os;

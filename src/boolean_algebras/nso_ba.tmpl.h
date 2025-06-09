@@ -1,8 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+#include <cvc5/cvc5.h>
+
 #include "builders.h"
 #include "queries.h"
-#include "z3++.h"
+//#include "z3++.h"
+#include <cvc5/cvc5.h>
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -10,7 +13,7 @@
 
 namespace idni::tau_lang {
 
-using namespace z3;
+using namespace cvc5;
 
 template <typename... BAs>
 tau<BAs...> operator&(const tau<BAs...>& l,

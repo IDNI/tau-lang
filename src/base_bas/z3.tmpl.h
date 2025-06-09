@@ -6,9 +6,7 @@
 
 namespace idni::tau_lang {
 
-using namespace z3;
-
-static auto BV = z3_context.bv_sort(64);
+static auto BV = z3_context.mkBitVectorSort(64);
 static auto BOOL = z3_context.bool_sort();
 
 // deactivated for the moment
@@ -237,7 +235,6 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars,
 	}
 	assert(false);
 }
-
 
 template <typename...BAs>
 bool is_z3_formula_sat(const tau<BAs...>& form) {
