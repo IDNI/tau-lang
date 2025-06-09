@@ -689,7 +689,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	auto equations = n->child.back();
 	if (is_z3_formula(equations)) {
 		try {
-			auto solution = solve_cvc5(equations);
+			auto solution = solve_bv(equations);
 			if (!solution) { std::cout << "no solution\n"; return; }
 			else print_z3_solver_cmd_solution(solution);
 		} catch (std::exception&) {
@@ -810,7 +810,7 @@ std::optional<tau_nso<BAs...>>
 	auto arg = n->child[1];
 	if (is_z3_formula(arg)) {
 		try {
-			return is_cvc5_formula_sat(arg)
+			return is_bv_formula_sat(arg)
 				? _T<tau_ba_t, BAs...>
 				: _F<tau_ba_t, BAs...>;
 		 } catch (std::exception&) {

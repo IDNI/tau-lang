@@ -117,7 +117,7 @@ Term mkBitVectorRotateRight(const Term& l, const Term& r) {
 
 
 template<typename...BAs>
-Term eval_cvc5(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::map<tau<BAs...>, Term>& free_vars, bool checked) {
+Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::map<tau<BAs...>, Term>& free_vars, bool checked) {
 	auto nt = std::get<tau_source_sym>(form->value).n();
 	// control overflow/underflow if requested
 	if (checked) {
@@ -129,27 +129,27 @@ Term eval_cvc5(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::
 		// due to hooks we should consider wff_t or bf_t
 		case tau_parser::wff:
 		case tau_parser::bv: {
-			auto expr = eval_cvc5(form->child[0], vars, free_vars, checked);
+			auto expr = eval_bv(form->child[0], vars, free_vars, checked);
 			return expr;
 		}
 		case tau_parser::wff_neg: {
-			return mkNot(eval_cvc5(form->child[0], vars, free_vars, checked));
+			return mkNot(eval_bv(form->child[0], vars, free_vars, checked));
 		}
 		case tau_parser::wff_and: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkAnd(l, r);
 		}
 		case tau_parser::wff_or: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkOr(l, r);
 		}
 		case tau_parser::wff_all: {
 			auto v = form->child[0];
 			if (auto it = vars.find(form); it != vars.end()) return it-> second;
 			auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
-			auto f = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto f = eval_bv(form->child[1], vars, free_vars, checked);
 			auto x = cvc5_solver.mkVar(BV, vn.c_str());
 			vars.emplace(v, x);
 			return mkForall(x, f);
@@ -158,7 +158,7 @@ Term eval_cvc5(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::
 			auto v = form->child[0];
 			if (auto it = vars.find(form); it != vars.end()) return it-> second;
 			auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
-			auto f = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto f = eval_bv(form->child[1], vars, free_vars, checked);
 			auto x = cvc5_solver.mkVar(BV, vn.c_str());
 			vars.emplace(v, x);
 			return mkExists(x, f);
@@ -175,136 +175,136 @@ Term eval_cvc5(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::
 			return x;
 		}
 		case tau_parser::bv_checked: {
-			return eval_cvc5(form->child[0], vars, free_vars, true);
+			return eval_bv(form->child[0], vars, free_vars, true);
 		}
 		case tau_parser::bv_eq: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkEqual(l, r);
 		};
 		case tau_parser::bv_neq: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkDisticnt(l, r);
 		}
 		case tau_parser::bv_less_equal: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkLessEqual(l, r);
 		}
 		case tau_parser::bv_nleq: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkNot(mkLessEqual(l, r));
 		}
 		case tau_parser::bv_greater: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkGreater(l, r);
 		}
 		case tau_parser::bv_ngreater: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkNot(mkGreater(l, r));
 		}
 		case tau_parser::bv_greater_equal: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkGreaterEqual(l, r);
 		}
 		case tau_parser::bv_ngeq: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkNot(mkGreaterEqual(l, r));
 		}
 		case tau_parser::bv_less: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkLess(l, r);
 		}
 		case tau_parser::bv_nless: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkNot(mkLess(l, r));
 		}
 		case tau_parser::bv_neg: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
 			return mkBitVectorNeg(l);
 		}
 		case tau_parser::bv_add: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkBitVectorAdd(l, r);
 		}
 		case tau_parser::bv_sub: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkBitVectorSub(l, r);
 		}
 		case tau_parser::bv_mul: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkBitVectorMul(l, r);
 		}
 		case tau_parser::bv_div: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkBitVectorDiv(l, r);
 		}
 		case tau_parser::bv_mod: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkBitVectorMod(l, r);
 		}
 		case tau_parser::bv_and: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkBitVectorAnd(l, r);
 		}
 		case tau_parser::bv_nand: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkBitVectorNand(l, r);
 		}
 		case tau_parser::bv_or: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkBitVectorOr(l, r);
 		}
 		case tau_parser::bv_nor: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkNot(mkBitVectorNor(l, r));
 		}
 		case tau_parser::bv_xor: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkBitVectorXor(l, r);
 		}
 		case tau_parser::bv_xnor: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return mkNot(mkBitVectorXnor(l, r));
 		}
 		/*case tau_parser::bv_min: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return min(l, r);
 		}
 		case tau_parser::bv_max: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
-			auto r = eval_cvc5(form->child[1], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+			auto r = eval_bv(form->child[1], vars, free_vars, checked);
 			return max(l, r);
 		}*/
 		case tau_parser::bv_rotate_left: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
 			auto value = make_string(tau_node_terminal_extractor<BAs...>, form->child[1]);
 			// this is the type of rotate_left
 			unsigned int ul = std::stoul(value);
 			return mkBitVectorRotateLeft(l, cvc5_solver.mkBitVector(64, ul));
 		}
 		case tau_parser::bv_rotate_right: {
-			auto l = eval_cvc5(form->child[0], vars, free_vars, checked);
+			auto l = eval_bv(form->child[0], vars, free_vars, checked);
 			auto value = make_string(tau_node_terminal_extractor<BAs...>, form->child[1]);
 			// this is the type of rotate_left
 			unsigned int ul = std::stoul(value);
@@ -325,10 +325,10 @@ Term eval_cvc5(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::
 
 
 template <typename...BAs>
-bool is_cvc5_formula_sat(const tau<BAs...>& form) {
+bool is_bv_formula_sat(const tau<BAs...>& form) {
 	std::map<tau<BAs...>, cvc5::Term> vars;
 	std::map<tau<BAs...>, cvc5::Term> free_vars;
-	auto expr = eval_cvc5(form, vars, free_vars);
+	auto expr = eval_bv(form, vars, free_vars);
 	// solve the equations
 	cvc5_solver.assertFormula(expr);
 
@@ -354,11 +354,11 @@ bool is_cvc5_formula_sat(const tau<BAs...>& form) {
 }
 
 template<typename...BAs>
-std::optional<solution<BAs...>> solve_cvc5(const tau<BAs...>& form) {
+std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 	std::map<tau<BAs...>, cvc5::Term> vars;
 	std::map<tau<BAs...>, cvc5::Term> free_vars;
 	cvc5_solver.resetAssertions();
-	auto expr = eval_cvc5(form, vars, free_vars);
+	auto expr = eval_bv(form, vars, free_vars);
 	// solve the equations
 	cvc5_solver.assertFormula(expr);
 

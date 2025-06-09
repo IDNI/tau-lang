@@ -88,7 +88,7 @@ void welcome() {
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	bdd_init<Bool>();
-	cvc5_config();
+	bv_config();
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
