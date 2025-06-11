@@ -12,7 +12,7 @@ start                  => spec _.
 # spec, inputs, library, builder, tau_constant_source, cli (bellow)
 spec                   => definitions _ wff:main _ '.'.
 definitions            => (_ (rec_relation | input_def | output_def) _ '.')*.
-ref_relations          => (_ rec_relation _ '.')*.
+rec_relations          => (_ rec_relation _ '.')*.
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
 input_def              => io_var_name [ typed ] _ '=' _ "in"    __ stream.
 output_def             => io_var_name [ typed ] _ '=' _ "out" [ __ stream ].
