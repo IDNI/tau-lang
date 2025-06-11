@@ -781,6 +781,16 @@ inline auto is_wff_bdd_var = [](const auto& n) {
 		using tp = tau_parser;
 		assert(!is_non_terminal(tp::bf_neq, n));
 		return is_child_non_terminal(tp::bf_eq, n)
+			|| is_child_non_terminal(tp::bv_eq, n)
+			|| is_child_non_terminal(tp::bv_neq, n)
+			|| is_child_non_terminal(tp::bv_less_equal, n)
+			|| is_child_non_terminal(tp::bv_nleq, n)
+			|| is_child_non_terminal(tp::bv_greater, n)
+			|| is_child_non_terminal(tp::bv_ngreater, n)
+			|| is_child_non_terminal(tp::bv_greater_equal, n)
+			|| is_child_non_terminal(tp::bv_ngeq, n)
+			|| is_child_non_terminal(tp::bv_less, n)
+			|| is_child_non_terminal(tp::bv_nless, n)
 			|| is_child_non_terminal(tp::wff_ref, n)
 			|| is_child_non_terminal(tp::wff_ex, n)
 			|| is_child_non_terminal(tp::wff_sometimes, n)
@@ -1822,14 +1832,27 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 	// std::cout << "(F) " << fm << "\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start reduce_across_bfs with";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/fm: " << fm;
 
 	auto squeezed_fm = (to_cnf ? push_negation_in(build_wff_neg(fm)) : fm);
+
+	BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/squeezed_fm: " << squeezed_fm;
+
 	// Squeeze all equalities and inequalities
 	squeezed_fm = squeeze_wff(squeezed_fm);
+
+	BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/squeezed_fm: " << squeezed_fm;
+
 	squeezed_fm = reduce_terms(to_dnf(squeezed_fm));
+
+	BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/squeezed_fm: " << squeezed_fm;
+
 	// std::cout << squeezed_fm << "\n";
 	// We work with unsqueezed equality
 	squeezed_fm  = unsqueeze_wff_pos(squeezed_fm);
+
+	BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/squeezed_fm: " << squeezed_fm;
+
 	// std::cout << "squeezed_fm: " << squeezed_fm << "\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Formula in DNF: " << squeezed_fm;
 #ifdef TAU_CACHE
@@ -1843,11 +1866,15 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 
 	if (paths.empty()) {
 		auto res = to_cnf ? _T<BAs...> : _F<BAs...>;
-#ifdef TAU_CACHE
-		return cache.emplace(make_pair(squeezed_fm, to_cnf), res).first->second;
-#endif // TAU_CACHE
+
+		BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/res: " << res;
 		BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
+
+		#ifdef TAU_CACHE
+		return cache.emplace(make_pair(squeezed_fm, to_cnf), res).first->second;
+		#endif // TAU_CACHE
+
 		return res;
 	} else if (paths.size() == 1 && paths[0].empty()) {
 		auto res = to_cnf ? _F<BAs...> : _T<BAs...>;
@@ -1856,6 +1883,8 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 #endif // TAU_CACHE
 		BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
+		BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/res: " << res;
+
 		return res;
 	}
 
@@ -1918,6 +1947,8 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 #endif // TAU_CACHE
 					BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
 					BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
+					BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/res: " << res;
+
 					return res;
 				}
 				has_simp = true;
@@ -1949,6 +1980,8 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 #endif // TAU_CACHE
 			BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
+			BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/res: " << res;
+
 			return res;
 		}
 		auto [simp_paths, simp_vars] =
@@ -3076,7 +3109,7 @@ std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_disjunctions(c
 }
 
 template<typename... BAs>
-auto build_z3_var(const tau<BAs...>& fm) {
+auto build_bv_var(const tau<BAs...>& fm) {
 	std::string name = make_string<tau_node_terminal_extractor_t<BAs...>,tau<BAs...>>(
 		tau_node_terminal_extractor<BAs...>, fm);
 	return cvc5_solver.mkConst(BV, name.c_str());
@@ -3089,7 +3122,7 @@ auto build_z3_skolem_func(const std::vector<tau<BAs...>>& vars) {
 	std::map<tau<BAs...>, cvc5::Term> z3_vars_map;
 	for (size_t i = 0; i < vars.size(); i++) {
 		z3_vars_sorts.push_back(BV);
-		auto z3_var = build_z3_var(vars[i]);
+		auto z3_var = build_bv_var(vars[i]);
 		z3_vars_vec.push_back(z3_var);
 		z3_vars_map.emplace(vars[i], z3_var);
 	}
@@ -3104,7 +3137,7 @@ tau<BAs...> eliminate_z3_existential_quantifier_from_clause(const tau<BAs...>& q
 		// remove qvar from variables to be used in skolem function
 		z3_vars.erase(it);
 		// get z3 quantified variable and skolem function
-		auto z3_qvar = build_z3_var(qvar);
+		auto z3_qvar = build_bv_var(qvar);
 		auto [z3_skolem_func, z3_vars_map, z3_vars_vec] = build_z3_skolem_func(z3_vars);
 		// split the clause into its constituents
 		auto [z3_literals, z3_constants, tau_literals] = split_clause_in_conjunctions(scoped_fm);
@@ -3235,7 +3268,7 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	};
 	auto visit = [&excluded_nodes](const tau<BAs...>& n) {
 		using p = tau_parser;
-		if (is_non_terminal(p::bf, n)) return false;
+		if (is_non_terminal(p::bf, n) || is_non_terminal(p::bv, n)) return false;
 		// Do not visit subtrees below a maximally pushed quantifier
 		if (excluded_nodes.contains(n)) return false;
 		return true;
