@@ -29,18 +29,12 @@ set(TAU_HEADERS
 )
 
 set(TAU_SOURCES
-	../external/parser/src/parser.cpp
-	../external/parser/src/recoders.cpp
-	../external/parser/src/utility/characters.cpp
-	../external/parser/src/utility/charclasses.cpp
-	../external/parser/src/utility/term.cpp
 	boolean_algebras/bool_ba.cpp
 	boolean_algebras/bdds/var_dict.cpp
 )
 
 set(CLI_SOURCES
 	main.cpp
-	../external/parser/src/utility/cli.cpp
 )
 
 set(TAU_HEADER_TEMPLATE ${CMAKE_CURRENT_SOURCE_DIR}/tau.h.in)

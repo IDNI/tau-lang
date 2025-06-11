@@ -3,6 +3,8 @@
 #ifndef __IDNI__TAU__DEFS_H__
 #define __IDNI__TAU__DEFS_H__
 
+#include "./version_license.h"
+
 #include <cstddef>
 #include <variant>
 #ifdef DEBUG
