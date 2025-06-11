@@ -21,12 +21,12 @@ jobs:
         continue-on-error: true
         name: check latest commit is less than a day
         if: ${{ github.event_name == 'schedule' }}
-        run: test -z $(git rev-list --after="24 hours" ${{ github.sha }}) && echo "::set-output name=should_run::false"
+        run: test -z $(git rev-list --after="24 hours" ${{ github.sha }}) && echo "should_run=false"
 
   build_and_deploy_nightly:
     needs: check_date
     if: ${{ needs.check_date.outputs.should_run != 'false' }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
