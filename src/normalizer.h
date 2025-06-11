@@ -63,6 +63,9 @@ tau<BAs...> normalizer_step(const tau<BAs...>& form) {
 	#ifdef TAU_CACHE
 	cache.emplace(form, result);
 	#endif // TAU_CACHE
+
+	BOOST_LOG_TRIVIAL(trace) << "normalizer.h:" << __LINE__ <<  " normalized_step/result: " << result;
+
 	return result;
 }
 
@@ -377,20 +380,37 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 		return n;
 	};
 	auto red_fm = normalizer_step(fm);
-	if (red_fm == _T<BAs...> || red_fm == _F<BAs...>) return red_fm;
+	if (red_fm == _T<BAs...> || red_fm == _F<BAs...>) {
+
+		BOOST_LOG_TRIVIAL(trace) << "normalizer.h:" << __LINE__ <<  " normalize_with_temp_simp/red_fm: " << red_fm;
+
+		return red_fm;
+	}
 	auto clauses = get_dnf_wff_clauses(red_fm);
 	tau<BAs...> new_fm = _F<BAs...>;
+
+	BOOST_LOG_TRIVIAL(trace) << "normalizer.h:" << __LINE__ <<  " normalize_with_temp_simp/new_fm: " << new_fm;
+
 	for (const auto& clause : clauses) {
+
+		BOOST_LOG_TRIVIAL(trace) << "normalizer.h:" << __LINE__ <<  " normalize_with_temp_simp/clause: " << clause;
+
 		auto aw_parts = select_top(clause,
 			is_child_non_terminal<tau_parser::wff_always, BAs...>);
 		auto st_parts = select_top(clause,
 			is_child_non_terminal<tau_parser::wff_sometimes, BAs ...>);
 		if (aw_parts.size() == 1 && st_parts.empty()) {
 			new_fm = build_wff_or(new_fm, clause);
+
+			BOOST_LOG_TRIVIAL(trace) << "normalizer.h:" << __LINE__ <<  " normalize_with_temp_simp/clause: " << clause;
+
 			continue;
 		}
 		if (aw_parts.empty() && st_parts.size() == 1) {
 			new_fm = build_wff_or(new_fm, clause);
+
+			BOOST_LOG_TRIVIAL(trace) << "normalizer.h:" << __LINE__ <<  " normalize_with_temp_simp/clause: " << clause;
+
 			continue;
 		}
 
@@ -401,6 +421,8 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 		for (const auto& st : st_parts)
 			changes.emplace(st, _T<BAs...>);
 		tau<BAs...> new_clause = replace(clause, changes);
+
+		BOOST_LOG_TRIVIAL(trace) << "normalizer.h:" << __LINE__ <<  " normalize_with_temp_simp/new_clause: " << new_clause;
 
 		// First check if any always statements are implied by others
 		for (size_t i = 0; i < aw_parts.size(); ++i) {
@@ -441,7 +463,14 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 		new_clause = build_wff_and(new_clause, build_wff_and(
 						build_wff_and<BAs...>(aw_parts),
 						build_wff_and<BAs...>(st_parts)));
+
+		BOOST_LOG_TRIVIAL(trace) << "normalizer.h:" << __LINE__ <<  " normalize_with_temp_simp/new_clause: " << new_clause;
+
+
 		new_fm = build_wff_or(new_fm, new_clause);
+
+		BOOST_LOG_TRIVIAL(trace) << "normalizer.h:" << __LINE__ <<  " normalize_with_temp_simp/new_fm: " << new_fm;
+
 	}
 	assert(new_fm != nullptr);
 	return new_fm;
