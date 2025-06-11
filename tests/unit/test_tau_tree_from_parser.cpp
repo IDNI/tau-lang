@@ -18,8 +18,8 @@ tt get_main(const char* sample) {
 }
 
 tt get_rec_relation(const char* sample) {
-	return tt(tau::get(sample))
-		| tau::spec | tau::rec_relations | tau::rec_relation;
+	tref n = tau::get(sample);
+	return tt(n) | tau::spec | tau::definitions | tau::rec_relation;
 }
 
 
