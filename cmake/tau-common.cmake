@@ -84,7 +84,7 @@ function(target_setup target)
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-			target_compile_features(${target} PRIVATE cxx_std_20)
+			target_compile_features(${target} PRIVATE cxx_std_23)
 			target_compile_options(${target} PRIVATE
 				-Wa,-mbig-obj
 				-fno-use-linker-plugin
