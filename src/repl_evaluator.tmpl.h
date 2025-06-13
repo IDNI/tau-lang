@@ -676,7 +676,7 @@ void print_z3_solver_cmd_solution(std::optional<solution<BAs...>>& solution) {
 }
 
 template <typename... BAs>
-bool is_z3_formula(const tau<BAs...>& n) {
+bool is_bv_formula(const tau<BAs...>& n) {
 	return is_non_terminal<tau_parser::wff, BAs...>(n)
 		&& !idni::tau_lang::is_child_non_terminal<BAs...>(tau_parser::wff_t, n)
 		&& !idni::tau_lang::is_child_non_terminal<BAs...>(tau_parser::wff_f, n)
@@ -687,7 +687,7 @@ template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	// if the  form is a z3 formula call z3
 	auto equations = n->child.back();
-	if (is_z3_formula(equations)) {
+	if (is_bv_formula(equations)) {
 		try {
 			auto solution = solve_bv(equations);
 			if (!solution) { std::cout << "no solution\n"; return; }
@@ -808,7 +808,7 @@ std::optional<tau_nso<BAs...>>
 {
 	// if the  form is a z3 formula call z3
 	auto arg = n->child[1];
-	if (is_z3_formula(arg)) {
+	/*if (is_bv_formula(arg)) {
 		try {
 			return is_bv_formula_sat(arg)
 				? _T<tau_ba_t, BAs...>
@@ -817,13 +817,13 @@ std::optional<tau_nso<BAs...>>
 			BOOST_LOG_TRIVIAL(error) << "(Error) overflow/underflow while solving the system";
 		}
 		return {};
-	}
+	}*/
 
 	// TODO (HIGH) remove this check once evrything is enabled
-	if (find_top(n, is_non_terminal<tau_parser::bv, tau_ba<BAs...>, BAs...>).has_value()) {
+	/*if (find_top(n, is_non_terminal<tau_parser::bv, tau_ba<BAs...>, BAs...>).has_value()) {
 		BOOST_LOG_TRIVIAL(error) << "(Error) mixed tau and bv formulas not enabled yet";
 		return {};
-	}
+	}*/
 
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
