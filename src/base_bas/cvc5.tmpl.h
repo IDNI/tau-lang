@@ -26,13 +26,23 @@ Term mkOr(const Term& l, const Term& r) {
 }
 
 Term mkForall(const Term& var, const Term& body) {
-	// assert var is a VARIABLE_LIST
-	return cvc5_solver.mkTerm(Kind::FORALL, {var, body});
+	auto vars = cvc5_solver.mkTerm(Kind::VARIABLE_LIST, {var});
+	return cvc5_solver.mkTerm(Kind::FORALL, {vars, body});
+}
+
+Term mkForall(const std::vector<Term>& vars, const Term& body) {
+	auto cvc5_var_list = cvc5_solver.mkTerm(Kind::VARIABLE_LIST, vars);
+	return cvc5_solver.mkTerm(Kind::FORALL, {cvc5_var_list, body});
 }
 
 Term mkExists(const Term& var, const Term& body) {
-	// assert var is a VARIABLE_LIST
-	return cvc5_solver.mkTerm(Kind::EXISTS, {var, body});
+	auto vars = cvc5_solver.mkTerm(Kind::VARIABLE_LIST, {var});
+	return cvc5_solver.mkTerm(Kind::EXISTS, {vars, body});
+}
+
+Term mkExists(const std::vector<Term>& vars, const Term& body) {
+	auto cvc5_var_list = cvc5_solver.mkTerm(Kind::VARIABLE_LIST, vars);
+	return cvc5_solver.mkTerm(Kind::EXISTS, {cvc5_var_list, body});
 }
 
 Term mkEqual(const Term& l, const Term& r) {
@@ -59,8 +69,8 @@ Term mkLess(const Term& l, const Term& r) {
 	return cvc5_solver.mkTerm(Kind::LT, {l, r});
 }
 
-Term mkBitVectorNeg(const Term& t) {
-	return cvc5_solver.mkTerm(Kind::BITVECTOR_NEG, {t});
+Term mkBitVectorNot(const Term& t) {
+	return cvc5_solver.mkTerm(Kind::BITVECTOR_NOT, {t});
 }
 
 Term mkBitVectorAnd(const Term& l, const Term& r) {
@@ -119,6 +129,9 @@ Term mkBitVectorRotateRight(const Term& l, const Term& r) {
 template<typename...BAs>
 Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::map<tau<BAs...>, Term>& free_vars, bool checked) {
 	auto nt = std::get<tau_source_sym>(form->value).n();
+
+	BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/from: " << form;
+
 	// control overflow/underflow if requested
 	if (checked) {
 		BOOST_LOG_TRIVIAL(warning)
@@ -146,22 +159,28 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::ma
 			return mkOr(l, r);
 		}
 		case tau_parser::wff_all: {
-			auto v = form->child[0];
-			if (auto it = vars.find(form); it != vars.end()) return it-> second;
-			auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
+			std::vector<Term> cvc5_var_list;
+			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
+				auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
+				auto x = cvc5_solver.mkVar(BV, vn.c_str());
+				vars.emplace(v, x);
+				cvc5_var_list.push_back(x);
+			}
 			auto f = eval_bv(form->child[1], vars, free_vars, checked);
-			auto x = cvc5_solver.mkVar(BV, vn.c_str());
-			vars.emplace(v, x);
-			return mkForall(x, f);
+			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << f;
+			return mkForall(cvc5_var_list, f);
 		}
 		case tau_parser::wff_ex: {
-			auto v = form->child[0];
-			if (auto it = vars.find(form); it != vars.end()) return it-> second;
-			auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
+			std::vector<Term> cvc5_var_list;
+			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
+				auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
+				auto x = cvc5_solver.mkVar(BV, vn.c_str());
+				vars.emplace(v, x);
+				cvc5_var_list.push_back(x);
+			}
 			auto f = eval_bv(form->child[1], vars, free_vars, checked);
-			auto x = cvc5_solver.mkVar(BV, vn.c_str());
-			vars.emplace(v, x);
-			return mkExists(x, f);
+			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << f;
+			return mkExists(cvc5_var_list, f);
 		}
 		case tau_parser::variable: {
 			// check if the variable is alr
@@ -229,7 +248,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::ma
 		}
 		case tau_parser::bv_neg: {
 			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			return mkBitVectorNeg(l);
+			return mkBitVectorNot(l);
 		}
 		case tau_parser::bv_add: {
 			auto l = eval_bv(form->child[0], vars, free_vars, checked);
@@ -328,29 +347,21 @@ template <typename...BAs>
 bool is_bv_formula_sat(const tau<BAs...>& form) {
 	std::map<tau<BAs...>, cvc5::Term> vars;
 	std::map<tau<BAs...>, cvc5::Term> free_vars;
+	cvc5_solver.resetAssertions();
+	// collect all variables and free variables
 	auto expr = eval_bv(form, vars, free_vars);
+
+	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/expr: " << expr;
+
 	// solve the equations
 	cvc5_solver.assertFormula(expr);
 
-	auto result = cvc5_solver.checkSat().isSat();
+	auto result = cvc5_solver.checkSat();
 
-	#ifdef DEBUG
-	// collect all values of vars in a vector
-	std::vector<cvc5::Term> vvars;
-	for (const auto& v: vars) {
-		vvars.push_back(v.second);
-	}
-	if (result) {
-		BOOST_LOG_TRIVIAL(info)
-			<< "(Info) bv system is sat\n"
-			<< "(Info) bv model\n" << cvc5_solver.getModel({ BV }, vvars);
-	} else {
-		BOOST_LOG_TRIVIAL(info)
-			<< "(Info) bv system is unsat\n";
-	}
-	#endif // DEBUG
+	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/result: " << result;
+	BOOST_LOG_TRIVIAL(info) << "(Info) bv system is " << result;
 
-	return result;
+	return result.isSat();
 }
 
 template<typename...BAs>
@@ -359,6 +370,7 @@ std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 	std::map<tau<BAs...>, cvc5::Term> free_vars;
 	cvc5_solver.resetAssertions();
 	auto expr = eval_bv(form, vars, free_vars);
+
 	// solve the equations
 	cvc5_solver.assertFormula(expr);
 

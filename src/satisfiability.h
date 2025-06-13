@@ -4,6 +4,7 @@
 #define __SATISFIABILITY_H__
 
 #include "normalizer.h"
+#include "base_bas/cvc5.h"
 
 namespace idni::tau_lang {
 
@@ -1034,7 +1035,9 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 			cache.emplace(std::make_pair(elim_aw(ubd_fm), start_time), elim_aw(ubd_fm));
 			return cache.emplace(std::make_pair(fm, start_time), elim_aw(ubd_fm)).first->second;
 #endif
-			return elim_aw(ubd_fm);
+			auto res = elim_aw(ubd_fm);
+			BOOST_LOG_TRIVIAL(trace) << "satisfiability.h:" << __LINE__ << " transform_to_execution/res: " << res;
+			return res;
 		}
 	} else {
 		ev_t = transform_to_eventual_variables(fm, true, start_time);
@@ -1043,7 +1046,9 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 #ifdef TAU_CACHE
 			return cache.emplace(std::make_pair(fm, start_time), elim_aw(fm)).first->second;
 #endif
-			return elim_aw(fm);
+		auto res = elim_aw(fm);
+		BOOST_LOG_TRIVIAL(trace) << "satisfiability.h:" << __LINE__ << " transform_to_execution/res: " << res;
+		return res;
 		}
 	}
 	auto aw_after_ev = find_top(ev_t.first, is_child_non_terminal<p::wff_always, BAs...>);
@@ -1051,7 +1056,9 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 #ifdef TAU_CACHE
 		return cache.emplace(std::make_pair(fm, start_time), elim_aw(fm)).first->second;
 #endif
-		return elim_aw(fm);
+		auto res = elim_aw(fm);
+		BOOST_LOG_TRIVIAL(trace) << "satisfiability.h:" << __LINE__ << " transform_to_execution/res: " << res;
+		return res;
 	}
 	auto st = select_top(ev_t.first, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	assert(st.size() < 2);
@@ -1068,6 +1075,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	cache.emplace(std::make_pair(res, start_time), res);
 	return cache.emplace(std::make_pair(fm, start_time), res).first->second;
 #endif
+	BOOST_LOG_TRIVIAL(trace) << "satisfiability.h:" << __LINE__ << " transform_to_execution/res: " << res;
 	return res;
 }
 
@@ -1080,8 +1088,16 @@ bool is_tau_formula_sat(const tau<BAs...>& fm, const int_t start_time = 0,
 	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or);
 	// Convert each disjunct to unbounded continuation
 	for (auto& clause: clauses) {
-		if (transform_to_execution(clause, start_time, output) != _F<BAs...>) {
+
+		if (auto executable = transform_to_execution(clause, start_time, output); executable != _F<BAs...>) {
 			BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
+			if (find_top(executable, is_non_terminal<tau_parser::bv, BAs...>).has_value()) {
+				BOOST_LOG_TRIVIAL(debug) << "(I) Checking bv satisfiability";
+				BOOST_LOG_TRIVIAL(trace) << "satisfiability.h:" << __LINE__ << " transform_to_execution/clause: " << clause;
+				auto res = is_bv_formula_sat(clause);
+				BOOST_LOG_TRIVIAL(trace) << "satisfiability.h:" << __LINE__ << " transform_to_execution/res: " << res;
+				return res;
+			}
 			return true;
 		}
 	}
