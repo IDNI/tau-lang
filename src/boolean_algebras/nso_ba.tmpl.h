@@ -87,6 +87,8 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	// more elaborate cases
 	if (lt[0].is_ba_constant())
 		return tau::get(bf_constant_neg(lt));
+	if (lt.is(tau::bf))
+		return tau::get(tau::build_bf_neg(lt.get()));
 	if (lt[0].is(tau::bf_eq))
 		return tau::get(tau::build_bf_eq((~lt[0][0]).get()));
 	if (lt[0].is(tau::bf_neq))
