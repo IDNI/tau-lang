@@ -16,7 +16,7 @@ tref infer_ba_types(tref n) {
 	LOG_TRACE << "-- Infer BA types: " << LOG_FM(n);
 	ba_types_inference<node> infer;
 	tref nn = infer(n);
-	if (nn) LOG_TRACE << "-- Inferred BA types: " << LOG_FM(nn);
+	if (nn) LOG_TRACE << "-- Inferred BA types: " << LOG_FM_DUMP(nn);
 	else    LOG_TRACE << "-- Inferred BA types: nullptr";
 	return nn;
 }
@@ -222,6 +222,8 @@ tref ba_types_inference<node>::add_scope_ids(
 				return nullptr;
 			}
 		}
+		LOG_TRACE << "r: " << LOG_FM_DUMP(r);
+		LOG_TRACE << "get_el_key(r): " << LOG_FM_DUMP(get_el_key(r));
 		types[get_el_key(r)] = tid;
 		LOG_TRACE << "add_scope_ids - transformed element: " << LOG_FM_DUMP(r)
 			<< " with type: " << LOG_BA_TYPE(tid);
@@ -444,6 +446,22 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 				if (el != key && t.get_ba_type() == 0) {
 					LOG_TRACE << "-- Propagated: "
 							<< LOG_FM_DUMP(key);
+					const auto& bfn = tau::get(
+						tau::get(tau::bf, key));
+					if (bfn[0].get_ba_type() > 0 &&
+						(  bfn[0].is(tau::bf_t)
+						|| bfn[0].is(tau::bf_f)))
+					{ // strip type info from 0 and 1 coming from hooks
+						tref typeless = tau::get(
+							bfn[0].get_type());
+						LOG_TRACE << "-- type stripped: "
+							<< LOG_FM_DUMP(typeless);
+						return typeless;
+					} else {
+						LOG_TRACE << "-- Not propagated: "
+							<< LOG_FM_DUMP(key);
+						return key;
+					}
 					return key;
 				}
 				tref new_el = tau::build_ba_constant(
