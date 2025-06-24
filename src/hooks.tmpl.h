@@ -1128,19 +1128,18 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 	//		| size_t_extractor<BAs...>
 	//		| optional_value_extractor<size_t>
 	//	: sizeof(size_t) * 8;
-	size_t size = sizeof(size_t) * 8;
 	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
 	tau<BAs...> bvn;
 	auto nt = get_non_terminal_node(n.child[0]);
 	switch (nt) {
 		case p::num : {
 			int64_t ull = std::stoull(value);
-			auto bv = cvc5_solver.mkBitVector(size, ull);
+			auto bv = cvc5_solver.mkBitVector(bv_default_size, ull);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
 		case p::bits : {
-			auto bv = cvc5_solver.mkBitVector(size, value.c_str(), 2);
+			auto bv = cvc5_solver.mkBitVector(bv_default_size, value.c_str(), 2);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
@@ -1149,7 +1148,7 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 			std::istringstream converter { value };
 			int64_t ull = 0;
 		    converter >> std::hex >> ull;
-			auto bv = cvc5_solver.mkBitVector(size, ull);
+			auto bv = cvc5_solver.mkBitVector(bv_default_size, ull);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}

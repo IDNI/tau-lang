@@ -9,6 +9,7 @@
 namespace idni::tau_lang {
 
 static cvc5::Solver cvc5_solver;
+static size_t bv_default_size = 8;
 
 static void bv_config() {
 	// configure the solver

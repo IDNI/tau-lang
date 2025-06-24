@@ -10,7 +10,7 @@ namespace idni::tau_lang {
 
 using namespace cvc5;
 
-static auto BV = cvc5_solver.mkBitVectorSort(64); // 64-bit bitvector
+static auto BV = cvc5_solver.mkBitVectorSort(bv_default_size); // cvc5_default_size-bit bitvector
 static auto BOOL = cvc5_solver.getBooleanSort();
 
 Term mkNot(const Term& t) {
@@ -340,14 +340,14 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 			auto value = make_string(tau_node_terminal_extractor<BAs...>, form->child[1]);
 			// this is the type of rotate_left
 			unsigned int ul = std::stoul(value);
-			return mkBitVectorRotateLeft(l, cvc5_solver.mkBitVector(64, ul));
+			return mkBitVectorRotateLeft(l, cvc5_solver.mkBitVector(bv_default_size, ul));
 		}
 		case tau_parser::bv_rotate_right: {
 			auto l = eval_bv(form->child[0], vars, free_vars, checked);
 			auto value = make_string(tau_node_terminal_extractor<BAs...>, form->child[1]);
 			// this is the type of rotate_left
 			unsigned int ul = std::stoul(value);
-			return mkBitVectorRotateRight(l, cvc5_solver.mkBitVector(64, ul));
+			return mkBitVectorRotateRight(l, cvc5_solver.mkBitVector(bv_default_size, ul));
 		}
 		case tau_parser::bitvector: {
 			auto expr = std::get<cvc5::Term>(form->child[0]->value);
