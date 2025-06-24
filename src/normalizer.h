@@ -11,6 +11,7 @@
 #include "parser.h"
 //#include "boolean_algebras/variant_ba.h"
 #include "normal_forms.h"
+#include "base_bas/cvc5.h"
 //#include "boolean_algebras/bdds/bdd_handle.h"
 
 #ifdef DEBUG
@@ -206,8 +207,11 @@ bool is_non_temp_nso_satisfiable (const tau<BAs...>& fm) {
 	auto vars = get_free_vars_from_nso(new_fm);
 	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
 	auto normalized = normalize_non_temp<BAs...>(new_fm);
-	assert((normalized == _T<BAs...> || normalized == _F<BAs...> ||
-		find_top(normalized, is_non_terminal<tau_parser::constraint, BAs...>)));
+	assert((normalized == _T<BAs...>
+		|| normalized == _F<BAs...>
+		|| find_top(normalized, is_non_terminal<tau_parser::constraint, BAs...>)
+		|| find_top(normalized, is_non_terminal<tau_parser::bv, BAs...>)
+	));
 	return normalized == _T<BAs...>;
 }
 
@@ -220,8 +224,11 @@ bool is_non_temp_nso_unsat (const tau<BAs...>& fm) {
 	auto vars = get_free_vars_from_nso(new_fm);
 	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
 	auto normalized = normalize_non_temp<BAs...>(new_fm);
-	assert((normalized == _T<BAs...> || normalized == _F<BAs...> ||
-		find_top(normalized, is_non_terminal<tau_parser::constraint, BAs...>)));
+	assert((normalized == _T<BAs...>
+		|| normalized == _F<BAs...>
+		|| find_top(normalized, is_non_terminal<tau_parser::constraint, BAs...>)
+		|| find_top(normalized, is_non_terminal<tau_parser::bv, BAs...>)
+	));
 	return normalized == _F<BAs...>;
 }
 
@@ -271,16 +278,33 @@ bool are_nso_equivalent(tau<BAs...> n1, tau<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- wff: " << build_wff_and(imp1, imp2);
 
 	auto dir1 = normalizer_step<BAs...>(imp1);
-	assert((dir1 == _T<BAs...> || dir1 == _F<BAs...> || find_top(dir1,
-		is_non_terminal<tau_parser::constraint, BAs...>)));
+	assert((dir1 == _T<BAs...>
+		|| dir1 == _F<BAs...>
+		|| find_top(dir1, is_non_terminal<tau_parser::constraint, BAs...>)
+		|| find_top(dir1, is_non_terminal<tau_parser::bv, BAs...>)));
 	if (dir1 == _F<BAs...>) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << dir1;
 		return false;
 	}
+	bool res_bv_dir1;
+	if (auto bv_dir1 = find_top(dir1, is_non_terminal<tau_parser::bv, BAs...>); bv_dir1) {
+		res_bv_dir1 = is_bv_formula_valid<BAs...>(dir1);
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << res_bv_dir1;
+		if (!res_bv_dir1) return false;
+	}
 	auto dir2 = normalizer_step<BAs...>(imp2);
-	assert((dir2 == _T<BAs...> || dir2 == _F<BAs...> || find_top(dir2,
-		is_non_terminal<tau_parser::constraint, BAs...>)));
-	bool res = (dir1 == _T<BAs...> && dir2 == _T<BAs...>);
+	assert((dir2 == _T<BAs...>
+		|| dir2 == _F<BAs...>
+		|| find_top(dir2, is_non_terminal<tau_parser::constraint, BAs...>))
+		|| find_top(dir2, is_non_terminal<tau_parser::bv, BAs...>)
+	);
+	bool res_bv_dir2;
+	if (auto bv_dir2 = find_top(dir2, is_non_terminal<tau_parser::bv, BAs...>); bv_dir2) {
+		res_bv_dir2 = is_bv_formula_valid<BAs...>(dir2);
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << res_bv_dir2;
+		if (!res_bv_dir2) return false;
+	}
+	bool res = (res_bv_dir1 && res_bv_dir2) || (dir1 == _T<BAs...> && dir2 == _T<BAs...>);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << res;
 

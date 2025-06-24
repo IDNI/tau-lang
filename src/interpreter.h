@@ -157,6 +157,13 @@ struct finputs {
 					<< var << "'\n";
 				return {};
 			}
+//			print_tau_tree(std::cout, cnst.value());
+/*			if (is_non_terminal<tau_parser::bitvector, BAs...>(cnst.value())) {
+				// If the constant is a bitvector, we need to wrap it in a bf_constant
+				// with the type of the variable.
+				value[wrap(tau_parser::bv, var)] = wrap(tau_parser::bv, cnst.value());
+				continue;
+			}*/
 			const auto wrapped_const = build_bf_constant(cnst.value(), it->second);
 			// Check that the input is a closed formula
 			if (has_open_tau_fm_in_constant(wrapped_const))

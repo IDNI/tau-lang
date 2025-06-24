@@ -318,6 +318,8 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 		<< "compute_system/clause: " << clause;
 	#endif // DEBUG
 
+
+
 	std::set<tau<BAs...>> pending_atomic_fms;
 	for (auto& atomic_fm: select_top(clause, is_atomic_fm)) {
 		#ifdef DEBUG
@@ -328,6 +330,18 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 	}
 	using p = tau_parser;
 	system<BAs...> sys;
+
+	// add bv type to system
+	for (const auto& bv_literal : select_top(clause, is_bv_literal<BAs...>)) {
+		auto bv_io_vars = select_top(bv_literal, is_child_non_terminal<p::io_var, BAs...>);
+		type_io_vars(bv_io_vars, "bv", inputs, outputs);
+		if (sys.find("bv") == sys.end()) {
+			sys["bv"] = bv_literal;
+		} else {
+			sys["bv"] = build_wff_and(sys["bv"], bv_literal);
+		}
+	}
+
 	bool new_choice = true;
 	while (new_choice) {
 		new_choice = false;
@@ -349,6 +363,7 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 		for (const auto& fm : to_erase_fms)
 			pending_atomic_fms.erase(fm);
 	}
+
 	// All remaining formulas in pending_atomic_fms can be typed by default
 	for (const auto& fm : pending_atomic_fms) {
 		// std::cout << "def. type for: " << fm << "\n";

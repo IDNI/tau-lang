@@ -65,4 +65,77 @@ TEST_SUITE("sample cvc5 programs") {
 		CHECK(result.isSat());
 	}
 
+	TEST_CASE("r o1[t] =_ i1[t]") {
+		/*
+		(set-logic BV)
+		(assert
+			(not
+				(and
+					(forall ((|i1[0]| (_ BitVec 64)))
+						(forall ((|o1[0]| (_ BitVec 64)))
+							(or
+								(distinct |i1[0]| |o1[0]|)
+								(= |i1[0]| |o1[0]|))))
+					(forall ((|i1[0]| (_ BitVec 64)))
+						(or
+							(forall ((|o1[0]| (_ BitVec 64)))
+								(distinct |i1[0]| |o1[0]|))
+							(forall ((|i1[1]| (_ BitVec 64)))
+								(exists ((|o1[1]| (_ BitVec 64)))
+									(= |i1[1]| |o1[1]|)
+								)
+							)
+						)
+					)
+				)
+			)
+		)
+		(check-sat)
+		*/
+		Solver solver;
+		auto bv64 = solver.mkBitVectorSort(64);
+		auto o1_t = solver.mkVar(bv64, "o1_t");
+		auto i1_t = solver.mkVar(bv64, "i1_t");
+
+		auto fml =
+			solver.mkTerm(Kind::NOT, {
+				solver.mkTerm(Kind::AND, {
+					solver.mkTerm(Kind::FORALL, {
+						solver.mkTerm(Kind::VARIABLE_LIST, {i1_t}),
+						solver.mkTerm(Kind::FORALL, {
+							solver.mkTerm(Kind::VARIABLE_LIST, {o1_t}),
+							solver.mkTerm(Kind::OR,	{
+								solver.mkTerm(Kind::DISTINCT, {i1_t, o1_t}),
+								solver.mkTerm(Kind::EQUAL, {i1_t, o1_t})
+							})
+						})
+					}),
+					solver.mkTerm(Kind::FORALL, {
+						solver.mkTerm(Kind::VARIABLE_LIST, {i1_t}),
+						solver.mkTerm(Kind::OR, {
+							solver.mkTerm(Kind::FORALL, {
+								solver.mkTerm(Kind::VARIABLE_LIST, {o1_t}),
+								solver.mkTerm(Kind::DISTINCT, {i1_t, o1_t})
+							}),
+							solver.mkTerm(Kind::FORALL, {
+								solver.mkTerm(Kind::VARIABLE_LIST, {i1_t}),
+								solver.mkTerm(Kind::EXISTS, {
+									solver.mkTerm(Kind::VARIABLE_LIST, {o1_t}),
+									solver.mkTerm(Kind::EQUAL, {i1_t, o1_t})
+								})
+							})
+						})
+					})
+				})
+			});
+
+		solver.assertFormula(fml);
+		auto result = solver.checkSat();
+
+		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
+		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
+
+		CHECK(result.isUnsat());
+	}
+
 }

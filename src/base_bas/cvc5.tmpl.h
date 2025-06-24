@@ -127,7 +127,7 @@ Term mkBitVectorRotateRight(const Term& l, const Term& r) {
 
 
 template<typename...BAs>
-Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::map<tau<BAs...>, Term>& free_vars, bool checked) {
+Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map<tau<BAs...>, Term>& free_vars, bool checked) {
 	auto nt = std::get<tau_source_sym>(form->value).n();
 
 	BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/from: " << form;
@@ -159,37 +159,57 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::ma
 			return mkOr(l, r);
 		}
 		case tau_parser::wff_all: {
+			cvc5_solver.push();
+
 			std::vector<Term> cvc5_var_list;
 			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
-				auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
+				auto vn = make_string(v);
+				BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
 				auto x = cvc5_solver.mkVar(BV, vn.c_str());
+				BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
 			}
 			auto f = eval_bv(form->child[1], vars, free_vars, checked);
-			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << f;
-			return mkForall(cvc5_var_list, f);
+			auto res = mkForall(cvc5_var_list, f);
+
+			cvc5_solver.pop();
+
+			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << res;
+
+			return res;
 		}
 		case tau_parser::wff_ex: {
+			cvc5_solver.push();
+
 			std::vector<Term> cvc5_var_list;
 			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
-				auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
+				auto vn = make_string(v);
+				BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
 				auto x = cvc5_solver.mkVar(BV, vn.c_str());
+				BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
 			}
+
 			auto f = eval_bv(form->child[1], vars, free_vars, checked);
-			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << f;
-			return mkExists(cvc5_var_list, f);
+			auto res = mkExists(cvc5_var_list, f);
+
+			cvc5_solver.pop();
+
+			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << res;
+			return res;
 		}
 		case tau_parser::variable: {
 			// check if the variable is alr
 			if (auto it = vars.find(form); it != vars.end()) return it->second;
 			if (auto it = free_vars.find(form); it != free_vars.end()) return it->second;
-			auto vn = make_string(tau_node_terminal_extractor<BAs...>, form);
+			auto vn = make_string(form);
 			// create a new constant according to the type and added to the map
+			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
 			auto x = cvc5_solver.mkConst(BV, vn.c_str());
-			vars.emplace(form, x);
+			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
+			//vars.emplace(form, x);
 			free_vars.emplace(form, x);
 			return x;
 		}
@@ -333,6 +353,12 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::ma
 			auto expr = std::get<cvc5::Term>(form->child[0]->value);
 			return expr;
 		}
+		case tau_parser::wff_always: {
+			return eval_bv(form->child[0], vars, free_vars, checked);
+		}
+		case tau_parser::wff_sometimes: {
+			return eval_bv(form->child[0], vars, free_vars, checked);
+		}
 		default: {
 			#ifdef DEBUG
 			BOOST_LOG_TRIVIAL(error) << "(Error) unknow bv non-terminal: " << nt;
@@ -341,7 +367,6 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term>& vars, std::ma
 	}
 	assert(false);
 }
-
 
 template <typename...BAs>
 bool is_bv_formula_sat(const tau<BAs...>& form) {
@@ -364,12 +389,22 @@ bool is_bv_formula_sat(const tau<BAs...>& form) {
 	return result.isSat();
 }
 
+template <typename...BAs>
+bool is_bv_formula_unsat(const tau<BAs...>& form) {
+	return !is_bv_formula_sat(form);
+}
+
+template<typename...BAs>
+bool is_bv_formula_valid(const tau<BAs...>& form) {
+	return is_bv_formula_unsat(build_wff_neg(form));
+}
+
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 	std::map<tau<BAs...>, cvc5::Term> vars;
 	std::map<tau<BAs...>, cvc5::Term> free_vars;
 	cvc5_solver.resetAssertions();
-	auto expr = eval_bv(form, vars, free_vars);
+	auto expr = eval_bv(form, vars, free_vars, false);
 
 	// solve the equations
 	cvc5_solver.assertFormula(expr);
@@ -403,5 +438,55 @@ std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 	return {};
 }
 
+/*template <typename...BAs>
+std::optional<tau_nso<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) {
+	// parse source
+	auto source = make_tau_source(src, {
+			.start = tau_parser::bitvector });
+	if (!source) return std::optional<tau_nso_t>{};
+	auto rr = make_nso_rr_using_factory<tau_ba_t, BAs...>(source);
+	if (!rr) return std::optional<tau_nso_t>{};
+	// cvompute final result
+	return std::optional<tau_nso_t>{
+		rewriter::make_node<tau_sym<tau_ba_t, BAs...>>(t, {}) };
+}*/
+
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_bv(const std::vector<tau<BAs...>>& lits) {
+	return solve_bv(build_wff_and<BAs...>(lits));
+}
+
+template <typename...BAs>
+std::optional<tau<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) {
+	// check source cache
+	if (auto cn = cache.find(src); cn != cache.end())
+		return cn->second;
+/*		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
+	if (!result.found) {
+		auto msg = result.parse_error
+			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
+		BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
+		return std::optional<tau<BAs...>>{}; // Syntax error
+	}
+	using parse_symbol = sbf_parser::node_type;
+	using namespace rewriter;
+	auto root = make_node_from_tree<sbf_parser,
+		drop_location_t<parse_symbol, sbf_sym>,
+		sbf_sym>(
+			drop_location<parse_symbol, sbf_sym>,
+			result.get_shaped_tree());
+	auto t = sbf_traverser_t(root) | sbf_parser::sbf;
+	auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
+	std::variant<BAs...> vp {b};
+	auto n = rewriter::make_node<tau_sym<BAs...>>(vp, {});
+	return cache.emplace(src, n).first->second;*/
+	//return {};
+	auto bv = make_nso_using_factory<BAs...>(src, { .start = tau_parser::bitvector });
+	if (!bv) return std::optional<tau<BAs...>>{};
+	// cvompute final result
+	//return std::optional<tau<BAs...>>{ cache.emplace(src, bv.value() ).first->second };
+	return bv;
+
+}
 
 } // namespace idni::tau_lang
