@@ -158,12 +158,12 @@ struct finputs {
 				return {};
 			}
 //			print_tau_tree(std::cout, cnst.value());
-/*			if (is_non_terminal<tau_parser::bitvector, BAs...>(cnst.value())) {
+			if (is_non_terminal<tau_parser::bitvector, BAs...>(cnst.value())) {
 				// If the constant is a bitvector, we need to wrap it in a bf_constant
 				// with the type of the variable.
 				value[wrap(tau_parser::bv, var)] = wrap(tau_parser::bv, cnst.value());
 				continue;
-			}*/
+			}
 			const auto wrapped_const = build_bf_constant(cnst.value(), it->second);
 			// Check that the input is a closed formula
 			if (has_open_tau_fm_in_constant(wrapped_const))
@@ -232,6 +232,7 @@ struct foutputs {
 		// Sort variables in output by time
 		std::vector<tau<BAs...>> io_vars;
 		for (const auto& [var, _ ] : outputs) {
+			print_tau_tree(std::cout, var);
 			assert(is_child_non_terminal(tau_parser::io_var, trim(var)));
 			io_vars.push_back(var);
 		}
@@ -245,10 +246,11 @@ struct foutputs {
 				| tau_parser::constant
 				| only_child_extractor<BAs...>
 				| ba_extractor<BAs...>;
-			auto io_var_name = trim2(trim2(io_var));
+				auto io_var_name = trim2(trim2(io_var));
+			print_tau_tree(std::cout, io_var);
 			std::stringstream ss;
-			if (!value) {
-				// is bf_t
+			if (!value && !is_non_terminal(tau_parser::bv, io_var)) {
+				// is a bv
 				if (auto check = outputs.find(io_var)->second
 						| tau_parser::bf_t; check) {
 					auto type = types.find(io_var_name)->second;
@@ -265,6 +267,8 @@ struct foutputs {
 						<< io_var << "'\n";
 					return false;
 				}
+			} else if (is_non_terminal(tau_parser::bv, io_var)) {
+				ss << outputs.find(io_var)->second;
 			} else {
 				ss << value.value();
 			}

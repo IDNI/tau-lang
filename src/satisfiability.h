@@ -305,8 +305,8 @@ tau<BAs...> build_step_chi(const tau<BAs...>& chi, const tau<BAs...>& st,
 inline auto constant_io_comp = [](const auto& v1, const auto& v2) {
 	using p = tau_parser;
 	// trim the bf of v1 and v2 if present
-	auto v1_ = is_non_terminal(p::bf, v1) ? trim(v1) : v1;
-	auto v2_ = is_non_terminal(p::bf, v2) ? trim(v2) : v2;
+	auto v1_ = (is_non_terminal(p::bf, v1)||is_non_terminal(p::bv, v1))  ? trim(v1) : v1;
+	auto v2_ = (is_non_terminal(p::bf, v2)||is_non_terminal(p::bv, v2))  ? trim(v2) : v2;
 	if (get_io_time_point(v1_) < get_io_time_point(v2_))
 		return true;
 	if (get_io_time_point(v1_) == get_io_time_point(v2_)) {
