@@ -1,5 +1,5 @@
-// This file is generated from a file /home/castrod/git/tau-lang/parser/tau.tgf by
-//       https://github.com/IDNI/parser/src/tgf
+// This file is generated from a file parser/tau.tgf by
+//       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __TAU_PARSER_H__
 #define __TAU_PARSER_H__
@@ -11,8 +11,7 @@ namespace tau_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline static constexpr size_t nt_bits = 9;
-inline const std::vector<std::string> symbol_names{
+inline std::vector<std::string> symbol_names{
 	"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "start", 
 	"rr", "_", "rec_relations", "main", "wff", "__E_rec_relations_0", "rec_relation", "__E_rec_relations_1", "ref", "__E_rec_relation_2", 
 	"capture", "bf", "sym", "__E_ref_3", "offsets", "ref_args", "__E_ref_4", "__", "fp_fallback", "first_sym", 
@@ -1608,7 +1607,7 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 
 } // namespace tau_parser_data
 
-struct tau_parser_nonterminals {
+struct tau_parser : public idni::parser<char, char> {
 	enum nonterminal {
 		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, start, 
 		rr, _, rec_relations, main, wff, __E_rec_relations_0, rec_relation, __E_rec_relations_1, ref, __E_rec_relation_2, 
@@ -1657,9 +1656,6 @@ struct tau_parser_nonterminals {
 		__E_help_arg_199, __E___E_help_arg_199_200, rel_memory, __E_memory_201, __E___E_memory_201_202, memory_id, abs_memory, __E_memory_203, named_binding, __N_0, 
 		__N_1, __N_2, __N_3, __N_4, __N_5, __N_6, __N_7, __N_8, 
 	};
-};
-
-struct tau_parser : public idni::parser<char, char>, public tau_parser_nonterminals {
 	static tau_parser& instance() {
 		static tau_parser inst;
 		return inst;

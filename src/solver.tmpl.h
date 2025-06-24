@@ -1032,7 +1032,7 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 			auto bv_solution = solve_bv<BAs...>(bv_lits);
 			if (bv_solution) {
 				for (const auto& [var, value]: bv_solution.value()) {
-					clause_solution[var] = value;
+					clause_solution[wrap(tau_parser::bv,var)] = value;
 				}
 			}
 		}
