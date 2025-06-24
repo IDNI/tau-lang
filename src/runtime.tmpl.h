@@ -52,6 +52,9 @@ namespace idni::tau_lang {
 		const std::string src, const std::string type_name)
 	{
 		if (type_name == "sbf")	return bf.parse(src);
+		else if (type_name == "bv") {
+			return bvf.parse(src);
+		}
 		return tf.parse(src);
 	}
 

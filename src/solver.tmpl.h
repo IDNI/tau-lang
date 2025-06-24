@@ -4,6 +4,7 @@
 
 #include "normal_forms.h"
 #include "splitter.h"
+#include "queries.h"
 //#include "base_bas/z3.h"
 #include <cvc5/cvc5.h>
 
@@ -1025,16 +1026,26 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 			BOOST_LOG_TRIVIAL(warning) << "(Warning) Skipped clause with temporal quantifier: " << clause;
 			continue;
 		}
-		auto is_equation = [](const tau<BAs...>& n) {
-			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
-			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
-		};
-		// FIXME convert vars to a set
-		auto eqs = select_top(clause, is_equation);
-		if (eqs.empty()) continue;
-		auto solution = solve<BAs...>(
-			std::set<tau<BAs...>>(eqs.begin(), eqs.end()), options);
-		if (solution.has_value()) return solution;
+		solution<BAs...> clause_solution;
+		// solve bv part
+		if (auto bv_lits = select_top(clause, is_bv_literal<BAs...>); !bv_lits.empty()) {
+			auto bv_solution = solve_bv<BAs...>(bv_lits);
+			if (bv_solution) {
+				for (const auto& [var, value]: bv_solution.value()) {
+					clause_solution[var] = value;
+				}
+			}
+		}
+		// solve bas... part
+		if (auto bas_lits = select_top(clause, is_tau_literal<BAs...>); !bas_lits.empty()) {
+			auto bas_solution = solve<BAs...>(std::set<tau<BAs...>>(bas_lits.begin(), bas_lits.end()), options);
+			if (bas_solution) {
+				for (const auto& [var, value]: bas_solution.value()) {
+					clause_solution[var] = value;
+				}
+			}
+		}
+		return clause_solution;
 	}
 	return {};
 }

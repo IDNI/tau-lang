@@ -9,7 +9,7 @@
 #include "boolean_algebras/nso_ba.h"
 #include "execution.h"
 //#include "base_bas/z3.h"
-#include "base_bas/cvc5.h"
+//#include "base_bas/cvc5.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -1891,6 +1891,7 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 #ifdef DEBUG
 	// Check that vars are not T or F.
 	for (auto& var : vars) {
+		BOOST_LOG_TRIVIAL(trace) << "normal_forms.h:" << __LINE__ <<  " reduce_across_bfs/var: " << var;
 		assert(var != _T<BAs...> && var != _F<BAs...>);
 	}
 #endif // DEBUG
@@ -3108,12 +3109,12 @@ std::tuple<tau<BAs...>, tau<BAs...>, tau<BAs...>> split_clause_in_disjunctions(c
 	return std::make_tuple(bv_literals, bv_constants, tau_literals);
 }
 
-template<typename... BAs>
+/*template<typename... BAs>
 auto build_bv_var(const tau<BAs...>& fm) {
 	std::string name = make_string<tau_node_terminal_extractor_t<BAs...>,tau<BAs...>>(
 		tau_node_terminal_extractor<BAs...>, fm);
 	return cvc5_solver.mkConst(BV, name.c_str());
-}
+}*/
 
 /*template<typename... BAs>
 auto build_z3_skolem_func(const std::vector<tau<BAs...>>& vars) {

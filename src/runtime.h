@@ -6,8 +6,8 @@
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/sbf_ba.h"
 #include "boolean_algebras/tau_ba.h"
+#include "base_bas/cvc5.h"
 #include "nso_rr.h"
-
 namespace idni::tau_lang {
 
 
@@ -17,6 +17,7 @@ namespace idni::tau_lang {
 template<>
 struct nso_factory<sbf_ba> {
 	inline static sbf_ba_factory<sbf_ba> bf;
+	//inline static bv_ba_factory<sbf_ba> bvf;
 
 	std::optional<tau<sbf_ba>> parse(const std::string& src,
 		const std::string& = "");
@@ -49,6 +50,7 @@ template<>
 struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 	inline static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
 	inline static tau_ba_factory<sbf_ba> tf;
+	inline static bv_ba_factory<tau_ba<sbf_ba>, sbf_ba> bvf;
 
 	std::optional<tau_nso<sbf_ba>> parse(const std::string src,
 		const std::string type_name);

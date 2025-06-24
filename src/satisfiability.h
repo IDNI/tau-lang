@@ -4,7 +4,7 @@
 #define __SATISFIABILITY_H__
 
 #include "normalizer.h"
-#include "base_bas/cvc5.h"
+//#include "base_bas/cvc5.h"
 
 namespace idni::tau_lang {
 
@@ -329,6 +329,8 @@ bool is_run_satisfiable(const tau<BAs...>& fm) {
 	using p = tau_parser;
 	if (fm == _F<BAs...>) return false;
 	if (fm == _T<BAs...>) return true;
+	if (auto bv = find_top(fm, is_non_terminal<p::bv, BAs...>))
+		return is_bv_formula_sat(fm);
 
 	auto free_io_vars = get_free_vars_from_nso(fm);
 	std::vector<tau<BAs...> > io_vars = select_top(fm,

@@ -227,6 +227,12 @@ std::string make_string(const extractor_t& extractor, const node_t& n) {
 	return ss.str();
 }
 
+template <typename node_t>
+std::string make_string(const node_t& n) {
+	std::basic_stringstream<char> ss;
+	ss << n;
+	return ss.str();
+}
 
 /**
  * Factory for creating and manipulating tau objects.
