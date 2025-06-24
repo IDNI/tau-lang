@@ -23,8 +23,7 @@ set(TESTS
 	make_node_hook
 	interpreter
 	cvc5_solver
-	#z3_satisfiability
-	#z3
+	cvc5_satisfiability
 	cvc5
 )
 
