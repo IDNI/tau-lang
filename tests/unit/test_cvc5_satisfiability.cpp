@@ -22,7 +22,7 @@ TEST_SUITE("configuration") {
 	}
 }
 
-TEST_SUITE("z3_satisfiability") {
+TEST_SUITE("cvc5_satisfiability") {
 
 	TEST_CASE("all x ex y x + y =_ 1") {
 		const char* sample = "all x ex y x + y =_ 1";
@@ -76,19 +76,22 @@ TEST_SUITE("z3_satisfiability") {
 	// next return FATAL ERROR: test case CRASHED: SIGABRT - Abort (abnormal termination) signal
 	// in file /usr/include/z3++.h:1776: z3::expr z3::operator<(const expr&, const expr&): Assertion `false' failed.
 
-	/*TEST_CASE("all x [x + 1] <_ 0") {
+	TEST_CASE("all x [x + 1] <_ 0") {
 		const char* sample = "all x [x + 1] <_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
-		CHECK_THROWS( is_bv_formula_sat(formula) );
-	}*/
+		// TODO (HIGH) change assertion when supporting overflows
+		//CHECK_THROWS( is_bv_formula_sat(formula) );
+		CHECK( !is_bv_formula_sat(formula) );
+	}
 
 	TEST_CASE("all x ex y [x + y] =_ 1") {
 		const char* sample = "all x ex y [x + y] =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
+		// TODO (HIGH) change assertion when supporting overflows
 		//CHECK_THROWS( is_bv_formula_sat(formula) );
 		CHECK( is_bv_formula_sat(formula) );
 
@@ -99,29 +102,29 @@ TEST_SUITE("z3_satisfiability") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
+		// TODO (HIGH) change assertion when supporting overflows
 		//CHECK_THROWS( is_bv_formula_sat(formula) );
 		CHECK( !is_bv_formula_sat(formula) );
 
 	}
 
-	/*TEST_CASE("all x [x - (x/2)] <=_ x") {
+	TEST_CASE("all x [x - (x/2)] <=_ x") {
 		const char* sample = "all x [x - (x/2)] <=_ x";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
-		CHECK_THROWS( is_bv_formula_sat(formula) );
-	}*/
+		// TODO (HIGH) change assertion when supporting overflows
+		CHECK( is_bv_formula_sat(formula) );
+		//CHECK_THROWS( is_bv_formula_sat(formula) );
+	}
 
-	// next return FATAL ERROR: test case CRASHED: SIGABRT - Abort (abnormal termination) signal
-	// in file /usr/include/z3++.h:1776: z3::expr z3::operator<(const expr&, const expr&): Assertion `false' failed.
-
-	/*TEST_CASE("all x ((x <_ 18446744073709551614) -> ([x + 1] >_ 0))") {
+	TEST_CASE("all x ((x <_ 18446744073709551614) -> ([x + 1] >_ 0))") {
 		const char* sample = "all x ((x <_ 18446744073709551614) -> ([x + 1] >_ 0))";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
 		CHECK( is_bv_formula_sat(formula) );
-	}*/
+	}
 
 	/*TEST_CASE("all x ((x <_ 18446744073709551615) -> ([x + 1] = 0))") {
 		const char* sample = "all x ((x <_ 18446744073709551615) -> ([x + 1] = 0))";
