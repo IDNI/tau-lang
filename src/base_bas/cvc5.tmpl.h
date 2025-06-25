@@ -54,19 +54,19 @@ Term mkDisticnt(const Term& l, const Term& r) {
 }
 
 Term mkLessEqual(const Term& l, const Term& r) {
-	return cvc5_solver.mkTerm(Kind::LEQ, {l, r});
+	return cvc5_solver.mkTerm(Kind::BITVECTOR_ULE, {l, r});
 }
 
 Term mkGreater(const Term& l, const Term& r) {
-	return cvc5_solver.mkTerm(Kind::GT, {l, r});
+	return cvc5_solver.mkTerm(Kind::BITVECTOR_UGT, {l, r});
 }
 
 Term mkGreaterEqual(const Term& l, const Term& r) {
-	return cvc5_solver.mkTerm(Kind::GEQ, {l, r});
+	return cvc5_solver.mkTerm(Kind::BITVECTOR_UGE, {l, r});
 }
 
 Term mkLess(const Term& l, const Term& r) {
-	return cvc5_solver.mkTerm(Kind::LT, {l, r});
+	return cvc5_solver.mkTerm(Kind::BITVECTOR_ULT, {l, r});
 }
 
 Term mkBitVectorNot(const Term& t) {
@@ -313,7 +313,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 		case tau_parser::bv_nor: {
 			auto l = eval_bv(form->child[0], vars, free_vars, checked);
 			auto r = eval_bv(form->child[1], vars, free_vars, checked);
-			return mkNot(mkBitVectorNor(l, r));
+			return mkBitVectorNor(l, r);
 		}
 		case tau_parser::bv_xor: {
 			auto l = eval_bv(form->child[0], vars, free_vars, checked);
@@ -323,7 +323,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 		case tau_parser::bv_xnor: {
 			auto l = eval_bv(form->child[0], vars, free_vars, checked);
 			auto r = eval_bv(form->child[1], vars, free_vars, checked);
-			return mkNot(mkBitVectorXnor(l, r));
+			return mkBitVectorXnor(l, r);
 		}
 		/*case tau_parser::bv_min: {
 			auto l = eval_bv(form->child[0], vars, free_vars, checked);
@@ -404,6 +404,7 @@ std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 	std::map<tau<BAs...>, cvc5::Term> vars;
 	std::map<tau<BAs...>, cvc5::Term> free_vars;
 	cvc5_solver.resetAssertions();
+	cvc5_solver.push();
 	auto expr = eval_bv(form, vars, free_vars, false);
 
 	// solve the equations
@@ -428,6 +429,7 @@ std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 				std::make_shared<rewriter::node<tau_sym<BAs...>>>(
 					tau_parser::instance().literal(tau_parser::bitvector), bvv));
 		}
+		cvc5_solver.pop();
 		return s;
 	} else {
 
@@ -435,6 +437,7 @@ std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 		BOOST_LOG_TRIVIAL(info) << "(Info) bv system is unsat";
 		#endif // DEBUG
 	}
+	cvc5_solver.pop();
 	return {};
 }
 
