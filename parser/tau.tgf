@@ -173,7 +173,9 @@ src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'
 
 type                   => bv_type | chars.
 # allowing non-default base bas
-bv_type                => "bv" _ '[' _ num _ ']'.
+# TODO (HIGH) uncomment when supporting different bit widths
+bv_type                => "bv" [_ '[' _ num _ ']'].
+#bv_type                => "bv".
 
 # common elements
 chars                  => alpha (alnum | '_')*.
