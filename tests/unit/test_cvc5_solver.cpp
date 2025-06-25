@@ -65,8 +65,28 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.has_value() );
 	}
 
+	// take into account modular arithmetic
+	TEST_CASE("X + 1 !>_ X") {
+		const char* sample = "X + 1 !>_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_bv(equation);
+		CHECK( solution.has_value() );
+	}
+
 	TEST_CASE("X >=_ X") {
 		const char* sample = "X >=_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_bv(equation);
+		CHECK( solution.has_value() );
+	}
+
+	// take into account modular arithmetic
+	TEST_CASE("X >=_ X + 1") {
+		const char* sample = "X >=_ X + 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
@@ -83,8 +103,27 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( !solution.has_value() );
 	}
 
+	TEST_CASE("X + 1 !>=_ X") {
+		const char* sample = "X + 1!>=_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_bv(equation);
+		CHECK( solution.has_value() );
+	}
+
 	TEST_CASE("X <=_ X") {
 		const char* sample = "X <=_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_bv(equation);
+		CHECK( solution.has_value() );
+	}
+
+	// take into account modular arithmetic
+	TEST_CASE("X + 1 <=_ X") {
+		const char* sample = "X + 1 <=_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
@@ -101,6 +140,15 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( !solution.has_value() );
 	}
 
+	TEST_CASE("X + 1 !<=_ X") {
+		const char* sample = "X + 1 !<=_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_bv(equation);
+		CHECK( solution.has_value() );
+	}
+
 	TEST_CASE("X <_ X") {
 		const char* sample = "X <_ X";
 		auto src = make_tau_source(sample, {
@@ -110,8 +158,27 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( !solution.has_value() );
 	}
 
+	TEST_CASE("X - 1 <_ X") {
+		const char* sample = "X - 1 <_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_bv(equation);
+		CHECK( solution.has_value() );
+	}
+
 	TEST_CASE("X !<_ X") {
 		const char* sample = "X !<_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_bv(equation);
+		CHECK( solution.has_value() );
+	}
+
+	// take into account modular arithmetic
+	TEST_CASE("X - 1 !<_ X") {
+		const char* sample = "X - 1!<_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
