@@ -5,8 +5,8 @@
 #include "doctest.h"
 
 #include <cvc5/cvc5.h>
-
-#include "../unit/test_helpers.h"
+#include "../../../src/init_log.h"
+//#include "../unit/test_helpers.h"
 
 using namespace boost::log;
 using namespace cvc5;
@@ -93,9 +93,9 @@ TEST_SUITE("sample cvc5 programs") {
 		(check-sat)
 		*/
 		Solver solver;
-		auto bv64 = solver.mkBitVectorSort(64);
-		auto o1_t = solver.mkVar(bv64, "o1_t");
-		auto i1_t = solver.mkVar(bv64, "i1_t");
+		auto bvSort = solver.mkBitVectorSort(4);
+		auto o1_t = solver.mkVar(bvSort, "o1_t");
+		auto i1_t = solver.mkVar(bvSort, "i1_t");
 
 		auto fml =
 			solver.mkTerm(Kind::NOT, {
