@@ -22,12 +22,12 @@ TEST_SUITE("configuration") {
 			expressions::stream << expressions::smessage);
 	}
 
-	TEST_CASE("z3_config") {
+	TEST_CASE("cvc5_config") {
 		bv_config();
 	}
 }
 
-TEST_SUITE("z3_solve simple") {
+TEST_SUITE("cvc5_solve simple") {
 
 	TEST_CASE("X =_ 1") {
 		const char* sample = "X =_ 1";
@@ -53,7 +53,7 @@ TEST_SUITE("z3_solve simple") {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
 		auto solution = solve_bv(equation);
-		CHECK( !solution.has_value() );
+		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X !>_ X") {
@@ -129,7 +129,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_checked") {
+	TEST_CASE("cvc5_checked") {
 		const char* sample = "[X] =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -139,7 +139,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_neg") {
+	TEST_CASE("cvc5_neg") {
 		const char* sample = "~X =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -149,7 +149,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_add") {
+	TEST_CASE("cvc5_add") {
 		const char* sample = "X + 1 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -159,7 +159,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_sub") {
+	TEST_CASE("cvc5_sub") {
 		const char* sample = "X - 1 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -169,7 +169,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_mul") {
+	TEST_CASE("cvc5_mul") {
 		const char* sample = "X * 1 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -179,7 +179,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_div") {
+	TEST_CASE("cvc5_div") {
 		const char* sample = "X / 1 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -189,7 +189,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_mod") {
+	TEST_CASE("cvc5_mod") {
 		const char* sample = "X % 2 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -199,7 +199,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_and") {
+	TEST_CASE("cvc5_and") {
 		const char* sample = "X & 1 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -209,7 +209,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_nand") {
+	TEST_CASE("cvc5_nand") {
 		const char* sample = "2 !& 1 =_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -219,7 +219,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_or") {
+	TEST_CASE("cvc5_or") {
 		const char* sample = "X | 1 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -229,7 +229,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_nor") {
+	TEST_CASE("cvc5_nor") {
 		const char* sample = "2 !| X =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -239,7 +239,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_xor") {
+	TEST_CASE("cvc5_xor") {
 		const char* sample = "X (+) 1 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -249,7 +249,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_xnor") {
+	TEST_CASE("cvc5_xnor") {
 		const char* sample = "X !(+) 1 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -259,7 +259,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_rotate_shift") {
+	TEST_CASE("cvc5_rotate_shift") {
 		const char* sample = "X << 1 =_ 2";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -269,7 +269,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_rotate_right") {
+	TEST_CASE("cvc5_rotate_right") {
 		const char* sample = "X >> 1 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -279,7 +279,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	/*TEST_CASE("z3_min") {
+	/*TEST_CASE("cvc5_min") {
 		const char* sample = "min 2 1 =_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -289,7 +289,7 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_max") {
+	TEST_CASE("cvc5_max") {
 		const char* sample = "max X 0 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
