@@ -770,6 +770,14 @@ TEST_SUITE("parsing variables") {
 		CHECK( var.has_value() );
 	}
 
+	TEST_CASE("regular bv typed variable (no width)") {
+		const char* sample = "x:bv";
+		auto src = make_tau_source(sample, { .start = tau_parser::bv });
+		auto frml = make_statement(src);
+		auto var = frml | tau_parser::variable | tau_parser::type | tau_parser::bv_type;
+		CHECK( var.has_value() );
+	}
+
 	TEST_CASE("io bv typed variable") {
 		const char* sample = "i1:bv[0]";
 		auto src = make_tau_source(sample, { .start = tau_parser::bv });
