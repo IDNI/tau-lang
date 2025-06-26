@@ -39,6 +39,8 @@ TEST_SUITE("cvc5_satisfiability") {
 		auto formula = make_statement(src);
 		// y is implicitlly existentially quantified by z3
 		CHECK( !is_bv_formula_sat(formula) );
+		CHECK( is_bv_formula_unsat(formula) );
+		CHECK( is_bv_formula_valid(build_wff_neg(formula)) );
 	}
 
 	TEST_CASE("all x x >_ 0") {
@@ -47,6 +49,8 @@ TEST_SUITE("cvc5_satisfiability") {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
 		CHECK( !is_bv_formula_sat(formula) );
+		CHECK( is_bv_formula_unsat(formula) );
+		CHECK( is_bv_formula_valid(build_wff_neg(formula)) );
 	}
 
 	TEST_CASE("all x x + 1 =_ 1") {
@@ -55,6 +59,8 @@ TEST_SUITE("cvc5_satisfiability") {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
 		CHECK( !is_bv_formula_sat(formula) );
+		CHECK( is_bv_formula_unsat(formula) );
+		CHECK( is_bv_formula_valid(build_wff_neg(formula)) );
 	}
 
 	TEST_CASE("all x all y (x + y) * (x + y)  =_ x * x + y* y + 2 * x * y") {
@@ -71,6 +77,8 @@ TEST_SUITE("cvc5_satisfiability") {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
 		CHECK( !is_bv_formula_sat(formula) );
+		CHECK( is_bv_formula_unsat(formula) );
+		CHECK( is_bv_formula_valid(build_wff_neg(formula)) );
 	}
 
 	// next return FATAL ERROR: test case CRASHED: SIGABRT - Abort (abnormal termination) signal
@@ -84,6 +92,8 @@ TEST_SUITE("cvc5_satisfiability") {
 		// TODO (HIGH) change assertion when supporting overflows
 		//CHECK_THROWS( is_bv_formula_sat(formula) );
 		CHECK( !is_bv_formula_sat(formula) );
+		CHECK( is_bv_formula_unsat(formula) );
+		CHECK( is_bv_formula_valid(build_wff_neg(formula)) );
 	}
 
 	TEST_CASE("all x ex y [x + y] =_ 1") {
@@ -105,6 +115,8 @@ TEST_SUITE("cvc5_satisfiability") {
 		// TODO (HIGH) change assertion when supporting overflows
 		//CHECK_THROWS( is_bv_formula_sat(formula) );
 		CHECK( !is_bv_formula_sat(formula) );
+		CHECK( is_bv_formula_unsat(formula) );
+		CHECK( is_bv_formula_valid(build_wff_neg(formula)) );
 
 	}
 
@@ -141,5 +153,7 @@ TEST_SUITE("cvc5_satisfiability") {
 		auto formula = make_statement(src);
 		//CHECK_THROWS( is_bv_formula_sat(formula) );
 		CHECK( !is_bv_formula_sat(formula) );
+		CHECK( is_bv_formula_unsat(formula) );
+		CHECK( is_bv_formula_valid(build_wff_neg(formula)) );
 	}
 }
