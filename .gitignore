@@ -76,7 +76,4 @@ logs/*
 .gdbinit
 external/boost
 libboost-mingw-w64
-examples/cvc5/are_nso_eqv.cvc5
-examples/testnet/andrei
-examples/testnet/andrei_uncomment.tau
-examples/testnet/andrei.tau
+private
