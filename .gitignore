@@ -47,9 +47,7 @@ CMakeFiles
 CMakeFiles/*
 Makefile
 CMakeCache.txt
-*.cmake
 *.nocmake
-!cmake/*
 !tests/repl/commands/*
 !tests/repl/execution/*
 !tests/repl/normal_forms/*
