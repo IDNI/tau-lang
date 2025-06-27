@@ -531,17 +531,6 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 				|| is_non_terminal(tau_parser::bv_ngeq, n)
 				|| is_non_terminal(tau_parser::bv_less, n);
 		};
-		auto bv = [](const tau_nso_t& n) {
-			return is_non_terminal(tau_parser::bv_eq, n)
-				|| is_non_terminal(tau_parser::bv_neq, n)
-				|| is_non_terminal(tau_parser::bv_less_equal, n)
-				|| is_non_terminal(tau_parser::bv_nleq, n)
-				|| is_non_terminal(tau_parser::bv_greater, n)
-				|| is_non_terminal(tau_parser::bv_ngreater, n)
-				|| is_non_terminal(tau_parser::bv_greater_equal, n)
-				|| is_non_terminal(tau_parser::bv_ngeq, n)
-				|| is_non_terminal(tau_parser::bv_less, n);
-		};
 		auto eqs = select_top(applied, atomic);
 		for (const auto& eq : eqs) {
 			// If find type, type all io_vars found in eq if not present yet
