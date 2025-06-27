@@ -66,7 +66,7 @@ using equations = subtree_set<node>;
  */
 template<NodeType node>
 using equation_system = std::pair<std::optional<equality>,
-				  std::set<inequality, subtree_equality<node>>>;
+				  std::set<inequality, subtree_less<node>>>;
 
 /**
  * @typedef inequality_system

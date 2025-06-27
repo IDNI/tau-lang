@@ -278,7 +278,7 @@ template <NodeType node>
 auto lex_var_comp = [](tref x, tref y) {
 #ifdef TAU_CACHE
 	static std::map<std::pair<tref, tref>, bool,
-		subtree_pair_equality<node, tref>> cache;
+		subtree_pair_less<node, tref>> cache;
 	if (auto it = cache.find({x,y}); it != cache.end())
 		return it->second;
 #endif // TAU_CACHE

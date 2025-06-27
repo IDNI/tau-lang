@@ -806,7 +806,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 	DBG(assert(t.is(tau::bf));)
 #ifdef TAU_CACHE
 	static std::map<std::pair<tref, bool>, tref,
-		subtree_pair_equality<node, bool>> cache;
+		subtree_pair_less<node, bool>> cache;
 	if (auto it = cache.find(std::make_pair(fm, make_paths_disjoint));
 		it != cache.end()) return trace(it->second);
 #endif //TAU_CACHE
@@ -1883,7 +1883,7 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 	LOG_DEBUG << "Formula in DNF: " << LOG_FM(squeezed_fm);
 #ifdef TAU_CACHE
 	static std::map<std::pair<tref, bool>, tref,
-		subtree_pair_equality<node, bool>> cache;
+		subtree_pair_less<node, bool>> cache;
 	if (auto it = cache.find(std::make_pair(squeezed_fm, to_cnf));
 			it != end(cache)) return it->second;
 #endif // TAU_CACHE
@@ -3011,7 +3011,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 
 #ifdef TAU_CACHE
 	static std::map<std::pair<tref, tref>, tref,
-		subtree_pair_equality<node, tref>> cache;
+		subtree_pair_less<node, tref>> cache;
 	if (auto it = cache.find(std::make_pair(inner_fm, scoped_fm));
 		it != end(cache)) return it->second;
 #endif // TAU_CACHE
@@ -3092,7 +3092,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 // Add cache after reductions; reductions are cached as well
 #ifdef TAU_CACHE
 	static std::map<std::pair<tref, tref>, tref,
-		subtree_pair_equality<node, tref>> cache;
+		subtree_pair_less<node, tref>> cache;
 	if (auto it = cache.find(std::make_pair(inner_fm, scoped_fm));
 		it != end(cache)) return it->second;
 #endif // TAU_CACHE
