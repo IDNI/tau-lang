@@ -315,7 +315,7 @@ memory                 => ( "%"
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
         sym, digits, hexnum, bits, type, bv_type, source, named_binding, capture,
-        variable, in_var_name, out_var_name, uninter_const_name, in, out,
+        variable, in_var_name, out_var_name, uninter_const_name,
         file_name, ctnvar, option_name, option_value, integer.
 
 # inline intermediate nodes and eliminate parenthesis

@@ -466,15 +466,17 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(
 	const tau<BAs...>& fm, const size_t start_time) {
 	for (auto& clause : get_dnf_wff_clauses(fm)) {
 #ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "compute_systems/clause: " << clause;
+		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/clause: " << clause;
+		print_tau_tree(std::cout, clause);
 #endif // DEBUG
 
 		auto executable = transform_to_execution(clause, start_time, true);
+
 #ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "compute_systems/executable: " << executable;
+		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/executable: " << executable;
+		print_tau_tree(std::cout, executable);
 #endif // DEBUG
+
 		if (executable == _F<BAs...>) continue;
 		// Make sure that no constant time position is smaller than 0
 		auto io_vars = select_top(executable, is_child_non_terminal<tau_parser::io_var, BAs...>);
@@ -489,8 +491,7 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(
 			get_uninterpreted_constants_constraints(executable, io_vars);
 		if (constraints == _F<BAs...>) continue;
 #ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "compute_systems/constraints: " << constraints;
+		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/constraints: " << constraints;
 #endif // DEBUG
 		auto spec = executable;
 		if (constraints != _T<BAs...>) {
