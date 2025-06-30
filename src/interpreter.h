@@ -159,7 +159,7 @@ struct finputs {
 			}
 //			print_tau_tree(std::cout, cnst.value());
 			if (is_non_terminal<tau_parser::bitvector, BAs...>(cnst.value())) {
-				// If the constant is a bitvector, we need to wrap it in a bf_constant
+				// If the constant is a bitvector, we need to wrap it in a bv
 				// with the type of the variable.
 				value[wrap(tau_parser::bv, var)] = wrap(tau_parser::bv, cnst.value());
 				continue;
@@ -232,7 +232,11 @@ struct foutputs {
 		// Sort variables in output by time
 		std::vector<tau<BAs...>> io_vars;
 		for (const auto& [var, _ ] : outputs) {
+
+			#ifdef DEBUG
 			print_tau_tree(std::cout, var);
+			#endif // DEBUG
+
 			assert(is_child_non_terminal(tau_parser::io_var, trim(var)));
 			io_vars.push_back(var);
 		}
@@ -247,7 +251,11 @@ struct foutputs {
 				| only_child_extractor<BAs...>
 				| ba_extractor<BAs...>;
 				auto io_var_name = trim2(trim2(io_var));
+
+			#ifdef DEBUG
 			print_tau_tree(std::cout, io_var);
+			#endif // DEBUG
+
 			std::stringstream ss;
 			if (!value && !is_non_terminal(tau_parser::bv, io_var)) {
 				// is a bv
@@ -416,7 +424,19 @@ std::optional<tau<BAs...>> unpack_tau_constant(const tau<BAs...>& constant) {
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<input_t, output_t, BAs...>>
 run(const tau<BAs...>& form, input_t& inputs, output_t& outputs, const size_t steps = 0) {
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace) << "interpreter.h:" << __LINE__ << " run/form: " << form;
+	print_tau_tree(std::cout, form);
+	#endif // DEBUG
+
 	auto spec = normalizer(form);
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace) << "interpreter.h:" << __LINE__ << " run/spec: " << spec;
+	print_tau_tree(std::cout, spec);
+	#endif // DEBUG
+
 	auto intrprtr_o = interpreter<input_t, output_t, BAs...>
 		::make_interpreter(spec, inputs, outputs);
 	if (!intrprtr_o) return {};

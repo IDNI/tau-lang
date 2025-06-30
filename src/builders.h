@@ -6,6 +6,9 @@
 #include "queries.h"
 #include "language.h"
 
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif // DEBUG
 namespace idni::tau_lang {
 
 // creates a specific builder from a tau.
@@ -371,6 +374,13 @@ auto is_io_initial (const tau<BAs...>& io_var) {
 
 template <typename... BAs>
 auto is_io_shift (const tau<BAs...>& io_var) {
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace) << "builders.h:" << __LINE__ << " get_io_var_shift/is_io_shift: " << io_var;
+	print_tau_tree(std::cout, io_var);
+	print_tau_tree(std::cout, trim2(io_var)->child[1]);
+	#endif // DEBUG
+
 	return (trim2(io_var)->child[1] | tau_parser::shift).has_value();
 }
 
@@ -397,6 +407,11 @@ tau<BAs...> get_tau_io_name(const tau<BAs...>& io_var) {
 
 template <typename... BAs>
 int_t get_io_var_shift(const tau<BAs...>& io_var) {
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace) << "builders.h:" << __LINE__ << " get_io_var_shift/io_var: " << io_var;
+	print_tau_tree(std::cout, io_var);
+	#endif // DEBUG
+
 	// If there is a shift
 	if (is_io_shift(io_var))
 		return get_io_shift(io_var);

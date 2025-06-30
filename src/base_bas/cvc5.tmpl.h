@@ -130,13 +130,12 @@ template<typename...BAs>
 Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map<tau<BAs...>, Term>& free_vars, bool checked) {
 	auto nt = std::get<tau_source_sym>(form->value).n();
 
-	BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/from: " << form;
+	//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/from: " << form;
 
 	// control overflow/underflow if requested
-	if (checked) {
-		BOOST_LOG_TRIVIAL(warning)
-			<< "(Warning) overflow/underflow checking is deactivated";
-	}
+	//if (checked) {
+	//	BOOST_LOG_TRIVIAL(warning) << "(Warning) overflow/underflow checking is deactivated";
+	//}
 
 	switch (nt) {
 		// due to hooks we should consider wff_t or bf_t
@@ -164,9 +163,9 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 			std::vector<Term> cvc5_var_list;
 			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
 				auto vn = make_string(v);
-				BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
+				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
 				auto x = cvc5_solver.mkVar(BV, vn.c_str());
-				BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
+				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
 			}
@@ -175,7 +174,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 
 			cvc5_solver.pop();
 
-			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << res;
+			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << res;
 
 			return res;
 		}
@@ -185,9 +184,9 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 			std::vector<Term> cvc5_var_list;
 			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
 				auto vn = make_string(v);
-				BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
+				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
 				auto x = cvc5_solver.mkVar(BV, vn.c_str());
-				BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
+				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
 			}
@@ -197,7 +196,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 
 			cvc5_solver.pop();
 
-			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << res;
+			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << res;
 			return res;
 		}
 		case tau_parser::variable: {
@@ -206,9 +205,9 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 			if (auto it = free_vars.find(form); it != free_vars.end()) return it->second;
 			auto vn = make_string(form);
 			// create a new constant according to the type and added to the map
-			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
+			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
 			auto x = cvc5_solver.mkConst(BV, vn.c_str());
-			BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
+			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
 			//vars.emplace(form, x);
 			free_vars.emplace(form, x);
 			return x;
@@ -361,7 +360,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 		}
 		default: {
 			#ifdef DEBUG
-			BOOST_LOG_TRIVIAL(error) << "(Error) unknow bv non-terminal: " << nt;
+			//BOOST_LOG_TRIVIAL(error) << "(Error) unknow bv non-terminal: " << nt;
 			#endif // DEBUG
 		}
 	}
@@ -370,17 +369,15 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 
 template <typename...BAs>
 bool is_bv_formula_sat(const tau<BAs...>& form) {
-	std::map<tau<BAs...>, cvc5::Term> vars;
-	std::map<tau<BAs...>, cvc5::Term> free_vars;
-	cvc5_solver.resetAssertions();
-	// collect all variables and free variables
+	std::map<tau<BAs...>, cvc5::Term> vars, free_vars;
+
 	auto expr = eval_bv(form, vars, free_vars);
 
+	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/form: " << form;
 	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/expr: " << expr;
 
-	// solve the equations
+	cvc5_solver.resetAssertions();
 	cvc5_solver.assertFormula(expr);
-
 	auto result = cvc5_solver.checkSat();
 
 	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/result: " << result;
