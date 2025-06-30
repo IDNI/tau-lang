@@ -129,17 +129,17 @@ inline bool matches_output(const auto& assm, const auto& memory) {
 		if (val == nullptr) continue;
 		if (auto it = memory.find(var); it != memory.end()) {
 			if (!are_bf_equal<node_t>(it->second, val)) {
-				LOG_ERROR << LOG_FM(it->second)
-						<< " != " << LOG_FM(val);
+				TAU_LOG_ERROR << TAU_LOG_FM(it->second)
+						<< " != " << TAU_LOG_FM(val);
 #ifdef DEBUG
-				LOG_INFO << "first:\n"
-						<< LOG_FM_DUMP(it->second);
-				LOG_INFO << "second:\n" << LOG_FM_DUMP(val);
+				TAU_LOG_INFO << "first:\n"
+						<< TAU_LOG_FM_DUMP(it->second);
+				TAU_LOG_INFO << "second:\n" << TAU_LOG_FM_DUMP(val);
 #endif // DEBUG
 				return false;
 			}
 		} else {
-			LOG_ERROR << TAU_TO_STR(var) << " not found";
+			TAU_LOG_ERROR << TAU_TO_STR(var) << " not found";
 			return false;
 		}
 	}

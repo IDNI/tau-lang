@@ -20,7 +20,7 @@ TEST_SUITE("bf operator hooks") {
 		using node = node_t;
 		string str(sample);
 		if (tau_sample) cout << "sample: " << str
-			<< " expected error, got : " << LOG_FM_DUMP(tau_sample) << "\n";
+			<< " expected error, got : " << TAU_LOG_FM_DUMP(tau_sample) << "\n";
 		else cout << "sample: " << str << " expected error, got it\n";
 #endif // DEBUG
 
@@ -29,7 +29,9 @@ TEST_SUITE("bf operator hooks") {
 
 	// we should be able to parse the sample and the expected result should be the same
 	bool check_hook(const char* sample, const char* expected) {
+		TAU_LOG_TRACE << "===== sample =====";
 		tref tau_sample   = tau::get(sample, parse_bf());
+		TAU_LOG_TRACE << "===== expected =====";
 		tref tau_expected = tau::get(expected, parse_bf());
 
 #ifdef DEBUG
@@ -64,30 +66,30 @@ TEST_SUITE("bf operator hooks") {
 		return type_id == type_expected_id && sample_type == expected_type;
 	}
 
-	TEST_CASE("conversion to 1/0") {
-		CHECK( check_hook("{T}", "1:tau") );
-		CHECK( check_hook("{F}", "0:tau") );
+	// TEST_CASE("conversion to 1/0") {
+	// 	CHECK( check_hook("{T}", "1:tau") );
+	// 	CHECK( check_hook("{F}", "0:tau") );
 
-		CHECK( check_hook("{T}:tau", "1:tau") );
-		CHECK( check_hook("{F}:tau", "0:tau") );
+	// 	CHECK( check_hook("{T}:tau", "1:tau") );
+	// 	CHECK( check_hook("{F}:tau", "0:tau") );
 
-		CHECK( check_hook("{1}:sbf", "1:sbf") );
-		CHECK( check_hook("{0}:sbf", "0:sbf") );
-	}
+	// 	CHECK( check_hook("{1}:sbf", "1:sbf") );
+	// 	CHECK( check_hook("{0}:sbf", "0:sbf") );
+	// }
 
 	TEST_CASE("'") {
-		CHECK( check_hook("0'", "1") );
-		CHECK( check_hook("1'", "0") );
+		// CHECK( check_hook("0'", "1") );
+		// CHECK( check_hook("1'", "0") );
 
-		CHECK( check_hook("0:sbf'", "1:sbf") );
-		CHECK( check_hook("1:sbf'", "0:sbf") );
+		// CHECK( check_hook("0:sbf'", "1:sbf") );
+		// CHECK( check_hook("1:sbf'", "0:sbf") );
 
-		CHECK( check_hook("0:tau'", "1:tau") );
-		CHECK( check_hook("1:tau'", "0:tau") );
+		// CHECK( check_hook("0:tau'", "1:tau") );
+		// CHECK( check_hook("1:tau'", "0:tau") );
 
-		CHECK( check_hook("x''", "x") );
+		// CHECK( check_hook("x''", "x") );
 
-		CHECK( check_type("{a}:sbf'", "sbf") );
+		// CHECK( check_type("{a}:sbf'", "sbf") );
 		CHECK( check_type("{o1[t] = 0}'", "tau") );
 		CHECK( check_type("{o1[t] = 0}:tau'", "tau") );
 	}

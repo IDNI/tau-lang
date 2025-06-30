@@ -15,7 +15,7 @@ tref splitter_one_bdd() {
 template <NodeType node>
 bool check_solution(tref eq, const solution<node>& sol) {
 	using tau = tree<node>;
-	DBG(LOG_TRACE << "check_solution/sol:\n" << dump_to_str(sol);)
+	DBG(TAU_LOG_TRACE << "check_solution/sol:\n" << dump_to_str(sol);)
 	tref substitution = rewriter::replace<node>(eq, sol);
 	tref check = snf_wff<node>(substitution);
 #ifdef DEBUG

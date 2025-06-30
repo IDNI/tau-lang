@@ -17,9 +17,9 @@ bool are_all_typed_as(tref n, const std::string& type) {
 	auto are_all_trefs_typed = [&](const trefs& ts) {
 		for (tref t : ts)
 			if (tau::get(t).get_ba_type() != tid) {
-				LOG_ERROR << "Type mismatch: " << LOG_FM(t)
-					<< " expected: " << LOG_BA_TYPE(tid)
-					<< " got: " << LOG_BA_TYPE(tau::get(t)
+				TAU_LOG_ERROR << "Type mismatch: " << TAU_LOG_FM(t)
+					<< " expected: " << TAU_LOG_BA_TYPE(tid)
+					<< " got: " << TAU_LOG_BA_TYPE(tau::get(t)
 								.get_ba_type());
 				return false;
 			}
@@ -48,7 +48,7 @@ TEST_SUITE("constant types") {
 	TEST_CASE("some typed") {
 		using node = node_t;
 		auto n = infer("{ 0 } : sbf = { 1 } { 0 } : sbf.");
-		LOG_TRACE << "inferred: " << LOG_FM_DUMP(n);
+		TAU_LOG_TRACE << "inferred: " << TAU_LOG_FM_DUMP(n);
 		CHECK( are_all_typed_as(n, "sbf") );
 	}
 
