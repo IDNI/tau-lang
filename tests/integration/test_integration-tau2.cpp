@@ -25,7 +25,7 @@ using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
-TEST_SUITE("simple tau formulas: no negatives, no loopbacks, no vars") {
+TEST_SUITE("simple tau formulas: no negatives, no lookbacks, no vars") {
 
 	TEST_CASE("{(0 = 0)}") {
 		const char* sample = "{(0 = 0)};";
@@ -44,7 +44,7 @@ TEST_SUITE("simple tau formulas: no negatives, no loopbacks, no vars") {
 	}
 }
 
-TEST_SUITE("simple tau formulas: no negatives, no loopbacks") {
+TEST_SUITE("simple tau formulas: no negatives, no lookbacks") {
 
 	TEST_CASE("{(i1[t] = o1[t])}") {
 		const char* sample = "{ ( i1[t] = o1[t] ) };";
@@ -82,7 +82,7 @@ TEST_SUITE("simple tau formulas: no negatives") {
 	}
 }
 
-TEST_SUITE("simple tau formulas: negatives, no loopbacks") {
+TEST_SUITE("simple tau formulas: negatives, no lookbacks") {
 
 	TEST_CASE("{(i1[t] != o1[t])}") {
 		const char* sample = "{ ( i1[t] != o1[t] ) };";
@@ -120,7 +120,7 @@ TEST_SUITE("simple tau formulas: negatives") {
 	}
 }
 
-TEST_SUITE("simple tau formulas: negatives, positive, no loopbacks") {
+TEST_SUITE("simple tau formulas: negatives, positive, no lookbacks") {
 
 	//TODO (HIGH) implement the following tests properly
 
@@ -141,7 +141,7 @@ TEST_SUITE("simple tau formulas: negatives, positive, no loopbacks") {
 	}
 }
 
-TEST_SUITE("simple tau formulas: negatives, positive, loopbacks") {
+TEST_SUITE("simple tau formulas: negatives, positive, lookbacks") {
 
 	//TODO (HIGH) implement the following tests properly
 
