@@ -52,7 +52,7 @@ std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* sample) {
 std::optional<rr<node_t>> get_nso_rr(const char* sample,
 	bool wo_inference = false)
 {
-	LOG_TRACE << "get_nso_rr: " << sample;
+	TAU_LOG_TRACE << "get_nso_rr: " << sample;
 	tref spec = tau::get(sample);
 	assert(spec != nullptr);
 	return get_nso_rr<node_t>(spec, wo_inference);
@@ -72,12 +72,12 @@ bool normalize_and_check(const char* sample,
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return expect_fail;
 
-	LOG_DEBUG << "(T) nso_rr: " << to_str<node_t>(nso_rr.value());
+	TAU_LOG_DEBUG << "(T) nso_rr: " << to_str<node_t>(nso_rr.value());
 
 	tref result = normalizer<node_t>(nso_rr.value());
 	if (!result) return expect_fail;
 
-	LOG_DEBUG << "(T) Normalized result: " << LOG_FM(result);
+	TAU_LOG_DEBUG << "(T) Normalized result: " << TAU_LOG_FM(result);
 
 	return tau::get(result).child_is(nt) != expect_fail;
 }

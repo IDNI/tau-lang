@@ -31,11 +31,15 @@ TEST_SUITE("normal forms: mnf for wffs") {
 	}
 
 	TEST_CASE("simple case: X = 0") {
+		using node = node_t;
 		const char* sample = "X = 0.";
-		tref fm = tt(tau::get(sample))
-			| tau::spec | tau::main | tau::wff | tt::ref;
+		tref spec = tau::get(sample);
+		TAU_LOG_TRACE << "spec: " << TAU_LOG_FM_DUMP(spec);
+		tref fm = tt(spec) | tau::spec | tau::main | tau::wff | tt::ref;
 		tref result = to_mnf<node_t>(reduce_across_bfs<node_t>(fm, false));
-		CHECK( fm == result );
+		TAU_LOG_TRACE << "fm:     " << TAU_LOG_FM_DUMP(fm);
+		TAU_LOG_TRACE << "result: " << TAU_LOG_FM_DUMP(result);
+		CHECK( tau::subtree_equals(fm, result) );
 	}
 
 	TEST_CASE("simple case: X != 0") {

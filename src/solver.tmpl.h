@@ -252,12 +252,19 @@ struct minterm_iterator {
 							partial_minterm);
 				partial_bf = rewriter::replace_with<node>(v,
 					tau::_0(), partial_bf);
+				DBG(LOG_TRACE << "minterm_iterator/partial_bf: "
+					<< LOG_FM(partial_bf);)
 				// ... and compute new values for the next one
 			}
 			// if the current choices correspond to a proper minterm, we update the current
 			// minterm, otherwise we compute the next valid choice
 			if (tref minterm = make_current_minterm();
-				!tau::get(minterm).equals_0()) current = minterm;
+				!tau::get(minterm).equals_0())
+			{
+				current = minterm;
+				DBG(LOG_TRACE << "minterm_iterator/current: "
+					<< LOG_FM(current);)
+			}
 			else make_next_choice();
 		// otherwise, i.e. no vars, we return an empty iterator as we have no vars.
 		} else exhausted = true;
