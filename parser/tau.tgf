@@ -143,8 +143,8 @@ scope_id               => digits. # dummy rule to introduce scope_id nt
 
 # whitespace and comments
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
-__                     => (space | comment) _.   # whitespace
-_                      => [ __ ].                # optional whitespace
+__                     => space | comment | __ space | __ comment. # whitespace
+_                      => __ | null.                      # optional whitespace
 
 ################################################################################
 
