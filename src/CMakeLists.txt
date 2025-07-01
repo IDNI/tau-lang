@@ -19,6 +19,7 @@ set(TAU_HEADERS
 	splitter.h
 	solver.h
 	interpreter.h
+    union_find.h       # union find data structure
 	nso_factory.h      # abstract template interface
 	boolean_algebras/bool_ba.h
 	boolean_algebras/variant_ba.h

@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "normal_forms.h"
+#include "union_find.h"
 
 namespace idni::tau_lang {
 
@@ -3474,6 +3475,103 @@ tref replace_free_vars_by(tref fm, tref val) {
 		return rewriter::replace<node>(fm, free_var_assgm);
 	} else return fm;
 }
+
+/**
+ * @brief Simplify using assumptions from equalities in formula. More effective
+ * if terms/bfs are in a normal form
+ * @tparam node Type of tree node
+ */
+template <NodeType node>
+struct simplify_using_equality {
+	using tau = tree<node>;
+	// Given a formula, traverse the formula and
+	// apply equality simplifications along the way
+	static tref operator() (tref fm) {
+		// Create comparator function that orders bfs by making constants smallest
+		// We have 0 < 1 < bf_constant < uninterpreted_constant < variable < rest by node count
+		auto tau_comp = [](tref l, tref r) {
+			if (l == _0<node>()) return true;
+			if (r == _0<node>()) return false;
+			if (l == _1<node>()) return true;
+			if (r == _1<node>()) return false;
+			if (is_child<node>(l, tau::bf_constant)) return true;
+			if (is_child<node>(r, tau::bf_constant)) return false;
+			if (is_child<node>(l, tau::variable)) {
+				if (is_child<node>(r, tau::variable)) {
+					// Check for uninterpreted constant
+					if (is_child<node>(tau::trim(l), tau::uconst)) return true;
+					if (is_child<node>(tau::trim(r), tau::uconst)) return false;
+				} else return true;
+			}
+			if (is_child<node>(r, tau::variable)) return false;
+			return node_count<node>(l) <= node_count<node>(r);
+		};
+		// Create union find data structure to hold equality information
+		auto uf = union_find<decltype(tau_comp), node>(tau_comp);
+		// Create stack of union find data structures
+		std::vector<union_find<decltype(tau_comp), node>> uf_stack {uf};
+
+		// Traverse the formula: on encounter of = or !=, first apply simplification and, if equality, add it
+		auto f = [&uf_stack](tref n, tref parent) {
+			if (parent != nullptr && is<node>(parent, tau::wff_or) &&
+				!is_child<node>(n, tau::wff_or)) {
+				// Push new uf to stack
+				uf_stack.push_back(uf_stack.back());
+			}
+			if (is_child<node>(n, tau::bf_eq)) {
+				auto s = simplify_equation(uf_stack.back(), n);
+				// If equation was simplified away
+				if (!is_child<node>(s, tau::bf_eq)) return s;
+				if (add_equality(uf_stack.back(), s)) return s;
+				else return _F<node>();
+			} else if (is_child<node>(n, tau::bf_neq)) {
+				return simplify_equation(uf_stack.back(), n);
+			} else return n;
+		};
+		auto up = [&uf_stack](tref n, tref parent) {
+			if (parent != nullptr && is<node>(parent, tau::wff_or) &&
+				!is_child<node>(n, tau::wff_or)) {
+				uf_stack.pop_back();
+			}
+			return n;
+		};
+		return pre_order<node>(fm).apply_unique_until_change(
+			f, visit_wff<node>, up);
+	}
+
+	// Given an equality, add it to the given union find data structure
+	// Returns false, if a resulting equality set contains a contradiction
+	static bool add_equality (auto& uf, tref eq) {
+		// We both add a = b and a' = b' in order to detect syntactic contradictions
+		const auto& left_hand_side = tau::trim2(eq);
+		const auto& right_hand_side = tau::get(tau::trim(eq)).child(1);
+		const auto& left_hand_side_neg =
+			push_negation_in<node, false>(build_bf_neg<node>(left_hand_side));
+		const auto& right_hand_side_neg =
+			push_negation_in<node, false>(build_bf_neg<node>(right_hand_side));
+
+		uf.merge(left_hand_side, right_hand_side);
+		uf.merge(left_hand_side_neg, right_hand_side_neg);
+		uf.merge(build_bf_and<node>(left_hand_side, right_hand_side_neg), _0<node>());
+		uf.merge(build_bf_and<node>(right_hand_side, left_hand_side_neg), _0<node>());
+		uf.merge(build_bf_or<node>(left_hand_side, right_hand_side_neg), _1<node>());
+		uf.merge(build_bf_or<node>(right_hand_side, left_hand_side_neg), _1<node>());
+		// Check if syntactic contradiction occurred
+		return !uf.connected(left_hand_side, left_hand_side_neg)
+				&& !uf.connected(right_hand_side, right_hand_side_neg)
+					&& !uf.connected(_0<node>(), _1<node>());
+	}
+
+	// Given current equalities in union find, simplify the equation
+	static tref simplify_equation (auto& uf, tref eq) {
+		// For each node, check if contained in uf -> if yes, replace
+		auto simp = [&uf](tref n) {
+			if (uf.contains(n)) return uf.find(n);
+			return n;
+		};
+		return pre_order<node>(eq).apply_unique(simp);
+	}
+};
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "to_snf"
