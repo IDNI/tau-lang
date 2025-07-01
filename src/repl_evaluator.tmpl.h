@@ -431,7 +431,7 @@ std::optional<tau_nso<BAs...>>
 		}
 		return res;
 	};
-	return rewriter::post_order_recursive_traverser<tau_nso_t>()(
+	return rewriter::depreciating::post_order_recursive_traverser<tau_nso_t>()(
 			in.value(), quantified_var_adder, scoped_replace);
 }
 
@@ -444,7 +444,7 @@ std::optional<tau_nso<BAs...>>
 		| optional_value_extractor<size_t>)
 			 == tau_parser::variable ? tau_parser::bf
 			 			: tau_parser::wff;
-	auto nn = rewriter::make_node(n->value, { n->child[0], n->child[1],
+	auto nn = rewriter::depreciating::make_node(n->value, { n->child[0], n->child[1],
 				wrap(var_type, n->child[2]), n->child[3] });
 	return substitute_cmd(nn);
 }

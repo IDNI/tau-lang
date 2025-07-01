@@ -2,7 +2,7 @@
 #ifndef __DEF_H__
 #define __DEF_H__
 
-#include "version_license.h"
+//#include "./version_license.h"
 
 // basic macro for conditional execution of code
 #ifdef DEBUG
@@ -53,7 +53,7 @@ struct std::hash<z3::expr> {
 //	return std::addressof(e1) <=> std::addressof(e2);
 //}
 
-template<typename T>
+/*template<typename T>
 void hash_combine (size_t& seed, const T& v) {
 	seed ^= std::hash<T>{}(v) + 0x9e3779b97f4a7c15 + (seed << 12) + (seed >> 4);
 }
@@ -84,7 +84,7 @@ struct std::hash<std::tuple<Ts...>> {
 		std::apply([&seed](auto&&... xs){(hash_combine(seed, xs),...);}, p);
 		return seed;
 	}
-};
+};*/
 
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {

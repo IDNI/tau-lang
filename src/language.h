@@ -79,7 +79,7 @@ tau<BAs...> wrap(tau_parser::nonterminal nt, const std::string& terminals);
  * @return The specific rule.
  */
 template <typename... BAs>
-rewriter::rule<tau<BAs...>> make_rule(const tau<BAs...>& rule);
+rewriter::depreciating::rule<tau<BAs...>> make_rule(const tau<BAs...>& rule);
 
 /**
  * Creates a set of rules from a given tau source.

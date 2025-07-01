@@ -1,18 +1,18 @@
 set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
-	../external/parser/src/characters.h
-	../external/parser/src/charclasses.h
-	../external/parser/src/defs.h
-	../external/parser/src/devhelpers.h
-	../external/parser/src/forest.h
-	../external/parser/src/parser.h
-	../external/parser/src/parser.tmpl.h
-	../external/parser/src/recoders.h
-	../external/parser/src/tgf.h
-	../parser/sbf_parser.generated.h
-	../parser/tau_parser.generated.h
-	../parser/z3/bv_parser.generated.h
+#	../external/parser/src/utility/characters.h
+#	../external/parser/src/utility/charclasses.h
+#	../external/parser/src/utility/devhelpers.h
+#	../external/parser/src/utility/forest.h
+#	../external/parser/src/utility/term_colors.h
+#	../external/parser/src/recoders.h
+#	../external/parser/src/parser.h
+#	../external/parser/src/defs.h
+#	../external/parser/src/tgf.h
+#	../parser/sbf_parser.generated.h
+#	../parser/tau_parser.generated.h
+	#../parser/z3/bv_parser.generated.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h
@@ -46,11 +46,6 @@ set(TAU_HEADERS
 )
 
 set(TAU_SOURCES
-	../external/parser/src/characters.cpp
-	../external/parser/src/charclasses.cpp
-	../external/parser/src/parser.cpp
-	../external/parser/src/recoders.cpp
-	../external/parser/src/term.cpp
 	boolean_algebras/bool_ba.cpp
 	dict.cpp
 	nso_rr.cpp
@@ -58,7 +53,6 @@ set(TAU_SOURCES
 
 set(CLI_SOURCES
 	main.cpp
-	../external/parser/src/cli.cpp
 )
 
 #
@@ -74,6 +68,7 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
 )
 
 #
@@ -88,6 +83,7 @@ target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
 )
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
@@ -107,7 +103,8 @@ target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
-	$<INSTALL_INTERFACE:.>
+	$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
+#	$<INSTALL_INTERFACE:.>
 )
 set_target_properties(${TAU_SHARED_LIB_NAME} PROPERTIES
 	EXPORT_NAME ${TAU_SHARED_LIB_NAME}
@@ -129,6 +126,7 @@ if(TAU_BUILD_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
+		$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
 	)
 endif(TAU_BUILD_EXECUTABLE)
 
@@ -144,6 +142,7 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
+		$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
 	)
 endif(TAU_BUILD_SHARED_EXECUTABLE)
 

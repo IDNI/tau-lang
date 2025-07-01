@@ -442,10 +442,10 @@ std::ostream& operator<<(std::ostream& stream,
 // << for node<tau_sym>
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::node<idni::tau_lang::tau_sym<BAs...>>& n)
+	const idni::rewriter::depreciating::node<idni::tau_lang::tau_sym<BAs...>>& n)
 {
 	return stream << std::make_shared<
-			idni::rewriter::node<idni::tau_lang::tau_sym<BAs...>>>(n);
+			idni::rewriter::depreciating::node<idni::tau_lang::tau_sym<BAs...>>>(n);
 }
 
 // old operator<< renamed to print_terminals and replaced by

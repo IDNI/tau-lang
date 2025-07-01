@@ -586,7 +586,7 @@ tau<BAs...> build_enumerated_main_step(const tau<BAs...>& form, size_t i,
 	auto ref = r | only_child_extractor<BAs...>
 		| tau_parser::ref
 		| optional_value_extractor<tau<BAs...>>;
-	changes[ref] = rewriter::make_node<tau_sym<BAs...>>(ref->value, {
+	changes[ref] = rewriter::depreciating::make_node<tau_sym<BAs...>>(ref->value, {
 		ref->child[0],
 		wrap<BAs...>(tau_parser::offsets, ofs), ref->child[1] });
 	r = replace(r, changes);
@@ -874,8 +874,8 @@ tau<BAs...> calculate_all_fixed_points(const rr<tau<BAs...>>& recrel) {
 	if (!types.ok() || !is_valid(recrel)) return nullptr;
 	// transform fp calculation calls by calculation results
 	fixed_point_transformer<BAs...> fpt(recrel, types);
-	auto new_main = rewriter::post_order_traverser<decltype(fpt),
-		rewriter::all_t, tau<BAs...>>(fpt, rewriter::all)(recrel.main);
+	auto new_main = rewriter::depreciating::post_order_traverser<decltype(fpt),
+		rewriter::depreciating::all_t, tau<BAs...>>(fpt, rewriter::depreciating::all)(recrel.main);
 	if (!new_main) return nullptr;
 	if (fpt.changes.size()) {
 		new_main = replace(new_main, fpt.changes);
