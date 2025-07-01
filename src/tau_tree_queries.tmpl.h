@@ -108,6 +108,16 @@ bool contains(tref fm, tref sub_fm) {
 }
 
 template <NodeType node>
+int_t node_count (tref fm) {
+	int_t c = 0;
+	auto count = [&c](tref) {
+		return ++c, true;
+	};
+	pre_order<node>(fm).visit(count);
+	return c;
+}
+
+template <NodeType node>
 auto visit_wff = [](tref n) static {
 	if (tree<node>::get(n).is(node::type::bf)) return false;
 	return true;
