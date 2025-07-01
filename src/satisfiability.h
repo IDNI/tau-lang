@@ -92,7 +92,7 @@ int_t get_lookback_after_normalization(const auto& io_vars) {
 template<typename... BAs>
 bool has_temporary_io_var (const tau<BAs...>& fm) {
 	using p = tau_parser;
-	auto io_vars = rewriter::select_top(
+	auto io_vars = rewriter::depreciating::select_top(
 		fm, is_child_non_terminal<p::io_var, BAs...>);
 	for (const auto& var : io_vars) {
 		// Check if the name of var starts with "_"

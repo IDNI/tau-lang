@@ -1,7 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "queries.h"
+#include "traverser.h"
+
 namespace idni::tau_lang {
+	using namespace idni;
 
 	using parse_forest = idni::parser<char, char>::pforest;
 	using parse_result = idni::parser<char, char>::result;
@@ -64,7 +67,7 @@ namespace idni::tau_lang {
 			}
 		}
 	}
-	
+
 	template <typename...BAs>
 	std::optional<tau<BAs...>> sbf_ba_factory<BAs...>::parse(
 		const std::string& src)
@@ -89,7 +92,7 @@ namespace idni::tau_lang {
 		auto t = sbf_traverser_t(root) | sbf_parser::sbf;
 		auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
 		std::variant<BAs...> vp {b};
-		auto n = rewriter::make_node<tau_sym<BAs...>>(vp, {});
+		auto n = rewriter::depreciating::make_node<tau_sym<BAs...>>(vp, {});
 		return cache.emplace(src, n).first->second;
 	}
 

@@ -131,7 +131,7 @@ static const tau<BAs...> _T_trimmed = trim(_T<BAs...>);
 template <typename... BAs>
 tau<BAs...> build_num(size_t num) {
 	return wrap(
-		tau_parser::num, rewriter::make_node<tau_sym<BAs...>>(
+		tau_parser::num, rewriter::depreciating::make_node<tau_sym<BAs...>>(
 			tau_sym<BAs...>(num), {}));
 }
 
@@ -142,10 +142,10 @@ tau<BAs...> build_int(int_t i) {
 	const bool n = i < 0;
 	size_t u = n ? (size_t)(-i) : (size_t)i;
 	if (n) {
-		children.emplace_back(rewriter::make_node<tau_sym<BAs...>>(
+		children.emplace_back(rewriter::depreciating::make_node<tau_sym<BAs...>>(
 				tau_source_sym('-'), {}));
 	}
-	children.emplace_back(rewriter::make_node<tau_sym<BAs...>>(
+	children.emplace_back(rewriter::depreciating::make_node<tau_sym<BAs...>>(
 				tau_sym<BAs...>(u),{}));
 	return wrap(p::integer, children);
 }
@@ -483,19 +483,19 @@ tau<BAs...> build_bf_constant(const tau<BAs...>& cte, const std::string& type) {
 
 template <typename... BAs>
 tau<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
-	auto cte = rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	auto cte = rewriter::depreciating::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	return build_bf_constant<BAs...>(cte);
 }
 
 template<typename... BAs>
 tau<BAs...> build_bf_constant(const std::variant<BAs...>& v, const tau<BAs...>& type) {
-	auto cte = rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	auto cte = rewriter::depreciating::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	return build_bf_constant<BAs...>(cte, type);
 }
 
 template<typename... BAs>
 tau<BAs...> build_bf_constant(const std::variant<BAs...>& v, const std::optional<tau<BAs...>>& type) {
-	auto cte = rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	auto cte = rewriter::depreciating::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	return type.has_value() ? build_bf_constant<BAs...>(cte, type.value()) : build_bf_constant<BAs...>(cte);
 }
 

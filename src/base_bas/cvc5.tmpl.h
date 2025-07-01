@@ -423,7 +423,7 @@ std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 			auto bvn = make_node<tau_sym<BAs...>>(cvc5_solver.getValue(v.second), {});
 			std::vector<tau<BAs...>> bvv{bvn};
 			s.emplace(v.first,
-				std::make_shared<rewriter::node<tau_sym<BAs...>>>(
+				std::make_shared<rewriter::depreciating::node<tau_sym<BAs...>>>(
 					tau_parser::instance().literal(tau_parser::bitvector), bvv));
 		}
 		cvc5_solver.pop();
@@ -448,7 +448,7 @@ std::optional<tau_nso<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& s
 	if (!rr) return std::optional<tau_nso_t>{};
 	// cvompute final result
 	return std::optional<tau_nso_t>{
-		rewriter::make_node<tau_sym<tau_ba_t, BAs...>>(t, {}) };
+		rewriter::depreciating::make_node<tau_sym<tau_ba_t, BAs...>>(t, {}) };
 }*/
 
 template<typename...BAs>
@@ -478,7 +478,7 @@ std::optional<tau<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) 
 	auto t = sbf_traverser_t(root) | sbf_parser::sbf;
 	auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
 	std::variant<BAs...> vp {b};
-	auto n = rewriter::make_node<tau_sym<BAs...>>(vp, {});
+	auto n = rewriter::depreciating::make_node<tau_sym<BAs...>>(vp, {});
 	return cache.emplace(src, n).first->second;*/
 	//return {};
 	auto bv = make_nso_using_factory<BAs...>(src, { .start = tau_parser::bitvector });

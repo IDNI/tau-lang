@@ -36,7 +36,7 @@
 
 namespace idni::tau_lang {
 
-using namespace idni::rewriter;
+using namespace idni::rewriter::depreciating;
 
 extern bool pretty_printer_highlighting;
 extern bool pretty_printer_indenting;
@@ -47,8 +47,8 @@ extern bool pretty_printer_indenting;
 
 // tau_source_node is the type of nodes we use to represent get from parsing tau language
 using tau_source_sym = idni::lit<char, char>;
-using tau_source_node = rewriter::node<idni::lit<char, char>>;
-using sp_tau_source_node = rewriter::sp_node<idni::lit<char, char>>;
+using tau_source_node = rewriter::depreciating::node<idni::lit<char, char>>;
+using sp_tau_source_node = rewriter::depreciating::sp_node<idni::lit<char, char>>;
 
 // node type for the tau language related programs, libraries and
 // specifications trees.
@@ -70,22 +70,22 @@ std::strong_ordering operator<=>(const tau_sym<BAs...>& lhs, const tau_sym<BAs..
 }
 
 template <typename... BAs>
-using tau = rewriter::sp_node<tau_sym<BAs...>>;
+using tau = rewriter::depreciating::sp_node<tau_sym<BAs...>>;
 
 template <typename node_t>
-using rec_relation = rewriter::rule<node_t>;
+using rec_relation = rewriter::depreciating::rule<node_t>;
 
 // IDEA maybe we could define a wrapper for recursive rules and rewriting rules that
 // call the appropriate apply method. This would play also nice with the builders
 // defined in the normalizer.
 
 template <typename... BAs>
-using builder = rewriter::rule<tau<BAs...>>;
+using builder = rewriter::depreciating::rule<tau<BAs...>>;
 
 // defines a vector of rules in the tau language, the order is important as it defines
 // the order of the rules in the rewriting process of the tau language.
 template <typename node_t>
-using rules = std::vector<rewriter::rule<node_t>>;
+using rules = std::vector<rewriter::depreciating::rule<node_t>>;
 
 // defines a vector of rec. relations in the tau language, the order is important as it defines
 // the order of the rec relations in the rewriting process of the tau language.
@@ -134,7 +134,7 @@ tau<BAs...> operator<<(const tau<BAs...>& n,
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template <typename... BAs>
-tau<BAs...> nso_rr_apply(const rewriter::rule<tau<BAs...>>& r,
+tau<BAs...> nso_rr_apply(const rewriter::depreciating::rule<tau<BAs...>>& r,
 	const tau<BAs...>& n)
 {
 	static const auto is_capture = [](const tau<BAs...>& n) {
@@ -144,7 +144,7 @@ tau<BAs...> nso_rr_apply(const rewriter::rule<tau<BAs...>>& r,
 	};
 
 	#ifdef TAU_CACHE
-	static std::map<std::pair<rewriter::rule<tau<BAs...>>, tau<BAs...>>, tau<BAs...>> cache;
+	static std::map<std::pair<rewriter::depreciating::rule<tau<BAs...>>, tau<BAs...>>, tau<BAs...>> cache;
 	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
 
@@ -222,8 +222,8 @@ template <typename extractor_t, typename node_t>
 std::string make_string(const extractor_t& extractor, const node_t& n) {
 	std::basic_stringstream<char> ss;
 	stringify<extractor_t, node_t> sy(extractor, ss);
-	rewriter::post_order_tree_traverser<stringify<extractor_t, node_t>,
-				rewriter::all_t, node_t>(sy, rewriter::all)(n);
+	rewriter::depreciating::post_order_tree_traverser<stringify<extractor_t, node_t>,
+				rewriter::depreciating::all_t, node_t>(sy, rewriter::depreciating::all)(n);
 	return ss.str();
 }
 
@@ -369,7 +369,7 @@ std::ostream& operator<<(std::ostream& os, const unordered_tau_set<BAs...>& set)
 
 } // namespace tau_lang
 
-namespace idni::rewriter {
+namespace idni::rewriter::depreciating {
 
 template <typename... BAs>
 struct make_node_cache_equality<tau_lang::tau_sym<BAs...>> {
@@ -415,7 +415,7 @@ struct traverser_pair_cache_equality<tau_lang::tau<BAs...>> {
 
 template <typename...BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::rule<idni::tau_lang::tau<BAs...>>& r)
+	const idni::rewriter::depreciating::rule<idni::tau_lang::tau<BAs...>>& r)
 {
 	return stream << r.first << " := " << r.second << ".";
 }

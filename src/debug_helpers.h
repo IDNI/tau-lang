@@ -8,7 +8,7 @@ namespace idni::tau_lang {
 
 template <typename node_t>
 std::ostream& operator<<(std::ostream &os,
-	std::map<rewriter::sp_node<node_t>, rewriter::sp_node<node_t>> m)
+	std::map<rewriter::depreciating::sp_node<node_t>, rewriter::depreciating::sp_node<node_t>> m)
 {
 	os << "{";
 	for (auto& [k, v] : m) os << " {" << k << " <- " << v << "} ";
@@ -17,7 +17,7 @@ std::ostream& operator<<(std::ostream &os,
 
 template <typename node_t>
 std::ostream& print_sp_tau_source_node_tree(std::ostream &os,
-	rewriter::sp_node<node_t> n, size_t l = 0)
+	rewriter::depreciating::sp_node<node_t> n, size_t l = 0)
 {
 	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
 	auto& v = n->value;
@@ -55,7 +55,7 @@ std::ostream& print_tau_tree(std::ostream &os, tau<BAs...> n,
 }
 
 template <typename node_t>
-std::ostream& ptree(std::ostream &os, rewriter::sp_node<node_t> n, size_t l = 0) {
+std::ostream& ptree(std::ostream &os, rewriter::depreciating::sp_node<node_t> n, size_t l = 0) {
 	return print_sp_tau_source_node_tree<node_t>(os, n, l);
 }
 
@@ -65,7 +65,7 @@ std::ostream& ptree(std::ostream &os, tau<BAs...> n, size_t l = 0) {
 }
 
 template <typename node_t>
-std::string ptree(rewriter::sp_node<node_t> n, size_t l = 0) {
+std::string ptree(rewriter::depreciating::sp_node<node_t> n, size_t l = 0) {
 	std::stringstream ss;
 	print_sp_tau_source_node_tree<node_t>(ss, n, l);
 	return ss.str();
