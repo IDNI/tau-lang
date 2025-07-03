@@ -17,6 +17,7 @@
 
 #include "defs.h"
 #include "dict.h"
+#include "utility/hashing.h"
 #include "boolean_algebras/bool_ba.h"
 
 typedef int32_t int_t;

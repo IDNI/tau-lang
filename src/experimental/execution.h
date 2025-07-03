@@ -17,16 +17,18 @@
 
 namespace idni::tau_lang::experimental {
 
+using namespace idni::rewriter::depreciating;
+
 // Check https://en.cppreference.com/w/cpp/utility/functional/function for more
 // information about std::function and how to use it.
 
 template<typename N, typename F>
-auto operator|(const rewriter::sp_node<N>& n, F f) {
+auto operator|(const sp_node<N>& n, F f) {
 	return f(n);
 }
 
 template<typename N, typename F, typename S>
-auto operator|(const rewriter::sp_node<N>& n, const std::pair<F, S>& p) {
+auto operator|(const sp_node<N>& n, const std::pair<F, S>& p) {
 	return n | p.first | p.second;
 }
 
