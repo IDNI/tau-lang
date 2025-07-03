@@ -10,7 +10,6 @@
 #include "nso_rr.h"
 #include "language.h"
 
-using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;
@@ -19,6 +18,8 @@ namespace testing = doctest;
 
 
 namespace idni::tau_lang {
+
+	using namespace idni::rewriter;
 
 	template<>
 	struct nso_factory<Bool> {
@@ -75,33 +76,33 @@ namespace idni::tau_lang {
 // helper functions
 tau<Bool> make_statement(const sp_tau_source_node& source) {
 	tauify<Bool> tf;
-	map_transformer<tauify<Bool>, sp_tau_source_node, tau<Bool>> transform(tf);
-	return post_order_traverser<
-			map_transformer<tauify<Bool>, sp_tau_source_node, tau<Bool>>,
-			all_t,
+	rewriter::depreciating::map_transformer<tauify<Bool>, sp_tau_source_node, tau<Bool>> transform(tf);
+	return rewriter::depreciating::post_order_traverser<
+			rewriter::depreciating::map_transformer<tauify<Bool>, sp_tau_source_node, tau<Bool>>,
+			rewriter::depreciating::all_t,
 			sp_node<tau_source_sym>,
 			tau<Bool>>(
-		transform, all)(source);
+		transform, rewriter::depreciating::all)(source);
 }
 
 tau<Bool> make_named_bindings(const tau<Bool>& statement, const bindings<Bool>& bs) {
 	name_binder<Bool> nb(bs);
 	bind_transformer<name_binder<Bool>, Bool> binder(nb);
-	return post_order_traverser<
+	return rewriter::depreciating::post_order_traverser<
 			bind_transformer<name_binder<Bool>, Bool>,
-			all_t,
+			rewriter::depreciating::all_t,
 			tau<Bool>>(
-		binder, all)(statement);
+		binder, rewriter::depreciating::all)(statement);
 }
 
 tau<Bool> make_factory_bindings(const tau<Bool>& statement) {
 	factory_binder<Bool> fb;
 	bind_transformer<factory_binder<Bool>, Bool> binder(fb);
-	return post_order_traverser<
+	return rewriter::depreciating::post_order_traverser<
 			bind_transformer<factory_binder<Bool>, Bool>,
-			all_t,
+			rewriter::depreciating::all_t,
 			tau<Bool>>(
-		binder, all)(statement);
+		binder, rewriter::depreciating::all)(statement);
 }
 
 std::ostream& print_tau(std::ostream &os, tau<Bool> n, size_t l = 0) {

@@ -8,7 +8,7 @@
 #include "experimental/execution.h"
 
 using namespace std;
-using namespace idni::rewriter;
+using namespace idni::rewriter::depreciating;
 using namespace idni::tau_lang;
 using namespace idni::tau_lang::experimental;
 
