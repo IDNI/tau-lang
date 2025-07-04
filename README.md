@@ -18,12 +18,13 @@
     1. [Tau specifications](#tau-specifications)
     2. [Satisfiability and execution](#satisfiability-and-execution)
     3. [Boolean functions](#boolean-functions)
-    4. [Functions and predicates](#functions-and-predicates)
-    5. [Constants](#constants)
-    6. [Streams](#streams)
-    7. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
-    8. [Pointwise revision](#pointwise-revision)
-    9. [Reserved symbols](#reserved-symbols)
+    4. [Bitvectors](#bitvectors)
+    5. [Functions and predicates](#functions-and-predicates)
+    6. [Constants](#constants)
+    7. [Streams](#streams)
+    8. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
+    9. [Pointwise revision](#pointwise-revision)
+    10. [Reserved symbols](#reserved-symbols)
 5. [Command line interface](#command-line-interface)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
@@ -327,13 +328,17 @@ local_spec => (local_spec "&&" local_spec)
             | (term "=" term) | (term "!=" term)
             | (term "<" term) | (term "!<" term) | (term "<=" term) | (term "!<=" term)
             | (term ">" term) | (term "!>" term) | (term ">=" term)| (term "!>=" term) |
+            | (bv_term "=_" bv_term) | (bv_term "!=_" bv_term)
+            | (bv_term "<_" bv_term) | (bv_term "!<_" bv_term) | (bv_term "<=_" bv_term) | (bv_term "!<=_" bv_term)
+            | (bv_term ">_" bv_term) | (bv_term "!>_" bv_term) | (bv_term ">=_" bv_term)| (bv_term "!>=_" bv_term) |
             | "all" variable local_spec
             | "ex" variable local_spec
             | predicate
             | T | F
 ```
 The naming conventions for `variable` are discussed in [Variables](#variables).
-Furthermore, `term` is discussed in the next section [Boolean functions](#boolean-functions).
+Furthermore, `term` is discussed in the section [Boolean functions](#boolean-functions)
+and `bv_term`, bitvector term, is discussed in the section [Bitvectors](#bitvectors).
 The `predicate` non-terminal in the above grammar describes how
 to add predicate definitions directly into a formula. See the subsection
 [Functions and predicates](#functions-and-predicates) for the
@@ -366,6 +371,16 @@ The symbols used have the following meaning, where a formula refers to either `l
 | `!>`              | standard not-greater relation in Boolean algebra       |
 | `>=`              | standard greater-equal relation in Boolean algebra     |
 | `!>=`             | standard not-greater-equal relation in Boolean algebra |
+| `=_`              | standard equality relation in bitvectors               |
+| `!=_`             | standard inequality relation in bitvectors             |
+| `<_`              | standard less relation in bitvectors                   |
+| `!<_`             | standard not-less relation in bitvectors               |
+| `<=_`             | standard less-equal relation in bitvectors             |
+| `!<=_`            | standard not-less-equal relation in bitvectors         |
+| `>_`              | standard greater relation in bitvectors                |
+| `!>_`             | standard not-greater relation in bitvectors            |
+| `>=_`             | standard greater-equal relation in bitvectors          |
+| `!>=_`            | standard not-greater-equal relation in bitvectors      |
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
@@ -518,6 +533,54 @@ For example, the following is a valid Boolean function of general type:
 ```
 
 where `x`, `y` and `z` are variables.
+
+## **Bitvectors**
+
+Another key ingredient of the Tau Language is bitvectors build from
+usual bityvector operations and variables, streams and bitvector constants
+They are given by the following grammar:
+
+```
+bv_term => '~' _ bv_term
+      | (bv_term _ '+' _ bv_term) | (bv_term _ '-' _ bv_term) | (bv_term _ '*' _ bv_term)
+      | (bv_term _ '/' _ bv_term) | (bv_term _ '%' _ bv_term) | (bv_term _ "!&" _ bv_term)
+      | (bv_term _ '&' _ bv_term) | (bv_term _ "!|" _ bv_term) | (bv_term _ '|' _ bv_term)
+      | (bv_term _ "!(+)" _ bv_term) | (bv_term _ "(+)" _ bv_term) | (bv_term _ "<<" _ num) 
+      | (bv_term _ ">>" _ num) | variable | stream_variable | bv_constant
+
+bv_constant => "#b" [0-1]+ | "#x" [0-9a-fA-F]+ | [0-9]+
+```
+
+where
+
+```
+
+where `bv_term` stands for a well-formed subformula representing a bitvector term,
+`bv_constant` is a bitvector constant, `variable` and `stream_variable` are as above and 
+the operators meaning is given in the following table:
+
+| Symbol            | Meaning                                                |
+|-------------------|--------------------------------------------------------|
+| `*`               | modular multiplication of bitvectors                   |
+| `/`               | modular division of bitvectors                         |
+| `%`               | modular remainder of bitvectors                        |
+| `+`               | modular addition of bitvectors                         |
+| `-`               | modular subtraction of bitvectors                      |
+| `~`               | bitwise negation of bitvector                          |
+| `&`               | bitwise and of bitvectors                              |
+| `!&`              | bitwise nand of bitvectors                             |
+| `|`               | bitwise or of bitvectors                               |
+| `!|`              | bitwise nor of bitvectors                              |
+| `(+ )`            | bitwise xor of bitvectors                              |
+| `!(+)`            | bitwise xnor of bitvectors                             |
+| `<<`              | left shift of bitvector by a number of bits            |
+| `>>`              | right shift of bitvector by a number of bits           |
+
+
+The order of the operations is the following (from higher precedence
+to lower): `*', `/`, `%` > `+`, `-` > `~` > `&`, `!&` > `|`, `!|` > `(+ )`, `!(+)` > `<<`, `>>`. 
+
+The type of the variables is automatically inferred from the context in which they are used.
 
 ## **Functions and predicates**
 
