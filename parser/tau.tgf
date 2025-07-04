@@ -111,18 +111,18 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
 bv                     => ('(' _ bv _ ')')            :bv_parenthesis
                         | ( '[' bv ']' )              :bv_checked
                         |                              variable
-                        | '~' _ bv                    :bv_neg
                         | (bv _ '+' _ bv)             :bv_add
-                        | (bv _ '-' _ bv)             :bv_sub
                         | (bv _ '*' _ bv)             :bv_mul
                         | (bv _ '/' _ bv)             :bv_div
                         | (bv _ '%' _ bv)             :bv_mod
-                        | (bv _ "!&" _ bv)            :bv_nand
+                        | (bv _ '-' _ bv)             :bv_sub
+                        | '~' _ bv                    :bv_neg
                         | (bv _ '&' _ bv)             :bv_and
-                        | (bv _ "!|" _ bv)            :bv_nor
+                        | (bv _ "!&" _ bv)            :bv_nand
                         | (bv _ '|' _ bv)             :bv_or
-                        | (bv _ "!(+)" _ bv)          :bv_xnor
+                        | (bv _ "!|" _ bv)            :bv_nor
                         | (bv _ "(+)" _ bv)           :bv_xor
+                        | (bv _ "!(+)" _ bv)          :bv_xnor
                         | (bv _ "<<" _ num)           :bv_rotate_left
                         | (bv _ ">>" _ num)           :bv_rotate_right
                         | ("min" __ bv __ bv)         :bv_min

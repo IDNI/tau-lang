@@ -1,5 +1,5 @@
 // This file is generated from a file parser/tau.tgf by
-//       https://github.com/IDNI/parser/tools/tgf
+//       https://github.com/IDNI/parser/src/tgf
 //
 #ifndef __TAU_PARSER_H__
 #define __TAU_PARSER_H__
@@ -11,7 +11,8 @@ namespace tau_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline std::vector<std::string> symbol_names{
+inline static constexpr size_t nt_bits = 9;
+inline const std::vector<std::string> symbol_names{
 	"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "start", 
 	"rr", "_", "rec_relations", "main", "wff", "__E_rec_relations_0", "rec_relation", "__E_rec_relations_1", "ref", "__E_rec_relation_2", 
 	"capture", "bf", "sym", "__E_ref_3", "offsets", "ref_args", "__E_ref_4", "__", "fp_fallback", "first_sym", 
@@ -29,9 +30,9 @@ inline std::vector<std::string> symbol_names{
 	"bf_splitter", "__E_bf_55", "bf_ref", "bf_or", "__E_bf_56", "bf_xor", "__E_bf_57", "bf_t", "__E_bf_58", "__E___E_bf_58_59", 
 	"type", "bf_f", "__E_bf_60", "__E___E_bf_60_61", "bf_and", "__E_bf_62", "__E___E_bf_62_63", "bf_neg", "__E_bf_64", "bf_neg_oprnd", 
 	"__E___E_bf_64_65", "bf_and_nosep", "__E_bf_66", "bf_and_nosep_1st_oprnd", "__E___E_bf_66_67", "bf_and_nosep_2nd_oprnd", "__E___E_bf_66_68", "bv_parenthesis", "__E_bv_69", "bv_checked", 
-	"__E_bv_70", "bv_neg", "bv_add", "__E_bv_71", "bv_sub", "__E_bv_72", "bv_mul", "__E_bv_73", "bv_div", "__E_bv_74", 
-	"bv_mod", "__E_bv_75", "bv_nand", "__E_bv_76", "bv_and", "__E_bv_77", "bv_nor", "__E_bv_78", "bv_or", "__E_bv_79", 
-	"bv_xnor", "__E_bv_80", "bv_xor", "__E_bv_81", "bv_rotate_left", "__E_bv_82", "num", "bv_rotate_right", "__E_bv_83", "bv_min", 
+	"__E_bv_70", "bv_add", "__E_bv_71", "bv_mul", "__E_bv_72", "bv_div", "__E_bv_73", "bv_mod", "__E_bv_74", "bv_sub", 
+	"__E_bv_75", "bv_neg", "bv_and", "__E_bv_76", "bv_nand", "__E_bv_77", "bv_or", "__E_bv_78", "bv_nor", "__E_bv_79", 
+	"bv_xor", "__E_bv_80", "bv_xnor", "__E_bv_81", "bv_rotate_left", "__E_bv_82", "num", "bv_rotate_right", "__E_bv_83", "bv_min", 
 	"__E_bv_84", "bv_max", "__E_bv_85", "bitvector", "bits", "__E_bitvector_86", "bv_type", "__E_bitvector_87", "hexnum", "__E_bitvector_88", 
 	"__E_bits_89", "__E_bits_90", "__E_hexnum_91", "ctn_neq", "__E_constraint_92", "ctnvar", "ctn_eq", "__E_constraint_93", "ctn_greater_equal", "__E_constraint_94", 
 	"ctn_greater", "__E_constraint_95", "ctn_less_equal", "__E_constraint_96", "ctn_less", "__E_constraint_97", "__E_variable_98", "__E_variable_99", "__E_variable_100", "__E_variable_101", 
@@ -67,7 +68,7 @@ inline std::vector<terminal_type> terminals{
 	'k', 'i', 'r', 's', 't', ',', '(', ')', 'o', 'm', 
 	'e', '<', '>', 'w', 'y', '[', ']', '?', 'x', '-', 
 	'|', '^', '&', '!', 'T', 'F', '_', 'S', '+', '1', 
-	'0', '\'', '~', '*', '/', '%', 'n', '#', 'u', '$', 
+	'0', '\'', '*', '/', '%', '~', 'n', '#', 'u', '$', 
 	'{', '}', 'v', '\t', '\n', '\r', 'q', 'h', 'p', 'd', 
 	'g', 'z', '"', 
 };
@@ -629,75 +630,75 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(117), (NT(169)));
 //G246: bv(117)              => variable(139).
 	p(NT(117), (NT(139)));
-//G247: bv_neg(171)          => bv(117).
-	p(NT(171), (NT(117)));
-//G248: bv(117)              => '~' _(11) bv_neg(171).
-	p(NT(117), (T(41)+NT(11)+NT(171)));
-//G249: __E_bv_71(173)       => bv(117) _(11) '+' _(11) bv(117).
-	p(NT(173), (NT(117)+NT(11)+T(37)+NT(11)+NT(117)));
-//G250: bv_add(172)          => __E_bv_71(173).
-	p(NT(172), (NT(173)));
-//G251: bv(117)              => bv_add(172).
-	p(NT(117), (NT(172)));
-//G252: __E_bv_72(175)       => bv(117) _(11) '-' _(11) bv(117).
-	p(NT(175), (NT(117)+NT(11)+T(28)+NT(11)+NT(117)));
-//G253: bv_sub(174)          => __E_bv_72(175).
-	p(NT(174), (NT(175)));
-//G254: bv(117)              => bv_sub(174).
-	p(NT(117), (NT(174)));
-//G255: __E_bv_73(177)       => bv(117) _(11) '*' _(11) bv(117).
-	p(NT(177), (NT(117)+NT(11)+T(42)+NT(11)+NT(117)));
-//G256: bv_mul(176)          => __E_bv_73(177).
-	p(NT(176), (NT(177)));
-//G257: bv(117)              => bv_mul(176).
-	p(NT(117), (NT(176)));
-//G258: __E_bv_74(179)       => bv(117) _(11) '/' _(11) bv(117).
-	p(NT(179), (NT(117)+NT(11)+T(43)+NT(11)+NT(117)));
-//G259: bv_div(178)          => __E_bv_74(179).
-	p(NT(178), (NT(179)));
-//G260: bv(117)              => bv_div(178).
-	p(NT(117), (NT(178)));
-//G261: __E_bv_75(181)       => bv(117) _(11) '%' _(11) bv(117).
-	p(NT(181), (NT(117)+NT(11)+T(44)+NT(11)+NT(117)));
-//G262: bv_mod(180)          => __E_bv_75(181).
-	p(NT(180), (NT(181)));
-//G263: bv(117)              => bv_mod(180).
-	p(NT(117), (NT(180)));
-//G264: __E_bv_76(183)       => bv(117) _(11) '!' '&' _(11) bv(117).
-	p(NT(183), (NT(117)+NT(11)+T(32)+T(31)+NT(11)+NT(117)));
-//G265: bv_nand(182)         => __E_bv_76(183).
+//G247: __E_bv_71(172)       => bv(117) _(11) '+' _(11) bv(117).
+	p(NT(172), (NT(117)+NT(11)+T(37)+NT(11)+NT(117)));
+//G248: bv_add(171)          => __E_bv_71(172).
+	p(NT(171), (NT(172)));
+//G249: bv(117)              => bv_add(171).
+	p(NT(117), (NT(171)));
+//G250: __E_bv_72(174)       => bv(117) _(11) '*' _(11) bv(117).
+	p(NT(174), (NT(117)+NT(11)+T(41)+NT(11)+NT(117)));
+//G251: bv_mul(173)          => __E_bv_72(174).
+	p(NT(173), (NT(174)));
+//G252: bv(117)              => bv_mul(173).
+	p(NT(117), (NT(173)));
+//G253: __E_bv_73(176)       => bv(117) _(11) '/' _(11) bv(117).
+	p(NT(176), (NT(117)+NT(11)+T(42)+NT(11)+NT(117)));
+//G254: bv_div(175)          => __E_bv_73(176).
+	p(NT(175), (NT(176)));
+//G255: bv(117)              => bv_div(175).
+	p(NT(117), (NT(175)));
+//G256: __E_bv_74(178)       => bv(117) _(11) '%' _(11) bv(117).
+	p(NT(178), (NT(117)+NT(11)+T(43)+NT(11)+NT(117)));
+//G257: bv_mod(177)          => __E_bv_74(178).
+	p(NT(177), (NT(178)));
+//G258: bv(117)              => bv_mod(177).
+	p(NT(117), (NT(177)));
+//G259: __E_bv_75(180)       => bv(117) _(11) '-' _(11) bv(117).
+	p(NT(180), (NT(117)+NT(11)+T(28)+NT(11)+NT(117)));
+//G260: bv_sub(179)          => __E_bv_75(180).
+	p(NT(179), (NT(180)));
+//G261: bv(117)              => bv_sub(179).
+	p(NT(117), (NT(179)));
+//G262: bv_neg(181)          => bv(117).
+	p(NT(181), (NT(117)));
+//G263: bv(117)              => '~' _(11) bv_neg(181).
+	p(NT(117), (T(44)+NT(11)+NT(181)));
+//G264: __E_bv_76(183)       => bv(117) _(11) '&' _(11) bv(117).
+	p(NT(183), (NT(117)+NT(11)+T(31)+NT(11)+NT(117)));
+//G265: bv_and(182)          => __E_bv_76(183).
 	p(NT(182), (NT(183)));
-//G266: bv(117)              => bv_nand(182).
+//G266: bv(117)              => bv_and(182).
 	p(NT(117), (NT(182)));
-//G267: __E_bv_77(185)       => bv(117) _(11) '&' _(11) bv(117).
-	p(NT(185), (NT(117)+NT(11)+T(31)+NT(11)+NT(117)));
-//G268: bv_and(184)          => __E_bv_77(185).
+//G267: __E_bv_77(185)       => bv(117) _(11) '!' '&' _(11) bv(117).
+	p(NT(185), (NT(117)+NT(11)+T(32)+T(31)+NT(11)+NT(117)));
+//G268: bv_nand(184)         => __E_bv_77(185).
 	p(NT(184), (NT(185)));
-//G269: bv(117)              => bv_and(184).
+//G269: bv(117)              => bv_nand(184).
 	p(NT(117), (NT(184)));
-//G270: __E_bv_78(187)       => bv(117) _(11) '!' '|' _(11) bv(117).
-	p(NT(187), (NT(117)+NT(11)+T(32)+T(29)+NT(11)+NT(117)));
-//G271: bv_nor(186)          => __E_bv_78(187).
+//G270: __E_bv_78(187)       => bv(117) _(11) '|' _(11) bv(117).
+	p(NT(187), (NT(117)+NT(11)+T(29)+NT(11)+NT(117)));
+//G271: bv_or(186)           => __E_bv_78(187).
 	p(NT(186), (NT(187)));
-//G272: bv(117)              => bv_nor(186).
+//G272: bv(117)              => bv_or(186).
 	p(NT(117), (NT(186)));
-//G273: __E_bv_79(189)       => bv(117) _(11) '|' _(11) bv(117).
-	p(NT(189), (NT(117)+NT(11)+T(29)+NT(11)+NT(117)));
-//G274: bv_or(188)           => __E_bv_79(189).
+//G273: __E_bv_79(189)       => bv(117) _(11) '!' '|' _(11) bv(117).
+	p(NT(189), (NT(117)+NT(11)+T(32)+T(29)+NT(11)+NT(117)));
+//G274: bv_nor(188)          => __E_bv_79(189).
 	p(NT(188), (NT(189)));
-//G275: bv(117)              => bv_or(188).
+//G275: bv(117)              => bv_nor(188).
 	p(NT(117), (NT(188)));
-//G276: __E_bv_80(191)       => bv(117) _(11) '!' '(' '+' ')' _(11) bv(117).
-	p(NT(191), (NT(117)+NT(11)+T(32)+T(15)+T(37)+T(16)+NT(11)+NT(117)));
-//G277: bv_xnor(190)         => __E_bv_80(191).
+//G276: __E_bv_80(191)       => bv(117) _(11) '(' '+' ')' _(11) bv(117).
+	p(NT(191), (NT(117)+NT(11)+T(15)+T(37)+T(16)+NT(11)+NT(117)));
+//G277: bv_xor(190)          => __E_bv_80(191).
 	p(NT(190), (NT(191)));
-//G278: bv(117)              => bv_xnor(190).
+//G278: bv(117)              => bv_xor(190).
 	p(NT(117), (NT(190)));
-//G279: __E_bv_81(193)       => bv(117) _(11) '(' '+' ')' _(11) bv(117).
-	p(NT(193), (NT(117)+NT(11)+T(15)+T(37)+T(16)+NT(11)+NT(117)));
-//G280: bv_xor(192)          => __E_bv_81(193).
+//G279: __E_bv_81(193)       => bv(117) _(11) '!' '(' '+' ')' _(11) bv(117).
+	p(NT(193), (NT(117)+NT(11)+T(32)+T(15)+T(37)+T(16)+NT(11)+NT(117)));
+//G280: bv_xnor(192)         => __E_bv_81(193).
 	p(NT(192), (NT(193)));
-//G281: bv(117)              => bv_xor(192).
+//G281: bv(117)              => bv_xnor(192).
 	p(NT(117), (NT(192)));
 //G282: __E_bv_82(195)       => bv(117) _(11) '<' '<' _(11) num(196).
 	p(NT(195), (NT(117)+NT(11)+T(20)+T(20)+NT(11)+NT(196)));
@@ -1200,7 +1201,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G530: subst_sym(340)       => __E___E_cli_command_160_161(341).
 	p(NT(340), (NT(341)));
 //G531: __E_cli_command_160(339) => subst_sym(340) __(27) nf_cmd_arg(342) _(11) '[' _(11) nf_cmd_arg(342) _(11) '/' _(11) nf_cmd_arg(342) _(11) ']'.
-	p(NT(339), (NT(340)+NT(27)+NT(342)+NT(11)+T(24)+NT(11)+NT(342)+NT(11)+T(43)+NT(11)+NT(342)+NT(11)+T(25)));
+	p(NT(339), (NT(340)+NT(27)+NT(342)+NT(11)+T(24)+NT(11)+NT(342)+NT(11)+T(42)+NT(11)+NT(342)+NT(11)+T(25)));
 //G532: subst_cmd(338)       => __E_cli_command_160(339).
 	p(NT(338), (NT(339)));
 //G533: cli_command(287)     => subst_cmd(338).
@@ -1498,9 +1499,9 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G679: normalize_cmd_arg(312) => bf(21).
 	p(NT(312), (NT(21)));
 //G680: inst_args(347)       => wff_cmd_arg(324) _(11) '[' _(11) variable(139) _(11) '/' _(11) bf_cmd_arg(435) _(11) ']'.
-	p(NT(347), (NT(324)+NT(11)+T(24)+NT(11)+NT(139)+NT(11)+T(43)+NT(11)+NT(435)+NT(11)+T(25)));
+	p(NT(347), (NT(324)+NT(11)+T(24)+NT(11)+NT(139)+NT(11)+T(42)+NT(11)+NT(435)+NT(11)+T(25)));
 //G681: inst_args(347)       => bf_cmd_arg(435) _(11) '[' _(11) variable(139) _(11) '/' _(11) bf_cmd_arg(435) _(11) ']'.
-	p(NT(347), (NT(435)+NT(11)+T(24)+NT(11)+NT(139)+NT(11)+T(43)+NT(11)+NT(435)+NT(11)+T(25)));
+	p(NT(347), (NT(435)+NT(11)+T(24)+NT(11)+NT(139)+NT(11)+T(42)+NT(11)+NT(435)+NT(11)+T(25)));
 //G682: help_arg(304)        => help_sym(301).
 	p(NT(304), (NT(301)));
 //G683: help_arg(304)        => version_sym(294).
@@ -1578,9 +1579,9 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G719: help_arg(304)        => examples_sym(440).
 	p(NT(304), (NT(440)));
 //G720: __E_memory_202(444)  => '%'.
-	p(NT(444), (T(44)));
+	p(NT(444), (T(43)));
 //G721: rel_memory_sym(437)  => '%' '-'.
-	p(NT(437), (T(44)+T(28)));
+	p(NT(437), (T(43)+T(28)));
 //G722: memory_id(446)       => digits(259).
 	p(NT(446), (NT(259)));
 //G723: __E___E_memory_202_203(445) => memory_id(446).
@@ -1594,7 +1595,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G727: memory(333)          => rel_memory(443).
 	p(NT(333), (NT(443)));
 //G728: abs_memory_sym(436)  => '%'.
-	p(NT(436), (T(44)));
+	p(NT(436), (T(43)));
 //G729: __E_memory_204(448)  => abs_memory_sym(436) memory_id(446).
 	p(NT(448), (NT(436)+NT(446)));
 //G730: abs_memory(447)      => __E_memory_204(448).
@@ -1611,7 +1612,7 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 
 } // namespace tau_parser_data
 
-struct tau_parser : public idni::parser<char, char> {
+struct tau_parser_nonterminals {
 	enum nonterminal {
 		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, start, 
 		rr, _, rec_relations, main, wff, __E_rec_relations_0, rec_relation, __E_rec_relations_1, ref, __E_rec_relation_2, 
@@ -1630,9 +1631,9 @@ struct tau_parser : public idni::parser<char, char> {
 		bf_splitter, __E_bf_55, bf_ref, bf_or, __E_bf_56, bf_xor, __E_bf_57, bf_t, __E_bf_58, __E___E_bf_58_59, 
 		type, bf_f, __E_bf_60, __E___E_bf_60_61, bf_and, __E_bf_62, __E___E_bf_62_63, bf_neg, __E_bf_64, bf_neg_oprnd, 
 		__E___E_bf_64_65, bf_and_nosep, __E_bf_66, bf_and_nosep_1st_oprnd, __E___E_bf_66_67, bf_and_nosep_2nd_oprnd, __E___E_bf_66_68, bv_parenthesis, __E_bv_69, bv_checked, 
-		__E_bv_70, bv_neg, bv_add, __E_bv_71, bv_sub, __E_bv_72, bv_mul, __E_bv_73, bv_div, __E_bv_74, 
-		bv_mod, __E_bv_75, bv_nand, __E_bv_76, bv_and, __E_bv_77, bv_nor, __E_bv_78, bv_or, __E_bv_79, 
-		bv_xnor, __E_bv_80, bv_xor, __E_bv_81, bv_rotate_left, __E_bv_82, num, bv_rotate_right, __E_bv_83, bv_min, 
+		__E_bv_70, bv_add, __E_bv_71, bv_mul, __E_bv_72, bv_div, __E_bv_73, bv_mod, __E_bv_74, bv_sub, 
+		__E_bv_75, bv_neg, bv_and, __E_bv_76, bv_nand, __E_bv_77, bv_or, __E_bv_78, bv_nor, __E_bv_79, 
+		bv_xor, __E_bv_80, bv_xnor, __E_bv_81, bv_rotate_left, __E_bv_82, num, bv_rotate_right, __E_bv_83, bv_min, 
 		__E_bv_84, bv_max, __E_bv_85, bitvector, bits, __E_bitvector_86, bv_type, __E_bitvector_87, hexnum, __E_bitvector_88, 
 		__E_bits_89, __E_bits_90, __E_hexnum_91, ctn_neq, __E_constraint_92, ctnvar, ctn_eq, __E_constraint_93, ctn_greater_equal, __E_constraint_94, 
 		ctn_greater, __E_constraint_95, ctn_less_equal, __E_constraint_96, ctn_less, __E_constraint_97, __E_variable_98, __E_variable_99, __E_variable_100, __E_variable_101, 
@@ -1660,6 +1661,9 @@ struct tau_parser : public idni::parser<char, char> {
 		examples_sym, __E_help_arg_200, __E___E_help_arg_200_201, rel_memory, __E_memory_202, __E___E_memory_202_203, memory_id, abs_memory, __E_memory_204, named_binding, 
 		__N_0, __N_1, __N_2, __N_3, __N_4, __N_5, __N_6, __N_7, __N_8, 
 	};
+};
+
+struct tau_parser : public idni::parser<char, char>, public tau_parser_nonterminals {
 	static tau_parser& instance() {
 		static tau_parser inst;
 		return inst;

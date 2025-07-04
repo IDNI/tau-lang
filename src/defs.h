@@ -2,7 +2,7 @@
 #ifndef __DEF_H__
 #define __DEF_H__
 
-//#include "./version_license.h"
+#include "./version_license.h"
 
 // basic macro for conditional execution of code
 #ifdef DEBUG
