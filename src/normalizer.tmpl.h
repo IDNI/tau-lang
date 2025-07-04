@@ -361,8 +361,8 @@ tref normalize_with_temp_simp(tref fm) {
 	for (tref clause : clauses) {
 		LOG_TRACE << "    clause: " << LOG_FM(clause);
 		const auto& t = tau::get(clause);
-		trefs aw_parts = t.select_top(is<node, tau::wff_always>);
-		trefs st_parts = t.select_top(is<node, tau::wff_sometimes>);
+		trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
+		trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
 		if (aw_parts.size() == 1 && st_parts.empty()) {
 			nn = tau::build_wff_or(nn, clause);
 			LOG_TRACE << "    nn: " << LOG_FM(nn);
