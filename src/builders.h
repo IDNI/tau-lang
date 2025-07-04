@@ -322,6 +322,20 @@ tau<BAs...> build_out_variable_at_n(const tau<BAs...>& out_var_name, const size_
 }
 
 template <typename... BAs>
+tau<BAs...> build_bv_out_variable_at_n(const tau<BAs...>& out_var_name, const size_t& num) {
+	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
+
+	return wrap(
+		tau_parser::bv,	wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var, wrap(
+					tau_parser::out,
+						out_var_name, wrap(
+						tau_parser::offset,
+							build_int<BAs...>(num))))));
+}
+
+template <typename... BAs>
 tau<BAs...> build_out_variable_at_n(const size_t& index, const size_t& num) {
 	return build_out_variable_at_n(build_out_var_name<BAs...>(index), num);
 }

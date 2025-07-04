@@ -533,6 +533,29 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		};
 		auto eqs = select_top(applied, atomic);
 		for (const auto& eq : eqs) {
+			// if bv eq, then type all io_vars found in eq if not present yet
+			if (is_non_terminal(tau_parser::bv_eq, eq)
+					|| is_non_terminal(tau_parser::bv_neq, eq)
+					|| is_non_terminal(tau_parser::bv_less_equal, eq)
+					|| is_non_terminal(tau_parser::bv_nleq, eq)
+					|| is_non_terminal(tau_parser::bv_greater, eq)
+					|| is_non_terminal(tau_parser::bv_ngreater, eq)
+					|| is_non_terminal(tau_parser::bv_greater_equal, eq)
+					|| is_non_terminal(tau_parser::bv_ngeq, eq)
+					|| is_non_terminal(tau_parser::bv_less, eq)) {
+				auto in_vars = select_top(eq, is_non_terminal<p::in_var_name, tau_ba<BAs...>, BAs...>);
+				for (const auto& in_var : in_vars) {
+					if (auto it = inputs.find(in_var); it == inputs.end())
+						inputs.emplace(in_var, std::make_pair("bv", ""));
+				}
+				auto out_vars = select_top(eq, is_non_terminal<p::out_var_name, tau_ba<BAs...>, BAs...>);
+				for (const auto& out_var : out_vars) {
+					if (auto it = outputs.find(out_var); it == outputs.end())
+						outputs.emplace(out_var, std::make_pair("bv", ""));
+				}
+				continue;
+			}
+
 			// If find type, type all io_vars found in eq if not present yet
 			auto type = find_top(eq, is_non_terminal<p::type, tau_ba<BAs...>, BAs...>);
 			if (!type) continue;
