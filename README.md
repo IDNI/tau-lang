@@ -580,7 +580,8 @@ the operators meaning is given in the following table:
 The order of the operations is the following (from higher precedence
 to lower): `*', `/`, `%` > `+`, `-` > `~` > `&`, `!&` > `|`, `!|` > `(+ )`, `!(+)` > `<<`, `>>`. 
 
-The type of the variables is automatically inferred from the context in which they are used.
+The type of the variables is automatically inferred from the context in which they are used. 
+Currently there is no need to define them explicitly, but this might change in the future.
 
 ## **Functions and predicates**
 
