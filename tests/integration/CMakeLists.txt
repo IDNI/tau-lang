@@ -13,8 +13,8 @@ set(TESTS
 	bf_fixed_point
 	bf_normalization
 	wff_normalization
-    satisfiability
-    splitter
+	satisfiability
+	splitter
 	splitter2
 #	solver
 	quantifiers
@@ -32,5 +32,5 @@ foreach(TEST IN LISTS TESTS)
 	target_link_libraries(${N} ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} doctest CVC5)
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
 	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
-	set_tests_properties(${N} PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tests)
+	set_tests_properties(${N} PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
 endforeach()

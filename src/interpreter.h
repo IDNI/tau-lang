@@ -9,7 +9,7 @@
 #include "boolean_algebras/variant_ba.h"
 #include "solver.h"
 #include "satisfiability.h"
-#include "term.h"
+#include "utility/term.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"

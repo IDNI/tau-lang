@@ -1,4 +1,4 @@
-![The TAU logo](/docs/images/tau_logo.png)
+![The TAU logo](/docs/images/Tau_Banner.png)
 
 | Build type | Status                                                                                     |
 |------------|--------------------------------------------------------------------------------------------|
@@ -236,7 +236,7 @@ Also, you can use the following recurrence relation definition
 
 ```
 g[0](y) := 0
-g[n](y) := g[n](y)'
+g[n](y) := g[n - 1](y)'
 ```
 
 which defines a function (rather than a predicate) and alternates between 0 and 1
@@ -614,7 +614,7 @@ while sample predicate definitions are
 ```
 bottom(x) := x = 0
 not_atom(x) := ex y y < x && y != 0
-chain(x,y,z) := x < y < z
+chain(x,y,z) := x < y && y < z  
 ```
 
 Furthermore, it is supported to define a function or a predicate by means of a

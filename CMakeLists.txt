@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external/parser/cmake)
 
 # Read version from file and strip prerelease information for cmake project VERSION property
-file(READ "${CMAKE_SOURCE_DIR}/VERSION" TAU_VERSION)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" TAU_VERSION)
 string(STRIP "${TAU_VERSION}" TAU_VERSION)
 string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" TAU_TARGET_VERSION "${TAU_VERSION}")
 message(STATUS "Tau version: ${TAU_TARGET_VERSION} / ${TAU_VERSION}")
@@ -152,6 +154,11 @@ message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 
 #
+# Add tauparser library
+#
+add_subdirectory(external/parser)
+
+#
 # Adding Boost log library
 #
 set(Boost_USE_STATIC_LIBS ON)
@@ -219,6 +226,9 @@ endif()
 # Generate version_license.h file
 #
 include(version_license)
+version_license(
+	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_license.h.template"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/version_license.h")
 
 #
 # load common cmake settings and load functions
@@ -286,7 +296,7 @@ if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
 		RUNTIME DESTINATION "bin"
 		COMPONENT "WindowsFiles"
 		CONFIGURATIONS Release)
-	install(FILES "${CMAKE_SOURCE_DIR}/LICENSE.txt" "${CMAKE_SOURCE_DIR}/README.md"
+	install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt" "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
 		DESTINATION "."
 		COMPONENT "WindowsFiles")
 	set(CPACK_GENERATOR "NSIS")
@@ -298,7 +308,7 @@ if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
 	set(CPACK_NSIS_HELP_LINK "https://github.com/IDNI/tau-lang/blob/main/README.md")
 	set(CPACK_NSIS_URL_INFO_ABOUT "${CPACK_PACKAGE_HOMEPAGE_URL}")
 	set(CPACK_NSIS_CONTACT "${CPACK_PACKAGE_CONTACT}")
-	set(CPACK_NSIS_LICENSE_FILE "${CMAKE_SOURCE_DIR}/LICENSE.txt")
+	set(CPACK_NSIS_LICENSE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
 	set(CPACK_NSIS_INSTALLER_PRIVILEGES "lowest")
 	set(CPACK_NSIS_MODIFY_PATH ON)
 elseif (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_ZIP_PACKAGE)
@@ -306,7 +316,7 @@ elseif (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_ZIP_PACKAGE)
 		RUNTIME DESTINATION "."
 		COMPONENT "win-standalone"
 		CONFIGURATIONS Release)
-	install(FILES "${CMAKE_SOURCE_DIR}/LICENSE.txt" "${CMAKE_SOURCE_DIR}/README.md"
+	install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt" "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
 		DESTINATION "."
 		COMPONENT "win-standalone")
 	set(CPACK_GENERATOR "ZIP")
@@ -317,7 +327,7 @@ elseif (TAU_BUILD_EXECUTABLE)
 		RUNTIME DESTINATION "bin"
 		COMPONENT "LinuxFiles"
 		CONFIGURATIONS Release)
-	install(FILES "${CMAKE_SOURCE_DIR}/LICENSE.txt" "${CMAKE_SOURCE_DIR}/README.md"
+	install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt" "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
 		DESTINATION "share/doc/${PROJECT_NAME}"
 		COMPONENT "LinuxFiles")
 	set(CPACK_GENERATOR "DEB;RPM")

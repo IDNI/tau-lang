@@ -27,7 +27,7 @@
 #include "parser.h"
 #include "utils.h"
 #include "rewriting.h"
-#include "term_colors.h"
+#include "utility/term_colors.h"
 #include "defs.h"
 
 #ifdef TAU_MEASURE
