@@ -19,6 +19,7 @@ node<BAs...> node<BAs...>::retype(size_t new_nt) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 node<BAs...> node<BAs...>::ba_retype(size_t new_ba) const {
+	DBG(assert(new_ba <= node<BAs...>::ba_max));
 	return node(nt, data, term, new_ba, ext);
 }
 
@@ -90,8 +91,11 @@ constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
 		hash(hashit())
 {
 	static_assert(sizeof...(BAs) > 0,
-		"Empty template parameter pack not allowed");
-	// LOG_TRACE << "node created:" << LOG_NT(nt)
+	"Empty template parameter pack not allowed");
+	// DBG(LOG_TRACE << "ba: " << ba_type);
+	// DBG(LOG_TRACE << "ba_max: " << node<BAs...>::ba_max);
+	DBG(assert(ba_type <= node<BAs...>::ba_max));
+		// LOG_TRACE << "node created:" << LOG_NT(nt)
 	// 	<< " data: " << data
 	// 	<< " is_term: " << is_term
 	// 	<< " ba_type: " << LOG_BA_TYPE(ba_type)
