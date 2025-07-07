@@ -46,7 +46,7 @@
 #include <boost/log/utility/setup/console.hpp>
 
 #include "interpreter.h"
-#include "repl.h"
+#include "utility/repl.h"
 
 namespace idni::tau_lang {
 

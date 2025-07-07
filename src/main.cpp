@@ -9,8 +9,8 @@
 #include "runtime.h"
 #include "hooks.h"
 #include "normalizer.h"
-#include "cli.h"
-#include "repl.h"
+#include "utility/cli.h"
+#include "utility/repl.h"
 #include "repl_evaluator.h"
 
 //#include "base_bas/z3.h"

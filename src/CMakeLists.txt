@@ -1,18 +1,8 @@
 set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
-#	../external/parser/src/utility/characters.h
-#	../external/parser/src/utility/charclasses.h
-#	../external/parser/src/utility/devhelpers.h
-#	../external/parser/src/utility/forest.h
-#	../external/parser/src/utility/term_colors.h
-#	../external/parser/src/recoders.h
-#	../external/parser/src/parser.h
-#	../external/parser/src/defs.h
-#	../external/parser/src/tgf.h
-#	../parser/sbf_parser.generated.h
-#	../parser/tau_parser.generated.h
-	#../parser/z3/bv_parser.generated.h
+	../parser/sbf_parser.generated.h
+	../parser/tau_parser.generated.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h
