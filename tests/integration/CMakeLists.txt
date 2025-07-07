@@ -16,19 +16,19 @@ set(TESTS
 
 	### inf loop - probably equality, hooks or bad traversal
 	# bf_fixed_point
-	# bf_normalization
 	# quantifiers
 	# splitter
-	# wff_normalization
 	# nso_rr_fixed_point
+	# satisfiability
 	# splitter2
 	
 	### assertions and aborts
 	solver
-	satisfiability
 	interpreter
-
+	wff_normalization
+	
 	### does not crash or assert, just doesn't pass
+	bf_normalization
 	sbf1
 	nso_rr_execution
 )
