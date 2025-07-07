@@ -73,7 +73,8 @@ struct node {
 	// bit sizes
 	static constexpr size_t bits      = std::numeric_limits<T>::digits;
 	static constexpr size_t nt_bits   = tau_parser_data::nt_bits;
-	static constexpr size_t ba_bits   = Pack_bitsize<BAs...>;
+	static constexpr size_t ba_bits   = Pack_bitsize<BAs...> + 1;
+	static constexpr size_t ba_max    = (1U << ba_bits) - 1;
 	static constexpr size_t data_bits = bits - nt_bits - 1 - ba_bits - 1;
 
 	// masks and shifts
