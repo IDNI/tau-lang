@@ -124,10 +124,10 @@ tref unsqueeze_wff_pos(tref fm) {
 		if (t.is(tau::bf_eq)) {
 			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
-				const auto& c1 = e[0], c2 = e[1];
+				const auto& c1 = e.first(), c2 = e.second();
 				return tau::trim(tau::build_wff_and(
-					tau::build_bf_eq(c1.get()),
-					tau::build_bf_eq(c2.get())));
+					tau::build_bf_eq(c1),
+					tau::build_bf_eq(c2)));
 			}
 		}
 		return n;
@@ -148,7 +148,7 @@ tref squeeze_wff_pos(tref fm) {
 			const auto& e1 = t[0], e2 = t[1];
 			if (e1.child_is(tau::bf_eq) && e2.child_is(tau::bf_eq))
 				return tau::trim(tau::build_bf_eq(
-					tau::build_bf_or(e1.get(), e2.get())));
+					tau::build_bf_or(e1[0].first(), e2[0].first())));
 		}
 		return n;
 	};
@@ -167,10 +167,10 @@ tref unsqueeze_wff_neg(tref fm) {
 		if (t.is(tau::bf_neq)) {
 			const auto& e = t[0];
 			if (e.is(tau::bf_or)) {
-				const auto& c1 = e[0], c2 = e[1];
+				const auto& c1 = e.first(), c2 = e.second();
 				return tau::trim(tau::build_wff_or(
-					tau::build_bf_neq(c1.get()),
-					tau::build_bf_neq(c2.get())));
+					tau::build_bf_neq(c1),
+					tau::build_bf_neq(c2)));
 			}
 		}
 		return n;
@@ -193,7 +193,7 @@ tref squeeze_wff_neg(tref fm) {
 				&& e2.child_is(tau::bf_neq))
 					return tau::trim(tau::build_bf_neq(
 						tau::build_bf_or(
-							e1.get(), e2.get())));
+							e1[0].first(), e2[0].first())));
 		}
 		return n;
 	};
@@ -2870,16 +2870,16 @@ tref push_universal_quantifier_one(tref fm) {
 	else if (st.child_is(tau::wff_or)) {
 		// Remove existential, if quant_var does not appear in clause
 		auto clauses = get_dnf_wff_clauses<node>(st.get());
-		tref no_q_fm = tau::_T();
+		tref no_q_fm = tau::_F();
 		for (tref clause : clauses) {
 			if (!contains<node>(clause, quant_var)) {
 				no_q_fm = tau::build_wff_or(no_q_fm, clause);
-				clause = tau::_T();
+				clause = tau::_F();
 			}
 		}
 		tref q_fm = tau::build_wff_or(clauses);
-		if (tau::get(q_fm).equals_T()) return scoped_fm;
-		else if (tau::get(no_q_fm).equals_T()) return fm;
+		if (tau::get(q_fm).equals_F()) return scoped_fm;
+		else if (tau::get(no_q_fm).equals_F()) return fm;
 		else return tau::build_wff_or(
 			tau::build_wff_all(quant_var, q_fm), no_q_fm);
 	}
@@ -2954,7 +2954,7 @@ tref wff_remove_existential(tref var, tref wff) {
 			: tau::_0();
 		tref f_1 = f ? rewriter::replace<node>(
 				f, var, tau::_1_trimmed())
-			: tau::_1();
+			: tau::_0();
 
 		if (auto neqs = tau::get(new_l).select_all(
 			is<node, tau::bf_neq>); neqs.size() > 0)
