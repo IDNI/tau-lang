@@ -34,7 +34,7 @@ requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	// TODO (HIGH) replace by ...tau... in the future
 	auto nmain = tau::geth(tau::build_wff_neg(
-			normalizer<tau_ba_node>(nso_rr.main->get())));
+			normalizer<node>(nso_rr.main->get())));
 	auto nrec_relations = nso_rr.rec_relations;
 	return tau_ba<BAs...>(nrec_relations, nmain);
 }
@@ -55,8 +55,8 @@ requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
 	auto nmain = tau::geth(tau::build_wff_or(
-			normalizer<tau_ba_node>(nso_rr.main->get()),
-			normalizer<tau_ba_node>(other.nso_rr.main->get())));
+			normalizer<node>(nso_rr.main->get()),
+			normalizer<node>(other.nso_rr.main->get())));
 	auto nrec_relations = rewriter::merge(nso_rr.rec_relations,
 					      other.nso_rr.rec_relations);
 	return tau_ba<BAs...>(nrec_relations, nmain);
@@ -67,8 +67,8 @@ requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba<BAs...>& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
 	auto nmain = tau::geth(tau::build_wff_xor_from_def(
-			normalizer<tau_ba_node>(nso_rr.main->get()),
-			normalizer<tau_ba_node>(other.nso_rr.main->get())));
+			normalizer<node>(nso_rr.main->get()),
+			normalizer<node>(other.nso_rr.main->get())));
 	rewriter::rules nrec_relations = rewriter::merge(nso_rr.rec_relations,
 						other.nso_rr.rec_relations);
 	return tau_ba<BAs...>(nrec_relations, nmain);
@@ -83,14 +83,14 @@ tau_ba<BAs...> tau_ba<BAs...>::operator^(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool tau_ba<BAs...>::is_zero() const {
-	tref normalized = normalizer<tau_ba_node>(nso_rr);
+	tref normalized = normalizer<node>(nso_rr);
 	return !is_tau_formula_sat<node>(normalized);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool tau_ba<BAs...>::is_one() const {
-	tref normalized = normalizer<tau_ba_node>(nso_rr);
+	tref normalized = normalizer<node>(nso_rr);
 	return is_tau_impl<node>(tau::_T(), normalized);
 }
 
