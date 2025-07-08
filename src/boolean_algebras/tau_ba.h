@@ -23,8 +23,7 @@ namespace idni::tau_lang {
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct tau_ba {
-	using node = tau_lang::node<BAs...>;
-	using tau_ba_node = tau_lang::node<tau_ba<BAs...>, BAs...>;
+	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tau_lang::tree<node>;
 
 	/**
@@ -121,7 +120,7 @@ struct tau_ba {
 	/**
 	 * @brief Type equivalent to tau_spec<BAs...>.
 	 */
-	const rr<tau_ba_node> nso_rr;
+	const rr<node> nso_rr;
 
 private:
 	// /**
