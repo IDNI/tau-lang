@@ -401,7 +401,7 @@ tref normalize_with_temp_simp(tref fm) {
 		if (clause_false) continue;
 
 		// Next check if any always statement implies a sometimes statement
-		for (tref aw : aw_parts) for (tref st : st_parts)
+		for (tref aw : aw_parts) for (tref& st : st_parts)
 			if (is_nso_impl<node>(aw, trim_q(st))) st = tau::_T();
 
 		// Now check if any sometimes statement implies another sometimes
