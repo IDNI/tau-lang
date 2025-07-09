@@ -1828,7 +1828,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 						auto neg_eq = push_negation_in<node, false>(
 							tau::build_bf_neg(clause));
 						// std::cout << "neg_eq: " << neg_eq << "\n";
-						for (tref neq : neq_clauses) {
+						for (tref& neq : neq_clauses) {
 							if (tau::get(neq).equals_T()
 								|| tau::get(neq).equals_1()) continue;
 							auto grouped_bf = group_dnf_expression<node>(neq);
@@ -1849,7 +1849,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 				rest = tau::build_wff_and(rest,
 					tau::build_wff_neg(vars[k]));
 		}
-		for (tref neq : neq_clauses) {
+		for (tref& neq : neq_clauses) {
 			if (tau::get(neq).equals_T()) continue;
 			neq = tau::build_bf_neq(neq);
 		}
@@ -2593,7 +2593,7 @@ tref pull_always_out(tref fm) {
 	tref always_part = nullptr;
 	int_t lookback = 0;
 	bool first = true;
-	for (tref fa : collected_always_fms) {
+	for (tref& fa : collected_always_fms) {
 		auto io_vars = tau::get(fa)
 				.select_top(is_child<node, tau::io_var>);
 		auto current_lb = get_max_shift<node>(io_vars);
@@ -2925,7 +2925,7 @@ tref wff_remove_existential(tref var, tref wff) {
 		tref nl = tau::_T();
 		bool is_quant_removable_in_clause = true;
 		auto conjs = get_cnf_wff_clauses<node>(l);
-		for (tref conj : conjs) {
+		for (tref& conj : conjs) {
 			if (!contains<node>(conj, var)) {
 				nl = tau::build_wff_and(nl, conj);
 				conj = tau::_T();
