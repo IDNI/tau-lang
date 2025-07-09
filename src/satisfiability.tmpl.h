@@ -1111,7 +1111,7 @@ tref simp_tau_unsat_valid(tref fm, const int_t start_time, const bool output) {
 	trefs clauses = get_leaves<node>(normalized_fm, tau::wff_or);
 
 	// Check satisfiability of each clause
-	for (tref clause: clauses) if (tau::get(transform_to_execution<node>(
+	for (tref& clause: clauses) if (tau::get(transform_to_execution<node>(
 		clause, start_time, output)).equals_F()) clause =tau::_F();
 
 	auto res = tau::build_wff_or(clauses);
