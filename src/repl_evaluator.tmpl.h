@@ -189,8 +189,8 @@ requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::contains(const tt& n, typename node::type nt) const {
 	bool found = false;
 	static const auto searcher = [&nt, &found](tref n) -> bool {
-		if (tau::get(n).get_type() == nt) return found = true;
-		return false;
+		if (tau::get(n).get_type() == nt) return found = true, false;
+		return true;
 	};
 	pre_order<node>(n.value()).search(searcher);
 	return found;
