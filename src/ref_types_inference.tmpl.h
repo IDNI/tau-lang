@@ -265,8 +265,7 @@ std::optional<rr<node>> infer_ref_types(const rr<node>& nso_rr,
 			if (auto topt = ts.get(get_rr_sig<node>(main)); topt) {
 				nt = topt.value();
 				LOG_TRACE << "updating main: " << LOG_FM(main);
-				update_ref(main, nt);
-				nn.main = tau::geth(main);
+				nn.main = tau::geth(update_ref(main, nt));
 			}
 		}
 	}
