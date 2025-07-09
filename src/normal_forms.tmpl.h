@@ -2828,9 +2828,9 @@ tref push_existential_quantifier_one(tref fm) {
 	}
 	else if (st.child_is(tau::wff_and)) {
 		// Remove existential, if quant_var does not appear in clause
-		trefs clauses = get_cnf_wff_clauses<node>(st.get());
+		trefs clauses = get_cnf_wff_clauses<node>(scoped_fm);
 		tref no_q_fm = tau::_T();
-		for (tref clause : clauses) {
+		for (tref& clause : clauses) {
 			if (!contains<node>(clause, quant_var)) {
 				no_q_fm = tau::build_wff_and(no_q_fm, clause);
 				clause = tau::_T();
@@ -2869,9 +2869,9 @@ tref push_universal_quantifier_one(tref fm) {
 	}
 	else if (st.child_is(tau::wff_or)) {
 		// Remove existential, if quant_var does not appear in clause
-		auto clauses = get_dnf_wff_clauses<node>(st.get());
+		auto clauses = get_dnf_wff_clauses<node>(scoped_fm);
 		tref no_q_fm = tau::_F();
-		for (tref clause : clauses) {
+		for (tref& clause : clauses) {
 			if (!contains<node>(clause, quant_var)) {
 				no_q_fm = tau::build_wff_or(no_q_fm, clause);
 				clause = tau::_F();
@@ -3190,8 +3190,9 @@ tref eliminate_quantifiers(tref fm) {
 		auto has_var = [&inner_fm](tref n) {
 			return tau::get(n) == tau::get(tau::trim2(inner_fm)); };
 		tref scoped_fm = tau::get(inner_fm)[0].second();
-		if (scoped_fm != nullptr)
+		if (scoped_fm != nullptr) {
 			LOG_DEBUG <<"elim_quant scoped_fm: "<<LOG_FM(scoped_fm);
+		}
 		if (!tau::get(scoped_fm).find_top(has_var)) {
 			// If the scoped formula does not contain
 			// the quantified variable, remove the quantifier

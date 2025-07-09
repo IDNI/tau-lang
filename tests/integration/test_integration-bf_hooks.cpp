@@ -330,7 +330,7 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( check_hook("x'+x", "1") );
 
 		CHECK( check_type("{a}:sbf+{b}:sbf", "sbf") );
-		// CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}", "tau") ); // TODO: fix this infinite loop
+		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}", "tau") );
 		CHECK( check_type("{o1[t] = 0}:tau+{o2[t] = 0}", "tau") );
 		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}:tau", "tau") );
 	}
