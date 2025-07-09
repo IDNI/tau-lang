@@ -179,8 +179,13 @@ std::optional<rr<node>> infer_ref_types(const rr<node>& nso_rr,
 	static auto update_ref = [](tref r, node::type nt) {
 		LOG_TRACE << "updating ref: " << LOG_FM(r)
 			<< " to " << LOG_NT(nt);
+		const auto& rt = tau::get(r);
 		r = tau::get(nt, tau::get(nt == tau::wff ? tau::wff_ref
-                                                : tau::bf_ref, r));
+                                                : tau::bf_ref,
+				bintree<node>::get(
+					node(rt.value.nt, 0,
+						nt == tau::wff ? 0 : 1),
+					rt.left_child(), rt.right_sibling())));
 		LOG_TRACE << "updated ref: " << LOG_FM(r);
 		return r;
 	};
