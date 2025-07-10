@@ -17,9 +17,13 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
 	else return tau::get_raw(v, ch, len, r);
 
-	HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
-	DBG(typename node::type nt = tau::get(ret).get_type();)
-	DBG(assert(nt == tau::bf || nt == tau::wff || nt == tau::shift);)
+	if (ret) {
+		HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
+		DBG(assert(ret != nullptr);)
+		DBG(typename node::type nt = tau::get(ret).get_type();)
+		DBG(assert(nt == tau::bf || nt == tau::wff
+			|| nt == tau::shift || nt == tau::integer);)
+	} else  HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error");
 	return ret;
 }
 
