@@ -1133,22 +1133,20 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::depreciating::node<tau_sym<
 	auto nt = get_non_terminal_node(n.child[0]);
 	switch (nt) {
 		case p::num : {
-			int64_t ull = std::stoull(value);
-			auto bv = cvc5_solver.mkBitVector(bv_default_size, ull);
+			// TODO (HIGH) control small size exception 
+			auto bv = cvc5_solver.mkBitVector(bv_default_size, value.c_str(), 10);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
 		case p::bits : {
+			// TODO (HIGH) control small size exception 
 			auto bv = cvc5_solver.mkBitVector(bv_default_size, value.c_str(), 2);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
 		case p::hexnum : {
-			// check https://stackoverflow.com/questions/48340828/how-to-convert-a-hexadecimal-string-to-long-in-c
-			std::istringstream converter { value };
-			int64_t ull = 0;
-		    converter >> std::hex >> ull;
-			auto bv = cvc5_solver.mkBitVector(bv_default_size, ull);
+			// TODO (HIGH) control small size exception 
+			auto bv = cvc5_solver.mkBitVector(bv_default_size, value.c_str(), 16);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
