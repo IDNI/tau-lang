@@ -32,8 +32,8 @@ inline const std::vector<std::string> symbol_names{
 	"__E___E_bf_64_65", "bf_and_nosep", "__E_bf_66", "bf_and_nosep_1st_oprnd", "__E___E_bf_66_67", "bf_and_nosep_2nd_oprnd", "__E___E_bf_66_68", "bv_parenthesis", "__E_bv_69", "bv_checked", 
 	"__E_bv_70", "bv_add", "__E_bv_71", "bv_mul", "__E_bv_72", "bv_div", "__E_bv_73", "bv_mod", "__E_bv_74", "bv_sub", 
 	"__E_bv_75", "bv_neg", "bv_and", "__E_bv_76", "bv_nand", "__E_bv_77", "bv_or", "__E_bv_78", "bv_nor", "__E_bv_79", 
-	"bv_xor", "__E_bv_80", "bv_xnor", "__E_bv_81", "bv_rotate_left", "__E_bv_82", "num", "bv_rotate_right", "__E_bv_83", "bv_min", 
-	"__E_bv_84", "bv_max", "__E_bv_85", "bitvector", "bits", "__E_bitvector_86", "bv_type", "__E_bitvector_87", "hexnum", "__E_bitvector_88", 
+	"bv_xor", "__E_bv_80", "bv_xnor", "__E_bv_81", "bv_rotate_left", "__E_bv_82", "bv_rotate_right", "__E_bv_83", "bv_min", "__E_bv_84", 
+	"bv_max", "__E_bv_85", "bitvector", "bits", "__E_bitvector_86", "bv_type", "num", "__E_bitvector_87", "hexnum", "__E_bitvector_88", 
 	"__E_bits_89", "__E_bits_90", "__E_hexnum_91", "ctn_neq", "__E_constraint_92", "ctnvar", "ctn_eq", "__E_constraint_93", "ctn_greater_equal", "__E_constraint_94", 
 	"ctn_greater", "__E_constraint_95", "ctn_less_equal", "__E_constraint_96", "ctn_less", "__E_constraint_97", "__E_variable_98", "__E_variable_99", "__E_variable_100", "__E_variable_101", 
 	"__E_variable_102", "__E_variable_103", "__E_variable_104", "io_var", "__E_variable_105", "in", "out", "__E_variable_106", "uninterpreted_constant", "in_var_name", 
@@ -96,7 +96,7 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		},
 		.trim_terminals = true,
 		.dont_trim_terminals_of = {
-			20, 22, 139, 150, 204, 206, 208, 215, 239, 243,
+			20, 22, 139, 150, 203, 205, 208, 215, 239, 243,
 			254, 259, 261, 268, 388, 393, 431, 449
 		},
 		.to_inline = {
@@ -700,50 +700,50 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(192), (NT(193)));
 //G281: bv(117)              => bv_xnor(192).
 	p(NT(117), (NT(192)));
-//G282: __E_bv_82(195)       => bv(117) _(11) '<' '<' _(11) num(196).
-	p(NT(195), (NT(117)+NT(11)+T(20)+T(20)+NT(11)+NT(196)));
+//G282: __E_bv_82(195)       => bv(117) _(11) '<' '<' _(11) bv(117).
+	p(NT(195), (NT(117)+NT(11)+T(20)+T(20)+NT(11)+NT(117)));
 //G283: bv_rotate_left(194)  => __E_bv_82(195).
 	p(NT(194), (NT(195)));
 //G284: bv(117)              => bv_rotate_left(194).
 	p(NT(117), (NT(194)));
-//G285: __E_bv_83(198)       => bv(117) _(11) '>' '>' _(11) num(196).
-	p(NT(198), (NT(117)+NT(11)+T(21)+T(21)+NT(11)+NT(196)));
-//G286: bv_rotate_right(197) => __E_bv_83(198).
-	p(NT(197), (NT(198)));
-//G287: bv(117)              => bv_rotate_right(197).
-	p(NT(117), (NT(197)));
-//G288: __E_bv_84(200)       => 'm' 'i' 'n' __(27) bv(117) __(27) bv(117).
-	p(NT(200), (T(18)+T(10)+T(45)+NT(27)+NT(117)+NT(27)+NT(117)));
-//G289: bv_min(199)          => __E_bv_84(200).
-	p(NT(199), (NT(200)));
-//G290: bv(117)              => bv_min(199).
-	p(NT(117), (NT(199)));
-//G291: __E_bv_85(202)       => 'm' 'a' 'x' __(27) bv(117) __(27) bv(117).
-	p(NT(202), (T(18)+T(5)+T(27)+NT(27)+NT(117)+NT(27)+NT(117)));
-//G292: bv_max(201)          => __E_bv_85(202).
-	p(NT(201), (NT(202)));
-//G293: bv(117)              => bv_max(201).
-	p(NT(117), (NT(201)));
-//G294: bv(117)              => bitvector(203).
-	p(NT(117), (NT(203)));
-//G295: __E_bitvector_86(205) => _(11) ':' _(11) bv_type(206) _(11).
-	p(NT(205), (NT(11)+T(2)+NT(11)+NT(206)+NT(11)));
-//G296: __E_bitvector_86(205) => null.
-	p(NT(205), (nul));
-//G297: bitvector(203)       => '#' 'b' bits(204) __E_bitvector_86(205).
-	p(NT(203), (T(46)+T(7)+NT(204)+NT(205)));
-//G298: __E_bitvector_87(207) => _(11) ':' _(11) bv_type(206) _(11).
-	p(NT(207), (NT(11)+T(2)+NT(11)+NT(206)+NT(11)));
+//G285: __E_bv_83(197)       => bv(117) _(11) '>' '>' _(11) bv(117).
+	p(NT(197), (NT(117)+NT(11)+T(21)+T(21)+NT(11)+NT(117)));
+//G286: bv_rotate_right(196) => __E_bv_83(197).
+	p(NT(196), (NT(197)));
+//G287: bv(117)              => bv_rotate_right(196).
+	p(NT(117), (NT(196)));
+//G288: __E_bv_84(199)       => 'm' 'i' 'n' __(27) bv(117) __(27) bv(117).
+	p(NT(199), (T(18)+T(10)+T(45)+NT(27)+NT(117)+NT(27)+NT(117)));
+//G289: bv_min(198)          => __E_bv_84(199).
+	p(NT(198), (NT(199)));
+//G290: bv(117)              => bv_min(198).
+	p(NT(117), (NT(198)));
+//G291: __E_bv_85(201)       => 'm' 'a' 'x' __(27) bv(117) __(27) bv(117).
+	p(NT(201), (T(18)+T(5)+T(27)+NT(27)+NT(117)+NT(27)+NT(117)));
+//G292: bv_max(200)          => __E_bv_85(201).
+	p(NT(200), (NT(201)));
+//G293: bv(117)              => bv_max(200).
+	p(NT(117), (NT(200)));
+//G294: bv(117)              => bitvector(202).
+	p(NT(117), (NT(202)));
+//G295: __E_bitvector_86(204) => _(11) ':' _(11) bv_type(205) _(11).
+	p(NT(204), (NT(11)+T(2)+NT(11)+NT(205)+NT(11)));
+//G296: __E_bitvector_86(204) => null.
+	p(NT(204), (nul));
+//G297: bitvector(202)       => '#' 'b' bits(203) __E_bitvector_86(204).
+	p(NT(202), (T(46)+T(7)+NT(203)+NT(204)));
+//G298: __E_bitvector_87(207) => _(11) ':' _(11) bv_type(205) _(11).
+	p(NT(207), (NT(11)+T(2)+NT(11)+NT(205)+NT(11)));
 //G299: __E_bitvector_87(207) => null.
 	p(NT(207), (nul));
-//G300: bitvector(203)       => num(196) __E_bitvector_87(207).
-	p(NT(203), (NT(196)+NT(207)));
-//G301: __E_bitvector_88(209) => _(11) ':' _(11) bv_type(206) _(11).
-	p(NT(209), (NT(11)+T(2)+NT(11)+NT(206)+NT(11)));
+//G300: bitvector(202)       => num(206) __E_bitvector_87(207).
+	p(NT(202), (NT(206)+NT(207)));
+//G301: __E_bitvector_88(209) => _(11) ':' _(11) bv_type(205) _(11).
+	p(NT(209), (NT(11)+T(2)+NT(11)+NT(205)+NT(11)));
 //G302: __E_bitvector_88(209) => null.
 	p(NT(209), (nul));
-//G303: bitvector(203)       => '#' 'x' hexnum(208) __E_bitvector_88(209).
-	p(NT(203), (T(46)+T(27)+NT(208)+NT(209)));
+//G303: bitvector(202)       => '#' 'x' hexnum(208) __E_bitvector_88(209).
+	p(NT(202), (T(46)+T(27)+NT(208)+NT(209)));
 //G304: __E_bits_89(210)     => '0'.
 	p(NT(210), (T(39)));
 //G305: __E_bits_89(210)     => '1'.
@@ -752,58 +752,58 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(211), (NT(210)));
 //G307: __E_bits_90(211)     => __E_bits_89(210) __E_bits_90(211).
 	p(NT(211), (NT(210)+NT(211)));
-//G308: bits(204)            => __E_bits_90(211).
-	p(NT(204), (NT(211)));
+//G308: bits(203)            => __E_bits_90(211).
+	p(NT(203), (NT(211)));
 //G309: __E_hexnum_91(212)   => xdigit(4).
 	p(NT(212), (NT(4)));
 //G310: __E_hexnum_91(212)   => xdigit(4) __E_hexnum_91(212).
 	p(NT(212), (NT(4)+NT(212)));
 //G311: hexnum(208)          => __E_hexnum_91(212).
 	p(NT(208), (NT(212)));
-//G312: __E_constraint_92(214) => '[' ctnvar(215) _(11) '!' '=' _(11) num(196) ']'.
-	p(NT(214), (T(24)+NT(215)+NT(11)+T(32)+T(3)+NT(11)+NT(196)+T(25)));
-//G313: __E_constraint_92(214) => '[' num(196) _(11) '!' '=' _(11) ctnvar(215) ']'.
-	p(NT(214), (T(24)+NT(196)+NT(11)+T(32)+T(3)+NT(11)+NT(215)+T(25)));
+//G312: __E_constraint_92(214) => '[' ctnvar(215) _(11) '!' '=' _(11) num(206) ']'.
+	p(NT(214), (T(24)+NT(215)+NT(11)+T(32)+T(3)+NT(11)+NT(206)+T(25)));
+//G313: __E_constraint_92(214) => '[' num(206) _(11) '!' '=' _(11) ctnvar(215) ']'.
+	p(NT(214), (T(24)+NT(206)+NT(11)+T(32)+T(3)+NT(11)+NT(215)+T(25)));
 //G314: ctn_neq(213)         => __E_constraint_92(214).
 	p(NT(213), (NT(214)));
 //G315: constraint(76)       => ctn_neq(213).
 	p(NT(76), (NT(213)));
-//G316: __E_constraint_93(217) => '[' ctnvar(215) _(11) '=' _(11) num(196) ']'.
-	p(NT(217), (T(24)+NT(215)+NT(11)+T(3)+NT(11)+NT(196)+T(25)));
-//G317: __E_constraint_93(217) => '[' num(196) _(11) '=' _(11) ctnvar(215) ']'.
-	p(NT(217), (T(24)+NT(196)+NT(11)+T(3)+NT(11)+NT(215)+T(25)));
+//G316: __E_constraint_93(217) => '[' ctnvar(215) _(11) '=' _(11) num(206) ']'.
+	p(NT(217), (T(24)+NT(215)+NT(11)+T(3)+NT(11)+NT(206)+T(25)));
+//G317: __E_constraint_93(217) => '[' num(206) _(11) '=' _(11) ctnvar(215) ']'.
+	p(NT(217), (T(24)+NT(206)+NT(11)+T(3)+NT(11)+NT(215)+T(25)));
 //G318: ctn_eq(216)          => __E_constraint_93(217).
 	p(NT(216), (NT(217)));
 //G319: constraint(76)       => ctn_eq(216).
 	p(NT(76), (NT(216)));
-//G320: __E_constraint_94(219) => '[' ctnvar(215) _(11) '>' '=' _(11) num(196) ']'.
-	p(NT(219), (T(24)+NT(215)+NT(11)+T(21)+T(3)+NT(11)+NT(196)+T(25)));
-//G321: __E_constraint_94(219) => '[' num(196) _(11) '>' '=' _(11) ctnvar(215) ']'.
-	p(NT(219), (T(24)+NT(196)+NT(11)+T(21)+T(3)+NT(11)+NT(215)+T(25)));
+//G320: __E_constraint_94(219) => '[' ctnvar(215) _(11) '>' '=' _(11) num(206) ']'.
+	p(NT(219), (T(24)+NT(215)+NT(11)+T(21)+T(3)+NT(11)+NT(206)+T(25)));
+//G321: __E_constraint_94(219) => '[' num(206) _(11) '>' '=' _(11) ctnvar(215) ']'.
+	p(NT(219), (T(24)+NT(206)+NT(11)+T(21)+T(3)+NT(11)+NT(215)+T(25)));
 //G322: ctn_greater_equal(218) => __E_constraint_94(219).
 	p(NT(218), (NT(219)));
 //G323: constraint(76)       => ctn_greater_equal(218).
 	p(NT(76), (NT(218)));
-//G324: __E_constraint_95(221) => '[' ctnvar(215) _(11) '>' _(11) num(196) ']'.
-	p(NT(221), (T(24)+NT(215)+NT(11)+T(21)+NT(11)+NT(196)+T(25)));
-//G325: __E_constraint_95(221) => '[' num(196) _(11) '>' _(11) ctnvar(215) ']'.
-	p(NT(221), (T(24)+NT(196)+NT(11)+T(21)+NT(11)+NT(215)+T(25)));
+//G324: __E_constraint_95(221) => '[' ctnvar(215) _(11) '>' _(11) num(206) ']'.
+	p(NT(221), (T(24)+NT(215)+NT(11)+T(21)+NT(11)+NT(206)+T(25)));
+//G325: __E_constraint_95(221) => '[' num(206) _(11) '>' _(11) ctnvar(215) ']'.
+	p(NT(221), (T(24)+NT(206)+NT(11)+T(21)+NT(11)+NT(215)+T(25)));
 //G326: ctn_greater(220)     => __E_constraint_95(221).
 	p(NT(220), (NT(221)));
 //G327: constraint(76)       => ctn_greater(220).
 	p(NT(76), (NT(220)));
-//G328: __E_constraint_96(223) => '[' ctnvar(215) _(11) '<' '=' _(11) num(196) ']'.
-	p(NT(223), (T(24)+NT(215)+NT(11)+T(20)+T(3)+NT(11)+NT(196)+T(25)));
-//G329: __E_constraint_96(223) => '[' num(196) _(11) '<' '=' _(11) ctnvar(215) ']'.
-	p(NT(223), (T(24)+NT(196)+NT(11)+T(20)+T(3)+NT(11)+NT(215)+T(25)));
+//G328: __E_constraint_96(223) => '[' ctnvar(215) _(11) '<' '=' _(11) num(206) ']'.
+	p(NT(223), (T(24)+NT(215)+NT(11)+T(20)+T(3)+NT(11)+NT(206)+T(25)));
+//G329: __E_constraint_96(223) => '[' num(206) _(11) '<' '=' _(11) ctnvar(215) ']'.
+	p(NT(223), (T(24)+NT(206)+NT(11)+T(20)+T(3)+NT(11)+NT(215)+T(25)));
 //G330: ctn_less_equal(222)  => __E_constraint_96(223).
 	p(NT(222), (NT(223)));
 //G331: constraint(76)       => ctn_less_equal(222).
 	p(NT(76), (NT(222)));
-//G332: __E_constraint_97(225) => '[' ctnvar(215) _(11) '<' _(11) num(196) ']'.
-	p(NT(225), (T(24)+NT(215)+NT(11)+T(20)+NT(11)+NT(196)+T(25)));
-//G333: __E_constraint_97(225) => '[' num(196) _(11) '<' _(11) ctnvar(215) ']'.
-	p(NT(225), (T(24)+NT(196)+NT(11)+T(20)+NT(11)+NT(215)+T(25)));
+//G332: __E_constraint_97(225) => '[' ctnvar(215) _(11) '<' _(11) num(206) ']'.
+	p(NT(225), (T(24)+NT(215)+NT(11)+T(20)+NT(11)+NT(206)+T(25)));
+//G333: __E_constraint_97(225) => '[' num(206) _(11) '<' _(11) ctnvar(215) ']'.
+	p(NT(225), (T(24)+NT(206)+NT(11)+T(20)+NT(11)+NT(215)+T(25)));
 //G334: ctn_less(224)        => __E_constraint_97(225).
 	p(NT(224), (NT(225)));
 //G335: constraint(76)       => ctn_less(224).
@@ -932,10 +932,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(258), (NT(139)) & ~(NT(456)));
 //G396: __E_shift_118(257)   => __E___E_shift_118_119(258).
 	p(NT(257), (NT(258)));
-//G397: shift(255)           => __E_shift_118(257) _(11) '-' _(11) num(196).
-	p(NT(255), (NT(257)+NT(11)+T(28)+NT(11)+NT(196)));
-//G398: num(196)             => digits(259).
-	p(NT(196), (NT(259)));
+//G397: shift(255)           => __E_shift_118(257) _(11) '-' _(11) num(206).
+	p(NT(255), (NT(257)+NT(11)+T(28)+NT(11)+NT(206)));
+//G398: num(206)             => digits(259).
+	p(NT(206), (NT(259)));
 //G399: __E_integer_120(260) => '-'.
 	p(NT(260), (T(28)));
 //G400: __E_integer_120(260) => null.
@@ -1000,16 +1000,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(275), (NT(274)+NT(275)));
 //G430: src_c(270)           => '{' __E_src_c_130(275) '}'.
 	p(NT(270), (T(49)+NT(275)+T(50)));
-//G431: type(150)            => bv_type(206).
-	p(NT(150), (NT(206)));
+//G431: type(150)            => bv_type(205).
+	p(NT(150), (NT(205)));
 //G432: type(150)            => chars(247).
 	p(NT(150), (NT(247)));
-//G433: __E_bv_type_131(276) => _(11) '[' _(11) num(196) _(11) ']'.
-	p(NT(276), (NT(11)+T(24)+NT(11)+NT(196)+NT(11)+T(25)));
+//G433: __E_bv_type_131(276) => _(11) '[' _(11) num(206) _(11) ']'.
+	p(NT(276), (NT(11)+T(24)+NT(11)+NT(206)+NT(11)+T(25)));
 //G434: __E_bv_type_131(276) => null.
 	p(NT(276), (nul));
-//G435: bv_type(206)         => 'b' 'v' __E_bv_type_131(276).
-	p(NT(206), (T(7)+T(51)+NT(276)));
+//G435: bv_type(205)         => 'b' 'v' __E_bv_type_131(276).
+	p(NT(205), (T(7)+T(51)+NT(276)));
 //G436: __E_chars_132(277)   => alnum(6).
 	p(NT(277), (NT(6)));
 //G437: __E_chars_132(277)   => '_'.
@@ -1633,8 +1633,8 @@ struct tau_parser_nonterminals {
 		__E___E_bf_64_65, bf_and_nosep, __E_bf_66, bf_and_nosep_1st_oprnd, __E___E_bf_66_67, bf_and_nosep_2nd_oprnd, __E___E_bf_66_68, bv_parenthesis, __E_bv_69, bv_checked, 
 		__E_bv_70, bv_add, __E_bv_71, bv_mul, __E_bv_72, bv_div, __E_bv_73, bv_mod, __E_bv_74, bv_sub, 
 		__E_bv_75, bv_neg, bv_and, __E_bv_76, bv_nand, __E_bv_77, bv_or, __E_bv_78, bv_nor, __E_bv_79, 
-		bv_xor, __E_bv_80, bv_xnor, __E_bv_81, bv_rotate_left, __E_bv_82, num, bv_rotate_right, __E_bv_83, bv_min, 
-		__E_bv_84, bv_max, __E_bv_85, bitvector, bits, __E_bitvector_86, bv_type, __E_bitvector_87, hexnum, __E_bitvector_88, 
+		bv_xor, __E_bv_80, bv_xnor, __E_bv_81, bv_rotate_left, __E_bv_82, bv_rotate_right, __E_bv_83, bv_min, __E_bv_84, 
+		bv_max, __E_bv_85, bitvector, bits, __E_bitvector_86, bv_type, num, __E_bitvector_87, hexnum, __E_bitvector_88, 
 		__E_bits_89, __E_bits_90, __E_hexnum_91, ctn_neq, __E_constraint_92, ctnvar, ctn_eq, __E_constraint_93, ctn_greater_equal, __E_constraint_94, 
 		ctn_greater, __E_constraint_95, ctn_less_equal, __E_constraint_96, ctn_less, __E_constraint_97, __E_variable_98, __E_variable_99, __E_variable_100, __E_variable_101, 
 		__E_variable_102, __E_variable_103, __E_variable_104, io_var, __E_variable_105, in, out, __E_variable_106, uninterpreted_constant, in_var_name, 
