@@ -123,6 +123,20 @@ auto visit_wff = [](tref n) static {
 	return true;
 };
 
+template <NodeType node>
+size_t find_ba_type (tref term) {
+	using tau = tree<node>;
+	size_t type = 0;
+	auto f = [&type](const tref n) {
+		const auto& t = tau::get(n);
+		if (t.is(tau::bf)) type = t.get_ba_type();
+		if (type > 0) return false;
+		return true;
+	};
+	pre_order<node>(term).search_unique(f);
+	return type;
+}
+
 // template <NodeType node>
 // auto visit_io_vars = [] (tref n) static {
 // 	auto nt = tree<node>::get(n).get_type();
