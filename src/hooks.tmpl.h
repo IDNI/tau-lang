@@ -518,19 +518,19 @@ tau<BAs...> make_node_hook_wff_neg(const rewriter::depreciating::node<tau_sym<BA
 		case tau_parser::bv_neq:
 			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_eq, n);
 		case tau_parser::bv_less_equal:
-			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_nleq, n);
+			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_greater, n);
 		case tau_parser::bv_nleq:
 			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_less_equal, n);
 		case tau_parser::bv_greater_equal:
-			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_ngeq, n);
+			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_less, n);
 		case tau_parser::bv_ngeq:
 			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_greater_equal, n);
 		case tau_parser::bv_less:
-			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_nless, n);
+			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_greater_equal, n);
 		case tau_parser::bv_nless:
 			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_less, n);
 		case tau_parser::bv_greater:
-			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_ngreater, n);
+			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_less_equal, n);
 		case tau_parser::bv_ngreater:
 			return make_node_hook_bv_literal<BAs...>(tau_parser::bv_greater, n);
 	}
