@@ -79,8 +79,11 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::offset) && t[0].is(tau::variable))
 			return tau::get(tau::offset,
-					tau::get(node(tau::capture,
-							t[0][0].data())));
+				tau::get(node(tau::capture, t[0][0].data())));
+		if (t.is(tau::shift) && t[0].is(tau::variable))
+			return tau::get(tau::shift, {
+				tau::get(node(tau::capture, t[0][0].data())),
+				t[0].right_sibling() });
 		if (t.is(tau::ref_arg) && t[0][0].is(tau::variable))
 			return tau::get(tau::ref_arg, tau::get(tau::bf,
 					tau::get(node(tau::capture,
