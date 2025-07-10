@@ -3678,8 +3678,8 @@ tref to_snf_step<node>::traverse(const bdd_path& path,
 		? tau::_F()
 		: tt(rewriter::replace_with<node>(lit, tau::_F(), form))
 			| simplify_snf<node>() | tt::ref;
-	tref t = tau::get(normalize_positive(path, lit)).equals_T()
-		? tau::_T()
+	tref t = tau::get(normalize_positive(path, lit)).equals_F()
+		? tau::_F()
 		: tt(rewriter::replace_with<node>(lit, tau::_T(), form))
 			| simplify_snf<node>() | tt::ref;
 
@@ -3775,15 +3775,15 @@ tref to_snf_step<node>::squeeze_positives(const literals& positives,
 	// if there is no such element we return the first element
 	if (first == positives.end()) return *positives.begin();
 	// otherwise...
-	auto first_cte = get_bf_constant(*first);
+	auto first_cte = tau::build_bf_ba_constant(get_constant(*first).value(), find_ba_type<node>(*first));
 	auto cte = std::accumulate(++positives.begin(), positives.end(),
 		first_cte, [&](tref l, tref r) {
 			auto l_cte = get_constant(l), r_cte = get_constant(r);
 			if (l_cte && r_cte)
-				return tau::get_ba_constant(
+				return tau::build_bf_ba_constant(
 					std::visit(_or, l_cte.value(),
 							r_cte.value()),
-					tau::get(l).get_ba_type());
+					find_ba_type<node>(l));
 			return l;
 		});
 
@@ -3798,7 +3798,7 @@ template <NodeType node>
 bool to_snf_step<node>::is_less_eq_than(tref ll, const exponent& le, tref rl,
 	const exponent& re) const
 {
-	return std::includes(le.begin(), le.end(), re.begin(), re.end())
+	return std::includes(le.begin(), le.end(), re.begin(), re.end(), lcrs_tree<node>::subtree_less)
 			&& is_less_eq_than(ll, rl);
 }
 
@@ -3882,13 +3882,14 @@ typename to_snf_step<node>::literal to_snf_step<node>::normalize(
 	// we tacitely assume that the positive literal has a constant
 	// different from 1. Otherwise, the normalizer should already
 	// return F.
-	auto neg_positive_cte = tau::build_bf_neg(positive);
+	auto neg_positive_cte = tau::build_bf_neg(
+		tau::build_bf_ba_constant(get_constant(positive).value(), find_ba_type<node>(positive)));
 	// now we conjunct the previous result with the constant of n
 	literals lits; lits.insert(positive);
 	for (tref negative : negatives) {
-		tref n_cte = negative;
+		auto n_cte = get_constant(negative);
 		tref nn_cte = n_cte
-			? tau::build_bf_and(neg_positive_cte, n_cte)
+			? tau::build_bf_and(neg_positive_cte, tau::build_bf_ba_constant(n_cte.value(), find_ba_type<node>(negative)))
 			: neg_positive_cte;
 		auto nn = tau::build_bf_and(nn_cte, tau::build_bf_and(exp));
 		lits.insert(tau::build_bf_neq(nn));
@@ -4018,7 +4019,6 @@ tref snf_wff(tref n) {
 		| bf_reduce_canonical<node>()
 		| tt::f(unsqueeze_wff<node>)
 		| simplify_snf<node>()
-		// TODO (LOW) Lucca thinks that maybe one call is enough
 		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>())
 		| tt::ref;
 	LOG_DEBUG << "--------------------------------";
@@ -4029,7 +4029,9 @@ tref snf_wff(tref n) {
 	// Note that in this case we don't need to unsqueeze the formula.
 	tref second_step = tt(tau::build_wff_neg(first_step))
 		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>())
-		| simplify_snf<node>()
+		| repeat_all<node, step<node> >(to_steps<node>({
+			elim_eqs<node>(), fix_neg_in_snf<node>()
+		}))
 		| bf_reduce_canonical<node>()
 		| tt::ref;
 	LOG_DEBUG << "--------------------------------";
