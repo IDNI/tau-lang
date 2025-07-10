@@ -545,8 +545,8 @@ bv_term => '~' _ bv_term
       | (bv_term _ '+' _ bv_term) | (bv_term _ '-' _ bv_term) | (bv_term _ '*' _ bv_term)
       | (bv_term _ '/' _ bv_term) | (bv_term _ '%' _ bv_term) | (bv_term _ "!&" _ bv_term)
       | (bv_term _ '&' _ bv_term) | (bv_term _ "!|" _ bv_term) | (bv_term _ '|' _ bv_term)
-      | (bv_term _ "!(+)" _ bv_term) | (bv_term _ "(+)" _ bv_term) | (bv_term _ "<<" _ num) 
-      | (bv_term _ ">>" _ num) | variable | stream_variable | bv_constant
+      | (bv_term _ "!(+)" _ bv_term) | (bv_term _ "(+)" _ bv_term) | (bv_term _ "<<" _ bv_term) 
+      | (bv_term _ ">>" _ bv_term) | variable | stream_variable | bv_constant
 
 bv_constant => "#b" [0-1]+ | "#x" [0-9a-fA-F]+ | [0-9]+
 ```
