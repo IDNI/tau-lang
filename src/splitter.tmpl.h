@@ -324,7 +324,7 @@ tref tau_splitter(tref fm, splitter_type st) {
 	auto splitter_of_clause = [&](tref clause) {
 		trefs specs = get_cnf_wff_clauses<node>(clause);
 		bool good_splitter = false;
-		for (tref spec : specs) {
+		for (tref& spec : specs) {
 			bool is_aw = is_child<node>(spec, tau::wff_always);
 			auto [splitter, type] = nso_tau_splitter<BAs...>(
 					tau::get(spec)[0].first(), st, clause);
