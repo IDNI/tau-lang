@@ -918,7 +918,14 @@ template <NodeType node>
 tref tree<node>::build_bf_ba_constant(const constant& constant,
 	size_t ba_type_id, tref right)
 {
-	return tau_lang::build_bf_ba_constant<node>(constant, ba_type_id,right);
+	return tau_lang::build_bf_ba_constant<node>(constant, ba_type_id, right);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_ba_constant(const constant& constant,
+	size_t ba_type_id)
+{
+	return tau_lang::build_bf_ba_constant<node>(constant, ba_type_id, nullptr);
 }
 
 template <NodeType node>
