@@ -79,23 +79,21 @@ TEST_SUITE("normal forms: snf for wff") {
 		CHECK( tau::get(result).to_str() == "x = 0" );
 	}*/
 
-	// TODO (HIGH) fix this to_snf test
-	// TEST_CASE("simple case: xy = 0 && x = 0") {
-	// 	const char* sample = "xy = 0 && x = 0.";
-	// 	auto nso_rr = get_nso_rr(sample);
-	// 	CHECK( nso_rr.has_value() );
-	// 	if (!nso_rr.has_value()) return;
-	// 	tref result = snf_wff<node_t>(nso_rr.value().main->get());
-	// 	CHECK( tau::get(result).to_str() == "x = 0" );
-	// }
+	TEST_CASE("simple case: xy = 0 && x = 0") {
+		const char* sample = "xy = 0 && x = 0.";
+		auto nso_rr = get_nso_rr(sample);
+		CHECK( nso_rr.has_value() );
+		if (!nso_rr.has_value()) return;
+		tref result = snf_wff<node_t>(nso_rr.value().main->get());
+		CHECK( tau::get(result).to_str() == "x = 0" );
+	}
 
-	// TODO (HIGH) fix this to_snf test
-	// TEST_CASE("simple case: xy != 0 && x != 0") {
-	// 	const char* sample = "xy != 0 && x != 0.";
-	// 	auto nso_rr = get_nso_rr(sample);
-	// 	CHECK( nso_rr.has_value() );
-	// 	if (!nso_rr.has_value()) return;
-	// 	tref result = snf_wff<node_t>(nso_rr.value().main->get());
-	// 	CHECK( tau::get(result).to_str() == "xy != 0" );
-	// }
+	TEST_CASE("simple case: xy != 0 && x != 0") {
+		const char* sample = "xy != 0 && x != 0.";
+		auto nso_rr = get_nso_rr(sample);
+		CHECK( nso_rr.has_value() );
+		if (!nso_rr.has_value()) return;
+		tref result = snf_wff<node_t>(nso_rr.value().main->get());
+		CHECK( tau::get(result).to_str() == "xy != 0" );
+	}
 }

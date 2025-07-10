@@ -53,7 +53,7 @@ bool test_ref_types(const char* rec_relation,
 
 TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 
-	// TODO: (HIGH) fix normalization
+	// TODO: (HIGH) fix infloop
 	// TEST_CASE("arities make different signature") { CHECK( test_ref_types(
 	// 	"f[0](x) := T."
 	// 	"f[0](x, y) := 1."
