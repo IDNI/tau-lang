@@ -123,8 +123,8 @@ bv                     => ('(' _ bv _ ')')            :bv_parenthesis
                         | (bv _ "!|" _ bv)            :bv_nor
                         | (bv _ "(+)" _ bv)           :bv_xor
                         | (bv _ "!(+)" _ bv)          :bv_xnor
-                        | (bv _ "<<" _ num)           :bv_rotate_left
-                        | (bv _ ">>" _ num)           :bv_rotate_right
+                        | (bv _ "<<" _ bv)            :bv_rotate_left
+                        | (bv _ ">>" _ bv)            :bv_rotate_right
                         | ("min" __ bv __ bv)         :bv_min
                         | ("max" __ bv __ bv)         :bv_max
                         | bitvector.
