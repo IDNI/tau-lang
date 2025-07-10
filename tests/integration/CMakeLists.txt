@@ -2,35 +2,33 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
 	### ok
+	ba_types_inference
 	nso_rr_partial_eval
 	sbf2
-	ba_types_inference
 	tau_ba1
-
-	### equality, hooks or bad traversal
+	wff_hooks
+	
+	### only several tests fail
+	bf_fixed_point        # remaining 1 test (no initial condition)
+	bf_hooks              # remaining 1 check_type (infloop) 
 	normal_forms          # remaining 2 to_snf tests
-	ref_types             # remaining 3 tests (infloop and normalization)
-	tau_ba3               # remaining 1 test (1st example)
-	bf_hooks              # remaining check_type tests for consts with io vars
-	wff_hooks             # remaining type mismatch tests (!check_hook)
-
-	### inf loop - probably equality, hooks or bad traversal
-	# bf_fixed_point
-	# quantifiers
-	# splitter
+	ref_types             # remaining 3 infloops
+	tau_ba3               # remaining 1 test + 2 infloops
+	
+	### inf loop - probably equality, hooks, unresolved/wrong types or bad traversal
 	# nso_rr_fixed_point
-	# satisfiability
-	# splitter2
 	
-	### assertions and aborts
-	solver
-	interpreter
-	wff_normalization
-	
-	### does not crash or assert, just doesn't pass
+	### other fails
 	bf_normalization
+	interpreter
+	nso_rr_execution  # (unresolved wff_ref)
+	quantifiers
+	satisfiability
 	sbf1
-	nso_rr_execution
+	solver
+	splitter
+	splitter2
+	wff_normalization
 )
 
 foreach(TEST IN LISTS TESTS)

@@ -66,30 +66,30 @@ TEST_SUITE("bf operator hooks") {
 		return type_id == type_expected_id && sample_type == expected_type;
 	}
 
-	// TEST_CASE("conversion to 1/0") {
-	// 	CHECK( check_hook("{T}", "1:tau") );
-	// 	CHECK( check_hook("{F}", "0:tau") );
+	TEST_CASE("conversion to 1/0") {
+		CHECK( check_hook("{T}", "1:tau") );
+		CHECK( check_hook("{F}", "0:tau") );
 
-	// 	CHECK( check_hook("{T}:tau", "1:tau") );
-	// 	CHECK( check_hook("{F}:tau", "0:tau") );
+		CHECK( check_hook("{T}:tau", "1:tau") );
+		CHECK( check_hook("{F}:tau", "0:tau") );
 
-	// 	CHECK( check_hook("{1}:sbf", "1:sbf") );
-	// 	CHECK( check_hook("{0}:sbf", "0:sbf") );
-	// }
+		CHECK( check_hook("{1}:sbf", "1:sbf") );
+		CHECK( check_hook("{0}:sbf", "0:sbf") );
+	}
 
 	TEST_CASE("'") {
-		// CHECK( check_hook("0'", "1") );
-		// CHECK( check_hook("1'", "0") );
+		CHECK( check_hook("0'", "1") );
+		CHECK( check_hook("1'", "0") );
 
-		// CHECK( check_hook("0:sbf'", "1:sbf") );
-		// CHECK( check_hook("1:sbf'", "0:sbf") );
+		CHECK( check_hook("0:sbf'", "1:sbf") );
+		CHECK( check_hook("1:sbf'", "0:sbf") );
 
-		// CHECK( check_hook("0:tau'", "1:tau") );
-		// CHECK( check_hook("1:tau'", "0:tau") );
+		CHECK( check_hook("0:tau'", "1:tau") );
+		CHECK( check_hook("1:tau'", "0:tau") );
 
-		// CHECK( check_hook("x''", "x") );
+		CHECK( check_hook("x''", "x") );
 
-		// CHECK( check_type("{a}:sbf'", "sbf") );
+		CHECK( check_type("{a}:sbf'", "sbf") );
 		CHECK( check_type("{o1[t] = 0}'", "tau") );
 		CHECK( check_type("{o1[t] = 0}:tau'", "tau") );
 	}
