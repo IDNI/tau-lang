@@ -1090,7 +1090,6 @@ bool is_tau_formula_sat(const tau<BAs...>& fm, const int_t start_time = 0,
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace) << "satisfiability.h:" << __LINE__ << " is_tau_formula_sat/normalized_fm: " << normalized_fm;
-	print_tau_tree(std::cout, normalized_fm);
 	#endif // DEBUG
 
 	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or);
@@ -1100,7 +1099,6 @@ bool is_tau_formula_sat(const tau<BAs...>& fm, const int_t start_time = 0,
 		if (auto executable = transform_to_execution(clause, start_time, output); executable != _F<BAs...>) {
 			#ifdef DEBUG
 			BOOST_LOG_TRIVIAL(trace) << "satisfiability.h:" << __LINE__ << " is_tau_formula_sat/executable: " << executable;
-			print_tau_tree(std::cout, executable);
 			#endif // DEBUG
 
 			BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";

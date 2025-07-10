@@ -130,7 +130,6 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 								global.emplace(var, value);
 						}
 					} else {
-						//print_tau_tree(std::cout, var);
 						memory.emplace(var, value);
 						global.emplace(var, value);
 					}
@@ -478,14 +477,12 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(
 	for (auto& clause : get_dnf_wff_clauses(fm)) {
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/clause: " << clause;
-		print_tau_tree(std::cout, clause);
 #endif // DEBUG
 
 		auto executable = transform_to_execution(clause, start_time, true);
 
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/executable: " << executable;
-		print_tau_tree(std::cout, executable);
 #endif // DEBUG
 
 		if (executable == _F<BAs...>) continue;

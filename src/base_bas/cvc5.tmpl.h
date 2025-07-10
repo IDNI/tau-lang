@@ -366,20 +366,22 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 template <typename...BAs>
 bool is_bv_formula_sat(const tau<BAs...>& form) {
 	std::map<tau<BAs...>, cvc5::Term> vars, free_vars;
-
+	
+	cvc5_solver.resetAssertions();
+	cvc5_solver.push();
 	auto expr = eval_bv(form, vars, free_vars);
 
 	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/form: " << form;
 	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/expr: " << expr;
 
-	cvc5_solver.resetAssertions();
 	cvc5_solver.assertFormula(expr);
-	auto result = cvc5_solver.checkSat();
+	auto result = cvc5_solver.checkSat().isSat();
+	cvc5_solver.pop();
 
 	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/result: " << result;
 	BOOST_LOG_TRIVIAL(info) << "(Info) bv system is " << result;
 
-	return result.isSat();
+	return result;
 }
 
 template <typename...BAs>
