@@ -335,19 +335,13 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 			return max(l, r);
 		}*/
 		case tau_parser::bv_rotate_left: {
-			print_tau_tree(std::cout, form);
 			auto l = eval_bv(form->child[0], vars, free_vars, checked);
 			auto r = eval_bv(form->child[1], vars, free_vars, checked);
-			//int64_t value = std::get<size_t>(form->child[1]->child[0]->value);
-			//return mkBitVectorRotateLeft(l, cvc5_solver.mkBitVector(bv_default_size, value));
 			return mkBitVectorRotateLeft(l, r);
 		}
 		case tau_parser::bv_rotate_right: {
-			print_tau_tree(std::cout, form);
 			auto l = eval_bv(form->child[0], vars, free_vars, checked);
 			auto r = eval_bv(form->child[1], vars, free_vars, checked);
-			//int64_t value = std::get<size_t>(form->child[1]->child[0]->value);
-			//return mkBitVectorRotateRight(l, cvc5_solver.mkBitVector(bv_default_size, value));
 			return mkBitVectorRotateRight(l, r);
 		}
 		case tau_parser::bitvector: {
