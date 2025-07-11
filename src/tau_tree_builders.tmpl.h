@@ -344,7 +344,7 @@ tref build_bf_ngteq(tref l, tref r) {
 template <NodeType node>
 tref build_bf_lt(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	return build_bf_and<node>(
+	return build_wff_and<node>(
 		build_bf_eq<node>(build_bf_and<node>(l, build_bf_neg<node>(r))),
 		build_bf_neq<node>(build_bf_xor<node>(l, r)));
 }
