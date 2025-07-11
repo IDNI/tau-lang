@@ -1533,12 +1533,14 @@ std::vector<std::vector<int_t>> wff_to_bdd(tref fm, auto& vars) {
 	return dnf.begin()->second;
 }
 
+template <NodeType node>
 bool is_ordered_subset(const auto& v1, const auto& v2) {
+	using tau = tree<node>;
 	if (v1.size() > v2.size()) return false;
 	if (v1.size() == 0) return true;
 	size_t j = 0;
 	for (size_t i = 0; i < v2.size(); ++i) {
-		if (v1[j] == v2[i]) ++j;
+		if (tau::get(v1[j]) == tau::get(v2[i])) ++j;
 		if (j == v1.size()) return true;
 	}
 	return false;
@@ -1574,7 +1576,6 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	tref clause = tau::_T();
 	tref pos_bf = tau::_0();
 	tref negs_wff = tau::_T();
-	LOG_TRACE << "simplify path / pos_bf: " << LOG_FM(pos_bf);
 	for (size_t p = 0; p < path.size(); ++p) {
 		if (path[p] == 2) continue;
 		const auto& t = tau::get(vars[p]);
@@ -1632,7 +1633,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 					}
 				}
 				// Inequality n is unsat if p is subset
-				if (is_ordered_subset(p, n)) n = {};
+				if (is_ordered_subset<node>(p, n)) n = {};
 			}
 			// If all inequalities of the cnf clause are unsat, this path is unsat
 			if (std::ranges::all_of(neq_clause,
@@ -1655,7 +1656,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 				{
 					if (cnf_neq_lits[c2][j].empty())
 						continue;
-					if (is_ordered_subset(
+					if (is_ordered_subset<node>(
 						cnf_neq_lits[c2][j],
 						cnf_neq_lits[c1][i]))
 					{

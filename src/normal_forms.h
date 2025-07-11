@@ -403,6 +403,7 @@ trefs push_eq_and_get_vars(trefs fm);
 template <NodeType node>
 std::vector<std::vector<int_t>> wff_to_bdd(tref fm, auto& vars = {});
 
+template <NodeType node>
 bool is_ordered_subset(const auto& v1, const auto& v2);
 
 template <NodeType node>
