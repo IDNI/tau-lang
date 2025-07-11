@@ -1805,7 +1805,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 		// std::cout << "neq_clauses: " << neq_clauses << "\n";
 		// Simplify bfs and drop !=
 		bool clause_false = false;
-		for (tref neq : neq_clauses) {
+		for (tref& neq : neq_clauses) {
 			LOG_DEBUG << "neq: " << LOG_FM(neq);
 			if (tau::get(neq).equals_T()) continue;
 			neq = reduce<node>(tau::trim2(neq), tau::bf);
