@@ -755,7 +755,7 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 		else if (!reduce_paths(i, it->second, p)) {
 			// Place coefficient together with variable assignment if no reduction happend
 			it->second.push_back(i);
-		} else erase_if(it->second,
+		} else std::erase_if(it->second,
 				[](const auto& v) { return v.empty(); });
 		return it->second.empty();
 	}
@@ -1022,7 +1022,7 @@ std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
 			if (!reduce_paths(i, paths, vars.size()))
 						paths.emplace_back(move(i));
 			else {
-				erase_if(paths,
+				std::erase_if(paths,
 					[](const auto& v){return v.empty();});
 				if (paths.empty()) return {};
 			}
