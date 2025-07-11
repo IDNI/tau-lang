@@ -1728,7 +1728,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 			}
 			// There is a new variable
 			DBG(assert(sorted_v != tau::build_bf_eq(tau::_T())
-				&& sorted_v != tau::build_bf_eq(tau::_0()));)
+				&& sorted_v != tau::build_bf_eq(tau::_F()));)
 			vars.push_back(sorted_v);
 			var_to_idx.emplace(sorted_v, vars.size() - 1);
 		}
