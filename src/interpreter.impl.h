@@ -475,19 +475,27 @@ std::pair<tau<BAs...>, tau<BAs...>>
 interpreter<input_t, output_t, BAs...>::get_executable_spec(
 	const tau<BAs...>& fm, const size_t start_time) {
 	for (auto& clause : get_dnf_wff_clauses(fm)) {
-#ifdef DEBUG
+		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/clause: " << clause;
-#endif // DEBUG
+		#endif // DEBUG
 
 		auto executable = transform_to_execution(clause, start_time, true);
 
-#ifdef DEBUG
+		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/executable: " << executable;
-#endif // DEBUG
+		#endif // DEBUG
 
 		if (executable == _F<BAs...>) continue;
 		// Make sure that no constant time position is smaller than 0
 		auto io_vars = select_top(executable, is_child_non_terminal<tau_parser::io_var, BAs...>);
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/io_vars: ";
+		for (const auto& io_var : io_vars) {
+			BOOST_LOG_TRIVIAL(trace) << "\t" << io_var;
+		}
+		#endif // DEBUG
+
 		for (const auto& io_var : io_vars) {
 			if (is_io_initial(io_var) && get_io_time_point(io_var) < 0) {
 				BOOST_LOG_TRIVIAL(error) << "(Error) Constant time position is smaller than 0\n";
@@ -495,41 +503,64 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(
 			}
 		}
 		// compute model for uninterpreted constants and solve it
-		auto constraints =
-			get_uninterpreted_constants_constraints(executable, io_vars);
-		if (constraints == _F<BAs...>) continue;
-#ifdef DEBUG
+		auto constraints = get_uninterpreted_constants_constraints(executable, io_vars);
+		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/constraints: " << constraints;
-#endif // DEBUG
+		#endif // DEBUG
+		
+		if (constraints == _F<BAs...>) continue;
+		
 		auto spec = executable;
 		if (constraints != _T<BAs...>) {
 			// setting proper options for the solver
 			solver_options<BAs...> options = {
 				.splitter_one = nso_factory<BAs...>::instance().splitter_one(""),
 				.mode = solver_mode::general };
-
-			auto model = solve(constraints, options);
-			if (!model) continue;
-
-			BOOST_LOG_TRIVIAL(info) << "Tau specification is executed setting ";
-			for (const auto& [uc, v] : model.value()) {
-				BOOST_LOG_TRIVIAL(info) << uc << " := " << v;
-			}
-
-#ifdef DEBUG
-			BOOST_LOG_TRIVIAL(trace)
-				<< "compute_systems/constraints/model: ";
-			for (const auto& [k, v]: model.value())
+			if (auto tau_lit = find_top(constraints, is_tau_literal<BAs...>); !tau_lit) {
+				BOOST_LOG_TRIVIAL(debug) << "(Debug) Tau literal not found in constraints";
+				auto model = solve_bv(constraints);
+				if (!model) continue;
+	
+				BOOST_LOG_TRIVIAL(info) << "Tau specification is executed setting ";
+				for (const auto& [uc, v] : model.value())
+					BOOST_LOG_TRIVIAL(info) << uc << " := " << v;
+	
+				#ifdef DEBUG
 				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " := " << v << " ";
-#endif // DEBUG
-			spec = replace(executable, model.value());
-			BOOST_LOG_TRIVIAL(info) << "Resulting Tau specification: " << spec << "\n\n";
+					<< "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/model: ";
+				for (const auto& [k, v]: model.value())
+					BOOST_LOG_TRIVIAL(trace) << "\t" << k << " := " << v << " ";
+				#endif // DEBUG
+	
+				spec = replace(executable, model.value());
+				BOOST_LOG_TRIVIAL(info) << "Resulting Tau specification: " << spec << "\n\n";
+			} else if (auto bv_lit = find_top(constraints, is_bv_literal<BAs...>); !bv_lit) {
+				BOOST_LOG_TRIVIAL(debug) << "(Debug) Bitvector literal not found in constraints";
+				auto model = solve(constraints, options);
+				if (!model) continue;
+	
+				BOOST_LOG_TRIVIAL(info) << "Tau specification is executed setting ";
+				for (const auto& [uc, v] : model.value())
+					BOOST_LOG_TRIVIAL(info) << uc << " := " << v;
+	
+				#ifdef DEBUG
+				BOOST_LOG_TRIVIAL(trace)
+					<< "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/model: ";
+				for (const auto& [k, v]: model.value())
+					BOOST_LOG_TRIVIAL(trace) << "\t" << k << " := " << v << " ";
+				#endif // DEBUG
+	
+				spec = replace(executable, model.value());
+				BOOST_LOG_TRIVIAL(info) << "Resulting Tau specification: " << spec << "\n\n";
+			} else {
+				// mixed case tau + bv literals, not yet supported
+				return std::make_pair(nullptr, nullptr);
+			}
 		}
-#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "compute_systems/program: " << spec;
-#endif // DEBUG
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace) << "interpreter.tmpl.h:" << __LINE__ << " get_executable_spec/spec: " << spec;
+		#endif // DEBUG
 		return std::make_pair(spec, clause);
 	}
 	return std::make_pair(nullptr, nullptr);

@@ -1021,6 +1021,11 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 
 	auto dnf = form | bf_reduce_canonical<BAs...>();
 	for (auto& clause: get_leaves(dnf, tau_parser::wff_or)) {
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.tmpl.h:" << __LINE__ << " solve/clause: " << clause;
+		#endif // DEBUG	
+
 		// Reject clause involving temporal quantification
 		if (find_top(clause, is_temporal_quantifier<BAs...>)) {
 			BOOST_LOG_TRIVIAL(warning) << "(Warning) Skipped clause with temporal quantifier: " << clause;
@@ -1034,7 +1039,7 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 				for (const auto& [var, value]: bv_solution.value()) {
 					clause_solution[wrap(tau_parser::bv,var)] = value;
 				}
-			}
+			} else continue; // if we cannot solve bv part, skip this clause
 		}
 		// solve bas... part
 		if (auto bas_lits = select_top(clause, is_tau_literal<BAs...>); !bas_lits.empty()) {
@@ -1043,7 +1048,7 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 				for (const auto& [var, value]: bas_solution.value()) {
 					clause_solution[var] = value;
 				}
-			}
+			} else continue; // if we cannot solve bas... part, skip this clause
 		}
 		return clause_solution;
 	}
