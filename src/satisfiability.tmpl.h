@@ -812,7 +812,7 @@ tref make_initial_run(tref aw, const int_t max_st_lookback) {
 	trefs io_vars = tau::get(aw).select_top(is_child<node, tau::io_var>);
 	const int_t t = get_max_shift<node>(io_vars);
 
-	tref run;
+	tref run = nullptr;
 	for (int_t i = 0; i < max_st_lookback; ++i) {
 		auto current_aw = fm_at_time_point<node>(aw, io_vars, t + i);
 		if (run) run = normalize_non_temp<node>(
@@ -841,7 +841,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 				? tau::trim2(ubd_aw_continuation)
 				: ubd_aw_continuation;
 	tref ori_aw_ctn = original_aw != nullptr
-				? (is<node>(original_aw, tau::wff_always)
+				? (is_child<node>(original_aw, tau::wff_always)
 					? tau::trim2(original_aw)
 					: original_aw)
 				: tau::_T();
@@ -987,7 +987,7 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 
 	tref aw_fm = tau::get(fm).find_top(is_child<node, tau::wff_always>);
 	std::pair<tref, int_t> ev_t;
-	tref ubd_aw_fm;
+	tref ubd_aw_fm = nullptr;
 	if (aw_fm != nullptr) {
 		// If there is an always part, replace it with its unbound continuation
 		ubd_aw_fm = always_to_unbounded_continuation<node>(
