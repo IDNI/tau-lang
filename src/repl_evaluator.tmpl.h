@@ -1222,8 +1222,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tau_nso_t& n) {
 #ifdef DEBUG
 	if (opt.debug_repl) {
 		std::cout << "command: " << command << "\n";
-		print_tau_tree<tau_ba_t, BAs...>(std::cout
-			<< "tree: ", command) << "\n";
+		//print_tau_tree<tau_ba_t, BAs...>(std::cout << "tree: ", command) << "\n";
 	}
 #endif
 	std::optional<tau_nso_t> result;

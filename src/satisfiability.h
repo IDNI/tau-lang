@@ -361,10 +361,14 @@ bool is_run_satisfiable(const tau<BAs...>& fm) {
 // Assumption is that the provided fm is an unbound continuation
 template<typename... BAs>
 tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto& io_vars) {
+	return _T<BAs...>;
 	using p = tau_parser;
 	// Substitute lookback as current time point
 	auto look_back = get_max_shift(io_vars);
 	auto uconst_ctns = fm_at_time_point(fm, io_vars, look_back);
+
+	//print_tau_tree(std::cout, uconst_ctns);
+
 	io_vars = select_top(uconst_ctns,
 			     is_child_non_terminal<p::io_var, BAs...>);
 
@@ -405,6 +409,8 @@ tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto&
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula describing constraints on uninterpreted constants";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << uconst_ctns;
+
+	//print_tau_tree(std::cout, uconst_ctns);
 
 	return uconst_ctns;
 }
