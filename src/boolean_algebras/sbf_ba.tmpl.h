@@ -148,6 +148,12 @@ std::optional<tau<sbf_ba> > nso_factory<sbf_ba>::unpack_tau_ba(
 	return {};
 }
 
+std::variant<sbf_ba> nso_factory<sbf_ba>::pack_tau_ba(
+	const tau<sbf_ba>&) const {
+	// There is no tau_ba
+	return {};
+}
+
 nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
 	static nso_factory<sbf_ba> factory;
 	return factory;
@@ -193,6 +199,13 @@ std::optional<tau_nso<sbf_ba> > nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_
 		return {};
 	const auto unpacked = std::get<tau_ba<sbf_ba>>(v);
 	return std::optional(unpacked.nso_rr.main);
+}
+
+inline std::variant<tau_ba<sbf_ba>, sbf_ba> nso_factory<tau_ba<sbf_ba>,
+	sbf_ba>::pack_tau_ba(
+	const tau<tau_ba<sbf_ba>, sbf_ba>& c) const {
+	tau_ba<sbf_ba> t {c};
+	return {t};
 }
 
 tau_nso<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(

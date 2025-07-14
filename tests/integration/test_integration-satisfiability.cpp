@@ -84,3 +84,11 @@ TEST_SUITE("Alignments") {
 	}
 #endif
 }
+
+TEST_SUITE("Mixed") {
+	TEST_CASE("this_stream_is_input_stream") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("this[t] < 1.");
+		CHECK(!is_tau_formula_sat(spec));
+	}
+}

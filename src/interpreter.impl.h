@@ -34,7 +34,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 	BOOST_LOG_TRIVIAL(info) << "Execution step: " << time_point << "\n";
 	bool auto_continue = false;
 	// Get inputs for this step
-	auto step_inputs = build_inputs_for_step(time_point);
+	auto [step_inputs, has_this_stream] = build_inputs_for_step(time_point);
 	step_inputs = appear_within_lookback(step_inputs);
 	// Get values for inputs which do not exceed time_point
 	auto [values, is_quit] = inputs.read(
@@ -50,6 +50,15 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 		auto_continue = true;
 		memory[var] = value;
 	}
+	// If the "this" input stream is present, write the current spec into it
+	if (has_this_stream) {
+		tau<BAs...> current_this_stream = build_in_variable_at_n<BAs...>("this", time_point);
+		tau<BAs...> wrapped_spec = build_bf_constant<BAs...>(
+			nso_factory<BAs...>::instance().pack_tau_ba(
+				original_spec), "tau");
+		memory[current_this_stream] = wrapped_spec;
+	}
+
 	// for each system in systems try to solve it, if it is not possible
 	// continue with the next system.
 	for (const auto& system: this->systems) {
@@ -222,14 +231,22 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
-std::vector<tau<BAs...>> interpreter<input_t, output_t, BAs...>::
+std::pair<std::vector<tau<BAs...>>, bool> interpreter<input_t, output_t, BAs...>::
 build_inputs_for_step(const size_t t) {
 	std::vector<tau<BAs...>> step_inputs;
+	bool has_this_stream = false;
 	for (auto& [var_name, _] : inputs.streams) {
+		// If var_name is "this", do not add
+		if (tau_to_str<BAs...>(var_name) == "this")
+			if (auto vt = inputs.type_of(var_name);
+				vt.has_value() && vt.value() == "tau") {
+			has_this_stream = true;
+			continue;
+		}
 		step_inputs.emplace_back(
 			trim(build_in_variable_at_n(var_name, t)));
 	}
-	return step_inputs;
+	return {step_inputs, has_this_stream};
 }
 
 template<typename input_t, typename output_t, typename...BAs>

@@ -32,14 +32,14 @@ struct tau_ba {
 	 * @param rec_relations Reference to rules of tau_nso_t.
 	 * @param main Reference to main tau_nso_t.
 	 */
-	tau_ba(rules<tau_nso_t>& rec_relations, tau_nso_t& main);
+	tau_ba(const rules<tau_nso_t>& rec_relations, const tau_nso_t& main);
 
 	/**
 	 * @brief Constructor initializing tau_ba with main tau_nso_t.
 	 *
 	 * @param main Reference to main tau_nso_t.
 	 */
-	tau_ba(tau_nso_t& main);
+	tau_ba(const tau_nso_t& main);
 
 	/**
 	 * @brief Three-way comparison operator.

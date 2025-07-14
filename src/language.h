@@ -138,6 +138,13 @@ struct nso_factory {
 	std::optional<tau<BAs...>> unpack_tau_ba (const std::variant<BAs...>& v);
 
 	/**
+	 * Returns a std::variant holding the tau_ba of the given formula
+	 * @param c Formula to wrap inside tau_ba
+	 * @return std::variant holding a tau_ba
+	 */
+	std::variant<BAs...> pack_tau_ba (const tau<BAs...>& c) const;
+
+	/**
 	 * Returns the singleton instance of the factory.
 	 * @return The singleton instance.
 	 */
