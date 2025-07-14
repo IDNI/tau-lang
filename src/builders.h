@@ -479,6 +479,12 @@ tau<BAs...> build_bf_constant(const std::variant<BAs...>& v, const tau<BAs...>& 
 }
 
 template<typename... BAs>
+tau<BAs...> build_bf_constant(const std::variant<BAs...>& v, const std::string& type) {
+	auto cte = rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	return build_bf_constant<BAs...>(cte, type);
+}
+
+template<typename... BAs>
 tau<BAs...> build_bf_constant(const std::variant<BAs...>& v, const std::optional<tau<BAs...>>& type) {
 	auto cte = rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	return type.has_value() ? build_bf_constant<BAs...>(cte, type.value()) : build_bf_constant<BAs...>(cte);

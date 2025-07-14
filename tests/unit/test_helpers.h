@@ -56,6 +56,11 @@ namespace idni::tau_lang {
 			return {};
 		}
 
+		std::variant<Bool> pack_tau_ba(const Bool&) const {
+			// There is no tau_ba
+			return {};
+		}
+
 		static nso_factory<Bool>& instance() {
 				static nso_factory<Bool> factory;
 				return factory;
