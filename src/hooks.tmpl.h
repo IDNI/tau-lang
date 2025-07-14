@@ -116,6 +116,7 @@ bool get_hook<node>::check_type_mismatch(const tref* ch) {
 
 template <NodeType node>
 tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
+	// return tau::get(tau::_0(), r);
 	HOOK_LOGGING(LOG_TRACE << "_0_typed " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_f, ba_type), 0, 0);
 	return tau::get_raw(node(tau::bf), &x, 1, r);
@@ -123,6 +124,7 @@ tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
 
 template <NodeType node>
 tref get_hook<node>::_1_typed(size_t ba_type, tref r) {
+	// return tau::get(tau::_1(), r);
 	HOOK_LOGGING(LOG_TRACE << "_1_typed " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_t, ba_type), 0, 0);
 	return tau::get_raw(node(tau::bf), &x, 1, r);
@@ -199,7 +201,7 @@ tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
 	HOOK_LOGGING(log("term_or", v, ch, len, r);)
 	DBG(assert(len == 1));
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
@@ -275,7 +277,7 @@ tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 	HOOK_LOGGING(log("term_and", v, ch, len, r);)
 	DBG(assert(len == 1));
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
@@ -392,7 +394,7 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 	HOOK_LOGGING(log("term_xor", v, ch, len, r);)
 	DBG(assert(len == 1));
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
@@ -800,7 +802,7 @@ template <NodeType node>
 tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
@@ -851,7 +853,7 @@ template <NodeType node>
 tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neq", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
@@ -1093,7 +1095,7 @@ template <NodeType node>
 tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_lt", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_LESS_SIMPLIFY_20, "0 < 1 ::= T.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
@@ -1131,7 +1133,7 @@ template <NodeType node>
 tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_nlt", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NLESS_SIMPLIFY_20, "0 !< 1 ::= F.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
@@ -1170,7 +1172,7 @@ template <NodeType node>
 tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_lteq", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_LESS_EQUAL_SIMPLIFY_2, "0 <= 1 ::= T.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
@@ -1204,7 +1206,7 @@ template <NodeType node>
 tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_nlteq", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NLEQ_SIMPLIFY_2, "0 !<= 1 ::= F.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
@@ -1238,7 +1240,7 @@ template <NodeType node>
 tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_gt", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_GREATER_SIMPLIFY_2, "1 > 0 ::= T.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
@@ -1277,7 +1279,7 @@ template <NodeType node>
 tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_ngt", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NGREATER_SIMPLIFY_2, "1 !> 0 ::= F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
@@ -1316,7 +1318,7 @@ template <NodeType node>
 tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_gteq", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_GREATER_EQUAL_SIMPLIFY_2, "1 >= 0 ::= T.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
@@ -1355,7 +1357,7 @@ template <NodeType node>
 tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_ngteq", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NGEQ_SIMPLIFY_2, "1 !>= 0 ::= F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
@@ -1396,7 +1398,7 @@ tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch
 {
 	HOOK_LOGGING(log("wff_interval", v, ch, len, r);)
 
-	if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	return tau::get(tau::build_bf_interval(
 		arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);

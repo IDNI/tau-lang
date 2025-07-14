@@ -161,6 +161,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			}
 			// get the bound constant node
 			tref n = get_ba_constant_from_source(src, ba_type_id);
+			tau::use_hooks = false;
+			// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
 			src = 0;
 			if (n == nullptr || n == x)
 				return error = true, nullptr;
@@ -265,19 +267,27 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 // #endif // DEBUG
 		return true;
 	};
+	// DBG(LOG_TRACE << "reget with hooks: " << options.reget_with_hooks;)
 	DBG(std::stringstream ss;)
 	DBG(LOG_TRACE << "parse tree: "
 			<< (parse_tree::get(ptr.get()).print(ss), ss.str());)
 
+	tau::use_hooks = false;
+	// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
 	post_order<tau_parser::pnode>(ptr.get()).search(transformer);
-	if (error) return nullptr;
-	if (m.find(ptr.get()) == m.end()) return nullptr;
-
+	if (error || m.find(ptr.get()) == m.end()) {
+		tau::use_hooks = true;
+		// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
+		return nullptr;
+	}
 	DBG(LOG_TRACE << "transformed: " << tree::get(m.at(ptr.get())).to_str();)
 	DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
 	tref transformed = m_ref(ptr.get());
-	if (options.infer_ba_types) return infer_ba_types<node>(transformed);
-	return transformed;
+	if (options.infer_ba_types)
+	transformed = infer_ba_types<node>(transformed);
+	tau::use_hooks = true;
+	// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
+	return options.reget_with_hooks ? reget(transformed) : transformed;
 }
 
 //------------------------------------------------------------------------------
@@ -362,7 +372,8 @@ template <NodeType node>
 rewriter::builder get_builder(const std::string& source){
 	using tau = tree<node>;
 	typename tau::get_options opts{ .parse = { .start = tau::builder },
-						   .infer_ba_types = false };
+						   .infer_ba_types = false,
+						   .reget_with_hooks = false };
 	return get_builder<node>(tau::get(source, opts));
 }
 
@@ -386,7 +397,8 @@ template <NodeType node>
 rewriter::library get_rules(const std::string& str) {
 	using tau = tree<node>;
 	typename tau::get_options opts{ .parse = { .start = tau::rules },
-					.infer_ba_types = false };
+					.infer_ba_types = false,
+					.reget_with_hooks = false };
 	return get_rules<node>(tau::get(str, opts));
 }
 
@@ -402,7 +414,8 @@ template <NodeType node>
 rewriter::library get_library(const std::string& str) {
 	using tau = tree<node>;
 	typename tau::get_options opts{ .parse = { .start = tau::library },
-					.infer_ba_types = false };
+					.infer_ba_types = false,
+					.reget_with_hooks = false };
 	return get_library<node>(tau::get(str, opts));
 }
 

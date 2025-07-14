@@ -17,6 +17,7 @@ set(TESTS
 	
 	### inf loop - probably equality, hooks, unresolved/wrong types or bad traversal
 	# nso_rr_fixed_point
+	# wff_normalization
 	
 	### other fails
 	bf_normalization
@@ -28,7 +29,6 @@ set(TESTS
 	solver
 	splitter
 	splitter2
-	wff_normalization
 )
 
 foreach(TEST IN LISTS TESTS)

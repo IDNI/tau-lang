@@ -14,21 +14,15 @@
 // Check if still hapopens after the latest changes to the grammar.
 
 tt get_main(const char* sample) {
-	return tt(tau::get(sample)) | tau::spec | tau::main;
+	return tt(tau::get(sample, tau::get_options{
+			.reget_with_hooks = false })) | tau::spec | tau::main;
 }
 
 tt get_rec_relation(const char* sample) {
-	tref n = tau::get(sample);
+	tref n = tau::get(sample, tau::get_options{ .reget_with_hooks = false});
 	return tt(n) | tau::spec | tau::definitions | tau::rec_relation;
 }
 
-
-TEST_SUITE("configuration") {
-	TEST_CASE("disable hooks") {
-		tau::use_hooks = false;
-		CHECK( tau::use_hooks == false );
-	}
-}
 
 TEST_SUITE("parsing only main") {
 

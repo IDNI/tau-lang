@@ -184,6 +184,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	// creation (transformation) from tau_parser::tree
 	static tref get(const tau_parser::tree& t, get_options options = {});
+	// reget a tree in post order
+	static tref reget(tref n);
 
 	// get node with children without triggering hooks
 	static tref get_raw(const node& v, const tref* ch = nullptr,
@@ -327,9 +329,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	// from parser (tau_tree_from_parser.tmpl.h)
 
 	struct get_options {
-		tau_parser::parse_options parse;
+		tau_parser::parse_options parse{};
 		std::map<std::string, tref> named_constants{};
 		bool infer_ba_types = true;
+		bool reget_with_hooks = true;
 	};
 
 	// creation from parser result or parser input (string, stream, file)

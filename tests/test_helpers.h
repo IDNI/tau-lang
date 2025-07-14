@@ -22,7 +22,8 @@ using bac = ba_constants<node_t>;
 
 tau::get_options parse_library() {
 	static tau::get_options opts{ .parse = { .start = tau::library },
-		.infer_ba_types = false };
+		.infer_ba_types = false,
+		.reget_with_hooks = false };
 	return opts;
 }
 
