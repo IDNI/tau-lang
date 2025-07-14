@@ -650,6 +650,7 @@ inline bool reduce_paths (std::vector<int_t>& i,
 	std::vector<std::vector<int_t>>& paths, int_t p, bool surface = true)
 {
 	for (size_t j = 0; j < paths.size(); ++j) {
+		if (paths[j].empty()) continue;
 		// Get Hamming distance between i and path and position of last difference
 		// while different irrelevant variables make assignments incompatible
 		int_t dist = 0, pos = 0;
