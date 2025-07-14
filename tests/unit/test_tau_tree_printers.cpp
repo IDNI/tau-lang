@@ -6,7 +6,8 @@
 bool check(std::string sample, std::string expected = "") {
 	expected = expected.empty() ? sample : expected;
 	std::stringstream ss;
-	tau::get(tau::get(sample)).print(ss);
+	tau::get(tau::get(sample, tau::get_options{
+		.reget_with_hooks = false })).print(ss);
 	bool result = ss.str() == (expected.empty() ? sample : expected);
 	if (!result) {
 		std::cout << "Input:    " << sample << "\n";
@@ -14,12 +15,6 @@ bool check(std::string sample, std::string expected = "") {
 		std::cout << "Got:      " << ss.str() << "\n";
 	}
 	return result;
-}
-
-TEST_SUITE("configuration") {
-	TEST_CASE("disable hooks") {
-		tau::use_hooks = false;
-	}
 }
 
 TEST_SUITE("pretty printer") {

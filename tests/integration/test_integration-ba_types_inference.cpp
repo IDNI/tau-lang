@@ -4,7 +4,7 @@
 #include "test_tau_helpers.h"
 
 tref infer(const char* sample) {
-	return tau::get(sample);
+	return tau::get(sample, tau::get_options{ .reget_with_hooks = false });
 }
 
 bool expect_infer_fail(const char* sample) {
@@ -31,9 +31,6 @@ bool are_all_typed_as(tref n, const std::string& type) {
 }
 
 TEST_SUITE("configuration") {
-	TEST_CASE("disable hooks") {
-		tau::use_hooks = false;
-	}
 	TEST_CASE("initialize bdd") {
 		bdd_init<Bool>();
 	}

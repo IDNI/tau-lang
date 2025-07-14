@@ -484,6 +484,18 @@ const tree<node>& tree<node>::right_sibling_tree() const {
 	return get(s);
 }
 
+template <NodeType node>
+tref tree<node>::reget(tref n) {
+	auto reget_node = [](tref n) -> tref {
+		const auto& t = tree<node>::get(n);
+		trefs children;
+		for (tref child : t.children())
+			children.push_back(child);
+		return tree<node>::get(t.value, children, t.right_sibling());
+	};
+	return post_order<node>(n).apply_unique(reget_node);
+}
+
 //------------------------------------------------------------------------------
 // nt category helpers
 

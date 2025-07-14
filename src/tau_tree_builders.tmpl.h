@@ -41,7 +41,7 @@ tref _T_trimmed() { return get_T_trimmed<node>().get(); }
 template <NodeType node>
 const tree<node>& get_0() {
 	using tau = tree<node>;
-	static htree::sp cached = tau::geth(tau::get(tau::bf, _0_trimmed<node>()));
+	static htref cached = tau::geth(tau::get(tau::bf, _0_trimmed<node>()));
 	return tau::get(cached);
 }
 
