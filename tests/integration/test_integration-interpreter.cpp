@@ -310,8 +310,33 @@ TEST_SUITE("Execution") {
 		auto i = run(spec, ins, outs, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
-}
 
+	TEST_CASE("this_stream") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("u[t] = i1[t] && this[t] = o1[t].");
+		std::vector<std::string> i1 = {
+			"o2[t] = 0", "F", "o3[t] = 0", "F"
+		};
+		std::vector<std::string> u = {
+			"o2[t] = 0", "F", "o3[t] = 0", "F"
+		};
+		std::vector<std::string> o1 = {
+			"always o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0 && i1[t]u[t]' = 0",
+			"always o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && o2[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0 && i1[t]u[t]' = 0",
+			"always o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && o2[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0 && i1[t]u[t]' = 0",
+			"always o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && o2[t] = 0 && o3[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0 && i1[t]u[t]' = 0"
+		};
+		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
+		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		build_input<base_bas>("i1", i1, "tau", assgn_in);
+		build_output<base_bas>("o1", o1, "tau", assgn_out);
+		build_output<base_bas>("u", u, "tau", assgn_out);
+		auto ins = input_vector<base_bas>(assgn_in, "tau");
+		auto outs = output_console<base_bas>("tau");
+		auto i = run(spec, ins, outs, 4);
+		CHECK( matches_output(assgn_out, i.value().memory) );
+	}
+}
 
 std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 		input_vector<tau_ba<sbf_ba>, sbf_ba>& inputs,

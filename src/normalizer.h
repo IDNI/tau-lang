@@ -501,7 +501,7 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 }
 
 template <typename... BAs>
-size_t get_max_loopback_in_rr(const tau<BAs...>& form) {
+size_t get_max_lookback_in_rr(const tau<BAs...>& form) {
 	size_t max = 0;
 	for (const auto& offsets: select_top(form, is_non_terminal<tau_parser::offsets, BAs...>))
 		for (const auto& offset : offsets || tau_parser::offset)
@@ -729,17 +729,17 @@ tau<BAs...> calculate_fixed_point(const rr<tau<BAs...>>& nso_rr,
 	tau<BAs...> current;
 	auto eos = "(I) -- End enumeration step";
 
-	size_t max_loopback = 0;
-	std::vector<size_t> loopbacks;
+	size_t max_lookback = 0;
+	std::vector<size_t> lookbacks;
 	for (const auto& r : nso_rr.rec_relations) {
-		size_t loopback = std::max(get_max_loopback_in_rr(r.first),
-					get_max_loopback_in_rr(r.second));
-		loopbacks.push_back(loopback);
-		max_loopback = std::max(max_loopback, loopback);
+		size_t lookback = std::max(get_max_lookback_in_rr(r.first),
+					get_max_lookback_in_rr(r.second));
+		lookbacks.push_back(lookback);
+		max_lookback = std::max(max_lookback, lookback);
 	}
-	BOOST_LOG_TRIVIAL(debug) << "(I) max loopback " << max_loopback;
+	BOOST_LOG_TRIVIAL(debug) << "(I) max lookback " << max_lookback;
 
-	for (size_t i = max_loopback; ; i++) {
+	for (size_t i = max_lookback; ; i++) {
 		current = build_enumerated_main_step<BAs...>(
 					form, i, offset_arity);
 		bool changed;
@@ -749,8 +749,8 @@ tau<BAs...> calculate_fixed_point(const rr<tau<BAs...>>& nso_rr,
 				ri != nso_rr.rec_relations.size(); ++ri)
 			{
 				const auto& r = nso_rr.rec_relations[ri];
-				if (loopbacks[ri] > i) {
-					BOOST_LOG_TRIVIAL(debug) << "(I) -- current step " << i << " < " << loopbacks[ri] << " loopback, skipping " << r;
+				if (lookbacks[ri] > i) {
+					BOOST_LOG_TRIVIAL(debug) << "(I) -- current step " << i << " < " << lookbacks[ri] << " lookback, skipping " << r;
 					continue; // skip steps depending on future fixed offsets
 				}
 				auto prev = current;
