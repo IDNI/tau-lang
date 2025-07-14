@@ -72,6 +72,9 @@ struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 	std::optional<tau_nso<sbf_ba>> unpack_tau_ba(
 		const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const;
 
+	std::variant<tau_ba<sbf_ba>, sbf_ba> pack_tau_ba(
+		const tau<tau_ba<sbf_ba>, sbf_ba>& c) const;
+		
 	static nso_factory<tau_ba<sbf_ba>, sbf_ba>& instance();
 private:
 	nso_factory();

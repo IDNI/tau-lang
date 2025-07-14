@@ -90,6 +90,12 @@ namespace idni::tau_lang {
 		return std::optional(unpacked.nso_rr.main);
 	}
 
+	inline std::variant<tau_ba<sbf_ba>, sbf_ba> nso_factory<tau_ba<sbf_ba>,	sbf_ba>::pack_tau_ba(
+			const tau<tau_ba<sbf_ba>, sbf_ba>& c) const {
+		tau_ba<sbf_ba> t {c};
+		return {t};
+	}
+
 	tau_nso<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
 		const std::string& type_name) const
 	{

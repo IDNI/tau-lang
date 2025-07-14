@@ -3,10 +3,10 @@
 namespace idni::tau_lang {
 
 template <typename...BAs>
-tau_ba<BAs...>::tau_ba(rules<tau_nso_t>& rec_relations, tau_nso_t& main)
+tau_ba<BAs...>::tau_ba(const rules<tau_nso_t>& rec_relations, const tau_nso_t& main)
 		: nso_rr({ rec_relations, main }) {}
 template <typename...BAs>
-tau_ba<BAs...>::tau_ba(tau_nso_t& main) : nso_rr({main}) {}
+tau_ba<BAs...>::tau_ba(const tau_nso_t& main) : nso_rr({main}) {}
 
 template <typename...BAs>
 auto tau_ba<BAs...>::operator<=>(const tau_ba<BAs...>&) const = default;

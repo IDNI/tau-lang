@@ -52,7 +52,9 @@ cli::options tau_options() {
 
 int error(const string& s) {BOOST_LOG_TRIVIAL(error)<< "(Error) "<< s;return 1;}
 
-int run_tau_spec(string spec_file, bool charvar) {
+int run_tau_spec(string spec_file, bool charvar,
+	boost::log::trivial::severity_level sev)
+{
 	string src = "";
 	if (spec_file == "-") {
 		std::ostringstream oss;
@@ -68,7 +70,8 @@ int run_tau_spec(string spec_file, bool charvar) {
 		.print_memory_store = false,
 		.error_quits        = true,
 		.charvar            = charvar,
-		.repl_running       = false
+		.repl_running       = false,
+		.severity           = sev
 	});
 	if (auto status = re.eval(src); status) return status;
 	return re.eval("run %");
@@ -121,7 +124,7 @@ int main(int argc, char** argv) {
 	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
 
 	// spec provided, run it
-	if (files.size()) return run_tau_spec(files.front(), charvar);
+	if (files.size()) return run_tau_spec(files.front(), charvar, sev);
 
 	// REPL
 	repl_evaluator<sbf_ba> re({

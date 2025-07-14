@@ -348,7 +348,7 @@ private:
 
 	bool calculate_initial_systems ();
 
-	std::vector<tau<BAs...>> build_inputs_for_step (const size_t t);
+	std::pair<std::vector<tau<BAs...>>, bool> build_inputs_for_step (const size_t t);
 
 	// Return typed systems of equations for the solver corresponding to each clause
 	// in the unbound continuation
