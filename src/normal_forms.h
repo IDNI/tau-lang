@@ -1360,8 +1360,8 @@ tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
 			if (has_simp) {
 				clauses.erase(clauses.begin() + j);
 				clauses.emplace_back(build_bf_and<BAs...>(cnf));
-				--j;
 				if (i >= j) --i;
+				--j;
 			}
 		}
 		if (erase_clause) {
