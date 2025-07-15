@@ -181,17 +181,29 @@ tau<BAs...> squeeze_wff (const tau<BAs...>& fm) {
 			const auto& e2 = n->child[1];
 			if (is_child_non_terminal(p::bf_eq, e1) &&
 				is_child_non_terminal(p::bf_eq, e2)) {
-				return trim(build_wff_eq(
-					build_bf_or(trim2(e1), trim2(e2))));
+				// Check that types match
+				auto t_e1 = find_top(e1, is_non_terminal<p::type, BAs...>);
+				auto t_e2 = find_top(e2, is_non_terminal<p::type, BAs...>);
+				if (!t_e1 || !t_e2 || t_e1 == t_e2) {
+					return trim(build_wff_eq(
+						build_bf_or(
+							trim2(e1), trim2(e2))));
+				}
 				}
 		}
-		if (is_non_terminal(p::wff_or, n)) {
+		else if (is_non_terminal(p::wff_or, n)) {
 			const auto& e1 = trim(n);
 			const auto& e2 = n->child[1];
 			if (is_child_non_terminal(p::bf_neq, e1) &&
 				is_child_non_terminal(p::bf_neq, e2)) {
-				return trim(build_wff_neq(
-					build_bf_or(trim2(e1), trim2(e2))));
+				// Check that types match
+				auto t_e1 = find_top(e1, is_non_terminal<p::type, BAs...>);
+				auto t_e2 = find_top(e2, is_non_terminal<p::type, BAs...>);
+				if (!t_e1 || !t_e2 || t_e1 == t_e2) {
+					return trim(build_wff_neq(
+						build_bf_or(
+							trim2(e1), trim2(e2))));
+				}
 				}
 		}
 		return n;
@@ -229,8 +241,13 @@ tau<BAs...> squeeze_wff_pos (const tau<BAs...>& fm) {
 			const auto& e2 = n->child[1];
 			if (is_child_non_terminal(p::bf_eq, e1) &&
 				is_child_non_terminal(p::bf_eq, e2)) {
-				return trim(build_wff_eq(
-					build_bf_or(trim2(e1), trim2(e2))));
+				// Check that types match
+				auto t_e1 = find_top(e1, is_non_terminal<p::type, BAs...>);
+				auto t_e2 = find_top(e2, is_non_terminal<p::type, BAs...>);
+				if (!t_e1 || !t_e2 || t_e1 == t_e2) {
+					return trim(build_wff_eq(
+						build_bf_or(trim2(e1), trim2(e2))));
+				}
 			}
 		}
 		return n;
@@ -268,8 +285,13 @@ tau<BAs...> squeeze_wff_neg (const tau<BAs...>& fm) {
 			const auto& e2 = n->child[1];
 			if (is_child_non_terminal(p::bf_neq, e1) &&
 				is_child_non_terminal(p::bf_neq, e2)) {
-				return trim(build_wff_neq(
-					build_bf_or(trim2(e1), trim2(e2))));
+				// Check that types match
+				auto t_e1 = find_top(e1, is_non_terminal<p::type, BAs...>);
+				auto t_e2 = find_top(e2, is_non_terminal<p::type, BAs...>);
+				if (!t_e1 || !t_e2 || t_e1 == t_e2) {
+					return trim(build_wff_neq(
+						build_bf_or(trim2(e1), trim2(e2))));
+				}
 				}
 		}
 		return n;
@@ -2901,17 +2923,30 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 			else res = new_conjunct;
 		}
 		else if (all_equal_zero) {
-			//TODO: If they have different type, seperate
-			tau<BAs...> new_func;
+			unordered_tau_map<tau<BAs...>, BAs...> new_funcs;
 			for (const auto& d: conjuncts) {
-				if (new_func) new_func = build_bf_or(new_func, trim2(d));
-				else new_func = trim2(d);
+				auto type_raw = find_top(d, is_non_terminal<tau_parser::type, BAs...>);
+				tau<BAs...> type = type_raw
+							? type_raw.value()
+							: build_type<BAs...>(
+								nso_factory<BAs ...>::instance()
+								.default_type());
+				if (auto it = new_funcs.find(type); it != new_funcs.end()) {
+					it->second = build_bf_or(it->second, trim2(d));
+				} else {
+					new_funcs.emplace(type, trim2(d));
+				}
 			}
-			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
-			new_func = wff_remove_existential(trim2(inner_fm), new_func);
-			if (new_func == _T<BAs...>) return _T<BAs...>;
-			if (res) res = build_wff_or(res, new_func);
-			else res = new_func;
+			tau<BAs...> new_fm;
+			for (auto& [_, func] : new_funcs) {
+				auto reduced_eq = build_wff_eq(func | bf_reduce_canonical<BAs...>());
+				if (new_fm) new_fm = build_wff_and(new_fm, reduced_eq);
+				else new_fm = reduced_eq;
+			}
+			new_fm = wff_remove_existential(trim2(inner_fm), new_fm);
+			if (new_fm == _T<BAs...>) return _T<BAs...>;
+			if (res) res = build_wff_or(res, new_fm);
+			else res = new_fm;
 		}
 		else {
 			// Resolve quantified variable in scoped_fm
@@ -2973,17 +3008,32 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 			else res = new_disjunct;
 		}
 		if (all_unequal_zero) {
-			tau<BAs...> new_func;
-			for (const auto &d: disjuncts) {
-				if (new_func) new_func = build_bf_or(new_func, trim2(d));
-				else new_func = trim2(d);
+			unordered_tau_map<tau<BAs...>, BAs...> new_funcs;
+			for (const auto& d: disjuncts) {
+				auto type_raw = find_top(d, is_non_terminal<tau_parser::type, BAs...>);
+				tau<BAs...> type = type_raw
+							? type_raw.value()
+							: build_type<BAs...>(
+								nso_factory<BAs ...>::instance()
+								.default_type());
+				if (auto it = new_funcs.find(type); it != new_funcs.end()) {
+					it->second = build_bf_or(it->second, trim2(d));
+				} else {
+					new_funcs.emplace(type, trim2(d));
+				}
 			}
-			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
-			new_func = push_negation_in(
-				build_wff_neg(wff_remove_existential(trim2(inner_fm), new_func)));
-			if (new_func == _F<BAs...>) return _F<BAs...>;
-			if (res) res = build_wff_and(res, new_func);
-			else res = new_func;
+			tau<BAs...> new_fm;
+			for (auto& [_, func] : new_funcs) {
+				auto reduced_eq = build_wff_eq(func | bf_reduce_canonical<BAs...>());
+				if (new_fm) new_fm = build_wff_or(new_fm, reduced_eq);
+				else new_fm = reduced_eq;
+			}
+			new_fm = push_negation_in(build_wff_neg(
+				wff_remove_existential(
+					trim2(inner_fm), new_fm)));
+			if (new_fm == _F<BAs...>) return _F<BAs...>;
+			if (res) res = build_wff_and(res, new_fm);
+			else res = new_fm;
 		} else {
 			// Turn universal into existential quantifier and eliminate
 			auto new_clause = push_negation_in(build_wff_neg(clause));
