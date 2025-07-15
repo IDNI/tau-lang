@@ -290,22 +290,6 @@ struct nso_factory {
 	 */
 	tau<BAs...> splitter_one(const std::string& type = "") const;
 
-
-	/**
-	 * Returns the tau formula stored in the variant, if present
-	 * @param v Variant for formula extraction
-	 * @return Extracted formula if present
-	 */
-	std::optional<tau<BAs...>> unpack_tau_ba (const std::variant<BAs...>& v);
-
-	/**
-	 * Returns a std::variant holding the tau_ba of the given formula
-	 * @param c Formula to wrap inside tau_ba
-	 * @return std::variant holding a tau_ba
-	 */
-
-	std::variant<BAs...> pack_tau_ba (const tau<BAs...>& c) const;
-	
 	/**
 	 * Returns the singleton instance of the factory.
 	 * @return The singleton instance.
