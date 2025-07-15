@@ -35,8 +35,6 @@ struct nso_factory<sbf_ba> {
 
 	std::string zero(const std::string type_name) const;
 
-	std::optional<tau<sbf_ba> > unpack_tau_ba(
-		const std::variant<sbf_ba>&) const;
 
 	static nso_factory<sbf_ba>& instance();
 private:
@@ -69,12 +67,24 @@ struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 
 	std::string zero(const std::string type_name = "tau") const;
 
+	// TODO (MEDIUM) move this method to interpreter
+	/**
+	 * Returns the tau formula stored in the variant, if present
+	 * @param v Variant for formula extraction
+	 * @return Extracted formula if present
+	 */
 	std::optional<tau_nso<sbf_ba>> unpack_tau_ba(
 		const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const;
 
+	// TODO (MEDIUM) move this method to interpreter
+	/**
+	 * Returns a std::variant holding the tau_ba of the given formula
+	 * @param c Formula to wrap inside tau_ba
+	 * @return std::variant holding a tau_ba
+	 */
 	std::variant<tau_ba<sbf_ba>, sbf_ba> pack_tau_ba(
 		const tau<tau_ba<sbf_ba>, sbf_ba>& c) const;
-		
+
 	static nso_factory<tau_ba<sbf_ba>, sbf_ba>& instance();
 private:
 	nso_factory();

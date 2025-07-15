@@ -34,12 +34,7 @@ namespace idni::tau_lang {
 		return "0";
 	}
 
-	std::optional<tau<sbf_ba> > nso_factory<sbf_ba>::unpack_tau_ba(
-		const std::variant<sbf_ba>&) const {
-		// There is no tau_ba present
-		return {};
-	}
-
+	
 	nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
 		static nso_factory<sbf_ba> factory;
 		return factory;
