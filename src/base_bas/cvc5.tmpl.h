@@ -10,7 +10,6 @@ namespace idni::tau_lang {
 
 using namespace cvc5;
 
-static auto BV = cvc5_solver.mkBitVectorSort(bv_default_size); // cvc5_default_size-bit bitvector
 static auto BOOL = cvc5_solver.getBooleanSort();
 
 Term mkNot(const Term& t) {
@@ -137,6 +136,20 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 	//	BOOST_LOG_TRIVIAL(warning) << "(Warning) overflow/underflow checking is deactivated";
 	//}
 
+	auto bv_sort = [](const tau<BAs...> var) -> Sort {
+		size_t bv_size;
+		if (auto num = var | tau_parser::type | tau_parser::bv_type | tau_parser::num; num) {
+			bv_size = num.value() 
+				| only_child_extractor<BAs...> 
+				| size_t_extractor<BAs...>
+				| optional_value_extractor<size_t>;
+		} else {
+			// default size is cvc5_default_size
+			bv_size = bv_default_size;
+		}
+		return cvc5_solver.mkBitVectorSort(bv_size); // cvc5_default_size-bit bitvector
+	};
+
 	switch (nt) {
 		// due to hooks we should consider wff_t or bf_t
 		case tau_parser::wff:
@@ -164,7 +177,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
 				auto vn = make_string(v);
 				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
-				auto x = cvc5_solver.mkVar(BV, vn.c_str());
+				auto x = cvc5_solver.mkVar(bv_sort(v), vn.c_str());
 				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
@@ -185,7 +198,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
 				auto vn = make_string(v);
 				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
-				auto x = cvc5_solver.mkVar(BV, vn.c_str());
+				auto x = cvc5_solver.mkVar(bv_sort(v), vn.c_str());
 				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
@@ -206,7 +219,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 			auto vn = make_string(form);
 			// create a new constant according to the type and added to the map
 			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
-			auto x = cvc5_solver.mkConst(BV, vn.c_str());
+			auto x = cvc5_solver.mkConst(bv_sort(form), vn.c_str());
 			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
 			//vars.emplace(form, x);
 			free_vars.emplace(form, x);

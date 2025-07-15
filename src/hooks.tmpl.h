@@ -1131,22 +1131,27 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::depreciating::node<tau_sym<
 	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
 	tau<BAs...> bvn;
 	auto nt = get_non_terminal_node(n.child[0]);
+	size_t bv_size = bv_default_size;
+	if (n.child.size() == 2) {
+		bv_size = std::stoull(
+			make_string(tau_node_terminal_extractor<BAs...>, n.child[1]->child[2]));
+	}
 	switch (nt) {
 		case p::num : {
 			// TODO (HIGH) control small size exception 
-			auto bv = cvc5_solver.mkBitVector(bv_default_size, value.c_str(), 10);
+			auto bv = cvc5_solver.mkBitVector(bv_size, value.c_str(), 10);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
 		case p::bits : {
 			// TODO (HIGH) control small size exception 
-			auto bv = cvc5_solver.mkBitVector(bv_default_size, value.c_str(), 2);
+			auto bv = cvc5_solver.mkBitVector(bv_size, value.c_str(), 2);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
 		case p::hexnum : {
 			// TODO (HIGH) control small size exception 
-			auto bv = cvc5_solver.mkBitVector(bv_default_size, value.c_str(), 16);
+			auto bv = cvc5_solver.mkBitVector(bv_size, value.c_str(), 16);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
