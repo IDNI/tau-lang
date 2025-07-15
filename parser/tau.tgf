@@ -149,7 +149,7 @@ constraint =>
 variable[charvar]      => (alpha & ~'T' & ~'F') digit* [_ ':' _ type].
 variable[var]          => (alpha & ~'T' & ~'F') (alnum | '_')* [_ ':' _ type].
 variable               => (in | out):io_var [_ ':' _ type].
-variable               => uninterpreted_constant.
+variable               => uninterpreted_constant [_ ':' _ type].
 in                     => (("i" digit+) | "this"):in_var_name  '[' offset ']'.
 out                    => (("o" digit+) | "u"):out_var_name '[' offset ']'.
 ctnvar                 => chars.
@@ -174,8 +174,7 @@ src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'
 type                   => bv_type | chars.
 # allowing non-default base bas
 # TODO (HIGH) uncomment when supporting different bit widths
-bv_type                => "bv" [_ '[' _ num _ ']'].
-#bv_type                => "bv".
+bv_type                => "bv" [num].
 
 # common elements
 chars                  => alpha (alnum | '_')*.

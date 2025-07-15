@@ -147,12 +147,17 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 			// Complete outputs using time_point and current solution
 			for (const auto& [o, stream ] : outputs.streams) {
 				auto type = outputs.types[o];
-				auto ot = (type == "bv") ? build_bv_out_variable_at_n(o, time_point) :build_out_variable_at_n(o, time_point);
+				auto ot = (type.starts_with("bv")) 
+					? build_bv_out_variable_at_n(o, time_point) 
+					: build_out_variable_at_n(o, time_point);
 				if (auto it = global.find(ot); it == global.end()) {
 					//print_tau_tree(std::cout, ot);
-					if (type == "bv") {
+					if (type.starts_with("bv")) {
 						// If it is a bitvector, we need to create a bitvector of the correct size
-						auto bv = cvc5_solver.mkBitVector(bv_default_size, 0);
+						size_t bv_size = (type.length() > 2)
+							? std::stoull(type.substr(2)) 
+							: bv_default_size;
+						auto bv = cvc5_solver.mkBitVector(bv_size, 0);
 						auto bvn = make_node<tau_sym<BAs...>>(bv, {});
 						global.emplace(ot, bvn);
 						memory.emplace(ot, bvn);
