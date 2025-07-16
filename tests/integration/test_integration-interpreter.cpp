@@ -63,6 +63,7 @@ struct output_console {
 	}
 
 	assignment<BAs...> streams;
+	std::map<tau<BAs...>, type> types;
 	std::string _type = "sbf";
 };
 
