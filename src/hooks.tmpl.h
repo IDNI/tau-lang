@@ -475,6 +475,7 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 		const auto& l = tau::get(ch[0]);
 		if (size_t typed = l.get_ba_type(); typed > 0) {
 			HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
+			typed = 0; // remove type for 0s and 1s
 			if (is_syntactic_zero(l.get_ba_constant())) {
 				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
 				HOOK_LOGGING(applied("is_syntactic_zero");)
