@@ -3,32 +3,32 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TESTS
 	### ok
 	ba_types_inference
+	bf_hooks
+	bf_normalization
+	normal_forms
+	nso_rr_execution
+	nso_rr_fixed_point
 	nso_rr_partial_eval
+	sbf1
 	sbf2
+	quantifiers
 	tau_ba1
 	wff_hooks
 	
 	### only several tests fail
 	bf_fixed_point        # remaining 1 test (no initial condition)
-	bf_hooks              # remaining 1 check_type (infloop) 
-	normal_forms          # remaining 2 to_snf tests
-	ref_types             # remaining 3 infloops
-	tau_ba3               # remaining 1 test + 2 infloops
-	
-	### inf loop - probably equality, hooks, unresolved/wrong types or bad traversal
-	# nso_rr_fixed_point
-	# wff_normalization
+	ref_types             # remaining 2 tests (fp call over inferred refs incl bf, and typo undetected)
+	tau_ba3               # remaining 3 quantified unresolved rr's
 	
 	### other fails
-	bf_normalization
 	interpreter
-	nso_rr_execution  # (unresolved wff_ref)
-	quantifiers
 	satisfiability
-	sbf1
 	solver
 	splitter
 	splitter2
+
+	### inf loop
+	# wff_normalization	
 )
 
 foreach(TEST IN LISTS TESTS)
