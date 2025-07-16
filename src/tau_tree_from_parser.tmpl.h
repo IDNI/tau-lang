@@ -87,7 +87,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 		bool is_term = is_term_nt(nt, parent_nt);
 		size_t ba_type = 0;
 
-		bool unresolved_ref = !is_term && nt == ref;
+		bool unresolved_ref = nt == ref && !is_term
+			&& parent_nt != wff_ref && parent_nt != bf_ref;
 		if (unresolved_ref) ba_type = 1; // is_term = 0 and ba_type = 1
 
 		// helper to create a new node with current node type and provided children
