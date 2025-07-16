@@ -8,8 +8,6 @@
 
 #include "boolean_algebras/nso_ba.h"
 #include "execution.h"
-//#include "base_bas/z3.h"
-//#include "base_bas/cvc5.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -3117,9 +3115,6 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	// Lambda is applied to nodes of fm in post order after quantifiers have
 	// been pushed in
 	auto elim_quant = [](const tau<BAs...>& inner_fm) -> tau<BAs...> {
-		// call z3 quantifier elimination if it is a z3 quantifier
-		//if (is_bv_quantifier(inner_fm)) return eliminate_z3_quantifier(inner_fm);
-		// Find out if current node is a quantifier
 		bool is_ex_quant;
 		if (is_child_non_terminal(tau_parser::wff_ex, inner_fm))
 			is_ex_quant = true;
@@ -3175,9 +3170,6 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	// Push quantifiers in during pre-order traversal
 	// and eliminate quantifiers during the traversal back up (post-order)
 	auto push_and_elim = [&elim_quant, &push_quantifiers, visit](const tau<BAs...>& n) {
-		// TODO (HIGH) if the variable is a z3 variable and the quantified formula
-		// doesn't conatins it, we can remove the quantifier
-
 		if (is_child_quantifier<BAs...>(n)) {
 			return rewriter::depreciating::pre_order(n).template
 			apply_unique<MemorySlotPre::eliminate_quantifiers_m>(

@@ -37,7 +37,7 @@ TEST_SUITE("cvc5_satisfiability") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
-		// y is implicitlly existentially quantified by z3
+		// y is implicitlly existentially quantified by cvc5
 		CHECK( !is_bv_formula_sat(formula) );
 		CHECK( is_bv_formula_unsat(formula) );
 		CHECK( is_bv_formula_valid(build_wff_neg(formula)) );
@@ -80,9 +80,6 @@ TEST_SUITE("cvc5_satisfiability") {
 		CHECK( is_bv_formula_unsat(formula) );
 		CHECK( is_bv_formula_valid(build_wff_neg(formula)) );
 	}
-
-	// next return FATAL ERROR: test case CRASHED: SIGABRT - Abort (abnormal termination) signal
-	// in file /usr/include/z3++.h:1776: z3::expr z3::operator<(const expr&, const expr&): Assertion `false' failed.
 
 	TEST_CASE("all x [x + 1] <_ 0") {
 		const char* sample = "all x [x + 1] <_ 1";

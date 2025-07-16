@@ -13,7 +13,6 @@
 #include "utility/repl.h"
 #include "repl_evaluator.h"
 
-//#include "base_bas/z3.h"
 #include "base_bas/cvc5.h"
 
 using namespace std;

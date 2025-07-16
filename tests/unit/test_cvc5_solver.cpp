@@ -5,8 +5,6 @@
 #include "doctest.h"
 
 #include "../unit/test_helpers.h"
-//#include "z3.h"
-
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;

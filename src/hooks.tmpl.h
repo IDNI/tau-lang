@@ -4,7 +4,6 @@
 
 #include "nso_rr.h"
 #include "builders.h"
-//#include "base_bas/z3.h"
 #include "base_bas/cvc5.h"
 
 #ifdef DEBUG

@@ -112,7 +112,7 @@ enum solver_mode {
 	maximum, /**< Maximum mode */
 	minimum, /**< Minimum mode */
 	general, /**< General mode */
-	bv /**< Z3 mode */
+	bv /**< cvc5 mode */
 };
 
 /**

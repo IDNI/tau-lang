@@ -1,12 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include <stack>
+#include <cvc5/cvc5.h>
 
 #include "normal_forms.h"
 #include "splitter.h"
 #include "queries.h"
-//#include "base_bas/z3.h"
-#include <cvc5/cvc5.h>
+
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -1001,7 +1001,6 @@ template<typename...BAs>
 std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 		const solver_options<BAs...>& options) {
 	if (form == _T<BAs...>) return { solution<BAs...>() };
-//	if (options.mode == solver_mode::z3) return solve_z3<BAs...>(form);
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
