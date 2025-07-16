@@ -53,31 +53,28 @@ bool test_ref_types(const char* rec_relation,
 
 TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 
-	// TODO: (HIGH) fix infloop
-	// TEST_CASE("arities make different signature") { CHECK( test_ref_types(
-	// 	"f[0](x) := T."
-	// 	"f[0](x, y) := 1."
-	// 	"g[0](x) := F."
-	// 	"g[0, 0](x) := 0."
-	// 	"f[0](x) && !g[0](x) && f[0](x, y) != g[0, 0](x)."
-	// ) ); }
+	TEST_CASE("arities make different signature") { CHECK( test_ref_types(
+		"f[0](x) := T."
+		"g[0](x) := F."
+		"f[0](x, y) := 1."
+		"g[0, 0](x) := 0."
+		"f[0](x) && !g[0](x) && f[0](x, y) != g[0, 0](x)."
+	) ); }
 
-	// TODO: (HIGH) fix infloop
-	// TEST_CASE("fp call over inferred refs (loop)") { CHECK( test_ref_types(
-	// 	"w[0](x, y) := T."
-	// 	"q[0](x, y) := w[0](x, y)."
-	// 	"q[n](x, y) := !q[n-1](x, y)."
-	// 	"!q(0, 0)."
-	// ) ); }
+	TEST_CASE("fp call over inferred refs (loop)") { CHECK( test_ref_types(
+		"w[0](x, y) := T."
+		"q[0](x, y) := w[0](x, y)."
+		"q[n](x, y) := !q[n-1](x, y)."
+		"!q(0, 0)."
+	) ); }
 
-	// TODO: (HIGH) fix infloop
-	// TEST_CASE("fp call over inferred refs, incl. bf") { CHECK( test_ref_types(
-	// 	"f[0](x) := x."
-	// 	"f[n](x) := f[n-1](x)'."
-	// 	"f[0](x, y) := T."
-	// 	"f[n](x, y) := f[n-1](x, y) && f[n-1](x) = 1."
-	// 	"f(1, 0)."
-	// ) ); }
+	TEST_CASE("fp call over inferred refs, incl. bf") { CHECK( test_ref_types(
+		"f[0](x) := x."
+		"f[n](x) := f[n-1](x)'."
+		"f[0](x, y) := T."
+		"f[n](x, y) := f[n-1](x, y) && f[n-1](x) = 1."
+		"f(1, 0)."
+	) ); }
 
 	TEST_CASE("type mismatch 1") { CHECK( test_ref_types(
 		"e[0, 0](x) := 1."
