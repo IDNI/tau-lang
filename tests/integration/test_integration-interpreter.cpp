@@ -470,7 +470,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[0] = {a}:sbf") {
 		const char* sample = "o1[0] = {a}:sbf.";
 		auto memory = run_test(sample, 3);
-		CHECK ( !memory.value().empty() );
+		CHECK ( !memory.value().empty() ); 
 	}
 
 	TEST_CASE("o1[1] = {a}:sbf") {

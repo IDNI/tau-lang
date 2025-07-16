@@ -10,7 +10,6 @@ set(TAU_HEADERS
 	boolean_algebras/variant_ba.h
 	boolean_algebras/product_ba.h
 	boolean_algebras/nso_ba.h
-	#base_bas/z3.h
 	base_bas/cvc5.h
 	experimental/execution.h
 	runtime.h
@@ -51,7 +50,6 @@ set(CLI_SOURCES
 add_library(${TAU_OBJECT_LIB_NAME} OBJECT)
 target_sources(${TAU_OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_OBJECT_LIB_NAME})
-#target_link_libraries(${TAU_OBJECT_LIB_NAME} Boost::log ${Z3_LIB} ${CVC5_LIB})
 target_link_libraries(${TAU_OBJECT_LIB_NAME} Boost::log ${CVC5_LIB})
 target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
@@ -67,7 +65,6 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 add_library(${TAU_STATIC_LIB_NAME} STATIC)
 target_sources(${TAU_STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_STATIC_LIB_NAME})
-#target_link_libraries(${TAU_STATIC_LIB_NAME} Boost::log ${Z3_LIB} ${CVC5_LIB})
 target_link_libraries(${TAU_STATIC_LIB_NAME} Boost::log ${CVC5_LIB})
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
@@ -87,7 +84,6 @@ endif()
 add_library(${TAU_SHARED_LIB_NAME} SHARED)
 add_library(${namespace}::${TAU_SHARED_LIB_NAME} ALIAS ${TAU_SHARED_LIB_NAME})
 target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
-#target_link_libraries(${TAU_SHARED_LIB_NAME} Boost::log ${Z3_LIB} ${CVC5_LIB})
 target_link_libraries(${TAU_SHARED_LIB_NAME} Boost::log ${CVC5_LIB})
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>

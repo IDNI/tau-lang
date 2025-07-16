@@ -4,8 +4,6 @@
 
 #include "builders.h"
 #include "queries.h"
-//#include "z3++.h"
-#include <cvc5/cvc5.h>
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -602,7 +600,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			{ tau_parser::bf_xor,                          740 },
 			{ tau_parser::bf_neg,                          750 },
 			{ tau_parser::bf,                              760 },
-			// z3
+			// bv
 			{ tau_parser::bv_add,                          771 },
 			{ tau_parser::bv_sub,                          772 },
 			{ tau_parser::bv_mul,                          773 },

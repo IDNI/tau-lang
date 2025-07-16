@@ -16,7 +16,6 @@
 #include <iostream>
 #include <vector>
 
-//#include "z3++.h"
 #include <cvc5/cvc5.h>
 
 #define pfst(x) (*(x).begin())
@@ -39,52 +38,6 @@ template<typename T, typename V> bool has(const T& t, const V& v) {
 template<typename T, typename V> bool hasv(const T& t, const V& v) {
 	return std::find(t.begin(), t.end(), v) != t.end();
 }
-
-// In cvc5, hashing is properly defined
-
-/*template <>
-struct std::hash<z3::expr> {
-	size_t operator()(const z3::expr& e) const {
-		return e.hash();
-	}
-};*/
-
-//auto operator<=>(const z3::expr& e1, const z3::expr& e2) {
-//	return std::addressof(e1) <=> std::addressof(e2);
-//}
-
-/*template<typename T>
-void hash_combine (size_t& seed, const T& v) {
-	seed ^= std::hash<T>{}(v) + 0x9e3779b97f4a7c15 + (seed << 12) + (seed >> 4);
-}
-
-template<typename X>
-struct std::hash<std::vector<X>> {
-	size_t operator()(const std::vector<X>& vec) const {
-		size_t seed = vec.size();
-		for(auto& i : vec) hash_combine(seed, i);
-		return seed;
-	}
-};
-
-template<typename T1, typename T2>
-struct std::hash<std::pair<T1, T2>> {
-	size_t operator()(const std::pair<T1, T2>& p) const noexcept {
-		size_t seed = 0;
-		hash_combine(seed, p.first);
-		hash_combine(seed, p.second);
-		return seed;
-	}
-};
-
-template<typename... Ts>
-struct std::hash<std::tuple<Ts...>> {
-	size_t operator()(const std::tuple<Ts...>& p) const noexcept {
-		size_t seed = 0;
-		std::apply([&seed](auto&&... xs){(hash_combine(seed, xs),...);}, p);
-		return seed;
-	}
-};*/
 
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {

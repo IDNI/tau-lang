@@ -1,6 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-//#include "base_bas/z3.h"
 #include "base_bas/cvc5.h"
 
 namespace idni::tau_lang {
@@ -694,7 +693,7 @@ void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 }
 
 template<typename...BAs>
-void print_z3_solver_cmd_solution(std::optional<solution<BAs...>>& solution) {
+void print_bv_solver_cmd_solution(std::optional<solution<BAs...>>& solution) {
 	if (!solution) { std::cout << "no solution\n"; return; }
 
 	std::cout << "solution: {\n";
@@ -717,13 +716,13 @@ bool is_bv_formula(const tau<BAs...>& n) {
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
-	// if the  form is a z3 formula call z3
+	// if the  form is a bv formula call bv
 	auto equations = n->child.back();
 	if (is_bv_formula(equations)) {
 		try {
 			auto solution = solve_bv(equations);
 			if (!solution) { std::cout << "no solution\n"; return; }
-			else print_z3_solver_cmd_solution(solution);
+			else print_bv_solver_cmd_solution(solution);
 		} catch (std::exception&) {
 			BOOST_LOG_TRIVIAL(error) << "(Error) overflow/underflow while solving the system";
 		}
@@ -838,7 +837,7 @@ template<typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::sat_cmd(const tau_nso_t& n)
 {
-	// if the  form is a z3 formula call z3
+	// if the  form is a bv formula call bv
 	auto arg = n->child[1];
 	/*if (is_bv_formula(arg)) {
 		try {
