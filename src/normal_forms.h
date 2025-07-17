@@ -1810,7 +1810,7 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 				}
 				return n;
 			};
-			neq = pre_order(neq).apply_unique(f, visit_wff<BAs...>, identity);
+			neq = rewriter::depreciating::pre_order(neq).apply_unique(f, visit_wff<BAs...>, rewriter::depreciating::identity);
 			if (neq == _F<BAs...>) clause_false = true;
 		}
 		if (clause_false) continue;
@@ -1839,7 +1839,7 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 								}
 								return n;
 							};
-							neq = pre_order(neq).apply_unique(f, visit_wff<BAs...>, identity);
+							neq = rewriter::depreciating::pre_order(neq).apply_unique(f, visit_wff<BAs...>, rewriter::depreciating::identity);
 						}
 					}
 				}
