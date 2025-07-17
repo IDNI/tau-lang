@@ -883,6 +883,14 @@ Note, in order to interpret the output, that `1` of type `tau` is represented as
 Furthermore, Tau specifications are always displayed normalized during execution.
 The REPL informs the user whenever an update was done successfully by printing the new, updated specification.
 
+### The *this* input stream
+
+Aside from `u` there is another special stream which can be utilized in specifications incorporating updates.
+The special stream is called `this` and behaves in the same way as an input stream. However, the input is
+not asked from the user. Instead, the currently running specification is written into the `this` stream at each
+point in time. For example the following specification always prints the currently running specification
+using the output stream `o1`: `u[t] = i1[t] && o1[t] = this[t]`.
+
 ### Pointwise revision details
 
 The following is a detailed explanation of the pointwise revision algorithm. Pointwise revision is performed
