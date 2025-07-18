@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TESTS
 	### ok
 	ba_types_inference
+	bf_fixed_point
 	bf_hooks
 	normal_forms
 	nso_rr_execution
@@ -15,7 +16,6 @@ set(TESTS
 	wff_hooks
 	
 	### only several tests fail
-	bf_fixed_point        # remaining 1 test (no initial condition)
 	ref_types             # remaining 2 tests (fp call over inferred refs incl bf, and typo undetected)
 	tau_ba3               # remaining 3 quantified unresolved rr's
 	
