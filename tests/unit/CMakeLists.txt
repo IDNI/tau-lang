@@ -25,6 +25,7 @@ set(TESTS
 	cvc5_solver
 	cvc5_satisfiability
 	cvc5
+	resolver
 )
 
 foreach(X IN LISTS TESTS)

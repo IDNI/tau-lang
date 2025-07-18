@@ -124,7 +124,6 @@ Term mkBitVectorRotateRight(const Term& l, const Term& r) {
 	return cvc5_solver.mkTerm(Kind::BITVECTOR_LSHR, {l, r});
 }
 
-
 template<typename...BAs>
 Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map<tau<BAs...>, Term>& free_vars, bool checked) {
 	auto nt = std::get<tau_source_sym>(form->value).n();

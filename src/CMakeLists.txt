@@ -32,6 +32,7 @@ set(TAU_HEADERS
 	language.h
 	queries.h
 	utils.h
+	resolver.h
 )
 
 set(TAU_SOURCES
