@@ -95,11 +95,12 @@ tref resolve_io_vars(spec_context<node>& ctx, tref fm) {
 						static const auto io_prefixed_io_var =
 				[](size_t var_sid) -> size_t
 			{
-				return    dict(var_sid)[0] == 'i'           ? 1
-					: (        dict(var_sid)[0] == 'o'
-						|| dict(var_sid) == "u"
-						|| dict(var_sid) == "this") ? 2
-					:                                     0;
+				return (dict(var_sid)[0] == 'i' || dict(var_sid) == "this")
+						? 1
+						: ((dict(var_sid)[0] == 'o' ||
+						dict(var_sid) == "u")
+							? 2
+							: 0);
 			};
 			size_t direction = io_prefixed_io_var(var_sid);
 			DBG(LOG_TRACE << "io_prefixed_io_var: " << dict(var_sid)
