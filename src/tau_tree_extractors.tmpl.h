@@ -91,7 +91,23 @@ tref resolve_io_vars(spec_context<node>& ctx, tref fm) {
 				if (var_sid == out_var_sid)
 					return t.replace_value(
 						t.value.replace_data(2));
-			// LOG_ERROR << "Undefined IO variable: " << TAU_TO_STR(n);
+
+						static const auto io_prefixed_io_var =
+				[](size_t var_sid) -> size_t
+			{
+				return    dict(var_sid)[0] == 'i'           ? 1
+					: (        dict(var_sid)[0] == 'o'
+						|| dict(var_sid) == "u"
+						|| dict(var_sid) == "this") ? 2
+					:                                     0;
+			};
+			size_t direction = io_prefixed_io_var(var_sid);
+			DBG(LOG_TRACE << "io_prefixed_io_var: " << dict(var_sid)
+				<< " " << (direction == 1 ? "IN"
+					: (direction == 2 ? "OUT"
+					: "UNRESOLVED I/O"));)
+			if (direction) return t.replace_value(
+					t.value.replace_data(direction));
 		}
 		return n;
 	};
@@ -111,7 +127,7 @@ rewriter::rules get_rec_relations(spec_context<node>& ctx, tref rrs) {
 	auto resolve_in_formula = [&x, &ctx](tt& t) {
 		x.emplace_back(t | tt::first  | tt::handle,
 			tau::geth(resolve_io_vars<node>(ctx,
-			       			t | tt::second | tt::ref)));
+						t | tt::second | tt::ref)));
 	};
 
 	if (t.is(tau::rec_relation)) return resolve_in_formula(t), x;
@@ -151,6 +167,25 @@ std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r, bool wo_infe
 	auto nso_rr = wo_inference
 			? std::optional<rr<node>>{ { rules, tau::geth(main_fm) } }
 			: get_nso_rr<node>(rules, main_fm);
+
+	auto check_resolved_io_vars = [](htref form) {
+		for (tref io_var : tau::get(form).select_all(is_io_var<node>)) {
+			// LOG_TRACE << "io_var: " << LOG_FM_DUMP(io_var);
+			if (tau::get(io_var)[0].data() == 0) {
+				LOG_ERROR << "I/O variable is not defined "
+					<< TAU_TO_STR(io_var);
+				return false;
+			}
+		}
+		return true;
+	};
+	if (nso_rr) {
+		if (!check_resolved_io_vars(nso_rr.value().main)) return {};
+		for (const auto& rec_relation : nso_rr.value().rec_relations)
+			if (!check_resolved_io_vars(rec_relation.second))
+				return {};
+	}
+
 #ifdef DEBUG
 	if (nso_rr) LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr.value());
 	else LOG_TRACE << "get_nso_rr result: no value";

@@ -52,7 +52,7 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	if (n.nt == tau::io_var) {
 		if (n.data == 1) os << " IN";
 		else if (n.data == 2) os << " OUT";
-		else os << " I/O";
+		else os << LOG_WARNING_COLOR << " I/O" << TC.CLEAR();
 	}
 
 	return os;
