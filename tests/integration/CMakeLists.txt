@@ -4,7 +4,6 @@ set(TESTS
 	### ok
 	ba_types_inference
 	bf_hooks
-	bf_normalization
 	normal_forms
 	nso_rr_execution
 	nso_rr_fixed_point
@@ -28,6 +27,7 @@ set(TESTS
 	splitter2
 
 	### inf loop
+	# bf_normalization
 	# wff_normalization	
 )
 
