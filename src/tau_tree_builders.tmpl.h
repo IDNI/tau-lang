@@ -550,7 +550,7 @@ tref build_in_var_at_t_minus(tref var_name_node, size_t shift, std::string t) {
 	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
 	return build_in_var<node>(var_name_node,
 		tau::get(tau::offset, tau::get(tau::shift,
-			tau::get(tau::variable, t), tau::get_num(shift))));
+			build_variable<node>(t), tau::get_num(shift))));
 }
 
 template <NodeType node>
@@ -610,7 +610,7 @@ tref build_out_var_at_t_minus(tref var_name_node, size_t shift, std::string t) {
 	using tau = tree<node>;
 	return build_out_var<node>(var_name_node,
 		tau::get(tau::offset, tau::get(tau::shift,
-			tau::get(tau::variable, t), tau::get_num(shift))));
+			build_variable<node>(t), tau::get_num(shift))));
 }
 
 template <NodeType node>
