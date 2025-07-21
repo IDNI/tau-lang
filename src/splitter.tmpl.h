@@ -233,28 +233,30 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 			.select_top(is<node, tau::bf_eq>);
 		for (tref eq : eqs) {
 			DBG(assert(tau::get(eq)[1][0].is(tau::bf_f));)
-			const auto& f = tau::get(eq)[0];
-			size_t type_f = f.get_ba_type();
+			size_t type_f = find_ba_type<node>(eq);
 			subtree_set<node> free_vars
 					= get_free_vars_from_nso<node>(fm);
-			for (tref c : constants) {
-				// First check that types match
-				size_t type_c = tau::get(c).get_ba_type();
-				if (type_f && type_f != type_c) continue;
+			// Check that term is typed
+			if (type_f > 0) {
+				for (tref c : constants) {
+					// First check that types match
+					size_t type_c = find_ba_type<node>(c);
+					if (type_f != type_c) continue;
 
-				// Try to convert f(x,...) = 0 to f(x,...) = 0 && x < c' for some variable x in f
-				trefs vars_f = f.select_top(
-					is_child<node, tau::variable>);
-				for (tref v : vars_f) {
-					if (!free_vars.contains(tau::trim(v))) continue;
-					tref new_fm = rewriter::replace<node>(
-						fm, clause, tau::build_wff_and(clause,
-							tau::build_bf_lteq(v, c)));
-					if (is_splitter<BAs...>(fm, new_fm, spec_clause))
-						return { new_fm, st };
+					// Try to convert f(x,...) = 0 to f(x,...) = 0 && x < c' for some variable x in f
+					trefs vars_f = rewriter::select_top<node>(eq,
+						is_child<node, tau::variable>);
+					for (tref v : vars_f) {
+						if (!free_vars.contains(tau::trim(v))) continue;
+						tref new_fm = rewriter::replace<node>(
+							fm, clause, tau::build_wff_and(clause,
+								tau::build_bf_lteq(v, c)));
+						if (is_splitter<BAs...>(fm, new_fm, spec_clause))
+							return { new_fm, st };
+					}
 				}
 			}
-			if (tref s = good_reverse_splitter_using_function<BAs...>(f.get(), st, clause);
+			if (tref s = good_reverse_splitter_using_function<BAs...>(tau::trim(eq), st, clause);
 				tau::get(s) != tau::get(clause))
 			{
 				//TODO: this equiv check should happen in good_reverse_splitter_using_function
@@ -270,23 +272,25 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 			LOG_TRACE << "neq: " << LOG_FM_DUMP(neq);
 			LOG_TRACE << " test " << LOG_FM_DUMP(tau::get(neq).first());
 			DBG(assert(tau::get(neq)[1].child_is(tau::bf_f));)
-			const auto& f = tau::get(neq)[0];
-			size_t type_f = f.get_ba_type();
-			for (tref c : constants) {
-				// Try to convert f != 0 to f >= c
-				// First check that types match
-				size_t type_c = tau::get(c).get_ba_type();
-				if (type_f && type_f != type_c) continue;
-				tref r = tau::build_bf_gteq(f.get(), c);
-				tref new_fm = rewriter::replace<node>(fm,
-					clause, tau::build_wff_and(clause, r));
-				new_fm = rewriter::replace<node>(
-							new_fm, neq, tau::_T());
-				if (is_splitter<BAs...>(fm, new_fm, spec_clause))
-					return { new_fm, st };
+			size_t type_f = find_ba_type<node>(neq);
+			// Check that term is typed
+			if (type_f > 0) {
+				for (tref c : constants) {
+					// Try to convert f != 0 to f >= c
+					// First check that types match
+					size_t type_c = find_ba_type<node>(c);
+					if (type_f != type_c) continue;
+					tref r = tau::build_bf_gteq(tau::trim(neq), c);
+					tref new_fm = rewriter::replace<node>(fm,
+						clause, tau::build_wff_and(clause, r));
+					new_fm = rewriter::replace<node>(
+								new_fm, neq, tau::_T_trimmed());
+					if (is_splitter<BAs...>(fm, new_fm, spec_clause))
+						return { new_fm, st };
+				}
 			}
 			if (tref s = good_splitter_using_function<BAs...>(
-							f.get(), st, clause);
+							tau::trim(neq), st, clause);
 				tau::get(s) != tau::get(clause))
 			{
 				//TODO: this equiv check should happen in good_splitter_using_function
