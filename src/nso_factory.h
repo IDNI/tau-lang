@@ -67,8 +67,7 @@ struct nso_factory {
 	 * @param ba_type Optional type name.
 	 * @return The splitter constant.
 	 */
-	constant_with_type<BAs...> splitter_one(
-		const std::string type_name = "") const;
+	tref splitter_one(const std::string type_name = "") const;
 
 	/**
 	 * Returns the tau formula stored in the variant, if present
