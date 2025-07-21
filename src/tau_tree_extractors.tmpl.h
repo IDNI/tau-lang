@@ -311,23 +311,23 @@ size_t get_var_name_sid(tref var) {
 
 template <NodeType node>
 bool is_io_initial(tref io_var) {
-	return tree<node>::get(io_var)[0][1].is_integer();
+	return tree<node>::get(io_var)[0][1][0].is_integer();
 }
 
 template <NodeType node>
 bool is_io_shift(tref io_var) {
 	using tau = tree<node>;
-	return tau::get(io_var)[0][1].is(tau::shift);
+	return tau::get(io_var)[0][1][0].is(tau::shift);
 }
 
 template <NodeType node>
 int_t get_io_time_point(tref io_var) {
-	return tree<node>::get(io_var)[0][0][1].get_integer();
+	return tree<node>::get(io_var)[0][1][0].get_integer();
 }
 
 template <NodeType node>
 int_t get_io_shift(tref io_var) {
-	return tree<node>::get(io_var)[0][1][0][1][0].get_integer();
+	return tree<node>::get(io_var)[0][1][0][1].get_num();
 }
 
 template <NodeType node>
