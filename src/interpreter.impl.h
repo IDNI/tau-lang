@@ -745,9 +745,8 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 		if (!tau::get(constraints).equals_T()) {
 			// setting proper options for the solver
 			solver_options options = {
-				.splitter_one = tau::get_ba_constant(
-					node::nso_factory::instance()
-							.splitter_one("")),
+				.splitter_one = node::nso_factory::instance()
+							.splitter_one(""),
 				.mode = solver_mode::general
 			};
 
@@ -899,8 +898,7 @@ solution_with_max_update(tref spec) {
 	auto get_solution = [](const auto& fm) {
 		// setting proper options for the solver
 		solver_options options = {
-			.splitter_one = tau::get_ba_constant(
-				node::nso_factory::instance().splitter_one("")),
+			.splitter_one = node::nso_factory::instance().splitter_one(""),
 			.mode = solver_mode::general
 		};
 		// solve the given system of equations

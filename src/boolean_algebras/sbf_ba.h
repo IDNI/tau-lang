@@ -41,7 +41,7 @@ struct sbf_ba_factory {
 
 	std::string zero() const;
 
-	constant_with_type<BAs...> splitter_one() const;
+	std::variant<BAs...> splitter_one() const;
 
 	static sbf_ba_factory<BAs...>& instance();
 private:
@@ -69,7 +69,7 @@ struct nso_factory<sbf_ba> {
 
 	std::string zero(const std::string type_name) const;
 
-	constant_with_type<sbf_ba> splitter_one() const;
+	tref splitter_one() const;
 
 	tref unpack_tau_ba(const std::variant<sbf_ba>&) const;
 
@@ -100,8 +100,7 @@ struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 
 	std::string zero(const std::string type_name = "tau") const;
 
-	constant_with_type<tau_ba<sbf_ba>, sbf_ba> splitter_one(
-		const std::string type_name) const;
+	tref splitter_one( const std::string type_name) const;
 
 	tref unpack_tau_ba(const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const;
 

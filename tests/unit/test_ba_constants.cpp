@@ -148,7 +148,7 @@ struct nso_factory<sbf_ba, Bool> {
 
 	string zero(const string) const { throw logic_error("not implemented");}
 
-	constant_with_type<sbf_ba, Bool> splitter_one(const string) const {
+	tref splitter_one(const string) const {
 		throw logic_error("not implemented");
 	}
 

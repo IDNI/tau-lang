@@ -30,8 +30,8 @@ struct nso_factory<Bool> {
 
 	string zero(const string) const { return "0"; }
 
-	constant_with_type<Bool> splitter_one(const string) const {
-		return { Bool(true), "bool" };
+	std::variant<Bool> splitter_one(const string) const {
+		return Bool(true);
 	}
 
 	// There is no tau_ba

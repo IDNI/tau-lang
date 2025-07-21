@@ -255,7 +255,7 @@ struct tau_ba_factory {
 	 *
 	 * @return Variant containing the splitter of one in the given BA.
 	 */
-	constant_with_type<tau_ba<BAs...>, BAs...> splitter_one() const;
+	std::variant<tau_ba<BAs...>, BAs...> splitter_one() const;
 
 	/**
 	 * @brief Converts one to string.

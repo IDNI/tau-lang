@@ -160,7 +160,7 @@ bool is_syntactic_zero(const tau_ba<BAs...>& fm) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
-	tref s = tau_splitter<BAs...>(
+	tref s = tau_splitter<tau_ba<BAs...>, BAs...>(
 		normalizer<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr), st);
 	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(s));
 }
@@ -168,7 +168,7 @@ tau_ba<BAs...> splitter(const tau_ba<BAs...>& fm, splitter_type st) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_splitter_one() {
-	return tau_ba<BAs...>(tau_bad_splitter<BAs...>());
+	return tau_ba<BAs...>(tau_bad_splitter<tau_ba<BAs...>, BAs...>());
 }
 
 template <typename... BAs>
@@ -226,11 +226,11 @@ std::string tau_ba_factory<BAs...>::zero(std::string&) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-constant_with_type<tau_ba<BAs...>, BAs...>
+std::variant<tau_ba<BAs...>, BAs...>
 	tau_ba_factory<BAs...>::splitter_one() const
 {
-	return { std::variant<tau_ba<BAs...>, BAs...>(
-			tau_splitter_one<BAs...>()), "tau" };
+	return std::variant<tau_ba<BAs...>, BAs...>(
+			tau_splitter_one<BAs...>());
 }
 
 template <typename... BAs>
