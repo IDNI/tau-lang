@@ -76,7 +76,7 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 				auto typed = wrap(tau_parser::variable, {var->child[0], widths.type_of(untyped)});
 				changes[untyped] = typed;
 			}
-			auto new_body = replace(body, changes);
+			auto new_form = replace(form, changes);
 			// remove quantified variables from the scope, close it and return 
 			// the result
 			for (auto var: quantifieds) {
@@ -84,7 +84,7 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 				widths.current.erase(untyped);
 			}
 			widths.close();
-			return new_body;
+			return new_form;
 		}
 		case tau_parser::bv_eq: 
 		case tau_parser::bv_neq:
