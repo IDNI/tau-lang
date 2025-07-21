@@ -5,6 +5,7 @@ set(TESTS
 	ba_types_inference
 	bf_fixed_point
 	bf_hooks
+	bf_normalization
 	normal_forms
 	nso_rr_execution
 	nso_rr_fixed_point
@@ -12,23 +13,20 @@ set(TESTS
 	sbf1
 	sbf2
 	quantifiers
+	solver
 	tau_ba1
+	tau_ba3
 	wff_hooks
+	wff_normalization
 	
 	### only several tests fail
 	ref_types             # remaining 2 tests (fp call over inferred refs incl bf, and typo undetected)
-	tau_ba3               # remaining 3 quantified unresolved rr's
-	
+
 	### other fails
 	interpreter
 	satisfiability
-	solver
 	splitter
 	splitter2
-
-	### inf loop
-	# bf_normalization
-	# wff_normalization	
 )
 
 foreach(TEST IN LISTS TESTS)
