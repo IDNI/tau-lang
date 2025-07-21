@@ -360,12 +360,6 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 			auto expr = std::get<cvc5::Term>(form->child[0]->value);
 			return expr;
 		}
-		case tau_parser::wff_always: {
-			return eval_bv(form->child[0], vars, free_vars, checked);
-		}
-		case tau_parser::wff_sometimes: {
-			return eval_bv(form->child[0], vars, free_vars, checked);
-		}
 		default: {
 			#ifdef DEBUG
 			//BOOST_LOG_TRIVIAL(error) << "(Error) unknow bv non-terminal: " << nt;

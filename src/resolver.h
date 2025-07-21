@@ -62,6 +62,12 @@ struct resolver {
 		return current.vars[var];
 	}
 
+	size_t add(const tau<BAs...>& var, const tau<BAs...>& var_type) {
+		auto idx = add(var);
+		type(var, var_type);
+		return idx;
+	}
+
 	size_t find(const size_t idx) {
 		if (parent[idx] != idx) {
 			parent[idx] = find(parent[idx]);
