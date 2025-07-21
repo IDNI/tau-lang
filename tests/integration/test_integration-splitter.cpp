@@ -223,7 +223,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		CHECK(tau::get(s).to_str() == "{ x3 y } : sbf ({ x3 y } : sbf w)' = 0" );
+		CHECK(tau::get(s).to_str() == "{ x3 y } : sbf (w{ x3 y } : sbf)' = 0" );
 	}
 
 	TEST_CASE("Tau_splitter_coeff2") {
@@ -233,8 +233,8 @@ TEST_SUITE("Tau_splitter_coeff") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		auto s_str = tau::get(s).to_str();
-		bool check1 = s_str == "{ x | x' y } : sbf ({ x | x' y } : sbf w)' = 0";
-		bool check2 = s_str == "{ x y' | y } : sbf ({ x y' | y } : sbf w)' = 0";
+		bool check1 = s_str == "{ x | x' y } : sbf (w{ x | x' y } : sbf)' = 0";
+		bool check2 = s_str == "{ x y' | y } : sbf (w{ x y' | y } : sbf)' = 0";
 		bool check = check1 || check2;
 		CHECK(check);
 	}

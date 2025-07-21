@@ -828,7 +828,7 @@ tref tree<node>::build_bf_ngt(tref l, tref r) {
 
 template <NodeType node>
 tref tree<node>::build_bf_gteq(tref l, tref r) {
-	return tau_lang::build_bf_gteq<node>(r, l);
+	return tau_lang::build_bf_gteq<node>(l, r);
 }
 
 template <NodeType node>

@@ -589,7 +589,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	std::set<std::pair<std::string, int_t>> initials;
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
             if (is_io_initial<node>(io_vars[i]))
-                initials.emplace(tau::get(io_vars[i]).get_string(),
+                initials.emplace(get_var_name<node>(io_vars[i]),
                     get_io_time_point<node>(io_vars[i]));
 
 	// Calculate unbound continuation of fm
