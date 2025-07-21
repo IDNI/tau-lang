@@ -165,7 +165,7 @@ tref unsqueeze_wff_neg(tref fm) {
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::bf_neq)) {
-			const auto& e = t[0];
+			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
 				const auto& c1 = e.first(), c2 = e.second();
 				return tau::trim(tau::build_wff_or(
@@ -1101,7 +1101,7 @@ tref sort_var(tref var) {
 	if (t.child_is(tau::bf_eq)) {
 		trefs clauses = get_dnf_bf_clauses<node>(t[0].first());
 		LOG_TRACE << "sort_var / child clauses size: " <<clauses.size();
-		std::ranges::sort(clauses);
+		std::ranges::sort(clauses, lcrs_tree<node>::subtree_less);
 		tref res = nullptr;
 		for (tref c : clauses) {
 			LOG_TRACE << "sort_var / child clause: " << LOG_FM(c);
@@ -1558,8 +1558,7 @@ std::vector<std::vector<trefs>> get_cnf_inequality_lits(tref fm) {
 	for (tref clause : get_cnf_wff_clauses<node>(neq_pushed_in)) {
 		std::vector<trefs> c;
 		for (tref neqs : get_dnf_wff_clauses<node>(clause))
-			c.emplace_back(get_cnf_bf_clauses<node>(
-						tau::get(neqs)[0].first()));
+			c.emplace_back(get_cnf_bf_clauses<node>(tau::trim2(neqs)));
 		cnf_lits.emplace_back(std::move(c));
 	}
 	return cnf_lits;
@@ -1604,7 +1603,9 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	// std::cout << "pos_bf after reduce: " << LOG_FM(pos_bf) << "\n";
 	tref new_pos_bf = nullptr;
 	for (tref c : get_dnf_bf_clauses<node>(pos_bf)) {
-		pos.emplace_back(get_cnf_bf_clauses<node>(c));
+		// If pos_bf simplifies to 0, do not add to pos
+		if (!tau::get(c).equals_0())
+			pos.emplace_back(get_cnf_bf_clauses<node>(c));
 		if (new_pos_bf) new_pos_bf = tau::build_wff_and(new_pos_bf,
 							tau::build_bf_eq(c));
 		else new_pos_bf = tau::build_bf_eq(c);
@@ -1627,7 +1628,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 							n[0] = tau::_1();
 							continue;
 						}
-					} else if (t.child_is(tau::bf_neg)) {
+					} else if (u.child_is(tau::bf_neg)) {
 						if (t == u[0][0]) {
 							n[0] = tau::_1();
 							continue;
@@ -1718,15 +1719,17 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 		if (auto it = var_to_idx.find(v); it == end(var_to_idx)) {
 			// First check if it is not sorted canonically
 			auto sorted_v = sort_var<node>(v);
-			// std::cout << "old var: " << v << "\n";
-            // std::cout << "new var: " << sorted_v << "\n";
-            if (sorted_v != v && var_to_idx.contains(sorted_v)) {
-                // Rename variable in current clause
-                clause = rewriter::replace<node>(clause, v, sorted_v);
-                continue;
-            }
+			// std::cout << "old var: " << tau::get(v) << "\n";
+			// std::cout << "new var: " << tau::get(sorted_v) << "\n";
+			if (sorted_v != v && var_to_idx.contains(sorted_v)) {
+				// Rename variable in current clause
+				clause = rewriter::replace<node>(
+					clause, v, sorted_v);
+				continue;
+			}
 			if (sorted_v != v) {
-				clause = rewriter::replace<node>(clause, v, sorted_v);
+				clause = rewriter::replace<node>(
+					clause, v, sorted_v);
 			}
 			// There is a new variable
 			DBG(assert(sorted_v != tau::build_bf_eq(tau::_T())
@@ -1961,13 +1964,13 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 				// std::vector<std::vector<int_t> > tmp1{paths[i]};
 				// std::vector<std::vector<int_t> > tmp2{simp_path};
 				// std::cout << "(F) Current path: " <<
-				// 		build_reduced_formula<BAs...>(
-				// 			tmp1, vars, false,
-				// 			true)<< "\n";
+						// tau::get(build_reduced_formula<node>(
+							// tmp1, vars, false,
+							// true)) << "\n";
 				// std::cout << "(F) Simplified path: " <<
-				// 		build_reduced_formula<BAs...>(
-				// 			tmp2, vars, false,
-				// 			true)<< "\n";
+						// tau::get(build_reduced_formula<node>(
+							// tmp2, vars, false,
+							// true)) << "\n";
 // #ifdef DEBUG
 // 				LOG_DEBUG << "Path simplification happened: ";
 // 				std::vector<std::vector<int_t> > tmp1{paths[i]};
