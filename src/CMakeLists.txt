@@ -11,6 +11,7 @@ set(TAU_HEADERS
 	boolean_algebras/product_ba.h
 	boolean_algebras/nso_ba.h
 	base_bas/cvc5.h
+	base_bas/cvc5_widths.h
 	experimental/execution.h
 	runtime.h
 	defs.h
