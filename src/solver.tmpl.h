@@ -21,10 +21,9 @@ namespace idni::tau_lang {
 // 	for (auto& v: remaing) solution.erase(v);
 // 	return solution;
 // }
-
 template <NodeType node>
 std::optional<solution<node>> find_solution(equality eq,
-	solution<node> substitution, solver_mode mode)
+	solution<node>& substitution, solver_mode mode)
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -580,8 +579,7 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 #endif // DEBUG
 
 		// case 1
-		if (get_exponent<node>(d) == new_m_exp) {
-
+		if (std::ranges::equal(get_exponent<node>(d), new_m_exp, lcrs_tree<node>::subtree_equals)) {
 			DBG(LOG_TRACE << "add_minterm_to_disjoint"
 				<< "/[case1]/new_disjoint: " << LOG_FM(d);)
 
