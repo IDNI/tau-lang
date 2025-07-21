@@ -96,18 +96,18 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 	auto check = get_type_and_arg(spec);
 	if (!check) return {};
 	auto [type, value] = check.value();
-	if (contains(spec.value(), tau::ref)) {
+	if (contains(value, tau::ref)) {
 		if (type == tau::spec) {
-			if (auto x = get_nso_rr<node>(ctx, spec.value()); x)
+			if (auto x = get_nso_rr<node>(ctx, value); x)
 				nso_rr = x.value();
 			else return {};
-		} else nso_rr = rr<node>(tau::geth(spec.value()));
+		} else nso_rr = rr<node>(tau::geth(value));
 		nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 			definitions.begin(), definitions.end());
 		if (auto infr = infer_ref_types<node>(nso_rr); infr)
 			return infr.value();
 		else return {};
-	} else return rr<node>(tau::geth(spec.value()));
+	} else return rr<node>(tau::geth(value));
 	return {};
 }
 
