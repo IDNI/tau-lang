@@ -13,7 +13,10 @@ set(TESTS
 	sbf1
 	sbf2
 	quantifiers
+    satisfiability
 	solver
+    splitter
+    splitter2
 	tau_ba1
 	tau_ba3
 	wff_hooks
@@ -24,9 +27,6 @@ set(TESTS
 
 	### other fails
 	interpreter
-	satisfiability
-	splitter
-	splitter2
 )
 
 foreach(TEST IN LISTS TESTS)
