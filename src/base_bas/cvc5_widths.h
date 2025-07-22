@@ -10,37 +10,37 @@
 namespace idni::tau_lang {
 
 template<typename...BAs>
-tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths = resolver<BAs...>{}) {
+tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths) {
 	auto nt = std::get<tau_source_sym>(form->value).n();
 	switch (nt) {
 		case tau_parser::wff_always: {
-			auto expr = infer_bv_width(form->child[0], widths);
+			auto expr = annotate_bv_widths(form->child[0], widths);
 			return wrap(tau_parser::wff_always, expr);
 		}
 		case tau_parser::wff_sometimes: {
-			auto expr = infer_bv_width(form->child[0], widths);
+			auto expr = annotate_bv_widths(form->child[0], widths);
 			return wrap(tau_parser::wff_sometimes, expr);
 		}
 		case tau_parser::wff: {
-			auto expr = infer_bv_width(form->child[0], widths);
+			auto expr = annotate_bv_widths(form->child[0], widths);
 			return wrap(tau_parser::wff, expr);
 		}
 		case tau_parser::bv: {
-			auto expr = infer_bv_width(form->child[0], widths);
+			auto expr = annotate_bv_widths(form->child[0], widths);
 			return wrap(tau_parser::bv, expr);
 		}
 		case tau_parser::wff_neg: {
-			auto expr = infer_bv_width(form->child[0], widths);
+			auto expr = annotate_bv_widths(form->child[0], widths);
 			return wrap(tau_parser::wff_neg, expr);
 		}
 		case tau_parser::wff_and: {
-			auto left = infer_bv_width(form->child[0], widths);
-			auto right = infer_bv_width(form->child[1], widths);
+			auto left = annotate_bv_widths(form->child[0], widths);
+			auto right = annotate_bv_widths(form->child[1], widths);
 			return wrap(tau_parser::wff_and, {left, right});
 		}
 		case tau_parser::wff_or: {
-			auto left = infer_bv_width(form->child[0], widths);
-			auto right = infer_bv_width(form->child[1], widths);
+			auto left = annotate_bv_widths(form->child[0], widths);
+			auto right = annotate_bv_widths(form->child[1], widths);
 			return wrap(tau_parser::wff_or, {left, right});
 		}
 		case tau_parser::wff_ex: 
@@ -57,11 +57,11 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 						// scope and type it
 						// we ignore the others as we are not interested in them
 						auto untyped = wrap(tau_parser::variable, {var->child[0]});
-						widths.current.erase(untyped);
+						widths.current.vars.erase(untyped);
 						widths.add(untyped, type.value());
 					} 
 				} else {
-					// we have an untyped variable, we add it as is
+					// we have an untyped variable, we add it as it is
 					widths.add(var);
 				}
 			}
@@ -71,17 +71,26 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 			auto body = annotate_bv_widths(form->child[1], widths);
 			// we gather type annotations from widths status
 			std::map<tau<BAs...>, tau<BAs...>> changes;
-			for (const auto& var : quantifieds) {
-				auto untyped = wrap(tau_parser::variable, {var->child[0]});
-				auto typed = wrap(tau_parser::variable, {var->child[0], widths.type_of(untyped)});
-				changes[untyped] = typed;
+			for (const auto& [var, _] : widths.current.vars) {
+				if (auto type = widths.type_of(var); type) {
+					auto typed = wrap(tau_parser::variable, {var->child[0], type});
+					
+					#ifdef DEBUG
+					print_tau_tree(std::cout, var);
+					print_tau_tree(std::cout, typed);
+					#endif // DEBUG
+
+					changes[var] = typed;
+				}
 			}
-			auto new_form = replace(form, changes);
+			auto new_body = replace(body, changes);
+			auto new_prefix = replace(form->child[0], changes);
+			auto new_form = make_node(form->value, {new_prefix, new_body});
 			// remove quantified variables from the scope, close it and return 
 			// the result
 			for (auto var: quantifieds) {
 				auto untyped = wrap(tau_parser::variable, {var->child[0]});
-				widths.current.erase(untyped);
+				widths.current.vars.erase(untyped);
 			}
 			widths.close();
 			return new_form;
@@ -96,34 +105,47 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 		case tau_parser::bv_ngeq:
 		case tau_parser::bv_less:
 		case tau_parser::bv_nless: {
-			// collect all variables, add missing ones to scope with
-			// the corresponding widths and unite all of them if possible
-			auto vars = select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>);
+			// collect all variables, add them to the scope, unite all of them and,
+			// if possible, type them
+			auto vars = select_top(form, is_non_terminal<tau_parser::variable, BAs...>);
 			if (vars.size() > 0) {
 				auto untyped_0 = wrap(tau_parser::variable, {vars[0]->child[0]});
-				if (auto type = vars[0] | tau_parser::type; type) {
-					widths.add(untyped_0, type.value());
-				} else {
-					widths.add(untyped_0);
-				}
-				for (int i = 1; i < vars.size(); i++) {
+				widths.add(untyped_0);
+				for (size_t i = 1; i < vars.size(); ++i) {
 					auto untyped_i = wrap(tau_parser::variable, {vars[i]->child[0]});
-					if (auto type = vars[i] | tau_parser::type; type) {
-						widths.add(untyped_i, type.value());
-					} else {
-						widths.add(untyped_i);
-					}
+					widths.add(untyped_i);
 					widths.unite(untyped_0, untyped_i);
 				}
+				if (auto type_bv = find_top(form, is_non_terminal<tau_parser::bv_type, BAs...>); type_bv) {
+					auto type = wrap(tau_parser::type, type_bv.value());
+					widths.type(untyped_0, type);
+				}
 			}
+			return form;
 		}
 		default: {
 			// in the rest of the cases, we simply return the original form
 			// as there is nothing to change
 			return form;
 		}
-
 	}
 }
+
+template<typename...BAs>
+tau<BAs...> annotate_bv_widths(const tau<BAs...>& form) {
+	resolver<BAs...> widths;
+	auto annotated = annotate_bv_widths(form, widths);
+	std::map<tau<BAs...>, tau<BAs...>> changes;
+	for (const auto& [var, _] : widths.current.vars) {
+		if (auto type = widths.type_of(var); type) {
+			auto typed = wrap(tau_parser::variable, {var->child[0], type});
+			changes[var] = typed;
+		}
+	}
+	auto new_form = replace(annotated, changes);
+	return new_form;
+}
+
+
 
 } // namespace idni::tau_lang

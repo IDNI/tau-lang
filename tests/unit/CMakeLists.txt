@@ -24,6 +24,7 @@ set(TESTS
 	interpreter
 	cvc5_solver
 	cvc5_satisfiability
+	cvc5_widths
 	cvc5
 	resolver
 )
