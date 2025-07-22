@@ -146,6 +146,83 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form) {
 	return new_form;
 }
 
+template<typename...BAs>
+tau<BAs...> annotate_bv_ctes(const tau<BAs...>& form, resolver<BAs...>& widths) {
+	auto nt = std::get<tau_source_sym>(form->value).n();
+	switch (nt) {
+		case tau_parser::wff_always: {
+			auto expr = annotate_bv_ctes(form->child[0], widths);
+			return wrap(tau_parser::wff_always, expr);
+		}
+		case tau_parser::wff_sometimes: {
+			auto expr = annotate_bv_ctes(form->child[0], widths);
+			return wrap(tau_parser::wff_sometimes, expr);
+		}
+		case tau_parser::wff: {
+			auto expr = annotate_bv_ctes(form->child[0], widths);
+			return wrap(tau_parser::wff, expr);
+		}
+		case tau_parser::bv: {
+			auto expr = annotate_bv_ctes(form->child[0], widths);
+			return wrap(tau_parser::bv, expr);
+		}
+		case tau_parser::wff_neg: {
+			auto expr = annotate_bv_ctes(form->child[0], widths);
+			return wrap(tau_parser::wff_neg, expr);
+		}
+		case tau_parser::wff_and: {
+			auto left = annotate_bv_ctes(form->child[0], widths);
+			auto right = annotate_bv_ctes(form->child[1], widths);
+			return wrap(tau_parser::wff_and, {left, right});
+		}
+		case tau_parser::wff_or: {
+			auto left = annotate_bv_ctes(form->child[0], widths);
+			auto right = annotate_bv_ctes(form->child[1], widths);
+			return wrap(tau_parser::wff_or, {left, right});
+		}
+		case tau_parser::wff_ex: 
+		case tau_parser::wff_all: {
+			auto new_body = annotate_bv_ctes(form->child[1], widths);
+			auto new_form = make_node(form->value, {form->child[0], new_body});
+			return new_form;
+		}
+		case tau_parser::bv_eq: 
+		case tau_parser::bv_neq:
+		case tau_parser::bv_less_equal:
+		case tau_parser::bv_nleq:
+		case tau_parser::bv_greater:
+		case tau_parser::bv_ngreater:
+		case tau_parser::bv_greater_equal:
+		case tau_parser::bv_ngeq:
+		case tau_parser::bv_less:
+		case tau_parser::bv_nless: {
+			// collect all ctes and, if possible, type them
+			if (auto bv_type = find_top(form, is_non_terminal<tau_parser::bv_type, BAs...>); bv_type) {
+				std::map<tau<BAs...>, tau<BAs...>> changes;
+				auto ctes = select_top(form, is_non_terminal<tau_parser::bitvector, BAs...>);
+				for (const auto& cte : ctes) {
+					if (auto type = cte | tau_parser::bv_type; !type) {
+						auto typed = wrap(tau_parser::bitvector, {cte->child[0], bv_type.value()});
+						changes[cte] = typed;
+					}
+				}
+				auto new_form = replace(form, changes);
+				return new_form;
+			}
+			return form;
+		}
+		default: {
+			// in the rest of the cases, we simply return the original form
+			// as there is nothing to change
+			return form;
+		}
+	}
+}
 
+template<typename...BAs>
+tau<BAs...> annotate_bv_ctes(const tau<BAs...>& form) {
+	resolver<BAs...> widths;
+	return annotate_bv_ctes(form, widths);
+}
 
 } // namespace idni::tau_lang
