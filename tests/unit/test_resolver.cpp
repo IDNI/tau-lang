@@ -5,6 +5,7 @@
 #include <cassert>
 
 #include "doctest.h"
+
 #include "test_helpers.h"
 #include "resolver.h"
 
