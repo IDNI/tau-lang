@@ -42,7 +42,7 @@ namespace idni::tau_lang {
 // Uncomment to compile in logging for hooks.
 // "hooks" must be listed in LOG_ENABLED_CHANNELS to pass the channel filter.
 //
-#define HOOK_LOGGING_ENABLED
+// #define HOOK_LOGGING_ENABLED
 
 // Uncomment to compile in logging for pretty printer
 // If enabled it prints information about traversing nodes.

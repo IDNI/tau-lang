@@ -47,15 +47,12 @@ TEST_SUITE("Alignments") {
 		tref spec = create_spec("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t-1] = 1).");
 		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
-#ifndef DEBUG
 	TEST_CASE("mixed_lookback_two_st_1") {
 		tref spec = create_spec("(always o1[t-2] = 1) && (sometimes o1[t-3] = 0) && (sometimes o1[t] = 1).");
 		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
-
 	TEST_CASE("mixed_lookback_two_st_2") {
 		tref spec = create_spec("(always o1[t-2] = 1) && (sometimes o1[t-3] = 1) && (sometimes o1[t] = 0).");
 		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
-#endif
 }
