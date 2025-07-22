@@ -18,7 +18,7 @@ set(TESTS
 	tau_ba3
 	wff_hooks
 	wff_normalization
-	
+
 	### only several tests fail
 	ref_types             # remaining 2 tests (fp call over inferred refs incl bf, and typo undetected)
 
