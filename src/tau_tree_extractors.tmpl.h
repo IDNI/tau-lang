@@ -341,7 +341,7 @@ template <NodeType node>
 int_t get_max_shift(const trefs& io_vars, bool ignore_temps) {
 	int_t max_shift = 0;
 	for (tref v : io_vars) {
-		if (ignore_temps && tree<node>::get(v).get_string()[0] == '_')
+		if (ignore_temps && get_var_name<node>(v)[0] == '_')
 			continue;
 		max_shift = std::max(max_shift, get_io_var_shift<node>(v));
 	}

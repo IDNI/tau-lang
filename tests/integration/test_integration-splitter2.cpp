@@ -17,7 +17,7 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		CHECK(tau::get(s).to_str() == "{ o1[t]o2[t] = 0 } : tau ({ o1[t]o2[t] = 0 } : tau v)' = 0");
+		CHECK(tau::get(s).to_str() == "{ o1[t :  _0_]o2[t :  _0_] = 0 } : tau ({ o1[t :  _0_]o2[t :  _0_] = 0 } : tau v)' = 0");
 	}
 
 	TEST_CASE("Tau_splitter_tau_coeff2") {
@@ -26,9 +26,6 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		auto s_str = tau::get(s).to_str();
-		CHECK((s_str == "{ o1[t]|o2[t] = 0 } : tau v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0) } : tau = 0"
-			|| s_str == "{ o1[t]|o2[t] = 0 } : tau v = 0 && v{ !(always o2[t] = 0 && o1[t] = 0) } = 0"
-			|| s_str == "{ o1[t]|o2[t] = 0 } v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0) } : tau = 0"
-			|| s_str == "{ o1[t]|o2[t] = 0 } v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0) } = 0"));
+		CHECK((s_str == "{ o1[t :  _0_]|o2[t :  _0_] = 0 } : tau v = 0 && v{ !(always o1[t :  _0_] = 0 && o2[t :  _0_] = 0) } : tau = 0"));
 	}
 }
