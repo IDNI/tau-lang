@@ -649,7 +649,7 @@ size_t interpreter<node, in_t, out_t>::get_type_atomic_fm(tref fm,
 	trefs io_vars = tau::get(fm).select_top(is_child<node, tau::io_var>);
 
 	// Check if any io_var has a predefined type
-	size_t type;
+	size_t type = 0;
 	for (tref io_var : io_vars) {
 		if (size_t t = inputs.type_of(get_var_name_node<node>(io_var))) {
 			if (type != 0 && type != t) {
@@ -847,7 +847,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 			continue;
 
 		// Now try to add always part of old spec in a pointwise way
-		tref new_spec_pointwise;
+		tref new_spec_pointwise = nullptr;
 		if (spec_always) {
 			if (upd_always) {
 				tref aw = always_conjunction<node>(
