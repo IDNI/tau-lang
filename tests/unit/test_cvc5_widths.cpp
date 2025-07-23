@@ -23,7 +23,7 @@ TEST_SUITE("annotate bv widths") {
 		CHECK( select_all(expr, is_non_terminal<tau_parser::type, Bool>).size() == 0 );
 		CHECK( select_all(annotated, is_non_terminal<tau_parser::type, Bool>).size() == 0 );
 		CHECK( annotated == expr );
-		
+
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(info) << "Expr: " << expr;
 		BOOST_LOG_TRIVIAL(info) << "Annotated: " << annotated;
@@ -67,7 +67,7 @@ TEST_SUITE("annotate bv widths") {
 		auto annotated = annotate_bv_widths(expr);
 		CHECK( select_all(expr, is_non_terminal<tau_parser::type, Bool>).size() == 0 );
 		CHECK( select_all(annotated, is_non_terminal<tau_parser::type, Bool>).size() == 1 );
-		
+
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(info) << "Expr: " << expr;
 		BOOST_LOG_TRIVIAL(info) << "Annotated: " << annotated;
@@ -109,7 +109,7 @@ TEST_SUITE("annotate bv widths") {
 		auto annotated = annotate_bv_widths(expr);
 		CHECK( select_all(expr, is_non_terminal<tau_parser::type, Bool>).size() == 0 );
 		CHECK( select_all(annotated, is_non_terminal<tau_parser::type, Bool>).size() == 2 );
-		
+
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(info) << "Expr: " << expr;
 		print_tau_tree(std::cout, expr);
@@ -125,7 +125,7 @@ TEST_SUITE("annotate bv widths") {
 		auto annotated = annotate_bv_widths(expr);
 		CHECK( select_all(expr, is_non_terminal<tau_parser::type, Bool>).size() == 1 );
 		CHECK( select_all(annotated, is_non_terminal<tau_parser::type, Bool>).size() == 2 );
-		
+
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(info) << "Expr: " << expr;
 		BOOST_LOG_TRIVIAL(info) << "Annotated: " << annotated;
@@ -139,7 +139,7 @@ TEST_SUITE("annotate bv widths") {
 		auto annotated = annotate_bv_widths(expr);
 		CHECK( select_all(expr, is_non_terminal<tau_parser::type, Bool>).size() == 1 );
 		CHECK( select_all(annotated, is_non_terminal<tau_parser::type, Bool>).size() == 3 );
-		
+
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(info) << "Expr: " << expr;
 		BOOST_LOG_TRIVIAL(info) << "Annotated: " << annotated;
@@ -153,7 +153,7 @@ TEST_SUITE("annotate bv widths") {
 		auto annotated = annotate_bv_widths(expr);
 		CHECK( select_all(expr, is_non_terminal<tau_parser::type, Bool>).size() == 1 );
 		CHECK( select_all(annotated, is_non_terminal<tau_parser::type, Bool>).size() == 3 );
-		
+
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(info) << "Expr: " << expr;
 		BOOST_LOG_TRIVIAL(info) << "Annotated: " << annotated;
@@ -167,7 +167,21 @@ TEST_SUITE("annotate bv widths") {
 		auto annotated = annotate_bv_widths(expr);
 		CHECK( select_all(expr, is_non_terminal<tau_parser::type, Bool>).size() == 0 );
 		CHECK( select_all(annotated, is_non_terminal<tau_parser::type, Bool>).size() == 2 );
-		
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(info) << "Expr: " << expr;
+		BOOST_LOG_TRIVIAL(info) << "Annotated: " << annotated;
+		#endif // DEBUG
+	}
+
+	TEST_CASE("one chain of free vars and a constant") {
+		const char* sample = "x =_ y && y =_ z && z =_ w && w =_ 1:bv16";
+		auto src = make_tau_source(sample, { .start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto annotated = annotate_bv_widths(expr);
+		CHECK( select_all(expr, is_non_terminal<tau_parser::type, Bool>).size() == 0 );
+		CHECK( select_all(annotated, is_non_terminal<tau_parser::type, Bool>).size() == 7 );
+
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(info) << "Expr: " << expr;
 		BOOST_LOG_TRIVIAL(info) << "Annotated: " << annotated;
@@ -185,7 +199,7 @@ TEST_SUITE("annotate bv ctes") {
 		CHECK( select_all(expr, is_non_terminal<tau_parser::bv_type, Bool>).size() == 0 );
 		CHECK( select_all(annotated, is_non_terminal<tau_parser::bv_type, Bool>).size() == 0 );
 		CHECK( annotated == expr );
-		
+
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(info) << "Expr: " << expr;
 		BOOST_LOG_TRIVIAL(info) << "Annotated: " << annotated;
