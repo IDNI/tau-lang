@@ -94,7 +94,7 @@ void build_input(const std::string& name,
 	for (const auto& val : values) {
 		auto in_var = build_in_var_at_n<node_t>(name, t);
 		auto v = node_t::nso_factory::instance().parse(val, type);
-		auto v_const = tau::get_ba_constant(v.value().first,
+		auto v_const = tau::build_bf_ba_constant(v.value().first,
 			get_ba_type_id<node_t>(type));
 
 		if (assgn.size() <= t) {
@@ -115,7 +115,7 @@ void build_output(const std::string& name, const std::vector<std::string>& value
 			assgn.emplace(out_var, nullptr);
 		} else {
 			auto v = node_t::nso_factory::instance().parse(val, type);
-			auto v_const = tau::get_ba_constant(v.value().first,
+			auto v_const = tau::build_bf_ba_constant(v.value().first,
 				get_ba_type_id<node_t>(type));
 			assgn.emplace(out_var, v_const);
 		}
