@@ -35,7 +35,7 @@ struct output_console {
 	bool write(const assignment<node_t>& outputs) const {
 		// for each stream in out.streams, write the value from the solution
 		for (const auto& [var, value]: outputs)
-			std::cout << var << " := " << value << "\n";
+			std::cout << tau::get(var) << " := " << tau::get(value) << "\n";
 		return true; // success (always)
 	}
 
@@ -616,10 +616,11 @@ TEST_SUITE("with inputs and outputs") {
 TEST_SUITE("test inputs") {
 
 	TEST_CASE("reading from file with sbf inputs") {
+		bdd_init<Bool>();
 		typed_io_vars input_map;
 		tref var = build_var_name_indexed<node_t>(1);
 		input_map[get_var_name_sid<node_t>(var)] = {
-			get_typed_stream<node_t>("sbf", "integration/test_files/sbf-alternating_zeros_and_ones-length_10.in") };
+			get_typed_stream<node_t>("sbf", "../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in") };
 		finputs<node_t> inputs(input_map);
 		CHECK ( inputs.type_of(var) > 0 );
 		for (size_t i = 0; i < 10; ++i) {
@@ -634,10 +635,11 @@ TEST_SUITE("test inputs") {
 	}
 
 	TEST_CASE("reading from file with tau program inputs") {
+		bdd_init<Bool>();
 		typed_io_vars input_map;
 		tref var = build_var_name_indexed<node_t>(1);
 		input_map[get_var_name_sid<node_t>(var)] = {
-			get_typed_stream<node_t>("tau", "integration/test_files/tau-alternating_zeros_and_ones-length_10.in") };
+			get_typed_stream<node_t>("tau", "../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in") };
 		finputs<node_t> inputs(input_map);
 		CHECK ( inputs.type_of(var) > 0 );
 		for (size_t i = 0; i < 10; ++i) {
@@ -655,6 +657,7 @@ TEST_SUITE("test inputs") {
 TEST_SUITE("test outputs") {
 
 	TEST_CASE("writing to file") {
+		bdd_init<Bool>();
 		typed_io_vars output_map;
 		tref var = build_var_name_indexed<node_t>(1);
 		size_t var_sid = get_var_name_sid<node_t>(var);
@@ -676,6 +679,7 @@ TEST_SUITE("test outputs") {
 	}
 
 	TEST_CASE("writing to files: two outputs") {
+		bdd_init<Bool>();
 		typed_io_vars output_map;
 		size_t type = get_ba_type_id<node_t>("sbf");
 		tref var1 = build_var_name_indexed<node_t>(1);
@@ -706,6 +710,7 @@ TEST_SUITE("test outputs") {
 	}
 
 	TEST_CASE("writing to files: completing outputs") {
+		bdd_init<Bool>();
 		typed_io_vars output_map;
 		size_t type = get_ba_type_id<node_t>("sbf");
 		auto var1 = build_var_name_indexed<node_t>(1);
