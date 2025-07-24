@@ -199,7 +199,7 @@ tref tau_bad_splitter(tref fm) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	tref new_uniter_const = tau::build_bf_neq(
-		get_new_uninterpreted_constant<node>(fm, "split"));
+		get_new_uninterpreted_constant<node>(fm, "split", get_ba_type_id<node>("tau")));
 	trefs clauses = get_dnf_wff_clauses<node>(fm);
 	// Add bad splitter only to a single disjunct if possible
 	if (!clauses.empty()) {

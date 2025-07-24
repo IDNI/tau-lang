@@ -92,10 +92,10 @@ void build_input(const std::string& name,
 {
 	size_t t = 0;
 	for (const auto& val : values) {
-		auto in_var = build_in_var_at_n<node_t>(name, t);
+		size_t ba_type = get_ba_type_id<node_t>(type);
+		auto in_var = build_in_var_at_n<node_t>(name, t, ba_type);
 		auto v = node_t::nso_factory::instance().parse(val, type);
-		auto v_const = tau::build_bf_ba_constant(v.value().first,
-			get_ba_type_id<node_t>(type));
+		auto v_const = tau::build_bf_ba_constant(v.value().first, ba_type);
 
 		if (assgn.size() <= t) {
 			subtree_map<node_t, tref> a;
@@ -110,13 +110,14 @@ void build_output(const std::string& name, const std::vector<std::string>& value
 		const std::string& type, auto& assgn) {
 	size_t t = 0;
 	for (const auto& val : values) {
-		auto out_var = build_out_var_at_n<node_t>(name, t);
+		size_t ba_type = get_ba_type_id<node_t>(type);
+		auto out_var = build_out_var_at_n<node_t>(name, t, ba_type);
 		if (val.empty()) {
 			assgn.emplace(out_var, nullptr);
 		} else {
 			auto v = node_t::nso_factory::instance().parse(val, type);
 			auto v_const = tau::build_bf_ba_constant(v.value().first,
-				get_ba_type_id<node_t>(type));
+				ba_type);
 			assgn.emplace(out_var, v_const);
 		}
 		++t;
@@ -573,7 +574,8 @@ TEST_SUITE("with inputs and outputs") {
 		size_t t = 0;
 		for (tref value : values) {
 			assignment<node_t> assignment;
-			assignment[build_in_var_at_n_indexed<node_t>(1, t)] = value;
+			assignment[build_in_var_at_n_indexed<node_t>(
+				1, t, get_ba_type_id<node_t>("tau"))] = value;
 			assignments.push_back(assignment);
 			++t;
 		}
@@ -656,7 +658,8 @@ TEST_SUITE("test outputs") {
 		typed_io_vars output_map;
 		tref var = build_var_name_indexed<node_t>(1);
 		size_t var_sid = get_var_name_sid<node_t>(var);
-		tref var_0 = build_out_var_at_n_indexed<node_t>(1, 0);
+		size_t type = get_ba_type_id<node_t>("sbf");
+		tref var_0 = build_out_var_at_n_indexed<node_t>(1, 0, type);
 
 		output_map[var_sid] = {
 			get_typed_stream<node_t>("sbf", random_file()) };
@@ -674,12 +677,13 @@ TEST_SUITE("test outputs") {
 
 	TEST_CASE("writing to files: two outputs") {
 		typed_io_vars output_map;
+		size_t type = get_ba_type_id<node_t>("sbf");
 		tref var1 = build_var_name_indexed<node_t>(1);
 		tref var2 = build_var_name_indexed<node_t>(2);
 		size_t var1_sid = get_var_name_sid<node_t>(var1);
 		size_t var2_sid = get_var_name_sid<node_t>(var2);
-		tref var1_0 = build_out_var_at_n<node_t>(var1, 0);
-		tref var2_0 = build_out_var_at_n<node_t>(var2, 0);
+		tref var1_0 = build_out_var_at_n<node_t>(var1, 0, type);
+		tref var2_0 = build_out_var_at_n<node_t>(var2, 0, type);
 		output_map[var1_sid] = {
 			get_typed_stream<node_t>("sbf", random_file()) };
 		output_map[var2_sid] = {
@@ -703,12 +707,13 @@ TEST_SUITE("test outputs") {
 
 	TEST_CASE("writing to files: completing outputs") {
 		typed_io_vars output_map;
+		size_t type = get_ba_type_id<node_t>("sbf");
 		auto var1 = build_var_name_indexed<node_t>(1);
 		auto var2 = build_var_name_indexed<node_t>(2);
 		size_t var1_sid = get_var_name_sid<node_t>(var1);
 		size_t var2_sid = get_var_name_sid<node_t>(var2);
-		auto var1_0 = build_out_var_at_n<node_t>(var1, 0);
-		auto var2_1 = build_out_var_at_n<node_t>(var2, 1);
+		auto var1_0 = build_out_var_at_n<node_t>(var1, 0, type);
+		auto var2_1 = build_out_var_at_n<node_t>(var2, 1, type);
 		output_map[var1_sid] = {
 			get_typed_stream<node_t>("sbf", random_file()) };
 		output_map[var2_sid] = {

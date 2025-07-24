@@ -90,7 +90,7 @@ int_t get_new_var_id(tref fm) {
 // Given a tref produce a number i such that the uninterpreted constant const_i is
 // not present
 template <NodeType node>
-tref get_new_uninterpreted_constant(tref fm, const std::string& name) {
+tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t type) {
 	using tau = tree<node>;
 	trefs uninter_consts
 		= tau::get(fm).select_top(is<node, tau::uconst_name>);
@@ -101,7 +101,7 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name) {
 		if (!tmp.empty()) ids.insert(std::stoi(id));
 	}
 	std::string id = std::to_string(*ids.rbegin() + 1);
-	tref uninter_const = tau::build_bf_uconst("", name + id);
+	tref uninter_const = tau::build_bf_uconst("", name + id, type);
 	return uninter_const;
 }
 

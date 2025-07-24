@@ -2542,11 +2542,12 @@ tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
 		// Skip initial conditions
 		if (is_io_initial<node>(io_var)) continue;
 		int_t var_shift = get_io_var_shift<node>(io_var);
+		size_t type = tau::get(io_var).get_ba_type();
 		changes[io_var] = tau::get(io_var).is_input_variable()
 			? tau::trim(build_in_var_at_t_minus<node>(get_var_name_node<node>(
-				io_var), var_shift + shift))
+				io_var), var_shift + shift, type))
 			: tau::trim(build_out_var_at_t_minus<node>(get_var_name_node<node>(
-				io_var), var_shift + shift));
+				io_var), var_shift + shift, type));
 	}
 	return rewriter::replace<node>(fm, changes);
 }
@@ -2561,11 +2562,12 @@ tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
 		int_t tp = get_io_time_point<node>(io_var);
 		// Make sure that the resulting time point is positive
 		if (tp + shift < 0) return tau::_F();
+		size_t type = tau::get(io_var).get_ba_type();
 		changes.emplace(io_var, tau::get(io_var).is_input_variable()
 			? tau::trim(build_in_var_at_n<node>(
-				get_var_name_node<node>(io_var), tp + shift))
+				get_var_name_node<node>(io_var), tp + shift, type))
 			: tau::trim(build_out_var_at_n<node>(
-				get_var_name_node<node>(io_var), tp + shift)));
+				get_var_name_node<node>(io_var), tp + shift, type)));
 	}
 	return rewriter::replace<node>(fm, changes);
 }

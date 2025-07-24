@@ -106,7 +106,8 @@ struct node {
 	// factory for a ba constant node
 	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
 
-	// factory for a node of a given node::type and BA type id
+	// factory for a node of a given node::type and BA type id,
+	// also sets term to 1
 	static constexpr node_t ba_typed(type nt, size_t ba_tid = 0);
 
 	// factories for an io_var node
@@ -221,8 +222,20 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref get(const node::type& nt, const trefs& ch,
 			tref r = nullptr); // with vector of children
 	static tref get(const node::type& nt, // with initializer list of children
-					const std::initializer_list<tref>& ch, tref r = nullptr);
+			const std::initializer_list<tref>& ch, tref r = nullptr);
 	static tref get(const node::type& nt, const std::string& str); // with string
+	// typed variants
+	static tref get_typed(const node::type& nt, size_t ba_type_id);
+	static tref get_typed(const node::type& nt, tref ch, size_t ba_type_id);
+	static tref get_typed(const node::type& nt, tref ch1, tref ch2, size_t ba_type_id);
+	static tref get_typed(const node::type& nt, const tref* ch, size_t len,
+				size_t ba_type_id, tref r = nullptr);
+	static tref get_typed(const node::type& nt, const trefs& ch,
+				size_t ba_type_id, tref r = nullptr); // with vector of children
+	static tref get_typed(const node::type& nt,
+				// with initializer list of children
+				const std::initializer_list<tref>& ch, size_t ba_type_id, tref r = nullptr);
+	static tref get_typed(const node::type& nt, const std::string& str, size_t ba_type_id);
 
 	// terminals
 	// creates a num node from a number n
@@ -526,38 +539,38 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_ba_constant(const constant& constant,
 					 size_t ba_type_id);
 	static tref build_bf_uconst(
-		const std::string& name1, const std::string& name2);
+		const std::string& name1, const std::string& name2, size_t type_id);
 	static tref build_var_name(size_t sid);
 	static tref build_var_name(const std::string& name);
 	static tref build_var_name_indexed(size_t index);
-	static tref build_variable(tref var_name_node);
-	static tref build_variable(const std::string& name);
-	static tref build_bf_variable(tref var_name_node);
-	static tref build_bf_variable(const std::string& name);
-	static tref build_in_var(tref var_name_node, tref offset_node);
-	static tref build_in_var_at_n(tref var_name_node, int_t pos);
-	static tref build_in_var_at_n(const std::string& name, int_t pos);
-	static tref build_in_var_at_n_indexed(size_t index, int_t pos);
-	static tref build_in_var_at_t(tref var_name_node, std::string t = "t");
-	static tref build_in_var_at_t_indexed(size_t index, std::string t = "t");
+	static tref build_variable(tref var_name_node, size_t type_id);
+	static tref build_variable(const std::string& name, size_t type_id);
+	static tref build_bf_variable(tref var_name_node, size_t type_id);
+	static tref build_bf_variable(const std::string& name, size_t type_id);
+	static tref build_in_var(tref var_name_node, tref offset_node, size_t type_id);
+	static tref build_in_var_at_n(tref var_name_node, int_t pos, size_t type_id);
+	static tref build_in_var_at_n(const std::string& name, int_t pos, size_t type_id);
+	static tref build_in_var_at_n_indexed(size_t index, int_t pos, size_t type_id);
+	static tref build_in_var_at_t(tref var_name_node, size_t type_id, std::string t = "t");
+	static tref build_in_var_at_t_indexed(size_t index, size_t type_id, std::string t = "t");
 	static tref build_in_var_at_t_minus(
-		tref var_name_node, size_t shift, std::string t = "t");
+		tref var_name_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_in_var_at_t_minus(
-		const std::string& var_name, size_t shift, std::string t = "t");
+		const std::string& var_name, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_in_var_at_t_minus_indexed(
-		size_t index, size_t shift, std::string t = "t");
-	static tref build_out_var(tref var_name_node, tref offset_node);
-	static tref build_out_var_at_n(tref var_name_node, int_t pos);
-	static tref build_out_var_at_n(const std::string& name, int_t pos);
-	static tref build_out_var_at_n_indexed(size_t index, int_t pos);
-	static tref build_out_var_at_t(tref var_name_node, std::string t = "t");
-	static tref build_out_var_at_t_indexed(size_t index, std::string t="t");
+		size_t index, size_t shift, size_t type_id, std::string t = "t");
+	static tref build_out_var(tref var_name_node, tref offset_node, size_t type_id);
+	static tref build_out_var_at_n(tref var_name_node, int_t pos, size_t type_id);
+	static tref build_out_var_at_n(const std::string& name, int_t pos, size_t type_id);
+	static tref build_out_var_at_n_indexed(size_t index, int_t pos, size_t type_id);
+	static tref build_out_var_at_t(tref var_name_node, size_t type_id, std::string t = "t");
+	static tref build_out_var_at_t_indexed(size_t index, size_t type_id, std::string t="t");
 	static tref build_out_var_at_t_minus(
-		tref var_name_node, size_t shift, std::string t = "t");
+		tref var_name_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_out_var_at_t_minus(
-		const std::string& io_var_node, size_t shift, std::string t = "t");
+		const std::string& io_var_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_out_var_at_t_minus_indexed(
-		size_t index, size_t shift, std::string t = "t");
+		size_t index, size_t shift, size_t type_id, std::string t = "t");
 
 private:
 	using tt = traverser;

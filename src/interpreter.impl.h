@@ -415,7 +415,8 @@ std::pair<std::optional<assignment<node>>, bool>
 			}
 			// Complete outputs using time_point and current solution
 			for (const auto& [o, _] : outputs.streams) {
-				tref ot = build_out_var_at_n<node>(o, time_point);
+				tref ot = build_out_var_at_n<node>(
+					o, time_point, outputs.type_of(o));
 				if (auto it = global.find(ot); it == global.end()) {
 					memory.emplace(ot, tau::_0());
 					global.emplace(ot, tau::_0());
@@ -502,7 +503,7 @@ std::vector<tref> interpreter<node, in_t, out_t>::build_inputs_for_step(
 	trefs step_inputs;
 	for (auto& [var, _] : inputs.streams)
 		step_inputs.emplace_back(tau::trim(
-					build_in_var_at_n<node>(var, t)));
+			build_in_var_at_n<node>(var, t, inputs.type_of(var))));
 	return step_inputs;
 }
 
@@ -905,7 +906,8 @@ solution_with_max_update(tref spec) {
 		// solve the given system of equations
 		return solve<node>(fm, options);
 	};
-	tref u = build_out_var_at_n<node>("u", time_point);
+	tref u = build_out_var_at_n<node>("u", time_point,
+					get_ba_type_id<node>("tau"));
 	auto is_u_stream = [&u](const auto& n) {
 		return n == u;
 	};
@@ -1022,7 +1024,7 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 
 		// Update interpreter in case the output stream u is present and unequal to 0
 		auto update_stream = build_out_var_at_n<node>(
-			"u", intrprtr.time_point - 1);
+			"u", intrprtr.time_point - 1, get_ba_type_id<node>("tau"));
 		// Update only if u is of type tau
 		if (size_t t = intrprtr.outputs.type_of(get_var_name_node<node>(update_stream));
 			t != 0 && t == get_ba_type_id<node>("tau"))

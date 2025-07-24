@@ -364,7 +364,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 				// bool var_t = tau::get(var).is(tau::variable);
 				std::ostringstream ss;
 				ss << "x" << var_id; ++var_id;
-				auto unused_var = build_bf_variable<node>(ss.str());
+				size_t type = tau::get(var).get_ba_type();
+				auto unused_var = build_bf_variable<node>(ss.str(), type);
 				// ???
 				// var_t
 					// ? build_bf_var<node>(ss.str())
