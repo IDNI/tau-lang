@@ -53,11 +53,12 @@ tref transform_io_var(tref io_var, int_t time_point) {
 	// Check if io_var has constant time point
 	if (is_io_initial<node>(io_var)) return io_var;
 	int_t shift = get_io_var_shift<node>(io_var);
+	size_t type = tau::get(io_var).get_ba_type();
 	if (tau::get(io_var).is_input_variable())
 		return tau::trim(build_in_var_at_n<node>(
-			get_var_name_node<node>(io_var), time_point - shift));
+			get_var_name_node<node>(io_var), time_point - shift, type));
 	else return tau::trim(build_out_var_at_n<node>(
-			get_var_name_node<node>(io_var), time_point - shift));
+			get_var_name_node<node>(io_var), time_point - shift, type));
 }
 
 template <NodeType node>
@@ -79,8 +80,9 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({
 			get_var_name<node>(io_vars[pos]), time_point })) continue;
+		size_t type = tau::get(io_vars[pos]).get_ba_type();
 		tref var = tau::trim(build_out_var_at_n<node>(
-			get_var_name_node<node>(io_vars[pos]), time_point));
+			get_var_name_node<node>(io_vars[pos]), time_point, type));
 		auto res = cache.emplace(var);
 		if (res.second) fm = tau::build_wff_ex(var, fm);
 	}
@@ -106,8 +108,9 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({
 			get_var_name<node>(io_vars[pos]), time_point })) continue;
+		size_t type = tau::get(io_vars[pos]).get_ba_type();
 		tref var = tau::trim(build_in_var_at_n<node>(
-			get_var_name_node<node>(io_vars[pos]), time_point));
+			get_var_name_node<node>(io_vars[pos]), time_point, type));
 		auto res = cache.emplace(var);
 		if (res.second) fm = tau::build_wff_all(var, fm);
 	}
@@ -186,7 +189,7 @@ std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 		auto new_io_var = transform_io_var<node>(io_vars[i],time_point);
 		changes[io_vars[i]] = new_io_var;
 	}
-	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point);
+	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point, 0);
 	c_pholder = tau::build_bf_eq(c_pholder);
 	pholder_to_st.emplace(c_pholder, rewriter::replace<node>(st, changes));
 	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes),
@@ -236,7 +239,7 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 	// We need a placeholder symbol in order to substitute during the next step
 	tref c_chi = rewriter::replace<node>(chi, changes);
 	tref c_pholder = build_out_var_at_n<node>("_pholder",
-							time_point + step_num);
+							time_point + step_num, 0);
 	c_pholder = tau::build_bf_eq(c_pholder);
 	tref c_st = rewriter::replace<node>(st, changes);
 	pholder_to_st.emplace(c_pholder, c_st);
@@ -448,20 +451,21 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 		int_t time_point = get_io_time_point<node>(io_var);
 		if (time_point <= highest_init_cond) continue;
 		tref transformed_var;
+		size_t type = tau::get(io_var).get_ba_type();
 		if (time_point - lookback != 0)
 			transformed_var = tau::get(io_var).is_input_variable()
 				? tau::trim(build_in_var_at_t_minus<node>(
 					get_var_name_node<node>(io_var),
-					abs(time_point - lookback), "t"))
+					abs(time_point - lookback), type,"t"))
 				: tau::trim(build_out_var_at_t_minus<node>(
 					get_var_name_node<node>(io_var),
-					abs(time_point - lookback), "t"));
+					abs(time_point - lookback), type,"t"));
 		else
 			transformed_var = tau::get(io_var).is_input_variable()
 				? tau::trim(build_in_var_at_t<node>(
-					get_var_name_node<node>(io_var), "t"))
+					get_var_name_node<node>(io_var), type, "t"))
 				: tau::trim(build_out_var_at_t<node>(
-					get_var_name_node<node>(io_var), "t"));
+					get_var_name_node<node>(io_var), type, "t"));
 		changes.emplace(io_var, transformed_var);
 	}
 	return rewriter::replace<node>(fm, changes);
@@ -471,18 +475,20 @@ template <NodeType node>
 tref build_flag_on_lookback(tref var_name_node, const std::string& var,
 							const int_t lookback)
 {
+	size_t flag_type = get_ba_type_id<node>("sbf");
 	if (lookback >= 2) return build_out_var_at_t_minus<node>(
-					var_name_node, lookback - 1, var);
-	else return build_out_var_at_t<node>(var_name_node, var);
+		var_name_node, lookback - 1, flag_type, var);
+	else return build_out_var_at_t<node>(var_name_node, flag_type, var);
 }
 
 template <NodeType node>
 tref build_prev_flag_on_lookback(tref io_var_node,
 				const std::string& var, const int_t lookback)
 {
+	size_t flag_type = get_ba_type_id<node>("sbf");
 	if (lookback >= 2)
-		return build_out_var_at_t_minus<node>(io_var_node, lookback, var);
-	else return build_out_var_at_t_minus<node>(io_var_node, 1, var);
+		return build_out_var_at_t_minus<node>(io_var_node, lookback, flag_type, var);
+	else return build_out_var_at_t_minus<node>(io_var_node, 1, flag_type, var);
 }
 
 template <NodeType node>
@@ -515,7 +521,9 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 			ct.find_top(is<node, tau::ctnvar>)).get_string();
 		std::stringstream ss; ss << "_f" << ctn_id++;
 		tref var = tau::build_var_name(ss.str());
-		tref flag_iovar = tau::trim(build_out_var_at_t<node>(var, ctnvar));
+		size_t flag_type = get_ba_type_id<node>("sbf");
+		tref flag_iovar = tau::trim(
+			build_out_var_at_t<node>(var, flag_type, ctnvar));
 
 		// Take lookback of formula into account for constructing rule
 		tref flag_rule1 = build_prev_flag_on_lookback<node>(
@@ -649,8 +657,9 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 		// Check if input stream variable
 		if (tau::get(io_vars.back())[0].is_input_variable()) {
 			// Give name of io_var and make it non-user definable with "_"
+			size_t type = tau::get(io_var).get_ba_type();
 			tref uc = tau::build_bf_uconst("_" + TAU_TO_STR(io_var),
-							std::to_string(number));
+							std::to_string(number), type);
 			tref cdn = tau::build_bf_eq(tau::build_bf_xor(
 				tau::get(tau::bf, io_var), uc));
 			guard = tau::build_wff_and(guard, cdn);
@@ -700,15 +709,17 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 
 		std::stringstream ss; ss << "_e" << n;
 		tref out = tau::build_var_name(ss.str());
+		size_t flag_type = get_ba_type_id<node>("sbf");
 		// Build the eventual var flags based on the maximal lookback
-		tref eNt_without_lookback = build_out_var_at_t<node>(out, "t");
+		tref eNt_without_lookback = build_out_var_at_t<node>(
+			out, flag_type, "t");
 		tref eNt = build_flag_on_lookback<node>(out, "t",
 						max_st_lookback + aw_lookback);
 		tref eNt_prev = build_prev_flag_on_lookback<node>(out, "t",
 						max_st_lookback + aw_lookback);
 
 		tref eN0_is_not_zero = tau::build_bf_neq(
-			build_out_var_at_n<node>(out, start_time));
+			build_out_var_at_n<node>(out, start_time, flag_type));
 		tref eNt_is_zero          = tau::build_bf_eq(eNt);
 		// tref eNt_is_not_zero      = tau::build_bf_neq(eNt);
 		tref eNt_prev_is_zero     = tau::build_bf_eq(eNt_prev);

@@ -77,6 +77,7 @@ inline bool is_term_nt(size_t nt) {
 		case tau_parser::bf_t:
 		case tau_parser::bf_f:
 		case tau_parser::variable:
+		case tau_parser::io_var:
 			return true;
 		default:
 			return false;

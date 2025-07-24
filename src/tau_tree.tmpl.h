@@ -283,8 +283,49 @@ tref tree<node>::get(const node::type& nt,
 }
 
 template <NodeType node>
-tref tree<node>::get(const node::type& nt, const std::string& s) {
-	return get(node(nt, dict(s)));
+tref tree<node>::get(const node::type& nt, const std::string& str) {
+	return get(node(nt, dict(str)));
+}
+
+template<NodeType node>
+tref tree<node>::get_typed(const typename node::type& nt, size_t ba_type_id) {
+	return get(node::ba_typed(nt, ba_type_id));
+}
+
+template<NodeType node>
+tref tree<node>::get_typed(const typename node::type& nt, tref ch,
+	size_t ba_type_id) {
+	return get(node::ba_typed(nt, ba_type_id), ch);
+}
+
+template<NodeType node>
+tref tree<node>::get_typed(const typename node::type& nt, tref ch1, tref ch2,
+	size_t ba_type_id) {
+	return get(node::ba_typed(nt, ba_type_id), ch1, ch2);
+}
+
+template<NodeType node>
+tref tree<node>::get_typed(const typename node::type& nt, const tref* ch,
+			size_t len, size_t ba_type_id, tref r) {
+	return get(node::ba_typed(nt, ba_type_id), ch, len, r);
+}
+
+template<NodeType node>
+tref tree<node>::get_typed(const typename node::type& nt, const trefs& ch,
+			size_t ba_type_id, tref r) {
+	return get(node::ba_typed(nt, ba_type_id), ch, r);
+}
+
+template<NodeType node>
+tref tree<node>::get_typed(const typename node::type& nt,
+			const std::initializer_list<tref>& ch, size_t ba_type_id, tref r) {
+	return get(node::ba_typed(nt, ba_type_id), ch, r);
+}
+
+template<NodeType node>
+tref tree<node>::get_typed(const typename node::type& nt,
+	const std::string& str, size_t ba_type_id) {
+	return get(node(nt, dict(str), true, ba_type_id));
 }
 
 //------------------------------------------------------------------------------
