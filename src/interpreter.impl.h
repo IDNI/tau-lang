@@ -984,7 +984,8 @@ trefs interpreter<node, in_t, out_t>::appear_within_lookback(const trefs& vars){
 
 template <NodeType node>
 tref unpack_tau_constant(tref constant) {
-	const auto& c = tree<node>::get(constant);
+	using tau = tree<node>;
+	const auto& c = tree<node>::get(tau::trim(constant));
 	if (!c.is_ba_constant()) return {};
 	tref main = node::nso_factory::instance()
 				.unpack_tau_ba(c.get_ba_constant());
