@@ -18,7 +18,7 @@ private:
 	subtree_map<node, tref> parent;
 	subtree_map<node, tref> next;
 	// The comparator used in order to decide the new root of a merged set
-	// The smaller root is choosen
+	// The smaller root is chosen
 	const comp& _comp;
 
 public:
