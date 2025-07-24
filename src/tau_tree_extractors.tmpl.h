@@ -170,9 +170,9 @@ std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r, bool wo_infe
 			: get_nso_rr<node>(rules, main_fm);
 
 	auto check_resolved_io_vars = [](htref form) {
-		for (tref io_var : tau::get(form).select_all(is_io_var<node>)) {
+		for (tref io_var : tau::get(form).select_all(is<node, tau::io_var>)) {
 			// LOG_TRACE << "io_var: " << LOG_FM_DUMP(io_var);
-			if (tau::get(io_var)[0].data() == 0) {
+			if (tau::get(io_var).data() == 0) {
 				LOG_ERROR << "I/O variable is not defined "
 					<< TAU_TO_STR(io_var);
 				return false;
