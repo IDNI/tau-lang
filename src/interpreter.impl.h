@@ -93,7 +93,7 @@ std::optional<assignment<node>> finputs<node>::read() {
 			return {};
 		}
 		current[var] =
-			tau::get_ba_constant(cnst.value().first, types[var]);
+			tau::build_bf_ba_constant(cnst.value().first, types[var]);
 	}
 	time_point += 1;
 	return current;
@@ -124,7 +124,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 				<< get_var_name<node>(vn) << "'\n";
 			return {};
 		} else {
-			std::cout << get_var_name<node>(vn) << " := ";
+			std::cout << tau::get(var) << " := ";
 			term::enable_getline_mode();
 			std::getline(std::cin, line);
 			term::disable_getline_mode();
@@ -140,7 +140,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 				get_ba_type_name<node>(it->second));
 		if (!cnst) {
 			LOG_ERROR << "Failed to parse input value '" << line
-				<< "' for stream '" << get_var_name<node>(vn)
+				<< "' for stream '" << tau::get(var)
 				<< "'\n";
 			return {};
 		}
@@ -218,42 +218,42 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 	// for each stream in out.streams, write the value from the solution
 	for (tref io_var : io_vars) {
 		// get the BA element associated with io_var_name
-		tref var = get_var_name_node<node>(io_var);
-		auto value = tt(outputs.find(var)->second) | tau::bf_constant;
+		tref var_name = get_var_name_node<node>(io_var);
+		auto value = tt(outputs.find(io_var)->second) | tau::bf_constant;
 		std::stringstream ss;
 		if (!value) {
 			// is bf_t
-			if (auto check = tt(outputs.find(var)->second)
+			if (auto check = tt(outputs.find(io_var)->second)
 					| tau::bf_t; check) {
-				size_t type = types.find(var)->second;
+				size_t type = types.find(var_name)->second;
 				ss << node::nso_factory::instance()
 					.one(get_ba_type_name<node>(type));
 			// is bf_f
-			} else if (auto check = tt(outputs.find(var)->second)
+			} else if (auto check = tt(outputs.find(io_var)->second)
 					| tau::bf_f; check) {
-				size_t type = types.find(var)->second;
+				size_t type = types.find(var_name)->second;
 				ss << node::nso_factory::instance()
 					.zero(get_ba_type_name<node>(type));
 			// is something else but not a BA element
 			} else {
 				LOG_ERROR << "No Boolean algebra element "
 					<< "assigned to output '"
-					<< TAU_TO_STR(var) << "'\n";
+					<< TAU_TO_STR(io_var) << "'\n";
 				return false;
 			}
 		} else {
 			ss << value.value();
 		}
 		// get the out_var_name tag
-		if (auto stream = streams.find(var); stream != streams.end())
+		if (auto stream = streams.find(var_name); stream != streams.end())
 			if (stream->second) stream->second.value() << ss.str() << "\n";
-			else std::cout << get_var_name<node>(var) << " := " << ss.str() << "\n";
+			else std::cout << tau::get(io_var) << " := " << ss.str() << "\n";
 		else {
-			if (auto name = get_var_name<node>(var);
+			if (auto name = get_var_name<node>(var_name);
 				!name.empty() && name.front() == '_') continue;
 
 			LOG_ERROR << "Failed to find output stream for stream '"
-				<< get_var_name<node>(var) << "'\n";
+				<< get_var_name<node>(var_name) << "'\n";
 			return false;
 		}
 	}
@@ -397,6 +397,7 @@ std::pair<std::optional<assignment<node>>, bool>
 				for (const auto& [var, value]: solution) {
 					// Check if we are dealing with a stream variable
 					if (tt(var) | tau::variable | tau::io_var) {
+						assert(tau::get(value).is(tau::bf));
 						if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
 							// std::cout << "time_point: " << time_point << "\n";
 							// std::cout << "var: " << var << "\n";
@@ -1023,7 +1024,7 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 		auto update_stream = build_out_var_at_n<node>(
 			"u", intrprtr.time_point - 1);
 		// Update only if u is of type tau
-		if (size_t t = intrprtr.outputs.type_of(tau::trim(update_stream));
+		if (size_t t = intrprtr.outputs.type_of(get_var_name_node<node>(update_stream));
 			t != 0 && t == get_ba_type_id<node>("tau"))
 		{
 			auto it = output.value().find(update_stream);
