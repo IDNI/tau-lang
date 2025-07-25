@@ -1,32 +1,27 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	### ok
 	ba_types_inference
 	bf_fixed_point
 	bf_hooks
 	bf_normalization
+	quantifiers
 	normal_forms
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval
+	interpreter
+	ref_types             # remaining 1 test (typo undetected)
+	satisfiability
 	sbf1
 	sbf2
-	quantifiers
-    satisfiability
 	solver
-    splitter
-    splitter2
+	splitter
+	splitter2
 	tau_ba1
 	tau_ba3
 	wff_hooks
 	wff_normalization
-
-	### only several tests fail
-	ref_types             # remaining 2 tests (fp call over inferred refs incl bf, and typo undetected)
-
-	### other fails
-	interpreter
 )
 
 foreach(TEST IN LISTS TESTS)
