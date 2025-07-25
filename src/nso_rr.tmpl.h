@@ -86,25 +86,29 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 				t[0].right_sibling() });
 		return n;
 	};
-	auto head_transformer = [&transformer](tref n) -> tref {
+	auto def_transformer = [&transformer](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if (t.is(tau::ref_arg) && t[0][0].is(tau::variable))
 			return tau::get(tau::ref_arg, tau::get(tau::bf,
 					tau::get(node(tau::capture,
 							t[0][0][0].data()))));
+		if (t.is(tau::bf) && t[0].is(tau::variable))
+			return tau::get(tau::bf,
+				tau::get(node(tau::capture,
+						t[0][0].data())));
 		return n;
 	};
-	auto transform = [&](const htree::sp& h, bool head = false) {
+	auto transform = [&](const htree::sp& h, bool def = false) {
 		tref n = pre_order<node>(h->get())
 				.apply_unique_until_change(transformer);
-		if (head) n = pre_order<node>(n)
-				.apply_unique_until_change(head_transformer);
+		if (def) n = pre_order<node>(n)
+				.apply_unique_until_change(def_transformer);
 		if (n != h->get()) return tau::geth(n);
 		return h;
 	};
 	rr<node> ret(nso_rr);
 	for (auto& r : ret.rec_relations) r.first = transform(r.first, true),
-					  r.second = transform(r.second);
+					  r.second = transform(r.second, true);
 	ret.main = transform(nso_rr.main);
 	LOG_TRACE << "-- transform_ref_args_to_captures result: " << LOG_RR_DUMP(ret);
 	return ret;
