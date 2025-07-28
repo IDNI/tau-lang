@@ -93,7 +93,7 @@ template <NodeType node>
 tref calculate_all_fixed_points(const rr<node>& recrel);
 
 template <NodeType node>
-tref apply_rr_to_formula (const rr<node>& nso_rr);
+tref apply_rr_to_formula(const rr<node>& nso_rr);
 
 template <NodeType node>
 tref normalizer(const rr<node>& fm);
