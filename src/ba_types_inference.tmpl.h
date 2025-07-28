@@ -246,7 +246,7 @@ tref ba_types_inference<node>::add_scope_ids(
 		}
 		case tau::wff_always:
 		case tau::wff_sometimes: {
-			tref x = add_scope_ids(t.first(), vscids, csid, ++tsid);
+			tref x = add_scope_ids(t.first(), vscids, csid, tsid);
 			if (x == nullptr) return nullptr;
 			return tau::get(nt, x);
 		}
