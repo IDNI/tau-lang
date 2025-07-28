@@ -41,10 +41,9 @@ private:
 
 	void clear();
 
-	std::map<size_t, size_t>  vars;     // var_sid_id -> var_scope_id
-	subtree_map<node, size_t> types;    // node -> ba_type_id
-	subtree_map<node, tref>   resolved; // untyped node -> resolved node
-	size_t untyped_n = 0;
+	std::map<size_t, size_t>  vars{};     // var_sid_id -> var_scope_id
+	subtree_map<node, size_t> types{};    // node -> ba_type_id
+	subtree_map<node, tref>   resolved{}; // untyped node -> resolved node
 
 	std::ostream& dump(std::ostream& os) const;
 	std::string dump_to_str() const;

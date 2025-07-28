@@ -13,11 +13,9 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref infer_ba_types(tref n) {
-	LOG_TRACE << "-- Infer BA types: " << LOG_FM(n);
+	DBG(LOG_TRACE << "-- Infer BA types: " << LOG_FM(n);)
 	ba_types_inference<node> infer;
 	tref nn = infer(n);
-	if (nn) LOG_TRACE << "-- Inferred BA types: " << LOG_FM_DUMP(nn);
-	else    LOG_TRACE << "-- Inferred BA types: nullptr";
 	return nn;
 }
 
@@ -29,6 +27,7 @@ tref ba_types_inference<node>::operator()(tref n) {
 	if (disabled) return n;
 	if (n == nullptr) return nullptr;
 
+#ifdef DEBUG
 	static size_t counter = 0;
 	counter++;
 	std::string id = "[" + LOG_BRIGHT_COLOR + std::to_string(counter)
@@ -36,109 +35,98 @@ tref ba_types_inference<node>::operator()(tref n) {
 	LOG_TRACE << id << LOG_SPLITTER;
 	LOG_TRACE << id << LOG_BRIGHT("BA type check and propagation: ")
 							<< LOG_FM_DUMP(n);
-
+#endif
 	size_t dflt = get_ba_type_id<node>(
 			node::nso_factory::instance().default_type());
 	subtree_map<node, tref> defaulted;
 
-	// LOG_TRACE << ba_types<node>::dump_to_str();
+	// DBG(LOG_TRACE << ba_types<node>::dump_to_str();)
 
-	untyped_n = 0;
 	var_scopes_t vscids; size_t tsid = 0;
 	tref scoped = add_scope_ids(n, vscids, 0, tsid);
 	if (scoped == nullptr) return nullptr;
 
-	LOG_TRACE << id << "-- BA elementes scoped: " << LOG_FM(scoped);
-	// LOG_TRACE << dump_to_str();
+	DBG(LOG_TRACE << id << "-- BA elementes scoped: " << LOG_FM(scoped);)
+	// DBG(LOG_TRACE << dump_to_str();)
 
-	LOG_TRACE << id << LOG_SPLITTER;
+	// DBG(LOG_TRACE << id << LOG_SPLITTER;)
 
-	LOG_TRACE << id << "-- Check and propagate: " << LOG_FM(n);
+	DBG(LOG_TRACE << id << "-- Check and propagate: " << LOG_FM(n);)
 	auto nn = check_and_propagate(scoped);
 
-	// LOG_TRACE << dump_to_str();
+	DBG(LOG_TRACE << dump_to_str();)
 	if (!nn) {
-		LOG_TRACE << id << "-- Check failed, returning nullptr for: "
-								<< LOG_FM(n);
+		DBG(LOG_TRACE << id << "-- Check failed, returning nullptr for: "
+								<< LOG_FM(n);)
 		return nullptr;
 	}
 
-	LOG_TRACE << id << "-- Check and propagate finished, set default type "
-		<< LOG_BA_TYPE(dflt) << " for untyped: " << LOG_FM(n);
+	DBG(LOG_TRACE << id << "-- Check and propagate finished, set default type "
+		<< LOG_BA_TYPE(dflt) << " for untyped: " << LOG_FM(n);)
 
-	// LOG_TRACE << ba_types<node>::dump_to_str();
+	// DBG(LOG_TRACE << ba_types<node>::dump_to_str();)
 
 	for (auto& [key, tid] : types) if (tau::get(key).get_ba_type() == 0) {
 		if (types[key] != 0) continue;
 		types[key] = dflt;
-		LOG_TRACE << dump_to_str();
-		LOG_TRACE << id << "-- Setting default type: "
-			<< LOG_BA_TYPE(dflt) << " to " << LOG_FM_DUMP(key);
+		DBG(LOG_TRACE << dump_to_str();)
+		DBG(LOG_TRACE << id << "-- Setting default type: "
+			<< LOG_BA_TYPE(dflt) << " to " << LOG_FM(key);)
 		// TODO if tid > 0, already resolved???
 		if (tau::get(key).is(tau::bf_constant)) {
 			tref bound = tau::get_ba_constant_from_source(
 						tau::get(key).data(), dflt);
 			if (bound == nullptr) {
-				LOG_TRACE << dump_to_str();
+				DBG(LOG_TRACE << dump_to_str();)
 				LOG_ERROR << "Failed to bind default type: "
 				<< LOG_BA_TYPE(dflt) << " to " << LOG_FM(key);
 				return nullptr;
 			}
-			LOG_TRACE << dump_to_str();
-			LOG_TRACE << id << "-- Resolved to a default type: "
-							<< LOG_FM_DUMP(bound);
+			DBG(LOG_TRACE << id << "-- Resolved to a default type: "
+							<< LOG_FM(bound);)
 			defaulted[key] = bound;
-			LOG_TRACE << dump_to_str();
-		}
-		else if (tau::get(key).is(tau::variable)) {
-			// tref res = bintree<node>::get(
-			// 	tau::get(key).value.ba_retype(dflt),
-			// 	tau::get(key).first(),
-			// 	tau::get(key).right_sibling());
-			// defaulted[key] = res;
-		}
-		else if (tau::get(key).is(tau::bf_f)
-			|| tau::get(key).is(tau::bf_t))
-		{
-			// defaulted[key] = tau::get(
-			// 		tau::get(key).value.ba_retype(dflt));
 		}
 	}
 
-	LOG_TRACE << id << LOG_SPLITTER;
+	// DBG(LOG_TRACE << id << LOG_SPLITTER;)
 
 	if (defaulted.size()) {
-		LOG_TRACE << id << "-- Check and propagate "
-				<< "BA types once more with default type";
+		DBG(LOG_TRACE << id << "-- Check and propagate "
+				<< "BA types once more with default type";)
 
-		for (auto& [key, res] : defaulted) {
-			types[res] = dflt;
+		for (auto& [key, res] : defaulted)
+			types[res] = dflt,
 			resolved[key] = res;
-		}
 
-		// LOG_TRACE << dump_to_str();
+		// DBG(LOG_TRACE << dump_to_str();)
 
-		untyped_n = 0;
 		nn = check_and_propagate(scoped);
 
-		LOG_TRACE << dump_to_str();
-		if (!nn) LOG_TRACE << id << "-- Check with default type failed, "
-				<< "returning nullptr for: " << LOG_FM(n);
+		DBG(if (!nn) LOG_TRACE << id << "-- Check with default type failed, "
+				<< "returning nullptr for: " << LOG_FM(n);)
 		if (!nn) return nullptr;
 	}
 
-	LOG_TRACE << id << LOG_SPLITTER;
+	// DBG(LOG_TRACE << id << LOG_SPLITTER;)
 
 	tref r = remove_scope_ids(scoped);
 
-	LOG_TRACE << id << LOG_SPLITTER;
-	LOG_TRACE << id << "-- BA constants: " << ba_constants<node>::dump_to_str();
+#ifdef DEBUG
+	// LOG_TRACE << id << LOG_SPLITTER;
+	// LOG_TRACE << id << "-- BA constants: " << ba_constants<node>::dump_to_str();
+
+	LOG_TRACE << dump_to_str();
+
 	if (r) LOG_TRACE << id
 		<< LOG_BRIGHT("-- Transformed BA types: ") << LOG_FM_DUMP(r);
 	else   LOG_TRACE << id
 		<< LOG_BRIGHT("-- Transformed BA types: nullptr");
 	LOG_TRACE << id << "\t\tfor: " << LOG_FM(n);
-	LOG_TRACE << id << LOG_SPLITTER;
+
+	// LOG_TRACE << id << LOG_SPLITTER;
+#endif
+
+	clear();
 
 	return r;
 }
@@ -149,6 +137,9 @@ tref ba_types_inference<node>::operator()(const tt& n) {
 	return (*this)(n.value());
 }
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "batinf_scoping"
+
 // removes type info from constants and vars and adds their scope_id
 // used as a preparation (first) step before type checking and propagation
 // vsc = vars scope ids
@@ -158,7 +149,7 @@ template <NodeType node>
 tref ba_types_inference<node>::add_scope_ids(
 	tref n, var_scopes_t& vscids, size_t csid, size_t& tsid)
 {
-	LOG_TRACE << "-- Add_scope_ids: " << LOG_FM_DUMP(n);
+	DBG(LOG_TRACE << "-- Add_scope_ids: " << LOG_FM_DUMP(n);)
 	// ptree(std::cout << "tree: ", n) << "\n";
 	const auto vsid = [this, &vscids](tref var) -> size_t {
 		size_t v = get_var_name_sid<node>(var);
@@ -173,7 +164,7 @@ tref ba_types_inference<node>::add_scope_ids(
 	const auto transform_element = [this, &csid, &tsid, &vsid](
 		tref el, size_t nt) -> tref
 	{
-		LOG_TRACE << "add_scope_ids - transform_element: " << LOG_FM_DUMP(el);
+		DBG(LOG_TRACE << "add_scope_ids - transform_element: " << LOG_FM_DUMP(el);)
 
 		static const size_t temporal = get_ba_type_id<node>("_temporal");
 		auto is_io = is_io_var<node>(el);
@@ -199,19 +190,18 @@ tref ba_types_inference<node>::add_scope_ids(
 		}
 		if (ch0) ch.push_back(ch0);
 		bool is_constant = nt == tau::bf_constant;
-		LOG_TRACE << "is_global: " << is_global;
-		LOG_TRACE << "is_constant: " << is_constant;
-		LOG_TRACE << "is_io: " << is_io;
+		DBG(LOG_TRACE << "is_global: " << is_global
+			<< "  is_constant: " << is_constant
+			<< "  is_io: " << is_io << "  nt: " << nt;)
 
 		if (!is_global && !is_constant) {
 			size_t scope_id = is_constant ? csid : vsid(el);
 			ch.push_back(tau::get(node(tau::scope_id, scope_id)));
 		}
-		for (tref c : ch) LOG_TRACE << "child: " << LOG_FM_DUMP(c);
 		auto r = tau::get(t.value, ch);
 		size_t tid = t.get_ba_type();
 		const auto& type = t.get_ba_type_name();
-		LOG_TRACE << "type: " << type;
+		DBG(LOG_TRACE << "type: " << type;)
 		if (type.size() && type != "untyped") {
 			bool found = false;
 			for (const auto& st : node::nso_factory::instance()
@@ -222,11 +212,11 @@ tref ba_types_inference<node>::add_scope_ids(
 				return nullptr;
 			}
 		}
-		LOG_TRACE << "r: " << LOG_FM_DUMP(r);
-		LOG_TRACE << "get_el_key(r): " << LOG_FM_DUMP(get_el_key(r));
+		DBG(LOG_TRACE << "r: " << LOG_FM_DUMP(r);)
+		DBG(LOG_TRACE << "get_el_key(r): " << LOG_FM_DUMP(get_el_key(r));)
 		types[get_el_key(r)] = tid;
-		LOG_TRACE << "add_scope_ids - transformed element: " << LOG_FM_DUMP(r)
-			<< " with type: " << LOG_BA_TYPE(tid);
+		DBG(LOG_TRACE << "add_scope_ids - transformed element: " << LOG_FM_DUMP(r)
+			<< " with type: " << LOG_BA_TYPE(tid);)
 		return r;
 	};
 	const auto transformer = [&](tref el) -> tref{
@@ -240,13 +230,13 @@ tref ba_types_inference<node>::add_scope_ids(
 			auto main = tt(el) | tau::main | tt::ref;
 			for (tref r : rrs.values()) {
 				var_scopes_t nvscids;
-				// LOG_TRACE << "replacing rec_relation";
+				// DBG(LOG_TRACE << "replacing rec_relation";)
 				tref x = add_scope_ids(r, nvscids, csid,++tsid);
 				if (x == nullptr) return nullptr;
 				rrch.push_back(x);
 			}
 			var_scopes_t nvscids;
-			// LOG_TRACE << "replacing main";
+			// DBG(LOG_TRACE << "replacing main";)
 			tref x = add_scope_ids(main, nvscids, csid, ++tsid);
 			if (x == nullptr) return nullptr;
 			ch.push_back(x);
@@ -263,14 +253,12 @@ tref ba_types_inference<node>::add_scope_ids(
 		case tau::wff_ex:
 		case tau::wff_all: {
 			inc_vsid(t.first());
-			// ptree(std::cout << "quant: ", el->child[0]) << "\n";
 			tref v = transform_element(t.first(), tau::variable);
 			if (v == nullptr) return nullptr;
-			// ptree(std::cout << "quant var: ", v) << "\n";
 			tref x = add_scope_ids(t.second(), vscids, csid, tsid);
 			if (x == nullptr) return nullptr;
 			tref r = tau::get(t.value, { v, x });
-			// LOG_TRACE << "quant replaced: " << LOG_FM(r);
+			// DBG(LOG_TRACE << "quant replaced: " << LOG_FM(r);)
 			return r;
 		}
 		case tau::bf_constant:
@@ -285,53 +273,58 @@ tref ba_types_inference<node>::add_scope_ids(
 		return el;
 	};
 	auto r = pre_order<node>(n).apply_until_change(transformer);
-	LOG_TRACE << "-- Added scope ids: " << LOG_FM(r);
+	DBG(LOG_TRACE << "-- Added scope ids: " << LOG_FM(r);)
 	return r;
 }
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "batinf_propagation"
 
 // checks and propagates types within the scope (global or quantifier)
 template <NodeType node>
 tref ba_types_inference<node>::check_and_propagate(tref n) {
-	bool err = false;
-	const auto checker_and_propagator = [this, &err](tref el) -> bool {
-		if (err) return false;
+	subtree_set<node> terms;
+	const auto visitor = [&](tref el, tref parent) -> bool {
+		auto is_atomic_nt = [](node::type nt) {
+			return nt == tau::bf_interval
+				|| nt == tau::bf_eq
+				|| nt == tau::bf_neq
+				|| nt == tau::bf_lteq
+				|| nt == tau::bf_nlteq
+				|| nt == tau::bf_gt
+				|| nt == tau::bf_ngt
+				|| nt == tau::bf_gteq
+				|| nt == tau::bf_ngteq
+				|| nt == tau::bf_lt
+				|| nt == tau::bf_nlt
+				|| nt == tau::bf;
+		};
+
 		auto nt = tau::get(el).get_type();
-		switch (nt) {
-			case tau::bf_interval:
-			case tau::bf_eq:
-			case tau::bf_neq:
-			case tau::bf_lteq:
-			case tau::bf_nlteq:
-			case tau::bf_gt:
-			case tau::bf_ngt:
-			case tau::bf_gteq:
-			case tau::bf_ngteq:
-			case tau::bf_lt:
-			case tau::bf_nlt:
-			case tau::bf:
-				// prop known type within atomic formulas
-				if (!propagate(el)) return err = true, false;
-				break;
-			case tau::wff_ex:
-			case tau::wff_all:
-				// check and propagate q_var sub scope first
-				LOG_TRACE << "check and propagate quantifier "
-					<< "subscope: " << LOG_FM(el);
-				check_and_propagate(tau::get(el).second());
-				return false;
-			default: break;
+		if (is_atomic_nt(nt) &&
+			(parent == nullptr ||
+				!is_atomic_nt(tau::get(parent).get_type())))
+					return terms.insert(el), false;
+		else if (nt == tau::wff_ex || nt == tau::wff_all) {
+			// check and propagate q_var sub scope first
+			DBG(LOG_TRACE << "check and propagate quantifier "
+				<< "subscope: " << LOG_FM(el);)
+			check_and_propagate(tau::get(el).second());
+			return false;
 		}
 		return true;
 	};
+	pre_order<node>(n).visit_unique(visitor);
 	// repeat visits of checker and propagator
 	// until we are still resolving any untyped elements
-	size_t untyped_n0;
+	size_t untyped_n0, untyped_n = 0;
 	do {
 		untyped_n0 = untyped_n;
-		// LOG_TRACE << "untyped_n0: " << LOG_FM(untyped_n0);
-		pre_order<node>(n).visit_unique(checker_and_propagator);
-		if (err) return nullptr; // type mismatch
-		// LOG_TRACE << "untyped_n: " << LOG_FM(untyped_n);
+		DBG(LOG_TRACE << "untyped_n0: " << untyped_n0;)
+		for (const auto& el : terms) if (!propagate(el)) return nullptr;
+		untyped_n = 0;
+		for (const auto [_, tid] : types) if (tid == 0) untyped_n++;
+		DBG(LOG_TRACE << "untyped_n: " << untyped_n;)
 	} while (untyped_n0 != untyped_n);
 	return n;
 }
@@ -352,18 +345,18 @@ tref ba_types_inference<node>::get_el_key(tref n) const {
 // check appearance of a single type in all BA elems, then propagate it
 template <NodeType node>
 bool ba_types_inference<node>::propagate(tref n) {
-	LOG_TRACE << dump_to_str();
-	LOG_TRACE << LOG_SPLITTER;
-	LOG_TRACE << "-- Propagate: " << LOG_FM(n);
+	DBG(LOG_TRACE << dump_to_str();)
+	DBG(LOG_TRACE << LOG_SPLITTER;)
+	DBG(LOG_TRACE << "-- Propagate: " << LOG_FM(n);)
 	static const size_t temporal = get_ba_type_id<node>("_temporal");
 	// collect types from BA elements
 	std::set<size_t> collected;
 	auto els = tau::get(n).select_all(is_ba_element<node>);
 	for (tref el : els) {
-		LOG_TRACE << "Collecting types from: " << LOG_FM_DUMP(el);
+		DBG(LOG_TRACE << "Collecting types from: " << LOG_FM_DUMP(el);)
 		tref key = get_el_key(el);
-		LOG_TRACE << "key:        " << LOG_FM_DUMP(key);
-		LOG_TRACE << "types[key]: " << LOG_BA_TYPE(types[key]);
+		DBG(LOG_TRACE << "key:        " << LOG_FM_DUMP(key);)
+		DBG(LOG_TRACE << "types[key]: " << LOG_BA_TYPE(types[key]);)
 		if (types[key] != 0 && types[key] != temporal) {
 			collected.insert(types[key]);
 			if (collected.size() > 1) { // multiple types found, error
@@ -380,39 +373,41 @@ bool ba_types_inference<node>::propagate(tref n) {
 	if (collected.size() == 1) { // single type found, propagate it
 		auto t = *collected.begin();
 		for (auto& el : els) {
-			LOG_TRACE << "Single type found: " << LOG_BA_TYPE(t)
-				<< ", propagating from node: " << LOG_FM_DUMP(el);
+			DBG(LOG_TRACE << "Single type found: " << LOG_BA_TYPE(t)
+				<< ", propagating from node: " << LOG_FM_DUMP(el);)
 			tref key = get_el_key(el);
 			DBG(assert(key));
+#ifdef DEBUG
 			if (!key) LOG_TRACE << "key is nullptr";
 			else LOG_TRACE << "key:        " << LOG_FM_DUMP(key);
 			LOG_TRACE      << "types[key]: "
 						<< LOG_BA_TYPE_DUMP(types[key]);
+#endif
 			const auto& kt = tau::get(key);
 			if (kt.get_ba_type() == 0)
 			{
-				LOG_TRACE << "-- Propagating type: "
-					<< LOG_BA_TYPE(t) << " to "<<LOG_FM_DUMP(el);
+				DBG(LOG_TRACE << "-- Propagating type: "
+					<< LOG_BA_TYPE(t) << " to "
+					<< LOG_FM_DUMP(el);)
 				const auto& elt = tau::get(el);
 				auto nt = elt.get_type();
 				if (nt == tau::bf_constant) {
 					// factory bind newly typed constant
 					tref bound = tau::get_ba_constant(
-							dict(kt.data()),
-							get_ba_type_name<node>(t));
+						dict(kt.data()),
+						get_ba_type_name<node>(t));
 					if (bound == nullptr) return false;
-					LOG_TRACE << "bound after type resolved: "
-								<< LOG_FM(bound);
+					DBG(LOG_TRACE << "bound after type resolved: "
+							<< LOG_FM(bound);)
 					types[key]    = t;
 					types[bound]  = t;
 					resolved[key] = bound;
-					if (types.find(bound) == types.end()) untyped_n--;
 				}
 				else {
 					types[key] = t;
-					LOG_TRACE << "resolved: "
+					DBG(LOG_TRACE << "resolved: "
 						<< LOG_FM_DUMP(key)
-						<< " -> " << LOG_BA_TYPE(t);
+						<< " -> " << LOG_BA_TYPE(t);)
 					continue;
 				}
 			}
@@ -421,31 +416,36 @@ bool ba_types_inference<node>::propagate(tref n) {
 	return true; 
 }
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "batinf_unscoping"
+
 // transform type info - remove scope_id and replace with typed element
 // scope_id is left in termporal vars to distinguish them by their scope further
 // last step of BA types checking and propagation
 template <NodeType node>
 tref ba_types_inference<node>::remove_scope_ids(tref n) const {
-	LOG_TRACE << "-- Remove scope ids: " << LOG_FM_DUMP(n);
+	DBG(LOG_TRACE << "-- Remove scope ids: " << LOG_FM_DUMP(n);)
 	const auto transformer = [this](tref el) {
 		if (is_ba_element<node>(el)) {
-			LOG_TRACE << LOG_SPLITTER;
-			LOG_TRACE << "-- Transformer of ba_element: "
-							<< LOG_FM_DUMP(el);
+			// DBG(LOG_TRACE << LOG_SPLITTER;)
+			DBG(LOG_TRACE << "-- Transformer of ba_element: "
+							<< LOG_FM_DUMP(el);)
 			tref key = get_el_key(el);
+			const auto& t = tau::get(el);
+#ifdef DEBUG
 			if (!key) LOG_TRACE << "key is nullptr";
 			else LOG_TRACE << "key: " << LOG_FM_DUMP(key);
-			const auto& t = tau::get(el);
 			LOG_TRACE << dump_to_str();
 			LOG_TRACE <<"el type:    "<<LOG_BA_TYPE(t.get_ba_type());
 			LOG_TRACE <<"types[key]: "<<LOG_BA_TYPE(types.at(key));
 			LOG_TRACE <<"node: " << t.value;
 			LOG_TRACE <<"tid:  " << t.get_ba_type();
+#endif
 			tref r;
 			if (t.is(tau::bf_constant)) {
 				if (el != key && t.get_ba_type() == 0) {
-					LOG_TRACE << "-- Propagated: "
-							<< LOG_FM_DUMP(key);
+					DBG(LOG_TRACE << "-- Propagated: "
+							<< LOG_FM_DUMP(key);)
 					const auto& bfn = tau::get(
 						tau::get(tau::bf, key));
 					if (bfn[0].get_ba_type() > 0 &&
@@ -454,12 +454,12 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 					{ // strip type info from 0 and 1 coming from hooks
 						tref typeless = tau::get(
 							bfn[0].get_type());
-						LOG_TRACE << "-- type stripped: "
-							<< LOG_FM_DUMP(typeless);
+						DBG(LOG_TRACE << "-- type stripped: "
+							<< LOG_FM_DUMP(typeless);)
 						return typeless;
 					} else {
-						LOG_TRACE << "-- Not propagated: "
-							<< LOG_FM_DUMP(key);
+						DBG(LOG_TRACE << "-- Not propagated: "
+							<< LOG_FM_DUMP(key);)
 						return key;
 					}
 					return key;
@@ -467,8 +467,8 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 				tref new_el = tau::build_ba_constant(
 					t.get_ba_constant(),
 					t.get_ba_type());
-				LOG_TRACE << "-- Transformed: "
-							<< LOG_FM_DUMP(new_el);
+				DBG(LOG_TRACE << "-- Transformed: "
+							<< LOG_FM_DUMP(new_el);)
 				return new_el;
 			}
 			else if (t.is(tau::bf_t) || t.is(tau::bf_f)) {
@@ -482,12 +482,21 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 							? tau::get(nv, t.first())
 							: tau::get(nv);
 			}
-			LOG_TRACE << "-- Transformed: "	<< LOG_FM_DUMP(r);
+			DBG(LOG_TRACE << "-- Transformed: "	<< LOG_FM_DUMP(r);)
 			return r;
 		}
 		return el;
 	};
 	return pre_order<node>(n).apply_until_change(transformer);
+}
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ba_types_inference"
+
+template <NodeType node>
+void ba_types_inference<node>::clear() {
+	types.clear();
+	resolved.clear();
 }
 
 template <NodeType node>
