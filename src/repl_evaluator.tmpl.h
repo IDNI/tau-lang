@@ -101,13 +101,15 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 			if (auto x = get_nso_rr<node>(ctx, value); x)
 				nso_rr = x.value();
 			else return {};
-		} else nso_rr = rr<node>(tau::geth(value));
+		} else nso_rr = rr<node>(tau::geth(
+				resolve_io_vars<node>(ctx, value)));
 		nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 			definitions.begin(), definitions.end());
 		if (auto infr = infer_ref_types<node>(nso_rr); infr)
 			return infr.value();
 		else return {};
-	} else return rr<node>(tau::geth(value));
+	} else return rr<node>(tau::geth(
+			resolve_io_vars<node>(ctx, value)));
 	return {};
 }
 
