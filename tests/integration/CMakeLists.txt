@@ -11,7 +11,7 @@ set(TESTS
 	nso_rr_fixed_point
 	nso_rr_partial_eval
 	interpreter
-	ref_types             # remaining 1 test (typo undetected)
+	ref_types
 	satisfiability
 	sbf1
 	sbf2
