@@ -59,6 +59,11 @@ TEST_SUITE("constant types") {
 		CHECK( are_all_typed_as(n, "tau") );
 	}
 
+	TEST_CASE("type over many variables beyond atomic formulas") {
+		auto n = infer("x = y && y = z && z = w && w = { x1 }:sbf.");
+		CHECK( are_all_typed_as(n, "sbf") );
+	}
+
 	TEST_CASE("type mismatch head vs body") {
 		auto n = expect_infer_fail("{ T }:tau = { 0 }:sbf { 1 }:sbf.");
 		CHECK( n );
