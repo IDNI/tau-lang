@@ -138,8 +138,8 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 	auto bv_sort = [](const tau<BAs...> var) -> Sort {
 		size_t bv_size;
 		if (auto num = var | tau_parser::type | tau_parser::bv_type | tau_parser::num; num) {
-			bv_size = num.value() 
-				| only_child_extractor<BAs...> 
+			bv_size = num.value()
+				| only_child_extractor<BAs...>
 				| size_t_extractor<BAs...>
 				| optional_value_extractor<size_t>;
 		} else {
@@ -150,6 +150,10 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 	};
 
 	switch (nt) {
+		case tau_parser::wff_always:
+		case tau_parser::wff_sometimes: {
+			return eval_bv(form->child[0], vars, free_vars, checked);
+		}
 		// due to hooks we should consider wff_t or bf_t
 		case tau_parser::wff:
 		case tau_parser::bv: {
@@ -362,7 +366,7 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 		}
 		default: {
 			#ifdef DEBUG
-			//BOOST_LOG_TRIVIAL(error) << "(Error) unknow bv non-terminal: " << nt;
+			print_tau_tree(std::cout, form);
 			#endif // DEBUG
 		}
 	}
@@ -372,9 +376,14 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 template <typename...BAs>
 bool is_bv_formula_sat(const tau<BAs...>& form) {
 	std::map<tau<BAs...>, cvc5::Term> vars, free_vars;
-	
+
 	cvc5_solver.resetAssertions();
 	cvc5_solver.push();
+
+	#ifdef DEBUG
+	print_tau_tree(std::cout, form);
+	#endif // DEBUG
+
 	auto expr = eval_bv(form, vars, free_vars);
 
 	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/form: " << form;
