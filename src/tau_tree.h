@@ -138,7 +138,7 @@ struct node {
 	constexpr auto     operator== (const node& that) const;
 	constexpr auto     operator!= (const node& that) const;
 
-	// hash function
+	// hash function for node
 	constexpr size_t hashit() const;
 };
 
@@ -694,6 +694,12 @@ template <NodeType node>
 rewriter::library get_library(const std::string& source);
 
 } // namespace idni::tau_lang
+
+// Hash for tau node
+template <typename... BAs> requires idni::tau_lang::BAsPack<BAs...>
+struct std::hash<idni::tau_lang::node<BAs...>> {
+	size_t operator()(const idni::tau_lang::node<BAs...>& n) const noexcept;
+};
 
 #include "tau_tree.tmpl.h"
 
