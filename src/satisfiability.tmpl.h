@@ -129,8 +129,8 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 	auto to_ba = [](const bool c) { return c ? tau::_1() : tau::_0(); };
 
 	if (ctn[0][0].is(tau::num))
-		is_left = true,  condition = ctn[0][0][0].get_integer();
-	else    is_left = false, condition = ctn[0][1][0].get_integer();
+		is_left = true,  condition = ctn[0][0].get_num();
+	else    is_left = false, condition = ctn[0][1].get_num();
 
 	if (t | tau::ctn_neq) return to_ba(condition != time_point);
 	if (t | tau::ctn_eq)  return to_ba(condition == time_point);
@@ -154,8 +154,8 @@ template <NodeType node>
 bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 	using tau = tree<node>;
 	const auto& ctn = tau::get(constraint);
-	const int_t condition = ctn.is(tau::num) ? ctn[0][0][0].get_integer()
-						 : ctn[0][1][0].get_integer();
+	const int_t condition = ctn[0][0].is(tau::num) ? ctn[0][0].get_num()
+						 : ctn[0][1].get_num();
 
 	// At this point the equality and inequality constraints should have been converted
 	auto t = ctn();

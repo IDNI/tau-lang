@@ -671,11 +671,10 @@ tref get_hook<node>::wff_or(const node& v, const tref* ch, size_t len, tref r) {
 }
 
 template <NodeType node>
-tref get_hook<node>::ctn_neg(tref n) {
-	const auto& t = tau::get(n);
-	auto num    = t.find_top(is<node, tau::num>);
-	auto ctnvar = t.find_top(is<node, tau::ctnvar>);
-	auto op = t[0].get_type();
+tref get_hook<node>::ctn_neg(const tree<node>& n) {
+	auto num    = n.find_top(is<node, tau::num>);
+	auto ctnvar = n.find_top(is<node, tau::ctnvar>);
+	auto op = n[0][0].get_type();
 	switch (op) {
 		//RULE(BF_PUSH_NEGATION_INWARDS_2, "($X != $Y)' := $X = $Y.")
 	case tau::ctn_neq:
@@ -701,7 +700,7 @@ tref get_hook<node>::ctn_neg(tref n) {
 	case tau::ctn_lt:
 		HOOK_LOGGING(applied("($X < $Y)' := $X >= $Y.");)
 		return tau::build_wff_ctn_gteq(ctnvar, num);
-	default: return n;
+	default: return build_wff_neg<node>(n.get());
 	}
 	return nullptr;
 }
@@ -727,8 +726,8 @@ tref get_hook<node>::wff_neg(const node& v, const tref* ch, size_t len, tref r) 
 		return tau::get(double_neg.value(), r);
 	}
 	if (arg1(ch).is(tau::constraint)) {
-		HOOK_LOGGING(applied("! ! $X ::=  $X.");)
-		return tau::get(ctn_neg(ch[0]), r);
+		HOOK_LOGGING(applied("! [a op b] ::=  [a op' b].");)
+		return tau::get(ctn_neg(arg1_fm(ch)), r);
 	}
 	return tau::get_raw(v, ch, len, r);
 }
