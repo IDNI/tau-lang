@@ -685,7 +685,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 				}
 				auto prev = current;
 				current = nso_rr_apply<node>(r, prev);
-				if (current != prev) changed = true;
+				if (tau::get(current) != tau::get(prev)) changed = true;
 			}
 		} while (changed);
 
