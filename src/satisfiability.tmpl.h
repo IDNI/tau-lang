@@ -355,7 +355,9 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 	trefs left_uconsts = tau::get(uconst_ctns).select_top(
 		is_child<node, tau::uconst_name>);
 	for (tref uc : uconsts) {
-		if (std::ranges::find(left_uconsts, uc) == left_uconsts.end())
+		if (std::ranges::find_if(left_uconsts, [&uc](const auto& n) {
+			return tau::get(n) == tau::get(uc);
+		}) == left_uconsts.end())
 			uconst_ctns = tau::build_wff_and(uconst_ctns,
 				tau::build_bf_eq(tau::get(tau::bf, uc)));
 	}
