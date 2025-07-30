@@ -974,8 +974,10 @@ trefs interpreter<node, in_t, out_t>::appear_within_lookback(const trefs& vars){
 				return tau::subtree_equals(n, v);
 			};
 			if (tau::get(step_ubt_ctn).find_top(has_var))
-				if (std::ranges::find(appeared, v)
-					== appeared.end())
+				if (std::ranges::find_if(
+					appeared, [&v](const auto& n) {
+						return tau::get(n) == tau::get(v);
+					}) == appeared.end())
 						appeared.emplace_back(v);
 		}
 	}
