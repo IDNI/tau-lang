@@ -45,7 +45,7 @@ private:
 	static tref _1(const node& v, const tref* ch, size_t len, tref r);
 	static tref _F(const node& v, const tref* ch, size_t len, tref r);
 	static tref _T(const node& v, const tref* ch, size_t len, tref r);
-	static tref ctn_neg(tref n);
+	static tref ctn_neg(const tree<node>& n);
 	static tref term           (const node& v, const tref* ch, size_t len, tref r);
 	static tref term_or        (const node& v, const tref* ch, size_t len, tref r);
 	static tref term_and       (const node& v, const tref* ch, size_t len, tref r);
