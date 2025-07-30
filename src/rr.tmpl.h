@@ -72,3 +72,11 @@ constexpr auto rr<node>::operator!=(const rr<node>& that) const {
 }
 
 } // namespace idni::tau_lang
+
+template<idni::tau_lang::NodeType node>
+std::size_t std::hash<idni::tau_lang::rr<node>>::operator()(
+	const idni::tau_lang::rr<node>& rr) const noexcept {
+	size_t seed = 0;
+	idni::hash_combine(seed, rr.rec_relations, rr.main);
+	return seed;
+}

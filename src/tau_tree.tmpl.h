@@ -702,3 +702,9 @@ const std::string& tree<node>::get_ba_type_name() const {
 }
 
 } // namespace idni::tau_lang
+
+template<typename... BAs> requires idni::tau_lang::BAsPack<BAs...>
+size_t std::hash<idni::tau_lang::node<BAs...>>::operator()(
+	const idni::tau_lang::node<BAs...>& n) const noexcept {
+	return n.hash;
+}

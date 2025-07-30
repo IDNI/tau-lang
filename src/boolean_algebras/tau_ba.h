@@ -297,6 +297,13 @@ struct std::hash<idni::tau_lang::tau_ba<BAs...>> {
 								noexcept;
 };
 
+template<typename ... BAs> requires idni::tau_lang::BAsPack<BAs...>
+std::size_t std::hash<idni::tau_lang::tau_ba<BAs...>>::operator()(
+	const idni::tau_lang::tau_ba<BAs...>& f) const noexcept {
+	using namespace idni::tau_lang;
+	return std::hash<rr<node<tau_ba<BAs...>, BAs...>>>{}(f.nso_rr);
+}
+
 #include "boolean_algebras/tau_ba.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__

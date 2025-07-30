@@ -198,15 +198,19 @@ constexpr auto node<BAs...>::operator!=(const node& that) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr size_t node<BAs...>::hashit() const {
-	std::size_t seed = grcprime;
+	std::size_t seed = 0;
 	hash_combine(seed, static_cast<bool>(nt));
 	hash_combine(seed, static_cast<bool>(term));
-	hash_combine(seed, ba);
+	// In order to have a deterministic hash, we hash the type name
+	hash_combine(seed, get_ba_type_name<node>(ba));
 	hash_combine(seed, static_cast<bool>(ext));
-	// if (tree<node>::is_string_nt(nt))
-	// 	hash_combine(seed, dict(data));
-	// else
-		hash_combine(seed, data);
+	// Get ba constant from pool
+	if (nt == type::bf_constant && data != 0 && ba != 0)
+		hash_combine(seed, ba_constants<node>::get(data));
+	// Get string from pool, untyped bf_constant also has string as data
+	else if (tree<node>::is_string_nt(nt) || nt == type::bf_constant)
+		hash_combine(seed, dict(data));
+	else hash_combine(seed, data);
 	return seed;
 }
 

@@ -26,6 +26,13 @@ struct rr {
 
 } // namespace idni::tau_lang
 
+// Hash for tau_ba using specialization to std::hash
+template <idni::tau_lang::NodeType node>
+struct std::hash<idni::tau_lang::rr<node>> {
+	size_t operator()(const idni::tau_lang::rr<node>& f) const
+								noexcept;
+};
+
 #include "rr.tmpl.h"
 
 #endif // __IDNI__TAU__RR_H__
