@@ -73,6 +73,8 @@ struct nso_factory<sbf_ba> {
 
 	tref unpack_tau_ba(const std::variant<sbf_ba>&) const;
 
+	std::variant<sbf_ba> pack_tau_ba(tref) const;
+
 	static nso_factory<sbf_ba>& instance();
 private:
 	nso_factory();
@@ -103,6 +105,8 @@ struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 	tref splitter_one( const std::string type_name) const;
 
 	tref unpack_tau_ba(const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const;
+
+	std::variant<tau_ba<sbf_ba>, sbf_ba> pack_tau_ba(tref c) const;
 
 	static nso_factory<tau_ba<sbf_ba>, sbf_ba>& instance();
 private:

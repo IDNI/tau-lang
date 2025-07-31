@@ -56,3 +56,11 @@ TEST_SUITE("Alignments") {
 		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
 }
+
+TEST_SUITE("Mixed") {
+	TEST_CASE("this_stream_is_input_stream") {
+		bdd_init<Bool>();
+		auto spec = create_spec("this[t] < 1.");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
+	}
+}

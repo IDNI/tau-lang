@@ -32,7 +32,7 @@ struct tau_ba {
 	 * @param rec_relations Reference to rules of tau_nso_t.
 	 * @param main Reference to main tau_nso_t.
 	 */
-	tau_ba(rewriter::rules& rec_relations, htree::sp main);
+	tau_ba(const rewriter::rules& rec_relations, htree::sp main);
 
 	/**
 	 * @brief Constructor initializing tau_ba with recursive relations and main tau_nso_t.
@@ -40,7 +40,7 @@ struct tau_ba {
 	 * @param rec_relations Reference to rules of tau_nso_t.
 	 * @param main Reference to main tau_nso_t.
 	 */
-	tau_ba(rewriter::rules& rec_relations, tref main);
+	tau_ba(const rewriter::rules& rec_relations, tref main);
 
 	/**
 	 * @brief Constructor initializing tau_ba with main tau_nso_t.

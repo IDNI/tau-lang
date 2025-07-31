@@ -110,7 +110,7 @@ private:
 
 	bool calculate_initial_systems();
 
-	trefs build_inputs_for_step(const size_t t);
+	std::pair<trefs, bool> build_inputs_for_step(const size_t t);
 
 	// Return typed systems of equations for the solver corresponding to each clause
 	// in the unbound continuation

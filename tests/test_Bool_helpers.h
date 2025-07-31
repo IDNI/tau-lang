@@ -37,6 +37,11 @@ struct nso_factory<Bool> {
 	// There is no tau_ba
 	tref unpack_tau_ba(const variant<Bool>&) const { return nullptr; }
 
+	std::variant<Bool> pack_tau_ba(tref) const {
+		// There is no tau_ba
+		return {};
+	}
+
 	static nso_factory<Bool>& instance() {
 		static nso_factory<Bool> factory;
 		return factory;

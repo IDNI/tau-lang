@@ -115,8 +115,8 @@ int run_tau_spec(string spec_file, bool charvar, bool exp,
 		.error_quits         = true,
 		.charvar             = charvar,
 		.repl_running        = false,
-		.experimental        = exp,
-		.severity	     = sev
+		.severity	     = sev,
+		.experimental        = exp
 	});
 	if (auto status = re.eval(src); status) return status;
 	return re.eval("run %");

@@ -314,7 +314,7 @@ std::pair<std::optional<assignment<node>>, bool>
 	LOG_INFO << "Execution step: " << time_point << "\n";
 	bool auto_continue = false;
 	// Get inputs for this step
-	auto step_inputs = build_inputs_for_step(time_point);
+	auto [step_inputs, has_this_stream] = build_inputs_for_step(time_point);
 	step_inputs = appear_within_lookback(step_inputs);
 	// Get values for inputs which do not exceed time_point
 	auto [values, is_quit] = inputs.read(step_inputs, time_point);
@@ -329,6 +329,16 @@ std::pair<std::optional<assignment<node>>, bool>
 		auto_continue = true;
 		memory[var] = value;
 	}
+	// If the "this" input stream is present, write the current spec into it
+	if (has_this_stream) {
+		tref current_this_stream = build_in_var_at_n<node>(
+			"this", time_point, get_ba_type_id<node>("tau"));
+		tref wrapped_spec = build_bf_ba_constant<node>(
+			node::nso_factory::instance().pack_tau_ba(
+				original_spec), get_ba_type_id<node>("tau"));
+		memory[current_this_stream] = wrapped_spec;
+	}
+
 	// for each system in systems try to solve it, if it is not possible
 	// continue with the next system.
 	for (const auto& system : this->systems) {
@@ -495,14 +505,23 @@ bool interpreter<node, in_t, out_t>::calculate_initial_systems() {
 }
 
 template <NodeType node, typename in_t, typename out_t>
-std::vector<tref> interpreter<node, in_t, out_t>::build_inputs_for_step(
+std::pair<trefs, bool> interpreter<node, in_t, out_t>::build_inputs_for_step(
 	const size_t t)
 {
 	trefs step_inputs;
-	for (auto& [var, _] : inputs.streams)
+	bool has_this_stream = false;
+	for (auto& [var, _] : inputs.streams) {
+		if (get_var_name<node>(var) == "this") {
+			if (size_t vt = inputs.type_of(var);
+				vt == get_ba_type_id<node>("tau")) {
+				has_this_stream = true;
+				continue;
+			}
+		}
 		step_inputs.emplace_back(tau::trim(
 			build_in_var_at_n<node>(var, t, inputs.type_of(var))));
-	return step_inputs;
+	}
+	return {step_inputs, has_this_stream};
 }
 
 template <NodeType node, typename in_t, typename out_t>
@@ -587,7 +606,7 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 	};
 
 	DBG(LOG_TRACE << "compute_system/clause: " << LOG_FM(clause);)
-	
+
 	system sys;
 	// Due to type inference all atomic formulas are typed
 	for (tref atomic_fm : tau::get(clause).select_top(is_atomic_fm)) {
