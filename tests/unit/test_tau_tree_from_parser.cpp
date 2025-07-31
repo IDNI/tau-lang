@@ -527,27 +527,27 @@ TEST_SUITE("parsing captures") {
 
 TEST_SUITE("parsing inputs") {
 
-	TEST_CASE("fix loopback") {
+	TEST_CASE("fix lookback") {
 		const char* sample = "( i1[0] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("capture loopback") {
+	TEST_CASE("capture lookback") {
 		const char* sample = "( i1[n] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("variable loopback") {
+	TEST_CASE("variable lookback") {
 		const char* sample = "( i1[t] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("shift capture loopback") {
+	TEST_CASE("shift capture lookback") {
 		const char* sample = "( i1[n - 1] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("shift variable loopback") {
+	TEST_CASE("shift variable lookback") {
 		const char* sample = "( i1[t - 1] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
@@ -555,27 +555,27 @@ TEST_SUITE("parsing inputs") {
 
 TEST_SUITE("parsing outputs") {
 
-	TEST_CASE("fix loopback") {
+	TEST_CASE("fix lookback") {
 		const char* sample = "( o1[0] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("capture loopback") {
+	TEST_CASE("capture lookback") {
 		const char* sample = "( o1[n] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("variable loopback") {
+	TEST_CASE("variable lookback") {
 		const char* sample = "( o1[t] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("shift capture loopback") {
+	TEST_CASE("shift capture lookback") {
 		const char* sample = "( o1[n - 1] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}
 
-	TEST_CASE("shift variable loopback") {
+	TEST_CASE("shift variable lookback") {
 		const char* sample = "( o1[t - 1] = 0 ).";
 		CHECK( get_main(sample).has_value() );
 	}

@@ -427,7 +427,7 @@ tref normalize_with_temp_simp(tref fm) {
 }
 
 template <NodeType node>
-size_t get_max_loopback_in_rr(tref form) {
+size_t get_max_lookback_in_rr(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	size_t max = 0;
@@ -658,18 +658,18 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	trefs previous;
 	tref current;
 
-	size_t max_loopback = 0;
-	std::vector<size_t> loopbacks;
+	size_t max_lookback = 0;
+	std::vector<size_t> lookbacks;
 	for (const auto& r : nso_rr.rec_relations) {
-		size_t loopback = std::max(
-			get_max_loopback_in_rr<node>(r.first->get()),
-			get_max_loopback_in_rr<node>(r.second->get()));
-		loopbacks.push_back(loopback);
-		max_loopback = std::max(max_loopback, loopback);
+		size_t lookback = std::max(
+			get_max_lookback_in_rr<node>(r.first->get()),
+			get_max_lookback_in_rr<node>(r.second->get()));
+		lookbacks.push_back(lookback);
+		max_lookback = std::max(max_lookback, lookback);
 	}
-	LOG_DEBUG << "max loopback " << max_loopback;
+	LOG_DEBUG << "max lookback " << max_lookback;
 
-	for (size_t i = max_loopback; ; i++) {
+	for (size_t i = max_lookback; ; i++) {
 		current = build_enumerated_main_step<node>(
 							form, i, offset_arity);
 		bool changed;
@@ -679,8 +679,8 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 				ri != nso_rr.rec_relations.size(); ++ri)
 			{
 				const auto& r = nso_rr.rec_relations[ri];
-				if (loopbacks[ri] > i) {
-					// LOG_DEBUG << "(I) -- current step " << i << " < " << loopbacks[ri] << " loopback, skipping " << r;
+				if (lookbacks[ri] > i) {
+					// LOG_DEBUG << "(I) -- current step " << i << " < " << lookbacks[ri] << " lookback, skipping " << r;
 					continue; // skip steps depending on future fixed offsets
 				}
 				auto prev = current;
