@@ -461,36 +461,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		return;
 	}
 
-	// running the program
-	// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
-	// as we would get a formula in dnf already. However, we would need to
-	// kept the application of definitionsand call the computation of phi/chi infinity
 	DBG(TAU_LOG_DEBUG << "run_cmd/applied: " << TAU_LOG_FM(applied);)
-
-	// -------------------------------------------------------------
-	// TODO: remove once type inference is ready
-	auto atomic = [](tref n) {
-		return is<node>(n, tau::bf_eq) || is<node>(n, tau::bf_neq);
-	};
-	trefs eqs = tau::get(applied).select_top(atomic);
-	for (tref eq : eqs) {
-		// If find type, type all io_vars found in eq if not present yet
-		size_t tid = get_ba_type<node>(eq);
-		if (tid == 0) continue; // untyped
-		trefs out_vars = tau::get(eq).select_top(is_output_var<node>);
-		for (tref out_var : out_vars) {
-			size_t var_sid = get_var_name_sid<node>(out_var);
-			if (auto it = ctx.outputs.find(var_sid); it == ctx.outputs.end())
-				ctx.outputs.emplace(var_sid, typed_stream{ tid, 0 });
-		}
-		trefs in_vars = tau::get(eq).select_top(is_input_var<node>);
-		for (tref in_var : in_vars) {
-			size_t var_sid = get_var_name_sid<node>(in_var);
-			if (auto it = ctx.inputs.find(var_sid); it == ctx.inputs.end())
-				ctx.inputs.emplace(var_sid, typed_stream{ tid, 0 });
-		}
-	}
-	// -------------------------------------------------------------
 
 	auto dnf = normalizer_step<node>(applied);
 
@@ -500,13 +471,20 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		// all elements of the set must be quantified
 		std::stringstream ss; bool has_real_free_vars = false;
 		for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
-			if (!is_child<node>(*it, tau::io_var) &&
-				!is_child<node>(*it, tau::uconst_name)) {
-					ss << *it << " ";
-					has_real_free_vars = true;
+			if (is_child<node>(*it, tau::io_var)) {
+				const tau& io_var_node = tau::get(*it)[0];
+				if (!io_var_node.is_input_variable() && !
+				io_var_node.is_output_variable()) {
+					TAU_LOG_ERROR << "The stream "
+					<< io_var_node
+					<< " is not defined as an input or output stream\n";
+					return;
 				}
+			} else if (!is_child<node>(*it, tau::uconst_name)) {
+				ss << *it << " ";
+				has_real_free_vars = true;
+			}
 		}
-
 		if (has_real_free_vars) {
 			TAU_LOG_ERROR << "The following variable(s) must be "
 				<< "quantified and cannot appear free: "
@@ -517,27 +495,70 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
 	// select current input variables
 	auto is_in_var = [](tref n) {
-		return tree<node>::get(n).is_input_variable();
+		const tau& tn = tau::get(n);
+		if (tn.is(tau::variable))
+			return tn[0].is_input_variable();
+		return false;
 	};
 	trefs in_vars = tau::get(dnf).select_all(is_in_var);
 	typed_io_vars current_inputs;
 	for (tref var : in_vars) {
 		size_t var_sid = get_var_name_sid<node>(var);
-		if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end())
-			current_inputs[var_sid] = it->second;
+		// Get type of current input stream
+		if (size_t type = tau::get(var).get_ba_type(); type > 0) {
+			// input stream has type
+			if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end()) {
+				// Check also predefined streams
+				if (type != it->second.first) {
+					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for "
+					<< tau::get(var).to_str() << "\n";
+					return;
+				}
+				current_inputs[var_sid] = it->second;
+			} else current_inputs.emplace(var_sid, std::make_pair(type, 0));
+		} else if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end()) {
+			// stream has predefined type
+			current_inputs.emplace(var_sid, it->second);
+		} else {
+			// Untyped io stream error
+			TAU_LOG_ERROR << "The following input stream must be typed: "
+					<< tau::get(var).to_str() << "\n";
+			return;
+		}
 	}
 	auto ins = finputs<node>(current_inputs);
 
 	// select current output variables
 	auto is_out_var = [](tref n) {
-		return tree<node>::get(n).is_output_variable();
+		const tau& tn = tau::get(n);
+		if (tn.is(tau::variable))
+			return tn[0].is_output_variable();
+		return false;
 	};
 	trefs out_vars = tau::get(dnf).select_all(is_out_var);
 	typed_io_vars current_outputs;
 	for (tref var : out_vars) {
 		size_t var_sid = get_var_name_sid<node>(var);
-		if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end())
-			current_outputs[var_sid] = it->second;
+		// Get type of current output stream
+		if (size_t type = tau::get(var).get_ba_type(); type > 0) {
+			if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end()) {
+				// Check also predefined streams
+				if (type != it->second.first) {
+					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for: "
+					<< tau::get(var).to_str() << "\n";
+					return;
+				}
+				current_outputs.emplace(var_sid, it->second);
+			} else current_outputs.emplace(var_sid, std::make_pair(type, 0));
+		} else if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end()) {
+			// stream has predefined type
+			current_outputs.emplace(var_sid, it->second);
+		} else {
+			// Untyped io stream error
+			TAU_LOG_ERROR << "The following input stream must be typed: "
+					<< tau::get(var).to_str() << "\n";
+			return;
+		}
 	}
 	auto outs = foutputs<node>(current_outputs);
 

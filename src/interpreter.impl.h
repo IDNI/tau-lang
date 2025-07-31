@@ -287,8 +287,6 @@ interpreter<node, in_t, out_t>::interpreter(
 		inputs(std::move(input)), outputs(std::move(output))
 {
 	compute_lookback_and_initial();
-	// Put all streams in ubt_ctn into outputs/inputs
-	compute_systems(this->ubt_ctn, inputs, outputs);
 }
 
 template <NodeType node, typename in_t, typename out_t>
@@ -486,10 +484,10 @@ bool interpreter<node, in_t, out_t>::calculate_initial_systems() {
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
 		auto step_ubt_ctn = get_ubt_ctn_at(time_point);
-		systems = compute_systems(step_ubt_ctn, inputs, outputs);
+		systems = compute_systems(step_ubt_ctn);
 		if (systems.empty()) return false;
 	} else if (time_point == initial_segment) {
-		systems = compute_systems(ubt_ctn, inputs, outputs);
+		systems = compute_systems(ubt_ctn);
 		final_system = true;
 		if (systems.empty()) return false;
 	}
@@ -563,16 +561,15 @@ void interpreter<node, in_t, out_t>::compute_lookback_and_initial() {
 }
 
 template <NodeType node, typename in_t, typename out_t>
-std::vector<system> interpreter<node, in_t, out_t>::compute_systems(
-	tref ubd_ctn, auto& inputs, auto& outputs)
+std::vector<system> interpreter<node, in_t, out_t>::compute_systems(tref ubd_ctn)
 {
 	std::vector<system> systems;
 	// Create blue-print for solver for each clause
 	for (tref clause : get_dnf_wff_clauses<node>(ubd_ctn)) {
-		if (auto system = compute_atomic_fm_types(clause, inputs, outputs); system)
+		if (auto system = compute_atomic_fm_types(clause); system)
 			systems.emplace_back(std::move(system.value()));
 		else {
-			LOG_TRACE << "unable to compute all types in equations"
+			LOG_TRACE << "Unable to find all types in equations"
 					<< " in: " << clause << "\n";
 			continue;
 		}
@@ -582,7 +579,7 @@ std::vector<system> interpreter<node, in_t, out_t>::compute_systems(
 
 template <NodeType node, typename in_t, typename out_t>
 std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
-	tref clause, auto& inputs, auto& outputs)
+	tref clause)
 {
 	auto is_atomic_fm = [](tref n) {
 		return is_child<node, tau::bf_eq>(n)
@@ -590,132 +587,20 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 	};
 
 	DBG(LOG_TRACE << "compute_system/clause: " << LOG_FM(clause);)
-
-	subtree_set<node> pending_atomic_fms;
-	for (tref atomic_fm : tau::get(clause).select_top(is_atomic_fm)) {
-		DBG(LOG_TRACE << "compute_system/atomic_fm " << LOG_FM(atomic_fm);)
-		pending_atomic_fms.emplace(atomic_fm);
-	}
+	
 	system sys;
-	bool new_choice = true;
-	while (new_choice) {
-		new_choice = false;
-		trefs to_erase_fms;
-		for (tref fm : pending_atomic_fms) {
-			if (size_t t = get_type_atomic_fm(fm, inputs, outputs);
-				t > 0)
-			{
-				// Skip atomic fms which have no type yet
-				to_erase_fms.push_back(fm);
-				if (!sys.contains(t)) sys[t] = fm;
-				else sys[t] = build_wff_and<node>(sys[t], fm);
-				new_choice = true;
-			} else {
-				// Error message is already printed in get_type_fm
-				return {};
-			}
+	// Due to type inference all atomic formulas are typed
+	for (tref atomic_fm : tau::get(clause).select_top(is_atomic_fm)) {
+		size_t type = find_ba_type<node>(atomic_fm);
+		if (type == 0) {
+			LOG_ERROR << "No type information found for "
+				  << atomic_fm << "\n";
+			return {};
 		}
-		for (tref fm : to_erase_fms)
-			pending_atomic_fms.erase(fm);
-	}
-	// All remaining formulas in pending_atomic_fms can be typed by default
-	for (tref fm : pending_atomic_fms) {
-		// std::cout << "def. type for: " << fm << "\n";
-		trefs io_vars = tau::get(fm).select_top(
-			is_child<node, tau::io_var>);
-		// TODO: shouldn't be the default taken from nso_factory?
-		size_t t = get_ba_type_id<node>("tau");
-		type_io_vars(io_vars, t, inputs, outputs);
-		if (sys.find(t) == sys.end()) sys[t] = fm;
-		else sys[t] = build_wff_and<node>(sys[t], fm);
+		if (!sys.contains(type)) sys[type] = atomic_fm;
+		else sys[type] = build_wff_and<node>(sys[type], atomic_fm);
 	}
 	return { sys };
-}
-
-template <NodeType node, typename in_t, typename out_t>
-void interpreter<node, in_t, out_t>::type_io_vars(
-	trefs io_vars, size_t type, auto& inputs, auto& outputs)
-{
-	for (tref io_var : io_vars) if (tau::get(io_var).is_input_variable())
-		// Add type to inputs
-		inputs.add_input(get_var_name_node<node>(io_var), type, 0);
-	else    // Add type to outputs
-		if (!is_excluded_output(io_var)) outputs.add_output(
-				get_var_name_node<node>(io_var), type, 0);
-}
-
-template <NodeType node, typename in_t, typename out_t>
-size_t interpreter<node, in_t, out_t>::get_type_atomic_fm(tref fm,
-		auto& inputs, auto& outputs)
-{
-	trefs io_vars = tau::get(fm).select_top(is_child<node, tau::io_var>);
-
-	// Check if any io_var has a predefined type
-	size_t type = 0;
-	for (tref io_var : io_vars) {
-		if (size_t t = inputs.type_of(get_var_name_node<node>(io_var))) {
-			if (type != 0 && type != t) {
-				// Type mismatch in atomic fm
-				LOG_ERROR
-				<< "Stream variable type mismatch between '"
-				<< get_ba_type_name<node>(type) <<"' and '"
-				<< get_ba_type_name<node>(t)
-				<< "' in atomic formula: " << TAU_TO_STR(fm)
-				<< "\n";
-				return 0;
-			} else if (type == 0) type = t;
-		}
-		if (size_t t = outputs.type_of(get_var_name_node<node>(io_var))) {
-			if (type != 0 && type != t) {
-				// Type mismatch in atomic fm
-				LOG_ERROR
-				<< "Stream variable type mismatch between '"
-				<< get_ba_type_name<node>(type)
-				<< "' and '" << get_ba_type_name<node>(t)
-				<< "' in atomic formula: " << TAU_TO_STR(fm)
-				<< "\n";
-				return 0;
-			} else if (type == 0) type = t;
-		}
-	}
-	// std::cout << "type before const: " << type << "\n";
-	// Check if all constants match the type, if present, else infer from there
-	trefs consts = tau::get(fm).select_top(is<node, tau::bf_constant>);
-	for (tref c : consts) {
-		size_t c_type = tau::get(c).get_ba_type();
-		// std::cout << "c_type: " << c_type << "\n";
-		if (type == 0) type = c_type;
-		else if (type != c_type) {
-			// Type mismatch in atomic fm
-			LOG_ERROR << "Stream variable or constant type mismatch "
-			<< "between '" << get_ba_type_name<node>(type)
-			<< "' and '" << get_ba_type_name<node>(c_type)
-			<< "' in atomic formula: " << TAU_TO_STR(fm)<<"\n";
-			return 0;
-		}
-	}
-
-	// Check if any other type information is available
-	// following should be covered by ba type inference...
-// 	if (tref alt_type = tau::get(fm).find_top(is<node, tau::type>)) {
-// 		if (type != to_str(alt_type.value())) {
-// 			// Type mismatch in atomic fm
-// 			LOG_ERROR << "Stream variable or constant type mismatch"
-//				<< " between '" << type << "' and '"
-//				<< alt_type.value() << "' in atomic formula: "
-//				<< fm << "\n";
-// 			return {};
-// 		} else type = to_str(alt_type.value());
-// 	}
-
-	// std::cout << "type: " << type << "\n";
-	// No type information was found, delay typing until all equations have
-	// been visited
-	if (type == 0) return 0;
-
-	// If a type is found, set all io_vars to found type
-	type_io_vars(io_vars, type, inputs, outputs);
-	return type;
 }
 
 template <NodeType node, typename in_t, typename out_t>
@@ -821,7 +706,7 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 	// The systems for solver need to be recomputed at beginning of next step
 	final_system = false;
 	compute_lookback_and_initial();
-	compute_systems(ubt_ctn, inputs, outputs);
+	compute_systems(ubt_ctn);
 	//TODO: remove inputs and outputs which no longer appear in the updated specification
 }
 

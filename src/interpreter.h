@@ -114,19 +114,10 @@ private:
 
 	// Return typed systems of equations for the solver corresponding to each clause
 	// in the unbound continuation
-	static std::vector<system> compute_systems(tref ubd_ctn,
-		auto& inputs, auto& outputs);
+	static std::vector<system> compute_systems(tref ubd_ctn);
 
 	// Get the type for a clause of a local specification
-	static std::optional<system> compute_atomic_fm_types(tref clause,
-		auto& inputs, auto& outputs);
-
-	// Record type of io_vars in inputs and outputs
-	static void type_io_vars(trefs io_vars, size_t type,
-					auto& inputs, auto& outputs);
-
-	// Compute the type of the equation f = 0 or f != 0 stored in fm for the solver
-	static size_t get_type_atomic_fm(tref fm, auto& inputs, auto& outputs);
+	static std::optional<system> compute_atomic_fm_types(tref clause);
 
 	tref update_to_time_point(tref f, const int_t t);
 
