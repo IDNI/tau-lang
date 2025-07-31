@@ -132,6 +132,12 @@ tref nso_factory<sbf_ba>::unpack_tau_ba(const std::variant<sbf_ba>&) const {
 	return nullptr; // There is no tau_ba present
 }
 
+std::variant<sbf_ba> nso_factory<sbf_ba>::pack_tau_ba(
+	tref) const {
+	// There is no tau_ba
+	return {};
+}
+
 nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
 	static nso_factory<sbf_ba> factory;
 	return factory;
@@ -182,6 +188,12 @@ tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
 	if (!std::holds_alternative<tau_ba<sbf_ba>>(v)) return {};
 	const auto unpacked = std::get<tau_ba<sbf_ba>>(v);
 	return unpacked.nso_rr.main->get();
+}
+
+inline std::variant<tau_ba<sbf_ba>, sbf_ba> nso_factory<tau_ba<sbf_ba>,
+	sbf_ba>::pack_tau_ba(tref c) const {
+	tau_ba<sbf_ba> t {c};
+	return {t};
 }
 
 nso_factory<tau_ba<sbf_ba>, sbf_ba>&

@@ -9,12 +9,12 @@ namespace idni::tau_lang {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...>::tau_ba(rewriter::rules& rec_relations, htree::sp main)
+tau_ba<BAs...>::tau_ba(const rewriter::rules& rec_relations, htree::sp main)
 		: nso_rr({ rec_relations, main }) {}
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...>::tau_ba(rewriter::rules& rec_relations, tref main)
+tau_ba<BAs...>::tau_ba(const rewriter::rules& rec_relations, tref main)
 		: nso_rr({ rec_relations, tau::geth(main) }) {}
 
 template <typename... BAs>
