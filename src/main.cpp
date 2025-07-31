@@ -47,7 +47,7 @@
 #include <sstream>
 
 #ifdef DEBUG
-// including nso_ba, sbf_ba and interpreter directly instead of 
+// including nso_ba, sbf_ba and interpreter directly instead of
 // #include "tau.h" to avoid error lines pointing to a generated tau.h
 #	include "boolean_algebras/nso_ba.h"
 #	include "boolean_algebras/sbf_ba.h"
@@ -97,7 +97,8 @@ cli::options tau_options() {
 
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
-int run_tau_spec(string spec_file, bool charvar, bool exp) {
+int run_tau_spec(string spec_file, bool charvar, bool exp,
+	boost::log::trivial::severity_level sev) {
 	string src = "";
 	if (spec_file == "-") {
 		std::ostringstream oss;
@@ -114,7 +115,8 @@ int run_tau_spec(string spec_file, bool charvar, bool exp) {
 		.error_quits         = true,
 		.charvar             = charvar,
 		.repl_running        = false,
-		.experimental        = exp
+		.experimental        = exp,
+		.severity	     = sev
 	});
 	if (auto status = re.eval(src); status) return status;
 	return re.eval("run %");
@@ -168,7 +170,7 @@ int main(int argc, char** argv) {
 	bool exp = opts["experimental"].get<bool>();
 
 	// spec provided, run it
-	if (files.size()) return run_tau_spec(files.front(), charvar, exp);
+	if (files.size()) return run_tau_spec(files.front(), charvar, exp, sev);
 
 	repl_evaluator<sbf_ba> re({
 		.status = opts["status"].get<bool>(),
