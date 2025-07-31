@@ -62,7 +62,7 @@ template <NodeType node>
 tref normalize_with_temp_simp(tref fm);
 
 template <NodeType node>
-size_t get_max_loopback_in_rr(tref fm);
+size_t get_max_lookback_in_rr(tref fm);
 
 template <NodeType node>
 tref build_shift_from_shift(tref shift, size_t step);
