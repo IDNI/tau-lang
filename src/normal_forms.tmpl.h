@@ -1090,8 +1090,7 @@ template <NodeType node>
 tref sort_var(tref var) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	// static unordered_tau_map<tref, BAs...> cache;
-	static subtree_map<node, tref> cache;
+	static subtree_unordered_map<node, tref> cache;
 	if (auto it = cache.find(var); it != end(cache))
 		return it->second;
 #endif // TAU_CACHE
@@ -1205,8 +1204,7 @@ template <NodeType node>
 tref group_dnf_expression(tref fm) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	// static unordered_tau_map<tref, BAs...> cache;
-	static subtree_map<node, tref> cache;
+	static subtree_unordered_map<node, tref> cache;
 	if (auto it = cache.find(fm); it != end(cache)) return it->second;
 #endif // TAU_CACHE
 	LOG_DEBUG << "Begin group_dnf_expression";
@@ -1362,12 +1360,9 @@ tref reduce(tref fm, size_t type, bool is_cnf,
 {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	// static std::unordered_map<std::tuple<tref, bool, bool>,
-	// 	tref,
-	// 	std::hash<std::tuple<tref, bool, bool>>,
-	// 	tuple_struc_equal<bool, bool, BAs...>> cache;
-	static std::map<std::tuple<tref, bool, bool>, tref,
-		subtree_bool_bool_tuple_equality<node>> cache;
+	static std::unordered_map<std::tuple<tref, bool, bool>, tref,
+		std::hash<std::tuple<tref, bool, bool>>,
+		subtree_bool_bool_tuple_less<node>> cache;
 	if (auto it = cache.find(std::make_tuple(
 					fm, all_reductions, enable_sort));
 		it != end(cache)) return it->second;
