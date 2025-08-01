@@ -1379,7 +1379,7 @@ tref reduce(tref fm, size_t type, bool is_cnf,
 #ifdef TAU_CACHE
 	static std::unordered_map<std::tuple<tref, bool, bool>, tref,
 		std::hash<std::tuple<tref, bool, bool>>,
-		subtree_bool_bool_tuple_less<node>> cache;
+		subtree_bool_bool_tuple_equality<node>> cache;
 	if (auto it = cache.find(std::make_tuple(
 					fm, all_reductions, enable_sort));
 		it != end(cache)) return it->second;

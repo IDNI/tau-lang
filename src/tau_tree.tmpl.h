@@ -118,18 +118,6 @@ bool has_open_tau_fm_in_constant(tref fm);
 
 namespace idni::tau_lang {
 
-template <typename node>
-struct subtree_bool_bool_tuple_less {
-	bool operator()(const std::tuple<tref, bool, bool>& a,
-			const std::tuple<tref, bool, bool>& b) const
-	{
-		return lcrs_tree<node>::subtree_less(std::get<0>(a),
-						     std::get<0>(b))
-			&& std::get<1>(a) < std::get<1>(b)
-			&& std::get<2>(a) < std::get<2>(b);
-	};
-};
-
 // -----------------------------------------------------------------------------
 // Tau tree templates implementation
 
