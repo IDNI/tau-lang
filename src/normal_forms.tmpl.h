@@ -1337,8 +1337,8 @@ tref simp_general_excluded_middle(tref fm) {
 			if (has_simp) {
 				clauses.erase(clauses.begin() + j);
 				clauses.emplace_back(tau::build_bf_and(cnf));
-				--j;
 				if (i >= j) --i;
+				--j;
 			}
 		}
 		if (erase_clause) {
