@@ -1782,7 +1782,6 @@ std::pair<tref, bool> group_paths_and_simplify(
 			}
 			// Here paths agree
 			if (is_equal) {
-				is_simp = true;
 				groups[i].emplace_back(std::move(paths[j]));
 				paths.erase(paths.begin() + j);
 				--j;
@@ -1815,7 +1814,12 @@ std::pair<tref, bool> group_paths_and_simplify(
 			neqs = to_cnf<node>(neqs);
 			neqs = reduce<node>(neqs, tau::wff, true);
 			// push != out
-			neqs = squeeze_wff_neg<node>(neqs);
+			tref neqs_squeezed = squeeze_wff_neg<node>(neqs);
+			if (neqs_squeezed != neqs) {
+				// Further simplification might be possible
+				is_simp = true;
+				neqs = neqs_squeezed;
+			}
 		}
 		trefs neq_clauses = get_cnf_wff_clauses<node>(neqs);
 		// std::cout << "neq_clauses: " << neq_clauses << "\n";
@@ -1824,9 +1828,15 @@ std::pair<tref, bool> group_paths_and_simplify(
 		for (tref& neq : neq_clauses) {
 			LOG_DEBUG << "neq: " << LOG_FM(neq);
 			if (tau::get(neq).equals_T()) continue;
-			neq = reduce<node>(tau::trim2(neq), tau::bf);
-			neq = simp_general_excluded_middle<node>(neq);
-			if (tau::get(neq).equals_0()) clause_false = true;
+			auto f = [](tref n) {
+				if (tau::get(n).child_is(tau::bf_neq)) {
+					tref nn = reduce<node>(tau::trim2(n), tau::bf);
+					return tau::build_bf_neq(simp_general_excluded_middle<node>(nn));
+				}
+				return n;
+			};
+			neq = pre_order<node>(neq).apply_unique(f, visit_wff<node>);
+			if (tau::get(neq).equals_F()) clause_false = true;
 		}
 		if (clause_false) continue;
 		// std::cout << "neq_clause after reduce: " << neq_clauses << "\n";
@@ -1848,15 +1858,19 @@ std::pair<tref, bool> group_paths_and_simplify(
 						for (tref& neq : neq_clauses) {
 							if (tau::get(neq).equals_T()
 								|| tau::get(neq).equals_1()) continue;
-							auto grouped_bf = group_dnf_expression<node>(neq);
-							// std::cout << "grouped_bf: " << grouped_bf << "\n";
-							auto simp_neq = rewriter::replace<node>(grouped_bf, neg_eq, tau::_1());
-							// std::cout << "simp_neq: " << simp_neq << "\n";
-							if (grouped_bf != simp_neq) {
-								neq = to_dnf<node, false>(simp_neq);
-								neq = reduce<node>(neq, tau::bf);
-								is_simp = true;
-							}
+							auto f = [&neg_eq, &is_simp](tref n) {
+								if (tau::get(n).child_is(tau::bf_neq)) {
+									tref grouped_bf = group_dnf_expression<node>(tau::trim2(n));
+									tref simp_neq = rewriter::replace<node>(grouped_bf, neg_eq, tau::_1());
+									if (tau::get(grouped_bf) != tau::get(simp_neq)) {
+										simp_neq = to_dnf<node, false>(simp_neq);
+										simp_neq = reduce<node>(simp_neq, tau::bf);
+										is_simp = true;
+										return tau::build_bf_neq(simp_neq);
+									}
+								}
+							};
+							neq = pre_order<node>(neq).apply_unique(f, visit_wff<node>);
 						}
 					}
 				}
@@ -1866,17 +1880,12 @@ std::pair<tref, bool> group_paths_and_simplify(
 				rest = tau::build_wff_and(rest,
 					tau::build_wff_neg(vars[k]));
 		}
-		for (tref& neq : neq_clauses) {
-			if (tau::get(neq).equals_T()) continue;
-			neq = tau::build_bf_neq(neq);
-		}
-
 		result = tau::build_wff_or(result,
 			tau::build_wff_and(rest,
 				tau::build_wff_and(neq_clauses)));
 	}
 	DBG(assert(result != nullptr);)
-	result = from_mnf_to_nnf<node>(result);
+	result = to_dnf<node>(from_mnf_to_nnf<node>(result));
 	LOG_DEBUG << "End group_paths_and_simplify";
 	LOG_DEBUG << "result: " << LOG_FM(result);
 	LOG_DEBUG << "is_simp: " << is_simp;
