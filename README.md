@@ -699,6 +699,10 @@ where `<type>` is either `tau` or `sbf` and `<stream_type>` is either `console` 
 stream reads/outputs values from/to the console) or `ifile("<filename>")` for input streams and `ofile("<filename>")`
 for output streams. `<filename>` denotes the file from/into which to read/write.
 
+### Special streams
+
+There are two predefined special `tau` streams called `u` and `this` which are discussed in the beginning of section [pointwise revision](#pointwise-revision)
+and subsection [the this input stream](#the-this-input-stream).
 
 ## **Variables and uninterpreted constants**
 
