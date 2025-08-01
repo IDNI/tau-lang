@@ -119,7 +119,7 @@ bool has_open_tau_fm_in_constant(tref fm);
 namespace idni::tau_lang {
 
 template <typename node>
-struct subtree_bool_bool_tuple_equality {
+struct subtree_bool_bool_tuple_less {
 	bool operator()(const std::tuple<tref, bool, bool>& a,
 			const std::tuple<tref, bool, bool>& b) const
 	{

@@ -13,8 +13,7 @@ tref normalizer_step(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 #ifdef TAU_CACHE
-	// static unordered_tau_map<node, tref> cache;
-	static subtree_map<node, tref> cache;
+	static subtree_unordered_map<node, tref> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 
@@ -40,8 +39,7 @@ tref normalize_non_temp(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 #ifdef TAU_CACHE
-	// static unordered_tau_map<node, tref> cache;
-	static subtree_map<node, tref> cache;
+	static subtree_unordered_map<node, tref> cache;
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	tref result = tt(fm)
