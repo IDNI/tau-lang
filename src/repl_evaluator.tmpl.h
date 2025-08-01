@@ -1,5 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+#include "interpreter.h"
 #include "repl_evaluator.h"
 
 #undef LOG_CHANNEL_NAME
@@ -463,7 +464,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
 	DBG(TAU_LOG_DEBUG << "run_cmd/applied: " << TAU_LOG_FM(applied);)
 
-	auto dnf = normalizer_step<node>(applied);
+	auto dnf = normalizer<node>(applied);
 
 	// Make sure that there is no free variable in the formula
 	auto free_vars = get_free_vars_from_nso<node>(dnf);
@@ -493,77 +494,9 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		}
 	}
 
-	// select current input variables
-	auto is_in_var = [](tref n) {
-		const tau& tn = tau::get(n);
-		if (tn.is(tau::variable))
-			return tn[0].is_input_variable();
-		return false;
-	};
-	trefs in_vars = tau::get(dnf).select_all(is_in_var);
-	typed_io_vars current_inputs;
-	for (tref var : in_vars) {
-		size_t var_sid = get_var_name_sid<node>(var);
-		// Get type of current input stream
-		if (size_t type = tau::get(var).get_ba_type(); type > 0) {
-			// input stream has type
-			if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end()) {
-				// Check also predefined streams
-				if (type != it->second.first) {
-					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for "
-					<< tau::get(var).to_str() << "\n";
-					return;
-				}
-				current_inputs[var_sid] = it->second;
-			} else current_inputs.emplace(var_sid, std::make_pair(type, 0));
-		} else if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end()) {
-			// stream has predefined type
-			current_inputs.emplace(var_sid, it->second);
-		} else {
-			// Untyped io stream error
-			TAU_LOG_ERROR << "The following input stream must be typed: "
-					<< tau::get(var).to_str() << "\n";
-			return;
-		}
-	}
-	auto ins = finputs<node>(current_inputs);
-
-	// select current output variables
-	auto is_out_var = [](tref n) {
-		const tau& tn = tau::get(n);
-		if (tn.is(tau::variable))
-			return tn[0].is_output_variable();
-		return false;
-	};
-	trefs out_vars = tau::get(dnf).select_all(is_out_var);
-	typed_io_vars current_outputs;
-	for (tref var : out_vars) {
-		size_t var_sid = get_var_name_sid<node>(var);
-		// Get type of current output stream
-		if (size_t type = tau::get(var).get_ba_type(); type > 0) {
-			if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end()) {
-				// Check also predefined streams
-				if (type != it->second.first) {
-					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for: "
-					<< tau::get(var).to_str() << "\n";
-					return;
-				}
-				current_outputs.emplace(var_sid, it->second);
-			} else current_outputs.emplace(var_sid, std::make_pair(type, 0));
-		} else if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end()) {
-			// stream has predefined type
-			current_outputs.emplace(var_sid, it->second);
-		} else {
-			// Untyped io stream error
-			TAU_LOG_ERROR << "The following input stream must be typed: "
-					<< tau::get(var).to_str() << "\n";
-			return;
-		}
-	}
-	auto outs = foutputs<node>(current_outputs);
-
-	run<node>(dnf, ins, outs);
-	return;
+	auto ins = finputs<node>(collect_input_streams<node>(dnf, ctx));
+	auto outs = foutputs<node>(collect_output_streams<node>(dnf, ctx));
+	run<node>(dnf, ins, outs, ctx);
 }
 
 template <NodeType node>

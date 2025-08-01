@@ -21,7 +21,7 @@ typed_stream get_typed_stream(const std::string& type,
 // finputs
 
 template <NodeType node>
-finputs<node>::finputs(typed_io_vars inputs) {
+finputs<node>::finputs(const typed_io_vars& inputs) {
 	// open the corresponding streams for input and store them in streams
 	for (const auto& [var_sid, desc] : inputs) {
 		tref var = build_var_name<node>(var_sid);
@@ -168,11 +168,30 @@ size_t finputs<node>::type_of(tref var) const {
 	return 0;
 }
 
+template<NodeType node>
+void finputs<node>::rebuild(const typed_io_vars& inputs) {
+	// Delete old streams
+	types.clear();
+	streams.clear();
+	// open the corresponding streams for input and store them in streams
+	for (const auto& [var_sid, desc] : inputs) {
+		tref var = build_var_name<node>(var_sid);
+		this->types[var] = desc.first;
+		this->streams[var] = desc.second == 0
+			? std::optional<std::ifstream>()
+			: std::ifstream(dict(desc.second));
+		if (this->streams[var]
+			&& !this->streams[var].value().is_open())
+			LOG_ERROR << "Failed to open input file: '"
+				<< dict(desc.second) << "'";
+	}
+}
+
 // -----------------------------------------------------------------------------
 // foutputs
 
 template <NodeType node>
-foutputs<node>::foutputs(typed_io_vars outputs) {
+foutputs<node>::foutputs(const typed_io_vars& outputs) {
 	// open the corresponding streams for input and store them in streams
 	for (const auto& [var_sid, desc] : outputs) {
 		tref var = build_var_name<node>(var_sid);
@@ -242,7 +261,7 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 				return false;
 			}
 		} else {
-			ss << value.value();
+			ss << (value | tt::ba_constant);
 		}
 		// get the out_var_name tag
 		if (auto stream = streams.find(var_name); stream != streams.end())
@@ -274,6 +293,21 @@ size_t foutputs<node>::type_of(tref var) const {
 	return 0;
 }
 
+template<NodeType node>
+void foutputs<node>::rebuild(const typed_io_vars& outputs) {
+	// Delete old streams
+	types.clear();
+	streams.clear();
+	// open the corresponding streams for input and store them in streams
+	for (const auto& [var_sid, desc] : outputs) {
+		tref var = build_var_name<node>(var_sid);
+		this->types[var] = desc.first;
+		this->streams[var] = desc.second == 0
+			? std::optional<std::ofstream>()
+			: std::ofstream(dict(desc.second));
+	}
+}
+
 
 // -----------------------------------------------------------------------------
 // interpreter
@@ -282,9 +316,10 @@ size_t foutputs<node>::type_of(tref var) const {
 template <NodeType node, typename in_t, typename out_t>
 interpreter<node, in_t, out_t>::interpreter(
 	tref ubt_ctn, tref original_spec, assignment<node>& memory,
-	in_t& input, out_t& output)
+	in_t& input, out_t& output, const spec_context<node>& ctx)
 	: ubt_ctn(ubt_ctn), original_spec(original_spec), memory(memory),
-		inputs(std::move(input)), outputs(std::move(output))
+		inputs(std::move(input)), outputs(std::move(output)),
+			ctx(ctx)
 {
 	compute_lookback_and_initial();
 }
@@ -292,7 +327,8 @@ interpreter<node, in_t, out_t>::interpreter(
 template <NodeType node, typename in_t, typename out_t>
 std::optional<interpreter<node, in_t, out_t>>
 	interpreter<node, in_t, out_t>::make_interpreter(tref spec,
-						auto& inputs, auto& outputs)
+						auto& inputs, auto& outputs,
+						const auto& ctx)
 {
 	// Find a satisfiable unbound continuation from spec
 	auto [ubd_ctn, clause] = get_executable_spec(spec);
@@ -302,7 +338,7 @@ std::optional<interpreter<node, in_t, out_t>>
 	}
 	//after the above, we have the interpreter ready to be used.
 	assignment<node> memory;
-	return interpreter{ ubd_ctn, clause, memory, inputs, outputs };
+	return interpreter{ ubd_ctn, clause, memory, inputs, outputs, ctx };
 }
 
 template <NodeType node, typename in_t, typename out_t>
@@ -725,8 +761,8 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 	// The systems for solver need to be recomputed at beginning of next step
 	final_system = false;
 	compute_lookback_and_initial();
-	compute_systems(ubt_ctn);
-	//TODO: remove inputs and outputs which no longer appear in the updated specification
+	outputs.rebuild(collect_output_streams(new_spec, ctx));
+	inputs.rebuild(collect_input_streams(new_spec, ctx));
 }
 
 template <NodeType node, typename in_t, typename out_t>
@@ -862,7 +898,8 @@ template <NodeType node, typename in_t, typename out_t>
 bool interpreter<node, in_t, out_t>::is_excluded_output(tref var) {
 	if (tau::get(var).is_input_variable()) return false;
 	const std::string& io_name = get_var_name<node>(var);
-	return io_name[0] == '_' && io_name.size() > 1 && io_name[1] == 'e';
+	return io_name[0] == '_' && io_name.size() > 1 &&
+		(io_name[1] == 'e' || io_name[1] == 'f');
 }
 
 template <NodeType node, typename in_t, typename out_t>
@@ -900,12 +937,13 @@ tref unpack_tau_constant(tref constant) {
 
 template <NodeType node, typename in_t, typename out_t>
 std::optional<interpreter<node, in_t, out_t>> run(tref form,
-	in_t& inputs, out_t& outputs, const size_t steps)
+	in_t& inputs, out_t& outputs, const auto& ctx, const size_t steps)
 {
 	using tau = tree<node>;
 	tref spec = normalizer<node>(form);
 	auto intrprtr_o = interpreter<node, in_t, out_t>::make_interpreter(
-							spec, inputs, outputs);
+							spec, inputs, outputs,
+							ctx);
 	if (!intrprtr_o) return {};
 	auto& intrprtr = intrprtr_o.value();
 
@@ -954,4 +992,80 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 	return intrprtr_o;
 }
 
+template<NodeType node>
+typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx) {
+	using tau = tree<node>;
+	// select current input variables
+	auto is_in_var = [](tref n) {
+		const tau& tn = tau::get(n);
+		if (tn.is(tau::variable))
+			return tn[0].is_input_variable();
+		return false;
+	};
+	trefs in_vars = tau::get(dnf).select_all(is_in_var);
+	typed_io_vars current_inputs;
+	for (tref var : in_vars) {
+		size_t var_sid = get_var_name_sid<node>(var);
+		// Get type of current input stream
+		if (size_t type = tau::get(var).get_ba_type(); type > 0) {
+			// input stream has type
+			if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end()) {
+				// Check also predefined streams
+				if (type != it->second.first) {
+					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for "
+					<< tau::get(var).to_str() << "\n";
+					return {};
+				}
+				current_inputs[var_sid] = it->second;
+			} else current_inputs.emplace(var_sid, std::make_pair(type, 0));
+		} else if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end()) {
+			// stream has predefined type
+			current_inputs.emplace(var_sid, it->second);
+		} else {
+			// Untyped io stream error
+			TAU_LOG_ERROR << "The following input stream must be typed: "
+					<< tau::get(var).to_str() << "\n";
+			return {};
+		}
+	}
+	return current_inputs;
+}
+
+template<NodeType node>
+typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx) {
+	using tau = tree<node>;
+	// select current output variables
+	auto is_out_var = [](tref n) {
+		const tau& tn = tau::get(n);
+		if (tn.is(tau::variable))
+			return tn[0].is_output_variable();
+		return false;
+	};
+	trefs out_vars = tau::get(dnf).select_all(is_out_var);
+	typed_io_vars current_outputs;
+	for (tref var : out_vars) {
+		size_t var_sid = get_var_name_sid<node>(var);
+		// Get type of current output stream
+		if (size_t type = tau::get(var).get_ba_type(); type > 0) {
+			if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end()) {
+				// Check also predefined streams
+				if (type != it->second.first) {
+					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for: "
+					<< tau::get(var).to_str() << "\n";
+					return {};
+				}
+				current_outputs.emplace(var_sid, it->second);
+			} else current_outputs.emplace(var_sid, std::make_pair(type, 0));
+		} else if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end()) {
+			// stream has predefined type
+			current_outputs.emplace(var_sid, it->second);
+		} else {
+			// Untyped io stream error
+			TAU_LOG_ERROR << "The following input stream must be typed: "
+					<< tau::get(var).to_str() << "\n";
+			return {};
+		}
+	}
+	return current_outputs;
+}
 } // namespace idni::tau_lang
