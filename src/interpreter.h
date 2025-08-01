@@ -32,7 +32,7 @@ struct finputs {
 	using bac = ba_constants<node>;
 
 	finputs() = delete;
-	finputs(typed_io_vars inputs);
+	finputs(const typed_io_vars& inputs);
 	finputs(finputs&& other) noexcept;
 	~finputs();
 
@@ -43,6 +43,8 @@ struct finputs {
 					trefs& in_vars, size_t time_step);
 
 	size_t type_of(tref var) const;
+
+	void rebuild (const typed_io_vars& inputs);
 
 	// map of var name node to a type id
 	subtree_map<node, size_t> types;
@@ -59,7 +61,7 @@ struct foutputs {
 	using bac = ba_constants<node>;
 
 	foutputs() = delete;
-	foutputs(typed_io_vars outputs);
+	foutputs(const typed_io_vars& outputs);
 	foutputs(foutputs&& other) noexcept;
 	~foutputs();
 
@@ -67,6 +69,8 @@ struct foutputs {
 	bool write(const assignment<node>& outputs);
 
 	size_t type_of(tref var) const;
+
+	void rebuild (const typed_io_vars& outputs);
 
 	// map of var name node to a type id
 	subtree_map<node, size_t> types;
@@ -80,10 +84,12 @@ struct interpreter {
 	using tt = tau::traverser;
 
 	interpreter(tref ubt_ctn, tref original_spec,
-		assignment<node>& memory, in_t& input, out_t& output);
+		assignment<node>& memory, in_t& input, out_t& output,
+		const spec_context<node>& ctx);
 
 	static std::optional<interpreter> make_interpreter(tref spec,
-						auto& inputs, auto& outputs);
+						auto& inputs, auto& outputs,
+						const auto& ctx);
 
 	std::pair<std::optional<assignment<node>>, bool> step();
 
@@ -96,6 +102,7 @@ struct interpreter {
 	size_t time_point = 0;
 	in_t inputs;
 	out_t outputs;
+	const spec_context<node>& ctx = {};
 
 private:
 	// store all the possible systems to be solved, each system corresponds to a
@@ -154,7 +161,14 @@ tref unpack_tau_constant(tref constant);
 
 template <NodeType node, typename in_t, typename out_t>
 std::optional<interpreter<node, in_t, out_t>> run(tref form,
-		in_t& inputs, out_t& outputs, const size_t steps = 0);
+		in_t& inputs, out_t& outputs, const auto& ctx,
+		const size_t steps = 0);
+
+template <NodeType node>
+typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx);
+
+template <NodeType node>
+typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx);
 
 } // namespace idni::tau_lang
 

@@ -45,6 +45,8 @@ struct output_console {
 		if (!streams.contains(v)) streams.emplace(v, v);
 	}
 
+	void rebuild (const auto&) {};
+
 	assignment<node_t> streams;
 	size_t _type = get_ba_type_id<node_t>("sbf");
 };
@@ -79,6 +81,8 @@ struct input_vector {
 	void add_input(tref v, size_t, size_t) {
 		if (!streams.contains(v)) streams.emplace(v, v);
 	}
+
+	void rebuild (const auto&) {};
 
 	std::vector<assignment<node_t>> inputs;
 	assignment<node_t> streams;
@@ -163,7 +167,8 @@ TEST_SUITE("Execution") {
 		build_output("o1", o1, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<node_t>(spec, ins, outs, 3);
+		spec_context<node_t> ctx;
+		auto i = run<node_t>(spec, ins, outs, ctx, 3);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -192,7 +197,8 @@ TEST_SUITE("Execution") {
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<node_t>(spec, ins, outs, 6);
+		spec_context<node_t> ctx;
+		auto i = run<node_t>(spec, ins, outs, ctx, 6);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -216,7 +222,8 @@ TEST_SUITE("Execution") {
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<node_t>(spec, ins, outs, 5);
+		spec_context<node_t> ctx;
+		auto i = run<node_t>(spec, ins, outs, ctx, 5);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -243,7 +250,8 @@ TEST_SUITE("Execution") {
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<node_t>(spec, ins, outs, 4);
+		spec_context<node_t> ctx;
+		auto i = run<node_t>(spec, ins, outs, ctx, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -266,7 +274,8 @@ TEST_SUITE("Execution") {
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<node_t>(spec, ins, outs, 4);
+		spec_context<node_t> ctx;
+		auto i = run<node_t>(spec, ins, outs, ctx, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -289,7 +298,8 @@ TEST_SUITE("Execution") {
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
 		auto outs = output_console("tau");
-		auto i = run<node_t>(spec, ins, outs, 4);
+		spec_context<node_t> ctx;
+		auto i = run<node_t>(spec, ins, outs, ctx, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 
@@ -303,10 +313,10 @@ TEST_SUITE("Execution") {
 			"o2[t] = 0", "F", "o3[t] = 0", "F"
 		};
 		std::vector<std::string> o1 = {
-			"always o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0 && i1[t]u[t]' = 0",
-			"always o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && o2[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0 && i1[t]u[t]' = 0",
-			"always o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && o2[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0 && i1[t]u[t]' = 0",
-			"always o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && o2[t] = 0 && o3[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0 && i1[t]u[t]' = 0"
+			"always i1[t]o1[t]u[t]' = 0 && o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]this[t]'u[t]' = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0",
+			"always i1[t]o1[t]u[t]' = 0 && o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]this[t]'u[t]' = 0 && o2[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0",
+			"always i1[t]o1[t]u[t]' = 0 && o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]this[t]'u[t]' = 0 && o2[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0",
+			"always i1[t]o1[t]u[t]' = 0 && o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]this[t]'u[t]' = 0 && o2[t] = 0 && o3[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0"
 		};
 		std::vector<assignment<node_t>> assgn_in;
 		assignment<node_t> assgn_out;
@@ -314,8 +324,10 @@ TEST_SUITE("Execution") {
 		build_output("o1", o1, "tau", assgn_out);
 		build_output("u", u, "tau", assgn_out);
 		auto ins = input_vector(assgn_in, "tau");
+		ins.add_input(build_var_name<node_t>("this"),0,0);
 		auto outs = output_console("tau");
-		auto i = run<node_t>(spec, ins, outs, 4);
+		spec_context<node_t> ctx;
+		auto i = run<node_t>(spec, ins, outs, ctx, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
 	}
 }
@@ -330,8 +342,9 @@ std::optional<assignment<node_t>> run_test(const char* sample,
 	std::cout << "run_test/sample: " << sample << "\n";
 #endif // DEBUG
 
+	spec_context<node_t> ctx;
 	auto intprtr = interpreter<node_t, input_vector, output_console>
-				::make_interpreter(spec, inputs, outputs);
+				::make_interpreter(spec, inputs, outputs, ctx);
 	if (intprtr) {
 		// we read the inputs only once (they are always empty in this test suite)
 
