@@ -1869,6 +1869,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 										return tau::build_bf_neq(simp_neq);
 									}
 								}
+								return n;
 							};
 							neq = pre_order<node>(neq).apply_unique(f, visit_wff<node>);
 						}
@@ -3030,7 +3031,6 @@ tref wff_remove_existential(tref var, tref wff) {
 template <NodeType node>
 tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	// Reductions to prevent blow ups and achieve DNF
 	LOG_DEBUG << "Start existential quantifier elimination";
 	LOG_DEBUG << "Quantified variable: " << LOG_FM(tau::trim2(inner_fm));
@@ -3073,7 +3073,6 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 		}
 		else if (all_equal_zero) {
 			std::map<size_t, tref> new_funcs;
-			tref new_func = nullptr;
 			for (tref d : conjuncts) {
 				size_t type_raw = find_ba_type<node>(d);
 				size_t type = type_raw == 0
@@ -3120,7 +3119,6 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 template <NodeType node>
 tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	LOG_DEBUG << "Start universal quantifier elimination";
 	LOG_DEBUG << "Quantified variable: " << LOG_FM(tau::trim2(inner_fm));
 	LOG_DEBUG << "Quantified formula: " << LOG_FM(scoped_fm);
