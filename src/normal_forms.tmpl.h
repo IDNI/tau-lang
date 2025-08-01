@@ -90,11 +90,14 @@ tref squeeze_wff(const tref& fm) {
 		if (t.is(tau::wff_and)) {
 			const auto& e1 = t[0], e2 = t[1];
 			if (e1.child_is(tau::bf_eq)
-				&& e2.child_is(tau::bf_eq))
-			{
-				return tau::trim(tau::build_bf_eq(
-					tau::build_bf_or(
+				&& e2.child_is(tau::bf_eq)) {
+				size_t t_e1 = find_ba_type<node>(e1.get());
+				size_t t_e2 = find_ba_type<node>(e2.get());
+				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
+					return tau::trim(tau::build_bf_eq(
+						tau::build_bf_or(
 						e1[0].first(), e2[0].first())));
+				}
 			}
 		}
 		else if (t.is(tau::wff_or)) {
@@ -102,9 +105,13 @@ tref squeeze_wff(const tref& fm) {
 			if (e1.child_is(tau::bf_neq)
 				&& e2.child_is(tau::bf_neq))
 			{
-				return tau::trim(tau::build_bf_neq(
-					tau::build_bf_or(
+				size_t t_e1 = find_ba_type<node>(e1.get());
+				size_t t_e2 = find_ba_type<node>(e2.get());
+				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
+					return tau::trim(tau::build_bf_neq(
+						tau::build_bf_or(
 						e1[0].first(), e2[0].first())));
+				}
 			}
 		}
 		return n;
@@ -146,9 +153,14 @@ tref squeeze_wff_pos(tref fm) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_and)) {
 			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_eq) && e2.child_is(tau::bf_eq))
-				return tau::trim(tau::build_bf_eq(
-					tau::build_bf_or(e1[0].first(), e2[0].first())));
+			if (e1.child_is(tau::bf_eq) && e2.child_is(tau::bf_eq)) {
+				size_t t_e1 = find_ba_type<node>(e1.get());
+				size_t t_e2 = find_ba_type<node>(e2.get());
+				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
+					return tau::trim(tau::build_bf_eq(
+						tau::build_bf_or(e1[0].first(), e2[0].first())));
+				}
+			}
 		}
 		return n;
 	};
@@ -190,10 +202,15 @@ tref squeeze_wff_neg(tref fm) {
 		if (t.is(tau::wff_or)) {
 			const auto& e1 = t[0], e2 = t[1];
 			if (e1.child_is(tau::bf_neq)
-				&& e2.child_is(tau::bf_neq))
+				&& e2.child_is(tau::bf_neq)) {
+				size_t t_e1 = find_ba_type<node>(e1.get());
+				size_t t_e2 = find_ba_type<node>(e2.get());
+				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
 					return tau::trim(tau::build_bf_neq(
 						tau::build_bf_or(
 							e1[0].first(), e2[0].first())));
+				}
+			}
 		}
 		return n;
 	};
@@ -3046,21 +3063,30 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 			else res = new_conjunct;
 		}
 		else if (all_equal_zero) {
-			//TODO: If they have different type, seperate
+			std::map<size_t, tref> new_funcs;
 			tref new_func = nullptr;
 			for (tref d : conjuncts) {
-				if (new_func) new_func =
-					tau::build_bf_or(new_func,
-							 tau::trim2(d));
-				else new_func = tau::trim2(d);
+				size_t type_raw = find_ba_type<node>(d);
+				size_t type = type_raw == 0
+							? 0
+							: get_ba_type_id<node>(
+								node::nso_factory::instance()
+								.default_type());
+				if (auto it = new_funcs.find(type); it != new_funcs.end())
+					it->second = tau::build_bf_or(it->second, tau::trim2(d));
+				else new_funcs.emplace(type, tau::trim2(d));
 			}
-			new_func = tau::build_bf_eq(tt(new_func)
-				| bf_reduce_canonical<node>() | tt::ref);
-			new_func = wff_remove_existential<node>(
-				tau::trim2(inner_fm), new_func);
-			if (tau::get(new_func).equals_T()) return tau::_T();
-			if (res) res = tau::build_wff_or(res, new_func);
-			else res = new_func;
+			tref new_fm = nullptr;
+			for (tref func: new_funcs | std::views::values) {
+				auto reduced_eq = tau::build_bf_eq(bf_reduce_canonical<node>()(func));
+				if (new_fm) new_fm = tau::build_wff_and(new_fm, reduced_eq);
+				else new_fm = reduced_eq;
+			}
+			new_fm = wff_remove_existential<node>(
+				tau::trim2(inner_fm), new_fm);
+			if (tau::get(new_fm).equals_T()) return tau::_T();
+			if (res) res = tau::build_wff_or(res, new_fm);
+			else res = new_fm;
 		}
 		else {
 			// Resolve quantified variable in scoped_fm
@@ -3134,20 +3160,30 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 			else res = new_disjunct;
 		}
 		if (all_unequal_zero) {
-			tref new_func = nullptr;
+			std::map<size_t, tref> new_funcs;
 			for (tref d : disjuncts) {
-				if (new_func) new_func = tau::build_bf_or(
-						new_func, tau::trim2(d));
-				else new_func = tau::trim2(d);
+				size_t type_raw = find_ba_type<node>(d);
+				size_t type = type_raw == 0
+							? 0
+							: get_ba_type_id<node>(
+								node::nso_factory::instance()
+								.default_type());
+				if (auto it = new_funcs.find(type); it != new_funcs.end())
+					it->second = tau::build_bf_or(it->second, tau::trim2(d));
+				else new_funcs.emplace(type, tau::trim2(d));
 			}
-			new_func = tau::build_bf_eq(tt(new_func)
-				| bf_reduce_canonical<node>() | tt::ref);
-			new_func = push_negation_in<node>(
+			tref new_fm = nullptr;
+			for (tref func : new_funcs | std::views::values) {
+				tref reduced_eq = tau::build_bf_eq(bf_reduce_canonical<node>()(func));
+				if (new_fm) new_fm = tau::build_wff_or(new_fm, reduced_eq);
+				else new_fm = reduced_eq;
+			}
+			new_fm = push_negation_in<node>(
 				tau::build_wff_neg(wff_remove_existential<node>(
-					tau::trim2(inner_fm), new_func)));
-			if (tau::get(new_func).equals_F()) return tau::_F();
-			if (res) res = tau::build_wff_and(res, new_func);
-			else res = new_func;
+					tau::trim2(inner_fm), new_fm)));
+			if (tau::get(new_fm).equals_F()) return tau::_F();
+			if (res) res = tau::build_wff_and(res, new_fm);
+			else res = new_fm;
 		} else {
 			// Turn universal into existential quantifier and eliminate
 			auto new_clause = push_negation_in<node>(
