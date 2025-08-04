@@ -4,6 +4,7 @@ set(TESTS
 	ba_constants
 	ba_types_inference
 	bool
+	gc
 	hbdd
 	normal_forms
 	nso_rr
