@@ -159,4 +159,29 @@ TEST_SUITE("gc") {
 		CHECK(!cache.contains(std::make_pair(d, tau::_F())));
 	}
 
+	TEST_CASE_FIXTURE(nodes_fixture, "cache rebuild - tau::create_cache<cache_t>()") {
+		static cache_t& cache = tau::create_cache<cache_t>();
+
+		cache.emplace(std::make_pair(a, tau::_T()), true);
+		cache.emplace(std::make_pair(b, tau::_F()), false);
+		cache.emplace(std::make_pair(c, tau::_T()), false);
+		cache.emplace(std::make_pair(d, tau::_F()), true);
+
+		TAU_LOG_INFO << "Keep a by creating a handle";
+		htref ha = tau::geth(a);
+
+		TAU_LOG_INFO << "Keep b by inserting it into the keep set";
+		std::unordered_set<tref> keep{};
+		keep.insert(b);
+
+		TAU_LOG_INFO << "GC", tau::gc(keep);
+
+		print(cache);
+
+		CHECK(cache.size() == 2);
+		CHECK(cache.contains(std::make_pair(a, tau::_T())));
+		CHECK(cache.contains(std::make_pair(b, tau::_F())));
+		CHECK(!cache.contains(std::make_pair(c, tau::_T())));
+		CHECK(!cache.contains(std::make_pair(d, tau::_F())));
+	}
 }
