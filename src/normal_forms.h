@@ -990,6 +990,14 @@ struct bf_reduce_canonical {
 	tau<BAs...> operator() (const tau<BAs...>& fm) const {
 		std::map<tau<BAs...>, tau<BAs...>> changes = {};
 		for (const auto& bf: select_top(fm, is_non_terminal<tau_parser::bf, BAs...>)) {
+			// In case of function/predicate symbol, normalize the arguments
+			if (is_child_non_terminal<BAs...>(tau_parser::bf_ref, bf)) {
+				for (const auto& arg: select_top(trim2(bf), is_non_terminal<tau_parser::bf, BAs...>)) {
+					auto dnf = bf_boole_normal_form(arg);
+					if (dnf != arg) changes[arg] = dnf;
+				}
+			}
+
 			auto dnf = bf_boole_normal_form(bf);
 			if (dnf != bf) changes[bf] = dnf;
 		}
