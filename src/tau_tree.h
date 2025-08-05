@@ -173,6 +173,14 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	inline static bool use_hooks = true; 
 
+	// gc
+	static void gc();
+	static void gc(std::unordered_set<tref>& keep);
+
+	using gc_callback =
+		std::function<void(const std::unordered_set<tref>& kept)>;
+	inline static std::vector<gc_callback> gc_callbacks{};
+
 	// tree direct API
 	// ---------------------------------------------------------------------
 
