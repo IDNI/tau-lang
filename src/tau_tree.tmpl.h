@@ -121,6 +121,20 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // Tau tree templates implementation
 
+// gc
+template <NodeType node>
+void tree<node>::gc() {
+	std::unordered_set<tref> keep{};
+	gc(keep);
+}
+
+template <NodeType node>
+void tree<node>::gc(std::unordered_set<tref>& keep) {
+	base_t::gc(keep);
+	// call callbacks to rebuild caches
+	for (const auto& cb : gc_callbacks) cb(keep);
+}
+
 //------------------------------------------------------------------------------
 // handles
 
