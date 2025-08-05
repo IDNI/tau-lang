@@ -12,6 +12,7 @@ set(TAU_HEADERS
 	boolean_algebras/nso_ba.h
 	experimental/execution.h
 	defs.h
+    definitions.h
 	rewriting.h
 	dict.h
 	normalizer.h

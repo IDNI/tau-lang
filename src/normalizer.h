@@ -12,6 +12,7 @@
 #include "boolean_algebras/variant_ba.h"
 #include "normal_forms.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
+#include "definitions.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -366,6 +367,10 @@ auto is_bf_same_to_any_of(tau<BAs...>& n, std::vector<tau<BAs...>>& previous) {
 		});
 }
 
+template <typename... BAs>
+tau<BAs...> apply_defs_to_spec(const tau<BAs...>& spec,
+	const size_t type = tau_parser::wff);
+
 template<typename... BAs>
 tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 	using p = tau_parser;
@@ -377,6 +382,20 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 		return n;
 	};
 	auto red_fm = normalizer_step(fm);
+	// Apply present function/predicate definitions
+	bool changed;
+	do {
+		changed = false;
+		// Unresolved symbol is still present
+		if (find_top(red_fm, is_non_terminal<tau_parser::ref, BAs...>)) {
+			auto resolved_red_fm = apply_defs_to_spec(red_fm);
+			if (resolved_red_fm != red_fm) {
+				red_fm = normalizer_step(resolved_red_fm);
+				changed = true;
+			}
+		}
+	} while (changed);
+
 	if (red_fm == _T<BAs...> || red_fm == _F<BAs...>) return red_fm;
 	auto clauses = get_dnf_wff_clauses(red_fm);
 	tau<BAs...> new_fm = _F<BAs...>;
@@ -487,7 +506,20 @@ template<typename... BAs>
 tau<BAs...> bf_normalizer_without_rec_relation (const tau<BAs...>& bf) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
 
-	auto result = bf_boole_normal_form(bf);
+	auto result = bf_reduce_canonical<BAs...>()(bf);
+	// Apply present function/predicate definitions
+	bool changed;
+	do {
+		changed = false;
+		// Unresolved symbol is still present
+		if (find_top(result, is_non_terminal<tau_parser::ref, BAs...>)) {
+			auto resolved_res = apply_defs_to_spec(result);
+			if (resolved_res != result) {
+				result = bf_reduce_canonical<BAs...>()(resolved_res);
+				changed = true;
+			}
+		}
+	} while (changed);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
 
@@ -509,7 +541,7 @@ tau<BAs...> bf_normalizer_with_rec_relation(const rr<tau<BAs...>> &bf) {
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
 
-	auto result = bf_boole_normal_form(bf_unfolded);
+	auto result = bf_normalizer_without_rec_relation(bf_unfolded);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
 
@@ -846,6 +878,30 @@ tau<BAs...> apply_rr_to_formula (const rr<tau<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End apply_rr_to_formula";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
 	return new_main;
+}
+
+template<typename... BAs>
+tau<BAs...> apply_defs_to_spec(const tau<BAs...>& spec, const size_t type)
+{
+	bool contains_ref = find_top(
+		spec, is_non_terminal<tau_parser::ref, BAs...>).has_value();
+	rr<tau<BAs...>> rr_{ nullptr };
+	if (contains_ref && type == tau_parser::rr) {
+		if (auto x = make_nso_rr_from_binded_code<BAs...>(
+				spec); x) rr_ = x.value();
+		else return {};
+	} else rr_ = rr<tau<BAs...>>(spec);
+	if (contains_ref) {
+		auto defs = definitions<BAs...>::instance().get();
+		rr_.rec_relations.insert(rr_.rec_relations.end(),
+			defs.begin(), defs.end());
+		if (auto infr = infer_ref_types<BAs...>(rr_); infr)
+			rr_ = infr.value();
+		else return nullptr;
+	}
+
+	rr_.main = apply_rr_to_formula(rr_);
+	return rr_.main;
 }
 
 // REVIEW (HIGH) review overall execution
