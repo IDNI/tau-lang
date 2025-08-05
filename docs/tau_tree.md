@@ -20,7 +20,7 @@ Node stores data:
 ```
 	size_t nt     : nt_bits;   - node::type enum id (bitsize is determined from number of nonterminals at constexpr)
 	size_t term   : 1;         - flag if is term or formula
-	size_t ba_id  : ba_bits;   - BA type id (bitsize is determined from number of BAs at constexpr)
+	size_t ba     : ba_bits;   - BA type id (bitsize is determined from number of BAs at constexpr)
 	size_t ext    : 1;         - extension flag (not implemented yet)
 	size_t data   : data_bits; - remaining bits for data
 	size_t hash;               - hash value
@@ -49,11 +49,8 @@ When we are speaking about `tau_parser::nonterminal` in the parse tree, we provi
 `node` also provides several `BAs...` packed aliases. They can be used in constructs where the pack is not available directly, ie. in methods and functions templated by `node` and not by the `BAs...` pack:
 ```
 	using node_t                            = node<BAs...>;
-	using bas_variant                       = std::variant<BAs...>;
-	using ba_constants_t                    = ba_constants<BAs...>;
-	using ba_constants_binder_t             = ba_constants_binder<BAs...>;
-	using ba_types_checker_and_propagator_t = ba_types_checker_and_propagator<BAs...>;
-	using tau_ba_t                          = tau_ba<BAs...>;
+	using constant                          = std::variant<BAs...>;
+	using nso_factory                       = tau_lang::nso_factory<BAs...>;
 ```
 
 
@@ -64,9 +61,9 @@ tree is templated by a `node<BAs...>` type.
 
 It is based on `idni::lcrs_tree<node>` which is then based on `idni::bintree<node>`
 
-It has three base data members:
+It has three base data members (from `idni::bintree<node>`):
 ```
-	const node value;     // node 
+	const node value;     // node
 	const tref l;         // first child
 	const tref r;         // right sibling
 ```
@@ -106,7 +103,7 @@ These aliases are also used in the following text.
 
 Tau tree inherits the nonterminals enum from a generated tau_parser, so the types are available directly from the tree:
 
-	tau::variable == node::type::variable == tau_parser::variable 
+	tau::variable == node::type::variable == tau_parser::variable
 
 
 
@@ -392,29 +389,6 @@ Following static methods stores a new constant into a pool and it returns a pair
 	// insert the constant value of a type id to the pool
 	static typed_constant get(const std::variant<BAs...>& b,size_t type_id);
 ```
-
-TODO
-
-### `ba_constants_binder<BAs...>`
-
-Stores constant in a pool and returns a tree node reference.
-Also can have a map of named constants. if provided source contains a name of a named constant, it returns the reference of the named constant.
-
-```
-	// binds the constant of a type into a tree, usually called from nso_factory
-	tref bind(const std::variant<BAs...>& constant, const std::string& type_name);
-
-	// binds the constant of a type into a tree, usually called internally
-	tref bind(const std::variant<BAs...>& constant, size_t type_id);
-```
-
-When parser encounters a constant it calls provided or default `binder(src, type_name)`. It checks if the source string is a named constant, then returns the reference of the named constant value. If no named constant is matched, then it calls `nso_factory<BAs...>::instance().binding(src, type_name)`.
-
-```
-	// binder interface operator
-	tref operator()(const std::string& src, const std::string& type_name);
-```
-
 
 TODO
 
