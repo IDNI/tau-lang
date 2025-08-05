@@ -76,3 +76,12 @@ logs/*
 external/boost
 libboost-mingw-w64
 .clangd
+private/.gitkeep
+private/andreis_example.txt
+private/luccas_notes.txt
+private/stack.txt
+private/valgrind.txt
+private/cvc5/are_nso_eqv.cvc5
+private/testnet/andrei
+private/testnet/andrei_uncomment.tau
+private/testnet/andrei.tau
