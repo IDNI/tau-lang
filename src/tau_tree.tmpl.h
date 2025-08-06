@@ -138,7 +138,7 @@ void tree<node>::gc(std::unordered_set<tref>& keep) {
 template <NodeType node>
 template <CacheType cache_t>
 cache_t& tree<node>::create_cache() {
-	static std::vector<cache_t> caches{};
+	static std::deque<cache_t> caches{};
 	cache_t& cache = caches.emplace_back();
 	gc_callbacks.push_back([&cache](const std::unordered_set<tref>& kept) {
 		cache_t new_cache{};
@@ -156,12 +156,11 @@ cache_t& tree<node>::create_cache() {
 				std::apply([&ok, &kept, &check](
 							const auto&... args)
 				{
-					((ok = ok &&
-					(std::is_same_v<
-						std::decay_t<
-							decltype(args)>, tref>
-						? check(args)
-						: true)), ...);
+					([&]() {
+						if constexpr (std::is_same_v<
+								std::decay_t<decltype(args)>, tref>)
+							check(args);
+					}(), ...);
 				}, key);
 			else {
 				if constexpr (std::is_same_v<std::decay_t<
