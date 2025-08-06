@@ -18,7 +18,8 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	};
 
 #ifdef TAU_CACHE
-	static std::map<std::pair<rewriter::rule, tref>, tref> cache;
+	using cache_t = std::map<std::pair<rewriter::rule, tref>, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 
@@ -57,7 +58,8 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 #ifdef TAU_CACHE
-	static std::map<std::pair<rewriter::rules, tref>, tref> cache;
+	using cache_t = std::map<std::pair<rewriter::rules, tref>, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find({rs, n}); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 

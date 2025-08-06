@@ -987,8 +987,9 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 	using tau = tree<node>;
 	DBG(assert(get_dnf_wff_clauses<node>(fm).size() == 1);)
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref, int_t>, tref,
-		subtree_pair_less<node, int_t>> cache;
+	using cache_t = std::map<std::pair<tref, int_t>, tref,
+				subtree_pair_less<node, int_t>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find(std::make_pair(fm, start_time));
 		it != cache.end()) return it->second;
 #endif // TAU_CACHE
