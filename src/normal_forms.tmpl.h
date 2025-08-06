@@ -1114,7 +1114,8 @@ template <NodeType node>
 tref sort_var(tref var) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	static subtree_unordered_map<node, tref> cache;
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(var); it != end(cache))
 		return it->second;
 #endif // TAU_CACHE
@@ -1228,7 +1229,8 @@ template <NodeType node>
 tref group_dnf_expression(tref fm) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	static subtree_unordered_map<node, tref> cache;
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != end(cache)) return it->second;
 #endif // TAU_CACHE
 	LOG_DEBUG << "Begin group_dnf_expression";
