@@ -5,7 +5,7 @@ Tau tree API is available in `idni::tau_lang` namespace.
 
 It provides `node<BAs...>` and `tree<node>` types.
 
-It also contains `ba_constants<BAs...>` pool and `ba_constants_binder<BAs...>` named and factory binder
+It also contains `ba_constants<BAs...>` pool.
 
 
 ## struct `node<BAs...>`
@@ -31,8 +31,8 @@ In data field is either number, integer, or id of an object in its respective po
 These are strings (or terminal sequences) and constants.
 
 Strings are:
- -  stored in a pool by `size_t string_id(const std::string&)`
- - and retrieved by `const std::string& string_from_id(size_t)`
+ -  stored in a pool by `size_t dict(const std::string&)`
+ - and retrieved by `const std::string& dict(size_t)`
 
 Constants, BA types and BA types map are managed by `ba_constants<BAs...> pool`.
 
@@ -75,7 +75,7 @@ There are four forms of the Tau tree used all around the codebase:
 
 ```
 tref                          node_ref;            // for passing around and for building
-htree::sp                     sp_node_handle;      // to prevent the node from being gc-ed
+htref (or htree::sp)          sp_node_handle;      // to prevent the node from being gc-ed
 const tree<node<BAs...>>&     node_value_and_api;  // to access the value and tree API
 tree<node<BAs...>>::traverser traverser_wrapper;   // traverser API with operator| and extractors
 ```
@@ -112,11 +112,11 @@ Tau tree inherits the nonterminals enum from a generated tau_parser, so the type
 1. I want to acces a node value, children or basically the whole tree API: `const tau&`
 ```
 	- from tref:       tau::get(node_ref);
-	- from htree::sp:  tau::get(sp_node_handle);
+	- from htref:      tau::get(sp_node_handle);
 	- from tt:         traverser_wrapper | tt::Tree;   // using extractor
 	                or traverser_wrapper.value_tree();
 ```
-2. I want to prevent a node from being GC-ed: `htree::sp`
+2. I want to prevent a node from being GC-ed: `htref`
 ```
 	- from tref:       tau::geth(node_ref);
 	- from const tau&: tau::geth(node_value_and_api.get());
@@ -125,7 +125,7 @@ Tau tree inherits the nonterminals enum from a generated tau_parser, so the type
 
 3. I want to pass a node reference around (for API calls and caching): `tref`
 ```
-	- from htree::sp:  sp_node_handle->get();
+	- from htref:      sp_node_handle->get();
 	- from const tau&: node_value_and_api.get();
 	- from tt:         traverser_wrapper | tt::ref;    // using extractor
 	                or traverser_wrapper.value();
@@ -134,7 +134,7 @@ Tau tree inherits the nonterminals enum from a generated tau_parser, so the type
 4. I want to use the traverser API: `tt`
 ```
 	- from tref:       tt(node_ref);
-	- from htree::sp:  tt(sp_node_handle);
+	- from htref:      tt(sp_node_handle);
 	- from const tau&: tt(node_value_and_api);
 	                or node_value_and_api();
 ```
@@ -262,7 +262,7 @@ Traverser acts as `std::optional` able to wrap single or multiple `tref` nodes.
 Construction:
  - `traverser();` - w/o value
  - `traverser(tref r);` - wrapping a single node
- - `traverser(const htree::sp& r);` - wrapping a single node from sp_handle
+ - `traverser(const htref& r);` - wrapping a single node from sp_handle
  - `traverser(const trefs& n);` - wrapping multiple nodes
 
 
@@ -291,7 +291,7 @@ Available extractors:
 	// handles
 	extractor<tref>                   ref;                  // value()
 	extractor<const trefs&>           refs;                 // values()
-	extractor<htree::sp>              handle;               // geth(value())
+	extractor<htref>                  handle;               // geth(value())
 	extractor<const tree<node>&>      Tree;                 // value_tree()
 
 	// print/dump - returns itself
