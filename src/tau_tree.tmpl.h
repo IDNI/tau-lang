@@ -191,17 +191,17 @@ const tree<node>& tree<node>::get(const tref id) {
 	return (const tree&) base_t::get(id);
 }
 template <NodeType node>
-const tree<node>& tree<node>::get(const htree::sp& h) {
+const tree<node>& tree<node>::get(const htref& h) {
 	return (const tree&) base_t::get(h);
 }
 template <NodeType node>
-htree::sp tree<node>::geth(tref h) {
+htref tree<node>::geth(tref h) {
 	DBG(assert(h != nullptr);)
 	return base_t::geth(h);
 }
 
 template <NodeType node>
-htree::sp tree<node>::geth(const tree& n) {
+htref tree<node>::geth(const tree& n) {
 	return geth(n.get());
 }
 

@@ -74,7 +74,7 @@ repl_evaluator<BAs...>::history_ref repl_evaluator<BAs...>::history_retrieve(
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::print_history(const htree::sp& mem, const size_t id,
+void repl_evaluator<BAs...>::print_history(const htref& mem, const size_t id,
 	const size_t size, bool print_relative_index) const
 {
 	std::cout << TC_OUTPUT << "%" << id + 1 << TC.CLEAR();

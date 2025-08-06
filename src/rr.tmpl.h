@@ -5,14 +5,14 @@
 namespace idni::tau_lang {
 
 template <NodeType node>
-rr<node>::rr(const rewriter::rules& rec_relations, const htree::sp& main)
+rr<node>::rr(const rewriter::rules& rec_relations, const htref& main)
 				: rec_relations(rec_relations), main(main) {};
 
 template <NodeType node>
-rr<node>::rr(const htree::sp& main) : main(main) {};
+rr<node>::rr(const htref& main) : main(main) {};
 
 template <NodeType node>
-std::weak_ordering compare_trees(const htree::sp& a, const htree::sp& b) {
+std::weak_ordering compare_trees(const htref& a, const htref& b) {
 	if (a && b) {
 		const auto& a_tree = tree<node>::get(a->get());
 		const auto& b_tree = tree<node>::get(b->get());

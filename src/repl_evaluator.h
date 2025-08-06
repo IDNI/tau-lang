@@ -52,7 +52,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 struct repl_evaluator {
 	friend struct repl<repl_evaluator<BAs...>>;
-	using history = htree::sp;
+	using history = htref;
 	using history_ref = std::optional<std::pair<history, size_t>>;
 
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
@@ -150,7 +150,7 @@ private:
 	// history
 	history_ref history_retrieve(const tt& n, bool silent = false) const;
 	void history_store(tref value);
-	void print_history(const htree::sp& mem, const size_t id,
+	void print_history(const htref& mem, const size_t id,
 		const size_t size, bool print_relative_index = true) const;
 	std::optional<size_t> get_history_index(const tt& n, const size_t size,
 						bool silent = false) const;
