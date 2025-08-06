@@ -277,8 +277,9 @@ void join_paths(std::vector<std::vector<int_t>>& paths);
 template <NodeType node>
 auto lex_var_comp = [](tref x, tref y) {
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref, tref>, bool,
-		subtree_pair_less<node, tref>> cache;
+	using cache_t = std::map<std::pair<tref, tref>, bool,
+				subtree_pair_less<node, tref>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find({x,y}); it != cache.end())
 		return it->second;
 #endif // TAU_CACHE
