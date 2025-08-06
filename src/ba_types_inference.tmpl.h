@@ -2,6 +2,7 @@
 
 #include "ba_types.h"
 #include "ba_types_inference.h"
+#include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "ba_types_inference"
@@ -198,9 +199,32 @@ tref ba_types_inference<node>::add_scope_ids(
 			size_t scope_id = is_constant ? csid : vsid(el);
 			ch.push_back(tau::get(node(tau::scope_id, scope_id)));
 		}
-		auto r = tau::get(t.value, ch);
-		size_t tid = t.get_ba_type();
-		const auto& type = t.get_ba_type_name();
+		tref r = tau::get(t.value, ch);
+		size_t tid = tau::get(r).get_ba_type();
+		if (is_io && tid == 0) {
+			// Update type information from stream definitions
+			// Get string id of stream name
+			size_t sid = get_var_name_sid<node>(r);
+			auto& defs = definitions<node>::instance();
+			// See if stream is present in outputs
+			const auto& mo = defs.get_output_defs();
+			if (auto it = mo.find(sid); it != mo.end()) {
+				// stream found, assign type id
+				tid = it->second.first;
+				r = tau::get(r).replace_value(
+					tau::get(r).value.ba_retype(tid));
+			} else {
+				// See if stream is present in inputs
+				const auto& mi = defs.get_input_defs();
+				if (it = mi.find(sid); it != mi.end()) {
+					// stream found, assign type id
+					tid = it->second.first;
+					r = tau::get(r).replace_value(
+						tau::get(r).value.ba_retype(tid));
+				}
+			}
+		}
+		const auto& type = tau::get(r).get_ba_type_name();
 		DBG(LOG_TRACE << "type: " << type;)
 		if (type.size() && type != "untyped") {
 			bool found = false;
