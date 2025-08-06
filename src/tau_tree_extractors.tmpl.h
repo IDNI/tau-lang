@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "tau_tree.h"
+#include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "extractors"
@@ -144,7 +145,7 @@ rewriter::rules get_rec_relations(spec_context<node>& ctx, tref rrs) {
 
 template <NodeType node>
 rewriter::rules get_rec_relations(tref rrs) {
-	spec_context<node> ctx;
+	spec_context<node>& ctx = definitions<node>::instance().get_io_context();
 	return get_rec_relations<node>(ctx, rrs);
 }
 
@@ -196,7 +197,7 @@ std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r, bool wo_infe
 
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(tref r, bool wo_inference) {
-	spec_context<node> ctx;
+	spec_context<node>& ctx = definitions<node>::instance().get_io_context();
 	return get_nso_rr<node>(ctx, r, wo_inference);
 }
 
