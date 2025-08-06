@@ -172,12 +172,11 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 					"currently no output is specified";
 			}
 			// update time_point and formula_time_point
-			if ((int_t)time_point < lookback) {
+			if (time_point < formula_time_point) {
 				// auto continue until lookback
 				auto_continue = true;
 				++time_point;
-			}
-			else {
+			} else {
 				// auto continue until highest initial position
 				if ((int_t)time_point < highest_initial_pos)
 					auto_continue = true;

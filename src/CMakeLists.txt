@@ -15,6 +15,7 @@ set(TAU_HEADERS
 	experimental/execution.h
 	runtime.h
 	defs.h
+    definitions.h
 	rewriting.h
 	dict.h
 	normalizer.h

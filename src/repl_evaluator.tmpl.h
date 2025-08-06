@@ -77,29 +77,6 @@ void print_memory(const tau_nso<BAs...> mem, const size_t id,
 	std::cout << ": " << mem << "\n";
 }
 
-template<typename... BAs>
-tau_nso<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
-	const size_t type, const tau_nso_t& program)
-{
-	bool contains_ref = contains(program, tau_parser::ref);
-	rr<tau_nso_t> rr_{ nullptr };
-	if (contains_ref && type == tau_parser::rr) {
-		if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
-				program); x) rr_ = x.value();
-		else return {};
-	} else rr_ = rr<tau_nso_t>(program);
-	if (contains_ref) {
-		rr_.rec_relations.insert(rr_.rec_relations.end(),
-			definitions.begin(), definitions.end());
-		if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_); infr)
-			rr_ = infr.value();
-		else return nullptr;
-	}
-
-	rr_.main = apply_rr_to_formula(rr_);
-	return rr_.main;
-}
-
 template <typename... BAs>
 void repl_evaluator<BAs...>::history_print_cmd(const tau_nso_t& command) {
 	auto n = command | tau_parser::memory;
@@ -215,7 +192,7 @@ std::optional<tau_nso<BAs...>>
 	auto var = n->child[2];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto applied = apply_defs_to_spec(program, type);
 		return onf<tau_ba_t, BAs...>(var, applied);
 	}
 	return {};
@@ -228,7 +205,7 @@ std::optional<tau_nso<BAs...>>
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto applied = apply_defs_to_spec(program, type);
 		if (is_non_terminal(tau_parser::bf, applied))
 			return reduce(to_dnf<false>(applied), tau_parser::bf);
 		else if (is_non_terminal(tau_parser::wff, applied))
@@ -245,7 +222,7 @@ std::optional<tau_nso<BAs...>>
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto applied = apply_defs_to_spec(program, type);
 		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff:
 			return reduce(to_cnf(applied), tau_parser::wff, true);
@@ -265,7 +242,7 @@ std::optional<tau_nso<BAs...>>
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto applied = apply_defs_to_spec(program, type);
 		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff: return to_nnf(applied);
 		case tau_parser::bf:  return push_negation_in<false>(applied);
@@ -282,7 +259,7 @@ std::optional<tau_nso<BAs...>>
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto applied = apply_defs_to_spec(program, type);
 		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff: return to_mnf(reduce_across_bfs(applied, false));
 		case tau_parser::bf:  return bf_boole_normal_form(applied);
@@ -299,7 +276,7 @@ std::optional<tau_nso<BAs...>>
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto applied = apply_defs_to_spec(program, type);
 		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff: return snf_wff<tau_ba_t, BAs...>(applied);
 		case tau_parser::bf:  return snf_bf<tau_ba_t, BAs...>(applied);
@@ -463,8 +440,9 @@ std::optional<tau_nso<BAs...>>
 		else return {};
 		} else rr_ = rr<tau_nso_t>(value);
 		if (contains_ref) {
+			auto defs = definitions<tau_ba_t, BAs...>::instance().get();
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end());
+				defs.begin(), defs.end());
 			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
 				infr) rr_ = infr.value();
 			else return {};
@@ -489,7 +467,7 @@ std::optional<tau_nso<BAs...>>
 {
 	if (auto check = get_type_and_arg(n->child[1]); check) {
 		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto applied = apply_defs_to_spec(program, type);
 		applied = eliminate_quantifiers<tau_ba_t, BAs...>(applied);
 		return reduce_across_bfs(applied, false);
 	}
@@ -508,7 +486,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		// as we would get a formula in dnf already. However, we would need to
 		// kept the application of definitionsand call the computation of phi/chi infinity
 		auto [t, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(t, program);
+		auto applied = apply_defs_to_spec(program, t);
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(debug) << "applied: " << applied << "\n";
@@ -750,7 +728,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	auto arg = n->child.back();
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [t, equations] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(t, equations);
+		auto applied = apply_defs_to_spec(equations, t);
 		applied = normalize_non_temp(applied);
 
 		#ifdef DEBUG
@@ -775,7 +753,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
 	auto arg = n->child.back();
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [t, equations] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(t, equations);
+		auto applied = apply_defs_to_spec(equations, t);
 		applied = normalize_non_temp(applied);
 
 		#ifdef DEBUG
@@ -814,8 +792,9 @@ std::optional<tau_nso<BAs...>>
 			else return {};
 		} else rr_ = rr<tau_nso_t>(value);
 		if (contains_ref) {
+			auto defs = definitions<tau_ba_t, BAs...>::instance().get();
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end());
+				defs.begin(), defs.end());
 			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
 				infr) rr_ = infr.value();
 			else return {};
@@ -866,8 +845,9 @@ std::optional<tau_nso<BAs...>>
 			else return {};
 		} else rr_ = rr<tau_nso_t>(value);
 		if (contains_ref) {
+			auto defs = definitions<tau_ba_t, BAs...>::instance().get();
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end());
+				defs.begin(), defs.end());
 			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
 				infr) rr_ = infr.value();
 			else return {};
@@ -900,8 +880,9 @@ std::optional<tau_nso<BAs...>>
 			else return {};
 		} else rr_ = rr<tau_nso_t>(value);
 		if (contains_ref) {
+			auto defs = definitions<tau_ba_t, BAs...>::instance().get();
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end());
+				defs.begin(), defs.end());
 			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
 				infr) rr_ = infr.value();
 			else return {};
@@ -921,17 +902,18 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_rr_cmd(const tau_nso_t& n) {
-	definitions.emplace_back(n->child[0]->child[0], n->child[0]->child[1]);
-	std::cout << "[" << definitions.size() << "] "
-						<< definitions.back() << "\n";
+	auto& defs = definitions<tau_ba_t, BAs...>::instance();
+	size_t idx = defs.add(n->child[0]->child[0], n->child[0]->child[1]);
+	std::cout << "[" << idx + 1 << "] " << defs[idx] << "\n";
 }
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_list_cmd() {
-	if (definitions.size() == 0) std::cout << "definitions: empty\n";
+	const auto& defs = definitions<tau_ba_t, BAs...>::instance();
+	if (defs.size() == 0) std::cout << "definitions: empty\n";
 	else std::cout << "definitions:\n";
-	for (size_t i = 0; i < definitions.size(); i++)
-		std::cout << "    [" << i + 1 << "] " << definitions[i] << "\n";
+	for (size_t i = 0; i < defs.size(); i++)
+		std::cout << "    [" << i + 1 << "] " << defs[i] << "\n";
 	if (inputs.size() == 0 && outputs.size() == 0)
 		std::cout << "io variables: empty\n";
 	else std::cout << "io variables:\n";
@@ -951,12 +933,13 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_print_cmd(const tau_nso_t& command) {
-	if (definitions.size() == 0) std::cout << "rec. relations: empty\n";
+	const auto& defs = definitions<tau_ba_t, BAs...>::instance();
+	if (defs.size() == 0) std::cout << "rec. relations: empty\n";
 	auto num = command | tau_parser::number;
 	if (!num) return;
 	auto i = digits(num.value());
-	if (i && i <= definitions.size()) {
-		std::cout << definitions[i-1] << "\n";
+	if (i && i <= defs.size()) {
+		std::cout << defs[i-1] << "\n";
 		return;
 	}
 	BOOST_LOG_TRIVIAL(error)

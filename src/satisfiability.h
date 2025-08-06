@@ -1016,6 +1016,13 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 				const int_t start_time = 0,
 				const bool output = false ) {
 	assert(get_dnf_wff_clauses(fm).size() == 1);
+	// Make sure that no function/predicate symbol is still present
+	if (auto ref = find_top(fm, is_non_terminal<tau_parser::ref, BAs...>); ref) {
+		BOOST_LOG_TRIVIAL(error)
+			<< "(Error) Unresolved function or predicate symbol "
+			<< ref.value() << " found. Returning unsat\n";
+		return _F<BAs...>;
+	}
 #ifdef TAU_CACHE
 	static std::map<std::pair<tau<BAs...>, int_t>, tau<BAs...>> cache;
 	if (auto it = cache.find(std::make_pair(fm, start_time)); it != cache.end())
