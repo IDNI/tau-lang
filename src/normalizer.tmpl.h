@@ -342,6 +342,20 @@ bool is_bf_same_to_any_of(tref n, trefs& previous) {
 }
 
 template <NodeType node>
+tref apply_defs_to_spec (tref spec) {
+	using tau = tree<node>;
+	rr<node> spec_with_defs {tau::geth(spec)};
+	if (tau::get(spec).find_top(is<node, tau::ref>)) {
+		const auto& defs = definitions<node>::instance().get_sym_defs();
+		spec_with_defs.rec_relations.insert(spec_with_defs.rec_relations.end(),
+		       defs.begin(), defs.end());
+		if (auto infr = infer_ref_types<node>(spec_with_defs); infr)
+			return apply_rr_to_formula(infr.value());
+	}
+	return spec;
+}
+
+template <NodeType node>
 tref normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
 	auto trim_q = [](tref n) {
@@ -350,7 +364,22 @@ tref normalize_with_temp_simp(tref fm) {
 			|| t.child_is(tau::wff_always)) return t[0].first();
 		return n;
 	};
-	const auto& red_fm = tau::get(normalizer_step<node>(fm));
+	fm = normalizer_step<node>(fm);
+	// Apply present function/predicate definitions
+	bool changed;
+	do {
+		changed = false;
+		// Unresolved symbol is still present
+		if (tau::get(fm).find_top(is<node, tau::ref>)) {
+			tref resolved_red_fm = apply_defs_to_spec<node>(fm);
+			if (tau::get(resolved_red_fm) != tau::get(fm)) {
+				fm = normalizer_step<node>(resolved_red_fm);
+				changed = true;
+			}
+		}
+	} while (changed);
+
+	const tau& red_fm = tau::get(fm);
 	LOG_TRACE << "red_fm: " << LOG_FM(red_fm.get());
 	if (red_fm.equals_T() || red_fm.equals_F())
 		return red_fm.get();
@@ -468,9 +497,23 @@ tref build_main_step(tref form, size_t step) {
 // Normalizes a Boolean function having no recurrence relation
 template <NodeType node>
 tref bf_normalizer_without_rec_relation(tref bf) {
+	using tau = tree<node>;
 	LOG_DEBUG << "Begin Boolean function normalizer";
 
-	auto result = bf_boole_normal_form<node>(bf);
+	tref result = bf_boole_normal_form<node>(bf);
+	// Apply present function/predicate definitions
+	bool changed;
+	do {
+		changed = false;
+		// Unresolved symbol is still present
+		if (tau::get(result).find_top(is<node, tau::ref>)) {
+			auto resolved_res = apply_defs_to_spec<node>(result);
+			if (resolved_res != result) {
+				result = bf_reduce_canonical<node>()(resolved_res);
+				changed = true;
+			}
+		}
+	} while (changed);
 
 	LOG_DEBUG << "End Boolean function normalizer";
 
@@ -490,7 +533,7 @@ tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
 	LOG_DEBUG << "End calculate recurrence relation";
 
 	LOG_DEBUG << "Begin Boolean function normalizer";
-	auto result = bf_boole_normal_form<node>(bf_unfolded);
+	auto result = bf_normalizer_without_rec_relation<node>(bf_unfolded);
 	LOG_DEBUG << "End Boolean function normalizer";
 
 	return result;

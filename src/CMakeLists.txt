@@ -4,11 +4,12 @@ set(TAU_HEADERS
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
 	tau_tree.h         # tau tree, node, tree traverser, builders,
-	                   # extractors, printers, queries, and 
+	                   # extractors, printers, queries, and
 	                   # transformations from the parse tree
 	ba_types.h         # BA types
 	ba_constants.h     # BA constants pool and binder
 	dict.h             # dictionaries of bdd var names and strings
+    definitions.h      # Storage for function and predicate definitions
 	rr.h               # recurrence relation structure
 	nso_rr.h           # nso_rr_apply
 	execution.h        # execution of nso rr rules

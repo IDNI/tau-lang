@@ -986,6 +986,13 @@ template <NodeType node>
 tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 	using tau = tree<node>;
 	DBG(assert(get_dnf_wff_clauses<node>(fm).size() == 1);)
+	// Make sure that no function/predicate symbol is still present
+	if (auto ref = tau::get(fm).find_top(is<node, tau::ref>); ref) {
+		BOOST_LOG_TRIVIAL(error)
+			<< "(Error) Unresolved function or predicate symbol "
+			<< tau::get(ref) << " found. Returning unsat\n";
+		return _F<node>();
+	}
 #ifdef TAU_CACHE
 	static std::map<std::pair<tref, int_t>, tref,
 		subtree_pair_less<node, int_t>> cache;

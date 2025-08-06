@@ -176,7 +176,9 @@ requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
-	auto simp_fm = apply_rr_to_formula<node>(fm.nso_rr);
+	tref simp_fm = apply_rr_to_formula<node>(fm.nso_rr);
+	if (!simp_fm) return false;
+	simp_fm = apply_defs_to_spec<node>(simp_fm);
 	if (!simp_fm) return false;
 	if (tau::get(simp_fm).find_top(is<node, tau::ref>))
 		return false;

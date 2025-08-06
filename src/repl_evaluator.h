@@ -174,8 +174,6 @@ private:
 	options opt{};
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
-	rewriter::rules definitions;
-	spec_context<node> ctx; // input and output definitions
 	bool error = false;
 	term::colors TC{};
 };
