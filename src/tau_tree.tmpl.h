@@ -156,12 +156,11 @@ cache_t& tree<node>::create_cache() {
 				std::apply([&ok, &kept, &check](
 							const auto&... args)
 				{
-					((ok = ok &&
-					(std::is_same_v<
-						std::decay_t<
-							decltype(args)>, tref>
-						? check(args)
-						: true)), ...);
+					([&]() {
+						if constexpr (std::is_same_v<
+								std::decay_t<decltype(args)>, tref>)
+							check(args);
+					}(), ...);
 				}, key);
 			else {
 				if constexpr (std::is_same_v<std::decay_t<
