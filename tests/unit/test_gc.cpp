@@ -240,4 +240,42 @@ TEST_SUITE("gc") {
 		CHECK(!cache.contains(d_tuple));
 	}
 
+	TEST_CASE_FIXTURE(nodes_fixture, "cache rebuild - multiple caches of same type") {
+		static cache_t& cache = tau::create_cache<cache_t>();
+		static cache_t& cache2 = tau::create_cache<cache_t>();
+		static cache_t& cache3 = tau::create_cache<cache_t>();
+
+		emplace_fixtures(cache);
+		emplace_fixtures(cache2);
+		emplace_fixtures(cache3);
+
+		TAU_LOG_INFO << "Keep a by creating a handle";
+		htref ha = tau::geth(a);
+
+		TAU_LOG_INFO << "Keep b by inserting it into the keep set";
+		std::unordered_set<tref> keep{ b };
+
+		TAU_LOG_INFO << "GC", tau::gc(keep);
+
+		print(cache);
+		print(cache2);
+		print(cache3);
+
+		CHECK( cache.size() == 2);
+		CHECK( cache.contains(a_pair));
+		CHECK( cache.contains(b_pair));
+		CHECK(!cache.contains(c_pair));
+		CHECK(!cache.contains(d_pair));
+		CHECK( cache2.size() == 2);
+		CHECK( cache2.contains(a_pair));
+		CHECK( cache2.contains(b_pair));
+		CHECK(!cache2.contains(c_pair));
+		CHECK(!cache2.contains(d_pair));
+		CHECK( cache3.size() == 2);
+		CHECK( cache3.contains(a_pair));
+		CHECK( cache3.contains(b_pair));
+		CHECK(!cache3.contains(c_pair));
+		CHECK(!cache3.contains(d_pair));
+	}
+
 }
