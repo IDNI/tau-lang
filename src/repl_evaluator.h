@@ -99,9 +99,7 @@ private:
 	std::optional<size_t> get_type(const tau_nso_t& n);
 	// returns if a subtree of a node contains a nonterminal
 	bool contains(const tau_nso_t& n, tau_parser::nonterminal nt);
-	// apply definitions and rr to a program
-	tau_nso_t apply_rr_to_rr_tau_nso(const size_t type,
-		const tau_nso_t& program);
+
 
 	// commands
 	void not_implemented_yet();
@@ -153,7 +151,6 @@ private:
 	options opt{};
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
-	rec_relations<tau_nso_t> definitions;
 	std::map<tau_nso_t, std::pair<type, filename>> inputs;
 	std::map<tau_nso_t, std::pair<type, filename>> outputs;
 	bool error = false;
