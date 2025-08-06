@@ -47,11 +47,11 @@ const typename tree<node>::template extractor<trefs>
 			});
 
 template <NodeType node>
-const typename tree<node>::template extractor<htree::sp>
+const typename tree<node>::template extractor<htref>
 	tree<node>::traverser::handle =
-		typename tree<node>::template extractor<htree::sp>(
+		typename tree<node>::template extractor<htref>(
 			[](const traverser& t) {
-				if (!t) return htree::sp();
+				if (!t) return htref();
 				return geth(t.value());
 			});
 
@@ -278,7 +278,7 @@ template <NodeType node>
 tree<node>::traverser::traverser(const tree<node>& t) : has_value_(true),
 			values_(trefs{ t.get() }) {}
 template <NodeType node>
-tree<node>::traverser::traverser(const htree::sp& h) : has_value_(h != nullptr),
+tree<node>::traverser::traverser(const htref& h) : has_value_(h != nullptr),
 			values_(has_value_ ? trefs{ h->get() } : trefs{}) {}
 template <NodeType node>
 tree<node>::traverser::traverser(const trefs& refs) { set_values(refs); }

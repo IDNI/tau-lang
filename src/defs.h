@@ -33,7 +33,7 @@
 // following macros work only if `node` type alias is defined
 // `using node = tau_lang::node<BAs...>;` where `BAs...` is a pack of Boolean Algebras)
 // argument `ref` is a tree pointer reference `tref`,
-// or shared pointer handle `htree::sp` 
+// or shared pointer handle `htref` 
 
 // helper macro for pretty printing a tau tree tref into std::cout
 #define TAU_PRINT(ref) (tree<node>::get(ref).print(std::cout))

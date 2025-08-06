@@ -100,7 +100,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 						t[0][0].data())));
 		return n;
 	};
-	auto transform = [&](const htree::sp& h, bool def = false) {
+	auto transform = [&](const htref& h, bool def = false) {
 		tref n = pre_order<node>(h->get())
 				.apply_unique_until_change(transformer);
 		if (def) n = pre_order<node>(n)
