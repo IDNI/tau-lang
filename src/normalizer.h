@@ -4,6 +4,7 @@
 #define __IDNI__TAU__NORMALIZER_H__
 
 #include "normal_forms.h"
+#include "definitions.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //

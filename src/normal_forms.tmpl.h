@@ -903,8 +903,15 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	LOG_TRACE << "bf reduce canonical: " << LOG_FM(fm);
 	subtree_map<node, tref> changes = {};
 	for (tref bf : t.select_top(is<node, tau::bf>)) {
+		if (tau::get(bf).child_is(tau::bf_ref)) {
+			for (tref arg : t[0][0].select_top(is<node, tau::bf>)) {
+				tref dnf = bf_boole_normal_form<node>(arg);
+				if (tau::get(dnf) != tau::get(arg))
+					changes.emplace(arg, dnf);
+			}
+		}
 		tref dnf = bf_boole_normal_form<node>(bf);
-		if (dnf != bf) changes[bf] = dnf;
+		if (tau::get(dnf) != tau::get(bf)) changes[bf] = dnf;
 	}
 	tref x = changes.empty()? fm : rewriter::replace<node>(fm, changes);
 	LOG_TRACE << "bf reduce canonical result: " << LOG_FM(x);

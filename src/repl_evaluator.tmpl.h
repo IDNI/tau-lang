@@ -97,20 +97,22 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 	auto check = get_type_and_arg(spec);
 	if (!check) return {};
 	auto [type, value] = check.value();
+	auto& defs = definitions<node>::instance();
 	if (contains(value, tau::ref)) {
 		if (type == tau::spec) {
-			if (auto x = get_nso_rr<node>(ctx, value); x)
+			if (auto x = get_nso_rr<node>(defs.get_io_context(), value); x)
 				nso_rr = x.value();
 			else return {};
 		} else nso_rr = rr<node>(tau::geth(
-				resolve_io_vars<node>(ctx, value)));
+				resolve_io_vars<node>(defs.get_io_context(), value)));
+		auto definitions = defs.get_sym_defs();
 		nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 			definitions.begin(), definitions.end());
 		if (auto infr = infer_ref_types<node>(nso_rr); infr)
 			return infr.value();
 		else return {};
 	} else return rr<node>(tau::geth(
-			resolve_io_vars<node>(ctx, value)));
+			resolve_io_vars<node>(defs.get_io_context(), value)));
 	return {};
 }
 
@@ -494,6 +496,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		}
 	}
 
+	auto& ctx = definitions<node>::instance().get_io_context();
 	auto ins = finputs<node>(collect_input_streams<node>(dnf, ctx));
 	auto outs = foutputs<node>(collect_output_streams<node>(dnf, ctx));
 	run<node>(dnf, ins, outs, ctx);
@@ -659,20 +662,21 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
-	definitions.emplace_back(tau::geth(n[0][0]), tau::geth(n[0][1]));
-	std::cout << "[" << definitions.size() << "] "
-		<< to_str<node>(definitions.back()) << "\n";
+	auto& defs = definitions<node>::instance();
+	size_t idx = defs.add(tau::geth(n[0][0]), tau::geth(n[0][1]));
+	std::cout << "[" << idx + 1 << "] " << to_str<node>(defs[idx]) << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_list_cmd() {
-	if (definitions.size() == 0) std::cout << "Definitions: empty\n";
+	auto& defs = definitions<node>::instance();
+	if (defs.size() == 0) std::cout << "Definitions: empty\n";
 	else std::cout << "Definitions:\n";
-	for (size_t i = 0; i < definitions.size(); i++)
+	for (size_t i = 0; i < defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< to_str<node>(definitions[i]) << "\n";
-	std::cout << ctx;
+			<< to_str<node>(defs[i]) << "\n";
+	std::cout << defs.get_io_context();
 }
 
 template <typename... BAs>
@@ -681,8 +685,9 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	auto num = command | tau::num;
 	if (!num) return;
 	auto i = num | tt::num;
-	if (i && i <= definitions.size()) {
-		print<node>(std::cout, definitions[i-1]) << "\n";
+	const auto& defs = definitions<node>::instance();
+	if (i && i <= defs.size()) {
+		print<node>(std::cout, defs[i-1]) << "\n";
 		return;
 	}
 	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
@@ -692,17 +697,18 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
-	if (!get_io_def<node>(command | tt::only_child | tt::ref, ctx.inputs)) {
+	auto& defs = definitions<node>::instance();
+	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_input_defs())) {
 		error = true;
 		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
 	}
 }
 
-
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
-	if (!get_io_def<node>(command | tt::only_child | tt::ref, ctx.outputs)){
+	auto& defs = definitions<node>::instance();
+	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_output_defs())){
 		error = true;
 		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
 	}
