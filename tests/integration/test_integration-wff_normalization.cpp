@@ -1,71 +1,36 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "doctest.h"
-#include "test_integration_helpers.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
+#include "test_init.h"
+#include "test_tau_helpers.h"
 
 TEST_SUITE("Normalizer") {
 	TEST_CASE("1") {
 		const char* sample = "all a,b,c,d a'c|b'd = 0 <-> a & b' & d | a' & c | b' & c' & d = 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
-		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_check(sample, tau::wff_t) );
 	}
 	TEST_CASE("2") {
 		const char* sample = "all x all y ex z (x != y) -> (x < z && z < y).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
-		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_check(sample, tau::wff_f) );
 	}
 	TEST_CASE("3") {
 		const char* sample = "all x all y ex z (x < y) -> (x < z && z < y).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
-		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_check(sample, tau::wff_t) );
 	}
 	TEST_CASE("4") {
 		const char* sample = "all a all b all c all d all e all f (ax + bx' != cy + d'y' || ax + bx' = ey + fy') <-> (ax + bx' = ey + fy' || ax + bx' != cy + d'y').";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
-		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_check(sample, tau::wff_t) );
 	}
 	TEST_CASE("5") {
 		const char* sample = "all a all b all c all d all e all f (ax + bx' != cy + d'y' || ax + bx' = ey + fy') <-> (ax + bx' = ey + fy' || ax + bx' = cy + d'y').";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
-		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_check(sample, tau::wff_f) );
 	}
 	TEST_CASE("6") {
 		const char* sample = "all x ex y all z ex w all u ex v ((x<y && y<z) || (z<w && w<u)|| (u<v && v<x)).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
-		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_check(sample, tau::wff_f) );
 	}
 	TEST_CASE("7") {
 		const char* sample = "xy = 0 && (abx' | by'a) != 0 <-> xy = 0 && ab != 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
-		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_check(sample, tau::wff_t) );
 	}
 }
 
@@ -98,7 +63,7 @@ TEST_SUITE("Normalizer") {
 	// 	auto simp_res = result
 	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
 	// 		| reduce_wff<sbf_ba>;
-	// 	CHECK( (simp_res | tau_parser::wff_t).has_value() );
+	// 	CHECK( (simp_res | tau::wff_t).has_value() );
 	// }
 
 	// TEST_CASE("push_in_3") {

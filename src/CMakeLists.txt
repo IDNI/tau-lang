@@ -8,43 +8,62 @@ set(TAU_HEADERS
 	boolean_algebras/bool_ba.h
 	boolean_algebras/sbf_ba.h
 	boolean_algebras/variant_ba.h
-	boolean_algebras/product_ba.h
 	boolean_algebras/nso_ba.h
-	base_bas/cvc5.h
-	base_bas/cvc5_widths.h
-	experimental/execution.h
-	runtime.h
-	defs.h
-	rewriting.h
-	dict.h
+	boolean_algebras/tau_ba.h
+	defs.h             # common macro and types definitions
+	logging.h          # logging and its macros
+	tau_tree.h         # tau tree, node, tree traverser, builders,
+	                   # extractors, printers, queries, and
+	                   # transformations from the parse tree
+	ba_types.h         # BA types
+	ba_constants.h     # BA constants pool and binder
+	dict.h             # dictionaries of bdd var names and strings
+	rr.h               # recurrence relation structure
+	nso_rr.h           # nso_rr_apply
+	execution.h        # execution of nso rr rules
+	normal_forms.h     # normal form transformations
 	normalizer.h
-	nso_rr.h
-	execution.h
-	tau.h
-	normal_forms.h
 	satisfiability.h
-	solver.h
-	splitter.h
 	splitter_types.h
+	splitter.h
+	solver.h
 	interpreter.h
-	interpreter.impl.h
-	hooks.h
-	builders.h
-	language.h
-	queries.h
-	utils.h
-	resolver.h
+    union_find.h       # union find data structure
+	nso_factory.h      # abstract template interface
+	undefs.h           # undefines implementation macros
 )
 
 set(TAU_SOURCES
 	boolean_algebras/bool_ba.cpp
-	dict.cpp
-	nso_rr.cpp
+	boolean_algebras/bdds/var_dict.cpp
 )
 
 set(CLI_SOURCES
 	main.cpp
 )
+
+set(TAU_HEADER_TEMPLATE ${CMAKE_CURRENT_SOURCE_DIR}/tau.h.in)
+set(TAU_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/tau.h)
+set(TAU_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
+message(STATUS "TAU_HEADER_TEMPLATE: ${TAU_HEADER_TEMPLATE}")
+message(STATUS "TAU_HEADER: ${TAU_HEADER}")
+message(STATUS "TAU_SOURCE_DIR: ${TAU_SOURCE_DIR}")
+
+# Custom command to generate the unified header
+add_custom_command(
+	OUTPUT ${TAU_HEADER}
+	COMMAND ${CMAKE_COMMAND}
+		-DTAU_HEADERS="${TAU_HEADERS}"
+		-DTAU_HEADER_TEMPLATE="${TAU_HEADER_TEMPLATE}"
+		-DTAU_HEADER="${TAU_HEADER}"
+		-DTAU_SOURCE_DIR="${TAU_SOURCE_DIR}"
+		-P ${PROJECT_SOURCE_DIR}/cmake/header.cmake
+	DEPENDS ${TAU_HEADERS} ${TAU_HEADER_TEMPLATE}
+	COMMENT "Building tau.h file"
+)
+
+add_custom_target(tau_header ALL DEPENDS ${TAU_HEADER})
 
 #
 # object library
@@ -58,7 +77,6 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
-	$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
 )
 
 #
@@ -72,7 +90,6 @@ target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
-	$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
 )
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
@@ -91,8 +108,7 @@ target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
-	$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
-#	$<INSTALL_INTERFACE:.>
+	$<INSTALL_INTERFACE:.>
 )
 set_target_properties(${TAU_SHARED_LIB_NAME} PROPERTIES
 	EXPORT_NAME ${TAU_SHARED_LIB_NAME}
@@ -114,7 +130,6 @@ if(TAU_BUILD_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
-		$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
 	)
 endif(TAU_BUILD_EXECUTABLE)
 
@@ -130,7 +145,6 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
-		$<BUILD_INTERFACE:${TAU}/external/parser/src/utility>
 	)
 endif(TAU_BUILD_SHARED_EXECUTABLE)
 

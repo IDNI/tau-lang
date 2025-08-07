@@ -1,89 +1,76 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "test_init.h"
+#include "test_sbf_ba_helpers.h"
 
-#include <cassert>
+TEST_SUITE("configuration") {
 
-#include "doctest.h"
+	TEST_CASE("init bdd") {
+		bdd_init<Bool>();
+	}
 
-#include "test_integration_helpers.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
-
-bool normalize_and_test_for_value(const char* sample, tau_parser::nonterminal nt) {
-	auto sample_src = make_tau_source(sample);
-	auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
-	if (!sample_formula.has_value()) return false;
-	auto result = normalizer<sbf_ba>(sample_formula.value());
-	auto check = result | nt;
-	return check.has_value();
 }
-
-// TODO (LOW) simplify this test cases extracting common logic to the helpers file
 
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
 	TEST_CASE("T") {
-		CHECK( normalize_and_test_for_value("T.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("T.", tau::wff_t) );
 	}
 
 	TEST_CASE("F") {
-		CHECK( normalize_and_test_for_value("F.", tau_parser::wff_f) );
+		CHECK( normalize_and_check("F.", tau::wff_f) );
 	}
 
 	TEST_CASE("T && F") {
-		CHECK( normalize_and_test_for_value("T && F.", tau_parser::wff_f) );
+		CHECK( normalize_and_check("T && F.", tau::wff_f) );
 	}
 
 	TEST_CASE("T ^ F") {
-		CHECK( normalize_and_test_for_value("T ^ F.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("T ^ F.", tau::wff_t) );
 	}
 
 	TEST_CASE("T ? T : F") {
-		CHECK( normalize_and_test_for_value("T ? T : F.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("T ? T : F.", tau::wff_t) );
 	}
 
 	TEST_CASE("F ? T : F") {
-		CHECK( normalize_and_test_for_value("F ? T : F.", tau_parser::wff_f) );
+		CHECK( normalize_and_check("F ? T : F.", tau::wff_f) );
 	}
 
 	TEST_CASE("F || F") {
-		CHECK( normalize_and_test_for_value("F || F.", tau_parser::wff_f) );
+		CHECK( normalize_and_check("F || F.", tau::wff_f) );
 	}
 
 	TEST_CASE("! F") {
-		CHECK( normalize_and_test_for_value("! F.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("! F.", tau::wff_t) );
 	}
 
 	TEST_CASE("F -> F") {
-		CHECK( normalize_and_test_for_value("F -> F.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("F -> F.", tau::wff_t) );
 	}
 
 	TEST_CASE("F <-> F") {
-		CHECK( normalize_and_test_for_value("F <-> F.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("F <-> F.", tau::wff_t) );
 	}
 
 	TEST_CASE("1 & 0 = 0.") {
-		CHECK( normalize_and_test_for_value("1 & 0 = 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("1 & 0 = 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("1 | 0 = 0.") {
-		CHECK( normalize_and_test_for_value("1 | 0 = 0.", tau_parser::wff_f) );
+		CHECK( normalize_and_check("1 | 0 = 0.", tau::wff_f) );
 	}
 
 	TEST_CASE("1 + 0 != 0.") {
-		CHECK( normalize_and_test_for_value("1 + 0 != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("1 + 0 != 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("0' = 0.") {
-		CHECK( normalize_and_test_for_value("(0' = 0).", tau_parser::wff_f) );
+		CHECK( normalize_and_check("(0' = 0).", tau::wff_f) );
 	}
 
 	TEST_CASE("1' = 0.") {
-		CHECK( normalize_and_test_for_value("1' = 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("1' = 0.", tau::wff_t) );
 	}
 }
 
@@ -100,61 +87,55 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 	// TODO (MEDIUM) check if we need to add more tests for bindings
 
 	TEST_CASE("{ X } : sbf != 0") {
-		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ X } : sbf != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("{ X } : sbf != 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("{ X } : sbf = 0") {
-		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ X } : sbf = 0.", tau_parser::wff_f) );
+		CHECK( normalize_and_check("{ X } : sbf = 0.", tau::wff_f) );
 	}
 
 	TEST_CASE("{ Y } : sbf | { Z } : sbf != 0") {
-		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ Y } : sbf | { Z } : sbf != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("{ Y } : sbf | { Z } : sbf != 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("{ Y } : sbf & { Z } : sbf != 0") {
-		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ Y } : sbf | { Z } : sbf != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("{ Y } : sbf | { Z } : sbf != 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("{ Y } : sbf' != 0") {
-		bdd_init<Bool>();
 		// TODO (HING) check this one too
-		// CHECK( normalize_and_test_for_value("{ Y } : sbf' != 0.", tau_parser::wff_t) );
-		CHECK( normalize_and_test_for_value("({ Y } : sbf)' != 0.", tau_parser::wff_t) );
+		// CHECK( normalize_and_check("{ Y } : sbf' != 0.", tau::wff_t) );
+		CHECK( normalize_and_check("({ Y } : sbf)' != 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("{ Y } : sbf != 0") {
-		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ Y } : sbf != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("{ Y } : sbf != 0.", tau::wff_t) );
 	}
 }
 
 TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 
 	TEST_CASE("ex P P != 0") {
-		CHECK( normalize_and_test_for_value("ex P P != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("ex P P != 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("ex P P = 0") {
-		CHECK( normalize_and_test_for_value("ex P P = 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("ex P P = 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("all P P != 0") {
-		CHECK( normalize_and_test_for_value("all P P != 0.", tau_parser::wff_f) );
+		CHECK( normalize_and_check("all P P != 0.", tau::wff_f) );
 	}
 
 	TEST_CASE("all P P = 0") {
-		CHECK( normalize_and_test_for_value("all P P = 0.", tau_parser::wff_f) );
+		CHECK( normalize_and_check("all P P = 0.", tau::wff_f) );
 	}
 
 	TEST_CASE("all X ex Y X = Y") {
-		CHECK( normalize_and_test_for_value("all X ex Y X = Y.", tau_parser::wff_t) );
+		CHECK( normalize_and_check("all X ex Y X = Y.", tau::wff_t) );
 	}
 
 	TEST_CASE("ex X all Y X = Y") {
-		CHECK( normalize_and_test_for_value("ex X all Y X = Y.", tau_parser::wff_f) );
+		CHECK( normalize_and_check("ex X all Y X = Y.", tau::wff_f) );
 	}
 }

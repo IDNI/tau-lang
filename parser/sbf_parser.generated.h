@@ -1,5 +1,5 @@
 // This file is generated from a file parser/sbf.tgf by
-//       https://github.com/IDNI/parser/src/tgf
+//       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __SBF_PARSER_H__
 #define __SBF_PARSER_H__
@@ -11,7 +11,8 @@ namespace sbf_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline std::vector<std::string> symbol_names{
+inline static constexpr size_t nt_bits = 6;
+inline const std::vector<std::string> symbol_names{
 	"", "space", "alpha", "digit", "start", "_", "sbf", "group", "__E_sbf_0", "variable", 
 	"disjunction", "__E_sbf_1", "exclusive_disjunction", "__E_sbf_2", "__E___E_sbf_2_3", "conjunction", "__E_sbf_4", "__E___E_sbf_4_5", "negation", "__E_sbf_6", 
 	"negation_oprnd", "__E___E_sbf_6_7", "one", "zero", "conjunction_nosep", "__E_sbf_8", "conjunction_nosep_1st_oprnd", "__E___E_sbf_8_9", "__E___10", "__E_variable_11", 
@@ -184,13 +185,16 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 
 } // namespace sbf_parser_data
 
-struct sbf_parser : public idni::parser<char, char> {
+struct sbf_parser_nonterminals {
 	enum nonterminal {
 		nul, space, alpha, digit, start, _, sbf, group, __E_sbf_0, variable, 
 		disjunction, __E_sbf_1, exclusive_disjunction, __E_sbf_2, __E___E_sbf_2_3, conjunction, __E_sbf_4, __E___E_sbf_4_5, negation, __E_sbf_6, 
 		negation_oprnd, __E___E_sbf_6_7, one, zero, conjunction_nosep, __E_sbf_8, conjunction_nosep_1st_oprnd, __E___E_sbf_8_9, __E___10, __E_variable_11, 
 		__E_variable_12, alnum, __E_variable_13, 
 	};
+};
+
+struct sbf_parser : public idni::parser<char, char>, public sbf_parser_nonterminals {
 	static sbf_parser& instance() {
 		static sbf_parser inst;
 		return inst;

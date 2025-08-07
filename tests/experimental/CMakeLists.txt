@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	experimental_execution
+	# experimental_execution
 )
 
 foreach(X IN LISTS TESTS)

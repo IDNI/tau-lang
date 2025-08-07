@@ -1,11 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __BA_H__
-#define __BA_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__PRODUCT_BA_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__PRODUCT_BA_H__
 
 #include <tuple>
 #include <list>
 #include <variant>
+
+namespace idni::tau_lang {
 
 // product boolean algebra
 template <typename...BAS>
@@ -25,24 +27,26 @@ struct product_ba: std::tuple<BAS...> {
 
 	product_ba<BAS...> operator&(product_ba<BAS...>& that) {
 		product_ba<BAS...> result;
-		auto __and = [](auto a, auto b, auto& c ) { return c = (a & b); };
+		auto __and = [](auto a, auto b, auto& c ) { return c = (a&b); };
 		(__and(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
 		return result;
 	}
 
 	product_ba<BAS...> operator|(product_ba<BAS...>& that) {
 		product_ba<BAS...> result;
-		auto __or = [](auto a, auto b, auto& c ) { return c = (a | b); };
+		auto __or = [](auto a, auto b, auto& c ) { return c = (a|b); };
 		(__or(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
 		return result;
 	}
 
 	product_ba<BAS...> operator^(product_ba<BAS...>& that) {
 		product_ba<BAS...> result;
-		auto __xor = [](auto a, auto b, auto& c ) { return c = (a ^ b); };
+		auto __xor = [](auto a, auto b, auto& c ) { return c = (a^b); };
 		(__xor(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
 		return result;
 	}
 };
 
-#endif // __BA_H__
+} // namespace idni::tau_lang
+
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__PRODUCT_BA_H__

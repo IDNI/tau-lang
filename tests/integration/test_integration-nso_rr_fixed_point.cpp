@@ -1,41 +1,26 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "test_init.h"
+#include "test_Bool_helpers.h"
 
-#include "doctest.h"
-
-#include "test_integration_helpers.h"
-#include "../unit/test_helpers.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
-
-bool fp_test(const char* sample, const size_t& nt, bool expect_fail = false) {
-	auto sample_src = make_tau_source(sample);
-	auto formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
-	if (!formula) return expect_fail;
-	auto normalized = normalizer<sbf_ba>(formula.value());
-	if (!normalized) return expect_fail;
-	auto ret = (normalized | nt).has_value();
-	return expect_fail ? !ret : ret;
+bool fp_test(const char* sample, typename node_t::type nt, bool expect_fail = false) {
+	return normalize_and_check(sample, nt, expect_fail);
 }
 
 bool fp_test_F(const char* sample) {
-	return fp_test(sample, tau_parser::wff_f);
+	return fp_test(sample, tau::wff_f);
 }
 
 bool fp_test_T(const char* sample) {
-	return fp_test(sample, tau_parser::wff_t);
+	return fp_test(sample, tau::wff_t);
 }
 
-bool fp_test_fail(const char* sample, const size_t& nt) {
+bool fp_test_fail(const char* sample, typename node_t::type nt) {
 	return fp_test(sample, nt, true);
 }
 
 bool fp_test_fail(const char* sample) {
-	return fp_test_fail(sample, tau_parser::wff_f);
+	return fp_test_fail(sample, tau::wff_f);
 }
 
 TEST_SUITE("rec relations fixed point") {
@@ -77,7 +62,7 @@ TEST_SUITE("rec relations fixed point") {
 			"f[n](x) := f[n-1](x) && x = 1."
 			"f[0](x) := T."
 			"f(x).";
-		CHECK( fp_test(sample, tau_parser::bf_eq) );
+		CHECK( fp_test(sample, tau::bf_eq) );
 	}
 
 	TEST_CASE("multiple") {
@@ -94,7 +79,7 @@ TEST_SUITE("rec relations fixed point") {
 		const char* sample =
 			"f[n](x) := f[n-1](x) && T."
 			"f(x).";
-		CHECK( fp_test(sample, tau_parser::wff_ref) );
+		CHECK( fp_test(sample, tau::wff_ref) );
 	}
 
 	TEST_CASE("with initial conditions") {

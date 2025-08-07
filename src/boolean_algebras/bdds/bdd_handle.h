@@ -1,13 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __BDD_HANDLE_H__
-#define __BDD_HANDLE_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BDD_HANDLE_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BDD_HANDLE_H__
 
 #include "babdd.h"
-#include "dict.h"
+#include "var_dict.h"
 #include "splitter_types.h"
-#include "defs.h"
 
+namespace idni::tau_lang {
 
 template<typename B, auto o> struct bdd_handle;
 template<typename B, auto o = bdd_options<>::create()>
@@ -646,8 +646,8 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 		std::stringstream t;
 		if (!(c.first == true)) t << '{' << c.first << '}';
 		for (int_t v : c.second)
-			if (v < 0) s.insert(std::string(dict(-v)) + "'");
-			else s.insert(dict(v));
+			if (v < 0) s.insert(std::string(var_dict(-v)) + "'");
+			else s.insert(var_dict(v));
 		bool first = true;
 		for (auto& x : s) {
 			if (!first) t << " "; else first = false;
@@ -663,5 +663,7 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 	}
 	return os;
 }
+
+} // namespace idni::tau_lang
 
 #endif

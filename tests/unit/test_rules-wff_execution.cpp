@@ -1,29 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "test_init.h"
+#include "test_Bool_helpers.h"
 
-#include "doctest.h"
-
-#include "test_helpers.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
-
-std::tuple<tau<Bool>, tau<Bool>, tau<Bool>>
-	test_rule(const std::string& rule_str)
-{
-	auto src_rule = make_tau_source(rule_str, {
-						.start = tau_parser::library });
-	auto statement = make_statement(src_rule);
-	auto rule = statement
-		| tau_parser::rules
-		| tau_parser::rule;
-	auto tau_rule = make_rule(rule.value());
+std::tuple<tref, tref, tref> test_rule(const std::string& rule_str) {
+        auto tau_rule = tau::get_rules(rule_str)[0];
 	auto [matcher, body] = tau_rule;
-	auto result = nso_rr_apply(tau_rule, matcher);
-	return { matcher, body, result };
+	tref result = nso_rr_apply<node_t>(tau_rule, matcher->get());
+	return { matcher->get(), body->get(), result };
 }
 
 TEST_SUITE("executing wff rules") {

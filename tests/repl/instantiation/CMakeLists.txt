@@ -11,7 +11,7 @@ add_repl_test(instantiation_cmd_bf2 "ax + bx'. y&z. i %1[x / %2]" ": \\(ayz\\)'b
 
 add_repl_test(instantiation_cmd_bf3 "(x | (w & z)) & z. b. i %1[ z / %2]" ": \\(x|wb\\)b")
 
-add_repl_test(instantiation_cmd_bf4 "x & y. T. i %1[x / %2]" "\\(Error\\) invalid argument")
+add_repl_test_fail(instantiation_cmd_bf4 "x & y. T. i %1[x / %2]" "Invalid argument")
 
 # WFF Instantiation
 
@@ -27,7 +27,7 @@ add_repl_test(instantiation_cmd_wff5 "ex x x=0 && y=0. x. i %1[y / %2]" ": ex x2
 
 add_repl_test(instantiation_cmd_wff6 "(x=0|| (w=0 && z=0)) && z=0. b. i %1[z / %2]" ": \\(x = 0 || w = 0 && b = 0\\) && b = 0")
 
-add_repl_test(instantiation_cmd_wff7 "x=0&& y=0. x=0. i %1[x/ %2]" "argument has wrong type")
+add_repl_test_fail(instantiation_cmd_wff7 "x=0&& y=0. x=0. i %1[x/ %2]" "Argument has a wrong type")
 
 add_repl_test(instantiation_cmd_wff8 "i (ex x x=0 && y=0) && x=0[y/x|a]" ": \\(ex x2 x2 = 0 && x|a = 0\\) && x = 0")
 

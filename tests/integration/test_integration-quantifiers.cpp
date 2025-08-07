@@ -3,22 +3,10 @@
 // tests parsing, printing, normalization and printed result of
 // quantifiers: all, ex
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "test_init.h"
+#include "test_Bool_helpers.h"
 
-#include "doctest.h"
-
-#include "test_integration_helpers.h"
-#include "../unit/test_helpers.h"
-
-// #include "debug_helpers.h"
-
-using namespace std;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
-
-using test_case = std::array<string, 3>;
+using test_case = array<string, 3>;
 using test_cases = vector<test_case>;
 
 test_cases ex_cases = {
@@ -51,20 +39,15 @@ ostream& operator<<(ostream& os, const test_case& tc) {
 		<< "\" result: \""      << tc[2] << "\"";
 }
 
-string to_str(const auto& n) {
-	stringstream ss; return (ss << n, ss.str());
-}
-
 bool test(const test_case& tc) {
 	const auto& [ sample, exp, nexp ] = tc;
 	bool fail = false;
-	auto src = make_tau_source(sample.c_str());
-	auto formula = make_nso_rr_using_factory<sbf_ba>(src);
-	if (!formula.has_value()) return fail;
-	auto got = to_str(formula.value());
+	auto nso_rr = get_nso_rr(sample.c_str());
+	if (!nso_rr.has_value()) return fail;
+	auto got = to_str<node_t>(nso_rr.value());
 	if (got != exp) fail = true;
-	auto norm = normalizer<sbf_ba>(formula.value());
-	auto ngot = to_str(norm);
+	tref norm = normalizer<node_t>(nso_rr.value());
+	auto ngot = tau::get(norm).to_str();
 	if (fail || ngot != nexp) fail = true,
 		cout << tc << "\n\tgot:      \"" << got
 				<< "\" result: \"" << ngot << "\"\n";

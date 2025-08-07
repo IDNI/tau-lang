@@ -1,40 +1,20 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include <cassert>
-
-#include "doctest.h"
-#include "nso_rr.h"
-#include "language.h"
-#include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
-#include "test_helpers.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-using namespace std;
-
-namespace testing = doctest;
+#include "test_init.h"
+#include "test_Bool_helpers.h"
 
 TEST_SUITE("operator|") {
 
 	TEST_CASE("match zero nodes") {
 		const char* sample = "$X & $Y := $Z.";
-		auto src = make_tau_source(sample, { .start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto args = lib
-			| tau_parser::main;
-		CHECK( !args );
+		auto lib = tt(tau::get(sample, parse_library()));
+		CHECK( !(lib | tau::main) );
 	}
 
 	TEST_CASE("match one node") {
 		const char* sample = "$X & $Y := $Z.";
-		auto src = make_tau_source(sample, { .start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto args = lib
-			| tau_parser::rules;
-		CHECK( args.has_value() );
+		auto lib = tt(tau::get(sample, parse_library()));
+		CHECK( (lib | tau::rules).size() == 1 );
 	}
 }
 
@@ -42,39 +22,23 @@ TEST_SUITE("operator||") {
 
 	TEST_CASE("match zero nodes") {
 		const char* sample = "$X & $Y := $Z.";
-		auto src = make_tau_source(sample, { .start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto args = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule
-			|| tau_parser::wff;
-		CHECK( args.size() == 0 );
+		auto lib = tt(tau::get(sample, parse_library()));
+		CHECK( (lib | tau::rules | tau::rule | tau::wff_rule					
+						|| tau::wff).empty() );
 	}
 
 	TEST_CASE("match one node") {
 		const char* sample = "X & Y := Z.";
-		auto src = make_tau_source(sample, { .start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto args = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			|| tau_parser::bf_rule;
-		CHECK( args.size() == 1 );
+		auto lib = tt(tau::get(sample, parse_library()));
+		CHECK( (lib | tau::rules | tau::rule
+						|| tau::bf_rule).size() == 1 );
 	}
 
 	TEST_CASE("match several nodes") {
 		const char* sample = "X & Y := Z.";
-		auto src = make_tau_source(sample, { .start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto args = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_matcher
-			| tau_parser::bf
-			| tau_parser::bf_and
-			|| tau_parser::bf;
-		CHECK( args.size() == 2 );
+		auto lib = tt(tau::get(sample, parse_library()));
+		CHECK( (lib | tau::rules | tau::rule | tau::bf_rule
+			| tau::bf_matcher | tau::bf | tau::bf_and
+						|| tau::bf).size() == 2 );
 	}
 }

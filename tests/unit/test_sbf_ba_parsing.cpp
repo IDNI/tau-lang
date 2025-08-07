@@ -1,49 +1,43 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "test_init.h"
+#include "test_Bool_helpers.h"
 
-#include "doctest.h"
-#include "runtime.h"
-#include "hooks.h"
-
-using namespace std;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
-
-tau<tau_ba<sbf_ba>, sbf_ba> build_binding(const char* src) {
-	bdd_init<Bool>();
+variant<tau_ba<sbf_ba>, sbf_ba> parse(const char* src) {
 	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
-	return bf.parse(src).value();
+	auto parsed = bf.parse(src);
+	assert(parsed.has_value());
+	return parsed.value().first;
 }
 
-const sbf_ba& get_binding(const tau<tau_ba<sbf_ba>, sbf_ba>& n) {
-	return get<sbf_ba>(get<variant<tau_ba<sbf_ba>, sbf_ba>>(n->value));
-}
-
-const sbf_ba& build_and_get_binding(const char* src) {
-	return get_binding(build_binding(src));
+sbf_ba parse_and_unpack(const char* src) {
+	return std::get<sbf_ba>(parse(src));
 }
 
 #define SAMPLES_SIZE (sizeof(samples) / sizeof(char *))
+
+TEST_SUITE("configuration") {
+
+	TEST_CASE("bdd_init") {
+		bdd_init<Bool>();
+	}
+}
 
 TEST_SUITE("sbf binding") {
 
 	TEST_CASE("sbf true") {
 		const char* sample = "1";
 		const char* expected = "1";
-		auto& v = build_and_get_binding(sample);
 		stringstream ss;
-		ss << v;
+		ss << parse_and_unpack(sample);
 		CHECK(ss.str() == expected);
 	}
 
 	TEST_CASE("sbf false") {
 		const char* sample = "0";
 		const char* expected = "0";
-		auto& v = build_and_get_binding(sample);
 		stringstream ss;
-		ss << v;
+		ss << parse_and_unpack(sample);
 		CHECK(ss.str() == expected);
 	}
 
@@ -56,7 +50,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -72,7 +66,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -86,7 +80,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -102,7 +96,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -118,7 +112,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -132,7 +126,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -146,7 +140,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -162,7 +156,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -176,7 +170,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -192,7 +186,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -208,7 +202,7 @@ TEST_SUITE("sbf binding") {
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
-			ss << build_and_get_binding(samples[i]);
+			ss << parse_and_unpack(samples[i]);
 			CHECK(ss.str() == expecteds[i]);
 		}
 	}
@@ -220,7 +214,7 @@ TEST_SUITE("sbf binding") {
 			" x z | a' b c d' x z | a' b c' d x z | a' b c' d' e x "
 			"z | b' d x z | b' d' e x z | d x' z | d' e x' z | z'";
 		stringstream ss;
-		ss << build_and_get_binding(sample);
+		ss << parse_and_unpack(sample);
 		CHECK(ss.str() == expected);
 	}
 

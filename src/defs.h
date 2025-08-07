@@ -1,53 +1,14 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
-#ifndef __DEF_H__
-#define __DEF_H__
 
-#include "./version_license.h"
+#ifndef __IDNI__TAU__DEFS_H__
+#define __IDNI__TAU__DEFS_H__
 
-// basic macro for conditional execution of code
+#include <cstddef>
+#include <variant>
 #ifdef DEBUG
-#	define DBG(x) x
-#	include <cxxabi.h>
-#else
-#define DBG(x)
+#	include <cxxabi.h>     // unmangle symbol names for debugging
 #endif
 
-#include <algorithm>
-#include <iostream>
-#include <vector>
-
-#include <cvc5/cvc5.h>
-
-#define pfst(x) (*(x).begin())
-#define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
-
-typedef int sym_t;
-
-template<typename B> struct zero {
-	bool operator()(const B&) const;
-};
-
-template<typename B> struct one {
-	bool operator()(const B&) const;
-};
-
-template<typename T, typename V> bool has(const T& t, const V& v) {
-	return t.find(v) != t.end();
-}
-
-template<typename T, typename V> bool hasv(const T& t, const V& v) {
-	return std::find(t.begin(), t.end(), v) != t.end();
-}
-
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
-	os << "[";
-	for (size_t i=0; i < vec.size(); ++i)
-		if (i+1 < vec.size()) os << vec[i] << ",";
-	if (!vec.empty()) os << vec.back();
-	os << "]";
-	return os;
-}
 //-----------------------------------------------------------------------------
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
 #ifndef GIT_DESCRIBED
@@ -60,4 +21,50 @@ std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
 #define GIT_BRANCH      "n/a"
 #endif
 
-#endif // __DEF_H__
+#include "version_license.h" // include generated version and license constants
+
+#include "logging.h"
+
+// include parser defs for DBG macro, int_t (int32_t) and mostly for
+// common std::hash templates and specializations
+#include "../external/parser/src/defs.h"
+
+// -----------------------------------------------------------------------------
+// following macros work only if `node` type alias is defined
+// `using node = tau_lang::node<BAs...>;` where `BAs...` is a pack of Boolean Algebras)
+// argument `ref` is a tree pointer reference `tref`,
+// or shared pointer handle `htree::sp`
+
+// helper macro for pretty printing a tau tree tref into std::cout
+#define TAU_PRINT(ref) (tree<node>::get(ref).print(std::cout))
+// helper macro for printing a tau tree tref into std::cout
+#define TAU_PRINT_TREE(ref) (tree<node>::get(ref).print_tree(std::cout))
+// helper macro for dumping a tau tree tref into std::cout
+#define TAU_DUMP(ref) (tree<node>::get(ref).dump(std::cout))
+// helper macro for pretty printing a tau tree tref into to stream
+#define TAU_PRINT_TO(ref, to) (tree<node>::get(ref).print(to))
+// helper macro for printing a tau tree tref into to stream
+#define TAU_PRINT_TREE_TO(ref, to) (tree<node>::get(ref).print_tree(to))
+// helper macro for dumping a tau tree tref into to stream
+#define TAU_DUMP_TO(ref, to) (tree<node>::get(ref).dump(to))
+// helper macro for pretty printing a tau tree tref into a string
+#define TAU_TO_STR(ref) (tree<node>::get(ref).to_str())
+// helper macro for printing a tau tree tref into a string
+#define TAU_TREE_TO_STR(ref) (tree<node>::get(ref).tree_to_str())
+// helper macro for printing a tau tree tref into a string
+#define TAU_DUMP_TO_STR(ref) (tree<node>::get(ref).dump_to_str())
+
+namespace idni::tau_lang {
+
+// helper to get size of a type pack
+template <typename... Pack>
+constexpr size_t Pack_size = std::variant_size<std::variant<Pack...>>::value;
+
+// helper to get bitsize required for size of a type pack
+template <typename... Pack>
+constexpr size_t Pack_bitsize = Pack_size<Pack...> <= 1 ? 1 :
+        (sizeof(size_t) * 8 - __builtin_clzl(Pack_size<Pack...> - 1));
+
+} // namespace idni::tau_lang
+
+#endif // __IDNI__TAU__DEFS_H__

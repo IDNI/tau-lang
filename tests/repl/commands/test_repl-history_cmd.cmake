@@ -2,6 +2,8 @@
 # history commands
 #
 
+include(add_repl_test)
+
 # history list command
 add_repl_test(history_list_cmd-empty "history" "history is empty")
 add_repl_test(history_list_cmd-non_empty "1. history" ": 1")
@@ -11,8 +13,8 @@ add_repl_test(history_store_cmd-bf "1" ": 1")
 add_repl_test(history_store_cmd-wff "T" ": T")
 add_repl_test(history_store_cmd-tau "{T.}" "1")
 
-add_repl_test(history_store_cmd-tau_fail "always o1[t]' = {x } i1[t]" "Syntax Error")
-add_repl_test(history_store_cmd-sbf_fail "always o1[t]' = {x = 0}:sbf i1[t]" "Syntax Error")
+add_repl_test_fail(history_store_cmd-tau_fail "always o1[t]' = {x } i1[t]" "Syntax Error")
+add_repl_test_fail(history_store_cmd-sbf_fail "always o1[t]' = {x = 0}:sbf i1[t]" "Syntax Error")
 
 # history print command
 add_repl_test(history_print_cmd-empty_absolute "history %1" "history is empty")
