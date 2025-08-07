@@ -1,17 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "doctest.h"
-
 #include <cvc5/cvc5.h>
-#include "../../../src/init_log.h"
-//#include "../unit/test_helpers.h"
 
-using namespace boost::log;
+#include "test_init.h"
+
 using namespace cvc5;
-
-namespace testing = doctest;
 
 TEST_SUITE("sample cvc5 programs") {
 
