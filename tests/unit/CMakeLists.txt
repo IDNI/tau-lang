@@ -18,6 +18,7 @@ set(TESTS
 	traversal
 	variant_ba
 	interpreter
+	cvc5
 )
 
 foreach(X IN LISTS TESTS)
