@@ -35,23 +35,6 @@ concept NodeType = requires { // Node Type has to provide
 	{ std::declval<node>().data } -> std::convertible_to<size_t>;
 };
 
-template <typename cache_t>
-concept CacheType = requires {
-	typename cache_t;
-	typename cache_t::const_iterator;
-	typename cache_t::key_type;
-	typename cache_t::mapped_type;
-	typename cache_t::size_type;
-} && 
-requires(cache_t& cache, const typename cache_t::key_type& key, 
-		const typename cache_t::mapped_type& value) {
-	{ cache.emplace(key, value) } -> std::convertible_to<std::pair<typename cache_t::const_iterator, bool>>;
-	{ cache.begin() } -> std::convertible_to<typename cache_t::const_iterator>;
-	{ cache.end() } -> std::convertible_to<typename cache_t::const_iterator>;
-	{ cache.size() } -> std::convertible_to<typename cache_t::size_type>;
-	{ cache.contains(key) } -> std::convertible_to<bool>;
-};
-
 // -----------------------------------------------------------------------------
 // forward declarations
 
@@ -188,18 +171,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	struct get_options; // fwd
 
-	inline static bool use_hooks = true; 
-
-	// gc
-	static void gc();
-	static void gc(std::unordered_set<tref>& keep);
-
-	using gc_callback =
-		std::function<void(const std::unordered_set<tref>& kept)>;
-	inline static std::vector<gc_callback> gc_callbacks{};
-
-	template <CacheType cache_t>
-	static cache_t& create_cache();
+	inline static bool use_hooks = true;
 
 	// tree direct API
 	// ---------------------------------------------------------------------
