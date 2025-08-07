@@ -2,22 +2,24 @@
 
 #include <iostream>
 #include <fstream>
-#include <iomanip>
 #include <sstream>
 
-#include "init_log.h"
+#ifdef DEBUG
+// including nso_ba, sbf_ba and interpreter directly instead of
+// #include "tau.h" to avoid error lines pointing to a generated tau.h
+#include "boolean_algebras/nso_ba.h"
+#include "boolean_algebras/sbf_ba.h"
+#include "interpreter.h"
 #include "runtime.h"
-#include "hooks.h"
-#include "normalizer.h"
-#include "utility/cli.h"
-#include "utility/repl.h"
+#else
+#	include "tau.h"
+#endif // DEBUG
+//#include "base_bas/cvc5.h"
 #include "repl_evaluator.h"
-
-#include "base_bas/cvc5.h"
+#include "utility/cli.h"
 
 using namespace std;
 using namespace idni;
-using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
 cli::options tau_options() {
@@ -46,14 +48,15 @@ cli::options tau_options() {
 		.set_description("use colors");
 	DBG(opts["debug"] = cli::option("debug", 'd', true)
 		.set_description("debug mode");)
+	opts["experimental"] = cli::option("experimental", 'x', false)
+		.set_description("enables transitioning features");
 	return opts;
 }
 
-int error(const string& s) {BOOST_LOG_TRIVIAL(error)<< "(Error) "<< s;return 1;}
+int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
-int run_tau_spec(string spec_file, bool charvar,
-	boost::log::trivial::severity_level sev)
-{
+int run_tau_spec(string spec_file, bool charvar, bool exp,
+	boost::log::trivial::severity_level sev) {
 	string src = "";
 	if (spec_file == "-") {
 		std::ostringstream oss;
@@ -66,19 +69,19 @@ int run_tau_spec(string spec_file, bool charvar,
 	}
 	if (src.empty()) return 0;
 	repl_evaluator<sbf_ba> re({
-		.print_memory_store = false,
-		.error_quits        = true,
-		.charvar            = charvar,
-		.repl_running       = false,
-		.severity           = sev
+		.print_history_store = false,
+		.error_quits         = true,
+		.charvar             = charvar,
+		.repl_running        = false,
+		.severity	     = sev,
+		.experimental        = exp
 	});
 	if (auto status = re.eval(src); status) return status;
 	return re.eval("run %");
 }
 
 void welcome() {
-	BOOST_LOG_TRIVIAL(info)
-		<< "Welcome to the " << full_version << " by IDNI AG.\n"
+	TAU_LOG_INFO << "Welcome to the " << full_version << " by IDNI AG.\n"
 		<< "This product is protected by patents and copyright."
 			" By using this product, you agree to the license terms."
 			" To view the license run \"tau --license\".\n\n"
@@ -87,10 +90,11 @@ void welcome() {
 		<< "For built-in help, type \"help\" or \"help command\".\n\n";
 }
 
+
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	bdd_init<Bool>();
-	bv_config();
+	//bv_config();
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
@@ -122,10 +126,11 @@ int main(int argc, char** argv) {
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
 	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
 
-	// spec provided, run it
-	if (files.size()) return run_tau_spec(files.front(), charvar, sev);
+	bool exp = opts["experimental"].get<bool>();
 
-	// REPL
+	// spec provided, run it
+	if (files.size()) return run_tau_spec(files.front(), charvar, exp, sev);
+
 	repl_evaluator<sbf_ba> re({
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
@@ -133,7 +138,8 @@ int main(int argc, char** argv) {
 #ifdef DEBUG
 		.debug_repl = opts["debug"].get<bool>(),
 #endif // DEBUG
-		.severity = sev
+		.severity = sev,
+		.experimental = exp
 	});
 	string e = opts["evaluate"].get<string>();
 	if (e.size()) return re.eval(e), 0;
@@ -141,4 +147,5 @@ int main(int argc, char** argv) {
 	welcome();
 	re.prompt();
 	return r.run();
+
 }

@@ -9,10 +9,6 @@
 #include "hooks.h"
 #include "normalizer.h"
 
-#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG
-
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
@@ -27,8 +23,6 @@ bool check_hook(const char* sample, const char* expected) {
 	#ifdef DEBUG
 	std::string str(sample);
 	std::cout << "sample: " << str << " expected: " << tau_expected << " got: " << tau_sample << "\n";
-	print_tau_tree(std::cout, tau_sample);
-	print_tau_tree(std::cout, tau_expected);
 	#endif // DEBUG
 
 	return tau_sample == tau_expected;

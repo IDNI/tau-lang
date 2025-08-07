@@ -1,16 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "doctest.h"
-#include "test_helpers.h"
-#include "normalizer.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
+#include "test_init.h"
+#include "test_Bool_helpers.h"
 
 // TODO (HIGH) write tests to check build_dnf_from_clauses
 // TODO (HIGH) write tests to check to_minterm

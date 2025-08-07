@@ -1,9 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG
-
 #include "nso_rr.h"
 
 namespace idni::tau_lang {

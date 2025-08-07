@@ -1,9 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG
-
 #include "nso_rr.h"
 #include "resolver.h"
 
@@ -43,7 +39,7 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 			auto right = annotate_bv_widths(form->child[1], widths);
 			return wrap(tau_parser::wff_or, {left, right});
 		}
-		case tau_parser::wff_ex: 
+		case tau_parser::wff_ex:
 		case tau_parser::wff_all: {
 			// first of all, we create a new "empty" scope
 			widths.open();
@@ -59,7 +55,7 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 						auto untyped = wrap(tau_parser::variable, {var->child[0]});
 						widths.current.vars.erase(untyped);
 						widths.add(untyped, type.value());
-					} 
+					}
 				} else {
 					// we have an untyped variable, we add it as it is
 					widths.add(var);
@@ -74,7 +70,7 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 			for (const auto& [var, _] : widths.current.vars) {
 				if (auto type = widths.type_of(var); type) {
 					auto typed = wrap(tau_parser::variable, {var->child[0], type});
-					
+
 					#ifdef DEBUG
 					print_tau_tree(std::cout, var);
 					print_tau_tree(std::cout, typed);
@@ -86,7 +82,7 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 			auto new_body = replace(body, changes);
 			auto new_prefix = replace(form->child[0], changes);
 			auto new_form = make_node(form->value, {new_prefix, new_body});
-			// remove quantified variables from the scope, close it and return 
+			// remove quantified variables from the scope, close it and return
 			// the result
 			for (auto var: quantifieds) {
 				auto untyped = wrap(tau_parser::variable, {var->child[0]});
@@ -95,7 +91,7 @@ tau<BAs...> annotate_bv_widths(const tau<BAs...>& form, resolver<BAs...>& widths
 			widths.close();
 			return new_form;
 		}
-		case tau_parser::bv_eq: 
+		case tau_parser::bv_eq:
 		case tau_parser::bv_neq:
 		case tau_parser::bv_less_equal:
 		case tau_parser::bv_nleq:
@@ -180,13 +176,13 @@ tau<BAs...> annotate_bv_ctes(const tau<BAs...>& form, resolver<BAs...>& widths) 
 			auto right = annotate_bv_ctes(form->child[1], widths);
 			return wrap(tau_parser::wff_or, {left, right});
 		}
-		case tau_parser::wff_ex: 
+		case tau_parser::wff_ex:
 		case tau_parser::wff_all: {
 			auto new_body = annotate_bv_ctes(form->child[1], widths);
 			auto new_form = make_node(form->value, {form->child[0], new_body});
 			return new_form;
 		}
-		case tau_parser::bv_eq: 
+		case tau_parser::bv_eq:
 		case tau_parser::bv_neq:
 		case tau_parser::bv_less_equal:
 		case tau_parser::bv_nleq:

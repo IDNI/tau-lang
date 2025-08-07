@@ -47,9 +47,7 @@ CMakeFiles
 CMakeFiles/*
 Makefile
 CMakeCache.txt
-*.cmake
 *.nocmake
-!cmake/*
 !tests/repl/commands/*
 !tests/repl/execution/*
 !tests/repl/normal_forms/*
@@ -57,6 +55,7 @@ CMakeCache.txt
 !tests/repl/satisfiability/*
 src/doctest.h
 src/version_license.h
+src/tau.h
 Testing
 
 # Sonarqube
@@ -76,4 +75,5 @@ logs/*
 .gdbinit
 external/boost
 libboost-mingw-w64
-private
+private/*
+.clangd

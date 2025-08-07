@@ -1,116 +1,101 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "queries.h"
-#include "traverser.h"
+#include "boolean_algebras/sbf_ba.h"
+#include "../parser/sbf_parser.generated.h"
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "sbf_ba"
 
 namespace idni::tau_lang {
 	using namespace idni;
 
-	using parse_forest = idni::parser<char, char>::pforest;
-	using parse_result = idni::parser<char, char>::result;
-	using sbf_traverser_t  = traverser<sbf_sym, sbf_parser>;
-
-	static constexpr const auto& get_children =
-		sbf_traverser_t::get_children_extractor();
-	static constexpr const auto& get_only_child =
-		sbf_traverser_t::get_only_child_extractor();
-	static constexpr const auto& get_terminals =
-		sbf_traverser_t::get_terminal_extractor();
-	static constexpr const auto& get_nonterminal =
-		sbf_traverser_t::get_nonterminal_extractor();
-
-	template <typename...BAs>
-	// evaluates a parsed bdd terminal node recursively
-	sbf_ba eval_node(const sbf_traverser_t& t) {
-		//BOOST_LOG_TRIVIAL(debug) << "eval_node";
-		auto n  = t | get_only_child;
-		auto nt = n | get_nonterminal;
+// evaluates a parsed bdd terminal node recursively
+inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
+	using tt = sbf_parser::tree::traverser;
+	using type = sbf_parser::nonterminal;
+	// LOG_DEBUG << "eval_node";
+	auto n  = t | tt::only_child;
+	auto nt = n | tt::nonterminal;
+	switch (nt) {
+	case type::zero: return bdd_handle<Bool>::hfalse;
+	case type::one:  return bdd_handle<Bool>::htrue;
+	case type::negation: {
+		auto e = sbf_eval_node(n | tt::only_child);
+		LOG_TRACE << e << "' = " << ~e;
+		return ~e;
+	}
+	case type::variable: {
+		// get var id from var node's terminals
+		auto var_name = n | tt::terminals;
+		auto v = var_dict(var_name);
+		// use cached var if exists
+		if (auto cn = var_cache.find(v);
+			cn != var_cache.end())
+				return cn->second;
+		// otherwise create a new var and cache it
+		auto ref = bdd<Bool>::bit(v);
+		return var_cache.emplace(v, bdd_handle<Bool>::get(ref))
+			.first->second;
+	}
+	default:
+		auto o = (n | tt::children)();
+		auto l = sbf_eval_node(o[0]), r = sbf_eval_node(o[1]);
 		switch (nt) {
-		case sbf_parser::zero: return bdd_handle<Bool>::hfalse;
-		case sbf_parser::one:  return bdd_handle<Bool>::htrue;
-		case sbf_parser::negation: {
-			auto e = eval_node(n | get_only_child);
-			BOOST_LOG_TRIVIAL(trace) << e << "' = " << ~e;
-			return ~e;
-		}
-		case sbf_parser::variable: {
-			// get var id from var node's terminals
-			auto var_name = n | get_terminals;
-			auto v = dict(var_name);
-			// use cached var if exists
-			if (auto cn = var_cache.find(v);
-				cn != var_cache.end())
-					return cn->second;
-			// otherwise create a new var and cache it
-			auto ref = bdd<Bool>::bit(v);
-			return var_cache.emplace(v, bdd_handle<Bool>::get(ref))
-				.first->second;
-		}
-		default:
-			auto o = (n | get_children)();
-			auto l = eval_node(o[0]), r = eval_node(o[1]);
-			switch (nt) {
-			case sbf_parser::disjunction:
-				BOOST_LOG_TRIVIAL(trace)
-					<< l << " | " << r << " -> " << (l | r);
-				return l | r;
-			case sbf_parser::exclusive_disjunction:
-				BOOST_LOG_TRIVIAL(trace)
-					<< l << " ^ " << r << " -> " << (l ^ r);
-				return l ^ r;
-			case sbf_parser::conjunction:
-			case sbf_parser::conjunction_nosep:
-				BOOST_LOG_TRIVIAL(trace)
-					<< l << " & " << r << " -> " << (l & r);
-				return l & r;
-			default: return bdd_handle<Bool>::hfalse;
-			}
+		case type::disjunction:
+			// LOG_TRACE << l << " | " << r << " -> " << (l | r);
+			return l | r;
+		case type::exclusive_disjunction:
+			// LOG_TRACE << l << " ^ " << r << " -> " << (l ^ r);
+			return l ^ r;
+		case type::conjunction:
+		case type::conjunction_nosep:
+			// LOG_TRACE << l << " & " << r << " -> " << (l & r);
+			return l & r;
+		default: return bdd_handle<Bool>::hfalse;
 		}
 	}
+}
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<constant_with_type<BAs...>> sbf_ba_factory<BAs...>::parse(
+	const std::string& src)
+{
+	// check source cache
+	auto sid = dict(src);
+	if (auto cn = cache.find(sid); cn != cache.end())
+		return constant_with_type<BAs...>{ cn->second, "sbf" };
+	auto result = sbf_parser::instance().parse(src.c_str(), src.size());
+	if (!result.found) {
+		auto msg = result.parse_error
+			.to_str(sbf_parser::error::info_lvl::INFO_BASIC);
+		LOG_ERROR << "[sbf] " << msg << "\n";
+		return {}; // Syntax error
+	}
+	auto t = sbf_parser::tree::traverser(result.get_shaped_tree2())
+							| sbf_parser::sbf;
+	auto v = t.has_value() ? sbf_eval_node(t) : bdd_handle<Bool>::hfalse;
+	return constant_with_type<BAs...>{
+		cache.emplace(sid, std::variant<BAs...>{ v }).first->second,
+		"sbf" };
+}
 
-	template <typename...BAs>
-	std::optional<tau<BAs...>> sbf_ba_factory<BAs...>::parse(
-		const std::string& src)
-	{
-		// check source cache
-		if (auto cn = cache.find(src); cn != cache.end())
-			return cn->second;
-		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
-		if (!result.found) {
-			auto msg = result.parse_error
-				.to_str(tau_parser::error::info_lvl::INFO_BASIC);
-			BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
-			return std::optional<tau<BAs...>>{}; // Syntax error
-		}
-		using parse_symbol = sbf_parser::node_type;
-		using namespace rewriter;
-		auto root = make_node_from_tree<sbf_parser,
-			drop_location_t<parse_symbol, sbf_sym>,
-			sbf_sym>(
-				drop_location<parse_symbol, sbf_sym>,
-				result.get_shaped_tree());
-		auto t = sbf_traverser_t(root) | sbf_parser::sbf;
-		auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
-		std::variant<BAs...> vp {b};
-		auto n = rewriter::depreciating::make_node<tau_sym<BAs...>>(vp, {});
-		return cache.emplace(src, n).first->second;
-	}
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::string sbf_ba_factory<BAs...>::zero() const {
+	return "0";
+}
 
-	template <typename...BAs>
-	tau<BAs...> sbf_ba_factory<BAs...>::binding(const tau<BAs...>& sn) {
-		auto source = sn
-			| tau_parser::source
-			| optional_value_extractor<tau<BAs...>>;
-		std::string src = make_string(
-			tau_node_terminal_extractor<BAs...>, source);
-		if (auto parsed = parse(src); parsed.has_value())
-			return parsed.value();
-		return nullptr;
-	}
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
+	return std::variant<BAs...>(bdd_splitter_one<Bool>());
+}
 
-	template <typename...BAs>
-	std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
-		return std::variant<BAs...>(bdd_splitter_one<Bool>());
-	}
+template <typename... BAs>
+requires BAsPack<BAs...>
+sbf_ba_factory<BAs...>& sbf_ba_factory<BAs...>::instance() {
+	static sbf_ba_factory<BAs...> factory;
+	return factory;
+}
 
 } // namespace idni::tau_lang
