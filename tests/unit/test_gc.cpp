@@ -62,7 +62,7 @@ TEST_SUITE("gc") {
 		static cache_t cache;
 		emplace_fixtures(cache);
 		print(cache);
-		CHECK(cache.size() == 4);
+		CHECK((cache.size() == 4));
 		CHECK(cache.contains(a_pair));
 		CHECK(cache.contains(b_pair));
 		CHECK(cache.contains(c_pair));
@@ -71,7 +71,7 @@ TEST_SUITE("gc") {
 		static tuple_cache_t tuple_cache;
 		emplace_fixtures(tuple_cache);
 		print(tuple_cache);
-		CHECK(tuple_cache.size() == 4);
+		CHECK((tuple_cache.size() == 4));
 		CHECK(tuple_cache.contains(a_tuple));
 		CHECK(tuple_cache.contains(b_tuple));
 		CHECK(tuple_cache.contains(c_tuple));
@@ -107,7 +107,7 @@ TEST_SUITE("gc") {
 
 		print(cache);
 
-		CHECK(cache.size() == 2);
+		CHECK((cache.size() == 2));
 		CHECK(cache.contains(a_pair));
 		CHECK(cache.contains(b_pair));
 		CHECK(!cache.contains(c_pair));
@@ -144,7 +144,7 @@ TEST_SUITE("gc") {
 
 		print(cache);
 
-		CHECK(cache.size() == 2);
+		CHECK((cache.size() == 2));
 		CHECK(cache.contains(a_pair));
 		CHECK(cache.contains(b_pair));
 		CHECK(!cache.contains(c_pair));
@@ -189,7 +189,7 @@ TEST_SUITE("gc") {
 
 		print(cache);
 
-		CHECK(cache.size() == 2);
+		CHECK((cache.size() == 2));
 		CHECK(cache.contains(a_pair));
 		CHECK(cache.contains(b_pair));
 		CHECK(!cache.contains(c_pair));
@@ -211,7 +211,7 @@ TEST_SUITE("gc") {
 
 		print(cache);
 
-		CHECK(cache.size() == 2);
+		CHECK((cache.size() == 2));
 		CHECK(cache.contains(a_pair));
 		CHECK(cache.contains(b_pair));
 		CHECK(!cache.contains(c_pair));
@@ -233,7 +233,7 @@ TEST_SUITE("gc") {
 
 		print(cache);
 
-		CHECK(cache.size() == 2);
+		CHECK((cache.size() == 2));
 		CHECK( cache.contains(a_tuple));
 		CHECK( cache.contains(b_tuple));
 		CHECK(!cache.contains(c_tuple));
@@ -261,17 +261,17 @@ TEST_SUITE("gc") {
 		print(cache2);
 		print(cache3);
 
-		CHECK( cache.size() == 2);
+		CHECK( (cache.size() == 2));
 		CHECK( cache.contains(a_pair));
 		CHECK( cache.contains(b_pair));
 		CHECK(!cache.contains(c_pair));
 		CHECK(!cache.contains(d_pair));
-		CHECK( cache2.size() == 2);
+		CHECK( (cache2.size() == 2));
 		CHECK( cache2.contains(a_pair));
 		CHECK( cache2.contains(b_pair));
 		CHECK(!cache2.contains(c_pair));
 		CHECK(!cache2.contains(d_pair));
-		CHECK( cache3.size() == 2);
+		CHECK( (cache3.size() == 2));
 		CHECK( cache3.contains(a_pair));
 		CHECK( cache3.contains(b_pair));
 		CHECK(!cache3.contains(c_pair));

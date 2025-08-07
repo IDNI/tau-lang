@@ -121,65 +121,6 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // Tau tree templates implementation
 
-// gc
-template <NodeType node>
-void tree<node>::gc() {
-	std::unordered_set<tref> keep{};
-	gc(keep);
-}
-
-template <NodeType node>
-void tree<node>::gc(std::unordered_set<tref>& keep) {
-	base_t::gc(keep);
-	// call callbacks to rebuild caches
-	for (const auto& cb : gc_callbacks) cb(keep);
-}
-
-template <NodeType node>
-template <CacheType cache_t>
-cache_t& tree<node>::create_cache() {
-	static std::deque<cache_t> caches{};
-	cache_t& cache = caches.emplace_back();
-	gc_callbacks.push_back([&cache](const std::unordered_set<tref>& kept) {
-		cache_t new_cache{};
-		for (auto it = cache.begin(); it != cache.end(); it++) {
-			bool ok = true;
-			const auto& key = it->first;
-			const auto check = [&ok, &kept](tref n) {
-				return (ok = ok && kept.contains(n));
-			};
-			if constexpr (std::is_same_v<
-					typename cache_t::key_type, tref>)
-				check(key);
-			else if constexpr (std::tuple_size_v<
-					typename cache_t::key_type> > 0)
-				std::apply([&ok, &kept, &check](
-							const auto&... args)
-				{
-					([&]() {
-						if constexpr (std::is_same_v<
-								std::decay_t<decltype(args)>, tref>)
-							check(args);
-					}(), ...);
-				}, key);
-			else {
-				if constexpr (std::is_same_v<std::decay_t<
-						decltype(key.first)>, tref>)
-					check(key.first);
-				if constexpr (std::is_same_v<std::decay_t<
-						decltype(key.second)>, tref>)
-					check(key.second);
-			}
-			if constexpr (std::is_same_v<
-					typename cache_t::mapped_type, tref>)
-				check(it->second);
-			if (ok) new_cache.emplace(it->first, it->second);
-		}
-		cache = std::move(new_cache);
-	});
-	return cache;
-}
-
 //------------------------------------------------------------------------------
 // handles
 
