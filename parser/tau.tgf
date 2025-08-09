@@ -12,7 +12,7 @@ start                  => spec _.
 # spec, inputs, library, builder, tau_constant_source, cli (bellow)
 spec                   => definitions _ wff:main _ '.'.
 spec_multiline         => _ (rec_relation | input_def | output_def | main)
-                                                                [ _ '.' ] _.
+                                                                [ _ '.' ] _ | _.
 definitions            => (_ (rec_relation | input_def | output_def) _ '.')*.
 rec_relations          => (_ rec_relation _ '.')*.
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
