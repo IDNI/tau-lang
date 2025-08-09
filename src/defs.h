@@ -21,15 +21,19 @@
 #define GIT_BRANCH      "n/a"
 #endif
 
-#include "version_license.h" // include generated version and license constants
+// include generated version and license constants from VERSION and LICENSE.txt
+#include "version_license.h"
 
-#include "logging.h"
+// initialize logging and include logging helper macros
+#include "logging.h" 
 
 // include parser defs for DBG macro, int_t (int32_t) and mostly for
 // common std::hash templates and specializations
 #include "../external/parser/src/defs.h"
 
 // -----------------------------------------------------------------------------
+// helper macros for printing
+
 // following macros work only if `node` type alias is defined
 // `using node = tau_lang::node<BAs...>;` where `BAs...` is a pack of Boolean Algebras)
 // argument `ref` is a tree pointer reference `tref`,
