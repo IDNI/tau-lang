@@ -934,6 +934,40 @@ tref unpack_tau_constant(tref constant) {
 	return main;
 }
 
+// returns true if there is a free variable in formula fm
+// prints error messages by default
+template <NodeType node>
+bool has_free_vars(tref fm, bool silent = false) {
+	using tau = tree<node>;
+	auto free_vars = get_free_vars_from_nso<node>(fm);
+	if (!free_vars.empty()) {
+		// all elements of the set must be quantified
+		std::stringstream ss; bool has_real_free_vars = false;
+		for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
+			if (is_child<node>(*it, tau::io_var)) {
+				const tau& io_var_node = tau::get(*it)[0];
+				if (!io_var_node.is_input_variable() && !
+				io_var_node.is_output_variable()) {
+					if (!silent) LOG_ERROR << "The stream "
+					<< io_var_node
+					<< " is not defined as an input or output stream\n";
+					return true;
+				}
+			} else if (!is_child<node>(*it, tau::uconst_name)) {
+				ss << *it << " ";
+				has_real_free_vars = true;
+			}
+		}
+		if (has_real_free_vars) {
+			if (!silent) LOG_ERROR << "The following variable(s) must be "
+				<< "quantified and cannot appear free: "
+				<< ss.str() << "\n";
+			return true;
+		}
+	}
+	return false;
+}
+
 template <NodeType node, typename in_t, typename out_t>
 std::optional<interpreter<node, in_t, out_t>> run(tref form,
 	in_t& inputs, out_t& outputs, const auto& ctx, const size_t steps)
