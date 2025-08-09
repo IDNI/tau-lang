@@ -469,32 +469,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	auto dnf = normalizer<node>(applied);
 
 	// Make sure that there is no free variable in the formula
-	auto free_vars = get_free_vars_from_nso<node>(dnf);
-	if (!free_vars.empty()) {
-		// all elements of the set must be quantified
-		std::stringstream ss; bool has_real_free_vars = false;
-		for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
-			if (is_child<node>(*it, tau::io_var)) {
-				const tau& io_var_node = tau::get(*it)[0];
-				if (!io_var_node.is_input_variable() && !
-				io_var_node.is_output_variable()) {
-					TAU_LOG_ERROR << "The stream "
-					<< io_var_node
-					<< " is not defined as an input or output stream\n";
-					return;
-				}
-			} else if (!is_child<node>(*it, tau::uconst_name)) {
-				ss << *it << " ";
-				has_real_free_vars = true;
-			}
-		}
-		if (has_real_free_vars) {
-			TAU_LOG_ERROR << "The following variable(s) must be "
-				<< "quantified and cannot appear free: "
-				<< ss.str() << "\n";
-			return;
-		}
-	}
+	if (has_free_vars<node>(dnf)) return;
 
 	auto& ctx = definitions<node>::instance().get_io_context();
 	auto ins = finputs<node>(collect_input_streams<node>(dnf, ctx));
@@ -700,7 +675,7 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
 	auto& defs = definitions<node>::instance();
 	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_input_defs())) {
 		error = true;
-		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
+		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
 	}
 }
 
@@ -710,7 +685,7 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
 	auto& defs = definitions<node>::instance();
 	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_output_defs())){
 		error = true;
-		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
+		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
 	}
 }
 
