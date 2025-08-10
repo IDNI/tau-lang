@@ -14,7 +14,7 @@ if [[ ! -f "$TGF" ]]; then
 	echo "tgf tool not built. Building..."
 	D=`pwd`
 	cd "$TGF_DIR"
-	./release.sh -DTAU_PARSER_BUILD_TGF=1
+	./dev release -DTAU_PARSER_BUILD_TGF=1
 	cd "$D"
 fi
 

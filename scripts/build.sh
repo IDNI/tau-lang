@@ -7,6 +7,7 @@ if [ "$2" = "-v" ]; then
 	VERBOSE="1"
 	shift
 fi
+VERBOSE="1"
 
 case "${BUILD_TYPE}" in
 	"Debug")
