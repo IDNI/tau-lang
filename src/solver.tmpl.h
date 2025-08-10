@@ -818,8 +818,8 @@ std::optional<solution<node>> solve_general_system(
 	// for each inequality g_i we apply the transformation given by lgrs solution
 	// of the equality
 	for (tref g_i : system.second) {
-		auto nphi = phi.value(),
-			ng_i = tt(rewriter::replace<node>(g_i, nphi))
+		auto nphi = phi.value();
+		auto ng_i = tt(rewriter::replace<node>(g_i, nphi))
 				| bf_reduce_canonical<node>() | tt::ref;
 		if (tau::get(ng_i).equals_F()) {
 			DBG(LOG_TRACE<<" solve_system/inequality_solution: {}";)
