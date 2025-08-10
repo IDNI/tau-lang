@@ -152,12 +152,12 @@ tref ba_types_inference<node>::add_scope_ids(
 {
 	DBG(LOG_TRACE << "-- Add_scope_ids: " << LOG_FM_DUMP(n);)
 	// ptree(std::cout << "tree: ", n) << "\n";
-	const auto vsid = [this, &vscids](tref var) -> size_t {
+	const auto vsid = [&vscids](tref var) -> size_t {
 		size_t v = get_var_name_sid<node>(var);
 		if (vscids.find(v) == vscids.end()) return 0;
 		return vscids[v];
 	};
-	const auto inc_vsid = [this, &vscids](tref var) {
+	const auto inc_vsid = [&vscids](tref var) {
 		size_t v = get_var_name_sid<node>(var);
 		if (vscids.find(v) == vscids.end()) vscids[v] = 0;
 		else vscids[v]++;
