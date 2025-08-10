@@ -88,7 +88,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 				t[0].right_sibling() });
 		return n;
 	};
-	auto def_transformer = [&transformer](tref n) -> tref {
+	auto def_transformer = [](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if (t.is(tau::ref_arg) && t[0][0].is(tau::variable))
 			return tau::get(tau::ref_arg, tau::get(tau::bf,

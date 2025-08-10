@@ -515,7 +515,7 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 			<< "}:" << options.type << "\n";
 	};
 
-	auto print_general_case = [&options](tref var, tref value) {
+	auto print_general_case = [](tref var, tref value) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := "
 			<< TAU_TO_STR(value) << "\n";
 	};
@@ -778,9 +778,9 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "colors:              " << pbool[opt.colors] << "\n"; } },
 	{ charvar_opt,      [this]() {
 		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
-	{ highlighting_opt, [this]() {
+	{ highlighting_opt, []() {
 		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
-	{ indenting_opt,    [this]() {
+	{ indenting_opt,    []() {
 		std::cout << "indenting:           " << pbool[pretty_printer_indenting] << "\n"; } },
 	{ severity_opt,     [this]() {
 		std::cout << "severity:            " << opt.severity << "\n"; } }};

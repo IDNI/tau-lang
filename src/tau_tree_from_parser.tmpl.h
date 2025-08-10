@@ -65,7 +65,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 		// simple renaming transformations
 		// TODO (LOW) this should be supported directly by the parser
-		auto retype_nonterminal = [&nt, &parent_nt]() -> type {
+		auto retype_nonterminal = [&nt]() -> type {
 			switch (nt) { // of intermediate nodes
 				// bf_and_nosep and bf_neg_oprnd
 				case bf_and_nosep_1st_oprnd:
