@@ -188,7 +188,7 @@ set(Boost_USE_STATIC_LIBS ON)
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 	CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 		find_package(Boost REQUIRED
-			PATHS "${CMAKE_CURRENT_SOURCE_DIR}/libboost-mingw-w64"
+			PATHS "${CMAKE_CURRENT_SOURCE_DIR}/external/libboost-mingw-w64"
 			COMPONENTS log)
 else()
 		find_package(Boost REQUIRED COMPONENTS log)

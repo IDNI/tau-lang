@@ -1,6 +1,6 @@
 #!/bin/bash
 
-./release.sh $@
+./dev release $@
 cd ./build-Release
 cpack -C Release
 cd ..
