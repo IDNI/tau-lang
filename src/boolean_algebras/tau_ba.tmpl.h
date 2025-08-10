@@ -126,6 +126,13 @@ bool operator==(const bool& b, const tau_ba<BAs...>& other) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+bool operator==(const tau_ba<BAs...>& lhs, const tau_ba<BAs...>& rhs) {
+	return lhs.nso_rr.main == rhs.nso_rr.main &&
+		lhs.nso_rr.rec_relations == rhs.nso_rr.rec_relations;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const tau_ba<BAs...>& other, const bool& b) {
 	return !(other == b);
 }
