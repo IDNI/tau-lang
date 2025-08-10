@@ -178,6 +178,7 @@ message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 #
 # Add tauparser library
 #
+set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
 add_subdirectory(external/parser)
 
 #
