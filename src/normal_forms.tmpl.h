@@ -1044,13 +1044,13 @@ std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
 			return {};
 		if (all_reductions) {
 			if (!reduce_paths(i, paths, vars.size()))
-						paths.emplace_back(move(i));
+				paths.emplace_back(std::move(i));
 			else {
 				std::erase_if(paths,
 					[](const auto& v){return v.empty();});
 				if (paths.empty()) return {};
 			}
-		} else paths.emplace_back(move(i));
+		} else paths.emplace_back(std::move(i));
 	}
 	return paths;
 }
@@ -1265,7 +1265,7 @@ tref group_dnf_expression(tref fm) {
 				 : get_cnf_bf_clauses<node>(clause);
 		if(wff) std::ranges::sort(atoms);
 		else std::ranges::sort(atoms, lex_var_comp<node>);
-		atoms_of_clauses.emplace_back(move(atoms));
+		atoms_of_clauses.emplace_back(std::move(atoms));
 	}
 	tref grouped_fm = wff ? tau::_F() : tau::_0();
 	for (int_t i = 0; i < (int_t) atoms_of_clauses.size(); ++i) {
