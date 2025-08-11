@@ -438,55 +438,30 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	return {};
 }
 
-/*template <typename...BAs>
-std::optional<tau_nso<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) {
-	// parse source
-	auto source = make_tau_source(src, {
-			.start = tau_parser::bitvector });
-	if (!source) return std::optional<tau_nso_t>{};
-	auto rr = make_nso_rr_using_factory<tau_ba_t, BAs...>(source);
-	if (!rr) return std::optional<tau_nso_t>{};
-	// cvompute final result
-	return std::optional<tau_nso_t>{
-		rewriter::depreciating::make_node<tau_sym<tau_ba_t, BAs...>>(t, {}) };
+template<NodeType node>
+std::optional<node> solve_bv(const trefs& lits) {
+	using tau = tree<node>;
+
+	return solve_bv(tau::build_wff_and(lits));
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_bv(const std::vector<tau<BAs...>>& lits) {
-	return solve_bv(build_wff_and<BAs...>(lits));
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<constant_with_type<BAs...>> bv_ba_factory<BAs...>::parse(
+		const std::string& src) {
+	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	typename tau::get_options opts{
+		.parse = { .start = tau::bitvector },
+		.infer_ba_types = false,
+		.reget_with_hooks = false };
+	auto result = tau::get(src, opts);
+	if (!result) return {};
+
+	auto bv_constant = tt(result) | tt::only_child | tt::ba_constant;
+	return constant_with_type<BAs...>{bv_constant, "bv"};
 }
-
-template <typename...BAs>
-std::optional<tau<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) {
-	// check source cache
-	if (auto cn = cache.find(src); cn != cache.end())
-		return cn->second;
-		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
-	if (!result.found) {
-		auto msg = result.parse_error
-			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
-		BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
-		return std::optional<tau<BAs...>>{}; // Syntax error
-	}
-	using parse_symbol = sbf_parser::node_type;
-	using namespace rewriter;
-	auto root = make_node_from_tree<sbf_parser,
-		drop_location_t<parse_symbol, sbf_sym>,
-		sbf_sym>(
-			drop_location<parse_symbol, sbf_sym>,
-			result.get_shaped_tree());
-	auto t = sbf_traverser_t(root) | sbf_parser::sbf;
-	auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
-	std::variant<BAs...> vp {b};
-	auto n = rewriter::depreciating::make_node<tau_sym<BAs...>>(vp, {});
-	return cache.emplace(src, n).first->second;
-	//return {};
-	auto bv = make_nso_using_factory<BAs...>(src, { .start = tau_parser::bitvector });
-	if (!bv) return std::optional<tau<BAs...>>{};
-	// cvompute final result
-	//return std::optional<tau<BAs...>>{ cache.emplace(src, bv.value() ).first->second };
-	return bv;
-
-}*/
 
 } // namespace idni::tau_lang
