@@ -389,13 +389,17 @@ bool is_bv_formula_valid(tref form) {
 	return is_bv_formula_unsat<node>(build_wff_neg<node>(form));
 }
 
-/*template <NodeType node>
-std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
-	std::map<tau<BAs...>, Term> vars;
-	std::map<tau<BAs...>, Term> free_vars;
+template <NodeType node>
+std::optional<solution<node>> solve_bv(const tref form) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	using type = tau_parser::nonterminal;
+
+	subtree_map<node, Term> vars, free_vars;
+
 	cvc5_solver.resetAssertions();
 	cvc5_solver.push();
-	auto expr = bv_eval_node(form, vars, free_vars, false);
+	auto expr = bv_eval_node(tt(form), vars, free_vars, false);
 
 	// solve the equations
 	cvc5_solver.assertFormula(expr);
@@ -408,16 +412,19 @@ std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 	// extract the model and return the solution if sat
 	if (result.isSat()) {
 
-		solution<BAs...> s;
+		solution<node> s;
 		for (const auto& v: free_vars) {
 			// create a new tau_sym node with the value of the variable
 			// and an empty child vector from cvc5 values
 
-			auto bvn = make_node<tau_sym<BAs...>>(cvc5_solver.getValue(v.second), {});
-			std::vector<tau<BAs...>> bvv{bvn};
+			// TODO (HIGH) fix when we introduce Terms in nodes
+			// auto bvn = make_node<tau_sym<BAs...>>(cvc5_solver.getValue(v.second), {});
+			// std::vector<tau<BAs...>> bvv{bvn};
 			s.emplace(v.first,
-				std::make_shared<rewriter::depreciating::node<tau_sym<BAs...>>>(
-					tau_parser::instance().literal(tau_parser::bitvector), bvv));
+				// TODO (HIGH) fix when we introduce Terms in nodes
+				//std::make_shared<rewriter::depreciating::node<tau_sym<BAs...>>>(
+				//	tau_parser::instance().literal(tau_parser::bitvector), bvv));
+				tau::get(type::bitvector));
 		}
 		cvc5_solver.pop();
 		return s;
@@ -431,7 +438,7 @@ std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 	return {};
 }
 
-template <typename...BAs>
+/*template <typename...BAs>
 std::optional<tau_nso<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) {
 	// parse source
 	auto source = make_tau_source(src, {
