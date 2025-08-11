@@ -1,10 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __CVC5_H__
-#define __CVC5_H__
+#ifndef __IDNI__TAU__CVC5_H__
+#define __IDNI__TAU__CVC5_H__
 
-#include "boolean_algebras/tau_ba.h"
-//#include "nso_rr.h"
+#include <cvc5/cvc5.h>
+
+#include "tau_tree.h"
 
 namespace idni::tau_lang {
 
@@ -18,45 +19,45 @@ static void bv_config() {
 	cvc5_solver.setLogic("BV");
 }
 
-template<typename...BAs>
-using var = tau<BAs...>;
+//using tau = tree<node>;
 
-template<typename...BAs>
-using solution = std::map<var<BAs...>, tau<BAs...>>;
+template<NodeType node>
+using solution = subtree_map<node, tref>;
 
-template <typename...BAs>
-cvc5::Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, cvc5::Term> vars,
-	std::map<tau<BAs...>, cvc5::Term>& free_vars, bool checked = false);
+template <NodeType node>
+std::optional<cvc5::Term> bv_eval_node(const typename tau::traverser& t, subtree_map<tref, cvc5::Term> vars,
+	subtree_map<tref, cvc5::Term>& free_vars, bool checked = false);
 
-template <typename...BAs>
-bool is_bv_formula_sat(const tau<BAs...>& form);
+template <NodeType node>
+bool is_bv_formula_sat(tref form);
 
-template <typename...BAs>
-bool is_bv_formula_valid(const tau<BAs...>& form);
+template <NodeType node>
+bool is_bv_formula_valid(tref form);
 
-template <typename...BAs>
-bool is_bv_formula_unsat(const tau<BAs...>& form);
+template <NodeType node>
+bool is_bv_formula_unsat(tref form);
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form, cvc5::Solver& solver);
+template <NodeType node>
+std::optional<solution<node>> solve_bv(tref form, cvc5::Solver& solver);
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form);
+template <NodeType node>
+std::optional<solution<node>> solve_bv(tref form);
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_bv(const std::vector<tau<BAs...>>& form);
+template <NodeType node>
+std::optional<solution<node>> solve_bv(trefs form);
 
-template<typename...BAs>
+/*template<typename...BAs>
+requires BAsPack<BAs...>
 struct bv_ba_factory {
-	std::optional<tau<BAs...>> parse(const std::string& src);
+	std::optional<constant_with_type<BAs...>> parse(const std::string& src);
 
 private:
 
-	inline static std::map<std::string, tau<BAs...>> cache;
-};
+	inline static std::map<size_t, tref> cache;
+};*/
 
 } // namespace idni::tau_lang
 
 #include "cvc5.tmpl.h"
 
-#endif // __CVC5_H__
+#endif // __IDNI__TAU__CVC5_H__

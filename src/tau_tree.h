@@ -207,6 +207,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	// handles
 	tref get() const;
+	static const tree& get(const std::optional<tref>& id);
 	static const tree& get(const tref id);
 	static const tree& get(const htree::sp& h);
 	static htree::sp geth(tref id);
@@ -416,6 +417,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		traverser();
 		traverser(tref r);
 		traverser(const tree& r);
+		traverser(const std::optional<tref>& r);
 		traverser(const htree::sp& r);
 		traverser(const trefs& n);
 		bool has_value() const;

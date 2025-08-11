@@ -18,6 +18,7 @@ set(TESTS
 	traversal
 	variant_ba
 	interpreter
+	base_bas_cvc5
 	cvc5
 )
 
