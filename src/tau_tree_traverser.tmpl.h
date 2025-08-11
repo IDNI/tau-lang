@@ -165,7 +165,7 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 				trefs only_ch;
 				for (tref v : t.values())
 					if (tref oc = get(v).only_child(); oc)
-						only_ch.push_back(oc);				
+						only_ch.push_back(oc);
 				return traverser(only_ch);
 			});
 
@@ -178,7 +178,7 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 				trefs first_ch;
 				for (tref v : t.values())
 					if (tref fc = get(v).first(); fc)
-						first_ch.push_back(fc);				
+						first_ch.push_back(fc);
 				return traverser(first_ch);
 			});
 
@@ -191,7 +191,7 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 				trefs second_ch;
 				for (tref v : t.values())
 					if (tref sc = get(v).second(); sc)
-						second_ch.push_back(sc);				
+						second_ch.push_back(sc);
 				return traverser(second_ch);
 			});
 
@@ -204,7 +204,7 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 				trefs third_ch;
 				for (tref v : t.values())
 					if (tref tc = get(v).third(); tc)
-						third_ch.push_back(tc);				
+						third_ch.push_back(tc);
 				return traverser(third_ch);
 			});
 
@@ -217,7 +217,7 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 				trefs fourth_ch;
 				for (tref v : t.values())
 					if (tref fc = get(v).child(3); fc)
-						fourth_ch.push_back(fc);				
+						fourth_ch.push_back(fc);
 				return traverser(fourth_ch);
 			});
 
@@ -230,7 +230,7 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 				trefs ch;
 				for (tref v : t.values())
 					for (tref c : get(v).children())
-						ch.push_back(c);				
+						ch.push_back(c);
 				return traverser(ch);
 			});
 
@@ -271,20 +271,29 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 
 template <NodeType node>
 tree<node>::traverser::traverser() : has_value_(false) {}
+
 template <NodeType node>
 tree<node>::traverser::traverser(tref r) : has_value_(r != nullptr),
-			values_(has_value_ ? trefs{ r } : trefs{}) {}
+		values_(has_value_ ? trefs{ r } : trefs{}) {}
+
+template <NodeType node>
+tree<node>::traverser::traverser(const std::optional<tref>& r) : has_value_(r.has_value()),
+		values_(has_value_ ? trefs{ *r } : trefs{}) {}
+
 template <NodeType node>
 tree<node>::traverser::traverser(const tree<node>& t) : has_value_(true),
-			values_(trefs{ t.get() }) {}
+		values_(trefs{ t.get() }) {}
+
 template <NodeType node>
 tree<node>::traverser::traverser(const htree::sp& h) : has_value_(h != nullptr),
-			values_(has_value_ ? trefs{ h->get() } : trefs{}) {}
+		values_(has_value_ ? trefs{ h->get() } : trefs{}) {}
+
 template <NodeType node>
 tree<node>::traverser::traverser(const trefs& refs) { set_values(refs); }
 
 template <NodeType node>
 bool tree<node>::traverser::has_value() const { return has_value_; }
+
 template <NodeType node>
 tree<node>::traverser::operator bool() const { return has_value(); }
 

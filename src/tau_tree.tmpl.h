@@ -186,15 +186,23 @@ cache_t& tree<node>::create_cache() {
 
 template <NodeType node>
 tref tree<node>::get() const { return base_t::get(); }
+
+template <NodeType node>
+const tree<node>& tree<node>::get(const std::optional<tref>& id) {
+	return id ? (const tree&) base_t::get(*id) : (const tree&) base_t::get();
+}
+
 template <NodeType node>
 const tree<node>& tree<node>::get(const tref id) {
 	DBG(assert(id != nullptr);)
 	return (const tree&) base_t::get(id);
 }
+
 template <NodeType node>
 const tree<node>& tree<node>::get(const htree::sp& h) {
 	return (const tree&) base_t::get(h);
 }
+
 template <NodeType node>
 htree::sp tree<node>::geth(tref h) {
 	DBG(assert(h != nullptr);)
@@ -467,7 +475,7 @@ template <NodeType node>
 tref tree<node>::get_ba_constant(
 	const std::optional<std::pair<constant, std::string>>& typed_const)
 {
-	if (!typed_const) LOG_TRACE 
+	if (!typed_const) LOG_TRACE
 		<< "get_ba_constant(optional): nullptr";
 	if (!typed_const) return nullptr;
 	return get_ba_constant(typed_const.value());

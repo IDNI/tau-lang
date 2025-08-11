@@ -1,12 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "nso_rr.h"
-
 namespace idni::tau_lang {
 
 using namespace cvc5;
-
-static auto BOOL = cvc5_solver.getBooleanSort();
+using namespace idni;
 
 Term mkNot(const Term& t) {
 	return cvc5_solver.mkTerm(Kind::NOT, {t});
@@ -120,24 +117,19 @@ Term mkBitVectorRotateRight(const Term& l, const Term& r) {
 	return cvc5_solver.mkTerm(Kind::BITVECTOR_LSHR, {l, r});
 }
 
-template<typename...BAs>
-Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map<tau<BAs...>, Term>& free_vars, bool checked) {
-	auto nt = std::get<tau_source_sym>(form->value).n();
+template <NodeType node>
+Term bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, Term> vars,
+		subtree_map<node, Term>& free_vars, bool checked) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	using type = tau_parser::nonterminal;
 
-	//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/from: " << form;
+	auto nt = form | tt::nt;
 
-	// control overflow/underflow if requested
-	//if (checked) {
-	//	BOOST_LOG_TRIVIAL(warning) << "(Warning) overflow/underflow checking is deactivated";
-	//}
-
-	auto bv_sort = [](const tau<BAs...> var) -> Sort {
+	auto bv_sort = [](tref var) -> Sort {
 		size_t bv_size;
-		if (auto num = var | tau_parser::type | tau_parser::bv_type | tau_parser::num; num) {
-			bv_size = num.value()
-				| only_child_extractor<BAs...>
-				| size_t_extractor<BAs...>
-				| optional_value_extractor<size_t>;
+		if (auto num = tt(var) | type::type | type::bv_type | type::num; num) {
+			bv_size = tt(num) | tt::only_child | tt::num;
 		} else {
 			// default size is cvc5_default_size
 			bv_size = bv_default_size;
@@ -146,272 +138,264 @@ Term eval_bv(const tau<BAs...>& form, std::map<tau<BAs...>, Term> vars, std::map
 	};
 
 	switch (nt) {
-		case tau_parser::wff_always:
-		case tau_parser::wff_sometimes: {
-			return eval_bv(form->child[0], vars, free_vars, checked);
+		case type::wff_always:
+		case type::wff_sometimes: {
+			return bv_eval_node(form | tt::first, vars, free_vars, checked);
 		}
 		// due to hooks we should consider wff_t or bf_t
-		case tau_parser::wff:
-		case tau_parser::bv: {
-			auto expr = eval_bv(form->child[0], vars, free_vars, checked);
+		case type::wff:
+		case type::bv: {
+			auto expr = bv_eval_node(form | tt::first, vars, free_vars, checked);
 			return expr;
 		}
-		case tau_parser::wff_neg: {
-			return mkNot(eval_bv(form->child[0], vars, free_vars, checked));
+		case type::wff_neg: {
+			return mkNot(bv_eval_node(form | tt::first, vars, free_vars, checked));
 		}
-		case tau_parser::wff_and: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::wff_and: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkAnd(l, r);
 		}
-		case tau_parser::wff_or: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::wff_or: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkOr(l, r);
 		}
-		case tau_parser::wff_all: {
+		case type::wff_all: {
 			cvc5_solver.push();
 
 			std::vector<Term> cvc5_var_list;
-			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
-				auto vn = make_string(v);
-				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
+			for (const auto& v: (form | tt::first | tt::Tree).select_top(is<node, tau::variable>)) {
+				auto vn = tau::get(v).to_str();
+				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/vn: " << vn;
 				auto x = cvc5_solver.mkVar(bv_sort(v), vn.c_str());
-				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
+				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
 			}
-			auto f = eval_bv(form->child[1], vars, free_vars, checked);
+			auto f = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			auto res = mkForall(cvc5_var_list, f);
 
 			cvc5_solver.pop();
 
-			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << res;
+			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/f: " << res;
 
 			return res;
 		}
-		case tau_parser::wff_ex: {
+		case type::wff_ex: {
 			cvc5_solver.push();
 
 			std::vector<Term> cvc5_var_list;
-			for (const auto& v : select_top(form->child[0], is_non_terminal<tau_parser::variable, BAs...>)) {
-				auto vn = make_string(v);
-				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
+			for (const auto& v: (form | tt::first | tt::Tree).select_top(is<node, tau::variable>)) {
+				auto vn = tau::get(v).to_str();
+				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/vn: " << vn;
 				auto x = cvc5_solver.mkVar(bv_sort(v), vn.c_str());
-				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
+				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
 			}
 
-			auto f = eval_bv(form->child[1], vars, free_vars, checked);
+			auto f = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			auto res = mkExists(cvc5_var_list, f);
 
 			cvc5_solver.pop();
 
-			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/f: " << res;
+			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/f: " << res;
 			return res;
 		}
-		case tau_parser::variable: {
+		case type::variable: {
 			// check if the variable is alr
-			if (auto it = vars.find(form); it != vars.end()) return it->second;
-			if (auto it = free_vars.find(form); it != free_vars.end()) return it->second;
-			auto vn = make_string(form);
+			if (auto it = vars.find(form | tt::ref); it != vars.end()) return it->second;
+			if (auto it = free_vars.find(form | tt::ref); it != free_vars.end()) return it->second;
+			auto vn = (form | tt::Tree).to_str();
 			// create a new constant according to the type and added to the map
-			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/vn: " << vn;
-			auto x = cvc5_solver.mkConst(bv_sort(form), vn.c_str());
-			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " eval_bv/x: " << x;
+			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/vn: " << vn;
+			auto x = cvc5_solver.mkConst(bv_sort(form | tt::ref), vn.c_str());
+			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/x: " << x;
 			//vars.emplace(form, x);
-			free_vars.emplace(form, x);
+			free_vars.emplace(form | tt::ref, x);
 			return x;
 		}
-		case tau_parser::bv_checked: {
-			return eval_bv(form->child[0], vars, free_vars, true);
+		case type::bv_checked: {
+			return bv_eval_node(form | tt::first, vars, free_vars, true);
 		}
-		case tau_parser::bv_eq: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_eq: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkEqual(l, r);
-		};
-		case tau_parser::bv_neq: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		}
+		case type::bv_neq: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkDisticnt(l, r);
 		}
-		case tau_parser::bv_less_equal: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_less_equal: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkLessEqual(l, r);
 		}
-		case tau_parser::bv_nleq: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_nleq: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkNot(mkLessEqual(l, r));
 		}
-		case tau_parser::bv_greater: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_greater: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkGreater(l, r);
 		}
-		case tau_parser::bv_ngreater: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_ngreater: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkNot(mkGreater(l, r));
 		}
-		case tau_parser::bv_greater_equal: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_greater_equal: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkGreaterEqual(l, r);
 		}
-		case tau_parser::bv_ngeq: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_ngeq: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkNot(mkGreaterEqual(l, r));
 		}
-		case tau_parser::bv_less: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_less: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkLess(l, r);
 		}
-		case tau_parser::bv_nless: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_nless: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkNot(mkLess(l, r));
 		}
-		case tau_parser::bv_neg: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
+		case type::bv_neg: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
 			return mkBitVectorNot(l);
 		}
-		case tau_parser::bv_add: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_add: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorAdd(l, r);
 		}
-		case tau_parser::bv_sub: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_sub: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorSub(l, r);
 		}
-		case tau_parser::bv_mul: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_mul: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorMul(l, r);
 		}
-		case tau_parser::bv_div: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_div: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorDiv(l, r);
 		}
-		case tau_parser::bv_mod: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_mod: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorMod(l, r);
 		}
-		case tau_parser::bv_and: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_and: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorAnd(l, r);
 		}
-		case tau_parser::bv_nand: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_nand: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorNand(l, r);
 		}
-		case tau_parser::bv_or: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_or: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorOr(l, r);
 		}
-		case tau_parser::bv_nor: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_nor: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorNor(l, r);
 		}
-		case tau_parser::bv_xor: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_xor: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorXor(l, r);
 		}
-		case tau_parser::bv_xnor: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_xnor: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorXnor(l, r);
 		}
-		/*case tau_parser::bv_min: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		/*case type::bv_min: {
+			auto l = bv_eval_node(form->child[0], vars, free_vars, checked);
+			auto r = bv_eval_node(form->child[1], vars, free_vars, checked);
 			return min(l, r);
 		}
-		case tau_parser::bv_max: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_max: {
+			auto l = bv_eval_node(form->child[0], vars, free_vars, checked);
+			auto r = bv_eval_node(form->child[1], vars, free_vars, checked);
 			return max(l, r);
 		}*/
-		case tau_parser::bv_rotate_left: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_rotate_left: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorRotateLeft(l, r);
 		}
-		case tau_parser::bv_rotate_right: {
-			auto l = eval_bv(form->child[0], vars, free_vars, checked);
-			auto r = eval_bv(form->child[1], vars, free_vars, checked);
+		case type::bv_rotate_right: {
+			auto l = bv_eval_node(form | tt::first, vars, free_vars, checked);
+			auto r = bv_eval_node(form | tt::second, vars, free_vars, checked);
 			return mkBitVectorRotateRight(l, r);
 		}
-		case tau_parser::bitvector: {
-			auto expr = std::get<cvc5::Term>(form->child[0]->value);
+		case type::bitvector: {
+			// TODO (HIGH) fix when we introduce Terms in nodes
+			// auto expr = std::get<Term>(form | tt::first | tt::template extractor<Term>());
+			auto expr = cvc5_solver.mkConst(bv_sort(form | tt::ref));
 			return expr;
 		}
 		default: {
 			#ifdef DEBUG
-			print_tau_tree(std::cout, form);
+			//print_tau_tree(std::cout, form);
 			#endif // DEBUG
 		}
 	}
-	assert(false);
+	throw cvc5::CVC5ApiException("unsupported bitvector operation");
 }
 
-template <typename...BAs>
-bool is_bv_formula_sat(const tau<BAs...>& form) {
-	std::map<tau<BAs...>, cvc5::Term> vars, free_vars;
+template <NodeType node>
+bool is_bv_formula_sat(tref form) {
+	using tt = tree<node>::traverser;
+
+	subtree_map<node, Term> vars, free_vars;
 
 	cvc5_solver.resetAssertions();
 	cvc5_solver.push();
-
-	#ifdef DEBUG
-	print_tau_tree(std::cout, form);
-	#endif // DEBUG
-
-	auto expr = eval_bv(form, vars, free_vars);
-
-	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/form: " << form;
-	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/expr: " << expr;
-
+//	auto tform = tt(form);
+	auto expr = bv_eval_node(tt(form), vars, free_vars, false);
 	cvc5_solver.assertFormula(expr);
 	auto result = cvc5_solver.checkSat().isSat();
 	cvc5_solver.pop();
-
-	BOOST_LOG_TRIVIAL(trace) << "cvc5.tml.h:" << __LINE__ << " is_bv_formula_sat/result: " << result;
-	BOOST_LOG_TRIVIAL(info) << "(Info) bv system is " << result;
-
 	return result;
 }
 
-template <typename...BAs>
-bool is_bv_formula_unsat(const tau<BAs...>& form) {
-	return !is_bv_formula_sat(form);
+template <NodeType node>
+bool is_bv_formula_unsat(tref form) {
+	return !is_bv_formula_sat<node>(form);
 }
 
-template<typename...BAs>
-bool is_bv_formula_valid(const tau<BAs...>& form) {
-	return is_bv_formula_unsat(build_wff_neg(form));
+template <NodeType node>
+bool is_bv_formula_valid(tref form) {
+	return is_bv_formula_unsat<node>(build_wff_neg<node>(form));
 }
 
-template<typename...BAs>
+/*template <NodeType node>
 std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
-	std::map<tau<BAs...>, cvc5::Term> vars;
-	std::map<tau<BAs...>, cvc5::Term> free_vars;
+	std::map<tau<BAs...>, Term> vars;
+	std::map<tau<BAs...>, Term> free_vars;
 	cvc5_solver.resetAssertions();
 	cvc5_solver.push();
-	auto expr = eval_bv(form, vars, free_vars, false);
+	auto expr = bv_eval_node(form, vars, free_vars, false);
 
 	// solve the equations
 	cvc5_solver.assertFormula(expr);
@@ -447,7 +431,7 @@ std::optional<solution<BAs...>> solve_bv(const tau<BAs...>& form) {
 	return {};
 }
 
-/*template <typename...BAs>
+template <typename...BAs>
 std::optional<tau_nso<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) {
 	// parse source
 	auto source = make_tau_source(src, {
@@ -458,7 +442,7 @@ std::optional<tau_nso<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& s
 	// cvompute final result
 	return std::optional<tau_nso_t>{
 		rewriter::depreciating::make_node<tau_sym<tau_ba_t, BAs...>>(t, {}) };
-}*/
+}
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_bv(const std::vector<tau<BAs...>>& lits) {
@@ -470,7 +454,7 @@ std::optional<tau<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) 
 	// check source cache
 	if (auto cn = cache.find(src); cn != cache.end())
 		return cn->second;
-/*		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
+		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
@@ -488,7 +472,7 @@ std::optional<tau<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) 
 	auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
 	std::variant<BAs...> vp {b};
 	auto n = rewriter::depreciating::make_node<tau_sym<BAs...>>(vp, {});
-	return cache.emplace(src, n).first->second;*/
+	return cache.emplace(src, n).first->second;
 	//return {};
 	auto bv = make_nso_using_factory<BAs...>(src, { .start = tau_parser::bitvector });
 	if (!bv) return std::optional<tau<BAs...>>{};
@@ -496,6 +480,6 @@ std::optional<tau<BAs...>> bv_ba_factory<BAs...>::parse(const std::string& src) 
 	//return std::optional<tau<BAs...>>{ cache.emplace(src, bv.value() ).first->second };
 	return bv;
 
-}
+}*/
 
 } // namespace idni::tau_lang

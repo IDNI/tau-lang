@@ -54,11 +54,6 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | ('!'   _ wff)                      :wff_neg
                         | 'T'                                :wff_t
                         | 'F'                                :wff_f
-# relational operators
-#
-# they are named bf_* as they involve boolean functions,
-# but they are not boolean functions themselves, they return a T/F wff value
-# and hence, should be considered as wffs
                         | (bf    _ "<="  _ bf _ "<=" _ bf)   :bf_interval
                         | (bf    _ '='   _ bf)               :bf_eq
                         | (bf    _ "!="  _ bf)               :bf_neq
@@ -70,7 +65,22 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "!>=" _ bf)               :bf_ngteq
                         | (bf    _ "<"   _ bf)               :bf_lt
                         | (bf    _ "!<"  _ bf)               :bf_nlt
+                        | (bv    _ "=_"   _ bv)              :bv_eq
+                        | (bv    _ "!=_"  _ bv)              :bv_neq
+                        | (bv    _ "<=_"  _ bv)              :bv_less_equal
+                        | (bv    _ "!<=_" _ bv)              :bv_nleq
+                        | (bv    _ ">_"   _ bv)              :bv_greater
+                        | (bv    _ "!>_"  _ bv)              :bv_ngreater
+                        | (bv    _ ">=_"  _ bv)              :bv_greater_equal
+                        | (bv    _ "!>=_" _ bv)              :bv_ngeq
+                        | (bv    _ "<_"   _ bv)              :bv_less
+                        | (bv    _ "!<_"  _ bv)              :bv_nless
                         |                                     capture.
+# relational operators for base types
+#
+# they are named bf_* as they involve boolean functions,
+# but they are not boolean functions themselves, they return a T/F wff value
+# and hence, should be considered as wffs
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     bf_constant
                         |                                     variable
@@ -96,6 +106,9 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
+# operators for bitvector types
+#
+# they are named bv_* as they involve bitvectors.
 bv                     => ('(' _ bv _ ')')            :bv_parenthesis
                         | ( '[' bv ']' )              :bv_checked
                         |                              variable
@@ -165,7 +178,9 @@ num                    => digits.
 integer                => [ '-' ] _ digits.
 sym                    => chars.
 capture                => '$' chars.
-typed                  => _ ':' _ chars:type.
+typed                  => _ ':' _ type.
+type                   => bv_type | chars.
+bv_type                => "bv" [num].
 
 scope_id               => digits. # dummy rule to introduce scope_id nt
 
@@ -291,8 +306,9 @@ history        => ( "%"
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, integer, source, capture, var_name, io_var_name,
-        uconst_name, type, file_name, ctnvar, option_name, option_value.
+        sym, digits, hexnum, bits, type, bv_type, integer, source, capture,
+        var_name, io_var_name, uconst_name, type, file_name, ctnvar, option_name,
+        option_value.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, typed, q_var, src_c, uconst,
@@ -300,6 +316,7 @@ history        => ( "%"
         normalize_cmd_arg,
         uconst > uconst_name,
         wff > wff_parenthesis > wff,
+        bv > bv_parenthesis > bv,
         bf > bf_parenthesis > bf,
         bf_neg_oprnd > bf_parenthesis > bf,
         bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
