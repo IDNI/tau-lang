@@ -46,15 +46,11 @@ std::optional<solution<node>> solve_bv(tref form);
 template <NodeType node>
 std::optional<solution<node>> solve_bv(trefs form);
 
-/*template<typename...BAs>
+template<typename...BAs>
 requires BAsPack<BAs...>
 struct bv_ba_factory {
 	std::optional<constant_with_type<BAs...>> parse(const std::string& src);
-
-private:
-
-	inline static std::map<size_t, tref> cache;
-};*/
+};
 
 } // namespace idni::tau_lang
 
