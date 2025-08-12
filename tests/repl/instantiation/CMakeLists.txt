@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 add_repl_test(instantiation_cmd_bf1 "x. 1. i %[x / %1]" ": 1")
 
-add_repl_test(instantiation_cmd_bf2 "ax + bx'. y&z. i %1[x / %2]" ": \\(ayz\\)'b\\(yz\\)'|ayz\\(b\\(yz\\)'\\)")
+add_repl_test(instantiation_cmd_bf2 "ax + bx'. y&z. i %1[x / %2]" ": ayz\\+b\\(yz\\)'")
 
 add_repl_test(instantiation_cmd_bf3 "(x | (w & z)) & z. b. i %1[ z / %2]" ": \\(x|wb\\)b")
 

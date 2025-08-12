@@ -18,6 +18,7 @@ tref normalizer_step(tref form) {
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	form = norm_all_equations<node>(form);
+	form = apply_all_xor_def<node>(form);
 	tref result = tt(form)
 		// Push all quantifiers in and eliminate them
 		| tt::f(eliminate_quantifiers<node>)
@@ -45,6 +46,7 @@ tref normalize_non_temp(tref fm) {
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	fm = norm_all_equations<node>(fm);
+	fm = apply_all_xor_def<node>(fm);
 	tref result = tt(fm)
 		// Push all quantifiers in and eliminate them
 		| tt::f(eliminate_quantifiers<node>)

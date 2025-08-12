@@ -252,6 +252,25 @@ tref norm_all_equations (tref fm) {
 						visit_wff<node>);
 }
 
+template<NodeType node>
+tref apply_xor_def(tref fm) {
+	using tau = tree<node>;
+	tau t = tau::get(fm);
+	if (t.child_is(tau::bf_xor)) {
+		return tau::build_bf_or(
+			tau::build_bf_and(t[0].first(),
+					tau::build_bf_neg(t[0].second())),
+			tau::build_bf_and(tau::build_bf_neg(t[0].first()),
+					t[0].second()));
+	}
+	return fm;
+}
+
+template<NodeType node>
+tref apply_all_xor_def(tref fm) {
+	return pre_order<node>(fm).apply_unique(apply_xor_def<node>);
+}
+
 template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& fm, const tau_f<node>& func)
@@ -848,6 +867,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 		LOG_TRACE << "bf_boole_normal_form result: " << LOG_FM(fm);
 		return fm;
 	};
+	fm = apply_all_xor_def<node>(fm);
 	// Function can only be applied to a BF
 	const auto& t = tau::get(fm);
 	DBG(assert(t.is(tau::bf));)
@@ -1188,7 +1208,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	DBG(assert(tau::get(fm).is(type));)
 	// Pull negation out of equality
 	bool wff = type == tau::wff;
-	tref new_fm = wff ? to_mnf<node>(fm) : fm;
+	tref new_fm = wff ? to_mnf<node>(fm) : apply_all_xor_def<node>(fm);
 	if (wff) {
 		LOG_TRACE << "dnf_cnf_to_bdd / mnf: " << LOG_FM(new_fm);
 		// Make equalities canonical

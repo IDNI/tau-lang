@@ -152,7 +152,9 @@ inline bool matches_output(const auto& assm, const auto& memory) {
 }
 
 tref create_spec(const char* spec) {
-	return get_nso_rr<node_t>(tau::get(spec)).value().main->get();
+	auto nso_rr = get_nso_rr<node_t>(tau::get(spec));
+	tref res = norm_all_equations<node_t>(nso_rr.value().main->get());
+	return apply_all_xor_def<node_t>(res);
 }
 
 TEST_SUITE("Execution") {

@@ -5,7 +5,8 @@
 
 tref create_spec(const char* spec) {
 	auto nso_rr = get_nso_rr<node_t>(tau::get(spec));
-	return norm_all_equations<node_t>(nso_rr.value().main->get());
+	tref res = norm_all_equations<node_t>(nso_rr.value().main->get());
+	return apply_all_xor_def<node_t>(res);
 }
 
 TEST_SUITE("configuration") {

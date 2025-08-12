@@ -464,7 +464,7 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 		HOOK_LOGGING(applied("{ $X } ^ { $Y } := bf_xor_cb $X $Y.");)
 		return cte_xor(v, ch, len, r);
 	}
-	return tau::get(tau::build_bf_xor(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+	return tau::get_raw(v, ch, len, r);
 }
 
 // Simplify constants being syntactically true or false

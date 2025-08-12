@@ -162,6 +162,12 @@ tref norm_equation(tref eq);
 template <NodeType node>
 tref norm_all_equations(tref fm);
 
+template <NodeType node>
+tref apply_xor_def(tref fm);
+
+template <NodeType node>
+tref apply_all_xor_def(tref fm);
+
 // // -----------------------------------------------------------------------------
 // // General operator for tref function application by pipe
 // template <NodeType node>
@@ -318,6 +324,8 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 	const int_t p, const auto& is_var);
 
 // Declaration of functions used in assign_and_reduce which are implemented later
+// Assume that fm is in DNF (or CNF -> set is_cnf to true)
+// TODO: Normalize Tau constants in case type == bf
 template <NodeType node>
 tref reduce(tref fm, size_t type, bool is_cnf = false,
 	bool all_reductions = true, bool enable_sort = true);
@@ -376,11 +384,7 @@ tref group_dnf_expression(tref fm);
 // General idea is to eliminate (xyz...)' | xyz... after factorization
 template <NodeType node>
 tref simp_general_excluded_middle(tref fm);
-// Assume that fm is in DNF (or CNF -> set is_cnf to true)
-// TODO: Normalize Tau constants in case type == bf
-template <NodeType node>
-tref reduce(tref fm, size_t type, bool is_cnf,
-	bool all_reductions, bool enable_sort);
+
 template <NodeType node>
 tref reduce_terms(tref fm, bool with_sorting = false);
 

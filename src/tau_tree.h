@@ -522,11 +522,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	// term builders
 	static tref build_bf_or(tref l, tref r);
 	static tref build_bf_or(const auto& bfs);
-	static tref build_bf_xor_from_def(tref l, tref r);
 	static tref build_bf_xor(tref l, tref r);
 	static tref build_bf_and(tref l, tref r);
 	static tref build_bf_and(const auto& bfs);
-	static tref build_bf_neg(tref n);
+	static tref build_bf_neg(tref l);
 
 	// terminals, variables and constants
 	static tref build_bf_t_type(size_t ba_tid);

@@ -378,19 +378,10 @@ tref build_bf_or(const auto& bfs) {
 }
 
 template <NodeType node>
-tref build_bf_xor_from_def(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_bf_or<node>(
-		build_bf_and<node>(build_bf_neg<node>(l), r),
-		build_bf_and<node>(build_bf_neg<node>(r), l));
-}
-
-template <NodeType node>
 tref build_bf_xor(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	return build_bf_or<node>(
-		build_bf_and<node>(build_bf_neg<node>(l), r),
-		build_bf_and<node>(l, build_bf_neg<node>(r)));
+	using tau = tree<node>;
+	return tau::get(tau::bf, tau::get(tau::bf_xor, l, r));
 }
 
 template <NodeType node>
@@ -868,11 +859,6 @@ tref tree<node>::build_bf_or(tref l, tref r) {
 template <NodeType node>
 tref tree<node>::build_bf_or(const auto& bfs) {
 	return tau_lang::build_bf_or<node>(bfs);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_xor_from_def(tref l, tref r) {
-	return tau_lang::build_bf_xor_from_def<node>(l, r);
 }
 
 template <NodeType node>
