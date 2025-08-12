@@ -22,15 +22,15 @@ test_cases all_cases = {
 };
 
 test_cases ex_all_cases = {
-	{ "ex x all y x=y.",            "ex x all y x'y|xy' = 0", "F" },
+	{ "ex x all y x=y.",            "ex x all y x = y", "F" },
 	{ "ex x,y all w,z x=w&&y=z.",
-		"ex x, y all w, z x'w|xw' = 0 && y'z|yz' = 0",     "F"},
+		"ex x, y all w, z x = w && y = z",     "F"},
 };
 
 test_cases all_ex_cases = {
-	{ "all x ex y x=y.",            "all x ex y x'y|xy' = 0", "T" },
+	{ "all x ex y x=y.",            "all x ex y x = y", "T" },
 	{ "all x,y ex w,z x=w && y=z.",
-		"all x, y ex w, z x'w|xw' = 0 && y'z|yz' = 0",    "T"},
+		"all x, y ex w, z x = w && y = z",    "T"},
 };
 
 ostream& operator<<(ostream& os, const test_case& tc) {

@@ -198,7 +198,7 @@ requires BAsPack<BAs...>
 tref tau_bad_splitter(tref fm) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
-	tref new_uniter_const = tau::build_bf_neq(
+	tref new_uniter_const = tau::build_bf_neq_0(
 		get_new_uninterpreted_constant<node>(fm, "split", get_ba_type_id<node>("tau")));
 	trefs clauses = get_dnf_wff_clauses<node>(fm);
 	// Add bad splitter only to a single disjunct if possible
@@ -232,6 +232,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		trefs eqs = tau::get(clause)
 			.select_top(is<node, tau::bf_eq>);
 		for (tref eq : eqs) {
+			eq = tau::trim(norm_equation<node>(tau::get(tau::wff, eq)));
 			DBG(assert(tau::get(eq)[1][0].is(tau::bf_f));)
 			size_t type_f = find_ba_type<node>(eq);
 			subtree_set<node> free_vars
@@ -269,6 +270,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		trefs neqs = tau::get(clause)
 					.select_top(is<node, tau::bf_neq>);
 		for (tref neq : neqs) {
+			neq = tau::trim(norm_equation<node>(tau::get(tau::wff, neq)));
 			LOG_TRACE << "neq: " << LOG_FM_DUMP(neq);
 			LOG_TRACE << " test " << LOG_FM_DUMP(tau::get(neq).first());
 			DBG(assert(tau::get(neq)[1].child_is(tau::bf_f));)

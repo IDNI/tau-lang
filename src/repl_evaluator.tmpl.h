@@ -287,7 +287,7 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
 		case tau::wff: return to_mnf<node>(reduce_across_bfs<node>(
-					applied, false));
+					norm_all_equations<node>(applied), false));
 		case tau::bf:  return bf_boole_normal_form<node>(applied);
 		default: return invalid_argument();
 		}
@@ -303,7 +303,7 @@ tref repl_evaluator<BAs...>::snf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::wff: return snf_wff<node>(applied);
+		case tau::wff: return snf_wff<node>(norm_all_equations<node>(applied));
 		case tau::bf:  return snf_bf<node>(applied);
 		default: return invalid_argument();
 		}
@@ -447,6 +447,7 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	tref arg = n[1].get();
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
+		applied = norm_all_equations<node>(applied);
 		applied = eliminate_quantifiers<node>(applied);
 		return reduce_across_bfs<node>(applied, false);
 	}
@@ -526,14 +527,12 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	for (auto [var, value]: solution.value()) {
 		if (auto check = tt(value) | tau::bf_t; check)
 			print_one_case(var);
-		else if (auto check = tt(value) | tau::bf_f; check)
+		else if (check = tt(value) | tau::bf_f; check)
 			print_zero_case(var);
 		else
 			print_general_case(var, value);
 	}
 	std::cout << "}\n";
-
-	return;
 }
 
 template <typename... BAs>
@@ -565,6 +564,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 
 	DBG(TAU_LOG_TRACE << "solve_cmd/applied: " << applied << "\n";)
 
+	applied = norm_all_equations<node>(applied);
 	auto solution = solve<node>(applied, options);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// auto vars = tau::get(equations).select_top(is_child<node, tau::variable>);
@@ -585,6 +585,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
+	applied = norm_all_equations<node>(applied);
 	tref equality = tt(applied) | tau::bf_eq | tt::ref;
 	if (!applied || !equality) {
 		TAU_LOG_ERROR << "Invalid argument(s)\n";

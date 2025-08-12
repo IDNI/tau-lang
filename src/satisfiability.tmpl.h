@@ -190,7 +190,7 @@ std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 		changes[io_vars[i]] = new_io_var;
 	}
 	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point, 0);
-	c_pholder = tau::build_bf_eq(c_pholder);
+	c_pholder = tau::build_bf_eq_0(c_pholder);
 	pholder_to_st.emplace(c_pholder, rewriter::replace<node>(st, changes));
 	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes),
 					 c_pholder);
@@ -240,7 +240,7 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 	tref c_chi = rewriter::replace<node>(chi, changes);
 	tref c_pholder = build_out_var_at_n<node>("_pholder",
 							time_point + step_num, 0);
-	c_pholder = tau::build_bf_eq(c_pholder);
+	c_pholder = tau::build_bf_eq_0(c_pholder);
 	tref c_st = rewriter::replace<node>(st, changes);
 	pholder_to_st.emplace(c_pholder, c_st);
 	// Quantify formula which is to be added to chi
@@ -359,7 +359,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 			return tau::get(n) == tau::get(uc);
 		}) == left_uconsts.end())
 			uconst_ctns = tau::build_wff_and(uconst_ctns,
-				tau::build_bf_eq(tau::get(tau::bf, uc)));
+				tau::build_bf_eq_0(tau::get(tau::bf, uc)));
 	}
 
 	LOG_DEBUG<<"Formula describing constraints on uninterpreted constants: "
@@ -500,13 +500,13 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 {
 	using tau = tree<node>;
 	auto to_eq_1 = [](tref n) {
-			return tau::build_bf_eq(tau::build_bf_neg(n)); };
+			return tau::build_bf_eq_0(tau::build_bf_neg(n)); };
 	auto create_initial =
 		[&flag_initials](tref ctn, tref flag_iovar, const int_t t)
 	{
 		tref flag_init_cond = transform_io_var<node>(flag_iovar, t);
 		flag_init_cond = tau::get(tau::bf, flag_init_cond);
-		flag_initials = tau::build_wff_and(tau::build_bf_eq(
+		flag_initials = tau::build_wff_and(tau::build_bf_eq_0(
 				tau::build_bf_xor(flag_init_cond,
 						calculate_ctn<node>(ctn, t))),
 			flag_initials);
@@ -536,7 +536,7 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 		if (ct() | tau::ctn_gt || ct() | tau::ctn_gteq) {
 			// Add flag rule _fk[lookback] != 0 -> _fk[lookback-1] = 1
 			auto flag_rule = tau::build_wff_or(
-				tau::build_bf_eq(flag_rule1),
+				tau::build_bf_eq_0(flag_rule1),
 				to_eq_1(flag_rule2));
 			// Conjunct flag rule with formula
 			flag_rules = tau::build_wff_and(flag_rules, flag_rule);
@@ -544,7 +544,7 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 			// Flag is of type less or less_equal
 			// Add flag rule _fk[lookback] != 1 -> _fk[lookback-1] = 0
 			auto flag_rule = tau::build_wff_or(to_eq_1(flag_rule1),
-						tau::build_bf_eq(flag_rule2));
+						tau::build_bf_eq_0(flag_rule2));
 			// Conjunct flag rule with formula
 			flag_rules = tau::build_wff_and(flag_rules, flag_rule);
 		}
@@ -662,7 +662,7 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 			size_t type = tau::get(io_var).get_ba_type();
 			tref uc = tau::build_bf_uconst("_" + TAU_TO_STR(io_var),
 							std::to_string(number), type);
-			tref cdn = tau::build_bf_eq(tau::build_bf_xor(
+			tref cdn = tau::build_bf_eq_0(tau::build_bf_xor(
 				tau::get(tau::bf, io_var), uc));
 			guard = tau::build_wff_and(guard, cdn);
 		}
@@ -720,12 +720,12 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 		tref eNt_prev = build_prev_flag_on_lookback<node>(out, "t",
 						max_st_lookback + aw_lookback);
 
-		tref eN0_is_not_zero = tau::build_bf_neq(
+		tref eN0_is_not_zero = tau::build_bf_neq_0(
 			build_out_var_at_n<node>(out, start_time, flag_type));
-		tref eNt_is_zero          = tau::build_bf_eq(eNt);
-		// tref eNt_is_not_zero      = tau::build_bf_neq(eNt);
-		tref eNt_prev_is_zero     = tau::build_bf_eq(eNt_prev);
-		tref eNt_prev_is_not_zero = tau::build_bf_neq(eNt_prev);
+		tref eNt_is_zero          = tau::build_bf_eq_0(eNt);
+		// tref eNt_is_not_zero      = tau::build_bf_neq_0(eNt);
+		tref eNt_prev_is_zero     = tau::build_bf_eq_0(eNt_prev);
+		tref eNt_prev_is_not_zero = tau::build_bf_neq_0(eNt_prev);
 		// transform `sometimes psi` to:
 		// (_eN[t-1] != 0 && _eN[t] == 0) -> psi (N is nth `sometimes`)
 		tref shifted_sometimes = (max_st_lookback==0 && aw_lookback==0)
@@ -782,7 +782,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 							res, aw_io_vars, 1);
 			res = tau::build_wff_and(res,
 				tau::build_wff_sometimes(
-					tau::build_bf_eq(ev_collection)));
+					tau::build_bf_eq_0(ev_collection)));
 		}
 	} else {
 		// Conjunct new sometimes part if present
@@ -790,7 +790,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 			res = tau::build_wff_and(
 				tau::build_wff_always(ev_assm),
 				tau::build_wff_sometimes(
-					tau::build_bf_eq(ev_collection)));
+					tau::build_bf_eq_0(ev_collection)));
 		else return  { fm, max_st_lookback };
 	}
 

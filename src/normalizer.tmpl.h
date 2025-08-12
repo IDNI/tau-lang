@@ -17,7 +17,7 @@ tref normalizer_step(tref form) {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-
+	form = norm_all_equations<node>(form);
 	tref result = tt(form)
 		// Push all quantifiers in and eliminate them
 		| tt::f(eliminate_quantifiers<node>)
@@ -44,6 +44,7 @@ tref normalize_non_temp(tref fm) {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
+	fm = norm_all_equations<node>(fm);
 	tref result = tt(fm)
 		// Push all quantifiers in and eliminate them
 		| tt::f(eliminate_quantifiers<node>)
@@ -324,7 +325,7 @@ bool are_bf_equal(tref n1, tref n2) {
 	auto vars2 = get_free_vars_from_nso<node>(n2);
 	vars.insert(vars2.begin(), vars2.end());
 
-	tref bf_equal_fm = tau::build_bf_eq(tau::build_bf_xor(n1, n2));
+	tref bf_equal_fm = tau::build_bf_eq_0(tau::build_bf_xor(n1, n2));
 	for (tref v : vars) bf_equal_fm = tau::build_wff_all(v, bf_equal_fm);
 	LOG_TRACE << "wff: " << LOG_FM(bf_equal_fm);
 
@@ -882,8 +883,9 @@ tref normalizer(const rr<node>& nso_rr) {
 	LOG_DEBUG << "Begin normalizer";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 
-	auto fm = apply_rr_to_formula<node>(nso_rr);
+	tref fm = apply_rr_to_formula<node>(nso_rr);
 	if (!fm) return nullptr;
+	fm = norm_all_equations<node>(fm);
 	tref res = normalize_with_temp_simp<node>(fm);
 
 	LOG_DEBUG << "End normalizer";
@@ -892,8 +894,9 @@ tref normalizer(const rr<node>& nso_rr) {
 }
 
 template <NodeType node>
-tref normalizer(tref form) {
-	return normalize_with_temp_simp<node>(form);
+tref normalizer(tref fm) {
+	fm = norm_all_equations<node>(fm);
+	return normalize_with_temp_simp<node>(fm);
 }
 
 } // namespace idni::tau_lang

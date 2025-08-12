@@ -16,7 +16,9 @@ tref to_mnf(tref fm) {
 		//$X != 0 ::= !($X = 0)
 		if (is<node>(n, tau::bf_neq)) {
 			return tau::trim(tau::build_wff_neg(
-					tau::build_bf_eq(tau::trim(n))));
+				tau::build_bf_eq(
+					tau::get(n).first(),
+					tau::get(n).second())));
 		}
 		return n;
 	};
@@ -35,7 +37,9 @@ tref from_mnf_to_nnf(tref fm) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_neg))
 			if (const auto& e = t[0][0]; e.is(tau::bf_eq))
-				return tau::trim(tau::build_bf_neq(e.first()));
+				return tau::trim(
+					tau::build_bf_neq(
+						e.first(), e.second()));
 		return n;
 	};
 	tref result = pre_order<node>(fm)
@@ -52,24 +56,24 @@ tref unsqueeze_wff(const tref& fm) {
 	LOG_TRACE << "unsqueeze_wff: " << LOG_FM(fm);
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::bf_eq)) {
+		if (t.is(tau::bf_eq) && t[1] == tau::get_0()) {
 			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
 				tref c1 = e.first();
 				tref c2 = e.second();
 				return tau::trim(tau::build_wff_and(
-					tau::build_bf_eq(c1),
-					tau::build_bf_eq(c2)));
+					tau::build_bf_eq_0(c1),
+					tau::build_bf_eq_0(c2)));
 			}
 		}
-		else if (t.is(tau::bf_neq)) {
+		else if (t.is(tau::bf_neq) && t[1] == tau::get_0()) {
 			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
 				tref c1 = e.first();
 				tref c2 = e.second();
 				return tau::trim(tau::build_wff_or(
-					tau::build_bf_neq(c1),
-					tau::build_bf_neq(c2)));
+					tau::build_bf_neq_0(c1),
+					tau::build_bf_neq_0(c2)));
 			}
 		}
 		return n;
@@ -89,12 +93,12 @@ tref squeeze_wff(const tref& fm) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_and)) {
 			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_eq)
-				&& e2.child_is(tau::bf_eq)) {
+			if (e1.child_is(tau::bf_eq) && e1[0][1] == tau::get_0()
+				&& e2.child_is(tau::bf_eq) && e2[0][1] == tau::get_0()) {
 				size_t t_e1 = find_ba_type<node>(e1.get());
 				size_t t_e2 = find_ba_type<node>(e2.get());
 				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
-					return tau::trim(tau::build_bf_eq(
+					return tau::trim(tau::build_bf_eq_0(
 						tau::build_bf_or(
 						e1[0].first(), e2[0].first())));
 				}
@@ -102,13 +106,13 @@ tref squeeze_wff(const tref& fm) {
 		}
 		else if (t.is(tau::wff_or)) {
 			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_neq)
-				&& e2.child_is(tau::bf_neq))
+			if (e1.child_is(tau::bf_neq) && e1[0][1] == tau::get_0()
+				&& e2.child_is(tau::bf_neq) && e2[0][1] == tau::get_0())
 			{
 				size_t t_e1 = find_ba_type<node>(e1.get());
 				size_t t_e2 = find_ba_type<node>(e2.get());
 				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
-					return tau::trim(tau::build_bf_neq(
+					return tau::trim(tau::build_bf_neq_0(
 						tau::build_bf_or(
 						e1[0].first(), e2[0].first())));
 				}
@@ -128,13 +132,13 @@ tref unsqueeze_wff_pos(tref fm) {
 	LOG_TRACE << "unsqueeze_wff_pos: " << LOG_FM(fm);
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::bf_eq)) {
+		if (t.is(tau::bf_eq) && t[1] == tau::get_0()) {
 			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
 				const auto& c1 = e.first(), c2 = e.second();
 				return tau::trim(tau::build_wff_and(
-					tau::build_bf_eq(c1),
-					tau::build_bf_eq(c2)));
+					tau::build_bf_eq_0(c1),
+					tau::build_bf_eq_0(c2)));
 			}
 		}
 		return n;
@@ -153,11 +157,12 @@ tref squeeze_wff_pos(tref fm) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_and)) {
 			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_eq) && e2.child_is(tau::bf_eq)) {
+			if (e1.child_is(tau::bf_eq) && e2.child_is(tau::bf_eq)
+				&& e1[0][1] == tau::get_0() && e2[0][1] == tau::get_0()) {
 				size_t t_e1 = find_ba_type<node>(e1.get());
 				size_t t_e2 = find_ba_type<node>(e2.get());
 				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
-					return tau::trim(tau::build_bf_eq(
+					return tau::trim(tau::build_bf_eq_0(
 						tau::build_bf_or(e1[0].first(), e2[0].first())));
 				}
 			}
@@ -176,13 +181,13 @@ tref unsqueeze_wff_neg(tref fm) {
 	LOG_TRACE << "unsqueeze_wff_neg: " << LOG_FM(fm);
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::bf_neq)) {
+		if (t.is(tau::bf_neq) && t[1] == tau::get_0()) {
 			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
 				const auto& c1 = e.first(), c2 = e.second();
 				return tau::trim(tau::build_wff_or(
-					tau::build_bf_neq(c1),
-					tau::build_bf_neq(c2)));
+					tau::build_bf_neq_0(c1),
+					tau::build_bf_neq_0(c2)));
 			}
 		}
 		return n;
@@ -201,12 +206,13 @@ tref squeeze_wff_neg(tref fm) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_or)) {
 			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_neq)
-				&& e2.child_is(tau::bf_neq)) {
+			if (e1.child_is(tau::bf_neq) && e2.child_is(tau::bf_neq)
+				&& e1[0][1] == tau::get_0()
+				&& e2[0][1] == tau::get_0()) {
 				size_t t_e1 = find_ba_type<node>(e1.get());
 				size_t t_e2 = find_ba_type<node>(e2.get());
 				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
-					return tau::trim(tau::build_bf_neq(
+					return tau::trim(tau::build_bf_neq_0(
 						tau::build_bf_or(
 							e1[0].first(), e2[0].first())));
 				}
@@ -225,6 +231,25 @@ tref to_nnf(tref fm) {
 	auto result = push_negation_in<node>(fm);
 	LOG_TRACE << "to_nnf result: " << LOG_FM(result);
 	return result;
+}
+
+// Convert X =(!=) Y to X + Y =(!=) 0
+template<NodeType node>
+tref norm_equation(tref eq) {
+	using tau = tree<node>;
+	tau e = tau::get(eq);
+	if (e.child_is(tau::bf_eq)) {
+		return tau::build_bf_eq_0(tau::build_bf_xor(e[0].first(), e[0].second()));
+	} else if (e.child_is(tau::bf_neq)) {
+		return tau::build_bf_neq_0(tau::build_bf_xor(e[0].first(), e[0].second()));
+	} else return eq;
+}
+
+// Convert all occurrences of X =(!=) Y to X + Y =(!=) 0 in fm
+template <NodeType node>
+tref norm_all_equations (tref fm) {
+	return pre_order<node>(fm).apply_unique(norm_equation<node>,
+						visit_wff<node>);
 }
 
 template <NodeType node>
@@ -502,7 +527,7 @@ onf_wff<node>::onf_wff(tref _var) {
 template <NodeType node>
 tref onf_wff<node>::operator()(tref n) const {
 	using tau = tree<node>;
-	auto [var, nn] = get_inner_quantified_wff<node>(n);
+	auto [ _ , nn] = get_inner_quantified_wff<node>(n);
 	// We assume that the formula is in DNF. In particular nn is in DNF
 	// For each disjunct calculate the onf
 	subtree_map<node, tref> changes;
@@ -527,13 +552,14 @@ template <NodeType node>
 tref onf_wff<node>::onf_subformula(tref n) const {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	auto has_var = [&](const auto& n) {
-		return tau::get(n) == tau::get(var);
+	auto has_var = [&](const auto& el) {
+		return tau::get(el) == tau::get(var);
 	};
 	const auto& t = tau::get(n);
 	tref eq = t.find_bottom(is<node, tau::bf_eq>);
 	subtree_map<node, tref> changes;
 	if (eq && tau::get(eq)[0].find_top(has_var)) {
+		eq = tau::trim(norm_equation<node>(tau::get(tau::wff, eq)));
 		const auto& eq_v = tau::get(eq);
 		DBG(assert(eq_v[1][0].is(tau::bf_f));)
 		tref f_0 = tt(rewriter::replace<node>(
@@ -547,6 +573,8 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 							f_0, var, f_1));
 	}
 	for (tref neq_ref : t.select_all(is<node, tau::bf_neq>)) {
+		neq_ref = tau::trim(
+			norm_equation<node>(tau::get(tau::wff, neq_ref)));
 		const auto& neq = tau::get(neq_ref);
 		DBG(assert(neq[1][0].is(tau::bf_f));)
 		if (!neq[0].find_top(has_var)) continue;
@@ -1137,7 +1165,7 @@ tref sort_var(tref var) {
 			else res = tau::build_bf_and(lits);
 			LOG_TRACE << "sort_var / res: " << LOG_FM(res);
 		}
-		res = tau::build_bf_eq(res);
+		res = tau::build_bf_eq_0(res);
 		LOG_TRACE << "sort_var / res: " << LOG_FM(res);
 #ifdef TAU_CACHE
 		cache.emplace(res, res);
@@ -1607,7 +1635,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 				auto vs = simp_general_excluded_middle<node>(
 								t[0].first());
 				negs_wff = tau::build_wff_and(negs_wff,
-							tau::build_bf_neq(vs));
+							tau::build_bf_neq_0(vs));
 			} else pos_bf = tau::build_bf_or(pos_bf, t[0].first());
 		}
 		else if (path[p] == -1) clause = tau::build_wff_and(clause,
@@ -1628,8 +1656,8 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 		if (!tau::get(c).equals_0())
 			pos.emplace_back(get_cnf_bf_clauses<node>(c));
 		if (new_pos_bf) new_pos_bf = tau::build_wff_and(new_pos_bf,
-							tau::build_bf_eq(c));
-		else new_pos_bf = tau::build_bf_eq(c);
+							tau::build_bf_eq_0(c));
+		else new_pos_bf = tau::build_bf_eq_0(c);
 	}
 	// std::cout << "New_pos_bf: " << LOG_FM(new_pos_bf) << "\n";
 	clause = tau::build_wff_and(clause, new_pos_bf);
@@ -1711,8 +1739,8 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 		for (const auto& n : neq_clause) {
 			if (n.empty()) continue;
 			if (neqs) neqs = tau::build_wff_or(neqs,
-				tau::build_bf_neq(tau::build_bf_and(n)));
-			else neqs = tau::build_bf_neq(tau::build_bf_and(n));
+				tau::build_bf_neq_0(tau::build_bf_and(n)));
+			else neqs = tau::build_bf_neq_0(tau::build_bf_and(n));
 		}
 		if (neqs) {
 			if (neq_cnf) neq_cnf = tau::build_wff_and(neq_cnf, neqs);
@@ -1753,8 +1781,8 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 					clause, v, sorted_v);
 			}
 			// There is a new variable
-			DBG(assert(sorted_v != tau::build_bf_eq(tau::_T())
-				&& sorted_v != tau::build_bf_eq(tau::_F()));)
+			DBG(assert(sorted_v != tau::build_bf_eq_0(tau::_T())
+				&& sorted_v != tau::build_bf_eq_0(tau::_F()));)
 			vars.push_back(sorted_v);
 			var_to_idx.emplace(sorted_v, vars.size() - 1);
 		}
@@ -1806,7 +1834,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 			const auto& t = tau::get(vars[k]);
 			if (path[k] == -1 && t.child_is(tau::bf_eq))
 				clause = tau::build_wff_and(clause,
-					tau::build_bf_neq(t[0].first()));
+					tau::build_bf_neq_0(t[0].first()));
 		}
 		return clause;
 	};
@@ -1841,7 +1869,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 			auto f = [](tref n) {
 				if (tau::get(n).child_is(tau::bf_neq)) {
 					tref nn = reduce<node>(tau::trim2(n), tau::bf);
-					return tau::build_bf_neq(simp_general_excluded_middle<node>(nn));
+					return tau::build_bf_neq_0(simp_general_excluded_middle<node>(nn));
 				}
 				return n;
 			};
@@ -1876,7 +1904,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 										simp_neq = to_dnf<node, false>(simp_neq);
 										simp_neq = reduce<node>(simp_neq, tau::bf);
 										is_simp = true;
-										return tau::build_bf_neq(simp_neq);
+										return tau::build_bf_neq_0(simp_neq);
 									}
 								}
 								return n;
@@ -2170,9 +2198,9 @@ tref push_negation_one_in(tref fm) {
 				tau::build_wff_neg(ct[0].first()),
 				tau::build_wff_neg(ct[0].second()));
 		if (ct.child_is(tau::bf_eq))
-			return tau::build_bf_neq(ct[0].first());
+			return tau::build_bf_neq(ct[0].first(), ct[0].second());
 		if (ct.child_is(tau::bf_neq))
-			return tau::build_bf_eq(ct[0].first());
+			return tau::build_bf_eq(ct[0].first(), ct[0].second());
 		if (ct.child_is(tau::wff_ex))
 			return tau::build_wff_all(ct[0].first(),
 				tau::build_wff_neg(ct[0].second()));
@@ -2250,10 +2278,10 @@ tref to_dnf(tref fm) {
 	};
 	tref r;
 	if constexpr (is_wff) r = pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::to_dnf2_m>(
+		.template apply_unique<MemorySlotPre::to_dnf_m>(
 					pn, visit_wff<node>, layer_to_dnf);
 	else r = pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::to_dnf2_m>(
+		.template apply_unique<MemorySlotPre::to_dnf_m>(
 					pn, all, layer_to_dnf);
 	LOG_TRACE << "to_dnf result: " << LOG_FM(r);
 	return r;
@@ -2328,10 +2356,10 @@ tref to_cnf(tref fm) {
 		return push_negation_one_in<node, is_wff>(n);
 	};
 	if constexpr (is_wff) return pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::to_cnf2_m>(
+		.template apply_unique<MemorySlotPre::to_cnf_m>(
 					pn, visit_wff<node>, layer_to_cnf);
 	else return pre_order<node>(fm)
-		.template apply_unique<MemorySlotPre::to_cnf2_m>(
+		.template apply_unique<MemorySlotPre::to_cnf_m>(
 					pn, all, layer_to_cnf);
 }
 
@@ -3012,14 +3040,14 @@ tref wff_remove_existential(tref var, tref wff) {
 				// If f_0 is equal to f_1 we can use assumption f_0 = 0 and f_1 = 0
 				if (tau::get(f_0) == tau::get(f_1)) {
 					nneqs = tau::build_wff_and(nneqs,
-						tau::build_bf_neq(
+						tau::build_bf_neq_0(
 							tau::build_bf_or(g_0,
 									 g_1)));
 				} else if (tau::get(g_0) == tau::get(g_1)) {
 					nneqs = tau::build_wff_and(nneqs,
-						tau::build_bf_neq(g_0));
+						tau::build_bf_neq_0(g_0));
 				} else nneqs = tau::build_wff_and(nneqs,
-					tau::build_bf_neq(tau::build_bf_or(
+					tau::build_bf_neq_0(tau::build_bf_or(
 						tau::build_bf_and(
 							tau::build_bf_neg(f_1),
 							g_1),
@@ -3028,10 +3056,10 @@ tref wff_remove_existential(tref var, tref wff) {
 							g_0))));
 			}
 			nl = tau::build_wff_and(nl, tau::build_wff_and(
-				tau::build_bf_eq(tau::build_bf_and(f_0, f_1)),
+				tau::build_bf_eq_0(tau::build_bf_and(f_0, f_1)),
 				nneqs));
 		} else if (f) {
-			nl = tau::build_wff_and(nl, tau::build_bf_eq(
+			nl = tau::build_wff_and(nl, tau::build_bf_eq_0(
 				tau::build_bf_and(f_0, f_1)));
 		}
 		changes[l] = nl;
@@ -3098,7 +3126,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 			}
 			tref new_fm = nullptr;
 			for (tref func: new_funcs | std::views::values) {
-				auto reduced_eq = tau::build_bf_eq(bf_reduce_canonical<node>()(func));
+				auto reduced_eq = tau::build_bf_eq_0(bf_reduce_canonical<node>()(func));
 				if (new_fm) new_fm = tau::build_wff_and(new_fm, reduced_eq);
 				else new_fm = reduced_eq;
 			}
@@ -3194,7 +3222,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 			}
 			tref new_fm = nullptr;
 			for (tref func : new_funcs | std::views::values) {
-				tref reduced_eq = tau::build_bf_eq(bf_reduce_canonical<node>()(func));
+				tref reduced_eq = tau::build_bf_eq_0(bf_reduce_canonical<node>()(func));
 				if (new_fm) new_fm = tau::build_wff_or(new_fm, reduced_eq);
 				else new_fm = reduced_eq;
 			}
@@ -3602,11 +3630,11 @@ struct simplify_using_equality {
 	// Returns false, if a resulting equality set contains a contradiction
 	static bool add_equality (auto& uf, tref eq) {
 		// We both add a = b and a' = b' in order to detect syntactic contradictions
-		const auto& left_hand_side = tau::trim2(eq);
-		const auto& right_hand_side = tau::get(tau::trim(eq)).child(1);
-		const auto& left_hand_side_neg =
+		tref left_hand_side = tau::trim2(eq);
+		tref right_hand_side = tau::get(tau::trim(eq)).child(1);
+		tref left_hand_side_neg =
 			push_negation_in<node, false>(build_bf_neg<node>(left_hand_side));
-		const auto& right_hand_side_neg =
+		tref right_hand_side_neg =
 			push_negation_in<node, false>(build_bf_neg<node>(right_hand_side));
 
 		uf.merge(left_hand_side, right_hand_side);
@@ -3850,7 +3878,7 @@ tref to_snf_step<node>::squeeze_positives(const literals& positives,
 	auto term = std::accumulate(exp.begin(), exp.end(), cte,
 		[](tref l, tref r) { return tau::build_bf_and(l, r); });
 	// return the corresponding wff
-	return tau::build_bf_eq(term);
+	return tau::build_bf_eq_0(term);
 }
 
 template <NodeType node>
@@ -3951,7 +3979,7 @@ typename to_snf_step<node>::literal to_snf_step<node>::normalize(
 			? tau::build_bf_and(neg_positive_cte, tau::build_bf_ba_constant(n_cte.value(), find_ba_type<node>(negative)))
 			: neg_positive_cte;
 		auto nn = tau::build_bf_and(nn_cte, tau::build_bf_and(exp));
-		lits.insert(tau::build_bf_neq(nn));
+		lits.insert(tau::build_bf_neq_0(nn));
 	}
 	return tau::build_wff_and(lits);
 }

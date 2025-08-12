@@ -824,19 +824,43 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 		HOOK_LOGGING(applied("1 = 1 ::= T.");)
 		return _T(v, ch, len, r);
 	}
-	//RULE(BF_DEF_SIMPLIFY_N, "{c} = 0 ::= ...."): this should never happen
+	//RULE(BF_DEF_SIMPLIFY_N, "{c} = 0 ::= T or F"): this should never happen
 	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0
 		&& arg2(ch).is(tau::bf_f))
 	{
-		HOOK_LOGGING(applied("{c} = 0 ::= ....");)
+		HOOK_LOGGING(applied("{c} = 0 ::= T or F");)
 		return wff_eq_cte(v, ch, len, r);
 	}
-	//RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
-	if (!arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("$X = $Y ::= $X & $Y' | $X' & $Y = 0.");)
-		return tau::get(tau::build_bf_eq(tau::build_bf_xor(
-				arg1_fm(ch).get(), arg2_fm(ch).get())), r);
+
+	// Rule {c} = {d} ::= {c} + {d} = 0
+	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant())
+		if (size_t t = arg1(ch).get_ba_type();
+			t > 0 && t == arg2(ch).get_ba_type()) {
+			HOOK_LOGGING(applied("{c} = {d} ::= {c} + {d} = 0");)
+			return tau::build_bf_eq_0(
+				build_bf_xor<node>(
+					arg1_fm(ch).get(), arg2_fm(ch).get()));
+			}
+
+	// Rule X = X ::= T
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("X = X ::= T");)
+		return tau::get(tau::_T(), r);
 	}
+
+	//Rule X = X' ::= F
+	if (arg1(ch).is(tau::bf_neg)) {
+		if (arg1(ch)[0] == arg2_fm(ch)) {
+			HOOK_LOGGING(applied("X' = X ::= F");)
+			return tau::get(tau::_F(), r);
+		}
+	} else if (arg2(ch).is(tau::bf_neg)) {
+		if (arg2(ch)[0] == arg1_fm(ch)) {
+			HOOK_LOGGING(applied("X = X' ::= F");)
+			return tau::get(tau::_F(), r);
+		}
+	}
+
 	return tau::get_raw(v, ch, len, r);
 }
 
@@ -875,19 +899,43 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 		HOOK_LOGGING(applied("1 != 1 ::= F.");)
 		return _F(v, ch, len, r);
 	}
-	//RULE(BF_DEF_SIMPLIFY_N, "{c} = 0 ::= ....")
+	//RULE(BF_DEF_SIMPLIFY_N, "{c} != 0 ::= T or F")
 	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0
 		&& arg2(ch).is(tau::bf_f))
 	{
-		HOOK_LOGGING(applied("{c} = 0 ::= ....");)
+		HOOK_LOGGING(applied("{c} = 0 ::= T or F");)
 		return tau::get(wff_neq_cte(v, ch, len, r), r);
 	}
-	//RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
-	if (!arg2(ch).is(tau::bf_f)) {
-		HOOK_LOGGING(applied("$X != $Y ::= $X & $Y' | $X' & $Y != 0.");)
-		return tau::get(tau::build_bf_neq(tau::build_bf_xor(
-				arg1_fm(ch).get(), arg2_fm(ch).get())), r);
+
+	// Rule {c} != {d} ::= {c} + {d} != 0
+	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant())
+		if (size_t t = arg1(ch).get_ba_type();
+			t > 0 && t == arg2(ch).get_ba_type()) {
+			HOOK_LOGGING(applied("{c} != {d} ::= {c} + {d} != 0");)
+			return tau::build_bf_neq_0(
+				build_bf_xor<node>(
+					arg1_fm(ch).get(), arg2_fm(ch).get()));
+		}
+
+	//Rule X != X ::= F
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("X != X ::= F");)
+		return tau::get(tau::_F(), r);
 	}
+
+	//Rule X != X' ::= T
+	if (arg1(ch).is(tau::bf_neg)) {
+		if (arg1(ch)[0] == arg2_fm(ch)) {
+			HOOK_LOGGING(applied("X' != X ::= T");)
+			return tau::get(tau::_T(), r);
+		}
+	} else if (arg2(ch).is(tau::bf_neg)) {
+		if (arg2(ch)[0] == arg1_fm(ch)) {
+			HOOK_LOGGING(applied("X != X' ::= T");)
+			return tau::get(tau::_T(), r);
+		}
+	}
+
 	return tau::get_raw(v, ch, len, r);
 }
 
@@ -914,18 +962,6 @@ tref get_hook<node>::wff_sometimes(const node& v, const tref* ch, size_t len, tr
 		HOOK_LOGGING(applied("sometimes F ::= F.");)
 		return tau::get(tau::_F(), r);
 	}
-	//RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
-	if (auto double_quantifier = arg1_fm(ch)() | tau::wff_sometimes;
-		double_quantifier) {
-		HOOK_LOGGING(applied("sometimes sometimes $X ::= sometimes $X.");)
-		return tau::get(arg1_fm(ch).get(), r);
-	}
-	//RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
-	if (auto double_quantifier = arg1_fm(ch)() | tau::wff_always;
-		double_quantifier) {
-		HOOK_LOGGING(applied("sometimes always $X ::= always $X.");)
-		return tau::get(arg1_fm(ch).get(), r);
-	}
 	return tau::get_raw(v, ch, len, r);
 }
 
@@ -941,20 +977,6 @@ tref get_hook<node>::wff_always(const node& v, const tref* ch, size_t len, tref 
 	if (arg1(ch).is(tau::wff_f)) {
 		HOOK_LOGGING(applied("always F ::= F.");)
 		return tau::get(tau::_F(), r);
-	}
-	//RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
-	if (auto double_quantifier = arg1_fm(ch)() | tau::wff_always;
-		double_quantifier && quantifier(ch).is(tau::wff_always))
-	{
-		HOOK_LOGGING(applied("always always $X ::= always $X.");)
-		return tau::get(arg1_fm(ch).get(), r);
-	}
-	//RULE(WFF_SIMPLIFY_ALWAYS_2,     "always sometimes $X ::= sometimes $X.")
-	if (auto double_quantifier = arg1_fm(ch)() | tau::wff_sometimes;
-		double_quantifier && quantifier(ch).is(tau::wff_always))
-	{
-		HOOK_LOGGING(applied("always sometimes $X ::= sometimes $X.");)
-		return tau::get(arg1_fm(ch).get(), r);
 	}
 	return tau::get_raw(v, ch, len, r);
 }
@@ -1122,7 +1144,7 @@ tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 	//RULE(BF_DEF_SIMPLIFY_N, "$X < 1 ::= $X' != 0.")
 	if (arg2(ch).is(tau::bf_t)) {
 		HOOK_LOGGING(applied("$X < 1 ::= $X' != 0.");)
-		return tau::get(tau::build_bf_neq(
+		return tau::get(tau::build_bf_neq_0(
 			tau::build_bf_neg(arg1_fm(ch).get())), r);
 	}
 	return tau::get(tau::build_bf_lt(arg1_fm(ch).get(),
@@ -1163,7 +1185,7 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 	//RULE(BF_DEF_SIMPLIFY_N, "$X !< 1 ::= $X' = 0.")
 	if (arg2(ch).is(tau::bf_t)) {
 		HOOK_LOGGING(applied("$X !< 1 ::= $X' = 0.");)
-		return tau::get(tau::build_bf_eq(tau::build_bf_neg(arg1_fm(ch).get())), r);
+		return tau::get(tau::build_bf_eq_0(tau::build_bf_neg(arg1_fm(ch).get())), r);
 	}
 	return tau::get(tau::build_bf_nlt(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
 }

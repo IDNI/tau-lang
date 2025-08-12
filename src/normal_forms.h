@@ -17,8 +17,8 @@ namespace idni::tau_lang {
 enum MemorySlotPre {
 	normalize_ba_m,
 	push_negation_in_m,
-	to_dnf2_m,
-	to_cnf2_m,
+	to_dnf_m,
+	to_cnf_m,
 	eliminate_quantifiers_m,
 	anti_prenex_step_m
 };
@@ -156,6 +156,12 @@ tref push_negation_in(tref);
 template <NodeType node>
 tref to_nnf(tref fm);
 
+template <NodeType node>
+tref norm_equation(tref eq);
+
+template <NodeType node>
+tref norm_all_equations(tref fm);
+
 // // -----------------------------------------------------------------------------
 // // General operator for tref function application by pipe
 // template <NodeType node>
@@ -237,7 +243,7 @@ std::pair<typename tree<node>::traverser, tref> get_inner_quantified_wff(tref n)
 
 template <NodeType node>
 struct onf_wff {
-	onf_wff(tref _var);
+	explicit onf_wff(tref _var);
 	tref operator()(tref n) const;
 private:
 	tref onf_subformula(tref n) const;
@@ -250,19 +256,6 @@ using onf_wff_t = onf_wff<node>;
 template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& t, const onf_wff_t<node>& r);
-
-template <NodeType node>
-static const auto is_not_eq_or_neq_to_zero_predicate = [](tref n) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	const auto& t = tau::get(n);
-	if (!(t.child_is(tau::bf_eq) || t.child_is(tau::bf_neq))) return true;
-	auto check = (tt(t.only_child()) || tau::bf)[1] || tau::bf_f;
-	return check.empty();
-};
-
-template <NodeType node>
-using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<node>);
 
 template <NodeType node>
 tref onf(tref n, tref var);
