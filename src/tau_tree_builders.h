@@ -172,9 +172,6 @@ template <NodeType node>
 tref build_bf_or(const auto& bfs);
 
 template <NodeType node>
-tref build_bf_xor_from_def(tref l, tref r);
-
-template <NodeType node>
 tref build_bf_xor(tref l, tref r);
 
 template <NodeType node>
@@ -184,7 +181,7 @@ template <NodeType node>
 tref build_bf_and(const auto& bfs);
 
 template <NodeType node>
-tref build_bf_neg(tref n);
+tref build_bf_neg(tref l);
 
 // -----------------------------------------------------------------------------
 // terminals, variables and constants
