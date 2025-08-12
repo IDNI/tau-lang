@@ -77,6 +77,8 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     bf_constant
                         |                                     variable
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
+                        | ("fall"     __ q_vars  __ bf)      :bf_fall
+                        | ("fex"      __ q_vars  __ bf)      :bf_fex
                         | ref                                :bf_ref
                         | (bf  _ '|' _       bf)             :bf_or
                         | (bf  _ '+' _       bf)             :bf_xor

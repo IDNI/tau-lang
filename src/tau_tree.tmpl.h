@@ -551,6 +551,8 @@ bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 		case bf:
 		case bf_constant:
 		case bf_splitter:
+		case bf_fall:
+		case bf_fex:
 		case bf_ref:
 		case bf_or:
 		case bf_xor:

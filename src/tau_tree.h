@@ -519,6 +519,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_nlt(tref l, tref r);
 
 	// term builders
+	static tref build_bf_fall(tref l, tref r);
+	static tref build_bf_fex(tref l, tref r);
 	static tref build_bf_or(tref l, tref r);
 	static tref build_bf_or(const auto& bfs);
 	static tref build_bf_xor_from_def(tref l, tref r);
