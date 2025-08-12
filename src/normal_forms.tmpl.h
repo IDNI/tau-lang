@@ -1196,6 +1196,7 @@ tref sort_var(tref var) {
 	return var;
 }
 
+//TODO: decide if to treat xor in bf case
 template <NodeType node>
 std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	tref fm, size_t type, bool is_cnf, bool all_reductions,bool enable_sort)
@@ -2245,6 +2246,10 @@ tref push_negation_one_in(tref fm) {
 			return tau::build_bf_and(
 				tau::build_bf_neg(ct[0].first()),
 				tau::build_bf_neg(ct[0].second()));
+		}
+		if (ct.child_is(tau::bf_xor)) {
+			// TODO: strategy for negating first or second argument
+			return tau::build_bf_xor(tau::build_bf_neg(ct[0].first()), ct[0].second());
 		}
 	}
 	return fm;
