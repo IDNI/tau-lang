@@ -275,7 +275,9 @@ tref ba_types_inference<node>::add_scope_ids(
 			return tau::get(nt, x);
 		}
 		case tau::wff_ex:
-		case tau::wff_all: {
+		case tau::wff_all:
+		case tau::bf_fall:
+		case tau::bf_fex: {
 			inc_vsid(t.first());
 			tref v = transform_element(t.first(), tau::variable);
 			if (v == nullptr) return nullptr;

@@ -14,8 +14,14 @@
 // Check if still hapopens after the latest changes to the grammar.
 
 tt get_main(const char* sample) {
-	return tt(tau::get(sample, tau::get_options{
-			.reget_with_hooks = false })) | tau::spec | tau::main;
+	return tt(tau::get(sample, { .reget_with_hooks = false })) | tau::spec | tau::main;
+}
+
+tt get_bf(const char* sample) {
+	return tt(tau::get(sample, {
+		.parse = { .start = tau::bf },
+		.reget_with_hooks = false }));
+
 }
 
 tt get_rec_relation(const char* sample) {
@@ -679,6 +685,20 @@ TEST_SUITE("parsing wwf formulas ") {
 }
 
 TEST_SUITE("parsing bf formulas ") {
+
+	TEST_CASE("fall") {
+		const char* sample =
+			"fall x, y x & y";
+		auto fall_formula = get_bf(sample) | tau::bf_fall;
+		CHECK( fall_formula.has_value() );
+	}
+
+	TEST_CASE("fex") {
+		const char* sample =
+			"fex x, y x | y";
+		auto fex_formula = get_bf(sample) | tau::bf_fex;
+		CHECK( fex_formula.has_value() );
+	}
 
 	TEST_CASE("'") {
 		const char* sample = "Z' := Z.";
