@@ -5,7 +5,7 @@
 
 tref create_spec(const char* spec) {
 	auto nso_rr = get_nso_rr<node_t>(tau::get(spec));
-	return nso_rr.value().main->get();
+	return norm_all_equations<node_t>(nso_rr.value().main->get());
 }
 
 TEST_SUITE("configuration") {
@@ -29,7 +29,7 @@ TEST_SUITE("Alignments") {
 	}
 	TEST_CASE("equal_lookback_two_st") {
 		tref spec = create_spec("(always o1[t] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
-		CHECK(transform_to_execution<node_t>(spec) == tau::_F());
+		CHECK((transform_to_execution<node_t>(spec) == tau::_F()));
 	}
 	TEST_CASE("greater_lookback_two_st_1") {
 		tref spec = create_spec("(always o1[t] = 1 && o2[t] = 1) && (sometimes o1[t-1] = 1) && (sometimes o2[t-2] = 0).");

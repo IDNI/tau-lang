@@ -14,10 +14,10 @@ struct nodes_fixture {
 	std::pair<tref, tref> a_pair, b_pair, c_pair, d_pair;
 	std::tuple<tref, bool, bool> a_tuple, b_tuple, c_tuple, d_tuple;
 	nodes_fixture() {
-		a = tau::build_bf_eq(tau::build_variable("a", 0));
-		b = tau::build_bf_eq(tau::build_variable("b", 0));
-		c = tau::build_bf_eq(tau::build_variable("c", 0));
-		d = tau::build_bf_eq(tau::build_variable("d", 0));
+		a = tau::build_bf_eq_0(tau::build_variable("a", 0));
+		b = tau::build_bf_eq_0(tau::build_variable("b", 0));
+		c = tau::build_bf_eq_0(tau::build_variable("c", 0));
+		d = tau::build_bf_eq_0(tau::build_variable("d", 0));
 		a_pair = std::make_pair(a, tau::_T());
 		b_pair = std::make_pair(b, tau::_F());
 		c_pair = std::make_pair(c, tau::_T());

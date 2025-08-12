@@ -91,13 +91,13 @@ tref calculate_fixed_point(const rr<node>& nso_rr, tref form, typename node::typ
 	size_t offset_arity, tref fallback);
 
 template <NodeType node>
-tref calculate_all_fixed_points(const rr<node>& recrel);
+tref calculate_all_fixed_points(const rr<node>& nso_rr);
 
 template <NodeType node>
 tref apply_rr_to_formula(const rr<node>& nso_rr);
 
 template <NodeType node>
-tref normalizer(const rr<node>& fm);
+tref normalizer(const rr<node>& nso_rr);
 
 template <NodeType node>
 tref normalizer(tref fm);

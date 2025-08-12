@@ -90,7 +90,7 @@ std::optional<solution<node>> find_solution(equality eq,
 				return substitution;
 			}
 		}
-		if (auto restricted = find_solution<node>(build_bf_eq<node>(gh),
+		if (auto restricted = find_solution<node>(build_bf_eq_0<node>(gh),
 						substitution, mode); restricted)
 		{
 			//solution.insert(restricted.value().begin(), restricted.value().end());
@@ -470,7 +470,7 @@ private:
 	minterm_system<node> make_current_minterm_system() {
 		minterm_system<node> minterms;
 		for (auto& it : minterm_iterators)
-			minterms.insert(build_bf_neq<node>(*it));
+			minterms.insert(build_bf_neq_0<node>(*it));
 
 #ifdef DEBUG
 		LOG_TRACE << " make_current_minterm_system/minterms: ";
@@ -723,7 +723,7 @@ std::optional<solution<node>> solve_minterm_system(
 
 	DBG(LOG_TRACE << "solve_minterm_system/eq[final]: " << LOG_FM(eq);)
 
-	eq = build_bf_eq<node>(eq);
+	eq = build_bf_eq_0<node>(eq);
 	return find_solution<node>(eq);
 }
 
@@ -962,7 +962,7 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 					| tau::bf_eq | tau::bf | tt::ref;
 				tref r = tt(eq)
 					| tau::bf_eq | tau::bf | tt::ref;
-				system.first = build_bf_eq<node>(
+				system.first = build_bf_eq_0<node>(
 					(tau::get(l) | tau::get(r)).get());
 			}
 		}

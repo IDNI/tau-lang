@@ -196,7 +196,6 @@ TEST_SUITE("wff comparator hooks") {
 		CHECK( check_hook("{F}:tau=0", "T") );
 		CHECK( check_hook("{1}:sbf=0", "F") );
 		CHECK( check_hook("{0}:sbf=0", "T") );
-		CHECK( check_hook("x = y", "x + y = 0") );
 	}
 
 	TEST_CASE("!=") {
@@ -251,7 +250,6 @@ TEST_SUITE("wff comparator hooks") {
 		CHECK( check_hook("{F}:tau!=0", "F") );
 		CHECK( check_hook("{1}:sbf!=0", "T") );
 		CHECK( check_hook("{0}:sbf!=0", "F") );
-		CHECK( check_hook("x != y", "x + y != 0") );
 	}
 
 	TEST_CASE("<") {
