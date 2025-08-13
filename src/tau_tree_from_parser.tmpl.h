@@ -252,6 +252,11 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 				// DBG(for (auto c : ch) LOG_TRACE << "child: " << LOG_FM_DUMP(c);)
 				x = getx(ch);
 
+#ifdef TAU_CACHE
+				if (nt == bf || nt == wff)
+					tau_lang::get_free_vars<node>(x);
+#endif
+
 				// process constant from a transformed node
 				if (nt == bf_constant && src)
 					if (x = process_bf_constant(x);

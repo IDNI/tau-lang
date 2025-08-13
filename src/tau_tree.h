@@ -337,6 +337,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	constant get_ba_constant() const;
 	size_t get_ba_type() const;
 	const std::string& get_ba_type_name() const;
+	const trefs& get_free_vars() const;
 
 	// ---------------------------------------------------------------------
 	// from parser (tau_tree_from_parser.tmpl.h)

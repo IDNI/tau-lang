@@ -234,8 +234,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		for (tref eq : eqs) {
 			DBG(assert(tau::get(eq)[1][0].is(tau::bf_f));)
 			size_t type_f = find_ba_type<node>(eq);
-			subtree_set<node> free_vars
-					= get_free_vars_from_nso<node>(fm);
+			const trefs& free_vars = get_free_vars<node>(fm);
 			// Check that term is typed
 			if (type_f > 0) {
 				for (tref c : constants) {
@@ -247,7 +246,10 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 					trefs vars_f = rewriter::select_top<node>(eq,
 						is_child<node, tau::variable>);
 					for (tref v : vars_f) {
-						if (!free_vars.contains(tau::trim(v))) continue;
+						if (!tau::contains_subtree(
+							free_vars,
+							tau::trim(v)))
+								continue;
 						tref new_fm = rewriter::replace<node>(
 							fm, clause, tau::build_wff_and(clause,
 								tau::build_bf_lteq(v, c)));

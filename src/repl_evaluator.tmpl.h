@@ -341,8 +341,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	}
 	subtree_map<node, tref> changes = { { thiz, with } };
 
-	auto free_vars_thiz = get_free_vars_from_nso<node>(thiz);
-	auto free_vars_with = get_free_vars_from_nso<node>(with);
+	const trefs& free_vars_thiz = get_free_vars<node>(thiz);
+	const trefs& free_vars_with = get_free_vars<node>(with);
 	trefs var_stack = {};
 	auto var_id = get_new_var_id<node>(in);
 	subtree_set<node> marked_quants;
@@ -350,8 +350,9 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	// A variable should only be replaced if it is not quantified
 	auto quantified_vars_skipper = [&](tref x) {
 		if (is_quantifier<node>(x)) {
-			tref var = tau::get(x).find_top(is_var_or_capture<node>());
-			if (var && free_vars_thiz.contains(var))
+			tref var = tau::get(x)
+					.find_top(is_var_or_capture<node>());
+			if (var && tau::contains_subtree(free_vars_thiz, var))
 				return false;
 		}
 		return true;
@@ -362,8 +363,9 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		if (!quantified_vars_skipper(x))
 			return false;
 		if (is_quantifier<node>(x)) {
-			tref var = tau::get(x).find_top(is_var_or_capture<node>());
-			if (var && free_vars_with.contains(var)) {
+			tref var = tau::get(x)
+					.find_top(is_var_or_capture<node>());
+			if (var && tau::contains_subtree(free_vars_with, var)) {
 				DBG(assert(!(tau::get(var).is(tau::capture)));)
 				marked_quants.insert(x);
 				// bool var_t = tau::get(var).is(tau::variable);

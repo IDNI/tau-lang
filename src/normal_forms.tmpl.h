@@ -3526,7 +3526,7 @@ template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val) {
 	DBG(using tau = tree<node>;)
 	DBG(assert(!is<node>(val, tau::bf));)
-	auto free_vars = get_free_vars_from_nso<node>(fm);
+	const trefs& free_vars = get_free_vars<node>(fm);
 	if (free_vars.size()) {
 		subtree_map<node, tref> free_var_assgm;
 		for (tref free_var : free_vars)
