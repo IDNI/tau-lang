@@ -63,6 +63,11 @@ set_property(CACHE TAU_WINDOWS_ZIP_PACKAGE     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
 
+# Load local cmake settings
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
+	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
+endif()
+
 if(TAU_BUILD_TESTS)
 	set(TAU_BUILD_UNIT_TESTS ON)
 	set(TAU_BUILD_REPL_TESTS ON)
