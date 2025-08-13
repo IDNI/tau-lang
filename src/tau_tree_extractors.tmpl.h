@@ -429,7 +429,9 @@ const trefs& get_free_vars(tref n) {
 		}
 	};
 	post_order<node>(n).search(collector);
-	trefs fv(free_vars.begin(), free_vars.end());
+	trefs fv(free_vars.size());
+	size_t i = 0;
+	for (tref v : free_vars) fv[i++] = tau::trim_right_sibling(v);
 	std::sort(fv.begin(), fv.end(), tau::subtree_less);
 #ifdef DEBUG
 	LOG_TRACE << "End get_free_vars " << LOG_FM(n);
@@ -440,8 +442,15 @@ const trefs& get_free_vars(tref n) {
 		it != free_vars_pool_index.end()) id = it->second;
 	else free_vars_pool_index.emplace(fv, id),
 		free_vars_pool.push_back(fv);
-	free_vars_map[n] = id;
-	return free_vars_pool[id];
+	free_vars_map.emplace(n, id);
+#ifdef DEBUG
+	LOG_TRACE << "free_vars_map[" << LOG_FM(n) << "] = " << id;
+	std::stringstream ss;
+	ss << "free_vars_pool[" << id << "] = ";
+	for (tref v : free_vars_pool[id]) ss << LOG_FM(v) << " ";
+	LOG_TRACE << ss.str();
+#endif
+	return free_vars_pool.at(id);
 }
 
 // A formula has a temporal variable if either it contains an io_var with a variable or capture
