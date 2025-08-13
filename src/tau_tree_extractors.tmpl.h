@@ -372,12 +372,10 @@ const trefs& get_free_vars(tref n) {
 	if (typename node::type nt = tau::get(n).get_type();
 		nt != tau::bf && nt != tau::wff) return no_free_vars;
 
-#ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, size_t>;
 	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
 	if (auto it = free_vars_map.find(n); it != free_vars_map.end())
 		return free_vars_pool[it->second];
-#endif
 
 	DBG(LOG_TRACE << "Begin get_free_vars of " << LOG_FM(n);)
 	subtree_set<node> free_vars;
@@ -442,9 +440,7 @@ const trefs& get_free_vars(tref n) {
 		it != free_vars_pool_index.end()) id = it->second;
 	else free_vars_pool_index.emplace(fv, id),
 		free_vars_pool.push_back(fv);
-#ifdef TAU_CACHE
 	free_vars_map[n] = id;
-#endif
 	return free_vars_pool[id];
 }
 
