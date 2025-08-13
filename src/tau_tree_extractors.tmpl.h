@@ -450,7 +450,7 @@ const trefs& get_free_vars(tref n) {
 	for (tref v : free_vars_pool[id]) ss << LOG_FM(v) << " ";
 	LOG_TRACE << ss.str();
 #endif
-	return free_vars_pool.at(id);
+	return free_vars_pool[id];
 }
 
 // A formula has a temporal variable if either it contains an io_var with a variable or capture
