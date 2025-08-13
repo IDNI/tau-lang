@@ -13,19 +13,31 @@ struct nodes_fixture {
 	tref a, b, c, d;
 	std::pair<tref, tref> a_pair, b_pair, c_pair, d_pair;
 	std::tuple<tref, bool, bool> a_tuple, b_tuple, c_tuple, d_tuple;
+	tref get_a() { return tau::build_bf_eq(tau::build_variable("a", 0)); }
+	tref get_b() { return tau::build_bf_eq(tau::build_variable("b", 0)); }
+	tref get_c() { return tau::build_bf_eq(tau::build_variable("c", 0)); }
+	tref get_d() { return tau::build_bf_eq(tau::build_variable("d", 0)); }
+	std::pair<tref, tref> get_a_pair() { return std::make_pair(get_a(), tau::_T()); }
+	std::pair<tref, tref> get_b_pair() { return std::make_pair(get_b(), tau::_F()); }
+	std::pair<tref, tref> get_c_pair() { return std::make_pair(get_c(), tau::_T()); }
+	std::pair<tref, tref> get_d_pair() { return std::make_pair(get_d(), tau::_F()); }
+	std::tuple<tref, bool, bool> get_a_tuple() { return std::make_tuple(get_a(), false, true); }
+	std::tuple<tref, bool, bool> get_b_tuple() { return std::make_tuple(get_b(), true, false); }
+	std::tuple<tref, bool, bool> get_c_tuple() { return std::make_tuple(get_c(), false, true); }
+	std::tuple<tref, bool, bool> get_d_tuple() { return std::make_tuple(get_d(), true, false); }
 	nodes_fixture() {
-		a = tau::build_bf_eq(tau::build_variable("a", 0));
-		b = tau::build_bf_eq(tau::build_variable("b", 0));
-		c = tau::build_bf_eq(tau::build_variable("c", 0));
-		d = tau::build_bf_eq(tau::build_variable("d", 0));
-		a_pair = std::make_pair(a, tau::_T());
-		b_pair = std::make_pair(b, tau::_F());
-		c_pair = std::make_pair(c, tau::_T());
-		d_pair = std::make_pair(d, tau::_F());
-		a_tuple = std::make_tuple(a, false, true);
-		b_tuple = std::make_tuple(b, true, false);
-		c_tuple = std::make_tuple(c, false, true);
-		d_tuple = std::make_tuple(d, true, false);
+		a = get_a();
+		b = get_b();
+		c = get_c();
+		d = get_d();
+		a_pair = get_a_pair();
+		b_pair = get_b_pair();
+		c_pair = get_c_pair();
+		d_pair = get_d_pair();
+		a_tuple = get_a_tuple();
+		b_tuple = get_b_tuple();
+		c_tuple = get_c_tuple();
+		d_tuple = get_d_tuple();
 	}
 	void emplace_fixtures(cache_t& cache) {
 		cache.emplace(a_pair, true);
@@ -63,19 +75,19 @@ TEST_SUITE("gc") {
 		emplace_fixtures(cache);
 		print(cache);
 		CHECK((cache.size() == 4));
-		CHECK(cache.contains(a_pair));
-		CHECK(cache.contains(b_pair));
-		CHECK(cache.contains(c_pair));
-		CHECK(cache.contains(d_pair));
+		CHECK(cache.contains(get_a_pair()));
+		CHECK(cache.contains(get_b_pair()));
+		CHECK(cache.contains(get_c_pair()));
+		CHECK(cache.contains(get_d_pair()));
 
 		static tuple_cache_t tuple_cache;
 		emplace_fixtures(tuple_cache);
 		print(tuple_cache);
 		CHECK((tuple_cache.size() == 4));
-		CHECK(tuple_cache.contains(a_tuple));
-		CHECK(tuple_cache.contains(b_tuple));
-		CHECK(tuple_cache.contains(c_tuple));
-		CHECK(tuple_cache.contains(d_tuple));
+		CHECK(tuple_cache.contains(get_a_tuple()));
+		CHECK(tuple_cache.contains(get_b_tuple()));
+		CHECK(tuple_cache.contains(get_c_tuple()));
+		CHECK(tuple_cache.contains(get_d_tuple()));
 	}
 
 	TEST_CASE_FIXTURE(nodes_fixture, "cache rebuild - proof of concept") {
@@ -108,10 +120,10 @@ TEST_SUITE("gc") {
 		print(cache);
 
 		CHECK((cache.size() == 2));
-		CHECK(cache.contains(a_pair));
-		CHECK(cache.contains(b_pair));
-		CHECK(!cache.contains(c_pair));
-		CHECK(!cache.contains(d_pair));
+		CHECK(cache.contains(get_a_pair()));
+		CHECK(cache.contains(get_b_pair()));
+		CHECK(!cache.contains(get_c_pair()));
+		CHECK(!cache.contains(get_d_pair()));
 	}
 
 	TEST_CASE_FIXTURE(nodes_fixture, "cache rebuild - callbacks") {
@@ -145,10 +157,10 @@ TEST_SUITE("gc") {
 		print(cache);
 
 		CHECK((cache.size() == 2));
-		CHECK(cache.contains(a_pair));
-		CHECK(cache.contains(b_pair));
-		CHECK(!cache.contains(c_pair));
-		CHECK(!cache.contains(d_pair));
+		CHECK(cache.contains(get_a_pair()));
+		CHECK(cache.contains(get_b_pair()));
+		CHECK(!cache.contains(get_c_pair()));
+		CHECK(!cache.contains(get_d_pair()));
 	}
 
 	cache_t& get_cache() {
@@ -190,10 +202,10 @@ TEST_SUITE("gc") {
 		print(cache);
 
 		CHECK((cache.size() == 2));
-		CHECK(cache.contains(a_pair));
-		CHECK(cache.contains(b_pair));
-		CHECK(!cache.contains(c_pair));
-		CHECK(!cache.contains(d_pair));
+		CHECK(cache.contains(get_a_pair()));
+		CHECK(cache.contains(get_b_pair()));
+		CHECK(!cache.contains(get_c_pair()));
+		CHECK(!cache.contains(get_d_pair()));
 	}
 
 	TEST_CASE_FIXTURE(nodes_fixture, "cache rebuild - tau::create_cache<cache_t>()") {
@@ -212,10 +224,10 @@ TEST_SUITE("gc") {
 		print(cache);
 
 		CHECK((cache.size() == 2));
-		CHECK(cache.contains(a_pair));
-		CHECK(cache.contains(b_pair));
-		CHECK(!cache.contains(c_pair));
-		CHECK(!cache.contains(d_pair));
+		CHECK(cache.contains(get_a_pair()));
+		CHECK(cache.contains(get_b_pair()));
+		CHECK(!cache.contains(get_c_pair()));
+		CHECK(!cache.contains(get_d_pair()));
 	}
 
 	TEST_CASE_FIXTURE(nodes_fixture, "cache rebuild - tau::create_cache<tuple_cache_t>()") {
@@ -234,10 +246,10 @@ TEST_SUITE("gc") {
 		print(cache);
 
 		CHECK((cache.size() == 2));
-		CHECK( cache.contains(a_tuple));
-		CHECK( cache.contains(b_tuple));
-		CHECK(!cache.contains(c_tuple));
-		CHECK(!cache.contains(d_tuple));
+		CHECK( cache.contains(get_a_tuple()));
+		CHECK( cache.contains(get_b_tuple()));
+		CHECK(!cache.contains(get_c_tuple()));
+		CHECK(!cache.contains(get_d_tuple()));
 	}
 
 	TEST_CASE_FIXTURE(nodes_fixture, "cache rebuild - multiple caches of same type") {
@@ -262,20 +274,20 @@ TEST_SUITE("gc") {
 		print(cache3);
 
 		CHECK( (cache.size() == 2));
-		CHECK( cache.contains(a_pair));
-		CHECK( cache.contains(b_pair));
-		CHECK(!cache.contains(c_pair));
-		CHECK(!cache.contains(d_pair));
+		CHECK( cache.contains(get_a_pair()));
+		CHECK( cache.contains(get_b_pair()));
+		CHECK(!cache.contains(get_c_pair()));
+		CHECK(!cache.contains(get_d_pair()));
 		CHECK( (cache2.size() == 2));
-		CHECK( cache2.contains(a_pair));
-		CHECK( cache2.contains(b_pair));
-		CHECK(!cache2.contains(c_pair));
-		CHECK(!cache2.contains(d_pair));
+		CHECK( cache2.contains(get_a_pair()));
+		CHECK( cache2.contains(get_b_pair()));
+		CHECK(!cache2.contains(get_c_pair()));
+		CHECK(!cache2.contains(get_d_pair()));
 		CHECK( (cache3.size() == 2));
-		CHECK( cache3.contains(a_pair));
-		CHECK( cache3.contains(b_pair));
-		CHECK(!cache3.contains(c_pair));
-		CHECK(!cache3.contains(d_pair));
+		CHECK( cache3.contains(get_a_pair()));
+		CHECK( cache3.contains(get_b_pair()));
+		CHECK(!cache3.contains(get_c_pair()));
+		CHECK(!cache3.contains(get_d_pair()));
 	}
 
 }
