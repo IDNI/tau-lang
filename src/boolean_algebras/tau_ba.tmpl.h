@@ -189,7 +189,7 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 	if (!simp_fm) return false;
 	if (tau::get(simp_fm).find_top(is<node, tau::ref>))
 		return false;
-	auto vars = get_free_vars_from_nso<node>(simp_fm);
+	const trefs& vars = get_free_vars<node>(simp_fm);
 	for (const auto& v : vars) {
 		const auto& t = tau::get(v);
 		if (!(t.only_child_tree().is(tau::io_var)

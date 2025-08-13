@@ -84,8 +84,11 @@ int_t get_max_shift(const trefs& io_vars, bool ignore_temps = false);
 template <NodeType node>
 int_t get_max_initial(const trefs& io_vars);
 
+inline static std::vector<trefs> free_vars_pool{ {} };
+inline static std::map<trefs, size_t> free_vars_pool_index{ { {}, 0 } };
+
 template <NodeType node>
-subtree_set<node> get_free_vars_from_nso(tref n);
+const trefs& get_free_vars(tref n);
 
 template <NodeType node>
 bool has_temp_var(tref n);
@@ -689,6 +692,13 @@ size_t tree<node>::get_ba_type() const {
 template <NodeType node>
 const std::string& tree<node>::get_ba_type_name() const {
 	return ba_types<node>::name(this->get_ba_type());
+}
+
+template <NodeType node>
+const trefs& tree<node>::get_free_vars() const {
+	static const trefs no_free_vars{};
+	return is(bf) || is(wff) ? tau_lang::get_free_vars<node>(get())
+				 : no_free_vars;
 }
 
 } // namespace idni::tau_lang
