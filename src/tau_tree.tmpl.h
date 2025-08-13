@@ -84,7 +84,7 @@ int_t get_max_shift(const trefs& io_vars, bool ignore_temps = false);
 template <NodeType node>
 int_t get_max_initial(const trefs& io_vars);
 
-inline static std::vector<trefs> free_vars_pool{ {} };
+inline static std::deque<trefs> free_vars_pool{ {} };
 inline static std::map<trefs, size_t> free_vars_pool_index{ { {}, 0 } };
 
 template <NodeType node>
