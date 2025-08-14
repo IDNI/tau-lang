@@ -83,7 +83,7 @@ std::optional<assignment<node>> finputs<node>::read() {
 			// TODo (MEDIUM) add echo for input from a file instead of console
 		}
 		if (line.empty()) return {}; // no more inputs
-		auto cnst = node::nso_factory::instance().parse(line,
+		auto cnst = node::nso_factory::parse(line,
 			get_ba_type_name<node>(types[var]));
 		if (!cnst) {
 			LOG_ERROR << "Failed to parse input value '"
@@ -135,7 +135,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 				<< get_var_name<node>(vn);
 			return {};
 		}
-		auto cnst = node::nso_factory::instance().parse(line,
+		auto cnst = node::nso_factory::parse(line,
 				get_ba_type_name<node>(it->second));
 		if (!cnst) {
 			LOG_ERROR << "Failed to parse input value '" << line
@@ -244,14 +244,12 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 			if (auto check = tt(outputs.find(io_var)->second)
 					| tau::bf_t; check) {
 				size_t type = types.find(var_name)->second;
-				ss << node::nso_factory::instance()
-					.one(get_ba_type_name<node>(type));
+				ss << node::nso_factory::one(get_ba_type_name<node>(type));
 			// is bf_f
 			} else if (auto check = tt(outputs.find(io_var)->second)
 					| tau::bf_f; check) {
 				size_t type = types.find(var_name)->second;
-				ss << node::nso_factory::instance()
-					.zero(get_ba_type_name<node>(type));
+				ss << node::nso_factory::zero(get_ba_type_name<node>(type));
 			// is something else but not a BA element
 			} else {
 				LOG_ERROR << "No Boolean algebra element "
@@ -369,7 +367,7 @@ std::pair<std::optional<assignment<node>>, bool>
 		tref current_this_stream = build_in_var_at_n<node>(
 			"this", time_point, get_ba_type_id<node>("tau"));
 		tref wrapped_spec = build_bf_ba_constant<node>(
-			node::nso_factory::instance().pack_tau_ba(
+			node::nso_factory::pack_tau_ba(
 				original_spec), get_ba_type_id<node>("tau"));
 		memory[current_this_stream] = wrapped_spec;
 	}
@@ -685,8 +683,7 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 		if (!tau::get(constraints).equals_T()) {
 			// setting proper options for the solver
 			solver_options options = {
-				.splitter_one = node::nso_factory::instance()
-							.splitter_one(""),
+				.splitter_one = node::nso_factory::splitter_one(""),
 				.mode = solver_mode::general
 			};
 
@@ -838,7 +835,7 @@ solution_with_max_update(tref spec) {
 	auto get_solution = [](const auto& fm) {
 		// setting proper options for the solver
 		solver_options options = {
-			.splitter_one = node::nso_factory::instance().splitter_one(""),
+			.splitter_one = node::nso_factory::splitter_one(""),
 			.mode = solver_mode::general
 		};
 		// solve the given system of equations
@@ -928,8 +925,7 @@ tref unpack_tau_constant(tref constant) {
 	using tau = tree<node>;
 	const auto& c = tree<node>::get(tau::trim(constant));
 	if (!c.is_ba_constant()) return {};
-	tref main = node::nso_factory::instance()
-				.unpack_tau_ba(c.get_ba_constant());
+	tref main = node::nso_factory::unpack_tau_ba(c.get_ba_constant());
 	return main;
 }
 

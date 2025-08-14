@@ -52,7 +52,7 @@ bool get_io_def(tref n, io_defs<node>& defs) {
 		return true;
 	}
 	std::string ba_type_name = get_ba_type_name<node>(ba_type);
-	for (const auto& fct_type : node::nso_factory::instance().types()) {
+	for (const auto& fct_type : node::nso_factory::types()) {
 		if (ba_type_name == fct_type) {
 			defs[var_sid] = { ba_type, stream_sid };
 			return true;

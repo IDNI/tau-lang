@@ -518,7 +518,7 @@ size_t get_solver_cmd_type(tref n) {
 	size_t type = get_ba_type<node>(n);
 	return type > 0 ? type
 		: get_ba_type_id<node>(
-			node::nso_factory::instance().default_type());
+			node::nso_factory::default_type());
 }
 
 template <NodeType node>
@@ -529,13 +529,13 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	using tt = tau::traverser;
 	auto print_zero_case = [&options](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory::instance().zero(options.type)
+			<< node::nso_factory::zero(options.type)
 			<< "}:" << options.type << "\n";
 	};
 
 	auto print_one_case = [&options](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory::instance().one(options.type)
+			<< node::nso_factory::one(options.type)
 			<< "}:" << options.type << "\n";
 	};
 
@@ -572,8 +572,8 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 
 	// setting solver options
 	solver_options options = {
-		.splitter_one = node::nso_factory::instance()
-				.splitter_one(get_ba_type_name<node>(type)),
+		.splitter_one = node::nso_factory::
+			splitter_one(get_ba_type_name<node>(type)),
 		.mode = get_solver_cmd_mode<node>(n.value()),
 		.type = get_ba_type_name<node>(type)
 	};
