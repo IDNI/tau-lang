@@ -15,4 +15,4 @@ add_repl_test(normalize_cmd_nso "n X & X' = 0" ": T")
 #
 
 add_repl_test(normalize_cmd_wff "n X & X' = 0" ": T")
-add_repl_test(normalize_cmd_memory "n X & X' = 0" ": T")
+add_repl_test(normalize_cmd_memory "X & X' = 0. n %" ": T")

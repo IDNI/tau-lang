@@ -171,7 +171,7 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
-	auto vars = get_free_vars_from_nso<node>(fm.get());
+	const trefs& vars = fm.get_free_vars();
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
@@ -188,7 +188,7 @@ bool is_non_temp_nso_unsat(tref n) {
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
-	auto vars = get_free_vars_from_nso<node>(nn);
+	const trefs& vars = get_free_vars<node>(nn);
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	const auto& t = tau::get(normalize_non_temp<node>(nn));
 	assert((t.equals_T() || t.equals_F()
@@ -231,11 +231,11 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 
-	auto vars = get_free_vars_from_nso<node>(n1);
+	trefs vars(get_free_vars<node>(n1));
 	for (tref v : vars) LOG_DEBUG << "var1: " << LOG_FM(v);
-	auto vars2 = get_free_vars_from_nso<node>(n2);
+	const trefs& vars2 = get_free_vars<node>(n2);
 	for (tref v : vars2) LOG_DEBUG << "var2: " << LOG_FM(v);
-	vars.insert(vars2.begin(), vars2.end());
+	vars.insert(vars.end(), vars2.begin(), vars2.end());
 	for (tref v : vars) LOG_DEBUG << "var: " << LOG_FM(v);
 
 	tref imp1 = tau::build_wff_imply(n1, n2);
@@ -290,9 +290,9 @@ bool is_nso_impl(tref n1, tref n2) {
 		return true;
 	}
 
-	auto vars  = get_free_vars_from_nso<node>(n1);
-	auto vars2 = get_free_vars_from_nso<node>(n2);
-	vars.insert(vars2.begin(), vars2.end());
+	trefs vars(get_free_vars<node>(n1));
+	const trefs& vars2 = get_free_vars<node>(n2);
+	vars.insert(vars.end(), vars2.begin(), vars2.end());
 
 	tref imp = tau::build_wff_imply(n1, n2);
 	for (tref v : vars) imp = tau::build_wff_all(v, imp);
@@ -323,9 +323,9 @@ bool are_bf_equal(tref n1, tref n2) {
 		return true;
 	}
 
-	auto vars = get_free_vars_from_nso<node>(n1);
-	auto vars2 = get_free_vars_from_nso<node>(n2);
-	vars.insert(vars2.begin(), vars2.end());
+	trefs vars(get_free_vars<node>(n1));
+	const trefs& vars2 = get_free_vars<node>(n2);
+	vars.insert(vars.end(), vars2.begin(), vars2.end());
 
 	tref bf_equal_fm = tau::build_bf_eq_0(tau::build_bf_xor(n1, n2));
 	for (tref v : vars) bf_equal_fm = tau::build_wff_all(v, bf_equal_fm);

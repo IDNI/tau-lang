@@ -23,7 +23,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 		DBG(typename node::type nt = tau::get(ret).get_type();)
 		DBG(assert(nt == tau::bf || nt == tau::wff
 			|| nt == tau::shift || nt == tau::integer);)
-	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error") }
+	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error"); }
 	return ret;
 }
 

@@ -290,7 +290,7 @@ bool is_run_satisfiable(tref fm) {
 	if (t.equals_F()) return false;
 	if (t.equals_T()) return true;
 
-	auto free_io_vars = get_free_vars_from_nso<node>(fm);
+	const trefs& free_io_vars = t.get_free_vars();
 	trefs io_vars = t.select_top(is_child<node, tau::io_var>);
 	sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
 
@@ -299,7 +299,7 @@ bool is_run_satisfiable(tref fm) {
 		[](tref el) { return is_io_initial<node>(el); }));)
 	auto sat_fm = fm;
 	while (!io_vars.empty()) {
-		if (!free_io_vars.contains(io_vars.back())) {
+		if (!tau::contains_subtree(free_io_vars, io_vars.back())) {
 			io_vars.pop_back();
 			continue;
 		}
@@ -328,14 +328,23 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 		[](tref el){ return is_io_initial<node>(el); }));)
 	sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
 
-	auto free_io_vars = get_free_vars_from_nso<node>(uconst_ctns);
+	trefs free_io_vars(get_free_vars<node>(uconst_ctns));
 	while (io_vars.size()) {
-		if (!free_io_vars.contains(io_vars.back())) {
+		if (!tau::contains_subtree(free_io_vars, io_vars.back()))
+		{
 			io_vars.pop_back();
 			continue;
 		}
 		auto& v = io_vars.back();
-		free_io_vars.erase(v);
+		
+		for (auto it = free_io_vars.begin();
+			it != free_io_vars.end(); ++it)
+		{
+			if (tau::subtree_equals(*it, v)) {
+				free_io_vars.erase(it);
+				break;
+			}
+		}
 		uconst_ctns = tau::get(v).is_input_variable()
 			? tau::build_wff_all(v, uconst_ctns)
 			: tau::build_wff_ex( v, uconst_ctns);
