@@ -38,6 +38,7 @@ option(TAU_BUILD_UNIT_TESTS        "Build unit tests"                      OFF)
 option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
 option(TAU_BUILD_REPL_TESTS        "Build repl tests"                      OFF)
 option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
+option(TAU_ADDRESS_SANITIZER       "Build with address sanitizer"          OFF)
 option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
@@ -59,9 +60,15 @@ set_property(CACHE TAU_BUILD_UNIT_TESTS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_INTEGRATION       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REPL_TESTS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BENCHMARK         PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_ADDRESS_SANITIZER       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_ZIP_PACKAGE     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
+
+# Load local cmake settings
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
+	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
+endif()
 
 if(TAU_BUILD_TESTS)
 	set(TAU_BUILD_UNIT_TESTS ON)
@@ -171,15 +178,10 @@ message(STATUS "TAU_BUILD_UNIT_TESTS: ${TAU_BUILD_UNIT_TESTS}")
 message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
 message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
+message(STATUS "TAU_ADDRESS_SANITIZER: ${TAU_ADDRESS_SANITIZER}")
 message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
-
-#
-# Add tauparser library
-#
-set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
-add_subdirectory(external/parser)
 
 #
 # Adding Boost log library
@@ -200,10 +202,6 @@ if (Boost_FOUND)
 else()
 	message(FATAL_ERROR "Boost not found")
 endif()
-
-#
-option(BOOST_LOG_TRIVIAL           "Build logging in parser"   ON)
-option(PARSER_BUILD_STATIC_LIBRARY "Build only static library" ON)
 
 #
 # Adding Z3
@@ -243,6 +241,18 @@ version_license(
 	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_license.h.template"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/version_license.h")
 
+if(TAU_ADDRESS_SANITIZER)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+	set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+endif()
+
+#
+# Add tauparser library
+#
+message("Building parser")
+set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
+add_subdirectory(external/parser)
+
 #
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
@@ -251,12 +261,14 @@ include(tau-common)
 #
 # Adding src dir
 #
+message(STATUS "Building src")
 add_subdirectory("src")
 
 #
 # Testing
 #
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION OR TAU_BUILD_REPL_TESTS)
+	message(STATUS "Building tests")
 	enable_testing()
 	add_subdirectory(tests)
 endif ()

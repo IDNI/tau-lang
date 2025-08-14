@@ -939,7 +939,7 @@ tref unpack_tau_constant(tref constant) {
 template <NodeType node>
 bool has_free_vars(tref fm, bool silent = false) {
 	using tau = tree<node>;
-	auto free_vars = get_free_vars_from_nso<node>(fm);
+	const trefs& free_vars = get_free_vars<node>(fm);
 	if (!free_vars.empty()) {
 		// all elements of the set must be quantified
 		std::stringstream ss; bool has_real_free_vars = false;

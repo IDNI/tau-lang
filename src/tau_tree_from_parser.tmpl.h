@@ -110,18 +110,20 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 		// };
 
 		// q_vars transformation (ex x,y to ex x ex y)
-		auto process_quantifier_vars = [&ptr, &m_get, &getx]() -> tref {
+		auto process_quantifier_vars =
+			[&ptr, &m_get, &getx](type nt) -> tref
+		{
 			const auto& q_vars = m_get(ptr.first());
-			const auto& wff_expr = m_get(ptr.second());
+			const auto& expr = m_get(ptr.second());
 			trefs vars = q_vars.get_children();
 			if (vars.empty()) // TODO (LOW) is this even reachable?
-				return getx(trefs{ q_vars.get(), wff_expr.get() });
-			tref x = wff_expr.only_child();
+				return getx(trefs{ q_vars.get(), expr.get() });
+			tref x = expr.only_child();
 			for (size_t vi = 0; vi != vars.size(); ++vi) {
 				// create a new quantifier node with var and new
 				// children. Note the reversed order!
 				x = getx(trefs{ vars[vars.size() - 1 - vi],
-								get(wff, x) });
+								get(nt, x) });
 			}
 			return x;
 		};
@@ -190,7 +192,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 				break;
 
 			case wff_all:
-			case wff_ex: x = process_quantifier_vars(); break;
+			case wff_ex: x = process_quantifier_vars(wff); break;
+			case bf_fall:
+			case bf_fex: x = process_quantifier_vars(bf); break;
 
 			// preprocess source node
 			case source:
@@ -247,6 +251,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 				}
 				// DBG(for (auto c : ch) LOG_TRACE << "child: " << LOG_FM_DUMP(c);)
 				x = getx(ch);
+
+				if (nt == bf || nt == wff)
+					tau_lang::get_free_vars<node>(x);
 
 				// process constant from a transformed node
 				if (nt == bf_constant && src)

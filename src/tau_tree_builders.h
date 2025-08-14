@@ -166,6 +166,12 @@ tref build_bf_nlt(tref l, tref r);
 // term builders
 
 template <NodeType node>
+tref build_bf_fall(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_fex(tref l, tref r);
+
+template <NodeType node>
 tref build_bf_or(tref l, tref r);
 
 template <NodeType node>

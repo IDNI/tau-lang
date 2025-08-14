@@ -365,6 +365,20 @@ tref build_bf_nlt(tref l, tref r) {
 // term builders
 
 template <NodeType node>
+tref build_bf_fall(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	return tau::get(tau::bf, tau::get(tau::bf_fall, l, r));
+}
+
+template <NodeType node>
+tref build_bf_fex(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	return tau::get(tau::bf, tau::get(tau::bf_fex, l, r));
+}
+
+template <NodeType node>
 tref build_bf_or(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
@@ -850,6 +864,16 @@ tref tree<node>::build_bf_nlt(tref l, tref r) {
 
 // -----------------------------------------------------------------------------
 // term builders
+
+template <NodeType node>
+tref tree<node>::build_bf_fall(tref l, tref r) {
+	return tau_lang::build_bf_fall<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_fex(tref l, tref r) {
+	return tau_lang::build_bf_fex<node>(l, r);
+}
 
 template <NodeType node>
 tref tree<node>::build_bf_or(tref l, tref r) {
