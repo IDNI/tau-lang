@@ -9,12 +9,12 @@
 // #include "tau.h" to avoid error lines pointing to a generated tau.h
 #include "boolean_algebras/nso_ba.h"
 #include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/bv_ba.h"
 #include "interpreter.h"
 #include "runtime.h"
 #else
 #	include "tau.h"
 #endif // DEBUG
-//#include "base_bas/cvc5.h"
 #include "repl_evaluator.h"
 #include "utility/cli.h"
 
@@ -94,7 +94,7 @@ void welcome() {
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	bdd_init<Bool>();
-	//bv_config();
+	bv_config();
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);

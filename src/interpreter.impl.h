@@ -499,7 +499,7 @@ tref interpreter<node, in_t, out_t>::get_ubt_ctn_at(int_t t) {
 	auto step_ubt_ctn = update_to_time_point(ubt_ctn, ut);
 	auto io_vars = tau::get(step_ubt_ctn).select_top(
 			is_child<node, tau::io_var>);
-	sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
+	std::sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
 	// All io_vars in fm have to refer to constant time positions
 	assert(std::all_of(io_vars.begin(), io_vars.end(),
 		[](const auto& el) { return is_io_initial<node>(el); }));

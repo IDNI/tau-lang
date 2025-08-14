@@ -10,7 +10,7 @@ set(TAU_HEADERS
 	boolean_algebras/variant_ba.h
 	boolean_algebras/nso_ba.h
 	boolean_algebras/tau_ba.h
-	base_bas/cvc5.h
+	boolean_algebras/bv_ba.h
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
 	tau_tree.h         # tau tree, node, tree traverser, builders,

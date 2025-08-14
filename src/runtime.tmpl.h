@@ -26,9 +26,7 @@ std::string nso_factory<sbf_ba>::zero(const std::string) const {
 	return "0";
 }
 
-tref nso_factory<sbf_ba>::splitter_one()
-	const
-{
+tref nso_factory<sbf_ba>::splitter_one() const {
 	using tau = tree<node<sbf_ba>>;
 	return tau::get(tau::bf, tau::get_ba_constant(bf.splitter_one(), "sbf"));
 }

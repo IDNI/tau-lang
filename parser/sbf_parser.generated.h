@@ -1,5 +1,5 @@
 // This file is generated from a file parser/sbf.tgf by
-//       https://github.com/IDNI/parser/tools/tgf
+//       https://github.com/IDNI/parser/src/tgf
 //
 #ifndef __SBF_PARSER_H__
 #define __SBF_PARSER_H__
