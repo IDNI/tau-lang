@@ -17,29 +17,25 @@ namespace idni::tau_lang {
  */
 template <>
 struct nso_factory<sbf_ba> {
-	inline static sbf_ba_factory<sbf_ba> bf;
 
-	std::optional<constant_with_type<sbf_ba>> parse(
+	static std::optional<constant_with_type<sbf_ba>> parse(
 		const std::string& constant_source,
 		const std::string = "");
 
-	std::vector<std::string> types() const;
+	static std::vector<std::string> types();
 
-	std::string default_type() const;
+	static std::string default_type();
 
-	std::string one(const std::string type_name) const;
+	static std::string one(const std::string type_name);
 
-	std::string zero(const std::string type_name) const;
+	static std::string zero(const std::string type_name);
 
-	tref splitter_one() const;
+	static tref splitter_one();
 
-	tref unpack_tau_ba(const std::variant<sbf_ba>&) const;
+	static tref unpack_tau_ba(const std::variant<sbf_ba>&);
 
-	std::variant<sbf_ba> pack_tau_ba(tref) const;
+	static std::variant<sbf_ba> pack_tau_ba(tref);
 
-	static nso_factory<sbf_ba>& instance();
-private:
-	nso_factory();
 };
 
 /**
@@ -47,32 +43,25 @@ private:
  */
 template<>
 struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
-	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba>& bf() {
-		return sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba>::instance(); }
-	static tau_ba_factory<sbf_ba>& tf() {
-		return tau_ba_factory<sbf_ba>::instance(); }
 
-	std::optional<constant_with_type<tau_ba<sbf_ba>, sbf_ba>> parse(
+	static std::optional<constant_with_type<tau_ba<sbf_ba>, sbf_ba>> parse(
 		const std::string& constant_source,
 		const std::string type_name);
 
-	std::vector<std::string> types() const;
+	static std::vector<std::string> types();
 
-	std::string default_type() const;
+	static std::string default_type();
 
-	std::string one(const std::string type_name = "tau") const;
+	static std::string one(const std::string type_name = "tau");
 
-	std::string zero(const std::string type_name = "tau") const;
+	static std::string zero(const std::string type_name = "tau");
 
-	tref splitter_one( const std::string type_name) const;
+	static tref splitter_one(const std::string type_name);
 
-	tref unpack_tau_ba(const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const;
+	static tref unpack_tau_ba(const std::variant<tau_ba<sbf_ba>, sbf_ba>& v);
 
-	std::variant<tau_ba<sbf_ba>, sbf_ba> pack_tau_ba(tref c) const;
+	static std::variant<tau_ba<sbf_ba>, sbf_ba> pack_tau_ba(tref c);
 
-	static nso_factory<tau_ba<sbf_ba>, sbf_ba>& instance();
-private:
-	nso_factory();
 };
 
 

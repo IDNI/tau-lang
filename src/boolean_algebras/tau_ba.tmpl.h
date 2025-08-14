@@ -214,30 +214,23 @@ std::optional<constant_with_type<tau_ba<BAs...>, BAs...>>
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::string tau_ba_factory<BAs...>::one(std::string&) const {
+std::string tau_ba_factory<BAs...>::one(std::string&) {
 	return "T";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::string tau_ba_factory<BAs...>::zero(std::string&) const {
+std::string tau_ba_factory<BAs...>::zero(std::string&) {
 	return "F";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::variant<tau_ba<BAs...>, BAs...>
-	tau_ba_factory<BAs...>::splitter_one() const
+	tau_ba_factory<BAs...>::splitter_one()
 {
 	return std::variant<tau_ba<BAs...>, BAs...>(
 			tau_splitter_one<BAs...>());
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-tau_ba_factory<BAs...>& tau_ba_factory<BAs...>::instance() {
-	static tau_ba_factory<BAs...> factory;
-	return factory;
 }
 
 template <typename... BAs>

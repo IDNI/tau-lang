@@ -31,63 +31,57 @@ struct nso_factory {
 	 * @param options Optional parse options.
 	 * @return A pair with the parsed constant and the string type name
 	 */
-	std::optional<constant_with_type<BAs...>> parse(
+	static std::optional<constant_with_type<BAs...>> parse(
 		const std::string& constant_source,
 		const std::string type_name,
-		const std::string options = "") const;
+		const std::string options = "");
 
 	/**
 	 * Returns a vector of available types.
 	 * @return A vector of type names.
 	 */
-	std::vector<std::string> types() const;
+	static std::vector<std::string> types();
 
 	/**
 	 * Returns the default type.
 	 * @return The default type name.
 	 */
-	std::string default_type() const;
+	static std::string default_type();
 
 	/**
 	 * Returns a string representation of one for the given type.
 	 * @param type_name The type name.
 	 * @return The string representation of one.
 	 */
-	std::string one(const std::string type_name) const;
+	static std::string one(const std::string type_name);
 
 	/**
 	 * Returns a string representation of zero for the given type.
 	 * @param type_name The type name.
 	 * @return The string representation of zero.
 	 */
-	std::string zero(const std::string type_name) const;
+	static std::string zero(const std::string type_name);
 
 	/**
 	 * Returns a tau object representing a splitter with one.
 	 * @param ba_type Optional type name.
 	 * @return The splitter constant.
 	 */
-	tref splitter_one(const std::string type_name = "") const;
+	static tref splitter_one(const std::string type_name = "");
 
 	/**
 	 * Returns the tau formula stored in the variant, if present
 	 * @param constant Variant for formula extraction
 	 * @return Extracted tau_ba spec if present
 	 */
-	tref unpack_tau_ba(const std::variant<BAs...>& constant);
+	static tref unpack_tau_ba(const std::variant<BAs...>& constant);
 
 	/**
 	 * Returns a std::variant holding the tau_ba of the given formula
 	 * @param c Formula to wrap inside tau_ba
 	 * @return std::variant holding a tau_ba
 	 */
-	std::variant<BAs...> pack_tau_ba (tref c) const;
-
-	/**
-	 * Returns the singleton instance of the factory.
-	 * @return The singleton instance.
-	 */
-	static nso_factory<BAs...>& instance();
+	static std::variant<BAs...> pack_tau_ba (tref c);
 };
 
 

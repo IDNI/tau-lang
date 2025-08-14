@@ -115,8 +115,7 @@ struct nso_factory<sbf_ba, Bool> {
 	optional<constant_with_type<sbf_ba, Bool>> parse_sbf_ba(
 		const string& constant_source) const
 	{
-		auto r = sbf_ba_factory<sbf_ba, Bool>::instance()
-						.parse(constant_source);
+		auto r = sbf_ba_factory<sbf_ba, Bool>::parse(constant_source);
 		if (!r) return {};
 		return constant_with_type<sbf_ba, Bool>{
 			std::get<sbf_ba>(r.value().first), "sbf" };
@@ -125,8 +124,7 @@ struct nso_factory<sbf_ba, Bool> {
 	optional<constant_with_type<sbf_ba, Bool>> parse_Bool(
 		const string& constant_source) const
 	{
-		auto r = nso_factory<Bool>::instance()
-						.parse(constant_source, "bool");
+		auto r = nso_factory<Bool>::parse(constant_source, "bool");
 		if (!r) return {};
 		return constant_with_type<sbf_ba, Bool>{
 			std::get<Bool>(r.value().first), "bool" };
@@ -156,13 +154,6 @@ struct nso_factory<sbf_ba, Bool> {
 	tref unpack_tau_ba(const variant<Bool>&) const { return nullptr; }
 
 	std::variant<sbf_ba, Bool> pack_tau_ba (const tref) const {return {};}
-
-	static nso_factory<sbf_ba, Bool>& instance() {
-		static nso_factory<sbf_ba, Bool> factory;
-		return factory;
-	}
-private:
-	nso_factory() {};
 };
 
 struct sbf_ba_Bool_constants_fixture {
@@ -171,7 +162,7 @@ struct sbf_ba_Bool_constants_fixture {
 	sbf_ba sbf_t, sbf_f;
 	template <typename BA>
 	BA get_sbf_Bool(const std::string& src, const std::string&) {
-		if (auto opt = sbf_ba_factory<sbf_ba>::instance().parse(src);
+		if (auto opt = sbf_ba_factory<sbf_ba>::parse(src);
 			opt) return std::get<BA>(opt.value().first);
 		assert(false);
 		return BA();

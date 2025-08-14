@@ -37,7 +37,7 @@ tref ba_types_inference<node>::operator()(tref n) {
 							<< LOG_FM_DUMP(n);
 #endif
 	size_t dflt = get_ba_type_id<node>(
-			node::nso_factory::instance().default_type());
+			node::nso_factory::default_type());
 	subtree_map<node, tref> defaulted;
 
 	// DBG(LOG_TRACE << ba_types<node>::dump_to_str();)
@@ -204,8 +204,7 @@ tref ba_types_inference<node>::add_scope_ids(
 		DBG(LOG_TRACE << "type: " << type;)
 		if (type.size() && type != "untyped") {
 			bool found = false;
-			for (const auto& st : node::nso_factory::instance()
-								.types())
+			for (const auto& st : node::nso_factory::types())
 				if (type == st) { found = true; break; }
 			if (!found) {
 				LOG_ERROR << "Unsupported type: " << type << "\n";
@@ -413,7 +412,7 @@ bool ba_types_inference<node>::propagate(tref n) {
 			}
 		}
 	}
-	return true; 
+	return true;
 }
 
 #undef LOG_CHANNEL_NAME

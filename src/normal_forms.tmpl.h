@@ -1201,7 +1201,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 
 	if (all_reductions) join_paths(paths);
 	if (paths.empty() && !decided) paths.emplace_back();
-	if (enable_sort) std::ranges::sort(paths);	
+	if (enable_sort) std::ranges::sort(paths);
 
 #ifdef DEBUG
 	std::stringstream ss;
@@ -2271,7 +2271,7 @@ tref single_dnf_lift(tref fm) {
 								c[0].first()),
 					tau::build_wff_and(t[0].first(),
 								c[0].second()));
-			}        
+			}
 		}
 		return n;
 	};
@@ -3078,8 +3078,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 				size_t type = type_raw == 0
 							? 0
 							: get_ba_type_id<node>(
-								node::nso_factory::instance()
-								.default_type());
+								node::nso_factory::default_type());
 				if (auto it = new_funcs.find(type); it != new_funcs.end())
 					it->second = tau::build_bf_or(it->second, tau::trim2(d));
 				else new_funcs.emplace(type, tau::trim2(d));
@@ -3173,8 +3172,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 				size_t type = type_raw == 0
 							? 0
 							: get_ba_type_id<node>(
-								node::nso_factory::instance()
-								.default_type());
+								node::nso_factory::default_type());
 				if (auto it = new_funcs.find(type); it != new_funcs.end())
 					it->second = tau::build_bf_or(it->second, tau::trim2(d));
 				else new_funcs.emplace(type, tau::trim2(d));

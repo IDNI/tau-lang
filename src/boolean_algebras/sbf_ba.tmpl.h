@@ -61,6 +61,8 @@ requires BAsPack<BAs...>
 std::optional<constant_with_type<BAs...>> sbf_ba_factory<BAs...>::parse(
 	const std::string& src)
 {
+	static std::map<size_t, std::variant<BAs...>> cache;
+
 	// check source cache
 	auto sid = dict(src);
 	if (auto cn = cache.find(sid); cn != cache.end())
@@ -82,21 +84,15 @@ std::optional<constant_with_type<BAs...>> sbf_ba_factory<BAs...>::parse(
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::string sbf_ba_factory<BAs...>::zero() const {
+std::string sbf_ba_factory<BAs...>::zero() {
 	return "0";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
+std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() {
 	return std::variant<BAs...>(bdd_splitter_one<Bool>());
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-sbf_ba_factory<BAs...>& sbf_ba_factory<BAs...>::instance() {
-	static sbf_ba_factory<BAs...> factory;
-	return factory;
-}
 
 } // namespace idni::tau_lang

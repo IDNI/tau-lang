@@ -247,7 +247,7 @@ struct tau_ba_factory {
 	 * @param src Reference to the source string.
 	 * @return Parsed tau_nso_t or std::nullopt if parsing fails.
 	 */
-	std::optional<constant_with_type<tau_ba<BAs...>, BAs...>> parse(
+	static std::optional<constant_with_type<tau_ba<BAs...>, BAs...>> parse(
 		const std::string& constant_source);
 
 	/**
@@ -255,7 +255,7 @@ struct tau_ba_factory {
 	 *
 	 * @return Variant containing the splitter of one in the given BA.
 	 */
-	std::variant<tau_ba<BAs...>, BAs...> splitter_one() const;
+	static std::variant<tau_ba<BAs...>, BAs...> splitter_one();
 
 	/**
 	 * @brief Converts one to string.
@@ -263,7 +263,7 @@ struct tau_ba_factory {
 	 * @param str Reference to the string.
 	 * @return Converted string.
 	 */
-	std::string one(std::string&) const;
+	static std::string one(std::string&);
 
 	/**
 	 * @brief Converts zero to string.
@@ -271,15 +271,7 @@ struct tau_ba_factory {
 	 * @param str Reference to the string.
 	 * @return Converted string.
 	 */
-	std::string zero(std::string&) const;
-
-	/**
-	 * @brief Returns the instance of the tau_ba_factory.
-	 *
-	 * @return Instance of the tau_ba_factory.
-	 */
-	static tau_ba_factory<BAs...>& instance();
-
+	static std::string zero(std::string&);
 };
 
 // << for printing tau_ba's nso rr

@@ -34,19 +34,16 @@ struct sbf_ba_factory {
 	 * @param src source string
 	 * @return optional parsed node if parsing successful
 	 */
-	std::optional<constant_with_type<BAs...>> parse(
+	static std::optional<constant_with_type<BAs...>> parse(
 		const std::string& constant_source);
 
-	std::string one() const;
+	static std::string one();
 
-	std::string zero() const;
+	static std::string zero();
 
-	std::variant<BAs...> splitter_one() const;
+	static std::variant<BAs...> splitter_one();
 
-	static sbf_ba_factory<BAs...>& instance();
-private:
-
-	inline static std::map<size_t, std::variant<BAs...>> cache;
+	//inline static std::map<size_t, std::variant<BAs...>> cache;
 };
 
 } // namespace idni::tau_lang
