@@ -8,6 +8,8 @@
 
 namespace idni::tau_lang {
 
+using namespace cvc5;
+
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
 #define TC_STATUS_OUTPUT TC(term::color::GREEN, term::color::BG_LIGHT_CYAN, \
 							term::color::BRIGHT)

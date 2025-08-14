@@ -3,7 +3,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-#include "base_bas/cvc5.h"
+#include "boolean_algebras/bv_ba.h"
 
 tref create_formula(const char* spec) {
 	return tau::get(spec);

@@ -1428,4 +1428,62 @@ tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
 	return nullptr; // Return error
 }
 
+/*template <NodeType node>
+tref get_hook<node>::bitvector(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("bitvector", v, ch, len, r);)
+	DBG(assert(len == 2 || len == 1);)
+
+	// parse bitvector copnstants
+	// This node could have two children. TYhe first one must be p::num, p::bits
+	// or p::hexnum, whereas the second one could be a type.
+	if (is_bv_node(n.child[0])) return std::make_shared<rewriter::depreciating::node<tau_sym<BAs...>>>(n);
+	// apply numerical simplifications
+	using p = tau_parser;
+	// get bitvector size, just 32 bits for now
+	// size_t size = n.child.size() == 2
+	//	? n.child[1]
+	//		| only_child_extractor<BAs...>
+	//		| size_t_extractor<BAs...>
+	//		| optional_value_extractor<size_t>
+	//	: sizeof(size_t) * 8;
+	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
+	tau<BAs...> bvn;
+	auto nt = get_non_terminal_node(n.child[0]);
+	size_t bv_size = bv_default_size;
+	if (n.child.size() == 2) {
+		bv_size = std::stoull(
+			make_string(tau_node_terminal_extractor<BAs...>, n.child[1]->child[2]));
+	}
+	switch (nt) {
+		case p::num : {
+			// TODO (HIGH) control small size exception
+			auto bv = bv_solver.mkBitVector(bv_size, value.c_str(), 10);
+			bvn = make_node<tau_sym<BAs...>>(bv, {});
+			break;
+		}
+		case p::bits : {
+			// TODO (HIGH) control small size exception
+			auto bv = bv_solver.mkBitVector(bv_size, value.c_str(), 2);
+			bvn = make_node<tau_sym<BAs...>>(bv, {});
+			break;
+		}
+		case p::hexnum : {
+			// TODO (HIGH) control small size exception
+			auto bv = bv_solver.mkBitVector(bv_size, value.c_str(), 16);
+			bvn = make_node<tau_sym<BAs...>>(bv, {});
+			break;
+		}
+		default: {
+			#ifdef DEBUG
+			BOOST_LOG_TRIVIAL(error) << "(error) Unknown bitvector type: " << nt;
+			#endif // DEBUG
+			assert(false);
+		}
+	}
+	std::vector<tau<BAs...>> v{bvn};
+	if (n.child.size() == 2) v.emplace_back(n.child[1]);
+	return std::make_shared<rewriter::depreciating::node<tau_sym<BAs...>>>(
+		tau_parser::instance().literal(p::bitvector), v);
+}*/
+
 } // namespace idni::tau_lang

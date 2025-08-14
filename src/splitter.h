@@ -3,6 +3,7 @@
 #ifndef __IDNI__TAU__SPLITTER_H__
 #define __IDNI__TAU__SPLITTER_H__
 
+#include "splitter_types.h"
 #include "satisfiability.h"
 
 namespace idni::tau_lang {

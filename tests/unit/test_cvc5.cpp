@@ -8,7 +8,7 @@ using namespace cvc5;
 
 TEST_SUITE("sample cvc5 programs") {
 
-	static Solver cvc5_solver;
+	static Solver bv_solver;
 
 	TEST_CASE("forall sample (static)") {
 		/*
@@ -19,14 +19,14 @@ TEST_SUITE("sample cvc5 programs") {
 		)
 		(check-sat)
 		*/
-		auto bv4 = cvc5_solver.mkBitVectorSort(4);
-		auto x = cvc5_solver.mkVar(bv4, "x");
-		auto b0101 = cvc5_solver.mkBitVector(4, 3);
-		auto eq = cvc5_solver.mkTerm(Kind::EQUAL, {x, b0101});
-		auto q_x = cvc5_solver.mkTerm(Kind::VARIABLE_LIST, {x});
-		auto fml = cvc5_solver.mkTerm(Kind::FORALL, {q_x, eq});
-		cvc5_solver.assertFormula(fml);
-		auto result = cvc5_solver.checkSat();
+		auto bv4 = bv_solver.mkBitVectorSort(4);
+		auto x = bv_solver.mkVar(bv4, "x");
+		auto b0101 = bv_solver.mkBitVector(4, 3);
+		auto eq = bv_solver.mkTerm(Kind::EQUAL, {x, b0101});
+		auto q_x = bv_solver.mkTerm(Kind::VARIABLE_LIST, {x});
+		auto fml = bv_solver.mkTerm(Kind::FORALL, {q_x, eq});
+		bv_solver.assertFormula(fml);
+		auto result = bv_solver.checkSat();
 
 		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
 		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
