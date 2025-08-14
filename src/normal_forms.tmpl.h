@@ -3685,6 +3685,145 @@ struct simplify_using_equality {
 	}
 };
 
+template <NodeType node>
+class syntactic_path_simplification {
+	using tau = tree<node>;
+
+	tref root;
+	const bool bf;
+	subtree_unordered_set<node> skip;
+
+	void simplify_wff () {
+		auto down = [&](tref n) {
+			// Skip intermediate nodes
+			if (!tau::get(n).is(tau::wff)) return n;
+			const tau& t_n = tau::get(n)[0];
+			// Skip or and xor
+			if (t_n.is(tau::wff_or) || t_n.is(tau::wff_xor))
+				return n;
+			// If no conjunction is found, no simplification is possible
+			if (!t_n.is(tau::wff_and)) return n;
+			subtree_map<node, tref> assignments;
+			// Get all conjuncted assumptions
+			for (tref l : get_cnf_wff_clauses<node>(n)) {
+				if (tau::get(l).child_is(tau::wff_or))
+					continue;
+				if (tau::get(l).child_is(tau::wff_xor))
+					continue;
+				// Treat subtree l as variable
+				if (tau::get(l).child_is(tau::wff_neg))
+					assignments.emplace(tau::trim2(l), _F<node>());
+				else assignments.emplace( l, _T<node>());
+			}
+			tref simp = rewriter::replace(n, assignments);
+			// If simp is false, current branch is not sat
+			if (tau::get(simp).equals_F()) {
+				// Remove branch
+				return _F<node>();
+			}
+			// Rebuild assumptions
+			tref assms = _T<node>();
+			for (const auto [k, v]: assignments) {
+				assms = v == _T<node>()
+						? tau::build_wff_and(assms, k)
+						: tau::build_wff_and(assms,
+							tau::build_wff_neg(k));
+			}
+			// Make sure to not revisit build assumptions
+			if (tau::get(simp) == get_T<node>())
+				skip.insert(tau::get(assms).first());
+			else skip.insert(assms);
+			// Conjunct assumptions with simplified tree
+			return tau::build_wff_and(assms, simp);
+		};
+		auto visit = [&](tref n) {
+			if (skip.contains(n)) return skip.erase(n), false;
+			return visit_wff<node>(n);
+		};
+		root = pre_order<node>(root).apply_unique(down, visit);
+	}
+
+	void simplify_bf() {
+		auto down = [&](tref n) {
+			// Skip intermediate nodes
+			if (!tau::get(n).is(tau::bf)) return n;
+			const tau& t_n = tau::get(n)[0];
+			// Skip or and xor
+			if (t_n.is(tau::bf_or) || t_n.is(tau::bf_xor))
+				return n;
+			// If no conjunction is found, no simplification is possible
+			if (!t_n.is(tau::bf_and)) return n;
+			subtree_map<node, tref> assignments;
+			// Get all conjuncted assumptions
+			for (tref l : get_cnf_bf_clauses<node>(n)) {
+				if (tau::get(l).child_is(tau::bf_or))
+					continue;
+				if (tau::get(l).child_is(tau::bf_xor))
+					continue;
+				// Treat subtree l as variable
+				if (tau::get(l).child_is(tau::bf_neg))
+					assignments.emplace(tau::trim2(l), _0<node>());
+				else assignments.emplace( l, _1<node>());
+			}
+			tref simp = rewriter::replace_if(n, assignments,
+				is_boolean_operation<node>);
+			// If simp is false, current branch is not sat
+			if (tau::get(simp).equals_0()) {
+				// Remove branch
+				return _0<node>();
+			}
+			// Rebuild assumptions
+			tref assms = _1<node>();
+			for (const auto [k, v]: assignments) {
+				assms = v == _1<node>()
+						? tau::build_bf_and(assms, k)
+						: tau::build_bf_and(assms,
+							tau::build_bf_neg(k));
+			}
+			// Make sure to not revisit build assumptions
+			if (tau::get(simp) == get_1<node>())
+				skip.insert(tau::get(assms).first());
+			else skip.insert(assms);
+			// Conjunct assumptions with simplified tree
+			return tau::build_bf_and(assms, simp);
+		};
+		auto visit = [&](tref n) {
+			if (skip.contains(n)) return skip.erase(n), false;
+			return is_boolean_operation<node>(n);
+		};
+		root = pre_order<node>(root).apply_unique(down, visit);
+	}
+
+public:
+	explicit syntactic_path_simplification(tref fm) :
+		bf(tau::get(fm).is_term()) {
+		if (bf) root = push_negation_in<node, false>(fm);
+		else root = to_mnf<node>(to_nnf<node>(fm));
+	}
+
+	tref operator() () {
+		if (bf) {
+			// Resolve contradictions
+			simplify_bf();
+			skip.clear();
+			// Resolve tautologies
+			root = push_negation_in<node, false>(tau::build_bf_neg(root));
+			simplify_bf();
+			root = push_negation_in<node, false>(tau::build_bf_neg(root));
+			return root;
+		} else {
+			// Resolve contradictions
+			simplify_wff();
+			skip.clear();
+			// Resolve tautologies
+			root = to_mnf<node>(to_nnf<node>(tau::build_wff_neg(root)));
+			simplify_wff();
+			root = to_nnf<node>(tau::build_wff_neg(root));
+			return root;
+		}
+	}
+};
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "to_snf"
 

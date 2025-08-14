@@ -554,6 +554,9 @@ tref replace_free_vars_by(tref fm, tref val);
 template <NodeType node>
 struct simplify_using_equality;
 
+template <NodeType node>
+class syntactic_path_simplification;
+
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
 // We implicitly transformed into BDD form and compute one step of the SNF transformation.
 template <NodeType node>

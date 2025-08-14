@@ -34,81 +34,29 @@ TEST_SUITE("Normalizer") {
 	}
 }
 
-// TEST_SUITE("wff_sometimes_always") {
-	// TEST_CASE("push_in_1") {
-	// 	const char* sample = "sometimes (x=0 && o1[t] = 0 && sometimes(x=0 && o1[t] = 0 && sometimes(x=0 && o1[t] = 0))).";
-	// 	auto src = make_tau_source(sample);
-	// 	auto formula = make_nso_rr_using_factory<sbf_ba>(src);
-	// 	CHECK( formula.has_value() );
-	// 	if (!formula.has_value()) return;
-	// 	auto fm = formula.value().main;
-	// 	std::set<tau<sbf_ba>> visited;
-	// 	auto result = push_sometimes_always_in(fm, visited);
-	// 	auto simp_res = result
-	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
-	// 		| reduce_wff<sbf_ba>;
-	// 	std::stringstream ss; ss << simp_res;
-	// 	CHECK((ss.str() == "x = 0 && (sometimes o1[t] = 0)" || ss.str() == "(sometimes o1[t] = 0) && x = 0"));
-	// }
-
-	// TEST_CASE("push_in_2") {
-	// 	const char* sample = "sometimes T.";
-	// 	auto src = make_tau_source(sample);
-	// 	auto formula = make_nso_rr_using_factory<sbf_ba>(src);
-	// 	CHECK( formula.has_value() );
-	// 	if (!formula.has_value()) return;
-	// 	auto fm = formula.value().main;
-	// 	std::set<tau<sbf_ba>> visited;
-	// 	auto result = push_sometimes_always_in(fm, visited);
-	// 	auto simp_res = result
-	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
-	// 		| reduce_wff<sbf_ba>;
-	// 	CHECK( (simp_res | tau::wff_t).has_value() );
-	// }
-
-	// TEST_CASE("push_in_3") {
-	// 	const char* sample = "sometimes (always o1[t] = 0 || (sometimes o1[t] = 0)) && (always o1[t] = 0).";
-	// 	auto src = make_tau_source(sample);
-	// 	auto formula = make_nso_rr_using_factory<sbf_ba>(src);
-	// 	CHECK( formula.has_value() );
-	// 	if (!formula.has_value()) return;
-	// 	auto fm = formula.value().main;
-	// 	std::set<tau<sbf_ba>> visited;
-	// 	auto result = push_sometimes_always_in(fm, visited);
-	// 	auto simp_res = result
-	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
-	// 		| reduce_wff<sbf_ba>;
-	// 	std::stringstream ss; ss << simp_res ;
-	// 	CHECK( ss.str() == "always o1[t] = 0" );
-	// }
-
-	// TEST_CASE("pull_out_1") {
-	// 	const char* sample = "(sometimes T && x=0) || (sometimes T && x=0) || (sometimes x=0).";
-	// 	auto src = make_tau_source(sample);
-	// 	auto formula = make_nso_rr_using_factory<sbf_ba>(src);
-	// 	CHECK( formula.has_value() );
-	// 	if (!formula.has_value()) return;
-	// 	auto fm = formula.value().main;
-	// 	auto result = pull_sometimes_always_out(fm);
-	// 	auto simp_res = result
-	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
-	// 		| reduce_wff<sbf_ba>;
-	// 	std::stringstream ss; ss << simp_res;
-	// 	CHECK(ss.str() == "sometimes x = 0");
-	// }
-
-	// TEST_CASE("pull_out_2") {
-	// 	const char* sample = "(always x=0) && x=0 && (sometimes x=0 && x=0).";
-	// 	auto src = make_tau_source(sample);
-	// 	auto formula = make_nso_rr_using_factory<sbf_ba>(src);
-	// 	CHECK( formula.has_value() );
-	// 	if (!formula.has_value()) return;
-	// 	auto fm = formula.value().main;
-	// 	auto result = pull_sometimes_always_out(fm);
-	// 	auto simp_res = result
-	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
-	// 		| reduce_wff<sbf_ba>;
-	// 	std::stringstream ss; ss << simp_res;
-	// 	CHECK(ss.str() == "x = 0");
-	// }
-// }
+TEST_SUITE("syntactic_path_simplification") {
+	TEST_CASE("1") {
+		const char* sample = "x & (z' | (y & (k | x'))) & x | x & y | z & (z' | k) & z | (j & l) | k | (j & l)'";
+		tref fm = get_bf_nso_rr("", sample).value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm)();
+		CHECK((tau::get(res).to_str() == "1"));
+	}
+	TEST_CASE("2") {
+		const char* sample = "x = 0 && (z != 0 || (y = 0 && (k = 0 || x != 0))) && x = 0 || x = 0 && y = 0 || z = 0 && (z != 0 || k = 0) && z = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm)();
+		CHECK(tau::get(res).to_str() == "x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0");
+	}
+	TEST_CASE("3") {
+		const char* sample = "x & (z' | (y & (k | x'))) & x | x & y | z & (z' | k) & z";
+		tref fm = get_bf_nso_rr("", sample).value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm)();
+		CHECK((tau::get(res).to_str() == "x(z'|yk)|xy|zk"));
+	}
+	TEST_CASE("4") {
+		const char* sample = "x = 0 && (z != 0 || (y = 0 && (k = 0 || x != 0))) && x = 0 || x = 0 && y = 0 || z = 0 && (z != 0 || k = 0) && z = 0 || (j = 0 && l = 0) || k = 0 || !(j = 0 && l = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm)();
+		CHECK((tau::get(res).to_str() == "T"));
+	}
+}
