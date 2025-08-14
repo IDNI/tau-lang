@@ -53,8 +53,8 @@ std::optional<solution<node>> find_solution(equality eq,
 	{
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		tref g = rewriter::replace_with<node>(vars[0], tau::_1(), f);
-		tref h = rewriter::replace_with<node>(vars[0], tau::_0(), f);
+		tref g = rewriter::replace<node>(vars[0], tau::_1(), f);
+		tref h = rewriter::replace<node>(vars[0], tau::_0(), f);
 		tref gh = tt(tau::get(g) & tau::get(h))
 			| bf_reduce_canonical<node>() | tt::ref;
 #ifdef DEBUG
@@ -249,7 +249,7 @@ struct minterm_iterator {
 					& ~tau::get(v)).get();
 				choices.emplace_back(v, false, partial_bf,
 							partial_minterm);
-				partial_bf = rewriter::replace_with<node>(v,
+				partial_bf = rewriter::replace<node>(v,
 					tau::_0(), partial_bf);
 				DBG(LOG_TRACE << "minterm_iterator/partial_bf: "
 					<< LOG_FM(partial_bf);)
@@ -313,9 +313,9 @@ private:
 
 	tref make_current_minterm() {
 		tref cte = choices.back().value
-			? rewriter::replace_with<node>(choices.back().var,
+			? rewriter::replace<node>(choices.back().var,
 				tau::_1(), choices.back().partial_bf)
-			: rewriter::replace_with<node>(choices.back().var,
+			: rewriter::replace<node>(choices.back().var,
 				tau::_0(), choices.back().partial_bf);
 		tref current = (tau::get(cte) & tau::get(choices.back()
 						.partial_minterm)).get();
@@ -358,10 +358,10 @@ private:
 					: ~tau::get(choices[i].var))
 				& tau::get(choices[i - 1].partial_minterm)).get();
 			choices[i].partial_bf = choices[i - 1].value
-				? rewriter::replace_with<node>(
+				? rewriter::replace<node>(
 					choices[i - 1].var, tau::_1(),
 					choices[i - 1].partial_bf)
-				: rewriter::replace_with<node>(
+				: rewriter::replace<node>(
 					choices[i - 1].var, tau::_0(),
 					choices[i - 1].partial_bf);
 			// if current partial bf is 0, we can skip the rest of the choices
