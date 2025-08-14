@@ -386,4 +386,21 @@ tref tau_splitter(tref fm, splitter_type st) {
 	}
 }
 
+// Splitter function for a nso tau::bf_constant node holding a BA constant
+template <typename... BAs>
+requires BAsPack<BAs...>
+const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
+	splitter_type st)
+{
+	// Lambda for calling splitter on n
+	auto _splitter = [&st](const auto& t) -> std::variant<BAs...> {
+		return splitter(t, st);
+	};
+	DBG(assert(t.is_ba_constant());)
+	return tree<node<BAs...>>::get(
+		tree<node<BAs...>>::build_bf_ba_constant(
+			std::visit(_splitter, t.get_ba_constant()),
+			t.get_ba_type()));
+}
+
 } // namespace idni::tau_lang
