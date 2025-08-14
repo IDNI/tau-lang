@@ -124,6 +124,15 @@ auto visit_wff = [](tref n) static {
 };
 
 template <NodeType node>
+auto is_boolean_operation = [](tref n) static {
+	using tau = tree<node>;
+	const tau& t = tau::get(n);
+	if (t.is(tau::bf) || t.is(tau::bf_and) || t.is(tau::bf_or)
+		|| t.is(tau::bf_xor)|| t.is(tau::bf_neg)) return true;
+	return false;
+};
+
+template <NodeType node>
 size_t find_ba_type (tref term) {
 	using tau = tree<node>;
 	size_t type = 0;
