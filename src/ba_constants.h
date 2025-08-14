@@ -17,6 +17,9 @@ struct ba_constants {
 	// insert the constant value of a type id to the pool
 	static tref get(const constant& constant, size_t type_id);
 
+	// insert the constant given by the string of a type id to the pool
+	//static tref get(const std::string& constant, size_t type_id);
+
 	// get the constant variant value by constant id
 	static constant get(size_t constant_id);
 
