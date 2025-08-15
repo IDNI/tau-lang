@@ -124,10 +124,8 @@ struct nso_factory<sbf_ba, Bool> {
 	optional<constant_with_type<sbf_ba, Bool>> parse_Bool(
 		const string& constant_source) const
 	{
-		auto r = nso_factory<Bool>::parse(constant_source, "bool");
-		if (!r) return {};
-		return constant_with_type<sbf_ba, Bool>{
-			std::get<Bool>(r.value().first), "bool" };
+		return ba_constants<node>::get(constant_source, "bool");
+
 	}
 
 	optional<constant_with_type<sbf_ba, Bool>> parse(

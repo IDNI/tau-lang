@@ -26,17 +26,6 @@ requires BAsPack<BAs...>
 struct nso_factory {
 
 	/**
-	 * Parses the given string into a tau object.
-	 * @param constant_source The string to parse.
-	 * @param options Optional parse options.
-	 * @return A pair with the parsed constant and the string type name
-	 */
-	static std::optional<constant_with_type<BAs...>> parse(
-		const std::string& constant_source,
-		const std::string type_name,
-		const std::string options = "");
-
-	/**
 	 * Returns a vector of available types.
 	 * @return A vector of type names.
 	 */

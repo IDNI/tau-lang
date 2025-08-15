@@ -57,6 +57,7 @@ requires(cache_t& cache, const typename cache_t::key_type& key,
 // forward declarations
 
 template <NodeType node> struct rr;
+template <NodeType node> struct ba_constants;
 template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
 
@@ -80,7 +81,6 @@ requires BAsPack<BAs...>
 struct node {
 	using node_t = node<BAs...>;
 	using type = tau_parser::nonterminal;
-
 	// alias for recreation of the packed variant
 	using constant = std::variant<BAs...>;
 	// alias for nso_factory<BAs...>

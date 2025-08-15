@@ -4,11 +4,11 @@ namespace idni::tau_lang {
 
 // ---------------------------------------------------------------------
 
-std::optional<constant_with_type<sbf_ba>> nso_factory<sbf_ba>::parse(
+/*std::optional<constant_with_type<sbf_ba>> nso_factory<sbf_ba>::parse(
 	const std::string& src, const std::string)
 {
 	return sbf_ba_factory<sbf_ba>::parse(src);
-}
+}*/
 
 std::vector<std::string> nso_factory<sbf_ba>::types() {
 	return { "sbf" };
@@ -41,14 +41,14 @@ std::variant<sbf_ba> nso_factory<sbf_ba>::pack_tau_ba(
 	return {};
 }
 
-std::optional<constant_with_type<tau_ba<sbf_ba>, sbf_ba>>
+/*std::optional<constant_with_type<tau_ba<sbf_ba>, sbf_ba>>
 	nso_factory<tau_ba<sbf_ba>, sbf_ba>::parse(
 		const std::string& constant_source,
 		const std::string type_name)
 {
 	return type_name == "sbf" ? sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba>::parse(constant_source)
 				  : tau_ba_factory<sbf_ba>::parse(constant_source);
-}
+}*/
 
 std::vector<std::string> nso_factory<tau_ba<sbf_ba>, sbf_ba>::types() {
 	return { "sbf", "tau" };

@@ -207,7 +207,7 @@ constexpr size_t node<BAs...>::hashit() const {
 	hash_combine(seed, static_cast<bool>(ext));
 	// Get ba constant from pool
 	if (nt == type::bf_constant && data != 0 && ba != 0)
-		hash_combine(seed, ba_constants<node>::get(data));
+		hash_combine(seed, tau_lang::ba_constants<node>::get(data));
 	// Get string from pool, untyped bf_constant also has string as data
 	else if (tree<node>::is_string_nt(nt) || nt == type::bf_constant)
 		hash_combine(seed, dict(data));

@@ -4,6 +4,7 @@
 // including instead of #include "tau.h" to avoid errors pointing to the generated tau.h
 #	include "boolean_algebras/nso_ba.h"
 #	include "boolean_algebras/sbf_ba.h"
+#   include "ba_constants.h"
 #   include "runtime.h"
 #else
 #	include "tau.h"

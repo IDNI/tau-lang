@@ -12,15 +12,6 @@ namespace idni::tau_lang {
 template<>
 struct nso_factory<Bool> {
 
-	static optional<constant_with_type<Bool>> parse(
-		const string& constant_source, const string) {
-		if (constant_source == "1" || constant_source == "true")
-			return constant_with_type<Bool>{ Bool(true), "bool" };
-		if (constant_source == "0" || constant_source == "false")
-			return constant_with_type<Bool>{ Bool(false), "bool" };
-		return {};
-	}
-
 	static vector<string> types() { return { "bool" }; }
 
 	static string default_type() { return "bool"; }
@@ -36,6 +27,18 @@ struct nso_factory<Bool> {
 
 	static std::variant<Bool> pack_tau_ba(tref) { return {}; }
 };
+
+template <>
+std::optional<typename ba_constants<node<Bool>>::constant_with_type> ba_constants<node<Bool>>::get(
+		[[maybe_unused]] const std::string& constant_source,
+		[[maybe_unused]] const std::string type_name,
+		[[maybe_unused]] const std::string options) {
+	if (constant_source == "1" || constant_source == "true")
+		return ba_constants<node<Bool>>::constant_with_type{ Bool(true), "bool" };
+	if (constant_source == "0" || constant_source == "false")
+		return ba_constants<node<Bool>>::constant_with_type{ Bool(false), "bool" };
+	return {};
+}
 
 } // namespace idni::tau_lang
 

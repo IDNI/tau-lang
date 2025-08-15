@@ -83,7 +83,7 @@ std::optional<assignment<node>> finputs<node>::read() {
 			// TODo (MEDIUM) add echo for input from a file instead of console
 		}
 		if (line.empty()) return {}; // no more inputs
-		auto cnst = node::nso_factory::parse(line,
+		auto cnst = ba_constants<node>::get(line,
 			get_ba_type_name<node>(types[var]));
 		if (!cnst) {
 			LOG_ERROR << "Failed to parse input value '"
@@ -135,7 +135,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 				<< get_var_name<node>(vn);
 			return {};
 		}
-		auto cnst = node::nso_factory::parse(line,
+		auto cnst = ba_constants<node>::get(line,
 				get_ba_type_name<node>(it->second));
 		if (!cnst) {
 			LOG_ERROR << "Failed to parse input value '" << line

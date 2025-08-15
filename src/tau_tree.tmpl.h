@@ -443,7 +443,7 @@ tref tree<node>::get_ba_constant_from_source(
 		? get( // untyped contains source sid
 			node::ba_constant(constant_source_sid, ba_type_id))
 		: get_ba_constant(
-				node::nso_factory::parse(
+				ba_constants<node>::get(
 					dict(constant_source_sid),
 					ba_types<node>::name(ba_type_id)));
 	if (r == nullptr) LOG_ERROR << "Parsing constant `"
