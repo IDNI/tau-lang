@@ -24,10 +24,8 @@ private:
 	// removes type info from constants and vars and adds their scope_id
 	// used as a preparation (first) step before type checking and propagation
 	// vscids = vars scope ids
-	// csid = constant scope id
-	// tsid = temporal scope id
-	tref add_scope_ids(tref n,
-			var_scopes_t& vscids, size_t csid, size_t& tsid);
+	// scid = scope id
+	tref add_scope_ids(tref n, var_scopes_t& vscids, size_t& scid);
 
 	// checks and propagates types within the scope (global or quantifier)
 	tref check_and_propagate(tref n);
