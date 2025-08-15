@@ -18,10 +18,6 @@ namespace idni::tau_lang {
 template <>
 struct nso_factory<sbf_ba> {
 
-	static std::optional<constant_with_type<sbf_ba>> parse(
-		const std::string& constant_source,
-		const std::string = "");
-
 	static std::vector<std::string> types();
 
 	static std::string default_type();
@@ -44,10 +40,6 @@ struct nso_factory<sbf_ba> {
 template<>
 struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 
-	static std::optional<constant_with_type<tau_ba<sbf_ba>, sbf_ba>> parse(
-		const std::string& constant_source,
-		const std::string type_name);
-
 	static std::vector<std::string> types();
 
 	static std::string default_type();
@@ -64,6 +56,24 @@ struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 
 };
 
+
+template <>
+std::optional<typename ba_constants<node<sbf_ba>>::constant_with_type> ba_constants<node<sbf_ba>>::get(
+		[[maybe_unused]] const std::string& constant_source,
+		[[maybe_unused]] const std::string type_name,
+		[[maybe_unused]] const std::string options) {
+	return sbf_ba_factory<sbf_ba>::parse(constant_source);
+}
+
+template <>
+std::optional<typename ba_constants<node<tau_ba<sbf_ba>, sbf_ba>>::constant_with_type> ba_constants<node<tau_ba<sbf_ba>, sbf_ba>>::get(
+		[[maybe_unused]] const std::string& constant_source,
+		[[maybe_unused]] const std::string type_name,
+		[[maybe_unused]] const std::string options) {
+	return type_name == "sbf"
+		? sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba>::parse(constant_source)
+		: tau_ba_factory<sbf_ba>::parse(constant_source);
+}
 
 } // namespace idni::tau_lang
 
