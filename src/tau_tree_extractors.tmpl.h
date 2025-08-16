@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+//#include <cvc5/cvc5.h>
+
 #include "tau_tree.h"
 
 #undef LOG_CHANNEL_NAME
@@ -430,6 +432,8 @@ bool has_temp_var(tref fm) {
 	// any input/output stream is a temporal variable, also constant positions
 	else return true;
 }
+
+//bool is_closed(const cvc5::Term&) { return false;}
 
 template <NodeType node>
 bool has_open_tau_fm_in_constant(tref fm) {

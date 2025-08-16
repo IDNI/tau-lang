@@ -7,11 +7,13 @@
 #ifdef DEBUG
 // including nso_ba, sbf_ba and interpreter directly instead of
 // #include "tau.h" to avoid error lines pointing to a generated tau.h
-#include "boolean_algebras/nso_ba.h"
-#include "boolean_algebras/sbf_ba.h"
 #include "boolean_algebras/bv_ba.h"
-#include "interpreter.h"
+#include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/nso_ba.h"
+#include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/variant_ba.h"
 #include "runtime.h"
+#include "interpreter.h"
 #else
 #	include "tau.h"
 #endif // DEBUG
@@ -131,7 +133,7 @@ int main(int argc, char** argv) {
 	// spec provided, run it
 	if (files.size()) return run_tau_spec(files.front(), charvar, exp, sev);
 
-	repl_evaluator<sbf_ba> re({
+	repl_evaluator<bv, sbf_ba> re({
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,

@@ -4,7 +4,7 @@
 #define __IDNI__TAU__TESTS__TEST_TAU_HELPERS_H__
 
 // helper types and functions for tau with just Bool BA as tree<node<Bool>>
-#define bas_pack tau_ba<sbf_ba>, sbf_ba
+#define bas_pack tau_ba<bv, sbf_ba>, bv, sbf_ba
 #include "test_helpers.h"
 
 namespace idni::tau_lang {

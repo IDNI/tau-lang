@@ -835,7 +835,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 		return tau::get(n).child_is(tau::variable);
 	};
 	auto vars = t.select_top(is_var);
-	sort(vars.begin(), vars.end(), lex_var_comp<node>);
+	std::sort(vars.begin(), vars.end(), lex_var_comp<node>);
 
 	std::vector<int_t> i(vars.size()); // Record assignments of vars
 
