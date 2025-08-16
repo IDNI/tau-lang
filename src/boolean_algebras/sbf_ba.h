@@ -4,8 +4,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
 
 #include "boolean_algebras/bdds/bdd_handle.h"
-#include "boolean_algebras/tau_ba.h"
-#include "boolean_algebras/variant_ba.h"
+#include "tau_tree.h"
 
 namespace idni::tau_lang {
 
@@ -45,6 +44,8 @@ struct sbf_ba_factory {
 
 	//inline static std::map<size_t, std::variant<BAs...>> cache;
 };
+
+bool is_closed(const sbf_ba&) { return true; }
 
 } // namespace idni::tau_lang
 

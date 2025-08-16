@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "boolean_algebras/nso_ba.h"
+#include "nso_ba.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "nso_ba"

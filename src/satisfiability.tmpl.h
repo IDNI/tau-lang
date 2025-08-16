@@ -292,7 +292,7 @@ bool is_run_satisfiable(tref fm) {
 
 	auto free_io_vars = get_free_vars_from_nso<node>(fm);
 	trefs io_vars = t.select_top(is_child<node, tau::io_var>);
-	sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
+	std::sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
 
 	// All io_vars in fm have to refer to constant time positions
 	DBG(assert(std::all_of(io_vars.begin(), io_vars.end(),
@@ -326,7 +326,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 	// All io_vars in fm have to refer to constant time positions
 	DBG(assert(std::all_of(io_vars.begin(), io_vars.end(),
 		[](tref el){ return is_io_initial<node>(el); }));)
-	sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
+	std::sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
 
 	auto free_io_vars = get_free_vars_from_nso<node>(uconst_ctns);
 	while (io_vars.size()) {
@@ -806,7 +806,7 @@ tref add_st_ctn(tref st, const int_t timepoint, const int_t steps) {
 	for (int_t s = 0; s <= steps; ++s) {
 		subtree_map<node, tref> changes;
 		for (size_t i = 0; i < io_vars.size(); ++i) {
-			tref new_io_var = 
+			tref new_io_var =
 				transform_io_var<node>(io_vars[i], timepoint + s);
 			changes[io_vars[i]] = new_io_var;
 		}
@@ -1142,4 +1142,3 @@ tref simp_tau_unsat_valid(tref fm, const int_t start_time, const bool output) {
  */
 
 } // namespace idni::tau_lang
-
