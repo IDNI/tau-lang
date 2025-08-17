@@ -9,7 +9,7 @@
 
 namespace idni::tau_lang {
 
-static cvc5::Solver cvc5_solver;
+static cvc5::TermManager cvc5_term_manager;
 
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
