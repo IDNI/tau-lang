@@ -78,7 +78,10 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
+	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 )
+add_dependencies(${TAU_OBJECT_LIB_NAME} cvc5)
 
 #
 # static library
@@ -91,9 +94,13 @@ target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
+	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 )
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
+add_dependencies(${TAU_STATIC_LIB_NAME} cvc5)
+
 if(NOT TAU_BUILD_STATIC_LIBRARY)
 	exclude(${TAU_STATIC_LIB_NAME})
 endif()
@@ -109,12 +116,16 @@ target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 	$<INSTALL_INTERFACE:.>
+	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 )
 set_target_properties(${TAU_SHARED_LIB_NAME} PROPERTIES
 	EXPORT_NAME ${TAU_SHARED_LIB_NAME}
 	PUBLIC_HEADER "${TAU_HEADERS}"
 )
+add_dependencies(${TAU_SHARED_LIB_NAME} cvc5)
+
 if(NOT TAU_BUILD_SHARED_LIBRARY)
 	exclude(${TAU_SHARED_LIB_NAME})
 endif()
@@ -123,15 +134,18 @@ endif()
 # executable
 #
 if(TAU_BUILD_EXECUTABLE)
-        add_executable(${TAU_EXECUTABLE_NAME})
-        target_sources(${TAU_EXECUTABLE_NAME} PRIVATE ${CLI_SOURCES})
-        target_setup(${TAU_EXECUTABLE_NAME})
-        target_link_libraries(${TAU_EXECUTABLE_NAME} ${TAU_STATIC_LIB_NAME})
+	add_executable(${TAU_EXECUTABLE_NAME})
+	target_sources(${TAU_EXECUTABLE_NAME} PRIVATE ${CLI_SOURCES})
+	target_setup(${TAU_EXECUTABLE_NAME})
+	target_link_libraries(${TAU_EXECUTABLE_NAME} ${TAU_STATIC_LIB_NAME})
 	target_include_directories(${TAU_EXECUTABLE_NAME} PUBLIC
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
+		$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
+		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
+	add_dependencies(${TAU_EXECUTABLE_NAME} cvc5)
 endif(TAU_BUILD_EXECUTABLE)
 
 #
@@ -146,7 +160,10 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/parser>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
+		$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
+		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
+	add_dependencies(${TAU_BUILD_SHARED_EXECUTABLE} cvc5)
 endif(TAU_BUILD_SHARED_EXECUTABLE)
 
 #
