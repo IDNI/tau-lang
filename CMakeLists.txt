@@ -20,6 +20,7 @@ project("${PROJECT_NAME}"
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
 
 include(FetchContent)
+include(ExternalProject)
 
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
 option(TAU_MEASURE                 "Measure tau performance"               OFF)
@@ -176,9 +177,35 @@ message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 
 #
-# Add tauparser library
+# Add tau parser library as external project
 #
 add_subdirectory(external/parser)
+
+#
+# Add cvc5 as an external project
+ExternalProject_Add(
+    cvc5_external_project
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
+    CONFIGURE_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5 && ${CMAKE_SOURCE_DIR}/external/cvc5/configure.sh --no-gpl --auto-download
+    BUILD_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5/build # && make && make test && make install
+    INSTALL_COMMAND cp ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so.1  ${PROJECT_BINARY_DIR}/
+    UPDATE_COMMAND ""
+    BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/external/cvc5/build/libcvc5.so
+)
+
+set(CVC5_FOUND TRUE)
+set(CVC5_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/external/cvc5/include/")
+set(CVC5_LIBRARIES "${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so")
+
+add_library(cvc5 STATIC IMPORTED GLOBAL)
+set_target_properties(
+  cvc5 PROPERTIES IMPORTED_LOCATION "${CVC5_LIBRARIES}"
+)
+set_target_properties(
+  cvc5 PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${CVC5_INCLUDE_DIR}"
+)
+add_dependencies(cvc5 cvc5_external_project)
+set(CVC5_LIB cvc5)
 
 #
 # Adding Boost log library
@@ -228,12 +255,12 @@ option(PARSER_BUILD_STATIC_LIBRARY "Build only static library" ON)
 #
 # Adding CVC5
 #
-find_library(CVC5
-	NAMES cvc5
-	HINTS /usr/lib)
-add_library(CVC5 SHARED IMPORTED)
-set_target_properties(CVC5 PROPERTIES IMPORTED_LOCATION "${CVC5}")
-set(CVC5_LIB "CVC5")
+#find_library(CVC5
+#	NAMES cvc5
+#	HINTS /usr/lib)
+#add_library(CVC5 SHARED IMPORTED)
+#set_target_properties(CVC5 PROPERTIES IMPORTED_LOCATION "${CVC5}")
+#set(CVC5_LIB "CVC5")
 
 #
 # Generate C++ parser from TGF if requested
