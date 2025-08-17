@@ -187,7 +187,7 @@ ExternalProject_Add(
     cvc5_external_project
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
     CONFIGURE_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5 && ${CMAKE_SOURCE_DIR}/external/cvc5/configure.sh --no-gpl --auto-download
-    BUILD_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5/build # && make && make test && make install
+    BUILD_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5/build && make # && make test && make install
     INSTALL_COMMAND cp ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so.1  ${PROJECT_BINARY_DIR}/
     UPDATE_COMMAND ""
     BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/external/cvc5/build/libcvc5.so

@@ -8,7 +8,8 @@ using namespace cvc5;
 
 TEST_SUITE("sample cvc5 programs") {
 
-	static Solver bv_solver;
+	static TermManager cvc5_term_manager;
+	static Solver cvc5_solver(cvc5_term_manager);
 
 	TEST_CASE("forall sample (static)") {
 		/*
@@ -19,14 +20,14 @@ TEST_SUITE("sample cvc5 programs") {
 		)
 		(check-sat)
 		*/
-		auto bv4 = bv_solver.mkBitVectorSort(4);
-		auto x = bv_solver.mkVar(bv4, "x");
-		auto b0101 = bv_solver.mkBitVector(4, 3);
-		auto eq = bv_solver.mkTerm(Kind::EQUAL, {x, b0101});
-		auto q_x = bv_solver.mkTerm(Kind::VARIABLE_LIST, {x});
-		auto fml = bv_solver.mkTerm(Kind::FORALL, {q_x, eq});
-		bv_solver.assertFormula(fml);
-		auto result = bv_solver.checkSat();
+		auto bv4 = cvc5_term_manager.mkBitVectorSort(4);
+		auto x = cvc5_term_manager.mkVar(bv4, "x");
+		auto b0101 = cvc5_term_manager.mkBitVector(4, 3);
+		auto eq = cvc5_term_manager.mkTerm(Kind::EQUAL, {x, b0101});
+		auto q_x = cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {x});
+		auto fml = cvc5_term_manager.mkTerm(Kind::FORALL, {q_x, eq});
+		cvc5_solver.assertFormula(fml);
+		auto result = cvc5_solver.checkSat();
 
 		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
 		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
@@ -43,15 +44,14 @@ TEST_SUITE("sample cvc5 programs") {
 		)
 		(check-sat)
 		*/
-		Solver solver;
-		auto bv4 = solver.mkBitVectorSort(4);
-		auto x = solver.mkVar(bv4, "x");
-		auto b0101 = solver.mkBitVector(4, 3);
-		auto eq = solver.mkTerm(Kind::EQUAL, {x, b0101});
-		auto q_x = solver.mkTerm(Kind::VARIABLE_LIST, {x});
-		auto fml = solver.mkTerm(Kind::FORALL, {q_x, eq});
-		solver.assertFormula(fml);
-		auto result = solver.checkSat();
+		auto bv4 = cvc5_term_manager.mkBitVectorSort(4);
+		auto x = cvc5_term_manager.mkVar(bv4, "x");
+		auto b0101 = cvc5_term_manager.mkBitVector(4, 3);
+		auto eq = cvc5_term_manager.mkTerm(Kind::EQUAL, {x, b0101});
+		auto q_x = cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {x});
+		auto fml = cvc5_term_manager.mkTerm(Kind::FORALL, {q_x, eq});
+		cvc5_solver.assertFormula(fml);
+		auto result = cvc5_solver.checkSat();
 
 		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
 		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
@@ -68,15 +68,14 @@ TEST_SUITE("sample cvc5 programs") {
 		)
 		(check-sat)
 		*/
-		Solver solver;
-		auto bv4 = solver.mkBitVectorSort(4);
-		auto x = solver.mkVar(bv4, "x");
-		auto b0101 = solver.mkBitVector(4, 3);
-		auto eq = solver.mkTerm(Kind::EQUAL, {x, b0101});
-		auto q_x = solver.mkTerm(Kind::VARIABLE_LIST, {x});
-		auto fml = solver.mkTerm(Kind::EXISTS, {q_x, eq});
-		solver.assertFormula(fml);
-		auto result = solver.checkSat();
+		auto bv4 = cvc5_term_manager.mkBitVectorSort(4);
+		auto x = cvc5_term_manager.mkVar(bv4, "x");
+		auto b0101 = cvc5_term_manager.mkBitVector(4, 3);
+		auto eq = cvc5_term_manager.mkTerm(Kind::EQUAL, {x, b0101});
+		auto q_x = cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {x});
+		auto fml = cvc5_term_manager.mkTerm(Kind::EXISTS, {q_x, eq});
+		cvc5_solver.assertFormula(fml);
+		auto result = cvc5_solver.checkSat();
 
 		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
 		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
@@ -111,36 +110,35 @@ TEST_SUITE("sample cvc5 programs") {
 		)
 		(check-sat)
 		*/
-		Solver solver;
-		auto bvSort = solver.mkBitVectorSort(4);
-		auto o1_t = solver.mkVar(bvSort, "o1_t");
-		auto i1_t = solver.mkVar(bvSort, "i1_t");
+		auto bvSort = cvc5_term_manager.mkBitVectorSort(4);
+		auto o1_t = cvc5_term_manager.mkVar(bvSort, "o1_t");
+		auto i1_t = cvc5_term_manager.mkVar(bvSort, "i1_t");
 
 		auto fml =
-			solver.mkTerm(Kind::NOT, {
-				solver.mkTerm(Kind::AND, {
-					solver.mkTerm(Kind::FORALL, {
-						solver.mkTerm(Kind::VARIABLE_LIST, {i1_t}),
-						solver.mkTerm(Kind::FORALL, {
-							solver.mkTerm(Kind::VARIABLE_LIST, {o1_t}),
-							solver.mkTerm(Kind::OR,	{
-								solver.mkTerm(Kind::DISTINCT, {i1_t, o1_t}),
-								solver.mkTerm(Kind::EQUAL, {i1_t, o1_t})
+			cvc5_term_manager.mkTerm(Kind::NOT, {
+				cvc5_term_manager.mkTerm(Kind::AND, {
+					cvc5_term_manager.mkTerm(Kind::FORALL, {
+						cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {i1_t}),
+						cvc5_term_manager.mkTerm(Kind::FORALL, {
+							cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {o1_t}),
+							cvc5_term_manager.mkTerm(Kind::OR,	{
+								cvc5_term_manager.mkTerm(Kind::DISTINCT, {i1_t, o1_t}),
+								cvc5_term_manager.mkTerm(Kind::EQUAL, {i1_t, o1_t})
 							})
 						})
 					}),
-					solver.mkTerm(Kind::FORALL, {
-						solver.mkTerm(Kind::VARIABLE_LIST, {i1_t}),
-						solver.mkTerm(Kind::OR, {
-							solver.mkTerm(Kind::FORALL, {
-								solver.mkTerm(Kind::VARIABLE_LIST, {o1_t}),
-								solver.mkTerm(Kind::DISTINCT, {i1_t, o1_t})
+					cvc5_term_manager.mkTerm(Kind::FORALL, {
+						cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {i1_t}),
+						cvc5_term_manager.mkTerm(Kind::OR, {
+							cvc5_term_manager.mkTerm(Kind::FORALL, {
+								cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {o1_t}),
+								cvc5_term_manager.mkTerm(Kind::DISTINCT, {i1_t, o1_t})
 							}),
-							solver.mkTerm(Kind::FORALL, {
-								solver.mkTerm(Kind::VARIABLE_LIST, {i1_t}),
-								solver.mkTerm(Kind::EXISTS, {
-									solver.mkTerm(Kind::VARIABLE_LIST, {o1_t}),
-									solver.mkTerm(Kind::EQUAL, {i1_t, o1_t})
+							cvc5_term_manager.mkTerm(Kind::FORALL, {
+								cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {i1_t}),
+								cvc5_term_manager.mkTerm(Kind::EXISTS, {
+									cvc5_term_manager.mkTerm(Kind::VARIABLE_LIST, {o1_t}),
+									cvc5_term_manager.mkTerm(Kind::EQUAL, {i1_t, o1_t})
 								})
 							})
 						})
@@ -149,7 +147,7 @@ TEST_SUITE("sample cvc5 programs") {
 			});
 
 		// TODO (MEDIUM) correct the above formula (using scopes)
-		CHECK_THROWS(solver.assertFormula(fml));
+		CHECK_THROWS(cvc5_solver.assertFormula(fml));
 
 		//auto result = solver.checkSat();
 		//BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;

@@ -15,6 +15,7 @@ using bv = cvc5::Term;
 using sort = cvc5::Sort;
 using bvs = std::vector<bv>;
 using solver = cvc5::Solver;
+using term_manager = cvc5::TermManager;
 
 static size_t bv_default_size = 64;
 
@@ -27,11 +28,11 @@ using solution = subtree_map<node, tref>;
 template<NodeType node>
 size_t get_bv_size(const tref b);
 
-static void bv_config() {
+void config_cvc5_solver(cvc5::Solver& solver) {
 	// configure the solver
-	cvc5_solver.setOption("produce-models", "true");
-	//cvc5_solver.setOption("incremental", "true");
-	cvc5_solver.setLogic("BV");
+	solver.setOption("produce-models", "true");
+	//solver.setOption("incremental", "true");
+	solver.setLogic("BV");
 }
 
 // -----------------------------------------------------------------------------
