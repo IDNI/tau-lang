@@ -187,6 +187,7 @@ message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 
 #
 # Add cvc5 as an external project
+#
 ExternalProject_Add(
     cvc5_external_project
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
@@ -230,37 +231,6 @@ if (Boost_FOUND)
 else()
 	message(FATAL_ERROR "Boost not found")
 endif()
-
-#
-# Adding Z3
-#
-#if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-#	set(Z3_BUILD_LIBZ3_SHARED OFF CACHE BOOL "Disable shared Z3 library")
-#	FetchContent_Declare(Z3
-#		GIT_REPOSITORY https://github.com/Z3Prover/z3
-#		GIT_TAG        z3-4.8.12
-#	)
-#	FetchContent_MakeAvailable(Z3)
-#	include_directories(${Z3_SOURCE_DIR}/src/api)
-#	set(Z3_LIB "libz3")
-#else()
-#	find_library(Z3
-#		NAMES z3
-#		HINTS /usr/lib)
-#	add_library(Z3 SHARED IMPORTED)
-#	set_target_properties(Z3 PROPERTIES IMPORTED_LOCATION "${Z3}")
-#	set(Z3_LIB "Z3")
-#endif()
-
-#
-# Adding CVC5
-#
-#find_library(CVC5
-#	NAMES cvc5
-#	HINTS /usr/lib)
-#add_library(CVC5 SHARED IMPORTED)
-#set_target_properties(CVC5 PROPERTIES IMPORTED_LOCATION "${CVC5}")
-#set(CVC5_LIB "CVC5")
 
 #
 # Generate C++ parser from TGF if requested
