@@ -1,22 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "test_init.h"
+#include "test_Bool_helpers.h"
 
-#include <cassert>
-
-#include "doctest.h"
-
-#include "test_helpers.h"
 #include "resolver.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
 
 TEST_SUITE("resolver") {
     TEST_CASE("empty resolver") {
-		resolver<Bool> r;
+		resolver r;
 		// current vars map is empty
 		CHECK(r.current.vars.empty());
 		// no parent scope
@@ -29,10 +20,10 @@ TEST_SUITE("resolver") {
 		CHECK(r.status().first.empty());
 		CHECK(r.status().second.empty());
 	}
-	
+
     TEST_CASE("resolver with one untyped variable") {
-		resolver<Bool> r;
-		auto x = build_variable<Bool>("x");
+		resolver r;
+		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
 		r.add(x);
 		// current vars map has one element...
 		CHECK(r.current.vars.size() == 1);
@@ -51,9 +42,10 @@ TEST_SUITE("resolver") {
 	}
 
     TEST_CASE("resolver with one typed variable") {
-		resolver<Bool> r;
-		auto x = build_variable<Bool>("x");
-		auto type = build_type<Bool>("bool");
+		resolver r;
+		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
+		// we just need a fake type to check everything
+		auto type = tree<node_t>::build_var_name("bool");
 		r.add(x);
 		r.type(x, type);
 		// current vars map has one element...
@@ -73,9 +65,9 @@ TEST_SUITE("resolver") {
 	}
 
     TEST_CASE("resolver with two untyped variable") {
-		resolver<Bool> r;
-		auto x = build_variable<Bool>("x");
-		auto y = build_variable<Bool>("y");
+		resolver r;
+		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
+		auto y = tree<node_t>::build_variable("y", ba_types<node_t>::id("bool"));
 		r.add(x);
 		r.add(y);
 		// current vars map has two elements...
@@ -99,10 +91,10 @@ TEST_SUITE("resolver") {
 	}
 
     TEST_CASE("resolver with two variables, one typed and the other one connected") {
-		resolver<Bool> r;
-		auto x = build_variable<Bool>("x");
-		auto y = build_variable<Bool>("y");
-		auto type = build_type<Bool>("bool");
+		resolver r;
+		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
+		auto y = tree<node_t>::build_variable("y", ba_types<node_t>::id("bool"));
+		auto type = tree<node_t>::build_var_name("bool");
 		r.add(x);
 		r.add(y);
 		r.type(x, type);
@@ -126,10 +118,10 @@ TEST_SUITE("resolver") {
 	}
 
     TEST_CASE("resolver with two nested scopes with same name variables and different types") {
-		resolver<Bool> r;
-		auto x = build_variable<Bool>("x");
-		auto type_a = build_type<Bool>("type_a");
-		auto type_b = build_type<Bool>("type_b");
+		resolver r;
+		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
+		auto type_a = tree<node_t>::build_var_name("type_a");
+		auto type_b = tree<node_t>::build_var_name("type_b");
 		// we add the first x and typed it with type_a
 		r.add(x);
 		r.type(x, type_a);
@@ -168,8 +160,8 @@ TEST_SUITE("resolver") {
 	}
 
     TEST_CASE("resolver with two nested scopes with an inner untyped variable") {
-		resolver<Bool> r;
-		auto x = build_variable<Bool>("x");
+		resolver r;
+		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
 		// we add the first x and typed it with type_a
 		r.open(x);
 		// current vars map in the inner scope has one element...
@@ -205,9 +197,9 @@ TEST_SUITE("resolver") {
 	}
 
     TEST_CASE("resolver with two nested scopes with an inner typed variable") {
-		resolver<Bool> r;
-		auto x = build_variable<Bool>("x");
-		auto type = build_type<Bool>("bool");
+		resolver r;
+		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
+		auto type = tree<node_t>::build_var_name("bool");
 		// we add the first x and typed it with type_a
 		r.open(x, type);
 		// current vars map in the inner scope has one element...

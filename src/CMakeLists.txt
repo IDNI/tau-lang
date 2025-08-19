@@ -11,6 +11,7 @@ set(TAU_HEADERS
 	boolean_algebras/nso_ba.h
 	boolean_algebras/tau_ba.h
 	boolean_algebras/bv_ba.h
+	boolean_algebras/bv_ba_widths.h
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
 	tau_tree.h         # tau tree, node, tree traverser, builders,
@@ -29,6 +30,7 @@ set(TAU_HEADERS
 	splitter_types.h
 	splitter.h
 	solver.h
+	resolver.h
 	interpreter.h
 	union_find.h       # union find data structure
 	nso_factory.h      # abstract template interface

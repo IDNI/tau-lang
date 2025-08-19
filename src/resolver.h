@@ -4,18 +4,19 @@
 #include <memory>
 #include <vector>
 
-#include "nso_rr.h"
+#include "tau_tree.h"
 
-template<typename...BAs>
+namespace idni::tau_lang {
+
 struct resolver {
 
 	struct scope {
 		std::shared_ptr<scope> parent;
-		std::map<tau<BAs...>, size_t> vars;
+		std::map<tref, size_t> vars;
 
 		scope open() {
 			return scope{
-				.parent = std::make_shared<scope>(*this), 
+				.parent = std::make_shared<scope>(*this),
 				.vars = vars };
 		}
 
@@ -32,13 +33,13 @@ struct resolver {
 		current = current.open();
 	}
 
-	void open(const tau<BAs...>& var) {
+	void open(const tref& var) {
 		open();
 		current.vars.erase(var);
 		add(var);
 	}
 
-	void open(const tau<BAs...>& var, const tau<BAs...>& var_type) {
+	void open(const tref& var, const tref& var_type) {
 		open(var);
 		type(var, var_type);
 	}
@@ -47,12 +48,12 @@ struct resolver {
 		current = current.close();
 	}
 
-	void close(const tau<BAs...>& var) {
+	void close(const tref& var) {
 		current.vars.erase(var);
 		close();
 	}
 
-	size_t add(const tau<BAs...>& var) {
+	size_t add(const tref& var) {
 		if (current.vars.find(var) == current.vars.end()) {
 			size_t idx = parent.size();
 			parent.push_back(idx);
@@ -62,7 +63,7 @@ struct resolver {
 		return current.vars[var];
 	}
 
-	size_t add(const tau<BAs...>& var, const tau<BAs...>& var_type) {
+	size_t add(const tref& var, const tref& var_type) {
 		auto idx = add(var);
 		type(var, var_type);
 		return idx;
@@ -75,16 +76,16 @@ struct resolver {
 		return parent[idx];
 	}
 
-	size_t find(const tau<BAs...>& var) {
+	size_t find(const tref& var) {
 		auto idx = current.vars.at(var);
 		return find(idx);
 	}
 
-	void type(const tau<BAs...>& var, const tau<BAs...>& type) {
+	void type(const tref& var, const tref& type) {
 		types[find(var)] = type;
 	}
 
-	tau<BAs...> type_of(const tau<BAs...>& var) {
+	tref type_of(const tref& var) {
 		auto it = types.find(find(var));
 		if (it != types.end()) {
 			return it->second;
@@ -92,7 +93,7 @@ struct resolver {
 		return std::nullptr_t{};
 	}
 
-	void unite(const tau<BAs...>& var1, const tau<BAs...>& var2) {
+	void unite(const tref& var1, const tref& var2) {
 		size_t root1 = find(var1);
 		size_t root2 = find(var2);
 		if (root1 != root2) {
@@ -107,13 +108,13 @@ struct resolver {
 		}
 	}
 
-	bool connected(const tau<BAs...>& var1, const tau<BAs...>& var2) {
+	bool connected(const tref& var1, const tref& var2) {
 		return find(var1) == find(var2);
 	}
 
-	std::pair<std::map<tau<BAs...>, tau<BAs...>>, std::set<tau<BAs...>>> status() {
-		std::map<tau<BAs...>, tau<BAs...>> typed;
-		std::set<tau<BAs...>> untyped;
+	std::pair<std::map<tref, tref>, std::set<tref>> status() {
+		std::map<tref, tref> typed;
+		std::set<tref> untyped;
 
 		for (const auto& [var, idx] : current.vars) {
 			if (auto type = type_of(var); type) {
@@ -128,6 +129,8 @@ struct resolver {
 
 	std::vector<size_t> parent;
 	std::vector<size_t> rank;
-	std::map<size_t, tau<BAs...>> types;
+	std::map<size_t, tref> types;
 	scope current;
 };
+
+} // namespace idni::tau_lang
