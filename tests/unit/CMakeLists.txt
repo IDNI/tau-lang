@@ -20,6 +20,7 @@ set(TESTS
 	interpreter
 	ba_cvc5
 	cvc5
+	resolver
 )
 
 foreach(X IN LISTS TESTS)

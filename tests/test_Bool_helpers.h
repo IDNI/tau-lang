@@ -12,18 +12,18 @@ namespace idni::tau_lang {
 template<>
 struct nso_factory<bv, Bool> {
 
-	static vector<string> types() { return { "bool" }; }
+	static std::vector<std::string> types() { return { "bool" }; }
 
-	static string default_type() { return "bool"; }
+	static std::string default_type() { return "bool"; }
 
-	static string one(const string) { return "1"; }
+	static std::string one(const std::string) { return "1"; }
 
-	static string zero(const string) { return "0"; }
+	static std::string zero(const std::string) { return "0"; }
 
-	static std::variant<bv, Bool> splitter_one(const string) { return Bool(true);}
+	static std::variant<bv, Bool> splitter_one(const std::string) { return Bool(true);}
 
 	// There is no tau_ba
-	static tref unpack_tau_ba(const variant<bv, Bool>&) { return nullptr; }
+	static tref unpack_tau_ba(const std::variant<bv, Bool>&) { return nullptr; }
 
 	static std::variant<bv, Bool> pack_tau_ba(tref) { return {}; }
 };
