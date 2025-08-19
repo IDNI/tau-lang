@@ -61,10 +61,10 @@ int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 // If a parse result is "Unexpected end of file", it appends next line and repeats.
 // This is used for making the dot ('.') at the end of a statement optional at
 // the end of a line.
-std::optional<rr<node<tau_ba<sbf_ba>, sbf_ba>>> get_spec_multiline(
+std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 	const string& src)
 {
-	using node = tau_lang::node<tau_ba<sbf_ba>, sbf_ba>;
+	using node = tau_lang::node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 	using tau = tree<node>;
 	std::istringstream iss(src);
 	std::string attempt, line, msg;
@@ -156,9 +156,9 @@ int run_tau_spec(string spec_file, bool charvar, bool /*exp*/,
 		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}
 	if (src.empty()) return 0;
-	
-	using node = tau_lang::node<tau_ba<sbf_ba>, sbf_ba>;
-	
+
+	using node = tau_lang::node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+
 	std::set<std::string> guards{ charvar ? "charvar" : "var" };
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
 	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
