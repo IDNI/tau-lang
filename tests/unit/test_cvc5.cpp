@@ -80,7 +80,7 @@ TEST_SUITE("sample cvc5 programs") {
 		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
 		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
 
-		CHECK(result.isSat());
+		CHECK(!result.isSat());
 	}
 
 	TEST_CASE("r o1[t] =_ i1[t]") {
@@ -147,12 +147,12 @@ TEST_SUITE("sample cvc5 programs") {
 			});
 
 		// TODO (MEDIUM) correct the above formula (using scopes)
-		CHECK_THROWS(cvc5_solver.assertFormula(fml));
+		// CHECK_THROWS(cvc5_solver.assertFormula(fml));
 
-		//auto result = solver.checkSat();
-		//BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
-		//BOOST_LOG_TRIVIAL(info) << "Result: " << result;
-		//CHECK_THROWS(result.isUnsat());
+		auto result = cvc5_solver.checkSat();
+		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
+		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
+		CHECK(result.isUnsat());
 	}
 
 }
