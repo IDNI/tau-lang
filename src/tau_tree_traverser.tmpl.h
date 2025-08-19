@@ -131,6 +131,24 @@ const typename tree<node>::template extractor<size_t>
 
 template <NodeType node>
 const typename tree<node>::template extractor<size_t>
+	tree<node>::traverser::bv_constant_id =
+		typename tree<node>::template extractor<size_t>(
+			[](const traverser& t) -> size_t {
+				if (!t) return 0;
+				return t.value_tree().get_bv_constant_id();
+			});
+
+template <NodeType node>
+const typename tree<node>::template extractor<typename tree<node>::constant>
+	tree<node>::traverser::bv_constant =
+		typename tree<node>::template extractor<constant>(
+			[](const traverser& t) -> constant {
+				return ba_constants<node>::get(
+					t.value_tree().get_bv_constant_id());
+			});
+
+template <NodeType node>
+const typename tree<node>::template extractor<size_t>
 	tree<node>::traverser::ba_constant_id =
 		typename tree<node>::template extractor<size_t>(
 			[](const traverser& t) -> size_t {

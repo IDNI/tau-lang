@@ -15,7 +15,7 @@ namespace idni::tau_lang {
  * @brief NSO factory used during testing
  * TODO (LOW) move to tests?
  */
-template <>
+/*template <>
 struct nso_factory<sbf_ba> {
 
 	static std::vector<std::string> types();
@@ -32,12 +32,12 @@ struct nso_factory<sbf_ba> {
 
 	static std::variant<sbf_ba> pack_tau_ba(tref);
 
-};
+};*/
 
 /**
  * @brief NSO factory used in REPL
  */
-template<>
+/*template<>
 struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 
 	static std::vector<std::string> types();
@@ -54,7 +54,7 @@ struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 
 	static std::variant<tau_ba<sbf_ba>, sbf_ba> pack_tau_ba(tref c);
 
-};
+};*/
 
 
 template <>
@@ -98,7 +98,7 @@ struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
 
 };
 
-template <>
+/*template <>
 std::optional<typename ba_constants<node<sbf_ba>>::constant_with_type> ba_constants<node<sbf_ba>>::get(
 		[[maybe_unused]] const std::string& constant_source,
 		[[maybe_unused]] const std::string type_name,
@@ -114,7 +114,7 @@ std::optional<typename ba_constants<node<tau_ba<sbf_ba>, sbf_ba>>::constant_with
 	return type_name == "sbf"
 		? sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba>::parse(constant_source)
 		: tau_ba_factory<sbf_ba>::parse(constant_source);
-}
+}*/
 
 template <>
 std::optional<typename ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_constants<node<bv, sbf_ba>>::get(

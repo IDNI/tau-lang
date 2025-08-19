@@ -6,6 +6,8 @@
 #include <concepts>
 #include <string>
 #include <initializer_list>
+#include <type_traits>
+#include <cvc5/cvc5.h>
 
 #include "defs.h"
 
@@ -15,9 +17,13 @@ namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
 // concepts
+template <typename T, typename... Ts>
+constexpr bool pack_contains = (std::is_same_v<T, Ts> || ...);
 
 template <typename... BAs>
-concept BAsPack = sizeof...(BAs) > 0;
+concept BAsPack = sizeof...(BAs) > 0 && pack_contains<cvc5::Term, BAs...>;
+
+using bv = cvc5::Term;
 
 template <typename node>
 concept NodeType = requires { // Node Type has to provide
@@ -123,6 +129,9 @@ struct node {
 
 	// factory for a ba constant node
 	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
+
+	// factory for a ba constant node
+	static constexpr node_t bv_constant(size_t v);
 
 	// factory for a node of a given node::type and BA type id,
 	// also sets term to 1
@@ -295,6 +304,13 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref get_ba_constant(
 		const std::optional<std::pair<constant, std::string>>&
 								typed_const);
+
+	// bv constants
+	// creates a bv_constant node from it's ba value
+	static tref get_bv_constant(const constant& constant);
+	// creates a bv_constant node from constant_id
+	static tref get_bv_constant(size_t constant_id);
+
 	// children
 	size_t children_size() const;
 
@@ -347,6 +363,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	bool is_integer() const;
 	bool is_num() const;
 	bool is_ba_constant() const;
+	bool is_bv_constant() const;
 	bool is_term() const;
 	bool is_input_variable() const;
 	bool is_output_variable() const;
@@ -365,6 +382,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	size_t get_num() const;
 	size_t get_ba_constant_id() const;
 	constant get_ba_constant() const;
+	size_t get_bv_constant_id() const;
+	constant get_bv_constant() const;
+	// TODO (LOW) rename to get_ba_type_id and get_ba_type as in constants
 	size_t get_ba_type() const;
 	const std::string& get_ba_type_name() const;
 
@@ -450,6 +470,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		static const extractor<size_t>              ba_constant_id;
 		static const extractor<size_t>              ba_type;
 		static const extractor<constant>            ba_constant;
+		static const extractor<size_t>              bv_constant_id;
+		static const extractor<constant>            bv_constant;
 		// children
 		static const extractor<traverser>           only_child;
 		static const extractor<traverser>           first;
@@ -566,9 +588,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_ba_constant(const constant& constant,
 				      size_t ba_type_id);
 	static tref build_bf_ba_constant(const constant& constant,
-					 size_t ba_type_id, tref right);
-	static tref build_bf_ba_constant(const constant& constant,
-					 size_t ba_type_id);
+					 size_t ba_type_id, tref right = nullptr);
+	static tref build_bv_constant(const constant& constant);
+	static tref build_bv_ba_constant(const constant& constant, tref right = nullptr);
 	static tref build_bf_uconst(
 		const std::string& name1, const std::string& name2, size_t type_id);
 	static tref build_var_name(size_t sid);

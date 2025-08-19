@@ -3,26 +3,34 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "hooks"
 
+#include <type_traits>
+
+#include "boolean_algebras/cvc5/cvc5.h"
+#include "hooks.h"  // Only for IDE resolution, not really needed.
+
 namespace idni::tau_lang {
 
 template <NodeType node>
 tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
-	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift)
-			log("- HOOK    -", v, ch, len, r, true);)
+	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift
+			|| v.nt == tau::bv_constant)
+		log("- HOOK    -", v, ch, len, r, true);)
 	tref ret = nullptr;
-	if      (v.nt == tau::bf)    ret = term( v, ch, len, r);
-	else if (v.nt == tau::wff)   ret = wff(  v, ch, len, r);
-	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
+	if      (v.nt == tau::bf)          ret = term( v, ch, len, r);
+	else if (v.nt == tau::wff)         ret = wff(  v, ch, len, r);
+	else if (v.nt == tau::shift)       ret = shift(v, ch, len, r);
+	else if (v.nt == tau::bv_constant) ret = bv_constant(v, ch, len, r);
 	else return tau::get_raw(v, ch, len, r);
 
 	if (ret) {
 		HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
 		DBG(assert(ret != nullptr);)
-		DBG(typename node::type nt = tau::get(ret).get_type();)
+		/*DBG(typename node::type nt = tau::get(ret).get_type();)
 		DBG(assert(nt == tau::bf || nt == tau::wff
-			|| nt == tau::shift || nt == tau::integer);)
+			|| nt == tau::shift || nt == tau::integer
+			|| nt == tau::bv_constant );)*/
 	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error") }
 	return ret;
 }
@@ -1428,62 +1436,34 @@ tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
 	return nullptr; // Return error
 }
 
-/*template <NodeType node>
-tref get_hook<node>::bitvector(const node& v, const tref* ch, size_t len, tref r) {
+template <NodeType node>
+tref get_hook<node>::bv_constant([[maybe_unused]] const node& v, const tref* ch, size_t len, [[maybe_unused]] tref r) {
 	HOOK_LOGGING(log("bitvector", v, ch, len, r);)
-	DBG(assert(len == 2 || len == 1);)
 
-	// parse bitvector copnstants
-	// This node could have two children. TYhe first one must be p::num, p::bits
-	// or p::hexnum, whereas the second one could be a type.
-	if (is_bv_node(n.child[0])) return std::make_shared<rewriter::depreciating::node<tau_sym<BAs...>>>(n);
-	// apply numerical simplifications
-	using p = tau_parser;
-	// get bitvector size, just 32 bits for now
-	// size_t size = n.child.size() == 2
-	//	? n.child[1]
-	//		| only_child_extractor<BAs...>
-	//		| size_t_extractor<BAs...>
-	//		| optional_value_extractor<size_t>
-	//	: sizeof(size_t) * 8;
-	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
-	tau<BAs...> bvn;
-	auto nt = get_non_terminal_node(n.child[0]);
-	size_t bv_size = bv_default_size;
-	if (n.child.size() == 2) {
-		bv_size = std::stoull(
-			make_string(tau_node_terminal_extractor<BAs...>, n.child[1]->child[2]));
-	}
-	switch (nt) {
-		case p::num : {
-			// TODO (HIGH) control small size exception
-			auto bv = bv_solver.mkBitVector(bv_size, value.c_str(), 10);
-			bvn = make_node<tau_sym<BAs...>>(bv, {});
-			break;
-		}
-		case p::bits : {
-			// TODO (HIGH) control small size exception
-			auto bv = bv_solver.mkBitVector(bv_size, value.c_str(), 2);
-			bvn = make_node<tau_sym<BAs...>>(bv, {});
-			break;
-		}
-		case p::hexnum : {
-			// TODO (HIGH) control small size exception
-			auto bv = bv_solver.mkBitVector(bv_size, value.c_str(), 16);
-			bvn = make_node<tau_sym<BAs...>>(bv, {});
-			break;
-		}
+	if (len == 0) return tau::get_raw(v, ch, len, r);
+
+	DBG(assert(len == 1 || len == 2);)
+
+	auto bv_size = len == 2
+		? tau::get(ch[1]).get_num()
+		: cvc5_default_bv_size;
+	auto str = tau::get(ch[0]).to_str();
+	auto type = tau::get(ch[0]).get_type();
+
+	size_t base;
+	switch (type) {
+		case tau::decimal: { base = 10; break; }
+		case tau::binary: { base = 2; break; }
+		case tau::hexadecimal: { base = 16; break; }
 		default: {
-			#ifdef DEBUG
-			BOOST_LOG_TRIVIAL(error) << "(error) Unknown bitvector type: " << nt;
-			#endif // DEBUG
-			assert(false);
+			DBG(assert(false);)
+			return nullptr;
 		}
 	}
-	std::vector<tau<BAs...>> v{bvn};
-	if (n.child.size() == 2) v.emplace_back(n.child[1]);
-	return std::make_shared<rewriter::depreciating::node<tau_sym<BAs...>>>(
-		tau_parser::instance().literal(p::bitvector), v);
-}*/
+
+	auto cte = make_bitvector_cte(bv_size, str, base);
+	typename tau::constant ba_cte{ cte };
+	return tau::build_bv_constant(ba_cte);
+}
 
 } // namespace idni::tau_lang

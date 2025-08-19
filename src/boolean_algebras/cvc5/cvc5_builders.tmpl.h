@@ -123,4 +123,8 @@ inline Term make_bitvector_shr(const Term& l, const Term& r) {
 	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_LSHR, {l, r});
 }
 
+inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str, const size_t base) {
+	return cvc5_term_manager.mkBitVector(size, str, base);
+}
+
 } // namespace idni::tau_lang

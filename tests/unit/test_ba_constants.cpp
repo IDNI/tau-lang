@@ -12,10 +12,10 @@ TEST_SUITE("Bool BA") {
 		CHECK( t == 1 );
 		CHECK( f == 2 );
 		CHECK( bac::get(t) != bac::get(f) );
-		CHECK( bac::get(t) == variant<Bool>(Bool(true)) );
-		CHECK( bac::get(t) != variant<Bool>(Bool(false)) );
-		CHECK( bac::get(f) == variant<Bool>(Bool(false)) );
-		CHECK( bac::get(f) != variant<Bool>(Bool(true)) );
+		CHECK( bac::get(t) == variant<bv, Bool>(Bool(true)) );
+		CHECK( bac::get(t) != variant<bv, Bool>(Bool(false)) );
+		CHECK( bac::get(f) == variant<bv, Bool>(Bool(false)) );
+		CHECK( bac::get(f) != variant<bv, Bool>(Bool(true)) );
 	}
 }
 
@@ -107,28 +107,28 @@ TEST_SUITE("constants from factory") {
 
 namespace idni::tau_lang {
 
-// nso_factory for tests with <sbf_ba, Bool>
+// nso_factory for tests with <bv, sbf_ba, Bool>
 template<>
-struct nso_factory<sbf_ba, Bool> {
-	using node = tau_lang::node<sbf_ba, Bool>;
+struct nso_factory<bv, sbf_ba, Bool> {
+	using node = tau_lang::node<bv, sbf_ba, Bool>;
 
-	optional<constant_with_type<sbf_ba, Bool>> parse_sbf_ba(
+	optional<constant_with_type<bv, sbf_ba, Bool>> parse_sbf_ba(
 		const string& constant_source) const
 	{
-		auto r = sbf_ba_factory<sbf_ba, Bool>::parse(constant_source);
+		auto r = sbf_ba_factory<bv, sbf_ba, Bool>::parse(constant_source);
 		if (!r) return {};
-		return constant_with_type<sbf_ba, Bool>{
+		return constant_with_type<bv, sbf_ba, Bool>{
 			std::get<sbf_ba>(r.value().first), "sbf" };
 	}
 
-	optional<constant_with_type<sbf_ba, Bool>> parse_Bool(
+	optional<constant_with_type<bv, sbf_ba, Bool>> parse_Bool(
 		const string& constant_source) const
 	{
 		return ba_constants<node>::get(constant_source, "bool");
 
 	}
 
-	optional<constant_with_type<sbf_ba, Bool>> parse(
+	optional<constant_with_type<bv, sbf_ba, Bool>> parse(
 		const string& constant_source, const string type_name) const
 	{
 		if (type_name == "sbf")
@@ -151,7 +151,7 @@ struct nso_factory<sbf_ba, Bool> {
 	// There is no tau_ba
 	tref unpack_tau_ba(const variant<Bool>&) const { return nullptr; }
 
-	std::variant<sbf_ba, Bool> pack_tau_ba (const tref) const {return {};}
+	std::variant<bv, sbf_ba, Bool> pack_tau_ba (const tref) const {return {};}
 };
 
 struct sbf_ba_Bool_constants_fixture {
@@ -160,7 +160,7 @@ struct sbf_ba_Bool_constants_fixture {
 	sbf_ba sbf_t, sbf_f;
 	template <typename BA>
 	BA get_sbf_Bool(const std::string& src, const std::string&) {
-		if (auto opt = sbf_ba_factory<sbf_ba>::parse(src);
+		if (auto opt = sbf_ba_factory<bv, sbf_ba>::parse(src);
 			opt) return std::get<BA>(opt.value().first);
 		assert(false);
 		return BA();
@@ -184,7 +184,7 @@ struct sbf_ba_Bool_constants_fixture {
 
 TEST_SUITE("sbf_ba and Bool BAs") {
 	TEST_CASE_FIXTURE(sbf_ba_Bool_constants_fixture, "sbf_ba, Bool") {
-		using node = node<sbf_ba, Bool>;
+		using node = node<bv, sbf_ba, Bool>;
 		using tau = tree<node>;
 		using bac = ba_constants<node>;
 
@@ -195,10 +195,10 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		CHECK( t == 1 );
 		CHECK( f == 2 );
 		CHECK( bac::get(t) != bac::get(f) );
-		CHECK( bac::get(t) == variant<sbf_ba, Bool>(Bool(true)) );
-		CHECK( bac::get(t) != variant<sbf_ba, Bool>(Bool(false)) );
-		CHECK( bac::get(f) == variant<sbf_ba, Bool>(Bool(false)) );
-		CHECK( bac::get(f) != variant<sbf_ba, Bool>(Bool(true)) );
+		CHECK( bac::get(t) == variant<bv, sbf_ba, Bool>(Bool(true)) );
+		CHECK( bac::get(t) != variant<bv, sbf_ba, Bool>(Bool(false)) );
+		CHECK( bac::get(f) == variant<bv, sbf_ba, Bool>(Bool(false)) );
+		CHECK( bac::get(f) != variant<bv, sbf_ba, Bool>(Bool(true)) );
 
 		t_ref = tau::get_ba_constant(sbf_t, "sbf");
 		f_ref = tau::get_ba_constant(sbf_f, "sbf");
@@ -207,9 +207,9 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		CHECK( t == 3 );
 		CHECK( f == 4 );
 		CHECK( bac::get(t) != bac::get(f) );
-		CHECK( bac::get(t) == variant<sbf_ba, Bool>(sbf_t) );
-		CHECK( bac::get(t) != variant<sbf_ba, Bool>(sbf_f) );
-		CHECK( bac::get(f) == variant<sbf_ba, Bool>(sbf_f) );
-		CHECK( bac::get(f) != variant<sbf_ba, Bool>(sbf_t) );
+		CHECK( bac::get(t) == variant<bv, sbf_ba, Bool>(sbf_t) );
+		CHECK( bac::get(t) != variant<bv, sbf_ba, Bool>(sbf_f) );
+		CHECK( bac::get(f) == variant<bv, sbf_ba, Bool>(sbf_f) );
+		CHECK( bac::get(f) != variant<bv, sbf_ba, Bool>(sbf_t) );
 	}
 }
