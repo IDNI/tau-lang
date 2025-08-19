@@ -303,17 +303,44 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_and,             740 },
 			{ bf_neg,             750 },
 			{ bf,                 790 },
-			{ bf_matcher,         795 },
-			{ bf_body,            795 },
-			{ rec_relation,       800 },
-			{ ref_args,           800 },
-			{ bf_rule,            800 },
-			{ wff_rule,           800 },
-			{ wff_builder_body,   800 },
-			{ wff_matcher,        800 },
-			{ wff_body,           800 },
+			{ bv_eq,              800 },
+			{ bv_neq,             801 },
+			{ bv_less_equal,      802 },
+			{ bv_nleq,            803 },
+			{ bv_greater,         804 },
+			{ bv_ngreater,        805 },
+			{ bv_greater_equal,   806 },
+			{ bv_ngeq,            807 },
+			{ bv_less,            808 },
+			{ bv_nless,           809 },
+			{ bv_or,              810 },
+			{ bv_nor,             811 },
+			{ bv_xor,             812 },
+			{ bv_xnor,            813 },
+			{ bv_and,             814 },
+			{ bv_nand,            815 },
+			{ bv_rotate_left,     816 },
+			{ bv_rotate_right,    817 },
+			{ bv_add,             818 },
+			{ bv_sub,             819 },
+			{ bv_mul,             820 },
+			{ bv_div,             821 },
+			{ bv_mod,             822 },
+			{ bv_min,             823 },
+			{ bv_max,             824 },
+			{ bv_neg,             825 },
+			{ bv,                 826 },
+			{ bf_matcher,         898 },
+			{ bf_body,            899 },
+			{ rec_relation,       900 },
+			{ ref_args,           900 },
+			{ bf_rule,            900 },
+			{ wff_rule,           900 },
+			{ wff_builder_body,   900 },
+			{ wff_matcher,        900 },
+			{ wff_body,           900 },
 		};
-		
+
 		if (no_wrap_for.find(nt) != no_wrap_for.end())
 			return false;
 		auto p_it = prio.find(pt);
@@ -368,6 +395,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	static const std::map<size_t, std::string> hl_colors = {
 		{ bf,            TC.LIGHT_GREEN() },
+		{ bv,         	 TC.GREEN() },
 		{ variable,      TC.WHITE() },
 		{ capture,       TC.BLUE() },
 		{ wff_all,       TC.MAGENTA() },
@@ -458,7 +486,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (last_quant_nt == wff_all) out(", ");
 				else last_quant_nt = wff_all, out("all ");
 				break;
-			case wff_ex:				
+			case wff_ex:
 				if (last_quant_nt == wff_ex) out(", ");
 				else last_quant_nt = wff_ex, out("ex ");
 				break;
@@ -466,7 +494,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (last_quant_nt == bf_fall) out(", ");
 				else last_quant_nt = bf_fall, out("fall ");
 				break;
-			case bf_fex:				
+			case bf_fex:
 				if (last_quant_nt == bf_fex) out(", ");
 				else last_quant_nt = bf_fex, out("fex ");
 				break;
@@ -556,6 +584,34 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_lt:             out(" < "); break;
 			case bf_nlt:            out(" !< "); break;
 
+			case bv_eq:             out(" =_ "); break;
+			case bv_neq:            out(" !=_ "); break;
+			case bv_less_equal:     out(" <=_ "); break;
+			case bv_nleq:           out(" !<=_ "); break;
+			case bv_greater:        out(" >_ "); break;
+			case bv_ngreater:       out(" !>_ "); break;
+			case bv_greater_equal:  out(" >=_ "); break;
+			case bv_ngeq:           out(" !>=_ "); break;
+			case bv_less:           out(" <_ "); break;
+			case bv_nless:          out(" !<_ "); break;
+			
+			case bv_add:            out("+"); break;
+			case bv_sub:            out("-"); break;
+			case bv_mul:            out("*"); break;
+			case bv_div:            out("/"); break;
+			case bv_mod:            out("%"); break;
+			case bv_and:            out("&"); break;
+			case bv_nand:           out("!&"); break;
+			case bv_or:             out("|"); break;
+			case bv_nor:            out("!|"); break;
+			case bv_xor:            out("(+)"); break;
+			case bv_xnor:           out("!(+)"); break;
+			case bv_rotate_left:    out("<<"); break;
+			case bv_rotate_right:   out(">>"); break;
+
+			case bv_max:            out("max "); break;
+			case bv_min:            out("min "); break;
+
 			case ctn_neq:           out(" != "); break;
 			case ctn_eq:            out(" = "); break;
 			case ctn_gteq:          out(" >= "); break;
@@ -615,7 +671,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		// t.print_tree( << "leaving: ") << "\n";
 		switch (nt) {
 			case bf_neg:            out("'"); break;
-			case main: 
+			case main:
 			case builder:
 			case rec_relation:
 			case wff_rule:
