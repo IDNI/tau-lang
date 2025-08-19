@@ -3,6 +3,7 @@
 //#include <cvc5/cvc5.h>
 
 #include "tau_tree.h"
+#include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "extractors"
@@ -146,7 +147,7 @@ rewriter::rules get_rec_relations(spec_context<node>& ctx, tref rrs) {
 
 template <NodeType node>
 rewriter::rules get_rec_relations(tref rrs) {
-	spec_context<node> ctx;
+	spec_context<node>& ctx = definitions<node>::instance().get_io_context();
 	return get_rec_relations<node>(ctx, rrs);
 }
 
@@ -198,7 +199,7 @@ std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r, bool wo_infe
 
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(tref r, bool wo_inference) {
-	spec_context<node> ctx;
+	spec_context<node>& ctx = definitions<node>::instance().get_io_context();
 	return get_nso_rr<node>(ctx, r, wo_inference);
 }
 
@@ -363,22 +364,35 @@ int_t get_max_initial(const trefs& io_vars) {
 }
 
 template <NodeType node>
-subtree_set<node> get_free_vars_from_nso(tref n) {
+const trefs& get_free_vars(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	LOG_TRACE << "Begin get_free_vars_from_nso of " << LOG_FM(n);
+
+	static const trefs no_free_vars{};
+
+	if (!n) return no_free_vars;
+	if (typename node::type nt = tau::get(n).get_type();
+		nt != tau::bf && nt != tau::wff) return no_free_vars;
+
+	using cache_t = subtree_unordered_map<node, size_t>;
+	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
+	if (auto it = free_vars_map.find(n); it != free_vars_map.end())
+		return free_vars_pool[it->second];
+
+	DBG(LOG_TRACE << "Begin get_free_vars of " << LOG_FM(n);)
 	subtree_set<node> free_vars;
-	LOG_TRACE << "End get_free_vars_from_nso" << LOG_FM(n);
 	auto collector = [&free_vars](tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::wff_all) || t.is(tau::wff_ex)) {
+		if (t.is(tau::wff_all) || t.is(tau::wff_ex) ||
+			t.is(tau::bf_fall) || t.is(tau::bf_fex))
+		{
 			tref var = t.find_top(
 				(bool(*)(tref)) is_var_or_capture<node>);
 			if (var) if (auto it = free_vars.find(var);
 				it != free_vars.end())
 			{
-				LOG_TRACE << "removing quantified var: "
-								<< LOG_FM(var);
+				DBG(LOG_TRACE << "removing quantified var: "
+								<< LOG_FM(var);)
 				free_vars.erase(it);
 			}
 		} else if (is_var_or_capture<node>(n)) {
@@ -392,9 +406,9 @@ subtree_set<node> get_free_vars_from_nso(tref n) {
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
-						LOG_TRACE << "removing var: "
+						DBG(LOG_TRACE << "removing var: "
 							<< LOG_FM(offset_child
-								.value());
+								.value());)
 						free_vars.erase(it);
 					}
 				} else if (offset_child.value_tree()
@@ -405,19 +419,40 @@ subtree_set<node> get_free_vars_from_nso(tref n) {
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
-						LOG_TRACE << "removing var: "
+						DBG(LOG_TRACE << "removing var: "
 							<< LOG_FM(offset_child
-								.value());
+								.value());)
 						free_vars.erase(it);
 					}
 				}
 			}
-			LOG_TRACE << "inserting var: " << LOG_FM(n);
+			DBG(LOG_TRACE << "inserting var: " << LOG_FM(n);)
 			free_vars.insert(n);
 		}
 	};
 	post_order<node>(n).search(collector);
-	return free_vars;
+	trefs fv(free_vars.size());
+	size_t i = 0;
+	for (tref v : free_vars) fv[i++] = tau::trim_right_sibling(v);
+	std::sort(fv.begin(), fv.end(), tau::subtree_less);
+#ifdef DEBUG
+	LOG_TRACE << "End get_free_vars " << LOG_FM(n);
+	for (tref v : fv) LOG_TRACE << "\tfree var: " << LOG_FM(v);
+#endif
+	size_t id = free_vars_pool.size();
+	if (auto it = free_vars_pool_index.find(fv);
+		it != free_vars_pool_index.end()) id = it->second;
+	else free_vars_pool_index.emplace(fv, id),
+		free_vars_pool.push_back(fv);
+	free_vars_map.emplace(n, id);
+#ifdef DEBUG
+	LOG_TRACE << "free_vars_map[" << LOG_FM(n) << "] = " << id;
+	std::stringstream ss;
+	ss << "free_vars_pool[" << id << "] = ";
+	for (tref v : free_vars_pool[id]) ss << LOG_FM(v) << " ";
+	LOG_TRACE << ss.str();
+#endif
+	return free_vars_pool[id];
 }
 
 // A formula has a temporal variable if either it contains an io_var with a variable or capture

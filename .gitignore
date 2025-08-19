@@ -65,6 +65,9 @@ bw-output
 # private directory for a local stuff
 .local
 
+# local cmake settings
+CMakeLocalLists.txt
+
 # cli history files
 .*_history
 

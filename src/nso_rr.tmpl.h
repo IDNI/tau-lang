@@ -18,7 +18,8 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	};
 
 #ifdef TAU_CACHE
-	static std::map<std::pair<rewriter::rule, tref>, tref> cache;
+	using cache_t = std::map<std::pair<rewriter::rule, tref>, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 
@@ -57,7 +58,8 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 #ifdef TAU_CACHE
-	static std::map<std::pair<rewriter::rules, tref>, tref> cache;
+	using cache_t = std::map<std::pair<rewriter::rules, tref>, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find({rs, n}); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 
@@ -86,7 +88,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 				t[0].right_sibling() });
 		return n;
 	};
-	auto def_transformer = [&transformer](tref n) -> tref {
+	auto def_transformer = [](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if (t.is(tau::ref_arg) && t[0][0].is(tau::variable))
 			return tau::get(tau::ref_arg, tau::get(tau::bf,
@@ -98,7 +100,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 						t[0][0].data())));
 		return n;
 	};
-	auto transform = [&](const htree::sp& h, bool def = false) {
+	auto transform = [&](const htref& h, bool def = false) {
 		tref n = pre_order<node>(h->get())
 				.apply_unique_until_change(transformer);
 		if (def) n = pre_order<node>(n)

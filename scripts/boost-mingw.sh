@@ -1,8 +1,9 @@
 #!/bin/bash
 
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
-PREFIX_DIR=$SCRIPT_DIR/../libboost-mingw-w64
-BOOST_ROOT=$SCRIPT_DIR/boost
+EXTERNAL_DIR=$SCRIPT_DIR/../external
+BOOST_ROOT=$EXTERNAL_DIR/boost-source
+PREFIX_DIR=$EXTERNAL_DIR/libboost-mingw-w64
 BOOST_REPO=https://github.com/boostorg/boost
 BOOST_COMMIT=65c1319   # Boost 1.86
 

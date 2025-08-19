@@ -6,7 +6,6 @@
 #include <string>
 #include <type_traits>
 #include <optional>
-#include <boost/log/trivial.hpp>
 
 #include "parser.h"
 #include "rewriting.h"

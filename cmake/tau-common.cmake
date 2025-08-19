@@ -48,9 +48,9 @@ set(LINK_OPTIONS "-flto=auto")
 message(STATUS "COMPILE_OPTIONS ${COMPILE_OPTIONS}")
 message(STATUS "LINK_OPTIONS ${LINK_OPTIONS}")
 
-include(git-defs) # for ${GIT_DEFINITIONS}
+include(git-defs) # for ${TAU_GIT_DEFINITIONS}
 function(target_git_definitions target)
-	target_compile_definitions(${target} PRIVATE ${GIT_DEFINITIONS})
+	target_compile_definitions(${target} PRIVATE ${TAU_GIT_DEFINITIONS})
 endfunction()
 
 # passes definitions if they exist
@@ -70,7 +70,6 @@ function(target_setup target)
 			-Wformat=2
 			-Wcast-align
 			-Wstrict-aliasing=2
-			-Wstrict-overflow=5
 			-Wfloat-equal
 			-Wwrite-strings
 			-Werror           # warning as errors
@@ -94,9 +93,18 @@ function(target_setup target)
 				-static-libgcc
 				-static-libstdc++
 			)
+			# reduce strict overflow level for boost has warnings in mingw
+			target_compile_options(${target} PRIVATE
+				-Wstrict-overflow=2
+			)
 	else()
 		target_compile_features(${target} PRIVATE cxx_std_23)
 		target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
+		if(NOT MSVC)
+			target_compile_options(${target} PRIVATE
+				-Wstrict-overflow=5
+			)
+		endif()
 	endif()
 	target_link_options(${target} PRIVATE "${LINK_OPTIONS}")
 	target_git_definitions(${target})

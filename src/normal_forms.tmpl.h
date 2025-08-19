@@ -824,8 +824,9 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 	const auto& t = tau::get(fm);
 	DBG(assert(t.is(tau::bf));)
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref, bool>, tref,
-		subtree_pair_less<node, bool>> cache;
+	using cache_t = std::map<std::pair<tref, bool>, tref,
+				subtree_pair_less<node, bool>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find(std::make_pair(fm, make_paths_disjoint));
 		it != cache.end()) return trace(it->second);
 #endif //TAU_CACHE
@@ -887,10 +888,9 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 		}
 	}
 #ifdef TAU_CACHE
-		cache.emplace(std::make_pair(
-			fm, make_paths_disjoint), reduced_dnf);
-		cache.emplace(std::make_pair(
-			reduced_dnf, make_paths_disjoint), reduced_dnf);
+	cache.emplace(std::make_pair(fm, make_paths_disjoint), reduced_dnf);
+	cache.emplace(std::make_pair(reduced_dnf, make_paths_disjoint),
+								reduced_dnf);
 #endif //TAU_CACHE
 	return trace(reduced_dnf);
 }
@@ -903,8 +903,15 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	LOG_TRACE << "bf reduce canonical: " << LOG_FM(fm);
 	subtree_map<node, tref> changes = {};
 	for (tref bf : t.select_top(is<node, tau::bf>)) {
+		if (tau::get(bf).child_is(tau::bf_ref)) {
+			for (tref arg : t[0][0].select_top(is<node, tau::bf>)) {
+				tref dnf = bf_boole_normal_form<node>(arg);
+				if (tau::get(dnf) != tau::get(arg))
+					changes.emplace(arg, dnf);
+			}
+		}
 		tref dnf = bf_boole_normal_form<node>(bf);
-		if (dnf != bf) changes[bf] = dnf;
+		if (tau::get(dnf) != tau::get(bf)) changes[bf] = dnf;
 	}
 	tref x = changes.empty()? fm : rewriter::replace<node>(fm, changes);
 	LOG_TRACE << "bf reduce canonical result: " << LOG_FM(x);
@@ -1037,13 +1044,13 @@ std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
 			return {};
 		if (all_reductions) {
 			if (!reduce_paths(i, paths, vars.size()))
-						paths.emplace_back(move(i));
+				paths.emplace_back(std::move(i));
 			else {
 				std::erase_if(paths,
 					[](const auto& v){return v.empty();});
 				if (paths.empty()) return {};
 			}
-		} else paths.emplace_back(move(i));
+		} else paths.emplace_back(std::move(i));
 	}
 	return paths;
 }
@@ -1107,7 +1114,8 @@ template <NodeType node>
 tref sort_var(tref var) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	static subtree_unordered_map<node, tref> cache;
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(var); it != end(cache))
 		return it->second;
 #endif // TAU_CACHE
@@ -1221,7 +1229,8 @@ template <NodeType node>
 tref group_dnf_expression(tref fm) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	static subtree_unordered_map<node, tref> cache;
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != end(cache)) return it->second;
 #endif // TAU_CACHE
 	LOG_DEBUG << "Begin group_dnf_expression";
@@ -1256,7 +1265,7 @@ tref group_dnf_expression(tref fm) {
 				 : get_cnf_bf_clauses<node>(clause);
 		if(wff) std::ranges::sort(atoms);
 		else std::ranges::sort(atoms, lex_var_comp<node>);
-		atoms_of_clauses.emplace_back(move(atoms));
+		atoms_of_clauses.emplace_back(std::move(atoms));
 	}
 	tref grouped_fm = wff ? tau::_F() : tau::_0();
 	for (int_t i = 0; i < (int_t) atoms_of_clauses.size(); ++i) {
@@ -1377,9 +1386,10 @@ tref reduce(tref fm, size_t type, bool is_cnf,
 {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	static std::unordered_map<std::tuple<tref, bool, bool>, tref,
-		std::hash<std::tuple<tref, bool, bool>>,
-		subtree_bool_bool_tuple_equality<node>> cache;
+	using cache_t = std::unordered_map<std::tuple<tref, bool, bool>, tref,
+				std::hash<std::tuple<tref, bool, bool>>,
+				subtree_bool_bool_tuple_equality<node>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find(std::make_tuple(
 					fm, all_reductions, enable_sort));
 		it != end(cache)) return it->second;
@@ -1910,8 +1920,9 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 	// std::cout << "squeezed_fm: " << squeezed_fm << "\n";
 	LOG_DEBUG << "Formula in DNF: " << LOG_FM(squeezed_fm);
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref, bool>, tref,
-		subtree_pair_less<node, bool>> cache;
+	using cache_t = std::map<std::pair<tref, bool>, tref,
+				subtree_pair_less<node, bool>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find(std::make_pair(squeezed_fm, to_cnf));
 			it != end(cache)) return it->second;
 #endif // TAU_CACHE
@@ -3039,8 +3050,9 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 	scoped_fm = reduce_across_bfs<node>(scoped_fm, false);
 
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref, tref>, tref,
-		subtree_pair_less<node, tref>> cache;
+	using cache_t = std::map<std::pair<tref, tref>, tref,
+				subtree_pair_less<node, tref>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find(std::make_pair(inner_fm, scoped_fm));
 		it != end(cache)) return it->second;
 #endif // TAU_CACHE
@@ -3126,8 +3138,9 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 	scoped_fm = reduce_across_bfs<node>(scoped_fm, true);
 // Add cache after reductions; reductions are cached as well
 #ifdef TAU_CACHE
-	static std::map<std::pair<tref, tref>, tref,
-		subtree_pair_less<node, tref>> cache;
+	using cache_t = std::map<std::pair<tref, tref>, tref,
+				subtree_pair_less<node, tref>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find(std::make_pair(inner_fm, scoped_fm));
 		it != end(cache)) return it->second;
 #endif // TAU_CACHE
@@ -3511,7 +3524,7 @@ template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val) {
 	DBG(using tau = tree<node>;)
 	DBG(assert(!is<node>(val, tau::bf));)
-	auto free_vars = get_free_vars_from_nso<node>(fm);
+	const trefs& free_vars = get_free_vars<node>(fm);
 	if (free_vars.size()) {
 		subtree_map<node, tref> free_var_assgm;
 		for (tref free_var : free_vars)
@@ -3708,7 +3721,8 @@ tref to_snf_step<node>::traverse(const bdd_path& path,
 {
 	// we only cache results in release mode
 #ifdef TAU_CACHE
-	static std::map<std::tuple<bdd_path, literals, tref>, tref> cache;
+	using cache_t = std::map<std::tuple<bdd_path, literals, tref>, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
 	if (auto it = cache.find({path, remaining, form});
 		it != cache.end()) return it->second;
 #endif // TAU_CACHE

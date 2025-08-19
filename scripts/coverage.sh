@@ -1,5 +1,5 @@
 #!/bin/bash
 
-./build.sh Coverage $@
+./dev build Coverage $@
 cd build-Coverage
 make coverage

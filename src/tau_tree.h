@@ -42,23 +42,6 @@ concept NodeType = requires { // Node Type has to provide
 	{ std::declval<node>().data } -> std::convertible_to<size_t>;
 };
 
-template <typename cache_t>
-concept CacheType = requires {
-	typename cache_t;
-	typename cache_t::const_iterator;
-	typename cache_t::key_type;
-	typename cache_t::mapped_type;
-	typename cache_t::size_type;
-} &&
-requires(cache_t& cache, const typename cache_t::key_type& key,
-		const typename cache_t::mapped_type& value) {
-	{ cache.emplace(key, value) } -> std::convertible_to<std::pair<typename cache_t::const_iterator, bool>>;
-	{ cache.begin() } -> std::convertible_to<typename cache_t::const_iterator>;
-	{ cache.end() } -> std::convertible_to<typename cache_t::const_iterator>;
-	{ cache.size() } -> std::convertible_to<typename cache_t::size_type>;
-	{ cache.contains(key) } -> std::convertible_to<bool>;
-};
-
 // -----------------------------------------------------------------------------
 // forward declarations
 
@@ -200,17 +183,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	inline static bool use_hooks = true;
 
-	// gc
-	static void gc();
-	static void gc(std::unordered_set<tref>& keep);
-
-	using gc_callback =
-		std::function<void(const std::unordered_set<tref>& kept)>;
-	inline static std::vector<gc_callback> gc_callbacks{};
-
-	template <CacheType cache_t>
-	static cache_t& create_cache();
-
 	// tree direct API
 	// ---------------------------------------------------------------------
 
@@ -218,9 +190,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	tref get() const;
 	static const tree& get(const std::optional<tref>& id);
 	static const tree& get(const tref id);
-	static const tree& get(const htree::sp& h);
-	static htree::sp geth(tref id);
-	static htree::sp geth(const tree& n);
+	static const tree& get(const htref& h);
+	static htref geth(tref id);
+	static htref geth(const tree& n);
 
 	// creation (transformation) from tau_parser::tree
 	static tref get(const tau_parser::tree& t, get_options options = {});
@@ -387,6 +359,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	// TODO (LOW) rename to get_ba_type_id and get_ba_type as in constants
 	size_t get_ba_type() const;
 	const std::string& get_ba_type_name() const;
+	const trefs& get_free_vars() const;
 
 	// ---------------------------------------------------------------------
 	// from parser (tau_tree_from_parser.tmpl.h)
@@ -438,7 +411,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		traverser(tref r);
 		traverser(const tree& r);
 		traverser(const std::optional<tref>& r);
-		traverser(const htree::sp& r);
+		traverser(const htref& r);
 		traverser(const trefs& n);
 		bool has_value() const;
 		explicit operator bool() const;
@@ -455,7 +428,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		// handles
 		static const extractor<tref>                ref;
 		static const extractor<trefs>               refs;
-		static const extractor<htree::sp>           handle;
+		static const extractor<htref>               handle;
 		static const extractor<const tree<node>&>   Tree;
 		// print/dump
 		static const extractor<traverser>           dump;
@@ -572,6 +545,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_nlt(tref l, tref r);
 
 	// term builders
+	static tref build_bf_fall(tref l, tref r);
+	static tref build_bf_fex(tref l, tref r);
 	static tref build_bf_or(tref l, tref r);
 	static tref build_bf_or(const auto& bfs);
 	static tref build_bf_xor_from_def(tref l, tref r);

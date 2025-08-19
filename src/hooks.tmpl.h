@@ -26,11 +26,10 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 
 	if (ret) {
 		HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
-		DBG(assert(ret != nullptr);)
-		/*DBG(typename node::type nt = tau::get(ret).get_type();)
+		DBG(typename node::type nt = tau::get(ret).get_type();)
 		DBG(assert(nt == tau::bf || nt == tau::wff
 			|| nt == tau::shift || nt == tau::integer
-			|| nt == tau::bv_constant );)*/
+			|| tau::get(ret).is_bv_constant() );)
 	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error") }
 	return ret;
 }

@@ -19,6 +19,7 @@ set(TAU_HEADERS
 	ba_types.h         # BA types
 	ba_constants.h     # BA constants pool and binder
 	dict.h             # dictionaries of bdd var names and strings
+	definitions.h      # Storage for function and predicate definitions
 	rr.h               # recurrence relation structure
 	nso_rr.h           # nso_rr_apply
 	execution.h        # execution of nso rr rules
@@ -29,7 +30,7 @@ set(TAU_HEADERS
 	splitter.h
 	solver.h
 	interpreter.h
-    union_find.h       # union find data structure
+	union_find.h       # union find data structure
 	nso_factory.h      # abstract template interface
 	undefs.h           # undefines implementation macros
 )
@@ -72,7 +73,7 @@ add_custom_target(tau_header ALL DEPENDS ${TAU_HEADER})
 add_library(${TAU_OBJECT_LIB_NAME} OBJECT)
 target_sources(${TAU_OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_OBJECT_LIB_NAME})
-target_link_libraries(${TAU_OBJECT_LIB_NAME} Boost::log ${CVC5_LIB})
+target_link_libraries(${TAU_OBJECT_LIB_NAME} Boost::log tauparser ${CVC5_LIB})
 target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
@@ -89,7 +90,7 @@ add_dependencies(${TAU_OBJECT_LIB_NAME} cvc5)
 add_library(${TAU_STATIC_LIB_NAME} STATIC)
 target_sources(${TAU_STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_STATIC_LIB_NAME})
-target_link_libraries(${TAU_STATIC_LIB_NAME} Boost::log ${CVC5_LIB})
+target_link_libraries(${TAU_STATIC_LIB_NAME} Boost::log tauparser ${CVC5_LIB})
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
@@ -111,7 +112,7 @@ endif()
 add_library(${TAU_SHARED_LIB_NAME} SHARED)
 add_library(${namespace}::${TAU_SHARED_LIB_NAME} ALIAS ${TAU_SHARED_LIB_NAME})
 target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
-target_link_libraries(${TAU_SHARED_LIB_NAME} Boost::log ${CVC5_LIB})
+target_link_libraries(${TAU_SHARED_LIB_NAME} Boost::log tauparser ${CVC5_LIB})
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>

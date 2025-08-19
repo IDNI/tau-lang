@@ -296,6 +296,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_lt,              510 },
 			{ bf_nlt,             511 },
 			{ wff,                580 },
+			{ bf_fall,            700 },
+			{ bf_fex,             710 },
 			{ bf_or,              720 },
 			{ bf_xor,             730 },
 			{ bf_and,             740 },
@@ -460,6 +462,14 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (last_quant_nt == wff_ex) out(", ");
 				else last_quant_nt = wff_ex, out("ex ");
 				break;
+			case bf_fall:
+				if (last_quant_nt == bf_fall) out(", ");
+				else last_quant_nt = bf_fall, out("fall ");
+				break;
+			case bf_fex:				
+				if (last_quant_nt == bf_fex) out(", ");
+				else last_quant_nt = bf_fex, out("fex ");
+				break;
 
 			case wff_sometimes:     out("sometimes "); break;
 			case wff_always:        out("always "); break;
@@ -572,6 +582,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 			case wff_all:
 			case wff_ex:
+			case bf_fall:
+			case bf_fex:
 				if (!t.right_sibling_tree()
 					.child_is(last_quant_nt)) out(" ");
 				break;

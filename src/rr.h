@@ -9,8 +9,8 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 struct rr {
-	rr(const rewriter::rules& rec_relations, const htree::sp& main);
-	rr(const htree::sp& main);
+	rr(const rewriter::rules& rec_relations, const htref& main);
+	rr(const htref& main);
 
 	std::weak_ordering operator<=>(const rr& that) const;
 	constexpr bool     operator<  (const rr& that) const;
@@ -21,7 +21,7 @@ struct rr {
 	constexpr auto     operator!= (const rr& that) const;
 
 	rewriter::rules rec_relations;
-	htree::sp main;
+	htref main;
 };
 
 } // namespace idni::tau_lang

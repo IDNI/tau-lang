@@ -32,7 +32,7 @@ struct tau_ba {
 	 * @param rec_relations Reference to rules of tau_nso_t.
 	 * @param main Reference to main tau_nso_t.
 	 */
-	tau_ba(const rewriter::rules& rec_relations, htree::sp main);
+	tau_ba(const rewriter::rules& rec_relations, htref main);
 
 	/**
 	 * @brief Constructor initializing tau_ba with recursive relations and main tau_nso_t.
@@ -47,7 +47,7 @@ struct tau_ba {
 	 *
 	 * @param main Reference to main tau_nso_t.
 	 */
-	tau_ba(htree::sp main);
+	tau_ba(htref main);
 
 	/**
 	 * @brief Constructor initializing tau_ba with main tau_nso_t.
@@ -164,6 +164,18 @@ bool operator==(const tau_ba<BAs...>& other, const bool& b);
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool operator==(const bool& b, const tau_ba<BAs...>& other);
+
+/**
+ * @brief Equality operator for two tau_ba objects.
+ *
+ * @tparam BAs Variadic template parameters.
+ * @param lhs Reference to first tau_ba.
+ * @param rhs Reference to second tau_ba.
+ * @return True if equal, otherwise false.
+ */
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool operator==(const tau_ba<BAs...>& lhs, const tau_ba<BAs...>& rhs);
 
 /**
  * @brief Inequality operator for tau_ba and bool.
