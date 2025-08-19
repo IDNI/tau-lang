@@ -13,7 +13,8 @@ tref normalizer_step(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 #ifdef TAU_CACHE
-	static subtree_unordered_map<node, tref> cache;
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 
@@ -39,7 +40,8 @@ tref normalize_non_temp(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 #ifdef TAU_CACHE
-	static subtree_unordered_map<node, tref> cache;
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	tref result = tt(fm)
@@ -166,7 +168,7 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
-	auto vars = get_free_vars_from_nso<node>(fm.get());
+	const trefs& vars = fm.get_free_vars();
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
@@ -183,7 +185,7 @@ bool is_non_temp_nso_unsat(tref n) {
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
-	auto vars = get_free_vars_from_nso<node>(nn);
+	const trefs& vars = get_free_vars<node>(nn);
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	const auto& t = tau::get(normalize_non_temp<node>(nn));
 	assert((t.equals_T() || t.equals_F()
@@ -226,11 +228,11 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 
-	auto vars = get_free_vars_from_nso<node>(n1);
+	trefs vars(get_free_vars<node>(n1));
 	for (tref v : vars) LOG_DEBUG << "var1: " << LOG_FM(v);
-	auto vars2 = get_free_vars_from_nso<node>(n2);
+	const trefs& vars2 = get_free_vars<node>(n2);
 	for (tref v : vars2) LOG_DEBUG << "var2: " << LOG_FM(v);
-	vars.insert(vars2.begin(), vars2.end());
+	vars.insert(vars.end(), vars2.begin(), vars2.end());
 	for (tref v : vars) LOG_DEBUG << "var: " << LOG_FM(v);
 
 	tref imp1 = tau::build_wff_imply(n1, n2);
@@ -285,9 +287,9 @@ bool is_nso_impl(tref n1, tref n2) {
 		return true;
 	}
 
-	auto vars  = get_free_vars_from_nso<node>(n1);
-	auto vars2 = get_free_vars_from_nso<node>(n2);
-	vars.insert(vars2.begin(), vars2.end());
+	trefs vars(get_free_vars<node>(n1));
+	const trefs& vars2 = get_free_vars<node>(n2);
+	vars.insert(vars.end(), vars2.begin(), vars2.end());
 
 	tref imp = tau::build_wff_imply(n1, n2);
 	for (tref v : vars) imp = tau::build_wff_all(v, imp);
@@ -318,9 +320,9 @@ bool are_bf_equal(tref n1, tref n2) {
 		return true;
 	}
 
-	auto vars = get_free_vars_from_nso<node>(n1);
-	auto vars2 = get_free_vars_from_nso<node>(n2);
-	vars.insert(vars2.begin(), vars2.end());
+	trefs vars(get_free_vars<node>(n1));
+	const trefs& vars2 = get_free_vars<node>(n2);
+	vars.insert(vars.end(), vars2.begin(), vars2.end());
 
 	tref bf_equal_fm = tau::build_bf_eq(tau::build_bf_xor(n1, n2));
 	for (tref v : vars) bf_equal_fm = tau::build_wff_all(v, bf_equal_fm);
@@ -342,6 +344,20 @@ bool is_bf_same_to_any_of(tref n, trefs& previous) {
 }
 
 template <NodeType node>
+tref apply_defs_to_spec (tref spec) {
+	using tau = tree<node>;
+	rr<node> spec_with_defs {tau::geth(spec)};
+	if (tau::get(spec).find_top(is<node, tau::ref>)) {
+		const auto& defs = definitions<node>::instance().get_sym_defs();
+		spec_with_defs.rec_relations.insert(spec_with_defs.rec_relations.end(),
+		       defs.begin(), defs.end());
+		if (auto infr = infer_ref_types<node>(spec_with_defs); infr)
+			return apply_rr_to_formula(infr.value());
+	}
+	return spec;
+}
+
+template <NodeType node>
 tref normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
 	auto trim_q = [](tref n) {
@@ -350,7 +366,22 @@ tref normalize_with_temp_simp(tref fm) {
 			|| t.child_is(tau::wff_always)) return t[0].first();
 		return n;
 	};
-	const auto& red_fm = tau::get(normalizer_step<node>(fm));
+	fm = normalizer_step<node>(fm);
+	// Apply present function/predicate definitions
+	bool changed;
+	do {
+		changed = false;
+		// Unresolved symbol is still present
+		if (tau::get(fm).find_top(is<node, tau::ref>)) {
+			tref resolved_red_fm = apply_defs_to_spec<node>(fm);
+			if (tau::get(resolved_red_fm) != tau::get(fm)) {
+				fm = normalizer_step<node>(resolved_red_fm);
+				changed = true;
+			}
+		}
+	} while (changed);
+
+	const tau& red_fm = tau::get(fm);
 	LOG_TRACE << "red_fm: " << LOG_FM(red_fm.get());
 	if (red_fm.equals_T() || red_fm.equals_F())
 		return red_fm.get();
@@ -468,9 +499,23 @@ tref build_main_step(tref form, size_t step) {
 // Normalizes a Boolean function having no recurrence relation
 template <NodeType node>
 tref bf_normalizer_without_rec_relation(tref bf) {
+	using tau = tree<node>;
 	LOG_DEBUG << "Begin Boolean function normalizer";
 
-	auto result = bf_boole_normal_form<node>(bf);
+	tref result = bf_boole_normal_form<node>(bf);
+	// Apply present function/predicate definitions
+	bool changed;
+	do {
+		changed = false;
+		// Unresolved symbol is still present
+		if (tau::get(result).find_top(is<node, tau::ref>)) {
+			auto resolved_res = apply_defs_to_spec<node>(result);
+			if (resolved_res != result) {
+				result = bf_reduce_canonical<node>()(resolved_res);
+				changed = true;
+			}
+		}
+	} while (changed);
 
 	LOG_DEBUG << "End Boolean function normalizer";
 
@@ -490,7 +535,7 @@ tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
 	LOG_DEBUG << "End calculate recurrence relation";
 
 	LOG_DEBUG << "Begin Boolean function normalizer";
-	auto result = bf_boole_normal_form<node>(bf_unfolded);
+	auto result = bf_normalizer_without_rec_relation<node>(bf_unfolded);
 	LOG_DEBUG << "End Boolean function normalizer";
 
 	return result;

@@ -246,18 +246,18 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
 #define TAU_LOG_BA(c)        TAU_LOG_BA_COLOR << c                  <<TC.CLEAR()
 #define LOG_BA(c)            TAU_LOG_BA(c)
 
-// LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` pretty print
+// LOG_FM_COLOR escapes in a stream for `tref` or `htref` pretty print
 #define TAU_LOG_FM(fm)       TAU_LOG_FM_COLOR << tree<node>::get(fm).to_str() \
 								    <<TC.CLEAR()
 #define LOG_FM(fm)           TAU_LOG_FM(fm)
 
-// LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` pretty print
+// LOG_FM_COLOR escapes in a stream for `tref` or `htref` pretty print
 //                      and then followed by nodes tree printed in a line
 #define TAU_LOG_FM_DUMP(fm)  TAU_LOG_FM_COLOR <<tree<node>::get(fm).to_str() \
 	<< TC.CLEAR() << " \t#\t" << tree<node>::get(fm).print_in_line_to_str()
 #define LOG_FM_DUMP(fm)      TAU_LOG_FM_DUMP(fm)
 
-// LOG_FM_COLOR escapes in a stream for `tref` or `htree::sp` tree print
+// LOG_FM_COLOR escapes in a stream for `tref` or `htref` tree print
 #define TAU_LOG_FM_TREE(fm)  TAU_LOG_FM_COLOR<<tree<node>::get(fm).tree_to_str() \
 								    <<TC.CLEAR()
 #define LOG_FM_TREE(fm)      TAU_LOG_FM_TREE(fm)

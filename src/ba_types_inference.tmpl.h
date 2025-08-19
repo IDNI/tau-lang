@@ -2,6 +2,7 @@
 
 #include "ba_types.h"
 #include "ba_types_inference.h"
+#include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "ba_types_inference"
@@ -42,8 +43,8 @@ tref ba_types_inference<node>::operator()(tref n) {
 
 	// DBG(LOG_TRACE << ba_types<node>::dump_to_str();)
 
-	var_scopes_t vscids; size_t tsid = 0;
-	tref scoped = add_scope_ids(n, vscids, 0, tsid);
+	var_scopes_t vscids; size_t scid = 0;
+	tref scoped = add_scope_ids(n, vscids, scid);
 	if (scoped == nullptr) return nullptr;
 
 	DBG(LOG_TRACE << id << "-- BA elementes scoped: " << LOG_FM(scoped);)
@@ -142,37 +143,32 @@ tref ba_types_inference<node>::operator()(const tt& n) {
 
 // removes type info from constants and vars and adds their scope_id
 // used as a preparation (first) step before type checking and propagation
-// vsc = vars scope ids
-// csid = constant scope id
-// tsid = temporal scope id
+// vscids = vars scope ids
+// scid = scope id
 template <NodeType node>
 tref ba_types_inference<node>::add_scope_ids(
-	tref n, var_scopes_t& vscids, size_t csid, size_t& tsid)
+	tref n, var_scopes_t& vscids, size_t& scid)
 {
 	DBG(LOG_TRACE << "-- Add_scope_ids: " << LOG_FM_DUMP(n);)
-	// ptree(std::cout << "tree: ", n) << "\n";
-	const auto vsid = [this, &vscids](tref var) -> size_t {
-		size_t v = get_var_name_sid<node>(var);
-		if (vscids.find(v) == vscids.end()) return 0;
-		return vscids[v];
-	};
-	const auto inc_vsid = [this, &vscids](tref var) {
-		size_t v = get_var_name_sid<node>(var);
-		if (vscids.find(v) == vscids.end()) vscids[v] = 0;
-		else vscids[v]++;
-	};
-	const auto transform_element = [this, &csid, &tsid, &vsid](
-		tref el, size_t nt) -> tref
-	{
-		DBG(LOG_TRACE << "add_scope_ids - transform_element: " << LOG_FM_DUMP(el);)
-
+	const auto transform_element = [this, &vscids](tref el) -> tref {
+		DBG(LOG_TRACE << "add_scope_ids - transform_element: " << LOG_FM(el);)
 		static const size_t temporal = get_ba_type_id<node>("_temporal");
-		auto is_io = is_io_var<node>(el);
-		bool is_global = is_io || is_uconst<node>(el);
 		const auto& t = tau::get(el);
-		trefs ch;
-		auto ch0 = t.first();
-		if (is_io) {
+		auto nt = t.get_type();
+		if (nt != tau::variable && nt != tau::bf_constant)
+			return el;
+		bool is_global = is_io_var<node>(el) || is_uconst<node>(el);
+		// get scope_id
+		size_t scope_id = 1; // start at 1 (0 is for temporals)
+		if (nt == tau::variable && !is_global) {
+			size_t var_name_id = get_var_name_sid<node>(el);
+			if (vscids.find(var_name_id) != vscids.end()) {
+				scope_id = vscids[var_name_id];
+			}
+		}
+		tref r = el;
+		// add scope 0 to io vars' temporal vars 
+		if (is_io_var<node>(el)) {
 			auto tv = tt(el) | tau::io_var
 				| tau::offset | tau::variable;
 			if (!tv) tv = tt(el) | tau::io_var
@@ -180,28 +176,48 @@ tref ba_types_inference<node>::add_scope_ids(
 			if (tv) {
 				tref tn = tau::get(tau::variable, {
 					tv.value_tree().first(),
-					tau::get(node(tau::scope_id, tsid))
+					tau::get(node(tau::scope_id, 0))
 				});
 				types[tau::get(tn).first()] = temporal;
-				ch0 = rewriter::replace<node>(ch0,
+				r = rewriter::replace<node>(el,
 					subtree_map<node, tref>{
-							{ tv.value(), tn } });
+						{ tv.value(), tn }});
 			}
 		}
-		if (ch0) ch.push_back(ch0);
-		bool is_constant = nt == tau::bf_constant;
-		DBG(LOG_TRACE << "is_global: " << is_global
-			<< "  is_constant: " << is_constant
-			<< "  is_io: " << is_io << "  nt: " << nt;)
-
-		if (!is_global && !is_constant) {
-			size_t scope_id = is_constant ? csid : vsid(el);
+		// add scope_id to non IO vars
+		else if (nt == tau::variable) {
+			trefs ch;
+			if (t.first()) ch.push_back(t.first());
 			ch.push_back(tau::get(node(tau::scope_id, scope_id)));
+			r = tau::get(t.value, ch);
+		} 
+		// extract type info
+		size_t tid = tau::get(r).get_ba_type();
+		if (is_io_var<node>(r) && tid == 0) {
+			// Update type information from stream definitions
+			// Get string id of stream name
+			size_t sid = get_var_name_sid<node>(r);
+			auto& defs = definitions<node>::instance();
+			// See if stream is present in outputs
+			const auto& mo = defs.get_output_defs();
+			if (auto it = mo.find(sid); it != mo.end()) {
+				// stream found, assign type id
+				tid = it->second.first;
+				r = tau::get(r).replace_value(
+					tau::get(r).value.ba_retype(tid));
+			} else {
+				// See if stream is present in inputs
+				const auto& mi = defs.get_input_defs();
+				if (it = mi.find(sid); it != mi.end()) {
+					// stream found, assign type id
+					tid = it->second.first;
+					r = tau::get(r).replace_value(
+						tau::get(r).value.ba_retype(tid));
+				}
+			}
 		}
-		auto r = tau::get(t.value, ch);
-		size_t tid = t.get_ba_type();
-		const auto& type = t.get_ba_type_name();
-		DBG(LOG_TRACE << "type: " << type;)
+		const auto& type = tau::get(r).get_ba_type_name();
+		// DBG(LOG_TRACE << "type: " << type;)
 		if (type.size() && type != "untyped") {
 			bool found = false;
 			for (const auto& st : node::nso_factory::types())
@@ -211,14 +227,14 @@ tref ba_types_inference<node>::add_scope_ids(
 				return nullptr;
 			}
 		}
-		DBG(LOG_TRACE << "r: " << LOG_FM_DUMP(r);)
-		DBG(LOG_TRACE << "get_el_key(r): " << LOG_FM_DUMP(get_el_key(r));)
+		// DBG(LOG_TRACE << "r: " << LOG_FM_DUMP(r);)
+		// DBG(LOG_TRACE << "get_el_key(r): " << LOG_FM_DUMP(get_el_key(r));)
 		types[get_el_key(r)] = tid;
 		DBG(LOG_TRACE << "add_scope_ids - transformed element: " << LOG_FM_DUMP(r)
 			<< " with type: " << LOG_BA_TYPE(tid);)
 		return r;
 	};
-	const auto transformer = [&](tref el) -> tref{
+	const auto transformer = [&](tref el) -> tref {
 		const auto& t = tau::get(el);
 		auto nt = t.get_type();
 		switch (nt) {
@@ -230,14 +246,13 @@ tref ba_types_inference<node>::add_scope_ids(
 			for (tref r : rrs.values()) {
 				var_scopes_t nvscids;
 				// DBG(LOG_TRACE << "replacing rec_relation";)
-				tref x = add_scope_ids(r, nvscids, csid,++tsid);
-				if (x == nullptr) return nullptr;
+				tref x = add_scope_ids(r, nvscids, ++scid);
+				if (!x) return nullptr;
 				rrch.push_back(x);
 			}
 			var_scopes_t nvscids;
-			// DBG(LOG_TRACE << "replacing main";)
-			tref x = add_scope_ids(main, nvscids, csid, ++tsid);
-			if (x == nullptr) return nullptr;
+			tref x = add_scope_ids(main, nvscids, ++scid);
+			if (!x) return nullptr;
 			ch.push_back(x);
 			if (rrch.size())
 				ch.push_back(tau::get(tau::definitions, rrch));
@@ -245,24 +260,33 @@ tref ba_types_inference<node>::add_scope_ids(
 		}
 		case tau::wff_always:
 		case tau::wff_sometimes: {
-			tref x = add_scope_ids(t.first(), vscids, csid, tsid);
-			if (x == nullptr) return nullptr;
-			return tau::get(nt, x);
+			tref x = add_scope_ids(t.first(), vscids, scid);
+			return x ? tau::get(nt, x) : nullptr;
 		}
 		case tau::wff_ex:
-		case tau::wff_all: {
-			inc_vsid(t.first());
-			tref v = transform_element(t.first(), tau::variable);
-			if (v == nullptr) return nullptr;
-			tref x = add_scope_ids(t.second(), vscids, csid, tsid);
-			if (x == nullptr) return nullptr;
-			tref r = tau::get(t.value, { v, x });
-			// DBG(LOG_TRACE << "quant replaced: " << LOG_FM(r);)
-			return r;
+		case tau::wff_all:
+		case tau::bf_fall:
+		case tau::bf_fex: {
+			// quantifiers create a new variable scope
+			size_t new_vscid = ++scid;
+			size_t var_sid = get_var_name_sid<node>(t.first());
+			size_t old_var_scope = 1; // 0 is for temporals
+			bool was_scoped = false;
+			if (auto it = vscids.find(var_sid); it != vscids.end())
+				old_var_scope = it->second, was_scoped = true;
+			vscids[var_sid] = new_vscid;
+			tref v = transform_element(t.first());
+			if (!v) return nullptr;
+			tref x = add_scope_ids(t.second(), vscids, scid);
+			if (!x) return nullptr;			
+			// restore previous scope state (or remove)
+			if (was_scoped) vscids[var_sid] = old_var_scope;
+			else vscids.erase(var_sid);
+			return tau::get(t.value, { v, x });
 		}
 		case tau::bf_constant:
 		case tau::variable:
-			return transform_element(el, nt);
+			return transform_element(el);
 		case tau::bf_f:
 		case tau::bf_t:
 			types[get_el_key(el)] = tau::get(el).get_ba_type();
@@ -272,7 +296,7 @@ tref ba_types_inference<node>::add_scope_ids(
 		return el;
 	};
 	auto r = pre_order<node>(n).apply_until_change(transformer);
-	DBG(LOG_TRACE << "-- Added scope ids: " << LOG_FM(r);)
+	DBG(LOG_WARNING << "-- Added scope ids: " << LOG_FM_DUMP(r);)
 	return r;
 }
 

@@ -76,7 +76,7 @@ repl_evaluator<BAs...>::history_ref repl_evaluator<BAs...>::history_retrieve(
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::print_history(const htree::sp& mem, const size_t id,
+void repl_evaluator<BAs...>::print_history(const htref& mem, const size_t id,
 	const size_t size, bool print_relative_index) const
 {
 	std::cout << TC_OUTPUT << "%" << id + 1 << TC.CLEAR();
@@ -99,20 +99,22 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 	auto check = get_type_and_arg(spec);
 	if (!check) return {};
 	auto [type, value] = check.value();
+	auto& defs = definitions<node>::instance();
 	if (contains(value, tau::ref)) {
 		if (type == tau::spec) {
-			if (auto x = get_nso_rr<node>(ctx, value); x)
+			if (auto x = get_nso_rr<node>(defs.get_io_context(), value); x)
 				nso_rr = x.value();
 			else return {};
 		} else nso_rr = rr<node>(tau::geth(
-				resolve_io_vars<node>(ctx, value)));
+				resolve_io_vars<node>(defs.get_io_context(), value)));
+		auto definitions = defs.get_sym_defs();
 		nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 			definitions.begin(), definitions.end());
 		if (auto infr = infer_ref_types<node>(nso_rr); infr)
 			return infr.value();
 		else return {};
 	} else return rr<node>(tau::geth(
-			resolve_io_vars<node>(ctx, value)));
+			resolve_io_vars<node>(defs.get_io_context(), value)));
 	return {};
 }
 
@@ -193,7 +195,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::contains(const tt& n, typename node::type nt) const {
 	bool found = false;
-	static const auto searcher = [&nt, &found](tref n) -> bool {
+	const auto searcher = [&nt, &found](tref n) -> bool {
 		if (tau::get(n).get_type() == nt) return found = true, false;
 		return true;
 	};
@@ -341,8 +343,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	}
 	subtree_map<node, tref> changes = { { thiz, with } };
 
-	auto free_vars_thiz = get_free_vars_from_nso<node>(thiz);
-	auto free_vars_with = get_free_vars_from_nso<node>(with);
+	const trefs& free_vars_thiz = get_free_vars<node>(thiz);
+	const trefs& free_vars_with = get_free_vars<node>(with);
 	trefs var_stack = {};
 	auto var_id = get_new_var_id<node>(in);
 	subtree_set<node> marked_quants;
@@ -350,8 +352,9 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	// A variable should only be replaced if it is not quantified
 	auto quantified_vars_skipper = [&](tref x) {
 		if (is_quantifier<node>(x)) {
-			tref var = tau::get(x).find_top(is_var_or_capture<node>());
-			if (var && free_vars_thiz.contains(var))
+			tref var = tau::get(x)
+					.find_top(is_var_or_capture<node>());
+			if (var && tau::contains_subtree(free_vars_thiz, var))
 				return false;
 		}
 		return true;
@@ -362,8 +365,9 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		if (!quantified_vars_skipper(x))
 			return false;
 		if (is_quantifier<node>(x)) {
-			tref var = tau::get(x).find_top(is_var_or_capture<node>());
-			if (var && free_vars_with.contains(var)) {
+			tref var = tau::get(x)
+					.find_top(is_var_or_capture<node>());
+			if (var && tau::contains_subtree(free_vars_with, var)) {
 				DBG(assert(!(tau::get(var).is(tau::capture)));)
 				marked_quants.insert(x);
 				// bool var_t = tau::get(var).is(tau::variable);
@@ -469,33 +473,9 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	auto dnf = normalizer<node>(applied);
 
 	// Make sure that there is no free variable in the formula
-	auto free_vars = get_free_vars_from_nso<node>(dnf);
-	if (!free_vars.empty()) {
-		// all elements of the set must be quantified
-		std::stringstream ss; bool has_real_free_vars = false;
-		for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
-			if (is_child<node>(*it, tau::io_var)) {
-				const tau& io_var_node = tau::get(*it)[0];
-				if (!io_var_node.is_input_variable() && !
-				io_var_node.is_output_variable()) {
-					TAU_LOG_ERROR << "The stream "
-					<< io_var_node
-					<< " is not defined as an input or output stream\n";
-					return;
-				}
-			} else if (!is_child<node>(*it, tau::uconst_name)) {
-				ss << *it << " ";
-				has_real_free_vars = true;
-			}
-		}
-		if (has_real_free_vars) {
-			TAU_LOG_ERROR << "The following variable(s) must be "
-				<< "quantified and cannot appear free: "
-				<< ss.str() << "\n";
-			return;
-		}
-	}
+	if (has_free_vars<node>(dnf)) return;
 
+	auto& ctx = definitions<node>::instance().get_io_context();
 	auto ins = finputs<node>(collect_input_streams<node>(dnf, ctx));
 	auto outs = foutputs<node>(collect_output_streams<node>(dnf, ctx));
 	run<node>(dnf, ins, outs, ctx);
@@ -539,7 +519,7 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 			<< "}:" << options.type << "\n";
 	};
 
-	auto print_general_case = [&options](tref var, tref value) {
+	auto print_general_case = [](tref var, tref value) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := "
 			<< TAU_TO_STR(value) << "\n";
 	};
@@ -661,20 +641,21 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
-	definitions.emplace_back(tau::geth(n[0][0]), tau::geth(n[0][1]));
-	std::cout << "[" << definitions.size() << "] "
-		<< to_str<node>(definitions.back()) << "\n";
+	auto& defs = definitions<node>::instance();
+	size_t idx = defs.add(tau::geth(n[0][0]), tau::geth(n[0][1]));
+	std::cout << "[" << idx + 1 << "] " << to_str<node>(defs[idx]) << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_list_cmd() {
-	if (definitions.size() == 0) std::cout << "Definitions: empty\n";
+	auto& defs = definitions<node>::instance();
+	if (defs.size() == 0) std::cout << "Definitions: empty\n";
 	else std::cout << "Definitions:\n";
-	for (size_t i = 0; i < definitions.size(); i++)
+	for (size_t i = 0; i < defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< to_str<node>(definitions[i]) << "\n";
-	std::cout << ctx;
+			<< to_str<node>(defs[i]) << "\n";
+	std::cout << defs.get_io_context();
 }
 
 template <typename... BAs>
@@ -683,8 +664,9 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	auto num = command | tau::num;
 	if (!num) return;
 	auto i = num | tt::num;
-	if (i && i <= definitions.size()) {
-		print<node>(std::cout, definitions[i-1]) << "\n";
+	const auto& defs = definitions<node>::instance();
+	if (i && i <= defs.size()) {
+		print<node>(std::cout, defs[i-1]) << "\n";
 		return;
 	}
 	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
@@ -694,19 +676,20 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
-	if (!get_io_def<node>(command | tt::only_child | tt::ref, ctx.inputs)) {
+	auto& defs = definitions<node>::instance();
+	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_input_defs())) {
 		error = true;
-		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
+		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
 	}
 }
-
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
-	if (!get_io_def<node>(command | tt::only_child | tt::ref, ctx.outputs)){
+	auto& defs = definitions<node>::instance();
+	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_output_defs())){
 		error = true;
-		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value()) << "\n";
+		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
 	}
 }
 
@@ -799,9 +782,9 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "colors:              " << pbool[opt.colors] << "\n"; } },
 	{ charvar_opt,      [this]() {
 		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
-	{ highlighting_opt, [this]() {
+	{ highlighting_opt, []() {
 		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
-	{ indenting_opt,    [this]() {
+	{ indenting_opt,    []() {
 		std::cout << "indenting:           " << pbool[pretty_printer_indenting] << "\n"; } },
 	{ severity_opt,     [this]() {
 		std::cout << "severity:            " << opt.severity << "\n"; } }};

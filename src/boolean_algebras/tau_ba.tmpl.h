@@ -9,7 +9,7 @@ namespace idni::tau_lang {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...>::tau_ba(const rewriter::rules& rec_relations, htree::sp main)
+tau_ba<BAs...>::tau_ba(const rewriter::rules& rec_relations, htref main)
 		: nso_rr({ rec_relations, main }) {}
 
 template <typename... BAs>
@@ -19,7 +19,7 @@ tau_ba<BAs...>::tau_ba(const rewriter::rules& rec_relations, tref main)
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...>::tau_ba(htree::sp main) : nso_rr({ main }) {}
+tau_ba<BAs...>::tau_ba(htref main) : nso_rr({ main }) {}
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -126,6 +126,13 @@ bool operator==(const bool& b, const tau_ba<BAs...>& other) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+bool operator==(const tau_ba<BAs...>& lhs, const tau_ba<BAs...>& rhs) {
+	return lhs.nso_rr.main == rhs.nso_rr.main &&
+		lhs.nso_rr.rec_relations == rhs.nso_rr.rec_relations;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const tau_ba<BAs...>& other, const bool& b) {
 	return !(other == b);
 }
@@ -176,11 +183,13 @@ requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
-	auto simp_fm = apply_rr_to_formula<node>(fm.nso_rr);
+	tref simp_fm = apply_rr_to_formula<node>(fm.nso_rr);
+	if (!simp_fm) return false;
+	simp_fm = apply_defs_to_spec<node>(simp_fm);
 	if (!simp_fm) return false;
 	if (tau::get(simp_fm).find_top(is<node, tau::ref>))
 		return false;
-	auto vars = get_free_vars_from_nso<node>(simp_fm);
+	const trefs& vars = get_free_vars<node>(simp_fm);
 	for (const auto& v : vars) {
 		const auto& t = tau::get(v);
 		if (!(t.only_child_tree().is(tau::io_var)

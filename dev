@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
+echo "dev - Tau development helper scripts"
+
+help() {
+	echo "Usage: ./dev <SCRIPT> <SCRIPT_OPTIONS>"
+	echo "Available scripts:"
+	for script in scripts/*.sh; do
+		if [ -f "$script" ]; then
+			echo -e "\t$(basename "$script" .sh)"
+		fi
+	done
+	echo "For more information, see scripts/README.md"
+}
+
+error() {
+	echo -e "\nError: $1\n"
+	help
+	exit 1
+}
+
+# Check if first argument is provided
+if [ $# -eq 0 ]; then
+	error "No script name provided"
+fi
+
+script_name="$1"
+
+if [ "$script_name" == "help" ] || [ "$script_name" == "--help" ] || [ "$script_name" == "-h" ]; then
+	help
+	exit 0
+fi
+
+script_name="${script_name%.sh}"  # remove .sh extension if provided
+script_path=""
+
+# Check if script exists (script must have .sh extension)
+if [ -f "scripts/${script_name}.sh" ]; then
+	script_path="scripts/${script_name}.sh"
+else
+	error "'scripts/${script_name}.sh' not found"
+fi
+
+echo "Running: $script_path"
+
+# Execute the script and pass all remaining arguments
+shift  # Remove the first argument (script name)
+exec "$script_path" "$@"

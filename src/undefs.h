@@ -2,12 +2,6 @@
 
 // undefines of Tau Language Framework macros used in implementation
 
-// defs.h
-
-#undef GIT_DESCRIBED
-#undef GIT_COMMIT_HASH
-#undef GIT_BRANCH
-
 // logging.h
 
 #undef HOOK_LOGGING_ENABLED

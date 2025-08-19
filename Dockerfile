@@ -48,7 +48,7 @@ COPY ./ /tau-lang
 
 WORKDIR /tau-lang
 
-RUN ./clean.sh
+RUN ./dev clean
 
 # if NIGHTLY is set to yes, then add .YYYY-MM-DD to the first line of the VERSION file
 RUN if [ "$NIGHTLY" = "yes" ]; then \
@@ -59,7 +59,7 @@ RUN echo "(BUILD) -- Building version: $(head -n 1 VERSION)"
 # Build tests and run them if TESTS is set to yes. Stop the build if they fail
 RUN echo " (BUILD) -- Running tests: $TESTS"
 RUN if [ "$TESTS" = "yes" ]; then \
-	./build.sh "${BUILD_TYPE}" -DTAU_BUILD_TESTS=ON && \
+	./dev build "${BUILD_TYPE}" -DTAU_BUILD_TESTS=ON && \
 	cd tests && \
 	ctest -j 8 --test-dir "../build-${BUILD_TYPE}" --output-on-failure \
 		|| exit 1; \
@@ -69,17 +69,17 @@ RUN echo "(BUILD) -- Building packages: $RELEASE (nightly: $NIGHTLY)"
 
 # Linux packages
 RUN if [ "$RELEASE" = "yes" ]; then \
-	./packages.sh && rm ./build-Release/CMakeCache.txt; \
+	./dev packages && rm ./build-Release/CMakeCache.txt; \
 fi
 
 # Windows packages
 RUN if [ "$RELEASE" = "yes" ]; then \
-	cd external && ./libboost-mingw-builder.sh && cd .. && \
-	./w64-packages.sh; \
+	./dev boost-mingw && \
+	./dev w64-packages; \
 fi
 
 # If tau executable does not exist already, build it
-RUN if [ ! -f ./build-${BUILD_TYPE}/tau ]; then ./build.sh "${BUILD_TYPE}"; fi
+RUN if [ ! -f ./build-${BUILD_TYPE}/tau ]; then ./dev build "${BUILD_TYPE}"; fi
 
 # Set the entrypoint to the tau executable
 WORKDIR /tau-lang/build-${BUILD_TYPE}

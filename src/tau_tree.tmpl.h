@@ -84,8 +84,11 @@ int_t get_max_shift(const trefs& io_vars, bool ignore_temps = false);
 template <NodeType node>
 int_t get_max_initial(const trefs& io_vars);
 
+inline static std::deque<trefs> free_vars_pool{ {} };
+inline static std::map<trefs, size_t> free_vars_pool_index{ { {}, 0 } };
+
 template <NodeType node>
-subtree_set<node> get_free_vars_from_nso(tref n);
+const trefs& get_free_vars(tref n);
 
 template <NodeType node>
 bool has_temp_var(tref n);
@@ -121,66 +124,6 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // Tau tree templates implementation
 
-// gc
-template <NodeType node>
-void tree<node>::gc() {
-	std::unordered_set<tref> keep{};
-	gc(keep);
-}
-
-template <NodeType node>
-void tree<node>::gc(std::unordered_set<tref>& keep) {
-	base_t::gc(keep);
-	// call callbacks to rebuild caches
-	for (const auto& cb : gc_callbacks) cb(keep);
-}
-
-template <NodeType node>
-template <CacheType cache_t>
-cache_t& tree<node>::create_cache() {
-	static std::vector<cache_t> caches{};
-	cache_t& cache = caches.emplace_back();
-	gc_callbacks.push_back([&cache](const std::unordered_set<tref>& kept) {
-		cache_t new_cache{};
-		for (auto it = cache.begin(); it != cache.end(); it++) {
-			bool ok = true;
-			const auto& key = it->first;
-			const auto check = [&ok, &kept](tref n) {
-				return (ok = ok && kept.contains(n));
-			};
-			if constexpr (std::is_same_v<
-					typename cache_t::key_type, tref>)
-				check(key);
-			else if constexpr (std::tuple_size_v<
-					typename cache_t::key_type> > 0)
-				std::apply([&ok, &kept, &check](
-							const auto&... args)
-				{
-					((ok = ok &&
-					(std::is_same_v<
-						std::decay_t<
-							decltype(args)>, tref>
-						? check(args)
-						: true)), ...);
-				}, key);
-			else {
-				if constexpr (std::is_same_v<std::decay_t<
-						decltype(key.first)>, tref>)
-					check(key.first);
-				if constexpr (std::is_same_v<std::decay_t<
-						decltype(key.second)>, tref>)
-					check(key.second);
-			}
-			if constexpr (std::is_same_v<
-					typename cache_t::mapped_type, tref>)
-				check(it->second);
-			if (ok) new_cache.emplace(it->first, it->second);
-		}
-		cache = std::move(new_cache);
-	});
-	return cache;
-}
-
 //------------------------------------------------------------------------------
 // handles
 
@@ -199,18 +142,18 @@ const tree<node>& tree<node>::get(const tref id) {
 }
 
 template <NodeType node>
-const tree<node>& tree<node>::get(const htree::sp& h) {
+const tree<node>& tree<node>::get(const htref& h) {
 	return (const tree&) base_t::get(h);
 }
 
 template <NodeType node>
-htree::sp tree<node>::geth(tref h) {
+htref tree<node>::geth(tref h) {
 	DBG(assert(h != nullptr);)
 	return base_t::geth(h);
 }
 
 template <NodeType node>
-htree::sp tree<node>::geth(const tree& n) {
+htref tree<node>::geth(const tree& n) {
 	return geth(n.get());
 }
 
@@ -634,6 +577,8 @@ bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 		case bf:
 		case bf_constant:
 		case bf_splitter:
+		case bf_fall:
+		case bf_fex:
 		case bf_ref:
 		case bf_or:
 		case bf_xor:
@@ -785,6 +730,13 @@ size_t tree<node>::get_ba_type() const {
 template <NodeType node>
 const std::string& tree<node>::get_ba_type_name() const {
 	return ba_types<node>::name(this->get_ba_type());
+}
+
+template <NodeType node>
+const trefs& tree<node>::get_free_vars() const {
+	static const trefs no_free_vars{};
+	return is(bf) || is(wff) ? tau_lang::get_free_vars<node>(get())
+				 : no_free_vars;
 }
 
 } // namespace idni::tau_lang

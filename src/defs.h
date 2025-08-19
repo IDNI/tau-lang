@@ -11,18 +11,20 @@
 
 //-----------------------------------------------------------------------------
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
-#ifndef GIT_DESCRIBED
-#define GIT_DESCRIBED   "n/a"
+#ifndef TAU_GIT_DESCRIBED
+#define TAU_GIT_DESCRIBED   "n/a"
 #endif
-#ifndef GIT_COMMIT_HASH
-#define GIT_COMMIT_HASH "n/a"
+#ifndef TAU_GIT_COMMIT_HASH
+#define TAU_GIT_COMMIT_HASH "n/a"
 #endif
-#ifndef GIT_BRANCH
-#define GIT_BRANCH      "n/a"
+#ifndef TAU_GIT_BRANCH
+#define TAU_GIT_BRANCH      "n/a"
 #endif
 
-#include "version_license.h" // include generated version and license constants
+// include generated version and license constants from VERSION and LICENSE.txt
+#include "version_license.h"
 
+// initialize logging and include logging helper macros
 #include "logging.h"
 
 // include parser defs for DBG macro, int_t (int32_t) and mostly for
@@ -30,10 +32,12 @@
 #include "../external/parser/src/defs.h"
 
 // -----------------------------------------------------------------------------
+// helper macros for printing
+
 // following macros work only if `node` type alias is defined
 // `using node = tau_lang::node<BAs...>;` where `BAs...` is a pack of Boolean Algebras)
 // argument `ref` is a tree pointer reference `tref`,
-// or shared pointer handle `htree::sp`
+// or shared pointer handle `htref`
 
 // helper macro for pretty printing a tau tree tref into std::cout
 #define TAU_PRINT(ref) (tree<node>::get(ref).print(std::cout))
