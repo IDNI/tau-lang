@@ -17,8 +17,6 @@ using bvs = std::vector<bv>;
 using solver = cvc5::Solver;
 using term_manager = cvc5::TermManager;
 
-static size_t bv_default_size = 64;
-
 template<NodeType node>
 using solution = subtree_map<node, tref>;
 

@@ -47,6 +47,20 @@ constexpr node<BAs...> node<BAs...>::ba_constant(
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+constexpr node<BAs...> node<BAs...>::bv_constant(size_t constant_id) {
+	// LOG_TRACE << " -- node::ba_constant: constant_id: "
+	// 	<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
+	// LOG_TRACE << " -- node::bitsizes: " << node::nt_bits << "/1/"
+	// 	  << node::ba_bits << "/1/" << node::data_bits;
+	// TODO (HIGH) if type is bv return bitvector...
+	auto n = node(type::bv_constant, constant_id,
+		    true /* is_term */, ba_types<node<BAs...>>::id("bv"));
+	// LOG_TRACE << " -- node::ba_constant result:" << n;
+	return n;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_typed(type nt, size_t ba_tid) {
 	return node(nt, 0, true /* is_term */, ba_tid);
 }

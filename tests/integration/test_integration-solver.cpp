@@ -7,9 +7,9 @@
 #endif
 
 tref splitter_one_bdd() {
-	using node = tau_lang::node<sbf_ba>;
+	using node = tau_lang::node<bv, sbf_ba>;
 	using tau = tree<node>;
-	static sbf_ba_factory<sbf_ba> factory;
+	static sbf_ba_factory<bv, sbf_ba> factory;
 	return tau::get(tau::bf, tau::get_ba_constant(factory.splitter_one(), "sbf"));
 }
 
@@ -613,7 +613,7 @@ TEST_SUITE("solve_system") {
 
 TEST_SUITE("solve") {
 	// This test is for the type tau_ba<sbf_ba>, sbf_ba
-	using node_t = node<tau_ba<sbf_ba>, sbf_ba>;
+	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 	using tau = tree<node_t>;
 
 

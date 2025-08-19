@@ -303,10 +303,10 @@ bool operator==(const variant_ba<BAs...>& l, const bool& r) {
 	if (std::holds_alternative<bool>(l.v))
 		return std::get<bool>(l.v) == r;
 	if (r) return std::visit(overloaded([](const auto& l) -> bool {
-							return l.is_one(); }),
+							return l == true; }),
 			std::get<std::variant<BAs...>>(l.v));
 	return std::visit(overloaded([](const auto& l) -> bool {
-							return l.is_zero(); }),
+							return l == false; }),
 		std::get<std::variant<BAs...>>(l.v));
 }
 

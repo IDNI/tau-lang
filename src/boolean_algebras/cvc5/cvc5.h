@@ -10,6 +10,7 @@
 namespace idni::tau_lang {
 
 static cvc5::TermManager cvc5_term_manager;
+static size_t cvc5_default_bv_size = 64;
 
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
@@ -71,6 +72,8 @@ inline cvc5::Term make_bitvector_div(const cvc5::Term& lhs, const cvc5::Term& rh
 inline cvc5::Term make_bitvector_mod(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_bitvector_shl(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_bitvector_shr(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
+	const size_t base);
 
 // -----------------------------------------------------------------------------
 // Queries

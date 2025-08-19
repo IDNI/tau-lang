@@ -16,7 +16,7 @@ size_t get_bv_size(const tref t) {
 			| node::type::num; num) {
 		return tt(num) | tt::only_child | tt::num;
 	}
-	return bv_default_size;
+	return cvc5_default_bv_size;
 }
 
 template <NodeType node>
@@ -240,13 +240,10 @@ bv bv_eval_node(cvc5::Solver& solver, const typename tree<node>::traverser& form
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_bitvector_shr(l, r);
 		}
-		case node::type::bitvector: {
-			// TODO (HIGH) fix when we introduce bvs in nodes
-			return cvc5_term_manager.mkConst(cvc5_term_manager.mkBitVectorSort(2));
-			// by replacing with
-			//auto cte = form | tt::first | tt::ba_constant;
-			//DBG( assert(std::holds_alternative<bv>(cte)); )
-			//return std::get<bv>(cte);
+		case node::type::bv_constant: {
+			auto cte = form | tt::bv_constant;
+			DBG( assert(std::holds_alternative<bv>(cte)); )
+			return std::get<bv>(cte);
 		}
 		default: {
 			throw cvc5::CVC5ApiException("unsupported bitvector operation");
@@ -264,7 +261,6 @@ bool is_bv_formula_sat(tref form) {
 	config_cvc5_solver(solver);
 
 	solver.push();
-//	auto tform = tt(form);
 	auto expr = bv_eval_node<node>(solver, tt(form), vars, free_vars, false);
 	solver.assertFormula(expr);
 	auto result = solver.checkSat().isSat();
@@ -315,10 +311,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 			// auto bvn = make_node<tau_sym<BAs...>>(solver.getValue(v.second), {});
 			// std::vector<tau<BAs...>> bvv{bvn};
 			s.emplace(v.first,
-				// TODO (HIGH) fix when we introduce bvs in nodes
-				//std::make_shared<rewriter::depreciating::node<tau_sym<BAs...>>>(
-				//	tau_parser::instance().literal(tau_parser::bitvector), bvv));
-				tau::get(type::bitvector));
+				tau::get(type::bv_constant));
 		}
 		solver.pop();
 		return s;
@@ -346,7 +339,7 @@ std::optional<constant_with_type<BAs...>> parse(const std::string& src) {
 	using tt = tau::traverser;
 
 	typename tau::get_options opts{
-		.parse = { .start = tau::bitvector },
+		.parse = { .start = tau::bv_constant },
 		.infer_ba_types = false,
 		.reget_with_hooks = false };
 	auto result = tau::get(src, opts);

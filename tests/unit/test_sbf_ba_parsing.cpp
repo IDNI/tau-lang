@@ -3,8 +3,8 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
-variant<tau_ba<sbf_ba>, sbf_ba> parse(const char* src) {
-	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
+variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> parse(const char* src) {
+	static sbf_ba_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> bf;
 	auto parsed = bf.parse(src);
 	assert(parsed.has_value());
 	return parsed.value().first;

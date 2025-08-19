@@ -128,14 +128,15 @@ bv                     => ('(' _ bv _ ')')            :bv_parenthesis
                         | (bv _ ">>" _ bv)            :bv_rotate_right
                         | ("min" __ bv __ bv)         :bv_min
                         | ("max" __ bv __ bv)         :bv_max
-                        | bitvector.
+                        | bv_constant.
 
 # bv constants
-bitvector              => "#b" bits [ _ ':' _ bv_type _ ]
-                        | num [ _ ':' _ bv_type _ ]
-                        | "#x" hexnum [ _ ':' _ bv_type _ ].
-bits                  => ('0' | '1')+.
-hexnum                => xdigit+.
+bv_constant            => "#b" binary [ _ ':' _ bv_type _ ]
+                        | decimal [ _ ':' _ bv_type _ ]
+                        | "#x" hexadecimal [ _ ':' _ bv_type _ ].
+binary                 => ('0' | '1')+.
+hexadecimal            => xdigit+.
+decimal                => digits+.
 
 # constant time constraints
 constraint =>
@@ -306,9 +307,9 @@ history        => ( "%"
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, hexnum, bits, type, bv_type, integer, source, capture,
-        var_name, io_var_name, uconst_name, type, file_name, ctnvar, option_name,
-        option_value.
+        sym, digits, decimal, hexadecimal, binary, type, bv_type, integer,
+        source, capture, var_name, io_var_name, uconst_name, type, file_name,
+        ctnvar, option_name, option_value.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, typed, q_var, src_c, uconst,

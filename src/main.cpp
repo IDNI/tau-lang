@@ -70,7 +70,7 @@ int run_tau_spec(string spec_file, bool charvar, bool exp,
 		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}
 	if (src.empty()) return 0;
-	repl_evaluator<sbf_ba> re({
+	repl_evaluator<bv, sbf_ba> re({
 		.print_history_store = false,
 		.error_quits         = true,
 		.charvar             = charvar,
