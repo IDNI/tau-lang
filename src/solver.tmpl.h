@@ -977,7 +977,9 @@ template <NodeType node>
 std::optional<solution<node>> solve(tref form, const solver_options& options) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+
 	if (tau::get(form).equals_T()) return { solution<node>() };
+	if (tau::get(form).equals_F()) return {};
 
 #ifdef DEBUG
 	LOG_TRACE << "solve/form: " << LOG_FM(form);
@@ -1001,18 +1003,36 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(clause);
 			continue;
 		}
-		auto is_equation = [](tref n) {
-			return tau::get(n).child_is(tau::bf_eq)
-				|| tau::get(n).child_is(tau::bf_neq);
-		};
-		// FIXME convert vars to a set
-		auto eqs = tau::get(clause).select_top(is_equation);
-		if (eqs.empty()) continue;
-		auto solution = solve<node>(
-			equations<node>(eqs.begin(), eqs.end()), options);
-		if (solution.has_value()) return solution;
+		solution<node> clause_solution;
+		// solve bv part
+		if (auto bv_eqs = tau::get(form).select_top(is_atomic_bv_fm<node>()); !bv_eqs.empty()) {
+			auto bv_solution = solve_bv<node>(bv_eqs);
+			if (bv_solution) {
+				for (const auto& [var, value]: bv_solution.value()) {
+					clause_solution[var] = value;
+				}
+			} else continue; // if we cannot solve bv part, skip this clause
+		}
+		// solve bas... part
+		if (auto eqs = tau::get(form).select_top(is_atomic_fm<node>()); !eqs.empty()) {
+			auto bas_solution = solve<node>(subtree_set<node>(eqs.begin(), eqs.end()), options);
+			if (bas_solution) {
+				for (const auto& [var, value]: bas_solution.value()) {
+					clause_solution[var] = value;
+				}
+			} else continue; // if we cannot solve bas... part, skip this clause
+		}
+		if (!clause_solution.empty()) return clause_solution;
 	}
 	return {};
 }
+
+template <NodeType node>
+std::optional<solution<node>> solve(const trefs& forms, const solver_options& options) {
+	using tau = tree<node>;
+
+	return solve<node>(tau::build_wff_and(forms), options);
+}
+
 
 } // namespace idni::tau_lang

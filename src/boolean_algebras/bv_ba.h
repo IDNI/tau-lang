@@ -57,7 +57,7 @@ template <NodeType node>
 std::optional<solution<node>> solve_bv(tref form);
 
 template <NodeType node>
-std::optional<solution<node>> solve_bv(trefs form);
+std::optional<solution<node>> solve_bv(const trefs& form);
 
 bv splitter(const cvc5::Term& fm, idni::tau_lang::splitter_type&) { return fm; }
 

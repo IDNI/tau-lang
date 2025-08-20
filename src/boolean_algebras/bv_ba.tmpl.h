@@ -326,7 +326,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 }
 
 template<NodeType node>
-std::optional<node> solve_bv(const trefs& lits) {
+std::optional<solution<node>> solve_bv(const trefs& lits) {
 	using tau = tree<node>;
 
 	return solve_bv<node>(tau::build_wff_and(lits));
