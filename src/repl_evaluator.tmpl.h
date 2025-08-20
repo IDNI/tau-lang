@@ -536,13 +536,35 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 			print_general_case(var, value);
 	}
 	std::cout << "}\n";
+}
 
-	return;
+template <NodeType node>
+void print_bv_solver_cmd_solution(std::optional<solution<node>>& solution)
+{
+	std::cout << "solution: {\n";
+	for (auto [var, value]: solution.value()) {
+		std::cout << "\t" << TAU_TO_STR(var) << " := "
+			<< TAU_TO_STR(value) << "\n";
+	}
+	std::cout << "}\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
+	// only bitvectors
+	if (!n.value_tree().find_top(is<node, tau::bf>)) {
+		auto solution = solve_bv<node>(n.value_tree().first());
+		print_bv_solver_cmd_solution<node>(solution);
+		return;
+	}
+
+	// mixed case not supported yet
+	if (n.value_tree().find_top(is<node, tau::bv>)) {
+		TAU_LOG_ERROR << "Invalid types\n";
+		return;
+	}
+
 	// getting the type
 	size_t type = get_solver_cmd_type<node>(n.value());
 	if (type == 0) {
@@ -621,14 +643,16 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	tref arg = n[1].get();
+	if (!n.value_tree().find_top(is<node, tau::bf>))
+		return is_bv_formula_sat<node>(arg) ? tau::_T() : tau::_F();
 	auto opt_nso_rr = get_nso_rr_with_defs(arg);
 	if (!opt_nso_rr || !opt_nso_rr.value().main) return invalid_argument();
 	rr<node> nso_rr = opt_nso_rr.value();
 	const auto& main = tau::get(nso_rr.main);
 	if (main.is(tau::bf)) return invalid_argument();
 	tref normalized_fm = normalizer<node>(nso_rr);
-	return is_tau_formula_sat<node>(normalized_fm, 0, true) ? tau::_T()
-								: tau::_F();
+	return is_tau_formula_sat<node>(normalized_fm, 0, true)
+		? tau::_T()	: tau::_F();
 }
 
 template <typename... BAs>
