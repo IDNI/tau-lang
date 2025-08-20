@@ -92,14 +92,14 @@ tref annotate_bv_widths(const typename tree<node>::traverser& form, resolver& wi
 		}
 		case tau::bv_eq:
 		case tau::bv_neq:
-		case tau::bv_less_equal:
+		case tau::bv_lteq:
 		case tau::bv_nleq:
-		case tau::bv_greater:
-		case tau::bv_ngreater:
-		case tau::bv_greater_equal:
-		case tau::bv_ngeq:
-		case tau::bv_less:
-		case tau::bv_nless: {
+		case tau::bv_gt:
+		case tau::bv_ngt:
+		case tau::bv_gteq:
+		case tau::bv_ngteq:
+		case tau::bv_lt:
+		case tau::bv_nlt: {
 			// collect all variables, add them to the scope, unite all of them and,
 			// if possible, type them
 			auto vars = (form | tt::first).value().select_top(is<node, tau::variable>);
@@ -190,7 +190,7 @@ tref annotate_bv_ctes(const typename tree<node>::traverser& form, resolver& widt
 		}
 		case tau::bv_eq:
 		case tau::bv_neq:
-		case tau::bv_less_equal:
+		case tau::bv_lteq:
 		case tau::bv_nleq:
 		case tau::bv_greater:
 		case tau::bv_ngreater:

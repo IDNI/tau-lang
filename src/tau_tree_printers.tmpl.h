@@ -305,14 +305,14 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf,                 790 },
 			{ bv_eq,              800 },
 			{ bv_neq,             801 },
-			{ bv_less_equal,      802 },
-			{ bv_nleq,            803 },
-			{ bv_greater,         804 },
-			{ bv_ngreater,        805 },
-			{ bv_greater_equal,   806 },
-			{ bv_ngeq,            807 },
-			{ bv_less,            808 },
-			{ bv_nless,           809 },
+			{ bv_lteq,            802 },
+			{ bv_nlteq,           803 },
+			{ bv_gt,              804 },
+			{ bv_ngt,             805 },
+			{ bv_gteq,            806 },
+			{ bv_ngteq,           807 },
+			{ bv_lt,              808 },
+			{ bv_nlt,             809 },
 			{ bv_or,              810 },
 			{ bv_nor,             811 },
 			{ bv_xor,             812 },
@@ -586,15 +586,15 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 			case bv_eq:             out(" =_ "); break;
 			case bv_neq:            out(" !=_ "); break;
-			case bv_less_equal:     out(" <=_ "); break;
-			case bv_nleq:           out(" !<=_ "); break;
-			case bv_greater:        out(" >_ "); break;
-			case bv_ngreater:       out(" !>_ "); break;
-			case bv_greater_equal:  out(" >=_ "); break;
-			case bv_ngeq:           out(" !>=_ "); break;
-			case bv_less:           out(" <_ "); break;
-			case bv_nless:          out(" !<_ "); break;
-			
+			case bv_lteq:           out(" <=_ "); break;
+			case bv_nlteq:          out(" !<=_ "); break;
+			case bv_gt:             out(" >_ "); break;
+			case bv_ngt:            out(" !>_ "); break;
+			case bv_gteq:          out(" >=_ "); break;
+			case bv_ngteq:         out(" !>=_ "); break;
+			case bv_lt:           out(" <_ "); break;
+			case bv_nlt:          out(" !<_ "); break;
+
 			case bv_add:            out("+"); break;
 			case bv_sub:            out("-"); break;
 			case bv_mul:            out("*"); break;
