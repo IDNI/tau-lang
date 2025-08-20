@@ -694,7 +694,7 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 			// setting proper options for the solver
 
 			std::optional<solution<node>> model;
-			if (!tau::get(constraints).find_top(is_basic_atomic_fm<node>())) {
+			if (!tau::get(constraints).find_top(is_atomic_fm<node>())) {
 				model = solve_bv<node>(constraints);
 				if (!model) continue;
 			} else if (!tau::get(constraints).find_top(is_atomic_bv_fm<node>())) {

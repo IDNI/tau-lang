@@ -305,7 +305,17 @@ inline auto is_wff_bdd_var = [](tref n) {
 		|| t.child_is(tau::wff_sometimes)
 		|| t.child_is(tau::wff_always)
 		|| t.child_is(tau::wff_all)
-		|| t.child_is(tau::constraint);
+		|| t.child_is(tau::constraint)
+		|| t.child_is(tau::bv_eq)
+		|| t.child_is(tau::bv_neq)
+		|| t.child_is(tau::bv_less_equal)
+		|| t.child_is(tau::bv_nleq)
+		|| t.child_is(tau::bv_greater)
+		|| t.child_is(tau::bv_ngreater)
+		|| t.child_is(tau::bv_greater_equal)
+		|| t.child_is(tau::bv_ngeq)
+		|| t.child_is(tau::bv_less)
+		|| t.child_is(tau::bv_nless);
 };
 
 template <NodeType node>

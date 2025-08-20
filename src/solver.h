@@ -189,6 +189,17 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 template <NodeType node>
 std::optional<solution<node>> solve(tref form, const solver_options& options);
 
+/**
+ * @brief Solves the given tau forms.
+ *
+ * @tparam BAs Variadic template parameters.
+ * @param forms The tau forms to solve.
+ * @param options The solver options.
+ * @return An optional solution.
+ */
+template <NodeType node>
+std::optional<solution<node>> solve(const trefs& forms, const solver_options& options);
+
 } // namespace idni::tau_lang
 
 #include "solver.tmpl.h"
