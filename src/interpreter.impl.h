@@ -456,11 +456,22 @@ std::pair<std::optional<assignment<node>>, bool>
 			}
 			// Complete outputs using time_point and current solution
 			for (const auto& [o, _] : outputs.streams) {
-				tref ot = build_out_var_at_n<node>(
-					o, time_point, outputs.type_of(o));
+				bool is_bv = (outputs.type_of(o) == ba_types<node>::id("bv"));
+				tref ot = is_bv
+					? build_bv_out_var_at_n<node>(o, time_point)
+					: build_out_var_at_n<node>(o, time_point, outputs.type_of(o));
 				if (auto it = global.find(ot); it == global.end()) {
-					memory.emplace(ot, tau::_0());
-					global.emplace(ot, tau::_0());
+					if (is_bv) {
+						// TODO (HIGH) adjust size
+						auto zero_bitvector = make_bitvector_zero();
+						auto zero_term = tau::get(tau::bv, {
+							tau::get_bv_constant(zero_bitvector)});
+						memory.emplace(ot, zero_term);
+						global.emplace(ot, zero_term);
+					} else {
+						memory.emplace(ot, tau::_0());
+						global.emplace(ot, tau::_0());
+					}
 				}
 			}
 			if (global.empty())
@@ -637,6 +648,19 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 			|| is_child<node, tau::bf_neq>(n);
 	};
 
+	auto is_atomic_bv_fm = [](tref n) {
+		return is_child<node, tau::bv_eq>(n)
+		|| is_child<node, tau::bv_neq>(n)
+		|| is_child<node, tau::bv_less_equal>(n)
+		|| is_child<node, tau::bv_nleq>(n)
+		|| is_child<node, tau::bv_greater>(n)
+		|| is_child<node, tau::bv_ngreater>(n)
+		|| is_child<node, tau::bv_greater_equal>(n)
+		|| is_child<node, tau::bv_ngeq>(n)
+		|| is_child<node, tau::bv_less>(n)
+		|| is_child<node, tau::bv_nless>(n);
+	};
+
 	DBG(LOG_TRACE << "compute_system/clause: " << LOG_FM(clause);)
 
 	system sys;
@@ -651,6 +675,12 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 		if (!sys.contains(type)) sys[type] = atomic_fm;
 		else sys[type] = build_wff_and<node>(sys[type], atomic_fm);
 	}
+	// Add bv atomic formulas
+	for (tref atomic_bv_fm : tau::get(clause).select_top(is_atomic_bv_fm)) {
+		auto type = ba_types<node>::id("bv");
+		if (!sys.contains(type)) sys[type] = atomic_bv_fm;
+		else sys[type] = build_wff_and<node>(sys[type], atomic_bv_fm);
+	}
 	return { sys };
 }
 
@@ -658,6 +688,24 @@ template <NodeType node, typename in_t, typename out_t>
 std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 	tref fm, const size_t start_time)
 {
+	auto is_atomic_fm = [](tref n) {
+		return is_child<node, tau::bf_eq>(n)
+			|| is_child<node, tau::bf_neq>(n);
+	};
+
+	auto is_atomic_bv_fm = [](tref n) {
+		return is_child<node, tau::bv_eq>(n)
+		|| is_child<node, tau::bv_neq>(n)
+		|| is_child<node, tau::bv_less_equal>(n)
+		|| is_child<node, tau::bv_nleq>(n)
+		|| is_child<node, tau::bv_greater>(n)
+		|| is_child<node, tau::bv_ngreater>(n)
+		|| is_child<node, tau::bv_greater_equal>(n)
+		|| is_child<node, tau::bv_ngeq>(n)
+		|| is_child<node, tau::bv_less>(n)
+		|| is_child<node, tau::bv_nless>(n);
+	};
+
 	for (tref clause : get_dnf_wff_clauses<node>(fm)) {
 		DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
 		tref executable = transform_to_execution<node>(clause, start_time, true);
@@ -682,13 +730,21 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 		tref spec = executable;
 		if (!tau::get(constraints).equals_T()) {
 			// setting proper options for the solver
-			solver_options options = {
-				.splitter_one = node::nso_factory::splitter_one(""),
-				.mode = solver_mode::general
-			};
 
-			auto model = solve<node>(constraints, options);
-			if (!model) continue;
+			std::optional<solution<node>> model;
+			if (!tau::get(constraints).find_top(is_atomic_fm)) {
+				model = solve_bv<node>(constraints);
+				if (!model) continue;
+			} else if (!tau::get(constraints).find_top(is_atomic_bv_fm)) {
+				static solver_options options = {
+					.splitter_one = node::nso_factory::splitter_one(""),
+					.mode = solver_mode::general
+				};
+				model = solve<node>(constraints, options);
+				if (!model) continue;
+			} else {
+				return std::make_pair(nullptr, nullptr);
+			}
 
 			LOG_INFO << "Tau specification is executed setting ";
 			for (const auto& [uc, v] : model.value())
