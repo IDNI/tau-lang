@@ -263,8 +263,8 @@ template <NodeType node>
 inline auto constant_io_comp = [](tref v1, tref v2) {
 	using tau = tree<node>;
 	// trim the bf of v1 and v2 if present
-	v1 = tau::get(v1).is(tau::bf) ? tau::trim(v1) : v1;
-	v2 = tau::get(v2).is(tau::bf) ? tau::trim(v2) : v2;
+	v1 = tau::get(v1).is(tau::bf) || tau::get(v1).is(tau::bv) ? tau::trim(v1) : v1;
+	v2 = tau::get(v2).is(tau::bf) || tau::get(v2).is(tau::bv) ? tau::trim(v2) : v2;
 	if (get_io_time_point<node>(v1) < get_io_time_point<node>(v2))
 		return true;
 	if (get_io_time_point<node>(v1) == get_io_time_point<node>(v2)) {
@@ -289,6 +289,7 @@ bool is_run_satisfiable(tref fm) {
 	const auto& t = tau::get(fm);
 	if (t.equals_F()) return false;
 	if (t.equals_T()) return true;
+	if (tau::get(fm).find_top(is<node, tau::bv>)) return is_bv_formula_sat<node>(fm);
 
 	const trefs& free_io_vars = t.get_free_vars();
 	trefs io_vars = t.select_top(is_child<node, tau::io_var>);
@@ -336,7 +337,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 			continue;
 		}
 		auto& v = io_vars.back();
-		
+
 		for (auto it = free_io_vars.begin();
 			it != free_io_vars.end(); ++it)
 		{
@@ -1089,6 +1090,8 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 		if (!tau::get(transform_to_execution<node>(
 			clause, start_time, output)).equals_F()) {
 			LOG_DEBUG << "End is_tau_formula_sat: true";
+			if (tau::get(clause).find_top(is<node, tau::bv>))
+				return is_bv_formula_sat<node>(clause);
 			return true;
 		}
 	}
