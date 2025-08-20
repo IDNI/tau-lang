@@ -127,4 +127,8 @@ inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str, 
 	return cvc5_term_manager.mkBitVector(size, str, base);
 }
 
+inline cvc5::Term make_bitvector_zero(const size_t size) {
+	return cvc5_term_manager.mkBitVector(size, 0);
+}
+
 } // namespace idni::tau_lang

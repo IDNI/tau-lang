@@ -48,9 +48,11 @@ inline cvc5::Term make_term_not(const cvc5::Term& operand);
 inline cvc5::Term make_term_and(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_term_or(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_term_forall(const cvc5::Term& var, const cvc5::Term& form);
-inline cvc5::Term make_term_forall(const std::vector<cvc5::Term>& vars, const cvc5::Term& form);
+inline cvc5::Term make_term_forall(const std::vector<cvc5::Term>& vars,
+	const cvc5::Term& form);
 inline cvc5::Term make_term_exists(const cvc5::Term& var, const cvc5::Term& form);
-inline cvc5::Term make_term_exists(const std::vector<cvc5::Term>& vars, const cvc5::Term& form);
+inline cvc5::Term make_term_exists(const std::vector<cvc5::Term>& vars,
+	const cvc5::Term& form);
 inline cvc5::Term make_term_equal(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_term_distinct(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_term_less_equal(const cvc5::Term& lhs, const cvc5::Term& rhs);
@@ -74,6 +76,8 @@ inline cvc5::Term make_bitvector_shl(const cvc5::Term& lhs, const cvc5::Term& rh
 inline cvc5::Term make_bitvector_shr(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 	const size_t base);
+inline cvc5::Term make_bitvector_zero(const size_t size = cvc5_default_bv_size);
+
 
 // -----------------------------------------------------------------------------
 // Queries
