@@ -69,14 +69,14 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "!<"  _ bf)               :bf_nlt
                         | (bv    _ "=_"   _ bv)              :bv_eq
                         | (bv    _ "!=_"  _ bv)              :bv_neq
-                        | (bv    _ "<=_"  _ bv)              :bv_less_equal
-                        | (bv    _ "!<=_" _ bv)              :bv_nleq
-                        | (bv    _ ">_"   _ bv)              :bv_greater
-                        | (bv    _ "!>_"  _ bv)              :bv_ngreater
-                        | (bv    _ ">=_"  _ bv)              :bv_greater_equal
-                        | (bv    _ "!>=_" _ bv)              :bv_ngeq
-                        | (bv    _ "<_"   _ bv)              :bv_less
-                        | (bv    _ "!<_"  _ bv)              :bv_nless
+                        | (bv    _ "<=_"  _ bv)              :bv_lteq
+                        | (bv    _ "!<=_" _ bv)              :bv_nlteq
+                        | (bv    _ ">_"   _ bv)              :bv_gt
+                        | (bv    _ "!>_"  _ bv)              :bv_ngt
+                        | (bv    _ ">=_"  _ bv)              :bv_gteq
+                        | (bv    _ "!>=_" _ bv)              :bv_ngteq
+                        | (bv    _ "<_"   _ bv)              :bv_lt
+                        | (bv    _ "!<_"  _ bv)              :bv_nlt
                         |                                     capture.
 # relational operators for base types
 #

@@ -148,14 +148,14 @@ std::function<bool(tref)> is_atomic_bv_fm() {
 		return fm.is(node::type::wff)
 			&& (fm.child_is(node::type::bv_eq)
 				|| fm.child_is(node::type::bv_neq)
-				|| fm.child_is(node::type::bv_less_equal)
-				|| fm.child_is(node::type::bv_nleq)
-				|| fm.child_is(node::type::bv_greater)
-				|| fm.child_is(node::type::bv_ngreater)
-				|| fm.child_is(node::type::bv_greater_equal)
-				|| fm.child_is(node::type::bv_ngeq)
-				|| fm.child_is(node::type::bv_less)
-				|| fm.child_is(node::type::bv_nless));
+				|| fm.child_is(node::type::bv_lteq)
+				|| fm.child_is(node::type::bv_nlteq)
+				|| fm.child_is(node::type::bv_gt)
+				|| fm.child_is(node::type::bv_ngt)
+				|| fm.child_is(node::type::bv_gteq)
+				|| fm.child_is(node::type::bv_ngteq)
+				|| fm.child_is(node::type::bv_lt)
+				|| fm.child_is(node::type::bv_nlt));
 	};
 }
 

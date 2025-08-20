@@ -26,9 +26,9 @@ inline const std::vector<std::string> symbol_names{
 	"wff_or", "__E_wff_37", "wff_xor", "__E_wff_38", "wff_and", "__E_wff_39", "wff_neg", "__E_wff_40", "wff_t", "wff_f", 
 	"bf_interval", "__E_wff_41", "bf_eq", "__E_wff_42", "bf_neq", "__E_wff_43", "bf_lteq", "__E_wff_44", "bf_nlteq", "__E_wff_45", 
 	"bf_gt", "__E_wff_46", "bf_ngt", "__E_wff_47", "bf_gteq", "__E_wff_48", "bf_ngteq", "__E_wff_49", "bf_lt", "__E_wff_50", 
-	"bf_nlt", "__E_wff_51", "bv_eq", "__E_wff_52", "bv", "bv_neq", "__E_wff_53", "bv_less_equal", "__E_wff_54", "bv_nleq", 
-	"__E_wff_55", "bv_greater", "__E_wff_56", "bv_ngreater", "__E_wff_57", "bv_greater_equal", "__E_wff_58", "bv_ngeq", "__E_wff_59", "bv_less", 
-	"__E_wff_60", "bv_nless", "__E_wff_61", "bf_parenthesis", "__E_bf_62", "bf_constant", "variable", "bf_splitter", "__E_bf_63", "bf_fall", 
+	"bf_nlt", "__E_wff_51", "bv_eq", "__E_wff_52", "bv", "bv_neq", "__E_wff_53", "bv_lteq", "__E_wff_54", "bv_nlteq", 
+	"__E_wff_55", "bv_gt", "__E_wff_56", "bv_ngt", "__E_wff_57", "bv_gteq", "__E_wff_58", "bv_ngteq", "__E_wff_59", "bv_lt", 
+	"__E_wff_60", "bv_nlt", "__E_wff_61", "bf_parenthesis", "__E_bf_62", "bf_constant", "variable", "bf_splitter", "__E_bf_63", "bf_fall", 
 	"__E_bf_64", "bf_fex", "__E_bf_65", "bf_ref", "bf_or", "__E_bf_66", "bf_xor", "__E_bf_67", "bf_t", "__E_bf_68", 
 	"__E___E_bf_68_69", "bf_f", "__E_bf_70", "__E___E_bf_70_71", "bf_and", "__E_bf_72", "__E___E_bf_72_73", "bf_neg", "__E_bf_74", "bf_neg_oprnd", 
 	"__E___E_bf_74_75", "bf_and_nosep", "__E_bf_76", "bf_and_nosep_1st_oprnd", "__E___E_bf_76_77", "bf_and_nosep_2nd_oprnd", "__E___E_bf_76_78", "bv_parenthesis", "__E_bv_79", "bv_checked", 
@@ -495,51 +495,51 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(14), (NT(135)));
 //G177: __E_wff_54(138)      => bv(134) _(11) '<' '=' '_' _(11) bv(134).
 	p(NT(138), (NT(134)+NT(11)+T(22)+T(3)+T(37)+NT(11)+NT(134)));
-//G178: bv_less_equal(137)   => __E_wff_54(138).
+//G178: bv_lteq(137)         => __E_wff_54(138).
 	p(NT(137), (NT(138)));
-//G179: wff(14)              => bv_less_equal(137).
+//G179: wff(14)              => bv_lteq(137).
 	p(NT(14), (NT(137)));
 //G180: __E_wff_55(140)      => bv(134) _(11) '!' '<' '=' '_' _(11) bv(134).
 	p(NT(140), (NT(134)+NT(11)+T(34)+T(22)+T(3)+T(37)+NT(11)+NT(134)));
-//G181: bv_nleq(139)         => __E_wff_55(140).
+//G181: bv_nlteq(139)        => __E_wff_55(140).
 	p(NT(139), (NT(140)));
-//G182: wff(14)              => bv_nleq(139).
+//G182: wff(14)              => bv_nlteq(139).
 	p(NT(14), (NT(139)));
 //G183: __E_wff_56(142)      => bv(134) _(11) '>' '_' _(11) bv(134).
 	p(NT(142), (NT(134)+NT(11)+T(23)+T(37)+NT(11)+NT(134)));
-//G184: bv_greater(141)      => __E_wff_56(142).
+//G184: bv_gt(141)           => __E_wff_56(142).
 	p(NT(141), (NT(142)));
-//G185: wff(14)              => bv_greater(141).
+//G185: wff(14)              => bv_gt(141).
 	p(NT(14), (NT(141)));
 //G186: __E_wff_57(144)      => bv(134) _(11) '!' '>' '_' _(11) bv(134).
 	p(NT(144), (NT(134)+NT(11)+T(34)+T(23)+T(37)+NT(11)+NT(134)));
-//G187: bv_ngreater(143)     => __E_wff_57(144).
+//G187: bv_ngt(143)          => __E_wff_57(144).
 	p(NT(143), (NT(144)));
-//G188: wff(14)              => bv_ngreater(143).
+//G188: wff(14)              => bv_ngt(143).
 	p(NT(14), (NT(143)));
 //G189: __E_wff_58(146)      => bv(134) _(11) '>' '=' '_' _(11) bv(134).
 	p(NT(146), (NT(134)+NT(11)+T(23)+T(3)+T(37)+NT(11)+NT(134)));
-//G190: bv_greater_equal(145) => __E_wff_58(146).
+//G190: bv_gteq(145)         => __E_wff_58(146).
 	p(NT(145), (NT(146)));
-//G191: wff(14)              => bv_greater_equal(145).
+//G191: wff(14)              => bv_gteq(145).
 	p(NT(14), (NT(145)));
 //G192: __E_wff_59(148)      => bv(134) _(11) '!' '>' '=' '_' _(11) bv(134).
 	p(NT(148), (NT(134)+NT(11)+T(34)+T(23)+T(3)+T(37)+NT(11)+NT(134)));
-//G193: bv_ngeq(147)         => __E_wff_59(148).
+//G193: bv_ngteq(147)        => __E_wff_59(148).
 	p(NT(147), (NT(148)));
-//G194: wff(14)              => bv_ngeq(147).
+//G194: wff(14)              => bv_ngteq(147).
 	p(NT(14), (NT(147)));
 //G195: __E_wff_60(150)      => bv(134) _(11) '<' '_' _(11) bv(134).
 	p(NT(150), (NT(134)+NT(11)+T(22)+T(37)+NT(11)+NT(134)));
-//G196: bv_less(149)         => __E_wff_60(150).
+//G196: bv_lt(149)           => __E_wff_60(150).
 	p(NT(149), (NT(150)));
-//G197: wff(14)              => bv_less(149).
+//G197: wff(14)              => bv_lt(149).
 	p(NT(14), (NT(149)));
 //G198: __E_wff_61(152)      => bv(134) _(11) '!' '<' '_' _(11) bv(134).
 	p(NT(152), (NT(134)+NT(11)+T(34)+T(22)+T(37)+NT(11)+NT(134)));
-//G199: bv_nless(151)        => __E_wff_61(152).
+//G199: bv_nlt(151)          => __E_wff_61(152).
 	p(NT(151), (NT(152)));
-//G200: wff(14)              => bv_nless(151).
+//G200: wff(14)              => bv_nlt(151).
 	p(NT(14), (NT(151)));
 //G201: wff(14)              => capture(29).
 	p(NT(14), (NT(29)));
@@ -1644,9 +1644,9 @@ struct tau_parser_nonterminals {
 		wff_or, __E_wff_37, wff_xor, __E_wff_38, wff_and, __E_wff_39, wff_neg, __E_wff_40, wff_t, wff_f, 
 		bf_interval, __E_wff_41, bf_eq, __E_wff_42, bf_neq, __E_wff_43, bf_lteq, __E_wff_44, bf_nlteq, __E_wff_45, 
 		bf_gt, __E_wff_46, bf_ngt, __E_wff_47, bf_gteq, __E_wff_48, bf_ngteq, __E_wff_49, bf_lt, __E_wff_50, 
-		bf_nlt, __E_wff_51, bv_eq, __E_wff_52, bv, bv_neq, __E_wff_53, bv_less_equal, __E_wff_54, bv_nleq, 
-		__E_wff_55, bv_greater, __E_wff_56, bv_ngreater, __E_wff_57, bv_greater_equal, __E_wff_58, bv_ngeq, __E_wff_59, bv_less, 
-		__E_wff_60, bv_nless, __E_wff_61, bf_parenthesis, __E_bf_62, bf_constant, variable, bf_splitter, __E_bf_63, bf_fall, 
+		bf_nlt, __E_wff_51, bv_eq, __E_wff_52, bv, bv_neq, __E_wff_53, bv_lteq, __E_wff_54, bv_nlteq, 
+		__E_wff_55, bv_gt, __E_wff_56, bv_ngt, __E_wff_57, bv_gteq, __E_wff_58, bv_ngteq, __E_wff_59, bv_lt, 
+		__E_wff_60, bv_nlt, __E_wff_61, bf_parenthesis, __E_bf_62, bf_constant, variable, bf_splitter, __E_bf_63, bf_fall, 
 		__E_bf_64, bf_fex, __E_bf_65, bf_ref, bf_or, __E_bf_66, bf_xor, __E_bf_67, bf_t, __E_bf_68, 
 		__E___E_bf_68_69, bf_f, __E_bf_70, __E___E_bf_70_71, bf_and, __E_bf_72, __E___E_bf_72_73, bf_neg, __E_bf_74, bf_neg_oprnd, 
 		__E___E_bf_74_75, bf_and_nosep, __E_bf_76, bf_and_nosep_1st_oprnd, __E___E_bf_76_77, bf_and_nosep_2nd_oprnd, __E___E_bf_76_78, bv_parenthesis, __E_bv_79, bv_checked, 

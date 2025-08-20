@@ -121,42 +121,42 @@ bv bv_eval_node(cvc5::Solver& solver, const typename tree<node>::traverser& form
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_term_distinct(l, r);
 		}
-		case node::type::bv_less_equal: {
+		case node::type::bv_lteq: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_term_less_equal(l, r);
 		}
-		case node::type::bv_nleq: {
+		case node::type::bv_nlteq: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_term_not(make_term_less_equal(l, r));
 		}
-		case node::type::bv_greater: {
+		case node::type::bv_gt: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_term_greater(l, r);
 		}
-		case node::type::bv_ngreater: {
+		case node::type::bv_ngt: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_term_not(make_term_greater(l, r));
 		}
-		case node::type::bv_greater_equal: {
+		case node::type::bv_gteq: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_term_greater_equal(l, r);
 		}
-		case node::type::bv_ngeq: {
+		case node::type::bv_ngteq: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_term_not(make_term_greater_equal(l, r));
 		}
-		case node::type::bv_less: {
+		case node::type::bv_lt: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_term_less(l, r);
 		}
-		case node::type::bv_nless: {
+		case node::type::bv_nlt: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return make_term_not(make_term_less(l, r));
