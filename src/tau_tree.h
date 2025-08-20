@@ -730,6 +730,14 @@ bool is_quantifier(tref n);
 template <NodeType node>
 bool contains(tref fm, tref sub_fm);
 
+template <NodeType node>
+inline std::function<bool(tref)> is_atomic_fm();
+
+template <NodeType node>
+inline std::function<bool(tref)> is_atomic_bv_fm();
+
+template <NodeType node>
+inline std::function<bool(tref)> is_basic_atomic_fm();
 // -----------------------------------------------------------------------------
 // builder, rules, library
 
