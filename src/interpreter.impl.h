@@ -641,31 +641,12 @@ std::vector<system> interpreter<node, in_t, out_t>::compute_systems(tref ubd_ctn
 
 template <NodeType node, typename in_t, typename out_t>
 std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
-	tref clause)
-{
-	auto is_atomic_fm = [](tref n) {
-		return is_child<node, tau::bf_eq>(n)
-			|| is_child<node, tau::bf_neq>(n);
-	};
-
-	auto is_atomic_bv_fm = [](tref n) {
-		return is_child<node, tau::bv_eq>(n)
-		|| is_child<node, tau::bv_neq>(n)
-		|| is_child<node, tau::bv_less_equal>(n)
-		|| is_child<node, tau::bv_nleq>(n)
-		|| is_child<node, tau::bv_greater>(n)
-		|| is_child<node, tau::bv_ngreater>(n)
-		|| is_child<node, tau::bv_greater_equal>(n)
-		|| is_child<node, tau::bv_ngeq>(n)
-		|| is_child<node, tau::bv_less>(n)
-		|| is_child<node, tau::bv_nless>(n);
-	};
-
+		tref clause) {
 	DBG(LOG_TRACE << "compute_system/clause: " << LOG_FM(clause);)
 
 	system sys;
 	// Due to type inference all atomic formulas are typed
-	for (tref atomic_fm : tau::get(clause).select_top(is_atomic_fm)) {
+	for (tref atomic_fm : tau::get(clause).select_top(is_basic_atomic_fm<node>())) {
 		size_t type = find_ba_type<node>(atomic_fm);
 		if (type == 0) {
 			LOG_ERROR << "No type information found for "
@@ -676,7 +657,7 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 		else sys[type] = build_wff_and<node>(sys[type], atomic_fm);
 	}
 	// Add bv atomic formulas
-	for (tref atomic_bv_fm : tau::get(clause).select_top(is_atomic_bv_fm)) {
+	for (tref atomic_bv_fm : tau::get(clause).select_top(is_atomic_bv_fm<node>())) {
 		auto type = ba_types<node>::id("bv");
 		if (!sys.contains(type)) sys[type] = atomic_bv_fm;
 		else sys[type] = build_wff_and<node>(sys[type], atomic_bv_fm);
@@ -686,26 +667,7 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 
 template <NodeType node, typename in_t, typename out_t>
 std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
-	tref fm, const size_t start_time)
-{
-	auto is_atomic_fm = [](tref n) {
-		return is_child<node, tau::bf_eq>(n)
-			|| is_child<node, tau::bf_neq>(n);
-	};
-
-	auto is_atomic_bv_fm = [](tref n) {
-		return is_child<node, tau::bv_eq>(n)
-		|| is_child<node, tau::bv_neq>(n)
-		|| is_child<node, tau::bv_less_equal>(n)
-		|| is_child<node, tau::bv_nleq>(n)
-		|| is_child<node, tau::bv_greater>(n)
-		|| is_child<node, tau::bv_ngreater>(n)
-		|| is_child<node, tau::bv_greater_equal>(n)
-		|| is_child<node, tau::bv_ngeq>(n)
-		|| is_child<node, tau::bv_less>(n)
-		|| is_child<node, tau::bv_nless>(n);
-	};
-
+		tref fm, const size_t start_time) {
 	for (tref clause : get_dnf_wff_clauses<node>(fm)) {
 		DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
 		tref executable = transform_to_execution<node>(clause, start_time, true);
@@ -732,10 +694,10 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 			// setting proper options for the solver
 
 			std::optional<solution<node>> model;
-			if (!tau::get(constraints).find_top(is_atomic_fm)) {
+			if (!tau::get(constraints).find_top(is_basic_atomic_fm<node>())) {
 				model = solve_bv<node>(constraints);
 				if (!model) continue;
-			} else if (!tau::get(constraints).find_top(is_atomic_bv_fm)) {
+			} else if (!tau::get(constraints).find_top(is_atomic_bv_fm<node>())) {
 				static solver_options options = {
 					.splitter_one = node::nso_factory::splitter_one(""),
 					.mode = solver_mode::general

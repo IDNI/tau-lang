@@ -69,32 +69,6 @@ bool is_io_var(tref n) {
 }
 
 template <NodeType node>
-bool is_bv_literal(tref n) {
-	return tree<node>::get(n).is(node::type::bv_eq)
-		|| tree<node>::get(n).is(node::type::bv_neq)
-		|| tree<node>::get(n).is(node::type::bv_less_equal)
-		|| tree<node>::get(n).is(node::type::bv_nleq)
-		|| tree<node>::get(n).is(node::type::bv_greater)
-		|| tree<node>::get(n).is(node::type::bv_ngreater)
-		|| tree<node>::get(n).is(node::type::bv_greater_equal)
-		|| tree<node>::get(n).is(node::type::bv_ngeq)
-		|| tree<node>::get(n).is(node::type::bv_less);
-}
-
-template <NodeType node>
-bool is_tau_literal(tref n) {
-	return tree<node>::get(n).is(node::type::bf_eq)
-		|| tree<node>::get(n).is(node::type::bf_neq)
-		|| tree<node>::get(n).is(node::type::bf_less_equal)
-		|| tree<node>::get(n).is(node::type::bf_nleq)
-		|| tree<node>::get(n).is(node::type::bf_greater)
-		|| tree<node>::get(n).is(node::type::bf_ngreater)
-		|| tree<node>::get(n).is(node::type::bf_greater_equal)
-		|| tree<node>::get(n).is(node::type::bf_ngeq)
-		|| tree<node>::get(n).is(node::type::bf_less);
-}
-
-template <NodeType node>
 bool is_input_var(tref n) {
 	return tree<node>::get(n).is_input_variable();
 }
@@ -131,6 +105,49 @@ bool contains(tref fm, tref sub_fm) {
 	};
 	pre_order<node>(fm).search_unique(has_sub_fm);
 	return is_contained;
+}
+
+template <NodeType node>
+std::function<bool(tref)> is_basic_atomic_fm() {
+	return [](tref n) -> bool {
+		return tree<node>::get(n).is(node::type::wff)
+			&& (tree<node>::get(n)[0].is(node::type::bf_eq)
+				|| tree<node>::get(n)[0].is(node::type::bf_neq));
+	};
+}
+
+template <NodeType node>
+std::function<bool(tref)> is_atomic_fm() {
+	return [](tref n) -> bool {
+		return tree<node>::get(n).is(node::type::wff)
+			&& (tree<node>::get(n)[0].is(node::type::bf_eq)
+				|| tree<node>::get(n)[0].is(node::type::bf_neq)
+				|| tree<node>::get(n)[0].is(node::type::bf_lteq)
+				|| tree<node>::get(n)[0].is(node::type::bf_nlteq)
+				|| tree<node>::get(n)[0].is(node::type::bf_gt)
+				|| tree<node>::get(n)[0].is(node::type::bf_ngt)
+				|| tree<node>::get(n)[0].is(node::type::bf_gteq)
+				|| tree<node>::get(n)[0].is(node::type::bf_ngteq)
+				|| tree<node>::get(n)[0].is(node::type::bf_lt)
+				|| tree<node>::get(n)[0].is(node::type::bf_nlt));
+	};
+}
+
+template <NodeType node>
+std::function<bool(tref)> is_atomic_bv_fm() {
+	return [](tref n) -> bool {
+		return tree<node>::get(n).is(node::type::wff)
+			&& (tree<node>::get(n)[0].is(node::type::bv_eq)
+				|| tree<node>::get(n)[0].is(node::type::bv_neq)
+				|| tree<node>::get(n)[0].is(node::type::bv_less_equal)
+				|| tree<node>::get(n)[0].is(node::type::bv_nleq)
+				|| tree<node>::get(n)[0].is(node::type::bv_greater)
+				|| tree<node>::get(n)[0].is(node::type::bv_ngreater)
+				|| tree<node>::get(n)[0].is(node::type::bv_greater_equal)
+				|| tree<node>::get(n)[0].is(node::type::bv_ngeq)
+				|| tree<node>::get(n)[0].is(node::type::bv_less)
+				|| tree<node>::get(n)[0].is(node::type::bv_nless));
+	};
 }
 
 template <NodeType node>
