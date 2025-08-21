@@ -12,26 +12,26 @@ namespace idni::tau_lang {
  * taking the smaller as new root
  * @tparam node Type of tree node
  */
-template <typename comp, NodeType node>
+template <typename data_t, typename container_t, typename less_t>
 struct union_find {
 private:
-	subtree_map<node, tref> parent;
-	subtree_map<node, tref> next;
+	container_t parent;
+	container_t next;
 	// The comparator used in order to decide the new root of a merged set
 	// The smaller root is chosen
-	const comp& _comp;
+	const less_t& _less;
 
 public:
-	explicit union_find(const comp& c) : _comp(c) {}
+	explicit union_find(const less_t& l) : _less(l) {}
 
-	void insert(tref x) {
+	void insert(data_t x) {
 		if (parent.contains(x)) return;
 		parent.emplace(x, x);
 		next.emplace(x,x);
 	}
 
 	// Find the root of the set containing x while inserting x if not present
-	tref find(tref x) {
+	data_t find(data_t x) {
 		if (auto it = parent.find(x); it == parent.end())
 			return insert(x), x;
 		else if (it->second != x) {
@@ -41,18 +41,18 @@ public:
        		} else return it->second;
 	}
 
-	bool contains (tref x) {
+	bool contains (data_t x) {
 		return parent.contains(x);
 	}
 
 	// Union the two sets containing x and y
-	void merge(tref x, tref y) {
-		tref root_x = find(x);
-		tref root_y = find(y);
+	void merge(data_t x, data_t y) {
+		data_t root_x = find(x);
+		data_t root_y = find(y);
 		// sets are already equal
 		if (root_x == root_y) return;
 
-		if (_comp(root_x, root_y))
+		if (_less(root_x, root_y))
 			// root_x becomes new root
 			parent[root_y] = root_x;
 		else
@@ -68,14 +68,14 @@ public:
 	}
 
 	// Check if two elements are in the same set
-	bool connected(tref x, tref y) {
+	bool connected(data_t x, data_t y) {
 		return find(x) == find(y);
 	}
 
 	// Get all elements in the same set as x
-	trefs get_set(tref x) {
-		trefs component {x};
-		tref current = next.find(x)->second;
+	std::vector<data_t> get_set(data_t x) {
+		std::vector<data_t> component {x};
+		data_t current = next.find(x)->second;
 		while (current != x) {
 			component.push_back(current);
 			current = next.find(current)->second;
