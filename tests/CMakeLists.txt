@@ -35,14 +35,6 @@ if (TAU_BUILD_UNIT_TESTS)
 endif ()
 
 #
-# Experimental testing
-#
-if (TAU_BUILD_UNIT_TESTS)
-	enable_testing()
-	add_subdirectory(experimental)
-endif ()
-
-#
 # Benchmark testing
 #
 if (TAU_BUILD_BENCHMARK)
