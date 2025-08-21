@@ -286,9 +286,9 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::wff: return to_mnf<node>(reduce_across_bfs<node>(
+		case tau::wff: return unequal_to_not_equal<node>(reduce_across_bfs<node>(
 					norm_all_equations<node>(applied), false));
-		case tau::bf:  return bf_boole_normal_form<node>(applied);
+		case tau::bf:  return bf_reduced_dnf<node>(applied);
 		default: return invalid_argument();
 		}
 	}

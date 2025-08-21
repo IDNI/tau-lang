@@ -505,7 +505,7 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 	using tau = tree<node>;
 	LOG_DEBUG << "Begin Boolean function normalizer";
 
-	tref result = bf_boole_normal_form<node>(bf);
+	tref result = bf_reduced_dnf<node>(bf);
 	// Apply present function/predicate definitions
 	bool changed;
 	do {
@@ -740,7 +740,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 
 		LOG_DEBUG << "Normalize step";
 		current = nt == tau::wff ? normalizer_step<node>(current)
-					 : bf_boole_normal_form<node>(current);
+					 : bf_reduced_dnf<node>(current);
 		LOG_DEBUG << "Normalized step";
 		LOG_DEBUG << "current: " << LOG_FM(current);
 

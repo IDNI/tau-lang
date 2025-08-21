@@ -453,6 +453,34 @@ const trefs& get_free_vars(tref n) {
 	return free_vars_pool[id];
 }
 
+template <NodeType node>
+trefs get_free_vars_appearance_order(tref expression) {
+	using tau = tree<node>;
+	std::multiset<tref, subtree_less<node>> scoped;
+	trefs free_vars;
+	auto f = [&scoped, &free_vars](tref n) {
+		// If encounter of non-scoped and new variable, add to free_vars
+		if (tau::get(n).is(tau::variable)) {
+			if (!scoped.contains(n) && !subtree_vec_contains<node>(free_vars, n))
+				free_vars.push_back(n);
+			return false;
+		}
+		// If encounter of quantifier, add quantified variable to scoped
+		if (is_quantifier<node>(n) || is_functional_quantifier<node>(n)) {
+			scoped.insert(tau::trim(n));
+		}
+		return true;
+	};
+	auto up = [&scoped](tref n) {
+		// If quantifier is encountered, remove quantified variable from scoped
+		if (is_quantifier<node>(n) || is_functional_quantifier<node>(n)) {
+			scoped.erase(tau::trim(n));
+		}
+	};
+	pre_order<node>(expression).visit_unique(f, all, up);
+	return free_vars;
+}
+
 // A formula has a temporal variable if either it contains an io_var with a variable or capture
 // or it contains a flag
 template <NodeType node>
