@@ -676,6 +676,9 @@ template <NodeType node>
 bool is_quantifier(tref n);
 
 template <NodeType node>
+bool is_functional_quantifier(tref n);
+
+template <NodeType node>
 bool contains(tref fm, tref sub_fm);
 
 // -----------------------------------------------------------------------------

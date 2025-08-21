@@ -105,10 +105,10 @@ static auto& elim_eqs() {
 }
 
 template <NodeType node>
-tref to_mnf(tref fm);
+tref unequal_to_not_equal(tref fm);
 
 template <NodeType node>
-tref from_mnf_to_nnf(tref fm);
+tref not_equal_to_unequal(tref fm);
 
 template <NodeType node>
 static auto& simplify_snf() {
@@ -158,6 +158,9 @@ tref to_nnf(tref fm);
 
 template <NodeType node>
 tref norm_equation(tref eq);
+
+template <NodeType node>
+tref denorm_equation(tref eq);
 
 template <NodeType node>
 tref norm_all_equations(tref fm);
@@ -338,7 +341,7 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 // Given a BF b, calculate the Boole normal form (DNF corresponding to the pathes to true in the BDD) of b
 // where the variable order is given by the function lex_var_comp
 template <NodeType node>
-tref bf_boole_normal_form(tref fm, bool make_paths_disjoint = false);
+tref bf_reduced_dnf(tref fm, bool make_paths_disjoint = false);
 
 // The needed class in order to make bf_to_reduce_dnf work with rule applying process
 template <NodeType node>
@@ -556,6 +559,39 @@ struct simplify_using_equality;
 
 template <NodeType node>
 class syntactic_path_simplification;
+
+template <NodeType node>
+tref syntactic_variable_simplification(tref atomic_fm, tref var);
+
+template <NodeType node>
+tref syntactic_formula_simplification(tref formula);
+
+template <NodeType node>
+tref syntactic_atomic_formula_simplification (tref atomic_formula);
+
+template <NodeType node>
+tref term_boole_decomposition(tref term, tref var);
+
+template <NodeType node>
+tref term_boole_decomposition(tref term, tref var, auto& pool);
+
+template <NodeType node>
+tref term_boole_decomposition_with_assm(tref term, tref var, tref assm, bool is_eq = true);
+
+template <NodeType node>
+tref term_boole_decomposition(tref term);
+
+template <NodeType node>
+tref boole_decomposition(tref formula, tref atm, auto& pool);
+
+template <NodeType node>
+tref boole_decomposition(tref formula, tref atm);
+
+// template <NodeType node>
+// tref quantified_boole_decomposition(tref formula, tref atm, tref var, auto& atm_pool);
+
+template <NodeType node>
+tref boole_normal_form(tref formula);
 
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
 // We implicitly transformed into BDD form and compute one step of the SNF transformation.

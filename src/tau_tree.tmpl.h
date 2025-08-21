@@ -696,9 +696,7 @@ const std::string& tree<node>::get_ba_type_name() const {
 
 template <NodeType node>
 const trefs& tree<node>::get_free_vars() const {
-	static const trefs no_free_vars{};
-	return is(bf) || is(wff) ? tau_lang::get_free_vars<node>(get())
-				 : no_free_vars;
+	return tau_lang::get_free_vars<node>(get());
 }
 
 } // namespace idni::tau_lang
