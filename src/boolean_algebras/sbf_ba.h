@@ -27,15 +27,6 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 struct sbf_ba_factory {
 
-	/**
-	 * @brief parses a SBF from a string
-	 *
-	 * @param src source string
-	 * @return optional parsed node if parsing successful
-	 */
-	static std::optional<constant_with_type<BAs...>> parse(
-		const std::string& constant_source);
-
 	static std::string one();
 
 	static std::string zero();
@@ -46,6 +37,10 @@ struct sbf_ba_factory {
 };
 
 bool is_closed(const sbf_ba&) { return true; }
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<constant_with_type<BAs...>> parse_sbf(const std::string& src);
 
 } // namespace idni::tau_lang
 

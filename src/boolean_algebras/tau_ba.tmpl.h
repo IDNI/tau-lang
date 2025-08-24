@@ -199,13 +199,15 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 	return true;
 }
 
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<constant_with_type<tau_ba<BAs...>, BAs...>>
-	tau_ba_factory<BAs...>::parse(const std::string& src)
+	parse_tau(const std::string& src)
 {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
+
 	// parse source
 	typename tau::get_options opts{ .parse = {
 					.start = tau::tau_constant_source } };

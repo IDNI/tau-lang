@@ -58,7 +58,7 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<constant_with_type<BAs...>> sbf_ba_factory<BAs...>::parse(
+std::optional<constant_with_type<BAs...>> parse_sbf(
 	const std::string& src)
 {
 	static std::map<size_t, std::variant<BAs...>> cache;

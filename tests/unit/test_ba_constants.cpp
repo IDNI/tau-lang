@@ -107,61 +107,14 @@ TEST_SUITE("constants from factory") {
 
 namespace idni::tau_lang {
 
-// nso_factory for tests with <bv, sbf_ba, Bool>
-template<>
-struct nso_factory<bv, sbf_ba, Bool> {
-	using node = tau_lang::node<bv, sbf_ba, Bool>;
-
-	optional<constant_with_type<bv, sbf_ba, Bool>> parse_sbf_ba(
-		const string& constant_source) const
-	{
-		auto r = sbf_ba_factory<bv, sbf_ba, Bool>::parse(constant_source);
-		if (!r) return {};
-		return constant_with_type<bv, sbf_ba, Bool>{
-			std::get<sbf_ba>(r.value().first), "sbf" };
-	}
-
-	optional<constant_with_type<bv, sbf_ba, Bool>> parse_Bool(
-		const string& constant_source) const
-	{
-		return ba_constants<node>::get(constant_source, "bool");
-
-	}
-
-	optional<constant_with_type<bv, sbf_ba, Bool>> parse(
-		const string& constant_source, const string type_name) const
-	{
-		if (type_name == "sbf")
-			return parse_sbf_ba(constant_source);
-		else    return parse_Bool(constant_source);
-	}
-
-	vector<string> types() const { return { "sbf", "bool" }; }
-
-	string default_type() const { return "sbf"; }
-
-	string one(const string) const { throw logic_error("not implemented"); }
-
-	string zero(const string) const { throw logic_error("not implemented");}
-
-	tref splitter_one(const string) const {
-		throw logic_error("not implemented");
-	}
-
-	// There is no tau_ba
-	tref unpack_tau_ba(const variant<Bool>&) const { return nullptr; }
-
-	std::variant<bv, sbf_ba, Bool> pack_tau_ba (const tref) const {return {};}
-};
-
 struct sbf_ba_Bool_constants_fixture {
 	sbf_ba _0, _1, _1_and_1, _0_and_1, _0_and_0,
 			_1_or_1, _0_or_1, _0_or_0;
 	sbf_ba sbf_t, sbf_f;
 	template <typename BA>
 	BA get_sbf_Bool(const std::string& src, const std::string&) {
-		if (auto opt = sbf_ba_factory<bv, sbf_ba>::parse(src);
-			opt) return std::get<BA>(opt.value().first);
+		if (auto opt = parse_sbf<bv, sbf_ba>(src); opt)
+			return std::get<BA>(opt.value().first);
 		assert(false);
 		return BA();
 	}
