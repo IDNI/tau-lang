@@ -70,8 +70,9 @@ requires BAsPack<BAs...>
 struct node {
 	using node_t = node<BAs...>;
 	using type = tau_parser::nonterminal;
-	// alias for recreation of the packed variant
+	// aliases for recreation of the packed variant
 	using constant = std::variant<BAs...>;
+	using constant_with_type = std::pair<constant, std::string>;
 	// alias for nso_factory<BAs...>
 	using nso_factory = tau_lang::nso_factory<BAs...>;
 
@@ -178,6 +179,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	using parse_tree = tau_parser::tree;
 	using tau = tree<node>;
 	using constant = node::constant;
+	using constant_with_type = node::constant_with_type;
 
 	struct get_options; // fwd
 

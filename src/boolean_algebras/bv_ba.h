@@ -61,14 +61,10 @@ std::optional<solution<node>> solve_bv(const trefs& form);
 
 bv splitter(const cvc5::Term& fm, idni::tau_lang::splitter_type&) { return fm; }
 
-// -----------------------------------------------------------------------------
-// NSO Factory
-
 template<typename...BAs>
 requires BAsPack<BAs...>
-struct bv_ba_factory {
-	std::optional<constant_with_type<BAs...>> parse(const std::string& src);
-};
+std::optional<constant_with_type<BAs...>> parse_bv(const std::string& src,
+	size_t size = cvc5_default_bv_size, size_t base = 10);
 
 } // namespace idni::tau_lang
 

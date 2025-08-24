@@ -4,8 +4,7 @@
 #include "test_Bool_helpers.h"
 
 variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> parse(const char* src) {
-	static sbf_ba_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> bf;
-	auto parsed = bf.parse(src);
+	auto parsed = parse_sbf<tau_ba<bv, sbf_ba>, bv, sbf_ba>(src);
 	assert(parsed.has_value());
 	return parsed.value().first;
 }

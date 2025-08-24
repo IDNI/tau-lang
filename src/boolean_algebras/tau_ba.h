@@ -253,14 +253,6 @@ bool is_closed(const tau_ba<BAs...>& fm);
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct tau_ba_factory {
-	/**
-	 * @brief Parses the given source string into tau_nso_t.
-	 *
-	 * @param src Reference to the source string.
-	 * @return Parsed tau_nso_t or std::nullopt if parsing fails.
-	 */
-	static std::optional<constant_with_type<tau_ba<BAs...>, BAs...>> parse(
-		const std::string& constant_source);
 
 	/**
 	 * @brief Splits one.
@@ -285,6 +277,11 @@ struct tau_ba_factory {
 	 */
 	static std::string zero(std::string&);
 };
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<constant_with_type<tau_ba<BAs...>, BAs...>>
+	parse_tau(const std::string& src);
 
 // << for printing tau_ba's nso rr
 template <typename... BAs>
