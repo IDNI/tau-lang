@@ -77,6 +77,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"nso_ba",
 	"sbf_ba",
 	"tau_ba",
+	"bv_ba",
 	"ba_types",
 	"ba_constants",
 	"ba_types_inference",
