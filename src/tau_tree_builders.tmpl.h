@@ -530,8 +530,11 @@ tref build_bf_variable(const std::string& name, size_t type_id) {
 template <NodeType node>
 tref build_in_var(tref var_name_node, tref offset_node, size_t type_id) {
 	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get_typed(tau::variable,
-		tau::get(node::input_variable(), var_name_node, offset_node), type_id));
+	return (type_id == ba_types<node>::id("bv"))
+		? tau::get(tau::bv, tau::get_typed(tau::variable,
+			tau::get(node::input_variable(), var_name_node, offset_node), type_id))
+		: tau::get(tau::bf, tau::get_typed(tau::variable,
+			tau::get(node::input_variable(), var_name_node, offset_node), type_id));
 }
 
 template <NodeType node>
@@ -593,8 +596,11 @@ tref build_in_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id,
 template <NodeType node>
 tref build_out_var(tref var_name_node, tref offset_node, size_t type_id) {
 	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get_typed(tau::variable,
-		tau::get(node::output_variable(), var_name_node, offset_node), type_id));
+	return (type_id == ba_types<node>::id("bv"))
+		? tau::get(tau::bv, tau::get_typed(tau::variable,
+			tau::get(node::output_variable(), var_name_node, offset_node), type_id))
+		: tau::get(tau::bf, tau::get_typed(tau::variable,
+			tau::get(node::output_variable(), var_name_node, offset_node), type_id));
 }
 
 template <NodeType node>

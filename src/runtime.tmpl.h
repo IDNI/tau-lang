@@ -3,7 +3,7 @@
 namespace idni::tau_lang {
 
 std::vector<std::string> nso_factory<bv, sbf_ba>::types() {
-	return { "sbf" };
+	return { "sbf", "bv" };
 }
 
 std::string nso_factory<bv, sbf_ba>::default_type() {
@@ -34,7 +34,7 @@ std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::pack_tau_ba(
 }
 
 std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {
-	return { "sbf", "tau" };
+	return { "sbf", "tau", "bv" };
 }
 
 std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::default_type() {

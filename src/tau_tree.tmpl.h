@@ -699,7 +699,8 @@ size_t tree<node>::get_num() const {
 
 template <NodeType node>
 size_t tree<node>::get_ba_constant_id() const {
-	DBG(assert(is_ba_constant());)
+	DBG(LOG_TRACE << LOG_FM_TREE(get()));
+	DBG(assert(is_ba_constant() || is_bv_constant());)
 	return this->value.data;
 }
 
