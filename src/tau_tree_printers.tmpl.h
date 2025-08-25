@@ -330,6 +330,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bv_max,             824 },
 			{ bv_neg,             825 },
 			{ bv,                 826 },
+			{ bv_constant,        827 },
 			{ bf_matcher,         898 },
 			{ bf_body,            899 },
 			{ rec_relation,       900 },
@@ -540,6 +541,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case subst_cmd:         track_chpos();
 						out("substitute "); break;
 			case wff_conditional:   track_chpos(); break;
+			case bv_constant:
+				if (auto first = tau::tt(ref) | tt::first | tt::ref; first) out(first);
+				else out(t.get_bv_constant());
+				break;
 			default:
 				if (is_string_nt(nt)) {
 					if (nt == uconst_name) out("<");

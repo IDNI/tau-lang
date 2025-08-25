@@ -528,6 +528,8 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 
 	std::cout << "solution: {\n";
 	for (auto [var, value]: solution.value()) {
+		DBG(LOG_TRACE << LOG_FM_TREE(var));
+		DBG(LOG_TRACE << LOG_FM_TREE(value));
 		if (auto check = tt(value) | tau::bf_t; check)
 			print_one_case(var);
 		else if (auto check = tt(value) | tau::bf_f; check)
@@ -543,6 +545,8 @@ void print_bv_solver_cmd_solution(std::optional<solution<node>>& solution)
 {
 	std::cout << "solution: {\n";
 	for (auto [var, value]: solution.value()) {
+		DBG(LOG_TRACE << LOG_FM_TREE(var));
+		DBG(LOG_TRACE << LOG_FM_TREE(value));
 		std::cout << "\t" << TAU_TO_STR(var) << " := "
 			<< TAU_TO_STR(value) << "\n";
 	}
@@ -554,7 +558,8 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	// only bitvectors
 	if (!n.value_tree().find_top(is<node, tau::bf>)) {
-		auto solution = solve_bv<node>(n.value_tree().first());
+		tref arg = (tt(n) | tau::wff).value();
+		auto solution = solve_bv<node>(arg);
 		print_bv_solver_cmd_solution<node>(solution);
 		return;
 	}

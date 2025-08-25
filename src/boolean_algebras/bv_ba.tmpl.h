@@ -9,12 +9,18 @@ using namespace idni;
 
 template<NodeType node>
 size_t get_bv_size(const tref t) {
+	using tau = tree<node>;
+
+	static std::map<tref, size_t> bv_size_cache;
 	using tt = typename tree<node>::traverser;
-	if (auto num = tt(t)
-			| node::type::type
-			| node::type::bv_type
-			| node::type::num; num) {
-		return tt(num) | tt::only_child | tt::num;
+	if (auto type_ref = tt(t) | tau::type; type_ref) {
+		if (auto it = bv_size_cache.find(type_ref.value()); it != bv_size_cache.end()) {
+			return it->second;
+		}
+		auto type_name = type_ref.value_tree().get_string();
+		auto bv_size = std::strtoull(type_name.substr(2).c_str(), nullptr, 10);
+		bv_size_cache[type_ref.value()] = bv_size;
+		return bv_size;
 	}
 	return cvc5_default_bv_size;
 }
@@ -105,7 +111,7 @@ bv bv_eval_node(cvc5::Solver& solver, const typename tree<node>::traverser& form
 			auto x = cvc5_term_manager.mkConst(cvc5_term_manager.mkBitVectorSort(bv_size), vn.c_str());
 			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/x: " << x;
 			//vars.emplace(form, x);
-			free_vars.emplace(form | tt::ref, x);
+			free_vars.emplace(tau::get(node::type::bv, form | tt::ref), x);
 			return x;
 		}
 		case node::type::bv_checked: {
@@ -251,7 +257,6 @@ bv bv_eval_node(cvc5::Solver& solver, const typename tree<node>::traverser& form
 	}
 }
 
-
 template <NodeType node>
 bool is_bv_formula_sat(tref form) {
 	using tt = tree<node>::traverser;
@@ -282,7 +287,7 @@ template <NodeType node>
 std::optional<solution<node>> solve_bv(const tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	using type = tau_parser::nonterminal;
+	//using type = tau::type;
 
 	subtree_map<node, bv> vars, free_vars;
 	cvc5::Solver solver(cvc5_term_manager);
@@ -303,15 +308,9 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	if (result.isSat()) {
 
 		solution<node> s;
-		for (const auto& v: free_vars) {
-			// create a new tau_sym node with the value of the variable
-			// and an empty child vector from cvc5 values
-
-			// TODO (HIGH) fix when we introduce bvs in nodes
-			// auto bvn = make_node<tau_sym<BAs...>>(solver.getValue(v.second), {});
-			// std::vector<tau<BAs...>> bvv{bvn};
-			s.emplace(v.first,
-				tau::get(type::bv_constant));
+		for (const auto& [tau_var, bv_var] : free_vars) {
+			auto cte = solver.getValue(bv_var);
+			s.emplace(tau_var, tau::get(tau::bv, tau::get_bv_constant({cte})));
 		}
 		solver.pop();
 		return s;
@@ -343,11 +342,11 @@ std::optional<constant_with_type<BAs...>> parse_bv(const std::string& src,
 	typename tau::get_options opts{
 		.parse = { .start = tau::bv_constant },
 		.infer_ba_types = false,
-		.reget_with_hooks = false };
+		.reget_with_hooks = true };
 	auto result = tau::get(src, opts);
 	if (!result) return {};
 
-	auto cte = tt(result) | tt::only_child | tt::ba_constant;
+	auto cte = tt(result) | tt::ba_constant;
 	return constant_with_type<BAs...>{ cte, "bv" };
 }
 

@@ -91,8 +91,10 @@ std::optional<assignment<node>> finputs<node>::read() {
 				<< get_var_name<node>(var) << "'\n";
 			return {};
 		}
-		current[var] =
-			tau::build_bf_ba_constant(cnst.value().first, types[var]);
+		LOG_TRACE << "Input read: " << LOG_FM_TREE(var) << " = " << cnst.value().first << "\n";
+		current[var] = (types[var] == ba_types<node>::id("bv"))
+			? tau::build_bv_ba_constant(cnst.value().first)
+			: tau::build_bf_ba_constant(cnst.value().first, types[var]);
 	}
 	time_point += 1;
 	return current;
@@ -142,6 +144,11 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 				<< "' for stream '" << tau::get(var)
 				<< "'\n";
 			return {};
+		}
+		if (it->second == ba_types<node>::id("bv")) {
+			value[tau::get(tau::bv, var)] = build_bv_ba_constant<node>(
+					cnst.value().first);
+			continue;
 		}
 		tref wrapped_const = build_bf_ba_constant<node>(
 					cnst.value().first, it->second);
@@ -193,7 +200,9 @@ template <NodeType node>
 foutputs<node>::foutputs(const typed_io_vars& outputs) {
 	// open the corresponding streams for input and store them in streams
 	for (const auto& [var_sid, desc] : outputs) {
+		LOG_TRACE << "output var_sid: " << var_sid;
 		tref var = build_var_name<node>(var_sid);
+		LOG_TRACE << "output var_name: " << LOG_FM_TREE(var);
 		this->types[var] = desc.first;
 		this->streams[var] = desc.second == 0
 			? std::optional<std::ofstream>()
@@ -228,6 +237,7 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 	// Sort variables in output by time
 	trefs io_vars;
 	for (const auto& [var, _ ] : outputs) {
+		DBG(LOG_TRACE << LOG_FM_TREE(var));
 		assert(tau::get(var)[0].child_is(tau::io_var));
 		io_vars.push_back(var);
 	}
@@ -236,7 +246,9 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 	// for each stream in out.streams, write the value from the solution
 	for (tref io_var : io_vars) {
 		// get the BA element associated with io_var_name
+		DBG(LOG_TRACE << LOG_FM_TREE(io_var));
 		tref var_name = get_var_name_node<node>(io_var);
+		DBG(LOG_TRACE << LOG_FM_TREE(var_name));
 		auto value = tt(outputs.find(io_var)->second) | tau::bf_constant;
 		std::stringstream ss;
 		if (!value) {
@@ -250,6 +262,10 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 					| tau::bf_f; check) {
 				size_t type = types.find(var_name)->second;
 				ss << node::nso_factory::zero(get_ba_type_name<node>(type));
+			// is bv
+			} else if (auto check = tt(outputs.find(io_var)->second)
+					| tau::bv_constant; check) {
+				ss << (check | tt::bv_constant);
 			// is something else but not a BA element
 			} else {
 				LOG_ERROR << "No Boolean algebra element "
@@ -351,6 +367,10 @@ std::pair<std::optional<assignment<node>>, bool>
 	step_inputs = appear_within_lookback(step_inputs);
 	// Get values for inputs which do not exceed time_point
 	auto [values, is_quit] = inputs.read(step_inputs, time_point);
+	DBG(
+		for (auto [k, v] : values.value())
+			LOG_DEBUG << "Input: " << LOG_FM_TREE(k) << " = " << LOG_FM_TREE(v) << "\n";
+	)
 	// Empty input
 	if (is_quit) return {};
 	// Error during input
@@ -386,10 +406,10 @@ std::pair<std::optional<assignment<node>>, bool>
 			current = normalize_non_temp<node>(current);
 
 #ifdef DEBUG
-			LOG_TRACE << "step/type: " << ba_type_id << "\n"
-				<< "step/equations: " << equations << "\n"
-				<< "step/updated: " << updated << "\n"
-				<< "step/current: " << current << "\n"
+			LOG_TRACE << "step/type: " << ba_types<node>::id(ba_type_id) << "\n"
+				<< "step/equations: " << LOG_FM(equations) << "\n"
+				<< "step/updated: " << LOG_FM(updated) << "\n"
+				<< "step/current: " << LOG_FM(current) << "\n"
 				<< "step/memory: ";
 			for (const auto& [k, v]: memory)
 				LOG_TRACE << "\t" << k << " := " << v << " ";
@@ -402,13 +422,17 @@ std::pair<std::optional<assignment<node>>, bool>
 				LOG_TRACE << "step/solution: ";
 				if (solution.value().empty())
 					LOG_TRACE << "\t{}";
-				else for (const auto& [k, v]: solution.value())
-					LOG_TRACE << "\t" << k << " := "
-								<< v << " ";
-				auto substituted = rewriter::replace<node>(
-						current, solution.value());
-				auto check = snf_wff<node>(substituted);
-				LOG_TRACE << "step/check: " << check << "\n";
+				else for (const auto& [k, v]: solution.value()) {
+					LOG_TRACE << "\t" << TAU_TO_STR(k) << " := "
+								<< TAU_TO_STR(v) << " ";
+					LOG_TRACE << LOG_FM_TREE(k) << "\n";
+					LOG_TRACE << LOG_FM_TREE(v) << "\n";
+				}
+				// TODO (HIGH) review taking into account bv
+				//auto substituted = rewriter::replace<node>(
+				//		current, solution.value());
+				//auto check = snf_wff<node>(substituted);
+				//LOG_TRACE << "step/check: " << check << "\n";
 			} else {
 				LOG_TRACE << "step/solution: no solution\n";
 			}
@@ -438,7 +462,8 @@ std::pair<std::optional<assignment<node>>, bool>
 				for (const auto& [var, value]: solution) {
 					// Check if we are dealing with a stream variable
 					if (tt(var) | tau::variable | tau::io_var) {
-						assert(tau::get(value).is(tau::bf));
+						DBG(LOG_TRACE << LOG_FM_TREE(value));
+						assert(tau::get(value).is(tau::bf) || tau::get(value).is(tau::bv));
 						if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
 							// std::cout << "time_point: " << time_point << "\n";
 							// std::cout << "var: " << var << "\n";
@@ -554,6 +579,8 @@ std::pair<trefs, bool> interpreter<node, in_t, out_t>::build_inputs_for_step(
 	trefs step_inputs;
 	bool has_this_stream = false;
 	for (auto& [var, _] : inputs.streams) {
+		DBG(LOG_TRACE << LOG_FM_TREE(var);)
+		DBG(LOG_TRACE << "type id " << inputs.type_of(var) << "\n");
 		if (get_var_name<node>(var) == "this") {
 			if (size_t vt = inputs.type_of(var);
 				vt == get_ba_type_id<node>("tau")) {
