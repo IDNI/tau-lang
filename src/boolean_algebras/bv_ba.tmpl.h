@@ -2,6 +2,9 @@
 
 #include "boolean_algebras/bv_ba.h" // Only for IDE resolution, not really needed.
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "bv_ba"
+
 namespace idni::tau_lang {
 
 using namespace cvc5;
@@ -58,46 +61,32 @@ bv bv_eval_node(cvc5::Solver& solver, const typename tree<node>::traverser& form
 		}
 		case node::type::wff_all: {
 			solver.push();
-
 			std::vector<bv> cvc5_var_list;
 			for (const auto& v: (form | tt::first | tt::Tree).select_top(is<node, tau::variable>)) {
 				auto vn = tau::get(v).to_str();
-				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/vn: " << vn;
 				size_t bv_size = get_bv_size<node>(v);
 				auto x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), vn.c_str());
-				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
 			}
 			auto f = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			auto res = make_term_forall(cvc5_var_list, f);
-
 			solver.pop();
-
-			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/f: " << res;
-
 			return res;
 		}
 		case node::type::wff_ex: {
 			solver.push();
-
 			std::vector<bv> cvc5_var_list;
 			for (const auto& v: (form | tt::first | tt::Tree).select_top(is<node, tau::variable>)) {
 				auto vn = tau::get(v).to_str();
-				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/vn: " << vn;
 				size_t bv_size = get_bv_size<node>(v);
 				auto x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), vn.c_str());
-				//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/x: " << x;
 				vars.emplace(v, x);
 				cvc5_var_list.push_back(x);
 			}
-
 			auto f = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			auto res = make_term_exists(cvc5_var_list, f);
-
 			solver.pop();
-
-			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/f: " << res;
 			return res;
 		}
 		case node::type::variable: {
@@ -106,11 +95,8 @@ bv bv_eval_node(cvc5::Solver& solver, const typename tree<node>::traverser& form
 			if (auto it = free_vars.find(form | tt::ref); it != free_vars.end()) return it->second;
 			auto vn = (form | tt::Tree).to_str();
 			// create a new constant according to the type and added to the map
-			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/vn: " << vn;
 			size_t bv_size = get_bv_size<node>(form | tt::ref);
 			auto x = cvc5_term_manager.mkConst(cvc5_term_manager.mkBitVectorSort(bv_size), vn.c_str());
-			//BOOST_LOG_TRIVIAL(trace) << "cvc5.tmpl.h:" << __LINE__ << " bv_eval_node/x: " << x;
-			//vars.emplace(form, x);
 			free_vars.emplace(tau::get(node::type::bv, form | tt::ref), x);
 			return x;
 		}
@@ -287,7 +273,6 @@ template <NodeType node>
 std::optional<solution<node>> solve_bv(const tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	//using type = tau::type;
 
 	subtree_map<node, bv> vars, free_vars;
 	cvc5::Solver solver(cvc5_term_manager);
@@ -295,18 +280,13 @@ std::optional<solution<node>> solve_bv(const tref form) {
 
 	solver.push();
 	auto expr = bv_eval_node<node>(solver, tt(form), vars, free_vars, false);
-
 	// solve the equations
 	solver.assertFormula(expr);
-
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(info) << "(Info) solving cvc5 formula: " << expr;
-	#endif // DEBUG
-
+	LOG_DEBUG << "Solving bitvector formula: " << expr;
 	auto result = solver.checkSat();
 	// extract the model and return the solution if sat
 	if (result.isSat()) {
-
+		LOG_DEBUG << "Bitvector system is sat.";
 		solution<node> s;
 		for (const auto& [tau_var, bv_var] : free_vars) {
 			auto cte = solver.getValue(bv_var);
@@ -314,12 +294,8 @@ std::optional<solution<node>> solve_bv(const tref form) {
 		}
 		solver.pop();
 		return s;
-	} else {
-
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(info) << "(Info) bv system is unsat";
-		#endif // DEBUG
-	}
+	} else
+		LOG_DEBUG << "Bitvector system is unsat.";
 	solver.pop();
 	return {};
 }
@@ -345,7 +321,6 @@ std::optional<constant_with_type<BAs...>> parse_bv(const std::string& src,
 		.reget_with_hooks = true };
 	auto result = tau::get(src, opts);
 	if (!result) return {};
-
 	auto cte = tt(result) | tt::ba_constant;
 	return constant_with_type<BAs...>{ cte, "bv" };
 }
