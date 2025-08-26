@@ -91,7 +91,8 @@ std::optional<assignment<node>> finputs<node>::read() {
 			LOG_ERROR
 				<< "Failed to parse input value '"
 				<< line << "' for stream '"
-				<< get_var_name<node>(var) << "'\n";
+				<< get_var_name<node>(var) <<
+				" of type '" << get_ba_type_name<node>(types[var]) << "'\n";
 
 			DBG(LOG_TRACE
 				<< "read[result]: {}\n"
@@ -182,13 +183,13 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 			return {};
 		}
 		auto cnst = ba_constants<node>::get(line,
-				get_ba_type_name<node>(it->second));
+			get_ba_type_name<node>(it->second));
 		if (!cnst) {
 			LOG_ERROR
-				<< "Failed to parse input value '" << line
-				<< "' for stream '" << tau::get(var)
-				<< "'\n";
-
+				<< "Failed to parse input value '"
+				<< line << "' for stream '"
+				<< get_var_name<node>(var) <<
+				" of type '" << get_ba_type_name<node>(types[var]) << "'\n";
 			DBG(LOG_TRACE
 				<< "read[result]: {}\n"
 				<< "read end\n";)
@@ -426,10 +427,9 @@ std::pair<std::optional<assignment<node>>, bool>
 	step_inputs = appear_within_lookback(step_inputs);
 	// Get values for inputs which do not exceed time_point
 	auto [values, is_quit] = inputs.read(step_inputs, time_point);
-	DBG(
-		for (auto [k, v] : values.value())
-			LOG_DEBUG << "Input: " << LOG_FM_TREE(k) << " = " << LOG_FM_TREE(v) << "\n";
-	)
+	DBG(if (values.has_value())
+			for (auto [k, v] : values.value())
+				LOG_DEBUG << "Input: " << LOG_FM_TREE(k) << " = " << LOG_FM_TREE(v) << "\n";)
 	// Empty input
 	if (is_quit) return {};
 	// Error during input
