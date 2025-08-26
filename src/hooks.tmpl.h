@@ -967,7 +967,11 @@ tref get_hook<node>::wff_always(const node& v, const tref* ch, size_t len, tref 
 }
 
 template <NodeType node>
-tref get_hook<node>::wff_conditional(const node& v, const tref* ch, size_t len, tref r) {
+tref get_hook<node>::wff_conditional(
+		[[maybe_unused]] const node& v,
+		[[maybe_unused]] const tref* ch,
+		[[maybe_unused]] size_t len,
+		[[maybe_unused]] tref r) {
 	HOOK_LOGGING(log("wff_conditional", v, ch, len, r);)
 	//RULE(WFF_CONDITIONAL_SIMPLIFY_0, "F ? $X : $Y ::= $Y.")
 	if (arg1(ch).is(tau::wff_f)) {
@@ -984,7 +988,8 @@ tref get_hook<node>::wff_conditional(const node& v, const tref* ch, size_t len, 
 		HOOK_LOGGING(applied("$X ? $Y : $Y ::= $Y.");)
 		return tau::get(arg3_fm(ch).get(), r);
 	}
-	return tau::get_raw(v, ch, len, r);
+	return tau::get(tau::build_wff_conditional(
+			arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);
 }
 
 template <NodeType node>
