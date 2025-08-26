@@ -26,7 +26,9 @@ RUN apt-get update && apt-get install -y \
 	cvc5 \
 	libcvc5-1 \
 	libcvc5-dev \
-	libcvc5parser1
+	libcvc5parser1 \
+	python3-venv \
+	python3-pip
 
 # Argument BUILD_TYPE=Debug/Release
 ARG BUILD_TYPE=Release
