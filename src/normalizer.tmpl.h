@@ -162,19 +162,25 @@ bool has_no_boolean_combs_of_models(tref n) {
 template <NodeType node>
 bool is_non_temp_nso_satisfiable(tref n) {
 	using tau = tree<node>;
+
 	DBG(assert(n != nullptr));
+
 	const auto& fm = tau::get(n);
-	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
-	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
+
+	DBG(assert(!fm.find_top(is<node, tau::wff_always>));
+		assert(!fm.find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
-	assert((t.equals_T() || t.equals_F()
+
+	DBG(assert((t.equals_T() || t.equals_F()
 		|| t.find_top(is<node, tau::constraint>)
-		|| t.find_top(is<node, tau::bv>)));
+		|| t.find_top(is<node, tau::bv>)));)
+
+	if (is_bv_fm<node>(normalized)) return is_bv_formula_sat<node>(normalized);
 	return t.equals_T();
 }
 

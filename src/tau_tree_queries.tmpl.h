@@ -160,6 +160,16 @@ std::function<bool(tref)> is_atomic_bv_fm() {
 }
 
 template <NodeType node>
+bool is_bv_fm(tref n) {
+	using tau = tree<node>;
+
+	return n != _T<node>()
+		&& n != _F<node>()
+		&& !tau::get(n).find_top(is<node, tau::bf>);
+}
+
+
+template <NodeType node>
 int_t node_count (tref fm) {
 	int_t c = 0;
 	auto count = [&c](tref) {

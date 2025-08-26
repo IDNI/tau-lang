@@ -733,13 +733,16 @@ template <NodeType node>
 bool contains(tref fm, tref sub_fm);
 
 template <NodeType node>
-inline std::function<bool(tref)> is_atomic_fm();
+std::function<bool(tref)> is_atomic_fm();
 
 template <NodeType node>
-inline std::function<bool(tref)> is_atomic_bv_fm();
+std::function<bool(tref)> is_atomic_bv_fm();
 
 template <NodeType node>
-inline std::function<bool(tref)> is_basic_atomic_fm();
+bool is_bv_fm(tref n);
+
+template <NodeType node>
+std::function<bool(tref)> is_basic_atomic_fm();
 // -----------------------------------------------------------------------------
 // builder, rules, library
 

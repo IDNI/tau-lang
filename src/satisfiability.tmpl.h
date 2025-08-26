@@ -286,10 +286,14 @@ inline auto constant_io_comp = [](tref v1, tref v2) {
 template <NodeType node>
 bool is_run_satisfiable(tref fm) {
 	using tau = tree<node>;
+
+	DBG(LOG_TRACE
+		<< "is_run_satisfiable begin\n"
+		<< "is_run_satisfiable[fm]: " << LOG_FM(fm);)
+
 	const auto& t = tau::get(fm);
 	if (t.equals_F()) return false;
 	if (t.equals_T()) return true;
-	if (tau::get(fm).find_top(is<node, tau::bv>)) return is_bv_formula_sat<node>(fm);
 
 	const trefs& free_io_vars = t.get_free_vars();
 	trefs io_vars = t.select_top(is_child<node, tau::io_var>);
@@ -298,6 +302,7 @@ bool is_run_satisfiable(tref fm) {
 	// All io_vars in fm have to refer to constant time positions
 	DBG(assert(std::all_of(io_vars.begin(), io_vars.end(),
 		[](tref el) { return is_io_initial<node>(el); }));)
+
 	auto sat_fm = fm;
 	while (!io_vars.empty()) {
 		if (!tau::contains_subtree(free_io_vars, io_vars.back())) {
@@ -305,14 +310,20 @@ bool is_run_satisfiable(tref fm) {
 			continue;
 		}
 		if (tau::get(io_vars.back())[0].is_input_variable())
-			sat_fm = tau::build_wff_all(io_vars.back(), sat_fm);
+		sat_fm = tau::build_wff_all(io_vars.back(), sat_fm);
 		else    sat_fm = tau::build_wff_ex(io_vars.back(), sat_fm);
 		io_vars.pop_back();
 	}
 
-	LOG_DEBUG << "Formula for sat check: " << LOG_FM(sat_fm);
+	DBG(LOG_TRACE << "is_run_satisfiable[sat_fm]: " << LOG_FM(sat_fm));
 
-	return is_non_temp_nso_satisfiable<node>(sat_fm);
+	auto result = is_non_temp_nso_satisfiable<node>(sat_fm);
+
+	DBG(LOG_TRACE
+		<< "is_run_satisfiable[result]: " << result << "\n"
+		<< "is_run_satisfiable end\n");
+
+	return result;
 }
 
 // Assumption is that the provided fm is an unbound continuation
@@ -581,10 +592,13 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	const bool output)
 {
 	using tau = tree<node>;
-	LOG_DEBUG << "Begin always_to_unbounded_continuation";
-	LOG_DEBUG << "Start fm for always_to_unbound: " << LOG_FM(fm);
+
+	DBG(LOG_TRACE
+		<< "always_to_unbounded_continuation begin\n"
+		<< "always_to_unbounded_continuation[fm]: " << LOG_FM(fm) << "\n";)
 
 	assert(has_no_boolean_combs_of_models<node>(fm));
+
 	if (tau::get(fm).child_is(tau::wff_always)) fm = tau::trim2(fm);
 
 	// Preparation to transform flags to output streams
@@ -599,9 +613,12 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		fm = shift_io_vars_in_fm<node>(transformed_fm, io_vars, 1);
 	} else fm = transformed_fm;
 	fm = tau::build_wff_and(fm, flag_rules);
-	LOG_DEBUG << "Removed flags: "
-			<< LOG_FM(tau::build_wff_and(fm, flag_initials));
 
+	DBG(LOG_TRACE
+		<< "always_to_unbounded_continuation(removed flags): "
+		<< LOG_FM(tau::build_wff_and(fm, flag_initials)) << "\n";)
+
+	// TODO (LOW) Maybe is better to compute io_vars separately and merge them
 	io_vars = tau::get(tau::build_wff_and(fm, flag_initials))
 			.select_top(is_child<node, tau::io_var>);
 
@@ -636,7 +653,9 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	for (int_t t = s; t < point_after_inits + lookback; ++t) {
 		auto current_step = fm_at_time_point<node>(ubd_ctn, io_vars, t);
 		run = tau::build_wff_and(run, current_step);
-		LOG_TRACE << "aw_ubd/run: " << LOG_FM(run) << "\n";
+
+		DBG(LOG_TRACE << "always_to_unbounded_continuation[run]: " << LOG_FM(run) << "\n";)
+
 		// Check if run is still sat
 		run = normalize_non_temp<node>(run);
 		if (!is_run_satisfiable<node>(run)) {
@@ -648,16 +667,19 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 			return tau::_F();
 		}
 	}
-	auto res = normalize_non_temp<node>(conjunct_with_run
-		? tau::build_wff_and(ubd_ctn, run) : ubd_ctn);
+	auto result = normalize_non_temp<node>(
+		conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn);
 	// The following is std::cout because it should always be printed
 	print_fixpoint_info(
 		"Temporal normalization of always specification reached fixpoint after "
 		+ std::to_string(steps) + " steps, yielding the result: ",
-		TAU_TO_STR(tau::get(res).child_is(tau::wff_always)
-			? tau::trim2(res) : res), output);
-	LOG_DEBUG << "End always_to_unbounded_continuation";
-	return res;
+		TAU_TO_STR(tau::get(result).child_is(tau::wff_always)
+			? tau::trim2(result) : result), output);
+
+	DBG(LOG_TRACE
+		<< "always_to_unbounded_continuation[result]: " << LOG_FM(result) << "\n"
+		<< "always_to_unbounded_continuation end\n";)
+	return result;
 }
 
 // Creates a guard using the names of the input streams in uninterpreted constants
