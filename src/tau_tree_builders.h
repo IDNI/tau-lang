@@ -159,6 +159,36 @@ tref build_bf_lt(tref l, tref r);
 template <NodeType node>
 tref build_bf_nlt(tref l, tref r);
 
+template <NodeType node>
+tref build_bv_eq(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_neq(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_lteq(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_nlteq(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_gt(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_ngt(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_gteq(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_ngteq(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_lt(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_nlt(tref l, tref r);
+
 // -----------------------------------------------------------------------------
 // term builders
 
@@ -188,6 +218,54 @@ tref build_bf_and(const auto& bfs);
 
 template <NodeType node>
 tref build_bf_neg(tref n);
+
+template <NodeType node>
+tref build_bv_or(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_or(const auto& bfs);
+
+template <NodeType node>
+tref build_bv_xor(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_and(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_and(const auto& bfs);
+
+template <NodeType node>
+tref build_bv_neg(tref n);
+
+template <NodeType node>
+tref build_bv_nand(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_nor(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_xnor(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_shl(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_shr(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_add(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_sub(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_mul(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_div(tref l, tref r);
+
+template <NodeType node>
+tref build_bv_mod(tref l, tref r);
 
 // -----------------------------------------------------------------------------
 // terminals, variables and constants
