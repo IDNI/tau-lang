@@ -319,8 +319,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bv_xnor,            813 },
 			{ bv_and,             814 },
 			{ bv_nand,            815 },
-			{ bv_rotate_left,     816 },
-			{ bv_rotate_right,    817 },
+			{ bv_shl,             816 },
+			{ bv_shr,             817 },
 			{ bv_add,             818 },
 			{ bv_sub,             819 },
 			{ bv_mul,             820 },
@@ -595,10 +595,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bv_nlteq:          out(" !<=_ "); break;
 			case bv_gt:             out(" >_ "); break;
 			case bv_ngt:            out(" !>_ "); break;
-			case bv_gteq:          out(" >=_ "); break;
-			case bv_ngteq:         out(" !>=_ "); break;
-			case bv_lt:           out(" <_ "); break;
-			case bv_nlt:          out(" !<_ "); break;
+			case bv_gteq:           out(" >=_ "); break;
+			case bv_ngteq:          out(" !>=_ "); break;
+			case bv_lt:             out(" <_ "); break;
+			case bv_nlt:            out(" !<_ "); break;
 
 			case bv_add:            out("+"); break;
 			case bv_sub:            out("-"); break;
@@ -611,8 +611,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bv_nor:            out("!|"); break;
 			case bv_xor:            out("(+)"); break;
 			case bv_xnor:           out("!(+)"); break;
-			case bv_rotate_left:    out("<<"); break;
-			case bv_rotate_right:   out(">>"); break;
+			case bv_shl:            out("<<"); break;
+			case bv_shr:            out(">>"); break;
 
 			case bv_max:            out("max "); break;
 			case bv_min:            out("min "); break;
