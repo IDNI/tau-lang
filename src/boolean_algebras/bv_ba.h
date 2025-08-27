@@ -92,10 +92,12 @@ void config_cvc5_solver(cvc5::Solver& solver) {
  * @param vars Mapping from tree nodes to bitvector values for bound variables.
  * @param free_vars Mapping from tree nodes to bitvector values for free variables (may be updated).
  * @param checked If true, performs additional consistency checks during evaluation.
- * @return The evaluated bitvector value of the node.
+ * @return An optional with the the evaluated bitvector value of the node if possible and
+ * an empty optional if not.
+ * 
  */
 template <NodeType node>
-bv bv_eval_node(const typename tree<node>::traverser& form,
+std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
 	subtree_map<node, bv> vars, subtree_map<node, bv>& free_vars,
 	bool checked);
 
