@@ -355,27 +355,110 @@ tref build_bf_nlt(tref l, tref r) {
 	return build_wff_neg<node>(build_bf_lt<node>(l, r));
 }
 
+template <NodeType node>
+tref build_bv_eq(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_eq, l, r));
+}
+
+template <NodeType node>
+tref build_bv_neq(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_neq, l, r));
+}
+
+template <NodeType node>
+tref build_bv_lteq(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_lteq, l, r));
+}
+
+template <NodeType node>
+tref build_bv_nlteq(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_nlteq, l, r));
+}
+
+template <NodeType node>
+tref build_bv_gt(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_gt, l, r));
+}
+
+template <NodeType node>
+tref build_bv_ngt(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_ngt, l, r));
+}
+
+template <NodeType node>
+tref build_bv_gteq(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_gteq, l, r));
+}
+
+template <NodeType node>
+tref build_bv_ngteq(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_ngteq, l, r));
+}
+
+template <NodeType node>
+tref build_bv_lt(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_lt, l, r));
+}
+
+template <NodeType node>
+tref build_bv_nlt(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::wff, tau::get(tau::bv_nlt, l, r));
+}
+
 // -----------------------------------------------------------------------------
 // term builders
 
 template <NodeType node>
 tref build_bf_fall(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
 	return tau::get(tau::bf, tau::get(tau::bf_fall, l, r));
 }
 
 template <NodeType node>
 tref build_bf_fex(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
 	return tau::get(tau::bf, tau::get(tau::bf_fex, l, r));
 }
 
 template <NodeType node>
 tref build_bf_or(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
 	return tau::get(tau::bf, tau::get(tau::bf_or, l, r));
 }
 
@@ -403,8 +486,9 @@ tref build_bf_xor(tref l, tref r) {
 
 template <NodeType node>
 tref build_bf_and(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
 	return tau::get(tau::bf, tau::get(tau::bf_and, l, r));
 }
 
@@ -416,12 +500,137 @@ tref build_bf_and(const auto& bfs) {
 
 template <NodeType node>
 tref build_bf_neg(tref l) {
-	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr);)
 	LOG_TRACE << "build_bf_neg";
 	DBG(LOG_TRACE << "l: " << LOG_FM_DUMP(l);)
 	DBG(LOG_TRACE << "bf_neg: " << LOG_FM_DUMP(tau::get(tau::bf_neg, l));)
 	return tau::get(tau::bf, tau::get(tau::bf_neg, l));
+}
+
+template <NodeType node>
+tref build_bv_or(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_or, l, r));
+}
+
+template <NodeType node>
+tref build_bv_or(const auto& bfs) {
+	return std::accumulate(bfs.begin(), bfs.end(), _0<node>(),
+		[](tref l, tref r) { return build_bv_or<node>(l, r); });
+}
+
+template <NodeType node>
+tref build_bv_xor(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_xor, l, r));
+}
+
+template <NodeType node>
+tref build_bv_and(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_and, l, r));
+}
+
+template <NodeType node>
+tref build_bv_and(const auto& bfs) {
+	return std::accumulate(bfs.begin(), bfs.end(), _1<node>(),
+		[](tref l, tref r) { return build_bv_and<node>(l, r);});
+}
+
+template <NodeType node>
+tref build_bv_neg(tref l) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_neg, l));
+}
+
+template <NodeType node>
+tref build_bv_nand(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_nand, l, r));
+}
+
+template <NodeType node>
+tref build_bv_nor(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_nor, l, r));
+}
+
+template <NodeType node>
+tref build_bv_xnor(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_xnor, l, r));
+}
+
+template <NodeType node>
+tref build_bv_shl(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_rotate_left, l, r));
+}
+
+template <NodeType node>
+tref build_bv_shr(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_rotate_right, l, r));
+}
+
+template <NodeType node>
+tref build_bv_add(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_add, l, r));
+}
+
+template <NodeType node>
+tref build_bv_sub(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_sub, l, r));
+}
+
+template <NodeType node>
+tref build_bv_mul(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_mul, l, r));
+}
+
+template <NodeType node>
+tref build_bv_div(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_div, l, r));
+}
+
+template <NodeType node>
+tref build_bv_mod(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bv, tau::get(tau::bv_mod, l, r));
 }
 
 // -----------------------------------------------------------------------------
@@ -1011,6 +1220,61 @@ tref tree<node>::build_bf_nlt(tref l, tref r) {
 	return tau_lang::build_bf_nlt<node>(l, r);
 }
 
+template <NodeType node>
+tref tree<node>::build_bv_eq(tref l, tref r) {
+	return tau_lang::build_bv_eq<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_eq(tref l) {
+	return tau_lang::build_bv_eq<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_neq(tref l) {
+	return tau_lang::build_bv_neq<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_lteq(tref l, tref r) {
+	return tau_lang::build_bv_lteq<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_nlteq(tref l, tref r) {
+	return tau_lang::build_bv_nlteq<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_gt(tref l, tref r) {
+	return tau_lang::build_bv_gt<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_ngt(tref l, tref r) {
+	return tau_lang::build_bv_ngt<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_gteq(tref l, tref r) {
+	return tau_lang::build_bv_gteq<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_ngteq(tref l, tref r) {
+	return tau_lang::build_bv_ngteq<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_lt(tref l, tref r) {
+	return tau_lang::build_bv_lt<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_nlt(tref l, tref r) {
+	return tau_lang::build_bv_nlt<node>(l, r);
+}
+
 // -----------------------------------------------------------------------------
 // term builders
 
@@ -1057,6 +1321,86 @@ tref tree<node>::build_bf_and(const auto& bfs) {
 template <NodeType node>
 tref tree<node>::build_bf_neg(tref l) {
 	return tau_lang::build_bf_neg<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_or(tref l, tref r) {
+	return tau_lang::build_bv_or<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_or(const auto& bfs) {
+	return tau_lang::build_bv_or<node>(bfs);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_xor(tref l, tref r) {
+	return tau_lang::build_bv_xor<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_and(tref l, tref r) {
+	return tau_lang::build_bv_and<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_and(const auto& bfs) {
+	return tau_lang::build_bv_and<node>(bfs);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_neg(tref l) {
+	return tau_lang::build_bv_neg<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_nand(tref l, tref r) {
+	return tau_lang::build_bv_nand<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_nor(tref l, tref r) {
+	return tau_lang::build_bv_nor<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_xnor(tref l, tref r) {
+	return tau_lang::build_bv_xnor<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_shl(tref l, tref r) {
+	return tau_lang::build_bv_shl<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_shr(tref l, tref r) {
+	return tau_lang::build_bv_shr<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_add(tref l, tref r) {
+	return tau_lang::build_bv_add<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_sub(tref l, tref r) {
+	return tau_lang::build_bv_sub<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_mul(tref l, tref r) {
+	return tau_lang::build_bv_mul<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_div(tref l, tref r) {
+	return tau_lang::build_bv_div<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_mod(tref l, tref r) {
+	return tau_lang::build_bv_mod<node>(l, r);
 }
 
 // -----------------------------------------------------------------------------
