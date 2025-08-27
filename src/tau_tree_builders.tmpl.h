@@ -582,7 +582,7 @@ tref build_bv_shl(tref l, tref r) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr && r != nullptr);)
-	return tau::get(tau::bv, tau::get(tau::bv_rotate_left, l, r));
+	return tau::get(tau::bv, tau::get(tau::bv_shl, l, r));
 }
 
 template <NodeType node>
@@ -590,7 +590,7 @@ tref build_bv_shr(tref l, tref r) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr && r != nullptr);)
-	return tau::get(tau::bv, tau::get(tau::bv_rotate_right, l, r));
+	return tau::get(tau::bv, tau::get(tau::bv_shr, l, r));
 }
 
 template <NodeType node>

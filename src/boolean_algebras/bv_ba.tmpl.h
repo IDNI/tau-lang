@@ -225,12 +225,12 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 			auto r = bv_eval_node<node>(solver, form->child[1], vars, free_vars, checked);
 			return (l && r) ? max(l.value(), r.value()) : std::nullopt;
 		}*/
-		case node::type::bv_rotate_left: {
+		case node::type::bv_shl: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bv_rotate_right: {
+		case node::type::bv_shr: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, checked);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;

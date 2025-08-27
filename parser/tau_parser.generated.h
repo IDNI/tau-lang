@@ -34,7 +34,7 @@ inline const std::vector<std::string> symbol_names{
 	"__E___E_bf_74_75", "bf_and_nosep", "__E_bf_76", "bf_and_nosep_1st_oprnd", "__E___E_bf_76_77", "bf_and_nosep_2nd_oprnd", "__E___E_bf_76_78", "bv_parenthesis", "__E_bv_79", "bv_checked", 
 	"__E_bv_80", "bv_add", "__E_bv_81", "bv_mul", "__E_bv_82", "bv_div", "__E_bv_83", "bv_mod", "__E_bv_84", "bv_sub", 
 	"__E_bv_85", "bv_neg", "bv_and", "__E_bv_86", "bv_nand", "__E_bv_87", "bv_or", "__E_bv_88", "bv_nor", "__E_bv_89", 
-	"bv_xor", "__E_bv_90", "bv_xnor", "__E_bv_91", "bv_rotate_left", "__E_bv_92", "bv_rotate_right", "__E_bv_93", "bv_min", "__E_bv_94", 
+	"bv_xor", "__E_bv_90", "bv_xnor", "__E_bv_91", "bv_shl", "__E_bv_92", "bv_shr", "__E_bv_93", "bv_min", "__E_bv_94", 
 	"bv_max", "__E_bv_95", "bv_constant", "binary", "__E_bv_constant_96", "type", "decimal", "__E_bv_constant_97", "hexadecimal", "__E_bv_constant_98", 
 	"__E_binary_99", "__E_binary_100", "__E_hexadecimal_101", "__E_decimal_102", "ctn_neq", "__E_constraint_103", "ctnvar", "num", "ctn_eq", "__E_constraint_104", 
 	"ctn_gteq", "__E_constraint_105", "ctn_gt", "__E_constraint_106", "ctn_lteq", "__E_constraint_107", "ctn_lt", "__E_constraint_108", "__E_bf_constant_109", "source", 
@@ -769,15 +769,15 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(134), (NT(212)));
 //G314: __E_bv_92(215)       => bv(134) _(11) '<' '<' _(11) bv(134).
 	p(NT(215), (NT(134)+NT(11)+T(22)+T(22)+NT(11)+NT(134)));
-//G315: bv_rotate_left(214)  => __E_bv_92(215).
+//G315: bv_shl(214)          => __E_bv_92(215).
 	p(NT(214), (NT(215)));
-//G316: bv(134)              => bv_rotate_left(214).
+//G316: bv(134)              => bv_shl(214).
 	p(NT(134), (NT(214)));
 //G317: __E_bv_93(217)       => bv(134) _(11) '>' '>' _(11) bv(134).
 	p(NT(217), (NT(134)+NT(11)+T(23)+T(23)+NT(11)+NT(134)));
-//G318: bv_rotate_right(216) => __E_bv_93(217).
+//G318: bv_shr(216)          => __E_bv_93(217).
 	p(NT(216), (NT(217)));
-//G319: bv(134)              => bv_rotate_right(216).
+//G319: bv(134)              => bv_shr(216).
 	p(NT(134), (NT(216)));
 //G320: __E_bv_94(219)       => 'm' 'i' 'n' __(34) bv(134) __(34) bv(134).
 	p(NT(219), (T(21)+T(4)+T(5)+NT(34)+NT(134)+NT(34)+NT(134)));
@@ -1644,7 +1644,7 @@ struct tau_parser_nonterminals {
 		__E___E_bf_74_75, bf_and_nosep, __E_bf_76, bf_and_nosep_1st_oprnd, __E___E_bf_76_77, bf_and_nosep_2nd_oprnd, __E___E_bf_76_78, bv_parenthesis, __E_bv_79, bv_checked, 
 		__E_bv_80, bv_add, __E_bv_81, bv_mul, __E_bv_82, bv_div, __E_bv_83, bv_mod, __E_bv_84, bv_sub, 
 		__E_bv_85, bv_neg, bv_and, __E_bv_86, bv_nand, __E_bv_87, bv_or, __E_bv_88, bv_nor, __E_bv_89, 
-		bv_xor, __E_bv_90, bv_xnor, __E_bv_91, bv_rotate_left, __E_bv_92, bv_rotate_right, __E_bv_93, bv_min, __E_bv_94, 
+		bv_xor, __E_bv_90, bv_xnor, __E_bv_91, bv_shl, __E_bv_92, bv_shr, __E_bv_93, bv_min, __E_bv_94, 
 		bv_max, __E_bv_95, bv_constant, binary, __E_bv_constant_96, type, decimal, __E_bv_constant_97, hexadecimal, __E_bv_constant_98, 
 		__E_binary_99, __E_binary_100, __E_hexadecimal_101, __E_decimal_102, ctn_neq, __E_constraint_103, ctnvar, num, ctn_eq, __E_constraint_104, 
 		ctn_gteq, __E_constraint_105, ctn_gt, __E_constraint_106, ctn_lteq, __E_constraint_107, ctn_lt, __E_constraint_108, __E_bf_constant_109, source, 
