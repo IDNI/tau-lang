@@ -689,7 +689,7 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 	tref guard = tau::_T();
 	for (tref io_var : io_vars) {
 		// Check if input stream variable
-		if (tau::get(io_vars.back())[0].is_input_variable()) {
+		if (tau::get(io_var)[0].is_input_variable()) {
 			// Give name of io_var and make it non-user definable with "_"
 			size_t type = tau::get(io_var).get_ba_type();
 			tref uc = tau::build_bf_uconst("_" + TAU_TO_STR(io_var),
