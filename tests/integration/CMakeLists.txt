@@ -12,7 +12,10 @@ set(TESTS
 	nso_rr_partial_eval
 	interpreter
 	ref_types
-	satisfiability
+	satisfiability1
+	satisfiability2
+	satisfiability3
+	#satisfiability4
 	sbf1
 	sbf2
 	solver
