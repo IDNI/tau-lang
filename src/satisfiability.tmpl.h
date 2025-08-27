@@ -1112,7 +1112,7 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 		if (!tau::get(transform_to_execution<node>(
 			clause, start_time, output)).equals_F()) {
 			LOG_DEBUG << "End is_tau_formula_sat: true";
-			if (tau::get(clause).find_top(is<node, tau::bv>))
+			if (is_bv_fm<node>(clause))
 				return is_bv_formula_sat<node>(clause);
 			return true;
 		}
