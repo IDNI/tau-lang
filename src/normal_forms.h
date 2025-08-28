@@ -160,6 +160,9 @@ template <NodeType node>
 tref norm_equation(tref eq);
 
 template <NodeType node>
+tref norm_trimmed_equation(tref eq);
+
+template <NodeType node>
 tref denorm_equation(tref eq);
 
 template <NodeType node>
@@ -408,11 +411,14 @@ template <NodeType node>
 bool is_ordered_subset(const auto& v1, const auto& v2);
 
 template <NodeType node>
+bool is_ordered_overlap_at_least(size_t i, const trefs& v1, const trefs& v2);
+
+template <NodeType node>
 std::vector<std::vector<trefs>> get_cnf_inequality_lits(tref fm);
 
 template <NodeType node>
 std::pair<std::vector<int_t>, bool> simplify_path(
-	const std::vector<int_t>& path, const trefs& vars);
+	const std::vector<int_t>& path, trefs& vars);
 
 template <NodeType node>
 std::pair<tref, bool> group_paths_and_simplify(
@@ -541,15 +547,11 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm);
 template <NodeType node>
 tref eliminate_quantifiers(tref fm);
 
-// fm is assumed to be quantifier free
-template <NodeType node>
-tref get_eq_with_most_quant_vars(tref fm, const auto& quant_vars);
-
 template <NodeType node>
 std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm);
 
 template <NodeType node>
-tref anti_prenex(const tref& fm);
+tref anti_prenex_depriciated(const tref& fm);
 
 template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val);
@@ -570,13 +572,16 @@ template <NodeType node>
 tref syntactic_atomic_formula_simplification (tref atomic_formula);
 
 template <NodeType node>
+tref squeeze_absorb_down(tref formula, tref var);
+
+template <NodeType node>
+tref squeeze_absorb_down(tref formula);
+
+template <NodeType node>
 tref term_boole_decomposition(tref term, tref var);
 
 template <NodeType node>
 tref term_boole_decomposition(tref term, tref var, auto& pool);
-
-template <NodeType node>
-tref term_boole_decomposition_with_assm(tref term, tref var, tref assm, bool is_eq = true);
 
 template <NodeType node>
 tref term_boole_decomposition(tref term);
@@ -587,11 +592,17 @@ tref boole_decomposition(tref formula, tref atm, auto& pool);
 template <NodeType node>
 tref boole_decomposition(tref formula, tref atm);
 
-// template <NodeType node>
-// tref quantified_boole_decomposition(tref formula, tref atm, tref var, auto& atm_pool);
-
 template <NodeType node>
 tref boole_normal_form(tref formula);
+
+template <NodeType node>
+tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool);
+
+template <NodeType node>
+tref treat_ex_quantified_clause(tref ex_formula);
+
+template <NodeType node>
+tref anti_prenex(tref formula);
 
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
 // We implicitly transformed into BDD form and compute one step of the SNF transformation.

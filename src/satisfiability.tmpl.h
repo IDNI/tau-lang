@@ -394,7 +394,7 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	int_t lookback = get_max_shift<node>(io_vars);
 	// Find fix point once all initial conditions have been passed and
 	// the time_point is greater equal the step_num
-	while (step_num < lookback || !are_nso_equivalent<node>(phi_prev, phi)){
+	while (step_num < lookback || !is_nso_impl<node>(phi_prev, phi)){
 		phi_prev = phi;
 		++step_num;
 
@@ -430,8 +430,7 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 			<< LOG_FM(rewriter::replace<node>(chi, pholder_to_st));
 
 	// Find fix point once the lookback is greater the step_num
-	while (step_num < lookback
-		|| !are_nso_equivalent<node>(chi_prev_replc, chi_replc))
+	while (step_num < lookback || !is_nso_impl<node>(chi_prev_replc, chi_replc))
 	{
 		chi_prev = chi, chi_prev_replc = chi_replc, ++step_num;
 		chi = build_step_chi<node>(chi_base, st, chi_prev, io_vars,

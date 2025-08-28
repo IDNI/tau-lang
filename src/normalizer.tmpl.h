@@ -231,16 +231,9 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 
-	trefs vars(get_free_vars<node>(n1));
-	for (tref v : vars) LOG_DEBUG << "var1: " << LOG_FM(v);
-	const trefs& vars2 = get_free_vars<node>(n2);
-	for (tref v : vars2) LOG_DEBUG << "var2: " << LOG_FM(v);
-	vars.insert(vars.end(), vars2.begin(), vars2.end());
-	for (tref v : vars) LOG_DEBUG << "var: " << LOG_FM(v);
-
 	tref imp1 = tau::build_wff_imply(n1, n2);
 	tref imp2 = tau::build_wff_imply(n2, n1);
-
+	const trefs& vars = get_free_vars<node>(imp1);
 	for (tref v : vars) {
 		imp1 = tau::build_wff_all(v, imp1);
 		imp2 = tau::build_wff_all(v, imp2);
@@ -290,11 +283,8 @@ bool is_nso_impl(tref n1, tref n2) {
 		return true;
 	}
 
-	trefs vars(get_free_vars<node>(n1));
-	const trefs& vars2 = get_free_vars<node>(n2);
-	vars.insert(vars.end(), vars2.begin(), vars2.end());
-
 	tref imp = tau::build_wff_imply(n1, n2);
+	const trefs& vars = get_free_vars<node>(imp);
 	for (tref v : vars) imp = tau::build_wff_all(v, imp);
 	LOG_DEBUG << "wff: " << LOG_FM(imp);
 

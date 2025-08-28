@@ -245,6 +245,18 @@ tref norm_equation(tref eq) {
 	} else return eq;
 }
 
+// Convert X =(!=) Y to X + Y =(!=) 0
+template<NodeType node>
+tref norm_trimmed_equation(tref eq) {
+	using tau = tree<node>;
+	tau e = tau::get(eq);
+	if (e.is(tau::bf_eq)) {
+		return tau::trim(tau::build_bf_eq_0(tau::build_bf_xor(e.first(), e.second())));
+	} else if (e.child_is(tau::bf_neq)) {
+		return tau::trim(tau::build_bf_neq_0(tau::build_bf_xor(e.first(), e.second())));
+	} else return eq;
+}
+
 template<NodeType node>
 tref denorm_equation(tref eq) {
 	using tau = tree<node>;
@@ -594,7 +606,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 	tref eq = t.find_bottom(is<node, tau::bf_eq>);
 	subtree_map<node, tref> changes;
 	if (eq && tau::get(eq)[0].find_top(has_var)) {
-		eq = tau::trim(norm_equation<node>(tau::get(tau::wff, eq)));
+		eq = norm_trimmed_equation<node>(eq);
 		const auto& eq_v = tau::get(eq);
 		DBG(assert(eq_v[1][0].is(tau::bf_f));)
 		tref f_0 = tt(rewriter::replace<node>(
@@ -608,8 +620,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 							f_0, var, f_1));
 	}
 	for (tref neq_ref : t.select_all(is<node, tau::bf_neq>)) {
-		neq_ref = tau::trim(
-			norm_equation<node>(tau::get(tau::wff, neq_ref)));
+		neq_ref = norm_trimmed_equation<node>(neq_ref);
 		const auto& neq = tau::get(neq_ref);
 		DBG(assert(neq[1][0].is(tau::bf_f));)
 		if (!neq[0].find_top(has_var)) continue;
@@ -1632,6 +1643,21 @@ bool is_ordered_subset(const auto& v1, const auto& v2) {
 		if (j == v1.size()) return true;
 	}
 	return false;
+}
+
+template<NodeType node>
+bool is_ordered_overlap_at_least(size_t i, const trefs& v1, const trefs& v2) {
+	using tau = tree<node>;
+	if (v1.size() < i) return false;
+	if (v2.size() < i) return false;
+	size_t j = 0, k = 0;
+	while (j < v1.size() && k < v2.size()) {
+		// Check match
+		if (tau::get(v1[j]) == tau::get(v2[k])) --i, ++j, ++k;
+		else if (tau::subtree_less(v1[j], v2[k])) ++j;
+		else ++k;
+	}
+	return i == 0;
 }
 
 template <NodeType node>
@@ -2919,6 +2945,7 @@ typename tree<node>::traverser operator|(
 	return typename tree<node>::traverser(r(fm.value()));
 }
 
+//TODO: xor
 template <NodeType node>
 tref push_existential_quantifier_one(tref fm) {
 	using tau = tree<node>;
@@ -2961,6 +2988,7 @@ tref push_existential_quantifier_one(tref fm) {
 	else return scoped_fm;
 }
 
+//TODO: xor
 template <NodeType node>
 tref push_universal_quantifier_one(tref fm) {
 	using tau = tree<node>;
@@ -3002,18 +3030,54 @@ tref push_universal_quantifier_one(tref fm) {
 	else return scoped_fm;
 }
 
+template <NodeType node>
+tref push_quantifiers_in(tref formula) {
+	using tau = tree<node>;
+	subtree_unordered_set<node> excluded_nodes;
+	auto push_quantifiers = [&excluded_nodes](tref n) {
+		// static size_t counter = 0; DBG(assert(counter++ < 12);)
+		if (is_child<node>(n, tau::wff_ex)) {
+			LOG_DEBUG << "push_quantifiers existential: " << LOG_FM(n);
+			tref pushed = push_existential_quantifier_one<node>(n);
+			if (tau::get(pushed) == tau::get(n)) {
+				// Quantifier cannot be pushed deeper
+				for (tref c : tau::get(n).children())
+					excluded_nodes.insert(c);
+				return n;
+			} else return pushed;
+		} else if (is_child<node>(n, tau::wff_all)) {
+			LOG_DEBUG << "push_quantifiers universal: " << LOG_FM(n);
+			tref pushed = push_universal_quantifier_one<node>(n);
+			if (tau::get(pushed) == tau::get(n)) {
+				// Quantifier cannot be pushed deeper
+				for (tref c : tau::get(n).children())
+					excluded_nodes.insert(c);
+				return n;
+			} else return pushed;
+		}
+		LOG_DEBUG << "push_quantifiers nothing to do: " << LOG_FM(n);
+		return n;
+	};
+	auto visit = [&excluded_nodes](tref n) {
+		return visit_wff<node>(n) && !excluded_nodes.contains(n);
+	};
+	return pre_order<node>(formula).apply_unique(push_quantifiers, visit);
+}
+
 // Squeeze all equalities found in n
-//TODO: make it type depended
+// Only use on equal types!!!
 template <NodeType node>
 tref squeeze_positives(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	LOG_TRACE << "squeeze_positives: " << LOG_FM(n);
-	if (auto eqs = tau::get(n).select_top(is<node, tau::bf_eq>);
+	if (trefs eqs = tau::get(n).select_top(is<node, tau::bf_eq>);
 		eqs.size() > 0)
 	{
-		trefs positives = tt(eqs) | tt::children | tt::refs;
-		tref res = tau::build_bf_or(positives);
+		for (tref& eq : eqs)
+			eq = norm_trimmed_equation<node>(eq);
+		eqs = tt(eqs) | tt::children | tt::refs;
+		tref res = tau::build_bf_or(eqs);
 		LOG_TRACE << "squeeze_positives result: " << LOG_FM(res);
 		return res;
 	}
@@ -3332,8 +3396,7 @@ tref eliminate_quantifiers(tref fm) {
 		else    return eliminate_universal_quantifier<node>(
 							inner_fm, scoped_fm);
 	};
-	// unordered_tau_set<BAs...> excluded_nodes;
-	subtree_set<node> excluded_nodes;
+	subtree_unordered_set<node> excluded_nodes;
 	auto push_quantifiers = [&excluded_nodes](tref n) {
 		// static size_t counter = 0; DBG(assert(counter++ < 12);)
 		if (is_child<node>(n, tau::wff_ex)) {
@@ -3374,37 +3437,6 @@ tref eliminate_quantifiers(tref fm) {
 		else return n;
 	};
 	return post_order<node>(fm).apply_unique(push_and_elim, visit_wff<node>);
-}
-
-// fm is assumed to be quantifier free
-template <NodeType node>
-tref get_eq_with_most_quant_vars(tref fm, const auto& quant_vars) {
-	using tau = tree<node>;
-	// std::cout << "Begin get_eq_with_most_quant_vars with\n";
-	// std::cout << "fm: " << fm << "\n";
-	// std::cout << "quantified vars: " << quant_vars << "\n";
-	tref eq_max_quants = nullptr;
-	int_t max_quants = 0;
-	auto get_eq = [&](tref n) {
-		if (is<node>(n, tau::bf_eq)) {
-			// Found term
-			// Get vars
-			auto vars = tau::get(n).select_top(
-				is<node, tau::variable>);
-			// Find overlap of vars and quant_vars
-			int_t quants = 0;
-			for (tref v : vars)
-				if (quant_vars.contains(v)) ++quants;
-			if (quants >= max_quants)
-				max_quants = quants, eq_max_quants = n;
-			// Dont go deeper
-			return false;
-		}
-		// Go deeper
-		return true;
-	};
-	pre_order<node>(fm).visit(get_eq, visit_wff<node>, identity);
-	return tau::get(tau::wff, eq_max_quants);
 }
 
 template <NodeType node>
@@ -3455,7 +3487,7 @@ std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm) {
 }
 
 template <NodeType node>
-tref anti_prenex(const tref& fm) {
+tref anti_prenex_depriciated(const tref& fm) {
 	using tau = tree<node>;
 	// unordered_tau_set<BAs...> excluded_nodes, quant_vars;
 	subtree_set<node> excluded_nodes, quant_vars;
@@ -3492,45 +3524,8 @@ tref anti_prenex(const tref& fm) {
 				excluded_nodes.insert(ch);
 			return res;
 
-			/*// Boole decomposition
-			auto eq = get_eq_with_most_quant_vars(scoped_fm, quant_vars);
-			//TODO: absorbtions
-			auto left = build_wff_and(eq, rewriter::replace<node>(scoped_fm, eq, _T<BAs...>));
-			if (tau::get(left).equals_F()) {
-				// Boole decomp does not create two branches
-				assert(find_top(n, is<node, tau::wff_or...>));
-				auto dis = single_dis_lift(n);
-				auto res = push_existential_quantifier_one(dis);
-				// std::cout << "Single || lift:\n";
-				// std::cout << "From " << n << "\n";
-				// ptree(std::cout, n);
-				// std::cout << "\n\n";
-				// std::cout << "dis: " << dis << "\n";
-				// std::cout << "To " << res << "\n\n";
-				return res;
-			}
-			auto neq = build_wff_neq(trim2(eq));
-			auto right = build_wff_and(neq, rewriter::replace<node>(scoped_fm, eq, _F<BAs...>));
-			if (tau::get(right).equals_F()) {
-				// Boole decomp does not create two branches
-				assert(find_top(n, is<node, tau::wff_or...>));
-				auto dis = single_dis_lift(n);
-				auto res = push_existential_quantifier_one(dis);
-				// std::cout << "Single || lift:\n";
-				// std::cout << "From " << n << "\n";
-				// ptree(std::cout, n);
-				// std::cout << "\n\n";
-				// std::cout << "dis: " << dis << "\n";
-				// std::cout << "To " << res << "\n\n";
-				return res;
-			}
-			auto res = build_wff_or(
-				build_wff_ex(q_v, left),
-				build_wff_ex(q_v, right));
-			// std::cout << "Boole decomposition:\n";
-			// std::cout << "From " << n << "\n";
-			// std::cout << "To " << res << "\n\n";
-			return res;*/
+			// Boole decomposition
+			// TODO
 		} else return n;
 	};
 	auto visit = [&excluded_nodes](tref n) {
@@ -3604,6 +3599,9 @@ tref replace_free_vars_by(tref fm, tref val) {
 	} else return fm;
 }
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "anti_prenex"
+
 template<NodeType node>
 tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	using tau = tree<node>;
@@ -3621,6 +3619,9 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		// Is func syntactically identically 0
 		if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0())
 			res = _T<node>();
+		// Is func syntactically identically 1
+		if (tau::get(func_v_0).equals_1() && tau::get(func_v_1).equals_1())
+			res = _F<node>();
 		// func is not dependent on var
 		else if (!contains<node>(func_v_0, var) && tau::get(func_v_0) == tau::get(func_v_1))
 			res = rewriter::replace<node>(atomic_fm, var, _0<node>());
@@ -3629,6 +3630,9 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		// Is func syntactically identically 0
 		if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0())
 			res = _F<node>();
+		// Is func syntactically identically 1
+		if (tau::get(func_v_0).equals_1() && tau::get(func_v_1).equals_1())
+			res = _T<node>();
 		// func is not dependent on var
 		else if (!contains<node>(func_v_0, var) && tau::get(func_v_0) == tau::get(func_v_1))
 			res = rewriter::replace<node>(atomic_fm, var, _0<node>());
@@ -3877,6 +3881,7 @@ public:
 	static tref on (tref fm) {
 		std::cout << "Syntactic_path_simplification on " << tau::get(fm) << "\n";
 		tref res = nullptr;
+		//TODO: T/F
 		if (tau::get(fm).is_term()) {
 			// Resolve contradictions
 			fm = push_negation_in<node, false>(fm);
@@ -4087,6 +4092,74 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 }
 
 template<NodeType node>
+tref squeeze_absorb_down(tref formula, tref var) {
+	using tau = tree<node>;
+	trefs assms { tau::_0() };
+	//TODO xor
+	auto f = [&assms, &var](tref n, tref parent) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		if (parent != nullptr && is<node>(parent, tau::wff_or) &&
+		    !is_child<node>(n, tau::wff_or)) {
+			assms.push_back(assms.back());
+		}
+		const tau& n_t = tau::get(n);
+		if (n_t.child_is(tau::wff_and)) {
+			// Squeeze = 0 if they share var
+			trefs conj = get_cnf_wff_clauses<node>(n);
+			tref squeezed = tau::_0();
+			for (tref& c : conj) {
+				const tau& c_t = tau::get(c);
+				if (c_t.child_is(tau::bf_eq) &&
+					c_t[0][1].equals_0()) {
+					if (contains<node>(c_t[0].first(), var)) {
+						squeezed = tau::build_bf_or(
+							squeezed, c_t[0].first());
+						c = tau::_T();
+					}
+				}
+			}
+			squeezed = tau::build_bf_eq_0(squeezed);
+			return tau::build_wff_and(squeezed,
+				tau::build_wff_and(conj));
+		}
+		if (n_t.child_is(tau::bf_eq) && n_t[0][1].equals_0()) {
+			if (!contains<node>(n_t[0].first(), var)) return n;
+			if (is_ordered_overlap_at_least<node>(2, get_free_vars<node>(n),
+				get_free_vars<node>(assms.back()))) {
+				// Add assm to n
+				return tau::build_bf_eq_0(
+					tau::build_bf_or(n_t[0].first(),
+					assms.back())
+					);
+			}
+			// Add n to assm
+			assms.back() = tau::build_bf_or(
+				assms.back(), n_t[0].first());
+		} else if (n_t.child_is(tau::bf_neq) && n_t[0][1].equals_0()) {
+			if (!contains<node>(n_t[0].first(), var)) return n;
+			if (is_ordered_overlap_at_least<node>(2, get_free_vars<node>(n),
+				get_free_vars<node>(assms.back()))) {
+				// Add assm to n
+				return tau::build_bf_neq_0(
+					tau::build_bf_and(n_t[0].first(),
+					tau::build_bf_neg(assms.back()))
+					);
+			}
+		}
+		return n;
+	};
+	//TODO xor
+	auto up = [&assms](tref n, tref parent) {
+		if (parent != nullptr && is<node>(parent, tau::wff_or) &&
+			!is_child<node>(n, tau::wff_or))
+				assms.pop_back();
+		return n;
+	};
+	return pre_order<node>(formula).apply(f, visit_wff<node>, up);
+}
+
+// TODO: maybe syntactic path simp?
+template<NodeType node>
 tref term_boole_decomposition(tref term, tref var) {
 	// Assumes that terms of atm allow Boole decomposition on var
 	using tau = tree<node>;
@@ -4100,6 +4173,7 @@ tref term_boole_decomposition(tref term, tref var) {
 	);
 }
 
+// TODO: maybe syntactic path simp?
 template<NodeType node>
 tref term_boole_decomposition(tref term, tref var, auto& pool) {
 	// Assumes that terms of atm allow Boole decomposition on var
@@ -4118,38 +4192,6 @@ tref term_boole_decomposition(tref term, tref var, auto& pool) {
 	term = tau::build_bf_or(tau::build_bf_and(var, p1), tau::build_bf_and(tau::build_bf_neg(var), p2));
 	std::cout << "Result: " << tau::get(term) << "\n";
 	return term;
-}
-
-template <NodeType node>
-tref term_boole_decomposition_with_assm(tref term, tref var, tref assm, bool is_eq) {
-	using tau = tree<node>;
-	DBG(assert(assm!=nullptr);)
-	DBG(assert(tau::get(var).is(tau::variable));)
-	var = tau::get(tau::bf, var);
-	if (is_eq) {
-		tref p1 = tau::get(term).replace(var, tau::_1());
-		tref p2 = tau::get(term).replace(var, tau::_0());
-		if (tau::get(p1) == tau::get(p2)) return p1;
-		tref res = tau::build_bf_or(
-			tau::build_bf_and(var, tau::build_bf_or(p1,
-				tau::get(assm).replace(var, tau::_1()))),
-			tau::build_bf_and(tau::build_bf_neg(var), tau::build_bf_or(p2,
-				tau::get(assm).replace(var, tau::_0())))
-		);
-		return syntactic_path_simplification<node>::on(res);
-	}
-	// Case where is_eq == false
-	assm = push_negation_in<node, false>(tau::build_bf_neg(assm));
-	tref p1 = tau::get(term).replace(var, tau::_1());
-	tref p2 = tau::get(term).replace(var, tau::_0());
-	if (tau::get(p1) == tau::get(p2)) return p1;
-	tref res = tau::build_bf_or(
-		tau::build_bf_and(var, tau::build_bf_and(p1,
-			tau::get(assm).replace(var, tau::_1()))),
-		tau::build_bf_and(tau::build_bf_neg(var), tau::build_bf_and(p2,
-			tau::get(assm).replace(var, tau::_0())))
-		);
-	return syntactic_path_simplification<node>::on(res);
 }
 
 //TODO: Does not work for bitvector
@@ -4193,6 +4235,7 @@ tref term_boole_decomposition(tref term) {
 	return term;
 }
 
+// TODO: maybe syntactic path simp?
 template<NodeType node>
 tref boole_decomposition(tref formula, tref atm, auto& pool) {
 	// Returns atm && formula[atm/T] || !atm && formula[!atm/F]
@@ -4207,6 +4250,7 @@ tref boole_decomposition(tref formula, tref atm, auto& pool) {
 	);
 }
 
+// TODO: maybe syntactic path simp?
 template<NodeType node>
 tref boole_decomposition(tref formula, tref atm) {
 	// Returns atm && formula[atm/T] || !atm && formula[!atm/F]
@@ -4219,15 +4263,12 @@ tref boole_decomposition(tref formula, tref atm) {
 	);
 }
 
-// template<NodeType node>
-// tref quantified_boole_decomposition(tref formula, tref atm, tref var, auto& atm_pool) {
-//
-// }
-
 template<NodeType node>
 tref boole_normal_form(tref formula) {
 	using tau = tree<node>;
 	std::cout << "Boole_normal_form on " << tau::get(formula) << "\n";
+	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
+		return formula;
 	// Step 1: Syntactically simplify resulting formula
 	formula = syntactic_formula_simplification<node>(formula);
 	std::cout << "After syntactic_formula_simplification: " << tau::get(formula) << "\n";
@@ -4241,6 +4282,8 @@ tref boole_normal_form(tref formula) {
 			// TODO: To reduced DNF/CNF instead of BDD
 			// Simplify
 			n = syntactic_atomic_formula_simplification<node>(n);
+			if (tau::get(n).equals_T() || tau::get(n).equals_F())
+				return n;
 			tref c1 = tau::get(n)[0].first();
 			tref c2 = tau::get(n)[0].second();
 			// Apply Boole decomposition
@@ -4250,6 +4293,8 @@ tref boole_normal_form(tref formula) {
 		} else if (tau::get(n).child_is(tau::bf_neq)) {
 			// Simplify
 			n = syntactic_atomic_formula_simplification<node>(n);
+			if (tau::get(n).equals_T() || tau::get(n).equals_F())
+				return n;
 			tref c1 = tau::get(n)[0].first();
 			tref c2 = tau::get(n)[0].second();
 			// Apply Boole decomposition
@@ -4297,6 +4342,252 @@ tref boole_normal_form(tref formula) {
 	eq_formula = not_equal_to_unequal<node>(eq_formula);
 	std::cout << "Boole_normal_form result: " << tau::get(eq_formula) << "\n";
 	return eq_formula;
+}
+
+template<NodeType node>
+tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
+	using tau = tree<node>;
+	DBG(assert(!tau::get(ex_quant_fm).find_top(is<node, tau::bf_neq>)));
+	// ex_quant_fm is of the form: ex var atm_assm && rest
+	// Find next best matching atomic formula atm from rest
+	// Try gamma_1 to gamma_4 as simps on atm
+	// If simp, build simplified result
+	// Else build Boole decomposition with squeeze/absorb
+
+	// Get atomic formulas from pool
+	auto it = pool.find(ex_quant_fm);
+	tref curr_pool = it != pool.end()
+				 ? it->second
+				 : tau::get(ex_quant_fm)[0].second();
+	trefs atms = tau::get(curr_pool).select_top(is_child<node, tau::bf_eq>);
+	if (atms.empty()) {
+		DBG(assert(false));
+		return ex_quant_fm;
+	}
+	// Sort the atomic formulas and get first
+	std::ranges::sort(atms, atm_formula_order_for_simplification<node>);
+	tref atm = atms[0];
+	// Get quantified variable
+	tref var = tau::get(tau::bf, tau::trim2(ex_quant_fm));
+	// Try syntactic simplifications
+	{
+	// TODO: add syntactic path simplification and resolve xor
+	tref func = tau::trim2(norm_equation<node>(atm));
+	// We use is_boolean_operation to enable the procedure on non-boolean functions
+	tref func_v_0 = rewriter::replace_if<node>(func, var, tau::_0(), is_boolean_operation<node>);
+	tref func_v_1 = rewriter::replace_if<node>(func, var, tau::_1(), is_boolean_operation<node>);
+	// Check identically zero
+	if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0()) {
+		return rewriter::replace<node>(ex_quant_fm, atm, tau::_T());
+	}
+	// Check identically one
+	else if (tau::get(func_v_0).equals_1() && tau::get(func_v_1).equals_1()) {
+		return rewriter::replace<node>(ex_quant_fm, atm, tau::_F());
+	}
+	// Check does not dependent on var
+	else if (tau::get(func_v_0) == tau::get(func_v_1) && !contains<node>(func_v_0, var)) {
+		tref fm = tau::get(ex_quant_fm)[0].second();
+		tref l = rewriter::replace<node>(fm, atm, tau::_T());
+		tref r = rewriter::replace<node>(fm, atm, tau::_F());
+		if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l);
+		atm = rewriter::replace<node>(atm, var, tau::_T());
+		return tau::build_wff_or(
+			tau::build_wff_and(atm, tau::build_wff_ex(tau::trim(var), l)),
+			tau::build_wff_and(tau::build_wff_neg(atm), tau::build_wff_ex(tau::trim(var), r))
+			);
+	}
+	// Check has a unique zero
+	func_v_1 = push_negation_in<node, false>(tau::build_bf_neg(func_v_1));
+	if (tau::get(func_v_0) == tau::get(func_v_1) && !contains<node>(func_v_0, var)) {
+		tref fm = tau::get(ex_quant_fm)[0].second();
+		tref l = rewriter::replace<node>(fm, atm, tau::_T());
+		l = rewriter::replace<node>(l, var, func_v_0);
+		tref r = rewriter::replace<node>(fm, atm, tau::_F());
+		if (tau::get(l) == tau::get(r)) return l;
+		tref boole_atm = tau::build_bf_eq(
+		term_boole_decomposition<node>(tau::get(atm)[0].first(), tau::trim(var)),
+		term_boole_decomposition<node>(tau::get(atm)[0].second(), tau::trim(var))
+		);
+		tref nr = tau::build_wff_ex(tau::trim(var),
+			tau::build_wff_and(tau::build_wff_neg(boole_atm), r));
+		std::cout << "curr_pool: " << tau::get(curr_pool) << "\n";
+		pool.insert_or_assign(nr,
+			rewriter::replace<node>(curr_pool, atm, tau::_F()));
+		std::cout << "new pool: " << tau::get(pool[nr]) << "\n";
+		atm = rewriter::replace<node>(atm, var, func_v_0);
+		return tau::build_wff_or(tau::build_wff_and(atm, l), nr);
+	}
+	}
+	// No simplification applied, build Boole decomposition
+	tref fm = tau::get(ex_quant_fm)[0].second();
+	tref l = rewriter::replace<node>(fm, atm, tau::_T());
+	tref r = rewriter::replace<node>(fm, atm, tau::_F());
+	if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l);
+	tref boole_atm = tau::build_bf_eq(
+		term_boole_decomposition<node>(tau::get(atm)[0].first(), tau::trim(var)),
+		term_boole_decomposition<node>(tau::get(atm)[0].second(), tau::trim(var))
+		);
+	tref nl = tau::build_wff_ex(tau::trim(var),
+		tau::build_wff_and(boole_atm, l));
+	tref nr = tau::build_wff_ex(tau::trim(var),
+		tau::build_wff_and(tau::build_wff_neg(boole_atm), r));
+	std::cout << "curr_pool: " << tau::get(curr_pool) << "\n";
+	pool.insert_or_assign(nl,
+		rewriter::replace<node>(curr_pool, atm, tau::_T()));
+	std::cout << "new l pool: " << tau::get(pool[nl]) << "\n";
+	pool.insert_or_assign(nr,
+		rewriter::replace<node>(curr_pool, atm, tau::_F()));
+	std::cout << "new r pool: " << tau::get(pool[nr]) << "\n";
+	return tau::build_wff_or(nl, nr);
+}
+
+// TODO: How to adjust for bitvector that are boolean?
+template <NodeType node>
+tref treat_ex_quantified_clause(tref ex_formula) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	// Following Corollary 2.3 from Taba book from Ohad
+	tref var = tau::trim2(ex_formula);
+	tref formula = tau::get(ex_formula)[0].second();
+	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
+		return formula;
+	tref new_fm = tau::_T();
+	bool is_quant_removable_in_clause = true;
+	trefs conjs = get_cnf_wff_clauses<node>(formula);
+	for (tref& conj : conjs) {
+		if (!contains<node>(conj, var)) {
+			new_fm = tau::build_wff_and(new_fm, conj);
+			conj = tau::_T();
+			continue;
+		}
+		// Check if conjunct is of form = or !=
+		if ((tt(conj) | tau::bf_eq) || (tt(conj) | tau::bf_neq))
+			continue;
+		// If the conjunct contains the quantified variable at this point
+		// we cannot resolve the quantifier in this clause
+		is_quant_removable_in_clause = false;
+		break;
+	}
+	tref scoped_fm = tau::build_wff_and(conjs);
+	if (!is_quant_removable_in_clause) {
+		// Since we cannot remove the quantifier in this
+		// clause it needs to be maintained
+		return tau::build_wff_and(
+			tau::build_wff_ex(var, scoped_fm), new_fm);
+	}
+	// Check that quantified variable appears
+	if (tau::get(scoped_fm).equals_T()) return new_fm;
+	tref f = squeeze_positives<node>(scoped_fm);
+	tref f_0 = f ? rewriter::replace<node>(f, var, tau::_0_trimmed()) : tau::_0();
+	tref f_1 = f ? rewriter::replace<node>(f, var, tau::_1_trimmed()) : tau::_0();
+	trefs neqs = tau::get(scoped_fm).select_top(is<node, tau::bf_neq>);
+	if (neqs.size()) {
+		tref nneqs = tau::_T();
+		for (tref neq : neqs) {
+			neq = norm_trimmed_equation<node>(neq);
+			tref g = tt(neq) | tau::bf | tt::ref;
+			tref g_0 = rewriter::replace<node>(g, var,
+						tau::_0_trimmed());
+			tref g_1 = rewriter::replace<node>(g, var,
+						tau::_1_trimmed());
+			// If both are 1 then inequality is implied by f_0f_1 = 0
+			if (tau::get(g_0).equals_1() && tau::get(g_1).equals_1())
+				continue;
+			// If f_0 is equal to f_1 we can use assumption f_0 = 0 and f_1 = 0
+			if (tau::get(f_0) == tau::get(f_1)) {
+				nneqs = tau::build_wff_and(nneqs,
+					tau::build_bf_neq_0(
+						tau::build_bf_or(g_0,
+								 g_1)));
+			} else if (tau::get(g_0) == tau::get(g_1)) {
+				nneqs = tau::build_wff_and(nneqs,
+					tau::build_bf_neq_0(g_0));
+			} else nneqs = tau::build_wff_and(
+				nneqs,
+				tau::build_bf_neq_0(
+					tau::build_bf_or(
+						tau::build_bf_and(
+						tau::build_bf_neg(f_1),
+						g_1),
+						tau::build_bf_and(
+						tau::build_bf_neg(f_0),
+						g_0)))
+					);
+		}
+		new_fm = tau::build_wff_and(new_fm, tau::build_wff_and(
+			tau::build_bf_eq_0(tau::build_bf_and(f_0, f_1)),
+			nneqs));
+	} else if (f) {
+		new_fm = tau::build_wff_and(new_fm,
+			tau::build_bf_eq_0(
+			tau::build_bf_and(f_0, f_1)));
+	}
+	return boole_normal_form<node>(new_fm);
+}
+
+template<NodeType node>
+tref anti_prenex(tref formula) {
+	using tau = tree<node>;
+	subtree_unordered_map<node, tref> atomic_pool;
+	auto anti_prenex_step = [&atomic_pool](tref n) {
+		while (is_child_quantifier<node>(n)) {
+			// By assumption is existential
+
+			// TODO: if all atomic formulas are !=
+
+			// If n is single DNF clause -> treat quantifier
+			if (!tau::get(n).find_top(is<node, tau::wff_or>)) {
+				std::cout << "Before treat_ex_quantified_clause: " << LOG_FM(n) << "\n";
+				n = treat_ex_quantified_clause<node>(n);
+				std::cout << "After treat_ex_quantified_clause: " << LOG_FM(n) << "\n";
+				return n;
+			}
+			// Try push quant down
+			auto pushed = push_existential_quantifier_one<node>(n);
+			if (pushed != n) {
+				// TODO: sort disjunctions to priorities
+				std::cout << "Before push_existential_quantifier_one: " << LOG_FM(n) << "\n";
+				std::cout << "After push_existential_quantifier_one: " << LOG_FM(pushed) << "\n";
+				return pushed;
+			}
+			// Smart Boole decomposition
+			n = unequal_to_not_equal<node>(n);
+			std::cout << "Before ex_quantified_boole_decomposition: " << LOG_FM(n) << "\n";
+			n = ex_quantified_boole_decomposition<node>(n, atomic_pool);
+			n = not_equal_to_unequal<node>(n);
+			std::cout << "After ex_quantified_boole_decomposition: " << LOG_FM(n) << "\n";
+		}
+		return n;
+	};
+	auto inner_quant = [&anti_prenex_step](tref n) {
+		if (is_child_quantifier<node>(n)) {
+			std::cout << "Inner_quant on " << LOG_FM(n) << "\n";
+			n = syntactic_formula_simplification<node>(n);
+			n = squeeze_absorb_down<node>(n, tau::trim2(n));
+			std::cout << "After squeeze_absorb_down " << LOG_FM(n) << "\n";
+			if (is_child<node>(n, tau::wff_all)) {
+				tref n_neg = to_nnf<node>(tau::build_wff_neg(n));
+				tref res = pre_order<node>(n_neg).template apply_unique<
+					anti_prenex_step_m>(anti_prenex_step, visit_wff<node>);
+				res = to_nnf<node>(tau::build_wff_neg(res));
+				return res;
+			} else {
+				return pre_order<node>(n).template apply_unique<
+					anti_prenex_step_m>(anti_prenex_step, visit_wff<node>);
+			}
+		} else return n;
+	};
+	std::cout << "Anti_prenex on " << LOG_FM(formula) << "\n";
+	// Initial simplification of formula
+	formula = syntactic_formula_simplification<node>(formula);
+	std::cout << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";
+	// Apply anti prenex procedure
+	formula = post_order<node>(formula).template
+		apply_unique<anti_prenex_m>(inner_quant, visit_wff<node>);
+	std::cout << "Anti_prenex result: " << LOG_FM(formula) << "\n";
+	formula = syntactic_formula_simplification<node>(formula);
+	std::cout << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";
+	return formula;
 }
 
 #undef LOG_CHANNEL_NAME
