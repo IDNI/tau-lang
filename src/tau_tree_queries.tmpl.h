@@ -101,6 +101,7 @@ bool is_functional_quantifier(tref n) {
 	return tau::get(n).is(tau::bf_fall) || tau::get(n).is(tau::bf_fex);
 };
 
+// TODO: Add cache
 template <NodeType node>
 bool contains(tref fm, tref sub_fm) {
 	bool is_contained = false;
@@ -135,7 +136,8 @@ auto is_boolean_operation = [](tref n) static {
 	using tau = tree<node>;
 	const tau& t = tau::get(n);
 	if (t.is(tau::bf) || t.is(tau::bf_and) || t.is(tau::bf_or)
-		|| t.is(tau::bf_xor)|| t.is(tau::bf_neg)) return true;
+		|| t.is(tau::bf_xor) || t.is(tau::bf_neg)
+		|| t.is(tau::bf_fex) || t.is(tau::bf_fall)) return true;
 	return false;
 };
 

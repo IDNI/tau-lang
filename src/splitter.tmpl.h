@@ -232,7 +232,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		trefs eqs = tau::get(clause)
 			.select_top(is<node, tau::bf_eq>);
 		for (tref eq : eqs) {
-			eq = tau::trim(norm_equation<node>(tau::get(tau::wff, eq)));
+			eq = norm_trimmed_equation<node>(eq);
 			DBG(assert(tau::get(eq)[1][0].is(tau::bf_f));)
 			size_t type_f = find_ba_type<node>(eq);
 			const trefs& free_vars = get_free_vars<node>(fm);
@@ -272,7 +272,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		trefs neqs = tau::get(clause)
 					.select_top(is<node, tau::bf_neq>);
 		for (tref neq : neqs) {
-			neq = tau::trim(norm_equation<node>(tau::get(tau::wff, neq)));
+			neq = norm_trimmed_equation<node>(neq);
 			LOG_TRACE << "neq: " << LOG_FM_DUMP(neq);
 			LOG_TRACE << " test " << LOG_FM_DUMP(tau::get(neq).first());
 			DBG(assert(tau::get(neq)[1].child_is(tau::bf_f));)
