@@ -256,6 +256,7 @@ bool is_bv_formula_sat(tref form) {
 	auto expr = bv_eval_node<node>(solver, tt(form), vars, free_vars, false);
 	// TODO (MEDIUM) handle this case at an upper level (maybe return an optional)
 	if (!expr) {
+		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		solver.pop();
 		return false;
 	}
@@ -287,6 +288,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	solver.push();
 	auto expr = bv_eval_node<node>(solver, tt(form), vars, free_vars, false);
 	if (!expr) {
+		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		solver.pop();
 		return std::nullopt;
 	}
@@ -330,7 +332,10 @@ std::optional<constant_with_type<BAs...>> parse_bv(const std::string& src,
 		.infer_ba_types = false,
 		.reget_with_hooks = true };
 	auto result = tau::get(src, opts);
-	if (!result) return {};
+	if (!result) {
+		LOG_ERROR << "Failed to parse bitvector constant: " << src;
+		return {};
+	}
 	auto cte = tt(result) | tt::ba_constant;
 	return constant_with_type<BAs...>{ cte, "bv" };
 }
