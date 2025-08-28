@@ -252,7 +252,7 @@ tref norm_trimmed_equation(tref eq) {
 	tau e = tau::get(eq);
 	if (e.is(tau::bf_eq)) {
 		return tau::trim(tau::build_bf_eq_0(tau::build_bf_xor(e.first(), e.second())));
-	} else if (e.child_is(tau::bf_neq)) {
+	} else if (e.is(tau::bf_neq)) {
 		return tau::trim(tau::build_bf_neq_0(tau::build_bf_xor(e.first(), e.second())));
 	} else return eq;
 }
@@ -3734,8 +3734,9 @@ public:
 	static tref on (tref fm) {
 		std::cout << "Syntactic_path_simplification on " << tau::get(fm) << "\n";
 		tref res = nullptr;
-		//TODO: T/F
 		if (tau::get(fm).is_term()) {
+			if (tau::get(fm).equals_0() || tau::get(fm).equals_1())
+				return fm;
 			// Resolve contradictions
 			fm = push_negation_in<node, false>(fm);
 			fm = simplify_bf(fm);
@@ -3744,6 +3745,8 @@ public:
 			fm = simplify_bf(fm);
 			res = push_negation_in<node, false>(tau::build_bf_neg(fm));
 		} else {
+			if (tau::get(fm).equals_F() || tau::get(fm).equals_T())
+				return fm;
 			// Resolve contradictions
 			fm = unequal_to_not_equal<node>(to_nnf<node>(fm));
 			fm = simplify_wff(fm);
@@ -4191,7 +4194,7 @@ tref boole_normal_form(tref formula) {
 		atms.pop_back();
 		return n;
 	};
-	eq_formula = pre_order<node>(eq_formula).apply(f, visit_wff<node>);
+	eq_formula = pre_order<node>(eq_formula).apply(f, visit_wff<node>, identity);
 	eq_formula = not_equal_to_unequal<node>(eq_formula);
 	std::cout << "Boole_normal_form result: " << tau::get(eq_formula) << "\n";
 	return eq_formula;
