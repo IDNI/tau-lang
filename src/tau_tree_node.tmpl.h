@@ -38,9 +38,9 @@ constexpr node<BAs...> node<BAs...>::ba_constant(
 	// 	<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
 	// LOG_TRACE << " -- node::bitsizes: " << node::nt_bits << "/1/"
 	// 	  << node::ba_bits << "/1/" << node::data_bits;
-	// TODO (HIGH) if type is bv return bitvector...
-	auto n = node(type::bf_constant, constant_id,
-		    true /* is_term */, ba_type_id);
+	auto n = (ba_types<node<BAs...>>::id("bv") == ba_type_id)
+		? node(type::bv_constant, constant_id, true /* is_term */, ba_type_id)
+		: node(type::bf_constant, constant_id, true /* is_term */, ba_type_id);
 	// LOG_TRACE << " -- node::ba_constant result:" << n;
 	return n;
 }
