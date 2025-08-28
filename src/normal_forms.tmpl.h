@@ -3440,153 +3440,6 @@ tref eliminate_quantifiers(tref fm) {
 }
 
 template <NodeType node>
-std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm) {
-	using tau = tree<node>;
-	// Check if single disjunct
-	if (!tau::get(scoped_fm).find_top(is<node, tau::wff_or>))
-		return { wff_remove_existential<node>(q, scoped_fm), true };
-	// Check if all atomic fms are negative or if all are positive
-	// static unordered_tau_set<BAs...> mixed_eqs;
-	static subtree_set<node> mixed_eqs;
-	if (mixed_eqs.contains(scoped_fm)) return { scoped_fm, false };
-	bool all_atm_fm_neq = true, all_atm_fm_eq = true;
-	auto check_atm_fms = [&all_atm_fm_neq, &all_atm_fm_eq, &q](tref n) {
-		if (is<node>(n, tau::bf_eq) && contains<node>(n, q)) {
-			all_atm_fm_neq = false;
-			return all_atm_fm_eq != false;
-		} else if (is<node>(n, tau::bf_neq) && contains<node>(n, q)) {
-			all_atm_fm_eq = false;
-			return all_atm_fm_neq != false;
-		} else if (is<node>(n, tau::wff_ref)) {
-			all_atm_fm_neq = false;
-			all_atm_fm_eq = false;
-			return false;
-		}
-		return true;
-	};
-	pre_order<node>(scoped_fm)
-		.search_unique(check_atm_fms, visit_wff<node>);
-	if (all_atm_fm_neq) {
-		// std::cout << "all atomic fms are negative\n";
-		// All atomic formulas are of the form !=
-		auto elim_quants = [&q](tref n) {
-			if (is_child<node>(n, tau::bf_neq)
-				&& contains<node>(n, q)) return
-					wff_remove_existential<node>(q, n);
-			else return n;
-		};
-		return { pre_order<node>(scoped_fm).apply_unique_until_change(
-			elim_quants, visit_wff<node>), true};
-	} else if (all_atm_fm_eq) {
-		// std::cout << "all atomic fms are positive\n";
-		tref red = reduce_across_bfs<node>(scoped_fm, false);
-		return { wff_remove_existential<node>(q, red), true };
-	}
-	mixed_eqs.insert(scoped_fm);
-	return { scoped_fm, false };
-}
-
-template <NodeType node>
-tref anti_prenex_depriciated(const tref& fm) {
-	using tau = tree<node>;
-	// unordered_tau_set<BAs...> excluded_nodes, quant_vars;
-	subtree_set<node> excluded_nodes, quant_vars;
-	auto anti_prenex_step = [&excluded_nodes](tref n) {
-		if (is_child_quantifier<node>(n)) {
-			// std::cout << "Start anti_prenex_step\n";
-			// Try push quant down
-			auto pushed = push_existential_quantifier_one<node>(n);
-			if (pushed != n) {
-				// std::cout << "Pushed existential one:\n";
-				// std::cout << "From " << n << "\n";
-				// std::cout << "To " << pushed << "\n\n";
-				return pushed;
-			}
-			const auto& t = tau::get(n);
-			tref scoped_fm = t[0].second();
-			tref q_v = t[0].first();
-			// Try apply finalize
-			auto [r, suc] = anti_prenex_finalize_ex<node>(q_v, scoped_fm);
-			if (suc) {
-				// r = reduce_across_bfs(r, false);
-				// std::cout << "Finalized subtree:\n";
-				// std::cout << "From " << n << "\n";
-				// std::cout << "To " << r << "\n\n";
-				for (tref ch : tau::get(r).children())
-					excluded_nodes.insert(ch);
-				return r;
-			}
-
-			// Try bf_reduce_across for now
-			tref res = eliminate_existential_quantifier<node>(n,
-								scoped_fm);
-			for (tref ch : tau::get(res).children())
-				excluded_nodes.insert(ch);
-			return res;
-
-			// Boole decomposition
-			// TODO
-		} else return n;
-	};
-	auto visit = [&excluded_nodes](tref n) {
-		if (is<node>(n, tau::bf)) return false;
-		if (excluded_nodes.contains(n)) return false;
-		return true;
-	};
-	auto inner_quant = [&anti_prenex_step, &visit, &quant_vars](tref n) {
-		if (is_child_quantifier<node>(n)) {
-			// TODO: implement universal quantifier explicitly
-			if (is_child<node>(n, tau::wff_all)) {
-				// std::cout << "Before elimination:\n";
-				// std::cout << n << "\n\n";
-				auto n_neg = push_negation_in<node>(
-					tau::build_wff_neg(n));
-				auto res = pre_order<node>(n_neg)
-				    .template apply_unique<
-					MemorySlotPre::anti_prenex_step_m>(
-						anti_prenex_step, visit);
-				quant_vars.erase(tau::trim2(n));
-				res = push_negation_in<node>(
-					tau::build_wff_neg(res));
-				// std::cout << "After elimination:\n";
-				// std::cout << res << "\n\n";
-				// std::cout << "Simp dnf after elimination:\n";
-				// std::cout << reduce_across_bfs(res, false) << "\n\n";
-				// std::cout << "Simp cnf after elimination:\n";
-				res = reduce_across_bfs<node>(res, true);
-				// std::cout << res << "\n\n";
-				return res;
-			} else {
-				// std::cout << "Before elimination:\n";
-				// std::cout << n << "\n\n";
-				auto res = pre_order<node>(n)
-				    .template apply_unique<
-					MemorySlotPre::anti_prenex_step_m>(
-						anti_prenex_step, visit);
-				quant_vars.erase(tau::trim2(n));
-				// std::cout << "After elimination:\n";
-				// std::cout << res << "\n\n";
-				// std::cout << "Simp dnf after elimination:\n";
-				// std::cout << reduce_across_bfs(res, false) << "\n\n";
-				// std::cout << "Simp cnf after elimination:\n";
-				res = reduce_across_bfs<node>(res, false);
-				// std::cout << res << "\n\n";
-				return res;
-			}
-		} else return n;
-	};
-	auto visit_inner_quant = [&quant_vars](tref n) {
-		if (is_quantifier<node>(n))
-			quant_vars.insert(tau::trim2(n));
-		if (is<node>(n, tau::bf)) return false;
-		return true;
-	};
-	auto nnf = push_negation_in<node>(fm);
-	return post_order<node>(nnf).template apply_unique<
-		MemorySlotPost::anti_prenex_m>(inner_quant, visit_inner_quant);
-}
-
-template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val) {
 	DBG(using tau = tree<node>;)
 	DBG(assert(!is<node>(val, tau::bf));)
@@ -3706,7 +3559,7 @@ struct simplify_using_equality {
 			}
 			return n;
 		};
-		fm = pre_order<node>(to_nnf<node>(fm)).apply_unique_until_change(
+		fm = pre_order<node>(to_nnf<node>(fm)).apply_until_change(
 			f, visit_wff<node>, up);
 		std::cout << "Simplify_using_equality result: " << tau::get(fm) << "\n";
 		return fm;
@@ -4230,7 +4083,7 @@ tref term_boole_decomposition(tref term) {
 		vars.pop_back();
 		return n;
 	};
-	term = pre_order<node>(term).apply_unique(f);
+	term = pre_order<node>(term).apply(f);
 	std::cout << "Term_boole_decomposition result: " << tau::get(term) << "\n";
 	return term;
 }
@@ -4338,7 +4191,7 @@ tref boole_normal_form(tref formula) {
 		atms.pop_back();
 		return n;
 	};
-	eq_formula = pre_order<node>(eq_formula).apply_unique(f, visit_wff<node>);
+	eq_formula = pre_order<node>(eq_formula).apply(f, visit_wff<node>);
 	eq_formula = not_equal_to_unequal<node>(eq_formula);
 	std::cout << "Boole_normal_form result: " << tau::get(eq_formula) << "\n";
 	return eq_formula;
@@ -4371,7 +4224,7 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 	tref var = tau::get(tau::bf, tau::trim2(ex_quant_fm));
 	// Try syntactic simplifications
 	{
-	// TODO: add syntactic path simplification and resolve xor
+	// TODO: add syntactic path simplification and resolve xor in func
 	tref func = tau::trim2(norm_equation<node>(atm));
 	// We use is_boolean_operation to enable the procedure on non-boolean functions
 	tref func_v_0 = rewriter::replace_if<node>(func, var, tau::_0(), is_boolean_operation<node>);
