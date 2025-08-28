@@ -37,5 +37,8 @@ foreach(TEST IN LISTS TESTS)
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
 	target_compile_definitions_if(${N} PUBLIC TAU_LOG_TRACE_TESTS)
 	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
-	set_tests_properties(${N} PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+	set_tests_properties(${N}
+		PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+	    ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$LD_LIBRARY_PATH"
+	)
 endforeach()
