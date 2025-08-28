@@ -56,7 +56,7 @@ tref unsqueeze_wff(const tref& fm) {
 	LOG_TRACE << "unsqueeze_wff: " << LOG_FM(fm);
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::bf_eq) && t[1] == tau::get_0()) {
+		if (t.is(tau::bf_eq) && t[1].equals_0()) {
 			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
 				tref c1 = e.first();
@@ -66,7 +66,7 @@ tref unsqueeze_wff(const tref& fm) {
 					tau::build_bf_eq_0(c2)));
 			}
 		}
-		else if (t.is(tau::bf_neq) && t[1] == tau::get_0()) {
+		else if (t.is(tau::bf_neq) && t[1].equals_0()) {
 			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
 				tref c1 = e.first();
@@ -93,8 +93,8 @@ tref squeeze_wff(const tref& fm) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_and)) {
 			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_eq) && e1[0][1] == tau::get_0()
-				&& e2.child_is(tau::bf_eq) && e2[0][1] == tau::get_0()) {
+			if (e1.child_is(tau::bf_eq) && e1[0][1].equals_0()
+				&& e2.child_is(tau::bf_eq) && e2[0][1].equals_0()) {
 				size_t t_e1 = find_ba_type<node>(e1.get());
 				size_t t_e2 = find_ba_type<node>(e2.get());
 				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
@@ -106,8 +106,8 @@ tref squeeze_wff(const tref& fm) {
 		}
 		else if (t.is(tau::wff_or)) {
 			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_neq) && e1[0][1] == tau::get_0()
-				&& e2.child_is(tau::bf_neq) && e2[0][1] == tau::get_0())
+			if (e1.child_is(tau::bf_neq) && e1[0][1].equals_0()
+				&& e2.child_is(tau::bf_neq) && e2[0][1].equals_0())
 			{
 				size_t t_e1 = find_ba_type<node>(e1.get());
 				size_t t_e2 = find_ba_type<node>(e2.get());
@@ -132,7 +132,7 @@ tref unsqueeze_wff_pos(tref fm) {
 	LOG_TRACE << "unsqueeze_wff_pos: " << LOG_FM(fm);
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::bf_eq) && t[1] == tau::get_0()) {
+		if (t.is(tau::bf_eq) && t[1].equals_0()) {
 			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
 				const auto& c1 = e.first(), c2 = e.second();
@@ -158,7 +158,7 @@ tref squeeze_wff_pos(tref fm) {
 		if (t.is(tau::wff_and)) {
 			const auto& e1 = t[0], e2 = t[1];
 			if (e1.child_is(tau::bf_eq) && e2.child_is(tau::bf_eq)
-				&& e1[0][1] == tau::get_0() && e2[0][1] == tau::get_0()) {
+				&& e1[0][1].equals_0() && e2[0][1].equals_0()) {
 				size_t t_e1 = find_ba_type<node>(e1.get());
 				size_t t_e2 = find_ba_type<node>(e2.get());
 				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
@@ -181,7 +181,7 @@ tref unsqueeze_wff_neg(tref fm) {
 	LOG_TRACE << "unsqueeze_wff_neg: " << LOG_FM(fm);
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::bf_neq) && t[1] == tau::get_0()) {
+		if (t.is(tau::bf_neq) && t[1].equals_0()) {
 			const auto& e = t[0][0];
 			if (e.is(tau::bf_or)) {
 				const auto& c1 = e.first(), c2 = e.second();
@@ -207,8 +207,8 @@ tref squeeze_wff_neg(tref fm) {
 		if (t.is(tau::wff_or)) {
 			const auto& e1 = t[0], e2 = t[1];
 			if (e1.child_is(tau::bf_neq) && e2.child_is(tau::bf_neq)
-				&& e1[0][1] == tau::get_0()
-				&& e2[0][1] == tau::get_0()) {
+				&& e1[0][1].equals_0()
+				&& e2[0][1].equals_0()) {
 				size_t t_e1 = find_ba_type<node>(e1.get());
 				size_t t_e2 = find_ba_type<node>(e2.get());
 				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
