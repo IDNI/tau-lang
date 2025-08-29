@@ -548,12 +548,6 @@ template <NodeType node>
 tref eliminate_quantifiers(tref fm);
 
 template <NodeType node>
-std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm);
-
-template <NodeType node>
-tref anti_prenex_depriciated(const tref& fm);
-
-template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val);
 
 template <NodeType node>
