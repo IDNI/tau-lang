@@ -640,31 +640,28 @@ tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	rr<node> nso_rr = opt_nso_rr.value();
 	const auto& main = tau::get(nso_rr.main);
 	if (main.is(tau::bf)) return invalid_argument();
-	tref normalized_fm = normalizer<node>(nso_rr);
-	return is_tau_impl<node>(tau::_T(), normalized_fm) ? tau::_T() : tau::_F();
+	tref normalized = normalizer<node>(nso_rr);
+	return is_tau_impl<node>(tau::_T(), normalized) ? tau::_T() : tau::_F();
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	tref arg = n[1].get();
-	if (!n.value_tree().find_top(is<node, tau::bf>))
-		return is_bv_formula_sat<node>(arg) ? tau::_T() : tau::_F();
 	auto opt_nso_rr = get_nso_rr_with_defs(arg);
 	if (!opt_nso_rr || !opt_nso_rr.value().main) return invalid_argument();
 	rr<node> nso_rr = opt_nso_rr.value();
 	const auto& main = tau::get(nso_rr.main);
 	if (main.is(tau::bf)) return invalid_argument();
-	tref normalized_fm = normalizer<node>(nso_rr);
-	return is_tau_formula_sat<node>(normalized_fm, 0, true)
+	tref normalized = normalizer<node>(nso_rr);
+	return is_tau_formula_sat<node>(normalized, 0, true)
 		? tau::_T()	: tau::_F();
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
-	return tau::get(sat_cmd(n)).equals_F() ? tau::_T()
-						    : tau::_F();
+	return tau::get(sat_cmd(n)).equals_F() ? tau::_T() : tau::_F();
 }
 
 template <typename... BAs>
