@@ -943,7 +943,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		return tau::_F();
 	}
 
-	chi_inf=transform_back_non_initials<node>(chi_inf, point_after_inits-1);
+	chi_inf = transform_back_non_initials<node>(chi_inf, point_after_inits-1);
 	io_vars = tau::get(chi_inf).select_top(is_child<node, tau::io_var>);
 	auto chi_inf_anchored = fm_at_time_point<node>(chi_inf, io_vars,
 				std::max(point_after_inits, time_point));

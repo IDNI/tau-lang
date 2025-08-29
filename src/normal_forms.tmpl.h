@@ -3526,50 +3526,85 @@ struct simplify_using_equality {
 			// TODO: maybe use free_vars instead of node_count?
 			return node_count<node>(l) <= node_count<node>(r);
 		};
+		fm = to_nnf<node>(fm);
 		std::cout << "Simplify_using_equality on " << tau::get(fm) << "\n";
 		// Create union find data structure to hold equality information
 		auto uf = union_find<decltype(tau_comp), node>(tau_comp);
 		// Create stack of union find data structures
 		std::vector<union_find<decltype(tau_comp), node>> uf_stack {uf};
-
+		// We need to mark disjunctions that do not cause a push to the
+		// stack, in order to make sure they are not popped later
+		subtree_unordered_set<node> mark;
 		// Traverse the formula: on encounter of = or !=, first apply simplification and, if equality, add it
-		// TODO: xor
-		auto f = [&uf_stack](tref n, tref parent) {
-			if (parent != nullptr && is<node>(parent, tau::wff_or) &&
-				!is_child<node>(n, tau::wff_or)) {
-				// Push new uf to stack
-				uf_stack.push_back(uf_stack.back());
+		auto f = [&uf_stack, &mark](tref n, tref parent) {
+			if (!is<node>(n, tau::wff)) return n;
+			const tau& cn = tau::get(n)[0];
+			if (parent != nullptr && is<node>(parent, tau::wff_or)) {
+				if (!cn.is(tau::wff_or)) {
+					// Push new uf to stack
+					uf_stack.push_back(uf_stack.back());
+				} else mark.insert(parent);
 			}
-			if (is_child<node>(n, tau::bf_eq)) {
-				auto s = simplify_equation(uf_stack.back(), n);
+			if (cn.is(tau::bf_eq)) {
+				n = syntactic_atomic_formula_simplification<node>(n);
+				tref s = simplify_equation(uf_stack.back(), n);
 				// If equation was simplified away
 				if (!is_child<node>(s, tau::bf_eq)) return s;
 				if (add_equality(uf_stack.back(), s)) return s;
 				else return _F<node>();
-			} else if (is_child<node>(n, tau::bf_neq)) {
+			} else if (cn.is(tau::bf_neq)) {
+				n = syntactic_atomic_formula_simplification<node>(n);
 				return simplify_equation(uf_stack.back(), n);
+			} else if (cn.is(tau::wff_and)) {
+				// We need to reorder all conjunctions in order
+				// to correctly collect all equalities
+				trefs conjs = get_cnf_wff_clauses<node>(n);
+				size_t end = conjs.size() - 1;
+				for (size_t i = 0; i < end; ++i) {
+					const tau& c = tau::get(conjs[i])[0];
+					if (c.is(tau::wff_or)) {
+						conjs.push_back(conjs[i]);
+						conjs.erase(conjs.begin() + i);
+						--end;
+						--i;
+					}
+				}
+				n = conjs[0];
+				for (size_t i = 1; i < conjs.size(); ++i)
+					n = tau::build_wff_and(n, conjs[i]);
+				return n;
 			} else return n;
 		};
-		// TODO: simplify equations on way up after all equalities have been collected
-		// TODO: xor
-		auto up = [&uf_stack](tref n, tref parent) {
-			if (parent != nullptr && is<node>(parent, tau::wff_or) &&
-				!is_child<node>(n, tau::wff_or)) {
-				uf_stack.pop_back();
+		auto up = [&uf_stack, &mark](tref n, tref parent) {
+			if (!is<node>(n, tau::wff)) return n;
+			if (parent != nullptr && is<node>(parent, tau::wff_or)) {
+				if (!is_child<node>(n, tau::wff_or)) {
+					// If parent was marked, child was a disjunction
+					// before and nothing was pushed on stack
+					if (auto it = mark.find(parent); it != mark.end()) {
+						mark.erase(it);
+					} else uf_stack.pop_back();
+				} else {
+					// Encounter of disjunction below disjunction
+					// If not marked, this happened due to simplification
+					// and we can safely pop
+					if (auto it = mark.find(parent); it == mark.end())
+						uf_stack.pop_back();
+					else mark.erase(it);
+				}
 			}
 			return n;
 		};
-		fm = pre_order<node>(to_nnf<node>(fm)).apply_until_change(
-			f, visit_wff<node>, up);
+		fm = pre_order<node>(fm).apply(f, visit_wff<node>, up);
 		std::cout << "Simplify_using_equality result: " << tau::get(fm) << "\n";
+		// In DEBUG make sure that push and pop on stack is correct
+		DBG(assert(uf_stack.size() == 1);)
 		return fm;
 	}
 
 	// Given an equality, add it to the given union find data structure
 	// Returns false, if a resulting equality set contains a contradiction
-	// TODO: canonical order on eq
-	// TODO: split disjunctions
-	static bool add_equality (auto& uf, tref eq) {
+	static bool add_raw_equality (auto& uf, tref eq) {
 		// We both add a = b and a' = b' in order to detect syntactic contradictions
 		tref left_hand_side = tau::trim2(eq);
 		tref right_hand_side = tau::get(tau::trim(eq)).child(1);
@@ -3590,7 +3625,17 @@ struct simplify_using_equality {
 					&& !uf.connected(_0<node>(), _1<node>());
 	}
 
-	// TODO: Artificially check dnf clauses of terms instead of just eq ordered in the same way as when adding equality
+	// In case eq is of form f = 0, unsqueeze disjunctions in f
+	static bool add_equality(auto& uf, tref eq) {
+		if (const tau& c = tau::get(eq)[0]; c[1].equals_0()) {
+			tref func = push_negation_in<node, false>(c.first());
+			bool valid = true;
+			for (tref d : get_dnf_bf_clauses<node>(func))
+				valid = valid && add_raw_equality(uf, tau::build_bf_eq_0(d));
+			return valid;
+		} else return add_raw_equality(uf, eq);
+	}
+
 	// Given current equalities in union find, simplify the equation
 	static tref simplify_equation (auto& uf, tref eq) {
 		// For each node, check if contained in uf -> if yes, replace
@@ -3625,8 +3670,8 @@ class syntactic_path_simplification {
 			// Skip intermediate nodes
 			if (!tau::get(n).is(tau::wff)) return n;
 			const tau& t_n = tau::get(n)[0];
-			// Skip or and xor
-			if (t_n.is(tau::wff_or) || t_n.is(tau::wff_xor))
+			// Skip or
+			if (t_n.is(tau::wff_or))
 				return n;
 			// If no conjunction is found, no simplification is possible
 			if (!t_n.is(tau::wff_and)) return n;
@@ -3634,8 +3679,6 @@ class syntactic_path_simplification {
 			// Get all conjuncted assumptions
 			for (tref l : get_cnf_wff_clauses<node>(n)) {
 				if (tau::get(l).child_is(tau::wff_or))
-					continue;
-				if (tau::get(l).child_is(tau::wff_xor))
 					continue;
 				// Treat subtree l as variable
 				if (tau::get(l).child_is(tau::wff_neg))
@@ -3951,7 +3994,7 @@ template<NodeType node>
 tref squeeze_absorb_down(tref formula, tref var) {
 	using tau = tree<node>;
 	trefs assms { tau::_0() };
-	//TODO xor
+	//TODO: Case where leave simplifies parent and push and pop dont match
 	auto f = [&assms, &var](tref n, tref parent) {
 		if (!tau::get(n).is(tau::wff)) return n;
 		if (parent != nullptr && is<node>(parent, tau::wff_or) &&
@@ -4004,7 +4047,6 @@ tref squeeze_absorb_down(tref formula, tref var) {
 		}
 		return n;
 	};
-	//TODO xor
 	auto up = [&assms](tref n, tref parent) {
 		if (parent != nullptr && is<node>(parent, tau::wff_or) &&
 			!is_child<node>(n, tau::wff_or))
@@ -4136,8 +4178,6 @@ tref boole_normal_form(tref formula) {
 	auto simp_eqs = [](tref n) {
 		if (tau::get(n).child_is(tau::bf_eq)) {
 			// TODO: To reduced DNF/CNF instead of BDD
-			// Simplify
-			n = syntactic_atomic_formula_simplification<node>(n);
 			if (tau::get(n).equals_T() || tau::get(n).equals_F())
 				return n;
 			tref c1 = tau::get(n)[0].first();
@@ -4147,8 +4187,6 @@ tref boole_normal_form(tref formula) {
 			c2 = term_boole_decomposition<node>(c2);
 			return tau::build_bf_eq(c1, c2);
 		} else if (tau::get(n).child_is(tau::bf_neq)) {
-			// Simplify
-			n = syntactic_atomic_formula_simplification<node>(n);
 			if (tau::get(n).equals_T() || tau::get(n).equals_F())
 				return n;
 			tref c1 = tau::get(n)[0].first();
@@ -4200,6 +4238,7 @@ tref boole_normal_form(tref formula) {
 	return eq_formula;
 }
 
+// TODO: maybe syntactic path simp?
 template<NodeType node>
 tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 	using tau = tree<node>;
