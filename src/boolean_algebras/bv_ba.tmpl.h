@@ -240,7 +240,8 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 			DBG(assert(std::holds_alternative<bv>(cte));)
 			return std::optional<bv>(std::get<bv>(cte));
 		}
-		default: return std::nullopt;
+		default:
+			return std::nullopt;
 	}
 }
 
