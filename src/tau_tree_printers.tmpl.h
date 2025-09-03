@@ -237,6 +237,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	size_t depth = 0;
 	std::unordered_set<tref> wraps, indented, highlighted;
 	char last_written_char = 0;
+	bool pending_bf_and_op = false;
 	typename node::type last_quant_nt = nul;
 	std::unordered_map<tref, size_t> chpos; // child positions if tracked
 
@@ -448,10 +449,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (parent && is_to_wrap(t.first_tree()
 					.get_type(), pnt))
 				{
+					if (pending_bf_and_op) out("&");
 					wraps.insert(ref), out("(");
 					if (static_cast<node::type>(nt) == wff)
 							depth++, break_line();
 				}
+				if (pending_bf_and_op) pending_bf_and_op = false;
 				break;
 
 			case wff_all:
@@ -542,6 +545,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (isdigit(last_written_char)
 					|| t.child_is(tau::bf_constant))
 						out(" ");
+				else if (isalpha(last_written_char))
+					pending_bf_and_op = true;
 				break;
 			case bf_or:             out("|"); break;
 			case bf_xor:            out("+"); break;
