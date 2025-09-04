@@ -1102,8 +1102,8 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 template <NodeType node>
 bool is_tau_impl(tref f1, tref f2) {
 	using tau = tree<node>;
-	auto f1_norm = normalizer_step<node>(f1);
-	auto f2_norm = normalizer_step<node>(f2);
+	auto f1_norm = normalize<node>(f1);
+	auto f2_norm = normalize<node>(f2);
 	auto imp_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_imply(f1_norm, f2_norm)));
 	// TODO: If formula is non-temporal
@@ -1121,8 +1121,8 @@ template <NodeType node>
 bool are_tau_equivalent(tref f1, tref f2) {
 	using tau = tree<node>;
 	// Negate equivalence for unsat check
-	tref f1_norm = normalizer_step<node>(f1);
-	tref f2_norm = normalizer_step<node>(f2);
+	tref f1_norm = normalize<node>(f1);
+	tref f2_norm = normalize<node>(f2);
 	tref equiv_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_equiv(f1_norm, f2_norm)));
 	// TODO: If formula is non-temporal

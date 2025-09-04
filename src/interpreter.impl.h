@@ -816,7 +816,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 		} else new_spec_pointwise = new_spec;
 
 		if (spec_sometimes.empty())
-			return normalizer_step<node>(new_spec_pointwise);
+			return normalize<node>(new_spec_pointwise);
 		// Now try to add sometimes part of old spec
 		tref new_spec_pointwise_sometimes =
 			build_wff_and<node>(new_spec_pointwise,
@@ -825,7 +825,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 		LOG_TRACE << "pwr/new_spec_pointwise_sometimes: "
 			<< LOG_FM(new_spec_pointwise_sometimes) << "\n";
 		if (!is_tau_formula_sat<node>(new_spec_pointwise_sometimes, start_time))
-			return normalizer_step<node>(new_spec_pointwise);
+			return normalize<node>(new_spec_pointwise);
 
 		return normalize_with_temp_simp<node>(new_spec_pointwise_sometimes);
 	}
