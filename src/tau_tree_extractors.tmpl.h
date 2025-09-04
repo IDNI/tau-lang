@@ -487,8 +487,8 @@ template <NodeType node>
 bool has_temp_var(tref fm) {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
-	trefs io_vars = t.select_top(is<node, tau::io_var>);
-	if (io_vars.empty())
+	tref io_vars = t.find_top(is<node, tau::io_var>);
+	if (io_vars == nullptr)
 		return t.find_top(is<node, tau::constraint>) != nullptr;
 	// any input/output stream is a temporal variable, also constant positions
 	else return true;

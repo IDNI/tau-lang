@@ -595,6 +595,9 @@ tref treat_ex_quantified_clause(tref ex_formula);
 template <NodeType node>
 tref anti_prenex(tref formula);
 
+template <NodeType node, bool normalize_scopes = true>
+tref normalize_temporal_quantifiers(tref fm);
+
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
 // We implicitly transformed into BDD form and compute one step of the SNF transformation.
 template <NodeType node>

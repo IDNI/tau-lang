@@ -291,6 +291,7 @@ bool is_run_satisfiable(tref fm) {
 	if (t.equals_T()) return true;
 
 	const trefs& free_io_vars = t.get_free_vars();
+	// TODO: filter free_io_vars instead of searching whole formula again
 	trefs io_vars = t.select_top(is_child<node, tau::io_var>);
 	sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
 
@@ -889,6 +890,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	// which corresponds to checking the sometimes statement up to time point
 	// of the highest initial condition + 1
 	const int_t s = start_time + time_point;
+	// TODO: flag_boundary is upper bound, improve!
 	const int_t flag_boundary =
 		std::max(time_point + point_after_inits, s + time_point + 1) + 1;
 	for (int_t i = s; i <= flag_boundary; ++i) {
@@ -1081,6 +1083,7 @@ template <NodeType node>
 bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	using tau = tree<node>;
 	LOG_DEBUG << "Start is_tau_formula_sat: " << LOG_FM(fm);
+	// TODO: If formula is non-temporal
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
 	trefs clauses = get_leaves<node>(normalized_fm, tau::wff_or);
 	// Convert each disjunct to unbounded continuation
@@ -1103,6 +1106,7 @@ bool is_tau_impl(tref f1, tref f2) {
 	auto f2_norm = normalizer_step<node>(f2);
 	auto imp_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_imply(f1_norm, f2_norm)));
+	// TODO: If formula is non-temporal
 	auto clauses = get_dnf_wff_clauses<node>(imp_check);
 	// Now check that each disjunct is not satisfiable
 	for (tref c : clauses) {
@@ -1117,11 +1121,12 @@ template <NodeType node>
 bool are_tau_equivalent(tref f1, tref f2) {
 	using tau = tree<node>;
 	// Negate equivalence for unsat check
-	auto f1_norm = normalizer_step<node>(f1);
-	auto f2_norm = normalizer_step<node>(f2);
-	auto equiv_check = normalize_with_temp_simp<node>(
+	tref f1_norm = normalizer_step<node>(f1);
+	tref f2_norm = normalizer_step<node>(f2);
+	tref equiv_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_equiv(f1_norm, f2_norm)));
-	auto clauses = get_dnf_wff_clauses<node>(equiv_check);
+	// TODO: If formula is non-temporal
+	trefs clauses = get_dnf_wff_clauses<node>(equiv_check);
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
 		auto ctn = transform_to_execution<node>(c);
@@ -1137,13 +1142,14 @@ tref simp_tau_unsat_valid(tref fm, const int_t start_time, const bool output) {
 	// Check if formula is valid
 	if (is_tau_impl<node>(tau::_T(), fm)) return tau::_T();
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
+	// TODO: If formula is non-temporal
 	trefs clauses = get_leaves<node>(normalized_fm, tau::wff_or);
 
 	// Check satisfiability of each clause
 	for (tref& clause: clauses) if (tau::get(transform_to_execution<node>(
-		clause, start_time, output)).equals_F()) clause =tau::_F();
+		clause, start_time, output)).equals_F()) clause = tau::_F();
 
-	auto res = tau::build_wff_or(clauses);
+	tref res = tau::build_wff_or(clauses);
 	LOG_DEBUG << "End simp_tau_unsat_valid: " << LOG_FM(res);
 	return res;
 }
