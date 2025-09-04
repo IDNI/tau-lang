@@ -17,16 +17,11 @@ tref normalizer_step(tref form) {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-	form = norm_all_equations<node>(form);
-	form = apply_all_xor_def<node>(form);
 	tref result = tt(form)
 		// Push all quantifiers in and eliminate them
-		| tt::f(eliminate_quantifiers<node>)
-		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
-		// are reduced
-		| bf_reduce_canonical<node>()
-		// Normalize always and sometimes quantifiers and reduce Tau formula
-		| sometimes_always_normalization<node>()
+		| tt::f(anti_prenex<node>)
+		// Normalize always and sometimes quantifiers and normalize Tau formula
+		| tt::f(normalize_temporal_quantifiers<node>)
 		| tt::ref;
 #ifdef TAU_CACHE
 	cache.emplace(form, result);
@@ -45,16 +40,11 @@ tref normalize_non_temp(tref fm) {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-	fm = norm_all_equations<node>(fm);
-	fm = apply_all_xor_def<node>(fm);
 	tref result = tt(fm)
-		// Push all quantifiers in and eliminate them
-		| tt::f(eliminate_quantifiers<node>)
-		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
-		// are reduced
-		| bf_reduce_canonical<node>()
+		// Push all quantifiers in, eliminate them and normalize result
+		| tt::f(anti_prenex<node>)
+		| tt::f(boole_normal_form<node>)
 		| tt::ref;
-	result = reduce_across_bfs<node>(result, false);
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
@@ -169,7 +159,6 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	const auto& fm = tau::get(n);
 	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
 	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
-
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
