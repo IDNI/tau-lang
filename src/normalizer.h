@@ -18,7 +18,7 @@ namespace idni::tau_lang {
 using offset_t = std::pair<tau_parser::nonterminal, size_t>;
 
 template <NodeType node>
-tref normalizer_step(tref form);
+tref normalize(tref form);
 
 template <NodeType node>
 tref normalize_non_temp(tref fm);

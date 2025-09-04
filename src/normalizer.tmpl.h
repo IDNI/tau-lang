@@ -9,7 +9,7 @@ namespace idni::tau_lang {
 
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template <NodeType node>
-tref normalizer_step(tref form) {
+tref normalize(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 #ifdef TAU_CACHE
@@ -345,7 +345,7 @@ tref normalize_with_temp_simp(tref fm) {
 			|| t.child_is(tau::wff_always)) return t[0].first();
 		return n;
 	};
-	fm = normalizer_step<node>(fm);
+	fm = normalize<node>(fm);
 	// Apply present function/predicate definitions
 	bool changed;
 	do {
@@ -354,7 +354,7 @@ tref normalize_with_temp_simp(tref fm) {
 		if (tau::get(fm).find_top(is<node, tau::ref>)) {
 			tref resolved_red_fm = apply_defs_to_spec<node>(fm);
 			if (tau::get(resolved_red_fm) != tau::get(fm)) {
-				fm = normalizer_step<node>(resolved_red_fm);
+				fm = normalize<node>(resolved_red_fm);
 				changed = true;
 			}
 		}
@@ -715,7 +715,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 		LOG_DEBUG << "current: " << LOG_FM(current);
 
 		LOG_DEBUG << "Normalize step";
-		current = nt == tau::wff ? normalizer_step<node>(current)
+		current = nt == tau::wff ? normalize<node>(current)
 					 : bf_reduced_dnf<node>(current);
 		LOG_DEBUG << "Normalized step";
 		LOG_DEBUG << "current: " << LOG_FM(current);
