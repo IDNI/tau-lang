@@ -575,16 +575,13 @@ template <NodeType node>
 tref term_boole_decomposition(tref term, tref var);
 
 template <NodeType node>
-tref term_boole_decomposition(tref term, tref var, auto& pool);
+tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx);
 
 template <NodeType node>
 tref term_boole_decomposition(tref term);
 
 template <NodeType node>
-tref boole_decomposition(tref formula, tref atm, auto& pool);
-
-template <NodeType node>
-tref boole_decomposition(tref formula, tref atm);
+tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx);
 
 template <NodeType node>
 tref boole_normal_form(tref formula);
