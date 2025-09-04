@@ -905,15 +905,14 @@ template <NodeType node, typename in_t, typename out_t>
 trefs interpreter<node, in_t, out_t>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
-		auto step_ubt_ctn = get_ubt_ctn_at(t);
+		tref step_ubt_ctn = update_to_time_point(
+			t < (int_t)formula_time_point ? formula_time_point : t);
 		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
-		step_ubt_ctn = normalizer<node>(step_ubt_ctn);
+		// We only apply a heuristic in order to decide if the variable still appears
+		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
 		// Try to find var in step_ubt_ctn
 		for (tref v : vars) {
-			const auto has_var = [&v](tref n) {
-				return tau::subtree_equals(n, v);
-			};
-			if (tau::get(step_ubt_ctn).find_top(has_var))
+			if (contains<node>(step_ubt_ctn, v))
 				if (std::ranges::find_if(
 					appeared, [&v](const auto& n) {
 						return tau::get(n) == tau::get(v);
