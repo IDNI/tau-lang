@@ -3,134 +3,98 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <ranges>
+#include <limits.h>
 
 #include "tau_tree.h"
+#include "union_find.h"
 
 namespace idni::tau_lang {
 
+template<typename data_t, typename kind_t>
 struct resolver {
+	using scope_t = size_t;
+	using element_t = std::pair<scope_t, data_t>;
+	using kinds_t = std::map<element_t, kind_t>;
+	using union_find_t = union_find<element_t, std::less<element_t>>;
+	using resolver_t = resolver<data_t, kind_t>;
 
-	struct scope {
-		std::shared_ptr<scope> parent;
-		std::map<tref, size_t> vars;
+	union_find_t uf;
+	scope_t current = 0;
+	std::deque<size_t> scopes { current };
+	std::map<element_t, kind_t> kinds_;
+	data_t minimum;
+	kind_t unknown;
 
-		scope open() {
-			return scope{
-				.parent = std::make_shared<scope>(*this),
-				.vars = vars };
-		}
+	resolver(const data_t& minimum, const kind_t& unknown):
+		minimum(minimum), unknown(unknown) {}
 
-		scope close() {
-			if (parent) {
-				parent->vars.insert(vars.begin(), vars.end());
-				return *parent;
-			}
-			return *this;
-		}
-	};
-
-	void open() {
-		current = current.open();
-	}
-
-	void open(const tref& var) {
-		open();
-		current.vars.erase(var);
-		add(var);
-	}
-
-	void open(const tref& var, const tref& var_type) {
-		open(var);
-		type(var, var_type);
+	void open(const std::map<data_t, kind_t>& kinds) {
+		scopes.push_back(++current);
+		for (const auto& [data, kind] : kinds)
+			kinds_.emplace({current, data}, kind);
 	}
 
 	void close() {
-		current = current.close();
+		if (scopes.size() == 1) return;
+		kinds_.erase(
+			kinds_.lower_bound({current, minimum}),
+			kinds_.end());
+		scopes.pop_back();
+		current = scopes.back();
 	}
 
-	void close(const tref& var) {
-		current.vars.erase(var);
-		close();
+	void insert(const data_t& data) {
+		static size_t global = 0;
+		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+			if (uf.contains(element_t{*it, data})) return;
+		uf.insert({global, data});
+		kinds_.emplace(element_t{global, data}, unknown);
 	}
 
-	size_t add(const tref& var) {
-		if (current.vars.find(var) == current.vars.end()) {
-			size_t idx = parent.size();
-			parent.push_back(idx);
-			rank.push_back(0);
-			current.vars[var] = idx;
-		}
-		return current.vars[var];
+	kind_t type_of(const data_t& data) {
+		return kinds_[uf.root({current, data})];
+/*		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+			if (uf.contains({*it, data}))
+				return kinds_.find(uf.root({*it, data}))->second;
+		return unknown;*/
 	}
 
-	size_t add(const tref& var, const tref& var_type) {
-		auto idx = add(var);
-		type(var, var_type);
-		return idx;
+	kind_t type_of(const element_t& element) {
+		return type_of(element.second);
 	}
 
-	size_t find(const size_t idx) {
-		if (parent[idx] != idx) {
-			parent[idx] = find(parent[idx]);
-		}
-		return parent[idx];
+	bool merge(const data_t& data1, const data_t& data2) {
+		auto kind1 = type_of(data1);
+		auto kind2 = type_of(data2);
+		if (kind1 != unknown && kind2 != unknown && kind1 != kind2)
+			return false;
+		auto kind = (kind1 == unknown) ? kind2 : kind1;
+		uf.merge({current, data1}, {current, data2});
+		return kinds_.emplace(uf.root({current, data1}), kind), true;
 	}
 
-	size_t find(const tref& var) {
-		auto idx = current.vars.at(var);
-		return find(idx);
+	bool same_kind(const data_t& data1, const data_t& data2) {
+		return type_of(data1) == type_of(data2);
 	}
 
-	void type(const tref& var, const tref& type) {
-		types[find(var)] = type;
+	bool assign(const data_t& data, const kind_t& kind) {
+		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+			if (auto uf_it = uf.find({*it, data}); uf_it != uf.end())
+				return kinds_.emplace(uf.root({*it, data}), kind), true;
+		return false;
 	}
 
-	tref type_of(const tref& var) {
-		auto it = types.find(find(var));
-		if (it != types.end()) {
-			return it->second;
-		}
-		return std::nullptr_t{};
+	std::map<data_t, kind_t> kinds() {
+		std::map<data_t, kind_t> result ;
+		// Note that we will overwrite the kind of a data if it appears in
+		// multiple scopes, keeping only the inner one.
+		for (auto it = kinds_.lower_bound({current, minimum}); it != kinds_.end(); ++it)
+			result[it->first.second] = type_of(it->first.second);
+		return result;
 	}
-
-	void unite(const tref& var1, const tref& var2) {
-		size_t root1 = find(var1);
-		size_t root2 = find(var2);
-		if (root1 != root2) {
-			if (rank[root1] < rank[root2]) {
-				parent[root1] = root2;
-			} else if (rank[root1] > rank[root2]) {
-				parent[root2] = root1;
-			} else {
-				parent[root2] = root1;
-				++rank[root1];
-			}
-		}
-	}
-
-	bool connected(const tref& var1, const tref& var2) {
-		return find(var1) == find(var2);
-	}
-
-	std::pair<std::map<tref, tref>, std::set<tref>> status() {
-		std::map<tref, tref> typed;
-		std::set<tref> untyped;
-
-		for (const auto& [var, idx] : current.vars) {
-			if (auto type = type_of(var); type) {
-				typed[var] = type;
-			} else {
-				untyped.insert(var);
-			}
-		}
-
-		return {std::move(typed), std::move(untyped)};
-	}
-
-	std::vector<size_t> parent;
-	std::vector<size_t> rank;
-	std::map<size_t, tref> types;
-	scope current;
 };
 
+template<NodeType node>
+using type_resolver = resolver<node, typename std::string>;
 } // namespace idni::tau_lang
