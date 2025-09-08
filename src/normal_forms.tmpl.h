@@ -3564,9 +3564,9 @@ struct simplify_using_equality {
 			return node_count<node>(l) <= node_count<node>(r);
 		};
 		// Create union find data structure to hold equality information
-		auto uf = union_find<tref, subtree_map<node, tref>, decltype(tau_comp)>(tau_comp);
+		auto uf = union_find<tref, decltype(tau_comp)>(tau_comp);
 		// Create stack of union find data structures
-		std::vector<union_find<tref, subtree_map<node, tref>, decltype(tau_comp)>> uf_stack {uf};
+		std::vector<union_find<tref, decltype(tau_comp)>> uf_stack {uf};
 
 		// Traverse the formula: on encounter of = or !=, first apply simplification and, if equality, add it
 		auto f = [&uf_stack](tref n, tref parent) {

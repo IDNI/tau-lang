@@ -7,230 +7,72 @@
 
 TEST_SUITE("resolver") {
     TEST_CASE("empty resolver") {
-		resolver r;
-		// current vars map is empty
-		CHECK(r.current.vars.empty());
-		// no parent scope
-		CHECK(r.current.parent == nullptr);
-		// all data is empty
-		CHECK(r.parent.empty());
-		CHECK(r.rank.empty());
-		CHECK(r.types.empty());
-		// status return empty
-		CHECK(r.status().first.empty());
-		CHECK(r.status().second.empty());
+		resolver<tref, size_t> r(0, 0);
+		// current kinds map is empty
+		CHECK(r.kinds().size() == 0);
 	}
 
-    TEST_CASE("resolver with one untyped variable") {
-		resolver r;
-		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
-		r.add(x);
-		// current vars map has one element...
-		CHECK(r.current.vars.size() == 1);
-		// ...which is x
-		CHECK(r.current.vars[x] == 0);
-		// x is untyped
-		CHECK(r.type_of(x) == nullptr);
-		// all data has one element except types...
-		// ...which correspond to x
-		CHECK(r.parent.size() == 1);
-		CHECK(r.rank.size() == 1);
-		CHECK(r.types.size() == 0);
-		// status return an untyped variable
-		CHECK(r.status().first.empty());
-		CHECK(r.status().second.size() == 1);
+    TEST_CASE("resolver with one unknown data") {
+		resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		r.insert(x);
+		CHECK(r.assign(x, 0));
+		CHECK(r.type_of(x) == r.unknown);
+		CHECK(r.kinds().size() == 1);
+		CHECK(r.kinds().at(x) == r.unknown);
 	}
 
-    TEST_CASE("resolver with one typed variable") {
-		resolver r;
-		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
-		// we just need a fake type to check everything
-		auto type = tree<node_t>::build_var_name("bool");
-		r.add(x);
-		r.type(x, type);
-		// current vars map has one element...
-		CHECK(r.current.vars.size() == 1);
-		// ...which is x
-		CHECK(r.current.vars[x] == 0);
-		// x is typed
+    TEST_CASE("resolver with one kinded data") {
+		resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		size_t type = 1;
+		r.insert(x);
+		CHECK(r.assign(x, type));
 		CHECK(r.type_of(x) == type);
-		// all data has one element...
-		// ...which correspond to x
-		CHECK(r.parent.size() == 1);
-		CHECK(r.rank.size() == 1);
-		CHECK(r.types.size() == 1);
-		// status return an untyped variable
-		CHECK(r.status().first.size() == 1);
-		CHECK(r.status().second.size() == 0);
+		CHECK(r.kinds().size() == 1);
+		CHECK(r.kinds().at(x) == type);
 	}
 
     TEST_CASE("resolver with two untyped variable") {
-		resolver r;
-		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
-		auto y = tree<node_t>::build_variable("y", ba_types<node_t>::id("bool"));
-		r.add(x);
-		r.add(y);
-		// current vars map has two elements...
-		CHECK(r.current.vars.size() == 2);
-		// ...which are x and y
-		CHECK(r.current.vars[x] == 0);
-		CHECK(r.current.vars[y] == 1);
-		// x and y are untyped
-		CHECK(r.type_of(x) == nullptr);
-		CHECK(r.type_of(y) == nullptr);
-		// all data has two elements except types...
-		// ...which correspond to x and y
-		CHECK(r.parent.size() == 2);
-		CHECK(r.rank.size() == 2);
-		CHECK(r.types.size() == 0);
-		// status return untyped variables
-		CHECK(r.status().first.empty());
-		CHECK(r.status().second.size() == 2);
-		CHECK(r.status().second.count(x) == 1);
-		CHECK(r.status().second.count(y) == 1);
+		resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		size_t y = 1;
+		r.insert(x);
+		r.insert(y);
+		CHECK(r.type_of(x) == r.unknown);
+		CHECK(r.type_of(y) == r.unknown);
+		CHECK(r.kinds().size() == 2);
+		CHECK(r.kinds().at(x) == r.unknown);
+		CHECK(r.kinds().at(y) == r.unknown);
 	}
 
-    TEST_CASE("resolver with two variables, one typed and the other one connected") {
-		resolver r;
-		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
-		auto y = tree<node_t>::build_variable("y", ba_types<node_t>::id("bool"));
-		auto type = tree<node_t>::build_var_name("bool");
-		r.add(x);
-		r.add(y);
-		r.type(x, type);
-		r.unite(x, y);
-		// current vars map has two elements...
-		CHECK(r.current.vars.size() == 2);
-		// ...which are x and y
-		CHECK(r.current.vars[x] == 0);
-		CHECK(r.current.vars[y] == 1);
-		// both are typed
-		CHECK(r.type_of(x) == type);
-		CHECK(r.type_of(y) == type);
-		// all data has two elements except types...
-		// ...which correspond to x and y
-		CHECK(r.parent.size() == 2);
-		CHECK(r.rank.size() == 2);
-		CHECK(r.types.size() == 1);
-		// status return no untyped variables
-		CHECK(r.status().first.size() == 2);
-		CHECK(r.status().second.size() == 0);
+    TEST_CASE("resolver with two data, one known and the other one unknown") {
+		resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		size_t y = 1;
+		r.insert(x);
+		r.insert(y);
+		CHECK(r.assign(x, 1));
+		CHECK(r.type_of(x) == 1);
+		CHECK(r.type_of(y) == r.unknown);
+		CHECK(r.kinds().size() == 2);
+		CHECK(r.kinds().at(x) == 1);
+		CHECK(r.kinds().at(y) == r.unknown);
 	}
 
-    TEST_CASE("resolver with two nested scopes with same name variables and different types") {
-		resolver r;
-		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
-		auto type_a = tree<node_t>::build_var_name("type_a");
-		auto type_b = tree<node_t>::build_var_name("type_b");
-		// we add the first x and typed it with type_a
-		r.add(x);
-		r.type(x, type_a);
-		// we open a new scope and remove the current x
-		r.open(x, type_b);
-		// current vars map in the inner scope has one element...
-		CHECK(r.current.vars.size() == 1);
-		// ...which is x
-		CHECK(r.current.vars[x] == 1);
-		// its type is type_b
-		CHECK(r.type_of(x) == type_b);
-		// all data has one element...
-		// ...which correspond to the inner x
-		CHECK(r.parent.size() == 2);
-		CHECK(r.rank.size() == 2);
-		CHECK(r.types.size() == 2);
-		// status return one typed variable
-		CHECK(r.status().first.size() == 1);
-		CHECK(r.status().second.size() == 0);
-		// we remove x and close the inner scope
-		r.close(x);
-		// current vars map has one elements...
-		CHECK(r.current.vars.size() == 1);
-		// ...which is x
-		CHECK(r.current.vars[x] == 0);
-		// its type is type_a
-		CHECK(r.type_of(x) == type_a);
-		// all data has one element...
-		// ...which correspond to the outer x
-		CHECK(r.parent.size() == 2);
-		CHECK(r.rank.size() == 2);
-		CHECK(r.types.size() == 2);
-		// status return one typed variable
-		CHECK(r.status().first.size() == 1);
-		CHECK(r.status().second.size() == 0);
+    TEST_CASE("resolver with two data, one known and the other one unknown, both known after merge") {
+		resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		size_t y = 1;
+		r.insert(x);
+		r.insert(y);
+		CHECK(r.assign(x, 1));
+		r.merge(x, y);
+		CHECK(r.type_of(x) == 1);
+		CHECK(r.type_of(y) == 1);
+		CHECK(r.kinds().size() == 2);
+		CHECK(r.kinds().at(x) == 1);
+		CHECK(r.kinds().at(y) == 1);
 	}
 
-    TEST_CASE("resolver with two nested scopes with an inner untyped variable") {
-		resolver r;
-		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
-		// we add the first x and typed it with type_a
-		r.open(x);
-		// current vars map in the inner scope has one element...
-		CHECK(r.current.vars.size() == 1);
-		// ...which is x
-		CHECK(r.current.vars[x] == 0);
-		// its type is type_b
-		CHECK(r.type_of(x) == nullptr);
-		// all data has one element...
-		// ...which correspond to the inner x
-		CHECK(r.parent.size() == 1);
-		CHECK(r.rank.size() == 1);
-		CHECK(r.types.size() == 0);
-		// status return one typed variable
-		CHECK(r.status().first.size() == 0);
-		CHECK(r.status().second.size() == 1);
-		// we remove x and close the inner scope
-		r.close();
-		// current vars map has one elements...
-		CHECK(r.current.vars.size() == 1);
-		// ...which is x
-		CHECK(r.current.vars[x] == 0);
-		// its type is type_a
-		CHECK(r.type_of(x) == nullptr);
-		// all data has one element...
-		// ...which correspond to the outer x
-		CHECK(r.parent.size() == 1);
-		CHECK(r.rank.size() == 1);
-		CHECK(r.types.size() == 0);
-		// status return one typed variable
-		CHECK(r.status().first.size() == 0);
-		CHECK(r.status().second.size() == 1);
-	}
-
-    TEST_CASE("resolver with two nested scopes with an inner typed variable") {
-		resolver r;
-		auto x = tree<node_t>::build_variable("x", ba_types<node_t>::id("bool"));
-		auto type = tree<node_t>::build_var_name("bool");
-		// we add the first x and typed it with type_a
-		r.open(x, type);
-		// current vars map in the inner scope has one element...
-		CHECK(r.current.vars.size() == 1);
-		// ...which is x
-		CHECK(r.current.vars[x] == 0);
-		// its type is type_b
-		CHECK(r.type_of(x) == type);
-		// all data has one element...
-		// ...which correspond to the inner x
-		CHECK(r.parent.size() == 1);
-		CHECK(r.rank.size() == 1);
-		CHECK(r.types.size() == 1);
-		// status return one typed variable
-		CHECK(r.status().first.size() == 1);
-		CHECK(r.status().second.size() == 0);
-		// close the inner scope
-		r.close();
-		// current vars map has one elements...
-		CHECK(r.current.vars.size() == 1);
-		// ...which is x
-		CHECK(r.current.vars[x] == 0);
-		// its type is type_a
-		CHECK(r.type_of(x) == type);
-		// all data has one element...
-		// ...which correspond to the outer x
-		CHECK(r.parent.size() == 1);
-		CHECK(r.rank.size() == 1);
-		CHECK(r.types.size() == 1);
-		// status return one typed variable
-		CHECK(r.status().first.size() == 1);
-		CHECK(r.status().second.size() == 0);
-	}
 }
