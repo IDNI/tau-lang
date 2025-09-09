@@ -977,6 +977,7 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	if (tau::get(form).equals_T()) return { solution<node>() };
+	if (tau::get(form).equals_F()) return {};
 
 #ifdef DEBUG
 	LOG_TRACE << "solve/form: " << LOG_FM(form);
@@ -993,19 +994,22 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 	}
 #endif // DEBUG
 
-	tref dnf = tt(form) | bf_reduce_canonical<node>() | tt::ref;
-	for (tref clause : get_leaves<node>(dnf, tau::wff_or)) {
+	form = boole_normal_form<node>(form);
+	for (tref path : expression_paths<node>(form)) {
 		// Reject clause involving temporal quantification
-		if (tau::get(clause).find_top(is_temporal_quantifier<node>)) {
-			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(clause);
+		if (tau::get(path).find_top(is_temporal_quantifier<node>)) {
+			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(path);
 			continue;
 		}
+		// TODO: collect assignments, i.e. variable = expression,
+		// early to simplify solving
+
 		auto is_equation = [](tref n) {
 			return tau::get(n).child_is(tau::bf_eq)
 				|| tau::get(n).child_is(tau::bf_neq);
 		};
 		// FIXME convert vars to a set
-		auto eqs = tau::get(clause).select_top(is_equation);
+		auto eqs = tau::get(path).select_top(is_equation);
 		if (eqs.empty()) continue;
 		auto solution = solve<node>(
 			equations<node>(eqs.begin(), eqs.end()), options);

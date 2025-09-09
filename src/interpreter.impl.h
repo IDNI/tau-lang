@@ -386,6 +386,7 @@ std::pair<std::optional<assignment<node>>, bool>
 			tref updated = update_to_time_point(equations, formula_time_point);
 			tref current = rewriter::replace<node>(updated, memory);
 			// Simplify after updating stream variables
+			// TODO: Maybe replace by syntactic simp?
 			current = normalize_non_temp<node>(current);
 
 #ifdef DEBUG
@@ -619,7 +620,7 @@ std::vector<system> interpreter<node, in_t, out_t>::compute_systems(tref ubd_ctn
 {
 	std::vector<system> systems;
 	// Create blue-print for solver for each clause
-	for (tref clause : get_dnf_wff_clauses<node>(ubd_ctn)) {
+	for (tref clause : expression_paths<node>(ubd_ctn)) {
 		if (auto system = compute_atomic_fm_types(clause); system)
 			systems.emplace_back(std::move(system.value()));
 		else {
@@ -661,7 +662,7 @@ template <NodeType node, typename in_t, typename out_t>
 std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 	tref fm, const size_t start_time)
 {
-	for (tref clause : get_dnf_wff_clauses<node>(fm)) {
+	for (tref clause : expression_paths<node>(fm)) {
 		DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
 		tref executable = transform_to_execution<node>(clause, start_time, true);
 		DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
@@ -770,7 +771,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 {
 	spec = normalizer<node>(spec);
 	update = normalizer<node>(update);
-	for (const auto& clause : get_dnf_wff_clauses<node>(update)) {
+	for (tref clause : expression_paths<node>(update)) {
 		tref upd_always = tau::get(clause).find_top(
 			is_child<node, tau::wff_always>);
 		trefs upd_sometime = tau::get(clause).select_top(
@@ -780,11 +781,10 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 		trefs spec_sometimes = tau::get(spec).select_top(
 			is_child<node, tau::wff_sometimes>);
 
-		const tref new_spec = clause;
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
-		LOG_TRACE << "pwr/new_spec: " << LOG_FM(new_spec) << "\n";
-		if (!is_tau_formula_sat<node>(new_spec, start_time))
+		LOG_TRACE << "pwr/new_spec: " << LOG_FM(clause) << "\n";
+		if (!is_tau_formula_sat<node>(clause, start_time))
 			continue;
 
 		// Now try to add always part of old spec in a pointwise way
@@ -812,8 +812,8 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 			LOG_TRACE << "pwr/new_spec_pointwise: "
 				<< LOG_FM(new_spec_pointwise) << "\n";
 			if (!is_tau_formula_sat<node>(new_spec_pointwise, start_time))
-				return new_spec;
-		} else new_spec_pointwise = new_spec;
+				return clause;
+		} else new_spec_pointwise = clause;
 
 		if (spec_sometimes.empty())
 			return normalize<node>(new_spec_pointwise);
@@ -850,20 +850,20 @@ solution_with_max_update(tref spec) {
 	auto is_u_stream = [&u](const auto& n) {
 		return n == u;
 	};
-	for (tref clause : get_dnf_wff_clauses<node>(spec)) {
+	for (tref path : expression_paths<node>(spec)) {
 		// Find update stream in clause
-		tref update = tau::get(clause).find_top(is_u_stream);
+		tref update = tau::get(path).find_top(is_u_stream);
 		// If there is no update in clause
 		if (!update) {
-			if (auto sol = get_solution(clause)) return sol;
+			if (auto sol = get_solution(path)) return sol;
 			else continue;
 		}
 
 		// Obtain single f = 0 part of clause
-		tref f = squeeze_positives<node>(clause);
+		tref f = squeeze_positives<node>(path);
 		// If no positive parts exists, the update cannot be maximized
 		if (!f) {
-			if (auto sol = get_solution(clause)) return sol;
+			if (auto sol = get_solution(path)) return sol;
 			else continue;
 		}
 
@@ -879,7 +879,7 @@ solution_with_max_update(tref spec) {
 
 		// Here we know that f is wide
 		tref max_u = build_bf_neg<node>(f1);
-		tref max_u_spec = rewriter::replace<node>(clause, u, max_u);
+		tref max_u_spec = rewriter::replace<node>(path, u, max_u);
 		auto sol = get_solution(max_u_spec);
 		if (!sol.has_value()) continue;
 		// Now we need to add solution for u[t]

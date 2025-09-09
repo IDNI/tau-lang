@@ -59,6 +59,67 @@ trefs get_dnf_bf_clauses(tref n);
 template <NodeType node>
 trefs get_cnf_bf_clauses(tref n);
 
+/**
+ * @brief Provides a range over the paths of a term or formula. If the formula has
+ * temporal quantifiers, a path is conjunction of temporally quantified formulas.
+ * In other words, disjunctions underneath a temporal quantifier are not taken
+ * into account.
+ * @tparam node Tree node class
+ */
+// TODO: stop on ref
+template <NodeType node>
+struct expression_paths {
+	using tau = tree<node>;
+	explicit expression_paths(tref expr) : _expr(expr) {}
+	struct iterator {
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = tref;
+		using difference_type = std::ptrdiff_t;
+		using pointer = tref*;
+		using reference = tref&;
+
+		explicit iterator(tref expr) : _expr(expr) {}
+		// Get path according to decisions
+		value_type operator*();
+		// WARNING: Only use after calling operator*() at least once on
+		// current state
+		// Adjust decisions to point to next path
+		iterator& operator++();
+		// Apply the function f to current path and return the result
+		// while erasing the path from _expr
+		// NOTE that this changes the result of operator*()
+		tref apply(const auto& f);
+		void undo_apply();
+		tref get_expr() const { return _expr; }
+		bool operator==(const iterator& other) const;
+		bool operator!=(const iterator& other) const;
+	private:
+		// True is left, false is right
+		std::vector<bool> decisions;
+		tref _expr;
+		tref _prev_expr;
+	};
+	iterator begin() const;
+	iterator end() const;
+	// Apply the function f on each path while replacing the path with the
+	// result in the expression. Note that this affects Boole normal form
+	// structure.
+	tref apply(const auto& path_transform);
+	// Apply the function f on each path while replacing the path with the
+	// result in the expression. Note that this affects Boole normal form
+	// structure
+	// If callback returns false, the current result is returned
+	tref apply(const auto& path_transform, const auto& callback);
+	// Apply the function f on the first pre-order path. If callback returns
+	// false on the result, leave the expression unchanged and try the next path
+	// until callback returns true or all paths are visited
+	// Note that this affects Boole normal form structure, if callback
+	// returns true on any path
+	tref apply_with_undo(const auto& path_transform, const auto& callback);
+private:
+	tref _expr;
+};
+
 template <NodeType node>
 size_t get_ba_type(tref n);
 

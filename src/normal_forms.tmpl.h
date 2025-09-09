@@ -3509,8 +3509,9 @@ struct simplify_using_equality {
 		auto tau_comp = [](tref l, tref r) {
 			if (l == _0<node>()) return true;
 			if (r == _0<node>()) return false;
-			if (l == _1<node>()) return true;
-			if (r == _1<node>()) return false;
+			// 1 is automatically rewritten to 0
+			// if (l == _1<node>()) return true;
+			// if (r == _1<node>()) return false;
 			if (is_child<node>(l, tau::bf_constant)) return true;
 			if (is_child<node>(r, tau::bf_constant)) return false;
 			if (is_child<node>(l, tau::variable)) {
@@ -3555,6 +3556,9 @@ struct simplify_using_equality {
 				n = syntactic_atomic_formula_simplification<node>(n);
 				return simplify_equation(uf_stack.back(), n);
 			} else if (cn.is(tau::wff_and)) {
+				// TODO: sort assignment assumptions smartly to top
+				// Check if conjunction was already processed
+				if (mark.contains(n)) return n;
 				// We need to reorder all conjunctions in order
 				// to correctly collect all equalities
 				trefs conjs = get_cnf_wff_clauses<node>(n);
@@ -3567,9 +3571,10 @@ struct simplify_using_equality {
 					}
 				}
 				n = conjs[0];
-				// TODO: do not revisit processed nodes
-				for (size_t i = 1; i < conjs.size(); ++i)
+				for (size_t i = 1; i < conjs.size(); ++i) {
 					n = tau::build_wff_and(n, conjs[i]);
+					mark.insert(n);
+				}
 				return n;
 			} else return n;
 		};
@@ -3624,27 +3629,37 @@ struct simplify_using_equality {
 	}
 
 	// In case eq is of form f = 0, unsqueeze disjunctions in f
-	// TODO: If f is in boole normal form
 	static bool add_equality(auto& uf, tref eq) {
 		if (const tau& c = tau::get(eq)[0]; c[1].equals_0()) {
 			tref func = push_negation_in<node, false>(c.first());
 			bool valid = true;
-			// TODO: add xor
-			for (tref d : get_dnf_bf_clauses<node>(func))
-				valid = valid && add_raw_equality(uf, tau::build_bf_eq_0(d));
+			for (tref path : expression_paths<node>(func)) {
+				// Sort path
+				trefs p = get_cnf_bf_clauses<node>(path);
+				std::ranges::sort(p, tau::subtree_less);
+				tref sorted_path = tau::build_bf_and(p);
+				valid = valid && add_raw_equality(uf,
+					tau::build_bf_eq_0(sorted_path));
+			}
 			return valid;
 		} else return add_raw_equality(uf, eq);
 	}
 
 	// Given current equalities in union find, simplify the equation
-	// TODO: If boole normal form, build path, sort then check
 	static tref simplify_equation (auto& uf, tref eq) {
 		// For each node, check if contained in uf -> if yes, replace
-		auto simp = [&uf](tref n) {
-			if (uf.contains(n)) return uf.find(n);
-			return n;
+		auto simp_path = [&uf](tref path) {
+			// Sort path
+			trefs p = get_cnf_bf_clauses<node>(path);
+			std::ranges::sort(p, tau::subtree_less);
+			tref sorted_path = tau::build_bf_and(p);
+			if (uf.contains(sorted_path))
+				return uf.find(sorted_path);
+			return path;
 		};
-		return pre_order<node>(eq).apply_unique(simp);
+		tref c1 = expression_paths<node>(tau::get(eq)[0].first()).apply(simp_path);
+		tref c2 = expression_paths<node>(tau::get(eq)[0].second()).apply(simp_path);
+		return tau::build_bf_eq(c1, c2);
 	}
 };
 

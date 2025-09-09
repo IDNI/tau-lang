@@ -1083,11 +1083,9 @@ template <NodeType node>
 bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	using tau = tree<node>;
 	LOG_DEBUG << "Start is_tau_formula_sat: " << LOG_FM(fm);
-	// TODO: If formula is non-temporal
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
-	trefs clauses = get_leaves<node>(normalized_fm, tau::wff_or);
 	// Convert each disjunct to unbounded continuation
-	for (tref clause : clauses) {
+	for (tref clause : expression_paths<node>(normalized_fm)) {
 		if (!tau::get(transform_to_execution<node>(
 			clause, start_time, output)).equals_F()) {
 			LOG_DEBUG << "End is_tau_formula_sat: true";
@@ -1106,10 +1104,8 @@ bool is_tau_impl(tref f1, tref f2) {
 	auto f2_norm = normalize<node>(f2);
 	auto imp_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_imply(f1_norm, f2_norm)));
-	// TODO: If formula is non-temporal
-	auto clauses = get_dnf_wff_clauses<node>(imp_check);
 	// Now check that each disjunct is not satisfiable
-	for (tref c : clauses) {
+	for (tref c : expression_paths<node>(imp_check)) {
 		auto ctn = transform_to_execution<node>(c);
 		if (!tau::get(ctn).equals_F()) return false;
 	}
@@ -1125,10 +1121,8 @@ bool are_tau_equivalent(tref f1, tref f2) {
 	tref f2_norm = normalize<node>(f2);
 	tref equiv_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_equiv(f1_norm, f2_norm)));
-	// TODO: If formula is non-temporal
-	trefs clauses = get_dnf_wff_clauses<node>(equiv_check);
 	// Now check that each disjunct is not satisfiable
-	for (const auto& c : clauses) {
+	for (const auto& c : expression_paths<node>(equiv_check)) {
 		auto ctn = transform_to_execution<node>(c);
 		if (!tau::get(ctn).equals_F()) return false;
 	}
@@ -1142,13 +1136,13 @@ tref simp_tau_unsat_valid(tref fm, const int_t start_time, const bool output) {
 	// Check if formula is valid
 	if (is_tau_impl<node>(tau::_T(), fm)) return tau::_T();
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
-	// TODO: If formula is non-temporal
-	trefs clauses = get_leaves<node>(normalized_fm, tau::wff_or);
-
+	trefs clauses = {tau::_F()};
 	// Check satisfiability of each clause
-	for (tref& clause: clauses) if (tau::get(transform_to_execution<node>(
-		clause, start_time, output)).equals_F()) clause = tau::_F();
-
+	for (tref clause: expression_paths<node>(normalized_fm))
+		if (!tau::get(transform_to_execution<node>(
+			clause, start_time, output)).equals_F()) {
+			clauses.push_back(clause);
+		}
 	tref res = tau::build_wff_or(clauses);
 	LOG_DEBUG << "End simp_tau_unsat_valid: " << LOG_FM(res);
 	return res;
