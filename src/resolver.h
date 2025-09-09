@@ -1,5 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+#ifndef __IDNI__TAU__RESOLVER_H__
+#define __IDNI__TAU__RESOLVER_H__
+
 #include <map>
 #include <memory>
 #include <vector>
@@ -53,11 +56,11 @@ struct resolver {
 	}
 
 	kind_t type_of(const data_t& data) {
-		return kinds_[uf.root({current, data})];
-/*		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+//		return kinds_[uf.root({current, data})];
+		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
 			if (uf.contains({*it, data}))
 				return kinds_.find(uf.root({*it, data}))->second;
-		return unknown;*/
+		return unknown;
 	}
 
 	kind_t type_of(const element_t& element) {
@@ -70,8 +73,8 @@ struct resolver {
 		if (kind1 != unknown && kind2 != unknown && kind1 != kind2)
 			return false;
 		auto kind = (kind1 == unknown) ? kind2 : kind1;
-		uf.merge({current, data1}, {current, data2});
-		return kinds_.emplace(uf.root({current, data1}), kind), true;
+		auto new_root = uf.merge({current, data1}, {current, data2});
+		return kinds_.emplace(new_root, kind), true;
 	}
 
 	bool same_kind(const data_t& data1, const data_t& data2) {
@@ -98,3 +101,5 @@ struct resolver {
 template<NodeType node>
 using type_resolver = resolver<node, typename std::string>;
 } // namespace idni::tau_lang
+
+#endif // __IDNI__TAU__RESOLVER_H__
