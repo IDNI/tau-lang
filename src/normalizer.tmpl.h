@@ -360,23 +360,17 @@ tref normalize_with_temp_simp(tref fm) {
 		}
 	} while (changed);
 
-	const tau& red_fm = tau::get(fm);
-	LOG_TRACE << "red_fm: " << LOG_FM(red_fm.get());
-	if (red_fm.equals_T() || red_fm.equals_F())
-		return red_fm.get();
-	trefs clauses = get_dnf_wff_clauses<node>(red_fm.get());
+	LOG_TRACE << "fm: " << LOG_FM(fm);
+	if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
+		return fm;
 	tref nn = tau::_F();
-	for (tref clause : clauses) {
+	for (tref clause : expression_paths<node>(fm)) {
 		LOG_TRACE << "    clause: " << LOG_FM(clause);
 		const auto& t = tau::get(clause);
 		trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
 		trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
-		if (aw_parts.size() == 1 && st_parts.empty()) {
-			nn = tau::build_wff_or(nn, clause);
-			LOG_TRACE << "    nn: " << LOG_FM(nn);
-			continue;
-		}
-		if (aw_parts.empty() && st_parts.size() == 1) {
+		if ((aw_parts.size() == 1 && st_parts.empty()) ||
+			(aw_parts.empty() && st_parts.size() == 1)) {
 			nn = tau::build_wff_or(nn, clause);
 			LOG_TRACE << "    nn: " << LOG_FM(nn);
 			continue;
@@ -863,7 +857,6 @@ tref normalizer(const rr<node>& nso_rr) {
 
 	tref fm = apply_rr_to_formula<node>(nso_rr);
 	if (!fm) return nullptr;
-	fm = norm_all_equations<node>(fm);
 	tref res = normalize_with_temp_simp<node>(fm);
 
 	LOG_DEBUG << "End normalizer";
@@ -873,7 +866,6 @@ tref normalizer(const rr<node>& nso_rr) {
 
 template <NodeType node>
 tref normalizer(tref fm) {
-	fm = norm_all_equations<node>(fm);
 	return normalize_with_temp_simp<node>(fm);
 }
 

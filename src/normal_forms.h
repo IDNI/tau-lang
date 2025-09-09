@@ -529,7 +529,6 @@ template <NodeType node>
 tref push_universal_quantifier_one(tref fm);
 
 // Squeeze all equalities found in n
-//TODO: make it type depended
 template <NodeType node>
 tref squeeze_positives(tref n);
 
