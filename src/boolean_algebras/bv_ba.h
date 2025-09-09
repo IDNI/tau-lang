@@ -94,7 +94,7 @@ void config_cvc5_solver(cvc5::Solver& solver) {
  * @param checked If true, performs additional consistency checks during evaluation.
  * @return An optional with the the evaluated bitvector value of the node if possible and
  * an empty optional if not.
- * 
+ *
  */
 template <NodeType node>
 std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
@@ -209,6 +209,6 @@ std::optional<constant_with_type<BAs...>> parse_bv(const std::string& src,
 
 } // namespace idni::tau_lang
 
-#include "bv_ba.tmpl.h"
+#include "boolean_algebras/bv_ba.tmpl.h"
 
 #endif // __IDNI__TAU__CVC5_H__

@@ -3,6 +3,7 @@ set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 set(TAU_HEADERS
 	../parser/sbf_parser.generated.h
 	../parser/tau_parser.generated.h
+	boolean_algebras/cvc5/cvc5.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h
@@ -11,7 +12,7 @@ set(TAU_HEADERS
 	boolean_algebras/nso_ba.h
 	boolean_algebras/tau_ba.h
 	boolean_algebras/bv_ba.h
-	boolean_algebras/bv_ba_widths.h
+	#boolean_algebras/bv_ba_widths.h
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
 	tau_tree.h         # tau tree, node, tree traverser, builders,
@@ -31,6 +32,7 @@ set(TAU_HEADERS
 	splitter.h
 	solver.h
 	resolver.h
+	runtime.h
 	interpreter.h
 	union_find.h       # union find data structure
 	nso_factory.h      # abstract template interface
