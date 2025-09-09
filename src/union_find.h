@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef UNION_FIND_H
-#define UNION_FIND_H
+#ifndef __IDNI__TAU__UNION_FIND_H__
+#define __IDNI__TAU__UNION_FIND_H__
 
 namespace idni::tau_lang {
 /**
@@ -10,21 +10,31 @@ namespace idni::tau_lang {
  * taking the smaller as new root
  * @tparam node Type of tree node
  */
-template <typename data_t, typename less_t>
+template <typename data_t, typename less_t = std::less<data_t>>
 struct union_find {
 private:
 	std::map<data_t, data_t> parent;
-
-	// The comparator used in order to decide the new root of a merged set
-	// The smaller root is chosen
-	const less_t& _less;
+	std::map<data_t, size_t> rank; // rank for union by rank
 
 public:
-	explicit union_find(const less_t& l = std::less<data_t>()) : _less(l) {}
 
+	// Insert element x if not present
 	data_t insert(data_t x) {
 		if (parent.contains(x)) return x;
-		return parent.emplace(x, x), x;
+		parent.emplace(x, x);
+		rank[x] = 0;
+		return x;
+	}
+
+	// Returns a map from root to set of elements in each set, the sets
+	// are ordered using the less_t comparator
+	std::map<data_t, std::set<data_t, less_t>> get_sets() {
+		std::map<data_t, std::set<data_t, less_t>> sets;
+		for (const auto& [elem, _] : parent) {
+			data_t r = root(elem);
+			sets[r].insert(elem);
+		}
+		return sets;
 	}
 
 	// Find the root of the set containing x while inserting x if not present
@@ -38,17 +48,19 @@ public:
        	} else return it->second;
 	}
 
-	// Union the two sets containing x and y
+	// Union the two sets containing x and y (union by rank)
 	void merge(data_t x, data_t y) {
 		auto root_x = root(x), root_y = root(y);
-		// sets are already equal
 		if (root_x == root_y) return;
-		if (_less(root_x, root_y))
-			// root_x becomes new root
-			parent[root_y] = root_x;
-		else
-			// root_y becomes the new root
+		// Union by rank
+		if (rank[root_x] < rank[root_y]) {
 			parent[root_x] = root_y;
+		} else if (rank[root_x] > rank[root_y]) {
+			parent[root_y] = root_x;
+		} else {
+			parent[root_y] = root_x;
+			rank[root_x]++;
+		}
 	}
 
 	// Check if two elements are in the same set
@@ -93,4 +105,4 @@ public:
 
 } // idni::tau_lang
 
-#endif //UNION_FIND_H
+#endif // __IDNI__TAU__UNION_FIND_H__
