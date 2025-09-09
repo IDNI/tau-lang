@@ -49,18 +49,20 @@ public:
 	}
 
 	// Union the two sets containing x and y (union by rank)
-	void merge(data_t x, data_t y) {
+	data_t merge(data_t x, data_t y) {
 		auto root_x = root(x), root_y = root(y);
-		if (root_x == root_y) return;
+		if (root_x == root_y) return root_x;
 		// Union by rank
 		if (rank[root_x] < rank[root_y]) {
 			parent[root_x] = root_y;
+			return root_y;
 		} else if (rank[root_x] > rank[root_y]) {
 			parent[root_y] = root_x;
-		} else {
-			parent[root_y] = root_x;
-			rank[root_x]++;
+			return root_x;
 		}
+		parent[root_y] = root_x;
+		rank[root_x]++;
+		return root_x;
 	}
 
 	// Check if two elements are in the same set
