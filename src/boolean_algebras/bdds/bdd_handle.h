@@ -3,8 +3,8 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BDD_HANDLE_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BDD_HANDLE_H__
 
-#include "babdd.h"
-#include "var_dict.h"
+#include "boolean_algebras/bdds/babdd.h"
+#include "boolean_algebras/bdds/var_dict.h"
 #include "splitter_types.h"
 
 namespace idni::tau_lang {
