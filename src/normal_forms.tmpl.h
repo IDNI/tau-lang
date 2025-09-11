@@ -3659,7 +3659,9 @@ struct simplify_using_equality {
 		};
 		tref c1 = expression_paths<node>(tau::get(eq)[0].first()).apply(simp_path);
 		tref c2 = expression_paths<node>(tau::get(eq)[0].second()).apply(simp_path);
-		return tau::build_bf_eq(c1, c2);
+		return is_child<node>(eq, tau::bf_eq)
+			       ? tau::build_bf_eq(c1, c2)
+			       : tau::build_bf_neq(c1, c2);
 	}
 };
 
