@@ -3527,6 +3527,8 @@ struct simplify_using_equality {
 		};
 		// Push negation all the way in
 		fm = to_nnf<node>(fm);
+		if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
+			return fm;
 		DBG(LOG_DEBUG << "Simplify_using_equality on " << LOG_FM(fm) << "\n";)
 		// Create union find data structure to hold equality information
 		auto uf = union_find<decltype(tau_comp), node>(tau_comp);
@@ -3609,6 +3611,9 @@ struct simplify_using_equality {
 	// Returns false, if a resulting equality set contains a contradiction
 	static bool add_raw_equality (auto& uf, tref eq) {
 		// We both add a = b and a' = b' in order to detect syntactic contradictions
+		if (tau::get(eq).equals_T()) return true;
+		if (tau::get(eq).equals_F()) return false;
+		// Here we know that eq is still bf_eq
 		tref left_hand_side = tau::trim2(eq);
 		tref right_hand_side = tau::get(tau::trim(eq)).child(1);
 		tref left_hand_side_neg =
