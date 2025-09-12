@@ -328,17 +328,19 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 	// std::cout << "Apply f on " << tau::get(path) << " yields " << tau::get(res) << "\n";
 	// If no change occurs
 	if (tau::subtree_equals(res, path)) return nullptr;
+	const bool term = tau::get(_expr).is_term();
 	// Now decisions holds the number of current wff_or occurrences on path
 	if (decisions.empty()) {
 		// Empty decisions means there is just a single path
 		_prev_expr = _expr;
-		_expr = tau::_F();
+		_expr = term ? tau::_0() : tau::_F();
 		return res;
 	}
 	size_t idx = 0;
-	const bool term = tau::get(_expr).is_term();
+	bool removed = false;
 	subtree_unordered_set<node> excluded;
-	auto remove = [&idx, &term, &excluded, this](tref n) {
+	auto remove = [&](tref n) {
+		if (removed) return n;
 		bool check;
 		if (term) {
 			if (!tau::get(n).is(tau::bf)) return n;
@@ -353,12 +355,12 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 			if (idx == decisions.size() - 1) {
 				// In order to delete the current path
 				// we simply exclude it
-				++idx;
+				removed = true;
 				if (decisions.back())
 					return tau::get(n)[0].second();
 				else return tau::get(n)[0].first();
 			}
-			if (decisions[idx++]) {
+			else if (decisions[idx++]) {
 				// Go left
 				excluded.insert(tau::get(n)[0].second());
 			} else {
@@ -461,7 +463,7 @@ tref expression_paths<node>::apply(const auto& path_transform, const auto& callb
 }
 
 template<NodeType node>
-tref expression_paths<node>::apply_with_undo(const auto& path_transform,
+tref expression_paths<node>::apply_only_if(const auto& path_transform,
 	const auto& callback) {
 	auto build_or = [*this](tref l, tref r) {
 		if (tau::get(_expr).is_term())
@@ -475,10 +477,12 @@ tref expression_paths<node>::apply_with_undo(const auto& path_transform,
 			res = build_or(it.get_expr(), c);
 			if (callback(res)) break;
 			else it.undo_apply();
+			res = it.get_expr();
 		}
 		++it;
 
 	}
+	DBG(LOG_TRACE << "apply_only_if res: " << tau::get(res) << "\n";)
 	return res;
 }
 

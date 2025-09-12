@@ -214,7 +214,21 @@ TEST_SUITE("anti_prenex") {
 	TEST_CASE("7") {
 		const char* sample = "xy = 0 && (abx' | by'a) != 0 <-> xy = 0 && ab != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		boole_normal_form<node_t>(fm);
+		anti_prenex<node_t>(fm);
+		CHECK(true);
+	}
+	TEST_CASE("8") {
+		const char* sample = "ex v { o1[t]o2[t] = 0 } : tau ({ o1[t]o2[t] = 0 } : tau v)' = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		std::cout << "res: " << tau::get(res) << "\n";
+		CHECK(true);
+	}
+	TEST_CASE("9") {
+		const char* sample = "all o1[0], o2[0] !o1[0]o2[0] = 0 || o1[0]o2[0] = 0 && (ex o2[1], o1[1] o1[1]o2[1] = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		std::cout << "res: " << tau::get(res) << "\n";
 		CHECK(true);
 	}
 }

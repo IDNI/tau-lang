@@ -12,10 +12,10 @@ enum class split_sym {
 	conjunction, disjunction
 };
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref split(tref fm, typename node<BAs...>::type fm_type, bool is_cnf,
-	const splitter_type st, trefs& mem, size_t i, bool check_temps);
+// template <typename... BAs>
+// requires BAsPack<BAs...>
+// tref split(tref fm, typename node<BAs...>::type fm_type, bool is_cnf,
+// 	const splitter_type st, trefs& mem, size_t i, bool check_temps);
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -35,14 +35,14 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr);
 // Find a Boolean function which implies f
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref good_splitter_using_function(tref f, splitter_type st, tref original_clause,
-	tref original_fm, tref spec_clause);
+tref good_splitter_using_function(tref f, splitter_type st, tref clause,
+	tref fm_without_clause, tref original_fm, tref spec_clause);
 
 // Find a Boolean function which is implied by f
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref good_reverse_splitter_using_function(tref f, splitter_type st,
-	tref original_clause, tref original_fm, tref spec_clause);
+	tref clause, tref fm_without_clause, tref original_fm, tref spec_clause);
 
 // Return a bad splitter for the provided formula
 // We assume the formula is fully normalized by normalizer
