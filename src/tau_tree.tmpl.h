@@ -115,7 +115,7 @@ struct expression_paths {
 	// until callback returns true or all paths are visited
 	// Note that this affects Boole normal form structure, if callback
 	// returns true on any path
-	tref apply_with_undo(const auto& path_transform, const auto& callback);
+	tref apply_only_if(const auto& path_transform, const auto& callback);
 private:
 	tref _expr;
 };
