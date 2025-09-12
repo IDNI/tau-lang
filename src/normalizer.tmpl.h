@@ -280,7 +280,7 @@ bool is_nso_impl(tref n1, tref n2) {
 	const tau& res = tau::get(normalize_non_temp<node>(imp));
 	DBG(assert((res.equals_T() || res.equals_F()
 		|| res.find_top(is<node, tau::constraint>)));)
-	LOG_DEBUG << "End is_nso_impl: " << res.get();
+	LOG_DEBUG << "End is_nso_impl: " << res;
 	return res.equals_T();
 }
 
