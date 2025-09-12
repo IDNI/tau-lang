@@ -101,6 +101,7 @@ template <NodeType node>
 tref build_wff_sometimes(tref l) {
 	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_sometimes, l));
 }
 
@@ -108,6 +109,7 @@ template <NodeType node>
 tref build_wff_always(tref l) {
 	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_always, l));
 }
 
@@ -124,6 +126,7 @@ template <NodeType node>
 tref build_wff_all(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_all, l, r));
 }
 
@@ -131,6 +134,7 @@ template <NodeType node>
 tref build_wff_ex(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_ex, l, r));
 }
 
@@ -138,6 +142,7 @@ template <NodeType node>
 tref build_wff_imply(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_or,
 		build_wff_neg<node>(l), r));
 }
@@ -146,6 +151,7 @@ template <NodeType node>
 tref build_wff_rimply(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_or,
 		build_wff_neg<node>(r), l));
 }
@@ -154,6 +160,7 @@ template <NodeType node>
 tref build_wff_equiv(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_and,
 		build_wff_imply<node>(l, r),
 		build_wff_imply<node>(r, l)));
@@ -163,6 +170,7 @@ template <NodeType node>
 tref build_wff_or(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_or, l, r));
 }
 
@@ -172,19 +180,12 @@ tref build_wff_or(const auto& wffs) {
 		[](tref l, tref r) { return build_wff_or<node>(l, r); });
 }
 
-template <NodeType node>
-tref build_wff_xor_from_def(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	using tau = tree<node>;
-	return tau::get(tau::wff, tau::get(tau::wff_or,
-		build_wff_and<node>(build_wff_neg<node>(l), r),
-		build_wff_and<node>(build_wff_neg<node>(r), l)));
-}
 
 template <NodeType node>
 tref build_wff_xor(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_or,
 		build_wff_and<node>(build_wff_neg<node>(l), r),
 		build_wff_and<node>(build_wff_neg<node>(r), l)));
@@ -194,6 +195,7 @@ template <NodeType node>
 tref build_wff_and(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_and, l, r));
 }
 
@@ -207,6 +209,7 @@ template <NodeType node>
 tref build_wff_neg(tref l) {
 	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_neg, l));
 }
 
@@ -275,6 +278,7 @@ template <NodeType node>
 tref build_bf_eq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::wff, tau::get(tau::bf_eq, l, r));
 }
 
@@ -282,6 +286,7 @@ template <NodeType node>
 tref build_bf_eq_0(tref l) {
 	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf));)
 	return tau::get(tau::wff, tau::get(tau::bf_eq, l, _0<node>()));
 }
 
@@ -289,6 +294,7 @@ template<NodeType node>
 tref build_bf_neq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::wff, tau::get(tau::bf_neq, l, r));
 }
 
@@ -296,60 +302,79 @@ template <NodeType node>
 tref build_bf_neq_0(tref l) {
 	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf));)
 	return tau::get(tau::wff, tau::get(tau::bf_neq, l, _0<node>()));
 }
 
 template <NodeType node>
 tref build_bf_lteq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_bf_eq_0<node>(build_bf_and<node>(l, build_bf_neg<node>(r)));
 }
 
 template <NodeType node>
 tref build_bf_nlteq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_bf_neq_0<node>(build_bf_and<node>(l, build_bf_neg<node>(r)));
 }
 
 template <NodeType node>
 tref build_bf_nlteq_lower(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_bf_neq_0<node>(build_bf_and<node>(r, build_bf_neg<node>(l)));
 }
 
 template <NodeType node>
 tref build_bf_nlteq_upper(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_bf_neq_0<node>(build_bf_and<node>(l, build_bf_neg<node>(r)));
 }
 
 template <NodeType node>
 tref build_bf_gt(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_bf_lt<node>(r, l);
 }
 
 template <NodeType node>
 tref build_bf_ngt(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_wff_neg<node>(build_bf_gt<node>(l, r));
 }
 
 template <NodeType node>
 tref build_bf_gteq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_bf_lteq<node>(r, l);
 }
 
 template <NodeType node>
 tref build_bf_ngteq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_wff_neg<node>(build_bf_gteq<node>(l, r));
 }
 
 template <NodeType node>
 tref build_bf_lt(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_wff_and<node>(
 		build_bf_eq_0<node>(build_bf_and<node>(l, build_bf_neg<node>(r))),
 		build_bf_neq<node>(l, r));
@@ -358,6 +383,8 @@ tref build_bf_lt(tref l, tref r) {
 template <NodeType node>
 tref build_bf_nlt(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return build_wff_neg<node>(build_bf_lt<node>(l, r));
 }
 
@@ -368,6 +395,7 @@ template <NodeType node>
 tref build_bf_fall(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_fall, l, r));
 }
 
@@ -375,6 +403,7 @@ template <NodeType node>
 tref build_bf_fex(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_fex, l, r));
 }
 
@@ -382,6 +411,7 @@ template <NodeType node>
 tref build_bf_or(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_or, l, r));
 }
 
@@ -395,6 +425,7 @@ template <NodeType node>
 tref build_bf_xor(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_xor, l, r));
 }
 
@@ -402,6 +433,7 @@ template <NodeType node>
 tref build_bf_and(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_and, l, r));
 }
 
@@ -415,6 +447,7 @@ template <NodeType node>
 tref build_bf_neg(tref l) {
 	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf));)
 	LOG_TRACE << "build_bf_neg";
 	DBG(LOG_TRACE << "l: " << LOG_FM_DUMP(l);)
 	DBG(LOG_TRACE << "bf_neg: " << LOG_FM_DUMP(tau::get(tau::bf_neg, l));)
@@ -724,11 +757,6 @@ tref tree<node>::build_wff_or(tref l, tref r) {
 template <NodeType node>
 tref tree<node>::build_wff_or(const auto& wffs) {
 	return tau_lang::build_wff_or<node>(wffs);
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_xor_from_def(tref l, tref r) {
-	return tau_lang::build_wff_xor_from_def<node>(l, r);
 }
 
 template <NodeType node>
