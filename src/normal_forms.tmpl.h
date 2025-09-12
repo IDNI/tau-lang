@@ -3497,6 +3497,7 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
  * if terms/bfs are in a normal form
  * @tparam node Type of tree node
  */
+// TODO: fix case (ex x x = 0) && (ex x x != 0)
 template <NodeType node>
 struct simplify_using_equality {
 	using tau = tree<node>;
@@ -3662,6 +3663,7 @@ struct simplify_using_equality {
 				return uf.find(sorted_path);
 			return path;
 		};
+		if (tau::get(eq).equals_T() || tau::get(eq).equals_F()) return eq;
 		tref c1 = expression_paths<node>(tau::get(eq)[0].first()).apply(simp_path);
 		tref c2 = expression_paths<node>(tau::get(eq)[0].second()).apply(simp_path);
 		return is_child<node>(eq, tau::bf_eq)
@@ -3671,6 +3673,7 @@ struct simplify_using_equality {
 };
 
 //TODO: add caching
+// TODO: fix case (ex x x = 0) && (ex x x != 0)
 template <NodeType node>
 class syntactic_path_simplification {
 	using tau = tree<node>;
@@ -4014,7 +4017,10 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 	using tau = tree<node>;
 	bool is_eq = tau::get(atomic_formula).child_is(tau::bf_eq);
 	DBG(assert(is_eq || tau::get(atomic_formula).child_is(tau::bf_neq));)
-	tref func = tau::trim2(norm_equation<node>(atomic_formula));
+	atomic_formula = norm_equation<node>(atomic_formula);
+	if (tau::get(atomic_formula).equals_T() ||
+		tau::get(atomic_formula).equals_F()) return atomic_formula;
+	tref func = tau::trim2(atomic_formula);
 	func = syntactic_path_simplification<node>::on(func);
 	atomic_formula = denorm_equation<node>(is_eq ? tau::build_bf_eq_0(func) : tau::build_bf_neq_0(func));
 	auto& free_vars = get_free_vars<node>(atomic_formula);
