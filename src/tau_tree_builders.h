@@ -79,9 +79,6 @@ template <NodeType node>
 tref build_wff_or(const auto& wffs);
 
 template <NodeType node>
-tref build_wff_xor_from_def(tref l, tref r);
-
-template <NodeType node>
 tref build_wff_xor(tref l, tref r);
 
 template <NodeType node>
