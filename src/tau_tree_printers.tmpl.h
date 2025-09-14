@@ -242,8 +242,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
-			bf_splitter, bf_ref, bf_neg, bf_constant, bf_t, bf_f,
-			wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
+			bf_splitter, bf_ref, bf_neg, bv_constant, bf_constant, bf_t,
+			bf_f, wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
 			variable, ref_args, start
 		};
 		// priority map (lower number = higher priority)
@@ -405,8 +405,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		{ rec_relation,  TC.YELLOW() },
 		{ constraint,    TC.LIGHT_MAGENTA() },
 		{ io_var,        TC.WHITE() },
-		{ bf_constant,   TC.LIGHT_CYAN() }
-
+		{ bf_constant,   TC.LIGHT_CYAN() },
+		{ bv_constant,   TC.LIGHT_CYAN() }
 		// { rule,          TC.BG_YELLOW() },
 		// { builder,       TC.BG_LIGHT_YELLOW() }
 	};
@@ -544,6 +544,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bv_constant:
 				if (auto first = tau::tt(ref) | tt::first | tt::ref; first) out(first);
 				else out(t.get_bv_constant());
+				if (auto num = tau::tt(ref) | tau::subtype | tau::num | tt::ref; num) {
+					out(" : bv "); out(tau::get(num).data());
+				} else out(" : bv ");
 				break;
 			default:
 				if (is_string_nt(nt)) {

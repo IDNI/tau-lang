@@ -1446,10 +1446,10 @@ tref get_hook<node>::bv_constant([[maybe_unused]] const node& v, const tref* ch,
 
 	if (len == 0) return tau::get_raw(v, ch, len, r);
 
-	DBG(assert(len == 1 || len == 2);)
+	DBG(assert(len == 1 || len == 2 || len == 3);)
 
-	auto bv_size = len == 2
-		? tau::get(ch[1]).get_num()
+	auto bv_size = len == 3
+		? tau::get(ch[2])[0].get_num()
 		: cvc5_default_bv_size;
 	auto str = tau::get(ch[0]).to_str();
 	auto type = tau::get(ch[0]).get_type();

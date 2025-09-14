@@ -135,9 +135,9 @@ bv                     => ('(' _ bv _ ')')            :bv_parenthesis
                         | bv_constant.
 
 # bv constants
-bv_constant            => "#b" binary [ _ ':' _ type _ ]
-                        | decimal [ _ ':' _ type _ ]
-                        | "#x" hexadecimal [ _ ':' _ type _ ].
+bv_constant            => "#b" binary [ typed ]
+                        | decimal [ typed ]
+                        | "#x" hexadecimal [ typed ].
 binary                 => ('0' | '1')+.
 hexadecimal            => xdigit+.
 decimal                => digit+.
@@ -183,8 +183,9 @@ num                    => digits.
 integer                => [ '-' ] _ digits.
 sym                    => chars.
 capture                => '$' chars.
-typed                  => _ ':' _ type.
+typed                  => _ ':' _ type [ _ '[' _ subtype _ ']' _ ].
 type                   => chars.
+subtype                => num.
 
 scope_id               => digits. # dummy rule to introduce scope_id nt
 
@@ -310,7 +311,7 @@ history        => ( "%"
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, decimal, hexadecimal, binary, type, integer,
+        sym, digits, decimal, hexadecimal, binary, type, subtype, integer,
         source, capture, var_name, io_var_name, uconst_name, file_name,
         ctnvar, option_name, option_value.
 
