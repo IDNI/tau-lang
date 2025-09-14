@@ -155,7 +155,7 @@ tref ba_types_inference<node>::add_scope_ids(
 		static const size_t temporal = get_ba_type_id<node>("_temporal");
 		const auto& t = tau::get(el);
 		auto nt = t.get_type();
-		if (nt != tau::variable && nt != tau::bf_constant)
+		if (nt != tau::variable && nt != tau::bf_constant && nt != tau::bv_constant)
 			return el;
 		bool is_global = is_io_var<node>(el) || is_uconst<node>(el);
 		// get scope_id
@@ -167,7 +167,7 @@ tref ba_types_inference<node>::add_scope_ids(
 			}
 		}
 		tref r = el;
-		// add scope 0 to io vars' temporal vars 
+		// add scope 0 to io vars' temporal vars
 		if (is_io_var<node>(el)) {
 			auto tv = tt(el) | tau::io_var
 				| tau::offset | tau::variable;
@@ -188,9 +188,11 @@ tref ba_types_inference<node>::add_scope_ids(
 		else if (nt == tau::variable) {
 			trefs ch;
 			if (t.first()) ch.push_back(t.first());
+			if (auto subtype = tt(el) | tau::subtype | tt::ref; subtype)
+				ch.push_back(subtype);
 			ch.push_back(tau::get(node(tau::scope_id, scope_id)));
 			r = tau::get(t.value, ch);
-		} 
+		}
 		// extract type info
 		size_t tid = tau::get(r).get_ba_type();
 		if (is_io_var<node>(r) && tid == 0) {
@@ -278,13 +280,14 @@ tref ba_types_inference<node>::add_scope_ids(
 			tref v = transform_element(t.first());
 			if (!v) return nullptr;
 			tref x = add_scope_ids(t.second(), vscids, scid);
-			if (!x) return nullptr;			
+			if (!x) return nullptr;
 			// restore previous scope state (or remove)
 			if (was_scoped) vscids[var_sid] = old_var_scope;
 			else vscids.erase(var_sid);
 			return tau::get(t.value, { v, x });
 		}
 		case tau::bf_constant:
+		case tau::bv_constant:
 		case tau::variable:
 			return transform_element(el);
 		case tau::bf_f:
@@ -320,7 +323,18 @@ tref ba_types_inference<node>::check_and_propagate(tref n) {
 				|| nt == tau::bf_ngteq
 				|| nt == tau::bf_lt
 				|| nt == tau::bf_nlt
-				|| nt == tau::bf;
+				|| nt == tau::bf
+				|| nt == tau::bv_eq
+				|| nt == tau::bv_neq
+				|| nt == tau::bv_lteq
+				|| nt == tau::bv_nlteq
+				|| nt == tau::bv_gt
+				|| nt == tau::bv_ngt
+				|| nt == tau::bv_gteq
+				|| nt == tau::bv_ngteq
+				|| nt == tau::bv_lt
+				|| nt == tau::bv_nlt
+				|| nt == tau::bv;
 		};
 
 		auto nt = tau::get(el).get_type();
@@ -355,12 +369,10 @@ tref ba_types_inference<node>::check_and_propagate(tref n) {
 template <NodeType node>
 tref ba_types_inference<node>::get_el_key(tref n) const {
 	DBG(assert(n));
-	if (tau::get(n).is(tau::bf_f) || tau::get(n).is(tau::bf_t))
-		return n;
+	if (tau::get(n).is(tau::bf_f) || tau::get(n).is(tau::bf_t))	return n;
 	n = get_var_name_node<node>(n);
 	if (tau::get(n).get_ba_type() == 0) {
-		auto it = resolved.find(n);
-		if (it != resolved.end()) return it->second;
+		if (auto it = resolved.find(n); it != resolved.end()) return it->second;
 	}
 	return n;
 }
@@ -501,6 +513,7 @@ tref ba_types_inference<node>::remove_scope_ids(tref n) const {
 			}
 			else {
 				node nv = t.value.ba_retype(types.at(key));
+
 				r = t.is(tau::variable)
 							? tau::get(nv, t.first())
 							: tau::get(nv);
