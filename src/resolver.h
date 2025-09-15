@@ -318,18 +318,20 @@ tref new_infer_ba_types(tref n) {
 			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_exists: {
 				// Close the current scope and replace occurrences of
 				// untyped variables with the inferred ones (if any).
+				// We resolve to tau all untyped variables.
+				// We also update the current node with the transformed
+				// children if any.
 				std::map<tref, tref> changes;
 				for(auto [var, type] : resolver.current_kinds()) {
-					if (type.first != resolver.unknown ) {
-						changes[var] = tau::build_variable(
-							tt(var) | tt::string,
-							type);
-					} else {
-						// We assume all variables scoped are resolved when
-						// closing the scope.
-						error = true; // Error, scoped variable without type!
-						return;
+					auto inferred = type;
+					if (type.first == resolver.unknown ) {
+						inferred = { ba_types<node>::id("tau"), nullptr };
+						resolver.assign(var, { ba_types<node>::id("tau"), nullptr });
 					}
+					changes[var] = tau::build_variable(
+						tt(var) | tt::string,
+						inferred.first,
+						inferred.second);
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
 				if (new_n != n) transformed[n] = new_n;
