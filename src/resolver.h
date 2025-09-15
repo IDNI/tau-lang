@@ -107,17 +107,20 @@ struct scoped_resolver {
 
 template<NodeType node>
 std::optional<type> merge_ba_types(const type& t1, const type& t2) {
-	auto result = t1;
-	if (result.first == 0) { // untyped
-		result.first = t2.first;
-		result.second = t2.second;
-	} else if (t2.second != result.second) {
-		return std::nullopt; // conflicting type info
-	} else if (t2.first == ba_types<node>::id("bv")) {
-		if (t2.second != nullptr && t2.second != result.second)
-			return std::nullopt; // conflicting subtype info
-		result.second = t2.second;
-		return result;
+	static auto untyped = ba_types<node>::id("untyped");
+	if (t1.first == untyped) {
+		if (t2.first != untyped) {
+			return { t2 };
+		} else {
+			return { std::make_pair(0, nullptr) }; // both untyped
+		}
+	}
+	if (t2.first == untyped) return { t1 };
+	if (t1.first == t2.first) {
+		if (t1.second == t2.second) return { t1 };
+		if (t1.second == nullptr) return { std::make_pair(t1.first, t2.second) };
+		if (t2.second == nullptr) return { std::make_pair(t1.first, t1.second) };
+		return std::nullopt; // conflicting subtype info
 	}
 	return std::nullopt;
 }
@@ -132,7 +135,7 @@ struct type_scoped_resolver : public scoped_resolver<tref, type> {
 
 	// merge two trefs if the types are compatible
 	// returns true if merge was successful, false otherwise
-	bool merge([[maybe_unused]] tref a, [[maybe_unused]] tref b) {
+	bool merge(tref a, tref b) {
 		auto type_a = this->type_of(a);
 		auto type_b = this->type_of(b);
 		auto merged = merge_ba_types<node>(type_a, type_b);
@@ -344,7 +347,7 @@ tref new_infer_ba_types(tref n) {
 				std::map<tref, tref> changes;
 				for(auto [cte, type] : resolver.current_kinds()) {
 					auto new_type = { type.first == resolver.unknown
-							? tau::ba_types<node>::id("tau")
+							? ba_types<node>::id("tau")
 							: type.first,
 						type.second };
 					// We replace all untyped vconstants with the inferred type.
@@ -366,7 +369,7 @@ tref new_infer_ba_types(tref n) {
 				std::map<tref, tref> changes;
 				for(auto [var, type] : resolver.current_kinds()) {
 					auto new_type = { type.first == resolver.unknown
-							? tau::ba_types<node>::id("tau")
+							? ba_types<node>::id("tau")
 							: type.first,
 						type.second };
 					// We replace all untyped variables with the inferred type.
