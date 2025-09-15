@@ -4,13 +4,14 @@
 #define __IDNI__TAU__UNION_FIND_H__
 
 namespace idni::tau_lang {
+
 /**
  * @brief Union find data structure with set retrieval for tau formulas
  * @tparam comp Comparison function used to decide root after merge,
  * taking the smaller as new root
  * @tparam node Type of tree node
  */
-template <typename data_t, typename less_t = std::less<data_t>>
+template <typename data_t, class less_t = std::less<data_t>>
 struct union_find {
 private:
 	std::map<data_t, data_t> parent;

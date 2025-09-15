@@ -25,7 +25,7 @@ struct scoped_resolver {
 
 	union_find_t uf;
 	scope_t current = 0;
-	std::deque<size_t> scopes { current };
+	std::deque<size_t> scopes_ { current };
 	std::map<element_t, kind_t> kinds_;
 	data_t minimum;
 	kind_t unknown;
@@ -35,34 +35,34 @@ struct scoped_resolver {
 		minimum(minimum), unknown(unknown) {}
 
 	void open(const std::map<data_t, kind_t>& kinds) {
-		scopes.push_back(++current);
+		scopes_.push_back(++current);
 		for (const auto& [data, kind] : kinds) {
 			uf.insert({current, data});
-			kinds_.emplace({current, data}, kind);
+			kinds_.emplace(element_t{current, data}, kind);
 		}
 	}
 
 	void close() {
-		if (scopes.size() == 1) return;
+		if (scopes_.size() == 1) return;
 		kinds_.erase(
 			kinds_.lower_bound({current, minimum}),
 			kinds_.end());
-		scopes.pop_back();
-		current = scopes.back();
+		scopes_.pop_back();
+		current = scopes_.back();
 	}
 
 	void insert(const data_t& data) {
 		static size_t global = 0;
-		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+		for(auto it = scopes_.rbegin(); it != scopes_.rend(); ++it)
 			if (uf.contains(element_t{*it, data})) return;
 		uf.insert({global, data});
 		kinds_.emplace(element_t{global, data}, unknown);
 	}
 
 	kind_t type_of(const data_t& data) {
-		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+		for(auto it = scopes_.rbegin(); it != scopes_.rend(); ++it)
 			if (uf.contains({*it, data}))
-				return kinds_.find(uf.root({*it, data}))->second;
+				return kinds_.find(uf.root(element_t{*it, data}))->second;
 		return unknown;
 	}
 
@@ -71,12 +71,12 @@ struct scoped_resolver {
 	}
 
 	bool assign(const data_t& data, const kind_t& kind) {
-		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+		for(auto it = scopes_.rbegin(); it != scopes_.rend(); ++it)
 			if (uf.contains({*it, data})) {
-				if (auto current = kinds_.find(uf.root({*it, data}))->second;
+				if (auto current = kinds_.find(uf.root(element_t{*it, data}))->second;
 						current != unknown && current != kind)
 					return false;
-				kinds_[uf.root({*it, data})] = kind;
+				kinds_[uf.root(element_t{*it, data})] = kind;
 				return true;
 			}
 		return false;
@@ -98,7 +98,7 @@ struct scoped_resolver {
 
 	std::map<data_t, kind_t> current_kinds() {
 		std::map<data_t, kind_t> result ;
-		for(auto it = uf.lower_bound({current, minimum}); it != uf.end(); ++it)
+		for(auto it = uf.lower_bound(element_t{current, minimum}); it != uf.end(); ++it)
 			if (kinds_.find(it->second) != kinds_.end())
 				result[it->second.second] = type_of(it->second.second);
 		return result;
@@ -133,6 +133,12 @@ struct type_scoped_resolver : public scoped_resolver<tref, type> {
 	// merge two trefs if the types are compatible
 	// returns true if merge was successful, false otherwise
 	bool merge([[maybe_unused]] tref a, [[maybe_unused]] tref b) {
+		auto type_a = this->type_of(a);
+		auto type_b = this->type_of(b);
+		auto merged = merge_ba_types<node>(type_a, type_b);
+		if (!merged) return false; // conflicting type info
+		this->uf.merge({this->current, a}, {this->current, b});
+		this->kinds_[this->uf.root({this->current, a})] = merged.value();
 		return true;
 	}
 };

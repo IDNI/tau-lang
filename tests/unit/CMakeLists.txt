@@ -21,6 +21,7 @@ set(TESTS
 	ba_cvc5
 	cvc5
 	resolver
+	union_find
 )
 
 foreach(X IN LISTS TESTS)
