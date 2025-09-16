@@ -1046,7 +1046,11 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 			return cache.emplace(std::make_pair(fm, start_time),
 					     elim_aw(fm)).first->second;
 #endif // TAU_CACHE
-			return elim_aw(fm);
+			// Here we deal with a non-temporal formula
+			fm = elim_aw(fm);
+			if (is_non_temp_nso_satisfiable<node>(fm))
+				return fm;
+			else return tau::_F();
 		}
 	}
 	auto aw_after_ev = tau::get(ev_t.first)

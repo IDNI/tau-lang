@@ -4414,7 +4414,9 @@ tref treat_ex_quantified_clause(tref ex_formula) {
 	if (tau::get(scoped_fm).equals_T()) return new_fm;
 	tref f = squeeze_positives<node>(scoped_fm);
 	tref f_0 = f ? rewriter::replace<node>(f, var, tau::_0_trimmed()) : tau::_0();
+	// std::cout << "f_0: " << tau::get(f_0) << "\n";
 	tref f_1 = f ? rewriter::replace<node>(f, var, tau::_1_trimmed()) : tau::_0();
+	// std::cout << "f_1: " << tau::get(f_1) << "\n";
 	trefs neqs = tau::get(scoped_fm).select_top(is<node, tau::bf_neq>);
 	if (neqs.size()) {
 		tref nneqs = tau::_T();
@@ -4423,8 +4425,10 @@ tref treat_ex_quantified_clause(tref ex_formula) {
 			tref g = tt(neq) | tau::bf | tt::ref;
 			tref g_0 = rewriter::replace<node>(g, var,
 						tau::_0_trimmed());
+			// std::cout << "g_0: " << tau::get(g_0) << "\n";
 			tref g_1 = rewriter::replace<node>(g, var,
 						tau::_1_trimmed());
+			// std::cout << "g_1: " << tau::get(g_1) << "\n";
 			// If both are 1 then inequality is implied by f_0f_1 = 0
 			if (tau::get(g_0).equals_1() && tau::get(g_1).equals_1())
 				continue;

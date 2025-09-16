@@ -148,7 +148,8 @@ tref good_splitter_using_function(tref f, splitter_type st, tref clause,
 	// First check if we have more than one disjunct
 	tref new_clause = nullptr;
 	auto check_splitter = [&](tref s) {
-		new_clause = rewriter::replace<node>(clause, f, tau::build_bf_eq_0(s));
+		if (tau::get(s).equals_0()) return false;
+		new_clause = rewriter::replace<node>(clause, f, tau::build_bf_neq_0(s));
 		if (tau::get(new_clause).equals_F()) return false;
 		tref splitter_candidate = tau::build_wff_or(
 			fm_without_clause, new_clause);
@@ -169,12 +170,14 @@ tref good_splitter_using_function(tref f, splitter_type st, tref clause,
 			.find_top(is<node, tau::bf_constant>);
 		if (!coeff) return false;
 		DBG(assert(is<node>(coeff, tau::bf_constant));)
-		tref scoeff = splitter<BAs...>(tau::get(coeff)).first();
+		const tau& scoeff_t = splitter<BAs...>(tau::get(coeff));
+		if (scoeff_t.equals_0()) return false;
+		tref scoeff = scoeff_t.first();
 		if (tau::get(scoeff) != tau::get(coeff)) {
 			tref path = rewriter::replace<node>(curr_path, coeff, scoeff);
 			curr_f = tau::build_bf_or(curr_f, path);
 			new_clause = rewriter::replace<node>(clause, f,
-				tau::build_bf_eq_0(curr_f));
+				tau::build_bf_neq_0(curr_f));
 			if (tau::get(new_clause).equals_F()) return false;
 			tref splitter_candidate =
 				tau::build_wff_or(fm_without_clause, new_clause);
@@ -227,6 +230,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 				      : tau::_1();
 			tref new_path = tau::build_bf_and(lits);
 			curr_f = tau::build_bf_or(curr_f, new_path);
+			if (tau::get(curr_f).equals_1()) return false;
 			new_clause = rewriter::replace<node>(
 				clause, f, tau::build_bf_eq_0(curr_f));
 			// Check if splitting resulted in false
