@@ -126,7 +126,7 @@ template <NodeType node>
 tref build_wff_all(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::wff));)
 	return tau::get(tau::wff, tau::get(tau::wff_all, l, r));
 }
 
