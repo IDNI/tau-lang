@@ -123,14 +123,14 @@ TEST_SUITE("scopes") {
 
 TEST_SUITE("merge_ba_types") {
 
-	bool match(const type& type1, const type& type2, const type& result) {
+	bool match(const type_t& type1, const type_t& type2, const type_t& result) {
 		auto merged = merge_ba_types<node_t>(type1, type2);
 		if (!merged) return false;
 		return (result.first == merged.value().first
 			&& result.second == merged.value().second);
 	}
 
-	bool nomatch(const type& type1, const type& type2) {
+	bool nomatch(const type_t& type1, const type_t& type2) {
 		auto merged = merge_ba_types<node_t>(type1, type2);
 		return !merged.has_value();
 	}
@@ -170,7 +170,7 @@ TEST_SUITE("type_scoped_resolver") {
 		tref b = (tref)2;
 		r.insert(a);
 		r.insert(b);
-		type t = {1, (tref)1};
+		type_t t = {1, (tref)1};
 		CHECK(r.assign(a, t));
 		CHECK(r.merge(a, b));
 		CHECK(r.type_of(a) == r.type_of(b));
@@ -181,7 +181,7 @@ TEST_SUITE("type_scoped_resolver") {
 		type_scoped_resolver<node_t> r;
 		tref a = (tref)1;
 		tref b = (tref)2;
-		type t = {1, (tref)1};
+		type_t t = {1, (tref)1};
 		r.insert(a);
 		r.open({{b, t}});
 		CHECK(r.merge(a, b));
@@ -195,8 +195,8 @@ TEST_SUITE("type_scoped_resolver") {
 		tref b = (tref)2;
 		r.insert(a);
 		r.insert(b);
-		type t1 = {1, (tref)1};
-		type t2 = {2, (tref)2};
+		type_t t1 = {1, (tref)1};
+		type_t t2 = {2, (tref)2};
 		CHECK(r.assign(a, t1));
 		CHECK(r.assign(b, t2));
 		CHECK(!r.merge(a, b)); // conflicting types
@@ -206,13 +206,11 @@ TEST_SUITE("type_scoped_resolver") {
 		type_scoped_resolver<node_t> r;
 		tref a = (tref)1;
 		tref b = (tref)2;
-		type t1 = {1, (tref)1};
-		type t2 = {2, (tref)2};
+		type_t t1 = {1, (tref)1};
+		type_t t2 = {2, (tref)2};
 		r.insert(a);
 		CHECK(r.assign(a, t1));
 		r.open({{b, t2}});
 		CHECK(!r.merge(a, b)); // conflicting types
 	}
 }
-
-TEST_SUITE("new_infer_ba_types") {}

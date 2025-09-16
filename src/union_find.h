@@ -81,6 +81,10 @@ public:
 		return parent.equal_range(x);
 	}
 
+	typename std::map<data_t, data_t>::iterator lower_bound(const data_t& x) {
+		return parent.lower_bound(x);
+	}
+
 	typename std::map<data_t, data_t>::iterator find(const data_t& x) {
 		return parent.find(x);
 	}

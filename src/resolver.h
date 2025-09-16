@@ -12,9 +12,13 @@
 #include "tau_tree.h"
 #include "union_find.h"
 
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "resolver"
+
 namespace idni::tau_lang {
 
-using type = std::pair<size_t, tref>; // (type_id, subtype)
+using type_t = std::pair<size_t, tref>; // (type_id, subtype)
 
 template<typename data_t, typename kind_t>
 struct scoped_resolver {
@@ -106,7 +110,7 @@ struct scoped_resolver {
 };
 
 template<NodeType node>
-std::optional<type> merge_ba_types(const type& t1, const type& t2) {
+std::optional<type_t> merge_ba_types(const type_t& t1, const type_t& t2) {
 	static auto untyped = ba_types<node>::id("untyped");
 	if (t1.first == untyped) {
 		if (t2.first != untyped) {
@@ -126,12 +130,12 @@ std::optional<type> merge_ba_types(const type& t1, const type& t2) {
 }
 
 template<NodeType node>
-struct type_scoped_resolver : public scoped_resolver<tref, type> {
+struct type_scoped_resolver : public scoped_resolver<tref, type_t> {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
 	type_scoped_resolver():
-		scoped_resolver<tref, type>(nullptr, {0, nullptr}) {}
+		scoped_resolver<tref, type_t>(nullptr, {0, nullptr}) {}
 
 	// merge two trefs if the types are compatible
 	// returns true if merge was successful, false otherwise
@@ -144,6 +148,16 @@ struct type_scoped_resolver : public scoped_resolver<tref, type> {
 		this->kinds_[this->uf.root({this->current, a})] = merged.value();
 		return true;
 	}
+
+	bool merge(const trefs& ts) {
+		if (ts.size() < 2) return true;
+		auto it = ts.begin();
+		tref first = *it;
+		++it;
+		for(; it != ts.end(); ++it)
+			if (!merge(first, *it)) return false;
+		return true;
+	}
 };
 
 // Infers the types of variables and constants in the tree n. It assumes that
@@ -154,6 +168,8 @@ template <NodeType node>
 tref new_infer_ba_types(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	// Untyped type
+	static type_t untyped = std::make_pair(ba_types<node>::id("untyped"), nullptr);
 
 	// The following variables conform the state of the traversal
 	// transformed: map from original tref to transformed tref
@@ -164,17 +180,19 @@ tref new_infer_ba_types(tref n) {
 	bool error = false;
 
 	// Extract the type and subtype of a variable or constant node vector
-	auto get_type = [&](trefs ts) -> std::optional<type> {
+	auto get_type = [&](trefs ts) -> std::optional<type_t> {
 		using tau = tree<node>;
 		using tt = tau::traverser;
 
-		if (ts.empty()) return {resolver.unknown, nullptr}; // no type, no subtype info
-		std::optional<type> result = { std::make_pair(0, nullptr) }; // (type_id, subtype)
+
+		// no type, no subtype info
+		if (ts.empty())	return std::optional<type_t>(untyped);
+		std::optional<type_t> result = untyped; // (type_id, subtype)
 		for (const auto& t : ts) {
-			auto t_type = make_pair<type, type>(
-				tau::tt(t) | tau::type | tt::ba_type,
-				tau::tt(t) | tau::subtype | tt::ref);
-			result = merge_ba_types(result.value(), t_type);
+			auto t_type = std::make_pair(
+				tt(t) | tau::type | tt::ba_type,
+				tt(t) | tau::subtype | tt::ref);
+			result = merge_ba_types<node>(result.value(), t_type);
 			if (!result) return std::nullopt; // conflicting type info
 		}
 		return result;
@@ -188,12 +206,12 @@ tref new_infer_ba_types(tref n) {
 			|| is<node, tau::bf_f>(t);
 	};
 
-	auto is_mergeable = [](tref t) -> bool {
+	/*auto is_mergeable = [](tref t) -> bool {
 		return is<node, tau::variable>(t)
 			|| is<node, tau::bf_constant>(t)
 			|| is<node, tau::bf_t>(t)
 			|| is<node, tau::bf_f>(t);
-	};
+	};*/
 
 	// We gather info about types and scopes while entering nodes
 	auto on_enter = [&] (tref n, [[maybe_unused]] tref parent) -> bool {
@@ -210,10 +228,14 @@ tref new_infer_ba_types(tref n) {
 		// When entering an atomic formula, we update the default kind
 		// according to the formula type (bv or bf).
 		DBG(assert(n != nullptr);)
+		// Stop traversal on error
+		if (error) return false;
+		// Get the node type
 		const auto& t = tau::get(n);
 		size_t nt = t.get_type();
+		// Depoending on the node type...
 		switch (nt) {
-			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_exists: {
+			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_fex: {
 				// Open a new scope. Add its variables to the scope, assigning
 				// them the type and subtype if known.
 				// We assume all scoped variables are resolved when closing the scope,
@@ -221,15 +243,16 @@ tref new_infer_ba_types(tref n) {
 				// node and do not further continue visiting child nodes.
 				if (transformed.find(n) != transformed.end())
 					return false; // Skip children
-				resolver.open();
-				std::map<tref, type> vars;
+				resolver.open({});
+				std::map<tref, type_t> vars;
 				auto qvars = tau::get(n)[0].select_top(is<node, tau::q_var>);
 				for (const auto& v : qvars) {
 					auto var = tt(v) | tau::variable | tt::ref;
-					auto var_type = make_pair<type, type>(
+					auto var_type = std::make_pair<size_t, tref>(
 						tt(var) | tau::type | tt::ba_type,
 						tt(var) | tau::subtype | tt::ref);
-					resolver.insert(var); assign(var, var_type);
+					resolver.insert(var);
+					resolver.assign(var, var_type);
 				}
 				break;
 			}
@@ -254,7 +277,7 @@ tref new_infer_ba_types(tref n) {
 					// processed.
 					if (is<node, tau::variable>(t)) {
 						resolver.insert(t);
-						resolver.assign(t, type);
+						resolver.assign(t, type.value());
 						mergeables.push_back(t);
 					}
 				}
@@ -279,7 +302,7 @@ tref new_infer_ba_types(tref n) {
 					// untyped.
 					if (is<node, tau::variable>(t)) {
 						resolver.insert(t);
-						resolver.assign(t, type);
+						resolver.assign(t, type.value());
 						mergeables.push_back(t);
 					} else if (is<node, tau::bf_constant>(t)) {
 						constants.push_back(t);
@@ -287,10 +310,10 @@ tref new_infer_ba_types(tref n) {
 					}
 				}
 				// Open a new scope for the constants and add them to it
-				resolver.open();
+				resolver.open({});
 				for (const auto& c : constants) {
 					resolver.insert(c);
-					resolver.assign(c, type);
+					resolver.assign(c, type.value());
 				}
 				// We merge all the info (variables and constants)
 				if (!resolver.merge(mergeables)) error = true; // Error in type checking
@@ -299,12 +322,14 @@ tref new_infer_ba_types(tref n) {
 			default:
 				break;
 		}
-		return !error; // Continue child traversal?
+		// Stop traversal on error
+		return !error;
 	};
 
 	// Do nothing between nodes
 	auto on_between = [&] ([[maybe_unused]] tref n, [[maybe_unused]]tref parent) -> bool {
-		return !error; // Continue traversal?
+		// Stop traversal on error
+		return !error;
 	};
 
 	// We update types (changing nodes while leaving them) while closing scopes
@@ -312,10 +337,14 @@ tref new_infer_ba_types(tref n) {
 		// We use transformed map to update children if they were changed
 		// and update it with the current node if it was changed.
 		DBG(assert(n != nullptr);)
+		// Stop traversal on error
+		if (error) return;
+		// Get the node type
 		const auto& t = tau::get(n);
 		size_t nt = t.get_type();
+		// Depoending on the node type...
 		switch (nt) {
-			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_exists: {
+			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_fex: {
 				// Close the current scope and replace occurrences of
 				// untyped variables with the inferred ones (if any).
 				// We resolve to tau all untyped variables.
@@ -324,7 +353,7 @@ tref new_infer_ba_types(tref n) {
 				std::map<tref, tref> changes;
 				for(auto [var, type] : resolver.current_kinds()) {
 					auto inferred = type;
-					if (type.first == resolver.unknown ) {
+					if (type.first == untyped.first ) {
 						inferred = { ba_types<node>::id("tau"), nullptr };
 						resolver.assign(var, { ba_types<node>::id("tau"), nullptr });
 					}
@@ -346,16 +375,24 @@ tref new_infer_ba_types(tref n) {
 				// is unknown, we assume is tau.
 				// We also update the current node with the transformed
 				// children if any.
+				// If a constant is untyped, we resolve it to tau.
+				// We also transform the constants to proper constant nodes
 				std::map<tref, tref> changes;
 				for(auto [cte, type] : resolver.current_kinds()) {
-					auto new_type = { type.first == resolver.unknown
-							? ba_types<node>::id("tau")
-							: type.first,
-						type.second };
-					// We replace all untyped vconstants with the inferred type.
-					changes[cte] = tau::build_ba_constant(
-					tt(cte) | tt::ba_constant,
-					new_type);
+					size_t inferred = type.first == untyped.first
+						? ba_types<node>::id("tau")
+						: type.first;
+					tref bounded = tau::get_ba_constant_from_source(
+						tau::get(cte).data(),
+						inferred
+					);
+					if (bounded == nullptr) {
+						LOG_ERROR << "Failed to bind default type: "
+								<< LOG_BA_TYPE(inferred)
+								<< " to " << LOG_FM(cte);
+						error = true;
+					}
+					changes[cte] = bounded;
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
 				if (new_n != n) transformed[n] = new_n;
@@ -370,14 +407,18 @@ tref new_infer_ba_types(tref n) {
 				if (parent) return;
 				std::map<tref, tref> changes;
 				for(auto [var, type] : resolver.current_kinds()) {
-					auto new_type = { type.first == resolver.unknown
-							? ba_types<node>::id("tau")
-							: type.first,
-						type.second };
-					// We replace all untyped variables with the inferred type.
-					changes[var] = tau::build_ba_variable(
-						tt(var) | tt::string,
-						new_type);
+					if (type.first == untyped.first) {
+						changes[var] = tau::build_variable(
+							tt(var) | tt::string,
+							ba_types<node>::id("tau"),
+							nullptr);
+					} else {
+						// We replace all untyped variables with tau.
+						changes[var] = tau::build_variable(
+							tt(var) | tt::string,
+							type.first,
+							type.second);
+					}
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
 				if (new_n != n) transformed[n] = new_n;
