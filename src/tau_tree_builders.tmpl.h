@@ -713,19 +713,15 @@ tref build_var_name_indexed(size_t index) {
 }
 
 template <NodeType node>
-tref build_variable(tref var_name_node, size_t type_id, tref subtype) {
+tref build_variable(tref var_name_node, size_t type_id) {
 	using tau = tree<node>;
-	return subtype
-		? tau::get_typed(tau::variable, var_name_node, subtype, type_id)
-		: tau::get_typed(tau::variable, var_name_node, type_id);
+	return tau::get_typed(tau::variable, var_name_node, type_id);
 }
 
 template <NodeType node>
-tref build_variable(const std::string& name, size_t type_id, tref subtype) {
+tref build_variable(const std::string& name, size_t type_id) {
 	using tau = tree<node>;
-	return subtype
-		? tau::get_typed(tau::variable, build_var_name<node>(name), subtype, type_id)
-		: tau::get_typed(tau::variable, build_var_name<node>(name), type_id);
+	return tau::get_typed(tau::variable, build_var_name<node>(name), type_id);
 }
 
 template <NodeType node>
@@ -1478,13 +1474,13 @@ tref tree<node>::build_var_name_indexed(size_t index) {
 }
 
 template <NodeType node>
-tref tree<node>::build_variable(tref var_name_node, size_t type_id, tref subtype) {
-	return tau_lang::build_variable<node>(var_name_node, type_id, subtype);
+tref tree<node>::build_variable(tref var_name_node, size_t type_id) {
+	return tau_lang::build_variable<node>(var_name_node, type_id);
 }
 
 template <NodeType node>
-tref tree<node>::build_variable(const std::string& name, size_t type_id, tref subtype) {
-	return tau_lang::build_variable<node>(name, type_id, subtype);
+tref tree<node>::build_variable(const std::string& name, size_t type_id) {
+	return tau_lang::build_variable<node>(name, type_id);
 }
 
 template <NodeType node>
