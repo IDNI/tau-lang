@@ -170,7 +170,7 @@ tref new_infer_ba_types(tref n) {
 	using tt = tau::traverser;
 
 	// Untyped type
-	static type_t untyped = std::make_pair(ba_types<node>::id("untyped"), nullptr);
+	static type_t untyped = { ba_types<node>::id("untyped"), nullptr };
 
 	// The following variables conform the state of the traversal
 	// transformed: map from original tref to transformed tref
@@ -189,9 +189,8 @@ tref new_infer_ba_types(tref n) {
 		if (ts.empty())	return std::optional<type_t>(untyped);
 		std::optional<type_t> result = untyped;
 		for (const auto& t : ts) {
-			auto t_type = std::make_pair(
-				tt(t) | tau::type | tt::ba_type,
-				tt(t) | tau::subtype | tt::ref);
+			type_t t_type = { tt(t) | tau::type | tt::ba_type,
+				tt(t) | tau::subtype | tt::ref };
 			result = merge_ba_types<node>(result.value(), t_type);
 			// If types are conflicting, return nullopt
 			if (!result) return std::nullopt;
@@ -241,7 +240,7 @@ tref new_infer_ba_types(tref n) {
 				for (const auto& v : qvars) {
 					auto var = tt(v) | tau::variable | tt::ref;
 					if (auto type = tt(var) | tau::type | tt::ba_type; type)
-						var_list[var] = std::make_pair(type, tt(var) | tau::subtype | tt::ref);
+						var_list[var] =  { type, tt(var) | tau::subtype | tt::ref };
 					else var_list[var] = untyped;
 				}
 				resolver.open(var_list);
