@@ -180,6 +180,8 @@ tref new_infer_ba_types(tref n) {
 	std::map<tref, tref> transformed;
 	bool error = false;
 
+	DBG(LOG_TRACE << "new_infer_ba_types/n: " << LOG_FM(n);)
+
 	// Extract the type and subtype of a variable or constant node vector
 	auto get_type = [&](trefs ts) -> std::optional<type_t> {
 		using tau = tree<node>;
@@ -217,6 +219,9 @@ tref new_infer_ba_types(tref n) {
 	// We gather info about types and scopes while entering nodes
 	auto on_enter = [&] (tref n, [[maybe_unused]] tref parent) -> bool {
 		DBG(assert(n != nullptr);)
+
+		DBG(LOG_TRACE << "new_infer_ba_types/on_enter/n: " << LOG_FM(n);)
+
 		// Stop traversal on error
 		if (error) return false;
 		// Get the node type
@@ -224,6 +229,19 @@ tref new_infer_ba_types(tref n) {
 		size_t nt = t.get_type();
 		// Depoending on the node type...
 		switch (nt) {
+			case tau::rec_relation: {
+				// We open a new scope for the relation variables and constants.
+				// We assume all scoped variables and constants are resolved when
+				// closing the scope. Otherwise, we type then to the tau type.
+				// So if the current node is already transformed, we use the transformed
+				// node and do not further continue visiting child nodes.
+				if (transformed.find(n) != transformed.end())
+					return false;
+
+				// We open the new scope
+				resolver.open({});
+				break;
+			}
 			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_fex: {
 				// We open a new scope, we get all the quantified variables,
 				// add them to the scope (with the given type if any).
@@ -274,7 +292,7 @@ tref new_infer_ba_types(tref n) {
 				// structure. If there is a conflict, we set error and stop the
 				// traversal.
 				if (!resolver.merge(typeables)) error = true;
-				// We stop the traversal of children as we have already
+				// Anyway, we stop the traversal of children as we have already
 				// processed all the typeables in the expression.
 				return false;
 			}
@@ -322,7 +340,7 @@ tref new_infer_ba_types(tref n) {
 				// structure. If there is a conflict, we set error and stop the
 				// traversal.
 				if (!resolver.merge(mergeables)) error = true;
-				// We stop the traversal of children as we have already
+				// Anyway, we stop the traversal of children as we have already
 				// processed all the typeables in the expression.
 				return false;
 			}
@@ -346,6 +364,9 @@ tref new_infer_ba_types(tref n) {
 		// We use transformed map to update children if they were any changes
 		// and add the current node if resulted changed.
 		DBG(assert(n != nullptr);)
+
+		DBG(LOG_TRACE << "new_infer_ba_types/on_leave/n: " << LOG_FM(n);)
+
 		// Stop traversal on error
 		if (error) return;
 		// Get the node type
@@ -353,6 +374,38 @@ tref new_infer_ba_types(tref n) {
 		size_t nt = t.get_type();
 		// Depoending on the node type...
 		switch (nt) {
+			case tau::rec_relation: {
+				// We type untyped variables with tau.
+				std::map<tref, tref> changes;
+				for(auto [e, type] : resolver.current_kinds()) {
+					if (type.first == untyped.first) {
+						if (resolver.assign(e, { ba_types<node>::id("tau"), nullptr })) {
+							// We have a type mismatch
+							error = true; return;
+						}
+						if (is<node, tau::variable>(e)) {
+							changes[e] = tau::build_variable(
+								tt(e) | tt::string,
+								ba_types<node>::id("tau"),
+								nullptr);
+						} else { // or a constant
+							tref bounded = tau::get_ba_constant_from_source(
+								tau::get(e).data(),
+								ba_types<node>::id("tau"));
+							if (bounded == nullptr) {
+								// We have a type mismatch
+								error = true; return;
+							}
+							changes[e] = bounded;
+						}
+					}
+				}
+				auto new_n = rewriter::replace<node>(n, changes);
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
+				if (new_n != n) transformed[n] = new_n;
+				resolver.close();
+				return;
+			}
 			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_fex: {
 				// Replace occurrences of untyped variables with the inferred
 				// ones (if any). We resolve to tau all untyped variables.
@@ -376,6 +429,7 @@ tref new_infer_ba_types(tref n) {
 						inferred.second);
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
 				if (new_n != n) transformed[n] = new_n;
 				resolver.close();
 				return;
@@ -400,14 +454,12 @@ tref new_infer_ba_types(tref n) {
 						inferred
 					);
 					if (bounded == nullptr) {
-						LOG_ERROR << "Failed to bind default type: "
-								<< LOG_BA_TYPE(inferred)
-								<< " to " << LOG_FM(cte);
 						error = true;
 					}
 					changes[cte] = bounded;
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
 				if (new_n != n) transformed[n] = new_n;
 				resolver.close();
 				return;
@@ -418,6 +470,7 @@ tref new_infer_ba_types(tref n) {
 				// Note that we do not need to close any scope here.
 				if (parent) {
 					auto new_n = rewriter::replace<node>(n, transformed);
+					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
 					if (new_n != n) transformed[n] = new_n;
 					return;
 				}
@@ -437,6 +490,7 @@ tref new_infer_ba_types(tref n) {
 					}
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
 				if (new_n != n) transformed[n] = new_n;
 				return;
 			}
