@@ -4,6 +4,11 @@
 #include "test_tau_helpers.h"
 #include "resolver.h"
 
+TEST_SUITE("Configuration") {
+	TEST_CASE("logging") {
+		logging::trace();
+	}
+}
 
 TEST_SUITE("new_infer_ba_types") {
 
