@@ -217,7 +217,7 @@ tref new_infer_ba_types(tref n) {
 	};*/
 
 	// We gather info about types and scopes while entering nodes
-	auto on_enter = [&] (tref n, [[maybe_unused]] tref parent) -> bool {
+	auto on_enter = [&](tref n, tref) {
 		DBG(assert(n != nullptr);)
 
 		DBG(LOG_TRACE << "new_infer_ba_types/on_enter/n: " << LOG_FM(n);)
@@ -225,7 +225,7 @@ tref new_infer_ba_types(tref n) {
 		// Stop traversal on error
 		if (error) return false;
 		// Get the node type
-		const auto& t = tau::get(n);
+		auto t = tau::get(n);
 		size_t nt = t.get_type();
 		// Depoending on the node type...
 		switch (nt) {
@@ -354,13 +354,13 @@ tref new_infer_ba_types(tref n) {
 	};
 
 	// Do nothing between nodes
-	auto on_between = [&] ([[maybe_unused]] tref n, [[maybe_unused]]tref parent) -> bool {
+	auto on_between = [&] (tref, tref) {
 		// Stop traversal on error
 		return !error;
 	};
 
 	// We update types (changing nodes while leaving them) while closing scopes
-	auto on_leave = [&] (tref n, tref parent) -> void {
+	auto on_leave = [&] (tref n, tref parent) {
 		// We use transformed map to update children if they were any changes
 		// and add the current node if resulted changed.
 		DBG(assert(n != nullptr);)
@@ -384,10 +384,10 @@ tref new_infer_ba_types(tref n) {
 							error = true; return;
 						}
 						if (is<node, tau::variable>(e)) {
-							changes[e] = tau::build_variable(
+							/*changes[e] = tau::build_variable(
 								tt(e) | tt::string,
 								ba_types<node>::id("tau"),
-								nullptr);
+								nullptr);*/
 						} else { // or a constant
 							tref bounded = tau::get_ba_constant_from_source(
 								tau::get(e).data(),
@@ -423,10 +423,10 @@ tref new_infer_ba_types(tref n) {
 							return;
 						}
 					}
-					changes[var] = tau::build_variable(
+					/*changes[var] = tau::build_variable(
 						tt(var) | tt::string,
 						inferred.first,
-						inferred.second);
+						inferred.second);*/
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
@@ -483,10 +483,10 @@ tref new_infer_ba_types(tref n) {
 							error = true;
 							return;
 						}
-						changes[var] = tau::build_variable(
+						/*changes[var] = tau::build_variable(
 							tt(var) | tt::string,
 							ba_types<node>::id("tau"),
-							nullptr);
+							nullptr);*/
 					}
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
@@ -501,11 +501,13 @@ tref new_infer_ba_types(tref n) {
 	auto visit_all = [](tref) { return true; };
 	// We visit the tree and return the transformed root if no error happened.
 	// If an error happened we return nullptr.
-	pre_order<node>(tau::get(n).get()).visit(on_enter, visit_all, on_leave, on_between);
+	pre_order<node>(n).visit(on_enter, visit_all, on_leave, on_between);
 	if (error) return nullptr;
 	// We add to the transformed map the untypping of the bf_t's and the bf_f's.
 	// ...some code here...
-	return transformed.contains(n) ? transformed[n] : n;
+	auto new_n = transformed.contains(n) ? transformed[n] : n;
+	DBG(LOG_TRACE << "new_infer_ba_types/new_n: " << LOG_FM(new_n);)
+	return new_n;
 }
 
 } // namespace idni::tau_lang

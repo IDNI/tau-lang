@@ -309,10 +309,10 @@ template <NodeType node>
 tref build_var_name_indexed(size_t index);
 
 template <NodeType node>
-tref build_variable(tref var_name_node, size_t type_id, tref subtype = nullptr);
+tref build_variable(tref var_name_node, size_t type_id);
 
 template <NodeType node>
-tref build_variable(const std::string& name, size_t type_id, tref subtype = nullptr);
+tref build_variable(const std::string& name, size_t type_id);
 
 template <NodeType node>
 tref build_bf_variable(tref var_name_node, size_t type_id);
