@@ -8,7 +8,7 @@ using namespace idni::tau_lang;
 TEST_SUITE("union_find") {
 
 	TEST_CASE("insert and contains") {
-		union_find<int> uf;
+		union_find_by_rank<int> uf;
 		uf.insert(1);
 		uf.insert(2);
 		uf.insert(3);
@@ -20,7 +20,7 @@ TEST_SUITE("union_find") {
 	}
 
 	TEST_CASE("merge and connected") {
-		union_find<int> uf;
+		union_find_by_rank<int> uf;
 		uf.insert(1);
 		uf.insert(2);
 		uf.insert(3);
@@ -32,7 +32,7 @@ TEST_SUITE("union_find") {
 	}
 
 	TEST_CASE("root and path compression") {
-		union_find<int> uf;
+		union_find_by_rank<int> uf;
 		uf.insert(1);
 		uf.insert(2);
 		uf.insert(3);
@@ -46,7 +46,7 @@ TEST_SUITE("union_find") {
 	}
 
 	TEST_CASE("get_sets returns correct sets") {
-		union_find<int> uf;
+		union_find_by_rank<int> uf;
 		uf.insert(1);
 		uf.insert(2);
 		uf.insert(3);
@@ -65,7 +65,7 @@ TEST_SUITE("union_find") {
 	}
 
 	TEST_CASE("size after merges and inserts") {
-		union_find<int> uf;
+		union_find_by_rank<int> uf;
 		uf.insert(1);
 		uf.insert(2);
 		uf.insert(3);
@@ -77,7 +77,7 @@ TEST_SUITE("union_find") {
 	}
 
 	TEST_CASE("connected for non-inserted elements") {
-		union_find<int> uf;
+		union_find_by_rank<int> uf;
 		CHECK(!uf.connected(1, 2));
 		uf.insert(1);
 		CHECK(!uf.connected(1, 2));

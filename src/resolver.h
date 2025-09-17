@@ -25,9 +25,9 @@ struct scoped_resolver {
 	using scope_t = size_t;
 	using element_t = std::pair<scope_t, data_t>;
 	using kinds_t = std::map<element_t, kind_t>;
-	using union_find_t = union_find<element_t, std::less<element_t>>;
+	using union_find_by_rank_t = union_find_by_rank<element_t, std::less<element_t>>;
 
-	union_find_t uf;
+	union_find_by_rank_t uf;
 	scope_t current = 0;
 	std::deque<size_t> scopes_ { current };
 	std::map<element_t, kind_t> kinds_;
