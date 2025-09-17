@@ -168,6 +168,7 @@ template <NodeType node>
 tref new_infer_ba_types(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+
 	// Untyped type
 	static type_t untyped = std::make_pair(ba_types<node>::id("untyped"), nullptr);
 
@@ -184,20 +185,21 @@ tref new_infer_ba_types(tref n) {
 		using tau = tree<node>;
 		using tt = tau::traverser;
 
-
-		// no type, no subtype info
+		// If trefs is empty we return the default (untyped)
 		if (ts.empty())	return std::optional<type_t>(untyped);
-		std::optional<type_t> result = untyped; // (type_id, subtype)
+		std::optional<type_t> result = untyped;
 		for (const auto& t : ts) {
 			auto t_type = std::make_pair(
 				tt(t) | tau::type | tt::ba_type,
 				tt(t) | tau::subtype | tt::ref);
 			result = merge_ba_types<node>(result.value(), t_type);
-			if (!result) return std::nullopt; // conflicting type info
+			// If types are conflicting, return nullopt
+			if (!result) return std::nullopt;
 		}
 		return result;
 	};
 
+	// Typeable trefs predicate
 	auto is_typeable = [](tref t) -> bool {
 		return is<node, tau::variable>(t)
 			|| is<node, tau::bf_constant>(t)
@@ -215,18 +217,6 @@ tref new_infer_ba_types(tref n) {
 
 	// We gather info about types and scopes while entering nodes
 	auto on_enter = [&] (tref n, [[maybe_unused]] tref parent) -> bool {
-		// When traversing a bv we set the default type to bv.
-		// When traversing a bf we set the default type to unknown as it can be
-		// either tau or sbf.
-		// When entering a quantifier we open a new scope and add its variables
-		// to the scope, assigning them the type if known, the default type
-		// otherwise.
-		// We entering a variable, we should take into account that if the
-		// parent is a qvar, we add it to the current scope, otherwise to the
-		// default one. The same if it is a quantifier (check which one is
-		// the correct one in the code)
-		// When entering an atomic formula, we update the default kind
-		// according to the formula type (bv or bf).
 		DBG(assert(n != nullptr);)
 		// Stop traversal on error
 		if (error) return false;
@@ -236,70 +226,80 @@ tref new_infer_ba_types(tref n) {
 		// Depoending on the node type...
 		switch (nt) {
 			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_fex: {
-				// Open a new scope. Add its variables to the scope, assigning
-				// them the type and subtype if known.
+				// We open a new scope, we get all the quantified variables,
+				// add them to the scope (with the given type if any).
+
 				// We assume all scoped variables are resolved when closing the scope,
 				// so if the current node is already transformed, we use the transformed
 				// node and do not further continue visiting child nodes.
 				if (transformed.find(n) != transformed.end())
-					return false; // Skip children
-				resolver.open({});
-				std::map<tref, type_t> vars;
+					return false;
+				// We collect all the variables/type pairs in a map. Note that
+				// repeated variables will be overwritten, keeping the inner one.
+				std::map<tref, type_t> var_list;
 				auto qvars = tau::get(n)[0].select_top(is<node, tau::q_var>);
 				for (const auto& v : qvars) {
 					auto var = tt(v) | tau::variable | tt::ref;
-					auto var_type = std::make_pair<size_t, tref>(
-						tt(var) | tau::type | tt::ba_type,
-						tt(var) | tau::subtype | tt::ref);
-					resolver.insert(var);
-					resolver.assign(var, var_type);
+					if (auto type = tt(var) | tau::type | tt::ba_type; type)
+						var_list[var] = std::make_pair(type, tt(var) | tau::subtype | tt::ref);
+					else var_list[var] = untyped;
 				}
+				resolver.open(var_list);
+				// We continue the traversal of children
 				break;
 			}
 			case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
 			case tau::bv_gt: case tau::bv_ngt: case tau::bv_gteq: case tau::bv_ngteq:
 			case tau::bv_lt: case tau::bv_nlt: {
-				// We get all the top variables in the expression
-				// assign then a type of bv, we subtype the ones
-				// with subtype info and added to resolver
-				// accordingly (inserting and merging).
-				// We also consider all the constants in the expression.
-				// The bf_t's and the bf_f's are considered only to hint
-				// the type of the variables, but they are not added to
-				// the resolver as they would be untypped.
+				// We get all the (top) typeables in the expression and assign
+				// then the type bv (and the subtype when available). We do the
+				// same for the constants.
+
+				// We get all the typeable top nodes in the expression, which in
+				// this case are only (bitvector) variables and constants.
 				auto typeables = tau::get(n).select_top(is_typeable);
+				// We infer the common type of all the typeables in the expression
 				auto type = get_type(typeables);
-				if (!type) return error = true, false; // Error in type checking
+				// If no common type is found, we set error and stop traversal
+				if (!type) return error = true, false;
+				// We add the variables and constants to the current scope and
+				// assign them the common type. We also collect them in a vector
+				// to be merged together later.
 				trefs mergeables;
 				for (const auto& t : typeables)	{
-					// We ignore the bv constants for a while. They need to be
-					// handled at the another method after the whole formula is
-					// processed.
-					if (is<node, tau::variable>(t)) {
-						resolver.insert(t);
-						resolver.assign(t, type.value());
-						mergeables.push_back(t);
-					}
+					resolver.insert(t);
+					resolver.assign(t, type.value());
+					mergeables.push_back(t);
 				}
-				if (!resolver.merge(typeables)) error = true; // Error in type checking
-				// Replace the typed variables in the expression and assign
-				// it to n in transformed.
-				return false; // Skip children
+				// We merge all the variables and constants in union-find data
+				// structure. If there is a conflict, we set error and stop the
+				// traversal.
+				if (!resolver.merge(typeables)) error = true;
+				// We stop the traversal of children as we have already
+				// processed all the typeables in the expression.
+				return false;
 			}
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt: {
-				// We get all the top variables in the expression
-				// assign then the type and subtype if present and
-				// added to resolver accordingly (inserting and merging).
-				// We also consider all the constants in the expression.
+				// We get all the (top) typeables in the expression and assign
+				// then the type bv (and the subtype when available). We do the
+				// same for the constants.
+
+				// We get all the typeable top nodes in the expression, which in
+				// this case are only (sbf/tau) variables and constants.
 				auto typeables = tau::get(n).select_top(is_typeable);
+				// We infer the common type of all the typeables in the expression
 				auto type = get_type(typeables);
-				if (!type) return error = true, false; // Error in type checking
+				// If no common type is found, we set error and stop traversal
+				if (!type) return error = true, false;
+				// We add the variables to the current scope and assign them the
+				// common type. We also collect them in a vector to be merged
+				// together later.
+				// We also collect the constants in a separate vector to be
+				// added to a new inner scope.
 				trefs mergeables, constants;
 				for (const auto& t : typeables)	{
-					// We ignore the bf_t's and the bf_f's as they must be
-					// untyped.
 					if (is<node, tau::variable>(t)) {
 						resolver.insert(t);
 						resolver.assign(t, type.value());
@@ -309,17 +309,27 @@ tref new_infer_ba_types(tref n) {
 						mergeables.push_back(t);
 					}
 				}
-				// Open a new scope for the constants and add them to it
+				// We open a new scope and add the constants to it with
+				// the inferred type. Constants must be resolved in the
+				// inner scope to avoid conflicts with other constants
+				// in outer scopes with the same source but different
+				// types (e.g., 0 as sbf and 0 as tau).
 				resolver.open({});
 				for (const auto& c : constants) {
 					resolver.insert(c);
 					resolver.assign(c, type.value());
 				}
-				// We merge all the info (variables and constants)
-				if (!resolver.merge(mergeables)) error = true; // Error in type checking
-				return false; // Skip children
-		}
+				// We merge all the variables and constants in union-find data
+				// structure. If there is a conflict, we set error and stop the
+				// traversal.
+				if (!resolver.merge(mergeables)) error = true;
+				// We stop the traversal of children as we have already
+				// processed all the typeables in the expression.
+				return false;
+			}
 			default:
+				// Otherwise, we continue the traversal of children
+				// without doing anything special in this node.
 				break;
 		}
 		// Stop traversal on error
@@ -334,8 +344,8 @@ tref new_infer_ba_types(tref n) {
 
 	// We update types (changing nodes while leaving them) while closing scopes
 	auto on_leave = [&] (tref n, tref parent) -> void {
-		// We use transformed map to update children if they were changed
-		// and update it with the current node if it was changed.
+		// We use transformed map to update children if they were any changes
+		// and add the current node if resulted changed.
 		DBG(assert(n != nullptr);)
 		// Stop traversal on error
 		if (error) return;
@@ -345,17 +355,21 @@ tref new_infer_ba_types(tref n) {
 		// Depoending on the node type...
 		switch (nt) {
 			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_fex: {
-				// Close the current scope and replace occurrences of
-				// untyped variables with the inferred ones (if any).
-				// We resolve to tau all untyped variables.
+				// Replace occurrences of untyped variables with the inferred
+				// ones (if any). We resolve to tau all untyped variables.
 				// We also update the current node with the transformed
 				// children if any.
+				// Finally, we close the scope.
 				std::map<tref, tref> changes;
 				for(auto [var, type] : resolver.current_kinds()) {
 					auto inferred = type;
 					if (type.first == untyped.first ) {
 						inferred = { ba_types<node>::id("tau"), nullptr };
-						resolver.assign(var, { ba_types<node>::id("tau"), nullptr });
+						if (resolver.assign(var, { ba_types<node>::id("tau"), nullptr })) {
+							// We have a type mismatch
+							error = true;
+							return;
+						}
 					}
 					changes[var] = tau::build_variable(
 						tt(var) | tt::string,
@@ -365,7 +379,7 @@ tref new_infer_ba_types(tref n) {
 				auto new_n = rewriter::replace<node>(n, changes);
 				if (new_n != n) transformed[n] = new_n;
 				resolver.close();
-				break;
+				return;
 			}
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
@@ -397,32 +411,35 @@ tref new_infer_ba_types(tref n) {
 				auto new_n = rewriter::replace<node>(n, changes);
 				if (new_n != n) transformed[n] = new_n;
 				resolver.close();
-				break;
+				return;
 			}
 			default: {
-				// If we are at the root, replace global untyped variables
-				// with the inferred ones (if any).
-				// In any case, we update the current node with the transformed
-				// children if any.
-				if (parent) return;
+				// For other intermediate nodes, we only need to update the
+				// current node with the transformed children if any.
+				// Note that we do not need to close any scope here.
+				if (parent) {
+					auto new_n = rewriter::replace<node>(n, transformed);
+					if (new_n != n) transformed[n] = new_n;
+					return;
+				}
+				// For the root node, we type untyped variables with tau.
 				std::map<tref, tref> changes;
 				for(auto [var, type] : resolver.current_kinds()) {
 					if (type.first == untyped.first) {
+						if (resolver.assign(var, { ba_types<node>::id("tau"), nullptr })) {
+							// We have a type mismatch
+							error = true;
+							return;
+						}
 						changes[var] = tau::build_variable(
 							tt(var) | tt::string,
 							ba_types<node>::id("tau"),
 							nullptr);
-					} else {
-						// We replace all untyped variables with tau.
-						changes[var] = tau::build_variable(
-							tt(var) | tt::string,
-							type.first,
-							type.second);
 					}
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
 				if (new_n != n) transformed[n] = new_n;
-				break;
+				return;
 			}
 		}
 	};
