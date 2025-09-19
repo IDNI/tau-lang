@@ -29,8 +29,8 @@ TEST_SUITE("Normalizer") {
 		CHECK( normalize_and_check(sample, tau::wff_f) );
 	}
 	TEST_CASE("7") {
-		const char* sample = "xy = 0 && (abx' | by'a) != 0 <-> xy = 0 && ab != 0.";
-		CHECK( normalize_and_check(sample, tau::wff_t) );
+		const char* sample = "ex t [t > 3].";
+		CHECK( normalize_and_check(sample, tau::wff_always) );
 	}
 }
 
@@ -58,6 +58,15 @@ TEST_SUITE("syntactic_path_simplification") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
 		CHECK((tau::get(res).to_str() == "T"));
+	}
+	// TODO: Printing error
+	TEST_CASE("4_5") {
+		const char* sample = "(ex x x = 0) && (ex x x != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		std::cout << "fm: " << tau::get(fm) << "\n";
+		tref res = syntactic_path_simplification<node_t>::on(fm);
+		std::cout << "res: " << tau::get(res) << "\n";
+		CHECK(true);
 	}
 	//TODO: goes to unit tests
 	TEST_CASE("5") {
@@ -129,6 +138,13 @@ TEST_SUITE("simplify_using_equality") {
 		std::cout << "res: " << tau::get(res) << "\n";
 		CHECK(true);
 	}
+	TEST_CASE("6") {
+		const char* sample = "(ex x x = 0) && (ex x x != 0) && ad != 0 && z = 0 && ad = z.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = boole_normal_form<node_t>(fm);
+		std::cout << "res: " << tau::get(res) << "\n";
+		CHECK(true);
+	}
 }
 
 // TEST_SUITE("term_boole_normal_form") {
@@ -144,14 +160,14 @@ TEST_SUITE("squeeze_absorb") {
 	TEST_CASE("1") {
 		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = squeeze_absorb_down<node_t>(fm, tau::build_bf_variable("x", 1));
+		tref res = squeeze_absorb_down<node_t>(fm, tau::build_variable("x", 1));
 		std::cout << "res: " << tau::get(res) << "\n";
 		CHECK(true);
 	}
 	TEST_CASE("2") {
 		const char* sample = "(((xy) = 0 || f(x)) && (xy)' = 0) || w = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = squeeze_absorb_down<node_t>(fm, tau::build_bf_variable("x", 1));
+		tref res = squeeze_absorb_down<node_t>(fm, tau::build_variable("x", 1));
 		std::cout << "res: " << tau::get(res) << "\n";
 		CHECK(true);
 	}
@@ -226,6 +242,20 @@ TEST_SUITE("anti_prenex") {
 	}
 	TEST_CASE("9") {
 		const char* sample = "all o1[0], o2[0] !o1[0]o2[0] = 0 || o1[0]o2[0] = 0 && (ex o2[1], o1[1] o1[1]o2[1] = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		std::cout << "res: " << tau::get(res) << "\n";
+		CHECK(true);
+	}
+	TEST_CASE("10") {
+		const char* sample = "all y !({ adc|a'dc|b = 0 } : tau y != 0 ) || { ab|cd = 0 } : tau y != 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		std::cout << "res: " << tau::get(res) << "\n";
+		CHECK(true);
+	}
+	TEST_CASE("11") {
+		const char* sample = "{always a&(b|dc)|a'dc = 0}'&{always b|dc = 0} != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		std::cout << "res: " << tau::get(res) << "\n";
