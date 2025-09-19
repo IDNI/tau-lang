@@ -18,106 +18,269 @@ TEST_SUITE("Configuration") {
 }
 
 TEST_SUITE("scopes") {
-    TEST_CASE("empty scopes") {
+    TEST_CASE("empty scope is empty") {
 		scoped_resolver<size_t, size_t> r(0, 0);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 0);
+	}
+
+	TEST_CASE("closing outer scope") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		r.close();
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 0);
+	}
+
+	TEST_CASE("opening inner scope") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		r.open({});
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 1);
+	}
+
+	TEST_CASE("opening clossing scope") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		r.open({});
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 1);
+		r.close();
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 1);
+	}
+
+	TEST_CASE("opening two nested inner scopes") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		r.open({});
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 1);
+		r.open({});
+		CHECK(r.scopes_.size() == 3);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 2);
+	}
+
+	TEST_CASE("closing two nested inner scopes") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		r.open({});
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 1);
+		r.open({});
+		CHECK(r.scopes_.size() == 3);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 2);
+		r.close();
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 2);
+		r.close();
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 2);
+	}
+
+	TEST_CASE("opening/closing two sibling inner scopes") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 0);
+		r.open({});
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 1);
+		r.close();
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 1);
+		r.open({});
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 2);
+		r.close();
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds().size() == 0);
+		CHECK(r.kinds_.size() == 0);
+		CHECK(r.current == 2);
+	}
+
+    TEST_CASE("adding unkinded element to empty scope") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		r.insert(x);
+		CHECK(r.kinds().size() == 1);
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds_.size() == 1);
+		CHECK(r.type_of(x) == r.unknown);
+	}
+
+    TEST_CASE("assigning to non-existing element in empty scope") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		size_t type = 1;
+		CHECK(!r.assign(x, type));
 		CHECK(r.kinds().size() == 0);
 		CHECK(r.scopes_.size() == 1);
 		CHECK(r.kinds_.size() == 0);
 	}
 
-    TEST_CASE("scope with one unknown data") {
-		scoped_resolver<size_t, size_t> r(0, 0);
-		size_t x = 0;
-		r.insert(x);
-		CHECK(r.assign(x, r.unknown));
-		CHECK(r.type_of(x) == r.unknown);
-		CHECK(r.kinds().size() == 1);
-		CHECK(r.kinds().at(x) == r.unknown);
-	}
-
-    TEST_CASE("scopes with one kinded data") {
+    TEST_CASE("adding and assign element to empty scope") {
 		scoped_resolver<size_t, size_t> r(0, 0);
 		size_t x = 0;
 		size_t type = 1;
 		r.insert(x);
-		CHECK(r.assign(x, type));
+		r.assign(x, type);
 		CHECK(r.type_of(x) == type);
 		CHECK(r.kinds().size() == 1);
-		CHECK(r.kinds().at(x) == type);
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds_.size() == 1);
 	}
 
-    TEST_CASE("scopes with two untyped variable") {
+	TEST_CASE("assigning unkinded element to a non-empty scope") {
 		scoped_resolver<size_t, size_t> r(0, 0);
 		size_t x = 0;
 		size_t y = 1;
 		r.insert(x);
 		r.insert(y);
+		CHECK(r.kinds().size() == 2);
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds_.size() == 2);
 		CHECK(r.type_of(x) == r.unknown);
 		CHECK(r.type_of(y) == r.unknown);
-		CHECK(r.kinds().size() == 2);
-		CHECK(r.kinds().at(x) == r.unknown);
-		CHECK(r.kinds().at(y) == r.unknown);
 	}
 
-    TEST_CASE("scopes with two data, one known and the other one unknown") {
+	TEST_CASE("assigning kinded element to a non-empty scope: existing unkinded") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		size_t y = 1;
+		size_t type = 2;
+		r.insert(x);
+		r.insert(y);
+		CHECK(r.assign(y, type));
+		CHECK(r.kinds().size() == 2);
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds_.size() == 2);
+		CHECK(r.type_of(x) == r.unknown);
+		CHECK(r.type_of(y) == type);
+	}
+
+	TEST_CASE("assigning kinded element to a non-empty scope: existing kinded") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		size_t y = 1;
+		size_t type1 = 2;
+		size_t type2 = 3;
+		r.insert(x);
+		r.insert(y);
+		CHECK(r.assign(y, type1));
+		CHECK(r.assign(x, type2)); // cannot assign conflicting kind
+		CHECK(r.kinds().size() == 2);
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds_.size() == 2);
+		CHECK(r.type_of(x) == type2);
+		CHECK(r.type_of(y) == type1);
+	}
+
+	TEST_CASE("assigning unkinded element to a nested scope") {
 		scoped_resolver<size_t, size_t> r(0, 0);
 		size_t x = 0;
 		size_t y = 1;
 		r.insert(x);
+		r.open({});
 		r.insert(y);
-		size_t type = 1;
+		CHECK(r.kinds().size() == 2);
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds_.size() == 2);
+		CHECK(r.type_of(x) == r.unknown);
+		CHECK(r.type_of(y) == r.unknown);
+	}
+
+	TEST_CASE("assigning kinded element to a nested scope (y1)") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		size_t y = 1;
+		size_t type = 2;
+		r.insert(x);
+		r.open({});
+		r.insert(y);
+		CHECK(r.assign(y, type));
+		CHECK(r.kinds().size() == 2);
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds_.size() == 2);
+		CHECK(r.type_of(x) == r.unknown);
+		CHECK(r.type_of(y) == type);
+	}
+
+	TEST_CASE("assigning kinded element to a nested scope (y2)") {
+		scoped_resolver<size_t, size_t> r(0, 0);
+		size_t x = 0;
+		size_t y = 1;
+		size_t type = 2;
+		r.insert(x);
 		CHECK(r.assign(x, type));
+		r.open({});
+		r.insert(y);
+		CHECK(r.kinds().size() == 2);
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds_.size() == 2);
 		CHECK(r.type_of(x) == type);
 		CHECK(r.type_of(y) == r.unknown);
-		CHECK(r.kinds().size() == 2);
-		CHECK(r.kinds().at(x) == type);
-		CHECK(r.kinds().at(y) == r.unknown);
 	}
 
-	TEST_CASE("open scope with kinds") {
+	TEST_CASE("overwriting kinded element kind in a nested scope") {
 		scoped_resolver<size_t, size_t> r(0, 0);
-		std::map<size_t, size_t> scoped = {{1, 1}, {2, 2}};
-		r.open(scoped);
-		CHECK(r.type_of(1) == 1);
-		CHECK(r.type_of(2) == 2);
-		CHECK(r.type_of(3) == 0);
-		r.insert(3);
-		CHECK(r.type_of(3) == 0);
-	}
-
-	TEST_CASE("assign and type_of") {
-		scoped_resolver<size_t, size_t> r(0, 0);
-		r.open({{1, 1}});
-		CHECK(r.type_of(1) == 1);
-		CHECK(!r.assign(1, 3)); // cannot assign conflicting kind
-	}
-
-	TEST_CASE("same_kind") {
-		scoped_resolver<size_t, size_t> r(0, 0);
-		r.open({{1, 1}, {2, 1}, {3, 2}});
-		CHECK(r.same_kind(1, 2));
-		CHECK(!r.same_kind(1, 3));
-	}
-
-	TEST_CASE("multiple scopes") {
-		scoped_resolver<size_t, size_t> r(0, 0);
-		r.open({{1, 1}});
-		r.open({{1, 2}});
-		CHECK(r.type_of(1) == 2);
+		size_t x = 0;
+		size_t type1 = 2;
+		size_t type2 = 3;
+		r.insert(x);
+		CHECK(r.assign(x, type1));
+		r.open({{x, type2}});
+		CHECK(r.kinds().size() == 1);
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds_.size() == 2);
+		CHECK(r.type_of(x) == type2);
 		r.close();
-		CHECK(r.type_of(1) == 1);
+		CHECK(r.kinds().size() == 1);
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds_.size() == 1);
+		CHECK(r.type_of(x) == type1);
 	}
 
-	TEST_CASE("kinds map") {
+	TEST_CASE("overwriting unkinded element kind in a nested scope") {
 		scoped_resolver<size_t, size_t> r(0, 0);
-		r.open({{1, 1}, {2, 2}});
-		r.insert(3);
-		r.assign(3, 3);
-		auto kinds_map = r.kinds();
-		CHECK(kinds_map.size() == 3);
-		CHECK(kinds_map[1] == 1);
-		CHECK(kinds_map[2] == 2);
-		CHECK(kinds_map[3] == 3);
+		size_t x = 0;
+		size_t type1 = 2;
+		r.insert(x);
+		r.open({{x, type1}});
+		CHECK(r.kinds().size() == 1);
+		CHECK(r.scopes_.size() == 2);
+		CHECK(r.kinds_.size() == 2);
+		CHECK(r.type_of(x) == type1);
+		r.close();
+		CHECK(r.kinds().size() == 1);
+		CHECK(r.scopes_.size() == 1);
+		CHECK(r.kinds_.size() == 1);
+		CHECK(r.type_of(x) == r.unknown);
 	}
 }
 

@@ -52,7 +52,6 @@ struct scoped_resolver {
 			kinds_.lower_bound({current, minimum}),
 			kinds_.end());
 		scopes_.pop_back();
-		current = scopes_.back();
 	}
 
 	void insert(const data_t& data) {
@@ -231,10 +230,6 @@ tref new_infer_ba_types(tref n) {
 
 		// Stop traversal on error
 		if (error) return false;
-		// So if the current node is already transformed, we use the transformed
-		// node and do not further continue visiting child nodes.
-		if (transformed.find(n) != transformed.end())
-			return false;
 		// Get the node type
 		auto t = tau::get(n);
 		size_t nt = t.get_type();
@@ -369,6 +364,7 @@ tref new_infer_ba_types(tref n) {
 					auto resolved_type = resolver.type_of(e);
 					auto e_type = tau::get(e).get_type();
 					auto final_type = resolved_type == untyped ? tau_type : resolved_type;
+					// assign
 					if (tau::get(e).children_size()) {
 						auto new_e = (final_type.second == nullptr)
 						? tau::get_typed(e_type, tau::get(e).child(0), final_type.first)
@@ -386,6 +382,7 @@ tref new_infer_ba_types(tref n) {
 				auto new_n = rewriter::replace<node>(n, changes);
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
 				if (new_n != n) transformed[n] = new_n;
+				resolver.close();
 				return;
 			}
 			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_fex: {
@@ -402,6 +399,7 @@ tref new_infer_ba_types(tref n) {
 					auto resolved_type = resolver.type_of(v);
 					auto v_type = tau::get(v).get_type();
 					auto final_type = resolved_type == untyped ? tau_type : resolved_type;
+					// assigbn
 					if (tau::get(v).children_size()) {
 						auto new_v = (final_type.second == nullptr)
 						? tau::get_typed(v_type, tau::get(v).child(0), final_type.first)
@@ -475,6 +473,7 @@ tref new_infer_ba_types(tref n) {
 					auto resolved_type = resolver.type_of(e);
 					auto e_type = tau::get(e).get_type();
 					auto final_type = resolved_type == untyped ? tau_type : resolved_type;
+					// assign
 					if (tau::get(e).children_size() > 0) {
 						auto new_e = (final_type.second == nullptr)
 						? tau::get_typed(e_type, tau::get(e).child(0), final_type.first)
