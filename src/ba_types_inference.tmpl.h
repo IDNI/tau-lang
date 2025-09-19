@@ -3,6 +3,7 @@
 #include "ba_types.h"
 #include "ba_types_inference.h"
 #include "definitions.h"
+#include "resolver.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "ba_types_inference"
@@ -15,9 +16,9 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref infer_ba_types(tref n) {
 	DBG(LOG_TRACE << "-- Infer BA types: " << LOG_FM(n);)
-	ba_types_inference<node> infer;
-	tref nn = infer(n);
-	return nn;
+	// ba_types_inference<node> infer;
+	// tref nn = infer(n);
+	return new_infer_ba_types<node>(n);
 }
 
 // -----------------------------------------------------------------------------

@@ -13,16 +13,16 @@ using namespace idni;
 template<NodeType node>
 size_t get_bv_size(const tref t) {
 	using tau = tree<node>;
+	using tt = typename tree<node>::traverser;
 
 	static std::map<tref, size_t> bv_size_cache;
-	using tt = typename tree<node>::traverser;
-	if (auto type_ref = tt(t) | tau::type; type_ref) {
-		if (auto it = bv_size_cache.find(type_ref.value()); it != bv_size_cache.end()) {
+	if (auto subtype = tt(t) | tau::subtype; subtype) {
+		if (auto it = bv_size_cache.find(subtype.value()); it != bv_size_cache.end()) {
 			return it->second;
 		}
-		auto type_name = type_ref.value_tree().get_string();
-		auto bv_size = std::strtoull(type_name.substr(2).c_str(), nullptr, 10);
-		bv_size_cache[type_ref.value()] = bv_size;
+		auto subtype_string = subtype.value_tree().get_string();
+		auto bv_size = std::strtoull(subtype_string.c_str(), nullptr, 10);
+		bv_size_cache[subtype.value()] = bv_size;
 		return bv_size;
 	}
 	return cvc5_default_bv_size;
