@@ -32,9 +32,9 @@ auto tau_ba<BAs...>::operator<=>(const tau_ba<BAs...>&) const = default;
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
-	// TODO (HIGH) replace by ...tau... in the future
 	auto nmain = tau::geth(tau::build_wff_neg(
-			normalizer<node>(nso_rr.main->get())));
+			normalize_temporal_quantifiers<node, false>(
+				nso_rr.main->get())));
 	auto nrec_relations = nso_rr.rec_relations;
 	return tau_ba<BAs...>(nrec_relations, nmain);
 }
@@ -42,9 +42,11 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
-	// TODO (HIGH) replace by ...tau... in the future
 	auto nmain = tau::geth(tau::build_wff_and(
-			nso_rr.main->get(), other.nso_rr.main->get()));
+			normalize_temporal_quantifiers<node, false>(
+				nso_rr.main->get()),
+			normalize_temporal_quantifiers<node, false>(
+				other.nso_rr.main->get())));
 	auto nrec_relations =
 		rewriter::merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba<BAs...>(nrec_relations, nmain);
@@ -53,10 +55,11 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
-	// TODO (HIGH) replace by ...tau... in the future
 	auto nmain = tau::geth(tau::build_wff_or(
-			normalizer<node>(nso_rr.main->get()),
-			normalizer<node>(other.nso_rr.main->get())));
+			normalize_temporal_quantifiers<node, false>(
+				nso_rr.main->get()),
+			normalize_temporal_quantifiers<node, false>(
+				other.nso_rr.main->get())));
 	auto nrec_relations = rewriter::merge(nso_rr.rec_relations,
 					      other.nso_rr.rec_relations);
 	return tau_ba<BAs...>(nrec_relations, nmain);
@@ -65,10 +68,11 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba<BAs...>& other) const {
-	// TODO (HIGH) replace by ...tau... in the future
 	auto nmain = tau::geth(tau::build_wff_xor(
-			normalizer<node>(nso_rr.main->get()),
-			normalizer<node>(other.nso_rr.main->get())));
+			normalize_temporal_quantifiers<node, false>(
+				nso_rr.main->get()),
+			normalize_temporal_quantifiers<node, false>(
+				other.nso_rr.main->get())));
 	rewriter::rules nrec_relations = rewriter::merge(nso_rr.rec_relations,
 						other.nso_rr.rec_relations);
 	return tau_ba<BAs...>(nrec_relations, nmain);

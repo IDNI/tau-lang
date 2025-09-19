@@ -333,8 +333,11 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 // Assume that fm is in DNF (or CNF -> set is_cnf to true)
 // TODO: Normalize Tau constants in case type == bf
 template <NodeType node>
-tref reduce(tref fm, size_t type, bool is_cnf = false,
+tref reduce_depreciated(tref fm, size_t type, bool is_cnf = false,
 	bool all_reductions = true, bool enable_sort = true);
+
+template <NodeType node, bool is_cnf = false>
+tref reduce(tref fm);
 
 // Create assignment in formula and reduce resulting clause
 template <NodeType node>
@@ -383,6 +386,11 @@ template <NodeType node>
 std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	tref fm, size_t type, bool is_cnf = false,
 	bool all_reductions = true, bool enable_sort = true);
+
+template <NodeType node>
+std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(
+	tref fm, bool is_cnf = false, bool is_wff = true);
+
 template <NodeType node>
 tref group_dnf_expression(tref fm);
 

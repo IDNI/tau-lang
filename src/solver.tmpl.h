@@ -201,6 +201,7 @@ std::optional<solution<node>> lgrs(equality eq) {
 	}
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 	solution<node> phi;
+	//TODO resolve xor below
 	for (auto [x_i, z_i] : s.value())
 		phi[x_i] = tt((tau::get(z_i) & tau::get(f))
 			+ (tau::get(x_i) & ~tau::get(f)))
@@ -975,7 +976,6 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 template <NodeType node>
 std::optional<solution<node>> solve(tref form, const solver_options& options) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	if (tau::get(form).equals_T()) return { solution<node>() };
 	if (tau::get(form).equals_F()) return {};
 

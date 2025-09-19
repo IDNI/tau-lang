@@ -235,9 +235,9 @@ tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::bf:  return reduce<node>(to_dnf<node, false>(
+		case tau::bf:  return reduce_depreciated<node>(to_dnf<node, false>(
 					applied), tau::bf);
-		case tau::wff: return reduce<node>(to_dnf<node>(
+		case tau::wff: return reduce_depreciated<node>(to_dnf<node>(
 					applied), tau::wff);
 		default: return invalid_argument();
 		}
@@ -252,9 +252,9 @@ tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::wff: return reduce<node>(to_cnf<node>(
+		case tau::wff: return reduce_depreciated<node>(to_cnf<node>(
 					applied), tau::wff, true);
-		case tau::bf:  return reduce<node>(to_cnf<node, false>(
+		case tau::bf:  return reduce_depreciated<node>(to_cnf<node, false>(
 					applied), tau::bf, true);
 		default: return invalid_argument();
 		}
