@@ -222,21 +222,21 @@ bool are_nso_equivalent(tref n1, tref n2) {
 
 	tref imp1 = tau::build_wff_imply(n1, n2);
 	tref imp2 = tau::build_wff_imply(n2, n1);
-	const trefs& vars = get_free_vars<node>(imp1);
+	const trefs& vars = get_free_vars<node>(tau::build_wff_and(n1, n2));
 	for (tref v : vars) {
 		imp1 = tau::build_wff_all(v, imp1);
 		imp2 = tau::build_wff_all(v, imp2);
 	}
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
-	const auto& tdir1 = tau::get(normalize_non_temp<node>(imp1));
+	const tau& tdir1 = tau::get(normalize_non_temp<node>(imp1));
 	DBG(assert((tdir1.equals_T() || tdir1.equals_F()
 		|| tdir1.find_top(is<node, tau::constraint>)));)
 	if (tdir1.equals_F()) {
 		LOG_DEBUG << "End are_nso_equivalent: " << LOG_FM(tdir1.get());
 		return false;
 	}
-	const auto& tdir2 = tau::get(normalize_non_temp<node>(imp2));
+	const tau& tdir2 = tau::get(normalize_non_temp<node>(imp2));
 	DBG(assert((tdir2.equals_T() || tdir2.equals_F()
 		|| tdir2.find_top(is<node, tau::constraint>))));
 	const bool res = (tdir1.equals_T() && tdir2.equals_T());
