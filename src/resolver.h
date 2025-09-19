@@ -322,11 +322,11 @@ tref new_infer_ba_types(tref n) {
 				// processed all the typeables in the expression.
 				break;
 			}
-			case tau::bf: case tau::bv: {
+			/*case tau::bf: case tau::bv: {
 				// As we are inside an equation already visited, we do not need
 				// to continue the traversal of children.
 				return false;
-			}
+			}*/
 			default:
 				// Otherwise, we continue the traversal of children
 				// without doing anything special in this node.
