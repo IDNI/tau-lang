@@ -53,8 +53,8 @@ std::optional<solution<node>> find_solution(equality eq,
 	{
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		tref g = rewriter::replace<node>(vars[0], tau::_1(), f);
-		tref h = rewriter::replace<node>(vars[0], tau::_0(), f);
+		tref g = rewriter::replace<node>(f, vars[0], tau::_1());
+		tref h = rewriter::replace<node>(f, vars[0], tau::_0());
 		tref gh = tt(tau::get(g) & tau::get(h))
 			| bf_reduce_canonical<node>() | tt::ref;
 #ifdef DEBUG
@@ -250,8 +250,8 @@ struct minterm_iterator {
 					& ~tau::get(v)).get();
 				choices.emplace_back(v, false, partial_bf,
 							partial_minterm);
-				partial_bf = rewriter::replace<node>(v,
-					tau::_0(), partial_bf);
+				partial_bf = rewriter::replace<node>(partial_bf,
+					v, tau::_0());
 				DBG(LOG_TRACE << "minterm_iterator/partial_bf: "
 					<< LOG_FM(partial_bf);)
 				// ... and compute new values for the next one
@@ -314,10 +314,10 @@ private:
 
 	tref make_current_minterm() {
 		tref cte = choices.back().value
-			? rewriter::replace<node>(choices.back().var,
-				tau::_1(), choices.back().partial_bf)
-			: rewriter::replace<node>(choices.back().var,
-				tau::_0(), choices.back().partial_bf);
+			? rewriter::replace<node>(choices.back().partial_bf,
+				choices.back().var, tau::_1())
+			: rewriter::replace<node>(choices.back().partial_bf,
+				choices.back().var, tau::_0());
 		tref current = (tau::get(cte) & tau::get(choices.back()
 						.partial_minterm)).get();
 
@@ -359,12 +359,10 @@ private:
 					: ~tau::get(choices[i].var))
 				& tau::get(choices[i - 1].partial_minterm)).get();
 			choices[i].partial_bf = choices[i - 1].value
-				? rewriter::replace<node>(
-					choices[i - 1].var, tau::_1(),
-					choices[i - 1].partial_bf)
-				: rewriter::replace<node>(
-					choices[i - 1].var, tau::_0(),
-					choices[i - 1].partial_bf);
+				? rewriter::replace<node>(choices[i - 1].partial_bf,
+					choices[i - 1].var, tau::_1())
+				: rewriter::replace<node>(choices[i - 1].partial_bf,
+					choices[i - 1].var, tau::_0());
 			// if current partial bf is 0, we can skip the rest of the choices
 			// as the corresponding minterms will be 0.
 			if (tau::get(choices[i].partial_bf).equals_0()) {
@@ -996,6 +994,8 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 
 	form = boole_normal_form<node>(form);
 	for (tref path : expression_paths<node>(form)) {
+		path = norm_all_equations<node>(path);
+		path = apply_all_xor_def<node>(path);
 		// Reject clause involving temporal quantification
 		if (tau::get(path).find_top(is_temporal_quantifier<node>)) {
 			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(path);

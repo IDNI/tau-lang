@@ -4718,9 +4718,10 @@ tref normalize_temporal_quantifiers(tref fm) {
 				tref staying = tau::_T();
 				for (tref conj : get_cnf_wff_clauses<node>(clause)) {
 					// All parts are temporally quantified
-					DBG(assert(st_aw(tau::get(conj).first()));)
+					DBG(assert(st_aw(tau::get(conj).first()) ||
+						!has_temp_var<node>(conj));)
 					// TODO: always conjunction is inefficient
-					if (is_child<node>(conj, tau::wff_always))
+					if (!is_child<node>(conj, tau::wff_sometimes))
 						always_part = always_conjunction<node>(
 							always_part, conj);
 					else staying = tau::build_wff_and(
@@ -4848,11 +4849,11 @@ tref to_snf_step<node>::traverse(const bdd_path& path,
 	auto exponent = get_exponent(lit);
 	tref f = tau::get(normalize_negative(path, lit)).equals_F()
 		? tau::_F()
-		: tt(rewriter::replace<node>(lit, tau::_F(), form))
+		: tt(rewriter::replace<node>(form, lit, tau::_F()))
 			| simplify_snf<node>() | tt::ref;
 	tref t = tau::get(normalize_positive(path, lit)).equals_F()
 		? tau::_F()
-		: tt(rewriter::replace<node>(lit, tau::_T(), form))
+		: tt(rewriter::replace<node>(form, lit, tau::_T()))
 			| simplify_snf<node>() | tt::ref;
 
 	if (tau::get(f).equals_F() && tau::get(t).equals_F()) {

@@ -286,8 +286,9 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::wff: return unequal_to_not_equal<node>(reduce_across_bfs<node>(
-					norm_all_equations<node>(applied), false));
+		case tau::wff: return unequal_to_not_equal<node>(
+			reduce_across_bfs<node>(apply_all_xor_def<node>(
+				norm_all_equations<node>(applied)), false));
 		case tau::bf:  return bf_reduced_dnf<node>(applied);
 		default: return invalid_argument();
 		}
@@ -303,7 +304,8 @@ tref repl_evaluator<BAs...>::snf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::wff: return snf_wff<node>(norm_all_equations<node>(applied));
+		case tau::wff: return snf_wff<node>(apply_all_xor_def<node>(
+			norm_all_equations<node>(applied)));
 		case tau::bf:  return snf_bf<node>(applied);
 		default: return invalid_argument();
 		}
@@ -450,6 +452,7 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		applied = norm_all_equations<node>(applied);
+		applied = apply_all_xor_def<node>(applied);
 		applied = eliminate_quantifiers<node>(applied);
 		return reduce_across_bfs<node>(applied, false);
 	}
@@ -566,7 +569,6 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 
 	DBG(TAU_LOG_TRACE << "solve_cmd/applied: " << applied << "\n";)
 
-	applied = norm_all_equations<node>(applied);
 	auto solution = solve<node>(applied, options);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// auto vars = tau::get(equations).select_top(is_child<node, tau::variable>);
@@ -588,6 +590,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 		arg = tau::get(arg).right_sibling();
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	applied = norm_all_equations<node>(applied);
+	applied = apply_all_xor_def<node>(applied);
 	tref equality = tt(applied) | tau::bf_eq | tt::ref;
 	if (!applied || !equality) {
 		TAU_LOG_ERROR << "Invalid argument(s)\n";
