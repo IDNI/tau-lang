@@ -3735,11 +3735,11 @@ tref to_snf_step<node>::traverse(const bdd_path& path,
 	auto exponent = get_exponent(lit);
 	tref f = tau::get(normalize_negative(path, lit)).equals_F()
 		? tau::_F()
-		: tt(rewriter::replace_with<node>(lit, tau::_F(), form))
+		: tt(rewriter::replace<node>(form, lit, tau::_F()))
 			| simplify_snf<node>() | tt::ref;
 	tref t = tau::get(normalize_positive(path, lit)).equals_F()
 		? tau::_F()
-		: tt(rewriter::replace_with<node>(lit, tau::_T(), form))
+		: tt(rewriter::replace<node>(form, lit, tau::_T()))
 			| simplify_snf<node>() | tt::ref;
 
 	if (tau::get(f).equals_F() && tau::get(t).equals_F()) {
