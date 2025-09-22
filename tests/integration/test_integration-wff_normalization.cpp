@@ -75,8 +75,8 @@ TEST_SUITE("syntactic_path_simplification") {
 		for (tref path : expression_paths<node_t>(fm)) {
 			std::cout << "path: " << tau::get(path) << "\n";
 			trefs paths = get_cnf_wff_clauses<node_t>(path);
-			assert(paths.size() == 5);
-			for (tref p : paths) assert(tau::get(p).is(tau::wff));
+			CHECK(paths.size() == 5);
+			for (tref p : paths) CHECK(tau::get(p).is(tau::wff));
 		}
 		CHECK(true);
 	}
@@ -86,7 +86,7 @@ TEST_SUITE("syntactic_path_simplification") {
 		for (tref path : expression_paths<node_t>(fm)) {
 			std::cout << "path: " << tau::get(path) << "\n";
 			trefs paths = get_cnf_bf_clauses<node_t>(path);
-			for (tref p : paths) assert(tau::get(p).is(tau::bf));
+			for (tref p : paths) CHECK(tau::get(p).is(tau::bf));
 		}
 		CHECK(true);
 	}
@@ -96,7 +96,7 @@ TEST_SUITE("syntactic_path_simplification") {
 		for (tref path : expression_paths<node_t>(fm)) {
 			std::cout << "path: " << tau::get(path) << "\n";
 			trefs paths = get_cnf_wff_clauses<node_t>(path);
-			for (tref p : paths) assert(tau::get(p).is(tau::wff));
+			for (tref p : paths) CHECK(tau::get(p).is(tau::wff));
 		}
 		CHECK(true);
 	}
