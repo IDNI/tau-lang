@@ -1104,9 +1104,9 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 template <NodeType node>
 bool is_tau_impl(tref f1, tref f2) {
 	using tau = tree<node>;
-	auto f1_norm = normalize<node>(f1);
-	auto f2_norm = normalize<node>(f2);
-	auto imp_check = normalize_with_temp_simp<node>(
+	tref f1_norm = normalize<node>(f1);
+	tref f2_norm = normalize<node>(f2);
+	tref imp_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_imply(f1_norm, f2_norm)));
 	// Now check that each disjunct is not satisfiable
 	for (tref c : expression_paths<node>(imp_check)) {

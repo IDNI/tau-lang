@@ -4707,15 +4707,26 @@ tref normalize_temporal_quantifiers(tref fm) {
 	bool has_temp_quant = tau::get(fm).find_top(st_aw);
 	if (has_temp_var<node>(fm)) {
 		if (has_temp_quant) {
-			// By assumption during parsing, the temporal
-			// quantifiers are placed correctly
+			// By assumption, all temporal variables are explicitly
+			// quantified by temporal quantifier without nesting
 			// DNF conversion is only done on temporal level
 			fm = temporal_layer_to_dnf<node>(fm);
 			trefs clauses = get_dnf_wff_clauses<node>(fm);
-			for (tref& clause : clauses) {
-				// In each clause squeeze all always statements
+			tref non_temp_clauses = tau::_F();
+			tref res = tau::_F();
+			for (tref clause : clauses) {
+				if (!has_temp_var<node>(clause)) {
+					// If temporal quantifier is there,
+					// remove it
+					if (st_aw(tau::get(clause).first()))
+						clause = tau::trim2(clause);
+					non_temp_clauses = tau::build_wff_or(
+						non_temp_clauses, clause);
+					continue;
+				}
 				tref always_part = tau::_T();
 				tref staying = tau::_T();
+				// In each clause squeeze all always statements
 				for (tref conj : get_cnf_wff_clauses<node>(clause)) {
 					// All parts are temporally quantified
 					DBG(assert(st_aw(tau::get(conj).first()) ||
@@ -4731,8 +4742,10 @@ tref normalize_temporal_quantifiers(tref fm) {
 				}
 				always_part = tau::build_wff_always(norm(always_part));
 				clause = tau::build_wff_and(always_part, staying);
+				res = tau::build_wff_or(res, clause);
 			}
-			return tau::build_wff_or(clauses);
+			non_temp_clauses = tau::build_wff_always(non_temp_clauses);
+			return tau::build_wff_or(res, non_temp_clauses);
 		} else {
 			// Temporal variable without temporal quantifier
 			// By assumption we quantify fm universally
@@ -4740,7 +4753,7 @@ tref normalize_temporal_quantifiers(tref fm) {
 		}
 	} else {
 		// No temporal variable, so no temporal quantifier needed
-		if (is_child<node>(fm, tau::wff_always))
+		if (st_aw(tau::get(fm).first()))
 			return norm(tau::trim2(fm));
 		else return norm(fm);
 	}

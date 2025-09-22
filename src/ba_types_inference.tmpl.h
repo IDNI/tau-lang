@@ -446,7 +446,7 @@ bool ba_types_inference<node>::propagate(tref n) {
 #define LOG_CHANNEL_NAME "batinf_unscoping"
 
 // transform type info - remove scope_id and replace with typed element
-// scope_id is left in termporal vars to distinguish them by their scope further
+// scope_id is left in temporal vars to distinguish them by their scope further
 // last step of BA types checking and propagation
 template <NodeType node>
 tref ba_types_inference<node>::remove_scope_ids(tref n) const {
