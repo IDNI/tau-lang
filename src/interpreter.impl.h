@@ -331,6 +331,7 @@ std::optional<interpreter<node, in_t, out_t>>
 						const auto& ctx)
 {
 	// Find a satisfiable unbound continuation from spec
+	spec = normalizer<node>(spec);
 	auto [ubd_ctn, clause] = get_executable_spec(spec);
 	if (ubd_ctn == nullptr) {
 		LOG_ERROR << "Tau specification is unsat\n";
@@ -972,9 +973,8 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 	in_t& inputs, out_t& outputs, const auto& ctx, const size_t steps)
 {
 	using tau = tree<node>;
-	tref spec = normalizer<node>(form);
 	auto intrprtr_o = interpreter<node, in_t, out_t>::make_interpreter(
-							spec, inputs, outputs,
+							form, inputs, outputs,
 							ctx);
 	if (!intrprtr_o) return {};
 	auto& intrprtr = intrprtr_o.value();

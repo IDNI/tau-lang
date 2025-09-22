@@ -389,7 +389,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 
 template <NodeType node>
 std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(
-	tref fm, bool is_cnf = false, bool is_wff = true);
+	tref fm, bool is_cnf = false);
 
 template <NodeType node>
 tref group_dnf_expression(tref fm);
