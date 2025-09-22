@@ -1304,16 +1304,32 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 //TODO: decide if to treat xor in bf case
 template<NodeType node>
 std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
-	bool is_cnf, bool is_wff) {
+	bool is_cnf) {
 	using tau = tree<node>;
+	auto smt_replace = [](tref n) {
+		if (is_child<node>(n, tau::wff_sometimes)) {
+			n = tau::trim2(n); // Remove quantifier
+			n = tau::build_wff_neg(n);
+			n = syntactic_formula_simplification<node>(n);
+			n = tau::build_wff_neg(tau::build_wff_always(n));
+			return n;
+		} else return n;
+	};
 	LOG_TRACE << "dnf_cnf_to_reduced: " << LOG_FM(fm);
+	bool is_wff = !tau::get(fm).is_term();
+	if (is_wff) fm = push_negation_in<node>(fm);
+	else fm = push_negation_in<node, false>(fm);
 	// Pull negation out of equality
-	tref new_fm = is_wff ? unequal_to_not_equal<node>(fm) : apply_all_xor_def<node>(fm);
-	trefs vars = is_wff ? tau::get(new_fm).select_top(is_wff_bdd_var<node>)
-			 : tau::get(new_fm).select_top(is_bf_bdd_var<node>);
+	if (is_wff) {
+		// Substitute all sometimes by !always! and push inner equality in
+		fm = pre_order<node>(fm).apply_unique(smt_replace);
+		fm = unequal_to_not_equal<node>(fm);
+	} else fm = apply_all_xor_def<node>(fm); // term case
+	trefs vars = is_wff ? tau::get(fm).select_top(is_wff_bdd_var<node>)
+			 : tau::get(fm).select_top(is_bf_bdd_var<node>);
 	LOG_TRACE << "dnf_cnf_to_reduced / vars.size(): " << vars.size();
 	if (vars.empty()) {
-		if (tau::get(new_fm).equals_T() || tau::get(new_fm).equals_1()) {
+		if (tau::get(fm).equals_T() || tau::get(fm).equals_1()) {
 			if (is_cnf) return {};
 			std::vector<std::vector<int_t>> paths;
 			paths.emplace_back();
@@ -1329,7 +1345,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
 		}
 	}
 	bool decided = true;
-	auto paths = collect_paths<node>(new_fm, is_wff, vars, decided, is_cnf,
+	auto paths = collect_paths<node>(fm, is_wff, vars, decided, is_cnf,
 					true);
 	join_paths(paths);
 	if (paths.empty() && !decided) paths.emplace_back();
@@ -1550,7 +1566,7 @@ tref reduce(tref fm) {
 #endif // TAU_CACHE
 	DBG(LOG_TRACE << "Begin reduce with is_cnf set to " << is_cnf;)
 	DBG(LOG_TRACE << "Formula to reduce: " << LOG_FM(fm);)
-	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf, is_wff);
+	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf);
 	if (paths.empty()) {
 		auto res = is_cnf ? (is_wff ? tau::_T() : tau::_1())
 				  : (is_wff ? tau::_F() : tau::_0());
@@ -1568,6 +1584,8 @@ tref reduce(tref fm) {
 		return res;
 	}
 	auto reduced_fm = build_reduced_formula<node>(paths, vars, is_cnf, is_wff);
+	if (is_wff) reduced_fm = push_negation_in<node>(reduced_fm);
+	else reduced_fm = push_negation_in<node, false>(reduced_fm);	
 	DBG(LOG_TRACE << "End reduce";)
 	DBG(LOG_TRACE << "Reduced formula: " << LOG_FM(reduced_fm);)
 #ifdef TAU_CACHE
@@ -4701,8 +4719,12 @@ tref normalize_temporal_quantifiers(tref fm) {
 					: arg;
 	};
 	auto st_aw = [](tref n) {
-		return is<node>(n, tau::wff_sometimes)
-			|| is<node>(n, tau::wff_always);
+		return is_child<node>(n, tau::wff_sometimes)
+			|| is_child<node>(n, tau::wff_always);
+	};
+	auto rm_temp_quant = [&st_aw](tref n) {
+		if (st_aw(n)) return tau::trim2(n);
+		return n;
 	};
 	bool has_temp_quant = tau::get(fm).find_top(st_aw);
 	if (has_temp_var<node>(fm)) {
@@ -4711,15 +4733,16 @@ tref normalize_temporal_quantifiers(tref fm) {
 			// quantified by temporal quantifier without nesting
 			// DNF conversion is only done on temporal level
 			fm = temporal_layer_to_dnf<node>(fm);
+			// Simplify temporal layer
+			fm = reduce<node>(fm);
 			trefs clauses = get_dnf_wff_clauses<node>(fm);
 			tref non_temp_clauses = tau::_F();
 			tref res = tau::_F();
 			for (tref clause : clauses) {
 				if (!has_temp_var<node>(clause)) {
-					// If temporal quantifier is there,
-					// remove it
-					if (st_aw(tau::get(clause).first()))
-						clause = tau::trim2(clause);
+					// Remove all temporal quantifiers
+					clause = pre_order<node>(clause).
+							apply_unique(rm_temp_quant);
 					non_temp_clauses = tau::build_wff_or(
 						non_temp_clauses, clause);
 					continue;
@@ -4729,10 +4752,13 @@ tref normalize_temporal_quantifiers(tref fm) {
 				// In each clause squeeze all always statements
 				for (tref conj : get_cnf_wff_clauses<node>(clause)) {
 					// All parts are temporally quantified
-					DBG(assert(st_aw(tau::get(conj).first()) ||
+					DBG(assert(st_aw(conj) ||
 						!has_temp_var<node>(conj));)
+					if (!has_temp_var<node>(conj))
+						always_part = tau::build_wff_and(
+							always_part, conj);
 					// TODO: always conjunction is inefficient
-					if (!is_child<node>(conj, tau::wff_sometimes))
+					else if (!is_child<node>(conj, tau::wff_sometimes))
 						always_part = always_conjunction<node>(
 							always_part, conj);
 					else staying = tau::build_wff_and(
@@ -4744,8 +4770,10 @@ tref normalize_temporal_quantifiers(tref fm) {
 				clause = tau::build_wff_and(always_part, staying);
 				res = tau::build_wff_or(res, clause);
 			}
-			non_temp_clauses = tau::build_wff_always(non_temp_clauses);
-			return tau::build_wff_or(res, non_temp_clauses);
+			non_temp_clauses = tau::build_wff_always(
+				norm(non_temp_clauses));
+			res = tau::build_wff_or(res, non_temp_clauses);
+			return res;
 		} else {
 			// Temporal variable without temporal quantifier
 			// By assumption we quantify fm universally
@@ -4753,8 +4781,7 @@ tref normalize_temporal_quantifiers(tref fm) {
 		}
 	} else {
 		// No temporal variable, so no temporal quantifier needed
-		if (st_aw(tau::get(fm).first()))
-			return norm(tau::trim2(fm));
+		if (st_aw(fm)) return norm(tau::trim2(fm));
 		else return norm(fm);
 	}
 }
