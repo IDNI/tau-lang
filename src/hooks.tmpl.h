@@ -21,7 +21,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	if      (v.nt == tau::bf)          ret = term( v, ch, len, r);
 	else if (v.nt == tau::wff)         ret = wff(  v, ch, len, r);
 	else if (v.nt == tau::shift)       ret = shift(v, ch, len, r);
-	else if (v.nt == tau::bv_constant) ret = bv_constant(v, ch, len, r);
+	//else if (v.nt == tau::bv_constant) ret = bv_constant(v, ch, len, r);
 	else return tau::get_raw(v, ch, len, r);
 
 	if (ret) {

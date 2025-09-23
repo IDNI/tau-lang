@@ -2,6 +2,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+
 #include "resolver.h"
 
 TEST_SUITE("Configuration") {
@@ -26,6 +27,8 @@ TEST_SUITE("new_infer_ba_types") {
 	}
 
 	bool check_vars(tref inferred, std::vector<std::pair<std::string, type_t>>& expected) {
+		using node = node_t;
+
 		auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
 		if (vars.empty() && expected.size() > 0) {
 			TAU_LOG_ERROR << "No variables found in.";
@@ -55,8 +58,8 @@ TEST_SUITE("new_infer_ba_types") {
 			auto vsubtype = tt(vars[i]) | tau::subtype | tt::ref;
 			if (vsubtype != expected_type.second) {
 				TAU_LOG_ERROR << "Variable '" << name
-					<< "' expected type '" << expected_type.second
-					<< "', found '" << vsubtype;
+					<< "' expected type '" << LOG_FM_TREE(expected_type.second)
+					<< "', found '" << LOG_FM_TREE(vsubtype);
 				return false;
 			}
 		}
@@ -126,7 +129,7 @@ TEST_SUITE("new_infer_ba_types") {
 	static type_t tau_type = {get_ba_type_id<node_t>("tau"), nullptr};
 	static type_t sbf_type = {get_ba_type_id<node_t>("sbf"), nullptr};
 	static type_t bv_type = {get_ba_type_id<node_t>("bv"), nullptr};
-	static type_t bv16_type = {get_ba_type_id<node_t>("bv"), tau::get_num(16)};
+	static type_t bv16_type = {get_ba_type_id<node_t>("bv"), tau::get(tau::subtype, tau::get_num(16))};
 
 	TEST_CASE("simple case 1") {
 		tref parsed = parse("x = 1");
@@ -174,7 +177,7 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	/*TEST_CASE("simple case 5") {
+	TEST_CASE("simple case 5") {
 		// TODO (HIGH) should fail
 		// tref parsed = parse("x = 1:bv[16]");
 		tref parsed = parse("x =_ 1:bv[16]");
@@ -185,7 +188,7 @@ TEST_SUITE("new_infer_ba_types") {
 			{"x", bv16_type}
 		};
 		CHECK( check_vars(inferred, expected) );
-	}*/
+	}
 
 	TEST_CASE("simple case 6") {
 		tref parsed = parse("x:bv =_ 1");
@@ -198,7 +201,7 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_bv_ctes(inferred, expected) );
 	}
 
-	/*TEST_CASE("simple case 7") {
+	TEST_CASE("simple case 7") {
 		tref parsed = parse("x:bv[16] =_ 1");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
@@ -207,17 +210,18 @@ TEST_SUITE("new_infer_ba_types") {
 			{bv16_type}
 		};
 		CHECK( check_bv_ctes(inferred, expected) );
-	}*/
+	}
 
 	TEST_CASE("simple case 7") {
 		tref parsed = parse("x:sbf = y");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		auto expected = std::vector<type_t> {
-			{bv_type}
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", sbf_type},
+			{"y", sbf_type}
 		};
-		CHECK( check_bv_ctes(inferred, expected) );
+		CHECK( check_vars(inferred, expected) );
 	}
 
 	TEST_CASE("simple case 8") {
@@ -225,10 +229,11 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		auto expected = std::vector<type_t> {
-			{bv_type}
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type},
+			{"y", tau_type}
 		};
-		CHECK( check_bv_ctes(inferred, expected) );
+		CHECK( check_vars(inferred, expected) );
 	}
 
 	TEST_CASE("simple case 9") {
@@ -236,10 +241,11 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		auto expected = std::vector<type_t> {
-			{bv_type}
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", sbf_type},
+			{"y", sbf_type}
 		};
-		CHECK( check_bv_ctes(inferred, expected) );
+		CHECK( check_vars(inferred, expected) );
 	}
 
 	TEST_CASE("simple case 10") {
@@ -247,10 +253,11 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		auto expected = std::vector<type_t> {
-			{bv_type}
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type},
+			{"y", tau_type}
 		};
-		CHECK( check_bv_ctes(inferred, expected) );
+		CHECK( check_vars(inferred, expected) );
 	}
 
 	TEST_CASE("type chaining (tau) right to left") {
@@ -281,6 +288,19 @@ TEST_SUITE("new_infer_ba_types") {
 
 	TEST_CASE("type chaining (sbf) right to left") {
 		tref parsed = parse("x = y && y = z:sbf");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", sbf_type},
+			{"y", sbf_type},
+			{"z", sbf_type},
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("type chaining (sbf) left to right") {
+		tref parsed = parse("x:sbf = y && y = z");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -396,6 +416,17 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
+	TEST_CASE("simple explicit tau constant  (y2)") {
+		tref parsed = parse("{ T }:tau = x");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
 	TEST_CASE("simple explicit sbf constant") {
 		tref parsed = parse("x = { x }:sbf");
 		CHECK( parsed != nullptr );
@@ -405,6 +436,16 @@ TEST_SUITE("new_infer_ba_types") {
 			{"x", sbf_type}
 		};
 		CHECK( check_vars(inferred, expected) );
-	}*/
+	}
 
+	TEST_CASE("simple explicit sbf constant (y2)") {
+		tref parsed = parse("{ x }:sbf = x");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", sbf_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}*/
 }

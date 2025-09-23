@@ -48,9 +48,8 @@ struct scoped_resolver {
 
 	void close() {
 		if (scopes_.size() == 1) return;
-		kinds_.erase(
-			kinds_.lower_bound({current, minimum}),
-			kinds_.end());
+		std::erase_if(kinds_, [&](const auto& e)
+			{ return e.first.first == current; });
 		scopes_.pop_back();
 	}
 
@@ -101,9 +100,9 @@ struct scoped_resolver {
 
 	std::map<data_t, kind_t> current_kinds() {
 		std::map<data_t, kind_t> result ;
-		for(auto it = uf.lower_bound(element_t{current, minimum}); it != uf.end(); ++it)
-			if (kinds_.find(it->second) != kinds_.end())
-				result[it->second.second] = type_of(it->second.second);
+//		for(auto it = uf.lower_bound(element_t{current, minimum}); it != uf.end(); ++it)
+		for(auto [element, _] : uf)
+			if (element.first == current) result[element.second] = type_of(element.second);
 		return result;
 	}
 };
@@ -145,6 +144,30 @@ struct type_scoped_resolver : public scoped_resolver<tref, type_t> {
 		if (!merged) return false; // conflicting type info
 		this->uf.merge({this->current, a}, {this->current, b});
 		this->kinds_[this->uf.root({this->current, a})] = merged.value();
+		// We also update the type of the merged elements
+		this->kinds_[{this->current, a}] = merged.value();
+		this->kinds_[{this->current, b}] = merged.value();
+#ifdef DEBUG
+		LOG_TRACE << "type_scoped_resolver/a: " << LOG_FM_TREE(a);
+		LOG_TRACE << "type_scoped_resolver/type_a: " << type_a.first << "["
+			<< (type_a.second ? tau::get(type_a.second).dump_to_str() : "") << "]";
+		LOG_TRACE << "type_scoped_resolver/b: " << LOG_FM_TREE(b);
+		LOG_TRACE << "type_scoped_resolver/type_b: " << type_b.first << "["
+			<< (type_b.second ? tau::get(type_b.second).dump_to_str() : "") << "]";
+		LOG_TRACE << "type_scoped_resolver/merge: " << merged.value().first << "["
+			<< (merged.value().second ? tau::get(merged.value().second).dump_to_str() : "") << "]";
+		LOG_TRACE << "type_scoped_resolver/uf.root({{this->current}, a}): " << LOG_FM_TREE(this->uf.root({this->current, a}).second);
+		LOG_TRACE << "type_scoped_resolver/kinds_[uf.root({{this->current}, a}): " <<
+			this->kinds_[this->uf.root({this->current, a})].first << "["
+			<< (this->kinds_[this->uf.root({this->current, a})].second ?
+				tau::get(this->kinds_[this->uf.root({this->current, a})].second).dump_to_str() : "")
+			<< "]";
+		LOG_TRACE << "type_scoped_resolver/kinds_[uf.root({{this->current}, b}): " <<
+			this->kinds_[this->uf.root({this->current, b})].first << "["
+			<< (this->kinds_[this->uf.root({this->current, b})].second ?
+				tau::get(this->kinds_[this->uf.root({this->current, b})].second).dump_to_str() : "")
+			<< "]";
+#endif // DEBUG
 		return true;
 	}
 
@@ -190,12 +213,20 @@ tref new_infer_ba_types(tref n) {
 		using tau = tree<node>;
 		using tt = tau::traverser;
 
+		DBG(LOG_TRACE << "new_infer_ba_types/get_type_of/t:\n" << LOG_FM_TREE(t);)
+
 		size_t t_type;
 		if (auto check = tt(t) | tau::type | tt::ref ; check) {
 			t_type = ba_types<node>::id(tau::get(check).get_string());
 		} else {
 			t_type = tt(t) | tt::ba_type;
 		}
+
+		DBG(LOG_TRACE << "new_infer_ba_types/get_type_of/result/type:\n"
+			<< t_type;)
+		DBG(LOG_TRACE << "new_infer_ba_types/get_type_of/result/subtype:\n"
+			<< (tt(t) | tau::subtype | tt::ref);)
+
 		return { t_type, tt(t) | tau::subtype | tt::ref };
 	};
 
@@ -211,21 +242,21 @@ tref new_infer_ba_types(tref n) {
 		std::optional<type_t> result = default_type;
 		for (const auto& t : ts) {
 			type_t type = get_type_of(t);
-#ifdef DEBUG
-			LOG_TRACE << "new_infer_ba_types/get_type/type: "
-				<< ba_types<node>::name(type.first) << "["
-				<< (type.second ? tau::get(type.second).dump_to_str() : "") << "]";
-#endif // DEBUG
+
+			DBG(LOG_TRACE << "new_infer_ba_types/get_type/t:\n" << LOG_FM_TREE(t);)
+
 			result = merge_ba_types<node>(result.value(), type);
 			// If types are conflicting, return nullopt
 			if (!result) return std::nullopt;
 		}
+
 #ifdef DEBUG
 		if (result)
 			LOG_TRACE << "new_infer_ba_types/get_type/result: "
 				<< ba_types<node>::name(result.value().first) << "["
 				<< (result.value().second ? tau::get(result.value().second).dump_to_str() : "") << "]";
 #endif // DEBUG
+
 		return result;
 	};
 
@@ -247,6 +278,8 @@ tref new_infer_ba_types(tref n) {
 
 	auto untype = [](tref t) -> tref {
 		using tau = tree<node>;
+
+		DBG(LOG_TRACE << "new_infer_ba_types/untype/t:\n" << LOG_FM_TREE(t);)
 
 		if (is<node, tau::bf_t>(t))
 			return tau::get(tau::bf_t);
@@ -361,11 +394,11 @@ tref new_infer_ba_types(tref n) {
 				// processed all the typeables in the expression.
 				break;
 			}
-			/*case tau::bf: case tau::bv: {
+			case tau::bf: case tau::bv: {
 				// As we are inside an equation already visited, we do not need
 				// to continue the traversal of children.
 				return false;
-			}*/
+			}
 			default:
 				// Otherwise, we continue the traversal of children
 				// without doing anything special in this node.
@@ -388,6 +421,24 @@ tref new_infer_ba_types(tref n) {
 		DBG(assert(n != nullptr);)
 
 		DBG(LOG_TRACE << "new_infer_ba_types/on_leave/n: " << LOG_FM(n);)
+
+#ifdef DEBUG
+		LOG_TRACE << "new_infer_ba_types/on_enter/resolver/uf:\n";
+		for (const auto& [v, _] : resolver.uf) {
+			LOG_TRACE << "  " << v.first << "," << LOG_FM_TREE(v.second) << ":"
+				<< resolver.type_of(v.second).first
+				<< "[" << (resolver.type_of(v.second).second ?
+					tau::get(resolver.type_of(v.second).second).dump_to_str() : "") << "]";
+		}
+		LOG_TRACE << "new_infer_ba_types/on_enter/resolver/kinds_:\n";
+		for (const auto& [v, t] : resolver.kinds_) {
+			LOG_TRACE << "  " << v.first << LOG_FM_TREE(v.second) << ":"
+				<< t.first
+				<< "[" << (t.second ?
+					tau::get(t.second).dump_to_str() : "") << "]";
+		}
+#endif // DEBUG
+
 
 		// Stop traversal on error
 		if (error) return;
@@ -463,12 +514,12 @@ tref new_infer_ba_types(tref n) {
 				for (const auto& c : constants) {
 					auto c_type = resolver.type_of(c); // already untyped
 					auto new_c = (c_type.second == nullptr)
-						? tau::get_typed(tau::bv, bv_type.first)
-						: tau::get_typed(tau::bv, c_type.second, bv_type.first);
+						? tau::get_typed(tau::bv_constant, tau::get(c).child(0), bv_type.first)
+						: tau::get_typed(tau::bv_constant, tau::get(c).child(0), c_type.second, bv_type.first);
 					if (new_c != c) changes[c] = new_c;
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
-				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM_TREE(new_n);)
 				if (new_n != n) transformed[n] = new_n;
 				return;
 			}
@@ -496,34 +547,36 @@ tref new_infer_ba_types(tref n) {
 				// For other intermediate nodes, we only need to update the
 				// current node with the transformed children if any.
 				// Note that we do not need to close any scope here.
-				if (parent) {
-					auto new_n = rewriter::replace<node>(n, transformed);
-					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
-					if (new_n != n) transformed[n] = new_n;
-					return;
-				}
+				auto new_n = rewriter::replace<node>(n, transformed);
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/new_n: " << LOG_FM(new_n);)
 				// For the root node, we type untyped variables with tau.
-				std::map<tref, tref> changes;
-				for(auto [e, _] : resolver.current_kinds()) {
-					auto resolved_type = resolver.type_of(e); // already untyped
-					auto e_type = tau::get(e).get_type();
-					auto final_type = resolved_type == untyped ? tau_type : resolved_type;
-					// assign
-					if (tau::get(e).children_size() > 0) {
-						auto new_e = (final_type.second == nullptr)
-						? tau::get_typed(e_type, tau::get(e).child(0), final_type.first)
-						: tau::get_typed(e_type, tau::get(e).child(0), final_type.second,
-							final_type.first);
-						if (new_e != e) changes[e] = new_e;
-					} else {
-						auto new_e = (final_type.second == nullptr)
-						? tau::get_typed(e_type, final_type.first)
-						: tau::get_typed(e_type, final_type.second, final_type.first);
-						if (new_e != e) changes[e] = new_e;
+				if (!parent) {
+					std::map<tref, tref> changes;
+					for(auto [e, _] : resolver.current_kinds()) {
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/e: " << LOG_FM_TREE(e);)
+						if (!is<node, tau::variable>(e)) continue; // must be already typed
+						auto resolved_type = resolver.type_of(e); // already untyped
+						auto e_type = tau::get(e).get_type();
+						auto final_type = resolved_type == untyped ? tau_type : resolved_type;
+						if (tau::get(e).children_size()) {
+							auto new_e = (final_type.second == nullptr)
+							? tau::get_typed(e_type, tau::get(e).child(0), final_type.first)
+							: tau::get_typed(e_type, tau::get(e).child(0), final_type.second,
+								final_type.first);
+							if (new_e != e) changes[e] = new_e;
+							DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/new_e: " << LOG_FM_TREE(new_e);)
+						} else { // bf_t/bf_f case
+							auto new_e = (final_type.second == nullptr)
+							? tau::get_typed(e_type, final_type.first)
+							: tau::get_typed(e_type, final_type.second, final_type.first);
+							if (new_e != e) changes[e] = new_e;
+							DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/new_e: " << LOG_FM_TREE(new_e);)
+						}
 					}
+					new_n = rewriter::replace<node>(new_n, changes);
+					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/new_n: " << LOG_FM_TREE(new_n);)
 				}
-				auto new_n = rewriter::replace<node>(n, changes);
-				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/new_n: " << LOG_FM_TREE(new_n);)
 				if (new_n != n) transformed[n] = new_n;
 				return;
 			}
