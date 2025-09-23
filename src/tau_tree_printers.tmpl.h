@@ -418,7 +418,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_t:              out('1'); break;
 			case wff_f:             out('F'); break;
 			case wff_t:             out('T'); break;
-			case wff_neg:           out("!"); break;
+			case wff_neg:           out("!");
+						last_quant_nt = nul; break;
 			case first_sym:         out("first"); break;
 			case last_sym:          out("last"); break;
 			case fp_fallback:       out(" fallback "); break;
@@ -542,19 +543,32 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (isdigit(last_written_char)
 					|| t.child_is(tau::bf_constant))
 						out(" ");
+				last_quant_nt = nul;
 				break;
-			case bf_or:             out("|"); break;
-			case bf_xor:            out("+"); break;
-			case bf_eq:             out(" = "); break;
-			case bf_neq:            out(" != "); break;
-			case bf_lteq:           out(" <= "); break;
-			case bf_nlteq:          out(" !<= "); break;
-			case bf_gt:             out(" > "); break;
-			case bf_ngt:            out(" !> "); break;
-			case bf_gteq:           out(" >= "); break;
-			case bf_ngteq:          out(" !>= "); break;
-			case bf_lt:             out(" < "); break;
-			case bf_nlt:            out(" !< "); break;
+			case bf_or:             out("|");
+						last_quant_nt = nul; break;
+			case bf_xor:            out("+");
+						last_quant_nt = nul; break;
+			case bf_eq:             out(" = ");
+						last_quant_nt = nul; break;
+			case bf_neq:            out(" != ");
+						last_quant_nt = nul; break;
+			case bf_lteq:           out(" <= ");
+						last_quant_nt = nul; break;
+			case bf_nlteq:          out(" !<= ");
+						last_quant_nt = nul; break;
+			case bf_gt:             out(" > ");
+						last_quant_nt = nul; break;
+			case bf_ngt:            out(" !> ");
+						last_quant_nt = nul; break;
+			case bf_gteq:           out(" >= ");
+						last_quant_nt = nul; break;
+			case bf_ngteq:          out(" !>= ");
+						last_quant_nt = nul; break;
+			case bf_lt:             out(" < ");
+						last_quant_nt = nul; break;
+			case bf_nlt:            out(" !< ");
+						last_quant_nt = nul; break;
 
 			case ctn_neq:           out(" != "); break;
 			case ctn_eq:            out(" = "); break;
@@ -563,11 +577,16 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case ctn_lteq:          out(" <= "); break;
 			case ctn_lt:            out(" < "); break;
 
-			case wff_and:           out(" && "); break;
-			case wff_or:            out(" || "); break;
-			case wff_xor:           out(" ^ "); break;
-			case wff_imply:         out(" -> "); break;
-			case wff_equiv:         out(" <-> "); break;
+			case wff_and:           out(" && ");
+						last_quant_nt = nul; break;
+			case wff_or:            out(" || ");
+						last_quant_nt = nul; break;
+			case wff_xor:           out(" ^ ");
+						last_quant_nt = nul; break;
+			case wff_imply:         out(" -> ");
+						last_quant_nt = nul;  break;
+			case wff_equiv:         out(" <-> ");
+						last_quant_nt = nul; break;
 
 			case bf_interval:       out(" <= "); break;
 
@@ -614,7 +633,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 #endif
 		// t.print_tree( << "leaving: ") << "\n";
 		switch (nt) {
-			case bf_neg:            out("'"); break;
+			case bf_neg:            out("'");
+						last_quant_nt = nul; break;
 			case main: 
 			case builder:
 			case rec_relation:
