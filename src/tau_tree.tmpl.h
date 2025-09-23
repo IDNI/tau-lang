@@ -61,12 +61,11 @@ trefs get_cnf_bf_clauses(tref n);
 
 /**
  * @brief Provides a range over the paths of a term or formula. If the formula has
- * temporal quantifiers, a path is conjunction of temporally quantified formulas.
+ * temporal quantifiers, a path is the conjunction of temporally quantified formulas.
  * In other words, disjunctions underneath a temporal quantifier are not taken
  * into account.
  * @tparam node Tree node class
  */
-// TODO: stop on ref
 template <NodeType node>
 struct expression_paths {
 	using tau = tree<node>;

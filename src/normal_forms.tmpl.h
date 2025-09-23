@@ -3570,6 +3570,15 @@ tref replace_free_vars_by(tref fm, tref val) {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "anti_prenex"
 
+/**
+ * @brief The procedure tries to detect, using 0/1 substitutions for the provided
+ * variable and syntactic comparison, if the atomic formula is equivalent to T
+ * or F or independent of the provided variable.
+ * @tparam node Type of tree node
+ * @param atomic_fm The atomic formula, ie an equation, to simplify
+ * @param var The variable to base the simplifications on
+ * @return The simplified atomic formula
+ */
 template<NodeType node>
 tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	using tau = tree<node>;
@@ -3821,6 +3830,10 @@ private:
 };
 
 //TODO: add caching
+/**
+ * @brief Syntactic simplifications for a formula or a term based on its paths.
+ * @tparam node Type of tree node
+ */
 template <NodeType node>
 class syntactic_path_simplification {
 	using tau = tree<node>;
@@ -3947,6 +3960,13 @@ class syntactic_path_simplification {
 	}
 
 public:
+	/**
+	 * @brief Simplify contradictions on the formula that appear along a path.
+	 * Then do the same for the negated formula, resolving simple tautologies.
+	 * The procedure pushes negations all the way in.
+	 * @param fm Formula to simplify
+	 * @return Simplified formula
+	 */
 	static tref on (tref fm) {
 		DBG(LOG_DEBUG << "Syntactic_path_simplification on " << LOG_FM(fm) << "\n";)
 		tref res = nullptr;
@@ -3975,6 +3995,12 @@ public:
 		return res;
 	}
 
+	/**
+	 * @brief Only simplify contradictions on paths of formula while not manipulating
+	 * present negations.
+	 * @param fm Formula to simplify
+	 * @return Simplified formula
+	 */
 	static tref unsat_on_unchanged_negations (tref fm) {
 		if (tau::get(fm).is_term()) {
 			if (tau::get(fm).equals_0() || tau::get(fm).equals_1())
@@ -3989,7 +4015,8 @@ public:
 };
 
 /**
- * @brief Function to apply syntactical simplifications to formula in almost linear time
+ * @brief Function to apply syntactical simplifications to formula in almost
+ * linear time in the formula size and the number of paths found in terms
  * @tparam node tree node type
  * @param formula The formula to simplify
  * @return The simplified formula
@@ -4000,8 +4027,12 @@ tref syntactic_formula_simplification(tref formula) {
 	return syntactic_path_simplification<node>::on(formula);
 }
 
-// To be used with std::stable_sort
-//TODO: shift var if 0
+/**
+ * @brief Comparator for the BDD variable order used during simplification of
+ * terms. It is used with std::stable_sort in order to preserve initial order
+ * in the found BDD variables.
+ * @tparam node Type of tree node
+ */
 template<NodeType node>
 auto variable_order_for_simplification = [](tref l, tref r) static {
 	// Order is: smaller time point first, if equal
@@ -4063,7 +4094,12 @@ auto variable_order_for_simplification = [](tref l, tref r) static {
 	} else return false; // compare equal
 };
 
-// To be used with std::stable_sort
+/**
+ * @brief Comparator for the BDD variable order used during simplification of a
+ * formula. It is used with std::stable_sort in order to preserve initial order
+ * in the found BDD variables.
+ * @tparam node Type of tree node
+ */
 template<NodeType node>
 auto atm_formula_order_for_simplification = [](tref l, tref r) static {
 	// Order is decided by three factors
@@ -4075,56 +4111,66 @@ auto atm_formula_order_for_simplification = [](tref l, tref r) static {
 	DBG(assert(tau::get(r).child_is(tau::bf_eq));)
 	// For l
 	std::pair<bool, int_t> low_t_l {true, 0}, high_t_l {true, 0};
+	bool is_high_init = false;
 	const trefs& free_vars_l = get_free_vars<node>(l);
 	size_t io_free_var_size_l = 0;
 	for (tref v : free_vars_l) {
-		if (is_io_var<node>(v)) {
-			++io_free_var_size_l;
-			if (is_io_initial<node>(v)) {
-				const int_t t = get_io_time_point<node>(v);
-				if (low_t_l.second >= t) {
-					low_t_l.first = false;
-					low_t_l.second = t;
-				}
-				if (high_t_l.second <= t) {
-					high_t_l.first = false;
-					high_t_l.second = t;
-				}
-			} else {
-				if (low_t_l.first)
-					if (const int_t t = get_io_var_shift<node>(v); t == 0 ? false : low_t_l.second < t)
-						low_t_l.second = t;
-				if (high_t_l.first)
-					if (const int_t t = get_io_var_shift<node>(v); t == 0 ? false : high_t_l.second > t)
-						high_t_l.second = t;
+		if (!is_io_var<node>(v)) continue;
+		++io_free_var_size_l;
+		if (is_io_initial<node>(v)) {
+			const int_t t = get_io_time_point<node>(v);
+			if (low_t_l.second >= t) {
+				low_t_l.first = false;
+				low_t_l.second = t;
 			}
+			if (high_t_l.second <= t || !is_high_init) {
+				high_t_l.first = false;
+				high_t_l.second = t;
+				is_high_init = true;
+			}
+		} else {
+			if (low_t_l.first)
+				if (const int_t t = get_io_var_shift<node>(v);
+					low_t_l.second < t)
+					low_t_l.second = t;
+			 if (high_t_l.first)
+				if (const int_t t = get_io_var_shift<node>(v);
+					high_t_l.second > t || !is_high_init) {
+					high_t_l.second = t;
+					is_high_init = true;
+				}
 		}
 	}
 	// For r
 	std::pair<bool, int_t> low_t_r {true, 0}, high_t_r {true, 0};
+	is_high_init = false;
 	const trefs& free_vars_r = get_free_vars<node>(r);
 	size_t io_free_var_size_r = 0;
 	for (tref v : free_vars_r) {
-		if (is_io_var<node>(v)) {
-			++io_free_var_size_r;
-			if (is_io_initial<node>(v)) {
-				const int_t t = get_io_time_point<node>(v);
-				if (low_t_r.second >= t) {
-					low_t_r.first = false;
-					low_t_r.second = t;
-				}
-				if (high_t_r.second <= t) {
-					high_t_r.first = false;
-					high_t_r.second = t;
-				}
-			} else {
-				if (low_t_r.first)
-					if (const int_t t = get_io_var_shift<node>(v); t == 0 ? false : low_t_r.second < t)
-						low_t_r.second = t;
-				if (high_t_r.first)
-					if (const int_t t = get_io_var_shift<node>(v); t == 0 ? false : high_t_r.second > t)
-						high_t_r.second = t;
+		if (!is_io_var<node>(v)) continue;
+		++io_free_var_size_r;
+		if (is_io_initial<node>(v)) {
+			const int_t t = get_io_time_point<node>(v);
+			if (low_t_r.second >= t) {
+				low_t_r.first = false;
+				low_t_r.second = t;
 			}
+			if (high_t_r.second <= t || !is_high_init) {
+				high_t_r.first = false;
+				high_t_r.second = t;
+				is_high_init = true;
+			}
+		} else {
+			if (low_t_r.first)
+				if (const int_t t = get_io_var_shift<node>(v);
+					low_t_r.second < t)
+					low_t_r.second = t;
+			if (high_t_r.first)
+				if (const int_t t = get_io_var_shift<node>(v);
+					high_t_r.second > t || !is_high_init) {
+					high_t_r.second = t;
+					is_high_init = true;
+				}
 		}
 	}
 	// Check that both have io variables
@@ -4159,17 +4205,30 @@ auto atm_formula_order_for_simplification = [](tref l, tref r) static {
 	}
 };
 
+/**
+ * @brief Applies syntactic simplifications to an atomic formula, ie an equation.
+ * @tparam node Tree node type
+ * @param atomic_formula Formula to simplify
+ * @return Simplified formula
+ */
 template<NodeType node>
 tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 	using tau = tree<node>;
 	bool is_eq = tau::get(atomic_formula).child_is(tau::bf_eq);
 	DBG(assert(is_eq || tau::get(atomic_formula).child_is(tau::bf_neq));)
+	// Bring the equation to (!)= 0
 	atomic_formula = norm_equation<node>(atomic_formula);
 	if (tau::get(atomic_formula).equals_T() ||
 		tau::get(atomic_formula).equals_F()) return atomic_formula;
 	tref func = tau::trim2(atomic_formula);
+	// Apply syntactic path simplification
 	func = syntactic_path_simplification<node>::on(func);
-	atomic_formula = denorm_equation<node>(is_eq ? tau::build_bf_eq_0(func) : tau::build_bf_neq_0(func));
+	// Apply syntactic variable simplification for each found free variable
+	atomic_formula = is_eq
+				 ? tau::build_bf_eq_0(func)
+				 : tau::build_bf_neq_0(func);
+	// Bring the equation back to its original form
+	atomic_formula = denorm_equation<node>(atomic_formula);
 	auto& free_vars = get_free_vars<node>(atomic_formula);
 	for (tref v : free_vars) {
 		atomic_formula =
@@ -4178,6 +4237,18 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 	return atomic_formula;
 }
 
+/**
+ * @brief The procedure collects all = 0 equalities within scope that share
+ * the provided variable. These collected assumptions are squeezed together,
+ * call the squeezed result A, and are then integrated into terms in scope that
+ * share at least 2 variables including the provided one in the following way:
+ * - Given f = 0, we produce f|A = 0
+ * - Given f != 0, we produce f & A' != 0
+ * @tparam node Tree node type
+ * @param formula The formula to apply the procedure to
+ * @param var The variable to base the procedure on
+ * @return The mutated formula
+ */
 template<NodeType node>
 tref squeeze_absorb_down(tref formula, tref var) {
 	using tau = tree<node>;
@@ -4190,7 +4261,9 @@ tref squeeze_absorb_down(tref formula, tref var) {
 			if (!cn.is(tau::wff_or)) {
 				// Push new assumption to stack
 				assms.push_back(assms.back());
-			} else mark.insert(parent);
+			}
+			// Mark disjunctions whose child is not a disjunction
+			else mark.insert(parent);
 		}
 		if (cn.is(tau::wff_and)) {
 			// Squeeze = 0 if they share var
@@ -4266,24 +4339,44 @@ tref squeeze_absorb_down(tref formula, tref var) {
 	return res;
 }
 
+/**
+ * @brief Do a single Boole decomposition step on term given the provided variable.
+ * Assumes that the decomposition is valid.
+ * @tparam node Tree node type
+ * @param term The term on which to apply Boole decomposition step
+ * @param var The variable on which to do Boole decomposition
+ * @return The resulting term
+ */
 template<NodeType node>
 tref term_boole_decomposition(tref term, tref var) {
-	// Assumes that terms of atm allow Boole decomposition on var
 	using tau = tree<node>;
 	DBG(assert(tau::get(var).is(tau::variable));)
 	var = tau::get(tau::bf, var);
 	tref p1 = tau::get(term).replace(var, tau::_1());
+	// Ensure early detection of F
 	p1 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p1);
 	tref p2 = tau::get(term).replace(var, tau::_0());
+	// Ensure early detection of F
 	p2 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p2);
 	if (tau::get(p1) == tau::get(p2)) return p1;
+	// Build Boole decomposition step
 	return tau::build_bf_or(
 		tau::build_bf_and(var, p1), tau::build_bf_and(tau::build_bf_neg(var), p2)
 	);
 }
 
-// Recursion depth is bound by the number of variables, which should
+// Note: Recursion depth is bound by the number of variables, which should
 // prevent a stack overflow due to tree size in all use cases
+/**
+ * @brief Recursively do Boole decomposition on term using the provided variables
+ * starting at idx.
+ * Assumes that the decomposition is valid for all provided variables.
+ * @tparam node Tree node type
+ * @param term Term on which to do Boole decomposition
+ * @param vars The variables to do Boole decomposition on
+ * @param idx The current variable index
+ * @return The resulting Boole decomposition
+ */
 template<NodeType node>
 tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx) {
 	using tau = tree<node>;
@@ -4297,8 +4390,10 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx)
 	}
 	DBG(assert(tau::get(vars[idx]).is(tau::variable));)
 	tref p1 = tau::get(term).replace(vars[idx], tau::_1_trimmed());
+	// Ensure early detection of F
 	p1 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p1);
 	tref p2 = tau::get(term).replace(vars[idx], tau::_0_trimmed());
+	// Ensure early detection of F
 	p2 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p2);
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
@@ -4307,6 +4402,7 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx)
 	p1 = rec_term_boole_decomposition<node>(p1, vars, idx + 1);
 	p2 = rec_term_boole_decomposition<node>(p2, vars, idx + 1);
 	tref var = tau::get(tau::bf, vars[idx]);
+	// Build Boole decomposition
 	if (tau::get(p1).equals_1())
 		term = tau::build_bf_or(var,  p2);
 	else if (tau::get(p2).equals_1())
@@ -4318,6 +4414,13 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx)
 }
 
 //TODO: Does not work for bitvector
+/**
+ * @brief Convert term to Boole normal form. Also treats normalization of
+ * encountered tau constants.
+ * @tparam node Tree node type
+ * @param term The term to do the Boole decomposition on
+ * @return The resulting Boole decomposition
+ */
 template<NodeType node>
 tref term_boole_decomposition(tref term) {
 	using tau = tree<node>;
@@ -4335,8 +4438,18 @@ tref term_boole_decomposition(tref term) {
 	return term;
 }
 
-// Recursion depth is bound by the number of variables, which should
+// Note: Recursion depth is bound by the number of variables, which should
 // prevent a stack overflow due to tree size in all use cases
+ /**
+ * @brief Recursively do Boole decomposition on formula using the provided variables
+ * starting at idx.
+ * Assumes that the decomposition is valid for all provided variables.
+ * @tparam node Tree node type
+ * @param formula The formula to do Boole decomposition on
+ * @param vars The variable to perform the Boole decomposition on
+ * @param idx The current variable index
+ * @return The resulting Boole decomposition
+ */
 template<NodeType node>
 tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 	using tau = tree<node>;
@@ -4349,8 +4462,10 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 	}
 	DBG(assert(tau::get(vars[idx]).child_is(tau::bf_eq));)
 	tref p1 = tau::get(formula).replace(vars[idx], tau::_T());
+	// Ensure early detection of F
 	p1 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p1);
 	tref p2 = tau::get(formula).replace(vars[idx], tau::_F());
+	// Ensure early detection of F
 	p2 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p2);
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
@@ -4358,6 +4473,7 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 	}
 	p1 = rec_boole_decomposition<node>(p1, vars, idx + 1);
 	p2 = rec_boole_decomposition<node>(p2, vars, idx + 1);
+	// Build Boole decomposition
 	if (tau::get(p1).equals_T())
 		formula = tau::build_wff_or(vars[idx], p2);
 	else if (tau::get(p2).equals_T())
@@ -4368,16 +4484,24 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 	return formula;
 }
 
+/**
+ * This procedure converts the formula to Boole normal form. It also converts all
+ * terms to Boole normal form.
+ * @tparam node Tree node type
+ * @param formula The formula to convert to Boole normal form
+ * @return The resulting Boole normal form
+ */
 template<NodeType node>
 tref boole_normal_form(tref formula) {
 	using tau = tree<node>;
 	DBG(LOG_DEBUG << "Boole_normal_form on " << LOG_FM(formula) << "\n";)
 	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
 		return formula;
-	// Step 1: Syntactically simplify resulting formula
+	// Step 1: Syntactically simplify formula
 	formula = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	// Squeeze all = 0 conjunctions together for additional simplifications during term normalization
+	// TODO: Don't squeeze all but only sharing
 	formula = squeeze_wff_pos<node>(formula);
 	// TODO: squeeze in scope if free vars are subset
 	// TODO: absorb in scope if free vars are subset
@@ -4417,23 +4541,29 @@ tref boole_normal_form(tref formula) {
 	trefs atms = tau::get(eq_formula).select_top(is_child<node, tau::bf_eq>);
 	// No variables for Boole decomposition
 	if (atms.empty()) return formula;
+	// Sort the BDD variables
 	std::ranges::stable_sort(atms, atm_formula_order_for_simplification<node>);
+	// Apply Boole decomposition
 	eq_formula = rec_boole_decomposition<node>(eq_formula, atms, 0);
+	// Convert !(=) to != again
 	eq_formula = not_equal_to_unequal<node>(eq_formula);
 	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_formula) << "\n";)
 	return eq_formula;
 }
 
-// TODO: maybe syntactic path simp?
+/**
+ * @brief Performs a Boole decomposition step on the formula with the goal to push
+ * the existential quantifier further in. Since the BDD variables are atomic formulas,
+ * the procedure investigates the best Boole decomposition in each situation.
+ * @tparam node Tree node type
+ * @param ex_quant_fm Existentially quantified formula on which to perform Boole decomposition step
+ * @param pool The pool of variables that can be used for the Boole decomposition
+ * @return The resulting Boole decomposition with the existential quantifier pushed further in
+ */
 template<NodeType node>
 tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 	using tau = tree<node>;
 	DBG(assert(!tau::get(ex_quant_fm).find_top(is<node, tau::bf_neq>)));
-	// ex_quant_fm is of the form: ex var atm_assm && rest
-	// Find next best matching atomic formula atm from rest
-	// Try gamma_1 to gamma_4 as simps on atm
-	// If simp, build simplified result
-	// Else build Boole decomposition with squeeze/absorb
 
 	// Get atomic formulas from pool
 	auto it = pool.find(ex_quant_fm);
@@ -4453,11 +4583,13 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 	tref var = tau::get(tau::bf, tau::trim2(ex_quant_fm));
 	// Try syntactic simplifications
 	{
-	// TODO: add syntactic path simplification and resolve xor in func
 	tref func = tau::trim2(norm_equation<node>(atm));
+	func = apply_xor_def<node>(func);
 	// We use is_boolean_operation to enable the procedure on non-boolean functions
 	tref func_v_0 = rewriter::replace_if<node>(func, var, tau::_0(), is_boolean_operation<node>);
+	func_v_0 = syntactic_path_simplification<node>::on(func_v_0);
 	tref func_v_1 = rewriter::replace_if<node>(func, var, tau::_1(), is_boolean_operation<node>);
+	func_v_1 = syntactic_path_simplification<node>::on(func_v_1);
 	// Check identically zero
 	if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0()) {
 		return rewriter::replace<node>(ex_quant_fm, atm, tau::_T());
@@ -4470,7 +4602,9 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 	else if (tau::get(func_v_0) == tau::get(func_v_1) && !contains<node>(func_v_0, var)) {
 		tref fm = tau::get(ex_quant_fm)[0].second();
 		tref l = rewriter::replace<node>(fm, atm, tau::_T());
+		l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
 		tref r = rewriter::replace<node>(fm, atm, tau::_F());
+		r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
 		if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l);
 		atm = rewriter::replace<node>(atm, var, tau::_T());
 		return tau::build_wff_or(
@@ -4479,12 +4613,14 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 			);
 	}
 	// Check has a unique zero
-	func_v_1 = push_negation_in<node, false>(tau::build_bf_neg(func_v_1));
+	func_v_1 = syntactic_path_simplification<node>::on(tau::build_bf_neg(func_v_1));
 	if (tau::get(func_v_0) == tau::get(func_v_1) && !contains<node>(func_v_0, var)) {
 		tref fm = tau::get(ex_quant_fm)[0].second();
 		tref l = rewriter::replace<node>(fm, atm, tau::_T());
 		l = rewriter::replace<node>(l, var, func_v_0);
+		l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
 		tref r = rewriter::replace<node>(fm, atm, tau::_F());
+		r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
 		if (tau::get(l) == tau::get(r)) return l;
 		tref boole_atm = tau::build_bf_eq(
 		term_boole_decomposition<node>(tau::get(atm)[0].first(), tau::trim(var)),
@@ -4492,10 +4628,8 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 		);
 		tref nr = tau::build_wff_ex(tau::trim(var),
 			tau::build_wff_and(tau::build_wff_neg(boole_atm), r));
-		// std::cout << "curr_pool: " << tau::get(curr_pool) << "\n";
 		pool.insert_or_assign(nr,
 			rewriter::replace<node>(curr_pool, atm, tau::_F()));
-		// std::cout << "new pool: " << tau::get(pool[nr]) << "\n";
 		atm = rewriter::replace<node>(atm, var, func_v_0);
 		return tau::build_wff_or(tau::build_wff_and(atm, l), nr);
 	}
@@ -4503,7 +4637,9 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 	// No simplification applied, build Boole decomposition
 	tref fm = tau::get(ex_quant_fm)[0].second();
 	tref l = rewriter::replace<node>(fm, atm, tau::_T());
+	l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
 	tref r = rewriter::replace<node>(fm, atm, tau::_F());
+	r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
 	if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l);
 	tref boole_atm = tau::build_bf_eq(
 		term_boole_decomposition<node>(tau::get(atm)[0].first(), tau::trim(var)),
@@ -4513,24 +4649,27 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 		tau::build_wff_and(boole_atm, l));
 	tref nr = tau::build_wff_ex(tau::trim(var),
 		tau::build_wff_and(tau::build_wff_neg(boole_atm), r));
-	// std::cout << "curr_pool: " << tau::get(curr_pool) << "\n";
+	// Update available pool for further BDD variables
 	pool.insert_or_assign(nl,
 		rewriter::replace<node>(curr_pool, atm, tau::_T()));
-	// std::cout << "new l pool: " << tau::get(pool[nl]) << "\n";
 	pool.insert_or_assign(nr,
 		rewriter::replace<node>(curr_pool, atm, tau::_F()));
-	// std::cout << "new r pool: " << tau::get(pool[nr]) << "\n";
 	return tau::build_wff_or(nl, nr);
 }
 
 // TODO: How to adjust for bitvector that are boolean?
+/**
+ * @brief Eliminate the existential quantifier scoping a clause.
+ * @tparam node Tree node type
+ * @param ex_clause Existentially quantified clause
+ * @return The resulting clause after removing the existential quantifier
+ */
 template <NodeType node>
-tref treat_ex_quantified_clause(tref ex_formula) {
+tref treat_ex_quantified_clause(tref ex_clause) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	// Following Corollary 2.3 from Taba book from Ohad
-	tref var = tau::trim2(ex_formula);
-	tref formula = tau::get(ex_formula)[0].second();
+	tref var = tau::trim2(ex_clause);
+	tref formula = tau::get(ex_clause)[0].second();
 	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
 		return formula;
 	tref new_fm = tau::_T();
@@ -4543,7 +4682,8 @@ tref treat_ex_quantified_clause(tref ex_formula) {
 			continue;
 		}
 		// Check if conjunct is of form = or !=
-		if ((tt(conj) | tau::bf_eq) || (tt(conj) | tau::bf_neq))
+		if (tau::get(conj).child_is(tau::bf_eq) ||
+			tau::get(conj).child_is(tau::bf_neq))
 			continue;
 		// If the conjunct contains the quantified variable at this point
 		// we cannot resolve the quantifier in this clause
@@ -4568,8 +4708,10 @@ tref treat_ex_quantified_clause(tref ex_formula) {
 	if (neqs.size()) {
 		tref nneqs = tau::_T();
 		for (tref neq : neqs) {
+			// Convert to != 0
 			neq = norm_trimmed_equation<node>(neq);
-			tref g = tt(neq) | tau::bf | tt::ref;
+			// Get term
+			tref g = tau::trim(neq);
 			tref g_0 = rewriter::replace<node>(g, var,
 						tau::_0_trimmed());
 			// std::cout << "g_0: " << tau::get(g_0) << "\n";
@@ -4612,6 +4754,13 @@ tref treat_ex_quantified_clause(tref ex_formula) {
 	return boole_normal_form<node>(new_fm);
 }
 
+/**
+ * @brief The procedure pushes all quantifiers that are present in formula as far
+ * in as possible.
+ * @tparam node Tree node type
+ * @param formula The formula to apply the procedure to
+ * @return The resulting formula
+ */
 template<NodeType node>
 tref anti_prenex(tref formula) {
 	using tau = tree<node>;
@@ -4648,11 +4797,9 @@ tref anti_prenex(tref formula) {
 	};
 	auto inner_quant = [&anti_prenex_step](tref n) {
 		if (is_child_quantifier<node>(n)) {
-			// std::cout << "Inner_quant on " << LOG_FM(n) << "\n";
 			DBG(LOG_TRACE << "Inner_quant on " << LOG_FM(n) << "\n";)
 			n = syntactic_formula_simplification<node>(n);
 			n = squeeze_absorb_down<node>(n, tau::trim2(n));
-			// std::cout << "Inner_quant simp: " << LOG_FM(n) << "\n";
 			DBG(LOG_TRACE << "After squeeze_absorb_down " << LOG_FM(n) << "\n";)
 			if (is_child<node>(n, tau::wff_all)) {
 				tref n_neg = to_nnf<node>(tau::build_wff_neg(n));
@@ -4666,6 +4813,7 @@ tref anti_prenex(tref formula) {
 			}
 		} else return n;
 	};
+	// TODO: move this temporal distinction to normalize method
 	// Formulas below temporal quantifiers need to be treated separately
 	auto st_aw = [](tref n) {
 		return is_child<node>(n, tau::wff_sometimes)
@@ -4710,6 +4858,15 @@ tref anti_prenex(tref formula) {
 	}
 }
 
+/**
+ * @brief Converts the temporal layer of a formula to reduced DNF, squeezes the always
+ * statements and ensures that formulas containing temporal variables are
+ * explicitly quantified while non-temporal formulas are not quantified temporally.
+ * @tparam node Tree node type
+ * @tparam normalize_scopes If true, temporally quantified formulas are converted to Boole normal form
+ * @param fm The formula that is to be temporally normalized
+ * @return The resulting formula after normalizing the temporal quantifiers
+ */
 template <NodeType node, bool normalize_scopes>
 tref normalize_temporal_quantifiers(tref fm) {
 	using tau = tree<node>;
@@ -4730,7 +4887,7 @@ tref normalize_temporal_quantifiers(tref fm) {
 	if (has_temp_var<node>(fm)) {
 		if (has_temp_quant) {
 			// By assumption, all temporal variables are explicitly
-			// quantified by temporal quantifier without nesting
+			// quantified by temporal quantifier without nesting.
 			// DNF conversion is only done on temporal level
 			fm = temporal_layer_to_dnf<node>(fm);
 			// Simplify temporal layer
@@ -4791,8 +4948,6 @@ tref normalize_temporal_quantifiers(tref fm) {
 
 template <NodeType node>
 tref to_snf_step<node>::operator()(tref form) const {
-	using tau = tree<node>;
-	using tt = tau::traverser;
 	// we select all literals, i.e. wff equalities or it negations.
 	static const auto is_literal = [](tref n) -> bool {
 		return tau::get(n).child_is(tau::bf_eq);
@@ -4813,7 +4968,6 @@ tref to_snf_step<node>::operator()(tref form) const {
 
 template <NodeType node>
 tref to_snf_step<node>::bdd_path_to_snf(const bdd_path& path, tref form) const {
-	using tt = typename tree<node>::traverser;
 	// we simplify the constant part of the formula
 	// TODO (HIGH) fix simplification
 	// auto simplified = tt(form) | simplify_snf<node>();

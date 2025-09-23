@@ -597,7 +597,7 @@ template <NodeType node>
 tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool);
 
 template <NodeType node>
-tref treat_ex_quantified_clause(tref ex_formula);
+tref treat_ex_quantified_clause(tref ex_clause);
 
 template <NodeType node>
 tref anti_prenex(tref formula);
