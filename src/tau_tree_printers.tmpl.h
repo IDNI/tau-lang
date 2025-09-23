@@ -446,7 +446,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_t:              out('1'); break;
 			case wff_f:             out('F'); break;
 			case wff_t:             out('T'); break;
-			case wff_neg:           out("!"); break;
+			case wff_neg:           out("!");
+						last_quant_nt = nul; break;
 			case first_sym:         out("first"); break;
 			case last_sym:          out("last"); break;
 			case fp_fallback:       out(" fallback "); break;
@@ -570,47 +571,60 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (isdigit(last_written_char)
 					|| t.child_is(tau::bf_constant))
 						out(" ");
+				last_quant_nt = nul;
 				break;
-			case bf_or:             out("|"); break;
-			case bf_xor:            out("+"); break;
-			case bf_eq:             out(" = "); break;
-			case bf_neq:            out(" != "); break;
-			case bf_lteq:           out(" <= "); break;
-			case bf_nlteq:          out(" !<= "); break;
-			case bf_gt:             out(" > "); break;
-			case bf_ngt:            out(" !> "); break;
-			case bf_gteq:           out(" >= "); break;
-			case bf_ngteq:          out(" !>= "); break;
-			case bf_lt:             out(" < "); break;
-			case bf_nlt:            out(" !< "); break;
+			case bf_or:             out("|");
+						last_quant_nt = nul; break;
+			case bf_xor:            out("+");
+						last_quant_nt = nul; break;
+			case bf_eq:             out(" = ");
+						last_quant_nt = nul; break;
+			case bf_neq:            out(" != ");
+						last_quant_nt = nul; break;
+			case bf_lteq:           out(" <= ");
+						last_quant_nt = nul; break;
+			case bf_nlteq:          out(" !<= ");
+						last_quant_nt = nul; break;
+			case bf_gt:             out(" > ");
+						last_quant_nt = nul; break;
+			case bf_ngt:            out(" !> ");
+						last_quant_nt = nul; break;
+			case bf_gteq:           out(" >= ");
+						last_quant_nt = nul; break;
+			case bf_ngteq:          out(" !>= ");
+						last_quant_nt = nul; break;
+			case bf_lt:             out(" < ");
+						last_quant_nt = nul; break;
+			case bf_nlt:            out(" !< ");
+						last_quant_nt = nul; break;
 
-			case bv_eq:             out(" =_ "); break;
-			case bv_neq:            out(" !=_ "); break;
-			case bv_lteq:           out(" <=_ "); break;
-			case bv_nlteq:          out(" !<=_ "); break;
-			case bv_gt:             out(" >_ "); break;
-			case bv_ngt:            out(" !>_ "); break;
-			case bv_gteq:           out(" >=_ "); break;
-			case bv_ngteq:          out(" !>=_ "); break;
-			case bv_lt:             out(" <_ "); break;
-			case bv_nlt:            out(" !<_ "); break;
+			case bv_eq:             out(" =_ "); last_quant_nt = nul; break;
+			case bv_neq:            out(" !=_ "); last_quant_nt = nul; break;
+			case bv_lteq:           out(" <=_ "); last_quant_nt = nul; break;
+			case bv_nlteq:          out(" !<=_ "); last_quant_nt = nul; break;
+			case bv_gt:             out(" >_ "); last_quant_nt = nul; break;
+			case bv_ngt:            out(" !>_ "); last_quant_nt = nul; break;
+			case bv_gteq:           out(" >=_ "); last_quant_nt = nul; break;
+			case bv_ngteq:          out(" !>=_ "); last_quant_nt = nul; break;
+			case bv_lt:             out(" <_ "); last_quant_nt = nul; break;
+			case bv_nlt:            out(" !<_ "); last_quant_nt = nul; break;
 
-			case bv_add:            out("+"); break;
-			case bv_sub:            out("-"); break;
-			case bv_mul:            out("*"); break;
-			case bv_div:            out("/"); break;
-			case bv_mod:            out("%"); break;
-			case bv_and:            out("&"); break;
-			case bv_nand:           out("!&"); break;
-			case bv_or:             out("|"); break;
-			case bv_nor:            out("!|"); break;
-			case bv_xor:            out("(+)"); break;
-			case bv_xnor:           out("!(+)"); break;
-			case bv_shl:            out("<<"); break;
-			case bv_shr:            out(">>"); break;
+			case bv_add:            out("+"); last_quant_nt = nul; break;
+			case bv_sub:            out("-"); last_quant_nt = nul; break;
+			case bv_mul:            out("*"); last_quant_nt = nul; break;
+			case bv_div:            out("/"); last_quant_nt = nul; break;
+			case bv_mod:            out("%"); last_quant_nt = nul; break;
+			case bv_and:            out("&"); last_quant_nt = nul; break;
+			case bv_nand:           out("!&"); last_quant_nt = nul; break;
+			case bv_or:             out("|"); last_quant_nt = nul; break;
+			case bv_nor:            out("!|"); last_quant_nt = nul; break;
+			case bv_xor:            out("(+)"); last_quant_nt = nul; break;
+			case bv_xnor:           out("!(+)"); last_quant_nt = nul; break;
+			case bv_shl:            out("<<"); last_quant_nt = nul; break;
+			case bv_shr:            out(">>"); last_quant_nt = nul; break;
 
-			case bv_max:            out("max "); break;
-			case bv_min:            out("min "); break;
+			case bv_max:            out("max "); last_quant_nt = nul; break;
+			case bv_min:            out("min "); last_quant_nt = nul; break;
 
 			case ctn_neq:           out(" != "); break;
 			case ctn_eq:            out(" = "); break;
@@ -619,13 +633,18 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case ctn_lteq:          out(" <= "); break;
 			case ctn_lt:            out(" < "); break;
 
-			case wff_and:           out(" && "); break;
-			case wff_or:            out(" || "); break;
-			case wff_xor:           out(" ^ "); break;
-			case wff_imply:         out(" -> "); break;
-			case wff_equiv:         out(" <-> "); break;
+			case wff_and:           out(" && ");
+						last_quant_nt = nul; break;
+			case wff_or:            out(" || ");
+						last_quant_nt = nul; break;
+			case wff_xor:           out(" ^ ");
+						last_quant_nt = nul; break;
+			case wff_imply:         out(" -> ");
+						last_quant_nt = nul;  break;
+			case wff_equiv:         out(" <-> ");
+						last_quant_nt = nul; break;
 
-			case bf_interval:       out(" <= "); break;
+			case bf_interval:       out(" <= "); last_quant_nt = nul; break;
 
 			case rec_relation:      out(" := "); break;
 			case wff_rule:          out(" ::= "); break;
@@ -670,7 +689,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 #endif
 		// t.print_tree( << "leaving: ") << "\n";
 		switch (nt) {
-			case bf_neg:            out("'"); break;
+			case bf_neg:            out("'");
+				last_quant_nt = nul; break;
 			case main:
 			case rec_relation:
 			case wff_rule:
