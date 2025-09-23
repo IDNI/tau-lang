@@ -3,6 +3,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
+
 #include "resolver.h"
 
 // Adding comprehensive doctest test cases for scope in resolver.h
@@ -19,7 +20,7 @@ TEST_SUITE("Configuration") {
 
 TEST_SUITE("scopes") {
     TEST_CASE("empty scope is empty") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		CHECK(r.kinds().size() == 0);
 		CHECK(r.scopes_.size() == 1);
 		CHECK(r.kinds_.size() == 0);
@@ -27,7 +28,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("closing outer scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		r.close();
 		CHECK(r.scopes_.size() == 1);
 		CHECK(r.kinds().size() == 0);
@@ -36,7 +37,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("opening inner scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		r.open({});
 		CHECK(r.scopes_.size() == 2);
 		CHECK(r.kinds().size() == 0);
@@ -45,7 +46,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("opening clossing scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		r.open({});
 		CHECK(r.scopes_.size() == 2);
 		CHECK(r.kinds().size() == 0);
@@ -59,7 +60,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("opening two nested inner scopes") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		r.open({});
 		CHECK(r.scopes_.size() == 2);
 		CHECK(r.kinds().size() == 0);
@@ -73,7 +74,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("closing two nested inner scopes") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		r.open({});
 		CHECK(r.scopes_.size() == 2);
 		CHECK(r.kinds().size() == 0);
@@ -97,7 +98,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("opening/closing two sibling inner scopes") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		CHECK(r.scopes_.size() == 1);
 		CHECK(r.kinds().size() == 0);
 		CHECK(r.kinds_.size() == 0);
@@ -125,7 +126,7 @@ TEST_SUITE("scopes") {
 	}
 
     TEST_CASE("adding unkinded element to empty scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		r.insert(x);
 		CHECK(r.kinds().size() == 1);
@@ -135,7 +136,7 @@ TEST_SUITE("scopes") {
 	}
 
     TEST_CASE("assigning to non-existing element in empty scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t type = 1;
 		CHECK(!r.assign(x, type));
@@ -145,7 +146,7 @@ TEST_SUITE("scopes") {
 	}
 
     TEST_CASE("adding and assign element to empty scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t type = 1;
 		r.insert(x);
@@ -157,7 +158,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("assigning unkinded element to a non-empty scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t y = 1;
 		r.insert(x);
@@ -170,7 +171,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("assigning kinded element to a non-empty scope: existing unkinded") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t y = 1;
 		size_t type = 2;
@@ -185,7 +186,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("assigning kinded element to a non-empty scope: existing kinded") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t y = 1;
 		size_t type1 = 2;
@@ -202,7 +203,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("assigning unkinded element to a nested scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t y = 1;
 		r.insert(x);
@@ -216,7 +217,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("assigning kinded element to a nested scope (y1)") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t y = 1;
 		size_t type = 2;
@@ -232,7 +233,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("assigning kinded element to a nested scope (y2)") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t y = 1;
 		size_t type = 2;
@@ -248,7 +249,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("overwriting kinded element kind in a nested scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t type1 = 2;
 		size_t type2 = 3;
@@ -267,7 +268,7 @@ TEST_SUITE("scopes") {
 	}
 
 	TEST_CASE("overwriting unkinded element kind in a nested scope") {
-		scoped_resolver<size_t, size_t> r(0, 0);
+		scoped_resolver<size_t, size_t> r(0);
 		size_t x = 0;
 		size_t type1 = 2;
 		r.insert(x);

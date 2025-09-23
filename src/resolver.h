@@ -31,12 +31,10 @@ struct scoped_resolver {
 	scope_t current = 0;
 	std::deque<size_t> scopes_ { current };
 	std::map<element_t, kind_t> kinds_;
-	data_t minimum;
 	kind_t unknown;
 	kind_t default_kind = unknown;
 
-	scoped_resolver(const data_t& minimum, const kind_t& unknown):
-		minimum(minimum), unknown(unknown) {}
+	scoped_resolver(const kind_t& unknown): unknown(unknown) {}
 
 	void open(const std::map<data_t, kind_t>& kinds) {
 		scopes_.push_back(++current);
@@ -100,7 +98,7 @@ struct scoped_resolver {
 
 	std::map<data_t, kind_t> current_kinds() {
 		std::map<data_t, kind_t> result ;
-//		for(auto it = uf.lower_bound(element_t{current, minimum}); it != uf.end(); ++it)
+		// TODO (HIGH) traverse in reverse until an element of other scope is found
 		for(auto [element, _] : uf)
 			if (element.first == current) result[element.second] = type_of(element.second);
 		return result;
@@ -133,7 +131,7 @@ struct type_scoped_resolver : public scoped_resolver<tref, type_t> {
 	using tt = tau::traverser;
 
 	type_scoped_resolver():
-		scoped_resolver<tref, type_t>(nullptr, {0, nullptr}) {}
+		scoped_resolver<tref, type_t>({0, nullptr}) {}
 
 	// merge two trefs if the types are compatible
 	// returns true if merge was successful, false otherwise
@@ -147,27 +145,6 @@ struct type_scoped_resolver : public scoped_resolver<tref, type_t> {
 		// We also update the type of the merged elements
 		this->kinds_[{this->current, a}] = merged.value();
 		this->kinds_[{this->current, b}] = merged.value();
-#ifdef DEBUG
-		LOG_TRACE << "type_scoped_resolver/a: " << LOG_FM_TREE(a);
-		LOG_TRACE << "type_scoped_resolver/type_a: " << type_a.first << "["
-			<< (type_a.second ? tau::get(type_a.second).dump_to_str() : "") << "]";
-		LOG_TRACE << "type_scoped_resolver/b: " << LOG_FM_TREE(b);
-		LOG_TRACE << "type_scoped_resolver/type_b: " << type_b.first << "["
-			<< (type_b.second ? tau::get(type_b.second).dump_to_str() : "") << "]";
-		LOG_TRACE << "type_scoped_resolver/merge: " << merged.value().first << "["
-			<< (merged.value().second ? tau::get(merged.value().second).dump_to_str() : "") << "]";
-		LOG_TRACE << "type_scoped_resolver/uf.root({{this->current}, a}): " << LOG_FM_TREE(this->uf.root({this->current, a}).second);
-		LOG_TRACE << "type_scoped_resolver/kinds_[uf.root({{this->current}, a}): " <<
-			this->kinds_[this->uf.root({this->current, a})].first << "["
-			<< (this->kinds_[this->uf.root({this->current, a})].second ?
-				tau::get(this->kinds_[this->uf.root({this->current, a})].second).dump_to_str() : "")
-			<< "]";
-		LOG_TRACE << "type_scoped_resolver/kinds_[uf.root({{this->current}, b}): " <<
-			this->kinds_[this->uf.root({this->current, b})].first << "["
-			<< (this->kinds_[this->uf.root({this->current, b})].second ?
-				tau::get(this->kinds_[this->uf.root({this->current, b})].second).dump_to_str() : "")
-			<< "]";
-#endif // DEBUG
 		return true;
 	}
 
