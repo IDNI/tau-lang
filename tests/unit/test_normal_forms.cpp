@@ -164,6 +164,36 @@ TEST_SUITE("normal forms: dnf_bf") {
 
 }
 
+TEST_SUITE("path_expressions") {
+	TEST_CASE("1") {
+		const char* sample = "(a=0||b=0)&&x=0&&y=0&&(p=0||f=0)&&(t=0||q=0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		for (tref path : expression_paths<node_t>(fm)) {
+			trefs paths = get_cnf_wff_clauses<node_t>(path);
+			CHECK(paths.size() == 5);
+			for (tref p : paths) CHECK(tau::get(p).is(tau::wff));
+		}
+	}
+	TEST_CASE("2") {
+		const char* sample = "x&(vw|y&(t|z|s|r)|gk)";
+		tref fm = get_bf_nso_rr("", sample).value().main->get();
+		for (tref path : expression_paths<node_t>(fm)) {
+			trefs paths = get_cnf_bf_clauses<node_t>(path);
+			CHECK(paths.size() == 3);
+			for (tref p : paths) CHECK(tau::get(p).is(tau::bf));
+		}
+	}
+	TEST_CASE("3") {
+		const char* sample = " (sometimes (a=0||b=0)&&x=0&&y=0&&(p=0||f=0)&&(t=0||q=0)) && (always x = 0) || (always y = 0) && (always k = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		for (tref path : expression_paths<node_t>(fm)) {
+			trefs paths = get_cnf_wff_clauses<node_t>(path);
+			CHECK(paths.size() == 2);
+			for (tref p : paths) CHECK(tau::get(p).is(tau::wff));
+		}
+	}
+}
+
 TEST_SUITE("normal forms: onf") {
 
 	/* TEST_CASE("T") {
