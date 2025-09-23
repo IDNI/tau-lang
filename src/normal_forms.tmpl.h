@@ -4813,49 +4813,17 @@ tref anti_prenex(tref formula) {
 			}
 		} else return n;
 	};
-	// TODO: move this temporal distinction to normalize method
-	// Formulas below temporal quantifiers need to be treated separately
-	auto st_aw = [](tref n) {
-		return is_child<node>(n, tau::wff_sometimes)
-			|| is_child<node>(n, tau::wff_always);
-	};
-	trefs temps = tau::get(formula).select_top(st_aw);
-	if (temps.empty()) {
-		DBG(LOG_DEBUG << "Anti_prenex on " << LOG_FM(formula) << "\n";)
-		// Initial simplification of formula
-		formula = syntactic_formula_simplification<node>(formula);
-		DBG(LOG_TRACE << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
-		// Apply anti prenex procedure
-		formula = post_order<node>(formula).template
-			apply_unique<anti_prenex_m>(inner_quant, visit_wff<node>);
-		DBG(LOG_TRACE << "Anti_prenex result: " << LOG_FM(formula) << "\n";)
-		formula = syntactic_formula_simplification<node>(formula);
-		DBG(LOG_DEBUG << "Anti_prenex result after syntactic simp: " << LOG_FM(formula) << "\n";)
-		return formula;
-	} else {
-		subtree_map<node, tref> changes;
-		for (tref temp : temps) {
-			bool is_aw = is_child<node>(temp, tau::wff_always);
-			// Remove temporal quantifier
-			temp = tau::trim2(temp);
-			DBG(LOG_DEBUG << "Anti_prenex on " << LOG_FM(temp) << "\n";)
-			// Initial simplification of temp
-			tref res = syntactic_formula_simplification<node>(temp);
-			DBG(LOG_TRACE << "After syntactic_formula_simplification: " << LOG_FM(res) << "\n";)
-			// Apply anti prenex procedure
-			res = post_order<node>(res).template
-				apply_unique<anti_prenex_m>(inner_quant, visit_wff<node>);
-			DBG(LOG_TRACE << "Anti_prenex result: " << LOG_FM(res) << "\n";)
-			res = syntactic_formula_simplification<node>(res);
-			// Add quantifier again and save as change
-			if (is_aw) changes.emplace(tau::build_wff_always(temp),
-				tau::build_wff_always(res));
-			else changes.emplace(tau::build_wff_sometimes(temp),
-				tau::build_wff_sometimes(res));
-			DBG(LOG_DEBUG << "Anti_prenex result after syntactic simp: " << LOG_FM(temp) << "\n";)
-		}
-		return rewriter::replace(formula, changes);
-	}
+	DBG(LOG_DEBUG << "Anti_prenex on " << LOG_FM(formula) << "\n";)
+	// Initial simplification of formula
+	formula = syntactic_formula_simplification<node>(formula);
+	DBG(LOG_TRACE << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
+	// Apply anti prenex procedure
+	formula = post_order<node>(formula).template
+		apply_unique<anti_prenex_m>(inner_quant, visit_wff<node>);
+	DBG(LOG_TRACE << "Anti_prenex result: " << LOG_FM(formula) << "\n";)
+	formula = syntactic_formula_simplification<node>(formula);
+	DBG(LOG_DEBUG << "Anti_prenex result after syntactic simp: " << LOG_FM(formula) << "\n";)
+	return formula;
 }
 
 /**
