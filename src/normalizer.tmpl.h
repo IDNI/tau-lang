@@ -11,18 +11,35 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref normalize(tref form) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-	tref result = tt(form)
-		// Push all quantifiers in and eliminate them
-		| tt::f(anti_prenex<node>)
-		// Normalize always and sometimes quantifiers and normalize Tau formula
-		| tt::f(normalize_temporal_quantifiers<node>)
-		| tt::ref;
+	// First resolve quantifiers in formulas below temporal quantifiers
+	auto st_aw = [](tref n) {
+		return is_child<node>(n, tau::wff_sometimes)
+			|| is_child<node>(n, tau::wff_always);
+	};
+	trefs temps = tau::get(form).select_top(st_aw);
+	// Case that the formula has no temporal quantifier
+	if (temps.empty()) form = anti_prenex<node>(form);
+	else {
+		subtree_map<node, tref> changes;
+		for (tref temp : temps) {
+			bool is_aw = is_child<node>(temp, tau::wff_always);
+			// Remove temporal quantifier
+			tref f = tau::trim2(temp);
+			f = anti_prenex<node>(f);
+			// Add quantifier again and save as change
+			if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
+			else changes.emplace(temp, tau::build_wff_sometimes(f));
+		}
+		form =  rewriter::replace(form, changes);
+	}
+	// Now normalize the temporal layer and convert the formulas below the temporal
+	// quantifiers to Boole normal form
+	tref result = normalize_temporal_quantifiers<node>(form);
 #ifdef TAU_CACHE
 	cache.emplace(form, result);
 #endif // TAU_CACHE
