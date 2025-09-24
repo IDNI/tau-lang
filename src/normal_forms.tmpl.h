@@ -4206,6 +4206,53 @@ auto atm_formula_order_for_simplification = [](tref l, tref r) static {
 };
 
 /**
+ * @brief Comparator for the BDD variable order used during anti-prenex algorithm.
+ * @tparam node Type of tree node
+ */
+template<NodeType node>
+auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
+	auto comp = [&quant_pattern](tref l, tref r) {
+		const trefs& free_vars_l = get_free_vars<node>(l);
+		int_t min_l = 0, max_l = 0;
+		bool is_min_init = false;
+		for (tref v : free_vars_l) {
+			auto it = quant_pattern.find(v);
+			// Not contained, means not quantified
+			if (it == quant_pattern.end()) {
+				min_l = 0;
+				is_min_init = true;
+				continue;
+			}
+			if (it->second < min_l || !is_min_init)
+				min_l = it->second, is_min_init = true;
+			if (max_l < it->second) max_l = it->second;
+		}
+		const trefs& free_vars_r = get_free_vars<node>(r);
+		int_t min_r = 0, max_r = 0;
+		is_min_init = false;
+		for (tref v : free_vars_r) {
+			auto it = quant_pattern.find(v);
+			// Not contained, means not quantified
+			if (it == quant_pattern.end()) {
+				min_r = 0;
+				is_min_init = true;
+				continue;
+			}
+			if (it->second < min_r || !is_min_init)
+				min_r = it->second, is_min_init = true;
+			if (max_r < it->second) max_r = it->second;
+		}
+		if (max_l > max_r) return true;
+		if (max_r > max_l) return false;
+		if (min_l > min_r) return true;
+		if (min_r > min_l) return false;
+		if (free_vars_l < free_vars_r) return true;
+		return false;
+	};
+	return comp;
+}
+
+/**
  * @brief Applies syntactic simplifications to an atomic formula, ie an equation.
  * @tparam node Tree node type
  * @param atomic_formula Formula to simplify
@@ -4561,7 +4608,8 @@ tref boole_normal_form(tref formula) {
  * @return The resulting Boole decomposition with the existential quantifier pushed further in
  */
 template<NodeType node>
-tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
+tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
+	auto& quant_pattern) {
 	using tau = tree<node>;
 	DBG(assert(!tau::get(ex_quant_fm).find_top(is<node, tau::bf_neq>)));
 
@@ -4576,9 +4624,8 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool) {
 		return ex_quant_fm;
 	}
 	// Sort the atomic formulas and get first
-	// TODO: improve order
-	std::ranges::sort(atms, atm_formula_order_for_simplification<node>);
-	tref atm = atms[0];
+	tref atm = *std::ranges::min_element(atms,
+		atm_formula_order_for_quant_elim<node>(quant_pattern));
 	// Get quantified variable
 	tref var = tau::get(tau::bf, tau::trim2(ex_quant_fm));
 	// Try syntactic simplifications
@@ -4765,7 +4812,9 @@ template<NodeType node>
 tref anti_prenex(tref formula) {
 	using tau = tree<node>;
 	subtree_unordered_map<node, tref> atomic_pool;
-	auto anti_prenex_step = [&atomic_pool](tref n) {
+	subtree_unordered_map<node, int_t> quant_pattern;
+	int_t qid = 1;
+	auto anti_prenex_step = [&atomic_pool, &quant_pattern](tref n) {
 		while (is_child_quantifier<node>(n)) {
 			// By assumption is existential
 
@@ -4789,29 +4838,38 @@ tref anti_prenex(tref formula) {
 			// Smart Boole decomposition
 			n = unequal_to_not_equal<node>(n);
 			DBG(LOG_TRACE << "Before ex_quantified_boole_decomposition: " << LOG_FM(n) << "\n";)
-			n = ex_quantified_boole_decomposition<node>(n, atomic_pool);
+			n = ex_quantified_boole_decomposition<node>(n,
+				atomic_pool, quant_pattern);
 			n = not_equal_to_unequal<node>(n);
 			DBG(LOG_TRACE << "After ex_quantified_boole_decomposition: " << LOG_FM(n) << "\n";)
 		}
 		return n;
 	};
-	auto inner_quant = [&anti_prenex_step](tref n) {
-		if (is_child_quantifier<node>(n)) {
-			DBG(LOG_TRACE << "Inner_quant on " << LOG_FM(n) << "\n";)
-			n = syntactic_formula_simplification<node>(n);
-			n = squeeze_absorb_down<node>(n, tau::trim2(n));
-			DBG(LOG_TRACE << "After squeeze_absorb_down " << LOG_FM(n) << "\n";)
-			if (is_child<node>(n, tau::wff_all)) {
-				tref n_neg = to_nnf<node>(tau::build_wff_neg(n));
-				tref res = pre_order<node>(n_neg).template apply_unique<
-					anti_prenex_step_m>(anti_prenex_step, visit_wff<node>);
-				res = to_nnf<node>(tau::build_wff_neg(res));
-				return res;
-			} else {
-				return pre_order<node>(n).template apply_unique<
-					anti_prenex_step_m>(anti_prenex_step, visit_wff<node>);
-			}
-		} else return n;
+	auto inner_quant = [&anti_prenex_step, &quant_pattern](tref n) {
+		if (!is_child_quantifier<node>(n)) return n;
+		// Here child is quantifier
+		DBG(LOG_TRACE << "Inner_quant on " << LOG_FM(n) << "\n";)
+		n = syntactic_formula_simplification<node>(n);
+		n = squeeze_absorb_down<node>(n, tau::trim2(n));
+		DBG(LOG_TRACE << "After squeeze_absorb_down " << LOG_FM(n) << "\n";)
+		tref res = nullptr;
+		if (is_child<node>(n, tau::wff_all)) {
+			tref n_neg = to_nnf<node>(tau::build_wff_neg(n));
+			res = pre_order<node>(n_neg).
+				apply_unique(anti_prenex_step, visit_wff<node>);
+			res = to_nnf<node>(tau::build_wff_neg(res));
+		} else {
+			res = pre_order<node>(n).
+				apply_unique(anti_prenex_step, visit_wff<node>);
+		}
+		// Update the quantifier pattern after elimination
+		quant_pattern.insert_or_assign(tau::trim2(n), 0);
+		return res;
+	};
+	auto visit = [&quant_pattern, &qid](tref n) {
+		if (is_quantifier<node>(n))
+			quant_pattern.insert_or_assign(tau::trim(n), qid++);
+		return visit_wff<node>(n);
 	};
 	DBG(LOG_DEBUG << "Anti_prenex on " << LOG_FM(formula) << "\n";)
 	// Initial simplification of formula
@@ -4819,7 +4877,7 @@ tref anti_prenex(tref formula) {
 	DBG(LOG_TRACE << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	// Apply anti prenex procedure
 	formula = post_order<node>(formula).template
-		apply_unique<anti_prenex_m>(inner_quant, visit_wff<node>);
+		apply_unique<anti_prenex_m>(inner_quant, visit);
 	DBG(LOG_TRACE << "Anti_prenex result: " << LOG_FM(formula) << "\n";)
 	formula = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "Anti_prenex result after syntactic simp: " << LOG_FM(formula) << "\n";)
