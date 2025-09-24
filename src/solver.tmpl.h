@@ -994,8 +994,7 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 
 	form = boole_normal_form<node>(form);
 	for (tref path : expression_paths<node>(form)) {
-		path = norm_all_equations<node>(path);
-		path = apply_all_xor_def<node>(path);
+
 		// Reject clause involving temporal quantification
 		if (tau::get(path).find_top(is_temporal_quantifier<node>)) {
 			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(path);
@@ -1004,16 +1003,65 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 		// TODO: collect assignments, i.e. variable = expression,
 		// early to simplify solving
 
+		// Find equations amounting to single variable assignments
+		subtree_map<node, tref> var_assignments;
+		auto find_assigment = [&var_assignments](tref n) {
+			if (!is<node, tau::bf_eq>(n)) return true;
+			const tau& n_t = tau::get(n);
+			// TODO: Do not introduce loops
+			if (n_t[0].child_is(tau::variable)) {
+				// First child is a single variable
+				tref var = n_t.first();
+				tref term = n_t.second();
+				auto it = var_assignments.find(var);
+				if (it == var_assignments.end()) {
+					// Variable is not present yet
+					var_assignments.emplace(var, term);
+				} else {
+					// Replace if term is better replacement
+					if (simplify_using_equality<node>::
+						term_comp(term, it->second))
+						it->second = term;
+				}
+			} else if (n_t[1].child_is(tau::variable)) {
+				// Second child is a single variable
+				tref var = n_t.second();
+				tref term = n_t.first();
+				auto it = var_assignments.find(var);
+				if (it == var_assignments.end()) {
+					// Variable is not present yet
+					var_assignments.emplace(var, term);
+				} else {
+					// Replace if term is better replacement
+					if (simplify_using_equality<node>::
+						term_comp(term, it->second))
+						it->second = term;
+				}
+			}
+		};
+		pre_order<node>(path).visit_unique(
+			find_assigment, visit_wff<node>, identity);
+		// Replace found variables with chosen terms
+		std::cout << "Path before: " << tau::get(path) << "\n";
+		path = rewriter::replace(path, var_assignments);
+		std::cout << "Path after: " << tau::get(path) << "\n";
+
 		auto is_equation = [](tref n) {
 			return tau::get(n).child_is(tau::bf_eq)
 				|| tau::get(n).child_is(tau::bf_neq);
 		};
+		path = norm_all_equations<node>(path);
+		path = apply_all_xor_def<node>(path);
 		// FIXME convert vars to a set
 		auto eqs = tau::get(path).select_top(is_equation);
 		if (eqs.empty()) continue;
 		auto solution = solve<node>(
 			equations<node>(eqs.begin(), eqs.end()), options);
-		if (solution.has_value()) return solution;
+		if (solution.has_value()) {
+			// Add variables defined by assignments to solution
+			// TODO
+			return solution;
+		}
 	}
 	return {};
 }
