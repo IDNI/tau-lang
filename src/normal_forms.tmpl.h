@@ -3632,7 +3632,7 @@ struct simplify_using_equality {
 	// TODO: For variables, make input < output and lower time step < higher time step
 	// Create comparator function that orders bfs by making constants smallest
 	// We have 0 < 1 < bf_constant < uninterpreted_constant < variable < rest by node count
-	static bool tau_comp(tref l, tref r) {
+	static bool term_comp(tref l, tref r) {
 		if (l == _0<node>()) return true;
 		if (r == _0<node>()) return false;
 		// 1 is automatically rewritten to 0
@@ -3661,9 +3661,9 @@ struct simplify_using_equality {
 			return fm;
 		DBG(LOG_DEBUG << "Simplify_using_equality on " << LOG_FM(fm) << "\n";)
 		// Create union find data structure to hold equality information
-		auto uf = union_find<decltype(tau_comp), node>(tau_comp);
+		auto uf = union_find<decltype(term_comp), node>(term_comp);
 		// Create stack of union find data structures
-		std::vector<union_find<decltype(tau_comp), node>> uf_stack {uf};
+		std::vector<union_find<decltype(term_comp), node>> uf_stack {uf};
 		// We need to mark disjunctions that do not cause a push to the
 		// stack, in order to make sure they are not popped later
 		// due to intermediate simplifications
@@ -3809,7 +3809,7 @@ private:
 			if (!is_child<node>(eq, tau::bf_eq)) return eq;
 			tref c1 = tau::get(eq)[0].first();
 			tref c2 = tau::get(eq)[0].second();
-			if (tau_comp(c1, c2))
+			if (term_comp(c1, c2))
 				return tau::build_bf_eq(c2, c1);
 			return eq;
 		};
@@ -3819,7 +3819,7 @@ private:
 			if (nl.child_is(tau::bf_eq)) {
 				if (!nr.child_is(tau::bf_eq)) return true;
 				// Both are equalities
-				if (tau_comp(nl[0].first(), nr[0].first()))
+				if (term_comp(nl[0].first(), nr[0].first()))
 					return true;
 				return false;
 			} else return false;
