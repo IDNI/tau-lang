@@ -179,6 +179,9 @@ struct type_scoped_resolver : public scoped_resolver<tref, type_t, idni::subtree
 	}
 
 	std::ostream& dump(std::ostream& os) {
+		os << "\n\tscopes: ";
+		for (auto scope: this->scopes_)
+			os << scope << ", ";
 		os << "\n";
 		for (auto [e,_]: this->uf) {
 			auto type = this->type_of(e.second);
@@ -442,9 +445,9 @@ tref new_infer_ba_types(tref n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/rec_relation/new_n:\n" << LOG_FM_TREE(new_n);)
 					transformed[n] = new_n;
 				}
-				resolver.close();
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/rec_relation/resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
+				resolver.close();
 				return;
 			}
 			case tau::wff_all: case tau::wff_ex: /* case tau::bf_fall: case tau::bf_fex:*/ {
@@ -476,9 +479,9 @@ tref new_infer_ba_types(tref n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../new_n:\n" << LOG_FM_TREE(new_n);)
 					transformed[n] = new_n;
 				}
-				resolver.close();
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
+				resolver.close();
 				return;
 			}
 			case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
