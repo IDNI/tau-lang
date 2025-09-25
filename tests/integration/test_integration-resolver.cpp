@@ -513,6 +513,9 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
+	// ex quantifiers behave the same as all quantifiers for type inference
+	// so no neede to test them separately
+
 	TEST_CASE("all bv") {
 		tref parsed = parse("all x:bv x =_ y");
 		CHECK( parsed != nullptr );
@@ -526,13 +529,25 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	TEST_CASE("all bv") {
-		tref parsed = parse("all x:bv x =_ y");
+	TEST_CASE("all bv (y2)") {
+		tref parsed = parse("all x x:bv =_ y");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
+			{"x", bv_type},
+			{"y", bv_type},
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("all bv (y3)") {
+		tref parsed = parse("all x x =_ y:bv");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
 			{"y", bv_type},
 		};
@@ -552,21 +567,8 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	TEST_CASE("ex bv") {
-		tref parsed = parse("ex x:bv x =_ y");
-		CHECK( parsed != nullptr );
-		tref inferred = new_infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, type_t>> {
-			{"x", bv_type},
-			{"x", bv_type},
-			{"y", bv_type},
-		};
-		CHECK( check_vars(inferred, expected) );
-	}
-
-	TEST_CASE("ex bv[16]") {
-		tref parsed = parse("ex x:bv[16] x =_ y");
+	TEST_CASE("all bv[16] (y2)") {
+		tref parsed = parse("all x x:bv[16] =_ y");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -577,6 +579,95 @@ TEST_SUITE("new_infer_ba_types") {
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
+
+	TEST_CASE("all bv[16] (y3)") {
+		tref parsed = parse("all x x =_ y:bv[16]");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", bv16_type},
+			{"y", bv16_type},
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("all sbf") {
+		tref parsed = parse("all x:sbf x = y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", sbf_type},
+			{"x", sbf_type},
+			{"y", sbf_type},
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("all sbf (y2)") {
+		tref parsed = parse("all x x:sbf = y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", sbf_type},
+			{"x", sbf_type},
+			{"y", sbf_type},
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("all sbf (y3)") {
+		tref parsed = parse("all x x = y:sbf");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", sbf_type},
+			{"y", sbf_type},
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("all tau") {
+		tref parsed = parse("all x:tau x = y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type},
+			{"x", tau_type},
+			{"y", tau_type},
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("all tau (y2)") {
+		tref parsed = parse("all x x:tau = y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type},
+			{"x", tau_type},
+			{"y", tau_type},
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("all tau (y3)") {
+		tref parsed = parse("all x x = y:tau");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type},
+			{"y", tau_type},
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
 
 
 
