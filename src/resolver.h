@@ -416,6 +416,20 @@ tref new_infer_ba_types(tref n) {
 		// We use transformed map to update children if they were any changes
 		// and add the current node if resulted changed.
 		DBG(assert(n != nullptr);)
+		// Helper lambdas
+		auto retype = [&](tref n, const type_t& new_type) -> tref {
+			auto n_type = tau::get(n).get_type();
+			if (tau::get(n).children_size()) {
+				return (new_type.second == nullptr)
+					? tau::get_typed(n_type, tau::get(n).child(0), new_type.first)
+					: tau::get_typed(n_type, tau::get(n).child(0), new_type.second,
+						new_type.first);
+			} else {
+				return (new_type.second == nullptr)
+					? tau::get_typed(n_type, new_type.first)
+					: tau::get_typed(n_type, new_type.second, new_type.first);
+			}
+		};
 
 		// Stop traversal on error
 		if (error) return;
@@ -429,25 +443,16 @@ tref new_infer_ba_types(tref n) {
 				subtree_map<node, tref> changes;
 				for(auto [e, _] : resolver.current_kinds()) {
 					auto resolved_type = resolver.type_of(e); // already untyped
-					auto e_type = tau::get(e).get_type();
 					auto final_type = resolved_type == untyped ? tau_type : resolved_type;
-					// assign
-					if (tau::get(e).children_size()) {
-						auto new_e = (final_type.second == nullptr)
-						? tau::get_typed(e_type, tau::get(e).child(0), final_type.first)
-						: tau::get_typed(e_type, tau::get(e).child(0), final_type.second,
-							final_type.first);
-						if (new_e != e) changes[e] = new_e;
-					} else {
-						auto new_e = (final_type.second == nullptr)
-						? tau::get_typed(e_type, final_type.first)
-						: tau::get_typed(e_type, final_type.second, final_type.first);
-						if (new_e != e) changes[e] = new_e;
-					}
+					if (auto new_e = retype(e, final_type); new_e != e) {
+						changes[untype(e)] = new_e;
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/rec_relation/e -> new_e:\n"
+							<< LOG_FM_TREE(e) << " -> " << LOG_FM_TREE(new_e);)
+						}
 				}
-				auto new_n = rewriter::replace<node>(n, changes);
-				if (new_n != n) {
-					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/rec_relation/new_n:\n" << LOG_FM_TREE(new_n);)
+				if (auto new_n = rewriter::replace<node>(n, changes); new_n != n) {
+					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/rec_relation/n -> new_n:\n"
+							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 					transformed[n] = new_n;
 				}
 				resolver.close();
@@ -463,27 +468,19 @@ tref new_infer_ba_types(tref n) {
 				subtree_map<node, tref> changes;
 				for(auto v : vars) {
 					auto resolved_type = resolver.type_of(untype(v)); // already untyped
-					auto v_type = tau::get(v).get_type();
 					auto final_type = resolved_type == untyped ? tau_type : resolved_type;
 					// We update the type of the var (overwriting it if that is the case)
 					resolver.assign(untype(v), final_type);
 					// Finally, we update the variable node if needed
-					if (tau::get(v).children_size()) {
-						auto new_v = (final_type.second == nullptr)
-						? tau::get_typed(v_type, tau::get(v).child(0), final_type.first)
-						: tau::get_typed(v_type, tau::get(v).child(0), final_type.second,
-							final_type.first);
-						if (new_v != v) changes[untype(v)] = new_v;
-					} else {
-						auto new_v = (final_type.second == nullptr)
-						? tau::get_typed(v_type, final_type.first)
-						: tau::get_typed(v_type, final_type.second, final_type.first);
-						if (new_v != v) changes[untype(v)] = new_v;
+					if (auto new_v = retype(v, final_type); new_v != v) {
+						changes[untype(v)] = new_v;
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../v -> new_v:\n"
+							<< LOG_FM_TREE(v) << " -> " << LOG_FM_TREE(new_v);)
 					}
 				}
-				auto new_n = rewriter::replace<node>(n, changes);
-				if (new_n != n) {
-					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../new_n:\n" << LOG_FM_TREE(new_n);)
+				if (auto new_n = rewriter::replace<node>(n, changes); new_n != n) {
+					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../n -> new_n:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 					transformed[n] = new_n;
 				}
 				resolver.close();
@@ -499,14 +496,15 @@ tref new_infer_ba_types(tref n) {
 				subtree_map<node, tref> changes;
 				for (const auto& c : constants) {
 					auto c_type = resolver.type_of(c); // already untyped
-					auto new_c = (c_type.second == nullptr)
-						? tau::get_typed(tau::bv_constant, tau::get(c).child(0), bv_type.first)
-						: tau::get_typed(tau::bv_constant, tau::get(c).child(0), c_type.second, bv_type.first);
-					if (new_c != c) changes[c] = new_c;
+					if (auto new_c = retype(c, c_type); new_c != c) {
+						changes[c] = new_c;
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../c -> new_c:\n"
+							<< LOG_FM_TREE(c) << " -> " << LOG_FM_TREE(new_c);)
+					}
 				}
-				auto new_n = rewriter::replace<node>(n, changes);
-				if (new_n != n) {
-					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../new_n:\n" << LOG_FM_TREE(new_n);)
+				if (auto new_n = rewriter::replace<node>(n, changes); new_n != n) {
+					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../n -> new_n:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 					transformed[n] = new_n;
 				}
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../resolver:\n";)
@@ -542,31 +540,16 @@ tref new_infer_ba_types(tref n) {
 				if (!parent) {
 					subtree_map<node, tref> changes;
 					for(auto [e, _] : resolver.current_kinds()) {
-						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/variable/e:\n" << LOG_FM_TREE(e);)
 						if (!is<node, tau::variable>(e)) continue; // must be already typed
 						auto resolved_type = resolver.type_of(untype(e)); // already untyped
-						auto e_type = tau::get(e).get_type();
 						auto final_type = resolved_type == untyped ? tau_type : resolved_type;
 						// We update the type of the var (overwriting it if that is the case)
 						resolver.assign(untype(e), final_type);
 						// Finally, we update the variable node if needed
-						if (tau::get(e).children_size()) {
-							auto new_e = (final_type.second == nullptr)
-							? tau::get_typed(e_type, tau::get(e).child(0), final_type.first)
-							: tau::get_typed(e_type, tau::get(e).child(0), final_type.second,
-								final_type.first);
-							if (new_e != e) {
-								changes[untype(e)] = new_e;
-								DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/variable/new_e:\n" << LOG_FM_TREE(new_e);)
-							}
-						} else { // bf_t/bf_f case
-							auto new_e = (final_type.second == nullptr)
-							? tau::get_typed(e_type, final_type.first)
-							: tau::get_typed(e_type, final_type.second, final_type.first);
-							if (new_e != e) {
-								changes[untype(e)] = new_e;
-								DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/variable/new_e:\n" << LOG_FM_TREE(new_e);)
-							}
+						if (auto new_e = retype(e, final_type); new_e != e) {
+							changes[untype(e)] = new_e;
+							DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/e -> new_e:\n"
+								<< LOG_FM_TREE(e) << " -> " << LOG_FM_TREE(new_e);)
 						}
 					}
 					new_n = rewriter::replace<node>(new_n, changes);
