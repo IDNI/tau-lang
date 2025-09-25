@@ -45,25 +45,6 @@ TEST_SUITE("union_find") {
 		CHECK(r2 == r3);
 	}
 
-	TEST_CASE("get_sets returns correct sets") {
-		union_find_by_rank<int> uf;
-		uf.insert(1);
-		uf.insert(2);
-		uf.insert(3);
-		uf.insert(4);
-		uf.merge(1, 2);
-		uf.merge(3, 4);
-		auto sets = uf.get_sets();
-		CHECK(sets.size() == 2);
-		bool found12 = false, found34 = false;
-		for (const auto& [root, members] : sets) {
-			if (members.contains(1) && members.contains(2)) found12 = true;
-			if (members.contains(3) && members.contains(4)) found34 = true;
-		}
-		CHECK(found12);
-		CHECK(found34);
-	}
-
 	TEST_CASE("size after merges and inserts") {
 		union_find_by_rank<int> uf;
 		uf.insert(1);

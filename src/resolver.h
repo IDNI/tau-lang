@@ -20,23 +20,35 @@ namespace idni::tau_lang {
 
 using type_t = std::pair<size_t, tref>; // (type_id, subtype)
 
-template<typename data_t, typename kind_t>
+template<typename data_t, typename kind_t, class less_t = std::less<data_t>>
 struct scoped_resolver {
 	using scope_t = size_t;
+
+	struct scoped_less {
+		bool operator()(const std::pair<scope_t, data_t>& a,
+			const std::pair<scope_t, data_t>& b) const {
+				static const less_t comp;
+				if (a.first < b.first) return true;
+				if (a.first > b.first) return false;
+				// same scope
+				return (comp(a.second, b.second));
+		}
+	};
+
 	using element_t = std::pair<scope_t, data_t>;
-	using kinds_t = std::map<element_t, kind_t>;
-	using union_find_by_rank_t = union_find_by_rank<element_t, std::less<element_t>>;
+	using kinds_t = std::map<element_t, kind_t, scoped_less>;
+	using union_find_by_rank_t = union_find_by_rank<element_t, scoped_less>;
 
 	union_find_by_rank_t uf;
 	scope_t current = 0;
 	std::deque<size_t> scopes_ { current };
-	std::map<element_t, kind_t> kinds_;
+	kinds_t kinds_;
 	kind_t unknown;
 	kind_t default_kind = unknown;
 
 	scoped_resolver(const kind_t& unknown): unknown(unknown) {}
 
-	void open(const std::map<data_t, kind_t>& kinds) {
+	void open(const std::map<data_t, kind_t, less_t>& kinds) {
 		current++;
 		scopes_.push_back(current);
 		for (const auto& [data, kind] : kinds) {
@@ -94,8 +106,8 @@ struct scoped_resolver {
 		return assign(data, default_kind);
 	}
 
-	std::map<data_t, kind_t> kinds() {
-		std::map<data_t, kind_t> result ;
+	std::map<data_t, kind_t, less_t> kinds() {
+		std::map<data_t, kind_t, less_t> result ;
 		// Note that we will overwrite the kind of a data if it appears in
 		// multiple scopes, keeping only the inner one.
 		for(auto it = uf.begin(); it != uf.end(); ++it)
@@ -104,8 +116,8 @@ struct scoped_resolver {
 		return result;
 	}
 
-	std::map<data_t, kind_t> current_kinds() {
-		std::map<data_t, kind_t> result ;
+	std::map<data_t, kind_t, less_t> current_kinds() {
+		std::map<data_t, kind_t, less_t> result ;
 		// TODO (HIGH) traverse in reverse until an element of other scope is found
 		for(auto [element, _] : uf)
 			if (element.first == current) result[element.second] = type_of(element.second);
@@ -134,12 +146,12 @@ std::optional<type_t> merge_ba_types(const type_t& t1, const type_t& t2) {
 }
 
 template<NodeType node>
-struct type_scoped_resolver : public scoped_resolver<tref, type_t> {
+struct type_scoped_resolver : public scoped_resolver<tref, type_t, idni::subtree_less<node>> {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
 	type_scoped_resolver():
-		scoped_resolver<tref, type_t>({0, nullptr}) {}
+		scoped_resolver<tref, type_t, idni::subtree_less<node>>({0, nullptr}) {}
 
 	// merge two trefs if the types are compatible
 	// returns true if merge was successful, false otherwise
@@ -189,7 +201,7 @@ tref new_infer_ba_types(tref n) {
 	// resolver: the type_scoped_resolver used to resolve types and scopes
 	// error: true if an error happened during traversal
 	type_scoped_resolver<node> resolver;
-	std::map<tref, tref> transformed;
+	subtree_map<node, tref> transformed;
 	bool error = false;
 
 	DBG(LOG_TRACE << "new_infer_ba_types/n:\n" << LOG_FM_TREE(n);)
@@ -310,7 +322,7 @@ tref new_infer_ba_types(tref n) {
 
 				// We collect all the variables/type pairs in a map. Note that
 				// repeated variables will be overwritten, keeping the inner one.
-				std::map<tref, type_t> var_list;
+				subtree_map<node, type_t> var_list;
 				auto vars = tau::get(n)[0].select_top(is<node, tau::variable>);
 				for (const auto& var : vars) {
 					var_list[untype(var)] =  get_type_of(var);
@@ -473,7 +485,7 @@ tref new_infer_ba_types(tref n) {
 		switch (nt) {
 			case tau::rec_relation: {
 				// we type untyped variables with tau and close the scope.
-				std::map<tref, tref> changes;
+				subtree_map<node, tref> changes;
 				for(auto [e, _] : resolver.current_kinds()) {
 					auto resolved_type = resolver.type_of(e); // already untyped
 					auto e_type = tau::get(e).get_type();
@@ -503,7 +515,7 @@ tref new_infer_ba_types(tref n) {
 				// to type if they are still untyped) and close the scope.
 				auto vars = tau::get(n)[0].select_top(is<node, tau::variable>);
 				// We type untyped variables with tau and close the scope.
-				std::map<tref, tref> changes;
+				subtree_map<node, tref> changes;
 				for(auto v : vars) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all/v: " << LOG_FM_TREE(v);)
 					auto resolved_type = resolver.type_of(untype(v)); // already untyped
@@ -536,7 +548,7 @@ tref new_infer_ba_types(tref n) {
 			case tau::bv_lt: case tau::bv_nlt: {
 				// We type all the constants
 				auto constants = tau::get(n).select_top(is<node, tau::bv_constant>);
-				std::map<tref, tref> changes;
+				subtree_map<node, tref> changes;
 				for (const auto& c : constants) {
 					auto c_type = resolver.type_of(c); // already untyped
 					auto new_c = (c_type.second == nullptr)
@@ -554,7 +566,7 @@ tref new_infer_ba_types(tref n) {
 			case tau::bf_lt: case tau::bf_nlt: {
 				// We type all the constants
 				/*auto constants = tau::get(n).select_top(is<node, tau::bf_constant>);
-				std::map<tref, tref> changes;
+				subtree_map<node, tref> changes;
 				for (const auto& c : constants) {
 					auto c_type = resolver.type_of(c); // already untyped
 					tref bound = tau::get_ba_constant_from_source(tau::get(c).data(), c_type.first);
@@ -577,7 +589,7 @@ tref new_infer_ba_types(tref n) {
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/new_n: " << LOG_FM(new_n);)
 				// For the root node, we type untyped variables with tau.
 				if (!parent) {
-					std::map<tref, tref> changes;
+					subtree_map<node, tref> changes;
 					for(auto [e, _] : resolver.current_kinds()) {
 						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/e: " << LOG_FM_TREE(e);)
 						if (!is<node, tau::variable>(e)) continue; // must be already typed
