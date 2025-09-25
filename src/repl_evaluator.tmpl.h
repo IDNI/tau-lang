@@ -1395,8 +1395,8 @@ void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
 		<< "  solve [options] <repl_memory>      computes a single satisfying assignment for the free variables in the Tau formula stored at the specified repl memory position"
 		<< "\n"
 		<< "options:\n"
-		<< "  --min, --minimmum                  computes the minimum extreme point of the lgrs corresponding to the solution\n"
-		<< "  --max, --maximum                   computes the maximum extreme point of the lgrs corresponding to the solution\n"
+		<< "  --min, --minimum                   computes a minimum solution of the system of equations\n"
+		<< "  --max, --maximum                   computes a maximum solution of the system of equations\n"
 		<< "  --<type>                           uses the specified type for the solution (sbf or tau)\n"
 		<< "\n";
 		break;
