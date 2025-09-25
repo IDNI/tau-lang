@@ -12,7 +12,7 @@ namespace idni::tau_lang {
  * @tparam node Type of tree node
  */
 template <typename data_t, class less_t = std::less<data_t>>
-struct union_find : public std::map<data_t, data_t> {
+struct union_find : public std::map<data_t, data_t, less_t> {
 
 	// Insert element x if not present. Note that the signature is different
 	// from those of vector	::insert as we want to return the element
@@ -21,17 +21,6 @@ struct union_find : public std::map<data_t, data_t> {
 		if (this->find(x) != this->end()) return x;
 		this->emplace(x, x);
 		return x;
-	}
-
-	// Returns a map from root to set of elements in each set, the sets
-	// are ordered using the less_t comparator
-	std::map<data_t, std::set<data_t, less_t>> get_sets() {
-		std::map<data_t, std::set<data_t, less_t>> sets;
-		for (auto it = this->begin(); it != this->end(); ++it) {
-			data_t r = root(it->first);
-			sets[r].insert(it->first);
-		}
-		return sets;
 	}
 
 	// Find the root of the set containing x while inserting x if not present
@@ -91,10 +80,10 @@ public:
  * taking the smaller as new root
  * @tparam node Type of tree node
  */
-template <typename data_t, class less_t = std::less<data_t>>
+template <typename data_t, class less_t = std::less<data_t>, class merge_less_t = std::less<data_t>>
 struct union_find_by_less : public union_find<data_t, less_t> {
 private:
-	static const less_t comp;
+	static const merge_less_t comp;
 
 public:
 	// Union the two sets containing x and y (union by rank)

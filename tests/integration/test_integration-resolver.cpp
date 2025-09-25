@@ -15,9 +15,75 @@ TEST_SUITE("Configuration") {
 	}
 }
 
+tref parse(const std::string& sample) {
+	auto opts = tau::get_options{
+		.parse = { .start = tau::wff },
+		.infer_ba_types = false,
+		.reget_with_hooks = false
+	};
+	auto src = tree<node_t>::get(sample, opts);
+	if (src == nullptr) {
+		TAU_LOG_ERROR << "Parsing failed for: " << sample;
+	}
+	return src;
+}
+
+TEST_SUITE("type_scoped_resolver") {
+
+	TEST_CASE("merging in the same scope") {
+		type_scoped_resolver<node_t> r;
+		tref a = parse("T"); // just an existing tref for testing
+		tref b = parse("F"); // just an existing tref for testing
+		r.insert(a);
+		r.insert(b);
+		type_t t = {1, (tref)1};
+		CHECK(r.assign(a, t));
+		CHECK(r.merge(a, b));
+		CHECK(r.type_of(a) == r.type_of(b));
+		CHECK(r.type_of(a) == t);
+	}
+
+	TEST_CASE("merging in different scopes") {
+		type_scoped_resolver<node_t> r;
+		tref a = parse("T"); // just an existing tref for testing
+		tref b = parse("F"); // just an existing tref for testing
+		type_t t = {1, (tref)1};
+		r.insert(a);
+		r.open({{b, t}});
+		CHECK(r.merge(a, b));
+		CHECK(r.type_of(a) == r.type_of(b));
+		CHECK(r.type_of(a) == t);
+	}
+
+	TEST_CASE("merging conflicting types in the same scope") {
+		type_scoped_resolver<node_t> r;
+		tref a = parse("T"); // just an existing tref for testing
+		tref b = parse("F"); // just an existing tref for testing
+		r.insert(a);
+		r.insert(b);
+		type_t t1 = {1, (tref)1};
+		type_t t2 = {2, (tref)2};
+		CHECK(r.assign(a, t1));
+		CHECK(r.assign(b, t2));
+		CHECK(!r.merge(a, b)); // conflicting types
+	}
+
+	TEST_CASE("merging conflicting types in different scopes") {
+		type_scoped_resolver<node_t> r;
+		tref a = parse("T"); // just an existing tref for testing
+		tref b = parse("F"); // just an existing tref for testing
+		type_t t1 = {1, (tref)1};
+		type_t t2 = {2, (tref)2};
+		r.insert(a);
+		CHECK(r.assign(a, t1));
+		r.open({{b, t2}});
+		CHECK(!r.merge(a, b)); // conflicting types
+	}
+}
+
 TEST_SUITE("new_infer_ba_types") {
 
-	tref parse(const std::string& sample) {
+	/*tref parse(const std::string& sample) {
 		auto opts = tau::get_options{
 			.parse = { .start = tau::wff },
 			.infer_ba_types = false,
@@ -28,7 +94,7 @@ TEST_SUITE("new_infer_ba_types") {
 			TAU_LOG_ERROR << "Parsing failed for: " << sample;
 		}
 		return src;
-	}
+	}*/
 
 	bool check_vars(tref inferred, std::vector<std::pair<std::string, type_t>>& expected) {
 		auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
@@ -133,7 +199,7 @@ TEST_SUITE("new_infer_ba_types") {
 	static type_t bv_type = {get_ba_type_id<node_t>("bv"), nullptr};
 	static type_t bv16_type = {get_ba_type_id<node_t>("bv"), tau::get(tau::subtype, tau::get_num(16))};
 
-	/*TEST_CASE("simple case 1") {
+	TEST_CASE("simple case 1") {
 		tref parsed = parse("x = 1");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
@@ -445,7 +511,7 @@ TEST_SUITE("new_infer_ba_types") {
 			{"z", bv16_type},
 		};
 		CHECK( check_vars(inferred, expected) );
-	}*/
+	}
 
 
 
@@ -460,6 +526,7 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
+			{"x", bv_type},
 			{"y", bv_type},
 		};
 		CHECK( check_vars(inferred, expected) );
@@ -471,6 +538,7 @@ TEST_SUITE("new_infer_ba_types") {
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", bv_type},
 			{"x", bv_type},
 			{"y", bv_type},
 		};
@@ -484,6 +552,7 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type},
+			{"x", bv16_type},
 			{"y", bv16_type},
 		};
 		CHECK( check_vars(inferred, expected) );
@@ -496,6 +565,7 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
+			{"x", bv_type},
 			{"y", bv_type},
 		};
 		CHECK( check_vars(inferred, expected) );
@@ -507,6 +577,7 @@ TEST_SUITE("new_infer_ba_types") {
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", bv16_type},
 			{"x", bv16_type},
 			{"y", bv16_type},
 		};
