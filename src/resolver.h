@@ -59,8 +59,8 @@ struct scoped_resolver {
 
 	void close() {
 		if (scopes_.size() == 1) return;
-		std::erase_if(kinds_, [&](const auto& e)
-			{ return e.first.first == current; });
+		/*std::erase_if(kinds_, [&](const auto& e)
+			{ return e.first.first == current; });*/
 		scopes_.pop_back();
 	}
 
@@ -119,8 +119,9 @@ struct scoped_resolver {
 	std::map<data_t, kind_t, less_t> current_kinds() {
 		std::map<data_t, kind_t, less_t> result ;
 		// TODO (HIGH) traverse in reverse until an element of other scope is found
+		auto scope = scopes_.back();
 		for(auto [element, _] : uf)
-			if (element.first == current) result[element.second] = type_of(element.second);
+			if (element.first == scope) result[element.second] = type_of(element.second);
 		return result;
 	}
 };
@@ -179,7 +180,7 @@ struct type_scoped_resolver : public scoped_resolver<tref, type_t, idni::subtree
 	}
 
 	std::ostream& dump(std::ostream& os) {
-		os << "\n\tscopes: ";
+		os << "scopes: ";
 		for (auto scope: this->scopes_)
 			os << scope << ", ";
 		os << "\n";
@@ -445,9 +446,9 @@ tref new_infer_ba_types(tref n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/rec_relation/new_n:\n" << LOG_FM_TREE(new_n);)
 					transformed[n] = new_n;
 				}
+				resolver.close();
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/rec_relation/resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
-				resolver.close();
 				return;
 			}
 			case tau::wff_all: case tau::wff_ex: /* case tau::bf_fall: case tau::bf_fex:*/ {
@@ -479,9 +480,9 @@ tref new_infer_ba_types(tref n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../new_n:\n" << LOG_FM_TREE(new_n);)
 					transformed[n] = new_n;
 				}
+				resolver.close();
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
-				resolver.close();
 				return;
 			}
 			case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
@@ -535,6 +536,7 @@ tref new_infer_ba_types(tref n) {
 				if (!parent) {
 					subtree_map<node, tref> changes;
 					for(auto [e, _] : resolver.current_kinds()) {
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/variable/e:\n" << LOG_FM_TREE(e);)
 						if (!is<node, tau::variable>(e)) continue; // must be already typed
 						auto resolved_type = resolver.type_of(untype(e)); // already untyped
 						auto e_type = tau::get(e).get_type();
@@ -544,12 +546,18 @@ tref new_infer_ba_types(tref n) {
 							? tau::get_typed(e_type, tau::get(e).child(0), final_type.first)
 							: tau::get_typed(e_type, tau::get(e).child(0), final_type.second,
 								final_type.first);
-							if (new_e != e) changes[untype(e)] = new_e;
+							if (new_e != e) {
+								changes[untype(e)] = new_e;
+								DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/variable/new_e:\n" << LOG_FM_TREE(new_e);)
+							}
 						} else { // bf_t/bf_f case
 							auto new_e = (final_type.second == nullptr)
 							? tau::get_typed(e_type, final_type.first)
 							: tau::get_typed(e_type, final_type.second, final_type.first);
-							if (new_e != e) changes[untype(e)] = new_e;
+							if (new_e != e) {
+								changes[untype(e)] = new_e;
+								DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/variable/new_e:\n" << LOG_FM_TREE(new_e);)
+							}
 						}
 					}
 					new_n = rewriter::replace<node>(new_n, changes);
