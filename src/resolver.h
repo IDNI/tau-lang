@@ -334,6 +334,10 @@ tref new_infer_ba_types(tref n) {
 				auto type = get_type(typeables, untyped);
 				// If no common type is found, we set error and stop traversal
 				if (!type) return error = true, false;
+				if (type.value() != untyped && type.value().first != bv_type.first) {
+					// We only allow bv type in bv equations
+					return error = true, false;
+				}
 				// We add the variables and constants to the current scope and
 				// assign them the common type. We also collect them in a vector
 				// to be merged together later.
@@ -461,7 +465,9 @@ tref new_infer_ba_types(tref n) {
 					auto resolved_type = resolver.type_of(untype(v)); // already untyped
 					auto v_type = tau::get(v).get_type();
 					auto final_type = resolved_type == untyped ? tau_type : resolved_type;
-					// assign
+					// We update the type of the var (overwriting it if that is the case)
+					resolver.assign(untype(v), final_type);
+					// Finally, we update the variable node if needed
 					if (tau::get(v).children_size()) {
 						auto new_v = (final_type.second == nullptr)
 						? tau::get_typed(v_type, tau::get(v).child(0), final_type.first)
@@ -541,6 +547,9 @@ tref new_infer_ba_types(tref n) {
 						auto resolved_type = resolver.type_of(untype(e)); // already untyped
 						auto e_type = tau::get(e).get_type();
 						auto final_type = resolved_type == untyped ? tau_type : resolved_type;
+						// We update the type of the var (overwriting it if that is the case)
+						resolver.assign(untype(e), final_type);
+						// Finally, we update the variable node if needed
 						if (tau::get(e).children_size()) {
 							auto new_e = (final_type.second == nullptr)
 							? tau::get_typed(e_type, tau::get(e).child(0), final_type.first)

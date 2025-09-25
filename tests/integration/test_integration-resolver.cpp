@@ -668,93 +668,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-
-
-
-
-	/*TEST_CASE("all typed") {
-		using node = node_t;
-		auto n = infer("{ 0 } : sbf = { 1 } : sbf & { 0 } : sbf.");
-		LOG_DEBUG << "inferred: " << LOG_FM(n);
-		CHECK( are_all_typed_as(n, "sbf") );
-	}
-
-	TEST_CASE("all typed (y2)") {
-		using node = node_t;
-		auto n = infer("x : bv[16] =_ y : bv[16].");
-		LOG_DEBUG << "inferred: " << LOG_FM(n);
-		CHECK( are_all_typed_as(n, "bv") );
-	}
-
-	TEST_CASE("all typed (y3)") {
-		using node = node_t;
-		auto n = infer("#b1 : bv[16] =_ #b0 : bv[16] & #b1 : bv.");
-		LOG_DEBUG << "inferred: " << LOG_FM(n);
-		CHECK( are_all_typed_as(n, "bv") );
-	}
-
-	TEST_CASE("some typed") {
-		using node = node_t;
-		auto n = infer("{ 0 } : sbf = { 1 } { 0 } : sbf.");
-		LOG_DEBUG << "inferred: " << LOG_FM(n);
-		CHECK( are_all_typed_as(n, "sbf") );
-	}
-
-	TEST_CASE("some typed (y2)") {
-		using node = node_t;
-		auto n = infer("#b1 : bv =_ #b0 & #b1.");
-		LOG_DEBUG << "inferred: " << LOG_FM(n);
-		CHECK( are_all_typed_as(n, "bv") );
-	}
-
-	TEST_CASE("only 1 typed") {
-		auto n = infer("{ 0 } = { 1 } & { 0 } : sbf.");
-		CHECK( are_all_typed_as(n, "sbf") );
-	}
-
-	TEST_CASE("none typed") {
-		auto n = infer("{ F } = { T } { F }.");
-		CHECK( are_all_typed_as(n, "tau") );
-	}
-
-	TEST_CASE("type over many variables beyond atomic formulas") {
-		auto n = infer("x = y && y = z && z = w && w = { x1 }:sbf.");
-		CHECK( are_all_typed_as(n, "sbf") );
-	}
-
-	TEST_CASE("type over many variables beyond atomic formulas (y2)") {
-		auto n = infer("x =_ y && y =_ z && z =_ w : bv.");
-		CHECK( are_all_typed_as(n, "bv") );
-	}
-
-	TEST_CASE("type over many variables beyond atomic formulas (y3)") {
-		auto n = infer("x =_ y && y =_ z && z =_ w : bv[16].");
-		CHECK( are_all_typed_as(n, "bv") );
-	}
-
-	TEST_CASE("type mismatch head vs body") {
-		auto n = expect_infer_fail("{ T }:tau = { 0 }:sbf { 1 }:sbf.");
-		CHECK( n );
-	}
-
-	TEST_CASE("type mismatch in body") {
-		auto n = expect_infer_fail("{ 0 }:sbf = { T }:tau { 1 }:sbf.");
-		CHECK( n );
-	}
-
-	TEST_CASE("type mismatch of default type in head vs body") {
-		auto n = expect_infer_fail("{ T }:tau = { 0 }:sbf { 1 }.");
-		CHECK( n );
-	}
-
-	TEST_CASE("type mismatch of default type in body") {
-		auto n = expect_infer_fail("{ 0 } = { T }:tau { 1 }:sbf { 1 }:sbf.");
-		CHECK( n );
-	}*/
-
-
-
-
 	TEST_CASE("simple explicit tau constant") {
 		tref parsed = parse("x = { T }:tau");
 		CHECK( parsed != nullptr );
@@ -798,4 +711,62 @@ TEST_SUITE("new_infer_ba_types") {
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
+
+
+	TEST_CASE("simple failing case") {
+		tref parsed = parse("x:tau = x:sbf");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("simple failing case (y2)") {
+		tref parsed = parse("x:tau = {x}:sbf");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("simple failing case (y3)") {
+		tref parsed = parse("x:tau = 1:sbf");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("simple failing case (y4)") {
+		tref parsed = parse("x:tau =_ 1");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("simple failing case (y5)") {
+		tref parsed = parse("x:tau =_ x:bv");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+
+
+	TEST_CASE("complex case: Ohad's example") {
+		tref parsed = parse("all x x = y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type},
+			{"y", tau_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("complex case: Ohad's example (y2)") {
+		tref parsed = parse("(all x x = y) && x = y:sbf");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
 }
