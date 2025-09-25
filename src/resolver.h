@@ -492,39 +492,41 @@ tref new_infer_ba_types(tref n) {
 						if (new_e != e) changes[e] = new_e;
 					}
 				}
-				resolver.close();
 				auto new_n = rewriter::replace<node>(n, changes);
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
 				if (new_n != n) transformed[n] = new_n;
 				resolver.close();
 				return;
 			}
-			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_fex: {
+			case tau::wff_all: case tau::wff_ex: /* case tau::bf_fall: case tau::bf_fex:*/ {
 				// We get the quantified variables, its inferred type (defaulting
 				// to type if they are still untyped) and close the scope.
 				auto vars = tau::get(n)[0].select_top(is<node, tau::variable>);
 				// We type untyped variables with tau and close the scope.
 				std::map<tref, tref> changes;
 				for(auto v : vars) {
+					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all/v: " << LOG_FM_TREE(v);)
 					auto resolved_type = resolver.type_of(untype(v)); // already untyped
 					auto v_type = tau::get(v).get_type();
 					auto final_type = resolved_type == untyped ? tau_type : resolved_type;
-					// assigbn
+					// assign
 					if (tau::get(v).children_size()) {
 						auto new_v = (final_type.second == nullptr)
 						? tau::get_typed(v_type, tau::get(v).child(0), final_type.first)
 						: tau::get_typed(v_type, tau::get(v).child(0), final_type.second,
 							final_type.first);
-						if (new_v != v) changes[v] = new_v;
+						if (new_v != v) changes[untype(v)] = new_v;
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all/new_v: " << LOG_FM_TREE(new_v);)
 					} else {
 						auto new_v = (final_type.second == nullptr)
 						? tau::get_typed(v_type, final_type.first)
 						: tau::get_typed(v_type, final_type.second, final_type.first);
-						if (new_v != v) changes[v] = new_v;
+						if (new_v != v) changes[untype(v)] = new_v;
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all/new_v: " << LOG_FM_TREE(new_v);)
 					}
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
-				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM(new_n);)
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM_TREE(new_n);)
 				if (new_n != n) transformed[n] = new_n;
 				resolver.close();
 				return;
@@ -543,7 +545,7 @@ tref new_infer_ba_types(tref n) {
 					if (new_c != c) changes[c] = new_c;
 				}
 				auto new_n = rewriter::replace<node>(n, changes);
-				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/new_n: " << LOG_FM_TREE(new_n);)
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_*/new_n: " << LOG_FM_TREE(new_n);)
 				if (new_n != n) transformed[n] = new_n;
 				return;
 			}
@@ -551,7 +553,6 @@ tref new_infer_ba_types(tref n) {
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt: {
 				// We type all the constants
-				// TODO (HIGH) they are already parser, but where?
 				/*auto constants = tau::get(n).select_top(is<node, tau::bf_constant>);
 				std::map<tref, tref> changes;
 				for (const auto& c : constants) {
@@ -588,13 +589,13 @@ tref new_infer_ba_types(tref n) {
 							? tau::get_typed(e_type, tau::get(e).child(0), final_type.first)
 							: tau::get_typed(e_type, tau::get(e).child(0), final_type.second,
 								final_type.first);
-							if (new_e != e) changes[e] = new_e;
+							if (new_e != e) changes[untype(e)] = new_e;
 							DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/new_e: " << LOG_FM_TREE(new_e);)
 						} else { // bf_t/bf_f case
 							auto new_e = (final_type.second == nullptr)
 							? tau::get_typed(e_type, final_type.first)
 							: tau::get_typed(e_type, final_type.second, final_type.first);
-							if (new_e != e) changes[e] = new_e;
+							if (new_e != e) changes[untype(e)] = new_e;
 							DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/new_e: " << LOG_FM_TREE(new_e);)
 						}
 					}
@@ -615,15 +616,8 @@ tref new_infer_ba_types(tref n) {
 		auto t = tau::get(n);
 		size_t nt = t.get_type();
 		switch (nt) {
-			case tau::rec_relation:
-			case tau::wff_all: case tau::wff_ex: case tau::bf_fall: case tau::bf_fex:
-			case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
-			case tau::bv_gt: case tau::bv_ngt: case tau::bv_gteq: case tau::bv_ngteq:
-			case tau::bv_lt: case tau::bv_nlt:
-			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
-			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
-			case tau::bf_lt: case tau::bf_nlt:
-				return true;
+			case tau::bf: case tau::bv:
+				return false;
 			default:
 				return true;
 		}

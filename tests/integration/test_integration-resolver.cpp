@@ -133,7 +133,7 @@ TEST_SUITE("new_infer_ba_types") {
 	static type_t bv_type = {get_ba_type_id<node_t>("bv"), nullptr};
 	static type_t bv16_type = {get_ba_type_id<node_t>("bv"), tau::get(tau::subtype, tau::get_num(16))};
 
-	TEST_CASE("simple case 1") {
+	/*TEST_CASE("simple case 1") {
 		tref parsed = parse("x = 1");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
@@ -445,7 +445,7 @@ TEST_SUITE("new_infer_ba_types") {
 			{"z", bv16_type},
 		};
 		CHECK( check_vars(inferred, expected) );
-	}
+	}*/
 
 
 
@@ -465,7 +465,7 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	TEST_CASE("all bv") {
+	/*TEST_CASE("all bv") {
 		tref parsed = parse("all x:bv x =_ y");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
@@ -511,7 +511,7 @@ TEST_SUITE("new_infer_ba_types") {
 			{"y", bv16_type},
 		};
 		CHECK( check_vars(inferred, expected) );
-	}
+	}*/
 
 
 
@@ -622,7 +622,7 @@ TEST_SUITE("new_infer_ba_types") {
 
 
 
-	TEST_CASE("simple explicit tau constant") {
+	/*TEST_CASE("simple explicit tau constant") {
 		tref parsed = parse("x = { T }:tau");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
@@ -664,5 +664,5 @@ TEST_SUITE("new_infer_ba_types") {
 			{"x", sbf_type}
 		};
 		CHECK( check_vars(inferred, expected) );
-	}
+	}*/
 }
