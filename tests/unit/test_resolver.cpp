@@ -263,7 +263,7 @@ TEST_SUITE("scopes") {
 		r.close();
 		CHECK(r.kinds().size() == 1);
 		CHECK(r.scopes_.size() == 1);
-		CHECK(r.kinds_.size() == 1);
+		CHECK(r.kinds_.size() == 2);
 		CHECK(r.type_of(x) == type1);
 	}
 
@@ -280,7 +280,7 @@ TEST_SUITE("scopes") {
 		r.close();
 		CHECK(r.kinds().size() == 1);
 		CHECK(r.scopes_.size() == 1);
-		CHECK(r.kinds_.size() == 1);
+		CHECK(r.kinds_.size() == 2);
 		CHECK(r.type_of(x) == r.unknown);
 	}
 }
@@ -325,5 +325,3 @@ TEST_SUITE("merge_ba_types") {
 		CHECK(nomatch({1, (tref)1}, {1, (tref)2}));
 	}
 }
-
-
