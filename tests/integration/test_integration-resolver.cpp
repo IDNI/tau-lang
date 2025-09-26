@@ -536,7 +536,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
-			{"x", bv_type},
 			{"y", bv_type},
 		};
 		CHECK( check_vars(inferred, expected) );
@@ -712,7 +711,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-
 	TEST_CASE("simple failing case") {
 		tref parsed = parse("x:tau = x:sbf");
 		CHECK( parsed != nullptr );
@@ -748,8 +746,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred == nullptr );
 	}
 
-
-
 	TEST_CASE("complex case: Ohad's example") {
 		tref parsed = parse("all x x = y");
 		CHECK( parsed != nullptr );
@@ -769,4 +765,37 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred == nullptr );
 	}
 
+	TEST_CASE("complex case: shadowing") {
+		tref parsed = parse("all x (all x x = 1:sbf)");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("complex case: shadowing (y2)") {
+		tref parsed = parse("all x ((all x x = 1:sbf) && x = 1:sbf)");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", sbf_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("complex case: shadowing (y3)") {
+		tref parsed = parse("all x ((all x x = 1:sbf) && x = 1:tau)");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type},
+			{"x", sbf_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
 }
