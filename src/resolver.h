@@ -209,7 +209,7 @@ struct type_scoped_resolver : public scoped_resolver<tref, type_t, idni::subtree
 template <NodeType node>
 tref new_infer_ba_types(tref n) {
 	using tau = tree<node>;
-	//using tt = tau::traverser;
+	using tt = tau::traverser;
 
 	// Some type definitions
 	static type_t untyped = { ba_types<node>::id("untyped"), nullptr };
@@ -431,33 +431,82 @@ tref new_infer_ba_types(tref n) {
 			}
 		};
 
-		auto is_fully_typed = [&](tref n) -> bool {
+		/*auto is_fully_typed = [&](tref n) -> bool {
 			auto t = get_type_of(n);
 			if (t.first == untyped.first) return false;
 			if (t.first == tau_type.first || t.first == sbf_type.first) return true;
 			return t.second != nullptr; // Bitvector size must be known
-		};
+		};*/
 
 		auto retype_vars = [&](tref n, const std::map<tref, type_t, subtree_less<node>>& types) -> tref {
-			auto update = [&](tref n) -> tref {
-				// We only retype variables
-				if (!is<node, tau::variable>(n)) return n;
-				// If the node is already fully typed, just ensure we don't have
-				// a type child
-				if (is_fully_typed(n))
-					return n; //retype(n, get_type_of(n));
-				// If a new possible type is not found, we return the node
-				if (types.find(n) == types.end()) return n;
-				// Otherwise, we merge with the inferred type and update the
-				// node with the merged type
-				if (auto merged = merge_ba_types<node>(get_type_of(n), types.at(n)); merged) {
-					return retype(n, merged.value());
-				}
-				// We return the node and set error as there is conflicting type info
-				return error = true, n;
+			std::map<tref, tref, subtree_less<node>> transformed;
 
+			auto update = [&](tref n) -> bool {
+				DBG(LOG_TRACE <<"new_infer_ba_types/retype_vars/tau_use_hooks: " << tau::use_hooks << "\n";)
+				const auto& t = tau::get(n);
+				size_t nt = t.get_type();
+				switch (nt) {
+					case tau::variable: {
+						// we remove type information if present
+						if (auto retyped = (tt(n) | tau::type | tt::ref) ? retype(n, get_type_of(n)) : n; retyped != n) {
+							DBG(LOG_TRACE << "new_infer_ba_types/retype_vars/update/variable/n -> retyped:\n"
+								<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(retyped);)
+							transformed.insert_or_assign(n, retyped);
+							break;
+						}
+						/*// If the node is already fully typed, just ensure we don't have
+						// a type child
+						if (is_fully_typed(n)) {
+							if (auto new_n = retype(n, get_type_of(n)); new_n != n) {
+								DBG(LOG_TRACE << "new_infer_ba_types/retype_vars/update/variable/n -> new_n:\n"
+									<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+								transformed.insert_or_assign(n, new_n);
+							}
+							break;
+						}*/
+						// If a new possible type is not found, we do nothing
+						if (types.find(untype(n)) == types.end()) { break; }
+						// Otherwise, we merge with the inferred type and update the
+						// node with the merged type
+						if (auto merged = merge_ba_types<node>(get_type_of(n), types.at(untype(n))); merged) {
+							if (auto new_n = retype(n, merged.value()); new_n != n) {
+								DBG(LOG_TRACE << "new_infer_ba_types/retype_vars/update/variable/n -> new_n:\n"
+									<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+								transformed.insert_or_assign(n, new_n);
+							}
+							break;
+						}
+						// We do nothing if types are conflicting
+						error = true;
+						break;
+					}
+					default: {
+						// We transform the node according to the transformation of
+						// its children
+						trefs ch;
+						for (tref c : t.children()) {
+							if (transformed.find(c) != transformed.end())
+								ch.push_back(transformed[c]);
+							else ch.push_back(c);
+						}
+						if (auto new_n = tau::get(t.value, ch); new_n != n) {
+							DBG(LOG_TRACE << "new_infer_ba_types/retype_vars/update/default/n -> new_n:\n"
+								<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+							transformed.insert_or_assign(n, new_n);
+						}
+						break;
+					}
+				}
+				return !error;
 			};
-			return post_order<node>(n).apply_unique(update);
+
+			post_order<node>(n).search_unique(update);
+			if (transformed.find(n) != transformed.end()) {
+				DBG(LOG_TRACE << "new_infer_ba_types/retype_vars/n -> transformed[n]:\n"
+					<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(transformed[n]);)
+				return transformed[n];
+			}
+			return n;
 		};
 
 		auto get_scoped_var_types = [&]() {
@@ -478,12 +527,14 @@ tref new_infer_ba_types(tref n) {
 			case tau::wff_all: case tau::wff_ex: /* case tau::bf_fall: case tau::bf_fex:*/
 			case tau::rec_relation: {
 				auto scoped_var_types = get_scoped_var_types();
-				if(auto new_n = retype_vars(n, scoped_var_types); new_n != n) {
-					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/rec_relation/n -> new_n:\n"
-						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
-					transformed[n] = new_n;
+				if(auto retyped = retype_vars(n, scoped_var_types); retyped != n) {
+					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../n -> retyped:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(retyped);)
+					transformed.insert_or_assign(n, retyped);
 				}
 				resolver.close();
+				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../resolver:\n";)
+				DBG(LOG_TRACE << resolver.dump_to_str();)
 				return;
 			}
 			case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
@@ -495,7 +546,7 @@ tref new_infer_ba_types(tref n) {
 				for (const auto& c : constants) {
 					auto c_type = resolver.type_of(c); // already untyped
 					if (auto new_c = retype(c, c_type); new_c != c) {
-						changes[c] = new_c;
+						changes.insert_or_assign(c, new_c);
 						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../c -> new_c:\n"
 							<< LOG_FM_TREE(c) << " -> " << LOG_FM_TREE(new_c);)
 					}
@@ -503,7 +554,7 @@ tref new_infer_ba_types(tref n) {
 				if (auto new_n = rewriter::replace<node>(n, changes); new_n != n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../n -> new_n:\n"
 						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
-					transformed[n] = new_n;
+					transformed.insert_or_assign(n, new_n);
 				}
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
@@ -537,11 +588,15 @@ tref new_infer_ba_types(tref n) {
 				// For the root node, we type untyped variables with tau.
 				if (!parent) {
 					auto var_types = get_scoped_var_types();
-					new_n = retype_vars(new_n, var_types);
+					if(auto retyped = retype_vars(new_n, var_types); retyped != new_n) {
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/n -> retyped:\n"
+							<< LOG_FM_TREE(new_n) << " -> " << LOG_FM_TREE(retyped);)
+						new_n = retyped;
+					}
 				}
 				if (new_n != n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/new_n:\n" << LOG_FM_TREE(new_n);)
-					transformed[n] = new_n;
+					transformed.insert_or_assign(n, new_n);
 				}
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
@@ -569,7 +624,7 @@ tref new_infer_ba_types(tref n) {
 	// We visit the tree and return the transformed root if no error happened.
 	// If an error happened we return nullptr.
 	pre_order<node>(n).visit(on_enter, visit_all, on_leave, on_between);
-	if (error) return tau::use_hooks = using_hooks,nullptr;
+	if (error) return tau::use_hooks = using_hooks, nullptr;
 	// We add to the transformed map the untypping of the bf_t's and the bf_f's.
 	// ...some code here...
 	auto new_n = transformed.contains(n) ? transformed[n] : n;

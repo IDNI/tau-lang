@@ -164,14 +164,15 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			}
 			// get the bound constant node
 			tref n = get_ba_constant_from_source(src, ba_type_id);
+			auto using_hooks = tau::use_hooks;
 			tau::use_hooks = false;
 			// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
 			src = 0;
 			if (n == nullptr || n == x)
-				return error = true, nullptr;
+				return error = true, tau::use_hooks = using_hooks, nullptr;
 			LOG_TRACE << (ba_type_id == 0 ? "un" : "") << "bound: "
 								<< LOG_FM(n);
-			return n;
+			return tau::use_hooks = using_hooks, n;
 		};
 
 		switch (nt) {
@@ -280,22 +281,21 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	DBG(LOG_TRACE << "parse tree: "
 			<< (parse_tree::get(ptr.get()).print(ss), ss.str());)
 
+	auto using_hooks = tau::use_hooks;
 	tau::use_hooks = false;
 	// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
 	post_order<tau_parser::pnode>(ptr.get()).search(transformer);
 	if (error || m.find(ptr.get()) == m.end()) {
-		tau::use_hooks = true;
 		// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
-		return nullptr;
+		return tau::use_hooks = using_hooks, nullptr;
 	}
 	DBG(LOG_TRACE << "transformed: " << tree::get(m.at(ptr.get())).to_str();)
 	DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
 	tref transformed = m_ref(ptr.get());
 	if (options.infer_ba_types)
 		transformed = infer_ba_types<node>(transformed);
-	tau::use_hooks = true;
 	// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
-	return options.reget_with_hooks ? reget(transformed) : transformed;
+	return tau::use_hooks = using_hooks, options.reget_with_hooks ? reget(transformed) : transformed;
 }
 
 //------------------------------------------------------------------------------
