@@ -523,7 +523,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
-			{"x", bv_type},
 			{"y", bv_type},
 		};
 		CHECK( check_vars(inferred, expected) );
@@ -560,7 +559,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type},
-			{"x", bv16_type},
 			{"y", bv16_type},
 		};
 		CHECK( check_vars(inferred, expected) );
@@ -572,7 +570,6 @@ TEST_SUITE("new_infer_ba_types") {
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
-			{"x", bv16_type},
 			{"x", bv16_type},
 			{"y", bv16_type},
 		};
@@ -598,7 +595,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type},
-			{"x", sbf_type},
 			{"y", sbf_type},
 		};
 		CHECK( check_vars(inferred, expected) );
@@ -610,7 +606,6 @@ TEST_SUITE("new_infer_ba_types") {
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
-			{"x", sbf_type},
 			{"x", sbf_type},
 			{"y", sbf_type},
 		};
@@ -636,7 +631,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
-			{"x", tau_type},
 			{"y", tau_type},
 		};
 		CHECK( check_vars(inferred, expected) );
@@ -648,7 +642,6 @@ TEST_SUITE("new_infer_ba_types") {
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
-			{"x", tau_type},
 			{"x", tau_type},
 			{"y", tau_type},
 		};
@@ -759,9 +752,13 @@ TEST_SUITE("new_infer_ba_types") {
 	}
 
 	TEST_CASE("complex case: Ohad's example (y2)") {
+		using node = node_t;
 		tref parsed = parse("(all x x = y) && x = y:sbf");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
+		if (inferred != nullptr) {
+			TAU_LOG_TRACE << "Expected nullptr got: " << LOG_FM_TREE(inferred);
+		}
 		CHECK( inferred == nullptr );
 	}
 
@@ -771,7 +768,8 @@ TEST_SUITE("new_infer_ba_types") {
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
-			{"x", tau_type}
+			{"x", tau_type},
+			{"x", sbf_type}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
