@@ -189,7 +189,7 @@ struct type_scoped_resolver : public scoped_resolver<tref, type_t, idni::subtree
 			os << "\tscope: " << e.first << ", tref: " << LOG_FM(e.second)
 			<< ", type: "
 				<< type.first << "["
-				<< ((type.second) ? tau::get(type.second).dump_to_str() : "") << "]\n";
+				<< ((type.second) ? tau::get(type.second).to_str() : "") << "]\n";
 		}
 		return os;
 	}
@@ -333,6 +333,9 @@ tref new_infer_ba_types(tref n) {
 				auto type = get_type(typeables, untyped);
 				// If no common type is found, we set error and stop traversal
 				if (!type) return error = true, false;
+				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bv_eq.../type: "
+					<< type.value().first
+					<< "[" << (type.value().second ? tau::get(type.value().second).to_str() : "") << "]\n";)
 				if (type.value() != untyped && type.value().first != bv_type.first) {
 					// We only allow bv type in bv equations
 					return error = true, false;
@@ -388,8 +391,9 @@ tref new_infer_ba_types(tref n) {
 				for (const auto& t : typeables)	{
 					auto ut = untype(t);
 					if (is<node, tau::bv_constant>(ut)) {
-						constants.emplace(ut, type.value());
+						if (is<node, tau::bf_f>(ut) || is<node, tau::bf_t>(ut)) continue;
 						mergeables.push_back(ut);
+						constants.emplace(ut, type.value());
 						continue;
 					}
 					// We only add variables to the current scope
@@ -458,7 +462,7 @@ tref new_infer_ba_types(tref n) {
 		};*/
 
 		auto retype_elements = [&](tref n, const std::map<tref, type_t, subtree_less<node>>& types, const type_t& default_type) -> tref {
-			std::map<tref, tref, subtree_less<node>> changes;
+			subtree_map<node, tref> changes;
 
 			auto update = [&](tref n) -> bool {
 				DBG(LOG_TRACE <<"new_infer_ba_types/retype_elements/tau_use_hooks: " << tau::use_hooks << "\n";)
@@ -532,6 +536,19 @@ tref new_infer_ba_types(tref n) {
 			for(auto [e, resolved_type] : resolver.current_kinds())
 				if (!tau::get(e).is(element_type)) continue;
 				else elements[e] = resolved_type;
+#ifdef DEBUG
+			LOG_TRACE << "new_infer_ba_types/on_leave/get_scoped_elements/elements:"
+				<< " type = " << (element_type == tau::variable ? "variable" :
+					(element_type == tau::bv_constant ? "bv_constant" :
+						(element_type == tau::bf_constant ? "bf_constant" : "unknown")))
+				<< " scope = " <<resolver.scopes_.back() << "\n";
+			for (auto [e, t] : elements)
+				LOG_TRACE << "\t" << LOG_FM(e) << " : "
+					<< t.first << "["
+					<< ((t.second) ? tau::get(t.second).to_str() : "") << "]\n";
+			LOG_TRACE << "new_infer_ba_types/on_leave/get_scoped_elements/uf:\n";
+			LOG_TRACE << resolver.dump_to_str();
+#endif // DEBUG
 			return elements;
 		};
 

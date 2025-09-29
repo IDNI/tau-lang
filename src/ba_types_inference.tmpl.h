@@ -287,8 +287,8 @@ tref ba_types_inference<node>::add_scope_ids(
 			else vscids.erase(var_sid);
 			return tau::get(t.value, { v, x });
 		}
-		case tau::bf_constant:
-		case tau::bv_constant:
+		//case tau::bf_constant:
+		//case tau::bv_constant:
 		case tau::variable:
 			return transform_element(el);
 		case tau::bf_f:
