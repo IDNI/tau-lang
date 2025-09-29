@@ -80,7 +80,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"bv_ba",
 	"ba_types",
 	"ba_constants",
-	"ba_types_inference",
+	// "ba_types_inference",
 	// "batinf_scoping",
 	// "batinf_propagation",
 	// "batinf_unscoping",

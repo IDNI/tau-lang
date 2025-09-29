@@ -97,6 +97,11 @@ TEST_SUITE("new_infer_ba_types") {
 	}*/
 
 	bool check_vars(tref inferred, std::vector<std::pair<std::string, type_t>>& expected) {
+		using node = node_t;
+
+		DBG(LOG_TRACE << "Checking variables in: "
+			<< LOG_FM_TREE(inferred);)
+
 		auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
 		if (vars.empty() && expected.size() > 0) {
 			TAU_LOG_ERROR << "No variables found in.";
@@ -135,6 +140,11 @@ TEST_SUITE("new_infer_ba_types") {
 	}
 
 	bool check_ctes(tref inferred, std::vector<type_t>& expected) {
+		using node = node_t;
+
+		DBG(LOG_TRACE << "Checking bf constants in: "
+			<< LOG_FM_TREE(inferred);)
+
 		auto ctes = tau::get(inferred).select_top(is<node_t, tau::bf_constant>);
 		if (ctes.empty() && expected.size() > 0) {
 			TAU_LOG_ERROR << "No constants found";
@@ -165,6 +175,11 @@ TEST_SUITE("new_infer_ba_types") {
 	}
 
 	bool check_bv_ctes(tref inferred, std::vector<type_t>& expected) {
+		using node = node_t;
+
+		DBG(LOG_TRACE << "Checking bv constants in: "
+			<< LOG_FM_TREE(inferred);)
+
 		auto ctes = tau::get(inferred).select_top(is<node_t, tau::bv_constant>);
 		if (ctes.empty() && expected.size() > 0) {
 			TAU_LOG_ERROR << "No constants found";
@@ -739,6 +754,90 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred == nullptr );
 	}
 
+
+
+
+	TEST_CASE("bv constants") {
+		tref parsed = parse("#b1 : bv =_ #b0 : bv & #b10");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected_ctes = std::vector<type_t> {
+			bv_type,
+			bv_type,
+			bv_type
+		};
+		CHECK( check_bv_ctes(inferred, expected_ctes) );
+	}
+
+	TEST_CASE("bv16 constants") {
+		tref parsed = parse("#b1 : bv[16] =_ #b0 : bv[16] & #b10 : bv");
+		CHECK( parsed != nullptr );
+		if (parsed == nullptr) {
+			TAU_LOG_ERROR << "Parsing failed";
+			return;
+		}
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected_ctes = std::vector<type_t> {
+			bv16_type,
+			bv16_type,
+			bv16_type
+		};
+		CHECK( check_bv_ctes(inferred, expected_ctes) );
+	}
+
+	TEST_CASE("sbf constants") {
+		tref parsed = parse("{ 0 } : sbf = { 1 } { 0 } : sbf");
+		CHECK( parsed != nullptr );
+		if (parsed == nullptr) {
+			TAU_LOG_ERROR << "Parsing failed";
+			return;
+		}
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected_ctes = std::vector<type_t> {
+			sbf_type,
+			sbf_type
+		};
+		CHECK( check_ctes(inferred, expected_ctes) );
+	}
+
+	TEST_CASE("sbf constants (y2)") {
+		tref parsed = parse("{ 0 } = { 1 } & { 0 } : sbf");
+		CHECK( parsed != nullptr );
+		if (parsed == nullptr) {
+			TAU_LOG_ERROR << "Parsing failed";
+			return;
+		}
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected_ctes = std::vector<type_t> {
+			sbf_type,
+			sbf_type
+		};
+		CHECK( check_ctes(inferred, expected_ctes) );
+	}
+
+	TEST_CASE("tau constants") {
+		tref parsed = parse("{ F } = { T } { F }");
+		CHECK( parsed != nullptr );
+		if (parsed == nullptr) {
+			TAU_LOG_ERROR << "Parsing failed";
+			return;
+		}
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected_ctes = std::vector<type_t> {
+			tau_type,
+			tau_type
+		};
+		CHECK( check_ctes(inferred, expected_ctes) );
+	}
+
+
+
+
 	TEST_CASE("complex case: Ohad's example") {
 		tref parsed = parse("all x x = y");
 		CHECK( parsed != nullptr );
@@ -796,4 +895,6 @@ TEST_SUITE("new_infer_ba_types") {
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
+
+
 }
