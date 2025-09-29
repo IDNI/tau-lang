@@ -23,10 +23,10 @@ using type_t = std::pair<size_t, tref>; // (type_id, subtype)
 template<typename data_t, typename kind_t, class less_t = std::less<data_t>>
 struct scoped_resolver {
 	using scope_t = size_t;
+	using element_t = std::pair<scope_t, data_t>;
 
 	struct scoped_less {
-		bool operator()(const std::pair<scope_t, data_t>& a,
-			const std::pair<scope_t, data_t>& b) const {
+		bool operator()(const element_t& a, const element_t& b) const {
 				static const less_t comp;
 				if (a.first < b.first) return true;
 				if (a.first > b.first) return false;
@@ -35,11 +35,10 @@ struct scoped_resolver {
 		}
 	};
 
-	using element_t = std::pair<scope_t, data_t>;
 	using kinds_t = std::map<element_t, kind_t, scoped_less>;
-	using union_find_by_rank_t = union_find_by_rank<element_t, scoped_less>;
+	using union_find_by_less_t = union_find_by_less<element_t, scoped_less>;
 
-	union_find_by_rank_t uf;
+	union_find_by_less_t uf;
 	scope_t current = 0;
 	std::deque<size_t> scopes_ { current };
 	kinds_t kinds_;
