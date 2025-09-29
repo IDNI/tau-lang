@@ -80,26 +80,24 @@ public:
  * taking the smaller as new root
  * @tparam node Type of tree node
  */
-template <typename data_t, class less_t = std::less<data_t>, class merge_less_t = std::less<data_t>>
+template <typename data_t, class less_t = std::less<data_t>>
 struct union_find_by_less : public union_find<data_t, less_t> {
-private:
-	static const merge_less_t comp;
 
-public:
 	// Union the two sets containing x and y (union by rank)
 	data_t merge(data_t x, data_t y) {
+		static const less_t comp;
 		auto root_x = this->root(x), root_y = this->root(y);
 		if (root_x == root_y) return root_x;
 		// Union by rank
 		if (comp(root_x, root_y)) {
-			this->operator[](root_x) = root_y;
-			return root_y;
-		} else if (comp(root_y, root_x)) {
 			this->operator[](root_y) = root_x;
 			return root_x;
+		} else if (comp(root_y, root_x)) {
+			this->operator[](root_x) = root_y;
+			return root_y;
 		}
-		this->operator[](root_y) = root_x;
-		return root_x;
+		this->operator[](root_x) = root_y;
+		return root_y;
 	}
 };
 
