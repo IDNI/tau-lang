@@ -30,7 +30,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 		DBG(assert(nt == tau::bf || nt == tau::wff
 			|| nt == tau::shift || nt == tau::integer
 			|| tau::get(ret).is_bv_constant() );)
-	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error") }
+	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error";) }
 	return ret;
 }
 
