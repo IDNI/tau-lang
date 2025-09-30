@@ -84,7 +84,7 @@ fi
 RUN if [ ! -f ./build-${BUILD_TYPE}/tau ]; then ./dev build "${BUILD_TYPE}"; fi
 
 # Set the entrypoint to the tau executable
-ENV LD_LIBRARY_PATH=/tau-lang/exteral/cvc5/build/src:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/tau-lang/external/cvc5/build/src:$LD_LIBRARY_PATH
 WORKDIR /tau-lang/build-${BUILD_TYPE}
 ENTRYPOINT [ "./tau" ]
 CMD []
