@@ -12,10 +12,10 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 size_t ba_types<node>::id(size_t type_sid) {
-	if (auto it = type_names_map.find(type_sid);
-		it != type_names_map.end()) return it->second;
-	return type_names_map.emplace(type_sid, types.size()),
-		types.push_back(type_sid), types.size() - 1;
+	if (auto it = type_names_map().find(type_sid);
+		it != type_names_map().end()) return it->second;
+	return type_names_map().emplace(type_sid, types().size()),
+		types().push_back(type_sid), types().size() - 1;
 }
 
 template <NodeType node>
@@ -25,9 +25,9 @@ size_t ba_types<node>::id(const std::string& name) {
 
 template <NodeType node>
 const std::string& ba_types<node>::name(size_t tid) {
-	DBG(assert(tid < types.size()));
-	if (tid >= types.size()) tid = 0;
-	return dict(types[tid]);
+	DBG(assert(tid < types().size()));
+	if (tid >= types().size()) tid = 0;
+	return dict(types()[tid]);
 }
 
 template <NodeType node>
@@ -37,13 +37,13 @@ std::ostream& ba_types<node>::print(std::ostream& os, size_t tid) {
 
 template <NodeType node>
 std::ostream& ba_types<node>::dump(std::ostream& os) {
-	LOG_TRACE << "BA types pool(" << types.size() << "):\n";
-	os << "BA types pool(" << types.size() << "):\n";
-	for (size_t i = 0; i < types.size(); ++i) {
+	LOG_TRACE << "BA types pool(" << types().size() << "):\n";
+	os << "BA types pool(" << types().size() << "):\n";
+	for (size_t i = 0; i < types().size(); ++i) {
 		LOG_TRACE << "type: " << i+1;
-		LOG_TRACE << "val:  " << dict(types[i]);
+		LOG_TRACE << "val:  " << dict(types()[i]);
 		os << LOG_INDENT << "type: "
-			<< i+1 << " " << dict(types[i]) << "\n";
+			<< i+1 << " " << dict(types()[i]) << "\n";
 	}
 	return os;
 }
@@ -53,6 +53,24 @@ std::string ba_types<node>::dump_to_str() {
 	std::stringstream ss;
 	return dump(ss), ss.str();
 }
+
+// type_sids (index = ba_type id)
+template <NodeType node>
+std::vector<size_t>& ba_types<node>::types() {
+	static std::vector<size_t> t{ dict("untyped"),
+				      dict("tau"), dict("bv"), dict("sbf") };
+	return t;
+}
+
+// type_sid -> ba_type id
+template <NodeType node>
+std::map<size_t, size_t>& ba_types<node>::type_names_map() {
+	static std::map<size_t, size_t> t{ { dict("untyped"), 0 },
+		{ dict("tau"), 1 }, { dict("bv"), 2 }, { dict("sbf"), 3 }
+	};
+	return t;
+}
+
 
 // -----------------------------------------------------------------------------
 // functional API to ba_types

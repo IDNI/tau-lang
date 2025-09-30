@@ -36,10 +36,10 @@ struct ba_types {
 
 private:
 	// type_sids (index = ba_type id)
-	inline static std::vector<size_t> types { dict("untyped"), dict("tau"), dict("bv"), dict("sbf") };
+	static std::vector<size_t>& types();
+
 	// type_sid -> ba_type id
-	inline static std::map<size_t, size_t> type_names_map{
-		{ dict("untyped"), 0 }, {dict("tau"), 1}, {dict("bv"), 2}, {dict("sbf"), 3} };
+	static std::map<size_t, size_t>& type_names_map();
 };
 
 // -----------------------------------------------------------------------------
