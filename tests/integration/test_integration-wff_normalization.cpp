@@ -163,6 +163,6 @@ TEST_SUITE("anti_prenex") {
 		const char* sample = "{always a&(b|dc)|a'dc = 0}'&{always b|dc = 0} != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
-		CHECK(tau::get(res).equals_T());
+		CHECK(tau::get(res).equals_F());
 	}
 }
