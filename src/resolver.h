@@ -225,6 +225,7 @@ tref new_infer_ba_types(tref n) {
 	static type_t untyped = { ba_types<node>::id("untyped"), nullptr };
 	static type_t bv_type = { ba_types<node>::id("bv"), nullptr };
 	static type_t tau_type = { ba_types<node>::id("tau"), nullptr };
+	[[maybe_unused]]
 	static type_t sbf_type = { ba_types<node>::id("sbf"), nullptr };
 
 	// The following variables conform the state of the traversal
