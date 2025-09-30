@@ -95,7 +95,7 @@ struct scoped_resolver {
 				if (auto current = kinds_.find(uf.root(element_t{*it, data}))->second;
 						current != unknown && current != kind)
 					return false;
-				kinds_[uf.root(element_t{*it, data})] = kind;
+				kinds_.insert_or_assign(uf.root(element_t{*it, data}), kind);
 				return true;
 			}
 		return false;
@@ -158,10 +158,22 @@ struct type_scoped_resolver : public scoped_resolver<tref, type_t, idni::subtree
 	bool merge(tref a, tref b) {
 		auto type_a = this->type_of(a); auto scope_a = this->scope_of(a);
 		auto type_b = this->type_of(b); auto scope_b = this->scope_of(b);
+		DBG(LOG_TRACE << "type_scoped_resolver/merge: "
+			<< LOG_FM(a) << ":" << type_a.first << "["
+			<< type_a.second
+			<< "] (scope " << scope_a << ")"
+			<< " <-> "
+			<< LOG_FM(b) << ":" << type_b.first << "["
+			<< type_b.second
+			<< "] (scope " << scope_b << ")\n";)
 		auto merged = merge_ba_types<node>(type_a, type_b);
 		if (!merged) return false; // conflicting type info
-		this->uf.merge({scope_a, a}, {scope_b, b});
-		this->kinds_[this->uf.root({scope_a, a})] = merged.value();
+		auto new_parent = this->uf.merge({scope_a, a}, {scope_b, b});
+		this->kinds_.insert_or_assign(new_parent, merged.value());
+		DBG(LOG_TRACE << "type_scoped_resolver/merge: merged to "
+			<< LOG_FM(new_parent.second) << ":" << merged.value().first << "["
+			<< merged.value().second
+			<< "]\n" << " (scope " << new_parent.first << ")";)
 		// We also update the type of the merged elements
 		//this->kinds_[{this->current, a}] = merged.value();
 		//this->kinds_[{this->current, b}] = merged.value();
@@ -184,7 +196,7 @@ struct type_scoped_resolver : public scoped_resolver<tref, type_t, idni::subtree
 			os << scope << ", ";
 		os << "\n";
 		for (auto [e,_]: this->uf) {
-			auto type = this->type_of(e.second);
+			auto type = this->kinds_.at(e);
 			os << "\tscope: " << e.first << ", tref: " << LOG_FM(e.second)
 			<< ", type: "
 				<< type.first << "["
@@ -534,7 +546,7 @@ tref new_infer_ba_types(tref n) {
 				return !error;
 			};
 
-			post_order<node>(n).search_unique(update);
+			post_order<node>(n).search(update);
 			if (changes.find(n) != changes.end()) {
 				DBG(LOG_TRACE << "new_infer_ba_types/retype_elements/n -> changes[n]:\n"
 					<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(changes[n]);)
@@ -563,6 +575,19 @@ tref new_infer_ba_types(tref n) {
 #endif // DEBUG
 			return elements;
 		};
+
+		/*auto update = [&](tref n) -> tref {
+			// We transform the node according to the transformation of
+			// its children
+			using tau = tree<node>;
+			trefs ch;
+			for (tref c : tau::get(n).children()) {
+				if (transformed.find(c) != transformed.end())
+					ch.push_back(transformed[c]);
+				else ch.push_back(c);
+			}
+			return tau::get(tau::get(n).get_type(), ch);
+		};*/
 
 		// Stop traversal on error
 		if (error) return;
