@@ -385,7 +385,7 @@ tref new_infer_ba_types(tref n) {
 				auto type = get_type(typeables, untyped);
 				// If no common type is found, we set error and stop traversal
 				if (!type) return error = true, false;
-				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bv_eq.../type: "
+				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bf_eq.../type: "
 					<< type.value().first
 					<< "[" << (type.value().second ? tau::get(type.value().second).to_str() : "") << "]\n";)
 				// We add the variables and the constants to the current scope
@@ -394,8 +394,7 @@ tref new_infer_ba_types(tref n) {
 				subtree_map<node, type_t> constants;
 				for (const auto& t : typeables)	{
 					auto ut = untype(t);
-					if (is<node, tau::bf_constant>(ut)) {
-						if (is<node, tau::bf_f>(ut) || is<node, tau::bf_t>(ut)) continue;
+					if (is<node, tau::bf_constant>(ut) || is<node, tau::bf_f>(ut) || is<node, tau::bf_t>(ut)) {
 						mergeables.push_back(ut);
 						constants.emplace(ut, type.value());
 						continue;
@@ -504,6 +503,15 @@ tref new_infer_ba_types(tref n) {
 						}
 						// We do nothing if types are conflicting
 						error = true;
+						break;
+					}
+					case tau::bf_t: case tau::bf_f: {
+						// We untype bf_t and bf_f
+						if (auto new_n = untype(n); new_n != n) {
+							DBG(LOG_TRACE << "new_infer_ba_types/retype_elements/update/bf_t.../n -> new_n:\n"
+								<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+							changes.insert_or_assign(n, new_n);
+						}
 						break;
 					}
 					default: {
