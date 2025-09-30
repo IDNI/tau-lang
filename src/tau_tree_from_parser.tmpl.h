@@ -147,9 +147,10 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 		// - if not call get_ba_constant() which stores them in the pool
 		//   and returns the bound constant node
 		auto process_bf_constant =
-			[&src, &error, &named_constants](tref x) -> tref
+			// [&src, &error, &named_constants](tref x) -> tref
+			[](tref x) -> tref
 		{
-			// LOG_TRACE << "binding: " << src << " " << get_type_sid<node>(x);
+			/*// LOG_TRACE << "binding: " << src << " " << get_type_sid<node>(x);
 			// get type id from type subnode (or 0 = untyped)
 			size_t ba_type_id = get_ba_type_id<node>(
 						get_type_sid<node>(x));
@@ -172,7 +173,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 				return error = true, tau::use_hooks = using_hooks, nullptr;
 			LOG_TRACE << (ba_type_id == 0 ? "un" : "") << "bound: "
 								<< LOG_FM(n);
-			return tau::use_hooks = using_hooks, n;
+			return tau::use_hooks = using_hooks, n;*/
+			return x;
 		};
 
 		switch (nt) {

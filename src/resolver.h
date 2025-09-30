@@ -383,13 +383,16 @@ tref new_infer_ba_types(tref n) {
 				auto type = get_type(typeables, untyped);
 				// If no common type is found, we set error and stop traversal
 				if (!type) return error = true, false;
+				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bv_eq.../type: "
+					<< type.value().first
+					<< "[" << (type.value().second ? tau::get(type.value().second).to_str() : "") << "]\n";)
 				// We add the variables and the constants to the current scope
 				// and assign them the common type.
 				trefs mergeables;
 				subtree_map<node, type_t> constants;
 				for (const auto& t : typeables)	{
 					auto ut = untype(t);
-					if (is<node, tau::bv_constant>(ut)) {
+					if (is<node, tau::bf_constant>(ut)) {
 						if (is<node, tau::bf_f>(ut) || is<node, tau::bf_t>(ut)) continue;
 						mergeables.push_back(ut);
 						constants.emplace(ut, type.value());
@@ -477,7 +480,7 @@ tref new_infer_ba_types(tref n) {
 							// We retype the element to the default type if possible
 							if (auto merged = merge_ba_types<node>(get_type_of(n), default_type); merged) {
 								if (auto new_n = retype(n, merged.value()); new_n != n) {
-									DBG(LOG_TRACE << "new_infer_ba_types/retype_elements/update/n -> new_n:\n"
+									DBG(LOG_TRACE << "new_infer_ba_types/retype_elements/update/variable.../n -> new_n:\n"
 										<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 									changes.insert_or_assign(n, new_n);
 								}
@@ -491,7 +494,7 @@ tref new_infer_ba_types(tref n) {
 						// If we have type information for the element
 						if (auto merged = merge_ba_types<node>(get_type_of(n), types.at(untype(n))); merged) {
 							if (auto new_n = retype(n, merged.value()); new_n != n) {
-								DBG(LOG_TRACE << "new_infer_ba_types/retype_elements/update/n -> new_n:\n"
+								DBG(LOG_TRACE << "new_infer_ba_types/retype_elements/update/variable.../n -> new_n:\n"
 									<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 								changes.insert_or_assign(n, new_n);
 							}
@@ -511,7 +514,7 @@ tref new_infer_ba_types(tref n) {
 							else ch.push_back(c);
 						}
 						if (auto new_n = tau::get(t.value, ch); new_n != n) {
-							DBG(LOG_TRACE << "new_infer_ba_types/retype_vars/update/default/n -> new_n:\n"
+							DBG(LOG_TRACE << "new_infer_ba_types/retype_elements/update/default/n -> new_n:\n"
 								<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 							changes.insert_or_assign(n, new_n);
 						}
@@ -523,7 +526,7 @@ tref new_infer_ba_types(tref n) {
 
 			post_order<node>(n).search_unique(update);
 			if (changes.find(n) != changes.end()) {
-				DBG(LOG_TRACE << "new_infer_ba_types/retype_vars/n -> changes[n]:\n"
+				DBG(LOG_TRACE << "new_infer_ba_types/retype_elements/n -> changes[n]:\n"
 					<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(changes[n]);)
 				return changes[n];
 			}
