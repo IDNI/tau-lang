@@ -99,8 +99,8 @@ TEST_SUITE("constants from factory") {
 		"binding: given one statement with one non-matching binding, "
 		"the binding process returns the original statement.")
 	{
-		const char* sample = "$X := { some_source_code } : nonbool.";
-		tref t = tau::get(sample, parse_lib);
+		const char* sample = "{ some_source_code } : nonbool.";
+		tref t = tau::get(sample);
 		CHECK( t == nullptr );
 	}
 }
