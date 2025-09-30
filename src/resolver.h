@@ -270,8 +270,10 @@ tref new_infer_ba_types(tref n) {
 			return tau::get(tau::bf_t);
 		if (is<node, tau::bf_f>(t))
 			return tau::get(tau::bf_f);
-		if (is<node, tau::bf_constant>(t))
-			return (tau::get(t).children_size() > 0) ? tau::get(tau::bf_constant, {tau::get(t).first()}) : t;
+		if (is<node, tau::bf_constant>(t)) {
+			auto nn = tau::get(t).value.ba_retype(0);
+			return (tau::get(t).children_size() > 0) ? tau::get(nn, tau::get(t).first()) : tau::get(nn);
+		}
 		if (is<node, tau::bv_constant>(t))
 			return tau::get(tau::bv_constant, {tau::get(t).first()});
 		if (is<node, tau::variable>(t))
@@ -365,7 +367,7 @@ tref new_infer_ba_types(tref n) {
 				if (!resolver.merge(mergeables)) error = true;
 				// Anyway, we stop the traversal of children as we have already
 				// processed all the typeables in the expression.
-				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bv_eq.../typeables:\n";)
+				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bv_eq.../resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
 			}
@@ -412,7 +414,7 @@ tref new_infer_ba_types(tref n) {
 				if (!resolver.merge(mergeables)) error = true;
 				// Anyway, we stop the traversal of children as we have already
 				// processed all the typeables in the expression.
-				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bf_eq.../typeables:\n";)
+				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bf_eq.../resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
 			}
