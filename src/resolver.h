@@ -117,7 +117,6 @@ struct scoped_resolver {
 
 	std::map<data_t, kind_t, less_t> current_kinds() {
 		std::map<data_t, kind_t, less_t> result ;
-		// TODO (HIGH) traverse in reverse until an element of other scope is found
 		auto scope = scopes_.back();
 		for(auto [element, _] : uf)
 			if (element.first == scope) result[element.second] = type_of(element.second);
