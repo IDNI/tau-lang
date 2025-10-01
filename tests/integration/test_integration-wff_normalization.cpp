@@ -32,6 +32,12 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "ex t [t > 3].";
 		CHECK( normalize_and_check(sample, tau::wff_always) );
 	}
+	TEST_CASE("8") {
+		const char* sample = "{ !i5[t] = x || o5[t] = y } : tau = u[0].";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = normalize_non_temp<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "{ always i5[t] != x || o5[t] = y } : tau = u[0]");
+	}
 }
 
 TEST_SUITE("syntactic_path_simplification") {

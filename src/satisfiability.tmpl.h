@@ -666,7 +666,6 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 	tref guard = tau::_T();
 	for (tref io_var : io_vars) {
 		// Check if input stream variable
-		std::cout << "io_var: " << tau::get(io_var) << "\n";
 		if (tau::get(io_var).is_input_variable()) {
 			// Give name of io_var and make it non-user definable with "_"
 			size_t type = tau::get(io_var).get_ba_type();
