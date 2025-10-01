@@ -43,7 +43,6 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	// get tau tree node instance from parse tree node ref
 	auto m_get = [&m](tref t) { return get(m.at(t)); };
 
-	size_t src = 0; // source dict id of the current constant
 	bool error = false;
 
 	std::map<size_t, tref> named_constants; // dict named constant names
@@ -140,43 +139,6 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 		tref x = nullptr; // result of node transformation
 
-		// takes already transformed bf_constant parser tree node, ie.
-		// it takes tau tree bf_constant node with type
-		// and processes it:
-		// - check if they are named constants
-		// - if not call get_ba_constant() which stores them in the pool
-		//   and returns the bound constant node
-		auto process_bf_constant =
-			// [&src, &error, &named_constants](tref x) -> tref
-			[](tref x) -> tref
-		{
-			/*// LOG_TRACE << "binding: " << src << " " << get_type_sid<node>(x);
-			// get type id from type subnode (or 0 = untyped)
-			size_t ba_type_id = get_ba_type_id<node>(
-						get_type_sid<node>(x));
-			if (ba_type_id == 0) { // untyped
-				// check if it's a named constant
-				auto it = named_constants.find(src);
-				if (it != named_constants.end()) {
-					LOG_TRACE << "named bound: "
-						<< LOG_FM(it->second);
-					return it->second;
-				}
-			}
-			// get the bound constant node
-			tref n = get_ba_constant_from_source(src, ba_type_id);
-			auto using_hooks = tau::use_hooks;
-			tau::use_hooks = false;
-			// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
-			src = 0;
-			if (n == nullptr || n == x)
-				return error = true, tau::use_hooks = using_hooks, nullptr;
-			LOG_TRACE << (ba_type_id == 0 ? "un" : "") << "bound: "
-								<< LOG_FM(n);
-			return tau::use_hooks = using_hooks, n;*/
-			return x;
-		};
-
 		switch (nt) {
 			// tau tree terminals
 			case digits: // preprocess digits
@@ -198,14 +160,6 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			case wff_ex: x = process_quantifier_vars(wff); break;
 			case bf_fall:
 			case bf_fex: x = process_quantifier_vars(bf); break;
-
-			// preprocess source node
-			case source:
-				src = dict(ptr.get_terminals());
-				DBG(LOG_TRACE << "BA constant source: `"
-							<< dict(src) << "`");
-				x = nullptr;
-				break;
 
 			case bf_t:
 			case bf_f:
@@ -255,14 +209,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 				// DBG(for (auto c : ch) LOG_TRACE << "child: " << LOG_FM_DUMP(c);)
 				x = getx(ch);
 
-				if (nt == bf || nt == wff)
-					tau_lang::get_free_vars<node>(x);
+				// if (nt == bf || nt == wff)
+				// 	tau_lang::get_free_vars<node>(x);
 
-				// process constant from a transformed node
-				if (nt == bf_constant && src)
-					if (x = process_bf_constant(x);
-						x == nullptr)
-							return false;
 				break;
 		}
 
