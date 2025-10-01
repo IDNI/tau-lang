@@ -891,7 +891,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 {
 	spec = normalizer<node>(spec);
 	update = normalizer<node>(update);
-	for (const auto& clause : get_dnf_wff_clauses<node>(update)) {
+	for (tref clause : get_dnf_wff_clauses<node>(update)) {
 		tref upd_always = tau::get(clause).find_top(
 			is_child<node, tau::wff_always>);
 		trefs upd_sometime = tau::get(clause).select_top(
@@ -901,40 +901,58 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 		trefs spec_sometimes = tau::get(spec).select_top(
 			is_child<node, tau::wff_sometimes>);
 
-		const tref new_spec = clause;
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
-		LOG_TRACE << "pwr/new_spec: " << LOG_FM(new_spec) << "\n";
-		if (!is_tau_formula_sat<node>(new_spec, start_time))
+		LOG_TRACE << "pwr/clause: " << LOG_FM(clause) << "\n";
+		if (!is_tau_formula_sat<node>(clause, start_time))
 			continue;
 
 		// Now try to add always part of old spec in a pointwise way
 		tref new_spec_pointwise = nullptr;
+		// First try to conjunct update with previous always specification
 		if (spec_always) {
 			if (upd_always) {
-				tref aw = always_conjunction<node>(
-						upd_always, spec_always);
-				trefs aw_io_vars = tau::get(aw).select_top(
-					is_child<node, tau::io_var>);
-				for (tref io_var : aw_io_vars)
-					if (tau::get(io_var).is_output_variable())
-						aw = build_wff_ex<node>(io_var, aw);
-				new_spec_pointwise = build_wff_or<node>(
-					always_conjunction<node>(upd_always, build_wff_neg<node>(aw)),
-					always_conjunction<node>(upd_always, spec_always)
-				);
-			} else new_spec_pointwise = tau::get(spec_always)[0].first();
-
+				new_spec_pointwise = always_conjunction<node>(
+					spec_always, upd_always);
+			} else new_spec_pointwise = tau::trim2(spec_always);
 			new_spec_pointwise = build_wff_always<node>(new_spec_pointwise);
 			new_spec_pointwise = build_wff_and<node>(
 				new_spec_pointwise,
 				build_wff_and<node>(upd_sometime));
+			if (!is_tau_formula_sat<node>(new_spec_pointwise, start_time)) {
+				// Apply pointwise revision to always statements
+				// if simply conjunction failed
+				if (upd_always) {
+					tref aw = always_conjunction<node>(
+							spec_always, upd_always);
+					trefs aw_io_vars = tau::get(aw).select_top(
+						is_child<node, tau::io_var>);
+					for (tref io_var : aw_io_vars)
+						if (tau::get(io_var).is_output_variable())
+							aw = build_wff_ex<node>(
+								io_var, aw);
+					new_spec_pointwise = build_wff_or<node>(
+						always_conjunction<node>(
+							build_wff_neg<node>(aw),
+							upd_always),
+						always_conjunction<node>(
+							spec_always,
+							upd_always)
+					);
+				} else new_spec_pointwise = tau::trim2(spec_always);
+				new_spec_pointwise = build_wff_always<node>(
+					new_spec_pointwise);
+				new_spec_pointwise = build_wff_and<node>(
+					new_spec_pointwise,
+					build_wff_and<node>(upd_sometime));
 
-			LOG_TRACE << "pwr/new_spec_pointwise: "
+				LOG_TRACE << "pwr/new_spec_pointwise: "
 				<< LOG_FM(new_spec_pointwise) << "\n";
-			if (!is_tau_formula_sat<node>(new_spec_pointwise, start_time))
-				return new_spec;
-		} else new_spec_pointwise = new_spec;
+				if (!is_tau_formula_sat<node>(
+					new_spec_pointwise, start_time))
+					return clause;
+			}
+		} else new_spec_pointwise = clause;
 
 		if (spec_sometimes.empty())
 			return normalizer_step<node>(new_spec_pointwise);
