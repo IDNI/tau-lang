@@ -395,6 +395,52 @@ tref tree<node>::get_ba_constant_from_source(
 }
 
 template <NodeType node>
+tref tree<node>::get_bv_constant_from_source(size_t constant_source_sid,
+		size_t bv_size) {
+	auto opts = tau::get_options{
+		.parse = { .start = tau::bv_constant },
+		.infer_ba_types = false,
+		.reget_with_hooks = false
+	};
+	auto src = tree<node>::get(dict(constant_source_sid), opts);
+	return get_bv_constant_from_tree(src, bv_size);
+}
+
+template <NodeType node>
+tref tree<node>::get_bv_constant_from_tree(tref bv_constant_tree, size_t bv_size) {
+
+#ifdef DEBUG
+	LOG_TRACE << " -- get bv_constant_from_tree(tref bv_constant_tree, size_t bv_size): `"
+				<< LOG_FM(bv_constant_tree);
+	LOG_TRACE << " -- bv size: " << bv_size;
+	assert(bv_size > 0);
+#endif // DEBUG
+
+	auto t = tau::get(bv_constant_tree);
+
+	auto actual_bv_size = t.children_size() == 3
+		? t.child(2)[0].get_num()
+		: bv_size;
+	auto str = t.child(0).to_str();
+	auto type = t.child(0).get_type();
+
+	size_t base;
+	switch (type) {
+		case tau::decimal: { base = 10; break; }
+		case tau::binary: { base = 2; break; }
+		case tau::hexadecimal: { base = 16; break; }
+		default: {
+			DBG(assert(false);)
+			return nullptr;
+		}
+	}
+
+	auto cte = make_bitvector_cte(actual_bv_size, str, base);
+	typename tau::constant ba_cte{ cte };
+	return tau::build_bv_constant(ba_cte);
+}
+
+template <NodeType node>
 tref tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
 	LOG_TRACE << " -- get_ba_constant(size_t constant_id, size_t ba_type_id): `"
 		<< LOG_BA(ba_constants<node>::get(constant_id)) << "`, "

@@ -21,7 +21,6 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	if      (v.nt == tau::bf)          ret = term( v, ch, len, r);
 	else if (v.nt == tau::wff)         ret = wff(  v, ch, len, r);
 	else if (v.nt == tau::shift)       ret = shift(v, ch, len, r);
-	//else if (v.nt == tau::bv_constant) ret = bv_constant(v, ch, len, r);
 	else return tau::get_raw(v, ch, len, r);
 
 	if (ret) {
@@ -1438,36 +1437,6 @@ tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
 	DBG(assert(right >= 0);)
 	if (left >= right) return tau::get(tau::get_integer(left - right), r);
 	return nullptr; // Return error
-}
-
-template <NodeType node>
-tref get_hook<node>::bv_constant([[maybe_unused]] const node& v, const tref* ch, size_t len, [[maybe_unused]] tref r) {
-	HOOK_LOGGING(log("bitvector", v, ch, len, r);)
-
-	if (len == 0) return tau::get_raw(v, ch, len, r);
-
-	DBG(assert(len == 1 || len == 2 || len == 3);)
-
-	auto bv_size = len == 3
-		? tau::get(ch[2])[0].get_num()
-		: cvc5_default_bv_size;
-	auto str = tau::get(ch[0]).to_str();
-	auto type = tau::get(ch[0]).get_type();
-
-	size_t base;
-	switch (type) {
-		case tau::decimal: { base = 10; break; }
-		case tau::binary: { base = 2; break; }
-		case tau::hexadecimal: { base = 16; break; }
-		default: {
-			DBG(assert(false);)
-			return nullptr;
-		}
-	}
-
-	auto cte = make_bitvector_cte(bv_size, str, base);
-	typename tau::constant ba_cte{ cte };
-	return tau::build_bv_constant(ba_cte);
 }
 
 } // namespace idni::tau_lang
