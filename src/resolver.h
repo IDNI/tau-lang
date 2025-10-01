@@ -457,11 +457,15 @@ tref new_infer_ba_types(tref n) {
 		DBG(assert(n != nullptr);)
 		// Helper lambdas
 		auto retype = [&](tref n, const type_t& new_type) -> tref {
-			auto n_type = tau::get(n).get_type();
-			if (tau::get(n).children_size()) {
+			const auto& t = tau::get(n);
+			auto n_type = t.get_type();
+			if (t.is(tau::bf_constant)) // parse the source of the constant
+				return tau::get_ba_constant_from_source(
+					t.child_data(), new_type.first);
+			if (tau::get(n).has_child()) {
 				return (new_type.second == nullptr)
-					? tau::get_typed(n_type, tau::get(n).child(0), new_type.first)
-					: tau::get_typed(n_type, tau::get(n).child(0), new_type.second,
+					? tau::get_typed(n_type, t.child(0), new_type.first)
+					: tau::get_typed(n_type, t.child(0), new_type.second,
 						new_type.first);
 			} else {
 				return (new_type.second == nullptr)

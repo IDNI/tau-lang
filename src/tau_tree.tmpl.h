@@ -374,19 +374,17 @@ tref tree<node>::get_ba_constant_from_source(
 	size_t constant_source_sid,
 	size_t ba_type_id)
 {
+#ifdef DEBUG
 	LOG_TRACE << " -- get ba_constant_from_source(size_t sid, size_t tid): `"
 				<< dict(constant_source_sid) << "`, "
 				<< LOG_BA_TYPE(ba_type_id) << " " << ba_type_id;
-
 	if (ba_type_id == 0)
 		LOG_TRACE << " -- untyped: " << dict(constant_source_sid);
 	else LOG_TRACE << " -- typed: " << ba_types<node>::name(ba_type_id);
+	assert(ba_type_id > 0);
+#endif // DEBUG
 
-	tref r = ba_type_id == 0
-		? get( // untyped contains source sid
-			node::ba_constant(constant_source_sid, ba_type_id))
-		: get_ba_constant(
-				ba_constants<node>::get(
+	tref r = get_ba_constant(ba_constants<node>::get(
 					dict(constant_source_sid),
 					ba_types<node>::name(ba_type_id)));
 	if (r == nullptr) LOG_ERROR << "Parsing constant `"
