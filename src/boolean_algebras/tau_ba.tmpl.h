@@ -32,9 +32,11 @@ auto tau_ba<BAs...>::operator<=>(const tau_ba<BAs...>&) const = default;
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
-	auto nmain = tau::geth(tau::build_wff_neg(
+	// Push the negation in at the end in order to keep normalized forms
+	// after double negation of formulas
+	auto nmain = tau::geth(to_nnf<node>(tau::build_wff_neg(
 			normalize_temporal_quantifiers<node, false>(
-				nso_rr.main->get())));
+				nso_rr.main->get()))));
 	auto nrec_relations = nso_rr.rec_relations;
 	return tau_ba<BAs...>(nrec_relations, nmain);
 }
