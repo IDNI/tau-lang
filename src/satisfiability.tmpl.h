@@ -666,13 +666,13 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 	tref guard = tau::_T();
 	for (tref io_var : io_vars) {
 		// Check if input stream variable
-		if (tau::get(io_vars.back())[0].is_input_variable()) {
+		std::cout << "io_var: " << tau::get(io_var) << "\n";
+		if (tau::get(io_var).is_input_variable()) {
 			// Give name of io_var and make it non-user definable with "_"
 			size_t type = tau::get(io_var).get_ba_type();
 			tref uc = tau::build_bf_uconst("_" + TAU_TO_STR(io_var),
 							std::to_string(number), type);
-			tref cdn = tau::build_bf_eq_0(tau::build_bf_xor(
-				tau::get(tau::bf, io_var), uc));
+			tref cdn = tau::build_bf_eq(tau::get(tau::bf, io_var), uc);
 			guard = tau::build_wff_and(guard, cdn);
 		}
 	}
