@@ -322,7 +322,7 @@ std::optional<solution<node>> solve_bv(const trefs& lits) {
 
 template<typename...BAs>
 requires BAsPack<BAs...>
-std::optional<constant_with_type<BAs...>> parse_bv(const std::string& src,
+std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
 		[[maybe_unused]] size_t size,
 		[[maybe_unused]] size_t base) {
 	using tau = tree<node<BAs...>>;
@@ -338,7 +338,7 @@ std::optional<constant_with_type<BAs...>> parse_bv(const std::string& src,
 		return {};
 	}
 	auto cte = tt(result) | tt::ba_constant;
-	return constant_with_type<BAs...>{ cte, "bv" };
+	return typename node<BAs...>::constant_with_type{ cte, "bv" };
 }
 
 } // namespace idni::tau_lang

@@ -180,6 +180,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	using tau = tree<node>;
 	using constant = node::constant;
 	using constant_with_type = node::constant_with_type;
+	using type_t = std::pair<size_t, tref>; // (type_id, subtype)
 
 	struct get_options; // fwd
 

@@ -56,7 +56,8 @@ template <>
 std::optional<typename ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_constants<node<bv, sbf_ba>>::get(
 		[[maybe_unused]] const std::string& constant_source,
 		[[maybe_unused]] const std::string type_name,
-		[[maybe_unused]] const std::string options) {
+		[[maybe_unused]] const std::string options,
+		[[maybe_unused]] const tref subtype) {
 	if (type_name == "bv") return parse_bv<bv, sbf_ba>(constant_source);
 	return parse_sbf<bv, sbf_ba>(constant_source);
 }
@@ -65,7 +66,8 @@ template <>
 std::optional<typename ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::constant_with_type> ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::get(
 		[[maybe_unused]] const std::string& constant_source,
 		[[maybe_unused]] const std::string type_name,
-		[[maybe_unused]] const std::string options) {
+		[[maybe_unused]] const std::string options,
+		[[maybe_unused]] const tref subtype) {
 	if (type_name == "sbf") return parse_sbf<tau_ba<bv, sbf_ba>, bv, sbf_ba>(constant_source);
 	if (type_name == "bv") return parse_bv<tau_ba<bv, sbf_ba>, bv, sbf_ba>(constant_source);
 	return parse_tau<bv, sbf_ba>(constant_source);
