@@ -4585,7 +4585,8 @@ tref boole_normal_form(tref formula) {
 
 	// First get atomic formulas without !=
 	tref eq_formula = unequal_to_not_equal<node>(formula);
-	trefs atms = tau::get(eq_formula).select_top(is_child<node, tau::bf_eq>);
+	trefs atms = rewriter::select_top_until<node>(eq_formula,
+		is_child<node, tau::bf_eq>, is_quantifier<node>);
 	// No variables for Boole decomposition
 	if (atms.empty()) return formula;
 	// Sort the BDD variables
@@ -4618,7 +4619,8 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	tref curr_pool = it != pool.end()
 				 ? it->second
 				 : tau::get(ex_quant_fm)[0].second();
-	trefs atms = tau::get(curr_pool).select_top(is_child<node, tau::bf_eq>);
+	trefs atms = rewriter::select_top_until<node>(curr_pool,
+		is_child<node, tau::bf_eq>, is_quantifier<node>);
 	if (atms.empty()) {
 		DBG(assert(false));
 		return ex_quant_fm;
