@@ -884,7 +884,7 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	return report(false);
 }
 
-// Given a BF b, calculate the Boole normal form (DNF corresponding to the pathes to true in the BDD) of b
+// Given a BF b, calculate the Boole normal form (DNF corresponding to the paths to true in the BDD) of b
 // where the variable order is given by the function lex_var_comp
 template <NodeType node>
 tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
@@ -1743,12 +1743,27 @@ bool is_ordered_overlap_at_least(size_t i, const trefs& v1, const trefs& v2) {
 	if (v2.size() < i) return false;
 	size_t j = 0, k = 0;
 	while (j < v1.size() && k < v2.size()) {
+		if (i == 0) return true;
 		// Check match
 		if (tau::get(v1[j]) == tau::get(v2[k])) --i, ++j, ++k;
 		else if (tau::subtree_less(v1[j], v2[k])) ++j;
 		else ++k;
 	}
 	return i == 0;
+}
+
+template<NodeType node>
+int_t get_ordered_overlap(const trefs& v1, const trefs& v2) {
+	using tau = tree<node>;
+	int_t i = 0;
+	size_t j = 0, k = 0;
+	while (j < v1.size() && k < v2.size()) {
+		// Check match
+		if (tau::get(v1[j]) == tau::get(v2[k])) ++i, ++j, ++k;
+		else if (tau::subtree_less(v1[j], v2[k])) ++j;
+		else ++k;
+	}
+	return i;
 }
 
 template <NodeType node>
@@ -4357,6 +4372,176 @@ tref squeeze_absorb_down(tref formula, tref var) {
 								assms.back())),
 									var)
 					);
+			}
+		}
+		return n;
+	};
+	auto up = [&assms, &mark](tref n, tref parent) {
+		if (!is<node>(n, tau::wff)) return n;
+		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
+			if (!is_child<node>(n, tau::wff_or)) {
+				// If parent was marked, child was a disjunction
+				// before and nothing was pushed on stack
+				if (auto it = mark.find(parent); it != mark.end()) {
+					mark.erase(it);
+				} else assms.pop_back();
+			} else {
+				// Encounter of disjunction below disjunction
+				// If not marked, this happened due to simplification
+				// and we can safely pop
+				if (auto it = mark.find(parent); it == mark.end())
+					assms.pop_back();
+				else mark.erase(it);
+			}
+		}
+		return n;
+	};
+	tref res = pre_order<node>(formula).apply(f, visit_wff<node>, up);
+	DBG(assert(assms.size() == 1);)
+	return res;
+}
+
+/**
+ * @brief The procedure collects all = 0 equalities within scope and squeezed
+ * those together that share at least one variable. Each squeezed formula A is
+ * then integrated into terms in scope that share at least 2 variables including
+ * the provided one in the following way:
+ * - Given f = 0, we produce f|A = 0
+ * - Given f != 0, we produce f & A' != 0
+ * @tparam node Tree node type
+ * @param formula The formula to apply the procedure to
+ * @return The mutated formula
+ */
+template<NodeType node>
+tref squeeze_absorb_down(tref formula) {
+	using tau = tree<node>;
+	std::vector<trefs> assms { trefs {tau::_0()} };
+	subtree_unordered_set<node> mark;
+	auto squeeze = [](tref e1, tref e2) {
+		// Combine f = 0 and g = 0 to f|g = 0
+		if (is_child<node>(e1, tau::bf_eq)) e1 = tau::trim2(e1);
+		if (is_child<node>(e2, tau::bf_eq)) e2 = tau::trim2(e2);
+		return tau::build_bf_or(e1, e2);
+	};
+	auto f = [&](tref n, tref parent) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		const tau& cn = tau::get(n)[0];
+		if (parent != nullptr && is<node>(parent, tau::wff_or)) {
+			if (!cn.is(tau::wff_or)) {
+				// Push new assumption to stack
+				assms.push_back(assms.back());
+			}
+			// Mark disjunctions whose child is not a disjunction
+			else mark.insert(parent);
+		}
+		if (cn.is(tau::wff_and)) {
+			if (mark.contains(n)) return n;
+			// Squeeze = 0 if they share var.
+			// For each conjunct collect the free variables and
+			// partition them, always merging those that are contained
+			// within the same term. All terms that are grouped together
+			// this way can then be squeezed.
+			trefs conj = get_cnf_wff_clauses<node>(n);
+			auto uf = union_find<std::function<bool (tref, tref)>,
+				node>(tau::subtree_less);
+			for (tref c : conj) {
+				const trefs& fv = get_free_vars<node>(c);
+				for (tref v : fv) uf.merge(fv[0], v);
+			}
+			trefs squeezed;
+			// Used to sort = 0 equations to front
+			size_t eq_idx = 0;
+			while (!conj.empty()) {
+				squeezed.push_back(conj[0]);
+				conj.erase(conj.begin());
+				// If conj[0] is not = 0, then continue
+				const tau& c_t = tau::get(squeezed.back());
+				if (!c_t.child_is(tau::bf_eq) || !c_t[0][1].equals_0())
+					continue;
+				// = 0 equation was added to squeezed
+				std::swap(squeezed[eq_idx], squeezed.back());
+				++eq_idx;
+				const trefs& fv = get_free_vars<node>(squeezed.back());
+				if (fv.empty()) continue;
+				for (size_t i = 0; i < conj.size(); ++i) {
+					// If conj[i] is not = 0, then continue
+					const tau& ci_t = tau::get(conj[i]);
+					if (!ci_t.child_is(tau::bf_eq) || !ci_t[0][1].equals_0())
+						continue;
+					const trefs& fv_c = get_free_vars<node>(conj[i]);
+					if (fv_c.empty()) continue;
+					if (uf.connected(fv[0], fv_c[0])) {
+						// Squeeze
+						squeezed.back() =
+							tau::build_bf_eq_0(
+								squeeze(squeezed.back(),
+									conj[i]));
+						conj.erase(conj.begin() + i);
+						--i;
+					}
+				}
+			}
+			n = squeezed[0];
+			for (size_t i = 1; i < squeezed.size(); ++i) {
+				n = tau::build_wff_and(n, squeezed[i]);
+				mark.insert(n);
+			}
+			return n;
+		}
+		if (cn.is(tau::bf_eq) && cn[1].equals_0()) {
+			// For each squeezed candidate A, check if there is an overlap
+			// of at least two free variables
+			const trefs& fv_n = get_free_vars<node>(n);
+			size_t i = 0;
+			for (;i < assms.back().size(); ++i) {
+				tref& A = assms.back()[i];
+				const trefs& fv_A = get_free_vars<node>(A);
+				const int_t count = get_ordered_overlap<node>(
+					fv_n, fv_A);
+				std::cout << "Ordered overlap " << count << " between " << tau::get(n) << " and " << tau::get(A) << "\n";
+				if (count >= 2) {
+					// Add A to n
+					n = squeeze(n, A);
+					A = n;
+					n = tau::build_bf_eq_0(n);
+					break;
+				} else if (count >= 1) {
+					A = squeeze(n, A);
+					break;
+				}
+			}
+			// Match between assumptions and current equation occured
+			if (i < assms.back().size()) {
+				// equation at i-th position changed
+				const trefs& fv_i = get_free_vars<node>(assms.back()[i]);
+				for (size_t j = 0; j < assms.back().size(); ++j) {
+					if (i == j) continue;
+					const trefs& fv_j = get_free_vars<node>(assms.back()[j]);
+					if (is_ordered_overlap_at_least<node>(1, fv_i, fv_j)) {
+						// Squeeze
+						assms.back()[i] = squeeze(assms.back()[i], assms.back()[j]);
+						assms.back().erase(assms.back().begin() + j);
+						if (i > j) --i;
+						--j;
+					}
+
+				}
+			} else {
+				// No match happened, hence, we add the equation
+				std::cout << "Adding to assms: " << tau::get(cn.first()) << "\n";
+				assms.back().push_back(cn.first());
+			}
+		} else if (cn.is(tau::bf_neq) && cn[1].equals_0()) {
+			for (tref A : assms.back()) {
+				if (is_ordered_overlap_at_least<node>(2,
+					get_free_vars<node>(n),
+					get_free_vars<node>(A))) {
+					// Add A to n
+					return tau::build_bf_neq_0(
+							tau::build_bf_and(cn.first(),
+								tau::build_bf_neg(
+									A)));
+				}
 			}
 		}
 		return n;

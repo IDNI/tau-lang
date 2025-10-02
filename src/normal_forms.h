@@ -422,6 +422,9 @@ template <NodeType node>
 bool is_ordered_overlap_at_least(size_t i, const trefs& v1, const trefs& v2);
 
 template <NodeType node>
+int_t get_ordered_overlap(const trefs& v1, const trefs& v2);
+
+template <NodeType node>
 std::vector<std::vector<trefs>> get_cnf_inequality_lits(tref fm);
 
 template <NodeType node>
