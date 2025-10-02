@@ -117,7 +117,6 @@ TEST_SUITE("squeeze_absorb") {
 		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = squeeze_absorb_down<node_t>(fm, tau::build_variable("x", 1));
-		std::cout << "res: " << tau::get(res) << "\n";
 		CHECK(tau::get(res).to_str() == "ex x xy = 0 && (x(yz|w|y) = 0 && f(x) || w = 0)");
 	}
 	TEST_CASE("2") {
