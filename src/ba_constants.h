@@ -25,10 +25,11 @@ struct ba_constants {
 	static constant get(size_t constant_id);
 
 	// get the constant variant from source
-	static std::optional<constant_with_type> get(
+	static std::optional<typename node::constant_with_type> get(
 		const std::string& constant_source,
 		const std::string type_name,
-		const std::string options = ""
+		const std::string options = "",
+		const tref subtype = nullptr
 	);
 
 	// dump the constant pool to a stream

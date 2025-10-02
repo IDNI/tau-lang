@@ -287,6 +287,8 @@ TEST_SUITE("scopes") {
 
 TEST_SUITE("merge_ba_types") {
 
+	using type_t = tree<node_t>::type_t;
+
 	bool match(const type_t& type1, const type_t& type2, const type_t& result) {
 		auto merged = merge_ba_types<node_t>(type1, type2);
 		if (!merged) return false;

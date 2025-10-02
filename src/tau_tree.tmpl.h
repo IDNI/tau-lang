@@ -419,10 +419,10 @@ tref tree<node>::get_bv_constant_from_tree(tref bv_constant_tree, size_t bv_size
 	auto t = tau::get(bv_constant_tree);
 
 	auto actual_bv_size = t.children_size() == 3
-		? t.child(2)[0].get_num()
+		? t[2][0].get_num()
 		: bv_size;
-	auto str = t.child(0).to_str();
-	auto type = t.child(0).get_type();
+	auto str = t[0].to_str();
+	auto type = t[0].get_type();
 
 	size_t base;
 	switch (type) {

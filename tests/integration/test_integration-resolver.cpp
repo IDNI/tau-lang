@@ -28,7 +28,10 @@ tref parse(const std::string& sample) {
 	return src;
 }
 
+using type_t = tree<node_t>::type_t;
+
 TEST_SUITE("type_scoped_resolver") {
+
 
 	TEST_CASE("merging in the same scope") {
 		type_scoped_resolver<node_t> r;
@@ -82,19 +85,6 @@ TEST_SUITE("type_scoped_resolver") {
 }
 
 TEST_SUITE("new_infer_ba_types") {
-
-	/*tref parse(const std::string& sample) {
-		auto opts = tau::get_options{
-			.parse = { .start = tau::wff },
-			.infer_ba_types = false,
-			.reget_with_hooks = false
-		};
-		auto src = tree<node_t>::get(sample, opts);
-		if (src == nullptr) {
-			TAU_LOG_ERROR << "Parsing failed for: " << sample;
-		}
-		return src;
-	}*/
 
 	bool check_vars(tref inferred, std::vector<std::pair<std::string, type_t>>& expected) {
 		using node = node_t;
@@ -199,6 +189,18 @@ TEST_SUITE("new_infer_ba_types") {
 				return false;
 			}
 			auto csubtype = tt(ctes[i]) | tau::subtype | tt::ref;
+			if (csubtype == nullptr) {
+				auto es = tt(expected[i].second) | tau::num | tt::num;
+				auto cs = tt(ctes[i]) | tt::ba_constant;
+				if (std::holds_alternative<cvc5::Term>(cs) && es != 0) {
+					auto c = std::get<cvc5::Term>(cs);
+					if (c.getSort().getBitVectorSize() == es) continue;
+					TAU_LOG_ERROR << "Constant '" << ctes[i]
+						<< "' expected subtype '" << expected[i].second
+						<< "', found 'untyped'" << c.getSort().getBitVectorSize();
+					return false;
+				}
+			}
 			if (csubtype != expected[i].second) {
 				TAU_LOG_ERROR << "Constant '" << ctes[i]
 					<< "' expected subtype '" << expected[i].second
@@ -754,9 +756,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( inferred == nullptr );
 	}
 
-
-
-
 	TEST_CASE("bv constants") {
 		tref parsed = parse("#b1 : bv =_ #b0 : bv & #b10");
 		CHECK( parsed != nullptr );
@@ -835,9 +834,6 @@ TEST_SUITE("new_infer_ba_types") {
 		CHECK( check_ctes(inferred, expected_ctes) );
 	}
 
-
-
-
 	TEST_CASE("complex case: Ohad's example") {
 		tref parsed = parse("all x x = y");
 		CHECK( parsed != nullptr );
@@ -895,6 +891,4 @@ TEST_SUITE("new_infer_ba_types") {
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
-
-
 }

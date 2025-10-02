@@ -204,7 +204,7 @@ bv splitter(const cvc5::Term& fm, idni::tau_lang::splitter_type&) { return fm; }
  */
 template<typename...BAs>
 requires BAsPack<BAs...>
-std::optional<constant_with_type<BAs...>> parse_bv(const std::string& src,
+std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
 	size_t size = cvc5_default_bv_size, size_t base = 10);
 
 } // namespace idni::tau_lang
