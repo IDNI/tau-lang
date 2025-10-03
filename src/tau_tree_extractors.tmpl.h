@@ -306,12 +306,20 @@ tref expression_paths<node>::iterator::operator*() {
 		if (is_temporal_quantifier<node>(n)) return false;
 		else return visit_wff<node>(n);
 	};
-	if (term) return pre_order<node>(_expr).apply(f);
-	else return pre_order<node>(_expr).apply(f, visit, identity);
+	tref res = nullptr;
+	if (term) res = pre_order<node>(_expr).apply(f);
+	else res = pre_order<node>(_expr).apply(f, visit, identity);
+	// Remove dangling decisions
+	while (idx < decisions.size()) decisions.pop_back();
+	return res;
 }
 
 template<NodeType node>
 expression_paths<node>::iterator& expression_paths<node>::iterator::operator++() {
+	if (keep_path) {
+		keep_path = false;
+		return *this;
+	}
 	while (!decisions.empty() && !decisions.back())
 		decisions.pop_back();
 	if (!decisions.empty())
@@ -356,8 +364,10 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 				// In order to delete the current path
 				// we simply exclude it
 				removed = true;
-				if (decisions.back())
+				if (decisions.back()) {
+					keep_path = true;
 					return tau::get(n)[0].second();
+				}
 				else return tau::get(n)[0].first();
 			}
 			else if (decisions[idx++]) {
@@ -384,6 +394,7 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 
 template<NodeType node>
 void expression_paths<node>::iterator::undo_apply() {
+	keep_path = false;
 	_expr = _prev_expr;
 }
 
