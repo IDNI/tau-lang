@@ -532,16 +532,16 @@ tref new_infer_ba_types(tref n) {
 						tref new_n;
 						if (get_type_of(n) == untyped) {
 							// We type it according to the inferred type or tau
-							auto var_type = (types.at(un) == untyped)
+							auto type = (types.at(un) == untyped)
 								? tau_type
 								: types.at(un);
-							if (resolver.assign(un, var_type) == false) {
+							if (resolver.assign(un, type) == false) {
 								LOG_ERROR << "Conflicting type information for variable "
 									<< LOG_FM(n) << ", expected "
 									<< types.at(un).first << "[" << (types.at(un).second ? tau::get(types.at(un).second).to_str() : "") << "]\n";
 								return error = true, !error;
 							}
-							new_n = retype(n, var_type);
+							new_n = retype(n, type);
 						} else {
 							// Otherwise, we remove type children if any
 							new_n = retype(n, get_type_of(n));
@@ -591,11 +591,11 @@ tref new_infer_ba_types(tref n) {
 						}
 						// We compute the bitvector size from the type info or
 						// use the default size if untyped
-						type_t bv_type = (types.at(un) == untyped)
+						type_t type = (types.at(un) == untyped)
 							? bv_type
 							: types.at(un);
-						size_t bv_size = (bv_type.second)
-							? tt(bv_type.second) | tau::num | tt::num
+						size_t bv_size = (type.second)
+							? tt(type.second) | tau::num | tt::num
 							: default_bv_size;
 						// We parse the constant
 						auto new_n = tau::get_bv_constant(n, bv_size);
@@ -641,11 +641,11 @@ tref new_infer_ba_types(tref n) {
 							return error = true, true;
 						}
 						// We get the type info or use the default (tau) if untyped
-						type_t bf_type = (types.at(un) == untyped)
+						type_t type = (types.at(un) == untyped)
 							? tau_type
 							: types.at(un);
 						// We parse the constant
-						auto new_n = tau::get_ba_constant_from_source(t.child_data(), bf_type.first);
+						auto new_n = tau::get_ba_constant_from_source(t.child_data(), type.first);
 						changes.insert_or_assign(n, new_n);
 						DBG(LOG_TRACE << "new_infer_ba_types/parse_bf_constants/update/bf_constant/n -> new_n:\n"
 							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
@@ -699,6 +699,8 @@ tref new_infer_ba_types(tref n) {
 			return elements;
 		};
 
+		DBG(LOG_TRACE << "new_infer_ba_types/on_leave/n:\n"
+			<< LOG_FM_TREE(n);)
 		// Stop traversal on error
 		if (error) return;
 		// Get the node type
