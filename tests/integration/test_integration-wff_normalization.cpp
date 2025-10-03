@@ -110,20 +110,44 @@ TEST_SUITE("simplify_using_equality") {
 		tref res = simplify_using_equality<node_t>::on(fm);
 		CHECK(tau::get(res).equals_F());
 	}
+	TEST_CASE("7") {
+		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>::on(fm);
+		CHECK(tau::get(res).to_str() == "wv = 0 && xy = 0 && yw = 0 && xv = 0");
+	}
 }
 
 TEST_SUITE("squeeze_absorb") {
 	TEST_CASE("1") {
-		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
+		const char* sample = "(((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = squeeze_absorb_down<node_t>(fm, tau::build_variable("x", 1));
-		CHECK(tau::get(res).to_str() == "ex x xy = 0 && (x(yz|w|y) = 0 && f(x) || w = 0)");
+		CHECK(tau::get(res).to_str() == "xy = 0 && (x(yz|w|y) = 0 && f(x) || w = 0)");
 	}
 	TEST_CASE("2") {
 		const char* sample = "(((xy) = 0 || f(x)) && (xy)' = 0) || w = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = squeeze_absorb_down<node_t>(fm, tau::build_variable("x", 1));
 		CHECK(tau::get(res).to_str() == "(xy)' = 0 && f(x) || w = 0");
+	}
+	TEST_CASE("3") {
+		const char* sample = "(((xy) = 0 || f(x)) && (xy)' = 0) || w = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = squeeze_absorb_down<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "(xy)' = 0 && f(x) || w = 0");
+	}
+	TEST_CASE("4") {
+		const char* sample = "(((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = squeeze_absorb_down<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "xy = 0 && (xyz|xw|xy = 0 && f(x) || w = 0 || xyz(xy)' != 0)");
+	}
+	TEST_CASE("5") {
+		const char* sample = "xy = 0 && vw = 0 && (yw = 0 && xv = 0 || k = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = squeeze_absorb_down<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0 || k = 0)");
 	}
 }
 
