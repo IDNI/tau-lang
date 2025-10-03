@@ -95,6 +95,7 @@ struct expression_paths {
 	private:
 		// True is left, false is right
 		std::vector<bool> decisions;
+		bool keep_path = false;
 		tref _expr;
 		tref _prev_expr;
 	};
