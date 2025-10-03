@@ -3755,6 +3755,7 @@ struct simplify_using_equality {
 	static bool add_raw_equality (auto& uf, tref eq) {
 		if (tau::get(eq).equals_T()) return true;
 		if (tau::get(eq).equals_F()) return false;
+		DBG(LOG_TRACE << "Adding equality: " << tau::get(eq) << "\n";)
 		// Here we know that eq is still bf_eq
 		// We both add a = b and a' = b' in order to detect syntactic contradictions
 		tref left_hand_side = tau::trim2(eq);
@@ -3801,11 +3802,13 @@ struct simplify_using_equality {
 			trefs p = get_cnf_bf_clauses<node>(path);
 			std::ranges::sort(p, tau::subtree_less);
 			tref sorted_path = tau::build_bf_and(p);
+			DBG(LOG_TRACE << "Simplifying: " << tau::get(sorted_path) << "\n";)
 			auto uf_find = [&uf](tref n) {
 				if (uf.contains(n)) return uf.find(n);
 				return n;
 			};
 			tref simp_sorted_path = pre_order<node>(sorted_path).apply(uf_find);
+			DBG(LOG_TRACE << "Simplified to: " << tau::get(simp_sorted_path) << "\n";)
 			if (tau::get(simp_sorted_path) != tau::get(sorted_path))
 				return simp_sorted_path;
 			else return path;
@@ -4396,7 +4399,12 @@ tref squeeze_absorb_down(tref formula, tref var) {
 		}
 		return n;
 	};
-	tref res = pre_order<node>(formula).apply(f, visit_wff<node>, up);
+	auto visit = [](tref n) {
+		if (is_quantifier<node>(n)) return false;
+		if (is_temporal_quantifier<node>(n)) return false;
+		return visit_wff<node>(n);
+	};
+	tref res = pre_order<node>(formula).apply(f, visit, up);
 	DBG(assert(assms.size() == 1);)
 	return res;
 }
@@ -4445,6 +4453,10 @@ tref squeeze_absorb_down(tref formula) {
 			auto uf = union_find<std::function<bool (tref, tref)>,
 				node>(tau::subtree_less);
 			for (tref c : conj) {
+				const tau& c_t = tau::get(c);
+				// Skip non = 0 equations
+				if (!c_t.child_is(tau::bf_eq) || !c_t[0][1].equals_0())
+					continue;
 				const trefs& fv = get_free_vars<node>(c);
 				for (tref v : fv) uf.merge(fv[0], v);
 			}
@@ -4459,18 +4471,31 @@ tref squeeze_absorb_down(tref formula) {
 				if (!c_t.child_is(tau::bf_eq) || !c_t[0][1].equals_0())
 					continue;
 				// = 0 equation was added to squeezed
+				// Place it at current eq_idx
 				std::swap(squeezed[eq_idx], squeezed.back());
 				++eq_idx;
-				const trefs& fv = get_free_vars<node>(squeezed.back());
-				if (fv.empty()) continue;
+				if (get_free_vars<node>(squeezed.back()).empty())
+					continue;
 				for (size_t i = 0; i < conj.size(); ++i) {
 					// If conj[i] is not = 0, then continue
 					const tau& ci_t = tau::get(conj[i]);
 					if (!ci_t.child_is(tau::bf_eq) || !ci_t[0][1].equals_0())
 						continue;
+					// Get free variables of back
+					const trefs& fv = get_free_vars<node>(squeezed.back());
+					// Get free variables of current conjunct
 					const trefs& fv_c = get_free_vars<node>(conj[i]);
 					if (fv_c.empty()) continue;
+					// Squeeze overlapping terms
 					if (uf.connected(fv[0], fv_c[0])) {
+						DBG(LOG_TRACE <<
+							"Squeezing on level: "
+							<< tau::get(tau::trim2(
+									squeezed
+									.back())
+							) << " and " << tau::get
+							(tau::trim2(conj[i])) <<
+							"\n";)
 						// Squeeze
 						squeezed.back() =
 							tau::build_bf_eq_0(
@@ -4498,37 +4523,67 @@ tref squeeze_absorb_down(tref formula) {
 				const trefs& fv_A = get_free_vars<node>(A);
 				const int_t count = get_ordered_overlap<node>(
 					fv_n, fv_A);
-				std::cout << "Ordered overlap " << count << " between " << tau::get(n) << " and " << tau::get(A) << "\n";
+				DBG(LOG_TRACE << "Ordered overlap " << count <<
+					" between " << tau::get(tau::trim2(n))
+					<< " and " << tau::get(A) << "\n";)
 				if (count >= 2) {
 					// Add A to n
+					DBG(LOG_TRACE << "Squeeze " << tau::get(
+							tau::trim2(n)) <<
+						" with " <<
+						tau::get(A) << "\n";)
 					n = squeeze(n, A);
 					A = n;
+					DBG(LOG_TRACE << "New term " << tau::get
+						(A) << "\n";)
 					n = tau::build_bf_eq_0(n);
 					break;
 				} else if (count >= 1) {
+					DBG(LOG_TRACE << "Squeeze " << tau::get(
+							tau::trim2(n)) <<
+						" with " <<
+						tau::get(A) << "\n";)
 					A = squeeze(n, A);
+					DBG(LOG_TRACE << "New assumption: " <<
+						tau::get(A) << "\n";)
 					break;
 				}
 			}
-			// Match between assumptions and current equation occured
+			// Match between assumptions and current equation occurred
 			if (i < assms.back().size()) {
 				// equation at i-th position changed
 				const trefs& fv_i = get_free_vars<node>(assms.back()[i]);
+				bool new_squeeze = false;
 				for (size_t j = 0; j < assms.back().size(); ++j) {
 					if (i == j) continue;
 					const trefs& fv_j = get_free_vars<node>(assms.back()[j]);
 					if (is_ordered_overlap_at_least<node>(1, fv_i, fv_j)) {
 						// Squeeze
+						DBG(LOG_TRACE <<
+							"Squeezing assumptions after new assumption: "
+							<< tau::get(assms.back()
+								[i]) << " and "
+							<< tau::get(assms.back()
+								[j]) << "\n";)
 						assms.back()[i] = squeeze(assms.back()[i], assms.back()[j]);
 						assms.back().erase(assms.back().begin() + j);
 						if (i > j) --i;
 						--j;
+						new_squeeze = true;
 					}
 
 				}
+				if (new_squeeze) {
+					// Apply newly created assumption to n
+					// since the overlap is at least 2 now
+					DBG(LOG_TRACE << "New term " << tau::get
+						(assms.back()[i]) << "\n";)
+					n = tau::build_bf_eq_0(assms.back()[i]);
+				}
 			} else {
 				// No match happened, hence, we add the equation
-				std::cout << "Adding to assms: " << tau::get(cn.first()) << "\n";
+				DBG(LOG_TRACE << "Adding to assms: " << tau::get
+					(cn.first()) << "\n";)
 				assms.back().push_back(cn.first());
 			}
 		} else if (cn.is(tau::bf_neq) && cn[1].equals_0()) {
@@ -4537,6 +4592,10 @@ tref squeeze_absorb_down(tref formula) {
 					get_free_vars<node>(n),
 					get_free_vars<node>(A))) {
 					// Add A to n
+					DBG(LOG_TRACE << "Absorb " << tau::get(A
+						) << " into " << tau::get(cn.
+							first()) <<
+						"\n";)
 					return tau::build_bf_neq_0(
 							tau::build_bf_and(cn.first(),
 								tau::build_bf_neg(
@@ -4566,7 +4625,12 @@ tref squeeze_absorb_down(tref formula) {
 		}
 		return n;
 	};
-	tref res = pre_order<node>(formula).apply(f, visit_wff<node>, up);
+	auto visit = [](tref n) {
+		if (is_quantifier<node>(n)) return false;
+		if (is_temporal_quantifier<node>(n)) return false;
+		return visit_wff<node>(n);
+	};
+	tref res = pre_order<node>(formula).apply(f, visit, up);
 	DBG(assert(assms.size() == 1);)
 	return res;
 }
