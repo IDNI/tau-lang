@@ -100,8 +100,8 @@ TEST_SUITE("cvc5_satisfiability") {
 		//CHECK_THROWS( is_bv_formula_sat<node_t>(formula) );
 	}
 
-	TEST_CASE("all x ((x <_ 18446744073709551614) -> ([x + 1] >_ 0))") {
-		const std::string sample = "all x ((x <_ 18446744073709551614) -> ([x + 1] >_ 0))";
+	TEST_CASE("all x ((x <_ 65534) -> ([x + 1] >_ 0))") {
+		const std::string sample = "all x ((x <_ 65534) -> ([x + 1] >_ 0))";
 		auto formula = parse_bv_formula(sample);
 		CHECK( is_bv_formula_sat<node_t>(formula) );
 	}
@@ -122,10 +122,9 @@ TEST_SUITE("cvc5_satisfiability") {
 	}
 }
 
-TEST_SUITE("cvc5_solve") {
+TEST_SUITE("Cleanup") {
 
-	TEST_CASE("...") {
-		// ...
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
 	}
-
 }
