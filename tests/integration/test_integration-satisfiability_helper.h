@@ -10,6 +10,6 @@ tref create_spec(const char* spec) {
 
 TEST_SUITE("Configuration") {
 	TEST_CASE("init bdd") {
-		cvc5_default_bv_size = 8;
+		default_bv_size = 8;
 	}
 }

@@ -198,14 +198,20 @@ bv splitter(const cvc5::Term& fm, idni::tau_lang::splitter_type&) { return fm; }
  *
  * @tparam BAs... Variadic template parameters representing Boolean Algebra types.
  * @param src The string representation of the bit-vector constant to parse.
- * @param size The size (in bits) of the bit-vector. Defaults to `cvc5_default_bv_size`.
+ * @param size The size (in bits) of the bit-vector. Defaults to `default_bv_size`.
  * @param base The numerical base to use for parsing (e.g., 2 for binary, 10 for decimal, 16 for hexadecimal). Defaults to 10.
  * @return std::optional<constant_with_type<BAs...>> The parsed bit-vector constant with type, or std::nullopt if parsing fails.
  */
 template<typename...BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
-	size_t size = cvc5_default_bv_size, size_t base = 10);
+	size_t size = default_bv_size, size_t base = 10);
+
+template<typename...BAs>
+requires BAsPack<BAs...>
+std::optional<typename node<BAs...>::constant_with_type> get_bv_from_parse_tree(const tref& src,
+	size_t size = default_bv_size);
+
 
 } // namespace idni::tau_lang
 

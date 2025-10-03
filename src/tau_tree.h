@@ -7,10 +7,10 @@
 #include <string>
 #include <initializer_list>
 #include <type_traits>
-#include <cvc5/cvc5.h>
+
 
 #include "defs.h"
-
+#include "boolean_algebras/cvc5/cvc5.h"
 #include "tau_parser.generated.h"
 
 namespace idni::tau_lang {
@@ -22,8 +22,6 @@ constexpr bool pack_contains = (std::is_same_v<T, Ts> || ...);
 
 template <typename... BAs>
 concept BAsPack = sizeof...(BAs) > 0 && pack_contains<cvc5::Term, BAs...>;
-
-using bv = cvc5::Term;
 
 template <typename node>
 concept NodeType = requires { // Node Type has to provide
@@ -270,23 +268,28 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	// creates a ba_constant node from constant source dict id and ba type id
 	static tref get_ba_constant_from_source(size_t constant_source_sid,
 				    size_t ba_type_id);
-	// creates a (bv) ba_constant node from constant source dict id and bv size
-	static tref get_bv_constant_from_source(size_t constant_source_sid,
-				    size_t bv_size);
-	// creates a (bv) ba_constant node from constant source dict id and bv size
-	static tref get_bv_constant_from_tree(tref bv_constant_tree,
-				    size_t bv_size);
 	// creates a ba_constant node from constant_id and ba type id
 	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
 	// creates a ba_constant node from a pair of constant_id and ba_type_id
 	static tref get_ba_constant(const std::pair<constant,
-				    std::string>& typed_const);
+		std::string>& typed_const);
 	// creates a ba_constant node from a pair of constant_id and ba_type_id
 	static tref get_ba_constant(
 		const std::optional<std::pair<constant, std::string>>&
-								typed_const);
+		typed_const);
 
 	// bv constants
+	// creates a bv_constant node from it's value and bv size
+	static tref get_bv_constant(const idni::tau_lang::bv& constant);
+	// creates a (bv) ba_constant node from constant source and bv size
+	static tref get_bv_constant_from_source(const std::string& source,
+					size_t bv_size = default_bv_size);
+	// creates a (bv) ba_constant node from constant source dict id and bv size
+	static tref get_bv_constant_from_source(size_t constant_source_sid,
+					size_t bv_size = default_bv_size);
+	// creates a (bv) ba_constant node from constant source dict id and bv size
+	static tref get_bv_constant(tref bv_parse_tree,
+					size_t bv_size = default_bv_size);
 	// creates a bv_constant node from it's ba value
 	static tref get_bv_constant(const constant& constant);
 	// creates a bv_constant node from constant_id
@@ -364,7 +367,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	size_t get_ba_constant_id() const;
 	constant get_ba_constant() const;
 	size_t get_bv_constant_id() const;
-	constant get_bv_constant() const;
+	idni::tau_lang::bv  get_bv_constant() const;
+	size_t get_bv_size() const;
 	// TODO (LOW) rename to get_ba_type_id and get_ba_type as in constants
 	size_t get_ba_type() const;
 	const std::string& get_ba_type_name() const;
@@ -454,6 +458,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		static const extractor<constant>            ba_constant;
 		static const extractor<size_t>              bv_constant_id;
 		static const extractor<constant>            bv_constant;
+		static const extractor<size_t>              bv_size;
 		// children
 		static const extractor<traverser>           only_child;
 		static const extractor<traverser>           first;

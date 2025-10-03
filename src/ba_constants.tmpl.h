@@ -39,6 +39,11 @@ tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 }
 
 template <NodeType node>
+tref ba_constants<node>::get(const constant& constant, const std::string& type) {
+	return get(constant, ba_types<node>::id(type));
+}
+
+template <NodeType node>
 typename ba_constants<node>::constant ba_constants<node>::get(
 	size_t constant_id)
 {
@@ -59,6 +64,12 @@ template <NodeType node>
 std::string ba_constants<node>::dump_to_str() {
 	std::stringstream ss;
 	return dump(ss), ss.str();
+}
+
+template <NodeType node>
+void ba_constants<node>::cleanup() {
+	C.clear(); C.shrink_to_fit();
+	T.clear(); T.shrink_to_fit();
 }
 
 } // namespace idni::tau_lang

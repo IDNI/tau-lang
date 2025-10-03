@@ -18,6 +18,9 @@ struct ba_constants {
 	// insert the constant value of a type id to the pool
 	static tref get(const constant& constant, size_t type_id);
 
+	// insert the constant value of a type to the pool
+	static tref get(const constant& constant, const std::string& type);
+
 	// insert the constant given by the string of a type id to the pool
 	//static tref get(const std::string& constant, size_t type_id);
 
@@ -28,15 +31,20 @@ struct ba_constants {
 	static std::optional<typename node::constant_with_type> get(
 		const std::string& constant_source,
 		const std::string type_name,
-		const std::string options = "",
-		const tref subtype = nullptr
+		const std::string options = ""
 	);
+
+	// TODO (HIGH) add a similar method that takes a type (pair of ba_id and
+	// subtype) to parse the constant instead of type name
 
 	// dump the constant pool to a stream
 	static std::ostream& dump(std::ostream& os);
 
 	// dump the constant pool to a string
 	static std::string dump_to_str();
+
+	// Clean up the pool
+	static void cleanup();
 
 private:
 	inline static std::vector<constant> C;  // pool of constants

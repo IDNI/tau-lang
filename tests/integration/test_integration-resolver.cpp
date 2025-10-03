@@ -6,6 +6,7 @@
 #include "resolver.h"
 
 TEST_SUITE("Configuration") {
+
 	TEST_CASE("logging") {
 		logging::trace();
 	}
@@ -890,5 +891,12 @@ TEST_SUITE("new_infer_ba_types") {
 			{"x", sbf_type}
 		};
 		CHECK( check_vars(inferred, expected) );
+	}
+}
+
+TEST_SUITE("Cleanup") {
+
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
 	}
 }

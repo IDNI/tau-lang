@@ -8,7 +8,7 @@ TEST_SUITE("Configuration") {
 	}
 
 	TEST_CASE("bv size") {
-		cvc5_default_bv_size = 4;
+		default_bv_size = 4;
 	}
 }
 
