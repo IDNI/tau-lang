@@ -217,9 +217,19 @@ void welcome() {
 		<< "For built-in help, type \"help\" or \"help command\".\n\n";
 }
 
+void at_exit() {
+	// On exit we must clean up the ba constants so the rest of the static
+	// constants managers are able to properly clean everything (in particula,
+	// cvc5::TermManager).
+	ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::cleanup();
+	// On the tests using ba_constants we also need to explicitly call
+	// the clean up in the constants.
+}
 
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
+	atexit(at_exit);
+
 	bdd_init<Bool>();
 
 	vector<string> args;

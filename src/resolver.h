@@ -450,7 +450,7 @@ tref new_infer_ba_types(tref n) {
 		return !error;
 	};
 
-	auto is_bv_constant_parsed = [](tref t) -> bool {
+	/*auto is_bv_constant_parsed = [](tref t) -> bool {
 		using tau = tree<node>;
 		if (tau::get(t).children_size() > 0) {
 			if (auto first = tau::get(t).child(0);
@@ -466,7 +466,7 @@ tref new_infer_ba_types(tref n) {
 		using tau = tree<node>;
 		if (tau::get(t).children_size() > 0) return false;
 		return true;
-	};
+	};*/
 
 	// We update types (changing nodes while leaving them) while closing scopes
 	auto on_leave = [&] (tref n, tref parent) {
@@ -496,14 +496,14 @@ tref new_infer_ba_types(tref n) {
 		auto retype = [&](tref n, const type_t& new_type) -> tref {
 			const auto& t = tau::get(n);
 			auto n_type = t.get_type();
-			if (t.is(tau::bf_constant) && !is_bf_constant_parsed(n)) // parse the source of the constant
+			/*if (t.is(tau::bf_constant) && !is_bf_constant_parsed(n)) // parse the source of the constant
 				return tau::get_ba_constant_from_source(
 					t.child_data(), new_type.first);
 			if (t.is(tau::bv_constant) && !is_bv_constant_parsed(n)) { // parse the source of the constant
-				auto bv_size = (new_type.second) ? tt(new_type.second) | tau::num | tt::num : cvc5_default_bv_size;
+				auto bv_size = (new_type.second) ? tt(new_type.second) | tau::num | tt::num : default_bv_size;
 				return tau::get_bv_constant_from_source(
 					t.child_data(), bv_size);
-			}
+			}*/
 			if (tau::get(n).has_child()) {
 				return (new_type.second == nullptr)
 					? tau::get_typed(n_type, t.child(0), new_type.first)
@@ -596,9 +596,9 @@ tref new_infer_ba_types(tref n) {
 							: types.at(un);
 						size_t bv_size = (bv_type.second)
 							? tt(bv_type.second) | tau::num | tt::num
-							: cvc5_default_bv_size;
+							: default_bv_size;
 						// We parse the constant
-						auto new_n = tau::get_bv_constant_from_tree(n, bv_size);
+						auto new_n = tau::get_bv_constant(n, bv_size);
 						changes.insert_or_assign(n, new_n);
 						DBG(LOG_TRACE << "new_infer_ba_types/parse_bv_constants/update/bv_constant/n -> new_n:\n"
 							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)

@@ -25,7 +25,7 @@ size_t get_bv_size(const tref t) {
 		bv_size_cache[subtype.value()] = bv_size;
 		return bv_size;
 	}
-	return cvc5_default_bv_size;
+	return default_bv_size;
 }
 
 template <NodeType node>

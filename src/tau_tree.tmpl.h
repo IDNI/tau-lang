@@ -340,6 +340,8 @@ tref tree<node>::get_integer(int_t n) {
 	return get(node(integer, static_cast<size_t>(n)));
 }
 
+// constants
+
 template <NodeType node>
 tref tree<node>::get_ba_constant(
 	const constant& constant, const std::string& type_name)
@@ -395,19 +397,61 @@ tref tree<node>::get_ba_constant_from_source(
 }
 
 template <NodeType node>
+tref tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
+	LOG_TRACE << " -- get_ba_constant(size_t constant_id, size_t ba_type_id): `"
+		<< LOG_BA(ba_constants<node>::get(constant_id)) << "`, "
+		<< LOG_BA_TYPE(ba_type_id);
+	return get_ba_constant(ba_constants<node>::get(constant_id), ba_type_id);
+}
+
+template <NodeType node>
+tref tree<node>::get_ba_constant(
+	const std::pair<constant, std::string>& typed_const)
+{
+	LOG_TRACE << " -- get_ba_constant(pair<constant, string>): `"
+		<< LOG_BA(typed_const.first) << "`, " << LOG_BA(typed_const.second);
+	return get_ba_constant(typed_const.first,
+			       get_ba_type_id<node>(typed_const.second));
+}
+
+template <NodeType node>
+tref tree<node>::get_ba_constant(
+	const std::optional<std::pair<constant, std::string>>& typed_const)
+{
+	if (!typed_const) LOG_TRACE
+		<< "get_ba_constant(optional): nullptr";
+	if (!typed_const) return nullptr;
+	return get_ba_constant(typed_const.value());
+}
+
+// bv constants
+
+template <NodeType node>
+tref tree<node>::get_bv_constant(const idni::tau_lang::bv& constant) {
+	tau::constant ba_cte = tau::constant(constant);
+	return tau::build_bv_constant(ba_cte);
+}
+
+template <NodeType node>
 tref tree<node>::get_bv_constant_from_source(size_t constant_source_sid,
+		size_t bv_size) {
+	return get_bv_constant(dict(constant_source_sid), bv_size);
+}
+
+template <NodeType node>
+tref tree<node>::get_bv_constant_from_source(const std::string& source,
 		size_t bv_size) {
 	auto opts = tau::get_options{
 		.parse = { .start = tau::bv_constant },
 		.infer_ba_types = false,
 		.reget_with_hooks = false
 	};
-	auto src = tree<node>::get(dict(constant_source_sid), opts);
-	return get_bv_constant_from_tree(src, bv_size);
+	auto src = tree<node>::get(source, opts);
+	return get_bv_constant(src, bv_size);
 }
 
 template <NodeType node>
-tref tree<node>::get_bv_constant_from_tree(tref bv_constant_tree, size_t bv_size) {
+tref tree<node>::get_bv_constant(tref bv_constant_tree, size_t bv_size) {
 
 #ifdef DEBUG
 	LOG_TRACE << " -- get bv_constant_from_tree(tref bv_constant_tree, size_t bv_size): `"
@@ -438,34 +482,6 @@ tref tree<node>::get_bv_constant_from_tree(tref bv_constant_tree, size_t bv_size
 	auto cte = make_bitvector_cte(actual_bv_size, str, base);
 	typename tau::constant ba_cte{ cte };
 	return tau::build_bv_constant(ba_cte);
-}
-
-template <NodeType node>
-tref tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
-	LOG_TRACE << " -- get_ba_constant(size_t constant_id, size_t ba_type_id): `"
-		<< LOG_BA(ba_constants<node>::get(constant_id)) << "`, "
-		<< LOG_BA_TYPE(ba_type_id);
-	return get_ba_constant(ba_constants<node>::get(constant_id), ba_type_id);
-}
-
-template <NodeType node>
-tref tree<node>::get_ba_constant(
-	const std::pair<constant, std::string>& typed_const)
-{
-	LOG_TRACE << " -- get_ba_constant(pair<constant, string>): `"
-		<< LOG_BA(typed_const.first) << "`, " << LOG_BA(typed_const.second);
-	return get_ba_constant(typed_const.first,
-			       get_ba_type_id<node>(typed_const.second));
-}
-
-template <NodeType node>
-tref tree<node>::get_ba_constant(
-	const std::optional<std::pair<constant, std::string>>& typed_const)
-{
-	if (!typed_const) LOG_TRACE
-		<< "get_ba_constant(optional): nullptr";
-	if (!typed_const) return nullptr;
-	return get_ba_constant(typed_const.value());
 }
 
 template <NodeType node>
@@ -761,9 +777,19 @@ size_t tree<node>::get_bv_constant_id() const {
 }
 
 template <NodeType node>
-tree<node>::constant tree<node>::get_bv_constant() const {
+idni::tau_lang::bv tree<node>::get_bv_constant() const {
 	DBG(assert(is_bv_constant());)
-	return ba_constants<node>::get(data());
+	auto cte = ba_constants<node>::get(data());
+	DBG(assert(std::holds_alternative<idni::tau_lang::bv>(cte));)
+	return std::get<idni::tau_lang::bv>(cte);
+}
+
+template <NodeType node>
+size_t tree<node>::get_bv_size() const {
+	DBG(assert(is_bv_constant());)
+	auto cte = ba_constants<node>::get(data());
+	DBG(assert(std::holds_alternative<idni::tau_lang::bv>(cte));)
+	return std::get<idni::tau_lang::bv>(cte).get_size();
 }
 
 template <NodeType node>
