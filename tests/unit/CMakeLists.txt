@@ -22,6 +22,7 @@ set(TESTS
 	cvc5
 	resolver
 	union_find
+	cvc5_solver
 )
 
 foreach(X IN LISTS TESTS)

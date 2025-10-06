@@ -26,6 +26,6 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		auto s_str = tau::get(s).to_str();
-		CHECK((s_str == "{ o1[t :  _0_]|o2[t :  _0_] = 0 } : tau v = 0 && v{ !(always o1[t :  _0_] = 0 && o2[t :  _0_] = 0) } : tau = 0"));
+		CHECK(s_str == "{ o1[t :  _0_]|o2[t :  _0_] = 0 } : tau v = 0 && v{ !(always o1[t :  _0_] = 0 && o2[t :  _0_] = 0) } : tau = 0");
 	}
 }

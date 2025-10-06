@@ -487,7 +487,7 @@ tref tree<node>::get_bv_constant(tref bv_constant_tree, size_t bv_size) {
 template <NodeType node>
 tref tree<node>::get_bv_constant(const constant& constant)
 {
-	LOG_TRACE << " -- get bv_constant(constant constant): `"
+	LOG_TRACE << "-- get bv_constant(constant constant): `"
 		<< LOG_BA(constant);
 	return ba_constants<node>::get(constant, get_ba_type_id<node>("bv"));
 }
