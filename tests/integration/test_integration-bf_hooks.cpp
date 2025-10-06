@@ -28,15 +28,17 @@ TEST_SUITE("bf operator hooks") {
 	}
 
 	// we should be able to parse the sample and the expected result should be the same
-	bool check_hook(const char* sample, const char* expected) {
+	bool check_hook(const char* sample_, const char* expected_) {
 		TAU_LOG_TRACE << "===== sample =====";
-		tref tau_sample   = tau::get(sample, parse_bf());
+		auto sample = string(sample_) + " = 0.";
+		tref tau_sample   = tau::get(sample);
 		TAU_LOG_TRACE << "===== expected =====";
-		tref tau_expected = tau::get(expected, parse_bf());
+		auto expected = string(expected_) + " = 0.";
+		tref tau_expected = tau::get(expected);
 
 #ifdef DEBUG
 		using node = node_t;
-		cout << "sample: " << string(sample) << "\nexpected: \t";
+		cout << "sample: " << sample << "\nexpected: \t";
 		if (tau_expected == 0) cout << "nullptr";
 		else cout << TAU_DUMP_TO_STR(tau_expected);
 		cout << "\ngot:      \t";
@@ -49,15 +51,18 @@ TEST_SUITE("bf operator hooks") {
 	}
 
 	bool check_type(const char* sample, const char* type) {
-		tref type_sample = tau::get(sample, parse_bf());
-		size_t type_id = tt(type_sample) | tau::bf_constant | tt::ba_type;
+		tref parsed = tau::get(std::string(sample) + " = 0.", { .reget_with_hooks = false });
+		using node = node_t;
+		// DBG(TAU_LOG_TRACE << "parsed: " << TAU_LOG_FM_DUMP(parsed);)
+		tref c = tau::get(parsed).find_top(is<node, tau::bf_constant>);
+		size_t type_id = tau::get(c).get_ba_type();
 		size_t type_expected_id = get_ba_type_id<node_t>(type);
 		auto sample_type = get_ba_type_name<node_t>(type_id);
 		auto expected_type = get_ba_type_name<node_t>(type_expected_id);
 
 #ifdef DEBUG
 		string str(sample);
-		if (type_sample) cout << "sample: " << str << " expected type: "
+		if (c) cout << "sample: " << str << " expected type: "
 			<< expected_type << " got: " << sample_type << "\n";
 		else cout << "sample: " << str << " expected type: "
 				<< expected_type << " got: tau\n";
