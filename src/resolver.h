@@ -647,6 +647,7 @@ tref new_infer_ba_types(tref n) {
 							: types.at(un);
 						// We parse the constant
 						auto new_n = tau::get_ba_constant_from_source(t.child_data(), type.first);
+						if (new_n == nullptr) return error = true, true;
 						changes.insert_or_assign(n, new_n);
 						DBG(LOG_TRACE << "new_infer_ba_types/parse_bf_constants/update/bf_constant/n -> new_n:\n"
 							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
