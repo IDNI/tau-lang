@@ -597,7 +597,8 @@ template <NodeType node>
 tref boole_normal_form(tref formula);
 
 template <NodeType node>
-tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool);
+tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
+	auto& quant_pattern);
 
 template <NodeType node>
 tref treat_ex_quantified_clause(tref ex_clause);

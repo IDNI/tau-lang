@@ -4431,6 +4431,9 @@ tref squeeze_absorb_down(tref formula) {
 		if (is_child<node>(e2, tau::bf_eq)) e2 = tau::trim2(e2);
 		return tau::build_bf_or(e1, e2);
 	};
+	auto uf_comp = [](tref l, tref r) {
+		return tau::subtree_less(l, r);
+	};
 	auto f = [&](tref n, tref parent) {
 		if (!tau::get(n).is(tau::wff)) return n;
 		const tau& cn = tau::get(n)[0];
@@ -4450,8 +4453,7 @@ tref squeeze_absorb_down(tref formula) {
 			// within the same term. All terms that are grouped together
 			// this way can then be squeezed.
 			trefs conj = get_cnf_wff_clauses<node>(n);
-			auto uf = union_find<std::function<bool (tref, tref)>,
-				node>(tau::subtree_less);
+			auto uf = union_find<decltype(uf_comp), node>(uf_comp);
 			for (tref c : conj) {
 				const tau& c_t = tau::get(c);
 				// Skip non = 0 equations
