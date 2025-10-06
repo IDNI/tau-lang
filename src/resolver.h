@@ -476,7 +476,8 @@ tref new_infer_ba_types(tref n) {
 		// Helper lambdas
 		auto update_default = [&](tref n, subtree_map<node, tref>& changes) -> tref{
 			// We transform the node according to the transformation of
-			// its children
+			// its children skipping constants and variables as they
+			// are replaced are higher levels.
 			using tau = tree<node>;
 
 			trefs ch;
@@ -706,17 +707,17 @@ tref new_infer_ba_types(tref n) {
 		// Get the node type
 		const auto& t = tau::get(n);
 		size_t nt = t.get_type();
-		tref new_n = update_default(n, transformed);
 		// Depoending on the node type...
 		switch (nt) {
 			case tau::wff_all: case tau::wff_ex: /* case tau::bf_fall: case tau::bf_fex:*/
 			case tau::rec_relation: {
+				tref new_n = update_default(n, transformed);
 				auto scoped_var_types = get_scoped_elements(tau::variable);
 				if(auto updated = update_variables(new_n, scoped_var_types); updated != new_n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../n -> updated:\n"
 						<< LOG_FM_TREE(new_n) << " -> " << LOG_FM_TREE(updated);)
-					transformed.insert_or_assign(n, updated);
-				}
+						transformed.insert_or_assign(n, updated);
+					}
 				resolver.close();
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/wff_all.../resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
@@ -726,7 +727,7 @@ tref new_infer_ba_types(tref n) {
 			case tau::bv_gt: case tau::bv_ngt: case tau::bv_gteq: case tau::bv_ngteq:
 			case tau::bv_lt: case tau::bv_nlt: {
 				auto scoped_bv_ctes_types = get_scoped_elements(tau::bv_constant);
-				if(auto updated = parse_bv_constants(new_n, scoped_bv_ctes_types); updated != n) {
+				if(auto updated = parse_bv_constants(n, scoped_bv_ctes_types); updated != n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../n -> updated:\n"
 						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
 					transformed.insert_or_assign(n, updated);
@@ -740,7 +741,7 @@ tref new_infer_ba_types(tref n) {
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt: {
 				auto scoped_bf_ctes_types = get_scoped_elements(tau::bf_constant);
-				if(auto updated = parse_bf_constants(new_n, scoped_bf_ctes_types); updated != n) {
+				if(auto updated = parse_bf_constants(n, scoped_bf_ctes_types); updated != n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
 						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
 					transformed.insert_or_assign(n, updated);
@@ -751,6 +752,7 @@ tref new_infer_ba_types(tref n) {
 				return;
 			}
 			default: {
+				tref new_n = update_default(n, transformed);
 				// For the root node, we type untyped variables with tau.
 				if (!parent) {
 					auto scoped_var_types = get_scoped_elements(tau::variable);

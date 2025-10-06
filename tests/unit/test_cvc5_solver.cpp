@@ -15,10 +15,6 @@ TEST_SUITE("Configuration") {
 	TEST_CASE("bdd init") {
 		bdd_init<Bool>();
 	}
-
-	TEST_CASE("bdd init") {
-		bdd_init<Bool>();
-	}
 }
 
 TEST_SUITE("cvc5_solve simple") {
