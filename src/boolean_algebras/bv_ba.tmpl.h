@@ -100,7 +100,7 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 			// create a new constant according to the type and added to the map
 			size_t bv_size = get_bv_size<node>(form | tt::ref);
 			auto x = cvc5_term_manager.mkConst(cvc5_term_manager.mkBitVectorSort(bv_size), vn.c_str());
-			free_vars.emplace(tau::get(node::type::bv, form | tt::ref), x);
+			free_vars.emplace(form | tt::ref, x);
 			return std::optional<bv>(x);
 		}
 		case node::type::bv_checked: {
@@ -303,7 +303,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 		solution<node> s;
 		for (const auto& [tau_var, bv_var] : free_vars) {
 			auto cte = solver.getValue(bv_var);
-			s.emplace(tau_var, tau::get(tau::bv, tau::get_bv_constant({cte})));
+			s.emplace(tau::get(tau::bv, tau_var), tau::get(tau::bv, tau::get_bv_constant({cte})));
 		}
 		solver.pop();
 		return s;
