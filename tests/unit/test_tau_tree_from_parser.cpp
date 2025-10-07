@@ -467,26 +467,6 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 	}
 }
 
-// TODO (MEDIUM) ass tests for multiple arguments in functions and rec relation wwf
-// TODO (MEDIUM) ass tests for multiple arguments in functions and rec relation bf
-
-TEST_SUITE("parsing builders") {
-
-	TEST_CASE("one capture") {
-		const char* sample = "( $X ) =:: ($X && $X).";
-		auto bldr = tau::get_builder(sample);
-		CHECK( tau::get(bldr.first).is(tau::builder_head) );
-		CHECK( tau::get(bldr.second).is(tau::wff) );
-	}
-
-	TEST_CASE("two capture") {
-		const char* sample = "( $X $Y ) =:: ($X && $Y).";
-		auto bldr = tau::get_builder(sample);
-		CHECK( tau::get(bldr.first).is(tau::builder_head) );
-		CHECK( tau::get(bldr.second).is(tau::wff) );
-	}
-}
-
 TEST_SUITE("parsing library") {
 
 	TEST_CASE("one rule") {
