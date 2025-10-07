@@ -688,7 +688,7 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 	using tau = tree<node>;
 
 	auto build_bv_guard = [] (const tref io_var, const tref uc) {
-		return tau::build_bv_eq(io_var, uc);
+		return tau::build_bv_eq(tau::get(tau::bv, io_var), uc);
 	};
 
 	auto build_bf_guard = [] (const tref io_var, const tref uc) {
@@ -1126,8 +1126,8 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 		if (!tau::get(transform_to_execution<node>(
 			clause, start_time, output)).equals_F()) {
 			LOG_DEBUG << "End is_tau_formula_sat: true";
-			if (is_bv_fm<node>(clause))
-				return is_bv_formula_sat<node>(clause);
+			//if (is_bv_fm<node>(clause))
+			//	return is_bv_formula_sat<node>(clause);
 			return true;
 		}
 	}
@@ -1147,7 +1147,7 @@ bool is_tau_impl(tref f1, tref f2) {
 	// Now check that each disjunct is not satisfiable
 	for (tref c : clauses) {
 		auto ctn = transform_to_execution<node>(c);
-		if (is_bv_fm<node>(ctn) && is_bv_formula_sat<node>(ctn)) return false;
+		//if (is_bv_fm<node>(ctn) && is_bv_formula_sat<node>(ctn)) return false;
 		if (!tau::get(ctn).equals_F()) return false;
 	}
 	return true;
@@ -1166,7 +1166,7 @@ bool are_tau_equivalent(tref f1, tref f2) {
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
 		auto ctn = transform_to_execution<node>(c);
-		if (is_bv_fm<node>(ctn) && is_bv_formula_sat<node>(ctn)) return false;
+		//if (is_bv_fm<node>(ctn) && is_bv_formula_sat<node>(ctn)) return false;
 		if (!tau::get(ctn).equals_F()) return false;
 	}
 	return true;
