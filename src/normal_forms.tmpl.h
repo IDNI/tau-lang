@@ -2977,7 +2977,6 @@ tref wff_remove_existential(tref var, tref wff) {
 			// If the conjunct contains the quantified variable at this point
 			// we cannot resolve the quantifier in this clause
 			is_quant_removable_in_clause = false;
-			break;
 		}
 		tref new_l = tau::build_wff_and(conjs);
 		if (!is_quant_removable_in_clause) {
