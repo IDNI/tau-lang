@@ -338,7 +338,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ ref_args,           900 },
 			{ bf_rule,            900 },
 			{ wff_rule,           900 },
-			{ wff_builder_body,   900 },
 			{ wff_matcher,        900 },
 			{ wff_body,           900 },
 		};
@@ -409,7 +408,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		{ bf_constant,   TC.LIGHT_CYAN() },
 		{ bv_constant,   TC.LIGHT_CYAN() }
 		// { rule,          TC.BG_YELLOW() },
-		// { builder,       TC.BG_LIGHT_YELLOW() }
 	};
 	auto syntax_highlight = [&](size_t nt) {
 		if (!pretty_printer_highlighting) return false;
@@ -453,7 +451,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case last_sym:          out("last"); break;
 			case fp_fallback:       out(" fallback "); break;
 			// wraps
-			case builder_head:
 			case ref_args:          out("("); break;
 			case constraint:
 			case offsets:           out("["); break;
@@ -499,9 +496,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 			case wff_sometimes:     out("sometimes "); break;
 			case wff_always:        out("always "); break;
-
-			case bf_builder_body:   out(" =: "); break;
-			case wff_builder_body:  out(" =:: "); break;
 
 			case rel_history:       out("%-"); break;
 			case abs_history:       out("%"); break;
@@ -678,7 +672,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (nt) {
 			case bf_neg:            out("'"); break;
 			case main:
-			case builder:
 			case rec_relation:
 			case wff_rule:
 			case bf_rule:           out("."); break;
@@ -689,7 +682,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offset:            if (pnt == io_var) out("]");
 						break;
 			case bf_splitter:
-			case builder_head:
 			case ref_args:          out(")"); break;
 			case bf:
 			case wff:

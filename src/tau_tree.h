@@ -391,10 +391,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref get_from_file(const std::string& filename,
 						get_options options = {});
 
-	// builders
-	static rewriter::builder get_builder(tref ref);
-	static rewriter::builder get_builder(const std::string& source);
-
+	//  rules, library
 	static rewriter::rules get_rules(tref r);
 	static rewriter::library get_rules(const std::string& source);
 
@@ -785,12 +782,7 @@ bool is_bv_fm(tref n);
 template <NodeType node>
 std::function<bool(tref)> is_basic_atomic_fm();
 // -----------------------------------------------------------------------------
-// builder, rules, library
-
-template <NodeType node>
-rewriter::builder get_builder(tref n);
-template <NodeType node>
-rewriter::builder get_builder(const std::string& source);
+// rules, library
 
 template <NodeType node>
 rewriter::rules get_rules(tref r);

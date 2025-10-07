@@ -285,16 +285,6 @@ tref tree<node>::get_from_file(const std::string& filename,
 }
 
 template <NodeType node>
-rewriter::builder tree<node>::get_builder(tref ref) {
-	return tau_lang::get_builder<node>(ref);
-}
-
-template <NodeType node>
-rewriter::builder tree<node>::get_builder(const std::string& source) {
-	return tau_lang::get_builder<node>(source);
-}
-
-template <NodeType node>
 rewriter::rules tree<node>::get_rules(tref ref) {
 	return tau_lang::get_rules<node>(ref);
 }
@@ -312,28 +302,6 @@ rewriter::library tree<node>::get_library(tref ref) {
 template <NodeType node>
 rewriter::library tree<node>::get_library(const std::string& str) {
 	return tau_lang::get_library<node>(str);
-}
-
-template <NodeType node>
-rewriter::builder get_builder(tref ref) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	DBG(assert(ref != nullptr);)
-	tt b(ref);
-	auto body = b | tau::builder_body | tt::only_child;
-	DBG(assert((body | tt::nt) == tau::bf_builder_body
-		|| (body | tt::nt) == tau::wff_builder_body);)
-	return { tau::geth(b | tau::builder_head | tt::ref),
-		 tau::geth(body | tt::first | tt::ref) };
-}
-
-template <NodeType node>
-rewriter::builder get_builder(const std::string& source){
-	using tau = tree<node>;
-	typename tau::get_options opts{ .parse = { .start = tau::builder },
-						   .infer_ba_types = false,
-						   .reget_with_hooks = false };
-	return get_builder<node>(tau::get(source, opts));
 }
 
 template <NodeType node>
