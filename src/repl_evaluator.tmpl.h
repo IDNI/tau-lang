@@ -495,7 +495,7 @@ solver_mode get_solver_cmd_mode(tref n) {
 
 template <NodeType node>
 size_t get_solver_cmd_type(tref n) {
-	size_t type = get_ba_type<node>(n);
+	size_t type = find_ba_type<node>(n);
 	return type > 0 ? type
 		: get_ba_type_id<node>(
 			node::nso_factory::default_type());
@@ -540,49 +540,15 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	std::cout << "}\n";
 }
 
-template <NodeType node>
-void print_bv_solver_cmd_solution(std::optional<solution<node>>& solution)
-{
-	std::cout << "solution: {\n";
-	for (auto [var, value]: solution.value()) {
-		DBG(LOG_TRACE << LOG_FM_TREE(var));
-		DBG(LOG_TRACE << LOG_FM_TREE(value));
-		std::cout << "\t" << TAU_TO_STR(var) << " := "
-			<< TAU_TO_STR(value) << "\n";
-	}
-	std::cout << "}\n";
-}
-
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
-	// only bitvectors
-	if (!n.value_tree().find_top(is<node, tau::bf>)) {
-		tref arg = (tt(n) | tau::wff).value();
-		auto solution = solve_bv<node>(arg);
-		print_bv_solver_cmd_solution<node>(solution);
-		return;
-	}
-
-	// mixed case not supported yet
-	if (n.value_tree().find_top(is<node, tau::bv>)) {
-		TAU_LOG_ERROR << "Invalid types\n";
-		return;
-	}
-
-	// getting the type
-	size_t type = get_solver_cmd_type<node>(n.value());
-	if (type == 0) {
-		TAU_LOG_ERROR << "Invalid type\n";
-		return;
-	}
-
 	// setting solver options
 	solver_options options = {
 		.splitter_one = node::nso_factory::
-			splitter_one(get_ba_type_name<node>(type)),
+			splitter_one(""),
 		.mode = get_solver_cmd_mode<node>(n.value()),
-		.type = get_ba_type_name<node>(type)
+		.type = ""
 	};
 
 	tref arg = n.value_tree().first();
