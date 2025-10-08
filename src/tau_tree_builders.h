@@ -300,6 +300,9 @@ template <NodeType node>
 tref build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id);
 
 template <NodeType node>
+tref build_bv_uconst(const std::string& n1, const std::string& n2, const tref subtype);
+
+template <NodeType node>
 tref build_var_name(size_t sid);
 
 template <NodeType node>

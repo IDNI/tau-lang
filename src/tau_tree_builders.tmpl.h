@@ -683,6 +683,7 @@ tref build_bv_constant(const typename node::constant& constant) {
 template <NodeType node>
 tref build_bv_ba_constant(const typename node::constant& constant, tref right) {
 	using tau = tree<node>;
+
 	return tau::get(tau::bv, {
 		tau::get_bv_constant(constant) }, right);
 }
@@ -690,8 +691,20 @@ tref build_bv_ba_constant(const typename node::constant& constant, tref right) {
 template <NodeType node>
 tref build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id) {
 	using tau = tree<node>;
+
 	return tau::get(tau::bf, tau::get_typed(tau::variable,
 			tau::get(tau::uconst_name, n1 + ":" + n2), type_id));
+}
+
+template <NodeType node>
+tref build_bv_uconst(const std::string& n1, const std::string& n2, tref subtype) {
+	using tau = tree<node>;
+
+	return (subtype)
+		? tau::get(tau::bv, tau::get_typed(tau::variable,
+			tau::get(tau::uconst_name, n1 + ":" + n2), ba_types<node>::id("bv")), subtype)
+		: tau::get(tau::bv, tau::get_typed(tau::variable,
+			tau::get(tau::uconst_name, n1 + ":" + n2), ba_types<node>::id("bv")));
 }
 
 template <NodeType node>
@@ -1452,10 +1465,14 @@ tref tree<node>::build_bv_ba_constant(const constant& constant, tref right)
 	return tau_lang::build_bv_ba_constant<node>(constant, right);
 }
 
-
 template <NodeType node>
 tref tree<node>::build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id) {
 	return tau_lang::build_bf_uconst<node>(n1, n2, type_id);
+}
+
+template <NodeType node>
+tref tree<node>::build_bv_uconst(const std::string& n1, const std::string& n2, tref subtype) {
+	return tau_lang::build_bv_uconst<node>(n1, n2, subtype);
 }
 
 template <NodeType node>
