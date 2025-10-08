@@ -426,6 +426,7 @@ TEST_SUITE("solve_inequality_system") {
 	// m = {a}:sbf x', both have different exponents and d_cte & m_cte != false
 	// and d_cte & ~m_cte != false
 	TEST_CASE("one var (using splitter of sbf): ({a}:sbf|{b}:sbf) x != 0 && {a}:sbf x' != 0.") {
+		bdd_init<Bool>();
 		const std::vector<std::string> sample =
 			{"({a}:sbf|{b}:sbf) x != 0." , "{a}:sbf x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
