@@ -608,6 +608,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bv_ba_constant(const constant& constant, tref right = nullptr);
 	static tref build_bf_uconst(
 		const std::string& name1, const std::string& name2, size_t type_id);
+	static tref build_bv_uconst(
+		const std::string& n1, const std::string& n2, tref subtype);
 	static tref build_var_name(size_t sid);
 	static tref build_var_name(const std::string& name);
 	static tref build_var_name_indexed(size_t index);
