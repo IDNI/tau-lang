@@ -346,12 +346,20 @@ tref new_infer_ba_types(tref n) {
 				// types and change untyped to bv as default type here.
 				auto type = get_type(typeables, untyped);
 				// If no common type is found, we set error and stop traversal
-				if (!type) return error = true, false;
+				if (!type) {
+					LOG_ERROR << "Conflicting type information in bv equation "
+						<< LOG_FM(n) << "\n";
+					return error = true, false;
+				}
 				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bv_eq.../type: "
 					<< type.value().first
 					<< "[" << (type.value().second ? tau::get(type.value().second).to_str() : "") << "]\n";)
 				if (type.value() != untyped && type.value().first != bv_type.first) {
 					// We only allow bv type in bv equations
+					LOG_ERROR << "Invalid type information in bv equation "
+						<< LOG_FM(n) << ": "
+						<< type.value().first
+						<< "[" << (type.value().second ? tau::get(type.value().second).to_str() : "") << "]\n";
 					return error = true, false;
 				}
 				// We add the variables  to the current scope, constants to an inner
@@ -377,7 +385,11 @@ tref new_infer_ba_types(tref n) {
 				// We merge all the variables and constants in union-find data
 				// structure. If there is a conflict, we set error and stop the
 				// traversal.
-				if (!resolver.merge(mergeables)) error = true;
+				if (!resolver.merge(mergeables)) {
+					LOG_ERROR << "Conflicting type information in bv equation "
+						<< LOG_FM(n) << "\n";
+					return error = true, false;
+				}
 				// Anyway, we stop the traversal of children as we have already
 				// processed all the typeables in the expression.
 				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bv_eq.../resolver:\n";)
@@ -397,7 +409,11 @@ tref new_infer_ba_types(tref n) {
 				// We infer the common type of all the typeables in the expression
 				auto type = get_type(typeables, untyped);
 				// If no common type is found, we set error and stop traversal
-				if (!type) return error = true, false;
+				if (!type){
+					LOG_ERROR << "Conflicting type information in bf equation "
+						<< LOG_FM(n) << "\n";
+					return error = true, false;
+				}
 				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bf_eq.../type: "
 					<< type.value().first
 					<< "[" << (type.value().second ? tau::get(type.value().second).to_str() : "") << "]\n";)
@@ -423,7 +439,11 @@ tref new_infer_ba_types(tref n) {
 				// We merge all the variables and constants in union-find data
 				// structure. If there is a conflict, we set error and stop the
 				// traversal.
-				if (!resolver.merge(mergeables)) error = true;
+				if (!resolver.merge(mergeables)) {
+					LOG_ERROR << "Conflicting type information in bf equation "
+						<< LOG_FM(n) << "\n";
+					return error = true, false;
+				}
 				// Anyway, we stop the traversal of children as we have already
 				// processed all the typeables in the expression.
 				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bf_eq.../resolver:\n";)
@@ -540,7 +560,7 @@ tref new_infer_ba_types(tref n) {
 								LOG_ERROR << "Conflicting type information for variable "
 									<< LOG_FM(n) << ", expected "
 									<< types.at(un).first << "[" << (types.at(un).second ? tau::get(types.at(un).second).to_str() : "") << "]\n";
-								return error = true, !error;
+								return error = true, false;
 							}
 							new_n = retype(n, type);
 						} else {
@@ -588,7 +608,7 @@ tref new_infer_ba_types(tref n) {
 						if (types.find(un) == types.end()) {
 							LOG_ERROR << "No detected type for bv constant in "
 								<< LOG_FM(n) << "\n";
-							return error = true, true;
+							return error = true, false;
 						}
 						// We compute the bitvector size from the type info or
 						// use the default size if untyped
@@ -639,7 +659,7 @@ tref new_infer_ba_types(tref n) {
 						if (types.find(un) == types.end()) {
 							LOG_ERROR << "No detected type for bf constant in "
 								<< LOG_FM(n) << "\n";
-							return error = true, true;
+							return error = true, false;
 						}
 						// We get the type info or use the default (tau) if untyped
 						type_t type = (types.at(un) == untyped)
@@ -647,7 +667,12 @@ tref new_infer_ba_types(tref n) {
 							: types.at(un);
 						// We parse the constant
 						auto new_n = tau::get_ba_constant_from_source(t.child_data(), type.first);
-						if (new_n == nullptr) return error = true, true;
+						if (new_n == nullptr) {
+							LOG_ERROR << "Could not parse bf constant in "
+								<< LOG_FM(n) << " with type "
+								<< type.first << "[" << (type.second ? tau::get(type.second).to_str() : "") << "]\n";
+							return error = true, false;
+						}
 						changes.insert_or_assign(n, new_n);
 						DBG(LOG_TRACE << "new_infer_ba_types/parse_bf_constants/update/bf_constant/n -> new_n:\n"
 							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
