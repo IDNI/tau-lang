@@ -805,20 +805,12 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 		if (!tau::get(constraints).equals_T()) {
 			// setting proper options for the solver
 
-			std::optional<solution<node>> model;
-			if (!tau::get(constraints).find_top(is_atomic_fm<node>())) {
-				model = solve_bv<node>(constraints);
-				if (!model) continue;
-			} else if (!tau::get(constraints).find_top(is_atomic_bv_fm<node>())) {
-				static solver_options options = {
-					.splitter_one = node::nso_factory::splitter_one(""),
-					.mode = solver_mode::general
-				};
-				model = solve<node>(constraints, options);
-				if (!model) continue;
-			} else {
-				return std::make_pair(nullptr, nullptr);
-			}
+			solver_options options = {
+				.splitter_one = node::nso_factory::splitter_one(""),
+				.mode = solver_mode::general
+			};
+			auto model = solve<node>(constraints, options);
+			if (!model) continue;
 
 			LOG_INFO << "Tau specification is executed setting ";
 			for (const auto& [uc, v] : model.value())
