@@ -189,7 +189,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 				<< "Failed to parse input value '"
 				<< line << "' for stream '"
 				<< get_var_name<node>(var) <<
-				" of type '" << get_ba_type_name<node>(types[var]) << "'\n";
+				" of type '" << get_ba_type_name<node>(types[vn]) << "'\n";
 			DBG(LOG_TRACE
 				<< "read[result]: {}\n"
 				<< "read end\n";)
@@ -1074,7 +1074,7 @@ bool has_free_vars(tref fm, bool silent = false) {
 					return true;
 				}
 			} else if (!is_child<node>(*it, tau::uconst_name)) {
-				ss << *it << " ";
+				ss << tau::get(*it) << " ";
 				has_real_free_vars = true;
 			}
 		}
