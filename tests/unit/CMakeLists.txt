@@ -19,7 +19,7 @@ set(TESTS
 	interpreter
 	ba_cvc5
 	cvc5
-	resolver
+	ba_types_inference
 	union_find
 	cvc5_solver
 )
