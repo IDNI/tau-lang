@@ -1130,8 +1130,6 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 		if (!tau::get(transform_to_execution<node>(
 			clause, start_time, output)).equals_F()) {
 			LOG_DEBUG << "End is_tau_formula_sat: true";
-			//if (is_bv_fm<node>(clause))
-			//	return is_bv_formula_sat<node>(clause);
 			return true;
 		}
 	}
@@ -1151,7 +1149,6 @@ bool is_tau_impl(tref f1, tref f2) {
 	// Now check that each disjunct is not satisfiable
 	for (tref c : clauses) {
 		auto ctn = transform_to_execution<node>(c);
-		//if (is_bv_fm<node>(ctn) && is_bv_formula_sat<node>(ctn)) return false;
 		if (!tau::get(ctn).equals_F()) return false;
 	}
 	return true;
@@ -1170,7 +1167,6 @@ bool are_tau_equivalent(tref f1, tref f2) {
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
 		auto ctn = transform_to_execution<node>(c);
-		//if (is_bv_fm<node>(ctn) && is_bv_formula_sat<node>(ctn)) return false;
 		if (!tau::get(ctn).equals_F()) return false;
 	}
 	return true;
@@ -1188,8 +1184,7 @@ tref simp_tau_unsat_valid(tref fm, const int_t start_time, const bool output) {
 	// Check satisfiability of each clause
 	for (tref& clause: clauses) {
 		auto ctn = transform_to_execution<node>(clause, start_time, output);
-		if ((is_bv_fm<node>(ctn) && is_bv_formula_unsat<node>(ctn))
-				|| (tau::get(ctn).equals_F()))
+		if (tau::get(ctn).equals_F())
 			clause = tau::_F();
 	}
 
