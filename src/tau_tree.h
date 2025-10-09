@@ -308,6 +308,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	tref second() const;
 	tref third()  const;
 	tref only_child() const;
+	bool has_child() const;
 
 	// fast traverse to a first child
 	tref trim() const;
