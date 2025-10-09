@@ -61,35 +61,29 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 			return (l && r) ? std::optional<bv>(make_term_or(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::wff_all: {
-			solver.push();
-			std::vector<bv> cvc5_var_list;
-			for (const auto& v: (form | tt::first | tt::Tree).select_top(is<node, tau::variable>)) {
-				auto vn = tau::get(v).to_str();
-				size_t bv_size = get_bv_size<node>(v);
-				auto x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), vn.c_str());
-				vars.emplace(v, x);
-				cvc5_var_list.push_back(x);
-			}
+			tref v = (form | tt::first | tt::ref);
+			DBG(assert(is<node>(v, tau::variable));)
+			size_t bv_size = get_bv_size<node>(v);
+			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
+			vars.emplace(v, x);
+
 			auto f = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			if (!f) return std::nullopt;
-			auto res = std::optional<bv>(make_term_forall(cvc5_var_list, f.value()));
-			solver.pop();
+			auto res = std::optional<bv>(make_term_forall({x}, f.value()));
+			vars.erase(v);
 			return res;
 		}
 		case node::type::wff_ex: {
-			solver.push();
-			std::vector<bv> cvc5_var_list;
-			for (const auto& v: (form | tt::first | tt::Tree).select_top(is<node, tau::variable>)) {
-				auto vn = tau::get(v).to_str();
-				size_t bv_size = get_bv_size<node>(v);
-				auto x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), vn.c_str());
-				vars.emplace(v, x);
-				cvc5_var_list.push_back(x);
-			}
+			tref v = (form | tt::first | tt::ref);
+			DBG(assert(is<node>(v, tau::variable));)
+			size_t bv_size = get_bv_size<node>(v);
+			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
+			vars.emplace(v, x);
+
 			auto f = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			if (!f) return std::nullopt;
-			auto res = std::optional<bv>(make_term_exists(cvc5_var_list, f.value()));
-			solver.pop();
+			auto res = std::optional<bv>(make_term_exists({x}, f.value()));
+			vars.erase(v);
 			return res;
 		}
 		case node::type::variable: {
@@ -286,7 +280,6 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);
 
-	solver.push();
 	auto expr = bv_eval_node<node>(solver, tt(form), vars, free_vars, false);
 	if (!expr) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
@@ -305,11 +298,9 @@ std::optional<solution<node>> solve_bv(const tref form) {
 			auto cte = solver.getValue(bv_var);
 			s.emplace(tau::get(tau::bv, tau_var), tau::get(tau::bv, tau::get_bv_constant({cte})));
 		}
-		solver.pop();
 		return s;
 	} else
 		LOG_DEBUG << "Bitvector system is unsat.";
-	solver.pop();
 	return {};
 }
 
