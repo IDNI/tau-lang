@@ -1004,38 +1004,42 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 			continue;
 		}
 		solution<node> clause_solution;
-
 		// Partition all found atomic equations according to their type
 		std::map<size_t, subtree_set<node>> type_partition;
-		// TODO: unify bv and below type partition after grammar unifies bitvector and bf
-		// solve bv part
-		if (auto bv_eqs = tau::get(form).select_top(is_atomic_bv_fm<node>()); !bv_eqs.empty()) {
-			if (auto bv_solution = solve_bv<node>(bv_eqs)) {
-				for (const auto& [var, value]: bv_solution.value()) {
-					clause_solution[var] = value;
-				}
-			} else continue; // if we cannot solve bv part, skip this clause
-		}
 		// Partition types
-		for (tref eq : tau::get(form).select_top(is_atomic_fm<node>())) {
-			size_t type = find_ba_type<node>(eq);
+		// TODO: Reject conjuncts which are not allowed in solver, such as wff_ref
+		for (tref conj : get_cnf_wff_clauses<node>(clause)) {
+			size_t type = find_ba_type<node>(conj);
 			if (auto it = type_partition.find(type); it != type_partition.end()) {
-				it->second.insert(eq);
-			} else type_partition.emplace(type, subtree_set<node>{eq});
+				it->second.insert(conj);
+			} else type_partition.emplace(type, subtree_set<node>{conj});
 		}
-		for (auto& [type, eqs] : type_partition) {
+		bool error = false, bv_sat = false;
+		for (auto& [type, conjs] : type_partition) {
 			// The options for the solver depend on the equation type
 			solver_options op = options;
 			const std::string type_name = get_ba_type_name<node>(type);
 			op.splitter_one = node::nso_factory::splitter_one(type_name);
 			op.type = type_name;
-			if (auto solution = solve<node>(eqs, op)) {
+			if (type_name == "bv") {
+				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
+					bv_sat = true;
+					for (const auto& [var, value]: bv_solution.value()) {
+						clause_solution[var] = value;
+					}
+				} else error = true; // if we cannot solve bv part, skip this clause
+			}
+			else if (auto solution = solve<node>(conjs, op)) {
 				for (const auto& [var, value]: solution.value()) {
 					clause_solution[var] = value;
 				}
-			} else continue; // if we cannot solve, skip this clause
+			} else error = true; // if we cannot solve, skip this clause
+			if (error) break;
 		}
-		if (!clause_solution.empty()) return clause_solution;
+		if (error) continue;
+		// It can happen that there is no free variable in bitvector formula
+		// causing empty solutions which are still sat
+		if (!clause_solution.empty() || bv_sat) return clause_solution;
 	}
 	return {};
 }
