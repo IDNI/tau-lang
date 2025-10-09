@@ -974,7 +974,7 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 
 // entry point for the solver
 template <NodeType node>
-std::optional<solution<node>> solve(tref form, const solver_options& options) {
+std::optional<solution<node>> solve(tref form, solver_options options) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
@@ -1004,31 +1004,48 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 			continue;
 		}
 		solution<node> clause_solution;
-		// solve bv part
-		if (auto bv_eqs = tau::get(form).select_top(is_atomic_bv_fm<node>()); !bv_eqs.empty()) {
-			auto bv_solution = solve_bv<node>(bv_eqs);
-			if (bv_solution) {
-				for (const auto& [var, value]: bv_solution.value()) {
+		// Partition all found atomic equations according to their type
+		std::map<size_t, subtree_set<node>> type_partition;
+		// Partition types
+		// TODO: Reject conjuncts which are not allowed in solver, such as wff_ref
+		for (tref conj : get_cnf_wff_clauses<node>(clause)) {
+			size_t type = find_ba_type<node>(conj);
+			if (auto it = type_partition.find(type); it != type_partition.end()) {
+				it->second.insert(conj);
+			} else type_partition.emplace(type, subtree_set<node>{conj});
+		}
+		bool error = false, bv_sat = false;
+		for (auto& [type, conjs] : type_partition) {
+			// The options for the solver depend on the equation type
+			solver_options op = options;
+			const std::string type_name = get_ba_type_name<node>(type);
+			op.splitter_one = node::nso_factory::splitter_one(type_name);
+			op.type = type_name;
+			if (type_name == "bv") {
+				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
+					bv_sat = true;
+					for (const auto& [var, value]: bv_solution.value()) {
+						clause_solution[var] = value;
+					}
+				} else error = true; // if we cannot solve bv part, skip this clause
+			}
+			else if (auto solution = solve<node>(conjs, op)) {
+				for (const auto& [var, value]: solution.value()) {
 					clause_solution[var] = value;
 				}
-			} else continue; // if we cannot solve bv part, skip this clause
+			} else error = true; // if we cannot solve, skip this clause
+			if (error) break;
 		}
-		// solve bas... part
-		if (auto eqs = tau::get(form).select_top(is_atomic_fm<node>()); !eqs.empty()) {
-			auto bas_solution = solve<node>(subtree_set<node>(eqs.begin(), eqs.end()), options);
-			if (bas_solution) {
-				for (const auto& [var, value]: bas_solution.value()) {
-					clause_solution[var] = value;
-				}
-			} else continue; // if we cannot solve bas... part, skip this clause
-		}
-		if (!clause_solution.empty()) return clause_solution;
+		if (error) continue;
+		// It can happen that there is no free variable in bitvector formula
+		// causing empty solutions which are still sat
+		if (!clause_solution.empty() || bv_sat) return clause_solution;
 	}
 	return {};
 }
 
 template <NodeType node>
-std::optional<solution<node>> solve(const trefs& forms, const solver_options& options) {
+std::optional<solution<node>> solve(const trefs& forms, solver_options options) {
 	using tau = tree<node>;
 
 	return solve<node>(tau::build_wff_and(forms), options);
