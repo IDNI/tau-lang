@@ -24,7 +24,7 @@ set(TESTS
 	tau_ba3
 	wff_hooks
 	wff_normalization
-	resolver
+	ba_types_inference
 )
 
 foreach(TEST IN LISTS TESTS)

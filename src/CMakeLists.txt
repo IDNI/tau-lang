@@ -30,7 +30,7 @@ set(TAU_HEADERS
 	splitter_types.h
 	splitter.h
 	solver.h
-	resolver.h
+	ba_types_inference.h
 	runtime.h
 	interpreter.h
 	union_find.h       # union find data structure
