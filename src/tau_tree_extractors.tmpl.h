@@ -372,7 +372,7 @@ const trefs& get_free_vars(tref n) {
 
 	if (!n) return no_free_vars;
 	if (typename node::type nt = tau::get(n).get_type();
-		nt != tau::bf && nt != tau::wff) return no_free_vars;
+		nt != tau::bv && nt != tau::bf && nt != tau::wff) return no_free_vars;
 
 	using cache_t = subtree_unordered_map<node, size_t>;
 	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
@@ -443,7 +443,7 @@ const trefs& get_free_vars(tref n) {
 	if (auto it = free_vars_pool_index.find(fv);
 		it != free_vars_pool_index.end()) id = it->second;
 	else free_vars_pool_index.emplace(fv, id),
-		free_vars_pool.push_back(fv);
+		free_vars_pool.emplace_back(std::move(fv));
 	free_vars_map.emplace(n, id);
 #ifdef DEBUG
 	LOG_TRACE << "free_vars_map[" << LOG_FM(n) << "] = " << id;
