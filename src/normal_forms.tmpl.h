@@ -2971,12 +2971,12 @@ tref wff_remove_existential(tref var, tref wff) {
 				conj = tau::_T();
 				continue;
 			}
-			// Check if conjunct is of form = 0 or != 0
-			if ((tt(conj) | tau::bf_eq) || (tt(conj) | tau::bf_neq))
-				continue;
-			// If the conjunct contains the quantified variable at this point
-			// we cannot resolve the quantifier in this clause
-			is_quant_removable_in_clause = false;
+			// Check that conjunct is not an unresolved reference
+			if (tt(conj) | tau::wff_ref) {
+				// If the reference contains the quantified variable at this point
+				// we cannot resolve the quantifier in this clause
+				is_quant_removable_in_clause = false;
+			}
 		}
 		tref new_l = tau::build_wff_and(conjs);
 		if (!is_quant_removable_in_clause) {
@@ -2987,6 +2987,25 @@ tref wff_remove_existential(tref var, tref wff) {
 			continue;
 		}
 
+		// Check if quantified variable is bitvector
+		if (tau::get(var).get_ba_type() == get_ba_type_id<node>("bv")) {
+			if (const trefs& free_vars = get_free_vars<node>(new_l);
+				free_vars.size() == 1 &&
+				tau::get(free_vars[0]) == tau::get(var)) {
+				// By assumption quantifier is pushed in all the way
+				// Closed bv formula, simplify to T/F
+				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, new_l)))
+					changes[l] = nl;
+				else changes[l] = tau::_F();
+				continue;
+			} else {
+				// Quantifier is not resolvable
+				changes[l] = tau::build_wff_and(
+					tau::build_wff_ex(var, new_l), nl);
+				continue;
+			}
+		}
+		// Continue with quantifier elimination for atomless BA
 		tref f = squeeze_positives<node>(new_l);
 		tref f_0 = f ? rewriter::replace<node>(
 				f, var, tau::_0_trimmed())
