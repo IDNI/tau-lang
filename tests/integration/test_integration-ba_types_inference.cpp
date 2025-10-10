@@ -16,12 +16,28 @@ TEST_SUITE("Configuration") {
 	}
 }
 
-tref parse(const std::string& sample) {
-	auto opts = tau::get_options{
-		.parse = { .start = tau::wff },
+tau::get_options parse_bf_no_infer() {
+	static tau::get_options opts{ .parse = { .start = tau::bf },
 		.infer_ba_types = false,
-		.reget_with_hooks = false
-	};
+		.reget_with_hooks = false };
+	return opts;
+}
+
+tau::get_options parse_wff_no_infer() {
+	static tau::get_options opts{ .parse = { .start = tau::wff },
+		.infer_ba_types = false,
+		.reget_with_hooks = false };
+	return opts;
+}
+
+tau::get_options parse_cli_no_infer() {
+	static tau::get_options opts{ .parse = { .start = tau::cli },
+		.infer_ba_types = false,
+		.reget_with_hooks = false };
+	return opts;
+}
+
+tref parse(const std::string& sample, const tau::get_options& opts = parse_wff_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
@@ -32,7 +48,6 @@ tref parse(const std::string& sample) {
 using type_t = tree<node_t>::type_t;
 
 TEST_SUITE("type_scoped_resolver") {
-
 
 	TEST_CASE("merging in the same scope") {
 		type_scoped_resolver<node_t> r;
@@ -85,137 +100,137 @@ TEST_SUITE("type_scoped_resolver") {
 	}
 }
 
-TEST_SUITE("infer_ba_types") {
+bool check_vars(tref inferred, std::vector<std::pair<std::string, type_t>>& expected) {
+	using node = node_t;
 
-	bool check_vars(tref inferred, std::vector<std::pair<std::string, type_t>>& expected) {
-		using node = node_t;
+	DBG(LOG_TRACE << "Checking variables in: "
+		<< LOG_FM_TREE(inferred);)
 
-		DBG(LOG_TRACE << "Checking variables in: "
-			<< LOG_FM_TREE(inferred);)
-
-		auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
-		if (vars.empty() && expected.size() > 0) {
-			TAU_LOG_ERROR << "No variables found in.";
+	auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
+	if (vars.empty() && expected.size() > 0) {
+		TAU_LOG_ERROR << "No variables found in.";
+		return false;
+	}
+	if (vars.size() != expected.size()) {
+		TAU_LOG_ERROR << "Expected " << expected.size()
+			<< " variables, found " << vars.size();
+		return false;
+	}
+	for (size_t i = 0; i < expected.size(); i++) {
+		auto [expected_name, expected_type] = expected[i];
+		auto name = get_var_name<node_t>(vars[i]);
+		if (name != expected_name) {
+			TAU_LOG_ERROR << "Variable " << (i+1)
+				<< " expected name '" << expected_name
+				<< "', found '" << name;
 			return false;
 		}
-		if (vars.size() != expected.size()) {
-			TAU_LOG_ERROR << "Expected " << expected.size()
-				<< " variables, found " << vars.size();
+		size_t vtype = tau::get(vars[i]).get_ba_type();
+		if (vtype != expected_type.first) {
+			TAU_LOG_ERROR << "Variable '" << name
+			<< "' expected type id " << expected_type.first
+			<< ", found " << vtype;
 			return false;
 		}
-		for (size_t i = 0; i < expected.size(); i++) {
-			auto [expected_name, expected_type] = expected[i];
-			auto name = get_var_name<node_t>(vars[i]);
-			if (name != expected_name) {
-				TAU_LOG_ERROR << "Variable " << (i+1)
-					<< " expected name '" << expected_name
-					<< "', found '" << name;
-				return false;
-			}
-			size_t vtype = tau::get(vars[i]).get_ba_type();
-			if (vtype != expected_type.first) {
-				TAU_LOG_ERROR << "Variable '" << name
-				<< "' expected type id " << expected_type.first
-				<< ", found " << vtype;
-				return false;
-			}
-			auto vsubtype = tt(vars[i]) | tau::subtype | tt::ref;
-			if (vsubtype != expected_type.second) {
-				TAU_LOG_ERROR << "Variable '" << name
+		auto vsubtype = tt(vars[i]) | tau::subtype | tt::ref;
+		if (vsubtype != expected_type.second) {
+			TAU_LOG_ERROR << "Variable '" << name
+			<< "' unexpected subtype '";
+			return false;
+		}
+		TAU_LOG_TRACE << "Variable " << name << " matched\n";
+	}
+	return true;
+}
+
+bool check_ctes(tref inferred, std::vector<type_t>& expected) {
+	using node = node_t;
+
+	DBG(LOG_TRACE << "Checking bf constants in: "
+		<< LOG_FM_TREE(inferred);)
+
+	auto ctes = tau::get(inferred).select_top(is<node_t, tau::bf_constant>);
+	if (ctes.empty() && expected.size() > 0) {
+		TAU_LOG_ERROR << "No constants found";
+		return false;
+	}
+	if (ctes.size() != expected.size()) {
+		TAU_LOG_ERROR << "Expected " << expected.size()
+			<< " constants, found " << ctes.size();
+		return false;
+	}
+	for (size_t i = 0; i < expected.size(); i++) {
+		size_t ctype = tau::get(ctes[i]).get_ba_type();
+		if (ctype != expected[i].first) {
+			TAU_LOG_ERROR << "Constant '" << ctes[i]
+				<< "' expected type id " << expected[i].first
+				<< ", found " << ctype;
+			return false;
+		}
+		auto csubtype = tt(ctes[i]) | tau::subtype | tt::ref;
+		if (csubtype != expected[i].second) {
+			TAU_LOG_ERROR << "Constant '" << ctes[i]
 				<< "' unexpected subtype '";
-				return false;
-			}
-			TAU_LOG_TRACE << "Variable " << name << " matched\n";
+			return false;
 		}
-		return true;
+		TAU_LOG_TRACE << "Constant '" << ctes[i] << " matched\n";
 	}
+	return true;
+}
 
-	bool check_ctes(tref inferred, std::vector<type_t>& expected) {
-		using node = node_t;
+bool check_bv_ctes(tref inferred, std::vector<type_t>& expected) {
+	using node = node_t;
 
-		DBG(LOG_TRACE << "Checking bf constants in: "
-			<< LOG_FM_TREE(inferred);)
+	DBG(LOG_TRACE << "Checking bv constants in: "
+		<< LOG_FM_TREE(inferred);)
 
-		auto ctes = tau::get(inferred).select_top(is<node_t, tau::bf_constant>);
-		if (ctes.empty() && expected.size() > 0) {
-			TAU_LOG_ERROR << "No constants found";
-			return false;
-		}
-		if (ctes.size() != expected.size()) {
-			TAU_LOG_ERROR << "Expected " << expected.size()
-				<< " constants, found " << ctes.size();
-			return false;
-		}
-		for (size_t i = 0; i < expected.size(); i++) {
-			size_t ctype = tau::get(ctes[i]).get_ba_type();
-			if (ctype != expected[i].first) {
-				TAU_LOG_ERROR << "Constant '" << ctes[i]
-					<< "' expected type id " << expected[i].first
-					<< ", found " << ctype;
-				return false;
-			}
-			auto csubtype = tt(ctes[i]) | tau::subtype | tt::ref;
-			if (csubtype != expected[i].second) {
-				TAU_LOG_ERROR << "Constant '" << ctes[i]
-					<< "' unexpected subtype '";
-				return false;
-			}
-			TAU_LOG_TRACE << "Constant '" << ctes[i] << " matched\n";
-		}
-		return true;
+	auto ctes = tau::get(inferred).select_top(is<node_t, tau::bv_constant>);
+	if (ctes.empty() && expected.size() > 0) {
+		TAU_LOG_ERROR << "No constants found";
+		return false;
 	}
-
-	bool check_bv_ctes(tref inferred, std::vector<type_t>& expected) {
-		using node = node_t;
-
-		DBG(LOG_TRACE << "Checking bv constants in: "
-			<< LOG_FM_TREE(inferred);)
-
-		auto ctes = tau::get(inferred).select_top(is<node_t, tau::bv_constant>);
-		if (ctes.empty() && expected.size() > 0) {
-			TAU_LOG_ERROR << "No constants found";
+	if (ctes.size() != expected.size()) {
+		TAU_LOG_ERROR << "Expected " << expected.size()
+			<< " constants, found " << ctes.size();
+		return false;
+	}
+	for (size_t i = 0; i < expected.size(); i++) {
+		size_t ctype = tau::get(ctes[i]).get_ba_type();
+		if (ctype != expected[i].first) {
+			TAU_LOG_ERROR << "Constant '" << ctes[i]
+				<< "' expected type id " << expected[i].first
+				<< ", found " << ctype;
 			return false;
 		}
-		if (ctes.size() != expected.size()) {
-			TAU_LOG_ERROR << "Expected " << expected.size()
-				<< " constants, found " << ctes.size();
-			return false;
-		}
-		for (size_t i = 0; i < expected.size(); i++) {
-			size_t ctype = tau::get(ctes[i]).get_ba_type();
-			if (ctype != expected[i].first) {
-				TAU_LOG_ERROR << "Constant '" << ctes[i]
-					<< "' expected type id " << expected[i].first
-					<< ", found " << ctype;
-				return false;
-			}
-			auto csubtype = tt(ctes[i]) | tau::subtype | tt::ref;
-			if (csubtype == nullptr) {
-				auto es = tt(expected[i].second) | tau::num | tt::num;
-				auto cs = tt(ctes[i]) | tt::ba_constant;
-				if (std::holds_alternative<cvc5::Term>(cs) && es != 0) {
-					auto c = std::get<cvc5::Term>(cs);
-					if (c.getSort().getBitVectorSize() == es) continue;
-					TAU_LOG_ERROR << "Constant '" << ctes[i]
-						<< "' expected subtype '" << expected[i].second
-						<< "', found 'untyped'" << c.getSort().getBitVectorSize();
-					return false;
-				}
-			}
-			if (csubtype != expected[i].second) {
+		auto csubtype = tt(ctes[i]) | tau::subtype | tt::ref;
+		if (csubtype == nullptr) {
+			auto es = tt(expected[i].second) | tau::num | tt::num;
+			auto cs = tt(ctes[i]) | tt::ba_constant;
+			if (std::holds_alternative<cvc5::Term>(cs) && es != 0) {
+				auto c = std::get<cvc5::Term>(cs);
+				if (c.getSort().getBitVectorSize() == es) continue;
 				TAU_LOG_ERROR << "Constant '" << ctes[i]
 					<< "' expected subtype '" << expected[i].second
-					<< "', found '" << tau::get(csubtype).dump_to_str() ;
+					<< "', found 'untyped'" << c.getSort().getBitVectorSize();
 				return false;
 			}
 		}
-		return true;
+		if (csubtype != expected[i].second) {
+			TAU_LOG_ERROR << "Constant '" << ctes[i]
+				<< "' expected subtype '" << expected[i].second
+				<< "', found '" << tau::get(csubtype).dump_to_str() ;
+			return false;
+		}
 	}
+	return true;
+}
 
-	static type_t tau_type = {get_ba_type_id<node_t>("tau"), nullptr};
-	static type_t sbf_type = {get_ba_type_id<node_t>("sbf"), nullptr};
-	static type_t bv_type = {get_ba_type_id<node_t>("bv"), nullptr};
-	static type_t bv16_type = {get_ba_type_id<node_t>("bv"), tau::get(tau::subtype, tau::get_num(16))};
+static type_t tau_type = {get_ba_type_id<node_t>("tau"), nullptr};
+static type_t sbf_type = {get_ba_type_id<node_t>("sbf"), nullptr};
+static type_t bv_type = {get_ba_type_id<node_t>("bv"), nullptr};
+static type_t bv16_type = {get_ba_type_id<node_t>("bv"), tau::get(tau::subtype, tau::get_num(16))};
+
+TEST_SUITE("infer_ba_types: wff formulas") {
 
 	TEST_CASE("simple case 1") {
 		tref parsed = parse("x = 1");
@@ -892,6 +907,36 @@ TEST_SUITE("infer_ba_types") {
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
+}
+
+TEST_SUITE("infer_ba_types: bf formulas") {
+
+	TEST_CASE("simple case 1") {
+		tref parsed = parse("x", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		tref inferred = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+}
+
+TEST_SUITE("infer_ba_types: cli commands") {
+
+	TEST_CASE("simple case 1") {
+		tref parsed = parse("x = 1", parse_cli_no_infer());
+		CHECK( parsed != nullptr );
+		tref inferred = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", tau_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
 }
 
 TEST_SUITE("Cleanup") {

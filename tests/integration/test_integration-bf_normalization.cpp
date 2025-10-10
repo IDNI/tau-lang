@@ -4,10 +4,7 @@
 #include "test_tau_helpers.h"
 
 bool bf_normalize_and_check(const char* sample_, typename node_t::type nt) {
-	string sample = string(sample_) + " = 0";
-	static tau::get_options opts{
-		.parse = { .start = tau::wff }, .reget_with_hooks = false };
-	tref formula = tau::reget(tau::get(tau::get(sample, opts))[0].first());
+	tref formula = tau::get(sample_, parse_bf());
 	if (!formula) return false;
 	auto nso_rr = get_nso_rr<node_t>(formula);
 	if (!nso_rr.has_value()) return false;

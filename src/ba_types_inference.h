@@ -190,8 +190,30 @@ tref infer_ba_types(tref n) {
 		return t;
 	};
 
+	auto is_top_level_bf = [&](tref parent) -> bool {
+		using tau = tree<node>;
+
+		if (parent == nullptr) return true;
+		auto nt = tau::get(parent).get_type();
+		switch (nt) {
+			// bf logical connectives
+			case tau::bf_and: case tau::bf_or: case tau::bf_neg:
+			case tau::bf_xor:
+			// bf quantifiers
+			case tau::bf_fall: case tau::bf_fex:
+			// bf atomic formulas
+			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq:
+			case tau::bf_nlteq: case tau::bf_gt: case tau::bf_ngt:
+			case tau::bf_gteq: case tau::bf_ngteq: case tau::bf_lt:
+			case tau::bf_nlt: case tau::bf_interval:
+				return false;
+			default:
+				return true;
+		}
+	};
+
 	// We gather info about types and scopes while entering nodes
-	auto on_enter = [&](tref n, tref) {
+	auto on_enter = [&](tref n, tref parent) {
 		DBG(assert(n != nullptr);)
 
 		// Stop traversal on error
@@ -292,6 +314,44 @@ tref infer_ba_types(tref n) {
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
 			}
+			case tau::bf: {
+				// If bf is top level we treat it as a bf equation (we
+				// FALLTHROUGH). Otherwise we don't traverse its children.
+				if (!is_top_level_bf(parent)) return false;
+				// We get all the typeable top nodes in the expression, which in
+				// this case are only (sbf/tau) variables and constants.
+				auto typeables = tau::get(n).select_top(is_typeable);
+				// We infer the common type of all the typeables in the expression
+				auto type = get_type(typeables, untyped);
+				// If no common type is found, we set error and stop traversal
+				if (!type){
+					LOG_ERROR << "Conflicting type information in bf "
+						<< LOG_FM(n) << "\n";
+					return error = true, false;
+				}
+				DBG(LOG_TRACE << "infer_ba_types/on_enter/bf.../type: "
+					<< type.value().first
+					<< "[" << (type.value().second ? tau::get(type.value().second).to_str() : "") << "]\n";)
+				// We add the variables and the constants to the current scope
+				// and assign them the common type.
+				trefs mergeables;
+				for (const auto& t : typeables)	{
+					auto ut = untype(t);
+					resolver.insert(ut);
+					resolver.assign(ut, type.value());
+					mergeables.push_back(ut);
+				}
+				if (!resolver.merge(mergeables)) {
+					LOG_ERROR << "Conflicting type information in bf "
+						<< LOG_FM(n) << "\n";
+					return error = true, false;
+				}
+				// Anyway, we stop the traversal of children as we have already
+				// processed all the typeables in the expression.
+				DBG(LOG_TRACE << "infer_ba_types/on_enter/b.../resolver:\n";)
+				DBG(LOG_TRACE << resolver.dump_to_str();)
+				break;
+			}
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt: {
@@ -346,7 +406,7 @@ tref infer_ba_types(tref n) {
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
 			}
-			case tau::bf: case tau::bv: {
+			case tau::bv: {
 				// As we are inside an equation already visited, we do not need
 				// to continue the traversal of children.
 				return false;
@@ -622,60 +682,6 @@ tref infer_ba_types(tref n) {
 			return elements;
 		};
 
-		auto is_inner_fm = [&](tref parent) -> bool {
-			using tau = tree<node>;
-
-			if (parent == nullptr) return false;
-			auto nt = tau::get(parent).get_type();
-			switch (nt) {
-				// wff quantifiers
-				case tau::wff_always: case tau::wff_sometimes:
-				case tau::wff_all: case tau::wff_ex:
-				// aff logical connectives
-				case tau::wff_and: case tau::wff_or: case tau::wff_neg:
-				case tau::wff_xor: case tau::wff_imply: case tau::wff_rimply:
-				case tau::wff_equiv: case tau::wff_conditional:
-				// wff constraints
-				case tau::constraint: case tau::ctn_neq: case tau::ctn_eq:
-				case tau::ctn_lteq: case tau::ctn_gteq: case tau::ctn_lt:
-				case tau::ctn_gt:
-				// bf atomic formulas
-				case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq:
-				case tau::bf_nlteq: case tau::bf_gt: case tau::bf_ngt:
-				case tau::bf_gteq: case tau::bf_ngteq: case tau::bf_lt:
-				case tau::bf_nlt: case tau::bf_interval:
-				// bf constants and alike
-				case tau::bf_constant: case tau::bf_t: case tau::bf_f:
-				// bf logical connectives
-				case tau::bf_and: case tau::bf_or: case tau::bf_neg:
-				case tau::bf_xor:
-				// bf quantifiers and others
-				case tau::bf_fall: case tau::bf_fex:
-				case tau::bf_ref: case tau::bf_splitter:
-				// bv atomic formulas
-				case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq:
-				case tau::bv_nlteq:	case tau::bv_gt: case tau::bv_ngt:
-				case tau::bv_gteq: case tau::bv_ngteq: case tau::bv_lt:
-				case tau::bv_nlt:
-				// bv constants and alike
-				case tau::bv_constant: case tau::bv_checked:
-				// bv logical connectives and operations
-				case tau::bv_and: case tau::bv_or: case tau::bv_neg:
-				case tau::bv_nand: case tau::bv_nor: case tau::bv_xor:
-				case tau::bv_xnor: case tau::bv_shl: case tau::bv_shr:
-				case tau::bv_add: case tau::bv_sub: case tau::bv_mul:
-				case tau::bv_div: case tau::bv_mod:
-				case tau::bv_min: case tau::bv_max:
-					return true;
-				default:
-					return false;
-			}
-		};
-
-		auto is_fm = [&](tref n) {
-			return is<node, tau::wff>(n) || is<node, tau::bf>(n) || is<node, tau::bv>(n);
-		};
-
 		DBG(LOG_TRACE << "infer_ba_types/on_leave/n:\n"
 			<< LOG_FM_TREE(n);)
 		// Stop traversal on error
@@ -727,15 +733,31 @@ tref infer_ba_types(tref n) {
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				return;
 			}
+			case tau::bf: {
+				if (is_top_level_bf(parent)) {
+					// We only process top-level bf nodes, as the inner ones
+					// are part of bf equations already processed.
+					auto scoped_bf_ctes_types = get_scoped_elements(tau::bf_constant);
+					if(auto updated = parse_bf_constants(n, scoped_bf_ctes_types); updated != n) {
+						DBG(LOG_TRACE << "infer_ba_types/on_leave/bf.../n -> updated:\n"
+							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
+						transformed.insert_or_assign(n, updated);
+					}
+					auto scoped_var_types = get_scoped_elements(tau::variable);
+					if(auto updated = update_variables(n, scoped_var_types, tau_type); updated != n) {
+						DBG(LOG_TRACE << "infer_ba_types/on_leave/bf.../n -> updated:\n"
+							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
+						transformed.insert_or_assign(n, updated);
+					}
+				}
+				return;
+			}
 			default: {
 				tref new_n = update_default(n, transformed);
 				// For the root node, we type untyped variables with tau.
-				if (is_fm(n) && !is_inner_fm(parent)) { // !parent
+				if (!parent) {
 					auto scoped_var_types = get_scoped_elements(tau::variable);
-					auto default_type = tau::get(n).is(tau::bv) ? bv_type : tau_type;
-					if(auto updated = update_variables(new_n, scoped_var_types, default_type); updated != new_n) {
-						new_n = updated;
-					}
+					new_n = update_variables(new_n, scoped_var_types, tau_type);
 				}
 				if (new_n != n) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/default/n -> new_n:\n"
@@ -756,7 +778,7 @@ tref infer_ba_types(tref n) {
 		auto t = tau::get(n);
 		size_t nt = t.get_type();
 		switch (nt) {
-			case tau::bf: case tau::bv:
+			case tau::bv:
 				return false;
 			default:
 				return true;
