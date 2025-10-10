@@ -527,6 +527,11 @@ tref tree<node>::only_child() const {
 	return base_t::only_child();
 }
 
+template<NodeType node>
+bool tree<node>::has_child() const {
+	return base_t::has_child();
+}
+
 template <NodeType node>
 tref tree<node>::trim() const { return first(); }
 
@@ -691,6 +696,7 @@ template <NodeType node>
 bool tree<node>::is_input_variable() const {
 	auto x = tt(*this);
 	if (x.is(bf)) x = x | variable;
+	if (x.is(bv)) x = x | variable;
 	if (x && x.is(variable)) x = x | io_var;
 	return x && x.is(io_var) && (x | tt::data) == 1;
 }
@@ -699,6 +705,7 @@ template <NodeType node>
 bool tree<node>::is_output_variable() const {
 	auto x = tt(*this);
 	if (x.is(bf)) x = x | variable;
+	if (x.is(bv)) x = x | variable;
 	if (x && x.is(variable)) x = x | io_var;
 	return x && x.is(io_var) && (x | tt::data) == 2;
 }
@@ -725,7 +732,7 @@ bool tree<node>::equals_T() const {
 
 template <NodeType node>
 bool tree<node>::child_is(size_t nt) const {
-	if (only_child() == nullptr) return false;
+	if (!has_child()) return false;
 	return first_tree().is(nt);
 }
 

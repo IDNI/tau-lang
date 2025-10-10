@@ -1082,11 +1082,16 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 							fm, true, start_time);
 		// Check if there is a sometimes present
 		if (ev_t.first == fm) {
+			// Here we deal with a non-temporal formula
+			// Use aw_fm to store result
+			aw_fm = elim_aw(fm);
+			if (!is_non_temp_nso_satisfiable<node>(fm))
+				aw_fm = tau::_F();
 #ifdef TAU_CACHE
 			return cache.emplace(std::make_pair(fm, start_time),
-					     elim_aw(fm)).first->second;
+					     aw_fm).first->second;
 #endif // TAU_CACHE
-			return elim_aw(fm);
+			return aw_fm;
 		}
 	}
 	auto aw_after_ev = tau::get(ev_t.first)
