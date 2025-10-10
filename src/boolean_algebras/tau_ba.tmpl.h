@@ -190,10 +190,10 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 	if (tau::get(simp_fm).find_top(is<node, tau::ref>))
 		return false;
 	const trefs& vars = get_free_vars<node>(simp_fm);
-	for (const auto& v : vars) {
-		const auto& t = tau::get(v);
-		if (!(t.only_child_tree().is(tau::io_var)
-			|| t.only_child_tree().is(tau::uconst_name)))
+	for (tref v : vars) {
+		const tau& t = tau::get(v);
+		if (!(t.child_is(tau::io_var)
+			|| t.child_is(tau::uconst_name)))
 				return false;
 	}
 	return true;
