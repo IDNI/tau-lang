@@ -230,12 +230,12 @@ static type_t sbf_type = {get_ba_type_id<node_t>("sbf"), nullptr};
 static type_t bv_type = {get_ba_type_id<node_t>("bv"), nullptr};
 static type_t bv16_type = {get_ba_type_id<node_t>("bv"), tau::get(tau::subtype, tau::get_num(16))};
 
-TEST_SUITE("infer_ba_types: wff formulas") {
+TEST_SUITE("new_infer_ba_types: wff formulas") {
 
 	TEST_CASE("simple case 1") {
 		tref parsed = parse("x = 1");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type}
@@ -246,7 +246,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 1 (y2)") {
 		tref parsed = parse("1 = x");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type}
@@ -257,7 +257,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 2") {
 		tref parsed = parse("x = 1:sbf");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type}
@@ -268,7 +268,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 2 (y2)") {
 		tref parsed = parse("1:sbf = x");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type}
@@ -279,7 +279,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 3") {
 		tref parsed = parse("x = 1:tau");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type}
@@ -290,7 +290,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 3 (y2)") {
 		tref parsed = parse("1:tau = x");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type}
@@ -303,7 +303,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 		// tref parsed = parse("x = 1:bv");
 		tref parsed = parse("x =_ 1:bv");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type}
@@ -316,7 +316,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 		// tref parsed = parse("x = 1:bv[16]");
 		tref parsed = parse("x =_ 1:bv[16]");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type}
@@ -327,7 +327,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 4 (y3)") {
 		tref parsed = parse("x:bv =_ 1");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<type_t> {
 			{bv_type}
@@ -338,7 +338,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 4 (y4)") {
 		tref parsed = parse("x:bv[16] =_ 1");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<type_t> {
 			{bv16_type}
@@ -349,7 +349,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 7") {
 		tref parsed = parse("x:sbf = y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type},
@@ -361,7 +361,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 7 (y2)") {
 		tref parsed = parse("x = y:sbf");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type},
@@ -373,7 +373,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 8") {
 		tref parsed = parse("x:tau = y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -385,7 +385,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 8 (y2)") {
 		tref parsed = parse("x = y:tau");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -397,7 +397,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 9") {
 		tref parsed = parse("x:bv =_ y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
@@ -409,7 +409,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 9 (y2)") {
 		tref parsed = parse("x =_ y:bv");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
@@ -421,7 +421,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 9 (y3)") {
 		tref parsed = parse("x:bv[16] =_ y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type},
@@ -433,7 +433,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 9 (y2)") {
 		tref parsed = parse("x =_ y:bv[16]");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type},
@@ -445,7 +445,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("type chaining (tau) right to left") {
 		tref parsed = parse("x = y && y = z:tau");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -458,7 +458,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("type chaining (tau) left to right") {
 		tref parsed = parse("x:tau = y && y = z");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -471,7 +471,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("type chaining (sbf) right to left") {
 		tref parsed = parse("x = y && y = z:sbf");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type},
@@ -484,7 +484,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("type chaining (sbf) left to right") {
 		tref parsed = parse("x:sbf = y && y = z");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type},
@@ -497,7 +497,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("type chaining (bv) left to right") {
 		tref parsed = parse("x:bv =_ y && y =_ z");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
@@ -510,7 +510,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("type chaining (bv[16]) left to right") {
 		tref parsed = parse("x:bv[16] =_ y && y =_ z");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type},
@@ -523,7 +523,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("type chaining (bv) right to left") {
 		tref parsed = parse("x =_ y && y =_ z:bv");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
@@ -536,7 +536,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("type chaining (bv[16]) right to left") {
 		tref parsed = parse("x =_ y && y =_ z:bv[16]");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type},
@@ -552,7 +552,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all bv") {
 		tref parsed = parse("all x:bv x =_ y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
@@ -564,7 +564,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all bv (y2)") {
 		tref parsed = parse("all x x:bv =_ y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
@@ -576,7 +576,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all bv (y3)") {
 		tref parsed = parse("all x x =_ y:bv");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv_type},
@@ -588,7 +588,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all bv[16]") {
 		tref parsed = parse("all x:bv[16] x =_ y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type},
@@ -600,7 +600,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all bv[16] (y2)") {
 		tref parsed = parse("all x x:bv[16] =_ y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type},
@@ -612,7 +612,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all bv[16] (y3)") {
 		tref parsed = parse("all x x =_ y:bv[16]");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", bv16_type},
@@ -624,7 +624,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all sbf") {
 		tref parsed = parse("all x:sbf x = y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type},
@@ -636,7 +636,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all sbf (y2)") {
 		tref parsed = parse("all x x:sbf = y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type},
@@ -648,7 +648,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all sbf (y3)") {
 		tref parsed = parse("all x x = y:sbf");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type},
@@ -660,7 +660,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all tau") {
 		tref parsed = parse("all x:tau x = y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -672,7 +672,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all tau (y2)") {
 		tref parsed = parse("all x x:tau = y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -684,7 +684,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("all tau (y3)") {
 		tref parsed = parse("all x x = y:tau");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -696,7 +696,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple explicit tau constant") {
 		tref parsed = parse("x = { T }:tau");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type}
@@ -707,7 +707,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple explicit tau constant  (y2)") {
 		tref parsed = parse("{ T }:tau = x");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type}
@@ -718,7 +718,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple explicit sbf constant") {
 		tref parsed = parse("x = { x }:sbf");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type}
@@ -729,7 +729,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple explicit sbf constant (y2)") {
 		tref parsed = parse("{ x }:sbf = x");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type}
@@ -740,42 +740,42 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("simple failing case") {
 		tref parsed = parse("x:tau = x:sbf");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("simple failing case (y2)") {
 		tref parsed = parse("x:tau = {x}:sbf");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("simple failing case (y3)") {
 		tref parsed = parse("x:tau = 1:sbf");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("simple failing case (y4)") {
 		tref parsed = parse("x:tau =_ 1");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("simple failing case (y5)") {
 		tref parsed = parse("x:tau =_ x:bv");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("bv constants") {
 		tref parsed = parse("#b1 : bv =_ #b0 : bv & #b10");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<type_t> {
 			bv_type,
@@ -792,7 +792,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 			TAU_LOG_ERROR << "Parsing failed";
 			return;
 		}
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<type_t> {
 			bv16_type,
@@ -809,7 +809,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 			TAU_LOG_ERROR << "Parsing failed";
 			return;
 		}
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<type_t> {
 			sbf_type,
@@ -825,7 +825,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 			TAU_LOG_ERROR << "Parsing failed";
 			return;
 		}
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<type_t> {
 			sbf_type,
@@ -841,7 +841,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 			TAU_LOG_ERROR << "Parsing failed";
 			return;
 		}
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<type_t> {
 			tau_type,
@@ -853,7 +853,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("complex case: Ohad's example") {
 		tref parsed = parse("all x x = y");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -866,7 +866,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 		using node = node_t;
 		tref parsed = parse("(all x x = y) && x = y:sbf");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		if (inferred != nullptr) {
 			TAU_LOG_TRACE << "Expected nullptr got: " << LOG_FM_TREE(inferred);
 		}
@@ -876,7 +876,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("complex case: shadowing") {
 		tref parsed = parse("all x (all x x = 1:sbf)");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -888,7 +888,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("complex case: shadowing (y2)") {
 		tref parsed = parse("all x ((all x x = 1:sbf) && x = 1:sbf)");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", sbf_type}
@@ -899,7 +899,7 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	TEST_CASE("complex case: shadowing (y3)") {
 		tref parsed = parse("all x ((all x x = 1:sbf) && x = 1:tau)");
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type},
@@ -909,34 +909,32 @@ TEST_SUITE("infer_ba_types: wff formulas") {
 	}
 }
 
-TEST_SUITE("infer_ba_types: bf formulas") {
+TEST_SUITE("new_infer_ba_types: bf formulas") {
 
 	TEST_CASE("simple case 1") {
 		tref parsed = parse("x", parse_bf_no_infer());
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
-
 }
 
-TEST_SUITE("infer_ba_types: cli commands") {
+TEST_SUITE("new_infer_ba_types: cli commands") {
 
 	TEST_CASE("simple case 1") {
 		tref parsed = parse("x = 1", parse_cli_no_infer());
 		CHECK( parsed != nullptr );
-		tref inferred = infer_ba_types<node_t>(parsed);
+		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, type_t>> {
 			{"x", tau_type}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
-
 }
 
 TEST_SUITE("Cleanup") {
