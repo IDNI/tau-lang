@@ -433,7 +433,7 @@ tref infer_ba_types(tref n) {
 			}
 		};
 
-		auto update_variables = [&](tref n, const std::map<tref, type_t, subtree_less<node>>& types) -> tref {
+		auto update_variables = [&](tref n, const std::map<tref, type_t, subtree_less<node>>& types, const type_t& default_type) -> tref {
 			subtree_map<node, tref> changes;
 
 			auto update = [&](tref n) -> bool {
@@ -450,7 +450,7 @@ tref infer_ba_types(tref n) {
 						if (get_type_of(n) == untyped) {
 							// We type it according to the inferred type or tau
 							auto type = (types.at(un) == untyped)
-								? tau_type
+								? default_type
 								: types.at(un);
 							if (resolver.assign(un, type) == false) {
 								LOG_ERROR << "Conflicting type information for variable "
@@ -622,6 +622,60 @@ tref infer_ba_types(tref n) {
 			return elements;
 		};
 
+		auto is_inner_fm = [&](tref parent) -> bool {
+			using tau = tree<node>;
+
+			if (parent == nullptr) return false;
+			auto nt = tau::get(parent).get_type();
+			switch (nt) {
+				// wff quantifiers
+				case tau::wff_always: case tau::wff_sometimes:
+				case tau::wff_all: case tau::wff_ex:
+				// aff logical connectives
+				case tau::wff_and: case tau::wff_or: case tau::wff_neg:
+				case tau::wff_xor: case tau::wff_imply: case tau::wff_rimply:
+				case tau::wff_equiv: case tau::wff_conditional:
+				// wff constraints
+				case tau::constraint: case tau::ctn_neq: case tau::ctn_eq:
+				case tau::ctn_lteq: case tau::ctn_gteq: case tau::ctn_lt:
+				case tau::ctn_gt:
+				// bf atomic formulas
+				case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq:
+				case tau::bf_nlteq: case tau::bf_gt: case tau::bf_ngt:
+				case tau::bf_gteq: case tau::bf_ngteq: case tau::bf_lt:
+				case tau::bf_nlt: case tau::bf_interval:
+				// bf constants and alike
+				case tau::bf_constant: case tau::bf_t: case tau::bf_f:
+				// bf logical connectives
+				case tau::bf_and: case tau::bf_or: case tau::bf_neg:
+				case tau::bf_xor:
+				// bf quantifiers and others
+				case tau::bf_fall: case tau::bf_fex:
+				case tau::bf_ref: case tau::bf_splitter:
+				// bv atomic formulas
+				case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq:
+				case tau::bv_nlteq:	case tau::bv_gt: case tau::bv_ngt:
+				case tau::bv_gteq: case tau::bv_ngteq: case tau::bv_lt:
+				case tau::bv_nlt:
+				// bv constants and alike
+				case tau::bv_constant: case tau::bv_checked:
+				// bv logical connectives and operations
+				case tau::bv_and: case tau::bv_or: case tau::bv_neg:
+				case tau::bv_nand: case tau::bv_nor: case tau::bv_xor:
+				case tau::bv_xnor: case tau::bv_shl: case tau::bv_shr:
+				case tau::bv_add: case tau::bv_sub: case tau::bv_mul:
+				case tau::bv_div: case tau::bv_mod:
+				case tau::bv_min: case tau::bv_max:
+					return true;
+				default:
+					return false;
+			}
+		};
+
+		auto is_fm = [&](tref n) {
+			return is<node, tau::wff>(n) || is<node, tau::bf>(n) || is<node, tau::bv>(n);
+		};
+
 		DBG(LOG_TRACE << "infer_ba_types/on_leave/n:\n"
 			<< LOG_FM_TREE(n);)
 		// Stop traversal on error
@@ -635,7 +689,7 @@ tref infer_ba_types(tref n) {
 			case tau::rec_relation: {
 				tref new_n = update_default(n, transformed);
 				auto scoped_var_types = get_scoped_elements(tau::variable);
-				if(auto updated = update_variables(new_n, scoped_var_types); updated != new_n) {
+				if(auto updated = update_variables(new_n, scoped_var_types, tau_type); updated != new_n) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/wff_all.../n -> updated:\n"
 						<< LOG_FM_TREE(new_n) << " -> " << LOG_FM_TREE(updated);)
 						transformed.insert_or_assign(n, updated);
@@ -676,9 +730,10 @@ tref infer_ba_types(tref n) {
 			default: {
 				tref new_n = update_default(n, transformed);
 				// For the root node, we type untyped variables with tau.
-				if (!parent) {
+				if (is_fm(n) && !is_inner_fm(parent)) { // !parent
 					auto scoped_var_types = get_scoped_elements(tau::variable);
-					if(auto updated = update_variables(new_n, scoped_var_types); updated != new_n) {
+					auto default_type = tau::get(n).is(tau::bv) ? bv_type : tau_type;
+					if(auto updated = update_variables(new_n, scoped_var_types, default_type); updated != new_n) {
 						new_n = updated;
 					}
 				}
