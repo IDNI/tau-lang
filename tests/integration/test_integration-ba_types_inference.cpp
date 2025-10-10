@@ -101,10 +101,10 @@ TEST_SUITE("type_scoped_resolver") {
 }
 
 bool check_vars(tref inferred, std::vector<std::pair<std::string, type_t>>& expected) {
-	using node = node_t;
-
-	DBG(LOG_TRACE << "Checking variables in: "
-		<< LOG_FM_TREE(inferred);)
+	// using node = node_t;
+	//
+	// DBG(LOG_TRACE << "Checking variables in: "
+	// 	<< LOG_FM_TREE(inferred);)
 
 	auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
 	if (vars.empty() && expected.size() > 0) {
@@ -144,10 +144,10 @@ bool check_vars(tref inferred, std::vector<std::pair<std::string, type_t>>& expe
 }
 
 bool check_ctes(tref inferred, std::vector<type_t>& expected) {
-	using node = node_t;
-
-	DBG(LOG_TRACE << "Checking bf constants in: "
-		<< LOG_FM_TREE(inferred);)
+	// using node = node_t;
+	//
+	// DBG(LOG_TRACE << "Checking bf constants in: "
+	// 	<< LOG_FM_TREE(inferred);)
 
 	auto ctes = tau::get(inferred).select_top(is<node_t, tau::bf_constant>);
 	if (ctes.empty() && expected.size() > 0) {
@@ -179,10 +179,10 @@ bool check_ctes(tref inferred, std::vector<type_t>& expected) {
 }
 
 bool check_bv_ctes(tref inferred, std::vector<type_t>& expected) {
-	using node = node_t;
-
-	DBG(LOG_TRACE << "Checking bv constants in: "
-		<< LOG_FM_TREE(inferred);)
+	// using node = node_t;
+	//
+	// DBG(LOG_TRACE << "Checking bv constants in: "
+	// 	<< LOG_FM_TREE(inferred);)
 
 	auto ctes = tau::get(inferred).select_top(is<node_t, tau::bv_constant>);
 	if (ctes.empty() && expected.size() > 0) {
@@ -868,7 +868,7 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		if (inferred != nullptr) {
-			TAU_LOG_TRACE << "Expected nullptr got: " << LOG_FM_TREE(inferred);
+			TAU_LOG_TRACE << "Expected nullptr got: " << TAU_LOG_FM_TREE(inferred);
 		}
 		CHECK( inferred == nullptr );
 	}
