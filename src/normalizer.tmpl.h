@@ -1,7 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "normalizer.h"
-#include "boolean_algebras/bv_ba.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normalizer"
@@ -178,10 +177,8 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	const auto& t = tau::get(normalized);
 
 	DBG(assert((t.equals_T() || t.equals_F()
-		|| t.find_top(is<node, tau::constraint>)
-		|| t.find_top(is<node, tau::bv>)));)
+		|| t.find_top(is<node, tau::constraint>)));)
 
-	if (is_bv_fm<node>(normalized)) return is_bv_formula_sat<node>(normalized);
 	return t.equals_T();
 }
 
@@ -198,9 +195,7 @@ bool is_non_temp_nso_unsat(tref n) {
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
 	assert((t.equals_T() || t.equals_F()
-		|| t.find_top(is<node, tau::constraint>)
-		|| t.find_top(is<node, tau::bv>)));
-	if (is_bv_fm<node>(normalized)) return is_bv_formula_unsat<node>(normalized);
+		|| t.find_top(is<node, tau::constraint>)));
 	return t.equals_F();
 }
 
@@ -239,11 +234,7 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 
-	trefs vars(get_free_vars<node>(n1));
-	for (tref v : vars) LOG_DEBUG << "var1: " << LOG_FM(v);
-	const trefs& vars2 = get_free_vars<node>(n2);
-	for (tref v : vars2) LOG_DEBUG << "var2: " << LOG_FM(v);
-	vars.insert(vars.end(), vars2.begin(), vars2.end());
+	trefs vars(get_free_vars<node>(tau::build_wff_and(n1, n2)));
 	for (tref v : vars) LOG_DEBUG << "var: " << LOG_FM(v);
 
 	tref imp1 = tau::build_wff_imply(n1, n2);
@@ -257,37 +248,17 @@ bool are_nso_equivalent(tref n1, tref n2) {
 
 	const auto& tdir1 = tau::get(normalizer_step<node>(imp1));
 	assert((tdir1.equals_T() || tdir1.equals_F()
-		|| tdir1.find_top(is<node, tau::constraint>)
-		|| tdir1.find_top(is<node, tau::bv>)));
+		|| tdir1.find_top(is<node, tau::constraint>)));
 	if (tdir1.equals_F()) {
 		LOG_DEBUG << "End are_nso_equivalent: " << LOG_FM(tdir1.get());
 		return false;
 	}
 
-	bool bdir1;
-	if (tdir1.find_top(is<node, tau::bv>)) {
-		bdir1 = is_bv_formula_valid<node>(tdir1.get());
-		if (!bdir1) {
-			LOG_DEBUG << "End are_nso_equivalent: false (tdir1 is not valid)";
-			return false;
-		}
-	}
-
 	const auto& tdir2 = tau::get(normalizer_step<node>(imp2));
 	assert((tdir2.equals_T() || tdir2.equals_F()
-		|| tdir2.find_top(is<node, tau::constraint>)
-		|| tdir2.find_top(is<node, tau::bv>)));
+		|| tdir2.find_top(is<node, tau::constraint>)));
 
-	bool bdir2;
-	if (tdir2.find_top(is<node, tau::bv>)) {
-		bdir2 = is_bv_formula_valid<node>(tdir2.get());
-		if (!bdir2) {
-			LOG_DEBUG << "End are_nso_equivalent: false (tdir2 is not valid)";
-			return false;
-		}
-	}
-
-	bool res = (bdir1 && bdir2) || (tdir1.equals_T() && tdir2.equals_T());
+	bool res = tdir1.equals_T() && tdir2.equals_T();
 	LOG_DEBUG << "End are_nso_equivalent: " << res;
 	return res;
 }
@@ -331,16 +302,7 @@ bool is_nso_impl(tref n1, tref n2) {
 	auto normalized = normalizer_step<node>(imp);
 	const auto& res = tau::get(normalized);
 	DBG(assert((res.equals_T() || res.equals_F()
-		|| res.find_top(is<node, tau::constraint>)
-		|| res.find_top(is<node, tau::bv>))));
-	if (is_bv_fm<node>(normalized)) {
-		auto valid = is_bv_formula_valid<node>(normalized);
-		if (!valid) {
-			LOG_DEBUG << "End are_nso_equivalent: false (tdir2 is not valid)";
-			return false;
-		}
-		return true;
-	}
+		|| res.find_top(is<node, tau::constraint>))));
 	LOG_DEBUG << "End is_nso_impl: " << res.get();
 	return res.equals_T();
 }
