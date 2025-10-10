@@ -13,17 +13,9 @@ using namespace idni;
 template<NodeType node>
 size_t get_bv_size(const tref t) {
 	using tau = tree<node>;
-	using tt = typename tree<node>::traverser;
-
-	static std::map<tref, size_t> bv_size_cache;
-	if (auto subtype = tt(t) | tau::subtype; subtype) {
-		if (auto it = bv_size_cache.find(subtype.value()); it != bv_size_cache.end()) {
-			return it->second;
-		}
-		auto subtype_string = subtype.value_tree().get_string();
-		auto bv_size = std::strtoull(subtype_string.c_str(), nullptr, 10);
-		bv_size_cache[subtype.value()] = bv_size;
-		return bv_size;
+	using tt = tau::traverser;
+	if (auto subtype = tt(t) | tau::subtype | tt::ref; subtype) {
+		return tau::get(subtype)[0].get_num();
 	}
 	return default_bv_size;
 }
@@ -247,7 +239,6 @@ bool is_bv_formula_sat(tref form) {
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);
 
-	solver.push();
 	auto expr = bv_eval_node<node>(solver, tt(form), vars, free_vars, false);
 	// TODO (MEDIUM) handle this case at an upper level (maybe return an optional)
 	if (!expr) {
@@ -256,9 +247,7 @@ bool is_bv_formula_sat(tref form) {
 		return false;
 	}
 	solver.assertFormula(expr.value());
-	auto result = solver.checkSat().isSat();
-	solver.pop();
-	return result;
+	return solver.checkSat().isSat();
 }
 
 template <NodeType node>
@@ -283,7 +272,6 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	auto expr = bv_eval_node<node>(solver, tt(form), vars, free_vars, false);
 	if (!expr) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
-		solver.pop();
 		return std::nullopt;
 	}
 	// solve the equations
@@ -328,7 +316,9 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 		LOG_ERROR << "Failed to parse bitvector constant: " << src;
 		return {};
 	}
-	auto cte = tt(result) | tt::ba_constant;
+	size_t bv_size = get_bv_size<node<BAs...>>(result);
+	tref cte_node = tau::get_bv_constant(result, bv_size);
+	auto cte = tt(cte_node) | tt::ba_constant;
 	return typename node<BAs...>::constant_with_type{ cte, "bv" };
 }
 
