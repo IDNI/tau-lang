@@ -243,7 +243,6 @@ bool is_bv_formula_sat(tref form) {
 	// TODO (MEDIUM) handle this case at an upper level (maybe return an optional)
 	if (!expr) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
-		solver.pop();
 		return false;
 	}
 	solver.assertFormula(expr.value());
