@@ -10,7 +10,7 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // ba type checking and propagation
 template <NodeType node>
-tref new_infer_ba_types(tref n);
+tref infer_ba_types(tref n);
 
 // -----------------------------------------------------------------------------
 // BA types

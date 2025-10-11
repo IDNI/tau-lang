@@ -262,7 +262,7 @@ tref new_infer_ba_types(tref n) {
 				// We infer the common type of all the typeables in the expression
 				// TODO (HIGH) make scoped_union_find accept a partial order of
 				// types and change untyped to bv as default type here.
-				auto type = get_type(typeables, untyped);
+				auto type = get_type(typeables, bv_type);
 				// If no common type is found, we set error and stop traversal
 				if (!type) {
 					LOG_ERROR << "Conflicting type information in bv equation "
