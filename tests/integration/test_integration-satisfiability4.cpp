@@ -4,7 +4,7 @@
 
 TEST_SUITE("Configuration") {
 	TEST_CASE("logging") {
-		logging::trace();
+		//logging::trace();
 	}
 
 	TEST_CASE("bv size") {
