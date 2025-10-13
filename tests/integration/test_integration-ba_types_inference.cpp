@@ -907,6 +907,39 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
+
+	TEST_CASE("bv default (y1)") {
+		tref parsed = parse("all x x & y =_ z");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", bv_type},
+			{"y", bv_type},
+			{"z", bv_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("bv default (y2)") {
+		tref parsed = parse("all x x & y =_ z && y =_ 1:bv[16]");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, type_t>> {
+			{"x", bv16_type},
+			{"y", bv16_type},
+			{"z", bv16_type}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("mixed sbf and tau") {
+		tref parsed = parse("ex x ex y x = 0:tau && xy != 0:sbf");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
 }
 
 TEST_SUITE("new_infer_ba_types: bf formulas") {
