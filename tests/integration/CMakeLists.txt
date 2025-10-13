@@ -14,7 +14,8 @@ set(TESTS
 	satisfiability1
 	satisfiability2
 	satisfiability3
-	#satisfiability4
+	satisfiability4
+	satisfiability5
 	sbf1
 	sbf2
 	solver
