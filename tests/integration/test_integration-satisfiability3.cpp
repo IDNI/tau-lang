@@ -2,6 +2,17 @@
 
 #include "test_integration-satisfiability_helper.h"
 
+TEST_SUITE("Configuration") {
+
+	TEST_CASE("logging") {
+		logging::trace();
+	}
+
+	TEST_CASE("bdd init") {
+		bdd_init<Bool>();
+	}
+}
+
 TEST_SUITE("Alignments y3") {
 	TEST_CASE("equal_lookback_one_st") {
 		tref spec = create_spec("(always o1[t-1]:bv =_ 0) && (sometimes o1[t]:bv =_ 1 && o1[t-1]:bv =_ 0).");

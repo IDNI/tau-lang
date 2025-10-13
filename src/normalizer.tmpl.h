@@ -176,6 +176,9 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
 
+	DBG(LOG_TRACE << "is_non_temp_nso_satisfiable/normalized: "
+		  << LOG_FM(normalized);)
+
 	DBG(assert((t.equals_T() || t.equals_F()
 		|| t.find_top(is<node, tau::constraint>)));)
 
