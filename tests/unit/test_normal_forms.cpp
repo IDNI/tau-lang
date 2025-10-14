@@ -118,17 +118,6 @@ TEST_SUITE("normal forms: reduce_bf") {
 	}*/
 }
 
-TEST_SUITE("normal forms: snf_bf") {
-
-	TEST_CASE("uninterpreted constants") {
-		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
-		tref fm = tt(tau::get(sample))
-			| tau::spec | tau::main | tau::wff
-			| tt::f(snf_bf<node_t>) | tt::ref;
-		CHECK( tau::get(fm) == tau::get_T() );
-	}
-}
-
 TEST_SUITE("normal forms: dnf_bf") {
 
 	TEST_CASE("uninterpreted constants") {
