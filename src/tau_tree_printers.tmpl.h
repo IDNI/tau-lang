@@ -243,7 +243,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
-			bf_splitter, bf_ref, bf_neg, bv_constant, bf_constant, bf_t,
+			bf_ref, bf_neg, bv_constant, bf_constant, bf_t,
 			bf_f, wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
 			variable, ref_args, start
 		};
@@ -457,7 +457,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offsets:           out("["); break;
 			case offset:            if (pnt == io_var) out("[");
 						break;
-			case bf_splitter:       out("S("); break;
 			case bf_constant:
 				out("{ ");
 				if (tref src = tt(ref) | source | tt::ref; src)
@@ -701,7 +700,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case subst_cmd:         out("]"); break;
 			case offset:            if (pnt == io_var) out("]");
 						break;
-			case bf_splitter:
 			case ref_args:          out(")"); break;
 			case bf:
 			case wff:

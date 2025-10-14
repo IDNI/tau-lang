@@ -81,7 +81,6 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     bf_constant
                         |                                     variable
-                        | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
                         | ref                                :bf_ref
@@ -92,16 +91,16 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | bf_constant
-                          | variable | bf_splitter | bf_ref
+                          | variable | bf_ref
                           | bf_t | bf_f | bf_neg | capture)
                                 :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
                         | ((bf_parenthesis | variable
-                           | bf_splitter | bf_ref | bf_neg
+                           | bf_ref | bf_neg
                            | bf_and_nosep | capture)
                                 :bf_and_nosep_1st_oprnd
                            (bf_parenthesis | bf_constant
-                           | variable | bf_splitter | bf_ref
+                           | variable | bf_ref
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
