@@ -211,7 +211,7 @@ std::optional<solution<node>> lgrs(equality eq) {
 	LOG_TRACE << "lgrs/equality: " << LOG_FM(eq);
 	LOG_TRACE << "lgrs/solution: ";
 	for (auto [k, v] : phi) LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
-	tref check = snf_wff<node>(rewriter::replace<node>(eq, phi));
+	tref check = normalizer<node>(rewriter::replace<node>(eq, phi));
 	LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
 #endif // DEBUG
 
