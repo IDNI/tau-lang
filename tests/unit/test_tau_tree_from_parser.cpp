@@ -555,8 +555,8 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( or_formula.has_value() );
 	}
 
-	TEST_CASE("^") {
-		const char* sample = "( Z = 0 ) ^ ( X = 0 ).";
+	TEST_CASE("^^") {
+		const char* sample = "( Z = 0 ) ^^ ( X = 0 ).";
 		auto xor_formula = get_main(sample) | tau::wff | tau::wff_xor;
 		CHECK( xor_formula.has_value() );
 	}

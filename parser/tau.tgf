@@ -42,7 +42,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff   _ "<-"  _ wff)              :wff_rimply
                         | (wff   _ "<->" _ wff)              :wff_equiv
                         | (wff   _ "||"  _ wff)              :wff_or
-                        | (wff   _ '^'   _ wff)              :wff_xor
+                        | (wff   _ "^^"  _ wff)              :wff_xor
                         | (wff   _ "&&"  _ wff)              :wff_and
                         | ('!'   _ wff)                      :wff_neg
                         | 'T'                                :wff_t

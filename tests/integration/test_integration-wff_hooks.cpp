@@ -109,19 +109,19 @@ TEST_SUITE("wff operator hooks") {
 		CHECK( check_hook("(x = 0)&&!(x = 0)", "F") );
 	}
 
-	TEST_CASE("^") {
-		CHECK( check_hook("T^T", "F") );
-		CHECK( check_hook("T^F", "T") );
-		CHECK( check_hook("F^T", "T") );
-		CHECK( check_hook("F^F", "F") );
+	TEST_CASE("^^") {
+		CHECK( check_hook("T^^T", "F") );
+		CHECK( check_hook("T^^F", "T") );
+		CHECK( check_hook("F^^T", "T") );
+		CHECK( check_hook("F^^F", "F") );
 
-		CHECK( check_hook("(x = 0)^F", "(x = 0)") );
-		CHECK( check_hook("F^(x = 0)", "(x = 0)") );
-		CHECK( check_hook("(x = 0)^(x = 0)", "F") );
-		CHECK( check_hook("!(x = 0)^(x = 0)", "T") );
-		CHECK( check_hook("(x = 0)^!(x = 0)", "T") );
-		CHECK( check_hook("(x = 0)^T", "!(x = 0)") );
-		CHECK( check_hook("T^(x = 0)", "!(x = 0)") );
+		CHECK( check_hook("(x = 0)^^F", "(x = 0)") );
+		CHECK( check_hook("F^^(x = 0)", "(x = 0)") );
+		CHECK( check_hook("(x = 0)^^(x = 0)", "F") );
+		CHECK( check_hook("!(x = 0)^^(x = 0)", "T") );
+		CHECK( check_hook("(x = 0)^^!(x = 0)", "T") );
+		CHECK( check_hook("(x = 0)^^T", "!(x = 0)") );
+		CHECK( check_hook("T^^(x = 0)", "!(x = 0)") );
 
 	}
 
