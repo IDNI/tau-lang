@@ -471,7 +471,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (parent && is_to_wrap(t.first_tree()
 					.get_type(), pnt))
 				{
-					wraps.insert(ref), out("(");
+					wraps.insert(ref), out("("), last_quant_nt = nul;
 					if (static_cast<node::type>(nt) == wff)
 							depth++, break_line();
 				}
