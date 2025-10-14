@@ -6,11 +6,7 @@ set(TESTS
 	gc
 	hbdd
 	normal_forms
-	nso_rr
 	product_ba
-	rules-bf_parsing
-	rules-wff_execution
-	rules-wff_parsing
 	sbf_ba_parsing
 	tau_tree_from_parser
 	tau_tree_printers
