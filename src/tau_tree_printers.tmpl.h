@@ -505,7 +505,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case nnf_cmd:           out("nnf "); break;
 			case pnf_cmd:           out("pnf "); break;
 			case mnf_cmd:           out("mnf "); break;
-			case snf_cmd:           out("snf "); break;
 			case onf_cmd:           out("onf "); break;
 			case def_print_cmd:
 			case def_rr_cmd:

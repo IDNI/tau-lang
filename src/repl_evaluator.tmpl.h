@@ -297,22 +297,6 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	return nullptr;
 }
 
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::snf_cmd(const tt& n) {
-	tref arg = n[1].get();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (applied) {
-		switch (tau::get(applied).get_type()) {
-		case tau::wff: return snf_wff<node>(applied);
-		case tau::bf:  return snf_bf<node>(applied);
-		default: return invalid_argument();
-		}
-	}
-	return nullptr;
-}
-
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
@@ -938,7 +922,6 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::nnf_cmd:            result = nnf_cmd(command); break;
 	case tau::pnf_cmd:            not_implemented_yet(); break;
 	case tau::mnf_cmd:            result = mnf_cmd(command); break;
-	case tau::snf_cmd:            result = snf_cmd(command); break;
 	// definition of rec relations to be included during normalization
 	case tau::def_rr_cmd:         def_rr_cmd(command); break;
 	case tau::def_list_cmd:       def_list_cmd(); break;
