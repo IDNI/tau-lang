@@ -17,7 +17,7 @@ add_repl_test_fail(instantiation_cmd_bf4 "x & y. T. i %1[x / %2]" "Invalid argum
 
 add_repl_test(instantiation_cmd_wff1 "x=0. 1. i %-1[x/ %]" ": F")
 
-add_repl_test(instantiation_cmd_wff2 "a=0 && x=0^ b=0 && !x=0. y & z. i %1[x/ %2]" ": !\\(a = 0 && y & z = 0\\) && b = 0 && !y & z = 0 || !\\(b = 0 && !y & z = 0\\) && a = 0 && y & z = 0")
+add_repl_test(instantiation_cmd_wff2 "a=0 && x=0^^ b=0 && !x=0. y & z. i %1[x/ %2]" ": !\\(a = 0 && y & z = 0\\) && b = 0 && !y & z = 0 || !\\(b = 0 && !y & z = 0\\) && a = 0 && y & z = 0")
 
 add_repl_test(instantiation_cmd_wff3 "ex k h=0 && k=0. v & w. i %1[k / %2]" ": ex k h = 0 && k = 0")
 

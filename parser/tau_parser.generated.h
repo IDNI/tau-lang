@@ -334,8 +334,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(78), (NT(79)));
 //G98:  wff(14)              => wff_or(78).
 	p(NT(14), (NT(78)));
-//G99:  __E_wff_30(81)       => wff(14) _(11) '^' _(11) wff(14).
-	p(NT(81), (NT(14)+NT(11)+T(32)+NT(11)+NT(14)));
+//G99:  __E_wff_30(81)       => wff(14) _(11) '^' '^' _(11) wff(14).
+	p(NT(81), (NT(14)+NT(11)+T(32)+T(32)+NT(11)+NT(14)));
 //G100: wff_xor(80)          => __E_wff_30(81).
 	p(NT(80), (NT(81)));
 //G101: wff(14)              => wff_xor(80).
