@@ -75,7 +75,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
 # but they are not boolean functions themselves, they return a T/F wff value
 # and hence, should be considered as wffs
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
-                        |                                     bf_constant
+                        |                                     ba_constant
                         |                                     variable
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
@@ -86,7 +86,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('0' [ typed ])                    :bf_f
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
-                        | ((bf_parenthesis | bf_constant
+                        | ((bf_parenthesis | ba_constant
                           | variable | bf_ref
                           | bf_t | bf_f | bf_neg | capture)
                                 :bf_neg_oprnd _ "'")         :bf_neg
@@ -95,7 +95,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                            | bf_ref | bf_neg
                            | bf_and_nosep | capture)
                                 :bf_and_nosep_1st_oprnd
-                           (bf_parenthesis | bf_constant
+                           (bf_parenthesis | ba_constant
                            | variable | bf_ref
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
@@ -142,7 +142,7 @@ constraint =>
         | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_lt.
 
 # constants
-bf_constant            => '{' _ (capture | source) _ '}' [ typed ].
+ba_constant            => '{' _ (capture | source) _ '}' [ typed ].
 source                 => src_c [ (src_c | space)* src_c ].
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 

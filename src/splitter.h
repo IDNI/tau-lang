@@ -57,7 +57,7 @@ requires BAsPack<BAs...>
 tref tau_splitter(tref fm, splitter_type st);
 
 /**
- * @brief Splitter function for a nso tau::bf_constant node holding a BA constant.
+ * @brief Splitter function for a nso tau::ba_constant node holding a BA constant.
  * @param n Operand.
  * @param st Splitter type (default is splitter_type::upper).
  * @return Result of the splitter operation.

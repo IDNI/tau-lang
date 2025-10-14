@@ -640,7 +640,7 @@ template <NodeType node>
 bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 	switch (nt) {
 		case bf:
-		case bf_constant:
+		case ba_constant:
 		case bf_fall:
 		case bf_fex:
 		case bf_ref:
@@ -683,7 +683,7 @@ template <NodeType node>
 bool tree<node>::is_num() const { return is(num) || is(history_id); }
 
 template <NodeType node>
-bool tree<node>::is_ba_constant() const { return is(bf_constant); }
+bool tree<node>::is_ba_constant() const { return is(ba_constant); }
 
 template <NodeType node>
 bool tree<node>::is_bv_constant() const { return is(bv_constant); }
