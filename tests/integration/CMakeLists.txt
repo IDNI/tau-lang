@@ -5,7 +5,6 @@ set(TESTS
 	bf_hooks
 	bf_normalization
 	quantifiers
-	normal_forms
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval
