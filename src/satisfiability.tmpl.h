@@ -460,8 +460,41 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 }
 
 template <NodeType node>
+tref quant_streams_to_var(tref fm) {
+	using tau = tree<node>;
+	// Currently use multiset in order to take nested scopes
+	// using same variable name into account
+	std::multiset<tref, subtree_less<node>> quant_vars;
+	auto f = [&quant_vars](tref n) {
+		if (is_quantifier<node>(n)) {
+			quant_vars.insert(tau::trim(n));
+			return n;
+		}
+		if (is_var_or_capture<node>(n) && quant_vars.contains(n)) {
+			if (is_child<node>(n, tau::io_var)) {
+				// Quantified io stream
+				// Transform to usual variable
+				const tau& n_t = tau::get(n);
+				return build_variable<node>(n_t.to_str(),
+					n_t.get_ba_type());
+			}
+		}
+		return n;
+	};
+	auto up = [&quant_vars](tref n) {
+		if (is_quantifier<node>(n))
+			quant_vars.extract(tau::trim(n));
+		return n;
+	};
+	return pre_order<node>(fm).apply_until_change(f, visit_wff<node>, up);
+}
+
+template <NodeType node>
 tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 	using tau = tree<node>;
+	// First convert quantified streams to normal variables
+	fm = quant_streams_to_var<node>(fm);
+
 	// Find lookback
 	auto current_io_vars = tau::get(fm).select_top(
 			is_child<node, tau::io_var>);
