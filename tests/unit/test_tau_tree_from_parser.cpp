@@ -9,7 +9,7 @@
 
 // TODO (LOW) why "$X := { : src_code } bf_and { bool : src_code }." is parsed
 //
-// improperly? bf | bf_constant | ...
+// improperly? bf | ba_constant | ...
 //
 // Check if still hapopens after the latest changes to the grammar.
 

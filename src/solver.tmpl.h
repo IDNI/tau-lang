@@ -526,13 +526,13 @@ private:
 template <NodeType node>
 tref get_constant(minterm m) {
 	using tau = tree<node>;
-	//auto cte = find_top(m, is_child_non_terminal<tau::bf_constant, node>);
+	//auto cte = find_top(m, is_child_non_terminal<tau::ba_constant, node>);
 	//return cte ? cte.value() : _1<node>;
-	auto is_bf_constant = [](const auto& n) -> bool {
-		return is_child<node, tau::bf_constant>(n);
+	auto is_ba_constant = [](const auto& n) -> bool {
+		return is_child<node, tau::ba_constant>(n);
 	};
 	// FIXME convert vars to a set
-	trefs all_vs = tau::get(m).select_top(is_bf_constant);
+	trefs all_vs = tau::get(m).select_top(is_ba_constant);
 	return build_bf_and<node>(all_vs);
 }
 
@@ -622,7 +622,7 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 					? options.splitter_one
 					// case 4.2
 					: splitter(tau::get(tt(d_cte)
-						| tau::bf_constant
+						| tau::ba_constant
 						| tt::ref)).get();
 
 				DBG(LOG_TRACE << "add_minterm_to_disjoint"

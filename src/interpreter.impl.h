@@ -309,7 +309,7 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 		DBG(LOG_TRACE << LOG_FM_TREE(io_var));
 		tref var_name = get_var_name_node<node>(io_var);
 		DBG(LOG_TRACE << LOG_FM_TREE(var_name));
-		auto value = tt(outputs.find(io_var)->second) | tau::bf_constant;
+		auto value = tt(outputs.find(io_var)->second) | tau::ba_constant;
 		std::stringstream ss;
 		if (!value) {
 			// is bf_t

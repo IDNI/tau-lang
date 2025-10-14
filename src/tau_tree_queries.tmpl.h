@@ -50,7 +50,7 @@ bool is_temporal_quantifier(tref n) {
 
 template <NodeType node>
 bool is_ba_element(tref n) {
-	return tree<node>::get(n).is(node::type::bf_constant)
+	return tree<node>::get(n).is(node::type::ba_constant)
 		|| tree<node>::get(n).is(node::type::variable)
 		|| tree<node>::get(n).is(node::type::bf_t)
 		|| tree<node>::get(n).is(node::type::bf_f);
@@ -202,7 +202,7 @@ size_t find_ba_type (tref term) {
 // template <NodeType node>
 // auto visit_io_vars = [] (tref n) static {
 // 	auto nt = tree<node>::get(n).get_type();
-// 	if (nt == node::type::bf_constant
+// 	if (nt == node::type::ba_constant
 // 		|| nt == node::type::uconst_name) return false;
 // 	return true;
 // };

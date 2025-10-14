@@ -39,7 +39,7 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 						os << " " << LOG_BA_TYPE(n.ba);
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
-	else if (n.nt == tau::bf_constant) {
+	else if (n.nt == tau::ba_constant) {
 		if (n.data != 0) // constant id is not 0 = parsed
 			os << " { " << ba_constants<node>::get(n.data)
 				<< " } : " << get_ba_type_name<node>(n.ba);
@@ -243,7 +243,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
-			bf_ref, bf_neg, bv_constant, bf_constant, bf_t,
+			bf_ref, bf_neg, bv_constant, ba_constant, bf_t,
 			bf_f, wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
 			variable, ref_args, start
 		};
@@ -397,7 +397,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		{ rec_relation,  TC.YELLOW() },
 		{ constraint,    TC.LIGHT_MAGENTA() },
 		{ io_var,        TC.WHITE() },
-		{ bf_constant,   TC.LIGHT_CYAN() },
+		{ ba_constant,   TC.LIGHT_CYAN() },
 		{ bv_constant,   TC.LIGHT_CYAN() }
 		// { rule,          TC.BG_YELLOW() },
 	};
@@ -449,7 +449,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offsets:           out("["); break;
 			case offset:            if (pnt == io_var) out("[");
 						break;
-			case bf_constant:
+			case ba_constant:
 				out("{ ");
 				if (tref src = tt(ref) | source | tt::ref; src)
 					out(tau::get(src).get_string());
@@ -529,7 +529,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 					out(" : bv "); out(tau::get(num).data());
 				} else out(" : bv ");
 				break;
-			case source: break; // is printed from bf_constant
+			case source: break; // is printed from ba_constant
 			default:
 				if (is_string_nt(nt)) {
 					if (nt == uconst_name) out("<");
@@ -558,7 +558,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (pnt) {
 			case bf_and:
 				if (isdigit(last_written_char)
-					|| t.child_is(tau::bf_constant))
+					|| t.child_is(tau::ba_constant))
 						out(" ");
 				last_quant_nt = nul;
 				break;
@@ -640,7 +640,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offsets:           out(", "); break;
 			case shift:             out("-"); break;
 			case variable:
-			case bf_constant:       out(" : "); break;
+			case ba_constant:       out(" : "); break;
 
 			case wff_all:
 			case wff_ex:

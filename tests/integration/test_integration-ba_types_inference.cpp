@@ -149,7 +149,7 @@ bool check_ctes(tref inferred, std::vector<type_t>& expected) {
 	// DBG(LOG_TRACE << "Checking bf constants in: "
 	// 	<< LOG_FM_TREE(inferred);)
 
-	auto ctes = tau::get(inferred).select_top(is<node_t, tau::bf_constant>);
+	auto ctes = tau::get(inferred).select_top(is<node_t, tau::ba_constant>);
 	if (ctes.empty() && expected.size() > 0) {
 		TAU_LOG_ERROR << "No constants found";
 		return false;

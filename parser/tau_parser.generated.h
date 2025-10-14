@@ -26,7 +26,7 @@ inline const std::vector<std::string> symbol_names{
 	"bf_ngt", "__E_wff_39", "bf_gteq", "__E_wff_40", "bf_ngteq", "__E_wff_41", "bf_lt", "__E_wff_42", "bf_nlt", "__E_wff_43", 
 	"bv_eq", "__E_wff_44", "bv", "bv_neq", "__E_wff_45", "bv_lteq", "__E_wff_46", "bv_nlteq", "__E_wff_47", "bv_gt", 
 	"__E_wff_48", "bv_ngt", "__E_wff_49", "bv_gteq", "__E_wff_50", "bv_ngteq", "__E_wff_51", "bv_lt", "__E_wff_52", "bv_nlt", 
-	"__E_wff_53", "bf_parenthesis", "__E_bf_54", "bf_constant", "variable", "bf_fall", "__E_bf_55", "bf_fex", "__E_bf_56", "bf_ref", 
+	"__E_wff_53", "bf_parenthesis", "__E_bf_54", "ba_constant", "variable", "bf_fall", "__E_bf_55", "bf_fex", "__E_bf_56", "bf_ref", 
 	"bf_or", "__E_bf_57", "bf_xor", "__E_bf_58", "bf_t", "__E_bf_59", "__E___E_bf_59_60", "bf_f", "__E_bf_61", "__E___E_bf_61_62", 
 	"bf_and", "__E_bf_63", "__E___E_bf_63_64", "bf_neg", "__E_bf_65", "bf_neg_oprnd", "__E___E_bf_65_66", "bf_and_nosep", "__E_bf_67", "bf_and_nosep_1st_oprnd", 
 	"__E___E_bf_67_68", "bf_and_nosep_2nd_oprnd", "__E___E_bf_67_69", "bv_parenthesis", "__E_bv_70", "bv_checked", "__E_bv_71", "bv_add", "__E_bv_72", "bv_mul", 
@@ -35,7 +35,7 @@ inline const std::vector<std::string> symbol_names{
 	"bv_shl", "__E_bv_83", "bv_shr", "__E_bv_84", "bv_min", "__E_bv_85", "bv_max", "__E_bv_86", "bv_constant", "binary", 
 	"__E_bv_constant_87", "decimal", "__E_bv_constant_88", "hexadecimal", "__E_bv_constant_89", "__E_binary_90", "__E_binary_91", "__E_hexadecimal_92", "__E_decimal_93", "ctn_neq", 
 	"__E_constraint_94", "ctnvar", "num", "ctn_eq", "__E_constraint_95", "ctn_gteq", "__E_constraint_96", "ctn_gt", "__E_constraint_97", "ctn_lteq", 
-	"__E_constraint_98", "ctn_lt", "__E_constraint_99", "__E_bf_constant_100", "source", "__E_bf_constant_101", "src_c", "__E_source_102", "__E___E_source_102_103", "__E___E_source_102_104", 
+	"__E_constraint_98", "ctn_lt", "__E_constraint_99", "__E_ba_constant_100", "source", "__E_ba_constant_101", "src_c", "__E_source_102", "__E___E_source_102_103", "__E___E_source_102_104", 
 	"__E_src_c_105", "__E_src_c_106", "__E_variable_107", "uconst", "io_var", "var_name", "__E_variable_108", "__E_var_name_109", "__E_var_name_110", "__E_var_name_111", 
 	"__E_var_name_112", "__E_var_name_113", "offset", "chars", "uconst_name", "__E_uconst_114", "__E___E_uconst_114_115", "q_var", "__E_q_vars_116", "__E_q_vars_117", 
 	"__E_offsets_118", "__E_offsets_119", "integer", "shift", "__E_offset_120", "__E_shift_121", "__E___E_shift_121_122", "__E_chars_123", "__E_chars_124", "digits", 
@@ -494,7 +494,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(131), (NT(132)));
 //G178: bf(30)               => bf_parenthesis(131).
 	p(NT(30), (NT(131)));
-//G179: bf(30)               => bf_constant(133).
+//G179: bf(30)               => ba_constant(133).
 	p(NT(30), (NT(133)));
 //G180: bf(30)               => variable(134).
 	p(NT(30), (NT(134)));
@@ -558,7 +558,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(30), (NT(150)));
 //G210: __E___E_bf_65_66(156) => bf_parenthesis(131).
 	p(NT(156), (NT(131)));
-//G211: __E___E_bf_65_66(156) => bf_constant(133).
+//G211: __E___E_bf_65_66(156) => ba_constant(133).
 	p(NT(156), (NT(133)));
 //G212: __E___E_bf_65_66(156) => variable(134).
 	p(NT(156), (NT(134)));
@@ -596,7 +596,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(159), (NT(160)));
 //G229: __E___E_bf_67_69(162) => bf_parenthesis(131).
 	p(NT(162), (NT(131)));
-//G230: __E___E_bf_67_69(162) => bf_constant(133).
+//G230: __E___E_bf_67_69(162) => ba_constant(133).
 	p(NT(162), (NT(133)));
 //G231: __E___E_bf_67_69(162) => variable(134).
 	p(NT(162), (NT(134)));
@@ -814,15 +814,15 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(221), (NT(222)));
 //G338: constraint(71)       => ctn_lt(221).
 	p(NT(71), (NT(221)));
-//G339: __E_bf_constant_100(223) => capture(29).
+//G339: __E_ba_constant_100(223) => capture(29).
 	p(NT(223), (NT(29)));
-//G340: __E_bf_constant_100(223) => source(224).
+//G340: __E_ba_constant_100(223) => source(224).
 	p(NT(223), (NT(224)));
-//G341: __E_bf_constant_101(225) => typed(33).
+//G341: __E_ba_constant_101(225) => typed(33).
 	p(NT(225), (NT(33)));
-//G342: __E_bf_constant_101(225) => null.
+//G342: __E_ba_constant_101(225) => null.
 	p(NT(225), (nul));
-//G343: bf_constant(133)     => '{' _(11) __E_bf_constant_100(223) _(11) '}' __E_bf_constant_101(225).
+//G343: ba_constant(133)     => '{' _(11) __E_ba_constant_100(223) _(11) '}' __E_ba_constant_101(225).
 	p(NT(133), (T(47)+NT(11)+NT(223)+NT(11)+T(48)+NT(225)));
 //G344: __E___E_source_102_103(228) => src_c(226).
 	p(NT(228), (NT(226)));
@@ -1565,7 +1565,7 @@ struct tau_parser_nonterminals {
 		bf_ngt, __E_wff_39, bf_gteq, __E_wff_40, bf_ngteq, __E_wff_41, bf_lt, __E_wff_42, bf_nlt, __E_wff_43, 
 		bv_eq, __E_wff_44, bv, bv_neq, __E_wff_45, bv_lteq, __E_wff_46, bv_nlteq, __E_wff_47, bv_gt, 
 		__E_wff_48, bv_ngt, __E_wff_49, bv_gteq, __E_wff_50, bv_ngteq, __E_wff_51, bv_lt, __E_wff_52, bv_nlt, 
-		__E_wff_53, bf_parenthesis, __E_bf_54, bf_constant, variable, bf_fall, __E_bf_55, bf_fex, __E_bf_56, bf_ref, 
+		__E_wff_53, bf_parenthesis, __E_bf_54, ba_constant, variable, bf_fall, __E_bf_55, bf_fex, __E_bf_56, bf_ref, 
 		bf_or, __E_bf_57, bf_xor, __E_bf_58, bf_t, __E_bf_59, __E___E_bf_59_60, bf_f, __E_bf_61, __E___E_bf_61_62, 
 		bf_and, __E_bf_63, __E___E_bf_63_64, bf_neg, __E_bf_65, bf_neg_oprnd, __E___E_bf_65_66, bf_and_nosep, __E_bf_67, bf_and_nosep_1st_oprnd, 
 		__E___E_bf_67_68, bf_and_nosep_2nd_oprnd, __E___E_bf_67_69, bv_parenthesis, __E_bv_70, bv_checked, __E_bv_71, bv_add, __E_bv_72, bv_mul, 
@@ -1574,7 +1574,7 @@ struct tau_parser_nonterminals {
 		bv_shl, __E_bv_83, bv_shr, __E_bv_84, bv_min, __E_bv_85, bv_max, __E_bv_86, bv_constant, binary, 
 		__E_bv_constant_87, decimal, __E_bv_constant_88, hexadecimal, __E_bv_constant_89, __E_binary_90, __E_binary_91, __E_hexadecimal_92, __E_decimal_93, ctn_neq, 
 		__E_constraint_94, ctnvar, num, ctn_eq, __E_constraint_95, ctn_gteq, __E_constraint_96, ctn_gt, __E_constraint_97, ctn_lteq, 
-		__E_constraint_98, ctn_lt, __E_constraint_99, __E_bf_constant_100, source, __E_bf_constant_101, src_c, __E_source_102, __E___E_source_102_103, __E___E_source_102_104, 
+		__E_constraint_98, ctn_lt, __E_constraint_99, __E_ba_constant_100, source, __E_ba_constant_101, src_c, __E_source_102, __E___E_source_102_103, __E___E_source_102_104, 
 		__E_src_c_105, __E_src_c_106, __E_variable_107, uconst, io_var, var_name, __E_variable_108, __E_var_name_109, __E_var_name_110, __E_var_name_111, 
 		__E_var_name_112, __E_var_name_113, offset, chars, uconst_name, __E_uconst_114, __E___E_uconst_114_115, q_var, __E_q_vars_116, __E_q_vars_117, 
 		__E_offsets_118, __E_offsets_119, integer, shift, __E_offset_120, __E_shift_121, __E___E_shift_121_122, __E_chars_123, __E_chars_124, digits, 

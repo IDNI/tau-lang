@@ -54,7 +54,7 @@ TEST_SUITE("bf operator hooks") {
 		tref parsed = tau::get(std::string(sample) + " = 0.", { .reget_with_hooks = false });
 		using node = node_t;
 		// DBG(TAU_LOG_TRACE << "parsed: " << TAU_LOG_FM_DUMP(parsed);)
-		tref c = tau::get(parsed).find_top(is<node, tau::bf_constant>);
+		tref c = tau::get(parsed).find_top(is<node, tau::ba_constant>);
 		size_t type_id = tau::get(c).get_ba_type();
 		size_t type_expected_id = get_ba_type_id<node_t>(type);
 		auto sample_type = get_ba_type_name<node_t>(type_id);

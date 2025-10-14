@@ -118,6 +118,6 @@ TEST_SUITE("SBF expressions") {
 	TEST_CASE("X or Y") {
 		bdd_init<Bool>();
 		const char* sample = "{X}:sbf | {Y}:sbf";
-		CHECK( bf_normalize_and_check(sample, tau::bf_constant) );
+		CHECK( bf_normalize_and_check(sample, tau::ba_constant) );
 	}
 }
