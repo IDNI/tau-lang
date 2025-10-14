@@ -22,20 +22,6 @@ using tau = tree<node_t>;
 using tt = tau::traverser;
 using bac = ba_constants<node_t>;
 
-tau::get_options parse_bf_rule() {
-	static tau::get_options opts{ .parse = { .start = tau::bf_rule },
-		.infer_ba_types = false,
-		.reget_with_hooks = false };
-	return opts;
-}
-
-tau::get_options parse_wff_rule() {
-	static tau::get_options opts{ .parse = { .start = tau::wff_rule },
-		.infer_ba_types = false,
-		.reget_with_hooks = false };
-	return opts;
-}
-
 tau::get_options parse_bf() {
 	static tau::get_options opts{ .parse = { .start = tau::bf } };
 	return opts;

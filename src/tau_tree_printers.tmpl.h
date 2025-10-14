@@ -271,8 +271,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ history_store_cmd,   50 },
 			{ sat_cmd,             50 },
 			{ main,                60 },
-			{ bf_rule,             60 },
-			{ wff_rule,            60 },
 			{ ref,                 80 },
 			{ wff_sometimes,      380 },
 			{ wff_always,         390 },
@@ -332,14 +330,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bv_neg,             825 },
 			{ bv,                 826 },
 			{ bv_constant,        827 },
-			{ bf_matcher,         898 },
-			{ bf_body,            899 },
 			{ rec_relation,       900 },
 			{ ref_args,           900 },
-			{ bf_rule,            900 },
-			{ wff_rule,           900 },
-			{ wff_matcher,        900 },
-			{ wff_body,           900 },
 		};
 
 		if (no_wrap_for.find(nt) != no_wrap_for.end())
@@ -645,8 +637,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_interval:       out(" <= "); last_quant_nt = nul; break;
 
 			case rec_relation:      out(" := "); break;
-			case wff_rule:          out(" ::= "); break;
-			case bf_rule:           out(" := "); break;
 			case ref_args:
 			case offsets:           out(", "); break;
 			case shift:             out("-"); break;
@@ -690,9 +680,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_neg:            out("'");
 				last_quant_nt = nul; break;
 			case main:
-			case rec_relation:
-			case wff_rule:
-			case bf_rule:           out("."); break;
+			case rec_relation:      out("."); break;
 			case constraint:
 			case offsets:
 			case inst_cmd:
