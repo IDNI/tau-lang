@@ -18,7 +18,7 @@ bool check_solution(tref eq, const solution<node>& sol) {
 	using tau = tree<node>;
 	DBG(TAU_LOG_TRACE << "check_solution/sol:\n" << dump_to_str(sol);)
 	tref substitution = rewriter::replace<node>(eq, sol);
-	tref check = snf_wff<node>(substitution);
+	tref check = normalizer<node>(substitution);
 #ifdef DEBUG
 	// std::cout << "check_solution/solution: " << dump<node>(sol) << "\n";
 	std::cout << "check_solution/equation: " << TAU_DUMP_TO_STR(eq) << "\n";
