@@ -9,7 +9,7 @@
 start                  => spec _.
 
 # start symbol posibilities:
-# spec, inputs, library, tau_constant_source, cli (bellow)
+# spec, inputs, tau_constant_source, cli (bellow)
 spec                   => definitions _ wff:main _ '.'.
 spec_multiline         => _ (rec_relation | input_def | output_def | main)
                                                                 [ _ '.' ] _ | _.
@@ -26,7 +26,6 @@ fp_fallback            => "first":first_sym | "last":last_sym
                         | capture | ref | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
-library                => ((_ (wff_rule | bf_rule):rule)*):rules.
 wff_rule               => wff:wff_matcher _ "::=" _ wff:wff_body _ '.'.
 bf_rule                => bf :bf_matcher  _  ":=" _ bf :bf_body  _ '.'.
 
