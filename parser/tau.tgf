@@ -230,7 +230,6 @@ cli_command            =>
         | ("nnf":nnf_sym __ nf_cmd_arg)                       :nnf_cmd
         | ("pnf":pnf_sym __ nf_cmd_arg)                       :pnf_cmd
         | ("mnf":mnf_sym __ nf_cmd_arg)                       :mnf_cmd
-        | ("snf":snf_sym __ nf_cmd_arg)                       :snf_cmd
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd

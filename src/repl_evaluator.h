@@ -132,7 +132,6 @@ private:
 	tref nnf_cmd(const tt& n);
 	tref mnf_cmd(const tt& n);
 	tref onf_cmd(const tt& n);
-	tref snf_cmd(const tt& n);
 
 	// eval
 	int eval_cmd(const tt& n);

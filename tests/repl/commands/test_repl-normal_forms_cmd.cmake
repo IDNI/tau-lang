@@ -47,12 +47,3 @@ add_repl_test(normal_forms-mnf_bf_mem_rel "T. mnf %-0" "T")
 #	COMMAND bash -c "echo 'onf X (X = 0) && ((Y=0) || (Z=0)). q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 #set_tests_properties(test_repl-onf_wff_cmd PROPERTIES
 #	PASS_REGULAR_EXPRESSION "onf command converts")
-
-# snf command
-add_repl_test(normal_forms-snf-wff "snf T" "T")
-add_repl_test(normal_forms-snf-wff_mem_abs "T. snf %1" "T")
-add_repl_test(normal_forms-snf-wff_mem_rel "T. snf %-0" "T")
-
-add_repl_test(normal_forms-snf-bf "snf 1" "1")
-add_repl_test(normal_forms-snf-bf_mem_abs "1. snf %1" "1")
-add_repl_test(normal_forms-snf-bf_mem_rel "1. snf %-0" "1")
