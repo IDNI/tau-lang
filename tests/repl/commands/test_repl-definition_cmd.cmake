@@ -4,10 +4,10 @@
 
 include(add_repl_test)
 
-# definition command wff_tule
+# definition command rec_relation
 add_repl_test(def_wff_cmd "g(Y) := T" "\\[1\\] g")
 
-# definition command bf_rule
+# definition command rec_relation
 add_repl_test(def_bf_cmd "g(Y) := 1" "\\[1\\] g")
 
 # definition command list

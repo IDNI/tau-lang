@@ -284,39 +284,4 @@ tref tree<node>::get_from_file(const std::string& filename,
 	return tree<node>::get(result, options);
 }
 
-template <NodeType node>
-rewriter::rules tree<node>::get_rules(tref ref) {
-	return tau_lang::get_rules<node>(ref);
-}
-
-template <NodeType node>
-rewriter::rules tree<node>::get_rules(const std::string& source) {
-	return tau_lang::get_rules<node>(source);
-}
-
-template <NodeType node>
-rewriter::rules get_rules(tref r) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	tt rules(r);
-	DBG(assert(rules.is(tau::rules));)
-	auto rs = rules || tau::rule || tt::first;
-	rewriter::rules x;
-	for (auto r : rs.traversers()) {
-		// tree::get(r.value()).print(std::cout << "rule: ");
-		x.emplace_back( tau::geth(r| tt::first  | tt::first | tt::ref),
-				tau::geth(r| tt::second | tt::first | tt::ref));
-	}
-	return x;
-}
-
-template <NodeType node>
-rewriter::rules get_rules(const std::string& str) {
-	using tau = tree<node>;
-	typename tau::get_options opts{ .parse = { .start = tau::rules },
-					.infer_ba_types = false,
-					.reget_with_hooks = false };
-	return get_rules<node>(tau::get(str, opts));
-}
-
 } // namespace idni::tau_lang

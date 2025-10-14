@@ -467,22 +467,6 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 	}
 }
 
-
-TEST_SUITE("parsing rewriting rules") {
-
-	TEST_CASE("wff rewriting rules") {
-		const char* sample = "T ::= T.";
-		auto wff_rule = tau::get(sample, parse_wff_rule());
-		CHECK( wff_rule != nullptr );
-	}
-
-	TEST_CASE("bf rewriting rules") {
-		const char* sample = "1 := 1.";
-		auto bf_rule = tau::get(sample, parse_bf_rule());
-		CHECK( bf_rule != nullptr );
-	}
-}
-
 TEST_SUITE("parsing variables") {
 	// done inderectly
 }
