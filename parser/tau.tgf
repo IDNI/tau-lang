@@ -177,8 +177,6 @@ typed                  => _ ':' _ type [ _ '[' _ subtype _ ']' _ ].
 type                   => chars.
 subtype                => num.
 
-scope_id               => digits. # dummy rule to introduce scope_id nt
-
 # whitespace and comments
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
 __                     => space | comment | __ space | __ comment. # whitespace

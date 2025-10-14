@@ -457,7 +457,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				out(" } : ");
 				out(t.get_ba_type_name());
 				break;
-			case scope_id: out(" _"), out(t.data()), out("_"); break;
 			case wff:
 			case bf:
 				if (parent && is_to_wrap(t.first_tree()
