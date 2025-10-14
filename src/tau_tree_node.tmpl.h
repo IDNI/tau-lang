@@ -83,7 +83,6 @@ inline bool is_term_nt(size_t nt) {
 	switch (nt) {
 		case tau_parser::bf:
 		case tau_parser::bf_constant:
-		case tau_parser::bf_splitter:
 		case tau_parser::bf_ref:
 		case tau_parser::bf_or:
 		case tau_parser::bf_xor:
