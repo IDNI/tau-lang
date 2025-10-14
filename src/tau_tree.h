@@ -394,10 +394,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	//  rules, library
 	static rewriter::rules get_rules(tref r);
-	static rewriter::library get_rules(const std::string& source);
-
-	static rewriter::rules get_library(tref r);
-	static rewriter::library get_library(const std::string& source);
+	static rewriter::rules get_rules(const std::string& source);
 
 	// ---------------------------------------------------------------------
 	// tree::traverser / tt API (tau_tree_traverser.tmpl.h)
@@ -791,11 +788,6 @@ template <NodeType node>
 rewriter::rules get_rules(tref r);
 template <NodeType node>
 rewriter::rules get_rules(const std::string& source);
-
-template <NodeType node>
-rewriter::rules get_library(tref r);
-template <NodeType node>
-rewriter::library get_library(const std::string& source);
 
 } // namespace idni::tau_lang
 

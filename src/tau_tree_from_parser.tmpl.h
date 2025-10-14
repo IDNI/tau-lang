@@ -295,16 +295,6 @@ rewriter::rules tree<node>::get_rules(const std::string& source) {
 }
 
 template <NodeType node>
-rewriter::library tree<node>::get_library(tref ref) {
-	return tau_lang::get_library<node>(ref);
-}
-
-template <NodeType node>
-rewriter::library tree<node>::get_library(const std::string& str) {
-	return tau_lang::get_library<node>(str);
-}
-
-template <NodeType node>
 rewriter::rules get_rules(tref r) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -321,29 +311,12 @@ rewriter::rules get_rules(tref r) {
 }
 
 template <NodeType node>
-rewriter::library get_rules(const std::string& str) {
+rewriter::rules get_rules(const std::string& str) {
 	using tau = tree<node>;
 	typename tau::get_options opts{ .parse = { .start = tau::rules },
 					.infer_ba_types = false,
 					.reget_with_hooks = false };
 	return get_rules<node>(tau::get(str, opts));
-}
-
-template <NodeType node>
-rewriter::rules get_library(tref r) {
-	using tau = tree<node>;
-	const auto& lib = tau::get(r);
-	DBG(assert(lib.is(tau::library));)
-	return get_rules<node>(lib.first());
-}
-
-template <NodeType node>
-rewriter::library get_library(const std::string& str) {
-	using tau = tree<node>;
-	typename tau::get_options opts{ .parse = { .start = tau::library },
-					.infer_ba_types = false,
-					.reget_with_hooks = false };
-	return get_library<node>(tau::get(str, opts));
 }
 
 } // namespace idni::tau_lang
