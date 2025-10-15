@@ -67,7 +67,6 @@ std::optional<constant_with_type<BAs...>> parse_sbf(
 	auto sid = dict(src);
 	if (auto cn = cache.find(sid); cn != cache.end())
 		return constant_with_type<BAs...>{ cn->second, "sbf" };
-
 	//parse the source
 	auto result = sbf_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
@@ -76,6 +75,7 @@ std::optional<constant_with_type<BAs...>> parse_sbf(
 		LOG_ERROR << "[sbf] " << msg << "\n";
 		return {}; // Syntax error
 	}
+	// get the sbf_constant node
 	auto t = sbf_parser::tree::traverser(result.get_shaped_tree2())
 							| sbf_parser::sbf;
 	auto v = t.has_value() ? sbf_eval_node(t) : bdd_handle<Bool>::hfalse;
