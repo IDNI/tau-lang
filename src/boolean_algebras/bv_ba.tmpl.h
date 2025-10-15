@@ -318,7 +318,7 @@ inline bv bv_eval_node(const bitvector_parser::tree::traverser& t, size_t size) 
 	DBG(assert(base > 0 );)
 
 	// get the string
-	auto str = t | tt::terminals;
+	auto str = n | tt::terminals;
 
 #ifdef DEBUG
 	LOG_TRACE << "get_bv_from_parse_tree/str: " << str;
