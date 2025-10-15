@@ -4,13 +4,16 @@
 
 @enable productions charvar.
 
-start  => _ bitvector _.
-
-bitvector  => "#b" binary
+start       => _ bitvector _.
+bitvector   => "#b" binary
             | decimal
             | "#x" hexadecimal.
-binary                 => ('0' | '1')+.
-hexadecimal            => xdigit+.
-decimal                => digit+.
+binary      => ('0' | '1')+.
+hexadecimal => xdigit+.
+decimal     => digit+.
+_           => [ space _ ].
 
 @trim _.
+
+@trim all terminals except children of
+        decimal, hexadecimal, binary.
