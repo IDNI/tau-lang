@@ -281,7 +281,7 @@ tref get_var_name_node(tref var) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto v = tt(var);
-	if (v.is(tau::ba_constant) || v.is(tau::var_name) || v.is(tau::bv_constant)) return var;
+	if (v.is(tau::ba_constant) || v.is(tau::var_name)) return var;
 	// TODO: refactor
 	if (auto vn = v | tau::var_name; vn) return vn.value();
 	if (auto vn = v | tau::io_var | tau::var_name; vn) return vn.value();

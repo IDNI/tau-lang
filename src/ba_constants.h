@@ -30,8 +30,8 @@ struct ba_constants {
 	// get the constant variant from source
 	static std::optional<typename node::constant_with_type> get(
 		const std::string& constant_source,
-		const std::string type_name,
-		const std::string options = ""
+		const std::string& type_name,
+		tref subtype = nullptr
 	);
 
 	// TODO (HIGH) add a similar method that takes a type (pair of ba_id and

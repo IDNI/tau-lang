@@ -29,10 +29,10 @@ struct nso_factory<bv, Bool> {
 };
 
 template <>
-std::optional<typename ba_constants<node<bv, Bool>>::constant_with_type> ba_constants<node<bv, Bool>>::get(
-		[[maybe_unused]] const std::string& constant_source,
-		[[maybe_unused]] const std::string type_name,
-		[[maybe_unused]] const std::string options) {
+std::optional<typename node<bv, Bool>::constant_with_type> ba_constants<node<bv, Bool>>::get(
+		const std::string& constant_source,
+		[[maybe_unused]] const std::string& type_name,
+		[[maybe_unused]] tref subtype) {
 	if (constant_source == "1" || constant_source == "true")
 		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(true), "bool" };
 	if (constant_source == "0" || constant_source == "false")

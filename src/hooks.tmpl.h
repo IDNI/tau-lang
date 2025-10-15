@@ -14,8 +14,7 @@ template <NodeType node>
 tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
-	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift
-			|| v.nt == tau::bv_constant)
+	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift)
 		log("- HOOK    -", v, ch, len, r, true);)
 	tref ret = nullptr;
 	if      (v.nt == tau::bf)          ret = term( v, ch, len, r);
@@ -27,8 +26,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 		HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
 		DBG(typename node::type nt = tau::get(ret).get_type();)
 		DBG(assert(nt == tau::bf || nt == tau::wff
-			|| nt == tau::shift || nt == tau::integer
-			|| tau::get(ret).is_bv_constant() );)
+			|| nt == tau::shift || nt == tau::integer);)
 	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error";) }
 	return ret;
 }

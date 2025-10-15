@@ -363,18 +363,20 @@ tref tree<node>::get_ba_constant(const constant& constant, size_t ba_type_id)
 template <NodeType node>
 tref tree<node>::get_ba_constant(
 	const std::string& constant_source,
-	const std::string  type_name)
+	const std::string  type_name,
+	tref subtype)
 {
 	LOG_TRACE << " -- get ba_constant(string constant_source, string type_name): `"
 		<< constant_source << "`, " << LOG_BA(type_name);
 	return get_ba_constant_from_source(dict(constant_source),
-		get_ba_type_id<node>(type_name));
+		get_ba_type_id<node>(type_name), subtype);
 }
 
 template <NodeType node>
 tref tree<node>::get_ba_constant_from_source(
 	size_t constant_source_sid,
-	size_t ba_type_id)
+	size_t ba_type_id,
+	tref subtype)
 {
 #ifdef DEBUG
 	LOG_TRACE << " -- get ba_constant_from_source(size_t sid, size_t tid): `"
@@ -388,7 +390,8 @@ tref tree<node>::get_ba_constant_from_source(
 
 	tref r = get_ba_constant(ba_constants<node>::get(
 					dict(constant_source_sid),
-					ba_types<node>::name(ba_type_id)));
+					ba_types<node>::name(ba_type_id),
+					subtype));
 	if (r == nullptr) LOG_ERROR << "Parsing constant `"
 		<< dict(constant_source_sid) << "` failed for type `"
 		<< ba_types<node>::name(ba_type_id) << "`.";
@@ -422,81 +425,6 @@ tref tree<node>::get_ba_constant(
 		<< "get_ba_constant(optional): nullptr";
 	if (!typed_const) return nullptr;
 	return get_ba_constant(typed_const.value());
-}
-
-// bv constants
-
-template <NodeType node>
-tref tree<node>::get_bv_constant(const idni::tau_lang::bv& constant) {
-	tau::constant ba_cte = tau::constant(constant);
-	return tau::build_bv_constant(ba_cte);
-}
-
-template <NodeType node>
-tref tree<node>::get_bv_constant_from_source(size_t constant_source_sid,
-		size_t bv_size) {
-	return get_bv_constant(dict(constant_source_sid), bv_size);
-}
-
-template <NodeType node>
-tref tree<node>::get_bv_constant_from_source(const std::string& source,
-		size_t bv_size) {
-	auto opts = tau::get_options{
-		.parse = { .start = tau::bv_constant },
-		.infer_ba_types = false,
-		.reget_with_hooks = false
-	};
-	auto src = tree<node>::get(source, opts);
-	return get_bv_constant(src, bv_size);
-}
-
-template <NodeType node>
-tref tree<node>::get_bv_constant(tref bv_constant_tree, size_t bv_size) {
-
-#ifdef DEBUG
-	LOG_TRACE << " -- get bv_constant_from_tree(tref bv_constant_tree, size_t bv_size): `"
-				<< LOG_FM(bv_constant_tree);
-	LOG_TRACE << " -- bv size: " << bv_size;
-	assert(bv_size > 0);
-#endif // DEBUG
-
-	auto t = tau::get(bv_constant_tree);
-
-	auto actual_bv_size = t.children_size() == 3
-		? t[2][0].get_num()
-		: bv_size;
-	auto str = t[0].to_str();
-	auto type = t[0].get_type();
-
-	size_t base;
-	switch (type) {
-		case tau::decimal: { base = 10; break; }
-		case tau::binary: { base = 2; break; }
-		case tau::hexadecimal: { base = 16; break; }
-		default: {
-			DBG(assert(false);)
-			return nullptr;
-		}
-	}
-
-	auto cte = make_bitvector_cte(actual_bv_size, str, base);
-	typename tau::constant ba_cte{ cte };
-	return tau::build_bv_constant(ba_cte);
-}
-
-template <NodeType node>
-tref tree<node>::get_bv_constant(const constant& constant)
-{
-	LOG_TRACE << "-- get bv_constant(constant constant): `"
-		<< LOG_BA(constant);
-	return ba_constants<node>::get(constant, get_ba_type_id<node>("bv"));
-}
-
-template <NodeType node>
-tref tree<node>::get_bv_constant(size_t constant_id) {
-	LOG_TRACE << " -- get_bv_constant(size_t constant_id): `"
-		<< LOG_BA(ba_constants<node>::get(constant_id));
-	return get_bv_constant(ba_constants<node>::get(constant_id));
 }
 
 // -----------------------------------------------------------------------------
@@ -686,7 +614,9 @@ template <NodeType node>
 bool tree<node>::is_ba_constant() const { return is(ba_constant); }
 
 template <NodeType node>
-bool tree<node>::is_bv_constant() const { return is(bv_constant); }
+bool tree<node>::is_bv_constant() const {
+	return is(ba_constant) && get_ba_type_name() == "bv";
+}
 
 template <NodeType node>
 bool tree<node>::is_term() const { return this->value.term || is(io_var); }

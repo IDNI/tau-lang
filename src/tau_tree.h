@@ -112,9 +112,6 @@ struct node {
 	// factory for a ba constant node
 	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
 
-	// factory for a ba constant node
-	static constexpr node_t bv_constant(size_t v);
-
 	// factory for a node of a given node::type and BA type id,
 	// also sets term to 1
 	static constexpr node_t ba_typed(type nt, size_t ba_tid = 0);
@@ -264,10 +261,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 				    size_t ba_type_id);
 	// creates a ba_constant node from constant source and type name
 	static tref get_ba_constant(const std::string& constant_source,
-				    const std::string type_name = "");
+				    const std::string type_name = "", tref subtype = nullptr);
 	// creates a ba_constant node from constant source dict id and ba type id
 	static tref get_ba_constant_from_source(size_t constant_source_sid,
-				    size_t ba_type_id);
+				    size_t ba_type_id, tref subtype = nullptr);
 	// creates a ba_constant node from constant_id and ba type id
 	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
 	// creates a ba_constant node from a pair of constant_id and ba_type_id
@@ -277,23 +274,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref get_ba_constant(
 		const std::optional<std::pair<constant, std::string>>&
 		typed_const);
-
-	// bv constants
-	// creates a bv_constant node from it's value and bv size
-	static tref get_bv_constant(const idni::tau_lang::bv& constant);
-	// creates a (bv) ba_constant node from constant source and bv size
-	static tref get_bv_constant_from_source(const std::string& source,
-					size_t bv_size = default_bv_size);
-	// creates a (bv) ba_constant node from constant source dict id and bv size
-	static tref get_bv_constant_from_source(size_t constant_source_sid,
-					size_t bv_size = default_bv_size);
-	// creates a (bv) ba_constant node from constant source dict id and bv size
-	static tref get_bv_constant(tref bv_parse_tree,
-					size_t bv_size = default_bv_size);
-	// creates a bv_constant node from it's ba value
-	static tref get_bv_constant(const constant& constant);
-	// creates a bv_constant node from constant_id
-	static tref get_bv_constant(size_t constant_id);
 
 	// children
 	size_t children_size() const;
@@ -598,8 +578,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 				      size_t ba_type_id);
 	static tref build_bf_ba_constant(const constant& constant,
 					 size_t ba_type_id, tref right = nullptr);
-	static tref build_bv_constant(const constant& constant);
-	static tref build_bv_ba_constant(const constant& constant, tref right = nullptr);
 	static tref build_bf_uconst(
 		const std::string& name1, const std::string& name2, size_t type_id);
 	static tref build_bv_uconst(
