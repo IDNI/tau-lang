@@ -82,7 +82,6 @@ private:
 	static tref wff_ngteq      (const node& v, const tref* ch, size_t len, tref r);
 	static tref wff_interval   (const node& v, const tref* ch, size_t len, tref r);
 	static tref shift          (const node& v, const tref* ch, size_t len, tref r);
-	static tref bv_constant    (const node& v, const tref* ch, size_t len, tref r);
 };
 
 } // namespace idni::tau_lang

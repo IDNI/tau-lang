@@ -115,7 +115,7 @@ template <NodeType node>
 tref new_infer_ba_types(tref n) {
 	using tau = tree<node>;
 	using type_t = tree<node>::type_t;
-	using tt = tau::traverser;
+	//using tt = tau::traverser;
 
 	// Some type definitions
 	static type_t untyped = { ba_types<node>::id("untyped"), nullptr };
@@ -168,25 +168,22 @@ tref new_infer_ba_types(tref n) {
 	auto is_typeable = [](tref t) -> bool {
 		return is<node, tau::variable>(t)
 			|| is<node, tau::ba_constant>(t)
-			|| is<node, tau::bv_constant>(t)
 			|| is<node, tau::bf_t>(t)
 			|| is<node, tau::bf_f>(t);
 	};
 
 	auto untype = [](tref t) -> tref {
 		using tau = tree<node>;
-		if (is<node, tau::bf_t>(t))
+		if (is<node, tau::bf_t>(t)) {
 			return tau::get(tau::bf_t);
-		if (is<node, tau::bf_f>(t))
+		} else if (is<node, tau::bf_f>(t)) {
 			return tau::get(tau::bf_f);
-		if (is<node, tau::ba_constant>(t)) {
+		} else if (is<node, tau::ba_constant>(t)) {
 			auto nn = tau::get(t).value.ba_retype(0);
 			return (tau::get(t).children_size() > 0) ? tau::get(nn, tau::get(t).first()) : tau::get(nn);
-		}
-		if (is<node, tau::bv_constant>(t))
-			return tau::get(tau::bv_constant, {tau::get(t).first()});
-		if (is<node, tau::variable>(t))
+		} else if (is<node, tau::variable>(t)) {
 			return tau::get(tau::variable, {tau::get(t).first()});
+		}
 		return t;
 	};
 
@@ -287,7 +284,7 @@ tref new_infer_ba_types(tref n) {
 				subtree_map<node, type_t> constants;
 				for (const auto& t : typeables)	{
 					auto ut = untype(t);
-					if (is<node, tau::bv_constant>(ut)) {
+					if (is<node, tau::ba_constant>(ut)) {
 						constants.emplace(ut, type.value());
 						mergeables.push_back(ut);
 						continue;
@@ -523,7 +520,7 @@ tref new_infer_ba_types(tref n) {
 			return n;
 		};
 
-		auto parse_bv_constants = [&](tref n, const std::map<tref, type_t, subtree_less<node>>& types) -> tref {
+		/*auto parse_bv_constants = [&](tref n, const std::map<tref, type_t, subtree_less<node>>& types) -> tref {
 			subtree_map<node, tref> changes;
 
 			auto update = [&](tref n) -> bool {
@@ -531,7 +528,7 @@ tref new_infer_ba_types(tref n) {
 				const auto t = tau::get(n);
 				size_t nt = t.get_type();
 				switch (nt) {
-					case tau::bv_constant: {
+					case tau::ba_constant: {
 						// If we have no type information for the bv constant we
 						// rise an error as we should have at least untyped info
 						const auto un = untype(n);
@@ -549,7 +546,7 @@ tref new_infer_ba_types(tref n) {
 							? tt(type.second) | tau::num | tt::num
 							: default_bv_size;
 						// We parse the constant
-						auto new_n = tau::get_bv_constant(n, bv_size);
+						auto new_n = tau::get_ba_constant(n, bv_size);
 						changes.insert_or_assign(n, new_n);
 						DBG(LOG_TRACE << "new_infer_ba_types/parse_bv_constants/update/bv_constant/n -> new_n:\n"
 							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
@@ -572,7 +569,7 @@ tref new_infer_ba_types(tref n) {
 				return changes[n];
 			}
 			return n;
-		};
+		};*/
 
 		auto parse_ba_constants = [&](tref n, const std::map<tref, type_t, subtree_less<node>>& types) -> tref {
 			subtree_map<node, tref> changes;
@@ -596,7 +593,7 @@ tref new_infer_ba_types(tref n) {
 							? tau_type
 							: types.at(un);
 						// We parse the constant
-						auto new_n = tau::get_ba_constant_from_source(t.child_data(), type.first);
+						auto new_n = tau::get_ba_constant_from_source(t.child_data(), type.first, type.second);
 						if (new_n == nullptr) {
 							LOG_ERROR << "Could not parse bf constant in "
 								<< LOG_FM(n) << " with type "
@@ -643,8 +640,7 @@ tref new_infer_ba_types(tref n) {
 #ifdef DEBUG
 			LOG_TRACE << "new_infer_ba_types/on_leave/get_scoped_elements/elements:"
 				<< " type = " << (element_type == tau::variable ? "variable" :
-					(element_type == tau::bv_constant ? "bv_constant" :
-						(element_type == tau::ba_constant ? "ba_constant" : "unknown")))
+					(element_type == tau::ba_constant ? "ba_constant" : "unknown"))
 				<< " scope = " <<resolver.scopes_.back() << "\n";
 			for (auto [e, t] : elements)
 				LOG_TRACE << "\t" << LOG_FM(e) << " : "
@@ -682,8 +678,8 @@ tref new_infer_ba_types(tref n) {
 			case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
 			case tau::bv_gt: case tau::bv_ngt: case tau::bv_gteq: case tau::bv_ngteq:
 			case tau::bv_lt: case tau::bv_nlt: {
-				auto scoped_bv_ctes_types = get_scoped_elements(tau::bv_constant);
-				if(auto updated = parse_bv_constants(n, scoped_bv_ctes_types); updated != n) {
+				auto scoped_bv_ctes_types = get_scoped_elements(tau::ba_constant);
+				if(auto updated = parse_ba_constants(n, scoped_bv_ctes_types); updated != n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../n -> updated:\n"
 						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
 					transformed.insert_or_assign(n, updated);

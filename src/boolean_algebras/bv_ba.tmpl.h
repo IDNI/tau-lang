@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "boolean_algebras/bv_ba.h" // Only for IDE resolution, not really needed.
+#include "../parser/bitvector_parser.generated.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba"
@@ -221,8 +222,8 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, checked);
 			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bv_constant: {
-			auto cte = form | tt::bv_constant;
+		case node::type::ba_constant: {
+			auto cte = form | tt::ba_constant;
 			DBG(assert(std::holds_alternative<bv>(cte));)
 			return std::optional<bv>(std::get<bv>(cte));
 		}
@@ -283,7 +284,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 		solution<node> s;
 		for (const auto& [tau_var, bv_var] : free_vars) {
 			auto cte = solver.getValue(bv_var);
-			s.emplace(tau::get(tau::bv, tau_var), tau::get(tau::bv, tau::get_bv_constant({cte})));
+			s.emplace(tau::get(tau::bv, tau_var), tau::get(tau::bv, tau::get_ba_constant(cte, "bv")));
 		}
 		return s;
 	} else
@@ -298,27 +299,63 @@ std::optional<solution<node>> solve_bv(const trefs& lits) {
 	return solve_bv<node>(tau::build_wff_and(lits));
 }
 
+inline bv bv_eval_node(const bitvector_parser::tree::traverser& t, size_t size) {
+	using tt = bitvector_parser::tree::traverser;
+	using type = bitvector_parser::nonterminal;
+
+	// get the base
+	size_t base;
+	auto n  = t | tt::only_child;
+	auto nt = n | tt::nonterminal;
+	switch (nt) {
+		case type::decimal: { base = 10; break; }
+		case type::binary: { base = 2; break; }
+		case type::hexadecimal: { base = 16; break; }
+		default: {
+			assert(false);
+		}
+	}
+	DBG(assert(base > 0 );)
+
+	// get the string
+	auto str = t | tt::terminals;
+
+#ifdef DEBUG
+	LOG_TRACE << "get_bv_from_parse_tree/str: " << str;
+	LOG_TRACE << "get_bv_from_parse_tree/base: " << base;
+#endif // DEBUG
+
+	return make_bitvector_cte(size, str, base);
+}
+
 template<typename...BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
-		[[maybe_unused]] size_t size,
-		[[maybe_unused]] size_t base) {
-	using tau = tree<node<BAs...>>;
-	using tt = tau::traverser;
+		tref subtype) {
+	static std::map<size_t, std::variant<BAs...>> cache;
 
-	typename tau::get_options opts{
-		.parse = { .start = tau::bv_constant },
-		.infer_ba_types = false,
-		.reget_with_hooks = true };
-	auto result = tau::get(src, opts);
-	if (!result) {
-		LOG_ERROR << "Failed to parse bitvector constant: " << src;
-		return {};
+	// check source cache
+	auto sid = dict(src);
+	if (auto cn = cache.find(sid); cn != cache.end())
+		return typename node<BAs...>::constant_with_type{ cn->second, "bv" };
+	// parse the source
+	auto result = bitvector_parser::instance().parse(src.c_str(), src.size());
+	if (!result.found) {
+		auto msg = result.parse_error
+			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC);
+		LOG_ERROR << "[bv] " << msg << "\n";
+		return {}; // Syntax error
 	}
-	size_t bv_size = get_bv_size<node<BAs...>>(result);
-	tref cte_node = tau::get_bv_constant(result, bv_size);
-	auto cte = tt(cte_node) | tt::ba_constant;
-	return typename node<BAs...>::constant_with_type{ cte, "bv" };
+	// get the size
+	size_t size = get_bv_size<node<BAs...>>(subtype);
+	// get the bv_constant node
+	if (auto t = bitvector_parser::tree::traverser(result.get_shaped_tree2())
+			| bitvector_parser::bitvector; t) {
+		auto cte = bv_eval_node(t, size);
+		return typename node<BAs...>::constant_with_type{
+			cache.emplace(sid, std::variant<BAs...>{cte}).first->second, "bv" };
+	}
+	return std::nullopt;
 }
 
 } // namespace idni::tau_lang

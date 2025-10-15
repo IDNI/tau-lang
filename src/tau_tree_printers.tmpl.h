@@ -243,7 +243,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
-			bf_ref, bf_neg, bv_constant, ba_constant, bf_t,
+			bf_ref, bf_neg, ba_constant, bf_t,
 			bf_f, wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
 			variable, ref_args, start
 		};
@@ -329,7 +329,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bv_max,             824 },
 			{ bv_neg,             825 },
 			{ bv,                 826 },
-			{ bv_constant,        827 },
 			{ rec_relation,       900 },
 			{ ref_args,           900 },
 		};
@@ -397,8 +396,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		{ rec_relation,  TC.YELLOW() },
 		{ constraint,    TC.LIGHT_MAGENTA() },
 		{ io_var,        TC.WHITE() },
-		{ ba_constant,   TC.LIGHT_CYAN() },
-		{ bv_constant,   TC.LIGHT_CYAN() }
+		{ ba_constant,   TC.LIGHT_CYAN() }
 		// { rule,          TC.BG_YELLOW() },
 	};
 	auto syntax_highlight = [&](size_t nt) {
@@ -522,13 +520,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case subst_cmd:         track_chpos();
 						out("substitute "); break;
 			case wff_conditional:   track_chpos(); break;
-			case bv_constant:
+			/*case bv_constant:
 				if (auto first = tau::tt(ref) | tt::first | tt::ref; first) out(first);
 				else out(t.get_bv_constant());
 				if (auto num = tau::tt(ref) | tau::subtype | tau::num | tt::ref; num) {
 					out(" : bv "); out(tau::get(num).data());
 				} else out(" : bv ");
-				break;
+				break;*/
 			case source: break; // is printed from ba_constant
 			default:
 				if (is_string_nt(nt)) {
