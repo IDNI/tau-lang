@@ -290,7 +290,7 @@ history        => ( "%"
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, decimal, hexadecimal, binary, type, subtype, integer,
+        sym, digits, type, subtype, integer,
         source, capture, var_name, io_var_name, uconst_name, file_name,
         ctnvar, option_name, option_value.
 

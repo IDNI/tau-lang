@@ -1,4 +1,4 @@
-// This file is generated from a file parser/bitvector.tgf by
+// This file is generated from a file ../parser/bitvector.tgf by
 //       https://github.com/IDNI/parser/src/tgf
 //
 #ifndef __BITVECTOR_PARSER_H__
@@ -14,7 +14,7 @@ using terminal_type = char;
 inline static constexpr size_t nt_bits = 4;
 inline const std::vector<std::string> symbol_names{
 	"", "space", "alpha", "digit", "xdigit", "start", "_", "bitvector", "binary", "decimal", 
-	"hexadecimal", "__E_binary_0", "__E_binary_1", "__E_hexadecimal_2", "__E_decimal_3", 
+	"hexadecimal", "__E_binary_0", "__E_binary_1", "__E_hexadecimal_2", "__E_decimal_3", "__E___4", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
@@ -40,7 +40,10 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		.to_trim = {
 			6
 		},
-		.trim_terminals = false,
+		.trim_terminals = true,
+		.dont_trim_terminals_of = {
+			8, 9, 10
+		},
 		.inline_char_classes = false
 	},
 	.enabled_guards = {
@@ -90,6 +93,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(14), (NT(3)+NT(14)));
 //G14:  decimal(9)           => __E_decimal_3(14).
 	p(NT(9), (NT(14)));
+//G15:  __E___4(15)          => space(1) _(6).
+	p(NT(15), (NT(1)+NT(6)));
+//G16:  __E___4(15)          => null.
+	p(NT(15), (nul));
+//G17:  _(6)                 => __E___4(15).
+	p(NT(6), (NT(15)));
 	#undef T
 	#undef NT
 	return loaded = true, p;
@@ -103,7 +112,7 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 struct bitvector_parser_nonterminals {
 	enum nonterminal {
 		nul, space, alpha, digit, xdigit, start, _, bitvector, binary, decimal, 
-		hexadecimal, __E_binary_0, __E_binary_1, __E_hexadecimal_2, __E_decimal_3, 
+		hexadecimal, __E_binary_0, __E_binary_1, __E_hexadecimal_2, __E_decimal_3, __E___4, 
 	};
 };
 
