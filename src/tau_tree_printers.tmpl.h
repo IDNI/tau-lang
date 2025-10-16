@@ -31,19 +31,19 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 #ifdef DEBUG
 	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
 	if (bool print_is_term = true; print_is_term && n.term) os << "*";
-	if (n.term == 0 && n.ba == 1 && n.nt == tau_parser::ref)
+	if (n.term == 0 && n.ba_type == 1 && n.nt == tau_parser::ref)
 		os << LOG_WARNING_COLOR << "?" << TC.CLEAR();
 	if (n.data) os << "[" << n.data << "]";
 	if (bool print_ba_type = true;
 		print_ba_type && n.term && n.nt != tau::bf)
-						os << " " << LOG_BA_TYPE(n.ba);
+						os << " " << LOG_BA_TYPE(n.ba_type);
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::bf_constant) {
 		if (n.data != 0) // constant id is not 0 = parsed
 			os << " { " << ba_constants<node>::get(n.data)
-				<< " } : " << get_ba_type_name<node>(n.ba);
-		else os << " { UNPARSED } : " << get_ba_type_name<node>(n.ba);
+				<< " } : " << get_ba_type_name<node>(n.ba_type);
+		else os << " { UNPARSED } : " << get_ba_type_name<node>(n.ba_type);
 	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name)
 		os << "<" << dict(n.data) << ">";
@@ -446,6 +446,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			// wraps
 			case ref_args:          out("("); break;
 			case constraint:
+			case subtype:
 			case offsets:           out("["); break;
 			case offset:            if (pnt == io_var) out("[");
 						break;
@@ -455,7 +456,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 					out(tau::get(src).get_string());
 				else out(tau::get(ref).get_ba_constant());
 				out(" } : ");
-				out(t.get_ba_type_name());
+				out(t.get_ba_type_tree());
 				break;
 			case scope_id: out(" _"), out(t.data()), out("_"); break;
 			case wff:
@@ -526,9 +527,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bv_constant:
 				if (auto first = tau::tt(ref) | tt::first | tt::ref; first) out(first);
 				else out(t.get_bv_constant());
-				if (auto num = tau::tt(ref) | tau::subtype | tau::num | tt::ref; num) {
-					out(" : bv "); out(tau::get(num).data());
-				} else out(" : bv ");
+				out(" : ");
+				out(t.get_ba_type_tree());
 				break;
 			case source: break; // is printed from bf_constant
 			default:
@@ -683,6 +683,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case rec_relation:      out("."); break;
 			case constraint:
 			case offsets:
+			case subtype:
 			case inst_cmd:
 			case subst_cmd:         out("]"); break;
 			case offset:            if (pnt == io_var) out("]");

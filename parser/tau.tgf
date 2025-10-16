@@ -305,7 +305,7 @@ history        => ( "%"
         ctnvar, option_name, option_value.
 
 # inline intermediate nodes and eliminate parenthesis
-@inline char classes, chars, typed, q_var, src_c, uconst,
+@inline char classes, chars, q_var, src_c, uconst,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg,
         uconst > uconst_name,

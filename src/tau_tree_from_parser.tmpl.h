@@ -165,8 +165,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			case bf_f:
 				if (bool typed = ptr.first() != nullptr; typed){
 					ba_type = get_ba_type_id<node>(
-						tau::get(m_ref(ptr.first()))
-							.data());
+						m_ref(ptr.first()));
 					LOG_TRACE << "ba_type: "
 						  << LOG_BA_TYPE(ba_type);
 				}
@@ -178,8 +177,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			default:
 				if (nt == variable && ptr.second()) {
 					ba_type = get_ba_type_id<node>(
-						tau::get(m_ref(ptr.second()))
-							.data());
+						m_ref(ptr.second()));
 					LOG_TRACE << "ba_type: "
 						  << LOG_BA_TYPE(ba_type);
 				} else if (nt == input_def || nt == output_def) {
@@ -188,8 +186,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 						.is(static_cast<size_t>(tau::type)))
 					{
 						ba_type = get_ba_type_id<node>(
-							tau::get(m_ref(ptr.second()))
-								.data());
+							m_ref(ptr.second()));
 						LOG_TRACE << "ba_type: "
 								<< LOG_BA_TYPE(ba_type);
 					}

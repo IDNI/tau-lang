@@ -13,13 +13,13 @@ namespace idni::tau_lang {
 template <NodeType node>
 struct ba_constants {
 	using constant = typename node::constant;
-	using constant_with_type = std::pair<constant, std::string>;
+	using constant_with_type = std::pair<constant, tref>;
 
 	// insert the constant value of a type id to the pool
 	static tref get(const constant& constant, size_t type_id);
 
 	// insert the constant value of a type to the pool
-	static tref get(const constant& constant, const std::string& type);
+	static tref get(const constant& constant, tref type_tree);
 
 	// insert the constant given by the string of a type id to the pool
 	//static tref get(const std::string& constant, size_t type_id);
@@ -30,7 +30,7 @@ struct ba_constants {
 	// get the constant variant from source
 	static std::optional<typename node::constant_with_type> get(
 		const std::string& constant_source,
-		const std::string type_name,
+		tref type_tree,
 		const std::string options = ""
 	);
 

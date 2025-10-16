@@ -35,7 +35,7 @@ concept NodeType = requires { // Node Type has to provide
 	// term is convertible to bool
 	{ std::declval<node>().term } -> std::convertible_to<bool>;
 	// ba is convertible to size_t
-	{ std::declval<node>().ba } -> std::convertible_to<size_t>;
+	{ std::declval<node>().ba_type } -> std::convertible_to<size_t>;
 	// data is convertible to size_t
 	{ std::declval<node>().data } -> std::convertible_to<size_t>;
 };
@@ -70,7 +70,7 @@ struct node {
 	using type = tau_parser::nonterminal;
 	// aliases for recreation of the packed variant
 	using constant = std::variant<BAs...>;
-	using constant_with_type = std::pair<constant, std::string>;
+	using constant_with_type = std::pair<constant, tref>;
 	// alias for nso_factory<BAs...>
 	using nso_factory = tau_lang::nso_factory<BAs...>;
 
@@ -79,26 +79,22 @@ struct node {
 	// bit sizes
 	static constexpr size_t bits      = std::numeric_limits<T>::digits;
 	static constexpr size_t nt_bits   = tau_parser_data::nt_bits;
-	static constexpr size_t ba_bits   = Pack_bitsize<BAs...> + 2;
-	static constexpr size_t ba_max    = (1U << ba_bits) - 1;
-	static constexpr size_t data_bits = bits - nt_bits - 1 - ba_bits - 1;
+	static constexpr size_t data_bits = bits - nt_bits - 1;
 
 	// masks and shifts
 	static constexpr size_t nt_mask = (size_t(1) << nt_bits) - size_t(1);
 	static constexpr size_t data_mask = (size_t(1) << data_bits) - size_t(1);
 	static constexpr size_t ext_shift = data_bits;
-	static constexpr size_t ba_shift = ext_shift + 1; // +1 for ext
-	static constexpr size_t term_shift = ba_shift + ba_bits;
+	static constexpr size_t term_shift = ext_shift + 1; // +1 for ext
 	static constexpr size_t nt_shift = term_shift + 1;  // +1 for term
-	static constexpr size_t ba_mask = ((size_t(1) << ba_bits) - size_t(1)) << ba_shift;
 
 	// node fields
 	const T nt   : nt_bits   = 0; // id of the nonterminal (container of the data index value)
 	const T term : 1         = 0; // 1 = is term, 0 = is tau (if term == 0 and ba == 1 it is untyped)
-	const T ba   : ba_bits   = 0; // id of the ba type, 0 = untyped
 	const T ext  : 1         = 0; // 1 = data is in the child node, 0 = data is in the node
 	const T data : data_bits = 0; // data or index in a container determined by nt, bf and ba
                                       // if nt == io_var, data == 1 for input or data == 2 for output
+	const unsigned short ba_type;
 	const size_t hash;
 
 	// generic constructor
@@ -111,9 +107,6 @@ struct node {
 
 	// factory for a ba constant node
 	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
-
-	// factory for a ba constant node
-	static constexpr node_t bv_constant(size_t v);
 
 	// factory for a node of a given node::type and BA type id,
 	// also sets term to 1
@@ -178,7 +171,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	using tau = tree<node>;
 	using constant = node::constant;
 	using constant_with_type = node::constant_with_type;
-	using type_t = std::pair<size_t, tref>; // (type_id, subtype)
 
 	struct get_options; // fwd
 
@@ -258,13 +250,13 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	// constants
 	// creates a ba_constant node from it's value and ba type name
 	static tref get_ba_constant(const constant& constant,
-				    const std::string& type_name);
+				    const tref type_tree);
 	// creates a ba_constant node from it's value and ba type id
 	static tref get_ba_constant(const constant& constant,
 				    size_t ba_type_id);
 	// creates a ba_constant node from constant source and type name
 	static tref get_ba_constant(const std::string& constant_source,
-				    const std::string type_name = "");
+				    tref type_tree);
 	// creates a ba_constant node from constant source dict id and ba type id
 	static tref get_ba_constant_from_source(size_t constant_source_sid,
 				    size_t ba_type_id);
@@ -272,28 +264,27 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
 	// creates a ba_constant node from a pair of constant_id and ba_type_id
 	static tref get_ba_constant(const std::pair<constant,
-		std::string>& typed_const);
+		tref>& typed_const);
 	// creates a ba_constant node from a pair of constant_id and ba_type_id
 	static tref get_ba_constant(
-		const std::optional<std::pair<constant, std::string>>&
+		const std::optional<std::pair<constant, tref>>&
 		typed_const);
 
 	// bv constants
+	// creates a bv_constant node from it's ba value
+	static tref get_bv_constant(const constant& constant, size_t ba_type_id);
 	// creates a bv_constant node from it's value and bv size
-	static tref get_bv_constant(const idni::tau_lang::bv& constant);
+	static tref get_bv_constant(const idni::tau_lang::bv& constant, size_t ba_type_id);
+	// creates a bv_constant node from it's value and bv size
+	static tref get_bv_constant(const idni::tau_lang::bv& constant, tref type_tree);
 	// creates a (bv) ba_constant node from constant source and bv size
 	static tref get_bv_constant_from_source(const std::string& source,
-					size_t bv_size = default_bv_size);
+					size_t ba_type_id);
 	// creates a (bv) ba_constant node from constant source dict id and bv size
 	static tref get_bv_constant_from_source(size_t constant_source_sid,
-					size_t bv_size = default_bv_size);
-	// creates a (bv) ba_constant node from constant source dict id and bv size
-	static tref get_bv_constant(tref bv_parse_tree,
-					size_t bv_size = default_bv_size);
-	// creates a bv_constant node from it's ba value
-	static tref get_bv_constant(const constant& constant);
+					size_t ba_type_id);
 	// creates a bv_constant node from constant_id
-	static tref get_bv_constant(size_t constant_id);
+	static tref get_bv_constant(size_t constant_id, size_t ba_type_id);
 
 	// children
 	size_t children_size() const;
@@ -372,7 +363,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	size_t get_bv_size() const;
 	// TODO (LOW) rename to get_ba_type_id and get_ba_type as in constants
 	size_t get_ba_type() const;
-	const std::string& get_ba_type_name() const;
+	std::string get_ba_type_name() const;
+	tref get_ba_type_tree() const;
 	const trefs& get_free_vars() const;
 
 	// ---------------------------------------------------------------------
@@ -598,12 +590,12 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 				      size_t ba_type_id);
 	static tref build_bf_ba_constant(const constant& constant,
 					 size_t ba_type_id, tref right = nullptr);
-	static tref build_bv_constant(const constant& constant);
-	static tref build_bv_ba_constant(const constant& constant, tref right = nullptr);
+	//TODO: make all bv variable/constant builders typed
+	static tref build_bv_ba_constant(const constant& constant, size_t type_id);
 	static tref build_bf_uconst(
 		const std::string& name1, const std::string& name2, size_t type_id);
 	static tref build_bv_uconst(
-		const std::string& n1, const std::string& n2, tref subtype);
+		const std::string& n1, const std::string& n2, size_t type_id);
 	static tref build_var_name(size_t sid);
 	static tref build_var_name(const std::string& name);
 	static tref build_var_name_indexed(size_t index);
@@ -635,32 +627,32 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		const std::string& io_var_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_out_var_at_t_minus_indexed(
 		size_t index, size_t shift, size_t type_id, std::string t = "t");
-	static tref build_bv_variable(tref var_name_node);
-	static tref build_bv_variable(const std::string& name);
-	static tref build_bv_in_var(tref var_name_node, tref offset_node);
-	static tref build_bv_in_var_at_n(tref var_name_node, int_t pos);
-	static tref build_bv_in_var_at_n(const std::string& name, int_t pos);
-	static tref build_bv_in_var_at_n_indexed(size_t index, int_t pos);
-	static tref build_bv_in_var_at_t(tref var_name_node, std::string t = "t");
-	static tref build_bv_in_var_at_t_indexed(size_t index, std::string t = "t");
+	static tref build_bv_variable(tref var_name_node, size_t type_id);
+	static tref build_bv_variable(const std::string& name, size_t type_id);
+	static tref build_bv_in_var(tref var_name_node, tref offset_node, size_t type_id);
+	static tref build_bv_in_var_at_n(tref var_name_node, int_t pos, size_t type_id);
+	static tref build_bv_in_var_at_n(const std::string& name, int_t pos, size_t type_id);
+	static tref build_bv_in_var_at_n_indexed(size_t index, int_t pos, size_t type_id);
+	static tref build_bv_in_var_at_t(tref var_name_node, size_t type_id, std::string t = "t");
+	static tref build_bv_in_var_at_t_indexed(size_t index, size_t type_id, std::string t = "t");
 	static tref build_bv_in_var_at_t_minus(
-		tref var_name_node, size_t shift, std::string t = "t");
+		tref var_name_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_bv_in_var_at_t_minus(
-		const std::string& var_name, size_t shift, std::string t = "t");
+		const std::string& var_name, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_bv_in_var_at_t_minus_indexed(
-		size_t index, size_t shift, std::string t = "t");
-	static tref build_bv_out_var(tref var_name_node, tref offset_node);
-	static tref build_bv_out_var_at_n(tref var_name_node, int_t pos);
-	static tref build_bv_out_var_at_n(const std::string& name, int_t pos);
-	static tref build_bv_out_var_at_n_indexed(size_t index, int_t pos);
-	static tref build_bv_out_var_at_t(tref var_name_node, std::string t = "t");
-	static tref build_bv_out_var_at_t_indexed(size_t index, std::string t="t");
+		size_t index, size_t shift, size_t type_id, std::string t = "t");
+	static tref build_bv_out_var(tref var_name_node, tref offset_node, size_t type_id);
+	static tref build_bv_out_var_at_n(tref var_name_node, int_t pos, size_t type_id);
+	static tref build_bv_out_var_at_n(const std::string& name, int_t pos, size_t type_id);
+	static tref build_bv_out_var_at_n_indexed(size_t index, int_t pos, size_t type_id);
+	static tref build_bv_out_var_at_t(tref var_name_node, size_t type_id, std::string t = "t");
+	static tref build_bv_out_var_at_t_indexed(size_t index, size_t type_id, std::string t="t");
 	static tref build_bv_out_var_at_t_minus(
-		tref var_name_node, size_t shift, std::string t = "t");
+		tref var_name_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_bv_out_var_at_t_minus(
-		const std::string& io_var_node, size_t shift, std::string t = "t");
+		const std::string& io_var_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_bv_out_var_at_t_minus_indexed(
-		size_t index, size_t shift, std::string t = "t");
+		size_t index, size_t shift, size_t type_id, std::string t = "t");
 
 
 private:
@@ -771,9 +763,6 @@ std::function<bool(tref)> is_atomic_fm();
 
 template <NodeType node>
 std::function<bool(tref)> is_atomic_bv_fm();
-
-template <NodeType node>
-bool is_bv_fm(tref n);
 
 template <NodeType node>
 std::function<bool(tref)> is_basic_atomic_fm();

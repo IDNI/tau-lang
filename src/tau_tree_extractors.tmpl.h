@@ -50,19 +50,19 @@ bool get_io_def(tref n, io_defs<node>& defs) {
 		static const size_t console_sid = dict("console");
 		if (stream_sid == console_sid) stream_sid = 0;
 	}
-	if (ba_type == 0) {
-		defs[var_sid] = { 0, stream_sid };
-		return true;
-	}
-	std::string ba_type_name = get_ba_type_name<node>(ba_type);
-	for (const auto& fct_type : node::nso_factory::types()) {
-		if (ba_type_name == fct_type) {
-			defs[var_sid] = { ba_type, stream_sid };
-			return true;
-		}
-	}
-	LOG_ERROR << "Invalid type " << ba_type_name;
-	return false;
+	// if (ba_type == 0) {
+	defs[var_sid] = { ba_type, stream_sid };
+	return true;
+	// }
+	// std::string ba_type_name = get_ba_type_name<node>(ba_type);
+	// for (const auto& fct_type : node::nso_factory::types()) {
+	// 	if (ba_type_name == fct_type) {
+	// 		defs[var_sid] = { ba_type, stream_sid };
+	// 		return true;
+	// 	}
+	// }
+	// LOG_ERROR << "Invalid type " << ba_type_name;
+	// return false;
 }
 
 template <NodeType node>

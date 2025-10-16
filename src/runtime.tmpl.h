@@ -6,21 +6,22 @@ std::vector<std::string> nso_factory<bv, sbf_ba>::types() {
 	return { "sbf", "bv" };
 }
 
-std::string nso_factory<bv, sbf_ba>::default_type() {
-	return "sbf";
+tref nso_factory<bv, sbf_ba>::default_type() {
+	return sbf_type<node<bv,sbf_ba>>();
 }
 
-std::string nso_factory<bv, sbf_ba>::one(const std::string) {
+std::string nso_factory<bv, sbf_ba>::one(const tref) {
 	return "1";
 }
 
-std::string nso_factory<bv, sbf_ba>::zero(const std::string) {
+std::string nso_factory<bv, sbf_ba>::zero(const tref) {
 	return "0";
 }
 
 tref nso_factory<bv, sbf_ba>::splitter_one() {
 	using tau = tree<node<bv, sbf_ba>>;
-	return tau::get(tau::bf, tau::get_ba_constant(sbf_ba_factory<bv, sbf_ba>::splitter_one(), "sbf"));
+	return tau::get(tau::bf, tau::get_ba_constant(
+		sbf_ba_factory<bv, sbf_ba>::splitter_one(), sbf_type<node<bv, sbf_ba>>()));
 }
 
 tref nso_factory<bv, sbf_ba>::unpack_tau_ba(const std::variant<bv, sbf_ba>&) {
@@ -37,33 +38,35 @@ std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {
 	return { "sbf", "tau", "bv" };
 }
 
-std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::default_type() {
-	return "tau";
+tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::default_type() {
+	return tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>();
 }
 
 std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::one(
-	const std::string type_name)
+	tref type_tree)
 {
-	return type_name == "sbf" ? "1" : "T";
+	return is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree) ? "1" : "T";
 }
 
 std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::zero(
-	const std::string type_name)
+	tref type_tree)
 {
-	return type_name == "sbf" ? "0" : "F";
+	return is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree) ? "0" : "F";
 }
 
 tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
-		const std::string type_name)
+		tref type_tree)
 {
 	using tau = tree<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>;
-	return (type_name == "sbf")
+	return is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree)
 		? tau::get(tau::bf,
 			tau::get_ba_constant(
-				sbf_ba_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(), "sbf"))
+				sbf_ba_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(),
+				sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>()))
 		: tau::get(tau::bf,
 			tau::get_ba_constant(
-				tau_ba_factory<bv, sbf_ba>::splitter_one(), "tau"));
+				tau_ba_factory<bv, sbf_ba>::splitter_one(),
+				tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>()));
 }
 
 tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::unpack_tau_ba(

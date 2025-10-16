@@ -487,20 +487,20 @@ size_t get_solver_cmd_type(tref n) {
 
 template <NodeType node>
 void print_solver_cmd_solution(std::optional<solution<node>>& solution,
-		const solver_options& options = { .type = "" })
+		size_t type_id)
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	auto print_zero_case = [&options](tref var) {
+	auto print_zero_case = [&type_id](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory::zero(options.type)
-			<< "}:" << options.type << "\n";
+			<< node::nso_factory::zero(get_ba_type_tree<node>(type_id))
+			<< "}:" << ba_types<node>::name(type_id) << "\n";
 	};
 
-	auto print_one_case = [&options](tref var) {
+	auto print_one_case = [&type_id](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory::one(options.type)
-			<< "}:" << options.type << "\n";
+			<< node::nso_factory::one(get_ba_type_tree<node>(type_id))
+			<< "}:" << ba_types<node>::name(type_id) << "\n";
 	};
 
 	auto print_general_case = [](tref var, tref value) {
@@ -530,9 +530,8 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	// setting solver options
 	solver_options options = {
 		.splitter_one = node::nso_factory::
-			splitter_one(""),
+			splitter_one(tau_type<node>()),
 		.mode = get_solver_cmd_mode<node>(n.value()),
-		.type = ""
 	};
 
 	tref arg = n.value_tree().first();
@@ -546,10 +545,11 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 
 	DBG(TAU_LOG_TRACE << "solve_cmd/applied: " << applied << "\n";)
 
+	size_t type = get_solver_cmd_type<node>(applied);
 	auto solution = solve<node>(applied, options);
 	if (!solution) { std::cout << "no solution\n"; return; }
-	// auto vars = tau::get(equations).select_top(is_child<node, tau::variable>);
-	print_solver_cmd_solution<node>(solution, options);
+
+	print_solver_cmd_solution<node>(solution, type);
 }
 
 template <typename... BAs>
@@ -578,7 +578,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	auto solution = lgrs<node>(applied);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
-	print_solver_cmd_solution<node>(solution);
+	print_solver_cmd_solution<node>(solution, type);
 }
 
 template <typename... BAs>

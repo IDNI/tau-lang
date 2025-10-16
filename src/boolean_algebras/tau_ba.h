@@ -280,7 +280,7 @@ struct tau_ba_factory {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<constant_with_type<tau_ba<BAs...>, BAs...>>
+std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	parse_tau(const std::string& src);
 
 // << for printing tau_ba's nso rr

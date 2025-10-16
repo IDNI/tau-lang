@@ -202,7 +202,7 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<constant_with_type<tau_ba<BAs...>, BAs...>>
+std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	parse_tau(const std::string& src)
 {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
@@ -216,11 +216,11 @@ std::optional<constant_with_type<tau_ba<BAs...>, BAs...>>
 	auto nso_rr = get_nso_rr<node>(source);
 	if (!nso_rr) return {};
 	// compute final result
-	return constant_with_type<tau_ba<BAs...>, BAs...>{
+	return typename node::constant_with_type{
 		std::variant<tau_ba<BAs...>, BAs...>(
 			tau_ba<BAs...>(nso_rr.value().rec_relations,
 				       nso_rr.value().main)),
-		"tau" };
+		tau_type<node>() };
 }
 
 template <typename... BAs>

@@ -25,9 +25,7 @@ tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 	}
 	C.push_back(constant);
 	size_t constant_id = C.size();
-	node n = (type_id == ba_types<node>::id("bv"))
-		? node::bv_constant(constant_id)
-		: node::ba_constant(constant_id, type_id);
+	node n = node::ba_constant(constant_id, type_id);
 	tref r = tree<node>::get(n);
 	T.push_back(r);
 	// LOG_TRACE << "node constant: " << n;
@@ -39,8 +37,8 @@ tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 }
 
 template <NodeType node>
-tref ba_constants<node>::get(const constant& constant, const std::string& type) {
-	return get(constant, ba_types<node>::id(type));
+tref ba_constants<node>::get(const constant& constant, tref type_tree) {
+	return get(constant, ba_types<node>::id(type_tree));
 }
 
 template <NodeType node>

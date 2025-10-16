@@ -176,8 +176,8 @@ struct scoped_union_find {
 	bool assign(const data_t& data, const kind_t& kind) {
 		for(auto it = scopes_.rbegin(); it != scopes_.rend(); ++it)
 			if (uf.contains({*it, data})) {
-				if (auto current = kinds_.find(uf.root(element_t{*it, data}))->second;
-						current != unknown && current != kind)
+				if (auto cur = kinds_.find(uf.root(element_t{*it, data}))->second;
+						cur != unknown && cur != kind)
 					return false;
 				kinds_.insert_or_assign(uf.root(element_t{*it, data}), kind);
 				return true;
