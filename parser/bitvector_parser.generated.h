@@ -11,17 +11,16 @@ namespace bitvector_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline static constexpr size_t nt_bits = 5;
+inline static constexpr size_t nt_bits = 4;
 inline const std::vector<std::string> symbol_names{
 	"", "space", "alpha", "digit", "xdigit", "start", "_", "bitvector", "binary", "decimal", 
-	"hexadecimal", "__E_binary_0", "__E_binary_1", "__E_hexadecimal_2", "__E_hexadecimal_3", "__E_decimal_4", "__E_decimal_5", "__E___6", 
+	"hexadecimal", "__E_binary_0", "__E_binary_1", "__E_hexadecimal_2", "__E_decimal_3", "__E___4", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
 inline std::vector<terminal_type> terminals{
-	'\0', '#', 'b', 'x', '0', '1', '2', '3', '4', 
-	'5', '6', '7', '8', '9', 'a', 'c', 'd', 'e', 'f', 
+	'\0', '#', 'b', 'x', '0', '1', 
 };
 
 inline ::idni::char_class_fns<terminal_type> char_classes =
@@ -45,7 +44,7 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		.dont_trim_terminals_of = {
 			8, 9, 10
 		},
-		.inline_char_classes = false
+		.inline_char_classes = true
 	},
 	.enabled_guards = {
 		"charvar"
@@ -82,76 +81,24 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(12), (NT(11)+NT(12)));
 //G8:   binary(8)            => __E_binary_1(12).
 	p(NT(8), (NT(12)));
-//G9:   __E_hexadecimal_2(13) => '0'.
-	p(NT(13), (T(4)));
-//G10:  __E_hexadecimal_2(13) => '1'.
-	p(NT(13), (T(5)));
-//G11:  __E_hexadecimal_2(13) => '2'.
-	p(NT(13), (T(6)));
-//G12:  __E_hexadecimal_2(13) => '3'.
-	p(NT(13), (T(7)));
-//G13:  __E_hexadecimal_2(13) => '4'.
-	p(NT(13), (T(8)));
-//G14:  __E_hexadecimal_2(13) => '5'.
-	p(NT(13), (T(9)));
-//G15:  __E_hexadecimal_2(13) => '6'.
-	p(NT(13), (T(10)));
-//G16:  __E_hexadecimal_2(13) => '7'.
-	p(NT(13), (T(11)));
-//G17:  __E_hexadecimal_2(13) => '8'.
-	p(NT(13), (T(12)));
-//G18:  __E_hexadecimal_2(13) => '9'.
-	p(NT(13), (T(13)));
-//G19:  __E_hexadecimal_2(13) => 'a'.
-	p(NT(13), (T(14)));
-//G20:  __E_hexadecimal_2(13) => 'b'.
-	p(NT(13), (T(2)));
-//G21:  __E_hexadecimal_2(13) => 'c'.
-	p(NT(13), (T(15)));
-//G22:  __E_hexadecimal_2(13) => 'd'.
-	p(NT(13), (T(16)));
-//G23:  __E_hexadecimal_2(13) => 'e'.
-	p(NT(13), (T(17)));
-//G24:  __E_hexadecimal_2(13) => 'f'.
-	p(NT(13), (T(18)));
-//G25:  __E_hexadecimal_3(14) => __E_hexadecimal_2(13).
-	p(NT(14), (NT(13)));
-//G26:  __E_hexadecimal_3(14) => __E_hexadecimal_2(13) __E_hexadecimal_3(14).
-	p(NT(14), (NT(13)+NT(14)));
-//G27:  hexadecimal(10)      => __E_hexadecimal_3(14).
-	p(NT(10), (NT(14)));
-//G28:  __E_decimal_4(15)    => '0'.
-	p(NT(15), (T(4)));
-//G29:  __E_decimal_4(15)    => '1'.
-	p(NT(15), (T(5)));
-//G30:  __E_decimal_4(15)    => '2'.
-	p(NT(15), (T(6)));
-//G31:  __E_decimal_4(15)    => '3'.
-	p(NT(15), (T(7)));
-//G32:  __E_decimal_4(15)    => '4'.
-	p(NT(15), (T(8)));
-//G33:  __E_decimal_4(15)    => '5'.
-	p(NT(15), (T(9)));
-//G34:  __E_decimal_4(15)    => '6'.
-	p(NT(15), (T(10)));
-//G35:  __E_decimal_4(15)    => '7'.
-	p(NT(15), (T(11)));
-//G36:  __E_decimal_4(15)    => '8'.
-	p(NT(15), (T(12)));
-//G37:  __E_decimal_4(15)    => '9'.
-	p(NT(15), (T(13)));
-//G38:  __E_decimal_5(16)    => __E_decimal_4(15).
-	p(NT(16), (NT(15)));
-//G39:  __E_decimal_5(16)    => __E_decimal_4(15) __E_decimal_5(16).
-	p(NT(16), (NT(15)+NT(16)));
-//G40:  decimal(9)           => __E_decimal_5(16).
-	p(NT(9), (NT(16)));
-//G41:  __E___6(17)          => space(1) _(6).
-	p(NT(17), (NT(1)+NT(6)));
-//G42:  __E___6(17)          => null.
-	p(NT(17), (nul));
-//G43:  _(6)                 => __E___6(17).
-	p(NT(6), (NT(17)));
+//G9:   __E_hexadecimal_2(13) => xdigit(4).
+	p(NT(13), (NT(4)));
+//G10:  __E_hexadecimal_2(13) => xdigit(4) __E_hexadecimal_2(13).
+	p(NT(13), (NT(4)+NT(13)));
+//G11:  hexadecimal(10)      => __E_hexadecimal_2(13).
+	p(NT(10), (NT(13)));
+//G12:  __E_decimal_3(14)    => digit(3).
+	p(NT(14), (NT(3)));
+//G13:  __E_decimal_3(14)    => digit(3) __E_decimal_3(14).
+	p(NT(14), (NT(3)+NT(14)));
+//G14:  decimal(9)           => __E_decimal_3(14).
+	p(NT(9), (NT(14)));
+//G15:  __E___4(15)          => space(1) _(6).
+	p(NT(15), (NT(1)+NT(6)));
+//G16:  __E___4(15)          => null.
+	p(NT(15), (nul));
+//G17:  _(6)                 => __E___4(15).
+	p(NT(6), (NT(15)));
 	#undef T
 	#undef NT
 	return loaded = true, p;
@@ -165,7 +112,7 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 struct bitvector_parser_nonterminals {
 	enum nonterminal {
 		nul, space, alpha, digit, xdigit, start, _, bitvector, binary, decimal, 
-		hexadecimal, __E_binary_0, __E_binary_1, __E_hexadecimal_2, __E_hexadecimal_3, __E_decimal_4, __E_decimal_5, __E___6, 
+		hexadecimal, __E_binary_0, __E_binary_1, __E_hexadecimal_2, __E_decimal_3, __E___4, 
 	};
 };
 
