@@ -174,32 +174,32 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_and(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bv_nand: {
+		/*case node::type::bv_nand: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_nand(l.value(), r.value())) : std::nullopt;
-		}
+		}*/
 		case node::type::bv_or: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_or(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bv_nor: {
+		/*case node::type::bv_nor: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_nor(l.value(), r.value())) : std::nullopt;
-		}
+		}*/
 		case node::type::bv_xor: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_xor(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bv_xnor: {
+		/*case node::type::bv_xnor: {
 			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_xnor(l.value(), r.value())) : std::nullopt;
 		}
-		/*case node::type::bv_min: {
+		case node::type::bv_min: {
 			auto l = bv_eval_node<node>(solver, form->child[0], vars, free_vars);
 			auto r = bv_eval_node<node>(solver, form->child[1], vars, free_vars);
 			return (l && r) ? min(l.value(), r.value()) : std::nullopt;

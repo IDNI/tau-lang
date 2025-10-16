@@ -219,13 +219,13 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("cvc5_nand") {
+	/*TEST_CASE("cvc5_nand") {
 		const char* sample = "{ 2 } !& { 1 } =_ X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
-	}
+	}*/
 
 	TEST_CASE("cvc5_or") {
 		const char* sample = "X | { 1 } =_ { 1 }";
@@ -235,13 +235,13 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("cvc5_nor") {
+	/*TEST_CASE("cvc5_nor") {
 		const char* sample = "{ 2 } !| X =_ { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
-	}
+	}*/
 
 	TEST_CASE("cvc5_xor") {
 		const char* sample = "X (+) { 1 } =_ { 1 }";
@@ -251,13 +251,13 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("cvc5_xnor") {
+	/*TEST_CASE("cvc5_xnor") {
 		const char* sample = "X !(+) { 1 } =_ { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
-	}
+	}*/
 
 	TEST_CASE("cvc5_rotate_shift") {
 		const char* sample = "X << { 1 } =_ { 2 }";
