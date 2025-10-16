@@ -112,15 +112,15 @@ bv                     => ('(' _ bv _ ')')            :bv_parenthesis
                         | (bv _ '-' _ bv)             :bv_sub
                         | '~' _ bv                    :bv_neg
                         | (bv _ '&' _ bv)             :bv_and
-                        | (bv _ "!&" _ bv)            :bv_nand
+#                       | (bv _ "!&" _ bv)            :bv_nand
                         | (bv _ '|' _ bv)             :bv_or
-                        | (bv _ "!|" _ bv)            :bv_nor
+#                       | (bv _ "!|" _ bv)            :bv_nor
                         | (bv _ "(+)" _ bv)           :bv_xor
-                        | (bv _ "!(+)" _ bv)          :bv_xnor
+#                       | (bv _ "!(+)" _ bv)          :bv_xnor
                         | (bv _ "<<" _ bv)            :bv_shl
                         | (bv _ ">>" _ bv)            :bv_shr
-                        | ("min" __ bv __ bv)         :bv_min
-                        | ("max" __ bv __ bv)         :bv_max
+#                       | ("min" __ bv __ bv)         :bv_min
+#                       | ("max" __ bv __ bv)         :bv_max
                         | ba_constant.
 
 # constant time constraints
