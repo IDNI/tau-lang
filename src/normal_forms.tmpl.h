@@ -2988,13 +2988,14 @@ tref wff_remove_existential(tref var, tref wff) {
 		}
 
 		// Check if quantified variable is bitvector
-		if (tau::get(var).get_ba_type() == get_ba_type_id<node>("bv")) {
+		if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
 			if (const trefs& free_vars = get_free_vars<node>(new_l);
 				free_vars.size() == 1 &&
 				tau::get(free_vars[0]) == tau::get(var)) {
 				// By assumption quantifier is pushed in all the way
 				// Closed bv formula, simplify to T/F
-				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, new_l)))
+				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, new_l),
+					get_ba_type_tree<node>(tau::get(var).get_ba_type())))
 					changes[l] = nl;
 				else changes[l] = tau::_F();
 				continue;

@@ -16,11 +16,11 @@ struct nso_factory<bv, sbf_ba> {
 
 	static std::vector<std::string> types();
 
-	static std::string default_type();
+	static tref default_type();
 
-	static std::string one(const std::string type_name);
+	static std::string one(const tref type_tree);
 
-	static std::string zero(const std::string type_name);
+	static std::string zero(const tref type_tree);
 
 	static tref splitter_one();
 
@@ -35,16 +35,15 @@ struct nso_factory<bv, sbf_ba> {
  */
 template<>
 struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
-
 	static std::vector<std::string> types();
 
-	static std::string default_type();
+	static tref default_type();
 
-	static std::string one(const std::string type_name = "tau");
+	static std::string one(tref type_tree = tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>());
 
-	static std::string zero(const std::string type_name = "tau");
+	static std::string zero(tref type_tree = tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>());
 
-	static tref splitter_one(const std::string type_name);
+	static tref splitter_one(tref type_tree);
 
 	static tref unpack_tau_ba(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v);
 
@@ -53,21 +52,24 @@ struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
 };
 
 template <>
-std::optional<typename ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_constants<node<bv, sbf_ba>>::get(
-		[[maybe_unused]] const std::string& constant_source,
-		[[maybe_unused]] const std::string type_name,
+std::optional<ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_constants<node<bv, sbf_ba>>::get(
+		const std::string& constant_source,
+		tref type_tree,
 		[[maybe_unused]] const std::string options) {
-	if (type_name == "bv") return parse_bv<bv, sbf_ba>(constant_source);
+	if (is_bv_type_family<node<bv, sbf_ba>>(type_tree))
+		return parse_bv<bv, sbf_ba>(constant_source, type_tree);
 	return parse_sbf<bv, sbf_ba>(constant_source);
 }
 
 template <>
 std::optional<typename ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::constant_with_type> ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::get(
-		[[maybe_unused]] const std::string& constant_source,
-		[[maybe_unused]] const std::string type_name,
+		const std::string& constant_source,
+		tref type_tree,
 		[[maybe_unused]] const std::string options) {
-	if (type_name == "sbf") return parse_sbf<tau_ba<bv, sbf_ba>, bv, sbf_ba>(constant_source);
-	if (type_name == "bv") return parse_bv<tau_ba<bv, sbf_ba>, bv, sbf_ba>(constant_source);
+	if (is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree))
+		return parse_sbf<tau_ba<bv, sbf_ba>, bv, sbf_ba>(constant_source);
+	if (is_bv_type_family<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree))
+		return parse_bv<tau_ba<bv, sbf_ba>, bv, sbf_ba>(constant_source, type_tree);
 	return parse_tau<bv, sbf_ba>(constant_source);
 }
 

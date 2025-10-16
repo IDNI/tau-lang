@@ -64,7 +64,7 @@ using solution = subtree_map<node, tref>;
  * @return The size of the bit-vector in bits.
  */
 template<NodeType node>
-size_t get_bv_size(const tref b);
+size_t get_bv_size(const tref t);
 
 /**
  * @brief Configures the given cvc5 solver instance for bit-vector logic.
@@ -99,7 +99,7 @@ void config_cvc5_solver(cvc5::Solver& solver) {
 template <NodeType node>
 std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
 	subtree_map<node, bv> vars, subtree_map<node, bv>& free_vars,
-	bool checked);
+	bool checked, tref type_tree);
 
 /**
  * @brief Checks if a given bit-vector formula is satisfiable.
@@ -112,7 +112,7 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
  * @return true if the formula is satisfiable, false otherwise.
  */
 template <NodeType node>
-bool is_bv_formula_sat(tref form);
+bool is_bv_formula_sat(tref form, tref type_tree);
 
 /**
  * @brief Checks whether a given bit-vector formula is valid.
@@ -124,7 +124,7 @@ bool is_bv_formula_sat(tref form);
  * @return true if the formula is valid, false otherwise.
  */
 template <NodeType node>
-bool is_bv_formula_valid(tref form);
+bool is_bv_formula_valid(tref form, tref type_tree);
 
 /**
  * @brief Checks whether a given bit-vector formula is unsatisfiable.
@@ -136,7 +136,7 @@ bool is_bv_formula_valid(tref form);
  * @return true if the formula is unsatisfiable; false otherwise.
  */
 template <NodeType node>
-bool is_bv_formula_unsat(tref form);
+bool is_bv_formula_unsat(tref form, tref type_tree);
 
 /**
  * @brief Solves a Boolean algebra problem over bit-vectors using the provided CVC5 solver.
@@ -163,7 +163,7 @@ std::optional<solution<node>> solve_bv(tref form, cvc5::Solver& solver);
  *         or std::nullopt if no solution is found.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_bv(tref form);
+std::optional<solution<node>> solve_bv(tref form, tref type_tree);
 
 /**
  * @brief Solves a Boolean algebra problem over bit-vectors.
@@ -176,7 +176,7 @@ std::optional<solution<node>> solve_bv(tref form);
  *         std::nullopt otherwise.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_bv(const trefs& form);
+std::optional<solution<node>> solve_bv(const trefs& form, tref type_tree);
 
 /**
  * @brief Dummy method included for completeness (variant ba). In the case
@@ -188,6 +188,10 @@ std::optional<solution<node>> solve_bv(const trefs& form);
  */
 bv splitter(const cvc5::Term& fm, idni::tau_lang::splitter_type&) { return fm; }
 
+template<typename...BAs>
+requires BAsPack<BAs...>
+std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);
+
 /**
  * @brief Parses a bit-vector constant from a string representation.
  *
@@ -198,20 +202,14 @@ bv splitter(const cvc5::Term& fm, idni::tau_lang::splitter_type&) { return fm; }
  *
  * @tparam BAs... Variadic template parameters representing Boolean Algebra types.
  * @param src The string representation of the bit-vector constant to parse.
- * @param size The size (in bits) of the bit-vector. Defaults to `default_bv_size`.
+ * @param type_tree The type of the bit-vector.
  * @param base The numerical base to use for parsing (e.g., 2 for binary, 10 for decimal, 16 for hexadecimal). Defaults to 10.
  * @return std::optional<constant_with_type<BAs...>> The parsed bit-vector constant with type, or std::nullopt if parsing fails.
  */
 template<typename...BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
-	size_t size = default_bv_size, size_t base = 10);
-
-template<typename...BAs>
-requires BAsPack<BAs...>
-std::optional<typename node<BAs...>::constant_with_type> get_bv_from_parse_tree(const tref& src,
-	size_t size = default_bv_size);
-
+	tref type_tree, size_t base = 10);
 
 } // namespace idni::tau_lang
 

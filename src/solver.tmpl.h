@@ -983,7 +983,6 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 
 #ifdef DEBUG
 	LOG_TRACE << "solve/form: " << LOG_FM(form);
-	LOG_TRACE << "solve/options/type: " << options.type;
 	switch (options.mode) {
 		case solver_mode::maximum: LOG_TRACE
 				<< " solve/options.kind: maximum"; break;
@@ -1018,11 +1017,10 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 		for (auto& [type, conjs] : type_partition) {
 			// The options for the solver depend on the equation type
 			solver_options op = options;
-			const std::string type_name = get_ba_type_name<node>(type);
-			op.splitter_one = node::nso_factory::splitter_one(type_name);
-			op.type = type_name;
-			if (type_name == "bv") {
-				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
+			tref type_tree = ba_types<node>::type_tree(type);
+			op.splitter_one = node::nso_factory::splitter_one(type_tree);
+			if (is_bv_type_family<node>(type_tree)) {
+				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs), type_tree)) {
 					bv_sat = true;
 					for (const auto& [var, value]: bv_solution.value()) {
 						clause_solution[var] = value;

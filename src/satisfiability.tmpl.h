@@ -531,7 +531,7 @@ template <NodeType node>
 tref build_flag_on_lookback(tref var_name_node, const std::string& var,
 							const int_t lookback)
 {
-	size_t flag_type = get_ba_type_id<node>("sbf");
+	size_t flag_type = get_ba_type_id<node>(sbf_type<node>());
 	if (lookback >= 2) return build_out_var_at_t_minus<node>(
 		var_name_node, lookback - 1, flag_type, var);
 	else return build_out_var_at_t<node>(var_name_node, flag_type, var);
@@ -541,7 +541,7 @@ template <NodeType node>
 tref build_prev_flag_on_lookback(tref io_var_node,
 				const std::string& var, const int_t lookback)
 {
-	size_t flag_type = get_ba_type_id<node>("sbf");
+	size_t flag_type = get_ba_type_id<node>(sbf_type<node>());
 	if (lookback >= 2)
 		return build_out_var_at_t_minus<node>(io_var_node, lookback, flag_type, var);
 	else return build_out_var_at_t_minus<node>(io_var_node, 1, flag_type, var);
@@ -577,7 +577,7 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 			ct.find_top(is<node, tau::ctnvar>)).get_string();
 		std::stringstream ss; ss << "_f" << ctn_id++;
 		tref var = tau::build_var_name(ss.str());
-		size_t flag_type = get_ba_type_id<node>("sbf");
+		size_t flag_type = get_ba_type_id<node>(sbf_type<node>());
 		tref flag_iovar = tau::trim(
 			build_out_var_at_t<node>(var, flag_type, ctnvar));
 
@@ -719,12 +719,10 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 template <NodeType node>
 tref create_guard(const trefs& io_vars, const int_t number) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 
-	auto build_bv_guard = [] (const tref io_var, const int_t number) {
-		tref subtype = tt(io_var) | tau::subtype | tt::ref;
+	auto build_bv_guard = [] (const tref io_var, const size_t type, const int_t number) {
 		tref uc = tau::build_bv_uconst("_" + TAU_TO_STR(io_var),
-			std::to_string(number), subtype);
+			std::to_string(number), type);
 		return tau::build_bv_eq(tau::get(tau::bv, io_var), uc);
 	};
 
@@ -737,8 +735,8 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 
 	auto build_guard = [&] (const tref io_var, const int_t number) {
 		size_t type = tau::get(io_var).get_ba_type();
-		return (type == ba_types<node>::id("bv"))
-			? build_bv_guard(io_var, number)
+		return is_bv_type_family<node>(type)
+			? build_bv_guard(io_var, type, number)
 			: build_bf_guard(io_var, type, number);
 	};
 
@@ -794,7 +792,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 
 		std::stringstream ss; ss << "_e" << n;
 		tref out = tau::build_var_name(ss.str());
-		size_t flag_type = get_ba_type_id<node>("sbf");
+		size_t flag_type = get_ba_type_id<node>(sbf_type<node>());
 		// Build the eventual var flags based on the maximal lookback
 		tref eNt_without_lookback = build_out_var_at_t<node>(
 			out, flag_type, "t");

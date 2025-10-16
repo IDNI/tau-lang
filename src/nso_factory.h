@@ -12,10 +12,6 @@
 
 namespace idni::tau_lang {
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-using constant_with_type = std::pair<std::variant<BAs...>, std::string>;
-
 /**
  * Factory for creating and manipulating tau objects.
  * - interface" for creating custom BA types by adding nso_factory<YourBA>
@@ -26,8 +22,8 @@ requires BAsPack<BAs...>
 struct nso_factory {
 
 	/**
-	 * Returns a vector of available types.
-	 * @return A vector of type names.
+	 * Returns a vector of available base type names.
+	 * @return A vector of base type names.
 	 */
 	static std::vector<std::string> types();
 
@@ -35,28 +31,28 @@ struct nso_factory {
 	 * Returns the default type.
 	 * @return The default type name.
 	 */
-	static std::string default_type();
+	static tref default_type();
 
 	/**
 	 * Returns a string representation of one for the given type.
-	 * @param type_name The type name.
+	 * @param type_tree The type tree.
 	 * @return The string representation of one.
 	 */
-	static std::string one(const std::string type_name);
+	static std::string one(tref type_tree);
 
 	/**
 	 * Returns a string representation of zero for the given type.
-	 * @param type_name The type name.
+	 * @param type_tree The type tree.
 	 * @return The string representation of zero.
 	 */
-	static std::string zero(const std::string type_name);
+	static std::string zero(tref type_tree);
 
 	/**
 	 * Returns a tau object representing a splitter with one.
-	 * @param ba_type Optional type name.
+	 * @param type_tree The type tree.
 	 * @return The splitter constant.
 	 */
-	static tref splitter_one(const std::string type_name = "");
+	static tref splitter_one(tref type_tree);
 
 	/**
 	 * Returns the tau formula stored in the variant, if present

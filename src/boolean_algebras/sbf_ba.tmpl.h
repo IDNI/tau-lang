@@ -58,7 +58,7 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<constant_with_type<BAs...>> parse_sbf(
+std::optional<typename node<BAs...>::constant_with_type> parse_sbf(
 	const std::string& src)
 {
 	static std::map<size_t, std::variant<BAs...>> cache;
@@ -66,7 +66,7 @@ std::optional<constant_with_type<BAs...>> parse_sbf(
 	// check source cache
 	auto sid = dict(src);
 	if (auto cn = cache.find(sid); cn != cache.end())
-		return constant_with_type<BAs...>{ cn->second, "sbf" };
+		return typename node<BAs...>::constant_with_type{ cn->second, sbf_type<node<BAs...>>() };
 	auto result = sbf_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
 		auto msg = result.parse_error
@@ -77,9 +77,22 @@ std::optional<constant_with_type<BAs...>> parse_sbf(
 	auto t = sbf_parser::tree::traverser(result.get_shaped_tree2())
 							| sbf_parser::sbf;
 	auto v = t.has_value() ? sbf_eval_node(t) : bdd_handle<Bool>::hfalse;
-	return constant_with_type<BAs...>{
+	return typename node<BAs...>::constant_with_type{
 		cache.emplace(sid, std::variant<BAs...>{ v }).first->second,
-		"sbf" };
+		sbf_type<node<BAs...>>() };
+}
+
+template<NodeType node>
+tref sbf_type() {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "sbf");
+	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+bool is_sbf_type(tref t) {
+	using tau = tree<node>;
+	return tau::get(t)[0].get_string() == "sbf";
 }
 
 template <typename... BAs>
