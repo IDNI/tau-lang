@@ -244,7 +244,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}*/
 
 	TEST_CASE("cvc5_xor") {
-		const char* sample = "X (+) { 1 } =_ { 1 }";
+		const char* sample = "X ^ { 1 } =_ { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -252,7 +252,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	/*TEST_CASE("cvc5_xnor") {
-		const char* sample = "X !(+) { 1 } =_ { 1 }";
+		const char* sample = "X !^ { 1 } =_ { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );

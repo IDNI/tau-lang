@@ -115,7 +115,7 @@ bv                     => ('(' _ bv _ ')')            :bv_parenthesis
 #                       | (bv _ "!&" _ bv)            :bv_nand
                         | (bv _ '|' _ bv)             :bv_or
 #                       | (bv _ "!|" _ bv)            :bv_nor
-                        | (bv _ "(+)" _ bv)           :bv_xor
+                        | (bv _ "^" _ bv)           :bv_xor
 #                       | (bv _ "!(+)" _ bv)          :bv_xnor
                         | (bv _ "<<" _ bv)            :bv_shl
                         | (bv _ ">>" _ bv)            :bv_shr

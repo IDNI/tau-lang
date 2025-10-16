@@ -605,8 +605,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			//case bv_nand:           out("!&"); last_quant_nt = nul; break;
 			case bv_or:             out("|"); last_quant_nt = nul; break;
 			//case bv_nor:            out("!|"); last_quant_nt = nul; break;
-			case bv_xor:            out("(+)"); last_quant_nt = nul; break;
-			//case bv_xnor:           out("!(+)"); last_quant_nt = nul; break;
+			case bv_xor:            out("^"); last_quant_nt = nul; break;
+			//case bv_xnor:           out("!^"); last_quant_nt = nul; break;
 			case bv_shl:            out("<<"); last_quant_nt = nul; break;
 			case bv_shr:            out(">>"); last_quant_nt = nul; break;
 			//case bv_max:            out("max "); last_quant_nt = nul; break;
