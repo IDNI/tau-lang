@@ -104,7 +104,6 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
 #
 # they are named bv_* as they involve bitvectors.
 bv                     => ('(' _ bv _ ')')            :bv_parenthesis
-                        | ( '[' bv ']' )              :bv_checked
                         |                              variable
                         | (bv _ '+' _ bv)             :bv_add
                         | (bv _ '*' _ bv)             :bv_mul
