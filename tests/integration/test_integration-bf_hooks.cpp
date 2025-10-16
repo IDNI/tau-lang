@@ -260,83 +260,83 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( check_type("{o1[t] = 0}&{o2[t] = 0}:tau", "tau") );
 	}
 
-	TEST_CASE("+") {
-		CHECK( check_hook("0+1", "1") );
-		CHECK( check_hook("1+0", "1") );
-		CHECK( check_hook("1+1", "0") );
-		CHECK( check_hook("0+0", "0") );
+	TEST_CASE("^") {
+		CHECK( check_hook("0^1", "1") );
+		CHECK( check_hook("1^0", "1") );
+		CHECK( check_hook("1^1", "0") );
+		CHECK( check_hook("0^0", "0") );
 
-		CHECK( check_hook("1:sbf+0:sbf", "1:sbf") );
-		CHECK( check_hook("0:sbf+1:sbf", "1:sbf") );
-		CHECK( check_hook("1:sbf+1:sbf", "0:sbf") );
-		CHECK( check_hook("0:sbf+0:sbf", "0:sbf") );
+		CHECK( check_hook("1:sbf^0:sbf", "1:sbf") );
+		CHECK( check_hook("0:sbf^1:sbf", "1:sbf") );
+		CHECK( check_hook("1:sbf^1:sbf", "0:sbf") );
+		CHECK( check_hook("0:sbf^0:sbf", "0:sbf") );
 
-		CHECK( check_hook("1:sbf+0", "1:sbf") );
-		CHECK( check_hook("0:sbf+1", "1:sbf") );
-		CHECK( check_hook("1:sbf+1", "0:sbf") );
-		CHECK( check_hook("0:sbf+0", "0:sbf") );
+		CHECK( check_hook("1:sbf^0", "1:sbf") );
+		CHECK( check_hook("0:sbf^1", "1:sbf") );
+		CHECK( check_hook("1:sbf^1", "0:sbf") );
+		CHECK( check_hook("0:sbf^0", "0:sbf") );
 
-		CHECK( check_hook("1+0:sbf", "1:sbf") );
-		CHECK( check_hook("0+1:sbf", "1:sbf") );
-		CHECK( check_hook("1+1:sbf", "0:sbf") );
-		CHECK( check_hook("0+0:sbf", "0:sbf") );
+		CHECK( check_hook("1^0:sbf", "1:sbf") );
+		CHECK( check_hook("0^1:sbf", "1:sbf") );
+		CHECK( check_hook("1^1:sbf", "0:sbf") );
+		CHECK( check_hook("0^0:sbf", "0:sbf") );
 
-		CHECK( check_hook("1:tau+0:tau", "1:tau") );
-		CHECK( check_hook("0:tau+1:tau", "1:tau") );
-		CHECK( check_hook("1:tau+1:tau", "0:tau") );
-		CHECK( check_hook("0:tau+0:tau", "0:tau") );
+		CHECK( check_hook("1:tau^0:tau", "1:tau") );
+		CHECK( check_hook("0:tau^1:tau", "1:tau") );
+		CHECK( check_hook("1:tau^1:tau", "0:tau") );
+		CHECK( check_hook("0:tau^0:tau", "0:tau") );
 
-		CHECK( check_hook("1+0:tau", "1:tau") );
-		CHECK( check_hook("0+1:tau", "1:tau") );
-		CHECK( check_hook("1+1:tau", "0:tau") );
-		CHECK( check_hook("0+0:tau", "0:tau") );
+		CHECK( check_hook("1^0:tau", "1:tau") );
+		CHECK( check_hook("0^1:tau", "1:tau") );
+		CHECK( check_hook("1^1:tau", "0:tau") );
+		CHECK( check_hook("0^0:tau", "0:tau") );
 
-		CHECK( check_hook("1:tau+0", "1:tau") );
-		CHECK( check_hook("0:tau+1", "1:tau") );
-		CHECK( check_hook("1:tau+1", "0:tau") );
-		CHECK( check_hook("0:tau+0", "0:tau") );
+		CHECK( check_hook("1:tau^0", "1:tau") );
+		CHECK( check_hook("0:tau^1", "1:tau") );
+		CHECK( check_hook("1:tau^1", "0:tau") );
+		CHECK( check_hook("0:tau^0", "0:tau") );
 
-		CHECK( !check_hook("1:sbf+0:tau", "1") );
-		CHECK( !check_hook("0:sbf+1:tau", "1") );
-		CHECK( !check_hook("1:sbf+1:tau", "0") );
-		CHECK( !check_hook("0:sbf+0:tau", "0") );
+		CHECK( !check_hook("1:sbf^0:tau", "1") );
+		CHECK( !check_hook("0:sbf^1:tau", "1") );
+		CHECK( !check_hook("1:sbf^1:tau", "0") );
+		CHECK( !check_hook("0:sbf^0:tau", "0") );
 
-		CHECK( !check_hook("1:tau+0:sbf", "1") );
-		CHECK( !check_hook("0:tau+1:sbf", "1") );
-		CHECK( !check_hook("1:tau+1:sbf", "0") );
-		CHECK( !check_hook("0:tau+0:sbf", "0") );
+		CHECK( !check_hook("1:tau^0:sbf", "1") );
+		CHECK( !check_hook("0:tau^1:sbf", "1") );
+		CHECK( !check_hook("1:tau^1:sbf", "0") );
+		CHECK( !check_hook("0:tau^0:sbf", "0") );
 
-		CHECK( !check_hook("{1}:sbf+0:tau", "1") );
-		CHECK( !check_hook("{0}:sbf+1:tau", "1") );
-		CHECK( !check_hook("{1}:sbf+1:tau", "0") );
-		CHECK( !check_hook("{0}:sbf+0:tau", "0") );
+		CHECK( !check_hook("{1}:sbf^0:tau", "1") );
+		CHECK( !check_hook("{0}:sbf^1:tau", "1") );
+		CHECK( !check_hook("{1}:sbf^1:tau", "0") );
+		CHECK( !check_hook("{0}:sbf^0:tau", "0") );
 
-		CHECK( !check_hook("1:tau+{0}:sbf", "1") );
-		CHECK( !check_hook("0:tau+{1}:sbf", "1") );
-		CHECK( !check_hook("1:tau+{1}:sbf", "0") );
-		CHECK( !check_hook("0:tau+{0}:sbf", "0") );
+		CHECK( !check_hook("1:tau^{0}:sbf", "1") );
+		CHECK( !check_hook("0:tau^{1}:sbf", "1") );
+		CHECK( !check_hook("1:tau^{1}:sbf", "0") );
+		CHECK( !check_hook("0:tau^{0}:sbf", "0") );
 
-		CHECK( !check_hook("1:sbf+{F}:tau", "1") );
-		CHECK( !check_hook("0:sbf+{T}:tau", "1") );
-		CHECK( !check_hook("1:sbf+{T}:tau", "0") );
-		CHECK( !check_hook("0:sbf+{F}:tau", "0") );
+		CHECK( !check_hook("1:sbf^{F}:tau", "1") );
+		CHECK( !check_hook("0:sbf^{T}:tau", "1") );
+		CHECK( !check_hook("1:sbf^{T}:tau", "0") );
+		CHECK( !check_hook("0:sbf^{F}:tau", "0") );
 
-		CHECK( !check_hook("{T}:tau+0:sbf", "1") );
-		CHECK( !check_hook("{F}:tau+1:sbf", "1") );
-		CHECK( !check_hook("{T}:tau+1:sbf", "0") );
-		CHECK( !check_hook("{F}:tau+0:sbf", "0") );
+		CHECK( !check_hook("{T}:tau^0:sbf", "1") );
+		CHECK( !check_hook("{F}:tau^1:sbf", "1") );
+		CHECK( !check_hook("{T}:tau^1:sbf", "0") );
+		CHECK( !check_hook("{F}:tau^0:sbf", "0") );
 
-		CHECK( check_hook("1+x", "x'") );
-		CHECK( check_hook("x+1", "x'") );
-		CHECK( check_hook("0+x", "x") );
-		CHECK( check_hook("x+0", "x") );
-		CHECK( check_hook("x+x", "0") );
-		CHECK( check_hook("x+x'", "1") );
-		CHECK( check_hook("x'+x", "1") );
+		CHECK( check_hook("1^x", "x'") );
+		CHECK( check_hook("x^1", "x'") );
+		CHECK( check_hook("0^x", "x") );
+		CHECK( check_hook("x^0", "x") );
+		CHECK( check_hook("x^x", "0") );
+		CHECK( check_hook("x^x'", "1") );
+		CHECK( check_hook("x'^x", "1") );
 
-		CHECK( check_type("{a}:sbf+{b}:sbf", "sbf") );
-		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}", "tau") );
-		CHECK( check_type("{o1[t] = 0}:tau+{o2[t] = 0}", "tau") );
-		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}:tau", "tau") );
+		CHECK( check_type("{a}:sbf^{b}:sbf", "sbf") );
+		CHECK( check_type("{o1[t] = 0}^{o2[t] = 0}", "tau") );
+		CHECK( check_type("{o1[t] = 0}:tau^{o2[t] = 0}", "tau") );
+		CHECK( check_type("{o1[t] = 0}^{o2[t] = 0}:tau", "tau") );
 	}
 }

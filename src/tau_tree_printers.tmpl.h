@@ -562,7 +562,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				break;
 			case bf_or:             out("|");
 						last_quant_nt = nul; break;
-			case bf_xor:            out("+");
+			case bf_xor:            out("^");
 						last_quant_nt = nul; break;
 			case bf_eq:             out(" = ");
 						last_quant_nt = nul; break;
