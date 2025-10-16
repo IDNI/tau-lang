@@ -265,8 +265,8 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.value().empty() );
 	}
 
-	TEST_CASE("o1[t] + o1[t-1] = 1") {
-		const char* sample = "o1[t] + o1[t-1] = 1.";
+	TEST_CASE("o1[t] ^ o1[t-1] = 1") {
+		const char* sample = "o1[t] ^ o1[t-1] = 1.";
 		auto memory = run_test(sample, 2);
 		CHECK ( !memory.value().empty() );
 	}
@@ -305,58 +305,58 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.value().empty() );
 	}
 
-	TEST_CASE("<:a> o1[t] + <:b> o1[t]' = 0") {
-		const char* sample = "<:a> o1[t] + <:b> o1[t]' = 0.";
+	TEST_CASE("<:a> o1[t] ^ <:b> o1[t]' = 0") {
+		const char* sample = "<:a> o1[t] ^ <:b> o1[t]' = 0.";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 
-	TEST_CASE("o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
-		const char* sample = "o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
+	TEST_CASE("o1[0] = <:c> && o1[t] = <:a> o1[t-1] ^ <:b> o1[t-1]'") {
+		const char* sample = "o1[0] = <:c> && o1[t] = <:a> o1[t-1] ^ <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 
 	// f(f(f(x))) = f(x) using uninterpreted constants
-	TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
-		const char* sample = "o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
+	TEST_CASE("o1[t] = <:a> o1[t-1] ^ <:b> o1[t-1]'") {
+		const char* sample = "o1[t] = <:a> o1[t-1] ^ <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 
 	// f(f(f(x))) = f(x) using constants
-	TEST_CASE("o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'") {
+	TEST_CASE("o1[t] = {a}:sbf o1[t-1] ^ {b}:sbf o1[t-1]'") {
 		// TODO (CHECK this one too
-		// const char* sample = "o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'.";
-		const char* sample = "o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'.";
+		// const char* sample = "o1[t] = {a}:sbf o1[t-1] ^ {b}:sbf o1[t-1]'.";
+		const char* sample = "o1[t] = {a}:sbf o1[t-1] ^ {b}:sbf o1[t-1]'.";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with BA constants (0 or 1)
-	TEST_CASE("o1[0] = 1 && o1[1] = 1 && o1[t] = o1[t-1] + o1[t-2]") {
-		const char* sample = "o1[0] = 1 && o1[1] = 1 && o1[t] = o1[t-1] + o1[t-2].";
+	TEST_CASE("o1[0] = 1 && o1[1] = 1 && o1[t] = o1[t-1] ^ o1[t-2]") {
+		const char* sample = "o1[0] = 1 && o1[1] = 1 && o1[t] = o1[t-1] ^ o1[t-2].";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with SBFs
-	TEST_CASE("o1[0] = {a}:sbf && o1[1] = {a}:sbf && o1[t] = o1[t-1] + o1[t-2]") {
-		const char* sample = "o1[0] =  {a}:sbf && o1[1] =  {a}:sbf && o1[t] = o1[t-1] + o1[t-2].";
+	TEST_CASE("o1[0] = {a}:sbf && o1[1] = {a}:sbf && o1[t] = o1[t-1] ^ o1[t-2]") {
+		const char* sample = "o1[0] =  {a}:sbf && o1[1] =  {a}:sbf && o1[t] = o1[t-1] ^ o1[t-2].";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with sample Tau syntax
-	TEST_CASE("o1[0] = {<:x> = 0.} && o1[1] = {<:x> = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
-		const char* sample = "o1[0] =  {<:x> = 0.} && o1[1] =  {<:x> = 0.} && o1[t] = o1[t-1] + o1[t-2].";
+	TEST_CASE("o1[0] = {<:x> = 0.} && o1[1] = {<:x> = 0.} && o1[t] = o1[t-1] ^ o1[t-2]") {
+		const char* sample = "o1[0] =  {<:x> = 0.} && o1[1] =  {<:x> = 0.} && o1[t] = o1[t-1] ^ o1[t-2].";
 		auto memory = run_test(sample, 8, "tau");
 		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with sample Tau programs
-	TEST_CASE("o1[0] = {o1[0] = 0.} && o1[1] = {o1[0] = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
-		const char* sample = "o1[0] =  {o1[0] = 0.} && o1[1] =  {o1[0] = 0.} && o1[t] = o1[t-1] + o1[t-2].";
+	TEST_CASE("o1[0] = {o1[0] = 0.} && o1[1] = {o1[0] = 0.} && o1[t] = o1[t-1] ^ o1[t-2]") {
+		const char* sample = "o1[0] =  {o1[0] = 0.} && o1[1] =  {o1[0] = 0.} && o1[t] = o1[t-1] ^ o1[t-2].";
 		auto memory = run_test(sample, 8, "tau");
 		CHECK ( !memory.value().empty() );
 	}

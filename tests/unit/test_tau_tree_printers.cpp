@@ -24,7 +24,7 @@ TEST_SUITE("pretty printer") {
 			"x = 1.",
 			"ab = 0.",
 			"x|ba != 1.",
-			"x+ba != 0.",
+			"x^ba != 0.",
 			"(a|b)x = 0.",
 		};
 
