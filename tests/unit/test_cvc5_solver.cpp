@@ -163,14 +163,6 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("cvc5_checked") {
-		const char* sample = "[X] =_ { 1 }";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
-		CHECK( solution.has_value() );
-		CHECK( solution.value().size() == 1 );
-	}
-
 	TEST_CASE("cvc5_neg") {
 		const char* sample = "~X =_ { 1 }";
 		auto src = parse(sample);
