@@ -421,6 +421,7 @@ tref tree<node>::get_ba_constant(
 
 // bv constants
 
+/*
 template <NodeType node>
 tref tree<node>::get_bv_constant(const constant& constant, size_t ba_type_id)
 {
@@ -463,6 +464,7 @@ tref tree<node>::get_bv_constant(size_t constant_id, size_t ba_type_id) {
 		<< LOG_BA(ba_constants<node>::get(constant_id));
 	return get_bv_constant(ba_constants<node>::get(constant_id), ba_type_id);
 }
+*/
 
 // -----------------------------------------------------------------------------
 // children
@@ -588,7 +590,7 @@ template <NodeType node>
 bool tree<node>::is_string_nt(size_t nt) {
 	static const std::set<size_t> string_nts{
 		sym, type, source, capture, var_name, uconst_name, file_name,
-		ctnvar, option_name, option_value, decimal, hexadecimal, binary
+		ctnvar, option_name, option_value,
 	};
 	return string_nts.contains(nt);
 }
@@ -605,7 +607,7 @@ template <NodeType node>
 bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 	switch (nt) {
 		case bf:
-		case bf_constant:
+		case ba_constant:
 		case bf_fall:
 		case bf_fex:
 		case bf_ref:
@@ -648,10 +650,12 @@ template <NodeType node>
 bool tree<node>::is_num() const { return is(num) || is(history_id); }
 
 template <NodeType node>
-bool tree<node>::is_ba_constant() const { return is(bf_constant); }
+bool tree<node>::is_ba_constant() const { return is(ba_constant); }
 
 template <NodeType node>
-bool tree<node>::is_bv_constant() const { return is(bv_constant); }
+bool tree<node>::is_bv_constant() const {
+	return is(ba_constant) && get_ba_type_name() == "bv";
+}
 
 template <NodeType node>
 bool tree<node>::is_term() const { return this->value.term || is(io_var); }

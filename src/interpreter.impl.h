@@ -107,6 +107,7 @@ std::optional<assignment<node>> finputs<node>::read() {
 			<< "read[types[var]]: " << ba_types<node>::name(types[var]) << "\n";)
 
 		current[var] = (is_bv_type_family<node>(types[var]))
+		//TODO: remove build_bv_ba_constant
 			? tau::build_bv_ba_constant(cnst.value().first, types[var])
 			: tau::build_bf_ba_constant(cnst.value().first, types[var]);
 	}
@@ -199,6 +200,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 		}
 
 		tref wrapped_const = (is_bv_type_family<node>(it->second))
+		//TODO: remove build_bv_ba_constant
 			? build_bv_ba_constant<node>(cnst.value().first, it->second)
 			: build_bf_ba_constant<node>(cnst.value().first, it->second);
 
@@ -310,7 +312,7 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 		DBG(LOG_TRACE << LOG_FM_TREE(io_var));
 		tref var_name = get_var_name_node<node>(io_var);
 		DBG(LOG_TRACE << LOG_FM_TREE(var_name));
-		auto value = tt(outputs.find(io_var)->second) | tau::bf_constant;
+		auto value = tt(outputs.find(io_var)->second) | tau::ba_constant;
 		std::stringstream ss;
 		if (!value) {
 			// is bf_t
@@ -323,10 +325,6 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 					| tau::bf_f; check) {
 				size_t type = types.find(var_name)->second;
 				ss << node::nso_factory::zero(get_ba_type_tree<node>(type));
-			// is bv
-			} else if (auto check = tt(outputs.find(io_var)->second)
-					| tau::bv_constant; check) {
-				ss << (check | tt::bv_constant);
 			// is something else but not a BA element
 			} else {
 				LOG_ERROR << "No Boolean algebra element "
@@ -551,7 +549,7 @@ std::pair<std::optional<assignment<node>>, bool>
 						auto zero_bitvector = make_bitvector_zero(
 							get_bv_size<node>(get_ba_type_tree<node>(ctype)));
 						auto zero_term = tau::get(tau::bv, {
-							tau::get_bv_constant(zero_bitvector, ctype)});
+							tau::get_ba_constant(zero_bitvector, ctype)});
 						memory.emplace(ot, zero_term);
 						global.emplace(ot, zero_term);
 					} else {

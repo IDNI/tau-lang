@@ -67,23 +67,23 @@ TEST_SUITE("operators: disjunction") {
 
 TEST_SUITE("operators: exclusive or") {
 
-	TEST_CASE("{ T. } + { T. } = 0") {
-		const char* sample = "{ T. } + { T. } = 0.";
+	TEST_CASE("{ T. } ^ { T. } = 0") {
+		const char* sample = "{ T. } ^ { T. } = 0.";
 		CHECK (normalize_and_check(sample, tau::wff_t));
 	}
 
-	TEST_CASE("{ F. } + { T. } = 0") {
-		const char* sample = "{ F. } + { T. } = 0.";
+	TEST_CASE("{ F. } ^ { T. } = 0") {
+		const char* sample = "{ F. } ^ { T. } = 0.";
 		CHECK (normalize_and_check(sample, tau::wff_f));
 	}
 
-	TEST_CASE("{ T. } + { F. } = 0") {
-		const char* sample = "{ T. } + { F. } = 0.";
+	TEST_CASE("{ T. } ^ { F. } = 0") {
+		const char* sample = "{ T. } ^ { F. } = 0.";
 		CHECK (normalize_and_check(sample, tau::wff_f));
 	}
 
-	TEST_CASE("{ F. } + { F. } = 0") {
-		const char* sample = "{ F. } + { F. } = 0.";
+	TEST_CASE("{ F. } ^ { F. } = 0") {
+		const char* sample = "{ F. } ^ { F. } = 0.";
 		CHECK (normalize_and_check(sample, tau::wff_t));
 	}
 }

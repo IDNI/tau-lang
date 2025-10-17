@@ -14,7 +14,7 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 {
 	using tau = tree<node<BAs...>>;
 
-	auto bf_constant_and = [](const auto& lt, const auto& rt) {
+	auto ba_constant_and = [](const auto& lt, const auto& rt) {
 		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
 						&& lt.get_ba_type() > 0);)
 		return tau::build_bf_ba_constant(
@@ -26,8 +26,8 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	if (lt.equals_1()) return rt;
 	if (rt.equals_1()) return lt;
 	// more elaborate cases
-	if (lt.child_is(tau::bf_constant) && rt.child_is(tau::bf_constant))
-		return tau::get(bf_constant_and(lt[0], rt[0]));
+	if (lt.child_is(tau::ba_constant) && rt.child_is(tau::ba_constant))
+		return tau::get(ba_constant_and(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_and(lt.get(), rt.get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
@@ -46,7 +46,7 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 {
 	using tau = tree<node<BAs...>>;
 
-	auto bf_constant_or = [](const auto& lt, const auto& rt) {
+	auto ba_constant_or = [](const auto& lt, const auto& rt) {
 		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
 						&& lt.get_ba_type() > 0);)
 		return tau::build_bf_ba_constant(
@@ -55,7 +55,7 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	};
 
 	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
-		return tau::get(bf_constant_or(lt[0], rt[0]));
+		return tau::get(ba_constant_or(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_or(lt.get(), rt.get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
@@ -72,7 +72,7 @@ requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
 
-	auto bf_constant_neg = [](const auto& lt) {
+	auto ba_constant_neg = [](const auto& lt) {
 		DBG(assert(lt.get_ba_type() > 0);)
 		return tau::build_bf_ba_constant(~lt.get_ba_constant(),
 					     lt.get_ba_type());
@@ -84,7 +84,7 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 
 	// more elaborate cases
 	if (lt[0].is_ba_constant())
-		return tau::get(bf_constant_neg(lt[0]));
+		return tau::get(ba_constant_neg(lt[0]));
 	if (lt.is(tau::bf))
 		return tau::get(tau::build_bf_neg(lt.get()));
 	if (lt[0].is(tau::bf_eq))
@@ -103,7 +103,7 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 {
 	using tau = tree<node<BAs...>>;
 
-	auto bf_constant_xor = [](const auto& lt, const auto& rt) {
+	auto ba_constant_xor = [](const auto& lt, const auto& rt) {
 		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
 						&& lt.get_ba_type() > 0);)
 		return tau::build_bf_ba_constant(
@@ -117,7 +117,7 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 
 	// more elaborate cases
 	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
-		return tau::get(bf_constant_xor(lt[0], rt[0]));
+		return tau::get(ba_constant_xor(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_xor(lt.get(), rt.get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))

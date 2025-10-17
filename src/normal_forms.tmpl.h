@@ -244,7 +244,7 @@ tref normalize_ba(tref fm) {
 	assert(tau::get(fm).is(tau::bf));
 	auto norm_ba = [&](tref n) {
 		const auto& t = tau::get(n);
-		if (!t.is(tau::bf_constant)) return n;
+		if (!t.is(tau::ba_constant)) return n;
 		// Node has a Boolean algebra element
 		auto c = t.get_ba_constant();
 		auto nc = normalize_ba<node>(c);
@@ -3564,14 +3564,14 @@ struct simplify_using_equality {
 	// apply equality simplifications along the way
 	static tref operator() (tref fm) {
 		// Create comparator function that orders bfs by making constants smallest
-		// We have 0 < 1 < bf_constant < uninterpreted_constant < variable < rest by node count
+		// We have 0 < 1 < ba_constant < uninterpreted_constant < variable < rest by node count
 		auto tau_comp = [](tref l, tref r) {
 			if (l == _0<node>()) return true;
 			if (r == _0<node>()) return false;
 			if (l == _1<node>()) return true;
 			if (r == _1<node>()) return false;
-			if (is_child<node>(l, tau::bf_constant)) return true;
-			if (is_child<node>(r, tau::bf_constant)) return false;
+			if (is_child<node>(l, tau::ba_constant)) return true;
+			if (is_child<node>(r, tau::ba_constant)) return false;
 			if (is_child<node>(l, tau::variable)) {
 				if (is_child<node>(r, tau::variable)) {
 					// Check for uninterpreted constant

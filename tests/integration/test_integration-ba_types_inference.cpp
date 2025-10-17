@@ -149,7 +149,7 @@ bool check_ctes(tref inferred, std::vector<type_t>& expected) {
 	// DBG(LOG_TRACE << "Checking bf constants in: "
 	// 	<< LOG_FM_TREE(inferred);)
 
-	auto ctes = tau::get(inferred).select_top(is<node_t, tau::bf_constant>);
+	auto ctes = tau::get(inferred).select_top(is<node_t, tau::ba_constant>);
 	if (ctes.empty() && expected.size() > 0) {
 		TAU_LOG_ERROR << "No constants found";
 		return false;
@@ -184,7 +184,7 @@ bool check_bv_ctes(tref inferred, std::vector<type_t>& expected) {
 	// DBG(LOG_TRACE << "Checking bv constants in: "
 	// 	<< LOG_FM_TREE(inferred);)
 
-	auto ctes = tau::get(inferred).select_top(is<node_t, tau::bv_constant>);
+	auto ctes = tau::get(inferred).select_top(is<node_t, tau::ba_constant>);
 	if (ctes.empty() && expected.size() > 0) {
 		TAU_LOG_ERROR << "No constants found";
 		return false;
@@ -299,9 +299,7 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 	}
 
 	TEST_CASE("simple case 4") {
-		// TODO (HIGH) should fail
-		// tref parsed = parse("x = 1:bv");
-		tref parsed = parse("x =_ 1:bv");
+		tref parsed = parse("x =_ { #b1001 }:bv");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -314,7 +312,7 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 	TEST_CASE("simple case 4 (y2)") {
 		// TODO (HIGH) should fail
 		// tref parsed = parse("x = 1:bv[8]");
-		tref parsed = parse("x =_ 1:bv[8]");
+		tref parsed = parse("x =_ { #b1001 }:bv[8]");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -325,7 +323,7 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 	}
 
 	TEST_CASE("simple case 4 (y3)") {
-		tref parsed = parse("x:bv =_ 1");
+		tref parsed = parse("x:bv =_  { #b1001 }");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -336,7 +334,7 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 	}
 
 	TEST_CASE("simple case 4 (y4)") {
-		tref parsed = parse("x:bv[16] =_ 1");
+		tref parsed = parse("x:bv[16] =_{ 1 }");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -761,7 +759,7 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 	}
 
 	TEST_CASE("simple failing case (y4)") {
-		tref parsed = parse("x:tau =_ 1");
+		tref parsed = parse("x:tau =_{ 1 }");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
@@ -775,7 +773,7 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 	}
 
 	TEST_CASE("bv constants") {
-		tref parsed = parse("#b1 : bv =_ #b0 : bv & #b10");
+		tref parsed = parse("{ #b1 }: bv =_ { #b0 } : bv & { #b10 }");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -788,7 +786,7 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 	}
 
 	TEST_CASE("bv8 constants") {
-		tref parsed = parse("#b1 : bv[8] =_ #b0 : bv[8] & #b10 : bv");
+		tref parsed = parse("{ #b1 } : bv[8] =_ { #b0 } : bv[8] & { #b10 } : bv");
 		CHECK( parsed != nullptr );
 		if (parsed == nullptr) {
 			TAU_LOG_ERROR << "Parsing failed";
@@ -924,7 +922,7 @@ TEST_SUITE("new_infer_ba_types: wff formulas") {
 	}
 
 	TEST_CASE("bv default (y2)") {
-		tref parsed = parse("all x x & y =_ z && y =_ 1:bv[8]");
+		tref parsed = parse("all x x & y =_ z && y =_ { 1 }:bv[8]");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );

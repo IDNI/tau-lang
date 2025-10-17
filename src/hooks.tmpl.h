@@ -14,8 +14,7 @@ template <NodeType node>
 tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
-	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift
-			|| v.nt == tau::bv_constant)
+	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift)
 		log("- HOOK    -", v, ch, len, r, true);)
 	tref ret = nullptr;
 	if      (v.nt == tau::bf)          ret = term( v, ch, len, r);
@@ -27,8 +26,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 		HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
 		DBG(typename node::type nt = tau::get(ret).get_type();)
 		DBG(assert(nt == tau::bf || nt == tau::wff
-			|| nt == tau::shift || nt == tau::integer
-			|| tau::get(ret).is_bv_constant() );)
+			|| nt == tau::shift || nt == tau::integer);)
 	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error";) }
 	return ret;
 }
@@ -197,7 +195,7 @@ tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	case tau::bf_and:      return term_and(v, ch, len, r);
 	case tau::bf_neg:      return term_neg(v, ch, len, r);
 	case tau::bf_xor:      return term_xor(v, ch, len, r);
-	case tau::bf_constant: return cte(v, ch, len, r);
+	case tau::ba_constant: return cte(v, ch, len, r);
 	default: return tau::get_raw(v, ch, len, r);
 	}
 }
@@ -849,7 +847,7 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 template <NodeType node>
 tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq_cte", v, ch, len, r);)
-	auto l = tt(ch[0]) | tau::bf | tau::bf_constant;
+	auto l = tt(ch[0]) | tau::bf | tau::ba_constant;
 	if (l && (l | tt::ba_constant) == false) return tau::get(tau::_T(), r);
 	else if (l) return tau::get(tau::_F(), r);
 	return tau::get_raw(v, ch, len, r);
@@ -900,7 +898,7 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 template <NodeType node>
 tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neq_cte", v, ch, len, r);)
-	auto l = tt(ch[0]) | tau::bf | tau::bf_constant;
+	auto l = tt(ch[0]) | tau::bf | tau::ba_constant;
 	if (l.has_value() && (l | tt::ba_constant) == false)
 		return tau::get(tau::_F(), r);
 	else if (l.has_value()) return tau::get(tau::_T(), r);

@@ -311,8 +311,8 @@ TEST_SUITE("find_solution") {
 		CHECK ( test_find_solution(sample) );
 	}
 
-	TEST_CASE("two var: x + y = 1.") {
-		const char* sample = "x + y = 1.";
+	TEST_CASE("two var: x ^ y = 1.") {
+		const char* sample = "x ^ y = 1.";
 		CHECK ( test_find_solution(sample) );
 	}
 
@@ -327,8 +327,8 @@ TEST_SUITE("find_solution") {
 	}
 
 	//  number 1 of test_integration-interpreter.cpp
-	TEST_CASE("<:a> z + <:b> z' = 0") {
-		const char* sample = "<:a> z + <:b> z' = 0.";
+	TEST_CASE("<:a> z ^ <:b> z' = 0") {
+		const char* sample = "<:a> z ^ <:b> z' = 0.";
 		CHECK ( test_find_solution(sample) );
 	}
 }

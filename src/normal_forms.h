@@ -230,7 +230,7 @@ inline auto is_bf_bdd_var = [](tref n) {
 	return t.child_is(tau::variable)
 		|| t.child_is(tau::capture)
 		|| t.child_is(tau::bf_ref)
-		|| t.child_is(tau::bf_constant);
+		|| t.child_is(tau::ba_constant);
 };
 // ------------------------------
 
@@ -538,7 +538,6 @@ private:
 	tref traverse(const bdd_path& path, const literals& remaining, tref form) const;
 
 	exponent get_exponent(const tref n) const;
-	tref get_bf_constant(literal lit) const;
 	std::optional<constant> get_constant(literal lit) const;
 	partition make_partition_by_exponent(const literals& s) const;
 

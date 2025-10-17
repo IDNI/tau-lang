@@ -54,7 +54,7 @@ TEST_SUITE("bf operator hooks") {
 		tref parsed = tau::get(std::string(sample) + " = 0.", { .reget_with_hooks = false });
 		using node = node_t;
 		// DBG(TAU_LOG_TRACE << "parsed: " << TAU_LOG_FM_DUMP(parsed);)
-		tref c = tau::get(parsed).find_top(is<node, tau::bf_constant>);
+		tref c = tau::get(parsed).find_top(is<node, tau::ba_constant>);
 		size_t type_id = tau::get(c).get_ba_type();
 		size_t type_expected_id = get_ba_type_id<node_t>(type);
 		auto sample_type = get_ba_type_name<node_t>(type_id);
@@ -260,83 +260,83 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( check_type("{o1[t] = 0}&{o2[t] = 0}:tau", tau_type<node_t>()) );
 	}
 
-	TEST_CASE("+") {
-		CHECK( check_hook("0+1", "1") );
-		CHECK( check_hook("1+0", "1") );
-		CHECK( check_hook("1+1", "0") );
-		CHECK( check_hook("0+0", "0") );
+	TEST_CASE("^") {
+		CHECK( check_hook("0^1", "1") );
+		CHECK( check_hook("1^0", "1") );
+		CHECK( check_hook("1^1", "0") );
+		CHECK( check_hook("0^0", "0") );
 
-		CHECK( check_hook("1:sbf+0:sbf", "1:sbf") );
-		CHECK( check_hook("0:sbf+1:sbf", "1:sbf") );
-		CHECK( check_hook("1:sbf+1:sbf", "0:sbf") );
-		CHECK( check_hook("0:sbf+0:sbf", "0:sbf") );
+		CHECK( check_hook("1:sbf^0:sbf", "1:sbf") );
+		CHECK( check_hook("0:sbf^1:sbf", "1:sbf") );
+		CHECK( check_hook("1:sbf^1:sbf", "0:sbf") );
+		CHECK( check_hook("0:sbf^0:sbf", "0:sbf") );
 
-		CHECK( check_hook("1:sbf+0", "1:sbf") );
-		CHECK( check_hook("0:sbf+1", "1:sbf") );
-		CHECK( check_hook("1:sbf+1", "0:sbf") );
-		CHECK( check_hook("0:sbf+0", "0:sbf") );
+		CHECK( check_hook("1:sbf^0", "1:sbf") );
+		CHECK( check_hook("0:sbf^1", "1:sbf") );
+		CHECK( check_hook("1:sbf^1", "0:sbf") );
+		CHECK( check_hook("0:sbf^0", "0:sbf") );
 
-		CHECK( check_hook("1+0:sbf", "1:sbf") );
-		CHECK( check_hook("0+1:sbf", "1:sbf") );
-		CHECK( check_hook("1+1:sbf", "0:sbf") );
-		CHECK( check_hook("0+0:sbf", "0:sbf") );
+		CHECK( check_hook("1^0:sbf", "1:sbf") );
+		CHECK( check_hook("0^1:sbf", "1:sbf") );
+		CHECK( check_hook("1^1:sbf", "0:sbf") );
+		CHECK( check_hook("0^0:sbf", "0:sbf") );
 
-		CHECK( check_hook("1:tau+0:tau", "1:tau") );
-		CHECK( check_hook("0:tau+1:tau", "1:tau") );
-		CHECK( check_hook("1:tau+1:tau", "0:tau") );
-		CHECK( check_hook("0:tau+0:tau", "0:tau") );
+		CHECK( check_hook("1:tau^0:tau", "1:tau") );
+		CHECK( check_hook("0:tau^1:tau", "1:tau") );
+		CHECK( check_hook("1:tau^1:tau", "0:tau") );
+		CHECK( check_hook("0:tau^0:tau", "0:tau") );
 
-		CHECK( check_hook("1+0:tau", "1:tau") );
-		CHECK( check_hook("0+1:tau", "1:tau") );
-		CHECK( check_hook("1+1:tau", "0:tau") );
-		CHECK( check_hook("0+0:tau", "0:tau") );
+		CHECK( check_hook("1^0:tau", "1:tau") );
+		CHECK( check_hook("0^1:tau", "1:tau") );
+		CHECK( check_hook("1^1:tau", "0:tau") );
+		CHECK( check_hook("0^0:tau", "0:tau") );
 
-		CHECK( check_hook("1:tau+0", "1:tau") );
-		CHECK( check_hook("0:tau+1", "1:tau") );
-		CHECK( check_hook("1:tau+1", "0:tau") );
-		CHECK( check_hook("0:tau+0", "0:tau") );
+		CHECK( check_hook("1:tau^0", "1:tau") );
+		CHECK( check_hook("0:tau^1", "1:tau") );
+		CHECK( check_hook("1:tau^1", "0:tau") );
+		CHECK( check_hook("0:tau^0", "0:tau") );
 
-		CHECK( !check_hook("1:sbf+0:tau", "1") );
-		CHECK( !check_hook("0:sbf+1:tau", "1") );
-		CHECK( !check_hook("1:sbf+1:tau", "0") );
-		CHECK( !check_hook("0:sbf+0:tau", "0") );
+		CHECK( !check_hook("1:sbf^0:tau", "1") );
+		CHECK( !check_hook("0:sbf^1:tau", "1") );
+		CHECK( !check_hook("1:sbf^1:tau", "0") );
+		CHECK( !check_hook("0:sbf^0:tau", "0") );
 
-		CHECK( !check_hook("1:tau+0:sbf", "1") );
-		CHECK( !check_hook("0:tau+1:sbf", "1") );
-		CHECK( !check_hook("1:tau+1:sbf", "0") );
-		CHECK( !check_hook("0:tau+0:sbf", "0") );
+		CHECK( !check_hook("1:tau^0:sbf", "1") );
+		CHECK( !check_hook("0:tau^1:sbf", "1") );
+		CHECK( !check_hook("1:tau^1:sbf", "0") );
+		CHECK( !check_hook("0:tau^0:sbf", "0") );
 
-		CHECK( !check_hook("{1}:sbf+0:tau", "1") );
-		CHECK( !check_hook("{0}:sbf+1:tau", "1") );
-		CHECK( !check_hook("{1}:sbf+1:tau", "0") );
-		CHECK( !check_hook("{0}:sbf+0:tau", "0") );
+		CHECK( !check_hook("{1}:sbf^0:tau", "1") );
+		CHECK( !check_hook("{0}:sbf^1:tau", "1") );
+		CHECK( !check_hook("{1}:sbf^1:tau", "0") );
+		CHECK( !check_hook("{0}:sbf^0:tau", "0") );
 
-		CHECK( !check_hook("1:tau+{0}:sbf", "1") );
-		CHECK( !check_hook("0:tau+{1}:sbf", "1") );
-		CHECK( !check_hook("1:tau+{1}:sbf", "0") );
-		CHECK( !check_hook("0:tau+{0}:sbf", "0") );
+		CHECK( !check_hook("1:tau^{0}:sbf", "1") );
+		CHECK( !check_hook("0:tau^{1}:sbf", "1") );
+		CHECK( !check_hook("1:tau^{1}:sbf", "0") );
+		CHECK( !check_hook("0:tau^{0}:sbf", "0") );
 
-		CHECK( !check_hook("1:sbf+{F}:tau", "1") );
-		CHECK( !check_hook("0:sbf+{T}:tau", "1") );
-		CHECK( !check_hook("1:sbf+{T}:tau", "0") );
-		CHECK( !check_hook("0:sbf+{F}:tau", "0") );
+		CHECK( !check_hook("1:sbf^{F}:tau", "1") );
+		CHECK( !check_hook("0:sbf^{T}:tau", "1") );
+		CHECK( !check_hook("1:sbf^{T}:tau", "0") );
+		CHECK( !check_hook("0:sbf^{F}:tau", "0") );
 
-		CHECK( !check_hook("{T}:tau+0:sbf", "1") );
-		CHECK( !check_hook("{F}:tau+1:sbf", "1") );
-		CHECK( !check_hook("{T}:tau+1:sbf", "0") );
-		CHECK( !check_hook("{F}:tau+0:sbf", "0") );
+		CHECK( !check_hook("{T}:tau^0:sbf", "1") );
+		CHECK( !check_hook("{F}:tau^1:sbf", "1") );
+		CHECK( !check_hook("{T}:tau^1:sbf", "0") );
+		CHECK( !check_hook("{F}:tau^0:sbf", "0") );
 
-		CHECK( check_hook("1+x", "x'") );
-		CHECK( check_hook("x+1", "x'") );
-		CHECK( check_hook("0+x", "x") );
-		CHECK( check_hook("x+0", "x") );
-		CHECK( check_hook("x+x", "0") );
-		CHECK( check_hook("x+x'", "1") );
-		CHECK( check_hook("x'+x", "1") );
+		CHECK( check_hook("1^x", "x'") );
+		CHECK( check_hook("x^1", "x'") );
+		CHECK( check_hook("0^x", "x") );
+		CHECK( check_hook("x^0", "x") );
+		CHECK( check_hook("x^x", "0") );
+		CHECK( check_hook("x^x'", "1") );
+		CHECK( check_hook("x'^x", "1") );
 
-		CHECK( check_type("{a}:sbf+{b}:sbf", sbf_type<node_t>()) );
-		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}", tau_type<node_t>()) );
-		CHECK( check_type("{o1[t] = 0}:tau+{o2[t] = 0}", tau_type<node_t>()) );
-		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}:tau", tau_type<node_t>()) );
+		CHECK( check_type("{a}:sbf^{b}:sbf", sbf_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}^{o2[t] = 0}", tau_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}:tau^{o2[t] = 0}", tau_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}^{o2[t] = 0}:tau", tau_type<node_t>()) );
 	}
 }
