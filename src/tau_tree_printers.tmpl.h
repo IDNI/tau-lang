@@ -456,7 +456,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 					out(tau::get(src).get_string());
 				else out(tau::get(ref).get_ba_constant());
 				out(" } : ");
-				out(t.get_ba_type_tree());
+				out(tau::get(t.get_ba_type_tree()));
 				break;
 			case scope_id: out(" _"), out(t.data()), out("_"); break;
 			case wff:
@@ -528,7 +528,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (auto first = tau::tt(ref) | tt::first | tt::ref; first) out(first);
 				else out(t.get_bv_constant());
 				out(" : ");
-				out(t.get_ba_type_tree());
+				out(tau::get(t.get_ba_type_tree()));
 				break;
 			case source: break; // is printed from bf_constant
 			default:

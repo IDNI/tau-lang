@@ -58,6 +58,13 @@ tref bv_type(unsigned short bitwidth) {
 }
 
 template<NodeType node>
+tref bv_base_type() {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "bv");
+	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
 bool is_bv_type_family(tref t) {
 	using tau = tree<node>;
 	return tau::get(t)[0].get_string() == "bv";
@@ -161,6 +168,21 @@ template<NodeType node>
 bool is_same_ba_type(tref t1, tref t2) {
 	using tau = tree<node>;
 	return tau::get(t1) == tau::get(t2);
+}
+
+template <NodeType node>
+tref unify(tref t1, tref t2) {
+	using tau = tree<node>;
+	if (is_same_ba_type<node>(t1, t2)) return t1;
+	// t1 and t2 have same type name
+	if (tau::subtree_equals(tau::trim(t1), tau::trim(t2))) {
+		// t1 or t2 does not have a type parameter
+		if (tau::get(t1).children_size() == 1)
+			return t2;
+		if (tau::get(t2).children_size() == 1)
+			return t1;
+	}
+	return nullptr;
 }
 
 template <NodeType node>
