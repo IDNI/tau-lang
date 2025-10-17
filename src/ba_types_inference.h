@@ -32,6 +32,7 @@ std::optional<size_t> merge_ba_types(size_t tid1, size_t tid2) {
 	}
 	if (is_untyped<node>(t2)) return { tid1 };
 	if (is_same_ba_type<node>(t1, t2)) return { tid1 };
+	if (tref u = unify<node>(t1, t2); u) return { get_ba_type_id<node>(u) };
 	return std::nullopt;
 }
 
@@ -243,7 +244,8 @@ tref new_infer_ba_types(tref n) {
 				// We infer the common type of all the typeables in the expression
 				// TODO (HIGH) make scoped_union_find accept a partial order of
 				// types and change untyped to bv as default type here.
-				auto type = get_type(typeables, bv_type_id);
+				auto type = get_type(typeables,
+					get_ba_type_id<node>(bv_base_type<node>()));
 				// If no common type is found, we set error and stop traversal
 				if (!type) {
 					LOG_ERROR << "Conflicting type information in bv equation "
@@ -252,8 +254,8 @@ tref new_infer_ba_types(tref n) {
 				}
 				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bv_eq.../type: "
 					<< ba_types<node>::name(type.value()) << "\n";)
-				if (type.value() != untyped_id && is_bv_type_family<node>(
-					ba_types<node>::type_tree(type.value()))) {
+				if (type.value() != untyped_id && !is_bv_type_family<node>(
+					type.value())) {
 					// We only allow bv type in bv equations
 					LOG_ERROR << "Invalid type information in bv equation "
 						<< LOG_FM(n) << ": "
@@ -765,9 +767,20 @@ tref new_infer_ba_types(tref n) {
 	// If an error happened we return nullptr.
 	pre_order<node>(n).visit(on_enter, visit_outside_equations, on_leave, on_between);
 	if (error) return tau::use_hooks = using_hooks, nullptr;
-	// We add to the transformed map the untypping of the bf_t's and the bf_f's.
+	// We add to the transformed map the untyping of the bf_t's and the bf_f's.
 	// ...some code here...
-	auto new_n = transformed.contains(n) ? transformed[n] : n;
+	tref new_n = transformed.contains(n) ? transformed[n] : n;
+	// TODO: unify the following with rest of type inference algorithm, once bv tag is gone
+	// Convert all bv default types to bv[16]
+	auto f = [](tref n) {
+		const tau& n_t = tau::get(n);
+		if (n_t.get_ba_type() ==
+			get_ba_type_id<node>(bv_base_type<node>())) {
+			return n_t.replace_value(n_t.value.ba_retype(bv_type_id));
+		}
+		return n;
+	};
+	new_n = pre_order<node>(new_n).apply_unique(f);
 	return  tau::use_hooks = using_hooks, new_n;
 }
 

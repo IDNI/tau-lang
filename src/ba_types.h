@@ -78,6 +78,9 @@ bool is_untyped(tref t);
 template <NodeType node>
 tref bv_type(unsigned short bitwidth = 16);
 
+template <NodeType node>
+tref bv_base_type();
+
 /**
  * @brief Checks if t represents a bitvector type
  * @tparam node Tree node type
@@ -139,6 +142,12 @@ std::string get_ba_type_name(size_t ba_type_id);
 // Check if type trees represent same type
 template <NodeType node>
 bool is_same_ba_type(tref t1, tref t2);
+
+// Checks if the base types of t1 and t2 agree
+// and returns the type with more information.
+// If the types do not allow this, returns nullptr
+template <NodeType node>
+tref unify(tref t1, tref t2);
 
 // print the type name to the stream
 template <NodeType node>
