@@ -5,8 +5,8 @@
 
 TEST_SUITE("Bool BA") {
 	TEST_CASE("Bool") {
-		tref t_ref = tau::get_ba_constant(Bool(true),  "bool");
-		tref f_ref = tau::get_ba_constant(Bool(false), "bool");
+		tref t_ref = tau::get_ba_constant(Bool(true),  bool_type());
+		tref f_ref = tau::get_ba_constant(Bool(false), bool_type());
 		size_t t = tau::get(t_ref).get_ba_constant_id();
 		size_t f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 1 );
@@ -24,8 +24,8 @@ struct ba_constants_fixture {
 
 	ba_constants_fixture() :
 
-	true_binding( tau::get_ba_constant(Bool(true),  "bool")),
-	false_binding(tau::get_ba_constant(Bool(false), "bool"))
+	true_binding( tau::get_ba_constant(Bool(true),  bool_type())),
+	false_binding(tau::get_ba_constant(Bool(false), bool_type()))
 
 	{}
 };
@@ -78,8 +78,8 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		using tau = tree<node>;
 		using bac = ba_constants<node>;
 
-		tref t_ref = tau::get_ba_constant(Bool(true),  "bool");
-		tref f_ref = tau::get_ba_constant(Bool(false), "bool");
+		tref t_ref = tau::get_ba_constant(Bool(true),  bool_type());
+		tref f_ref = tau::get_ba_constant(Bool(false), bool_type());
 		size_t t = tau::get(t_ref).get_ba_constant_id();
 		size_t f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 1 );
@@ -90,8 +90,8 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		CHECK( bac::get(f) == variant<bv, sbf_ba, Bool>(Bool(false)) );
 		CHECK( bac::get(f) != variant<bv, sbf_ba, Bool>(Bool(true)) );
 
-		t_ref = tau::get_ba_constant(sbf_t, "sbf");
-		f_ref = tau::get_ba_constant(sbf_f, "sbf");
+		t_ref = tau::get_ba_constant(sbf_t, sbf_type<node>());
+		f_ref = tau::get_ba_constant(sbf_f, sbf_type<node>());
 		t = tau::get(t_ref).get_ba_constant_id();
 		f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 3 );

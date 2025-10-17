@@ -9,16 +9,21 @@
 
 namespace idni::tau_lang {
 
+tref bool_type() {
+	tref type = tau::get(tau::type, "bool");
+	return tau::get(tau::typed, type);
+}
+
 template<>
 struct nso_factory<bv, Bool> {
 
 	static std::vector<std::string> types() { return { "bool" }; }
 
-	static std::string default_type() { return "bool"; }
+	static tref default_type() { return bool_type(); }
 
-	static std::string one(const std::string) { return "1"; }
+	static std::string one(const tref) { return "1"; }
 
-	static std::string zero(const std::string) { return "0"; }
+	static std::string zero(const tref) { return "0"; }
 
 	static std::variant<bv, Bool> splitter_one(const std::string) { return Bool(true);}
 
@@ -30,13 +35,13 @@ struct nso_factory<bv, Bool> {
 
 template <>
 std::optional<typename ba_constants<node<bv, Bool>>::constant_with_type> ba_constants<node<bv, Bool>>::get(
-		[[maybe_unused]] const std::string& constant_source,
-		[[maybe_unused]] const std::string type_name,
+		const std::string& constant_source,
+		[[maybe_unused]] tref type_tree,
 		[[maybe_unused]] const std::string options) {
 	if (constant_source == "1" || constant_source == "true")
-		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(true), "bool" };
+		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(true), bool_type() };
 	if (constant_source == "0" || constant_source == "false")
-		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(false), "bool" };
+		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(false), bool_type() };
 	return {};
 }
 
