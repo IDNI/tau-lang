@@ -675,17 +675,17 @@ tref build_bf_ba_constant(const typename node::constant& constant,
 		tau::get_ba_constant(constant, ba_type_id) }, right);
 }
 
-template <NodeType node>
+/*template <NodeType node>
 tref build_bv_constant(const typename node::constant& constant, size_t ba_type_id) {
 	return tree<node>::get_bv_constant(constant, ba_type_id);
-}
+}*/
 
 template <NodeType node>
 tref build_bv_ba_constant(const typename node::constant& constant, size_t ba_type_id) {
 	using tau = tree<node>;
 
 	return tau::get(tau::bv, {
-		tau::get_bv_constant(constant, ba_type_id) });
+		tau::get_ba_constant(constant, ba_type_id) });
 }
 
 template <NodeType node>

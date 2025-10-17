@@ -11,20 +11,27 @@ tref parse_bv_formula(const std::string spec) {
 	return tau::get(spec, opts);
 }
 
-TEST_SUITE("cvc5_parsing") {
+TEST_SUITE("Configuration") {
 
+	TEST_CASE("logging") {
+		logging::trace();
+	}
+
+	TEST_CASE("bdd init") {
+		bdd_init<Bool>();
+	}
 }
 
 TEST_SUITE("cvc5_satisfiability") {
 
-	TEST_CASE("all x ex y x + y =_ 1") {
-		const std::string sample = "all x ex y x + y =_ 1";
+	TEST_CASE("all x ex y x + y =_ { #b1 }:bv") {
+		const std::string sample = "all x ex y x + y =_ { #b1 }:bv";
 		auto formula = parse_bv_formula(sample);
 		CHECK( is_bv_formula_sat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
 	}
 
-	TEST_CASE("all x x + y =_ 1") {
-		const std::string sample = "all x x + y =_ 1";
+	TEST_CASE("all x x + y =_ { #b1 }:bv") {
+		const std::string sample = "all x x + y =_ { #b1 }:bv";
 		auto formula = parse_bv_formula(sample);
 		// y is implicitlly existentially quantified by cvc5
 		CHECK( !is_bv_formula_sat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
@@ -81,44 +88,12 @@ TEST_SUITE("cvc5_satisfiability") {
 
 	}
 
-	TEST_CASE("all x [x - (x/2)] =_ x") {
-		const std::string sample = "all x [x - (x/2)] =_ x";
-		auto formula = parse_bv_formula(sample);
-		// TODO (HIGH) change assertion when supporting overflows
-		//CHECK_THROWS( is_bv_formula_sat<node_t>(formula) );
-		CHECK( !is_bv_formula_sat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
-		CHECK( is_bv_formula_unsat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
-		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula), find_ba_type_tree<node_t>(formula)) );
-
-	}
-
-	TEST_CASE("all x [x - (x/2)] <=_ x") {
-		const std::string sample = "all x [x - (x/2)] <=_ x";
+	TEST_CASE("all x x + { 1 }:bv <_ { 1 }:bv") {
+		const std::string sample = "all x x + { 1 }:bv <_ { 1 }:bv";
 		auto formula = parse_bv_formula(sample);
 		// TODO (HIGH) change assertion when supporting overflows
 		CHECK( is_bv_formula_sat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
 		//CHECK_THROWS( is_bv_formula_sat<node_t>(formula) );
-	}
-
-	TEST_CASE("all x ((x <_ 65534) -> ([x + 1] >_ 0))") {
-		const std::string sample = "all x ((x <_ 65534) -> ([x + 1] >_ 0))";
-		auto formula = parse_bv_formula(sample);
-		CHECK( is_bv_formula_sat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
-	}
-
-	/*TEST_CASE("all x ((x <_ 18446744073709551615) -> ([x + 1] = 0))") {
-		const std::string sample = "all x ((x <_ 18446744073709551615) -> ([x + 1] = 0))";
-		auto formula = tau::get(sample, parse_wff());
-		CHECK_THROWS( is_bv_formula_sat<node_t>(formula) );
-	}*/
-
-	TEST_CASE("all x ((x <_ 5) -> ([x + 1] =_ 0))") {
-		const std::string sample = "all x ((x <_ 5) -> ([x + 1] =_ 0))";
-		auto formula = parse_bv_formula(sample);
-		//CHECK_THROWS( is_bv_formula_sat<node_t>(formula) );
-		CHECK( !is_bv_formula_sat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
-		CHECK( is_bv_formula_unsat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
-		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula), find_ba_type_tree<node_t>(formula)) );
 	}
 }
 

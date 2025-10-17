@@ -25,8 +25,8 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		CHECK( normalize_and_check("T && F.", tau::wff_f) );
 	}
 
-	TEST_CASE("T ^ F") {
-		CHECK( normalize_and_check("T ^ F.", tau::wff_t) );
+	TEST_CASE("T ^^ F") {
+		CHECK( normalize_and_check("T ^^ F.", tau::wff_t) );
 	}
 
 	TEST_CASE("T ? T : F") {
@@ -61,8 +61,8 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		CHECK( normalize_and_check("1 | 0 = 0.", tau::wff_f) );
 	}
 
-	TEST_CASE("1 + 0 != 0.") {
-		CHECK( normalize_and_check("1 + 0 != 0.", tau::wff_t) );
+	TEST_CASE("1 ^ 0 != 0.") {
+		CHECK( normalize_and_check("1 ^ 0 != 0.", tau::wff_t) );
 	}
 
 	TEST_CASE("0' = 0.") {

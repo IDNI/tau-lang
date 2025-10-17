@@ -91,7 +91,6 @@ void config_cvc5_solver(cvc5::Solver& solver) {
  * @param form Traverser for the boolean algebra tree node to be evaluated.
  * @param vars Mapping from tree nodes to bitvector values for bound variables.
  * @param free_vars Mapping from tree nodes to bitvector values for free variables (may be updated).
- * @param checked If true, performs additional consistency checks during evaluation.
  * @return An optional with the the evaluated bitvector value of the node if possible and
  * an empty optional if not.
  *
@@ -99,7 +98,7 @@ void config_cvc5_solver(cvc5::Solver& solver) {
 template <NodeType node>
 std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
 	subtree_map<node, bv> vars, subtree_map<node, bv>& free_vars,
-	bool checked, tref type_tree);
+	tref type_tree);
 
 /**
  * @brief Checks if a given bit-vector formula is satisfiable.
@@ -209,7 +208,7 @@ std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);
 template<typename...BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
-	tref type_tree, size_t base = 10);
+	tref type_tree);
 
 } // namespace idni::tau_lang
 

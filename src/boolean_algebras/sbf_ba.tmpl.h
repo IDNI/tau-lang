@@ -13,7 +13,7 @@ namespace idni::tau_lang {
 inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	using tt = sbf_parser::tree::traverser;
 	using type = sbf_parser::nonterminal;
-	// LOG_DEBUG << "eval_node";
+
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 	switch (nt) {
@@ -67,6 +67,7 @@ std::optional<typename node<BAs...>::constant_with_type> parse_sbf(
 	auto sid = dict(src);
 	if (auto cn = cache.find(sid); cn != cache.end())
 		return typename node<BAs...>::constant_with_type{ cn->second, sbf_type<node<BAs...>>() };
+	//parse the source
 	auto result = sbf_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
 		auto msg = result.parse_error
@@ -74,6 +75,7 @@ std::optional<typename node<BAs...>::constant_with_type> parse_sbf(
 		LOG_ERROR << "[sbf] " << msg << "\n";
 		return {}; // Syntax error
 	}
+	// get the sbf_constant node
 	auto t = sbf_parser::tree::traverser(result.get_shaped_tree2())
 							| sbf_parser::sbf;
 	auto v = t.has_value() ? sbf_eval_node(t) : bdd_handle<Bool>::hfalse;

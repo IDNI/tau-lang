@@ -1,0 +1,19 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
+@use char classes space, alpha, digit, xdigit.
+
+@enable productions charvar.
+
+start       => _ bitvector _.
+bitvector   => "#b" binary
+            | decimal
+            | "#x" hexadecimal.
+binary      => ('0' | '1')+.
+hexadecimal => xdigit+.
+decimal     => digit+.
+_           => [ space _ ].
+
+@trim _.
+@inline char classes.
+@trim all terminals except children of
+        decimal, hexadecimal, binary.

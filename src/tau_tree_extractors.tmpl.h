@@ -281,7 +281,7 @@ tref get_var_name_node(tref var) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto v = tt(var);
-	if (v.is(tau::bf_constant) || v.is(tau::var_name) || v.is(tau::bv_constant)) return var;
+	if (v.is(tau::ba_constant) || v.is(tau::var_name)) return var;
 	// TODO: refactor
 	if (auto vn = v | tau::var_name; vn) return vn.value();
 	if (auto vn = v | tau::io_var | tau::var_name; vn) return vn.value();
@@ -475,9 +475,9 @@ bool has_open_tau_fm_in_constant(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto _closed = [](const auto& c) -> bool { return is_closed(c); };
-	trefs consts = tau::get(fm).select_top(is_child<node, tau::bf_constant>);
+	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
 	for (tref c : consts) {
-		auto ba_const = tt(c) | tau::bf_constant | tt::ba_constant;
+		auto ba_const = tt(c) | tau::ba_constant | tt::ba_constant;
 		if (!std::visit(_closed, ba_const)) {
 			LOG_ERROR << "A Tau formula constant must be closed: "
 								<< ba_const;

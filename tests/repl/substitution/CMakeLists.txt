@@ -9,7 +9,7 @@ add_repl_test(substitution_cmd_bf0 "x. 1. s %[x / %1]" ": 1")
 
 add_repl_test(substitution_cmd_bf1 "x. 1. s %2[x / %1]" ": 1")
 
-add_repl_test(substitution_cmd_bf2 "ax + bx'. y&z. s %1[x / %2]" ": \\(ayz\\)'b\\(yz\\)'|ayz\\(b\\(yz\\)'\\)'")
+add_repl_test(substitution_cmd_bf2 "ax ^ bx'. y&z. s %1[x / %2]" ": \\(ayz\\)'b\\(yz\\)'|ayz\\(b\\(yz\\)'\\)'")
 
 add_repl_test(substitution_cmd_bf5 "(x | (w & z)) & z. b. s %1[ z / %2]" ": \\(x|wb\\)b")
 
@@ -19,7 +19,7 @@ add_repl_test_fail(substitution_cmd_bf6 "x & y. T. s %1[x / %2]" "Invalid argume
 
 add_repl_test(substitution_cmd_wff1 "x=0. T. s %-1[x=0/ %]" ": T")
 
-add_repl_test(substitution_cmd_wff2 "a=0 && x=0 ^ b=0 && !x=0. y=0 && z=0. s %1[x=0 / %2]" ": !\\(a = 0 && y = 0 && z = 0\\) && b = 0 && !\\(y = 0 && z = 0\\) || !\\(b = 0 && !\\(y = 0 && z = 0\\)\\) && a = 0 && y = 0 && z = 0")
+add_repl_test(substitution_cmd_wff2 "a=0 && x=0 ^^ b=0 && !x=0. y=0 && z=0. s %1[x=0 / %2]" ": !\\(a = 0 && y = 0 && z = 0\\) && b = 0 && !\\(y = 0 && z = 0\\) || !\\(b = 0 && !\\(y = 0 && z = 0\\)\\) && a = 0 && y = 0 && z = 0")
 
 add_repl_test(substitution_cmd_wff3 "ex k h=0 && k=0. v=0 && w=0. s %1[k=0 / %2]" ": ex k h = 0 && k = 0")
 

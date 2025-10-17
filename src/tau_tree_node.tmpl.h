@@ -37,11 +37,8 @@ constexpr node<BAs...> node<BAs...>::ba_constant(
 	// 	<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
 	// LOG_TRACE << " -- node::bitsizes: " << node::nt_bits << "/1/"
 	// 	  << node::ba_bits << "/1/" << node::data_bits;
-	auto n = (is_bv_type_family<node>(ba_type_id))
-		? node(type::bv_constant, constant_id, true /* is_term */, ba_type_id)
-		: node(type::bf_constant, constant_id, true /* is_term */, ba_type_id);
+	return node(type::ba_constant, constant_id, true /* is_term */, ba_type_id);
 	// LOG_TRACE << " -- node::ba_constant result:" << n;
-	return n;
 }
 
 template <typename... BAs>
@@ -67,7 +64,7 @@ constexpr node<BAs...> node<BAs...>::output_variable(size_t ba_tid)
 inline bool is_term_nt(size_t nt) {
 	switch (nt) {
 		case tau_parser::bf:
-		case tau_parser::bf_constant:
+		case tau_parser::ba_constant:
 		case tau_parser::bf_ref:
 		case tau_parser::bf_or:
 		case tau_parser::bf_xor:
@@ -197,10 +194,10 @@ constexpr size_t node<BAs...>::hashit() const {
 	hash_combine(seed, get_ba_type_name<node>(ba_type));
 	hash_combine(seed, static_cast<bool>(ext));
 	// Get ba constant from pool
-	if (nt == type::bf_constant && data != 0 && ba_type != 0)
+	if (nt == type::ba_constant && data != 0 && ba_type != 0)
 		hash_combine(seed, tau_lang::ba_constants<node>::get(data));
-	// Get string from pool, untyped bf_constant also has string as data
-	else if (tree<node>::is_string_nt(nt) || nt == type::bf_constant)
+	// Get string from pool, untyped ba_constant also has string as data
+	else if (tree<node>::is_string_nt(nt) || nt == type::ba_constant)
 		hash_combine(seed, dict(data));
 	else hash_combine(seed, data);
 	return seed;
