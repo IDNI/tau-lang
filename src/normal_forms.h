@@ -210,7 +210,9 @@ inline auto is_wff_bdd_var = [](tref n) {
 		|| t.child_is(tau::wff_sometimes)
 		|| t.child_is(tau::wff_always)
 		|| t.child_is(tau::wff_all)
-		|| t.child_is(tau::constraint)
+		|| t.child_is(tau::constraint);
+	// TODO (HIGH) we need to check the ba_type if it is bv
+	/*
 		|| t.child_is(tau::bv_eq)
 		|| t.child_is(tau::bv_neq)
 		|| t.child_is(tau::bv_lteq)
@@ -221,6 +223,7 @@ inline auto is_wff_bdd_var = [](tref n) {
 		|| t.child_is(tau::bv_ngteq)
 		|| t.child_is(tau::bv_lt)
 		|| t.child_is(tau::bv_nlt);
+	*/
 };
 
 template <NodeType node>

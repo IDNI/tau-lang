@@ -106,10 +106,7 @@ std::optional<assignment<node>> finputs<node>::read() {
 			<< "read[var]: " << LOG_FM(var) << " = " << cnst.value().first << "\n"
 			<< "read[types[var]]: " << ba_types<node>::name(types[var]) << "\n";)
 
-		current[var] = (is_bv_type_family<node>(types[var]))
-		//TODO: remove build_bv_ba_constant
-			? tau::build_bv_ba_constant(cnst.value().first, types[var])
-			: tau::build_bf_ba_constant(cnst.value().first, types[var]);
+		current[var] = tau::build_bf_ba_constant(cnst.value().first, types[var]);
 	}
 	time_point += 1;
 
@@ -199,10 +196,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 			return {};
 		}
 
-		tref wrapped_const = (is_bv_type_family<node>(it->second))
-		//TODO: remove build_bv_ba_constant
-			? build_bv_ba_constant<node>(cnst.value().first, it->second)
-			: build_bf_ba_constant<node>(cnst.value().first, it->second);
+		tref wrapped_const = build_bf_ba_constant<node>(cnst.value().first, it->second);
 
 		DBG(LOG_TRACE << "read[wrapped_const]: " << LOG_FM(wrapped_const) << "\n";)
 
@@ -214,8 +208,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 				<< "read end\n";)
 			return {};
 		}
-		auto sym = is_bv_type_family<node>(it->second) ? tau::bv : tau::bf;
-		value[tau::get(sym, var)] = wrapped_const;
+		value[tau::get(tau::bf, var)] = wrapped_const;
 	}
 
 	DBG(LOG_TRACE << "read end\n";)
@@ -521,7 +514,7 @@ std::pair<std::optional<assignment<node>>, bool>
 					// Check if we are dealing with a stream variable
 					if (tt(var) | tau::variable | tau::io_var) {
 						DBG(LOG_TRACE << LOG_FM_TREE(value));
-						assert(tau::get(value).is(tau::bf) || tau::get(value).is(tau::bv));
+						assert(tau::get(value).is(tau::bf));
 						if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
 							// std::cout << "time_point: " << time_point << "\n";
 							// std::cout << "var: " << var << "\n";
@@ -541,14 +534,12 @@ std::pair<std::optional<assignment<node>>, bool>
 			for (const auto& [o, _] : outputs.streams) {
 				const size_t ctype = outputs.type_of(o);
 				bool is_bv = is_bv_type_family<node>(ctype);
-				tref ot = is_bv
-					? build_bv_out_var_at_n<node>(o, time_point, ctype)
-					: build_out_var_at_n<node>(o, time_point, ctype);
+				tref ot = build_out_var_at_n<node>(o, time_point, ctype);
 				if (auto it = global.find(ot); it == global.end()) {
 					if (is_bv) {
 						auto zero_bitvector = make_bitvector_zero(
 							get_bv_size<node>(get_ba_type_tree<node>(ctype)));
-						auto zero_term = tau::get(tau::bv, {
+						auto zero_term = tau::get(tau::bf, {
 							tau::get_ba_constant(zero_bitvector, ctype)});
 						memory.emplace(ot, zero_term);
 						global.emplace(ot, zero_term);
