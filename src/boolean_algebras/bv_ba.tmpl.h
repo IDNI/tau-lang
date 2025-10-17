@@ -300,14 +300,13 @@ std::optional<solution<node>> solve_bv(const trefs& lits, tref type_tree) {
 
 template<typename ... BAs> requires BAsPack<BAs...>
 std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree) {
-	using tau = tree<node<BAs...>>;
+	using tt = bitvector_parser::tree::traverser;
 	using bv_parser = bitvector_parser::nonterminal;
 	if (!parse_tree) return std::nullopt;
-	const tau& t = tau::get(parse_tree);
+	auto t = bitvector_parser::tree::traverser(parse_tree)
+					| bitvector_parser::bitvector;
 
-	auto str = t[0].to_str();
-	auto type = t[0].get_type();
-
+	auto type = t | tt::only_child | tt::nonterminal;
 	size_t base;
 	switch (type) {
 		case bv_parser::decimal: { base = 10; break; }
@@ -318,7 +317,9 @@ std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree) {
 			return std::nullopt;
 		}
 	}
+	DBG(assert(base > 0 );)
 	size_t bv_size = get_bv_size<node<BAs...>>(type_tree);
+	auto str = t | tt::terminals;
 	return make_bitvector_cte(bv_size, str, base);
 }
 
