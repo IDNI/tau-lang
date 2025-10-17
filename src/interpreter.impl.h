@@ -11,7 +11,7 @@
 namespace idni::tau_lang {
 
 template <NodeType node>
-typed_stream get_typed_stream(const std::string& type,
+typed_stream get_typed_stream(const tref type,
 				const std::string& filename)
 {
 	return std::make_pair(get_ba_type_id<node>(type), dict(filename));
@@ -87,7 +87,7 @@ std::optional<assignment<node>> finputs<node>::read() {
 		}
 		if (line.empty()) return {}; // no more inputs
 		auto cnst = ba_constants<node>::get(line,
-			get_ba_type_name<node>(types[var]));
+			get_ba_type_tree<node>(types[var]));
 		if (!cnst) {
 			LOG_ERROR
 				<< "Failed to parse input value '"
@@ -104,10 +104,10 @@ std::optional<assignment<node>> finputs<node>::read() {
 
 		DBG(LOG_TRACE
 			<< "read[var]: " << LOG_FM(var) << " = " << cnst.value().first << "\n"
-			<< "read[types[var]]: " << ba_types<node>::id(types[var]) << "\n";)
+			<< "read[types[var]]: " << ba_types<node>::name(types[var]) << "\n";)
 
 		current[var] = (is_bv_type_family<node>(types[var]))
-			? tau::build_bv_ba_constant(cnst.value().first)
+			? tau::build_bv_ba_constant(cnst.value().first, types[var])
 			: tau::build_bf_ba_constant(cnst.value().first, types[var]);
 	}
 	time_point += 1;

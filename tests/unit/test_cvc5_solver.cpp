@@ -35,28 +35,28 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X =_ 1") {
 		const char* sample = "X =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X !=_ X") {
 		const char* sample = "X !=_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( !solution.has_value() );
 	}
 
 	TEST_CASE("X + 0 >_ 0") {
 		const char* sample = "X + 0 >_ 0";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X !>_ X") {
 		const char* sample = "X !>_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
@@ -64,14 +64,14 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X + 1 !>_ X") {
 		const char* sample = "X + 1 !>_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X >=_ X") {
 		const char* sample = "X >=_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
@@ -79,28 +79,28 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X >=_ X + 1") {
 		const char* sample = "X >=_ X + 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X !>=_ X") {
 		const char* sample = "X !>=_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( !solution.has_value() );
 	}
 
 	TEST_CASE("X + 1 !>=_ X") {
 		const char* sample = "X + 1!>=_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X <=_ X") {
 		const char* sample = "X <=_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
@@ -108,42 +108,42 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X + 1 <=_ X") {
 		const char* sample = "X + 1 <=_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X !<=_ X") {
 		const char* sample = "X !<=_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( !solution.has_value() );
 	}
 
 	TEST_CASE("X + 1 !<=_ X") {
 		const char* sample = "X + 1 !<=_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X <_ X") {
 		const char* sample = "X <_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( !solution.has_value() );
 	}
 
 	TEST_CASE("X - 1 <_ X") {
 		const char* sample = "X - 1 <_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("X !<_ X") {
 		const char* sample = "X !<_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
@@ -151,14 +151,14 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("X - 1 !<_ X") {
 		const char* sample = "X - 1 !<_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("variable") {
 		const char* sample = "X =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -166,7 +166,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_checked") {
 		const char* sample = "[X] =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -174,7 +174,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_neg") {
 		const char* sample = "~X =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -182,7 +182,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_add") {
 		const char* sample = "X + 1 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -190,7 +190,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_sub") {
 		const char* sample = "X - 1 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -198,7 +198,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_mul") {
 		const char* sample = "X * 1 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -206,7 +206,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_div") {
 		const char* sample = "X / 1 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -214,7 +214,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_mod") {
 		const char* sample = "X % 2 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -222,7 +222,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_and") {
 		const char* sample = "X & 1 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -230,7 +230,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_nand") {
 		const char* sample = "2 !& 1 =_ X";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -238,7 +238,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_or") {
 		const char* sample = "X | 1 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -246,7 +246,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_nor") {
 		const char* sample = "2 !| X =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -254,7 +254,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_xor") {
 		const char* sample = "X (+) 1 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -262,7 +262,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_xnor") {
 		const char* sample = "X !(+) 1 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -270,7 +270,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_rotate_shift") {
 		const char* sample = "X << 1 =_ 2";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
@@ -278,7 +278,7 @@ TEST_SUITE("cvc5_solve simple") {
 	TEST_CASE("cvc5_rotate_right") {
 		const char* sample = "X >> 1 =_ 1";
 		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}

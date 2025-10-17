@@ -29,7 +29,7 @@ std::string random_file(const std::string& extension = ".out", const std::string
 
 struct output_console {
 	output_console() = default;
-	output_console(const std::string& type)
+	output_console(const tref type)
 		: _type(get_ba_type_id<node_t>(type)) {}
 
 	bool write(const assignment<node_t>& outputs) const {
@@ -48,7 +48,7 @@ struct output_console {
 	void rebuild (const auto&) {};
 
 	assignment<node_t> streams;
-	size_t _type = get_ba_type_id<node_t>("sbf");
+	size_t _type = get_ba_type_id<node_t>(sbf_type<node_t>());
 };
 
 struct input_vector {
@@ -56,10 +56,10 @@ struct input_vector {
 	input_vector() = default;
 	input_vector(std::vector<assignment<node_t>>& inputs) : inputs(
 		std::move(inputs)) {}
-	input_vector(const std::string& type)
+	input_vector(const tref type)
 		: _type(get_ba_type_id<node_t>(type)) {}
 	input_vector(std::vector<assignment<node_t>>& inputs,
-		const std::string& type) : inputs(std::move(inputs)),
+		const tref type) : inputs(std::move(inputs)),
 			_type(get_ba_type_id<node_t>(type)) {}
 
 	std::optional<assignment<node_t>> get() const {
@@ -87,11 +87,11 @@ struct input_vector {
 	std::vector<assignment<node_t>> inputs;
 	assignment<node_t> streams;
 	size_t current = 0;
-	size_t _type = get_ba_type_id<node_t>("sbf");
+	size_t _type = get_ba_type_id<node_t>(sbf_type<node_t>());
 };
 
 void build_input(const std::string& name,
-	const std::vector<std::string>& values, const std::string& type,
+	const std::vector<std::string>& values, const tref type,
 	auto& assgn)
 {
 	size_t t = 0;
@@ -111,7 +111,7 @@ void build_input(const std::string& name,
 }
 
 void build_output(const std::string& name, const std::vector<std::string>& values,
-		const std::string& type, auto& assgn) {
+		const tref type, auto& assgn) {
 	size_t t = 0;
 	for (const auto& val : values) {
 		size_t ba_type = get_ba_type_id<node_t>(type);
@@ -216,7 +216,7 @@ std::optional<assignment<node_t>> run_test(const char* sample,
 }
 
 std::optional<assignment<node_t>> run_test(const char* sample,
-		const size_t& times, const std::string& type = "sbf")
+		const size_t& times, const tref type = sbf_type<node_t>())
 {
 	input_vector inputs(type);
 	output_console outputs(type);
@@ -250,7 +250,7 @@ input_vector build_i1_inputs(trefs values) {
 	for (tref value : values) {
 		assignment<node_t> assignment;
 		assignment[build_in_var_at_n_indexed<node_t>(
-			1, t, get_ba_type_id<node_t>("tau"))] = value;
+			1, t, get_ba_type_id<node_t>(tau_type<node_t>()))] = value;
 		assignments.push_back(assignment);
 		++t;
 	}

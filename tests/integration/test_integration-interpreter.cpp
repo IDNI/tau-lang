@@ -10,10 +10,10 @@ TEST_SUITE("Execution") {
 		std::vector<std::string> o1 = i1;
 		std::vector<assignment<node_t>> assgn_in;
 		assignment<node_t> assgn_out;
-		build_input("i1", i1, "tau", assgn_in);
-		build_output("o1", o1, "tau", assgn_out);
-		auto ins = input_vector(assgn_in, "tau");
-		auto outs = output_console("tau");
+		build_input("i1", i1, tau_type<node_t>(), assgn_in);
+		build_output("o1", o1, tau_type<node_t>(), assgn_out);
+		auto ins = input_vector(assgn_in, tau_type<node_t>());
+		auto outs = output_console(tau_type<node_t>());
 		spec_context<node_t> ctx;
 		auto i = run<node_t>(spec, ins, outs, ctx, 3);
 		CHECK( matches_output(assgn_out, i.value().memory) );
@@ -38,12 +38,12 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<assignment<node_t>> assgn_in;
 		assignment<node_t> assgn_out;
-		build_input("i1", i1, "tau", assgn_in);
-		build_input("i2", i2, "tau", assgn_in);
-		build_output("o1", o1, "tau", assgn_out);
-		build_output("u", u, "tau", assgn_out);
-		auto ins = input_vector(assgn_in, "tau");
-		auto outs = output_console("tau");
+		build_input("i1", i1, tau_type<node_t>(), assgn_in);
+		build_input("i2", i2, tau_type<node_t>(), assgn_in);
+		build_output("o1", o1, tau_type<node_t>(), assgn_out);
+		build_output("u", u, tau_type<node_t>(), assgn_out);
+		auto ins = input_vector(assgn_in, tau_type<node_t>());
+		auto outs = output_console(tau_type<node_t>());
 		spec_context<node_t> ctx;
 		auto i = run<node_t>(spec, ins, outs, ctx, 6);
 		CHECK( matches_output(assgn_out, i.value().memory) );
@@ -64,11 +64,11 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<assignment<node_t>> assgn_in;
 		assignment<node_t> assgn_out;
-		build_input("i1", i1, "tau", assgn_in);
-		build_output("o3", o3, "tau", assgn_out);
-		build_output("u", u, "tau", assgn_out);
-		auto ins = input_vector(assgn_in, "tau");
-		auto outs = output_console("tau");
+		build_input("i1", i1, tau_type<node_t>(), assgn_in);
+		build_output("o3", o3, tau_type<node_t>(), assgn_out);
+		build_output("u", u, tau_type<node_t>(), assgn_out);
+		auto ins = input_vector(assgn_in, tau_type<node_t>());
+		auto outs = output_console(tau_type<node_t>());
 		spec_context<node_t> ctx;
 		auto i = run<node_t>(spec, ins, outs, ctx, 5);
 		CHECK( matches_output(assgn_out, i.value().memory) );
@@ -91,12 +91,12 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<assignment<node_t>> assgn_in;
 		assignment<node_t> assgn_out;
-		build_input("i1", i1, "tau", assgn_in);
-		build_output("o3", o3, "tau", assgn_out);
-		build_output("o2", o2, "tau", assgn_out);
-		build_output("u", u, "tau", assgn_out);
-		auto ins = input_vector(assgn_in, "tau");
-		auto outs = output_console("tau");
+		build_input("i1", i1, tau_type<node_t>(), assgn_in);
+		build_output("o3", o3, tau_type<node_t>(), assgn_out);
+		build_output("o2", o2, tau_type<node_t>(), assgn_out);
+		build_output("u", u, tau_type<node_t>(), assgn_out);
+		auto ins = input_vector(assgn_in, tau_type<node_t>());
+		auto outs = output_console(tau_type<node_t>());
 		spec_context<node_t> ctx;
 		auto i = run<node_t>(spec, ins, outs, ctx, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
@@ -116,11 +116,11 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<assignment<node_t>> assgn_in;
 		assignment<node_t> assgn_out;
-		build_input("i1", i1, "tau", assgn_in);
-		build_output("o1", o1, "tau", assgn_out);
-		build_output("u", u, "tau", assgn_out);
-		auto ins = input_vector(assgn_in, "tau");
-		auto outs = output_console("tau");
+		build_input("i1", i1, tau_type<node_t>(), assgn_in);
+		build_output("o1", o1, tau_type<node_t>(), assgn_out);
+		build_output("u", u, tau_type<node_t>(), assgn_out);
+		auto ins = input_vector(assgn_in, tau_type<node_t>());
+		auto outs = output_console(tau_type<node_t>());
 		spec_context<node_t> ctx;
 		auto i = run<node_t>(spec, ins, outs, ctx, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
@@ -140,11 +140,11 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<assignment<node_t>> assgn_in;
 		assignment<node_t> assgn_out;
-		build_input("i1", i1, "tau", assgn_in);
-		build_output("o1", o1, "tau", assgn_out);
-		build_output("u", u, "tau", assgn_out);
-		auto ins = input_vector(assgn_in, "tau");
-		auto outs = output_console("tau");
+		build_input("i1", i1, tau_type<node_t>(), assgn_in);
+		build_output("o1", o1, tau_type<node_t>(), assgn_out);
+		build_output("u", u, tau_type<node_t>(), assgn_out);
+		auto ins = input_vector(assgn_in, tau_type<node_t>());
+		auto outs = output_console(tau_type<node_t>());
 		spec_context<node_t> ctx;
 		auto i = run<node_t>(spec, ins, outs, ctx, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
@@ -167,12 +167,12 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<assignment<node_t>> assgn_in;
 		assignment<node_t> assgn_out;
-		build_input("i1", i1, "tau", assgn_in);
-		build_output("o1", o1, "tau", assgn_out);
-		build_output("u", u, "tau", assgn_out);
-		auto ins = input_vector(assgn_in, "tau");
+		build_input("i1", i1, tau_type<node_t>(), assgn_in);
+		build_output("o1", o1, tau_type<node_t>(), assgn_out);
+		build_output("u", u, tau_type<node_t>(), assgn_out);
+		auto ins = input_vector(assgn_in, tau_type<node_t>());
 		ins.add_input(build_var_name<node_t>("this"),0,0);
-		auto outs = output_console("tau");
+		auto outs = output_console(tau_type<node_t>());
 		spec_context<node_t> ctx;
 		auto i = run<node_t>(spec, ins, outs, ctx, 4);
 		CHECK( matches_output(assgn_out, i.value().memory) );
@@ -350,14 +350,14 @@ TEST_SUITE("only outputs") {
 	// Fibonacci like sequence with sample Tau syntax
 	TEST_CASE("o1[0] = {<:x> = 0.} && o1[1] = {<:x> = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
 		const char* sample = "o1[0] =  {<:x> = 0.} && o1[1] =  {<:x> = 0.} && o1[t] = o1[t-1] + o1[t-2].";
-		auto memory = run_test(sample, 8, "tau");
+		auto memory = run_test(sample, 8, tau_type<node_t>());
 		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with sample Tau programs
 	TEST_CASE("o1[0] = {o1[0] = 0.} && o1[1] = {o1[0] = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
 		const char* sample = "o1[0] =  {o1[0] = 0.} && o1[1] =  {o1[0] = 0.} && o1[t] = o1[t-1] + o1[t-2].";
-		auto memory = run_test(sample, 8, "tau");
+		auto memory = run_test(sample, 8, tau_type<node_t>());
 		CHECK ( !memory.value().empty() );
 	}
 }
@@ -402,7 +402,7 @@ TEST_SUITE("test inputs") {
 		typed_io_vars input_map;
 		tref var = build_var_name_indexed<node_t>(1);
 		input_map[get_var_name_sid<node_t>(var)] = {
-			get_typed_stream<node_t>("sbf", "../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in") };
+			get_typed_stream<node_t>(sbf_type<node_t>(), "../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in") };
 		finputs<node_t> inputs(input_map);
 		CHECK ( inputs.type_of(var) > 0 );
 		for (size_t i = 0; i < 10; ++i) {
@@ -421,7 +421,7 @@ TEST_SUITE("test inputs") {
 		typed_io_vars input_map;
 		tref var = build_var_name_indexed<node_t>(1);
 		input_map[get_var_name_sid<node_t>(var)] = {
-			get_typed_stream<node_t>("tau", "../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in") };
+			get_typed_stream<node_t>(tau_type<node_t>(), "../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in") };
 		finputs<node_t> inputs(input_map);
 		CHECK ( inputs.type_of(var) > 0 );
 		for (size_t i = 0; i < 10; ++i) {
@@ -443,11 +443,11 @@ TEST_SUITE("test outputs") {
 		typed_io_vars output_map;
 		tref var = build_var_name_indexed<node_t>(1);
 		size_t var_sid = get_var_name_sid<node_t>(var);
-		size_t type = get_ba_type_id<node_t>("sbf");
+		size_t type = get_ba_type_id<node_t>(sbf_type<node_t>());
 		tref var_0 = build_out_var_at_n_indexed<node_t>(1, 0, type);
 
 		output_map[var_sid] = {
-			get_typed_stream<node_t>("sbf", random_file()) };
+			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
 
 #ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var_sid].second << "\n";
@@ -463,7 +463,7 @@ TEST_SUITE("test outputs") {
 	TEST_CASE("writing to files: two outputs") {
 		bdd_init<Bool>();
 		typed_io_vars output_map;
-		size_t type = get_ba_type_id<node_t>("sbf");
+		size_t type = get_ba_type_id<node_t>(sbf_type<node_t>());
 		tref var1 = build_var_name_indexed<node_t>(1);
 		tref var2 = build_var_name_indexed<node_t>(2);
 		size_t var1_sid = get_var_name_sid<node_t>(var1);
@@ -471,9 +471,9 @@ TEST_SUITE("test outputs") {
 		tref var1_0 = build_out_var_at_n<node_t>(var1, 0, type);
 		tref var2_0 = build_out_var_at_n<node_t>(var2, 0, type);
 		output_map[var1_sid] = {
-			get_typed_stream<node_t>("sbf", random_file()) };
+			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
 		output_map[var2_sid] = {
-			get_typed_stream<node_t>("sbf", random_file()) };
+			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
 
 #ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";
@@ -494,7 +494,7 @@ TEST_SUITE("test outputs") {
 	TEST_CASE("writing to files: completing outputs") {
 		bdd_init<Bool>();
 		typed_io_vars output_map;
-		size_t type = get_ba_type_id<node_t>("sbf");
+		size_t type = get_ba_type_id<node_t>(sbf_type<node_t>());
 		auto var1 = build_var_name_indexed<node_t>(1);
 		auto var2 = build_var_name_indexed<node_t>(2);
 		size_t var1_sid = get_var_name_sid<node_t>(var1);
@@ -502,9 +502,9 @@ TEST_SUITE("test outputs") {
 		auto var1_0 = build_out_var_at_n<node_t>(var1, 0, type);
 		auto var2_1 = build_out_var_at_n<node_t>(var2, 1, type);
 		output_map[var1_sid] = {
-			get_typed_stream<node_t>("sbf", random_file()) };
+			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
 		output_map[var2_sid] = {
-			get_typed_stream<node_t>("sbf", random_file()) };
+			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
 
 #ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";

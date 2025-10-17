@@ -50,7 +50,7 @@ TEST_SUITE("bf operator hooks") {
 		return tau::subtree_equals(tau_sample, tau_expected);
 	}
 
-	bool check_type(const char* sample, const char* type) {
+	bool check_type(const char* sample, const tref type) {
 		tref parsed = tau::get(std::string(sample) + " = 0.", { .reget_with_hooks = false });
 		using node = node_t;
 		// DBG(TAU_LOG_TRACE << "parsed: " << TAU_LOG_FM_DUMP(parsed);)
@@ -94,9 +94,9 @@ TEST_SUITE("bf operator hooks") {
 
 		CHECK( check_hook("x''", "x") );
 
-		CHECK( check_type("{a}:sbf'", "sbf") );
-		CHECK( check_type("{o1[t] = 0}'", "tau") );
-		CHECK( check_type("{o1[t] = 0}:tau'", "tau") );
+		CHECK( check_type("{a}:sbf'", sbf_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}'",  tau_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}:tau'", tau_type<node_t>()) );
 	}
 
 	TEST_CASE("|") {
@@ -173,10 +173,10 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( check_hook("x|x'", "1") );
 		CHECK( check_hook("x'|x", "1") );
 
-		CHECK( check_type("{a}:sbf|{b}:sbf", "sbf") );
-		CHECK( check_type("{o1[t] = 0}|{o2[t] = 0}", "tau") );
-		CHECK( check_type("{o1[t] = 0}:tau|{o2[t] = 0}", "tau") );
-		CHECK( check_type("{o1[t] = 0}|{o2[t] = 0}:tau", "tau") );
+		CHECK( check_type("{a}:sbf|{b}:sbf", sbf_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}|{o2[t] = 0}", tau_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}:tau|{o2[t] = 0}", tau_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}|{o2[t] = 0}:tau", tau_type<node_t>()) );
 
 	}
 
@@ -254,10 +254,10 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( check_hook("x&x'", "0") );
 		CHECK( check_hook("x'&x", "0") );
 
-		CHECK( check_type("{a}:sbf&{b}:sbf", "sbf") );
-		CHECK( check_type("{o1[t] = 0}&{o2[t] = 0}", "tau") );
-		CHECK( check_type("{o1[t] = 0}:tau&{o2[t] = 0}", "tau") );
-		CHECK( check_type("{o1[t] = 0}&{o2[t] = 0}:tau", "tau") );
+		CHECK( check_type("{a}:sbf&{b}:sbf", sbf_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}&{o2[t] = 0}", tau_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}:tau&{o2[t] = 0}", tau_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}&{o2[t] = 0}:tau", tau_type<node_t>()) );
 	}
 
 	TEST_CASE("+") {
@@ -334,9 +334,9 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( check_hook("x+x'", "1") );
 		CHECK( check_hook("x'+x", "1") );
 
-		CHECK( check_type("{a}:sbf+{b}:sbf", "sbf") );
-		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}", "tau") );
-		CHECK( check_type("{o1[t] = 0}:tau+{o2[t] = 0}", "tau") );
-		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}:tau", "tau") );
+		CHECK( check_type("{a}:sbf+{b}:sbf", sbf_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}", tau_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}:tau+{o2[t] = 0}", tau_type<node_t>()) );
+		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}:tau", tau_type<node_t>()) );
 	}
 }

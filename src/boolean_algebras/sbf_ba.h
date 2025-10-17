@@ -14,23 +14,6 @@ namespace idni::tau_lang {
 using sbf_ba = hbdd<Bool>;
 
 /**
- * @brief Create the type tree for the sbf type
- * @tparam node Tree node type
- * @return Tree reference representing sbf type tree
- */
-template <NodeType node>
-tref sbf_type();
-
-/**
- * @brief Checks if t represents the sbf type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents a sbf
- */
-template <NodeType node>
-bool is_sbf_type(tref t);
-
-/**
  * @brief global static bdd variable cache
  */
 inline static std::map<int_t, sbf_ba> var_cache{};

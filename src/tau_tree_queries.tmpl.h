@@ -189,6 +189,12 @@ size_t find_ba_type (tref term) {
 	return type;
 }
 
+template <NodeType node>
+tref find_ba_type_tree (tref term) {
+	const size_t t = find_ba_type<node>(term);
+	return get_ba_type_tree<node>(t);
+}
+
 // template <NodeType node>
 // auto visit_io_vars = [] (tref n) static {
 // 	auto nt = tree<node>::get(n).get_type();
