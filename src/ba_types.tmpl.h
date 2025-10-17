@@ -47,6 +47,21 @@ bool is_untyped(tref t) {
 	return tau::get(t)[0].get_string() == "untyped";
 }
 
+// sbf type definitions
+// TODO: They must go into sbf_ba.impl.h -> currently causes compilation error
+template<NodeType node>
+tref sbf_type() {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "sbf");
+	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+bool is_sbf_type(tref t) {
+	using tau = tree<node>;
+	return tau::get(t)[0].get_string() == "sbf";
+}
+
 // bitvector type definitions
 // TODO: They must go into bv_ba.impl.h -> currently causes compilation error
 template<NodeType node>

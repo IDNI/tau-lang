@@ -15,13 +15,12 @@ TEST_SUITE("Configuration") {
 
 TEST_SUITE("merge_ba_types") {
 
-	using type_t = tree<node_t>::type_t;
+	using type_t = size_t;
 
 	bool match(const type_t& type1, const type_t& type2, const type_t& result) {
 		auto merged = merge_ba_types<node_t>(type1, type2);
 		if (!merged) return false;
-		return (result.first == merged.value().first
-			&& result.second == merged.value().second);
+		return result == merged.value();
 	}
 
 	bool nomatch(const type_t& type1, const type_t& type2) {
@@ -30,28 +29,19 @@ TEST_SUITE("merge_ba_types") {
 	}
 
 	TEST_CASE("untyped with untyped") {
-		CHECK(match({0, nullptr}, {0, nullptr}, {0, nullptr}));
-		CHECK(match({0, (tref)1}, {0, nullptr}, {0, nullptr}));
-		CHECK(match({0, nullptr}, {0, (tref)1}, {0, nullptr}));
+		CHECK(match(0, 0, 0));
 	}
 
 	TEST_CASE("untyped with any type") {
-		CHECK(match({0, nullptr}, {1, nullptr}, {1, nullptr}));
-		CHECK(match({0, nullptr}, {1, (tref)1}, {1, (tref)1}));
-		CHECK(match({1, nullptr}, {0, nullptr}, {1, nullptr}));
-		CHECK(match({1, (tref)1}, {0, nullptr}, {1, (tref)1}));
-		CHECK(match({0, nullptr}, {0, nullptr}, {0, nullptr}));
+		CHECK(match(0, 1, 1));
+		CHECK(match(1, 0, 1));
 	}
 
 	TEST_CASE("same types all possible subtypes") {
-		CHECK(match({1, nullptr}, {1, nullptr}, {1, nullptr}));
-		CHECK(match({1, (tref)1}, {1, (tref)1}, {1, (tref)1}));
-		CHECK(match({1, nullptr}, {1, (tref)1}, {1, (tref)1}));
-		CHECK(match({1, (tref)1}, {1, nullptr}, {1, (tref)1}));
+		CHECK(match(1, 1, 1));
 	}
 
 	TEST_CASE("different types") {
-		CHECK(nomatch({1, nullptr}, {2, nullptr}));
-		CHECK(nomatch({1, (tref)1}, {1, (tref)2}));
+		CHECK(nomatch(1, 2));
 	}
 }

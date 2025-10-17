@@ -82,18 +82,7 @@ std::optional<typename node<BAs...>::constant_with_type> parse_sbf(
 		sbf_type<node<BAs...>>() };
 }
 
-template<NodeType node>
-tref sbf_type() {
-	using tau = tree<node>;
-	tref type = tau::get(tau::type, "sbf");
-	return tau::get(tau::typed, type);
-}
 
-template<NodeType node>
-bool is_sbf_type(tref t) {
-	using tau = tree<node>;
-	return tau::get(t)[0].get_string() == "sbf";
-}
 
 template <typename... BAs>
 requires BAsPack<BAs...>

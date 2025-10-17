@@ -10,7 +10,7 @@ tref splitter_one_bdd() {
 	using node = tau_lang::node<bv, sbf_ba>;
 	using tau = tree<node>;
 	static sbf_ba_factory<bv, sbf_ba> factory;
-	return tau::get(tau::bf, tau::get_ba_constant(factory.splitter_one(), "sbf"));
+	return tau::get(tau::bf, tau::get_ba_constant(factory.splitter_one(), sbf_type<node>()));
 }
 
 template <NodeType node>
@@ -627,7 +627,7 @@ TEST_SUITE("solve") {
 		return solution ? check_solution<node_t>(form, solution.value()) : false;
 	}
 
-	bool test_solve_min(const std::string system, const std::string type = "tau") {
+	bool test_solve_min(const std::string system, const tref type = tau_type<node_t>()) {
 		solver_options options = {
 			.splitter_one = node_t::nso_factory::splitter_one(type),
 			.mode = solver_mode::minimum
@@ -635,7 +635,7 @@ TEST_SUITE("solve") {
 		return test_solve(system, options);
 	}
 
-	bool test_solve_max(const std::string system, const std::string type = "tau") {
+	bool test_solve_max(const std::string system, const tref type = tau_type<node_t>()) {
 		solver_options options = {
 			.splitter_one = node_t::nso_factory::splitter_one(type),
 			.mode = solver_mode::maximum
@@ -643,7 +643,7 @@ TEST_SUITE("solve") {
 		return test_solve(system, options);
 	}
 
-	bool test_solve(const std::string system, const std::string type = "tau") {
+	bool test_solve(const std::string system, const tref type = tau_type<node_t>()) {
 		solver_options options = {
 			.splitter_one = node_t::nso_factory::splitter_one(type),
 			.mode = solver_mode::general
@@ -659,7 +659,7 @@ TEST_SUITE("solve") {
 
 	TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0") {
 		const char* system = " y < x && y = {a}:sbf && x' != 0.";
-		CHECK ( test_solve(system, "sbf") );
+		CHECK ( test_solve(system, sbf_type<node_t>()) );
 	}
 
 	// increasing monotonicity (2)
@@ -668,13 +668,13 @@ TEST_SUITE("solve") {
 	// and call the solve_system method (see above).
 	TEST_CASE("x = {a}:sbf && x < y && y != 1") {
 		const char* system = "x = {a}:sbf && x < y && y != 1.";
-		CHECK ( test_solve(system, "sbf") );
+		CHECK ( test_solve(system, sbf_type<node_t>()) );
 	}
 
 	// increasing monotonicity (2 y2)
 	TEST_CASE("x = {a}:sbf {b}:sbf && x < y && y != 1") {
 		const char* system = "x = {a}:sbf {b}:sbf && x < y && y != 1.";
-		CHECK ( test_solve(system, "sbf") );
+		CHECK ( test_solve(system, sbf_type<node_t>()) );
 	}
 
 	TEST_CASE("x != 0") {

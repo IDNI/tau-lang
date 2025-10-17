@@ -3,8 +3,6 @@
 #ifndef __IDNI__TAU__BA_TYPES_H__
 #define __IDNI__TAU__BA_TYPES_H__
 
-#include "boolean_algebras/sbf_ba.h"
-
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
@@ -68,6 +66,27 @@ bool is_untyped(tref t);
 
 // -----------------------------------------------------------------------------
 // Type definitions for bitvector
+// TODO: They must go into sbf_ba.h -> currently causes compilation error
+
+/**
+ * @brief Create the type tree for the sbf type
+ * @tparam node Tree node type
+ * @return Tree reference representing sbf type tree
+ */
+template <NodeType node>
+tref sbf_type();
+
+/**
+ * @brief Checks if t represents the sbf type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents a sbf
+ */
+template <NodeType node>
+bool is_sbf_type(tref t);
+
+// -----------------------------------------------------------------------------
+// Type definitions for bitvector
 // TODO: They must go into bv_ba.h -> currently causes compilation error
 
 /**
@@ -76,7 +95,7 @@ bool is_untyped(tref t);
  * @return Tree reference representing the type for bitvectors
  */
 template <NodeType node>
-tref bv_type(unsigned short bitwidth = 16);
+tref bv_type(unsigned short bitwidth = default_bv_size);
 
 template <NodeType node>
 tref bv_base_type();
