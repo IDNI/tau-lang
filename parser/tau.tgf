@@ -58,16 +58,6 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "!>=" _ bf)               :bf_ngteq
                         | (bf    _ "<"   _ bf)               :bf_lt
                         | (bf    _ "!<"  _ bf)               :bf_nlt
-                        | (bv    _ "=_"   _ bv)              :bv_eq
-                        | (bv    _ "!=_"  _ bv)              :bv_neq
-                        | (bv    _ "<=_"  _ bv)              :bv_lteq
-                        | (bv    _ "!<=_" _ bv)              :bv_nlteq
-                        | (bv    _ ">_"   _ bv)              :bv_gt
-                        | (bv    _ "!>_"  _ bv)              :bv_ngt
-                        | (bv    _ ">=_"  _ bv)              :bv_gteq
-                        | (bv    _ "!>=_" _ bv)              :bv_ngteq
-                        | (bv    _ "<_"   _ bv)              :bv_lt
-                        | (bv    _ "!<_"  _ bv)              :bv_nlt
                         |                                     capture.
 # relational operators for base types
 #
@@ -82,6 +72,13 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ref                                :bf_ref
                         | (bf  _ '|' _       bf)             :bf_or
                         | (bf  _ '^' _       bf)             :bf_xor
+                        | (bf  _ '+' _       bf)             :bf_add
+                        | (bf  _ '-' _       bf)             :bf_sub
+                        | (bf  _ '*' _       bf)             :bf_mul
+                        | (bf  _ '/' _       bf)             :bf_div
+                        | (bf  _ '%' _       bf)             :bf_mod
+                        | (bf  _ ">>" _      bf)             :bf_shr
+                        | (bf  _ "<<" _      bf)             :bf_shl
                         | ('1' [ typed ])                    :bf_t
                         | ('0' [ typed ])                    :bf_f
                         | (bf (_ '&' _ | __) bf)             :bf_and
@@ -100,28 +97,6 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
-# operators for bitvector types
-#
-# they are named bv_* as they involve bitvectors.
-bv                     => ('(' _ bv _ ')')            :bv_parenthesis
-                        |                              variable
-                        | (bv _ '+' _ bv)             :bv_add
-                        | (bv _ '*' _ bv)             :bv_mul
-                        | (bv _ '/' _ bv)             :bv_div
-                        | (bv _ '%' _ bv)             :bv_mod
-                        | (bv _ '-' _ bv)             :bv_sub
-                        | '~' _ bv                    :bv_neg
-                        | (bv _ '&' _ bv)             :bv_and
-#                       | (bv _ "!&" _ bv)            :bv_nand
-                        | (bv _ '|' _ bv)             :bv_or
-#                       | (bv _ "!|" _ bv)            :bv_nor
-                        | (bv _ "^" _ bv)           :bv_xor
-#                       | (bv _ "!(+)" _ bv)          :bv_xnor
-                        | (bv _ "<<" _ bv)            :bv_shl
-                        | (bv _ ">>" _ bv)            :bv_shr
-#                       | ("min" __ bv __ bv)         :bv_min
-#                       | ("max" __ bv __ bv)         :bv_max
-                        | ba_constant.
 
 # constant time constraints
 constraint =>
@@ -299,7 +274,6 @@ history        => ( "%"
         normalize_cmd_arg,
         uconst > uconst_name,
         wff > wff_parenthesis > wff,
-        bv > bv_parenthesis > bv,
         bf > bf_parenthesis > bf,
         bf_neg_oprnd > bf_parenthesis > bf,
         bf_and_nosep_1st_oprnd > bf_parenthesis > bf,

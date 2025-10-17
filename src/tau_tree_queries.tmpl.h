@@ -141,9 +141,12 @@ std::function<bool(tref)> is_atomic_fm() {
 
 template <NodeType node>
 std::function<bool(tref)> is_atomic_bv_fm() {
-	using tau = tree<node>;
+	//using tau = tree<node>;
 
-	return [](tref n) -> bool {
+	return is_atomic_fm<node>();
+
+	//TODO (HIGH) check the type and the ba_type
+	/*return [](tref n) -> bool {
 		auto fm = tau::get(n);
 		return fm.is(node::type::wff)
 			&& (fm.child_is(node::type::bv_eq)
@@ -156,7 +159,7 @@ std::function<bool(tref)> is_atomic_bv_fm() {
 				|| fm.child_is(node::type::bv_ngteq)
 				|| fm.child_is(node::type::bv_lt)
 				|| fm.child_is(node::type::bv_nlt));
-	};
+	};*/
 }
 
 template <NodeType node>
@@ -191,7 +194,7 @@ size_t find_ba_type (tref term) {
 	size_t type = 0;
 	auto f = [&type](const tref n) {
 		const auto& t = tau::get(n);
-		if (t.is(tau::bf) || t.is(tau::bv)) type = t.get_ba_type();
+		if (t.is(tau::bf)) type = t.get_ba_type();
 		if (type > 0) return false;
 		return true;
 	};

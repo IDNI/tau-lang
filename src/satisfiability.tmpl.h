@@ -263,8 +263,8 @@ template <NodeType node>
 inline auto constant_io_comp = [](tref v1, tref v2) {
 	using tau = tree<node>;
 	// trim the bf of v1 and v2 if present
-	v1 = tau::get(v1).is(tau::bf) || tau::get(v1).is(tau::bv) ? tau::trim(v1) : v1;
-	v2 = tau::get(v2).is(tau::bf) || tau::get(v2).is(tau::bv) ? tau::trim(v2) : v2;
+	v1 = tau::get(v1).is(tau::bf) ? tau::trim(v1) : v1;
+	v2 = tau::get(v2).is(tau::bf) ? tau::trim(v2) : v2;
 	if (get_io_time_point<node>(v1) < get_io_time_point<node>(v2))
 		return true;
 	if (get_io_time_point<node>(v1) == get_io_time_point<node>(v2)) {
@@ -719,27 +719,13 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 template <NodeType node>
 tref create_guard(const trefs& io_vars, const int_t number) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 
-	auto build_bv_guard = [] (const tref io_var, const int_t number) {
-		tref subtype = tt(io_var) | tau::subtype | tt::ref;
-		tref uc = tau::build_bv_uconst("_" + TAU_TO_STR(io_var),
-			std::to_string(number), subtype);
-		return tau::build_bv_eq(tau::get(tau::bv, io_var), uc);
-	};
-
-	auto build_bf_guard = [] (const tref io_var, const size_t type, const int_t number) {
+	auto build_guard = [&] (const tref io_var, const int_t number) {
+		size_t type = tau::get(io_var).get_ba_type();
 		tref uc = tau::build_bf_uconst("_" + TAU_TO_STR(io_var),
 			std::to_string(number), type);
 		return tau::build_bf_eq(tau::build_bf_xor(
 			tau::get(tau::bf, io_var), uc));
-	};
-
-	auto build_guard = [&] (const tref io_var, const int_t number) {
-		size_t type = tau::get(io_var).get_ba_type();
-		return (type == ba_types<node>::id("bv"))
-			? build_bv_guard(io_var, number)
-			: build_bf_guard(io_var, type, number);
 	};
 
 	tref guard = tau::_T();
