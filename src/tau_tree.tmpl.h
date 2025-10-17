@@ -625,7 +625,6 @@ template <NodeType node>
 bool tree<node>::is_input_variable() const {
 	auto x = tt(*this);
 	if (x.is(bf)) x = x | variable;
-	if (x.is(bv)) x = x | variable;
 	if (x && x.is(variable)) x = x | io_var;
 	return x && x.is(io_var) && (x | tt::data) == 1;
 }
@@ -634,7 +633,6 @@ template <NodeType node>
 bool tree<node>::is_output_variable() const {
 	auto x = tt(*this);
 	if (x.is(bf)) x = x | variable;
-	if (x.is(bv)) x = x | variable;
 	if (x && x.is(variable)) x = x | io_var;
 	return x && x.is(io_var) && (x | tt::data) == 2;
 }
@@ -730,7 +728,7 @@ size_t tree<node>::get_bv_size() const {
 
 template <NodeType node>
 size_t tree<node>::get_ba_type() const {
-	if (this->value.nt == bf || this->value.nt == bv)
+	if (this->value.nt == bf)
 		return child_tree(0).get_ba_type();
 	return this->value.ba;
 }
@@ -743,7 +741,7 @@ const std::string& tree<node>::get_ba_type_name() const {
 template <NodeType node>
 const trefs& tree<node>::get_free_vars() const {
 	static const trefs no_free_vars{};
-	return is (bv) || is(bf) || is(wff) ? tau_lang::get_free_vars<node>(get())
+	return is(bf) || is(wff) ? tau_lang::get_free_vars<node>(get())
 				 : no_free_vars;
 }
 

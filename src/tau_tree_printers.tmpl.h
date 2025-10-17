@@ -302,33 +302,19 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_and,             740 },
 			{ bf_neg,             750 },
 			{ bf,                 790 },
-			{ bv_eq,              800 },
-			{ bv_neq,             801 },
-			{ bv_lteq,            802 },
-			{ bv_nlteq,           803 },
-			{ bv_gt,              804 },
-			{ bv_ngt,             805 },
-			{ bv_gteq,            806 },
-			{ bv_ngteq,           807 },
-			{ bv_lt,              808 },
-			{ bv_nlt,             809 },
-			{ bv_or,              810 },
 			//{ bv_nor,             811 },
-			{ bv_xor,             812 },
 			//{ bv_xnor,            813 },
-			{ bv_and,             814 },
 			//{ bv_nand,            815 },
-			{ bv_shl,             816 },
-			{ bv_shr,             817 },
-			{ bv_add,             818 },
-			{ bv_sub,             819 },
-			{ bv_mul,             820 },
-			{ bv_div,             821 },
-			{ bv_mod,             822 },
+			{ bf_shl,             816 },
+			{ bf_shr,             817 },
+			{ bf_add,             818 },
+			{ bf_sub,             819 },
+			{ bf_mul,             820 },
+			{ bf_div,             821 },
+			{ bf_mod,             822 },
 			//{ bv_min,             823 },
 			//{ bv_max,             824 },
-			{ bv_neg,             825 },
-			{ bv,                 826 },
+			//{ bf_minus,           825 },
 			{ rec_relation,       900 },
 			{ ref_args,           900 },
 		};
@@ -387,7 +373,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	static const std::map<size_t, std::string> hl_colors = {
 		{ bf,            TC.LIGHT_GREEN() },
-		{ bv,         	 TC.GREEN() },
 		{ variable,      TC.WHITE() },
 		{ capture,       TC.BLUE() },
 		{ wff_all,       TC.MAGENTA() },
@@ -585,30 +570,16 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_nlt:            out(" !< ");
 						last_quant_nt = nul; break;
 
-			case bv_eq:             out(" =_ "); last_quant_nt = nul; break;
-			case bv_neq:            out(" !=_ "); last_quant_nt = nul; break;
-			case bv_lteq:           out(" <=_ "); last_quant_nt = nul; break;
-			case bv_nlteq:          out(" !<=_ "); last_quant_nt = nul; break;
-			case bv_gt:             out(" >_ "); last_quant_nt = nul; break;
-			case bv_ngt:            out(" !>_ "); last_quant_nt = nul; break;
-			case bv_gteq:           out(" >=_ "); last_quant_nt = nul; break;
-			case bv_ngteq:          out(" !>=_ "); last_quant_nt = nul; break;
-			case bv_lt:             out(" <_ "); last_quant_nt = nul; break;
-			case bv_nlt:            out(" !<_ "); last_quant_nt = nul; break;
-
-			case bv_add:            out("+"); last_quant_nt = nul; break;
-			case bv_sub:            out("-"); last_quant_nt = nul; break;
-			case bv_mul:            out("*"); last_quant_nt = nul; break;
-			case bv_div:            out("/"); last_quant_nt = nul; break;
-			case bv_mod:            out("%"); last_quant_nt = nul; break;
-			case bv_and:            out("&"); last_quant_nt = nul; break;
+			case bf_add:            out("+"); last_quant_nt = nul; break;
+			case bf_sub:            out("-"); last_quant_nt = nul; break;
+			case bf_mul:            out("*"); last_quant_nt = nul; break;
+			case bf_div:            out("/"); last_quant_nt = nul; break;
+			case bf_mod:            out("%"); last_quant_nt = nul; break;
 			//case bv_nand:           out("!&"); last_quant_nt = nul; break;
-			case bv_or:             out("|"); last_quant_nt = nul; break;
 			//case bv_nor:            out("!|"); last_quant_nt = nul; break;
-			case bv_xor:            out("^"); last_quant_nt = nul; break;
 			//case bv_xnor:           out("!^"); last_quant_nt = nul; break;
-			case bv_shl:            out("<<"); last_quant_nt = nul; break;
-			case bv_shr:            out(">>"); last_quant_nt = nul; break;
+			case bf_shl:            out("<<"); last_quant_nt = nul; break;
+			case bf_shr:            out(">>"); last_quant_nt = nul; break;
 			//case bv_max:            out("max "); last_quant_nt = nul; break;
 			//case bv_min:            out("min "); last_quant_nt = nul; break;
 

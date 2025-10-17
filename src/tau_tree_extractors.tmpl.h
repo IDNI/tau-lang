@@ -372,7 +372,7 @@ const trefs& get_free_vars(tref n) {
 
 	if (!n) return no_free_vars;
 	if (typename node::type nt = tau::get(n).get_type();
-		nt != tau::bv && nt != tau::bf && nt != tau::wff) return no_free_vars;
+		nt != tau::bf && nt != tau::wff) return no_free_vars;
 
 	using cache_t = subtree_unordered_map<node, size_t>;
 	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
