@@ -228,7 +228,8 @@ tref new_infer_ba_types(tref n) {
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
 			}
-			case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
+			// TODO (HIGH) deal with those eq appropiately
+			/*case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
 			case tau::bv_gt: case tau::bv_ngt: case tau::bv_gteq: case tau::bv_ngteq:
 			case tau::bv_lt: case tau::bv_nlt: {
 				// We get all the (top) typeables in the expression and assign
@@ -293,7 +294,7 @@ tref new_infer_ba_types(tref n) {
 				DBG(LOG_TRACE << "new_infer_ba_types/on_enter/bv_eq.../resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
-			}
+			}*/
 			case tau::bf: {
 				// If bf is top level we treat it as a bf equation (we
 				// FALLTHROUGH). Otherwise we don't traverse its children.
@@ -386,11 +387,11 @@ tref new_infer_ba_types(tref n) {
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
 			}
-			case tau::bv: {
+			/*case tau::bv: {
 				// As we are inside an equation already visited, we do not need
 				// to continue the traversal of children.
 				return false;
-			}
+			}*/
 			default:
 				// Otherwise, we continue the traversal of children
 				// without doing anything special in this node.
@@ -661,7 +662,8 @@ tref new_infer_ba_types(tref n) {
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				return;
 			}
-			case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
+			// TODO (HIGH) deal with those eq appropiately
+			/*case tau::bv_eq: case tau::bv_neq: case tau::bv_lteq: case tau::bv_nlteq:
 			case tau::bv_gt: case tau::bv_ngt: case tau::bv_gteq: case tau::bv_ngteq:
 			case tau::bv_lt: case tau::bv_nlt: {
 				auto scoped_bv_ctes_types = get_scoped_elements(tau::ba_constant);
@@ -674,7 +676,7 @@ tref new_infer_ba_types(tref n) {
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bv_eq.../resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				return;
-			}
+			}*/
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt: {
@@ -732,8 +734,9 @@ tref new_infer_ba_types(tref n) {
 		const tau& t = tau::get(n);
 		size_t nt = t.get_type();
 		switch (nt) {
-			case tau::bv:
-				return false;
+			// TODO (HIGH) deal with those eq appropiately
+			/*case tau::bv:
+				return false;*/
 			default:
 				return true;
 		}

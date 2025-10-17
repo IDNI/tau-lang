@@ -159,36 +159,6 @@ tref build_bf_lt(tref l, tref r);
 template <NodeType node>
 tref build_bf_nlt(tref l, tref r);
 
-template <NodeType node>
-tref build_bv_eq(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_neq(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_lteq(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_nlteq(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_gt(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_ngt(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_gteq(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_ngteq(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_lt(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_nlt(tref l, tref r);
-
 // -----------------------------------------------------------------------------
 // term builders
 
@@ -220,52 +190,25 @@ template <NodeType node>
 tref build_bf_neg(tref n);
 
 template <NodeType node>
-tref build_bv_or(tref l, tref r);
+tref build_bf_shl(tref l, tref r);
 
 template <NodeType node>
-tref build_bv_or(const auto& bfs);
+tref build_bf_shr(tref l, tref r);
 
 template <NodeType node>
-tref build_bv_xor(tref l, tref r);
+tref build_bf_add(tref l, tref r);
 
 template <NodeType node>
-tref build_bv_and(tref l, tref r);
+tref build_bf_sub(tref l, tref r);
 
 template <NodeType node>
-tref build_bv_and(const auto& bfs);
+tref build_bf_mul(tref l, tref r);
 
 template <NodeType node>
-tref build_bv_neg(tref n);
+tref build_bf_div(tref l, tref r);
 
 template <NodeType node>
-tref build_bv_nand(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_nor(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_xnor(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_shl(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_shr(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_add(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_sub(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_mul(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_div(tref l, tref r);
-
-template <NodeType node>
-tref build_bv_mod(tref l, tref r);
+tref build_bf_mod(tref l, tref r);
 
 // -----------------------------------------------------------------------------
 // terminals, variables and constants
@@ -300,9 +243,6 @@ tref build_bv_ba_constant(const typename node::constant& constant, size_t ba_typ
 
 template <NodeType node>
 tref build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id);
-
-template <NodeType node>
-tref build_bv_uconst(const std::string& n1, const std::string& n2, size_t type_id);
 
 template <NodeType node>
 tref build_var_name(size_t sid);
@@ -378,66 +318,6 @@ tref build_out_var_at_t_minus(const std::string& var_name, size_t shift, size_t 
 
 template <NodeType node>
 tref build_out_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_variable(tref var_name_node, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_variable(const std::string& name, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_in_var(tref var_name_node, tref offset_node, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_in_var_at_n(tref var_name_node, int_t pos, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_in_var_at_n(const std::string& name, int_t pos, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_in_var_at_n_indexed(size_t index, int_t pos, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_in_var_at_t(tref var_name_node, size_t ba_type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_in_var_at_t_indexed(size_t index, size_t ba_type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_in_var_at_t_minus(tref var_name_node, size_t shift, size_t ba_type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_in_var_at_t_minus(const std::string& var_name, size_t shift, size_t ba_type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_in_var_at_t_minus_indexed(size_t index, size_t shift, size_t ba_type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_out_var(tref var_name_node, tref offset_node, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_out_var_at_n(tref var_name_node, int_t pos, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_out_var_at_n(const std::string& var_name, int_t pos, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_out_var_at_n_indexed(size_t index, int_t pos, size_t ba_type_id);
-
-template <NodeType node>
-tref build_bv_out_var_at_t(tref var_name_node, size_t ba_type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_out_var_at_t_indexed(size_t index, size_t ba_type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_out_var_at_t_minus(tref var_name_node, size_t shift, size_t ba_type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_out_var_at_t_minus(const std::string& var_name, size_t shift, size_t ba_type_id, std::string t = "t");
-
-template <NodeType node>
-tref build_bv_out_var_at_t_minus_indexed(size_t index, size_t shift, size_t ba_type_id, std::string t = "t");
 
 } // namespace idni::tau_lang
 

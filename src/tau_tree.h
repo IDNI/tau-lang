@@ -542,18 +542,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_lt(tref l, tref r);
 	static tref build_bf_nlt(tref l, tref r);
 
-    static tref build_bv_eq(tref l, tref r);
-    static tref build_bv_eq(tref l);
-	static tref build_bv_neq(tref l);
-	static tref build_bv_lteq(tref l, tref r);
-	static tref build_bv_nlteq(tref l, tref r);
-	static tref build_bv_gt(tref l, tref r);
-	static tref build_bv_ngt(tref l, tref r);
-	static tref build_bv_gteq(tref l, tref r);
-	static tref build_bv_ngteq(tref l, tref r);
-	static tref build_bv_lt(tref l, tref r);
-	static tref build_bv_nlt(tref l, tref r);
-
 	// term builders
 	static tref build_bf_fall(tref l, tref r);
 	static tref build_bf_fex(tref l, tref r);
@@ -564,23 +552,13 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_and(tref l, tref r);
 	static tref build_bf_and(const auto& bfs);
 	static tref build_bf_neg(tref n);
-
-    static tref build_bv_or(tref l, tref r);
-    static tref build_bv_or(const auto& bfs);
-    static tref build_bv_xor(tref l, tref r);
-    static tref build_bv_and(tref l, tref r);
-    static tref build_bv_and(const auto& bfs);
-    static tref build_bv_neg(tref l);
-	static tref build_bv_nand(tref l, tref r);
-	static tref build_bv_nor(tref l, tref r);
-	static tref build_bv_xnor(tref l, tref r);
-	static tref build_bv_shl(tref l, tref r);
-	static tref build_bv_shr(tref l, tref r);
-	static tref build_bv_add(tref l, tref r);
-	static tref build_bv_sub(tref l, tref r);
-	static tref build_bv_mul(tref l, tref r);
-	static tref build_bv_div(tref l, tref r);
-	static tref build_bv_mod(tref l, tref r);
+	static tref build_bf_shl(tref l, tref r);
+	static tref build_bf_shr(tref l, tref r);
+	static tref build_bf_add(tref l, tref r);
+	static tref build_bf_sub(tref l, tref r);
+	static tref build_bf_mul(tref l, tref r);
+	static tref build_bf_div(tref l, tref r);
+	static tref build_bf_mod(tref l, tref r);
 
 	// terminals, variables and constants
 	static tref build_bf_t_type(size_t ba_tid);
@@ -594,8 +572,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bv_ba_constant(const constant& constant, size_t type_id);
 	static tref build_bf_uconst(
 		const std::string& name1, const std::string& name2, size_t type_id);
-	static tref build_bv_uconst(
-		const std::string& n1, const std::string& n2, size_t type_id);
 	static tref build_var_name(size_t sid);
 	static tref build_var_name(const std::string& name);
 	static tref build_var_name_indexed(size_t index);
@@ -627,33 +603,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		const std::string& io_var_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_out_var_at_t_minus_indexed(
 		size_t index, size_t shift, size_t type_id, std::string t = "t");
-	static tref build_bv_variable(tref var_name_node, size_t type_id);
-	static tref build_bv_variable(const std::string& name, size_t type_id);
-	static tref build_bv_in_var(tref var_name_node, tref offset_node, size_t type_id);
-	static tref build_bv_in_var_at_n(tref var_name_node, int_t pos, size_t type_id);
-	static tref build_bv_in_var_at_n(const std::string& name, int_t pos, size_t type_id);
-	static tref build_bv_in_var_at_n_indexed(size_t index, int_t pos, size_t type_id);
-	static tref build_bv_in_var_at_t(tref var_name_node, size_t type_id, std::string t = "t");
-	static tref build_bv_in_var_at_t_indexed(size_t index, size_t type_id, std::string t = "t");
-	static tref build_bv_in_var_at_t_minus(
-		tref var_name_node, size_t shift, size_t type_id, std::string t = "t");
-	static tref build_bv_in_var_at_t_minus(
-		const std::string& var_name, size_t shift, size_t type_id, std::string t = "t");
-	static tref build_bv_in_var_at_t_minus_indexed(
-		size_t index, size_t shift, size_t type_id, std::string t = "t");
-	static tref build_bv_out_var(tref var_name_node, tref offset_node, size_t type_id);
-	static tref build_bv_out_var_at_n(tref var_name_node, int_t pos, size_t type_id);
-	static tref build_bv_out_var_at_n(const std::string& name, int_t pos, size_t type_id);
-	static tref build_bv_out_var_at_n_indexed(size_t index, int_t pos, size_t type_id);
-	static tref build_bv_out_var_at_t(tref var_name_node, size_t type_id, std::string t = "t");
-	static tref build_bv_out_var_at_t_indexed(size_t index, size_t type_id, std::string t="t");
-	static tref build_bv_out_var_at_t_minus(
-		tref var_name_node, size_t shift, size_t type_id, std::string t = "t");
-	static tref build_bv_out_var_at_t_minus(
-		const std::string& io_var_node, size_t shift, size_t type_id, std::string t = "t");
-	static tref build_bv_out_var_at_t_minus_indexed(
-		size_t index, size_t shift, size_t type_id, std::string t = "t");
-
 
 private:
 	using tt = traverser;
