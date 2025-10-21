@@ -12,7 +12,7 @@
 #include "tau_tree.h"
 #include "union_find.h"
 #include "boolean_algebras/bv_ba.h"
-
+#include "ba_types.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "resolver"
@@ -401,6 +401,25 @@ tref new_infer_ba_types(tref n) {
 		return !error;
 	};
 
+	auto update_default = [&](tref n, subtree_map<node, tref>& changes) -> tref{
+		// We transform the node according to the transformation of
+		// its children skipping constants and variables as they
+		// are replaced are higher levels.
+		trefs ch;
+		for (tref c : tau::get(n).children()) {
+			if (changes.find(c) != changes.end())
+				ch.push_back(changes[c]);
+			else ch.push_back(c);
+		}
+		// TODO: Can get_raw cause problems?
+		if (auto new_n = tau::get_raw(tau::get(n).value, ch.data(), ch.size()); new_n != n) {
+			/*DBG(LOG_TRACE << "new_infer_ba_types/on_leave/update_default//n -> new_n:\n"
+				<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)*/
+			changes.insert_or_assign(n, new_n);
+		}
+		return (changes.find(n) != changes.end()) ? changes[n] : n;
+	};
+
 	// Do nothing between nodes
 	auto on_between = [&] (tref, tref) {
 		// Stop traversal on error
@@ -413,24 +432,6 @@ tref new_infer_ba_types(tref n) {
 		// and add the current node if resulted changed.
 		DBG(assert(n != nullptr);)
 		// Helper lambdas
-		auto update_default = [&](tref n, subtree_map<node, tref>& changes) -> tref{
-			// We transform the node according to the transformation of
-			// its children skipping constants and variables as they
-			// are replaced are higher levels.
-			trefs ch;
-			for (tref c : tau::get(n).children()) {
-				if (changes.find(c) != changes.end())
-					ch.push_back(changes[c]);
-				else ch.push_back(c);
-			}
-			// TODO: Can get_raw cause problems?
-			if (auto new_n = tau::get_raw(tau::get(n).value, ch.data(), ch.size()); new_n != n) {
-				/*DBG(LOG_TRACE << "new_infer_ba_types/on_leave/update_default//n -> new_n:\n"
-					<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)*/
-				changes.insert_or_assign(n, new_n);
-			}
-			return (changes.find(n) != changes.end()) ? changes[n] : n;
-		};
 
 		auto retype = [&](tref n, const size_t new_type) -> tref {
 			const tau& t = tau::get(n);
@@ -752,6 +753,7 @@ tref new_infer_ba_types(tref n) {
 	// ...some code here...
 	tref new_n = transformed.contains(n) ? transformed[n] : n;
 	// TODO: unify the following with rest of type inference algorithm, once bv tag is gone
+
 	// Convert all bv default types to bv[16]
 	auto f = [](tref n) {
 		const tau& n_t = tau::get(n);
@@ -762,6 +764,85 @@ tref new_infer_ba_types(tref n) {
 		return n;
 	};
 	new_n = pre_order<node>(new_n).apply_unique(f);
+
+	// type all symbols according to their children's types
+	auto update_symbols = [&](tref n) -> tref {
+		subtree_map<node, tref> changes;
+
+		auto update = [&] (tref n) -> tref {
+
+			auto update_symbol = [&](tref n) -> tref {
+				// We have one child at least and we know that the types of the
+				// children have already been updated and they are consistent.
+				auto t = tau::get(n);
+				auto chs = t.get_children();
+				auto n_type = tau::get(chs[0]).get_ba_type();
+				auto new_n = tau::get(t.value.ba_retype(n_type), chs);
+				DBG(LOG_TRACE << "new_infer_ba_types/update_symbols/n -> new_n:\n"
+					<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+				return new_n;
+			};
+
+			const tau& t = tau::get(n);
+			size_t nt = t.get_type();
+			switch (nt) {
+				// no bv types allowed
+				case tau::bf_interval: {
+					auto new_n = update_symbol(n);
+					if (error) return n;
+					if (is_bv_type_family<node>(new_n)) {
+						LOG_ERROR << "Invalid bv type for bf_interval "
+							<< LOG_FM(n) << "\n";
+						return error = true, n;
+					}
+					changes.insert_or_assign(n, new_n);
+					break;
+				}
+
+				// all types allowed
+				case tau::bf: case tau::bf_eq: case tau::bf_neq:
+				case tau::bf_lteq: case tau::bf_nlteq: case tau::bf_gt:
+				case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
+				case tau::bf_lt: case tau::bf_nlt: case tau::bf_or:
+				case tau::bf_xor: case tau::bf_and: case tau::bf_neg: {
+					auto new_n = update_symbol(n);
+					if (error) return n;
+					changes.insert_or_assign(n, new_n);
+					break;
+				}
+
+				// only bv types allowed
+				case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
+				case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
+				case tau::bf_shl: {
+					auto new_n = update_symbol(n);
+					if (error) return n;
+					if (!is_bv_type_family<node>(new_n)) {
+						LOG_ERROR << "Invalid bv type for bf_interval "
+							<< LOG_FM(n) << "\n";
+						return error = true, n;
+					}
+					changes.insert_or_assign(n, new_n);
+					break;
+				}
+				default:
+					update_default(n, changes);
+					break;
+			}
+			return n;
+		};
+
+		post_order<node>(n).search(update);
+		if (error) return tau::use_hooks = using_hooks, nullptr;
+		if (changes.find(n) != changes.end()) {
+			DBG(LOG_TRACE << "new_infer_ba_types/update_variables/n -> changes[n]:\n"
+				<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(changes[n]);)
+			return changes[n];
+		}
+		return n;
+	};
+
+	new_n = update_symbols(new_n);
 	return  tau::use_hooks = using_hooks, new_n;
 }
 
