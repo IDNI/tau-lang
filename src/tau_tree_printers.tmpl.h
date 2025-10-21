@@ -29,13 +29,41 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	using tau = tree<node>;
 	os << node::name(n.nt);
 #ifdef DEBUG
+	auto is_typeable = [](size_t nt) {
+		return nt == tau::ba_constant
+			|| nt == tau::variable
+			|| nt == tau::bf
+			|| nt == tau::bf_interval
+			|| nt == tau::bf_eq
+			|| nt == tau::bf_neq
+			|| nt == tau::bf_lteq
+			|| nt == tau::bf_nlteq
+			|| nt == tau::bf_gt
+			|| nt == tau::bf_ngt
+			|| nt == tau::bf_gteq
+			|| nt == tau::bf_ngteq
+			|| nt == tau::bf_lt
+			|| nt == tau::bf_nlt
+			|| nt == tau::bf_or
+			|| nt == tau::bf_xor
+			|| nt == tau::bf_and
+			|| nt == tau::bf_neg
+			|| nt == tau::bf_add
+			|| nt == tau::bf_sub
+			|| nt == tau::bf_mul
+			|| nt == tau::bf_div
+			|| nt == tau::bf_mod
+			|| nt == tau::bf_shr
+			|| nt == tau::bf_shl
+			|| nt == tau::bf_f
+			|| nt == tau::bf_t;
+	};
 	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
 	if (bool print_is_term = true; print_is_term && n.term) os << "*";
 	if (n.term == 0 && n.ba_type == 1 && n.nt == tau_parser::ref)
 		os << LOG_WARNING_COLOR << "?" << TC.CLEAR();
 	if (n.data) os << "[" << n.data << "]";
-	if (bool print_ba_type = true;
-		print_ba_type && n.term && n.nt != tau::bf)
+	if (bool print_ba_type = true; print_ba_type && is_typeable(n.nt))
 						os << " " << LOG_BA_TYPE(n.ba_type);
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
