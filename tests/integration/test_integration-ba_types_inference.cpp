@@ -45,6 +45,14 @@ tref parse(const std::string& sample, const tau::get_options& opts = parse_wff_n
 	return src;
 }
 
+tref parse_bf(const std::string& sample, const tau::get_options& opts = parse_bf_no_infer()) {
+	auto src = tree<node_t>::get(sample, opts);
+	if (src == nullptr) {
+		TAU_LOG_ERROR << "Parsing failed for: " << sample;
+	}
+	return src;
+}
+
 using type_t = size_t;
 
 TEST_SUITE("type_scoped_resolver") {
@@ -230,7 +238,7 @@ static type_t sbf_type_id = get_ba_type_id<node_t>(sbf_type<node_t>());
 static type_t bv_type_id = get_ba_type_id<node_t>(bv_type<node_t>());
 static type_t bv8_type_id = get_ba_type_id<node_t>(bv_type<node_t>(8));
 
-TEST_SUITE("new_infer_ba_types: wff formulas") {
+TEST_SUITE("new_infer_ba_types: variables and constants") {
 
 	TEST_CASE("simple case 1") {
 		tref parsed = parse("x = 1");
@@ -969,6 +977,291 @@ TEST_SUITE("new_infer_ba_types: cli commands") {
 		CHECK( check_vars(inferred, expected) );
 	}
 }
+
+TEST_SUITE("new_infer_ba_types: symbols") {
+
+	template<typename node_t::type nt>
+	bool check_symbol(tref inferred,
+			type_t expected_type) {
+		auto syms = tau::get(inferred).select_top(is<node_t, nt>);
+		if (syms.empty()) {
+			TAU_LOG_ERROR << "No symbols found";
+			return false;
+		}
+		for (auto& s : syms) {
+			auto stype = tau::get(s).get_ba_type();
+			if (stype != expected_type) {
+				TAU_LOG_ERROR << "Symbol '" << nt
+					<< "' expected type id " << expected_type
+					<< ", found " << stype;
+				return false;
+			}
+		}
+		return true;
+	}
+
+	TEST_CASE("tau bf_eq symbol") {
+		tref parsed = parse("x:tau = y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("sbf bf_eq symbol") {
+		tref parsed = parse("x:sbf = y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_eq>(inferred, sbf_type_id) );
+	}
+
+	TEST_CASE("bv bf_eq symbol") {
+		tref parsed = parse("x:bv = y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_eq>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv[8] bf_eq symbol") {
+		tref parsed = parse("x:bv[8] = y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_eq>(inferred, bv8_type_id) );
+	}
+
+	TEST_CASE("tau bf_eq symbol involving constant") {
+		tref parsed = parse("x:tau = { x = 0 }");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_eq symbol involving bf_t") {
+		tref parsed = parse("x:tau = 1");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_eq symbol involving bf_f") {
+		tref parsed = parse("x:tau = 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_neq symbol") {
+		tref parsed = parse("x:tau != 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_lteq symbol") {
+		tref parsed = parse("x:tau <= 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_nlteq symbol") {
+		tref parsed = parse("x:tau !<= 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_nlteq>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_gt symbol") {
+		tref parsed = parse("x:tau > 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_gt>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_ngt symbol") {
+		tref parsed = parse("x:tau !> 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_ngt>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_gteq symbol") {
+		tref parsed = parse("x:tau >= 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_gteq>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_ngteq symbol") {
+		tref parsed = parse("x:tau !>= 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_ngteq>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_lt symbol") {
+		tref parsed = parse("x:tau < 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_lt>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau bf_nlt symbol") {
+		tref parsed = parse("x:tau !< 0");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_nlt>(inferred, tau_type_id) );
+	}
+
+	/*TEST_CASE("tau bf_interval symbol") {
+		tref parsed = parse("x:tau <= y <= z");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_interval>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("sbf bf_interval symbol") {
+		tref parsed = parse("x:sbf <= y <= z");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_interval>(inferred, sbf_type_id) );
+	}
+
+	TEST_CASE("bv bf_interval symbol") {
+		tref parsed = parse("x:bv <= y <= z");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}*/
+
+	TEST_CASE("tau bf_and symbol") {
+		tref parsed = parse_bf("x:bv & y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_and>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("tau bf_or symbol") {
+		tref parsed = parse_bf("x:bv | y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_or>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("tau bf_xor symbol") {
+		tref parsed = parse_bf("x:bv ^ y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("tau bf_neg symbol") {
+		tref parsed = parse_bf("x:bv'");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id) );
+	}
+
+	/*TEST_CASE("bv bf_add symbol") {
+		tref parsed = parse_bf("x:bv + y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_add>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv bf_sub symbol") {
+		tref parsed = parse_bf("x:bv - y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_sub>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv bf_mul symbol") {
+		tref parsed = parse_bf("x:bv * y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_mul>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv bf_div symbol") {
+		tref parsed = parse_bf("x:bv / y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_div>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv bf_mod symbol") {
+		tref parsed = parse_bf("x:bv % y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_mod>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv bf_shr symbol") {
+		tref parsed = parse_bf("x:bv >> y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_shr>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv bf_shl symbol") {
+		tref parsed = parse_bf("x:bv << y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_shl>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv[8] bf_shl symbol") {
+		tref parsed = parse_bf("x:bv[8] << y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_shl>(inferred, bv8_type_id) );
+	}
+
+	TEST_CASE("tau bf_shl symbol") {
+		tref parsed = parse_bf("x:tau << y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("sbf bf_shl symbol") {
+		tref parsed = parse_bf("x:sbf << y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}*/
+}
+
 
 TEST_SUITE("Cleanup") {
 
