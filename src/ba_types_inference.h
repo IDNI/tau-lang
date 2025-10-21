@@ -755,6 +755,7 @@ tref new_infer_ba_types(tref n) {
 	// TODO: unify the following with rest of type inference algorithm, once bv tag is gone
 
 	// Convert all bv default types to bv[16]
+	// TODO (HIGH) use get_raw to avoid hooks
 	auto f = [](tref n) {
 		const tau& n_t = tau::get(n);
 		if (n_t.get_ba_type() ==
@@ -777,24 +778,27 @@ tref new_infer_ba_types(tref n) {
 				auto t = tau::get(n);
 				auto chs = t.get_children();
 				auto n_type = tau::get(chs[0]).get_ba_type();
-				auto new_n = tau::get(t.value.ba_retype(n_type), chs);
-				DBG(LOG_TRACE << "new_infer_ba_types/update_symbols/n -> new_n:\n"
+				auto new_n = tau::get_raw(t.value.ba_retype(n_type), chs.data(), chs.size());
+				DBG(LOG_TRACE << "new_infer_ba_types/update_symbol/n -> new_n:\n"
 					<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 				return new_n;
 			};
 
-			const tau& t = tau::get(n);
+			auto nn = update_default(n, changes);
+			const tau& t = tau::get(nn);
 			size_t nt = t.get_type();
 			switch (nt) {
 				// no bv types allowed
 				case tau::bf_interval: {
-					auto new_n = update_symbol(n);
-					if (error) return n;
+					auto new_n = update_symbol(nn);
+					if (error) return nn;
 					if (is_bv_type_family<node>(new_n)) {
 						LOG_ERROR << "Invalid bv type for bf_interval "
 							<< LOG_FM(n) << "\n";
 						return error = true, n;
 					}
+					DBG(LOG_TRACE << "new_infer_ba_types/update_symbols/default/n -> new_n:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 					changes.insert_or_assign(n, new_n);
 					break;
 				}
@@ -805,8 +809,10 @@ tref new_infer_ba_types(tref n) {
 				case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 				case tau::bf_lt: case tau::bf_nlt: case tau::bf_or:
 				case tau::bf_xor: case tau::bf_and: case tau::bf_neg: {
-					auto new_n = update_symbol(n);
-					if (error) return n;
+					auto new_n = update_symbol(nn);
+					if (error) return nn;
+					DBG(LOG_TRACE << "new_infer_ba_types/update_symbols/default/n -> new_n:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 					changes.insert_or_assign(n, new_n);
 					break;
 				}
@@ -815,18 +821,25 @@ tref new_infer_ba_types(tref n) {
 				case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 				case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
 				case tau::bf_shl: {
-					auto new_n = update_symbol(n);
-					if (error) return n;
+					auto new_n = update_symbol(nn);
+					if (error) return nn;
 					if (!is_bv_type_family<node>(new_n)) {
 						LOG_ERROR << "Invalid bv type for bf_interval "
 							<< LOG_FM(n) << "\n";
-						return error = true, n;
+						return error = true, nn;
 					}
+					DBG(LOG_TRACE << "new_infer_ba_types/update_symbols/default/n -> new_n:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 					changes.insert_or_assign(n, new_n);
 					break;
 				}
 				default:
-					update_default(n, changes);
+					auto new_n = update_default(nn, changes);
+					if (new_n != nn) {
+						DBG(LOG_TRACE << "new_infer_ba_types/update_symbols/default/n -> new_n:\n"
+							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+						changes.insert_or_assign(n, new_n);
+					}
 					break;
 			}
 			return n;
