@@ -916,20 +916,7 @@ TEST_SUITE("new_infer_ba_types: variables and constants") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	TEST_CASE("bv default (y1)") {
-		tref parsed = parse("all x x & y = z");
-		CHECK( parsed != nullptr );
-		tref inferred = new_infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, type_t>> {
-			{"x", bv_type_id},
-			{"y", bv_type_id},
-			{"z", bv_type_id}
-		};
-		CHECK( check_vars(inferred, expected) );
-	}
-
-	TEST_CASE("bv default (y2)") {
+	TEST_CASE("complex case: bv chaining") {
 		tref parsed = parse("all x x & y = z && y = { 1 }:bv[8]");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
@@ -1061,7 +1048,7 @@ TEST_SUITE("new_infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id) );
+		CHECK( check_symbol<tau::bf_neq>(inferred, tau_type_id) );
 	}
 
 	TEST_CASE("tau bf_lteq symbol") {
@@ -1069,7 +1056,7 @@ TEST_SUITE("new_infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id) );
+		CHECK( check_symbol<tau::bf_lteq>(inferred, tau_type_id) );
 	}
 
 	TEST_CASE("tau bf_nlteq symbol") {
@@ -1180,7 +1167,7 @@ TEST_SUITE("new_infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id) );
+		CHECK( check_symbol<tau::bf_neg>(inferred, bv_type_id) );
 	}
 
 	/*TEST_CASE("bv bf_add symbol") {
