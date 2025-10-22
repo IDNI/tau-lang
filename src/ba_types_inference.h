@@ -109,8 +109,12 @@ tref new_infer_ba_types(tref n) {
 
 	// Some type definitions
 	static size_t untyped_id = ba_types<node>::id(untyped_type<node>());
-	//static size_t bv_type_id = ba_types<node>::id(bv_type<node>());
+	static size_t bv_type_id = ba_types<node>::id(bv_type<node>());
 	static size_t tau_type_id = ba_types<node>::id(tau_type<node>());
+
+	// We restore the original value of use_hooks at the end of the function
+	auto using_hooks = tau::use_hooks;
+	tau::use_hooks = false;
 
 	// The following variables conform the state of the traversal
 	// transformed: map from original tref to transformed tref
@@ -395,7 +399,7 @@ tref new_infer_ba_types(tref n) {
 							size_t type = (types.at(un) == untyped_id)
 								? tau_type_id
 								: types.at(un);
-							
+
 							if (resolver.assign(un, type) == false) {
 								LOG_ERROR << "Conflicting type information for variable "
 									<< LOG_FM(n) << ", expected "
@@ -488,7 +492,6 @@ tref new_infer_ba_types(tref n) {
 			}
 			return n;
 		};
-
 
 		auto parse_ba_constants = [&](tref n, const std::map<tref, size_t, subtree_less<node>>& types) -> tref {
 			subtree_map<node, tref> changes;
@@ -649,6 +652,32 @@ tref new_infer_ba_types(tref n) {
 		}
 	};
 
+	auto bv_defaulting = [&](tref n) -> tref {
+		subtree_map<node, tref> changes;
+
+		auto update = [&](tref n) -> bool {
+			DBG(LOG_TRACE <<"new_infer_ba_types/defaulting_bv/tau_use_hooks: " << tau::use_hooks << "\n";)
+			auto new_n = update_default(n, changes);
+			const tau& t = tau::get(new_n);
+			if (t.get_ba_type() == get_ba_type_id<node>(bv_base_type<node>())) {
+				auto chs = t.get_children();
+				new_n = tau::get_raw(t.value.ba_retype(bv_type_id), chs.data(), chs.size());
+				DBG(LOG_TRACE << "new_infer_ba_types/bv_defaulting/n -> new_n:\n"
+					<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+			}
+			changes.insert_or_assign(n, new_n);
+			return true;
+		};
+
+		post_order<node>(n).search(update);
+		if (changes.find(n) != changes.end()) {
+			DBG(LOG_TRACE << "new_infer_ba_types/defaulting_bv/n -> changes[n]:\n"
+				<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(changes[n]);)
+			return changes[n];
+		}
+		return n;
+	};
+
 	// All nodes
 	auto visit_outside_equations = [](tref n) {
 		const tau& t = tau::get(n);
@@ -661,9 +690,7 @@ tref new_infer_ba_types(tref n) {
 				return true;
 		}
 	};
-	// We restore the original value of use_hooks at the end of the function
-	auto using_hooks = tau::use_hooks;
-	tau::use_hooks = false;
+
 	// We visit the tree and return the transformed root if no error happened.
 	// If an error happened we return nullptr.
 	pre_order<node>(n).visit(on_enter, visit_outside_equations, on_leave, on_between);
@@ -671,6 +698,8 @@ tref new_infer_ba_types(tref n) {
 	// We add to the transformed map the untyping of the bf_t's and the bf_f's.
 	// ...some code here...
 	tref new_n = transformed.contains(n) ? transformed[n] : n;
+
+	new_n = bv_defaulting(new_n);
 	// TODO: unify the following with rest of type inference algorithm, once bv tag is gone
 
 	// Convert all bv default types to bv[16]
@@ -693,7 +722,7 @@ tref new_infer_ba_types(tref n) {
 	auto update_symbols = [&](tref n) -> tref {
 		subtree_map<node, tref> changes;
 
-		auto update = [&] (tref n) -> tref {
+		auto update = [&] (tref n) -> bool {
 
 			auto update_symbol = [&](tref n) -> tref {
 				// We have one child at least and we know that the types of the
@@ -751,7 +780,7 @@ tref new_infer_ba_types(tref n) {
 					}
 					break;
 			}
-			return new_n;
+			return true;
 		};
 
 		post_order<node>(n).search(update);
