@@ -437,7 +437,7 @@ tref new_infer_ba_types(tref n) {
 			return n;
 		};
 
-		auto update_bf_ctes = [&](tref n, const std::map<tref, size_t, subtree_less<node>>& types, const size_t default_type) -> tref {
+		auto update_bf_ctes = [&](tref n, const std::map<tref, size_t, subtree_less<node>>& types) -> tref {
 			subtree_map<node, tref> changes;
 
 			auto update = [&](tref n) -> bool {
@@ -454,7 +454,7 @@ tref new_infer_ba_types(tref n) {
 						if (get_type_of(n) == untyped_id) {
 							// We type it according to the inferred type or tau
 							size_t type = (types.at(un) == untyped_id)
-								? default_type
+								? tau_type_id
 								: types.at(un);
 							if (resolver.assign(un, type) == false) {
 								LOG_ERROR << "Conflicting type information for  "
@@ -591,23 +591,26 @@ tref new_infer_ba_types(tref n) {
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
-				auto scoped_bA_ctes_types = get_scoped_elements(tau::ba_constant);
-				if(auto updated = parse_ba_constants(n, scoped_bA_ctes_types); updated != n) {
+				auto scoped_ba_ctes_types = get_scoped_elements(tau::ba_constant);
+				auto updated_ba_ctes = parse_ba_constants(n, scoped_ba_ctes_types);
+				if(updated_ba_ctes != n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
-						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
-					transformed.insert_or_assign(n, updated);
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_ba_ctes);)
+					transformed.insert_or_assign(n, updated_ba_ctes);
 				}
-				auto scoped_bf_T_types = get_scoped_elements(tau::bf_t);
-				if(auto updated = update_bf_ctes(n, scoped_bf_T_types, tau_type_id); updated != n) {
+				auto scoped_bf_t_types = get_scoped_elements(tau::bf_t);
+				auto updated_bf_t_ctes = update_bf_ctes(updated_ba_ctes, scoped_bf_t_types);
+				if(updated_bf_t_ctes != updated_ba_ctes) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
-						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
-					transformed.insert_or_assign(n, updated);
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_t_ctes);)
+					transformed.insert_or_assign(n, updated_bf_t_ctes);
 				}
-				auto scoped_bf_F_types = get_scoped_elements(tau::bf_f);
-				if(auto updated = update_bf_ctes(n, scoped_bf_F_types, tau_type_id); updated != n) {
+				auto scoped_bf_f_types = get_scoped_elements(tau::bf_f);
+				auto updated_bf_f_ctes = update_bf_ctes(updated_bf_t_ctes, scoped_bf_f_types);
+				if(updated_bf_f_ctes != updated_bf_t_ctes) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
-						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
-					transformed.insert_or_assign(n, updated);
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_f_ctes);)
+					transformed.insert_or_assign(n, updated_bf_f_ctes);
 				}
 				resolver.close();
 				DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../resolver:\n";)
