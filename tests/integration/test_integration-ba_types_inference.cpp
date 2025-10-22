@@ -1248,6 +1248,78 @@ TEST_SUITE("new_infer_ba_types: symbols") {
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
+
+	TEST_CASE("sbf xor symbol") {
+		tref parsed = parse_bf("x:sbf ^ y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id) );
+	}
+
+	TEST_CASE("sbf xor symbol (Y2)") {
+		tref parsed = parse_bf("x:sbf ^ 1");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id) );
+	}
+
+	TEST_CASE("sbf xor symbol (y3)") {
+		tref parsed = parse_bf("1 ^ y:SBF");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id) );
+	}
+
+	TEST_CASE("tau xor symbol") {
+		tref parsed = parse_bf("x ^ y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau xor symbol (y2)") {
+		tref parsed = parse_bf("x ^ 1");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("tau xor symbol (y3)") {
+		tref parsed = parse_bf("1 ^ y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, tau_type_id) );
+	}
+
+	TEST_CASE("bv xor symbol") {
+		tref parsed = parse_bf("x:bv ^ y");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv xor symbol (y2)") {
+		tref parsed = parse_bf("x:bv ^ 1");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id) );
+	}
+
+	TEST_CASE("bv xor symbol (y3)") {
+		tref parsed = parse_bf("1 ^ y:bv");
+		CHECK( parsed != nullptr );
+		tref inferred = new_infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id) );
+	}
 }
 
 TEST_SUITE("Cleanup") {
