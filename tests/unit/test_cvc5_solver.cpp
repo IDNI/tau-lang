@@ -31,132 +31,131 @@ TEST_SUITE("cvc5_solve simple") {
 		return src;
 	}
 
-
-	TEST_CASE("X = { 1 }") {
-		const char* sample = "X = { 1 }";
+	TEST_CASE("X = { 1 }:bv") {
+		const char* sample = "X = { 1 }:bv";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X != X") {
-		const char* sample = "X != X";
+	TEST_CASE("X:bv != X") {
+		const char* sample = "X:bv != X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( !solution.has_value() );
 	}
 
-	TEST_CASE("X + { 0 } > { 0 }") {
-		const char* sample = "X + { 0 } > { 0 }";
+	TEST_CASE("X:bv + { 0 } > { 0 }") {
+		const char* sample = "X:bv + { 0 } > { 0 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X !> X") {
-		const char* sample = "X !> X";
+	TEST_CASE("X:bv !> X") {
+		const char* sample = "X:bv !> X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	// take into account modular arithmetic
-	TEST_CASE("X + { 1 } !> X") {
-		const char* sample = "X + { 1 } !> X";
+	TEST_CASE("X:bv + { 1 } !> X") {
+		const char* sample = "X:bv + { 1 } !> X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X >= X") {
-		const char* sample = "X >= X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
-		CHECK( solution.has_value() );
-	}
-
-	// take into account modular arithmetic
-	TEST_CASE("X >= X + { 1 }") {
-		const char* sample = "X >= X + { 1 }";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
-		CHECK( solution.has_value() );
-	}
-
-	TEST_CASE("X !>= X") {
-		const char* sample = "X !>= X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
-		CHECK( !solution.has_value() );
-	}
-
-	TEST_CASE("X + { 1 } !>= X") {
-		const char* sample = "X + { 1 }!>= X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
-		CHECK( solution.has_value() );
-	}
-
-	TEST_CASE("X <= X") {
-		const char* sample = "X <= X";
+	TEST_CASE("X:bv >= X") {
+		const char* sample = "X:bv >= X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	// take into account modular arithmetic
-	TEST_CASE("X + { 1 } <= X") {
-		const char* sample = "X + { 1 } <= X";
+	TEST_CASE("X:bv >= X + { 1 }") {
+		const char* sample = "X:bv >= X + { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X !<= X") {
-		const char* sample = "X !<= X";
+	TEST_CASE("X:bv !>= X") {
+		const char* sample = "X:bv !>= X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( !solution.has_value() );
 	}
 
-	TEST_CASE("X + { 1 } !<= X") {
-		const char* sample = "X + { 1 } !<= X";
+	TEST_CASE("X:bv + { 1 } !>= X") {
+		const char* sample = "X:bv + { 1 } !>= X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X < X") {
-		const char* sample = "X < X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
-		CHECK( !solution.has_value() );
-	}
-
-	TEST_CASE("X - { 1 } < X") {
-		const char* sample = "X - { 1 } < X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
-		CHECK( solution.has_value() );
-	}
-
-	TEST_CASE("X !< X") {
-		const char* sample = "X !< X";
+	TEST_CASE("X:bv <= X") {
+		const char* sample = "X:bv <= X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	// take into account modular arithmetic
-	TEST_CASE("X - { 1 } !< X") {
-		const char* sample = "X - { 1 } !< X";
+	TEST_CASE("X:bv + { 1 } <= X") {
+		const char* sample = "X:bv + { 1 } <= X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("X:bv !<= X") {
+		const char* sample = "X:bv !<= X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
+		CHECK( !solution.has_value() );
+	}
+
+	TEST_CASE("X:bv + { 1 } !<= X") {
+		const char* sample = "X:bv + { 1 } !<= X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("X:bv < X") {
+		const char* sample = "X:bv < X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
+		CHECK( !solution.has_value() );
+	}
+
+	TEST_CASE("X:bv - { 1 } < X") {
+		const char* sample = "X:bv - { 1 } < X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("X:bv !< X") {
+		const char* sample = "X:bv !< X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
+		CHECK( solution.has_value() );
+	}
+
+	// take into account modular arithmetic
+	TEST_CASE("X:bv - { 1 } !< X") {
+		const char* sample = "X:bv - { 1 } !< X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("variable") {
-		const char* sample = "X = { 1 }";
+		const char* sample = "X:bv = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -164,7 +163,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_neg") {
-		const char* sample = "X' = { 1 }";
+		const char* sample = "X:bv' = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -172,7 +171,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_add") {
-		const char* sample = "X + { 1 } = { 1 }";
+		const char* sample = "X:bv + { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -180,7 +179,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_sub") {
-		const char* sample = "X - { 1 } = { 1 }";
+		const char* sample = "X:bv - { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -188,7 +187,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_mul") {
-		const char* sample = "X * { 1 } = { 1 }";
+		const char* sample = "X:bv * { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -196,7 +195,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_div") {
-		const char* sample = "X / { 1 } = { 1 }";
+		const char* sample = "X:bv / { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -204,7 +203,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_mod") {
-		const char* sample = "X % { 2 } = { 1 }";
+		const char* sample = "X:bv % { 2 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -212,7 +211,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_and") {
-		const char* sample = "X & { 1 } = { 1 }";
+		const char* sample = "X:bv & { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -228,7 +227,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}*/
 
 	TEST_CASE("cvc5_or") {
-		const char* sample = "X | { 1 } = { 1 }";
+		const char* sample = "X:bv | { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -244,7 +243,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}*/
 
 	TEST_CASE("cvc5_xor") {
-		const char* sample = "X ^ { 1 } = { 1 }";
+		const char* sample = "X:bv ^ { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
@@ -259,16 +258,16 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}*/
 
-	TEST_CASE("cvc5_rotate_shift") {
-		const char* sample = "X << { 1 } = { 2 }";
+	TEST_CASE("cvc5_left_shift") {
+		const char* sample = "X:bv << { 1 } = { 2 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("cvc5_rotate_right") {
-		const char* sample = "X >> { 1 } = { 1 }";
+	TEST_CASE("cvc5_right_shift") {
+		const char* sample = "X:bv >> { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src, find_ba_type_tree<node_t>(src));
 		CHECK( solution.has_value() );
