@@ -35,7 +35,7 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 			return bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
 		}
 		// due to hooks we should consider wff_t or bf_t
-		case node::type::wff:
+		case node::type::wff: case node::type::bf:
 		// TODO (HIGH) deal with those eq appropiately
 		/*case node::type::bv:*/ {
 			return bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);

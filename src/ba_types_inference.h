@@ -335,7 +335,8 @@ tref new_infer_ba_types(tref n) {
 			}
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
-			case tau::bf_lt: case tau::bf_nlt: {
+			case tau::bf_lt: case tau::bf_nlt:
+			case tau::bf_interval: {
 				// We get all the (top) typeables in the expression and assign
 				// then the type bv (and the subtype when available). We do the
 				// same for the constants.
@@ -680,7 +681,8 @@ tref new_infer_ba_types(tref n) {
 			}*/
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
-			case tau::bf_lt: case tau::bf_nlt: {
+			case tau::bf_lt: case tau::bf_nlt:
+			case tau::bf_interval: {
 				auto scoped_bf_ctes_types = get_scoped_elements(tau::ba_constant);
 				if(auto updated = parse_ba_constants(n, scoped_bf_ctes_types); updated != n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
@@ -756,15 +758,19 @@ tref new_infer_ba_types(tref n) {
 
 	// Convert all bv default types to bv[16]
 	// TODO (HIGH) use get_raw to avoid hooks
-	auto f = [](tref n) {
-		const tau& n_t = tau::get(n);
-		if (n_t.get_ba_type() ==
-			get_ba_type_id<node>(bv_base_type<node>())) {
-			return n_t.replace_value(n_t.value.ba_retype(bv_type_id));
+	auto bv_defaulting = [](tref n) {
+		const tau& t = tau::get(n);
+		if (t.get_ba_type() == get_ba_type_id<node>(bv_base_type<node>())) {
+			auto chs = t.get_children();
+			auto new_n = tau::get_raw(t.value.ba_retype(bv_type_id), chs.data(), chs.size());
+			DBG(LOG_TRACE << "new_infer_ba_types/bv_defaulting/n -> new_n:\n"
+				<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+			return new_n;
 		}
 		return n;
 	};
-	new_n = pre_order<node>(new_n).apply_unique(f);
+	// TODO (HIGH) use get_raw to avoid hooks in apply_unique
+	new_n = pre_order<node>(new_n).apply_unique(bv_defaulting);
 
 	// type all symbols according to their children's types
 	auto update_symbols = [&](tref n) -> tref {
@@ -788,22 +794,8 @@ tref new_infer_ba_types(tref n) {
 			const tau& t = tau::get(nn);
 			size_t nt = t.get_type();
 			switch (nt) {
-				// no bv types allowed
-				case tau::bf_interval: {
-					auto new_n = update_symbol(nn);
-					if (error) return nn;
-					if (is_bv_type_family<node>(new_n)) {
-						LOG_ERROR << "Invalid bv type for bf_interval "
-							<< LOG_FM(n) << "\n";
-						return error = true, n;
-					}
-					DBG(LOG_TRACE << "new_infer_ba_types/update_symbols/default/n -> new_n:\n"
-						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
-					changes.insert_or_assign(n, new_n);
-					break;
-				}
-
 				// all types allowed
+				case tau::bf_interval:
 				case tau::bf: case tau::bf_eq: case tau::bf_neq:
 				case tau::bf_lteq: case tau::bf_nlteq: case tau::bf_gt:
 				case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
@@ -823,7 +815,7 @@ tref new_infer_ba_types(tref n) {
 				case tau::bf_shl: {
 					auto new_n = update_symbol(nn);
 					if (error) return nn;
-					if (!is_bv_type_family<node>(new_n)) {
+					if (!is_bv_type_family<node>(tau::get(new_n).get_ba_type())) {
 						LOG_ERROR << "Invalid bv type for bf_interval "
 							<< LOG_FM(n) << "\n";
 						return error = true, nn;
@@ -842,7 +834,7 @@ tref new_infer_ba_types(tref n) {
 					}
 					break;
 			}
-			return n;
+			return new_n;
 		};
 
 		post_order<node>(n).search(update);
@@ -856,7 +848,7 @@ tref new_infer_ba_types(tref n) {
 	};
 
 	new_n = update_symbols(new_n);
-	return  tau::use_hooks = using_hooks, new_n;
+	return tau::use_hooks = using_hooks, error ? nullptr : new_n;
 }
 
 template <NodeType node>
