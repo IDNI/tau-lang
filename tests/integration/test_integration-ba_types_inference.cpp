@@ -1257,7 +1257,7 @@ TEST_SUITE("new_infer_ba_types: symbols") {
 		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id) );
 	}
 
-	TEST_CASE("sbf xor symbol (Y2)") {
+	TEST_CASE("sbf xor symbol (y2)") {
 		tref parsed = parse_bf("x:sbf ^ 1");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
@@ -1266,7 +1266,7 @@ TEST_SUITE("new_infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("sbf xor symbol (y3)") {
-		tref parsed = parse_bf("1 ^ y:SBF");
+		tref parsed = parse_bf("1 ^ y:sbf");
 		CHECK( parsed != nullptr );
 		tref inferred = new_infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
