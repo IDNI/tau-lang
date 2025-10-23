@@ -694,7 +694,7 @@ trefs get_free_vars_appearance_order(tref expression) {
 			if (!scoped.contains(n) && !subtree_vec_contains<node>(free_vars, n))
 				free_vars.push_back(n);
 			return false;
-		}
+		} else if (tau::get(n).is(tau::bf_ref)) return false;
 		// If encounter of quantifier, add quantified variable to scoped
 		if (is_quantifier<node>(n) || is_functional_quantifier<node>(n)) {
 			scoped.insert(tau::trim(n));
