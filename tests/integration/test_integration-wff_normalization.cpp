@@ -134,40 +134,34 @@ TEST_SUITE("squeeze_absorb") {
 	TEST_CASE("3") {
 		const char* sample = "(((xy) = 0 || f(x)) && (xy)' = 0) || w = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = squeeze_absorb_down<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "(xy)' = 0 && f(x) || w = 0");
+		tref res = squeeze_absorb<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "w = 0 || (xy)' = 0 && f(x)");
 	}
 	TEST_CASE("4") {
 		const char* sample = "(((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = squeeze_absorb_down<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "xy = 0 && (xyz|xw|xy = 0 && f(x) || w = 0 || xyz(xy)' != 0)");
+		tref res = squeeze_absorb<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "xy = 0 && (xyz(xy)' != 0 || w = 0 || xyz(xyz(xy)')'|xw|xy = 0 && f(x))");
 	}
 	TEST_CASE("5") {
 		const char* sample = "xy = 0 && vw = 0 && (yw = 0 && xv = 0 || k = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = squeeze_absorb_down<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0 || k = 0)");
+		tref res = squeeze_absorb<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "xy = 0 && vw = 0 && (k = 0 || yw = 0 && xv = 0)");
+	}
+	TEST_CASE("6") {
+		const char* sample = "fx != 0 || (g = 0 && fxy = 0 && fxw != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = squeeze_absorb<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "fx != 0 || g = 0 && fxy(fx)' = 0 && (fxw|fx)(fxy(fx)')' != 0");
+	}
+	TEST_CASE("7") {
+		const char* sample = "fx = 0 && (g != 0 || fxy != 0 || fxw = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = squeeze_absorb<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "fx = 0 && (g != 0 || fxy(fx)' != 0 || (fxw|fx)(fxy(fx)')' = 0)");
 	}
 }
-
-// This suite could be used once boole_normal_form is more advanced
-// TEST_SUITE("boole_normal_form") {
-// 	TEST_CASE("1") {
-// 		const char* sample = "(x<y && y<z && x>z) || (z<w && w<u).";
-// 		tref fm = get_nso_rr(sample).value().main->get();
-// 		tref res = boole_normal_form<node_t>(fm);
-// 		std::cout << tau::get(res);
-// 		CHECK(true);
-// 	}
-// 	TEST_CASE("2") {
-// 		const char* sample = "xy = 0 && (abx' | by'a)|(xy) != 0.";
-// 		tref fm = get_nso_rr(sample).value().main->get();
-// 		tref res = boole_normal_form<node_t>(fm);
-// 		std::cout << tau::get(res);
-// 		CHECK(true);
-// 	}
-// }
 
 TEST_SUITE("anti_prenex") {
 	TEST_CASE("1") {
@@ -193,5 +187,51 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK(tau::get(res).equals_F());
+	}
+	// Test to see the blow up caused by quantified free function symbols
+	// In particular conversion to Boole normal form causes blow up
+	// TEST_CASE("5") {
+	// 	const char* sample = "all x ex y (f1(x,y)=0 && g1(x,y)!=0 && h1(x,y)!=0) || (f2(x,y)=0 && g2(x,y)!=0 && h2(x,y)!=0).";
+	// 	tref fm = get_nso_rr(sample).value().main->get();
+	// 	tref res = anti_prenex<node_t>(fm);
+	// 	std::cout << "res: " << tau::get(res) << "\n";
+	// 	res = boole_normal_form<node_t>(res);
+	// 	std::cout << "res: " << tau::get(res) << "\n";
+	// 	CHECK(true);
+	// }
+}
+
+TEST_SUITE("boole_normal_form") {
+	TEST_CASE("1") {
+		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = boole_normal_form<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "xa'b|x'ab' = 0 || a(x|b)|x'a'b != 0");
+	}
+	TEST_CASE("2") {
+		const char* sample = "f(0, 0)f(0, 1) = 0 && f(1, 1)f(1, 0) = 0 && f(1, 0)f(1, 1)|f(0, 1)f(0, 0) != 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = boole_normal_form<node_t>(fm);
+		CHECK(tau::get(res).equals_F());
+	}
+	// Inequality reasoning is not supported yet
+	// TEST_CASE("3") {
+	// 	const char* sample = "(x<y && y<z && x>z).";
+	// 	tref fm = get_nso_rr(sample).value().main->get();
+	// 	tref res = boole_normal_form<node_t>(fm);
+	// 	std::cout << "res: " << tau::get(res) << "\n";
+	// 	CHECK(true);
+	// }
+	TEST_CASE("4") {
+		const char* sample = "xy = 0 && (abx' | by'a) != 0 && ab = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = boole_normal_form<node_t>(fm);
+		CHECK(tau::get(res).equals_F());
+	}
+	TEST_CASE("5") {
+		const char* sample = "!(xy = 0 && (abx' | by'a) != 0 && ab = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = boole_normal_form<node_t>(fm);
+		CHECK(tau::get(res).equals_T());
 	}
 }
