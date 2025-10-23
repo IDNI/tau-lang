@@ -579,7 +579,7 @@ template <NodeType node>
 tref squeeze_absorb_down(tref formula, tref var);
 
 template <NodeType node>
-tref squeeze_absorb_down(tref formula);
+tref squeeze_absorb (tref formula);
 
 template <NodeType node>
 tref term_boole_decomposition(tref term, tref var);
