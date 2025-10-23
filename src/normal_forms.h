@@ -576,10 +576,10 @@ template <NodeType node>
 tref syntactic_atomic_formula_simplification (tref atomic_formula);
 
 template <NodeType node>
-tref squeeze_absorb_down(tref formula, tref var);
+tref squeeze_absorb (tref formula);
 
 template <NodeType node>
-tref squeeze_absorb (tref formula);
+tref squeeze_absorb (tref formula, tref var);
 
 template <NodeType node>
 tref term_boole_decomposition(tref term, tref var);
