@@ -122,14 +122,14 @@ TEST_SUITE("squeeze_absorb") {
 	TEST_CASE("1") {
 		const char* sample = "(((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = squeeze_absorb_down<node_t>(fm, tau::build_variable("x", 1));
-		CHECK(tau::get(res).to_str() == "xy = 0 && (x(yz|w|y) = 0 && f(x) || w = 0)");
+		tref res = squeeze_absorb<node_t>(fm, tau::build_variable("x", 1));
+		CHECK(tau::get(res).to_str() == "xy = 0 && (xyz(xy)' != 0 || w = 0 || xyz(xyz(xy)')'|xw|xy = 0 && f(x))");
 	}
 	TEST_CASE("2") {
 		const char* sample = "(((xy) = 0 || f(x)) && (xy)' = 0) || w = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = squeeze_absorb_down<node_t>(fm, tau::build_variable("x", 1));
-		CHECK(tau::get(res).to_str() == "(xy)' = 0 && f(x) || w = 0");
+		tref res = squeeze_absorb<node_t>(fm, tau::build_variable("x", 1));
+		CHECK(tau::get(res).to_str() == "w = 0 || (xy)' = 0 && f(x)");
 	}
 	TEST_CASE("3") {
 		const char* sample = "(((xy) = 0 || f(x)) && (xy)' = 0) || w = 0.";
