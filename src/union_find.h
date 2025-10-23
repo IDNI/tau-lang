@@ -14,6 +14,7 @@ namespace idni::tau_lang {
  */
 template <typename comp, NodeType node>
 struct union_find {
+	using tau = tree<node>;
 private:
 	subtree_unordered_map<node, tref> parent;
 	subtree_unordered_map<node, tref> next;
@@ -34,7 +35,7 @@ public:
 	tref find(tref x) {
 		if (auto it = parent.find(x); it == parent.end())
 			return insert(x), x;
-		else if (it->second != x) {
+		else if (tau::get(it->second) != tau::get(x)) {
                   // Path compression
                   it->second = find(it->second);
                   return it->second;
@@ -50,7 +51,7 @@ public:
 		tref root_x = find(x);
 		tref root_y = find(y);
 		// sets are already equal
-		if (root_x == root_y) return;
+		if (tau::get(root_x) == tau::get(root_y)) return;
 
 		if (_comp(root_x, root_y))
 			// root_x becomes new root
@@ -71,18 +72,25 @@ public:
 
 	// Check if two elements are in the same set
 	bool connected(tref x, tref y) {
-		return find(x) == find(y);
+		return tau::get(find(x)) == tau::get(find(y));
 	}
 
 	// Get all elements in the same set as x
 	trefs get_set(tref x) {
 		trefs component {x};
-		tref current = next.find(x)->second;
-		while (current != x) {
+		auto it = next.find(x);
+		if (it == next.end()) return component;
+		tref current = it->second;
+		while (tau::get(current) != tau::get(x)) {
 			component.push_back(current);
 			current = next.find(current)->second;
 		}
 		return component;
+	}
+
+	void clear () {
+		parent.clear();
+		next.clear();
 	}
 };
 
