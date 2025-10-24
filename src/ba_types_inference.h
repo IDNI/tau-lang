@@ -49,6 +49,10 @@ template<NodeType node>
 static size_t sbf_type_id = ba_types<node>::id(sbf_type<node>());
 template<NodeType node>
 static size_t bv8_type_id = ba_types<node>::id(bv_type<node>(8));
+template<NodeType node>
+static size_t bv16_type_id = ba_types<node>::id(bv_type<node>(16));
+template<NodeType node>
+static size_t bv32_type_id = ba_types<node>::id(bv_type<node>(32));
 
 
 // Infers the types of variables and constants in the tree n. It assumes that

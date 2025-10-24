@@ -136,8 +136,8 @@ bool check_vars(tref inferred, std::vector<std::pair<std::string, size_t>>& expe
 		size_t vtype = tau::get(vars[i]).get_ba_type();
 		if (vtype != expected_type) {
 			TAU_LOG_ERROR << "Variable '" << name
-			<< "' expected type id " << expected_type
-			<< ", found " << vtype;
+			<< "' expected type " << ba_types<node_t>::name(expected_type)
+			<< ", found " << ba_types<node_t>::name(vtype);
 			return false;
 		}
 		// auto vsubtype = tt(vars[i]) | tau::subtype | tt::ref;
@@ -171,8 +171,8 @@ bool check_ctes(tref inferred, std::vector<size_t>& expected) {
 		size_t ctype = tau::get(ctes[i]).get_ba_type();
 		if (ctype != expected[i]) {
 			TAU_LOG_ERROR << "Constant '" << ctes[i]
-				<< "' expected type id " << expected[i]
-				<< ", found " << ctype;
+				<< "' expected type " << ba_types<node_t>::name(expected[i])
+				<< ", found " << ba_types<node_t>::name(ctype);
 			return false;
 		}
 		// auto csubtype = tt(ctes[i]) | tau::subtype | tt::ref;
@@ -206,8 +206,8 @@ bool check_bv_ctes(tref inferred, std::vector<size_t>& expected) {
 		size_t ctype = tau::get(ctes[i]).get_ba_type();
 		if (ctype != expected[i]) {
 			TAU_LOG_ERROR << "Constant '" << ctes[i]
-				<< "' expected type id " << expected[i]
-				<< ", found " << ctype;
+				<< "' expected type " << ba_types<node_t>::name(expected[i])
+				<< ", found " << ba_types<node_t>::name(ctype);
 			return false;
 		}
 		// auto csubtype = tt(ctes[i]) | tau::subtype | tt::ref;
@@ -978,9 +978,9 @@ TEST_SUITE("new_infer_ba_types: symbols") {
 		for (auto& s : syms) {
 			auto stype = tau::get(s).get_ba_type();
 			if (stype != expected_type) {
-				TAU_LOG_ERROR << "Symbol '" << nt
-					<< "' expected type id " << expected_type
-					<< ", found " << stype;
+				TAU_LOG_ERROR << "Symbol '" << node_t::name(nt)
+					<< "' expected type " << ba_types<node_t>::name(expected_type)
+					<< ", found " << ba_types<node_t>::name(stype);
 				return false;
 			}
 		}

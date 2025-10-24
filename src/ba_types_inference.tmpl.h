@@ -434,6 +434,7 @@ tref update_variables(type_scoped_resolver<node>& resolver, tref n, const std::m
 
 	auto update = [&](tref n) -> bool {
 		DBG(LOG_TRACE <<"new_infer_ba_types/update_variables/tau_use_hooks: " << tau::use_hooks << "\n";)
+		if (error) return false;
 		const auto t = tau::get(n);
 		size_t nt = t.get_type();
 		switch (nt) {
@@ -501,8 +502,8 @@ auto bv_defaulting = [](tref n) -> tref {
 			new_n = tau::get_raw(t.value.ba_retype(bv_type_id<node>), chs.data(), chs.size());
 			DBG(LOG_TRACE << "new_infer_ba_types/bv_defaulting/n -> new_n:\n"
 				<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+			changes.insert_or_assign(n, new_n);
 		}
-		changes.insert_or_assign(n, new_n);
 		return true;
 	};
 
@@ -720,6 +721,7 @@ tref new_infer_ba_types(tref n) {
 			case tau::bf_interval: {
 				auto scoped_ba_ctes_types = get_scoped_elements<node>(resolver, tau::ba_constant);
 				auto updated_ba_ctes = parse_ba_constants<node>(n, scoped_ba_ctes_types);
+				if(updated_ba_ctes == nullptr) { error = true; return; }
 				if(updated_ba_ctes != n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
 						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_ba_ctes);)
@@ -727,6 +729,7 @@ tref new_infer_ba_types(tref n) {
 				}
 				auto scoped_bf_t_types = get_scoped_elements<node>(resolver, tau::bf_t);
 				auto updated_bf_t_ctes = update_bf_ctes<node>(resolver, updated_ba_ctes, scoped_bf_t_types);
+				if(updated_bf_t_ctes == nullptr) { error = true; return; }
 				if(updated_bf_t_ctes != updated_ba_ctes) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
 						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_t_ctes);)
@@ -734,6 +737,7 @@ tref new_infer_ba_types(tref n) {
 				}
 				auto scoped_bf_f_types = get_scoped_elements<node>(resolver, tau::bf_f);
 				auto updated_bf_f_ctes = update_bf_ctes<node>(resolver, updated_bf_t_ctes, scoped_bf_f_types);
+				if(updated_bf_f_ctes == nullptr) { error = true; return; }
 				if(updated_bf_f_ctes != updated_bf_t_ctes) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
 						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_f_ctes);)
@@ -749,16 +753,36 @@ tref new_infer_ba_types(tref n) {
 					// We only process top-level bf nodes, as the inner ones
 					// are part of bf equations already processed.
 					auto scoped_bf_ctes_types = get_scoped_elements<node>(resolver, tau::ba_constant);
-					if(auto updated = parse_ba_constants<node>(n, scoped_bf_ctes_types); updated != n) {
+					auto parsed_ba_constants = parse_ba_constants<node>(n, scoped_bf_ctes_types);
+					if (parsed_ba_constants == nullptr) { error = true; return; }
+					if (parsed_ba_constants != n) {
 						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf.../n -> updated:\n"
-							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
-						transformed.insert_or_assign(n, updated);
+							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(parsed_ba_constants);)
+						transformed.insert_or_assign(n, parsed_ba_constants);
 					}
 					auto scoped_var_types = get_scoped_elements<node>(resolver, tau::variable);
-					if(auto updated = update_variables<node>(resolver, n, scoped_var_types); updated != n) {
+					auto upodated_variables = update_variables<node>(resolver, parsed_ba_constants, scoped_var_types);
+					if (upodated_variables == nullptr) { error = true; return; }
+					if (upodated_variables != parsed_ba_constants) {
 						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf.../n -> updated:\n"
-							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated);)
-						transformed.insert_or_assign(n, updated);
+							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(upodated_variables);)
+						transformed.insert_or_assign(n, upodated_variables);
+					}
+					auto scoped_bf_t_types = get_scoped_elements<node>(resolver, tau::bf_t);
+					auto updated_bf_t_ctes = update_bf_ctes<node>(resolver, upodated_variables, scoped_bf_t_types);
+					if(updated_bf_t_ctes == nullptr) { error = true; return; }
+					if(updated_bf_t_ctes != upodated_variables) {
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_t_ctes);)
+						transformed.insert_or_assign(n, updated_bf_t_ctes);
+					}
+					auto scoped_bf_f_types = get_scoped_elements<node>(resolver, tau::bf_f);
+					auto updated_bf_f_ctes = update_bf_ctes<node>(resolver, updated_bf_t_ctes, scoped_bf_f_types);
+					if(updated_bf_f_ctes == nullptr) { error = true; return; }
+					if(updated_bf_f_ctes != updated_bf_t_ctes) {
+						DBG(LOG_TRACE << "new_infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+							<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_f_ctes);)
+						transformed.insert_or_assign(n, updated_bf_f_ctes);
 					}
 				}
 				return;
@@ -769,6 +793,7 @@ tref new_infer_ba_types(tref n) {
 				if (!parent) {
 					auto scoped_var_types = get_scoped_elements<node>(resolver, tau::variable);
 					new_n = update_variables<node>(resolver, new_n, scoped_var_types);
+					if (new_n == nullptr) { error = true; return; }
 				}
 				if (new_n != n) {
 					DBG(LOG_TRACE << "new_infer_ba_types/on_leave/default/n -> new_n:\n"
@@ -802,16 +827,17 @@ tref new_infer_ba_types(tref n) {
 	// We add to the transformed map the untyping of the bf_t's and the bf_f's.
 	// ...some code here...
 	tref new_n = transformed.contains(n) ? transformed[n] : n;
-	return tau::use_hooks = using_hooks, error ? nullptr : new_n;
+	new_n = bv_defaulting<node>(new_n);
+	if (new_n == nullptr) return tau::use_hooks = using_hooks, nullptr;
+	new_n = update_symbols<node>(new_n);
+	if (new_n == nullptr) return tau::use_hooks = using_hooks, nullptr;
+	return new_n;
 }
 
 template <NodeType node>
 tref infer_ba_types(tref n) {
 	using tau = tree<node>;
 	auto new_n = new_infer_ba_types<node>(n);
-	if (new_n == nullptr) return nullptr;
-	new_n = bv_defaulting<node>(new_n);
-	new_n = update_symbols<node>(new_n);
 	return tau::reget(new_n);
 }
 
