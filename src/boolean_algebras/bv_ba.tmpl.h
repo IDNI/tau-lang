@@ -225,6 +225,14 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 			DBG(assert(std::holds_alternative<bv>(cte));)
 			return std::optional<bv>(std::get<bv>(cte));
 		}
+		case node::type::bf_t: {
+			auto bv_size = get_bv_size<node>(type_tree);
+			return make_bitvector_one(bv_size);
+		}
+		case node::type::bf_f: {
+			auto bv_size = get_bv_size<node>(type_tree);
+			return make_bitvector_zero(bv_size);
+		}
 		default:
 			return std::nullopt;
 	}
@@ -244,6 +252,7 @@ bool is_bv_formula_sat(tref form, tref type_tree) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		return false;
 	}
+	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
 	solver.assertFormula(expr.value());
 	return solver.checkSat().isSat();
 }
@@ -273,6 +282,8 @@ std::optional<solution<node>> solve_bv(const tref form, tref type_tree) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		return std::nullopt;
 	}
+	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
+
 	// solve the equations
 	solver.assertFormula(expr.value());
 	LOG_DEBUG << "Solving bitvector formula: " << expr.value();
