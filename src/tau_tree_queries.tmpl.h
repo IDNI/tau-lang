@@ -142,16 +142,12 @@ auto is_boolean_operation = [](tref n) static {
 };
 
 template <NodeType node>
-auto is_non_boolean_term = [](tref n) static {
-	using tau = tree<node>;
-	const tau& t = tau::get(n);
-	if (t.is(tau::bf) || t.is(tau::bf_and) || t.is(tau::bf_or)
-		|| t.is(tau::bf_xor) || t.is(tau::bf_neg)
-		|| t.is(tau::bf_fex) || t.is(tau::bf_fall)
-		|| t.is(tau::variable) || t.is(tau::bf_ref)
-		|| t.is(tau::bf_constant) || t.is(tau::bf_t) || t.is(tau::bf_f))
-		return false;
-	return true;
+auto is_non_boolean_term = [](tref ) static {
+	// using tau = tree<node>;
+	// TODO: Add non_boolean operations from new grammar once it is there
+	if (false)
+		return true;
+	return false;
 };
 
 template <NodeType node>

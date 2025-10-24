@@ -114,7 +114,7 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
-		CHECK(tau::get(res).to_str() == "wv = 0 && xy = 0 && yw = 0 && xv = 0");
+		CHECK(tau::get(res).to_str() == "xy = 0 && wv = 0 && yw = 0 && xv = 0");
 	}
 }
 
