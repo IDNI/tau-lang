@@ -5118,7 +5118,7 @@ tref boole_normal_form(tref formula) {
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	// Squeeze and absorb for additional simplifications during term normalization
 	// -> causes mayor blow ups
-	// formula = squeeze_absorb<node>(formula);
+	formula = squeeze_absorb<node>(formula);
 	// Step 2: Traverse formula, simplify all encountered equations
 	auto simp_eqs = [](tref n) {
 		if (tau::get(n).child_is(tau::bf_eq)) {
