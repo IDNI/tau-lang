@@ -14,11 +14,15 @@ tref parse_bv_formula(const std::string spec) {
 TEST_SUITE("Configuration") {
 
 	TEST_CASE("logging") {
-		// logging::trace();
+		logging::trace();
 	}
 
 	TEST_CASE("bdd init") {
 		bdd_init<Bool>();
+	}
+
+	TEST_CASE("bv size") {
+		idni::tau_lang::default_bv_size = 16;
 	}
 }
 
@@ -40,7 +44,7 @@ TEST_SUITE("cvc5_satisfiability") {
 	}
 
 	TEST_CASE("all x x > { 0 }") {
-		const std::string sample = "all x x > { 0 }";
+		const std::string sample = "all x x > { 0 }:bv";
 		auto formula = parse_bv_formula(sample);
 		CHECK( !is_bv_formula_sat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
 		CHECK( is_bv_formula_unsat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
@@ -48,7 +52,7 @@ TEST_SUITE("cvc5_satisfiability") {
 	}
 
 	TEST_CASE("all x x + { 1 } = { 1 }") {
-		const std::string sample = "all x x + { 1 } = { 1 }";
+		const std::string sample = "all x x + { 1 } = { 1 }:bv";
 		auto formula = parse_bv_formula(sample);
 		CHECK( !is_bv_formula_sat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
 		CHECK( is_bv_formula_unsat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
@@ -62,7 +66,7 @@ TEST_SUITE("cvc5_satisfiability") {
 	}*/
 
 	TEST_CASE("all x x + { 1 } < { 1 }") {
-		const std::string sample = "all x x + { 1 } < { 1 }";
+		const std::string sample = "all x x + { 1 } < { 1 }:bv";
 		auto formula = parse_bv_formula(sample);
 		CHECK( !is_bv_formula_sat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );
 		CHECK( is_bv_formula_unsat<node_t>(formula, find_ba_type_tree<node_t>(formula)) );

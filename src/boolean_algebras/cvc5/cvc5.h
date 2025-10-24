@@ -79,6 +79,7 @@ inline cvc5::Term make_bitvector_shr(const cvc5::Term& lhs, const cvc5::Term& rh
 inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 	const size_t base);
 inline cvc5::Term make_bitvector_zero(const size_t size = default_bv_size);
+inline cvc5::Term make_bitvector_one(const size_t size = default_bv_size);
 
 
 // -----------------------------------------------------------------------------
