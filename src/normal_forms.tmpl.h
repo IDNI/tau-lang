@@ -4958,6 +4958,11 @@ template<NodeType node>
 tref term_boole_decomposition(tref term, tref var) {
 	using tau = tree<node>;
 	DBG(assert(tau::get(var).is(tau::variable));)
+	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
+		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
+			<< tau::get(term) << "\n");
+		return term;
+	}
 	var = tau::get(tau::bf, var);
 	tref p1 = tau::get(term).replace(var, tau::_1());
 	// Ensure early detection of F
@@ -5020,7 +5025,6 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx)
 	return term;
 }
 
-//TODO: Does not work for bitvector
 /**
  * @brief Convert term to Boole normal form. Also treats normalization of
  * encountered tau constants.
@@ -5032,6 +5036,11 @@ template<NodeType node>
 tref term_boole_decomposition(tref term) {
 	using tau = tree<node>;
 	DBG(LOG_DEBUG << "Term_boole_decomposition on " << LOG_FM(term) << "\n";)
+	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
+		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
+			<< tau::get(term) << "\n");
+		return term;
+	}
 	// Simple cases
 	if (tau::get(term).equals_0() || tau::get(term).equals_1())
 		return term;
@@ -5108,7 +5117,8 @@ tref boole_normal_form(tref formula) {
 	formula = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	// Squeeze and absorb for additional simplifications during term normalization
-	formula = squeeze_absorb<node>(formula);
+	// -> causes mayor blow ups
+	// formula = squeeze_absorb<node>(formula);
 	// Step 2: Traverse formula, simplify all encountered equations
 	auto simp_eqs = [](tref n) {
 		if (tau::get(n).child_is(tau::bf_eq)) {
@@ -5117,6 +5127,7 @@ tref boole_normal_form(tref formula) {
 			tref c1 = tau::get(n)[0].first();
 			tref c2 = tau::get(n)[0].second();
 			// Apply Boole decomposition
+			// TODO: different simplification for bitvectors
 			c1 = term_boole_decomposition<node>(c1);
 			c2 = term_boole_decomposition<node>(c2);
 			return tau::build_bf_eq(c1, c2);
@@ -5126,6 +5137,7 @@ tref boole_normal_form(tref formula) {
 			tref c1 = tau::get(n)[0].first();
 			tref c2 = tau::get(n)[0].second();
 			// Apply Boole decomposition
+			// TODO: different simplification for bitvectors
 			c1 = term_boole_decomposition<node>(c1);
 			c2 = term_boole_decomposition<node>(c2);
 			return tau::build_bf_neq(c1, c2);
@@ -5150,8 +5162,49 @@ tref boole_normal_form(tref formula) {
 	eq_formula = rec_boole_decomposition<node>(eq_formula, atms, 0);
 	// Convert !(=) to != again
 	eq_formula = not_equal_to_unequal<node>(eq_formula);
+	eq_formula = simplify_using_equality<node>::on(eq_formula);
 	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_formula) << "\n";)
 	return eq_formula;
+}
+
+template<NodeType node>
+tref term_boole_normal_form(tref formula) {
+	using tau = tree<node>;
+	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
+		return formula;
+	// Step 1: Syntactically simplify formula
+	formula = syntactic_formula_simplification<node>(formula);
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
+	auto simp_eqs = [](tref n) {
+		if (tau::get(n).child_is(tau::bf_eq)) {
+			if (tau::get(n).equals_T() || tau::get(n).equals_F())
+				return n;
+			tref c1 = tau::get(n)[0].first();
+			tref c2 = tau::get(n)[0].second();
+			// Apply Boole decomposition
+			// TODO: different simplification for bitvectors
+			c1 = term_boole_decomposition<node>(c1);
+			c2 = term_boole_decomposition<node>(c2);
+			return tau::build_bf_eq(c1, c2);
+		} else if (tau::get(n).child_is(tau::bf_neq)) {
+			if (tau::get(n).equals_T() || tau::get(n).equals_F())
+				return n;
+			tref c1 = tau::get(n)[0].first();
+			tref c2 = tau::get(n)[0].second();
+			// Apply Boole decomposition
+			// TODO: different simplification for bitvectors
+			c1 = term_boole_decomposition<node>(c1);
+			c2 = term_boole_decomposition<node>(c2);
+			return tau::build_bf_neq(c1, c2);
+		}
+		return n;
+	};
+	formula = pre_order<node>(formula).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(formula) << "\n";)
+	// Step 3: Syntactically simplify resulting formula again after normalization of terms
+	formula = syntactic_formula_simplification<node>(formula);
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
+	return formula;
 }
 
 /**
@@ -5356,7 +5409,7 @@ tref treat_ex_quantified_clause(tref ex_clause) {
 			tau::build_bf_and(f_0, f_1)));
 	}
 	// TODO: maybe unsqueeze? Only simp atomic formulas
-	return boole_normal_form<node>(new_fm);
+	return term_boole_normal_form<node>(new_fm);
 }
 
 /**
