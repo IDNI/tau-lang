@@ -3637,8 +3637,7 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 }
 
 /**
- * @brief Simplify using assumptions from equalities in formula. More effective
- * if terms/bfs are in a normal form
+ * @brief Simplify using assumptions from equalities in formula.
  * @tparam node Type of tree node
  */
 template <NodeType node>
@@ -3664,7 +3663,7 @@ struct simplify_using_equality {
 		}
 		if (is_child<node>(r, tau::variable)) return false;
 		// TODO: maybe use free_vars instead of node_count?
-		return node_count<node>(l) <= node_count<node>(r);
+		return node_count<node>(l) < node_count<node>(r);
 	};
 
 	// Given a formula, traverse the formula and
