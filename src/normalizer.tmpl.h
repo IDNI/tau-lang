@@ -377,19 +377,24 @@ tref normalize_with_temp_simp(tref fm) {
 		}
 	} while (changed);
 
-	LOG_TRACE << "fm: " << LOG_FM(fm);
+	DBG(LOG_TRACE << "fm: " << LOG_FM(fm) << "\n";)
 	if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
 		return fm;
+	// If after normalization no temporal quantifier is present, the formula
+	// is non-temporal
+	if (!tau::get(fm).find_top(is_temporal_quantifier<node>))
+		return fm;
 	tref nn = tau::_F();
+	// The temporal layer of a formula is in DNF
 	for (tref clause : expression_paths<node>(fm)) {
-		LOG_TRACE << "    clause: " << LOG_FM(clause);
+		DBG(LOG_TRACE << "    clause: " << LOG_FM(clause);)
 		const auto& t = tau::get(clause);
 		trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
 		trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
 		if ((aw_parts.size() == 1 && st_parts.empty()) ||
 			(aw_parts.empty() && st_parts.size() == 1)) {
 			nn = tau::build_wff_or(nn, clause);
-			LOG_TRACE << "    nn: " << LOG_FM(nn);
+			DBG(LOG_TRACE << "    nn: " << LOG_FM(nn);)
 			continue;
 		}
 
@@ -398,7 +403,7 @@ tref normalize_with_temp_simp(tref fm) {
 		for (tref aw : aw_parts) changes.emplace(aw, tau::_T());
 		for (tref st : st_parts) changes.emplace(st, tau::_T());
 		tref new_clause = rewriter::replace<node>(clause, changes);
-		LOG_TRACE << "    new clause: " << LOG_FM(nn);
+		DBG(LOG_TRACE << "    new clause: " << LOG_FM(nn);)
 
 		// First check if any always statements are implied by others
 		for (size_t i = 0; i < aw_parts.size(); ++i) {
@@ -416,8 +421,10 @@ tref normalize_with_temp_simp(tref fm) {
 			tref f = tau::build_wff_and(trim_q(aw), trim_q(st));
 			if (is_non_temp_nso_unsat<node>(f)) clause_false = true;
 		}
-		if (clause_false) LOG_TRACE << "    clause false";
-		if (clause_false) continue;
+		if (clause_false) {
+			DBG(LOG_TRACE << "    clause false";)
+			continue;
+		}
 
 		// Next check if any always statement implies a sometimes statement
 		for (tref aw : aw_parts) for (tref& st : st_parts)
@@ -438,10 +445,10 @@ tref normalize_with_temp_simp(tref fm) {
 					tau::build_wff_and(aw_parts),
 					tau::build_wff_and(st_parts)));
 		nn = tau::build_wff_or(nn, new_clause);
-		LOG_TRACE << "    nn: " << LOG_FM(nn);
+		DBG(LOG_TRACE << "    nn: " << LOG_FM(nn);)
 	}
 	DBG(assert(nn != nullptr);)
-	LOG_TRACE << "normalize_with_temp_simp result: " << LOG_FM(nn);
+	DBG(LOG_TRACE << "normalize_with_temp_simp result: " << LOG_FM(nn);)
 	return nn;
 }
 
