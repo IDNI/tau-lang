@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "tau_tree.h"
+#include "ba_types.h"
 #include "interpreter_types.h"
 
 namespace idni::tau_lang {
@@ -183,14 +184,67 @@ tref tree<node>::get(const node& v, tref ch1, tref ch2) {
 
 template <NodeType node>
 tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
+	// update ba_type if needed
+	//auto new_v = v;
+	//auto nt = v.ba_type;
+	auto propagate_types = [](const node n) {
+		switch (n.nt) {
+			case node::type::bf_interval:
+			case node::type::bf: case node::type::bf_eq: case node::type::bf_neq:
+			case node::type::bf_lteq: case node::type::bf_nlteq: case node::type::bf_gt:
+			case node::type::bf_ngt: case node::type::bf_gteq: case node::type::bf_ngteq:
+			case node::type::bf_lt: case node::type::bf_nlt: case node::type::bf_or:
+			case node::type::bf_xor: case node::type::bf_and: case node::type::bf_neg:
+			case node::type::bf_add: case node::type::bf_sub: case node::type::bf_mul:
+			case node::type::bf_div: case node::type::bf_mod: case node::type::bf_shr:
+			case node::type::bf_shl:
+			return true;
+			default:
+			return false;
+		}
+	};
+
+	auto get_type = [](const node& n, const tref* ch, size_t len) -> size_t {
+		if (ba_types<node>::id(untyped_type<node>()) != n.ba_type) return n.ba_type;
+		for (size_t i = 0; i < len; ++i) {
+			if(tree<node>::get(ch[i]).value.ba_type != ba_types<node>::id(untyped_type<node>())) {
+				return tree<node>::get(ch[i]).value.ba_type;
+			}
+		}
+		return ba_types<node>::id(untyped_type<node>()) ; // something must have type;
+	};
+
+	auto update_type = [&](const node& n, const tref* ch, size_t len, size_t ba_type) -> std::pair<node, trefs> {
+		auto new_v = n.ba_type == ba_type ? n : n.ba_retype(ba_type);
+		trefs new_ch;
+		for (size_t i = 0; i < len; ++i) {
+			if (tree<node>::get(ch[i]).value.ba_type != ba_type) {
+				auto new_ch_i_n = tree<node>::get(ch[i]).value.ba_retype(ba_type);
+				auto new_ch_i_ch = tree<node>::get(ch[i]).get_children();
+				auto new_ch_i = tree<node>::get(new_ch_i_n, new_ch_i_ch.data(),
+					new_ch_i_ch.size());
+				new_ch.push_back(new_ch_i);
+			} else {
+				new_ch.push_back(ch[i]);
+			}
+		}
+		return { new_v, new_ch };
+	};
+
 	if (!use_hooks) return get_raw(v, ch, len, r);
+	// propagate types?
+	if (propagate_types(v)) {
+		size_t ba_type = get_type(v, ch, len);
+		auto [new_v, new_ch] = update_type(v, ch, len, ba_type);
+		return base_t::get(new_v, new_ch.data(), len, r);
+	}
+	// get with hooks
 	get_hook<node> hook;
 	// set hook first if not hooked
 	if (!base_t::is_hooked()) base_t::set_hook(
 		[&hook](const node& v, const tref* ch, size_t len, tref r) {
 			return hook(v, ch, len, r);
 		});
-	// get with hooks
 	return base_t::get(v, ch, len, r);
 }
 

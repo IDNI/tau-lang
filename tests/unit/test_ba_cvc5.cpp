@@ -22,7 +22,7 @@ TEST_SUITE("Configuration") {
 	}
 
 	TEST_CASE("bv size") {
-		idni::tau_lang::default_bv_size = 16;
+		idni::tau_lang::default_bv_size = 4;
 	}
 }
 
