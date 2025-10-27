@@ -8,6 +8,10 @@ TEST_SUITE("configuration") {
 	TEST_CASE("bdd_init") {
 		bdd_init<Bool>();
 	}
+
+	TEST_CASE("logging") {
+		logging::trace();
+	}
 }
 
 TEST_SUITE("bf operator hooks") {
