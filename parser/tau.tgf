@@ -9,7 +9,7 @@
 start                  => spec _.
 
 # start symbol posibilities:
-# spec, inputs, library, builder, tau_constant_source, cli (bellow)
+# spec, inputs, tau_constant_source, cli (bellow)
 spec                   => definitions _ wff:main _ '.'.
 spec_multiline         => _ (rec_relation | input_def | output_def | main)
                                                                 [ _ '.' ] _ | _.
@@ -25,15 +25,6 @@ ref                    => sym [offsets] ref_args [_ "fallback" __ fp_fallback].
 fp_fallback            => "first":first_sym | "last":last_sym
                         | capture | ref | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
-
-library                => ((_ (wff_rule | bf_rule):rule)*):rules.
-wff_rule               => wff:wff_matcher _ "::=" _ wff:wff_body _ '.'.
-bf_rule                => bf :bf_matcher  _  ":=" _ bf :bf_body  _ '.'.
-
-builder                => _ builder_head _ builder_body _ '.'.
-builder_head           => '(' _ capture (__ capture)* _ ')'.
-builder_body           => ("=:"  _ bf) :bf_builder_body
-                        | ("=::" _ wff):wff_builder_body.
 
 tau_constant_source    => rec_relations _ main _ [ '.' _ ].
 
@@ -51,16 +42,11 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff   _ "<-"  _ wff)              :wff_rimply
                         | (wff   _ "<->" _ wff)              :wff_equiv
                         | (wff   _ "||"  _ wff)              :wff_or
-                        | (wff   _ '^'   _ wff)              :wff_xor
+                        | (wff   _ "^^"  _ wff)              :wff_xor
                         | (wff   _ "&&"  _ wff)              :wff_and
                         | ('!'   _ wff)                      :wff_neg
                         | 'T'                                :wff_t
                         | 'F'                                :wff_f
-# relational operators
-#
-# they are named bf_* as they involve boolean functions,
-# but they are not boolean functions themselves, they return a T/F wff value
-# and hence, should be considered as wffs
                         | (bf    _ "<="  _ bf _ "<=" _ bf)   :bf_interval
                         | (bf    _ '='   _ bf)               :bf_eq
                         | (bf    _ "!="  _ bf)               :bf_neq
@@ -73,33 +59,45 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "<"   _ bf)               :bf_lt
                         | (bf    _ "!<"  _ bf)               :bf_nlt
                         |                                     capture.
+# relational operators for base types
+#
+# they are named bf_* as they involve boolean functions,
+# but they are not boolean functions themselves, they return a T/F wff value
+# and hence, should be considered as wffs
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
-                        |                                     bf_constant
+                        |                                     ba_constant
                         |                                     variable
-                        | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
                         | ref                                :bf_ref
                         | (bf  _ '|' _       bf)             :bf_or
-                        | (bf  _ '+' _       bf)             :bf_xor
+                        | (bf  _ '^' _       bf)             :bf_xor
+                        | (bf  _ '+' _       bf)             :bf_add
+                        | (bf  _ '-' _       bf)             :bf_sub
+                        | (bf  _ '*' _       bf)             :bf_mul
+                        | (bf  _ '/' _       bf)             :bf_div
+                        | (bf  _ '%' _       bf)             :bf_mod
+                        | (bf  _ ">>" _      bf)             :bf_shr
+                        | (bf  _ "<<" _      bf)             :bf_shl
                         | ('1' [ typed ])                    :bf_t
                         | ('0' [ typed ])                    :bf_f
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
-                        | ((bf_parenthesis | bf_constant
-                          | variable | bf_splitter | bf_ref
+                        | ((bf_parenthesis | ba_constant
+                          | variable | bf_ref
                           | bf_t | bf_f | bf_neg | capture)
                                 :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
                         | ((bf_parenthesis | variable
-                           | bf_splitter | bf_ref | bf_neg
+                           | bf_ref | bf_neg
                            | bf_and_nosep | capture)
                                 :bf_and_nosep_1st_oprnd
-                           (bf_parenthesis | bf_constant
-                           | variable | bf_splitter | bf_ref
+                           (bf_parenthesis | ba_constant
+                           | variable | bf_ref
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
+
 # constant time constraints
 constraint =>
           ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]"):ctn_neq
@@ -110,7 +108,7 @@ constraint =>
         | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_lt.
 
 # constants
-bf_constant            => '{' _ (capture | source) _ '}' [ typed ].
+ba_constant            => '{' _ (capture | source) _ '}' [ typed ].
 source                 => src_c [ (src_c | space)* src_c ].
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
@@ -141,9 +139,9 @@ num                    => digits.
 integer                => [ '-' ] _ digits.
 sym                    => chars.
 capture                => '$' chars.
-typed                  => _ ':' _ chars:type.
-
-scope_id               => digits. # dummy rule to introduce scope_id nt
+typed                  => _ ':' _ type [ _ '[' _ subtype _ ']' _ ].
+type                   => chars.
+subtype                => num.
 
 # whitespace and comments
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
@@ -192,7 +190,6 @@ cli_command            =>
         | ("nnf":nnf_sym __ nf_cmd_arg)                       :nnf_cmd
         | ("pnf":pnf_sym __ nf_cmd_arg)                       :pnf_cmd
         | ("mnf":mnf_sym __ nf_cmd_arg)                       :mnf_cmd
-        | ("snf":snf_sym __ nf_cmd_arg)                       :snf_cmd
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
@@ -267,11 +264,12 @@ history        => ( "%"
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, integer, source, capture, var_name, io_var_name,
-        uconst_name, type, file_name, ctnvar, option_name, option_value.
+        sym, digits, type, subtype, integer,
+        source, capture, var_name, io_var_name, uconst_name, file_name,
+        ctnvar, option_name, option_value.
 
 # inline intermediate nodes and eliminate parenthesis
-@inline char classes, chars, typed, q_var, src_c, uconst,
+@inline char classes, chars, q_var, src_c, uconst,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg,
         uconst > uconst_name,
@@ -281,4 +279,3 @@ history        => ( "%"
         bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
         bf_and_nosep_2nd_oprnd > bf_parenthesis > bf,
         bf_and_nosep > bf_parenthesis > bf_and.
-

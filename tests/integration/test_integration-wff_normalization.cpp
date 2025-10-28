@@ -17,11 +17,11 @@ TEST_SUITE("Normalizer") {
 		CHECK( normalize_and_check(sample, tau::wff_t) );
 	}
 	TEST_CASE("4") {
-		const char* sample = "all a all b all c all d all e all f (ax + bx' != cy + d'y' || ax + bx' = ey + fy') <-> (ax + bx' = ey + fy' || ax + bx' != cy + d'y').";
+		const char* sample = "all a all b all c all d all e all f (ax ^ bx' != cy ^ d'y' || ax ^ bx' = ey ^ fy') <-> (ax ^ bx' = ey ^ fy' || ax ^ bx' != cy ^ d'y').";
 		CHECK( normalize_and_check(sample, tau::wff_t) );
 	}
 	TEST_CASE("5") {
-		const char* sample = "all a all b all c all d all e all f (ax + bx' != cy + d'y' || ax + bx' = ey + fy') <-> (ax + bx' = ey + fy' || ax + bx' = cy + d'y').";
+		const char* sample = "all a all b all c all d all e all f (ax ^ bx' != cy ^ d'y' || ax ^ bx' = ey ^ fy') <-> (ax ^ bx' = ey ^ fy' || ax ^ bx' = cy ^ d'y').";
 		CHECK( normalize_and_check(sample, tau::wff_f) );
 	}
 	TEST_CASE("6") {

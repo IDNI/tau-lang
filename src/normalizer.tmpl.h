@@ -162,18 +162,26 @@ bool has_no_boolean_combs_of_models(tref n) {
 template <NodeType node>
 bool is_non_temp_nso_satisfiable(tref n) {
 	using tau = tree<node>;
+
 	DBG(assert(n != nullptr));
+
 	const auto& fm = tau::get(n);
-	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
-	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
+
+	DBG(assert(!fm.find_top(is<node, tau::wff_always>));
+		assert(!fm.find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
-	assert((t.equals_T() || t.equals_F()
-		|| t.find_top(is<node, tau::constraint>)));
+
+	DBG(LOG_TRACE << "is_non_temp_nso_satisfiable/normalized: "
+		  << LOG_FM(normalized);)
+
+	DBG(assert((t.equals_T() || t.equals_F()
+		|| t.find_top(is<node, tau::constraint>)));)
+
 	return t.equals_T();
 }
 
@@ -187,7 +195,8 @@ bool is_non_temp_nso_unsat(tref n) {
 	tref nn = n;
 	const trefs& vars = get_free_vars<node>(nn);
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
-	const auto& t = tau::get(normalize_non_temp<node>(nn));
+	tref normalized = normalize_non_temp<node>(nn);
+	const auto& t = tau::get(normalized);
 	assert((t.equals_T() || t.equals_F()
 		|| t.find_top(is<node, tau::constraint>)));
 	return t.equals_F();
@@ -228,11 +237,7 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 
-	trefs vars(get_free_vars<node>(n1));
-	for (tref v : vars) LOG_DEBUG << "var1: " << LOG_FM(v);
-	const trefs& vars2 = get_free_vars<node>(n2);
-	for (tref v : vars2) LOG_DEBUG << "var2: " << LOG_FM(v);
-	vars.insert(vars.end(), vars2.begin(), vars2.end());
+	trefs vars(get_free_vars<node>(tau::build_wff_and(n1, n2)));
 	for (tref v : vars) LOG_DEBUG << "var: " << LOG_FM(v);
 
 	tref imp1 = tau::build_wff_imply(n1, n2);
@@ -245,16 +250,18 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
 	const auto& tdir1 = tau::get(normalizer_step<node>(imp1));
-	DBG(assert((tdir1.equals_T() || tdir1.equals_F()
-		|| tdir1.find_top(is<node, tau::constraint>)));)
+	assert((tdir1.equals_T() || tdir1.equals_F()
+		|| tdir1.find_top(is<node, tau::constraint>)));
 	if (tdir1.equals_F()) {
 		LOG_DEBUG << "End are_nso_equivalent: " << LOG_FM(tdir1.get());
 		return false;
 	}
+
 	const auto& tdir2 = tau::get(normalizer_step<node>(imp2));
-	DBG(assert((tdir2.equals_T() || tdir2.equals_F()
-		|| tdir2.find_top(is<node, tau::constraint>))));
-	bool res = (tdir1.equals_T() && tdir2.equals_T());
+	assert((tdir2.equals_T() || tdir2.equals_F()
+		|| tdir2.find_top(is<node, tau::constraint>)));
+
+	bool res = tdir1.equals_T() && tdir2.equals_T();
 	LOG_DEBUG << "End are_nso_equivalent: " << res;
 	return res;
 }
@@ -295,9 +302,10 @@ bool is_nso_impl(tref n1, tref n2) {
 	for (tref v : vars) imp = tau::build_wff_all(v, imp);
 	LOG_DEBUG << "wff: " << LOG_FM(imp);
 
-	const auto& res = tau::get(normalizer_step<node>(imp));
+	auto normalized = normalizer_step<node>(imp);
+	const auto& res = tau::get(normalized);
 	DBG(assert((res.equals_T() || res.equals_F()
-		|| res.find_top(is<node, tau::constraint>)));)
+		|| res.find_top(is<node, tau::constraint>))));
 	LOG_DEBUG << "End is_nso_impl: " << res.get();
 	return res.equals_T();
 }
@@ -306,7 +314,7 @@ template <NodeType node>
 bool are_bf_equal(tref n1, tref n2) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	
+
 	LOG_DEBUG << "Begin are_bf_equal";
 	LOG_TRACE << "n1 " << LOG_FM(n1);
 	LOG_TRACE << "n2 " << LOG_FM(n2);

@@ -8,6 +8,8 @@
 
 namespace idni::tau_lang {
 
+using namespace cvc5;
+
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
 #define TC_STATUS_OUTPUT TC(term::color::GREEN, term::color::BG_LIGHT_CYAN, \
 							term::color::BRIGHT)
@@ -295,22 +297,6 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	return nullptr;
 }
 
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::snf_cmd(const tt& n) {
-	tref arg = n[1].get();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (applied) {
-		switch (tau::get(applied).get_type()) {
-		case tau::wff: return snf_wff<node>(applied);
-		case tau::bf:  return snf_bf<node>(applied);
-		default: return invalid_argument();
-		}
-	}
-	return nullptr;
-}
-
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
@@ -493,28 +479,28 @@ solver_mode get_solver_cmd_mode(tref n) {
 
 template <NodeType node>
 size_t get_solver_cmd_type(tref n) {
-	size_t type = get_ba_type<node>(n);
+	size_t type = find_ba_type<node>(n);
 	return type > 0 ? type
 		: get_ba_type_id<node>(
-			node::nso_factory::instance().default_type());
+			node::nso_factory::default_type());
 }
 
 template <NodeType node>
 void print_solver_cmd_solution(std::optional<solution<node>>& solution,
-		const solver_options& options = { .type = "" })
+		size_t type_id)
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	auto print_zero_case = [&options](tref var) {
+	auto print_zero_case = [&type_id](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory::instance().zero(options.type)
-			<< "}:" << options.type << "\n";
+			<< node::nso_factory::zero(get_ba_type_tree<node>(type_id))
+			<< "}:" << ba_types<node>::name(type_id) << "\n";
 	};
 
-	auto print_one_case = [&options](tref var) {
+	auto print_one_case = [&type_id](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory::instance().one(options.type)
-			<< "}:" << options.type << "\n";
+			<< node::nso_factory::one(get_ba_type_tree<node>(type_id))
+			<< "}:" << ba_types<node>::name(type_id) << "\n";
 	};
 
 	auto print_general_case = [](tref var, tref value) {
@@ -526,6 +512,8 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 
 	std::cout << "solution: {\n";
 	for (auto [var, value]: solution.value()) {
+		DBG(LOG_TRACE << LOG_FM_TREE(var));
+		DBG(LOG_TRACE << LOG_FM_TREE(value));
 		if (auto check = tt(value) | tau::bf_t; check)
 			print_one_case(var);
 		else if (auto check = tt(value) | tau::bf_f; check)
@@ -534,26 +522,16 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 			print_general_case(var, value);
 	}
 	std::cout << "}\n";
-
-	return;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
-	// getting the type
-	size_t type = get_solver_cmd_type<node>(n.value());
-	if (type == 0) {
-		TAU_LOG_ERROR << "Invalid type\n";
-		return;
-	}
-
 	// setting solver options
 	solver_options options = {
-		.splitter_one = node::nso_factory::instance()
-				.splitter_one(get_ba_type_name<node>(type)),
+		.splitter_one = node::nso_factory::
+			splitter_one(tau_type<node>()),
 		.mode = get_solver_cmd_mode<node>(n.value()),
-		.type = get_ba_type_name<node>(type)
 	};
 
 	tref arg = n.value_tree().first();
@@ -567,10 +545,11 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 
 	DBG(TAU_LOG_TRACE << "solve_cmd/applied: " << applied << "\n";)
 
+	size_t type = get_solver_cmd_type<node>(applied);
 	auto solution = solve<node>(applied, options);
 	if (!solution) { std::cout << "no solution\n"; return; }
-	// auto vars = tau::get(equations).select_top(is_child<node, tau::variable>);
-	print_solver_cmd_solution<node>(solution, options);
+
+	print_solver_cmd_solution<node>(solution, type);
 }
 
 template <typename... BAs>
@@ -599,7 +578,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	auto solution = lgrs<node>(applied);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
-	print_solver_cmd_solution<node>(solution);
+	print_solver_cmd_solution<node>(solution, type);
 }
 
 template <typename... BAs>
@@ -611,8 +590,8 @@ tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
 	rr<node> nso_rr = opt_nso_rr.value();
 	const auto& main = tau::get(nso_rr.main);
 	if (main.is(tau::bf)) return invalid_argument();
-	tref normalized_fm = normalizer<node>(nso_rr);
-	return is_tau_impl<node>(tau::_T(), normalized_fm) ? tau::_T() : tau::_F();
+	tref normalized = normalizer<node>(nso_rr);
+	return is_tau_impl<node>(tau::_T(), normalized) ? tau::_T() : tau::_F();
 }
 
 template <typename... BAs>
@@ -624,16 +603,15 @@ tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	rr<node> nso_rr = opt_nso_rr.value();
 	const auto& main = tau::get(nso_rr.main);
 	if (main.is(tau::bf)) return invalid_argument();
-	tref normalized_fm = normalizer<node>(nso_rr);
-	return is_tau_formula_sat<node>(normalized_fm, 0, true) ? tau::_T()
-								: tau::_F();
+	tref normalized = normalizer<node>(nso_rr);
+	return is_tau_formula_sat<node>(normalized, 0, true)
+		? tau::_T()	: tau::_F();
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
-	return tau::get(sat_cmd(n)).equals_F() ? tau::_T()
-						    : tau::_F();
+	return tau::get(sat_cmd(n)).equals_F() ? tau::_T() : tau::_F();
 }
 
 template <typename... BAs>
@@ -944,7 +922,6 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::nnf_cmd:            result = nnf_cmd(command); break;
 	case tau::pnf_cmd:            not_implemented_yet(); break;
 	case tau::mnf_cmd:            result = mnf_cmd(command); break;
-	case tau::snf_cmd:            result = snf_cmd(command); break;
 	// definition of rec relations to be included during normalization
 	case tau::def_rr_cmd:         def_rr_cmd(command); break;
 	case tau::def_list_cmd:       def_list_cmd(); break;

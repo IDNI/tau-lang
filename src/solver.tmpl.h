@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "solver.h"
+#include <cvc5/cvc5.h>
+
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "solver"
@@ -210,7 +211,7 @@ std::optional<solution<node>> lgrs(equality eq) {
 	LOG_TRACE << "lgrs/equality: " << LOG_FM(eq);
 	LOG_TRACE << "lgrs/solution: ";
 	for (auto [k, v] : phi) LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
-	tref check = snf_wff<node>(rewriter::replace<node>(eq, phi));
+	tref check = normalizer<node>(rewriter::replace<node>(eq, phi));
 	LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
 #endif // DEBUG
 
@@ -249,8 +250,8 @@ struct minterm_iterator {
 					& ~tau::get(v)).get();
 				choices.emplace_back(v, false, partial_bf,
 							partial_minterm);
-				partial_bf = rewriter::replace<node>(partial_bf, v,
-					tau::_0());
+				partial_bf = rewriter::replace<node>(v,
+					tau::_0(), partial_bf);
 				DBG(LOG_TRACE << "minterm_iterator/partial_bf: "
 					<< LOG_FM(partial_bf);)
 				// ... and compute new values for the next one
@@ -358,10 +359,12 @@ private:
 					: ~tau::get(choices[i].var))
 				& tau::get(choices[i - 1].partial_minterm)).get();
 			choices[i].partial_bf = choices[i - 1].value
-				? rewriter::replace<node>(choices[i - 1].partial_bf,
-					choices[i - 1].var, tau::_1())
-				: rewriter::replace<node>(choices[i - 1].partial_bf,
-					choices[i - 1].var, tau::_0());
+				? rewriter::replace<node>(
+					choices[i - 1].var, tau::_1(),
+					choices[i - 1].partial_bf)
+				: rewriter::replace<node>(
+					choices[i - 1].var, tau::_0(),
+					choices[i - 1].partial_bf);
 			// if current partial bf is 0, we can skip the rest of the choices
 			// as the corresponding minterms will be 0.
 			if (tau::get(choices[i].partial_bf).equals_0()) {
@@ -523,13 +526,13 @@ private:
 template <NodeType node>
 tref get_constant(minterm m) {
 	using tau = tree<node>;
-	//auto cte = find_top(m, is_child_non_terminal<tau::bf_constant, node>);
+	//auto cte = find_top(m, is_child_non_terminal<tau::ba_constant, node>);
 	//return cte ? cte.value() : _1<node>;
-	auto is_bf_constant = [](const auto& n) -> bool {
-		return is_child<node, tau::bf_constant>(n);
+	auto is_ba_constant = [](const auto& n) -> bool {
+		return is_child<node, tau::ba_constant>(n);
 	};
 	// FIXME convert vars to a set
-	trefs all_vs = tau::get(m).select_top(is_bf_constant);
+	trefs all_vs = tau::get(m).select_top(is_ba_constant);
 	return build_bf_and<node>(all_vs);
 }
 
@@ -619,7 +622,7 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 					? options.splitter_one
 					// case 4.2
 					: splitter(tau::get(tt(d_cte)
-						| tau::bf_constant
+						| tau::ba_constant
 						| tt::ref)).get();
 
 				DBG(LOG_TRACE << "add_minterm_to_disjoint"
@@ -971,14 +974,15 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 
 // entry point for the solver
 template <NodeType node>
-std::optional<solution<node>> solve(tref form, const solver_options& options) {
+std::optional<solution<node>> solve(tref form, solver_options options) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+
 	if (tau::get(form).equals_T()) return { solution<node>() };
+	if (tau::get(form).equals_F()) return {};
 
 #ifdef DEBUG
 	LOG_TRACE << "solve/form: " << LOG_FM(form);
-	LOG_TRACE << "solve/options/type: " << options.type;
 	switch (options.mode) {
 		case solver_mode::maximum: LOG_TRACE
 				<< " solve/options.kind: maximum"; break;
@@ -998,18 +1002,52 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(clause);
 			continue;
 		}
-		auto is_equation = [](tref n) {
-			return tau::get(n).child_is(tau::bf_eq)
-				|| tau::get(n).child_is(tau::bf_neq);
-		};
-		// FIXME convert vars to a set
-		auto eqs = tau::get(clause).select_top(is_equation);
-		if (eqs.empty()) continue;
-		auto solution = solve<node>(
-			equations<node>(eqs.begin(), eqs.end()), options);
-		if (solution.has_value()) return solution;
+		solution<node> clause_solution;
+		// Partition all found atomic equations according to their type
+		std::map<size_t, subtree_set<node>> type_partition;
+		// Partition types
+		// TODO: Reject conjuncts which are not allowed in solver, such as wff_ref
+		for (tref conj : get_cnf_wff_clauses<node>(clause)) {
+			size_t type = find_ba_type<node>(conj);
+			if (auto it = type_partition.find(type); it != type_partition.end()) {
+				it->second.insert(conj);
+			} else type_partition.emplace(type, subtree_set<node>{conj});
+		}
+		bool error = false, bv_sat = false;
+		for (auto& [type, conjs] : type_partition) {
+			// The options for the solver depend on the equation type
+			solver_options op = options;
+			tref type_tree = ba_types<node>::type_tree(type);
+			op.splitter_one = node::nso_factory::splitter_one(type_tree);
+			if (is_bv_type_family<node>(type_tree)) {
+				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs), type_tree)) {
+					bv_sat = true;
+					for (const auto& [var, value]: bv_solution.value()) {
+						clause_solution[var] = value;
+					}
+				} else error = true; // if we cannot solve bv part, skip this clause
+			}
+			else if (auto solution = solve<node>(conjs, op)) {
+				for (const auto& [var, value]: solution.value()) {
+					clause_solution[var] = value;
+				}
+			} else error = true; // if we cannot solve, skip this clause
+			if (error) break;
+		}
+		if (error) continue;
+		// It can happen that there is no free variable in bitvector formula
+		// causing empty solutions which are still sat
+		if (!clause_solution.empty() || bv_sat) return clause_solution;
 	}
 	return {};
 }
+
+template <NodeType node>
+std::optional<solution<node>> solve(const trefs& forms, solver_options options) {
+	using tau = tree<node>;
+
+	return solve<node>(tau::build_wff_and(forms), options);
+}
+
 
 } // namespace idni::tau_lang

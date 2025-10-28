@@ -3,56 +3,45 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
-tref infer(const char* sample) {
-	tref code = tau::get(sample);
-	DBG(assert(code != nullptr);)
-	return infer_ba_types<node_t>(code);
+#include "ba_types_inference.h"
+
+using namespace idni::tau_lang;
+
+TEST_SUITE("Configuration") {
+	TEST_CASE("logging") {
+		logging::trace();
+	}
 }
 
-bool expect_infer_fail(const char* sample) {
-	return infer(sample) == nullptr;
-}
+TEST_SUITE("merge_ba_types") {
 
-bool are_all_typed_as(tref n, const std::string& type) {
-	using node = node_t;
-	size_t tid = get_ba_type_id<node>(type);
-	auto are_all_trefs_typed = [&](const trefs& ts) {
-		for (tref t : ts)
-			if (tau::get(t).get_ba_type() != tid) {
-				TAU_LOG_ERROR << "Type mismatch: " << TAU_LOG_FM(t)
-					<< " expected: " << TAU_LOG_BA_TYPE(tid)
-					<< " got: " << TAU_LOG_BA_TYPE(tau::get(t)
-								.get_ba_type());
-				return false;
-			}
-		return true;
-	};
-	const auto& t = tau::get(n);
-	return are_all_trefs_typed(t.select_all(is<node, tau::bf_constant>))
-	    && are_all_trefs_typed(t.select_all(is<node, tau::variable>));
-}
+	using type_t = size_t;
 
-TEST_SUITE("constant types") {
-	TEST_CASE("all typed") {
-		auto n = infer("{ 0 } : bool = { 1 } : bool & { 0 } : bool.");
-		CHECK( are_all_typed_as(n, "bool") );
+	bool match(const type_t& type1, const type_t& type2, const type_t& result) {
+		auto merged = merge_ba_types<node_t>(type1, type2);
+		if (!merged) return false;
+		return result == merged.value();
 	}
 
-	TEST_CASE("some typed") {
-		using node = node_t;
-		auto n = infer("{ 0 } : bool = { 1 } { 0 } : bool.");
-		TAU_LOG_TRACE << "inferred: " << TAU_LOG_FM_DUMP(n);
-		CHECK( are_all_typed_as(n, "bool") );
+	bool nomatch(const type_t& type1, const type_t& type2) {
+		auto merged = merge_ba_types<node_t>(type1, type2);
+		return !merged.has_value();
 	}
 
-	TEST_CASE("only 1 typed") {
-		auto n = infer("{ 0 } = { 1 } & { 0 } : bool.");
-		CHECK( are_all_typed_as(n, "bool") );
+	TEST_CASE("untyped with untyped") {
+		CHECK(match(0, 0, 0));
 	}
 
-	TEST_CASE("none typed") {
-		auto n = infer("{ 0 } = { 1 } { 0 }.");
-		CHECK( are_all_typed_as(n, "bool") );
+	TEST_CASE("untyped with any type") {
+		CHECK(match(0, 1, 1));
+		CHECK(match(1, 0, 1));
 	}
 
+	TEST_CASE("same types all possible subtypes") {
+		CHECK(match(1, 1, 1));
+	}
+
+	TEST_CASE("different types") {
+		CHECK(nomatch(1, 2));
+	}
 }

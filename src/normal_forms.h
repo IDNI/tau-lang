@@ -31,101 +31,6 @@ enum MemorySlotPost {
 	anti_prenex_m
 };
 
-// tau system library, used to define the tau system of rewriting rules
-#define RULE(name, code) const std::string name = code;
-
-// IDEA (MEDIUM) add commutative rule and halve the number of rules if is performance friendly
-
-// bf rules
-RULE(BF_TO_DNF_0, "($X | $Y) & $Z := $X & $Z | $Y & $Z.")
-RULE(BF_TO_DNF_1, "$X & ($Y | $Z) := $X & $Y | $X & $Z.")
-RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := $X' | $Y'.")
-RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := $X' & $Y'.")
-
-// bf callbacks
-RULE(BF_CALLBACK_NORMALIZE, "{ $X } := bf_normalize_cb $X.")
-
-// wff rules
-RULE(WFF_TO_DNF_0, "($X || $Y) && $Z ::= $X && $Z || $Y && $Z.")
-RULE(WFF_TO_DNF_1, "$X && ($Y || $Z) ::= $X && $Y || $X && $Z.")
-RULE(WFF_PUSH_NEGATION_INWARDS_0, "!($X && $Y) ::= ! $X || !$Y.")
-RULE(WFF_PUSH_NEGATION_INWARDS_1, "!($X || $Y) ::= ! $X && !$Y.")
-RULE(WFF_PUSH_NEGATION_INWARDS_2, "!($X = 0) ::= $X != 0.")
-RULE(WFF_PUSH_NEGATION_INWARDS_3, "!($X != 0) ::= $X = 0.")
-RULE(WFF_PUSH_NEGATION_INWARDS_4, "! always $X ::= sometimes (! $X).")
-RULE(WFF_PUSH_NEGATION_INWARDS_5, "! sometimes $X ::= always (! $X).")
-RULE(WFF_SIMPLIFY_SOMETIMES_3,  "(sometimes $X) && (always $X) ::= always $X.")
-RULE(WFF_SIMPLIFY_ALWAYS_3,		"(always $X) && (sometimes $X) ::= always $X.")
-RULE(WFF_PUSH_SOMETIMES_INWARDS,"sometimes($X || $Y) ::= (sometimes $X) || (sometimes $Y).")
-RULE(WFF_PUSH_ALWAYS_INWARDS,   "always($X && $Y) ::= (always $X) && (always $Y).")
-
-// trivialities
-RULE(BF_EQ_AND_SIMPLIFY_0, "$X != 0 && $X = 0 ::= F.")
-RULE(BF_EQ_AND_SIMPLIFY_1, "$X = 0 && $X != 0 ::= F.")
-RULE(BF_EQ_OR_SIMPLIFY_0, "$X != 0 || $X = 0 ::= T.")
-RULE(BF_EQ_OR_SIMPLIFY_1, "$X = 0 || $X != 0 ::= T.")
-
-// bf conjunctive normal form
-RULE(BF_TO_CNF_0, "$X & $Y | $Z := ($X | $Z) & ($Y | $Z).")
-RULE(BF_TO_CNF_1, "$X | $Y & $Z := ($X | $Y) & ($X | $Z).")
-
-// wff conjunctive normal form
-RULE(WFF_TO_CNF_0, "$X && $Y || $Z ::= ($X || $Z) && ($Y || $Z).")
-RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
-
-RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != 0 ::= !($X = 0).")
-RULE(WFF_UNSQUEEZE_POSITIVES_0, "$X | $Y = 0 ::= $X = 0 && $Y = 0.")
-RULE(WFF_UNSQUEEZE_NEGATIVES_0, "$X | $Y != 0 ::= $X != 0 || $Y != 0.")
-RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
-RULE(WFF_SQUEEZE_NEGATIVES_0, "$X != 0 || $Y != 0 ::= $X | $Y != 0.")
-
-RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
-
-#undef RULE
-
-template <NodeType node>
-static auto& push_neg_for_snf() {
-	static auto instance = tree<node>::get_library(
-		WFF_PUSH_NEGATION_UPWARDS_0
-		+ WFF_PUSH_NEGATION_INWARDS_0
-		+ WFF_PUSH_NEGATION_INWARDS_1
-	);
-	return instance;
-}
-
-template <NodeType node>
-static auto& elim_eqs() {
-	static auto instance = tree<node>::get_library(
-		BF_EQ_AND_SIMPLIFY_0
-		+ BF_EQ_AND_SIMPLIFY_1
-		+ BF_EQ_OR_SIMPLIFY_0
-		+ BF_EQ_OR_SIMPLIFY_1
-	);
-	return instance;
-}
-
-template <NodeType node>
-tref to_mnf(tref fm);
-
-template <NodeType node>
-tref from_mnf_to_nnf(tref fm);
-
-template <NodeType node>
-static auto& simplify_snf() {
-	static auto instance = repeat_all<node, step<node>>(
-		to_steps<node>({ elim_eqs<node>(), push_neg_for_snf<node>() }));
-	return instance;
-}
-
-template <NodeType node>
-static auto& fix_neg_in_snf() {
-	static auto instance = tree<node>::get_library(
-		WFF_PUSH_NEGATION_INWARDS_2
-		+ WFF_PUSH_NEGATION_INWARDS_3
-	);
-	return instance;
-}
-
 template <NodeType node>
 tref unsqueeze_wff(const tref& fm);
 
@@ -180,56 +85,6 @@ tref normalize_ba(tref fm);
 
 template <NodeType node>
 struct bf_reduce_canonical;
-
-template <NodeType node, node::type type>
-struct reduce_deprecated {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-
-	// TODO (VERY_HIGH) properly implement it
-	tref operator()(tref form) const;
-	tt operator()(const tt& t) const;
-
-private:
-	using literals = subtree_set<node>;
-
-	void get_literals(tref clause, literals& lits) const;
-
-	literals get_literals(tref clause) const;
-
-	std::pair<literals, literals> get_positive_negative_literals(
-		tref clause) const;
-
-	subtree_set<node> get_dnf_clauses(tref n,
-					subtree_set<node> clauses = {}) const;
-
-	tref build_dnf_clause_from_literals(const literals& positives,
-					const literals& negatives) const;
-
-	tref to_minterm(tref clause) const;
-
-	tref build_dnf_from_clauses(const subtree_set<node>& clauses) const;
-
-	tref simplify(tref form) const;
-};
-
-template <NodeType node>
-static const reduce_deprecated<node, tau_parser::bf> reduce_bf_deprecated;
-template <NodeType node>
-using reduce_bf_t = reduce_deprecated<node, tau_parser::bf>;
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t, const reduce_bf_t<node>& r);
-
-template <NodeType node>
-static const reduce_deprecated<node, tau_parser::wff> reduce_wff_deprecated;
-template <NodeType node>
-using reduce_wff_t = reduce_deprecated<node, tau_parser::wff>;
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t, const reduce_wff_t<node>& r);
 
 // return the inner quantifier or the top wff if the formula is not quantified
 template <NodeType node>
@@ -297,15 +152,23 @@ auto lex_var_comp = [](tref x, tref y) {
 template <NodeType node>
 inline auto is_wff_bdd_var = [](tref n) {
 	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	DBG(assert(!t.is(tau::bf_neq));)
-	return t.child_is(tau::bf_eq)
-		|| t.child_is(tau::wff_ref)
-		|| t.child_is(tau::wff_ex)
-		|| t.child_is(tau::wff_sometimes)
-		|| t.child_is(tau::wff_always)
-		|| t.child_is(tau::wff_all)
-		|| t.child_is(tau::constraint);
+	auto t = tau::get(n);
+	if (t.children_size() != 1) return false;
+	auto child = t[0];
+	auto nt = child.get_type();
+	switch (nt) {
+		case tau::wff_ref: case tau::wff_ex: case tau::wff_all:
+		case tau::wff_sometimes: case tau::wff_always: case tau::constraint:
+			return true;
+		case tau::bf_eq:
+			return true;
+		case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
+		case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq:
+		case tau::bf_ngteq: case tau::bf_lt: case tau::bf_nlt:
+			return is_bv_type_family<node>(child);
+		default:
+			return false;
+	}
 };
 
 template <NodeType node>
@@ -315,7 +178,7 @@ inline auto is_bf_bdd_var = [](tref n) {
 	return t.child_is(tau::variable)
 		|| t.child_is(tau::capture)
 		|| t.child_is(tau::bf_ref)
-		|| t.child_is(tau::bf_constant);
+		|| t.child_is(tau::ba_constant);
 };
 // ------------------------------
 
@@ -623,7 +486,6 @@ private:
 	tref traverse(const bdd_path& path, const literals& remaining, tref form) const;
 
 	exponent get_exponent(const tref n) const;
-	tref get_bf_constant(literal lit) const;
 	std::optional<constant> get_constant(literal lit) const;
 	partition make_partition_by_exponent(const literals& s) const;
 

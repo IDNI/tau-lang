@@ -1,0 +1,19 @@
+(assert
+	(exists ((x (_ BitVec 32)) (y (_ BitVec 32)) (z (_ BitVec 32)))
+		(and
+			(and (not (= x #x00000000))
+				(not (= y #x00000000))
+				(not (= x y)))
+			(and
+				(=>
+					(= z (bvadd x y))
+					(= z (bvadd (bvxor x y) (bvand x y))))
+				(=>
+					(= z (bvadd (bvxor x y) (bvand x y)))
+					(= z (bvadd x y)))
+			)
+		)
+	)
+)
+
+(check-sat)

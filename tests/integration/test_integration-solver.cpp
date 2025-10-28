@@ -7,10 +7,10 @@
 #endif
 
 tref splitter_one_bdd() {
-	using node = tau_lang::node<sbf_ba>;
+	using node = tau_lang::node<bv, sbf_ba>;
 	using tau = tree<node>;
-	static sbf_ba_factory<sbf_ba> factory;
-	return tau::get(tau::bf, tau::get_ba_constant(factory.splitter_one(), "sbf"));
+	static sbf_ba_factory<bv, sbf_ba> factory;
+	return tau::get(tau::bf, tau::get_ba_constant(factory.splitter_one(), sbf_type<node>()));
 }
 
 template <NodeType node>
@@ -18,7 +18,7 @@ bool check_solution(tref eq, const solution<node>& sol) {
 	using tau = tree<node>;
 	DBG(TAU_LOG_TRACE << "check_solution/sol:\n" << dump_to_str(sol);)
 	tref substitution = rewriter::replace<node>(eq, sol);
-	tref check = snf_wff<node>(substitution);
+	tref check = normalizer<node>(substitution);
 #ifdef DEBUG
 	// std::cout << "check_solution/solution: " << dump<node>(sol) << "\n";
 	std::cout << "check_solution/equation: " << TAU_DUMP_TO_STR(eq) << "\n";
@@ -311,8 +311,8 @@ TEST_SUITE("find_solution") {
 		CHECK ( test_find_solution(sample) );
 	}
 
-	TEST_CASE("two var: x + y = 1.") {
-		const char* sample = "x + y = 1.";
+	TEST_CASE("two var: x ^ y = 1.") {
+		const char* sample = "x ^ y = 1.";
 		CHECK ( test_find_solution(sample) );
 	}
 
@@ -327,8 +327,8 @@ TEST_SUITE("find_solution") {
 	}
 
 	//  number 1 of test_integration-interpreter.cpp
-	TEST_CASE("<:a> z + <:b> z' = 0") {
-		const char* sample = "<:a> z + <:b> z' = 0.";
+	TEST_CASE("<:a> z ^ <:b> z' = 0") {
+		const char* sample = "<:a> z ^ <:b> z' = 0.";
 		CHECK ( test_find_solution(sample) );
 	}
 }
@@ -426,6 +426,7 @@ TEST_SUITE("solve_inequality_system") {
 	// m = {a}:sbf x', both have different exponents and d_cte & m_cte != false
 	// and d_cte & ~m_cte != false
 	TEST_CASE("one var (using splitter of sbf): ({a}:sbf|{b}:sbf) x != 0 && {a}:sbf x' != 0.") {
+		bdd_init<Bool>();
 		const std::vector<std::string> sample =
 			{"({a}:sbf|{b}:sbf) x != 0." , "{a}:sbf x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
@@ -613,7 +614,7 @@ TEST_SUITE("solve_system") {
 
 TEST_SUITE("solve") {
 	// This test is for the type tau_ba<sbf_ba>, sbf_ba
-	using node_t = node<tau_ba<sbf_ba>, sbf_ba>;
+	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 	using tau = tree<node_t>;
 
 
@@ -626,28 +627,25 @@ TEST_SUITE("solve") {
 		return solution ? check_solution<node_t>(form, solution.value()) : false;
 	}
 
-	bool test_solve_min(const std::string system, const std::string type = "tau") {
+	bool test_solve_min(const std::string system, const tref type = tau_type<node_t>()) {
 		solver_options options = {
-			.splitter_one = node_t::nso_factory::instance()
-					.splitter_one(type),
+			.splitter_one = node_t::nso_factory::splitter_one(type),
 			.mode = solver_mode::minimum
 		};
 		return test_solve(system, options);
 	}
 
-	bool test_solve_max(const std::string system, const std::string type = "tau") {
+	bool test_solve_max(const std::string system, const tref type = tau_type<node_t>()) {
 		solver_options options = {
-			.splitter_one = node_t::nso_factory::instance()
-					.splitter_one(type),
+			.splitter_one = node_t::nso_factory::splitter_one(type),
 			.mode = solver_mode::maximum
 		};
 		return test_solve(system, options);
 	}
 
-	bool test_solve(const std::string system, const std::string type = "tau") {
+	bool test_solve(const std::string system, const tref type = tau_type<node_t>()) {
 		solver_options options = {
-			.splitter_one = node_t::nso_factory::instance()
-					.splitter_one(type),
+			.splitter_one = node_t::nso_factory::splitter_one(type),
 			.mode = solver_mode::general
 		};
 		return test_solve(system, options);
@@ -661,7 +659,7 @@ TEST_SUITE("solve") {
 
 	TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0") {
 		const char* system = " y < x && y = {a}:sbf && x' != 0.";
-		CHECK ( test_solve(system, "sbf") );
+		CHECK ( test_solve(system, sbf_type<node_t>()) );
 	}
 
 	// increasing monotonicity (2)
@@ -670,13 +668,13 @@ TEST_SUITE("solve") {
 	// and call the solve_system method (see above).
 	TEST_CASE("x = {a}:sbf && x < y && y != 1") {
 		const char* system = "x = {a}:sbf && x < y && y != 1.";
-		CHECK ( test_solve(system, "sbf") );
+		CHECK ( test_solve(system, sbf_type<node_t>()) );
 	}
 
 	// increasing monotonicity (2 y2)
 	TEST_CASE("x = {a}:sbf {b}:sbf && x < y && y != 1") {
 		const char* system = "x = {a}:sbf {b}:sbf && x < y && y != 1.";
-		CHECK ( test_solve(system, "sbf") );
+		CHECK ( test_solve(system, sbf_type<node_t>()) );
 	}
 
 	TEST_CASE("x != 0") {

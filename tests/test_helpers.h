@@ -4,6 +4,10 @@
 // including instead of #include "tau.h" to avoid errors pointing to the generated tau.h
 #	include "boolean_algebras/nso_ba.h"
 #	include "boolean_algebras/sbf_ba.h"
+#	include "boolean_algebras/bv_ba.h"
+#	include "boolean_algebras/variant_ba.h"
+#   include "ba_constants.h"
+#   include "runtime.h"
 #else
 #	include "tau.h"
 #endif // DEBUG
@@ -11,21 +15,12 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "testing"
 
-// common helpers to be included in test_*_helpers.h after defining bas_pack macro
-
 namespace idni::tau_lang {
-	
+
 using node_t = tau_lang::node<bas_pack>;
 using tau = tree<node_t>;
 using tt = tau::traverser;
 using bac = ba_constants<node_t>;
-
-tau::get_options parse_library() {
-	static tau::get_options opts{ .parse = { .start = tau::library },
-		.infer_ba_types = false,
-		.reget_with_hooks = false };
-	return opts;
-}
 
 tau::get_options parse_bf() {
 	static tau::get_options opts{ .parse = { .start = tau::bf } };

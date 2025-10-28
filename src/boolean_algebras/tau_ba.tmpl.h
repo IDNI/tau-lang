@@ -190,22 +190,24 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 	if (tau::get(simp_fm).find_top(is<node, tau::ref>))
 		return false;
 	const trefs& vars = get_free_vars<node>(simp_fm);
-	for (const auto& v : vars) {
-		const auto& t = tau::get(v);
-		if (!(t.only_child_tree().is(tau::io_var)
-			|| t.only_child_tree().is(tau::uconst_name)))
+	for (tref v : vars) {
+		const tau& t = tau::get(v);
+		if (!(t.child_is(tau::io_var)
+			|| t.child_is(tau::uconst_name)))
 				return false;
 	}
 	return true;
 }
 
+
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::optional<constant_with_type<tau_ba<BAs...>, BAs...>>
-	tau_ba_factory<BAs...>::parse(const std::string& src)
+std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
+	parse_tau(const std::string& src)
 {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
+
 	// parse source
 	typename tau::get_options opts{ .parse = {
 					.start = tau::tau_constant_source } };
@@ -214,39 +216,32 @@ std::optional<constant_with_type<tau_ba<BAs...>, BAs...>>
 	auto nso_rr = get_nso_rr<node>(source);
 	if (!nso_rr) return {};
 	// compute final result
-	return constant_with_type<tau_ba<BAs...>, BAs...>{
+	return typename node::constant_with_type{
 		std::variant<tau_ba<BAs...>, BAs...>(
 			tau_ba<BAs...>(nso_rr.value().rec_relations,
 				       nso_rr.value().main)),
-		"tau" };
+		tau_type<node>() };
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::string tau_ba_factory<BAs...>::one(std::string&) const {
+std::string tau_ba_factory<BAs...>::one(std::string&) {
 	return "T";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::string tau_ba_factory<BAs...>::zero(std::string&) const {
+std::string tau_ba_factory<BAs...>::zero(std::string&) {
 	return "F";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::variant<tau_ba<BAs...>, BAs...>
-	tau_ba_factory<BAs...>::splitter_one() const
+	tau_ba_factory<BAs...>::splitter_one()
 {
 	return std::variant<tau_ba<BAs...>, BAs...>(
 			tau_splitter_one<BAs...>());
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-tau_ba_factory<BAs...>& tau_ba_factory<BAs...>::instance() {
-	static tau_ba_factory<BAs...> factory;
-	return factory;
 }
 
 template <typename... BAs>

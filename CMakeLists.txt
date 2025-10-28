@@ -20,6 +20,7 @@ project("${PROJECT_NAME}"
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
 
 include(FetchContent)
+include(ExternalProject)
 
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
 option(TAU_MEASURE                 "Measure tau performance"               OFF)
@@ -183,6 +184,34 @@ message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 
+
+#
+# Add cvc5 as an external project
+#
+ExternalProject_Add(
+    cvc5_external_project
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
+    CONFIGURE_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5 && ${CMAKE_SOURCE_DIR}/external/cvc5/configure.sh --no-gpl --auto-download
+    BUILD_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5/build && make # && make test && make install
+    INSTALL_COMMAND cp ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so.1  ${PROJECT_BINARY_DIR}/
+    UPDATE_COMMAND ""
+    BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/external/cvc5/build/libcvc5.so
+)
+
+set(CVC5_FOUND TRUE)
+set(CVC5_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/external/cvc5/include/")
+set(CVC5_LIBRARIES "${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so")
+
+add_library(cvc5 STATIC IMPORTED GLOBAL)
+set_target_properties(
+  cvc5 PROPERTIES IMPORTED_LOCATION "${CVC5_LIBRARIES}"
+)
+set_target_properties(
+  cvc5 PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${CVC5_INCLUDE_DIR}"
+)
+add_dependencies(cvc5 cvc5_external_project)
+set(CVC5_LIB cvc5)
+
 #
 # Adding Boost log library
 #
@@ -201,27 +230,6 @@ if (Boost_FOUND)
 	message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
 else()
 	message(FATAL_ERROR "Boost not found")
-endif()
-
-#
-# Adding Z3
-#
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	set(Z3_BUILD_LIBZ3_SHARED OFF CACHE BOOL "Disable shared Z3 library")
-	FetchContent_Declare(Z3
-		GIT_REPOSITORY https://github.com/Z3Prover/z3
-		GIT_TAG        z3-4.8.12
-	)
-	FetchContent_MakeAvailable(Z3)
-	include_directories(${Z3_SOURCE_DIR}/src/api)
-	set(Z3_LIB "libz3")
-else()
-	find_library(Z3
-		NAMES z3
-		HINTS /usr/lib)
-	add_library(Z3 SHARED IMPORTED)
-	set_target_properties(Z3 PROPERTIES IMPORTED_LOCATION "${Z3}")
-	set(Z3_LIB "Z3")
 endif()
 
 #

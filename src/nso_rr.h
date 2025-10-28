@@ -24,7 +24,7 @@ template <NodeType node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n);
 
 // transform ref args to captures
-// this has to be called before rr apply or before calculating fixed points in normalizer 
+// this has to be called before rr apply or before calculating fixed points in normalizer
 // TODO find better place for this? maybe normalization?
 template <NodeType node>
 rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr);

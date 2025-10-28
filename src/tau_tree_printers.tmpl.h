@@ -29,20 +29,49 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	using tau = tree<node>;
 	os << node::name(n.nt);
 #ifdef DEBUG
+	auto is_typeable = [](size_t nt) {
+		return nt == tau::ba_constant
+			|| nt == tau::variable
+			|| nt == tau::bf
+			|| nt == tau::bf_interval
+			|| nt == tau::bf_eq
+			|| nt == tau::bf_neq
+			|| nt == tau::bf_lteq
+			|| nt == tau::bf_nlteq
+			|| nt == tau::bf_gt
+			|| nt == tau::bf_ngt
+			|| nt == tau::bf_gteq
+			|| nt == tau::bf_ngteq
+			|| nt == tau::bf_lt
+			|| nt == tau::bf_nlt
+			|| nt == tau::bf_or
+			|| nt == tau::bf_xor
+			|| nt == tau::bf_and
+			|| nt == tau::bf_neg
+			|| nt == tau::bf_add
+			|| nt == tau::bf_sub
+			|| nt == tau::bf_mul
+			|| nt == tau::bf_div
+			|| nt == tau::bf_mod
+			|| nt == tau::bf_shr
+			|| nt == tau::bf_shl
+			|| nt == tau::bf_f
+			|| nt == tau::bf_t;
+	};
 	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
 	if (bool print_is_term = true; print_is_term && n.term) os << "*";
-	if (n.term == 0 && n.ba == 1 && n.nt == tau_parser::ref)
+	if (n.term == 0 && n.ba_type == 1 && n.nt == tau_parser::ref)
 		os << LOG_WARNING_COLOR << "?" << TC.CLEAR();
 	if (n.data) os << "[" << n.data << "]";
-	if (bool print_ba_type = true;
-		print_ba_type && n.term && n.nt != tau::bf)
-						os << " " << LOG_BA_TYPE(n.ba);
+	if (bool print_ba_type = true; print_ba_type && is_typeable(n.nt))
+						os << " " << LOG_BA_TYPE(n.ba_type);
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
-	else if (n.nt == tau::bf_constant) {
-		if (n.ba) os << " { " << ba_constants<node>::get(n.data)
-				<< " } : " << get_ba_type_name<node>(n.ba);
-		else os << " { " << dict(n.data) << " } : untyped";
+	else if (n.nt == tau::ba_constant) {
+		if (n.data != 0) // constant id is not 0 = parsed
+			os << " { " << ba_constants<node>::get(n.data)
+				<< " } : " << get_ba_type_name<node>(n.ba_type);
+		else os << " { UNPARSED } : " << get_ba_type_name<node>(n.ba_type);
 	} else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name)
 		os << "<" << dict(n.data) << ">";
@@ -243,8 +272,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
-			bf_splitter, bf_ref, bf_neg, bf_constant, bf_t, bf_f,
-			wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
+			bf_ref, bf_neg, ba_constant, bf_t,
+			bf_f, wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
 			variable, ref_args, start
 		};
 		// priority map (lower number = higher priority)
@@ -271,8 +300,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ history_store_cmd,   50 },
 			{ sat_cmd,             50 },
 			{ main,                60 },
-			{ bf_rule,             60 },
-			{ wff_rule,            60 },
 			{ ref,                 80 },
 			{ wff_sometimes,      380 },
 			{ wff_always,         390 },
@@ -304,17 +331,23 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_and,             740 },
 			{ bf_neg,             750 },
 			{ bf,                 790 },
-			{ bf_matcher,         795 },
-			{ bf_body,            795 },
-			{ rec_relation,       800 },
-			{ ref_args,           800 },
-			{ bf_rule,            800 },
-			{ wff_rule,           800 },
-			{ wff_builder_body,   800 },
-			{ wff_matcher,        800 },
-			{ wff_body,           800 },
+			//{ bv_nor,             811 },
+			//{ bv_xnor,            813 },
+			//{ bv_nand,            815 },
+			{ bf_shl,             816 },
+			{ bf_shr,             817 },
+			{ bf_add,             818 },
+			{ bf_sub,             819 },
+			{ bf_mul,             820 },
+			{ bf_div,             821 },
+			{ bf_mod,             822 },
+			//{ bv_min,             823 },
+			//{ bv_max,             824 },
+			//{ bf_minus,           825 },
+			{ rec_relation,       900 },
+			{ ref_args,           900 },
 		};
-		
+
 		if (no_wrap_for.find(nt) != no_wrap_for.end())
 			return false;
 		auto p_it = prio.find(pt);
@@ -377,10 +410,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		{ rec_relation,  TC.YELLOW() },
 		{ constraint,    TC.LIGHT_MAGENTA() },
 		{ io_var,        TC.WHITE() },
-		{ bf_constant,   TC.LIGHT_CYAN() }
-
+		{ ba_constant,   TC.LIGHT_CYAN() }
 		// { rule,          TC.BG_YELLOW() },
-		// { builder,       TC.BG_LIGHT_YELLOW() }
 	};
 	auto syntax_highlight = [&](size_t nt) {
 		if (!pretty_printer_highlighting) return false;
@@ -419,37 +450,31 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_t:              out('1'); break;
 			case wff_f:             out('F'); break;
 			case wff_t:             out('T'); break;
-			case wff_neg:           out("!"); break;
+			case wff_neg:           out("!");
+						last_quant_nt = nul; break;
 			case first_sym:         out("first"); break;
 			case last_sym:          out("last"); break;
 			case fp_fallback:       out(" fallback "); break;
 			// wraps
-			case builder_head:
 			case ref_args:          out("("); break;
 			case constraint:
+			case subtype:
 			case offsets:           out("["); break;
 			case offset:            if (pnt == io_var) out("[");
 						break;
-			case bf_splitter:       out("S("); break;
-			case bf_constant:
-				if (t.get_ba_type() > 0) {
-					out("{ ");
-					out(tau::get(ref).get_ba_constant());
-					out(" } : ");
-					out(t.get_ba_type_name());
-				} else {
-					out("{ ");
-					out(dict(t.data()));
-					out(" } : untyped");
-				}
+			case ba_constant:
+				out("{ ");
+				if (tref src = tt(ref) | source | tt::ref; src)
+					out(tau::get(src).get_string());
+				else out(tau::get(ref).get_ba_constant());
+				out(" } : ");
+				out(tau::get(t.get_ba_type_tree()));
 				break;
-			case scope_id: out(" _"), out(t.data()), out("_"); break;
 			case wff:
 			case bf:
 				if (parent && is_to_wrap(t.first_tree()
 					.get_type(), pnt))
 				{
-					if (pending_bf_and_op) out("&");
 					wraps.insert(ref), out("(");
 					if (static_cast<node::type>(nt) == wff)
 							depth++, break_line();
@@ -461,7 +486,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (last_quant_nt == wff_all) out(", ");
 				else last_quant_nt = wff_all, out("all ");
 				break;
-			case wff_ex:				
+			case wff_ex:
 				if (last_quant_nt == wff_ex) out(", ");
 				else last_quant_nt = wff_ex, out("ex ");
 				break;
@@ -469,16 +494,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (last_quant_nt == bf_fall) out(", ");
 				else last_quant_nt = bf_fall, out("fall ");
 				break;
-			case bf_fex:				
+			case bf_fex:
 				if (last_quant_nt == bf_fex) out(", ");
 				else last_quant_nt = bf_fex, out("fex ");
 				break;
 
 			case wff_sometimes:     out("sometimes "); break;
 			case wff_always:        out("always "); break;
-
-			case bf_builder_body:   out(" =: "); break;
-			case wff_builder_body:  out(" =:: "); break;
 
 			case rel_history:       out("%-"); break;
 			case abs_history:       out("%"); break;
@@ -488,7 +510,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case nnf_cmd:           out("nnf "); break;
 			case pnf_cmd:           out("pnf "); break;
 			case mnf_cmd:           out("mnf "); break;
-			case snf_cmd:           out("snf "); break;
 			case onf_cmd:           out("onf "); break;
 			case def_print_cmd:
 			case def_rr_cmd:
@@ -515,6 +536,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case subst_cmd:         track_chpos();
 						out("substitute "); break;
 			case wff_conditional:   track_chpos(); break;
+			/*case bv_constant:
+				if (auto first = tau::tt(ref) | tt::first | tt::ref; first) out(first);
+				else out(t.get_bv_constant());
+				out(" : ");
+				out(tau::get(t.get_ba_type_tree()));
+				break;*/
+			case source: break; // is printed from bf_constant
 			default:
 				if (is_string_nt(nt)) {
 					if (nt == uconst_name) out("<");
@@ -543,23 +571,46 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (pnt) {
 			case bf_and:
 				if (isdigit(last_written_char)
-					|| t.child_is(tau::bf_constant))
+					|| t.child_is(tau::ba_constant))
 						out(" ");
-				else if (isalpha(last_written_char))
-					pending_bf_and_op = true;
 				break;
-			case bf_or:             out("|"); break;
-			case bf_xor:            out("+"); break;
-			case bf_eq:             out(" = "); break;
-			case bf_neq:            out(" != "); break;
-			case bf_lteq:           out(" <= "); break;
-			case bf_nlteq:          out(" !<= "); break;
-			case bf_gt:             out(" > "); break;
-			case bf_ngt:            out(" !> "); break;
-			case bf_gteq:           out(" >= "); break;
-			case bf_ngteq:          out(" !>= "); break;
-			case bf_lt:             out(" < "); break;
-			case bf_nlt:            out(" !< "); break;
+			case bf_or:             out("|");
+						last_quant_nt = nul; break;
+			case bf_xor:            out("^");
+						last_quant_nt = nul; break;
+			case bf_eq:             out(" = ");
+						last_quant_nt = nul; break;
+			case bf_neq:            out(" != ");
+						last_quant_nt = nul; break;
+			case bf_lteq:           out(" <= ");
+						last_quant_nt = nul; break;
+			case bf_nlteq:          out(" !<= ");
+						last_quant_nt = nul; break;
+			case bf_gt:             out(" > ");
+						last_quant_nt = nul; break;
+			case bf_ngt:            out(" !> ");
+						last_quant_nt = nul; break;
+			case bf_gteq:           out(" >= ");
+						last_quant_nt = nul; break;
+			case bf_ngteq:          out(" !>= ");
+						last_quant_nt = nul; break;
+			case bf_lt:             out(" < ");
+						last_quant_nt = nul; break;
+			case bf_nlt:            out(" !< ");
+						last_quant_nt = nul; break;
+
+			case bf_add:            out("+"); last_quant_nt = nul; break;
+			case bf_sub:            out("-"); last_quant_nt = nul; break;
+			case bf_mul:            out("*"); last_quant_nt = nul; break;
+			case bf_div:            out("/"); last_quant_nt = nul; break;
+			case bf_mod:            out("%"); last_quant_nt = nul; break;
+			//case bv_nand:           out("!&"); last_quant_nt = nul; break;
+			//case bv_nor:            out("!|"); last_quant_nt = nul; break;
+			//case bv_xnor:           out("!^"); last_quant_nt = nul; break;
+			case bf_shl:            out("<<"); last_quant_nt = nul; break;
+			case bf_shr:            out(">>"); last_quant_nt = nul; break;
+			//case bv_max:            out("max "); last_quant_nt = nul; break;
+			//case bv_min:            out("min "); last_quant_nt = nul; break;
 
 			case ctn_neq:           out(" != "); break;
 			case ctn_eq:            out(" = "); break;
@@ -568,22 +619,25 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case ctn_lteq:          out(" <= "); break;
 			case ctn_lt:            out(" < "); break;
 
-			case wff_and:           out(" && "); break;
-			case wff_or:            out(" || "); break;
-			case wff_xor:           out(" ^ "); break;
-			case wff_imply:         out(" -> "); break;
-			case wff_equiv:         out(" <-> "); break;
+			case wff_and:           out(" && ");
+						last_quant_nt = nul; break;
+			case wff_or:            out(" || ");
+						last_quant_nt = nul; break;
+			case wff_xor:           out(" ^ ");
+						last_quant_nt = nul; break;
+			case wff_imply:         out(" -> ");
+						last_quant_nt = nul;  break;
+			case wff_equiv:         out(" <-> ");
+						last_quant_nt = nul; break;
 
-			case bf_interval:       out(" <= "); break;
+			case bf_interval:       out(" <= "); last_quant_nt = nul; break;
 
 			case rec_relation:      out(" := "); break;
-			case wff_rule:          out(" ::= "); break;
-			case bf_rule:           out(" := "); break;
 			case ref_args:
 			case offsets:           out(", "); break;
 			case shift:             out("-"); break;
 			case variable:
-			case bf_constant:       out(" : "); break;
+			case ba_constant:       out(" : "); break;
 
 			case wff_all:
 			case wff_ex:
@@ -619,20 +673,17 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 #endif
 		// t.print_tree( << "leaving: ") << "\n";
 		switch (nt) {
-			case bf_neg:            out("'"); break;
-			case main: 
-			case builder:
-			case rec_relation:
-			case wff_rule:
-			case bf_rule:           out("."); break;
+			case bf_neg:            out("'");
+				last_quant_nt = nul; break;
+			case main:
+			case rec_relation:      out("."); break;
 			case constraint:
 			case offsets:
+			case subtype:
 			case inst_cmd:
 			case subst_cmd:         out("]"); break;
 			case offset:            if (pnt == io_var) out("]");
 						break;
-			case bf_splitter:
-			case builder_head:
 			case ref_args:          out(")"); break;
 			case bf:
 			case wff:

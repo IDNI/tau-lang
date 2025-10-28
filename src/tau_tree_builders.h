@@ -189,6 +189,27 @@ tref build_bf_and(const auto& bfs);
 template <NodeType node>
 tref build_bf_neg(tref n);
 
+template <NodeType node>
+tref build_bf_shl(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_shr(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_add(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_sub(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_mul(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_div(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_mod(tref l, tref r);
+
 // -----------------------------------------------------------------------------
 // terminals, variables and constants
 
@@ -211,6 +232,14 @@ tref build_ba_constant(const typename node::constant& constant,
 template <NodeType node>
 tref build_bf_ba_constant(const typename node::constant& constant,
                           size_t ba_type_id, tref right = nullptr);
+
+/*
+template <NodeType node>
+tref build_bv_constant(const typename node::constant& constant, size_t ba_type_id);
+*/
+
+template <NodeType node>
+tref build_bv_ba_constant(const typename node::constant& constant, size_t ba_type_id);
 
 template <NodeType node>
 tref build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id);

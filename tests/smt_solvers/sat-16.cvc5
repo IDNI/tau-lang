@@ -1,0 +1,10 @@
+(set-logic BV)
+(assert
+	(forall ((x (_ BitVec 128)) (y (_ BitVec 128)))
+		(exists ((z (_ BitVec 128)) (w (_ BitVec 128)))
+			(= x (bvand z (bvor w y)))
+		)
+	)
+)
+(check-sat)
+(get-model)

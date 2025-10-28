@@ -244,7 +244,7 @@ tref normalize_ba(tref fm) {
 	assert(tau::get(fm).is(tau::bf));
 	auto norm_ba = [&](tref n) {
 		const auto& t = tau::get(n);
-		if (!t.is(tau::bf_constant)) return n;
+		if (!t.is(tau::ba_constant)) return n;
 		// Node has a Boolean algebra element
 		auto c = t.get_ba_constant();
 		auto nc = normalize_ba<node>(c);
@@ -258,218 +258,7 @@ tref normalize_ba(tref fm) {
 }
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "reduce_deprecated"
-
-// TODO (VERY_HIGH) properly implement it
-template <NodeType node, node::type type>
-tref reduce_deprecated<node, type>::operator()(tref form) const {
-	subtree_map<node, tref> changes;
-	// for all type dnfs do...
-	for (tref dnf : tau::get(form).select_top(is<node, type>)) {
-		auto simplified = simplify(dnf);
-		if (simplified != dnf) changes[dnf] = simplified;
-	}
-	return rewriter::replace<node>(form, changes);
-}
-
-template <NodeType node, node::type type>
-typename reduce_deprecated<node,type>::tt
-	reduce_deprecated<node, type>::operator()(const tt& t) const
-{
-	return tt(this->operator()(t.value()));
-}
-
-template <NodeType node, node::type type>
-void reduce_deprecated<node, type>::get_literals(tref clause, literals& lits) const {
-	LOG_TRACE << "get_bf_literals of: " << LOG_FM(clause);
-	if constexpr (type == tau::bf) {
-		if (auto check = tt(clause) | tau::bf_and; check.has_value())
-			for (tref c : (check || tau::bf).values())
-				get_literals(c, lits);
-		else {
-			lits.insert(clause);
-			LOG_TRACE << "found literal: " << LOG_FM(clause);
-		}
-	} else {
-		if (auto check = tt(clause) | tau::wff_and; check.has_value())
-			for (tref c : (check || tau::wff).values())
-				get_literals(c , lits);
-		else {
-			lits.insert(clause);
-			LOG_TRACE << "found literal: " << LOG_FM(clause);
-		}
-	}
-}
-
-template <NodeType node, node::type type>
-typename reduce_deprecated<node, type>::literals
-	reduce_deprecated<node, type>::get_literals(tref clause) const
-{
-	literals lits;
-	get_literals(clause, lits);
-	return lits;
-}
-
-template <NodeType node, node::type type>
-std::pair<typename reduce_deprecated<node, type>::literals,
-	typename reduce_deprecated<node, type>::literals>
-		reduce_deprecated<node, type>::get_positive_negative_literals(
-							tref clause) const
-{
-	literals positives, negatives;
-	for(tref l : get_literals(clause)) if constexpr (type == tau::bf) {
-		if (auto check = tt(l) | tau::bf_neg; !check.has_value()) {
-			positives.insert(l);
-			LOG_TRACE << "found positive: " << LOG_FM(l);
-		} else {
-			negatives.insert(l);
-			LOG_TRACE << "found negative: " << LOG_FM(l);
-		}
-	} else {
-		if (auto check = tt(l) | tau::wff_neg; !check.has_value()) {
-			positives.insert(l);
-			LOG_TRACE << "found positive: " << LOG_FM(l);
-		} else {
-			negatives.insert(l);
-			LOG_TRACE << "found negative: " << LOG_FM(l);
-		}
-	}
-	return { positives, negatives };
-}
-
-template <NodeType node, node::type type>
-subtree_set<node> reduce_deprecated<node, type>::get_dnf_clauses(
-					tref n, subtree_set<node> clauses) const
-{
-	if constexpr (type == tau::bf)
-		if (auto check = tt(n) | tau::bf_or; check)
-			for (tref clause : (check || tau::bf).values())
-				clauses = get_dnf_clauses(clause, clauses);
-		else clauses.insert(n);
-	else
-		if (auto check = tt(n) | tau::wff_or; check)
-			for (tref clause : (check || tau::wff).values())
-				clauses = get_dnf_clauses(clause, clauses);
-		else clauses.insert(n);
-
-#ifdef DEBUG
-	if (clauses.empty()) {
-		LOG_TRACE << "found clause: " << LOG_FM(n);
-	} else for (tref clause : clauses)
-		LOG_TRACE << "found clause: " << LOG_FM(clause);
-#endif // DEBUG
-
-	return clauses;
-}
-
-template <NodeType node, node::type type>
-tref reduce_deprecated<node, type>::build_dnf_clause_from_literals(
-	const literals& positives, const literals& negatives) const
-{
-	if (positives.empty() && negatives.empty()) {
-		LOG_DEBUG << "(F) {}"; return nullptr; }
-
-	trefs lits;
-	lits.insert(lits.end(), positives.begin(), positives.end());
-	lits.insert(lits.end(), negatives.begin(), negatives.end());
-
-	if (lits.size() == 1) return lits[0];
-	tref clause = lits[0];
-	for (size_t i = 1; i < lits.size(); ++i)
-		if constexpr (type == tau::bf)
-			clause = tau::build_bf_and(clause, lits[i]);
-		else clause = tau::build_wff_and(clause, lits[i]);
-
-	LOG_DEBUG << "dnf clause built from literals: " << LOG_FM(clause);
-	return clause;
-}
-
-template <NodeType node, node::type type>
-tref reduce_deprecated<node, type>::to_minterm(tref clause) const {
-	auto [positives, negatives] = get_positive_negative_literals(clause);
-	if constexpr (type == tau::bf) {
-		for (tref negation : negatives) {
-			auto negated =
-				tt(negation) | tau::bf_neg | tau::bf | tt::ref;
-			for (tref positive : positives) {
-				LOG_TRACE << "are literals " << LOG_FM(positive)
-					<< " and " << LOG_FM(negation)
-					<< " clashing? ";
-				if (tau::get(positive).equals_0()) {
-					LOG_TRACE << "yes\n"; return nullptr; }
-				else if (tau::get(positive)==tau::get(negated)){
-					LOG_TRACE << "yes\n"; return nullptr; }
-				else LOG_TRACE << "no\n";
-			}
-		}
-	} else {
-		for (tref negation : negatives) {
-			auto neq_bf = tt(negation)
-					| tau::wff_neg | tau::wff | tt::ref;
-			for (tref positive : positives) {
-				auto eq_bf = tt(positive)
-					| tt::first | tau::bf | tt::ref;
-				LOG_TRACE << "are literals " << LOG_FM(positive)
-					<< " and " << LOG_FM(negation)
-					<< " clashing: ";
-				if (tau::get(eq_bf).equals_F()) {
-					LOG_TRACE << "yes\n"; return nullptr; }
-				else if (tau::get(eq_bf) == tau::get(neq_bf)) {
-					LOG_TRACE << "yes\n"; return nullptr; }
-				else LOG_TRACE << "no\n";
-			}
-		}
-	}
-	return build_dnf_clause_from_literals(positives, negatives);
-}
-
-template <NodeType node, node::type type>
-tref reduce_deprecated<node, type>::build_dnf_from_clauses(
-	const subtree_set<node>& clauses) const
-{
-	if (clauses.empty()) {
-		if constexpr (type == tau::bf) {
-			LOG_DEBUG<<"(F) dnf from clauses: 0"; return tau::_0();}
-		else  { LOG_DEBUG<<"(F) dnf from clauses: F"; return tau::_F();}
-	}
-	tref dnf = *clauses.begin();
-	for (auto it = ++clauses.begin(); it != clauses.end(); ++it)
-		if constexpr (type == tau::bf) dnf = tau::build_bf_or( dnf,*it);
-		else                           dnf = tau::build_wff_or(dnf,*it);
-
-	LOG_DEBUG << "dnf from clauses: " << LOG_FM(dnf);
-	return dnf;
-}
-template <NodeType node, node::type type>
-tref reduce_deprecated<node, type>::simplify(tref form) const {
-	subtree_set<node> clauses;
-	LOG_DEBUG << "Begin simplifying of " << LOG_FM(form);
-	for (tref clause : get_dnf_clauses(form))
-		if (tref dnf = to_minterm(clause); dnf) clauses.insert(dnf);
-	tref dnf = build_dnf_from_clauses(clauses);
-	LOG_DEBUG << "End simplifying" << LOG_FM(dnf);
-	return dnf;
-}
-
-#undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t, const reduce_bf_t<node>& r)
-{
-	using tt = typename tree<node>::traverser;
-	return tt(r(t.value()));
-}
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t, const reduce_wff_t<node>& r)
-{
-	using tt = typename tree<node>::traverser;
-	return tt(r(t.value()));
-}
-
 
 // return the inner quantifier or the top wff if the formula is not quantified
 template <NodeType node>
@@ -836,7 +625,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 		return tau::get(n).child_is(tau::variable);
 	};
 	auto vars = t.select_top(is_var);
-	sort(vars.begin(), vars.end(), lex_var_comp<node>);
+	std::sort(vars.begin(), vars.end(), lex_var_comp<node>);
 
 	std::vector<int_t> i(vars.size()); // Record assignments of vars
 
@@ -1209,7 +998,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 
 	if (all_reductions) join_paths(paths);
 	if (paths.empty() && !decided) paths.emplace_back();
-	if (enable_sort) std::ranges::sort(paths);	
+	if (enable_sort) std::ranges::sort(paths);
 
 #ifdef DEBUG
 	std::stringstream ss;
@@ -2282,7 +2071,7 @@ tref single_dnf_lift(tref fm) {
 								c[0].first()),
 					tau::build_wff_and(t[0].first(),
 								c[0].second()));
-			}        
+			}
 		}
 		return n;
 	};
@@ -2971,13 +2760,12 @@ tref wff_remove_existential(tref var, tref wff) {
 				conj = tau::_T();
 				continue;
 			}
-			// Check if conjunct is of form = 0 or != 0
-			if ((tt(conj) | tau::bf_eq) || (tt(conj) | tau::bf_neq))
-				continue;
-			// If the conjunct contains the quantified variable at this point
-			// we cannot resolve the quantifier in this clause
-			is_quant_removable_in_clause = false;
-			break;
+			// Check that conjunct is not an unresolved reference
+			if (tt(conj) | tau::wff_ref) {
+				// If the reference contains the quantified variable at this point
+				// we cannot resolve the quantifier in this clause
+				is_quant_removable_in_clause = false;
+			}
 		}
 		tref new_l = tau::build_wff_and(conjs);
 		if (!is_quant_removable_in_clause) {
@@ -2988,6 +2776,26 @@ tref wff_remove_existential(tref var, tref wff) {
 			continue;
 		}
 
+		// Check if quantified variable is bitvector
+		if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
+			if (const trefs& free_vars = get_free_vars<node>(new_l);
+				free_vars.size() == 1 &&
+				tau::get(free_vars[0]) == tau::get(var)) {
+				// By assumption quantifier is pushed in all the way
+				// Closed bv formula, simplify to T/F
+				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, new_l),
+					get_ba_type_tree<node>(tau::get(var).get_ba_type())))
+					changes[l] = nl;
+				else changes[l] = tau::_F();
+				continue;
+			} else {
+				// Quantifier is not resolvable
+				changes[l] = tau::build_wff_and(
+					tau::build_wff_ex(var, new_l), nl);
+				continue;
+			}
+		}
+		// Continue with quantifier elimination for atomless BA
 		tref f = squeeze_positives<node>(new_l);
 		tref f_0 = f ? rewriter::replace<node>(
 				f, var, tau::_0_trimmed())
@@ -3090,8 +2898,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 				size_t type = type_raw == 0
 							? 0
 							: get_ba_type_id<node>(
-								node::nso_factory::instance()
-								.default_type());
+								node::nso_factory::default_type());
 				if (auto it = new_funcs.find(type); it != new_funcs.end())
 					it->second = tau::build_bf_or(it->second, tau::trim2(d));
 				else new_funcs.emplace(type, tau::trim2(d));
@@ -3186,8 +2993,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 				size_t type = type_raw == 0
 							? 0
 							: get_ba_type_id<node>(
-								node::nso_factory::instance()
-								.default_type());
+								node::nso_factory::default_type());
 				if (auto it = new_funcs.find(type); it != new_funcs.end())
 					it->second = tau::build_bf_or(it->second, tau::trim2(d));
 				else new_funcs.emplace(type, tau::trim2(d));
@@ -3547,14 +3353,14 @@ struct simplify_using_equality {
 	// apply equality simplifications along the way
 	static tref operator() (tref fm) {
 		// Create comparator function that orders bfs by making constants smallest
-		// We have 0 < 1 < bf_constant < uninterpreted_constant < variable < rest by node count
+		// We have 0 < 1 < ba_constant < uninterpreted_constant < variable < rest by node count
 		auto tau_comp = [](tref l, tref r) {
 			if (l == _0<node>()) return true;
 			if (r == _0<node>()) return false;
 			if (l == _1<node>()) return true;
 			if (r == _1<node>()) return false;
-			if (is_child<node>(l, tau::bf_constant)) return true;
-			if (is_child<node>(r, tau::bf_constant)) return false;
+			if (is_child<node>(l, tau::ba_constant)) return true;
+			if (is_child<node>(r, tau::ba_constant)) return false;
 			if (is_child<node>(l, tau::variable)) {
 				if (is_child<node>(r, tau::variable)) {
 					// Check for uninterpreted constant
@@ -3566,9 +3372,9 @@ struct simplify_using_equality {
 			return node_count<node>(l) <= node_count<node>(r);
 		};
 		// Create union find data structure to hold equality information
-		auto uf = union_find<decltype(tau_comp), node>(tau_comp);
+		auto uf = union_find_by_less<tref, decltype(tau_comp)>();
 		// Create stack of union find data structures
-		std::vector<union_find<decltype(tau_comp), node>> uf_stack {uf};
+		std::vector<union_find_by_less<tref, decltype(tau_comp)>> uf_stack {uf};
 
 		// Traverse the formula: on encounter of = or !=, first apply simplification and, if equality, add it
 		auto f = [&uf_stack](tref n, tref parent) {
@@ -3635,469 +3441,6 @@ struct simplify_using_equality {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "to_snf"
 
-template <NodeType node>
-tref to_snf_step<node>::operator()(tref form) const {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	// we select all literals, i.e. wff equalities or it negations.
-	static const auto is_literal = [](tref n) -> bool {
-		return tau::get(n).child_is(tau::bf_eq);
-	};
-	if (auto literals = tau::get(form).select_all(is_literal);
-		literals.size())
-	{
-		// we call the recursive method traverse to traverse all the paths
-		// of the BDD.
-		subtree_set<node> remaining(literals.begin(), literals.end());
-		bdd_path path;
-		return tt(traverse(path, remaining, form))
-			| bf_reduce_canonical<node>()
-			| reduce_wff_deprecated<node> | tt::ref;
-	}
-	return form;
-}
-
-template <NodeType node>
-tref to_snf_step<node>::bdd_path_to_snf(const bdd_path& path, tref form) const {
-	using tt = typename tree<node>::traverser;
-	// we simplify the constant part of the formula
-	// TODO (HIGH) fix simplification
-	// auto simplified = tt(form) | simplify_snf<node>();
-	return tt(tau::build_wff_and(normalize(path), form))
-					| simplify_snf<node>() | tt::ref;
-}
-
-template <NodeType node>
-typename to_snf_step<node>::bdd_path to_snf_step<node>::add_to_negative_path(
-	const bdd_path& path, tref lit) const
-{
-	bdd_path npath;
-	npath.first = path.first;
-	auto lit_exp = get_exponent(lit);
-
-	for (auto& [exp, negatives]: path.second)
-		if (exp != lit_exp) npath.second[exp] = negatives;
-	if (!path.second.contains(lit_exp))
-		npath.second[lit_exp] = { lit };
-	else {
-		bool insert = true;
-		for (auto& n : path.second.at(lit_exp)){
-			// careful with the order of the statements
-			if (is_less_eq_than(n, lit)) insert = false;
-			if (is_less_eq_than(lit, n)) continue;
-			npath.second[lit_exp].insert(n);
-		}
-		if (insert) npath.second[lit_exp].insert(lit);
-	}
-	return npath;
-}
-
-template <NodeType node>
-typename to_snf_step<node>::bdd_path to_snf_step<node>::add_to_positive_path(
-	const bdd_path& path, tref lit) const
-{
-	bdd_path npath;
-	npath.second = path.second;
-	auto lit_exp = get_exponent(lit);
-
-	for (auto& [exp, positives] : path.first)
-		if (exp != lit_exp) npath.first[exp] = positives;
-	if (!path.first.contains(lit_exp))
-		npath.first[lit_exp] = { lit };
-	else {
-		bool insert = true;
-		for (auto& n : path.first.at(lit_exp)) {
-			// careful with the order of the statements
-			if (is_less_eq_than(lit, n)) insert = false;
-			if (is_less_eq_than(n, lit)) continue;
-			npath.first[lit_exp].insert(n);
-		}
-		if (insert) npath.first[lit_exp].insert(lit);
-	}
-	return npath;
-}
-
-template <NodeType node>
-tref to_snf_step<node>::traverse(const bdd_path& path,
-	const literals& remaining, tref form) const
-{
-	// we only cache results in release mode
-#ifdef TAU_CACHE
-	using cache_t = std::map<std::tuple<bdd_path, literals, tref>, tref>;
-	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find({path, remaining, form});
-		it != cache.end()) return it->second;
-#endif // TAU_CACHE
-
-	if (remaining.empty()) return bdd_path_to_snf(path, form);
-
-	auto lit = *remaining.begin();
-	auto exponent = get_exponent(lit);
-	tref f = tau::get(normalize_negative(path, lit)).equals_F()
-		? tau::_F()
-		: tt(rewriter::replace<node>(form, lit, tau::_F()))
-			| simplify_snf<node>() | tt::ref;
-	tref t = tau::get(normalize_positive(path, lit)).equals_F()
-		? tau::_F()
-		: tt(rewriter::replace<node>(form, lit, tau::_T()))
-			| simplify_snf<node>() | tt::ref;
-
-	if (tau::get(f).equals_F() && tau::get(t).equals_F()) {
-		// we only cache results in release mode
-#ifdef TAU_CACHE
-		cache[{ path, remaining, form }] = tau::_F();
-#endif // TAU_CACHE
-		return tau::_F();
-	}
-
-	literals nremaining(++remaining.begin(), remaining.end());
-
-	if (tau::get(f) == tau::get(t)) return traverse(path, nremaining, t);
-
-	tref t_snf = tau::_F(), f_snf = tau::_F();
-
-	if (!tau::get(f).equals_F()) {
-		auto f_path = add_to_negative_path(path, lit);
-		f_snf = traverse(f_path, nremaining, f);
-	}
-
-	if (!tau::get(t).equals_F()) {
-		auto t_path = add_to_positive_path(path, lit);
-		t_snf = traverse(t_path, nremaining, t);
-	}
-
-	if (tau::get(f_snf).equals_F()) {
-#ifdef TAU_CACHE
-		cache[{ path, remaining, form }] = t_snf;
-#endif // TAU_CACHE
-		return t_snf;
-	}
-
-	if (tau::get(t_snf).equals_F()) {
-#ifdef TAU_CACHE
-		cache[{ path, remaining, form }] = f_snf;
-#endif // TAU_CACHE
-		return f_snf;
-	}
-
-	tref result = tau::build_wff_or(t_snf, f_snf);
-	// we only cache results in release mode
-#ifdef TAU_CACHE
-	cache[{ path, remaining, form }] = result;
-#endif // TAU_CACHE
-	return result;
-}
-
-template <NodeType node>
-typename to_snf_step<node>::exponent to_snf_step<node>::get_exponent(
-	const tref n) const
-{
-	auto is_bf_literal = [](tref n) -> bool {
-		return (tt(n) | tau::variable).has_value()
-			|| (tt(n) | tau::bf_neg | tau::bf
-					| tau::variable).has_value();
-	};
-	auto all_vs = tau::get(n).select_top(is_bf_literal);
-	return exponent(all_vs.begin(), all_vs.end());
-}
-
-template <NodeType node>
-tref to_snf_step<node>::get_bf_constant(tref lit) const {
-	return tau::get(lit).find_top(is<node, tau::bf_constant>);
-}
-
-template <NodeType node>
-std::optional<typename to_snf_step<node>::constant>
-	to_snf_step<node>::get_constant(tref lit) const
-{
-	if (tref c = get_bf_constant(lit); c)
-		return tau::get(c).get_ba_constant();
-	return {};
-}
-
-template <NodeType node>
-typename to_snf_step<node>::partition
-	to_snf_step<node>::make_partition_by_exponent(const literals& s) const
-{
-	partition p;
-	for (tref e: s) p[get_exponent(e)].insert(e);
-	return p;
-}
-
-template <NodeType node>
-tref to_snf_step<node>::squeeze_positives(const literals& positives,
-					  const exponent& exp) const
-{
-	// find first element with non trivial constant
-	auto first = std::find_if(positives.begin(), positives.end(),
-		[&](tref l) { return get_bf_constant(l) != nullptr; });
-	// if there is no such element we return the first element
-	if (first == positives.end()) return *positives.begin();
-	// otherwise...
-	auto first_cte = tau::build_bf_ba_constant(get_constant(*first).value(), find_ba_type<node>(*first));
-	auto cte = std::accumulate(++positives.begin(), positives.end(),
-		first_cte, [&](tref l, tref r) {
-			auto l_cte = get_constant(l), r_cte = get_constant(r);
-			if (l_cte && r_cte)
-				return tau::build_bf_ba_constant(
-					std::visit(_or, l_cte.value(),
-							r_cte.value()),
-					find_ba_type<node>(l));
-			return l;
-		});
-
-	// return the conjunction of all the same exponent literals and the accumulated constant
-	auto term = std::accumulate(exp.begin(), exp.end(), cte,
-		[](tref l, tref r) { return tau::build_bf_and(l, r); });
-	// return the corresponding wff
-	return tau::build_bf_eq(term);
-}
-
-template <NodeType node>
-bool to_snf_step<node>::is_less_eq_than(tref ll, const exponent& le, tref rl,
-	const exponent& re) const
-{
-	return std::includes(le.begin(), le.end(), re.begin(), re.end(), lcrs_tree<node>::subtree_less)
-			&& is_less_eq_than(ll, rl);
-}
-
-// remove redundant positives
-template <NodeType node>
-std::map<typename to_snf_step<node>::exponent, tref>
-	to_snf_step<node>::remove_redundant_positives(
-		const std::map<exponent, tref>& positives) const
-{
-	std::map<exponent, tref> nonredundant;
-
-	for (auto& [exp, lit]: positives) {
-		bool insert = true;
-		std::set<exponent> to_remove;
-		for (auto& [e, l]: nonredundant) {
-			if (is_less_eq_than(lit, exp, l, e)) {
-				insert = false; break;
-			} else if (is_less_eq_than(l, e, lit, exp))
-				to_remove.insert(e);
-		}
-		if (insert) nonredundant[exp] = lit;
-		for (auto& e: to_remove) nonredundant.erase(e);
-	}
-
-	return nonredundant;
-}
-
-template <NodeType node>
-typename to_snf_step<node>::partition
-	to_snf_step<node>::remove_redundant_negatives(
-		const partition& negatives) const
-{
-	partition nonredundant;
-
-	for (auto& [exp, lits] : negatives)
-		for (auto& lit : lits) {
-			bool insert = true;
-			std::set<exponent> to_remove;
-			for (auto& [e, ls] : nonredundant)
-				for(auto& l : ls) {
-					if (is_less_eq_than(l, e, lit, exp)) {
-						insert = false; break;
-					} else if (is_less_eq_than(
-								lit, exp, l, e))
-						to_remove.insert(e);
-				}
-			if (insert) nonredundant[exp].insert(lit);
-			for (auto& e: to_remove) nonredundant.erase(e);
-		}
-
-	return nonredundant;
-}
-
-// squeezed positives as much as possible possible.
-template <NodeType node>
-std::map<typename to_snf_step<node>::exponent,
-	 typename to_snf_step<node>::literal>
-		to_snf_step<node>::squeeze_positives(
-			const partition& positives) const
-{
-	// first we squeeze positives by exponent
-	std::map<exponent, literal> squeezed;
-	for (auto& [exponent, literals] : positives)
-		squeezed[exponent] = squeeze_positives(literals, exponent);
-	// then we remove redundant positives
-	return remove_redundant_positives(squeezed);
-}
-
-template <NodeType node>
-bool to_snf_step<node>::is_less_eq_than(literal l, literal r) const {
-	auto l_cte = get_constant(l), r_cte = get_constant(r);
-	if (!l_cte) return !r_cte;
-	if (!r_cte) return true;
-	return std::visit(_leq, l_cte.value(), r_cte.value());
-}
-
-template <NodeType node>
-typename to_snf_step<node>::literal to_snf_step<node>::normalize(
-	const literals& negatives, literal positive, const exponent& exp) const
-{
-	// we tacitely assume that the positive literal has a constant
-	// different from 1. Otherwise, the normalizer should already
-	// return F.
-	auto neg_positive_cte = tau::build_bf_neg(
-		tau::build_bf_ba_constant(get_constant(positive).value(), find_ba_type<node>(positive)));
-	// now we conjunct the previous result with the constant of n
-	literals lits; lits.insert(positive);
-	for (tref negative : negatives) {
-		auto n_cte = get_constant(negative);
-		tref nn_cte = n_cte
-			? tau::build_bf_and(neg_positive_cte, tau::build_bf_ba_constant(n_cte.value(), find_ba_type<node>(negative)))
-			: neg_positive_cte;
-		auto nn = tau::build_bf_and(nn_cte, tau::build_bf_and(exp));
-		lits.insert(tau::build_bf_neq(nn));
-	}
-	return tau::build_wff_and(lits);
-}
-
-// normalize each bdd path applying Corollary 3.1 from TABA book with few
-// improvements related to the handling of negative literals.
-template <NodeType node>
-tref to_snf_step<node>::normalize(const bdd_path& path) const {
-	// if we have no positive literals we return the conjunction of all the
-	// negative literals negated. PLease note that we store the positive
-	// versions of the literals in the second component of the path. Thus,
-	// we need to negate them or, equivalently, to build the conjunction of
-	// them, we compute the negation of the the disjunction.
-	if (path.first.empty()) {
-		literals negs;
-		for (auto& [_, lits] : remove_redundant_negatives(path.second))
-			negs.insert(lits.begin(), lits.end());
-		return tau::build_wff_neg(tau::build_wff_or(negs));
-	}
-
-	// otherwise, let us consider lits the set of literals to be returned
-	// conjuncted.
-	partition squeezed_negatives;
-	// first we squeezed positive literals...
-	auto squeezed_positives = squeeze_positives(path.first);
-	// ...the negatives are already squeezed (by order)
-	// for every negative class (same exponent) of literals...
-	for (auto& [negative_exponent, negatives] : path.second) {
-		// - if no positive literal has the same exponent as n, we add n to
-		//   the literals
-		if (!squeezed_positives.contains(negative_exponent)) {
-			squeezed_negatives[negative_exponent].insert(
-				tau::build_wff_neg(
-					tau::build_wff_or(negatives)));
-			continue;
-		}
-		// - if the positive literal has 1 as constant we return F,
-		if (!get_bf_constant(squeezed_positives[negative_exponent]))
-			return tau::_F();
-	// otherwise we compute the new negated literal following the Corollary 3.1
-		// from TABA book.
-		squeezed_negatives[negative_exponent].insert(normalize(
-			negatives, squeezed_positives.at(negative_exponent),
-			negative_exponent));
-	}
-	// we remove redundant negatives
-	squeezed_negatives = remove_redundant_negatives(squeezed_negatives);
-	// and add the positive terms...
-	literals result;
-	for (auto [_, negatives]: squeezed_negatives)
-		result.insert(negatives.begin(), negatives.end());
-
-	for (auto [_, positive]: squeezed_positives)
-		result.insert(positive);
-	// and return the conjunction of all the lits
-	return tau::build_wff_and(result);
-}
-
-template <NodeType node>
-typename to_snf_step<node>::bdd_path to_snf_step<node>::get_relative_path(
-	const bdd_path& path, literal lit) const
-{
-	bdd_path relative_path;
-	auto exp = get_exponent(lit);
-	if (path.first.contains(exp))
-		relative_path.first[exp] = path.first.at(exp);
-	if (path.second.contains(exp))
-		relative_path.second[exp] = path.second.at(exp);
-	return relative_path;
-}
-
-template <NodeType node>
-tref to_snf_step<node>::normalize_positive(
-	const bdd_path& path, literal positive) const
-{
-	auto relative_path = get_relative_path(path, positive);
-	return normalize(add_to_positive_path(relative_path, positive));
-}
-
-template <NodeType node>
-tref to_snf_step<node>::normalize_negative(
-	const bdd_path& path, literal negative) const
-{
-	auto relative_path = get_relative_path(path, negative);
-	return normalize(add_to_negative_path(relative_path, negative));
-}
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n, const to_snf_step<node>& r)
-{
-	return typename tree<node>::traverser(r(n.value()));
-}
-
-template <NodeType node>
-tref snf_bf(tref n) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	// TODO (HIGH) give a proper implementation (call to_bdd...)
-	return tt(n) | bf_reduce_canonical<node>()
-		| tt::f(to_dnf<node, false>)
-		| repeat_all<node, step<node>>(elim_eqs<node>())
-		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_bf_deprecated<node>
-		| tt::ref;
-}
-
-// We mostly follow the Remark 3.5 from the TABA book. However, we deviate at
-// some points. In particular, we assume that the formula is in MNF,
-// instead of in MNF+BDD. The reason behind this is that we want to avoid the
-// construction of the BDD form and then traverse it. Our aim is to build the
-// BDD form and traverse it afterwards.
-template <NodeType node>
-tref snf_wff(tref n) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	LOG_DEBUG << "--------------------------------";
-	LOG_DEBUG << "to_snf formula: " << LOG_FM(n);
-	LOG_DEBUG << "--------------------------------";
-	auto [_, nn] = get_inner_quantified_wff<node>(n);
-	// in the first step we apply compute the SNF of the formula, as a result we get
-	// the formula in SNF with positive equal exponent literals sqeezed.
-	tref first_step = tt(tau::build_wff_neg(nn))
-		| bf_reduce_canonical<node>()
-		| tt::f(unsqueeze_wff<node>)
-		| simplify_snf<node>()
-		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>())
-		| tt::ref;
-	LOG_DEBUG << "--------------------------------";
-	LOG_DEBUG << "to_snf first_step result: " << LOG_FM(first_step);
-	LOG_DEBUG << "--------------------------------";
-	// in the second step we compute the SNF of the negation of the the result
-	// of the first step in order to squeeze the negative equal exponent literals.
-	// Note that in this case we don't need to unsqueeze the formula.
-	tref second_step = tt(tau::build_wff_neg(first_step))
-		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>())
-		| repeat_all<node, step<node> >(to_steps<node>({
-			elim_eqs<node>(), fix_neg_in_snf<node>()
-		}))
-		| bf_reduce_canonical<node>()
-		| tt::ref;
-	LOG_DEBUG << "--------------------------------";
-	LOG_DEBUG << "to_snf second_step result: " << LOG_FM(second_step);
-	LOG_DEBUG << "--------------------------------";
-	return rewriter::replace<node>(n, nn, second_step);
-}
 
 template <NodeType node>
 tref build_split_wff_using(typename node::type type, tref a, tref b) {

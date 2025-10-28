@@ -3,6 +3,11 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "hooks"
 
+#include <type_traits>
+
+#include "boolean_algebras/cvc5/cvc5.h"
+#include "hooks.h"  // Only for IDE resolution, not really needed.
+
 namespace idni::tau_lang {
 
 template <NodeType node>
@@ -10,20 +15,19 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
 	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift)
-			log("- HOOK    -", v, ch, len, r, true);)
+		log("- HOOK    -", v, ch, len, r, true);)
 	tref ret = nullptr;
-	if      (v.nt == tau::bf)    ret = term( v, ch, len, r);
-	else if (v.nt == tau::wff)   ret = wff(  v, ch, len, r);
-	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
+	if      (v.nt == tau::bf)          ret = term( v, ch, len, r);
+	else if (v.nt == tau::wff)         ret = wff(  v, ch, len, r);
+	else if (v.nt == tau::shift)       ret = shift(v, ch, len, r);
 	else return tau::get_raw(v, ch, len, r);
 
 	if (ret) {
 		HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
-		DBG(assert(ret != nullptr);)
 		DBG(typename node::type nt = tau::get(ret).get_type();)
 		DBG(assert(nt == tau::bf || nt == tau::wff
 			|| nt == tau::shift || nt == tau::integer);)
-	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error"); }
+	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error";) }
 	return ret;
 }
 
@@ -191,7 +195,7 @@ tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	case tau::bf_and:      return term_and(v, ch, len, r);
 	case tau::bf_neg:      return term_neg(v, ch, len, r);
 	case tau::bf_xor:      return term_xor(v, ch, len, r);
-	case tau::bf_constant: return cte(v, ch, len, r);
+	case tau::ba_constant: return cte(v, ch, len, r);
 	default: return tau::get_raw(v, ch, len, r);
 	}
 }
@@ -843,7 +847,7 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 template <NodeType node>
 tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq_cte", v, ch, len, r);)
-	auto l = tt(ch[0]) | tau::bf | tau::bf_constant;
+	auto l = tt(ch[0]) | tau::bf | tau::ba_constant;
 	if (l && (l | tt::ba_constant) == false) return tau::get(tau::_T(), r);
 	else if (l) return tau::get(tau::_F(), r);
 	return tau::get_raw(v, ch, len, r);
@@ -894,7 +898,7 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 template <NodeType node>
 tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neq_cte", v, ch, len, r);)
-	auto l = tt(ch[0]) | tau::bf | tau::bf_constant;
+	auto l = tt(ch[0]) | tau::bf | tau::ba_constant;
 	if (l.has_value() && (l | tt::ba_constant) == false)
 		return tau::get(tau::_F(), r);
 	else if (l.has_value()) return tau::get(tau::_T(), r);
@@ -960,7 +964,11 @@ tref get_hook<node>::wff_always(const node& v, const tref* ch, size_t len, tref 
 }
 
 template <NodeType node>
-tref get_hook<node>::wff_conditional(const node& v, const tref* ch, size_t len, tref r) {
+tref get_hook<node>::wff_conditional(
+		[[maybe_unused]] const node& v,
+		[[maybe_unused]] const tref* ch,
+		[[maybe_unused]] size_t len,
+		[[maybe_unused]] tref r) {
 	HOOK_LOGGING(log("wff_conditional", v, ch, len, r);)
 	//RULE(WFF_CONDITIONAL_SIMPLIFY_0, "F ? $X : $Y ::= $Y.")
 	if (arg1(ch).is(tau::wff_f)) {
@@ -977,7 +985,8 @@ tref get_hook<node>::wff_conditional(const node& v, const tref* ch, size_t len, 
 		HOOK_LOGGING(applied("$X ? $Y : $Y ::= $Y.");)
 		return tau::get(arg3_fm(ch).get(), r);
 	}
-	return tau::get_raw(v, ch, len, r);
+	return tau::get(tau::build_wff_conditional(
+			arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);
 }
 
 template <NodeType node>

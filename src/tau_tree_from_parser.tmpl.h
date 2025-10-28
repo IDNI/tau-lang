@@ -43,7 +43,6 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	// get tau tree node instance from parse tree node ref
 	auto m_get = [&m](tref t) { return get(m.at(t)); };
 
-	size_t src = 0; // source dict id of the current constant
 	bool error = false;
 
 	std::map<size_t, tref> named_constants; // dict named constant names
@@ -140,40 +139,6 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 		tref x = nullptr; // result of node transformation
 
-		// takes already transformed bf_constant parser tree node, ie.
-		// it takes tau tree bf_constant node with type
-		// and processes it:
-		// - check if they are named constants
-		// - if not call get_ba_constant() which stores them in the pool
-		//   and returns the bound constant node
-		auto process_bf_constant =
-			[&src, &error, &named_constants](tref x) -> tref
-		{
-			// LOG_TRACE << "binding: " << src << " " << get_type_sid<node>(x);
-			// get type id from type subnode (or 0 = untyped)
-			size_t ba_type_id = get_ba_type_id<node>(
-						get_type_sid<node>(x));
-			if (ba_type_id == 0) { // untyped
-				// check if it's a named constant
-				auto it = named_constants.find(src);
-				if (it != named_constants.end()) {
-					LOG_TRACE << "named bound: "
-						<< LOG_FM(it->second);
-					return it->second;
-				}
-			}
-			// get the bound constant node
-			tref n = get_ba_constant_from_source(src, ba_type_id);
-			tau::use_hooks = false;
-			// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
-			src = 0;
-			if (n == nullptr || n == x)
-				return error = true, nullptr;
-			LOG_TRACE << (ba_type_id == 0 ? "un" : "") << "bound: "
-								<< LOG_FM(n);
-			return n;
-		};
-
 		switch (nt) {
 			// tau tree terminals
 			case digits: // preprocess digits
@@ -196,20 +161,11 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			case bf_fall:
 			case bf_fex: x = process_quantifier_vars(bf); break;
 
-			// preprocess source node
-			case source:
-				src = dict(ptr.get_terminals());
-				DBG(LOG_TRACE << "BA constant source: `"
-							<< dict(src) << "`");
-				x = nullptr;
-				break;
-
 			case bf_t:
 			case bf_f:
 				if (bool typed = ptr.first() != nullptr; typed){
 					ba_type = get_ba_type_id<node>(
-						tau::get(m_ref(ptr.first()))
-							.data());
+						m_ref(ptr.first()));
 					LOG_TRACE << "ba_type: "
 						  << LOG_BA_TYPE(ba_type);
 				}
@@ -221,8 +177,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			default:
 				if (nt == variable && ptr.second()) {
 					ba_type = get_ba_type_id<node>(
-						tau::get(m_ref(ptr.second()))
-							.data());
+						m_ref(ptr.second()));
 					LOG_TRACE << "ba_type: "
 						  << LOG_BA_TYPE(ba_type);
 				} else if (nt == input_def || nt == output_def) {
@@ -231,8 +186,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 						.is(static_cast<size_t>(tau::type)))
 					{
 						ba_type = get_ba_type_id<node>(
-							tau::get(m_ref(ptr.second()))
-								.data());
+							m_ref(ptr.second()));
 						LOG_TRACE << "ba_type: "
 								<< LOG_BA_TYPE(ba_type);
 					}
@@ -252,14 +206,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 				// DBG(for (auto c : ch) LOG_TRACE << "child: " << LOG_FM_DUMP(c);)
 				x = getx(ch);
 
-				if (nt == bf || nt == wff)
-					tau_lang::get_free_vars<node>(x);
+				// if (nt == bf || nt == wff)
+				// 	tau_lang::get_free_vars<node>(x);
 
-				// process constant from a transformed node
-				if (nt == bf_constant && src)
-					if (x = process_bf_constant(x);
-						x == nullptr)
-							return false;
 				break;
 		}
 
@@ -280,22 +229,21 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	DBG(LOG_TRACE << "parse tree: "
 			<< (parse_tree::get(ptr.get()).print(ss), ss.str());)
 
+	auto using_hooks = tau::use_hooks;
 	tau::use_hooks = false;
 	// DBG(LOG_TRACE << "HOOKS DISABLED: " << tau::use_hooks;)
 	post_order<tau_parser::pnode>(ptr.get()).search(transformer);
 	if (error || m.find(ptr.get()) == m.end()) {
-		tau::use_hooks = true;
 		// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
-		return nullptr;
+		return tau::use_hooks = using_hooks, nullptr;
 	}
 	DBG(LOG_TRACE << "transformed: " << tree::get(m.at(ptr.get())).to_str();)
 	DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
 	tref transformed = m_ref(ptr.get());
 	if (options.infer_ba_types)
 		transformed = infer_ba_types<node>(transformed);
-	tau::use_hooks = true;
 	// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
-	return options.reget_with_hooks ? reget(transformed) : transformed;
+	return tau::use_hooks = using_hooks, options.reget_with_hooks ? reget(transformed) : transformed;
 }
 
 //------------------------------------------------------------------------------
@@ -331,100 +279,6 @@ tref tree<node>::get_from_file(const std::string& filename,
 {
 	auto result = tau_parser::instance().parse(filename, options.parse);
 	return tree<node>::get(result, options);
-}
-
-template <NodeType node>
-rewriter::builder tree<node>::get_builder(tref ref) {
-	return tau_lang::get_builder<node>(ref);
-}
-
-template <NodeType node>
-rewriter::builder tree<node>::get_builder(const std::string& source) {
-	return tau_lang::get_builder<node>(source);
-}
-
-template <NodeType node>
-rewriter::rules tree<node>::get_rules(tref ref) {
-	return tau_lang::get_rules<node>(ref);
-}
-
-template <NodeType node>
-rewriter::rules tree<node>::get_rules(const std::string& source) {
-	return tau_lang::get_rules<node>(source);
-}
-
-template <NodeType node>
-rewriter::library tree<node>::get_library(tref ref) {
-	return tau_lang::get_library<node>(ref);
-}
-
-template <NodeType node>
-rewriter::library tree<node>::get_library(const std::string& str) {
-	return tau_lang::get_library<node>(str);
-}
-
-template <NodeType node>
-rewriter::builder get_builder(tref ref) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	DBG(assert(ref != nullptr);)
-	tt b(ref);
-	auto body = b | tau::builder_body | tt::only_child;
-	DBG(assert((body | tt::nt) == tau::bf_builder_body
-		|| (body | tt::nt) == tau::wff_builder_body);)
-	return { tau::geth(b | tau::builder_head | tt::ref),
-		 tau::geth(body | tt::first | tt::ref) };
-}
-
-template <NodeType node>
-rewriter::builder get_builder(const std::string& source){
-	using tau = tree<node>;
-	typename tau::get_options opts{ .parse = { .start = tau::builder },
-						   .infer_ba_types = false,
-						   .reget_with_hooks = false };
-	return get_builder<node>(tau::get(source, opts));
-}
-
-template <NodeType node>
-rewriter::rules get_rules(tref r) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	tt rules(r);
-	DBG(assert(rules.is(tau::rules));)
-	auto rs = rules || tau::rule || tt::first;
-	rewriter::rules x;
-	for (auto r : rs.traversers()) {
-		// tree::get(r.value()).print(std::cout << "rule: ");
-		x.emplace_back( tau::geth(r| tt::first  | tt::first | tt::ref),
-				tau::geth(r| tt::second | tt::first | tt::ref));
-	}
-	return x;
-}
-
-template <NodeType node>
-rewriter::library get_rules(const std::string& str) {
-	using tau = tree<node>;
-	typename tau::get_options opts{ .parse = { .start = tau::rules },
-					.infer_ba_types = false,
-					.reget_with_hooks = false };
-	return get_rules<node>(tau::get(str, opts));
-}
-
-template <NodeType node>
-rewriter::rules get_library(tref r) {
-	using tau = tree<node>;
-	const auto& lib = tau::get(r);
-	DBG(assert(lib.is(tau::library));)
-	return get_rules<node>(lib.first());
-}
-
-template <NodeType node>
-rewriter::library get_library(const std::string& str) {
-	using tau = tree<node>;
-	typename tau::get_options opts{ .parse = { .start = tau::library },
-					.infer_ba_types = false,
-					.reget_with_hooks = false };
-	return get_library<node>(tau::get(str, opts));
 }
 
 } // namespace idni::tau_lang

@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "tau_tree.h"
+#include "ba_types.h"
 #include "interpreter_types.h"
 
 namespace idni::tau_lang {
@@ -129,15 +130,23 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref tree<node>::get() const { return base_t::get(); }
+
+template <NodeType node>
+const tree<node>& tree<node>::get(const std::optional<tref>& id) {
+	return id ? (const tree&) base_t::get(*id) : (const tree&) base_t::get();
+}
+
 template <NodeType node>
 const tree<node>& tree<node>::get(const tref id) {
 	DBG(assert(id != nullptr);)
 	return (const tree&) base_t::get(id);
 }
+
 template <NodeType node>
 const tree<node>& tree<node>::get(const htref& h) {
 	return (const tree&) base_t::get(h);
 }
+
 template <NodeType node>
 htref tree<node>::geth(tref h) {
 	DBG(assert(h != nullptr);)
@@ -175,14 +184,68 @@ tref tree<node>::get(const node& v, tref ch1, tref ch2) {
 
 template <NodeType node>
 tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
+	// update ba_type if needed
+	//auto new_v = v;
+	//auto nt = v.ba_type;
+	auto propagate_types = [](const node n) {
+		switch (n.nt) {
+			case node::type::bf_interval:
+			case node::type::bf: case node::type::bf_eq: case node::type::bf_neq:
+			case node::type::bf_lteq: case node::type::bf_nlteq: case node::type::bf_gt:
+			case node::type::bf_ngt: case node::type::bf_gteq: case node::type::bf_ngteq:
+			case node::type::bf_lt: case node::type::bf_nlt: case node::type::bf_or:
+			case node::type::bf_xor: case node::type::bf_and: case node::type::bf_neg:
+			case node::type::bf_add: case node::type::bf_sub: case node::type::bf_mul:
+			case node::type::bf_div: case node::type::bf_mod: case node::type::bf_shr:
+			case node::type::bf_shl: case node::type::bf_fall: case node::type::bf_fex:
+			case node::type::q_vars: case node::type::q_var:
+				return true;
+			default:
+				return false;
+		}
+	};
+
+	auto get_type = [](const node& n, const tref* ch, size_t len) -> size_t {
+		if (ba_types<node>::id(untyped_type<node>()) != n.ba_type) return n.ba_type;
+		for (size_t i = 0; i < len; ++i) {
+			if(tree<node>::get(ch[i]).value.ba_type != ba_types<node>::id(untyped_type<node>())) {
+				return tree<node>::get(ch[i]).value.ba_type;
+			}
+		}
+		return ba_types<node>::id(untyped_type<node>()) ; // something must have type;
+	};
+
+	auto update_type = [&](const node& n, const tref* ch, size_t len, size_t ba_type) -> std::pair<node, trefs> {
+		auto new_v = n.ba_type == ba_type ? n : n.ba_retype(ba_type);
+		trefs new_ch;
+		for (size_t i = 0; i < len; ++i) {
+			if (tree<node>::get(ch[i]).value.ba_type != ba_type) {
+				auto new_ch_i_n = tree<node>::get(ch[i]).value.ba_retype(ba_type);
+				auto new_ch_i_ch = tree<node>::get(ch[i]).get_children();
+				auto new_ch_i = tree<node>::get(new_ch_i_n, new_ch_i_ch.data(),
+					new_ch_i_ch.size());
+				new_ch.push_back(new_ch_i);
+			} else {
+				new_ch.push_back(ch[i]);
+			}
+		}
+		return { new_v, new_ch };
+	};
+
 	if (!use_hooks) return get_raw(v, ch, len, r);
+	// propagate types?
+	if (propagate_types(v)) {
+		size_t ba_type = get_type(v, ch, len);
+		auto [new_v, new_ch] = update_type(v, ch, len, ba_type);
+		return base_t::get(new_v, new_ch.data(), len, r);
+	}
+	// get with hooks
 	get_hook<node> hook;
 	// set hook first if not hooked
 	if (!base_t::is_hooked()) base_t::set_hook(
 		[&hook](const node& v, const tref* ch, size_t len, tref r) {
 			return hook(v, ch, len, r);
 		});
-	// get with hooks
 	return base_t::get(v, ch, len, r);
 }
 
@@ -332,14 +395,13 @@ tref tree<node>::get_integer(int_t n) {
 	return get(node(integer, static_cast<size_t>(n)));
 }
 
+// constants
+
 template <NodeType node>
-tref tree<node>::get_ba_constant(
-	const constant& constant, const std::string& type_name)
+tref tree<node>::get_ba_constant(const constant& constant, tref type_tree)
 {
-	LOG_TRACE << " -- get ba_constant(constant constant, string type_name): `"
-		<< LOG_BA(constant) << "`, " << LOG_BA(type_name);
 	return ba_constants<node>::get(constant,
-				       get_ba_type_id<node>(type_name));
+				       get_ba_type_id<node>(type_tree));
 }
 
 template <NodeType node>
@@ -353,12 +415,10 @@ tref tree<node>::get_ba_constant(const constant& constant, size_t ba_type_id)
 template <NodeType node>
 tref tree<node>::get_ba_constant(
 	const std::string& constant_source,
-	const std::string  type_name)
+	tref type_tree)
 {
-	LOG_TRACE << " -- get ba_constant(string constant_source, string type_name): `"
-		<< constant_source << "`, " << LOG_BA(type_name);
 	return get_ba_constant_from_source(dict(constant_source),
-		get_ba_type_id<node>(type_name));
+		get_ba_type_id<node>(type_tree));
 }
 
 template <NodeType node>
@@ -366,21 +426,19 @@ tref tree<node>::get_ba_constant_from_source(
 	size_t constant_source_sid,
 	size_t ba_type_id)
 {
+#ifdef DEBUG
 	LOG_TRACE << " -- get ba_constant_from_source(size_t sid, size_t tid): `"
 				<< dict(constant_source_sid) << "`, "
 				<< LOG_BA_TYPE(ba_type_id) << " " << ba_type_id;
-
 	if (ba_type_id == 0)
 		LOG_TRACE << " -- untyped: " << dict(constant_source_sid);
 	else LOG_TRACE << " -- typed: " << ba_types<node>::name(ba_type_id);
+	assert(ba_type_id > 0);
+#endif // DEBUG
 
-	tref r = ba_type_id == 0
-		? get( // untyped contains source sid
-			node::ba_constant(constant_source_sid, ba_type_id))
-		: get_ba_constant(
-				node::nso_factory::instance().parse(
+	tref r = get_ba_constant(ba_constants<node>::get(
 					dict(constant_source_sid),
-					ba_types<node>::name(ba_type_id)));
+					ba_types<node>::type_tree(ba_type_id)));
 	if (r == nullptr) LOG_ERROR << "Parsing constant `"
 		<< dict(constant_source_sid) << "` failed for type `"
 		<< ba_types<node>::name(ba_type_id) << "`.";
@@ -398,7 +456,7 @@ tref tree<node>::get_ba_constant(size_t constant_id, size_t ba_type_id) {
 
 template <NodeType node>
 tref tree<node>::get_ba_constant(
-	const std::pair<constant, std::string>& typed_const)
+	const std::pair<constant, tref>& typed_const)
 {
 	LOG_TRACE << " -- get_ba_constant(pair<constant, string>): `"
 		<< LOG_BA(typed_const.first) << "`, " << LOG_BA(typed_const.second);
@@ -408,9 +466,9 @@ tref tree<node>::get_ba_constant(
 
 template <NodeType node>
 tref tree<node>::get_ba_constant(
-	const std::optional<std::pair<constant, std::string>>& typed_const)
+	const std::optional<std::pair<constant, tref>>& typed_const)
 {
-	if (!typed_const) LOG_TRACE 
+	if (!typed_const) LOG_TRACE
 		<< "get_ba_constant(optional): nullptr";
 	if (!typed_const) return nullptr;
 	return get_ba_constant(typed_const.value());
@@ -442,6 +500,11 @@ tree_range<tree<node>> tree<node>::children_trees() const{
 template <NodeType node>
 tref tree<node>::only_child() const {
 	return base_t::only_child();
+}
+
+template<NodeType node>
+bool tree<node>::has_child() const {
+	return base_t::has_child();
 }
 
 template <NodeType node>
@@ -535,7 +598,7 @@ template <NodeType node>
 bool tree<node>::is_string_nt(size_t nt) {
 	static const std::set<size_t> string_nts{
 		sym, type, source, capture, var_name, uconst_name, file_name,
-		ctnvar, option_name, option_value
+		ctnvar, option_name, option_value,
 	};
 	return string_nts.contains(nt);
 }
@@ -552,8 +615,7 @@ template <NodeType node>
 bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 	switch (nt) {
 		case bf:
-		case bf_constant:
-		case bf_splitter:
+		case ba_constant:
 		case bf_fall:
 		case bf_fex:
 		case bf_ref:
@@ -596,7 +658,12 @@ template <NodeType node>
 bool tree<node>::is_num() const { return is(num) || is(history_id); }
 
 template <NodeType node>
-bool tree<node>::is_ba_constant() const { return is(bf_constant); }
+bool tree<node>::is_ba_constant() const { return is(ba_constant); }
+
+template <NodeType node>
+bool tree<node>::is_bv_constant() const {
+	return is(ba_constant) && get_ba_type_name() == "bv";
+}
 
 template <NodeType node>
 bool tree<node>::is_term() const { return this->value.term || is(io_var); }
@@ -639,7 +706,7 @@ bool tree<node>::equals_T() const {
 
 template <NodeType node>
 bool tree<node>::child_is(size_t nt) const {
-	if (only_child() == nullptr) return false;
+	if (!has_child()) return false;
 	return first_tree().is(nt);
 }
 
@@ -673,7 +740,8 @@ size_t tree<node>::get_num() const {
 
 template <NodeType node>
 size_t tree<node>::get_ba_constant_id() const {
-	DBG(assert(is_ba_constant());)
+	DBG(LOG_TRACE << LOG_FM_TREE(get()));
+	DBG(assert(is_ba_constant() || is_bv_constant());)
 	return this->value.data;
 }
 
@@ -684,14 +752,43 @@ tree<node>::constant tree<node>::get_ba_constant() const {
 }
 
 template <NodeType node>
-size_t tree<node>::get_ba_type() const {
-	if (this->value.nt == bf) return child_tree(0).get_ba_type();
-	return this->value.ba;
+size_t tree<node>::get_bv_constant_id() const {
+	DBG(assert(is_bv_constant());)
+	return this->value.data;
 }
 
 template <NodeType node>
-const std::string& tree<node>::get_ba_type_name() const {
+idni::tau_lang::bv tree<node>::get_bv_constant() const {
+	DBG(assert(is_bv_constant());)
+	auto cte = ba_constants<node>::get(data());
+	DBG(assert(std::holds_alternative<idni::tau_lang::bv>(cte));)
+	return std::get<idni::tau_lang::bv>(cte);
+}
+
+template <NodeType node>
+size_t tree<node>::get_bv_size() const {
+	DBG(assert(is_bv_constant());)
+	auto cte = ba_constants<node>::get(data());
+	DBG(assert(std::holds_alternative<idni::tau_lang::bv>(cte));)
+	return std::get<idni::tau_lang::bv>(cte).get_size();
+}
+
+template <NodeType node>
+size_t tree<node>::get_ba_type() const {
+	// Commented as now we also type bf nodes with ba_type
+	//if (this->value.nt == bf)
+	//	return child_tree(0).get_ba_type();
+	return this->value.ba_type;
+}
+
+template <NodeType node>
+std::string tree<node>::get_ba_type_name() const {
 	return ba_types<node>::name(this->get_ba_type());
+}
+
+template<NodeType node>
+tref tree<node>::get_ba_type_tree() const {
+	return ba_types<node>::type_tree(this->get_ba_type());
 }
 
 template <NodeType node>
