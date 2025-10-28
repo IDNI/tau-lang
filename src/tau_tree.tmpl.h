@@ -197,10 +197,11 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 			case node::type::bf_xor: case node::type::bf_and: case node::type::bf_neg:
 			case node::type::bf_add: case node::type::bf_sub: case node::type::bf_mul:
 			case node::type::bf_div: case node::type::bf_mod: case node::type::bf_shr:
-			case node::type::bf_shl:
-			return true;
+			case node::type::bf_shl: case node::type::bf_fall: case node::type::bf_fex:
+			case node::type::q_vars: case node::type::q_var:
+				return true;
 			default:
-			return false;
+				return false;
 		}
 	};
 
@@ -472,53 +473,6 @@ tref tree<node>::get_ba_constant(
 	if (!typed_const) return nullptr;
 	return get_ba_constant(typed_const.value());
 }
-
-// bv constants
-
-/*
-template <NodeType node>
-tref tree<node>::get_bv_constant(const constant& constant, size_t ba_type_id)
-{
-	LOG_TRACE << "-- get bv_constant(constant constant): `"
-		<< LOG_BA(constant);
-	return ba_constants<node>::get(constant, ba_type_id);
-}
-
-template <NodeType node>
-tref tree<node>::get_bv_constant(const idni::tau_lang::bv& constant, size_t ba_type_id) {
-	tau::constant ba_cte = tau::constant(constant);
-	return get_bv_constant(ba_cte, ba_type_id);
-}
-
-template<NodeType node>
-tref tree<node>::get_bv_constant(const idni::tau_lang::bv& constant,
-	tref type_tree) {
-	tau::constant ba_cte = tau::constant(constant);
-	return get_bv_constant(ba_cte, get_ba_type_id<node>(type_tree));
-}
-
-template <NodeType node>
-tref tree<node>::get_bv_constant_from_source(size_t constant_source_sid,
-		size_t ba_type_id) {
-	return get_bv_constant_from_source(dict(constant_source_sid), ba_type_id);
-}
-
-template <NodeType node>
-tref tree<node>::get_bv_constant_from_source(const std::string& source,
-		size_t ba_type_id) {
-	auto c_w_t =
-		ba_constants<node>::get(source, ba_types<node>::type_tree(ba_type_id));
-	if (!c_w_t) return nullptr;
-	return get_bv_constant(c_w_t.value().first, ba_type_id);
-}
-
-template <NodeType node>
-tref tree<node>::get_bv_constant(size_t constant_id, size_t ba_type_id) {
-	LOG_TRACE << " -- get_bv_constant(size_t constant_id): `"
-		<< LOG_BA(ba_constants<node>::get(constant_id));
-	return get_bv_constant(ba_constants<node>::get(constant_id), ba_type_id);
-}
-*/
 
 // -----------------------------------------------------------------------------
 // children
