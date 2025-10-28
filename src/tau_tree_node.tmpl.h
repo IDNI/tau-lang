@@ -13,20 +13,19 @@ namespace idni::tau_lang {
 template <typename... BAs>
 requires BAsPack<BAs...>
 node<BAs...> node<BAs...>::retype(size_t new_nt) const {
-	return node(new_nt, data, term, ba, ext);
+	return node(new_nt, data, term, ba_type, ext);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 node<BAs...> node<BAs...>::ba_retype(size_t new_ba) const {
-	DBG(assert(new_ba <= node<BAs...>::ba_max));
 	return node(nt, data, term, new_ba, ext);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 node<BAs...> node<BAs...>::replace_data(size_t new_data) const {
-	return node(nt, new_data, term, ba, ext);
+	return node(nt, new_data, term, ba_type, ext);
 }
 
 template <typename... BAs>
@@ -38,10 +37,8 @@ constexpr node<BAs...> node<BAs...>::ba_constant(
 	// 	<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
 	// LOG_TRACE << " -- node::bitsizes: " << node::nt_bits << "/1/"
 	// 	  << node::ba_bits << "/1/" << node::data_bits;
-	auto n = node(type::bf_constant, constant_id,
-		    true /* is_term */, ba_type_id);
+	return node(type::ba_constant, constant_id, true /* is_term */, ba_type_id);
 	// LOG_TRACE << " -- node::ba_constant result:" << n;
-	return n;
 }
 
 template <typename... BAs>
@@ -67,8 +64,7 @@ constexpr node<BAs...> node<BAs...>::output_variable(size_t ba_tid)
 inline bool is_term_nt(size_t nt) {
 	switch (nt) {
 		case tau_parser::bf:
-		case tau_parser::bf_constant:
-		case tau_parser::bf_splitter:
+		case tau_parser::ba_constant:
 		case tau_parser::bf_ref:
 		case tau_parser::bf_or:
 		case tau_parser::bf_xor:
@@ -88,14 +84,13 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
 		size_t ba_type, size_t ext) noexcept
-	: nt(nt), term(is_term || is_term_nt(nt)), ba(ba_type), ext(ext), data(data),
+	: nt(nt), term(is_term || is_term_nt(nt)), ext(ext), data(data), ba_type(ba_type),
 		hash(hashit())
 {
 	static_assert(sizeof...(BAs) > 0,
 	"Empty template parameter pack not allowed");
 	// DBG(LOG_TRACE << "ba: " << ba_type);
 	// DBG(LOG_TRACE << "ba_max: " << node<BAs...>::ba_max);
-	DBG(assert(ba_type <= node<BAs...>::ba_max));
 		// LOG_TRACE << "node created:" << LOG_NT(nt)
 	// 	<< " data: " << data
 	// 	<< " is_term: " << is_term
@@ -129,7 +124,6 @@ constexpr node<BAs...> node<BAs...>::extension(T raw_value) {
 	return node(
 		(raw_value >> node::nt_shift) & node::nt_mask,
 		(raw_value >> node::term_shift) & 1u,
-		(raw_value >> node::ba_shift) & ((1u << node::ba_bits) - 1u),
 		(raw_value >> node::ext_shift) & 1u,
 			raw_value & node::data_mask
 	);
@@ -142,7 +136,6 @@ constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
 	T result = 0;
 	result |= (C(nt) & ((1u << node::nt_bits) - 1u)) << node::nt_shift;
 	result |= (C(term) & 1u) << node::term_shift ;
-	result |= (C(ba) & ((1u << node::ba_bits) - 1u)) << node::ba_shift;
 	result |= (C(ext) & 1u) << node::ext_shift;
 	result |= C(data) & node::data_mask;
 	return result;
@@ -153,7 +146,7 @@ std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	// if (hash != that.hash) return hash    <=> that.hash;
 	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
 	if (term != that.term) return C(term) <=> C(that.term);
-	if (ba   != that.ba)   return C(ba)   <=> C(that.ba);
+	if (ba_type   != that.ba_type)   return C(ba_type)   <=> C(that.ba_type);
 	if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
 	// if (tree<node>::is_string_nt(nt))
 	// 	return dict(data) <=> dict(that.data);
@@ -183,11 +176,7 @@ constexpr bool node<BAs...>::operator>=(const node& that) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator==(const node& that) const {
-	// if (nt == type::bf_f && that.nt == type::bf_f) // 0 - ignore ba type if any untyped
-	// 	return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
-	// if (nt == type::bf_t && that.nt == type::bf_t) // 1 - ignore ba type if any untyped
-	// 	return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
-	return nt == that.nt && term == that.term && ba == that.ba
+	return nt == that.nt && term == that.term && ba_type == that.ba_type
 			&& ext == that.ext && data == that.data;
 }
 template <typename... BAs>
@@ -202,13 +191,13 @@ constexpr size_t node<BAs...>::hashit() const {
 	hash_combine(seed, static_cast<bool>(nt));
 	hash_combine(seed, static_cast<bool>(term));
 	// In order to have a deterministic hash, we hash the type name
-	hash_combine(seed, get_ba_type_name<node>(ba));
+	hash_combine(seed, get_ba_type_name<node>(ba_type));
 	hash_combine(seed, static_cast<bool>(ext));
 	// Get ba constant from pool
-	if (nt == type::bf_constant && data != 0 && ba != 0)
-		hash_combine(seed, ba_constants<node>::get(data));
-	// Get string from pool, untyped bf_constant also has string as data
-	else if (tree<node>::is_string_nt(nt) || nt == type::bf_constant)
+	if (nt == type::ba_constant && data != 0 && ba_type != 0)
+		hash_combine(seed, tau_lang::ba_constants<node>::get(data));
+	// Get string from pool, untyped ba_constant also has string as data
+	else if (tree<node>::is_string_nt(nt) || nt == type::ba_constant)
 		hash_combine(seed, dict(data));
 	else hash_combine(seed, data);
 	return seed;

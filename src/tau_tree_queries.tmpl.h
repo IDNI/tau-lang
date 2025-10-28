@@ -48,27 +48,27 @@ bool is_temporal_quantifier(tref n) {
 
 }
 
-template <NodeType node> 
+template <NodeType node>
 bool is_ba_element(tref n) {
-	return tree<node>::get(n).is(node::type::bf_constant)
+	return tree<node>::get(n).is(node::type::ba_constant)
 		|| tree<node>::get(n).is(node::type::variable)
 		|| tree<node>::get(n).is(node::type::bf_t)
 		|| tree<node>::get(n).is(node::type::bf_f);
 }
 
-template <NodeType node> 
+template <NodeType node>
 bool is_uconst(tref n) {
 	return tree<node>::get(n).is(node::type::uconst_name);
 }
 
-template <NodeType node> 
+template <NodeType node>
 bool is_io_var(tref n) {
 	return tree<node>::get(n).is(node::type::io_var)
 		|| (tree<node>::get(n).is(node::type::variable)
 			&& tree<node>::get(n).child_is(node::type::io_var));
 }
 
-template <NodeType node> 
+template <NodeType node>
 bool is_input_var(tref n) {
 	return tree<node>::get(n).is_input_variable();
 }
@@ -108,6 +108,64 @@ bool contains(tref fm, tref sub_fm) {
 }
 
 template <NodeType node>
+std::function<bool(tref)> is_basic_atomic_fm() {
+	using tau = tree<node>;
+
+	return [](tref n) -> bool {
+		auto fm = tau::get(n);
+		return fm.is(node::type::wff)
+			&& (fm.child_is(node::type::bf_eq)
+				|| fm.child_is(node::type::bf_neq));
+	};
+}
+
+template <NodeType node>
+std::function<bool(tref)> is_atomic_fm() {
+	using tau = tree<node>;
+
+	return [](tref n) -> bool {
+		auto fm = tau::get(n);
+		if (fm.children_size() != 1) return false;
+		auto child = fm[0];
+		return fm.is(node::type::wff)
+			&& (fm.child_is(node::type::bf_eq)
+				|| fm.child_is(node::type::bf_neq)
+				|| fm.child_is(node::type::bf_lteq)
+				|| fm.child_is(node::type::bf_nlteq)
+				|| fm.child_is(node::type::bf_gt)
+				|| fm.child_is(node::type::bf_ngt)
+				|| fm.child_is(node::type::bf_gteq)
+				|| fm.child_is(node::type::bf_ngteq)
+				|| fm.child_is(node::type::bf_lt)
+				|| fm.child_is(node::type::bf_nlt))
+			&& (is_tau_type<node>(child) || is_sbf_type<node>(child));
+	};
+}
+
+template <NodeType node>
+std::function<bool(tref)> is_atomic_bv_fm() {
+	using tau = tree<node>;
+
+	return [](tref n) -> bool {
+		auto fm = tau::get(n);
+		if (fm.children_size() != 1) return false;
+		auto child = fm[0];
+		return fm.is(node::type::wff)
+			&& (fm.child_is(node::type::bf_eq)
+				|| fm.child_is(node::type::bf_neq)
+				|| fm.child_is(node::type::bf_lteq)
+				|| fm.child_is(node::type::bf_nlteq)
+				|| fm.child_is(node::type::bf_gt)
+				|| fm.child_is(node::type::bf_ngt)
+				|| fm.child_is(node::type::bf_gteq)
+				|| fm.child_is(node::type::bf_ngteq)
+				|| fm.child_is(node::type::bf_lt)
+				|| fm.child_is(node::type::bf_nlt))
+			&& (is_bv_type_family<node>(child));
+	};
+}
+
+template <NodeType node>
 int_t node_count (tref fm) {
 	int_t c = 0;
 	auto count = [&c](tref) {
@@ -137,10 +195,16 @@ size_t find_ba_type (tref term) {
 	return type;
 }
 
+template <NodeType node>
+tref find_ba_type_tree (tref term) {
+	const size_t t = find_ba_type<node>(term);
+	return get_ba_type_tree<node>(t);
+}
+
 // template <NodeType node>
 // auto visit_io_vars = [] (tref n) static {
 // 	auto nt = tree<node>::get(n).get_type();
-// 	if (nt == node::type::bf_constant
+// 	if (nt == node::type::ba_constant
 // 		|| nt == node::type::uconst_name) return false;
 // 	return true;
 // };

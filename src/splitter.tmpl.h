@@ -128,9 +128,9 @@ tref good_splitter_using_function(tref f, splitter_type st, tref original_fm) {
 	if (clauses.empty()) clauses.push_back(f);
 	for (tref clause : clauses) {
 		tref coeff = tau::get(clause)
-			.find_top(is<node, tau::bf_constant>);
+			.find_top(is<node, tau::ba_constant>);
 		if (!coeff) continue;
-		DBG(assert(is<node>(coeff, tau::bf_constant));)
+		DBG(assert(is<node>(coeff, tau::ba_constant));)
 		tref s = splitter<BAs...>(tau::get(coeff)).get();
 		if (tau::get(s) != tau::get(coeff)) {
 			tref new_fm = rewriter::replace<node>(
@@ -170,14 +170,14 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 	trefs clauses = get_leaves<node>(f_cnf, tau::bf_and);
 	for (tref clause : clauses) {
 		tref coeff = tau::get(clause).find_top(
-			is_child<node, tau::bf_constant>);
+			is_child<node, tau::ba_constant>);
 		if (!coeff) continue;
 		// TODO: Optimization: Instead of negating the formula think about reverse splitter call
 		// If coefficient exists try to split the negation
 		tref neg_coeff = push_negation_in<node, false>(
 			tau::build_bf_neg(coeff));
 		DBG(assert(is<node>(
-				tau::trim(neg_coeff), tau::bf_constant));)
+				tau::trim(neg_coeff), tau::ba_constant));)
 		const auto& s = splitter<BAs...>(tau::get(tau::trim(neg_coeff)), st);
 		// Negating s results in a reversed splitter for s
 		tref r = push_negation_in<node, false>(tau::build_bf_neg(s.get()));
@@ -199,7 +199,7 @@ tref tau_bad_splitter(tref fm) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	tref new_uniter_const = tau::build_bf_neq(
-		get_new_uninterpreted_constant<node>(fm, "split", get_ba_type_id<node>("tau")));
+		get_new_uninterpreted_constant<node>(fm, "split", get_ba_type_id<node>(tau_type<node>())));
 	trefs clauses = get_dnf_wff_clauses<node>(fm);
 	// Add bad splitter only to a single disjunct if possible
 	if (!clauses.empty()) {
@@ -222,7 +222,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 
 	// Collect coefficients to produce splitters
 	trefs constants = tau::get(fm)
-		.select_top(is_child<node, tau::bf_constant>);
+		.select_top(is_child<node, tau::ba_constant>);
 
 	//fm = snf_wff(fm);
 	// Collect all occurances of "||" while assuming that fm is in DNF
@@ -386,6 +386,23 @@ tref tau_splitter(tref fm, splitter_type st) {
 		// Split disjunction taking splitter type into account
 		return split<BAs...>(fm, tau::wff, false, st, clauses, 0, false);
 	}
+}
+
+// Splitter function for a nso tau::ba_constant node holding a BA constant
+template <typename... BAs>
+requires BAsPack<BAs...>
+const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
+	splitter_type st)
+{
+	// Lambda for calling splitter on n
+	auto _splitter = [&st](const auto& t) -> std::variant<BAs...> {
+		return splitter(t, st);
+	};
+	DBG(assert(t.is_ba_constant());)
+	return tree<node<BAs...>>::get(
+		tree<node<BAs...>>::build_bf_ba_constant(
+			std::visit(_splitter, t.get_ba_constant()),
+			t.get_ba_type()));
 }
 
 } // namespace idni::tau_lang

@@ -4,51 +4,46 @@
 #define __IDNI__TAU__TESTS__TEST_BOOL_HELPERS_H__
 
 // helper types and functions for tau with just Bool BA as tree<node<Bool>>
-#define bas_pack Bool
+#define bas_pack bv, Bool
 #include "test_helpers.h"
 
 namespace idni::tau_lang {
 
+tref bool_type() {
+	tref type = tau::get(tau::type, "bool");
+	return tau::get(tau::typed, type);
+}
+
 template<>
-struct nso_factory<Bool> {
+struct nso_factory<bv, Bool> {
 
-	optional<constant_with_type<Bool>> parse(
-		const string& constant_source, const string) const
-	{
-		if (constant_source == "1" || constant_source == "true")
-			return constant_with_type<Bool>{ Bool(true), "bool" };
-		if (constant_source == "0" || constant_source == "false")
-			return constant_with_type<Bool>{ Bool(false), "bool" };
-		return {};
-	}
+	static std::vector<std::string> types() { return { "bool" }; }
 
-	vector<string> types() const { return { "bool" }; }
+	static tref default_type() { return bool_type(); }
 
-	string default_type() const { return "bool"; }
+	static std::string one(const tref) { return "1"; }
 
-	string one(const string) const { return "1"; }
+	static std::string zero(const tref) { return "0"; }
 
-	string zero(const string) const { return "0"; }
-
-	std::variant<Bool> splitter_one(const string) const {
-		return Bool(true);
-	}
+	static std::variant<bv, Bool> splitter_one(const std::string) { return Bool(true);}
 
 	// There is no tau_ba
-	tref unpack_tau_ba(const variant<Bool>&) const { return nullptr; }
+	static tref unpack_tau_ba(const std::variant<bv, Bool>&) { return nullptr; }
 
-	std::variant<Bool> pack_tau_ba(tref) const {
-		// There is no tau_ba
-		return {};
-	}
-
-	static nso_factory<Bool>& instance() {
-		static nso_factory<Bool> factory;
-		return factory;
-	}
-private:
-	nso_factory() {};
+	static std::variant<bv, Bool> pack_tau_ba(tref) { return {}; }
 };
+
+template <>
+std::optional<typename ba_constants<node<bv, Bool>>::constant_with_type> ba_constants<node<bv, Bool>>::get(
+		const std::string& constant_source,
+		[[maybe_unused]] tref type_tree,
+		[[maybe_unused]] const std::string options) {
+	if (constant_source == "1" || constant_source == "true")
+		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(true), bool_type() };
+	if (constant_source == "0" || constant_source == "false")
+		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(false), bool_type() };
+	return {};
+}
 
 } // namespace idni::tau_lang
 

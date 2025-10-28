@@ -22,7 +22,13 @@ RUN apt-get update && apt-get install -y \
 	mingw-w64=11.0.1-3build1 \
 	libboost-all-dev=1.83.0.1ubuntu2 \
 	libz3-dev=4.8.12-3.1build1 \
-	python3-distutils-extra
+	python3-distutils-extra \
+	cvc5 \
+	libcvc5-1 \
+	libcvc5-dev \
+	libcvc5parser1 \
+	python3-venv \
+	python3-pip
 
 # Argument BUILD_TYPE=Debug/Release
 ARG BUILD_TYPE=Release
@@ -78,6 +84,7 @@ fi
 RUN if [ ! -f ./build-${BUILD_TYPE}/tau ]; then ./dev build "${BUILD_TYPE}"; fi
 
 # Set the entrypoint to the tau executable
+ENV LD_LIBRARY_PATH=/tau-lang/external/cvc5/build/src:$LD_LIBRARY_PATH
 WORKDIR /tau-lang/build-${BUILD_TYPE}
 ENTRYPOINT [ "./tau" ]
 CMD []

@@ -3,6 +3,7 @@
 #ifndef __IDNI__TAU__SPLITTER_H__
 #define __IDNI__TAU__SPLITTER_H__
 
+#include "splitter_types.h"
 #include "satisfiability.h"
 
 namespace idni::tau_lang {
@@ -48,12 +49,23 @@ tref tau_bad_splitter(tref fm = tree<node<BAs...>>::_T());
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
-				splitter_type st, tref spec_clause = nullptr);
+	splitter_type st, tref spec_clause = nullptr);
 
 // We assume fm to be normalized in DNF
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref tau_splitter(tref fm, splitter_type st);
+
+/**
+ * @brief Splitter function for a nso tau::ba_constant node holding a BA constant.
+ * @param n Operand.
+ * @param st Splitter type (default is splitter_type::upper).
+ * @return Result of the splitter operation.
+ */
+template <typename... BAs>
+requires BAsPack<BAs...>
+const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& n,
+    splitter_type st = splitter_type::upper);
 
 } // namespace idni::tau_lang
 

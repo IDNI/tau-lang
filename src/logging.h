@@ -47,7 +47,7 @@ namespace idni::tau_lang {
 // Uncomment to compile in logging for pretty printer
 // If enabled it prints information about traversing nodes.
 // It prints to std::cerr to view cout and cerr in a split screen in parallel
-//  
+//
 // #define PRETTY_PRINTER_LOGGING_ENABLED 1
 
 // Uncomment or use -D to print file paths with a line number in the log
@@ -77,9 +77,10 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"nso_ba",
 	"sbf_ba",
 	"tau_ba",
+	"bv_ba",
 	"ba_types",
 	"ba_constants",
-	"ba_types_inference",
+	// "ba_types_inference",
 	// "batinf_scoping",
 	// "batinf_propagation",
 	// "batinf_unscoping",
@@ -88,8 +89,6 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"interpreter",
 	"normal_forms",
 	"assign_and_reduce",
-	"reduce_deprecated",
-	"to_snf",
 	"normalizer",
 	"nso_rr",
 	"ref_types_inference",
@@ -105,7 +104,8 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"printers",
 	"queries",
 	"traverser",
-	"testing"
+	"testing",
+	"resolver"
 };
 #else // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS) else
 static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
@@ -394,7 +394,7 @@ private:
 	inline static boost::log::trivial::severity_level set_level;
 };
 
-// static initialization of the logging system 
+// static initialization of the logging system
 inline static logging initialize_logging;
 
 } // namespace idni::tau_lang

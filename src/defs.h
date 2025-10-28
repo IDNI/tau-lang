@@ -25,7 +25,7 @@
 #include "version_license.h"
 
 // initialize logging and include logging helper macros
-#include "logging.h" 
+#include "logging.h"
 
 // include parser defs for DBG macro, int_t (int32_t) and mostly for
 // common std::hash templates and specializations
@@ -37,7 +37,7 @@
 // following macros work only if `node` type alias is defined
 // `using node = tau_lang::node<BAs...>;` where `BAs...` is a pack of Boolean Algebras)
 // argument `ref` is a tree pointer reference `tref`,
-// or shared pointer handle `htref` 
+// or shared pointer handle `htref`
 
 // helper macro for pretty printing a tau tree tref into std::cout
 #define TAU_PRINT(ref) (tree<node>::get(ref).print(std::cout))
@@ -66,7 +66,7 @@ constexpr size_t Pack_size = std::variant_size<std::variant<Pack...>>::value;
 
 // helper to get bitsize required for size of a type pack
 template <typename... Pack>
-constexpr size_t Pack_bitsize = Pack_size<Pack...> <= 1 ? 1 : 
+constexpr size_t Pack_bitsize = Pack_size<Pack...> <= 1 ? 1 :
         (sizeof(size_t) * 8 - __builtin_clzl(Pack_size<Pack...> - 1));
 
 } // namespace idni::tau_lang

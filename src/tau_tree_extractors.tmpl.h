@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+//#include <cvc5/cvc5.h>
+
 #include "tau_tree.h"
 #include "definitions.h"
 
@@ -48,19 +50,19 @@ bool get_io_def(tref n, io_defs<node>& defs) {
 		static const size_t console_sid = dict("console");
 		if (stream_sid == console_sid) stream_sid = 0;
 	}
-	if (ba_type == 0) {
-		defs[var_sid] = { 0, stream_sid };
-		return true;
-	}
-	std::string ba_type_name = get_ba_type_name<node>(ba_type);
-	for (const auto& fct_type : node::nso_factory::instance().types()) {
-		if (ba_type_name == fct_type) {
-			defs[var_sid] = { ba_type, stream_sid };
-			return true;
-		}
-	}
-	LOG_ERROR << "Invalid type " << ba_type_name;
-	return false;
+	// if (ba_type == 0) {
+	defs[var_sid] = { ba_type, stream_sid };
+	return true;
+	// }
+	// std::string ba_type_name = get_ba_type_name<node>(ba_type);
+	// for (const auto& fct_type : node::nso_factory::types()) {
+	// 	if (ba_type_name == fct_type) {
+	// 		defs[var_sid] = { ba_type, stream_sid };
+	// 		return true;
+	// 	}
+	// }
+	// LOG_ERROR << "Invalid type " << ba_type_name;
+	// return false;
 }
 
 template <NodeType node>
@@ -279,7 +281,7 @@ tref get_var_name_node(tref var) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto v = tt(var);
-	if (v.is(tau::bf_constant) || v.is(tau::var_name)) return var;
+	if (v.is(tau::ba_constant) || v.is(tau::var_name)) return var;
 	// TODO: refactor
 	if (auto vn = v | tau::var_name; vn) return vn.value();
 	if (auto vn = v | tau::io_var | tau::var_name; vn) return vn.value();
@@ -441,7 +443,7 @@ const trefs& get_free_vars(tref n) {
 	if (auto it = free_vars_pool_index.find(fv);
 		it != free_vars_pool_index.end()) id = it->second;
 	else free_vars_pool_index.emplace(fv, id),
-		free_vars_pool.push_back(fv);
+		free_vars_pool.emplace_back(std::move(fv));
 	free_vars_map.emplace(n, id);
 #ifdef DEBUG
 	LOG_TRACE << "free_vars_map[" << LOG_FM(n) << "] = " << id;
@@ -466,14 +468,16 @@ bool has_temp_var(tref fm) {
 	else return true;
 }
 
+//bool is_closed(const cvc5::Term&) { return false;}
+
 template <NodeType node>
 bool has_open_tau_fm_in_constant(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto _closed = [](const auto& c) -> bool { return is_closed(c); };
-	trefs consts = tau::get(fm).select_top(is_child<node, tau::bf_constant>);
+	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
 	for (tref c : consts) {
-		auto ba_const = tt(c) | tau::bf_constant | tt::ba_constant;
+		auto ba_const = tt(c) | tau::ba_constant | tt::ba_constant;
 		if (!std::visit(_closed, ba_const)) {
 			LOG_ERROR << "A Tau formula constant must be closed: "
 								<< ba_const;

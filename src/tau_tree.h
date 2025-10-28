@@ -6,17 +6,22 @@
 #include <concepts>
 #include <string>
 #include <initializer_list>
+#include <type_traits>
+
 
 #include "defs.h"
+#include "boolean_algebras/cvc5/cvc5.h"
 #include "tau_parser.generated.h"
 
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
 // concepts
+template <typename T, typename... Ts>
+constexpr bool pack_contains = (std::is_same_v<T, Ts> || ...);
 
 template <typename... BAs>
-concept BAsPack = sizeof...(BAs) > 0;
+concept BAsPack = sizeof...(BAs) > 0 && pack_contains<cvc5::Term, BAs...>;
 
 template <typename node>
 concept NodeType = requires { // Node Type has to provide
@@ -30,7 +35,7 @@ concept NodeType = requires { // Node Type has to provide
 	// term is convertible to bool
 	{ std::declval<node>().term } -> std::convertible_to<bool>;
 	// ba is convertible to size_t
-	{ std::declval<node>().ba } -> std::convertible_to<size_t>;
+	{ std::declval<node>().ba_type } -> std::convertible_to<size_t>;
 	// data is convertible to size_t
 	{ std::declval<node>().data } -> std::convertible_to<size_t>;
 };
@@ -39,6 +44,7 @@ concept NodeType = requires { // Node Type has to provide
 // forward declarations
 
 template <NodeType node> struct rr;
+template <NodeType node> struct ba_constants;
 template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
 
@@ -62,9 +68,9 @@ requires BAsPack<BAs...>
 struct node {
 	using node_t = node<BAs...>;
 	using type = tau_parser::nonterminal;
-
-	// alias for recreation of the packed variant
+	// aliases for recreation of the packed variant
 	using constant = std::variant<BAs...>;
+	using constant_with_type = std::pair<constant, tref>;
 	// alias for nso_factory<BAs...>
 	using nso_factory = tau_lang::nso_factory<BAs...>;
 
@@ -73,26 +79,22 @@ struct node {
 	// bit sizes
 	static constexpr size_t bits      = std::numeric_limits<T>::digits;
 	static constexpr size_t nt_bits   = tau_parser_data::nt_bits;
-	static constexpr size_t ba_bits   = Pack_bitsize<BAs...> + 1;
-	static constexpr size_t ba_max    = (1U << ba_bits) - 1;
-	static constexpr size_t data_bits = bits - nt_bits - 1 - ba_bits - 1;
+	static constexpr size_t data_bits = bits - nt_bits - 1;
 
 	// masks and shifts
 	static constexpr size_t nt_mask = (size_t(1) << nt_bits) - size_t(1);
 	static constexpr size_t data_mask = (size_t(1) << data_bits) - size_t(1);
 	static constexpr size_t ext_shift = data_bits;
-	static constexpr size_t ba_shift = ext_shift + 1; // +1 for ext
-	static constexpr size_t term_shift = ba_shift + ba_bits;
+	static constexpr size_t term_shift = ext_shift + 1; // +1 for ext
 	static constexpr size_t nt_shift = term_shift + 1;  // +1 for term
-	static constexpr size_t ba_mask = ((size_t(1) << ba_bits) - size_t(1)) << ba_shift;
 
 	// node fields
 	const T nt   : nt_bits   = 0; // id of the nonterminal (container of the data index value)
 	const T term : 1         = 0; // 1 = is term, 0 = is tau (if term == 0 and ba == 1 it is untyped)
-	const T ba   : ba_bits   = 0; // id of the ba type, 0 = untyped
 	const T ext  : 1         = 0; // 1 = data is in the child node, 0 = data is in the node
 	const T data : data_bits = 0; // data or index in a container determined by nt, bf and ba
                                       // if nt == io_var, data == 1 for input or data == 2 for output
+	const unsigned short ba_type;
 	const size_t hash;
 
 	// generic constructor
@@ -122,10 +124,10 @@ struct node {
 	// casts size_t data to int_t
 	int_t as_int() const;
 
-	// TODO null node? is it required? 
+	// TODO null node? is it required?
 	static constexpr node_t nnull();
 
-	// getter and setter for the raw data access of an extension node 
+	// getter and setter for the raw data access of an extension node
 	static constexpr node_t extension(T raw_value);
 	constexpr T extension() const noexcept;
 
@@ -149,7 +151,7 @@ struct node {
 //
 // - extends lcrs_tree<node<BAs...>> with tau_parser_nonterminals
 // - is expected to be templated with node<BAs...>
-// 
+//
 // Tree is usually created by static get calls either manually or transformed
 // from a tau parse tree
 //
@@ -168,6 +170,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	using parse_tree = tau_parser::tree;
 	using tau = tree<node>;
 	using constant = node::constant;
+	using constant_with_type = node::constant_with_type;
 
 	struct get_options; // fwd
 
@@ -178,6 +181,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	// handles
 	tref get() const;
+	static const tree& get(const std::optional<tref>& id);
 	static const tree& get(const tref id);
 	static const tree& get(const htref& h);
 	static htref geth(tref id);
@@ -246,13 +250,13 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	// constants
 	// creates a ba_constant node from it's value and ba type name
 	static tref get_ba_constant(const constant& constant,
-				    const std::string& type_name);
+				    const tref type_tree);
 	// creates a ba_constant node from it's value and ba type id
 	static tref get_ba_constant(const constant& constant,
 				    size_t ba_type_id);
 	// creates a ba_constant node from constant source and type name
 	static tref get_ba_constant(const std::string& constant_source,
-				    const std::string type_name = "");
+				    tref type_tree);
 	// creates a ba_constant node from constant source dict id and ba type id
 	static tref get_ba_constant_from_source(size_t constant_source_sid,
 				    size_t ba_type_id);
@@ -260,11 +264,12 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
 	// creates a ba_constant node from a pair of constant_id and ba_type_id
 	static tref get_ba_constant(const std::pair<constant,
-				    std::string>& typed_const);
+		tref>& typed_const);
 	// creates a ba_constant node from a pair of constant_id and ba_type_id
 	static tref get_ba_constant(
-		const std::optional<std::pair<constant, std::string>>&
-								typed_const);
+		const std::optional<std::pair<constant, tref>>&
+		typed_const);
+
 	// children
 	size_t children_size() const;
 
@@ -278,6 +283,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	tref second() const;
 	tref third()  const;
 	tref only_child() const;
+	bool has_child() const;
 
 	// fast traverse to a first child
 	tref trim() const;
@@ -293,7 +299,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	const tree& third_tree()  const;
 	const tree& only_child_tree() const;
 	const tree& right_sibling_tree() const;
-	
+
 	std::ostream& print(std::ostream& o) const;
 	std::ostream& print_tree(std::ostream& o, size_t s = 0) const;
 	std::string to_str() const;
@@ -317,6 +323,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	bool is_integer() const;
 	bool is_num() const;
 	bool is_ba_constant() const;
+	bool is_bv_constant() const;
 	bool is_term() const;
 	bool is_input_variable() const;
 	bool is_output_variable() const;
@@ -335,8 +342,13 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	size_t get_num() const;
 	size_t get_ba_constant_id() const;
 	constant get_ba_constant() const;
+	size_t get_bv_constant_id() const;
+	idni::tau_lang::bv  get_bv_constant() const;
+	size_t get_bv_size() const;
+	// TODO (LOW) rename to get_ba_type_id and get_ba_type as in constants
 	size_t get_ba_type() const;
-	const std::string& get_ba_type_name() const;
+	std::string get_ba_type_name() const;
+	tref get_ba_type_tree() const;
 	const trefs& get_free_vars() const;
 
 	// ---------------------------------------------------------------------
@@ -355,16 +367,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref get(std::istream& is, get_options options = {});
 	static tref get_from_file(const std::string& filename,
 						get_options options = {});
-
-	// builders
-	static rewriter::builder get_builder(tref ref);
-	static rewriter::builder get_builder(const std::string& source);
-
-	static rewriter::rules get_rules(tref r);
-	static rewriter::library get_rules(const std::string& source);
-
-	static rewriter::rules get_library(tref r);
-	static rewriter::library get_library(const std::string& source);
 
 	// ---------------------------------------------------------------------
 	// tree::traverser / tt API (tau_tree_traverser.tmpl.h)
@@ -388,6 +390,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		traverser();
 		traverser(tref r);
 		traverser(const tree& r);
+		traverser(const std::optional<tref>& r);
 		traverser(const htref& r);
 		traverser(const trefs& n);
 		bool has_value() const;
@@ -420,6 +423,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		static const extractor<size_t>              ba_constant_id;
 		static const extractor<size_t>              ba_type;
 		static const extractor<constant>            ba_constant;
+		static const extractor<size_t>              bv_constant_id;
+		static const extractor<constant>            bv_constant;
+		static const extractor<size_t>              bv_size;
 		// children
 		static const extractor<traverser>           only_child;
 		static const extractor<traverser>           first;
@@ -430,7 +436,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		static const extractor<tref_range<node>>    children_range;
 		static const
 			extractor<tree_range<tree<node>>>   children_trees_range;
-		// (tref) -> tref function tt:f wrapper	
+		// (tref) -> tref function tt:f wrapper
 		static const extractor<traverser> f(const auto& fn);
 
 		// traverses to the first child of the type nt
@@ -529,6 +535,13 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_and(tref l, tref r);
 	static tref build_bf_and(const auto& bfs);
 	static tref build_bf_neg(tref n);
+	static tref build_bf_shl(tref l, tref r);
+	static tref build_bf_shr(tref l, tref r);
+	static tref build_bf_add(tref l, tref r);
+	static tref build_bf_sub(tref l, tref r);
+	static tref build_bf_mul(tref l, tref r);
+	static tref build_bf_div(tref l, tref r);
+	static tref build_bf_mod(tref l, tref r);
 
 	// terminals, variables and constants
 	static tref build_bf_t_type(size_t ba_tid);
@@ -538,9 +551,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_ba_constant(const constant& constant,
 				      size_t ba_type_id);
 	static tref build_bf_ba_constant(const constant& constant,
-					 size_t ba_type_id, tref right);
-	static tref build_bf_ba_constant(const constant& constant,
-					 size_t ba_type_id);
+					 size_t ba_type_id, tref right = nullptr);
+	static tref build_bv_ba_constant(const constant& constant, size_t type_id);
 	static tref build_bf_uconst(
 		const std::string& name1, const std::string& name2, size_t type_id);
 	static tref build_var_name(size_t sid);
@@ -651,13 +663,13 @@ bool is_child_quantifier(tref n);
 template <NodeType node>
 bool is_temporal_quantifier(tref n);
 
-template <NodeType node> 
+template <NodeType node>
 bool is_ba_element(tref n);
 
-template <NodeType node> 
+template <NodeType node>
 bool is_uconst(tref n);
 
-template <NodeType node> 
+template <NodeType node>
 bool is_io_var(tref n);
 
 template <NodeType node>
@@ -678,23 +690,14 @@ bool is_quantifier(tref n);
 template <NodeType node>
 bool contains(tref fm, tref sub_fm);
 
-// -----------------------------------------------------------------------------
-// builder, rules, library
+template <NodeType node>
+std::function<bool(tref)> is_atomic_fm();
 
 template <NodeType node>
-rewriter::builder get_builder(tref n);
-template <NodeType node>
-rewriter::builder get_builder(const std::string& source);
+std::function<bool(tref)> is_atomic_bv_fm();
 
 template <NodeType node>
-rewriter::rules get_rules(tref r);
-template <NodeType node>
-rewriter::rules get_rules(const std::string& source);
-
-template <NodeType node>
-rewriter::rules get_library(tref r);
-template <NodeType node>
-rewriter::library get_library(const std::string& source);
+std::function<bool(tref)> is_basic_atomic_fm();
 
 } // namespace idni::tau_lang
 

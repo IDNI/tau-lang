@@ -3,16 +3,23 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 function(add_valgrind_file_test test_name test_file)
 	add_test(NAME "test_repl-${test_name}"
 		COMMAND bash -c "cat \"${test_file}\" | valgrind --tool=callgrind --callgrind-out-file=${PROJECT_BINARY_DIR}/test_benchmark-${test_name}-${GIT_COMMIT_HASH}.callgrind.out $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+	set_tests_properties("test_repl-${test_name}"
+	    ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$LD_LIBRARY_PATH"
+	)
 endfunction()
 
 function(add_valgrind_command_test test_name test_cmd)
 	add_test(NAME "test_repl-${test_name}"
 		COMMAND bash -c "echo \"${test_cmd}. q\" | valgrind --tool=callgrind --callgrind-out-file=${PROJECT_BINARY_DIR}/test_benchmark-${test_name}-${GIT_COMMIT_HASH}.callgrind.out $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+	set_tests_properties("test_repl-${test_name}"
+	    ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$LD_LIBRARY_PATH"
+	)
 endfunction()
 
 set(BENCHMARK_TESTS
 	wff_normalization
 	interpreter
+	cvc5
 )
 
 # adding benchmark tests
@@ -23,6 +30,9 @@ foreach(X IN LISTS BENCHMARK_TESTS)
 	target_link_libraries(${N} ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
 	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
+	set_tests_properties(${N}
+	    ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$LD_LIBRARY_PATH"
+	)
 endforeach()
 
 # adding valgrind tests for wff normalization

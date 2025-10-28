@@ -72,7 +72,7 @@ using equation_system = std::pair<std::optional<equality>,
  * @typedef inequality_system
  * @brief Alias for a set of inequalities.
  */
-template<NodeType node>	
+template<NodeType node>
 using inequality_system = subtree_set<node>;
 
 /**
@@ -96,7 +96,8 @@ using solution = subtree_map<node, tref>;
 enum solver_mode {
 	maximum, /**< Maximum mode */
 	minimum, /**< Minimum mode */
-	general  /**< General mode */
+	general, /**< General mode */
+	bitvector /**< cvc5 mode */
 };
 
 /**
@@ -106,7 +107,6 @@ enum solver_mode {
 struct solver_options {
 	tref splitter_one = nullptr; /**< Splitter option */
 	solver_mode mode = solver_mode::general; /**< Solver mode option */
-	std::string type = ""; /**< Type option */
 };
 
 /**
@@ -186,7 +186,18 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
  * @return An optional solution.
  */
 template <NodeType node>
-std::optional<solution<node>> solve(tref form, const solver_options& options);
+std::optional<solution<node>> solve(tref form, solver_options options);
+
+/**
+ * @brief Solves the given tau forms.
+ *
+ * @tparam BAs Variadic template parameters.
+ * @param forms The tau forms to solve.
+ * @param options The solver options.
+ * @return An optional solution.
+ */
+template <NodeType node>
+std::optional<solution<node>> solve(const trefs& forms, solver_options options);
 
 } // namespace idni::tau_lang
 

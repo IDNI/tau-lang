@@ -253,21 +253,13 @@ bool is_closed(const tau_ba<BAs...>& fm);
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct tau_ba_factory {
-	/**
-	 * @brief Parses the given source string into tau_nso_t.
-	 *
-	 * @param src Reference to the source string.
-	 * @return Parsed tau_nso_t or std::nullopt if parsing fails.
-	 */
-	std::optional<constant_with_type<tau_ba<BAs...>, BAs...>> parse(
-		const std::string& constant_source);
 
 	/**
 	 * @brief Splits one.
 	 *
 	 * @return Variant containing the splitter of one in the given BA.
 	 */
-	std::variant<tau_ba<BAs...>, BAs...> splitter_one() const;
+	static std::variant<tau_ba<BAs...>, BAs...> splitter_one();
 
 	/**
 	 * @brief Converts one to string.
@@ -275,7 +267,7 @@ struct tau_ba_factory {
 	 * @param str Reference to the string.
 	 * @return Converted string.
 	 */
-	std::string one(std::string&) const;
+	static std::string one(std::string&);
 
 	/**
 	 * @brief Converts zero to string.
@@ -283,16 +275,13 @@ struct tau_ba_factory {
 	 * @param str Reference to the string.
 	 * @return Converted string.
 	 */
-	std::string zero(std::string&) const;
-
-	/**
-	 * @brief Returns the instance of the tau_ba_factory.
-	 *
-	 * @return Instance of the tau_ba_factory.
-	 */
-	static tau_ba_factory<BAs...>& instance();
-
+	static std::string zero(std::string&);
 };
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
+	parse_tau(const std::string& src);
 
 // << for printing tau_ba's nso rr
 template <typename... BAs>

@@ -6,39 +6,35 @@
 TEST_SUITE("operator|") {
 
 	TEST_CASE("match zero nodes") {
-		const char* sample = "$X & $Y := $Z.";
-		auto lib = tt(tau::get(sample, parse_library()));
-		CHECK( !(lib | tau::main) );
+		const char* sample = "X & Y";
+		auto rule = tt(tau::get(sample, parse_bf()));
+		CHECK( !(rule | tau::main) );
 	}
 
 	TEST_CASE("match one node") {
-		const char* sample = "$X & $Y := $Z.";
-		auto lib = tt(tau::get(sample, parse_library()));
-		CHECK( (lib | tau::rules).size() == 1 );
+		const char* sample = "X & Y";
+		auto rule = tt(tau::get(sample, parse_bf()));
+		CHECK( (rule | tau::bf_and).size() == 1 );
 	}
 }
 
 TEST_SUITE("operator||") {
 
 	TEST_CASE("match zero nodes") {
-		const char* sample = "$X & $Y := $Z.";
-		auto lib = tt(tau::get(sample, parse_library()));
-		CHECK( (lib | tau::rules | tau::rule | tau::wff_rule					
-						|| tau::wff).empty() );
+		const char* sample = "X & Y";
+		auto rule = tt(tau::get(sample, parse_bf()));
+		CHECK( (rule || tau::wff).empty() );
 	}
 
 	TEST_CASE("match one node") {
-		const char* sample = "X & Y := Z.";
-		auto lib = tt(tau::get(sample, parse_library()));
-		CHECK( (lib | tau::rules | tau::rule
-						|| tau::bf_rule).size() == 1 );
+		const char* sample = "X & Y";
+		auto rule = tt(tau::get(sample, parse_bf()));
+		CHECK( (rule || tau::bf_and).size() == 1 );
 	}
 
 	TEST_CASE("match several nodes") {
-		const char* sample = "X & Y := Z.";
-		auto lib = tt(tau::get(sample, parse_library()));
-		CHECK( (lib | tau::rules | tau::rule | tau::bf_rule
-			| tau::bf_matcher | tau::bf | tau::bf_and
-						|| tau::bf).size() == 2 );
+		const char* sample = "X & Y";
+		auto rule = tt(tau::get(sample, parse_bf()));
+		CHECK( (rule | tau::bf_and || tau::bf).size() == 2 );
 	}
 }

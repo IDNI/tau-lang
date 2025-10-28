@@ -360,22 +360,25 @@ tref build_bf_nlt(tref l, tref r) {
 
 template <NodeType node>
 tref build_bf_fall(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
 	return tau::get(tau::bf, tau::get(tau::bf_fall, l, r));
 }
 
 template <NodeType node>
 tref build_bf_fex(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
 	return tau::get(tau::bf, tau::get(tau::bf_fex, l, r));
 }
 
 template <NodeType node>
 tref build_bf_or(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
 	return tau::get(tau::bf, tau::get(tau::bf_or, l, r));
 }
 
@@ -403,8 +406,9 @@ tref build_bf_xor(tref l, tref r) {
 
 template <NodeType node>
 tref build_bf_and(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
 	return tau::get(tau::bf, tau::get(tau::bf_and, l, r));
 }
 
@@ -416,12 +420,69 @@ tref build_bf_and(const auto& bfs) {
 
 template <NodeType node>
 tref build_bf_neg(tref l) {
-	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
+
+	DBG(assert(l != nullptr);)
 	LOG_TRACE << "build_bf_neg";
 	DBG(LOG_TRACE << "l: " << LOG_FM_DUMP(l);)
 	DBG(LOG_TRACE << "bf_neg: " << LOG_FM_DUMP(tau::get(tau::bf_neg, l));)
 	return tau::get(tau::bf, tau::get(tau::bf_neg, l));
+}
+
+template <NodeType node>
+tref build_bf_shl(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bf, tau::get(tau::bf_shl, l, r));
+}
+
+template <NodeType node>
+tref build_bf_shr(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bf, tau::get(tau::bf_shr, l, r));
+}
+
+template <NodeType node>
+tref build_bf_add(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bf, tau::get(tau::bf_add, l, r));
+}
+
+template <NodeType node>
+tref build_bf_sub(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bf, tau::get(tau::bf_sub, l, r));
+}
+
+template <NodeType node>
+tref build_bf_mul(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bf, tau::get(tau::bf_mul, l, r));
+}
+
+template <NodeType node>
+tref build_bf_div(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bf, tau::get(tau::bf_div, l, r));
+}
+
+template <NodeType node>
+tref build_bf_mod(tref l, tref r) {
+	using tau = tree<node>;
+
+	DBG(assert(l != nullptr && r != nullptr);)
+	return tau::get(tau::bf, tau::get(tau::bf_mod, l, r));
 }
 
 // -----------------------------------------------------------------------------
@@ -460,16 +521,29 @@ tref build_ba_constant(const typename node::constant& constant,
 
 template <NodeType node>
 tref build_bf_ba_constant(const typename node::constant& constant,
-	size_t ba_type_id, tref right)
-{
+		size_t ba_type_id, tref right) {
 	using tau = tree<node>;
 	return tau::get(tau::bf, {
 		tau::get_ba_constant(constant, ba_type_id) }, right);
 }
 
+/*template <NodeType node>
+tref build_bv_constant(const typename node::constant& constant, size_t ba_type_id) {
+	return tree<node>::get_bv_constant(constant, ba_type_id);
+}*/
+
+template <NodeType node>
+tref build_bv_ba_constant(const typename node::constant& constant, size_t ba_type_id) {
+	using tau = tree<node>;
+
+	return tau::get(tau::bv, {
+		tau::get_ba_constant(constant, ba_type_id) });
+}
+
 template <NodeType node>
 tref build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id) {
 	using tau = tree<node>;
+
 	return tau::get(tau::bf, tau::get_typed(tau::variable,
 			tau::get(tau::uconst_name, n1 + ":" + n2), type_id));
 }
@@ -520,7 +594,7 @@ template <NodeType node>
 tref build_in_var(tref var_name_node, tref offset_node, size_t type_id) {
 	using tau = tree<node>;
 	return tau::get(tau::bf, tau::get_typed(tau::variable,
-		tau::get(node::input_variable(), var_name_node, offset_node), type_id));
+			tau::get(node::input_variable(), var_name_node, offset_node), type_id));
 }
 
 template <NodeType node>
@@ -549,7 +623,7 @@ tref build_in_var_at_t(tref var_name_node, size_t type_id, std::string t) {
 	DBG(assert(var_name_node != nullptr);)
 	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
 	return build_in_var<node>(var_name_node,
-		tau::get(tau::offset, build_variable<node>(t, get_ba_type_id<node>("_temporal"))), type_id);
+		tau::get(tau::offset, build_variable<node>(t, get_ba_type_id<node>(nat_type<node>()))), type_id);
 }
 
 template <NodeType node>
@@ -564,7 +638,7 @@ tref build_in_var_at_t_minus(tref var_name_node, size_t shift, size_t type_id, s
 	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
 	return build_in_var<node>(var_name_node,
 		tau::get(tau::offset, tau::get(tau::shift,
-			build_variable<node>(t, get_ba_type_id<node>("_temporal")), tau::get_num(shift))), type_id);
+			build_variable<node>(t, get_ba_type_id<node>(nat_type<node>())), tau::get_num(shift))), type_id);
 }
 
 template <NodeType node>
@@ -583,7 +657,7 @@ template <NodeType node>
 tref build_out_var(tref var_name_node, tref offset_node, size_t type_id) {
 	using tau = tree<node>;
 	return tau::get(tau::bf, tau::get_typed(tau::variable,
-		tau::get(node::output_variable(), var_name_node, offset_node), type_id));
+			tau::get(node::output_variable(), var_name_node, offset_node), type_id));
 }
 
 template <NodeType node>
@@ -610,7 +684,8 @@ tref build_out_var_at_t(tref var_name_node, size_t type_id, std::string t) {
 	DBG(assert(var_name_node != nullptr);)
 	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
 	return build_out_var<node>(var_name_node,
-		tau::get(tau::offset, build_variable<node>(t, get_ba_type_id<node>("_temporal"))), type_id);
+		tau::get(tau::offset, build_variable<node>(t,
+			get_ba_type_id<node>(nat_type<node>()))), type_id);
 }
 
 template <NodeType node>
@@ -624,7 +699,9 @@ tref build_out_var_at_t_minus(tref var_name_node, size_t shift, size_t type_id, 
 	using tau = tree<node>;
 	return build_out_var<node>(var_name_node,
 		tau::get(tau::offset, tau::get(tau::shift,
-			build_variable<node>(t, get_ba_type_id<node>("_temporal")), tau::get_num(shift))), type_id);
+			build_variable<node>(t,
+				get_ba_type_id<node>(nat_type<node>())),
+				tau::get_num(shift))), type_id);
 }
 
 template <NodeType node>
@@ -908,6 +985,41 @@ tref tree<node>::build_bf_neg(tref l) {
 	return tau_lang::build_bf_neg<node>(l);
 }
 
+template <NodeType node>
+tref tree<node>::build_bf_shl(tref l, tref r) {
+	return tau_lang::build_bf_shl<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_shr(tref l, tref r) {
+	return tau_lang::build_bf_shr<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_add(tref l, tref r) {
+	return tau_lang::build_bf_add<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_sub(tref l, tref r) {
+	return tau_lang::build_bf_sub<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_mul(tref l, tref r) {
+	return tau_lang::build_bf_mul<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_div(tref l, tref r) {
+	return tau_lang::build_bf_div<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_mod(tref l, tref r) {
+	return tau_lang::build_bf_mod<node>(l, r);
+}
+
 // -----------------------------------------------------------------------------
 // terminals, variables and constants
 
@@ -946,10 +1058,9 @@ tref tree<node>::build_bf_ba_constant(const constant& constant,
 }
 
 template <NodeType node>
-tref tree<node>::build_bf_ba_constant(const constant& constant,
-	size_t ba_type_id)
+tref tree<node>::build_bv_ba_constant(const constant& constant, size_t type_id)
 {
-	return tau_lang::build_bf_ba_constant<node>(constant, ba_type_id, nullptr);
+	return tau_lang::build_bv_ba_constant<node>(constant, type_id);
 }
 
 template <NodeType node>

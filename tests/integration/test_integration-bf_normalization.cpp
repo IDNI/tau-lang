@@ -3,8 +3,8 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-bool bf_normalize_and_check(const char* sample, typename node_t::type nt) {
-	tref formula = tau::get(sample, parse_bf());
+bool bf_normalize_and_check(const char* sample_, typename node_t::type nt) {
+	tref formula = tau::get(sample_, parse_bf());
 	if (!formula) return false;
 	auto nso_rr = get_nso_rr<node_t>(formula);
 	if (!nso_rr.has_value()) return false;
@@ -118,6 +118,6 @@ TEST_SUITE("SBF expressions") {
 	TEST_CASE("X or Y") {
 		bdd_init<Bool>();
 		const char* sample = "{X}:sbf | {Y}:sbf";
-		CHECK( bf_normalize_and_check(sample, tau::bf_constant) );
+		CHECK( bf_normalize_and_check(sample, tau::ba_constant) );
 	}
 }

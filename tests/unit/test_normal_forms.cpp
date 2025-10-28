@@ -8,7 +8,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 	TEST_CASE("simple case: T") {
 		const char* sample = "1";
 		tau::get_options opts;
-		opts.parse.start = tau::bf; 
+		opts.parse.start = tau::bf;
 		tref fm = tau::get(sample, opts);
 		tau::get(fm).dump(std::cout << "fm: ") << "\n";
 		CHECK( tau::get(fm)[0].is(tau::bf_t) );
@@ -116,17 +116,6 @@ TEST_SUITE("normal forms: reduce_bf") {
 		auto result = statement | reduce_bf<Bool>;
 		CHECK( result == _F<Bool> );
 	}*/
-}
-
-TEST_SUITE("normal forms: snf_bf") {
-
-	TEST_CASE("uninterpreted constants") {
-		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
-		tref fm = tt(tau::get(sample))
-			| tau::spec | tau::main | tau::wff
-			| tt::f(snf_bf<node_t>) | tt::ref;
-		CHECK( tau::get(fm) == tau::get_T() );
-	}
 }
 
 TEST_SUITE("normal forms: dnf_bf") {

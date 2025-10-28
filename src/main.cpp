@@ -1,47 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-// General improvements
-
-// TODO (IMPORTANT) semantic checks
-	// TODO (HIGH) no capture allowed in Tau source
-	// TODO (MEDIUM) type checkings
-// TODO (MEDIUM) declare a static const lambda instead of a predicates if possible
-// TODO (LOW) split code into h/cpp files
-// TODO (IMPORTANT) error and runtime error handling
-	// TODO (IMPORTANT) parsing errors reporting
-	// TODO (IMPORTANT) semantic errors reporting
-	// TODO (IMPORTANT) runtime errors reporting
-	// TODO (IMPORTANT) internal errors reporting
-// TODO (MEDIUM) simplify bindings API
-// TODO (HIGH) allow typing in variables
-
-// Documentation related tasks
-
-// TODO (LOW) tau Language API documentation
-	// TODO (LOW) rewriter
-	// TODO (LOW) nso
-	// TODO (LOW) tau
-	// TODO (LOW) normalizer
-	// TODO (LOW) satisfability
-	// TODO (LOW) executor
-	// TODO (LOW) CLI
-	// TODO (VERY_LOW) CONTRIBUTING.md
-	// TODO (VERY_LOW) CODE_OF_CONDUCT.md
-	// TODO (VERY_LOW) LICENSE
-
-// Tasks related to the Tau language rewriting rules and their use
-
-// TODO (HIGH) the callback to remove quantifiers call builder_xor that relais
-// on xor, which is removed at the beginning only. Change the builder_xor to
-// use the xor definition directly
-
-// TODO (HIGH) we apply too much rules. Review the apply methods to apply the
-// trivialities directly in the apply methods instead of calling them as
-// separate steps
-
-// TODO (MEDIUM) change the execution API to use tuples instead of vectors
-// so we could give more fine grained executions.
-
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -49,14 +7,16 @@
 #ifdef DEBUG
 // including nso_ba, sbf_ba and interpreter directly instead of
 // #include "tau.h" to avoid error lines pointing to a generated tau.h
-#	include "boolean_algebras/nso_ba.h"
-#	include "boolean_algebras/sbf_ba.h"
-#	include "interpreter.h"
+#include "boolean_algebras/bv_ba.h"
+#include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/nso_ba.h"
+#include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/variant_ba.h"
+#include "runtime.h"
+#include "interpreter.h"
 #else
 #	include "tau.h"
 #endif // DEBUG
-
-
 #include "repl_evaluator.h"
 #include "utility/cli.h"
 
@@ -101,10 +61,10 @@ int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 // If a parse result is "Unexpected end of file", it appends next line and repeats.
 // This is used for making the dot ('.') at the end of a statement optional at
 // the end of a line.
-std::optional<rr<node<tau_ba<sbf_ba>, sbf_ba>>> get_spec_multiline(
+std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 	const string& src)
 {
-	using node = tau_lang::node<tau_ba<sbf_ba>, sbf_ba>;
+	using node = tau_lang::node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 	using tau = tree<node>;
 	std::istringstream iss(src);
 	std::string attempt, line, msg;
@@ -196,9 +156,9 @@ int run_tau_spec(string spec_file, bool charvar, bool /*exp*/,
 		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}
 	if (src.empty()) return 0;
-	
-	using node = tau_lang::node<tau_ba<sbf_ba>, sbf_ba>;
-	
+
+	using node = tau_lang::node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+
 	std::set<std::string> guards{ charvar ? "charvar" : "var" };
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
 	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
@@ -235,7 +195,7 @@ int run_tau_spec_old(string spec_file, bool charvar, bool exp,
 		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}
 	if (src.empty()) return 0;
-	repl_evaluator<sbf_ba> re({
+	repl_evaluator<bv, sbf_ba> re({
 		.print_history_store = false,
 		.error_quits         = true,
 		.charvar             = charvar,
@@ -257,9 +217,19 @@ void welcome() {
 		<< "For built-in help, type \"help\" or \"help command\".\n\n";
 }
 
+void at_exit() {
+	// On exit we must clean up the ba constants so the rest of the static
+	// constants managers are able to properly clean everything (in particula,
+	// cvc5::TermManager).
+	ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::cleanup();
+	// On the tests using ba_constants we also need to explicitly call
+	// the clean up in the constants.
+}
 
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
+	atexit(at_exit);
+
 	bdd_init<Bool>();
 
 	vector<string> args;
@@ -300,7 +270,7 @@ int main(int argc, char** argv) {
 		else return run_tau_spec_old(files.front(), charvar, exp, sev);
 	}
 
-	repl_evaluator<sbf_ba> re({
+	repl_evaluator<bv, sbf_ba> re({
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,

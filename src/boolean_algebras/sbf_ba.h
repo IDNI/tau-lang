@@ -4,8 +4,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
 
 #include "boolean_algebras/bdds/bdd_handle.h"
-#include "boolean_algebras/tau_ba.h"
-#include "boolean_algebras/variant_ba.h"
+#include "tau_tree.h"
 
 namespace idni::tau_lang {
 
@@ -28,90 +27,20 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 struct sbf_ba_factory {
 
-	/**
-	 * @brief parses a SBF from a string
-	 *
-	 * @param src source string
-	 * @return optional parsed node if parsing successful
-	 */
-	std::optional<constant_with_type<BAs...>> parse(
-		const std::string& constant_source);
+	static std::string one();
 
-	std::string one() const;
+	static std::string zero();
 
-	std::string zero() const;
+	static std::variant<BAs...> splitter_one();
 
-	std::variant<BAs...> splitter_one() const;
-
-	static sbf_ba_factory<BAs...>& instance();
-private:
-
-	inline static std::map<size_t, std::variant<BAs...>> cache;
+	//inline static std::map<size_t, std::variant<BAs...>> cache;
 };
 
-/**
- * @brief NSO factory used during testing
- * TODO (LOW) move to tests?
- */
-template <>
-struct nso_factory<sbf_ba> {
-	inline static sbf_ba_factory<sbf_ba> bf;
+bool is_closed(const sbf_ba&) { return true; }
 
-	std::optional<constant_with_type<sbf_ba>> parse(
-		const std::string& constant_source,
-		const std::string = "");
-
-	std::vector<std::string> types() const;
-
-	std::string default_type() const;
-
-	std::string one(const std::string type_name) const;
-
-	std::string zero(const std::string type_name) const;
-
-	tref splitter_one() const;
-
-	tref unpack_tau_ba(const std::variant<sbf_ba>&) const;
-
-	std::variant<sbf_ba> pack_tau_ba(tref) const;
-
-	static nso_factory<sbf_ba>& instance();
-private:
-	nso_factory();
-};
-
-/**
- * @brief NSO factory used in REPL
- */
-template<>
-struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
-	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba>& bf() {
-		return sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba>::instance(); }
-	static tau_ba_factory<sbf_ba>& tf() {
-		return tau_ba_factory<sbf_ba>::instance(); }
-
-	std::optional<constant_with_type<tau_ba<sbf_ba>, sbf_ba>> parse(
-		const std::string& constant_source,
-		const std::string type_name);
-
-	std::vector<std::string> types() const;
-
-	std::string default_type() const;
-
-	std::string one(const std::string type_name = "tau") const;
-
-	std::string zero(const std::string type_name = "tau") const;
-
-	tref splitter_one( const std::string type_name) const;
-
-	tref unpack_tau_ba(const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const;
-
-	std::variant<tau_ba<sbf_ba>, sbf_ba> pack_tau_ba(tref c) const;
-
-	static nso_factory<tau_ba<sbf_ba>, sbf_ba>& instance();
-private:
-	nso_factory();
-};
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<typename node<BAs...>::constant_with_type> parse_sbf(const std::string& src);
 
 } // namespace idni::tau_lang
 

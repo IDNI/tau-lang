@@ -16,7 +16,7 @@
 #include <cmath>
 #include <algorithm>
 
-#include "var_dict.h"
+#include "boolean_algebras/bdds/var_dict.h"
 #include "boolean_algebras/bool_ba.h"
 
 namespace idni::tau_lang {
