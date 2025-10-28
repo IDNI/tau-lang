@@ -36,7 +36,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "{ !i5[t] = x || o5[t] = y } : tau = u[0].";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = normalize_non_temp<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "{ always i5[t] != x || o5[t] = y } : tau = u[0]");
+		CHECK(tau::get(res).to_str() == "{ always i5[t :  _0_] != x || o5[t :  _0_] = y } : tau = u[0]");
 	}
 }
 
