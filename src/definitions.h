@@ -3,16 +3,18 @@
 #ifndef DEFINITIONS_H
 #define DEFINITIONS_H
 
-#include "nso_rr.h"
+#include "interpreter_types.h"
 
 namespace idni::tau_lang {
 
 /*
  * Struct to manage function and predicate definitions
+ * as well as input and output stream definitions
  */
-template<typename ... BAs>
+template<NodeType node>
 struct definitions {
-	size_t add (const tau<BAs...>& head, const tau<BAs...>& body) {
+	using tau = tree<node>;
+	size_t add (htref head, htref body) {
 		// Check if rule is updated
 		for (size_t i = 0; i < heads.size(); ++i) {
 			if (heads[i] == head) {
@@ -27,11 +29,23 @@ struct definitions {
 		return heads.size() - 1;
 	}
 
-	rules<tau<BAs...>> get () {
-		rules<tau<BAs...>> r;
+	rewriter::rules get_sym_defs () const {
+		rewriter::rules r;
 		for (size_t i = 0; i < heads.size(); ++i)
 			r.emplace_back(heads[i], bodies[i]);
 		return r;
+	}
+
+	spec_context<node>& get_io_context () {
+		return ctx;
+	}
+
+	io_defs<node>& get_input_defs () {
+		return ctx.inputs;
+	}
+
+	io_defs<node>& get_output_defs () {
+		return ctx.outputs;
 	}
 
 	size_t size () const {
@@ -39,11 +53,11 @@ struct definitions {
 		return heads.size();
 	}
 
-	std::pair<tau<BAs...>, tau<BAs...>> back () const {
+	rewriter::rule back () const {
 		return std::make_pair(heads.back(), bodies.back());
 	}
 
-	std::pair<tau<BAs...>, tau<BAs...>> operator[](const size_t i) const {
+	rewriter::rule operator[](const size_t i) const {
 		return std::make_pair(heads[i], bodies[i]);
 	}
 
@@ -54,8 +68,10 @@ struct definitions {
 private:
 	definitions() = default;
 
-	std::vector<tau<BAs...>> heads = {};
-	std::vector<tau<BAs...>> bodies = {};
+	std::vector<htref> heads = {};
+	std::vector<htref> bodies = {};
+
+	spec_context<node> ctx; // input and output definitions
 };
 
 }

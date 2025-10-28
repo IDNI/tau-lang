@@ -1,12 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __SBF_BA_H__
-#define __SBF_BA_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
 
-#include <boost/log/trivial.hpp>
-
+#include "boolean_algebras/bdds/bdd_handle.h"
 #include "boolean_algebras/tau_ba.h"
-#include "../parser/sbf_parser.generated.h"
+#include "boolean_algebras/variant_ba.h"
 
 namespace idni::tau_lang {
 
@@ -14,8 +13,6 @@ namespace idni::tau_lang {
  * @brief Simple Boolean function Boolean algebra represented by bdd
  */
 using sbf_ba = hbdd<Bool>;
-using sbf_source_sym = idni::lit<char, char>;
-using sbf_sym = std::variant<sbf_source_sym, sbf_ba>;
 
 /**
  * @brief global static bdd variable cache
@@ -27,7 +24,8 @@ inline static std::map<int_t, sbf_ba> var_cache{};
  *
  * @tparam BAs Boolean algebras
  */
-template<typename...BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct sbf_ba_factory {
 
 	/**
@@ -36,43 +34,34 @@ struct sbf_ba_factory {
 	 * @param src source string
 	 * @return optional parsed node if parsing successful
 	 */
-	std::optional<tau<BAs...>> parse(const std::string& src);
-
-	/**
-	 * @brief builds a SBF bounded node from a parsed terminals of a source binding
-	 *
-	 * @param sn tau code node with parsed SBF
-	 * @return bounded constant
-	 */
-	tau<BAs...> binding(const tau<BAs...>& sn);
-
-	std::variant<BAs...> splitter_one () const;
+	std::optional<constant_with_type<BAs...>> parse(
+		const std::string& constant_source);
 
 	std::string one() const;
 
 	std::string zero() const;
-	// static sbf_ba_factory<BAs...>& instance();
+
+	std::variant<BAs...> splitter_one() const;
+
+	static sbf_ba_factory<BAs...>& instance();
 private:
 
-	inline static std::map<std::string, tau<BAs...>> cache;
+	inline static std::map<size_t, std::variant<BAs...>> cache;
 };
 
 /**
  * @brief NSO factory used during testing
+ * TODO (LOW) move to tests?
  */
-template<>
+template <>
 struct nso_factory<sbf_ba> {
 	inline static sbf_ba_factory<sbf_ba> bf;
 
-	std::optional<tau<sbf_ba>> parse(const std::string& src,
-		const std::string& = "");
-
-	tau<sbf_ba> binding(const tau<sbf_ba>& n,
-		const std::string& = "");
+	std::optional<constant_with_type<sbf_ba>> parse(
+		const std::string& constant_source,
+		const std::string = "");
 
 	std::vector<std::string> types() const;
-
-	tau<sbf_ba> splitter_one() const;
 
 	std::string default_type() const;
 
@@ -80,10 +69,11 @@ struct nso_factory<sbf_ba> {
 
 	std::string zero(const std::string type_name) const;
 
-	std::optional<tau<sbf_ba> > unpack_tau_ba(
-		const std::variant<sbf_ba>&) const;
+	tref splitter_one() const;
 
-	std::variant<sbf_ba> pack_tau_ba(const tau<sbf_ba>&) const;
+	tref unpack_tau_ba(const std::variant<sbf_ba>&) const;
+
+	std::variant<sbf_ba> pack_tau_ba(tref) const;
 
 	static nso_factory<sbf_ba>& instance();
 private:
@@ -95,31 +85,28 @@ private:
  */
 template<>
 struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
-	inline static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
-	inline static tau_ba_factory<sbf_ba> tf;
+	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba>& bf() {
+		return sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba>::instance(); }
+	static tau_ba_factory<sbf_ba>& tf() {
+		return tau_ba_factory<sbf_ba>::instance(); }
 
-	std::optional<tau_nso<sbf_ba>> parse(const std::string src,
-		const std::string type_name);
-
-	tau_nso<sbf_ba> binding(
-		const tau<tau_ba<sbf_ba>, sbf_ba>& n,
+	std::optional<constant_with_type<tau_ba<sbf_ba>, sbf_ba>> parse(
+		const std::string& constant_source,
 		const std::string type_name);
 
 	std::vector<std::string> types() const;
 
 	std::string default_type() const;
 
-	tau_nso<sbf_ba> splitter_one(const std::string& type_name) const;
-
 	std::string one(const std::string type_name = "tau") const;
 
 	std::string zero(const std::string type_name = "tau") const;
 
-	std::optional<tau_nso<sbf_ba>> unpack_tau_ba(
-		const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const;
+	tref splitter_one( const std::string type_name) const;
 
-	std::variant<tau_ba<sbf_ba>, sbf_ba> pack_tau_ba(
-		const tau<tau_ba<sbf_ba>, sbf_ba>& c) const;
+	tref unpack_tau_ba(const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const;
+
+	std::variant<tau_ba<sbf_ba>, sbf_ba> pack_tau_ba(tref c) const;
 
 	static nso_factory<tau_ba<sbf_ba>, sbf_ba>& instance();
 private:
@@ -130,11 +117,13 @@ private:
 
 // Hash for hbdd as specialization of std::hash
 template<>
-struct std::hash<hbdd<Bool>> {
-	size_t operator()(const hbdd<Bool>& h) const noexcept {
+struct std::hash<idni::tau_lang::hbdd<idni::tau_lang::Bool>> {
+	size_t operator()(const idni::tau_lang::hbdd<idni::tau_lang::Bool>& h)
+		const noexcept
+	{
 		return h->hash();
 	}
 };
 
-#include "sbf_ba.tmpl.h"
-#endif // __SBF_BA_H__
+#include "boolean_algebras/sbf_ba.tmpl.h"
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__

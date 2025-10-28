@@ -2,6 +2,8 @@
 # help command
 #
 
+include(add_repl_test)
+
 # basic help command
 add_repl_test(help_cmd-full "help" "General")
 add_repl_test(help_cmd-shortened "h" "General")
@@ -11,14 +13,8 @@ add_repl_test(help_normalize_command_cmd-full "help normalize" "the normalize co
 add_repl_test(help_shortened_normalize_cmd "h normalize" "the normalize command")
 
 # help qelim command
-add_test(NAME test_repl-help_qelim_command_cmd-full
-	COMMAND bash -c "echo 'help qelim. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-help_qelim_command_cmd-full PROPERTIES
-	PASS_REGULAR_EXPRESSION "the qelim command eliminates")
-add_test(NAME test_repl-help_shortened_qelim_cmd
-	COMMAND bash -c "echo 'h qelim. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-help_shortened_qelim_cmd PROPERTIES
-	PASS_REGULAR_EXPRESSION "the qelim command eliminates")
+add_repl_test(help_qelim_command_cmd-full "help qelim" "the qelim command eliminates")
+add_repl_test(help_shortened_qelim_cmd "h qelim" "the qelim command eliminates")
 
 # help normalize command with shortened command
 add_repl_test(help_normalize_cmd_shortened "help n" "the normalize command")

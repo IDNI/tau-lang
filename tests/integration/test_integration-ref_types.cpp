@@ -1,53 +1,36 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-// #include "init_log.h"
-
-#include "doctest.h"
-
-#include "test_integration_helpers.h"
-#include "../unit/test_helpers.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
+#include "test_init.h"
+#include "test_Bool_helpers.h"
 
 bool test_ref_types(const char* rec_relation,
 	const std::string& expected_error = "", bool expect_fail = false)
 {
-	// boost::log::core::get()->set_filter(
-	// 	boost::log::trivial::severity >= boost::log::trivial::trace);
+	using node = node_t;
+	DBG(TAU_LOG_INFO << "Ref type inference test input: `"
+		<< rec_relation << "`");
+	auto nso_rr = get_nso_rr(rec_relation, true);
+	if (!nso_rr.has_value()) return false;
+	DBG(TAU_LOG_INFO << "Infer types for:\n" << TAU_LOG_RR(nso_rr.value());)
 
-	auto source = make_tau_source(rec_relation, { .start = tau_parser::rr });
-	auto code = make_tau_code<sbf_ba>(source);
-	factory_binder<sbf_ba> fb;
-	auto binded = bind_tau_code_using_binder<
-				factory_binder<sbf_ba>, sbf_ba>(code, fb);
-	if (!binded) return false;
-
-	// auto nt = binded | non_terminal_extractor<sbf_ba>
-	// 	| optional_value_extractor<size_t>;
-	// std::cerr << "nt: " << tau_parser::instance().name(nt) << "\n";
-
-	auto main = binded | tau_parser::main
-		| tau_parser::wff | optional_value_extractor<tau<sbf_ba>>;
-	auto nso_rr = rr<tau<sbf_ba>>{ make_rec_relations<sbf_ba>(binded), main };
-
-	rr_types<sbf_ba> ts(nso_rr);
-	auto nso_rr_opt = infer_ref_types<sbf_ba>(nso_rr, ts);
+	ref_types<node> ts(nso_rr.value());
+	auto nso_rr_inferred = infer_ref_types<node>(nso_rr.value(), ts);
 	bool fail = !ts.ok();
 
 	if (!expect_fail) expect_fail = expected_error != "";
-	// std::cerr << "fail: " << fail << " expect_fail: " << expect_fail << "\n";
+	if (fail != expect_fail) {
+		TAU_LOG_ERROR << (fail ? "failed" : "success") <<" but expected to "
+			<< (expect_fail ? "fail" : "be successful") << ". # "
+			<< expected_error;
+		TAU_LOG_TRACE << "for spec: " << TAU_LOG_RR(nso_rr.value());
+	}
 	if (fail) { // type checking or inference error 
 		if (expected_error == "Unknown") {
 			if (ts.unresolved().size()) {
-				// std::cerr << "Unresolved not empty\n";
+				TAU_LOG_ERROR << "There are still unresolved refs";
 				return expect_fail;
 			} else {
-				// std::cerr << "Unresolved empty\n";
+				TAU_LOG_ERROR << "All resolved";
 				return false;
 			}
 		}
@@ -56,12 +39,12 @@ bool test_ref_types(const char* rec_relation,
 				return expect_fail;
 		return false;
 	} else {
-		auto normalized = normalizer<sbf_ba>(nso_rr_opt.value());
+		tref normalized = normalizer<node>(nso_rr_inferred.value());
 		if (normalized == nullptr) {
-			// std::cerr << "normalizer failed\n";
+			TAU_LOG_ERROR << "normalizer failed\n";
 			return expect_fail;
-		} else if (!(normalized | tau_parser::wff_t).has_value()) {
-			// std::cerr << "not T " << expect_fail << "\n";
+		} else if (!tau::get(normalized).child_is(tau::wff_t)) {
+			TAU_LOG_ERROR << "not T " << expect_fail << "\n";
 			return expect_fail;
 		}
 	}
@@ -72,8 +55,8 @@ TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 
 	TEST_CASE("arities make different signature") { CHECK( test_ref_types(
 		"f[0](x) := T."
-		"f[0](x, y) := 1."
 		"g[0](x) := F."
+		"f[0](x, y) := 1."
 		"g[0, 0](x) := 0."
 		"f[0](x) && !g[0](x) && f[0](x, y) != g[0, 0](x)."
 	) ); }
@@ -128,6 +111,5 @@ TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 		"f[n](x) := f[m, n-1](x)."
 		"f[1](0).", "Unknown"
 	) ); }
-
 
 }

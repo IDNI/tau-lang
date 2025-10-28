@@ -1,94 +1,66 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "test_init.h"
+#include "test_tau_helpers.h"
 
-#include "doctest.h"
-#include "boolean_algebras/sbf_ba.h"
-#include "satisfiability.h"
+tref create_spec(const char* spec) {
+	auto nso_rr = get_nso_rr<node_t>(tau::get(spec));
+	return nso_rr.value().main->get();
+}
 
-// TODO (LOW) consider move this test to integration tests
-#include "../integration/test_integration_helpers.h"
-
-#define base_bas tau_ba<sbf_ba>, sbf_ba
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-using namespace std;
-
-namespace testing = doctest;
-
-template<typename... BAs>
-tau<BAs...> create_spec(const char* spec) {
-	auto sample_src = make_tau_source(spec);
-	return make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(
-		sample_src).value().main;
+TEST_SUITE("configuration") {
+	TEST_CASE("init bdd") {
+		bdd_init<Bool>();
+	}
 }
 
 TEST_SUITE("Alignments") {
 	TEST_CASE("equal_lookback_one_st") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0).");
-		CHECK(!is_tau_formula_sat(spec));
+		tref spec = create_spec("(always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0).");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
 	TEST_CASE("smaller_lookback_one_st") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t] = o1[t-1] && o1[t-1] = 1) && (sometimes o2[t] = 0).");
-		CHECK(is_tau_formula_sat(spec));
+		tref spec = create_spec("(always o1[t] = o1[t-1] && o1[t-1] = 1) && (sometimes o2[t] = 0).");
+		CHECK(is_tau_formula_sat<node_t>(spec));
 	}
 	TEST_CASE("greater_lookback_one_st") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t] = o1[t-1]) && (sometimes o1[t] != o1[t-2]).");
-		CHECK(!is_tau_formula_sat(spec));
+		tref spec = create_spec("(always o1[t] = o1[t-1]) && (sometimes o1[t] != o1[t-2]).");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
 	TEST_CASE("equal_lookback_two_st") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
-		CHECK(transform_to_execution(spec) == _F<base_bas>);
+		tref spec = create_spec("(always o1[t] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
+		CHECK(transform_to_execution<node_t>(spec) == tau::_F());
 	}
 	TEST_CASE("greater_lookback_two_st_1") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t] = 1 && o2[t] = 1) && (sometimes o1[t-1] = 1) && (sometimes o2[t-2] = 0).");
-		CHECK(!is_tau_formula_sat(spec));
+		tref spec = create_spec("(always o1[t] = 1 && o2[t] = 1) && (sometimes o1[t-1] = 1) && (sometimes o2[t-2] = 0).");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
 	TEST_CASE("greater_lookback_two_st_2") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t] = 1 && o2[t] = 1) && (sometimes o1[t-1] = 0) && (sometimes o2[t-2] = 1).");
-		CHECK(!is_tau_formula_sat(spec));
+		tref spec = create_spec("(always o1[t] = 1 && o2[t] = 1) && (sometimes o1[t-1] = 0) && (sometimes o2[t-2] = 1).");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
 	TEST_CASE("smaller_lookback_two_st_1") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 1) && (sometimes o1[t-1] = 0).");
-		CHECK(!is_tau_formula_sat(spec));
+		tref spec = create_spec("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 1) && (sometimes o1[t-1] = 0).");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
 	TEST_CASE("smaller_lookback_two_st_2") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t-1] = 1).");
-		CHECK(!is_tau_formula_sat(spec));
+		tref spec = create_spec("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t-1] = 1).");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
-#ifndef DEBUG
 	TEST_CASE("mixed_lookback_two_st_1") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t-2] = 1) && (sometimes o1[t-3] = 0) && (sometimes o1[t] = 1).");
-		CHECK(!is_tau_formula_sat(spec));
+		tref spec = create_spec("(always o1[t-2] = 1) && (sometimes o1[t-3] = 0) && (sometimes o1[t] = 1).");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
-
 	TEST_CASE("mixed_lookback_two_st_2") {
-		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("(always o1[t-2] = 1) && (sometimes o1[t-3] = 1) && (sometimes o1[t] = 0).");
-		CHECK(!is_tau_formula_sat(spec));
+		tref spec = create_spec("(always o1[t-2] = 1) && (sometimes o1[t-3] = 1) && (sometimes o1[t] = 0).");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
-#endif
 }
 
 TEST_SUITE("Mixed") {
 	TEST_CASE("this_stream_is_input_stream") {
 		bdd_init<Bool>();
-		auto spec = create_spec<base_bas>("this[t] < 1.");
-		CHECK(!is_tau_formula_sat(spec));
+		auto spec = create_spec("this[t] < 1.");
+		CHECK(!is_tau_formula_sat<node_t>(spec));
 	}
 }

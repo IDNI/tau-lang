@@ -1,12 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include <stack>
-
 #include "solver.h"
 
-#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "solver"
 
 // In what follows we use the algorithms and notations of TABA book (cf.
 // Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
@@ -14,170 +11,172 @@
 
 namespace idni::tau_lang {
 
-template<typename...BAs>
-solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const tau<BAs...>& gh) {
-	solution<BAs...> solution;
-	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<BAs...>;
-	// FIXME convert vars to a set
-	auto remaing = select_top(gh, is_child_non_terminal<tau_parser::variable, BAs...>);
-	for (auto& v: remaing) solution.erase(v);
-	return solution;
-}
-
-template<typename...BAs>
-std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, solution<BAs...>& substitution, solver_mode mode) {
+// not used?
+// template <NodeType node>
+// solution<node> make_removed_vars_solution(const std::vector<var>& originals, tref gh) {
+// 	solution<node> solution;
+// 	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<node>;
+// 	// FIXME convert vars to a set
+// 	auto remaing = select_top(gh, is_child_non_terminal<tau::variable, node>);
+// 	for (auto& v: remaing) solution.erase(v);
+// 	return solution;
+// }
+template <NodeType node>
+std::optional<solution<node>> find_solution(equality eq,
+	solution<node>& substitution, solver_mode mode)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
 	// We would use the algorithm subyaccent to the following theorem (of Taba Book):
 	//
 	// Theorem 3.1. For f (x,X) = xg (X) + x′h (X), let Z be a zero of
 	// g (Z) h (Z) (which is guaranteed to exist by Boole’s consistency condition).
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " find_solution/eq: " << eq;
-	#endif // DEBUG
-
-	auto has_no_var = [](const tau<BAs...>& f) {
-		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
+	DBG(LOG_TRACE << "find_solution/eq: " << LOG_FM(eq);)
+	auto has_no_var = [](tref f) {
+		return !tau::get(f).find_top(is_child<node, tau::variable>);
 	};
 
-	if (!(eq | tau_parser::bf_eq).has_value()) {
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " find_solution/solution[no_eq]: {}";
-		#endif // DEBUG
-
+	if (!(tt(eq) | tau::bf_eq).has_value()) {
+		DBG(LOG_TRACE << "find_solution/solution[no_eq]: {}";)
 		return {};
 	}
 
-	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau<BAs...>>;
+	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " find_solution/f: " << f;
-	#endif // DEBUG
+	DBG(LOG_TRACE << "find_solution/f: " << LOG_FM(f);)
 
 	// FIXME convert vars to a set
-	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
+	if (trefs vars = tau::get(f)
+		.select_top(is_child<node, tau::variable>); vars.size())
+	{
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		auto g = replace_with(vars[0], _1<BAs...>, f);
-		auto h = replace_with(vars[0], _0<BAs...>, f);
-		auto gh = (g & h) | bf_reduce_canonical<BAs...>();
-
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " find_solution/var[0]: " << vars[0] << "\n"
-			<< "solver.tmpl.h:" << __LINE__ << " find_solution/g: " << g << "\n"
-			<< "solver.tmpl.h:" << __LINE__ << " find_solution/h: " << h << "\n"
-			<< "solver.tmpl.h:" << __LINE__ << " find_solution/gh: " << gh << "\n";
-		#endif // DEBUG
+		tref g = rewriter::replace<node>(f, vars[0], tau::_1());
+		tref h = rewriter::replace<node>(f, vars[0], tau::_0());
+		tref gh = tt(tau::get(g) & tau::get(h))
+			| bf_reduce_canonical<node>() | tt::ref;
+#ifdef DEBUG
+		LOG_TRACE << "find_solution/var[0]: " << LOG_FM(vars[0]);
+		LOG_TRACE << "find_solution/g: "      << LOG_FM(g);
+		LOG_TRACE << "find_solution/h: "      << LOG_FM(h);
+		LOG_TRACE << "find_solution/gh: "     << LOG_FM(gh);
+#endif // DEBUG
 
 		if (has_no_var(gh)) {
-			if (gh != _0<BAs...>) {
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " find_solution/solution[gh_no_var,gh_!=_0]: {}";
-				#endif // DEBUG
-
+			if (!tau::get(gh).equals_0()) {
+				DBG(LOG_TRACE << "find_solution"
+					<< "/solution[gh_no_var,gh_!=_0]: {}";)
 				return {};
 			}
 			else {
-				substitution[vars[0]] = ( ( mode == solver_mode::maximum
-						? replace(~g, substitution)
-						: replace(h, substitution) )
-					| bf_reduce_canonical<BAs...>() );
+				substitution[vars[0]] = tt(mode
+						== solver_mode::maximum
+					? rewriter::replace<node>(
+						(~tau::get(g)).get(),
+								substitution)
+					: rewriter::replace<node>(h,
+								substitution))
+					| bf_reduce_canonical<node>() | tt::ref;
 
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " find_solution/solution[gh_no_var,gh=0]: ";
-				for (const auto& [k, v]: substitution)
-					BOOST_LOG_TRIVIAL(trace)
-						<< "solver.tmpl.h:" << __LINE__ << "\t" << k << " := " << v << " ";
-				#endif // DEBUG
+#ifdef DEBUG
+				LOG_TRACE << "find_solution"
+					<< "/solution[gh_no_var,gh=0]: ";
+				for (const auto& [k, v] : substitution)
+					LOG_TRACE<<LOG_FM(k)<<" := "<<LOG_FM(v);
+#endif // DEBUG
 
 				return substitution;
 			}
 		}
-		if (auto restricted = find_solution(build_wff_eq(gh), substitution, mode); restricted) {
+		if (auto restricted = find_solution<node>(build_bf_eq<node>(gh),
+						substitution, mode); restricted)
+		{
 			//solution.insert(restricted.value().begin(), restricted.value().end());
-			substitution[vars[0]] = ( ( mode == solver_mode::maximum
-					? replace(~g, restricted.value())
-					: replace(h, restricted.value()) )
-				| bf_reduce_canonical<BAs...>() );
+			substitution[vars[0]] =
+				tt(mode == solver_mode::maximum
+					? rewriter::replace<node>(
+						(~tau::get(g)).get(),
+							restricted.value())
+					: rewriter::replace<node>(h,
+							restricted.value()))
+				| bf_reduce_canonical<node>() | tt::ref;
 
-			#ifdef DEBUG
-			BOOST_LOG_TRIVIAL(trace)
-				<< "solver.tmpl.h:" << __LINE__ << " find_solution/substitution[general]: ";
-			for (const auto& [k, v]: substitution)
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << "\t" << k << " := " << v << " ";
-			#endif // DEBUG
+#ifdef DEBUG
+			LOG_TRACE << "find_solution/substitution[general]: ";
+			for (const auto& [k, v] : substitution)
+				LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
+#endif // DEBUG
 
 			return substitution;
 		}
 	}
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " find_solution/substitution[no_var]: {}";
-	#endif // DEBUG
-
+	DBG(LOG_TRACE << "find_solution/substitution[no_var]: {}";)
 	return {};
 }
 
-template<typename...BAs>
-std::vector<tau<BAs...>> get_variables(const equality<BAs...>& eq) {
-	return select_top(eq, is_child_non_terminal<tau_parser::variable, BAs...>);
+template <NodeType node>
+trefs get_variables(equality eq) {
+	using tau = tree<node>;
+	return tau::get(eq).select_top(is_child<node, tau::variable>);
 }
 
-template<typename...BAs>
-std::vector<tau<BAs...>> get_variables(const equation_system<BAs...>& system) {
-	std::vector<tau<BAs...>> vars;
+template <NodeType node>
+trefs get_variables(const equation_system<node>& system) {
+	trefs vars;
 	if (system.first.has_value()) {
-		auto vs = get_variables(system.first.value());
+		trefs vs = get_variables<node>(system.first.value());
 		vars.insert(vars.end(), vs.begin(), vs.end());
 	}
-	for (const auto& inequality: system.second) {
-		auto vs = get_variables(inequality);
+	for (inequality t : system.second) {
+		trefs vs = get_variables<node>(t);
 		vars.insert(vars.end(), vs.begin(), vs.end());
 	}
 	return vars;
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> find_maximal_solution(const equation_system<BAs...>& system) {
-	auto vars = get_variables(system);
-	if (vars.empty()) return solution<BAs...>();
-	auto substitution = solution<BAs...>();
-	for (auto& var: vars) substitution[var] = _1<BAs...>;
+template <NodeType node>
+std::optional<solution<node>> find_maximal_solution(const equation_system<node>& system) {
+	using tau = tree<node>;
+	trefs vars = get_variables<node>(system);
+	if (vars.empty()) return solution<node>();
+	auto substitution = solution<node>();
+	for (tref var : vars) substitution[var] = tau::_1();
 	return (system.first)
-		? find_solution(system.first.value(), substitution, solver_mode::maximum)
+		? find_solution<node>(system.first.value(), substitution,
+							solver_mode::maximum)
 		: substitution;
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> find_minimal_solution(const equation_system<BAs...>& system) {
-	auto vars = get_variables(system);
-	if (vars.empty()) return solution<BAs...>();
-	auto substitution = solution<BAs...>();
-	for (auto& var: vars) substitution[var] = _0<BAs...>;
+template <NodeType node>
+std::optional<solution<node>> find_minimal_solution(
+	const equation_system<node>& system)
+{
+	using tau = tree<node>;
+	trefs vars = get_variables<node>(system);
+	if (vars.empty()) return solution<node>();
+	auto substitution = solution<node>();
+	for (tref var : vars) substitution[var] = tau::_0();
 	return (system.first)
-		? find_solution(system.first.value(), substitution, solver_mode::minimum)
+		? find_solution<node>(system.first.value(), substitution,
+							solver_mode::minimum)
 		: substitution;
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
-	auto vars = get_variables(eq);
-	if (vars.empty()) return solution<BAs...>();
-	auto substitution = solution<BAs...>();
-	for (auto& var: vars) substitution[var] = _1<BAs...>;
-	return find_solution(eq, substitution, solver_mode::maximum);
+template <NodeType node>
+std::optional<solution<node>> find_solution(equality eq) {
+	using tau = tree<node>;
+	trefs vars = get_variables<node>(eq);
+	if (vars.empty()) return solution<node>();
+	auto substitution = solution<node>();
+	for (tref var : vars) substitution[var] = tau::_1();
+	return find_solution<node>(eq, substitution, solver_mode::maximum);
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
+template <NodeType node>
+std::optional<solution<node>> lgrs(equality eq) {
 	// We would use Lowenheim’s General Reproductive Solution (LGRS) as given
 	// in the following theorem (of Taba Book):
 	//
@@ -186,83 +185,85 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	// the image of ϕ : Bn → Bn defined by ϕ (X) = Zf (X) + Xf′ (X). Decyphering
 	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
 
-	if (equality == _T<BAs...>) {
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " lgrs/solution: {}";
-		#endif // DEBUG
-		return solution<BAs...>();
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	if (tau::get(eq).equals_T()) {
+		DBG(LOG_TRACE << "lgrs/solution: {}";)
+		return solution<node>();
 	}
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " lgrs/eq: " << equality << "\n";
-	#endif // DEBUG
+	DBG(LOG_TRACE << "lgrs/eq: " << LOG_FM(eq) << "\n";)
 
-	auto s = find_solution(equality);
+	auto s = find_solution<node>(eq);
 	if (!s.has_value()) {
-
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " lgrs/no solution";
-		#endif // DEBUG
-
+		DBG(LOG_TRACE << "lgrs/no solution";)
 		return {};
 	}
-	auto f = equality
-		| tau_parser::bf_eq
-		| tau_parser::bf
-		| optional_value_extractor<tau<BAs...>>;
-	solution<BAs...> phi;
-	for (auto& [x_i, z_i] : s.value())
-		phi[x_i] = ((z_i & f) + (x_i & ~f)) | bf_reduce_canonical<BAs...>();
+	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
+	solution<node> phi;
+	for (auto [x_i, z_i] : s.value())
+		phi[x_i] = tt((tau::get(z_i) & tau::get(f))
+			+ (tau::get(x_i) & ~tau::get(f)))
+				| bf_reduce_canonical<node>() | tt::ref;
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " lgrs/equality: " << equality << "\n"
-		<< "solver.tmpl.h:" << __LINE__ << " lgrs/solution: ";
-	for (const auto& [k, v] : phi)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << k << " := " << v << " ";
-	auto check = snf_wff(replace(equality, phi));
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " lgrs/check: " << check << "\n";
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << "lgrs/equality: " << LOG_FM(eq);
+	LOG_TRACE << "lgrs/solution: ";
+	for (auto [k, v] : phi) LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
+	tref check = snf_wff<node>(rewriter::replace<node>(eq, phi));
+	LOG_TRACE << "lgrs/check: " << LOG_FM(check) << "\n";
+#endif // DEBUG
 
 	return phi;
 }
 
-template<typename...BAs>
-class minterm_iterator {
-public:
+template <NodeType node>
+struct minterm_iterator {
 	// iterator traits
 	using difference_type = size_t;
-	using value_type = minterm<BAs...>;
-	using pointer = const minterm<BAs...>*;
-	using reference = const minterm<BAs...>&;
+	using value_type = minterm;
+	using pointer = const minterm*;
+	using reference = const minterm&;
 	using iterator_category = std::input_iterator_tag;
+
+	using tau = tree<node>;
+	using tt = tau::traverser;
 
 	// sentinel class
 	class sentinel {};
 	static constexpr sentinel end{};
 
-	minterm_iterator(const tau<BAs...>& f) {
+	minterm_iterator(tref f) {
 		// FIXME convert vars to a set
-		if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
+		if (trefs vars = tau::get(f)
+				.select_top(is_child<node, tau::variable>);
+			vars.size())
+		{
 			// we start with the full bf...
-			auto partial_bf = f;
+			tref partial_bf = f;
 			// ... and the first variable (for computing the first partial minterm)
-			auto partial_minterm = _1<BAs...>;
-			for (auto& v : vars) {
+			tref partial_minterm = tau::_1();
+			for (tref v : vars) {
 				// we add the current choice to the list of choices...
-				partial_minterm = partial_minterm & ~v;
-				choices.emplace_back(v, false, partial_bf, partial_minterm);
-				partial_bf = replace_with(v, _0<BAs...>, partial_bf);
+				partial_minterm = (tau::get(partial_minterm)
+					& ~tau::get(v)).get();
+				choices.emplace_back(v, false, partial_bf,
+							partial_minterm);
+				partial_bf = rewriter::replace<node>(partial_bf, v,
+					tau::_0());
+				DBG(LOG_TRACE << "minterm_iterator/partial_bf: "
+					<< LOG_FM(partial_bf);)
 				// ... and compute new values for the next one
 			}
 			// if the current choices correspond to a proper minterm, we update the current
 			// minterm, otherwise we compute the next valid choice
-			if (auto minterm = make_current_minterm(); minterm != _0<BAs...>) current = minterm;
+			if (tref minterm = make_current_minterm();
+				!tau::get(minterm).equals_0())
+			{
+				current = minterm;
+				DBG(LOG_TRACE << "minterm_iterator/current: "
+					<< LOG_FM(current);)
+			}
 			else make_next_choice();
 		// otherwise, i.e. no vars, we return an empty iterator as we have no vars.
 		} else exhausted = true;
@@ -270,18 +271,18 @@ public:
 
 	minterm_iterator();
 
-	minterm_iterator<BAs...>& operator++() {
+	minterm_iterator<node>& operator++() {
 		if (exhausted) return *this;
 		make_next_choice();
 		return *this;
 	}
 
-	minterm_iterator<BAs...> operator++(int) {
+	minterm_iterator<node> operator++(int) {
 		return ++*this;
 	}
 
-	bool operator==(const minterm_iterator<BAs...>& that) const = default;
-	bool operator!=(const minterm_iterator<BAs...>& that) const = default;
+	bool operator==(const minterm_iterator<node>& that) const = default;
+	bool operator!=(const minterm_iterator<node>& that) const = default;
 
 	bool operator==(const sentinel&) const {
 		return exhausted;
@@ -291,35 +292,36 @@ public:
 		return !exhausted;
 	}
 
-	const minterm<BAs...>& operator*() const {
+	minterm operator*() const {
 		return current;
 	}
 
 private:
 	struct choice {
-		var<BAs...> var;
+		tref var;
 		bool value;
-		tau<BAs...> partial_bf;
-		tau<BAs...> partial_minterm;
+		tref partial_bf;
+		tref partial_minterm;
 
 		bool operator==(const choice&) const = default;
 		bool operator!=(const choice&) const = default;
 	};
 
 	std::vector<choice> choices;
-	minterm<BAs...> current;
+	tref current;
 	bool exhausted = false;
 
-	tau<BAs...> make_current_minterm() {
-		auto cte =  choices.back().value
-			? replace_with(choices.back().var, _1<BAs...>, choices.back().partial_bf)
-			: replace_with(choices.back().var, _0<BAs...>, choices.back().partial_bf);
-		auto current = (cte & choices.back().partial_minterm);
+	tref make_current_minterm() {
+		tref cte = choices.back().value
+			? rewriter::replace<node>(choices.back().partial_bf,
+				choices.back().var, tau::_1())
+			: rewriter::replace<node>(choices.back().partial_bf,
+				choices.back().var, tau::_0());
+		tref current = (tau::get(cte) & tau::get(choices.back()
+						.partial_minterm)).get();
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " make_current_minterm/current: " << current;
-		#endif // DEBUG
+		DBG(LOG_TRACE << "make_current_minterm/current: "
+							<< LOG_FM(current);)
 
 		return current;
 	}
@@ -328,33 +330,43 @@ private:
 		if (exhausted) return;
 		// update the choices from right to left
 		size_t last_changed_value = choices.size();
-		while (last_changed_value > 0)  if (choices[--last_changed_value].value ^= true) break;
+		while (last_changed_value > 0)
+			if (choices[--last_changed_value].value ^= true) break;
 		// if all choices are exhausted, we are done
-		if (last_changed_value == 0 && choices[0].value == false) { exhausted = true; return; }
+		if (last_changed_value == 0 && choices[0].value == false) {
+			exhausted = true; return;
+		}
 		// we update the choices from the last changed value till the end
 		update_choices_from(last_changed_value);
 		// if the current minterm is valid, we update current field, otherwise...
-		if (auto minterm = make_current_minterm(); minterm != _0<BAs...>) { current = minterm; return; }
+		if (tref mt = make_current_minterm();
+			!tau::get(mt).equals_0()) { current = mt; return; }
 		// ... we try again with the next choice
 		make_next_choice();
 	}
 
 	void update_choices_from(size_t start) {
 		if (start == 0) {
-			choices[0].partial_minterm = choices[0].value ? choices[0].var : ~choices[0].var;
+			choices[0].partial_minterm = choices[0].value
+					? choices[0].var
+					: (~tau::get(choices[0].var)).get();
 			++start;
 		}
 		for (size_t i = start; i < choices.size(); ++i) {
-			choices[i].partial_minterm = (choices[i].value ? choices[i].var : ~choices[i].var)
-				& choices[i - 1].partial_minterm;
+			choices[i].partial_minterm = ((choices[i].value
+					? tau::get(choices[i].var)
+					: ~tau::get(choices[i].var))
+				& tau::get(choices[i - 1].partial_minterm)).get();
 			choices[i].partial_bf = choices[i - 1].value
-				? replace_with(choices[i - 1].var, _1<BAs...>, choices[i - 1].partial_bf)
-				: replace_with(choices[i - 1].var, _0<BAs...>, choices[i - 1].partial_bf);
+				? rewriter::replace<node>(choices[i - 1].partial_bf,
+					choices[i - 1].var, tau::_1())
+				: rewriter::replace<node>(choices[i - 1].partial_bf,
+					choices[i - 1].var, tau::_0());
 			// if current partial bf is 0, we can skip the rest of the choices
 			// as the corresponding minterms will be 0.
-			if (choices[i].partial_bf == _0<BAs...>) {
+			if (tau::get(choices[i].partial_bf).equals_0()) {
 				for (size_t j = i + 1; j < choices.size(); ++j) {
-					choices[j].partial_bf = _0<BAs...>;
+					choices[j].partial_bf = tau::_0();
 					choices[j].value = true;
 				}
 				return;
@@ -363,55 +375,54 @@ private:
 	}
 };
 
-template<typename...BAs>
-class minterm_range {
-public:
+template <NodeType node>
+struct minterm_range {
+	explicit minterm_range(tref f): f (f) {}
 
-	explicit minterm_range(const tau<BAs...>& f): f (f) {}
+	bool empty() { return false; }
 
-	bool empty() {
-		return false;
-	}
-
-	minterm_iterator<BAs...> begin() {
-		minterm_iterator<BAs...> begin(f);
+	minterm_iterator<node> begin() {
+		minterm_iterator<node> begin(f);
 		return begin;
 	}
 
-	minterm_iterator<BAs...>::sentinel end() const {
-		return minterm_iterator<BAs...>::end;
+	minterm_iterator<node>::sentinel end() const {
+		return minterm_iterator<node>::end;
 	}
 
-	bool operator==(const minterm_range<BAs...>&) const = default;
-	bool operator!=(const minterm_range<BAs...>&) const = default;
+	bool operator==(const minterm_range<node>&) const = default;
+	bool operator!=(const minterm_range<node>&) const = default;
 
 private:
-	const tau<BAs...> f;
+	const tref f;
 };
 
-template<typename...BAs>
-class minterm_inequality_system_iterator {
-public:
+template <NodeType node>
+struct minterm_inequality_system_iterator {
+
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
 	// iterator traits
 	using difference_type = size_t;
-	using value_type = minterm_system<BAs...>;
-	using pointer = const minterm_system<BAs...>*;
-	using reference = const minterm_system<BAs...>&;
+	using value_type = minterm_system<node>;
+	using pointer = const minterm_system<node>*;
+	using reference = const minterm_system<node>&;
 	using iterator_category = std::input_iterator_tag;
 
 	// sentinel class
-	class sentinel {};
+	struct sentinel {};
 	static constexpr sentinel end{};
 
-	minterm_inequality_system_iterator(const inequality_system<BAs...>& sys) {
+	minterm_inequality_system_iterator(const inequality_system<node>& sys) {
 		if (sys.empty()) { exhausted = true; return; }
 		// for each inequality in the system, we create a minterm range
-		for (auto& neq: sys) {
-			auto f = neq | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<tau<BAs...>>;
-			ranges.push_back(minterm_range(f));
+		for (tref neq : sys) {
+			tref f = tt(neq) | tau::bf_neq | tau::bf | tt::ref;
+			ranges.push_back(minterm_range<node>(f));
 		}
 		// we initialize the minterm iterators
-		for (auto& range: ranges) {
+		for (auto& range : ranges) {
 			minterm_iterators.push_back(range.begin());
 			if (minterm_iterators.back() == range.end()) {
 				exhausted = true;
@@ -423,18 +434,18 @@ public:
 
 	minterm_inequality_system_iterator();
 
-	minterm_inequality_system_iterator<BAs...> &operator++() {
+	minterm_inequality_system_iterator<node> &operator++() {
 		if (exhausted) return *this;
 		make_next_choice();
 		return *this;
 	}
 
-	minterm_inequality_system_iterator<BAs...> operator++(int) {
+	minterm_inequality_system_iterator<node> operator++(int) {
 		return ++*this;
 	}
 
-	bool operator==(const minterm_inequality_system_iterator<BAs...>& that) const = default;
-	bool operator!=(const minterm_inequality_system_iterator<BAs...>& that) const = default;
+	bool operator==(const minterm_inequality_system_iterator<node>& that) const = default;
+	bool operator!=(const minterm_inequality_system_iterator<node>& that) const = default;
 
 	bool operator==(const sentinel&) const {
 		return exhausted;
@@ -444,27 +455,25 @@ public:
 		return !exhausted;
 	}
 
-	const minterm_system<BAs...>& operator*() const {
+	const minterm_system<node>& operator*() const {
 		return current;
 	}
 
 private:
-	std::vector<minterm_range<BAs...>> ranges;
-	std::vector<minterm_iterator<BAs...>> minterm_iterators;
-	minterm_system<BAs...> current;
+	std::vector<minterm_range<node>> ranges;
+	std::vector<minterm_iterator<node>> minterm_iterators;
+	minterm_system<node> current;
 	bool exhausted = false;
 
-	minterm_system<BAs...> make_current_minterm_system() {
-		minterm_system<BAs...> minterms;
-		for (auto& it: minterm_iterators) minterms.insert(build_wff_neq(*it));
+	minterm_system<node> make_current_minterm_system() {
+		minterm_system<node> minterms;
+		for (auto& it : minterm_iterators)
+			minterms.insert(build_bf_neq<node>(*it));
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " make_current_minterm_system/minterms: ";
-		for (const auto& minterm: minterms)
-			BOOST_LOG_TRIVIAL(trace)
-				<< "solver.tmpl.h:" << __LINE__ << "\t" << minterm;
-		#endif // DEBUG
+#ifdef DEBUG
+		LOG_TRACE << " make_current_minterm_system/minterms: ";
+		for (tref mt : minterms) LOG_TRACE << LOG_FM(mt);
+#endif // DEBUG
 
 		return minterms;
 	}
@@ -474,271 +483,252 @@ private:
 		size_t last_changed_value = minterm_iterators.size();
 		while (last_changed_value > 0) {
 			--last_changed_value;
-			if (++minterm_iterators[last_changed_value] == ranges[last_changed_value].end())
-				minterm_iterators[last_changed_value] = ranges[last_changed_value].begin();
+			if (++minterm_iterators[last_changed_value]
+				== ranges[last_changed_value].end())
+					minterm_iterators[last_changed_value]
+					   = ranges[last_changed_value].begin();
 			else break;
 		}
-		if (last_changed_value == 0 && minterm_iterators[0] == ranges[0].begin()) {
+		if (last_changed_value == 0
+			&& minterm_iterators[0] == ranges[0].begin())
+		{
 			exhausted = true; return;
 		}
 		current = make_current_minterm_system();
 	}
 };
 
-template<typename...BAs>
+template <NodeType node>
 class minterm_inequality_system_range {
 public:
 
-	explicit minterm_inequality_system_range(const inequality_system<BAs...>& sys): sys(sys) {};
+	explicit minterm_inequality_system_range(
+		const inequality_system<node>& sys): sys(sys) {};
 
-	bool empty() {
-		return sys.size() == 0;
-	}
+	bool empty() { return sys.empty(); }
 
-	minterm_inequality_system_iterator<BAs...> begin() {
-		minterm_inequality_system_iterator<BAs...> begin(sys);
+	minterm_inequality_system_iterator<node> begin() {
+		minterm_inequality_system_iterator<node> begin(sys);
 		return begin;
 	}
 
-	minterm_inequality_system_iterator<BAs...>::sentinel end() {
-		return minterm_inequality_system_iterator<BAs...>::end;
+	minterm_inequality_system_iterator<node>::sentinel end() {
+		return minterm_inequality_system_iterator<node>::end;
 	}
 
 private:
-	inequality_system<BAs...> sys;
+	inequality_system<node> sys;
 };
 
-template<typename...BAs>
-tau<BAs...> get_constant(const minterm<BAs...>& m) {
-	//auto cte = find_top(m, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
-	//return cte ? cte.value() : _1<BAs...>;
+template <NodeType node>
+tref get_constant(minterm m) {
+	using tau = tree<node>;
+	//auto cte = find_top(m, is_child_non_terminal<tau::bf_constant, node>);
+	//return cte ? cte.value() : _1<node>;
 	auto is_bf_constant = [](const auto& n) -> bool {
-		return is_child_non_terminal<tau_parser::bf_constant, BAs...>(n);
+		return is_child<node, tau::bf_constant>(n);
 	};
 	// FIXME convert vars to a set
-	auto all_vs = select_top(m, is_bf_constant);
-	return build_bf_and<BAs...>(all_vs);
+	trefs all_vs = tau::get(m).select_top(is_bf_constant);
+	return build_bf_and<node>(all_vs);
 }
 
-template<typename...BAs>
-std::set<tau<BAs...>> get_exponent(const tau<BAs...>& n) {
-	auto is_bf_literal = [](const auto& n) -> bool {
-		return (n | tau_parser::variable).has_value()
-			|| (n | tau_parser::bf_neg | tau_parser::bf | tau_parser::variable).has_value();
+template <NodeType node>
+subtree_set<node> get_exponent(tref n) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	auto is_bf_literal = [](tref n) -> bool {
+		return (tt(n) | tau::variable).has_value()
+			|| (tt(n) | tau::bf_neg | tau::bf | tau::variable)
+								.has_value();
 	};
 	// FIXME convert vars to a set
-	auto all_vs = select_top(n, is_bf_literal);
-	return std::set<tau<BAs...>>(all_vs.begin(), all_vs.end());
+	trefs all_vs = tau::get(n).select_top(is_bf_literal);
+	return subtree_set<node>(all_vs.begin(), all_vs.end());
 }
 
-template<typename...BAs>
-tau<BAs...> get_minterm(const minterm<BAs...>& m) {
-	return build_bf_and<BAs...>(get_exponent(m));
+template <NodeType node>
+tref get_minterm(minterm m) {
+	return build_bf_and<node>(get_exponent<node>(m));
 }
 
-template<typename...BAs>
-std::optional<minterm_system<BAs...>> add_minterm_to_disjoint(
-		const minterm_system<BAs...>& disjoint,	const minterm<BAs...>& m,
-		const solver_options<BAs...>& options) {
-	minterm_system<BAs...> new_disjoint;
-	auto new_m = m;
+template <NodeType node>
+std::optional<minterm_system<node>> add_minterm_to_disjoint(
+	const minterm_system<node>& disjoint, minterm m,
+	const solver_options& options)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
 
-	for (auto& d: disjoint) {
-		auto new_m_cte = get_constant(new_m);
-		auto new_m_exp = get_exponent(new_m);
+	minterm_system<node> new_disjoint;
+	tref new_m = m;
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/d: " << d << "\n"
-			<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/new_m: " << new_m << "\n"
-			<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/new_m_cte: " << new_m_cte << "\n"
-			<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/new_m_exp:\n";
-		for (const auto& e: new_m_exp)
-			BOOST_LOG_TRIVIAL(trace)
-				<< "solver.tmpl.h:" << __LINE__ << "\t" << e;
-		#endif // DEBUG
+	for (tref d : disjoint) {
+		const auto& new_m_cte = tau::get(get_constant<node>(new_m));
+		auto new_m_exp = get_exponent<node>(new_m);
+
+#ifdef DEBUG
+		LOG_TRACE << "add_minterm_to_disjoint/d:"     << LOG_FM(d);
+		LOG_TRACE << "add_minterm_to_disjoint/new_m:" << LOG_FM(new_m);
+		LOG_TRACE << "add_minterm_to_disjoint/new_m_cte:"
+						<< LOG_FM(new_m_cte.get());
+		LOG_TRACE << "add_minterm_to_disjoint/new_m_exp:";
+		for (tref e : new_m_exp) LOG_TRACE << LOG_FM(e);
+#endif // DEBUG
 
 		// case 1
-		if (get_exponent(d) == new_m_exp) {
-
-			#ifdef DEBUG
-			BOOST_LOG_TRIVIAL(trace)
-				<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/[case1]/new_disjoint: " << d << "\n";
-			#endif // DEBUG
+		if (std::ranges::equal(get_exponent<node>(d), new_m_exp, lcrs_tree<node>::subtree_equals)) {
+			DBG(LOG_TRACE << "add_minterm_to_disjoint"
+				<< "/[case1]/new_disjoint: " << LOG_FM(d);)
 
 			new_disjoint.insert(d);
 			continue;
 		}
-		if (auto d_cte = get_constant(d); (d_cte & new_m_cte) != false) {
+		const auto& d_cte = tau::get(get_constant<node>(d));
+		if ((d_cte & new_m_cte) != false) {
 			// case 2
 			if ((d_cte & ~new_m_cte) != false) {
-				new_disjoint.insert(~new_m_cte & d);
+				const auto& x = ~new_m_cte & tau::get(d);
+				new_disjoint.insert(x.get());
 
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/[case2]/new_disjoint: " << (~new_m_cte & d) << "\n";
-				#endif // DEBUG
+				DBG(LOG_TRACE << "add_minterm_to_disjoint"
+					<< "/[case2]/new_disjoint: "
+					<< LOG_FM(x.get()) << "\n";)
 
 			// case 3
 			} else if ((~d_cte & new_m_cte) != false) {
 				new_disjoint.insert(d);
-				new_m = (~d_cte & new_m) | bf_reduce_canonical<BAs...>();
+				new_m = tt(~d_cte & tau::get(new_m))
+					| bf_reduce_canonical<node>() | tt::ref;
 
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/[case3]/new_disjoint: " << d << "\n"
-					<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/[case3]/new_m: " << new_m << "\n";
-				#endif // DEBUG
+				DBG(LOG_TRACE
+					<< " add_minterm_to_disjoint/[case3]"
+					"/new_disjoint: " << LOG_FM(d)<<"\n"
+				 <<" add_minterm_to_disjoint"
+					"/[case3]/new_m: "<< LOG_FM(new_m);)
 
 			// case 4
 			} else {
-
 				// otherwise, go with the splitters
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/[case4]/d_cte: " << d_cte << "\n";
-				#endif // DEBUG
+				DBG(LOG_TRACE << "add_minterm_to_disjoint/"
+					<< "[case4]/d_cte: "
+					<< LOG_FM(d_cte.get());)
 
-				auto s = d_cte == _1<BAs...>
+				tref s = d_cte.equals_1()
 					// case 4.1
 					? options.splitter_one
 					// case 4.2
-					: splitter(d_cte
-						| tau_parser::bf_constant
-						| optional_value_extractor<tau<BAs...>>);
+					: splitter(tau::get(tt(d_cte)
+						| tau::bf_constant
+						| tt::ref)).get();
 
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/[case4]/s: " << s << "\n";
-				#endif // DEBUG
+				DBG(LOG_TRACE << "add_minterm_to_disjoint"
+					<< "/[case4]/s: " << LOG_FM(s) << "\n";)
 
-				new_disjoint.insert(s & d);
-				new_m = (~s & new_m) | bf_reduce_canonical<BAs...>();
+				const auto& st = tau::get(s);
+				new_disjoint.insert((st & tau::get(d)).get());
+				new_m = tt(~st & tau::get(new_m))
+					| bf_reduce_canonical<node>() | tt::ref;
 
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/[case4]/new_disjoint: " << (s & d) << "\n"
-					<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/[case4]/new_m: " << new_m << "\n";
-				#endif // DEBUG
+				DBG(LOG_TRACE << "add_minterm_to_disjoint"
+					<< "/[case4]/new_disjoint: "
+					<< LOG_FM((st & tau::get(d)).get());)
+				DBG(LOG_TRACE << "add_minterm_to_disjoint"
+					<< "/[case4]/new_m: "<< LOG_FM(new_m);)
 			}
 		// case 5
 		} else {
 			new_disjoint.insert(d);
 
-			#ifdef DEBUG
-			BOOST_LOG_TRIVIAL(trace)
-				<< "solver.tmpl.h:" << __LINE__ << " add_minterm_to_disjoint/[case5]/new_disjoint: " << d << "\n";
-			#endif // DEBUG
+			DBG(LOG_TRACE << "add_minterm_to_disjoint"
+				<< "/[case5]/new_disjoint: " << LOG_FM(d);)
 		}
 	}
 	new_disjoint.insert(new_m);
 	return new_disjoint;
 }
 
-template<typename...BAs>
-std::optional<minterm_system<BAs...>> make_minterm_system_disjoint(
-		const minterm_system<BAs...>& sys, const solver_options<BAs...>& options) {
+template <NodeType node>
+std::optional<minterm_system<node>> make_minterm_system_disjoint(
+	const minterm_system<node>& sys, const solver_options& options)
+{
+#ifdef DEBUG
+	LOG_TRACE << "make_minterm_system_disjoint/system: ";
+	for (minterm t : sys) LOG_TRACE << LOG_FM(t);
+#endif // DEBUG
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " make_minterm_system_disjoint/system: ";
-	for (const auto& minterm : sys)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << minterm;
-	#endif // DEBUG
-
-	minterm_system<BAs...> disjoints;
+	minterm_system<node> disjoints;
 	for (auto it = sys.begin(); it != sys.end(); ++it)
-		if (auto new_disjoints = add_minterm_to_disjoint<BAs...>(disjoints, *it, options); new_disjoints)
-			disjoints = new_disjoints.value();
+		if (auto new_disjoints = add_minterm_to_disjoint<node>(
+						disjoints, *it, options);
+			new_disjoints) disjoints = new_disjoints.value();
 		else return {};
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " make_minterm_system_disjoint/disjoints: ";
-	for (const auto& minterm : disjoints)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << minterm;
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << "make_minterm_system_disjoint/disjoints: ";
+	for (minterm t : disjoints) LOG_TRACE << LOG_FM(t);
+#endif // DEBUG
 
 	return disjoints;
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...>& system,
-		const solver_options<BAs...>& options) {
+template <NodeType node>
+std::optional<solution<node>> solve_minterm_system(
+	const minterm_system<node>& system, const solver_options& options)
+{
 	// To solve the minterm system, we use the Corollary 3.2 (of Taba Book),
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " solve_minterm_system/system: ";
-	for (const auto& minterm : system)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << minterm;
-	#endif // DEBUG
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+#ifdef DEBUG
+	LOG_TRACE << "solve_minterm_system/system: ";
+	for (minterm t : system) LOG_TRACE << LOG_FM(t);
+#endif // DEBUG
 
 	// We know the system has a solution as we only iterate over non-negative
 	// minterms (which trivially satisfy the condition of Theorem 3.3)
-	equality<BAs...> eq = _0<BAs...>;
-	auto disjoint_minterms = make_minterm_system_disjoint<BAs...>(system, options);
+	equality eq = tau::_0();
+	auto disjoint_minterms = make_minterm_system_disjoint<node>(system, options);
 	if (!disjoint_minterms.has_value()) return {};
 
-	for (auto& neq: disjoint_minterms.value()) {
+	for (tref neq : disjoint_minterms.value()) {
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_minterm_system/neq: " << neq;
-		#endif // DEBUG
+		DBG(LOG_TRACE << "solve_minterm_system/neq: " << LOG_FM(neq);)
 
-		auto nf = neq
-			| tau_parser::bf_neq
-			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>
-			| bf_reduce_canonical<BAs...>();
+		tref nf = tt(neq) | tau::bf_neq | tau::bf
+			| bf_reduce_canonical<node>() | tt::ref;
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_minterm_system/nf: " << nf;
-		#endif // DEBUG
+		DBG(LOG_TRACE << "solve_minterm_system/nf: " << LOG_FM(nf);)
 
-		if (nf == _0<BAs...>) continue;
+		if (tau::get(nf).equals_0()) continue;
 
-		auto cte = get_constant(nf);
+		tref cte = get_constant<node>(nf);
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_minterm_system/cte: " << cte;
-		#endif // DEBUG
+		DBG(LOG_TRACE << "solve_minterm_system/cte: " << LOG_FM(cte);)
 
-		auto minterm = get_minterm(nf);
+		minterm t = get_minterm<node>(nf);
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_minterm_system/minterm: " << minterm;
-		#endif // DEBUG
+		DBG(LOG_TRACE << "solve_minterm_system/minterm: " <<LOG_FM(t);)
 
-		eq = eq | (cte & ~minterm);
+		eq = (tau::get(eq) | (tau::get(cte) & ~tau::get(t))).get();
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_minterm_system/eq[partial]: " << eq;
-		#endif // DEBUG
+		DBG(LOG_TRACE << "solve_minterm_system/eq[partial]: "
+								<< LOG_FM(eq);)
 	}
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " solve_minterm_system/eq[final]: " << eq;
-	#endif // DEBUG
+	DBG(LOG_TRACE << "solve_minterm_system/eq[final]: " << LOG_FM(eq);)
 
-	eq = build_wff_eq(eq);
-	return find_solution(eq);
+	eq = build_bf_eq<node>(eq);
+	return find_solution<node>(eq);
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<BAs...>& system,
-		const solver_options<BAs...>& options) {
+template <NodeType node>
+std::optional<solution<node>> solve_inequality_system(
+	const inequality_system<node>& system, const solver_options& options)
+{
 	// Following Taba book:
 	//
 	// To solve  {h_i (T) ̸= 0}i∈I (and hence the original system whose solution
@@ -755,41 +745,34 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 	// for each possible choice of H_i's, we try to solve the minterm system
 	// using tthe above solve method.
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " solve_inequality_system/system: ";
-	for (const auto& inequality : system)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << inequality;
+#ifdef DEBUG
+	LOG_TRACE << "solve_inequality_system/system: ";
+	for (inequality t : system) LOG_TRACE << LOG_FM(t);
 	#endif // DEBUG
 	// If no inequality is contained, return an empty solution
-	if (system.empty()) return solution<BAs...>{};
-	//for (auto& ms: minterm_inequality_system_range<BAs...>(system)) {
-	for (auto it = minterm_inequality_system_iterator<BAs...>(system); it != minterm_inequality_system_iterator<BAs...>::end; ++it) {
+	if (system.empty()) return solution<node>{};
+	//for (auto& ms: minterm_inequality_system_range<node>(system)) {
+	for (auto it = minterm_inequality_system_iterator<node>(system);
+		it != minterm_inequality_system_iterator<node>::end; ++it)
+	{
+#ifdef DEBUG
+		LOG_TRACE << "solve_inequality_system/minterm system: ";
+		for (minterm t : *it) LOG_TRACE << LOG_FM(t);
+#endif // DEBUG
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_inequality_system/minterm system: ";
-		for (const auto& minterm : *it)
-			BOOST_LOG_TRIVIAL(trace)
-				<< "solver.tmpl.h:" << __LINE__ << "\t" << minterm;
-		#endif // DEBUG
-
-		auto solution = solve_minterm_system<BAs...>(*it, options);
+		auto solution = solve_minterm_system<node>(*it, options);
 		if (solution.has_value()) return solution;
 	}
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " solve_inequality_system/solution: {}";
-	#endif // DEBUG
+	DBG(LOG_TRACE << "solve_inequality_system/solution: {}";)
 
 	return {};
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_general_system(const equation_system<BAs...>& system,
-		const solver_options<BAs...>& options) {
+template <NodeType node>
+std::optional<solution<node>> solve_general_system(
+	const equation_system<node>& system, const solver_options& options)
+{
 	// As in the Taba book, we consider
 	// 		f (X) = 0
 	//		{g_i (X) ̸= 0}i∈I
@@ -803,236 +786,230 @@ std::optional<solution<BAs...>> solve_general_system(const equation_system<BAs..
 	// TODO (HIGH) check for constant equalities/inequalities and remove them if
 	// they are true, return empty solution otherwise
 
-	#ifdef DEBUG
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+#ifdef DEBUG
 	if (system.first.has_value())
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_system/eq: " << system.first.value();
+		LOG_TRACE << "solve_system/eq: "<<LOG_FM(system.first.value());
 	if (!system.second.empty()) {
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_system/inequalities: ";
-		for (const auto& inequality : system.second)
-			BOOST_LOG_TRIVIAL(trace)
-				<< "solver.tmpl.h:" << __LINE__ << "\t" << inequality;
+		LOG_TRACE << "solve_system/inequalities: ";
+		for (inequality t : system.second) LOG_TRACE << LOG_FM(t);
 	}
-	#endif // DEBUG
+#endif // DEBUG
 
-	if (!system.first) return solve_inequality_system<BAs...>(system.second, options);
-	if (system.second.empty()) return find_solution(system.first.value());
+	if (!system.first)
+		return solve_inequality_system<node>(system.second, options);
+	if (system.second.empty())
+		return find_solution<node>(system.first.value());
 
-	auto phi = lgrs(system.first.value());
+	auto phi = lgrs<node>(system.first.value());
 	if (!phi.has_value()) return {};
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " solve_system/phi: ";
+#ifdef DEBUG
+	LOG_TRACE << "solve_system/phi: ";
 	for (const auto& [k, v]: phi.value())
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << k << " := " << v;
-	#endif // DEBUG
+		LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
+#endif // DEBUG
 
-
-	inequality_system<BAs...> inequalities;
+	inequality_system<node> inequalities;
 	// for each inequality g_i we apply the transformation given by lgrs solution
 	// of the equality
-	for (auto& g_i: system.second) {
-		auto nphi = phi.value(), ng_i = replace(g_i, nphi) | bf_reduce_canonical<BAs...>();
-		if (ng_i == _F<BAs...>) {
-
-			#ifdef DEBUG
-			BOOST_LOG_TRIVIAL(trace)
-				<< "solver.tmpl.h:" << __LINE__ << " solve_system/inequality_solution: {}";
-			#endif // DEBUG
+	for (tref g_i : system.second) {
+		auto nphi = phi.value();
+		auto ng_i = tt(rewriter::replace<node>(g_i, nphi))
+				| bf_reduce_canonical<node>() | tt::ref;
+		if (tau::get(ng_i).equals_F()) {
+			DBG(LOG_TRACE<<" solve_system/inequality_solution: {}";)
 
 			return {};
 		}
-		else if (ng_i == _T<BAs...>) continue;
+		else if (tau::get(ng_i).equals_T()) continue;
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_system/inequality: " << ng_i;
-		#endif // DEBUG
+		DBG(LOG_TRACE << "solve_system/inequality: " << LOG_FM(ng_i);)
 
 		inequalities.insert(ng_i);
 	}
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " solve_system/inequalities: ";
-	for (const auto& inequality : inequalities)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << inequality;
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << "solve_system/inequalities: ";
+	for (inequality t : inequalities) LOG_TRACE << LOG_FM(t);
+#endif // DEBUG
 
 
 	// solve the given system  of inequalities
-	auto inequality_solution = solve_inequality_system<BAs...>(inequalities, options);
+	auto inequality_solution =
+			solve_inequality_system<node>(inequalities, options);
 	if (!inequality_solution.has_value()) {
-
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve_system/inequality_solution: {}";
-		#endif // DEBUG
+		DBG(LOG_TRACE << "solve_system/inequality_solution: {}";)
 
 		return {};
 	}
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " solve_system/inequality_solution: ";
-	for (const auto& [k, v]: inequality_solution.value())
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << k << " := " << v;
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << "solve_system/inequality_solution: ";
+	for (auto [k, v]: inequality_solution.value())
+		LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
+#endif // DEBUG
 
 	// and finally, apply the solution to lgrs solution to get the final one (ϕ (T)).
 	// Solutions coming from inequality_solution for variables appearing also
 	// in the equality part will be replaced in the next step
-	solution<BAs...> solution = inequality_solution.value();
+	solution<node> solution = inequality_solution.value();
 
 	// Now we need to add solutions for variables in the lgrs
-	for (auto& [var, func]: phi.value()) {
-		auto func_with_neq_assgm = replace(func, inequality_solution.value());
+	for (auto [var, func]: phi.value()) {
+		tref func_with_neq_assgm = rewriter::replace<node>(func,
+						inequality_solution.value());
 		// Now assign the remaining variables to 0 and compute
 		// resulting value for var
-		solution[var] = replace_free_vars_by(func_with_neq_assgm,
-			_0_trimmed<BAs...>) | bf_reduce_canonical<BAs...>();
+		solution[var] =	tt(replace_free_vars_by<node>(
+					func_with_neq_assgm, tau::_0_trimmed()))
+				| bf_reduce_canonical<node>() | tt::ref;
 	}
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " solve_system/inequality_solution: ";
-	for (const auto& [k, v]: solution)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << k << " := " << v;
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << "solve_system/inequality_solution: ";
+	for (auto [k, v]: solution)
+		LOG_TRACE << LOG_FM(k) << " := " << LOG_FM(v);
+#endif // DEBUG
 
 	return solution;
 }
 
-template<typename...BAs>
-bool check_extreme_solution(const equation_system<BAs...>& system,
-		const solution<BAs...>& substitution) {
-	#ifdef DEBUG
-	if (system.first)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " check_extreme_solution/eq: " << system.first.value();
-	for (const auto& inequality: system.second)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " check_extreme_solution/ineq: " << inequality;
-	for (const auto& [k, v]: substitution)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " check_extreme_solution/substitution: " << k << " := " << v;
-	#endif // DEBUG
+template <NodeType node>
+bool check_extreme_solution(const equation_system<node>& system,
+	const solution<node>& substitution)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+#ifdef DEBUG
+	if (system.first) LOG_TRACE <<" check_extreme_solution/eq: "
+		<< LOG_FM(system.first.value());
+	for (inequality t : system.second) LOG_TRACE
+		<< " check_extreme_solution/ineq: " << LOG_FM(t);
+	for (auto [k, v]: substitution) LOG_TRACE <<
+		" check_extreme_solution/substitution: "
+		<< LOG_FM(k) << " := " << LOG_FM(v);
+#endif // DEBUG
 	// We check if the solution satisfies the inequalities of the system
-	for (const auto& inequality: system.second) {
-		auto value = replace(inequality, substitution) | bf_reduce_canonical<BAs...>();
-		if (value == _F<BAs...>)
-			return false;
+	for (inequality t : system.second) {
+		tref value = tt(rewriter::replace<node>(t, substitution))
+			| bf_reduce_canonical<node>() | tt::ref;
+		if (tau::get(value).equals_F()) return false;
 	}
 	return true;
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_maximum_system(const equation_system<BAs...>& system) {
-	if (auto s = find_maximal_solution<BAs...>(system); s)
-		return check_extreme_solution(system, s.value()) ? s : std::optional<solution<BAs...>>();
+template <NodeType node>
+std::optional<solution<node>> solve_maximum_system(
+	const equation_system<node>& system)
+{
+	if (auto s = find_maximal_solution<node>(system); s)
+		return check_extreme_solution<node>(system, s.value()) ? s
+					: std::optional<solution<node>>();
 	else return {};
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_minimum_system(const equation_system<BAs...>& system) {
-	if(auto s = find_minimal_solution<BAs...>(system); s)
-		return check_extreme_solution(system, s.value()) ? s : std::optional<solution<BAs...>>();
+template <NodeType node>
+std::optional<solution<node>> solve_minimum_system(
+	const equation_system<node>& system)
+{
+	if(auto s = find_minimal_solution<node>(system); s)
+		return check_extreme_solution<node>(system, s.value()) ? s
+					: std::optional<solution<node>>();
 	else return {};
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
-		const solver_options<BAs...>& options) {
+template <NodeType node>
+std::optional<solution<node>> solve_system(const equation_system<node>& system,
+					const solver_options& options)
+{
 	// we try to find a maximal solution
 	if (options.mode != solver_mode::minimum) {
-		if (auto solution = solve_maximum_system<BAs...>(system); solution)
+		if (auto solution = solve_maximum_system<node>(system); solution)
 			return solution;
 		else if (options.mode == solver_mode::maximum) return {};
 	}
 	// if it fails, we try a minimum solution
-	if (auto solution = solve_minimum_system<BAs...>(system); solution)
+	if (auto solution = solve_minimum_system<node>(system); solution)
 		return solution;
 	else if (options.mode == solver_mode::minimum) return {};
 	// if we have no equality we try to solve the inequalities
-	if (!system.first.has_value()) return solve_inequality_system<BAs...>(system.second, options);
+	if (!system.first.has_value())
+		return solve_inequality_system<node>(system.second, options);
 	// otherwise we try a general solution
-	return solve_general_system<BAs...>(system, options);
+	return solve_general_system<node>(system, options);
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs,
-		const solver_options<BAs...>& options) {
+template <NodeType node>
+std::optional<solution<node>> solve(const equations<node>& eqs,
+					const solver_options& options)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
 	// split among equalities and inequalities
-	equation_system<BAs...> system;
-	for (const auto& eq: eqs) {
-		if (is_child_non_terminal<tau_parser::bf_eq, BAs...>(eq)) {
+	equation_system<node> system;
+	for (tref eq : eqs) {
+		if (tau::get(eq).child_is(tau::bf_eq)) {
 			if (!system.first.has_value())
-				system.first = std::optional<equality<BAs...>>(eq);
+				system.first = std::optional<equality>(eq);
 			else {
 				// squeeze the equalities
-				auto l = system.first.value()
-					| tau_parser::bf_eq
-					| tau_parser::bf
-					| optional_value_extractor<tau<BAs...>>;
-				auto r = eq
-					| tau_parser::bf_eq
-					| tau_parser::bf
-					| optional_value_extractor<tau<BAs...>>;
-				system.first = build_wff_eq(l | r);
+				tref l = tt(system.first.value())
+					| tau::bf_eq | tau::bf | tt::ref;
+				tref r = tt(eq)
+					| tau::bf_eq | tau::bf | tt::ref;
+				system.first = build_bf_eq<node>(
+					(tau::get(l) | tau::get(r)).get());
 			}
 		}
 		else system.second.insert(eq);
 	}
-	return solve_system<BAs...>(system, options);
+	return solve_system<node>(system, options);
 }
 
 // entry point for the solver
-template<typename...BAs>
-std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
-		const solver_options<BAs...>& options) {
-	if (form == _T<BAs...>) return { solution<BAs...>() };
+template <NodeType node>
+std::optional<solution<node>> solve(tref form, const solver_options& options) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	if (tau::get(form).equals_T()) return { solution<node>() };
 
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.tmpl.h:" << __LINE__ << " solve/form: " << form << "\n"
-		<< "solver.tmpl.h:" << __LINE__ << " solve/options/type: " << options.type << "\n";
+#ifdef DEBUG
+	LOG_TRACE << "solve/form: " << LOG_FM(form);
+	LOG_TRACE << "solve/options/type: " << options.type;
 	switch (options.mode) {
-		case solver_mode::maximum: BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve/options.kind: maximum\n"; break;
-		case solver_mode::minimum: BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve/options.kind: minimum"; break;
-		default: BOOST_LOG_TRIVIAL(trace)
-			<< "solver.tmpl.h:" << __LINE__ << " solve/options.kind: default\n"
-			<< "solver.tmpl.h:" << __LINE__ << " solve/options.splitter_one:"
-			<< options.splitter_one; break;
+		case solver_mode::maximum: LOG_TRACE
+				<< " solve/options.kind: maximum"; break;
+		case solver_mode::minimum: LOG_TRACE
+				<< " solve/options.kind: minimum"; break;
+		default: LOG_TRACE
+			<< " solve/options.kind: default";
+			LOG_TRACE << "solve/options.splitter_one:"
+				<< options.splitter_one; break;
 	}
-	#endif // DEBUG
+#endif // DEBUG
 
-	auto dnf = form | bf_reduce_canonical<BAs...>();
-	for (auto& clause: get_leaves(dnf, tau_parser::wff_or)) {
+	tref dnf = tt(form) | bf_reduce_canonical<node>() | tt::ref;
+	for (tref clause : get_leaves<node>(dnf, tau::wff_or)) {
 		// Reject clause involving temporal quantification
-		if (find_top(clause, is_temporal_quantifier<BAs...>)) {
-			BOOST_LOG_TRIVIAL(warning) << "(Warning) Skipped clause with temporal quantifier: " << clause;
+		if (tau::get(clause).find_top(is_temporal_quantifier<node>)) {
+			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(clause);
 			continue;
 		}
-		auto is_equation = [](const tau<BAs...>& n) {
-			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
-			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
+		auto is_equation = [](tref n) {
+			return tau::get(n).child_is(tau::bf_eq)
+				|| tau::get(n).child_is(tau::bf_neq);
 		};
 		// FIXME convert vars to a set
-		auto eqs = select_top(clause, is_equation);
+		auto eqs = tau::get(clause).select_top(is_equation);
 		if (eqs.empty()) continue;
-		auto solution = solve<BAs...>(
-			std::set<tau<BAs...>>(eqs.begin(), eqs.end()), options);
+		auto solution = solve<node>(
+			equations<node>(eqs.begin(), eqs.end()), options);
 		if (solution.has_value()) return solution;
 	}
 	return {};
 }
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang

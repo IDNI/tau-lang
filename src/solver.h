@@ -10,98 +10,84 @@
  * at https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf.
  */
 
-#ifndef __SOLVER_H__
-#define __SOLVER_H__
+#ifndef __IDNI__TAU__SOLVER_H__
+#define __IDNI__TAU__SOLVER_H__
 
-#include <stack>
-#include <set>
-#include <map>
-#include <optional>
-#include <string>
-
-#include "boolean_algebras/tau_ba.h"
-#include "normal_forms.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
 #include "splitter.h"
 
 namespace idni::tau_lang {
 
 /**
  * @typedef typed_nso
- * @brief Alias for tau template with variadic template parameters.
+ * @brief Alias for tau tree node.
  */
-template<typename...BAs>
-using typed_nso = tau<BAs...>;
+using typed_nso = tref;
 
 /**
  * @typedef var
- * @brief Alias for tau template with variadic template parameters.
+ * @brief Alias for tau tree node.
  */
-template<typename...BAs>
-using var = tau<BAs...>;
+using var = tref;
 
 /**
  * @typedef minterm
- * @brief Alias for tau template with variadic template parameters.
+ * @brief Alias for tau tree node.
  */
-template<typename...BAs>
-using minterm = tau<BAs...>;
+using minterm = tref;
 
 /**
  * @typedef equality
- * @brief Alias for tau template with variadic template parameters.
+ * @brief Alias for tau tree node.
  */
-template<typename...BAs>
-using equality = tau<BAs...>;
+using equality = tref;
 
 /**
  * @typedef inequality
- * @brief Alias for tau template with variadic template parameters.
+ * @brief Alias for tau tree node.
  */
-template<typename...BAs>
-using inequality = tau<BAs...>;
+using inequality = tref;
 
 /**
  * @typedef equation
- * @brief Alias for tau template with variadic template parameters.
+ * @brief Alias for tau tree node.
  */
-template<typename...BAs>
-using equation = tau<BAs...>;
+using equation = tref;
 
 /**
  * @typedef equations
- * @brief Alias for a set of tau templates with variadic template parameters.
+ * @brief Alias for a set of tau tree nodes.
  */
-template<typename...BAs>
-using equations = std::set<tau<BAs...>>;
+template <NodeType node>
+using equations = subtree_set<node>;
 
 /**
  * @typedef equation_system
  * @brief Alias for a pair consisting of an optional equality and a set of inequalities.
  */
-template<typename...BAs>
-using equation_system = std::pair<std::optional<equality<BAs...>>, std::set<inequality<BAs...>>>;
+template<NodeType node>
+using equation_system = std::pair<std::optional<equality>,
+				  std::set<inequality, subtree_less<node>>>;
 
 /**
  * @typedef inequality_system
  * @brief Alias for a set of inequalities.
  */
-template<typename...BAs>
-using inequality_system = std::set<inequality<BAs...>>;
+template<NodeType node>	
+using inequality_system = subtree_set<node>;
 
 /**
  * @typedef minterm_system
  * @brief Alias for a set of inequalities.
  */
-template<typename...BAs>
-using minterm_system = std::set<inequality<BAs...>>;
+template<NodeType node>
+using minterm_system = subtree_set<node>;
 
 /**
  * @typedef solution
  * @brief Alias for a map of variables to tau templates.
  */
-template<typename...BAs>
-using solution = std::map<var<BAs...>, tau<BAs...>>;
+template<NodeType node>
+using solution = subtree_map<node, tref>;
 
 /**
  * @enum solver_mode
@@ -117,9 +103,8 @@ enum solver_mode {
  * @struct solver_options
  * @brief Structure for solver options.
  */
-template<typename...BAs>
 struct solver_options {
-	tau<BAs...> splitter_one = nullptr; /**< Splitter option */
+	tref splitter_one = nullptr; /**< Splitter option */
 	solver_mode mode = solver_mode::general; /**< Solver mode option */
 	std::string type = ""; /**< Type option */
 };
@@ -131,8 +116,8 @@ struct solver_options {
  * @param eq The equality to solve.
  * @return An optional solution.
  */
-template<typename...BAs>
-std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq);
+template <NodeType node>
+std::optional<solution<node>> find_solution(equality eq);
 
 /**
  * @brief Solves the given equality using LGRS algorithm.
@@ -141,8 +126,8 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq);
  * @param equality The equality to solve.
  * @return An optional solution.
  */
-template<typename...BAs>
-std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality);
+template <NodeType node>
+std::optional<solution<node>> lgrs(equality equality);
 
 /**
  * @brief Solves the given minterm system.
@@ -152,9 +137,9 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality);
  * @param options The solver options.
  * @return An optional solution.
  */
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...>& system,
-	const solver_options<BAs...>& options);
+template <NodeType node>
+std::optional<solution<node>> solve_minterm_system(
+	const minterm_system<node>& system, const solver_options& options);
 
 /**
  * @brief Solves the given inequality system.
@@ -164,9 +149,9 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
  * @param options The solver options.
  * @return An optional solution.
  */
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<BAs...>& system,
-	const solver_options<BAs...>& options);
+template <NodeType node>
+std::optional<solution<node>> solve_inequality_system(
+	const inequality_system<node>& system, const solver_options& options);
 
 /**
  * @brief Solves the given equation system.
@@ -176,9 +161,9 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
  * @param options The solver options.
  * @return An optional solution.
  */
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
-	const solver_options<BAs...>& options);
+template <NodeType node>
+std::optional<solution<node>> solve_system(
+	const equation_system<node>& system, const solver_options& options);
 
 /**
  * @brief Solves the given set of equations.
@@ -188,9 +173,9 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
  * @param options The solver options.
  * @return An optional solution.
  */
-template<typename...BAs>
-std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs,
-	const solver_options<BAs...>& options);
+template <NodeType node>
+std::optional<solution<node>> solve(const equations<node>& eqs,
+					const solver_options& options);
 
 /**
  * @brief Solves the given tau form.
@@ -200,11 +185,10 @@ std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs,
  * @param options The solver options.
  * @return An optional solution.
  */
-template<typename...BAs>
-std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
-	const solver_options<BAs...>& options);
+template <NodeType node>
+std::optional<solution<node>> solve(tref form, const solver_options& options);
 
-} // idni::tau_lang namespace
+} // namespace idni::tau_lang
 
 #include "solver.tmpl.h"
-#endif // __SOLVER_H__
+#endif // __IDNI__TAU__SOLVER_H__

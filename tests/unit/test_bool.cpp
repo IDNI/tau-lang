@@ -11,12 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "doctest.h"
+#include "test_init.h"
 #include "boolean_algebras/bool_ba.h"
-
-namespace testing = doctest;
 
 TEST_SUITE("bool boolean algebra") {
 

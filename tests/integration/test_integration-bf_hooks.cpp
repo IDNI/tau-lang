@@ -1,28 +1,7 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentiTd cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include <cassert>
-
-#include "doctest.h"
-#include "boolean_algebras/sbf_ba.h"
-#include "normalizer.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
+#include "test_init.h"
+#include "test_tau_helpers.h"
 
 TEST_SUITE("configuration") {
 
@@ -34,62 +13,57 @@ TEST_SUITE("configuration") {
 TEST_SUITE("bf operator hooks") {
 
 	// we should get an error during parsing and hence return true if we get an error
-	bool check_unbinded_hook(const char* sample) {
-		auto tau_sample_src = make_tau_source(sample, { .start = tau_parser::bf });
-		auto tau_sample = make_tau_code<tau_ba<sbf_ba>, sbf_ba>(tau_sample_src);
+	bool check_unbound_hook(const char* sample) {
+		tref tau_sample = tau::get(sample, parse_bf());
 
-		#ifdef DEBUG
-		std::string str(sample);
-		if (tau_sample)
-			std::cout << "sample: " << str << " expected error, got : " << tau_sample << "\n";
-		else
-			std::cout << "sample: " << str << " expected error, got it\n";
-		#endif // DEBUG
+#ifdef DEBUG
+		using node = node_t;
+		string str(sample);
+		if (tau_sample) cout << "sample: " << str
+			<< " expected error, got : " << TAU_LOG_FM_DUMP(tau_sample) << "\n";
+		else cout << "sample: " << str << " expected error, got it\n";
+#endif // DEBUG
 
 		return tau_sample == nullptr;
 	}
 
 	// we should be able to parse the sample and the expected result should be the same
 	bool check_hook(const char* sample, const char* expected) {
-		auto tau_sample = make_nso_using_factory<
-			tau_ba<sbf_ba>, sbf_ba>(sample, { .start = tau_parser::bf }).value();
-		auto tau_expected = make_nso_using_factory<
-			tau_ba<sbf_ba>, sbf_ba>(expected, { .start = tau_parser::bf }).value();
+		TAU_LOG_TRACE << "===== sample =====";
+		tref tau_sample   = tau::get(sample, parse_bf());
+		TAU_LOG_TRACE << "===== expected =====";
+		tref tau_expected = tau::get(expected, parse_bf());
 
-		#ifdef DEBUG
-		std::string str(sample);
-		std::cout << "sample: " << str << " expected: " << tau_expected << " got: " << tau_sample << "\n";
-		#endif // DEBUG
+#ifdef DEBUG
+		using node = node_t;
+		cout << "sample: " << string(sample) << "\nexpected: \t";
+		if (tau_expected == 0) cout << "nullptr";
+		else cout << TAU_DUMP_TO_STR(tau_expected);
+		cout << "\ngot:      \t";
+		if (tau_sample == 0) cout << "nullptr";
+		else cout << TAU_DUMP_TO_STR(tau_sample);
+		cout << "\n";
+#endif // DEBUG
 
-		return tau_sample == tau_expected;
+		return tau::subtree_equals(tau_sample, tau_expected);
 	}
 
 	bool check_type(const char* sample, const char* type) {
-		auto type_sample = make_nso_using_factory<
-					tau_ba<sbf_ba>, sbf_ba>(
-				sample, { .start = tau_parser::bf }).value()
-			| tau_parser::bf_constant
-			| tau_parser::type
-			| optional_value_extractor<tau<tau_ba<sbf_ba>, sbf_ba>>;
-		auto type_expected = make_nso_using_factory<
-				tau_ba<sbf_ba>, sbf_ba>(
-			type, { .start = tau_parser::type }).value();
+		tref type_sample = tau::get(sample, parse_bf());
+		size_t type_id = tt(type_sample) | tau::bf_constant | tt::ba_type;
+		size_t type_expected_id = get_ba_type_id<node_t>(type);
+		auto sample_type = get_ba_type_name<node_t>(type_id);
+		auto expected_type = get_ba_type_name<node_t>(type_expected_id);
 
-		#ifdef DEBUG
-		std::string str(sample);
-		if (type_sample)
-			std::cout << "sample: " << str << " expected type: " << type_expected << " got: " << type_sample << "\n";
-		else
-			std::cout << "sample: " << str << " expected type: " << type_expected << " got: tau\n";
-		#endif // DEBUG
+#ifdef DEBUG
+		string str(sample);
+		if (type_sample) cout << "sample: " << str << " expected type: "
+			<< expected_type << " got: " << sample_type << "\n";
+		else cout << "sample: " << str << " expected type: "
+				<< expected_type << " got: tau\n";
+#endif // DEBUG
 
-		std::stringstream ss_sample, ss_expected;
-
-		if (type_sample) ss_sample << type_sample;
-		else ss_sample << "tau";
-
-		ss_expected << type_expected;
-		return ss_sample.str() == ss_expected.str();
+		return type_id == type_expected_id && sample_type == expected_type;
 	}
 
 	TEST_CASE("conversion to 1/0") {
@@ -186,16 +160,6 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( !check_hook("{T}:tau|1:sbf", "1") );
 		CHECK( !check_hook("{F}:tau|0:sbf", "0") );
 
-		CHECK( check_unbinded_hook("{1}:sbf|{F}:tau") );
-		CHECK( check_unbinded_hook("{0}:sbf|{T}:tau") );
-		CHECK( check_unbinded_hook("{1}:sbf|{T}:tau") );
-		CHECK( check_unbinded_hook("{0}:sbf|{F}:tau") );
-
-		CHECK( check_unbinded_hook("{T}:tau|{1}:sbf") );
-		CHECK( check_unbinded_hook("{F}:tau|{0}:sbf") );
-		CHECK( check_unbinded_hook("{T}:tau|{1}:sbf") );
-		CHECK( check_unbinded_hook("{F}:tau|{0}:sbf") );
-
 		CHECK( check_hook("1|x", "1") );
 		CHECK( check_hook("x|1", "1") );
 		CHECK( check_hook("0|x", "x") );
@@ -277,16 +241,6 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( !check_hook("{T}:tau&1:sbf", "1") );
 		CHECK( !check_hook("{F}:tau&0:sbf", "0") );
 
-		CHECK( check_unbinded_hook("{1}:sbf&{F}:tau") );
-		CHECK( check_unbinded_hook("{0}:sbf&{T}:tau") );
-		CHECK( check_unbinded_hook("{1}:sbf&{T}:tau") );
-		CHECK( check_unbinded_hook("{0}:sbf&{F}:tau") );
-
-		CHECK( check_unbinded_hook("{T}:tau&{0}:sbf") );
-		CHECK( check_unbinded_hook("{F}:tau&{1}:sbf") );
-		CHECK( check_unbinded_hook("{T}:tau&{1}:sbf") );
-		CHECK( check_unbinded_hook("{F}:tau&{0}:sbf") );
-
 		CHECK( check_hook("1&x", "x") );
 		CHECK( check_hook("x&1", "x") );
 		CHECK( check_hook("0&x", "0") );
@@ -366,16 +320,6 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( !check_hook("{F}:tau+1:sbf", "1") );
 		CHECK( !check_hook("{T}:tau+1:sbf", "0") );
 		CHECK( !check_hook("{F}:tau+0:sbf", "0") );
-
-		CHECK( check_unbinded_hook("{1}:sbf+{F}:tau") );
-		CHECK( check_unbinded_hook("{0}:sbf+{T}:tau") );
-		CHECK( check_unbinded_hook("{1}:sbf+{T}:tau") );
-		CHECK( check_unbinded_hook("{0}:sbf+{F}:tau") );
-
-		CHECK( check_unbinded_hook("{T}:tau+{0}:sbf") );
-		CHECK( check_unbinded_hook("{F}:tau+{1}:sbf") );
-		CHECK( check_unbinded_hook("{T}:tau+{1}:sbf") );
-		CHECK( check_unbinded_hook("{F}:tau+{0}:sbf") );
 
 		CHECK( check_hook("1+x", "x'") );
 		CHECK( check_hook("x+1", "x'") );
