@@ -30,6 +30,12 @@ tref tau_type();
 template <NodeType node>
 bool is_tau_type(tref t);
 
+template <NodeType node>
+bool is_tau_type(tree<node>& t);
+
+template <NodeType node>
+bool is_tau_type(size_t t);
+
 /**
  * @brief Creates the type tree associated with the type "nat"
  * @tparam Tree node type
@@ -64,6 +70,12 @@ tref untyped_type();
 template <NodeType node>
 bool is_untyped(tref t);
 
+template <NodeType node>
+bool is_untyped(tree<node>& t);
+
+template <NodeType node>
+bool is_untyped(size_t t);
+
 // -----------------------------------------------------------------------------
 // Type definitions for bitvector
 // TODO: They must go into sbf_ba.h -> currently causes compilation error
@@ -84,6 +96,12 @@ tref sbf_type();
  */
 template <NodeType node>
 bool is_sbf_type(tref t);
+
+template <NodeType node>
+bool is_sbf_type(tree<node>& t);
+
+template <NodeType node>
+bool is_sbf_type(size_t t);
 
 // -----------------------------------------------------------------------------
 // Type definitions for bitvector
@@ -110,8 +128,10 @@ template <NodeType node>
 bool is_bv_type_family(tref t);
 
 template <NodeType node>
-bool is_bv_type_family(size_t ba_type_id);
+bool is_bv_type_family(tree<node>& t);
 
+template <NodeType node>
+bool is_bv_type_family(size_t ba_type_id);
 
 // -----------------------------------------------------------------------------
 // BA types

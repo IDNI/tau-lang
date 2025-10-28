@@ -21,6 +21,16 @@ bool is_tau_type(tref t) {
 	return tau::get(t)[0].get_string() == "tau";
 }
 
+template <NodeType node>
+bool is_tau_type(tree<node>& t) {
+	return is_tau_type<node>(t.valu.ba_type);
+}
+
+template <NodeType node>
+bool is_tau_type(size_t t) {
+	return is_tau_type<node>(ba_types<node>::type_tree(t));
+}
+
 template<NodeType node>
 tref nat_type() {
 	using tau = tree<node>;
@@ -47,6 +57,16 @@ bool is_untyped(tref t) {
 	return tau::get(t)[0].get_string() == "untyped";
 }
 
+template <NodeType node>
+bool is_untyped(size_t t) {
+	return is_untyped<node>(ba_types<node>::type_tree(t));
+}
+
+template <NodeType node>
+bool is_untyped(tree<node>& t) {
+	return is_untyped<node>(t.value.ba_type);
+}
+
 // sbf type definitions
 // TODO: They must go into sbf_ba.impl.h -> currently causes compilation error
 template<NodeType node>
@@ -60,6 +80,16 @@ template<NodeType node>
 bool is_sbf_type(tref t) {
 	using tau = tree<node>;
 	return tau::get(t)[0].get_string() == "sbf";
+}
+
+template <NodeType node>
+bool is_sbf_type(size_t t) {
+	return is_sbf_type<node>(ba_types<node>::type_tree(t));
+}
+
+template <NodeType node>
+bool is_sbf_type(tree<node>& t) {
+	return is_sbf_type<node>(t.value.ba_type);
 }
 
 // bitvector type definitions
@@ -90,6 +120,10 @@ bool is_bv_type_family(size_t ba_type_id) {
 	return is_bv_type_family<node>(ba_types<node>::type_tree(ba_type_id));
 }
 
+template <NodeType node>
+bool is_bv_type_family(tree<node>& t) {
+	return is_bv_type_family<node>(t.value.ba_type);
+}
 
 // -----------------------------------------------------------------------------
 // BA types
