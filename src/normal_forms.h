@@ -202,28 +202,23 @@ auto lex_var_comp = [](tref x, tref y) {
 template <NodeType node>
 inline auto is_wff_bdd_var = [](tref n) {
 	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	DBG(assert(!t.is(tau::bf_neq));)
-	return t.child_is(tau::bf_eq)
-		|| t.child_is(tau::wff_ref)
-		|| t.child_is(tau::wff_ex)
-		|| t.child_is(tau::wff_sometimes)
-		|| t.child_is(tau::wff_always)
-		|| t.child_is(tau::wff_all)
-		|| t.child_is(tau::constraint);
-	// TODO (HIGH) we need to check the ba_type if it is bv
-	/*
-		|| t.child_is(tau::bv_eq)
-		|| t.child_is(tau::bv_neq)
-		|| t.child_is(tau::bv_lteq)
-		|| t.child_is(tau::bv_nlteq)
-		|| t.child_is(tau::bv_gt)
-		|| t.child_is(tau::bv_ngt)
-		|| t.child_is(tau::bv_gteq)
-		|| t.child_is(tau::bv_ngteq)
-		|| t.child_is(tau::bv_lt)
-		|| t.child_is(tau::bv_nlt);
-	*/
+	auto t = tau::get(n);
+	if (t.children_size() != 1) return false;
+	auto child = t[0];
+	auto nt = child.get_type();
+	switch (nt) {
+		case tau::wff_ref: case tau::wff_ex: case tau::wff_all:
+		case tau::wff_sometimes: case tau::wff_always: case tau::constraint:
+			return true;
+		case tau::bf_eq:
+			return true;
+		case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
+		case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq:
+		case tau::bf_ngteq: case tau::bf_lt: case tau::bf_nlt:
+			return is_bv_type_family<node>(child);
+		default:
+			return false;
+	}
 };
 
 template <NodeType node>
