@@ -11,27 +11,14 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include <cassert>
-
-#include "boolean_algebras/bool_ba.h"
-#include "doctest.h"
-#include "nso_rr.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
-#include "normalizer.h"
-#include "test_helpers.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
+#include "test_init.h"
+#include "test_Bool_helpers.h"
 
 TEST_SUITE("make_library") {
 
 	TEST_CASE("make_library: one rule case") {
 		const auto sample = BF_TO_DNF_0;
-		auto lib = make_library<Bool>(sample);
+		auto lib = tau::get_library(sample);
 		CHECK( lib.size() == 1 );
 	}
 }
@@ -51,7 +38,7 @@ TEST_SUITE("make_library") {
 // other unit/integration tests. However, it is better to have explicit tests
 // for each of them.
 
-// TODO (VERY_LOW) write tests for operator<<(ostream, tau<...>)
+// TODO (VERY_LOW) write tests for operator<<(ostream, tau_<...>)
 // TODO (VERY_LOW) write tests for operator<<(ostream, sp_tau_source_node)
 //
 // They are tagged as VERY_LOW because they should be remove once we have a proper

@@ -1,1114 +1,1431 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include <optional>
-
-#include "nso_rr.h"
-#include "builders.h"
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "hooks"
 
 namespace idni::tau_lang {
 
-template <typename...BAs>
-tau<BAs...> first_argument_formula(const rewriter::node<tau_sym<BAs...>>& n) {
-	return n.child[0]->child[0];
-}
-
-template <typename...BAs>
-tau<BAs...> first_argument_expression(const rewriter::node<tau_sym<BAs...>>& n){
-	return n.child[0]->child[0]->child[0];
-}
-
-template <typename...BAs>
-tau<BAs...> second_argument_formula(const rewriter::node<tau_sym<BAs...>>& n) {
-	return n.child[0]->child[1];
-}
-
-template <typename...BAs>
-tau<BAs...> second_argument_expression(const rewriter::node<tau_sym<BAs...>>& n)
+template <NodeType node>
+tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
+	tref r)
 {
-	return n.child[0]->child[1]->child[0];
+	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift)
+			log("- HOOK    -", v, ch, len, r, true);)
+	tref ret = nullptr;
+	if      (v.nt == tau::bf)    ret = term( v, ch, len, r);
+	else if (v.nt == tau::wff)   ret = wff(  v, ch, len, r);
+	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
+	else return tau::get_raw(v, ch, len, r);
+
+	if (ret) {
+		HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
+		DBG(assert(ret != nullptr);)
+		DBG(typename node::type nt = tau::get(ret).get_type();)
+		DBG(assert(nt == tau::bf || nt == tau::wff
+			|| nt == tau::shift || nt == tau::integer);)
+	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error"); }
+	return ret;
 }
 
-template <typename...BAs>
-tau<BAs...> third_argument_formula(const rewriter::node<tau_sym<BAs...>>& n) {
-	return n.child[0]->child[2];
-}
-
-template <typename...BAs>
-tau<BAs...> third_argument_expression(const rewriter::node<tau_sym<BAs...>>& n){
-	return n.child[0]->child[2]->child[0];
-}
-
-template <typename...BAs>
-tau<BAs...> logic_operator(const rewriter::node<tau_sym<BAs...>>& n) {
-	return n.child[0];
-}
-
-template <typename...BAs>
-tau<BAs...> quantifier(const rewriter::node<tau_sym<BAs...>>& n) {
-	return n.child[0];
-}
-
-template <typename...BAs>
-tau<BAs...> quantified_formula(const rewriter::node<tau_sym<BAs...>>& n) {
-	return n.child[0]->child[0];
-}
-
-template<typename...BAs>
-std::optional<tau<BAs...>> type_of(const tau<BAs...>& e)
+#ifdef HOOK_LOGGING_ENABLED
+template <NodeType node>
+void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
+	size_t len, [[maybe_unused]] tref r, bool track_each_call)
 {
-	return e | tau_parser::type;
+	if (!track_each_call) return;
+	std::stringstream ss;
+	ss << "[" << msg << "] ";
+	ss << LOG_NT(v.nt);
+	if (len) {
+		ss << " \t[";
+		for (size_t i = 0; i < len; ++i) {
+			DBG(assert(ch[i] != nullptr);)
+			// ss << "<" << ch[i] << ">";
+			ss <<(i ? ", " : "")<<LOG_NT(tau::get(ch[i]).get_type())
+				<< "(" << LOG_FM(ch[i]) << ")";
+		}
+		ss << "]";
+	}
+	LOG_TRACE << ss.str();
+}
+void applied(const std::string& rule) {
+	LOG_TRACE << "[- " << LOG_BRIGHT("APPLIED") << " -] "
+				<< LOG_RULE_COLOR << rule << TC.CLEAR();
+}
+#endif // HOOK_LOGGING_ENABLED
+
+template <NodeType node>
+const tree<node>& get_hook<node>::arg1(const tref* ch) {
+	return tau::get(ch[0])[0][0];
 }
 
-template<typename...BAs>
-bool unbinded_subexpressionns(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto l = first_argument_expression(n)
-		| tau_parser::constant
-		| tau_parser::binding;
-	auto r = second_argument_expression(n)
-		| tau_parser::constant
-		| tau_parser::binding;
-	return l.has_value() || r.has_value();
+template <NodeType node>
+const tree<node>& get_hook<node>::arg2(const tref* ch) {
+	return tau::get(ch[0])[1][0];
 }
 
-template<typename...BAs>
-tau<BAs...> make_node_hook_cte_or(
-	const rewriter::node<tau_sym<BAs...>>& n)
-{
-	auto l = first_argument_expression(n)
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	auto r = second_argument_expression(n)
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	auto type_l = type_of(first_argument_expression(n));
-	auto type_r = type_of(second_argument_expression(n));
-	auto type = type_l ? type_l : type_r;
-	return l && r ? build_bf_constant<BAs...>(l.value() | r.value(), type)
-		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+template <NodeType node>
+const tree<node>& get_hook<node>::arg3(const tref* ch) {
+	return tau::get(ch[0])[2][0];
 }
 
-template<typename...BAs>
-tau<BAs...> build_bf_1(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto type_l = type_of(first_argument_expression(n));
-	auto type_r = type_of(second_argument_expression(n));
-	if (type_l == type_r && type_l) return build_bf_t_type<BAs...>(type_l.value());
-	if (type_l == type_r) return _1<BAs...>;
-	if (type_l && !type_r) return build_bf_t_type<BAs...>(type_l.value());
-	if (!type_l && type_r) return build_bf_t_type<BAs...>(type_r.value());
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+template <NodeType node>
+const tree<node>& get_hook<node>::arg1_fm(const tref* ch) {
+	return tau::get(ch[0])[0];
 }
 
-template<typename...BAs>
-tau<BAs...> build_bf_0(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto type_l = type_of(first_argument_expression(n));
-	auto type_r = type_of(second_argument_expression(n));
-	if (type_l == type_r && type_l) return build_bf_f_type<BAs...>(type_l.value());
-	if (type_l == type_r) return _0<BAs...>;
-	if (type_l && !type_r) return build_bf_f_type<BAs...>(type_l.value());
-	if (!type_l && type_r) return build_bf_f_type<BAs...>(type_r.value());
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+template <NodeType node>
+const tree<node>& get_hook<node>::arg2_fm(const tref* ch) {
+	return tau::get(ch[0])[1];
 }
 
-template <typename...BAs>
-tau<BAs...> make_node_hook_bf_or(const rewriter::node<tau_sym<BAs...>>& n) {
+template <NodeType node>
+const tree<node>& get_hook<node>::arg3_fm(const tref* ch) {
+	return tau::get(ch[0])[2];
+}
+
+template <NodeType node>
+const tree<node>& get_hook<node>::logic_operator(const tref* ch) {
+	return tau::get(ch[0]);
+}
+
+template <NodeType node>
+const tree<node>& get_hook<node>::quantifier(const tref* ch) {
+	return tau::get(ch[0]);
+}
+
+template <NodeType node>
+const tree<node>& get_hook<node>::quantified_formula(const tref* ch) {
+	return tau::get(ch[0])[0];
+}
+
+template <NodeType node>
+bool get_hook<node>::check_type_mismatch(const tref* ch) {
+	std::set<size_t> types;
+	for (tref c : tau::get(ch[0]).children()) {
+		const auto& t = tau::get(c)[0];
+		if (t.get_ba_type() > 0 || !(t.is(tau::bf_t) || t.is(tau::bf_f)))
+			types.insert(t.get_ba_type());
+		if (types.size() > 1) {
+			HOOK_LOGGING(applied("type mismatch or unresolved yet. skipping hook");)
+			return true;
+		}
+	}
+	return false;
+}
+
+template <NodeType node>
+tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
+	// return tau::get(tau::_0(), r);
+	HOOK_LOGGING(LOG_TRACE << "_0_typed " << LOG_BA_TYPE(ba_type);)
+	tref x = tau::get_raw(node::ba_typed(tau::bf_f, ba_type), 0, 0);
+	return tau::get_raw(node(tau::bf), &x, 1, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::_1_typed(size_t ba_type, tref r) {
+	// return tau::get(tau::_1(), r);
+	HOOK_LOGGING(LOG_TRACE << "_1_typed " << LOG_BA_TYPE(ba_type);)
+	tref x = tau::get_raw(node::ba_typed(tau::bf_t, ba_type), 0, 0);
+	return tau::get_raw(node(tau::bf), &x, 1, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::_0(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("_0", v, ch, len, r);)
+	size_t type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
+	// if (type_l == type_r && type_l >  0) return _0_typed(type_l, r);
+	if (type_l == type_r)                return _0_typed(type_l, r);
+	if (type_l >  0      && type_r == 0) return _0_typed(type_l, r);
+	if (type_l == 0      && type_r >  0) return _0_typed(type_r, r);
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::_1(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("_1", v, ch, len, r);)
+	size_t type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
+	// if (type_l == type_r && type_l >  0) return _1_typed(type_l, r);
+	if (type_l == type_r)                return _1_typed(type_l, r);
+	if (type_l >  0      && type_r == 0) return _1_typed(type_l, r);
+	if (type_l == 0      && type_r >  0) return _1_typed(type_r, r);
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::_F(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("_F", v, ch, len, r);)
+	auto type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
+	if ((type_l == type_r && type_l > 0)
+		|| (type_l == type_r)
+		|| (type_l >  0   && type_r == 0)
+		|| (type_l == 0   && type_r > 0)) return tau::get(tau::_F(), r);
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::_T(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("_T", v, ch, len, r);)
+	auto type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
+	if ((type_l == type_r && type_l > 0)
+		|| (type_l == type_r)
+		|| (type_l >  0   && type_r == 0)
+		|| (type_l == 0   && type_r > 0)) return tau::get(tau::_T(), r);
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("term", v, ch, len, r);)
+#ifdef DEBUG
+	if (len != 1) {
+		LOG_TRACE << "term: " << LOG_NT(v.nt) << " len: " << len;
+		for (size_t i = 0; i < len; ++i) {
+			LOG_TRACE << "ch[" << i << "]: " << LOG_FM(ch[i]);
+		}
+	}
+#endif
+	DBG(assert(len == 1);)
+	switch (tau::get(ch[0]).get_type()) {
+	case tau::bf_or:       return term_or(v, ch, len, r);
+	case tau::bf_and:      return term_and(v, ch, len, r);
+	case tau::bf_neg:      return term_neg(v, ch, len, r);
+	case tau::bf_xor:      return term_xor(v, ch, len, r);
+	case tau::bf_constant: return cte(v, ch, len, r);
+	default: return tau::get_raw(v, ch, len, r);
+	}
+}
+
+template <NodeType node>
+tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
+	HOOK_LOGGING(log("term_or", v, ch, len, r);)
+	DBG(assert(len == 1));
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
-	if (unbinded_subexpressionns(n)) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-	//RULE(BF_SIMPLIFY_ONE_00, "1 | 1 := 1.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_bf_1<BAs...>(n);
-	//RULE(BF_SIMPLIFY_ONE_01, "0 |  0:= 0.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_bf_0<BAs...>(n);
+	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 | 1 := 1.");)
+		return _1(v, ch, len, r); }
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 | 0 := 0.");)
+		return _0(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_ONE_02, "1 | 0 := 1.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_bf_1<BAs...>(n);
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 | 0 := 1.");)
+		return _1(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_ONE_03, "0 | 1 := 1.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_bf_1<BAs...>(n);
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 | 1 := 1.");)
+		return _1(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_ONE_0, "1 | $X := 1.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n)))
-		return first_argument_formula(n);
+	if (arg1(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 | $X := 1.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
 	//RULE(BF_SIMPLIFY_ONE_1, "$X | 1 := 1.")
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return second_argument_formula(n);
+	if (arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("$X | 1 := 1.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
 	//RULE(BF_SIMPLIFY_ZERO_2, "0 | $X := $X.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n)))
-		return second_argument_formula(n);
+	if (arg1(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 | $X := $X.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
 	//RULE(BF_SIMPLIFY_ZERO_3, "$X | 0 := $X.")
-	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return first_argument_formula(n);
+	if (arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X | 0 := $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
 	//RULE(BF_SIMPLIFY_SELF_1, "$X | $X := $X.")
-	if (first_argument_formula(n) == second_argument_formula(n))
-		return first_argument_formula(n);
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X | $X := $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
 	//RULE(BF_CALLBACK_OR, "{ $X } | { $Y } := bf_or_cb $X $Y.")
-	if (is_non_terminal<tau_parser::bf_constant>(first_argument_expression(n))
-		&& is_non_terminal<tau_parser::bf_constant>(second_argument_expression(n)))
-		return make_node_hook_cte_or(n);
+	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant()
+		&& arg1(ch).get_ba_type() > 0 && arg2(ch).get_ba_type() > 0)
+	{
+		HOOK_LOGGING(applied("{ $X } | { $Y } := bf_or_cb $X $Y.");)
+		return cte_or(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_SELF_3, "$X | $X' := 1.")
-	if (auto negated = second_argument_formula(n) | tau_parser::bf_neg |tau_parser::bf;
-			negated && negated.value() == first_argument_formula(n))
-		return _1<BAs...>;
+	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
+			negated && negated.value_tree() == arg1_fm(ch))
+	{
+		HOOK_LOGGING(applied("$X | $X' := 1.");)
+		return tau::get(tau::_1(), r);
+	}
 	//RULE(BF_SIMPLIFY_SELF_5, "$X' | $X := 1.")
-	if (auto negated = first_argument_formula(n) | tau_parser::bf_neg | tau_parser::bf;
-			negated && negated.value() == second_argument_formula(n))
-		return _1<BAs...>;
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
+			negated && negated.value_tree() == arg2_fm(ch))
+	{
+		HOOK_LOGGING(applied("$X' | $X := 1.");)
+		return tau::get(tau::_1(), r);
+	}
+	return tau::get_raw(v, ch, len, r);
 }
 
-template <typename...BAs>
-tau<BAs...> make_node_hook_cte_and(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto l = first_argument_expression(n)
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	auto r = second_argument_expression(n)
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	auto type_l = type_of(first_argument_expression(n));
-	auto type_r = type_of(second_argument_expression(n));
-	auto type = type_l ? type_l : type_r;
-	return l && r ? build_bf_constant<BAs...>(l.value() & r.value(), type)
-		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_bf_and(const rewriter::node<tau_sym<BAs...>>& n) {
-	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
-	if (unbinded_subexpressionns(n)) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-	//RULE(BF_SIMPLIFY_ONE_00, "1 & 1 := 1.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_bf_1<BAs...>(n);
-	//RULE(BF_SIMPLIFY_ONE_01, "0 & 0 := 0.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_bf_0<BAs...>(n);
-	//RULE(BF_SIMPLIFY_ONE_02, "1 & 0 := 0.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_bf_0<BAs...>(n);
-	//RULE(BF_SIMPLIFY_ONE_03, "0 & 1 := 0.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_bf_0<BAs...>(n);
-	//RULE(BF_SIMPLIFY_ONE_2, "1 & $X := $X.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(BF_SIMPLIFY_ONE_3, "$X & 1 := $X.")
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return first_argument_formula(n);
-	//RULE(BF_SIMPLIFY_ZERO_0, "0 & $X := 0.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n)))
-		return first_argument_formula(n);
-	//RULE(BF_SIMPLIFY_ZERO_1, "$X & 0 := 0.")
-	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(BF_SIMPLIFY_SELF_0, "$X & $X := $X.")
-	if (first_argument_formula(n) == second_argument_formula(n))
-		return first_argument_formula(n);
-	//RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
-	if (is_non_terminal<tau_parser::bf_constant>(first_argument_expression(n))
-		&& is_non_terminal<tau_parser::bf_constant>(second_argument_expression(n)))
-		return make_node_hook_cte_and(n);
-	//RULE(BF_SIMPLIFY_SELF_2, "$X & $X' := 0.")
-	if (auto negated = second_argument_formula(n) | tau_parser::bf_neg | tau_parser::bf;
-			negated && negated.value() == first_argument_formula(n))
-		return _0<BAs...>;
-	//RULE(BF_SIMPLIFY_SELF_4, "$X' & $X := 0.")
-	if (auto negated = first_argument_formula(n) | tau_parser::bf_neg | tau_parser::bf;
-			negated && negated.value() == second_argument_formula(n))
-		return _0<BAs...>;
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename...BAs>
-tau<BAs...> make_node_hook_cte_neg(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto l = first_argument_expression(n)
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	auto type = type_of(first_argument_expression(n));
-	return l ? build_bf_constant<BAs...>(~l.value(), type)
-		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_bf_neg(
-	const rewriter::node<tau_sym<BAs...>>& n)
+template <NodeType node>
+tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 {
+	HOOK_LOGGING(log("term_and", v, ch, len, r);)
+	DBG(assert(len == 1));
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
+	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
+	//RULE(BF_SIMPLIFY_ONE_00, "1 & 1 := 1.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 & 1 := 1.");)
+		return _1(v, ch, len, r);
+	}
+	//RULE(BF_SIMPLIFY_ONE_01, "0 & 0 := 0.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 & 0 := 0.");)
+		return _0(v, ch, len, r);
+	}
+	//RULE(BF_SIMPLIFY_ONE_02, "1 & 0 := 0.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 & 0 := 0.");)
+		return _0(v, ch, len, r);
+	}
+	//RULE(BF_SIMPLIFY_ONE_03, "0 & 1 := 0.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 & 1 := 0.");)
+		return _0(v, ch, len, r);
+	}
+	//RULE(BF_SIMPLIFY_ONE_2, "1 & $X := $X.")
+	if (arg1(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 & $X := $X.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(BF_SIMPLIFY_ONE_3, "$X & 1 := $X.")
+	if (arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("$X & 1 := $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(BF_SIMPLIFY_ZERO_0, "0 & $X := 0.")
+	if (arg1(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 & $X := 0.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(BF_SIMPLIFY_ZERO_1, "$X & 0 := 0.")
+	if (arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X & 0 := 0.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(BF_SIMPLIFY_SELF_0, "$X & $X := $X.")
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X & $X := $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
+	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant()
+		&& arg1(ch).get_ba_type() > 0 && arg2(ch).get_ba_type() > 0)
+	{
+		HOOK_LOGGING(applied("{ $X } & { $Y } := bf_and_cb $X $Y.");)
+		return cte_and(v, ch, len, r);
+	}
+	//RULE(BF_SIMPLIFY_SELF_2, "$X & $X' := 0.")
+	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
+			negated && negated.value_tree() == arg1_fm(ch))
+	{
+		HOOK_LOGGING(applied("$X & $X' := 0.");)
+		return tau::get(tau::_0(), r);
+	}
+	//RULE(BF_SIMPLIFY_SELF_4, "$X' & $X := 0.")
+	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
+			negated && negated.value_tree() == arg2_fm(ch))
+	{
+		HOOK_LOGGING(applied("$X' & $X := 0.");)
+		return tau::get(tau::_0(), r);
+	}
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
+{
+	HOOK_LOGGING(log("term_neg", v, ch, len, r);)
+	DBG(assert(len == 1));
 	//RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
-	if (auto neg_one = logic_operator(n) | tau_parser::bf | tau_parser::bf_t;
-			neg_one && is_non_terminal<tau_parser::bf_neg>(logic_operator(n))) {
-		auto type = type_of(neg_one.value());
-		return type ? build_bf_f_type(type.value()) : _0<BAs...>;
+	if (auto neg_one = logic_operator(ch)() | tau::bf | tau::bf_t;
+		neg_one && logic_operator(ch).is(tau::bf_neg))
+	{
+		HOOK_LOGGING(applied("1' := 0.");)
+		size_t type = neg_one.value_tree().get_ba_type();
+		return type > 0 ? _0_typed(type, r)
+			: tau::get(tau::_0(), r);
 	}
 	//RULE(BF_SIMPLIFY_ZERO_4, "0' := 1.")
-	if (auto neg_zero = logic_operator(n) | tau_parser::bf | tau_parser::bf_f;
-			neg_zero && is_non_terminal<tau_parser::bf_neg>(logic_operator(n))) {
-		auto type = type_of(neg_zero.value());
-		return type ? build_bf_t_type(type.value()) : _1<BAs...>;
-		}
+	if (auto neg_zero = logic_operator(ch)() | tau::bf | tau::bf_f;
+		neg_zero && logic_operator(ch).is(tau::bf_neg))
+	{
+		HOOK_LOGGING(applied("0' := 1.");)
+		size_t type = neg_zero.value_tree().get_ba_type();
+		return type > 0 ? _1_typed(type, r)
+			: tau::get(tau::_1(), r);
+	}
 	//RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
-	if (auto double_neg = logic_operator(n) | tau_parser::bf | tau_parser::bf_neg; double_neg
-			&& is_non_terminal<tau_parser::bf_neg>(logic_operator(n)))
-		return double_neg.value()->child[0];
+	if (auto double_neg = logic_operator(ch)() | tau::bf | tau::bf_neg;
+		double_neg && logic_operator(ch).is(tau::bf_neg))
+	{
+		HOOK_LOGGING(applied("$X'' :=  $X.");)
+		return tau::get(double_neg.value_tree().first(), r);
+	}
 	//RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
-	if (is_non_terminal<tau_parser::bf_constant>(first_argument_expression(n)))
-		return make_node_hook_cte_neg(n);
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0) {
+		HOOK_LOGGING(applied("{ $X }' := bf_neg_cb $X.");)
+		return cte_neg(v, ch, len, r);
+	}
+	return tau::get_raw(v, ch, len, r);
 }
 
-template <typename...BAs>
-tau<BAs...> make_node_hook_cte_xor(
-	const rewriter::node<tau_sym<BAs...>>& n)
+template <NodeType node>
+tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 {
-	auto l = first_argument_expression(n)
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	auto r = second_argument_expression(n)
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	auto type_l = type_of(first_argument_expression(n));
-	auto type_r = type_of(second_argument_expression(n));
-	auto type = type_l ? type_l : type_r;
-	return l && r ? build_bf_constant<BAs...>(l.value() ^ r.value(), type)
-		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+	HOOK_LOGGING(log("term_xor", v, ch, len, r);)
+	DBG(assert(len == 1));
 
-}
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
-template <typename... BAs>
-tau<BAs...> make_node_hook_bf_xor(const rewriter::node<tau_sym<BAs...>>& n) {
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
-	if (unbinded_subexpressionns(n)) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 ^ 1 := 0.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_bf_0<BAs...>(n);
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 ^ 1 := 0.");)
+		return _0(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_ONE_01, "0 ^ 0 := 0.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_bf_0<BAs...>(n);
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 ^ 0 := 0.");)
+		return _0(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_ONE_02, "1 ^ 0 := 1.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_bf_1<BAs...>(n);
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 ^ 0 := 1.");)
+		return _1(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_ONE_03, "0 ^ 1 := 1.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_bf_1<BAs...>(n);
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 ^ 1 := 1.");)
+		return _1(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_ONE_N, "1 ^ $X := $X'.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n)))
-		return build_bf_neg(second_argument_formula(n));
+	if (arg1(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 ^ $X := $X'.");)
+		return tau::get(tau::build_bf_neg(arg2_fm(ch).get()), r);
+	}
 	//RULE(BF_SIMPLIFY_ONE_N, "$X ^ 1 := $X'.")
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_bf_neg(first_argument_formula(n));
+	if (arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("$X ^ 1 := $X'.");)
+		return tau::get(tau::build_bf_neg(arg1_fm(ch).get()), r);
+	}
 	//RULE(BF_SIMPLIFY_ZERO_N, "0 ^ $X := $X.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n)))
-		return second_argument_formula(n);
+	if (arg1(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 ^ $X := $X.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
 	//RULE(BF_SIMPLIFY_ZERO_N, "$X ^ 0 := $X.")
-	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return first_argument_formula(n);
+	if (arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X ^ 0 := $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
 	//RULE(BF_SIMPLIFY_SELF_N, "$X ^ $X := 0.")
-	if (first_argument_formula(n) == second_argument_formula(n))
-		return _0<BAs...>;
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X ^ $X := 0.");)
+		return _0(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_SELF_2, "$X ^ $X' := 1.")
-	if (auto negated = second_argument_formula(n) | tau_parser::bf_neg | tau_parser::bf;
-			negated && negated.value() == first_argument_formula(n))
-		return _1<BAs...>;
+	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
+			negated && negated.value_tree() == arg1_fm(ch))
+	{
+		HOOK_LOGGING(applied("$X ^ $X' := 1.");)
+		return _1(v, ch, len, r);
+	}
 	//RULE(BF_SIMPLIFY_SELF_2, "$X' ^ $X := 1.")
-	if (auto negated = first_argument_formula(n) | tau_parser::bf_neg | tau_parser::bf;
-			negated && negated.value() == second_argument_formula(n))
-		return _1<BAs...>;
+	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
+			negated && negated.value_tree() == arg2_fm(ch))
+	{
+		HOOK_LOGGING(applied("$X' ^ $X := 1.");)
+		return _1(v, ch, len, r);
+	}
 	//RULE(BF_CALLBACK_XOR, "{ $X } ^ { $Y } := bf_xor_cb $X $Y.")
-	if (is_non_terminal<tau_parser::bf_constant>(first_argument_expression(n))
-		&& is_non_terminal<tau_parser::bf_constant>(second_argument_expression(n)))
-		return make_node_hook_cte_xor(n);
-	return  build_bf_xor<BAs...>(first_argument_formula(n), second_argument_formula(n));
+	if (arg1(ch).is_ba_constant() && arg2(ch).is_ba_constant()
+		&& arg1(ch).get_ba_type() > 0 && arg2(ch).get_ba_type() > 0)
+	{
+		HOOK_LOGGING(applied("{ $X } ^ { $Y } := bf_xor_cb $X $Y.");)
+		return cte_xor(v, ch, len, r);
+	}
+	return tau::get(tau::build_bf_xor(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
 }
 
 // Simplify constants being syntactically true or false
-template <typename...BAs>
-tau<BAs...> make_node_hook_cte(const rewriter::node<tau_sym<BAs...>>& n)
+template <NodeType node>
+tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
+	HOOK_LOGGING(log("cte", v, ch, len, right);)
+	if (len == 1 && tau::get(ch[0]).is_ba_constant()) {
+		const auto& l = tau::get(ch[0]);
+		if (size_t typed = l.get_ba_type(); typed > 0) {
+			HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
+			typed = 0; // remove type for 0s and 1s
+			if (is_syntactic_zero(l.get_ba_constant())) {
+				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
+				HOOK_LOGGING(applied("is_syntactic_zero");)
+				return tau::get(typed
+					? tau::get(tau::get(tau::bf, tau::get_raw(
+						node::ba_typed(tau::bf_f, typed))), right)
+					: tau::_0(), right);
+			} else if (is_syntactic_one(l.get_ba_constant())) {
+				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
+				HOOK_LOGGING(applied("is_syntactic_one");)
+				return tau::get(typed
+					? tau::get(tau::get(tau::bf, tau::get_raw(
+						node::ba_typed(tau::bf_t, typed))), right)
+					: tau::_1(), right);
+			}
+		}
+	}
+	return tau::get_raw(v, ch, len, right);
+}
+
+template <NodeType node>
+tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, tref right)
 {
-	auto l = n
-		| tau_parser::bf_constant
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	if (l.has_value()) {
-		auto typed = n | tau_parser::bf_constant | tau_parser::type;
-		if (is_syntactic_zero(l.value()))
-			return typed.has_value() ? build_bf_f_type(typed.value()) : _0<BAs...>;
-		else if (is_syntactic_one(l.value()))
-			return typed.has_value() ? build_bf_t_type(typed.value()) : _1<BAs...>;
-	}
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+	HOOK_LOGGING(log("cte_or", v, ch, len, right);)
+	auto l = arg1(ch).get_ba_constant();
+	auto r = arg2(ch).get_ba_constant();
+	auto type_l = arg1(ch).get_ba_type();
+	auto type_r = arg2(ch).get_ba_type();
+	auto type = type_l ? type_l : type_r;
+	return build_bf_ba_constant<node>(l | r, type, right);
 }
 
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_ctn(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto sp_n = make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-	auto num = find_top(sp_n, is_non_terminal<tau_parser::num, BAs...>).value();
-	auto ctnvar = find_top(sp_n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
-	auto op = non_terminal_extractor<BAs...>(trim2(sp_n)).value();
-	switch (op) {
-	case tau_parser::ctn_eq:
-		return build_wff_and(build_wff_ctn_less_equal(ctnvar, num),
-				build_wff_ctn_greater_equal(ctnvar, num));
-	case tau_parser::ctn_neq:
-		return build_wff_or(build_wff_ctn_less(ctnvar, num),
-	 			build_wff_ctn_greater(ctnvar, num));
-	}
-	return sp_n;
+template <NodeType node>
+tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, tref right)
+{
+	HOOK_LOGGING(log("cte_and", v, ch, len, right);)
+	auto l = arg1(ch).get_ba_constant();
+	auto r = arg2(ch).get_ba_constant();
+	auto type_l = arg1(ch).get_ba_type();
+	auto type_r = arg2(ch).get_ba_type();
+	auto type = type_l ? type_l : type_r;
+	return build_bf_ba_constant<node>(l & r, type, right);
 }
 
-template <typename...BAs>
-tau<BAs...> make_node_hook_ctn_neg(const tau<BAs...>& n) {
-	auto num = find_top(n, is_non_terminal<tau_parser::num, BAs...>).value();
-	auto ctnvar = find_top(n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
-	auto op = non_terminal_extractor<BAs...>(trim(n)).value();
+template <NodeType node>
+tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, tref right)
+{
+	HOOK_LOGGING(log("cte_xor", v, ch, len, right);)
+	auto l = arg1(ch).get_ba_constant();
+	auto r = arg2(ch).get_ba_constant();
+	auto type_l = arg1(ch).get_ba_type();
+	auto type_r = arg2(ch).get_ba_type();
+	auto type = type_l ? type_l : type_r;
+	return build_bf_ba_constant<node>(l ^ r, type, right);
+}
+
+template <NodeType node>
+tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, tref right)
+{
+	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
+	auto l = arg1(ch).get_ba_constant();
+	size_t type = arg1(ch).get_ba_type();
+	return build_bf_ba_constant<node>(~l, type, right);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff", v, ch, len, r);)
+	switch (logic_operator(ch).get_type()) {
+	case tau::wff_and:          return wff_and(v, ch, len, r);
+	case tau::wff_or:           return wff_or(v, ch, len, r);
+	case tau::wff_neg:          return wff_neg(v, ch, len, r);
+	case tau::wff_xor:          return wff_xor(v, ch, len, r);
+	case tau::constraint:       return wff_ctn(v, ch, len, r);
+	case tau::bf_eq:            return wff_eq(v, ch, len, r);
+	case tau::bf_neq:           return wff_neq(v, ch, len, r);
+	case tau::wff_sometimes:    return wff_sometimes(v, ch, len, r);
+	case tau::wff_always:       return wff_always(v, ch, len, r);
+	case tau::wff_conditional:  return wff_conditional(v, ch, len, r);
+	case tau::wff_imply:        return wff_imply(v, ch, len, r);
+	case tau::wff_rimply:       return wff_rimply(v, ch, len, r);
+	case tau::wff_equiv:        return wff_equiv(v, ch, len, r);
+	case tau::bf_lt:            return wff_lt(v, ch, len, r);
+	case tau::bf_nlt:           return wff_nlt(v, ch, len, r);
+	case tau::bf_lteq:          return wff_lteq(v, ch, len, r);
+	case tau::bf_nlteq:         return wff_nlteq(v, ch, len, r);
+	case tau::bf_gt:            return wff_gt(v, ch, len, r);
+	case tau::bf_ngt:           return wff_ngt(v, ch, len, r);
+	case tau::bf_gteq:          return wff_gteq(v, ch, len, r);
+	case tau::bf_ngteq:         return wff_ngteq(v, ch, len, r);
+	case tau::bf_interval:      return wff_interval(v, ch, len, r);
+	default: return tau::get_raw(v, ch, len, r);
+	}
+	return nullptr;
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_and(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_and", v, ch, len, r);)
+	//RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("T && $X ::= $X.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ONE_3, "$X && T ::= $X.")
+	if (arg2(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("$X && T ::= $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ZERO_0, "F && $X ::= F.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("F && $X ::= F.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ZERO_1, "$X && F ::= F.")
+	if (arg2(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("$X && F ::= F.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_SELF_0, "$X && $X ::= $X.")
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X && $X ::= $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_SELF_2, "$X && ! $X ::= F.")
+	if (auto negated = arg2_fm(ch)() | tau::wff_neg | tau::wff;
+		negated && negated.value_tree() == arg1_fm(ch))
+	{
+		HOOK_LOGGING(applied("$X && ! $X ::= F.");)
+		return tau::get(tau::_F(), r);
+	}
+	//RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
+	if (auto negated = arg1_fm(ch)() | tau::wff_neg | tau::wff;
+		negated && negated.value_tree() == arg2_fm(ch))
+	{
+		HOOK_LOGGING(applied("!$X && $X ::= F.");)
+		return tau::get(tau::_F(), r);
+	}
+	//RULE(BF_EQ_AND_SIMPLIFY_0, "$X != 0 && $X = 0 ::= F.")
+	//RULE(BF_EQ_AND_SIMPLIFY_1, "$X = 0 && $X != 0 ::= F.")
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_or(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_or", v, ch, len, r);)
+	//RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("T || $X ::= T.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
+	if (arg2(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("$X || T ::= T.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ZERO_2, "F || $X ::= $X.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("F || $X ::= $X.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ZERO_3, "$X || F ::= $X.")
+	if (arg2(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("$X || F ::= $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_SELF_1, "$X || $X ::= $X.")
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X || $X ::= $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
+	if (auto negated = arg2_fm(ch)() | tau::wff_neg | tau::wff;
+			negated && negated.value_tree() == arg1_fm(ch))
+	{
+		HOOK_LOGGING(applied("$X || ! $X ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
+	if (auto negated = arg1_fm(ch)() | tau::wff_neg | tau::wff;
+			negated && negated.value_tree() == arg2_fm(ch))
+	{
+		HOOK_LOGGING(applied("!$X || $X ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(BF_EQ_OR_SIMPLIFY_0, "$X != 0 || $X = 0 ::= T.")
+	//RULE(BF_EQ_OR_SIMPLIFY_1, "$X = 0 || $X != 0 ::= T.")
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::ctn_neg(const tree<node>& n) {
+	auto num    = n.find_top(is<node, tau::num>);
+	auto ctnvar = n.find_top(is<node, tau::ctnvar>);
+	auto op = n[0][0].get_type();
 	switch (op) {
 		//RULE(BF_PUSH_NEGATION_INWARDS_2, "($X != $Y)' := $X = $Y.")
-	case tau_parser::ctn_neq:
-		return build_wff_ctn_eq<BAs...>(ctnvar, num);
+	case tau::ctn_neq:
+		HOOK_LOGGING(applied("($X != $Y)' := $X = $Y.");)
+		return tau::build_wff_ctn_eq(ctnvar, num);
 		//RULE(BF_PUSH_NEGATION_INWARDS_3, "($X = $Y)' := $X != $Y.")
-	case tau_parser::ctn_eq:
-		return build_wff_ctn_neq<BAs...>(ctnvar, num);
+	case tau::ctn_eq:
+		HOOK_LOGGING(applied("($X = $Y)' := $X != $Y.");)
+		return tau::build_wff_ctn_neq(ctnvar, num);
 		//RULE(BF_PUSH_NEGATION_INWARDS_4, "($X >= $Y)' := $X < $Y.")
-	case tau_parser::ctn_greater_equal:
-		return build_wff_ctn_less<BAs...>(ctnvar, num);
+	case tau::ctn_gteq:
+		HOOK_LOGGING(applied("($X >= $Y)' := $X < $Y.");)
+		return tau::build_wff_ctn_lt(ctnvar, num);
 		//RULE(BF_PUSH_NEGATION_INWARDS_5, "($X > $Y)' := $X <= $Y.")
-	case tau_parser::ctn_greater:
-		return build_wff_ctn_less_equal<BAs...>(ctnvar, num);
+	case tau::ctn_gt:
+		HOOK_LOGGING(applied("($X > $Y)' := $X <= $Y.");)
+		return tau::build_wff_ctn_lteq(ctnvar, num);
 		//RULE(BF_PUSH_NEGATION_INWARDS_6, "($X <= $Y)' := $X > $Y.")
-	case tau_parser::ctn_less_equal:
-		return build_wff_ctn_greater<BAs...>(ctnvar, num);
+	case tau::ctn_lteq:
+		HOOK_LOGGING(applied("($X <= $Y)' := $X > $Y.");)
+		return tau::build_wff_ctn_gt(ctnvar, num);
 		//RULE(BF_PUSH_NEGATION_INWARDS_7, "($X < $Y)' := $X >= $Y.")
-	case tau_parser::ctn_less:
-		return build_wff_ctn_greater_equal<BAs...>(ctnvar, num);
+	case tau::ctn_lt:
+		HOOK_LOGGING(applied("($X < $Y)' := $X >= $Y.");)
+		return tau::build_wff_ctn_gteq(ctnvar, num);
+	default: return build_wff_neg<node>(n.get());
 	}
-	// Can never happen - all cases exhausted
-	assert(false);
+	return nullptr;
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_neg(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_neg", v, ch, len, r);)
+	DBG(assert(len == 1));
+	//RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("! T ::= F.");)
+		return tau::get(tau::_F(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ZERO_4, "! F ::= T.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("! F ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
+	if (auto double_neg = arg1_fm(ch)() | tau::wff_neg | tau::wff;
+		double_neg) {
+		HOOK_LOGGING(applied("! ! $X ::=  $X.");)
+		return tau::get(double_neg.value(), r);
+	}
+	if (arg1(ch).is(tau::constraint)) {
+		HOOK_LOGGING(applied("! [a op b] ::=  [a op' b].");)
+		return tau::get(ctn_neg(arg1_fm(ch)), r);
+	}
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_xor([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_xor", v, ch, len, r);)
+	//RULE(BF_XOR_SIMPLIFY_0, "$X ^ F ::= $X.")
+	if (arg2(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("$X ^ F ::= $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(BF_XOR_SIMPLIFY_1, "F ^ $X ::= $X.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("F ^ $X ::= $X.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(BF_XOR_SIMPLIFY_2, "$X ^ $X ::= F.")
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X ^ $X ::= F.");)
+		return tau::get(tau::_F(), r);
+	}
+	//RULE(BF_XOR_SIMPLIFY_3, "$X ^ ! $X ::= T.")
+	if (auto negated = arg2_fm(ch)() | tau::wff_neg | tau::wff;
+			negated && negated.value_tree() == arg1_fm(ch))
+	{
+		HOOK_LOGGING(applied("$X ^ ! $X ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(BF_XOR_SIMPLIFY_4, "! $X ^ $X ::= T.")
+	if (auto negated = arg1_fm(ch)() | tau::wff_neg | tau::wff;
+			negated && negated.value_tree() == arg2_fm(ch))
+	{
+		HOOK_LOGGING(applied("! $X ^ $X ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(BF_XOR_SIMPLIFY_5, "$X ^ T ::= ! $X.")
+	if (arg2(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("$X ^ T ::= ! $X.");)
+		return tau::get(tau::build_wff_neg(arg1_fm(ch).get()), r);
+	}
+	//RULE(BF_XOR_SIMPLIFY_6, "T ^ $X ::= ! $X.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("T ^ $X ::= ! $X.");)
+		return tau::get(tau::build_wff_neg(arg2_fm(ch).get()), r);
+	}
+	return tau::get(tau::build_wff_xor(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_ctn(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_ctn", v, ch, len, r);)
+	tref n = tau::get_raw(v, ch, len, r);
+	const auto& t = tau::get(n);
+	tref num    = t.find_top(is<node, tau::num>);
+	tref ctnvar = t.find_top(is<node, tau::ctnvar>);
+	size_t op = t[0][0].get_type();
+	switch (op) {
+	case tau::ctn_eq: return tau::get(tau::build_wff_and(
+				tau::build_wff_ctn_lteq(ctnvar, num),
+				tau::build_wff_ctn_gteq(ctnvar, num)), r);
+	case tau::ctn_neq: return tau::get(tau::build_wff_or(
+				tau::build_wff_ctn_lt(ctnvar, num),
+				tau::build_wff_ctn_gt(ctnvar, num)), r);
+	}
 	return n;
 }
 
-template <typename... BAs>
-tau<BAs...> make_node_hook_bf(const rewriter::node<tau_sym<BAs...>>& n) {
-	// if n is ref, capture, 0 or 1, we can return accordingly
-	//if (n.child.size() != 1)
-	//	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-	// otherwise we need to check the children
-	if (is_non_terminal_node<BAs...>(n.child[0]))
-		switch (std::get<tau_source_sym>(n.child[0]->value).n()) {
-			case tau_parser::bf_or:
-				return make_node_hook_bf_or<BAs...>(n);
-			case tau_parser::bf_and:
-				return make_node_hook_bf_and<BAs...>(n);
-			case tau_parser::bf_neg:
-				return make_node_hook_bf_neg<BAs...>(n);
-			case tau_parser::bf_xor:
-				return make_node_hook_bf_xor<BAs...>(n);
-			case tau_parser::bf_constant:
-				return make_node_hook_cte<BAs...>(n);
-			default: return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-		}
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
+template <NodeType node>
+tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_eq", v, ch, len, r);)
 
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_and(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_ONE_3, "$X && T ::= $X.")
-	if (is_non_terminal<tau_parser::wff_t>(second_argument_expression(n)))
-		return first_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_ZERO_0, "F && $X ::= F.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return first_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_ZERO_1, "$X && F ::= F.")
-	if (is_non_terminal<tau_parser::wff_f>(second_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_SELF_0, "$X && $X ::= $X.")
-	if (first_argument_formula(n) == second_argument_formula(n))
-		return first_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_SELF_2, "$X && ! $X ::= F.")
-	if (auto negated = second_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff;
-			negated && negated.value() == first_argument_formula(n))
-		return _F<BAs...>;
-	//RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
-	if (auto negated = first_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff;
-			negated && negated.value() == second_argument_formula(n))
-		return _F<BAs...>;
-	//RULE(BF_EQ_AND_SIMPLIFY_0, "$X != 0 && $X = 0 ::= F.")
-	//RULE(BF_EQ_AND_SIMPLIFY_1, "$X = 0 && $X != 0 ::= F.")
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_or(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return first_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
-	if (is_non_terminal<tau_parser::wff_t>(second_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_ZERO_2, "F || $X ::= $X.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_ZERO_3, "$X || F ::= $X.")
-	if (is_non_terminal<tau_parser::wff_f>(second_argument_expression(n)))
-		return first_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_SELF_1, "$X || $X ::= $X.")
-	if (first_argument_formula(n) == second_argument_formula(n))
-		return first_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
-	if (auto negated = second_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff;
-			negated && negated.value() == first_argument_formula(n))
-		return _T<BAs...>;
-	//RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
-	if (auto negated = first_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff;
-			negated && negated.value() == second_argument_formula(n))
-		return _T<BAs...>;
-	//RULE(BF_EQ_OR_SIMPLIFY_0, "$X != 0 || $X = 0 ::= T.")
-	//RULE(BF_EQ_OR_SIMPLIFY_1, "$X = 0 || $X != 0 ::= T.")
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_neg(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return _F<BAs...>;
-	//RULE(WFF_SIMPLIFY_ZERO_4, "! F ::= T.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
-	if (auto double_neg = first_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff; double_neg)
-		return double_neg.value();
-	if (is_non_terminal<tau_parser::constraint>(first_argument_expression(n))) {
-		return make_node_hook_ctn_neg(first_argument_expression(n));
-	}
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename...BAs>
-tau<BAs...> make_node_hook_wff_eq_cte(const rewriter::node<tau_sym<BAs...>>& n){
-	auto l = n
-		| tau_parser::bf_eq
-		| tau_parser::bf
-		| tau_parser::bf_constant
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	//TODO: remove normalizer call
-	if (l.has_value() && l.value() == false) return _T<BAs...>;
-	else if (l.has_value()) return _F<BAs...>;
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template<typename... BAs>
-tau<BAs...> build_wff_t(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto type_l = type_of(first_argument_expression(n));
-	auto type_r = type_of(second_argument_expression(n));
-	if (type_l == type_r && type_l) return _T<BAs...>;
-	if (type_l == type_r) return _T<BAs...>;
-	if (type_l && !type_r) return _T<BAs...>;
-	if (!type_l && type_r) return _T<BAs...>;
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template<typename... BAs>
-tau<BAs...> build_wff_f(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto type_l = type_of(first_argument_expression(n));
-	auto type_r = type_of(second_argument_expression(n));
-	if (type_l == type_r && type_l) return _F<BAs...>;
-	if (type_l == type_r) return _F<BAs...>;
-	if (type_l && !type_r) return _F<BAs...>;
-	if (!type_l && type_r) return _F<BAs...>;
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template<typename... BAs>
-tau<BAs...> make_node_hook_wff_eq(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_DEF_SIMPLIFY_0, "0 = 1")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_DEF_SIMPLIFY_1, "1 = 1")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_DEF_SIMPLIFY_N, "{c} = 0 ::= ...."): this should never happen
-	if(is_non_terminal<tau_parser::bf_constant>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return make_node_hook_wff_eq_cte(n);
-	//RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
-	if (!is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_eq<BAs...>(
-			build_bf_xor(first_argument_formula(n), second_argument_formula(n)));
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename...BAs>
-tau<BAs...> make_node_hook_wff_neq_cte(const rewriter::node<tau_sym<BAs...>>& n)
-{
-	auto l = n
-		| tau_parser::bf_neq
-		| tau_parser::bf
-		| tau_parser::bf_constant
-		| tau_parser::constant
-		| only_child_extractor<BAs...>
-		| ba_extractor<BAs...>;
-	//TODO: remove normalizer call
-	if (l.has_value() && l.value() == false) return _F<BAs...>;
-	else if (l.has_value()) return _T<BAs...>;
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_neq(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_NEQ_SIMPLIFY_2, "0 != 1 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_NEQ_SIMPLIFY_3, "1 != 1 ::= F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_DEF_SIMPLIFY_N, "{c} = 0 ::= ....")
-	if(is_non_terminal<tau_parser::bf_constant>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return make_node_hook_wff_neq_cte(n);
-	//RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
-	if (!is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_neq<BAs...>(
-			build_bf_xor(first_argument_formula(n), second_argument_formula(n)));
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_sometimes(
-	const rewriter::node<tau_sym<BAs...>>& n)
-{
-	//RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return _F<BAs...>;
-	//RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
-	if (auto double_quantifier = first_argument_formula(n) | tau_parser::wff_sometimes; double_quantifier)
-		return first_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
-	if (auto double_quantifier = first_argument_formula(n) | tau_parser::wff_always;	double_quantifier)
-		return first_argument_formula(n);
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_always(
-	const rewriter::node<tau_sym<BAs...>>& n)
-{
-	//RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return _F<BAs...>;
-	//RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
-	if (auto double_quantifier = first_argument_formula(n) | tau_parser::wff_always;
-			double_quantifier && is_non_terminal<tau_parser::wff_always>(quantifier(n)))
-		return first_argument_formula(n);
-	//RULE(WFF_SIMPLIFY_ALWAYS_2,     "always sometimes $X ::= sometimes $X.")
-	if (auto double_quantifier = first_argument_formula(n) | tau_parser::wff_sometimes;
-			double_quantifier && is_non_terminal<tau_parser::wff_always>(quantifier(n)))
-		return first_argument_formula(n);
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_less(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(BF_LESS_SIMPLIFY_20, "0 < 1 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_LESS_SIMPLIFY_21, "1 < 0 ::= F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_LESS_SIMPLIFY_0, "0 < 0 ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_DEF_SIMPLIFY_N, "1 < 1 ::= F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_LESS_SIMPLIFY_0, "$X < 0 ::= F.") @CP
-	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return _F<BAs...>;
-	//RULE(BF_DEF_SIMPLIFY_N, "$X < 1 ::= $X' != 0.")
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_neq<BAs...>(build_bf_neg(first_argument_formula(n)));
-
-	return build_bf_less<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_nless(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(BF_NLESS_SIMPLIFY_20, "0 !< 1 ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_NLESS_SIMPLIFY_21, "1 !< 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_NLESS_SIMPLIFY_0, "0 !< 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_DEF_SIMPLIFY_N, "1 !< 1 ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_NLESS_SIMPLIFY_0, "$X !< 0 ::= T.") @CP
-	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(BF_DEF_SIMPLIFY_N, "$X !< 1 ::= $X' = 0.")
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_eq<BAs...>(build_bf_neg(first_argument_formula(n)));
-	return build_bf_nless<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_less_equal(
-	const rewriter::node<tau_sym<BAs...>>& n)
-{
-	//RULE(BF_LESS_EQUAL_SIMPLIFY_2, "0 <= 1 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "0 <= 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_LESS_EQUAL_SIMPLIFY_1, "1 <= 0 ::= F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_DEF_SIMPLIFY_N, "1 <= 1 ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "$X <= 1 ::= T.") @CP
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return _T<BAs...>;
-	return build_bf_less_equal<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_nleq(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(BF_NLEQ_SIMPLIFY_2, "0 !<= 1 ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_NLEQ_SIMPLIFY_0, "0 !<= 0 ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_NLEQ_SIMPLIFY_1, "1 !<= 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_NLEQ_SIMPLIFY_0, "1 !<= 1 ::= F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_NLEQ_SIMPLIFY_0, "$X !<= 1 ::= F.") @CP
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return _F<BAs...>;
-	return build_bf_nleq<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_greater(const rewriter::node<tau_sym<BAs...>>& n)
-{
-	//RULE(BF_GREATER_SIMPLIFY_2, "1 > 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_GREATER_SIMPLIFY_0, "0 > 0 ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_GREATER_SIMPLIFY_1, "0 > 1 ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_GREATER_SIMPLIFY_3, "1 > 1 ::= F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_GREATER_SIMPLIFY_0, "$X > 1 ::= F.") @CP
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return _F<BAs...>;
-	//RULE(BF_GREATER_SIMPLIFY_3, "0 > $X ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n)))
-		return _F<BAs...>;
-	return build_bf_greater<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_ngreater(
-	const rewriter::node<tau_sym<BAs...>>& n)
-{
-	//RULE(BF_NGREATER_SIMPLIFY_2, "1 !> 0 ::= F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_NGREATER_SIMPLIFY_1, "0 !> 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_NGREATER_SIMPLIFY_0, "0 !> 1 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_NGREATER_SIMPLIFY_3, "1 !> 1 ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_NGREATER_SIMPLIFY_0, "$X !> 1 ::= T.") @CP
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(BF_NGREATER_SIMPLIFY_3, "0 !> $X ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n)))
-		return _T<BAs...>;
-	return build_bf_ngreater<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-inline tau<BAs...> make_node_hook_wff_greater_equal(
-	const rewriter::node<tau_sym<BAs...>>& n)
-{
-	//RULE(BF_GREATER_EQUAL_SIMPLIFY_2, "1 >= 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_GREATER_EQUAL_SIMPLIFY_1, "0 >= 0 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_GREATER_EQUAL_SIMPLIFY_0, "0 >= 1 ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_GREATER_EQUAL_SIMPLIFY_3, "1 >= 1 ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_GREATER_EQUAL_SIMPLIFY_0, "$X >= 0 ::= T.") @CP
-	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(BF_GREATER_EQUAL_SIMPLIFY_2, "1 >= X ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n)))
-		return _T<BAs...>;
-	return build_bf_greater_equal<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_ngeq(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(BF_NGEQ_SIMPLIFY_2, "1 !>= 0 ::= F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_NGEQ_SIMPLIFY_1, "0 !>= 0 ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_NGEQ_SIMPLIFY_0, "0 !>= 1 ::= T.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_t<BAs...>(n);
-	//RULE(BF_NGEQ_SIMPLIFY_3, "1 !>= 1 ::= F.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
-			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return build_wff_f<BAs...>(n);
-	//RULE(BF_NGEQ_SIMPLIFY_0, "$X !>= 0 ::= F.") @CP
-	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
-		return _F<BAs...>;
-	//RULE(BF_NGEQ_SIMPLIFY_1, "1 !>= $X ::= F.") @CP
-	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
-		return _F<BAs...>;
-	return build_bf_ngeq<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_interval(
-	const rewriter::node<tau_sym<BAs...>>& n)
-{
-	return build_bf_interval<BAs...>(first_argument_formula(n), second_argument_formula(n), third_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_xor(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(BF_XOR_SIMPLIFY_0, "$X ^ F ::= $X.")
-	if (is_non_terminal<tau_parser::wff_f>(second_argument_expression(n)))
-		return first_argument_formula(n);
-	//RULE(BF_XOR_SIMPLIFY_1, "F ^ $X ::= $X.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(BF_XOR_SIMPLIFY_2, "$X ^ $X ::= F.")
-	if (first_argument_formula(n) == second_argument_formula(n))
-		return _F<BAs...>;
-	//RULE(BF_XOR_SIMPLIFY_3, "$X ^ ! $X ::= T.")
-	if (auto negated = second_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff;
-			negated && negated.value() == first_argument_formula(n))
-		return _T<BAs...>;
-	//RULE(BF_XOR_SIMPLIFY_4, "! $X ^ $X ::= T.")
-	if (auto negated = first_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff;
-			negated && negated.value() == second_argument_formula(n))
-		return _T<BAs...>;
-	//RULE(BF_XOR_SIMPLIFY_5, "$X ^ T ::= ! $X.")
-	if (is_non_terminal<tau_parser::wff_t>(second_argument_expression(n)))
-		return build_wff_neg<BAs...>(first_argument_formula(n));
-	//RULE(BF_XOR_SIMPLIFY_6, "T ^ $X ::= ! $X.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return build_wff_neg<BAs...>(second_argument_formula(n));
-	return build_wff_xor<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_conditional(
-	const rewriter::node<tau_sym<BAs...>>& n)
-{
-	//RULE(WFF_CONDITIONAL_SIMPLIFY_0, "F ? $X : $Y ::= $Y.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return third_argument_formula(n);
-	//RULE(WFF_CONDITIONAL_SIMPLIFY_1, "T ? $X : $Y ::= $X.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(WFF_CONDITIONAL_SIMPLIFY_4, "$X ? $Y : $Y ::= $Y.")
-	if (second_argument_formula(n) == third_argument_formula(n))
-		return third_argument_formula(n);
-	return build_wff_conditional<BAs...>(first_argument_formula(n), second_argument_formula(n), third_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_imply(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(WFF_IMPLY_SIMPLIFY_0, "F -> $X ::= T.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(WFF_IMPLY_SIMPLIFY_1, "T -> $X ::= $X.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(WFF_IMPLY_SIMPLIFY_2, "$X -> F ::= ! $X.")
-	if (is_non_terminal<tau_parser::wff_f>(second_argument_expression(n)))
-		return build_wff_neg<BAs...>(first_argument_formula(n));
-	//RULE(WFF_IMPLY_SIMPLIFY_3, "$X -> T ::= T.")
-	if (is_non_terminal<tau_parser::wff_t>(second_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(WFF_IMPLY_SIMPLIFY_4, "$X -> $X ::= T.")
-	if (first_argument_formula(n) == second_argument_formula(n))
-		return _T<BAs...>;
-	return build_wff_imply<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_rimply(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(WFF_IMPLY_SIMPLIFY_0, "F -> $X ::= T.")
-	if (is_non_terminal<tau_parser::wff_f>(second_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(WFF_IMPLY_SIMPLIFY_1, "T -> $X ::= $X.")
-	if (is_non_terminal<tau_parser::wff_t>(second_argument_expression(n)))
-		return first_argument_formula(n);
-	//RULE(WFF_IMPLY_SIMPLIFY_2, "$X -> F ::= ! $X.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return build_wff_neg<BAs...>(second_argument_formula(n));
-	//RULE(WFF_IMPLY_SIMPLIFY_3, "$X -> T ::= T.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return _T<BAs...>;
-	//RULE(WFF_IMPLY_SIMPLIFY_4, "$X -> $X ::= T.")
-	if (first_argument_formula(n) == second_argument_formula(n))
-		return _T<BAs...>;
-	return build_wff_imply<BAs...>(second_argument_formula(n), first_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff_equiv(const rewriter::node<tau_sym<BAs...>>& n) {
-	//RULE(WFF_EQUIV_SIMPLIFY_0, "F <-> $X ::= ! $X.")
-	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return build_wff_neg<BAs...>(second_argument_formula(n));
-	//RULE(WFF_EQUIV_SIMPLIFY_1, "T <-> $X ::= $X.")
-	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
-		return second_argument_formula(n);
-	//RULE(WFF_EQUIV_SIMPLIFY_2, "$X <-> F ::= ! $X.")
-	if (is_non_terminal<tau_parser::wff_f>(second_argument_expression(n)))
-		return build_wff_neg<BAs...>(first_argument_formula(n));
-	//RULE(WFF_EQUIV_SIMPLIFY_3, "$X <-> T ::= $X.")
-	if (is_non_terminal<tau_parser::wff_t>(second_argument_expression(n)))
-		return first_argument_formula(n);
-	//RULE(WFF_EQUIV_SIMPLIFY_4, "$X <-> $X ::= T.")
-	if (first_argument_formula(n) == second_argument_formula(n))
-		return _T<BAs...>;
-	//RULE(WFF_EQUIV_SIMPLIFY_5, "$X <-> ! $X ::= F.")
-	if (auto negated = second_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff;
-			negated && negated.value() == first_argument_formula(n))
-		return _F<BAs...>;
-	//RULE(WFF_EQUIV_SIMPLIFY_6, "! $X <-> $X ::= F.")
-	if (auto negated = first_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff;
-			negated && negated.value() == second_argument_formula(n))
-		return _F<BAs...>;
-	return build_wff_equiv<BAs...>(first_argument_formula(n), second_argument_formula(n));
-}
-
-template <typename... BAs>
-tau<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n) {
-	switch (get_non_terminal_node(logic_operator(n))) {
-		case tau_parser::wff_and:
-			return make_node_hook_wff_and<BAs...>(n);
-		case tau_parser::wff_or:
-			return make_node_hook_wff_or<BAs...>(n);
-		case tau_parser::wff_neg:
-			return make_node_hook_wff_neg<BAs...>(n);
-		case tau_parser::bf_eq:
-			return make_node_hook_wff_eq<BAs...>(n);
-		case tau_parser::bf_neq:
-			return make_node_hook_wff_neq<BAs...>(n);
-		case tau_parser::wff_sometimes:
-			return make_node_hook_wff_sometimes<BAs...>(n);
-		case tau_parser::wff_always:
-			return make_node_hook_wff_always<BAs...>(n);
-		case tau_parser::wff_xor:
-			return make_node_hook_wff_xor<BAs...>(n);
-		case tau_parser::wff_conditional:
-			return make_node_hook_wff_conditional<BAs...>(n);
-		case tau_parser::wff_imply:
-			return make_node_hook_wff_imply<BAs...>(n);
-		case tau_parser::wff_rimply:
-			return make_node_hook_wff_rimply<BAs...>(n);
-		case tau_parser::wff_equiv:
-			return make_node_hook_wff_equiv<BAs...>(n);
-		case tau_parser::constraint:
-			return make_node_hook_wff_ctn<BAs...>(n);
-		case tau_parser::bf_less:
-			return make_node_hook_wff_less<BAs...>(n);
-		case tau_parser::bf_nless:
-			return make_node_hook_wff_nless<BAs...>(n);
-		case tau_parser::bf_less_equal:
-			return make_node_hook_wff_less_equal<BAs...>(n);
-		case tau_parser::bf_nleq:
-			return make_node_hook_wff_nleq<BAs...>(n);
-		case tau_parser::bf_greater:
-			return make_node_hook_wff_greater<BAs...>(n);
-		case tau_parser::bf_ngreater:
-			return make_node_hook_wff_ngreater<BAs...>(n);
-		case tau_parser::bf_greater_equal:
-			return make_node_hook_wff_greater_equal<BAs...>(n);
-		case tau_parser::bf_ngeq:
-			return make_node_hook_wff_ngeq<BAs...>(n);
-		case tau_parser::bf_interval:
-			return make_node_hook_wff_interval<BAs...>(n);
-		default: return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 = 0 ::=  F.");)
+		return tau::get(tau::_F(), r);
 	}
+	//RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 = 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_DEF_SIMPLIFY_0, "0 = 1")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 = 1 ::= F.");)
+		return tau::get(tau::_F(), r);
+	}
+	//RULE(BF_DEF_SIMPLIFY_1, "1 = 1")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 = 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_DEF_SIMPLIFY_N, "{c} = 0 ::= ...."): this should never happen
+	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0
+		&& arg2(ch).is(tau::bf_f))
+	{
+		HOOK_LOGGING(applied("{c} = 0 ::= ....");)
+		return wff_eq_cte(v, ch, len, r);
+	}
+	//RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
+	if (!arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X = $Y ::= $X & $Y' | $X' & $Y = 0.");)
+		return tau::get(tau::build_bf_eq(tau::build_bf_xor(
+				arg1_fm(ch).get(), arg2_fm(ch).get())), r);
+	}
+	return tau::get_raw(v, ch, len, r);
 }
 
-template <typename... BAs>
-tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
+template <NodeType node>
+tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_eq_cte", v, ch, len, r);)
+	auto l = tt(ch[0]) | tau::bf | tau::bf_constant;
+	if (l && (l | tt::ba_constant) == false) return tau::get(tau::_T(), r);
+	else if (l) return tau::get(tau::_F(), r);
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_neq", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	//RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 != 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 != 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NEQ_SIMPLIFY_2, "0 != 1 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 != 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NEQ_SIMPLIFY_3, "1 != 1 ::= F.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 != 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_DEF_SIMPLIFY_N, "{c} = 0 ::= ....")
+	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0
+		&& arg2(ch).is(tau::bf_f))
+	{
+		HOOK_LOGGING(applied("{c} = 0 ::= ....");)
+		return tau::get(wff_neq_cte(v, ch, len, r), r);
+	}
+	//RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
+	if (!arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X != $Y ::= $X & $Y' | $X' & $Y != 0.");)
+		return tau::get(tau::build_bf_neq(tau::build_bf_xor(
+				arg1_fm(ch).get(), arg2_fm(ch).get())), r);
+	}
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_neq_cte", v, ch, len, r);)
+	auto l = tt(ch[0]) | tau::bf | tau::bf_constant;
+	if (l.has_value() && (l | tt::ba_constant) == false)
+		return tau::get(tau::_F(), r);
+	else if (l.has_value()) return tau::get(tau::_T(), r);
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_sometimes(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_sometimes", v, ch, len, r);)
+	//RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("sometimes T ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("sometimes F ::= F.");)
+		return tau::get(tau::_F(), r);
+	}
+	//RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
+	if (auto double_quantifier = arg1_fm(ch)() | tau::wff_sometimes;
+		double_quantifier) {
+		HOOK_LOGGING(applied("sometimes sometimes $X ::= sometimes $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
+	if (auto double_quantifier = arg1_fm(ch)() | tau::wff_always;
+		double_quantifier) {
+		HOOK_LOGGING(applied("sometimes always $X ::= always $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_always(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_always", v, ch, len, r);)
+	//RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("always T ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("always F ::= F.");)
+		return tau::get(tau::_F(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
+	if (auto double_quantifier = arg1_fm(ch)() | tau::wff_always;
+		double_quantifier && quantifier(ch).is(tau::wff_always))
+	{
+		HOOK_LOGGING(applied("always always $X ::= always $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_SIMPLIFY_ALWAYS_2,     "always sometimes $X ::= sometimes $X.")
+	if (auto double_quantifier = arg1_fm(ch)() | tau::wff_sometimes;
+		double_quantifier && quantifier(ch).is(tau::wff_always))
+	{
+		HOOK_LOGGING(applied("always sometimes $X ::= sometimes $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_conditional(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_conditional", v, ch, len, r);)
+	//RULE(WFF_CONDITIONAL_SIMPLIFY_0, "F ? $X : $Y ::= $Y.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("F ? $X : $Y ::= $Y.");)
+		return tau::get(arg3_fm(ch).get(), r);
+	}
+	//RULE(WFF_CONDITIONAL_SIMPLIFY_1, "T ? $X : $Y ::= $X.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("T ? $X : $Y ::= $X.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(WFF_CONDITIONAL_SIMPLIFY_4, "$X ? $Y : $Y ::= $Y.")
+	if (arg2_fm(ch) == arg3_fm(ch)) {
+		HOOK_LOGGING(applied("$X ? $Y : $Y ::= $Y.");)
+		return tau::get(arg3_fm(ch).get(), r);
+	}
+	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_imply([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_imply", v, ch, len, r);)
+	//RULE(WFF_IMPLY_SIMPLIFY_0, "F -> $X ::= T.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("F -> $X ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(WFF_IMPLY_SIMPLIFY_1, "T -> $X ::= $X.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("T -> $X ::= $X.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(WFF_IMPLY_SIMPLIFY_2, "$X -> F ::= ! $X.")
+	if (arg2(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("$X -> F ::= ! $X.");)
+		return tau::get(tau::build_wff_neg(arg1_fm(ch).get()), r);
+	}
+	//RULE(WFF_IMPLY_SIMPLIFY_3, "$X -> T ::= T.")
+	if (arg2(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("$X -> T ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(WFF_IMPLY_SIMPLIFY_4, "$X -> $X ::= T.")
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X -> $X ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	return tau::get(tau::build_wff_imply(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_rimply([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_rimply", v, ch, len, r);)
+	//RULE(WFF_RIMPLY_SIMPLIFY_0, "F <- $X ::= T.")
+	if (arg2(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("F <- $X ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(WFF_RIMPLY_SIMPLIFY_1, "T <- $X ::= $X.")
+	if (arg2(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("T <- $X ::= $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_RIMPLY_SIMPLIFY_2, "$X <- F ::= ! $X.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("$X <- F ::= ! $X.");)
+		return tau::get(tau::build_wff_neg(arg2_fm(ch).get()), r);
+	}
+	//RULE(WFF_RIMPLY_SIMPLIFY_3, "$X <- T ::= T.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("$X <- T ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(WFF_RIMPLY_SIMPLIFY_4, "$X <- $X ::= T.")
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X <- $X ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	return tau::get(tau::build_wff_imply(arg2_fm(ch).get(), arg1_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_equiv([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_equiv", v, ch, len, r);)
+	//RULE(WFF_EQUIV_SIMPLIFY_0, "F <-> $X ::= ! $X.")
+	if (arg1(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("F <-> $X ::= ! $X.");)
+		return tau::get(tau::build_wff_neg(arg2_fm(ch).get()), r);
+	}
+	//RULE(WFF_EQUIV_SIMPLIFY_1, "T <-> $X ::= $X.")
+	if (arg1(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("T <-> $X ::= $X.");)
+		return tau::get(arg2_fm(ch).get(), r);
+	}
+	//RULE(WFF_EQUIV_SIMPLIFY_2, "$X <-> F ::= ! $X.")
+	if (arg2(ch).is(tau::wff_f)) {
+		HOOK_LOGGING(applied("$X <-> F ::= ! $X.");)
+		return tau::get(tau::build_wff_neg(arg1_fm(ch).get()), r);
+	}
+	//RULE(WFF_EQUIV_SIMPLIFY_3, "$X <-> T ::= $X.")
+	if (arg2(ch).is(tau::wff_t)) {
+		HOOK_LOGGING(applied("$X <-> T ::= $X.");)
+		return tau::get(arg1_fm(ch).get(), r);
+	}
+	//RULE(WFF_EQUIV_SIMPLIFY_4, "$X <-> $X ::= T.")
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X <-> $X ::= T.");)
+		return tau::get(tau::_T(), r);
+	}
+	//RULE(WFF_EQUIV_SIMPLIFY_5, "$X <-> ! $X ::= F.")
+	if (auto negated = tt(arg2_fm(ch)) | tau::wff_neg | tau::wff;
+		negated && tau::get(negated.value()) == arg1_fm(ch)) {
+		HOOK_LOGGING(applied("$X <-> ! $X ::= F.");)
+		return tau::get(tau::_F(), r);
+	}
+	//RULE(WFF_EQUIV_SIMPLIFY_6, "! $X <-> $X ::= F.")
+	if (auto negated = tt(arg1_fm(ch)) | tau::wff_neg | tau::wff;
+		negated && tau::get(negated.value()) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("! $X <-> $X ::= F.");)
+		return tau::get(tau::_F(), r);
+	}
+	return tau::get(tau::build_wff_equiv(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_lt", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	//RULE(BF_LESS_SIMPLIFY_20, "0 < 1 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 < 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_LESS_SIMPLIFY_21, "1 < 0 ::= F.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 < 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_LESS_SIMPLIFY_0, "0 < 0 ::= F.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 < 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_DEF_SIMPLIFY_N, "1 < 1 ::= F.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 < 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_LESS_SIMPLIFY_0, "$X < 0 ::= F.") @CP
+	if (arg2(ch).is(tau::bf_f)) return _F(v, ch, len, r);
+	//RULE(BF_DEF_SIMPLIFY_N, "$X < 1 ::= $X' != 0.")
+	if (arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("$X < 1 ::= $X' != 0.");)
+		return tau::get(tau::build_bf_neq(
+			tau::build_bf_neg(arg1_fm(ch).get())), r);
+	}
+	return tau::get(tau::build_bf_lt(arg1_fm(ch).get(),
+					 arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_nlt", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	//RULE(BF_NLESS_SIMPLIFY_20, "0 !< 1 ::= F.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 !< 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NLESS_SIMPLIFY_21, "1 !< 0 ::= T.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 !< 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NLESS_SIMPLIFY_0, "0 !< 0 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 !< 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_DEF_SIMPLIFY_N, "1 !< 1 ::= T.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 !< 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NLESS_SIMPLIFY_0, "$X !< 0 ::= T.") @CP
+	if (arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X !< 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_DEF_SIMPLIFY_N, "$X !< 1 ::= $X' = 0.")
+	if (arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("$X !< 1 ::= $X' = 0.");)
+		return tau::get(tau::build_bf_eq(tau::build_bf_neg(arg1_fm(ch).get())), r);
+	}
+	return tau::get(tau::build_bf_nlt(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_lteq", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	//RULE(BF_LESS_EQUAL_SIMPLIFY_2, "0 <= 1 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 <= 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "0 <= 0 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 <= 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_LESS_EQUAL_SIMPLIFY_1, "1 <= 0 ::= F.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 <= 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_DEF_SIMPLIFY_N, "1 <= 1 ::= T.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 <= 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "$X <= 1 ::= T.") @CP
+	if (arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("$X <= 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	return tau::get(tau::build_bf_lteq(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_nlteq", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	//RULE(BF_NLEQ_SIMPLIFY_2, "0 !<= 1 ::= F.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 !<= 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NLEQ_SIMPLIFY_0, "0 !<= 0 ::= F.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 !<= 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NLEQ_SIMPLIFY_1, "1 !<= 0 ::= T.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 !<= 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NLEQ_SIMPLIFY_0, "1 !<= 1 ::= F.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 !<= 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NLEQ_SIMPLIFY_0, "$X !<= 1 ::= F.") @CP
+	if (arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("$X !<= 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	return tau::get(tau::build_bf_nlteq(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_gt", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	//RULE(BF_GREATER_SIMPLIFY_2, "1 > 0 ::= T.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 > 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_SIMPLIFY_0, "0 > 0 ::= F.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 > 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_SIMPLIFY_1, "0 > 1 ::= F.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 > 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_SIMPLIFY_3, "1 > 1 ::= F.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 > 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_SIMPLIFY_0, "$X > 1 ::= F.") @CP
+	if (arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("$X > 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_SIMPLIFY_3, "0 > $X ::= F.") @CP
+	if (arg1(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 > $X ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	return tau::get(tau::build_bf_gt(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_ngt", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	//RULE(BF_NGREATER_SIMPLIFY_2, "1 !> 0 ::= F.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 !> 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NGREATER_SIMPLIFY_1, "0 !> 0 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 !> 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NGREATER_SIMPLIFY_0, "0 !> 1 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 !> 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NGREATER_SIMPLIFY_3, "1 !> 1 ::= T.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 !> 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NGREATER_SIMPLIFY_0, "$X !> 1 ::= T.") @CP
+	if (arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("$X !> 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NGREATER_SIMPLIFY_3, "0 !> $X ::= T.") @CP
+	if (arg1(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 !> $X ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	return tau::get(tau::build_bf_ngt(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_gteq", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	//RULE(BF_GREATER_EQUAL_SIMPLIFY_2, "1 >= 0 ::= T.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 >= 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_EQUAL_SIMPLIFY_1, "0 >= 0 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 >= 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_EQUAL_SIMPLIFY_0, "0 >= 1 ::= F.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 >= 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_EQUAL_SIMPLIFY_3, "1 >= 1 ::= T.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 >= 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_EQUAL_SIMPLIFY_0, "$X >= 0 ::= T.") @CP
+	if (arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X >= 0 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_GREATER_EQUAL_SIMPLIFY_2, "1 >= X ::= T.")
+	if (arg1(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 >= $X ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	return tau::get(tau::build_bf_gteq(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_ngteq", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	//RULE(BF_NGEQ_SIMPLIFY_2, "1 !>= 0 ::= F.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("1 !>= 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NGEQ_SIMPLIFY_1, "0 !>= 0 ::= F.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 !>= 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NGEQ_SIMPLIFY_0, "0 !>= 1 ::= T.")
+	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("0 !>= 1 ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	//RULE(BF_NGEQ_SIMPLIFY_3, "1 !>= 1 ::= F.")
+	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 !>= 1 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NGEQ_SIMPLIFY_0, "$X !>= 0 ::= F.") @CP
+	if (arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X !>= 0 ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	//RULE(BF_NGEQ_SIMPLIFY_1, "1 !>= $X ::= F.") @CP
+	if (arg1(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 !>= $X ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	return tau::get(tau::build_bf_ngteq(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_interval", v, ch, len, r);)
+
+	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
+
+	return tau::get(tau::build_bf_interval(
+		arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);
+}
+
+template <NodeType node>
+tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("shift", v, ch, len, r);)
+	DBG(assert(len == 2);)
 	// apply numerical simplifications
-	using p = tau_parser;
 	// This node must have two children
 	// The first node is either p::variable, p::capture, p::num or p::integer
 	// The second node must be p::num
-	if (n.child.size() == 2) {
-		int_t left = -1;
-		const auto& c0 = n.child[0];
-		if (is_non_terminal(p::integer, c0))
-			left = int_extractor<BAs...>(c0);
-		else if (is_non_terminal(p::num, c0))
-			left = (int_t)(c0
-				| only_child_extractor<BAs...>
-				| size_t_extractor<BAs...>
-				| optional_value_extractor<size_t>);
-		if (left < 0) {
-			assert(is_non_terminal(p::variable, c0) || is_non_terminal(p::capture, c0));
-			return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-		}
-		int_t right = -1;
-		if (is_non_terminal(p::num, n.child[1]))
-			right = (int_t) ( n.child[1]
-				| only_child_extractor<BAs...>
-				| size_t_extractor<BAs...>
-				| optional_value_extractor<size_t>);
-		if (right < 0) {
-			// This is not allowed to happen
-			assert(false);
-			return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-		}
-		if (left >= right) return build_int<BAs...>(left-right);
-		// Return error
-		return nullptr;
-	} else { assert(false); }
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template <typename...BAs>
-std::optional<tau<BAs...>> make_tau_node<BAs...>::operator()(
-	const rewriter::node<tau_sym<BAs...>>& n)
-{
-	if (is_non_terminal_node<BAs...>(n)) {
-		switch (get_non_terminal_node(n)) {
-			case tau_parser::bf: {
-				return make_node_hook_bf<BAs...>(n);
-			}
-			case tau_parser::wff: {
-				return make_node_hook_wff<BAs...>(n);
-			}
-			case tau_parser::shift: {
-				return make_node_hook_shift<BAs...>(n);
-			}
-			default: return std::optional<tau<BAs...>>();
-		}
+	int_t left = -1;
+	const auto& c0 = tau::get(ch[0]);
+	if (c0.is(tau::integer)) left = c0.get_integer();
+	else if (c0.is(tau::num)) left = (int_t)(c0.get_num());
+	if (left < 0) {
+		DBG(assert(c0.is(tau::variable) || c0.is(tau::capture));)
+		return tau::get_raw(v, ch, len, r);
 	}
-	return std::optional<tau<BAs...>>();
+	int_t right = -1;
+	if (tau::get(ch[1]).is(tau::num))
+		right = (int_t)(tau::get(ch[1]).get_num());
+	DBG(assert(right >= 0);)
+	if (left >= right) return tau::get(tau::get_integer(left - right), r);
+	return nullptr; // Return error
 }
 
 } // namespace idni::tau_lang
-
-namespace idni::rewriter {
-
-template <typename...BAs>
-std::optional<idni::tau_lang::tau<BAs...>> make_node_hook<idni::tau_lang::tau_sym<BAs...>>::operator()(
-		const rewriter::node<idni::tau_lang::tau_sym<BAs...>>& n) {
-	static idni::tau_lang::make_tau_node<BAs...> hook;
-	return hook(n);
-}
-
-} // namespace idni::rewriter

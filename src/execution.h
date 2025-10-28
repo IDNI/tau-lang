@@ -1,176 +1,118 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __EXECUTION_H__
-#define __EXECUTION_H__
+// TODO (MEDIUM) clean execution api code
 
-#include <string>
-#include <optional>
-#include <boost/log/trivial.hpp>
+#ifndef __IDNI__TAU__EXECUTION_H__
+#define __IDNI__TAU__EXECUTION_H__
 
-#include "boolean_algebras/variant_ba.h"
-#include "parser.h"
-#include "normal_forms.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
+#include "nso_rr.h"
 
 namespace idni::tau_lang {
 
 // TODO (MEDIUM) clean execution api code
-template<typename... BAs>
+template <NodeType node>
 struct step {
-	step(library<tau<BAs...>> lib): lib(lib) {}
 
-	tau<BAs...> operator()(const tau<BAs...>& n) const {
-		return nso_rr_apply(lib, n);
-	}
+	step(rewriter::library lib);
 
-	library<tau<BAs...>> lib;
+	tref operator()(tref n) const;
+
+	rewriter::library lib;
 };
 
-template<typename step_t, typename...BAs>
+template <NodeType node, typename step_t>
 struct steps {
 
-	steps(std::vector<step_t> libraries) : libraries(libraries) {}
-	steps(step_t library) {
-		libraries.push_back(library);
-	}
+	steps(std::vector<step_t> libraries);
+	steps(step_t library);
 
-	tau<BAs...> operator()(const tau<BAs...>& n) const {
-		if (libraries.empty()) return n;
-		auto nn = n;
-		for (auto& lib : libraries) nn = lib(nn);
-		return nn;
-	}
+	tref operator()(tref n) const;
 
 	std::vector<step_t> libraries;
 };
 
-template<typename step_t, typename... BAs>
+template <NodeType node, typename step_t>
 struct repeat_each {
 
-	repeat_each(steps<step_t, BAs...> s) : s(s) {}
-	repeat_each(step_t s) : s(steps<step_t, BAs...>(s)) {}
+	repeat_each(steps<node, step_t> s);
+	repeat_each(step_t s);
 
-	tau<BAs...> operator()(const tau<BAs...>& n) const {
-		auto nn = n;
-		for (auto& l: s.libraries) {
-			std::set<tau<BAs...>> visited;
-			while (true) {
-				nn = l(nn);
-				if (visited.find(nn) != visited.end()) break;
-				visited.insert(nn);
-			}
-		}
-		return nn;
-	}
+	tref operator()(tref n) const;
 
-	steps<step_t, BAs...> s;
+	steps<node, step_t> s;
 };
 
-template<typename step_t, typename... BAs>
+template <NodeType node, typename step_t>
 struct repeat_all {
 
-	repeat_all(steps<step_t, BAs...> s) : s(s) {}
-	repeat_all(step_t s) : s(steps<step_t, BAs...>(s)) {}
+	repeat_all(steps<node, step_t> s);
+	repeat_all(step_t s);
 
-	tau<BAs...> operator()(const tau<BAs...>& n) const {
-		auto nn = n;
-		std::set<tau<BAs...>> visited;
-		while (true) {
-			for (auto& l: s.libraries) nn = l(nn);
-			auto nnn = s(nn);
-			if (nnn == nn) break;
-			nn = nnn;
-		}
-		return nn;
-	}
+	tref operator()(tref n) const;
 
-	steps<step_t, BAs...> s;
+	steps<node, step_t> s;
 };
 
-template<typename step_t, typename... BAs>
+template <NodeType node, typename step_t>
 struct repeat_once {
 
-	repeat_once(steps<step_t, BAs...> s) : s(s) {}
-	repeat_once(step_t s) : s(steps<step_t, BAs...>(s)) {}
+	repeat_once(steps<node, step_t> s);
+	repeat_once(step_t s);
 
-	tau<BAs...> operator()(const tau<BAs...>& n) const {
-		auto nn = n;
-		for(auto& l: s.libraries) {
-			nn = l(nn);
-		}
-		return nn;
-	}
+	tref operator()(tref n) const;
 
-	steps<step_t, BAs...> s;
+	steps<node, step_t> s;
 };
 
-template<typename...BAs>
-steps<step<BAs...>, BAs...> operator|(const library<tau<BAs...>>& l, const library<tau<BAs...>>& r) {
-	auto s = steps<step<BAs...>, BAs...>(step<BAs...>(l));
-	s.libraries.push_back(r);
-	return s;
-}
+template <NodeType node>
+steps<node, step<node>> to_steps(
+	const std::initializer_list<rewriter::library>& libs);
 
-template<typename step_t, typename...BAs>
-steps<repeat_each<step_t, BAs...>, BAs...> operator|(const repeat_each<step_t, BAs...>& l, const repeat_each<step_t, BAs...>& r) {
-	auto s = steps<repeat_each<step_t, BAs...>, BAs...>(l);
-	s.libraries.push_back(r);
-	return s;
-}
+template <NodeType node, typename step_t>
+steps<repeat_each<node, step_t>, node> operator|(
+	const repeat_each<node, step_t>& l, const repeat_each<node, step_t>& r);
 
-template<typename step_t, typename...BAs>
-steps<repeat_all<step_t, BAs...>, BAs...> operator|(const repeat_all<step_t, BAs...>& l, const repeat_all<step_t, BAs...>& r) {
-	auto s = steps<repeat_all<step_t, BAs...>, BAs...>(l);
-	s.libraries.push_back(r);
-	return s;
-}
+template <NodeType node, typename step_t>
+steps<repeat_all<node, step_t>, node> operator|(
+	const repeat_all<node, step_t>& l, const repeat_all<node, step_t>& r);
 
-template<typename step_t, typename... BAs>
-steps<step_t, BAs...> operator|(const steps<step_t, BAs...>& s, const step_t& l) {
-	auto ns = s;
-	ns.libraries.push_back(l);
-	return ns;
-}
+template <NodeType node, typename step_t>
+steps<node, step<node>> operator|(const steps<node, step<node>>& s,
+	const step_t& l);
 
-template<typename step_t, typename... BAs>
-steps<step_t, BAs...> operator|(const steps<step_t, BAs...>& s, const library<tau<BAs...>>& l) {
-	auto ns = s;
-	ns.libraries.push_back(l);
-	return ns;
-}
+template <NodeType node, typename step_t>
+steps<node, step<node>> operator|(const steps<node, step<node>>& s,
+	const rewriter::library& l);
 
-template<typename... BAs>
-steps<step<library<tau<BAs...>>, BAs...>, BAs...> operator|(const steps<step<library<tau<BAs...>>, BAs...>, BAs...>& s, const library<tau<BAs...>>& l) {
-	auto ns = s;
-	ns.libraries.push_back(l);
-	return ns;
-}
+template <NodeType node>
+steps<node, step<node>> operator|(const steps<node, step<node>>& s,
+	const rewriter::library& l);
 
-template<typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& n, const library<tau<BAs...>>& l) {
-	auto s = step<BAs...>(l);
-	return s(n);
-}
+template <NodeType node>
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n, const rewriter::library& l);
 
-template<typename step_t, typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& n, const steps<step_t, BAs...>& s) {
-	return s(n);
-}
+template <NodeType node, typename step_t>
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n, const steps<step_t, node>& s);
 
-template<typename step_t, typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& n, const repeat_once<step_t, BAs...>& r) {
-	return r(n);
-}
+template <NodeType node, typename step_t>
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n,
+	const repeat_once<node, step_t>& r);
 
-template<typename step_t, typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& n, const repeat_all<step_t, BAs...>& r) {
-	return r(n);
-}
+template <NodeType node, typename step_t>
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n,
+	const repeat_all<node, step_t>& r);
 
-template<typename step_t, typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& n, const repeat_each<step_t, BAs...>& r) {
-	return r(n);
-}
+template <NodeType node, typename step_t>
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n,
+	const repeat_each<node, step_t>& r);
 
 } // namespace idni::tau_lang
-#endif // __EXECUTION_H__
+
+#include "execution.tmpl.h"
+
+#endif // __IDNI__TAU__EXECUTION_H__

@@ -17,11 +17,17 @@ project("${PROJECT_NAME}"
 	DESCRIPTION "IDNI's tau language"
 )
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
+
 include(FetchContent)
 
-option(TAU_MEASURE                 "Measure tau performance"               OFF)
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
+option(TAU_MEASURE                 "Measure tau performance"               OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
+option(TAU_LOG_LINES               "Log file and line numbers"             OFF)
+option(TAU_LOG_LINE_PATHS          "Log file with a path and line numbers" OFF)
+option(TAU_LOG_CHANNELS            "Enable Debug and Trace logging channels" OFF)
+option(TAU_LOG_TRACE_TESTS         "Trace logging severity for tests"      OFF)
 option(TAU_BUILD_DOC               "Build documentation"                   OFF)
 option(TAU_BUILD_STATIC_LIBRARY    "Build static library"                  OFF)
 option(TAU_BUILD_SHARED_LIBRARY    "Build shared library"                  OFF)
@@ -29,24 +35,40 @@ option(TAU_BUILD_EXECUTABLE        "Build executable"                      OFF)
 option(TAU_BUILD_SHARED_EXECUTABLE "Build shared executable"               OFF)
 option(TAU_BUILD_TESTS             "Build all tests"                       OFF)
 option(TAU_BUILD_UNIT_TESTS        "Build unit tests"                      OFF)
-option(TAU_BUILD_REPL_TESTS        "Build repl tests"                      OFF)
 option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
+option(TAU_BUILD_REPL_TESTS        "Build repl tests"                      OFF)
 option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
+option(TAU_ADDRESS_SANITIZER       "Build with address sanitizer"          OFF)
 option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
+
+set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_MEASURE                 PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_CACHE                   PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_LOG_LINES               PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_LOG_LINE_PATHS          PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_LOG_CHANNELS            PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_LOG_TRACE_TESTS         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_DOC               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_EXECUTABLE        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_EXECUTABLE PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_TESTS             PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_UNIT_TESTS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_INTEGRATION       PROPERTY STRINGS "OFF" "ON")
-set_property(CACHE TAU_BUILD_BENCHMARK         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REPL_TESTS        PROPERTY STRINGS "OFF" "ON")
-set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BENCHMARK         PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_ADDRESS_SANITIZER       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_ZIP_PACKAGE     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
+
+# Load local cmake settings
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
+	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
+endif()
 
 if(TAU_BUILD_TESTS)
 	set(TAU_BUILD_UNIT_TESTS ON)
@@ -81,14 +103,14 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(TAU_BUILD_BENCHMARK OFF)
 	set(TAU_MEASURE OFF)
 	set(TAU_CACHE OFF)
-	elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+#	set(TAU_LOG_TRACE_TESTS ON)
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(TAU_BUILD_BENCHMARK OFF)
 	set(TAU_MEASURE OFF)
-	set(TAU_CACHE TRUE)
-	elseif(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+	set(TAU_CACHE ON)
+elseif(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 	set(TAU_BUILD_BENCHMARK OFF)
 	set(TAU_MEASURE OFF)
-	set(TAU_CACHE TRUE)
 	message(STATUS "Building with coverage information")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
@@ -135,28 +157,31 @@ endif()
 set(TAU_DEFINITIONS
 	TAU_MEASURE
 	TAU_CACHE
+	TAU_LOG_LINES
+	TAU_LOG_LINE_PATHS
+	TAU_LOG_CHANNELS
 )
 
-message(STATUS "TAU_MEASURE: ${TAU_MEASURE}")
 message(STATUS "PARSER_MEASURE: ${PARSER_MEASURE}")
+message(STATUS "TAU_MEASURE: ${TAU_MEASURE}")
 message(STATUS "TAU_CACHE: ${TAU_CACHE}")
+message(STATUS "TAU_LOG_LINES: ${TAU_LOG_LINES}")
+message(STATUS "TAU_LOG_LINE_PATHS: ${TAU_LOG_LINE_PATHS}")
+message(STATUS "TAU_LOG_CHANNELS: ${TAU_LOG_CHANNELS}")
+message(STATUS "TAU_LOG_TRACE_TESTS: ${TAU_LOG_TRACE_TESTS}")
 message(STATUS "TAU_BUILD_STATIC_LIBRARY: ${TAU_BUILD_STATIC_LIBRARY}")
 message(STATUS "TAU_BUILD_SHARED_LIBRARY: ${TAU_BUILD_SHARED_LIBRARY}")
 message(STATUS "TAU_BUILD_EXECUTABLE: ${TAU_BUILD_EXECUTABLE}")
 message(STATUS "TAU_BUILD_SHARED_EXECUTABLE: ${TAU_BUILD_SHARED_EXECUTABLE}")
 message(STATUS "TAU_BUILD_TESTS: ${TAU_BUILD_TESTS}")
 message(STATUS "TAU_BUILD_UNIT_TESTS: ${TAU_BUILD_UNIT_TESTS}")
-message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
+message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
-message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
+message(STATUS "TAU_ADDRESS_SANITIZER: ${TAU_ADDRESS_SANITIZER}")
 message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
-
-#
-# Add tauparser library
-#
-add_subdirectory(external/parser)
+message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 
 #
 # Adding Boost log library
@@ -165,7 +190,7 @@ set(Boost_USE_STATIC_LIBS ON)
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 	CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 		find_package(Boost REQUIRED
-			PATHS "${CMAKE_CURRENT_SOURCE_DIR}/libboost-mingw-w64"
+			PATHS "${CMAKE_CURRENT_SOURCE_DIR}/external/libboost-mingw-w64"
 			COMPONENTS log)
 else()
 		find_package(Boost REQUIRED COMPONENTS log)
@@ -177,10 +202,6 @@ if (Boost_FOUND)
 else()
 	message(FATAL_ERROR "Boost not found")
 endif()
-
-#
-option(BOOST_LOG_TRIVIAL           "Build logging in parser"   ON)
-option(PARSER_BUILD_STATIC_LIBRARY "Build only static library" ON)
 
 #
 # Adding Z3
@@ -220,6 +241,18 @@ version_license(
 	"${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_license.h.template"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/version_license.h")
 
+if(TAU_ADDRESS_SANITIZER)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+	set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+endif()
+
+#
+# Add tauparser library
+#
+message("Building parser")
+set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
+add_subdirectory(external/parser)
+
 #
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
@@ -228,12 +261,14 @@ include(tau-common)
 #
 # Adding src dir
 #
+message(STATUS "Building src")
 add_subdirectory("src")
 
 #
 # Testing
 #
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION OR TAU_BUILD_REPL_TESTS)
+	message(STATUS "Building tests")
 	enable_testing()
 	add_subdirectory(tests)
 endif ()

@@ -1,44 +1,24 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentiTd cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include <cassert>
-
-#include "doctest.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
-#include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/sbf_ba.h"
-#include "nso_rr.h"
-#include "normalizer.h"
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
+#include "test_init.h"
+#include "test_tau_helpers.h"
 
 bool check_hook(const char* sample, const char* expected) {
-	auto tau_sample = make_nso_using_factory<
-		tau_ba<sbf_ba>, sbf_ba>(sample, { .start = tau_parser::wff }).value();
-	auto tau_expected = make_nso_using_factory<
-		tau_ba<sbf_ba>, sbf_ba>(expected, { .start = tau_parser::wff }).value();
+	tref tau_sample   = tau::get(sample, parse_wff());
+	tref tau_expected = tau::get(expected, parse_wff());
 
-	#ifdef DEBUG
-	std::string str(sample);
-	std::cout << "sample: " << str << " expected: " << tau_expected << " got: " << tau_sample << "\n";
-	#endif // DEBUG
+#ifdef DEBUG
+	using node = node_t;
+	std::cout << "sample: " << string(sample) << " expected: ";
+	if (tau_expected == 0) cout << "nullptr";
+	else cout << TAU_DUMP_TO_STR(tau_expected);
+	cout << "\n\tgot: ";
+	if (tau_sample == 0) cout << "nullptr";
+	else cout << TAU_DUMP_TO_STR(tau_sample);
+	cout << "\n";
+#endif // DEBUG
 
-	return tau_sample == tau_expected;
+	return tau::subtree_equals(tau_sample, tau_expected);
 }
 
 TEST_SUITE("configuration") {

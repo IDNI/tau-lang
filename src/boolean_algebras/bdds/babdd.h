@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __BABDD_H__
-#define __BABDD_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BABDD_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BABDD_H__
 
 #include <vector>
 #include <map>
@@ -14,15 +14,18 @@
 #include <memory>
 #include <functional>
 #include <cmath>
+#include <algorithm>
 
-#include "defs.h"
-#include "dict.h"
+#include "var_dict.h"
 #include "boolean_algebras/bool_ba.h"
+
+namespace idni::tau_lang {
 
 typedef int32_t int_t;
 typedef uint32_t uint_t;
 template<typename T> using sp = std::shared_ptr<T>;
 
+#define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
 #define hash_tri(x, y, z), N fpairing(hash_pair(x, y), neg_to_odd(z))
@@ -222,38 +225,48 @@ struct node_skeleton {
 	}
 };
 
+} // namespace idni::tau_lang
+
+namespace std {
+
 template<typename R>
-struct std::hash<bdd_node<R>> {
+struct hash<idni::tau_lang::bdd_node<R>> {
 	size_t operator()(auto& n) const { return n.hash; }
 };
 
 template<typename R>
-struct std::hash<node_skeleton<R>> {
+struct hash<idni::tau_lang::node_skeleton<R>> {
 	size_t operator()(auto& n) const { return n.hash; }
 };
 
-template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<std::array<bdd_reference<S, O, IW, SW>, 2>> {
+template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct hash<array<idni::tau_lang::bdd_reference<S, O, IW, SW>, 2>> {
 	size_t operator()(const auto& a) const {
-		return hash_upair((bdd_reference<S, O, IW, SW>::hash(a[0])),
-				  (bdd_reference<S, O, IW, SW>::hash(a[1])));
+		return idni::tau_lang::hash_upair(
+			(idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[0])),
+			(idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[1])));
 	}
 };
 
-template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<bdd_reference<S, O, IW, SW>> {
+template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct hash<idni::tau_lang::bdd_reference<S, O, IW, SW>> {
 	size_t operator()(const auto& a) const {
-		return bdd_reference<S, O, IW, SW>::hash(a);
+		return idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a);
 	}
 };
 
-template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<std::pair<bdd_reference<S, O, IW, SW>, uint_t>> {
+template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct hash<pair<idni::tau_lang::bdd_reference<S, O, IW, SW>, idni::tau_lang::uint_t>> {
 	size_t operator()(const auto& p) const {
-		return hash_upair((hash<bdd_reference<S, O, IW, SW>>{}(p.first)),
-				  p.second);
+		return idni::tau_lang::hash_upair(
+			(hash<idni::tau_lang::bdd_reference<S, O, IW, SW>>{}(p.first)),
+			p.second);
 	}
 };
+
+} // namespace std
+
+namespace idni::tau_lang {
 
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
@@ -523,7 +536,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
-		dict(v>0?v:-v);
+		var_dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
 
@@ -1076,7 +1089,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
-		dict(v>0?v:-v);
+		var_dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
 
@@ -1446,4 +1459,13 @@ bool
 	return x.id < y.id || (x.id == y.id && s);
 };
 
-#endif
+} // namespace idni::tau_lang
+
+#undef hasbc
+#undef neg_to_odd
+#undef hash_pair
+#undef hash_tri
+#undef hash_upair
+#undef hash_utri
+
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BABDD_H__

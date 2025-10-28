@@ -47,9 +47,7 @@ CMakeFiles
 CMakeFiles/*
 Makefile
 CMakeCache.txt
-*.cmake
 *.nocmake
-!cmake/*
 !tests/repl/commands/*
 !tests/repl/execution/*
 !tests/repl/normal_forms/*
@@ -57,6 +55,7 @@ CMakeCache.txt
 !tests/repl/satisfiability/*
 src/doctest.h
 src/version_license.h
+src/tau.h
 Testing
 
 # Sonarqube
@@ -65,6 +64,9 @@ bw-output
 
 # private directory for a local stuff
 .local
+
+# local cmake settings
+CMakeLocalLists.txt
 
 # cli history files
 .*_history
@@ -76,3 +78,13 @@ logs/*
 .gdbinit
 external/boost
 libboost-mingw-w64
+.clangd
+private/.gitkeep
+private/andreis_example.txt
+private/luccas_notes.txt
+private/stack.txt
+private/valgrind.txt
+private/cvc5/are_nso_eqv.cvc5
+private/testnet/andrei
+private/testnet/andrei_uncomment.tau
+private/testnet/andrei.tau

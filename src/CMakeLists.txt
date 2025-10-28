@@ -1,47 +1,66 @@
 set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
-	../parser/sbf_parser.generated.h
-	../parser/tau_parser.generated.h
-	boolean_algebras/bdds/babdd.h
-	boolean_algebras/bdds/bdd_handle.h
-	boolean_algebras/bool_ba.h
-	boolean_algebras/sbf_ba.h
-	boolean_algebras/variant_ba.h
-	boolean_algebras/product_ba.h
-	boolean_algebras/nso_ba.h
-	experimental/execution.h
-	defs.h
-    definitions.h
-	rewriting.h
-	dict.h
+	defs.h             # common macro and types definitions
+	logging.h          # logging and its macros
+	tau_tree.h         # tau tree, node, tree traverser, builders,
+	                   # extractors, printers, queries, and
+	                   # transformations from the parse tree
+	ba_types.h         # BA types
+	ba_constants.h     # BA constants pool and binder
+	dict.h             # dictionaries of bdd var names and strings
+	definitions.h      # Storage for function and predicate definitions
+	rr.h               # recurrence relation structure
+	nso_rr.h           # nso_rr_apply
+	execution.h        # execution of nso rr rules
+	normal_forms.h     # normal form transformations
 	normalizer.h
-	nso_rr.h
-	execution.h
-	tau.h
-	normal_forms.h
 	satisfiability.h
-	solver.h
-	splitter.h
 	splitter_types.h
+	splitter.h
+	solver.h
 	interpreter.h
-	interpreter.impl.h
-	hooks.h
-	builders.h
-	language.h
-	queries.h
-	utils.h
+	union_find.h       # union find data structure
+	nso_factory.h      # abstract template interface
+	boolean_algebras/bool_ba.h
+	boolean_algebras/variant_ba.h
+	boolean_algebras/nso_ba.h
+	boolean_algebras/tau_ba.h
+	boolean_algebras/sbf_ba.h
+	undefs.h           # undefines implementation macros
 )
 
 set(TAU_SOURCES
 	boolean_algebras/bool_ba.cpp
-	dict.cpp
-	nso_rr.cpp
+	boolean_algebras/bdds/var_dict.cpp
 )
 
 set(CLI_SOURCES
 	main.cpp
 )
+
+set(TAU_HEADER_TEMPLATE ${CMAKE_CURRENT_SOURCE_DIR}/tau.h.in)
+set(TAU_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/tau.h)
+set(TAU_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
+message(STATUS "TAU_HEADER_TEMPLATE: ${TAU_HEADER_TEMPLATE}")
+message(STATUS "TAU_HEADER: ${TAU_HEADER}")
+message(STATUS "TAU_SOURCE_DIR: ${TAU_SOURCE_DIR}")
+
+# Custom command to generate the unified header
+add_custom_command(
+	OUTPUT ${TAU_HEADER}
+	COMMAND ${CMAKE_COMMAND}
+		-DTAU_HEADERS="${TAU_HEADERS}"
+		-DTAU_HEADER_TEMPLATE="${TAU_HEADER_TEMPLATE}"
+		-DTAU_HEADER="${TAU_HEADER}"
+		-DTAU_SOURCE_DIR="${TAU_SOURCE_DIR}"
+		-P ${PROJECT_SOURCE_DIR}/cmake/header.cmake
+	DEPENDS ${TAU_HEADERS} ${TAU_HEADER_TEMPLATE}
+	COMMENT "Building tau.h file"
+)
+
+add_custom_target(tau_header ALL DEPENDS ${TAU_HEADER})
 
 #
 # object library
@@ -49,7 +68,7 @@ set(CLI_SOURCES
 add_library(${TAU_OBJECT_LIB_NAME} OBJECT)
 target_sources(${TAU_OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_OBJECT_LIB_NAME})
-target_link_libraries(${TAU_OBJECT_LIB_NAME} Boost::log ${Z3_LIB})
+target_link_libraries(${TAU_OBJECT_LIB_NAME} tauparser Boost::log ${Z3_LIB})
 target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
@@ -63,7 +82,7 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 add_library(${TAU_STATIC_LIB_NAME} STATIC)
 target_sources(${TAU_STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_STATIC_LIB_NAME})
-target_link_libraries(${TAU_STATIC_LIB_NAME} Boost::log ${Z3_LIB})
+target_link_libraries(${TAU_STATIC_LIB_NAME} tauparser Boost::log ${Z3_LIB})
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
@@ -81,7 +100,7 @@ endif()
 add_library(${TAU_SHARED_LIB_NAME} SHARED)
 add_library(${namespace}::${TAU_SHARED_LIB_NAME} ALIAS ${TAU_SHARED_LIB_NAME})
 target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
-target_link_libraries(${TAU_SHARED_LIB_NAME} Boost::log ${Z3_LIB})
+target_link_libraries(${TAU_SHARED_LIB_NAME} tauparser Boost::log ${Z3_LIB})
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>

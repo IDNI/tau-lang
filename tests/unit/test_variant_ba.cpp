@@ -1,14 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "doctest.h"
+#include "test_init.h"
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/variant_ba.h"
-
-namespace testing = doctest;
-
-using namespace idni::tau_lang;
 
 TEST_SUITE("variant Boolen algebra") {
 

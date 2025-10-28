@@ -1,12 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __EXPERIMENTAL_EXECUTION_H__
-#define __EXPERIMENTAL_EXECUTION_H__
+#ifndef __IDNI__TAU__EXPERIMENTAL__EXECUTION_H__
+#define __IDNI__TAU__EXPERIMENTAL__EXECUTION_H__
 
 #include <string>
 #include <type_traits>
 #include <optional>
-#include <boost/log/trivial.hpp>
 
 #include "parser.h"
 #include "rewriting.h"
@@ -26,7 +25,9 @@ auto operator|(const rewriter::sp_node<N>& n, F f) {
 }
 
 template<typename N, typename F, typename S>
-auto operator|(const rewriter::sp_node<N>& n, const std::pair<F, S>& p) {
+auto operator|(const rewriter::sp_node<N>& n,
+	const std::pair<F, S>& p)
+{
 	return n | p.first | p.second;
 }
 
@@ -108,4 +109,4 @@ struct satisfying {
 
 } // namespace idni::tau_lang::experimental
 
-#endif // __EXPERIMENTAL_EXECUTION_H__
+#endif // __IDNI__TAU__EXPERIMENTAL__EXECUTION_H__
