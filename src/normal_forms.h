@@ -86,56 +86,6 @@ tref normalize_ba(tref fm);
 template <NodeType node>
 struct bf_reduce_canonical;
 
-template <NodeType node, node::type type>
-struct reduce_deprecated {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-
-	// TODO (VERY_HIGH) properly implement it
-	tref operator()(tref form) const;
-	tt operator()(const tt& t) const;
-
-private:
-	using literals = subtree_set<node>;
-
-	void get_literals(tref clause, literals& lits) const;
-
-	literals get_literals(tref clause) const;
-
-	std::pair<literals, literals> get_positive_negative_literals(
-		tref clause) const;
-
-	subtree_set<node> get_dnf_clauses(tref n,
-					subtree_set<node> clauses = {}) const;
-
-	tref build_dnf_clause_from_literals(const literals& positives,
-					const literals& negatives) const;
-
-	tref to_minterm(tref clause) const;
-
-	tref build_dnf_from_clauses(const subtree_set<node>& clauses) const;
-
-	tref simplify(tref form) const;
-};
-
-template <NodeType node>
-static const reduce_deprecated<node, tau_parser::bf> reduce_bf_deprecated;
-template <NodeType node>
-using reduce_bf_t = reduce_deprecated<node, tau_parser::bf>;
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t, const reduce_bf_t<node>& r);
-
-template <NodeType node>
-static const reduce_deprecated<node, tau_parser::wff> reduce_wff_deprecated;
-template <NodeType node>
-using reduce_wff_t = reduce_deprecated<node, tau_parser::wff>;
-
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& t, const reduce_wff_t<node>& r);
-
 // return the inner quantifier or the top wff if the formula is not quantified
 template <NodeType node>
 std::pair<typename tree<node>::traverser, tref> get_inner_quantified_wff(tref n);
