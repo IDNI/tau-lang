@@ -125,6 +125,8 @@ std::function<bool(tref)> is_atomic_fm() {
 
 	return [](tref n) -> bool {
 		auto fm = tau::get(n);
+		if (fm.children_size() != 1) return false;
+		auto child = fm[0];
 		return fm.is(node::type::wff)
 			&& (fm.child_is(node::type::bf_eq)
 				|| fm.child_is(node::type::bf_neq)
@@ -135,31 +137,32 @@ std::function<bool(tref)> is_atomic_fm() {
 				|| fm.child_is(node::type::bf_gteq)
 				|| fm.child_is(node::type::bf_ngteq)
 				|| fm.child_is(node::type::bf_lt)
-				|| fm.child_is(node::type::bf_nlt));
+				|| fm.child_is(node::type::bf_nlt))
+			&& (is_tau_type<node>(child) || is_sbf_type<node>(child));
 	};
 }
 
 template <NodeType node>
 std::function<bool(tref)> is_atomic_bv_fm() {
-	//using tau = tree<node>;
+	using tau = tree<node>;
 
-	return is_atomic_fm<node>();
-
-	//TODO (HIGH) check the type and the ba_type
-	/*return [](tref n) -> bool {
+	return [](tref n) -> bool {
 		auto fm = tau::get(n);
+		if (fm.children_size() != 1) return false;
+		auto child = fm[0];
 		return fm.is(node::type::wff)
-			&& (fm.child_is(node::type::bv_eq)
-				|| fm.child_is(node::type::bv_neq)
-				|| fm.child_is(node::type::bv_lteq)
-				|| fm.child_is(node::type::bv_nlteq)
-				|| fm.child_is(node::type::bv_gt)
-				|| fm.child_is(node::type::bv_ngt)
-				|| fm.child_is(node::type::bv_gteq)
-				|| fm.child_is(node::type::bv_ngteq)
-				|| fm.child_is(node::type::bv_lt)
-				|| fm.child_is(node::type::bv_nlt));
-	};*/
+			&& (fm.child_is(node::type::bf_eq)
+				|| fm.child_is(node::type::bf_neq)
+				|| fm.child_is(node::type::bf_lteq)
+				|| fm.child_is(node::type::bf_nlteq)
+				|| fm.child_is(node::type::bf_gt)
+				|| fm.child_is(node::type::bf_ngt)
+				|| fm.child_is(node::type::bf_gteq)
+				|| fm.child_is(node::type::bf_ngteq)
+				|| fm.child_is(node::type::bf_lt)
+				|| fm.child_is(node::type::bf_nlt))
+			&& (is_bv_type_family<node>(child));
+	};
 }
 
 template <NodeType node>
