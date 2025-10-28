@@ -19,6 +19,15 @@ project("${PROJECT_NAME}"
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
 
+# Set the number of jobs to use for the build
+include(ProcessorCount)
+ProcessorCount(PROCESSOR_COUNT)
+if(PROCESSOR_COUNT EQUAL 0)
+	message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
+	set(PROCESSOR_COUNT 1)
+endif()
+set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${PROCESSOR_COUNT}")
+
 include(FetchContent)
 include(ExternalProject)
 
@@ -163,6 +172,7 @@ set(TAU_DEFINITIONS
 	TAU_LOG_CHANNELS
 )
 
+message(STATUS "PROCESSOR_COUNT: ${PROCESSOR_COUNT}")
 message(STATUS "PARSER_MEASURE: ${PARSER_MEASURE}")
 message(STATUS "TAU_MEASURE: ${TAU_MEASURE}")
 message(STATUS "TAU_CACHE: ${TAU_CACHE}")
@@ -192,7 +202,7 @@ ExternalProject_Add(
     cvc5_external_project
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
     CONFIGURE_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5 && ${CMAKE_SOURCE_DIR}/external/cvc5/configure.sh --no-gpl --auto-download
-    BUILD_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5/build && make # && make test && make install
+    BUILD_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5/build && make -j ${PROCESSOR_COUNT} # && make test && make install
     INSTALL_COMMAND cp ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so.1  ${PROJECT_BINARY_DIR}/
     UPDATE_COMMAND ""
     BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/external/cvc5/build/libcvc5.so
