@@ -43,6 +43,8 @@ mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
 rm -f ./CMakeCache.txt
 
+PROCESSOR_COUNT=$(cmake -P ../cmake/processor-counter.cmake 2>&1 || echo "1")
+
 NINJA_BIN="$(which ninja 2>&1)";
 if [ $? -ne 0 ]; then
 	NINJA_BIN="$(which ninja-build 2>&1)";
@@ -54,12 +56,12 @@ fi
 if [ -z $NINJA_BIN ]; then
 	echo "Using make build system"
 	cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
-	cmake --build . -- ${VERBOSE:+VERBOSE=1}
+	cmake --build . -- -j ${PROCESSOR_COUNT} ${VERBOSE:+VERBOSE=1}
 	STATUS=$?
 else
 	echo "Using Ninja build system"
 	cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
-	ninja ${VERBOSE:+-v}
+	ninja --parallel ${PROCESSOR_COUNT} ${VERBOSE:+-v}
 	STATUS=$?
 fi
 
