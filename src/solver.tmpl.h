@@ -91,7 +91,7 @@ std::optional<solution<node>> find_solution(equality eq,
 				return substitution;
 			}
 		}
-		if (auto restricted = find_solution<node>(build_bf_eq<node>(gh),
+		if (auto restricted = find_solution<node>(build_bf_eq_0<node>(gh),
 						substitution, mode); restricted)
 		{
 			//solution.insert(restricted.value().begin(), restricted.value().end());
@@ -202,6 +202,7 @@ std::optional<solution<node>> lgrs(equality eq) {
 	}
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 	solution<node> phi;
+	//TODO resolve xor below
 	for (auto [x_i, z_i] : s.value())
 		phi[x_i] = tt((tau::get(z_i) & tau::get(f))
 			+ (tau::get(x_i) & ~tau::get(f)))
@@ -250,8 +251,8 @@ struct minterm_iterator {
 					& ~tau::get(v)).get();
 				choices.emplace_back(v, false, partial_bf,
 							partial_minterm);
-				partial_bf = rewriter::replace<node>(v,
-					tau::_0(), partial_bf);
+				partial_bf = rewriter::replace<node>(partial_bf,
+					v, tau::_0());
 				DBG(LOG_TRACE << "minterm_iterator/partial_bf: "
 					<< LOG_FM(partial_bf);)
 				// ... and compute new values for the next one
@@ -359,12 +360,10 @@ private:
 					: ~tau::get(choices[i].var))
 				& tau::get(choices[i - 1].partial_minterm)).get();
 			choices[i].partial_bf = choices[i - 1].value
-				? rewriter::replace<node>(
-					choices[i - 1].var, tau::_1(),
-					choices[i - 1].partial_bf)
-				: rewriter::replace<node>(
-					choices[i - 1].var, tau::_0(),
-					choices[i - 1].partial_bf);
+				? rewriter::replace<node>(choices[i - 1].partial_bf,
+					choices[i - 1].var, tau::_1())
+				: rewriter::replace<node>(choices[i - 1].partial_bf,
+					choices[i - 1].var, tau::_0());
 			// if current partial bf is 0, we can skip the rest of the choices
 			// as the corresponding minterms will be 0.
 			if (tau::get(choices[i].partial_bf).equals_0()) {
@@ -471,7 +470,7 @@ private:
 	minterm_system<node> make_current_minterm_system() {
 		minterm_system<node> minterms;
 		for (auto& it : minterm_iterators)
-			minterms.insert(build_bf_neq<node>(*it));
+			minterms.insert(build_bf_neq_0<node>(*it));
 
 #ifdef DEBUG
 		LOG_TRACE << " make_current_minterm_system/minterms: ";
@@ -724,7 +723,7 @@ std::optional<solution<node>> solve_minterm_system(
 
 	DBG(LOG_TRACE << "solve_minterm_system/eq[final]: " << LOG_FM(eq);)
 
-	eq = build_bf_eq<node>(eq);
+	eq = build_bf_eq_0<node>(eq);
 	return find_solution<node>(eq);
 }
 
@@ -963,7 +962,7 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 					| tau::bf_eq | tau::bf | tt::ref;
 				tref r = tt(eq)
 					| tau::bf_eq | tau::bf | tt::ref;
-				system.first = build_bf_eq<node>(
+				system.first = build_bf_eq_0<node>(
 					(tau::get(l) | tau::get(r)).get());
 			}
 		}
@@ -972,12 +971,81 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 	return solve_system<node>(system, options);
 }
 
+/**
+ * @brief Check if adding the assignment var := term will introduce a loop given
+ * the previous variable assignments.
+ * @tparam node Tree node type
+ * @param var_assignments A map that sends each variable to the set of variables reachable by assignments
+ * @param var The current variable that is assigned
+ * @param term The current term that is assigend
+ * @return Whether adding the current variable assignment is valid
+ */
+template <NodeType node>
+bool check_var_assignment(auto& var_assignments, tref var, tref term) {
+	using tau = tree<node>;
+	// If the variable is already assigned, we cannot add it
+	if (var_assignments.contains(var)) return false;
+	trefs term_vars = get_free_vars<node>(term);
+	// Add bf node in order to align with var and term structure
+	for (tref& tv : term_vars) tv = tau::get(tau::bf, tv);
+	// Make sure that term does not contain var
+	for (tref tv : term_vars) if (tau::get(tv) == tau::get(var))
+		return false;
+	// First check if adding var := term would create a loop given previous
+	// assignments
+	for (const auto& [v, cv] : var_assignments) {
+		if (cv.contains(var)) for (tref tv : term_vars)
+			if (tau::get(tv) == tau::get(v)) return false;
+	}
+	// Now complete reachable variables given the new assignment to enable future
+	// loop checking
+	subtree_set<node> term_cv(term_vars.begin(), term_vars.end());
+	for (auto& [v, cv] : var_assignments) {
+		// Add new reachable variables to previous variable set
+		if (cv.contains(var)) for (tref tv : term_vars)
+			cv.insert(tv);
+		// Add the reachable variables for the current term
+		if (term_cv.contains(v)) {
+			DBG(assert(!cv.contains(var));)
+			for (tref el : cv) term_cv.insert(el);
+		}
+	}
+	// Finally add variable assignment
+	var_assignments.emplace(var, std::move(term_cv));
+	return true;
+}
+
+/**
+ * @brief Add the assignment var := term to var_assignments while making sure that
+ * assigned variables do not appear in any assigned term.
+ * @tparam node Tree node type
+ * @param var_assignments Map of assignments of terms to variables
+ * @param var The new variable that is assigned to term
+ * @param term The new term that is assigned to var
+ */
+template <NodeType node>
+void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments, tref var, tref term) {
+	using tau = tree<node>;
+	// For each variable in term, get replacement from var_assignment
+	const trefs& term_vars = get_free_vars<node>(term);
+	for (tref tv : term_vars) {
+		tv = tau::get(tau::bf, tv);
+		if (auto it = var_assignments.find(tv); it != var_assignments.end())
+			term = rewriter::replace<node>(term, tv, it->second);
+	}
+	// Now term is replaced by assignments from var_assignment
+	// Update current variable assignments with new term
+	for (auto& [_, t] : var_assignments)
+		t = rewriter::replace<node>(t, var, term);
+	// Add assignment
+	DBG(LOG_TRACE << "Adding: " << tau::get(var) << " := " << tau::get(term) << "\n";)
+	var_assignments.emplace(var, term);
+}
+
 // entry point for the solver
 template <NodeType node>
 std::optional<solution<node>> solve(tref form, solver_options options) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
-
 	if (tau::get(form).equals_T()) return { solution<node>() };
 	if (tau::get(form).equals_F()) return {};
 
@@ -995,11 +1063,11 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 	}
 #endif // DEBUG
 
-	tref dnf = tt(form) | bf_reduce_canonical<node>() | tt::ref;
-	for (tref clause : get_leaves<node>(dnf, tau::wff_or)) {
+	form = boole_normal_form<node>(form);
+	for (tref path : expression_paths<node>(form)) {
 		// Reject clause involving temporal quantification
-		if (tau::get(clause).find_top(is_temporal_quantifier<node>)) {
-			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(clause);
+		if (tau::get(path).find_top(is_temporal_quantifier<node>)) {
+			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(path);
 			continue;
 		}
 		solution<node> clause_solution;

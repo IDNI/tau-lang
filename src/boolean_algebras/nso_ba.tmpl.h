@@ -30,10 +30,14 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 		return tau::get(ba_constant_and(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_and(lt.get(), rt.get()));
-	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
-		return tau::get(tau::build_bf_eq((lt & rt[0][0]).get()));
-	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq))
-		return tau::get(tau::build_bf_neq((lt & rt[0][0]).get()));
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq)) {
+		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
+		return tau::get(tau::build_bf_eq_0((lt & n_rt[0][0]).get()));
+	}
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq)) {
+		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
+		return tau::get(tau::build_bf_neq_0((lt & n_rt[0][0]).get()));
+	}
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_and(lt.get(), rt.get()));
 	throw std::logic_error("nso_ba and: wrong types");
@@ -58,10 +62,14 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 		return tau::get(ba_constant_or(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_or(lt.get(), rt.get()));
-	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
-		return tau::get(tau::build_bf_eq((lt | rt[0][0]).get()));
-	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq))
-		return tau::get(tau::build_bf_neq((lt | rt[0][0]).get()));
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq)) {
+		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
+		return tau::get(tau::build_bf_eq_0((lt | n_rt[0][0]).get()));
+	}
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq)) {
+		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
+		return tau::get(tau::build_bf_neq_0((lt | n_rt[0][0]).get()));
+	}
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_or(lt.get(), rt.get()));
 	throw std::logic_error("nso_ba or: wrong types");
@@ -87,10 +95,14 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 		return tau::get(ba_constant_neg(lt[0]));
 	if (lt.is(tau::bf))
 		return tau::get(tau::build_bf_neg(lt.get()));
-	if (lt[0].is(tau::bf_eq))
-		return tau::get(tau::build_bf_eq((~lt[0][0]).get()));
-	if (lt[0].is(tau::bf_neq))
-		return tau::get(tau::build_bf_neq((~lt[0][0]).get()));
+	if (lt[0].is(tau::bf_eq)) {
+		tau n_lt = tau::get(norm_equation<node<BAs...>>(lt.get()));
+		return tau::get(tau::build_bf_eq_0((~n_lt[0][0]).get()));
+	}
+	if (lt[0].is(tau::bf_neq)) {
+		tau n_lt = tau::get(norm_equation<node<BAs...>>(lt.get()));
+		return tau::get(tau::build_bf_neq_0((~n_lt[0][0]).get()));
+	}
 	if (lt.is(tau::wff))
 		return tau::get(tau::build_wff_neg(lt.get()));
 	throw std::logic_error("nso_ba neg: wrong types");
@@ -120,10 +132,14 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 		return tau::get(ba_constant_xor(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_xor(lt.get(), rt.get()));
-	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
-		return tau::get(tau::build_bf_eq((lt ^ rt[0][0]).get()));
-	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq))
-		return tau::get(tau::build_bf_neq((lt ^ rt[0][0]).get()));
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq)) {
+		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
+		return tau::get(tau::build_bf_eq_0((lt ^ n_rt[0][0]).get()));
+	}
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq)) {
+		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
+		return tau::get(tau::build_bf_neq_0((lt ^ n_rt[0][0]).get()));
+	}
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_xor(lt.get(), rt.get()));
 	throw std::logic_error("nso_ba xor: wrong types");

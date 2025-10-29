@@ -25,11 +25,11 @@ TEST_SUITE("allowing unresolved rr's in normalization") {
 
 	TEST_CASE("ex x f[0](x) && x = 0.") {
 		const char* sample = "ex x f[0](x) && x = 0.";
-		CHECK( normalize_and_check(sample, "ex x f[0](x) && x = 0") );
+		CHECK( normalize_and_check(sample, "ex x x = 0 && f[0](x)") );
 	}
 
 	TEST_CASE("ex x f[0](x) && x != 0.") {
 		const char* sample = "ex x f[0](x) && x != 0.";
-		CHECK( normalize_and_check(sample, "ex x f[0](x) && x != 0") );
+		CHECK( normalize_and_check(sample, "ex x x != 0 && f[0](x)") );
 	}
 }

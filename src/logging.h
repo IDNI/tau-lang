@@ -89,6 +89,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"interpreter",
 	"normal_forms",
 	"assign_and_reduce",
+	"anti_prenex",
 	"normalizer",
 	"nso_rr",
 	"ref_types_inference",

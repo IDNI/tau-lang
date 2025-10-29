@@ -573,6 +573,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (isdigit(last_written_char)
 					|| t.child_is(tau::ba_constant))
 						out(" ");
+				last_quant_nt = nul;
 				break;
 			case bf_or:             out("|");
 						last_quant_nt = nul; break;
@@ -674,9 +675,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		// t.print_tree( << "leaving: ") << "\n";
 		switch (nt) {
 			case bf_neg:            out("'");
-				last_quant_nt = nul; break;
-			case main:
-			case rec_relation:      out("."); break;
+						last_quant_nt = nul; break;
+			case main: 
+			case rec_relation:
 			case constraint:
 			case offsets:
 			case subtype:

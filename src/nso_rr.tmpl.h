@@ -88,29 +88,49 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 				t[0].right_sibling() });
 		return n;
 	};
-	auto def_transformer = [](tref n) -> tref {
+	subtree_set<node> head_vars;
+	bool collecting = false;
+	auto def_transformer = [&](tref n) -> tref {
 		const auto& t = tau::get(n);
-		if (t.is(tau::ref_arg) && t[0][0].is(tau::variable))
+		if (t.is(tau::ref_arg) && t[0][0].is(tau::variable)) {
+			// If we collect head variables, save it
+			if (collecting) head_vars.insert(tau::trim(n));
 			return tau::get(tau::ref_arg, tau::get(tau::bf,
 					tau::get(node(tau::capture,
 							t[0][0][0].data()))));
-		if (t.is(tau::bf) && t[0].is(tau::variable))
+		}
+		if (t.is(tau::bf) && t[0].is(tau::variable)) {
+			// If we do not collect head variables, check if the
+			// current variable is contained in the head of the rule
+			if (!collecting && !head_vars.contains(n)) return n;
 			return tau::get(tau::bf,
 				tau::get(node(tau::capture,
 						t[0][0].data())));
+		}
 		return n;
+	};
+	// We need to skip IO stream variables
+	auto visit = [](tref n) {
+		if (is_io_var<node>(n)) return false;
+		return true;
 	};
 	auto transform = [&](const htref& h, bool def = false) {
 		tref n = pre_order<node>(h->get())
-				.apply_unique_until_change(transformer);
+				.apply_unique_until_change(transformer, visit);
 		if (def) n = pre_order<node>(n)
-				.apply_unique_until_change(def_transformer);
+				.apply_unique_until_change(def_transformer, visit);
 		if (n != h->get()) return tau::geth(n);
 		return h;
 	};
 	rr<node> ret(nso_rr);
-	for (auto& r : ret.rec_relations) r.first = transform(r.first, true),
-					  r.second = transform(r.second, true);
+	for (auto& r : ret.rec_relations) {
+		head_vars.clear();
+		collecting = true;
+		r .first = transform(r.first, true);
+		collecting = false;
+		// Only convert vars to capture that appear in the head of the definition
+		r.second = transform(r.second, true);
+	}
 	ret.main = transform(nso_rr.main);
 	LOG_TRACE << "-- transform_ref_args_to_captures result: " << LOG_RR_DUMP(ret);
 	return ret;

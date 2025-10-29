@@ -9,6 +9,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 
@@ -17,6 +18,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 
@@ -25,6 +27,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 
@@ -33,30 +36,31 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s));
 	}
-#ifndef DEBUG
 	TEST_CASE("Tau_splitter_5") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
-
 	TEST_CASE("Tau_splitter_6") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
-#endif
 	TEST_CASE("Tau_splitter_7") {
 		const char *sample = "(sometimes o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
 	TEST_CASE("Tau_splitter_8") {
@@ -64,6 +68,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
 
@@ -72,6 +77,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
 
@@ -80,11 +86,45 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
+	}
+	TEST_CASE("Tau_splitter_11") {
+		const char *sample = "xy = 0 && x != 0.";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
+		CHECK(is_splitter<bas_pack>(fm, s ));
+	}
+	TEST_CASE("Tau_splitter_12") {
+		const char *sample = "{ab|cd = 0} & y = 0 && {ab|cd = 0} & y < {ab|cd = 0}.";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
+		CHECK(is_splitter<bas_pack>(fm, s));
+	}
+	TEST_CASE("Tau_splitter_13") {
+		const char *sample = "{ab|cd = 0} & y != 0 && { ab|cd = 0 } : tau ({ ab|cd = 0 } : tau y)' != 0.";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
+		CHECK(is_splitter<bas_pack>(fm, s));
+	}
+	TEST_CASE("Tau_splitter_14") {
+		const char *sample = "x = 0 && y != 0 || z = 0 && k = 0.";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		// std::cout << "splitter: " << tau::get(s) << "\n";
+		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 }
 
-TEST_SUITE("Tau_splitter_middle_tests") {
+// For now we only support upper splitters
+/*TEST_SUITE("Tau_splitter_middle_tests") {
 	TEST_CASE("Tau_splitter_1") {
 		const char *sample = "xyz = 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
@@ -183,7 +223,7 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	}
 
 	//TODO: re-enable once performance allows it
-	/*TEST_CASE("Tau_splitter_5") {
+	TEST_CASE("Tau_splitter_5") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::lower);
 		CHECK(fm != nullptr);
@@ -197,7 +237,7 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
-	}*/
+	}#1#
 
 	TEST_CASE("Tau_splitter_7") {
 		const char *sample = "(sometimes o1[t] = 1).";
@@ -213,7 +253,7 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 		CHECK(s != nullptr);
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
-}
+}*/
 
 TEST_SUITE("Tau_splitter_coeff") {
 
@@ -223,7 +263,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		CHECK(tau::get(s).to_str() == "{ x3 y } : sbf (w{ x3 y } : sbf)' = 0" );
+		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 
 	TEST_CASE("Tau_splitter_coeff2") {
@@ -232,11 +272,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		auto s_str = tau::get(s).to_str();
-		bool check1 = s_str == "{ x | x' y } : sbf (w{ x | x' y } : sbf)' = 0";
-		bool check2 = s_str == "{ x y' | y } : sbf (w{ x y' | y } : sbf)' = 0";
-		bool check = check1 || check2;
-		CHECK(check);
+		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 
 	TEST_CASE("Tau_splitter_coeff3") {
@@ -245,8 +281,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper, true);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		auto s_str = tau::get(s).to_str();
-		CHECK(s_str == "f{ x } : sbf = 0 && g{ y } : sbf = 0 && f{ x' } : sbf = 0");
+		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 }
 

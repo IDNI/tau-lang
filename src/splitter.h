@@ -5,6 +5,7 @@
 
 #include "splitter_types.h"
 #include "satisfiability.h"
+#include "splitter_types.h"
 
 namespace idni::tau_lang {
 
@@ -12,10 +13,15 @@ enum class split_sym {
 	conjunction, disjunction
 };
 
+// template <typename... BAs>
+// requires BAsPack<BAs...>
+// tref split(tref fm, typename node<BAs...>::type fm_type, bool is_cnf,
+// 	const splitter_type st, trefs& mem, size_t i, bool check_temps);
+
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref split(tref fm, typename node<BAs...>::type fm_type, bool is_cnf,
-	const splitter_type st, trefs& mem, size_t i, bool check_temps);
+tref split_path(tref fm, const splitter_type st, bool check_temps,
+	const auto& callback);
 
 // If checking a temporal Tau formula F, we split a single DNF clause.
 // In order to check if the split clause yields a splitter for F, we have that
@@ -30,13 +36,14 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr);
 // Find a Boolean function which implies f
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref good_splitter_using_function(tref f, splitter_type st, tref original_fm);
+tref good_splitter_using_function(tref f, splitter_type st, tref clause,
+	tref fm_without_clause, tref original_fm, tref spec_clause);
 
 // Find a Boolean function which is implied by f
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref good_reverse_splitter_using_function(tref f, splitter_type st,
-							tref original_fm);
+	tref clause, tref fm_without_clause, tref original_fm, tref spec_clause);
 
 // Return a bad splitter for the provided formula
 // We assume the formula is fully normalized by normalizer
