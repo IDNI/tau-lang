@@ -242,6 +242,12 @@ else()
 	message(FATAL_ERROR "Boost not found")
 endif()
 
+# Add relative path of shared libraries to the executable's path (ld token $ORIGIN)
+set(CMAKE_BUILD_RPATH "${CMAKE_BUILD_RPATH}:\$ORIGIN")
+set(CMAKE_INSTALL_RPATH "\$ORIGIN")
+message(STATUS "CMAKE_BUILD_RPATH: ${CMAKE_BUILD_RPATH}")
+message(STATUS "CMAKE_INSTALL_RPATH: ${CMAKE_INSTALL_RPATH}")
+
 #
 # Generate C++ parser from TGF if requested
 #
