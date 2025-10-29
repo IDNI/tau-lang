@@ -29,9 +29,23 @@ esac
 
 BUILD_DIR="build-${SUFFIX}"
 
+# Extract TAU_SHARED_PREFIX from CLI arguments
+TAU_SHARED_PREFIX="${HOME}/.tau"
+for arg in "${@:2}"; do
+	if [[ $arg == -DTAU_SHARED_PREFIX=* ]]; then
+		TAU_SHARED_PREFIX="${arg#-DTAU_SHARED_PREFIX=}"
+		break
+	fi
+done
+
 git submodule status | while read -r LINE; do
 	GIT_SUBMOD=$(echo $LINE | awk '{print $2}')
 	if [[ $LINE == -* ]]; then
+		# Skip external/cvc5 if libcvc5.so already exists
+		if [[ $GIT_SUBMOD == "external/cvc5" && -f ${TAU_SHARED_PREFIX}/lib/libcvc5.so ]]; then
+			echo "Skipping submodule $GIT_SUBMOD - libcvc5.so already exists at ${TAU_SHARED_PREFIX}/lib/libcvc5.so"
+			continue
+		fi
 		echo "Initializing submodule $GIT_SUBMOD"
 		git submodule update --init --recursive $GIT_SUBMOD
 	else
