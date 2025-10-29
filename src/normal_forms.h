@@ -20,7 +20,8 @@ enum MemorySlotPre {
 	to_dnf_m,
 	to_cnf_m,
 	eliminate_quantifiers_m,
-	anti_prenex_step_m
+	anti_prenex_step_m,
+	synt_path_simp_m
 };
 
 /**

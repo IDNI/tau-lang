@@ -101,9 +101,16 @@ bool is_functional_quantifier(tref n) {
 	return tau::get(n).is(tau::bf_fall) || tau::get(n).is(tau::bf_fex);
 };
 
-// TODO: Add cache
 template <NodeType node>
 bool contains(tref fm, tref sub_fm) {
+#ifdef TAU_CACHE
+	using tau = tree<node>;
+	using cache_t = std::unordered_map<std::pair<tref, tref>, bool>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find(std::make_pair(tau::trim_right_sibling(fm),
+		tau::trim_right_sibling(sub_fm))); it != cache.end())
+		return it->second;
+#endif // TAU_CACHE
 	bool is_contained = false;
 	auto has_sub_fm = [&sub_fm, &is_contained](tref n) {
 		if (tree<node>::subtree_equals(n, sub_fm))
@@ -111,17 +118,30 @@ bool contains(tref fm, tref sub_fm) {
 		return true;
 	};
 	pre_order<node>(fm).search_unique(has_sub_fm);
+#ifdef TAU_CACHE
+	return cache.emplace(std::make_pair(tau::trim_right_sibling(fm),
+		tau::trim_right_sibling(sub_fm)), is_contained).first->second;
+#endif // TAU_CACHE
 	return is_contained;
 }
 
-// TODO: cache all intermediate
 template <NodeType node>
 int_t node_count (tref fm) {
+#ifdef TAU_CACHE
+	using tau = tree<node>;
+	using cache_t = std::unordered_map<tref, int_t>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find(tau::trim_right_sibling(fm)); it != cache.end())
+		return it->second;
+#endif // TAU_CACHE
 	int_t c = 0;
 	auto count = [&c](tref) {
 		return ++c, true;
 	};
 	pre_order<node>(fm).visit(count);
+#ifdef TAU_CACHE
+	return cache.emplace(tau::trim_right_sibling(fm), c).first->second;
+#endif // TAU_CACHE
 	return c;
 }
 
