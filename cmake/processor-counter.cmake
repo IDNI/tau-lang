@@ -1,0 +1,7 @@
+include(ProcessorCount)
+ProcessorCount(PROCESSOR_COUNT)
+if(PROCESSOR_COUNT EQUAL 0)
+	message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
+	set(PROCESSOR_COUNT 1)
+endif()
+message("${PROCESSOR_COUNT}")
