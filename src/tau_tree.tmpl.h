@@ -686,22 +686,22 @@ bool tree<node>::is_output_variable() const {
 
 template <NodeType node>
 bool tree<node>::equals_0() const {
-	return *this == tree<node>::get_0();
+	return is_child<node>(get(), tau::bf_f);
 }
 
 template <NodeType node>
 bool tree<node>::equals_1() const {
-	return *this == tree<node>::get_1();
+	return is_child<node>(get(), tau::bf_t);
 }
 
 template <NodeType node>
 bool tree<node>::equals_F() const {
-	return *this == tree<node>::get_F();
+	return is_child<node>(get(), tau::wff_f);
 }
 
 template <NodeType node>
 bool tree<node>::equals_T() const {
-	return *this == tree<node>::get_T();
+	return is_child<node>(get(), tau::wff_t);
 }
 
 template <NodeType node>
