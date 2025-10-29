@@ -3598,6 +3598,13 @@ template<NodeType node>
 tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	using tau = tree<node>;
 	DBG(assert(tau::get(var).is(tau::variable));)
+#ifdef TAU_CACHE
+	using cache_t = std::unordered_map<std::pair<tref, tref>, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find(std::make_pair(tau::trim_right_sibling(atomic_fm),
+		tau::trim_right_sibling(var))); it != end(cache))
+		return it->second;
+#endif // TAU_CACHE
 	// Return early if atomic_fm is either T or F
 	if (tau::get(atomic_fm).equals_T() || tau::get(atomic_fm).equals_F())
 		return atomic_fm;
@@ -3633,6 +3640,12 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 			res = rewriter::replace<node>(atomic_fm, var, _0<node>());
 	}
 	DBG(LOG_TRACE << "Syntactic_variable_simplification result: " << LOG_FM(res) << "\n";)
+#ifdef TAU_CACHE
+	cache.emplace(std::make_pair(tau::trim_right_sibling(res),
+		tau::trim_right_sibling(var)), res);
+	return cache.emplace(std::make_pair(tau::trim_right_sibling(atomic_fm),
+		tau::trim_right_sibling(var)), res).first->second;
+#endif // TAU_CACHE
 	return res;
 }
 
@@ -3846,7 +3859,6 @@ private:
 	}
 };
 
-//TODO: add caching
 /**
  * @brief Syntactic simplifications for a formula or a term based on its paths.
  * @tparam node Type of tree node
@@ -3916,7 +3928,8 @@ class syntactic_path_simplification {
 				return skip = nullptr, false;
 			return visit_wff<node>(n);
 		};
-		return pre_order<node>(root).apply_unique(down, visit);
+		return pre_order<node>(root).template
+			apply_unique<synt_path_simp_m>(down, visit);
 	}
 
 	static tref simplify_bf(tref root) {
@@ -3973,7 +3986,8 @@ class syntactic_path_simplification {
 				return skip = nullptr, false;
 			return is_boolean_operation<node>(n);
 		};
-		return pre_order<node>(root).apply_unique(down, visit);
+		return pre_order<node>(root).template
+			apply_unique<synt_path_simp_m>(down, visit);
 	}
 
 public:
@@ -5036,6 +5050,12 @@ template<NodeType node>
 tref term_boole_decomposition(tref term) {
 	using tau = tree<node>;
 	DBG(LOG_DEBUG << "Term_boole_decomposition on " << LOG_FM(term) << "\n";)
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find(term); it != cache.end())
+		return it->second;
+#endif // TAU_CACHE
 	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
 		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
 			<< tau::get(term) << "\n");
@@ -5044,14 +5064,24 @@ tref term_boole_decomposition(tref term) {
 	// Simple cases
 	if (tau::get(term).equals_0() || tau::get(term).equals_1())
 		return term;
-	term = push_negation_in<node, false>(term);
-	auto vars = get_free_vars_appearance_order<node>(term);
+	tref bd = push_negation_in<node, false>(term);
+	auto vars = get_free_vars_appearance_order<node>(bd);
 	// No free var, so no boole decomposition step
-	if (vars.empty()) return normalize_ba<node>(term);
+	if (vars.empty()) {
+#ifdef TAU_CACHE
+		cache.emplace(bd, bd);
+		return cache.emplace(term, bd).first->second;
+#endif // TAU_CACHE
+		return normalize_ba<node>(bd);
+	}
 	std::ranges::stable_sort(vars, variable_order_for_simplification<node>);
-	term = rec_term_boole_decomposition<node>(term, vars, 0);
+	bd = rec_term_boole_decomposition<node>(bd, vars, 0);
 	DBG(LOG_DEBUG << "Term_boole_decomposition result: " << LOG_FM(term) << "\n";)
-	return term;
+#ifdef TAU_CACHE
+	cache.emplace(bd, bd);
+	return cache.emplace(term, bd).first->second;
+#endif // TAU_CACHE
+	return bd;
 }
 
 // Note: Recursion depth is bound by the number of variables, which should
@@ -5104,21 +5134,27 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
  * This procedure converts the formula to Boole normal form. It also converts all
  * terms to Boole normal form.
  * @tparam node Tree node type
- * @param formula The formula to convert to Boole normal form
+ * @param bnf The formula to convert to Boole normal form
  * @return The resulting Boole normal form
  */
 template<NodeType node>
 tref boole_normal_form(tref formula) {
 	using tau = tree<node>;
 	DBG(LOG_DEBUG << "Boole_normal_form on " << LOG_FM(formula) << "\n";)
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find(formula); it != cache.end())
+		return it->second;
+#endif // TAU_CACHE
 	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
 		return formula;
 	// Step 1: Syntactically simplify formula
-	formula = syntactic_formula_simplification<node>(formula);
+	tref bnf = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	// Squeeze and absorb for additional simplifications during term normalization
 	// -> causes mayor blow ups
-	formula = squeeze_absorb<node>(formula);
+	bnf = squeeze_absorb<node>(bnf);
 	// Step 2: Traverse formula, simplify all encountered equations
 	auto simp_eqs = [](tref n) {
 		if (tau::get(n).child_is(tau::bf_eq)) {
@@ -5144,36 +5180,52 @@ tref boole_normal_form(tref formula) {
 		}
 		return n;
 	};
-	formula = pre_order<node>(formula).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(formula) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
-	formula = syntactic_formula_simplification<node>(formula);
+	bnf = syntactic_formula_simplification<node>(bnf);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	// Step 4: Convert formula to Boole normal form
 	// First get atomic formulas without !=
-	tref eq_formula = unequal_to_not_equal<node>(formula);
-	trefs atms = rewriter::select_top_until<node>(eq_formula,
+	tref eq_bnf = unequal_to_not_equal<node>(bnf);
+	trefs atms = rewriter::select_top_until<node>(eq_bnf,
 		is_child<node, tau::bf_eq>, is_quantifier<node>);
 	// No variables for Boole decomposition
-	if (atms.empty()) return formula;
+	if (atms.empty()) {
+#ifdef TAU_CACHE
+		cache.emplace(bnf, bnf);
+		return cache.emplace(formula, bnf).first->second;
+#endif // TAU_CACHE
+		return bnf;
+	}
 	// Sort the BDD variables
 	std::ranges::stable_sort(atms, atm_formula_order_for_simplification<node>);
 	// Apply Boole decomposition
-	eq_formula = rec_boole_decomposition<node>(eq_formula, atms, 0);
+	eq_bnf = rec_boole_decomposition<node>(eq_bnf, atms, 0);
 	// Convert !(=) to != again
-	eq_formula = not_equal_to_unequal<node>(eq_formula);
-	eq_formula = simplify_using_equality<node>::on(eq_formula);
+	eq_bnf = not_equal_to_unequal<node>(eq_bnf);
+	eq_bnf = simplify_using_equality<node>::on(eq_bnf);
 	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_formula) << "\n";)
-	return eq_formula;
+#ifdef TAU_CACHE
+	cache.emplace(eq_bnf, eq_bnf);
+	return cache.emplace(formula, eq_bnf).first->second;
+#endif // TAU_CACHE
+	return eq_bnf;
 }
 
 template<NodeType node>
 tref term_boole_normal_form(tref formula) {
 	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find(formula); it != cache.end())
+		return it->second;
+#endif // TAU_CACHE
 	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
 		return formula;
 	// Step 1: Syntactically simplify formula
-	formula = syntactic_formula_simplification<node>(formula);
+	tref tbnf = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	auto simp_eqs = [](tref n) {
 		if (tau::get(n).child_is(tau::bf_eq)) {
@@ -5199,12 +5251,16 @@ tref term_boole_normal_form(tref formula) {
 		}
 		return n;
 	};
-	formula = pre_order<node>(formula).apply_unique_until_change(simp_eqs, visit_wff<node>);
-	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(formula) << "\n";)
+	tbnf = pre_order<node>(tbnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(tbnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
-	formula = syntactic_formula_simplification<node>(formula);
-	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
-	return formula;
+	tbnf = syntactic_formula_simplification<node>(tbnf);
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(tbnf) << "\n";)
+#ifdef TAU_CACHE
+	cache.emplace(tbnf, tbnf);
+	return cache.emplace(formula, tbnf).first->second;
+#endif // TAU_CACHE
+	return tbnf;
 }
 
 /**
@@ -5408,7 +5464,6 @@ tref treat_ex_quantified_clause(tref ex_clause) {
 			tau::build_bf_eq_0(
 			tau::build_bf_and(f_0, f_1)));
 	}
-	// TODO: maybe unsqueeze? Only simp atomic formulas
 	return term_boole_normal_form<node>(new_fm);
 }
 
@@ -5460,21 +5515,33 @@ tref anti_prenex(tref formula) {
 		if (!is_child_quantifier<node>(n)) return n;
 		// Here child is quantifier
 		DBG(LOG_TRACE << "Inner_quant on " << LOG_FM(n) << "\n";)
-		n = syntactic_formula_simplification<node>(n);
-		n = squeeze_absorb<node>(n, tau::trim2(n));
+#ifdef TAU_CACHE
+		using cache_t = subtree_unordered_map<node, tref>;
+		static cache_t& cache = tree<node>::template create_cache<cache_t>();
+		if (auto it = cache.find(n); it != cache.end()) {
+			// Update the quantifier pattern after elimination
+			quant_pattern.insert_or_assign(tau::trim2(n), 0);
+			return it->second;
+		}
+#endif // TAU_CACHE
+		tref n_elim = syntactic_formula_simplification<node>(n);
+		n_elim = squeeze_absorb<node>(n_elim, tau::trim2(n_elim));
 		DBG(LOG_TRACE << "After squeeze_absorb_down " << LOG_FM(n) << "\n";)
 		tref res = nullptr;
-		if (is_child<node>(n, tau::wff_all)) {
-			tref n_neg = to_nnf<node>(tau::build_wff_neg(n));
+		if (is_child<node>(n_elim, tau::wff_all)) {
+			tref n_neg = to_nnf<node>(tau::build_wff_neg(n_elim));
 			res = pre_order<node>(n_neg).
 				apply_unique(anti_prenex_step, visit_wff<node>);
 			res = to_nnf<node>(tau::build_wff_neg(res));
 		} else {
-			res = pre_order<node>(n).
+			res = pre_order<node>(n_elim).
 				apply_unique(anti_prenex_step, visit_wff<node>);
 		}
 		// Update the quantifier pattern after elimination
-		quant_pattern.insert_or_assign(tau::trim2(n), 0);
+		quant_pattern.insert_or_assign(tau::trim2(n_elim), 0);
+#ifdef TAU_CACHE
+		return cache.emplace(n, res).first->second;
+#endif // TAU_CACHE
 		return res;
 	};
 	auto visit = [&quant_pattern, &qid](tref n) {
@@ -5487,8 +5554,7 @@ tref anti_prenex(tref formula) {
 	formula = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_TRACE << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	// Apply anti prenex procedure
-	formula = post_order<node>(formula).template
-		apply_unique<anti_prenex_m>(inner_quant, visit);
+	formula = post_order<node>(formula).apply_unique(inner_quant, visit);
 	DBG(LOG_TRACE << "Anti_prenex result: " << LOG_FM(formula) << "\n";)
 	formula = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "Anti_prenex result after syntactic simp: " << LOG_FM(formula) << "\n";)
