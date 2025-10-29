@@ -17,10 +17,11 @@ namespace idni::tau_lang {
 enum MemorySlotPre {
 	normalize_ba_m,
 	push_negation_in_m,
-	to_dnf2_m,
-	to_cnf2_m,
+	to_dnf_m,
+	to_cnf_m,
 	eliminate_quantifiers_m,
-	anti_prenex_step_m
+	anti_prenex_step_m,
+	synt_path_simp_m
 };
 
 /**
@@ -30,6 +31,12 @@ enum MemorySlotPre {
 enum MemorySlotPost {
 	anti_prenex_m
 };
+
+template <NodeType node>
+tref unequal_to_not_equal(tref fm);
+
+template <NodeType node>
+tref not_equal_to_unequal(tref fm);
 
 template <NodeType node>
 tref unsqueeze_wff(const tref& fm);
@@ -60,6 +67,24 @@ tref push_negation_in(tref);
 
 template <NodeType node>
 tref to_nnf(tref fm);
+
+template <NodeType node>
+tref norm_equation(tref eq);
+
+template <NodeType node>
+tref norm_trimmed_equation(tref eq);
+
+template <NodeType node>
+tref denorm_equation(tref eq);
+
+template <NodeType node>
+tref norm_all_equations(tref fm);
+
+template <NodeType node>
+tref apply_xor_def(tref fm);
+
+template <NodeType node>
+tref apply_all_xor_def(tref fm);
 
 // // -----------------------------------------------------------------------------
 // // General operator for tref function application by pipe
@@ -92,7 +117,7 @@ std::pair<typename tree<node>::traverser, tref> get_inner_quantified_wff(tref n)
 
 template <NodeType node>
 struct onf_wff {
-	onf_wff(tref _var);
+	explicit onf_wff(tref _var);
 	tref operator()(tref n) const;
 private:
 	tref onf_subformula(tref n) const;
@@ -105,19 +130,6 @@ using onf_wff_t = onf_wff<node>;
 template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& t, const onf_wff_t<node>& r);
-
-template <NodeType node>
-static const auto is_not_eq_or_neq_to_zero_predicate = [](tref n) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	const auto& t = tau::get(n);
-	if (!(t.child_is(tau::bf_eq) || t.child_is(tau::bf_neq))) return true;
-	auto check = (tt(t.only_child()) || tau::bf)[1] || tau::bf_f;
-	return check.empty();
-};
-
-template <NodeType node>
-using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<node>);
 
 template <NodeType node>
 tref onf(tref n, tref var);
@@ -188,9 +200,14 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 	const int_t p, const auto& is_var);
 
 // Declaration of functions used in assign_and_reduce which are implemented later
+// Assume that fm is in DNF (or CNF -> set is_cnf to true)
+// TODO: Normalize Tau constants in case type == bf
 template <NodeType node>
-tref reduce(tref fm, size_t type, bool is_cnf = false,
+tref reduce_depreciated(tref fm, size_t type, bool is_cnf = false,
 	bool all_reductions = true, bool enable_sort = true);
+
+template <NodeType node, bool is_cnf = false>
+tref reduce(tref fm);
 
 // Create assignment in formula and reduce resulting clause
 template <NodeType node>
@@ -200,7 +217,7 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 // Given a BF b, calculate the Boole normal form (DNF corresponding to the pathes to true in the BDD) of b
 // where the variable order is given by the function lex_var_comp
 template <NodeType node>
-tref bf_boole_normal_form(tref fm, bool make_paths_disjoint = false);
+tref bf_reduced_dnf(tref fm, bool make_paths_disjoint = false);
 
 // The needed class in order to make bf_to_reduce_dnf work with rule applying process
 template <NodeType node>
@@ -239,6 +256,11 @@ template <NodeType node>
 std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	tref fm, size_t type, bool is_cnf = false,
 	bool all_reductions = true, bool enable_sort = true);
+
+template <NodeType node>
+std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(
+	tref fm, bool is_cnf = false);
+
 template <NodeType node>
 tref group_dnf_expression(tref fm);
 
@@ -246,11 +268,7 @@ tref group_dnf_expression(tref fm);
 // General idea is to eliminate (xyz...)' | xyz... after factorization
 template <NodeType node>
 tref simp_general_excluded_middle(tref fm);
-// Assume that fm is in DNF (or CNF -> set is_cnf to true)
-// TODO: Normalize Tau constants in case type == bf
-template <NodeType node>
-tref reduce(tref fm, size_t type, bool is_cnf,
-	bool all_reductions, bool enable_sort);
+
 template <NodeType node>
 tref reduce_terms(tref fm, bool with_sorting = false);
 
@@ -271,11 +289,17 @@ template <NodeType node>
 bool is_ordered_subset(const auto& v1, const auto& v2);
 
 template <NodeType node>
+bool is_ordered_overlap_at_least(size_t i, const trefs& v1, const trefs& v2);
+
+template <NodeType node>
+int_t get_ordered_overlap(const trefs& v1, const trefs& v2);
+
+template <NodeType node>
 std::vector<std::vector<trefs>> get_cnf_inequality_lits(tref fm);
 
 template <NodeType node>
 std::pair<std::vector<int_t>, bool> simplify_path(
-	const std::vector<int_t>& path, const trefs& vars);
+	const std::vector<int_t>& path, trefs& vars);
 
 template <NodeType node>
 std::pair<tref, bool> group_paths_and_simplify(
@@ -386,7 +410,6 @@ template <NodeType node>
 tref push_universal_quantifier_one(tref fm);
 
 // Squeeze all equalities found in n
-//TODO: make it type depended
 template <NodeType node>
 tref squeeze_positives(tref n);
 
@@ -404,21 +427,57 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm);
 template <NodeType node>
 tref eliminate_quantifiers(tref fm);
 
-// fm is assumed to be quantifier free
-template <NodeType node>
-tref get_eq_with_most_quant_vars(tref fm, const auto& quant_vars);
-
-template <NodeType node>
-std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm);
-
-template <NodeType node>
-tref anti_prenex(const tref& fm);
-
 template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val);
 
 template <NodeType node>
 struct simplify_using_equality;
+
+template <NodeType node>
+class syntactic_path_simplification;
+
+template <NodeType node>
+tref syntactic_variable_simplification(tref atomic_fm, tref var);
+
+template <NodeType node>
+tref syntactic_formula_simplification(tref formula);
+
+template <NodeType node>
+tref syntactic_atomic_formula_simplification (tref atomic_formula);
+
+template <NodeType node>
+tref squeeze_absorb (tref formula);
+
+template <NodeType node>
+tref squeeze_absorb (tref formula, tref var);
+
+template <NodeType node>
+tref term_boole_decomposition(tref term, tref var);
+
+template <NodeType node>
+tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx);
+
+template <NodeType node>
+tref term_boole_decomposition(tref term);
+
+template <NodeType node>
+tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx);
+
+template <NodeType node>
+tref boole_normal_form(tref formula);
+
+template <NodeType node>
+tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
+	auto& quant_pattern);
+
+template <NodeType node>
+tref treat_ex_quantified_clause(tref ex_clause);
+
+template <NodeType node>
+tref anti_prenex(tref formula);
+
+template <NodeType node, bool normalize_scopes = true>
+tref normalize_temporal_quantifiers(tref fm);
 
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
 // We implicitly transformed into BDD form and compute one step of the SNF transformation.

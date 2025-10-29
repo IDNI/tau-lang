@@ -9,24 +9,37 @@ namespace idni::tau_lang {
 
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template <NodeType node>
-tref normalizer_step(tref form) {
+tref normalize(tref form) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-
-	tref result = tt(form)
-		// Push all quantifiers in and eliminate them
-		| tt::f(eliminate_quantifiers<node>)
-		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
-		// are reduced
-		| bf_reduce_canonical<node>()
-		// Normalize always and sometimes quantifiers and reduce Tau formula
-		| sometimes_always_normalization<node>()
-		| tt::ref;
+	// First resolve quantifiers in formulas below temporal quantifiers
+	auto st_aw = [](tref n) {
+		return is_child<node>(n, tau::wff_sometimes)
+			|| is_child<node>(n, tau::wff_always);
+	};
+	trefs temps = tau::get(form).select_top(st_aw);
+	// Case that the formula has no temporal quantifier
+	if (temps.empty()) form = anti_prenex<node>(form);
+	else {
+		subtree_map<node, tref> changes;
+		for (tref temp : temps) {
+			bool is_aw = is_child<node>(temp, tau::wff_always);
+			// Remove temporal quantifier
+			tref f = tau::trim2(temp);
+			f = anti_prenex<node>(f);
+			// Add quantifier again and save as change
+			if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
+			else changes.emplace(temp, tau::build_wff_sometimes(f));
+		}
+		form =  rewriter::replace(form, changes);
+	}
+	// Now normalize the temporal layer and convert the formulas below the temporal
+	// quantifiers to Boole normal form
+	tref result = normalize_temporal_quantifiers<node>(form);
 #ifdef TAU_CACHE
 	cache.emplace(form, result);
 #endif // TAU_CACHE
@@ -45,13 +58,10 @@ tref normalize_non_temp(tref fm) {
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	tref result = tt(fm)
-		// Push all quantifiers in and eliminate them
-		| tt::f(eliminate_quantifiers<node>)
-		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
-		// are reduced
-		| bf_reduce_canonical<node>()
+		// Push all quantifiers in, eliminate them and normalize result
+		| tt::f(anti_prenex<node>)
+		| tt::f(boole_normal_form<node>)
 		| tt::ref;
-	result = reduce_across_bfs<node>(result, false);
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
@@ -166,10 +176,8 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	DBG(assert(n != nullptr));
 
 	const auto& fm = tau::get(n);
-
-	DBG(assert(!fm.find_top(is<node, tau::wff_always>));
-		assert(!fm.find_top(is<node, tau::wff_sometimes>));)
-
+	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
+	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
@@ -237,31 +245,27 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 
-	trefs vars(get_free_vars<node>(tau::build_wff_and(n1, n2)));
-	for (tref v : vars) LOG_DEBUG << "var: " << LOG_FM(v);
-
 	tref imp1 = tau::build_wff_imply(n1, n2);
 	tref imp2 = tau::build_wff_imply(n2, n1);
-
+	const trefs& vars = get_free_vars<node>(tau::build_wff_and(n1, n2));
+	DBG(for (tref v : vars) LOG_DEBUG << "var: " << LOG_FM(v);)
 	for (tref v : vars) {
 		imp1 = tau::build_wff_all(v, imp1);
 		imp2 = tau::build_wff_all(v, imp2);
 	}
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
-	const auto& tdir1 = tau::get(normalizer_step<node>(imp1));
-	assert((tdir1.equals_T() || tdir1.equals_F()
-		|| tdir1.find_top(is<node, tau::constraint>)));
+	const tau& tdir1 = tau::get(normalize_non_temp<node>(imp1));
+	DBG(assert((tdir1.equals_T() || tdir1.equals_F()
+		|| tdir1.find_top(is<node, tau::constraint>)));)
 	if (tdir1.equals_F()) {
 		LOG_DEBUG << "End are_nso_equivalent: " << LOG_FM(tdir1.get());
 		return false;
 	}
-
-	const auto& tdir2 = tau::get(normalizer_step<node>(imp2));
-	assert((tdir2.equals_T() || tdir2.equals_F()
-		|| tdir2.find_top(is<node, tau::constraint>)));
-
-	bool res = tdir1.equals_T() && tdir2.equals_T();
+	const tau& tdir2 = tau::get(normalize_non_temp<node>(imp2));
+	DBG(assert((tdir2.equals_T() || tdir2.equals_F()
+		|| tdir2.find_top(is<node, tau::constraint>))));
+	const bool res = (tdir1.equals_T() && tdir2.equals_T());
 	LOG_DEBUG << "End are_nso_equivalent: " << res;
 	return res;
 }
@@ -294,18 +298,14 @@ bool is_nso_impl(tref n1, tref n2) {
 		return true;
 	}
 
-	trefs vars(get_free_vars<node>(n1));
-	const trefs& vars2 = get_free_vars<node>(n2);
-	vars.insert(vars.end(), vars2.begin(), vars2.end());
-
 	tref imp = tau::build_wff_imply(n1, n2);
+	const trefs& vars = get_free_vars<node>(imp);
 	for (tref v : vars) imp = tau::build_wff_all(v, imp);
 	LOG_DEBUG << "wff: " << LOG_FM(imp);
 
-	auto normalized = normalizer_step<node>(imp);
-	const auto& res = tau::get(normalized);
+	const tau& res = tau::get(normalize_non_temp<node>(imp));
 	DBG(assert((res.equals_T() || res.equals_F()
-		|| res.find_top(is<node, tau::constraint>))));
+		|| res.find_top(is<node, tau::constraint>)));)
 	LOG_DEBUG << "End is_nso_impl: " << res.get();
 	return res.equals_T();
 }
@@ -328,15 +328,12 @@ bool are_bf_equal(tref n1, tref n2) {
 		return true;
 	}
 
-	trefs vars(get_free_vars<node>(n1));
-	const trefs& vars2 = get_free_vars<node>(n2);
-	vars.insert(vars.end(), vars2.begin(), vars2.end());
-
-	tref bf_equal_fm = tau::build_bf_eq(tau::build_bf_xor(n1, n2));
+	tref bf_equal_fm = tau::build_bf_eq_0(tau::build_bf_xor(n1, n2));
+	const trefs& vars = get_free_vars<node>(bf_equal_fm);
 	for (tref v : vars) bf_equal_fm = tau::build_wff_all(v, bf_equal_fm);
 	LOG_TRACE << "wff: " << LOG_FM(bf_equal_fm);
 
-	tref normalized = normalizer_step<node>(bf_equal_fm);
+	tref normalized = normalize_non_temp<node>(bf_equal_fm);
 	LOG_TRACE << "Normalized: " << LOG_FM(normalized);
 
 	auto check = tt(normalized) | tau::wff_t;
@@ -374,7 +371,7 @@ tref normalize_with_temp_simp(tref fm) {
 			|| t.child_is(tau::wff_always)) return t[0].first();
 		return n;
 	};
-	fm = normalizer_step<node>(fm);
+	fm = normalize<node>(fm);
 	// Apply present function/predicate definitions
 	bool changed;
 	do {
@@ -383,31 +380,30 @@ tref normalize_with_temp_simp(tref fm) {
 		if (tau::get(fm).find_top(is<node, tau::ref>)) {
 			tref resolved_red_fm = apply_defs_to_spec<node>(fm);
 			if (tau::get(resolved_red_fm) != tau::get(fm)) {
-				fm = normalizer_step<node>(resolved_red_fm);
+				fm = normalize<node>(resolved_red_fm);
 				changed = true;
 			}
 		}
 	} while (changed);
 
-	const tau& red_fm = tau::get(fm);
-	LOG_TRACE << "red_fm: " << LOG_FM(red_fm.get());
-	if (red_fm.equals_T() || red_fm.equals_F())
-		return red_fm.get();
-	trefs clauses = get_dnf_wff_clauses<node>(red_fm.get());
+	DBG(LOG_TRACE << "fm: " << LOG_FM(fm) << "\n";)
+	if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
+		return fm;
+	// If after normalization no temporal quantifier is present, the formula
+	// is non-temporal
+	if (!tau::get(fm).find_top(is_temporal_quantifier<node>))
+		return fm;
 	tref nn = tau::_F();
-	for (tref clause : clauses) {
-		LOG_TRACE << "    clause: " << LOG_FM(clause);
+	// The temporal layer of a formula is in DNF
+	for (tref clause : expression_paths<node>(fm)) {
+		DBG(LOG_TRACE << "    clause: " << LOG_FM(clause);)
 		const auto& t = tau::get(clause);
 		trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
 		trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
-		if (aw_parts.size() == 1 && st_parts.empty()) {
+		if ((aw_parts.size() == 1 && st_parts.empty()) ||
+			(aw_parts.empty() && st_parts.size() == 1)) {
 			nn = tau::build_wff_or(nn, clause);
-			LOG_TRACE << "    nn: " << LOG_FM(nn);
-			continue;
-		}
-		if (aw_parts.empty() && st_parts.size() == 1) {
-			nn = tau::build_wff_or(nn, clause);
-			LOG_TRACE << "    nn: " << LOG_FM(nn);
+			DBG(LOG_TRACE << "    nn: " << LOG_FM(nn);)
 			continue;
 		}
 
@@ -416,7 +412,7 @@ tref normalize_with_temp_simp(tref fm) {
 		for (tref aw : aw_parts) changes.emplace(aw, tau::_T());
 		for (tref st : st_parts) changes.emplace(st, tau::_T());
 		tref new_clause = rewriter::replace<node>(clause, changes);
-		LOG_TRACE << "    new clause: " << LOG_FM(nn);
+		DBG(LOG_TRACE << "    new clause: " << LOG_FM(nn);)
 
 		// First check if any always statements are implied by others
 		for (size_t i = 0; i < aw_parts.size(); ++i) {
@@ -434,8 +430,10 @@ tref normalize_with_temp_simp(tref fm) {
 			tref f = tau::build_wff_and(trim_q(aw), trim_q(st));
 			if (is_non_temp_nso_unsat<node>(f)) clause_false = true;
 		}
-		if (clause_false) LOG_TRACE << "    clause false";
-		if (clause_false) continue;
+		if (clause_false) {
+			DBG(LOG_TRACE << "    clause false";)
+			continue;
+		}
 
 		// Next check if any always statement implies a sometimes statement
 		for (tref aw : aw_parts) for (tref& st : st_parts)
@@ -456,10 +454,10 @@ tref normalize_with_temp_simp(tref fm) {
 					tau::build_wff_and(aw_parts),
 					tau::build_wff_and(st_parts)));
 		nn = tau::build_wff_or(nn, new_clause);
-		LOG_TRACE << "    nn: " << LOG_FM(nn);
+		DBG(LOG_TRACE << "    nn: " << LOG_FM(nn);)
 	}
 	DBG(assert(nn != nullptr);)
-	LOG_TRACE << "normalize_with_temp_simp result: " << LOG_FM(nn);
+	DBG(LOG_TRACE << "normalize_with_temp_simp result: " << LOG_FM(nn);)
 	return nn;
 }
 
@@ -510,7 +508,7 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 	using tau = tree<node>;
 	LOG_DEBUG << "Begin Boolean function normalizer";
 
-	tref result = bf_boole_normal_form<node>(bf);
+	tref result = bf_reduced_dnf<node>(bf);
 	// Apply present function/predicate definitions
 	bool changed;
 	do {
@@ -744,8 +742,8 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 		LOG_DEBUG << "current: " << LOG_FM(current);
 
 		LOG_DEBUG << "Normalize step";
-		current = nt == tau::wff ? normalizer_step<node>(current)
-					 : bf_boole_normal_form<node>(current);
+		current = nt == tau::wff ? normalize<node>(current)
+					 : bf_reduced_dnf<node>(current);
 		LOG_DEBUG << "Normalized step";
 		LOG_DEBUG << "current: " << LOG_FM(current);
 
@@ -890,7 +888,7 @@ tref normalizer(const rr<node>& nso_rr) {
 	LOG_DEBUG << "Begin normalizer";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 
-	auto fm = apply_rr_to_formula<node>(nso_rr);
+	tref fm = apply_rr_to_formula<node>(nso_rr);
 	if (!fm) return nullptr;
 	tref res = normalize_with_temp_simp<node>(fm);
 
@@ -900,8 +898,8 @@ tref normalizer(const rr<node>& nso_rr) {
 }
 
 template <NodeType node>
-tref normalizer(tref form) {
-	return normalize_with_temp_simp<node>(form);
+tref normalizer(tref fm) {
+	return normalize_with_temp_simp<node>(fm);
 }
 
 } // namespace idni::tau_lang

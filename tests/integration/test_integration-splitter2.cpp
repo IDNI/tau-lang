@@ -11,13 +11,12 @@ TEST_SUITE("configuration") {
 }
 
 TEST_SUITE("Tau_splitter_tau_coeff") {
-
 	TEST_CASE("Tau_splitter_tau_coeff1") {
 		const char *sample = "{o1[t]o2[t] = 0.} v != 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
-		CHECK(tau::get(s).to_str() == "{ o1[t]o2[t] = 0 } : tau ({ o1[t]o2[t] = 0 } : tau v)' = 0");
+		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 
 	TEST_CASE("Tau_splitter_tau_coeff2") {
@@ -26,6 +25,6 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		auto s_str = tau::get(s).to_str();
-		CHECK(s_str == "{ o1[t]|o2[t] = 0 } : tau v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0) } : tau = 0");
+		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 }

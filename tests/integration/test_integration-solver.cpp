@@ -292,6 +292,8 @@ TEST_SUITE("find_solution") {
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
 		tref equation = get_nso_rr<node_t>(tau::get(src)).value().main->get();
+		equation = norm_all_equations<node_t>(equation);
+		equation = apply_all_xor_def<node_t>(equation);
 		auto solution = find_solution<node_t>(equation);
 		return ( check_solution<node_t>(equation, solution.value()));
 	}

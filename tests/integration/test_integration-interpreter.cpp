@@ -160,10 +160,10 @@ TEST_SUITE("Execution") {
 			"o2[t] = 0", "F", "o3[t] = 0", "F"
 		};
 		std::vector<std::string> o1 = {
-			"always i1[t]o1[t]u[t]' = 0 && o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]this[t]'u[t]' = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0",
-			"always i1[t]o1[t]u[t]' = 0 && o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]this[t]'u[t]' = 0 && o2[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0",
-			"always i1[t]o1[t]u[t]' = 0 && o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]this[t]'u[t]' = 0 && o2[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0",
-			"always i1[t]o1[t]u[t]' = 0 && o1[t]this[t]' = 0 && o1[t]'this[t] = 0 && i1[t]this[t]'u[t]' = 0 && o2[t] = 0 && o3[t] = 0 && i1[t]'o1[t]u[t] = 0 && i1[t]'this[t]'u[t] = 0"
+			"always u[t] = i1[t] && this[t] = o1[t]",
+			"always u[t] = i1[t] && this[t] = o1[t] && o2[t] = 0",
+			"always u[t] = i1[t] && this[t] = o1[t] && o2[t] = 0",
+			"always u[t] = i1[t] && this[t] = o1[t] && o2[t] = 0 && o3[t] = 0"
 		};
 		std::vector<assignment<node_t>> assgn_in;
 		assignment<node_t> assgn_out;

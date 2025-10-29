@@ -237,9 +237,9 @@ tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::bf:  return reduce<node>(to_dnf<node, false>(
+		case tau::bf:  return reduce_depreciated<node>(to_dnf<node, false>(
 					applied), tau::bf);
-		case tau::wff: return reduce<node>(to_dnf<node>(
+		case tau::wff: return reduce_depreciated<node>(to_dnf<node>(
 					applied), tau::wff);
 		default: return invalid_argument();
 		}
@@ -254,9 +254,9 @@ tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::wff: return reduce<node>(to_cnf<node>(
+		case tau::wff: return reduce_depreciated<node>(to_cnf<node>(
 					applied), tau::wff, true);
-		case tau::bf:  return reduce<node>(to_cnf<node, false>(
+		case tau::bf:  return reduce_depreciated<node>(to_cnf<node, false>(
 					applied), tau::bf, true);
 		default: return invalid_argument();
 		}
@@ -288,9 +288,10 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::wff: return to_mnf<node>(reduce_across_bfs<node>(
-					applied, false));
-		case tau::bf:  return bf_boole_normal_form<node>(applied);
+		case tau::wff: return unequal_to_not_equal<node>(
+			reduce_across_bfs<node>(apply_all_xor_def<node>(
+				norm_all_equations<node>(applied)), false));
+		case tau::bf:  return bf_reduced_dnf<node>(applied);
 		default: return invalid_argument();
 		}
 	}
@@ -435,6 +436,8 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	tref arg = n[1].get();
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
+		applied = norm_all_equations<node>(applied);
+		applied = apply_all_xor_def<node>(applied);
 		applied = eliminate_quantifiers<node>(applied);
 		return reduce_across_bfs<node>(applied, false);
 	}
@@ -516,7 +519,7 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 		DBG(LOG_TRACE << LOG_FM_TREE(value));
 		if (auto check = tt(value) | tau::bf_t; check)
 			print_one_case(var);
-		else if (auto check = tt(value) | tau::bf_f; check)
+		else if (check = tt(value) | tau::bf_f; check)
 			print_zero_case(var);
 		else
 			print_general_case(var, value);
@@ -566,6 +569,8 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
+	applied = norm_all_equations<node>(applied);
+	applied = apply_all_xor_def<node>(applied);
 	tref equality = tt(applied) | tau::bf_eq | tt::ref;
 	if (!applied || !equality) {
 		TAU_LOG_ERROR << "Invalid argument(s)\n";

@@ -201,7 +201,7 @@ message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 #
 # Add cvc5 as an external project
 #
-if (NOT EXISTS "${TAU_SHARED_PREFIX}/lib/libcvc5.so")
+if (NOT EXISTS "${TAU_SHARED_PREFIX}/lib64/libcvc5.so")
 	message(STATUS "cvc5 not found in ${TAU_SHARED_PREFIX}, building from source...")
 	ExternalProject_Add(cvc5_external_project
 		SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
@@ -217,7 +217,7 @@ endif()
 
 set(CVC5_FOUND TRUE)
 set(CVC5_INCLUDE_DIR "${TAU_SHARED_PREFIX}/include/")
-set(CVC5_LIBRARIES "${TAU_SHARED_PREFIX}/lib/libcvc5.so")
+set(CVC5_LIBRARIES "${TAU_SHARED_PREFIX}/lib64/libcvc5.so")
 
 add_library(cvc5 STATIC IMPORTED GLOBAL)
 set_target_properties(
@@ -250,8 +250,8 @@ else()
 endif()
 
 # Add relative path of shared libraries to the executable's path (ld token $ORIGIN)
-set(CMAKE_BUILD_RPATH "${CMAKE_BUILD_RPATH}:\$ORIGIN:${TAU_SHARED_PREFIX}/lib")
-set(CMAKE_INSTALL_RPATH "\$ORIGIN:${TAU_SHARED_PREFIX}/lib")
+set(CMAKE_BUILD_RPATH "${CMAKE_BUILD_RPATH}:\$ORIGIN:${TAU_SHARED_PREFIX}/lib64")
+set(CMAKE_INSTALL_RPATH "\$ORIGIN:${TAU_SHARED_PREFIX}/lib64")
 message(STATUS "CMAKE_BUILD_RPATH: ${CMAKE_BUILD_RPATH}")
 message(STATUS "CMAKE_INSTALL_RPATH: ${CMAKE_INSTALL_RPATH}")
 

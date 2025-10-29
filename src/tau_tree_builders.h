@@ -79,9 +79,6 @@ template <NodeType node>
 tref build_wff_or(const auto& wffs);
 
 template <NodeType node>
-tref build_wff_xor_from_def(tref l, tref r);
-
-template <NodeType node>
 tref build_wff_xor(tref l, tref r);
 
 template <NodeType node>
@@ -124,10 +121,13 @@ template <NodeType node>
 tref build_bf_eq(tref l, tref r);
 
 template <NodeType node>
-tref build_bf_eq(tref l);
+tref build_bf_eq_0(tref l);
 
 template <NodeType node>
-tref build_bf_neq(tref l);
+tref build_bf_neq(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_neq_0(tref l);
 
 template <NodeType node>
 tref build_bf_lteq(tref l, tref r);
@@ -175,9 +175,6 @@ template <NodeType node>
 tref build_bf_or(const auto& bfs);
 
 template <NodeType node>
-tref build_bf_xor_from_def(tref l, tref r);
-
-template <NodeType node>
 tref build_bf_xor(tref l, tref r);
 
 template <NodeType node>
@@ -187,7 +184,7 @@ template <NodeType node>
 tref build_bf_and(const auto& bfs);
 
 template <NodeType node>
-tref build_bf_neg(tref n);
+tref build_bf_neg(tref l);
 
 template <NodeType node>
 tref build_bf_shl(tref l, tref r);

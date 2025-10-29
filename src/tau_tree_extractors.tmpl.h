@@ -269,6 +269,236 @@ trefs get_cnf_bf_clauses(tref n) {
 	return get_leaves<node>(n, tau::bf_and);
 }
 
+template<NodeType node>
+tref expression_paths<node>::iterator::operator*() {
+	if (!_expr) return nullptr;
+	size_t idx = 0;
+	const bool term = tau::get(_expr).is_term();
+	auto f = [&idx, &term, this](tref n) {
+		bool check = true;
+		// In order to catch chained bf_or we need to loop
+		while (check) {
+			if (term) {
+				if (!tau::get(n).is(tau::bf)) return n;
+				const tau& t = tau::get(n)[0];
+				check = t.is(tau::bf_or) || t.is(tau::bf_xor);
+			} else {
+				if (!tau::get(n).is(tau::wff)) return n;
+				check = tau::get(n)[0].is(tau::wff_or);
+			}
+			if (check) {
+				if (idx == decisions.size()) {
+					// Encounter fork for the first time
+					// Go left with save
+					decisions.push_back(true);
+					++idx;
+					n = tau::get(n)[0].first();
+				} else if (decisions[idx++]) {
+					// Go left
+					n = tau::get(n)[0].first();
+				} else {
+					// Go right
+					n = tau::get(n)[0].second();
+				}
+			}
+		}
+		return n;
+	};
+	auto visit = [](tref n) {
+		if (is_temporal_quantifier<node>(n)) return false;
+		else return visit_wff<node>(n);
+	};
+	tref res = nullptr;
+	if (term) res = pre_order<node>(_expr).apply(f);
+	else res = pre_order<node>(_expr).apply(f, visit, identity);
+	// Remove dangling decisions
+	while (idx < decisions.size()) decisions.pop_back();
+	return res;
+}
+
+template<NodeType node>
+expression_paths<node>::iterator& expression_paths<node>::iterator::operator++() {
+	if (keep_path) {
+		keep_path = false;
+		return *this;
+	}
+	while (!decisions.empty() && !decisions.back())
+		decisions.pop_back();
+	if (!decisions.empty())
+		decisions.back() = false;
+	else _expr = nullptr; // We have reached the end
+	return *this;
+}
+
+template<NodeType node>
+tref expression_paths<node>::iterator::apply(const auto& f) {
+	if (!_expr) return nullptr;
+	tref path = operator*();
+	tref res = f(path);
+	// std::cout << "Apply f on " << tau::get(path) << " yields " << tau::get(res) << "\n";
+	// If no change occurs
+	if (tau::subtree_equals(res, path)) return nullptr;
+	const bool term = tau::get(_expr).is_term();
+	// Now decisions holds the number of current wff_or occurrences on path
+	if (decisions.empty()) {
+		// Empty decisions means there is just a single path
+		_prev_expr = _expr;
+		_expr = term ? tau::_0() : tau::_F();
+		return res;
+	}
+	size_t idx = 0;
+	bool removed = false;
+	subtree_unordered_set<node> excluded;
+	auto remove = [&](tref n) {
+		if (removed) return n;
+		bool check;
+		if (term) {
+			if (!tau::get(n).is(tau::bf)) return n;
+			const tau& t = tau::get(n)[0];
+			check = t.is(tau::bf_or) || t.is(tau::bf_xor);
+		} else {
+			if (!tau::get(n).is(tau::wff)) return n;
+			check = tau::get(n)[0].is(tau::wff_or);
+		}
+		if (check) {
+			DBG(assert(idx < decisions.size());)
+			if (idx == decisions.size() - 1) {
+				// In order to delete the current path
+				// we simply exclude it
+				removed = true;
+				if (decisions.back()) {
+					keep_path = true;
+					return tau::get(n)[0].second();
+				}
+				else return tau::get(n)[0].first();
+			}
+			else if (decisions[idx++]) {
+				// Go left
+				excluded.insert(tau::get(n)[0].second());
+			} else {
+				// Go right
+				excluded.insert(tau::get(n)[0].first());
+			}
+		}
+		return n;
+	};
+	auto visit = [&excluded, &term](tref n) {
+		if (!term && is_temporal_quantifier<node>(n)) return false;
+		if (excluded.contains(n)) return false;
+		else if (!term) return visit_wff<node>(n);
+		else return true;
+	};
+	// Remove path from _expr and return res
+	_prev_expr = _expr;
+	_expr = pre_order<node>(_expr).apply(remove, visit, identity);
+	return res;
+}
+
+template<NodeType node>
+void expression_paths<node>::iterator::undo_apply() {
+	keep_path = false;
+	_expr = _prev_expr;
+}
+
+template<NodeType node>
+bool expression_paths<node>::iterator::operator==(const iterator& other) const {
+	if (tau::subtree_equals(_expr, other._expr)) {
+		if (decisions.size() <= other.decisions.size()) {
+			for (size_t i = 0; i < decisions.size(); ++i)
+				if (decisions[i] != other.decisions[i])
+					return false;
+			for (size_t i = decisions.size();
+			     i < other.decisions.size(); ++i)
+				if (!other.decisions[i]) return false;
+			return true;
+		} else {
+			for (size_t i = 0; i < other.decisions.size(); ++i)
+				if (decisions[i] != other.decisions[i])
+					return false;
+			for (size_t i = other.decisions.size();
+			     i < decisions.size(); ++i)
+				if (!decisions[i]) return false;
+			return true;
+		}
+	} else return false;
+}
+
+template<NodeType node>
+bool expression_paths<node>::iterator::operator!=(const iterator& other) const {
+	return !(*this == other);
+}
+
+template<NodeType node>
+expression_paths<node>::iterator expression_paths<node>::begin() const {
+	return iterator(_expr);
+}
+
+template<NodeType node>
+expression_paths<node>::iterator expression_paths<node>::end() const {
+	return iterator(nullptr);
+}
+
+template<NodeType node>
+tref expression_paths<node>::apply(const auto& path_transform) {
+	iterator it = iterator(_expr);
+	trefs changes;
+	tref res;
+	while (it != end()) {
+		if (tref c = it.apply(path_transform)) {
+			changes.push_back(c);
+		}
+		res = it.get_expr();
+		++it;
+	}
+	if (tau::get(_expr).is_term()) {
+		return tau::build_bf_or(res, tau::build_bf_or(changes));
+	} else return tau::build_wff_or(res, tau::build_wff_or(changes));
+}
+
+template<NodeType node>
+tref expression_paths<node>::apply(const auto& path_transform, const auto& callback) {
+	auto build_or = [*this](tref l, tref r) {
+		if (tau::get(_expr).is_term())
+			return tau::build_bf_or(l, r);
+		else return tau::build_wff_or(l, r);
+	};
+	iterator it = iterator(_expr);
+	tref change = tau::get(_expr).is_term() ? tau::_0() : tau::_F();
+	tref res = nullptr;
+	while (callback(res) && it != end()) {
+		if (tref c = it.apply(path_transform))
+			change = build_or(change, c);
+		res = build_or(it.get_expr(), change);
+		++it;
+
+	}
+	return res;
+}
+
+template<NodeType node>
+tref expression_paths<node>::apply_only_if(const auto& path_transform,
+	const auto& callback) {
+	auto build_or = [*this](tref l, tref r) {
+		if (tau::get(_expr).is_term())
+			return tau::build_bf_or(l, r);
+		else return tau::build_wff_or(l, r);
+	};
+	iterator it = iterator(_expr);
+	tref res = nullptr;
+	while (it != end()) {
+		if (tref c = it.apply(path_transform)) {
+			res = build_or(it.get_expr(), c);
+			if (callback(res)) break;
+			else it.undo_apply();
+			res = it.get_expr();
+		}
+		++it;
+
+	}
+	DBG(LOG_TRACE << "apply_only_if res: " << tau::get(res) << "\n";)
+	return res;
+}
+
 // -----------------------------------------------------------------------------
 
 template <NodeType node>
@@ -455,14 +685,42 @@ const trefs& get_free_vars(tref n) {
 	return free_vars_pool[id];
 }
 
+template <NodeType node>
+trefs get_free_vars_appearance_order(tref expression) {
+	using tau = tree<node>;
+	std::multiset<tref, subtree_less<node>> scoped;
+	trefs free_vars;
+	auto f = [&scoped, &free_vars](tref n) {
+		// If encounter of non-scoped and new variable, add to free_vars
+		if (tau::get(n).is(tau::variable)) {
+			if (!scoped.contains(n) && !subtree_vec_contains<node>(free_vars, n))
+				free_vars.push_back(n);
+			return false;
+		} else if (tau::get(n).is(tau::bf_ref)) return false;
+		// If encounter of quantifier, add quantified variable to scoped
+		if (is_quantifier<node>(n) || is_functional_quantifier<node>(n)) {
+			scoped.insert(tau::trim(n));
+		}
+		return true;
+	};
+	auto up = [&scoped](tref n) {
+		// If quantifier is encountered, remove quantified variable from scoped
+		if (is_quantifier<node>(n) || is_functional_quantifier<node>(n)) {
+			scoped.erase(tau::trim(n));
+		}
+	};
+	pre_order<node>(expression).visit_unique(f, all, up);
+	return free_vars;
+}
+
 // A formula has a temporal variable if either it contains an io_var with a variable or capture
 // or it contains a flag
 template <NodeType node>
 bool has_temp_var(tref fm) {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
-	trefs io_vars = t.select_top(is<node, tau::io_var>);
-	if (io_vars.empty())
+	tref io_vars = t.find_top(is<node, tau::io_var>);
+	if (io_vars == nullptr)
 		return t.find_top(is<node, tau::constraint>) != nullptr;
 	// any input/output stream is a temporal variable, also constant positions
 	else return true;

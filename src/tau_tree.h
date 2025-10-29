@@ -495,7 +495,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_wff_equiv(tref l, tref r);
 	static tref build_wff_or(tref l, tref r);
 	static tref build_wff_or(const auto& wffs);
-	static tref build_wff_xor_from_def(tref l, tref r);
 	static tref build_wff_xor(tref l, tref r);
 	static tref build_wff_and(tref l, tref r);
 	static tref build_wff_and(const auto& wffs);
@@ -512,8 +511,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	// wff relational operators of terms
 	static tref build_bf_interval(tref x, tref y, tref z);
 	static tref build_bf_eq(tref l, tref r);
-	static tref build_bf_eq(tref l);
-	static tref build_bf_neq(tref l);
+	static tref build_bf_eq_0(tref l);
+	static tref build_bf_neq(tref l, tref r);
+	static tref build_bf_neq_0(tref l);
 	static tref build_bf_lteq(tref l, tref r);
 	static tref build_bf_nlteq(tref l, tref r);
 	static tref build_bf_nlteq_lower(tref l, tref r);
@@ -530,11 +530,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_fex(tref l, tref r);
 	static tref build_bf_or(tref l, tref r);
 	static tref build_bf_or(const auto& bfs);
-	static tref build_bf_xor_from_def(tref l, tref r);
 	static tref build_bf_xor(tref l, tref r);
 	static tref build_bf_and(tref l, tref r);
 	static tref build_bf_and(const auto& bfs);
-	static tref build_bf_neg(tref n);
+	static tref build_bf_neg(tref l);
 	static tref build_bf_shl(tref l, tref r);
 	static tref build_bf_shr(tref l, tref r);
 	static tref build_bf_add(tref l, tref r);
@@ -686,6 +685,9 @@ inline std::function<bool(tref)> is_var_or_capture();
 
 template <NodeType node>
 bool is_quantifier(tref n);
+
+template <NodeType node>
+bool is_functional_quantifier(tref n);
 
 template <NodeType node>
 bool contains(tref fm, tref sub_fm);

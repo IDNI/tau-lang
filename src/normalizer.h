@@ -18,7 +18,7 @@ namespace idni::tau_lang {
 using offset_t = std::pair<tau_parser::nonterminal, size_t>;
 
 template <NodeType node>
-tref normalizer_step(tref form);
+tref normalize(tref form);
 
 template <NodeType node>
 tref normalize_non_temp(tref fm);
@@ -91,13 +91,13 @@ tref calculate_fixed_point(const rr<node>& nso_rr, tref form, typename node::typ
 	size_t offset_arity, tref fallback);
 
 template <NodeType node>
-tref calculate_all_fixed_points(const rr<node>& recrel);
+tref calculate_all_fixed_points(const rr<node>& nso_rr);
 
 template <NodeType node>
 tref apply_rr_to_formula(const rr<node>& nso_rr);
 
 template <NodeType node>
-tref normalizer(const rr<node>& fm);
+tref normalizer(const rr<node>& nso_rr);
 
 template <NodeType node>
 tref normalizer(tref fm);

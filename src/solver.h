@@ -177,6 +177,13 @@ template <NodeType node>
 std::optional<solution<node>> solve(const equations<node>& eqs,
 					const solver_options& options);
 
+template <NodeType node>
+bool check_var_assignment(auto& var_assignments, tref var, tref term);
+
+template <NodeType node>
+void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments,
+tref var, tref term);
+
 /**
  * @brief Solves the given tau form.
  *

@@ -396,6 +396,7 @@ std::optional<interpreter<node, in_t, out_t>>
 						const auto& ctx)
 {
 	// Find a satisfiable unbound continuation from spec
+	spec = normalizer<node>(spec);
 	auto [ubd_ctn, clause] = get_executable_spec(spec);
 	if (ubd_ctn == nullptr) {
 		LOG_ERROR << "Tau specification is unsat\n";
@@ -454,6 +455,7 @@ std::pair<std::optional<assignment<node>>, bool>
 			tref updated = update_to_time_point(equations, formula_time_point);
 			tref current = rewriter::replace<node>(updated, memory);
 			// Simplify after updating stream variables
+			// TODO: Maybe replace by syntactic simp?
 			current = normalize_non_temp<node>(current);
 
 #ifdef DEBUG
@@ -729,7 +731,7 @@ std::vector<system> interpreter<node, in_t, out_t>::compute_systems(tref ubd_ctn
 {
 	std::vector<system> systems;
 	// Create blue-print for solver for each clause
-	for (tref clause : get_dnf_wff_clauses<node>(ubd_ctn)) {
+	for (tref clause : expression_paths<node>(ubd_ctn)) {
 		if (auto system = compute_atomic_fm_types(clause); system)
 			systems.emplace_back(std::move(system.value()));
 		else {
@@ -769,9 +771,9 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 
 template <NodeType node, typename in_t, typename out_t>
 std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
-		tref fm, const size_t start_time) {
+	tref fm, const size_t start_time) {
 	LOG_TRACE << "get_executable_spec begin\n";
-	for (tref clause : get_dnf_wff_clauses<node>(fm)) {
+	for (tref clause : expression_paths<node>(fm)) {
 		DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
 		tref executable = transform_to_execution<node>(clause, start_time, true);
 		DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
@@ -883,7 +885,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 {
 	spec = normalizer<node>(spec);
 	update = normalizer<node>(update);
-	for (tref clause : get_dnf_wff_clauses<node>(update)) {
+	for (tref clause : expression_paths<node>(update)) {
 		tref upd_always = tau::get(clause).find_top(
 			is_child<node, tau::wff_always>);
 		trefs upd_sometime = tau::get(clause).select_top(
@@ -947,7 +949,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 		} else new_spec_pointwise = clause;
 
 		if (spec_sometimes.empty())
-			return normalizer_step<node>(new_spec_pointwise);
+			return normalize<node>(new_spec_pointwise);
 		// Now try to add sometimes part of old spec
 		tref new_spec_pointwise_sometimes =
 			build_wff_and<node>(new_spec_pointwise,
@@ -956,7 +958,7 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 		LOG_TRACE << "pwr/new_spec_pointwise_sometimes: "
 			<< LOG_FM(new_spec_pointwise_sometimes) << "\n";
 		if (!is_tau_formula_sat<node>(new_spec_pointwise_sometimes, start_time))
-			return normalizer_step<node>(new_spec_pointwise);
+			return normalize<node>(new_spec_pointwise);
 
 		return normalize_with_temp_simp<node>(new_spec_pointwise_sometimes);
 	}
@@ -981,20 +983,20 @@ solution_with_max_update(tref spec) {
 	auto is_u_stream = [&u](const auto& n) {
 		return n == u;
 	};
-	for (tref clause : get_dnf_wff_clauses<node>(spec)) {
+	for (tref path : expression_paths<node>(spec)) {
 		// Find update stream in clause
-		tref update = tau::get(clause).find_top(is_u_stream);
+		tref update = tau::get(path).find_top(is_u_stream);
 		// If there is no update in clause
 		if (!update) {
-			if (auto sol = get_solution(clause)) return sol;
+			if (auto sol = get_solution(path)) return sol;
 			else continue;
 		}
 
 		// Obtain single f = 0 part of clause
-		tref f = squeeze_positives<node>(clause);
+		tref f = squeeze_positives<node>(path);
 		// If no positive parts exists, the update cannot be maximized
 		if (!f) {
-			if (auto sol = get_solution(clause)) return sol;
+			if (auto sol = get_solution(path)) return sol;
 			else continue;
 		}
 
@@ -1010,7 +1012,7 @@ solution_with_max_update(tref spec) {
 
 		// Here we know that f is wide
 		tref max_u = build_bf_neg<node>(f1);
-		tref max_u_spec = rewriter::replace<node>(clause, u, max_u);
+		tref max_u_spec = rewriter::replace<node>(path, u, max_u);
 		auto sol = get_solution(max_u_spec);
 		if (!sol.has_value()) continue;
 		// Now we need to add solution for u[t]
@@ -1036,15 +1038,14 @@ template <NodeType node, typename in_t, typename out_t>
 trefs interpreter<node, in_t, out_t>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
-		auto step_ubt_ctn = get_ubt_ctn_at(t);
+		tref step_ubt_ctn = update_to_time_point(ubt_ctn,
+			t < formula_time_point ? formula_time_point : t);
 		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
-		step_ubt_ctn = normalizer<node>(step_ubt_ctn);
+		// We only apply a heuristic in order to decide if the variable still appears
+		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
 		// Try to find var in step_ubt_ctn
 		for (tref v : vars) {
-			const auto has_var = [&v](tref n) {
-				return tau::subtree_equals(n, v);
-			};
-			if (tau::get(step_ubt_ctn).find_top(has_var))
+			if (contains<node>(step_ubt_ctn, v))
 				if (std::ranges::find_if(
 					appeared, [&v](const auto& n) {
 						return tau::get(n) == tau::get(v);
@@ -1107,10 +1108,9 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 		LOG_TRACE << "run[steps]: " << steps << "\n";)
 
 	using tau = tree<node>;
-	tref spec = normalizer<node>(form);
-	DBG(LOG_TRACE << "run[spec]: " << LOG_FM(spec) << "\n");
+	DBG(LOG_TRACE << "run[form]: " << LOG_FM(form) << "\n");
 	auto intrprtr_o = interpreter<node, in_t, out_t>::make_interpreter(
-							spec, inputs, outputs,
+							form, inputs, outputs,
 							ctx);
 	if (!intrprtr_o) return {};
 	auto& intrprtr = intrprtr_o.value();
