@@ -53,6 +53,8 @@ option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 
+set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
+
 set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MEASURE                 PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_CACHE                   PROPERTY STRINGS "OFF" "ON")
@@ -193,24 +195,29 @@ message(STATUS "TAU_ADDRESS_SANITIZER: ${TAU_ADDRESS_SANITIZER}")
 message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
+message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 
 
 #
 # Add cvc5 as an external project
 #
-ExternalProject_Add(
-    cvc5_external_project
-    SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
-    CONFIGURE_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5 && ${CMAKE_SOURCE_DIR}/external/cvc5/configure.sh --no-gpl --auto-download
-    BUILD_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5/build && make -j ${PROCESSOR_COUNT} # && make test && make install
-    INSTALL_COMMAND cp ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so ${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so.1  ${PROJECT_BINARY_DIR}/
-    UPDATE_COMMAND ""
-    BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/external/cvc5/build/libcvc5.so
-)
+if (NOT EXISTS "${TAU_SHARED_PREFIX}/lib/libcvc5.so")
+	message(STATUS "cvc5 not found in ${TAU_SHARED_PREFIX}, building from source...")
+	ExternalProject_Add(cvc5_external_project
+		SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
+		CONFIGURE_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5 && ${CMAKE_SOURCE_DIR}/external/cvc5/configure.sh --no-gpl --auto-download --prefix=${TAU_SHARED_PREFIX}
+		BUILD_COMMAND make -C ${CMAKE_SOURCE_DIR}/external/cvc5/build -j ${PROCESSOR_COUNT} # && make test && make install
+		INSTALL_COMMAND make -C ${CMAKE_SOURCE_DIR}/external/cvc5/build install
+		UPDATE_COMMAND ""
+		BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/external/cvc5/build/libcvc5.so
+	)
+else()
+	message(STATUS "cvc5 found in ${TAU_SHARED_PREFIX}, using prebuilt library...")
+endif()
 
 set(CVC5_FOUND TRUE)
-set(CVC5_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/external/cvc5/include/")
-set(CVC5_LIBRARIES "${CMAKE_SOURCE_DIR}/external/cvc5/build/src/libcvc5.so")
+set(CVC5_INCLUDE_DIR "${TAU_SHARED_PREFIX}/include/")
+set(CVC5_LIBRARIES "${TAU_SHARED_PREFIX}/lib/libcvc5.so")
 
 add_library(cvc5 STATIC IMPORTED GLOBAL)
 set_target_properties(
@@ -243,8 +250,8 @@ else()
 endif()
 
 # Add relative path of shared libraries to the executable's path (ld token $ORIGIN)
-set(CMAKE_BUILD_RPATH "${CMAKE_BUILD_RPATH}:\$ORIGIN")
-set(CMAKE_INSTALL_RPATH "\$ORIGIN")
+set(CMAKE_BUILD_RPATH "${CMAKE_BUILD_RPATH}:\$ORIGIN:${TAU_SHARED_PREFIX}/lib")
+set(CMAKE_INSTALL_RPATH "\$ORIGIN:${TAU_SHARED_PREFIX}/lib")
 message(STATUS "CMAKE_BUILD_RPATH: ${CMAKE_BUILD_RPATH}")
 message(STATUS "CMAKE_INSTALL_RPATH: ${CMAKE_INSTALL_RPATH}")
 
