@@ -42,6 +42,9 @@ ARG NIGHTLY=no
 # Argument TESTS=no is used to skip running tests
 ARG TESTS=yes
 
+# Number of build jobs (0 to use all available logical CPU cores)
+ARG BUILD_JOBS=5
+
 # Copy source code
 COPY ./ /tau-lang
 
@@ -61,7 +64,7 @@ RUN echo "(BUILD) -- Building version: $(head -n 1 VERSION)"
 # Build tests and run them if TESTS is set to yes. Stop the build if they fail
 RUN echo " (BUILD) -- Running tests: $TESTS"
 RUN if [ "$TESTS" = "yes" ]; then \
-	./dev build "${BUILD_TYPE}" -DTAU_BUILD_TESTS=ON && \
+	./dev build "${BUILD_TYPE}" -DTAU_BUILD_JOBS=${BUILD_JOBS} -DTAU_BUILD_TESTS=ON && \
 	cd tests && \
 	ctest -j 8 --test-dir "../build-${BUILD_TYPE}" --output-on-failure \
 		|| exit 1; \
@@ -71,17 +74,19 @@ RUN echo "(BUILD) -- Building packages: $RELEASE (nightly: $NIGHTLY)"
 
 # Linux packages
 RUN if [ "$RELEASE" = "yes" ]; then \
-	./dev packages && rm ./build-Release/CMakeCache.txt; \
+	./dev packages -DTAU_BUILD_JOBS=${BUILD_JOBS} && rm ./build-Release/CMakeCache.txt; \
 fi
 
 # Windows packages
 RUN if [ "$RELEASE" = "yes" ]; then \
 	./dev boost-mingw && \
-	./dev w64-packages; \
+	./dev w64-packages -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
 fi
 
 # If tau executable does not exist already, build it
-RUN if [ ! -f ./build-${BUILD_TYPE}/tau ]; then ./dev build "${BUILD_TYPE}"; fi
+RUN if [ ! -f ./build-${BUILD_TYPE}/tau ]; then \
+	./dev build "${BUILD_TYPE}" -DTAU_BUILD_JOBS=${BUILD_JOBS}; \
+fi
 
 # Set the entrypoint to the tau executable
 ENV LD_LIBRARY_PATH=/tau-lang/external/cvc5/build/src:$LD_LIBRARY_PATH
