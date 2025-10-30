@@ -75,7 +75,7 @@ if [ -z $NINJA_BIN ]; then
 else
 	echo "Using Ninja build system"
 	cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
-	ninja --parallel ${PROCESSOR_COUNT} ${VERBOSE:+-v}
+	ninja -j ${PROCESSOR_COUNT} ${VERBOSE:+-v}
 	STATUS=$?
 fi
 

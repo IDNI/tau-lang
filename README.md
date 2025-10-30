@@ -551,10 +551,6 @@ bv_term => '~' _ bv_term
 bv_constant => "#b" [0-1]+ | "#x" [0-9a-fA-F]+ | [0-9]+
 ```
 
-where
-
-```
-
 where `bv_term` stands for a well-formed subformula representing a bitvector term,
 `bv_constant` is a bitvector constant, `variable` and `stream_variable` are as above and 
 the operators meaning is given in the following table:
@@ -569,16 +565,17 @@ the operators meaning is given in the following table:
 | `~`               | bitwise negation of bitvector                          |
 | `&`               | bitwise and of bitvectors                              |
 | `!&`              | bitwise nand of bitvectors                             |
-| `|`               | bitwise or of bitvectors                               |
-| `!|`              | bitwise nor of bitvectors                              |
+| `\|`               | bitwise or of bitvectors                               |
+| `!\|`              | bitwise nor of bitvectors                              |
 | `(+ )`            | bitwise xor of bitvectors                              |
 | `!(+)`            | bitwise xnor of bitvectors                             |
 | `<<`              | left shift of bitvector by a number of bits            |
 | `>>`              | right shift of bitvector by a number of bits           |
 
 
-The order of the operations is the following (from higher precedence
-to lower): `*', `/`, `%` > `+`, `-` > `~` > `&`, `!&` > `|`, `!|` > `(+ )`, `!(+)` > `<<`, `>>`. 
+The order of the operations is the following
+
+(from higher precedence to lower): `*`, `/`, `%` > `+`, `-` > `~` > `&`, `!&` > `|`, `!|` > `(+ )`, `!(+)` > `<<`, `>>`. 
 
 The type of the variables is automatically inferred from the context in which they are used. 
 Currently there is no need to define them explicitly, but this might change in the future.
