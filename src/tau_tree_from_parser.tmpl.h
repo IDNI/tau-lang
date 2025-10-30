@@ -241,7 +241,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
 	tref transformed = m_ref(ptr.get());
 	if (options.infer_ba_types)
-		transformed = infer_ba_types<node>(transformed);
+		transformed = infer_ba_types<node>(transformed, options.global_scope);
 	// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
 	return tau::use_hooks = using_hooks, options.reget_with_hooks ? reget(transformed) : transformed;
 }
