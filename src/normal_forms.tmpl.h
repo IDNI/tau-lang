@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "normal_forms.h"
-#include "union_find.h"
+#include "union_find_with_sets.h"
 
 namespace idni::tau_lang {
 
