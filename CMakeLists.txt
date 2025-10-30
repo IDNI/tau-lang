@@ -232,11 +232,9 @@ set(CVC5_INCLUDE_DIR "${TAU_SHARED_PREFIX}/include/")
 set(CVC5_LIBRARIES "${TAU_SHARED_PREFIX}/lib/libcvc5.so")
 
 add_library(cvc5 STATIC IMPORTED GLOBAL)
-set_target_properties(
-  cvc5 PROPERTIES IMPORTED_LOCATION "${CVC5_LIBRARIES}"
-)
-set_target_properties(
-  cvc5 PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${CVC5_INCLUDE_DIR}"
+set_target_properties(cvc5 PROPERTIES
+	IMPORTED_LOCATION "${CVC5_LIBRARIES}"
+	INTERFACE_INCLUDE_DIRECTORIES "${CVC5_INCLUDE_DIR}"
 )
 add_dependencies(cvc5 cvc5_external_project)
 set(CVC5_LIB cvc5)
