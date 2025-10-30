@@ -51,7 +51,7 @@ TEST_SUITE("syntactic_path_simplification") {
 		const char* sample = "x = 0 && (z != 0 || (y = 0 && (k = 0 || x != 0))) && x = 0 || x = 0 && y = 0 || z = 0 && (z != 0 || k = 0) && z = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
-		CHECK(tau::get(res).to_str() == "x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0");
+		CHECK(tau::get(res).to_str() == "x = 0 && (z != 0 || y = 0 && k = 0) || x = 0 && y = 0 || z = 0 && k = 0");
 	}
 	TEST_CASE("3") {
 		const char* sample = "x & (z' | (y & (k | x'))) & x | x & y | z & (z' | k) & z";
