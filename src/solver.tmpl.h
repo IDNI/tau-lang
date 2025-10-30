@@ -1107,21 +1107,30 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 		DBG(LOG_DEBUG << "solve/Path after: " << tau::get(path) << "\n";)
 
 		auto is_equation = [](tref n) {
-			return tau::get(n).child_is(tau::bf_eq)
-				|| tau::get(n).child_is(tau::bf_neq);
+			const tau& n_t = tau::get(n);
+			return n_t.child_is(tau::bf_eq)
+				|| n_t.child_is(tau::bf_neq)
+				|| n_t.equals_T();
 		};
 		path = norm_all_equations<node>(path);
 		path = apply_all_xor_def<node>(path);
+		if (tau::get(path).equals_F()) continue;
 
 		// Partition all found atomic equations according to their type
 		std::map<size_t, subtree_set<node>> type_partition;
 		// Partition types
 		bool error = false;
+		bool path_sat = false;
 		for (tref conj : get_cnf_wff_clauses<node>(path)) {
 			if (!is_equation(conj)) {
 				LOG_WARNING << "Skipped clause containing non-equation: " << TAU_TO_STR(path);
 				error = true;
 				break;
+			}
+			// If path is T, we skip in order to have empty type_partition
+			if (tau::get(conj).equals_T()) {
+				path_sat = true;
+				continue;
 			}
 			size_t type = find_ba_type<node>(conj);
 			if (auto it = type_partition.find(type); it != type_partition.end()) {
@@ -1155,7 +1164,7 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 		if (error) continue;
 		// It can happen that there is no free variable in bitvector formula
 		// causing empty solutions which are still sat
-		if (!clause_solution.empty() || bv_sat) {
+		if (!clause_solution.empty() || bv_sat || path_sat) {
 			// Add variables defined by assignments to solution
 			for (auto& [v, a] : var_assignments) {
 				// Apply the found solutions
