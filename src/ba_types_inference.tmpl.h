@@ -553,6 +553,47 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 
 				// We open the new scope
 				resolver.open({});
+				// We get all the typeable top nodes in the expression, which in
+				// this case are only (sbf/tau) variables and constants.
+				auto typeables = tau::get(n).select_top(is_typeable<node>);
+				// Remove offset variables from typeables
+				auto offsets = tau::get(n).select_top(is<node, tau::offset>);
+				for (tref offset : offsets) {
+					if (auto offset_var = tau::get(offset).find_top(is<node, tau::variable>); offset_var) {
+						auto it = std::find(typeables.begin(), typeables.end(), offset_var);
+						if (it != typeables.end())
+							typeables.erase(it);
+					}
+				}
+				// We infer the common type of all the typeables in the expression
+				auto type = get_type(resolver, typeables, untyped_id<node>);
+				// If no common type is found, we set error and stop traversal
+				if (!type){
+					LOG_ERROR << "Conflicting type information in rec. relation "
+						<< LOG_FM(n) << "\n";
+					return error = true, false;
+				}
+				DBG(LOG_TRACE << "infer_ba_types/on_enter/rec_relation.../type: "
+					<< ba_types<node>::name(type.value())
+					<< "\n";)
+				// We add the variables and the constants to the current scope
+				// and assign them the common type.
+				trefs mergeables;
+				for (tref typeable : typeables)	{
+					tref ut = untype<node>(typeable);
+					resolver.insert(ut);
+					resolver.assign(ut, type.value());
+					mergeables.push_back(ut);
+				}
+				if (!resolver.merge(mergeables)) {
+					LOG_ERROR << "Conflicting type information in rec. relation "
+						<< LOG_FM(n) << "\n";
+					return error = true, false;
+				}
+				// Anyway, we stop the traversal of children as we have already
+				// processed all the typeables in the expression.
+				DBG(LOG_TRACE << "infer_ba_types/on_enter/rec_relation/resolver:\n";)
+				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
 			}
 			case tau::wff_all: case tau::wff_ex: {
@@ -606,7 +647,7 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 				}
 				// Anyway, we stop the traversal of children as we have already
 				// processed all the typeables in the expression.
-				DBG(LOG_TRACE << "infer_ba_types/on_enter/b.../resolver:\n";)
+				DBG(LOG_TRACE << "infer_ba_types/on_enter/bf/resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
 			}
@@ -665,11 +706,6 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 				DBG(LOG_TRACE << resolver.dump_to_str();)
 				break;
 			}
-			/*case tau::bv: {
-				// As we are inside an equation already visited, we do not need
-				// to continue the traversal of children.
-				return false;
-			}*/
 			default:
 				// Otherwise, we continue the traversal of children
 				// without doing anything special in this node.
@@ -701,8 +737,7 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 		size_t nt = t.get_type();
 		// Depoending on the node type...
 		switch (nt) {
-			case tau::wff_all: case tau::wff_ex: /* case tau::bf_fall: case tau::bf_fex:*/
-			case tau::rec_relation: {
+			case tau::wff_all: case tau::wff_ex: case tau::rec_relation: {
 				tref new_n = update_default<node>(n, transformed);
 				auto scoped_var_types = get_scoped_elements<node>(resolver, tau::variable);
 				if(auto updated = update_variables<node>(resolver, new_n, scoped_var_types); updated != new_n) {
