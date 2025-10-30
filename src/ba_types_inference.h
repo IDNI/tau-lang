@@ -62,10 +62,8 @@ static size_t bv32_type_id = ba_types<node>::id(bv_type<node>(32));
 // scopes (in the future we will restrict it to equations)
 // If conflicting type information is found, the function returns nullptr.
 template <NodeType node>
-tref new_infer_ba_types(tref n);
-
-template <NodeType node>
-tref infer_ba_types(tref n);
+tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope =
+	subtree_map<node, size_t>());
 
 } // namespace idni::tau_lang
 
