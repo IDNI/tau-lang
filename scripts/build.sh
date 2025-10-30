@@ -42,7 +42,7 @@ done
 
 echo "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}"
 
-# Set number of build jobs (0 to use all available logical CPU cores)
+# Set number of build jobs (0 to use half of available logical CPU cores)
 TAU_BUILD_JOBS=0
 for arg in "${@:2}"; do
 	if [[ $arg == -DTAU_BUILD_JOBS=* ]]; then
@@ -52,6 +52,8 @@ for arg in "${@:2}"; do
 done
 if [ $TAU_BUILD_JOBS -eq 0 ]; then
 	TAU_BUILD_JOBS=$(cmake -P cmake/processor-counter.cmake 2>&1 || echo "1")
+	TAU_BUILD_JOBS=$((TAU_BUILD_JOBS / 2))
+	echo "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (half of available cores)"
 fi
 
 git submodule status | while read -r LINE; do
