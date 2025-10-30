@@ -220,10 +220,12 @@ auto is_boolean_operation = [](tref n) static {
 };
 
 template <NodeType node>
-auto is_non_boolean_term = [](tref ) static {
-	// using tau = tree<node>;
-	// TODO: Add non_boolean operations from new grammar once it is there
-	if (false)
+auto is_non_boolean_term = [](tref n) static {
+	using tau = tree<node>;
+	const tau& t = tau::get(n);
+	if (t.is(tau::bf_add) || t.is(tau::bf_sub) || t.is(tau::bf_mul)
+		|| t.is(tau::bf_div) || t.is(tau::bf_mod) || t.is(tau::bf_shr)
+			|| t.is(tau::bf_shl))
 		return true;
 	return false;
 };
