@@ -19,15 +19,6 @@ project("${PROJECT_NAME}"
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
 
-# Set the number of jobs to use for the build
-include(ProcessorCount)
-ProcessorCount(PROCESSOR_COUNT)
-if(PROCESSOR_COUNT EQUAL 0)
-	message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
-	set(PROCESSOR_COUNT 1)
-endif()
-set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${PROCESSOR_COUNT}")
-
 include(FetchContent)
 include(ExternalProject)
 
@@ -54,6 +45,21 @@ option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
+set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
+
+message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
+
+# Set the number of jobs to use for the build
+if (TAU_BUILD_JOBS EQUAL 0)
+	include(ProcessorCount)
+	ProcessorCount(TAU_BUILD_JOBS)
+	message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (all available cores)")
+	if(TAU_BUILD_JOBS EQUAL 0)
+		message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
+		set(TAU_BUILD_JOBS 1)
+	endif()
+endif()
+set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${TAU_BUILD_JOBS}")
 
 set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MEASURE                 PROPERTY STRINGS "OFF" "ON")
@@ -174,8 +180,7 @@ set(TAU_DEFINITIONS
 	TAU_LOG_CHANNELS
 )
 
-message(STATUS "PROCESSOR_COUNT: ${PROCESSOR_COUNT}")
-message(STATUS "PARSER_MEASURE: ${PARSER_MEASURE}")
+message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
 message(STATUS "TAU_MEASURE: ${TAU_MEASURE}")
 message(STATUS "TAU_CACHE: ${TAU_CACHE}")
 message(STATUS "TAU_LOG_LINES: ${TAU_LOG_LINES}")
@@ -213,7 +218,7 @@ if (NOT EXISTS "${TAU_SHARED_PREFIX}/lib/libcvc5.so")
 	ExternalProject_Add(cvc5_external_project
 		SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
 		CONFIGURE_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5 && ${CMAKE_SOURCE_DIR}/external/cvc5/configure.sh --no-gpl --auto-download --prefix=${TAU_SHARED_PREFIX}
-		BUILD_COMMAND make -C ${CMAKE_SOURCE_DIR}/external/cvc5/build -j ${PROCESSOR_COUNT} # && make test && make install
+		BUILD_COMMAND make -C ${CMAKE_SOURCE_DIR}/external/cvc5/build -j ${TAU_BUILD_JOBS} # && make test && make install
 		INSTALL_COMMAND make -C ${CMAKE_SOURCE_DIR}/external/cvc5/build install
 		UPDATE_COMMAND ""
 		BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/external/cvc5/build/libcvc5.so
