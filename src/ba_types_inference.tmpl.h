@@ -555,16 +555,13 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 				resolver.open({});
 				// We get all the typeable top nodes in the expression, which in
 				// this case are only (sbf/tau) variables and constants.
-				auto typeables = tau::get(n).select_top(is_typeable<node>);
-				// Remove offset variables from typeables
-				auto offsets = tau::get(n).select_top(is<node, tau::offset>);
-				for (tref offset : offsets) {
-					if (auto offset_var = tau::get(offset).find_top(is<node, tau::variable>); offset_var) {
-						auto it = std::find(typeables.begin(), typeables.end(), offset_var);
-						if (it != typeables.end())
-							typeables.erase(it);
-					}
-				}
+				// We use the following predicate to avoid vist tyhe variables
+				// inside of a offset (ref case).
+				auto is_offset = [] (tref n) {
+					using tau = tree<node>;
+					return is<node, tau::offset>(n);
+				};
+				auto typeables = tau::get(n).select_top_until(is_typeable<node>, is_offset);
 				// We infer the common type of all the typeables in the expression
 				auto type = get_type(resolver, typeables, untyped_id<node>);
 				// If no common type is found, we set error and stop traversal
