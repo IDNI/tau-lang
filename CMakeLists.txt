@@ -197,6 +197,13 @@ message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 
+if(NOT EXISTS "${TAU_SHARED_PREFIX}/lib")
+	execute_process(COMMAND mkdir -p "${TAU_SHARED_PREFIX}/lib")
+endif()
+
+if(NOT EXISTS "${TAU_SHARED_PREFIX}/lib64")
+	execute_process(COMMAND ln -s lib ${TAU_SHARED_PREFIX}/lib64)
+endif()
 
 #
 # Add cvc5 as an external project

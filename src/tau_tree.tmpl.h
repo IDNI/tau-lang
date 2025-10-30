@@ -294,12 +294,6 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 	};
 
 	if (!use_hooks) return get_raw(v, ch, len, r);
-	// propagate types?
-	if (propagate_types(v)) {
-		size_t ba_type = get_type(v, ch, len);
-		auto [new_v, new_ch] = update_type(v, ch, len, ba_type);
-		return base_t::get(new_v, new_ch.data(), len, r);
-	}
 	// get with hooks
 	get_hook<node> hook;
 	// set hook first if not hooked
@@ -307,6 +301,12 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 		[&hook](const node& v, const tref* ch, size_t len, tref r) {
 			return hook(v, ch, len, r);
 		});
+	// propagate types?
+	if (propagate_types(v)) {
+		size_t ba_type = get_type(v, ch, len);
+		auto [new_v, new_ch] = update_type(v, ch, len, ba_type);
+		return base_t::get(new_v, new_ch.data(), len, r);
+	}
 	return base_t::get(v, ch, len, r);
 }
 
