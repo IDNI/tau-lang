@@ -29,6 +29,8 @@ esac
 
 BUILD_DIR="build-${SUFFIX}"
 
+echo "Building in ${BUILD_DIR} directory"
+
 # Extract TAU_SHARED_PREFIX from CLI arguments
 TAU_SHARED_PREFIX="${HOME}/.tau"
 for arg in "${@:2}"; do
@@ -37,6 +39,20 @@ for arg in "${@:2}"; do
 		break
 	fi
 done
+
+echo "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}"
+
+# Set number of build jobs (0 to use all available logical CPU cores)
+TAU_BUILD_JOBS=0
+for arg in "${@:2}"; do
+	if [[ $arg == -DTAU_BUILD_JOBS=* ]]; then
+		TAU_BUILD_JOBS="${arg#-DTAU_BUILD_JOBS=}"
+		break
+	fi
+done
+if [ $TAU_BUILD_JOBS -eq 0 ]; then
+	TAU_BUILD_JOBS=$(cmake -P cmake/processor-counter.cmake 2>&1 || echo "1")
+fi
 
 git submodule status | while read -r LINE; do
 	GIT_SUBMOD=$(echo $LINE | awk '{print $2}')
@@ -57,8 +73,6 @@ mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
 rm -f ./CMakeCache.txt
 
-PROCESSOR_COUNT=$(cmake -P ../cmake/processor-counter.cmake 2>&1 || echo "1")
-
 NINJA_BIN="$(which ninja 2>&1)";
 if [ $? -ne 0 ]; then
 	NINJA_BIN="$(which ninja-build 2>&1)";
@@ -68,14 +82,18 @@ if [ $? -ne 0 ]; then
 fi
 
 if [ -z $NINJA_BIN ]; then
-	echo "Using make build system"
+	echo "Configuring with make build system"
 	cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
-	cmake --build . -- -j ${PROCESSOR_COUNT} ${VERBOSE:+VERBOSE=1}
+	echo "Building with make"
+	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
+	cmake --build . -- -j ${TAU_BUILD_JOBS} ${VERBOSE:+VERBOSE=1}
 	STATUS=$?
 else
-	echo "Using Ninja build system"
+	echo "Configuring with Ninja build system"
 	cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
-	ninja --parallel ${PROCESSOR_COUNT} ${VERBOSE:+-v}
+	echo "Building with Ninja"
+	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
+	ninja --parallel ${TAU_BUILD_JOBS} ${VERBOSE:+-v}
 	STATUS=$?
 fi
 
