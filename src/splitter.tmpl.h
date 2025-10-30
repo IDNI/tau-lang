@@ -167,9 +167,9 @@ tref good_splitter_using_function(tref f, splitter_type st, tref clause,
 	};
 	auto split_coeff = [&](tref curr_f) {
 		tref coeff = tau::get(curr_path)
-			.find_top(is<node, tau::bf_constant>);
+			.find_top(is<node, tau::ba_constant>);
 		if (!coeff) return false;
-		DBG(assert(is<node>(coeff, tau::bf_constant));)
+		DBG(assert(is<node>(coeff, tau::ba_constant));)
 		const tau& scoeff_t = splitter<BAs...>(tau::get(coeff));
 		if (scoeff_t.equals_0()) return false;
 		tref scoeff = scoeff_t.first();
@@ -214,7 +214,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 	auto reverse_split_coeff = [&st](tref coeff) {
 		// We need to split the negated constant
 		coeff = tau::build_bf_neg(coeff);
-		DBG(assert(is<node>(tau::trim(coeff), tau::bf_constant));)
+		DBG(assert(is<node>(tau::trim(coeff), tau::ba_constant));)
 		tref s = splitter<BAs...>(tau::get(coeff)[0], st).get();
 		// Negate again to get the reversed splitter
 		return tau::build_bf_neg(s);
@@ -225,7 +225,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 		trefs lits = get_cnf_bf_clauses<node>(curr_path);
 		for (tref& lit : lits) {
 			tref tmp = lit;
-			lit = is_child<node>(lit, tau::bf_constant)
+			lit = is_child<node>(lit, tau::ba_constant)
 				      ? reverse_split_coeff(lit)
 				      : tau::_1();
 			tref new_path = tau::build_bf_and(lits);
@@ -262,7 +262,7 @@ tref tau_bad_splitter(tref fm) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	tref new_uniter_const = tau::build_bf_neq_0(
-		get_new_uninterpreted_constant<node>(fm, "split", get_ba_type_id<node>("tau")));
+		get_new_uninterpreted_constant<node>(fm, "split", get_ba_type_id<node>(tau_type<node>())));
 	// Find bottom wff_or and conjunct with left child
 	bool added = false;
 	auto f = [&added, &new_uniter_const](tref n) {

@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "nso_ba.h"
+#include "normal_forms.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "nso_ba"

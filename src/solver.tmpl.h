@@ -1070,18 +1070,68 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(path);
 			continue;
 		}
-		solution<node> clause_solution;
+
+		// collect assignments, i.e. variable = expression
+		// early to simplify solving
+
+		// Find equations amounting to single variable assignments
+		subtree_map<node, tref> var_assignments;
+		subtree_map<node, subtree_set<node>> assignment_check;
+		auto find_assigment = [&](tref n) {
+			if (!is<node, tau::bf_eq>(n)) return true;
+			const tau& n_t = tau::get(n);
+			if (n_t[0].child_is(tau::variable)) {
+				// First child is a single variable
+				tref var = n_t.first();
+				tref term = n_t.second();
+				if (check_var_assignment<node>(
+					assignment_check, var, term))
+					normalize_and_add_assignment<node>(
+						var_assignments, var, term);
+			} else if (n_t[1].child_is(tau::variable)) {
+				// Second child is a single variable
+				tref var = n_t.second();
+				tref term = n_t.first();
+				if (check_var_assignment<node>(
+					assignment_check, var, term))
+					normalize_and_add_assignment<node>(
+						var_assignments, var, term);
+			}
+			return false;
+		};
+		pre_order<node>(path).visit_unique(
+			find_assigment, visit_wff<node>, identity);
+		// Replace found variables with chosen terms
+		DBG(LOG_DEBUG << "solve/Path before: " << tau::get(path) << "\n";)
+		path = rewriter::replace(path, var_assignments);
+		DBG(LOG_DEBUG << "solve/Path after: " << tau::get(path) << "\n";)
+
+		auto is_equation = [](tref n) {
+			return tau::get(n).child_is(tau::bf_eq)
+				|| tau::get(n).child_is(tau::bf_neq);
+		};
+		path = norm_all_equations<node>(path);
+		path = apply_all_xor_def<node>(path);
+
 		// Partition all found atomic equations according to their type
 		std::map<size_t, subtree_set<node>> type_partition;
 		// Partition types
-		// TODO: Reject conjuncts which are not allowed in solver, such as wff_ref
-		for (tref conj : get_cnf_wff_clauses<node>(clause)) {
+		bool error = false;
+		for (tref conj : get_cnf_wff_clauses<node>(path)) {
+			if (!is_equation(conj)) {
+				LOG_WARNING << "Skipped clause containing non-equation: " << TAU_TO_STR(path);
+				error = true;
+				break;
+			}
 			size_t type = find_ba_type<node>(conj);
 			if (auto it = type_partition.find(type); it != type_partition.end()) {
 				it->second.insert(conj);
 			} else type_partition.emplace(type, subtree_set<node>{conj});
 		}
-		bool error = false, bv_sat = false;
+		if (error) continue;
+
+		bool bv_sat = false;
+		solution<node> clause_solution;
 		for (auto& [type, conjs] : type_partition) {
 			// The options for the solver depend on the equation type
 			solver_options op = options;
@@ -1105,7 +1155,23 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 		if (error) continue;
 		// It can happen that there is no free variable in bitvector formula
 		// causing empty solutions which are still sat
-		if (!clause_solution.empty() || bv_sat) return clause_solution;
+		if (!clause_solution.empty() || bv_sat) {
+			// Add variables defined by assignments to solution
+			for (auto& [v, a] : var_assignments) {
+				// Apply the found solutions
+				a = rewriter::replace<node>(a, clause_solution);
+				const trefs fv_a = get_free_vars<node>(a);
+				for (tref fv : fv_a) {
+					fv = tau::get(tau::bf, fv);
+					if (options.mode == minimum)
+						clause_solution.emplace(fv, tau::_0());
+					else clause_solution.emplace(fv, tau::_1());
+				}
+				a = rewriter::replace<node>(a, clause_solution);
+				clause_solution.emplace(v, a);
+			}
+			return clause_solution;
+		}
 	}
 	return {};
 }

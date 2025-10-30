@@ -3471,8 +3471,8 @@ struct simplify_using_equality {
 		// 1 is automatically rewritten to 0
 		// if (l == _1<node>()) return true;
 		// if (r == _1<node>()) return false;
-		if (is_child<node>(l, tau::bf_constant)) return true;
-		if (is_child<node>(r, tau::bf_constant)) return false;
+		if (is_child<node>(l, tau::ba_constant)) return true;
+		if (is_child<node>(r, tau::ba_constant)) return false;
 		if (is_child<node>(l, tau::variable)) {
 			if (is_child<node>(r, tau::variable)) {
 				// Check for uninterpreted constant
@@ -3494,9 +3494,9 @@ struct simplify_using_equality {
 			return fm;
 		DBG(LOG_DEBUG << "Simplify_using_equality on " << LOG_FM(fm) << "\n";)
 		// Create union find data structure to hold equality information
-		auto uf = union_find<decltype(term_comp), node>(term_comp);
+		auto uf = union_find_with_sets<decltype(term_comp), node>(term_comp);
 		// Create stack of union find data structures
-		std::vector<union_find<decltype(term_comp), node>> uf_stack {uf};
+		std::vector<union_find_with_sets<decltype(term_comp), node>> uf_stack {uf};
 		// We need to mark disjunctions that do not cause a push to the
 		// stack, in order to make sure they are not popped later
 		// due to intermediate simplifications
@@ -4357,7 +4357,7 @@ tref squeeze_absorb(tref formula) {
 			// Sort the equations in conjs up front and prepare
 			// union find to compute variable overlaps
 			size_t eq_idx = 0;
-			auto uf = union_find<decltype(uf_comp), node>(uf_comp);
+			auto uf = union_find_with_sets<decltype(uf_comp), node>(uf_comp);
 			for (tref& conj : conjs) {
 				const tau& conj_t = tau::get(conj);
 				if (conj_t.child_is(tau::bf_neq)) {
@@ -4433,7 +4433,7 @@ tref squeeze_absorb(tref formula) {
 			// Sort equations in disjs up front and prepare union find
 			// to compute variable overlap
 			size_t eq_idx = 0;
-			auto uf = union_find<decltype(uf_comp), node>(uf_comp);
+			auto uf = union_find_with_sets<decltype(uf_comp), node>(uf_comp);
 			for (tref& disj : disjs) {
 				const tau& disj_t = tau::get(disj);
 				if (disj_t.child_is(tau::bf_eq)) {
@@ -5011,7 +5011,7 @@ tref boole_normal_form(tref formula) {
 	// Convert !(=) to != again
 	eq_bnf = not_equal_to_unequal<node>(eq_bnf);
 	eq_bnf = simplify_using_equality<node>::on(eq_bnf);
-	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_formula) << "\n";)
+	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_bnf) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(eq_bnf, eq_bnf);
 	return cache.emplace(formula, eq_bnf).first->second;
