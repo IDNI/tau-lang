@@ -35,6 +35,7 @@ set(TAU_HEADERS
 	runtime.h
 	interpreter.h
 	union_find.h       # union find data structure
+    union_find_with_sets.h
 	nso_factory.h      # abstract template interface
 	undefs.h           # undefines implementation macros
 )
