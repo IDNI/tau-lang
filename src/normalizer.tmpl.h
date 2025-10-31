@@ -23,14 +23,17 @@ tref normalize(tref form) {
 	};
 	trefs temps = tau::get(form).select_top(st_aw);
 	// Case that the formula has no temporal quantifier
-	if (temps.empty()) form = anti_prenex<node>(form);
-	else {
+	if (temps.empty()) {
+		form = anti_prenex<node>(form);
+		form = resolve_quantifiers<node>(form);
+	} else {
 		subtree_map<node, tref> changes;
 		for (tref temp : temps) {
 			bool is_aw = is_child<node>(temp, tau::wff_always);
 			// Remove temporal quantifier
 			tref f = tau::trim2(temp);
 			f = anti_prenex<node>(f);
+			f = resolve_quantifiers<node>(f);
 			// Add quantifier again and save as change
 			if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
 			else changes.emplace(temp, tau::build_wff_sometimes(f));
@@ -60,6 +63,7 @@ tref normalize_non_temp(tref fm) {
 	tref result = tt(fm)
 		// Push all quantifiers in, eliminate them and normalize result
 		| tt::f(anti_prenex<node>)
+		| tt::f(resolve_quantifiers<node>)
 		| tt::f(boole_normal_form<node>)
 		| tt::ref;
 #ifdef TAU_CACHE
