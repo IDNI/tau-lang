@@ -473,7 +473,7 @@ TEST_SUITE("solve_inequality_system") {
 	// increasing monotonicity (4)
 	TEST_CASE("x > y && x != 1") {
 		const std::vector<std::string> inequalities =
-			{ "x y' != 0.",  "x' != 0." };
+			{ "x:sbf y' != 0.",  "(x : sbf)' != 0." };
 		CHECK ( test_solve_inequality_system(inequalities) );
 	}
 }
