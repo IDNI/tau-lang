@@ -397,7 +397,7 @@ typename tree<node>::traverser operator|(
 	const sometimes_always_normalization<node>& r);
 
 template <NodeType node>
-tref push_existential_quantifier_one(tref fm);
+tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded = nullptr);
 
 template <NodeType node>
 tref push_universal_quantifier_one(tref fm);
@@ -460,14 +460,20 @@ template <NodeType node>
 tref boole_normal_form(tref formula);
 
 template <NodeType node>
-tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
-	auto& quant_pattern);
+tref term_boole_normal_form(tref formula);
 
 template <NodeType node>
-tref treat_ex_quantified_clause(tref ex_clause);
+tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
+	auto& quant_pattern, subtree_set<node>* excluded, bool& no_atms);
+
+template <NodeType node>
+tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
 
 template <NodeType node>
 tref anti_prenex(tref formula);
+
+template <NodeType node>
+tref resolve_quantifiers(tref formula);
 
 template <NodeType node, bool normalize_scopes = true>
 tref normalize_temporal_quantifiers(tref fm);
