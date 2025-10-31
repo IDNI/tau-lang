@@ -31,9 +31,6 @@ template <NodeType node>
 bool is_tau_type(tref t);
 
 template <NodeType node>
-bool is_tau_type(tree<node>& t);
-
-template <NodeType node>
 bool is_tau_type(size_t t);
 
 /**
@@ -71,9 +68,6 @@ template <NodeType node>
 bool is_untyped(tref t);
 
 template <NodeType node>
-bool is_untyped(tree<node>& t);
-
-template <NodeType node>
 bool is_untyped(size_t t);
 
 // -----------------------------------------------------------------------------
@@ -96,9 +90,6 @@ tref sbf_type();
  */
 template <NodeType node>
 bool is_sbf_type(tref t);
-
-template <NodeType node>
-bool is_sbf_type(tree<node>& t);
 
 template <NodeType node>
 bool is_sbf_type(size_t t);
@@ -126,9 +117,6 @@ tref bv_base_type();
  */
 template <NodeType node>
 bool is_bv_type_family(tref t);
-
-template <NodeType node>
-bool is_bv_type_family(tree<node>& t);
 
 template <NodeType node>
 bool is_bv_type_family(size_t ba_type_id);
