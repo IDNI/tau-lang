@@ -53,10 +53,12 @@ message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
 if (TAU_BUILD_JOBS EQUAL 0)
 	include(ProcessorCount)
 	ProcessorCount(TAU_BUILD_JOBS)
-	message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (all available cores)")
 	if(TAU_BUILD_JOBS EQUAL 0)
 		message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
 		set(TAU_BUILD_JOBS 1)
+	else()
+		math(EXPR TAU_BUILD_JOBS "( ${TAU_BUILD_JOBS} + 1 ) / 2")
+		message(STATUS "Auto setting TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (half of available cores)")
 	endif()
 endif()
 set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${TAU_BUILD_JOBS}")
@@ -180,7 +182,6 @@ set(TAU_DEFINITIONS
 	TAU_LOG_CHANNELS
 )
 
-message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
 message(STATUS "TAU_MEASURE: ${TAU_MEASURE}")
 message(STATUS "TAU_CACHE: ${TAU_CACHE}")
 message(STATUS "TAU_LOG_LINES: ${TAU_LOG_LINES}")
@@ -201,6 +202,10 @@ message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
+
+if(NOT EXISTS "${TAU_SHARED_PREFIX}/include")
+	execute_process(COMMAND mkdir -p "${TAU_SHARED_PREFIX}/include")
+endif()
 
 if(NOT EXISTS "${TAU_SHARED_PREFIX}/lib")
 	execute_process(COMMAND mkdir -p "${TAU_SHARED_PREFIX}/lib")
@@ -232,11 +237,9 @@ set(CVC5_INCLUDE_DIR "${TAU_SHARED_PREFIX}/include/")
 set(CVC5_LIBRARIES "${TAU_SHARED_PREFIX}/lib64/libcvc5.so")
 
 add_library(cvc5 STATIC IMPORTED GLOBAL)
-set_target_properties(
-  cvc5 PROPERTIES IMPORTED_LOCATION "${CVC5_LIBRARIES}"
-)
-set_target_properties(
-  cvc5 PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${CVC5_INCLUDE_DIR}"
+set_target_properties(cvc5 PROPERTIES
+	IMPORTED_LOCATION "${CVC5_LIBRARIES}"
+	INTERFACE_INCLUDE_DIRECTORIES "${CVC5_INCLUDE_DIR}"
 )
 add_dependencies(cvc5 cvc5_external_project)
 set(CVC5_LIB cvc5)
