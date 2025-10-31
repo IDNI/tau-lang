@@ -476,6 +476,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 					.get_type(), pnt))
 				{
 					wraps.insert(ref), out("(");
+					last_quant_nt = nul;
 					if (static_cast<node::type>(nt) == wff)
 							depth++, break_line();
 				}
@@ -676,8 +677,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (nt) {
 			case bf_neg:            out("'");
 						last_quant_nt = nul; break;
-			case main: 
-			case rec_relation:
+			case main:		out(".");
+			case rec_relation:	break;
 			case constraint:
 			case offsets:
 			case subtype:
