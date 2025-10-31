@@ -750,7 +750,7 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 
 	system sys;
 	// Due to type inference all atomic formulas are typed
-	for (tref atomic_fm : tau::get(clause).select_top(is_basic_atomic_fm<node>())) {
+	for (tref atomic_fm : tau::get(clause).select_top(is_atomic_fm<node>())) {
 		size_t type = find_ba_type<node>(atomic_fm);
 		if (type == 0) {
 			LOG_ERROR << "No type information found for "
@@ -759,12 +759,6 @@ std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
 		}
 		if (!sys.contains(type)) sys[type] = atomic_fm;
 		else sys[type] = build_wff_and<node>(sys[type], atomic_fm);
-	}
-	// Add bv atomic formulas
-	for (tref atomic_bv_fm : tau::get(clause).select_top(is_atomic_bv_fm<node>())) {
-		auto type = find_ba_type<node>(atomic_bv_fm);
-		if (!sys.contains(type)) sys[type] = atomic_bv_fm;
-		else sys[type] = build_wff_and<node>(sys[type], atomic_bv_fm);
 	}
 	return { sys };
 }

@@ -126,60 +126,24 @@ bool contains(tref fm, tref sub_fm) {
 }
 
 template <NodeType node>
-std::function<bool(tref)> is_basic_atomic_fm() {
-	using tau = tree<node>;
-
-	return [](tref n) -> bool {
-		auto fm = tau::get(n);
-		return fm.is(node::type::wff)
-			&& (fm.child_is(node::type::bf_eq)
-				|| fm.child_is(node::type::bf_neq));
-	};
-}
-
-template <NodeType node>
 std::function<bool(tref)> is_atomic_fm() {
 	using tau = tree<node>;
 
 	return [](tref n) -> bool {
 		auto fm = tau::get(n);
 		if (fm.children_size() != 1) return false;
-		auto child = fm[0];
-		return fm.is(node::type::wff)
-			&& (fm.child_is(node::type::bf_eq)
-				|| fm.child_is(node::type::bf_neq)
-				|| fm.child_is(node::type::bf_lteq)
-				|| fm.child_is(node::type::bf_nlteq)
-				|| fm.child_is(node::type::bf_gt)
-				|| fm.child_is(node::type::bf_ngt)
-				|| fm.child_is(node::type::bf_gteq)
-				|| fm.child_is(node::type::bf_ngteq)
-				|| fm.child_is(node::type::bf_lt)
-				|| fm.child_is(node::type::bf_nlt))
-			&& (is_tau_type<node>(child) || is_sbf_type<node>(child));
-	};
-}
-
-template <NodeType node>
-std::function<bool(tref)> is_atomic_bv_fm() {
-	using tau = tree<node>;
-
-	return [](tref n) -> bool {
-		auto fm = tau::get(n);
-		if (fm.children_size() != 1) return false;
-		auto child = fm[0];
-		return fm.is(node::type::wff)
-			&& (fm.child_is(node::type::bf_eq)
-				|| fm.child_is(node::type::bf_neq)
-				|| fm.child_is(node::type::bf_lteq)
-				|| fm.child_is(node::type::bf_nlteq)
-				|| fm.child_is(node::type::bf_gt)
-				|| fm.child_is(node::type::bf_ngt)
-				|| fm.child_is(node::type::bf_gteq)
-				|| fm.child_is(node::type::bf_ngteq)
-				|| fm.child_is(node::type::bf_lt)
-				|| fm.child_is(node::type::bf_nlt))
-			&& (is_bv_type_family<node>(child));
+		const tau& child = fm[0];
+		return fm.is(tau::wff)
+			&& (child.is(tau::bf_eq)
+				|| child.is(tau::bf_neq)
+				|| child.is(tau::bf_lteq)
+				|| child.is(tau::bf_nlteq)
+				|| child.is(tau::bf_gt)
+				|| child.is(tau::bf_ngt)
+				|| child.is(tau::bf_gteq)
+				|| child.is(tau::bf_ngteq)
+				|| child.is(tau::bf_lt)
+				|| child.is(tau::bf_nlt));
 	};
 }
 

@@ -696,12 +696,6 @@ bool contains(tref fm, tref sub_fm);
 template <NodeType node>
 std::function<bool(tref)> is_atomic_fm();
 
-template <NodeType node>
-std::function<bool(tref)> is_atomic_bv_fm();
-
-template <NodeType node>
-std::function<bool(tref)> is_basic_atomic_fm();
-
 } // namespace idni::tau_lang
 
 // Hash for tau node
