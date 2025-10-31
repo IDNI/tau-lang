@@ -6,11 +6,6 @@
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
-// ba type checking and propagation
-//template <NodeType node>
-//tref infer_ba_types(tref n);
-
-// -----------------------------------------------------------------------------
 // Type definitions of untyped, tau and nat
 
 /**

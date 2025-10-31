@@ -37,6 +37,13 @@ tau::get_options parse_cli_no_infer() {
 	return opts;
 }
 
+tau::get_options parse_definitions_no_infer() {
+	static tau::get_options opts{ .parse = { .start = tau::definitions },
+		.infer_ba_types = false,
+		.reget_with_hooks = false };
+	return opts;
+}
+
 tref parse(const std::string& sample, const tau::get_options& opts = parse_wff_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
@@ -46,6 +53,14 @@ tref parse(const std::string& sample, const tau::get_options& opts = parse_wff_n
 }
 
 tref parse_bf(const std::string& sample, const tau::get_options& opts = parse_bf_no_infer()) {
+	auto src = tree<node_t>::get(sample, opts);
+	if (src == nullptr) {
+		TAU_LOG_ERROR << "Parsing failed for: " << sample;
+	}
+	return src;
+}
+
+tref parse_definitions(const std::string& sample, const tau::get_options& opts = parse_definitions_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
@@ -232,11 +247,6 @@ bool check_bv_ctes(tref inferred, std::vector<size_t>& expected) {
 	}
 	return true;
 }
-
-/*static size_t tau_type_id<node_t> = get_ba_type_id<node_t>(tau_type<node_t>());
-static size_t sbf_type_id<node_t> = get_ba_type_id<node_t>(sbf_type<node_t>());
-static size_t bv_type_id<node_t> = get_ba_type_id<node_t>(bv_type<node_t>());
-static size_t bv8_type_id<node_t> = get_ba_type_id<node_t>(bv_type<node_t>(8));*/
 
 TEST_SUITE("infer_ba_types: variables and constants") {
 
@@ -1320,6 +1330,59 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( inferred != nullptr );
 		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>) );
 	}
+}
+
+TEST_SUITE("infer_ba_types: definitions") {
+
+	TEST_CASE("default typing") {
+		using node = node_t;
+		tref parsed = parse_definitions("g[n](x) := g[n-1](x).");
+		CHECK( parsed != nullptr );
+		tref inferred = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(LOG_TRACE << "Inferred: " << LOG_FM_TREE(inferred);)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"n", untyped_id<node_t>},
+			{"x", tau_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("sbf typing (y1)") {
+		using node = node_t;
+		tref parsed = parse_definitions("g[n](x:sbf) := g[n-1](x).");
+		CHECK( parsed != nullptr );
+		tref inferred = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(LOG_TRACE << "Inferred: " << LOG_FM_TREE(inferred);)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"n", untyped_id<node_t>},
+			{"x", sbf_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("sbf typing (y2)") {
+		using node = node_t;
+		tref parsed = parse_definitions("g[n](x) := g[n-1](x:sbf).");
+		CHECK( parsed != nullptr );
+		tref inferred = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(LOG_TRACE << "Inferred: " << LOG_FM_TREE(inferred);)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"n", untyped_id<node_t>},
+			{"x", sbf_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("incompatible types") {
+		tref parsed = parse_definitions("g[n](x:tau) := g[n-1](x:sbf).");
+		CHECK( parsed != nullptr );
+		tref inferred = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
 }
 
 TEST_SUITE("Cleanup") {
