@@ -36,7 +36,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "{ !i5[t] = x || o5[t] = y } : tau = u[0].";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = normalize_non_temp<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "{ always i5[t :  _0_] != x || o5[t :  _0_] = y } : tau = u[0]");
+		CHECK(tau::get(res).to_str() == "{ always i5[t] != x || o5[t] = y } : tau = u[0]");
 	}
 }
 
@@ -66,7 +66,7 @@ TEST_SUITE("syntactic_path_simplification") {
 		CHECK((tau::get(res).to_str() == "T"));
 	}
 	TEST_CASE("4_5") {
-		const char* sample = "(ex x x != 0) && (ex x x = 0).";
+		const char* sample = "(ex x x = 0) && (ex x x != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
 		CHECK(tau::get(res) == tau::get(fm));
@@ -161,6 +161,12 @@ TEST_SUITE("squeeze_absorb") {
 		tref res = squeeze_absorb<node_t>(fm);
 		CHECK(tau::get(res).to_str() == "fx = 0 && (g != 0 || fxy(fx)' != 0 || (fxw|fx)(fxy(fx)')' = 0)");
 	}
+	TEST_CASE("8") {
+		const char* sample = "o1[4] = o1[3] && o2[0] != 0 && (o1[3] != o1[1] || o2[2] != 0 || o2[1] = 0) && (o2[1] != 0 || o2[2] = 0) && (o2[2] = 0 || o2[3] = 0 && o1[4] != o1[2]).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = squeeze_absorb<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "o2[0] != 0 && o1[4] = o1[3] && (o2[2] != 0 || o2[1] = 0 || o1[3] != o1[1]) && (o2[1] != 0 || o2[2] = 0) && (o2[2] = 0 || o2[3] = 0 && o1[4] != o1[2])");
+	}
 }
 
 TEST_SUITE("anti_prenex") {
@@ -206,7 +212,7 @@ TEST_SUITE("boole_normal_form") {
 		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = boole_normal_form<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "xa'b|x'ab' = 0 || a(x|b)|x'a'b != 0");
+		CHECK(tau::get(res).to_str() == "x'ab'|xa'b = 0 || a(x|b)|x'a'b != 0");
 	}
 	TEST_CASE("2") {
 		const char* sample = "f(0, 0)f(0, 1) = 0 && f(1, 1)f(1, 0) = 0 && f(1, 0)f(1, 1)|f(0, 1)f(0, 0) != 0.";
