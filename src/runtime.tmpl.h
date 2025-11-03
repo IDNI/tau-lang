@@ -10,18 +10,27 @@ tref nso_factory<bv, sbf_ba>::default_type() {
 	return sbf_type<node<bv,sbf_ba>>();
 }
 
-std::string nso_factory<bv, sbf_ba>::one(const tref) {
-	return "1";
+std::string nso_factory<bv, sbf_ba>::one(const tref type_tree) {
+	using node_t = node<bv, sbf_ba>;
+	if (is_bv_type_family<node_t>(type_tree))
+		return make_bitvector_one(
+			get_bv_size<node_t>(type_tree)).toString();
+	else return "1";
 }
 
-std::string nso_factory<bv, sbf_ba>::zero(const tref) {
+std::string nso_factory<bv, sbf_ba>::zero(const tref type_tree) {
+	using node_t = node<bv, sbf_ba>;
+	if (is_bv_type_family<node_t>(type_tree))
+		return make_bitvector_one(
+			get_bv_size<node_t>(type_tree)).toString();
 	return "0";
 }
 
 tref nso_factory<bv, sbf_ba>::splitter_one() {
 	using tau = tree<node<bv, sbf_ba>>;
 	return tau::get(tau::bf, tau::get_ba_constant(
-		sbf_ba_factory<bv, sbf_ba>::splitter_one(), sbf_type<node<bv, sbf_ba>>()));
+		sbf_ba_factory<bv, sbf_ba>::splitter_one(),
+		sbf_type<node<bv, sbf_ba>>()));
 }
 
 tref nso_factory<bv, sbf_ba>::unpack_tau_ba(const std::variant<bv, sbf_ba>&) {
@@ -45,19 +54,33 @@ tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::default_type() {
 std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::one(
 	tref type_tree)
 {
-	return is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree) ? "1" : "T";
+	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+	if (is_sbf_type<node_t>(type_tree)) {
+		return "1";
+	} else if (is_bv_type_family<node_t>(type_tree)) {
+		return make_bitvector_one(
+			get_bv_size<node_t>(type_tree)).toString();
+	} else return "T";
 }
 
 std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::zero(
 	tref type_tree)
 {
-	return is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree) ? "0" : "F";
+	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+	if (is_sbf_type<node_t>(type_tree)) {
+		return "0";
+	} else if (is_bv_type_family<node_t>(type_tree)) {
+		return make_bitvector_zero(
+			get_bv_size<node_t>(type_tree)).toString();
+	} else return "F";
 }
 
 tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
 		tref type_tree)
 {
-	using tau = tree<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>;
+	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+	using tau = tree<node_t>;
+	DBG(assert(!is_bv_type_family<node_t>(type_tree)));
 	return is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree)
 		? tau::get(tau::bf,
 			tau::get_ba_constant(
