@@ -18,10 +18,20 @@ static size_t default_bv_size = 16;
 // Basic Boolean algebra infrastructure
 
 size_t get_cvc5_size(const cvc5::Term& b);
-cvc5::Term normalize(const cvc5::Term& fm) { return fm; }
-bool is_syntactic_zero(const cvc5::Term&) { return false; }
-bool is_syntactic_one(const cvc5::Term&) { return false; }
-bool is_closed(const cvc5::Term&) { return false; }
+inline cvc5::Term normalize(const cvc5::Term& fm) { return fm; }
+inline bool is_syntactic_zero(const cvc5::Term& fm) {
+	// Check if represented bitvector is just bottom element in Boolean algebra
+	if (!fm.isBitVectorValue()) return false;
+	return fm.getBitVectorValue(2) ==
+		std::string(fm.getSort().getBitVectorSize(), '0');
+}
+inline bool is_syntactic_one(const cvc5::Term& fm) {
+	// Check if represented bitvector is just top element in Boolean algebra
+	if (!fm.isBitVectorValue()) return false;
+	return fm.getBitVectorValue(2) ==
+		std::string(fm.getSort().getBitVectorSize(), '1');
+}
+inline bool is_closed(const cvc5::Term&) { return true; }
 
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra operatiors
