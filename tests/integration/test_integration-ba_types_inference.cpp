@@ -1335,6 +1335,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 TEST_SUITE("infer_ba_types: definitions") {
 
 	TEST_CASE("default typing") {
+		using node = node_t;
 		tref parsed = parse_definitions("g[n](x) := g[n-1](x).");
 		CHECK( parsed != nullptr );
 		tref inferred = infer_ba_types<node_t>(parsed);
@@ -1348,6 +1349,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 
 	TEST_CASE("sbf typing (y1)") {
+		using node = node_t;
 		tref parsed = parse_definitions("g[n](x:sbf) := g[n-1](x).");
 		CHECK( parsed != nullptr );
 		tref inferred = infer_ba_types<node_t>(parsed);
@@ -1361,6 +1363,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 
 	TEST_CASE("sbf typing (y2)") {
+		using node = node_t;
 		tref parsed = parse_definitions("g[n](x) := g[n-1](x:sbf).");
 		CHECK( parsed != nullptr );
 		tref inferred = infer_ba_types<node_t>(parsed);
@@ -1379,7 +1382,6 @@ TEST_SUITE("infer_ba_types: definitions") {
 		tref inferred = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
-
 }
 
 TEST_SUITE("Cleanup") {
