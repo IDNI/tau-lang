@@ -18,7 +18,11 @@ static size_t default_bv_size = 16;
 // Basic Boolean algebra infrastructure
 
 size_t get_cvc5_size(const cvc5::Term& b);
-inline cvc5::Term normalize(const cvc5::Term& fm) { return fm; }
+inline cvc5::Term normalize(const cvc5::Term& fm) {
+	cvc5::Solver solver(cvc5_term_manager);
+	// Use general simplification procedure
+	return solver.simplify(fm);
+}
 inline bool is_syntactic_zero(const cvc5::Term& fm) {
 	// Check if represented bitvector is just bottom element in Boolean algebra
 	if (!fm.isBitVectorValue()) return false;
