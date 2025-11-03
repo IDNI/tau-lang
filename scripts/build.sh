@@ -95,7 +95,7 @@ else
 	cmake .. -G Ninja -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}
 	echo "Building with Ninja"
 	echo "Parallel jobs: ${TAU_BUILD_JOBS}"
-	ninja --parallel ${TAU_BUILD_JOBS} ${VERBOSE:+-v}
+	ninja -j ${TAU_BUILD_JOBS} ${VERBOSE:+-v}
 	STATUS=$?
 fi
 
