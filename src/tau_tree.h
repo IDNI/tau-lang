@@ -562,6 +562,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_variable(const std::string& name, size_t type_id);
 	static tref build_bf_variable(tref var_name_node, size_t type_id);
 	static tref build_bf_variable(const std::string& name, size_t type_id);
+	static tref build_in_var(tref var_name_node, size_t type_id);
 	static tref build_in_var(tref var_name_node, tref offset_node, size_t type_id);
 	static tref build_in_var_at_n(tref var_name_node, int_t pos, size_t type_id);
 	static tref build_in_var_at_n(const std::string& name, int_t pos, size_t type_id);
@@ -574,6 +575,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		const std::string& var_name, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_in_var_at_t_minus_indexed(
 		size_t index, size_t shift, size_t type_id, std::string t = "t");
+	static tref build_out_var(tref var_name_node, size_t type_id);
 	static tref build_out_var(tref var_name_node, tref offset_node, size_t type_id);
 	static tref build_out_var_at_n(tref var_name_node, int_t pos, size_t type_id);
 	static tref build_out_var_at_n(const std::string& name, int_t pos, size_t type_id);
@@ -586,6 +588,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 		const std::string& io_var_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_out_var_at_t_minus_indexed(
 		size_t index, size_t shift, size_t type_id, std::string t = "t");
+
+	static tref build_spec(const rr<node>& nso_rr);
 
 private:
 	using tt = traverser;
