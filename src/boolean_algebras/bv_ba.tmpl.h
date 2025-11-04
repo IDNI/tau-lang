@@ -314,6 +314,10 @@ tref cvc5_tree_to_tau_tree(bv n) {
 
 template<NodeType node>
 tref simplify_bv(tref fm) {
+	using tau = tree<node>;
+	// Only simplify formulas with constants
+	if (rewriter::find_top<node>(fm, is<node, tau::variable>))
+		return fm;
 	subtree_map<node, bv> vars, free_vars;
 	Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);
