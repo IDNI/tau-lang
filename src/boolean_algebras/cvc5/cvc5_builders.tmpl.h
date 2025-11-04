@@ -135,4 +135,12 @@ inline cvc5::Term make_bitvector_one(const size_t size) {
 	return cvc5_term_manager.mkBitVector(size, 1);
 }
 
+inline cvc5::Term make_bitvector_true() {
+	return cvc5_term_manager.mkBoolean(true);
+}
+
+inline cvc5::Term make_bitvector_false() {
+	return cvc5_term_manager.mkBoolean(false);
+}
+
 } // namespace idni::tau_lang
