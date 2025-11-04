@@ -14,27 +14,7 @@ using bv = cvc5::Term;
 static cvc5::TermManager cvc5_term_manager;
 static size_t default_bv_size = 16;
 
-// -----------------------------------------------------------------------------
-// Basic Boolean algebra infrastructure
-
 size_t get_cvc5_size(const cvc5::Term& b);
-inline cvc5::Term normalize(const cvc5::Term& fm) {
-	cvc5::Solver solver(cvc5_term_manager);
-	// Use general simplification procedure
-	return solver.simplify(fm);
-}
-inline bool is_syntactic_zero(const cvc5::Term& fm) {
-	// Check if represented bitvector is just bottom element in Boolean algebra
-	if (!fm.isBitVectorValue()) return false;
-	return fm.getBitVectorValue(2) ==
-		std::string(fm.getSort().getBitVectorSize(), '0');
-}
-inline bool is_syntactic_one(const cvc5::Term& fm) {
-	// Check if represented bitvector is just top element in Boolean algebra
-	if (!fm.isBitVectorValue()) return false;
-	return fm.getBitVectorValue(2) ==
-		std::string(fm.getSort().getBitVectorSize(), '1');
-}
 inline bool is_closed(const cvc5::Term&) { return true; }
 
 // -----------------------------------------------------------------------------
@@ -94,7 +74,8 @@ inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 	const size_t base);
 inline cvc5::Term make_bitvector_zero(const size_t size = default_bv_size);
 inline cvc5::Term make_bitvector_one(const size_t size = default_bv_size);
-
+inline cvc5::Term make_bitvector_true();
+inline cvc5::Term make_bitvector_false();
 
 // -----------------------------------------------------------------------------
 // Queries

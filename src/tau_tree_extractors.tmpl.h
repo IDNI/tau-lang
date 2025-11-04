@@ -726,8 +726,6 @@ bool has_temp_var(tref fm) {
 	else return true;
 }
 
-//bool is_closed(const cvc5::Term&) { return false;}
-
 template <NodeType node>
 bool has_open_tau_fm_in_constant(tref fm) {
 	using tau = tree<node>;

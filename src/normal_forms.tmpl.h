@@ -3058,8 +3058,7 @@ tref wff_remove_existential(tref var, tref wff) {
 				tau::get(free_vars[0]) == tau::get(var)) {
 				// By assumption quantifier is pushed in all the way
 				// Closed bv formula, simplify to T/F
-				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, new_l),
-					get_ba_type_tree<node>(tau::get(var).get_ba_type())))
+				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, new_l)))
 					changes[l] = nl;
 				else changes[l] = tau::_F();
 				continue;
@@ -4975,13 +4974,14 @@ tref boole_normal_form(tref formula) {
 	bnf = squeeze_absorb<node>(bnf);
 	// Step 2: Traverse formula, simplify all encountered equations
 	auto simp_eqs = [](tref n) {
-		if (tau::get(n).child_is(tau::bf_eq)) {
+		if (is_atomic_fm<node>()(n) && is_bv_type_family<node>(find_ba_type<node>(n))) {
+			return simplify_bv<node>(n);
+		} else if (tau::get(n).child_is(tau::bf_eq)) {
 			if (tau::get(n).equals_T() || tau::get(n).equals_F())
 				return n;
 			tref c1 = tau::get(n)[0].first();
 			tref c2 = tau::get(n)[0].second();
 			// Apply Boole decomposition
-			// TODO: different simplification for bitvectors
 			c1 = term_boole_decomposition<node>(c1);
 			c2 = term_boole_decomposition<node>(c2);
 			return tau::build_bf_eq(c1, c2);
@@ -4991,7 +4991,6 @@ tref boole_normal_form(tref formula) {
 			tref c1 = tau::get(n)[0].first();
 			tref c2 = tau::get(n)[0].second();
 			// Apply Boole decomposition
-			// TODO: different simplification for bitvectors
 			c1 = term_boole_decomposition<node>(c1);
 			c2 = term_boole_decomposition<node>(c2);
 			return tau::build_bf_neq(c1, c2);
@@ -5248,8 +5247,7 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 			tau::get(free_vars[0]) == tau::get(var)) {
 				// By assumption quantifier is pushed in all the way
 				// Closed bv formula, simplify to T/F
-				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, scoped_fm),
-					get_ba_type_tree<node>(tau::get(var).get_ba_type())))
+				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, scoped_fm)))
 					return new_fm;
 				else return tau::_F();
 			} else {
@@ -5435,8 +5433,7 @@ tref resolve_quantifiers(tref formula) {
 					free_vars.empty()) {
 					// By assumption quantifier is pushed in all the way
 					// Closed bv formula, simplify to T/F
-					if (is_bv_formula_sat<node>(n,
-						get_ba_type_tree<node>(tau::get(var).get_ba_type())))
+					if (is_bv_formula_sat<node>(n))
 						return tau::_T();
 					else return tau::_F();
 				} else excluded.insert(n);

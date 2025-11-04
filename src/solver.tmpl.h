@@ -1147,7 +1147,7 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 			tref type_tree = ba_types<node>::type_tree(type);
 			op.splitter_one = node::nso_factory::splitter_one(type_tree);
 			if (is_bv_type_family<node>(type_tree)) {
-				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs), type_tree)) {
+				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
 					bv_sat = true;
 					for (const auto& [var, value]: bv_solution.value()) {
 						clause_solution[var] = value;
