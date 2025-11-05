@@ -547,6 +547,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	using tau = tree<node>;
 	//using tt = tau::traverser;
 
+	DBG(LOG_TRACE << "================================================";)
+	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
+		<< " for: " << LOG_FM_DUMP(n);)
+
 	// We restore the original value of use_hooks at the end of the function
 	auto using_hooks = tau::use_hooks;
 	tau::use_hooks = false;
@@ -566,10 +570,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 		size_t nt = t.get_type();
 		// Depoending on the node type...
 		switch (nt) {
-			case tau::input_def: case tau::output_def: {
-				// TODO
-				break;
-			}
+			case tau::input_def: case tau::output_def:
 			case tau::rec_relation: {
 				// We open a new scope for the relation variables and constants.
 				// We assume all scoped variables and constants are resolved when
@@ -843,10 +844,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				}
 				return;
 			}
-			case tau::input_def: case tau::output_def: {
-				// TODO
-				return;
-			}
 			default: {
 				tref new_n = update_default<node>(n, transformed);
 				// For the root node, we type untyped variables with tau.
@@ -888,6 +885,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	// We visit the tree and return the transformed root if no error happened.
 	// If an error happened we return nullptr.
 	pre_order<node>(n).visit(on_enter, visit_outside_equations, on_leave, on_between);
+	DBG(LOG_TRACE << "================================================";)
+
 	if (error) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	// We add to the transformed map the untyping of the bf_t's and the bf_f's.
 	// ...some code here...
@@ -897,6 +896,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	new_n = update_symbols<node>(new_n);
 	if (new_n == nullptr) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	auto n_global_scope = resolver.current_kinds();
+	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
+		<< " of: " << LOG_FM(n) << " resulted into: " << LOG_FM_DUMP(new_n);)
 	return std::pair<tref, subtree_map<node, size_t>>{ new_n, n_global_scope };
 }
 
