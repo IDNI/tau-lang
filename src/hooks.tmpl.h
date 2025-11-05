@@ -120,7 +120,6 @@ bool get_hook<node>::check_type_mismatch(const tref* ch) {
 
 template <NodeType node>
 tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
-	// return tau::get(tau::_0(), r);
 	HOOK_LOGGING(LOG_TRACE << "_0_typed " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_f, ba_type), 0, 0);
 	return tau::get_raw(node(tau::bf), &x, 1, r);
@@ -128,7 +127,6 @@ tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
 
 template <NodeType node>
 tref get_hook<node>::_1_typed(size_t ba_type, tref r) {
-	// return tau::get(tau::_1(), r);
 	HOOK_LOGGING(LOG_TRACE << "_1_typed " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_t, ba_type), 0, 0);
 	return tau::get_raw(node(tau::bf), &x, 1, r);
@@ -263,14 +261,14 @@ tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
 			negated && negated.value_tree() == arg1_fm(ch))
 	{
 		HOOK_LOGGING(applied("$X | $X' := 1.");)
-		return tau::get(tau::_1(), r);
+		return _1_typed(negated.value_tree().get_ba_type(), r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_5, "$X' | $X := 1.")
 	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
 			negated && negated.value_tree() == arg2_fm(ch))
 	{
 		HOOK_LOGGING(applied("$X' | $X := 1.");)
-		return tau::get(tau::_1(), r);
+		return _1_typed(negated.value_tree().get_ba_type(), r);
 	}
 	return tau::get_raw(v, ch, len, r);
 }
@@ -342,14 +340,14 @@ tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 			negated && negated.value_tree() == arg1_fm(ch))
 	{
 		HOOK_LOGGING(applied("$X & $X' := 0.");)
-		return tau::get(tau::_0(), r);
+		return _0_typed(negated.value_tree().get_ba_type(), r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_4, "$X' & $X := 0.")
 	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
 			negated && negated.value_tree() == arg2_fm(ch))
 	{
 		HOOK_LOGGING(applied("$X' & $X := 0.");)
-		return tau::get(tau::_0(), r);
+		return _0_typed(negated.value_tree().get_ba_type(), r);
 	}
 	return tau::get_raw(v, ch, len, r);
 }
@@ -365,8 +363,7 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 	{
 		HOOK_LOGGING(applied("1' := 0.");)
 		size_t type = neg_one.value_tree().get_ba_type();
-		return type > 0 ? _0_typed(type, r)
-			: tau::get(tau::_0(), r);
+		return _0_typed(type, r);
 	}
 	//RULE(BF_SIMPLIFY_ZERO_4, "0' := 1.")
 	if (auto neg_zero = logic_operator(ch)() | tau::bf | tau::bf_f;
@@ -374,8 +371,7 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 	{
 		HOOK_LOGGING(applied("0' := 1.");)
 		size_t type = neg_zero.value_tree().get_ba_type();
-		return type > 0 ? _1_typed(type, r)
-			: tau::get(tau::_1(), r);
+		return _1_typed(type, r);
 	}
 	//RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
 	if (auto double_neg = logic_operator(ch)() | tau::bf | tau::bf_neg;
@@ -479,21 +475,16 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 		const auto& l = tau::get(ch[0]);
 		if (size_t typed = l.get_ba_type(); typed > 0) {
 			HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
-			typed = 0; // remove type for 0s and 1s
 			if (is_syntactic_zero(l.get_ba_constant())) {
 				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
 				HOOK_LOGGING(applied("is_syntactic_zero");)
-				return tau::get(typed
-					? tau::get(tau::get(tau::bf, tau::get_raw(
-						node::ba_typed(tau::bf_f, typed))), right)
-					: tau::_0(), right);
+				return tau::get(tau::get(tau::bf, tau::get_raw(
+						node::ba_typed(tau::bf_f, typed))), right);
 			} else if (is_syntactic_one(l.get_ba_constant())) {
 				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
 				HOOK_LOGGING(applied("is_syntactic_one");)
-				return tau::get(typed
-					? tau::get(tau::get(tau::bf, tau::get_raw(
-						node::ba_typed(tau::bf_t, typed))), right)
-					: tau::_1(), right);
+				return tau::get(tau::get(tau::bf, tau::get_raw(
+						node::ba_typed(tau::bf_t, typed))), right);
 			}
 		}
 	}
