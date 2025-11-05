@@ -100,21 +100,27 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 	if (!check) return {};
 	auto [type, value] = check.value();
 	auto& defs = definitions<node>::instance();
+	spec_context<node>& ctx = defs.get_io_context();
 	if (contains(value, tau::ref)) {
 		if (type == tau::spec) {
-			if (auto x = get_nso_rr<node>(defs.get_io_context(), value); x)
+			if (auto x = get_nso_rr<node>(ctx, value); x)
 				nso_rr = x.value();
 			else return {};
 		} else nso_rr = rr<node>(tau::geth(
-				resolve_io_vars<node>(defs.get_io_context(), value)));
+				resolve_io_vars<node>(ctx, value)));
 		auto definitions = defs.get_sym_defs();
 		nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 			definitions.begin(), definitions.end());
-		if (auto infr = infer_ref_types<node>(nso_rr); infr)
-			return infr.value();
+		auto ref_infr = infer_ref_types<node>(nso_rr);
+		if (!ref_infr) return {};
+		if (auto infr = infer_ba_types<node>(
+					build_spec<node>(ref_infr.value()),
+						defs.get_io_scope()); infr)
+			if (auto infr_rr = get_nso_rr<node>(ctx, infr, true);
+				infr_rr) return infr_rr.value();
+			else return {};
 		else return {};
-	} else return rr<node>(tau::geth(
-			resolve_io_vars<node>(defs.get_io_context(), value)));
+	} else return rr<node>(tau::geth(resolve_io_vars<node>(ctx, value)));
 	return {};
 }
 
@@ -699,7 +705,9 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		return nullptr; // Unexpected eof, continue with reading input
 	}
 	auto t = result.get_shaped_tree2();
-	auto bound = tau::get(tau_parser::tree::get(t));
+	auto bound = tau::get(tau_parser::tree::get(t), {
+		.global_scope = definitions<node>::instance().get_io_scope()
+	});
 	if (!bound) return fail();
 	return bound;
 }
