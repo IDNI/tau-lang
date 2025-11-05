@@ -299,6 +299,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ history_print_cmd,   50 },
 			{ history_store_cmd,   50 },
 			{ sat_cmd,             50 },
+			{ spec,                50 },
 			{ main,                60 },
 			{ ref,                 80 },
 			{ wff_sometimes,      380 },
@@ -455,6 +456,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case first_sym:         out("first"); break;
 			case last_sym:          out("last"); break;
 			case fp_fallback:       out(" fallback "); break;
+			case typed:             out(" : "); break;
 			// wraps
 			case ref_args:          out("("); break;
 			case constraint:
