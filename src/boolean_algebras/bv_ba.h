@@ -74,7 +74,7 @@ size_t get_bv_size(const tref t);
  *
  * @param solver Reference to a cvc5::Solver instance to be configured.
  */
-void config_cvc5_solver(cvc5::Solver& solver) {
+inline void config_cvc5_solver(cvc5::Solver& solver) {
 	// configure the solver
 	solver.setOption("produce-models", "true");
 	//solver.setOption("incremental", "true");
@@ -97,8 +97,17 @@ void config_cvc5_solver(cvc5::Solver& solver) {
  */
 template <NodeType node>
 std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
-	subtree_map<node, bv> vars, subtree_map<node, bv>& free_vars,
-	tref type_tree);
+	subtree_map<node, bv> vars, subtree_map<node, bv>& free_vars);
+
+template <NodeType node>
+std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv> vars,
+	subtree_map<node, bv>& free_vars);
+
+template <NodeType node>
+tref cvc5_tree_to_tau_tree (bv n);
+
+template <NodeType node>
+tref simplify_bv(tref fm);
 
 /**
  * @brief Checks if a given bit-vector formula is satisfiable.
@@ -111,7 +120,7 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
  * @return true if the formula is satisfiable, false otherwise.
  */
 template <NodeType node>
-bool is_bv_formula_sat(tref form, tref type_tree);
+bool is_bv_formula_sat(tref form);
 
 /**
  * @brief Checks whether a given bit-vector formula is valid.
@@ -123,7 +132,7 @@ bool is_bv_formula_sat(tref form, tref type_tree);
  * @return true if the formula is valid, false otherwise.
  */
 template <NodeType node>
-bool is_bv_formula_valid(tref form, tref type_tree);
+bool is_bv_formula_valid(tref form);
 
 /**
  * @brief Checks whether a given bit-vector formula is unsatisfiable.
@@ -135,7 +144,7 @@ bool is_bv_formula_valid(tref form, tref type_tree);
  * @return true if the formula is unsatisfiable; false otherwise.
  */
 template <NodeType node>
-bool is_bv_formula_unsat(tref form, tref type_tree);
+bool is_bv_formula_unsat(tref form);
 
 /**
  * @brief Solves a Boolean algebra problem over bit-vectors using the provided CVC5 solver.
@@ -162,7 +171,7 @@ std::optional<solution<node>> solve_bv(tref form, cvc5::Solver& solver);
  *         or std::nullopt if no solution is found.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_bv(tref form, tref type_tree);
+std::optional<solution<node>> solve_bv(tref form);
 
 /**
  * @brief Solves a Boolean algebra problem over bit-vectors.
@@ -175,7 +184,7 @@ std::optional<solution<node>> solve_bv(tref form, tref type_tree);
  *         std::nullopt otherwise.
  */
 template <NodeType node>
-std::optional<solution<node>> solve_bv(const trefs& form, tref type_tree);
+std::optional<solution<node>> solve_bv(const trefs& form);
 
 /**
  * @brief Dummy method included for completeness (variant ba). In the case
@@ -209,6 +218,30 @@ template<typename...BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
 	tref type_tree);
+
+// -----------------------------------------------------------------------------
+// Basic Boolean algebra infrastructure
+
+inline cvc5::Term normalize(const cvc5::Term& fm) {
+	cvc5::Solver solver(cvc5_term_manager);
+	config_cvc5_solver(solver);
+	// Use general simplification procedure
+	return solver.simplify(fm);
+}
+inline bool is_syntactic_zero(const cvc5::Term& fm) {
+	// Check if represented bitvector is just bottom element in Boolean algebra
+	if (!fm.isBitVectorValue()) return false;
+	return fm.getBitVectorValue(2) ==
+		std::string(fm.getSort().getBitVectorSize(), '0');
+}
+inline bool is_syntactic_one(const cvc5::Term& fm) {
+	// Check if represented bitvector is just top element in Boolean algebra
+	if (!fm.isBitVectorValue()) return false;
+	return fm.getBitVectorValue(2) ==
+		std::string(fm.getSort().getBitVectorSize(), '1');
+}
+
+// -----------------------------------------------------------------------------
 
 } // namespace idni::tau_lang
 

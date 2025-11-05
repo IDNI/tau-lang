@@ -14,14 +14,8 @@ using bv = cvc5::Term;
 static cvc5::TermManager cvc5_term_manager;
 static size_t default_bv_size = 16;
 
-// -----------------------------------------------------------------------------
-// Basic Boolean algebra infrastructure
-
 size_t get_cvc5_size(const cvc5::Term& b);
-cvc5::Term normalize(const cvc5::Term& fm) { return fm; }
-bool is_syntactic_zero(const cvc5::Term&) { return false; }
-bool is_syntactic_one(const cvc5::Term&) { return false; }
-bool is_closed(const cvc5::Term&) { return false; }
+inline bool is_closed(const cvc5::Term&) { return true; }
 
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra operatiors
@@ -80,7 +74,8 @@ inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 	const size_t base);
 inline cvc5::Term make_bitvector_zero(const size_t size = default_bv_size);
 inline cvc5::Term make_bitvector_one(const size_t size = default_bv_size);
-
+inline cvc5::Term make_bitvector_true();
+inline cvc5::Term make_bitvector_false();
 
 // -----------------------------------------------------------------------------
 // Queries

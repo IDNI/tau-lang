@@ -546,6 +546,10 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 		size_t nt = t.get_type();
 		// Depoending on the node type...
 		switch (nt) {
+			case tau::input_def: case tau::output_def: {
+				// TODO
+				break;
+			}
 			case tau::rec_relation: {
 				// We open a new scope for the relation variables and constants.
 				// We assume all scoped variables and constants are resolved when
@@ -817,6 +821,10 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 						transformed.insert_or_assign(n, updated_bf_f_ctes);
 					}
 				}
+				return;
+			}
+			case tau::input_def: case tau::output_def: {
+				// TODO
 				return;
 			}
 			default: {

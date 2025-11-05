@@ -263,6 +263,9 @@ template <NodeType node>
 tref build_bf_variable(const std::string& name, size_t type_id);
 
 template <NodeType node>
+tref build_in_var(tref var_name_node, size_t type_id);
+
+template <NodeType node>
 tref build_in_var(tref var_name_node, tref offset_node, size_t type_id);
 
 template <NodeType node>
@@ -290,6 +293,9 @@ template <NodeType node>
 tref build_in_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id, std::string t = "t");
 
 template <NodeType node>
+tref build_out_var(tref var_name_node, size_t type_id);
+
+template <NodeType node>
 tref build_out_var(tref var_name_node, tref offset_node, size_t type_id);
 
 template <NodeType node>
@@ -315,6 +321,9 @@ tref build_out_var_at_t_minus(const std::string& var_name, size_t shift, size_t 
 
 template <NodeType node>
 tref build_out_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id, std::string t = "t");
+
+template <NodeType node>
+tref build_spec(const rr<node>& nso_rr);
 
 } // namespace idni::tau_lang
 

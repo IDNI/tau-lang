@@ -1335,12 +1335,11 @@ TEST_SUITE("infer_ba_types: symbols") {
 TEST_SUITE("infer_ba_types: definitions") {
 
 	TEST_CASE("default typing") {
-		using node = node_t;
 		tref parsed = parse_definitions("g[n](x) := g[n-1](x).");
 		CHECK( parsed != nullptr );
 		tref inferred = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_TRACE << "Inferred: " << LOG_FM_TREE(inferred);)
+		DBG(LOG_TRACE << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_id<node_t>},
 			{"x", tau_type_id<node_t>}
@@ -1349,12 +1348,11 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 
 	TEST_CASE("sbf typing (y1)") {
-		using node = node_t;
 		tref parsed = parse_definitions("g[n](x:sbf) := g[n-1](x).");
 		CHECK( parsed != nullptr );
 		tref inferred = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_TRACE << "Inferred: " << LOG_FM_TREE(inferred);)
+		DBG(LOG_TRACE << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_id<node_t>},
 			{"x", sbf_type_id<node_t>}
@@ -1363,12 +1361,11 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 
 	TEST_CASE("sbf typing (y2)") {
-		using node = node_t;
 		tref parsed = parse_definitions("g[n](x) := g[n-1](x:sbf).");
 		CHECK( parsed != nullptr );
 		tref inferred = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_TRACE << "Inferred: " << LOG_FM_TREE(inferred);)
+		DBG(LOG_TRACE << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_id<node_t>},
 			{"x", sbf_type_id<node_t>}
