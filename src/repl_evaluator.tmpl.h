@@ -717,10 +717,13 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		return nullptr; // Unexpected eof, continue with reading input
 	}
 	auto t = result.get_shaped_tree2();
-	auto bound = tau::get(tau_parser::tree::get(t), {
-		.global_scope = definitions<node>::instance().get_global_scope()
-	});
+	auto& global_scope = definitions<node>::instance().get_global_scope();
+	typename tau::get_options opts = {
+		.global_scope = global_scope
+	};
+	auto bound = tau::get(tau_parser::tree::get(t), opts);
 	if (!bound) return fail();
+	global_scope = opts.global_scope;
 	return bound;
 }
 
