@@ -113,7 +113,7 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 			definitions.begin(), definitions.end());
 		auto ref_infr = infer_ref_types<node>(nso_rr);
 		if (!ref_infr) return {};
-		if (auto infr = infer_ba_types<node>(
+		if (auto [infr, _] = infer_ba_types<node>(
 					build_spec<node>(ref_infr.value()),
 						defs.get_io_scope()); infr)
 			if (auto infr_rr = get_nso_rr<node>(ctx, infr, true);
