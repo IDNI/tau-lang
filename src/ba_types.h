@@ -6,7 +6,7 @@
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
-// Type definitions of untyped, tau and nat
+// Type definitions of untyped, tau, bool and nat
 
 /**
  * @brief Creates the type tree associated with the type "tau"
@@ -15,6 +15,38 @@ namespace idni::tau_lang {
  */
 template <NodeType node>
 tref tau_type();
+
+/**
+ * @brief Checks if t represents the tau type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents tau
+ */
+template <NodeType node>
+bool is_tau_type(tref t);
+
+template <NodeType node>
+bool is_tau_type(size_t t);
+
+/**
+ * @brief Creates the type tree associated with the type "bool"
+ * @tparam Tree node type
+ * @return Tree reference to type tree
+ */
+template <NodeType node>
+tref bool_type();
+
+/**
+ * @brief Checks if t represents the bool type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents bool
+ */
+template <NodeType node>
+bool is_bool_type(tref t);
+
+template <NodeType node>
+bool is_bool_type(size_t t);
 
 /**
  * @brief Checks if t represents the tau type
@@ -66,7 +98,7 @@ template <NodeType node>
 bool is_untyped(size_t t);
 
 // -----------------------------------------------------------------------------
-// Type definitions for bitvector
+// Type definitions for sbf
 // TODO: They must go into sbf_ba.h -> currently causes compilation error
 
 /**

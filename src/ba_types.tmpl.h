@@ -27,6 +27,24 @@ bool is_tau_type(size_t t) {
 }
 
 template<NodeType node>
+tref bool_type() {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "bool");
+	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+bool is_bool_type(tref t) {
+	using tau = tree<node>;
+	return tau::get(t)[0].get_string() == "bool";
+}
+
+template <NodeType node>
+bool is_bool_type(size_t t) {
+	return is_bool_type<node>(ba_types<node>::type_tree(t));
+}
+
+template<NodeType node>
 tref nat_type() {
 	using tau = tree<node>;
 	tref type = tau::get(tau::type, "nat");
