@@ -317,7 +317,7 @@ auto update_bf_ctes = [](type_scoped_resolver<node>& resolver, tref n, const std
 	auto error = false;
 
 	auto update = [&](tref n) -> bool {
-		DBG(LOG_TRACE <<"infer_ba_types/update_bf_ctes/tau_use_hooks: " << tau::use_hooks << "\n";)
+		// DBG(LOG_TRACE <<"infer_ba_types/update_bf_ctes/tau_use_hooks: " << tau::use_hooks << "\n";)
 		const auto t = tau::get(n);
 		size_t nt = t.get_type();
 		switch (nt) {
@@ -377,7 +377,7 @@ auto parse_ba_constants = [](tref n, const std::map<tref, size_t, subtree_less<n
 	auto error = false;
 
 	auto update = [&](tref n) -> bool {
-		DBG(LOG_TRACE <<"infer_ba_types/parse_ba_constants/tau_use_hooks: " << tau::use_hooks << "\n";)
+		// DBG(LOG_TRACE <<"infer_ba_types/parse_ba_constants/tau_use_hooks: " << tau::use_hooks << "\n";)
 		const auto t = tau::get(n);
 		size_t nt = t.get_type();
 		switch (nt) {
@@ -516,7 +516,7 @@ tref update_variables(type_scoped_resolver<node>& resolver, tref n, const std::m
 	auto error = false;
 
 	auto update = [&](tref n) -> bool {
-		DBG(LOG_TRACE <<"infer_ba_types/update_variables/tau_use_hooks: " << tau::use_hooks << "\n";)
+		// DBG(LOG_TRACE <<"infer_ba_types/update_variables/tau_use_hooks: " << tau::use_hooks << "\n";)
 		if (error) return false;
 		const auto t = tau::get(n);
 		size_t nt = t.get_type();
@@ -577,7 +577,7 @@ auto bv_defaulting = [](tref n) -> tref {
 	subtree_map<node, tref> changes;
 
 	auto update = [&](tref n) -> bool {
-		DBG(LOG_TRACE <<"infer_ba_types/defaulting_bv/tau_use_hooks: " << tau::use_hooks << "\n";)
+		// DBG(LOG_TRACE <<"infer_ba_types/defaulting_bv/tau_use_hooks: " << tau::use_hooks << "\n";)
 		auto new_n = update_default<node>(n, changes);
 		auto t = tau::get(new_n);
 		if (t.get_ba_type() == get_ba_type_id<node>(bv_base_type<node>())) {
