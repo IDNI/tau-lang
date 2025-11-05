@@ -17,6 +17,18 @@ bool test_ref_types(const char* rec_relation,
 	auto nso_rr_inferred = infer_ref_types<node>(nso_rr.value(), ts);
 	bool fail = !ts.ok();
 
+	auto& global_scope = definitions<node>::instance().get_global_scope();
+	if (auto [infr, n_global_scope] = infer_ba_types<node>(
+		build_spec<node>(nso_rr_inferred.value()), global_scope); infr)
+	{
+		global_scope = n_global_scope;
+		if (auto infr_rr = get_nso_rr<node>(
+				definitions<node>::instance().get_io_context(),
+				infr, true);
+			infr_rr) nso_rr_inferred = infr_rr;
+		else fail = false;
+	} else fail = false;
+
 	if (!expect_fail) expect_fail = expected_error != "";
 	if (fail != expect_fail) {
 		TAU_LOG_ERROR << (fail ? "failed" : "success") <<" but expected to "
@@ -39,6 +51,7 @@ bool test_ref_types(const char* rec_relation,
 				return expect_fail;
 		return false;
 	} else {
+		TAU_LOG_TRACE << "nso_rr_inferred: " << TAU_LOG_RR(nso_rr_inferred.value());
 		tref normalized = normalizer<node>(nso_rr_inferred.value());
 		if (normalized == nullptr) {
 			TAU_LOG_ERROR << "normalizer failed\n";
