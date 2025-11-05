@@ -797,7 +797,12 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 					tau_type<node>()),
 				.mode = solver_mode::general
 			};
-			auto model = solve<node>(constraints, options);
+			bool solve_error = false;
+			auto model = solve<node>(constraints, options, solve_error);
+			if (solve_error) {
+				LOG_ERROR << "Internal error in solver\n";
+				return std::make_pair(nullptr, nullptr);
+			}
 			if (!model) continue;
 
 			LOG_INFO << "Tau specification is executed setting ";
@@ -970,7 +975,13 @@ solution_with_max_update(tref spec) {
 			.mode = solver_mode::general
 		};
 		// solve the given system of equations
-		return solve<node>(fm, options);
+		bool solve_error = false;
+		std::optional<solution<node>> s = solve<node>(fm, options, solve_error);
+		if (solve_error) {
+			LOG_ERROR << "Internal error in solver\n";
+			return std::optional<solution<node>>();
+		}
+		return s;
 	};
 	tref u = build_out_var_at_n<node>("u", time_point,
 					get_ba_type_id<node>(tau_type<node>()));

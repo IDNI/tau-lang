@@ -551,11 +551,21 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid argument(s)\n";
 		return;
 	}
+	// Reject formula involving temporal quantification
+	if (tau::get(applied).find_top(is_temporal_quantifier<node>)) {
+		TAU_LOG_ERROR << "Found temporal quantifier in formula: " << TAU_TO_STR(applied);
+		return;
+	}
 
 	DBG(TAU_LOG_TRACE << "solve_cmd/applied: " << applied << "\n";)
 
 	size_t type = get_solver_cmd_type<node>(applied);
-	auto solution = solve<node>(applied, options);
+	bool solve_error = false;
+	auto solution = solve<node>(applied, options, solve_error);
+	if (solve_error) {
+		TAU_LOG_ERROR << "Internal error in solver\n";
+		return;
+	}
 	if (!solution) { std::cout << "no solution\n"; return; }
 
 	print_solver_cmd_solution<node>(solution, type);
