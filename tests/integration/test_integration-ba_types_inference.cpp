@@ -155,26 +155,26 @@ bool check_vars(tref inferred, std::vector<std::pair<std::string, size_t>>& expe
 	return true;
 }
 
-bool check_ctes(tref inferred, std::vector<size_t>& expected) {
-	auto ctes = tau::get(inferred).select_top(is<node_t, tau::ref>);
-	if (ctes.empty() && expected.size() > 0) {
-		TAU_LOG_ERROR << "No refss found";
+bool check_refs(tref inferred, std::vector<size_t>& expected) {
+	auto refs = tau::get(inferred).select_top(is<node_t, tau::ref>);
+	if (refs.empty() && expected.size() > 0) {
+		TAU_LOG_ERROR << "No refs found";
 		return false;
 	}
-	if (ctes.size() != expected.size()) {
+	if (refs.size() != expected.size()) {
 		TAU_LOG_ERROR << "Expected " << expected.size()
-			<< " refs, found " << ctes.size();
+			<< " refs, found " << refs.size();
 		return false;
 	}
 	for (size_t i = 0; i < expected.size(); i++) {
-		size_t ctype = tau::get(ctes[i]).get_ba_type();
+		size_t ctype = tau::get(refs[i]).get_ba_type();
 		if (ctype != expected[i]) {
-			TAU_LOG_ERROR << "Ref '" << ctes[i]
+			TAU_LOG_ERROR << "Ref '" << refs[i]
 				<< "' expected type " << ba_types<node_t>::name(expected[i])
 				<< ", found " << ba_types<node_t>::name(ctype);
 			return false;
 		}
-		TAU_LOG_TRACE << "Ref '" << ctes[i] << " matched\n";
+		TAU_LOG_TRACE << "Ref '" << refs[i] << " matched\n";
 	}
 	return true;
 }
