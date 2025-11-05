@@ -49,16 +49,16 @@ struct definitions {
 	}
 
 	subtree_map<node, size_t>& get_global_scope() {
-		auto add = [this](size_t sid, size_t type, bool is_in) {
+		auto add = [this](size_t sid, size_t type) {
 			tref var_name = build_var_name<node>(sid);
-			tref var = is_in ? build_in_var <node>(var_name, type)
-					 : build_out_var<node>(var_name, type);
+			tref var = tau::get(tau::variable,
+					tau::get(tau::io_var, { var_name }));
 			if (auto it = global_scope.find(var);
 				it != global_scope.end()) return;
 			global_scope[var] = type;
 		};
-		for (auto [sid, x] : ctx.inputs)  add(sid, x.first, true);
-		for (auto [sid, x] : ctx.outputs) add(sid, x.first, false);
+		for (auto [sid, x] : ctx.inputs)  add(sid, x.first);
+		for (auto [sid, x] : ctx.outputs) add(sid, x.first);
 		return global_scope;
 	}
 
