@@ -235,6 +235,26 @@ auto untype = [](tref t) -> tref {
 };
 
 template<NodeType node>
+auto canonize = [](tref t) -> tref {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	tref new_t = untype<node>(t);
+	if (auto var_name = tt(new_t) | tau::io_var | tau::var_name | tt::ref; var_name) {
+		new_t = tau::get(tau::variable, tau::get(tau::io_var, { var_name }));
+	} else if (auto sym = tt(new_t) | tau::sym | tt::ref; sym) {
+		auto ref_args = tt(new_t) | tau::ref_args | tt::ref;
+		auto offsets = tt(new_t) | tau::offsets | tt::ref;
+		auto num_ref_args = (ref_args) ? (tau::get(ref_args).children_size()) : 0;
+		auto size_offsets = (offsets) ? (tau::get(offsets).children_size()) : 0;
+		new_t = tau::get(tau::ref, { sym, tau::get_num(num_ref_args), tau::get_num(size_offsets) });
+	}
+	DBG(LOG_TRACE << "canonize/t -> new_t:\n"
+		<< LOG_FM_TREE(t) << " -> " << LOG_FM_TREE(new_t);)
+	return new_t;
+};
+
+template<NodeType node>
 auto is_top_level_bf = [](tref parent) -> bool {
 	using tau = tree<node>;
 	if (parent == nullptr) return true;
@@ -302,19 +322,19 @@ auto update_bf_ctes = [](type_scoped_resolver<node>& resolver, tref n, const std
 		switch (nt) {
 			case tau::bf_t: case tau::bf_f: {
 				// If we have no type information for the element we do nothing
-				tref un = untype<node>(n);
-				if (!types.contains(un)) break;
+				tref canonized = canonize<node>(n);
+				if (!types.contains(canonized)) break;
 				// If the bf_t/bf_f is not typed
 				tref new_n;
 				if (get_type_of<node>(n) == untyped_id<node>) {
 					// We type it according to the inferred type or tau
-					size_t type = (types.at(un) == untyped_id<node>)
+					size_t type = (types.at(canonized) == untyped_id<node>)
 						? tau_type_id<node>
-						: types.at(un);
-					if (resolver.assign(un, type) == false) {
+						: types.at(canonized);
+					if (resolver.assign(canonized, type) == false) {
 						LOG_ERROR << "Conflicting type information for  "
 							<< LOG_FM(n) << ", expected "
-							<< ba_types<node>::name(types.at(un)) << "\n";
+							<< ba_types<node>::name(types.at(canonized)) << "\n";
 						return error = true, false;
 					}
 					new_n = retype<node>(n, type);
@@ -363,16 +383,16 @@ auto parse_ba_constants = [](tref n, const std::map<tref, size_t, subtree_less<n
 			case tau::ba_constant: {
 				// If we have no type information for the bf constant we
 				// rise an error as we should have at least untyped info
-				tref un = untype<node>(n);
-				if (!types.contains(un)) {
+				tref canonized = canonize<node>(n);
+				if (!types.contains(canonized)) {
 					LOG_ERROR << "No detected type for bf constant in "
 						<< LOG_FM(n) << "\n";
 					return error = true, false;
 				}
 				// We get the type info or use the default (tau) if untyped
-				size_t type = (types.at(un) == untyped_id<node>)
+				size_t type = (types.at(canonized) == untyped_id<node>)
 					? tau_type_id<node>
-					: types.at(un);
+					: types.at(canonized);
 				// We parse the constant
 				auto new_n = tau::get_ba_constant_from_source(t.child_data(), type);
 				if (new_n == nullptr) {
@@ -440,20 +460,20 @@ tref update_variables(type_scoped_resolver<node>& resolver, tref n, const std::m
 		switch (nt) {
 			case tau::variable: {
 				// If we have no type information for the element we do nothing
-				tref un = untype<node>(n);
-				if (!types.contains(un)) break;
+				tref canonized = canonize<node>(n);
+				if (!types.contains(canonized)) break;
 				// If the variable is not typed
 				tref new_n;
 				if (get_type_of<node>(n) == untyped_id<node>) {
 					// We type it according to the inferred type or default
-					size_t type = (types.at(un) == untyped_id<node>)
+					size_t type = (types.at(canonized) == untyped_id<node>)
 						? tau_type_id<node>
-						: types.at(un);
+						: types.at(canonized);
 
-					if (resolver.assign(un, type) == false) {
+					if (resolver.assign(canonized, type) == false) {
 						LOG_ERROR << "Conflicting type information for variable "
 							<< LOG_FM(n) << ", expected "
-							<< ba_types<node>::name(types.at(un)) << "\n";
+							<< ba_types<node>::name(types.at(canonized)) << "\n";
 						return error = true, false;
 					}
 					new_n = retype<node>(n, type);
@@ -581,10 +601,10 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 				// and assign them the common type.
 				trefs mergeables;
 				for (tref typeable : typeables)	{
-					tref ut = untype<node>(typeable);
-					resolver.insert(ut);
-					resolver.assign(ut, type.value());
-					mergeables.push_back(ut);
+					tref canonized = canonize<node>(typeable);
+					resolver.insert(canonized);
+					resolver.assign(canonized, type.value());
+					mergeables.push_back(canonized);
 				}
 				if (!resolver.merge(mergeables)) {
 					LOG_ERROR << "Conflicting type information in rec. relation "
@@ -606,7 +626,7 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 				subtree_map<node, size_t> var_list;
 				auto vars = tau::get(n)[0].select_top(is<node, tau::variable>);
 				for (tref var : vars) {
-					var_list[untype<node>(var)] =  get_type_of<node>(var);
+					var_list[canonize<node>(var)] =  get_type_of<node>(var);
 				}
 				resolver.open(var_list);
 				// We continue the traversal of children
@@ -636,10 +656,10 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 				// and assign them the common type.
 				trefs mergeables;
 				for (tref typeable : typeables)	{
-					tref ut = untype<node>(typeable);
-					resolver.insert(ut);
-					resolver.assign(ut, type.value());
-					mergeables.push_back(ut);
+					tref canonized = canonize<node>(typeable);
+					resolver.insert(canonized);
+					resolver.assign(canonized, type.value());
+					mergeables.push_back(canonized);
 				}
 				if (!resolver.merge(mergeables)) {
 					LOG_ERROR << "Conflicting type information in bf "
@@ -679,17 +699,17 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 				trefs mergeables;
 				subtree_map<node, size_t> constants;
 				for (tref typeable : typeables)	{
-					tref ut = untype<node>(typeable);
-					if (is<node, tau::ba_constant>(ut) || is<node, tau::bf_f>(ut) || is<node, tau::bf_t>(ut)) {
-						mergeables.push_back(ut);
-						constants.emplace(ut, type.value());
+					tref canonized = canonize<node>(typeable);
+					if (is<node, tau::ba_constant>(canonized) || is<node, tau::bf_f>(canonized) || is<node, tau::bf_t>(canonized)) {
+						mergeables.push_back(canonized);
+						constants.emplace(canonized, type.value());
 						continue;
 					}
 					// We only add variables to the current scope
 					// Constants will be added to an inner scope
-					resolver.insert(ut);
-					resolver.assign(ut, type.value());
-					mergeables.push_back(ut);
+					resolver.insert(canonized);
+					resolver.assign(canonized, type.value());
+					mergeables.push_back(canonized);
 				}
 				// We create an inner scope for the constants
 				resolver.open(constants);
@@ -862,7 +882,7 @@ tref infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 
 	// Adding global_scope info to resolver
 	for (auto [var, type] : global_scope) {
-		auto untyped = untype<node>(var);
+		auto untyped = canonize<node>(var);
 		resolver.insert(untyped), resolver.assign(untyped, type);
 	}
 	// We visit the tree and return the transformed root if no error happened.
