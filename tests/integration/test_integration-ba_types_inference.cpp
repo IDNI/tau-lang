@@ -1381,6 +1381,25 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 }
 
+TEST_SUITE("infer_ba_types: I/O vars") {
+
+	TEST_CASE("different time stamp propagation") {
+		using node = node_t;
+		tref parsed = parse("i1[t] = o1[t] && i1[t-1] = 1:sbf");
+		CHECK( parsed != nullptr );
+		tref inferred = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(LOG_TRACE << "Inferred: " << LOG_FM_TREE(inferred);)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"i1", sbf_type_id<node_t>},
+			{"o1", sbf_type_id<node_t>},
+			{"i1", sbf_type_id<node_t>}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+}
+
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
