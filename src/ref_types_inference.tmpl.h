@@ -23,11 +23,7 @@ const std::set<std::string>& ref_types<node>::errors() const { return errors_; }
 // returns set of unresolved refs
 template <NodeType node>
 std::set<rr_sig> ref_types<node>::unresolved() const {
-	std::set<rr_sig> unres(todo_);
-	std::erase_if(unres, [this](const rr_sig& x) {
-		return fpcalls_.contains(x);
-	});
-	return unres;
+	return todo_;
 }
 
 // returns known type of a ref, or no value
@@ -36,22 +32,12 @@ std::optional<typename node::type> ref_types<node>::get(
 	const rr_sig& sig)
 {
 	rr_sig s(sig);
-	auto fpopt = fpcall(s);
-	if (fpopt) s = fpopt.value();
 	if (auto it = types_.find(s); it != types_.end()) {
 		LOG_TRACE << "Looking for type of " << s << " found "
 							<< LOG_NT(it->second);
 		return { it->second };
 	}
 	LOG_TRACE << "Looking for type of " << LOG_RR_SIG(sig) << " failed";
-	return {};
-}
-
-// returns ref to calculate fp by provided by fp call sig, or no value
-template <NodeType node>
-std::optional<rr_sig>  ref_types<node>::fpcall(const rr_sig& fp_sig) const {
-	if (auto it = fpcalls_.find(fp_sig); it != fpcalls_.end())
-		return { it->second };
 	return {};
 }
 
@@ -85,20 +71,6 @@ void ref_types<node>::todo(const rr_sig& sig) {
 	todo_.insert(sig);
 }
 
-template <NodeType node>
-void ref_types<node>::add_fpcall(const rr_sig& sig) {
-	// TODO (LOW) decide how to call fp calculation for various
-	// offset arity rels with otherwise same signature.
-	// We currently call the rel with the least offset arity.
-	// Should we provide a way how to specify exact relation to call? 
-	rr_sig fp_sig(sig);
-	fp_sig.offset_arity = 0;
-	if (auto fp_exists = fpcall(fp_sig); fp_exists) {
-		if (sig.offset_arity < fp_exists.value().offset_arity)
-			fpcalls_[fp_sig] = sig;
-	} else fpcalls_.emplace(fp_sig, sig);
-}
-
 // add sig with type t, and if it's already typed, check it equals to t
 template <NodeType node>
 bool ref_types<node>::add(tref n, node::type t) {
@@ -106,11 +78,6 @@ bool ref_types<node>::add(tref n, node::type t) {
 	if (auto r_as_child = tt(n) | tau::ref; r_as_child)
 		r = r_as_child.value();
 	auto sig = get_rr_sig<node>(r);
-	if (auto fp_sig = fpcall(sig); fp_sig) { // if fp_call
-		LOG_TRACE << "FP call " << LOG_RR_SIG(fp_sig.value()) << " for "
-				<< LOG_RR_SIG(sig) << " : " << LOG_NT(t);
-		sig = fp_sig.value(); // use actual relation's sig
-	}
 	typename node::type new_type = t;
 	auto it = types_.find(sig);
 	if (it != types_.end()) {
@@ -133,13 +100,12 @@ bool ref_types<node>::add(tref n, node::type t) {
 };
 
 template <NodeType node>
-bool ref_types<node>::get_types(tref n, bool def) {
+bool ref_types<node>::get_types(tref n) {
 	const auto& t = tau::get(n);
 	// collect all refs to do
 	for (tref r : t.select_all(is<node, tau::ref>)){
 		auto sig = get_rr_sig<node>(r);
 		todo(sig);
-		if (def	&& sig.offset_arity > 0) add_fpcall(sig);
 	}
 	// collect all wff typed refs
 	for (tref r : t.select_all(is<node, tau::wff_ref>)) add(r, tau::wff);
@@ -152,7 +118,7 @@ template <NodeType node>
 bool ref_types<node>::get_ref_types(const rr<node>& nso_rr) {
 	// get types from relations' heads if any
 	for (const auto& r : nso_rr.rec_relations)
-		get_types(r.first->get(), true); // true since these are defs
+		get_types(r.first->get());
 	// from relations' bodies
 	for (const auto& r : nso_rr.rec_relations)
 		get_types(r.second->get());
