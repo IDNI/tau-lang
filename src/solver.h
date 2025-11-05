@@ -190,10 +190,11 @@ tref var, tref term);
  * @tparam BAs Variadic template parameters.
  * @param form The tau form to solve.
  * @param options The solver options.
+ * @param error Reports if a clause is found that is not supported within solving
  * @return An optional solution.
  */
 template <NodeType node>
-std::optional<solution<node>> solve(tref form, solver_options options);
+std::optional<solution<node>> solve(tref form, solver_options options, bool& error);
 
 /**
  * @brief Solves the given tau forms.
@@ -201,10 +202,11 @@ std::optional<solution<node>> solve(tref form, solver_options options);
  * @tparam BAs Variadic template parameters.
  * @param forms The tau forms to solve.
  * @param options The solver options.
+ * @param error Reports if a clause is found that is not supported within solving
  * @return An optional solution.
  */
 template <NodeType node>
-std::optional<solution<node>> solve(const trefs& forms, solver_options options);
+std::optional<solution<node>> solve(const trefs& forms, solver_options options, bool& error);
 
 } // namespace idni::tau_lang
 

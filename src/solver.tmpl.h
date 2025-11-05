@@ -1044,7 +1044,7 @@ void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments, tref
 
 // entry point for the solver
 template <NodeType node>
-std::optional<solution<node>> solve(tref form, solver_options options) {
+std::optional<solution<node>> solve(tref form, solver_options options, bool& error) {
 	using tau = tree<node>;
 	if (tau::get(form).equals_T()) return { solution<node>() };
 	if (tau::get(form).equals_F()) return {};
@@ -1061,16 +1061,11 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 			LOG_TRACE << "solve/options.splitter_one:"
 				<< options.splitter_one; break;
 	}
+	// The solver cannot solve temporally quantified formulas
+	assert(!tau::get(form).find_top(is_temporal_quantifier<node>));
 #endif // DEBUG
-
-	form = boole_normal_form<node>(form);
+	form = normalize_non_temp<node>(form);
 	for (tref path : expression_paths<node>(form)) {
-		// Reject clause involving temporal quantification
-		if (tau::get(path).find_top(is_temporal_quantifier<node>)) {
-			LOG_WARNING << "Skipped clause with temporal quantifier: " << TAU_TO_STR(path);
-			continue;
-		}
-
 		// collect assignments, i.e. variable = expression
 		// early to simplify solving
 
@@ -1119,11 +1114,10 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 		// Partition all found atomic equations according to their type
 		std::map<size_t, subtree_set<node>> type_partition;
 		// Partition types
-		bool error = false;
 		bool path_sat = false;
 		for (tref conj : get_cnf_wff_clauses<node>(path)) {
 			if (!is_equation(conj)) {
-				LOG_WARNING << "Skipped clause containing non-equation: " << TAU_TO_STR(path);
+				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);
 				error = true;
 				break;
 			}
@@ -1137,9 +1131,9 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 				it->second.insert(conj);
 			} else type_partition.emplace(type, subtree_set<node>{conj});
 		}
-		if (error) continue;
+		if (error) return {};
 
-		bool bv_sat = false;
+		bool bv_sat = false, skip = false;
 		solution<node> clause_solution;
 		for (auto& [type, conjs] : type_partition) {
 			// The options for the solver depend on the equation type
@@ -1151,7 +1145,7 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 					for (const auto& [var, value]: bv_solution.value()) {
 						clause_solution[var] = value;
 					}
-				} else error = true; // if we cannot solve bv part, skip this clause
+				} else skip = true; // if we cannot solve bv part, skip this clause
 			} else {
 				op.splitter_one = node::nso_factory::splitter_one(type_tree);
 				if (auto solution = solve<node>(conjs, op)) {
@@ -1159,21 +1153,22 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 						clause_solution[var] = value;
 					}
 				}
-				else error = true; // if we cannot solve, skip this clause
+				else skip = true; // if we cannot solve, skip this clause
 			}
-			if (error) break;
+			if (skip) break;
 		}
-		if (error) continue;
+		if (skip) continue;
 		// It can happen that there is no free variable in bitvector formula
 		// causing empty solutions which are still sat
 		if (!clause_solution.empty() || bv_sat || path_sat) {
 			// Add variables defined by assignments to solution
 			for (auto& [v, a] : var_assignments) {
 				// Apply the found solutions
-				a = rewriter::replace<node>(a, clause_solution);
 				const trefs fv_a = get_free_vars<node>(a);
 				for (tref fv : fv_a) {
 					fv = tau::get(tau::bf, fv);
+					// Skip already solved variables
+					if (clause_solution.contains(fv)) continue;
 					if (options.mode == minimum)
 						clause_solution.emplace(fv, tau::_0());
 					else clause_solution.emplace(fv, tau::_1());
@@ -1191,10 +1186,10 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 }
 
 template <NodeType node>
-std::optional<solution<node>> solve(const trefs& forms, solver_options options) {
+std::optional<solution<node>> solve(const trefs& forms, solver_options options, bool& error) {
 	using tau = tree<node>;
 
-	return solve<node>(tau::build_wff_and(forms), options);
+	return solve<node>(tau::build_wff_and(forms), options, error);
 }
 
 
