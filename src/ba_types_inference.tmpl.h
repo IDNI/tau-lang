@@ -78,7 +78,7 @@ std::ostream& type_scoped_resolver<node>::dump(std::ostream& os) {
 	for (auto [e,_]: this->uf) {
 		auto type = this->kinds_.at(e);
 		os << "\tscope: " << e.first << ", tref: " << LOG_FM(e.second)
-		<< ", type: " << ba_types<node>::name(type) << "\n";
+			<< ", type: " << ba_types<node>::name(type) << "\n";
 	}
 	return os;
 }
