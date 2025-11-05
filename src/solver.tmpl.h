@@ -1164,10 +1164,11 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			// Add variables defined by assignments to solution
 			for (auto& [v, a] : var_assignments) {
 				// Apply the found solutions
-				a = rewriter::replace<node>(a, clause_solution);
 				const trefs fv_a = get_free_vars<node>(a);
 				for (tref fv : fv_a) {
 					fv = tau::get(tau::bf, fv);
+					// Skip already solved variables
+					if (clause_solution.contains(fv)) continue;
 					if (options.mode == minimum)
 						clause_solution.emplace(fv, tau::_0());
 					else clause_solution.emplace(fv, tau::_1());
