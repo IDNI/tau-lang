@@ -22,8 +22,8 @@ size_t get_bv_size(const tref t) {
 }
 
 template <NodeType node>
-std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::traverser& form, subtree_map<node, bv> vars,
-		subtree_map<node, bv>& free_vars, tref type_tree) {
+std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv> vars,
+			       subtree_map<node, bv>& free_vars) {
 	using tau = tree<node>;
 	using tt = tree<node>::traverser;
 
@@ -32,36 +32,38 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 	switch (nt) {
 		case node::type::wff_always:
 		case node::type::wff_sometimes: {
-			return bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
+			return bv_eval_node<node>(form | tt::first, vars, free_vars);
 		}
 		// due to hooks we should consider wff_t or bf_t
 		case node::type::wff: case node::type::bf:
 		// TODO (HIGH) deal with those eq appropiately
 		/*case node::type::bv:*/ {
-			return bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
+			return bv_eval_node<node>(form | tt::first, vars, free_vars);
 		}
+		case node::type::wff_t: return make_bitvector_true();
+		case node::type::wff_f: return make_bitvector_false();
 		case node::type::wff_neg: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			return l ? std::optional<bv>(make_term_not(l.value())) : std::nullopt;
 		}
 		case node::type::wff_and: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_and(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::wff_or: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_or(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::wff_all: {
 			tref v = (form | tt::first | tt::ref);
 			DBG(assert(is<node>(v, tau::variable));)
-			size_t bv_size = get_bv_size<node>(type_tree);
+			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
 			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
 			vars.emplace(v, x);
 
-			auto f = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			if (!f) return std::nullopt;
 			auto res = std::optional<bv>(make_term_forall({x}, f.value()));
 			vars.erase(v);
@@ -70,11 +72,11 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 		case node::type::wff_ex: {
 			tref v = (form | tt::first | tt::ref);
 			DBG(assert(is<node>(v, tau::variable));)
-			size_t bv_size = get_bv_size<node>(type_tree);
+			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
 			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
 			vars.emplace(v, x);
 
-			auto f = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			if (!f) return std::nullopt;
 			auto res = std::optional<bv>(make_term_exists({x}, f.value()));
 			vars.erase(v);
@@ -82,142 +84,143 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 		}
 		case node::type::variable: {
 			// check if the variable is alr
-			if (auto it = vars.find(form | tt::ref); it != vars.end()) return it->second;
+			tref v = form | tt::ref;
+			if (auto it = vars.find(v); it != vars.end()) return it->second;
 			if (auto it = free_vars.find(form | tt::ref); it != free_vars.end()) return it->second;
 			auto vn = (form | tt::Tree).to_str();
 			// create a new constant according to the type and added to the map
-			size_t bv_size = get_bv_size<node>(type_tree);
+			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
 			auto x = cvc5_term_manager.mkConst(cvc5_term_manager.mkBitVectorSort(bv_size), vn.c_str());
 			free_vars.emplace(form | tt::ref, x);
 			return std::optional<bv>(x);
 		}
 		case node::type::bf_eq: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_equal(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_neq: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_distinct(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_lteq: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_less_equal(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_nlteq: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_not(make_term_less_equal(l.value(), r.value()))) : std::nullopt;
 		}
 		case node::type::bf_gt: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_greater(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_ngt: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_not(make_term_greater(l.value(), r.value()))) : std::nullopt;
 		}
 		case node::type::bf_gteq: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_greater_equal(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_ngteq: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_not(make_term_greater_equal(l.value(), r.value()))) : std::nullopt;
 		}
 		case node::type::bf_lt: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_less(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_nlt: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_not(make_term_less(l.value(), r.value()))) : std::nullopt;
 		}
 		case node::type::bf_neg: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			return (l) ? std::optional<bv>(make_bitvector_not(l.value())) : std::nullopt;
 		}
 		case node::type::bf_add: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_add(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_sub: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_sub(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_mul: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_mul(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_div: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_div(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_mod: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_mod(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_and: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_and(l.value(), r.value())) : std::nullopt;
 		}
 		/*case node::type::bv_nand: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_nand(l.value(), r.value())) : std::nullopt;
 		}*/
 		case node::type::bf_or: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_or(l.value(), r.value())) : std::nullopt;
 		}
 		/*case node::type::bv_nor: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_nor(l.value(), r.value())) : std::nullopt;
 		}*/
 		case node::type::bf_xor: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_xor(l.value(), r.value())) : std::nullopt;
 		}
 		/*case node::type::bv_xnor: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_xnor(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bv_min: {
-			auto l = bv_eval_node<node>(solver, form->child[0], vars, free_vars);
-			auto r = bv_eval_node<node>(solver, form->child[1], vars, free_vars);
+			auto l = bv_eval_node<node>(form->child[0], vars, free_vars);
+			auto r = bv_eval_node<node>(form->child[1], vars, free_vars);
 			return (l && r) ? min(l.value(), r.value()) : std::nullopt;
 		}
 		case node::type::bv_max: {
-			auto l = bv_eval_node<node>(solver, form->child[0], vars, free_vars);
-			auto r = bv_eval_node<node>(solver, form->child[1], vars, free_vars);
+			auto l = bv_eval_node<node>(form->child[0], vars, free_vars);
+			auto r = bv_eval_node<node>(form->child[1], vars, free_vars);
 			return (l && r) ? max(l.value(), r.value()) : std::nullopt;
 		}*/
 		case node::type::bf_shl: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_shr: {
-			auto l = bv_eval_node<node>(solver, form | tt::first, vars, free_vars, type_tree);
-			auto r = bv_eval_node<node>(solver, form | tt::second, vars, free_vars, type_tree);
+			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::ba_constant: {
@@ -226,11 +229,13 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 			return std::optional<bv>(std::get<bv>(cte));
 		}
 		case node::type::bf_t: {
-			auto bv_size = get_bv_size<node>(type_tree);
+			tref c = form | tt::ref;
+			auto bv_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
 			return make_bitvector_one(bv_size);
 		}
 		case node::type::bf_f: {
-			auto bv_size = get_bv_size<node>(type_tree);
+			tref c = form | tt::ref;
+			auto bv_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
 			return make_bitvector_zero(bv_size);
 		}
 		default:
@@ -238,15 +243,103 @@ std::optional<bv> bv_eval_node(cvc5::Solver& solver, const typename tree<node>::
 	}
 }
 
+template<NodeType node>
+std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv> vars,
+	subtree_map<node, bv>& free_vars) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	auto t = tt(form);
+	return bv_eval_node(t, vars, free_vars);
+}
+
+template<NodeType node>
+tref cvc5_tree_to_tau_tree(bv n) {
+#define rec(x) (cvc5_tree_to_tau_tree<node>(x)) // ease recursive calls
+
+	auto from_collection = [](const bv& t, const auto& f) {
+		tref res = rec(t[0]);
+		for (size_t i = 1; i < t.getNumChildren(); ++i) {
+			res = f(res, rec(t[i]));
+		}
+		return res;
+	};
+
+	using tau = tree<node>;
+	switch (n.getKind()) {
+		case Kind::AND: return from_collection(n, build_wff_and<node>);
+		case Kind::OR: return from_collection(n, build_wff_or<node>);
+		case Kind::NOT: return build_wff_neg<node>(rec(n[0]));
+		case Kind::EXISTS: return build_wff_ex<node>(rec(n[0]), rec(n[1]));
+		case Kind::FORALL: return build_wff_all<node>(rec(n[0]), rec(n[1]));
+		case Kind::VARIABLE_LIST: return tau::trim(rec(n[0]));
+		case Kind::VARIABLE: return build_bf_variable<node>(n.toString(),
+			get_ba_type_id<node>(bv_type<node>(n.getSort().getBitVectorSize())));
+
+		case Kind::CONST_BOOLEAN:
+			if (n.getBooleanValue()) return tau::_T();
+			else return tau::_F();
+
+		case Kind::EQUAL: return build_bf_eq<node>(rec(n[0]), rec(n[1]));
+		case Kind::DISTINCT: return build_bf_neq<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_ULE: return build_bf_lteq<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_UGT: return build_bf_gt<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_UGE: return build_bf_gteq<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_ULT: return build_bf_lt<node>(rec(n[0]), rec(n[1]));
+
+		case Kind::CONSTANT: return build_bf_variable<node>(n.toString(),
+			get_ba_type_id<node>(bv_type<node>(n.getSort().getBitVectorSize())));
+		case Kind::CONST_BITVECTOR: return build_bf_ba_constant<node>(n,
+			get_ba_type_id<node>(bv_type<node>(n.getSort().getBitVectorSize())));
+
+		case Kind::BITVECTOR_NOT: return build_bf_neg<node>(rec(n[0]));
+		case Kind::BITVECTOR_AND: return from_collection(n, build_bf_and<node>);
+		case Kind::BITVECTOR_OR: return from_collection(n, build_bf_or<node>);
+		case Kind::BITVECTOR_XOR: return from_collection(n, build_bf_xor<node>);
+		case Kind::BITVECTOR_ADD: return from_collection(n, build_bf_add<node>);
+		case Kind::BITVECTOR_SUB: return from_collection(n, build_bf_sub<node>);
+		case Kind::BITVECTOR_MULT: return from_collection(n, build_bf_mul<node>);
+		case Kind::BITVECTOR_UDIV: return build_bf_div<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_SMOD: return build_bf_mod<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_SHL: return build_bf_shl<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_LSHR: return build_bf_shr<node>(rec(n[0]), rec(n[1]));
+
+		default:
+			LOG_ERROR << "Unexpected bitvector kind during tree translation: "
+					<< n.getKind() << "\n";
+			DBG(assert(false);)
+			return nullptr;
+	}
+#undef rec
+}
+
+template<NodeType node>
+tref simplify_bv(tref fm) {
+	using tau = tree<node>;
+	// Only simplify formulas with constants
+	if (rewriter::find_top<node>(fm, is<node, tau::variable>))
+		return fm;
+	subtree_map<node, bv> vars, free_vars;
+	Solver solver(cvc5_term_manager);
+	config_cvc5_solver(solver);
+	auto fm_bv_op = bv_eval_node(fm, vars, free_vars);
+	if (!fm_bv_op) {
+		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(fm);
+		return nullptr;
+	}
+	bv fm_bv = fm_bv_op.value();
+	fm_bv = solver.simplify(fm_bv);
+	return cvc5_tree_to_tau_tree<node>(fm_bv);
+}
+
 template <NodeType node>
-bool is_bv_formula_sat(tref form, tref type_tree) {
+bool is_bv_formula_sat(tref form) {
 	using tt = tree<node>::traverser;
 
 	subtree_map<node, bv> vars, free_vars;
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);
 
-	auto expr = bv_eval_node<node>(solver, tt(form), vars, free_vars, type_tree);
+	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	// TODO (MEDIUM) handle this case at an upper level (maybe return an optional)
 	if (!expr) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
@@ -258,18 +351,18 @@ bool is_bv_formula_sat(tref form, tref type_tree) {
 }
 
 template <NodeType node>
-bool is_bv_formula_unsat(tref form, tref type_tree) {
-	return !is_bv_formula_sat<node>(form, type_tree);
+bool is_bv_formula_unsat(tref form) {
+	return !is_bv_formula_sat<node>(form);
 }
 
 template <NodeType node>
-bool is_bv_formula_valid(tref form, tref type_tree) {
+bool is_bv_formula_valid(tref form) {
 	using tau = tree<node>;
-	return is_bv_formula_unsat<node>(tau::build_wff_neg(form), type_tree);
+	return is_bv_formula_unsat<node>(tau::build_wff_neg(form));
 }
 
 template <NodeType node>
-std::optional<solution<node>> solve_bv(const tref form, tref type_tree) {
+std::optional<solution<node>> solve_bv(const tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
@@ -277,7 +370,7 @@ std::optional<solution<node>> solve_bv(const tref form, tref type_tree) {
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);
 
-	auto expr = bv_eval_node<node>(solver, tt(form), vars, free_vars, type_tree);
+	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	if (!expr) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		return std::nullopt;
@@ -295,7 +388,8 @@ std::optional<solution<node>> solve_bv(const tref form, tref type_tree) {
 		for (const auto& [tau_var, bv_var] : free_vars) {
 			bv cte = solver.getValue(bv_var);
 			s.emplace(tau::get(tau::bf, tau_var),
-				tau::get(tau::bf, tau::get_ba_constant(cte, type_tree)));
+				tau::get(tau::bf, tau::get_ba_constant(cte,
+					bv_type<node>(cte.getSort().getBitVectorSize()))));
 		}
 		return s;
 	} else
@@ -304,10 +398,10 @@ std::optional<solution<node>> solve_bv(const tref form, tref type_tree) {
 }
 
 template<NodeType node>
-std::optional<solution<node>> solve_bv(const trefs& lits, tref type_tree) {
+std::optional<solution<node>> solve_bv(const trefs& lits) {
 	using tau = tree<node>;
 
-	return solve_bv<node>(tau::build_wff_and(lits), type_tree);
+	return solve_bv<node>(tau::build_wff_and(lits));
 }
 
 template<typename ... BAs> requires BAsPack<BAs...>

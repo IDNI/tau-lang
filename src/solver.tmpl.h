@@ -1145,20 +1145,22 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 			// The options for the solver depend on the equation type
 			solver_options op = options;
 			tref type_tree = ba_types<node>::type_tree(type);
-			op.splitter_one = node::nso_factory::splitter_one(type_tree);
 			if (is_bv_type_family<node>(type_tree)) {
-				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs), type_tree)) {
+				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
 					bv_sat = true;
 					for (const auto& [var, value]: bv_solution.value()) {
 						clause_solution[var] = value;
 					}
 				} else error = true; // if we cannot solve bv part, skip this clause
-			}
-			else if (auto solution = solve<node>(conjs, op)) {
-				for (const auto& [var, value]: solution.value()) {
-					clause_solution[var] = value;
+			} else {
+				op.splitter_one = node::nso_factory::splitter_one(type_tree);
+				if (auto solution = solve<node>(conjs, op)) {
+					for (const auto& [var, value]: solution.value()) {
+						clause_solution[var] = value;
+					}
 				}
-			} else error = true; // if we cannot solve, skip this clause
+				else error = true; // if we cannot solve, skip this clause
+			}
 			if (error) break;
 		}
 		if (error) continue;
@@ -1177,6 +1179,9 @@ std::optional<solution<node>> solve(tref form, solver_options options) {
 					else clause_solution.emplace(fv, tau::_1());
 				}
 				a = rewriter::replace<node>(a, clause_solution);
+				// Simplify bitvectors
+				if (is_bv_type_family<node>(tau::get(a).get_ba_type()))
+					a = simplify_bv<node>(a);
 				clause_solution.emplace(v, a);
 			}
 			return clause_solution;

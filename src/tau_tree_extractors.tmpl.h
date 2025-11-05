@@ -39,8 +39,8 @@ bool get_io_def(tref n, io_defs<node>& defs) {
 	using tt = tau::traverser;
 
 	const auto& t            = tau::get(n);
-	size_t ba_type           = t.get_ba_type();
 	size_t var_sid           = t[0].data();
+	size_t ba_type           = 0;
 	size_t stream_sid        = 0;
 
 	if (auto fn = tt(n) | tau::stream | tau::q_file_name | tau::file_name;
@@ -49,20 +49,15 @@ bool get_io_def(tref n, io_defs<node>& defs) {
 		stream_sid = fn | tt::data;
 		static const size_t console_sid = dict("console");
 		if (stream_sid == console_sid) stream_sid = 0;
+
 	}
-	// if (ba_type == 0) {
+	if (tref type_node = tt(n) | tau::typed | tau::type | tt::ref;
+		type_node) ba_type = get_ba_type_id<node>(type_node);
 	defs[var_sid] = { ba_type, stream_sid };
+	DBG(LOG_TRACE << "get_io_def: " << LOG_FM_DUMP(n) << " -> "
+		<< dict(var_sid) << " : " << LOG_BA_TYPE(ba_type) << " / "
+		<< dict(stream_sid);)
 	return true;
-	// }
-	// std::string ba_type_name = get_ba_type_name<node>(ba_type);
-	// for (const auto& fct_type : node::nso_factory::types()) {
-	// 	if (ba_type_name == fct_type) {
-	// 		defs[var_sid] = { ba_type, stream_sid };
-	// 		return true;
-	// 	}
-	// }
-	// LOG_ERROR << "Invalid type " << ba_type_name;
-	// return false;
 }
 
 template <NodeType node>
@@ -442,7 +437,7 @@ template<NodeType node>
 tref expression_paths<node>::apply(const auto& path_transform) {
 	iterator it = iterator(_expr);
 	trefs changes;
-	tref res;
+	tref res = nullptr;
 	while (it != end()) {
 		if (tref c = it.apply(path_transform)) {
 			changes.push_back(c);
@@ -725,8 +720,6 @@ bool has_temp_var(tref fm) {
 	// any input/output stream is a temporal variable, also constant positions
 	else return true;
 }
-
-//bool is_closed(const cvc5::Term&) { return false;}
 
 template <NodeType node>
 bool has_open_tau_fm_in_constant(tref fm) {
