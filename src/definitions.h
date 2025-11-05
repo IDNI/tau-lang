@@ -48,7 +48,20 @@ struct definitions {
 		return ctx.outputs;
 	}
 
-	size_t size () const {
+	subtree_map<node, size_t> get_io_scope() {
+		subtree_map<node, size_t> scope;
+		auto add = [&scope](size_t sid, size_t type, bool is_in) {
+			tref var_name = build_var_name<node>(sid);
+			tref var = is_in ? build_in_var <node>(var_name, type)
+					 : build_out_var<node>(var_name, type);
+			scope[var] = type;
+		};
+		for (auto [sid, x] : ctx.inputs)  add(sid, x.first, true);
+		for (auto [sid, x] : ctx.outputs) add(sid, x.first, false);
+		return scope;
+	}
+
+	size_t size() const {
 		DBG(assert(heads.size() == bodies.size());)
 		return heads.size();
 	}
