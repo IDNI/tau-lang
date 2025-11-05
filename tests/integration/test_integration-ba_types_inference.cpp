@@ -1362,7 +1362,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 TEST_SUITE("infer_ba_types: I/O vars") {
 
 	TEST_CASE("different time stamp propagation") {
-		using node = node_t;
+		DBG(using node = node_t;)
 		tref parsed = parse("i1[t] = o1[t] && i1[t-1] = 1:sbf");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);

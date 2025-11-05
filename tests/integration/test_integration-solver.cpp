@@ -627,7 +627,8 @@ TEST_SUITE("solve") {
 		std::cout << "------------------------------------------------------\n";
 #endif // DEBUG
 		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
-		auto solution = solve<node_t>(form, options);
+		bool solve_error = false;
+		auto solution = solve<node_t>(form, options, solve_error);
 		return solution ? check_solution<node_t>(form, solution.value()) : false;
 	}
 
