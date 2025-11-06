@@ -356,34 +356,34 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	// TODO (LOW) this could be move to the parser
 
-	std::map<size_t, trefs> select_top_by_predicate(
+	std::vector<trefs> select_top_by_predicates(
 		const std::function<bool(const tref&)>* queries, const size_t count) const;
-	std::map<size_t, trefs> select_top_by_predicate(
+	std::vector<trefs> select_top_by_predicates(
 		const std::initializer_list<std::function<bool(const tref&)>>& queries) const;
-	std::map<size_t, trefs> select_top_by_predicate(
+	std::vector<trefs> select_top_by_predicates(
 		const std::vector<std::function<bool(const tref&)>>& queries) const;
-	std::map<size_t, trefs> select_top_until_by_predicate(
+	std::vector<trefs> select_top_until_by_predicates(
 		const std::function<bool(const tref&)>* queries, const size_t count,
 		const auto& until) const;
-	std::map<size_t, trefs> select_top_until_by_predicate(
+	std::vector<trefs> select_top_until_by_predicates(
 		const std::initializer_list<std::function<bool(const tref&)>>& queries,
 		const auto& until) const;
-	std::map<size_t, trefs> select_top_until_by_predicate(
+	std::vector<trefs> select_top_until_by_predicates(
 		const std::vector<std::function<bool(const tref&)>>& queries,
 		const auto& until) const;
-	std::map<size_t, trefs> select_all_by_predicate(
+	std::vector<trefs> select_all_by_predicates(
 		const std::function<bool(const tref&)>* queries, const size_t count) const;
-	std::map<size_t, trefs> select_all_by_predicate(
+	std::vector<trefs> select_all_by_predicates(
 		const std::initializer_list<std::function<bool(const tref&)>>& queries) const;
-	std::map<size_t, trefs> select_all_by_predicate(
+	std::vector<trefs> select_all_by_predicates(
 		const std::vector<std::function<bool(const tref&)>>& queries) const;
-	std::map<size_t, trefs> select_all_until_by_predicate(
+	std::vector<trefs> select_all_until_by_predicates(
 		const std::function<bool(const tref&)>* queries, const size_t count,
 		const auto& until) const;
-	std::map<size_t, trefs> select_all_until_by_predicate(
+	std::vector<trefs> select_all_until_by_predicates(
 		const std::initializer_list<std::function<bool(const tref&)>>& queries,
 		const auto& until) const;
-	std::map<size_t, trefs> select_all_until_by_predicate(
+	std::vector<trefs> select_all_until_by_predicates(
 		const std::vector<std::function<bool(const tref&)>>& queries,
 		const auto& until) const;
 
