@@ -18,12 +18,12 @@ tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 		<< LOG_BA(constant) << ", " << LOG_BA_TYPE(type_id);
 	// LOG_TRACE << dump_to_str();
 	// TODO optimize
-	for (size_t i = 0; i < C.size(); ++i) if (C[i] == constant) {
+	for (size_t i = 0; i < C.size(); ++i) if (C[i] == std::make_pair(constant, type_id)) {
 		LOG_TRACE << "-- returning already pooled: "
 						<< i+1 << " " << LOG_FM(T[i]);
 		return T[i];
 	}
-	C.push_back(constant);
+	C.push_back(std::make_pair(constant, type_id));
 	size_t constant_id = C.size();
 	node n = node::ba_constant(constant_id, type_id);
 	tref r = tree<node>::get(n);
@@ -47,7 +47,7 @@ typename ba_constants<node>::constant ba_constants<node>::get(
 {
 	DBG(assert(constant_id > 0);)
 	DBG(assert(constant_id <= C.size());)
-	return C[constant_id - 1];
+	return C[constant_id - 1].first;
 }
 
 template <NodeType node>
