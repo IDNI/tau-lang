@@ -991,18 +991,12 @@ solution_with_max_update(tref spec) {
 		// Find update stream in clause
 		tref update = tau::get(path).find_top(is_u_stream);
 		// If there is no update in clause
-		if (!update) {
-			if (auto sol = get_solution(path)) return sol;
-			else continue;
-		}
+		if (!update) continue;
 
 		// Obtain single f = 0 part of clause
 		tref f = squeeze_positives<node>(path);
 		// If no positive parts exists, the update cannot be maximized
-		if (!f) {
-			if (auto sol = get_solution(path)) return sol;
-			else continue;
-		}
+		if (!f) continue;
 
 		// Check that f is wide (not 0 and has more than one zero), otherwise continue
 		f = tt(f) | bf_reduce_canonical<node>() | tt::ref;
@@ -1029,8 +1023,7 @@ solution_with_max_update(tref spec) {
 		sol.value().emplace(u, max_u);
 		return sol;
 	}
-	// In case there is no maximal solution for u
-	// TODO: remove call to get_solution duplicate
+	// In case there is no maximal solution for u on any path of spec
 	return get_solution(spec);
 }
 
