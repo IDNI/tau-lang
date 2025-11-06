@@ -1674,17 +1674,19 @@ tref push_quantifiers_in(tref formula) {
 }
 
 // Squeeze all equalities found in n
-// Only use on equal types!!!
 template <NodeType node>
-tref squeeze_positives(tref n) {
+tref squeeze_positives(tref n, size_t type_id) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	LOG_TRACE << "squeeze_positives: " << LOG_FM(n);
-	if (trefs eqs = tau::get(n).select_top(is<node, tau::bf_eq>);
+	auto match = [&type_id](tref n) {
+		return is<node, tau::bf_eq>(n) &&
+			find_ba_type<node>(n) == type_id;
+	};
+	if (trefs eqs = tau::get(n).select_top(match);
 		eqs.size() > 0)
 	{
 		for (tref& eq : eqs) {
-			DBG(assert(find_ba_type<node>(eqs[0]) == find_ba_type<node>(eq)));
 			eq = norm_trimmed_equation<node>(eq);
 		}
 		eqs = tt(eqs) | tt::children | tt::refs;
@@ -3576,8 +3578,8 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 			}
 	}
 	// Continue with quantifier elimination for atomless BA
-	tref f = squeeze_positives<node>(scoped_fm);
 	size_t type_v = find_ba_type<node>(var);
+	tref f = squeeze_positives<node>(scoped_fm, type_v);
 	tref f_0 = f ? rewriter::replace<node>(f, var, tau::_0_trimmed(type_v)) : tau::_0(type_v);
 	// std::cout << "f_0: " << tau::get(f_0) << "\n";
 	tref f_1 = f ? rewriter::replace<node>(f, var, tau::_1_trimmed(type_v)) : tau::_0(type_v);

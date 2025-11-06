@@ -312,7 +312,7 @@ tref push_universal_quantifier_one(tref fm);
 
 // Squeeze all equalities found in n
 template <NodeType node>
-tref squeeze_positives(tref n);
+tref squeeze_positives(tref n, size_t type_id);
 
 template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val);
