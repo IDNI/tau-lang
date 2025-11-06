@@ -1079,6 +1079,10 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 		subtree_map<node, subtree_set<node>> assignment_check;
 		auto find_assigment = [&](tref n) {
 			if (!is<node, tau::bf_eq>(n)) return true;
+			// Do not extract variable assignments from bitvector
+			// due to possible quantification
+			if (is_bv_type_family<node>(tau::get(n).get_ba_type()))
+				return false;
 			const tau& n_t = tau::get(n);
 			if (n_t[0].child_is(tau::variable)) {
 				// First child is a single variable
@@ -1121,7 +1125,8 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 		// Partition types
 		bool path_sat = false;
 		for (tref conj : get_cnf_wff_clauses<node>(path)) {
-			if (!is_equation(conj)) {
+			size_t type = find_ba_type<node>(conj);
+			if (!is_equation(conj) && !(is_bv_type_family<node>(type) && is_child_quantifier<node>(conj))) {
 				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);
 				error = true;
 				break;
@@ -1131,7 +1136,6 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				path_sat = true;
 				continue;
 			}
-			size_t type = find_ba_type<node>(conj);
 			if (auto it = type_partition.find(type); it != type_partition.end()) {
 				it->second.insert(conj);
 			} else type_partition.emplace(type, subtree_set<node>{conj});
