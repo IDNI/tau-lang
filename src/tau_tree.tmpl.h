@@ -245,9 +245,6 @@ tref tree<node>::get(const node& v, tref ch1, tref ch2) {
 
 template <NodeType node>
 tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
-	// update ba_type if needed
-	//auto new_v = v;
-	//auto nt = v.ba_type;
 	auto propagate_types = [](const node n) {
 		switch (n.nt) {
 			case node::type::bf_interval:
@@ -862,6 +859,125 @@ tref tree<node>::get_ba_type_tree() const {
 template <NodeType node>
 const trefs& tree<node>::get_free_vars() const {
 	return tau_lang::get_free_vars<node>(get());
+}
+
+template <NodeType node>
+std::function<bool(const tref&)> or_predicate(
+		const std::function<bool(const tref&)>* query, size_t count) {
+	return [query, count](const tref& t) {
+		for (size_t i = 0; i < count; ++i) {
+			if (query[i](t)) return true;
+		}
+		return false;
+	};
+}
+
+template <NodeType node>
+std::map<size_t, trefs> select_by_predicate(
+		const trefs refs,
+		const std::function<bool(const tref&)>* queries,
+		const size_t count) {
+	std::map<size_t, trefs> result;
+	for (const tref& r : refs) {
+		for (size_t i = 0; i < count; ++i) {
+			if (queries[i](r)) {
+				result[i].push_back(r);
+			}
+		}
+	}
+	return result;
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_top_by_predicate(
+		const std::function<bool(const tref&)>* queries,
+		const size_t count) const {
+	auto refs = select_top(or_predicate<node>(queries, count));
+	return select_by_predicate<node>(refs, queries, count);
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_top_by_predicate(
+		const std::initializer_list<std::function<bool(const tref&)>>& queries) const  {
+	auto refs = select_top(or_predicate<node>(queries.begin(), queries.size()));
+	return select_by_predicate<node>(refs, queries.begin(), queries.size());
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_top_by_predicate(
+		const std::vector<std::function<bool(const tref&)>>& queries) const {
+	auto refs = select_top(or_predicate<node>(queries.data(), queries.size()));
+	return select_by_predicate<node>(refs, queries.data(), queries.size());
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_top_until_by_predicate(
+		const std::function<bool(const tref&)>* queries, const size_t count,
+		const auto& until) const {
+	auto refs = select_top_until(or_predicate<node>(queries, count), until);
+	return select_by_predicate<node>(refs, queries, count);
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_top_until_by_predicate(
+		const std::initializer_list<std::function<bool(const tref&)>>& queries,
+		const auto& until) const {
+	auto refs = select_top_until(or_predicate<node>(queries.begin(), queries.size()), until);
+	return select_by_predicate<node>(refs, queries.begin(), queries.size());
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_top_until_by_predicate(
+		const std::vector<std::function<bool(const tref&)>>& queries,
+		const auto& until) const {
+	auto refs = select_top_until(or_predicate<node>(queries.data(), queries.size()), until);
+	return select_by_predicate<node>(refs, queries.data(), queries.size());
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_all_by_predicate(
+		const std::function<bool(const tref&)>* queries, const size_t count) const {
+	auto refs = select_all(or_predicate<node>(queries, count));
+	return select_by_predicate<node>(refs, queries, count);
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_all_by_predicate(
+		const std::initializer_list<std::function<bool(const tref&)>>& queries) const {
+	auto refs = select_all(or_predicate<node>(queries.begin(), queries.size()));
+	return select_by_predicate<node>(refs, queries.begin(), queries.size());
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_all_by_predicate(
+		const std::vector<std::function<bool(const tref&)>>& queries) const {
+	auto refs = select_all(or_predicate<node>(queries.data(), queries.size()));
+	return select_by_predicate<node>(refs, queries.data(), queries.size());
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_all_until_by_predicate(
+		const std::function<bool(const tref&)>* queries, const size_t count,
+		const auto& until) const {
+	auto refs = select_all_until(or_predicate<node>(queries, count), until);
+	return select_by_predicate<node>(refs, queries, count);
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_all_until_by_predicate(
+		const std::initializer_list<std::function<bool(const tref&)>>& queries,
+		const auto& until) const {
+	auto refs = select_all_until(or_predicate<node>(queries.begin(), queries.size()), until);
+	return select_by_predicate<node>(refs, queries.begin(), queries.size());
+}
+
+template <NodeType node>
+std::map<size_t, trefs> tree<node>::select_all_until_by_predicate(
+		const std::vector<std::function<bool(const tref&)>>& queries,
+		const auto& until) const {
+	auto refs = select_all_until(
+		or_predicate<node>(queries.data(), queries.size()), until);
+	return select_by_predicate<node>(refs, queries.data(), queries.size());
 }
 
 } // namespace idni::tau_lang

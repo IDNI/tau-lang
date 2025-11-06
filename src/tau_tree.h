@@ -352,6 +352,42 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	const trefs& get_free_vars() const;
 
 	// ---------------------------------------------------------------------
+	// helpers for querying
+
+	// TODO (LOW) this could be move to the parser
+
+	std::map<size_t, trefs> select_top_by_predicate(
+		const std::function<bool(const tref&)>* queries, const size_t count) const;
+	std::map<size_t, trefs> select_top_by_predicate(
+		const std::initializer_list<std::function<bool(const tref&)>>& queries) const;
+	std::map<size_t, trefs> select_top_by_predicate(
+		const std::vector<std::function<bool(const tref&)>>& queries) const;
+	std::map<size_t, trefs> select_top_until_by_predicate(
+		const std::function<bool(const tref&)>* queries, const size_t count,
+		const auto& until) const;
+	std::map<size_t, trefs> select_top_until_by_predicate(
+		const std::initializer_list<std::function<bool(const tref&)>>& queries,
+		const auto& until) const;
+	std::map<size_t, trefs> select_top_until_by_predicate(
+		const std::vector<std::function<bool(const tref&)>>& queries,
+		const auto& until) const;
+	std::map<size_t, trefs> select_all_by_predicate(
+		const std::function<bool(const tref&)>* queries, const size_t count) const;
+	std::map<size_t, trefs> select_all_by_predicate(
+		const std::initializer_list<std::function<bool(const tref&)>>& queries) const;
+	std::map<size_t, trefs> select_all_by_predicate(
+		const std::vector<std::function<bool(const tref&)>>& queries) const;
+	std::map<size_t, trefs> select_all_until_by_predicate(
+		const std::function<bool(const tref&)>* queries, const size_t count,
+		const auto& until) const;
+	std::map<size_t, trefs> select_all_until_by_predicate(
+		const std::initializer_list<std::function<bool(const tref&)>>& queries,
+		const auto& until) const;
+	std::map<size_t, trefs> select_all_until_by_predicate(
+		const std::vector<std::function<bool(const tref&)>>& queries,
+		const auto& until) const;
+
+	// ---------------------------------------------------------------------
 	// from parser (tau_tree_from_parser.tmpl.h)
 
 	struct get_options {
