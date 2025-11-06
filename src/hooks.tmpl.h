@@ -122,14 +122,14 @@ template <NodeType node>
 tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
 	HOOK_LOGGING(LOG_TRACE << "_0_typed " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_f, ba_type), 0, 0);
-	return tau::get_raw(node(tau::bf), &x, 1, r);
+	return tau::get_raw(node::ba_typed(tau::bf, ba_type), &x, 1, r);
 }
 
 template <NodeType node>
 tref get_hook<node>::_1_typed(size_t ba_type, tref r) {
 	HOOK_LOGGING(LOG_TRACE << "_1_typed " << LOG_BA_TYPE(ba_type);)
 	tref x = tau::get_raw(node::ba_typed(tau::bf_t, ba_type), 0, 0);
-	return tau::get_raw(node(tau::bf), &x, 1, r);
+	return tau::get_raw(node::ba_typed(tau::bf, ba_type), &x, 1, r);
 }
 
 template <NodeType node>

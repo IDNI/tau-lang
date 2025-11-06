@@ -69,7 +69,7 @@ TEST_SUITE("syntactic_path_simplification") {
 		const char* sample = "(ex x x = 0) && (ex x x != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
-		CHECK(tau::get(res) == tau::get(fm));
+		CHECK(tau::get(res).to_str() == "(ex x x != 0) && (ex x x = 0)");
 	}
 }
 
