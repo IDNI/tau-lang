@@ -367,7 +367,10 @@ TEST_SUITE("with inputs and outputs") {
 
 	TEST_CASE("i1[t] = o1[t]") {
 		const char* sample = "i1[t] = o1[t].";
-		auto ins = build_i1_inputs({ tau::_1(), tau::_0(), tau::_0() });
+		auto ins = build_i1_inputs({
+			tau::_1(tau_type_id<node_t>()),
+			tau::_0(tau_type_id<node_t>()),
+			tau::_0(tau_type_id<node_t>()) });
 		auto memory = run_test(sample, ins, 3);
 		CHECK ( !memory.value().empty() );
 	}
@@ -379,7 +382,10 @@ TEST_SUITE("with inputs and outputs") {
 	// which is an assumption on an input stream
 	TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t] = o1[t] && o1[0] = 0.";
-		auto ins = build_i1_inputs({ tau::_1(), tau::_1(), tau::_1() });
+		auto ins = build_i1_inputs({
+			tau::_1(tau_type_id<node_t>()),
+			tau::_1(tau_type_id<node_t>()),
+			tau::_1(tau_type_id<node_t>()) });
 		auto memory = run_test(sample, ins, 3);
 		CHECK ( (!memory.has_value() || memory.value().empty()) );
 	}
@@ -388,7 +394,10 @@ TEST_SUITE("with inputs and outputs") {
 	// at the beginning.
 	TEST_CASE("i1[t-1] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t-1] = o1[t] && o1[0] = 0.";
-		auto ins = build_i1_inputs({ tau::_1(), tau::_1(), tau::_1() });
+		auto ins = build_i1_inputs({
+			tau::_1(tau_type_id<node_t>()),
+			tau::_1(tau_type_id<node_t>()),
+			tau::_1(tau_type_id<node_t>()) });
 		auto memory = run_test(sample, ins, 2);
 		CHECK ( !memory.value().empty() );
 	}
@@ -454,7 +463,7 @@ TEST_SUITE("test outputs") {
 #endif // DEBUG
 
 		foutputs<node_t> outputs(output_map);
-		assignment<node_t> output = { { var_0, tau::_1() } };
+		assignment<node_t> output = { { var_0, tau::_1(sbf_type_id<node_t>()) } };
 
 		CHECK( outputs.type_of(var) > 0 );
 		CHECK ( outputs.write(output) );
@@ -463,7 +472,7 @@ TEST_SUITE("test outputs") {
 	TEST_CASE("writing to files: two outputs") {
 		bdd_init<Bool>();
 		typed_io_vars output_map;
-		size_t type = get_ba_type_id<node_t>(sbf_type<node_t>());
+		size_t type = sbf_type_id<node_t>();
 		tref var1 = build_var_name_indexed<node_t>(1);
 		tref var2 = build_var_name_indexed<node_t>(2);
 		size_t var1_sid = get_var_name_sid<node_t>(var1);
@@ -482,8 +491,8 @@ TEST_SUITE("test outputs") {
 
 		foutputs<node_t> outputs(output_map);
 		assignment<node_t> output = {
-			{ var1_0, tau::_1() },
-			{ var2_0, tau::_0() }
+			{ var1_0, tau::_1(type) },
+			{ var2_0, tau::_0(type) }
 		};
 
 		CHECK( outputs.type_of(var1) > 0 );
@@ -494,7 +503,7 @@ TEST_SUITE("test outputs") {
 	TEST_CASE("writing to files: completing outputs") {
 		bdd_init<Bool>();
 		typed_io_vars output_map;
-		size_t type = get_ba_type_id<node_t>(sbf_type<node_t>());
+		size_t type = sbf_type_id<node_t>();
 		auto var1 = build_var_name_indexed<node_t>(1);
 		auto var2 = build_var_name_indexed<node_t>(2);
 		size_t var1_sid = get_var_name_sid<node_t>(var1);
@@ -513,8 +522,8 @@ TEST_SUITE("test outputs") {
 
 		foutputs<node_t> outputs(output_map);
 		assignment<node_t> output = {
-			{ var1_0, tau::_1() },
-			{ var2_1, tau::_1() }
+			{ var1_0, tau::_1(type) },
+			{ var2_1, tau::_1(type) }
 		};
 
 		CHECK( outputs.type_of(var1) > 0 );

@@ -502,20 +502,20 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	static tref apply_builder(const rewriter::builder& b, trefs n);
 
-	static tref _0();
-	static tref _1();
+	static tref _0(size_t type_id);
+	static tref _1(size_t type_id);
 	static tref _F();
 	static tref _T();
-	static tref _0_trimmed();
-	static tref _1_trimmed();
+	static tref _0_trimmed(size_t type_id);
+	static tref _1_trimmed(size_t type_id);
 	static tref _F_trimmed();
 	static tref _T_trimmed();
-	static const tree<node>& get_0();
-	static const tree<node>& get_1();
+	static const tree<node>& get_0(size_t type_id);
+	static const tree<node>& get_1(size_t type_id);
 	static const tree<node>& get_F();
 	static const tree<node>& get_T();
-	static const tree<node>& get_0_trimmed();
-	static const tree<node>& get_1_trimmed();
+	static const tree<node>& get_0_trimmed(size_t type_id);
+	static const tree<node>& get_1_trimmed(size_t type_id);
 	static const tree<node>& get_F_trimmed();
 	static const tree<node>& get_T_trimmed();
 
@@ -566,10 +566,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_fall(tref l, tref r);
 	static tref build_bf_fex(tref l, tref r);
 	static tref build_bf_or(tref l, tref r);
-	static tref build_bf_or(const auto& bfs);
+	static tref build_bf_or(const auto& bfs, size_t type_id);
 	static tref build_bf_xor(tref l, tref r);
 	static tref build_bf_and(tref l, tref r);
-	static tref build_bf_and(const auto& bfs);
+	static tref build_bf_and(const auto& bfs, size_t type_id);
 	static tref build_bf_neg(tref l);
 	static tref build_bf_shl(tref l, tref r);
 	static tref build_bf_shr(tref l, tref r);
@@ -581,9 +581,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 
 	// terminals, variables and constants
 	static tref build_bf_t_type(size_t ba_tid);
-	static tref build_bf_t_type(const std::string& type);
 	static tref build_bf_f_type(size_t ba_tid);
-	static tref build_bf_f_type(const std::string& type);
 	static tref build_ba_constant(const constant& constant,
 				      size_t ba_type_id);
 	static tref build_bf_ba_constant(const constant& constant,

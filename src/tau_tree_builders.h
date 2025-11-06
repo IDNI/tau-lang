@@ -12,34 +12,34 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 
 template <NodeType node>
-tref _0();
+tref _0(size_t type_id);
 template <NodeType node>
-tref _1();
+tref _1(size_t type_id);
 template <NodeType node>
 tref _F();
 template <NodeType node>
 tref _T();
 template <NodeType node>
-tref _0_trimmed();
+tref _0_trimmed(size_t type_id);
 template <NodeType node>
-tref _1_trimmed();
+tref _1_trimmed(size_t type_id);
 template <NodeType node>
 tref _F_trimmed();
 template <NodeType node>
 tref _T_trimmed();
 
 template <NodeType node>
-const tree<node>& get_0();
+const tree<node>& get_0(size_t type_id);
 template <NodeType node>
-const tree<node>& get_1();
+const tree<node>& get_1(size_t type_id);
 template <NodeType node>
 const tree<node>& get_F();
 template <NodeType node>
 const tree<node>& get_T();
 template <NodeType node>
-const tree<node>& get_0_trimmed();
+const tree<node>& get_0_trimmed(size_t type_id);
 template <NodeType node>
-const tree<node>& get_1_trimmed();
+const tree<node>& get_1_trimmed(size_t type_id);
 template <NodeType node>
 const tree<node>& get_F_trimmed();
 template <NodeType node>
@@ -172,7 +172,7 @@ template <NodeType node>
 tref build_bf_or(tref l, tref r);
 
 template <NodeType node>
-tref build_bf_or(const auto& bfs);
+tref build_bf_or(const auto& bfs, size_t type_id);
 
 template <NodeType node>
 tref build_bf_xor(tref l, tref r);
@@ -181,7 +181,7 @@ template <NodeType node>
 tref build_bf_and(tref l, tref r);
 
 template <NodeType node>
-tref build_bf_and(const auto& bfs);
+tref build_bf_and(const auto& bfs, size_t type_id);
 
 template <NodeType node>
 tref build_bf_neg(tref l);

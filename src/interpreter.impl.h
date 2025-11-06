@@ -467,7 +467,6 @@ std::pair<std::optional<assignment<node>>, bool>
 			for (const auto& [k, v]: memory)
 				LOG_TRACE << "\t" << k << " := " << v << " ";
 #endif // DEBUG
-
 			auto solution = solution_with_max_update(current);
 
 #ifdef DEBUG
@@ -546,8 +545,8 @@ std::pair<std::optional<assignment<node>>, bool>
 						memory.emplace(ot, zero_term);
 						global.emplace(ot, zero_term);
 					} else {
-						memory.emplace(ot, tau::_0());
-						global.emplace(ot, tau::_0());
+						memory.emplace(ot, tau::_0(ctype));
+						global.emplace(ot, tau::_0(ctype));
 					}
 				}
 			}
@@ -1008,8 +1007,10 @@ solution_with_max_update(tref spec) {
 		// Check that f is wide (not 0 and has more than one zero), otherwise continue
 		f = tt(f) | bf_reduce_canonical<node>() | tt::ref;
 		if (tau::get(f).equals_0()) continue;
-		tref f0 = rewriter::replace<node>(f, u, tau::_0());
-		tref f1 = rewriter::replace<node>(f, u, tau::_1());
+		tref f0 = rewriter::replace<node>(f, u, tau::_0(
+			get_ba_type_id<node>(tau_type<node>())));
+		tref f1 = rewriter::replace<node>(f, u, tau::_1(
+			get_ba_type_id<node>(tau_type<node>())));
 		tref f0_xor_f1 = tt(build_bf_xor<node>(f0, f1))
 			| bf_reduce_canonical<node>() | tt::ref;
 		if (tau::get(f0_xor_f1).equals_0()
@@ -1022,12 +1023,14 @@ solution_with_max_update(tref spec) {
 		if (!sol.has_value()) continue;
 		// Now we need to add solution for u[t]
 		max_u = rewriter::replace<node>(max_u, sol.value());
-		max_u = tt(replace_free_vars_by<node>(max_u, tau::_0_trimmed()))
+		max_u = tt(replace_free_vars_by<node>(max_u,
+			tau::_0_trimmed(find_ba_type<node>(max_u))))
 			| bf_reduce_canonical<node>() | tt::ref;
 		sol.value().emplace(u, max_u);
 		return sol;
 	}
 	// In case there is no maximal solution for u
+	// TODO: remove call to get_solution duplicate
 	return get_solution(spec);
 }
 

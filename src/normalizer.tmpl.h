@@ -832,7 +832,8 @@ struct fixed_point_transformer {
 	tref get_fallback(type nt, tref ref) {
 		auto fallback = tt(ref) | tau::ref | tau::fp_fallback;
 		if (!fallback) return nt == tau::wff
-			? tau::_F() : tau::_0();
+		// TODO: Review getting type from ref
+			? tau::_F() : tau::_0(find_ba_type<node>(ref));
 		return fallback | tt::only_child | tt::ref;
 	}
 

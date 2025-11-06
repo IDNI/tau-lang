@@ -18,7 +18,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "T.";
 		tref fm = tau::get(tau::get(sample))
 			.find_top(is<node_t, tau::wff>);
-		fm = unequal_to_not_equal<node_t>(reduce_across_bfs<node_t>(fm, false));
+		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		CHECK( tau::get(fm)[0].is(tau::wff_t) );
 	}
 
@@ -26,7 +26,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "F.";
 		tref fm = tau::get(tau::get(sample))
 			.find_top(is<node_t, tau::wff>);
-		fm = unequal_to_not_equal<node_t>(reduce_across_bfs<node_t>(fm, false));
+		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		CHECK( tau::get(fm)[0].is(tau::wff_f) );
 	}
 
@@ -36,7 +36,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		tref spec = tau::get(sample);
 		TAU_LOG_TRACE << "spec: " << TAU_LOG_FM_DUMP(spec);
 		tref fm = tt(spec) | tau::spec | tau::main | tau::wff | tt::ref;
-		tref result = unequal_to_not_equal<node_t>(reduce_across_bfs<node_t>(fm, false));
+		tref result = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		TAU_LOG_TRACE << "fm:     " << TAU_LOG_FM_DUMP(fm);
 		TAU_LOG_TRACE << "result: " << TAU_LOG_FM_DUMP(result);
 		CHECK( tau::subtree_equals(fm, result) );
@@ -47,7 +47,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = unequal_to_not_equal<node_t>(reduce_across_bfs<node_t>(fm, false));
+		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		trefs check_eq  = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		trefs check_neg = tau::get(fm).select_all(is<node_t, tau::wff_neg>);
 		CHECK( check_eq.size() == 1 );
@@ -58,7 +58,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 && Y = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = unequal_to_not_equal<node_t>(reduce_across_bfs<node_t>(fm, false));
+		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		trefs check_and = tau::get(fm).select_all(is<node_t, tau::wff_and>);
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		CHECK( check_and.size() == 1 );
@@ -69,7 +69,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X != 0 && Y != 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = unequal_to_not_equal<node_t>(reduce_across_bfs<node_t>(fm, false));
+		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		trefs check_neg = tau::get(fm).select_all(is<node_t, tau::wff_neg>);
 		trefs check_and = tau::get(fm).select_all(is<node_t, tau::wff_and>);
@@ -82,7 +82,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 || Y = 0.";
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
-		fm = unequal_to_not_equal<node_t>(reduce_across_bfs<node_t>(fm, false));
+		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		trefs check_or = tau::get(fm).select_all(is<node_t, tau::wff_or>);
 		CHECK( check_eq.size() == 2 );
@@ -125,7 +125,7 @@ TEST_SUITE("normal forms: dnf_bf") {
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tau::bf_eq
 			| tau::bf | tt::f(to_dnf<node_t, false>) | tt::ref;
-		CHECK( tau::get(fm) == tau::get_0() );
+		CHECK( tau::get(fm).equals_0() );
 	}
 
 	/*TEST_CASE("uninterpreted constants") {

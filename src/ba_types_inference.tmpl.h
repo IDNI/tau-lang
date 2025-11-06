@@ -327,10 +327,10 @@ auto update_bf_ctes = [](type_scoped_resolver<node>& resolver, tref n, const std
 				if (!types.contains(canonized)) break;
 				// If the bf_t/bf_f is not typed
 				tref new_n;
-				if (get_type_of<node>(n) == untyped_id<node>) {
+				if (get_type_of<node>(n) == untyped_type_id<node>()) {
 					// We type it according to the inferred type or tau
-					size_t type = (types.at(canonized) == untyped_id<node>)
-						? tau_type_id<node>
+					size_t type = (types.at(canonized) == untyped_type_id<node>())
+						? tau_type_id<node>()
 						: types.at(canonized);
 					if (resolver.assign(canonized, type) == false) {
 						LOG_ERROR << "Conflicting type information for  "
@@ -391,8 +391,8 @@ auto parse_ba_constants = [](tref n, const std::map<tref, size_t, subtree_less<n
 					return error = true, false;
 				}
 				// We get the type info or use the default (tau) if untyped
-				size_t type = (types.at(canonized) == untyped_id<node>)
-					? tau_type_id<node>
+				size_t type = (types.at(canonized) == untyped_type_id<node>())
+					? tau_type_id<node>()
 					: types.at(canonized);
 				// We parse the constant
 				auto new_n = tau::get_ba_constant_from_source(t.child_data(), type);
@@ -465,10 +465,10 @@ tref update_refs(type_scoped_resolver<node>& resolver, tref n, const std::map<tr
 				if (!types.contains(canonized)) break;
 				// If the variable is not typed
 				tref new_n;
-				if (get_type_of<node>(n) == untyped_id<node>) {
+				if (get_type_of<node>(n) == untyped_type_id<node>()) {
 					// We type it according to the inferred type or default
-					size_t type = (types.at(canonized) == untyped_id<node>)
-						? tau_type_id<node>
+					size_t type = (types.at(canonized) == untyped_type_id<node>())
+						? tau_type_id<node>()
 						: types.at(canonized);
 
 					if (resolver.assign(canonized, type) == false) {
@@ -527,10 +527,10 @@ tref update_variables(type_scoped_resolver<node>& resolver, tref n, const std::m
 				if (!types.contains(canonized)) break;
 				// If the variable is not typed
 				tref new_n;
-				if (get_type_of<node>(n) == untyped_id<node>) {
+				if (get_type_of<node>(n) == untyped_type_id<node>()) {
 					// We type it according to the inferred type or default
-					size_t type = (types.at(canonized) == untyped_id<node>)
-						? tau_type_id<node>
+					size_t type = (types.at(canonized) == untyped_type_id<node>())
+						? tau_type_id<node>()
 						: types.at(canonized);
 
 					if (resolver.assign(canonized, type) == false) {
@@ -582,7 +582,7 @@ auto bv_defaulting = [](tref n) -> tref {
 		auto t = tau::get(new_n);
 		if (t.get_ba_type() == get_ba_type_id<node>(bv_base_type<node>())) {
 			auto chs = t.get_children();
-			new_n = tau::get_raw(t.value.ba_retype(bv_type_id<node>), chs.data(), chs.size());
+			new_n = tau::get_raw(t.value.ba_retype(bv_type_id<node>()), chs.data(), chs.size());
 			DBG(LOG_TRACE << "infer_ba_types/bv_defaulting/n -> new_n:\n"
 				<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
 			changes.insert_or_assign(n, new_n);
@@ -652,7 +652,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// inside of a offset (ref case).
 				auto typeables = tau::get(n).select_top_until(is_typeable<node>, is_offset);
 				// We infer the common type of all the typeables in the expression
-				auto type = get_type(resolver, typeables, untyped_id<node>);
+				auto type = get_type(resolver, typeables, untyped_type_id<node>());
 				// If no common type is found, we set error and stop traversal
 				if (!type){
 					LOG_ERROR << "Conflicting type information in rec. relation "
@@ -707,7 +707,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// this case are only (sbf/tau) variables and constants.
 				auto typeables = tau::get(n).select_top(is_typeable<node>);
 				// We infer the common type of all the typeables in the expression
-				auto type = get_type(resolver, typeables, untyped_id<node>);
+				auto type = get_type(resolver, typeables, untyped_type_id<node>());
 				// If no common type is found, we set error and stop traversal
 				if (!type){
 					LOG_ERROR << "Conflicting type information in bf "
@@ -749,7 +749,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// this case are only (sbf/tau) variables and constants.
 				auto typeables = tau::get(n).select_top(is_typeable<node>);
 				// We infer the common type of all the typeables in the expression
-				auto type = get_type(resolver, typeables, untyped_id<node>);
+				auto type = get_type(resolver, typeables, untyped_type_id<node>());
 				// If no common type is found, we set error and stop traversal
 				if (!type){
 					LOG_ERROR << "Conflicting type information in bf equation "

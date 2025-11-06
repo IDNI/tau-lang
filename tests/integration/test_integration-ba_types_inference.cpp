@@ -234,7 +234,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -245,7 +245,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -256,7 +256,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>}
+			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -267,7 +267,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>}
+			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -278,7 +278,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -289,7 +289,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -300,7 +300,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>}
+			{"x", bv_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -324,7 +324,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<size_t> {
-			bv_type_id<node_t>
+			bv_type_id<node_t>()
 		};
 		CHECK( check_bv_ctes(inferred, expected) );
 	}
@@ -335,7 +335,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<size_t> {
-			bv_type_id<node_t>
+			bv_type_id<node_t>()
 		};
 		CHECK( check_bv_ctes(inferred, expected) );
 	}
@@ -346,8 +346,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>},
-			{"y", sbf_type_id<node_t>}
+			{"x", sbf_type_id<node_t>()},
+			{"y", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -358,8 +358,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>},
-			{"y", sbf_type_id<node_t>}
+			{"x", sbf_type_id<node_t>()},
+			{"y", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -370,8 +370,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"y", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()},
+			{"y", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -382,8 +382,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"y", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()},
+			{"y", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -394,8 +394,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>},
-			{"y", bv_type_id<node_t>}
+			{"x", bv_type_id<node_t>()},
+			{"y", bv_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -406,8 +406,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>},
-			{"y", bv_type_id<node_t>}
+			{"x", bv_type_id<node_t>()},
+			{"y", bv_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -442,9 +442,9 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"y", tau_type_id<node_t>},
-			{"z", tau_type_id<node_t>},
+			{"x", tau_type_id<node_t>()},
+			{"y", tau_type_id<node_t>()},
+			{"z", tau_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -455,9 +455,9 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"y", tau_type_id<node_t>},
-			{"z", tau_type_id<node_t>},
+			{"x", tau_type_id<node_t>()},
+			{"y", tau_type_id<node_t>()},
+			{"z", tau_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -468,9 +468,9 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>},
-			{"y", sbf_type_id<node_t>},
-			{"z", sbf_type_id<node_t>},
+			{"x", sbf_type_id<node_t>()},
+			{"y", sbf_type_id<node_t>()},
+			{"z", sbf_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -481,9 +481,9 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>},
-			{"y", sbf_type_id<node_t>},
-			{"z", sbf_type_id<node_t>},
+			{"x", sbf_type_id<node_t>()},
+			{"y", sbf_type_id<node_t>()},
+			{"z", sbf_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -494,9 +494,9 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>},
-			{"y", bv_type_id<node_t>},
-			{"z", bv_type_id<node_t>},
+			{"x", bv_type_id<node_t>()},
+			{"y", bv_type_id<node_t>()},
+			{"z", bv_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -520,9 +520,9 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>},
-			{"y", bv_type_id<node_t>},
-			{"z", bv_type_id<node_t>},
+			{"x", bv_type_id<node_t>()},
+			{"y", bv_type_id<node_t>()},
+			{"z", bv_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -549,8 +549,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>},
-			{"y", bv_type_id<node_t>},
+			{"x", bv_type_id<node_t>()},
+			{"y", bv_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -561,8 +561,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>},
-			{"y", bv_type_id<node_t>},
+			{"x", bv_type_id<node_t>()},
+			{"y", bv_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -573,8 +573,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>},
-			{"y", bv_type_id<node_t>},
+			{"x", bv_type_id<node_t>()},
+			{"y", bv_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -621,8 +621,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>},
-			{"y", sbf_type_id<node_t>},
+			{"x", sbf_type_id<node_t>()},
+			{"y", sbf_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -633,8 +633,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>},
-			{"y", sbf_type_id<node_t>},
+			{"x", sbf_type_id<node_t>()},
+			{"y", sbf_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -645,8 +645,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>},
-			{"y", sbf_type_id<node_t>},
+			{"x", sbf_type_id<node_t>()},
+			{"y", sbf_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -657,8 +657,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"y", tau_type_id<node_t>},
+			{"x", tau_type_id<node_t>()},
+			{"y", tau_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -669,8 +669,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"y", tau_type_id<node_t>},
+			{"x", tau_type_id<node_t>()},
+			{"y", tau_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -681,8 +681,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"y", tau_type_id<node_t>},
+			{"x", tau_type_id<node_t>()},
+			{"y", tau_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -693,7 +693,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -704,7 +704,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -716,7 +716,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>}
+			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -728,7 +728,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>}
+			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -774,9 +774,9 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<size_t> {
-			bv_type_id<node_t>,
-			bv_type_id<node_t>,
-			bv_type_id<node_t>
+			bv_type_id<node_t>(),
+			bv_type_id<node_t>(),
+			bv_type_id<node_t>()
 		};
 		CHECK( check_bv_ctes(inferred, expected_ctes) );
 	}
@@ -808,8 +808,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<size_t> {
-			sbf_type_id<node_t>,
-			sbf_type_id<node_t>
+			sbf_type_id<node_t>(),
+			sbf_type_id<node_t>()
 		};
 		CHECK( check_ctes(inferred, expected_ctes) );
 	}
@@ -824,8 +824,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<size_t> {
-			sbf_type_id<node_t>,
-			sbf_type_id<node_t>
+			sbf_type_id<node_t>(),
+			sbf_type_id<node_t>()
 		};
 		CHECK( check_ctes(inferred, expected_ctes) );
 	}
@@ -840,8 +840,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<size_t> {
-			tau_type_id<node_t>,
-			tau_type_id<node_t>
+			tau_type_id<node_t>(),
+			tau_type_id<node_t>()
 		};
 		CHECK( check_ctes(inferred, expected_ctes) );
 	}
@@ -852,8 +852,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"y", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()},
+			{"y", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -875,8 +875,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"x", sbf_type_id<node_t>}
+			{"x", tau_type_id<node_t>()},
+			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -887,7 +887,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>}
+			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -898,8 +898,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>},
-			{"x", sbf_type_id<node_t>}
+			{"x", tau_type_id<node_t>()},
+			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -933,7 +933,7 @@ TEST_SUITE("infer_ba_types: bf formulas") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -947,7 +947,7 @@ TEST_SUITE("infer_ba_types: cli commands") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>}
+			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -980,7 +980,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("sbf bf_eq symbol") {
@@ -988,7 +988,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_eq>(inferred, sbf_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_eq>(inferred, sbf_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv bf_eq symbol") {
@@ -996,7 +996,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_eq>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_eq>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv[8] bf_eq symbol") {
@@ -1012,7 +1012,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_eq symbol involving bf_t") {
@@ -1020,7 +1020,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_eq symbol involving bf_f") {
@@ -1028,7 +1028,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_eq>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_neq symbol") {
@@ -1036,7 +1036,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_neq>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_neq>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_lteq symbol") {
@@ -1044,7 +1044,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_lteq>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_lteq>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_nlteq symbol") {
@@ -1052,7 +1052,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_nlteq>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_nlteq>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_gt symbol") {
@@ -1060,7 +1060,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_gt>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_gt>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_ngt symbol") {
@@ -1068,7 +1068,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_ngt>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_ngt>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_gteq symbol") {
@@ -1076,7 +1076,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_gteq>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_gteq>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_ngteq symbol") {
@@ -1084,7 +1084,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_ngteq>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_ngteq>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_lt symbol") {
@@ -1092,7 +1092,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_lt>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_lt>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_nlt symbol") {
@@ -1100,7 +1100,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_nlt>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_nlt>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_interval symbol") {
@@ -1108,7 +1108,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_interval>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_interval>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("sbf bf_interval symbol") {
@@ -1116,7 +1116,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_interval>(inferred, sbf_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_interval>(inferred, sbf_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv bf_interval symbol") {
@@ -1124,7 +1124,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_interval>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_interval>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_and symbol") {
@@ -1132,7 +1132,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_and>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_and>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_or symbol") {
@@ -1140,7 +1140,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_or>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_or>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_xor symbol") {
@@ -1148,7 +1148,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau bf_neg symbol") {
@@ -1156,7 +1156,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_neg>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_neg>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv bf_add symbol") {
@@ -1164,7 +1164,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_add>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_add>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv bf_sub symbol") {
@@ -1172,7 +1172,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_sub>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_sub>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv bf_mul symbol") {
@@ -1180,7 +1180,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_mul>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_mul>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv bf_div symbol") {
@@ -1188,7 +1188,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_div>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_div>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv bf_mod symbol") {
@@ -1196,7 +1196,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_mod>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_mod>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv bf_shr symbol") {
@@ -1204,7 +1204,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_shr>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_shr>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv bf_shl symbol") {
@@ -1212,7 +1212,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_shl>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_shl>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv[8] bf_shl symbol") {
@@ -1242,7 +1242,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id<node_t>()) );
 	}
 
 	TEST_CASE("sbf xor symbol (y2)") {
@@ -1250,7 +1250,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id<node_t>()) );
 	}
 
 	TEST_CASE("sbf xor symbol (y3)") {
@@ -1258,7 +1258,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, sbf_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau xor symbol") {
@@ -1266,7 +1266,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau xor symbol (y2)") {
@@ -1274,7 +1274,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("tau xor symbol (y3)") {
@@ -1282,7 +1282,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, tau_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, tau_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv xor symbol") {
@@ -1290,7 +1290,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv xor symbol (y2)") {
@@ -1298,7 +1298,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>()) );
 	}
 
 	TEST_CASE("bv xor symbol (y3)") {
@@ -1306,7 +1306,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>()) );
 	}
 }
 
@@ -1319,8 +1319,8 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( inferred != nullptr );
 		DBG(LOG_TRACE << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"n", untyped_id<node_t>},
-			{"x", tau_type_id<node_t>}
+			{"n", untyped_type_id<node_t>()},
+			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -1332,8 +1332,8 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( inferred != nullptr );
 		DBG(LOG_TRACE << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"n", untyped_id<node_t>},
-			{"x", sbf_type_id<node_t>}
+			{"n", untyped_type_id<node_t>()},
+			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -1345,8 +1345,8 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( inferred != nullptr );
 		DBG(LOG_TRACE << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"n", untyped_id<node_t>},
-			{"x", sbf_type_id<node_t>}
+			{"n", untyped_type_id<node_t>()},
+			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -1369,9 +1369,9 @@ TEST_SUITE("infer_ba_types: I/O vars") {
 		CHECK( inferred != nullptr );
 		DBG(LOG_TRACE << "Inferred: " << LOG_FM_TREE(inferred);)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"i1", sbf_type_id<node_t>},
-			{"o1", sbf_type_id<node_t>},
-			{"i1", sbf_type_id<node_t>}
+			{"i1", sbf_type_id<node_t>()},
+			{"o1", sbf_type_id<node_t>()},
+			{"i1", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}

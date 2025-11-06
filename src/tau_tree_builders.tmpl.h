@@ -21,35 +21,35 @@ tref tree<node>::apply_builder(const rewriter::builder& b, trefs n) {
 // builders
 
 template <NodeType node>
-tref _0() { return get_0<node>().get(); }
+tref _0(size_t type_id) { return get_0<node>(type_id).get(); }
 template <NodeType node>
-tref _1() { return get_1<node>().get(); }
+tref _1(size_t type_id) { return get_1<node>(type_id).get(); }
 template <NodeType node>
 tref _F() { return get_F<node>().get(); }
 template <NodeType node>
 tref _T() { return get_T<node>().get(); }
 
 template <NodeType node>
-tref _0_trimmed() { return get_0_trimmed<node>().get(); }
+tref _0_trimmed(size_t type_id) { return get_0_trimmed<node>(type_id).get(); }
 template <NodeType node>
-tref _1_trimmed() { return get_1_trimmed<node>().get(); }
+tref _1_trimmed(size_t type_id) { return get_1_trimmed<node>(type_id).get(); }
 template <NodeType node>
 tref _F_trimmed() { return get_F_trimmed<node>().get(); }
 template <NodeType node>
 tref _T_trimmed() { return get_T_trimmed<node>().get(); }
 
 template <NodeType node>
-const tree<node>& get_0() {
+const tree<node>& get_0(size_t type_id) {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::bf, _0_trimmed<node>()));
-	return tau::get(cached);
+	return tau::get(tau::get_typed(tau::bf,
+		_0_trimmed<node>(type_id), type_id));
 }
 
 template <NodeType node>
-const tree<node>& get_1() {
+const tree<node>& get_1(size_t type_id) {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::bf, _1_trimmed<node>()));
-	return tau::get(cached);
+	return tau::get(tau::get_typed(tau::bf,
+		_1_trimmed<node>(type_id), type_id));
 }
 
 template <NodeType node>
@@ -67,17 +67,15 @@ const tree<node>& get_T() {
 }
 
 template <NodeType node>
-const tree<node>& get_0_trimmed() {
+const tree<node>& get_0_trimmed(size_t type_id) {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::bf_f));
-	return tau::get(cached);
+	return tau::get(tau::get_typed(tau::bf_f, type_id));
 }
 
 template <NodeType node>
-const tree<node>& get_1_trimmed() {
+const tree<node>& get_1_trimmed(size_t type_id) {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::bf_t));
-	return tau::get(cached);
+	return tau::get(tau::get_typed(tau::bf_t, type_id));
 }
 
 template <NodeType node>
@@ -287,7 +285,7 @@ tref build_bf_eq_0(tref l) {
 	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_eq, l, _0<node>()));
+	return tau::get(tau::wff, tau::get(tau::bf_eq, l, _0<node>(tau::get(l).get_ba_type())));
 }
 
 template<NodeType node>
@@ -303,7 +301,8 @@ tref build_bf_neq_0(tref l) {
 	DBG(assert(l != nullptr);)
 	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf));)
-	return tau::get(tau::wff, tau::get(tau::bf_neq, l, _0<node>()));
+	return tau::get(tau::wff, tau::get(tau::bf_neq, l, _0<node>(
+		tau::get(l).get_ba_type())));
 }
 
 template <NodeType node>
@@ -416,8 +415,8 @@ tref build_bf_or(tref l, tref r) {
 }
 
 template <NodeType node>
-tref build_bf_or(const auto& bfs) {
-	return std::accumulate(bfs.begin(), bfs.end(), _0<node>(),
+tref build_bf_or(const auto& bfs, size_t type_id) {
+	return std::accumulate(bfs.begin(), bfs.end(), _0<node>(type_id),
 		[](tref l, tref r) { return build_bf_or<node>(l, r); });
 }
 
@@ -438,8 +437,8 @@ tref build_bf_and(tref l, tref r) {
 }
 
 template <NodeType node>
-tref build_bf_and(const auto& bfs) {
-	return std::accumulate(bfs.begin(), bfs.end(), _1<node>(),
+tref build_bf_and(const auto& bfs, size_t type_id) {
+	return std::accumulate(bfs.begin(), bfs.end(), _1<node>(type_id),
 		[](tref l, tref r) { return build_bf_and<node>(l, r);});
 }
 
@@ -461,6 +460,7 @@ tref build_bf_shl(tref l, tref r) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_shl, l, r));
 }
 
@@ -469,6 +469,7 @@ tref build_bf_shr(tref l, tref r) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_shr, l, r));
 }
 
@@ -477,6 +478,7 @@ tref build_bf_add(tref l, tref r) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_add, l, r));
 }
 
@@ -485,6 +487,7 @@ tref build_bf_sub(tref l, tref r) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_sub, l, r));
 }
 
@@ -493,6 +496,7 @@ tref build_bf_mul(tref l, tref r) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_mul, l, r));
 }
 
@@ -501,6 +505,7 @@ tref build_bf_div(tref l, tref r) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_div, l, r));
 }
 
@@ -509,6 +514,7 @@ tref build_bf_mod(tref l, tref r) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_mod, l, r));
 }
 
@@ -774,34 +780,34 @@ tref build_spec(const rr<node>& nso_rr) {
 // -----------------------------------------------------------------------------
 
 template <NodeType node>
-tref tree<node>::_0() { return tau_lang::_0<node>(); }
+tref tree<node>::_0(size_t type_id) { return tau_lang::_0<node>(type_id); }
 template <NodeType node>
-tref tree<node>::_1() { return tau_lang::_1<node>(); }
+tref tree<node>::_1(size_t type_id) { return tau_lang::_1<node>(type_id); }
 template <NodeType node>
 tref tree<node>::_F() { return tau_lang::_F<node>(); }
 template <NodeType node>
 tref tree<node>::_T() { return tau_lang::_T<node>(); }
 template <NodeType node>
-tref tree<node>::_0_trimmed() { return tau_lang::_0_trimmed<node>(); }
+tref tree<node>::_0_trimmed(size_t type_id) { return tau_lang::_0_trimmed<node>(type_id); }
 template <NodeType node>
-tref tree<node>::_1_trimmed() { return tau_lang::_1_trimmed<node>(); }
+tref tree<node>::_1_trimmed(size_t type_id) { return tau_lang::_1_trimmed<node>(type_id); }
 template <NodeType node>
 tref tree<node>::_F_trimmed() { return tau_lang::_F_trimmed<node>(); }
 template <NodeType node>
 tref tree<node>::_T_trimmed() { return tau_lang::_T_trimmed<node>(); }
 
 template <NodeType node>
-const tree<node>& tree<node>::get_0() { return tau_lang::get_0<node>(); }
+const tree<node>& tree<node>::get_0(size_t type_id) { return tau_lang::get_0<node>(type_id); }
 template <NodeType node>
-const tree<node>& tree<node>::get_1() { return tau_lang::get_1<node>(); }
+const tree<node>& tree<node>::get_1(size_t type_id) { return tau_lang::get_1<node>(type_id); }
 template <NodeType node>
 const tree<node>& tree<node>::get_F() { return tau_lang::get_F<node>(); }
 template <NodeType node>
 const tree<node>& tree<node>::get_T() { return tau_lang::get_T<node>(); }
 template <NodeType node>
-const tree<node>& tree<node>::get_0_trimmed() { return tau_lang::get_0_trimmed<node>(); }
+const tree<node>& tree<node>::get_0_trimmed(size_t type_id) { return tau_lang::get_0_trimmed<node>(type_id); }
 template <NodeType node>
-const tree<node>& tree<node>::get_1_trimmed() { return tau_lang::get_1_trimmed<node>(); }
+const tree<node>& tree<node>::get_1_trimmed(size_t type_id) { return tau_lang::get_1_trimmed<node>(type_id); }
 template <NodeType node>
 const tree<node>& tree<node>::get_F_trimmed() { return tau_lang::get_F_trimmed<node>(); }
 template <NodeType node>
@@ -1010,8 +1016,8 @@ tref tree<node>::build_bf_or(tref l, tref r) {
 }
 
 template <NodeType node>
-tref tree<node>::build_bf_or(const auto& bfs) {
-	return tau_lang::build_bf_or<node>(bfs);
+tref tree<node>::build_bf_or(const auto& bfs, size_t type_id) {
+	return tau_lang::build_bf_or<node>(bfs, type_id);
 }
 
 template <NodeType node>
@@ -1025,8 +1031,8 @@ tref tree<node>::build_bf_and(tref l, tref r) {
 }
 
 template <NodeType node>
-tref tree<node>::build_bf_and(const auto& bfs) {
-	return tau_lang::build_bf_and<node>(bfs);
+tref tree<node>::build_bf_and(const auto& bfs, size_t type_id) {
+	return tau_lang::build_bf_and<node>(bfs, type_id);
 }
 
 template <NodeType node>
@@ -1078,18 +1084,8 @@ tref tree<node>::build_bf_t_type(size_t ba_tid) {
 }
 
 template <NodeType node>
-tref tree<node>::build_bf_t_type(const std::string& type) {
-	return tau_lang::build_bf_t_type<node>(get_ba_type_id<node>(type));
-}
-
-template <NodeType node>
 tref tree<node>::build_bf_f_type(size_t ba_tid) {
 	return tau_lang::build_bf_f_type<node>(ba_tid);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_f_type(const std::string& type_name) {
-	return tau_lang::build_bf_f_type<node>(get_ba_type_id<node>(type_name));
 }
 
 template <NodeType node>

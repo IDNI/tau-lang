@@ -126,7 +126,10 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 	tt t = ctn();
 	int_t condition;
 	bool is_left;
-	auto to_ba = [](const bool c) { return c ? tau::_1() : tau::_0(); };
+	auto to_ba = [](const bool c) {
+		const size_t type = sbf_type_id<node>();
+		return c ? tau::_1(type) : tau::_0(type);
+	};
 
 	if (ctn[0][0].is(tau::num))
 		is_left = true,  condition = ctn[0][0].get_num();
@@ -239,7 +242,7 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 	// We need a placeholder symbol in order to substitute during the next step
 	tref c_chi = rewriter::replace<node>(chi, changes);
 	tref c_pholder = build_out_var_at_n<node>("_pholder",
-							time_point + step_num, 0);
+							time_point + step_num, sbf_type_id<node>());
 	c_pholder = tau::build_bf_eq_0(c_pholder);
 	tref c_st = rewriter::replace<node>(st, changes);
 	pholder_to_st.emplace(c_pholder, c_st);
@@ -758,8 +761,9 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	}
 
 	LOG_TRACE << "transforming eventual variables: " << LOG_FM(fm);
+	size_t flag_type = sbf_type_id<node>();
 	tref ev_assm = tau::_T();
-	tref ev_collection = tau::_0();
+	tref ev_collection = tau::_0(flag_type);
 	for (size_t n = 0; n < smt_fms.size(); ++n) {
 		trefs st_io_vars = tau::get(smt_fms[n])
 				.select_top(is_child<node, tau::io_var>);
@@ -775,7 +779,6 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 
 		std::stringstream ss; ss << "_e" << n;
 		tref out = tau::build_var_name(ss.str());
-		size_t flag_type = get_ba_type_id<node>(sbf_type<node>());
 		// Build the eventual var flags based on the maximal lookback
 		tref eNt_without_lookback = build_out_var_at_t<node>(
 			out, flag_type, "t");
@@ -953,7 +956,6 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		if (run) run = tau::build_wff_and(run, current_aw);
 		else run = current_aw;
 		auto current_flag = fm_at_time_point<node>(st_flags, st_io_vars, i);
-
 		auto normed_run = normalize_non_temp<node>(
 					tau::build_wff_and(run, current_flag));
 		if (is_run_satisfiable<node>(normed_run)) {
@@ -999,7 +1001,6 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 			TAU_TO_STR(tau::_F()), output);
 		return tau::_F();
 	}
-
 	chi_inf = transform_back_non_initials<node>(chi_inf, point_after_inits-1);
 	io_vars = tau::get(chi_inf).select_top(is_child<node, tau::io_var>);
 	auto chi_inf_anchored = fm_at_time_point<node>(chi_inf, io_vars,
