@@ -47,7 +47,7 @@ struct ba_constants {
 	static void cleanup();
 
 private:
-	inline static std::vector<constant> C;  // pool of constants
+	inline static std::vector<std::pair<constant, size_t>> C;  // pool of constants
 	inline static trefs T;                  // pool of constant tree nodes with type info
 };
 
