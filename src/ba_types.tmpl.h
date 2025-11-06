@@ -16,6 +16,11 @@ tref tau_type() {
 }
 
 template<NodeType node>
+size_t tau_type_id() {
+	return ba_types<node>::id(tau_type<node>());
+}
+
+template<NodeType node>
 bool is_tau_type(tref t) {
 	using tau = tree<node>;
 	return tau::get(t)[0].get_string() == "tau";
@@ -31,6 +36,11 @@ tref bool_type() {
 	using tau = tree<node>;
 	tref type = tau::get(tau::type, "bool");
 	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+size_t bool_type_id() {
+	return ba_types<node>::id(bool_type<node>());
 }
 
 template<NodeType node>
@@ -52,6 +62,11 @@ tref nat_type() {
 }
 
 template<NodeType node>
+size_t nat_type_id() {
+	return ba_types<node>::id(nat_type<node>());
+}
+
+template<NodeType node>
 bool is_nat_type(tref t) {
 	using tau = tree<node>;
 	return tau::get(t)[0].get_string() == "nat";
@@ -62,6 +77,11 @@ tref untyped_type() {
 	using tau = tree<node>;
 	tref type = tau::get(tau::type, "untyped");
 	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+size_t untyped_type_id() {
+	return ba_types<node>::id(untyped_type<node>());
 }
 
 template<NodeType node>
@@ -85,6 +105,11 @@ tref sbf_type() {
 }
 
 template<NodeType node>
+size_t sbf_type_id() {
+	return ba_types<node>::id(sbf_type<node>());
+}
+
+template<NodeType node>
 bool is_sbf_type(tref t) {
 	using tau = tree<node>;
 	return tau::get(t)[0].get_string() == "sbf";
@@ -103,6 +128,11 @@ tref bv_type(unsigned short bitwidth) {
 	tref type = tau::get(tau::type, "bv");
 	tref subtype = tau::get(tau::subtype, tau::get_num(bitwidth));
 	return tau::get(tau::typed, type, subtype);
+}
+
+template<NodeType node>
+size_t bv_type_id(unsigned short bitwidth) {
+	return ba_types<node>::id(bv_type<node>(bitwidth));
 }
 
 template<NodeType node>

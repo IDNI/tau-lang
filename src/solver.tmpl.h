@@ -54,8 +54,8 @@ std::optional<solution<node>> find_solution(equality eq,
 	{
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		tref g = rewriter::replace<node>(f, vars[0], tau::_1());
-		tref h = rewriter::replace<node>(f, vars[0], tau::_0());
+		tref g = rewriter::replace<node>(f, vars[0], tau::_1(find_ba_type<node>(vars[0])));
+		tref h = rewriter::replace<node>(f, vars[0], tau::_0(find_ba_type<node>(vars[0])));
 		tref gh = tt(tau::get(g) & tau::get(h))
 			| bf_reduce_canonical<node>() | tt::ref;
 #ifdef DEBUG
@@ -144,7 +144,7 @@ std::optional<solution<node>> find_maximal_solution(const equation_system<node>&
 	trefs vars = get_variables<node>(system);
 	if (vars.empty()) return solution<node>();
 	auto substitution = solution<node>();
-	for (tref var : vars) substitution[var] = tau::_1();
+	for (tref var : vars) substitution[var] = tau::_1(find_ba_type<node>(var));
 	return (system.first)
 		? find_solution<node>(system.first.value(), substitution,
 							solver_mode::maximum)
@@ -159,7 +159,7 @@ std::optional<solution<node>> find_minimal_solution(
 	trefs vars = get_variables<node>(system);
 	if (vars.empty()) return solution<node>();
 	auto substitution = solution<node>();
-	for (tref var : vars) substitution[var] = tau::_0();
+	for (tref var : vars) substitution[var] = tau::_0(find_ba_type<node>(var));
 	return (system.first)
 		? find_solution<node>(system.first.value(), substitution,
 							solver_mode::minimum)
@@ -172,7 +172,7 @@ std::optional<solution<node>> find_solution(equality eq) {
 	trefs vars = get_variables<node>(eq);
 	if (vars.empty()) return solution<node>();
 	auto substitution = solution<node>();
-	for (tref var : vars) substitution[var] = tau::_1();
+	for (tref var : vars) substitution[var] = tau::_1(find_ba_type<node>(var));
 	return find_solution<node>(eq, substitution, solver_mode::maximum);
 }
 
@@ -244,7 +244,7 @@ struct minterm_iterator {
 			// we start with the full bf...
 			tref partial_bf = f;
 			// ... and the first variable (for computing the first partial minterm)
-			tref partial_minterm = tau::_1();
+			tref partial_minterm = tau::_1(find_ba_type<node>(f));
 			for (tref v : vars) {
 				// we add the current choice to the list of choices...
 				partial_minterm = (tau::get(partial_minterm)
@@ -252,7 +252,7 @@ struct minterm_iterator {
 				choices.emplace_back(v, false, partial_bf,
 							partial_minterm);
 				partial_bf = rewriter::replace<node>(partial_bf,
-					v, tau::_0());
+					v, tau::_0(find_ba_type<node>(v)));
 				DBG(LOG_TRACE << "minterm_iterator/partial_bf: "
 					<< LOG_FM(partial_bf);)
 				// ... and compute new values for the next one
@@ -316,9 +316,11 @@ private:
 	tref make_current_minterm() {
 		tref cte = choices.back().value
 			? rewriter::replace<node>(choices.back().partial_bf,
-				choices.back().var, tau::_1())
+				choices.back().var, tau::_1(
+					find_ba_type<node>(choices.back().var)))
 			: rewriter::replace<node>(choices.back().partial_bf,
-				choices.back().var, tau::_0());
+				choices.back().var, tau::_0(
+					find_ba_type<node>(choices.back().var)));
 		tref current = (tau::get(cte) & tau::get(choices.back()
 						.partial_minterm)).get();
 
@@ -361,14 +363,16 @@ private:
 				& tau::get(choices[i - 1].partial_minterm)).get();
 			choices[i].partial_bf = choices[i - 1].value
 				? rewriter::replace<node>(choices[i - 1].partial_bf,
-					choices[i - 1].var, tau::_1())
+					choices[i - 1].var, tau::_1(
+						find_ba_type<node>(choices[i - 1].var)))
 				: rewriter::replace<node>(choices[i - 1].partial_bf,
-					choices[i - 1].var, tau::_0());
+					choices[i - 1].var, tau::_0(
+						find_ba_type<node>(choices[i - 1].var)));
 			// if current partial bf is 0, we can skip the rest of the choices
 			// as the corresponding minterms will be 0.
 			if (tau::get(choices[i].partial_bf).equals_0()) {
 				for (size_t j = i + 1; j < choices.size(); ++j) {
-					choices[j].partial_bf = tau::_0();
+					choices[j].partial_bf = tau::_0(find_ba_type<node>(choices[j].partial_bf));
 					choices[j].value = true;
 				}
 				return;
@@ -523,7 +527,7 @@ private:
 };
 
 template <NodeType node>
-tref get_constant(minterm m) {
+tref get_constant(minterm m, size_t type_id) {
 	using tau = tree<node>;
 	//auto cte = find_top(m, is_child_non_terminal<tau::ba_constant, node>);
 	//return cte ? cte.value() : _1<node>;
@@ -532,7 +536,7 @@ tref get_constant(minterm m) {
 	};
 	// FIXME convert vars to a set
 	trefs all_vs = tau::get(m).select_top(is_ba_constant);
-	return build_bf_and<node>(all_vs);
+	return build_bf_and<node>(all_vs, type_id);
 }
 
 template <NodeType node>
@@ -550,8 +554,8 @@ subtree_set<node> get_exponent(tref n) {
 }
 
 template <NodeType node>
-tref get_minterm(minterm m) {
-	return build_bf_and<node>(get_exponent<node>(m));
+tref get_minterm(minterm m, size_t type_id) {
+	return build_bf_and<node>(get_exponent<node>(m), type_id);
 }
 
 template <NodeType node>
@@ -566,7 +570,7 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 	tref new_m = m;
 
 	for (tref d : disjoint) {
-		const auto& new_m_cte = tau::get(get_constant<node>(new_m));
+		const auto& new_m_cte = tau::get(get_constant<node>(new_m, options.type_id));
 		auto new_m_exp = get_exponent<node>(new_m);
 
 #ifdef DEBUG
@@ -586,7 +590,7 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 			new_disjoint.insert(d);
 			continue;
 		}
-		const auto& d_cte = tau::get(get_constant<node>(d));
+		const auto& d_cte = tau::get(get_constant<node>(d, options.type_id));
 		if ((d_cte & new_m_cte) != false) {
 			// case 2
 			if ((d_cte & ~new_m_cte) != false) {
@@ -692,7 +696,7 @@ std::optional<solution<node>> solve_minterm_system(
 
 	// We know the system has a solution as we only iterate over non-negative
 	// minterms (which trivially satisfy the condition of Theorem 3.3)
-	equality eq = tau::_0();
+	equality eq = tau::_0(options.type_id);
 	auto disjoint_minterms = make_minterm_system_disjoint<node>(system, options);
 	if (!disjoint_minterms.has_value()) return {};
 
@@ -707,11 +711,11 @@ std::optional<solution<node>> solve_minterm_system(
 
 		if (tau::get(nf).equals_0()) continue;
 
-		tref cte = get_constant<node>(nf);
+		tref cte = get_constant<node>(nf, options.type_id);
 
 		DBG(LOG_TRACE << "solve_minterm_system/cte: " << LOG_FM(cte);)
 
-		minterm t = get_minterm<node>(nf);
+		minterm t = get_minterm<node>(nf, options.type_id);
 
 		DBG(LOG_TRACE << "solve_minterm_system/minterm: " <<LOG_FM(t);)
 
@@ -866,7 +870,8 @@ std::optional<solution<node>> solve_general_system(
 		// Now assign the remaining variables to 0 and compute
 		// resulting value for var
 		solution[var] =	tt(replace_free_vars_by<node>(
-					func_with_neq_assgm, tau::_0_trimmed()))
+					func_with_neq_assgm, tau::_0_trimmed(
+						find_ba_type<node>(func_with_neq_assgm))))
 				| bf_reduce_canonical<node>() | tt::ref;
 	}
 
@@ -1139,6 +1144,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			// The options for the solver depend on the equation type
 			solver_options op = options;
 			tref type_tree = ba_types<node>::type_tree(type);
+			op.type_id = get_ba_type_id<node>(type_tree);
 			if (is_bv_type_family<node>(type_tree)) {
 				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
 					bv_sat = true;
@@ -1170,13 +1176,16 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 					// Skip already solved variables
 					if (clause_solution.contains(fv)) continue;
 					if (options.mode == minimum)
-						clause_solution.emplace(fv, tau::_0());
-					else clause_solution.emplace(fv, tau::_1());
+						clause_solution.emplace(fv, tau::_0(
+							find_ba_type<node>(fv)));
+					else clause_solution.emplace(fv, tau::_1(
+						find_ba_type<node>(fv)));
 				}
 				a = rewriter::replace<node>(a, clause_solution);
 				// Simplify bitvectors
-				if (is_bv_type_family<node>(tau::get(a).get_ba_type()))
+				if (is_bv_type_family<node>(tau::get(a).get_ba_type())) {
 					a = simplify_bv<node>(a);
+				}
 				clause_solution.emplace(v, a);
 			}
 			return clause_solution;

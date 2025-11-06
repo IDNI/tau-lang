@@ -197,7 +197,8 @@ auto is_non_boolean_term = [](tref n) static {
 template <NodeType node>
 size_t find_ba_type (tref term) {
 	using tau = tree<node>;
-	size_t type = 0;
+	size_t type = tau::get(term).get_ba_type();
+	if (type != 0) return type;
 	auto f = [&type](const tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::bf)) type = t.get_ba_type();

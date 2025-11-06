@@ -107,6 +107,7 @@ enum solver_mode {
 struct solver_options {
 	tref splitter_one = nullptr; /**< Splitter option */
 	solver_mode mode = solver_mode::general; /**< Solver mode option */
+	size_t type_id = 0;
 };
 
 /**

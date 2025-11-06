@@ -40,14 +40,6 @@ struct type_scoped_resolver : public scoped_union_find<tref, size_t, idni::subtr
 
 // Some type definitions
 template<NodeType node>
-static size_t untyped_id = ba_types<node>::id(untyped_type<node>());
-template<NodeType node>
-static size_t bv_type_id = ba_types<node>::id(bv_type<node>());
-template<NodeType node>
-static size_t tau_type_id = ba_types<node>::id(tau_type<node>());
-template<NodeType node>
-static size_t sbf_type_id = ba_types<node>::id(sbf_type<node>());
-template<NodeType node>
 static size_t bv8_type_id = ba_types<node>::id(bv_type<node>(8));
 template<NodeType node>
 static size_t bv16_type_id = ba_types<node>::id(bv_type<node>(16));

@@ -338,7 +338,7 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 	if (decisions.empty()) {
 		// Empty decisions means there is just a single path
 		_prev_expr = _expr;
-		_expr = term ? tau::_0() : tau::_F();
+		_expr = (term ? tau::_0(find_ba_type<node>(_expr)) : tau::_F());
 		return res;
 	}
 	size_t idx = 0;
@@ -446,7 +446,8 @@ tref expression_paths<node>::apply(const auto& path_transform) {
 		++it;
 	}
 	if (tau::get(_expr).is_term()) {
-		return tau::build_bf_or(res, tau::build_bf_or(changes));
+		return tau::build_bf_or(res, tau::build_bf_or(changes,
+			find_ba_type<node>(res)));
 	} else return tau::build_wff_or(res, tau::build_wff_or(changes));
 }
 
@@ -458,7 +459,8 @@ tref expression_paths<node>::apply(const auto& path_transform, const auto& callb
 		else return tau::build_wff_or(l, r);
 	};
 	iterator it = iterator(_expr);
-	tref change = tau::get(_expr).is_term() ? tau::_0() : tau::_F();
+	tref change = tau::get(_expr).is_term() ? tau::_0(
+		find_ba_type<node>(_expr)) : tau::_F();
 	tref res = nullptr;
 	while (callback(res) && it != end()) {
 		if (tref c = it.apply(path_transform))

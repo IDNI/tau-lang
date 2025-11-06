@@ -84,7 +84,7 @@ tref split_path(tref fm, const splitter_type st, bool check_temps, const auto& c
 				if (check_temps && has_temporary_io_var<node>(clause))
 					return clause;
 				return tau::get(fm).is_term()
-					       ? tau::_0()
+					       ? tau::_0(find_ba_type<node>(fm))
 					       : tau::_F();
 			};
 			auto cb = [&callback](tref curr_fm) {
@@ -163,7 +163,7 @@ tref good_splitter_using_function(tref f, splitter_type st, tref clause,
 	tref curr_path = nullptr;
 	auto remove_path = [&](tref path) {
 		curr_path = path;
-		return tau::_0();
+		return tau::_0(find_ba_type<node>(path));
 	};
 	auto split_coeff = [&](tref curr_f) {
 		tref coeff = tau::get(curr_path)
@@ -209,7 +209,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 	tref new_clause = nullptr;
 	auto remove_path = [&](tref path) {
 		curr_path = path;
-		return tau::_0();
+		return tau::_0(find_ba_type<node>(path));
 	};
 	auto reverse_split_coeff = [&st](tref coeff) {
 		// We need to split the negated constant
@@ -227,8 +227,8 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 			tref tmp = lit;
 			lit = is_child<node>(lit, tau::ba_constant)
 				      ? reverse_split_coeff(lit)
-				      : tau::_1();
-			tref new_path = tau::build_bf_and(lits);
+				      : tau::_1(find_ba_type<node>(lit));
+			tref new_path = tau::build_bf_and(lits, find_ba_type<node>(lit));
 			curr_f = tau::build_bf_or(curr_f, new_path);
 			if (tau::get(curr_f).equals_1()) return false;
 			new_clause = rewriter::replace<node>(

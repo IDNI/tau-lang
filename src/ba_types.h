@@ -16,6 +16,9 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref tau_type();
 
+template <NodeType node>
+size_t tau_type_id();
+
 /**
  * @brief Checks if t represents the tau type
  * @tparam node Tree node type
@@ -36,6 +39,9 @@ bool is_tau_type(size_t t);
 template <NodeType node>
 tref bool_type();
 
+template <NodeType node>
+size_t bool_type_id();
+
 /**
  * @brief Checks if t represents the bool type
  * @tparam node Tree node type
@@ -49,24 +55,15 @@ template <NodeType node>
 bool is_bool_type(size_t t);
 
 /**
- * @brief Checks if t represents the tau type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents tau
- */
-template <NodeType node>
-bool is_tau_type(tref t);
-
-template <NodeType node>
-bool is_tau_type(size_t t);
-
-/**
  * @brief Creates the type tree associated with the type "nat"
  * @tparam Tree node type
  * @return Tree reference to type tree
  */
 template <NodeType node>
 tref nat_type();
+
+template <NodeType node>
+size_t nat_type_id();
 
 /**
  * @brief Checks if t represents the nat type
@@ -84,6 +81,9 @@ bool is_nat_type(tref t);
  */
 template <NodeType node>
 tref untyped_type();
+
+template <NodeType node>
+size_t untyped_type_id();
 
 /**
  * @brief Checks if t has untyped as type information
@@ -109,6 +109,9 @@ bool is_untyped(size_t t);
 template <NodeType node>
 tref sbf_type();
 
+template <NodeType node>
+size_t sbf_type_id();
+
 /**
  * @brief Checks if t represents the sbf type
  * @tparam node Tree node type
@@ -132,6 +135,9 @@ bool is_sbf_type(size_t t);
  */
 template <NodeType node>
 tref bv_type(unsigned short bitwidth = default_bv_size);
+
+template <NodeType node>
+size_t bv_type_id(unsigned short bitwidth = default_bv_size);
 
 template <NodeType node>
 tref bv_base_type();

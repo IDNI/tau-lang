@@ -245,10 +245,8 @@ tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::bf:  return reduce_depreciated<node>(to_dnf<node, false>(
-					applied), tau::bf);
-		case tau::wff: return reduce_depreciated<node>(to_dnf<node>(
-					applied), tau::wff);
+		case tau::bf:  return reduce<node>(to_dnf<node, false>(applied));
+		case tau::wff: return reduce<node>(to_dnf<node>(applied));
 		default: return invalid_argument();
 		}
 	}
@@ -262,10 +260,9 @@ tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
-		case tau::wff: return reduce_depreciated<node>(to_cnf<node>(
-					applied), tau::wff, true);
-		case tau::bf:  return reduce_depreciated<node>(to_cnf<node, false>(
-					applied), tau::bf, true);
+		case tau::wff: return reduce<node, true>(to_cnf<node>(applied));
+		case tau::bf:  return reduce<node, true>(to_cnf<node, false>(
+					applied));
 		default: return invalid_argument();
 		}
 	}
@@ -297,8 +294,9 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	if (applied) {
 		switch (tau::get(applied).get_type()) {
 		case tau::wff: return unequal_to_not_equal<node>(
-			reduce_across_bfs<node>(apply_all_xor_def<node>(
-				norm_all_equations<node>(applied)), false));
+			reduce<node>(to_dnf<node>(
+				bf_reduce_canonical<node>()(applied)
+				)));
 		case tau::bf:  return bf_reduced_dnf<node>(applied);
 		default: return invalid_argument();
 		}
@@ -444,10 +442,8 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 	tref arg = n[1].get();
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (applied) {
-		applied = norm_all_equations<node>(applied);
-		applied = apply_all_xor_def<node>(applied);
-		applied = eliminate_quantifiers<node>(applied);
-		return reduce_across_bfs<node>(applied, false);
+		applied = anti_prenex<node>(applied);
+		return resolve_quantifiers<node>(applied);
 	}
 	return invalid_argument();
 }
