@@ -299,6 +299,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ history_print_cmd,   50 },
 			{ history_store_cmd,   50 },
 			{ sat_cmd,             50 },
+			{ spec,                50 },
 			{ main,                60 },
 			{ ref,                 80 },
 			{ wff_sometimes,      380 },
@@ -452,6 +453,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case wff_t:             out('T'); break;
 			case wff_neg:           out("!");
 						last_quant_nt = nul; break;
+			case console_sym:       out("console"); break;
 			case first_sym:         out("first"); break;
 			case last_sym:          out("last"); break;
 			case fp_fallback:       out(" fallback "); break;
@@ -469,6 +471,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				else out(tau::get(ref).get_ba_constant());
 				out(" } : ");
 				out(tau::get(t.get_ba_type_tree()));
+				break;
+			case typed:
+				if (pnt == input_def || pnt == output_def) out(" : ");
+				break;
+			case stream:
+				if (pnt == input_def) out(" = in ");
+				else if (pnt == output_def) out(" = out ");
 				break;
 			case wff:
 			case bf:
