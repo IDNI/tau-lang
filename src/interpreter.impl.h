@@ -412,7 +412,7 @@ std::pair<std::optional<assignment<node>>, bool>
 	interpreter<node, in_t, out_t>::step()
 {
 	// Compute systems for the current step
-	if (!calculate_initial_systems()) return {};
+	if (!calculate_initial_spec()) return {};
 	LOG_INFO << "Execution step: " << time_point << "\n";
 	bool auto_continue = false;
 	// Get inputs for this step
@@ -444,91 +444,65 @@ std::pair<std::optional<assignment<node>>, bool>
 		memory[current_this_stream] = wrapped_spec;
 	}
 
-	// for each system in systems try to solve it, if it is not possible
-	// continue with the next system.
-	for (const auto& system : this->systems) {
-		std::map<size_t, solution<node>> solutions;
-		bool solved = true;
-		// solve the equations for each type in the system
-		for (const auto& [ba_type_id, equations] : system) {
-			// rewriting the inputs and inserting them into memory
-			tref updated = update_to_time_point(equations, formula_time_point);
-			tref current = rewriter::replace<node>(updated, memory);
-			// Simplify after updating stream variables
-			// TODO: Maybe replace by syntactic simp?
-			current = normalize_non_temp<node>(current);
-
+	// Try to solve a path/disjunct of the current step specification
+	for (tref path : expression_paths<node>(this->step_spec)) {
+		// rewriting the inputs and inserting them into memory
+		tref updated = update_to_time_point(path, formula_time_point);
+		tref current = rewriter::replace<node>(updated, memory);
+		// Simplify after updating stream variables
+		// TODO: Maybe replace by syntactic simp?
+		current = normalize_non_temp<node>(current);
 #ifdef DEBUG
-			LOG_TRACE << "step/type: " << ba_types<node>::name(ba_type_id) << "\n"
-				<< "step/equations: " << LOG_FM(equations) << "\n"
-				<< "step/updated: " << LOG_FM(updated) << "\n"
-				<< "step/current: " << LOG_FM(current) << "\n"
-				<< "step/memory: ";
-			for (const auto& [k, v]: memory)
-				LOG_TRACE << "\t" << k << " := " << v << " ";
+		LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
+			<< "step/updated: " << LOG_FM(updated) << "\n"
+			<< "step/current: " << LOG_FM(current) << "\n"
+			<< "step/memory: ";
+		for (const auto& [k, v]: memory)
+			LOG_TRACE << "\t" << k << " := " << v << " ";
 #endif // DEBUG
-			auto solution = solution_with_max_update(current);
-
+		auto path_solution = solution_with_max_update(current);
 #ifdef DEBUG
-			if (solution) {
-				LOG_TRACE << "step/solution: ";
-				if (solution.value().empty())
-					LOG_TRACE << "\t{}";
-				else for (const auto& [k, v]: solution.value()) {
-					LOG_TRACE << "\t" << TAU_TO_STR(k) << " := "
-								<< TAU_TO_STR(v) << " ";
-					LOG_TRACE << LOG_FM_TREE(k) << "\n";
-					LOG_TRACE << LOG_FM_TREE(v) << "\n";
-				}
-				// TODO (HIGH) review taking into account bv
-				//auto substituted = rewriter::replace<node>(
-				//		current, solution.value());
-				//auto check = snf_wff<node>(substituted);
-				//LOG_TRACE << "step/check: " << check << "\n";
-			} else {
-				LOG_TRACE << "step/solution: no solution\n";
+		if (path_solution) {
+			LOG_TRACE << "step/solution: ";
+			if (path_solution.value().empty())
+				LOG_TRACE << "\t{}";
+			else for (const auto& [k, v]: path_solution.value()) {
+				LOG_TRACE << "\t" << TAU_TO_STR(k) << " := "
+							<< TAU_TO_STR(v) << " ";
+				LOG_TRACE << LOG_FM_TREE(k) << "\n";
+				LOG_TRACE << LOG_FM_TREE(v) << "\n";
 			}
-#endif // DEBUG
-
-			if (solution.has_value()) {
-				// std::cout << "solution: \n";
-				// for (const auto& [var, val] : solution.value()) {
-				// 	std::cout << "var: " << var << ", val: " << val << "\n";
-				// }
-				// It can happen that variables are assigned
-				// to variables -> those need to be replaced
-				resolve_solution_dependencies(solution.value());
-				solutions[ba_type_id] = solution.value();
-			}
-			else {
-				solved = false;
-				// We need to clear the solutions to current clause since it is unsat
-				solutions.clear();
-				break;
-			}
+			auto substituted = rewriter::replace<node>(
+					current, path_solution.value());
+			auto check = normalize_non_temp<node>(substituted);
+			LOG_TRACE << "step/check: " << check << "\n";
+		} else {
+			LOG_TRACE << "step/solution: no solution\n";
 		}
-		if (solved) {
+#endif // DEBUG
+		// if (solution) {
+		// 	// It can happen that variables are assigned
+		// 	// to variables -> those need to be replaced
+		// 	resolve_solution_dependencies(solution.value());
+		// }
+		if (path_solution) {
 			solution<node> global;
-			// merge the solutions
-			for (const auto& [ba_type_id, solution]: solutions) {
-				for (const auto& [var, value]: solution) {
-					// Check if we are dealing with a stream variable
-					if (tt(var) | tau::variable | tau::io_var) {
-						DBG(LOG_TRACE << LOG_FM_TREE(value));
-						assert(tau::get(value).is(tau::bf));
-						if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
-							// std::cout << "time_point: " << time_point << "\n";
-							// std::cout << "var: " << var << "\n";
-							memory.emplace(var, value);
-							// Exclude temporary streams in solution
-							if (!is_excluded_output(tau::trim(var)))
-								global.emplace(var, value);
-						}
-					} else {
+			for (const auto& [var, value]: path_solution.value()) {
+				// Check if we are dealing with a stream variable
+				if (tt(var) | tau::variable | tau::io_var) {
+					DBG(LOG_TRACE << LOG_FM_TREE(value));
+					assert(tau::get(value).is(tau::bf));
+					if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
+						// std::cout << "time_point: " << time_point << "\n";
+						// std::cout << "var: " << var << "\n";
 						memory.emplace(var, value);
-						global.emplace(var, value);
+						// Exclude temporary streams in solution
+						if (!is_excluded_output(tau::trim(var)))
+							global.emplace(var, value);
 					}
-
+				} else {
+					memory.emplace(var, value);
+					global.emplace(var, value);
 				}
 			}
 			// Complete outputs using time_point and current solution
@@ -612,7 +586,7 @@ tref interpreter<node, in_t, out_t>::get_ubt_ctn_at(int_t t) {
 }
 
 template <NodeType node, typename in_t, typename out_t>
-bool interpreter<node, in_t, out_t>::calculate_initial_systems() {
+bool interpreter<node, in_t, out_t>::calculate_initial_spec() {
 	LOG_TRACE << "calculate_initial_systems begin \n";
 	if (final_system) return true;
 
@@ -621,21 +595,10 @@ bool interpreter<node, in_t, out_t>::calculate_initial_systems() {
 	LOG_TRACE << "calculate_initial_systems[time_point]: " << time_point << "\n";
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
-		auto step_ubt_ctn = get_ubt_ctn_at(time_point);
-		systems = compute_systems(step_ubt_ctn);
-		if (systems.empty()) {
-			LOG_TRACE << "calculate_initial_systems(time_point < initial_segment)[result]: empty\n";
-			LOG_TRACE << "calculate_initial_systems end\n";
-			return false;
-		}
+		step_spec = get_ubt_ctn_at(time_point);
 	} else if (time_point == initial_segment) {
-		systems = compute_systems(ubt_ctn);
+		step_spec = ubt_ctn;
 		final_system = true;
-		if (systems.empty()) {
-			LOG_TRACE << "calculate_initial_systems(time_point == initial_segment)[result]: empty\n";
-			LOG_TRACE << "calculate_initial_systems end\n";
-			return false;
-		}
 	}
 	LOG_TRACE << "calculate_initial_systems[result]: true\n";
 	LOG_TRACE << "calculate_initial_systems end\n";
@@ -983,7 +946,7 @@ solution_with_max_update(tref spec) {
 		return s;
 	};
 	tref u = build_out_var_at_n<node>("u", time_point,
-					get_ba_type_id<node>(tau_type<node>()));
+		tau_type_id<node>());
 	auto is_u_stream = [&u](const auto& n) {
 		return n == u;
 	};
@@ -994,19 +957,18 @@ solution_with_max_update(tref spec) {
 		if (!update) continue;
 
 		// Obtain single f = 0 part of clause
-		tref f = squeeze_positives<node>(path);
+		tref f = squeeze_positives<node>(path, tau_type_id<node>());
 		// If no positive parts exists, the update cannot be maximized
 		if (!f) continue;
 
 		// Check that f is wide (not 0 and has more than one zero), otherwise continue
-		f = tt(f) | bf_reduce_canonical<node>() | tt::ref;
+		f = bf_reduced_dnf<node>(f);
 		if (tau::get(f).equals_0()) continue;
 		tref f0 = rewriter::replace<node>(f, u, tau::_0(
 			get_ba_type_id<node>(tau_type<node>())));
 		tref f1 = rewriter::replace<node>(f, u, tau::_1(
 			get_ba_type_id<node>(tau_type<node>())));
-		tref f0_xor_f1 = tt(build_bf_xor<node>(f0, f1))
-			| bf_reduce_canonical<node>() | tt::ref;
+		tref f0_xor_f1 = bf_reduced_dnf<node>(build_bf_xor<node>(f0, f1));
 		if (tau::get(f0_xor_f1).equals_0()
 			|| tau::get(f0_xor_f1).equals_1()) continue;
 
@@ -1017,9 +979,9 @@ solution_with_max_update(tref spec) {
 		if (!sol.has_value()) continue;
 		// Now we need to add solution for u[t]
 		max_u = rewriter::replace<node>(max_u, sol.value());
-		max_u = tt(replace_free_vars_by<node>(max_u,
-			tau::_0_trimmed(find_ba_type<node>(max_u))))
-			| bf_reduce_canonical<node>() | tt::ref;
+		max_u = bf_reduced_dnf<node>(
+			replace_free_vars_by<node>(max_u,
+			tau::_0_trimmed(find_ba_type<node>(max_u))));
 		sol.value().emplace(u, max_u);
 		return sol;
 	}

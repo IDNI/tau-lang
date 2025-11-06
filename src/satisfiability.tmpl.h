@@ -489,7 +489,7 @@ tref quant_streams_to_var(tref fm) {
 			quant_vars.extract(tau::trim(n));
 		return n;
 	};
-	return pre_order<node>(fm).apply_until_change(f, visit_wff<node>, up);
+	return pre_order<node>(fm).apply_until_change(f, all, up);
 }
 
 template <NodeType node>
@@ -497,7 +497,6 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 	using tau = tree<node>;
 	// First convert quantified streams to normal variables
 	fm = quant_streams_to_var<node>(fm);
-
 	// Find lookback
 	auto current_io_vars = tau::get(fm).select_top(
 			is_child<node, tau::io_var>);

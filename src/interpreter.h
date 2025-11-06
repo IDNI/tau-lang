@@ -105,9 +105,7 @@ struct interpreter {
 	const spec_context<node>& ctx = {};
 
 private:
-	// store all the possible systems to be solved, each system corresponds to a
-	// different clause.
-	std::vector<system> systems;
+	tref step_spec;
 	bool final_system = false;
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
@@ -115,7 +113,7 @@ private:
 
 	tref get_ubt_ctn_at(int_t t);
 
-	bool calculate_initial_systems();
+	bool calculate_initial_spec();
 
 	std::pair<trefs, bool> build_inputs_for_step(const size_t t);
 
