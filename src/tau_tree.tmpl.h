@@ -245,51 +245,21 @@ tref tree<node>::get(const node& v, tref ch1, tref ch2) {
 
 template <NodeType node>
 tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
-	auto propagate_types = [](const node n) {
-		switch (n.nt) {
-			case node::type::bf_interval:
-			case node::type::bf: case node::type::bf_eq: case node::type::bf_neq:
-			case node::type::bf_lteq: case node::type::bf_nlteq: case node::type::bf_gt:
-			case node::type::bf_ngt: case node::type::bf_gteq: case node::type::bf_ngteq:
-			case node::type::bf_lt: case node::type::bf_nlt: case node::type::bf_or:
-			case node::type::bf_xor: case node::type::bf_and: case node::type::bf_neg:
-			case node::type::bf_add: case node::type::bf_sub: case node::type::bf_mul:
-			case node::type::bf_div: case node::type::bf_mod: case node::type::bf_shr:
-			case node::type::bf_shl: case node::type::bf_fall: case node::type::bf_fex:
-			case node::type::q_vars: case node::type::q_var:
-				return true;
-			default:
-				return false;
-		}
+	auto propagate_type = [](const node n) {
+		// Do not propagate bool type as it is reserved for predicate definitions
+		if (n.nt == wff || n.ba_type == 4)
+			return false;
+		else return true;
 	};
-
 	auto get_type = [](const node& n, const tref* ch, size_t len) -> size_t {
-		if (ba_types<node>::id(untyped_type<node>()) != n.ba_type) return n.ba_type;
+		if (n.ba_type != 0) return n.ba_type;
 		for (size_t i = 0; i < len; ++i) {
-			if(tree<node>::get(ch[i]).value.ba_type != ba_types<node>::id(untyped_type<node>())) {
-				return tree<node>::get(ch[i]).value.ba_type;
+			if(tau::get(ch[i]).get_ba_type() != 0) {
+				return tau::get(ch[i]).get_ba_type();
 			}
 		}
-		return ba_types<node>::id(untyped_type<node>()) ; // something must have type;
+		return n.ba_type;
 	};
-
-	auto update_type = [&](const node& n, const tref* ch, size_t len, size_t ba_type) -> std::pair<node, trefs> {
-		auto new_v = n.ba_type == ba_type ? n : n.ba_retype(ba_type);
-		trefs new_ch;
-		for (size_t i = 0; i < len; ++i) {
-			if (tree<node>::get(ch[i]).value.ba_type != ba_type) {
-				auto new_ch_i_n = tree<node>::get(ch[i]).value.ba_retype(ba_type);
-				auto new_ch_i_ch = tree<node>::get(ch[i]).get_children();
-				auto new_ch_i = tree<node>::get(new_ch_i_n, new_ch_i_ch.data(),
-					new_ch_i_ch.size());
-				new_ch.push_back(new_ch_i);
-			} else {
-				new_ch.push_back(ch[i]);
-			}
-		}
-		return { new_v, new_ch };
-	};
-
 	if (!use_hooks) return get_raw(v, ch, len, r);
 	// get with hooks
 	get_hook<node> hook;
@@ -298,11 +268,10 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 		[&hook](const node& v, const tref* ch, size_t len, tref r) {
 			return hook(v, ch, len, r);
 		});
-	// propagate types?
-	if (propagate_types(v)) {
+	// We only propagate the type information up
+	if (propagate_type(v)) {
 		size_t ba_type = get_type(v, ch, len);
-		auto [new_v, new_ch] = update_type(v, ch, len, ba_type);
-		return base_t::get(new_v, new_ch.data(), len, r);
+		return base_t::get(v.ba_retype(ba_type), ch, len, r);
 	}
 	return base_t::get(v, ch, len, r);
 }

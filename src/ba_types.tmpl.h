@@ -218,7 +218,7 @@ std::string ba_types<node>::dump_to_str() {
 template <NodeType node>
 std::vector<tref>& ba_types<node>::type_trees() {
 	static std::vector<tref> t { untyped_type<node>(), tau_type<node>(),
-		bv_type<node>(), sbf_type<node>() };
+		bv_type<node>(), sbf_type<node>(), bool_type<node>() };
 	return t;
 }
 
@@ -227,7 +227,7 @@ template <NodeType node>
 subtree_map<node, size_t>& ba_types<node>::type_tree_to_idx() {
 	static subtree_map<node, size_t> t{ {untyped_type<node>(), 0 },
 		{ tau_type<node>(), 1 }, { bv_type<node>(), 2 },
-		{ sbf_type<node>(), 3 }
+		{ sbf_type<node>(), 3 }, { bool_type<node>(), 4 }
 	};
 	return t;
 }
