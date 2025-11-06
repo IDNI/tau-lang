@@ -17,7 +17,7 @@ template <NodeType node>
 tref tau_type();
 
 template <NodeType node>
-size_t tau_type_id();
+inline size_t tau_type_id();
 
 /**
  * @brief Checks if t represents the tau type
@@ -40,7 +40,7 @@ template <NodeType node>
 tref bool_type();
 
 template <NodeType node>
-size_t bool_type_id();
+inline size_t bool_type_id();
 
 /**
  * @brief Checks if t represents the bool type
@@ -63,7 +63,7 @@ template <NodeType node>
 tref nat_type();
 
 template <NodeType node>
-size_t nat_type_id();
+inline size_t nat_type_id();
 
 /**
  * @brief Checks if t represents the nat type
@@ -83,7 +83,7 @@ template <NodeType node>
 tref untyped_type();
 
 template <NodeType node>
-size_t untyped_type_id();
+inline size_t untyped_type_id();
 
 /**
  * @brief Checks if t has untyped as type information
@@ -110,7 +110,7 @@ template <NodeType node>
 tref sbf_type();
 
 template <NodeType node>
-size_t sbf_type_id();
+inline size_t sbf_type_id();
 
 /**
  * @brief Checks if t represents the sbf type
@@ -137,7 +137,10 @@ template <NodeType node>
 tref bv_type(unsigned short bitwidth = default_bv_size);
 
 template <NodeType node>
-size_t bv_type_id(unsigned short bitwidth = default_bv_size);
+inline size_t bv_type_id();
+
+template <NodeType node>
+size_t bv_type_id(unsigned short bitwidth);
 
 template <NodeType node>
 tref bv_base_type();
