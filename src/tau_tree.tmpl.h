@@ -245,12 +245,6 @@ tref tree<node>::get(const node& v, tref ch1, tref ch2) {
 
 template <NodeType node>
 tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
-	auto propagate_type = [](const node n) {
-		// Do not propagate bool type as it is reserved for predicate definitions
-		if (n.nt == wff || n.ba_type == 4)
-			return false;
-		else return true;
-	};
 	auto get_type = [](const node& n, const tref* ch, size_t len) -> size_t {
 		if (n.ba_type != 0) return n.ba_type;
 		for (size_t i = 0; i < len; ++i) {
@@ -269,7 +263,10 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 			return hook(v, ch, len, r);
 		});
 	// We only propagate the type information up
-	if (propagate_type(v)) {
+	// Do not propagate bool type as it is reserved for predicate definitions
+	// TODO Instead of comparing to 4, do bool_type_id<node>() ->
+	// currently inf loop due to bool_type<node>() using this get method
+	if (v.nt != wff && v.ba_type != 4) {
 		size_t ba_type = get_type(v, ch, len);
 		return base_t::get(v.ba_retype(ba_type), ch, len, r);
 	}
