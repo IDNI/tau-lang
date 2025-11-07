@@ -448,6 +448,7 @@ std::pair<std::optional<assignment<node>>, bool>
 	for (tref path : expression_paths<node>(this->step_spec)) {
 		// rewriting the inputs and inserting them into memory
 		tref updated = update_to_time_point(path, formula_time_point);
+		// TODO: Check why constant time positions are not being replaced
 		tref current = rewriter::replace<node>(updated, memory);
 		// Simplify after updating stream variables
 		// TODO: Maybe replace by syntactic simp?
@@ -597,6 +598,7 @@ bool interpreter<node, in_t, out_t>::calculate_initial_spec() {
 	if (time_point < initial_segment) {
 		step_spec = get_ubt_ctn_at(time_point);
 	} else if (time_point == initial_segment) {
+		// TODO: update constant time positions with values from memory to simplify step_spec
 		step_spec = ubt_ctn;
 		final_system = true;
 	}
@@ -659,70 +661,11 @@ bool interpreter<node, in_t, out_t>::is_memory_access_valid(const auto& io_vars)
 }
 
 template <NodeType node, typename in_t, typename out_t>
-void interpreter<node, in_t, out_t>::resolve_solution_dependencies(
-	solution<node>& s)
-{
-	for (auto& [v, a] : s) {
-		if (is_child<node>(a, tau::variable)) {
-			// The assigned value is a variables
-			auto new_a = a;
-			while (is_child<node>(new_a, tau::variable)) {
-				auto it = s.find(new_a);
-				if (it == s.end()) {
-					LOG_ERROR << "Cannot eliminate variable"
-							<< " in solution\n";
-					break;
-				}
-				new_a = it->second;
-			}
-			a = new_a;
-		}
-	}
-}
-
-template <NodeType node, typename in_t, typename out_t>
 void interpreter<node, in_t, out_t>::compute_lookback_and_initial() {
 	trefs io_vars = tau::get(ubt_ctn).select_top(is_child<node, tau::io_var>);
 	lookback = get_max_shift<node>(io_vars);
 	formula_time_point = time_point + lookback;
 	highest_initial_pos = get_max_initial<node>(io_vars);
-}
-
-template <NodeType node, typename in_t, typename out_t>
-std::vector<system> interpreter<node, in_t, out_t>::compute_systems(tref ubd_ctn)
-{
-	std::vector<system> systems;
-	// Create blue-print for solver for each clause
-	for (tref clause : expression_paths<node>(ubd_ctn)) {
-		if (auto system = compute_atomic_fm_types(clause); system)
-			systems.emplace_back(std::move(system.value()));
-		else {
-			LOG_TRACE << "Unable to find all types in equations"
-					<< " in: " << clause << "\n";
-			continue;
-		}
-	}
-	return systems;
-}
-
-template <NodeType node, typename in_t, typename out_t>
-std::optional<system> interpreter<node, in_t, out_t>::compute_atomic_fm_types(
-		tref clause) {
-	DBG(LOG_TRACE << "compute_system/clause: " << LOG_FM(clause);)
-
-	system sys;
-	// Due to type inference all atomic formulas are typed
-	for (tref atomic_fm : tau::get(clause).select_top(is_atomic_fm<node>())) {
-		size_t type = find_ba_type<node>(atomic_fm);
-		if (type == 0) {
-			LOG_ERROR << "No type information found for "
-				  << atomic_fm << "\n";
-			return {};
-		}
-		if (!sys.contains(type)) sys[type] = atomic_fm;
-		else sys[type] = build_wff_and<node>(sys[type], atomic_fm);
-	}
-	return { sys };
 }
 
 template <NodeType node, typename in_t, typename out_t>
