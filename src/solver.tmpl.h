@@ -1109,6 +1109,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 		DBG(LOG_DEBUG << "solve/Path before: " << tau::get(path) << "\n";)
 		path = rewriter::replace(path, var_assignments);
 		DBG(LOG_DEBUG << "solve/Path after: " << tau::get(path) << "\n";)
+		if (tau::get(path).equals_F()) continue;
 
 		auto is_equation = [](tref n) {
 			const tau& n_t = tau::get(n);
@@ -1116,10 +1117,6 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				|| n_t.child_is(tau::bf_neq)
 				|| n_t.equals_T();
 		};
-		path = norm_all_equations<node>(path);
-		path = apply_all_xor_def<node>(path);
-		if (tau::get(path).equals_F()) continue;
-
 		// Partition all found atomic equations according to their type
 		std::map<size_t, subtree_set<node>> type_partition;
 		// Partition types
@@ -1135,6 +1132,10 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			if (tau::get(conj).equals_T()) {
 				path_sat = true;
 				continue;
+			}
+			if (!is_bv_type_family<node>(type)) {
+				conj = norm_equation<node>(conj);
+				conj = apply_all_xor_def<node>(conj);
 			}
 			if (auto it = type_partition.find(type); it != type_partition.end()) {
 				it->second.insert(conj);
