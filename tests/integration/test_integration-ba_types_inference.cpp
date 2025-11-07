@@ -1375,6 +1375,22 @@ TEST_SUITE("infer_ba_types: I/O vars") {
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
+	TEST_CASE("Propagation of bv type") {
+		DBG(using node = node_t;)
+		tref parsed = parse("o1[t]:bv = o1[t-1] + o1[t-2] && o1[0] = { 1 } && o1[1] = { 1 }");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(std::cout << "Inferred: " << LOG_FM_TREE(inferred);)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"o1", bv_type_id<node_t>(16)},
+			{"o1", bv_type_id<node_t>(16)},
+			{"o1", bv_type_id<node_t>(16)},
+			{"o1", bv_type_id<node_t>(16)},
+			{"o1", bv_type_id<node_t>(16)}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
 }
 
 
