@@ -300,7 +300,8 @@ tref expression_paths<node>::iterator::operator*() {
 		return n;
 	};
 	auto visit = [](tref n) {
-		if (is_temporal_quantifier<node>(n)) return false;
+		if (is_temporal_quantifier<node>(n) || is_quantifier<node>(n))
+			return false;
 		else return visit_wff<node>(n);
 	};
 	tref res = nullptr;
@@ -379,6 +380,7 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 	};
 	auto visit = [&excluded, &term](tref n) {
 		if (!term && is_temporal_quantifier<node>(n)) return false;
+		if (!term && is_quantifier<node>(n)) return false;
 		if (excluded.contains(n)) return false;
 		else if (!term) return visit_wff<node>(n);
 		else return true;
