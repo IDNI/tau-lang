@@ -75,6 +75,10 @@ inline Term make_bitvector_and(const Term& l, const Term& r) {
 	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_AND, {l, r});
 }
 
+inline Term make_bitvector_nand(const Term& l, const Term& r) {
+	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_NAND, {l, r});
+}
+
 inline Term make_bitvector_or(const Term& l, const Term& r) {
 	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_OR, {l, r});
 }
@@ -89,10 +93,6 @@ inline Term make_bitvector_xor(const Term& l, const Term& r) {
 
 inline Term make_bitvector_xnor(const Term& l, const Term& r) {
 	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_XNOR, {l, r});
-}
-
-inline Term make_bitvector_nand(const Term& l, const Term& r) {
-	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_NAND, {l, r});
 }
 
 inline Term make_bitvector_add(const Term& l, const Term& r) {
@@ -123,7 +123,8 @@ inline Term make_bitvector_shr(const Term& l, const Term& r) {
 	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_LSHR, {l, r});
 }
 
-inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str, const size_t base) {
+inline cvc5::Term make_bitvector_cte(const size_t size,
+		const std::string& str, const size_t base) {
 	return cvc5_term_manager.mkBitVector(size, str, base);
 }
 

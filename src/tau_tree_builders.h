@@ -175,13 +175,22 @@ template <NodeType node>
 tref build_bf_or(const auto& bfs, size_t type_id);
 
 template <NodeType node>
+tref build_bf_nor(tref l, tref r);
+
+template <NodeType node>
 tref build_bf_xor(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_xnor(tref l, tref r);
 
 template <NodeType node>
 tref build_bf_and(tref l, tref r);
 
 template <NodeType node>
 tref build_bf_and(const auto& bfs, size_t type_id);
+
+template <NodeType node>
+tref build_bf_nand(tref l, tref r);
 
 template <NodeType node>
 tref build_bf_neg(tref l);

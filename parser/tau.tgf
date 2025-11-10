@@ -79,6 +79,9 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | (bf  _ '%' _       bf)             :bf_mod
                         | (bf  _ ">>" _      bf)             :bf_shr
                         | (bf  _ "<<" _      bf)             :bf_shl
+                        | (bf  _ "!&" _      bf)             :bf_nand
+                        | (bf  _ "!|" _      bf)             :bf_nor
+                        | (bf  _ "!^" _      bf)             :bf_xnor
                         | ('1' [ typed ])                    :bf_t
                         | ('0' [ typed ])                    :bf_f
                         | (bf (_ '&' _ | __) bf)             :bf_and
