@@ -117,20 +117,9 @@ private:
 
 	std::pair<trefs, bool> build_inputs_for_step(const size_t t);
 
-	// Return typed systems of equations for the solver corresponding to each clause
-	// in the unbound continuation
-	static std::vector<system> compute_systems(tref ubd_ctn);
-
-	// Get the type for a clause of a local specification
-	static std::optional<system> compute_atomic_fm_types(tref clause);
-
 	tref update_to_time_point(tref f, const int_t t);
 
 	bool is_memory_access_valid(const auto& io_vars);
-
-	// If a variable is assigned a variable V in a solution from the solver,
-	// try to find a non-variable value by checking the solution for V
-	void resolve_solution_dependencies(solution<node>& s);
 
 	// Return the lookback and highest initial position of the given unbound continuation
 	void compute_lookback_and_initial();
@@ -151,7 +140,6 @@ private:
 
 	// Return those variables that appear within the lookback
 	trefs appear_within_lookback(const trefs& vars);
-
 };
 
 template <NodeType node>

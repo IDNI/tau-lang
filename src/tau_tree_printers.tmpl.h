@@ -15,6 +15,8 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& v) {
 	std::visit(overloaded {
+		[&os](const bv& a) { os << std::stoi(
+			a.toString().substr(2), nullptr, 2); },
 		[&os](const auto& a) { os << a; }
 	}, v);
 	return os;

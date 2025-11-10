@@ -181,6 +181,13 @@ TEST_SUITE("path_expressions") {
 			for (tref p : paths) CHECK(tau::get(p).is(tau::wff));
 		}
 	}
+	TEST_CASE("3") {
+		const char* sample = " x = 0 && y = 0 && (ex z z = 0 && k = 0 || t = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		trefs p {expression_paths<node_t>(fm).begin(),
+			expression_paths<node_t>(fm).end()};
+		CHECK(p.size() == 1);
+	}
 }
 
 TEST_SUITE("normal forms: onf") {
