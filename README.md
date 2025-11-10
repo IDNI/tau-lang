@@ -320,17 +320,14 @@ where `local_spec` is a formula defined by the rules:
 ```
 local_spec => (local_spec "&&" local_spec)
             | ("!" local_spec)
-            | (local_spec "^" local_spec)
+            | (local_spec "^^" local_spec)
             | (local_spec "||" local_spec)
             | (local_spec "->" local_spec)
             | (local_spec "<->" local_spec)
             | (local_spec "?" local_spec ":" local_spec)
             | (term "=" term) | (term "!=" term)
             | (term "<" term) | (term "!<" term) | (term "<=" term) | (term "!<=" term)
-            | (term ">" term) | (term "!>" term) | (term ">=" term)| (term "!>=" term) |
-            | (bv_term "=_" bv_term) | (bv_term "!=_" bv_term)
-            | (bv_term "<_" bv_term) | (bv_term "!<_" bv_term) | (bv_term "<=_" bv_term) | (bv_term "!<=_" bv_term)
-            | (bv_term ">_" bv_term) | (bv_term "!>_" bv_term) | (bv_term ">=_" bv_term)| (bv_term "!>=_" bv_term) |
+            | (term ">" term) | (term "!>" term) | (term ">=" term)| (term "!>=" term)
             | "all" variable local_spec
             | "ex" variable local_spec
             | predicate
@@ -349,42 +346,32 @@ can be provided as explained in subsection
 
 The symbols used have the following meaning, where a formula refers to either `local_spec` or `spec`:
 
-| Symbol            | Meaning                                                |
-|-------------------|--------------------------------------------------------|
-| `!`               | negation of formula                                    |
-| `&&`              | conjunction of formulas                                |
-| `^`               | xor of formulas                                        |
-| `\|\|`            | disjunction of formulas                                |
-| `<->`             | equivalence of formulas                                |
-| `<-`              | left-implication of formulas                           |
-| `->`              | right-implication of formulas                          |
-| `ex`              | existential quantification of `variable`               |
-| `all`             | universal quantification of `variable`                 |
-| `... ? ... : ...` | if ... then ... else ...                               |
-| `=`               | standard equality relation in Boolean algebra          |
-| `!=`              | standard inequality relation in Boolean algebra        |
-| `<`               | standard less relation in Boolean algebra              |
-| `!<`              | standard not-less relation in Boolean algebra          |
-| `<=`              | standard less-equal relation in Boolean algebra        |
-| `!<=`             | standard not-less-equal relation in Boolean algebra    |
-| `>`               | standard greater relation in Boolean algebra           |
-| `!>`              | standard not-greater relation in Boolean algebra       |
-| `>=`              | standard greater-equal relation in Boolean algebra     |
-| `!>=`             | standard not-greater-equal relation in Boolean algebra |
-| `=_`              | standard equality relation in bitvectors               |
-| `!=_`             | standard inequality relation in bitvectors             |
-| `<_`              | standard less relation in bitvectors                   |
-| `!<_`             | standard not-less relation in bitvectors               |
-| `<=_`             | standard less-equal relation in bitvectors             |
-| `!<=_`            | standard not-less-equal relation in bitvectors         |
-| `>_`              | standard greater relation in bitvectors                |
-| `!>_`             | standard not-greater relation in bitvectors            |
-| `>=_`             | standard greater-equal relation in bitvectors          |
-| `!>=_`            | standard not-greater-equal relation in bitvectors      |
+| Symbol            | Meaning                                                 |
+|-------------------|---------------------------------------------------------|
+| `!`               | negation of formula                                     |
+| `&&`              | conjunction of formulas                                 |
+| `^^`              | xor of formulas                                         |
+| `\|\|`            | disjunction of formulas                                 |
+| `<->`             | equivalence of formulas                                 |
+| `<-`              | left-implication of formulas                            |
+| `->`              | right-implication of formulas                           |
+| `ex`              | existential quantification of `variable`                |
+| `all`             | universal quantification of `variable`                  |
+| `... ? ... : ...` | if ... then ... else ...                                |
+| `=`               | standard equality relation in BA or bitvectors          |
+| `!=`              | standard inequality relation in BA or bitvectors        |
+| `<`               | standard less relation in BA or bitvectors              |
+| `!<`              | standard not-less relation in BA or bitvectors          |
+| `<=`              | standard less-equal relation in BA or bitvectors        |
+| `!<=`             | standard not-less-equal relation in BA or bitvectors    |
+| `>`               | standard greater relation in BA or bitvectors           |
+| `!>`              | standard not-greater relation in BA or bitvectors       |
+| `>=`              | standard greater-equal relation in BA or bitvectors     |
+| `!>=`             | standard not-greater-equal relation in BA or bitvectors |
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
-`!` > `&&` > `^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
+`!` > `&&` > `^^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
 `... ? ... : ...` > `always ...`> `sometimes ...`.
 
 A Tau specification without a mentioning of "always" or "sometimes" is implicitly
@@ -489,7 +476,7 @@ They are given by the following grammar:
 
 ```
 term => (term "&" term) | term "'"
-      | (term "+" term) | (term "|" term)
+      | (term "^" term) | (term "|" term)
       | function | constant | uninterpreted_constant
       | variable | stream_variable | "0" | "1"
 
@@ -498,7 +485,7 @@ term => (term "&" term) | term "'"
 where
 
 * `term` stands for a well-formed subformula representing a Boolean function and the operators `&`, `'`,
-`+` (or equivalently `^`) and `|` respectively stand for conjunction, negation, exclusive-or
+`^` and `|` respectively stand for conjunction, negation, exclusive-or
 and disjunction,
 * `function` is the non-terminal symbol used to incorporate function definitions (see the subsection
 [Functions and Predicates](#functions-and-predicates)),
@@ -520,7 +507,7 @@ stream. The type of a stream also determines the type of the Boolean function (s
 algebra.
 
 The order of the operations is the following (from higher precedence
-to lower): `'` > `&` > `+` (equivalently > `^`) > `|`.
+to lower): `'` > `&` > `^` > `|`.
 
 If no type information is present within a Boolean function, it is assumed to be of the
 general type `countable atomless Boolean algebra`. Since all such Boolean algebras are
@@ -537,27 +524,18 @@ where `x`, `y` and `z` are variables.
 ## **Bitvectors**
 
 Another key ingredient of the Tau Language is bitvectors build from
-usual bityvector operations and variables, streams and bitvector constants
-They are given by the following grammar:
+usual Boolean algebra operations and variables, streams and bitvector constants.
+They add the following to the above grammar for terms:
 
 ```
-bv_term => '~' _ bv_term
-      | (bv_term _ '+' _ bv_term) | (bv_term _ '-' _ bv_term) | (bv_term _ '*' _ bv_term)
-      | (bv_term _ '/' _ bv_term) | (bv_term _ '%' _ bv_term) | (bv_term _ "!&" _ bv_term)
-      | (bv_term _ '&' _ bv_term) | (bv_term _ "!|" _ bv_term) | (bv_term _ '|' _ bv_term)
-      | (bv_term _ "!(+)" _ bv_term) | (bv_term _ "(+)" _ bv_term) | (bv_term _ "<<" _ bv_term) 
-      | (bv_term _ ">>" _ bv_term) | variable | stream_variable | bv_constant
-
-bv_constant => "#b" [0-1]+ | "#x" [0-9a-fA-F]+ | [0-9]+
+term => (term _ '+' _ term) | (term _ '-' _ term) | (term _ '*' _ term)
+      | (term _ '/' _ term) | (term _ '%' _ term) | (term _ "!&" _ term)
+      | (term _ "!|" _ term) | (term _ "!^" _ term) | (term _ "<<" _ term)
+      | (term _ ">>" _ term)
 ```
 
-where
-
-```
-
-where `bv_term` stands for a well-formed subformula representing a bitvector term,
-`bv_constant` is a bitvector constant, `variable` and `stream_variable` are as above and 
-the operators meaning is given in the following table:
+where `term` is as above are as above and
+the new operators meaning is given in the following table:
 
 | Symbol            | Meaning                                                |
 |-------------------|--------------------------------------------------------|
@@ -566,22 +544,15 @@ the operators meaning is given in the following table:
 | `%`               | modular remainder of bitvectors                        |
 | `+`               | modular addition of bitvectors                         |
 | `-`               | modular subtraction of bitvectors                      |
-| `~`               | bitwise negation of bitvector                          |
-| `&`               | bitwise and of bitvectors                              |
 | `!&`              | bitwise nand of bitvectors                             |
-| `|`               | bitwise or of bitvectors                               |
 | `!|`              | bitwise nor of bitvectors                              |
-| `(+ )`            | bitwise xor of bitvectors                              |
-| `!(+)`            | bitwise xnor of bitvectors                             |
+| `!^`              | bitwise xnor of bitvectors                             |
 | `<<`              | left shift of bitvector by a number of bits            |
 | `>>`              | right shift of bitvector by a number of bits           |
 
 
 The order of the operations is the following (from higher precedence
-to lower): `*', `/`, `%` > `+`, `-` > `~` > `&`, `!&` > `|`, `!|` > `(+ )`, `!(+)` > `<<`, `>>`. 
-
-The type of the variables is automatically inferred from the context in which they are used. 
-Currently there is no need to define them explicitly, but this might change in the future.
+to lower): `*' > `/` > `%` > `+` > `-` > `!&` > `!|` > `!^` > `<<` > `>>`.
 
 ## **Functions and predicates**
 
@@ -614,7 +585,7 @@ while sample predicate definitions are
 ```
 bottom(x) := x = 0
 not_atom(x) := ex y y < x && y != 0
-chain(x,y,z) := x < y && y < z  
+chain(x,y,z) := x < y && y < z
 ```
 
 Furthermore, it is supported to define a function or a predicate by means of a
@@ -662,9 +633,12 @@ Constants in the Tau Language are elements of some available Boolean algebra,
 usually different from just `0` and `1`. Constants in a particular Boolean algebra come
 with their own syntax.
 
-In the Tau language, we currently support two Boolean algebras, which we also call the base Boolean algebras:
+In the Tau language, we currently support two non-atomless Boolean algebras,
+which we also call the base Boolean algebras:
 1. the Boolean algebra of Tau specifications (also referred to as Tau Boolean algebra)
 2. the Boolean algebra of simple Boolean functions
+
+As commented before, we also support the Boolean algebra of bitvectors of fixed bit width.
 
 Several others are in development, like the Boolean algebra of bitvectors of fixed bit width and
 the Boolean algebra of Boolean (not just simple) functions in general.
@@ -683,7 +657,7 @@ constant => "{" (spec | term) "}" [":" base_boolean_algebra_type]
 where `base_boolean_algebra_type` is given by:
 
 ```
-base_boolean_algebra_type => "tau" | "sbf"
+base_boolean_algebra_type => "tau" | "sbf" | "bv" [ '[' bit_width ']' ]
 ```
 
 As mentioned, we can have a Tau specification seen as a Boolean algebra element (you can omit
@@ -709,6 +683,23 @@ A constant in the simple Boolean function algebra is for example:
 ```
 
 where `x`, `y` and `z` are variables.
+
+Finally, a constant in the bitvector Boolean algebra follows the syntax:
+
+```
+constant => '{' "#b" [0-1]+ | "#x" [0-9a-fA-F]+ | [0-9]+ `}`
+```
+
+For example, the following are valid bitvector constants of width 8:
+
+```
+{ #x1f }:bv[8]
+```
+or
+
+```
+{ #b00011111 }:bv[8]
+```
 
 ## **Streams**
 
