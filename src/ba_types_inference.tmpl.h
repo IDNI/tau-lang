@@ -135,7 +135,8 @@ tref update_symbols(tref n) {
 			// only bv types allowed
 			case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
 			case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
-			case tau::bf_shl: {
+			case tau::bf_shl: case tau::bf_xnor: case tau::bf_nand:
+			case tau::bf_nor: {
 				auto new_n = update_symbol(nn);
 				if (error) return nn;
 				if (!is_bv_type_family<node>(tau::get(new_n).get_ba_type())) {
@@ -264,6 +265,11 @@ auto is_top_level_bf = [](tref parent) -> bool {
 		// bf logical connectives
 		case tau::bf_and: case tau::bf_or: case tau::bf_neg:
 		case tau::bf_xor:
+		// bv ops
+		case tau::bf_nor: case tau::bf_nand: case tau::bf_xnor:
+		case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
+		case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
+		case tau::bf_shl:
 		// bf quantifiers
 		case tau::bf_fall: case tau::bf_fex:
 		// bf atomic formulas

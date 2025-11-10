@@ -647,7 +647,9 @@ bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 		case bf_fex:
 		case bf_ref:
 		case bf_or:
+		case bf_nor:
 		case bf_xor:
+		case bf_xnor:
 		case bf_add:
 		case bf_sub:
 		case bf_mul:
@@ -656,6 +658,7 @@ bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 		case bf_shr:
 		case bf_shl:
 		case bf_and:
+		case bf_nand:
 		case bf_neg:
 		case bf_t:
 		case bf_f:

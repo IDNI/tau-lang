@@ -189,7 +189,8 @@ auto is_non_boolean_term = [](tref n) static {
 	const tau& t = tau::get(n);
 	if (t.is(tau::bf_add) || t.is(tau::bf_sub) || t.is(tau::bf_mul)
 		|| t.is(tau::bf_div) || t.is(tau::bf_mod) || t.is(tau::bf_shr)
-			|| t.is(tau::bf_shl))
+			|| t.is(tau::bf_shl) || t.is(tau::bf_nand)
+			|| t.is(tau::bf_nor) || t.is(tau::bf_xnor))
 		return true;
 	return false;
 };

@@ -263,13 +263,13 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	/*TEST_CASE("cvc5_nand") {
-		const char* sample = "{ 2 } !& { 1 } = X";
+	TEST_CASE("cvc5_nand") {
+		const char* sample = "{ 2 } !& { 1 } = X:bv";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
-	}*/
+	}
 
 	TEST_CASE("cvc5_or") {
 		const char* sample = "X:bv | { 1 } = { 1 }";
@@ -279,13 +279,13 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	/*TEST_CASE("cvc5_nor") {
-		const char* sample = "{ 2 } !| X = { 1 }";
+	TEST_CASE("cvc5_nor") {
+		const char* sample = "{ 2 } !| X:bv = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
-	}*/
+	}
 
 	TEST_CASE("cvc5_xor") {
 		const char* sample = "X:bv ^ { 1 } = { 1 }";
@@ -295,13 +295,13 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	/*TEST_CASE("cvc5_xnor") {
-		const char* sample = "X !^ { 1 } = { 1 }";
+	TEST_CASE("cvc5_xnor") {
+		const char* sample = "X:bv !^ { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
-	}*/
+	}
 
 	TEST_CASE("cvc5_left_shift") {
 		const char* sample = "X:bv << { 1 } = { 2 }";
@@ -318,24 +318,6 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
-
-	/*TEST_CASE("cvc5_min") {
-		const char* sample = "min 2 1 = X";
-		auto src = make_tau_source(sample, { .start = tau_parser::wff });
-		auto equation = make_statement(src);
-		auto solution = solve_bv<node_t>(equation);
-		CHECK( solution.has_value() );
-		CHECK( solution.value().size() == 1 );
-	}
-
-	TEST_CASE("cvc5_max") {
-		const char* sample = "max X 0 = 1";
-		auto src = make_tau_source(sample, { .start = tau_parser::wff });
-		auto equation = make_statement(src);
-		auto solution = solve_bv<node_t>(equation);
-		CHECK( solution.has_value() );
-		CHECK( solution.value().size() == 1 );
-	}*/
 }
 
 TEST_SUITE("Cleanup") {

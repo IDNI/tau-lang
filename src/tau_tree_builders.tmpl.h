@@ -417,7 +417,15 @@ tref build_bf_or(tref l, tref r) {
 template <NodeType node>
 tref build_bf_or(const auto& bfs, size_t type_id) {
 	return std::accumulate(bfs.begin(), bfs.end(), _0<node>(type_id),
-		[](tref l, tref r) { return build_bf_or<node>(l, r); });
+	[](tref l, tref r) { return build_bf_or<node>(l, r); });
+}
+
+template <NodeType node>
+tref build_bf_nor(tref l, tref r) {
+	using tau = tree<node>;
+	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
+	return tau::get(tau::bf, tau::get(tau::bf_nor, l, r));
 }
 
 template <NodeType node>
@@ -426,6 +434,14 @@ tref build_bf_xor(tref l, tref r) {
 	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
 	return tau::get(tau::bf, tau::get(tau::bf_xor, l, r));
+}
+
+template <NodeType node>
+tref build_bf_xnor(tref l, tref r) {
+	using tau = tree<node>;
+	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
+	return tau::get(tau::bf, tau::get(tau::bf_xnor, l, r));
 }
 
 template <NodeType node>
@@ -440,6 +456,14 @@ template <NodeType node>
 tref build_bf_and(const auto& bfs, size_t type_id) {
 	return std::accumulate(bfs.begin(), bfs.end(), _1<node>(type_id),
 		[](tref l, tref r) { return build_bf_and<node>(l, r);});
+}
+
+template <NodeType node>
+tref build_bf_nand(tref l, tref r) {
+	using tau = tree<node>;
+	DBG(assert(l != nullptr && r != nullptr);)
+	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
+	return tau::get(tau::bf, tau::get(tau::bf_nand, l, r));
 }
 
 template <NodeType node>
@@ -1021,8 +1045,18 @@ tref tree<node>::build_bf_or(const auto& bfs, size_t type_id) {
 }
 
 template <NodeType node>
+tref tree<node>::build_bf_nor(tref l, tref r) {
+	return tau_lang::build_bf_nor<node>(l, r);
+}
+
+template <NodeType node>
 tref tree<node>::build_bf_xor(tref l, tref r) {
 	return tau_lang::build_bf_xor<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_xnor(tref l, tref r) {
+	return tau_lang::build_bf_xnor<node>(l, r);
 }
 
 template <NodeType node>
@@ -1033,6 +1067,11 @@ tref tree<node>::build_bf_and(tref l, tref r) {
 template <NodeType node>
 tref tree<node>::build_bf_and(const auto& bfs, size_t type_id) {
 	return tau_lang::build_bf_and<node>(bfs, type_id);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_nand(tref l, tref r) {
+	return tau_lang::build_bf_nand<node>(l, r);
 }
 
 template <NodeType node>

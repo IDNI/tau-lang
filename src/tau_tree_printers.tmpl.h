@@ -45,8 +45,11 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			|| nt == tau::bf_lt
 			|| nt == tau::bf_nlt
 			|| nt == tau::bf_or
+			|| nt == tau::bf_nor
 			|| nt == tau::bf_xor
+			|| nt == tau::bf_xnor
 			|| nt == tau::bf_and
+			|| nt == tau::bf_nand
 			|| nt == tau::bf_neg
 			|| nt == tau::bf_add
 			|| nt == tau::bf_sub
@@ -332,9 +335,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_and,             740 },
 			{ bf_neg,             750 },
 			{ bf,                 790 },
-			//{ bv_nor,             811 },
-			//{ bv_xnor,            813 },
-			//{ bv_nand,            815 },
+			{ bf_nor,             811 },
+			{ bf_xnor,            813 },
+			{ bf_nand,            815 },
 			{ bf_shl,             816 },
 			{ bf_shr,             817 },
 			{ bf_add,             818 },
@@ -342,9 +345,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_mul,             820 },
 			{ bf_div,             821 },
 			{ bf_mod,             822 },
-			//{ bv_min,             823 },
-			//{ bv_max,             824 },
-			//{ bf_minus,           825 },
 			{ rec_relation,       900 },
 			{ ref_args,           900 },
 		};
@@ -615,13 +615,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_mul:            out("*"); last_quant_nt = nul; break;
 			case bf_div:            out("/"); last_quant_nt = nul; break;
 			case bf_mod:            out("%"); last_quant_nt = nul; break;
-			//case bv_nand:           out("!&"); last_quant_nt = nul; break;
-			//case bv_nor:            out("!|"); last_quant_nt = nul; break;
-			//case bv_xnor:           out("!^"); last_quant_nt = nul; break;
+			case bf_nand:           out("!&"); last_quant_nt = nul; break;
+			case bf_nor:            out("!|"); last_quant_nt = nul; break;
+			case bf_xnor:           out("!^"); last_quant_nt = nul; break;
 			case bf_shl:            out("<<"); last_quant_nt = nul; break;
 			case bf_shr:            out(">>"); last_quant_nt = nul; break;
-			//case bv_max:            out("max "); last_quant_nt = nul; break;
-			//case bv_min:            out("min "); last_quant_nt = nul; break;
 
 			case ctn_neq:           out(" != "); break;
 			case ctn_eq:            out(" = "); break;

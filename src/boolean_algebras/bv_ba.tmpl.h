@@ -178,41 +178,31 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_and(l.value(), r.value())) : std::nullopt;
 		}
-		/*case node::type::bv_nand: {
+		case node::type::bf_nand: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_nand(l.value(), r.value())) : std::nullopt;
-		}*/
+		}
 		case node::type::bf_or: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_or(l.value(), r.value())) : std::nullopt;
 		}
-		/*case node::type::bv_nor: {
+		case node::type::bf_nor: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_nor(l.value(), r.value())) : std::nullopt;
-		}*/
+		}
 		case node::type::bf_xor: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_xor(l.value(), r.value())) : std::nullopt;
 		}
-		/*case node::type::bv_xnor: {
+		case node::type::bf_xnor: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_xnor(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bv_min: {
-			auto l = bv_eval_node<node>(form->child[0], vars, free_vars);
-			auto r = bv_eval_node<node>(form->child[1], vars, free_vars);
-			return (l && r) ? min(l.value(), r.value()) : std::nullopt;
-		}
-		case node::type::bv_max: {
-			auto l = bv_eval_node<node>(form->child[0], vars, free_vars);
-			auto r = bv_eval_node<node>(form->child[1], vars, free_vars);
-			return (l && r) ? max(l.value(), r.value()) : std::nullopt;
-		}*/
 		case node::type::bf_shl: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
@@ -295,6 +285,9 @@ tref cvc5_tree_to_tau_tree(bv n) {
 		case Kind::BITVECTOR_AND: return from_collection(n, build_bf_and<node>);
 		case Kind::BITVECTOR_OR: return from_collection(n, build_bf_or<node>);
 		case Kind::BITVECTOR_XOR: return from_collection(n, build_bf_xor<node>);
+		case Kind::BITVECTOR_NAND: return from_collection(n, build_bf_nand<node>);
+		case Kind::BITVECTOR_NOR: return from_collection(n, build_bf_nor<node>);
+		case Kind::BITVECTOR_XNOR: return from_collection(n, build_bf_xnor<node>);
 		case Kind::BITVECTOR_ADD: return from_collection(n, build_bf_add<node>);
 		case Kind::BITVECTOR_SUB: return from_collection(n, build_bf_sub<node>);
 		case Kind::BITVECTOR_MULT: return from_collection(n, build_bf_mul<node>);

@@ -567,9 +567,12 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_fex(tref l, tref r);
 	static tref build_bf_or(tref l, tref r);
 	static tref build_bf_or(const auto& bfs, size_t type_id);
+	static tref build_bf_nor(tref l, tref r);
 	static tref build_bf_xor(tref l, tref r);
+	static tref build_bf_xnor(tref l, tref r);
 	static tref build_bf_and(tref l, tref r);
 	static tref build_bf_and(const auto& bfs, size_t type_id);
+	static tref build_bf_nand(tref l, tref r);
 	static tref build_bf_neg(tref l);
 	static tref build_bf_shl(tref l, tref r);
 	static tref build_bf_shr(tref l, tref r);
