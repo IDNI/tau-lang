@@ -270,6 +270,49 @@ bool is_rr_function_type(size_t t) {
 	return is_rr_function_type<node>(ba_types<node>::type_tree(t));
 }
 
+// function type definitions
+template<NodeType node>
+tref function_type(const std::initializer_list<tref>& signature) {
+	return rr_function_type<node>(0, signature);
+}
+
+template<NodeType node>
+tref function_type(const std::initializer_list<size_t>& signature) {
+	return rr_function_type<node>(0, signature);
+}
+
+template<NodeType node>
+tref function_type(size_t arity) {
+	return rr_function_type<node>(0, arity);
+}
+
+template<NodeType node>
+inline size_t function_type_id(size_t arity) {
+	return rr_function_type_id<node>(0, arity);
+}
+
+template<NodeType node>
+inline size_t function_type_id(const std::initializer_list<tref>& signature) {
+	return rr_function_type_id<node>(0, signature);
+}
+
+template<NodeType node>
+inline size_t function_type_id(const std::initializer_list<size_t>& signature) {
+	return rr_function_type_id<node>(0, signature);
+}
+
+template<NodeType node>
+bool is_function_type(tref t) {
+	using tau = tree<node>;
+	return tau::get(t)[0].get_string() == "rr_function"
+		&& tau::get(t)[1].get_num() == 0;
+}
+
+template <NodeType node>
+bool is_function_type(size_t t) {
+	return is_function_type<node>(ba_types<node>::type_tree(t));
+}
+
 // -----------------------------------------------------------------------------
 // BA types
 
