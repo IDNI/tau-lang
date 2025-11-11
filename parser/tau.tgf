@@ -80,8 +80,8 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | (bf  _ '%' _       bf)             :bf_mod
                         | (bf  _ '/' _       bf)             :bf_div
                         | (bf  _ '*' _       bf)             :bf_mul
-                        | (bf  _ '^' _       bf)             :bf_xor
                         | (bf  _ '|' _       bf)             :bf_or
+                        | (bf  _ '^' _       bf)             :bf_xor
                         | ('1' [ typed ])                    :bf_t
                         | ('0' [ typed ])                    :bf_f
                         | (bf (_ '&' _ | __) bf)             :bf_and

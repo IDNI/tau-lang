@@ -26,8 +26,8 @@ inline const std::vector<std::string> symbol_names{
 	"bf_ngt", "__E_wff_39", "bf_gteq", "__E_wff_40", "bf_ngteq", "__E_wff_41", "bf_lt", "__E_wff_42", "bf_nlt", "__E_wff_43", 
 	"bf_parenthesis", "__E_bf_44", "ba_constant", "variable", "bf_fall", "__E_bf_45", "bf_fex", "__E_bf_46", "bf_ref", "bf_shr", 
 	"__E_bf_47", "bf_shl", "__E_bf_48", "bf_xnor", "__E_bf_49", "bf_nor", "__E_bf_50", "bf_nand", "__E_bf_51", "bf_sub", 
-	"__E_bf_52", "bf_add", "__E_bf_53", "bf_mod", "__E_bf_54", "bf_div", "__E_bf_55", "bf_mul", "__E_bf_56", "bf_xor", 
-	"__E_bf_57", "bf_or", "__E_bf_58", "bf_t", "__E_bf_59", "__E___E_bf_59_60", "bf_f", "__E_bf_61", "__E___E_bf_61_62", "bf_and", 
+	"__E_bf_52", "bf_add", "__E_bf_53", "bf_mod", "__E_bf_54", "bf_div", "__E_bf_55", "bf_mul", "__E_bf_56", "bf_or", 
+	"__E_bf_57", "bf_xor", "__E_bf_58", "bf_t", "__E_bf_59", "__E___E_bf_59_60", "bf_f", "__E_bf_61", "__E___E_bf_61_62", "bf_and", 
 	"__E_bf_63", "__E___E_bf_63_64", "bf_neg", "__E_bf_65", "bf_neg_oprnd", "__E___E_bf_65_66", "bf_and_nosep", "__E_bf_67", "bf_and_nosep_1st_oprnd", "__E___E_bf_67_68", 
 	"bf_and_nosep_2nd_oprnd", "__E___E_bf_67_69", "ctn_neq", "__E_constraint_70", "ctnvar", "num", "ctn_eq", "__E_constraint_71", "ctn_gteq", "__E_constraint_72", 
 	"ctn_gt", "__E_constraint_73", "ctn_lteq", "__E_constraint_74", "ctn_lt", "__E_constraint_75", "__E_ba_constant_76", "source", "__E_ba_constant_77", "src_c", 
@@ -508,17 +508,17 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(137), (NT(138)));
 //G188: bf(30)               => bf_mul(137).
 	p(NT(30), (NT(137)));
-//G189: __E_bf_57(140)       => bf(30) _(11) '^' _(11) bf(30).
-	p(NT(140), (NT(30)+NT(11)+T(32)+NT(11)+NT(30)));
-//G190: bf_xor(139)          => __E_bf_57(140).
+//G189: __E_bf_57(140)       => bf(30) _(11) '|' _(11) bf(30).
+	p(NT(140), (NT(30)+NT(11)+T(31)+NT(11)+NT(30)));
+//G190: bf_or(139)           => __E_bf_57(140).
 	p(NT(139), (NT(140)));
-//G191: bf(30)               => bf_xor(139).
+//G191: bf(30)               => bf_or(139).
 	p(NT(30), (NT(139)));
-//G192: __E_bf_58(142)       => bf(30) _(11) '|' _(11) bf(30).
-	p(NT(142), (NT(30)+NT(11)+T(31)+NT(11)+NT(30)));
-//G193: bf_or(141)           => __E_bf_58(142).
+//G192: __E_bf_58(142)       => bf(30) _(11) '^' _(11) bf(30).
+	p(NT(142), (NT(30)+NT(11)+T(32)+NT(11)+NT(30)));
+//G193: bf_xor(141)          => __E_bf_58(142).
 	p(NT(141), (NT(142)));
-//G194: bf(30)               => bf_or(141).
+//G194: bf(30)               => bf_xor(141).
 	p(NT(30), (NT(141)));
 //G195: __E___E_bf_59_60(145) => typed(33).
 	p(NT(145), (NT(33)));
@@ -1409,8 +1409,8 @@ struct tau_parser_nonterminals {
 		bf_ngt, __E_wff_39, bf_gteq, __E_wff_40, bf_ngteq, __E_wff_41, bf_lt, __E_wff_42, bf_nlt, __E_wff_43, 
 		bf_parenthesis, __E_bf_44, ba_constant, variable, bf_fall, __E_bf_45, bf_fex, __E_bf_46, bf_ref, bf_shr, 
 		__E_bf_47, bf_shl, __E_bf_48, bf_xnor, __E_bf_49, bf_nor, __E_bf_50, bf_nand, __E_bf_51, bf_sub, 
-		__E_bf_52, bf_add, __E_bf_53, bf_mod, __E_bf_54, bf_div, __E_bf_55, bf_mul, __E_bf_56, bf_xor, 
-		__E_bf_57, bf_or, __E_bf_58, bf_t, __E_bf_59, __E___E_bf_59_60, bf_f, __E_bf_61, __E___E_bf_61_62, bf_and, 
+		__E_bf_52, bf_add, __E_bf_53, bf_mod, __E_bf_54, bf_div, __E_bf_55, bf_mul, __E_bf_56, bf_or, 
+		__E_bf_57, bf_xor, __E_bf_58, bf_t, __E_bf_59, __E___E_bf_59_60, bf_f, __E_bf_61, __E___E_bf_61_62, bf_and, 
 		__E_bf_63, __E___E_bf_63_64, bf_neg, __E_bf_65, bf_neg_oprnd, __E___E_bf_65_66, bf_and_nosep, __E_bf_67, bf_and_nosep_1st_oprnd, __E___E_bf_67_68, 
 		bf_and_nosep_2nd_oprnd, __E___E_bf_67_69, ctn_neq, __E_constraint_70, ctnvar, num, ctn_eq, __E_constraint_71, ctn_gteq, __E_constraint_72, 
 		ctn_gt, __E_constraint_73, ctn_lteq, __E_constraint_74, ctn_lt, __E_constraint_75, __E_ba_constant_76, source, __E_ba_constant_77, src_c, 
