@@ -146,6 +146,9 @@ template <NodeType node>
 tref rr_predicate_type(size_t offsets = 0, const std::initializer_list<tref>& signature = {});
 
 template <NodeType node>
+tref rr_predicate_type(size_t offsets = 0, const std::initializer_list<size_t>& signature = {});
+
+template <NodeType node>
 tref rr_predicate_type(size_t offsets = 0, size_t arity = 0);
 
 template <NodeType node>
@@ -153,6 +156,9 @@ inline size_t rr_predicate_type_id(size_t offsets = 0, size_t arity = 0);
 
 template <NodeType node>
 inline size_t rr_predicate_type_id(size_t offsets = 0, const std::initializer_list<tref>& signature = {});
+
+template <NodeType node>
+inline size_t rr_predicate_type_id(size_t offsets = 0, const std::initializer_list<size_t>& signature = {});
 
 /**
  * @brief Checks if t represents the rr predicate type
@@ -165,7 +171,6 @@ bool is_rr_predicate_type_family(tref t);
 
 template <NodeType node>
 bool is_rr_predicate_type_family(size_t t);
-
 
 // -----------------------------------------------------------------------------
 // BA types

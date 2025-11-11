@@ -152,6 +152,17 @@ tref rr_predicate_type(size_t offsets, const std::initializer_list<tref>& signat
 }
 
 template<NodeType node>
+tref rr_predicate_type(size_t offsets, const std::initializer_list<size_t>& signature) {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "rr_predicate");
+	tref offsets_ = tau::get_num(offsets);
+	std::vector<tref> children{type, offsets_};
+	for (auto sid : signature)
+		children.push_back(ba_types<node>::type_tree(sid));
+	return tau::get(tau::typed, children);
+}
+
+template<NodeType node>
 tref rr_predicate_type(size_t offsets, size_t arity) {
 	using tau = tree<node>;
 	tref type = tau::get(tau::type, "rr_predicate");
@@ -164,6 +175,15 @@ tref rr_predicate_type(size_t offsets, size_t arity) {
 
 template<NodeType node>
 inline size_t rr_predicate_type_id(size_t offsets, const std::initializer_list<tref>& signature) {
+	static size_t id = ba_types<node>::id(rr_predicate_type<node>(offsets, signature));
+	return id;
+}
+
+template<NodeType node>
+inline size_t rr_predicate_type_id(size_t offsets, const std::initializer_list<size_t>& signature) {
+	std::vector<tref> signature_;
+	for (auto sid : signature)
+		signature_.push_back(ba_types<node>::type_tree(sid));
 	static size_t id = ba_types<node>::id(rr_predicate_type<node>(offsets, signature));
 	return id;
 }
