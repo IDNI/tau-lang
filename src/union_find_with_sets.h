@@ -53,12 +53,14 @@ public:
 		// sets are already equal
 		if (tau::get(root_x) == tau::get(root_y)) return;
 
-		if (_comp(root_x, root_y))
+		if (_comp(root_x, root_y)) {
 			// root_x becomes new root
-				parent[root_y] = root_x;
-		else if (_comp(root_y, root_x))
+			parent[root_y] = root_x;
+		}
+		else if (_comp(root_y, root_x)) {
 			// root_y becomes the new root
-				parent[root_x] = root_y;
+			parent[root_x] = root_y;
+		}
 		// We do not merge equal comparing elements
 		else return;
 
