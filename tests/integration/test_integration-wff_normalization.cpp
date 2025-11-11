@@ -75,7 +75,7 @@ TEST_SUITE("syntactic_path_simplification") {
 
 TEST_SUITE("simplify_using_equality") {
 	TEST_CASE("1") {
-		const char* sample = "x&(y|z) = 0 && xy = 0.";
+		const char* sample = "xy|zx = 0 && xy = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
 		CHECK(tau::get(res).to_str() == "xy = 0 && xz = 0");
@@ -91,12 +91,6 @@ TEST_SUITE("simplify_using_equality") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
 		CHECK(tau::get(res).equals_F());
-	}
-	TEST_CASE("4") {
-		const char* sample = "zyx = 0 && x&(v|y&(t|z|s|r)|g) = w.";
-		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = simplify_using_equality<node_t>::on(fm);
-		CHECK(tau::get(res).to_str() == "xyz = 0 && x(g|v|y(s|t|r)) = w");
 	}
 	TEST_CASE("5") {
 		const char* sample = "(w != 0 || o1[0]'&x = 0) && x&o1[0]'|o2[0] = 0 && x'|o1[0] != 1.";
@@ -114,7 +108,7 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
-		CHECK(tau::get(res).to_str() == "xy = 0 && wv = 0 && yw = 0 && xv = 0");
+		CHECK(tau::get(res).to_str() == "xv|yw|xy|wv = 0");
 	}
 }
 

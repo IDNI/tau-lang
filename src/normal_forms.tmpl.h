@@ -1793,23 +1793,34 @@ struct simplify_using_equality {
 	// Create comparator function that orders bfs by making constants smallest
 	// We have 0 < 1 < bf_constant < uninterpreted_constant < variable < rest by node count
 	static bool term_comp(tref l, tref r) {
-		if (tau::get(l).equals_0()) return true;
+		if (tau::get(l).equals_0()) {
+			if (!tau::get(r).equals_0()) return true;
+			else return false;
+		}
 		if (tau::get(r).equals_0()) return false;
 		// 1 is automatically rewritten to 0
 		// if (l == _1<node>()) return true;
 		// if (r == _1<node>()) return false;
-		if (is_child<node>(l, tau::ba_constant)) return true;
+		if (is_child<node>(l, tau::ba_constant)) {
+			if (!is_child<node>(r, tau::ba_constant)) return true;
+			else return tau::subtree_less(l,r);
+		}
 		if (is_child<node>(r, tau::ba_constant)) return false;
 		if (is_child<node>(l, tau::variable)) {
 			if (is_child<node>(r, tau::variable)) {
 				// Check for uninterpreted constant
-				if (is_child<node>(tau::trim(l), tau::uconst)) return true;
+				if (is_child<node>(tau::trim(l), tau::uconst)) {
+					if (!is_child<node>(tau::trim(r), tau::uconst))
+						return true;
+					else return tau::subtree_less(l,r);
+				}
 				if (is_child<node>(tau::trim(r), tau::uconst)) return false;
+				return tau::subtree_less(l,r);
 			} else return true;
 		}
 		if (is_child<node>(r, tau::variable)) return false;
-		// TODO: maybe use free_vars instead of node_count?
-		return node_count<node>(l) < node_count<node>(r);
+		// TODO: also use free_vars count once constant time
+		return tau::subtree_less(l,r);
 	};
 
 	// Given a formula, traverse the formula and
@@ -1928,13 +1939,9 @@ struct simplify_using_equality {
 		if (const tau& c = tau::get(eq)[0]; c[1].equals_0()) {
 			tref func = push_negation_in<node, false>(c.first());
 			bool valid = true;
-			for (tref path : expression_paths<node>(func)) {
-				// Sort path
-				trefs p = get_cnf_bf_clauses<node>(path);
-				std::ranges::sort(p, tau::subtree_less);
-				tref sorted_path = tau::build_bf_and(p, find_ba_type<node>(path));
+			for (tref disj : get_dnf_bf_clauses<node>(func)) {
 				valid = valid && add_raw_equality(uf,
-					tau::build_bf_eq_0(sorted_path));
+					tau::build_bf_eq_0(disj));
 			}
 			return valid;
 		} else return add_raw_equality(uf, eq);
@@ -1942,29 +1949,17 @@ struct simplify_using_equality {
 
 	// Given current equalities in union find, simplify the equation
 	static tref simplify_equation (auto& uf, tref eq) {
-		// For each node, check if contained in uf -> if yes, replace
-		auto simp_path = [&uf](tref path) {
-			// Sort path
-			trefs p = get_cnf_bf_clauses<node>(path);
-			std::ranges::sort(p, tau::subtree_less);
-			tref sorted_path = tau::build_bf_and(p, find_ba_type<node>(path));
-			DBG(LOG_TRACE << "Simplifying: " << tau::get(sorted_path) << "\n";)
-			auto uf_find = [&uf](tref n) {
-				if (uf.contains(n)) return uf.find(n);
-				return n;
-			};
-			tref simp_sorted_path = pre_order<node>(sorted_path).apply(uf_find);
-			DBG(LOG_TRACE << "Simplified to: " << tau::get(simp_sorted_path) << "\n";)
-			if (tau::get(simp_sorted_path) != tau::get(sorted_path))
-				return simp_sorted_path;
-			else return path;
-		};
+		DBG(LOG_TRACE << "Simplifying: " << tau::get(eq) << "\n";)
 		if (tau::get(eq).equals_T() || tau::get(eq).equals_F()) return eq;
-		tref c1 = expression_paths<node>(tau::get(eq)[0].first()).apply(simp_path);
-		tref c2 = expression_paths<node>(tau::get(eq)[0].second()).apply(simp_path);
-		return is_child<node>(eq, tau::bf_eq)
-			       ? tau::build_bf_eq(c1, c2)
-			       : tau::build_bf_neq(c1, c2);
+		auto uf_find = [&uf](tref n) {
+			if (uf.contains(n)) return uf.find(n);
+			return n;
+		};
+		tref simp_eq = pre_order<node>(eq).apply(uf_find);
+		DBG(LOG_TRACE << "Simplified to: " << tau::get(simp_eq) << "\n";)
+		if (tau::get(simp_eq) != tau::get(eq))
+			return simp_eq;
+		else return eq;
 	}
 
 private:
