@@ -211,6 +211,44 @@ template <NodeType node>
 bool is_rr_function_type_family(size_t t);
 
 // -----------------------------------------------------------------------------
+// Type definitions for functions
+
+/**
+ * @brief Creates the type tree associated with the type "functions"
+ * @tparam Tree node type
+ * @return Tree reference to type tree
+ */
+template <NodeType node>
+tref function_type(const std::initializer_list<tref>& signature = {});
+
+template <NodeType node>
+tref function_type(const std::initializer_list<size_t>& signature = {});
+
+template <NodeType node>
+tref function_type(size_t arity = 0);
+
+template <NodeType node>
+inline size_t function_type_id(size_t arity = 0);
+
+template <NodeType node>
+inline size_t function_type_id(const std::initializer_list<tref>& signature = {});
+
+template <NodeType node>
+inline size_t function_type_id(const std::initializer_list<size_t>& signature = {});
+
+/**
+ * @brief Checks if t represents the function type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents function
+ */
+template <NodeType node>
+bool is_function_type_family(tref t);
+
+template <NodeType node>
+bool is_function_type_family(size_t t);
+
+// -----------------------------------------------------------------------------
 // BA types
 //   contains type map of BA types
 // is templated by NodeType to scope it to the specific BAs... packed node tree
