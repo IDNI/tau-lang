@@ -219,22 +219,10 @@ bool is_rr_function_type_family(size_t t);
  * @return Tree reference to type tree
  */
 template <NodeType node>
-tref function_type(const std::initializer_list<tref>& signature = {});
+tref function_type(tref type = untyped_type<node>(), size_t arity = 0);
 
 template <NodeType node>
-tref function_type(const std::initializer_list<size_t>& signature = {});
-
-template <NodeType node>
-tref function_type(size_t arity = 0);
-
-template <NodeType node>
-inline size_t function_type_id(size_t arity = 0);
-
-template <NodeType node>
-inline size_t function_type_id(const std::initializer_list<tref>& signature = {});
-
-template <NodeType node>
-inline size_t function_type_id(const std::initializer_list<size_t>& signature = {});
+inline size_t function_type_id(tref type = untyped_type<node>(), size_t arity = 0);
 
 /**
  * @brief Checks if t represents the function type
