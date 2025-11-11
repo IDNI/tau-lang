@@ -33,30 +33,6 @@ bool is_tau_type(size_t t) {
 }
 
 template<NodeType node>
-tref bool_type() {
-	using tau = tree<node>;
-	tref type = tau::get(tau::type, "bool");
-	return tau::get(tau::typed, type);
-}
-
-template<NodeType node>
-inline size_t bool_type_id() {
-	static size_t id = ba_types<node>::id(bool_type<node>());
-	return id;
-}
-
-template<NodeType node>
-bool is_bool_type(tref t) {
-	using tau = tree<node>;
-	return tau::get(t)[0].get_string() == "bool";
-}
-
-template <NodeType node>
-bool is_bool_type(size_t t) {
-	return is_bool_type<node>(ba_types<node>::type_tree(t));
-}
-
-template<NodeType node>
 tref nat_type() {
 	using tau = tree<node>;
 	tref type = tau::get(tau::type, "nat");
@@ -164,6 +140,53 @@ bool is_bv_type_family(size_t ba_type_id) {
 	return is_bv_type_family<node>(ba_types<node>::type_tree(ba_type_id));
 }
 
+// rr predicate type definitions
+template<NodeType node>
+tref rr_predicate_type(size_t offsets, const std::initializer_list<tref>& signature) {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "rr_predicate");
+	tref offsets_ = tau::get_num(offsets);
+	std::vector<tref> children{type, offsets_};
+	children.insert(children.end(), signature.begin(), signature.end());
+	return tau::get(tau::typed, children);
+}
+
+template<NodeType node>
+tref rr_predicate_type(size_t offsets, size_t arity) {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "rr_predicate");
+	tref offsets_ = tau::get_num(offsets);
+	std::vector<tref> children{type, offsets_};
+	for (size_t i = 0; i < arity; ++i)
+		children.push_back(tau::get(tau::type, "untyped"));
+	return tau::get(tau::typed, children);
+}
+
+template<NodeType node>
+inline size_t rr_predicate_type_id(size_t offsets, const std::initializer_list<tref>& signature) {
+	static size_t id = ba_types<node>::id(rr_predicate_type<node>(offsets, signature));
+	return id;
+}
+
+template<NodeType node>
+inline size_t rr_predicate_type_id(size_t offsets, size_t arity) {
+	static size_t id = ba_types<node>::id(rr_predicate_type<node>(offsets, arity));
+	return id;
+}
+
+template<NodeType node>
+bool is_rr_predicate_type(tref t) {
+	using tau = tree<node>;
+	return tau::get(t)[0].get_string() == "rr_predicate";
+}
+
+template <NodeType node>
+bool is_rr_predicate_type(size_t t) {
+	return is_rr_predicate_type<node>(ba_types<node>::type_tree(t));
+}
+
+
+
 // -----------------------------------------------------------------------------
 // BA types
 
@@ -218,7 +241,7 @@ std::string ba_types<node>::dump_to_str() {
 template <NodeType node>
 std::vector<tref>& ba_types<node>::type_trees() {
 	static std::vector<tref> t { untyped_type<node>(), tau_type<node>(),
-		bv_type<node>(), sbf_type<node>(), bool_type<node>() };
+		bv_type<node>(), sbf_type<node>(), rr_predicate_type<node>(0,0) };
 	return t;
 }
 
@@ -227,7 +250,7 @@ template <NodeType node>
 subtree_map<node, size_t>& ba_types<node>::type_tree_to_idx() {
 	static subtree_map<node, size_t> t{ {untyped_type<node>(), 0 },
 		{ tau_type<node>(), 1 }, { bv_type<node>(), 2 },
-		{ sbf_type<node>(), 3 }, { bool_type<node>(), 4 }
+		{ sbf_type<node>(), 3 }, { rr_predicate_type<node>(0,0), 4 }
 	};
 	return t;
 }

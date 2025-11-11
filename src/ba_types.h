@@ -32,29 +32,6 @@ template <NodeType node>
 bool is_tau_type(size_t t);
 
 /**
- * @brief Creates the type tree associated with the type "bool"
- * @tparam Tree node type
- * @return Tree reference to type tree
- */
-template <NodeType node>
-tref bool_type();
-
-template <NodeType node>
-inline size_t bool_type_id();
-
-/**
- * @brief Checks if t represents the bool type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents bool
- */
-template <NodeType node>
-bool is_bool_type(tref t);
-
-template <NodeType node>
-bool is_bool_type(size_t t);
-
-/**
  * @brief Creates the type tree associated with the type "nat"
  * @tparam Tree node type
  * @return Tree reference to type tree
@@ -156,6 +133,39 @@ bool is_bv_type_family(tref t);
 
 template <NodeType node>
 bool is_bv_type_family(size_t ba_type_id);
+
+// -----------------------------------------------------------------------------
+// Type definitions for rr predicates
+
+/**
+ * @brief Creates the type tree associated with the type "rr predicate"
+ * @tparam Tree node type
+ * @return Tree reference to type tree
+ */
+template <NodeType node>
+tref rr_predicate_type(size_t offsets = 0, const std::initializer_list<tref>& signature = {});
+
+template <NodeType node>
+tref rr_predicate_type(size_t offsets = 0, size_t arity = 0);
+
+template <NodeType node>
+inline size_t rr_predicate_type_id(size_t offsets = 0, size_t arity = 0);
+
+template <NodeType node>
+inline size_t rr_predicate_type_id(size_t offsets = 0, const std::initializer_list<tref>& signature = {});
+
+/**
+ * @brief Checks if t represents the rr predicate type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents rr predicate
+ */
+template <NodeType node>
+bool is_rr_predicate_type_family(tref t);
+
+template <NodeType node>
+bool is_rr_predicate_type_family(size_t t);
+
 
 // -----------------------------------------------------------------------------
 // BA types
