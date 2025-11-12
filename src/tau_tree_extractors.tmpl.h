@@ -732,8 +732,10 @@ bool has_open_tau_fm_in_constant(tref fm) {
 	auto _closed = [](const auto& c) -> bool { return is_closed(c); };
 	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
 	for (tref c : consts) {
-		auto ba_const = tt(c) | tau::ba_constant | tt::ba_constant;
-		if (!std::visit(_closed, ba_const)) {
+		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
+		// Special case if the ba_constant is not converted to constant yet
+		if (tau::get(ba_const).get_ba_constant_id() == 0) return false;
+		if (!std::visit(_closed, tt(ba_const) | tt::ba_constant)) {
 			LOG_ERROR << "A Tau formula constant must be closed: "
 								<< ba_const;
 			return true;
@@ -742,4 +744,100 @@ bool has_open_tau_fm_in_constant(tref fm) {
 	return false;
 }
 
+template<NodeType node>
+bool invalid_nesting_of_temp_quants(tref fm) {
+	using tau = tree<node>;
+	auto temp_statements = rewriter::select_top<node>(fm,
+		is_temporal_quantifier<node>);
+	// Check that in no temp_statement another temporal statement is found
+	for (const auto& temp_st : temp_statements) {
+		if(auto n = rewriter::find_top<node>(tau::trim(temp_st),
+			is_temporal_quantifier<node>); n) {
+			LOG_ERROR << "Nesting of temporal quantifiers is not allowed: "
+			<< "Found \"" << tau::get(n) << "\" in \"" << tau::get(temp_st) << "\"\n";
+			return true;
+		}
+	}
+	return false;
+}
+
+// If a temporal quantifier is found, all other parts of the formula
+// also have to be in the scope of a temporal quantifier
+template<NodeType node>
+bool missing_temp_quants(tref fm) {
+	using tau = tree<node>;
+	if (!tau::get(fm).find_top(is_temporal_quantifier<node>))
+		return false;
+	// All parts of the formula have to be under a temporal quantifier
+	trefs fms = tau::get(fm).select_top(is<node, tau::wff>);
+	if (fms.empty()) return false;
+	auto atom = [](tref n) {
+		const tau& n_t = tau::get(n);
+		if (n_t.is(tau::wff) || n_t.is(tau::wff_or) ||
+			n_t.is(tau::wff_and) || n_t.is(tau::wff_neg))
+			return false;
+		return true;
+	};
+	for (tref f : fms) {
+		if (tref a = tau::get(f).find_top_until(atom,
+			is_temporal_quantifier<node>); a) {
+			LOG_ERROR << "The formula \"" << tau::get(a) <<
+				"\" must be scoped by a temporal quantifier" << "\n";
+			return true;
+		}
+	}
+	return false;
+}
+
+template<NodeType node>
+bool invalid_nesting_of_quants(tref fm) {
+	using tau = tree<node>;
+	auto non_temp_quants = rewriter::select_all<node>(fm, is_quantifier<node>);
+	for (tref ntq : non_temp_quants) {
+		auto temp_quants = rewriter::select_all<node>(ntq,
+			is_temporal_quantifier<node>);
+		tref var = tau::trim(ntq);
+		for (tref tq : temp_quants) {
+			// Check that the non-temp quantified variable doesn't appear free
+			if (subtree_vec_contains<node>(get_free_vars<node>(tq), var)) {
+				LOG_ERROR << "Variable \"" << tau::get(var) << "\" is captured outside of the temporal quantifier in \"" << tau::get(tq) << "\"\n";
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+template<NodeType node>
+bool has_negative_offset(tref fm) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	auto refs = [](tref n) {
+		return is<node>(n, tau::ref) ||
+		       is<node>(n, tau::bf_ref) ||
+			      is<node>(n, tau::wff_ref);
+	};
+	for (tref ref : tau::get(fm).select_top(refs)) {
+		auto offsets = tt(ref) | tau::offsets;
+		if (!offsets) continue;
+		for (tref i : tau::get(offsets | tt::ref).select_top(is<node, tau::integer>)) {
+			// Check that each integer is positive
+			if (tau::get(i).get_integer() < 0) {
+				LOG_ERROR << "Index in recurrence relation is negative: " << tau::get(ref);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+template<NodeType node>
+bool has_semantic_error(tref fm) {
+	bool error = invalid_nesting_of_quants<node>(fm)
+		     || has_open_tau_fm_in_constant<node>(fm)
+		     || invalid_nesting_of_temp_quants<node>(fm)
+		     || missing_temp_quants<node>(fm)
+		     || has_negative_offset<node>(fm);
+	return error;
+}
 } // namespace idni::tau_lang

@@ -158,6 +158,21 @@ bool has_temp_var(tref n);
 template <NodeType node>
 bool has_open_tau_fm_in_constant(tref fm);
 
+template <NodeType node>
+bool invalid_nesting_of_temp_quants(tref fm);
+
+template <NodeType node>
+bool missing_temp_quants(tref fm);
+
+template <NodeType node>
+bool invalid_nesting_of_quants(tref fm);
+
+template <NodeType node>
+bool has_negative_offset(tref fm);
+
+template <NodeType node>
+bool has_semantic_error(tref fm);
+
 } // namespace idni::tau_lang
 
 #include "dict.h"      // string pool accessed with dict() functions

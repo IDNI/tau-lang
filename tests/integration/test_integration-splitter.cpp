@@ -98,7 +98,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(is_splitter<bas_pack>(fm, s ));
 	}
 	TEST_CASE("Tau_splitter_12") {
-		const char *sample = "{ab|cd = 0} & y = 0 && {ab|cd = 0} & y < {ab|cd = 0}.";
+		const char *sample = "{<:a><:b>|<:c><:d> = 0} & y = 0 && {<:a><:b>|<:c><:d> = 0} & y < {<:a><:b>|<:c><:d> = 0}.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -106,7 +106,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 	TEST_CASE("Tau_splitter_13") {
-		const char *sample = "{ab|cd = 0} & y != 0 && { ab|cd = 0 } : tau ({ ab|cd = 0 } : tau y)' != 0.";
+		const char *sample = "{<:a><:b>|<:c><:d> = 0} & y != 0 && { <:a><:b>|<:c><:d> = 0 } : tau ({ <:a><:b>|<:c><:d> = 0 } : tau y)' != 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);

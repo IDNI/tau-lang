@@ -33,10 +33,10 @@ TEST_SUITE("Normalizer") {
 		CHECK( normalize_and_check(sample, tau::wff_always) );
 	}
 	TEST_CASE("8") {
-		const char* sample = "{ !i5[t] = x || o5[t] = y } : tau = u[0].";
+		const char* sample = "{ !i5[t] = <:x> || o5[t] = <:y> } : tau = u[0].";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = normalize_non_temp<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "{ always i5[t] != x || o5[t] = y } : tau = u[0]");
+		CHECK(tau::get(res).to_str() == "{ always i5[t] != <:x> || o5[t] = <:y> } : tau = u[0]");
 	}
 }
 
@@ -177,13 +177,13 @@ TEST_SUITE("anti_prenex") {
 		CHECK(tau::get(res).equals_T());
 	}
 	TEST_CASE("3") {
-		const char* sample = "all y !({ adc|a'dc|b = 0 } : tau y != 0 ) || { ab|cd = 0 } : tau y != 0.";
+		const char* sample = "all y !({ <:a><:d><:c>|<:a>'<:d><:c>|<:b> = 0 } : tau y != 0 ) || { <:a><:b>|<:c><:d> = 0 } : tau y != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK(tau::get(res).equals_T());
 	}
 	TEST_CASE("4") {
-		const char* sample = "{always a&(b|dc)|a'dc = 0}'&{always b|dc = 0} != 0.";
+		const char* sample = "{always <:a>&(<:b>|<:d><:c>)|<:a>'<:d><:c> = 0}'&{always <:b>|<:d><:c> = 0} != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK(tau::get(res).equals_F());
