@@ -572,6 +572,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
+	// TODO: fix for generalized Boolean grammar
 	// getting the type
 	size_t type = get_solver_cmd_type<node>(n.value());
 	if (type == 0) {
