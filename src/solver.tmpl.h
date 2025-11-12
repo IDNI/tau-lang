@@ -202,7 +202,6 @@ std::optional<solution<node>> lgrs(equality eq) {
 	}
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 	solution<node> phi;
-	//TODO resolve xor below
 	for (auto [x_i, z_i] : s.value())
 		phi[x_i] = tt((tau::get(z_i) & tau::get(f))
 			+ (tau::get(x_i) & ~tau::get(f)))

@@ -437,6 +437,7 @@ typename tree<node>::traverser operator|(
 
 template <NodeType node>
 tref onf(tref n, tref var) {
+	// TODO: fix for generalized Boolean grammar
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	// FIXME take into account quiantifiers
@@ -685,6 +686,9 @@ tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 		LOG_TRACE << "bf_boole_normal_form result: " << LOG_FM(fm);
 		return fm;
 	};
+	// We do not treat terms that contain a non-Boolean operation
+	if (rewriter::find_top<node>(fm, is_non_boolean_term<node>))
+		return fm;
 	fm = apply_all_xor_def<node>(fm);
 	// Function can only be applied to a BF
 	const auto& t = tau::get(fm);
@@ -1147,6 +1151,18 @@ tref reduce(tref fm) {
 #endif // TAU_CACHE
 	DBG(LOG_TRACE << "Begin reduce with is_cnf set to " << is_cnf;)
 	DBG(LOG_TRACE << "Formula to reduce: " << LOG_FM(fm);)
+	// Terms can only contain bf_neg, bf_and, bf_xor and bf_or
+	if (!is_wff) {
+		auto invalid = [](tref n) {
+			const tau& t = tau::get(n);
+			if (t.is(tau::bf) || t.is(tau::bf_and) || t.is(tau::bf_or)
+				|| t.is(tau::bf_xor) || t.is(tau::bf_neg))
+				return false;
+			return true;
+		};
+		if (tau::get(fm).find_top(invalid))
+			return syntactic_path_simplification<node>::on(fm);
+	}
 	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf);
 	if (paths.empty()) {
 		auto res = is_cnf ? (is_wff ? tau::_T() : tau::_1(type_id))
