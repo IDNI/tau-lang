@@ -245,6 +245,12 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 		transformed = result.first;
 		if (transformed) options.global_scope = result.second;
 	}
+	//Check for semantic errors in expression
+	if (has_semantic_error<node>(transformed)) {
+		use_hooks = using_hooks;
+		return nullptr;
+	}
+
 	// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
 	return tau::use_hooks = using_hooks, options.reget_with_hooks ? reget(transformed) : transformed;
 }
