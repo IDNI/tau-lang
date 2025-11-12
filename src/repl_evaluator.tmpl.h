@@ -572,7 +572,6 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
-	// TODO: fix for generalized Boolean grammar
 	// getting the type
 	size_t type = get_solver_cmd_type<node>(n.value());
 	if (type == 0) {
@@ -589,6 +588,12 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	tref equality = tt(applied) | tau::bf_eq | tt::ref;
 	if (!applied || !equality) {
 		TAU_LOG_ERROR << "Invalid argument(s)\n";
+		return;
+	}
+	// Exclude non-Boolean operations from equation
+	if (tau::get(applied)[0].find_top(is_non_boolean_term<node>) ||
+		tau::get(applied)[1].find_top(is_non_boolean_term<node>)) {
+		TAU_LOG_ERROR << "Found non-Boolean operation in equation\n";
 		return;
 	}
 

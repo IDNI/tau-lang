@@ -388,6 +388,12 @@ template <NodeType node>
 tref onf_wff<node>::onf_subformula(tref n) const {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	auto invalid = [](tref n) {
+		if (tau::get(n).is_term() && is_non_boolean_term<node>(n))
+			return true;
+		else return false;
+	};
+	if (tau::get(n).find_top(invalid)) return n;
 	auto has_var = [&](const auto& el) {
 		return tau::get(el) == tau::get(var);
 	};
@@ -437,7 +443,6 @@ typename tree<node>::traverser operator|(
 
 template <NodeType node>
 tref onf(tref n, tref var) {
-	// TODO: fix for generalized Boolean grammar
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	// FIXME take into account quiantifiers
