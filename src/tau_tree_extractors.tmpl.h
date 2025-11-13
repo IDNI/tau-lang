@@ -705,7 +705,7 @@ trefs get_free_vars_appearance_order(tref expression) {
 	auto up = [&scoped](tref n) {
 		// If quantifier is encountered, remove quantified variable from scoped
 		if (is_quantifier<node>(n) || is_functional_quantifier<node>(n)) {
-			scoped.erase(tau::trim(n));
+			scoped.extract(tau::trim(n));
 		}
 	};
 	pre_order<node>(expression).visit_unique(f, all, up);
