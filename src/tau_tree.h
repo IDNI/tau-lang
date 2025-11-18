@@ -351,7 +351,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	tref get_ba_type_tree() const;
 	const trefs& get_free_vars() const;
 
-	tref substitute(tref that, tref with);
+	tref substitute(tref that, tref with) const;
 
 	// ---------------------------------------------------------------------
 	// helpers for querying
