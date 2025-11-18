@@ -1280,10 +1280,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(248), (NT(14)));
 //G573: normalize_cmd_arg(248) => bf(30).
 	p(NT(248), (NT(30)));
-//G574: inst_args(283)       => wff_cmd_arg(260) _(11) '[' _(11) variable(113) _(11) '/' _(11) bf_cmd_arg(358) _(11) ']'.
-	p(NT(283), (NT(260)+NT(11)+T(26)+NT(11)+NT(113)+NT(11)+T(39)+NT(11)+NT(358)+NT(11)+T(27)));
-//G575: inst_args(283)       => bf_cmd_arg(358) _(11) '[' _(11) variable(113) _(11) '/' _(11) bf_cmd_arg(358) _(11) ']'.
-	p(NT(283), (NT(358)+NT(11)+T(26)+NT(11)+NT(113)+NT(11)+T(39)+NT(11)+NT(358)+NT(11)+T(27)));
+//G574: inst_args(283)       => wff_cmd_arg(260) _(11) '[' _(11) bf(30) _(11) '/' _(11) bf_cmd_arg(358) _(11) ']'.
+	p(NT(283), (NT(260)+NT(11)+T(26)+NT(11)+NT(30)+NT(11)+T(39)+NT(11)+NT(358)+NT(11)+T(27)));
+//G575: inst_args(283)       => bf_cmd_arg(358) _(11) '[' _(11) bf(30) _(11) '/' _(11) bf_cmd_arg(358) _(11) ']'.
+	p(NT(283), (NT(358)+NT(11)+T(26)+NT(11)+NT(30)+NT(11)+T(39)+NT(11)+NT(358)+NT(11)+T(27)));
 //G576: help_arg(240)        => help_sym(237).
 	p(NT(240), (NT(237)));
 //G577: help_arg(240)        => version_sym(230).

@@ -339,9 +339,12 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::inst_cmd(const tt& n) {
 	const auto& t = n.value_tree();
-	typename node::type var_type = t[2].is(tau::variable) ? tau::bf : tau::wff;
+	if (!t[2][0].is(tau::variable)) {
+		TAU_LOG_ERROR << "Invalid argument\n";
+		return nullptr;
+	}
 	tref nn = tau::get(t.value, { t.first(), t.second(),
-			tau::get(var_type, t.third()), t.child(3) });
+			t.third(), t.child(3) });
 	return subst_cmd(nn);
 }
 
