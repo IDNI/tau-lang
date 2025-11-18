@@ -184,7 +184,7 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
-	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
+	nn = tau::build_wff_ex_many(vars, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
 
@@ -206,7 +206,7 @@ bool is_non_temp_nso_unsat(tref n) {
 
 	tref nn = n;
 	const trefs& vars = get_free_vars<node>(nn);
-	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
+	nn = tau::build_wff_ex_many(vars, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
 	assert((t.equals_T() || t.equals_F()
@@ -253,10 +253,9 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	tref imp2 = tau::build_wff_imply(n2, n1);
 	const trefs& vars = get_free_vars<node>(tau::build_wff_and(n1, n2));
 	DBG(for (tref v : vars) LOG_DEBUG << "var: " << LOG_FM(v);)
-	for (tref v : vars) {
-		imp1 = tau::build_wff_all(v, imp1);
-		imp2 = tau::build_wff_all(v, imp2);
-	}
+	imp1 = tau::build_wff_all_many(vars, imp1);
+	imp2 = tau::build_wff_all_many(vars, imp2);
+
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
 	const tau& tdir1 = tau::get(normalize_non_temp<node>(imp1));
@@ -304,7 +303,8 @@ bool is_nso_impl(tref n1, tref n2) {
 
 	tref imp = tau::build_wff_imply(n1, n2);
 	const trefs& vars = get_free_vars<node>(imp);
-	for (tref v : vars) imp = tau::build_wff_all(v, imp);
+	imp = tau::build_wff_all_many(vars, imp);
+
 	LOG_DEBUG << "wff: " << LOG_FM(imp);
 
 	const tau& res = tau::get(normalize_non_temp<node>(imp));
@@ -334,7 +334,7 @@ bool are_bf_equal(tref n1, tref n2) {
 
 	tref bf_equal_fm = tau::build_bf_eq_0(tau::build_bf_xor(n1, n2));
 	const trefs& vars = get_free_vars<node>(bf_equal_fm);
-	for (tref v : vars) bf_equal_fm = tau::build_wff_all(v, bf_equal_fm);
+	bf_equal_fm = tau::build_wff_all_many(vars, bf_equal_fm);
 	LOG_TRACE << "wff: " << LOG_FM(bf_equal_fm);
 
 	tref normalized = normalize_non_temp<node>(bf_equal_fm);

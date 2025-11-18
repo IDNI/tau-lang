@@ -35,7 +35,7 @@ TEST_SUITE("pretty printer") {
 	TEST_CASE("pretty print different from input") {
 		vector<std::pair<string, string>> different = {
 			{ "(x) = 1.", "x = 1." },
-			{ "all x all y xy = 0.", "all x, y xy = 0." },
+			{ "all x all y xy = 0.", "all b2, b1 b2 b1 = 0." },
 		};
 
 		for (auto& [sample, expected] : different)

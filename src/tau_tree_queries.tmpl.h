@@ -99,7 +99,12 @@ template<NodeType node>
 bool is_functional_quantifier(tref n) {
 	using tau = tree<node>;
 	return tau::get(n).is(tau::bf_fall) || tau::get(n).is(tau::bf_fex);
-};
+}
+
+template <NodeType node>
+bool is_logical_or_functional_quant(tref n) {
+	return is_quantifier<node>(n) || is_functional_quantifier<node>(n);
+}
 
 template <NodeType node>
 bool contains(tref fm, tref sub_fm) {
@@ -169,8 +174,7 @@ int_t node_count (tref fm) {
 
 template <NodeType node>
 auto visit_wff = [](tref n) static {
-	if (tree<node>::get(n).is(node::type::bf)) return false;
-	return true;
+	return !tree<node>::get(n).is_term();
 };
 
 template <NodeType node>

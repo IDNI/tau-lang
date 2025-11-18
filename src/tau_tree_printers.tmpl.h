@@ -258,6 +258,34 @@ std::ostream& tree<node>::dump(std::ostream& os, tref n, bool subtree) {
 //------------------------------------------------------------------------------
 // print
 
+// Find the smallest number n such that "bm" for all m > n does not occur
+// as a variable name
+template <NodeType node>
+int_t get_max_var_name_b_id(tref fm) {
+	// Find all occurrences of bn where n is some number in fm
+	// and return the maximal n + 1
+	using tau = tree<node>;
+	auto is_number = [](const std::string& s) static {
+		if (s.empty()) return false;
+		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		return true;
+	};
+	int_t id = 0;
+	auto f = [&](tref n) {
+		if (tau::get(n).is(tau::variable)) {
+			auto name = get_var_name<node>(n);
+			if (!name.empty() && name[0] == 'b') {
+				// Check if of form bn
+				if (is_number(name.substr(1)))
+					id = std::max(id, std::stoi(
+						name.substr(1)));
+			}
+		}
+	};
+	pre_order<node>(fm).visit_unique(f);
+	return id;
+}
+
 // pretty printer settings
 inline bool pretty_printer_highlighting = false;
 inline bool pretty_printer_indenting    = false;
@@ -274,7 +302,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	bool pending_bf_and_op = false;
 	typename node::type last_quant_nt = nul;
 	std::unordered_map<tref, size_t> chpos; // child positions if tracked
+	int_t bound_var_id_offset = get_max_var_name_b_id<node>(get());
 
+	auto is_number = [](const std::string& s) static {
+		if (s.empty()) return false;
+		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		return true;
+	};
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
 			bf_ref, bf_neg, ba_constant, bf_t,
@@ -555,6 +589,15 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				out(tau::get(t.get_ba_type_tree()));
 				break;*/
 			case source: break; // is printed from bf_constant
+			case var_name:
+				// Only bound variable names are numbers
+				if (is_number(t.get_string())) {
+					int_t id = std::stoi(t.get_string());
+					// Adjust id to not clash with any free variable name
+					id = id + bound_var_id_offset;
+					out("b" + std::to_string(id));
+				} else out(t.get_string());
+				break;
 			default:
 				if (is_string_nt(nt)) {
 					if (nt == uconst_name) out("<");

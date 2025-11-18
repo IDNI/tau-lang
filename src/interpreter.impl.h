@@ -573,8 +573,8 @@ tref interpreter<node, in_t, out_t>::get_ubt_ctn_at(int_t t) {
 			continue;
 		}
 		if (tau::get(v).is_input_variable())
-			step_ubt_ctn = build_wff_all<node>(v, step_ubt_ctn);
-		else step_ubt_ctn = build_wff_ex<node>(v, step_ubt_ctn);
+			step_ubt_ctn = build_wff_all<node>(v, step_ubt_ctn, false);
+		else step_ubt_ctn = build_wff_ex<node>(v, step_ubt_ctn, false);
 		io_vars.pop_back();
 	}
 	LOG_TRACE << "get_ubt_ctn_at[step_ubt_ctn]: " << tau::get(step_ubt_ctn) << "\n";
@@ -821,14 +821,15 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 				// Apply pointwise revision to always statements
 				// if simply conjunction failed
 				if (upd_always) {
+					auto out_vars = [](tref n) {
+						return is_child<node, tau::io_var>(n) &&
+							tau::get(n).is_output_variable();
+					};
 					tref aw = always_conjunction<node>(
 							spec_always, upd_always);
-					trefs aw_io_vars = tau::get(aw).select_top(
-						is_child<node, tau::io_var>);
-					for (tref io_var : aw_io_vars)
-						if (tau::get(io_var).is_output_variable())
-							aw = build_wff_ex<node>(
-								io_var, aw);
+					trefs aw_out_vars = tau::get(aw).select_top(
+						out_vars);
+					aw = tau::build_wff_ex_many(aw_out_vars, aw);
 					new_spec_pointwise = build_wff_or<node>(
 						always_conjunction<node>(
 							build_wff_neg<node>(aw),

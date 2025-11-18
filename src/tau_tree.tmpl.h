@@ -845,6 +845,20 @@ const trefs& tree<node>::get_free_vars() const {
 	return tau_lang::get_free_vars<node>(get());
 }
 
+template<NodeType node>
+tref tree<node>::substitute(tref that, tref with) {
+	// If that contains a quantifier, the above quantifier id's in formula need
+	// to be recalculated; otherwise just simple replace method
+	DBG(assert(get_free_bound_vars<node>(that).empty());)
+	DBG(assert(get_free_bound_vars<node>(with).empty());)
+	DBG(assert(tau::get(that).get_ba_type() ==
+		tau::get(with).get_ba_type());)
+	//with contains a quantifier
+	if (tau::get(with).find_top(is_logical_or_functional_quant<node>)) {
+		return canonize_quantifier_ids<node>(this->replace(that, with));
+	} else return this->replace(that, with);
+}
+
 template <NodeType node>
 std::function<bool(const tref&)> or_predicate(
 		const std::function<bool(const tref&)>* query, size_t count) {
@@ -956,6 +970,11 @@ std::vector<trefs> tree<node>::select_all_until_by_predicates(
 	auto refs = select_all_until(
 		or_predicate<node>(queries.data(), queries.size()), until);
 	return select_by_predicates<node>(refs, queries.data(), queries.size());
+}
+
+template <NodeType node>
+tref substitute(tref formula, tref that, tref with) {
+	return tree<node>::get(formula).substitue(that, with);
 }
 
 } // namespace idni::tau_lang
