@@ -849,8 +849,6 @@ template<NodeType node>
 tref tree<node>::substitute(tref that, tref with) const {
 	// If that contains a quantifier, the above quantifier id's in formula need
 	// to be recalculated; otherwise just simple replace method
-	DBG(assert(get_free_bound_vars<node>(that).empty());)
-	DBG(assert(get_free_bound_vars<node>(with).empty());)
 	DBG(assert(tau::get(that).get_ba_type() ==
 		tau::get(with).get_ba_type());)
 	//with contains a quantifier
