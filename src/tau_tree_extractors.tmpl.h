@@ -712,6 +712,26 @@ trefs get_free_vars_appearance_order(tref expression) {
 	return free_vars;
 }
 
+// Collects all free appearances of variables that are in bound representation
+// This can happen for example in subformulas
+template <NodeType node>
+trefs get_free_bound_vars(tref expression) {
+	using tau = tree<node>;
+	auto is_number = [](const std::string& s) {
+		if (s.empty()) return false;
+		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		return true;
+	};
+	const trefs& free_vars = get_free_vars<node>(expression);
+	trefs bound_vars;
+	for (tref fv : free_vars) {
+		const tau& fv_t = tau::get(fv);
+		if (fv_t[0].is(tau::var_name) && is_number(fv_t[0].get_string()))
+			bound_vars.push_back(fv);
+	}
+	return bound_vars;
+}
+
 // A formula has a temporal variable if either it contains an io_var with a variable or capture
 // or it contains a flag
 template <NodeType node>

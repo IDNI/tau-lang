@@ -17,6 +17,73 @@ tref tree<node>::apply_builder(const rewriter::builder& b, trefs n) {
 	return rewriter::replace<node>(b.second->get(), changes);
 }
 
+template<NodeType node>
+tref canonize_quantifier_ids(tref fm) {
+	using tau = tree<node>;
+	DBG(LOG_DEBUG << "Start canonize_quantifier_ids with: " << tau::get(fm) << "\n";)
+	// Going down fm once, collect quantifiers and calculate quantifier ids
+	// during this traversal. The quantifier id is the maximal quantifier
+	// depth below the current quantifier + 1
+	// Going down fm again, replace found bound variables with corresponding
+	// quantifier id variable
+	subtree_map<node, size_t> scope_to_id;
+	std::vector<size_t> scope_id;
+	auto populate_scope = [&](tref n) {
+		if (is_quantifier<node>(n)) {
+			scope_id.push_back(1);
+			for (size_t i = scope_id.size(); i > 1; --i) {
+				if (scope_id[i-2] == scope_id[i-1])
+					++scope_id[i-2];
+			}
+		}
+		return !tree<node>::get(n).is_term();
+	};
+	auto populate_ids = [&](tref n) {
+		if (is_quantifier<node>(n)) {
+			scope_to_id.emplace(n, scope_id.back());
+			scope_id.pop_back();
+		}
+	};
+	pre_order<node>(fm).visit(populate_scope, all, populate_ids);
+	// Next update variables using the information from var_to_id
+	subtree_map<node, std::vector<size_t>> var_to_id;
+	subtree_map<node, tref> old_name;
+	auto update_var = [&](tref n) {
+		if (is_quantifier<node>(n)) {
+			DBG(assert(scope_to_id.contains(n));)
+			if (auto it = var_to_id.find(tau::trim(n)); it != var_to_id.end()) {
+				it->second.push_back(scope_to_id.find(n)->second);
+			} else var_to_id.emplace(tau::trim(n), std::vector{scope_to_id.find(n)->second});
+		} else if (is<node, tau::variable>(n)) {
+			if (auto it = var_to_id.find(n); it != var_to_id.end()) {
+				tref nvar = tau::build_variable(
+					std::to_string(it->second.back()),
+					tau::get(n).get_ba_type());
+				old_name.emplace(nvar, n);
+				return tau::build_variable(
+					std::to_string(it->second.back()),
+					tau::get(n).get_ba_type());
+			}
+		}
+		return n;
+	};
+	auto update_var_up = [&](tref n) {
+		if (is_quantifier<node>(n)) {
+			DBG(assert(old_name.contains(tau::trim(n)));)
+			DBG(assert(var_to_id.contains(
+				old_name.find(tau::trim(n))->second));)
+			auto it = var_to_id.find(old_name.find(tau::trim(n))->second);
+			old_name.erase(tau::trim(n));
+			if ( it->second.size() == 1) var_to_id.erase(it);
+			else it->second.pop_back();
+		}
+		return n;
+	};
+	fm = pre_order<node>(fm).apply(update_var, all, update_var_up);
+	DBG(LOG_DEBUG << "End canonize_quantifier_ids with: " << tau::get(fm) << "\n";)
+	return fm;
+}
+
 //------------------------------------------------------------------------------
 // builders
 
@@ -121,19 +188,111 @@ tref build_wff_conditional(tref x, tref y, tref z) {
 }
 
 template <NodeType node>
-tref build_wff_all(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
+int_t find_biggest_quant_id(tref fm) {
 	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::wff));)
-	return tau::get(tau::wff, tau::get(tau::wff_all, l, r));
+	// Find the biggest quantifier id in fm
+	int_t id = 0;
+	auto is_number = [](const std::string& s) static {
+		if (s.empty()) return false;
+		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		return true;
+	};
+	auto f = [&](tref n) {
+		if (is_quantifier<node>(n)) {
+			if (auto name = get_var_name<node>(tau::trim(n));
+				is_number(name)) {
+				id = std::max(id, std::stoi(name));
+				return false;
+			}
+		}
+		return !tau::get(n).is_term();
+	};
+	pre_order<node>(fm).visit_unique(f);
+	return id;
 }
 
+// If calculate_quant_id is false no variable renaming in subformula
+// is performed, and it is assumed that bound_var has correct representation
 template <NodeType node>
-tref build_wff_ex(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
+tref build_wff_all(tref bound_var, tref subformula, bool calculate_quant_id) {
+	DBG(assert(bound_var != nullptr && subformula != nullptr);)
 	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::variable) && tau::get(r).is(tau::wff));)
-	return tau::get(tau::wff, tau::get(tau::wff_ex, l, r));
+	DBG(assert(tau::get(bound_var).is(tau::variable) && tau::get(subformula).is(tau::wff));)
+	tref res = tau::get(tau::wff, tau::get(tau::wff_all, bound_var, subformula));
+	if (calculate_quant_id) {
+		// Find the biggest quantifier id in subformula and rename
+		// bound var to id + 1
+		const int_t id = find_biggest_quant_id<node>(subformula);
+		return tau::get(res).replace(bound_var,
+			tau::build_variable(std::to_string(id + 1),
+				tau::get(bound_var).get_ba_type()));
+	} else return res;
+}
+
+// Quantification pattern is build such that the last bound variable in
+// bound_vars is innermost
+template <NodeType node>
+tref build_wff_all_many(const trefs& bound_vars, tref subformula) {
+	using tau = tree<node>;
+#ifdef DEBUG
+	for (tref bv : bound_vars)
+		assert(bv != nullptr && tau::get(bv).is(tau::variable));
+	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
+#endif
+	// Find the biggest quantifier id in subformula and rename
+	// first bound variable to id + 1
+	int_t id = find_biggest_quant_id<node>(subformula);
+	// Prepare renaming changes and build formula
+	subtree_map<node, tref> changes;
+	for (tref bv : bound_vars | std::views::reverse) {
+		changes.emplace(bv, tau::build_variable(std::to_string(++id),
+			tau::get(bv).get_ba_type()));
+		subformula = build_wff_all<node>(bv, subformula, false);
+	}
+	// Rename bound variables
+	return rewriter::replace(subformula, changes);
+}
+
+// If calculate_quant_id is false no variable renaming in subformula
+// is performed, and it is assumed that bound_var has correct representation
+template <NodeType node>
+tref build_wff_ex(tref bound_var, tref subformula, bool calculate_quant_id) {
+	DBG(assert(bound_var != nullptr && subformula != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(bound_var).is(tau::variable) && tau::get(subformula).is(tau::wff));)
+	tref res = tau::get(tau::wff, tau::get(tau::wff_ex, bound_var, subformula));
+	if (calculate_quant_id) {
+		// Find the biggest quantifier id in subformula and rename
+		// bound var to id + 1
+		const int_t id = find_biggest_quant_id<node>(subformula);
+		return tau::get(res).replace(bound_var,
+			tau::build_variable(std::to_string(id + 1),
+				tau::get(bound_var).get_ba_type()));
+	} else return res;
+}
+
+// Quantification pattern is build such that the last bound variable in
+// bound_vars is innermost
+template <NodeType node>
+tref build_wff_ex_many(const trefs& bound_vars, tref subformula) {
+	using tau = tree<node>;
+#ifdef DEBUG
+	for (tref bv : bound_vars)
+		assert(bv != nullptr && tau::get(bv).is(tau::variable));
+	assert(subformula != nullptr && tau::get(subformula).is(tau::wff));
+#endif
+	// Find the biggest quantifier id in subformula and rename
+	// first bound variable to id + 1
+	int_t id = find_biggest_quant_id<node>(subformula);
+	// Prepare renaming changes and build formula
+	subtree_map<node, tref> changes;
+	for (tref bv : bound_vars | std::views::reverse) {
+		changes.emplace(bv, tau::build_variable(std::to_string(++id),
+			tau::get(bv).get_ba_type()));
+		subformula = build_wff_ex<node>(bv, subformula, false);
+	}
+	// Rename bound variables
+	return rewriter::replace(subformula, changes);
 }
 
 template <NodeType node>
@@ -856,13 +1015,23 @@ tref tree<node>::build_wff_conditional(tref x, tref y, tref z) {
 }
 
 template <NodeType node>
-tref tree<node>::build_wff_all(tref l, tref r) {
-	return tau_lang::build_wff_all<node>(l, r);
+tref tree<node>::build_wff_all(tref bound_var, tref subformula, bool calculate_quant_id) {
+	return tau_lang::build_wff_all<node>(bound_var, subformula, calculate_quant_id);
 }
 
 template <NodeType node>
-tref tree<node>::build_wff_ex(tref l, tref r) {
-	return tau_lang::build_wff_ex<node>(l, r);
+tref tree<node>::build_wff_all_many(const trefs& bound_vars, tref subformula) {
+	return tau_lang::build_wff_all_many<node>(bound_vars, subformula);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_ex(tref bound_var, tref subformula, bool calculate_quant_id) {
+	return tau_lang::build_wff_ex<node>(bound_var, subformula, calculate_quant_id);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_ex_many(const trefs& bound_vars, tref subformula) {
+	return tau_lang::build_wff_ex_many<node>(bound_vars, subformula);
 }
 
 template <NodeType node>

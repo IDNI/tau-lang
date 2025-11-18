@@ -10,27 +10,27 @@ using test_case = array<string, 3>;
 using test_cases = vector<test_case>;
 
 test_cases ex_cases = {
-	{ "ex x x=0.",                  "ex x x = 0",             "T" },
-	{ "ex x,y xy=0.",               "ex x, y xy = 0",         "T" },
-	{ "ex x ex y xy=0.",            "ex x, y xy = 0",         "T" },
+	{ "ex x x=0.",                  "ex b1 b1 = 0",             "T" },
+	{ "ex x,y xy=0.",               "ex b2, b1 b2 b1 = 0",         "T" },
+	{ "ex x ex y xy=0.",            "ex b2, b1 b2 b1 = 0",         "T" },
 };
 
 test_cases all_cases = {
-	{ "all x x!=0.",                "all x x != 0",           "F" },
-	{ "all x,y xy!=0.",             "all x, y xy != 0",       "F" },
-	{ "all x all y xy!=0.",         "all x, y xy != 0",       "F" },
+	{ "all x x!=0.",                "all b1 b1 != 0",           "F" },
+	{ "all x,y xy!=0.",             "all b2, b1 b2 b1 != 0",       "F" },
+	{ "all x all y xy!=0.",         "all b2, b1 b2 b1 != 0",       "F" },
 };
 
 test_cases ex_all_cases = {
-	{ "ex x all y x=y.",            "ex x all y x = y", "F" },
+	{ "ex x all y x=y.",            "ex b2 all b1 b2 = b1", "F" },
 	{ "ex x,y all w,z x=w&&y=z.",
-		"ex x, y all w, z x = w && y = z",     "F"},
+		"ex b4, b3 all b2, b1 b4 = b2 && b3 = b1",     "F"},
 };
 
 test_cases all_ex_cases = {
-	{ "all x ex y x=y.",            "all x ex y x = y", "T" },
+	{ "all x ex y x=y.",            "all b2 ex b1 b2 = b1", "T" },
 	{ "all x,y ex w,z x=w && y=z.",
-		"all x, y ex w, z x = w && y = z",    "T"},
+		"all b4, b3 ex b2, b1 b4 = b2 && b3 = b1",    "T"},
 };
 
 ostream& operator<<(ostream& os, const test_case& tc) {

@@ -1342,10 +1342,10 @@ tref push_negation_one_in(tref fm) {
 			return tau::build_bf_eq(ct[0].first(), ct[0].second());
 		if (ct.child_is(tau::wff_ex))
 			return tau::build_wff_all(ct[0].first(),
-				tau::build_wff_neg(ct[0].second()));
+				tau::build_wff_neg(ct[0].second()), false);
 		if (ct.child_is(tau::wff_all))
 			return tau::build_wff_ex(ct[0].first(),
-				tau::build_wff_neg(ct[0].second()));
+				tau::build_wff_neg(ct[0].second()), false);
 		if (ct.child_is(tau::wff_always))
 			return tau::build_wff_sometimes(
 				tau::build_wff_neg(ct[0].first()));
@@ -1577,8 +1577,8 @@ tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded) {
 	const auto& st = tau::get(scoped_fm);
 	if (st.child_is(tau::wff_or)) {
 		// Push quantifier in
-		tref c0 = tau::build_wff_ex(quant_var, st[0].first());
-		tref c1 = tau::build_wff_ex(quant_var, st[0].second());
+		tref c0 = tau::build_wff_ex(quant_var, st[0].first(), false);
+		tref c1 = tau::build_wff_ex(quant_var, st[0].second(), false);
 		return tau::build_wff_or(c0, c1);
 	}
 	else if (st.child_is(tau::wff_and)) {
@@ -1600,7 +1600,7 @@ tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded) {
 		else {
 			if (excluded) excluded->insert(no_q_fm);
 			return tau::build_wff_and(
-				tau::build_wff_ex(quant_var, q_fm), no_q_fm);
+				tau::build_wff_ex(quant_var, q_fm, false), no_q_fm);
 		}
 	}
 	else if (st.child_is(tau::wff_ex)) {
@@ -1630,8 +1630,8 @@ tref push_universal_quantifier_one(tref fm) {
 	const auto& st = tau::get(scoped_fm);
 	if (st.child_is(tau::wff_and)) {
 		// Push quantifier in
-		const auto c0 = tau::build_wff_all(quant_var, st[0].first());
-		const auto c1 = tau::build_wff_all(quant_var, st[0].second());
+		const auto c0 = tau::build_wff_all(quant_var, st[0].first(), false);
+		const auto c1 = tau::build_wff_all(quant_var, st[0].second(), false);
 		return tau::build_wff_and(c0, c1);
 	}
 	else if (st.child_is(tau::wff_or)) {
@@ -1648,7 +1648,7 @@ tref push_universal_quantifier_one(tref fm) {
 		if (tau::get(q_fm).equals_F()) return scoped_fm;
 		else if (tau::get(no_q_fm).equals_F()) return fm;
 		else return tau::build_wff_or(
-			tau::build_wff_all(quant_var, q_fm), no_q_fm);
+			tau::build_wff_all(quant_var, q_fm, false), no_q_fm);
 	}
 	else if (st.child_is(tau::wff_all)) {
 		//other all quant, hence can switch them
@@ -3476,11 +3476,11 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 		l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
 		tref r = rewriter::replace<node>(fm, atm, tau::_F());
 		r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
-		if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l);
+		if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l, false);
 		atm = rewriter::replace<node>(atm, var, tau::_T());
 		return tau::build_wff_or(
-			tau::build_wff_and(atm, tau::build_wff_ex(tau::trim(var), l)),
-			tau::build_wff_and(tau::build_wff_neg(atm), tau::build_wff_ex(tau::trim(var), r))
+			tau::build_wff_and(atm, tau::build_wff_ex(tau::trim(var), l, false)),
+			tau::build_wff_and(tau::build_wff_neg(atm), tau::build_wff_ex(tau::trim(var), r, false))
 			);
 	}
 	// Check has a unique zero
@@ -3501,7 +3501,7 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 		term_boole_decomposition<node>(tau::get(atm)[0].second(), tau::trim(var))
 		);
 		tref nr = tau::build_wff_ex(tau::trim(var),
-			tau::build_wff_and(tau::build_wff_neg(boole_atm), r));
+					    tau::build_wff_and(tau::build_wff_neg(boole_atm), r), false);
 		pool.insert_or_assign(nr,
 			rewriter::replace<node>(curr_pool, atm, tau::_F()));
 		atm = rewriter::replace<node>(atm, var, func_v_0);
@@ -3516,15 +3516,15 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
 	tref r = rewriter::replace<node>(fm, atm, tau::_F());
 	r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
-	if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l);
+	if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l, false);
 	tref boole_atm = tau::build_bf_eq(
 		term_boole_decomposition<node>(tau::get(atm)[0].first(), tau::trim(var)),
 		term_boole_decomposition<node>(tau::get(atm)[0].second(), tau::trim(var))
 		);
 	tref nl = tau::build_wff_ex(tau::trim(var),
-		tau::build_wff_and(boole_atm, l));
+				    tau::build_wff_and(boole_atm, l), false);
 	tref nr = tau::build_wff_ex(tau::trim(var),
-		tau::build_wff_and(tau::build_wff_neg(boole_atm), r));
+				    tau::build_wff_and(tau::build_wff_neg(boole_atm), r), false);
 	// Update available pool for further BDD variables
 	pool.insert_or_assign(nl,
 		rewriter::replace<node>(curr_pool, atm, tau::_T()));
@@ -3571,7 +3571,7 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 		// clause it needs to be maintained
 		quant_eliminated = false;
 		return tau::build_wff_and(
-			tau::build_wff_ex(var, scoped_fm), new_fm);
+			tau::build_wff_ex(var, scoped_fm, false), new_fm);
 	}
 	// Check that quantified variable appears
 	if (tau::get(scoped_fm).equals_T()) return new_fm;
@@ -3583,14 +3583,14 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 			tau::get(free_vars[0]) == tau::get(var)) {
 				// By assumption quantifier is pushed in all the way
 				// Closed bv formula, simplify to T/F
-				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, scoped_fm)))
+				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, scoped_fm, false)))
 					return new_fm;
 				else return tau::_F();
 			} else {
 				// Quantifier is not resolvable
 				quant_eliminated = false;
 				return tau::build_wff_and(
-					tau::build_wff_ex(var, scoped_fm), new_fm);
+					tau::build_wff_ex(var, scoped_fm, false), new_fm);
 			}
 	}
 	// Continue with quantifier elimination for atomless BA

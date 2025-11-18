@@ -351,6 +351,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	tref get_ba_type_tree() const;
 	const trefs& get_free_vars() const;
 
+	tref substitute(tref that, tref with);
+
 	// ---------------------------------------------------------------------
 	// helpers for querying
 
@@ -525,8 +527,12 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_wff_sometimes(tref n);
 	static tref build_wff_always(tref n);
 	static tref build_wff_conditional(tref x, tref y, tref z);
-	static tref build_wff_all(tref l, tref r);
-	static tref build_wff_ex(tref l, tref r);
+	static tref build_wff_all(tref bound_var, tref subformula,
+		bool calculate_quant_id = true);
+	static tref build_wff_all_many(const trefs& bound_vars, tref subformula);
+	static tref build_wff_ex(tref bound_var, tref subformula,
+		bool calculate_quant_id = true);
+	static tref build_wff_ex_many(const trefs& bound_vars, tref subformula);
 	static tref build_wff_imply(tref l, tref r);
 	static tref build_wff_rimply(tref l, tref r);
 	static tref build_wff_equiv(tref l, tref r);
@@ -633,6 +639,10 @@ private:
 
 };
 
+// Substitution method for tau trees
+template <NodeType node>
+tref substitute(tref formula, tref that, tref with);
+
 // -----------------------------------------------------------------------------
 // printers (tau_tree_printers.tmpl.h)
 
@@ -730,6 +740,9 @@ bool is_quantifier(tref n);
 
 template <NodeType node>
 bool is_functional_quantifier(tref n);
+
+template <NodeType node>
+bool is_logical_or_functional_quant(tref n);
 
 template <NodeType node>
 bool contains(tref fm, tref sub_fm);

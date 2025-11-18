@@ -84,7 +84,9 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
 		tref var = tau::trim(build_out_var_at_n<node>(
 			get_var_name_node<node>(io_vars[pos]), time_point, type));
 		auto res = cache.emplace(var);
-		if (res.second) fm = tau::build_wff_ex(var, fm);
+		// Due to the way that phi/chi infinity are build, we do not
+		// rename the bound variables
+		if (res.second) fm = tau::build_wff_ex(var, fm, false);
 	}
 	return fm;
 }
@@ -112,7 +114,9 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 		tref var = tau::trim(build_in_var_at_n<node>(
 			get_var_name_node<node>(io_vars[pos]), time_point, type));
 		auto res = cache.emplace(var);
-		if (res.second) fm = tau::build_wff_all(var, fm);
+		// Due to the way that phi/chi infinity are build, we do not
+		// rename the bound variables
+		if (res.second) fm = tau::build_wff_all(var, fm, false);
 	}
 	return fm;
 }
@@ -314,8 +318,8 @@ bool is_run_satisfiable(tref fm) {
 			continue;
 		}
 		if (tau::get(io_vars.back())[0].is_input_variable())
-		sat_fm = tau::build_wff_all(io_vars.back(), sat_fm);
-		else    sat_fm = tau::build_wff_ex(io_vars.back(), sat_fm);
+		sat_fm = tau::build_wff_all(io_vars.back(), sat_fm, false);
+		else    sat_fm = tau::build_wff_ex(io_vars.back(), sat_fm, false);
 		io_vars.pop_back();
 	}
 
@@ -362,15 +366,15 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 			}
 		}
 		uconst_ctns = tau::get(v).is_input_variable()
-			? tau::build_wff_all(v, uconst_ctns)
-			: tau::build_wff_ex( v, uconst_ctns);
+			? tau::build_wff_all(v, uconst_ctns, false)
+			: tau::build_wff_ex( v, uconst_ctns, false);
 		io_vars.pop_back();
 	}
 	// Existentially quantify remaining variables
 	trefs uconsts;
 	for (tref v : free_io_vars) {
 		if (!tau::get(v).child_is(tau::uconst_name))
-			uconst_ctns = tau::build_wff_ex(v, uconst_ctns);
+			uconst_ctns = tau::build_wff_ex(v, uconst_ctns, false);
 		else uconsts.push_back(v);
 	}
 	// Eliminate all variables
@@ -463,40 +467,10 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 }
 
 template <NodeType node>
-tref quant_streams_to_var(tref fm) {
-	using tau = tree<node>;
-	// Currently use multiset in order to take nested scopes
-	// using same variable name into account
-	std::multiset<tref, subtree_less<node>> quant_vars;
-	auto f = [&quant_vars](tref n) {
-		if (is_quantifier<node>(n)) {
-			quant_vars.insert(tau::trim(n));
-			return n;
-		}
-		if (is_var_or_capture<node>(n) && quant_vars.contains(n)) {
-			if (is_child<node>(n, tau::io_var)) {
-				// Quantified io stream
-				// Transform to usual variable
-				const tau& n_t = tau::get(n);
-				return build_variable<node>(n_t.to_str(),
-					n_t.get_ba_type());
-			}
-		}
-		return n;
-	};
-	auto up = [&quant_vars](tref n) {
-		if (is_quantifier<node>(n))
-			quant_vars.extract(tau::trim(n));
-		return n;
-	};
-	return pre_order<node>(fm).apply_until_change(f, all, up);
-}
-
-template <NodeType node>
 tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 	using tau = tree<node>;
-	// First convert quantified streams to normal variables
-	fm = quant_streams_to_var<node>(fm);
+	// First, make quantifiers canonical again
+	fm = canonize_quantifier_ids<node>(fm);
 	// Find lookback
 	auto current_io_vars = tau::get(fm).select_top(
 			is_child<node, tau::io_var>);

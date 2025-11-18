@@ -240,6 +240,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	DBG(LOG_TRACE << "transformed: " << tree::get(m.at(ptr.get())).to_str();)
 	DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
 	tref transformed = m_ref(ptr.get());
+
 	if (options.infer_ba_types) {
 		auto result = infer_ba_types<node>(transformed, options.global_scope);
 		transformed = result.first;
@@ -247,12 +248,18 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	}
 	//Check for semantic errors in expression
 	if (has_semantic_error<node>(transformed)) {
-		use_hooks = using_hooks;
+		tau::use_hooks = using_hooks;
 		return nullptr;
 	}
-
+	tau::use_hooks = using_hooks;
+	if (options.reget_with_hooks) transformed = reget(transformed);
+	// As final step, convert the bound variables to a canonical numbered representation
+	// This only makes sense in combination with type inference since
+	// otherwise quantified variables cannot be correctly caught
+	if (options.infer_ba_types)
+		transformed = canonize_quantifier_ids<node>(transformed);
 	// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
-	return tau::use_hooks = using_hooks, options.reget_with_hooks ? reget(transformed) : transformed;
+	return transformed;
 }
 
 //------------------------------------------------------------------------------

@@ -7,6 +7,10 @@
 
 namespace idni::tau_lang {
 
+// Make the quantifier names found in fm canonical
+template <NodeType node>
+tref canonize_quantifier_ids(tref fm);
+
 // -----------------------------------------------------------------------------
 // tree builders functional API
 // -----------------------------------------------------------------------------
@@ -58,10 +62,16 @@ template <NodeType node>
 tref build_wff_conditional(tref x, tref y, tref z);
 
 template <NodeType node>
-tref build_wff_all(tref l, tref r);
+tref build_wff_all(tref bound_var, tref subformula, bool calculate_quant_id = true);
 
 template <NodeType node>
-tref build_wff_ex(tref l, tref r);
+tref build_wff_all_many(const trefs& bound_vars, tref subformula);
+
+template <NodeType node>
+tref build_wff_ex(tref bound_var, tref subformula, bool calculate_quant_id = true);
+
+template <NodeType node>
+tref build_wff_ex_many(const trefs& bound_vars, tref subformula);
 
 template <NodeType node>
 tref build_wff_imply(tref l, tref r);
