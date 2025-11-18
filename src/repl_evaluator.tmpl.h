@@ -319,7 +319,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	if (in) { // BF substitution
 		tref thiz = get_bf(arg2), with = get_bf(arg3);
 		if (!in || !thiz || !with) return invalid_argument();
-		return rewriter::replace<node>(in, thiz, with);
+		return tau::get(in).substitute(thiz, with);
 	}
 	// First argument was not a bf so it must be a wff
 	in = get_wff(arg1);
@@ -332,84 +332,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
-	subtree_map<node, tref> changes = { { thiz, with } };
-
-	const trefs& free_vars_thiz = get_free_vars<node>(thiz);
-	const trefs& free_vars_with = get_free_vars<node>(with);
-	trefs var_stack = {};
-	auto var_id = get_new_var_id<node>(in);
-	subtree_set<node> marked_quants;
-
-	// A variable should only be replaced if it is not quantified
-	auto quantified_vars_skipper = [&](tref x) {
-		if (is_quantifier<node>(x)) {
-			tref var = tau::get(x)
-					.find_top(is_var_or_capture<node>());
-			if (var && tau::contains_subtree(free_vars_thiz, var))
-				return false;
-		}
-		return true;
-	};
-	// If we encounter a variable in "with" that would be captured by a quantifier
-	// the quantified variable needs to be changed
-	auto quantified_var_adder = [&](tref x) {
-		if (!quantified_vars_skipper(x))
-			return false;
-		if (is_quantifier<node>(x)) {
-			tref var = tau::get(x)
-					.find_top(is_var_or_capture<node>());
-			if (var && tau::contains_subtree(free_vars_with, var)) {
-				DBG(assert(!(tau::get(var).is(tau::capture)));)
-				marked_quants.insert(x);
-				// bool var_t = tau::get(var).is(tau::variable);
-				std::ostringstream ss;
-				ss << "x" << var_id; ++var_id;
-				size_t type = tau::get(var).get_ba_type();
-				auto unused_var = build_bf_variable<node>(ss.str(), type);
-				// ???
-				// var_t
-					// ? build_bf_var<node>(ss.str())
-					// : build_wff_var<node>(ss.str());
-				// Case where variable is captured by two or more quantifiers
-				if (changes.contains(var)) {
-					var_stack.emplace_back(var);
-					var_stack.emplace_back(changes[var]);
-					changes[var] = unused_var;
-				} else {
-					changes.emplace(var, unused_var);
-					var_stack.emplace_back(var);
-				}
-			}
-		}
-		return true;
-	};
-	// After a quantifier is encountered on the way up in post_order_traverser
-	// it needs to be removed from changes
-	auto scoped_replace = [&](auto x, auto c) {
-		tref res;
-		if (auto iter = changes.find(x); iter != changes.end())
-			res = iter->second;
-		else if (tau::get(x).get_children() == c) res = x;
-		else res = tau::get(tau::get(x).value, c, tau::get(x).r);
-
-		if (marked_quants.contains(x)) {
-			assert(!var_stack.empty());
-			if (auto iter = changes.find(var_stack.back());
-				iter != changes.end())
-			{
-				var_stack.pop_back();
-				changes.erase(iter);
-			} else {
-				assert(var_stack.size() >= 2);
-				changes[var_stack.end()[-2]] = var_stack.back();
-				var_stack.pop_back();
-				var_stack.pop_back();
-			}
-		}
-		return res;
-	};
-	return rewriter::post_order_recursive_traverser<node>()(
-			in, quantified_var_adder, scoped_replace);
+	return tau::get(in).substitute(thiz, with);
 }
 
 template <typename... BAs>

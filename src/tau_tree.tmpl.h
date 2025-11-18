@@ -846,7 +846,7 @@ const trefs& tree<node>::get_free_vars() const {
 }
 
 template<NodeType node>
-tref tree<node>::substitute(tref that, tref with) {
+tref tree<node>::substitute(tref that, tref with) const {
 	// If that contains a quantifier, the above quantifier id's in formula need
 	// to be recalculated; otherwise just simple replace method
 	DBG(assert(get_free_bound_vars<node>(that).empty());)
