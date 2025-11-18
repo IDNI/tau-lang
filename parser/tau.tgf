@@ -236,8 +236,8 @@ onf_cmd_arg            => history | wff.
 normalize_cmd_arg      => history | spec | ref | wff | bf.
 # TODO (MEDIUM) check if could we only have one case?
 inst_args              =>
-          wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
-        | bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'.
+          wff_cmd_arg _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'
+        | bf_cmd_arg  _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'.
 
 # symbols usable for detailed help message
 #
