@@ -244,8 +244,14 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	if (options.infer_ba_types) {
 		auto result = infer_ba_types<node>(transformed, options.global_scope);
 		transformed = result.first;
+		// If type inference failed
+		if (!transformed) {
+			tau::use_hooks = using_hooks;
+			return nullptr;
+		}
 		if (transformed) options.global_scope = result.second;
 	}
+
 	//Check for semantic errors in expression
 	if (has_semantic_error<node>(transformed)) {
 		tau::use_hooks = using_hooks;
