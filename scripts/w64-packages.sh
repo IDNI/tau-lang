@@ -1,11 +1,11 @@
 #!/bin/bash
 
-./dev build Release -DTAU_WINDOWS_ZIP_PACKAGE=ON -DCMAKE_TOOLCHAIN_FILE=../cmake/mingw-w64-x86_64.cmake $@
+./dev w64-build Release -DTAU_WINDOWS_ZIP_PACKAGE=ON $@
 cd ./build-Release
 cpack -C Release
 cd ..
 
-./dev build Release -DTAU_WINDOWS_PACKAGE=ON -DCMAKE_TOOLCHAIN_FILE=../cmake/mingw-w64-x86_64.cmake $@
+./dev w64-build Release -DTAU_WINDOWS_PACKAGE=ON $@
 cd ./build-Release
 cpack -C Release
 cd ..

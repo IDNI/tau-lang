@@ -19,8 +19,8 @@ project("${PROJECT_NAME}"
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
 
+include(GNUInstallDirs)
 include(FetchContent)
-include(ExternalProject)
 
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
 option(TAU_MEASURE                 "Measure tau performance"               OFF)
@@ -40,6 +40,8 @@ option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
 option(TAU_BUILD_REPL_TESTS        "Build repl tests"                      OFF)
 option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
 option(TAU_ADDRESS_SANITIZER       "Build with address sanitizer"          OFF)
+option(TAU_DEB_PACKAGE             "Build DEB package"                     OFF)
+option(TAU_RPM_PACKAGE             "Build RPM package"                     OFF)
 option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
@@ -81,6 +83,8 @@ set_property(CACHE TAU_BUILD_INTEGRATION       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REPL_TESTS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BENCHMARK         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_ADDRESS_SANITIZER       PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_DEB_PACKAGE             PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_RPM_PACKAGE             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_ZIP_PACKAGE     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
@@ -198,60 +202,58 @@ message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
 message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
 message(STATUS "TAU_ADDRESS_SANITIZER: ${TAU_ADDRESS_SANITIZER}")
+message(STATUS "TAU_RPM_PACKAGE: ${TAU_RPM_PACKAGE}")
+message(STATUS "TAU_DEB_PACKAGE: ${TAU_DEB_PACKAGE}")
 message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 
-if(NOT EXISTS "${TAU_SHARED_PREFIX}/include")
-	execute_process(COMMAND mkdir -p "${TAU_SHARED_PREFIX}/include")
-endif()
-
-if(NOT EXISTS "${TAU_SHARED_PREFIX}/lib")
-	execute_process(COMMAND mkdir -p "${TAU_SHARED_PREFIX}/lib")
-endif()
-
-if(NOT EXISTS "${TAU_SHARED_PREFIX}/lib64")
-	execute_process(COMMAND ln -s lib ${TAU_SHARED_PREFIX}/lib64)
-endif()
+set(CMAKE_INSTALL_PREFIX "${TAU_SHARED_PREFIX}" CACHE PATH "Install prefix" FORCE)
+message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "CMAKE_INSTALL_BINDIR: ${CMAKE_INSTALL_BINDIR}")
+message(STATUS "CMAKE_INSTALL_LIBDIR: ${CMAKE_INSTALL_LIBDIR}")
+message(STATUS "CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
 
 #
-# Add cvc5 as an external project
+# Add cvc5 library
 #
-if (NOT EXISTS "${TAU_SHARED_PREFIX}/lib64/libcvc5.so")
-	message(STATUS "cvc5 not found in ${TAU_SHARED_PREFIX}, building from source...")
-	ExternalProject_Add(cvc5_external_project
-		SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cvc5
-		CONFIGURE_COMMAND cd ${CMAKE_SOURCE_DIR}/external/cvc5 && ${CMAKE_SOURCE_DIR}/external/cvc5/configure.sh --no-gpl --auto-download --prefix=${TAU_SHARED_PREFIX}
-		BUILD_COMMAND make -C ${CMAKE_SOURCE_DIR}/external/cvc5/build -j ${TAU_BUILD_JOBS} # && make test && make install
-		INSTALL_COMMAND make -C ${CMAKE_SOURCE_DIR}/external/cvc5/build install
-		UPDATE_COMMAND ""
-		BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/external/cvc5/build/libcvc5.so
-	)
-else()
-	message(STATUS "cvc5 found in ${TAU_SHARED_PREFIX}, using prebuilt library...")
+set(DEP_CVC5_ARGS "-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS} -DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX}")
+set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX}/cvc5)
+set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	set(DEP_CVC5_ARGS "${DEP_CVC5_ARGS} --w64")
+	set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
 endif()
+message(STATUS "DEP_CVC5_ARGS: ${DEP_CVC5_ARGS}")
+message(STATUS "CVC5_LIBDIR: ${CVC5_LIBDIR}")
+execute_process(COMMAND bash -c "cd ${CMAKE_CURRENT_SOURCE_DIR} && ./dev dep-cvc5.sh ${DEP_CVC5_ARGS}")
 
-set(CVC5_FOUND TRUE)
-set(CVC5_INCLUDE_DIR "${TAU_SHARED_PREFIX}/include/")
-set(CVC5_LIBRARIES "${TAU_SHARED_PREFIX}/lib64/libcvc5.so")
-
-add_library(cvc5 STATIC IMPORTED GLOBAL)
-set_target_properties(cvc5 PROPERTIES
-	IMPORTED_LOCATION "${CVC5_LIBRARIES}"
-	INTERFACE_INCLUDE_DIRECTORIES "${CVC5_INCLUDE_DIR}"
-)
-add_dependencies(cvc5 cvc5_external_project)
-set(CVC5_LIB cvc5)
+find_package(cvc5 CONFIG REQUIRED
+	PATHS ${CVC5_LIBDIR}/cmake/cvc5)
+message(STATUS "cvc5 found: ${cvc5_FOUND}")
+message(STATUS "cvc5 version: ${cvc5_VERSION}")
 
 #
-# Adding Boost log library
+# Add Boost log library
 #
+set(DEP_BOOST_ARGS "-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS} -DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX}")
+set(BOOST_SOURCE_DIR ${TAU_SHARED_PREFIX}/boost)
+set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	set(DEP_BOOST_ARGS "${DEP_BOOST_ARGS} --w64")
+	set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
+endif()
+message(STATUS "DEP_BOOST_ARGS: ${DEP_BOOST_ARGS}")
+message(STATUS "BOOST_LIBDIR: ${BOOST_LIBDIR}")
+
+execute_process(COMMAND bash -c "cd ${CMAKE_CURRENT_SOURCE_DIR} && ./dev dep-boost.sh ${DEP_BOOST_ARGS}")
+
 set(Boost_USE_STATIC_LIBS ON)
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 	CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 		find_package(Boost REQUIRED
-			PATHS "${CMAKE_CURRENT_SOURCE_DIR}/external/libboost-mingw-w64"
+			PATHS "${BOOST_LIBDIR}/cmake/Boost-1.86.0"
 			COMPONENTS log)
 else()
 		find_package(Boost REQUIRED COMPONENTS log)
@@ -264,14 +266,20 @@ else()
 	message(FATAL_ERROR "Boost not found")
 endif()
 
-# Add relative path of shared libraries to the executable's path (ld token $ORIGIN)
-set(CMAKE_BUILD_RPATH "${CMAKE_BUILD_RPATH}:\$ORIGIN:${TAU_SHARED_PREFIX}/lib64")
-set(CMAKE_INSTALL_RPATH "\$ORIGIN:${TAU_SHARED_PREFIX}/lib64")
+# Set RPATH where to find dependencies
+set(CMAKE_BUILD_RPATH "\${ORIGIN}")
+set(CMAKE_INSTALL_RPATH "\${ORIGIN}:\${ORIGIN}/../lib/tau:\${ORIGIN}/../lib64/tau")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_RPATH FALSE)
 message(STATUS "CMAKE_BUILD_RPATH: ${CMAKE_BUILD_RPATH}")
 message(STATUS "CMAKE_INSTALL_RPATH: ${CMAKE_INSTALL_RPATH}")
+message(STATUS "CMAKE_INSTALL_RPATH_USE_LINK_PATH: ${CMAKE_INSTALL_RPATH_USE_LINK_PATH}")
+message(STATUS "CMAKE_SKIP_BUILD_RPATH: ${CMAKE_SKIP_BUILD_RPATH}")
+message(STATUS "CMAKE_BUILD_WITH_RPATH: ${CMAKE_BUILD_WITH_RPATH}")
 
 #
-# Generate C++ parser from TGF if requested
+# Generate C++ parsers from TGF if requested
 #
 if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	include(generate-parser)
@@ -353,29 +361,59 @@ set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_VENDOR "IDNI")
 set(CPACK_PACKAGE_CONTACT "contact@idni.org")
-set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}/packages")
+set(CPACK_PACKAGE_DIRECTORY "${TAU_SHARED_PREFIX}/packages")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://idni.org")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 set(CPACK_COMPONENT_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 
 #
-# Specify installation directories and files
+# Set component and destinations
 #
+set(TAU_PKG_DESTINATION "bin")
+set(TAU_PKG_COMPONENT "LinuxFiles")
+set(TAU_PKG_DOCS_DESTINATION "share/doc/tau")
+if (TAU_WINDOWS_PACKAGE)
+	set(TAU_PKG_COMPONENT "WindowsFiles")
+elseif (TAU_WINDOWS_ZIP_PACKAGE)
+	set(TAU_PKG_COMPONENT "WindowsFilesStandalone")
+	set(TAU_PKG_DESTINATION ".")
+	set(TAU_PKG_DOCS_DESTINATION ".")
+endif()
+
+# Install executable and documentation
+install(TARGETS ${TAU_EXECUTABLE_NAME}
+	RUNTIME DESTINATION ${TAU_PKG_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT}
+	CONFIGURATIONS Release)
+install(FILES	"${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt"
+		"${CMAKE_CURRENT_SOURCE_DIR}/README.md"
+	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/licenses
+	DESTINATION ${TAU_PKG_DOCS_DESTINATION} COMPONENT ${TAU_PKG_COMPONENT})
+
+# Install cvc5 runtime dependencies
+include(install_cvc5)
+if (TAU_RPM_PACKAGE)
+	execute_process(COMMAND rpm --eval "%{_lib}"
+			OUTPUT_VARIABLE rpm_libdir
+			OUTPUT_STRIP_TRAILING_WHITESPACE)
+	set(CMAKE_INSTALL_LIBDIR "${rpm_libdir}")
+	install_cvc5("${rpm_libdir}/tau" "LinuxFiles" "Linux")
+elseif (TAU_DEB_PACKAGE)
+	set(CMAKE_INSTALL_LIBDIR "lib")
+	install_cvc5("lib/tau" "${TAU_PKG_COMPONENT}" "Linux")
+elseif (TAU_WINDOWS_PACKAGE OR TAU_WINDOWS_ZIP_PACKAGE)
+	install_cvc5("${TAU_PKG_DESTINATION}" "${TAU_PKG_COMPONENT}" "Windows")
+endif()
+
+# Set CPack generators
+set(CPACK_COMPONENTS_ALL ${TAU_PKG_COMPONENT})
 if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
-	install(TARGETS ${TAU_EXECUTABLE_NAME}
-		RUNTIME DESTINATION "bin"
-		COMPONENT "WindowsFiles"
-		CONFIGURATIONS Release)
-	install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt" "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
-		DESTINATION "."
-		COMPONENT "WindowsFiles")
 	set(CPACK_GENERATOR "NSIS")
-	set(CPACK_COMPONENTS_ALL "WindowsFiles")
 	# NSIS (Windows Installer) specific settings
 	set(CPACK_NSIS_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.exe")
 	set(CPACK_PACKAGE_INSTALL_DIRECTORY "tau-lang-${CPACK_PACKAGE_VERSION}")
-	set(CPACK_NSIS_DISPLAY_NAME "Tau Language")
+	set(CPACK_NSIS_DISPLAY_NAME "Tau Language Framework")
 	set(CPACK_NSIS_HELP_LINK "https://github.com/IDNI/tau-lang/blob/main/README.md")
 	set(CPACK_NSIS_URL_INFO_ABOUT "${CPACK_PACKAGE_HOMEPAGE_URL}")
 	set(CPACK_NSIS_CONTACT "${CPACK_PACKAGE_CONTACT}")
@@ -383,40 +421,27 @@ if (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_PACKAGE)
 	set(CPACK_NSIS_INSTALLER_PRIVILEGES "lowest")
 	set(CPACK_NSIS_MODIFY_PATH ON)
 elseif (TAU_BUILD_EXECUTABLE AND TAU_WINDOWS_ZIP_PACKAGE)
-	install(TARGETS ${TAU_EXECUTABLE_NAME}
-		RUNTIME DESTINATION "."
-		COMPONENT "win-standalone"
-		CONFIGURATIONS Release)
-	install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt" "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
-		DESTINATION "."
-		COMPONENT "win-standalone")
 	set(CPACK_GENERATOR "ZIP")
-	set(CPACK_COMPONENTS_ALL "win-standalone")
 	set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
-elseif (TAU_BUILD_EXECUTABLE)
-	install(TARGETS ${TAU_EXECUTABLE_NAME}
-		RUNTIME DESTINATION "bin"
-		COMPONENT "LinuxFiles"
-		CONFIGURATIONS Release)
-	install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt" "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
-		DESTINATION "share/doc/${PROJECT_NAME}"
-		COMPONENT "LinuxFiles")
-	set(CPACK_GENERATOR "DEB;RPM")
-	set(CPACK_COMPONENTS_ALL "LinuxFiles")
-	# DEB specific settings
-	set(CPACK_DEBIAN_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.deb")
-	set(CPACK_DEBIAN_PACKAGE_MAINTAINER "IDNI") # required
-	set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27)")
-	set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
-	set(CPACK_DEBIAN_ARCHITECTURE "amd64")
-	# RPM specific settings
+elseif (TAU_BUILD_EXECUTABLE AND TAU_RPM_PACKAGE)
+	set(CPACK_GENERATOR "RPM")
 	set(CPACK_RPM_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.rpm")
 	set(CPACK_RPM_PACKAGE_AUTOREQ " no")
 	set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
 	set(CPACK_RPM_PACKAGE_LICENSE "Tau Language Framework")
 	set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
-	#set(CPACK_RPM_PACKAGE_REQUIRES "libc >= 2.27")
+	# cvc5 dependencies: glibc, gmp, libstdc++
+	set(CPACK_RPM_PACKAGE_REQUIRES "glibc >= 2.27, gmp >= 6.2.1, libstdc++ >= 4.9")
 	set(CPACK_RPM_PACKAGE_DOC_DIR "share/doc/${PROJECT_NAME}")
+elseif (TAU_BUILD_EXECUTABLE AND TAU_DEB_PACKAGE)
+	set(CPACK_GENERATOR "DEB")
+	# DEB specific settings
+	set(CPACK_DEBIAN_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}.deb")
+	set(CPACK_DEBIAN_PACKAGE_MAINTAINER "IDNI") # required
+	# cvc5 dependencies: libc6, libgmp10 (or libgmp), libstdc++6
+	set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27), libgmp10 (>= 2:6.2.1), libstdc++6 (>= 4.9)")
+	set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+	set(CPACK_DEBIAN_ARCHITECTURE "amd64")
 endif()
 
 # Include the CPack module

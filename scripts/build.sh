@@ -59,11 +59,6 @@ fi
 git submodule status | while read -r LINE; do
 	GIT_SUBMOD=$(echo $LINE | awk '{print $2}')
 	if [[ $LINE == -* ]]; then
-		# Skip external/cvc5 if libcvc5.so already exists
-		if [[ $GIT_SUBMOD == "external/cvc5" && -f ${TAU_SHARED_PREFIX}/lib/libcvc5.so ]]; then
-			echo "Skipping submodule $GIT_SUBMOD - libcvc5.so already exists at ${TAU_SHARED_PREFIX}/lib/libcvc5.so"
-			continue
-		fi
 		echo "Initializing submodule $GIT_SUBMOD"
 		git submodule update --init --recursive $GIT_SUBMOD
 	else
