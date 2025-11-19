@@ -351,7 +351,10 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	tref get_ba_type_tree() const;
 	const trefs& get_free_vars() const;
 
+	// Substitution method for typed tau trees
 	tref substitute(tref that, tref with) const;
+	// Substitution method for typed tau trees applying several substitutions
+	tref substitute(const auto& changes) const;
 
 	// ---------------------------------------------------------------------
 	// helpers for querying
@@ -639,9 +642,13 @@ private:
 
 };
 
-// Substitution method for tau trees
+// Substitution method for typed tau trees
 template <NodeType node>
 tref substitute(tref formula, tref that, tref with);
+
+// Substitution method for typed tau trees applying several changes
+template <NodeType node>
+tref substitute(tref formula, const auto& changes);
 
 // -----------------------------------------------------------------------------
 // printers (tau_tree_printers.tmpl.h)
