@@ -857,6 +857,18 @@ tref tree<node>::substitute(tref that, tref with) const {
 	} else return this->replace(that, with);
 }
 
+template<NodeType node>
+tref tree<node>::substitute(const auto& changes) const {
+	bool canonize = false;
+	for (auto& [k, v] : changes) {
+		if (tau::get(v).find_top(is_logical_or_functional_quant<node>))
+			canonize = true;
+	}
+	if (canonize) {
+		return canonize_quantifier_ids<node>(this->replace(changes));
+	} else return this->replace(changes);
+}
+
 template <NodeType node>
 std::function<bool(const tref&)> or_predicate(
 		const std::function<bool(const tref&)>* query, size_t count) {
@@ -972,9 +984,13 @@ std::vector<trefs> tree<node>::select_all_until_by_predicates(
 
 template <NodeType node>
 tref substitute(tref formula, tref that, tref with) {
-	return tree<node>::get(formula).substitue(that, with);
+	return tree<node>::get(formula).substitute(that, with);
 }
 
+template<NodeType node>
+tref substitute(tref formula, const auto& changes) {
+	return tree<node>::get(formula).substitute(changes);
+}
 } // namespace idni::tau_lang
 
 template<typename... BAs> requires idni::tau_lang::BAsPack<BAs...>
