@@ -1170,19 +1170,30 @@ tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 		return _F(v, ch, len, r);
 	}
 	//RULE(BF_LESS_SIMPLIFY_0, "$X < 0 ::= F.") @CP
-	if (arg2(ch).is(tau::bf_f)) return _F(v, ch, len, r);
-	//RULE(BF_DEF_SIMPLIFY_N, "$X < 1 ::= $X' != 0.")
-	if (arg2(ch).is(tau::bf_t)) {
-		HOOK_LOGGING(applied("$X < 1 ::= $X' != 0.");)
-		return tau::get(tau::build_bf_neq_0(
-			tau::build_bf_neg(arg1_fm(ch).get())), r);
+	if (arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X < 0 ::= F.");)
+		return _F(v, ch, len, r);
 	}
+	//RULE(BF_DEF_SIMPLIFY_N, "1 < $X ::= F.")
+	if (arg1(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 < $X ::= F.");)
+		return _F(v, ch, len, r);
+	}
+
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X < $X ::= F.");)
+		return _F(v, ch, len, r);
+	}
+
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::get_raw(v, ch, len, r);
 	}
-	return tau::get(tau::build_bf_lt(arg1_fm(ch).get(),
-					 arg2_fm(ch).get()), r);
+
+	return tau::get(build_wff_and<node>(
+		build_bf_eq_0<node>(build_bf_and<node>(arg1_fm(ch).get(),
+				build_bf_neg<node>(arg2_fm(ch).get()))),
+		build_bf_neq<node>(arg1_fm(ch).get(), arg2_fm(ch).get())), r);
 }
 
 template <NodeType node>
@@ -1221,11 +1232,20 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 		HOOK_LOGGING(applied("$X !< 1 ::= $X' = 0.");)
 		return tau::get(tau::build_bf_eq_0(tau::build_bf_neg(arg1_fm(ch).get())), r);
 	}
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X !< $X ::= T.");)
+		return _T(v, ch, len, r);
+	}
+
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::get_raw(v, ch, len, r);
 	}
-	return tau::get(tau::build_bf_nlt(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+
+	return tau::get(build_wff_or<node>(
+		build_bf_neq_0<node>(build_bf_and<node>(arg1_fm(ch).get(),
+				build_bf_neg<node>(arg2_fm(ch).get()))),
+		build_bf_eq<node>(arg1_fm(ch).get(), arg2_fm(ch).get())), r);
 }
 
 template <NodeType node>
@@ -1259,11 +1279,23 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 		HOOK_LOGGING(applied("$X <= 1 ::= T.");)
 		return _T(v, ch, len, r);
 	}
+	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "0 <= $X ::= T.") @CP
+	if (arg1(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 <= $X ::= T.");)
+		return _T(v, ch, len, r);
+	}
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X <= $X ::= T.");)
+		return _T(v, ch, len, r);
+	}
+
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::get_raw(v, ch, len, r);
 	}
-	return tau::get(tau::build_bf_lteq(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+
+	return tau::get(build_bf_eq_0<node>(build_bf_and<node>(arg1_fm(ch).get(),
+		build_bf_neg<node>(arg2_fm(ch).get()))), r);
 }
 
 template <NodeType node>
@@ -1297,11 +1329,23 @@ tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r
 		HOOK_LOGGING(applied("$X !<= 1 ::= F.");)
 		return _F(v, ch, len, r);
 	}
+	//RULE(BF_NLEQ_SIMPLIFY_0, "0 !<= $X ::= F.") @CP
+	if (arg1(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 !<= $X ::= F.");)
+		return _F(v, ch, len, r);
+	}
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X !<= $X ::= F.");)
+		return _F(v, ch, len, r);
+	}
+
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::get_raw(v, ch, len, r);
 	}
-	return tau::get(tau::build_bf_nlteq(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+
+	return tau::get(build_bf_neq_0<node>(build_bf_and<node>(arg1_fm(ch).get(),
+		build_bf_neg<node>(arg2_fm(ch).get()))), r);
 }
 
 template <NodeType node>
@@ -1340,11 +1384,20 @@ tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 		HOOK_LOGGING(applied("0 > $X ::= F.");)
 		return _F(v, ch, len, r);
 	}
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X > $X ::= F.");)
+		return _F(v, ch, len, r);
+	}
+
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::get_raw(v, ch, len, r);
 	}
-	return tau::get(tau::build_bf_gt(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+
+	return tau::get(build_wff_and<node>(
+		build_bf_eq_0<node>(build_bf_and<node>(arg2_fm(ch).get(),
+				build_bf_neg<node>(arg1_fm(ch).get()))),
+		build_bf_neq<node>(arg2_fm(ch).get(), arg1_fm(ch).get())), r);
 }
 
 template <NodeType node>
@@ -1383,11 +1436,20 @@ tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) 
 		HOOK_LOGGING(applied("0 !> $X ::= T.");)
 		return _T(v, ch, len, r);
 	}
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X !> $X ::= T.");)
+		return _T(v, ch, len, r);
+	}
+
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::get_raw(v, ch, len, r);
 	}
-	return tau::get(tau::build_bf_ngt(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+
+	return tau::get(build_wff_or<node>(
+		build_bf_neq_0<node>(build_bf_and<node>(arg2_fm(ch).get(),
+				build_bf_neg<node>(arg1_fm(ch).get()))),
+		build_bf_eq<node>(arg2_fm(ch).get(), arg1_fm(ch).get())), r);
 }
 
 template <NodeType node>
@@ -1426,11 +1488,18 @@ tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r)
 		HOOK_LOGGING(applied("1 >= $X ::= T.");)
 		return _T(v, ch, len, r);
 	}
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X >= $X ::= T.");)
+		return _T(v, ch, len, r);
+	}
+
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::get_raw(v, ch, len, r);
 	}
-	return tau::get(tau::build_bf_gteq(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+
+	return tau::get(build_bf_eq_0<node>(build_bf_and<node>(arg2_fm(ch).get(),
+				build_bf_neg<node>(arg1_fm(ch).get()))), r);
 }
 
 template <NodeType node>
@@ -1469,11 +1538,18 @@ tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r
 		HOOK_LOGGING(applied("1 !>= $X ::= F.");)
 		return _F(v, ch, len, r);
 	}
+	if (arg1_fm(ch) == arg2_fm(ch)) {
+		HOOK_LOGGING(applied("$X !>= $X ::= F.");)
+		return _F(v, ch, len, r);
+	}
+
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::get_raw(v, ch, len, r);
 	}
-	return tau::get(tau::build_bf_ngteq(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
+
+	return tau::get(build_bf_neq_0<node>(build_bf_and<node>(arg2_fm(ch).get(),
+				build_bf_neg<node>(arg1_fm(ch).get()))), r);
 }
 
 template <NodeType node>
@@ -1485,9 +1561,9 @@ tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::build_wff_and(
-			tau::build_bf_gteq(arg1_fm(ch).get(),
+			tau::build_bf_lteq(arg1_fm(ch).get(),
 				arg2_fm(ch).get()),
-			tau::build_bf_gteq(arg2_fm(ch).get(),
+			tau::build_bf_lteq(arg2_fm(ch).get(),
 				arg3_fm(ch).get()));
 	}
 	return tau::get(tau::build_bf_interval(

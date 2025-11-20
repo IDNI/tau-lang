@@ -1110,27 +1110,21 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 		DBG(LOG_DEBUG << "solve/Path after: " << tau::get(path) << "\n";)
 		if (tau::get(path).equals_F()) continue;
 
-		auto is_equation = [](tref n) {
-			const tau& n_t = tau::get(n);
-			return n_t.child_is(tau::bf_eq)
-				|| n_t.child_is(tau::bf_neq)
-				|| n_t.equals_T();
-		};
 		// Partition all found atomic equations according to their type
 		std::map<size_t, subtree_set<node>> type_partition;
 		// Partition types
 		bool path_sat = false;
 		for (tref conj : get_cnf_wff_clauses<node>(path)) {
-			size_t type = find_ba_type<node>(conj);
-			if (!is_equation(conj) && !(is_bv_type_family<node>(type) && is_child_quantifier<node>(conj))) {
-				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);
-				error = true;
-				break;
-			}
 			// If path is T, we skip in order to have empty type_partition
 			if (tau::get(conj).equals_T()) {
 				path_sat = true;
 				continue;
+			}
+			size_t type = find_ba_type<node>(conj);
+			if (!is_atomic_fm<node>(conj) && !(is_bv_type_family<node>(type) && is_child_quantifier<node>(conj))) {
+				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);
+				error = true;
+				break;
 			}
 			if (!is_bv_type_family<node>(type)) {
 				conj = norm_equation<node>(conj);

@@ -805,6 +805,9 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 		if (!is_tau_formula_sat<node>(clause, start_time))
 			continue;
 
+		// TODO: call type inference algorithm in order to unify
+		// types between current spec and update
+
 		// Now try to add always part of old spec in a pointwise way
 		tref new_spec_pointwise = nullptr;
 		// First try to conjunct update with previous always specification

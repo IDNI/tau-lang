@@ -131,26 +131,23 @@ bool contains(tref fm, tref sub_fm) {
 }
 
 template <NodeType node>
-std::function<bool(tref)> is_atomic_fm() {
+bool is_atomic_fm(tref n) {
 	using tau = tree<node>;
-
-	return [](tref n) -> bool {
-		auto fm = tau::get(n);
-		if (fm.children_size() != 1) return false;
-		const tau& child = fm[0];
-		return fm.is(tau::wff)
-			&& (child.is(tau::bf_eq)
-				|| child.is(tau::bf_neq)
-				|| child.is(tau::bf_lteq)
-				|| child.is(tau::bf_nlteq)
-				|| child.is(tau::bf_gt)
-				|| child.is(tau::bf_ngt)
-				|| child.is(tau::bf_gteq)
-				|| child.is(tau::bf_ngteq)
-				|| child.is(tau::bf_lt)
-				|| child.is(tau::bf_nlt));
-	};
-}
+	auto fm = tau::get(n);
+	if (fm.children_size() != 1) return false;
+	const tau& child = fm[0];
+	return fm.is(tau::wff)
+	       && (child.is(tau::bf_eq)
+		   || child.is(tau::bf_neq)
+		   || child.is(tau::bf_lteq)
+		   || child.is(tau::bf_nlteq)
+		   || child.is(tau::bf_gt)
+		   || child.is(tau::bf_ngt)
+		   || child.is(tau::bf_gteq)
+		   || child.is(tau::bf_ngteq)
+		   || child.is(tau::bf_lt)
+		   || child.is(tau::bf_nlt));
+};
 
 template <NodeType node>
 int_t node_count (tref fm) {
