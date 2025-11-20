@@ -467,83 +467,65 @@ tref build_bf_neq_0(tref l) {
 template <NodeType node>
 tref build_bf_lteq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
+	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_bf_eq_0<node>(build_bf_and<node>(l, build_bf_neg<node>(r)));
+	return tau::get(tau::wff, tau::get(tau::bf_lteq, l, r));
 }
 
 template <NodeType node>
 tref build_bf_nlteq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
+	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_bf_neq_0<node>(build_bf_and<node>(l, build_bf_neg<node>(r)));
-}
-
-template <NodeType node>
-tref build_bf_nlteq_lower(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_bf_neq_0<node>(build_bf_and<node>(r, build_bf_neg<node>(l)));
-}
-
-template <NodeType node>
-tref build_bf_nlteq_upper(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
-	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_bf_neq_0<node>(build_bf_and<node>(l, build_bf_neg<node>(r)));
+	return tau::get(tau::wff, tau::get(tau::bf_nlteq, l, r));
 }
 
 template <NodeType node>
 tref build_bf_gt(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
+	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_bf_lt<node>(r, l);
+	return tau::get(tau::wff, tau::get(tau::bf_gt, l, r));
 }
 
 template <NodeType node>
 tref build_bf_ngt(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
+	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_wff_neg<node>(build_bf_gt<node>(l, r));
+	return tau::get(tau::wff, tau::get(tau::bf_ngt, l, r));
 }
 
 template <NodeType node>
 tref build_bf_gteq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
+	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_bf_lteq<node>(r, l);
+	return tau::get(tau::wff, tau::get(tau::bf_gteq, l, r));
 }
 
 template <NodeType node>
 tref build_bf_ngteq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
+	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_wff_neg<node>(build_bf_gteq<node>(l, r));
+	return tau::get(tau::wff, tau::get(tau::bf_ngteq, l, r));
 }
 
 template <NodeType node>
 tref build_bf_lt(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
+	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_wff_and<node>(
-		build_bf_eq_0<node>(build_bf_and<node>(l, build_bf_neg<node>(r))),
-		build_bf_neq<node>(l, r));
+	return tau::get(tau::wff, tau::get(tau::bf_lt, l, r));
 }
 
 template <NodeType node>
 tref build_bf_nlt(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	DBG(using tau = tree<node>;)
+	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf) && tau::get(r).is(tau::bf));)
-	return build_wff_neg<node>(build_bf_lt<node>(l, r));
+	return tau::get(tau::wff, tau::get(tau::bf_nlt, l, r));
 }
 
 // -----------------------------------------------------------------------------
@@ -1148,16 +1130,6 @@ tref tree<node>::build_bf_lteq(tref l, tref r) {
 template <NodeType node>
 tref tree<node>::build_bf_nlteq(tref l, tref r) {
 	return tau_lang::build_bf_nlteq<node>(l, r);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_nlteq_lower(tref l, tref r) {
-	return tau_lang::build_bf_nlteq_lower<node>(l, r);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_nlteq_upper(tref l, tref r) {
-	return tau_lang::build_bf_nlteq_upper<node>(l, r);
 }
 
 template <NodeType node>

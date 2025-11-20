@@ -562,8 +562,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
 	static tref build_bf_neq_0(tref l);
 	static tref build_bf_lteq(tref l, tref r);
 	static tref build_bf_nlteq(tref l, tref r);
-	static tref build_bf_nlteq_lower(tref l, tref r);
-	static tref build_bf_nlteq_upper(tref l, tref r);
 	static tref build_bf_gt(tref l, tref r);
 	static tref build_bf_ngt(tref l, tref r);
 	static tref build_bf_gteq(tref l, tref r);
@@ -755,7 +753,7 @@ template <NodeType node>
 bool contains(tref fm, tref sub_fm);
 
 template <NodeType node>
-std::function<bool(tref)> is_atomic_fm();
+bool is_atomic_fm(tref n);
 
 } // namespace idni::tau_lang
 

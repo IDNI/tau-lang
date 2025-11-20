@@ -146,12 +146,6 @@ template <NodeType node>
 tref build_bf_nlteq(tref l, tref r);
 
 template <NodeType node>
-tref build_bf_nlteq_lower(tref l, tref r);
-
-template <NodeType node>
-tref build_bf_nlteq_upper(tref l, tref r);
-
-template <NodeType node>
 tref build_bf_gt(tref l, tref r);
 
 template <NodeType node>

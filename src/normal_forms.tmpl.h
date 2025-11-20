@@ -428,8 +428,8 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 			tau::_1(find_ba_type<node>(var))))
 				| bf_reduce_canonical<node>() | tt::ref;
 		changes[neq.get()] = tau::trim(tau::build_wff_or(
-			tau::build_bf_nlteq_upper(f_0, var),
-			tau::build_bf_nlteq_lower(f_1, var)));
+			tau::build_bf_nlteq(f_0, var),
+			tau::build_bf_nlteq(var, f_1)));
 	}
 	return rewriter::replace<node>(n, changes);
 }
@@ -1326,48 +1326,52 @@ tref push_negation_one_in(tref fm) {
 	const auto& t = tau::get(fm);
 	// Tau formula rules
 	if constexpr (is_wff) if (t.child_is(tau::wff_neg)) {
-		tref c = t[0].first();
-		const auto& ct = tau::get(c);
-		if (ct.child_is(tau::wff_and))
-			return tau::build_wff_or(
-				tau::build_wff_neg(ct[0].first()),
-				tau::build_wff_neg(ct[0].second()));
-		if (ct.child_is(tau::wff_or))
-			return tau::build_wff_and(
-				tau::build_wff_neg(ct[0].first()),
-				tau::build_wff_neg(ct[0].second()));
-		if (ct.child_is(tau::bf_eq))
-			return tau::build_bf_neq(ct[0].first(), ct[0].second());
-		if (ct.child_is(tau::bf_neq))
-			return tau::build_bf_eq(ct[0].first(), ct[0].second());
-		if (ct.child_is(tau::wff_ex))
-			return tau::build_wff_all(ct[0].first(),
-				tau::build_wff_neg(ct[0].second()), false);
-		if (ct.child_is(tau::wff_all))
-			return tau::build_wff_ex(ct[0].first(),
-				tau::build_wff_neg(ct[0].second()), false);
-		if (ct.child_is(tau::wff_always))
-			return tau::build_wff_sometimes(
-				tau::build_wff_neg(ct[0].first()));
-		if (ct.child_is(tau::wff_sometimes))
-			return tau::build_wff_always(
-				tau::build_wff_neg(ct[0].first()));
+		const tau& ct = t[0][0];
+		if (!ct.has_child()) return fm;
+		switch (ct[0].value.nt) {
+			case tau::wff_and: return tau::build_wff_or(
+						tau::build_wff_neg(ct[0].first()),
+						tau::build_wff_neg(ct[0].second()));
+			case tau::wff_or: return tau::build_wff_and(
+						tau::build_wff_neg(ct[0].first()),
+						tau::build_wff_neg(ct[0].second()));
+			case tau::bf_eq: return tau::build_bf_neq(ct[0].first(), ct[0].second());
+			case tau::bf_neq: return tau::build_bf_eq(ct[0].first(), ct[0].second());
+			case tau::wff_ex: return tau::build_wff_all(ct[0].first(),
+						tau::build_wff_neg(ct[0].second()), false);
+			case tau::wff_all: return tau::build_wff_ex(ct[0].first(),
+						tau::build_wff_neg(ct[0].second()), false);
+			case tau::wff_always: return tau::build_wff_sometimes(
+						tau::build_wff_neg(ct[0].first()));
+			case tau::wff_sometimes: return tau::build_wff_always(
+						tau::build_wff_neg(ct[0].first()));
+			case tau::bf_lt: return tau::build_bf_nlt(ct[0].first(), ct[0].second());
+			case tau::bf_nlt: return tau::build_bf_lt(ct[0].first(), ct[0].second());
+			case tau::bf_lteq: return tau::build_bf_nlteq(ct[0].first(), ct[0].second());
+			case tau::bf_nlteq: return tau::build_bf_lteq(ct[0].first(), ct[0].second());
+			case tau::bf_gt: return tau::build_bf_ngt(ct[0].first(), ct[0].second());
+			case tau::bf_ngt: return tau::build_bf_gt(ct[0].first(), ct[0].second());
+			case tau::bf_gteq: return tau::build_bf_ngteq(ct[0].first(), ct[0].second());
+			case tau::bf_ngteq: return tau::build_bf_gteq(ct[0].first(), ct[0].second());
+			default: return fm;
+		}
 	}
 	// Boolean function rules
 	if constexpr (!is_wff) if (t.child_is(tau::bf_neg)) {
-		const auto& ct = t[0][0];
-		if (ct.child_is(tau::bf_and))
-			return tau::build_bf_or(
+		const tau& ct = t[0][0];
+		if (!ct.has_child()) return fm;
+		switch (ct[0].value.nt) {
+			case tau::bf_and: return tau::build_bf_or(
 				tau::build_bf_neg(ct[0].first()),
 				tau::build_bf_neg(ct[0].second()));
-		if (ct.child_is(tau::bf_or)) {
-			return tau::build_bf_and(
+			case tau::bf_or: return tau::build_bf_and(
 				tau::build_bf_neg(ct[0].first()),
 				tau::build_bf_neg(ct[0].second()));
-		}
-		if (ct.child_is(tau::bf_xor)) {
-			// TODO: strategy for negating first or second argument
-			return tau::build_bf_xor(tau::build_bf_neg(ct[0].first()), ct[0].second());
+			case tau::bf_xor: {
+				// TODO: strategy for negating first or second argument
+				return tau::build_bf_xor(tau::build_bf_neg(ct[0].first()), ct[0].second());
+			}
+			default: return fm;
 		}
 	}
 	return fm;
@@ -3310,7 +3314,7 @@ tref boole_normal_form(tref formula) {
 	bnf = squeeze_absorb<node>(bnf);
 	// Step 2: Traverse formula, simplify all encountered equations
 	auto simp_eqs = [](tref n) {
-		if (is_atomic_fm<node>()(n) && is_bv_type_family<node>(find_ba_type<node>(n))) {
+		if (is_atomic_fm<node>(n) && is_bv_type_family<node>(find_ba_type<node>(n))) {
 			return simplify_bv<node>(n);
 		} else if (tau::get(n).child_is(tau::bf_eq)) {
 			if (tau::get(n).equals_T() || tau::get(n).equals_F())

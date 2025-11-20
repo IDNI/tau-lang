@@ -305,7 +305,7 @@ TEST_SUITE("wff comparator hooks") {
 		CHECK( !check_hook("0:sbf<1:tau", "T") );
 
 		CHECK( check_hook("X<0", "F") );
-		CHECK( check_hook("X<1", "X'!=0") );
+		CHECK( check_hook("1<X", "F") );
 	}
 
 	TEST_CASE("!<"){
