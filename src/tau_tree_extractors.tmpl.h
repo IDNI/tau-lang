@@ -51,8 +51,15 @@ bool get_io_def(tref n, io_defs<node>& defs) {
 		if (stream_sid == console_sid) stream_sid = 0;
 
 	}
-	if (tref type_node = tt(n) | tau::typed | tau::type | tt::ref;
-		type_node) ba_type = get_ba_type_id<node>(type_node);
+	if (tref type_node = tt(n) | tau::typed | tt::ref; type_node){
+		if (is_bv_type_family<node>(type_node)) {
+			auto width = get_bv_width<node>(type_node);
+			ba_type = bv_type_id<node>(width);
+		} else {
+			ba_type = get_ba_type_id<node>(type_node);
+		}
+
+	}
 	defs[var_sid] = { ba_type, stream_sid };
 	DBG(LOG_TRACE << "get_io_def: " << LOG_FM_DUMP(n) << " -> "
 		<< dict(var_sid) << " : " << LOG_BA_TYPE(ba_type) << " / "

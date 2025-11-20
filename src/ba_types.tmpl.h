@@ -140,6 +140,17 @@ bool is_bv_type_family(size_t ba_type_id) {
 	return is_bv_type_family<node>(ba_types<node>::type_tree(ba_type_id));
 }
 
+
+template <NodeType node>
+size_t get_bv_width(tref t) {
+	using tau = tree<node>;
+	using tt = tau::traverser;;
+	DBG(assert(is_bv_type_family<node>(t)));
+	if (size_t num = tt(t) | tau::subtype | tau::num | tt::num; num)
+		return num;
+	return default_bv_size;
+}
+
 // rr predicate type definitions
 template<NodeType node>
 tref rr_predicate_type(size_t offsets, const std::initializer_list<tref>& signature) {
