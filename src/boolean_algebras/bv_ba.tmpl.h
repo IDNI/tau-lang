@@ -419,7 +419,13 @@ std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree) {
 	DBG(assert(base > 0 );)
 	size_t bv_size = get_bv_size<node<BAs...>>(type_tree);
 	auto str = t | tt::terminals;
-	return make_bitvector_cte(bv_size, str, base);
+	try {
+		return make_bitvector_cte(bv_size, str, base);
+	} catch (const cvc5::CVC5ApiException& e) {
+		LOG_ERROR << "Error creating bitvector constant from string '"
+			<< str << "': " << e.what() << "\n";
+		return std::nullopt;
+	}
 }
 
 template<typename...BAs>
