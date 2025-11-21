@@ -102,6 +102,32 @@ template <NodeType node>
 bool is_sbf_type(size_t t);
 
 // -----------------------------------------------------------------------------
+// Type definitions for bool
+
+/**
+ * @brief Create the type tree for the bool type
+ * @tparam node Tree node type
+ * @return Tree reference representing bool type tree
+ */
+template <NodeType node>
+tref bool_type();
+
+template <NodeType node>
+inline size_t bool_type_id();
+
+/**
+ * @brief Checks if t represents the bool type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents a bool
+ */
+template <NodeType node>
+bool is_bool_type(tref t);
+
+template <NodeType node>
+bool is_bool_type(size_t t);
+
+// -----------------------------------------------------------------------------
 // Type definitions for bitvector
 // TODO: They must go into bv_ba.h -> currently causes compilation error
 

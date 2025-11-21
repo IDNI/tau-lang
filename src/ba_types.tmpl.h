@@ -101,6 +101,32 @@ bool is_sbf_type(size_t t) {
 	return is_sbf_type<node>(ba_types<node>::type_tree(t));
 }
 
+
+// bool type definitions
+template<NodeType node>
+tref bool_type() {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "bool");
+	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+inline size_t bool_type_id() {
+	static size_t id = ba_types<node>::id(bool_type<node>());
+	return id;
+}
+
+template<NodeType node>
+bool is_bool_type(tref t) {
+	using tau = tree<node>;
+	return tau::get(t)[0].get_string() == "bool";
+}
+
+template <NodeType node>
+bool is_bool_type(size_t t) {
+	return is_bool_type<node>(ba_types<node>::type_tree(t));
+}
+
 // bitvector type definitions
 // TODO: They must go into bv_ba.impl.h -> currently causes compilation error
 template<NodeType node>
