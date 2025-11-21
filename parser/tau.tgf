@@ -21,7 +21,7 @@ output_def             => io_var_name [ typed ] _ '=' _ "out" [ __ stream ].
 stream                 => "file" _ '(' _ q_file_name  _ ')'
                         | "console":console_sym
                         . # in the future tcp, udp,...
-ref                    => sym [offsets] ref_args [_ "fallback" __ fp_fallback].
+ref                    => sym [offsets] ref_args [typed] [_ "fallback" __ fp_fallback].
 fp_fallback            => "first":first_sym | "last":last_sym
                         | capture | ref | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
