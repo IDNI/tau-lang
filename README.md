@@ -1127,8 +1127,6 @@ expression.
 
 * `mnf <repl_memory|tau|term>`: computes the minterm normal form of the given expression.
 
-* `snf <repl_memory|tau|term>`: computes the strong normal form of the given expression.
-
 * `onf <var> <repl_memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
 
