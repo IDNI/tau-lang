@@ -173,8 +173,8 @@ the inputs and outputs of the specification.
 An example of how to define input and output streams is the following:
 
 ```
-tau i1 = console
-tau o1 = console
+i1 : tau = in console
+o1 : tau = out console
 ```
 
 In the above case we specify that `i1` and `o1` are of type `tau`, namely that
@@ -186,8 +186,8 @@ Tau specifications themselves abstracted as Boolean algebra elements.
 You can also define files as input or output streams:
 
 ```
-tau i1 = ifile("input.in")
-tau o1 = ofile("output.out")
+i1 : tau = ii file("input.in")
+o1 : tau = out file("output.out")
 ```
 
 The above two examples, `o1[t] = 0` and `o1[t] = i1[t]`, define one program each
@@ -749,11 +749,11 @@ Variables will be taken into account soon.
 
 When typing a stream explicitly in [REPL](#the-tau-repl), the syntax is
 ```
-stream_variable [type] = stream_type stream
+stream_definition => stream_variable [":" type] "=" stream_type stream
 ```
 where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`...), 
 `stream_type` is either input stream (`in`) or output stream (`out`), and `stream` is either `console` (meaning that the
-stream reads/outputs values from/to the console) or `filename` which denotes the file from/into which to read/write 
+stream reads/outputs values from/to the console) or `file(file_name)` which denotes the file from/into which to read/write 
 (in quotes if needed). For example,
 ```
 keyboard tau = in console
@@ -761,6 +761,10 @@ keyboard tau = in console
 or 
 ```
 screen tau = out console
+```
+or 
+```
+log tau = out file("log.tau")
 ```
 
 ### Special streams
