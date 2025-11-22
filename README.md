@@ -754,7 +754,14 @@ stream_variable [type] = stream_type stream
 where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`...), 
 `stream_type` is either input stream (`in`) or output stream (`out`), and `stream` is either `console` (meaning that the
 stream reads/outputs values from/to the console) or `filename` which denotes the file from/into which to read/write 
-(in quotes if needed).
+(in quotes if needed). For example,
+```
+keyboard tau = in console
+```
+or 
+```
+screen tau = out console
+```
 
 ### Special streams
 
