@@ -749,11 +749,12 @@ Variables will be taken into account soon.
 
 When typing a stream explicitly in [REPL](#the-tau-repl), the syntax is
 ```
-<type> <stream_variable> = <stream_type>
+stream_variable [type] = stream_type stream
 ```
-where `<type>` is either `tau` or `sbf` and `<stream_type>` is either `console` (meaning that the
-stream reads/outputs values from/to the console) or `ifile("<filename>")` for input streams and `ofile("<filename>")`
-for output streams. `<filename>` denotes the file from/into which to read/write.
+where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`...), 
+`stream_type` is either input stream (`in`) or output stream (`out`), and `stream` is either `console` (meaning that the
+stream reads/outputs values from/to the console) or `filename` which denotes the file from/into which to read/write 
+(in quotes if needed).
 
 ### Special streams
 
