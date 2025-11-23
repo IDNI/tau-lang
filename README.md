@@ -756,15 +756,15 @@ where `stream_variable` is the name of the stream, `type` is a supported type (`
 stream reads/outputs values from/to the console) or `file(file_name)` which denotes the file from/into which to read/write 
 (in quotes if needed). For example,
 ```
-keyboard tau = in console
+i1 : tau = in console
 ```
 or 
 ```
-screen tau = out console
+o1 : tau = out console
 ```
 or 
 ```
-log tau = out file("log.tau")
+o2 : tau = out file("log.tau")
 ```
 
 ### Special streams
