@@ -173,8 +173,8 @@ the inputs and outputs of the specification.
 An example of how to define input and output streams is the following:
 
 ```
-tau i1 = console
-tau o1 = console
+i1 : tau = in console
+o1 : tau = out console
 ```
 
 In the above case we specify that `i1` and `o1` are of type `tau`, namely that
@@ -186,8 +186,8 @@ Tau specifications themselves abstracted as Boolean algebra elements.
 You can also define files as input or output streams:
 
 ```
-tau i1 = ifile("input.in")
-tau o1 = ofile("output.out")
+i1 : tau = ii file("input.in")
+o1 : tau = out file("output.out")
 ```
 
 The above two examples, `o1[t] = 0` and `o1[t] = i1[t]`, define one program each
@@ -749,11 +749,23 @@ Variables will be taken into account soon.
 
 When typing a stream explicitly in [REPL](#the-tau-repl), the syntax is
 ```
-<type> <stream_variable> = <stream_type>
+stream_definition => stream_variable [":" type] "=" stream_type stream
 ```
-where `<type>` is either `tau` or `sbf` and `<stream_type>` is either `console` (meaning that the
-stream reads/outputs values from/to the console) or `ifile("<filename>")` for input streams and `ofile("<filename>")`
-for output streams. `<filename>` denotes the file from/into which to read/write.
+where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`...), 
+`stream_type` is either input stream (`in`) or output stream (`out`), and `stream` is either `console` (meaning that the
+stream reads/outputs values from/to the console) or `file(file_name)` which denotes the file from/into which to read/write 
+(in quotes if needed). For example,
+```
+i1 : tau = in console
+```
+or 
+```
+o1 : tau = out console
+```
+or 
+```
+o2 : tau = out file("log.tau")
+```
 
 ### Special streams
 
@@ -1126,8 +1138,6 @@ expression.
 * `nnf <repl_memory|tau|term>`: computes the negation normal form of the given expression.
 
 * `mnf <repl_memory|tau|term>`: computes the minterm normal form of the given expression.
-
-* `snf <repl_memory|tau|term>`: computes the strong normal form of the given expression.
 
 * `onf <var> <repl_memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
