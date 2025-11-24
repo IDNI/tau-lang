@@ -431,15 +431,50 @@ template <NodeType node>
 tref unify(tref t1, tref t2) {
 	using tau = tree<node>;
 	if (is_same_ba_type<node>(t1, t2)) return t1;
-	// t1 and t2 have same type name
+	// If one is untyped return the other
+	if (is_untyped<node>(t1)) return t2;
+	if (is_untyped<node>(t2)) return t1;
+	// If t1 and t2 have same type name
 	if (tau::subtree_equals(tau::trim(t1), tau::trim(t2))) {
-		// t1 or t2 does not have a type parameter
+		// If t1 or t2 does not have a type parameter
 		if (tau::get(t1).children_size() == 1)
 			return t2;
 		if (tau::get(t2).children_size() == 1)
 			return t1;
 	}
 	return nullptr;
+}
+
+template <NodeType node>
+size_t unify(size_t tid1, size_t tid2) {
+	auto t1 = ba_types<node>::type_tree(tid1);
+	auto t2 = ba_types<node>::type_tree(tid2);
+	auto result = unify<node>(t1, t2);
+	return result ? ba_types<node>::id(result) : nat_type_id<node>();
+}
+
+template <NodeType node>
+bool is_typed(tref n) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	return tt(n) | tau::typed | tt::ref != nullptr;
+}
+
+
+template <NodeType node>
+tref get_type(tref t) {
+	auto type_id = get_type_id<node>(t);
+	return ba_types<node>::type_tree(type_id);	
+}
+
+template <NodeType node>
+size_t get_type_id(tref t) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	if (auto check = tt(t) | tau::typed | tt::ref ; check)
+		return ba_types<node>::id(check);
+	return tt(t) | tt::ba_type;
 }
 
 template <NodeType node>
