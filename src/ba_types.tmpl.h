@@ -456,10 +456,23 @@ tref unify(tref t1, tref t2) {
 }
 
 template <NodeType node>
-tref unify(trefs ns, tref default_type) {
+tref unify(const trefs& ns, tref default_type) {
 	tref result = default_type;
 	for (size_t i = 0; i < ns.size(); ++i) {
 		result = unify<node>(result, ns[i]);
+		if (result == nullptr) return nullptr;
+	}
+	return result;
+}
+
+template <NodeType node>
+tref unify(const trefs& ns1, const trefs& ns2, tref default_type) {
+	if (ns1.size() != ns2.size()) return nullptr;
+	auto result = default_type;
+	for (size_t i = 0; i < ns1.size(); ++i) {
+		auto result = unify<node>(result, ns1[i]);
+		if (result == nullptr) return nullptr;
+		result = unify<node>(result, ns2[i]);
 		if (result == nullptr) return nullptr;
 	}
 	return result;
@@ -474,7 +487,7 @@ std::optional<size_t> unify(size_t tid1, size_t tid2) {
 }	
 
 template <NodeType node>
-std::optional<size_t> unify(std::vector<size_t> nids, size_t default_type) {
+std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type) {
 	std::optional<size_t> result = default_type;
 	for (size_t i = 0; i < nids.size(); ++i) {
 		result = unify<node>(result.value(), nids[i]);
@@ -483,6 +496,18 @@ std::optional<size_t> unify(std::vector<size_t> nids, size_t default_type) {
 	return result;
 }
 
+template <NodeType node>
+std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type) {
+	if (nids1.size() != nids2.size()) return std::nullopt;
+	std::optional<size_t> result = default_type;
+	for (size_t i = 0; i < nids1.size(); ++i) {
+		result = unify<node>(result.value(), nids1[i]);
+		if (!result) return std::nullopt;
+		result = unify<node>(result.value(), nids2[i]);
+		if (!result) return std::nullopt;
+	}
+	return result;
+}
 
 template <NodeType node>
 bool is_typed(tref n) {
@@ -491,11 +516,24 @@ bool is_typed(tref n) {
 	return tt(n) | tau::typed | tt::ref != nullptr;
 }
 
+template <NodeType node>
+bool are_typed(trefs ns) {
+	for (auto n : ns)
+		if (!is_typed<node>(n)) return false;
+	return true;
+}
 
 template <NodeType node>
 tref get_type(tref t) {
 	auto type_id = get_type_id<node>(t);
 	return ba_types<node>::type_tree(type_id);	
+}
+
+template <NodeType node>
+trefs get_types(trefs t) {
+	trefs types;
+	for (auto ti : t) types.push_back(get_type<node>(ti));
+	return types;
 }
 
 template <NodeType node>
@@ -506,6 +544,13 @@ size_t get_type_id(tref t) {
 	if (auto check = tt(t) | tau::typed | tt::ref ; check)
 		return ba_types<node>::id(check);
 	return tt(t) | tt::ba_type;
+}
+
+template <NodeType node>
+std::vector<size_t> get_type_ids(trefs t) {
+	std::vector<size_t> type_ids;
+	for (auto ti : t) type_ids.push_back(get_type_id<node>(ti));
+	return type_ids;
 }
 
 template <NodeType node>

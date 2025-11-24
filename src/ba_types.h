@@ -330,24 +330,42 @@ std::optional<size_t> unify(size_t tid1, size_t tid2);
 // Checks if the types of a vector of trefs are compatible with the supplied 
 // default type. If so, returns the type and nullptr otherwise.
 template <NodeType node>
-tref unify(trefs ns, tref default_type);
+tref unify(const trefs& ns, tref default_type);
+
+template <NodeType node>
+tref unify(const trefs& ns1, const trefs& ns2, tref default_type);
 
 // Checks if the types of a vector of trefs are compatible with the supplied 
 // default type. If so, returns type id and nat_type_id otherwise.
 template <NodeType node>
-std::optional<size_t> unify(std::vector<size_t> nids, size_t default_type);
+std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type);
+
+template <NodeType node>
+std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type);
 
 // Checks if the ref is typed
 template <NodeType node>
 bool is_typed(tref n);
 
-// Get type id of a reference
+// Checks if the ref is typed
+template <NodeType node>
+bool are_typed(trefs ns);
+
+// Get type of a reference
 template <NodeType node>
 tref get_type(tref t);
 
-// Get type (reference) of a reference
+// Get types of references
+template <NodeType node>
+trefs get_types(trefs t);
+
+// Get type id of a reference
 template <NodeType node>
 size_t get_type_id(tref t);
+
+// Get type ids of references
+template <NodeType node>
+std::vector<size_t> get_type_ids(trefs t);
 
 // print the type name to the stream
 template <NodeType node>
