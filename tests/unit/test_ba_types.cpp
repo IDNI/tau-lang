@@ -1,0 +1,54 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
+#include "test_Bool_helpers.h"
+#include "ba_types.h"
+
+TEST_SUITE("ba_types") {
+
+	TEST_SUITE("Configuration") {
+	TEST_CASE("logging") {
+		logging::trace();
+	}
+}
+
+TEST_SUITE("assumptions") {
+
+	TEST_CASE("untyped_id is 0") {
+		// Assumed in some parts of the code
+		CHECK( idni::tau_lang::untyped_type_id<node_t>() == 0 );
+	}
+
+}
+
+TEST_SUITE("unify") {
+
+	using type_t = size_t;
+
+	bool match(const type_t& type1, const type_t& type2, const type_t& result) {
+		auto merged = unify<node_t>(type1, type2);
+		if (merged == nat_type_id<node_t>()) return false;
+		return result == merged.value();
+	}
+
+	bool nomatch(const type_t& type1, const type_t& type2) {
+		auto merged = unify<node_t>(type1, type2);
+		return merged == nat_type_id<node_t>();
+	}
+
+	TEST_CASE("untyped with untyped") {
+		CHECK(match(0, 0, 0));
+	}
+
+	TEST_CASE("untyped with any type") {
+		CHECK(match(0, 1, 1));
+		CHECK(match(1, 0, 1));
+	}
+
+	TEST_CASE("same types all possible subtypes") {
+		CHECK(match(1, 1, 1));
+	}
+
+	TEST_CASE("different types") {
+		CHECK(nomatch(1, 2));
+	}
+}

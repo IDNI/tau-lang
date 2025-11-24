@@ -321,6 +321,29 @@ bool is_same_ba_type(tref t1, tref t2);
 template <NodeType node>
 tref unify(tref t1, tref t2);
 
+// Checks if the base types of tid1 and tid2 agree
+// and returns the type with more information.
+// If the types do not allow this, returns nullptr
+template <NodeType node>
+size_t unify(size_t tid1, size_t tid2);
+
+// Checks if the types of a vector of trefs are compatible with the supplied 
+// default type. If so, returns true and false otherwise.
+template <NodeType node>
+bool unify(trefs ns, tref default_type = nullptr);
+
+// Checks if the ref is typed
+template <NodeType node>
+bool is_typed(tref n);
+
+// Get type id of a reference
+template <NodeType node>
+tref get_type(tref t);
+
+// Get type (reference) of a reference
+template <NodeType node>
+size_t get_type_id(tref t);
+
 // print the type name to the stream
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);
