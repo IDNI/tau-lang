@@ -21,6 +21,11 @@ Building scripts run cmake with different options. Additional script options pro
 - `w64-debug [<CMAKE_OPTIONS>]` and `w64-release [<CMAKE_OPTIONS>]` build for windows using mingw-w64
 - `boost-mingw` builds boost for windows using mingw-w64 (a prerequisite for `w64-debug` and `w64-release`)
 
+### Building with clang compiler
+
+- `clang <SCRIPT> <SCRIPT_OPTIONS>` works as a prefix argument for build scripts
+  Example: `./dev clang release` would run `./dev release` build using clang compiler 
+
 ### Build directories
 
 `debug` and `w64-debug` builds are using `build-Debug` directory.
@@ -42,7 +47,6 @@ Building scripts run cmake with different options. Additional script options pro
 
 - `packages [<CMAKE_OPTIONS>]` builds packages for linux
 - `w64-packages [<CMAKE_OPTIONS>]` builds packages for windows
-- `extract-packages` extracts packages from a docker image called 'packages'
 
 Packages are created in `build-Release/packages` directory.
 
@@ -52,3 +56,23 @@ Packages are created in `build-Release/packages` directory.
 - `test-release` runs ctest with `Release` BUILD_TYPE
 - `test-relwithdebinfo` runs ctest with `RelWithDebInfo` BUILD_TYPE
 - `test-wine` runs tests with wine
+
+## Docker
+
+`docker <ACTION> <DOCKER OPTIONS>`
+
+- `docker tau` builds tau runner image with Tau executable and runs it in interactive mode
+- `dockewr tau-rpm` builds tau rpm-based runner image with Tau executable and runs it in interactive mode
+- `docker run -t <IMAGE>` runs docker image in interactive mode
+- `docker bash -t <IMAGE>` runs bash in docker image in interactive mode
+- `docker build` default build (default options with no target)
+- `docker base` builds base image
+- `docker deps` builds deps image
+- `docker build-debug` builds build image with `Debug` BUILD_TYPE and tests
+- `docker build-release` builds build image with `Release` BUILD_TYPE and tests
+- `docker packages` builds packages image and extracts them to `~/.tau/packages`
+- `docker nightly` builds nightly packages image and extracts them to `~/.tau/packages`
+- `docker w64-deps` builds Windows deps image
+- `docker w64-build` builds Windows build image
+- `docker w64-packages` builds Windows packages and extracts them to `~/.tau/packages`
+- `docker w64-nightly` builds Windows nightly packages and extracts them to `~/.tau/packages`
