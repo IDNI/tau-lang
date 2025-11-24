@@ -9,7 +9,6 @@ set(TESTS
 	nso_rr_fixed_point
 	nso_rr_partial_eval
 	interpreter
-	ref_types
 	satisfiability1
 	satisfiability2
 	satisfiability3

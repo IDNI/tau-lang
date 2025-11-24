@@ -360,8 +360,7 @@ tref apply_defs_to_spec (tref spec) {
 		const auto& defs = definitions<node>::instance().get_sym_defs();
 		spec_with_defs.rec_relations.insert(spec_with_defs.rec_relations.end(),
 		       defs.begin(), defs.end());
-		if (auto infr = infer_ref_types<node>(spec_with_defs); infr)
-			return apply_rr_to_formula(infr.value());
+		return apply_rr_to_formula(spec_with_defs);
 	}
 	return spec;
 }

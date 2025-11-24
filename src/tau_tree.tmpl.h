@@ -11,7 +11,6 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 
 struct rr_sig;
-template <NodeType node> struct ref_types;
 template <NodeType node> struct ba_types;
 template <NodeType node> struct ba_constants;
 template <NodeType node> struct get_hook;

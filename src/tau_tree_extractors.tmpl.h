@@ -216,7 +216,7 @@ template <NodeType node>
 std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules,
 	const htref& main_fm)
 {
-	return infer_ref_types<node>({ rules, main_fm });
+	return std::optional<rr<node>>({ rules, main_fm });
 }
 
 // -----------------------------------------------------------------------------

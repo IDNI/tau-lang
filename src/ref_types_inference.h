@@ -9,16 +9,6 @@
 
 namespace idni::tau_lang {
 
-template <NodeType node>
-struct ref_types;
-
-template <NodeType node>
-std::optional<rr<node>> infer_ref_types(const rr<node>& nso_rr);
-template <NodeType node>
-std::optional<rr<node>> infer_ref_types(const rr<node>& nso_rr, ref_types<node>& ts);
-
-// -----------------------------------------------------------------------------
-
 // rr name-id dict
 static inline std::vector<std::string> rr_v{ "dummy" };
 static inline std::map<std::string, size_t> rr_m{};
@@ -34,6 +24,13 @@ struct rr_sig {
 	auto operator<=>(const rr_sig&) const = default;
 };
 
+inline std::ostream& operator<<(std::ostream& os, const rr_sig& s) {
+	return os 
+		<< rr_dict(s.name) 
+		<< "[" << s.offset_arity << "]/" 
+		<< s.arg_arity;
+}
+
 } // namespace idni::tau_lang
 
 template<>
@@ -47,42 +44,6 @@ struct std::hash<idni::tau_lang::rr_sig> {
 	}
 };
 
-namespace idni::tau_lang {
 
-// manages information about refs resolved/unresolved types and fp calls
-template <NodeType node>
-struct ref_types {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	template <NodeType N>
-	friend std::optional<rr<N>> infer_ref_types(const rr<N>& nso_rr);
-	template <NodeType N>
-	friend std::optional<rr<N>> infer_ref_types(const rr<N>& nso_rr,
-						ref_types<N>& ts);
-
-	ref_types(const rr<node>& nso_rr);
-	// returns false if any error or unresolved ref
-	bool ok() const;
-	// returns set of errors
-	const std::set<std::string>& errors() const;
-	// returns set of unresolved refs
-	std::set<rr_sig> unresolved() const;
-	// returns known type of a ref, or no value
-	std::optional<typename node::type> get(const rr_sig& sig);
-private:
-	void done(const rr_sig& sig);
-	void todo(const rr_sig& sig);
-	// add sig with type t, and if it's already typed, check it equals to t
-	bool add(tref n, typename node::type t);
-	bool get_types(tref n);
-	bool get_ref_types(const rr<node>& nso_rr);
-	std::unordered_map<rr_sig, typename node::type> types_;
-	std::set<rr_sig> done_, todo_;
-	std::set<std::string> errors_;
-};
-
-} // namespace idni::tau_lang
-
-#include "ref_types_inference.tmpl.h"
 
 #endif // __IDNI__TAU__REF_TYPES_INFERENCE_H__
