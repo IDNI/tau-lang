@@ -155,11 +155,17 @@ struct scoped_union_find {
 		kinds_.emplace(element_t{global, data}, unknown);
 	}
 
-	kind_t type_of(const data_t& data) {
+	kind_t type_of(const data_t& datum) {
 		for(auto it = scopes_.rbegin(); it != scopes_.rend(); ++it)
-			if (uf.contains({*it, data}))
-				return kinds_.find(uf.root(element_t{*it, data}))->second;
+			if (uf.contains({*it, datum}))
+				return kinds_.find(uf.root(element_t{*it, datum}))->second;
 		return unknown;
+	}
+
+	std::vector<kind_t> types_of(const std::vector<data_t>& data) {
+		std::vector<kind_t> result;
+		for(auto datum: data) result.push_back(type_of(datum));
+		return result;
 	}
 
 	scope_t scope_of(const data_t& data) {

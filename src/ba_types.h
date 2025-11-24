@@ -325,12 +325,17 @@ tref unify(tref t1, tref t2);
 // and returns the type with more information.
 // If the types do not allow this, returns nullptr
 template <NodeType node>
-size_t unify(size_t tid1, size_t tid2);
+std::optional<size_t> unify(size_t tid1, size_t tid2);
 
 // Checks if the types of a vector of trefs are compatible with the supplied 
-// default type. If so, returns true and false otherwise.
+// default type. If so, returns the type and nullptr otherwise.
 template <NodeType node>
-bool unify(trefs ns, tref default_type = nullptr);
+tref unify(trefs ns, tref default_type);
+
+// Checks if the types of a vector of trefs are compatible with the supplied 
+// default type. If so, returns type id and nat_type_id otherwise.
+template <NodeType node>
+std::optional<size_t> unify(std::vector<size_t> nids, size_t default_type);
 
 // Checks if the ref is typed
 template <NodeType node>
