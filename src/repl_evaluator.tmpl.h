@@ -111,11 +111,9 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 		auto definitions = defs.get_sym_defs();
 		nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 			definitions.begin(), definitions.end());
-		auto ref_infr = infer_ref_types<node>(nso_rr);
-		if (!ref_infr) return {};
 		auto& global_scope = defs.get_global_scope();
 		if (auto [infr, n_global_scope] = infer_ba_types<node>(
-			build_spec<node>(ref_infr.value()), global_scope); infr)
+			build_spec<node>(nso_rr), global_scope); infr)
 		{
 			global_scope = n_global_scope;
 			if (auto infr_rr = get_nso_rr<node>(ctx, infr, true);

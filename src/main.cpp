@@ -134,9 +134,7 @@ std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 		def.first,
 		tau::geth(resolve_io_vars<node>(
 			defs.get_io_context(), def.second->get())));
-	if (auto infr = infer_ref_types<node>(nso_rr); infr)
-		return infr.value();
-	return {};
+	return nso_rr;
 }
 
 int run_tau_spec(string spec_file, bool charvar, bool /*exp*/,
