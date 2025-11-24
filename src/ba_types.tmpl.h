@@ -460,8 +460,7 @@ tref unify(trefs ns, tref default_type) {
 	tref result = default_type;
 	for (size_t i = 0; i < ns.size(); ++i) {
 		result = unify<node>(result, ns[i]);
-		if (result == nullptr)
-			return nullptr;
+		if (result == nullptr) return nullptr;
 	}
 	return result;
 }
@@ -479,8 +478,7 @@ std::optional<size_t> unify(std::vector<size_t> nids, size_t default_type) {
 	std::optional<size_t> result = default_type;
 	for (size_t i = 0; i < nids.size(); ++i) {
 		result = unify<node>(result.value(), nids[i]);
-		if (!result)
-			return std::nullopt;
+		if (!result) return std::nullopt;
 	}
 	return result;
 }
