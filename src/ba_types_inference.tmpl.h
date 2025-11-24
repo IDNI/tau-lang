@@ -27,11 +27,11 @@ bool type_scoped_resolver<node>::merge(tref a, tref b) {
 		<< LOG_FM(b) << ":" << ba_types<node>::name(type_b)
 		<< " (scope " << scope_b << ")\n";)
 	auto merged = unify<node>(type_a, type_b);
-	if (merged == nat_type_id<node>()) return false; // conflicting type info
+	if (!merged) return false; // conflicting type info
 	auto new_parent = this->uf.merge({scope_a, a}, {scope_b, b});
-	this->kinds_.insert_or_assign(new_parent, merged);
+	this->kinds_.insert_or_assign(new_parent, merged.value());
 	DBG(LOG_TRACE << "type_scoped_resolver/merge: merged to "
-		<< LOG_FM(new_parent.second) << ":" << ba_types<node>::name(merged)
+		<< LOG_FM(new_parent.second) << ":" << ba_types<node>::name(merged.value())
 		<< "\n" << " (scope " << new_parent.first << ")";)
 	// We also update the type of the merged elements
 	//this->kinds_[{this->current, a}] = merged;
@@ -159,19 +159,8 @@ tref update_symbols(tref n) {
 // If the vector is empty, we return the default type (untyped). If there is
 // conflicting type information, we return nullopt.
 template<NodeType node>
-size_t get_type(type_scoped_resolver<node>& resolver, trefs ts, size_t default_type) {
-	// If trefs is empty we return the default (untyped)
-	if (ts.empty())	return { default_type };
-	size_t result = default_type;
-	for (tref t : ts) {
-		size_t current_type = get_type_id<node>(t);
-		size_t stored_type = resolver.type_of(t);
-		auto type = unify<node>(current_type, stored_type);
-		if (type == nat_type_id<node>()) return nat_type_id<node>(); // conflicting type info
-		result = unify<node>(result, type);
-		if (result == nat_type_id<node>()) return nat_type_id<node>(); // conflicting type info
-	}
-	return result;
+std::optional<size_t> get_type(type_scoped_resolver<node>& resolver, trefs ts, size_t default_type) {
+	return unify<node>(resolver.types_of(ts), default_type);
 };
 
 // Typeable trefs predicate
@@ -628,13 +617,13 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// We infer the common type of all the typeables in the expression
 				auto type = get_type(resolver, typeables, untyped_type_id<node>());
 				// If no common type is found, we set error and stop traversal
-				if (type == nat_type_id<node>()){
+				if (!type){
 					LOG_ERROR << "Conflicting type information in rec. relation "
 						<< LOG_FM(n) << "\n";
 					return error = true, false;
 				}
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/rec_relation.../type: "
-					<< ba_types<node>::name(type)
+					<< ba_types<node>::name(type.value())
 					<< "\n";)
 				// We add the variables and the constants to the current scope
 				// and assign them the common type.
@@ -642,7 +631,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				for (tref typeable : typeables)	{
 					tref canonized = canonize<node>(typeable);
 					resolver.insert(canonized);
-					resolver.assign(canonized, type);
+					resolver.assign(canonized, type.value());
 					mergeables.push_back(canonized);
 				}
 				if (!resolver.merge(mergeables)) {
@@ -683,13 +672,13 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// We infer the common type of all the typeables in the expression
 				auto type = get_type(resolver, typeables, untyped_type_id<node>());
 				// If no common type is found, we set error and stop traversal
-				if (type == nat_type_id<node>()){
+				if (!type){
 					LOG_ERROR << "Conflicting type information in bf "
 						<< LOG_FM(n) << "\n";
 					return error = true, false;
 				}
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/bf.../type: "
-					<< ba_types<node>::name(type)
+					<< ba_types<node>::name(type.value())
 					<< "\n";)
 				// We add the variables and the constants to the current scope
 				// and assign them the common type.
@@ -697,7 +686,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				for (tref typeable : typeables)	{
 					tref canonized = canonize<node>(typeable);
 					resolver.insert(canonized);
-					resolver.assign(canonized, type);
+					resolver.assign(canonized, type.value());
 					mergeables.push_back(canonized);
 				}
 				if (!resolver.merge(mergeables)) {
@@ -725,13 +714,13 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// We infer the common type of all the typeables in the expression
 				auto type = get_type(resolver, typeables, untyped_type_id<node>());
 				// If no common type is found, we set error and stop traversal
-				if (type == nat_type_id<node>()){
+				if (!type){
 					LOG_ERROR << "Conflicting type information in bf equation "
 						<< LOG_FM(n) << "\n";
 					return error = true, false;
 				}
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/bf_eq.../type: "
-					<< ba_types<node>::name(type)
+					<< ba_types<node>::name(type.value())
 					<< "\n";)
 				// We add the variables and the constants to the current scope
 				// and assign them the common type.
@@ -741,13 +730,13 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					tref canonized = canonize<node>(typeable);
 					if (is<node, tau::ba_constant>(canonized) || is<node, tau::bf_f>(canonized) || is<node, tau::bf_t>(canonized)) {
 						mergeables.push_back(canonized);
-						constants.emplace(canonized, type);
+						constants.emplace(canonized, type.value());
 						continue;
 					}
 					// We only add variables to the current scope
 					// Constants will be added to an inner scope
 					resolver.insert(canonized);
-					resolver.assign(canonized, type);
+					resolver.assign(canonized, type.value());
 					mergeables.push_back(canonized);
 				}
 				// We create an inner scope for the constants

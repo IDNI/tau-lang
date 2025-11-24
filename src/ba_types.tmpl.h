@@ -386,17 +386,24 @@ std::string ba_types<node>::dump_to_str() {
 // type_sids (index = ba_type id)
 template <NodeType node>
 std::vector<tref>& ba_types<node>::type_trees() {
-	static std::vector<tref> t { untyped_type<node>(), tau_type<node>(),
-		bv_type<node>(), sbf_type<node>(), rr_predicate_type<node>(0,0) };
+	static std::vector<tref> t { 
+		untyped_type<node>(), 
+		tau_type<node>(),
+		bv_type<node>(), 
+		sbf_type<node>(), 
+		rr_predicate_type<node>(0,0) };
 	return t;
 }
 
 // type_sid -> ba_type id
 template <NodeType node>
 subtree_map<node, size_t>& ba_types<node>::type_tree_to_idx() {
-	static subtree_map<node, size_t> t{ {untyped_type<node>(), 0 },
-		{ tau_type<node>(), 1 }, { bv_type<node>(), 2 },
-		{ sbf_type<node>(), 3 }, { rr_predicate_type<node>(0,0), 4 }
+	static subtree_map<node, size_t> t{ 
+		{ untyped_type<node>(), 0 },
+		{ tau_type<node>(), 1 }, 
+		{ bv_type<node>(), 2 },
+		{ sbf_type<node>(), 3 }, 
+		{ rr_predicate_type<node>(0,0), 4 }
 	};
 	return t;
 }
@@ -430,10 +437,13 @@ bool is_same_ba_type(tref t1, tref t2) {
 template <NodeType node>
 tref unify(tref t1, tref t2) {
 	using tau = tree<node>;
-	if (is_same_ba_type<node>(t1, t2)) return t1;
+	// If either is nat, return nat
+	if (is_nat_type<node>(t1) || is_nat_type<node>(t2)) return nullptr;
 	// If one is untyped return the other
 	if (is_untyped<node>(t1)) return t2;
 	if (is_untyped<node>(t2)) return t1;
+	// If they are the same type return either
+	if (is_same_ba_type<node>(t1, t2)) return t1;
 	// If t1 and t2 have same type name
 	if (tau::subtree_equals(tau::trim(t1), tau::trim(t2))) {
 		// If t1 or t2 does not have a type parameter
@@ -446,12 +456,35 @@ tref unify(tref t1, tref t2) {
 }
 
 template <NodeType node>
-size_t unify(size_t tid1, size_t tid2) {
+tref unify(trefs ns, tref default_type) {
+	tref result = default_type;
+	for (size_t i = 0; i < ns.size(); ++i) {
+		result = unify<node>(result, ns[i]);
+		if (result == nullptr)
+			return nullptr;
+	}
+	return result;
+}
+
+template <NodeType node>
+std::optional<size_t> unify(size_t tid1, size_t tid2) {
 	auto t1 = ba_types<node>::type_tree(tid1);
 	auto t2 = ba_types<node>::type_tree(tid2);
 	auto result = unify<node>(t1, t2);
-	return result ? ba_types<node>::id(result) : nat_type_id<node>();
+	return result ? std::optional<size_t>{ ba_types<node>::id(result) } : std::nullopt;
+}	
+
+template <NodeType node>
+std::optional<size_t> unify(std::vector<size_t> nids, size_t default_type) {
+	std::optional<size_t> result = default_type;
+	for (size_t i = 0; i < nids.size(); ++i) {
+		result = unify<node>(result.value(), nids[i]);
+		if (!result)
+			return std::nullopt;
+	}
+	return result;
 }
+
 
 template <NodeType node>
 bool is_typed(tref n) {

@@ -16,6 +16,7 @@ set(TESTS
 	ba_cvc5
 	cvc5
 	ba_types_inference
+	ba_types
 	union_find
 	cvc5_solver
 )

@@ -1,11 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+#include "test_init.h"
 #include "test_Bool_helpers.h"
+
 #include "ba_types.h"
 
-TEST_SUITE("ba_types") {
+TEST_SUITE("Configuration") {
 
-	TEST_SUITE("Configuration") {
 	TEST_CASE("logging") {
 		logging::trace();
 	}
@@ -13,7 +14,12 @@ TEST_SUITE("ba_types") {
 
 TEST_SUITE("assumptions") {
 
-	TEST_CASE("untyped_id is 0") {
+	/*TEST_CASE("nat_type_id is 0") {
+		// Assumed in some parts of the code
+		CHECK( idni::tau_lang::nat_type_id<node_t>() == 0 );
+	}*/
+
+	TEST_CASE("untyped_type_id is 0") {
 		// Assumed in some parts of the code
 		CHECK( idni::tau_lang::untyped_type_id<node_t>() == 0 );
 	}
@@ -26,13 +32,12 @@ TEST_SUITE("unify") {
 
 	bool match(const type_t& type1, const type_t& type2, const type_t& result) {
 		auto merged = unify<node_t>(type1, type2);
-		if (merged == nat_type_id<node_t>()) return false;
 		return result == merged.value();
 	}
 
 	bool nomatch(const type_t& type1, const type_t& type2) {
 		auto merged = unify<node_t>(type1, type2);
-		return merged == nat_type_id<node_t>();
+		return !merged;
 	}
 
 	TEST_CASE("untyped with untyped") {
@@ -44,11 +49,11 @@ TEST_SUITE("unify") {
 		CHECK(match(1, 0, 1));
 	}
 
-	TEST_CASE("same types all possible subtypes") {
-		CHECK(match(1, 1, 1));
+	TEST_CASE("same types") {
+		CHECK(match(2, 2, 2));
 	}
 
 	TEST_CASE("different types") {
-		CHECK(nomatch(1, 2));
+		CHECK(nomatch(2, 3));
 	}
 }
