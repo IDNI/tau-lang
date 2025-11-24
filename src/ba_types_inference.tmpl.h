@@ -154,33 +154,6 @@ tref update_symbols(tref n) {
 	return n;
 }
 
-// Typeable trefs predicate
-template<NodeType node>
-auto is_typeable = [](tref t) -> bool {
-	using tau = tree<node>;
-	return is<node, tau::variable>(t)
-		|| is<node, tau::ba_constant>(t)
-		|| is<node, tau::bf_t>(t)
-		|| is<node, tau::bf_f>(t);
-		// || is<node, tau::ref>(t);
-};
-
-template<NodeType node>
-auto untype = [](tref t) -> tref {
-	using tau = tree<node>;
-	if (is<node, tau::bf_t>(t)) {
-		return tau::get(tau::bf_t);
-	} else if (is<node, tau::bf_f>(t)) {
-		return tau::get(tau::bf_f);
-	} else if (is<node, tau::ba_constant>(t)) {
-		auto nn = tau::get(t).value.ba_retype(0);
-		return (tau::get(t).children_size() > 0) ? tau::get(nn, tau::get(t).first()) : tau::get(nn);
-	} else if (is<node, tau::variable>(t)) {
-		return tau::get(tau::variable, {tau::get(t).first()});
-	}
-	return t;
-};
-
 template<NodeType node>
 auto canonize = [](tref t) -> tref {
 	using tau = tree<node>;

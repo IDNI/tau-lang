@@ -523,6 +523,40 @@ bool are_typed(trefs ns) {
 	return true;
 }
 
+template<NodeType node>
+bool is_typeable(tref t) {
+	using tau = tree<node>;
+	return is<node, tau::variable>(t)
+		|| is<node, tau::ba_constant>(t)
+		|| is<node, tau::bf_t>(t)
+		|| is<node, tau::bf_f>(t);
+		// || is<node, tau::ref>(t);
+}
+
+template<NodeType node>
+tref untype(tref t) {
+	using tau = tree<node>;
+	auto nt = tau::get(t).get_type();
+	switch (nt) {
+	case tau::bf_t:
+		return tau::get(tau::bf_t);
+	case tau::bf_f:
+		return tau::get(tau::bf_f);
+	case tau::ba_constant: {
+		if (tau::get(t).children_size() > 0)
+			return tau::get(tau::ba_constant, tau::get(t).first());
+		else
+			return tau::get(tau::get(t).value.ba_retype(0));
+	}
+	case tau::variable:
+		return tau::get(tau::variable, {tau::get(t).first()});
+	case tau::ref:
+		return tau::get(tau::ref, tau::get(t).get_children());
+	default:
+		return t;
+	}
+}
+
 template <NodeType node>
 tref get_type(tref t) {
 	auto type_id = get_type_id<node>(t);

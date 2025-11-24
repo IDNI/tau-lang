@@ -351,6 +351,13 @@ bool is_typed(tref n);
 template <NodeType node>
 bool are_typed(trefs ns);
 
+// Checks if the ref is typeable
+template <NodeType node>
+bool is_typeable(tref n);
+
+template <NodeType node>
+tref untype(tref n);
+
 // Get type of a reference
 template <NodeType node>
 tref get_type(tref t);
