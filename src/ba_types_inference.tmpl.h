@@ -160,7 +160,20 @@ tref update_symbols(tref n) {
 // conflicting type information, we return nullopt.
 template<NodeType node>
 std::optional<size_t> get_type(type_scoped_resolver<node>& resolver, trefs ts, size_t default_type) {
-	return unify<node>(resolver.types_of(ts), default_type);
+	// If trefs is empty we return the default (untyped)
+	if (ts.empty())	return { default_type };
+	std::optional<size_t> result = default_type;
+	for (tref t : ts) {
+		size_t current_type = get_type_id<node>(t);
+		size_t stored_type = resolver.type_of(t);
+		auto type = unify<node>(current_type, stored_type);
+		if (!type) return std::nullopt; // conflicting type info
+		result = unify<node>(result.value(), type.value());
+		// If types are conflicting, return nullopt
+		if (!result) return std::nullopt;
+	}
+	return result;
+	// return unify<node>(resolver.types_of(ts), default_type);
 };
 
 // Typeable trefs predicate
