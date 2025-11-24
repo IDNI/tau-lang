@@ -154,20 +154,6 @@ tref update_symbols(tref n) {
 	return n;
 }
 
-
-// Extract the type and subtype of a vector consisting of typeable trefs.
-// If the vector is empty, we return the default type (untyped). If there is
-// conflicting type information, we return nullopt.
-template<NodeType node>
-std::optional<size_t> get_type(type_scoped_resolver<node>& resolver, trefs ts, size_t default_type) {
-	// TODO (MEDIUM) in general we should return ranges instead of vectors to
-	// optimize the code and avoid unnecessary copies.
-	return unify<node>(
-		resolver.types_of(ts), 
-		get_type_ids<node>(ts),
-		default_type);
-}
-
 // Typeable trefs predicate
 template<NodeType node>
 auto is_typeable = [](tref t) -> bool {
@@ -620,7 +606,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// inside of a offset (ref case).
 				auto typeables = tau::get(n).select_top_until(is_typeable<node>, is_offset);
 				// We infer the common type of all the typeables in the expression
-				auto type = get_type(resolver, typeables, untyped_type_id<node>());
+				auto type = unify<node>(
+					resolver.types_of(typeables),
+					get_type_ids<node>(typeables),
+					untyped_type_id<node>());
 				// If no common type is found, we set error and stop traversal
 				if (!type){
 					LOG_ERROR << "Conflicting type information in rec. relation "
@@ -675,7 +664,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// this case are only (sbf/tau) variables and constants.
 				auto typeables = tau::get(n).select_top(is_typeable<node>);
 				// We infer the common type of all the typeables in the expression
-				auto type = get_type(resolver, typeables, untyped_type_id<node>());
+				auto type = unify<node>(
+					resolver.types_of(typeables),
+					get_type_ids<node>(typeables),
+					untyped_type_id<node>());
 				// If no common type is found, we set error and stop traversal
 				if (!type){
 					LOG_ERROR << "Conflicting type information in bf "
@@ -717,7 +709,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// this case are only (sbf/tau) variables and constants.
 				auto typeables = tau::get(n).select_top(is_typeable<node>);
 				// We infer the common type of all the typeables in the expression
-				auto type = get_type(resolver, typeables, untyped_type_id<node>());
+				auto type = unify<node>(
+					resolver.types_of(typeables),
+					get_type_ids<node>(typeables),
+					untyped_type_id<node>());
 				// If no common type is found, we set error and stop traversal
 				if (!type){
 					LOG_ERROR << "Conflicting type information in bf equation "
