@@ -529,13 +529,15 @@ bool is_typeable(tref t) {
 	return is<node, tau::variable>(t)
 		|| is<node, tau::ba_constant>(t)
 		|| is<node, tau::bf_t>(t)
-		|| is<node, tau::bf_f>(t);
-		// || is<node, tau::ref>(t);
+		|| is<node, tau::bf_f>(t)
+		|| is<node, tau::ref>(t);
 }
 
 template<NodeType node>
 tref untype(tref t) {
 	using tau = tree<node>;
+	using tt = tau::traverser;
+
 	auto nt = tau::get(t).get_type();
 	switch (nt) {
 	case tau::bf_t:
@@ -551,6 +553,12 @@ tref untype(tref t) {
 	case tau::variable:
 		return tau::get(tau::variable, {tau::get(t).first()});
 	case tau::ref:
+		if (auto check = tt(t) | tau::typed; check) {
+			// copy all the children but the last one (the type)
+			auto children = tau::get(t).get_children();
+			trefs n_children(children.begin(), children.end() - 1);
+			return tau::get(tau::ref, n_children);
+		}
 		return tau::get(tau::ref, tau::get(t).get_children());
 	default:
 		return t;
