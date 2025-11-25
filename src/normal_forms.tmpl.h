@@ -1158,14 +1158,7 @@ tref reduce(tref fm) {
 	DBG(LOG_TRACE << "Formula to reduce: " << LOG_FM(fm);)
 	// Terms can only contain bf_neg, bf_and, bf_xor and bf_or
 	if (!is_wff) {
-		auto invalid = [](tref n) {
-			const tau& t = tau::get(n);
-			if (t.is(tau::bf) || t.is(tau::bf_and) || t.is(tau::bf_or)
-				|| t.is(tau::bf_xor) || t.is(tau::bf_neg))
-				return false;
-			return true;
-		};
-		if (tau::get(fm).find_top(invalid))
+		if (tau::get(fm).find_top(is_non_boolean_term<node>))
 			return syntactic_path_simplification<node>::on(fm);
 	}
 	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf);
