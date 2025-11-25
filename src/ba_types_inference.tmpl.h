@@ -951,6 +951,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	auto n_global_scope = resolver.current_kinds();
 	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
 		<< " of: " << LOG_FM(n) << " resulted into: " << LOG_FM_DUMP(new_n);)
+	tau::use_hooks = using_hooks;
 	return std::pair<tref, subtree_map<node, size_t>>{ new_n, n_global_scope };
 }
 
