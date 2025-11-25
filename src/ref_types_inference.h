@@ -44,6 +44,4 @@ struct std::hash<idni::tau_lang::rr_sig> {
 	}
 };
 
-
-
 #endif // __IDNI__TAU__REF_TYPES_INFERENCE_H__

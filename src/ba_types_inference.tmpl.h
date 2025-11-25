@@ -523,6 +523,20 @@ auto bv_defaulting = [](tref n) -> tref {
 	return n;
 };
 
+template <NodeType node>
+auto get_typeable_type_ids = [] (tref n) -> subtree_map<node, size_t> {
+	using tau = tree<node>;
+	subtree_map<node, size_t> typeable_type_ids;
+	auto typeables = tau::get(n).select_top_until(
+		is_typeable<node>,
+		is<node, tau::offset>);
+	for (tref typeable : typeables) {
+		auto canonized = canonize<node>(typeable);
+		typeable_type_ids[canonized] = get_type_id<node>(typeable);
+	}
+	return typeable_type_ids;
+};
+
 // Infers the types of variables and constants in the tree n. It assumes that
 // the types of the scoped variables are known when closing the scope.
 // If a variable or constant remains unassigned, it is assigned to tau.
@@ -546,11 +560,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	subtree_map<node, tref> transformed;
 	bool error = false;
 
-	auto is_offset = [] (tref n) {
-		using tau = tree<node>;
-		return is<node, tau::offset>(n);
-	};
-
 	// We gather info about types and scopes while entering nodes
 	auto on_enter = [&](tref n, tref parent) {
 		DBG(assert(n != nullptr);)
@@ -565,52 +574,60 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			case tau::input_def: case tau::output_def: {
 				// We just add the variables to the current (global) scope.
 			}
-
 			case tau::rec_relation: {
-				// We open a new scope for the relation variables and constants.
-				// We assume all scoped variables and constants are resolved when
-				// closing the scope. Otherwise, we type then to the tau type.
-
-				// We open the new scope
-				resolver.open({});
-				// We get all the typeable top nodes in the expression, which in
-				// this case are only (sbf/tau) variables and constants.
-				// We use the following predicate to avoid vist tyhe variables
-				// inside of a offset (ref case).
-				auto typeables = tau::get(n).select_top_until(is_typeable<node>, is_offset);
-				// We infer the common type of all the typeables in the expression
-				auto type = unify<node>(
-					resolver.types_of(typeables),
-					get_type_ids<node>(typeables),
-					untyped_type_id<node>());
-				// If no common type is found, we set error and stop traversal
-				if (!type){
-					LOG_ERROR << "Conflicting type information in rec. relation "
-						<< LOG_FM(n) << "\n";
-					return error = true, false;
+				// We create a new scope for the relation with all the arguments.
+				auto arguments_type_ids = get_typeable_type_ids<node>(t[0 /*head*/].child(0 /* ref_args */));
+				resolver.open(arguments_type_ids);
+				// If the head is typed or the body is bf_eq, we have a functional
+				// relation and all the typeables must be merged.
+				if (auto return_type = get_type_id<node>(t.child(0)); 
+						return_type != untyped_type_id<node>() 
+						|| is<node, tau::bf>(t.child(1))) {
+					auto typeables_type_ids = get_typeable_type_ids<node>(n);
+					trefs mergeables;
+					// We add all the typeables to the scope with their current type
+					// and merge all of them.
+					for (auto [typeable, type_id] : typeables_type_ids)	{
+						tref canonized = canonize<node>(typeable);
+						resolver.insert(canonized);
+						resolver.assign(canonized, type_id);
+						mergeables.push_back(canonized);
+					}
+					if (!resolver.merge(mergeables)) {
+						LOG_ERROR << "Conflicting type information in rec. relation "
+							<< LOG_FM(n) << "\n";
+						return error = true, false;
+					}
+					break;
 				}
-				DBG(LOG_TRACE << "infer_ba_types/on_enter/rec_relation.../type: "
-					<< ba_types<node>::name(type.value())
-					<< "\n";)
-				// We add the variables and the constants to the current scope
-				// and assign them the common type.
-				trefs mergeables;
-				for (tref typeable : typeables)	{
-					tref canonized = canonize<node>(typeable);
-					resolver.insert(canonized);
-					resolver.assign(canonized, type.value());
-					mergeables.push_back(canonized);
+				// if the body is a wff, we do nothing as we have a predicate relation
+				// that would be treated at wff_ref case or in the bf_eq,... cases.
+				// if the body is a ref, we have a functional or predicate relation
+				// depending on whether the ref is typed or not.
+				if (is<node, tau::ref>(t.child(1))) {
+					auto body_type = get_type_id<node>(t.child(1));
+					if (body_type != untyped_type_id<node>()) {
+						// We have a functional relation
+						auto typeables_type_ids = get_typeable_type_ids<node>(n);
+						trefs mergeables;
+						// We add all the typeables to the scope with their current type
+						// and merge all of them.
+						for (auto [typeable, type_id] : typeables_type_ids)	{
+							tref canonized = canonize<node>(typeable);
+							resolver.insert(canonized);
+							resolver.assign(canonized, type_id);
+							mergeables.push_back(canonized);
+						}
+						if (!resolver.merge(mergeables)) {
+							LOG_ERROR << "Conflicting type information in rec. relation "
+								<< LOG_FM(n) << "\n";
+							return error = true, false;
+						}
+						break;
+					}
+					// Otherwise, we have a predicate relation and we do nothing.
 				}
-				if (!resolver.merge(mergeables)) {
-					LOG_ERROR << "Conflicting type information in rec. relation "
-						<< LOG_FM(n) << "\n";
-					return error = true, false;
-				}
-				// Anyway, we stop the traversal of children as we have already
-				// processed all the typeables in the expression.
-				DBG(LOG_TRACE << "infer_ba_types/on_enter/rec_relation/resolver:\n";)
-				DBG(LOG_TRACE << resolver.dump_to_str();)
-				break;
+				break;						
 			}
 			case tau::wff_all: case tau::wff_ex: {
 				// We open a new scope, we get all the quantified variables,
@@ -668,6 +685,29 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// processed all the typeables in the expression.
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/bf/resolver:\n";)
 				DBG(LOG_TRACE << resolver.dump_to_str();)
+				break;
+			}
+			case tau::wff_ref: {
+				// For each argument we create a new scope and merge all the
+				// typeables in the argument.
+				auto arguments = t[0].select_top_until(
+					is_typeable<node>,
+					is<node>(tau::offset));
+				for (tref arg : arguments) {
+					auto typeables = tau::get(arg).select_top_until(is_typeable<node>, is<node>(tau::offset));
+					trefs mergeables;
+					for (tref typeable : typeables)	{
+						tref canonized = canonize<node>(typeable);
+						resolver.insert(canonized);
+						resolver.assign(canonized, get_type_id<node>(typeable));
+						mergeables.push_back(canonized);
+					}
+					if (!resolver.merge(mergeables)) {
+						LOG_ERROR << "Conflicting type information in wff ref "
+							<< LOG_FM(n) << "\n";
+						return error = true, false;
+					}
+				}
 				break;
 			}
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
@@ -759,7 +799,20 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 		size_t nt = t.get_type();
 		// Depoending on the node type...
 		switch (nt) {
-			case tau::wff_all: case tau::wff_ex: case tau::rec_relation: {
+			case tau::input_def: case tau::output_def: {
+				// Resolve everything in the rec relation and close the scope
+				return;
+			}
+			case tau::wff_ref: {
+				// Resolve everything in the rec relation and close the scope
+				return;
+			}
+			case tau::rec_relation: {
+				// Resolve everything in the rec relation and close the scope
+				// Adjust wrapping around refs accordingly (if needed)
+				return;
+			}
+			case tau::wff_all: case tau::wff_ex: {
 				tref new_n = update_default<node>(n, transformed);
 				auto scoped_var_types = get_scoped_elements<node>(resolver, tau::variable);
 				if(auto updated = update_variables<node>(resolver, new_n, scoped_var_types); updated != new_n) {
