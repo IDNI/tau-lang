@@ -183,7 +183,9 @@ inline auto is_bf_bdd_var = [](tref n) {
 	return t.child_is(tau::variable)
 		|| t.child_is(tau::capture)
 		|| t.child_is(tau::bf_ref)
-		|| t.child_is(tau::ba_constant);
+		|| t.child_is(tau::ba_constant)
+		|| t.child_is(tau::bf_fall)
+		|| t.child_is(tau::bf_fex);
 };
 // ------------------------------
 

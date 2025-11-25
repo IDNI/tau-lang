@@ -1158,14 +1158,7 @@ tref reduce(tref fm) {
 	DBG(LOG_TRACE << "Formula to reduce: " << LOG_FM(fm);)
 	// Terms can only contain bf_neg, bf_and, bf_xor and bf_or
 	if (!is_wff) {
-		auto invalid = [](tref n) {
-			const tau& t = tau::get(n);
-			if (t.is(tau::bf) || t.is(tau::bf_and) || t.is(tau::bf_or)
-				|| t.is(tau::bf_xor) || t.is(tau::bf_neg))
-				return false;
-			return true;
-		};
-		if (tau::get(fm).find_top(invalid))
+		if (tau::get(fm).find_top(is_non_boolean_term<node>))
 			return syntactic_path_simplification<node>::on(fm);
 	}
 	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf);
@@ -3385,13 +3378,14 @@ tref term_boole_normal_form(tref formula) {
 	tref tbnf = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	auto simp_eqs = [](tref n) {
-		if (tau::get(n).child_is(tau::bf_eq)) {
+		if (is_atomic_fm<node>(n) && is_bv_type_family<node>(find_ba_type<node>(n))) {
+			return simplify_bv<node>(n);
+		} else if (tau::get(n).child_is(tau::bf_eq)) {
 			if (tau::get(n).equals_T() || tau::get(n).equals_F())
 				return n;
 			tref c1 = tau::get(n)[0].first();
 			tref c2 = tau::get(n)[0].second();
 			// Apply Boole decomposition
-			// TODO: different simplification for bitvectors
 			c1 = term_boole_decomposition<node>(c1);
 			c2 = term_boole_decomposition<node>(c2);
 			return tau::build_bf_eq(c1, c2);
@@ -3401,7 +3395,6 @@ tref term_boole_normal_form(tref formula) {
 			tref c1 = tau::get(n)[0].first();
 			tref c2 = tau::get(n)[0].second();
 			// Apply Boole decomposition
-			// TODO: different simplification for bitvectors
 			c1 = term_boole_decomposition<node>(c1);
 			c2 = term_boole_decomposition<node>(c2);
 			return tau::build_bf_neq(c1, c2);

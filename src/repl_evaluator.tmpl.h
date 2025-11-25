@@ -116,6 +116,9 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 			build_spec<node>(nso_rr), global_scope); infr)
 		{
 			global_scope = n_global_scope;
+			tt mains_child = tt(infr) | tau::main | tt::first;
+			if (mains_child.is(tau::bf))
+				return rr<node>(tau::geth(mains_child | tt::ref));
 			if (auto infr_rr = get_nso_rr<node>(ctx, infr, true);
 				infr_rr) return infr_rr.value();
 			else return {};
@@ -1221,7 +1224,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "the substitute command substitutes a Tau expression in a Tau expression by another Tau expression\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  substitute <input> [ <match> / <replace>]\n"
+		<< "  substitute <input> '[' <match> / <replace> ']'\n"
 		<< "\n"
 		<< "where:\n"
 		<< "  <input> is the Tau expression in which to replace\n"
@@ -1236,7 +1239,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "the instantiate command instantiates a variable in a Tau formula with the specified term\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  instantiate <input> [ <variable> / <value>]\n"
+		<< "  instantiate <input> '[' <variable> / <value> ']'\n"
 		<< "\n"
 		<< "where:\n"
 		<< "  <input> is the Tau term to instantiate in\n"
