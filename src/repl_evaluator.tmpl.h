@@ -118,6 +118,9 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 			build_spec<node>(ref_infr.value()), global_scope); infr)
 		{
 			global_scope = n_global_scope;
+			tt mains_child = tt(infr) | tau::main | tt::first;
+			if (mains_child.is(tau::bf))
+				return rr<node>(tau::geth(mains_child | tt::ref));
 			if (auto infr_rr = get_nso_rr<node>(ctx, infr, true);
 				infr_rr) return infr_rr.value();
 			else return {};
