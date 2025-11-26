@@ -371,7 +371,7 @@ auto get_scoped_elements = [](type_scoped_resolver<node>& resolver, size_t eleme
 	return elements;
 };
 
-/*template<NodeType node>
+template<NodeType node>
 tref update_refs(type_scoped_resolver<node>& resolver, tref n, const std::map<tref, size_t, subtree_less<node>>& types) {
 	using tau = tree<node>;
 	subtree_map<node, tref> changes;
@@ -431,7 +431,7 @@ tref update_refs(type_scoped_resolver<node>& resolver, tref n, const std::map<tr
 		return changes[n];
 	}
 	return n;
-};*/
+};
 
 template<NodeType node>
 tref update_variables(type_scoped_resolver<node>& resolver, tref n, const std::map<tref, size_t, subtree_less<node>>& types) {
@@ -537,6 +537,30 @@ auto get_typeable_type_ids = [] (tref n) -> subtree_map<node, size_t> {
 	return typeable_type_ids;
 };
 
+template<NodeType node>
+auto is_functional_relation = [] (tref n) -> bool {
+	using tau = tree<node>;
+	auto t = tau::get(n);
+	// If the head is we have a functional relation.
+	if (auto return_type = get_type_id<node>(t.child(0)); 
+			return_type != untyped_type_id<node>() ) {
+		return true;
+	}
+	// if the body is a typed ref, we have a functional relation.
+	if (is<node, tau::ref>(t.child(1))) {
+		auto body_type = get_type_id<node>(t.child(1));
+		if (body_type != untyped_type_id<node>()) {
+			return true;
+		}
+	}
+	// If the body is a bf, we have a functional relation.
+	if (is<node, tau::bf>(t.child(1))) {
+		return true;
+	}
+	// Otherwise, we have a predicate relation.
+	return false;
+};
+
 // Infers the types of variables and constants in the tree n. It assumes that
 // the types of the scoped variables are known when closing the scope.
 // If a variable or constant remains unassigned, it is assigned to tau.
@@ -580,9 +604,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				resolver.open(arguments_type_ids);
 				// If the head is typed or the body is bf_eq, we have a functional
 				// relation and all the typeables must be merged.
-				if (auto return_type = get_type_id<node>(t.child(0)); 
-						return_type != untyped_type_id<node>() 
-						|| is<node, tau::bf>(t.child(1))) {
+				if (is_functional_relation<node>(n)) {
 					auto typeables_type_ids = get_typeable_type_ids<node>(n);
 					trefs mergeables;
 					// We add all the typeables to the scope with their current type
@@ -598,36 +620,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 							<< LOG_FM(n) << "\n";
 						return error = true, false;
 					}
-					break;
 				}
-				// if the body is a wff, we do nothing as we have a predicate relation
-				// that would be treated at wff_ref case or in the bf_eq,... cases.
-				// if the body is a ref, we have a functional or predicate relation
-				// depending on whether the ref is typed or not.
-				if (is<node, tau::ref>(t.child(1))) {
-					auto body_type = get_type_id<node>(t.child(1));
-					if (body_type != untyped_type_id<node>()) {
-						// We have a functional relation
-						auto typeables_type_ids = get_typeable_type_ids<node>(n);
-						trefs mergeables;
-						// We add all the typeables to the scope with their current type
-						// and merge all of them.
-						for (auto [typeable, type_id] : typeables_type_ids)	{
-							tref canonized = canonize<node>(typeable);
-							resolver.insert(canonized);
-							resolver.assign(canonized, type_id);
-							mergeables.push_back(canonized);
-						}
-						if (!resolver.merge(mergeables)) {
-							LOG_ERROR << "Conflicting type information in rec. relation "
-								<< LOG_FM(n) << "\n";
-							return error = true, false;
-						}
-						break;
-					}
-					// Otherwise, we have a predicate relation and we do nothing.
-				}
-				break;						
+				// Otherwise, the body is a wff or an untyped ref and hence, we
+				// have a predicate relation and we do nothing as that would be 
+				// treated at wff_ref case or in the bf_eq,... cases.
+				break;
 			}
 			case tau::wff_all: case tau::wff_ex: {
 				// We open a new scope, we get all the quantified variables,
@@ -805,12 +802,115 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			}
 			case tau::wff_ref: {
 				// Resolve everything in the rec relation and close the scope
+				auto scoped_ba_ctes_types = get_scoped_elements<node>(resolver, tau::ba_constant);
+				auto updated_ba_ctes = parse_ba_constants<node>(n, scoped_ba_ctes_types);
+				if(updated_ba_ctes == nullptr) { error = true; return; }
+				if(updated_ba_ctes != n) {
+					DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_ba_ctes);)
+					transformed.insert_or_assign(n, updated_ba_ctes);
+				}
+				auto scoped_bf_t_types = get_scoped_elements<node>(resolver, tau::bf_t);
+				auto updated_bf_t_ctes = update_bf_ctes<node>(resolver, updated_ba_ctes, scoped_bf_t_types);
+				if(updated_bf_t_ctes == nullptr) { error = true; return; }
+				if(updated_bf_t_ctes != updated_ba_ctes) {
+					DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_t_ctes);)
+					transformed.insert_or_assign(n, updated_bf_t_ctes);
+				}
+				auto scoped_bf_f_types = get_scoped_elements<node>(resolver, tau::bf_f);
+				auto updated_bf_f_ctes = update_bf_ctes<node>(resolver, updated_bf_t_ctes, scoped_bf_f_types);
+				if(updated_bf_f_ctes == nullptr) { error = true; return; }
+				if(updated_bf_f_ctes != updated_bf_t_ctes) {
+					DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_f_ctes);)
+					transformed.insert_or_assign(n, updated_bf_f_ctes);
+				}
+				auto scoped_ref_types = get_scoped_elements<node>(resolver, tau::ref);
+				auto updated_refs = update_refs<node>(resolver, updated_bf_f_ctes, scoped_ref_types);
+				if(updated_refs == nullptr) { error = true; return; }
+				if(updated_refs != updated_bf_f_ctes) {
+					DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_refs);)
+					transformed.insert_or_assign(n, updated_refs);
+				}
+				// TODO (HIGH) type the ref as bool
+				DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../resolver:\n";)
+				DBG(LOG_TRACE << resolver.dump_to_str();)
 				return;
 			}
 			case tau::rec_relation: {
 				// Resolve everything in the rec relation and close the scope
 				// Adjust wrapping around refs accordingly (if needed)
+				if (!is_functional_relation<node>(n)) {
+					// We have a predicate relation, so we need to adjust the
+					// wrapping around refs in the body and the head accordingly.
+					// The rest is treated as wff_ref or bf_eq,... cases.
+					auto new_head = tau::get(tau::wff,
+						tau::get(tau::wff_ref,
+							tau::get(t[0].value.ba_retype(bool_type_id<node>()), t[0].get_children())));
+					tref new_body = is<node, tau::ref>(t.child(1))
+						? tau::get(tau::wff,
+							tau::get(tau::wff_ref,
+								tau::get(t[1].value.ba_retype(bool_type_id<node>()), t[1].get_children())))
+						: t.child(1);
+					auto new_n = tau::get(tau::rec_relation, {new_head, new_body});
+					DBG(LOG_TRACE << "infer_ba_types/on_leave/rec_relation/predicate/n -> new_n:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+					transformed.insert_or_assign(n, new_n);
+					return;
+				}	
+				// Otherwise, we have a functional relation and we need to 
+				// resolve everything in the head and the body. We also need to
+				// adjust the wrapping around refs in the body and the head
+				// accordingly.
+				auto scoped_ba_ctes_types = get_scoped_elements<node>(resolver, tau::ba_constant);
+				auto updated_ba_ctes = parse_ba_constants<node>(n, scoped_ba_ctes_types);
+				if(updated_ba_ctes == nullptr) { error = true; return; }
+				if(updated_ba_ctes != n) {
+					DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_ba_ctes);)
+					transformed.insert_or_assign(n, updated_ba_ctes);
+				}
+				auto scoped_bf_t_types = get_scoped_elements<node>(resolver, tau::bf_t);
+				auto updated_bf_t_ctes = update_bf_ctes<node>(resolver, updated_ba_ctes, scoped_bf_t_types);
+				if(updated_bf_t_ctes == nullptr) { error = true; return; }
+				if(updated_bf_t_ctes != updated_ba_ctes) {
+					DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_t_ctes);)
+					transformed.insert_or_assign(n, updated_bf_t_ctes);
+				}
+				auto scoped_bf_f_types = get_scoped_elements<node>(resolver, tau::bf_f);
+				auto updated_bf_f_ctes = update_bf_ctes<node>(resolver, updated_bf_t_ctes, scoped_bf_f_types);
+				if(updated_bf_f_ctes == nullptr) { error = true; return; }
+				if(updated_bf_f_ctes != updated_bf_t_ctes) {
+					DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_bf_f_ctes);)
+					transformed.insert_or_assign(n, updated_bf_f_ctes);
+				}
+				auto scoped_ref_types = get_scoped_elements<node>(resolver, tau::ref);
+				auto updated_refs = update_refs<node>(resolver, updated_bf_f_ctes, scoped_ref_types);
+				if(updated_refs == nullptr) { error = true; return; }
+				if(updated_refs != updated_bf_f_ctes) {
+					DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../n -> updated:\n"
+						<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(updated_refs);)
+					transformed.insert_or_assign(n, updated_refs);
+				}
+				auto type = tau::get(updated_refs)[0].get_ba_type();
+				auto new_head = tau::get_typed(tau::bf, 
+					tau::get_typed(tau::bf_ref, tau::get(updated_refs).child(0), type), type);
+				auto new_body = is<node, tau::ref>(t.child(1))
+					? tau::get_typed(tau::bf, tau::get_typed(tau::bf_ref, tau::get(updated_refs).child(1), type), type)
+					: t.child(1);
+				auto new_n = tau::get(tau::rec_relation, {new_head, new_body});
+				DBG(LOG_TRACE << "infer_ba_types/on_leave/rec_relation/functional/n -> new_n:\n"
+					<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
+				transformed.insert_or_assign(n, new_n);
+				resolver.close();
+				DBG(LOG_TRACE << "infer_ba_types/on_leave/bf_eq.../resolver:\n";)
+				DBG(LOG_TRACE << resolver.dump_to_str();)
 				return;
+
 			}
 			case tau::wff_all: case tau::wff_ex: {
 				tref new_n = update_default<node>(n, transformed);
