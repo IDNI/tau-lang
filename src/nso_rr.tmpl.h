@@ -95,17 +95,20 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 		if (t.is(tau::ref_arg) && t[0][0].is(tau::variable)) {
 			// If we collect head variables, save it
 			if (collecting) head_vars.insert(tau::trim(n));
-			return tau::get(tau::ref_arg, tau::get(tau::bf,
-					tau::get(node(tau::capture,
-							t[0][0][0].data()))));
+			auto type = t[0][0].get_ba_type();
+			return tau::get_typed(tau::ref_arg, 
+				tau::get_typed(tau::bf,
+					tau::get(node(tau::capture,	t[0][0][0].data()))
+				, type)
+			, type);
 		}
 		if (t.is(tau::bf) && t[0].is(tau::variable)) {
 			// If we do not collect head variables, check if the
 			// current variable is contained in the head of the rule
 			if (!collecting && !head_vars.contains(n)) return n;
-			return tau::get(tau::bf,
-				tau::get(node(tau::capture,
-						t[0][0].data())));
+			auto type = t[0][0].get_ba_type();
+			return tau::get_typed(tau::bf,
+				tau::get(node(tau::capture,	t[0][0].data())), type);
 		}
 		return n;
 	};

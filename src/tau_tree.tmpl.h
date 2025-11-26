@@ -280,7 +280,7 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 	// Do not propagate bool type as it is reserved for predicate definitions
 	// TODO Instead of comparing to 4, do bool_type_id<node>() ->
 	// currently inf loop due to bool_type<node>() using this get method
-	if (v.nt != wff && v.ba_type != 4) {
+	if (v.nt != wff && v.ba_type != 4 && v.nt != ref_args) {
 		size_t ba_type = get_type(v, ch, len);
 		return base_t::get(v.ba_retype(ba_type), ch, len, r);
 	}
