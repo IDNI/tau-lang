@@ -545,7 +545,7 @@ the new operators meaning is given in the following table:
 | `+`               | modular addition of bitvectors                         |
 | `-`               | modular subtraction of bitvectors                      |
 | `!&`              | bitwise nand of bitvectors                             |
-| `!|`              | bitwise nor of bitvectors                              |
+| `!\|`             | bitwise nor of bitvectors                              |
 | `!^`              | bitwise xnor of bitvectors                             |
 | `<<`              | left shift of bitvector by a number of bits            |
 | `>>`              | right shift of bitvector by a number of bits           |
