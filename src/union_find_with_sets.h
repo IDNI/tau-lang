@@ -47,22 +47,25 @@ public:
 	}
 
 	// Union the two sets containing x and y
-	void merge(tref x, tref y) {
+	tref merge(tref x, tref y) {
 		tref root_x = find(x);
 		tref root_y = find(y);
 		// sets are already equal
-		if (tau::get(root_x) == tau::get(root_y)) return;
+		if (tau::get(root_x) == tau::get(root_y)) return root_x;
 
+		tref new_root = nullptr;
 		if (_comp(root_x, root_y)) {
 			// root_x becomes new root
 			parent[root_y] = root_x;
+			new_root = root_x;
 		}
 		else if (_comp(root_y, root_x)) {
 			// root_y becomes the new root
 			parent[root_x] = root_y;
+			new_root = root_y;
 		}
 		// We do not merge equal comparing elements
-		else return;
+		else return root_x;
 
 		// Update linking
 		auto next_y = next.find(root_y);
@@ -70,6 +73,7 @@ public:
 		tref tmp = next_x->second;
 		next_x->second = next_y->second;
 		next_y->second = tmp;
+		return new_root;
 	}
 
 	// Check if two elements are in the same set
@@ -88,6 +92,11 @@ public:
 			current = next.find(current)->second;
 		}
 		return component;
+	}
+
+	void merge(union_find_with_sets& other) {
+		for (auto [v, p] : other.parent)
+			merge(v, p);
 	}
 
 	void clear () {

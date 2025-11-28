@@ -62,7 +62,7 @@ bool is_run_satisfiable(tref fm);
 
 // Assumption is that the provided fm is an unbound continuation
 template <NodeType node>
-tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars);
+tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, int_t start_time);
 
 template <NodeType node>
 std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,

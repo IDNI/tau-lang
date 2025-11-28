@@ -336,11 +336,11 @@ bool is_run_satisfiable(tref fm) {
 
 // Assumption is that the provided fm is an unbound continuation
 template <NodeType node>
-tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
+tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_t start_time) {
 	using tau = tree<node>;
 	// Substitute lookback as current time point
 	int_t look_back = get_max_shift<node>(io_vars);
-	tref uconst_ctns = fm_at_time_point<node>(fm, io_vars, look_back);
+	tref uconst_ctns = fm_at_time_point<node>(fm, io_vars, look_back + start_time);
 	io_vars = tau::get(uconst_ctns).select_top(is_child<node, tau::io_var>);
 
 	// All io_vars in fm have to refer to constant time positions

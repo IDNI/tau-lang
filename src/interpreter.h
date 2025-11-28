@@ -83,7 +83,7 @@ struct interpreter {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	interpreter(tref ubt_ctn, tref original_spec,
+	interpreter(trefs& ubt_ctn, auto& original_spec, auto& output_partition,
 		assignment<node>& memory, in_t& input, out_t& output,
 		const spec_context<node>& ctx);
 
@@ -96,8 +96,9 @@ struct interpreter {
 	// Update the interpreter with a given update
 	void update(tref update);
 
-	tref ubt_ctn;
-	tref original_spec;
+	trefs ubt_ctn;
+	// Partition of spec each with representative for set of output streams
+	std::vector<std::pair<tref, tref>> original_spec;
 	assignment<node> memory;
 	size_t time_point = 0;
 	in_t inputs;
@@ -105,13 +106,20 @@ struct interpreter {
 	const spec_context<node>& ctx = {};
 
 private:
-	tref step_spec;
+	static bool stream_comp(tref s1, tref s2) {
+		return tau::subtree_less(s1, s2);
+	};
+	union_find_with_sets<decltype(stream_comp), node> output_partition;
+	trefs step_spec;
 	bool final_system = false;
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
 
-	tref get_ubt_ctn_at(int_t t);
+	static std::vector<std::pair<tref, tref>>
+	create_spec_partition(tref spec, auto& output_partition);
+
+	trefs get_ubt_ctn_at(int_t t);
 
 	bool calculate_initial_spec();
 
@@ -125,8 +133,7 @@ private:
 	void compute_lookback_and_initial();
 
 	// Find an executable specification from DNF
-	static std::pair<tref, tref> get_executable_spec(tref fm,
-						const size_t start_time = 0);
+	static tref get_executable_spec(tref& clause, const size_t start_time = 0);
 
 	// Pointwise revision algorithm for producing updated specification
 	// Both spec and update need to be normalized
@@ -140,6 +147,9 @@ private:
 
 	// Return those variables that appear within the lookback
 	trefs appear_within_lookback(const trefs& vars);
+
+	// Utility to squeeze always statements without timepoint adjustment
+	static tref squeeze_always(tref cnf_expression);
 };
 
 template <NodeType node>
@@ -151,7 +161,15 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 		const size_t steps = 0);
 
 template <NodeType node>
+bool collect_input_streams(tref dnf, typed_io_vars& current_inputs,
+	const spec_context<node>& ctx);
+
+template <NodeType node>
 typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx);
+
+template <NodeType node>
+bool collect_output_streams(tref dnf, typed_io_vars& current_inputs,
+	const spec_context<node>& ctx);
 
 template <NodeType node>
 typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx);

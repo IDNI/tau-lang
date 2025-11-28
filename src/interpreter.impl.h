@@ -380,12 +380,13 @@ void foutputs<node>::rebuild(const typed_io_vars& outputs) {
 
 template <NodeType node, typename in_t, typename out_t>
 interpreter<node, in_t, out_t>::interpreter(
-	tref ubt_ctn, tref original_spec, assignment<node>& memory,
-	in_t& input, out_t& output, const spec_context<node>& ctx)
-	: ubt_ctn(ubt_ctn), original_spec(original_spec), memory(memory),
-		inputs(std::move(input)), outputs(std::move(output)),
-			ctx(ctx)
-{
+	trefs& ubt_ctn, auto& original_spec, auto& output_partition,
+	assignment<node>& memory, in_t& input, out_t& output,
+	const spec_context<node>& ctx)
+	: ubt_ctn(std::move(ubt_ctn)), original_spec(std::move(original_spec)),
+		memory(std::move(memory)), inputs(std::move(input)),
+		outputs(std::move(output)), ctx(ctx),
+		output_partition(std::move(output_partition)) {
 	compute_lookback_and_initial();
 }
 
@@ -397,14 +398,92 @@ std::optional<interpreter<node, in_t, out_t>>
 {
 	// Find a satisfiable unbound continuation from spec
 	spec = normalizer<node>(spec);
-	auto [ubd_ctn, clause] = get_executable_spec(spec);
-	if (ubd_ctn == nullptr) {
-		LOG_ERROR << "Tau specification is unsat\n";
-		return {};
+	// For each spec clause, we check if it is executable
+	for (tref clause : expression_paths<node>(spec)) {
+		union_find_with_sets<decltype(stream_comp), node> output_partition(stream_comp);
+		auto spec_partition = create_spec_partition(clause, output_partition);
+		trefs ubt_ctn;
+		bool executable = true;
+		for (auto& [spec_part, out_rep] : spec_partition) {
+			auto ubd_ctn_part = get_executable_spec(spec_part);
+			if (ubd_ctn_part == nullptr) {
+				// Need to try next clause
+				executable = false; break;
+			}
+			ubt_ctn.push_back(ubd_ctn_part);
+		}
+		if (!executable) continue;
+		// All parts of spec are realizable
+		assignment<node> memory;
+		return interpreter{ ubt_ctn, spec_partition, output_partition,
+			memory, inputs, outputs, ctx };
 	}
-	//after the above, we have the interpreter ready to be used.
-	assignment<node> memory;
-	return interpreter{ ubd_ctn, clause, memory, inputs, outputs, ctx };
+	// Given specification is not realizable
+	LOG_ERROR << "Tau specification is unsat\n";
+	return {};
+}
+
+template<NodeType node, typename in_t, typename out_t>
+std::vector<std::pair<tref, tref>>
+interpreter<node, in_t, out_t>::create_spec_partition(tref spec, auto& output_partition) {
+	// Get CNF clauses of DNF clause
+	trefs clauses = get_cnf_wff_clauses<node>(spec);
+	// Split each always statement into conjuncts again
+	for (tref& c : clauses) {
+		if (tau::get(c).child_is(tau::wff_always)) {
+			trefs aw_clauses = get_cnf_wff_clauses<node>(tau::trim2(c));
+			DBG(assert(!aw_clauses.empty()));
+			c = tau::build_wff_always(aw_clauses[0]);
+			for (size_t i = 1; i < aw_clauses.size(); ++i) {
+				clauses.push_back(
+					tau::build_wff_always(aw_clauses[i]));
+			}
+		}
+	}
+	// Compute sets of output streams
+	std::vector<std::pair<tref, tref>> partition;
+	for (tref c : clauses) {
+		// Get output streams and uninterpreted constants
+		trefs ostreams;
+		auto f = [&ostreams](tref n) {
+			if (tau::get(n).is(tau::io_var) && is_output_var<node>(n)) {
+				ostreams.push_back(tau::trim(n));
+				return false;
+			} else if (tau::get(n).is(tau::uconst)) {
+				ostreams.push_back(n);
+				return false;
+			}
+			return true;
+		};
+		pre_order<node>(c).visit_unique(f);
+		// Save collection of output streams into union find
+		if (!ostreams.empty()) output_partition.insert(ostreams.front());
+		for (size_t i = 1; i < ostreams.size(); ++i) {
+			output_partition.merge(ostreams[i-1], ostreams[i]);
+		}
+		if (!ostreams.empty())
+			partition.emplace_back(c, output_partition.find(ostreams.front()));
+		else partition.emplace_back(c, nullptr);
+	}
+	for (size_t i = 0; i < partition.size(); ++i) {
+		// If no output/uninterpreted constants are present, skip
+		if (!partition[i].second) continue;
+		for (size_t j = i+1; j < partition.size(); ++j) {
+			// If no output/uninterpreted constants are present, skip
+			if (!partition[j].second) continue;
+			// Check overlap between output streams of clauses
+			if (output_partition.connected(partition[i].second, partition[j].second)) {
+				// If there is an overlap, conjunct the spec parts
+				partition[i].first = tau::build_wff_and(
+					partition[i].first, partition[j].first);
+				partition.erase(partition.begin()+j);
+				--j;
+			}
+		}
+		// Squeeze always statements again
+		partition[i].first = squeeze_always(partition[i].first);
+	}
+	return partition;
 }
 
 template <NodeType node, typename in_t, typename out_t>
@@ -440,150 +519,158 @@ std::pair<std::optional<assignment<node>>, bool>
 			"this", time_point, get_ba_type_id<node>(tau_type<node>()));
 		tref wrapped_spec = build_bf_ba_constant<node>(
 			node::nso_factory::pack_tau_ba(
-				original_spec), get_ba_type_id<node>(tau_type<node>()));
+				tau::build_wff_and(original_spec | std::views::keys)),
+				get_ba_type_id<node>(tau_type<node>()));
 		memory[current_this_stream] = wrapped_spec;
 	}
 
-	// Try to solve a path/disjunct of the current step specification
-	for (tref path : expression_paths<node>(this->step_spec)) {
-		// rewriting the inputs and inserting them into memory
-		tref updated = update_to_time_point(path, formula_time_point);
-		// TODO: Check why constant time positions are not being replaced
-		tref current = rewriter::replace<node>(updated, memory);
-		// Simplify after updating stream variables
-		// TODO: Maybe replace by syntactic simp?
-		current = normalize_non_temp<node>(current);
+	solution<node> global;
+	for (tref spec_part : step_spec) {
+		// Try to solve a path/disjunct of the current step specification part
+		bool solved = false;
+		for (tref path : expression_paths<node>(spec_part)) {
+			// rewriting the inputs and inserting them into memory
+			tref updated = update_to_time_point(path, formula_time_point);
+			// TODO: Check why constant time positions are not being replaced
+			tref current = rewriter::replace<node>(updated, memory);
+			// Simplify after updating stream variables
+			// TODO: Maybe replace by syntactic simp?
+			current = normalize_non_temp<node>(current);
 #ifdef DEBUG
-		LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
-			<< "step/updated: " << LOG_FM(updated) << "\n"
-			<< "step/current: " << LOG_FM(current) << "\n"
-			<< "step/memory: ";
-		for (const auto& [k, v]: memory)
-			LOG_TRACE << "\t" << k << " := " << v << " ";
+			LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
+				<< "step/updated: " << LOG_FM(updated) << "\n"
+				<< "step/current: " << LOG_FM(current) << "\n"
+				<< "step/memory: ";
+			for (const auto& [k, v]: memory)
+				LOG_TRACE << "\t" << k << " := " << v << " ";
 #endif // DEBUG
-		auto path_solution = solution_with_max_update(current);
+			auto path_solution = solution_with_max_update(current);
 #ifdef DEBUG
-		if (path_solution) {
-			LOG_TRACE << "step/solution: ";
-			if (path_solution.value().empty())
-				LOG_TRACE << "\t{}";
-			else for (const auto& [k, v]: path_solution.value()) {
-				LOG_TRACE << "\t" << TAU_TO_STR(k) << " := "
-							<< TAU_TO_STR(v) << " ";
-				LOG_TRACE << LOG_FM_TREE(k) << "\n";
-				LOG_TRACE << LOG_FM_TREE(v) << "\n";
-			}
-			auto substituted = rewriter::replace<node>(
-					current, path_solution.value());
-			auto check = normalize_non_temp<node>(substituted);
-			LOG_TRACE << "step/check: " << check << "\n";
-		} else {
-			LOG_TRACE << "step/solution: no solution\n";
-		}
-#endif // DEBUG
-		// if (solution) {
-		// 	// It can happen that variables are assigned
-		// 	// to variables -> those need to be replaced
-		// 	resolve_solution_dependencies(solution.value());
-		// }
-		if (path_solution) {
-			solution<node> global;
-			for (const auto& [var, value]: path_solution.value()) {
-				// Check if we are dealing with a stream variable
-				if (tt(var) | tau::variable | tau::io_var) {
-					DBG(LOG_TRACE << LOG_FM_TREE(value));
-					assert(tau::get(value).is(tau::bf));
-					if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
-						// std::cout << "time_point: " << time_point << "\n";
-						// std::cout << "var: " << var << "\n";
-						memory.emplace(var, value);
-						// Exclude temporary streams in solution
-						if (!is_excluded_output(tau::trim(var)))
-							global.emplace(var, value);
-					}
-				} else {
-					memory.emplace(var, value);
-					global.emplace(var, value);
+			if (path_solution) {
+				LOG_TRACE << "step/solution: ";
+				if (path_solution.value().empty())
+					LOG_TRACE << "\t{}";
+				else for (const auto& [k, v]: path_solution.value()) {
+					LOG_TRACE << "\t" << TAU_TO_STR(k) << " := "
+								<< TAU_TO_STR(v) << " ";
+					LOG_TRACE << LOG_FM_TREE(k) << "\n";
+					LOG_TRACE << LOG_FM_TREE(v) << "\n";
 				}
-			}
-			// Complete outputs using time_point and current solution
-			for (const auto& [o, _] : outputs.streams) {
-				const size_t ctype = outputs.type_of(o);
-				bool is_bv = is_bv_type_family<node>(ctype);
-				tref ot = build_out_var_at_n<node>(o, time_point, ctype);
-				if (auto it = global.find(ot); it == global.end()) {
-					if (is_bv) {
-						auto zero_bitvector = make_bitvector_zero(
-							get_bv_size<node>(get_ba_type_tree<node>(ctype)));
-						auto zero_term = tau::get(tau::bf, {
-							tau::get_ba_constant(zero_bitvector, ctype)});
-						memory.emplace(ot, zero_term);
-						global.emplace(ot, zero_term);
-					} else {
-						memory.emplace(ot, tau::_0(ctype));
-						global.emplace(ot, tau::_0(ctype));
-					}
-				}
-			}
-			if (global.empty())
-				LOG_INFO << "currently no output is specified";
-			// update time_point and formula_time_point
-			if (time_point < formula_time_point) {
-				// auto continue until lookback
-				auto_continue = true;
-				++time_point;
+				auto substituted = rewriter::replace<node>(
+						current, path_solution.value());
+				auto check = normalize_non_temp<node>(substituted);
+				LOG_TRACE << "step/check: " << check << "\n";
 			} else {
-				// auto continue until highest initial position
-				if ((int_t) time_point < highest_initial_pos)
-					auto_continue = true;
-				++time_point;
-				formula_time_point = time_point;
+				LOG_TRACE << "step/solution: no solution\n";
 			}
-			// TODO (HIGH) remove old values from memory
-			return { global, auto_continue };
+#endif // DEBUG
+			if (path_solution) {
+				solved = true;
+				for (const auto& [var, value]: path_solution.value()) {
+					// Check if we are dealing with a stream variable
+					if (tt(var) | tau::variable | tau::io_var) {
+						DBG(LOG_TRACE << LOG_FM_TREE(value));
+						assert(tau::get(value).is(tau::bf));
+						if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
+							// std::cout << "time_point: " << time_point << "\n";
+							// std::cout << "var: " << var << "\n";
+							memory.emplace(var, value);
+							// Exclude temporary streams in solution
+							if (!is_excluded_output(tau::trim(var)))
+								global.emplace(var, value);
+						}
+					} else {
+						memory.emplace(var, value);
+						global.emplace(var, value);
+					}
+				}
+				break;
+			}
+		}
+		if (!solved) {
+			LOG_ERROR << "Internal error: Tau specification is unexpectedly unsat\n";
+			return {};
 		}
 	}
-	LOG_ERROR << "Internal error: Tau specification is unexpectedly unsat\n";
-	return {};
+	// Complete outputs using time_point and current solution
+	for (const auto& [o, _] : outputs.streams) {
+		const size_t ctype = outputs.type_of(o);
+		bool is_bv = is_bv_type_family<node>(ctype);
+		tref ot = build_out_var_at_n<node>(o, time_point, ctype);
+		if (auto it = global.find(ot); it == global.end()) {
+			if (is_bv) {
+				auto zero_bitvector = make_bitvector_zero(
+					get_bv_size<node>(get_ba_type_tree<node>(ctype)));
+				auto zero_term = tau::get(tau::bf, {
+					tau::get_ba_constant(zero_bitvector, ctype)});
+				memory.emplace(ot, zero_term);
+				global.emplace(ot, zero_term);
+			} else {
+				memory.emplace(ot, tau::_0(ctype));
+				global.emplace(ot, tau::_0(ctype));
+			}
+		}
+	}
+	if (global.empty()) LOG_INFO << "currently no output is specified";
+	// update time_point and formula_time_point
+	if (time_point < formula_time_point) {
+		// auto continue until lookback
+		auto_continue = true;
+		++time_point;
+	} else {
+		// auto continue until highest initial position
+		if ((int_t) time_point < highest_initial_pos)
+			auto_continue = true;
+		++time_point;
+		formula_time_point = time_point;
+	}
+	// TODO (HIGH) remove old values from memory
+	return { global, auto_continue };
 }
 
 template <NodeType node, typename in_t, typename out_t>
-tref interpreter<node, in_t, out_t>::get_ubt_ctn_at(int_t t) {
+trefs interpreter<node, in_t, out_t>::get_ubt_ctn_at(int_t t) {
 	LOG_TRACE << "get_ubt_ctn_at begin \n";
 	LOG_TRACE << "get_ubt_ctn_at[t]: " << t << "\n";
 
 	const int_t ut = t < (int_t)formula_time_point
 					? (int_t)formula_time_point : t;
+	trefs upd_ubt_ctn;
 	if (t >= std::max(highest_initial_pos, (int_t)formula_time_point)) {
-		return update_to_time_point(ubt_ctn, ut);
+		for (tref ubt_ctn_part : ubt_ctn)
+			upd_ubt_ctn.push_back(update_to_time_point(ubt_ctn_part, ut));
+		return upd_ubt_ctn;
 	}
 	// Adjust ubt_ctn to time_point by eliminating inputs and outputs
 	// which are greater than current time_point in a time-compatible fashion
-	auto step_ubt_ctn = update_to_time_point(ubt_ctn, ut);
-	auto io_vars = tau::get(step_ubt_ctn).select_top(
-			is_child<node, tau::io_var>);
-	std::sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
-	// All io_vars in fm have to refer to constant time positions
-	assert(std::all_of(io_vars.begin(), io_vars.end(),
-		[](const auto& el) { return is_io_initial<node>(el); }));
-	while (!io_vars.empty()) {
-		tref v = io_vars.back();
-		if (get_io_time_point<node>(v) <= t) {
+	for (tref ubt_ctn_part : ubt_ctn) {
+		auto step_ubt_ctn = update_to_time_point(ubt_ctn_part, ut);
+		auto io_vars = tau::get(step_ubt_ctn).select_top(
+				is_child<node, tau::io_var>);
+		std::sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
+		// All io_vars in fm have to refer to constant time positions
+		assert(std::all_of(io_vars.begin(), io_vars.end(),
+			[](const auto& el) { return is_io_initial<node>(el); }));
+		while (!io_vars.empty()) {
+			tref v = io_vars.back();
+			if (get_io_time_point<node>(v) <= t) {
+				io_vars.pop_back();
+				continue;
+			}
+			if (tau::get(v).is_input_variable())
+				step_ubt_ctn = build_wff_all<node>(v, step_ubt_ctn, false);
+			else step_ubt_ctn = build_wff_ex<node>(v, step_ubt_ctn, false);
 			io_vars.pop_back();
-			continue;
 		}
-		if (tau::get(v).is_input_variable())
-			step_ubt_ctn = build_wff_all<node>(v, step_ubt_ctn, false);
-		else step_ubt_ctn = build_wff_ex<node>(v, step_ubt_ctn, false);
-		io_vars.pop_back();
-	}
-	LOG_TRACE << "get_ubt_ctn_at[step_ubt_ctn]: " << tau::get(step_ubt_ctn) << "\n";
+		LOG_TRACE << "get_ubt_ctn_at[step_ubt_ctn]: " << tau::get(step_ubt_ctn) << "\n";
 
-	// Eliminate added quantifiers
-	auto result = normalize_non_temp<node>(step_ubt_ctn);
-	LOG_TRACE << "get_ubt_ctn_at[result]: " << tau::get(result) << "\n";
+		// Eliminate added quantifiers
+		upd_ubt_ctn.push_back(normalize_non_temp<node>(step_ubt_ctn));
+	}
+	LOG_TRACE << "get_ubt_ctn_at[result]: " <<
+		tau::get(tau::build_wff_and(upd_ubt_ctn)) << "\n";
 	LOG_TRACE << "get_ubt_ctn_at end \n";
-	return result;
+	return upd_ubt_ctn;
 }
 
 template <NodeType node, typename in_t, typename out_t>
@@ -662,73 +749,73 @@ bool interpreter<node, in_t, out_t>::is_memory_access_valid(const auto& io_vars)
 
 template <NodeType node, typename in_t, typename out_t>
 void interpreter<node, in_t, out_t>::compute_lookback_and_initial() {
-	trefs io_vars = tau::get(ubt_ctn).select_top(is_child<node, tau::io_var>);
+	trefs io_vars;
+	for (tref ubt_ctn_part : ubt_ctn) {
+		io_vars.append_range(tau::get(ubt_ctn_part).select_top(
+			is_child<node, tau::io_var>));
+	}
 	lookback = get_max_shift<node>(io_vars);
 	formula_time_point = time_point + lookback;
 	highest_initial_pos = get_max_initial<node>(io_vars);
 }
 
 template <NodeType node, typename in_t, typename out_t>
-std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
-	tref fm, const size_t start_time) {
+tref interpreter<node, in_t, out_t>::get_executable_spec(
+	tref& clause, const size_t start_time) {
 	LOG_TRACE << "get_executable_spec begin\n";
-	for (tref clause : expression_paths<node>(fm)) {
-		DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
-		tref executable = transform_to_execution<node>(clause, start_time, true);
-		DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
-		if (tau::get(executable).equals_F()) continue;
-		// Make sure that no constant time position is smaller than 0
-		trefs io_vars = tau::get(executable).select_top(
-			is_child<node, tau::io_var>);
-		for (tref io_var : io_vars) {
-			if (is_io_initial<node>(io_var)
-				&& get_io_time_point<node>(io_var) < 0)
-			{
-				LOG_ERROR << "Constant time position is smaller than 0\n";
-				return std::make_pair(nullptr, nullptr);
-			}
+
+	DBG(LOG_TRACE << "compute_systems/clause: " << LOG_FM(clause);)
+	tref executable = transform_to_execution<node>(clause, start_time, true);
+	DBG(LOG_TRACE << "compute_systems/executable: " << LOG_FM(executable);)
+	if (tau::get(executable).equals_F()) return nullptr;
+	// Make sure that no constant time position is smaller than 0
+	trefs io_vars = tau::get(executable).select_top(
+		is_child<node, tau::io_var>);
+	for (tref io_var : io_vars) {
+		if (is_io_initial<node>(io_var)
+			&& get_io_time_point<node>(io_var) < 0)
+		{
+			LOG_ERROR << "Constant time position is smaller than 0\n";
+			return nullptr;
 		}
-		// compute model for uninterpreted constants and solve it
-		tref constraints = get_uninterpreted_constants_constraints<node>(
-							executable, io_vars);
-		if (tau::get(constraints).equals_F()) continue;
-		DBG(LOG_TRACE << "compute_systems/constraints: " << constraints;)
-		tref spec = executable;
-		if (!tau::get(constraints).equals_T()) {
-			// setting proper options for the solver
-
-			solver_options options = {
-				.splitter_one = node::nso_factory::splitter_one(
-					tau_type<node>()),
-				.mode = solver_mode::general
-			};
-			bool solve_error = false;
-			auto model = solve<node>(constraints, options, solve_error);
-			if (solve_error) {
-				LOG_ERROR << "Internal error in solver\n";
-				return std::make_pair(nullptr, nullptr);
-			}
-			if (!model) continue;
-
-			LOG_INFO << "Tau specification is executed setting ";
-			for (const auto& [uc, v] : model.value())
-				LOG_INFO << TAU_TO_STR(uc) << " := " << TAU_TO_STR(v);
-
-			spec = rewriter::replace<node>(executable, model.value());
-			LOG_INFO << "Resulting Tau specification: "	<< TAU_TO_STR(spec) << "\n";
-			LOG_TRACE << "get_executable_spec[spec]: " << TAU_TO_STR(spec) << "\n";
-		}
-		LOG_TRACE << "get_executable_spec[spec]: " << spec;
-		LOG_TRACE << "get_executable_spec end\n";
-		return std::make_pair(spec, clause);
 	}
-	LOG_TRACE << "get_executable_spec[result]: {nullptr, nullptr}\n";
+	// compute model for uninterpreted constants and solve it
+	tref constraints = get_uninterpreted_constants_constraints<node>(
+		executable, io_vars, start_time);
+	if (tau::get(constraints).equals_F()) return nullptr;
+	DBG(LOG_TRACE << "compute_systems/constraints: " << constraints;)
+	if (!tau::get(constraints).equals_T()) {
+		// setting proper options for the solver
+		solver_options options = {
+			.splitter_one = node::nso_factory::splitter_one(
+				tau_type<node>()),
+			.mode = solver_mode::general
+		};
+		bool solve_error = false;
+		auto model = solve<node>(constraints, options, solve_error);
+		if (solve_error) {
+			LOG_ERROR << "Internal error in solver\n";
+			return nullptr;
+		}
+		if (!model) return nullptr;
+
+		LOG_INFO << "Tau specification part " << tau::get(clause) << " is executed setting ";
+		for (const auto& [uc, v] : model.value())
+			LOG_INFO << TAU_TO_STR(uc) << " := " << TAU_TO_STR(v);
+
+		executable = rewriter::replace<node>(executable, model.value());
+		clause = rewriter::replace<node>(clause, model.value());
+		LOG_INFO << "Resulting Tau specification part: " << TAU_TO_STR(clause) << "\n";
+		LOG_TRACE << "get_executable_spec[spec]: " << TAU_TO_STR(executable) << "\n";
+	}
+	LOG_TRACE << "get_executable_spec[spec]: " << tau::get(executable);
 	LOG_TRACE << "get_executable_spec end\n";
-	return std::make_pair(nullptr, nullptr);
+	return executable;
 }
 
 template <NodeType node, typename in_t, typename out_t>
 void interpreter<node, in_t, out_t>::update(tref update) {
+	// TODO: shift spec time according to new lookback from update
 	trefs io_vars = tau::get(update)
 				.select_top(is_child<node, tau::io_var>);
 	// the constant time positions in update are seen relative to
@@ -746,41 +833,134 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 		return;
 	}
 	shifted_update = rewriter::replace<node>(shifted_update, memory);
+	shifted_update = normalizer<node>(shifted_update);
 	LOG_TRACE << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
+	// std::cout << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 
-	// The constant time positions in original_spec need to be replaced
-	// by present assignments from memory and already executed sometimes statements need to be removed
-	tref current_spec = rewriter::replace<node>(original_spec, memory);
-	LOG_DEBUG << "update/current_spec: " << LOG_FM(current_spec) << "\n";
+	// For each clause of update, check if we can do pointwise revision
+	for (tref clause : expression_paths<node>(shifted_update)) {
+		// The constant time positions in original_spec need to be replaced
+		// by present assignments from memory and already executed sometimes statements need to be removed
+		auto current_spec = original_spec;
+		for (auto& [spec, rep] : current_spec) {
+			// update current spec part with memory
+			// TODO: maybe update constant time positions to current time point in order to avoid loosing initial conditions on restarting updated specification
+			spec = rewriter::replace<node>(spec, memory);
+			LOG_DEBUG << "update/memory replaced spec: " << LOG_FM(spec) << "\n";
+			// std::cout << "update/memory replaced spec: " << LOG_FM(spec) << "\n";
+		}
+		// TODO: current_spec = remove_happend_sometimes(current_spec);
+		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
+		auto upd_partition = create_spec_partition(clause, uf);
+		trefs collected_updates;
+		// Merge current output_partition into uf
+		uf.merge(output_partition);
+		// Merge now overlapping spec parts
+		for (size_t i = 0; i < current_spec.size(); ++i) {
+			// If no output/uninterpreted constant present, skip
+			if (!current_spec[i].second) continue;
+			// std::cout << "spec part i: " << tau::get(current_spec[i].first) << "\n";
+			for (size_t j = i+1; j < current_spec.size(); ++j) {
+				// If no output/uninterpreted constant present, skip
+				if (!current_spec[j].second) continue;
+				// std::cout << "spec part j: " << tau::get(current_spec[j].first) << "\n";
+				if (uf.connected(current_spec[i].second, current_spec[j].second)) {
+					current_spec[i].first = tau::build_wff_and(current_spec[i].first, current_spec[j].first);
+					current_spec.erase(current_spec.begin()+j);
+					--j;
+				}
+			}
+		}
+		// Collect overlapping update parts
+		for (size_t i = 0; i < current_spec.size(); ++i) {
+			// Initialize the collected updates for current spec part
+			collected_updates.push_back(tau::_T());
+			// If no output/uninterpreted constant present, skip
+			if (!current_spec[i].second) continue;
+			// std::cout << "spec part i: " << tau::get(current_spec[i].first) << "\n";
+			for (size_t j = 0; j < upd_partition.size(); ++j) {
+				// If no output/uninterpreted constant present, skip
+				if (!upd_partition[j].second) continue;
+				// std::cout << "update part j: " << tau::get(upd_partition[j].first) << "\n";
+				// Check if current spec part overlaps with current update part
+				if (uf.connected(current_spec[i].second, upd_partition[j].second)) {
+					// Add current update part to update collection
+					collected_updates[i] = tau::build_wff_and(collected_updates[i], upd_partition[j].first);
+					// Now remove update part from upd_partition
+					upd_partition.erase(upd_partition.begin()+j);
+					--j;
+				}
+			}
+		}
+		// Squeeze always statements in current_spec and collected_updates
+		for (tref& spec_part: current_spec | std::views::keys) {
+			// Squeeze always parts in spec_part
+			spec_part = squeeze_always(spec_part);
+		}
+		for (tref& upd: collected_updates) {
+			// Squeeze always parts in upd
+			upd = squeeze_always(upd);
+		}
+		// Now do pointwise revision on each part of current spec with collected_updates
+		bool update_valid = true;
+		trefs current_ubd_ctn;
+		for (size_t i = 0; i < current_spec.size(); ++i) {
+			current_spec[i].first = pointwise_revision(current_spec[i].first, collected_updates[i], time_point);
+			LOG_DEBUG << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first) << "\n";
+			// std::cout << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first) << "\n";
+			if (tau::get(current_spec[i].first).equals_F()) {
+				update_valid = false;
+				break;
+			}
+			tref new_ubd_ctn_part = get_executable_spec(current_spec[i].first, time_point);
+			if (new_ubd_ctn_part == nullptr) {
+				update_valid = false;
+				break;
+			}
+			current_ubd_ctn.push_back(new_ubd_ctn_part);
+		}
+		if (!update_valid) continue;
+		// Here, all pointwise revisions were successful
+		// We now add the remaining update parts left in upd_partition
+		for (auto& upd : upd_partition) {
+			tref new_ubd_ctn_part = get_executable_spec(upd.first, time_point);
+			if (new_ubd_ctn_part == nullptr) {
+				update_valid = false;
+				break;
+			}
+			current_ubd_ctn.push_back(new_ubd_ctn_part);
+			current_spec.emplace_back(std::move(upd));
+		}
+		if (!update_valid) continue;
+		// Here, all update parts were successful
+		// The unbound continuation from start_time is possible for all parts,
+		// so it is safe to swap the current spec by update_unbound
+		// Update interpreter and return
+		LOG_INFO << "Updated specification: \n" <<
+			TAU_TO_STR(tau::build_wff_and(current_spec | std::views::keys)) << "\n\n";
 
-	// TODO: current_spec = remove_happend_sometimes(current_spec);
-
-	tref new_raw_spec = pointwise_revision(current_spec, shifted_update, time_point);
-	LOG_DEBUG << "update/new_spec: " << LOG_FM(new_raw_spec) << "\n";
-	// std::cout << "update/new_spec: " << new_raw_spec << "\n";
-	if (tau::get(new_raw_spec).equals_F()) {
-		LOG_WARNING << "No updated performed: updated specification is unsat\n";
+		// Set new specification for interpreter
+		ubt_ctn = std::move(current_ubd_ctn);
+		original_spec = std::move(current_spec);
+		// The systems for solver need to be recomputed at beginning of next step
+		final_system = false;
+		compute_lookback_and_initial();
+		typed_io_vars output_streams;
+		for (tref spec_part : original_spec | std::views::keys) {
+			if (!collect_output_streams(spec_part, output_streams, ctx))
+				return;
+		}
+		outputs.rebuild(output_streams);
+		typed_io_vars input_streams;
+		for (tref spec_part : original_spec | std::views::keys) {
+			if (!collect_input_streams(spec_part, input_streams, ctx))
+				return;
+		}
+		inputs.rebuild(input_streams);
 		return;
 	}
-
-	// If the unbound continuation from start_time is possible,
-	// it is safe to swap the current spec by update_unbound
-	auto [new_ubd_ctn, new_spec] = get_executable_spec(new_raw_spec, time_point);
-	if (new_ubd_ctn == nullptr) {
-		LOG_WARNING << "No update performed: updated specification is unsat\n";
-		return;
-	}
-
-	LOG_INFO << "Updated specification: \n" << TAU_TO_STR(new_spec) << "\n\n";
-
-	// Set new specification for interpreter
-	ubt_ctn = new_ubd_ctn;
-	original_spec = new_spec;
-	// The systems for solver need to be recomputed at beginning of next step
-	final_system = false;
-	compute_lookback_and_initial();
-	outputs.rebuild(collect_output_streams(new_spec, ctx));
-	inputs.rebuild(collect_input_streams(new_spec, ctx));
+	// No more clause left in update and all clauses are not realizable
+	LOG_WARNING << "No update performed: updated specification is unsat\n";
 }
 
 template <NodeType node, typename in_t, typename out_t>
@@ -789,6 +969,8 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 {
 	spec = normalizer<node>(spec);
 	update = normalizer<node>(update);
+	// If the update is T, nothing changes
+	if (tau::get(update).equals_T()) return spec;
 	for (tref clause : expression_paths<node>(update)) {
 		tref upd_always = tau::get(clause).find_top(
 			is_child<node, tau::wff_always>);
@@ -948,22 +1130,40 @@ template <NodeType node, typename in_t, typename out_t>
 trefs interpreter<node, in_t, out_t>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
-		tref step_ubt_ctn = update_to_time_point(ubt_ctn,
-			t < formula_time_point ? formula_time_point : t);
-		step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
-		// We only apply a heuristic in order to decide if the variable still appears
-		step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
-		// Try to find var in step_ubt_ctn
-		for (tref v : vars) {
-			if (contains<node>(step_ubt_ctn, v))
-				if (std::ranges::find_if(
-					appeared, [&v](const auto& n) {
-						return tau::get(n) == tau::get(v);
-					}) == appeared.end())
+		for (tref ubt_ctn_part : ubt_ctn) {
+			tref step_ubt_ctn = update_to_time_point(ubt_ctn_part,
+				t < formula_time_point ? formula_time_point : t);
+			step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
+			// We only apply a heuristic in order to decide if the variable still appears
+			step_ubt_ctn = syntactic_formula_simplification<node>(step_ubt_ctn);
+			// Try to find var in step_ubt_ctn
+			for (tref v : vars) {
+				if (contains<node>(step_ubt_ctn, v))
+					if (std::ranges::find_if(
+						appeared, [&v](const auto& n) {
+							return tau::get(n) == tau::get(v);
+						}) == appeared.end())
 						appeared.emplace_back(v);
+			}
 		}
 	}
 	return appeared;
+}
+
+template <NodeType node, typename in_t, typename out_t>
+tref interpreter<node, in_t, out_t>::squeeze_always(tref cnf_expression) {
+	// Squeeze always statements again
+	trefs clauses = get_cnf_wff_clauses<node>(cnf_expression);
+	trefs aw_clauses;
+	for (tref& c : clauses) {
+		if (tau::get(c).child_is(tau::wff_always)) {
+			aw_clauses.push_back(tau::trim2(c));
+			c = tau::_T();
+		}
+	}
+	return tau::build_wff_and(
+		tau::build_wff_always(tau::build_wff_and(aw_clauses)),
+		tau::build_wff_and(clauses));
 }
 
 template <NodeType node>
@@ -1081,8 +1281,9 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 	return intrprtr_o;
 }
 
-template<NodeType node>
-typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx) {
+template <NodeType node>
+bool collect_input_streams(tref dnf, typed_io_vars& current_inputs,
+	const spec_context<node>& ctx) {
 	using tau = tree<node>;
 	// select current input variables
 	auto is_in_var = [](tref n) {
@@ -1092,7 +1293,6 @@ typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx) {
 		return false;
 	};
 	trefs in_vars = tau::get(dnf).select_all(is_in_var);
-	typed_io_vars current_inputs;
 	for (tref var : in_vars) {
 		size_t var_sid = get_var_name_sid<node>(var);
 		// Get type of current input stream
@@ -1103,7 +1303,7 @@ typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx) {
 				if (type != it->second.first) {
 					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for "
 					<< tau::get(var).to_str() << "\n";
-					return {};
+					return false;
 				}
 				current_inputs[var_sid] = it->second;
 			} else current_inputs.emplace(var_sid, std::make_pair(type, 0));
@@ -1114,14 +1314,23 @@ typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx) {
 			// Untyped io stream error
 			TAU_LOG_ERROR << "The following input stream must be typed: "
 					<< tau::get(var).to_str() << "\n";
-			return {};
+			return false;
 		}
 	}
-	return current_inputs;
+	return true;
 }
 
 template<NodeType node>
-typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx) {
+typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx) {
+	typed_io_vars current_inputs;
+	if (collect_input_streams(dnf, current_inputs, ctx))
+		return current_inputs;
+	else return {};
+}
+
+template <NodeType node>
+bool collect_output_streams(tref dnf, typed_io_vars& current_outputs,
+	const spec_context<node>& ctx) {
 	using tau = tree<node>;
 	// select current output variables
 	auto is_out_var = [](tref n) {
@@ -1131,7 +1340,6 @@ typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx) {
 		return false;
 	};
 	trefs out_vars = tau::get(dnf).select_all(is_out_var);
-	typed_io_vars current_outputs;
 	for (tref var : out_vars) {
 		size_t var_sid = get_var_name_sid<node>(var);
 		// Get type of current output stream
@@ -1141,7 +1349,7 @@ typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx) {
 				if (type != it->second.first) {
 					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for: "
 					<< tau::get(var).to_str() << "\n";
-					return {};
+					return false;
 				}
 				current_outputs.emplace(var_sid, it->second);
 			} else current_outputs.emplace(var_sid, std::make_pair(type, 0));
@@ -1152,9 +1360,17 @@ typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx) {
 			// Untyped io stream error
 			TAU_LOG_ERROR << "The following input stream must be typed: "
 					<< tau::get(var).to_str() << "\n";
-			return {};
+			return false;
 		}
 	}
-	return current_outputs;
+	return true;
+}
+
+template<NodeType node>
+typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx) {
+	typed_io_vars current_outputs;
+	if (collect_output_streams(dnf, current_outputs, ctx))
+		return current_outputs;
+	else return {};
 }
 } // namespace idni::tau_lang
