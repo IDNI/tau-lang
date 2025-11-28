@@ -45,7 +45,11 @@ struct output_console {
 		if (!streams.contains(v)) streams.emplace(v, v);
 	}
 
-	void rebuild (const auto&) {};
+	void rebuild (const typed_io_vars& c) {
+		streams.clear();
+		for (auto& [key, v] : c)
+			add_output(build_var_name<node_t>(key), v.first, v.second);
+	}
 
 	assignment<node_t> streams;
 	size_t _type = get_ba_type_id<node_t>(sbf_type<node_t>());
@@ -82,7 +86,11 @@ struct input_vector {
 		if (!streams.contains(v)) streams.emplace(v, v);
 	}
 
-	void rebuild (const auto&) {};
+	void rebuild (const typed_io_vars& c) {
+		streams.clear();
+		for (auto& [key, v] : c)
+			add_input(build_var_name<node_t>(key), v.first, v.second);
+	}
 
 	std::vector<assignment<node_t>> inputs;
 	assignment<node_t> streams;
