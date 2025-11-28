@@ -64,7 +64,7 @@ tref normalize_non_temp(tref fm) {
 		// Push all quantifiers in, eliminate them and normalize result
 		| tt::f(anti_prenex<node>)
 		| tt::f(resolve_quantifiers<node>)
-		| tt::f(boole_normal_form<node>)
+		| tt::f(term_boole_normal_form<node>)
 		| tt::ref;
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);

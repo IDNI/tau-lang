@@ -3796,7 +3796,7 @@ tref normalize_temporal_quantifiers(tref fm) {
 	using tau = tree<node>;
 	auto norm = [](tref arg) {
 		return normalize_scopes
-					? boole_normal_form<node>(arg)
+					? term_boole_normal_form<node>(arg)
 					: arg;
 	};
 	auto st_aw = [](tref n) {
