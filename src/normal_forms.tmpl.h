@@ -48,6 +48,42 @@ tref not_equal_to_unequal(tref fm) {
 	return result;
 }
 
+template<NodeType node>
+tref normalize_atomic_formula_operators(tref fm) {
+	using tau = tree<node>;
+	LOG_TRACE << "Begin normalize_atomic_formula_operators: " << LOG_FM(fm);
+	auto normalize_operators = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		const tau& c = tau::get(n)[0];
+		switch (c.value.nt) {
+			case tau::bf_neq:
+				return tau::build_wff_neg(
+					tau::build_bf_eq(c.first(), c.second()));
+			case tau::bf_nlteq:
+				return tau::build_wff_neg(
+					tau::build_bf_lteq(c.first(), c.second()));
+				break;
+			case tau::bf_nlt:
+				return tau::build_wff_neg(
+					tau::build_bf_lt(c.first(), c.second()));
+			case tau::bf_gteq:
+				return tau::build_bf_lteq(c.second(), c.first());
+			case tau::bf_gt:
+				return tau::build_bf_lt(c.second(), c.first());
+			case tau::bf_ngteq:
+				return tau::build_wff_neg(
+					tau::build_bf_lteq(c.second(), c.first()));
+			case tau::bf_ngt: return tau::build_wff_neg(
+					tau::build_bf_lt(c.second(), c.first()));
+			default: return n;
+		}
+	};
+	tref result = pre_order<node>(fm)
+				.apply_unique(normalize_operators, visit_wff<node>);
+	LOG_TRACE << "End normalize_atomic_formula_operators: " << LOG_FM(result);
+	return result;
+}
+
 template <NodeType node>
 tref unsqueeze_wff(const tref& fm) {
 	// $X | $Y = 0 ::= $X = 0 && $Y = 0
@@ -2164,10 +2200,10 @@ public:
 			if (tau::get(fm).equals_F() || tau::get(fm).equals_T())
 				return fm;
 			// Resolve contradictions
-			fm = unequal_to_not_equal<node>(to_nnf<node>(fm));
+			fm = normalize_atomic_formula_operators<node>(to_nnf<node>(fm));
 			fm = simplify_wff(fm);
 			// Resolve tautologies
-			fm = unequal_to_not_equal<node>(to_nnf<node>(tau::build_wff_neg(fm)));
+			fm = normalize_atomic_formula_operators<node>(to_nnf<node>(tau::build_wff_neg(fm)));
 			fm = simplify_wff(fm);
 			res = to_nnf<node>(tau::build_wff_neg(fm));
 		}
