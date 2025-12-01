@@ -61,7 +61,14 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			|| nt == tau::bf_shr
 			|| nt == tau::bf_shl
 			|| nt == tau::bf_f
-			|| nt == tau::bf_t;
+			|| nt == tau::bf_t
+			// added for debugging purposes in overloading
+			|| nt == tau::ref
+			|| nt == tau::bf_ref
+			|| nt == tau::ref
+			|| nt == tau::ref_args
+			|| nt == tau::ref_arg
+			|| nt == tau::offset;
 	};
 	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
 	if (bool print_is_term = true; print_is_term && n.term) os << "*";
