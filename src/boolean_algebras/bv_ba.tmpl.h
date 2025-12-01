@@ -221,12 +221,12 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		case node::type::bf_t: {
 			tref c = form | tt::ref;
 			auto bv_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
-			return make_bitvector_one(bv_size);
+			return make_bitvector_top_elem(bv_size);
 		}
 		case node::type::bf_f: {
 			tref c = form | tt::ref;
 			auto bv_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
-			return make_bitvector_zero(bv_size);
+			return make_bitvector_bottom_elem(bv_size);
 		}
 		default:
 			return std::nullopt;
