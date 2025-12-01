@@ -751,8 +751,10 @@ template <NodeType node, typename in_t, typename out_t>
 void interpreter<node, in_t, out_t>::compute_lookback_and_initial() {
 	trefs io_vars;
 	for (tref ubt_ctn_part : ubt_ctn) {
-		io_vars.append_range(tau::get(ubt_ctn_part).select_top(
-			is_child<node, tau::io_var>));
+		const trefs current_io_vars = tau::get(ubt_ctn_part).select_top(
+			is_child<node, tau::io_var>);
+		io_vars.insert(io_vars.end(),
+			current_io_vars.begin(), current_io_vars.end());
 	}
 	lookback = get_max_shift<node>(io_vars);
 	formula_time_point = time_point + lookback;
