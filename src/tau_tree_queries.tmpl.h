@@ -22,6 +22,22 @@ inline std::function<bool(tref)> is(size_t nt) {
 }
 
 template <NodeType node>
+bool is(tref n, std::initializer_list<size_t> nts) {
+	for (auto nt : nts) {
+		if (tree<node>::get(n).is(nt)) return true;
+	}
+	return false;
+}
+
+// factory method for is predicate
+template <NodeType node>
+inline std::function<bool(tref)> is(std::initializer_list<size_t> nts) {
+	return [nts](tref n) { return is<node>(n, nts); };
+}
+
+
+
+template <NodeType node>
 bool is_child(tref n, size_t nt) {
 	return tree<node>::get(n).child_is(nt);
 }

@@ -269,19 +269,26 @@ auto bv_defaulting = [](tref n) -> tref {
 	return n;
 };
 
-/*template <NodeType node>
-subtree_map<node, size_t> get_typeable_type_ids(tref n) {
+
+template <NodeType node>
+std::map<size_t, trefs> get_typeables_by_type(tref n,
+		const std::function<bool(tref)>& query = is_typeable<node>,
+		const std::function<bool(tref)>& stop = is<node, tree<node>::offset>) {
 	using tau = tree<node>;
-	subtree_map<node, size_t> typeable_type_ids;
-	auto typeables = tau::get(n).select_top_until(
-		is_typeable<node>,
-		is<node, tau::offset>);
+	auto typeables = tau::get(n).select_top_until(query, stop);
+	std::map<size_t, trefs> typeables_by_type;
 	for (tref typeable : typeables) {
 		auto canonized = canonize<node>(typeable);
-		typeable_type_ids[canonized] = get_type_id<node>(typeable);
+		typeables_by_type[canonized] = get_type_id<node>(typeable);
 	}
-	return typeable_type_ids;
-}*/
+	return typeables_by_type;
+}
+
+template <NodeType node>
+std::map<size_t, trefs> get_typeable_by_type(tref n,
+		const std::initializer_list<size_t>& types) {
+	return get_typeable_by_type<node>(n, is<node>(types));
+}
 
 template <NodeType node>
 std::map<size_t, subtree_map<node, size_t>> get_typeable_type_ids_by_type(tref n, 
@@ -289,29 +296,20 @@ std::map<size_t, subtree_map<node, size_t>> get_typeable_type_ids_by_type(tref n
 		const std::function<bool(tref)>& stop = is<node, tree<node>::offset>) {
 	using tau = tree<node>;
 
-	std::map<size_t, subtree_map<node, size_t>> typeable_type_ids;
 	auto typeables = tau::get(n).select_top_until(query, stop);
+	std::map<size_t, subtree_map<node, size_t>> typeable_type_ids_by_type;
 	for (tref typeable : typeables) {
 		auto canonized = canonize<node>(typeable);
 		auto nt = tau::get(typeable).get_type();
-		if (typeable_type_ids.find(nt) == typeable_type_ids.end())
-			typeable_type_ids[nt] = subtree_map<node, size_t>();
-		typeable_type_ids[nt][canonized] = get_type_id<node>(typeable);
+		if (typeable_type_ids_by_type.find(nt) == typeable_type_ids_by_type.end())
+			typeable_type_ids_by_type[nt] = subtree_map<node, size_t>();
+		typeable_type_ids_by_type[nt][canonized] = get_type_id<node>(typeable);
 	}
-	return typeable_type_ids;
+	return typeable_type_ids_by_type;
 }
 template <NodeType node>
 std::map<size_t, subtree_map<node, size_t>> get_typeable_type_ids_by_type(tref n, const std::initializer_list<size_t>& types) {
-	using tau = tree<node>;
-
-	auto query = [&] (tref n) -> bool {
-		for (auto type : types) {
-			if (tau::get(n).is(type)) return true;
-		}
-		return false;
-	};
-
-	return get_typeable_type_ids_by_type<node>(n, query);
+	return get_typeable_type_ids_by_type<node>(n, is<node>(types));
 }
 
 template<NodeType node>
@@ -333,6 +331,16 @@ bool insert(type_scoped_resolver<node>& resolver, const std::initializer_list<su
 			if (!resolver.assign(t, type)) return false;
 		}
 	}
+	return true;
+}
+
+template<NodeType node>
+bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, tref type) {
+	subtree_map<node, size_t> scoped;
+	for (auto typeables : ns)
+		for (auto t : typeables)
+			scoped[t] = type;
+	resolver.open(scoped);
 	return true;
 }
 
@@ -736,11 +744,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// Resolve everything in the rec relation and close the scope
 				return;
 			}
-			case tau::wff_ref: {
-				// TODO (HIGH) Traverse all the aguments in reverse order closing scopes.
-				
-				// Resolve everything in the rec relation and close the scope
-				auto updated = update<node>(resolver, n, { tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
+			case tau::ref_arg: {
+				// We are dealing with a ref_arg of a predicate relation.
+				auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f });
 				if(updated == nullptr) { error = true; return; }
 				if(updated != n) transformed.insert_or_assign(n, updated);
 				break;
