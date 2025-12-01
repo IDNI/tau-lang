@@ -146,8 +146,7 @@ struct node {
 
 struct tau_parser_nonterminal_groups {
 	enum nonterminal {
-		op_logical = 1000,
-		op_overloadable = 2000,
+		typeable_symbol = 1000,
 		// quantifiers
 		// atomic...
 	};
