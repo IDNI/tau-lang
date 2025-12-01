@@ -599,7 +599,7 @@ std::pair<std::optional<assignment<node>>, bool>
 		tref ot = build_out_var_at_n<node>(o, time_point, ctype);
 		if (auto it = global.find(ot); it == global.end()) {
 			if (is_bv) {
-				auto zero_bitvector = make_bitvector_zero(
+				auto zero_bitvector = make_bitvector_bottom_elem(
 					get_bv_size<node>(get_ba_type_tree<node>(ctype)));
 				auto zero_term = tau::get(tau::bf, {
 					tau::get_ba_constant(zero_bitvector, ctype)});
