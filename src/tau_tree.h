@@ -144,6 +144,14 @@ struct node {
 	constexpr size_t hashit() const;
 };
 
+struct tau_parser_nonterminal_groups {
+	enum nonterminal {
+		op_logical = 1000,
+		op_overloadable = 2000,
+		// quantifiers
+		// atomic...
+	};
+};
 // -----------------------------------------------------------------------------
 // Tau tree (tau_tree.tmpl.h)
 //
@@ -164,7 +172,8 @@ struct node {
 //     - parse_tree = tau_parser::tree
 
 template <NodeType node>
-struct tree : public lcrs_tree<node>, public tau_parser_nonterminals {
+struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
+	    public tau_parser_nonterminal_groups {
 	using node_type = node;
 	using base_t = lcrs_tree<node>;
 	using parse_tree = tau_parser::tree;
@@ -702,6 +711,13 @@ bool is(tref n);
 // factory method for is predicate
 template <NodeType node>
 inline std::function<bool(tref)> is(size_t nt);
+
+template <NodeType node>
+bool is(tref n, std::initializer_list<size_t> nts);
+
+// factory method for is predicate
+template <NodeType node>
+inline std::function<bool(tref)> is(std::initializer_list<size_t> nts);
 
 template <NodeType node>
 bool is_child(tref n, size_t nt);
