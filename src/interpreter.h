@@ -148,8 +148,8 @@ private:
 	// Return those variables that appear within the lookback
 	trefs appear_within_lookback(const trefs& vars);
 
-	// Utility to squeeze always statements without timepoint adjustment
-	static tref squeeze_always(tref cnf_expression);
+	// Utility to unsqueeze always statements without timepoint adjustment
+	static tref unsqueeze_always(tref cnf_expression);
 };
 
 template <NodeType node>
