@@ -277,7 +277,7 @@ std::map<size_t, trefs> get_typeable_of_type(tref n,
 }
 
 template <NodeType node>
-std::map<size_t, subtree_map<node, size_t>> get_typeable_type_ids_by_type(tref n, 
+std::optional<std::map<size_t, subtree_map<node, size_t>>> get_typeable_type_ids_by_type(tref n, 
 		const std::function<bool(tref)>& query = is_typeable<node>,
 		const std::function<bool(tref)>& stop = is<node, tree<node>::offset>) {
 	using tau = tree<node>;
@@ -289,12 +289,30 @@ std::map<size_t, subtree_map<node, size_t>> get_typeable_type_ids_by_type(tref n
 		auto nt = tau::get(typeable).get_type();
 		if (typeable_type_ids_by_type.find(nt) == typeable_type_ids_by_type.end())
 			typeable_type_ids_by_type[nt] = subtree_map<node, size_t>();
+		if (auto it = typeable_type_ids_by_type[nt].find(canonized); it !=
+				typeable_type_ids_by_type[nt].end()) {
+			if (auto type_id = unify<node>(it->second, get_type_id<node>(typeable)); type_id) {
+				typeable_type_ids_by_type[nt][canonized] = type_id.value();
+				continue;
+			}
+			return std::nullopt; // incompatible types
+		}
 		typeable_type_ids_by_type[nt][canonized] = get_type_id<node>(typeable);
 	}
+#ifdef DEBUG
+	LOG_TRACE << "get_typeable_type_ids_by_type/typeable_type_ids_by_type:\n";
+	for (auto [type, typeables] : typeable_type_ids_by_type) {
+		LOG_TRACE << "\ttype: " << LOG_NT(type) << "\n";
+		for (auto [t, tid] : typeables) {
+			LOG_TRACE << "\t\t" << LOG_FM(t) << " : "
+				<< ba_types<node>::name(tid) << "\n";
+		}
+	}
+#endif // DEBUG
 	return typeable_type_ids_by_type;
 }
 
-template <NodeType node>
+/*template <NodeType node>
 std::map<size_t, subtree_map<node, size_t>> get_typeable_type_ids_of_type(tref n, 
 		const size_t inferred_type = untyped_type_id<node>(),
 		const std::function<bool(tref)>& query = is_typeable<node>,
@@ -310,10 +328,10 @@ std::map<size_t, subtree_map<node, size_t>> get_typeable_type_ids_of_type(tref n
 		}
 	}
 	return typeable_type_ids_of_type;
-}
+}*/
 
 template <NodeType node>
-std::map<size_t, subtree_map<node, size_t>> get_typeable_type_ids_by_type(tref n, const std::initializer_list<size_t>& types) {
+std::optional<std::map<size_t, subtree_map<node, size_t>>> get_typeable_type_ids_by_type(tref n, const std::initializer_list<size_t>& types) {
 	return get_typeable_type_ids_by_type<node>(n, is<node>(types));
 }
 
@@ -784,32 +802,35 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 
 				// We open a new scope with all the vars in the header.
 				auto header_type = get_type_id<node>(t[1].get());
-				auto arguments = get_typeable_type_ids_of_type<node>(t[0].get(), { tau::variable });
-				//auto argument_types = unify<node>(arguments, untyped_type_id<node>());
-				if (!unify<node>(arguments, header_type)) {	error = true; break; }
-				if (!open<node>(resolver, {	arguments })) { error = true; break; }
+				auto arguments = get_typeable_type_ids_by_type<node>(t[0].get(), { tau::variable });
+				if (!arguments) { error = true; break; } // Incompatible types
+				auto arguments_map = arguments.value();
+				if (!unify<node>(arguments_map, header_type)) {	error = true; break; }
+				if (!open<node>(resolver, {	arguments_map })) { error = true; break; }
 				// If the relation is functional we create another scope to 
 				// resolve the constants and the bfs in the body.
 				if (is_functional_relation<node>(n)) {
 					// We gather all the data about the body typeables
 					auto body_type_ids = get_typeable_type_ids_by_type<node>(t[1].get(), { 
 						tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
-					if (!unify<node>(body_type_ids, header_type)) { error = true; break; }
+					if (!body_type_ids) { error = true; break; } // Incompatible types
+					auto body_type_ids_map = body_type_ids.value();
+					if (!unify<node>(body_type_ids_map, header_type)) { error = true; break; }
 					// We create a new scope with all the inferable typeables
 					// taking into account that they should have the same type.
 					if (!open_same_type<node>(resolver, {
-							body_type_ids[tau::ba_constant], 
-							body_type_ids[tau::bf_t], 
-							body_type_ids[tau::bf_f] })) { error = true; break; }
+							body_type_ids_map[tau::ba_constant], 
+							body_type_ids_map[tau::bf_t], 
+							body_type_ids_map[tau::bf_f] })) { error = true; break; }
 					// We add all the variables in the body to the current scope.
-					if (!insert<node>(resolver, { body_type_ids[tau::variable] })) { error = true; break; }
+					if (!insert<node>(resolver, { body_type_ids_map[tau::variable] })) { error = true; break; }
 					// We merge all the header and the body typeables together.
 					if (!merge<node>(resolver,  {
-							arguments[tau::variable],
-							body_type_ids[tau::ba_constant], 
-							body_type_ids[tau::bf_t], 
-							body_type_ids[tau::bf_f], 
-							body_type_ids[tau::variable] })) { error = true; break; }
+							arguments_map[tau::variable],
+							body_type_ids_map[tau::ba_constant], 
+							body_type_ids_map[tau::bf_t], 
+							body_type_ids_map[tau::bf_f], 
+							body_type_ids_map[tau::variable] })) { error = true; break; }
 					break;
 				}
 				// Otherwise, we have a predicate relation. We let the the processing 
@@ -825,7 +846,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// We open a new scope, we get all the quantified variables,
 				// add them to the scope (with the given type if any).
 				auto quantified_vars = get_typeable_type_ids_by_type<node>(t.child(0), { tau::variable });
-				open<node>(resolver, quantified_vars);
+				if (!quantified_vars) { error = true; break; } // Incompatible types
+				auto quantified_vars_map = quantified_vars.value();
+				open<node>(resolver, quantified_vars_map);
 				break;
 			}
 			case tau::bf: {
@@ -842,14 +865,16 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
 				auto typeables = get_typeable_type_ids_by_type<node>(n, { 
-					tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
+					tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
+				if (!typeables) { error = true; break; } // Incompatible types
+				auto typeables_map = typeables.value();
 				if (!open<node>(resolver, { 
-						typeables[tau::ba_constant], 
-						typeables[tau::bf_t], 
-						typeables[tau::bf_f] })) { error = true; break; }
+						typeables_map[tau::ba_constant], 
+						typeables_map[tau::bf_t], 
+						typeables_map[tau::bf_f] })) { error = true; break; }
 				if (!insert<node>(resolver, { 
-						typeables[tau::variable] })) { error = true; break; }
-				if (!merge<node>(resolver, typeables)) { error = true; break; }
+						typeables_map[tau::variable] })) { error = true; break; }
+				if (!merge<node>(resolver, typeables_map)) { error = true; break; }
 				break;
 			}
 			case tau::ref: {
