@@ -20,22 +20,35 @@
 namespace idni::tau_lang {
 
 template<NodeType node>
-struct type_scoped_resolver : public scoped_union_find<tref, size_t, idni::subtree_less<node>> {
+struct type_scoped_resolver { 
+	using element = scoped_union_find<tref, idni::subtree_less<node>>::element;
+	using scope = scoped_union_find<tref, idni::subtree_less<node>>::scope;
+	using type_id = size_t;
+		
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	type_scoped_resolver():
-		scoped_union_find<tref, size_t, idni::subtree_less<node>>(0) {}
-
+	bool open(const subtree_map<node, type_id>& elements = {});
+	void close();
+	element insert(tref n);
+	type_id type_id_of(tref n);
+	scope scope_of(tref n);
+	bool assign(tref a, type_id tid);
 	// merge two trefs if the types are compatible
 	// returns true if merge was successful, false otherwise
 	bool merge(tref a, tref b);
 	bool merge(const trefs& ts);
+	subtree_map<node, type_id> current_types();
+	subtree_map<node, type_id> all_types();
+	 
 
 #ifdef DEBUG
 	std::ostream& dump(std::ostream& os);
 	std::string dump_to_str();
 #endif // DEBUG
+
+	scoped_union_find<tref, idni::subtree_less<node>> scoped;
+	std::map<element, type_id, scoped_less<tref, idni::subtree_less<node>>> type_ids; // map from tref to ba_type id
 };
 
 // Some type definitions

@@ -17,37 +17,94 @@
 namespace idni::tau_lang {
 
 template<NodeType node>
+bool type_scoped_resolver<node>::open(const subtree_map<node, typename type_scoped_resolver<node>::type_id>& elements) {
+	scoped.open();
+	for (auto [n, tid] : elements) {
+		auto element = scoped.push(n);
+		type_ids.emplace(element, tid);
+	}
+	return true;
+}
+
+template<NodeType node>
+void type_scoped_resolver<node>::close() {
+	scoped.close();
+}
+
+template<NodeType node>
+typename type_scoped_resolver<node>::element type_scoped_resolver<node>::insert(tref n) {
+	return scoped.insert(n);
+}
+
+template<NodeType node>
+typename type_scoped_resolver<node>::type_id type_scoped_resolver<node>::type_id_of(tref n) {
+	auto root = scoped.root(scoped.insert(n));	
+	if(auto it = type_ids.find(root); it != type_ids.end())
+		return it->second;
+	 // has no type info, type as untyped
+	return type_ids.emplace(root, untyped_type_id<node>()).first->second;
+}
+
+template<NodeType node>
+typename type_scoped_resolver<node>::scope type_scoped_resolver<node>::scope_of(tref n) {
+	auto element = scoped.insert(n);
+	return element.first;
+}
+
+template<NodeType node>
+bool type_scoped_resolver<node>::assign(tref n, typename type_scoped_resolver<node>::type_id tid) {
+	auto element = scoped.insert(n);
+	auto root = scoped.root(element);
+	if (auto it = type_ids.find(root); it != type_ids.end()) {
+		auto merged_tid = unify<node>(it->second, tid);
+		if (!merged_tid) return false; // conflicting type info
+		type_ids.insert_or_assign(root, merged_tid.value());
+		return true;
+	} 
+	type_ids.insert_or_assign(element, tid);
+	return true;
+}
+	
+template<NodeType node>
 bool type_scoped_resolver<node>::merge(tref a, tref b) {
-	auto type_a = this->type_of(a); auto scope_a = this->scope_of(a);
-	auto type_b = this->type_of(b); auto scope_b = this->scope_of(b);
-	DBG(LOG_TRACE << "type_scoped_resolver/merge: "
-		<< LOG_FM(a) << ":" << ba_types<node>::name(type_a)
-		<< " (scope " << scope_a << ")"
-		<< " <-> "
-		<< LOG_FM(b) << ":" << ba_types<node>::name(type_b)
-		<< " (scope " << scope_b << ")\n";)
+	auto type_a = type_id_of(a);
+	auto type_b = type_id_of(b);
 	auto merged = unify<node>(type_a, type_b);
 	if (!merged) return false; // conflicting type info
-	auto new_parent = this->uf.merge({scope_a, a}, {scope_b, b});
-	this->kinds_.insert_or_assign(new_parent, merged.value());
-	DBG(LOG_TRACE << "type_scoped_resolver/merge: merged to "
-		<< LOG_FM(new_parent.second) << ":" << ba_types<node>::name(merged.value())
-		<< "\n" << " (scope " << new_parent.first << ")";)
-	// We also update the type of the merged elements
-	//this->kinds_[{this->current, a}] = merged;
-	//this->kinds_[{this->current, b}] = merged;
+	auto new_root = scoped.merge(a, b);
+	type_ids.insert_or_assign(new_root, merged.value());
+	DBG(LOG_TRACE << "type_scoped_resolver/merge: "
+		<< LOG_FM(a) << ":" << ba_types<node>::name(type_a)
+		<< " (scope " << scoped.insert(a).first << ")"
+		<< " <-> "
+		<< LOG_FM(b) << ":" << ba_types<node>::name(type_b)
+		<< " (scope " << scoped.insert(b).first << ")\n";)
 	return true;
 }
 
 template<NodeType node>
 bool type_scoped_resolver<node>::merge(const trefs& ts) {
 	if (ts.size() < 2) return true;
-	auto it = ts.begin();
-	tref first = *it;
-	++it;
-	for(; it != ts.end(); ++it)
-		if (!merge(first, *it)) return false;
+	for (size_t i = 1; i < ts.size(); ++i)
+		if (!merge(ts[0], ts[i])) return false;
 	return true;
+}
+
+template<NodeType node>
+subtree_map<node, typename type_scoped_resolver<node>::type_id> type_scoped_resolver<node>::current_types() {
+	subtree_map<node, typename type_scoped_resolver<node>::type_id> current_types;
+	auto current_scope =scoped.scopes.back();
+	for(auto [scoped, _] : scoped.uf)
+		if (scoped.first == current_scope) current_types[scoped.second] = type_id_of(scoped.second);
+	return current_types;
+}
+
+template<NodeType node>
+subtree_map<node, typename type_scoped_resolver<node>::type_id> type_scoped_resolver<node>::all_types() {
+	subtree_map<node, typename type_scoped_resolver<node>::type_id> all_types;
+	for(auto [scoped, _] : scoped.uf)
+		all_types[scoped.second] = type_id_of(scoped.second);
+	return all_types;
 }
 
 #ifdef DEBUG
@@ -55,11 +112,11 @@ bool type_scoped_resolver<node>::merge(const trefs& ts) {
 template<NodeType node>
 std::ostream& type_scoped_resolver<node>::dump(std::ostream& os) {
 	os << "scopes: ";
-	for (auto scope: this->scopes_)
+	for (auto scope: scoped.scopes)
 		os << scope << ", ";
 	os << "\n";
-	for (auto [e,_]: this->uf) {
-		auto type = this->kinds_.at(e);
+	for (auto [e,_]: scoped.uf) {
+		auto type = type_ids.at(e);
 		os << "\tscope: " << e.first << ", tref: " << LOG_FM(e.second)
 			<< ", type: " << ba_types<node>::name(type) << "\n";
 	}
@@ -573,7 +630,7 @@ tref update(type_scoped_resolver<node>& resolver, tref n, std::initializer_list<
 	subtree_map<node, tref> changes;
 
 	bool error = false;
-	auto types = resolver.current_kinds();
+	auto types = resolver.current_types();
 	auto to_be_updated = std::set<size_t>(types_to_update.begin(), types_to_update.end());
 	
 	auto f = [&](tref n) -> bool {
@@ -920,7 +977,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	// Adding global_scope info to resolver
 	for (auto [var, type] : global_scope) {
 		auto untyped = canonize<node>(var);
-		resolver.insert(untyped), resolver.assign(untyped, type);
+		resolver.insert(untyped);
+		resolver.assign(untyped, type);
 	}
 	// We visit the tree and return the transformed root if no error happened.
 	// If an error happened we return nullptr.
@@ -935,7 +993,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	if (new_n == nullptr) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	//new_n = update_symbols<node>(new_n);
 	if (new_n == nullptr) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
-	auto n_global_scope = resolver.current_kinds();
+	auto n_global_scope = resolver.current_types();
 	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
 		<< " of: " << LOG_FM(n) << " resulted into: " << LOG_FM_DUMP(new_n);)
 	tau::use_hooks = using_hooks;
