@@ -29,7 +29,7 @@ TEST_SUITE("Execution") {
 			"F", "F", "F", "<:x> = 0", "<:y> = 0", "<:z> = 0"
 		};
 		std::vector<std::string> u = {
-			"F", "always o1[t]o1[t-1]' = 0 && i2[t]o1[t]'o1[t-1] = 0 && i2[t]'o1[t] = 0 && o1[0]' = 0",
+			"F", "always o1[0]' = 0 && i2[t]o1[t-1] = o1[t]",
 			"F", "F", "F", "F"
 		};
 		std::vector<std::string> o1 = {
