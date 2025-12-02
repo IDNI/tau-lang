@@ -110,6 +110,54 @@ TEST_SUITE("simplify_using_equality") {
 		tref res = simplify_using_equality<node_t>::on(fm);
 		CHECK(tau::get(res).to_str() == "xv|yw|xy|wv = 0");
 	}
+	TEST_CASE("8") {
+		const char* sample = "xyk|x'yk:bv < 1 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>::on(fm);
+		CHECK(tau::get(res).to_str() == "y' = 0 && k < 1");
+	}
+	TEST_CASE("9") {
+		const char* sample = "xyk|x'yk:bv !< 1 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>::on(fm);
+		CHECK(tau::get(res).to_str() == "y' = 0 && k' = 0");
+	}
+	TEST_CASE("10") {
+		const char* sample = "xyk|x'yk:bv > 0 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>::on(fm);
+		CHECK(tau::get(res).to_str() == "y' = 0 && 0 < k");
+	}
+	TEST_CASE("11") {
+		const char* sample = "xyk|x'yk:bv !> 0 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>::on(fm);
+		CHECK(tau::get(res).to_str() == "y' = 0 && k = 0");
+	}
+	TEST_CASE("12") {
+		const char* sample = "xyk|x'yk:bv <= 0 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>::on(fm);
+		CHECK(tau::get(res).to_str() == "y' = 0 && k = 0");
+	}
+	TEST_CASE("13") {
+		const char* sample = "xyk|x'yk:bv !<= 0 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>::on(fm);
+		CHECK(tau::get(res).to_str() == "y' = 0 && k !<= 0");
+	}
+	TEST_CASE("14") {
+		const char* sample = "xyk|x'yk:bv >= 1 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>::on(fm);
+		CHECK(tau::get(res).to_str() == "y' = 0 && k' = 0");
+	}
+	TEST_CASE("15") {
+		const char* sample = "xyk|x'yk:bv !>= 1 && y = 1.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>::on(fm);
+		CHECK(tau::get(res).to_str() == "y' = 0 && 1 !<= k");
+	}
 }
 
 TEST_SUITE("squeeze_absorb") {

@@ -1232,6 +1232,16 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 		HOOK_LOGGING(applied("$X !< 1 ::= $X' = 0.");)
 		return tau::get(tau::build_bf_eq_0(tau::build_bf_neg(arg1_fm(ch).get())), r);
 	}
+	//RULE(BF_DEF_SIMPLIFY_N, "0 !< $X ::= $X = 0.")
+	if (arg1(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("0 !< $X ::= $X = 0.");)
+		return tau::get(tau::build_bf_eq_0(arg2_fm(ch).get()), r);
+	}
+	//RULE(BF_NLESS_SIMPLIFY_0, "1 !< $X ::= T.") @CP
+	if (arg1(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 !< $X ::= T.");)
+		return _T(v, ch, len, r);
+	}
 	if (arg1_fm(ch) == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("$X !< $X ::= T.");)
 		return _T(v, ch, len, r);
@@ -1278,6 +1288,17 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 	if (arg2(ch).is(tau::bf_t)) {
 		HOOK_LOGGING(applied("$X <= 1 ::= T.");)
 		return _T(v, ch, len, r);
+	}
+	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "1 <= $X ::= $X' = 0.") @CP
+	if (arg1(ch).is(tau::bf_t)) {
+		HOOK_LOGGING(applied("1 <= $X ::= $X' = 0.");)
+		return tau::get(tau::build_bf_eq_0(
+			tau::build_bf_neg(arg2_fm(ch).get())), r);
+	}
+	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "$X <= 0 ::= X = 0.") @CP
+	if (arg2(ch).is(tau::bf_f)) {
+		HOOK_LOGGING(applied("$X <= 0 ::= X = 0.");)
+		return tau::get(tau::build_bf_eq_0(arg1_fm(ch).get()), r);
 	}
 	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "0 <= $X ::= T.") @CP
 	if (arg1(ch).is(tau::bf_f)) {
