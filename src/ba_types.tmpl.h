@@ -529,8 +529,8 @@ bool is_typeable(tref t) {
 	return is<node, tau::variable>(t)
 		|| is<node, tau::ba_constant>(t)
 		|| is<node, tau::bf_t>(t)
-		|| is<node, tau::bf_f>(t)
-		|| is<node, tau::ref>(t);
+		|| is<node, tau::bf_f>(t);
+		//|| is<node, tau::ref>(t);
 }
 
 template<NodeType node>

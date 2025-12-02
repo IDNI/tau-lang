@@ -7,10 +7,6 @@
 
 TEST_SUITE("Configuration") {
 
-	TEST_CASE("logging") {
-		logging::trace();
-	}
-
 	TEST_CASE("bdd init") {
 		bdd_init<Bool>();
 	}
@@ -925,34 +921,6 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 }
 
-TEST_SUITE("infer_ba_types: bf formulas") {
-
-	TEST_CASE("simple case 1") {
-		tref parsed = parse("x", parse_bf_no_infer());
-		CHECK( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>()}
-		};
-		CHECK( check_vars(inferred, expected) );
-	}
-}
-
-TEST_SUITE("infer_ba_types: cli commands") {
-
-	TEST_CASE("simple case 1") {
-		tref parsed = parse("x = 1", parse_cli_no_infer());
-		CHECK( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", tau_type_id<node_t>()}
-		};
-		CHECK( check_vars(inferred, expected) );
-	}
-}
-
 TEST_SUITE("infer_ba_types: symbols") {
 
 	template<typename node_t::type nt>
@@ -1310,46 +1278,111 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 }
 
+TEST_SUITE("infer_ba_types: bf formulas") {
+
+	TEST_CASE("simple case 1") {
+		tref parsed = parse("x", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", tau_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("simple case 2") {
+		tref parsed = parse("f[8](x)", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", tau_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+}
+
+TEST_SUITE("infer_ba_types: cli commands") {
+
+	TEST_CASE("simple case 1") {
+		tref parsed = parse("x = 1", parse_cli_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", tau_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+}
+
+
 TEST_SUITE("infer_ba_types: definitions") {
 
-	TEST_CASE("default typing") {
+	TEST_CASE("absent typing") {
 		tref parsed = parse_definitions("g[n](x) := g[n-1](x).");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_TRACE << "Inferred: " << tau::get(inferred).tree_to_str();)
+		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_type_id<node_t>()},
 			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
+	
+	// Should we allow this?
 
-	TEST_CASE("sbf typing (y1)") {
+	/*TEST_CASE("functional sbf typing: right position") {
+		tref parsed = parse_definitions("g[n](x) := g[n-1](x):sbf.");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"n", untyped_type_id<node_t>()},
+			{"x", sbf_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}*/
+
+	TEST_CASE("functional sbf typing: left position") {
+		tref parsed = parse_definitions("g[n](x):sbf := g[n-1](x).");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"n", untyped_type_id<node_t>()},
+			{"x", sbf_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("predicate sbf: in the body") {
+		tref parsed = parse_definitions("g[n](x) := g[n-1](x:sbf).");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	/*TEST_CASE("predicate sbf: right position") {
 		tref parsed = parse_definitions("g[n](x:sbf) := g[n-1](x).");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_TRACE << "Inferred: " << tau::get(inferred).tree_to_str();)
+		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_type_id<node_t>()},
 			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
-	}
-
-	TEST_CASE("sbf typing (y2)") {
-		tref parsed = parse_definitions("g[n](x) := g[n-1](x:sbf).");
-		CHECK( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		DBG(LOG_TRACE << "Inferred: " << tau::get(inferred).tree_to_str();)
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"n", untyped_type_id<node_t>()},
-			{"x", sbf_type_id<node_t>()}
-		};
-		CHECK( check_vars(inferred, expected) );
-	}
+	}*/ 
 
 	TEST_CASE("incompatible types") {
 		tref parsed = parse_definitions("g[n](x:tau) := g[n-1](x:sbf).");
@@ -1357,6 +1390,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
+
 }
 
 TEST_SUITE("infer_ba_types: I/O vars") {
@@ -1367,7 +1401,7 @@ TEST_SUITE("infer_ba_types: I/O vars") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_TRACE << "Inferred: " << LOG_FM_TREE(inferred);)
+		DBG(LOG_INFO << "Inferred: " << LOG_FM_TREE(inferred);)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"i1", sbf_type_id<node_t>()},
 			{"o1", sbf_type_id<node_t>()},
