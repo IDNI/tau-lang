@@ -22,10 +22,10 @@ inline const std::vector<std::string> symbol_names{
 	"wff_always", "__E_wff_21", "__E___E_wff_21_22", "wff_conditional", "__E_wff_23", "wff_all", "__E_wff_24", "q_vars", "wff_ex", "__E_wff_25", 
 	"wff_ref", "constraint", "wff_imply", "__E_wff_26", "wff_rimply", "__E_wff_27", "wff_equiv", "__E_wff_28", "wff_or", "__E_wff_29", 
 	"wff_xor", "__E_wff_30", "wff_and", "__E_wff_31", "wff_neg", "__E_wff_32", "wff_t", "wff_f", "bf_interval", "__E_wff_33", 
-	"bf_eq", "__E_wff_34", "bf_neq", "__E_wff_35", "bf_lteq", "__E_wff_36", "bf_nlteq", "__E_wff_37", "bf_gt", "__E_wff_38", 
-	"bf_ngt", "__E_wff_39", "bf_gteq", "__E_wff_40", "bf_ngteq", "__E_wff_41", "bf_lt", "__E_wff_42", "bf_nlt", "__E_wff_43", 
+	"bf_eq", "__E_wff_34", "bf_neq", "__E_wff_35", "bf_lt", "__E_wff_36", "bf_nlt", "__E_wff_37", "bf_lteq", "__E_wff_38", 
+	"bf_nlteq", "__E_wff_39", "bf_gt", "__E_wff_40", "bf_ngt", "__E_wff_41", "bf_gteq", "__E_wff_42", "bf_ngteq", "__E_wff_43", 
 	"bf_parenthesis", "__E_bf_44", "ba_constant", "variable", "bf_fall", "__E_bf_45", "bf_fex", "__E_bf_46", "bf_ref", "bf_shr", 
-	"__E_bf_47", "bf_shl", "__E_bf_48", "bf_xnor", "__E_bf_49", "bf_nor", "__E_bf_50", "bf_nand", "__E_bf_51", "bf_sub", 
+	"__E_bf_47", "bf_shl", "__E_bf_48", "bf_nor", "__E_bf_49", "bf_xnor", "__E_bf_50", "bf_nand", "__E_bf_51", "bf_sub", 
 	"__E_bf_52", "bf_add", "__E_bf_53", "bf_mod", "__E_bf_54", "bf_div", "__E_bf_55", "bf_mul", "__E_bf_56", "bf_or", 
 	"__E_bf_57", "bf_xor", "__E_bf_58", "bf_t", "__E_bf_59", "__E___E_bf_59_60", "bf_f", "__E_bf_61", "__E___E_bf_61_62", "bf_and", 
 	"__E_bf_63", "__E___E_bf_63_64", "bf_neg", "__E_bf_65", "bf_neg_oprnd", "__E___E_bf_65_66", "bf_and_nosep", "__E_bf_67", "bf_and_nosep_1st_oprnd", "__E___E_bf_67_68", 
@@ -372,53 +372,53 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(92), (NT(93)));
 //G120: wff(14)              => bf_neq(92).
 	p(NT(14), (NT(92)));
-//G121: __E_wff_36(95)       => bf(30) _(11) '<' '=' _(11) bf(30).
-	p(NT(95), (NT(30)+NT(11)+T(22)+T(3)+NT(11)+NT(30)));
-//G122: bf_lteq(94)          => __E_wff_36(95).
+//G121: __E_wff_36(95)       => bf(30) _(11) '<' _(11) bf(30).
+	p(NT(95), (NT(30)+NT(11)+T(22)+NT(11)+NT(30)));
+//G122: bf_lt(94)            => __E_wff_36(95).
 	p(NT(94), (NT(95)));
-//G123: wff(14)              => bf_lteq(94).
+//G123: wff(14)              => bf_lt(94).
 	p(NT(14), (NT(94)));
-//G124: __E_wff_37(97)       => bf(30) _(11) '!' '<' '=' _(11) bf(30).
-	p(NT(97), (NT(30)+NT(11)+T(34)+T(22)+T(3)+NT(11)+NT(30)));
-//G125: bf_nlteq(96)         => __E_wff_37(97).
+//G124: __E_wff_37(97)       => bf(30) _(11) '!' '<' _(11) bf(30).
+	p(NT(97), (NT(30)+NT(11)+T(34)+T(22)+NT(11)+NT(30)));
+//G125: bf_nlt(96)           => __E_wff_37(97).
 	p(NT(96), (NT(97)));
-//G126: wff(14)              => bf_nlteq(96).
+//G126: wff(14)              => bf_nlt(96).
 	p(NT(14), (NT(96)));
-//G127: __E_wff_38(99)       => bf(30) _(11) '>' _(11) bf(30).
-	p(NT(99), (NT(30)+NT(11)+T(23)+NT(11)+NT(30)));
-//G128: bf_gt(98)            => __E_wff_38(99).
+//G127: __E_wff_38(99)       => bf(30) _(11) '<' '=' _(11) bf(30).
+	p(NT(99), (NT(30)+NT(11)+T(22)+T(3)+NT(11)+NT(30)));
+//G128: bf_lteq(98)          => __E_wff_38(99).
 	p(NT(98), (NT(99)));
-//G129: wff(14)              => bf_gt(98).
+//G129: wff(14)              => bf_lteq(98).
 	p(NT(14), (NT(98)));
-//G130: __E_wff_39(101)      => bf(30) _(11) '!' '>' _(11) bf(30).
-	p(NT(101), (NT(30)+NT(11)+T(34)+T(23)+NT(11)+NT(30)));
-//G131: bf_ngt(100)          => __E_wff_39(101).
+//G130: __E_wff_39(101)      => bf(30) _(11) '!' '<' '=' _(11) bf(30).
+	p(NT(101), (NT(30)+NT(11)+T(34)+T(22)+T(3)+NT(11)+NT(30)));
+//G131: bf_nlteq(100)        => __E_wff_39(101).
 	p(NT(100), (NT(101)));
-//G132: wff(14)              => bf_ngt(100).
+//G132: wff(14)              => bf_nlteq(100).
 	p(NT(14), (NT(100)));
-//G133: __E_wff_40(103)      => bf(30) _(11) '>' '=' _(11) bf(30).
-	p(NT(103), (NT(30)+NT(11)+T(23)+T(3)+NT(11)+NT(30)));
-//G134: bf_gteq(102)         => __E_wff_40(103).
+//G133: __E_wff_40(103)      => bf(30) _(11) '>' _(11) bf(30).
+	p(NT(103), (NT(30)+NT(11)+T(23)+NT(11)+NT(30)));
+//G134: bf_gt(102)           => __E_wff_40(103).
 	p(NT(102), (NT(103)));
-//G135: wff(14)              => bf_gteq(102).
+//G135: wff(14)              => bf_gt(102).
 	p(NT(14), (NT(102)));
-//G136: __E_wff_41(105)      => bf(30) _(11) '!' '>' '=' _(11) bf(30).
-	p(NT(105), (NT(30)+NT(11)+T(34)+T(23)+T(3)+NT(11)+NT(30)));
-//G137: bf_ngteq(104)        => __E_wff_41(105).
+//G136: __E_wff_41(105)      => bf(30) _(11) '!' '>' _(11) bf(30).
+	p(NT(105), (NT(30)+NT(11)+T(34)+T(23)+NT(11)+NT(30)));
+//G137: bf_ngt(104)          => __E_wff_41(105).
 	p(NT(104), (NT(105)));
-//G138: wff(14)              => bf_ngteq(104).
+//G138: wff(14)              => bf_ngt(104).
 	p(NT(14), (NT(104)));
-//G139: __E_wff_42(107)      => bf(30) _(11) '<' _(11) bf(30).
-	p(NT(107), (NT(30)+NT(11)+T(22)+NT(11)+NT(30)));
-//G140: bf_lt(106)           => __E_wff_42(107).
+//G139: __E_wff_42(107)      => bf(30) _(11) '>' '=' _(11) bf(30).
+	p(NT(107), (NT(30)+NT(11)+T(23)+T(3)+NT(11)+NT(30)));
+//G140: bf_gteq(106)         => __E_wff_42(107).
 	p(NT(106), (NT(107)));
-//G141: wff(14)              => bf_lt(106).
+//G141: wff(14)              => bf_gteq(106).
 	p(NT(14), (NT(106)));
-//G142: __E_wff_43(109)      => bf(30) _(11) '!' '<' _(11) bf(30).
-	p(NT(109), (NT(30)+NT(11)+T(34)+T(22)+NT(11)+NT(30)));
-//G143: bf_nlt(108)          => __E_wff_43(109).
+//G142: __E_wff_43(109)      => bf(30) _(11) '!' '>' '=' _(11) bf(30).
+	p(NT(109), (NT(30)+NT(11)+T(34)+T(23)+T(3)+NT(11)+NT(30)));
+//G143: bf_ngteq(108)        => __E_wff_43(109).
 	p(NT(108), (NT(109)));
-//G144: wff(14)              => bf_nlt(108).
+//G144: wff(14)              => bf_ngteq(108).
 	p(NT(14), (NT(108)));
 //G145: wff(14)              => capture(29).
 	p(NT(14), (NT(29)));
@@ -460,17 +460,17 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(121), (NT(122)));
 //G164: bf(30)               => bf_shl(121).
 	p(NT(30), (NT(121)));
-//G165: __E_bf_49(124)       => bf(30) _(11) '!' '^' _(11) bf(30).
-	p(NT(124), (NT(30)+NT(11)+T(34)+T(32)+NT(11)+NT(30)));
-//G166: bf_xnor(123)         => __E_bf_49(124).
+//G165: __E_bf_49(124)       => bf(30) _(11) '!' '|' _(11) bf(30).
+	p(NT(124), (NT(30)+NT(11)+T(34)+T(31)+NT(11)+NT(30)));
+//G166: bf_nor(123)          => __E_bf_49(124).
 	p(NT(123), (NT(124)));
-//G167: bf(30)               => bf_xnor(123).
+//G167: bf(30)               => bf_nor(123).
 	p(NT(30), (NT(123)));
-//G168: __E_bf_50(126)       => bf(30) _(11) '!' '|' _(11) bf(30).
-	p(NT(126), (NT(30)+NT(11)+T(34)+T(31)+NT(11)+NT(30)));
-//G169: bf_nor(125)          => __E_bf_50(126).
+//G168: __E_bf_50(126)       => bf(30) _(11) '!' '^' _(11) bf(30).
+	p(NT(126), (NT(30)+NT(11)+T(34)+T(32)+NT(11)+NT(30)));
+//G169: bf_xnor(125)         => __E_bf_50(126).
 	p(NT(125), (NT(126)));
-//G170: bf(30)               => bf_nor(125).
+//G170: bf(30)               => bf_xnor(125).
 	p(NT(30), (NT(125)));
 //G171: __E_bf_51(128)       => bf(30) _(11) '!' '&' _(11) bf(30).
 	p(NT(128), (NT(30)+NT(11)+T(34)+T(33)+NT(11)+NT(30)));
@@ -1405,10 +1405,10 @@ struct tau_parser_nonterminals {
 		wff_always, __E_wff_21, __E___E_wff_21_22, wff_conditional, __E_wff_23, wff_all, __E_wff_24, q_vars, wff_ex, __E_wff_25, 
 		wff_ref, constraint, wff_imply, __E_wff_26, wff_rimply, __E_wff_27, wff_equiv, __E_wff_28, wff_or, __E_wff_29, 
 		wff_xor, __E_wff_30, wff_and, __E_wff_31, wff_neg, __E_wff_32, wff_t, wff_f, bf_interval, __E_wff_33, 
-		bf_eq, __E_wff_34, bf_neq, __E_wff_35, bf_lteq, __E_wff_36, bf_nlteq, __E_wff_37, bf_gt, __E_wff_38, 
-		bf_ngt, __E_wff_39, bf_gteq, __E_wff_40, bf_ngteq, __E_wff_41, bf_lt, __E_wff_42, bf_nlt, __E_wff_43, 
+		bf_eq, __E_wff_34, bf_neq, __E_wff_35, bf_lt, __E_wff_36, bf_nlt, __E_wff_37, bf_lteq, __E_wff_38, 
+		bf_nlteq, __E_wff_39, bf_gt, __E_wff_40, bf_ngt, __E_wff_41, bf_gteq, __E_wff_42, bf_ngteq, __E_wff_43, 
 		bf_parenthesis, __E_bf_44, ba_constant, variable, bf_fall, __E_bf_45, bf_fex, __E_bf_46, bf_ref, bf_shr, 
-		__E_bf_47, bf_shl, __E_bf_48, bf_xnor, __E_bf_49, bf_nor, __E_bf_50, bf_nand, __E_bf_51, bf_sub, 
+		__E_bf_47, bf_shl, __E_bf_48, bf_nor, __E_bf_49, bf_xnor, __E_bf_50, bf_nand, __E_bf_51, bf_sub, 
 		__E_bf_52, bf_add, __E_bf_53, bf_mod, __E_bf_54, bf_div, __E_bf_55, bf_mul, __E_bf_56, bf_or, 
 		__E_bf_57, bf_xor, __E_bf_58, bf_t, __E_bf_59, __E___E_bf_59_60, bf_f, __E_bf_61, __E___E_bf_61_62, bf_and, 
 		__E_bf_63, __E___E_bf_63_64, bf_neg, __E_bf_65, bf_neg_oprnd, __E___E_bf_65_66, bf_and_nosep, __E_bf_67, bf_and_nosep_1st_oprnd, __E___E_bf_67_68, 
