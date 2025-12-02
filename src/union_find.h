@@ -103,114 +103,75 @@ struct union_find_by_less : public union_find<data_t, less_t> {
 	}
 };
 
+template<typename data_t, class less_t = std::less<data_t>>
+struct scoped_less {
+	using scope = size_t;
+	using element = std::pair<scope, data_t>;
 
-template<typename data_t, typename kind_t, class less_t = std::less<data_t>>
+	bool operator()(const element& a, const element& b) const {
+			static const less_t comp;
+			if (a.first < b.first) return true;
+			if (a.first > b.first) return false;
+			// same scope
+			return (comp(a.second, b.second));
+	}
+};
+
+template<typename data_t, class less_t = std::less<data_t>>
 struct scoped_union_find {
-	using scope_t = size_t;
-	using element_t = std::pair<scope_t, data_t>;
+	using scope = size_t;
+	using element = std::pair<scope, data_t>;
 
-	struct scoped_less {
-		bool operator()(const element_t& a, const element_t& b) const {
-				static const less_t comp;
-				if (a.first < b.first) return true;
-				if (a.first > b.first) return false;
-				// same scope
-				return (comp(a.second, b.second));
-		}
-	};
+	union_find_by_less<std::pair<size_t, data_t>, scoped_less<data_t, less_t>> uf;
+	scope current = 0;
+	std::deque<size_t> scopes { current };
+	scope global = 0;
 
-	using kinds_t = std::map<element_t, kind_t, scoped_less>;
-	using union_find_by_less_t = union_find_by_less<element_t, scoped_less>;
+	scoped_union_find() {}
 
-	union_find_by_less_t uf;
-	scope_t current = 0;
-	std::deque<size_t> scopes_ { current };
-	kinds_t kinds_;
-	kind_t unknown;
-	kind_t default_kind = unknown;
-
-	scoped_union_find(const kind_t& unknown): unknown(unknown) {}
-
-	void open(const std::map<data_t, kind_t, less_t>& kinds) {
+	void open() {
 		current++;
-		scopes_.push_back(current);
-		for (const auto& [data, kind] : kinds) {
-			uf.insert({current, data});
-			kinds_.emplace(element_t{current, data}, kind);
-		}
+		scopes.push_back(current);
 	}
 
 	void close() {
-		if (scopes_.size() == 1) return;
-		/*std::erase_if(kinds_, [&](const auto& e)
-			{ return e.first.first == current; });*/
-		scopes_.pop_back();
+		if (scopes.size() == 1) return;
+		scopes.pop_back();
 	}
 
-	void insert(const data_t& data) {
-		static size_t global = 0;
-		for(auto it = scopes_.rbegin(); it != scopes_.rend(); ++it)
-			if (uf.contains(element_t{*it, data})) return;
-		uf.insert({global, data});
-		kinds_.emplace(element_t{global, data}, unknown);
+	element root(const element& e) {
+		return uf.root(e);
 	}
 
-	kind_t type_of(const data_t& datum) {
-		for(auto it = scopes_.rbegin(); it != scopes_.rend(); ++it)
-			if (uf.contains({*it, datum}))
-				return kinds_.find(uf.root(element_t{*it, datum}))->second;
-		return unknown;
+	element insert(const data_t& data) {
+		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+			if (auto eit = uf.find(element{*it, data}); eit != uf.end()) 
+				return eit->first;
+		return uf.insert(element{global, data});
 	}
 
-	std::vector<kind_t> types_of(const std::vector<data_t>& data) {
-		std::vector<kind_t> result;
-		for(auto datum: data) result.push_back(type_of(datum));
-		return result;
+	element push(const data_t& data) {
+		return uf.insert(element{current, data});
 	}
 
-	scope_t scope_of(const data_t& data) {
-		for(auto it = scopes_.rbegin(); it != scopes_.rend(); ++it)
-			if (uf.contains({*it, data}))
-				return (*it);
-		return 0; // global scope
+	element merge(const data_t& d1, const data_t& d2) {
+		auto e1 = insert(d1);
+		auto e2 = insert(d2);
+		return uf.merge(e1, e2);
 	}
 
-	bool same_kind(const data_t& data1, const data_t& data2) {
-		return type_of(data1) == type_of(data2);
+	scope scope_of(const data_t& data) {
+		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+			if (auto eit = uf.find(element{*it, data}); eit != uf.end()) 
+				return eit->first.first;
+		return uf.insert(element{global, data}).first; // global scope
 	}
 
-	bool assign(const data_t& data, const kind_t& kind) {
-		for(auto it = scopes_.rbegin(); it != scopes_.rend(); ++it)
-			if (uf.contains({*it, data})) {
-				if (auto cur = kinds_.find(uf.root(element_t{*it, data}))->second;
-						cur != unknown && cur != kind)
-					return false;
-				kinds_.insert_or_assign(uf.root(element_t{*it, data}), kind);
+	bool contains(const data_t& data) {
+		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
+			if (uf.contains(element{*it, data})) 
 				return true;
-			}
 		return false;
-	}
-
-	bool assign(const data_t& data) {
-		return assign(data, default_kind);
-	}
-
-	std::map<data_t, kind_t, less_t> kinds() {
-		std::map<data_t, kind_t, less_t> result ;
-		// Note that we will overwrite the kind of a data if it appears in
-		// multiple scopes, keeping only the inner one.
-		for(auto it = uf.begin(); it != uf.end(); ++it)
-			if (kinds_.find(it->second) != kinds_.end())
-				result[it->second.second] = type_of(it->second.second);
-		return result;
-	}
-
-	std::map<data_t, kind_t, less_t> current_kinds() {
-		std::map<data_t, kind_t, less_t> result ;
-		auto scope = scopes_.back();
-		for(auto [element, _] : uf)
-			if (element.first == scope) result[element.second] = type_of(element.second);
-		return result;
 	}
 };
 
