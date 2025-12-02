@@ -128,12 +128,12 @@ inline cvc5::Term make_bitvector_cte(const size_t size,
 	return cvc5_term_manager.mkBitVector(size, str, base);
 }
 
-inline cvc5::Term make_bitvector_zero(const size_t size) {
+inline cvc5::Term make_bitvector_bottom_elem(const size_t size) {
 	return cvc5_term_manager.mkBitVector(size, 0);
 }
 
-inline cvc5::Term make_bitvector_one(const size_t size) {
-	return cvc5_term_manager.mkBitVector(size, 1);
+inline cvc5::Term make_bitvector_top_elem(const size_t size) {
+	return cvc5_term_manager.mkBitVector(size, std::string(size, '1'), 2);
 }
 
 inline cvc5::Term make_bitvector_true() {

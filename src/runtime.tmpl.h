@@ -13,18 +13,16 @@ tref nso_factory<bv, sbf_ba>::default_type() {
 std::string nso_factory<bv, sbf_ba>::one(const tref type_tree) {
 	using node_t = node<bv, sbf_ba>;
 	if (is_bv_type_family<node_t>(type_tree))
-		return std::to_string(std::stoi(make_bitvector_one(
-			get_bv_size<node_t>(type_tree)).toString().substr(2),
-			nullptr, 2));
+		return make_bitvector_top_elem(get_bv_size<node_t>(type_tree)
+			).getBitVectorValue(10);
 	else return "1";
 }
 
 std::string nso_factory<bv, sbf_ba>::zero(const tref type_tree) {
 	using node_t = node<bv, sbf_ba>;
 	if (is_bv_type_family<node_t>(type_tree))
-		return std::to_string(std::stoi(make_bitvector_zero(
-			get_bv_size<node_t>(type_tree)).toString().substr(2),
-			nullptr, 2));
+		return make_bitvector_bottom_elem(get_bv_size<node_t>(type_tree)
+			).getBitVectorValue(10);
 	return "0";
 }
 
@@ -60,9 +58,8 @@ std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::one(
 	if (is_sbf_type<node_t>(type_tree)) {
 		return "1";
 	} else if (is_bv_type_family<node_t>(type_tree)) {
-		return std::to_string(std::stoi(make_bitvector_one(
-			get_bv_size<node_t>(type_tree)).toString().substr(2),
-			nullptr, 2));
+		return make_bitvector_top_elem(get_bv_size<node_t>(type_tree)
+			).getBitVectorValue(10);
 	} else return "T";
 }
 
@@ -73,9 +70,8 @@ std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::zero(
 	if (is_sbf_type<node_t>(type_tree)) {
 		return "0";
 	} else if (is_bv_type_family<node_t>(type_tree)) {
-		return std::to_string(std::stoi(make_bitvector_zero(
-			get_bv_size<node_t>(type_tree)).toString().substr(2),
-			nullptr, 2));
+		return make_bitvector_bottom_elem(get_bv_size<node_t>(type_tree)
+			).getBitVectorValue(10);
 	} else return "F";
 }
 
