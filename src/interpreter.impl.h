@@ -429,14 +429,15 @@ interpreter<node, in_t, out_t>::create_spec_partition(tref spec, auto& output_pa
 	// Get CNF clauses of DNF clause
 	trefs clauses = get_cnf_wff_clauses<node>(spec);
 	// Split each always statement into conjuncts again
-	for (tref& c : clauses) {
-		if (tau::get(c).child_is(tau::wff_always)) {
-			trefs aw_clauses = get_cnf_wff_clauses<node>(tau::trim2(c));
+	for (size_t i = 0; i < clauses.size(); ++i) {
+		if (tau::get(clauses[i]).child_is(tau::wff_always)) {
+			trefs aw_clauses = get_cnf_wff_clauses<node>(
+				tau::trim2(clauses[i]));
 			DBG(assert(!aw_clauses.empty()));
-			c = tau::build_wff_always(aw_clauses[0]);
-			for (size_t i = 1; i < aw_clauses.size(); ++i) {
+			clauses[i] = tau::build_wff_always(aw_clauses[0]);
+			for (size_t j = 1; j < aw_clauses.size(); ++j) {
 				clauses.push_back(
-					tau::build_wff_always(aw_clauses[i]));
+					tau::build_wff_always(aw_clauses[j]));
 			}
 		}
 	}
