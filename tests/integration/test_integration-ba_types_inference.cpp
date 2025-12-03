@@ -865,6 +865,10 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		CHECK( inferred == nullptr );
 	}
 
+	TEST_CASE("logging") {
+		logging::trace();
+	}	
+
 	TEST_CASE("complex case: shadowing") {
 		tref parsed = parse("all x (all x x = 1:sbf)");
 		CHECK( parsed != nullptr );
@@ -877,18 +881,11 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	TEST_CASE("complex case: shadowing (y2)") {
-		tref parsed = parse("all x ((all x x = 1:sbf) && x = 1:sbf)");
-		CHECK( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", sbf_type_id<node_t>()}
-		};
-		CHECK( check_vars(inferred, expected) );
-	}
+	TEST_CASE("logging") {
+		logging::info();
+	}	
 
-	TEST_CASE("complex case: shadowing (y3)") {
+	TEST_CASE("complex case: shadowing (y2)") {
 		tref parsed = parse("all x ((all x x = 1:sbf) && x = 1:tau)");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -1285,7 +1282,6 @@ TEST_SUITE("infer_ba_types: bf formulas") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"x", tau_type_id<node_t>()}
 		};
@@ -1297,7 +1293,6 @@ TEST_SUITE("infer_ba_types: bf formulas") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"x", tau_type_id<node_t>()}
 		};
@@ -1312,7 +1307,6 @@ TEST_SUITE("infer_ba_types: cli commands") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"x", tau_type_id<node_t>()}
 		};
@@ -1320,6 +1314,43 @@ TEST_SUITE("infer_ba_types: cli commands") {
 	}
 }
 
+TEST_SUITE("infer_ba_types: I/O vars") {
+
+	TEST_CASE("different time stamp propagation") {
+		//DBG(using node = node_t;)
+		tref parsed = parse("i1[t] = o1[t] && i1[t-1] = 1:sbf");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		//DBG(LOG_INFO << "Inferred: " << LOG_FM_TREE(inferred);)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"i1", sbf_type_id<node_t>()},
+			{"o1", sbf_type_id<node_t>()},
+			{"i1", sbf_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+}
+
+TEST_SUITE("bitvectors") {
+
+	TEST_CASE("Propagation of bv type") {
+		//DBG(using node = node_t;)
+		tref parsed = parse("o1[t]:bv = o1[t-1] + o1[t-2] && o1[0] = { 1 } && o1[1] = { 1 }");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		//DBG(std::cout << "Inferred: " << LOG_FM_TREE(inferred);)
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"o1", bv_type_id<node_t>(16)},
+			{"o1", bv_type_id<node_t>(16)},
+			{"o1", bv_type_id<node_t>(16)},
+			{"o1", bv_type_id<node_t>(16)},
+			{"o1", bv_type_id<node_t>(16)}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+}
 
 TEST_SUITE("infer_ba_types: definitions") {
 
@@ -1328,7 +1359,6 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_type_id<node_t>()},
 			{"x", tau_type_id<node_t>()}
@@ -1343,7 +1373,6 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_type_id<node_t>()},
 			{"x", sbf_type_id<node_t>()}
@@ -1356,7 +1385,6 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_type_id<node_t>()},
 			{"x", sbf_type_id<node_t>()}
@@ -1368,12 +1396,29 @@ TEST_SUITE("infer_ba_types: definitions") {
 		tref parsed = parse_definitions("g[n](x) := g[n-1](x:sbf).");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred == nullptr );
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"n", untyped_type_id<node_t>()},
+			{"x", sbf_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
 	}
 
-	/*TEST_CASE("predicate sbf: right position") {
-		tref parsed = parse_definitions("g[n](x:sbf) := g[n-1](x).");
+	/*TEST_CASE("predicate sbf: in the head") {
+		tref parsed = parse_definitions("g[n](x:sbf) := g[n-1](x) && T.");
 		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"n", untyped_type_id<node_t>()},
+			{"x", sbf_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}*/
+
+/*TEST_CASE("predicate sbf: right position") {
+	tref parsed = parse_definitions("g[n](x:sbf) := g[n-1](x).");
+	CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
@@ -1382,51 +1427,15 @@ TEST_SUITE("infer_ba_types: definitions") {
 			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
-	}*/ 
-
+		}*/ 
+	
 	TEST_CASE("incompatible types") {
 		tref parsed = parse_definitions("g[n](x:tau) := g[n-1](x:sbf).");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
-
 }
-
-TEST_SUITE("infer_ba_types: I/O vars") {
-
-	TEST_CASE("different time stamp propagation") {
-		DBG(using node = node_t;)
-		tref parsed = parse("i1[t] = o1[t] && i1[t-1] = 1:sbf");
-		CHECK( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		DBG(LOG_INFO << "Inferred: " << LOG_FM_TREE(inferred);)
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"i1", sbf_type_id<node_t>()},
-			{"o1", sbf_type_id<node_t>()},
-			{"i1", sbf_type_id<node_t>()}
-		};
-		CHECK( check_vars(inferred, expected) );
-	}
-	TEST_CASE("Propagation of bv type") {
-		DBG(using node = node_t;)
-		tref parsed = parse("o1[t]:bv = o1[t-1] + o1[t-2] && o1[0] = { 1 } && o1[1] = { 1 }");
-		CHECK( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		DBG(std::cout << "Inferred: " << LOG_FM_TREE(inferred);)
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"o1", bv_type_id<node_t>(16)},
-			{"o1", bv_type_id<node_t>(16)},
-			{"o1", bv_type_id<node_t>(16)},
-			{"o1", bv_type_id<node_t>(16)},
-			{"o1", bv_type_id<node_t>(16)}
-		};
-		CHECK( check_vars(inferred, expected) );
-	}
-}
-
 
 TEST_SUITE("Cleanup") {
 

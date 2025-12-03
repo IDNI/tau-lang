@@ -303,6 +303,10 @@ private:
 template <NodeType node>
 size_t get_ba_type_id(tref ba_type);
 
+// Get the ba type ids of references
+template <NodeType node>
+std::vector<size_t> get_ba_type_ids(trefs t);
+
 // Get the type tree corresponding to a type id
 template <NodeType node>
 tref get_ba_type_tree(size_t ba_type_id);
@@ -357,6 +361,9 @@ bool is_typeable(tref n);
 
 template <NodeType node>
 tref untype(tref n);
+
+template <NodeType node>
+tref untyped(tref n);
 
 // Get type of a reference
 template <NodeType node>

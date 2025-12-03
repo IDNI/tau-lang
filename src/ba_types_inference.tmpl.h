@@ -491,7 +491,7 @@ tref update_bf_constant(type_scoped_resolver<node>& resolver, tref n, const subt
 		if (resolver.assign(canonized, type) == false) return nullptr;
 		return retype<node>(n, type);
 	} 
-	return retype<node>(n, get_type_id<node>(n));
+	return untyped<node>(n);
 }
 
 template<NodeType node>
@@ -525,16 +525,18 @@ tref update_ref(type_scoped_resolver<node>& resolver, tref n, const subtree_map<
 		if (resolver.assign(canonized, type) == false) return nullptr;
 		return retype<node>(n, type);
 	}
-	return retype<node>(n, get_type_id<node>(n));
+	return untyped<node>(n);
 }
 
 template<NodeType node>
 tref update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+	using tau = tree<node>;
+
 	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return n;
 	// If the variable is not typed
-	if (get_type_id<node>(n) == untyped_type_id<node>()) {
+	if (tau::get(n).get_ba_type() == untyped_type_id<node>()) {
 		// We type it according to the inferred type or default
 		size_t type = (types.at(canonized) == untyped_type_id<node>())
 			? tau_type_id<node>()
@@ -543,8 +545,7 @@ tref update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree
 		if (resolver.assign(canonized, type) == false) return nullptr;
 		return retype<node>(n, type);
 	} 
-	return retype<node>(n, get_type_id<node>(n));
-	return n;
+	return untyped<node>(n);
 }
 
 template<NodeType node>
@@ -832,8 +833,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			case tau::ref: {
 				// We skip the traversal if the parent is not a wff_ref or 
 				// is a functional ref as are treated elsewhere.
-				if (!is<node, tau::wff_ref>(parent)
-						&& !is_functional_relation<node>(parent)) { 
+				if (is_functional_relation<node>(parent)) { 
 					skip = true; break;
 				}
 				// Otherwise, we continue the traversal so that we can treat

@@ -86,9 +86,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 		bool is_term = is_term_nt(nt, parent_nt);
 		size_t ba_type = 0;
 
-		bool unresolved_ref = nt == ref && !is_term
+		/*bool unresolved_ref = nt == ref && !is_term
 			&& parent_nt != wff_ref && parent_nt != bf_ref;
-		if (unresolved_ref) ba_type = 1; // is_term = 0 and ba_type = 1
+		if (unresolved_ref) ba_type = 1; // is_term = 0 and ba_type = 1*/
 
 		// helper to create a new node with current node type and provided children
 		auto getx = [&nt, &is_term, &ba_type](const auto& ch) -> tref {
@@ -161,7 +161,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			case bf_fall:
 			case bf_fex: x = process_quantifier_vars(bf); break;
 
-			case bf_t:
+			/*case bf_t:
 			case bf_f:
 				if (bool typed = ptr.first() != nullptr; typed){
 					ba_type = get_ba_type_id<node>(
@@ -170,12 +170,12 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 						  << LOG_BA_TYPE(ba_type);
 				}
 				x = getx_data(0);
-				break;
+				break;*/
 
 			// case variable: x = process_var(x); // break;
 
 			default:
-				if (nt == variable && ptr.second()) {
+				/*if (nt == variable && ptr.second()) {
 					ba_type = get_ba_type_id<node>(
 						m_ref(ptr.second()));
 					LOG_TRACE << "ba_type: "
@@ -190,7 +190,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 						LOG_TRACE << "ba_type: "
 								<< LOG_BA_TYPE(ba_type);
 					}
-				}
+				}*/
 				if (is_string_nt(nt)) {
 					x = getx_data(
 						dict(ptr.get_terminals()));
