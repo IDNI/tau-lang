@@ -565,6 +565,26 @@ tref untype(tref t) {
 	}
 }
 
+template<NodeType node>
+tref untyped(tref n) {
+	using tau = tree<node>;
+
+	auto nt = tau::get(n).get_type();
+	switch (nt) {
+	case tau::bf_t:
+	case tau::bf_f:
+		return tau::get_typed(nt, tau::get(n).get_ba_type());
+	case tau::variable:
+		return tau::get_typed(tau::variable, {tau::get(n).first()}, tau::get(n).get_ba_type());
+	case tau::ref: {
+		auto children = tau::get(n).get_children();
+		return tau::get_typed(tau::ref, children, tau::get(n).get_ba_type());
+	}
+	default:
+		return n;
+	}
+}
+
 template <NodeType node>
 tref get_type(tref t) {
 	auto type_id = get_type_id<node>(t);
@@ -585,7 +605,7 @@ size_t get_type_id(tref t) {
 
 	if (auto check = tt(t) | tau::typed | tt::ref ; check)
 		return ba_types<node>::id(check);
-	return tt(t) | tt::ba_type;
+	return untyped_type_id<node>(); //tt(t) | tt::ba_type;
 }
 
 template <NodeType node>
