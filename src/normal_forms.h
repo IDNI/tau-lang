@@ -39,6 +39,12 @@ template <NodeType node>
 tref not_equal_to_unequal(tref fm);
 
 template <NodeType node>
+tref normalize_atomic_formula_operators(tref fm);
+
+template <NodeType node>
+tref gt_gteq_to_lt_lteq(tref fm);
+
+template <NodeType node>
 tref unsqueeze_wff(const tref& fm);
 
 template <NodeType node>

@@ -150,7 +150,7 @@ template <NodeType node>
 bool is_atomic_fm(tref n) {
 	using tau = tree<node>;
 	auto fm = tau::get(n);
-	if (fm.children_size() != 1) return false;
+	if (!fm.is(tau::wff)) return false;
 	const tau& child = fm[0];
 	return fm.is(tau::wff)
 	       && (child.is(tau::bf_eq)

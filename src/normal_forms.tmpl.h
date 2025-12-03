@@ -48,6 +48,66 @@ tref not_equal_to_unequal(tref fm) {
 	return result;
 }
 
+template<NodeType node>
+tref normalize_atomic_formula_operators(tref fm) {
+	using tau = tree<node>;
+	LOG_TRACE << "Begin normalize_atomic_formula_operators: " << LOG_FM(fm);
+	auto normalize_operators = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		const tau& c = tau::get(n)[0];
+		switch (c.value.nt) {
+			case tau::bf_neq:
+				return tau::build_wff_neg(
+					tau::build_bf_eq(c.first(), c.second()));
+			case tau::bf_nlteq:
+				return tau::build_bf_lt(c.second(), c.first());
+				break;
+			case tau::bf_nlt:
+				return tau::build_wff_neg(
+					tau::build_bf_lt(c.first(), c.second()));
+			case tau::bf_gteq:
+				return tau::build_wff_neg(
+					tau::build_bf_lt(c.first(), c.second()));
+			case tau::bf_gt:
+				return tau::build_bf_lt(c.second(), c.first());
+			case tau::bf_ngteq:
+				return tau::build_bf_lt(c.first(), c.second());
+			case tau::bf_ngt: return tau::build_wff_neg(
+					tau::build_bf_lt(c.second(), c.first()));
+			default: return n;
+		}
+	};
+	tref result = pre_order<node>(fm)
+				.apply_unique(normalize_operators, visit_wff<node>);
+	LOG_TRACE << "End normalize_atomic_formula_operators: " << LOG_FM(result);
+	return result;
+}
+
+template<NodeType node>
+tref gt_gteq_to_lt_lteq(tref fm) {
+	using tau = tree<node>;
+	LOG_TRACE << "gt_gteq_to_lt_lteq: " << LOG_FM(fm);
+	auto normalize_operators = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		const tau& c = tau::get(n)[0];
+		switch (c.value.nt) {
+			case tau::bf_gteq:
+				return tau::build_bf_lteq(c.second(), c.first());
+			case tau::bf_gt:
+				return tau::build_bf_lt(c.second(), c.first());
+			case tau::bf_ngteq:
+				return tau::build_bf_nlteq(c.second(), c.first());
+			case tau::bf_ngt:
+				return tau::build_bf_nlt(c.second(), c.first());
+			default: return n;
+		}
+	};
+	tref result = pre_order<node>(fm)
+				.apply_unique(normalize_operators, visit_wff<node>);
+	LOG_TRACE << "gt_gteq_to_lt_lteq: " << LOG_FM(result);
+	return result;
+}
+
 template <NodeType node>
 tref unsqueeze_wff(const tref& fm) {
 	// $X | $Y = 0 ::= $X = 0 && $Y = 0
@@ -1758,38 +1818,45 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	DBG(LOG_TRACE << "Syntactic_variable_simplification on " << LOG_FM(atomic_fm) << "\n";)
 	DBG(LOG_TRACE << "with var: " << LOG_FM(var) << "\n";)
 	var = tau::get(tau::bf, var);
-	tref func = tau::trim2(norm_equation<node>(atomic_fm));
-	// Make sure that it works only on Boolean parts
-	tref func_v_0 = rewriter::replace_if<node>(func, var,
+	atomic_fm = gt_gteq_to_lt_lteq<node>(atomic_fm);
+	atomic_fm = norm_equation<node>(atomic_fm);
+	auto atm_type = tau::get(atomic_fm)[0].value.nt;
+	tref func1 = tau::get(atomic_fm)[0].first();
+	tref func2 = tau::get(atomic_fm)[0].second();
+	// Make sure that it works only on Boolean parts by using replace_if
+	tref func1_v_0 = rewriter::replace_if<node>(func1, var,
 		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
-	tref func_v_1 = rewriter::replace_if<node>(func, var,
+	tref func1_v_1 = rewriter::replace_if<node>(func1, var,
 		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
-	// Check if atomic formula is equality or inequality
-	tref res = atomic_fm;
-	if (tau::get(atomic_fm).child_is(tau::bf_eq)) {
-		// Is func syntactically identically 0
-		if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0())
-			res = _T<node>();
-		// Is func syntactically identically 1
-		if (tau::get(func_v_0).equals_1() && tau::get(func_v_1).equals_1())
-			res = _F<node>();
-		// func is not dependent on var
-		else if (!contains<node>(func_v_0, var) && tau::get(func_v_0) == tau::get(func_v_1))
-			res = rewriter::replace<node>(atomic_fm, var,
-				_0<node>(find_ba_type<node>(var)));
-	} else {
-		DBG(assert(tau::get(atomic_fm).child_is(tau::bf_neq));)
-		// Is func syntactically identically 0
-		if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0())
-			res = _F<node>();
-		// Is func syntactically identically 1
-		if (tau::get(func_v_0).equals_1() && tau::get(func_v_1).equals_1())
-			res = _T<node>();
-		// func is not dependent on var
-		else if (!contains<node>(func_v_0, var) && tau::get(func_v_0) == tau::get(func_v_1))
-			res = rewriter::replace<node>(atomic_fm, var,
-				_0<node>(find_ba_type<node>(var)));
-	}
+	// Is func syntactically identically 0
+	if (tau::get(func1_v_0).equals_0() && tau::get(func1_v_1).equals_0())
+		func1 = tau::_0(find_ba_type<node>(func1));
+	// Is func syntactically identically 1
+	else if (tau::get(func1_v_0).equals_1() && tau::get(func1_v_1).equals_1())
+		func1 = tau::_1(find_ba_type<node>(func1));
+	// func is not dependent on var
+	else if (tau::get(func1_v_0) == tau::get(func1_v_1) && !contains<node>(func1_v_0, var))
+		func1 = rewriter::replace<node>(func1, var,
+			_0<node>(find_ba_type<node>(var)));
+	if (tau::get(func2).equals_0())
+		return denorm_equation<node>(
+			tau::get(tau::wff, tau::get(atm_type, func1, func2)));
+	// Simplify func2
+	tref func2_v_0 = rewriter::replace_if<node>(func2, var,
+		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+	tref func2_v_1 = rewriter::replace_if<node>(func2, var,
+		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+	// Is func syntactically identically 0
+	if (tau::get(func2_v_0).equals_0() && tau::get(func2_v_1).equals_0())
+		func2 = tau::_0(find_ba_type<node>(func2));
+	// Is func syntactically identically 1
+	else if (tau::get(func2_v_0).equals_1() && tau::get(func2_v_1).equals_1())
+		func2 = tau::_1(find_ba_type<node>(func2));
+	// func is not dependent on var
+	else if (tau::get(func2_v_0) == tau::get(func2_v_1) && !contains<node>(func2_v_0, var))
+		func2 = rewriter::replace<node>(func2, var,
+			_0<node>(find_ba_type<node>(var)));
+	tref res = tau::get(tau::wff, tau::get(atm_type, func1, func2));
 	DBG(LOG_TRACE << "Syntactic_variable_simplification result: " << LOG_FM(res) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(std::make_pair(tau::trim_right_sibling(res),
@@ -1816,9 +1883,11 @@ struct simplify_using_equality {
 			else return false;
 		}
 		if (tau::get(r).equals_0()) return false;
-		// 1 is automatically rewritten to 0
-		// if (l == _1<node>()) return true;
-		// if (r == _1<node>()) return false;
+		if (tau::get(l).equals_1()) {
+			if (!tau::get(r).equals_1()) return true;
+			else return false;
+		}
+		if (tau::get(r).equals_1()) return false;
 		if (is_child<node>(l, tau::ba_constant)) {
 			if (!is_child<node>(r, tau::ba_constant)) return true;
 			else return tau::subtree_less(l,r);
@@ -1874,7 +1943,7 @@ struct simplify_using_equality {
 				if (!is_child<node>(s, tau::bf_eq)) return s;
 				if (add_equality(uf_stack.back(), s)) return s;
 				else return _F<node>();
-			} else if (cn.is(tau::bf_neq)) {
+			} else if (is_atomic_fm<node>(n)) {
 				n = syntactic_atomic_formula_simplification<node>(n);
 				return simplify_equation(uf_stack.back(), n);
 			} else if (cn.is(tau::wff_and)) {
@@ -2164,10 +2233,10 @@ public:
 			if (tau::get(fm).equals_F() || tau::get(fm).equals_T())
 				return fm;
 			// Resolve contradictions
-			fm = unequal_to_not_equal<node>(to_nnf<node>(fm));
+			fm = normalize_atomic_formula_operators<node>(to_nnf<node>(fm));
 			fm = simplify_wff(fm);
 			// Resolve tautologies
-			fm = unequal_to_not_equal<node>(to_nnf<node>(tau::build_wff_neg(fm)));
+			fm = normalize_atomic_formula_operators<node>(to_nnf<node>(tau::build_wff_neg(fm)));
 			fm = simplify_wff(fm);
 			res = to_nnf<node>(tau::build_wff_neg(fm));
 		}
@@ -2441,26 +2510,30 @@ auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
 template<NodeType node>
 tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 	using tau = tree<node>;
-	bool is_eq = tau::get(atomic_formula).child_is(tau::bf_eq);
-	DBG(assert(is_eq || tau::get(atomic_formula).child_is(tau::bf_neq));)
-	// Bring the equation to (!)= 0
+	DBG(LOG_TRACE << "Start syntactic_atomic_formula_simplification: "
+		<< tau::get(atomic_formula) << "\n";)
+	auto atm_type = tau::get(atomic_formula)[0].value.nt;
+	// Bring an equation to !(=) 0
 	atomic_formula = norm_equation<node>(atomic_formula);
 	if (tau::get(atomic_formula).equals_T() ||
 		tau::get(atomic_formula).equals_F()) return atomic_formula;
-	tref func = tau::trim2(atomic_formula);
+	tref func1 = syntactic_path_simplification<node>::on(
+		tau::get(atomic_formula)[0].first());
+	tref func2 = syntactic_path_simplification<node>::on(
+		tau::get(atomic_formula)[0].second());
 	// Apply syntactic path simplification
-	func = syntactic_path_simplification<node>::on(func);
-	// Apply syntactic variable simplification for each found free variable
-	atomic_formula = is_eq
-				 ? tau::build_bf_eq_0(func)
-				 : tau::build_bf_neq_0(func);
-	// Bring the equation back to its original form
+	atomic_formula = tau::get(tau::wff,
+		tau::get(atm_type, func1, func2));
+	// Bring an equation back to its original form
 	atomic_formula = denorm_equation<node>(atomic_formula);
+	// Apply syntactic variable simplification for each found free variable
 	auto& free_vars = get_free_vars<node>(atomic_formula);
 	for (tref v : free_vars) {
 		atomic_formula =
 			syntactic_variable_simplification<node>(atomic_formula, v);
 	}
+	DBG(LOG_TRACE << "End syntactic_atomic_formula_simplification: "
+		<< tau::get(atomic_formula) << "\n";)
 	return atomic_formula;
 }
 
@@ -3337,9 +3410,19 @@ tref boole_normal_form(tref formula) {
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	// Step 4: Convert formula to Boole normal form
 	// First get atomic formulas without !=
-	tref eq_bnf = unequal_to_not_equal<node>(bnf);
+	auto is_atomic = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return false;
+		const tau& c = tau::get(n)[0];
+		switch (c.value.nt) {
+			case tau::bf_eq:
+			case tau::bf_lt:
+			case tau::bf_lteq: return true;
+			default: return false;
+		}
+	};
+	tref eq_bnf = normalize_atomic_formula_operators<node>(bnf);
 	trefs atms = rewriter::select_top_until<node>(eq_bnf,
-		is_child<node, tau::bf_eq>, is_quantifier<node>);
+		is_atomic, is_quantifier<node>);
 	// No variables for Boole decomposition
 	if (atms.empty()) {
 #ifdef TAU_CACHE
@@ -3353,7 +3436,7 @@ tref boole_normal_form(tref formula) {
 	// Apply Boole decomposition
 	eq_bnf = rec_boole_decomposition<node>(eq_bnf, atms, 0);
 	// Convert !(=) to != again
-	eq_bnf = not_equal_to_unequal<node>(eq_bnf);
+	eq_bnf = to_nnf<node>(eq_bnf);
 	eq_bnf = simplify_using_equality<node>::on(eq_bnf);
 	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_bnf) << "\n";)
 #ifdef TAU_CACHE
@@ -3430,6 +3513,16 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	auto& quant_pattern, subtree_set<node>* excluded, bool& no_atms) {
 	using tau = tree<node>;
 	DBG(assert(!tau::get(ex_quant_fm).find_top(is<node, tau::bf_neq>)));
+	auto is_atomic = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return false;
+		const tau& c = tau::get(n)[0];
+		switch (c.value.nt) {
+			case tau::bf_eq:
+			case tau::bf_lt:
+			case tau::bf_lteq: return true;
+			default: return false;
+		}
+	};
 
 	// Get atomic formulas from pool
 	auto it = pool.find(ex_quant_fm);
@@ -3437,7 +3530,7 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 				 ? it->second
 				 : tau::get(ex_quant_fm)[0].second();
 	trefs atms = rewriter::select_top_until<node>(curr_pool,
-		is_child<node, tau::bf_eq>, is_quantifier<node>);
+		is_atomic, is_quantifier<node>);
 	if (atms.empty()) {
 		// std::cout << "ex_quant_fm: " << tau::get(ex_quant_fm) << "\n";
 		no_atms = true;
@@ -3447,10 +3540,11 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	// Sort the atomic formulas and get first
 	tref atm = *std::ranges::min_element(atms,
 		atm_formula_order_for_quant_elim<node>(quant_pattern));
+	auto atm_type = tau::get(atm)[0].value.nt;
 	// Get quantified variable
 	tref var = tau::get(tau::bf, tau::trim2(ex_quant_fm));
 	// Try syntactic simplifications
-	{
+	if (atm_type == tau::bf_eq || atm_type == tau::bf_neq) {
 	tref func = tau::trim2(norm_equation<node>(atm));
 	func = apply_xor_def<node>(func);
 	// We use is_boolean_operation to enable the procedure on non-boolean functions
@@ -3474,7 +3568,7 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 		tref r = rewriter::replace<node>(fm, atm, tau::_F());
 		r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
 		if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l, false);
-		atm = rewriter::replace<node>(atm, var, tau::_T());
+		atm = rewriter::replace<node>(atm, var, tau::_0(find_ba_type<node>(var)));
 		return tau::build_wff_or(
 			tau::build_wff_and(atm, tau::build_wff_ex(tau::trim(var), l, false)),
 			tau::build_wff_and(tau::build_wff_neg(atm), tau::build_wff_ex(tau::trim(var), r, false))
@@ -3514,10 +3608,10 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	tref r = rewriter::replace<node>(fm, atm, tau::_F());
 	r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
 	if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l, false);
-	tref boole_atm = tau::build_bf_eq(
+	tref boole_atm = tau::get(tau::wff, tau::get(atm_type,
 		term_boole_decomposition<node>(tau::get(atm)[0].first(), tau::trim(var)),
 		term_boole_decomposition<node>(tau::get(atm)[0].second(), tau::trim(var))
-		);
+		));
 	tref nl = tau::build_wff_ex(tau::trim(var),
 				    tau::build_wff_and(boole_atm, l), false);
 	tref nr = tau::build_wff_ex(tau::trim(var),
@@ -3686,7 +3780,7 @@ tref anti_prenex(tref formula) {
 					return pushed;
 				}
 				// Smart Boole decomposition
-				n = unequal_to_not_equal<node>(n);
+				n = normalize_atomic_formula_operators<node>(n);
 				DBG(LOG_TRACE << "Before ex_quantified_boole_decomposition: " << LOG_FM(n) << "\n";)
 				bool no_atms = false;
 				n = ex_quantified_boole_decomposition<node>(n,
@@ -3694,7 +3788,7 @@ tref anti_prenex(tref formula) {
 				// Quantifier is pushed in as far as possible but cannot
 				// be resolved yet
 				if (no_atms) return n;
-				n = not_equal_to_unequal<node>(n);
+				n = to_nnf<node>(n);
 				DBG(LOG_TRACE << "After ex_quantified_boole_decomposition: " << LOG_FM(n) << "\n";)
 			}
 			return n;
