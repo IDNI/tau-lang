@@ -50,14 +50,14 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "<="  _ bf _ "<=" _ bf)   :bf_interval
                         | (bf    _ '='   _ bf)               :bf_eq
                         | (bf    _ "!="  _ bf)               :bf_neq
+                        | (bf    _ "<"   _ bf)               :bf_lt
+                        | (bf    _ "!<"  _ bf)               :bf_nlt
                         | (bf    _ "<="  _ bf)               :bf_lteq
                         | (bf    _ "!<=" _ bf)               :bf_nlteq
                         | (bf    _ ">"   _ bf)               :bf_gt
                         | (bf    _ "!>"  _ bf)               :bf_ngt
                         | (bf    _ ">="  _ bf)               :bf_gteq
                         | (bf    _ "!>=" _ bf)               :bf_ngteq
-                        | (bf    _ "<"   _ bf)               :bf_lt
-                        | (bf    _ "!<"  _ bf)               :bf_nlt
                         |                                     capture.
 # relational operators for base types
 #
@@ -72,8 +72,8 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ref                                :bf_ref
                         | (bf  _ ">>" _      bf)             :bf_shr
                         | (bf  _ "<<" _      bf)             :bf_shl
-                        | (bf  _ "!^" _      bf)             :bf_xnor
                         | (bf  _ "!|" _      bf)             :bf_nor
+                        | (bf  _ "!^" _      bf)             :bf_xnor
                         | (bf  _ "!&" _      bf)             :bf_nand
                         | (bf  _ '-' _       bf)             :bf_sub
                         | (bf  _ '+' _       bf)             :bf_add

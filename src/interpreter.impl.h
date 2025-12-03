@@ -429,14 +429,15 @@ interpreter<node, in_t, out_t>::create_spec_partition(tref spec, auto& output_pa
 	// Get CNF clauses of DNF clause
 	trefs clauses = get_cnf_wff_clauses<node>(spec);
 	// Split each always statement into conjuncts again
-	for (tref& c : clauses) {
-		if (tau::get(c).child_is(tau::wff_always)) {
-			trefs aw_clauses = get_cnf_wff_clauses<node>(tau::trim2(c));
+	for (size_t i = 0; i < clauses.size(); ++i) {
+		if (tau::get(clauses[i]).child_is(tau::wff_always)) {
+			trefs aw_clauses = get_cnf_wff_clauses<node>(
+				tau::trim2(clauses[i]));
 			DBG(assert(!aw_clauses.empty()));
-			c = tau::build_wff_always(aw_clauses[0]);
-			for (size_t i = 1; i < aw_clauses.size(); ++i) {
+			clauses[i] = tau::build_wff_always(aw_clauses[0]);
+			for (size_t j = 1; j < aw_clauses.size(); ++j) {
 				clauses.push_back(
-					tau::build_wff_always(aw_clauses[i]));
+					tau::build_wff_always(aw_clauses[j]));
 			}
 		}
 	}
@@ -480,8 +481,8 @@ interpreter<node, in_t, out_t>::create_spec_partition(tref spec, auto& output_pa
 				--j;
 			}
 		}
-		// Squeeze always statements again
-		partition[i].first = squeeze_always(partition[i].first);
+		// Unsqueeze always statements again
+		partition[i].first = unsqueeze_always(partition[i].first);
 	}
 	return partition;
 }
@@ -518,8 +519,8 @@ std::pair<std::optional<assignment<node>>, bool>
 		tref current_this_stream = build_in_var_at_n<node>(
 			"this", time_point, get_ba_type_id<node>(tau_type<node>()));
 		tref wrapped_spec = build_bf_ba_constant<node>(
-			node::nso_factory::pack_tau_ba(
-				tau::build_wff_and(original_spec | std::views::keys)),
+			node::nso_factory::pack_tau_ba(unsqueeze_always(
+				tau::build_wff_and(original_spec | std::views::keys))),
 				get_ba_type_id<node>(tau_type<node>()));
 		memory[current_this_stream] = wrapped_spec;
 	}
@@ -894,14 +895,14 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 				}
 			}
 		}
-		// Squeeze always statements in current_spec and collected_updates
+		// Unsqueeze always statements in current_spec and collected_updates
 		for (tref& spec_part: current_spec | std::views::keys) {
-			// Squeeze always parts in spec_part
-			spec_part = squeeze_always(spec_part);
+			// Unsqueeze always parts in spec_part
+			spec_part = unsqueeze_always(spec_part);
 		}
 		for (tref& upd: collected_updates) {
-			// Squeeze always parts in upd
-			upd = squeeze_always(upd);
+			// Unsqueeze always parts in upd
+			upd = unsqueeze_always(upd);
 		}
 		// Now do pointwise revision on each part of current spec with collected_updates
 		bool update_valid = true;
@@ -938,8 +939,9 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 		// The unbound continuation from start_time is possible for all parts,
 		// so it is safe to swap the current spec by update_unbound
 		// Update interpreter and return
-		LOG_INFO << "Updated specification: \n" <<
-			TAU_TO_STR(tau::build_wff_and(current_spec | std::views::keys)) << "\n\n";
+		update = unsqueeze_always(tau::build_wff_and(current_spec | std::views::keys));
+		LOG_INFO << "Updated specification:";
+		LOG_INFO << TAU_TO_STR(update) << "\n\n";
 
 		// Set new specification for interpreter
 		ubt_ctn = std::move(current_ubd_ctn);
@@ -1153,7 +1155,7 @@ trefs interpreter<node, in_t, out_t>::appear_within_lookback(const trefs& vars){
 }
 
 template <NodeType node, typename in_t, typename out_t>
-tref interpreter<node, in_t, out_t>::squeeze_always(tref cnf_expression) {
+tref interpreter<node, in_t, out_t>::unsqueeze_always(tref cnf_expression) {
 	// Squeeze always statements again
 	trefs clauses = get_cnf_wff_clauses<node>(cnf_expression);
 	trefs aw_clauses;
