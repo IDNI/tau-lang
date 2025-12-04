@@ -27,7 +27,6 @@ static size_t bv16_type_id = ba_types<node>::id(bv_type<node>(16));
 template<NodeType node>
 static size_t bv32_type_id = ba_types<node>::id(bv_type<node>(32));
 
-
 // Infers the types of variables and constants in the tree n. It assumes that
 // the types of the scoped variables are known when closing the scope.
 // If a variable or constant remains unassigned, it is assigned to tau.

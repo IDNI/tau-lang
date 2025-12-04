@@ -40,7 +40,6 @@ struct type_scoped_resolver {
 	bool merge(const trefs& ts);
 	subtree_map<node, type_id> current_types();
 	subtree_map<node, type_id> all_types();
-	 
 
 #ifdef DEBUG
 	std::ostream& dump(std::ostream& os);
