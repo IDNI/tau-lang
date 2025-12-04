@@ -105,7 +105,8 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	"queries",
 	"traverser",
 	"testing",
-	"resolver"
+	"resolver",
+	"inference",
 };
 #else // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS) else
 static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
