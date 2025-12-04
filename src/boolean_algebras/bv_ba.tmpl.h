@@ -206,7 +206,7 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		case node::type::bf_shl: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
-			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;
+			return (l && r) ? std::optional<bv>(make_bitvector_shl(l.value(), r.value())) : std::nullopt;
 		}
 		case node::type::bf_shr: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
