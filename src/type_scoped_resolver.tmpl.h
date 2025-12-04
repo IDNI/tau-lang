@@ -104,7 +104,7 @@ template<NodeType node>
 subtree_map<node, typename type_scoped_resolver<node>::type_id> type_scoped_resolver<node>::all_types() {
 	subtree_map<node, typename type_scoped_resolver<node>::type_id> all_types;
 	for(auto [scoped, _] : scoped.uf)
-		all_types[scoped.second] = type_id_of(scoped.second);
+		all_types.insert_or_assign(scoped.second, type_id_of(scoped.second));
 	return all_types;
 }
 
@@ -254,7 +254,5 @@ bool merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_
 			mergeables.push_back(t);
 	return resolver.merge(mergeables);
 }
-
-
 
 } // namespace idni::tau_lang

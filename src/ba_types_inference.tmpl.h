@@ -527,7 +527,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// p(x:sbf) := q(x)  (P) head untyped, body is a ref
 				// p(x:sbf) := x = 0 (P) head untyped, body is a wff
 				// p(x) := x = 0     (E) x is untyped
+				// p(x) := x = 1:sbf (P) x is sbf typed in body
 				// ...
+				// p(x) := q(x):sbf  (F) x is sbf typed in body
+				// p(x, y) := x + y  (F) x and y are typed in body
 
 				// We open a new scope with all the vars in the header.
 				auto header_type = get_type_id<node>(t[0].get());
@@ -570,6 +573,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				break;
 			}
 			case tau::bf: {
+				// Be aware that if we have a command with unconnected bf's
+				// this would fail.
+				//
 				// If bf is not a top level one, it must have been treated somewhere else.
 				if (!is_top_level_bf<node>(parent)) { skip = true; break; }
 				// Otherwise we have to treat it as a global scope
@@ -588,7 +594,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			case tau::ref: {
 				// We skip the traversal if the parent is not a wff_ref or 
 				// is a functional ref as are treated elsewhere.
-				if (is_functional_relation<node>(parent)) { 
+				if (is_functional_relation<node>(parent) /* && 
+						tau::get(parent).child(0) == n*/ ) { 
 					skip = true; break;
 				}
 				// Otherwise, we continue the traversal so that we can treat
@@ -599,6 +606,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// This case happens when we are in a wff_ref node in a rec 
 				// relation (thanks to the above check).We must treat 
 				// the argument as an atomic formula 
+				resolver.open();
+				[[fallthrough]];
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
@@ -673,6 +682,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				break;
 			}
 			case tau::ref_arg:
+				resolver.close();
+				[[fallthrough]];
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
