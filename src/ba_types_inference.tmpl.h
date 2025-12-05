@@ -305,8 +305,8 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n) {
 	resolver.close();
 	// Finally, we get the new body and reference and create a new rr
 	// assuming the type of the head
-	auto head = tau::get(updated).child(0);
-	auto body = tau::get(updated).child(1);
+	auto head = untype<node>(tau::get(updated).child(0));
+	auto body = untype<node>(tau::get(updated).child(1));
 	auto type = tau::get(updated)[0].get_ba_type();
 	auto new_head = 
 		tau::get_typed(tau::bf, 
