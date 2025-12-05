@@ -76,7 +76,11 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 template <NodeType node>
 rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	using tau = tree<node>;
-	LOG_TRACE << "-- transform_ref_args_to_captures: " << LOG_RR(nso_rr);
+	DBG(	LOG_TRACE << "-- transform_ref_args_to_captures:";)
+	DBG(LOG_TRACE << "nso_rr main: " << tau::get(nso_rr.main->get()).tree_to_str();
+		for (const auto& [k, v] : nso_rr.rec_relations) {
+			LOG_TRACE << tau::get(k->get()).tree_to_str() << " -> " << tau::get(v->get()).tree_to_str();
+		});
 	auto transformer = [](tref n) -> tref {
 		const auto& t = tau::get(n);
 		if (t.is(tau::offset) && t[0].is(tau::variable))
@@ -106,7 +110,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 			// If we do not collect head variables, check if the
 			// current variable is contained in the head of the rule
 			if (!collecting && !head_vars.contains(n)) return n;
-			auto type = t[0][0].get_ba_type();
+			auto type = t[0].get_ba_type();
 			return tau::get_typed(tau::bf,
 				tau::get(node(tau::capture,	t[0][0].data())), type);
 		}
@@ -135,7 +139,11 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 		r.second = transform(r.second, true);
 	}
 	ret.main = transform(nso_rr.main);
-	LOG_TRACE << "-- transform_ref_args_to_captures result: " << LOG_RR_DUMP(ret);
+	DBG(LOG_TRACE << "-- transform_ref_args_to_captures result: " << LOG_RR_DUMP(ret);)
+	DBG(LOG_TRACE << "ret main: " << tau::get(ret.main->get()).tree_to_str();
+		for (const auto& [k, v] : ret.rec_relations) {
+			LOG_TRACE << tau::get(k->get()).tree_to_str() << " -> " << tau::get(v->get()).tree_to_str();
+		};)
 	return ret;
 }
 
