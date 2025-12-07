@@ -1295,8 +1295,19 @@ TEST_SUITE("infer_ba_types: bf formulas") {
 
 TEST_SUITE("infer_ba_types: cli commands") {
 
-	TEST_CASE("simple case 1") {
+	TEST_CASE("simple case (y1)") {
 		tref parsed = parse("x = 1", parse_cli_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", tau_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("simple case (y2)") {
+		tref parsed = parse("n f(x)", parse_cli_no_infer());
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );

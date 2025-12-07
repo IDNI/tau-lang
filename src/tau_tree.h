@@ -770,6 +770,9 @@ bool contains(tref fm, tref sub_fm);
 template <NodeType node>
 bool is_atomic_fm(tref n);
 
+template <NodeType node>
+bool is_cli_cmd(tref n);
+
 } // namespace idni::tau_lang
 
 // Hash for tau node

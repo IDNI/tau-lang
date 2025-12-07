@@ -166,6 +166,49 @@ bool is_atomic_fm(tref n) {
 };
 
 template <NodeType node>
+bool is_cli_cmd(tref n) {
+	using tau = tree<node>;
+
+	return is<node>(n, {
+		tau::quit_cmd,
+		tau::version_cmd,
+		tau::clear_cmd,
+		tau::help_cmd,
+		tau::file_cmd,
+		tau::sat_cmd,
+		tau::unsat_cmd,
+		tau::solve_cmd,
+		tau::run_cmd,
+		tau::normalize_cmd,
+		tau::subst_cmd,
+		tau::inst_cmd,
+		tau::dnf_cmd,
+		tau::cnf_cmd,
+		tau::anf_cmd,
+		tau::nnf_cmd,
+		tau::pnf_cmd,
+		tau::mnf_cmd,
+		tau::onf_cmd,
+		tau::qelim_cmd,
+		tau::get_cmd,
+		tau::set_cmd,
+		tau::enable_cmd,
+		tau::disable_cmd,
+		tau::toggle_cmd,
+		tau::def_list_cmd,
+		tau::def_print_cmd,
+		tau::def_rr_cmd,
+		tau::def_list_cmd,
+		tau::def_input_cmd,
+		tau::def_output_cmd,
+		tau::history_list_cmd,
+		tau::history_print_cmd,
+		tau::history_list_cmd	
+	});
+}
+
+
+template <NodeType node>
 int_t node_count (tref fm) {
 #ifdef TAU_CACHE
 	using tau = tree<node>;
@@ -232,13 +275,5 @@ tref find_ba_type_tree (tref term) {
 	const size_t t = find_ba_type<node>(term);
 	return get_ba_type_tree<node>(t);
 }
-
-// template <NodeType node>
-// auto visit_io_vars = [] (tref n) static {
-// 	auto nt = tree<node>::get(n).get_type();
-// 	if (nt == node::type::ba_constant
-// 		|| nt == node::type::uconst_name) return false;
-// 	return true;
-// };
 
 } // namespace idni::tau_lang
