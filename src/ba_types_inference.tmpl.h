@@ -298,6 +298,7 @@ tref update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree
 template<NodeType node>
 tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n) {
 	using tau = tree<node>;
+
 	// First we update the ba_constant, the ariables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
@@ -323,6 +324,7 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n) {
 template<NodeType node>
 tref update_predicate_rr(type_scoped_resolver<node>& resolver, tref n) {
 	using tau = tree<node>;
+
 	// First we update the variables in the rr head and body and close 
 	// the rr scope
 	auto updated = update<node>(resolver, n, { tau::variable });
@@ -342,6 +344,30 @@ tref update_predicate_rr(type_scoped_resolver<node>& resolver, tref n) {
 				body))
 		: tau::get(updated).child(1);
 	return tau::get(tau::rec_relation, { new_head, new_body });
+}
+
+template<NodeType node>
+tref update_functional_ref(type_scoped_resolver<node>& resolver, tref n) {
+	using tau = tree<node>;
+
+	// First we update the ba_constant, the ariables and bf_t/bf_f in the ref
+	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
+	if (updated == nullptr) return nullptr;
+	// Finally, we wrap the new ref accordingly
+	auto type = tau::get(updated).get_ba_type();
+	auto new_n = untype<node>(updated);
+	return tau::get_typed(tau::bf, tau::get_typed(tau::bf_ref, new_n, type), type);
+}
+
+template<NodeType node>
+tref update_predicate_ref(type_scoped_resolver<node>& resolver, tref n) {
+	using tau = tree<node>;
+
+	// First we update the variables in the ref
+	auto updated = update<node>(resolver, n, { tau::variable });
+	if (updated == nullptr) return nullptr;
+	// Finally, we wrap the new ref accordingly
+	return tau::get(tau::wff, tau::get(tau::wff_ref, updated));
 }
 
 template<NodeType node>
@@ -598,7 +624,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 						tau::get(parent).child(0) == n*/ ) { 
 					skip = true; break;
 				}
-				// Otherwise, we continue the traversal so that we can treat
+				if (!is_cli_cmd<node>(parent)) {
+					skip = true; break;
+				}
+				//  If n is typed, we have a functional ref
+				if (is_typed<node>(n)) resolver.open({}); // functional ref
+				// Anyway, we continue the traversal so that we can treat
 				// the ref_args as above.
 				break;
 			}
@@ -678,7 +709,22 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				auto updated = update<node>(resolver, new_n, { tau::variable});
 				if(updated == nullptr) { error = true; break; }
 				if(updated != new_n) transformed.insert_or_assign(n, updated);
-				resolver.close();
+				if(!resolver.close()) LOG_ERROR << "Unbalanced scopes";;
+				break;
+			}
+			case tau::ref: {
+				if (is_cli_cmd<node>(parent)) {
+					auto new_n = update_default<node>(n, transformed);
+					new_n = is_typed<node>(new_n)
+						? update_functional_ref<node>(resolver, new_n)
+						: update_predicate_ref<node>(resolver, new_n);
+					if(new_n == nullptr) { error = true; break; }
+					if(new_n != n) transformed.insert_or_assign(n, new_n);
+				}
+				tref new_n = update_default<node>(n, transformed);
+				new_n = update<node>(resolver, new_n, { tau::variable });
+				if (new_n == nullptr) { error = true; break; }
+				if (new_n != n) transformed.insert_or_assign(n, new_n);	
 				break;
 			}
 			case tau::ref_arg:

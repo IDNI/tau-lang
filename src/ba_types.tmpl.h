@@ -513,7 +513,8 @@ template <NodeType node>
 bool is_typed(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	return tt(n) | tau::typed | tt::ref != nullptr;
+	
+	return (tt(n) | tau::typed | tt::ref) != nullptr;
 }
 
 template <NodeType node>

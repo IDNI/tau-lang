@@ -85,10 +85,31 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT 
 
 TEST_SUITE("Normalize Boolean function with recurrence relation") {
 
-	TEST_CASE("Alternating negation") {
+	TEST_CASE("Simple case (y1)") {
 		const char* rec =
 		"h(X):tau := X.";
 		const char* sample = "h(Y)";
+		DBG(logging::trace();)
+		auto nso_rr = get_bf_nso_rr(rec, sample);
+		CHECK( nso_rr.has_value() );
+		if (!nso_rr.has_value()) return;
+		DBG(LOG_TRACE << "nso_rr: " << (nso_rr.has_value() ? "has value" : "no value");)
+		DBG(if (nso_rr.has_value()) {
+			LOG_TRACE << "nso_rr main: " << tau::get(nso_rr.value().main->get()).tree_to_str();
+			for (const auto& [k, v] : nso_rr.value().rec_relations) {
+				LOG_TRACE << tau::get(k->get()).tree_to_str() << " -> " << tau::get(v->get()).tree_to_str();
+			}
+		})
+		tref result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
+		DBG(LOG_TRACE << "result: " << tau::get(result).tree_to_str();)
+		DBG(logging::info();)
+		CHECK( tau::get(result).child_is(tau::variable) );
+	}
+
+	TEST_CASE("Simple case (y2)") {
+		const char* rec =
+		"f(X):tau := a x ^ b x.";
+		const char* sample = "f(y)";
 		DBG(logging::trace();)
 		auto nso_rr = get_bf_nso_rr(rec, sample);
 		CHECK( nso_rr.has_value() );
