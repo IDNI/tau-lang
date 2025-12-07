@@ -29,7 +29,7 @@ struct type_scoped_resolver {
 	using tt = tau::traverser;
 
 	bool open(const subtree_map<node, type_id>& elements = {});
-	void close();
+	bool close();
 	element insert(tref n);
 	type_id type_id_of(tref n);
 	scope scope_of(tref n);

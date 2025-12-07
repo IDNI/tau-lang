@@ -134,9 +134,12 @@ struct scoped_union_find {
 		scopes.push_back(current);
 	}
 
-	void close() {
-		if (scopes.size() == 1) return;
+	bool close() {
+		if (scopes.size() == 1) { 
+			DBG(LOG_ERROR << "scoped_union_find/close: cannot close global scope (unbalenced scopes)\n";)
+			return false; }
 		scopes.pop_back();
+		return true;
 	}
 
 	element root(const element& e) {
