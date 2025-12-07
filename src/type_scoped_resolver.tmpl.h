@@ -28,8 +28,8 @@ bool type_scoped_resolver<node>::open(const subtree_map<node, typename type_scop
 }
 
 template<NodeType node>
-void type_scoped_resolver<node>::close() {
-	scoped.close();
+bool type_scoped_resolver<node>::close() {
+	return scoped.close();
 }
 
 template<NodeType node>
