@@ -31,13 +31,16 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 		auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
 							r, n, is_capture);
 #ifdef DEBUG
-		if (n != nn) {
-			LOG_TRACE << "--------------------------------";
-			LOG_TRACE << "rule:       " << LOG_RULE(r);
-			LOG_TRACE << "applied to: " << TAU_TO_STR(n);
-			LOG_TRACE << "result:     " << LOG_FM(nn);
-			LOG_TRACE << "--------------------------------";
-		}
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "rule:       " << LOG_RULE(r);
+	LOG_TRACE << "applied to: " << TAU_TO_STR(n);
+	if (n != nn) {
+		LOG_TRACE << "result:     " << LOG_FM(nn);
+		LOG_TRACE << "--------------------------------";
+	} else {
+		LOG_TRACE << "no change";
+		LOG_TRACE << "--------------------------------";
+	}
 #endif // DEBUG
 
 #ifdef TAU_MEASURE

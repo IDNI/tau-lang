@@ -145,7 +145,7 @@ requires BAsPack<BAs...>
 std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	// if (hash != that.hash) return hash    <=> that.hash;
 	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
-	if (term != that.term) return C(term) <=> C(that.term);
+	//if (term != that.term) return C(term) <=> C(that.term);
 	if (ba_type   != that.ba_type)   return C(ba_type)   <=> C(that.ba_type);
 	if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
 	// if (tree<node>::is_string_nt(nt))
@@ -176,7 +176,7 @@ constexpr bool node<BAs...>::operator>=(const node& that) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator==(const node& that) const {
-	return nt == that.nt && term == that.term && ba_type == that.ba_type
+	return nt == that.nt /*&& term == that.term*/ && ba_type == that.ba_type
 			&& ext == that.ext && data == that.data;
 }
 template <typename... BAs>
