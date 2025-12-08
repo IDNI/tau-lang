@@ -234,7 +234,7 @@ tref update_bf_ref(tref n) {
 	// We have one child at least and we know that the types of the
 	// children have already been updated and they are consistent.
 	// We only need to check that the type is bv type family.
-	auto n_type = tt(n) | tau::ref | tau::ref_args | tau::ref_arg | tt::ba_type;
+	auto n_type = tt(n) | tau::ref | tau::ref_args | tau::ref_arg | tt::first | tt::ba_type;
 	auto t = tau::get(n);
 	auto chs = t.get_children();
 	auto new_n = tau::get_raw(t.value.ba_retype(n_type), chs.data(), chs.size());
@@ -302,20 +302,13 @@ tref update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return n;
 	// If the variable is typed
-	/*if (is_typed<node>(n)) {
+	if (is_typed<node>(n)) {
 		// We check that the type is compatible
 		auto current_type = get_typed_id<node>(n);
-		auto inferred_type = types.at(canonized);
-		if (auto unified_type = unify<node>(current_type, inferred_type); unified_type) {
-			if (unified_type.value() != current_type) {
-				if (resolver.assign(canonized, unified_type.value()) == false)
-					return nullptr;
-				return retype<node>(canonized, unified_type.value());
-			}
-			return untyped<node>(n);
-		}
-		return nullptr; // incompatible types
-	}*/
+		if (!resolver.assign(canonized, current_type))
+			return nullptr; // incompatible types
+		return retype<node>(canonized, current_type);
+	}
 	// If the variable is not typed
 	if (tau::get(n).get_ba_type() == untyped_type_id<node>()) {
 		// We type it according to the inferred type or default
@@ -857,7 +850,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	tref new_n = transformed.contains(n) ? transformed[n] : n;
 	new_n = bv_defaulting<node>(new_n);
 	if (new_n == nullptr) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
-	new_n = update<node>(resolver, new_n, { tau::typeable_symbol });
+	new_n = update<node>(resolver, new_n, { tau::typeable_symbol, tau::bf_ref });
 	if (new_n == nullptr) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	auto n_global_scope = resolver.current_types();
 	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
