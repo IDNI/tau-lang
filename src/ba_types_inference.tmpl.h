@@ -189,8 +189,12 @@ bool is_functional_relation(tref n) {
 	auto t = tau::get(n);
 	if (!is<node, tau::rec_relation>(n)) return false;
 	// If the head is typed we have a functional relation.
-	if (auto return_type = get_typed_id<node>(t.child(0)); 
-			return_type != untyped_type_id<node>() ) {
+	if (auto header_return_type = get_typed_id<node>(t.child(0)); 
+			header_return_type != untyped_type_id<node>() ) {
+		return true;
+	}
+	if (auto body_return_type = get_typed_id<node>(t.child(1));
+			body_return_type != untyped_type_id<node>()) {
 		return true;
 	}
 	// Otherwise, we have a predicate relation.
@@ -583,7 +587,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				// p(x, y) := x + y  (F) x and y are typed in body
 
 				// We open a new scope with all the vars in the header.
-				auto header_type = get_typed_id<node>(t[0].get());
+				auto header_type = is_typed<node>(t[0].get()) 
+					? get_typed_id<node>(t[0].get())
+					: get_typed_id<node>(t[1].get());
 				auto arguments = get_typeable_type_ids_by_type<node>(t[0].get(), { tau::variable });
 				if (!arguments) { error = true; break; } // Incompatible types
 				auto arguments_map = arguments.value();

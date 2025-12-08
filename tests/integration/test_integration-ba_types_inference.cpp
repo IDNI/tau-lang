@@ -1370,7 +1370,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( check_vars(inferred, expected) );
 	}
 	
-	/*TEST_CASE("functional sbf typing: right position") {
+	TEST_CASE("functional sbf typing: right position") {
 		tref parsed = parse_definitions("g[n](x) := g[n-1](x):sbf.");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -1380,7 +1380,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
-	}*/
+	}
 
 	TEST_CASE("functional sbf typing: left position") {
 		tref parsed = parse_definitions("g[n](x):sbf := g[n-1](x).");
