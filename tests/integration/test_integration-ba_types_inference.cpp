@@ -1359,7 +1359,6 @@ TEST_SUITE("bitvectors") {
 TEST_SUITE("infer_ba_types: definitions") {
 
 	TEST_CASE("absent typing") {
-		logging::trace();
 		tref parsed = parse_definitions("g[n](x) := g[n-1](x).");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -1369,7 +1368,6 @@ TEST_SUITE("infer_ba_types: definitions") {
 			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
-		logging::info();
 	}
 	
 	/*TEST_CASE("functional sbf typing: right position") {
@@ -1401,13 +1399,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 		tref parsed = parse_definitions("g[n](x) := g[n-1](x:sbf).");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		//DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"n", untyped_type_id<node_t>()},
-			{"x", sbf_type_id<node_t>()}
-		};
-		CHECK( check_vars(inferred, expected) );
+		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("predicate sbf: in the head") {
@@ -1427,7 +1419,6 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		//DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_type_id<node_t>()},
 			{"x", sbf_type_id<node_t>()}
@@ -1436,10 +1427,13 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 	
 	TEST_CASE("incompatible types") {
+		logging::trace();
 		tref parsed = parse_definitions("g[n](x:tau) := g[n-1](x:sbf).");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
+		DBG(if (inferred) LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
+		logging::info();
 	}
 }
 
