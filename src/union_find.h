@@ -137,7 +137,8 @@ struct scoped_union_find {
 	bool close() {
 		if (scopes.size() == 1) { 
 			DBG(LOG_ERROR << "scoped_union_find/close: cannot close global scope (unbalenced scopes)\n";)
-			return false; }
+			return false; 
+		}
 		scopes.pop_back();
 		return true;
 	}

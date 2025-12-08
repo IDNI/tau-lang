@@ -347,6 +347,10 @@ std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type
 template <NodeType node>
 std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type);
 
+// Checks if the ref is typeable
+template <NodeType node>
+bool is_typeable(tref n);
+
 // Checks if the ref is typed
 template <NodeType node>
 bool is_typed(tref n);
@@ -355,31 +359,49 @@ bool is_typed(tref n);
 template <NodeType node>
 bool are_typed(trefs ns);
 
-// Checks if the ref is typeable
+// Get type of a reference
 template <NodeType node>
-bool is_typeable(tref n);
+tref get_typed(tref t);
 
+// Get type of a reference
 template <NodeType node>
-tref untype(tref n);
+trefs get_typeds(trefs t);
+
+// Get type id of a reference
+template <NodeType node>
+size_t get_typed_id(tref t);
+
+// Get type ids of references
+template <NodeType node>
+std::vector<size_t> get_typed_ids(trefs t);
 
 template <NodeType node>
 tref untyped(tref n);
 
-// Get type of a reference
 template <NodeType node>
-tref get_type(tref t);
+bool has_type(tref n);
+
+template <NodeType node>
+bool have_types(trefs t);
+
+// Get type of references
+template <NodeType node>
+trefs get_type(tref t);
 
 // Get types of references
 template <NodeType node>
 trefs get_types(trefs t);
 
-// Get type id of a reference
+// Get type of references
 template <NodeType node>
 size_t get_type_id(tref t);
 
-// Get type ids of references
+// Get type of references
 template <NodeType node>
-std::vector<size_t> get_type_ids(trefs t);
+std::vector<size_t> get_type_ids(tref t);
+
+template <NodeType node>
+tref untype(tref n);
 
 // print the type name to the stream
 template <NodeType node>
