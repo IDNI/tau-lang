@@ -162,8 +162,7 @@ bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<tref
 	for (auto typeables : ns)
 		for (auto t : typeables)
 			scoped[t] = type;
-	resolver.open(scoped);
-	return true;
+	return resolver.open(scoped);
 }
 
 template<NodeType node>
@@ -178,8 +177,7 @@ bool open(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_m
 	for (auto [_, typeables] : types)
 		for (auto [t, type] : typeables)
 			scoped[t] = type;
-	resolver.open(scoped);
-	return true;
+	return resolver.open(scoped);
 }
 
 template<NodeType node>
@@ -188,8 +186,7 @@ bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<subt
 	for (auto typeables : types)
 		for (auto [t, type] : typeables)
 			scoped[t] = type;
-	resolver.open(scoped);
-	return true;
+	return resolver.open(scoped);
 }
 
 template<NodeType node>
@@ -203,8 +200,7 @@ bool open_same_type(type_scoped_resolver<node>& resolver, const std::map<size_t,
 			scoped[t] = inferred_type;
 		}
 	}
-	resolver.open(scoped);
-	return true;
+	return resolver.open(scoped);
 }
 
 template<NodeType node>
@@ -218,8 +214,7 @@ bool open_same_type(type_scoped_resolver<node>& resolver, const std::initializer
 			scoped[t] = inferred_type;
 		}
 	}
-	resolver.open(scoped);
-	return true;
+	return resolver.open(scoped);
 }
 
 template<NodeType node>
@@ -234,7 +229,6 @@ std::optional<size_t> unify(const std::map<size_t, subtree_map<node, size_t>>& t
 	}
 	return { unified_type };
 }
-
 
 template<NodeType node>
 bool merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {

@@ -509,21 +509,6 @@ std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<
 	return result;
 }
 
-template <NodeType node>
-bool is_typed(tref n) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	
-	return (tt(n) | tau::typed | tt::ref) != nullptr;
-}
-
-template <NodeType node>
-bool are_typed(trefs ns) {
-	for (auto n : ns)
-		if (!is_typed<node>(n)) return false;
-	return true;
-}
-
 template<NodeType node>
 bool is_typeable(tref t) {
 	using tau = tree<node>;
@@ -532,6 +517,115 @@ bool is_typeable(tref t) {
 		|| is<node, tau::bf_t>(t)
 		|| is<node, tau::bf_f>(t);
 		//|| is<node, tau::ref>(t);
+}
+
+template <NodeType node>
+bool is_typed(tref n) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	return (tt(n) | tau::typed | tt::ref) != nullptr;
+}	
+
+template <NodeType node>
+bool are_typed(trefs ns) {
+	for (auto n : ns)
+		if (!is_typed<node>(n)) return false;
+	return true;	
+}	
+
+template <NodeType node>
+tref get_typed(tref n) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	return (tt(n) | tau::typed | tt::ref);
+}	
+
+template <NodeType node>
+trefs get_typeds(trefs n) {
+	trefs typed_nodes;
+	for (auto ni : n) typed_nodes.push_back(get_typed<node>(ni));
+	return typed_nodes;
+}	
+
+template <NodeType node>
+size_t get_typed_id(tref n) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	if (auto check = tt(n) | tau::typed | tt::ref ; check)
+		return ba_types<node>::id(check);
+	return untyped_type_id<node>();	
+}	
+
+template <NodeType node>
+std::vector<size_t> get_typed_ids(trefs n) {
+	std::vector<size_t> type_ids;
+	for (auto ni : n) type_ids.push_back(get_typed_id<node>(ni));
+	return type_ids;
+}
+
+
+template<NodeType node>
+tref untyped(tref n) {
+	using tau = tree<node>;
+
+	auto nt = tau::get(n).get_type();
+	switch (nt) {
+	case tau::bf_t:
+	case tau::bf_f:
+		return tau::get_typed(nt, tau::get(n).get_ba_type());
+	case tau::variable:
+	return tau::get_typed(tau::variable, {tau::get(n).first()}, tau::get(n).get_ba_type());
+	case tau::ref: {
+		auto children = tau::get(n).get_children();
+		return tau::get_typed(tau::ref, children, tau::get(n).get_ba_type());
+	}
+	default:
+		return n;
+	}
+}
+
+template <NodeType node>
+bool has_type(tref n) {
+	using tau = tree<node>;
+
+	return tau::get(n).get_ba_type() != untyped_type_id<node>();
+}
+
+template <NodeType node>
+bool have_types(trefs t) {
+	for (auto ti : t)
+		if (!has_type<node>(ti)) return false;
+	return true;
+}
+
+template <NodeType node>
+tref get_type(tref t) {
+	auto type_id = get_type_id<node>(t);
+	return ba_types<node>::type_tree(type_id);	
+}
+
+template <NodeType node>
+trefs get_types(trefs t) {
+	trefs types;
+	for (auto ti : t) types.push_back(get_type<node>(ti));
+	return types;
+}
+
+template <NodeType node>
+size_t get_type_id(tref t) {
+	using tau = tree<node>;
+
+	return tau::get(t).get_ba_type();
+}
+
+template <NodeType node>
+std::vector<size_t> get_type_ids(trefs t) {
+	std::vector<size_t> type_ids;
+	for (auto ti : t) type_ids.push_back(get_type_id<node>(ti));
+	return type_ids;
 }
 
 template<NodeType node>
@@ -566,55 +660,6 @@ tref untype(tref t) {
 	}
 }
 
-template<NodeType node>
-tref untyped(tref n) {
-	using tau = tree<node>;
-
-	auto nt = tau::get(n).get_type();
-	switch (nt) {
-	case tau::bf_t:
-	case tau::bf_f:
-		return tau::get_typed(nt, tau::get(n).get_ba_type());
-	case tau::variable:
-		return tau::get_typed(tau::variable, {tau::get(n).first()}, tau::get(n).get_ba_type());
-	case tau::ref: {
-		auto children = tau::get(n).get_children();
-		return tau::get_typed(tau::ref, children, tau::get(n).get_ba_type());
-	}
-	default:
-		return n;
-	}
-}
-
-template <NodeType node>
-tref get_type(tref t) {
-	auto type_id = get_type_id<node>(t);
-	return ba_types<node>::type_tree(type_id);	
-}
-
-template <NodeType node>
-trefs get_types(trefs t) {
-	trefs types;
-	for (auto ti : t) types.push_back(get_type<node>(ti));
-	return types;
-}
-
-template <NodeType node>
-size_t get_type_id(tref t) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-
-	if (auto check = tt(t) | tau::typed | tt::ref ; check)
-		return ba_types<node>::id(check);
-	return untyped_type_id<node>(); //tt(t) | tt::ba_type;
-}
-
-template <NodeType node>
-std::vector<size_t> get_type_ids(trefs t) {
-	std::vector<size_t> type_ids;
-	for (auto ti : t) type_ids.push_back(get_type_id<node>(ti));
-	return type_ids;
-}
 
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id) {
