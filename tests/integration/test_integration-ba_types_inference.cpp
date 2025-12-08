@@ -1321,12 +1321,10 @@ TEST_SUITE("infer_ba_types: cli commands") {
 TEST_SUITE("infer_ba_types: I/O vars") {
 
 	TEST_CASE("different time stamp propagation") {
-		//DBG(using node = node_t;)
 		tref parsed = parse("i1[t] = o1[t] && i1[t-1] = 1:sbf");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		//DBG(LOG_INFO << "Inferred: " << LOG_FM_TREE(inferred);)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"i1", sbf_type_id<node_t>()},
 			{"o1", sbf_type_id<node_t>()},
@@ -1387,7 +1385,6 @@ TEST_SUITE("infer_ba_types: definitions") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		//DBG(LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
 		auto expected = std::vector<std::pair<std::string, size_t>> {
 			{"n", untyped_type_id<node_t>()},
 			{"x", sbf_type_id<node_t>()}
@@ -1427,13 +1424,11 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 	
 	TEST_CASE("incompatible types") {
-		logging::trace();
 		tref parsed = parse_definitions("g[n](x:tau) := g[n-1](x:sbf).");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 		DBG(if (inferred) LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
-		logging::info();
 	}
 }
 
