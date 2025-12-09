@@ -36,7 +36,7 @@ struct sbf_ba_factory {
 	//inline static std::map<size_t, std::variant<BAs...>> cache;
 };
 
-bool is_closed(const sbf_ba&) { return true; }
+inline bool is_closed(const sbf_ba&) { return true; }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
