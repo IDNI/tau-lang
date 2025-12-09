@@ -31,7 +31,7 @@ In data field is either number, integer, or id of an object in its respective po
 These are strings (or terminal sequences) and constants.
 
 Strings are:
- -  stored in a pool by `size_t dict(const std::string&)`
+ - stored in a pool by `size_t dict(const std::string&)`
  - and retrieved by `const std::string& dict(size_t)`
 
 Constants, BA types and BA types map are managed by `ba_constants<BAs...> pool`.

@@ -650,7 +650,7 @@ bool tree<node>::is_digital_nt(size_t nt) {
 }
 
 template <NodeType node>
-bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
+bool tree<node>::is_term_nt(size_t nt) {
 	switch (nt) {
 		case bf:
 		case ba_constant:
@@ -674,12 +674,18 @@ bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 		case bf_t:
 		case bf_f:
 		case variable:
+		case capture: // capture only appears under terms now, otherwise error
 			return true;
-		case capture: if (parent_nt == bf) return true; break;
-		case ref: if (parent_nt == bf_ref) return true; break;
-		default: ;
+		default: return false;
 	}
-	return false;
+}
+
+template <NodeType node>
+bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
+	switch (nt) {
+		case ref: return parent_nt == bf_ref;
+		default: return is_term_nt(nt);
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -714,7 +720,7 @@ bool tree<node>::is_bv_constant() const {
 }
 
 template <NodeType node>
-bool tree<node>::is_term() const { return this->value.term || is(io_var); }
+bool tree<node>::is_term() const { return is_term_nt(this->value.nt) || is(io_var); }
 
 template <NodeType node>
 bool tree<node>::is_input_variable() const {
