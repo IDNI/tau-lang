@@ -52,7 +52,7 @@ struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
 };
 
 template <>
-std::optional<ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_constants<node<bv, sbf_ba>>::get(
+inline std::optional<ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_constants<node<bv, sbf_ba>>::get(
 		const std::string& constant_source,
 		tref type_tree,
 		[[maybe_unused]] const std::string options) {
@@ -62,7 +62,7 @@ std::optional<ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_constants<n
 }
 
 template <>
-std::optional<typename ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::constant_with_type> ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::get(
+inline std::optional<typename ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::constant_with_type> ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::get(
 		const std::string& constant_source,
 		tref type_tree,
 		[[maybe_unused]] const std::string options) {

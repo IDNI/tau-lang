@@ -1,16 +1,15 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 namespace idni::tau_lang {
-
-std::vector<std::string> nso_factory<bv, sbf_ba>::types() {
+inline std::vector<std::string> nso_factory<bv, sbf_ba>::types() {
 	return { "sbf", "bv" };
 }
 
-tref nso_factory<bv, sbf_ba>::default_type() {
+inline tref nso_factory<bv, sbf_ba>::default_type() {
 	return sbf_type<node<bv,sbf_ba>>();
 }
 
-std::string nso_factory<bv, sbf_ba>::one(const tref type_tree) {
+inline std::string nso_factory<bv, sbf_ba>::one(const tref type_tree) {
 	using node_t = node<bv, sbf_ba>;
 	if (is_bv_type_family<node_t>(type_tree))
 		return make_bitvector_top_elem(get_bv_size<node_t>(type_tree)
@@ -18,7 +17,7 @@ std::string nso_factory<bv, sbf_ba>::one(const tref type_tree) {
 	else return "1";
 }
 
-std::string nso_factory<bv, sbf_ba>::zero(const tref type_tree) {
+inline std::string nso_factory<bv, sbf_ba>::zero(const tref type_tree) {
 	using node_t = node<bv, sbf_ba>;
 	if (is_bv_type_family<node_t>(type_tree))
 		return make_bitvector_bottom_elem(get_bv_size<node_t>(type_tree)
@@ -26,32 +25,32 @@ std::string nso_factory<bv, sbf_ba>::zero(const tref type_tree) {
 	return "0";
 }
 
-tref nso_factory<bv, sbf_ba>::splitter_one() {
+inline tref nso_factory<bv, sbf_ba>::splitter_one() {
 	using tau = tree<node<bv, sbf_ba>>;
 	return tau::get(tau::bf, tau::get_ba_constant(
 		sbf_ba_factory<bv, sbf_ba>::splitter_one(),
 		sbf_type<node<bv, sbf_ba>>()));
 }
 
-tref nso_factory<bv, sbf_ba>::unpack_tau_ba(const std::variant<bv, sbf_ba>&) {
+inline tref nso_factory<bv, sbf_ba>::unpack_tau_ba(const std::variant<bv, sbf_ba>&) {
 	return nullptr; // There is no tau_ba present
 }
 
-std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::pack_tau_ba(
+inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::pack_tau_ba(
 	tref) {
 	// There is no tau_ba
 	return {};
 }
 
-std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {
+inline std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {
 	return { "sbf", "tau", "bv" };
 }
 
-tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::default_type() {
+inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::default_type() {
 	return tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>();
 }
 
-std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::one(
+inline std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::one(
 	tref type_tree)
 {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
@@ -63,7 +62,7 @@ std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::one(
 	} else return "T";
 }
 
-std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::zero(
+inline std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::zero(
 	tref type_tree)
 {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
@@ -75,7 +74,7 @@ std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::zero(
 	} else return "F";
 }
 
-tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
+inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
 		tref type_tree)
 {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
@@ -92,7 +91,7 @@ tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
 				tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>()));
 }
 
-tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::unpack_tau_ba(
+inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::unpack_tau_ba(
 		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v)
 {
 	if (!std::holds_alternative<tau_ba<bv, sbf_ba>>(v)) return {};
