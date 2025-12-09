@@ -25,6 +25,9 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...>::tau_ba(tref main) : nso_rr({ tau::geth(main) }) {}
 
+template<typename ... BAs> requires BAsPack<BAs...>
+tau_ba<BAs...>::tau_ba() : nso_rr() {}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 auto tau_ba<BAs...>::operator<=>(const tau_ba<BAs...>&) const = default;

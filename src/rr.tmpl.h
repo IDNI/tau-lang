@@ -9,7 +9,10 @@ rr<node>::rr(const rewriter::rules& rec_relations, const htref& main)
 				: rec_relations(rec_relations), main(main) {};
 
 template <NodeType node>
-rr<node>::rr(const htref& main) : main(main) {};
+rr<node>::rr(const htref& main) : main(main) {}
+
+template<NodeType node>
+rr<node>::rr(){}
 
 template <NodeType node>
 std::weak_ordering compare_trees(const htref& a, const htref& b) {

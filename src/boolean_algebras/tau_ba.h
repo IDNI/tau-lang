@@ -56,6 +56,8 @@ struct tau_ba {
 	 */
 	tau_ba(tref main);
 
+	tau_ba();
+
 	/**
 	 * @brief Three-way comparison operator.
 	 *
