@@ -106,9 +106,6 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv> vars,
 template <NodeType node>
 tref cvc5_tree_to_tau_tree (bv n);
 
-template <NodeType node>
-tref simplify_bv(tref fm);
-
 /**
  * @brief Checks if a given bit-vector formula is satisfiable.
  *

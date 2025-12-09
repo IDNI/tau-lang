@@ -305,25 +305,6 @@ tref cvc5_tree_to_tau_tree(bv n) {
 #undef rec
 }
 
-template<NodeType node>
-tref simplify_bv(tref fm) {
-	using tau = tree<node>;
-	// Only simplify formulas with constants
-	if (rewriter::find_top<node>(fm, is<node, tau::variable>))
-		return fm;
-	subtree_map<node, bv> vars, free_vars;
-	Solver solver(cvc5_term_manager);
-	config_cvc5_solver(solver);
-	auto fm_bv_op = bv_eval_node(fm, vars, free_vars);
-	if (!fm_bv_op) {
-		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(fm);
-		return nullptr;
-	}
-	bv fm_bv = fm_bv_op.value();
-	fm_bv = solver.simplify(fm_bv);
-	return cvc5_tree_to_tau_tree<node>(fm_bv);
-}
-
 template <NodeType node>
 bool is_bv_formula_sat(tref form) {
 	using tt = tree<node>::traverser;

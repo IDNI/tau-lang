@@ -3282,7 +3282,7 @@ tref term_boole_decomposition(tref term) {
 	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
 		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
 			<< tau::get(term) << "\n");
-		return term;
+		return normalize_ba<node>(term);
 	}
 	// Simple cases
 	if (tau::get(term).equals_0() || tau::get(term).equals_1())
@@ -3291,11 +3291,12 @@ tref term_boole_decomposition(tref term) {
 	auto vars = get_free_vars_appearance_order<node>(bd);
 	// No free var, so no boole decomposition step
 	if (vars.empty()) {
+		bd = normalize_ba<node>(bd);
 #ifdef TAU_CACHE
 		cache.emplace(bd, bd);
 		return cache.emplace(term, bd).first->second;
 #endif // TAU_CACHE
-		return normalize_ba<node>(bd);
+		return bd;
 	}
 	std::ranges::stable_sort(vars, variable_order_for_simplification<node>);
 	bd = rec_term_boole_decomposition<node>(bd, vars, 0);
@@ -3380,9 +3381,7 @@ tref boole_normal_form(tref formula) {
 	bnf = squeeze_absorb<node>(bnf);
 	// Step 2: Traverse formula, simplify all encountered equations
 	auto simp_eqs = [](tref n) {
-		if (is_atomic_fm<node>(n) && is_bv_type_family<node>(find_ba_type<node>(n))) {
-			return simplify_bv<node>(n);
-		} else if (tau::get(n).child_is(tau::bf_eq)) {
+		if (tau::get(n).child_is(tau::bf_eq)) {
 			if (tau::get(n).equals_T() || tau::get(n).equals_F())
 				return n;
 			tref c1 = tau::get(n)[0].first();
@@ -3461,9 +3460,7 @@ tref term_boole_normal_form(tref formula) {
 	tref tbnf = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
 	auto simp_eqs = [](tref n) {
-		if (is_atomic_fm<node>(n) && is_bv_type_family<node>(find_ba_type<node>(n))) {
-			return simplify_bv<node>(n);
-		} else if (tau::get(n).child_is(tau::bf_eq)) {
+		if (tau::get(n).child_is(tau::bf_eq)) {
 			if (tau::get(n).equals_T() || tau::get(n).equals_F())
 				return n;
 			tref c1 = tau::get(n)[0].first();
