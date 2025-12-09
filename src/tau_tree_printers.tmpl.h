@@ -71,7 +71,7 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			|| nt == tau::offset;
 	};
 	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
-	if (bool print_is_term = true; print_is_term && n.term) os << "*";
+	//if (bool print_is_term = true; print_is_term && n.term) os << "*";
 	if (n.term == 0 && n.ba_type == 1 && n.nt == tau_parser::ref)
 		os << LOG_WARNING_COLOR << "?" << TC.CLEAR();
 	if (n.data) os << "[" << n.data << "]";

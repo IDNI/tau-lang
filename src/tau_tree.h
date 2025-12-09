@@ -321,6 +321,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static bool is_digital_nt(size_t nt);
 	static bool is_string_nt(size_t nt);
 	static bool is_term_nt(size_t nt, size_t parent_nt);
+	static bool is_term_nt(size_t nt);
 
 	// fast access helpers
 	size_t data() const;
