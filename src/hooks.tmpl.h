@@ -196,6 +196,8 @@ tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	case tau::ba_constant: return cte(v, ch, len, r);
 	default: break;
 	}
+	// Term is currently untyped
+	if (v.ba_type == 0) return tau::get_raw(v, ch, len, r);
 	// Simplifications for bitvector symbols
 	return base_ba_symbol_simplification(
 		tau::get_raw(v, ch, len, r),
