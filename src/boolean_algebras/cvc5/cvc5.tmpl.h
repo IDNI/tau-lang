@@ -58,13 +58,4 @@ Term operator>>(const Term& lhs, const Term& rhs) {
 	return make_bitvector_shr(lhs, rhs);
 }
 
-bool operator==(const Term& , const bool& ) { return false; }
-
-bool operator==(const bool& , const Term& ) { return false; }
-
-bool operator!=(const Term& , const bool& ) { return false; }
-
-bool operator!=(const bool& , const Term& ) { return false; }
-
-
 } // namespace idni::tau_lang

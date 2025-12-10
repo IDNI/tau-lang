@@ -429,6 +429,22 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 	return typename node<BAs...>::constant_with_type{ cte.value(), type_tree };
 }
 
+bool operator==(const Term& lhs, const bool& rhs) {
+	if (rhs) {
+		// Check if lhs equals 1
+		return normalize(lhs) == make_bitvector_top_elem(lhs.getSort().getBitVectorSize());
+	} else {
+		// Check if rhs equals 0
+		return normalize(lhs) == make_bitvector_bottom_elem(lhs.getSort().getBitVectorSize());
+	}
+}
+
+bool operator==(const bool& lhs, const Term& rhs) { return rhs == lhs; }
+
+bool operator!=(const Term& lhs, const bool& rhs) { return !(lhs == rhs); }
+
+bool operator!=(const bool& lhs, const Term& rhs) { return !(rhs == lhs); }
+
 template<NodeType node>
 tref term_add(tref symbol) {
 	using tau = tree<node>;
