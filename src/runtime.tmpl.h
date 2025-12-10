@@ -42,6 +42,13 @@ inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::pack_tau_ba(
 	return {};
 }
 
+inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::to_base_ba_type(tref type_tree) {
+	using node_t = node<bv, sbf_ba>;
+	if (is_bv_type_family<node_t>(type_tree))
+		return {sbf_ba()};
+	else return {bv()};
+}
+
 inline std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {
 	return { "sbf", "tau", "bv" };
 }
@@ -105,4 +112,14 @@ inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_b
 	return {t};
 }
 
+inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_ba>,
+	bv, sbf_ba>::to_base_ba_type(tref type_tree) {
+	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+	if (is_tau_type<node_t>(type_tree)) return { tau_ba<bv, sbf_ba>() };
+	else if (is_sbf_type<node_t>(type_tree)) return { sbf_ba() };
+	else {
+		DBG(assert(is_bv_type_family<node_t>(type_tree)));
+		return { bv() };
+	}
+}
 } // namespace idni::tau_lang

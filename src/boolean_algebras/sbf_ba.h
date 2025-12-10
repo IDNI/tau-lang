@@ -38,6 +38,8 @@ struct sbf_ba_factory {
 
 inline bool is_closed(const sbf_ba&) { return true; }
 
+inline tref base_ba_symbol_simplification(tref sym, const sbf_ba&) { return sym; }
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_sbf(const std::string& src);

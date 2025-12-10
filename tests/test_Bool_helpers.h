@@ -31,6 +31,10 @@ struct nso_factory<bv, Bool> {
 	static tref unpack_tau_ba(const std::variant<bv, Bool>&) { return nullptr; }
 
 	static std::variant<bv, Bool> pack_tau_ba(tref) { return {}; }
+
+	static std::variant<bv, Bool> to_base_ba_type(tref) {
+		return { Bool() };
+	}
 };
 
 template <>

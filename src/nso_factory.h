@@ -67,6 +67,15 @@ struct nso_factory {
 	 * @return std::variant holding a tau_ba
 	 */
 	static std::variant<BAs...> pack_tau_ba (tref c);
+
+	/**
+	 * Returns a std::variant containing a default base Boolean algebra
+	 * element corresponding to the type given by type_tree
+	 * @param type_tree Tree representation of type
+	 * @return std::variant holding a default corresponding base Boolean
+	 * algebra element
+	 */
+	static std::variant<BAs...> to_base_ba_type(tref type_tree);
 };
 
 

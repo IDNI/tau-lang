@@ -240,6 +240,36 @@ inline bool is_syntactic_one(const cvc5::Term& fm) {
 		std::string(fm.getSort().getBitVectorSize(), '1');
 }
 
+// Bitvector specific symbol simplification
+template<NodeType node>
+tref term_add(tref symbol);
+template<NodeType node>
+tref term_sub(tref symbol);
+template<NodeType node>
+tref term_mul(tref symbol);
+template<NodeType node>
+tref term_div(tref symbol);
+template<NodeType node>
+tref term_mod(tref symbol);
+template<NodeType node>
+tref term_shr(tref symbol);
+template<NodeType node>
+tref term_shl(tref symbol);
+template<NodeType node>
+tref term_nor(tref symbol);
+template<NodeType node>
+tref term_xnor(tref symbol);
+template<NodeType node>
+tref term_nand(tref symbol);
+
+/**
+ * Simplifies a symbol specific to this base Boolean algebra
+ * @param symbol The symbol to simplify
+ * @return The result of simplification
+ */
+template <typename ...BAs> requires BAsPack<BAs...>
+tref base_ba_symbol_simplification(tref symbol, const bv&);
+
 // -----------------------------------------------------------------------------
 
 } // namespace idni::tau_lang
