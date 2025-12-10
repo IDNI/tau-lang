@@ -15,7 +15,6 @@ static cvc5::TermManager cvc5_term_manager;
 static size_t default_bv_size = 16;
 
 size_t get_cvc5_size(const cvc5::Term& b);
-inline bool is_closed(const cvc5::Term&) { return true; }
 
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra operatiors

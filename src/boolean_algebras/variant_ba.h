@@ -107,6 +107,16 @@ bool is_syntactic_zero(const std::variant<BAs...>& elem) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+bool is_closed(const std::variant<BAs...>& elem) {
+	return std::visit(overloaded(
+		[](const auto& el) {
+			return is_closed(el);
+		}
+	), elem);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem,
 	splitter_type st)
 {

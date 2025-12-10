@@ -756,13 +756,12 @@ template <NodeType node>
 bool has_open_tau_fm_in_constant(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	auto _closed = [](const auto& c) -> bool { return is_closed(c); };
 	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
 	for (tref c : consts) {
 		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
 		// Special case if the ba_constant is not converted to constant yet
 		if (tau::get(ba_const).get_ba_constant_id() == 0) return false;
-		if (!std::visit(_closed, tt(ba_const) | tt::ba_constant)) {
+		if (!is_closed(tt(ba_const) | tt::ba_constant)) {
 			LOG_ERROR << "A Tau formula constant must be closed: "
 								<< ba_const;
 			return true;
