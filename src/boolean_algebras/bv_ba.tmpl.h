@@ -429,4 +429,615 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 	return typename node<BAs...>::constant_with_type{ cte.value(), type_tree };
 }
 
+template<NodeType node>
+tref term_add(tref symbol) {
+	using tau = tree<node>;
+	auto add_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_add(c1, c2);
+		typename node::constant v = {res};
+		return tau::build_bf_ba_constant(v, type_id);
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 + X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width =  get_bv_width<node>(get_ba_type_tree<node>(t));
+				return add_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 + 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return add_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 + X
+		case tau::bf_f: return tau::get(symbol)[0].second();
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X + 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return add_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// x + 0
+		case tau::bf_f: return tau::get(symbol)[0].first();
+		default: break;
+	}
+	// { ... } + { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return add_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+	}
+	return symbol;
+}
+
+template<NodeType node>
+tref term_sub(tref symbol) {
+	using tau = tree<node>;
+	auto sub_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_sub(c1, c2);
+		typename node::constant v = {res};
+		return tau::build_bf_ba_constant(v, type_id);
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 - X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width =  get_bv_width<node>(get_ba_type_tree<node>(t));
+				return sub_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 - 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				return tau::_0(c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 - X cannot be simplified
+		case tau::bf_f: {
+			// 0 - 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width =  get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return sub_consts(
+					make_bitvector_bottom_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+		}
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X - 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return sub_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// x - 0
+		case tau::bf_f: return tau::get(symbol)[0].first();
+		default: break;
+	}
+	// { ... } - { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return sub_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+		}
+	return symbol;
+}
+
+template<NodeType node>
+tref term_mul(tref symbol) {
+	using tau = tree<node>;
+	auto mul_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_mul(c1, c2);
+		typename node::constant v = {res};
+		return tau::build_bf_ba_constant(v, type_id);
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 * X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return mul_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 * 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return mul_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 * X
+		case tau::bf_f: return tau::_0(c2.get_ba_type());
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X * 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return mul_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X * 0
+		case tau::bf_f: return tau::_0(c1.get_ba_type());
+		default: break;
+	}
+	// { ... } * { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return mul_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+		}
+	return symbol;
+}
+
+template<NodeType node>
+tref term_div(tref symbol) {
+	using tau = tree<node>;
+	auto div_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_div(c1, c2);
+		typename node::constant v = {res};
+		return tau::build_bf_ba_constant(v, type_id);
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 / X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return div_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 / 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return div_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			// 1 / 0
+			if (c2.is(tau::bf_f)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return div_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_bottom_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 / X
+		case tau::bf_f: return tau::_0(c2.get_ba_type());
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X / 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return div_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X / 0
+		case tau::bf_f: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return div_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_bottom_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		default: break;
+	}
+	// { ... } / { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return div_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+		}
+	return symbol;
+}
+
+template<NodeType node>
+tref term_mod(tref symbol) {
+	using tau = tree<node>;
+	auto mod_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_mod(c1, c2);
+		typename node::constant v = {res};
+		return tau::build_bf_ba_constant(v, type_id);
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 % X
+		case tau::bf_t: {
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return mod_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 % 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return mod_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			// 1 % 0
+			if (c2.is(tau::bf_f)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return mod_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_bottom_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 % X
+		case tau::bf_f: return tau::_0(c2.get_ba_type());
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X % 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return mod_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X % 0
+		case tau::bf_f: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return mod_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_bottom_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		default: break;
+	}
+	// { ... } % { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return mod_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+		}
+	return symbol;
+}
+
+template<NodeType node>
+tref term_shr(tref symbol) {
+	using tau = tree<node>;
+	auto shr_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_shr(c1, c2);
+		typename node::constant v = {res};
+		return tau::build_bf_ba_constant(v, type_id);
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 >> X
+		case tau::bf_t: {
+			// 1 >> {...}
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return shr_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 >> 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return shr_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 >> X
+		case tau::bf_f: {
+			// 0 >> {...}
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return shr_consts(
+					make_bitvector_bottom_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 0 >> 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return shr_consts(
+					make_bitvector_bottom_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X >> 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return shr_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X >> 0
+		case tau::bf_f: return tau::get(symbol)[0].first();
+		default: break;
+	}
+	// { ... } >> { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return shr_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+	}
+	return symbol;
+}
+
+template<NodeType node>
+tref term_shl(tref symbol) {
+	using tau = tree<node>;
+	auto shl_consts = [](const bv& c1, const bv& c2, size_t type_id) {
+		bv res = make_bitvector_shl(c1, c2);
+		typename node::constant v = {res};
+		return tau::build_bf_ba_constant(v, type_id);
+	};
+	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
+	const tau& c1 = tau::get(symbol)[0][0][0];
+	const tau& c2 = tau::get(symbol)[0][1][0];
+	switch (c1.value.nt) {
+		// 1 << X
+		case tau::bf_t: {
+			// 1 << {...}
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return shl_consts(
+					make_bitvector_top_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+			}
+			// 1 << 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return shl_consts(
+					make_bitvector_top_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		// 0 << X
+		case tau::bf_f: {
+			// 0 << {...}
+			if (size_t t = c2.get_ba_type();
+				c2.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return shl_consts(
+					make_bitvector_bottom_elem(width),
+					std::get<bv>(c2.get_ba_constant()),
+					c2.get_ba_type());
+				}
+			// 0 << 1
+			if (c2.is(tau::bf_t)) {
+				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
+				return shl_consts(
+					make_bitvector_bottom_elem(width),
+					make_bitvector_top_elem(width),
+					c2.get_ba_type());
+			}
+			break;
+		}
+		default: break;
+	}
+	switch (c2.value.nt) {
+		// X << 1
+		case tau::bf_t: {
+			if (size_t t = c1.get_ba_type();
+				c1.is_ba_constant() && t > 0) {
+				DBG(assert(is_bv_type_family<node>(t));)
+				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
+				return shl_consts(
+					std::get<bv>(c1.get_ba_constant()),
+					make_bitvector_top_elem(width),
+					c1.get_ba_type());
+				}
+			break;
+		}
+		// X << 0
+		case tau::bf_f: return tau::get(symbol)[0].first();
+		default: break;
+	}
+	// { ... } << { ... }
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		return shl_consts(std::get<bv>(c1.get_ba_constant()),
+					std::get<bv>(c2.get_ba_constant()),
+					c1.get_ba_type());
+	}
+	return symbol;
+}
+
+template<NodeType node>
+tref term_nor(tref symbol) {
+	using tau = tree<node>;
+	tref c1 = tau::get(symbol)[0].first();
+	tref c2 = tau::get(symbol)[0].second();
+	return tau::build_bf_neg(tau::build_bf_or(c1, c2));
+}
+
+template<NodeType node>
+tref term_xnor(tref symbol) {
+	using tau = tree<node>;
+	tref c1 = tau::get(symbol)[0].first();
+	tref c2 = tau::get(symbol)[0].second();
+	return tau::build_bf_neg(tau::build_bf_xor(c1, c2));
+}
+
+template<NodeType node>
+tref term_nand(tref symbol) {
+	using tau = tree<node>;
+	tref c1 = tau::get(symbol)[0].first();
+	tref c2 = tau::get(symbol)[0].second();
+	return tau::build_bf_neg(tau::build_bf_and(c1, c2));
+}
+
+// TODO: make test cases
+// 0+1 = x1 :bv && 1+1 = x2 :bv && 1+0 = x3 :bv &&  1+{8} = x4 :bv &&  {8}+1 = x5 :bv &&  {8} + {8} = x6:bv
+// 0-1 = x1 :bv && 1-1 = x2 :bv && 1-0 = x3 :bv &&  1-{8} = x4 :bv &&  {8}-1 = x5 :bv &&  {8} - {8} = x6:bv
+// 0*1 = x1 :bv && 1*1 = x2 :bv && 1*0 = x3 :bv &&  1*{8} = x4 :bv &&  {8}*1 = x5 :bv &&  {8} * {8} = x6:bv
+// 0/1 = x1 :bv && 1/1 = x2 :bv && 1/0 = x3 :bv &&  1/{8} = x4 :bv &&  {8}/1 = x5 :bv &&  {8} / {8} = x6:bv
+// 0%1 = x1 :bv && 1%1 = x2 :bv && 1%0 = x3 :bv &&  1%{8} = x4 :bv &&  {8}%1 = x5 :bv &&  {8} % {8} = x6:bv
+// 0>>1 = x1 :bv && 1>>1 = x2 :bv && 1>>0 = x3 :bv &&  1>>{8} = x4 :bv &&  {8}>>1 = x5 :bv &&  {8} >> {8} = x6:bv
+// 0<<1 = x1 :bv && 1<<1 = x2 :bv && 1<<0 = x3 :bv &&  1<<{8} = x4 :bv &&  {8}<<1 = x5 :bv &&  {8} << {8} = x6:bv
+
+template <typename ...BAs> requires BAsPack<BAs...>
+tref base_ba_symbol_simplification(tref symbol, const bv&) {
+	using node_t = node<BAs...>;
+	using tau = tree<node_t>;
+	switch (tau::get(symbol)[0].get_type()) {
+		case tau::bf_add: return term_add<node_t>(symbol);
+		case tau::bf_sub: return term_sub<node_t>(symbol);
+		case tau::bf_mul: return term_mul<node_t>(symbol);
+		case tau::bf_div: return term_div<node_t>(symbol);
+		case tau::bf_mod: return term_mod<node_t>(symbol);
+		case tau::bf_shr: return term_shr<node_t>(symbol);
+		case tau::bf_shl: return term_shl<node_t>(symbol);
+		case tau::bf_nor: return term_nor<node_t>(symbol);
+		case tau::bf_xnor: return term_xnor<node_t>(symbol);
+		case tau::bf_nand: return term_nand<node_t>(symbol);
+		default: return symbol;
+	}
+}
+
 } // namespace idni::tau_lang

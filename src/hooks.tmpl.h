@@ -194,8 +194,13 @@ tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	case tau::bf_neg:      return term_neg(v, ch, len, r);
 	case tau::bf_xor:      return term_xor(v, ch, len, r);
 	case tau::ba_constant: return cte(v, ch, len, r);
-	default: return tau::get_raw(v, ch, len, r);
+	default: break;
 	}
+	// Simplifications for bitvector symbols
+	return base_ba_symbol_simplification(
+		tau::get_raw(v, ch, len, r),
+		node::nso_factory::to_base_ba_type(
+			get_ba_type_tree<node>(v.ba_type)));
 }
 
 template <NodeType node>

@@ -208,6 +208,13 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 	return true;
 }
 
+template<typename ... BAs> requires BAsPack<BAs...>
+tref base_ba_symbol_simplification(tref symbol, const auto&) {
+	// All symbols for the tau base Boolean algebra are
+	// simplified in general procedure
+	return symbol;
+}
+
 
 template <typename... BAs>
 requires BAsPack<BAs...>
