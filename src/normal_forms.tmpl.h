@@ -3898,8 +3898,8 @@ tref normalize_temporal_quantifiers(tref fm) {
 		if (st_aw(n)) return tau::trim2(n);
 		return n;
 	};
-	bool has_temp_quant = tau::get(fm).find_top(st_aw);
 	if (has_temp_var<node>(fm)) {
+		const bool has_temp_quant = tau::get(fm).find_top(st_aw);
 		if (has_temp_quant) {
 			// By assumption, all temporal variables are explicitly
 			// quantified by temporal quantifier without nesting.
@@ -3928,7 +3928,7 @@ tref normalize_temporal_quantifiers(tref fm) {
 						!has_temp_var<node>(conj));)
 					if (!has_temp_var<node>(conj))
 						always_part = tau::build_wff_and(
-							always_part, conj);
+							always_part, rm_temp_quant(conj));
 					// TODO: always conjunction is inefficient
 					else if (!is_child<node>(conj, tau::wff_sometimes))
 						always_part = always_conjunction<node>(
@@ -3953,8 +3953,8 @@ tref normalize_temporal_quantifiers(tref fm) {
 		}
 	} else {
 		// No temporal variable, so no temporal quantifier needed
-		if (st_aw(fm)) return norm(tau::trim2(fm));
-		else return norm(fm);
+		fm = pre_order<node>(fm).apply_unique(rm_temp_quant);
+		return norm(fm);
 	}
 }
 
