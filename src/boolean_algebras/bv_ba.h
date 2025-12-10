@@ -240,6 +240,12 @@ inline bool is_syntactic_one(const cvc5::Term& fm) {
 		std::string(fm.getSort().getBitVectorSize(), '1');
 }
 
+// Bool comparisons
+inline bool operator==(const cvc5::Term& lhs, const bool& rhs);
+inline bool operator==(const bool& lhs, const cvc5::Term& rhs);
+inline bool operator!=(const cvc5::Term& lhs, const bool& rhs);
+inline bool operator!=(const bool& lhs, const cvc5::Term& rhs);
+
 // Bitvector specific symbol simplification
 template<NodeType node>
 tref term_add(tref symbol);

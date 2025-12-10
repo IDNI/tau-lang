@@ -31,10 +31,7 @@ inline cvc5::Term operator%(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term operator<<(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term operator>>(const cvc5::Term& lhs, const cvc5::Term& rhs);
 
-inline bool operator==(const cvc5::Term& lhs, const bool& rhs);
-inline bool operator==(const bool& lhs, const cvc5::Term& rhs);
-inline bool operator!=(const cvc5::Term& lhs, const bool& rhs);
-inline bool operator!=(const bool& lhs, const cvc5::Term& rhs);
+
 
 // -----------------------------------------------------------------------------
 // Builders
