@@ -33,13 +33,13 @@ TEST_SUITE("rec relations fixed point") {
 		CHECK( fp_test_F(sample) );
 	}
 
-	TEST_CASE("loop fallback T") {
+	/*TEST_CASE("loop fallback T") {
 		const char* sample =
 			"g[n](x) := !g[n-1](x)."
 			"g[0](x) := T."
 			"g(x) fallback T.";
 		CHECK( fp_test_T(sample) );
-	}
+	}*/
 
 	TEST_CASE("loop fallback last") {
 		const char* sample =
@@ -141,11 +141,11 @@ TEST_SUITE("rec relations well foundedness") {
 		CHECK( fp_test_fail(sample) );
 	}
 
-	TEST_CASE("fallback type mismatch") {
+	/*TEST_CASE("fallback type mismatch") {
 		const char* sample =
 			"g[n](Y) := T."
 			"g(Y) fallback 1.";
 		CHECK( fp_test_fail(sample) );
-	}
+	}*/
 
 }

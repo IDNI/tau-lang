@@ -40,6 +40,12 @@ tau::get_options parse_definitions_no_infer() {
 	return opts;
 }
 
+tau::get_options parse_spec_no_infer() {
+	static tau::get_options opts{ .parse = { .start = tau::definitions },
+		.infer_ba_types = false,
+		.reget_with_hooks = false };
+	return opts;
+}
 tref parse(const std::string& sample, const tau::get_options& opts = parse_wff_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
@@ -57,6 +63,14 @@ tref parse_bf(const std::string& sample, const tau::get_options& opts = parse_bf
 }
 
 tref parse_definitions(const std::string& sample, const tau::get_options& opts = parse_definitions_no_infer()) {
+	auto src = tree<node_t>::get(sample, opts);
+	if (src == nullptr) {
+		TAU_LOG_ERROR << "Parsing failed for: " << sample;
+	}
+	return src;
+}
+
+tref parse_spec(const std::string& sample, const tau::get_options& opts = parse_spec_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
@@ -152,31 +166,60 @@ bool check_vars(tref inferred, std::vector<std::pair<std::string, size_t>>& expe
 }
 
 bool check_refs(tref inferred, std::vector<size_t>& expected) {
-	auto refs = tau::get(inferred).select_top(is<node_t, tau::ref>);
-	if (refs.empty() && expected.size() > 0) {
+	auto ref_parents = tau::get(inferred).select_top(is_child<node_t, tau::ref>);
+	if (ref_parents.empty() && expected.size() > 0) {
 		TAU_LOG_ERROR << "No refs found";
 		return false;
 	}
-	if (refs.size() != expected.size()) {
+	if (ref_parents.size() != expected.size()) {
 		TAU_LOG_ERROR << "Expected " << expected.size()
-			<< " refs, found " << refs.size();
+			<< " refs, found " << ref_parents.size();
 		return false;
 	}
 	for (size_t i = 0; i < expected.size(); i++) {
-		size_t ctype = tau::get(refs[i]).get_ba_type();
-		if (ctype != expected[i]) {
-			TAU_LOG_ERROR << "Ref '" << refs[i]
-				<< "' expected type " << ba_types<node_t>::name(expected[i])
-				<< ", found " << ba_types<node_t>::name(ctype);
+		size_t rtype = tau::get(ref_parents[i])[0].get_type();
+		if (rtype != expected[i]) {
+			TAU_LOG_ERROR << "Ref '" << ref_parents[i]
+				<< "' expected type " << expected[i]
+				<< ", found " << rtype;
 			return false;
 		}
-		TAU_LOG_TRACE << "Ref '" << refs[i] << " matched\n";
+		TAU_LOG_TRACE << "Ref '" << ref_parents[i] << " matched\n";
 	}
 	return true;
 }
 
 bool check_ctes(tref inferred, std::vector<size_t>& expected) {
 	auto ctes = tau::get(inferred).select_top(is<node_t, tau::ba_constant>);
+	if (ctes.empty() && expected.size() > 0) {
+		TAU_LOG_ERROR << "No constants found";
+		return false;
+	}
+	if (ctes.size() != expected.size()) {
+		TAU_LOG_ERROR << "Expected " << expected.size()
+			<< " constants, found " << ctes.size();
+		return false;
+	}
+	for (size_t i = 0; i < expected.size(); i++) {
+		size_t ctype = tau::get(ctes[i]).get_ba_type();
+		if (ctype != expected[i]) {
+			TAU_LOG_ERROR << "Constant '" << ctes[i]
+				<< "' expected type " << ba_types<node_t>::name(expected[i])
+				<< ", found " << ba_types<node_t>::name(ctype);
+			return false;
+		}
+		TAU_LOG_TRACE << "Constant '" << ctes[i] << " matched\n";
+	}
+	return true;
+}
+
+bool check_bf_ctes(tref inferred, std::vector<size_t>& expected) {
+	auto is_bf_constant = [](tref n) -> bool {
+		using tau = tree<node_t>;
+
+		return tau::get(n).is(tau::bf_t) || tau::get(n).is(tau::bf_f);
+	};
+	auto ctes = tau::get(inferred).select_top(is_bf_constant);
 	if (ctes.empty() && expected.size() > 0) {
 		TAU_LOG_ERROR << "No constants found";
 		return false;
@@ -1429,6 +1472,93 @@ TEST_SUITE("infer_ba_types: definitions") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 		DBG(if (inferred) LOG_INFO << "Inferred: " << tau::get(inferred).tree_to_str();)
+	}
+}
+
+TEST_SUITE("regression tests") {
+
+	/*TEST_CASE("satisfiability3/qual_lookback_one_st") {
+		tref parsed = parse("(always o1[t-1]:bv = { 0 }) && (sometimes o1[t]:bv = { 1 } && o1[t-1]:bv = { 0 })");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"o1", bv_type_id<node_t>()},
+			{"t", untyped_type_id<node_t>()},
+			{"o1", bv_type_id<node_t>()},
+			{"t", untyped_type_id<node_t>()},
+			{"o1", bv_type_id<node_t>()},
+			{"t", untyped_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto expected_ctes = std::vector<size_t> {
+			bv_type_id<node_t>(),
+			bv_type_id<node_t>(),
+			bv_type_id<node_t>()
+		};
+		CHECK( check_ctes(inferred, expected_ctes) );
+	}
+
+	TEST_CASE("splitter/Tau_splitter_7") {
+		tref parsed = parse("(sometimes o1[t] = 1)");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"o1", tau_type_id<node_t>()},
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto expected_ctes = std::vector<size_t> {
+			tau_type_id<node_t>()
+		};
+		CHECK( check_bf_ctes(inferred, expected_ctes) );
+	}*/
+
+	/*TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
+		logging::trace();
+		tref parsed = parse_spec(
+			"g(Y) := T."
+			"g(Y)."
+		);
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"Y", tau_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto expected_refs = std::vector<size_t> {
+			tau::wff_ref,
+			tau::wff_ref
+		};
+		CHECK( check_refs(inferred, expected_refs) );
+		logging::info();
+	}*/
+
+	TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
+		tref parsed = parse("g(x):tau fallback 1", parse_cli_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", tau_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto expected_ctes = std::vector<size_t> {
+			tau_type_id<node_t>()
+		};
+		CHECK( check_bf_ctes(inferred, expected_ctes) );
+	}
+
+	TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
+		tref parsed = parse("g(x:tau) fallback T", parse_cli_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", tau_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
 	}
 }
 
