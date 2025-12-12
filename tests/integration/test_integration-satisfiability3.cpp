@@ -14,6 +14,7 @@ TEST_SUITE("Configuration") {
 }
 
 TEST_SUITE("Alignments y3") {
+
 	TEST_CASE("equal_lookback_one_st") {
 		tref spec = create_spec("(always o1[t-1]:bv = { 0 }) && (sometimes o1[t]:bv = { 1 } && o1[t-1]:bv = { 0 }).");
 		CHECK(!is_tau_formula_sat<node_t>(spec));

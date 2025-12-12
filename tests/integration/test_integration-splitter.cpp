@@ -39,6 +39,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s));
 	}
+
 	TEST_CASE("Tau_splitter_5") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
@@ -47,6 +48,8 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
+
+	
 	TEST_CASE("Tau_splitter_6") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
@@ -55,6 +58,8 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
+	
+	// TODO (HIGH) fix this test case
 	TEST_CASE("Tau_splitter_7") {
 		const char *sample = "(sometimes o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
@@ -63,6 +68,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
+
 	TEST_CASE("Tau_splitter_8") {
 		const char *sample = "(always o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
@@ -89,6 +95,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
+
 	TEST_CASE("Tau_splitter_11") {
 		const char *sample = "xy = 0 && x != 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
@@ -97,6 +104,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s ));
 	}
+
 	TEST_CASE("Tau_splitter_12") {
 		const char *sample = "{<:a><:b>|<:c><:d> = 0} & y = 0 && {<:a><:b>|<:c><:d> = 0} & y < {<:a><:b>|<:c><:d> = 0}.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
@@ -105,6 +113,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s));
 	}
+
 	TEST_CASE("Tau_splitter_13") {
 		const char *sample = "{<:a><:b>|<:c><:d> = 0} & y != 0 && { <:a><:b>|<:c><:d> = 0 } : tau ({ <:a><:b>|<:c><:d> = 0 } : tau y)' != 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
@@ -113,6 +122,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s));
 	}
+
 	TEST_CASE("Tau_splitter_14") {
 		const char *sample = "x = 0 && y != 0 || z = 0 && k = 0.";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
