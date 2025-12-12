@@ -72,14 +72,14 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ref                                :bf_ref
                         | (bf  _ ">>" _      bf)             :bf_shr
                         | (bf  _ "<<" _      bf)             :bf_shl
+                        | (bf  _ '+' _       bf)             :bf_add
+                        | (bf  _ '-' _       bf)             :bf_sub
+                        | (bf  _ '%' _       bf)             :bf_mod
+                        | (bf  _ '*' _       bf)             :bf_mul
+                        | (bf  _ '/' _       bf)             :bf_div
                         | (bf  _ "!|" _      bf)             :bf_nor
                         | (bf  _ "!^" _      bf)             :bf_xnor
                         | (bf  _ "!&" _      bf)             :bf_nand
-                        | (bf  _ '-' _       bf)             :bf_sub
-                        | (bf  _ '+' _       bf)             :bf_add
-                        | (bf  _ '%' _       bf)             :bf_mod
-                        | (bf  _ '/' _       bf)             :bf_div
-                        | (bf  _ '*' _       bf)             :bf_mul
                         | (bf  _ '|' _       bf)             :bf_or
                         | (bf  _ '^' _       bf)             :bf_xor
                         | ('1' [ typed ])                    :bf_t
