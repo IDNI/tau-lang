@@ -403,6 +403,12 @@ std::vector<size_t> get_type_ids(tref t);
 template <NodeType node>
 tref untype(tref n);
 
+template <NodeType node>
+size_t find_ba_type (tref term);
+
+template <NodeType node>
+tref find_ba_type_tree (tref term);
+
 // print the type name to the stream
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);

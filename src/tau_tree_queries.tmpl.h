@@ -256,24 +256,13 @@ auto is_non_boolean_term = [](tref n) static {
 };
 
 template <NodeType node>
-size_t find_ba_type (tref term) {
+bool has_fallback (tref n) {
 	using tau = tree<node>;
-	size_t type = tau::get(term).get_ba_type();
-	if (type != 0) return type;
-	auto f = [&type](const tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf)) type = t.get_ba_type();
-		if (type > 0) return false;
-		return true;
-	};
-	pre_order<node>(term).search_unique(f);
-	return type;
+	using tt = tau::traverser;
+
+	auto f = tt(n) | tau::fp_fallback | tt::first | tt::ref;
+	return f != nullptr && !tau::get(f).is(tau::first_sym) && !tau::get(f).is(tau::last_sym);
 }
 
-template <NodeType node>
-tref find_ba_type_tree (tref term) {
-	const size_t t = find_ba_type<node>(term);
-	return get_ba_type_tree<node>(t);
-}
 
 } // namespace idni::tau_lang
