@@ -774,6 +774,9 @@ bool is_atomic_fm(tref n);
 template <NodeType node>
 bool is_cli_cmd(tref n);
 
+template <NodeType node>
+bool has_fallback (tref n);
+
 } // namespace idni::tau_lang
 
 // Hash for tau node

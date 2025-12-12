@@ -649,9 +649,11 @@ tref untype(tref t) {
 		return tau::get(tau::variable, {tau::get(t).first()});
 	case tau::ref:
 		if (auto check = tt(t) | tau::typed; check) {
-			// copy all the children but the last one (the type)
+			// copy all the children but the typed
 			auto children = tau::get(t).get_children();
-			trefs n_children(children.begin(), children.end() - 1);
+			trefs n_children;
+			for (auto ch: tau::get(t).get_children())
+				if (!is<node, tau::typed>(ch)) n_children.push_back(ch);
 			return tau::get(tau::ref, n_children);
 		}
 		return tau::get(tau::ref, tau::get(t).get_children());
@@ -660,6 +662,26 @@ tref untype(tref t) {
 	}
 }
 
+template <NodeType node>
+size_t find_ba_type (tref term) {
+	using tau = tree<node>;
+	size_t type = tau::get(term).get_ba_type();
+	if (type != 0) return type;
+	auto f = [&type](const tref n) {
+		const auto& t = tau::get(n);
+		if (t.is(tau::bf)) type = t.get_ba_type();
+		if (type > 0) return false;
+		return true;
+	};
+	pre_order<node>(term).search_unique(f);
+	return type;
+}
+
+template <NodeType node>
+tref find_ba_type_tree (tref term) {
+	const size_t t = find_ba_type<node>(term);
+	return get_ba_type_tree<node>(t);
+}
 
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id) {
