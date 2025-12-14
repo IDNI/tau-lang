@@ -49,7 +49,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	for (auto& [cn, c] : options.named_constants)
 		named_constants[dict(cn)] = c;
 
-	auto transformer = [&](tref t, tref parent) {
+	auto transformer = [&](tref t, [[maybe_unused]] tref parent) {
 		// DBG(LOG_TRACE << " -- transforming: "
 		// 	      << (parse_tree::get(t).print_to_str());)
 
@@ -59,8 +59,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 
 		// get node type and parent node type
 		type nt = static_cast<type>(ptr.get_nt());
-		type parent_nt = static_cast<type>(parent == nullptr ? 0
-					: parse_tree::get(parent).get_nt());
+		//type parent_nt = static_cast<type>(parent == nullptr ? 0
+		//			: parse_tree::get(parent).get_nt());
 
 		// simple renaming transformations
 		// TODO (LOW) this should be supported directly by the parser
@@ -83,7 +83,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 		nt = retype_nonterminal();
 
 		// determine node types
-		bool is_term = is_term_nt(nt, parent_nt);
+		bool is_term = false; //is_term_nt(nt, parent_nt);
 		size_t ba_type = 0;
 
 		/*bool unresolved_ref = nt == ref && !is_term

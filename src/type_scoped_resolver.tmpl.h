@@ -94,9 +94,14 @@ bool type_scoped_resolver<node>::merge(const trefs& ts) {
 template<NodeType node>
 subtree_map<node, typename type_scoped_resolver<node>::type_id> type_scoped_resolver<node>::current_types() {
 	subtree_map<node, typename type_scoped_resolver<node>::type_id> current_types;
-	auto current_scope =scoped.scopes.back();
+	auto current_scope = scoped.scopes.back();
+	DBG(LOG_TRACE << "type_scoped_resolver/current_types/current_scope: " << current_scope << "\n";)
 	for(auto [scoped, _] : scoped.uf)
-		if (scoped.first == current_scope) current_types[scoped.second] = type_id_of(scoped.second);
+		if (scoped.first == current_scope) {
+			current_types[scoped.second] = type_id_of(scoped.second);
+			DBG(LOG_TRACE << "\t" << LOG_FM_DUMP(scoped.second)
+				<< " : " << ba_types<node>::name(current_types[scoped.second]) << "\n";)
+		}
 	return current_types;
 }
 
