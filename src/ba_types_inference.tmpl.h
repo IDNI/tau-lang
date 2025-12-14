@@ -25,13 +25,13 @@ tref canonize(tref t) {
 	tref new_t = untype<node>(t);
 	if (auto var_name = tt(new_t) | tau::io_var | tau::var_name | tt::ref; var_name) {
 		new_t = tau::get(tau::variable, tau::get(tau::io_var, { var_name }));
-	} else if (auto sym = tt(new_t) | tau::sym | tt::ref; sym) {
+	} /*else if (auto sym = tt(new_t) | tau::sym | tt::ref; sym) {
 		auto ref_args = tt(new_t) | tau::ref_args | tt::ref;
 		auto offsets = tt(new_t) | tau::offsets | tt::ref;
 		auto num_ref_args = (ref_args) ? (tau::get(ref_args).children_size()) : 0;
 		auto size_offsets = (offsets) ? (tau::get(offsets).children_size()) : 0;
 		new_t = tau::get(tau::ref, { sym, tau::get_num(num_ref_args), tau::get_num(size_offsets) });
-	}
+	}*/
 	DBG(LOG_TRACE << "canonize/t -> new_t:\n"
 		<< LOG_FM_TREE(t) << " -> " << LOG_FM_TREE(new_t);)
 	return new_t;
@@ -286,6 +286,7 @@ template<NodeType node>
 tref update_ba_constant([[maybe_unused]] type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
 	using tau = tree<node>;
 
+	DBG(LOG_TRACE <<"update_ba_constant/n: " << LOG_FM_DUMP(n) << "\n";)
 	// If we have no type information for the bf constant we
 	// rise an error as we should have at least untyped info
 	tref canonized = canonize<node>(n);
@@ -329,7 +330,7 @@ tref update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree
 		auto current_type = get_typed_id<node>(n);
 		if (!resolver.assign(canonized, current_type))
 			return nullptr; // incompatible types
-		return retype<node>(canonized, current_type);
+		return retype<node>(n, current_type);
 	}
 	// If the variable is not typed
 	if (tau::get(n).get_ba_type() == untyped_type_id<node>()) {
@@ -487,6 +488,8 @@ tref update(type_scoped_resolver<node>& resolver, tref n, std::initializer_list<
 		size_t nt = t.get_type();
 	
 		if (error) return false;
+		if (t.get_ba_type() != untyped_type_id<node>()) return n;
+
 		switch (nt) {
 			/*case tau::ref: {
 				if (!to_be_updated.contains(nt)) break;

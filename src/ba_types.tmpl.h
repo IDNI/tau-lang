@@ -641,12 +641,11 @@ tref untype(tref t) {
 		return tau::get(tau::bf_f);
 	case tau::ba_constant: {
 		if (tau::get(t).children_size() > 0)
-			return tau::get(tau::ba_constant, tau::get(t).first());
+			return t; // tau::get(tau::ba_constant, tau::get(t).first());
 		else
-			return tau::get(tau::get(t).value.ba_retype(0));
+			return tau::get(tau::get(t).value.ba_retype(untyped_type_id<node>()));
 	}
 	case tau::variable:
-		return tau::get(tau::variable, {tau::get(t).first()});
 	case tau::ref:
 		if (auto check = tt(t) | tau::typed; check) {
 			// copy all the children but the typed
@@ -654,9 +653,9 @@ tref untype(tref t) {
 			trefs n_children;
 			for (auto ch: tau::get(t).get_children())
 				if (!is<node, tau::typed>(ch)) n_children.push_back(ch);
-			return tau::get(tau::ref, n_children);
+			return tau::get(nt, n_children);
 		}
-		return tau::get(tau::ref, tau::get(t).get_children());
+		return tau::get(nt, tau::get(t).get_children());
 	default:
 		return t;
 	}
