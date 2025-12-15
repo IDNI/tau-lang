@@ -34,7 +34,7 @@ TEST_SUITE("tree translation and simplification") {
 	TEST_CASE("1") {
 		const char* sample = "(ex x x = { 1 }:bv) && { 16 } : bv[7] - { 8 } = h && asdf' = j+k:bv[4] || !(j = i)";
 		tref src = parse(sample);
-		tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
+		// tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
 		subtree_map<node_t, bv> vars, free_vars;
 		bv bv_tree = bv_eval_node<node_t>(src, vars, free_vars).value();
 		tref tau_tree = cvc5_tree_to_tau_tree<node_t>(bv_tree);
@@ -43,21 +43,19 @@ TEST_SUITE("tree translation and simplification") {
 	TEST_CASE("2") {
 		const char* sample = "{ 8 } + { 16 } = { 24 } : bv[8]";
 		tref src = parse(sample);
-		tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
+		// tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
 		subtree_map<node_t, bv> vars, free_vars;
 		bv bv_tree = bv_eval_node<node_t>(src, vars, free_vars).value();
 		tref tau_tree = cvc5_tree_to_tau_tree<node_t>(bv_tree);
-		tau_tree = simplify_bv<node_t>(tau_tree);
 		CHECK(tau::get(tau_tree).equals_T());
 	}
 	TEST_CASE("3") {
 		const char* sample = "{ 8 } + { 16 } = { 25 } : bv[8]";
 		tref src = parse(sample);
-		tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
+		// tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
 		subtree_map<node_t, bv> vars, free_vars;
 		bv bv_tree = bv_eval_node<node_t>(src, vars, free_vars).value();
 		tref tau_tree = cvc5_tree_to_tau_tree<node_t>(bv_tree);
-		tau_tree = simplify_bv<node_t>(tau_tree);
 		CHECK(tau::get(tau_tree).equals_F());
 	}
 }

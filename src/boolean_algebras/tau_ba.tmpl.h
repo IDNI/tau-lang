@@ -25,6 +25,9 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...>::tau_ba(tref main) : nso_rr({ tau::geth(main) }) {}
 
+template<typename ... BAs> requires BAsPack<BAs...>
+tau_ba<BAs...>::tau_ba() : nso_rr() {}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 auto tau_ba<BAs...>::operator<=>(const tau_ba<BAs...>&) const = default;
@@ -203,6 +206,13 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 				return false;
 	}
 	return true;
+}
+
+template<typename ... BAs> requires BAsPack<BAs...>
+tref base_ba_symbol_simplification(tref symbol, const auto&) {
+	// All symbols for the tau base Boolean algebra are
+	// simplified in general procedure
+	return symbol;
 }
 
 
