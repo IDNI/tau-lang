@@ -107,6 +107,16 @@ bool is_syntactic_zero(const std::variant<BAs...>& elem) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+bool is_closed(const std::variant<BAs...>& elem) {
+	return std::visit(overloaded(
+		[](const auto& el) {
+			return is_closed(el);
+		}
+	), elem);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem,
 	splitter_type st)
 {
@@ -141,6 +151,15 @@ bool is_one(const std::variant<BAs...>& l) {
 			return l == true;
 		}
 	), l);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref base_ba_symbol_simplification(tref symbol, const std::variant<BAs...>& v) {
+	auto f = [&](const auto& ba_type) -> tref {
+		return base_ba_symbol_simplification<BAs...>(symbol, ba_type);
+	};
+	return std::visit(overloaded(f), v);
 }
 
 template <typename... BAs>

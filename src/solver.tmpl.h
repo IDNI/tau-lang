@@ -1181,10 +1181,6 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				}
 				a = rewriter::replace<node>(a, clause_solution);
 				a = bf_reduced_dnf<node>(a);
-				// Simplify bitvectors
-				if (is_bv_type_family<node>(tau::get(a).get_ba_type())) {
-					a = simplify_bv<node>(a);
-				}
 				clause_solution.emplace(v, a);
 			}
 			return clause_solution;

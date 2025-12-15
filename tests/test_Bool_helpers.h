@@ -9,9 +9,13 @@
 
 namespace idni::tau_lang {
 
-tref bool_type() {
+inline tref bool_type() {
 	tref type = tau::get(tau::type, "bool");
 	return tau::get(tau::typed, type);
+}
+
+inline tref base_ba_symbol_simplification(tref symbol, const Bool&) {
+	return symbol;
 }
 
 template<>
@@ -31,6 +35,33 @@ struct nso_factory<bv, Bool> {
 	static tref unpack_tau_ba(const std::variant<bv, Bool>&) { return nullptr; }
 
 	static std::variant<bv, Bool> pack_tau_ba(tref) { return {}; }
+
+	static std::variant<bv, Bool> to_base_ba_type(tref) {
+		return { Bool() };
+	}
+};
+
+template<>
+struct nso_factory<bv, sbf_ba, Bool> {
+
+	static std::vector<std::string> types() { return { "bool" }; }
+
+	static tref default_type() { return bool_type(); }
+
+	static std::string one(const tref) { return "1"; }
+
+	static std::string zero(const tref) { return "0"; }
+
+	static std::variant<bv, sbf_ba, Bool> splitter_one(const std::string) { return Bool(true);}
+
+	// There is no tau_ba
+	static tref unpack_tau_ba(const std::variant<bv, sbf_ba, Bool>&) { return nullptr; }
+
+	static std::variant<bv, sbf_ba, Bool> pack_tau_ba(tref) { return {}; }
+
+	static std::variant<bv, sbf_ba, Bool> to_base_ba_type(tref) {
+		return { Bool() };
+	}
 };
 
 template <>

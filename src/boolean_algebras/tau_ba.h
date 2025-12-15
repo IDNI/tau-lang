@@ -56,6 +56,8 @@ struct tau_ba {
 	 */
 	tau_ba(tref main);
 
+	tau_ba();
+
 	/**
 	 * @brief Three-way comparison operator.
 	 *
@@ -244,6 +246,15 @@ tau_ba<BAs...> tau_splitter_one();
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm);
+
+/**
+ * Simplifies a symbol specific to this base Boolean algebra
+ * @tparam BAs Base Boolean algebras
+ * @param symbol The symbol to simplify
+ * @return The result of simplification
+ */
+template <typename... BAs> requires BAsPack<BAs...>
+tref base_ba_symbol_simplification(tref symbol, const auto&);
 
 /**
  * @brief Template struct representing a tau_ba_factory.
