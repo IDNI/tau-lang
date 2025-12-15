@@ -9,9 +9,7 @@ TEST_SUITE("function execution: simple cases") {
 		const char* sample =
 			"g(Y) := T."
 			"g(Y).";
-		//logging::trace();
 		CHECK( normalize_and_check(sample, tau::wff_t) );
-		//logging::info();
 	}
 
 	TEST_CASE("bf_rec_relation: direct substitution") {
@@ -141,13 +139,13 @@ TEST_SUITE("2d cases") {
 
 TEST_SUITE("rec relations execution: several relations") {
 
-	/*TEST_CASE("direct substitution, wff_rec_relation case") {
+	TEST_CASE("direct substitution, wff_rec_relation case") {
 		const char* sample =
 			"g[0, 0](Y) := T."
 			"h[0, 0](Y) := T."
 			"g[0, 0](Y) && h[0, 0](1).";
 		CHECK( normalize_and_check(sample, tau::wff_t) );
-	}*/
+	}
 
 	TEST_CASE("direct substitution, bf_rec_relation case") {
 		const char* sample =

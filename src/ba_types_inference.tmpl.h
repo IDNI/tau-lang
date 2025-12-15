@@ -77,10 +77,9 @@ tref retype(tref n, const size_t new_type) {
 	using tau = tree<node>;
 	auto t = tau::get(n);
 	auto n_type = t.get_type();
-	if (tau::get(n).has_child())
-		return tau::get_typed(n_type, t.child(0), new_type);
-	else
-		return tau::get_typed(n_type, new_type);
+	return (tau::get(n).has_child())
+		? tau::get_typed(n_type, t.child(0), new_type)
+		: tau::get_typed(n_type, new_type);
 };
 
 template<NodeType node>
