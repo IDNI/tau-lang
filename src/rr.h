@@ -11,6 +11,7 @@ template <NodeType node>
 struct rr {
 	rr(const rewriter::rules& rec_relations, const htref& main);
 	rr(const htref& main);
+	rr();
 
 	std::weak_ordering operator<=>(const rr& that) const;
 	constexpr bool     operator<  (const rr& that) const;
