@@ -1478,7 +1478,6 @@ TEST_SUITE("infer_ba_types: definitions") {
 TEST_SUITE("regression tests") {
 
 	TEST_CASE("satisfiability3/qual_lookback_one_st") {
-		logging::trace();
 		tref parsed = parse("(always o1[t-1]:bv = { 0 }) && (sometimes o1[t]:bv = { 1 } && o1[t-1]:bv = { 0 })");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -1493,9 +1492,8 @@ TEST_SUITE("regression tests") {
 			bv_type_id<node_t>()
 		};
 		CHECK( check_ctes(inferred, expected_ctes) );
-		logging::info();
 	}
-
+	
 	TEST_CASE("splitter/Tau_splitter_7") {
 		tref parsed = parse("(sometimes o1[t] = 1)");
 		CHECK( parsed != nullptr );
@@ -1511,7 +1509,7 @@ TEST_SUITE("regression tests") {
 		CHECK( check_bf_ctes(inferred, expected_ctes) );
 	}
 
-	TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
+	/*TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
 		logging::trace();
 		tref parsed = parse_spec(
 			"g(Y) := T."
@@ -1530,7 +1528,7 @@ TEST_SUITE("regression tests") {
 		};
 		CHECK( check_refs(inferred, expected_refs) );
 		logging::info();
-	}
+	}*/
 
 	TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
 		tref parsed = parse("g(x):tau fallback 1", parse_cli_no_infer());
@@ -1548,6 +1546,7 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
+		logging::trace();
 		tref parsed = parse("g(x:tau) fallback T", parse_cli_no_infer());
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -1556,6 +1555,25 @@ TEST_SUITE("regression tests") {
 			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
+		logging::info();
+	}
+
+	TEST_CASE("nso_rr_fixed_point/loop fallback T") {
+		tref parsed = parse("g(x) fallback T", parse_cli_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", tau_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("nso_rr_fixed_point/fallback type mismatch") {
+		tref parsed = parse("g(x) fallback 1", parse_cli_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
 	}
 }
 

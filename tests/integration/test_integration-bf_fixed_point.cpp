@@ -39,6 +39,7 @@ TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 		CHECK( test_bf_rr_fp_0(rec, sample) );
 	}
 
+	// TODO (HIGH) fix this test case
 	/*TEST_CASE("loop fallback 1") {
 		logging::trace();
 		const char* rec=
