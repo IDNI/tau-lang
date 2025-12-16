@@ -282,7 +282,7 @@ tref update_bf_constant(type_scoped_resolver<node>& resolver, tref n, const subt
 }
 
 template<NodeType node>
-tref update_ba_constant([[maybe_unused]] type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+tref update_ba_constant(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
 	using tau = tree<node>;
 
 	DBG(LOG_TRACE <<"update_ba_constant/n: " << LOG_FM_DUMP(n) << "\n";)
@@ -300,6 +300,21 @@ tref update_ba_constant([[maybe_unused]] type_scoped_resolver<node>& resolver, t
 	if (!resolver.assign(canonized, type)) return nullptr;
 	// We parse the constant
 	return tau::get_ba_constant_from_source(tau::get(n).child_data(), type);
+}
+
+template<NodeType node>
+bool using_default_type(tref n, const subtree_map<node, size_t>& types) {
+	tref canonized = canonize<node>(n);
+	if (!types.contains(canonized)) return false;
+	return types.at(canonized) == untyped_type_id<node>();
+}
+
+template<NodeType node>
+bool using_default_bv_size(tref n, const subtree_map<node, size_t>& types) {
+	tref canonized = canonize<node>(n);
+	if (!types.contains(canonized)) return false;
+	auto type_id = types.at(canonized);
+	return is_bv_base_type<node>(type_id);
 }
 
 template<NodeType node>
@@ -477,7 +492,7 @@ tref update_default(tref n, subtree_map<node, tref>& changes) {
 };
 
 template<NodeType node>
-tref update(type_scoped_resolver<node>& resolver, tref n, std::initializer_list<size_t> types_to_update) {
+tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<size_t> types_to_update) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
@@ -508,6 +523,10 @@ tref update(type_scoped_resolver<node>& resolver, tref n, std::initializer_list<
 				if (!to_be_updated.contains(nt)) break;
 				if (auto updated = update_variable<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
+					if (using_default_type<node>(n, types)) {
+						LOG_INFO << "Variable " << LOG_FM(canonize<node>(n))
+							<< " assigned default type (tau) in " << LOG_FM(r) << "\n";
+					}
 				} else error = true; 
 				break;
 			}
@@ -515,6 +534,14 @@ tref update(type_scoped_resolver<node>& resolver, tref n, std::initializer_list<
 				if (!to_be_updated.contains(nt)) break;
 				if (auto updated = update_ba_constant<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
+					if (using_default_type<node>(n, types)) {
+						LOG_INFO << "Constant " << LOG_FM(canonize<node>(n))
+							<< " assigned default type (tau) in " << LOG_FM(r) << "\n";
+					}
+					if (using_default_bv_size<node>(n, types)) {
+						LOG_INFO << "Constant " << LOG_FM(canonize<node>(n))
+							<< " assigned default bv size (" << default_bv_size << ") in " << LOG_FM(r) << "\n";
+					}
 				} else error = true; 
 				break;
 			}
@@ -522,6 +549,10 @@ tref update(type_scoped_resolver<node>& resolver, tref n, std::initializer_list<
 				if (!to_be_updated.contains(nt)) break;
 				if (auto updated = update_bf_constant<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
+					if (using_default_type<node>(n, types)) {
+						LOG_INFO << "Boolean constant " << LOG_FM(canonize<node>(n))
+							<< " assigned default type (tau) in " << LOG_FM(r) << "\n";
+					}
 				} else error = true; 
 				break;
 			}
@@ -577,9 +608,9 @@ tref update(type_scoped_resolver<node>& resolver, tref n, std::initializer_list<
 		return !error;
 	};
 	
-	post_order<node>(n).search(f);
+	post_order<node>(r).search(f);
 	if (error) return nullptr;
-	return changes.find(n) != changes.end() ? changes[n] : n;
+	return changes.find(r) != changes.end() ? changes[r] : r;
 }
 
 // Infers the types of variables and constants in the tree n. It assumes that
@@ -905,7 +936,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				if (!resolver.close()) { 
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = true; 
-					break; 
 				}
 				break;
 			}
