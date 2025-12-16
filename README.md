@@ -233,15 +233,15 @@ which you can use in your specification as follows:
 o1[t] = 0 && f(i1[t])
 ```
 
-Also, you can use the following recurrence relation definition
+Also, you can use the following function definition by a recurrence relation:
 
 ```
-g[0](y) := 0
-g[n](y) := g[n - 1](y)'
+g[0](y):sbf := 0
+g[n](y):sbf := g[n - 1](y)'
 ```
 
 which defines a function (rather than a predicate) and alternates between 0 and 1
-depending on the parity of n.
+depending on the parity of n in the `sbf` Boolean algebra (see below in [Type System](#type-system)).
 
 In the [demos](https://github.com/IDNI/tau-lang/tree/main/demos) folder you
 can find lots of examples regarding how to use the Tau Language, its semantics
@@ -563,14 +563,15 @@ and `predicate_def` defines the syntax for a predicate:
 
 ```
 function_def      => function ":=" term
-function          => name "[" index+  "]" "(" [ variable ("," variable)* ] ")"
+function          => name "[" index+  "]" "(" [ variable ("," variable)* ] ") [":" type]"
 predicate_def     => predicate ":=" spec
-predícate         => name "[" index+  "]" "(" [ variable ("," variable)* ] ")"
+predícate         => name "[" index+  "]" "(" [ variable [":" type] ("," variable [":" type])* ] ")"
 ```
 
 where `name` is the name of the function or predicate (it has to be a sequence of
-letters and numbers starting by a letter) and `index` is a positive integer or
-a variable or a variable minus a positive integer, i.e.:
+letters and numbers starting by a letter), `type`is the type of the arguments or 
+the function itself (as considered in [Type System](#type-system)) and `index` 
+is a positive integer or a variable or a variable minus a positive integer, i.e.:
 
 ```
 index => number | variable | variable "-" number
@@ -578,22 +579,22 @@ index => number | variable | variable "-" number
 
 Simple examples of function definitions are
 ```
-union(x, y, z) := x | y | z
-intersection(x, y, z) := x & y & z
-bf(a, b, x) := ax | bx'
+union(x, y, z) : sbf := x | y | z
+intersection(x, y, z) :sbf := x & y & z
+bf(a, b, x) : tau := ax | bx'
 ```
 while sample predicate definitions are
 ```
 bottom(x) := x = 0
-not_atom(x) := ex y y < x && y != 0
+not_atom(x : tau) := ex y y < x && y != 0
 chain(x,y,z) := x < y && y < z
 ```
 
 Furthermore, it is supported to define a function or a predicate by means of a
 recurrence relations. Let's see a small example for such a function definition:
 ```
-rotate[0](x,y,z) := x&y | z
-rotate[n](x,y,z) := rotate[n-1](y,z,x)
+rotate[0](x,y,z) : sbf := x & y | z
+rotate[n](x,y,z) : sbf := rotate[n-1](y,z,x)
 ```
 As can be seen `rotate[n](x,y,z)` is defined in terms of `rotate[n-1](y,z,x)`. Together
 with the initial condition `rotate[0](x,y,z)`, `rotate[k](x,y,z)` can be calculated for any positive
@@ -607,7 +608,7 @@ f[n](w,x,y,z) := f[n-1](x,y,z,w)
 h[0](w,x,y,z) := f[0](w,x,y,z)
 h[n](w,x,y,z) := h[n-1](w,x,y,z) && f[n](w,x,y,z)
 ```
-As a result, calling `h[3](w,x,y,z)` checks that none of the arguments `w,x,y,z`
+As a result, calling `h[3](w,x,y,z)` checks that none of the arguments `w, x, y, z`
 assumes `sometimes o1[t] != 0`.
 
 As can be seen, recurrence relations can also refer to other recurrence relations.
@@ -618,7 +619,7 @@ recurrence relation definitions in use.
 Furthermore, we support the calculation of a fixpoint of a defined recurrence relation during normalization.
 The syntax is to call a defined recurrence relation as
 ```
-name "(" [ variable ("," variable)* ] ")"
+name "(" [ variable ("," variable)* ] ")" [":" type]"
 ```
 hence, omitting the `index`. For example, using the recurrence relation `h` from above,
 we can call the fix point by typing into [REPL](#the-tau-repl) `normalize h(x,y,z,w)`.
@@ -666,13 +667,13 @@ the type, since `tau` is the default type). For example, the following is a vali
 constant in the Tau Boolean algebra:
 
 ```
-{ ex x ex y ex z (x & y | z) = 0 }:tau
+{ ex x ex y ex z (x & y | z) = 0 } : tau
 ```
 
 or even a deeper nesting resulting in
 
 ```
-{ { ex x ex y ex z (x & y | z) = 0 }:tau = 0 }:tau
+{ { ex x ex y ex z (x & y | z) = 0 } : tau = 0 } : tau
 ```
 
 where `x`, `y` and `z` are variables.
@@ -680,7 +681,7 @@ where `x`, `y` and `z` are variables.
 A constant in the simple Boolean function algebra is for example:
 
 ```
-{ (x & y | z) }:sbf
+{ (x & y | z) } : sbf
 ```
 
 where `x`, `y` and `z` are variables.
@@ -694,12 +695,12 @@ constant => '{' "#b" [0-1]+ | "#x" [0-9a-fA-F]+ | [0-9]+ `}`
 For example, the following are valid bitvector constants of width 8:
 
 ```
-{ #x1f }:bv[8]
+{ #x1f } : bv[8]
 ```
 or
 
 ```
-{ #b00011111 }:bv[8]
+{ #b00011111 } : bv[8]
 ```
 
 ## **Streams**
