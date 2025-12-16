@@ -23,8 +23,9 @@
     6. [Constants](#constants)
     7. [Streams](#streams)
     8. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
-    9. [Pointwise revision](#pointwise-revision)
-    10. [Reserved symbols](#reserved-symbols)
+    9. [Type system](#type-system)
+    10. [Pointwise revision](#pointwise-revision)
+    11. [Reserved symbols](#reserved-symbols)
 5. [Command line interface](#command-line-interface)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
@@ -805,6 +806,85 @@ closed. Note that when executing a specification containing uninterpreted consta
 they are currently assigned a default value in a suitable way and the specification
 is then executed with those assignments.
 
+## **Type system**
+
+### Available types
+
+The Tau Language currently supports the following types:
+
+1. `tau`: the type of Tau specifications,
+2. `sbf`: the type of simple Boolean functions, and
+3. `bv`: the type of bitvectors of fixed bit width.
+
+You can type the following elements: variables, streams, recurrence relations, 
+constants and (term) constants. In order to do so, you just add the type
+information after a colon `:`. For example,
+
+```
+x : sbf
+o1[t] : bv
+{ #b00001111 } : bv[16]
+{ ex x ex y (x & y) = 0 } : tau
+1: tau
+```
+
+are all valid typed elements.
+
+In the case of functional recurrence relations (as all arguments must have the
+same type) the syntax is as follows:
+
+```
+f(x) : tau := ...
+g[n](x, y) : sbf := ...
+```
+
+In the case of predicate recurrence relations, the syntax is different as each argument 
+can have its own type. The syntax is as follows:
+
+```
+p(x : tau) := ...
+q[n](x : sbf, y : tau) := ...
+```
+
+In general, if no type information is present, the default type `tau` is assumed.
+Also note that the type `bv` actually represents a family of types, one for each bit width.
+For example, `bv[8]` is the type of bitvectors of width 8, while `bv[16]` is the type
+of bitvectors of width 16 (the default bit width is 16 if not specified or inferred otherwise).
+
+### Type inference
+
+The Tau Language has a type inference system which infers types of all elements
+that are not explicitly typed and detect type mismatches. 
+
+The inference system is base on a union-find data structure
+and works by unifying types of elements appearing together in the same context.
+
+Moreover, the inference system is scoped, i.e. types inferred within a certain scope
+do not leak outside of that scope (unless the element is scoped in an outer scope). 
+For example, argument types inferred within a function definition do not leak outside of 
+that function definition.
+
+Currently, we have the following scopes:
+
+1. recurrence relations definitions: the scoped elements are the arguments of the 
+recurrence relation (everything is resolved taking into account those type arguments):
+variables, streams and constants,
+2. existential and universal quantifications: the scoped elements are the 
+quantified variables, and
+3. atomic formulas: the scoped elements are constants appearing in the atomic formula.
+
+Depending on the scope, we also merge the types of the different elements to be typed:
+
+1. in a recurrence relation definition:
+      - in the functional case: everything is typed acoordingly to the type of 
+      the recurrence relation: variables, constants, streams,...
+      - in the predicate case: everything is typed accordingly to the involved 
+      argument types: variables, constants, streams,...
+2. in an atomic formula:
+      - everything is merged together and typed accordingly: variables, streams, 
+      constants,...
+
+If we have no type information, the default type `tau` is assumed. 
 
 ## **Pointwise revision**
 
