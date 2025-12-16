@@ -1589,6 +1589,13 @@ TEST_SUITE("regression tests") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
+
+	TEST_CASE("Andrei's example") {
+		tref parsed = parse("always u[t]:tau = i0[t]:tau && (o2[t]:bv[16] = 0 || i2[t]:bv[16] !< i1[t]:bv[16]) && (o2[t]:bv[16] = { 1 }:bv[16] || i2[t]:bv[16] < i1[t]:bv[16]) && (i3[t]:bv[16] != i4[t]:bv[16] || o3[t]:bv[16] = 0) && (o3[t]:bv[16] = { 1 }:bv[16] || i3[t]:bv[16] = i4[t]:bv[16]) && (i1[t]:bv[16] != 0 || o4[t]:bv[16] = 0) && (o4[t]:bv[16] = { 1 }:bv[16] || i1[t]:bv[16] = 0) && o1[t]:bv[16] = i1[t]:bv[16] && (i0[t]:bv[16]|i1[t]:bv[16] != 0 || i1[t]:bv[16] = 0)");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
 }
 
 TEST_SUITE("Cleanup") {
