@@ -524,8 +524,8 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				if (auto updated = update_variable<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
 					if (using_default_type<node>(n, types)) {
-						LOG_INFO << "Variable " << tau::get(canonize<node>(n))
-							<< " assigned default type (tau) in " << tau::get(r) << "\n";
+						LOG_INFO << "(Default typing) " << tau::get(n)
+							<< " in " << tau::get(r) << "\n";
 					}
 				} else error = true; 
 				break;
@@ -535,12 +535,12 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				if (auto updated = update_ba_constant<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
 					if (using_default_type<node>(n, types)) {
-						LOG_INFO << "Constant " << tau::get(canonize<node>(n))
-							<< " assigned default type (tau) in " << tau::get(r) << "\n";
+						LOG_INFO << "(Default typing) " << tau::get(n)
+							<< " in " << tau::get(r) << "\n";
 					}
 					if (using_default_bv_size<node>(n, types)) {
-						LOG_INFO << "Constant " << tau::get(canonize<node>(n))
-							<< " assigned default bv size (" << default_bv_size << ") in " << tau::get(r) << "\n";
+						LOG_INFO << "(Default bv size) " << tau::get(n)
+							<< " in " << tau::get(r) << "\n";
 					}
 				} else error = true; 
 				break;
@@ -550,8 +550,8 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				if (auto updated = update_bf_constant<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
 					if (using_default_type<node>(n, types)) {
-						LOG_INFO << "Boolean constant " << tau::get(canonize<node>(n))
-							<< " assigned default type (tau) in " << tau::get(r) << "\n";
+						LOG_INFO << "(Default typing) " << tau::get(n)
+							<< " in " << tau::get(r) << "\n";
 					}
 				} else error = true; 
 				break;
