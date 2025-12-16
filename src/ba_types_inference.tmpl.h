@@ -293,7 +293,11 @@ tref update_ba_constant([[maybe_unused]] type_scoped_resolver<node>& resolver, t
 	// We get the type info or use the default (tau) if untyped
 	size_t type = (types.at(canonized) == untyped_type_id<node>())
 		? tau_type_id<node>()
-		: types.at(canonized);
+		: (is_bv_base_type<node>(types.at(canonized))
+			? bv_type_id<node>(default_bv_size)
+			: types.at(canonized));
+	// We assign the type to the constant in the resolver
+	if (!resolver.assign(canonized, type)) return nullptr;
 	// We parse the constant
 	return tau::get_ba_constant_from_source(tau::get(n).child_data(), type);
 }
