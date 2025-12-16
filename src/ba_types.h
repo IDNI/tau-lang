@@ -161,6 +161,12 @@ template <NodeType node>
 bool is_bv_type_family(size_t ba_type_id);
 
 template <NodeType node>
+bool is_bv_base_type(tref t);
+
+template <NodeType node>
+bool is_bv_base_type(size_t ba_type_id);
+
+template <NodeType node>
 size_t get_bv_width(tref t);
 
 

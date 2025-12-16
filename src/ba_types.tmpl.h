@@ -11,6 +11,7 @@ namespace idni::tau_lang {
 template<NodeType node>
 tref tau_type() {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "tau");
 	return tau::get(tau::typed, type);
 }
@@ -24,6 +25,7 @@ inline size_t tau_type_id() {
 template<NodeType node>
 bool is_tau_type(tref t) {
 	using tau = tree<node>;
+
 	return tau::get(t)[0].get_string() == "tau";
 }
 
@@ -35,6 +37,7 @@ bool is_tau_type(size_t t) {
 template<NodeType node>
 tref nat_type() {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "nat");
 	return tau::get(tau::typed, type);
 }
@@ -48,12 +51,14 @@ inline size_t nat_type_id() {
 template<NodeType node>
 bool is_nat_type(tref t) {
 	using tau = tree<node>;
+
 	return tau::get(t)[0].get_string() == "nat";
 }
 
 template<NodeType node>
 tref untyped_type() {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "untyped");
 	return tau::get(tau::typed, type);
 }
@@ -67,6 +72,7 @@ inline size_t untyped_type_id() {
 template<NodeType node>
 bool is_untyped(tref t) {
 	using tau = tree<node>;
+
 	return tau::get(t)[0].get_string() == "untyped";
 }
 
@@ -80,6 +86,7 @@ bool is_untyped(size_t t) {
 template<NodeType node>
 tref sbf_type() {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "sbf");
 	return tau::get(tau::typed, type);
 }
@@ -93,6 +100,7 @@ inline size_t sbf_type_id() {
 template<NodeType node>
 bool is_sbf_type(tref t) {
 	using tau = tree<node>;
+
 	return tau::get(t)[0].get_string() == "sbf";
 }
 
@@ -106,6 +114,7 @@ bool is_sbf_type(size_t t) {
 template<NodeType node>
 tref bool_type() {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "bool");
 	return tau::get(tau::typed, type);
 }
@@ -119,6 +128,7 @@ inline size_t bool_type_id() {
 template<NodeType node>
 bool is_bool_type(tref t) {
 	using tau = tree<node>;
+
 	return tau::get(t)[0].get_string() == "bool";
 }
 
@@ -132,6 +142,7 @@ bool is_bool_type(size_t t) {
 template<NodeType node>
 tref bv_type(unsigned short bitwidth) {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "bv");
 	tref subtype = tau::get(tau::subtype, tau::get_num(bitwidth));
 	return tau::get(tau::typed, type, subtype);
@@ -151,6 +162,7 @@ size_t bv_type_id(unsigned short bitwidth) {
 template<NodeType node>
 tref bv_base_type() {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "bv");
 	return tau::get(tau::typed, type);
 }
@@ -158,6 +170,7 @@ tref bv_base_type() {
 template<NodeType node>
 bool is_bv_type_family(tref t) {
 	using tau = tree<node>;
+
 	return tau::get(t)[0].get_string() == "bv";
 }
 
@@ -166,11 +179,24 @@ bool is_bv_type_family(size_t ba_type_id) {
 	return is_bv_type_family<node>(ba_types<node>::type_tree(ba_type_id));
 }
 
+template<NodeType node>
+bool is_bv_base_type(tref n) {
+	using tau = tree<node>;
+
+	auto t = tau::get(n);
+	return t[0].get_string() == "bv" && t.children_size() == 1;
+}
+
+template<NodeType node>
+bool is_bv_base_type(size_t ba_type_id) {
+	return is_bv_base_type<node>(ba_types<node>::type_tree(ba_type_id));
+}
 
 template <NodeType node>
 size_t get_bv_width(tref t) {
 	using tau = tree<node>;
-	using tt = tau::traverser;;
+	using tt = tau::traverser;
+
 	DBG(assert(is_bv_type_family<node>(t)));
 	if (size_t num = tt(t) | tau::subtype | tau::num | tt::num; num)
 		return num;
@@ -181,6 +207,7 @@ size_t get_bv_width(tref t) {
 template<NodeType node>
 tref rr_predicate_type(size_t offsets, const std::initializer_list<tref>& signature) {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "rr_predicate");
 	tref offsets_ = tau::get_num(offsets);
 	std::vector<tref> children{type, offsets_};
@@ -191,6 +218,7 @@ tref rr_predicate_type(size_t offsets, const std::initializer_list<tref>& signat
 template<NodeType node>
 tref rr_predicate_type(size_t offsets, const std::initializer_list<size_t>& signature) {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "rr_predicate");
 	tref offsets_ = tau::get_num(offsets);
 	std::vector<tref> children{type, offsets_};
@@ -202,6 +230,7 @@ tref rr_predicate_type(size_t offsets, const std::initializer_list<size_t>& sign
 template<NodeType node>
 tref rr_predicate_type(size_t offsets, size_t arity) {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "rr_predicate");
 	tref offsets_ = tau::get_num(offsets);
 	std::vector<tref> children{type, offsets_};
@@ -234,6 +263,7 @@ inline size_t rr_predicate_type_id(size_t offsets, size_t arity) {
 template<NodeType node>
 bool is_rr_predicate_type(tref t) {
 	using tau = tree<node>;
+
 	return tau::get(t)[0].get_string() == "rr_predicate";
 }
 
@@ -246,6 +276,7 @@ bool is_rr_predicate_type(size_t t) {
 template<NodeType node>
 tref rr_function_type(size_t offsets, const std::initializer_list<tref>& signature) {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "rr_function");
 	tref offsets_ = tau::get_num(offsets);
 	std::vector<tref> children{type, offsets_};
@@ -256,6 +287,7 @@ tref rr_function_type(size_t offsets, const std::initializer_list<tref>& signatu
 template<NodeType node>
 tref rr_function_type(size_t offsets, const std::initializer_list<size_t>& signature) {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "rr_function");
 	tref offsets_ = tau::get_num(offsets);
 	std::vector<tref> children{type, offsets_};
@@ -267,6 +299,7 @@ tref rr_function_type(size_t offsets, const std::initializer_list<size_t>& signa
 template<NodeType node>
 tref rr_function_type(size_t offsets, size_t arity) {
 	using tau = tree<node>;
+
 	tref type = tau::get(tau::type, "rr_function");
 	tref offsets_ = tau::get_num(offsets);
 	std::vector<tref> children{type, offsets_};
@@ -299,6 +332,7 @@ inline size_t rr_function_type_id(size_t offsets, size_t arity) {
 template<NodeType node>
 bool is_rr_function_type_family(tref t) {
 	using tau = tree<node>;
+
 	return tau::get(t)[0].get_string() == "rr_function";
 }
 
@@ -324,6 +358,7 @@ inline size_t function_type_id(tref type, size_t arity) {
 template <NodeType node>
 bool is_function_type_family(tref t) {
 	using tau = tree<node>;
+
 	return tau::get(t)[0].get_string() == "rr_function"
 		&& tau::get(t)[1] == tau::get_num(0);
 }
@@ -354,6 +389,7 @@ tref ba_types<node>::type_tree(size_t ba_type_id) {
 template <NodeType node>
 std::string ba_types<node>::name(size_t ba_type_id) {
 	using tau = tree<node>;
+
 	DBG(assert(ba_type_id < type_trees().size()));
 	if (ba_type_id >= type_trees().size()) ba_type_id = 0;
 	return tau::get(type_trees()[ba_type_id]).to_str();
@@ -431,12 +467,14 @@ std::string get_ba_type_name(size_t ba_type_id) {
 template<NodeType node>
 bool is_same_ba_type(tref t1, tref t2) {
 	using tau = tree<node>;
+
 	return tau::get(t1) == tau::get(t2);
 }
 
 template <NodeType node>
 tref unify(tref t1, tref t2) {
 	using tau = tree<node>;
+
 	// If either is nat, return nat
 	if (is_nat_type<node>(t1) || is_nat_type<node>(t2)) return nullptr;
 	// If one is untyped return the other
@@ -512,6 +550,7 @@ std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<
 template<NodeType node>
 bool is_typeable(tref t) {
 	using tau = tree<node>;
+
 	return is<node, tau::variable>(t)
 		|| is<node, tau::ba_constant>(t)
 		|| is<node, tau::bf_t>(t)
@@ -664,6 +703,7 @@ tref untype(tref t) {
 template <NodeType node>
 size_t find_ba_type (tref term) {
 	using tau = tree<node>;
+
 	size_t type = tau::get(term).get_ba_type();
 	if (type != 0) return type;
 	auto f = [&type](const tref n) {

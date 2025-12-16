@@ -1575,6 +1575,20 @@ TEST_SUITE("regression tests") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
+
+	TEST_CASE("Lucca's constant parsing example (y1)") {
+		tref parsed = parse("x = {1}:bv && x = y:bv[32]");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("Lucca's constant parsing example (y2)") {
+		tref parsed = parse("x = 1 && x = y:sbf");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
 }
 
 TEST_SUITE("Cleanup") {
