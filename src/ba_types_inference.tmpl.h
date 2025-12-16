@@ -524,8 +524,8 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				if (auto updated = update_variable<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
 					if (using_default_type<node>(n, types)) {
-						LOG_INFO << "Variable " << LOG_FM(canonize<node>(n))
-							<< " assigned default type (tau) in " << LOG_FM(r) << "\n";
+						LOG_INFO << "Variable " << tau::get(canonize<node>(n))
+							<< " assigned default type (tau) in " << tau::get(r) << "\n";
 					}
 				} else error = true; 
 				break;
@@ -535,12 +535,12 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				if (auto updated = update_ba_constant<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
 					if (using_default_type<node>(n, types)) {
-						LOG_INFO << "Constant " << LOG_FM(canonize<node>(n))
-							<< " assigned default type (tau) in " << LOG_FM(r) << "\n";
+						LOG_INFO << "Constant " << tau::get(canonize<node>(n))
+							<< " assigned default type (tau) in " << tau::get(r) << "\n";
 					}
 					if (using_default_bv_size<node>(n, types)) {
-						LOG_INFO << "Constant " << LOG_FM(canonize<node>(n))
-							<< " assigned default bv size (" << default_bv_size << ") in " << LOG_FM(r) << "\n";
+						LOG_INFO << "Constant " << tau::get(canonize<node>(n))
+							<< " assigned default bv size (" << default_bv_size << ") in " << tau::get(r) << "\n";
 					}
 				} else error = true; 
 				break;
@@ -550,8 +550,8 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				if (auto updated = update_bf_constant<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
 					if (using_default_type<node>(n, types)) {
-						LOG_INFO << "Boolean constant " << LOG_FM(canonize<node>(n))
-							<< " assigned default type (tau) in " << LOG_FM(r) << "\n";
+						LOG_INFO << "Boolean constant " << tau::get(canonize<node>(n))
+							<< " assigned default type (tau) in " << tau::get(r) << "\n";
 					}
 				} else error = true; 
 				break;
@@ -599,7 +599,7 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 		}
 
 		if (error)
-			LOG_ERROR << "Incompatible or absent type information in " << LOG_FM(n) << "\n";
+			LOG_ERROR << "Incompatible or absent type information in " << tau::get(n) << "\n";
 		DBG(if (!error) LOG_TRACE << "infer_ba_types/update/" << LOG_NT(nt) << "/n -> new_n:\n"
 				<< LOG_FM_TREE(n) << " -> "
 				<< LOG_FM_TREE(changes.contains(n) ? changes[n] : n);)
@@ -825,7 +825,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			break;
 		}
 		if (error) 
-			LOG_ERROR << "Incompatible or absent type information in " << LOG_FM(n) << "\n";
+			LOG_ERROR << "Incompatible or absent type information in " << tau::get(n) << "\n";
 		DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) << "/resolver:\n"
 			<< resolver.dump_to_str();)
 		// Stop traversal on error
@@ -962,7 +962,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			}
 		}
 		if (error) 
-			LOG_ERROR << "Incompatible or absent type information in " << LOG_FM(n) << "\n";
+			LOG_ERROR << "Incompatible or absent type information in " << tau::get(n) << "\n";
 		DBG(if (!error) LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) << "/n -> new_n:\n"
 			<< LOG_FM_TREE(n) << " -> "
 			<< LOG_FM_TREE(transformed.contains(n) ? transformed[n] : n);)
