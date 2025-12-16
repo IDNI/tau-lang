@@ -36,7 +36,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "{ !i5[t] = <:x> || o5[t] = <:y> } : tau = u[0].";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = normalize_non_temp<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "{ always i5[t] != <:x> || o5[t] = <:y> } : tau = u[0]");
+		CHECK(tau::get(res).to_str() == "{ always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau = u[0]:tau");
 	}
 }
 
@@ -207,7 +207,7 @@ TEST_SUITE("squeeze_absorb") {
 		const char* sample = "o1[4] = o1[3] && o2[0] != 0 && (o1[3] != o1[1] || o2[2] != 0 || o2[1] = 0) && (o2[1] != 0 || o2[2] = 0) && (o2[2] = 0 || o2[3] = 0 && o1[4] != o1[2]).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = squeeze_absorb<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "o2[0] != 0 && o1[4] = o1[3] && (o2[2] != 0 || o2[1] = 0 || o1[3] != o1[1]) && (o2[1] != 0 || o2[2] = 0) && (o2[2] = 0 || o2[3] = 0 && o1[4] != o1[2])");
+		CHECK(tau::get(res).to_str() == "o2[0]:tau != 0 && o1[4]:tau = o1[3]:tau && (o2[2]:tau != 0 || o2[1]:tau = 0 || o1[3]:tau != o1[1]:tau) && (o2[1]:tau != 0 || o2[2]:tau = 0) && (o2[2]:tau = 0 || o2[3]:tau = 0 && o1[4]:tau != o1[2]:tau)");
 	}
 }
 
