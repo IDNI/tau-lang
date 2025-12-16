@@ -135,6 +135,10 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 		LOG_TRACE << "}\n";)
 
 	std::ranges::sort(in_vars, constant_io_comp<node>);
+	// For formatting, get the maximal length of an output stream name with type information
+	int_t max_length = 0;
+	for (tref var : in_vars)
+		max_length = std::max(max_length, (int_t)TAU_TO_STR(var).length());
 	assignment<node> value;
 	for (tref var : in_vars) {
 
@@ -163,7 +167,9 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 
 			return {};
 		} else {
-			std::cout << tau::get(var) << "\t := ";
+			const std::string vs = TAU_TO_STR(var);
+			const auto spacing = std::string(max_length - vs.length(), ' ');
+			std::cout << vs << spacing << " := ";
 			term::enable_getline_mode();
 			std::getline(std::cin, line);
 			term::disable_getline_mode();
@@ -299,6 +305,10 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 	}
 	std::ranges::sort(io_vars, constant_io_comp<node>);
 
+	// For formatting, get the maximal length of an output stream name with type information
+	int_t max_length = 0;
+	for (tref io_var : io_vars)
+		max_length = std::max(max_length, (int_t)TAU_TO_STR(io_var).length());
 	// for each stream in out.streams, write the value from the solution
 	for (tref io_var : io_vars) {
 		// get the BA element associated with io_var_name
@@ -331,7 +341,11 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 		// get the out_var_name tag
 		if (auto stream = streams.find(var_name); stream != streams.end())
 			if (stream->second) stream->second.value() << ss.str() << "\n";
-			else std::cout << tau::get(io_var) << "\t := " << ss.str() << "\n";
+			else {
+				const std::string vn = TAU_TO_STR(io_var);
+				const auto spacing = std::string(max_length - vn.length(), ' ');
+				std::cout << vn << spacing << " := " << ss.str() << "\n";
+			}
 		else {
 			if (auto name = get_var_name<node>(var_name);
 				!name.empty() && name.front() == '_') continue;
@@ -940,8 +954,7 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 		// so it is safe to swap the current spec by update_unbound
 		// Update interpreter and return
 		update = unsqueeze_always(tau::build_wff_and(current_spec | std::views::keys));
-		LOG_INFO << "Updated specification:";
-		LOG_INFO << TAU_TO_STR(update) << "\n\n";
+		LOG_INFO << "Updated specification: " << TAU_TO_STR(update) << "\n\n";
 
 		// Set new specification for interpreter
 		ubt_ctn = std::move(current_ubd_ctn);
