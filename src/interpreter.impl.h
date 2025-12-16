@@ -163,7 +163,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 
 			return {};
 		} else {
-			std::cout << tau::get(var) << " := ";
+			std::cout << tau::get(var) << "\t := ";
 			term::enable_getline_mode();
 			std::getline(std::cin, line);
 			term::disable_getline_mode();
@@ -331,7 +331,7 @@ bool foutputs<node>::write(const assignment<node>& outputs) {
 		// get the out_var_name tag
 		if (auto stream = streams.find(var_name); stream != streams.end())
 			if (stream->second) stream->second.value() << ss.str() << "\n";
-			else std::cout << tau::get(io_var) << " := " << ss.str() << "\n";
+			else std::cout << tau::get(io_var) << "\t := " << ss.str() << "\n";
 		else {
 			if (auto name = get_var_name<node>(var_name);
 				!name.empty() && name.front() == '_') continue;
