@@ -951,6 +951,15 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
+
+	TEST_CASE("bv specizalization") {
+		tref parsed = parse("ex x : bv x = 1 : bv[8]");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv8_type_id<node_t>},
+		};
+	}
 }
 
 TEST_SUITE("infer_ba_types: symbols") {
