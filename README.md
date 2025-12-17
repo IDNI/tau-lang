@@ -552,7 +552,7 @@ the new operators meaning is given in the following table:
 
 
 The order of the operations is the following (from higher precedence
-to lower): `*' > `/` > `%` > `+` > `-` > `!&` > `!|` > `!^` > `<<` > `>>`.
+to lower): `*` > `/` > `%` > `+` > `-` > `!&` > `!|` > `!^` > `<<` > `>>`.
 
 ## **Functions and predicates**
 
