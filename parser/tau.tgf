@@ -70,16 +70,16 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
                         | ref                                :bf_ref
-                        | (bf  _ ">>" _      bf)             :bf_shr
-                        | (bf  _ "<<" _      bf)             :bf_shl
-                        | (bf  _ "!|" _      bf)             :bf_nor
-                        | (bf  _ "!^" _      bf)             :bf_xnor
-                        | (bf  _ "!&" _      bf)             :bf_nand
-                        | (bf  _ '-' _       bf)             :bf_sub
+                        | (bf  _ ">>" _      (bf & ~bf_shr)) :bf_shr
+                        | (bf  _ "<<" _      (bf & ~bf_shl)) :bf_shl
                         | (bf  _ '+' _       bf)             :bf_add
-                        | (bf  _ '%' _       bf)             :bf_mod
-                        | (bf  _ '/' _       bf)             :bf_div
+                        | (bf  _ '-' _       (bf & ~bf_sub)) :bf_sub
+                        | (bf  _ '%' _       (bf & ~bf_mod)) :bf_mod
                         | (bf  _ '*' _       bf)             :bf_mul
+                        | (bf  _ '/' _       (bf & ~bf_div)) :bf_div
+                        | (bf  _ "!|" _      (bf & ~bf_nor)) :bf_nor
+                        | (bf  _ "!^" _      (bf & ~bf_xnor)):bf_xnor
+                        | (bf  _ "!&" _      (bf & ~bf_nand)):bf_nand
                         | (bf  _ '|' _       bf)             :bf_or
                         | (bf  _ '^' _       bf)             :bf_xor
                         | ('1' [ typed ])                    :bf_t
