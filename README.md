@@ -887,6 +887,38 @@ Depending on the scope, we also merge the types of the different elements to be 
 
 If we have no type information, the default type `tau` is assumed. 
 
+### Examples
+
+Here are some small examples to illustrate the type inference system:
+
+1. `x = y && y = z:sbf`:
+      - ``x` is inferred to be of the same type as `y`,
+      - `z` is typed as `sbf`,
+      - `y` is inferred to be of the same type as `z`, i.e. `sbf`,
+      - no type mismatch occurs.
+
+2. `all x:bv x = y`:
+      - `x` is typed `bv` (`bv[16] by default),
+      - `y` is inferred to be of the same type as `x`, i.e. `bv`,
+      - no type mismatch occurs.
+3. `all x x = y`:
+      - `x` is inferred to be of the default type `tau`, as no type information is present,
+      - `y` is inferred to be of the same type as `x`, i.e. `tau`,
+      - no type mismatch occurs.
+4. `(all x x = y) && x = y:sbf`:
+      - `x` is inferred to be of the same type as `y` in the first part, i.e. `tau`, as no type information is present,
+      - `y` is inferred to be of type `sbf` in the outer formula which is not compatible with the previous type assigned (`tau`).
+      - a type mismatch occurs.    
+4. `all x (all x x = 1:sbf)`:
+      - the inner `x` is inferred to be of type `sbf`,
+      - the outer `x` is inferred to be of the default type `tau`,
+      - no type mismatch occurs as both `x` are in different scopes.
+5. `ex x : bv x = 1 : bv[8]"`:
+      - `x` is typed as `bv`,
+      - the constant `1` is typed as `bv[8]`,
+      - `x` is inferred to be of the same type as the constant `1`, i.e. `bv[8]`,
+      - no type mismatch occurs.
+
 ## **Pointwise revision**
 
 As mentioned in the beginning, pointwise revision refers to the feature to incorporate
