@@ -154,7 +154,7 @@ rewriter::rules get_rec_relations(tref rrs) {
 }
 
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r, bool wo_inference) {
+std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(r);)
@@ -164,16 +164,17 @@ std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r, bool wo_infe
 	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
 	if (t.is(tau::rec_relation))
 		return { { get_rec_relations<node>(ctx, r), (htref) nullptr } };
+	// Add input and output definitions from r to context
 	if (t.is(tau::spec)) get_io_defs<node>(ctx, r);
 	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(r);
-	tref main_fm = resolve_io_vars<node>(ctx, tt(r) | tau::main
-							| tau::wff | tt::ref);
+
+	tref expression = tt(r) | tau::main | tau::wff | tt::ref;
+	if (!expression) expression = tt(r) | tau::main | tau::bf | tt::ref;
+	tref main_fm = resolve_io_vars<node>(ctx, expression);
+
 	rewriter::rules rules = get_rec_relations<node>(ctx, r);
 	DBG(LOG_TRACE << "rules: " << rules.size();)
-	auto nso_rr = wo_inference
-			? std::optional<rr<node>>{ { rules, tau::geth(main_fm) } }
-			: get_nso_rr<node>(rules, main_fm);
-
+	auto nso_rr = rr<node>(rules, tau::geth(main_fm));
 	auto check_resolved_io_vars = [](htref form) {
 		for (tref io_var : tau::get(form).select_all(is<node, tau::io_var>)) {
 			// LOG_TRACE << "io_var: " << LOG_FM_DUMP(io_var);
@@ -185,38 +186,18 @@ std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r, bool wo_infe
 		}
 		return true;
 	};
-	if (nso_rr) {
-		if (!check_resolved_io_vars(nso_rr.value().main)) return {};
-		for (const auto& rec_relation : nso_rr.value().rec_relations)
-			if (!check_resolved_io_vars(rec_relation.second))
-				return {};
-	}
-
-#ifdef DEBUG
-	if (nso_rr) LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr.value());
-	else LOG_TRACE << "get_nso_rr result: no value";
-#endif
+	if (!check_resolved_io_vars(nso_rr.main)) return {};
+	for (const auto& rec_relation : nso_rr.rec_relations)
+		if (!check_resolved_io_vars(rec_relation.second))
+			return {};
+	DBG(LOG_TRACE << "get_nso_rr result: "<< LOG_RR(nso_rr);)
 	return nso_rr;
 }
 
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(tref r, bool wo_inference) {
+std::optional<rr<node>> get_nso_rr(tref r) {
 	spec_context<node>& ctx = definitions<node>::instance().get_io_context();
-	return get_nso_rr<node>(ctx, r, wo_inference);
-}
-
-template <NodeType node>
-std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules,
-	tref main_fm)
-{
-	return get_nso_rr<node>(rules, tree<node>::geth(main_fm));
-}
-
-template <NodeType node>
-std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules,
-	const htref& main_fm)
-{
-	return std::optional<rr<node>>({ rules, main_fm });
+	return get_nso_rr<node>(ctx, r);
 }
 
 // -----------------------------------------------------------------------------
