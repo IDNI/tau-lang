@@ -35,15 +35,9 @@ template <NodeType node>
 rewriter::rules get_rec_relations(tref r);
 
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref ref,
-				   bool wo_inference = false);
+std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref ref);
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(tref ref, bool wo_inference = false);
-template <NodeType node>
-std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules, tref main_fm);
-template <NodeType node>
-std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules,
-				   const htref& main_fm);
+std::optional<rr<node>> get_nso_rr(tref ref);
 
 template <NodeType node>
 void get_leaves(tref n, typename node::type branch, trefs& leaves);
