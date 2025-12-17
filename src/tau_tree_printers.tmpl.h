@@ -375,14 +375,14 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_fex,             710 },
 			{ bf_shr,             711 },
 			{ bf_shl,             712 },
-			{ bf_nor,             713 },
-			{ bf_xnor,            714 },
-			{ bf_nand,            715 },
-			{ bf_sub,             716 },
-			{ bf_add,             717 },
-			{ bf_mod,             718 },
-			{ bf_div,             719 },
-			{ bf_mul,             720 },
+			{ bf_add,             713 },
+			{ bf_sub,             714 },
+			{ bf_mod,             715 },
+			{ bf_mul,             716 },
+			{ bf_div,             717 },
+			{ bf_nor,             718 },
+			{ bf_xnor,            719 },
+			{ bf_nand,            720 },
 			{ bf_or,              721 },
 			{ bf_xor,             730 },
 			{ bf_and,             740 },
@@ -512,7 +512,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (tref src = tt(ref) | source | tt::ref; src)
 					out(tau::get(src).get_string());
 				else out(tau::get(ref).get_ba_constant());
-				out(" } : ");
+				out(" }:");
 				out(tau::get(t.get_ba_type_tree()));
 				break;
 			case typed:
@@ -746,6 +746,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offset:            if (pnt == io_var) out("]");
 						break;
 			case ref_args:          out(")"); break;
+			case io_var:
+				// Print type information if present
+				if (parent) {
+					out(":");
+					out(tau::get(tau::get(parent).get_ba_type_tree()));
+				}
+				break;
 			case bf:
 			case wff:
 				if (wraps.find(ref) != wraps.end()) {
