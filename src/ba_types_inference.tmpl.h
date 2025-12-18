@@ -210,7 +210,14 @@ tref update_ba_symbol(tref n) {
 	// children have already been updated and they are consistent.
 	auto t = tau::get(n);
 	auto chs = t.get_children();
-	auto n_type = tau::get(chs[0]).get_ba_type();
+	size_t n_type = 0;
+	for (tref c : chs) {
+		const size_t ct = tau::get(c).get_ba_type();
+		if (ct != 0) {
+			n_type = ct;
+			break;
+		}
+	}
 	auto new_n = tau::get_raw(t.value.ba_retype(n_type), chs.data(), chs.size());
 	return new_n;
 }
