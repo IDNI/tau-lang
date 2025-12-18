@@ -261,6 +261,8 @@ history        => ( "%"
                   | "%-":rel_history_sym [digits:history_id]):rel_history
                 | ( "%" :abs_history_sym         history_id) :abs_history.
 
+unreachable => processed.
+
 # shaping of the parsed tree
 #
 @trim _, __.  # trim whitespace
