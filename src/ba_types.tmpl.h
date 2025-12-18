@@ -393,10 +393,8 @@ size_t find_ba_type (tref term) {
 	size_t type = tau::get(term).get_ba_type();
 	if (type != 0) return type;
 	auto f = [&type](const tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf)) type = t.get_ba_type();
-		if (type > 0) return false;
-		return true;
+		type = tau::get(n).get_ba_type();
+		return type == 0;
 	};
 	pre_order<node>(term).search_unique(f);
 	return type;

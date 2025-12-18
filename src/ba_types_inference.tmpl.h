@@ -169,12 +169,10 @@ bool is_functional_relation(tref n) {
 	auto t = tau::get(n);
 	if (!is<node, tau::rec_relation>(n)) return false;
 	// If the head is typed we have a functional relation.
-	if (auto header_return_type = tau::get(t.child(0)).get_ba_type();
-			header_return_type != untyped_type_id<node>() ) {
+	if (!is_untyped<node>(t[0].get_ba_type()) || t[0].is_term()) {
 		return true;
 	}
-	if (auto body_return_type = tau::get(t.child(1)).get_ba_type();
-			body_return_type != untyped_type_id<node>()) {
+	if (!is_untyped<node>(t[1].get_ba_type()) || t[1].is_term()) {
 		return true;
 	}
 	// Otherwise, we have a predicate relation.
@@ -188,13 +186,13 @@ bool is_functional_fallback(tref n) {
 
 	if (!is<node, tau::ref>(n)) return false;
 	// If the head is typed we have a functional relation.
-	if (auto header_return_type = tau::get(n).get_ba_type();
-			header_return_type != untyped_type_id<node>() ) {
+	if (!is_untyped<node>(tau::get(n).get_ba_type())
+		|| tau::get(n).is_term()) {
 		return true;
 	}
 	auto fallback = tt(n) | tau::fp_fallback | tt::first | tt::ref;
-	if (auto fallback_return_type = tau::get(fallback).get_ba_type();
-			fallback_return_type != untyped_type_id<node>()) {
+	if (!is_untyped<node>(tau::get(fallback).get_ba_type())
+		|| tau::get(fallback).is_term()) {
 		return true;
 	}
 	// Otherwise, we have a predicate callback.
@@ -378,6 +376,7 @@ tref update_functional_fallback(type_scoped_resolver<node>& resolver, tref n) {
 	auto ref_args = tt(updated) | tau::ref_args | tt::ref;
 	auto fallback = tt(updated) | tau::fp_fallback | tt::first | tt::ref;
 	auto type = find_ba_type<node>(updated);
+	DBG(assert(!is_untyped<node>(type));)
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get_typed(tau::bf, 
 			tau::get_typed(tau::bf_ref, 
@@ -414,7 +413,8 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n) {
 	// assuming the type of the head
 	auto head = untype<node>(tau::get(updated).child(0));
 	auto body = untype<node>(tau::get(updated).child(1));
-	auto type = tau::get(updated)[0].get_ba_type();
+	auto type = find_ba_type<node>(updated);
+	DBG(assert(!is_untyped<node>(type)));
 	auto new_head = 
 		tau::get_typed(tau::bf, 
 			tau::get_typed(tau::bf_ref, 
@@ -459,7 +459,8 @@ tref update_functional_ref(type_scoped_resolver<node>& resolver, tref n, [[maybe
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
 	if (updated == nullptr) return nullptr;
 	// Finally, we wrap the new ref accordingly
-	auto type = tau::get(updated).get_ba_type();
+	auto type = find_ba_type<node>(updated);
+	DBG(assert(!is_untyped<node>(type)));
 	auto new_n = untype<node>(updated);
 	return tau::get_typed(tau::bf, tau::get_typed(tau::bf_ref, new_n, type), type);
 }
