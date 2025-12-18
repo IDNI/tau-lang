@@ -251,61 +251,8 @@ std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type
 template <NodeType node>
 std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type);
 
-// Checks if the ref is typeable
 template <NodeType node>
-bool is_typeable(tref n);
-
-// Checks if the ref is typed
-template <NodeType node>
-bool is_typed(tref n);
-
-// Checks if the ref is typed
-template <NodeType node>
-bool are_typed(trefs ns);
-
-// Get type of a reference
-template <NodeType node>
-tref get_typed(tref t);
-
-// Get type of a reference
-template <NodeType node>
-trefs get_typeds(trefs t);
-
-// Get type id of a reference
-template <NodeType node>
-size_t get_typed_id(tref t);
-
-// Get type ids of references
-template <NodeType node>
-std::vector<size_t> get_typed_ids(trefs t);
-
-template <NodeType node>
-tref untyped(tref n);
-
-template <NodeType node>
-bool has_type(tref n);
-
-template <NodeType node>
-bool have_types(trefs t);
-
-// Get type of references
-template <NodeType node>
-trefs get_type(tref t);
-
-// Get types of references
-template <NodeType node>
-trefs get_types(trefs t);
-
-// Get type of references
-template <NodeType node>
-size_t get_type_id(tref t);
-
-// Get type of references
-template <NodeType node>
-std::vector<size_t> get_type_ids(tref t);
-
-template <NodeType node>
-tref untype(tref n);
+bool has_ba_type (tref term);
 
 template <NodeType node>
 size_t find_ba_type (tref term);
@@ -316,7 +263,6 @@ tref find_ba_type_tree (tref term);
 // print the type name to the stream
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);
-
 
 } // namespace idni::tau_lang
 

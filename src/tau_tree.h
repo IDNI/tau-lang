@@ -358,6 +358,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	tref get_ba_type_tree() const;
 	const trefs& get_free_vars() const;
 
+	static tref untype(tref term);
+
 	// Substitution method for typed tau trees
 	tref substitute(tref that, tref with) const;
 	// Substitution method for typed tau trees applying several substitutions
@@ -646,6 +648,9 @@ private:
 	using tt = traverser;
 
 };
+
+template <NodeType node>
+tref untype(tref term);
 
 // Substitution method for typed tau trees
 template <NodeType node>
