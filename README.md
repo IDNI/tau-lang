@@ -865,23 +865,28 @@ do not leak outside of that scope (unless the element is scoped in an outer scop
 For example, argument types inferred within a function definition do not leak outside of 
 that function definition.
 
-Currently, we have the following scopes:
+Among others, we have the following scopes:
 
-1. recurrence relations definitions: the scoped elements are the arguments of the 
+1. global scope: the scoped elements are untyped variables and streams of the formula,
+2. recurrence relations definitions: the scoped elements are the arguments of the 
 recurrence relation (everything is resolved taking into account those type arguments):
 variables, streams and constants,
-2. existential and universal quantifications: the scoped elements are the 
+3. existential and universal quantifications: the scoped elements are the 
 quantified variables, and
-3. atomic formulas: the scoped elements are constants appearing in the atomic formula.
+4. atomic formulas: the scoped elements are constants appearing in the atomic formula.
 
 Depending on the scope, we also merge the types of the different elements to be typed:
 
-1. in a recurrence relation definition:
+1. untyped variables and streams in the global scope are assigned the default type `tau`,
+2. in a recurrence relation definition:
       - in the functional case: everything is typed acoordingly to the type of 
-      the recurrence relation: variables, constants, streams,...
+      the recurrence relation: argument variables, constants, streams,...
       - in the predicate case: everything is typed accordingly to the involved 
       argument types: variables, constants, streams,...
-2. in an atomic formula:
+3. in an existential or universal quantification:
+      - the quantified variable is typed accordingly to the type inferred in the 
+      quantified formula,
+4. in an atomic formula:
       - everything is merged together and typed accordingly: variables, streams, 
       constants,...
 
