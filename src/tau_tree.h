@@ -182,8 +182,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 
 	struct get_options; // fwd
 
-	inline static bool use_hooks = true;
-
 	// tree direct API
 	// ---------------------------------------------------------------------
 
