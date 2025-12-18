@@ -756,9 +756,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 						tau::get(parent).child(0) == n*/ ) { 
 					skip = true; break;
 				}
-				if (!is_cli_cmd<node>(parent) && !is<node, tau::wff_ref>(parent)) {
-					skip = true; break;
-				}
+				// if (!is_cli_cmd<node>(parent) && !is<node, tau::wff_ref>(parent)) {
+				// 	skip = true; break;
+				// }
 				if (has_fallback<node>(n)) {
 					// we must deal with it as a rec relation
 					auto fallback = tt(n) | tau::fp_fallback | tt::first | tt::ref;
@@ -789,11 +789,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					if (!open<node>(resolver, arguments_map)) { error = true; break; }
 					DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 					break;
-				}
-				//  If n is typed, we have a functional ref
-				if (is_typed<node>(n)) {
-					if (!resolver.open({})) { error = true; break; } // functional ref
-					DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 				}
 				// Anyway, we continue the traversal so that we can treat
 				// the ref_args as above.
