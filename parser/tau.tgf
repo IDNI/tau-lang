@@ -212,7 +212,7 @@ cli_command            =>
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ history)       :history_print_cmd
-        | (                     wff | bf)                     :history_store_cmd
+        | (                     ref | wff | bf)               :history_store_cmd
         .
 
 # options
