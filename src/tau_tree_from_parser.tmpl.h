@@ -137,6 +137,61 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			return neg ? -i : i;
 		};
 
+		// Convert the type information from the parse tree to the
+		// type id used by the type system for tau trees
+		auto process_type_tree = [&](size_t non_terminal) {
+			switch (non_terminal) {
+				case bf_t:
+				case bf_f: {
+					if (ptr.first()){
+						ba_type = get_ba_type_id<node>(
+							m_ref(ptr.first()));
+						LOG_TRACE << "ba_type: "
+							  << LOG_BA_TYPE(ba_type);
+					}
+					break;
+				}
+				case variable:
+				case ba_constant: {
+					if (ptr.second()) {
+						ba_type = get_ba_type_id<node>(
+								m_ref(ptr.second()));
+						LOG_TRACE << "ba_type: "
+							  << LOG_BA_TYPE(ba_type);
+					}
+					break;
+				}
+				case input_def:
+				case output_def: {
+					if (ptr[0].has_right_sibling()
+						&& ptr[0].right_sibling_tree()
+							.is(tau::type))
+					{
+						ba_type = get_ba_type_id<node>(
+							m_ref(ptr.second()));
+						LOG_TRACE << "ba_type: "
+							<< LOG_BA_TYPE(ba_type);
+					}
+					break;
+				}
+				case ref: {
+					// Find possible type info
+					const auto len = ptr.children_size();
+					if (len >= 3 && ptr[2].is(typed)) {
+						ba_type = get_ba_type_id<node>(
+							m_ref(ptr[2].get()));
+					} else if (len >= 4 && ptr[3].is(typed)) {
+						ba_type = get_ba_type_id<node>(
+							m_ref(ptr[3].get()));
+					}
+					LOG_TRACE << "ba_type: "
+						  << LOG_BA_TYPE(ba_type);
+					break;
+				}
+				default: break;
+			}
+		};
+
 		tref x = nullptr; // result of node transformation
 
 		switch (nt) {
@@ -161,36 +216,16 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			case bf_fall:
 			case bf_fex: x = process_quantifier_vars(bf); break;
 
-			/*case bf_t:
+			case bf_t:
 			case bf_f:
-				if (bool typed = ptr.first() != nullptr; typed){
-					ba_type = get_ba_type_id<node>(
-						m_ref(ptr.first()));
-					LOG_TRACE << "ba_type: "
-						  << LOG_BA_TYPE(ba_type);
-				}
+				// Integrate type information
+				process_type_tree(nt);
 				x = getx_data(0);
-				break;*/
-
-			// case variable: x = process_var(x); // break;
+				break;
 
 			default:
-				/*if (nt == variable && ptr.second()) {
-					ba_type = get_ba_type_id<node>(
-						m_ref(ptr.second()));
-					LOG_TRACE << "ba_type: "
-						  << LOG_BA_TYPE(ba_type);
-				} else if (nt == input_def || nt == output_def) {
-					if (ptr[0].has_right_sibling()
-						&& ptr[0].right_sibling_tree()
-						.is(static_cast<size_t>(tau::type)))
-					{
-						ba_type = get_ba_type_id<node>(
-							m_ref(ptr.second()));
-						LOG_TRACE << "ba_type: "
-								<< LOG_BA_TYPE(ba_type);
-					}
-				}*/
+				// Integrate type information
+				process_type_tree(nt);
 				if (is_string_nt(nt)) {
 					x = getx_data(
 						dict(ptr.get_terminals()));
@@ -201,7 +236,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 				trefs ch;
 				for (tref c : ptr.children()) {
 					DBG(assert(c != nullptr && m_ex(c));)
-					if (m_ref(c)) ch.push_back(m_ref(c));
+					// Remove type information which is already saved in tau nodes
+					if (m_ref(c) && !tau::get(c).is(typed))
+						ch.push_back(m_ref(c));
 				}
 				// DBG(for (auto c : ch) LOG_TRACE << "child: " << LOG_FM_DUMP(c);)
 				x = getx(ch);

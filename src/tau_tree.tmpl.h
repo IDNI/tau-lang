@@ -845,6 +845,15 @@ const trefs& tree<node>::get_free_vars() const {
 }
 
 template<NodeType node>
+tref tree<node>::untype(tref term) {
+	const tau& n = tau::get(term);
+	if (n.has_child())
+		return tau::get(n.value.ba_retype(untyped_type_id<node>()),
+			n.get_children());
+	else return tau::get(n.value.ba_retype(untyped_type_id<node>()));
+}
+
+template<NodeType node>
 tref tree<node>::substitute(tref that, tref with) const {
 	// If that contains a quantifier, the above quantifier id's in formula need
 	// to be recalculated; otherwise just simple replace method
@@ -979,6 +988,11 @@ std::vector<trefs> tree<node>::select_all_until_by_predicates(
 	auto refs = select_all_until(
 		or_predicate<node>(queries.data(), queries.size()), until);
 	return select_by_predicates<node>(refs, queries.data(), queries.size());
+}
+
+template<NodeType node>
+tref untype(tref term) {
+	return tree<node>::untype(term);
 }
 
 template <NodeType node>
