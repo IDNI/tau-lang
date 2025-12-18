@@ -262,7 +262,7 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 		}
 		return n.ba_type;
 	};
-	if (!use_hooks) return get_raw(v, ch, len, r);
+	if (!base_t::use_hooks) return get_raw(v, ch, len, r);
 	// get with hooks
 	get_hook<node> hook;
 	// set hook first if not hooked
