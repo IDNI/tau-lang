@@ -413,6 +413,8 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n) {
 	// assuming the type of the head
 	auto head = untype<node>(tau::get(updated).child(0));
 	auto body = untype<node>(tau::get(updated).child(1));
+	// If the body is a formula and not a term, reject
+	if (!tau::get(body).is_term()) return nullptr;
 	auto type = find_ba_type<node>(updated);
 	DBG(assert(!is_untyped<node>(type)));
 	auto new_head = is<node, tau::ref>(head)
