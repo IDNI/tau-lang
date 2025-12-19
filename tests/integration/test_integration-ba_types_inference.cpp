@@ -1512,10 +1512,10 @@ TEST_SUITE("regression tests") {
 			{"o1", tau_type_id<node_t>()},
 		};
 		CHECK( check_vars(inferred, expected) );
-		auto expected_ctes = std::vector<size_t> {
+		auto expected_bf_ctes = std::vector<size_t> {
 			tau_type_id<node_t>()
 		};
-		CHECK( check_bf_ctes(inferred, expected_ctes) );
+		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
 	}
 
 	/*TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
@@ -1548,14 +1548,13 @@ TEST_SUITE("regression tests") {
 			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
-		auto expected_ctes = std::vector<size_t> {
+		auto expected_bf_ctes = std::vector<size_t> {
 			tau_type_id<node_t>()
 		};
-		CHECK( check_bf_ctes(inferred, expected_ctes) );
+		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
 	}
 
 	TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
-		logging::trace();
 		tref parsed = parse("g(x:tau) fallback T", parse_cli_no_infer());
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -1564,7 +1563,6 @@ TEST_SUITE("regression tests") {
 			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
-		logging::info();
 	}
 
 	TEST_CASE("nso_rr_fixed_point/loop fallback T") {
@@ -1578,13 +1576,53 @@ TEST_SUITE("regression tests") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	// TODO
-	// TEST_CASE("nso_rr_fixed_point/fallback type mismatch") {
-	// 	tref parsed = parse("g(x) fallback 1", parse_cli_no_infer());
-	// 	CHECK( parsed != nullptr );
-	// 	auto [inferred, _] = infer_ba_types<node_t>(parsed);
-	// 	CHECK( inferred == nullptr );
-	// }
+	/*TEST_CASE("Lucca's question") {
+		logging::trace();
+		tref parsed = parse("(ex x:sbf x = 0) && (ex x:tau x = 0)");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", sbf_type_id<node_t>()},
+			{"x", tau_type_id<node_t>()},
+		};
+		CHECK( check_vars(inferred, expected) );
+		CHECK( check_vars(inferred, expected) );
+		auto expected_bf_ctes = std::vector<size_t> {
+			sbf_type_id<node_t>(),
+			tau_type_id<node_t>()
+		};
+		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
+		logging::info();
+	}*/
+
+	/*TEST_CASE("Lucca's question") {
+		logging::trace();
+		tref parsed = parse("(ex x:sbf x = 0) && (ex x:tau x = 0)");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", sbf_type_id<node_t>()},
+			{"x", tau_type_id<node_t>()},
+		};
+		CHECK( check_vars(inferred, expected) );
+		CHECK( check_vars(inferred, expected) );
+		auto expected_bf_ctes = std::vector<size_t> {
+			sbf_type_id<node_t>(),
+			tau_type_id<node_t>()
+		};
+		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
+		logging::info();
+	}*/
+
+	// TODO (HIGH) Fix this test case
+	/* TEST_CASE("nso_rr_fixed_point/fallback type mismatch") {
+	 	tref parsed = parse("g(x) fallback 1", parse_cli_no_infer());
+	 	CHECK( parsed != nullptr );
+	 	auto [inferred, _] = infer_ba_types<node_t>(parsed);
+	 	CHECK( inferred == nullptr );
+	}*/
 
 	TEST_CASE("Lucca's constant parsing example (y1)") {
 		tref parsed = parse("x = {1}:bv && x = y:bv[32]");
