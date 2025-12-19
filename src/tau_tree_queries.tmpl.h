@@ -201,7 +201,6 @@ bool is_cli_cmd(tref n) {
 		tau::def_list_cmd,
 		tau::def_input_cmd,
 		tau::def_output_cmd,
-		tau::history_list_cmd,
 		tau::history_print_cmd,
 		tau::history_list_cmd,
 		tau::history_store_cmd
