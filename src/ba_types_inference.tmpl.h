@@ -625,6 +625,38 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 // We assume that the types of the constants could also be propagated across
 // scopes (in the future we will restrict it to equations)
 // If conflicting type information is found, the function returns nullptr.
+
+// | Element  | Found in          | On enter     | On leave     | Case                                   
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | bf       | nf_cmd_arg        | bf           | bf           | top level
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | bf       | bf_cmd_arg        | bf           | bf           | top level
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | bf       | rec_relation      | bf           | bf           | top level 
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | bf       | ref_arg           | ref_arg      | ref_arg      | top level
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | bf       | bf_eq             | bf_eq        | bf_eq        | skip (treated at the bf_eq level)
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | wff      | nf_cmd_arg        | default      | default      |
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | wff      | wff_cmd_arg       | default      | default      |
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | wff      | rec_relation      | default      | default      |
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | ref	  | nf_cmd_arg        | ref	         | ref          | (fallback or continue)
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | ref      | rec_relation      | rec_relation | rec_relation |
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | ref      | bf_ref 			  | bf_eq        | bf_eq        | (treated at the bf_eq level))
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | ref      | wff_ref			  | ref	         | ref          | ref_args also deal with this case for args
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | wff      | wff_all           | wff_all      | wff_all      | resolve the quantified variables
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+// | wff      | wff_ex            | wff_ex       | wff_ex       | resolve the quantified variables
+// |----------|-------------------|--------------|--------------|-----------------------------------------------
+
 template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope) {
 	type_scoped_resolver<node> resolver;
