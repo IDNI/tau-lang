@@ -182,8 +182,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 
 	struct get_options; // fwd
 
-	inline static bool use_hooks = true;
-
 	// tree direct API
 	// ---------------------------------------------------------------------
 
@@ -359,6 +357,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	std::string get_ba_type_name() const;
 	tref get_ba_type_tree() const;
 	const trefs& get_free_vars() const;
+
+	static tref untype(tref term);
 
 	// Substitution method for typed tau trees
 	tref substitute(tref that, tref with) const;
@@ -648,6 +648,9 @@ private:
 	using tt = traverser;
 
 };
+
+template <NodeType node>
+tref untype(tref term);
 
 // Substitution method for typed tau trees
 template <NodeType node>

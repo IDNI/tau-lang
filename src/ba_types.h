@@ -171,108 +171,6 @@ size_t get_bv_width(tref t);
 
 
 // -----------------------------------------------------------------------------
-// Type definitions for rr predicates
-
-/**
- * @brief Creates the type tree associated with the type "rr predicate"
- * @tparam Tree node type
- * @return Tree reference to type tree
- */
-template <NodeType node>
-tref rr_predicate_type(size_t offsets = 0, const std::initializer_list<tref>& signature = {});
-
-template <NodeType node>
-tref rr_predicate_type(size_t offsets = 0, const std::initializer_list<size_t>& signature = {});
-
-template <NodeType node>
-tref rr_predicate_type(size_t offsets = 0, size_t arity = 0);
-
-template <NodeType node>
-inline size_t rr_predicate_type_id(size_t offsets = 0, size_t arity = 0);
-
-template <NodeType node>
-inline size_t rr_predicate_type_id(size_t offsets = 0, const std::initializer_list<tref>& signature = {});
-
-template <NodeType node>
-inline size_t rr_predicate_type_id(size_t offsets = 0, const std::initializer_list<size_t>& signature = {});
-
-/**
- * @brief Checks if t represents the rr predicate type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents rr predicate
- */
-template <NodeType node>
-bool is_rr_predicate_type_family(tref t);
-
-template <NodeType node>
-bool is_rr_predicate_type_family(size_t t);
-
-// -----------------------------------------------------------------------------
-// Type definitions for rr functions
-
-/**
- * @brief Creates the type tree associated with the type "rr functions"
- * @tparam Tree node type
- * @return Tree reference to type tree
- */
-template <NodeType node>
-tref rr_function_type(size_t offsets = 0, const std::initializer_list<tref>& signature = {});
-
-template <NodeType node>
-tref rr_function_type(size_t offsets = 0, const std::initializer_list<size_t>& signature = {});
-
-template <NodeType node>
-tref rr_function_type(size_t offsets = 0, size_t arity = 0);
-
-template <NodeType node>
-inline size_t rr_function_type_id(size_t offsets = 0, size_t arity = 0);
-
-template <NodeType node>
-inline size_t rr_function_type_id(size_t offsets = 0, const std::initializer_list<tref>& signature = {});
-
-template <NodeType node>
-inline size_t rr_function_type_id(size_t offsets = 0, const std::initializer_list<size_t>& signature = {});
-
-/**
- * @brief Checks if t represents the rr predicate type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents rr predicate
- */
-template <NodeType node>
-bool is_rr_function_type_family(tref t);
-
-template <NodeType node>
-bool is_rr_function_type_family(size_t t);
-
-// -----------------------------------------------------------------------------
-// Type definitions for functions
-
-/**
- * @brief Creates the type tree associated with the type "functions"
- * @tparam Tree node type
- * @return Tree reference to type tree
- */
-template <NodeType node>
-tref function_type(tref type = untyped_type<node>(), size_t arity = 0);
-
-template <NodeType node>
-inline size_t function_type_id(tref type = untyped_type<node>(), size_t arity = 0);
-
-/**
- * @brief Checks if t represents the function type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents function
- */
-template <NodeType node>
-bool is_function_type_family(tref t);
-
-template <NodeType node>
-bool is_function_type_family(size_t t);
-
-// -----------------------------------------------------------------------------
 // BA types
 //   contains type map of BA types
 // is templated by NodeType to scope it to the specific BAs... packed node tree
@@ -353,61 +251,8 @@ std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type
 template <NodeType node>
 std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type);
 
-// Checks if the ref is typeable
 template <NodeType node>
-bool is_typeable(tref n);
-
-// Checks if the ref is typed
-template <NodeType node>
-bool is_typed(tref n);
-
-// Checks if the ref is typed
-template <NodeType node>
-bool are_typed(trefs ns);
-
-// Get type of a reference
-template <NodeType node>
-tref get_typed(tref t);
-
-// Get type of a reference
-template <NodeType node>
-trefs get_typeds(trefs t);
-
-// Get type id of a reference
-template <NodeType node>
-size_t get_typed_id(tref t);
-
-// Get type ids of references
-template <NodeType node>
-std::vector<size_t> get_typed_ids(trefs t);
-
-template <NodeType node>
-tref untyped(tref n);
-
-template <NodeType node>
-bool has_type(tref n);
-
-template <NodeType node>
-bool have_types(trefs t);
-
-// Get type of references
-template <NodeType node>
-trefs get_type(tref t);
-
-// Get types of references
-template <NodeType node>
-trefs get_types(trefs t);
-
-// Get type of references
-template <NodeType node>
-size_t get_type_id(tref t);
-
-// Get type of references
-template <NodeType node>
-std::vector<size_t> get_type_ids(tref t);
-
-template <NodeType node>
-tref untype(tref n);
+bool has_ba_type (tref term);
 
 template <NodeType node>
 size_t find_ba_type (tref term);
@@ -418,7 +263,6 @@ tref find_ba_type_tree (tref term);
 // print the type name to the stream
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);
-
 
 } // namespace idni::tau_lang
 

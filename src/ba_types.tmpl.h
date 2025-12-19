@@ -203,171 +203,6 @@ size_t get_bv_width(tref t) {
 	return default_bv_size;
 }
 
-// rr predicate type definitions
-template<NodeType node>
-tref rr_predicate_type(size_t offsets, const std::initializer_list<tref>& signature) {
-	using tau = tree<node>;
-
-	tref type = tau::get(tau::type, "rr_predicate");
-	tref offsets_ = tau::get_num(offsets);
-	std::vector<tref> children{type, offsets_};
-	children.insert(children.end(), signature.begin(), signature.end());
-	return tau::get(tau::typed, children);
-}
-
-template<NodeType node>
-tref rr_predicate_type(size_t offsets, const std::initializer_list<size_t>& signature) {
-	using tau = tree<node>;
-
-	tref type = tau::get(tau::type, "rr_predicate");
-	tref offsets_ = tau::get_num(offsets);
-	std::vector<tref> children{type, offsets_};
-	for (auto sid : signature)
-		children.push_back(ba_types<node>::type_tree(sid));
-	return tau::get(tau::typed, children);
-}
-
-template<NodeType node>
-tref rr_predicate_type(size_t offsets, size_t arity) {
-	using tau = tree<node>;
-
-	tref type = tau::get(tau::type, "rr_predicate");
-	tref offsets_ = tau::get_num(offsets);
-	std::vector<tref> children{type, offsets_};
-	for (size_t i = 0; i < arity; ++i)
-		children.push_back(tau::get(tau::type, "untyped"));
-	return tau::get(tau::typed, children);
-}
-
-template<NodeType node>
-inline size_t rr_predicate_type_id(size_t offsets, const std::initializer_list<tref>& signature) {
-	static size_t id = ba_types<node>::id(rr_predicate_type<node>(offsets, signature));
-	return id;
-}
-
-template<NodeType node>
-inline size_t rr_predicate_type_id(size_t offsets, const std::initializer_list<size_t>& signature) {
-	std::vector<tref> signature_;
-	for (auto sid : signature)
-		signature_.push_back(ba_types<node>::type_tree(sid));
-	static size_t id = ba_types<node>::id(rr_predicate_type<node>(offsets, signature));
-	return id;
-}
-
-template<NodeType node>
-inline size_t rr_predicate_type_id(size_t offsets, size_t arity) {
-	static size_t id = ba_types<node>::id(rr_predicate_type<node>(offsets, arity));
-	return id;
-}
-
-template<NodeType node>
-bool is_rr_predicate_type(tref t) {
-	using tau = tree<node>;
-
-	return tau::get(t)[0].get_string() == "rr_predicate";
-}
-
-template <NodeType node>
-bool is_rr_predicate_type(size_t t) {
-	return is_rr_predicate_type<node>(ba_types<node>::type_tree(t));
-}
-
-// rr function type definitions
-template<NodeType node>
-tref rr_function_type(size_t offsets, const std::initializer_list<tref>& signature) {
-	using tau = tree<node>;
-
-	tref type = tau::get(tau::type, "rr_function");
-	tref offsets_ = tau::get_num(offsets);
-	std::vector<tref> children{type, offsets_};
-	children.insert(children.end(), signature.begin(), signature.end());
-	return tau::get(tau::typed, children);
-}
-
-template<NodeType node>
-tref rr_function_type(size_t offsets, const std::initializer_list<size_t>& signature) {
-	using tau = tree<node>;
-
-	tref type = tau::get(tau::type, "rr_function");
-	tref offsets_ = tau::get_num(offsets);
-	std::vector<tref> children{type, offsets_};
-	for (auto sid : signature)
-		children.push_back(ba_types<node>::type_tree(sid));
-	return tau::get(tau::typed, children);
-}
-
-template<NodeType node>
-tref rr_function_type(size_t offsets, size_t arity) {
-	using tau = tree<node>;
-
-	tref type = tau::get(tau::type, "rr_function");
-	tref offsets_ = tau::get_num(offsets);
-	std::vector<tref> children{type, offsets_};
-	for (size_t i = 0; i < arity; ++i)
-		children.push_back(tau::get(tau::type, "untyped"));
-	return tau::get(tau::typed, children);
-}
-
-template<NodeType node>
-inline size_t rr_function_type_id(size_t offsets, const std::initializer_list<tref>& signature) {
-	static size_t id = ba_types<node>::id(rr_function_type<node>(offsets, signature));
-	return id;
-}
-
-template<NodeType node>
-inline size_t rr_function_type_id(size_t offsets, const std::initializer_list<size_t>& signature) {
-	std::vector<tref> signature_;
-	for (auto sid : signature)
-		signature_.push_back(ba_types<node>::type_tree(sid));
-	static size_t id = ba_types<node>::id(rr_function_type<node>(offsets, signature));
-	return id;
-}
-
-template<NodeType node>
-inline size_t rr_function_type_id(size_t offsets, size_t arity) {
-	static size_t id = ba_types<node>::id(rr_function_type<node>(offsets, arity));
-	return id;
-}
-
-template<NodeType node>
-bool is_rr_function_type_family(tref t) {
-	using tau = tree<node>;
-
-	return tau::get(t)[0].get_string() == "rr_function";
-}
-
-template <NodeType node>
-bool is_rr_function_type_family(size_t t) {
-	return is_rr_function_type<node>(ba_types<node>::type_tree(t));
-}
-
-// function type definitions
-template<NodeType node>
-tref function_type(tref type, size_t arity) {
-	std::vector<tref> signature;
-	for (size_t i = 0; i < arity; ++i)
-		signature.push_back(type);
-	return rr_function_type<node>(0, signature);
-}
-
-template<NodeType node>
-inline size_t function_type_id(tref type, size_t arity) {
-	return rr_function_type_id<node>(function_type<node>(type, arity));
-}
-
-template <NodeType node>
-bool is_function_type_family(tref t) {
-	using tau = tree<node>;
-
-	return tau::get(t)[0].get_string() == "rr_function"
-		&& tau::get(t)[1] == tau::get_num(0);
-}
-
-template <NodeType node>
-bool is_function_type_family(size_t t) {
-	return is_function_type_family<node>(ba_types<node>::type_tree(t));
-}
-
 // -----------------------------------------------------------------------------
 // BA types
 
@@ -426,8 +261,7 @@ std::vector<tref>& ba_types<node>::type_trees() {
 		untyped_type<node>(), 
 		tau_type<node>(),
 		bv_type<node>(), 
-		sbf_type<node>(), 
-		rr_predicate_type<node>(0,0) };
+		sbf_type<node>() };
 	return t;
 }
 
@@ -438,8 +272,7 @@ subtree_map<node, size_t>& ba_types<node>::type_tree_to_idx() {
 		{ untyped_type<node>(), 0 },
 		{ tau_type<node>(), 1 }, 
 		{ bv_type<node>(), 2 },
-		{ sbf_type<node>(), 3 }, 
-		{ rr_predicate_type<node>(0,0), 4 }
+		{ sbf_type<node>(), 3 }
 	};
 	return t;
 }
@@ -548,156 +381,9 @@ std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<
 }
 
 template<NodeType node>
-bool is_typeable(tref t) {
+bool has_ba_type(tref term) {
 	using tau = tree<node>;
-
-	return is<node, tau::variable>(t)
-		|| is<node, tau::ba_constant>(t)
-		|| is<node, tau::bf_t>(t)
-		|| is<node, tau::bf_f>(t);
-		//|| is<node, tau::ref>(t);
-}
-
-template <NodeType node>
-bool is_typed(tref n) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-
-	return (tt(n) | tau::typed | tt::ref) != nullptr;
-}	
-
-template <NodeType node>
-bool are_typed(trefs ns) {
-	for (auto n : ns)
-		if (!is_typed<node>(n)) return false;
-	return true;	
-}	
-
-template <NodeType node>
-tref get_typed(tref n) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-
-	return (tt(n) | tau::typed | tt::ref);
-}	
-
-template <NodeType node>
-trefs get_typeds(trefs n) {
-	trefs typed_nodes;
-	for (auto ni : n) typed_nodes.push_back(get_typed<node>(ni));
-	return typed_nodes;
-}	
-
-template <NodeType node>
-size_t get_typed_id(tref n) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-
-	if (auto check = tt(n) | tau::typed | tt::ref ; check)
-		return ba_types<node>::id(check);
-	return untyped_type_id<node>();	
-}	
-
-template <NodeType node>
-std::vector<size_t> get_typed_ids(trefs n) {
-	std::vector<size_t> type_ids;
-	for (auto ni : n) type_ids.push_back(get_typed_id<node>(ni));
-	return type_ids;
-}
-
-
-template<NodeType node>
-tref untyped(tref n) {
-	using tau = tree<node>;
-
-	auto nt = tau::get(n).get_type();
-	switch (nt) {
-	case tau::bf_t:
-	case tau::bf_f:
-		return tau::get_typed(nt, tau::get(n).get_ba_type());
-	case tau::variable:
-	return tau::get_typed(tau::variable, {tau::get(n).first()}, tau::get(n).get_ba_type());
-	case tau::ref: {
-		auto children = tau::get(n).get_children();
-		return tau::get_typed(tau::ref, children, tau::get(n).get_ba_type());
-	}
-	default:
-		return n;
-	}
-}
-
-template <NodeType node>
-bool has_type(tref n) {
-	using tau = tree<node>;
-
-	return tau::get(n).get_ba_type() != untyped_type_id<node>();
-}
-
-template <NodeType node>
-bool have_types(trefs t) {
-	for (auto ti : t)
-		if (!has_type<node>(ti)) return false;
-	return true;
-}
-
-template <NodeType node>
-tref get_type(tref t) {
-	auto type_id = get_type_id<node>(t);
-	return ba_types<node>::type_tree(type_id);	
-}
-
-template <NodeType node>
-trefs get_types(trefs t) {
-	trefs types;
-	for (auto ti : t) types.push_back(get_type<node>(ti));
-	return types;
-}
-
-template <NodeType node>
-size_t get_type_id(tref t) {
-	using tau = tree<node>;
-
-	return tau::get(t).get_ba_type();
-}
-
-template <NodeType node>
-std::vector<size_t> get_type_ids(trefs t) {
-	std::vector<size_t> type_ids;
-	for (auto ti : t) type_ids.push_back(get_type_id<node>(ti));
-	return type_ids;
-}
-
-template<NodeType node>
-tref untype(tref t) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-
-	auto nt = tau::get(t).get_type();
-	switch (nt) {
-	case tau::bf_t:
-		return tau::get(tau::bf_t);
-	case tau::bf_f:
-		return tau::get(tau::bf_f);
-	case tau::ba_constant: {
-		if (tau::get(t).children_size() > 0)
-			return t; // tau::get(tau::ba_constant, tau::get(t).first());
-		else
-			return tau::get(tau::get(t).value.ba_retype(untyped_type_id<node>()));
-	}
-	case tau::variable:
-	case tau::ref:
-		if (auto check = tt(t) | tau::typed; check) {
-			// copy all the children but the typed
-			auto children = tau::get(t).get_children();
-			trefs n_children;
-			for (auto ch: tau::get(t).get_children())
-				if (!is<node, tau::typed>(ch)) n_children.push_back(ch);
-			return tau::get(nt, n_children);
-		}
-		return tau::get(nt, tau::get(t).get_children());
-	default:
-		return t;
-	}
+	return tau::get(term).get_ba_type() != untyped_type_id<node>();
 }
 
 template <NodeType node>
@@ -707,10 +393,8 @@ size_t find_ba_type (tref term) {
 	size_t type = tau::get(term).get_ba_type();
 	if (type != 0) return type;
 	auto f = [&type](const tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf)) type = t.get_ba_type();
-		if (type > 0) return false;
-		return true;
+		type = tau::get(n).get_ba_type();
+		return type == 0;
 	};
 	pre_order<node>(term).search_unique(f);
 	return type;
