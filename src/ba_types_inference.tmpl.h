@@ -415,15 +415,16 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n) {
 	auto body = untype<node>(tau::get(updated).child(1));
 	auto type = find_ba_type<node>(updated);
 	DBG(assert(!is_untyped<node>(type)));
-	auto new_head = 
-		tau::get_typed(tau::bf, 
-			tau::get_typed(tau::bf_ref, 
-				head, type), type);
+	auto new_head = is<node, tau::ref>(head)
+				? tau::get_typed(tau::bf,
+					tau::get_typed(tau::bf_ref, head, type),
+					type)
+				: head;
 	auto new_body = is<node, tau::ref>(body)
-		? tau::get_typed(tau::bf, 
-			tau::get_typed(tau::bf_ref, 
-				body, type), type)
-		: tau::get(updated).child(1);
+				? tau::get_typed( tau::bf,
+					tau::get_typed(tau::bf_ref, body, type),
+					type)
+				: body;
 	return tau::get(tau::rec_relation, { new_head, new_body });
 }
 
@@ -439,15 +440,12 @@ tref update_predicate_rr(type_scoped_resolver<node>& resolver, tref n) {
 	// assuming boolean type
 	auto head = tau::get(updated).child(0);
 	auto body = tau::get(updated).child(1);
-	auto new_head = 
-		tau::get(tau::wff, 
-			tau::get(tau::wff_ref, 
-				head));
+	auto new_head = is<node, tau::ref>(head)
+				? tau::get(tau::wff, tau::get(tau::wff_ref, head))
+				: head;
 	auto new_body = is<node, tau::ref>(body)
-		? tau::get(tau::wff, 
-			tau::get(tau::wff_ref, 
-				body))
-		: tau::get(updated).child(1);
+				? tau::get(tau::wff, tau::get(tau::wff_ref, body))
+				: body;
 	return tau::get(tau::rec_relation, { new_head, new_body });
 }
 
