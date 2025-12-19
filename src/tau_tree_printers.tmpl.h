@@ -120,7 +120,7 @@ std::ostream& operator<<(std::ostream& os, const spec_context<node>& ctx) {
         if (ctx.inputs.size() == 0 && ctx.outputs.size() == 0) os << " none";
         os << "\n";
         auto print_io = [&](size_t var_sid, const auto& s, bool output){
-                os << "\t" << dict(var_sid) << " : "
+                os << "\t" << dict(var_sid)
                         << get_ba_type_name<node>(s.first) << " = "
                         << (output ? "out" : "in") << " "
                         << (s.second == 0 ? "console"
@@ -516,8 +516,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				out(tau::get(t.get_ba_type_tree()));
 				break;
 			case typed:
-				if (pnt == input_def || pnt == output_def) out(" : ");
-				break;
+				out(":"); break;
 			case stream:
 				if (pnt == input_def) out(" = in ");
 				else if (pnt == output_def) out(" = out ");
@@ -698,7 +697,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offsets:           out(", "); break;
 			case shift:             out("-"); break;
 			case variable:
-			case ba_constant:       out(" : "); break;
+			case ba_constant:       break;
 
 			case wff_all:
 			case wff_ex:

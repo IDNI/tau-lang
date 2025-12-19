@@ -163,9 +163,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 				}
 				case input_def:
 				case output_def: {
-					if (ptr[0].has_right_sibling()
-						&& ptr[0].right_sibling_tree()
-							.is(tau::type))
+					if (ptr.second() && ptr.second_tree().
+						is(tau::typed))
 					{
 						ba_type = get_ba_type_id<node>(
 							m_ref(ptr.second()));
