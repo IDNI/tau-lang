@@ -748,7 +748,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case io_var:
 				// Print type information if present
 				if (parent) {
-					out(":");
 					out(tau::get(tau::get(parent).get_ba_type_tree()));
 				}
 				break;
