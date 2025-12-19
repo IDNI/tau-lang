@@ -28,6 +28,19 @@ bool is_typeable(tref t) {
 	//|| is<node, tau::ref>(t);
 }
 
+template <NodeType node>
+void default_typing_message(tref var, tref env, const bool bv = false) {
+	using tau = tree<node>;
+
+	const std::string type_info = (is_io_var<node>(var)
+					|| tau::get(var).is(tau::ba_constant))
+					? ""
+					:  get_ba_type_name<node>(
+						  tau::get(var).get_ba_type());
+	const std::string message = bv ? "(Default bv width) " : "(Default typing) ";
+	LOG_INFO << message << tau::get(var) << type_info << " in "
+			<< tau::get(env) << "\n";
+}
 
 template<NodeType node>
 tref canonize(tref t) {
@@ -414,7 +427,7 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n) {
 	auto head = untype<node>(tau::get(updated).child(0));
 	auto body = untype<node>(tau::get(updated).child(1));
 	// If the body is a formula and not a term, reject
-	if (!tau::get(body).is_term()) return nullptr;
+	if (tau::get(body).is(tau::wff)) return nullptr;
 	auto type = find_ba_type<node>(updated);
 	DBG(assert(!is_untyped<node>(type)));
 	auto new_head = is<node, tau::ref>(head)
@@ -503,13 +516,19 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 	bool error = false;
 	auto types = resolver.current_types();
 	auto to_be_updated = std::set<size_t>(types_to_update.begin(), types_to_update.end());
-	
+	std::vector type_environment = {r};
+
 	auto f = [&](tref n) -> bool {
+		auto t = tau::get(n);
+
+		if (is_atomic_fm<node>(n)) type_environment.pop_back();
+		else if (t.is(tau::rec_relation)) type_environment.pop_back();
+		else if (t.is(tau::ref)) type_environment.pop_back();
+		// Do not pop the bf environment
 
 		// Check if n was already processed
 		if (tt(n) | tau::processed) return true;
 
-		auto t = tau::get(n);
 		size_t nt = t.get_type();
 	
 		if (error) return false;
@@ -530,8 +549,7 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				if (auto updated = update_variable<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
 					if (using_default_type<node>(n, types)) {
-						LOG_INFO << "(Default typing) " << tau::get(n)
-							<< " in " << tau::get(r) << "\n";
+						default_typing_message<node>(updated, type_environment.back());
 					}
 				} else error = true; 
 				break;
@@ -541,12 +559,9 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				if (auto updated = update_ba_constant<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
 					if (using_default_type<node>(n, types)) {
-						LOG_INFO << "(Default typing) " << tau::get(n)
-							<< " in " << tau::get(r) << "\n";
-					}
-					if (using_default_bv_size<node>(n, types)) {
-						LOG_INFO << "(Default bv size) " << tau::get(n)
-							<< " in " << tau::get(r) << "\n";
+						default_typing_message<node>(updated, type_environment.back());
+					} else if (using_default_bv_size<node>(n, types)) {
+						default_typing_message<node>(updated, type_environment.back(), true);
 					}
 				} else error = true; 
 				break;
@@ -556,8 +571,7 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				if (auto updated = update_bf_constant<node>(resolver, n, types); updated) {
 					if (updated != n) changes.insert_or_assign(n, updated);
 					if (using_default_type<node>(n, types)) {
-						LOG_INFO << "(Default typing) " << tau::get(n)
-							<< " in " << tau::get(r) << "\n";
+						default_typing_message<node>(updated, type_environment.back());
 					}
 				} else error = true; 
 				break;
@@ -613,8 +627,18 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				<< resolver.dump_to_str();)
 		return !error;
 	};
-	
-	post_order<node>(r).search(f);
+	// Solution to not printing the entire tau command tree for default typing
+	auto update_type_env = [&type_environment](tref n) {
+		const tau& n_t = tau::get(n);
+		if (is_atomic_fm<node>(n)) type_environment.push_back(n);
+		else if (n_t.is(tau::rec_relation)) type_environment.push_back(n);
+		else if (n_t.is(tau::ref)) type_environment.push_back(n);
+		// Case of single bf
+		else if (type_environment.empty() && n_t.is(tau::bf))
+			type_environment.push_back(n);
+		return true;
+	};
+	post_order<node>(r).search(f, update_type_env);
 	if (error) return nullptr;
 	return changes.find(r) != changes.end() ? changes[r] : r;
 }
