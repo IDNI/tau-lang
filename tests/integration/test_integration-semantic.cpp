@@ -1,0 +1,18 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
+#include "test_init.h"
+#include "test_Bool_helpers.h"
+
+#include "tau.h"
+
+TEST_SUITE("Semantic checks") {
+
+	TEST_CASE("missplaced fallback") {
+		logging::trace();
+
+		const string input = "g[n](x):tau := g[n-1](x) fallback 1.";
+		tref parsed = tau::get(input, parse_rec_relations());
+		CHECK( parsed == nullptr );
+		logging::info();
+	}
+}
