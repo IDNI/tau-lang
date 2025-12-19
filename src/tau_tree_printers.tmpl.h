@@ -512,7 +512,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (tref src = tt(ref) | source | tt::ref; src)
 					out(tau::get(src).get_string());
 				else out(tau::get(ref).get_ba_constant());
-				out(" }:");
+				out(" }");
 				out(tau::get(t.get_ba_type_tree()));
 				break;
 			case typed:
