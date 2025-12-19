@@ -16,9 +16,6 @@ template <NodeType node> struct ba_constants;
 template <NodeType node> struct get_hook;
 
 // -----------------------------------------------------------------------------
-// various extractors (tau_tree_extractors.tmpl.h)
-template <NodeType node>
-size_t get_type_sid(tref n);
 
 template <NodeType node>
 rr_sig get_rr_sig(tref n);
@@ -35,15 +32,9 @@ template <NodeType node>
 rewriter::rules get_rec_relations(tref r);
 
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref ref,
-				   bool wo_inference = false);
+std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref ref);
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(tref ref, bool wo_inference = false);
-template <NodeType node>
-std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules, tref main_fm);
-template <NodeType node>
-std::optional<rr<node>> get_nso_rr(const rewriter::rules& rules,
-				   const htref& main_fm);
+std::optional<rr<node>> get_nso_rr(tref ref);
 
 template <NodeType node>
 void get_leaves(tref n, typename node::type branch, trefs& leaves);
@@ -268,7 +259,7 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 		}
 		return n.ba_type;
 	};
-	if (!use_hooks) return get_raw(v, ch, len, r);
+	if (!base_t::use_hooks) return get_raw(v, ch, len, r);
 	// get with hooks
 	get_hook<node> hook;
 	// set hook first if not hooked
@@ -851,6 +842,15 @@ const trefs& tree<node>::get_free_vars() const {
 }
 
 template<NodeType node>
+tref tree<node>::untype(tref term) {
+	const tau& n = tau::get(term);
+	if (n.has_child())
+		return tau::get(n.value.ba_retype(untyped_type_id<node>()),
+			n.get_children());
+	else return tau::get(n.value.ba_retype(untyped_type_id<node>()));
+}
+
+template<NodeType node>
 tref tree<node>::substitute(tref that, tref with) const {
 	// If that contains a quantifier, the above quantifier id's in formula need
 	// to be recalculated; otherwise just simple replace method
@@ -985,6 +985,11 @@ std::vector<trefs> tree<node>::select_all_until_by_predicates(
 	auto refs = select_all_until(
 		or_predicate<node>(queries.data(), queries.size()), until);
 	return select_by_predicates<node>(refs, queries.data(), queries.size());
+}
+
+template<NodeType node>
+tref untype(tref term) {
+	return tree<node>::untype(term);
 }
 
 template <NodeType node>
