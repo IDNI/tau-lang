@@ -839,12 +839,33 @@ bool has_negative_offset(tref fm) {
 }
 
 template<NodeType node>
+bool has_missplaced_fallback(tref fm) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	auto missplaced_fallback = [](tref n) {
+		// Maybe reject only the same rr
+		if (is<node>(n, tau::rec_relation)) {
+			return (tt(n) // rec_relation
+				| tt::second // body bf/wff
+				| tt::first // bf_ref/wff_ref
+				| tau::ref
+				| tau::fp_fallback | tt::ref) != nullptr;
+		};
+		return false;
+	};
+
+	return tau::get(fm).find_top(missplaced_fallback) != nullptr;
+}
+
+template<NodeType node>
 bool has_semantic_error(tref fm) {
-	bool error = invalid_nesting_of_quants<node>(fm)
+	return invalid_nesting_of_quants<node>(fm)
 		     || has_open_tau_fm_in_constant<node>(fm)
 		     || invalid_nesting_of_temp_quants<node>(fm)
 		     || missing_temp_quants<node>(fm)
-		     || has_negative_offset<node>(fm);
-	return error;
+		     || has_negative_offset<node>(fm)
+			 || has_missplaced_fallback<node>(fm);
 }
+
 } // namespace idni::tau_lang

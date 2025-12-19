@@ -24,6 +24,7 @@ set(TESTS
 	wff_hooks
 	wff_normalization
 	ba_types_inference
+	semantic
 )
 
 foreach(TEST IN LISTS TESTS)
