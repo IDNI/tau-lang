@@ -16,9 +16,6 @@ template <NodeType node> struct ba_constants;
 template <NodeType node> struct get_hook;
 
 // -----------------------------------------------------------------------------
-// various extractors (tau_tree_extractors.tmpl.h)
-template <NodeType node>
-size_t get_type_sid(tref n);
 
 template <NodeType node>
 rr_sig get_rr_sig(tref n);

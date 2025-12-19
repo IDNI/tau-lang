@@ -14,15 +14,6 @@ namespace idni::tau_lang {
 // various extractors
 
 template <NodeType node>
-size_t get_type_sid(tref n) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	static size_t untyped_sid = dict("untyped");
-	if (auto t = tt(n) | tau::type; t) return t | tt::data;
-	return untyped_sid;
-}
-
-template <NodeType node>
 rr_sig get_rr_sig(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -40,7 +31,7 @@ bool get_io_def(tref n, io_defs<node>& defs) {
 
 	const auto& t            = tau::get(n);
 	size_t var_sid           = t[0].data();
-	size_t ba_type           = 0;
+	size_t ba_type           = t.get_ba_type();
 	size_t stream_sid        = 0;
 
 	if (auto fn = tt(n) | tau::stream | tau::q_file_name | tau::file_name;
@@ -51,15 +42,7 @@ bool get_io_def(tref n, io_defs<node>& defs) {
 		if (stream_sid == console_sid) stream_sid = 0;
 
 	}
-	if (tref type_node = tt(n) | tau::typed | tt::ref; type_node){
-		if (is_bv_type_family<node>(type_node)) {
-			auto width = get_bv_width<node>(type_node);
-			ba_type = bv_type_id<node>(width);
-		} else {
-			ba_type = get_ba_type_id<node>(type_node);
-		}
 
-	}
 	defs[var_sid] = { ba_type, stream_sid };
 	DBG(LOG_TRACE << "get_io_def: " << LOG_FM_DUMP(n) << " -> "
 		<< dict(var_sid) << " : " << LOG_BA_TYPE(ba_type) << " / "
