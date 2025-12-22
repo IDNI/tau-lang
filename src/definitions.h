@@ -17,7 +17,7 @@ struct definitions {
 	size_t add (htref head, htref body) {
 		// Check if rule is updated
 		for (size_t i = 0; i < heads.size(); ++i) {
-			if (heads[i] == head) {
+			if (tau::get(heads[i]) == tau::get(head)) {
 				// update definition
 				heads[i] = head;
 				bodies[i] = body;
