@@ -303,9 +303,12 @@ tref update_ba_constant(type_scoped_resolver<node>& resolver, tref n, const subt
 			: types.at(canonized));
 	// We assign the type to the constant in the resolver
 	if (!resolver.assign(canonized, type)) return nullptr;
-	// We parse the constant
-	n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type);
-	if (n == nullptr) return nullptr;
+	// Check that the constant was not parsed yet
+	if (tau::get(n).data() == 0) {
+		// We parse the constant
+		n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type);
+		if (n == nullptr) return nullptr;
+	}
 	n = tau::add_child(n, tau::get(tau::processed));
 	return n;
 }
