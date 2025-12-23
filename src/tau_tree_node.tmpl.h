@@ -129,7 +129,7 @@ constexpr node<BAs...> node<BAs...>::extension(T raw_value) {
 	);
 }
 
-#define C(x) static_cast<T>(x)
+#define C(x) static_cast<node<BAs...>::T>(x)
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
@@ -140,16 +140,17 @@ constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
 	result |= C(data) & node::data_mask;
 	return result;
 }
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
-	// if (hash != that.hash) return hash    <=> that.hash;
+	// The hash comparison is needed in order to ensure determinism due to
+	// due to different possible storage positions of strings and BA constants
+	if (hash != that.hash) return hash    <=> that.hash;
 	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
 	//if (term != that.term) return C(term) <=> C(that.term);
 	if (ba_type   != that.ba_type)   return C(ba_type)   <=> C(that.ba_type);
 	if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
-	// if (tree<node>::is_string_nt(nt))
-	// 	return dict(data) <=> dict(that.data);
 	return C(data) <=> C(that.data);
 }
 #undef C
@@ -188,8 +189,8 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr size_t node<BAs...>::hashit() const {
 	std::size_t seed = 0;
-	hash_combine(seed, static_cast<bool>(nt));
-	hash_combine(seed, static_cast<bool>(term));
+	hash_combine(seed, static_cast<size_t>(nt));
+	// hash_combine(seed, static_cast<bool>(term));
 	// In order to have a deterministic hash, we hash the type name
 	hash_combine(seed, get_ba_type_name<node>(ba_type));
 	hash_combine(seed, static_cast<bool>(ext));
@@ -199,7 +200,7 @@ constexpr size_t node<BAs...>::hashit() const {
 	// Get string from pool, untyped ba_constant also has string as data
 	else if (tree<node>::is_string_nt(nt) || nt == type::ba_constant)
 		hash_combine(seed, dict(data));
-	else hash_combine(seed, data);
+	else hash_combine(seed, static_cast<size_t>(data));
 	return seed;
 }
 
