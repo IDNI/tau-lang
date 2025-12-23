@@ -295,6 +295,26 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	}
 	tau::use_hooks = using_hooks;
 	if (options.reget_with_hooks) transformed = reget(transformed);
+
+#ifdef DEBUG
+	// Check that all term nodes have been typed
+	auto check = [](tref n) {
+		if (is_term_nt(tau::get(n).value.nt) && !tau::get(n).is(tau::capture)) {
+			if (tau::get(n).get_ba_type() == 0) {
+				LOG_DEBUG << "Untyped term node: " << tau::get(n).tree_to_str();
+				assert(false);
+			}
+		}
+		return true;
+	};
+	auto visit = [](tref n) {
+		if (tau::get(n).is(tau::offset)) return false;
+		return true;
+	};
+	if (options.infer_ba_types && options.reget_with_hooks)
+		pre_order<node>(transformed).visit(check, visit, identity);
+#endif
+
 	// As final step, convert the bound variables to a canonical numbered representation
 	// This only makes sense in combination with type inference since
 	// otherwise quantified variables cannot be correctly caught
