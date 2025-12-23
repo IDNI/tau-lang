@@ -350,7 +350,8 @@ template <NodeType node>
 tref term_boole_decomposition(tref term, tref var);
 
 template <NodeType node>
-tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx);
+tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
+	const bool free_funcs = false);
 
 template <NodeType node>
 tref term_boole_decomposition(tref term);

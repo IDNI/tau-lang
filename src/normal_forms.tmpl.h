@@ -3227,17 +3227,27 @@ tref term_boole_decomposition(tref term, tref var) {
  * @return The resulting Boole decomposition
  */
 template<NodeType node>
-tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx) {
+tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
+	const bool free_funcs) {
 	using tau = tree<node>;
 	DBG(LOG_TRACE << "Step on " << LOG_FM(term) << "\n";)
 	if (tau::get(term).equals_0()) return term;
 	if (tau::get(term).equals_1()) return term;
 	if (idx == (int_t)vars.size()) {
-		term = normalize_ba<node>(term);
+		if (!free_funcs) {
+			term = normalize_ba<node>(term);
+			auto func_syms = tau::get(term).select_top(is<node, tau::bf_ref>);
+			if (!func_syms.empty()) {
+				std::ranges::sort(func_syms, tau::subtree_less);
+				term = rec_term_boole_decomposition<node>(term, func_syms, 0, true);
+			}
+		} else {
+			term = rec_term_boole_decomposition<node>(term, vars, idx + 1, true);
+		}
 		DBG(LOG_TRACE << "Result: " << LOG_FM(term) << "\n";)
 		return term;
 	}
-	DBG(assert(tau::get(vars[idx]).is(tau::variable));)
+	DBG(assert(tau::get(vars[idx]).is(tau::variable) || tau::get(vars[idx]).is(tau::bf_ref));)
 	tref p1 = tau::get(term).replace(vars[idx], tau::_1_trimmed(find_ba_type<node>(vars[idx])));
 	// Ensure early detection of F
 	p1 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p1);
@@ -3250,6 +3260,10 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx)
 	}
 	p1 = rec_term_boole_decomposition<node>(p1, vars, idx + 1);
 	p2 = rec_term_boole_decomposition<node>(p2, vars, idx + 1);
+	if (tau::get(p1) == tau::get(p2)) {
+		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
+		return p1;
+	}
 	tref var = tau::get(tau::bf, vars[idx]);
 	// Build Boole decomposition
 	if (tau::get(p1).equals_1())
@@ -3292,6 +3306,9 @@ tref term_boole_decomposition(tref term) {
 	// No free var, so no boole decomposition step
 	if (vars.empty()) {
 		bd = normalize_ba<node>(bd);
+		auto func_syms = tau::get(bd).select_top(is<node, tau::bf_ref>);
+		std::ranges::sort(func_syms, tau::subtree_less);
+		bd = rec_term_boole_decomposition<node>(bd, func_syms, 0);
 #ifdef TAU_CACHE
 		cache.emplace(bd, bd);
 		return cache.emplace(term, bd).first->second;
@@ -3343,6 +3360,10 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 	}
 	p1 = rec_boole_decomposition<node>(p1, vars, idx + 1);
 	p2 = rec_boole_decomposition<node>(p2, vars, idx + 1);
+	if (tau::get(p1) == tau::get(p2)) {
+		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
+		return p1;
+	}
 	// Build Boole decomposition
 	if (tau::get(p1).equals_T())
 		formula = tau::build_wff_or(vars[idx], p2);
