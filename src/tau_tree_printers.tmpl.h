@@ -616,6 +616,16 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		return true;
 	};
 	auto on_between = [&](tref left, tref parent) {
+		auto is_wrapped_negation = [&](const tau& n) {
+			if (n.child_is(bf_neg)) {
+				return is_to_wrap(n[0][0][0].get_type(), bf_neg);
+			} else return false;
+		};
+		auto is_next_conj_wrapped = [&](const tau& n) {
+			tref tmp = n.get();
+			while (get(tmp).child_is(bf_and)) tmp = get(tmp)[0][0].get();
+			return is_to_wrap(get(tmp)[0].get_type(), bf_and);
+		};
 		if (parent == nullptr) return true;
 		const auto& t = get(left), p = get(parent);
 		size_t pnt = p.get_type();
@@ -632,8 +642,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (pnt) {
 			case bf_and:
 				if (isdigit(last_written_char)
-					|| t.child_is(tau::ba_constant))
-						out(" ");
+					|| t.child_is(tau::ba_constant)) {
+					out(" ");
+				}
+				else if (is_next_conj_wrapped(p[1])
+					|| is_wrapped_negation(p[1])) {
+					out("&");
+				}
 				last_quant_nt = nul;
 				break;
 			case bf_or:             out("|");
