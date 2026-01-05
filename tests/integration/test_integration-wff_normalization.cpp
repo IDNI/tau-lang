@@ -58,7 +58,7 @@ TEST_SUITE("syntactic_path_simplification") {
 		tref fm = get_bf_nso_rr("", sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
 		std::cout << "res: " << tau::get(res) << "\n";
-		CHECK((tau::get(res).to_str() == "x(z'|ky)|xy|zk"));
+		CHECK((tau::get(res).to_str() == "x&(z'|ky)|xy|zk"));
 	}
 	TEST_CASE("4") {
 		const char* sample = "x = 0 && (z != 0 || (y = 0 && (k = 0 || x != 0))) && x = 0 || x = 0 && y = 0 || z = 0 && (z != 0 || k = 0) && z = 0 || (j = 0 && l = 0) || k = 0 || !(j = 0 && l = 0).";
@@ -166,7 +166,7 @@ TEST_SUITE("squeeze_absorb") {
 		const char* sample = "(((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = squeeze_absorb<node_t>(fm, tau::build_variable("x", 1));
-		CHECK(tau::get(res).to_str() == "xy = 0 && (xyz(xy)' != 0 || w = 0 || xyz(xyz(xy)')'|xw|xy = 0 && f(x))");
+		CHECK(tau::get(res).to_str() == "xy = 0 && (xyz&(xy)' != 0 || w = 0 || xyz&(xyz&(xy)')'|xw|xy = 0 && f(x))");
 	}
 	TEST_CASE("2") {
 		const char* sample = "(((xy) = 0 || f(x)) && (xy)' = 0) || w = 0.";
@@ -184,7 +184,7 @@ TEST_SUITE("squeeze_absorb") {
 		const char* sample = "(((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = squeeze_absorb<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "xy = 0 && (xyz(xy)' != 0 || w = 0 || xyz(xyz(xy)')'|xw|xy = 0 && f(x))");
+		CHECK(tau::get(res).to_str() == "xy = 0 && (xyz&(xy)' != 0 || w = 0 || xyz&(xyz&(xy)')'|xw|xy = 0 && f(x))");
 	}
 	TEST_CASE("5") {
 		const char* sample = "xy = 0 && vw = 0 && (yw = 0 && xv = 0 || k = 0).";
@@ -196,13 +196,13 @@ TEST_SUITE("squeeze_absorb") {
 		const char* sample = "fx != 0 || (g = 0 && fxy = 0 && fxw != 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = squeeze_absorb<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "fx != 0 || g = 0 && fxy(fx)' = 0 && (fxw|fx)(fxy(fx)')' != 0");
+		CHECK(tau::get(res).to_str() == "fx != 0 || g = 0 && fxy&(fx)' = 0 && (fxw|fx)&(fxy&(fx)')' != 0");
 	}
 	TEST_CASE("7") {
 		const char* sample = "fx = 0 && (g != 0 || fxy != 0 || fxw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = squeeze_absorb<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "fx = 0 && (g != 0 || fxy(fx)' != 0 || (fxw|fx)(fxy(fx)')' = 0)");
+		CHECK(tau::get(res).to_str() == "fx = 0 && (g != 0 || fxy&(fx)' != 0 || (fxw|fx)&(fxy&(fx)')' = 0)");
 	}
 	TEST_CASE("8") {
 		const char* sample = "o1[4] = o1[3] && o2[0] != 0 && (o1[3] != o1[1] || o2[2] != 0 || o2[1] = 0) && (o2[1] != 0 || o2[2] = 0) && (o2[2] = 0 || o2[3] = 0 && o1[4] != o1[2]).";
@@ -255,7 +255,7 @@ TEST_SUITE("boole_normal_form") {
 		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = boole_normal_form<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "b'ax'|ba'x = 0 || b(a|x')|b'ax != 0");
+		CHECK(tau::get(res).to_str() == "b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0");
 	}
 	TEST_CASE("2") {
 		const char* sample = "f(0, 0)f(0, 1) = 0 && f(1, 1)f(1, 0) = 0 && f(1, 0)f(1, 1)|f(0, 1)f(0, 0) != 0.";
