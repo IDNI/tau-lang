@@ -115,23 +115,42 @@ std::ostream& operator<<(std::ostream& os,
 }
 
 template <NodeType node>
-std::ostream& operator<<(std::ostream& os, const spec_context<node>& ctx) {
-        os << "IO variables:";
-        if (ctx.inputs.size() == 0 && ctx.outputs.size() == 0) os << " none";
-        os << "\n";
-        auto print_io = [&](size_t var_sid, const auto& s, bool output){
-                os << "\t" << dict(var_sid)
-                        << get_ba_type_name<node>(s.first) << " = "
-                        << (output ? "out" : "in") << " "
-                        << (s.second == 0 ? "console"
-                                : "file(\"" + dict(s.second) + "\")")
-                        << "\n";
-        };
-        for (const auto& [var_sid, desc] : ctx.inputs)
-                print_io(var_sid, desc, false);
-        for (const auto& [var_sid, desc] : ctx.outputs)
-                print_io(var_sid, desc, true);
-	return os;
+std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
+	os << "IO Context\n================\nGlobal scope:";
+	if (ctx.global_scope.size() == 0) os << " none";
+	os << "\n";
+	for (const auto& [var, type] : ctx.global_scope) os << "\t" << get_var_name<node>(var) << " : " << get_ba_type_name<node>(type) << "\n";
+	os << "\n";
+
+	os << "Types:";
+	if (ctx.types.size() == 0) os << " none";
+	os << "\n";
+	for (const auto& [var, type] : ctx.types) os << "\t" << LOG_FM_DUMP(var) << /* << get_var_name<node>(var) <<*/ " : " << get_ba_type_name<node>(type) << "\n";
+	os << "\n";
+
+	os << "IO streams:";
+	if (ctx.inputs.size() == 0 && ctx.outputs.size() == 0) os << " none";
+	os << "\n";
+	auto print_io = [&](tref var, size_t s, bool output) {
+		os << "\t" << get_var_name<node>(var) << " : "
+			<< get_ba_type_name<node>(ctx.type_of(var)) << " = "
+			<< (output ? "out" : "in") << " "
+			<< (s == 0 ? "console"
+				: "file(\"" + dict(s) + "\")")
+			<< "\n";
+	};
+	for (const auto& [var, s] : ctx.inputs)  print_io(var, s, false);
+	for (const auto& [var, s] : ctx.outputs) print_io(var, s, true);
+
+	os << "\n";
+	os << "Input remaps:";
+	if (ctx.input_remaps.size() == 0) os << " none";
+	else for (const auto& [name, stream] : ctx.input_remaps) os << " " << name;
+	os << "\n";
+	os << "Output remaps:";
+	if (ctx.output_remaps.size() == 0) os << " none";
+	else for (const auto& [name, stream] : ctx.output_remaps) os << " " << name;
+	return os << "\n";
 }
 
 template <NodeType node>
