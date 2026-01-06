@@ -3,7 +3,7 @@
 #ifndef DEFINITIONS_H
 #define DEFINITIONS_H
 
-#include "interpreter_types.h"
+#include "io_context.h"
 
 namespace idni::tau_lang {
 
@@ -36,30 +36,32 @@ struct definitions {
 		return r;
 	}
 
-	spec_context<node>& get_io_context () {
+	io_context<node>& get_io_context () {
 		return ctx;
 	}
 
-	io_defs<node>& get_input_defs () {
+	subtree_map<node, size_t>& get_input_defs () {
 		return ctx.inputs;
 	}
 
-	io_defs<node>& get_output_defs () {
+	subtree_map<node, size_t>& get_output_defs () {
 		return ctx.outputs;
 	}
 
 	subtree_map<node, size_t>& get_global_scope() {
-		auto add = [this](size_t sid, size_t type) {
+		for (auto [sid, x] : ctx.types) {
 			tref var_name = build_var_name<node>(sid);
 			tref var = tau::get(tau::variable,
 					tau::get(tau::io_var, { var_name }));
-			if (auto it = global_scope.find(var);
-				it != global_scope.end()) return;
-			global_scope[var] = type;
-		};
-		for (auto [sid, x] : ctx.inputs)  add(sid, x.first);
-		for (auto [sid, x] : ctx.outputs) add(sid, x.first);
-		return global_scope;
+			if (auto it = ctx.global_scope.find(var);
+				it == ctx.global_scope.end())
+					ctx.global_scope[var] = x.first;
+		}
+		return ctx.global_scope;
+	}
+
+	subtree_map<node, size_t>& get_types() {
+		return ctx.types;
 	}
 
 	size_t size() const {
@@ -85,8 +87,7 @@ private:
 	std::vector<htref> heads = {};
 	std::vector<htref> bodies = {};
 
-	spec_context<node> ctx; // input and output definitions
-	subtree_map<node, size_t> global_scope = {};
+	io_context<node> ctx; // input and output definitions
 };
 
 }
