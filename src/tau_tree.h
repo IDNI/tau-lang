@@ -611,6 +611,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_var_name(size_t sid);
 	static tref build_var_name(const std::string& name);
 	static tref build_var_name_indexed(size_t index);
+	static tref build_canonized_io_var(const std::string& name);
 	static tref build_variable(tref var_name_node, size_t type_id);
 	static tref build_variable(const std::string& name, size_t type_id);
 	static tref build_bf_variable(tref var_name_node, size_t type_id);
