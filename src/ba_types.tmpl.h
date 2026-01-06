@@ -257,10 +257,10 @@ std::string ba_types<node>::dump_to_str() {
 // type_sids (index = ba_type id)
 template <NodeType node>
 std::vector<tref>& ba_types<node>::type_trees() {
-	static std::vector<tref> t { 
-		untyped_type<node>(), 
+	static std::vector<tref> t {
+		untyped_type<node>(),
 		tau_type<node>(),
-		bv_type<node>(), 
+		bv_type<node>(),
 		sbf_type<node>() };
 	return t;
 }
@@ -268,9 +268,9 @@ std::vector<tref>& ba_types<node>::type_trees() {
 // type_sid -> ba_type id
 template <NodeType node>
 subtree_map<node, size_t>& ba_types<node>::type_tree_to_idx() {
-	static subtree_map<node, size_t> t{ 
+	static subtree_map<node, size_t> t{
 		{ untyped_type<node>(), 0 },
-		{ tau_type<node>(), 1 }, 
+		{ tau_type<node>(), 1 },
 		{ bv_type<node>(), 2 },
 		{ sbf_type<node>(), 3 }
 	};
@@ -355,7 +355,7 @@ std::optional<size_t> unify(size_t tid1, size_t tid2) {
 	auto t2 = ba_types<node>::type_tree(tid2);
 	auto result = unify<node>(t1, t2);
 	return result ? std::optional<size_t>{ ba_types<node>::id(result) } : std::nullopt;
-}	
+}
 
 template <NodeType node>
 std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type) {
