@@ -94,24 +94,24 @@ std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 					tau::geth(resolve_io_vars<node>(
 						defs.get_io_context(),
 						t[0].second())));
-			else if (t.child_is(tau::input_def)) {
-				if (!get_io_def<node>(t.first(),
-						      defs.get_input_defs()))
-				{
-					TAU_LOG_ERROR << "Invalid type "
-						<< TAU_TO_STR(t.first());
-					return {};
-				}
-			}
-			else if (t.child_is(tau::output_def)) {
-				if (!get_io_def<node>(t.first(),
-						      defs.get_output_defs()))
-				{
-					TAU_LOG_ERROR << "Invalid type "
-						<< TAU_TO_STR(t.first());
-					return {};
-				}
-			}
+			// else if (t.child_is(tau::input_def)) {
+			// 	if (!get_io_def<node>(t.first(),
+			// 			      defs.get_input_defs()))
+			// 	{
+			// 		TAU_LOG_ERROR << "Invalid type "
+			// 			<< TAU_TO_STR(t.first());
+			// 		return {};
+			// 	}
+			// }
+			// else if (t.child_is(tau::output_def)) {
+			// 	if (!get_io_def<node>(t.first(),
+			// 			      defs.get_output_defs()))
+			// 	{
+			// 		TAU_LOG_ERROR << "Invalid type "
+			// 			<< TAU_TO_STR(t.first());
+			// 		return {};
+			// 	}
+			// }
 			attempt = "";
 		} else {
 			// Check if the error contains "Unexpected end of file"
@@ -169,11 +169,7 @@ int run_tau_spec(string spec_file, bool charvar, bool /*exp*/,
 	if (!normalized) return 3;
 	if (has_free_vars<node>(normalized)) return 4;
 	definitions<node>& defs = definitions<node>::instance();
-	auto ins = finputs<node>(
-		collect_input_streams<node>(normalized, defs.get_io_context()));
-	auto outs = foutputs<node>(
-		collect_output_streams<node>(normalized,defs.get_io_context()));
-	auto result = run<node>(normalized, ins, outs, defs.get_io_context());
+	auto result = run<node>(normalized, defs.get_io_context());
 	if (!result) return 5;
 	return 0;
 }
