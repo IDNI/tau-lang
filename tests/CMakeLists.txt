@@ -35,11 +35,13 @@ if (TAU_BUILD_UNIT_TESTS)
 endif ()
 
 #
-# Benchmark testing
+# API testing
 #
-if (TAU_BUILD_BENCHMARK)
+set(TAU_BUILD_API_TESTS ON CACHE STRING "build the tau-lang api suite ON")
+set_property(CACHE TAU_BUILD_API_TESTS PROPERTY STRINGS "OFF" "ON")
+if (TAU_BUILD_API_TESTS)
 	enable_testing()
-	add_subdirectory(benchmark)
+	add_subdirectory(api)
 endif ()
 
 #
@@ -51,4 +53,12 @@ set_property(CACHE TAU_BUILD_REPL_TESTS PROPERTY STRINGS "OFF" "ON")
 if (TAU_BUILD_REPL_TESTS)
 	enable_testing()
 	add_subdirectory(repl)
+endif ()
+
+#
+# Benchmark testing
+#
+if (TAU_BUILD_BENCHMARK)
+	enable_testing()
+	add_subdirectory(benchmark)
 endif ()
