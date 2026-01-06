@@ -490,7 +490,7 @@ std::pair<std::optional<assignment<node>>, bool>
 		}
 	}
 	// Complete outputs using time_point and current solution
-	for (const auto& [o, _] : ctx.outputs) {
+	for (const auto& [o, _] : outputs) {
 		const size_t ctype = ctx.type_of(o);
 		bool is_bv = is_bv_type_family<node>(ctype);
 		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), time_point, ctype);
