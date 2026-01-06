@@ -483,7 +483,9 @@ bool is_io_shift(tref io_var) {
 
 template <NodeType node>
 int_t get_io_time_point(tref io_var) {
-	return tree<node>::get(io_var)[0][1][0].get_integer();
+	using tau = tree<node>;
+	if (tau::get(io_var).is(tau::bf)) io_var = tau::trim(io_var);
+	return tau::get(io_var)[0][1][0].get_integer();
 }
 
 template <NodeType node>
