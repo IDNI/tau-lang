@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
+
+set(TESTS
+	string_api
+)
+
+foreach(TEST IN LISTS TESTS)
+	set(N "test_api-${TEST}")
+	add_executable(${N} "${N}.cpp")
+	target_setup(${N})
+	target_include_directories(${N} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+	target_link_libraries(${N} ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} doctest cvc5::cvc5)
+	add_dependencies(${N} tau_header)
+	target_compile_options(${N} PUBLIC -Wno-unused-function)
+	target_compile_definitions_if(${N} PUBLIC TAU_LOG_TRACE_TESTS)
+	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
+	set_tests_properties(${N}
+		PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+		ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$LD_LIBRARY_PATH"
+	)
+endforeach()
