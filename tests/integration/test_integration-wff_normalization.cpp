@@ -232,7 +232,7 @@ TEST_SUITE("anti_prenex") {
 		CHECK(tau::get(res).equals_T());
 	}
 	TEST_CASE("4") {
-		const char* sample = "{always <:a>&(<:b>|<:d><:c>)|<:a>'<:d><:c> = 0}'&{always <:b>|<:d><:c> = 0} != 0.";
+		const char* sample = "{!(always <:a>&(<:b>|<:d><:c>)|<:a>'<:d><:c> = 0)}&{always <:b>|<:d><:c> = 0} != 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK(tau::get(res).equals_F());

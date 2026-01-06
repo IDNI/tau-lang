@@ -20,16 +20,6 @@ Term operator^(const Term& lhs, const Term& rhs) {
 }
 
 Term operator~(const Term& operand) {
-	// TODO (LOW) find another workaround for automatic simplification
-
-	// This automatic simplification is needed in order to not call the
-	// ba constant normalization procedure several times
-	/*if (operand.isBitVectorValue()) {
-		std::string v = operand.getBitVectorValue(10);
-		return cvc5_term_manager.mkBitVector(
-			operand.getSort().getBitVectorSize(), ~std::stoll(v));
-	}*/
-
 	return make_bitvector_not(operand);
 }
 
