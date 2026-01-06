@@ -765,6 +765,12 @@ tref build_var_name_indexed(size_t index) {
 }
 
 template <NodeType node>
+tref build_canonized_io_var(const std::string& name) {
+	using tau = tree<node>;
+	return tau::get(tau::variable, tau::get(tau::io_var, { build_var_name<node>(name) }));
+}
+
+template <NodeType node>
 tref build_variable(tref var_name_node, size_t type_id) {
 	using tau = tree<node>;
 	return tau::get_typed(tau::variable, var_name_node, type_id);
@@ -1306,6 +1312,11 @@ tref tree<node>::build_var_name(const std::string& name) {
 template <NodeType node>
 tref tree<node>::build_var_name_indexed(size_t index) {
 	return tau_lang::build_var_name_indexed<node>(index);
+}
+
+template <NodeType node>
+tref tree<node>::build_canonized_io_var(const std::string& name) {
+	return tau_lang::build_canonized_io_var<node>(name);
 }
 
 template <NodeType node>
