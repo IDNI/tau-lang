@@ -25,62 +25,21 @@ rr_sig get_rr_sig(tref n) {
 }
 
 template <NodeType node>
-bool get_io_def(tref n, io_defs<node>& defs) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-
-	const auto& t            = tau::get(n);
-	size_t var_sid           = t[0].data();
-	size_t ba_type           = t.get_ba_type();
-	size_t stream_sid        = 0;
-
-	if (auto fn = tt(n) | tau::stream | tau::q_file_name | tau::file_name;
-		fn)
-	{
-		stream_sid = fn | tt::data;
-		static const size_t console_sid = dict("console");
-		if (stream_sid == console_sid) stream_sid = 0;
-
-	}
-
-	defs[var_sid] = { ba_type, stream_sid };
-	DBG(LOG_TRACE << "get_io_def: " << LOG_FM_DUMP(n) << " -> "
-		<< dict(var_sid) << " : " << LOG_BA_TYPE(ba_type) << " / "
-		<< dict(stream_sid);)
-	return true;
-}
-
-template <NodeType node>
-bool get_io_defs(spec_context<node>& ctx, tref code) {
-	using tau = tree<node>;
-	for (tref r : tau::get(code).select_top(is<node, tau::input_def>))
-		if (!get_io_def<node>(r, ctx.inputs))
-				return false;
-	for (tref r : tau::get(code).select_top(is<node, tau::output_def>))
-		if (!get_io_def<node>(r, ctx.outputs))
-				return false;
-	LOG_TRACE << ctx;
-	return true;
-}
-
-template <NodeType node>
-tref resolve_io_vars(spec_context<node>& ctx, tref fm) {
+tref resolve_io_vars(io_context<node>& ctx, tref fm) {
 	LOG_TRACE << "resolve_io_vars - fm: " << LOG_FM_DUMP(fm);
 	using tau = tree<node>;
 	auto resolve = [&ctx](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::io_var)) {
-			size_t var_sid = get_var_name_sid<node>(n);
-			for (const auto& [in_var_sid, def] : ctx.inputs)
-				if (var_sid == in_var_sid)
-					return t.replace_value(
-						t.value.replace_data(1));
-			for (const auto& [out_var_sid, def] : ctx.outputs)
-				if (var_sid == out_var_sid)
-					return t.replace_value(
-						t.value.replace_data(2));
+			tref var = canonize<node>(n);
+			if (auto it = ctx.inputs.find(var); it != ctx.inputs.end())
+				return t.replace_value(
+					t.value.replace_data(1));
+			if (auto it = ctx.outputs.find(var); it != ctx.outputs.end())
+				return t.replace_value(
+					t.value.replace_data(2));
 
-						static const auto io_prefixed_io_var =
+			static const auto io_prefixed_io_var =
 				[](size_t var_sid) -> size_t
 			{
 				return (dict(var_sid)[0] == 'i' || dict(var_sid) == "this")
@@ -90,6 +49,7 @@ tref resolve_io_vars(spec_context<node>& ctx, tref fm) {
 							? 2
 							: 0);
 			};
+			size_t var_sid = get_var_name_sid<node>(var);
 			size_t direction = io_prefixed_io_var(var_sid);
 			DBG(LOG_TRACE << "io_prefixed_io_var: " << dict(var_sid)
 				<< " " << (direction == 1 ? "IN"
@@ -106,7 +66,7 @@ tref resolve_io_vars(spec_context<node>& ctx, tref fm) {
 }
 
 template <NodeType node>
-rewriter::rules get_rec_relations(spec_context<node>& ctx, tref rrs) {
+rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	rewriter::rules x;
@@ -132,12 +92,12 @@ rewriter::rules get_rec_relations(spec_context<node>& ctx, tref rrs) {
 
 template <NodeType node>
 rewriter::rules get_rec_relations(tref rrs) {
-	spec_context<node>& ctx = definitions<node>::instance().get_io_context();
+	io_context<node>& ctx = definitions<node>::instance().get_io_context();
 	return get_rec_relations<node>(ctx, rrs);
 }
 
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r) {
+std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(r);)
@@ -147,8 +107,6 @@ std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r) {
 	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
 	if (t.is(tau::rec_relation))
 		return { { get_rec_relations<node>(ctx, r), (htref) nullptr } };
-	// Add input and output definitions from r to context
-	if (t.is(tau::spec)) get_io_defs<node>(ctx, r);
 	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(r);
 
 	tref expression = tt(r) | tau::main | tau::wff | tt::ref;
@@ -179,7 +137,7 @@ std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref r) {
 
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(tref r) {
-	spec_context<node>& ctx = definitions<node>::instance().get_io_context();
+	io_context<node>& ctx = definitions<node>::instance().get_io_context();
 	return get_nso_rr<node>(ctx, r);
 }
 

@@ -47,6 +47,7 @@ template <NodeType node> struct rr;
 template <NodeType node> struct ba_constants;
 template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
+template <NodeType node> struct io_context;
 
 // -----------------------------------------------------------------------------
 // Tau tree node (tau_tree_node.tmpl.h)
@@ -409,7 +410,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		std::map<std::string, tref> named_constants{};
 		bool infer_ba_types = true;
 		bool reget_with_hooks = true;
-		subtree_map<node, size_t> global_scope = subtree_map<node, size_t>{};
+		io_context<node>* context = nullptr;
 	};
 
 	// creation from parser result or parser input (string, stream, file)
