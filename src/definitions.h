@@ -49,13 +49,10 @@ struct definitions {
 	}
 
 	subtree_map<node, size_t>& get_global_scope() {
-		for (auto [sid, x] : ctx.types) {
-			tref var_name = build_var_name<node>(sid);
-			tref var = tau::get(tau::variable,
-					tau::get(tau::io_var, { var_name }));
+		for (auto [var, type] : ctx.types) {
 			if (auto it = ctx.global_scope.find(var);
 				it == ctx.global_scope.end())
-					ctx.global_scope[var] = x.first;
+					ctx.global_scope[var] = type;
 		}
 		return ctx.global_scope;
 	}
