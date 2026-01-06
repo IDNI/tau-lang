@@ -387,11 +387,6 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 		HOOK_LOGGING(applied("$X'' :=  $X.");)
 		return tau::get(double_neg.value_tree().first(), r);
 	}
-	//RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
-	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0) {
-		HOOK_LOGGING(applied("{ $X }' := bf_neg_cb $X.");)
-		return cte_neg(v, ch, len, r);
-	}
 	return tau::get_raw(v, ch, len, r);
 }
 

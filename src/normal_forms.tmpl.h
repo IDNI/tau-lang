@@ -367,15 +367,25 @@ typename tree<node>::traverser operator|(
 }
 // -----------------------------------------------------------------------------
 
-// This function traverses n and normalizes coefficients in a BF
+// This function traverses a term fm and normalizes all Boolean algebra constants
 template <NodeType node>
 tref normalize_ba(tref fm) {
 	using tau = tree<node>;
 	DBG(LOG_TRACE << "normalize_ba: " << LOG_FM(fm));
 	using tau = tree<node>;
-	assert(tau::get(fm).is(tau::bf));
+	DBG(assert(tau::get(fm).is(tau::bf));)
 	auto norm_ba = [&](tref n) {
 		const auto& t = tau::get(n);
+		// Push negation into constants
+		if (t.is(tau::bf_neg) && t[0].child_is(tau::ba_constant)) {
+			const auto c = t[0][0].get_ba_constant();
+			// Normalize negated constant
+			const auto nc = normalize_ba<node>(~c);
+			return tau::get_ba_constant(nc, t.get_ba_type());
+		}
+		// Push negations in
+		n = push_negation_one_in<node, false>(n);
+		// Check if node is a constant
 		if (!t.is(tau::ba_constant)) return n;
 		// Node has a Boolean algebra element
 		auto c = t.get_ba_constant();
@@ -383,8 +393,7 @@ tref normalize_ba(tref fm) {
 		if (c == nc) return n;
 		return tau::get_ba_constant(nc, t.get_ba_type());
 	};
-	tref r = pre_order<node>(fm).template apply_unique_until_change<
-					MemorySlotPre::normalize_ba_m>(norm_ba);
+	tref r = pre_order<node>(fm).template apply_unique<normalize_ba_m>(norm_ba);
 	DBG(LOG_TRACE << "normalize_ba result: " << LOG_FM(r));
 	return r;
 }
