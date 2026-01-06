@@ -48,6 +48,7 @@ tref canonize(tref t) {
 	using tt = tau::traverser;
 
 	tref new_t = untype<node>(t);
+	if (tau::get(new_t).is(tau::bf)) new_t = tau::trim(new_t);
 	if (auto var_name = tt(new_t) | tau::io_var | tau::var_name | tt::ref; var_name) {
 		new_t = tau::get(tau::variable, tau::get(tau::io_var, { var_name }));
 	} /*else if (auto sym = tt(new_t) | tau::sym | tt::ref; sym) {
