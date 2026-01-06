@@ -81,9 +81,9 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
                         return {};
                 }
                 TAU_LOG_TRACE << "Input " << in.first << "[" << in.second << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first));
-                step_inputs.emplace_back(tau::trim(
+                step_inputs.emplace_back(
                         build_in_var_at_n<node>(in.first, in.second,
-                                i.ctx.type_of(it->first))));
+                                i.ctx.type_of(it->first)));
                 step_input_map[step_inputs.back()] = in;
                 DBG(TAU_LOG_TRACE << "added step input: " << TAU_LOG_FM_DUMP(step_inputs.back());)
         }
@@ -93,11 +93,10 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 
         // parse input values
         TAU_LOG_TRACE << "Parsing input values";
-        TAU_LOG_TRACE << "Step inputs: " << step_inputs.size();
         for (tref step_input : step_inputs) {
                 TAU_LOG_TRACE << "Step input: " << TAU_LOG_FM_DUMP(step_input);
                 const std::string& input_value = inputs[step_input_map[step_input]];
-                size_t type_id = i.ctx.type_of(step_input);
+                size_t type_id = i.ctx.type_of(canonize<node>(step_input));
                 auto cnst = ba_constants<node>::get(input_value, get_ba_type_tree<node>(type_id));
                 if (!cnst) {
                         TAU_LOG_ERROR << "Failed to parse input value " << input_value;
