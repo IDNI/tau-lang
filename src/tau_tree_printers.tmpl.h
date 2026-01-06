@@ -116,23 +116,23 @@ std::ostream& operator<<(std::ostream& os,
 
 template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
-	os << "IO Context\n================\nGlobal scope:";
-	if (ctx.global_scope.size() == 0) os << " none";
-	os << "\n";
-	for (const auto& [var, type] : ctx.global_scope) os << "\t" << get_var_name<node>(var) << " : " << get_ba_type_name<node>(type) << "\n";
-	os << "\n";
+	os << "\n=== IO Context ===\n";
 
-	os << "Types:";
-	if (ctx.types.size() == 0) os << " none";
+	os << "Global scope for type inference:";
+	if (ctx.global_scope.empty()) os << " none";
 	os << "\n";
-	for (const auto& [var, type] : ctx.types) os << "\t" << LOG_FM_DUMP(var) << /* << get_var_name<node>(var) <<*/ " : " << get_ba_type_name<node>(type) << "\n";
+	for (const auto& [var, type] : ctx.global_scope) os << "\t" << get_var_name<node>(var) << get_ba_type_name<node>(type) << "\n";
+
+	os << "IO types:";
+	if (ctx.types.empty()) os << " none";
 	os << "\n";
+	for (const auto& [var, type] : ctx.types) os << "\t" << get_var_name<node>(var) << get_ba_type_name<node>(type) << "\n";
 
 	os << "IO streams:";
-	if (ctx.inputs.size() == 0 && ctx.outputs.size() == 0) os << " none";
+	if (ctx.inputs.empty() && ctx.outputs.empty()) os << " none";
 	os << "\n";
 	auto print_io = [&](tref var, size_t s, bool output) {
-		os << "\t" << get_var_name<node>(var) << " : "
+		os << "\t" << get_var_name<node>(var)
 			<< get_ba_type_name<node>(ctx.type_of(var)) << " = "
 			<< (output ? "out" : "in") << " "
 			<< (s == 0 ? "console"
@@ -142,11 +142,11 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	for (const auto& [var, s] : ctx.inputs)  print_io(var, s, false);
 	for (const auto& [var, s] : ctx.outputs) print_io(var, s, true);
 
-	os << "\n";
 	os << "Input remaps:";
 	if (ctx.input_remaps.size() == 0) os << " none";
 	else for (const auto& [name, stream] : ctx.input_remaps) os << " " << name;
 	os << "\n";
+
 	os << "Output remaps:";
 	if (ctx.output_remaps.size() == 0) os << " none";
 	else for (const auto& [name, stream] : ctx.output_remaps) os << " " << name;
