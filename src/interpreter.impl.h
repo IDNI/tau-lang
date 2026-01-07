@@ -439,10 +439,12 @@ std::pair<std::optional<assignment<node>>, bool>
 #ifdef DEBUG
 			LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
 				<< "step/updated: " << LOG_FM(updated) << "\n"
-				<< "step/current: " << LOG_FM(current) << "\n"
+				<< "step/current: " << LOG_FM_DUMP(current) << "\n"
 				<< "step/memory: ";
 			for (const auto& [k, v]: memory)
-				LOG_TRACE << "\t" << k << " := " << v << " ";
+				LOG_TRACE << "\t" << k << " := " << v << "\n"
+					<< "\t\t" << LOG_FM_DUMP(k) << "\n"
+					<< "\t\t" << LOG_FM_DUMP(v) << "\n";
 #endif // DEBUG
 			auto path_solution = solution_with_max_update(current);
 #ifdef DEBUG
@@ -524,6 +526,7 @@ std::pair<std::optional<assignment<node>>, bool>
 		++time_point;
 		formula_time_point = time_point;
 	}
+	// DBG(LOG_TRACE << dump_to_str();)
 	// TODO (HIGH) remove old values from memory
 	return { global, auto_continue };
 }
@@ -960,9 +963,13 @@ tref interpreter<node>::pointwise_revision(
 }
 
 template <NodeType node>
-std::optional<assignment<node>> interpreter<node>::
-solution_with_max_update(tref spec) {
+std::optional<assignment<node>> interpreter<node>::solution_with_max_update(
+	tref spec)
+{
+	// using tau = tree<node>;
+	// DBG(LOG_TRACE << "solution_with_max_update/spec: " << LOG_FM_DUMP(spec) << "\n";)
 	auto get_solution = [](const auto& fm) {
+		// DBG(LOG_TRACE << "get_solution/fm: " << LOG_FM_DUMP(fm) << "\n";)
 		// setting proper options for the solver
 		solver_options options = {
 			.splitter_one = node::nso_factory::splitter_one(tau_type<node>()),
@@ -975,6 +982,10 @@ solution_with_max_update(tref spec) {
 			LOG_ERROR << "Internal error in solver\n";
 			return std::optional<solution<node>>();
 		}
+// #ifdef DEBUG
+// 		if (s) for (auto [k, v] : s.value()) LOG_TRACE
+// 			<< "get_solution/solution: \n\t\tkey: " << LOG_FM_DUMP(k) << "\n\t\tvalue: " << LOG_FM_DUMP(v);
+// #endif // DEBUG
 		return s;
 	};
 	tref u = build_out_var_at_n<node>("u", time_point,
