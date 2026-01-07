@@ -598,7 +598,7 @@ std::pair<trefs, bool> interpreter<node>::build_inputs_for_step(
 	LOG_TRACE << "build_inputs_for_step begin\n";
 	trefs step_inputs;
 	bool has_this_stream = false;
-	for (auto& [var, _] : ctx.inputs) {
+	for (auto& [var, _] : inputs) {
 		LOG_TRACE << "build_inputs_for_step[var]: " << LOG_FM_TREE(var);
 		LOG_TRACE << "build_inputs_for_step[ctx.type_of(var)] " << LOG_BA_TYPE(ctx.type_of(var)) << "\n";
 		if (get_var_name<node>(var) == "this") {
