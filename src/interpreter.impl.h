@@ -1256,15 +1256,32 @@ subtree_map<node, size_t> collect_output_streams(tref dnf, const io_context<node
 
 template <NodeType node>
 std::ostream& interpreter<node>::dump(std::ostream& os) const {
-	os << "Interpreter:\n";
-	os << "  time_point: " << time_point << "\n";
-	os << "  inputs:";
+	os << "\n" << TC.GREEN() << "=== Interpreter ===" << TC.CLEAR() << "\n";
+	os << "Time point:      " << time_point << "\n";
+	os << "Inputs:         ";
+	if (inputs.empty()) os << " none";
 	for (const auto& [var, _] : ctx.inputs) os << " " << get_var_name<node>(var);
 	os << "\n";
-	os << "  outputs:";
-	for (const auto& [var, _] : ctx.outputs) os << " " << get_var_name<node>(var);
+	os << "Outputs:        ";
+	if (outputs.empty()) os << " none";
+	for (const auto& [var, _] : outputs) os << " " << get_var_name<node>(var);
 	os << "\n";
-	return os;
+	os << "Current inputs: ";
+	if (inputs.empty()) os << " none";
+	for (const auto& [var, _] : inputs) os << " " << get_var_name<node>(var);
+	os << "\n";
+	os << "Current outputs:";
+	if (outputs.empty()) os << " none";
+	for (const auto& [var, _] : outputs) os << " " << get_var_name<node>(var);
+	os << "\n";
+	os << "Memory:         ";
+	if (memory.empty()) os << " none";
+	os << "\n";
+	for (const auto& [k, v]: memory)
+		os << "\t" << k << " := " << v << "\n"
+			<< "\t\t" << LOG_FM(k) << "\n"
+			<< "\t\t" << LOG_FM(v) << "\n";
+	return os << "\n";
 }
 
 template <NodeType node>
