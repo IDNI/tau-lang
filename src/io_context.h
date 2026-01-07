@@ -74,12 +74,13 @@ protected:
 
 struct vector_output_stream : public serialized_constant_output_stream {
 	vector_output_stream();
+	vector_output_stream(const std::shared_ptr<std::vector<std::string>>& values);
 	virtual ~vector_output_stream() = default;
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
 	virtual bool put(const std::string& value) override;
 	std::vector<std::string> get_values() const;
 protected:
-	std::vector<std::string> values{};
+	std::shared_ptr<std::vector<std::string>> values;
 };
 
 // context for input and output streams and their types
