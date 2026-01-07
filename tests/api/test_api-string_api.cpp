@@ -48,7 +48,7 @@ TEST_SUITE("String API") {
 		std::stringstream ss;
 		for (auto& output : collected_outputs) ss << output << " ";
 		TAU_LOG_TRACE << "Collected outputs: " << ss.str();
-		CHECK(collected_outputs == std::vector<std::string>({ "0", "1", "0" }));
+		CHECK(collected_outputs == std::vector<std::string>({ "F", "T", "F" }));
 	}
 
 	TEST_CASE("with remapped streams") {

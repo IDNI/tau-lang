@@ -131,8 +131,13 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		DBG(TAU_LOG_TRACE << "Output " << get_var_name<node>(out) << "[" << i.time_point << "] = `" << tau::get(val).to_str() <<"`";)
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
-		outputs[{ get_var_name<node>(out), i.time_point }] =
-							tau::get(val).to_str();
+		std::stringstream ss;
+		if (!i.serialize_constant(ss, val, i.ctx.type_of(out))) {
+			TAU_LOG_ERROR << "No Boolean algebra element assigned "
+				"to output '" << TAU_TO_STR(out) << "'";
+			return {};
+		}
+		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
 	}
 	return outputs;
 }

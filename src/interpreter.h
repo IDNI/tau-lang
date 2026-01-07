@@ -63,6 +63,8 @@ private:
 	std::pair<std::optional<assignment<node>>, bool> read(
 		const trefs& in_vars, size_t time_step);
 	bool write(const assignment<node>& outputs);
+	bool serialize_constant(std::stringstream& ss, tref constant,
+		size_t type) const;
 	void rebuild_inputs(const subtree_map<node, size_t>& current_inputs);
 	void rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
 

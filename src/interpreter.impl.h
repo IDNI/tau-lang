@@ -120,6 +120,26 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 }
 
 template <NodeType node>
+bool interpreter<node>::serialize_constant(std::stringstream& ss,
+	tref constant, size_t type) const
+{
+	DBG(LOG_TRACE << "serialize_constant[constant]: " << LOG_FM_DUMP(constant) << "\n";)
+	auto value = tt(constant) | tau::ba_constant;
+	if (!value) {
+		// is bf_t
+		if (auto check = tt(constant) | tau::bf_t; check)
+			ss << node::nso_factory::one(get_ba_type_tree<node>(type));
+		// is bf_f
+		else if (auto check = tt(constant) | tau::bf_f; check)
+			ss << node::nso_factory::zero(get_ba_type_tree<node>(type));
+		// is something else but not a BA element
+		else return false;
+	} else ss << (value | tt::ba_constant);
+	DBG(LOG_TRACE << "serialize_constant[ss]: " << ss.str() << "\n";)
+	return true;
+}
+
+template <NodeType node>
 bool interpreter<node>::write(const assignment<node>& output_values) {
 	// Sort variables in output by time
 	trefs io_vars;
@@ -128,9 +148,6 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		// DBG(LOG_TRACE << "io var dump: " << LOG_FM_DUMP(var));
 		assert(tau::get(var)[0].child_is(tau::io_var));
 		io_vars.push_back(var);
-	}
-	for (tref var : io_vars) {
-		LOG_TRACE << "pushed dump: " << LOG_FM_DUMP(var);
 	}
 	std::ranges::sort(io_vars, constant_io_comp<node>);
 
@@ -147,26 +164,12 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		DBG(LOG_TRACE << LOG_FM_DUMP(vn));
 		auto value = tt(output_values.find(io_var)->second) | tau::ba_constant;
 		std::stringstream ss;
-		if (!value) {
-			// is bf_t
-			if (auto check = tt(output_values.find(io_var)->second)
-					| tau::bf_t; check) {
-				size_t type = ctx.type_of(vn);
-				ss << node::nso_factory::one(get_ba_type_tree<node>(type));
-			// is bf_f
-			} else if (auto check = tt(output_values.find(io_var)->second)
-					| tau::bf_f; check) {
-				size_t type = ctx.type_of(vn);
-				ss << node::nso_factory::zero(get_ba_type_tree<node>(type));
-			// is something else but not a BA element
-			} else {
-				LOG_ERROR << "No Boolean algebra element "
-					<< "assigned to output '"
-					<< TAU_TO_STR(io_var) << "'";
+		if (!serialize_constant(ss, output_values.find(io_var)->second,
+			ctx.type_of(vn)))
+		{
+			LOG_ERROR << "No Boolean algebra element assigned to "
+				"output '" << TAU_TO_STR(io_var) << "'";
 				return false;
-			}
-		} else {
-			ss << (value | tt::ba_constant);
 		}
 		auto it = outputs.find(vn);
 		if (it == outputs.end()) {
