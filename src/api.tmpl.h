@@ -46,13 +46,14 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 
 template <NodeType node>
 std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
-        std::vector<stream_at> step_inputs;
-        for (auto& [var, _] : i.ctx.inputs) {
-                TAU_LOG_TRACE << "var: " << TAU_LOG_FM_DUMP(var);
-                if (get_var_name<node>(var) == "this") continue;
-                step_inputs.push_back({ get_var_name<node>(var), i.time_point });
+        auto [step_inputs, _] = i.build_inputs_for_step(i.time_point);
+        std::vector<stream_at> inputs;
+        for (auto& var : i.appear_within_lookback(step_inputs)) {
+                DBG(TAU_LOG_TRACE << "get_inputs_for_step/input: "
+                                << TAU_LOG_FM_DUMP(var);)
+                inputs.emplace_back(get_var_name<node>(var), i.time_point);
         }
-        return step_inputs;
+        return inputs;
 }
 
 template <NodeType node>
