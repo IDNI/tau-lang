@@ -112,30 +112,38 @@ std::optional<std::string> vector_input_stream::get() {
 }
 
 vector_output_stream::vector_output_stream()
-	: serialized_constant_output_stream()
+	: serialized_constant_output_stream(),
+	values(std::make_shared<std::vector<std::string>>())
 {
 	DBG(LOG_TRACE << "vector_output_stream::vector_output_stream()";)
+}
+
+vector_output_stream::vector_output_stream(const std::shared_ptr<std::vector<std::string>>& values)
+	: serialized_constant_output_stream(),
+	values(values)
+{
+	DBG(LOG_TRACE << "vector_output_stream::vector_output_stream(values) values.size(): " << values->size();)
 }
 
 std::shared_ptr<serialized_constant_output_stream>
 	vector_output_stream::rebuild()
 {
 	DBG(LOG_TRACE << "vector_output_stream::rebuild()";)
-	return std::make_shared<vector_output_stream>();
+	return std::make_shared<vector_output_stream>(values);
 }
 
 bool vector_output_stream::put(const std::string& value) {
-	values.push_back(value);
-	DBG(LOG_TRACE << "vector_output_stream::put(\"" << values.back() << "\") values.size(): " << values.size();)
+	values->push_back(value);
+	DBG(LOG_TRACE << "vector_output_stream::put(\"" << values->back() << "\") values.size(): " << values->size();)
 	return true;
 }
 
 std::vector<std::string> vector_output_stream::get_values() const {
-	DBG(LOG_TRACE << "vector_output_stream::get_values() values.size(): " << values.size();)
-	for (const auto& value : values) {
+	DBG(LOG_TRACE << "vector_output_stream::get_values() values.size(): " << values->size();)
+	for (const auto& value : *values) {
 		DBG(LOG_TRACE << "vector_output_stream::get_values() value: " << value << "\n";)
 	}
-	return values;
+	return *values;
 }
 
 // -----------------------------------------------------------------------------
