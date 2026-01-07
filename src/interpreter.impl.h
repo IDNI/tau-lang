@@ -615,9 +615,8 @@ std::pair<trefs, bool> interpreter<node>::build_inputs_for_step(
 				continue;
 			}
 		}
-		step_inputs.emplace_back(tau::trim(
-			build_in_var_at_n<node>(get_var_name_node<node>(var),
-				t, ctx.type_of(var))));
+		step_inputs.emplace_back(build_in_var_at_n<node>(
+			get_var_name_node<node>(var), t, ctx.type_of(var)));
 	}
 	LOG_TRACE << "build_inputs_for_step end\n";
 	return { step_inputs, has_this_stream };

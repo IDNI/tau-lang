@@ -57,6 +57,7 @@ TEST_SUITE("String API") {
 		// Remap input and output streams from default console to custom streams
 		interpreter_options opts;
 		auto o_stream = std::make_shared<vector_output_stream>();
+
 		opts.input_remaps["i"] = std::make_shared<vector_input_stream>(
 			i_values);
 		opts.output_remaps["o"] = o_stream;
@@ -79,10 +80,9 @@ TEST_SUITE("String API") {
 			if (outputs.empty()) TAU_LOG_INFO << "No outputs\n";
 			for (auto& [stream, value] : outputs)
 				TAU_LOG_INFO << stream.first << "[" << stream.second << "] = `" << value << "`\n";
-
+		}
 
 			auto o_values = o_stream->get_values();
-
 			for (size_t t = 0; t < i_values.size(); t++)
 				TAU_LOG_TRACE << "i_values[" << t << "]: " << i_values[t];
 			if (i_values.empty()) TAU_LOG_TRACE << "No inputs";
@@ -91,7 +91,6 @@ TEST_SUITE("String API") {
 			if (o_values.empty()) TAU_LOG_TRACE << "No outputs";
 			CHECK( o_values.size() == i_values.size() );
 			CHECK( o_values == i_values );
-		}
 	}
 
 }
