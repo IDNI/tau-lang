@@ -152,12 +152,6 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
                 return {};
         }
 
-        // Write output values
-        if (!i.write(output.value())) {
-                TAU_LOG_ERROR << "Failed to write outputs";
-                return {};
-        }
-
         // Build outputs for the step
         std::map<stream_at, std::string> outputs;
         for (const auto& [out, val] : output.value()) {
