@@ -41,7 +41,7 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 		if (tau::get(var).is_output_variable())
 			continue;
 		// Skip input stream variables with time point greater time_step
-		if (get_io_time_point<node>(var) > (int_t)time_step)
+		if (get_io_time_point<node>(tau::trim(var)) > (int_t)time_step)
 			continue;
 
 		for (auto& [var, stream] : ctx.inputs) {
@@ -401,7 +401,7 @@ std::pair<std::optional<assignment<node>>, bool>
 	// Save inputs in memory
 	for (const auto& [var, value] : values) {
 		DBG(LOG_TRACE << "step[var]: " << LOG_FM_DUMP(var);)
-		assert(get_io_time_point<node>(var) <= (int_t)time_point);
+		assert(get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point);
 		// If there is at least one input, continue automatically in execution
 		auto_continue = true;
 		memory[var] = value;
