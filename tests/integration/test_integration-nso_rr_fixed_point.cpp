@@ -143,7 +143,7 @@ TEST_SUITE("rec relations well foundedness") {
 	}
 
 	// This test fails as type inference fails (see test case
-	// "nso_rr_fixed_point/fallback type mismatch" in 
+	// "nso_rr_fixed_point/fallback type mismatch" in
 	// test_integration-ba_types_inference.cpp). however there is no simple
 	// way to catch failed assertions in doctest...so we commented out until
 	// that is possible.

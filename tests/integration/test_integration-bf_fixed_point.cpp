@@ -84,7 +84,7 @@ TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 	}
 
 	TEST_CASE("no initial condition") {
-		const char* rec = 
+		const char* rec =
 			"f[n](x):tau := f[n-1](x) & 1.";
 		const char* sample = "f(x):tau";
 		CHECK( test_bf_rr_fp(rec, sample, tau::bf_or) );
@@ -121,7 +121,7 @@ TEST_SUITE("Boolean function recurrence relation well foundedness") {
 	}
 
 	TEST_CASE("fallback type mismatch") {
-		const char* rec = 
+		const char* rec =
 			"g[n](Y):tau := 1.";
 		const char* sample = "g(Y):tau fallback T";
 		CHECK( test_bf_rr_fp_expect_fail(rec, sample, tau::bf_f) );
