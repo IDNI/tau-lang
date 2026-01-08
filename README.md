@@ -918,7 +918,7 @@ Here are some small examples to illustrate the type inference system:
       - the inner `x` is inferred to be of type `sbf`,
       - the outer `x` is inferred to be of the default type `tau`,
       - no type mismatch occurs as both `x` are in different scopes.
-5. `ex x : bv x = 1 : bv[8]"`:
+5. `ex x : bv x = 1 : bv[8]`:
       - `x` is typed as `bv`,
       - the constant `1` is typed as `bv[8]`,
       - `x` is inferred to be of the same type as the constant `1`, i.e. `bv[8]`,
