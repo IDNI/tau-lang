@@ -859,6 +859,8 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 		// The constant time positions in original_spec need to be replaced
 		// by present assignments from memory and already executed sometimes statements need to be removed
 		auto current_spec = original_spec;
+		auto current_ubd_ctn = ubt_ctn;
+		DBG(assert(current_spec.size() == current_ubd_ctn.size()));
 		for (auto& [spec, rep] : current_spec) {
 			// update current spec part with memory
 			// TODO: maybe update constant time positions to current time point in order to avoid loosing initial conditions on restarting updated specification
@@ -869,7 +871,6 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 		// TODO: current_spec = remove_happend_sometimes(current_spec);
 		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
 		auto upd_partition = create_spec_partition(clause, uf);
-		trefs collected_updates;
 		// Merge current output_partition into uf
 		uf.merge(output_partition);
 		// Merge now overlapping spec parts
@@ -884,15 +885,17 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 				if (uf.connected(current_spec[i].second, current_spec[j].second)) {
 					// std::cout << "Merged.\n";
 					current_spec[i].first = tau::build_wff_and(current_spec[i].first, current_spec[j].first);
+					current_ubd_ctn[i] = tau::build_wff_and(current_ubd_ctn[i], current_ubd_ctn[j]);
 					current_spec.erase(current_spec.begin()+j);
+					current_ubd_ctn.erase(current_ubd_ctn.begin()+j);
 					--j;
 				}
 			}
 		}
 		// Collect overlapping update parts
+		// Initialize the collected updates for current spec parts
+		trefs collected_updates(current_spec.size(), tau::_T());
 		for (size_t i = 0; i < current_spec.size(); ++i) {
-			// Initialize the collected updates for current spec part
-			collected_updates.push_back(tau::_T());
 			// If no output/uninterpreted constant present, skip
 			if (!current_spec[i].second) continue;
 			// std::cout << "spec part i: " << tau::get(current_spec[i].first) << "\n";
@@ -922,21 +925,31 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 		}
 		// Now do pointwise revision on each part of current spec with collected_updates
 		bool update_valid = true;
-		trefs current_ubd_ctn;
 		for (size_t i = 0; i < current_spec.size(); ++i) {
-			current_spec[i].first = pointwise_revision(current_spec[i].first, collected_updates[i], time_point);
+			// If there is no update for the current partition,
+			// then the unbound continuation also does not need to
+			// be updated
+			if (tau::get(collected_updates[i]).equals_T()) {
+				continue;
+			}
+			tref revision = pointwise_revision(current_spec[i].first, collected_updates[i], time_point);
 			LOG_DEBUG << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first) << "\n";
 			// std::cout << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first) << "\n";
-			if (tau::get(current_spec[i].first).equals_F()) {
+			if (tau::get(revision).equals_F()) {
 				update_valid = false;
 				break;
+			} else if (tau::subtree_equals(current_spec[i].first, revision)) {
+				// Unbound continuation does not need to be updated
+				continue;
 			}
+			current_spec[i].first = revision;
 			tref new_ubd_ctn_part = get_executable_spec(current_spec[i].first, time_point);
 			if (new_ubd_ctn_part == nullptr) {
 				update_valid = false;
 				break;
 			}
-			current_ubd_ctn.push_back(new_ubd_ctn_part);
+			// Update unbound continuation
+			current_ubd_ctn[i] = new_ubd_ctn_part;
 		}
 		if (!update_valid) continue;
 		// Here, all pointwise revisions were successful
