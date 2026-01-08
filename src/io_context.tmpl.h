@@ -92,10 +92,15 @@ bool file_output_stream::put(const std::string& value) {
 vector_input_stream::vector_input_stream(const std::vector<std::string>& values)
 	: serialized_constant_input_stream(), values(values)
 {
-	DBG(LOG_TRACE << "vector_input_stream::vector_input_stream() values.size(): " << values.size();)
-	for (const auto& value : values) {
-		DBG(LOG_TRACE << "vector_input_stream::vector_input_stream() value: " << value << "\n";)
-	}
+#ifdef DEBUG
+	std::stringstream ss;
+	ss << "vector_input_stream::vector_input_stream({";
+	bool first = true;
+	for (const auto& value : values)
+		ss << (first ? (first = false, " ") : ", ") << "{ " << value << " }";
+	ss << " })";
+	LOG_TRACE << ss.str();
+#endif
 }
 
 std::shared_ptr<serialized_constant_input_stream>
@@ -139,10 +144,15 @@ bool vector_output_stream::put(const std::string& value) {
 }
 
 std::vector<std::string> vector_output_stream::get_values() const {
-	DBG(LOG_TRACE << "vector_output_stream::get_values() values.size(): " << values->size();)
-	for (const auto& value : *values) {
-		DBG(LOG_TRACE << "vector_output_stream::get_values() value: " << value << "\n";)
-	}
+#ifdef DEBUG
+	std::stringstream ss;
+	ss << "vector_output_stream::get_values() = {";
+	bool first = true;
+	for (const auto& value : *values)
+		ss << (first ? (first = false, " ") : ", ") << "{ " << value << " }";
+	ss << " })";
+	LOG_TRACE << ss.str();
+#endif
 	return *values;
 }
 
