@@ -158,10 +158,10 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 	// for each stream in out.streams, write the value from the solution
 	for (tref io_var : io_vars) {
 		// get the BA element associated with io_var_name
-		DBG(LOG_TRACE << LOG_FM_TREE(io_var));
+		DBG(LOG_TRACE << "write[io_var]: " << LOG_FM_DUMP(io_var));
 		tref vn = canonize<node>(io_var);
 		assert(vn != nullptr);
-		DBG(LOG_TRACE << LOG_FM_DUMP(vn));
+		DBG(LOG_TRACE << "write[canonized]: " << LOG_FM(vn));
 		auto value = tt(output_values.find(io_var)->second) | tau::ba_constant;
 		std::stringstream ss;
 		if (!serialize_constant(ss, output_values.find(io_var)->second,
@@ -182,6 +182,7 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 			return false;
 		}
 		// write value to output stream
+		DBG(LOG_TRACE << "write/put(serialized_constant): " << ss.str();)
 		if (!it->second->put(ss.str())) {
 			LOG_ERROR << "Failed to write to output stream '"
 				<< get_var_name<node>(vn) << "'";
@@ -200,9 +201,9 @@ void interpreter<node>::rebuild_inputs(
 	inputs.clear();
 	// open the corresponding streams for input and store them in streams
 	for (auto& [current_var, stream_id] : current_inputs) {
-		DBG(LOG_TRACE << "rebuild_inputs[current_var]: " << LOG_FM_DUMP(current_var) << "\n";)
+		DBG(LOG_TRACE << "rebuild_inputs[current_var]: " << LOG_FM(current_var) << "\n";)
 		tref var = canonize<node>(current_var);
-		DBG(LOG_TRACE << "rebuild_inputs[var]: " << LOG_FM_DUMP(var) << "\n";)
+		DBG(LOG_TRACE << "rebuild_inputs[var]: " << LOG_FM(var) << "\n";)
 		auto it = ctx.inputs.find(var);
 		if (it == ctx.inputs.end()) {
 			LOG_ERROR << "Failed to find input stream for stream '"
@@ -265,7 +266,9 @@ interpreter<node>::interpreter(
 		output_partition(std::move(output_partition))
 {
 	compute_lookback_and_initial();
+	LOG_TRACE << "interpreter::interpreter/rebuild_inputs";
 	rebuild_inputs(ctx.inputs);
+	LOG_TRACE << "interpreter::interpreter/rebuild_outputs";
 	rebuild_outputs(ctx.outputs);
 }
 
@@ -381,10 +384,11 @@ std::pair<std::optional<assignment<node>>, bool>
 	auto [step_inputs, _] = build_inputs_for_step(time_point);
 	step_inputs = appear_within_lookback(step_inputs);
 	// Get values for inputs which do not exceed time_point
+	LOG_TRACE << "interpreter::step/read";
 	auto [values, is_quit] = read(step_inputs, time_point);
 	DBG(if (values.has_value())
 			for (auto [k, v] : values.value())
-				LOG_DEBUG << "Input: " << LOG_FM_TREE(k) << " = " << LOG_FM_TREE(v) << "\n";)
+				LOG_DEBUG << "Input: " << LOG_FM_DUMP(k) << " = " << LOG_FM_TREE(v) << "\n";)
 	// Empty input
 	if (is_quit) return {};
 	// Error during input
@@ -526,7 +530,7 @@ std::pair<std::optional<assignment<node>>, bool>
 		++time_point;
 		formula_time_point = time_point;
 	}
-	// DBG(LOG_TRACE << dump_to_str();)
+	DBG(LOG_TRACE << dump_to_str();)
 	// TODO (HIGH) remove old values from memory
 	return { global, auto_continue };
 }
@@ -592,8 +596,8 @@ bool interpreter<node>::calculate_initial_spec() {
 		step_spec = ubt_ctn;
 		final_system = true;
 	}
-	LOG_TRACE << "calculate_initial_systems[result]: true\n";
-	LOG_TRACE << "calculate_initial_systems end\n";
+	LOG_TRACE << "calculate_initial_systems[result]: true";
+	LOG_TRACE << "calculate_initial_systems end";
 	return true;
 }
 
@@ -601,24 +605,26 @@ template <NodeType node>
 std::pair<trefs, bool> interpreter<node>::build_inputs_for_step(
 	const size_t t)
 {
-	LOG_TRACE << "build_inputs_for_step begin\n";
+	LOG_TRACE << "build_inputs_for_step begin";
 	trefs step_inputs;
 	bool has_this_stream = false;
+	if (inputs.empty()) LOG_TRACE << "build_inputs_for_step[inputs]: empty";
 	for (auto& [var, _] : inputs) {
-		LOG_TRACE << "build_inputs_for_step[var]: " << LOG_FM_TREE(var);
-		LOG_TRACE << "build_inputs_for_step[ctx.type_of(var)] " << LOG_BA_TYPE(ctx.type_of(var)) << "\n";
+		LOG_TRACE << "build_inputs_for_step[var]: " << LOG_FM_DUMP(var);
+		LOG_TRACE << "build_inputs_for_step[ctx.type_of(var)] " << LOG_BA_TYPE(ctx.type_of(var));
 		if (get_var_name<node>(var) == "this") {
 			if (size_t vt = ctx.type_of(var);
 				vt == get_ba_type_id<node>(tau_type<node>())) {
 				has_this_stream = true;
-				LOG_TRACE << "build_inputs_for_step[has_this_stream]: true\n";
+				LOG_TRACE << "build_inputs_for_step[has_this_stream]: true";
 				continue;
 			}
 		}
 		step_inputs.emplace_back(build_in_var_at_n<node>(
 			get_var_name_node<node>(var), t, ctx.type_of(var)));
+		DBG(LOG_TRACE << "build_inputs_for_step[step_input]: " << LOG_FM_DUMP(step_inputs.back());)
 	}
-	LOG_TRACE << "build_inputs_for_step end\n";
+	LOG_TRACE << "build_inputs_for_step end (step_inputs size: " << step_inputs.size() << ")";
 	return { step_inputs, has_this_stream };
 }
 
@@ -631,7 +637,7 @@ tref interpreter<node>::update_to_time_point(
 	// corresponding to the current time_point minus the shift.
 	auto io_vars = tau::get(f).select_top(is_child<node, tau::io_var>);
 	auto result = fm_at_time_point<node>(f, io_vars, t);
-	LOG_TRACE << "update_to_time_point[result]: " << tau::get(result) << "\n";
+	LOG_TRACE << "update_to_time_point[result]: " << LOG_FM_DUMP(result) << "\n";
 	LOG_TRACE << "update_to_time_point end\n";
 	return result;
 }
@@ -711,9 +717,9 @@ tref interpreter<node>::get_executable_spec(
 		executable = rewriter::replace<node>(executable, model.value());
 		clause = rewriter::replace<node>(clause, model.value());
 		LOG_INFO << "Resulting Tau specification part: " << TAU_TO_STR(clause) << "\n";
-		LOG_TRACE << "get_executable_spec[spec]: " << TAU_TO_STR(executable) << "\n";
+		LOG_TRACE << "get_executable_spec[spec]: " << LOG_FM(executable) << "\n";
 	}
-	LOG_TRACE << "get_executable_spec[spec]: " << tau::get(executable);
+	LOG_TRACE << "get_executable_spec[spec]: " << LOG_FM(executable);
 	LOG_TRACE << "get_executable_spec end\n";
 	return executable;
 }
@@ -855,12 +861,14 @@ void interpreter<node>::update(tref update) {
 			if (!collect_output_streams(spec_part, output_streams, ctx))
 				return;
 		}
+		LOG_TRACE << "interpreter::update/rebuild_outputs";
 		rebuild_outputs(output_streams);
 		subtree_map<node, size_t> input_streams;
 		for (tref spec_part : original_spec | std::views::keys) {
 			if (!collect_input_streams(spec_part, input_streams, ctx))
 				return;
 		}
+		LOG_TRACE << "interpreter::update/rebuild_inputs";
 		rebuild_inputs(input_streams);
 		return;
 	}
@@ -1138,7 +1146,9 @@ std::optional<interpreter<node>> run(tref form, const io_context<node>& ctx,
 	if (!intrprtr_o) return {};
 	auto& intrprtr = intrprtr_o.value();
 
+	LOG_TRACE << "run/rebuild_inputs";
 	intrprtr.rebuild_inputs(intrprtr.ctx.inputs);
+	LOG_TRACE << "run/rebuild_outputs";
 	intrprtr.rebuild_outputs(intrprtr.ctx.outputs);
 
 	LOG_INFO << "-----------------------------------------------------------------------------------------------------------";
@@ -1154,7 +1164,7 @@ std::optional<interpreter<node>> run(tref form, const io_context<node>& ctx,
 			if (output.has_value()) {
 				LOG_TRACE << "{ ";
 				for (const auto& [v, val] : output.value())
-					LOG_TRACE << LOG_FM_TREE(v) << " := " << LOG_FM_TREE(val) << "; ";
+					LOG_TRACE << LOG_FM_DUMP(v) << " := " << LOG_FM_TREE(val) << "; ";
 				LOG_TRACE << "}\n";
 			} else LOG_TRACE << "no output\n";
 			LOG_TRACE << "run[auto_continue]: " << auto_continue << "\n";
@@ -1272,12 +1282,12 @@ std::ostream& interpreter<node>::dump(std::ostream& os) const {
 	os << "\n" << TC.GREEN() << "=== Interpreter ===" << TC.CLEAR() << "\n";
 	os << "Time point:      " << time_point << "\n";
 	os << "Inputs:         ";
-	if (inputs.empty()) os << " none";
+	if (ctx.inputs.empty()) os << " none";
 	for (const auto& [var, _] : ctx.inputs) os << " " << get_var_name<node>(var);
 	os << "\n";
 	os << "Outputs:        ";
-	if (outputs.empty()) os << " none";
-	for (const auto& [var, _] : outputs) os << " " << get_var_name<node>(var);
+	if (ctx.outputs.empty()) os << " none";
+	for (const auto& [var, _] : ctx.outputs) os << " " << get_var_name<node>(var);
 	os << "\n";
 	os << "Current inputs: ";
 	if (inputs.empty()) os << " none";
@@ -1288,12 +1298,11 @@ std::ostream& interpreter<node>::dump(std::ostream& os) const {
 	for (const auto& [var, _] : outputs) os << " " << get_var_name<node>(var);
 	os << "\n";
 	os << "Memory:         ";
-	if (memory.empty()) os << " none";
+	if (memory.empty()) os << " empty";
 	os << "\n";
 	for (const auto& [k, v]: memory)
-		os << "\t" << k << " := " << v << "\n"
-			<< "\t\t" << LOG_FM(k) << "\n"
-			<< "\t\t" << LOG_FM(v) << "\n";
+		os //<< "\t" << k << " := " << v
+			<< "\t" << LOG_FM(k) << " := " << LOG_FM(v) << "\n";
 	return os << "\n";
 }
 
