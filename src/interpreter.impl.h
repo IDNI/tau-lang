@@ -882,6 +882,7 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 				if (!current_spec[j].second) continue;
 				// std::cout << "spec part j: " << tau::get(current_spec[j].first) << "\n";
 				if (uf.connected(current_spec[i].second, current_spec[j].second)) {
+					// std::cout << "Merged.\n";
 					current_spec[i].first = tau::build_wff_and(current_spec[i].first, current_spec[j].first);
 					current_spec.erase(current_spec.begin()+j);
 					--j;
@@ -901,6 +902,7 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 				// std::cout << "update part j: " << tau::get(upd_partition[j].first) << "\n";
 				// Check if current spec part overlaps with current update part
 				if (uf.connected(current_spec[i].second, upd_partition[j].second)) {
+					// std::cout << "Merged.\n";
 					// Add current update part to update collection
 					collected_updates[i] = tau::build_wff_and(collected_updates[i], upd_partition[j].first);
 					// Now remove update part from upd_partition
@@ -959,6 +961,7 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 		// Set new specification for interpreter
 		ubt_ctn = std::move(current_ubd_ctn);
 		original_spec = std::move(current_spec);
+		output_partition = std::move(uf);
 		// The systems for solver need to be recomputed at beginning of next step
 		final_system = false;
 		compute_lookback_and_initial();
