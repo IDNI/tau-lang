@@ -33,6 +33,13 @@ tau::get_options parse_cli_no_infer() {
 	return opts;
 }
 
+tau::get_options parse_no_infer() {
+	static tau::get_options opts{ .parse = {},
+		.infer_ba_types = false,
+		.reget_with_hooks = false };
+	return opts;
+}
+
 tau::get_options parse_definitions_no_infer() {
 	static tau::get_options opts{ .parse = { .start = tau::definitions },
 		.infer_ba_types = false,
@@ -1518,8 +1525,7 @@ TEST_SUITE("regression tests") {
 		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
 	}
 
-	/*TEST_CASE("Lucca's question") {
-		logging::trace();
+	TEST_CASE("Lucca's question") {
 		tref parsed = parse("(ex x:sbf x = 0) && (ex x:tau x = 0)");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -1535,8 +1541,7 @@ TEST_SUITE("regression tests") {
 			tau_type_id<node_t>()
 		};
 		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
-		logging::info();
-	}*/
+	}
 
 	TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
 		tref parsed = parse("g(x):tau fallback 1", parse_cli_no_infer());
@@ -1554,12 +1559,10 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("nso_rr_fixed_point/fallback type mismatch") {
-		logging::trace();
 		tref parsed = parse("g(x):tau fallback 1:sbf", parse_cli_no_infer());
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
-		logging::info();
 	}
 
 	TEST_CASE("nso_rr_fixed_point/fallback type mismatch (modified)") {
@@ -1586,6 +1589,26 @@ TEST_SUITE("regression tests") {
 			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
+	}
+
+	TEST_CASE("nso_rr_execution/direct substitution, wff_rec_relation case") {
+		logging::trace();
+		tref parsed = parse(
+			"g[0, 0](y:tau) := y."
+			"h[0, 0](y:tau) := y."
+			"g[0, 0](y:tau) && h[0, 0](1:tau)."
+		, parse_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"y", tau_type_id<node_t>()}
+		};
+		auto expected_bf_ctes = std::vector<size_t> {
+			tau_type_id<node_t>()
+		};
+		CHECK( check_vars(inferred, expected) );
+		logging::info();
 	}
 
 	TEST_CASE("nso_rr_fixed_point/loop fallback T") {
