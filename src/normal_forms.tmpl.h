@@ -379,9 +379,7 @@ tref normalize_ba(tref fm) {
 		// Push negation into constants
 		if (t.is(tau::bf_neg) && t[0].child_is(tau::ba_constant)) {
 			const auto c = t[0][0].get_ba_constant();
-			// Normalize negated constant
-			const auto nc = normalize_ba<node>(~c);
-			return tau::get_ba_constant(nc, t.get_ba_type());
+			return tau::get_ba_constant(~c, t.get_ba_type());
 		}
 		// Push negations in
 		n = push_negation_one_in<node, false>(n);
