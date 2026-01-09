@@ -266,10 +266,6 @@ interpreter<node>::interpreter(
 		output_partition(std::move(output_partition))
 {
 	compute_lookback_and_initial();
-	LOG_TRACE << "interpreter::interpreter/rebuild_inputs";
-	rebuild_inputs(ctx.inputs);
-	LOG_TRACE << "interpreter::interpreter/rebuild_outputs";
-	rebuild_outputs(ctx.outputs);
 }
 
 template <NodeType node>
@@ -1147,9 +1143,13 @@ std::optional<interpreter<node>> run(tref form, const io_context<node>& ctx,
 	auto& intrprtr = intrprtr_o.value();
 
 	LOG_TRACE << "run/rebuild_inputs";
-	intrprtr.rebuild_inputs(intrprtr.ctx.inputs);
+	subtree_map<node, size_t> current_inputs;
+	if (!collect_input_streams(form, current_inputs, ctx)) return {};
+	intrprtr.rebuild_inputs(current_inputs);
 	LOG_TRACE << "run/rebuild_outputs";
-	intrprtr.rebuild_outputs(intrprtr.ctx.outputs);
+	subtree_map<node, size_t> current_outputs;
+	if (!collect_output_streams(form, current_outputs, ctx)) return {};
+	intrprtr.rebuild_outputs(current_outputs);
 
 	LOG_INFO << "-----------------------------------------------------------------------------------------------------------";
 	LOG_INFO << "Please provide requested input, or press ENTER to terminate                                               |";
