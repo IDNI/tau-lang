@@ -294,6 +294,17 @@ std::optional<interpreter<node>>
 		assignment<node> memory;
 		auto i = interpreter{ ubt_ctn, spec_partition, output_partition,
 			memory, ctx };
+
+		// rebuild io streams according to the spec
+		subtree_map<node, size_t> output_streams;
+		if (!collect_output_streams(spec, output_streams, i.ctx)) return {};
+		LOG_TRACE << "interpreter::make_interpreter/rebuild_outputs";
+		i.rebuild_outputs(output_streams);
+		subtree_map<node, size_t> input_streams;
+		if (!collect_input_streams(spec, input_streams, i.ctx)) return {};
+		LOG_TRACE << "interpreter::make_interpreter/rebuild_inputs";
+		i.rebuild_inputs(input_streams);
+
 		DBG(LOG_TRACE << "interpreter created\n";)
 		DBG(LOG_TRACE << i.dump_to_str();)
 		// DBG(LOG_TRACE << ctx;)
