@@ -31,16 +31,7 @@ bool test_bf_rr_fp_expect_fail(const char* rec, const char* sample,
 
 TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 
-	TEST_CASE("loop default fallback (0)") {
-		const char* rec=
-			"g[n](x):tau := g[n-1](x)'."
-			"g[0](x):tau := 1.";
-		const char* sample = "g(0):tau";
-		CHECK( test_bf_rr_fp_0(rec, sample) );
-	}
-
-	// TODO (HIGH) fix this test case
-	/*TEST_CASE("loop fallback 1") {
+	TEST_CASE("loop fallback 1") {
 		logging::trace();
 		const char* rec=
 			"g[n](x):tau := g[n-1](x)'."
@@ -48,7 +39,15 @@ TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 		const char* sample = "g(x):tau fallback 1";
 		CHECK( test_bf_rr_fp_1(rec, sample) );
 		logging::info();
-	}*/
+	}
+
+	TEST_CASE("loop default fallback (0)") {
+		const char* rec=
+			"g[n](x):tau := g[n-1](x)'."
+			"g[0](x):tau := 1.";
+		const char* sample = "g(0):tau";
+		CHECK( test_bf_rr_fp_0(rec, sample) );
+	}
 
 	TEST_CASE("loop fallback last") {
 		const char* rec=
