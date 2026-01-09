@@ -64,12 +64,14 @@ protected:
 
 struct vector_input_stream : public serialized_constant_input_stream {
 	vector_input_stream(const std::vector<std::string>& values);
+	vector_input_stream(std::shared_ptr<std::vector<std::string>> values,
+		std::shared_ptr<size_t> current);
 	virtual ~vector_input_stream() = default;
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
 	virtual std::optional<std::string> get() override;
 protected:
-	std::vector<std::string> values;
-	size_t current = 0;
+	std::shared_ptr<std::vector<std::string>> values;
+	std::shared_ptr<size_t> current = 0;
 };
 
 struct vector_output_stream : public serialized_constant_output_stream {

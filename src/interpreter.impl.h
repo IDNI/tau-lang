@@ -44,11 +44,6 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 		if (get_io_time_point<node>(tau::trim(var)) > (int_t)time_step)
 			continue;
 
-		for (auto& [var, stream] : ctx.inputs) {
-			DBG(LOG_TRACE << "input var having stream: " << LOG_FM_DUMP(canonize<node>(var));)
-			DBG(LOG_TRACE << "searched for canonized : " << LOG_FM_DUMP(vn);)
-		}
-
 		auto it = inputs.find(canonize<node>(var));
 		if (it == inputs.end())  {
 			LOG_ERROR
