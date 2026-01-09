@@ -1930,7 +1930,9 @@ struct simplify_using_equality {
 		// Create union find data structure to hold equality information
 		auto uf = union_find_with_sets<decltype(term_comp), node>(term_comp);
 		// Create stack of union find data structures
-		std::vector<union_find_with_sets<decltype(term_comp), node>> uf_stack {uf};
+		std::vector<union_find_with_sets<decltype(term_comp), node>> uf_stack;
+		uf_stack.emplace_back(std::move(uf));
+
 		// We need to mark disjunctions that do not cause a push to the
 		// stack, in order to make sure they are not popped later
 		// due to intermediate simplifications
