@@ -397,6 +397,7 @@ tref update_functional_fallback(type_scoped_resolver<node>& resolver, tref n) {
 		fallback = tau::get_typed(tau::bf,
 			tau::get_typed(tau::bf_ref,
 				fallback, type), type);
+	fallback = tau::get(tau::fp_fallback, fallback);
 	return tau::get_typed(tau::ref, { sym, ref_args, fallback }, type);
 }
 
@@ -414,6 +415,7 @@ tref update_predicate_fallback(type_scoped_resolver<node>& resolver, tref n) {
 	auto fallback = tt(updated) | tau::fp_fallback | tt::first | tt::ref;
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get(tau::wff, tau::get(tau::wff_ref, fallback));
+	fallback = tau::get(tau::fp_fallback, fallback);
 	return tau::get(tau::ref, { sym, ref_args, fallback });
 }
 

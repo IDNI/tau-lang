@@ -33,14 +33,15 @@ TEST_SUITE("rec relations fixed point") {
 		CHECK( fp_test_F(sample) );
 	}
 
-	// TODO (HIGH) fix this test case
-	/*TEST_CASE("loop fallback T") {
+	TEST_CASE("loop fallback T") {
+		logging::trace();
 		const char* sample =
 			"g[n](x) := !g[n-1](x)."
 			"g[0](x) := T."
 			"g(x) fallback T.";
 		CHECK( fp_test_T(sample) );
-	}*/
+		logging::info();
+	}
 
 	TEST_CASE("loop fallback last") {
 		const char* sample =
