@@ -3257,8 +3257,6 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 				std::ranges::sort(func_syms, tau::subtree_less);
 				term = rec_term_boole_decomposition<node>(term, func_syms, 0, true);
 			}
-		} else {
-			term = rec_term_boole_decomposition<node>(term, vars, idx + 1, true);
 		}
 		DBG(LOG_TRACE << "Result: " << LOG_FM(term) << "\n";)
 		return term;
