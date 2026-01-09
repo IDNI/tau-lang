@@ -89,16 +89,24 @@ bool file_output_stream::put(const std::string& value) {
 	return true;
 }
 
-vector_input_stream::vector_input_stream(const std::vector<std::string>& values)
-	: serialized_constant_input_stream(), values(values)
+vector_input_stream::vector_input_stream(
+	const std::vector<std::string>& values)
+	: vector_input_stream(
+		std::make_shared<std::vector<std::string>>(values),
+		std::make_shared<size_t>(0)) {}
+
+vector_input_stream::vector_input_stream(
+	std::shared_ptr<std::vector<std::string>> values,
+	std::shared_ptr<size_t> current)
+	: serialized_constant_input_stream(), values(values), current(current)
 {
 #ifdef DEBUG
 	std::stringstream ss;
 	ss << "vector_input_stream::vector_input_stream({";
 	bool first = true;
-	for (const auto& value : values)
+	for (const auto& value : *values)
 		ss << (first ? (first = false, " ") : ", ") << "{ " << value << " }";
-	ss << " })";
+	ss << " }, " << *current << ")";
 	LOG_TRACE << ss.str();
 #endif
 }
@@ -106,14 +114,15 @@ vector_input_stream::vector_input_stream(const std::vector<std::string>& values)
 std::shared_ptr<serialized_constant_input_stream>
 	vector_input_stream::rebuild()
 {
-	DBG(LOG_TRACE << "vector_input_stream::rebuild() values.size(): " << values.size();)
-	return std::make_shared<vector_input_stream>(values);
+	DBG(LOG_TRACE << "vector_input_stream::rebuild() values.size(): " << values->size() << " current: " << current;)
+	return std::make_shared<vector_input_stream>(values, current);
 }
 
 std::optional<std::string> vector_input_stream::get() {
-	if (current >= values.size()) return {};
-	DBG(LOG_TRACE << "vector_input_stream::get() = \"" << values[current] << "\" current: " << current << " values.size(): " << values.size();)
-	return values[current++];
+	if (*current >= values->size()) return {};
+	DBG(LOG_TRACE << "vector_input_stream::get() = \"" << values->at(*current)
+		<< "\" current: " << *current << " values.size(): " << values->size();)
+	return values->at((*current)++);
 }
 
 vector_output_stream::vector_output_stream()
