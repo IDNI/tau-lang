@@ -395,10 +395,9 @@ tref update_functional_fallback(type_scoped_resolver<node>& resolver, tref n) {
 	DBG(assert(!is_untyped<node>(type));)
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get_typed(tau::bf,
-			tau::get_typed(tau::bf_ref,
-				fallback, type), type);
+			tau::get_typed(tau::bf_ref, fallback, type), type);
 	fallback = tau::get(tau::fp_fallback, fallback);
-	return tau::get_typed(tau::ref, { sym, ref_args, fallback }, type);
+	return tau::get(tau::ref, { sym, ref_args, fallback });
 }
 
 template<NodeType node>

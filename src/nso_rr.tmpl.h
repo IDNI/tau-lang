@@ -103,7 +103,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 			// If we collect head variables, save it
 			if (collecting) head_vars.insert(tau::trim(n));
 			auto type = t[0][0].get_ba_type();
-			return tau::get_typed(tau::ref_arg, 
+			return tau::get_typed(tau::ref_arg,
 				tau::get_typed(tau::bf,
 					tau::get(node(tau::capture,	t[0][0][0].data()))
 				, type)
