@@ -686,7 +686,7 @@ bool has_open_tau_fm_in_constant(tref fm) {
 		if (tau::get(ba_const).get_ba_constant_id() == 0) return false;
 		if (!is_closed(tt(ba_const) | tt::ba_constant)) {
 			LOG_ERROR << "A Tau formula constant must be closed: "
-								<< ba_const;
+							<< TAU_TO_STR(ba_const);
 			return true;
 		}
 	}
