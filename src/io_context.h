@@ -88,7 +88,6 @@ protected:
 // context for input and output streams and their types
 template <NodeType node>
 struct io_context {
-	subtree_map<node, size_t> global_scope;    // element -> ba type id
 	subtree_map<node, size_t> types;           // var -> ba type id
 	subtree_map<node, size_t> inputs;          // var -> stream name id
 	subtree_map<node, size_t> outputs;         // var -> stream name id

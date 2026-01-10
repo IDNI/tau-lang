@@ -297,18 +297,19 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	tref transformed = m_ref(ptr.get());
 
 	if (options.infer_ba_types) {
-		subtree_map<node, size_t> global_scope = options.context
-			? options.context->global_scope : subtree_map<node, size_t>();
-		auto result = infer_ba_types<node>(transformed, global_scope);
+		subtree_map<node, size_t> dummy_global_scope;
+		subtree_map<node, size_t>* global_scope = options.global_scope
+			? options.global_scope : &dummy_global_scope;
+		auto result = infer_ba_types<node>(transformed, *global_scope);
 		transformed = result.first;
 		// If type inference failed
 		if (!transformed) {
 			tau::use_hooks = using_hooks;
 			return nullptr;
 		}
+		if (options.global_scope) *options.global_scope = result.second;
 		if (options.context) {
-			options.context->update_types(
-				(options.context->global_scope = result.second));
+			options.context->update_types(result.second);
 			DBG(LOG_TRACE << *options.context;)
 		}
 	}
