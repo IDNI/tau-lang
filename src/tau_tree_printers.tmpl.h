@@ -118,11 +118,6 @@ template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	os << "\n" << TC.GREEN() << "=== IO Context ===" << TC.CLEAR() << "\n";
 
-	os << "Global scope for type inference:";
-	if (ctx.global_scope.empty()) os << " none";
-	os << "\n";
-	for (const auto& [var, type] : ctx.global_scope) os << "\t" << get_var_name<node>(var) << get_ba_type_name<node>(type) << "\n";
-
 	os << "IO types:     ";
 	if (ctx.types.empty()) os << " none";
 	os << "\n";

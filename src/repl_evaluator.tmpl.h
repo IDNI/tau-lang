@@ -115,6 +115,7 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 		if (auto [infr, n_global_scope] = infer_ba_types<node>(
 			build_spec<node>(nso_rr), global_scope); infr)
 		{
+			defs.set_global_scope(n_global_scope);
 			ctx.update_types(n_global_scope);
 			tt mains_child = tt(infr) | tau::main | tt::first;
 			if (mains_child.is(tau::bf))

@@ -50,11 +50,15 @@ struct definitions {
 
 	subtree_map<node, size_t>& get_global_scope() {
 		for (auto [var, type] : ctx.types) {
-			if (auto it = ctx.global_scope.find(var);
-				it == ctx.global_scope.end())
-					ctx.global_scope[var] = type;
+			if (auto it = global_scope.find(var);
+				it == global_scope.end())
+					global_scope[var] = type;
 		}
-		return ctx.global_scope;
+		return global_scope;
+	}
+
+	void set_global_scope(const subtree_map<node, size_t>& global_scope) {
+		this->global_scope = global_scope;
 	}
 
 	subtree_map<node, size_t>& get_types() {
@@ -85,6 +89,7 @@ private:
 	std::vector<htref> bodies = {};
 
 	io_context<node> ctx; // input and output definitions
+	subtree_map<node, size_t> global_scope;
 };
 
 }
