@@ -44,7 +44,7 @@ struct interpreter {
 	size_t time_point = 0;
 	input_streams<node>     inputs;
 	output_streams<node>    outputs;
-	const io_context<node>& ctx;
+	io_context<node> ctx;
 
 private:
 	static bool stream_comp(tref s1, tref s2) {
@@ -67,6 +67,11 @@ private:
 		size_t type) const;
 	void rebuild_inputs(const subtree_map<node, size_t>& current_inputs);
 	void rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
+
+	bool collect_input_streams(tref dnf, subtree_map<node, size_t>& current_inputs);
+	subtree_map<node, size_t> collect_input_streams(tref dnf);
+	bool collect_output_streams(tref dnf, subtree_map<node, size_t>& current_outputs);
+	subtree_map<node, size_t> collect_output_streams(tref dnf);
 
 	trefs get_ubt_ctn_at(int_t t);
 
@@ -114,20 +119,6 @@ tref unpack_tau_constant(tref constant);
 template <NodeType node>
 std::optional<interpreter<node>> run(tref form,
 	const io_context<node>& ctx, const size_t steps = 0);
-
-template <NodeType node>
-bool collect_input_streams(tref dnf, subtree_map<node, size_t>& current_inputs,
-	const io_context<node>& ctx);
-
-template <NodeType node>
-subtree_map<node, size_t> collect_input_streams(tref dnf, io_context<node>& ctx);
-
-template <NodeType node>
-bool collect_output_streams(tref dnf, subtree_map<node, size_t>& current_outputs,
-	const io_context<node>& ctx);
-
-template <NodeType node>
-subtree_map<node, size_t> collect_output_streams(tref dnf, const io_context<node>& ctx);
 
 } // namespace idni::tau_lang
 
