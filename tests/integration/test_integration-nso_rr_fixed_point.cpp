@@ -33,14 +33,15 @@ TEST_SUITE("rec relations fixed point") {
 		CHECK( fp_test_F(sample) );
 	}
 
-	// TODO (HIGH) fix this test case
-	/*TEST_CASE("loop fallback T") {
+	TEST_CASE("loop fallback T") {
+		logging::trace();
 		const char* sample =
 			"g[n](x) := !g[n-1](x)."
 			"g[0](x) := T."
 			"g(x) fallback T.";
 		CHECK( fp_test_T(sample) );
-	}*/
+		logging::info();
+	}
 
 	TEST_CASE("loop fallback last") {
 		const char* sample =
@@ -143,7 +144,7 @@ TEST_SUITE("rec relations well foundedness") {
 	}
 
 	// This test fails as type inference fails (see test case
-	// "nso_rr_fixed_point/fallback type mismatch" in 
+	// "nso_rr_fixed_point/fallback type mismatch" in
 	// test_integration-ba_types_inference.cpp). however there is no simple
 	// way to catch failed assertions in doctest...so we commented out until
 	// that is possible.

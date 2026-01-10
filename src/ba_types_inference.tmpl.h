@@ -396,9 +396,9 @@ tref update_functional_fallback(type_scoped_resolver<node>& resolver, tref n) {
 	DBG(assert(!is_untyped<node>(type));)
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get_typed(tau::bf,
-			tau::get_typed(tau::bf_ref,
-				fallback, type), type);
-	return tau::get_typed(tau::ref, { sym, ref_args, fallback }, type);
+			tau::get_typed(tau::bf_ref, fallback, type), type);
+	fallback = tau::get(tau::fp_fallback, fallback);
+	return tau::get(tau::ref, { sym, ref_args, fallback });
 }
 
 template<NodeType node>
@@ -415,6 +415,7 @@ tref update_predicate_fallback(type_scoped_resolver<node>& resolver, tref n) {
 	auto fallback = tt(updated) | tau::fp_fallback | tt::first | tt::ref;
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get(tau::wff, tau::get(tau::wff_ref, fallback));
+	fallback = tau::get(tau::fp_fallback, fallback);
 	return tau::get(tau::ref, { sym, ref_args, fallback });
 }
 
@@ -856,12 +857,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				break;
 			}
 			case tau::ref_arg:
-				// This case happens when we are in a wff_ref node in a rec
-				// relation (thanks to the above check).We must treat
-				// the argument as an atomic formula
-				if (!resolver.open()) { error = true; break; }
-				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
-				[[fallthrough]];
+				// This case only happens when we are processing a wff_ref in
+				// a formula.
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
@@ -978,22 +975,18 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				if (new_n != n) transformed.insert_or_assign(n, new_n);
 				break;
 			}
-			case tau::ref_arg: {
-				if (!resolver.close()) {
-					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
-					error = true;
-					break;
-				}
-				[[fallthrough]];
-			}
+			case tau::ref_arg:
+				// This case only happens when we are processing a wff_ref in
+				// a formula.
 			case tau::bf_eq: case tau::bf_neq: case tau::bf_lteq: case tau::bf_nlteq:
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
-				tref new_n = update_default<node>(n, transformed);
-				auto updated = update<node>(resolver, new_n, { tau::ba_constant, tau::bf_t, tau::bf_f });
+				//tref new_n = update_default<node>(n, transformed);
+				//auto updated = update<node>(resolver, new_n, { tau::ba_constant, tau::bf_t, tau::bf_f });
+				auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f });
 				if(updated == nullptr) { error = true; break; }
-				if(updated != new_n) transformed.insert_or_assign(n, updated);
+				if(updated != n) transformed.insert_or_assign(n, updated);
 				if (!resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = true;

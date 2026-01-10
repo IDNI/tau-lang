@@ -25,6 +25,22 @@ private:
 public:
 	explicit union_find_with_sets(const comp& c) : _comp(c) {}
 
+	explicit union_find_with_sets(const union_find_with_sets& other) :
+		parent(other.parent),
+		next(other.next),
+		_comp(other._comp) {}
+
+	explicit union_find_with_sets(union_find_with_sets&& other) noexcept :
+		parent(std::move(other.parent)),
+		next(std::move(other.next)),
+		_comp(other._comp) {}
+
+	union_find_with_sets& operator=(union_find_with_sets&& other) {
+		parent = std::move(other.parent);
+		next = std::move(other.next);
+		return *this;
+	}
+
 	void insert(tref x) {
 		if (parent.contains(x)) return;
 		parent.emplace(x, x);
