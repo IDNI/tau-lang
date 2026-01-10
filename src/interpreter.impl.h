@@ -55,7 +55,7 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 			DBG(LOG_TRACE << dump_to_str());
 			return {};
 		}
-		auto maybe_line = it->second->get(); // get value from input stream
+		auto maybe_line = it->second->get(time_point); // get a value from input stream
 		if (!maybe_line.has_value()) {
 			LOG_ERROR
 				<< "Failed to read from input stream '"
