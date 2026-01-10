@@ -212,7 +212,7 @@ void interpreter<node>::rebuild_inputs(
 			inputs.emplace(var, std::move(it->second->rebuild()));
 		} else {
 			if (stream_id == 0) inputs.emplace(var,
-				std::make_shared<console_input_stream>());
+				std::make_shared<console_prompt_input_stream>(vn));
 			else inputs.emplace(var,
 				std::make_shared<file_input_stream>(dict(stream_id)));
 		}
@@ -240,7 +240,7 @@ void interpreter<node>::rebuild_outputs(
 			outputs.emplace(var, std::move(it->second->rebuild()));
 		else {
 			if (stream_id == 0) outputs.emplace(var,
-				std::make_shared<console_output_stream>());
+				std::make_shared<console_prompt_output_stream>(vn));
 			else outputs.emplace(var,
 				std::make_shared<file_output_stream>(dict(stream_id)));
 		}
