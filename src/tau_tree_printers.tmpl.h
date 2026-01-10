@@ -320,7 +320,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	size_t depth = 0;
 	std::unordered_set<tref> wraps, indented, highlighted;
 	char last_written_char = 0;
-	bool pending_bf_and_op = false;
+	bool type_printed = false;
 	typename node::type last_quant_nt = nul;
 	std::unordered_map<tref, size_t> chpos; // child positions if tracked
 	int_t bound_var_id_offset = get_max_var_name_b_id<node>(get());
@@ -530,7 +530,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				out(tau::get(t.get_ba_type_tree()));
 				break;
 			case typed:
+				type_printed = true;
 				out(":"); break;
+			case bf_and:
+				type_printed = false;
+				break;
 			case stream:
 				if (pnt == input_def) out(" = in ");
 				else if (pnt == output_def) out(" = out ");
@@ -545,7 +549,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 					if (static_cast<node::type>(nt) == wff)
 							depth++, break_line();
 				}
-				if (pending_bf_and_op) pending_bf_and_op = false;
 				break;
 
 			case wff_all:
@@ -656,7 +659,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 		switch (pnt) {
 			case bf_and:
-				if (isdigit(last_written_char)
+				if (type_printed || isdigit(last_written_char)
 					|| t.child_is(tau::ba_constant)) {
 					out(" ");
 				}
@@ -778,7 +781,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				// Print type information if present
 				if (parent) {
 					out(tau::get(tau::get(parent).get_ba_type_tree()));
+					type_printed = true;
 				}
+				break;
+			case bf_and:
+				type_printed = false;
 				break;
 			case bf:
 			case wff:
