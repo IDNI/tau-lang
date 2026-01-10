@@ -414,12 +414,16 @@ std::pair<std::optional<assignment<node>>, bool>
 		memory[var] = value;
 	}
 	bool has_this_stream = false;
-	for (auto& [var, _] : values) {
-		if (get_var_name<node>(var) == "this") {
+	for (auto& [var, _] : inputs) {
+		if (get_var_name<node>(var) == "this"
+			&& ctx.type_of(var) == get_ba_type_id<node>(
+							tau_type<node>()))
+		{
 			has_this_stream = true;
 			break;
 		}
 	}
+	DBG(LOG_TRACE << "step/has_this_stream: " << has_this_stream << "\n";)
 	// If the "this" input stream is present, write the current spec into it
 	if (has_this_stream) {
 		tref current_this_stream = build_in_var_at_n<node>(
