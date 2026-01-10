@@ -178,7 +178,7 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		}
 		// write value to output stream
 		DBG(LOG_TRACE << "write/put(serialized_constant): " << ss.str();)
-		if (!it->second->put(ss.str())) {
+		if (!it->second->put(ss.str(), time_point)) {
 			LOG_ERROR << "Failed to write to output stream '"
 				<< get_var_name<node>(vn) << "'";
 			return false;
