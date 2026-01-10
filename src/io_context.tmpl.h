@@ -37,6 +37,36 @@ bool console_output_stream::put(const std::string& value) {
 	return true;
 }
 
+console_prompt_input_stream::console_prompt_input_stream(
+	const std::string& name) : name(name) {}
+
+std::shared_ptr<serialized_constant_input_stream>
+	console_prompt_input_stream::rebuild()
+{
+	return std::make_shared<console_prompt_input_stream>(name);
+}
+
+std::optional<std::string> console_prompt_input_stream::get(size_t time_point) {
+	std::cout << name << "[" << time_point << "] := ";
+	return this->get();
+}
+
+console_prompt_output_stream::console_prompt_output_stream(
+	const std::string& name) : name(name) {}
+
+std::shared_ptr<serialized_constant_output_stream>
+	console_prompt_output_stream::rebuild()
+{
+	return std::make_shared<console_prompt_output_stream>(name);
+}
+
+bool console_prompt_output_stream::put(const std::string& value,
+	size_t time_point)
+{
+	std::cout << name << "[" << time_point << "] := ";
+	return this->put(value);
+}
+
 file_input_stream::file_input_stream(const std::string& filename)
 	: serialized_constant_input_stream(), filename(filename)
 {

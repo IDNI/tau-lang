@@ -54,6 +54,27 @@ struct console_output_stream : public serialized_constant_output_stream {
 	virtual bool put(const std::string& value) override;
 };
 
+struct console_prompt_input_stream : public console_input_stream {
+	console_prompt_input_stream(const std::string& name);
+	virtual ~console_prompt_input_stream() = default;
+	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
+	using console_input_stream::get;
+	virtual std::optional<std::string> get(size_t time_point) override;
+private:
+	std::string name;
+};
+
+struct console_prompt_output_stream : public console_output_stream {
+	console_prompt_output_stream(const std::string& name);
+	virtual ~console_prompt_output_stream() = default;
+	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
+	using console_output_stream::put;
+	virtual bool put(const std::string& value, size_t time_point) override;
+private:
+	std::string name;
+};
+
+
 struct file_input_stream : public serialized_constant_input_stream {
 	file_input_stream(const std::string& filename);
 	virtual ~file_input_stream();
