@@ -59,7 +59,7 @@ template <NodeType node>
 std::optional<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i, std::map<stream_at, std::string> inputs)
 {
-	using tau = tree<node>;
+	DBG(using tau = tree<node>;)
 
 	auto& ctx = definitions<node>::instance().get_io_context();
 
