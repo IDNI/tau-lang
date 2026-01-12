@@ -84,11 +84,11 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 			LOG_ERROR
 				<< "Failed to parse input value '"
 				<< line << "' for stream '"
-				<< get_var_name<node>(var) <<
-				" of type '" << get_ba_type_name<node>(type) << "'\n";
+				<< get_var_name<node>(var)
+				<< get_ba_type_name<node>(type) << "'";
 			DBG(LOG_TRACE
 				<< "read[result]: {}\n"
-				<< "read end\n";)
+				<< "read end";)
 
 			return {};
 		}
