@@ -39,7 +39,7 @@ typename type_scoped_resolver<node>::element type_scoped_resolver<node>::insert(
 
 template<NodeType node>
 typename type_scoped_resolver<node>::type_id type_scoped_resolver<node>::type_id_of(tref n) {
-	auto root = scoped.root(scoped.insert(n));	
+	auto root = scoped.root(scoped.insert(n));
 	if(auto it = type_ids.find(root); it != type_ids.end())
 		return it->second;
 	 // has no type info, type as untyped
@@ -61,11 +61,11 @@ bool type_scoped_resolver<node>::assign(tref n, typename type_scoped_resolver<no
 		if (!merged_tid) return false; // conflicting type info
 		type_ids.insert_or_assign(root, merged_tid.value());
 		return true;
-	} 
+	}
 	type_ids.insert_or_assign(element, tid);
 	return true;
 }
-	
+
 template<NodeType node>
 bool type_scoped_resolver<node>::merge(tref a, tref b) {
 	auto type_a = type_id_of(a);
@@ -209,7 +209,7 @@ bool open_same_type(type_scoped_resolver<node>& resolver, const std::map<size_t,
 }
 
 template<NodeType node>
-bool open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types, 
+bool open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
 		size_t inferred_type) {
 	subtree_map<node, size_t> scoped;
 	//auto inferred_type = untyped_type_id<node>();

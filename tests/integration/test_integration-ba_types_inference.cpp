@@ -1592,7 +1592,6 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("nso_rr_execution/direct substitution, wff_rec_relation case") {
-		logging::trace();
 		tref parsed = parse(
 			"g[0, 0](y:tau) := y."
 			"h[0, 0](y:tau) := y."
@@ -1608,7 +1607,6 @@ TEST_SUITE("regression tests") {
 			tau_type_id<node_t>()
 		};
 		CHECK( check_vars(inferred, expected) );
-		logging::info();
 	}
 
 	TEST_CASE("nso_rr_fixed_point/loop fallback T") {
@@ -1638,6 +1636,53 @@ TEST_SUITE("regression tests") {
 
 	TEST_CASE("Andrei's example") {
 		tref parsed = parse("always u[t]:tau = i0[t]:tau && (o2[t]:bv[16] = 0 || i2[t]:bv[16] !< i1[t]:bv[16]) && (o2[t]:bv[16] = { 1 }:bv[16] || i2[t]:bv[16] < i1[t]:bv[16]) && (i3[t]:bv[16] != i4[t]:bv[16] || o3[t]:bv[16] = 0) && (o3[t]:bv[16] = { 1 }:bv[16] || i3[t]:bv[16] = i4[t]:bv[16]) && (i1[t]:bv[16] != 0 || o4[t]:bv[16] = 0) && (o4[t]:bv[16] = { 1 }:bv[16] || i1[t]:bv[16] = 0) && o1[t]:bv[16] = i1[t]:bv[16] && (i0[t]:bv[16]|i1[t]:bv[16] != 0 || i1[t]:bv[16] = 0)");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("improper function type inference in cli") {
+		logging::trace();
+		tref parsed = parse("f(x):sbf", parse_cli_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", sbf_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+		logging::info();
+	}
+
+	TEST_CASE("improper function type inference in formula (y1)") {
+		tref parsed = parse("f(x):sbf = 1");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", sbf_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+		auto expected_bf_ctes = std::vector<size_t> {
+			sbf_type_id<node_t>()
+		};
+		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
+	}
+
+	TEST_CASE("improper function type inference in formula (y2)") {
+		tref parsed = parse("all x:sbf f(x):tau = 1");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("improper function type inference in formula (y3)") { // <-- works as intended
+		tref parsed = parse("all x:sbf f(x:tau) = 1");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("improper function type inference in formula (y4)") {
+		tref parsed = parse("f(x:tau):sbf = 1");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
