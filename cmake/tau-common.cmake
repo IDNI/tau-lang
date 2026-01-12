@@ -81,9 +81,9 @@ function(target_setup target)
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")
+	target_compile_features(${target} PRIVATE cxx_std_23)
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-			target_compile_features(${target} PRIVATE cxx_std_23)
 			target_compile_options(${target} PRIVATE
 				-Wa,-mbig-obj
 				-fno-use-linker-plugin
@@ -98,7 +98,6 @@ function(target_setup target)
 				-Wstrict-overflow=2
 			)
 	else()
-		target_compile_features(${target} PRIVATE cxx_std_23)
 		target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
 		if(NOT MSVC)
 			target_compile_options(${target} PRIVATE
