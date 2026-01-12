@@ -374,17 +374,19 @@ tref normalize_ba(tref fm) {
 	DBG(LOG_TRACE << "normalize_ba: " << LOG_FM(fm));
 	using tau = tree<node>;
 	DBG(assert(tau::get(fm).is(tau::bf));)
-	auto norm_ba = [&](tref n) {
-		const auto& t = tau::get(n);
+	auto push_negation = [&](tref n) {
+		const tau& t = tau::get(n);
 		// Push negation into constants
 		if (t.is(tau::bf_neg) && t[0].child_is(tau::ba_constant)) {
 			const auto c = t[0][0].get_ba_constant();
-			// Normalize negated constant
-			const auto nc = normalize_ba<node>(~c);
-			return tau::get_ba_constant(nc, t.get_ba_type());
+			return tau::get_ba_constant(~c, t.get_ba_type());
 		}
 		// Push negations in
 		n = push_negation_one_in<node, false>(n);
+		return n;
+	};
+	auto norm_ba = [](tref n) {
+		const tau& t = tau::get(n);
 		// Check if node is a constant
 		if (!t.is(tau::ba_constant)) return n;
 		// Node has a Boolean algebra element
@@ -393,6 +395,7 @@ tref normalize_ba(tref fm) {
 		if (c == nc) return n;
 		return tau::get_ba_constant(nc, t.get_ba_type());
 	};
+	fm = pre_order<node>(fm).apply_unique(push_negation);
 	tref r = pre_order<node>(fm).template apply_unique<normalize_ba_m>(norm_ba);
 	DBG(LOG_TRACE << "normalize_ba result: " << LOG_FM(r));
 	return r;
@@ -3252,8 +3255,6 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 				std::ranges::sort(func_syms, tau::subtree_less);
 				term = rec_term_boole_decomposition<node>(term, func_syms, 0, true);
 			}
-		} else {
-			term = rec_term_boole_decomposition<node>(term, vars, idx + 1, true);
 		}
 		DBG(LOG_TRACE << "Result: " << LOG_FM(term) << "\n";)
 		return term;
