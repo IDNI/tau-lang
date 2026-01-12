@@ -66,6 +66,7 @@ struct console_prompt_input_stream : public console_input_stream {
 	virtual std::optional<std::string> get(size_t time_point) override;
 private:
 	std::string name;
+	inline static size_t max_length = 0;
 };
 
 struct console_prompt_output_stream : public console_output_stream {
@@ -76,6 +77,7 @@ struct console_prompt_output_stream : public console_output_stream {
 	virtual bool put(const std::string& value, size_t time_point) override;
 private:
 	std::string name;
+	inline static size_t max_length = 0;
 };
 
 // file input and output streams
