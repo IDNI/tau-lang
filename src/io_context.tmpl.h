@@ -38,7 +38,10 @@ bool console_output_stream::put(const std::string& value) {
 }
 
 console_prompt_input_stream::console_prompt_input_stream(
-	const std::string& name) : name(name) {}
+	const std::string& name) : name(name)
+{
+	max_length = std::max(max_length, name.length());
+}
 
 std::shared_ptr<serialized_constant_input_stream>
 	console_prompt_input_stream::rebuild()
@@ -46,13 +49,39 @@ std::shared_ptr<serialized_constant_input_stream>
 	return std::make_shared<console_prompt_input_stream>(name);
 }
 
+// helper
+inline std::string spacing(const std::string& name, size_t max_length) {
+	return (max_length <= name.length())
+		? std::string{}
+		: std::string(max_length - name.length(), ' ');
+}
+
 std::optional<std::string> console_prompt_input_stream::get(size_t time_point) {
-	std::cout << name << "[" << time_point << "] := ";
+	DBG(LOG_TRACE << "console_prompt_input_stream::get(name: "
+		<< name << ", time_point: " << time_point << ", max_length: "
+		<< max_length << ", name.length(): " << name.length() << ")";)
+
+	std::cout << name << "[" << time_point << "]"
+		<< spacing(name, max_length) << " := ";
+
+#ifdef DEBUG
+	std::optional<std::string> result = this->get();
+	std::stringstream ss;
+	ss << "console_prompt_input_stream::get[result]: ";
+	if (result.has_value()) ss << "\"" << result.value() << "\"";
+	else ss << "error";
+	LOG_TRACE << ss.str();
+	return result;
+#endif // DEBUG
+
 	return this->get();
 }
 
 console_prompt_output_stream::console_prompt_output_stream(
-	const std::string& name) : name(name) {}
+	const std::string& name) : name(name)
+{
+	max_length = std::max(max_length, name.length());
+}
 
 std::shared_ptr<serialized_constant_output_stream>
 	console_prompt_output_stream::rebuild()
@@ -63,8 +92,17 @@ std::shared_ptr<serialized_constant_output_stream>
 bool console_prompt_output_stream::put(const std::string& value,
 	size_t time_point)
 {
-	std::cout << name << "[" << time_point << "] := ";
-	return this->put(value);
+	DBG(LOG_TRACE << "console_prompt_output_stream::put(name: "
+		<< name << ", time_point: " << time_point << ", value: "
+		<< value << ", max_length: " << max_length << ", name.length(): "
+		<< name.length() << ")";)
+
+	std::cout << name << "[" << time_point << "]"
+		<< spacing(name, max_length) << " := ";
+	bool result = this->put(value);
+
+	DBG(LOG_TRACE << "console_prompt_output_stream::put[result]: " << result << ")";)
+	return result;
 }
 
 file_input_stream::file_input_stream(const std::string& filename)
@@ -72,7 +110,7 @@ file_input_stream::file_input_stream(const std::string& filename)
 {
 	file.open(filename);
 	if (!file.is_open())
-		LOG_ERROR << "Failed to reopen file: '" << filename << "'";
+		LOG_ERROR << "Failed to open file: '" << filename << "'";
 }
 
 file_input_stream::~file_input_stream() {
