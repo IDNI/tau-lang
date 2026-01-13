@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "rr.h"
 
@@ -24,7 +24,7 @@ std::weak_ordering compare_trees(const htref& a, const htref& b) {
 		return std::weak_ordering::equivalent;
 	} else if (a) {
 		return std::weak_ordering::greater;
-	} else if (b) 
+	} else if (b)
 		return std::weak_ordering::less;
 	return std::weak_ordering::equivalent;
 }

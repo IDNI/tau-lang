@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
@@ -144,7 +144,7 @@ TEST_SUITE("sample cvc5 programs") {
 		Term fml = mkFormula(params);
 		std::cout << "formula: " << fml << std::endl;
 		// create a std::thread to run the checkSat method
-		
+
 		// and assert the formula
 
 		params.solver.assertFormula(fml);

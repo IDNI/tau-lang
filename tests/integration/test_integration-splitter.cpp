@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
@@ -49,7 +49,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
 
-	
+
 	TEST_CASE("Tau_splitter_6") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
@@ -58,7 +58,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		// std::cout << "splitter: " << tau::get(s) << "\n";
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
 	}
-	
+
 	TEST_CASE("Tau_splitter_7") {
 		const char *sample = "(sometimes o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);

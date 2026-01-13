@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__UNION_FIND_H__
 #define __IDNI__TAU__UNION_FIND_H__
@@ -135,9 +135,9 @@ struct scoped_union_find {
 	}
 
 	bool close() {
-		if (scopes.size() == 1) { 
+		if (scopes.size() == 1) {
 			DBG(LOG_ERROR << "scoped_union_find/close: cannot close global scope (unbalenced scopes)\n";)
-			return false; 
+			return false;
 		}
 		scopes.pop_back();
 		return true;
@@ -149,7 +149,7 @@ struct scoped_union_find {
 
 	element insert(const data_t& data) {
 		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
-			if (auto eit = uf.find(element{*it, data}); eit != uf.end()) 
+			if (auto eit = uf.find(element{*it, data}); eit != uf.end())
 				return eit->first;
 		return uf.insert(element{global, data});
 	}
@@ -166,14 +166,14 @@ struct scoped_union_find {
 
 	scope scope_of(const data_t& data) {
 		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
-			if (auto eit = uf.find(element{*it, data}); eit != uf.end()) 
+			if (auto eit = uf.find(element{*it, data}); eit != uf.end())
 				return eit->first.first;
 		return uf.insert(element{global, data}).first; // global scope
 	}
 
 	bool contains(const data_t& data) {
 		for(auto it = scopes.rbegin(); it != scopes.rend(); ++it)
-			if (uf.contains(element{*it, data})) 
+			if (uf.contains(element{*it, data}))
 				return true;
 		return false;
 	}

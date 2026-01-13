@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 namespace idni::tau_lang {
 inline std::vector<std::string> nso_factory<bv, sbf_ba>::types() {

@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 // TODO (LOW) rename file to msnso_rr.h
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction

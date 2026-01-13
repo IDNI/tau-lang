@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__BA_TYPES_H__
 #define __IDNI__TAU__BA_TYPES_H__
@@ -235,7 +235,7 @@ tref unify(tref t1, tref t2);
 template <NodeType node>
 std::optional<size_t> unify(size_t tid1, size_t tid2);
 
-// Checks if the types of a vector of trefs are compatible with the supplied 
+// Checks if the types of a vector of trefs are compatible with the supplied
 // default type. If so, returns the type and nullptr otherwise.
 template <NodeType node>
 tref unify(const trefs& ns, tref default_type);
@@ -243,7 +243,7 @@ tref unify(const trefs& ns, tref default_type);
 template <NodeType node>
 tref unify(const trefs& ns1, const trefs& ns2, tref default_type);
 
-// Checks if the types of a vector of trefs are compatible with the supplied 
+// Checks if the types of a vector of trefs are compatible with the supplied
 // default type. If so, returns type id and nat_type_id otherwise.
 template <NodeType node>
 std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type);
