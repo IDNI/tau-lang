@@ -112,7 +112,7 @@ inline Term make_bitvector_div(const Term& l, const Term& r) {
 }
 
 inline Term make_bitvector_mod(const Term& l, const Term& r) {
-	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_SMOD, {l, r});
+	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_UREM, {l, r});
 }
 
 inline Term make_bitvector_shl(const Term& l, const Term& r) {
