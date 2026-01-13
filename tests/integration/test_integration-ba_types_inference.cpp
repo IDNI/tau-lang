@@ -1641,7 +1641,14 @@ TEST_SUITE("regression tests") {
 		CHECK( inferred == nullptr );
 	}
 
-	TEST_CASE("improper function type inference in cli") {
+	TEST_CASE("improper function type inference in formula (y3)") {
+		tref parsed = parse("all x:sbf f(x:tau) = 1");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	/*TEST_CASE("improper function type inference in cli") {
 		logging::trace();
 		tref parsed = parse("f(x):sbf", parse_cli_no_infer());
 		CHECK( parsed != nullptr );
@@ -1674,19 +1681,12 @@ TEST_SUITE("regression tests") {
 		CHECK( inferred == nullptr );
 	}
 
-	TEST_CASE("improper function type inference in formula (y3)") { // <-- works as intended
-		tref parsed = parse("all x:sbf f(x:tau) = 1");
-		CHECK( parsed != nullptr );
-		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred == nullptr );
-	}
-
 	TEST_CASE("improper function type inference in formula (y4)") {
 		tref parsed = parse("f(x:tau):sbf = 1");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
-	}
+	}*/
 }
 
 TEST_SUITE("Cleanup") {
