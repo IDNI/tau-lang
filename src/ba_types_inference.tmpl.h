@@ -358,9 +358,13 @@ tref update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree
 	if (has_ba_type<node>(n)) {
 		// We check that the type is compatible
 		auto current_type = tau::get(n).get_ba_type();
-		if (!resolver.assign(canonized, current_type))
+		auto inferred_type = types.at(canonized);
+		auto unified_type = unify<node>(current_type, inferred_type);
+		if (!unified_type.has_value())
 			return nullptr; // incompatible types
-		n = retype<node>(n, current_type);
+		if (!resolver.assign(canonized, unified_type.value()))
+			return nullptr; // incompatible types
+		n = retype<node>(n, unified_type.value());
 		n = tau::add_child(n, tau::get(tau::processed));
 		return n;
 	}

@@ -1649,7 +1649,6 @@ TEST_SUITE("regression tests") {
 	}
 
 	/*TEST_CASE("improper function type inference in cli") {
-		logging::trace();
 		tref parsed = parse("f(x):sbf", parse_cli_no_infer());
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -1657,7 +1656,6 @@ TEST_SUITE("regression tests") {
 			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
-		logging::info();
 	}
 
 	TEST_CASE("improper function type inference in formula (y1)") {
@@ -1687,6 +1685,18 @@ TEST_SUITE("regression tests") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}*/
+
+	TEST_CASE("Issue 52") {
+		size_t bv15_type_id = ba_types<node_t>::id(bv_type<node_t>(15));
+		tref parsed = parse("x:bv = {1}:bv[15]");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv15_type_id}
+		};
+		CHECK( check_vars(inferred, expected) );
+	}
 }
 
 TEST_SUITE("Cleanup") {
