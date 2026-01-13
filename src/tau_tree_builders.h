@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__TAU_TREE_BUILDERS_H__
 #define __IDNI__TAU__TAU_TREE_BUILDERS_H__

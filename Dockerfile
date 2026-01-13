@@ -68,9 +68,9 @@ COPY ./scripts   /tau-lang/scripts
 COPY ./src       /tau-lang/src
 COPY ./tests     /tau-lang/tests
 COPY ./.gitignore ./.gitmodules ./CMakeLists.txt ./dev \
-	./README.md ./LICENSE.txt ./VERSION 	/tau-lang/
-COPY ./parser/*.generated.h			/tau-lang/parser/
-	
+	./README.md ./LICENSE.md ./VERSION      /tau-lang/
+COPY ./parser/*.generated.h                     /tau-lang/parser/
+
 
 # ============================================================
 

@@ -569,8 +569,8 @@ predícate         => name "[" index+  "]" "(" [ variable [":" type] ("," variab
 ```
 
 where `name` is the name of the function or predicate (it has to be a sequence of
-letters and numbers starting by a letter), `type`is the type of the arguments or 
-the function itself (as considered in [Type System](#type-system)) and `index` 
+letters and numbers starting by a letter), `type`is the type of the arguments or
+the function itself (as considered in [Type System](#type-system)) and `index`
 is a positive integer or a variable or a variable minus a positive integer, i.e.:
 
 ```
@@ -753,18 +753,18 @@ When typing a stream explicitly in [REPL](#the-tau-repl), the syntax is
 ```
 stream_definition => stream_variable [":" type] "=" stream_type stream
 ```
-where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`...), 
+where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`...),
 `stream_type` is either input stream (`in`) or output stream (`out`), and `stream` is either `console` (meaning that the
-stream reads/outputs values from/to the console) or `file(file_name)` which denotes the file from/into which to read/write 
+stream reads/outputs values from/to the console) or `file(file_name)` which denotes the file from/into which to read/write
 (in quotes if needed). For example,
 ```
 i1 : tau = in console
 ```
-or 
+or
 ```
 o1 : tau = out console
 ```
-or 
+or
 ```
 o2 : tau = out file("log.tau")
 ```
@@ -817,7 +817,7 @@ The Tau Language currently supports the following types:
 2. `sbf`: the type of simple Boolean functions, and
 3. `bv`: the type of bitvectors of fixed bit width.
 
-You can type the following elements: variables, streams, recurrence relations, 
+You can type the following elements: variables, streams, recurrence relations,
 constants and (term) constants. In order to do so, you just add the type
 information after a colon `:`. For example,
 
@@ -839,7 +839,7 @@ f(x) : tau := ...
 g[n](x, y) : sbf := ...
 ```
 
-In the case of predicate recurrence relations, the syntax is different as each argument 
+In the case of predicate recurrence relations, the syntax is different as each argument
 can have its own type. The syntax is as follows:
 
 ```
@@ -855,23 +855,23 @@ of bitvectors of width 16 (the default bit width is 16 if not specified or infer
 ### Type inference
 
 The Tau Language has a type inference system which infers types of all elements
-that are not explicitly typed and detect type mismatches. 
+that are not explicitly typed and detect type mismatches.
 
 The inference system is base on a union-find data structure
 and works by unifying types of elements appearing together in the same context.
 
 Moreover, the inference system is scoped, i.e. types inferred within a certain scope
-do not leak outside of that scope (unless the element is scoped in an outer scope). 
-For example, argument types inferred within a function definition do not leak outside of 
+do not leak outside of that scope (unless the element is scoped in an outer scope).
+For example, argument types inferred within a function definition do not leak outside of
 that function definition.
 
 Among others, we have the following scopes:
 
 1. global scope: the scoped elements are untyped variables and streams of the formula,
-2. recurrence relations definitions: the scoped elements are the arguments of the 
+2. recurrence relations definitions: the scoped elements are the arguments of the
 recurrence relation (everything is resolved taking into account those type arguments):
 variables, streams and constants,
-3. existential and universal quantifications: the scoped elements are the 
+3. existential and universal quantifications: the scoped elements are the
 quantified variables, and
 4. atomic formulas: the scoped elements are constants appearing in the atomic formula.
 
@@ -879,18 +879,18 @@ Depending on the scope, we also merge the types of the different elements to be 
 
 1. untyped variables and streams in the global scope are assigned the default type `tau`,
 2. in a recurrence relation definition:
-      - in the functional case: everything is typed acoordingly to the type of 
+      - in the functional case: everything is typed acoordingly to the type of
       the recurrence relation: argument variables, constants, streams,...
-      - in the predicate case: everything is typed accordingly to the involved 
+      - in the predicate case: everything is typed accordingly to the involved
       argument types: variables, constants, streams,...
 3. in an existential or universal quantification:
-      - the quantified variable is typed accordingly to the type inferred in the 
+      - the quantified variable is typed accordingly to the type inferred in the
       quantified formula,
 4. in an atomic formula:
-      - everything is merged together and typed accordingly: variables, streams, 
+      - everything is merged together and typed accordingly: variables, streams,
       constants,...
 
-If we have no type information, the default type `tau` is assumed. 
+If we have no type information, the default type `tau` is assumed.
 
 ### Examples
 
@@ -913,7 +913,7 @@ Here are some small examples to illustrate the type inference system:
 4. `(all x x = y) && x = y:sbf`:
       - `x` is inferred to be of the same type as `y` in the first part, i.e. `tau`, as no type information is present,
       - `y` is inferred to be of type `sbf` in the outer formula which is not compatible with the previous type assigned (`tau`).
-      - a type mismatch occurs.    
+      - a type mismatch occurs.
 4. `all x (all x x = 1:sbf)`:
       - the inner `x` is inferred to be of type `sbf`,
       - the outer `x` is inferred to be of the default type `tau`,
@@ -1301,7 +1301,7 @@ Please submit issues at the following link: [Tau Language issues](https://github
 # **License**
 
 Tau Language is licensed under the following terms:
-[Tau Language License](https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt)
+[Tau Language License](https://github.com/IDNI/tau-lang/blob/main/LICENSE.md)
 
 # **Authors**
 

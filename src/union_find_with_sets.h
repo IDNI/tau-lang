@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef TAU_UNION_FIND_WITH_SETS_H
 #define TAU_UNION_FIND_WITH_SETS_H

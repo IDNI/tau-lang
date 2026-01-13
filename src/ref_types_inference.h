@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__REF_TYPES_INFERENCE_H__
 #define __IDNI__TAU__REF_TYPES_INFERENCE_H__
@@ -25,9 +25,9 @@ struct rr_sig {
 };
 
 inline std::ostream& operator<<(std::ostream& os, const rr_sig& s) {
-	return os 
-		<< rr_dict(s.name) 
-		<< "[" << s.offset_arity << "]/" 
+	return os
+		<< rr_dict(s.name)
+		<< "[" << s.offset_arity << "]/"
 		<< s.arg_arity;
 }
 

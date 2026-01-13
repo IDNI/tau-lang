@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__PRODUCT_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__PRODUCT_BA_H__

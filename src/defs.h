@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__DEFS_H__
 #define __IDNI__TAU__DEFS_H__
@@ -21,7 +21,7 @@
 #define TAU_GIT_BRANCH      "n/a"
 #endif
 
-// include generated version and license constants from VERSION and LICENSE.txt
+// include generated version and license constants from VERSION and LICENSE.md
 #include "version_license.h"
 
 // initialize logging and include logging helper macros
