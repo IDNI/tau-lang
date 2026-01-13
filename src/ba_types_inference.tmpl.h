@@ -140,7 +140,7 @@ std::optional<std::map<size_t, subtree_map<node, size_t>>> get_typeable_type_ids
 		const std::function<bool(tref)>& stop = is<node, tree<node>::offset>) {
 	using tau = tree<node>;
 
-	auto typeables = tau::get(n).select_top_until(query, stop);
+	auto typeables = tau::get(n).select_all_until(query, stop);
 	std::map<size_t, subtree_map<node, size_t>> typeable_type_ids_by_type;
 	for (tref typeable : typeables) {
 		auto canonized = canonize<node>(typeable);
@@ -472,7 +472,7 @@ template<NodeType node>
 tref update_functional_ref(type_scoped_resolver<node>& resolver, tref n, [[maybe_unused]] tref parent) {
 	using tau = tree<node>;
 
-	// First we update the ba_constant, the ariables and bf_t/bf_f in the ref
+	// First we update the ba_constant, the variables and bf_t/bf_f in the ref
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
 	if (updated == nullptr) return nullptr;
 	// Finally, we wrap the new ref accordingly
@@ -799,10 +799,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				if (!is_top_level_bf<node>(parent)) { skip = true; break; }
 				// Otherwise we have to treat it as a global scope
 				auto typeables = get_typeable_type_ids_by_type<node>(n, {
-					tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
+					tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
 				if (!typeables) { error = true; break; } // Incompatible types
 				auto typeables_map = typeables.value();
 				if (!insert<node>(resolver, {
+					typeables_map[tau::ref],
 					typeables_map[tau::variable],
 					typeables_map[tau::ba_constant],
 					typeables_map[tau::bf_t],
@@ -863,7 +864,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
 				auto typeables = get_typeable_type_ids_by_type<node>(n, {
-					tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
+					tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
 				if (!typeables) { error = true; break; } // Incompatible types
 				auto typeables_map = typeables.value();
 				if (!open<node>(resolver, {
@@ -872,7 +873,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 						typeables_map[tau::bf_f] })) { error = true; break; }
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 				if (!insert<node>(resolver, {
-						typeables_map[tau::variable] })) { error = true; break; }
+						typeables_map[tau::variable],
+						typeables_map[tau::ref] })) { error = true; break; }
 				if (!merge<node>(resolver, typeables_map)) { error = true; break; }
 				break;
 			}

@@ -1658,7 +1658,7 @@ TEST_SUITE("regression tests") {
 		};
 		CHECK( check_vars(inferred, expected) );
 		logging::info();
-	}
+	}*/
 
 	TEST_CASE("improper function type inference in formula (y1)") {
 		tref parsed = parse("f(x):sbf = 1");
@@ -1686,7 +1686,7 @@ TEST_SUITE("regression tests") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
-	}*/
+	}
 }
 
 TEST_SUITE("Cleanup") {
