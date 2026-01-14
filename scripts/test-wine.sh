@@ -5,7 +5,7 @@ TESTS_DIR=../build-$BUILD_TYPE
 STATUS=0
 
 echo "Building $BUILD_TYPE exe files"
-./dev build $BUILD_TYPE -DCMAKE_TOOLCHAIN_FILE=../cmake/mingw-w64-x86_64.cmake -DTAU_BUILD_TESTS=ON
+./dev build $BUILD_TYPE -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mingw-w64-x86_64.cmake -DTAU_BUILD_TESTS=ON
 
 cd tests
 for TEST in $TESTS_DIR/test_*.exe; do
