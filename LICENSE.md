@@ -1,22 +1,30 @@
 License Agreement for the Tau Language Framework
 
 The Tau Language Framework (the “Product,” including all associated files) is protected by IDNI AG legal rights, including intellectual property rights, which may be covered by patents and/or copyrights. IDNI AG retains all of its intellectual property rights, but grants permission to use the Product for free for both commercial and non-commercial usage in the following instances (the "Tau Net Related Instances"):
-(1) for developing and deploying applications, smart contracts, and/or blockchain specifications solely for deployment and execution over the Tau Net blockchain;
-(2) for the sole purpose of integrating applications with the Tau Net blockchain; and
-(3) as part of running the aforementioned Tau Net blockchain client software.
+  1. for developing and deploying applications, smart contracts, and/or blockchain specifications solely for deployment and execution over the Tau Net blockchain;
+  2. for the sole purpose of integrating applications with the Tau Net blockchain; and
+  3. as part of running the aforementioned Tau Net blockchain client software.
+
 The Tau Net blockchain (including its testnets) is a separate product deployed by IDNI AG, and utilizes the Product.
+
 IDNI AG further grants permission to use the Product for free in the following additional instances (the "Additional Instances"): educational use, research purposes, non-commercial use, and time-limited (30 days) internal evaluation.  Software created within the scope of the Tau Net Related Instances and Additional Instances are free to be licensed and distributed under the terms of their creator(s).  The Additional Instances do not include any instance where the Product or portions thereof is used to build and/or run software or hardware of any kind for profit or commercial usage.
- When software is executed using the Product, that usage is subject to this license. The Product’s installer may automatically download the Product from its official distribution channels and install it, subject to the condition that this license is presented to and agreed by the end-user.
+
+When software is executed using the Product, that usage is subject to this license. The Product’s installer may automatically download the Product from its official distribution channels and install it, subject to the condition that this license is presented to and agreed by the end-user.
+
 The Additional Instances and Tau Net Related Instances do not include any instance where the Product or portions thereof is redistributed to third parties.
 
 Any use of the Product outside the scope of the listed Additional Instances and Tau Net Related Instances requires an additional license for use.  To request an additional license for the Product and/or any IDNI AG component thereof, contact IDNI AG.
+
 Usage, installation, and/or download of the Product constitutes acceptance of the terms of this license.  The terms of this license are subject to modification by IDNI AG at its sole discretion, and continued usage of the Product after modification of the license terms constitutes acceptance of the modified terms. Free usage of the Product in the context of the Tau Net blockchain applies to the Product in its complete form according to the license it was shipped with, and you may continue using that version for free according to that license.
+
 Any person agreeing to this license on behalf of an entity represents having authority to accept the terms of this license agreement on behalf of the entity.
 
 **§ 1 The Tau Language Framework.**  The Product consists of a set of materials published by IDNI AG as part of the Tau Language Framework, which may include executable files in machine code, data files, source code, object code, link libraries, utility programs, project files, scripts related to the software listed above, and related documentation associated with the Tau Language Framework.
 
 **§ 2 Grant of license.**  For usage of the Product that is permitted for free, IDNI AG grants you a personal, non-exclusive, non-transferable, limited license without fees to install, execute, and use the Product.
+
 The Product is licensed, not sold.
+
 IDNI AG reserves all rights not expressly granted in this license.
 
 **§ 3 Contributions to the Tau Language Framework.**  You are entitled to propose new code, documentation, or any other materials (a "Contribution"), via the public code repositories of the Product. In such cases, you transfer to IDNI AG all rights, title, and interest associated with the Contribution. Such contributed materials are subject to this license agreement as if they were created by IDNI AG.
