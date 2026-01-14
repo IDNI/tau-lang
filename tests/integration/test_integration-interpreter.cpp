@@ -373,14 +373,14 @@ TEST_SUITE("only outputs") {
 	// Fibonacci like sequence with sample Tau syntax
 	TEST_CASE("o1[0] = {<:x> = 0.} && o1[1] = {<:x> = 0.} && o1[t] = o1[t-1] ^ o1[t-2]") {
 		const char* sample = "o1[0] =  {<:x> = 0.} && o1[1] =  {<:x> = 0.} && o1[t] = o1[t-1] ^ o1[t-2].";
-		auto memory = run_test(sample, 8, tau_type_id<node_t>());
+		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with sample Tau programs
 	TEST_CASE("o1[0] = {o1[0] = 0.} && o1[1] = {o1[0] = 0.} && o1[t] = o1[t-1] ^ o1[t-2]") {
 		const char* sample = "o1[0] =  {o1[0] = 0.} && o1[1] =  {o1[0] = 0.} && o1[t] = o1[t-1] ^ o1[t-2].";
-		auto memory = run_test(sample, 8, tau_type_id<node_t>());
+		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 }

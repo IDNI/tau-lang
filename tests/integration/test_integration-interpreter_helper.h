@@ -35,14 +35,13 @@ tref create_spec(io_context<node_t>& ctx, const char* spec) {
 	return get_nso_rr<node_t>(ctx, tau::get(spec)).value().main->get();
 }
 
-
 std::optional<assignment<node_t>> run_test(tref spec, io_context<node_t>& ctx,
-	const size_t& times, const size_t type = sbf_type_id<node_t>())
+	const size_t& times)
 {
 	using node = node_t;
 #ifdef DEBUG
 	std::cout << "run_test/------------------------------------------------------\n";
-	std::cout << "run_test/sample: " << LOG_FM_DUMP(spec) << " : type: " << type << "\n";
+	std::cout << "run_test/sample: " << LOG_FM_DUMP(spec) << "\n";
 #endif // DEBUG
 
 	auto intprtr = interpreter<node>::make_interpreter(spec, ctx);
@@ -83,17 +82,17 @@ std::optional<assignment<node_t>> run_test(tref spec, io_context<node_t>& ctx,
 }
 
 std::optional<assignment<node_t>> run_test(const char* sample,
-		const size_t& times, const size_t type = sbf_type_id<node_t>())
+	const size_t& times)
 {
 	io_context<node_t> ctx;
 	tref spec = create_spec(ctx, sample);
-	return run_test(spec, ctx, times, type);
+	return run_test(spec, ctx, times);
 }
 
-std::optional<assignment<node_t>> run_test(const char* sample, io_context<node_t>& ctx,
-	const size_t& times, const size_t type = sbf_type_id<node_t>())
+std::optional<assignment<node_t>> run_test(const char* sample,
+	io_context<node_t>& ctx, const size_t& times)
 {
 	tref spec = create_spec(ctx, sample);
-	return run_test(spec, ctx, times, type);
+	return run_test(spec, ctx, times);
 }
 
