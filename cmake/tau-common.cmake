@@ -43,10 +43,10 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(COMPILE_OPTIONS "${TAU_RELEASE_OPTIONS}")
 endif()
 
-set(LINK_OPTIONS "-flto=auto")
+set(TAU_LINK_OPTIONS "-flto=auto")
 
 message(STATUS "COMPILE_OPTIONS ${COMPILE_OPTIONS}")
-message(STATUS "LINK_OPTIONS ${LINK_OPTIONS}")
+message(STATUS "TAU_LINK_OPTIONS ${TAU_LINK_OPTIONS}")
 
 include(git-defs) # for ${TAU_GIT_DEFINITIONS}
 function(target_git_definitions target)
@@ -105,7 +105,7 @@ function(target_setup target)
 			)
 		endif()
 	endif()
-	target_link_options(${target} PRIVATE "${LINK_OPTIONS}")
+	target_link_options(${target} PRIVATE "${TAU_LINK_OPTIONS}")
 	target_git_definitions(${target})
 	set_target_properties(${target} PROPERTIES
 		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
