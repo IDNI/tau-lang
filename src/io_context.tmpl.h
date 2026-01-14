@@ -12,6 +12,8 @@ namespace idni::tau_lang {
 // constant streams
 // -----------------------------------------------------------------------------
 
+// -- console_input_stream --
+
 std::shared_ptr<serialized_constant_input_stream>
 	console_input_stream::rebuild()
 {
@@ -26,6 +28,8 @@ std::optional<std::string> console_input_stream::get() {
 	return line;
 }
 
+// -- console_output_stream --
+
 std::shared_ptr<serialized_constant_output_stream>
 	console_output_stream::rebuild()
 {
@@ -37,6 +41,15 @@ bool console_output_stream::put(const std::string& value) {
 	return true;
 }
 
+// console_prompt_*_stream spacing helper
+inline std::string spacing(const std::string& name, size_t max_length) {
+	return (max_length <= name.length())
+		? std::string{}
+		: std::string(max_length - name.length(), ' ');
+}
+
+// -- console_prompt_input_stream --
+
 console_prompt_input_stream::console_prompt_input_stream(
 	const std::string& name) : name(name)
 {
@@ -47,13 +60,6 @@ std::shared_ptr<serialized_constant_input_stream>
 	console_prompt_input_stream::rebuild()
 {
 	return std::make_shared<console_prompt_input_stream>(name);
-}
-
-// helper
-inline std::string spacing(const std::string& name, size_t max_length) {
-	return (max_length <= name.length())
-		? std::string{}
-		: std::string(max_length - name.length(), ' ');
 }
 
 std::optional<std::string> console_prompt_input_stream::get(size_t time_point) {
@@ -76,6 +82,8 @@ std::optional<std::string> console_prompt_input_stream::get(size_t time_point) {
 
 	return this->get();
 }
+
+// -- console_prompt_output_stream --
 
 console_prompt_output_stream::console_prompt_output_stream(
 	const std::string& name) : name(name)
@@ -105,6 +113,8 @@ bool console_prompt_output_stream::put(const std::string& value,
 	return result;
 }
 
+// -- file_input_stream --
+
 file_input_stream::file_input_stream(const std::string& filename)
 	: serialized_constant_input_stream(), filename(filename)
 {
@@ -129,6 +139,8 @@ std::optional<std::string> file_input_stream::get() {
 	DBG(LOG_TRACE << "file_input_stream(\"" << filename << "\"): get() = \"" << line << "\"";)
 	return line;
 }
+
+// -- file_output_stream --
 
 file_output_stream::file_output_stream(const std::string& filename)
 	: serialized_constant_output_stream(), filename(filename)
@@ -156,6 +168,8 @@ bool file_output_stream::put(const std::string& value) {
 	file << value << std::endl;
 	return true;
 }
+
+// -- vector_input_stream --
 
 vector_input_stream::vector_input_stream(
 	const std::vector<std::string>& values)
@@ -192,6 +206,8 @@ std::optional<std::string> vector_input_stream::get() {
 		<< "\" current: " << *current << " values.size(): " << values->size();)
 	return values->at((*current)++);
 }
+
+// -- vector_output_stream --
 
 vector_output_stream::vector_output_stream()
 	: serialized_constant_output_stream(),

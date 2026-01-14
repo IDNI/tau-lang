@@ -27,6 +27,7 @@ struct serialized_constant_output_stream {
 	virtual ~serialized_constant_output_stream() = default;
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() = 0;
 	virtual bool put(const std::string& value) = 0;
+	// optional override for time_point-dependent output streams
 	virtual bool put(const std::string& value, size_t /*time_point*/) {
 		// DBG(LOG_TRACE << "serialized_constant_output_stream::put(value: " << value << ", time_point: " << time_point << ")";)
 		return this->put(value);
