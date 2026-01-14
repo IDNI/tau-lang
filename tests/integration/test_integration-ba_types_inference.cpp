@@ -97,7 +97,7 @@ TEST_SUITE("type_scoped_resolver") {
 		r.insert(b);
 		size_t t = 1;
 		CHECK(r.assign(a, t));
-		CHECK(r.merge(a, b).first);
+		CHECK(r.merge(a, b));
 		CHECK(r.type_id_of(a) == r.type_id_of(b));
 		CHECK(r.type_id_of(a) == t);
 	}
@@ -109,7 +109,7 @@ TEST_SUITE("type_scoped_resolver") {
 		size_t t = 1;
 		r.insert(a);
 		r.open({{b, t}});
-		CHECK(r.merge(a, b).first);
+		CHECK(r.merge(a, b));
 		CHECK(r.type_id_of(a) == r.type_id_of(b));
 		CHECK(r.type_id_of(a) == t);
 	}
@@ -124,7 +124,7 @@ TEST_SUITE("type_scoped_resolver") {
 		size_t t2 = 2;
 		CHECK(r.assign(a, t1));
 		CHECK(r.assign(b, t2));
-		CHECK(!r.merge(a, b).first); // conflicting types
+		CHECK(!r.merge(a, b)); // conflicting types
 	}
 
 	TEST_CASE("merging conflicting types in different scopes") {
@@ -136,7 +136,7 @@ TEST_SUITE("type_scoped_resolver") {
 		r.insert(a);
 		CHECK(r.assign(a, t1));
 		r.open({{b, t2}});
-		CHECK(!r.merge(a, b).first); // conflicting types
+		CHECK(!r.merge(a, b)); // conflicting types
 	}
 }
 

@@ -441,7 +441,7 @@ template<NodeType node>
 tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n, auto& function_symbols) {
 	using tau = tree<node>;
 
-	// First we update the ba_constant, the ariables and bf_t/bf_f in the rr and
+	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
 	if (updated == nullptr) return nullptr;
@@ -466,9 +466,10 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n, auto& fu
 
 	// Add new function definition to available definitions
 	auto sig = get_function_signature<node>(tau::trim2(new_head));
-	if (auto it = function_symbols.find(sig); it != function_symbols.end())
-		it->second.push_back(type);
-	function_symbols.emplace(std::move(sig), std::vector{type});
+	if (auto it = function_symbols.find(sig); it != function_symbols.end()) {
+		// Update type information
+		it->second = type;
+	} else function_symbols.emplace(std::move(sig), type);
 
 	return tau::get(tau::rec_relation, { new_head, new_body });
 }
@@ -738,8 +739,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 
 	// In order to infer types of function symbols depending on predefined
 	// definitions, we keep a map of those present symbol definitions
-	// The map sends <symbol_name, offset_arity, argument_arity> to types
-	std::map<std::tuple<size_t, int_t, int_t>, std::vector<size_t>>
+	// The map sends <symbol_name, offset_arity, argument_arity> to a type
+	std::map<std::tuple<size_t, int_t, int_t>, size_t>
 	available_function_symbols;
 	if (definition_heads) {
 		for (htref func_def : *definition_heads) {
@@ -748,8 +749,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			if (type_id == 0) continue;
 			auto sig = get_function_signature<node>(func_def->get());
 			if (auto it = available_function_symbols.find(sig); it != available_function_symbols.end()) {
-				it->second.push_back(type_id);
-			} else available_function_symbols.emplace(std::move(sig), std::vector{type_id});
+				// Update type_id
+				it->second = type_id;
+			} else available_function_symbols.emplace(std::move(sig), type_id);
 		}
 	}
 	auto type_by_function_symbol = [&](size_t type, const auto& type_map) {
@@ -762,9 +764,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					find(get_function_signature<node>(func));
 					it != available_function_symbols.end()) {
 					// Found previous function definition
-					if (!resolver.assign(func, it->second.front()))
+					if (!resolver.assign(func, it->second))
 						error = true;
-					// We take the first found matching definition
+					// Return as soon as a type is found
 					return;
 				}
 			}
@@ -827,10 +829,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					// taking into account that they should have the same type.
 					if (!open_same_type<node>(resolver, rec_type_ids_map, inferred_type)) { error = true; break; }
 					// We merge all the header and the body typeables together.
-					auto [success, merged_type] = merge<node>(resolver, rec_type_ids_map);
-					if (!success) { error = true; break; }
+					const auto merged_type = merge<node>(resolver, rec_type_ids_map);
+					if (!merged_type) { error = true; break; }
 					// Take type definition due to function symbols into account
-					type_by_function_symbol(merged_type, rec_type_ids_map[tau::ref]);
+					type_by_function_symbol(merged_type.value(), rec_type_ids_map[tau::ref]);
 					break;
 				}
 				// Otherwise, we have a predicate relation. We create a new scope
@@ -872,11 +874,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					typeables_map[tau::ba_constant],
 					typeables_map[tau::bf_t],
 					typeables_map[tau::bf_f] })) { error = true; break; }
-				const auto [success, merged_type] =
-					merge<node>(resolver, typeables_map);
-				if (!success) { error = true; break; }
+				const auto merged_type = merge<node>(resolver, typeables_map);
+				if (!merged_type) { error = true; break; }
 				// Take type definition due to function symbols into account
-				type_by_function_symbol(merged_type, typeables_map[tau::ref]);
+				type_by_function_symbol(merged_type.value(), typeables_map[tau::ref]);
 				break;
 			}
 			case tau::ref: {
@@ -911,10 +912,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 						// taking into account that they should have the same type.
 						if (!open_same_type<node>(resolver, rec_type_ids_map, inferred_type)) { error = true; break; }
 						// We merge all the header and the body typeables together.
-						auto [success, merged_type] = merge<node>(resolver, rec_type_ids_map);
-						if (!success) { error = true; break; }
+						const auto merged_type = merge<node>(resolver, rec_type_ids_map);
+						if (!merged_type) { error = true; break; }
 						// Take type definition due to function symbols into account
-						type_by_function_symbol(merged_type, rec_type_ids_map[tau::ref]);
+						type_by_function_symbol(merged_type.value(), rec_type_ids_map[tau::ref]);
 						break;
 					}
 					// Otherwise, we have a predicate relation. We create a new scope
@@ -947,11 +948,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 				if (!insert<node>(resolver, {
 						typeables_map[tau::variable]
 						 })) { error = true; break; }
-				const auto [success, merged_type] =
-					merge<node>(resolver, typeables_map);
-				if (!success) { error = true; break; }
+				const auto merged_type = merge<node>(resolver, typeables_map);
+				if (!merged_type) { error = true; break; }
 				// Take type definition due to function symbols into account
-				type_by_function_symbol(merged_type, typeables_map[tau::ref]);
+				type_by_function_symbol(merged_type.value(), typeables_map[tau::ref]);
 				break;
 			}
 			default:
