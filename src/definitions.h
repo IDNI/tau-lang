@@ -29,6 +29,10 @@ struct definitions {
 		return heads.size() - 1;
 	}
 
+	const std::vector<htref>* get_definition_heads () const {
+		return &heads;
+	}
+
 	rewriter::rules get_sym_defs () const {
 		rewriter::rules r;
 		for (size_t i = 0; i < heads.size(); ++i)
