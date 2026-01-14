@@ -278,7 +278,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	tref transformed = m_ref(ptr.get());
 
 	if (options.infer_ba_types) {
-		auto result = infer_ba_types<node>(transformed, options.global_scope);
+		auto result = infer_ba_types<node>(transformed,
+			options.global_scope, options.definition_heads);
 		transformed = result.first;
 		// If type inference failed
 		if (!transformed) {

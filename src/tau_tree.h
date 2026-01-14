@@ -409,6 +409,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		std::map<std::string, tref> named_constants{};
 		bool infer_ba_types = true;
 		bool reget_with_hooks = true;
+		const std::vector<htref>* definition_heads = nullptr;
 		subtree_map<node, size_t> global_scope = subtree_map<node, size_t>{};
 	};
 
