@@ -1,7 +1,7 @@
 #!/bin/bash
 
 CMD="${1:-help}"
-PROGRESS="auto"
+PROGRESS="auto" # "auto" or "plain"
 
 build() {
         echo "Building: '${@}'"
