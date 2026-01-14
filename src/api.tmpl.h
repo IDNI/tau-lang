@@ -70,21 +70,21 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	subtree_map<node, stream_at> step_input_map;
 	trefs step_inputs;
 	for (auto& [in, value] : inputs) {
-		if (in.first == "this") continue;
-		size_t var_name_sid = dict(in.first);
+		if (in.name == "this") continue;
+		size_t var_name_sid = dict(in.name);
 		auto has_var_name_sid = [&var_name_sid](auto it) {
 			return get_var_name_sid<node>(it.first) == var_name_sid;
 		};
 		auto it = std::find_if(ctx.inputs.begin(), ctx.inputs.end(),
 					has_var_name_sid);
 		if (it == ctx.inputs.end()) {
-			TAU_LOG_ERROR << "Input stream " << in.first
+			TAU_LOG_ERROR << "Input stream " << in.name
 						<< " not found in context";
 			return {};
 		}
-		DBG(TAU_LOG_TRACE << "Input " << in.first << "[" << in.second << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first));)
+		DBG(TAU_LOG_TRACE << "Input " << in.name << "[" << in.time_point << "] = `" << value << "` : " << TAU_LOG_BA_TYPE(i.ctx.type_of(it->first));)
 		step_inputs.emplace_back(
-			build_in_var_at_n<node>(in.first, in.second,
+			build_in_var_at_n<node>(in.name, in.time_point,
 				i.ctx.type_of(it->first)));
 		step_input_map[step_inputs.back()] = in;
 		DBG(TAU_LOG_TRACE << "added step input: " << TAU_LOG_FM_DUMP(step_inputs.back());)

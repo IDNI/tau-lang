@@ -29,14 +29,14 @@ TEST_SUITE("String API") {
 			TAU_LOG_TRACE << "Inputs:";
 			if (inputs.empty()) TAU_LOG_TRACE << "No inputs";
 			for (auto& input_at : inputs)
-				TAU_LOG_TRACE << input_at.first << "[" << input_at.second << "]";
+				TAU_LOG_TRACE << input_at.name << "[" << input_at.time_point<< "]";
 #endif
 
 			// Assign values to the inputs (spec has only `i` input stream)
 			std::map<stream_at, std::string> assigned_inputs;
 			for (auto& input_at : inputs) {
 				assigned_inputs[input_at] = step % 2 == 0 ? "T." : "F.";
-				DBG(TAU_LOG_TRACE << "Assigned " << input_at.first << "[" << input_at.second << "] = `" << assigned_inputs[input_at] << "`";)
+				DBG(TAU_LOG_TRACE << "Assigned " << input_at.name << "[" << input_at.time_point << "] = `" << assigned_inputs[input_at] << "`";)
 			}
 
 			// Step the interpreter with the assigned values
@@ -52,7 +52,7 @@ TEST_SUITE("String API") {
 			// Collect the outputs (we have only one output stream `o`)
 			for (auto& [output_at, value] : outputs) {
 				collected_outputs.push_back(value);
-				DBG(TAU_LOG_TRACE << output_at.first << "[" << output_at.second << "] = `" << value << "`";)
+				DBG(TAU_LOG_TRACE << output_at.name << "[" << output_at.time_point << "] = `" << value << "`";)
 			}
 		}
 #ifdef DEBUG
@@ -95,7 +95,7 @@ TEST_SUITE("String API") {
 			TAU_LOG_TRACE << "Outputs:";
 			if (outputs.empty()) TAU_LOG_TRACE << "No outputs";
 			for (auto& [output_at, value] : outputs)
-				TAU_LOG_TRACE << output_at.first << "[" << output_at.second << "] = `" << value << "`";
+				TAU_LOG_TRACE << output_at.name << "[" << output_at.time_point << "] = `" << value << "`";
 #endif
 		}
 

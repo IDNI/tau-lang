@@ -7,7 +7,12 @@
 
 namespace idni::tau_lang {
 
-using stream_at = std::pair<std::string, size_t>;
+struct stream_at {
+	std::string name;
+	size_t time_point;
+
+	auto operator<=>(const stream_at& other) const = default;
+};
 
 struct interpreter_options {
 	input_streams_remap  input_remaps;
