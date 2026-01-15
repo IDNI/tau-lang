@@ -31,7 +31,7 @@ namespace idni::tau_lang {
 //
 
 template <NodeType node>
-tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
+tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	using type = typename node::type;
 
 	// map of parse tree nodes' refs to tau tree nodes' refs
@@ -286,7 +286,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 			tau::use_hooks = using_hooks;
 			return nullptr;
 		}
-		if (transformed) options.global_scope = result.second;
+		if (transformed) options.global_scope = std::move(result.second);
 	}
 
 	//Check for semantic errors in expression

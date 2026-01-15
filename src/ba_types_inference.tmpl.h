@@ -1152,7 +1152,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	DBG(LOG_TRACE << "================================================";)
 
 	tau::use_hooks = using_hooks;
-	return std::pair<tref, subtree_map<node, size_t>>{ new_n, n_global_scope };
+	return std::pair<tref, subtree_map<node, size_t>>{ new_n, std::move(n_global_scope) };
 }
 
 } // namespace idni::tau_lang
