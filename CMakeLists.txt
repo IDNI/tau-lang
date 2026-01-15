@@ -40,12 +40,14 @@ option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
 option(TAU_BUILD_API_TESTS         "Build API tests"                       OFF)
 option(TAU_BUILD_REPL_TESTS        "Build repl tests"                      OFF)
 option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
+option(TAU_BUILD_PIC               "Build position independent code"       OFF)
 option(TAU_ADDRESS_SANITIZER       "Build with address sanitizer"          OFF)
 option(TAU_DEB_PACKAGE             "Build DEB package"                     OFF)
 option(TAU_RPM_PACKAGE             "Build RPM package"                     OFF)
 option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
+option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
 
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
 set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
@@ -90,6 +92,7 @@ set_property(CACHE TAU_RPM_PACKAGE             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_ZIP_PACKAGE     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
 
 # Load local cmake settings
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
@@ -101,11 +104,20 @@ if(TAU_BUILD_TESTS)
 	set(TAU_BUILD_INTEGRATION ON)
 	set(TAU_BUILD_API_TESTS ON)
 	set(TAU_BUILD_REPL_TESTS ON)
-	set(TAU_BUILD_BENCHMARK ON)
+	# set(TAU_BUILD_BENCHMARK ON)
 endif()
 
 if(TAU_BUILD_REPL_TESTS)
 	set(TAU_BUILD_EXECUTABLE ON)
+endif()
+
+if(TAU_BUILD_BINDING_PYTHON)
+	set(TAU_BUILD_STATIC_LIBRARY ON)
+	set(TAU_BUILD_PIC ON)
+endif()
+
+if(TAU_BUILD_SHARED_LIBRARY)
+	set(TAU_BUILD_PIC ON)
 endif()
 
 if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
@@ -213,7 +225,13 @@ message(STATUS "TAU_DEB_PACKAGE: ${TAU_DEB_PACKAGE}")
 message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
+message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
+
+message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
+message(STATUS "CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "CMAKE_CXX_STANDARD: ${CMAKE_CXX_STANDARD}")
 
 set(CMAKE_INSTALL_PREFIX "${TAU_SHARED_PREFIX}" CACHE PATH "Install prefix" FORCE)
 message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
@@ -224,16 +242,21 @@ message(STATUS "CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
 #
 # Add cvc5 library
 #
-set(DEP_CVC5_ARGS "-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS} -DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX}")
+set(DEP_CVC5_ARGS
+	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
+	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX})
 set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX}/cvc5)
 set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	set(DEP_CVC5_ARGS "${DEP_CVC5_ARGS} --w64")
+	list(APPEND DEP_CVC5_ARGS --w64)
 	set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
 endif()
 message(STATUS "DEP_CVC5_ARGS: ${DEP_CVC5_ARGS}")
 message(STATUS "CVC5_LIBDIR: ${CVC5_LIBDIR}")
-execute_process(COMMAND bash -c "cd ${CMAKE_CURRENT_SOURCE_DIR} && ./dev dep-cvc5.sh ${DEP_CVC5_ARGS}")
+execute_process(
+	COMMAND bash ./dev dep-cvc5.sh ${DEP_CVC5_ARGS}
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
 find_package(cvc5 CONFIG REQUIRED
 	PATHS ${CVC5_LIBDIR}/cmake/cvc5)
@@ -243,28 +266,32 @@ message(STATUS "cvc5 version: ${cvc5_VERSION}")
 #
 # Add Boost log library
 #
-set(DEP_BOOST_ARGS "-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS} -DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX}")
+set(DEP_BOOST_ARGS
+	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
+	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX}
+	-DTAU_BUILD_PIC=${TAU_BUILD_PIC})
 set(BOOST_SOURCE_DIR ${TAU_SHARED_PREFIX}/boost)
 set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	set(DEP_BOOST_ARGS "${DEP_BOOST_ARGS} --w64")
+	list(APPEND DEP_BOOST_ARGS --w64)
 	set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
 endif()
 message(STATUS "DEP_BOOST_ARGS: ${DEP_BOOST_ARGS}")
 message(STATUS "BOOST_LIBDIR: ${BOOST_LIBDIR}")
+execute_process(
+	COMMAND bash ./dev dep-boost.sh ${DEP_BOOST_ARGS}
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
-execute_process(COMMAND bash -c "cd ${CMAKE_CURRENT_SOURCE_DIR} && ./dev dep-boost.sh ${DEP_BOOST_ARGS}")
-
+# cmake_policy(SET CMP0167 NEW) is required in future versions of CMake
 set(Boost_USE_STATIC_LIBS ON)
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
-	CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-		find_package(Boost REQUIRED
-			PATHS "${BOOST_LIBDIR}/cmake/Boost-1.86.0"
-			COMPONENTS log)
-else()
-		find_package(Boost REQUIRED COMPONENTS log)
+if ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	OR TAU_BUILD_PIC)
+		set(Boost_DIR "${BOOST_LIBDIR}/cmake/Boost-1.86.0")
 endif()
+find_package(Boost REQUIRED COMPONENTS log)
 if (Boost_FOUND)
+	message(STATUS "Boost_DIR: ${Boost_DIR}")
 	message(STATUS "Boost version: ${Boost_VERSION}")
 	message(STATUS "Boost include dirs: ${Boost_INCLUDE_DIRS}")
 	message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
@@ -330,9 +357,17 @@ add_subdirectory("src")
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
  OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS)
 	message(STATUS "Building tests")
-	enable_testing()
+	include(CTest)
 	add_subdirectory(tests)
 endif ()
+
+#
+# Building Python bindings
+#
+if (TAU_BUILD_BINDING_PYTHON)
+	message(STATUS "Building Python nanobind bindings")
+	add_subdirectory(bindings/python/nanobind)
+endif()
 
 #
 # Build documentation
