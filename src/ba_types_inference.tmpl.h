@@ -466,10 +466,8 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n, auto& fu
 
 	// Add new function definition to available definitions
 	auto sig = get_function_signature<node>(tau::trim2(new_head));
-	if (auto it = function_symbols.find(sig); it != function_symbols.end()) {
-		// Update type information
-		it->second = type;
-	} else function_symbols.emplace(std::move(sig), type);
+	// std::cout << "Update func def: " << tau::get(new_head) << " with " << get_ba_type_name<node>(type) << "\n";
+	function_symbols.insert_or_assign(sig, type);
 
 	return tau::get(tau::rec_relation, { new_head, new_body });
 }
@@ -748,10 +746,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			// Exclude definitions that are not functions
 			if (type_id == 0) continue;
 			auto sig = get_function_signature<node>(func_def->get());
-			if (auto it = available_function_symbols.find(sig); it != available_function_symbols.end()) {
-				// Update type_id
-				it->second = type_id;
-			} else available_function_symbols.emplace(std::move(sig), type_id);
+			// std::cout << "Update func def: " << tau::get(func_def->get()) << " with " << get_ba_type_name<node>(type_id) << "\n";
+			available_function_symbols.insert_or_assign(sig, type_id);
 		}
 	}
 	auto type_by_function_symbol = [&](size_t type, const auto& type_map) {
