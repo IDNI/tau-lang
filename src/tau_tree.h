@@ -194,7 +194,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static htref geth(const tree& n);
 
 	// creation (transformation) from tau_parser::tree
-	static tref get(const tau_parser::tree& t, get_options& options = {});
+	static tref get(const tau_parser::tree& t, get_options& options);
 	// reget a tree in post order
 	static tref reget(tref n);
 
