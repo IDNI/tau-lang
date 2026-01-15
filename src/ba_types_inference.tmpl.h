@@ -32,14 +32,10 @@ template <NodeType node>
 void default_typing_message(tref var, tref env, const bool bv = false) {
 	using tau = tree<node>;
 
-	const std::string type_info = (is_io_var<node>(var)
-					|| tau::get(var).is(tau::ba_constant))
-					? ""
-					:  get_ba_type_name<node>(
-						  tau::get(var).get_ba_type());
+	const std::string type_info = (is_io_var<node>(var)|| tau::get(var).is(tau::ba_constant))
+		? "" : get_ba_type_name<node>(tau::get(var).get_ba_type());
 	const std::string message = bv ? "(Default bv width) " : "(Default typing) ";
-	LOG_DEBUG << message << tau::get(var) << type_info << " in "
-			<< tau::get(env) << "\n";
+	LOG_DEBUG << message << tau::get(var) << type_info << " in " << tau::get(env) << "\n";
 }
 
 template<NodeType node>
@@ -251,7 +247,6 @@ tref update_bv_symbol(tref n) {
 template<NodeType node>
 tref update_bf_ref(tref n) {
 	using tau = tree<node>;
-	// using tt = tau::traverser;
 
 	// We have one child at least and we know that the types of the
 	// children have already been updated and they are consistent.
@@ -262,28 +257,50 @@ tref update_bf_ref(tref n) {
 }
 
 template<NodeType node>
-tref update_bf_constant(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+std::optional<size_t> get_inferred_type(tref n,	tref canonized,
+		const subtree_map<node, size_t>& types) {
 	using tau = tree<node>;
-	// DBG(LOG_TRACE <<"infer_ba_types/update_bf_ctes/tau_use_hooks: " << tau::use_hooks << "\n";)
+
+	if (has_ba_type<node>(n)) {
+		// We check that the type is compatible
+		auto current_type = tau::get(n).get_ba_type();
+		auto inferred_type = types.at(canonized);
+		return unify<node>(current_type, inferred_type);
+	}
+	return (types.at(canonized) == untyped_type_id<node>())
+		? tau_type_id<node>()
+		: types.at(canonized);
+}
+
+template<NodeType node>
+tref update_tref(tref n, size_t type) {
+	using tau = tree<node>;
+
+	n = retype<node>(n, type);
+	return tau::add_child(n, tau::get(tau::processed));
+}
+
+template<NodeType node>
+tref update_tref(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
 	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return nullptr;
-	// If the bf_t/bf_f is not typed
-	if (tau::get(n).get_ba_type() == untyped_type_id<node>()) {
-		// We type it according to the inferred type or tau
-		size_t type = (types.at(canonized) == untyped_type_id<node>())
-			? tau_type_id<node>()
-			: types.at(canonized);
-		if (resolver.assign(canonized, type) == false) return nullptr;
-		n = retype<node>(n, type);
-		n = tau::add_child(n, tau::get(tau::processed));
-		return n;
+	if (!types.contains(canonized)) return n;
+	// If the tref is typed
+	if (auto type = get_inferred_type<node>(n, canonized, types); type) {
+		if (!resolver.assign(canonized, type.value())) return nullptr;
+		return update_tref<node>(n, type.value());
 	}
-	auto current_type = tau::get(n).get_ba_type();
-	if (!resolver.assign(canonized, current_type))
-		return nullptr; // incompatible types
-	n = tau::add_child(n, tau::get(tau::processed));
-	return n;
+	return nullptr;
+}
+
+template<NodeType node>
+inline tref update_bf_constant(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+	return update_tref<node>(resolver, n, types);
+}
+
+template<NodeType node>
+inline tref update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+	return update_tref<node>(resolver, n, types);
 }
 
 template<NodeType node>
@@ -291,11 +308,9 @@ tref update_ba_constant(type_scoped_resolver<node>& resolver, tref n, const subt
 	using tau = tree<node>;
 
 	DBG(LOG_TRACE <<"update_ba_constant/n: " << LOG_FM_DUMP(n) << "\n";)
-	// If we have no type information for the bf constant we
-	// rise an error as we should have at least untyped info
+	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return nullptr;
-	// We get the type info or use the default (tau) if untyped
 	size_t type = (types.at(canonized) == untyped_type_id<node>())
 		? tau_type_id<node>()
 		: (is_bv_base_type<node>(types.at(canonized))
@@ -305,12 +320,26 @@ tref update_ba_constant(type_scoped_resolver<node>& resolver, tref n, const subt
 	if (!resolver.assign(canonized, type)) return nullptr;
 	// Check that the constant was not parsed yet
 	if (tau::get(n).data() == 0) {
-		// We parse the constant
 		n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type);
 		if (n == nullptr) return nullptr;
 	}
 	n = tau::add_child(n, tau::get(tau::processed));
 	return n;
+
+	/*// If we have no type information for the bf constant we
+	// rise an error as we should have at least untyped info
+	tref canonized = canonize<node>(n);
+	if (!types.contains(canonized)) return nullptr;
+	// We get the type info or use the default (tau) if untyped
+	if (auto type = get_inferred_type<node>(n, canonized, types); type) {
+		if (!resolver.assign(canonized, type.value())) return nullptr;
+		// We parse the constant
+		if (tau::get(n).data() == 0)
+			n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type.value());
+		if (n == nullptr) return nullptr; // parsing error
+		return update_tref<node>(n, type.value());
+	}
+	return nullptr;*/
 }
 
 template<NodeType node>
@@ -348,41 +377,6 @@ tref update_ref(type_scoped_resolver<node>& resolver, tref n, const subtree_map<
 }
 
 template<NodeType node>
-tref update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
-	using tau = tree<node>;
-
-	// If we have no type information for the element we do nothing
-	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return n;
-	// If the variable is typed
-	if (has_ba_type<node>(n)) {
-		// We check that the type is compatible
-		auto current_type = tau::get(n).get_ba_type();
-		auto inferred_type = types.at(canonized);
-		auto unified_type = unify<node>(current_type, inferred_type);
-		if (!unified_type.has_value())
-			return nullptr; // incompatible types
-		if (!resolver.assign(canonized, unified_type.value()))
-			return nullptr; // incompatible types
-		n = retype<node>(n, unified_type.value());
-		n = tau::add_child(n, tau::get(tau::processed));
-		return n;
-	}
-	// If the variable is not typed
-	else {
-		// We type it according to the inferred type or default
-		size_t type = (types.at(canonized) == untyped_type_id<node>())
-			? tau_type_id<node>()
-			: types.at(canonized);
-
-		if (resolver.assign(canonized, type) == false) return nullptr;
-		n = retype<node>(n, type);
-		n = tau::add_child(n, tau::get(tau::processed));
-		return n;
-	}
-}
-
-template<NodeType node>
 tref update_functional_fallback(type_scoped_resolver<node>& resolver, tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -391,7 +385,6 @@ tref update_functional_fallback(type_scoped_resolver<node>& resolver, tref n) {
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
 	if (updated == nullptr) return nullptr;
-
 	auto sym = tt(updated) | tau::sym | tt::ref;
 	auto ref_args = tt(updated) | tau::ref_args | tt::ref;
 	auto fallback = tt(updated) | tau::fp_fallback | tt::first | tt::ref;
@@ -439,15 +432,11 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n) {
 	auto type = find_ba_type<node>(updated);
 	DBG(assert(!is_untyped<node>(type)));
 	auto new_head = is<node, tau::ref>(head)
-				? tau::get_typed(tau::bf,
-					tau::get_typed(tau::bf_ref, head, type),
-					type)
-				: head;
+		? tau::get_typed(tau::bf, tau::get_typed(tau::bf_ref, head, type), type)
+		: head;
 	auto new_body = is<node, tau::ref>(body)
-				? tau::get_typed( tau::bf,
-					tau::get_typed(tau::bf_ref, body, type),
-					type)
-				: body;
+		? tau::get_typed( tau::bf, tau::get_typed(tau::bf_ref, body, type),	type)
+		: body;
 	return tau::get(tau::rec_relation, { new_head, new_body });
 }
 
