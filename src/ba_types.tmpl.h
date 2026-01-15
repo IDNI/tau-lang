@@ -341,7 +341,7 @@ tref unify(const trefs& ns1, const trefs& ns2, tref default_type) {
 	if (ns1.size() != ns2.size()) return nullptr;
 	auto result = default_type;
 	for (size_t i = 0; i < ns1.size(); ++i) {
-		auto result = unify<node>(result, ns1[i]);
+		result = unify<node>(result, ns1[i]);
 		if (result == nullptr) return nullptr;
 		result = unify<node>(result, ns2[i]);
 		if (result == nullptr) return nullptr;
