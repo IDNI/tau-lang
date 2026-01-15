@@ -602,10 +602,8 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
 	auto& defs = definitions<node>::instance();
-	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_input_defs())) {
+	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_input_defs()))
 		error = true;
-		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
-	}
 }
 
 template <typename... BAs>

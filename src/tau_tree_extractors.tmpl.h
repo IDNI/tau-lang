@@ -43,6 +43,11 @@ bool get_io_def(tref n, io_defs<node>& defs) {
 
 	}
 
+	if (defs.contains(var_sid) && defs[var_sid].first != ba_type) {
+		LOG_ERROR << "I/O var redefinition not supported: " << dict(var_sid);
+		return false;
+	}
+
 	defs[var_sid] = { ba_type, stream_sid };
 	DBG(LOG_TRACE << "get_io_def: " << LOG_FM_DUMP(n) << " -> "
 		<< dict(var_sid) << " : " << LOG_BA_TYPE(ba_type) << " / "
