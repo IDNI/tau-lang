@@ -1120,6 +1120,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 
 	// Adding global_scope info to resolver
 	for (auto [var, type] : global_scope) {
+		// We only insert io streams into the global scope
+		if (!is_io_var<node>(var)) continue;
 		auto untyped = canonize<node>(var);
 		resolver.insert(untyped);
 		resolver.assign(untyped, type);
