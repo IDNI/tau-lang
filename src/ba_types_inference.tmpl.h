@@ -832,6 +832,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					const auto merged_type = merge<node>(resolver, rec_type_ids_map);
 					if (!merged_type) { error = true; break; }
 					// Take type definition due to function symbols into account
+					// First remove current ref definition
+					auto cur_sig = get_function_signature<node>(t.first());
+					auto current_ref = [&](const auto& el) {
+						return get_function_signature<node>(el.first) == cur_sig;
+					};
+					std::erase_if(rec_type_ids_map[tau::ref], current_ref);
 					type_by_function_symbol(merged_type.value(), rec_type_ids_map[tau::ref]);
 					break;
 				}
