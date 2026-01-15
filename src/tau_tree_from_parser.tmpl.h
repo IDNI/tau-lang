@@ -328,7 +328,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 //------------------------------------------------------------------------------
 
 template <NodeType node>
-tref tree<node>::get(tau_parser::result& result, get_options options) {
+tref tree<node>::get(tau_parser::result& result, get_options& options) {
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
@@ -340,21 +340,21 @@ tref tree<node>::get(tau_parser::result& result, get_options options) {
 }
 
 template <NodeType node>
-tref tree<node>::get(const std::string& source, get_options options) {
+tref tree<node>::get(const std::string& source, get_options& options) {
 	auto result = tau_parser::instance()
 		.parse(source.c_str(), source.size(), options.parse);
 	return tree<node>::get(result, options);
 }
 
 template <NodeType node>
-tref tree<node>::get(std::istream& is, get_options options) {
+tref tree<node>::get(std::istream& is, get_options& options) {
 	auto result = tau_parser::instance().parse(is, options.parse);
 	return tree<node>::get(result, options);
 }
 
 template <NodeType node>
 tref tree<node>::get_from_file(const std::string& filename,
-	get_options options)
+	get_options& options)
 {
 	auto result = tau_parser::instance().parse(filename, options.parse);
 	return tree<node>::get(result, options);
