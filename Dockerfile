@@ -41,7 +41,7 @@ FROM ubuntu:24.04 AS base
 # Install dependencies
 RUN echo "(BUILD) -- Installing dependencies" && \
 	apt-get update && apt-get install -y \
-	bash wget git nsis rpm python3-pip python3-venv bison \
+	bash wget git nsis rpm python3-pip python3-venv bison nanobind-dev \
 	cmake=3.28.3-1build7 \
 	g++=4:13.2.0-7ubuntu1 \
 	mingw-w64=11.0.1-3build1 \
@@ -61,6 +61,7 @@ FROM base AS source
 
 # Copy source files to tau-lang directory
 COPY ./.git      /tau-lang/.git
+COPY ./bindings  /tau-lang/bindings
 COPY ./cmake     /tau-lang/cmake
 COPY ./external  /tau-lang/external
 COPY ./licenses  /tau-lang/licenses
@@ -70,7 +71,7 @@ COPY ./tests     /tau-lang/tests
 COPY ./.gitignore ./.gitmodules ./CMakeLists.txt ./dev \
 	./README.md ./LICENSE.txt ./VERSION 	/tau-lang/
 COPY ./parser/*.generated.h			/tau-lang/parser/
-	
+
 
 # ============================================================
 
@@ -86,6 +87,10 @@ COPY ./scripts/dep-cvc5.sh	/tau-lang/scripts/
 RUN echo "(BUILD) -- Building dependencies: cvc5" && \
 	cd /tau-lang && \
 	./dev dep-cvc5.sh -DTAU_BUILD_JOBS=${BUILD_JOBS}
+COPY ./scripts/dep-boost.sh	/tau-lang/scripts/
+RUN echo "(BUILD) -- Building dependencies: boost" && \
+	cd /tau-lang && \
+	./dev dep-boost -DTAU_BUILD_JOBS=${BUILD_JOBS}
 
 
 # ------------------------------------------------------------
