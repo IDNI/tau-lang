@@ -104,12 +104,14 @@ protected:
 
 // vector input and output streams (used for testing or by using API)
 struct vector_input_stream : public serialized_constant_input_stream {
+	vector_input_stream();
 	vector_input_stream(const std::vector<std::string>& values);
 	vector_input_stream(std::shared_ptr<std::vector<std::string>> values,
 		std::shared_ptr<size_t> current);
 	virtual ~vector_input_stream() = default;
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
 	virtual std::optional<std::string> get() override;
+	virtual void put(const std::string& value);
 protected:
 	std::shared_ptr<std::vector<std::string>> values;
 	std::shared_ptr<size_t> current = 0;
@@ -121,9 +123,12 @@ struct vector_output_stream : public serialized_constant_output_stream {
 	virtual ~vector_output_stream() = default;
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
 	virtual bool put(const std::string& value) override;
+	virtual std::optional<std::string> get();
 	std::vector<std::string> get_values() const;
+	virtual void clear();
 protected:
 	std::shared_ptr<std::vector<std::string>> values;
+	std::shared_ptr<size_t> current = 0;
 };
 
 // context for input and output streams and their types

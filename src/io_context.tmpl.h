@@ -177,6 +177,9 @@ vector_input_stream::vector_input_stream(
 		std::make_shared<std::vector<std::string>>(values),
 		std::make_shared<size_t>(0)) {}
 
+vector_input_stream::vector_input_stream()
+	: vector_input_stream(std::vector<std::string>{}) {}
+
 vector_input_stream::vector_input_stream(
 	std::shared_ptr<std::vector<std::string>> values,
 	std::shared_ptr<size_t> current)
@@ -205,6 +208,11 @@ std::optional<std::string> vector_input_stream::get() {
 	DBG(LOG_TRACE << "vector_input_stream::get() = \"" << values->at(*current)
 		<< "\" current: " << *current << " values.size(): " << values->size();)
 	return values->at((*current)++);
+}
+
+void vector_input_stream::put(const std::string& value) {
+	values->push_back(value);
+	DBG(LOG_TRACE << "vector_input_stream::put(\"" << value << "\") values.size(): " << values->size();)
 }
 
 // -- vector_output_stream --
@@ -236,6 +244,13 @@ bool vector_output_stream::put(const std::string& value) {
 	return true;
 }
 
+std::optional<std::string> vector_output_stream::get() {
+	if (*current >= values->size()) return {};
+	DBG(LOG_TRACE << "vector_output_stream::get() = \"" << values->at(*current)
+		<< "\" current: " << *current << " values.size(): " << values->size();)
+	return values->at((*current)++);
+}
+
 std::vector<std::string> vector_output_stream::get_values() const {
 #ifdef DEBUG
 	std::stringstream ss;
@@ -247,6 +262,12 @@ std::vector<std::string> vector_output_stream::get_values() const {
 	LOG_TRACE << ss.str();
 #endif
 	return *values;
+}
+
+void vector_output_stream::clear() {
+	values->clear();
+	*current = 0;
+	DBG(LOG_TRACE << "vector_output_stream::clear_values() values.size(): " << values->size();)
 }
 
 // -----------------------------------------------------------------------------
