@@ -4,8 +4,9 @@
 #include "test_tau_helpers.h"
 
 bool check_hook(const char* sample, const char* expected) {
-	tref tau_sample   = tau::get(sample, parse_wff());
-	tref tau_expected = tau::get(expected, parse_wff());
+	auto pwff = parse_wff();
+	tref tau_sample   = tau::get(sample, pwff);
+	tref tau_expected = tau::get(expected, pwff);
 
 #ifdef DEBUG
 	using node = node_t;

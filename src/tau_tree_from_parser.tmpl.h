@@ -339,6 +339,12 @@ tref tree<node>::get(tau_parser::result& result, get_options& options) {
 	return tree<node>::get(pt, options);
 }
 
+template<NodeType node>
+tref tree<node>::get(const std::string& str) {
+	get_options opts;
+	return get(str, opts);
+}
+
 template <NodeType node>
 tref tree<node>::get(const std::string& source, get_options& options) {
 	auto result = tau_parser::instance()

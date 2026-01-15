@@ -6,8 +6,10 @@
 bool check(std::string sample, std::string expected = "") {
 	expected = expected.empty() ? sample : expected;
 	std::stringstream ss;
-	tau::get(tau::get(sample, tau::get_options{
-		.reget_with_hooks = false })).print(ss);
+	tau::get_options opts = {
+		.reget_with_hooks = false
+	};
+	tau::get(tau::get(sample, opts)).print(ss);
 	bool result = ss.str() == (expected.empty() ? sample : expected);
 	if (!result) {
 		std::cout << "Input:    " << sample << "\n";
