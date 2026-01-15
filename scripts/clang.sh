@@ -37,5 +37,5 @@ shift  # Remove the first argument (script name)
 if [ "$script_name" == "docker" ]; then
         exec "$script_path" "clang" "$@"
 else
-        exec "$script_path" "$@" "-DCMAKE_CXX_COMPILER=$(which clang++) -DCMAKE_C_COMPILER=$(which clang)"
+        exec "$script_path" "$@" "-DCMAKE_CXX_COMPILER=$(which clang++) -DCMAKE_C_COMPILER=$(which clang) -DCMAKE_CXX_SCAN_FOR_MODULES=0"
 fi
