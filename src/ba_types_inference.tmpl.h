@@ -265,6 +265,9 @@ std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		// We check that the type is compatible
 		auto current_type = tau::get(n).get_ba_type();
 		auto inferred_type = types.at(canonized);
+		inferred_type = is_bv_base_type<node>(inferred_type)
+			? bv_type_id<node>()
+			: inferred_type;
 		return unify<node>(current_type, inferred_type);
 	}
 	return (types.at(canonized) == untyped_type_id<node>())
@@ -307,39 +310,20 @@ template<NodeType node>
 tref update_ba_constant(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
 	using tau = tree<node>;
 
-	DBG(LOG_TRACE <<"update_ba_constant/n: " << LOG_FM_DUMP(n) << "\n";)
 	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return nullptr;
-	size_t type = (types.at(canonized) == untyped_type_id<node>())
-		? tau_type_id<node>()
-		: (is_bv_base_type<node>(types.at(canonized))
-			? bv_type_id<node>(default_bv_size)
-			: types.at(canonized));
-	// We assign the type to the constant in the resolver
-	if (!resolver.assign(canonized, type)) return nullptr;
-	// Check that the constant was not parsed yet
-	if (tau::get(n).data() == 0) {
-		n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type);
-		if (n == nullptr) return nullptr;
-	}
-	n = tau::add_child(n, tau::get(tau::processed));
-	return n;
-
-	/*// If we have no type information for the bf constant we
-	// rise an error as we should have at least untyped info
-	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return nullptr;
-	// We get the type info or use the default (tau) if untyped
+	// If the tref is typed
 	if (auto type = get_inferred_type<node>(n, canonized, types); type) {
 		if (!resolver.assign(canonized, type.value())) return nullptr;
-		// We parse the constant
-		if (tau::get(n).data() == 0)
+		// Check that the constant was not parsed yet
+		if (tau::get(n).data() == 0) {
 			n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type.value());
-		if (n == nullptr) return nullptr; // parsing error
+			if (n == nullptr) return nullptr;
+		}
 		return update_tref<node>(n, type.value());
 	}
-	return nullptr;*/
+	return n;
 }
 
 template<NodeType node>
