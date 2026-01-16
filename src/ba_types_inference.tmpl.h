@@ -228,7 +228,7 @@ bool is_functional_fallback(tref n) {
 }
 
 template<NodeType node>
-bool is_functional_ref(tref n) {
+bool is_functional_ref(tref n, const auto& function_symbols) {
 	using tau = tree<node>;
 
 	if (!is<node, tau::ref>(n)) return false;
@@ -236,8 +236,10 @@ bool is_functional_ref(tref n) {
 	if (!is_untyped<node>(tau::get(n).get_ba_type())) {
 		return true;
 	}
+	// If the head was previously defined as a function we also have a functional ref
 	// Otherwise, we have a predicate callback.
-	return false;
+	auto sig = get_function_signature<node>(n);
+	return function_symbols.contains(sig);
 }
 
 // type all symbols according to their children's types
@@ -921,7 +923,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 					break;
 				}
-				if (is_functional_ref<node>(n)) {
+				if (is_functional_ref<node>(n, available_function_symbols)) {
 					auto arguments = get_typeable_type_ids_by_type<node>(n);
 					if (!arguments) { error = true; break; } // Incompatible types
 					auto arguments_map = arguments.value();
@@ -933,6 +935,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					}
 					const auto merged_type = merge<node>(resolver, arguments_map);
 					if (!merged_type) { error = true; break; }
+					// Take type definition due to function symbols into account
+					type_by_function_symbol(merged_type.value(), arguments_map[tau::ref]);
 					break;
 				}
 				// Anyway, we continue the traversal so that we can treat
@@ -1050,7 +1054,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 						break;
 					}
 					auto new_n = update_default<node>(n, transformed);
-					new_n = has_ba_type<node>(new_n)
+					new_n = is_functional_ref<node>(new_n, available_function_symbols)
 						? update_functional_ref<node>(resolver, new_n, parent)
 						: update_predicate_ref<node>(resolver, new_n, parent);
 					if(new_n == nullptr) { error = true; break; }
