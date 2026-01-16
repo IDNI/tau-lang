@@ -1648,7 +1648,7 @@ TEST_SUITE("regression tests") {
 		CHECK( inferred == nullptr );
 	}
 
-	/*TEST_CASE("improper function type inference in cli") {
+	TEST_CASE("improper function type inference in cli") {
 		logging::trace();
 		tref parsed = parse("f(x):sbf", parse_cli_no_infer());
 		CHECK( parsed != nullptr );
@@ -1679,7 +1679,7 @@ TEST_SUITE("regression tests") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
-	}*/
+	}
 
 	TEST_CASE("improper function type inference in formula (y4)") {
 		tref parsed = parse("f(x:tau):sbf = 1");
@@ -1730,7 +1730,6 @@ TEST_SUITE("regression tests") {
 			bv15_type_id
 		};
 		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
-
 	}
 }
 
