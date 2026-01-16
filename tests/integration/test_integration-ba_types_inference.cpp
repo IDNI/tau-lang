@@ -1649,7 +1649,6 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("improper function type inference in cli") {
-		logging::trace();
 		tref parsed = parse("f(x):sbf", parse_cli_no_infer());
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -1657,7 +1656,6 @@ TEST_SUITE("regression tests") {
 			{"x", sbf_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
-		logging::info();
 	}
 
 	TEST_CASE("improper function type inference in formula (y1)") {

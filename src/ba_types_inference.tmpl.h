@@ -44,15 +44,8 @@ tref canonize(tref t) {
 	using tt = tau::traverser;
 
 	tref new_t = untype<node>(t);
-	if (auto var_name = tt(new_t) | tau::io_var | tau::var_name | tt::ref; var_name) {
+	if (auto var_name = tt(new_t) | tau::io_var | tau::var_name | tt::ref; var_name)
 		new_t = tau::get(tau::variable, tau::get(tau::io_var, { var_name }));
-	} /*else if (auto sym = tt(new_t) | tau::sym | tt::ref; sym) {
-		auto ref_args = tt(new_t) | tau::ref_args | tt::ref;
-		auto offsets = tt(new_t) | tau::offsets | tt::ref;
-		auto num_ref_args = (ref_args) ? (tau::get(ref_args).children_size()) : 0;
-		auto size_offsets = (offsets) ? (tau::get(offsets).children_size()) : 0;
-		new_t = tau::get(tau::ref, { sym, tau::get_num(num_ref_args), tau::get_num(size_offsets) });
-	}*/
 	DBG(LOG_TRACE << "canonize/t -> new_t:\n"
 		<< LOG_FM_TREE(t) << " -> " << LOG_FM_TREE(new_t);)
 	return new_t;
@@ -461,7 +454,6 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n, auto& fu
 
 	// Add new function definition to available definitions
 	auto sig = get_function_signature<node>(tau::trim2(new_head));
-	// std::cout << "Update func def: " << tau::get(new_head) << " with " << get_ba_type_name<node>(type) << "\n";
 	function_symbols.insert_or_assign(sig, type);
 
 	return tau::get(tau::rec_relation, { new_head, new_body });
@@ -552,22 +544,10 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 
 		// Check if n was already processed
 		if (tt(n) | tau::processed) return true;
-
 		size_t nt = t.get_type();
-
 		if (error) return false;
 
 		switch (nt) {
-			/*case tau::ref: {
-				if (!to_be_updated.contains(nt)) break;
-				auto nn = update_default<node>(n, changes);
-				if (auto updated = update_ref<node>(resolver, nn, types); updated) {
-					DBG(LOG_TRACE << "infer_ba_types/update/" << LOG_NT(nt) << "/updated:\n"
-						<< LOG_FM_TREE(updated);)
-					if (updated != n) changes.insert_or_assign(n, updated);
-				} else error = true;
-				break;
-			}*/
 			case tau::variable: {
 				if (!to_be_updated.contains(nt)) break;
 				if (auto updated = update_variable<node>(resolver, n, types); updated) {
@@ -741,7 +721,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			// Exclude definitions that are not functions
 			if (type_id == 0) continue;
 			auto sig = get_function_signature<node>(func_def->get());
-			// std::cout << "Update func def: " << tau::get(func_def->get()) << " with " << get_ba_type_name<node>(type_id) << "\n";
 			available_function_symbols.insert_or_assign(sig, type_id);
 		}
 	}
@@ -880,13 +859,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			case tau::ref: {
 				// We skip the traversal if the parent is not a wff_ref or
 				// is a functional ref as are treated elsewhere.
-				if (is_functional_relation<node>(parent) /* &&
-						tau::get(parent).child(0) == n*/ ) {
+				if (is_functional_relation<node>(parent)) {
 					skip = true; break;
 				}
-				// if (!is_cli_cmd<node>(parent) && !is<node, tau::wff_ref>(parent)) {
-				// 	skip = true; break;
-				// }
 				if (has_fallback<node>(n)) {
 					// we must deal with it as a rec relation
 					auto fallback = tt(n) | tau::fp_fallback | tt::first | tt::ref;
@@ -925,9 +900,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					auto arguments = get_typeable_type_ids_by_type<node>(n);
 					if (!arguments) { error = true; break; } // Incompatible types
 					auto arguments_map = arguments.value();
-					//auto unified = unify<node>(arguments_map, type);
-					//if (!unified) {	error = true; break; } // Incompatible types
-					//auto inferred_type = unified.value();
 					if (!insert<node>(resolver, arguments_map)) {
 						error = true; break;
 					}
@@ -1070,8 +1042,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
-				//tref new_n = update_default<node>(n, transformed);
-				//auto updated = update<node>(resolver, new_n, { tau::ba_constant, tau::bf_t, tau::bf_f });
 				auto updated = update<node>(resolver, n, { tau::ref, tau::ba_constant, tau::bf_t, tau::bf_f });
 				if(updated == nullptr) { error = true; break; }
 				if(updated != n) transformed.insert_or_assign(n, updated);
@@ -1113,20 +1083,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 		return;
 	};
 
-	// All nodes
-	// TODO (LOW) replace by all predicate
-	auto visit_outside_equations = [](tref n) {
-		const tau& t = tau::get(n);
-		size_t nt = t.get_type();
-		switch (nt) {
-			// TODO (HIGH) deal with those eq appropiately
-			/*case tau::bv:
-				return false;*/
-			default:
-				return true;
-		}
-	};
-
 	// Adding global_scope info to resolver
 	for (auto [var, type] : global_scope) {
 		// We only insert io streams into the global scope
@@ -1137,7 +1093,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	}
 	// We visit the tree and return the transformed root if no error happened.
 	// If an error happened we return nullptr.
-	pre_order<node>(n).visit(on_enter, visit_outside_equations, on_leave, on_between);
+	pre_order<node>(n).visit(on_enter, idni::all, on_leave, on_between);
 	if (error) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	// We add to the transformed map the untyping of the bf_t's and the bf_f's.
 	// ...some code here...
