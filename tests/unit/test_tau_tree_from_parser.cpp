@@ -14,18 +14,24 @@
 // Check if still hapopens after the latest changes to the grammar.
 
 tt get_main(const char* sample) {
-	return tt(tau::get(sample, { .reget_with_hooks = false })) | tau::spec | tau::main;
+	tau::get_options opts = { .reget_with_hooks = false };
+	return tt(tau::get(sample, opts)) | tau::spec | tau::main;
 }
 
 tt get_bf(const char* sample) {
-	return tt(tau::get(sample, {
+	tau::get_options opts = {
 		.parse = { .start = tau::bf },
-		.reget_with_hooks = false }));
+		.reget_with_hooks = false
+	};
+	return tt(tau::get(sample, opts));
 
 }
 
 tt get_rec_relation(const char* sample) {
-	tref n = tau::get(sample, tau::get_options{ .reget_with_hooks = false});
+	tau::get_options opts = {
+		.reget_with_hooks = false
+	};
+	tref n = tau::get(sample, opts);
 	return tt(n) | tau::spec | tau::definitions | tau::rec_relation;
 }
 

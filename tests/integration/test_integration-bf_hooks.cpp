@@ -18,7 +18,8 @@ TEST_SUITE("bf operator hooks") {
 
 	// we should get an error during parsing and hence return true if we get an error
 	bool check_unbound_hook(const char* sample) {
-		tref tau_sample = tau::get(sample, parse_bf());
+		auto pbf = parse_bf();
+		tref tau_sample = tau::get(sample, pbf);
 
 #ifdef DEBUG
 		using node = node_t;
@@ -55,7 +56,10 @@ TEST_SUITE("bf operator hooks") {
 	}
 
 	bool check_type(const char* sample, const tref type) {
-		tref parsed = tau::get(std::string(sample) + " = 0.", { .reget_with_hooks = false });
+		tau::get_options opts = {
+			.reget_with_hooks = false
+		};
+		tref parsed = tau::get(std::string(sample) + " = 0.", opts);
 		using node = node_t;
 		// DBG(TAU_LOG_TRACE << "parsed: " << TAU_LOG_FM_DUMP(parsed);)
 		tref c = tau::get(parsed).find_top(is<node, tau::ba_constant>);

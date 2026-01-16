@@ -53,7 +53,7 @@ tau::get_options parse_spec_no_infer() {
 		.reget_with_hooks = false };
 	return opts;
 }
-tref parse(const std::string& sample, const tau::get_options& opts = parse_wff_no_infer()) {
+tref parse(const std::string& sample, tau::get_options opts = parse_wff_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
@@ -61,7 +61,7 @@ tref parse(const std::string& sample, const tau::get_options& opts = parse_wff_n
 	return src;
 }
 
-tref parse_bf(const std::string& sample, const tau::get_options& opts = parse_bf_no_infer()) {
+tref parse_bf(const std::string& sample, tau::get_options opts = parse_bf_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
@@ -69,7 +69,7 @@ tref parse_bf(const std::string& sample, const tau::get_options& opts = parse_bf
 	return src;
 }
 
-tref parse_definitions(const std::string& sample, const tau::get_options& opts = parse_definitions_no_infer()) {
+tref parse_definitions(const std::string& sample, tau::get_options opts = parse_definitions_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;
@@ -77,7 +77,7 @@ tref parse_definitions(const std::string& sample, const tau::get_options& opts =
 	return src;
 }
 
-tref parse_spec(const std::string& sample, const tau::get_options& opts = parse_spec_no_infer()) {
+tref parse_spec(const std::string& sample, tau::get_options opts = parse_spec_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
 		TAU_LOG_ERROR << "Parsing failed for: " << sample;

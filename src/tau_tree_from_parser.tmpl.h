@@ -31,7 +31,7 @@ namespace idni::tau_lang {
 //
 
 template <NodeType node>
-tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
+tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	using type = typename node::type;
 
 	// map of parse tree nodes' refs to tau tree nodes' refs
@@ -278,14 +278,15 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 	tref transformed = m_ref(ptr.get());
 
 	if (options.infer_ba_types) {
-		auto result = infer_ba_types<node>(transformed, options.global_scope);
+		auto result = infer_ba_types<node>(transformed,
+			options.global_scope, options.definition_heads);
 		transformed = result.first;
 		// If type inference failed
 		if (!transformed) {
 			tau::use_hooks = using_hooks;
 			return nullptr;
 		}
-		if (transformed) options.global_scope = result.second;
+		if (transformed) options.global_scope = std::move(result.second);
 	}
 
 	//Check for semantic errors in expression
@@ -327,7 +328,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options options) {
 //------------------------------------------------------------------------------
 
 template <NodeType node>
-tref tree<node>::get(tau_parser::result& result, get_options options) {
+tref tree<node>::get(tau_parser::result& result, get_options& options) {
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
@@ -338,22 +339,28 @@ tref tree<node>::get(tau_parser::result& result, get_options options) {
 	return tree<node>::get(pt, options);
 }
 
+template<NodeType node>
+tref tree<node>::get(const std::string& str) {
+	get_options opts;
+	return get(str, opts);
+}
+
 template <NodeType node>
-tref tree<node>::get(const std::string& source, get_options options) {
+tref tree<node>::get(const std::string& source, get_options& options) {
 	auto result = tau_parser::instance()
 		.parse(source.c_str(), source.size(), options.parse);
 	return tree<node>::get(result, options);
 }
 
 template <NodeType node>
-tref tree<node>::get(std::istream& is, get_options options) {
+tref tree<node>::get(std::istream& is, get_options& options) {
 	auto result = tau_parser::instance().parse(is, options.parse);
 	return tree<node>::get(result, options);
 }
 
 template <NodeType node>
 tref tree<node>::get_from_file(const std::string& filename,
-	get_options options)
+	get_options& options)
 {
 	auto result = tau_parser::instance().parse(filename, options.parse);
 	return tree<node>::get(result, options);

@@ -194,7 +194,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static htref geth(const tree& n);
 
 	// creation (transformation) from tau_parser::tree
-	static tref get(const tau_parser::tree& t, get_options options = {});
+	static tref get(const tau_parser::tree& t, get_options& options);
 	// reget a tree in post order
 	static tref reget(tref n);
 
@@ -409,15 +409,17 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		std::map<std::string, tref> named_constants{};
 		bool infer_ba_types = true;
 		bool reget_with_hooks = true;
+		const std::vector<htref>* definition_heads = nullptr;
 		subtree_map<node, size_t> global_scope = subtree_map<node, size_t>{};
 	};
 
 	// creation from parser result or parser input (string, stream, file)
-	static tref get(tau_parser::result& result, get_options options = {});
-	static tref get(const std::string& str, get_options options = {});
-	static tref get(std::istream& is, get_options options = {});
+	static tref get(tau_parser::result& result, get_options& options);
+	static tref get(const std::string& str);
+	static tref get(const std::string& str, get_options& options);
+	static tref get(std::istream& is, get_options& options);
 	static tref get_from_file(const std::string& filename,
-						get_options options = {});
+						get_options& options);
 
 	// ---------------------------------------------------------------------
 	// tree::traverser / tt API (tau_tree_traverser.tmpl.h)

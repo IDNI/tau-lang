@@ -67,11 +67,11 @@ bool type_scoped_resolver<node>::assign(tref n, typename type_scoped_resolver<no
 }
 
 template<NodeType node>
-bool type_scoped_resolver<node>::merge(tref a, tref b) {
+std::optional<size_t> type_scoped_resolver<node>::merge(tref a, tref b) {
 	auto type_a = type_id_of(a);
 	auto type_b = type_id_of(b);
 	auto merged = unify<node>(type_a, type_b);
-	if (!merged) return false; // conflicting type info
+	if (!merged) return std::nullopt; // conflicting type info
 	auto new_root = scoped.merge(a, b);
 	type_ids.insert_or_assign(new_root, merged.value());
 	DBG(LOG_TRACE << "type_scoped_resolver/merge: "
@@ -80,15 +80,19 @@ bool type_scoped_resolver<node>::merge(tref a, tref b) {
 		<< " <-> "
 		<< LOG_FM(b) << ":" << ba_types<node>::name(type_b)
 		<< " (scope " << scoped.insert(b).first << ")\n";)
-	return true;
+	return merged.value();
 }
 
 template<NodeType node>
-bool type_scoped_resolver<node>::merge(const trefs& ts) {
-	if (ts.size() < 2) return true;
-	for (size_t i = 1; i < ts.size(); ++i)
-		if (!merge(ts[0], ts[i])) return false;
-	return true;
+std::optional<size_t> type_scoped_resolver<node>::merge(const trefs& ts) {
+	if (ts.size() < 2) return type_id_of(ts[0]);
+	size_t type_id = 0;
+	for (size_t i = 1; i < ts.size(); ++i) {
+		const auto res = merge(ts[0], ts[i]);
+		if (!res) return std::nullopt;
+		type_id = res.value();
+	}
+	return type_id;
 }
 
 template<NodeType node>
@@ -236,7 +240,7 @@ std::optional<size_t> unify(const std::map<size_t, subtree_map<node, size_t>>& t
 }
 
 template<NodeType node>
-bool merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
+std::optional<size_t> merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
 	trefs mergeables;
 	for (auto typeables : types)
 		for (auto [t, _] : typeables)
@@ -244,9 +248,8 @@ bool merge(type_scoped_resolver<node>& resolver, const std::initializer_list<sub
 	return resolver.merge(mergeables);
 }
 
-
 template<NodeType node>
-bool merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
+std::optional<size_t> merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
 	trefs mergeables;
 	for (auto [_, typeables] : types)
 		for (auto [t, _] : typeables)

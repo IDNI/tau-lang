@@ -11,7 +11,8 @@ TEST_SUITE("Semantic checks") {
 		logging::trace();
 
 		const string input = "g[n](x):tau := g[n-1](x) fallback 1.";
-		tref parsed = tau::get(input, parse_rec_relations());
+		auto prr = parse_rec_relations();
+		tref parsed = tau::get(input, prr);
 		CHECK( parsed == nullptr );
 		logging::info();
 	}

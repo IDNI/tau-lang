@@ -79,8 +79,14 @@ std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 			attempt.c_str(), attempt.size(),
 			{ .start = tau_parser::spec_multiline });
 		if (result.found) {
-			tref n = tau::get(result);
+			auto& global_scope = defs.get_global_scope();
+			tau::get_options opts = {
+				.definition_heads = defs.get_definition_heads(),
+				.global_scope = global_scope
+			};
+			tref n = tau::get(result, opts);
 			if (!n) return {};
+			global_scope = opts.global_scope;
 			const auto& t = tau::get(n);
 			if (t.child_is(tau::main)) {
 				if (main) {

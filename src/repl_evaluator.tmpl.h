@@ -113,9 +113,10 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 			definitions.begin(), definitions.end());
 		auto& global_scope = defs.get_global_scope();
 		if (auto [infr, n_global_scope] = infer_ba_types<node>(
-			build_spec<node>(nso_rr), global_scope); infr)
+			build_spec<node>(nso_rr), global_scope,
+			defs.get_definition_heads()); infr)
 		{
-			global_scope = n_global_scope;
+			global_scope = std::move(n_global_scope);
 			if (auto infr_rr = get_nso_rr<node>(ctx, infr); infr_rr)
 				return infr_rr.value();
 			else return {};
@@ -642,12 +643,14 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	}
 	auto t = result.get_shaped_tree2();
 	auto& global_scope = definitions<node>::instance().get_global_scope();
+	const auto* def_heads = definitions<node>::instance().get_definition_heads();
 	typename tau::get_options opts = {
+		.definition_heads = def_heads,
 		.global_scope = global_scope
 	};
 	auto bound = tau::get(tau_parser::tree::get(t), opts);
 	if (!bound) return fail();
-	global_scope = opts.global_scope;
+	global_scope = std::move(opts.global_scope);
 	return bound;
 }
 
