@@ -36,8 +36,8 @@ struct type_scoped_resolver {
 	bool assign(tref a, type_id tid);
 	// merge two trefs if the types are compatible
 	// returns true if merge was successful, false otherwise
-	bool merge(tref a, tref b);
-	bool merge(const trefs& ts);
+	std::optional<size_t> merge(tref a, tref b);
+	std::optional<size_t> merge(const trefs& ts);
 	subtree_map<node, type_id> current_types();
 	subtree_map<node, type_id> all_types();
 
@@ -83,11 +83,11 @@ bool open_same_type(type_scoped_resolver<node>& resolver, const std::initializer
 		size_t inferred_type);
 
 template<NodeType node>
-bool merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
+std::optional<size_t> merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 
 template<NodeType node>
-bool merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
+std::optional<size_t> merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
 
 template<NodeType node>
 std::optional<size_t> unify(const std::map<size_t, subtree_map<node, size_t>>& types, size_t default_type);

@@ -225,8 +225,11 @@ std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	using tau = tree<node>;
 
 	// parse source
+	auto& defs = definitions<node>::instance();
 	typename tau::get_options opts{ .parse = {
-					.start = tau::tau_constant_source } };
+					.start = tau::tau_constant_source },
+					.definition_heads = defs.get_definition_heads(),
+					.global_scope = defs.get_global_scope() };
 	tref source = tau::get(src, opts);
 	if (!source) return {};
 	auto nso_rr = get_nso_rr<node>(source);

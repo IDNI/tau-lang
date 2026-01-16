@@ -38,9 +38,11 @@ tau::get_options parse_rec_relations() {
 }
 
 std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* sample) {
+	auto prr = parse_rec_relations();
 	rewriter::rules rrs = get_rec_relations<node_t>(
-			tau::get(rec, parse_rec_relations()));
-	tref main_fm = tau::get(sample, parse_bf());
+			tau::get(rec, prr));
+	auto pbf = parse_bf();
+	tref main_fm = tau::get(sample, pbf);
 	if (!main_fm) return {};
 	return rr<node_t>(rrs, tau::geth(main_fm));
 }
