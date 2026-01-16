@@ -24,8 +24,8 @@ bool is_typeable(tref t) {
 	return is<node, tau::variable>(t)
 		|| is<node, tau::ba_constant>(t)
 		|| is<node, tau::bf_t>(t)
-		|| is<node, tau::bf_f>(t);
-	//|| is<node, tau::ref>(t);
+		|| is<node, tau::bf_f>(t)
+		|| is<node, tau::ref>(t);
 }
 
 template <NodeType node>
@@ -227,6 +227,19 @@ bool is_functional_fallback(tref n) {
 	return false;
 }
 
+template<NodeType node>
+bool is_functional_ref(tref n) {
+	using tau = tree<node>;
+
+	if (!is<node, tau::ref>(n)) return false;
+	// If the head is typed we have a functional relation.
+	if (!is_untyped<node>(tau::get(n).get_ba_type())) {
+		return true;
+	}
+	// Otherwise, we have a predicate callback.
+	return false;
+}
+
 // type all symbols according to their children's types
 template<NodeType node>
 tref update_ba_symbol(tref n) {
@@ -280,6 +293,7 @@ std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		const subtree_map<node, size_t>& types) {
 	using tau = tree<node>;
 
+	// TODO (LOW) I think this could be simplified
 	if (has_ba_type<node>(n)) {
 		// We check that the type is compatible
 		auto current_type = tau::get(n).get_ba_type();
@@ -905,6 +919,20 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 					// with all the variables in the header.
 					if (!open<node>(resolver, arguments_map)) { error = true; break; }
 					DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
+					break;
+				}
+				if (is_functional_ref<node>(n)) {
+					auto arguments = get_typeable_type_ids_by_type<node>(n);
+					if (!arguments) { error = true; break; } // Incompatible types
+					auto arguments_map = arguments.value();
+					//auto unified = unify<node>(arguments_map, type);
+					//if (!unified) {	error = true; break; } // Incompatible types
+					//auto inferred_type = unified.value();
+					if (!insert<node>(resolver, arguments_map)) {
+						error = true; break;
+					}
+					const auto merged_type = merge<node>(resolver, arguments_map);
+					if (!merged_type) { error = true; break; }
 					break;
 				}
 				// Anyway, we continue the traversal so that we can treat
