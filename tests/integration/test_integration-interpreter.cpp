@@ -3,179 +3,201 @@
 #include "test_integration-interpreter_helper.h"
 
 TEST_SUITE("Execution") {
+
 	TEST_CASE("o1[t] = i1[t]") {
 		bdd_init<Bool>();
 		auto spec = create_spec("o1[t] = i1[t].");
-		std::vector<std::string> i1 = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
-		std::vector<std::string> o1 = i1;
-		std::vector<assignment<node_t>> assgn_in;
-		assignment<node_t> assgn_out;
-		build_input("i1", i1, tau_type<node_t>(), assgn_in);
-		build_output("o1", o1, tau_type<node_t>(), assgn_out);
-		auto ins = input_vector(assgn_in, tau_type<node_t>());
-		auto outs = output_console(tau_type<node_t>());
-		spec_context<node_t> ctx;
-		auto i = run<node_t>(spec, ins, outs, ctx, 3);
-		CHECK( matches_output(assgn_out, i.value().memory) );
+		io_context<node_t> ctx;
+		std::vector<std::string> i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
+		ctx.add_input( "i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
+		auto o1 = std::make_shared<vector_output_stream>();
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		auto maybe_i = run<node_t>(spec, ctx, 3);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		CHECK( o1_values == i1_values );
 	}
 
 	TEST_CASE("u[t] = i1[t]: dec_seq") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t].");
-		std::vector<std::string> i1 = {
+		std::vector<std::string> i1_values = {
 			"F", "o1[t] = o1[t-1]&i2[t] && o1[0] = 1", "F", "F", "F", "F"
 		};
-		std::vector<std::string> i2 = {
-			"F", "F", "F", "<:x> = 0", "<:y> = 0", "<:z> = 0"
+		std::vector<std::string> i2_values = {
+			"<:x> = 0", "<:y> = 0", "<:z> = 0"
 		};
-		std::vector<std::string> u = {
-			"F", "always o1[0]' = 0 && i2[t]o1[t-1] = o1[t]",
+		std::vector<std::string> u_expected = {
+			"F", "always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
 			"F", "F", "F", "F"
 		};
-		std::vector<std::string> o1 = {
-			"", "", "T", "<:x> = 0", "<:x> = 0 && <:y> = 0",
-			"<:x> = 0 && <:y> = 0 && <:z> = 0"
+		std::vector<std::string> o1_expected = {
+			"T", "<:x> = 0", "<:x> = 0 && <:y> = 0",
+			"<:z> = 0 && <:x> = 0 && <:y> = 0"
 		};
-		std::vector<assignment<node_t>> assgn_in;
-		assignment<node_t> assgn_out;
-		build_input("i1", i1, tau_type<node_t>(), assgn_in);
-		build_input("i2", i2, tau_type<node_t>(), assgn_in);
-		build_output("o1", o1, tau_type<node_t>(), assgn_out);
-		build_output("u", u, tau_type<node_t>(), assgn_out);
-		auto ins = input_vector(assgn_in, tau_type<node_t>());
-		auto outs = output_console(tau_type<node_t>());
-		spec_context<node_t> ctx;
-		auto i = run<node_t>(spec, ins, outs, ctx, 6);
-		CHECK( matches_output(assgn_out, i.value().memory) );
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto i2 = std::make_shared<vector_input_stream>(i2_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_input( "i2", tau_type_id<node_t>(), i2);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u", tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 6);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		CHECK( o1_values == o1_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected);
 	}
 
 	TEST_CASE("u[t] = i1[t]: negative_rel_pos") {
 		bdd_init<Bool>();
 		auto spec = create_spec(
 			"u[t] = i1[t] && o1[2] = { <:x> = 0 } && o2[1] = { <:y> = 0 }.");
-		std::vector<std::string> i1 = {
+		std::vector<std::string> i1_values = {
 			"F", "F", "o3[t] = o1[-1] & o2[-2]", "F", "F"
 		};
-		std::vector<std::string> u = {
-			"F", "F", "o3[t] = o1[-1] & o2[-2]", "F", "F"
+		std::vector<std::string> u_expected = {
+			"F", "F", "always o3[t]:tau = o2[-2]:tau o1[-1]:tau", "F", "F"
 		};
-		std::vector<std::string> o3 = {
-			"", "", "", "<:x> = 0 && <:y> = 0", "<:x> = 0 && <:y> = 0"
+		std::vector<std::string> o3_expected = {
+			"<:x> = 0 && <:y> = 0", "<:x> = 0 && <:y> = 0"
 		};
-		std::vector<assignment<node_t>> assgn_in;
-		assignment<node_t> assgn_out;
-		build_input("i1", i1, tau_type<node_t>(), assgn_in);
-		build_output("o3", o3, tau_type<node_t>(), assgn_out);
-		build_output("u", u, tau_type<node_t>(), assgn_out);
-		auto ins = input_vector(assgn_in, tau_type<node_t>());
-		auto outs = output_console(tau_type<node_t>());
-		spec_context<node_t> ctx;
-		auto i = run<node_t>(spec, ins, outs, ctx, 5);
-		CHECK( matches_output(assgn_out, i.value().memory) );
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto o3 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_output("o3", tau_type_id<node_t>(), o3);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 5);
+		CHECK( maybe_i.has_value() );
+		DBG(TAU_LOG_TRACE << "o3 get values";)
+		auto o3_values = o3->get_values();
+		CHECK( o3_values == o3_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected );
 	}
 
 	TEST_CASE("u[t] = i1[t]: 2_clauses") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o2[t] = 0.");
-		std::vector<std::string> i1 = {
+		std::vector<std::string> i1_values = {
 			"(always o2[-1] = 1) || (always o3[t] = 1)", "F", "F", "F"
 		};
-		std::vector<std::string> u = {
-			"(always o2[-1]' = 0) || (always o3[t]' = 0)", "F", "F", "F"
+		std::vector<std::string> u_expected = {
+			"(always o2[-1]:tau' = 0) || (always o3[t]:tau' = 0)", "F", "F", "F"
 		};
-		std::vector<std::string> o2 = {
+		std::vector<std::string> o2_expected = {
 			"F", "F", "F", "F",
 		};
-		std::vector<std::string> o3 = {
-			"", "T", "T", "T"
+		std::vector<std::string> o3_expected = {
+			"T", "T", "T"
 		};
-		std::vector<assignment<node_t>> assgn_in;
-		assignment<node_t> assgn_out;
-		build_input("i1", i1, tau_type<node_t>(), assgn_in);
-		build_output("o3", o3, tau_type<node_t>(), assgn_out);
-		build_output("o2", o2, tau_type<node_t>(), assgn_out);
-		build_output("u", u, tau_type<node_t>(), assgn_out);
-		auto ins = input_vector(assgn_in, tau_type<node_t>());
-		auto outs = output_console(tau_type<node_t>());
-		spec_context<node_t> ctx;
-		auto i = run<node_t>(spec, ins, outs, ctx, 4);
-		CHECK( matches_output(assgn_out, i.value().memory) );
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o3 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		ctx.add_output("o3", tau_type_id<node_t>(), o3);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		auto o2_values = o2->get_values();
+		CHECK( o2_values == o2_expected );
+		auto o3_values = o3->get_values();
+		CHECK( o3_values == o3_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected );
 	}
 
 	TEST_CASE("u[t] = i1[t]: history_unsat") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
-		std::vector<std::string> i1 = {
+		std::vector<std::string> i1_values = {
 			"F", "o1[-1] = 1", "F", "F"
 		};
-		std::vector<std::string> u = {
-			"F", "o1[-1] = 1", "F", "F"
+		std::vector<std::string> u_expected = {
+			"F", "always o1[-1]:tau' = 0", "F", "F"
 		};
-		std::vector<std::string> o1 = {
+		std::vector<std::string> o1_expected = {
 			"F", "F", "F", "F",
 		};
-		std::vector<assignment<node_t>> assgn_in;
-		assignment<node_t> assgn_out;
-		build_input("i1", i1, tau_type<node_t>(), assgn_in);
-		build_output("o1", o1, tau_type<node_t>(), assgn_out);
-		build_output("u", u, tau_type<node_t>(), assgn_out);
-		auto ins = input_vector(assgn_in, tau_type<node_t>());
-		auto outs = output_console(tau_type<node_t>());
-		spec_context<node_t> ctx;
-		auto i = run<node_t>(spec, ins, outs, ctx, 4);
-		CHECK( matches_output(assgn_out, i.value().memory) );
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		CHECK( o1_values == o1_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected );
 	}
 
 	TEST_CASE("u[t] = i1[t]: spec_replace") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
-		std::vector<std::string> i1 = {
+		std::vector<std::string> i1_values = {
 			"F", "o1[t] = 1", "F", "F"
 		};
-		std::vector<std::string> u = {
-			"F", "o1[t] = 1", "", ""
+		std::vector<std::string> u_expected = {
+			"F", "always o1[t]:tau' = 0", "F", "F"
 		};
-		std::vector<std::string> o1 = {
+		std::vector<std::string> o1_expected = {
 			"F", "F", "T", "T",
 		};
-		std::vector<assignment<node_t>> assgn_in;
-		assignment<node_t> assgn_out;
-		build_input("i1", i1, tau_type<node_t>(), assgn_in);
-		build_output("o1", o1, tau_type<node_t>(), assgn_out);
-		build_output("u", u, tau_type<node_t>(), assgn_out);
-		auto ins = input_vector(assgn_in, tau_type<node_t>());
-		auto outs = output_console(tau_type<node_t>());
-		spec_context<node_t> ctx;
-		auto i = run<node_t>(spec, ins, outs, ctx, 4);
-		CHECK( matches_output(assgn_out, i.value().memory) );
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		ctx.add_input("this", tau_type_id<node_t>(), std::make_shared<console_input_stream>());
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		CHECK( o1_values == o1_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected );
 	}
 
 	TEST_CASE("this_stream") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && this[t] = o1[t].");
-		std::vector<std::string> i1 = {
+		std::vector<std::string> i1_values = {
 			"o2[t] = 0", "F", "o3[t] = 0", "F"
 		};
-		std::vector<std::string> u = {
-			"o2[t] = 0", "F", "o3[t] = 0", "F"
+		std::vector<std::string> u_expected = {
+			"always o2[t]:tau = 0", "F", "always o3[t]:tau = 0", "F"
 		};
-		std::vector<std::string> o1 = {
-			"always u[t] = i1[t] && this[t] = o1[t]",
-			"always u[t] = i1[t] && this[t] = o1[t] && o2[t] = 0",
-			"always u[t] = i1[t] && this[t] = o1[t] && o2[t] = 0",
-			"always u[t] = i1[t] && this[t] = o1[t] && o2[t] = 0 && o3[t] = 0"
+		std::vector<std::string> o1_expected = {
+			"always i1[t]:tau = u[t]:tau && o1[t]:tau = this[t]:tau",
+			"always i1[t]:tau = u[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
+			"always i1[t]:tau = u[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
+			"always i1[t]:tau = u[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && o3[t]:tau = 0"
 		};
-		std::vector<assignment<node_t>> assgn_in;
-		assignment<node_t> assgn_out;
-		build_input("i1", i1, tau_type<node_t>(), assgn_in);
-		build_output("o1", o1, tau_type<node_t>(), assgn_out);
-		build_output("u", u, tau_type<node_t>(), assgn_out);
-		auto ins = input_vector(assgn_in, tau_type<node_t>());
-		ins.add_input(build_var_name<node_t>("this"),0,0);
-		auto outs = output_console(tau_type<node_t>());
-		spec_context<node_t> ctx;
-		auto i = run<node_t>(spec, ins, outs, ctx, 4);
-		CHECK( matches_output(assgn_out, i.value().memory) );
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		CHECK( o1_values == o1_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected );
 	}
 }
 
@@ -255,7 +277,8 @@ TEST_SUITE("only outputs") {
 
 	TEST_CASE("o1[t] | o2[t]= 0") {
 		const char* sample = "o1[t] | o2[t]= 0.";
-		auto memory = run_test(sample, 2);
+		io_context<node_t> ctx;
+		auto memory = run_test(sample, ctx, 2);
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -350,14 +373,14 @@ TEST_SUITE("only outputs") {
 	// Fibonacci like sequence with sample Tau syntax
 	TEST_CASE("o1[0] = {<:x> = 0.} && o1[1] = {<:x> = 0.} && o1[t] = o1[t-1] ^ o1[t-2]") {
 		const char* sample = "o1[0] =  {<:x> = 0.} && o1[1] =  {<:x> = 0.} && o1[t] = o1[t-1] ^ o1[t-2].";
-		auto memory = run_test(sample, 8, tau_type<node_t>());
+		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with sample Tau programs
 	TEST_CASE("o1[0] = {o1[0] = 0.} && o1[1] = {o1[0] = 0.} && o1[t] = o1[t-1] ^ o1[t-2]") {
 		const char* sample = "o1[0] =  {o1[0] = 0.} && o1[1] =  {o1[0] = 0.} && o1[t] = o1[t-1] ^ o1[t-2].";
-		auto memory = run_test(sample, 8, tau_type<node_t>());
+		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
 }
@@ -367,11 +390,11 @@ TEST_SUITE("with inputs and outputs") {
 
 	TEST_CASE("i1[t] = o1[t]") {
 		const char* sample = "i1[t] = o1[t].";
-		auto ins = build_i1_inputs({
-			tau::_1(tau_type_id<node_t>()),
-			tau::_0(tau_type_id<node_t>()),
-			tau::_0(tau_type_id<node_t>()) });
-		auto memory = run_test(sample, ins, 3);
+		io_context<node_t> ctx;
+		std::vector<std::string> i1_values = { "T", "F", "F" };
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto memory = run_test(sample, ctx, 3);
 		CHECK ( !memory.value().empty() );
 	}
 
@@ -382,11 +405,11 @@ TEST_SUITE("with inputs and outputs") {
 	// which is an assumption on an input stream
 	TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t] = o1[t] && o1[0] = 0.";
-		auto ins = build_i1_inputs({
-			tau::_1(tau_type_id<node_t>()),
-			tau::_1(tau_type_id<node_t>()),
-			tau::_1(tau_type_id<node_t>()) });
-		auto memory = run_test(sample, ins, 3);
+		io_context<node_t> ctx;
+		std::vector<std::string> i1_values = { "T", "T", "T" };
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto memory = run_test(sample, ctx, 3);
 		CHECK ( (!memory.has_value() || memory.value().empty()) );
 	}
 
@@ -394,140 +417,145 @@ TEST_SUITE("with inputs and outputs") {
 	// at the beginning.
 	TEST_CASE("i1[t-1] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t-1] = o1[t] && o1[0] = 0.";
-		auto ins = build_i1_inputs({
-			tau::_1(tau_type_id<node_t>()),
-			tau::_1(tau_type_id<node_t>()),
-			tau::_1(tau_type_id<node_t>()) });
-		auto memory = run_test(sample, ins, 2);
+		io_context<node_t> ctx;
+		std::vector<std::string> i1_values = { "T", "T", "T" };
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		auto memory = run_test(sample, ctx, 2);
 		CHECK ( !memory.value().empty() );
 	}
 
 }
 
-TEST_SUITE("test inputs") {
+// -----------------------------------------------------------------------------
+// obsoleted
+// TODO: tests for streams - finputs and foutputs were replaced by streams in io_context
 
-	TEST_CASE("reading from file with sbf inputs") {
-		bdd_init<Bool>();
-		typed_io_vars input_map;
-		tref var = build_var_name_indexed<node_t>(1);
-		input_map[get_var_name_sid<node_t>(var)] = {
-			get_typed_stream<node_t>(sbf_type<node_t>(), "../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in") };
-		finputs<node_t> inputs(input_map);
-		CHECK ( inputs.type_of(var) > 0 );
-		for (size_t i = 0; i < 10; ++i) {
-			auto in = inputs.read();
-			if (in) {
-				auto check = (i % 2)
-					? tau::get(in.value()[var]).equals_1()
-					: tau::get(in.value()[var]).equals_0();
-				CHECK ( check );
-			} else FAIL("no input");
-		}
-	}
+// TEST_SUITE("test inputs") {
 
-	TEST_CASE("reading from file with tau program inputs") {
-		bdd_init<Bool>();
-		typed_io_vars input_map;
-		tref var = build_var_name_indexed<node_t>(1);
-		input_map[get_var_name_sid<node_t>(var)] = {
-			get_typed_stream<node_t>(tau_type<node_t>(), "../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in") };
-		finputs<node_t> inputs(input_map);
-		CHECK ( inputs.type_of(var) > 0 );
-		for (size_t i = 0; i < 10; ++i) {
-			auto in = inputs.read();
-			if (in) {
-				auto check = (i % 2)
-					? tau::get(in.value()[var]).equals_1()
-					: tau::get(in.value()[var]).equals_0();
-				CHECK ( check );
-			} else FAIL("no input");
-		}
-	}
-}
+// 	TEST_CASE("reading from file with sbf inputs") {
+// 		bdd_init<Bool>();
+// 		// io_context<node_t
+// 		typed_io_vars input_map;
+// 		tref var = build_var_name_indexed<node_t>(1);
+// 		input_map[get_var_name_sid<node_t>(var)] = {
+// 			get_typed_stream<node_t>(sbf_type<node_t>(), "../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in") };
+// 		finputs<node_t> inputs(input_map);
+// 		CHECK ( inputs.type_of(var) > 0 );
+// 		for (size_t i = 0; i < 10; ++i) {
+// 			auto in = inputs.read();
+// 			if (in) {
+// 				auto check = (i % 2)
+// 					? tau::get(in.value()[var]).equals_1()
+// 					: tau::get(in.value()[var]).equals_0();
+// 				CHECK ( check );
+// 			} else FAIL("no input");
+// 		}
+// 	}
 
-TEST_SUITE("test outputs") {
+// 	TEST_CASE("reading from file with tau program inputs") {
+// 		bdd_init<Bool>();
+// 		typed_io_vars input_map;
+// 		tref var = build_var_name_indexed<node_t>(1);
+// 		input_map[get_var_name_sid<node_t>(var)] = {
+// 			get_typed_stream<node_t>(tau_type<node_t>(), "../tests/integration/test_files/tau-alternating_zeros_and_ones-length_10.in") };
+// 		finputs<node_t> inputs(input_map);
+// 		CHECK ( inputs.type_of(var) > 0 );
+// 		for (size_t i = 0; i < 10; ++i) {
+// 			auto in = inputs.read();
+// 			if (in) {
+// 				auto check = (i % 2)
+// 					? tau::get(in.value()[var]).equals_1()
+// 					: tau::get(in.value()[var]).equals_0();
+// 				CHECK ( check );
+// 			} else FAIL("no input");
+// 		}
+// 	}
+// }
 
-	TEST_CASE("writing to file") {
-		bdd_init<Bool>();
-		typed_io_vars output_map;
-		tref var = build_var_name_indexed<node_t>(1);
-		size_t var_sid = get_var_name_sid<node_t>(var);
-		size_t type = get_ba_type_id<node_t>(sbf_type<node_t>());
-		tref var_0 = build_out_var_at_n_indexed<node_t>(1, 0, type);
+// TEST_SUITE("test outputs") {
 
-		output_map[var_sid] = {
-			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
+// 	TEST_CASE("writing to file") {
+// 		bdd_init<Bool>();
+// 		typed_io_vars output_map;
+// 		tref var = build_var_name_indexed<node_t>(1);
+// 		size_t var_sid = get_var_name_sid<node_t>(var);
+// 		size_t type = get_ba_type_id<node_t>(sbf_type<node_t>());
+// 		tref var_0 = build_out_var_at_n_indexed<node_t>(1, 0, type);
 
-#ifdef DEBUG
-		std::cout << "test_outputs/writing_to_file/output: " << output_map[var_sid].second << "\n";
-#endif // DEBUG
+// 		output_map[var_sid] = {
+// 			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
 
-		foutputs<node_t> outputs(output_map);
-		assignment<node_t> output = { { var_0, tau::_1(sbf_type_id<node_t>()) } };
+// #ifdef DEBUG
+// 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var_sid].second << "\n";
+// #endif // DEBUG
 
-		CHECK( outputs.type_of(var) > 0 );
-		CHECK ( outputs.write(output) );
-	}
+// 		foutputs<node_t> outputs(output_map);
+// 		assignment<node_t> output = { { var_0, tau::_1(sbf_type_id<node_t>()) } };
 
-	TEST_CASE("writing to files: two outputs") {
-		bdd_init<Bool>();
-		typed_io_vars output_map;
-		size_t type = sbf_type_id<node_t>();
-		tref var1 = build_var_name_indexed<node_t>(1);
-		tref var2 = build_var_name_indexed<node_t>(2);
-		size_t var1_sid = get_var_name_sid<node_t>(var1);
-		size_t var2_sid = get_var_name_sid<node_t>(var2);
-		tref var1_0 = build_out_var_at_n<node_t>(var1, 0, type);
-		tref var2_0 = build_out_var_at_n<node_t>(var2, 0, type);
-		output_map[var1_sid] = {
-			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
-		output_map[var2_sid] = {
-			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
+// 		CHECK( outputs.type_of(var) > 0 );
+// 		CHECK ( outputs.write(output) );
+// 	}
 
-#ifdef DEBUG
-		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";
-		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_sid].second << "\n";
-#endif // DEBUG
+// 	TEST_CASE("writing to files: two outputs") {
+// 		bdd_init<Bool>();
+// 		typed_io_vars output_map;
+// 		size_t type = sbf_type_id<node_t>();
+// 		tref var1 = build_var_name_indexed<node_t>(1);
+// 		tref var2 = build_var_name_indexed<node_t>(2);
+// 		size_t var1_sid = get_var_name_sid<node_t>(var1);
+// 		size_t var2_sid = get_var_name_sid<node_t>(var2);
+// 		tref var1_0 = build_out_var_at_n<node_t>(var1, 0, type);
+// 		tref var2_0 = build_out_var_at_n<node_t>(var2, 0, type);
+// 		output_map[var1_sid] = {
+// 			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
+// 		output_map[var2_sid] = {
+// 			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
 
-		foutputs<node_t> outputs(output_map);
-		assignment<node_t> output = {
-			{ var1_0, tau::_1(type) },
-			{ var2_0, tau::_0(type) }
-		};
+// #ifdef DEBUG
+// 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";
+// 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_sid].second << "\n";
+// #endif // DEBUG
 
-		CHECK( outputs.type_of(var1) > 0 );
-		CHECK( outputs.type_of(var2) > 0 );
-		CHECK ( outputs.write(output) );
-	}
+// 		foutputs<node_t> outputs(output_map);
+// 		assignment<node_t> output = {
+// 			{ var1_0, tau::_1(type) },
+// 			{ var2_0, tau::_0(type) }
+// 		};
 
-	TEST_CASE("writing to files: completing outputs") {
-		bdd_init<Bool>();
-		typed_io_vars output_map;
-		size_t type = sbf_type_id<node_t>();
-		auto var1 = build_var_name_indexed<node_t>(1);
-		auto var2 = build_var_name_indexed<node_t>(2);
-		size_t var1_sid = get_var_name_sid<node_t>(var1);
-		size_t var2_sid = get_var_name_sid<node_t>(var2);
-		auto var1_0 = build_out_var_at_n<node_t>(var1, 0, type);
-		auto var2_1 = build_out_var_at_n<node_t>(var2, 1, type);
-		output_map[var1_sid] = {
-			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
-		output_map[var2_sid] = {
-			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
+// 		CHECK( outputs.type_of(var1) > 0 );
+// 		CHECK( outputs.type_of(var2) > 0 );
+// 		CHECK ( outputs.write(output) );
+// 	}
 
-#ifdef DEBUG
-		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";
-		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_sid].second << "\n";
-#endif // DEBUG
+// 	TEST_CASE("writing to files: completing outputs") {
+// 		bdd_init<Bool>();
+// 		typed_io_vars output_map;
+// 		size_t type = sbf_type_id<node_t>();
+// 		auto var1 = build_var_name_indexed<node_t>(1);
+// 		auto var2 = build_var_name_indexed<node_t>(2);
+// 		size_t var1_sid = get_var_name_sid<node_t>(var1);
+// 		size_t var2_sid = get_var_name_sid<node_t>(var2);
+// 		auto var1_0 = build_out_var_at_n<node_t>(var1, 0, type);
+// 		auto var2_1 = build_out_var_at_n<node_t>(var2, 1, type);
+// 		output_map[var1_sid] = {
+// 			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
+// 		output_map[var2_sid] = {
+// 			get_typed_stream<node_t>(sbf_type<node_t>(), random_file()) };
 
-		foutputs<node_t> outputs(output_map);
-		assignment<node_t> output = {
-			{ var1_0, tau::_1(type) },
-			{ var2_1, tau::_1(type) }
-		};
+// #ifdef DEBUG
+// 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";
+// 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_sid].second << "\n";
+// #endif // DEBUG
 
-		CHECK( outputs.type_of(var1) > 0 );
-		CHECK( outputs.type_of(var2) > 0 );
-		CHECK ( outputs.write(output) );
-	}
-}
+// 		foutputs<node_t> outputs(output_map);
+// 		assignment<node_t> output = {
+// 			{ var1_0, tau::_1(type) },
+// 			{ var2_1, tau::_1(type) }
+// 		};
+
+// 		CHECK( outputs.type_of(var1) > 0 );
+// 		CHECK( outputs.type_of(var2) > 0 );
+// 		CHECK ( outputs.write(output) );
+// 	}
+// }

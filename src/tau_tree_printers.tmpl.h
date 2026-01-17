@@ -116,23 +116,37 @@ std::ostream& operator<<(std::ostream& os,
 }
 
 template <NodeType node>
-std::ostream& operator<<(std::ostream& os, const spec_context<node>& ctx) {
-        os << "IO variables:";
-        if (ctx.inputs.size() == 0 && ctx.outputs.size() == 0) os << " none";
-        os << "\n";
-        auto print_io = [&](size_t var_sid, const auto& s, bool output){
-                os << "\t" << dict(var_sid)
-                        << get_ba_type_name<node>(s.first) << " = "
-                        << (output ? "out" : "in") << " "
-                        << (s.second == 0 ? "console"
-                                : "file(\"" + dict(s.second) + "\")")
-                        << "\n";
-        };
-        for (const auto& [var_sid, desc] : ctx.inputs)
-                print_io(var_sid, desc, false);
-        for (const auto& [var_sid, desc] : ctx.outputs)
-                print_io(var_sid, desc, true);
-	return os;
+std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
+	os << "\n" << TC.GREEN() << "=== IO Context ===" << TC.CLEAR() << "\n";
+
+	os << "IO types:     ";
+	if (ctx.types.empty()) os << " none";
+	os << "\n";
+	for (const auto& [var, type] : ctx.types) os << "\t" << get_var_name<node>(var) << get_ba_type_name<node>(type) << "\n";
+
+	os << "IO streams:   ";
+	if (ctx.inputs.empty() && ctx.outputs.empty()) os << " none";
+	os << "\n";
+	auto print_io = [&](tref var, size_t s, bool output) {
+		os << "\t" << get_var_name<node>(var)
+			<< get_ba_type_name<node>(ctx.type_of(var)) << " = "
+			<< (output ? "out" : "in") << " "
+			<< (s == 0 ? "console"
+				: "file(\"" + dict(s) + "\")")
+			<< "\n";
+	};
+	for (const auto& [var, s] : ctx.inputs)  print_io(var, s, false);
+	for (const auto& [var, s] : ctx.outputs) print_io(var, s, true);
+
+	os << "Input remaps: ";
+	if (ctx.input_remaps.size() == 0) os << " none";
+	else for (const auto& [name, stream] : ctx.input_remaps) os << " " << name;
+	os << "\n";
+
+	os << "Output remaps:";
+	if (ctx.output_remaps.size() == 0) os << " none";
+	else for (const auto& [name, stream] : ctx.output_remaps) os << " " << name;
+	return os << "\n\n";
 }
 
 template <NodeType node>
@@ -307,7 +321,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	size_t depth = 0;
 	std::unordered_set<tref> wraps, indented, highlighted;
 	char last_written_char = 0;
-	bool pending_bf_and_op = false;
+	bool type_printed = false;
 	typename node::type last_quant_nt = nul;
 	std::unordered_map<tref, size_t> chpos; // child positions if tracked
 	int_t bound_var_id_offset = get_max_var_name_b_id<node>(get());
@@ -517,7 +531,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				out(tau::get(t.get_ba_type_tree()));
 				break;
 			case typed:
+				type_printed = true;
 				out(":"); break;
+			case bf_and:
+				type_printed = false;
+				break;
 			case stream:
 				if (pnt == input_def) out(" = in ");
 				else if (pnt == output_def) out(" = out ");
@@ -532,7 +550,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 					if (static_cast<node::type>(nt) == wff)
 							depth++, break_line();
 				}
-				if (pending_bf_and_op) pending_bf_and_op = false;
 				break;
 
 			case wff_all:
@@ -643,7 +660,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 		switch (pnt) {
 			case bf_and:
-				if (isdigit(last_written_char)
+				if (type_printed || isdigit(last_written_char)
 					|| t.child_is(tau::ba_constant)) {
 					out(" ");
 				}
@@ -765,7 +782,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				// Print type information if present
 				if (parent) {
 					out(tau::get(tau::get(parent).get_ba_type_tree()));
+					type_printed = true;
 				}
+				break;
+			case bf_and:
+				type_printed = false;
 				break;
 			case bf:
 			case wff:

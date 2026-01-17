@@ -47,6 +47,7 @@ template <NodeType node> struct rr;
 template <NodeType node> struct ba_constants;
 template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
+template <NodeType node> struct io_context;
 
 // -----------------------------------------------------------------------------
 // Tau tree node (tau_tree_node.tmpl.h)
@@ -410,7 +411,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		bool infer_ba_types = true;
 		bool reget_with_hooks = true;
 		const std::vector<htref>* definition_heads = nullptr;
-		subtree_map<node, size_t> global_scope = subtree_map<node, size_t>{};
+		subtree_map<node, size_t>* global_scope = nullptr;
+		io_context<node>* context = nullptr;
 	};
 
 	// creation from parser result or parser input (string, stream, file)
@@ -613,6 +615,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_var_name(size_t sid);
 	static tref build_var_name(const std::string& name);
 	static tref build_var_name_indexed(size_t index);
+	static tref build_canonized_io_var(const std::string& name);
 	static tref build_variable(tref var_name_node, size_t type_id);
 	static tref build_variable(const std::string& name, size_t type_id);
 	static tref build_bf_variable(tref var_name_node, size_t type_id);

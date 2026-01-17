@@ -78,8 +78,10 @@ add_custom_target(tau_header ALL DEPENDS ${TAU_HEADER})
 add_library(${TAU_OBJECT_LIB_NAME} OBJECT)
 target_sources(${TAU_OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_OBJECT_LIB_NAME})
-target_link_libraries(${TAU_OBJECT_LIB_NAME} Boost::log tauparser cvc5::cvc5)
-target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
+target_link_libraries(${TAU_OBJECT_LIB_NAME} tauparser Boost::log cvc5::cvc5)
+if (TAU_BUILD_PIC)
+	target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
+endif()
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
@@ -95,13 +97,17 @@ add_dependencies(${TAU_OBJECT_LIB_NAME} tau_header)
 add_library(${TAU_STATIC_LIB_NAME} STATIC)
 target_sources(${TAU_STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_STATIC_LIB_NAME})
-target_link_libraries(${TAU_STATIC_LIB_NAME} Boost::log tauparser cvc5::cvc5)
+target_link_libraries(${TAU_STATIC_LIB_NAME} tauparser Boost::log cvc5::cvc5)
+if (TAU_BUILD_PIC)
+	target_compile_options(${TAU_STATIC_LIB_NAME} PRIVATE -fPIC)
+endif()
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
 	$<BUILD_INTERFACE:${TAU}/external/parser/src>
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
+	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
@@ -117,7 +123,7 @@ endif()
 add_library(${TAU_SHARED_LIB_NAME} SHARED)
 add_library(${namespace}::${TAU_SHARED_LIB_NAME} ALIAS ${TAU_SHARED_LIB_NAME})
 target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
-target_link_libraries(${TAU_SHARED_LIB_NAME} Boost::log tauparser cvc5::cvc5)
+target_link_libraries(${TAU_SHARED_LIB_NAME} tauparser Boost::log cvc5::cvc5)
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>

@@ -264,6 +264,9 @@ template <NodeType node>
 tref build_var_name_indexed(size_t index);
 
 template <NodeType node>
+tref build_canonized_io_var(const std::string& name);
+
+template <NodeType node>
 tref build_variable(tref var_name_node, size_t type_id);
 
 template <NodeType node>

@@ -44,6 +44,7 @@ tref canonize(tref t) {
 	using tt = tau::traverser;
 
 	tref new_t = untype<node>(t);
+	if (tau::get(new_t).is(tau::bf)) new_t = tau::trim(new_t);
 	if (auto var_name = tt(new_t) | tau::io_var | tau::var_name | tt::ref; var_name)
 		new_t = tau::get(tau::variable, tau::get(tau::io_var, { var_name }));
 	DBG(LOG_TRACE << "canonize/t -> new_t:\n"
@@ -696,8 +697,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 // This function version is introduced for debugging purposes as it allows
 // to inspect the resolver state after the type inference.
 template <NodeType node>
-std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope, const std::vector<htref> *definition_heads,
-		type_scoped_resolver<node>& resolver) {
+std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
+	const subtree_map<node, size_t>* global_scope,
+	const std::vector<htref> *definition_heads,
+	type_scoped_resolver<node>& resolver)
+{
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
@@ -1088,13 +1092,14 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	};
 
 	// Adding global_scope info to resolver
-	for (auto [var, type] : global_scope) {
-		// We only insert io streams into the global scope
-		if (!is_io_var<node>(var)) continue;
-		auto untyped = canonize<node>(var);
-		resolver.insert(untyped);
-		resolver.assign(untyped, type);
-	}
+	if (global_scope)
+		for (auto [var, type] : *global_scope) {
+			// We only insert io streams into the global scope
+			if (!is_io_var<node>(var)) continue;
+			auto untyped = canonize<node>(var);
+			resolver.insert(untyped);
+			resolver.assign(untyped, type);
+		}
 	// We visit the tree and return the transformed root if no error happened.
 	// If an error happened we return nullptr.
 	pre_order<node>(n).visit(on_enter, idni::all, on_leave, on_between);
@@ -1119,7 +1124,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_
 	auto n_global_scope = resolver.current_types();
 	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
 	<< " of: " << LOG_FM(n) << " resulted into: " << LOG_FM_DUMP(new_n);)
-
 	DBG(LOG_TRACE << "================================================";)
 
 	tau::use_hooks = using_hooks;

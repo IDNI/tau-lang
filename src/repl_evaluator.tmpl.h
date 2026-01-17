@@ -100,7 +100,7 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 	if (!check) return {};
 	auto [type, value] = check.value();
 	auto& defs = definitions<node>::instance();
-	spec_context<node>& ctx = defs.get_io_context();
+	io_context<node>& ctx = defs.get_io_context();
 	if (contains(value, tau::ref)) {
 		if (type == tau::spec) {
 			if (auto x = get_nso_rr<node>(ctx, value); x)
@@ -111,13 +111,15 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 		auto definitions = defs.get_sym_defs();
 		nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
 			definitions.begin(), definitions.end());
-		auto& global_scope = defs.get_global_scope();
 		if (auto [infr, n_global_scope] = infer_ba_types<node>(
-			build_spec<node>(nso_rr), global_scope,
+			build_spec<node>(nso_rr), defs.get_global_scope(),
 			defs.get_definition_heads()); infr)
 		{
-			global_scope = std::move(n_global_scope);
-			if (auto infr_rr = get_nso_rr<node>(ctx, infr); infr_rr)
+			ctx.update_types(n_global_scope);
+			defs.set_global_scope(n_global_scope);
+			if (auto term = tt(infr) | tau::main | tau::bf; term)
+				return rr<node>(tau::geth(term | tt::ref));
+			if (auto infr_rr = get_nso_rr<node>(ctx, infr);	infr_rr)
 				return infr_rr.value();
 			else return {};
 		} else return {};
@@ -392,9 +394,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	if (has_free_vars<node>(dnf)) return;
 
 	auto& ctx = definitions<node>::instance().get_io_context();
-	auto ins = finputs<node>(collect_input_streams<node>(dnf, ctx));
-	auto outs = foutputs<node>(collect_output_streams<node>(dnf, ctx));
-	run<node>(dnf, ins, outs, ctx);
+	run<node>(dnf, ctx);
 }
 
 template <NodeType node>
@@ -601,20 +601,22 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
-	auto& defs = definitions<node>::instance();
-	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_input_defs()))
-		error = true;
+void repl_evaluator<BAs...>::def_input_cmd(const tt& /*command*/) {
+	// auto& defs = definitions<node>::instance();
+	// if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_input_defs())) {
+	// 	error = true;
+	// 	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
+	// }
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
-	auto& defs = definitions<node>::instance();
-	if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_output_defs())){
-		error = true;
-		TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
-	}
+void repl_evaluator<BAs...>::def_output_cmd(const tt& /*command*/) {
+	// auto& defs = definitions<node>::instance();
+	// if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_output_defs())){
+	// 	error = true;
+	// 	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
+	// }
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -642,15 +644,14 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		return nullptr; // Unexpected eof, continue with reading input
 	}
 	auto t = result.get_shaped_tree2();
-	auto& global_scope = definitions<node>::instance().get_global_scope();
-	const auto* def_heads = definitions<node>::instance().get_definition_heads();
+	auto& defs = definitions<node>::instance();
 	typename tau::get_options opts = {
-		.definition_heads = def_heads,
-		.global_scope = global_scope
+		.definition_heads = defs.get_definition_heads(),
+		.global_scope = defs.get_global_scope(),
+		.context = defs.get_io_context()
 	};
 	auto bound = tau::get(tau_parser::tree::get(t), opts);
 	if (!bound) return fail();
-	global_scope = std::move(opts.global_scope);
 	return bound;
 }
 
