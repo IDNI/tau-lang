@@ -287,7 +287,7 @@ void io_context<node>::update_types(
 {
 	// update types of inputs and outputs
 	// and create a default console stream if not defined
-	for (auto& [var, type] : update) if (is_io_var<node>(var)) {
+	for (const auto& [var, type] : update) if (is_io_var<node>(var)) {
 		types[var] = type;
 		std::string name = get_var_name<node>(var);
 		DBG(LOG_TRACE << "updating stream: " << name;)

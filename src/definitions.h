@@ -52,7 +52,7 @@ struct definitions {
 		return ctx.outputs;
 	}
 
-	const subtree_map<node, size_t>* get_global_scope() {
+	subtree_map<node, size_t>* get_global_scope() {
 		for (auto [var, type] : ctx.types) {
 			if (auto it = global_scope.find(var);
 				it == global_scope.end())
@@ -61,7 +61,7 @@ struct definitions {
 		return &global_scope;
 	}
 
-	void set_global_scope(const subtree_map<node, size_t>& global_scope) {
+	void set_global_scope(subtree_map<node, size_t>& global_scope) {
 		this->global_scope = std::move(global_scope);
 	}
 

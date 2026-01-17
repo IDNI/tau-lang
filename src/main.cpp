@@ -79,14 +79,13 @@ std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 			attempt.c_str(), attempt.size(),
 			{ .start = tau_parser::spec_multiline });
 		if (result.found) {
-			auto& global_scope = defs.get_global_scope();
 			tau::get_options opts = {
 				.definition_heads = defs.get_definition_heads(),
-				.global_scope = global_scope
+				.global_scope = defs.get_global_scope()
 			};
 			tref n = tau::get(result, opts);
 			if (!n) return {};
-			global_scope = opts.global_scope;
+			defs.set_global_scope(*opts.global_scope);
 			const auto& t = tau::get(n);
 			if (t.child_is(tau::main)) {
 				if (main) {
@@ -98,7 +97,7 @@ std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 			else if (t.child_is(tau::rec_relation))
 				defs.add(tau::geth(t[0][0]),
 					tau::geth(resolve_io_vars<node>(
-						defs.get_io_context(),
+						*defs.get_io_context(),
 						t[0].second())));
 			// else if (t.child_is(tau::input_def)) {
 			// 	if (!get_io_def<node>(t.first(),
@@ -134,12 +133,12 @@ std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 		return {};
 	}
 	rr<node> nso_rr{ tau::geth(resolve_io_vars<node>(
-		defs.get_io_context(), main)) };
+		*defs.get_io_context(), main)) };
 	auto definitions = defs.get_sym_defs();
 	for (auto& def : definitions) nso_rr.rec_relations.emplace_back(
 		def.first,
 		tau::geth(resolve_io_vars<node>(
-			defs.get_io_context(), def.second->get())));
+			*defs.get_io_context(), def.second->get())));
 	return nso_rr;
 }
 
@@ -175,7 +174,7 @@ int run_tau_spec(string spec_file, bool charvar, bool /*exp*/,
 	if (!normalized) return 3;
 	if (has_free_vars<node>(normalized)) return 4;
 	definitions<node>& defs = definitions<node>::instance();
-	auto result = run<node>(normalized, defs.get_io_context());
+	auto result = run<node>(normalized, *defs.get_io_context());
 	if (!result) return 5;
 	return 0;
 }

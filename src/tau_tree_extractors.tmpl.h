@@ -92,8 +92,8 @@ rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 
 template <NodeType node>
 rewriter::rules get_rec_relations(tref rrs) {
-	io_context<node>& ctx = definitions<node>::instance().get_io_context();
-	return get_rec_relations<node>(ctx, rrs);
+	return get_rec_relations<node>(
+		*definitions<node>::instance().get_io_context(), rrs);
 }
 
 template <NodeType node>
@@ -137,8 +137,8 @@ std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
 
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(tref r) {
-	io_context<node>& ctx = definitions<node>::instance().get_io_context();
-	return get_nso_rr<node>(ctx, r);
+	return get_nso_rr<node>(
+		*definitions<node>::instance().get_io_context(), r);
 }
 
 // -----------------------------------------------------------------------------

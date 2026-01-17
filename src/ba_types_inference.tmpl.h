@@ -689,7 +689,10 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 // |----------|-------------------|--------------|--------------|-----------------------------------------------
 
 template <NodeType node>
-std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n, const subtree_map<node, size_t>& global_scope, const std::vector<htref> *definition_heads) {
+std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
+	const subtree_map<node, size_t>* global_scope,
+	const std::vector<htref> *definition_heads)
+{
 	type_scoped_resolver<node> resolver;
 	return infer_ba_types<node>(n, global_scope, definition_heads, resolver);
 }

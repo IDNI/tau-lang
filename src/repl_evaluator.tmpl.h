@@ -100,7 +100,7 @@ std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
 	if (!check) return {};
 	auto [type, value] = check.value();
 	auto& defs = definitions<node>::instance();
-	io_context<node>& ctx = defs.get_io_context();
+	io_context<node>& ctx = *defs.get_io_context();
 	if (contains(value, tau::ref)) {
 		if (type == tau::spec) {
 			if (auto x = get_nso_rr<node>(ctx, value); x)
@@ -393,8 +393,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	// Make sure that there is no free variable in the formula
 	if (has_free_vars<node>(dnf)) return;
 
-	auto& ctx = definitions<node>::instance().get_io_context();
-	run<node>(dnf, ctx);
+	run<node>(dnf, *definitions<node>::instance().get_io_context());
 }
 
 template <NodeType node>
