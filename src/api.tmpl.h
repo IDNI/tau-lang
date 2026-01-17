@@ -30,7 +30,7 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	const std::string& specification,
 	interpreter_options& options)
 {
-	auto& ctx = definitions<node>::instance().get_io_context();
+	auto& ctx = *definitions<node>::instance().get_io_context();
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
 	htref spec = parse_specification(specification, ctx);
@@ -61,7 +61,7 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 {
 	DBG(using tau = tree<node>;)
 
-	auto& ctx = definitions<node>::instance().get_io_context();
+	auto& ctx = *definitions<node>::instance().get_io_context();
 
 	if (!i.calculate_initial_spec()) return {};
 
