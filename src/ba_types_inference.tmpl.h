@@ -634,6 +634,7 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				<< resolver.dump_to_str();)
 		return !error;
 	};
+	
 	// Solution to not printing the entire tau command tree for default typing
 	auto update_type_env = [&type_environment](tref n) {
 		const tau& n_t = tau::get(n);
@@ -648,6 +649,26 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 	post_order<node>(r).search(f, update_type_env);
 	if (error) return nullptr;
 	return changes.find(r) != changes.end() ? changes[r] : r;
+}
+
+template <NodeType node>
+bool type_by_function_symbol(type_scoped_resolver<node>& resolver,
+		std::map<std::tuple<size_t, int_t, int_t>, size_t>& available_function_symbols,
+		size_t type, const auto& type_map) {
+	// If the merged type is untyped, we try to update the type
+	// information by considering previously defined function definitions
+	// contained in available_function_symbols
+	if (type == untyped_type_id<node>()) {
+		for (auto [func, _] : type_map) {
+			if (auto it = available_function_symbols.find(get_function_signature<node>(func));
+					it != available_function_symbols.end()) {
+				// Found previous function definition and return as soon as
+				// possible
+				return resolver.assign(func, it->second);
+			}
+		}
+	}
+	return true;
 }
 
 // Infers the types of variables and constants in the tree n. It assumes that
@@ -690,34 +711,21 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 
 template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
-	const subtree_map<node, size_t>* global_scope,
-	const std::vector<htref> *definition_heads)
-{
-	type_scoped_resolver<node> resolver;
-	return infer_ba_types<node>(n, global_scope, definition_heads, resolver);
-}
-
-// This function version is introduced for debugging purposes as it allows
-// to inspect the resolver state after the type inference.
-template <NodeType node>
-std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
-	const subtree_map<node, size_t>* global_scope,
-	const std::vector<htref> *definition_heads,
-	type_scoped_resolver<node>& resolver)
-{
+ 		const subtree_map<node, size_t>* global_scope,
+		const std::vector<htref>* definition_heads) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 
-	DBG(LOG_TRACE << "================================================";)
-	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
-		<< " for: " << LOG_FM_DUMP(n);)
+	type_scoped_resolver<node> resolver;
 
-	// We restore the original value of use_hooks at the end of the function
-	auto using_hooks = tau::use_hooks;
-	tau::use_hooks = false;
-
-	subtree_map<node, tref> transformed;
-	bool error = false;
+	// Adding global_scope info to resolver
+	if (global_scope)
+		for (auto [var, type] : *global_scope) {
+			// We only insert io streams into the global scope
+			if (!is_io_var<node>(var)) continue;
+			auto untyped = canonize<node>(var);
+			resolver.insert(untyped);
+			resolver.assign(untyped, type);
+		}
 
 	// In order to infer types of function symbols depending on predefined
 	// definitions, we keep a map of those present symbol definitions
@@ -733,24 +741,30 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			available_function_symbols.insert_or_assign(sig, type_id);
 		}
 	}
-	auto type_by_function_symbol = [&](size_t type, const auto& type_map) {
-		// If the merged type is untyped, we try to update the type
-		// information by considering previously defined function definitions
-		// contained in available_function_symbols
-		if (type == untyped_type_id<node>()) {
-			for (auto [func, _] : type_map) {
-				if (auto it = available_function_symbols.
-					find(get_function_signature<node>(func));
-					it != available_function_symbols.end()) {
-					// Found previous function definition
-					if (!resolver.assign(func, it->second))
-						error = true;
-					// Return as soon as a type is found
-					return;
-				}
-			}
-		}
-	};
+
+	return infer_ba_types<node>(n, available_function_symbols, resolver);
+}
+
+// This function version is introduced for debugging purposes as it allows
+// to inspect the resolver state after the type inference.
+template <NodeType node>
+std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
+	std::map<std::tuple<size_t, int_t, int_t>, size_t>& available_function_symbols,
+	type_scoped_resolver<node>& resolver)
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	DBG(LOG_TRACE << "================================================";)
+	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
+		<< " for: " << LOG_FM_DUMP(n);)
+
+	// We restore the original value of use_hooks at the end of the function
+	auto using_hooks = tau::use_hooks;
+	tau::use_hooks = false;
+
+	subtree_map<node, tref> transformed;
+	bool error = false;
 
 	// We gather info about types and scopes while entering nodes
 	auto on_enter = [&](tref n, tref parent) {
@@ -817,7 +831,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						return get_function_signature<node>(el.first) == cur_sig;
 					};
 					std::erase_if(rec_type_ids_map[tau::ref], current_ref);
-					type_by_function_symbol(merged_type.value(), rec_type_ids_map[tau::ref]);
+					if (!type_by_function_symbol(resolver, available_function_symbols,
+							merged_type.value(), rec_type_ids_map[tau::ref])) {
+						error = true;
+					}
 					break;
 				}
 				// Otherwise, we have a predicate relation. We create a new scope
@@ -862,7 +879,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				const auto merged_type = merge<node>(resolver, typeables_map);
 				if (!merged_type) { error = true; break; }
 				// Take type definition due to function symbols into account
-				type_by_function_symbol(merged_type.value(), typeables_map[tau::ref]);
+				if (!type_by_function_symbol(resolver, available_function_symbols,
+						merged_type.value(), typeables_map[tau::ref])) {
+					error = true;
+				}
 				break;
 			}
 			case tau::ref: {
@@ -896,7 +916,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						const auto merged_type = merge<node>(resolver, rec_type_ids_map);
 						if (!merged_type) { error = true; break; }
 						// Take type definition due to function symbols into account
-						type_by_function_symbol(merged_type.value(), rec_type_ids_map[tau::ref]);
+						if (!type_by_function_symbol(resolver, available_function_symbols,
+								merged_type.value(), rec_type_ids_map[tau::ref])) {
+							error = true;
+						}
 						break;
 					}
 					// Otherwise, we have a predicate relation. We create a new scope
@@ -915,7 +938,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					const auto merged_type = merge<node>(resolver, arguments_map);
 					if (!merged_type) { error = true; break; }
 					// Take type definition due to function symbols into account
-					type_by_function_symbol(merged_type.value(), arguments_map[tau::ref]);
+					if (!type_by_function_symbol(resolver, available_function_symbols,
+							merged_type.value(), arguments_map[tau::ref])) {
+						error = true;
+					}
 					break;
 				}
 				// Anyway, we continue the traversal so that we can treat
@@ -945,7 +971,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				const auto merged_type = merge<node>(resolver, typeables_map);
 				if (!merged_type) { error = true; break; }
 				// Take type definition due to function symbols into account
-				type_by_function_symbol(merged_type.value(), typeables_map[tau::ref]);
+				if (!type_by_function_symbol(resolver, available_function_symbols,
+						merged_type.value(), typeables_map[tau::ref])) {
+					error = true;
+				}
 				break;
 			}
 			default:
@@ -1094,15 +1123,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		return;
 	};
 
-	// Adding global_scope info to resolver
-	if (global_scope)
-		for (auto [var, type] : *global_scope) {
-			// We only insert io streams into the global scope
-			if (!is_io_var<node>(var)) continue;
-			auto untyped = canonize<node>(var);
-			resolver.insert(untyped);
-			resolver.assign(untyped, type);
-		}
 	// We visit the tree and return the transformed root if no error happened.
 	// If an error happened we return nullptr.
 	pre_order<node>(n).visit(on_enter, idni::all, on_leave, on_between);
