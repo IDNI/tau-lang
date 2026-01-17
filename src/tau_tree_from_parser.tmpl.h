@@ -190,6 +190,24 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				default: break;
 			}
 		};
+		// extract stream information from a type definition
+		// and store it in io context
+		auto process_io_def = [&nt, &options](tref x) {
+			const auto& io_def = tau::get(x);
+			size_t stream_id = 0;
+			tref stream_node = io_def.first();
+			while (stream_node != nullptr)
+				stream_node = tau::get(stream_node).r;
+			if (stream_node != io_def.first()) {
+				const auto& stream = tau::get(stream_node);
+				if (stream.has_child())
+					stream_id = stream.child_data();
+			}
+			DBG(assert(options.context != nullptr));
+			(nt == input_def ? options.context->inputs
+					 : options.context->outputs)
+				[canonize<node>(io_def.first())] = stream_id;
+		};
 
 		tref x = nullptr; // result of node transformation
 
@@ -242,8 +260,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				// DBG(for (auto c : ch) LOG_TRACE << "child: " << LOG_FM_DUMP(c);)
 				x = getx(ch);
 
-				// if (nt == bf || nt == wff)
-				// 	tau_lang::get_free_vars<node>(x);
+				// update io_context by stream's input_def or output_def
+				if ((nt == input_def || nt == output_def)
+					&& options.context) process_io_def(x);
 
 				break;
 		}
@@ -286,7 +305,14 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 			tau::use_hooks = using_hooks;
 			return nullptr;
 		}
-		if (transformed) options.global_scope = std::move(result.second);
+		if (transformed) {
+			if (options.context) {
+				options.context->update_types(result.second);
+				DBG(LOG_TRACE << *options.context;)
+			}
+			if (options.global_scope)
+				*options.global_scope = std::move(result.second);
+		}
 	}
 
 	//Check for semantic errors in expression

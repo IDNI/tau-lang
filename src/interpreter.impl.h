@@ -10,199 +10,91 @@
 
 namespace idni::tau_lang {
 
-template <NodeType node>
-typed_stream get_typed_stream(const tref type,
-				const std::string& filename)
-{
-	return std::make_pair(get_ba_type_id<node>(type), dict(filename));
-}
-
 // -----------------------------------------------------------------------------
-// finputs
+// interpreter IO (read/write and rebuild_inputs/rebuild_outputs)
+// -----------------------------------------------------------------------------
 
 template <NodeType node>
-finputs<node>::finputs(const typed_io_vars& inputs) {
-	// open the corresponding streams for input and store them in streams
-	for (const auto& [var_sid, desc] : inputs) {
-		tref var = build_var_name<node>(var_sid);
-		this->types[var] = desc.first;
-		this->streams[var] = desc.second == 0
-			? std::optional<std::ifstream>()
-			: std::ifstream(dict(desc.second));
-		if (this->streams[var]
-			&& !this->streams[var].value().is_open())
-				LOG_ERROR << "Failed to open input file: '"
-					<< dict(desc.second) << "'";
-	}
-}
-
-template <NodeType node>
-finputs<node>::finputs(finputs&& other) noexcept {
-	types = std::move(other.types);
-	streams = std::move(other.streams);
-	time_point = other.time_point;
-}
-
-template <NodeType node>
-finputs<node>::~finputs() {
-	// close the streams
-	for (auto& [_, file] : streams) if (file) file.value().close();
-}
-
-template <NodeType node>
-void finputs<node>::add_input(tref var, size_t type_sid, size_t filename_sid) {
-	// size_t var_sid = get_var_name_sid<node>(var);
-	if (!types.contains(var)) {
-		types.emplace(var, type_sid);
-		streams.emplace(var, filename_sid == 0
-			? std::optional<std::ifstream>()
-			: std::ifstream(dict(filename_sid)));
-		if (this->streams[var]
-			&& !this->streams[var].value().is_open())
-				LOG_ERROR << "Failed to open input file: '"
-					<< dict(filename_sid) << "'";
-	}
-}
-
-template <NodeType node>
-std::optional<assignment<node>> finputs<node>::read() {
-	DBG(LOG_TRACE << "read begin\n";)
-
-	// for each stream in in streams, read the value from the file/stdin,
-	// parsed it and store it in out.
-	if (streams.empty()) return assignment<node>();
-	assignment<node> current;
-	for (auto& [var, file] : streams) {
-		std::string line;
-		if (file) {
-			auto& fs = file.value();
-			std::getline(fs, line);
-			std::cout << line << "\n";
-		} else {
-			std::cout << get_var_name<node>(var) << "[" << time_point << "] := ";
-			term::enable_getline_mode();
-			std::getline(std::cin, line);
-			term::disable_getline_mode();
-			// TODO (MEDIUM) add echo for input from a file instead of console
-		}
-		if (line.empty()) return {}; // no more inputs
-		auto cnst = ba_constants<node>::get(line,
-			get_ba_type_tree<node>(types[var]));
-		if (!cnst) {
-			LOG_ERROR
-				<< "Failed to parse input value '"
-				<< line << "' for stream '"
-				<< get_var_name<node>(var) <<
-				" of type '" << get_ba_type_name<node>(types[var]) << "'\n";
-
-			DBG(LOG_TRACE
-				<< "read[result]: {}\n"
-				<< "read end\n";)
-
-			return {};
-		}
-
-		DBG(LOG_TRACE
-			<< "read[var]: " << LOG_FM(var) << " = " << cnst.value().first << "\n"
-			<< "read[types[var]]: " << ba_types<node>::name(types[var]) << "\n";)
-
-		current[var] = tau::build_bf_ba_constant(cnst.value().first, types[var]);
-	}
-	time_point += 1;
-
-	DBG(LOG_TRACE
-			<< "read[time_point]: " << time_point << "\n"
-			<< "read[result]: { ";
-		for (const auto& [var, value] : current)
-			LOG_TRACE << LOG_FM(var) << " = " << value << ", ";
-		LOG_TRACE
-			<< "}\nread end\n";)
-
-	return current;
-}
-
-template <NodeType node>
-std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
-	trefs& in_vars, size_t time_step)
+std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
+	const trefs& in_vars, size_t time_step)
 {
-	DBG(LOG_TRACE
-			<< "read begin\n"
-			 << "read[time_point]: " << time_point << "\n"
-			 << "read[in_vars]: { ";
-		for (auto& var: in_vars) {
-			LOG_TRACE << LOG_FM(var) << ", ";
-		}
+	DBG(LOG_TRACE   << "read begin\n"
+			<< "read[time_point]: " << time_point << "\n"
+			<< "read[in_vars]: { ";
+		for (auto& var : in_vars) LOG_TRACE << LOG_FM_DUMP(var) << ", ";
 		LOG_TRACE << "}\n";)
 
-	std::ranges::sort(in_vars, constant_io_comp<node>);
-	// For formatting, get the maximal length of an output stream name with type information
-	int_t max_length = 0;
-	for (tref var : in_vars)
-		max_length = std::max(max_length, (int_t)TAU_TO_STR(var).length());
+	trefs sorted_in_vars = in_vars;
+	std::ranges::sort(sorted_in_vars, constant_io_comp<node>);
+	// // For formatting, get the maximal length of an output stream name with type information
+	// int_t max_length = 0;
+	// for (tref var : in_vars)
+	// 	max_length = std::max(max_length, (int_t)TAU_TO_STR(var).length());
 	assignment<node> value;
-	for (tref var : in_vars) {
+	for (tref var : sorted_in_vars) {
+		tref vn = canonize<node>(var);
 
-		DBG(LOG_TRACE << "read[var]: " << LOG_FM(var) << "\n";)
+		DBG(LOG_TRACE << "read[var]: " << LOG_FM_DUMP(var) << "\n";)
+		DBG(LOG_TRACE << "read[vn]: " << LOG_FM_DUMP(vn) << "\n";)
 
 		// Skip output stream variables
 		if (tau::get(var).is_output_variable())
 			continue;
 		// Skip input stream variables with time point greater time_step
-		if (get_io_time_point<node>(var) > (int_t)time_step)
+		if (get_io_time_point<node>(tau::trim(var)) > (int_t)time_step)
 			continue;
-		std::string line;
-		tref vn = get_var_name_node<node>(var);
-		if (auto it = streams.find(vn); it != streams.end()
-			&& it->second.has_value())
-		{
-			std::getline(it->second.value(), line);
-			std::cout << line << "\n";
-		} else if (it == streams.end()) {
+
+		auto it = inputs.find(canonize<node>(var));
+		if (it == inputs.end())  {
 			LOG_ERROR
 				<< "Failed to find input stream for stream '"
-				<< get_var_name<node>(vn) << "'\n";
+				<< get_var_name<node>(var) << "'\n";
+			DBG(LOG_TRACE << "read[result]: {}\n"
+				<< "read end\n";)
+			DBG(LOG_TRACE << ctx;)
+			DBG(LOG_TRACE << dump_to_str());
+			return {};
+		}
+		auto maybe_line = it->second->get(time_point); // get a value from input stream
+		if (!maybe_line.has_value()) {
+			LOG_ERROR
+				<< "Failed to read from input stream '"
+				<< get_var_name<node>(var) << "'\n";
+			DBG(LOG_TRACE << "read[result]: {}\n"
+				<< "read end\n";)
+		       return {};
+		}
+		std::string line = maybe_line.value();
+		std::cout << line << "\n"; // ???
+
+		if (line.empty()) return { value, true }; // no more inputs
+		size_t type = ctx.type_of(vn);
+		if (type == 0) {
+			LOG_ERROR << "Failed to find type for "
+				  << get_var_name<node>(var);
 
 			DBG(LOG_TRACE << "read[result]: {}\n"
-					 << "read end\n";)
-
-			return {};
-		} else {
-			const std::string vs = TAU_TO_STR(var);
-			const auto spacing = std::string(max_length - vs.length(), ' ');
-			std::cout << vs << spacing << " := ";
-			term::enable_getline_mode();
-			std::getline(std::cin, line);
-			term::disable_getline_mode();
-		}
-		if (line.empty()) return { value, true }; // no more inputs
-		const auto it = types.find(vn);
-		if (it == types.end()) {
-			LOG_ERROR
-				<< "Failed to find type for "
-				<< get_var_name<node>(vn);
-
-			DBG(LOG_TRACE
-				<< "read[result]: {}\n"
-				<< "read end\n";)
+				      << "read end\n";)
 
 			return {};
 		}
 		auto cnst = ba_constants<node>::get(line,
-			get_ba_type_tree<node>(it->second));
+				get_ba_type_tree<node>(type));
 		if (!cnst) {
 			LOG_ERROR
 				<< "Failed to parse input value '"
 				<< line << "' for stream '"
-				<< get_var_name<node>(var) <<
-				" of type '" << get_ba_type_name<node>(types[vn]) << "'\n";
+				<< get_var_name<node>(var)
+				<< get_ba_type_name<node>(type) << "'";
 			DBG(LOG_TRACE
 				<< "read[result]: {}\n"
-				<< "read end\n";)
+				<< "read end";)
 
 			return {};
 		}
 
-		tref wrapped_const = build_bf_ba_constant<node>(cnst.value().first, it->second);
+		tref wrapped_const = build_bf_ba_constant<node>(
+			cnst.value().first, type);
 
 		DBG(LOG_TRACE << "read[wrapped_const]: " << LOG_FM(wrapped_const) << "\n";)
 
@@ -214,7 +106,7 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 				<< "read end\n";)
 			return {};
 		}
-		value[tau::get(tau::bf, var)] = wrapped_const;
+		value[var] = wrapped_const;
 	}
 
 	DBG(LOG_TRACE << "read end\n";)
@@ -223,193 +115,160 @@ std::pair<std::optional<assignment<node>>, bool> finputs<node>::read(
 }
 
 template <NodeType node>
-size_t finputs<node>::type_of(tref var) const {
-	if (auto type = types.find(var);
-		type != types.end()) return type->second;
-
-	const std::string& name = get_var_name<node>(var);
-	if (name.size() > 1 && name[0] == '_' && name[1] == 'e')
-		return get_ba_type_id<node>(sbf_type<node>());
-
-	// LOG_ERROR << "Failed to find type for stream: "
-	// 	<< var << "\n";
-	return 0;
-}
-
-template<NodeType node>
-void finputs<node>::rebuild(const typed_io_vars& inputs) {
-	// Delete old streams
-	types.clear();
-	streams.clear();
-	// open the corresponding streams for input and store them in streams
-	for (const auto& [var_sid, desc] : inputs) {
-		tref var = build_var_name<node>(var_sid);
-		this->types[var] = desc.first;
-		this->streams[var] = desc.second == 0
-			? std::optional<std::ifstream>()
-			: std::ifstream(dict(desc.second));
-		if (this->streams[var]
-			&& !this->streams[var].value().is_open())
-			LOG_ERROR << "Failed to open input file: '"
-				<< dict(desc.second) << "'";
-	}
-}
-
-// -----------------------------------------------------------------------------
-// foutputs
-
-template <NodeType node>
-foutputs<node>::foutputs(const typed_io_vars& outputs) {
-	// open the corresponding streams for input and store them in streams
-	for (const auto& [var_sid, desc] : outputs) {
-		LOG_TRACE << "output var_sid: " << var_sid;
-		tref var = build_var_name<node>(var_sid);
-		LOG_TRACE << "output var_name: " << LOG_FM_TREE(var);
-		this->types[var] = desc.first;
-		this->streams[var] = desc.second == 0
-			? std::optional<std::ofstream>()
-			: std::ofstream(dict(desc.second));
-	}
+bool interpreter<node>::serialize_constant(std::stringstream& ss,
+	tref constant, size_t type) const
+{
+	DBG(LOG_TRACE << "serialize_constant[constant]: " << LOG_FM_DUMP(constant) << "\n";)
+	auto value = tt(constant) | tau::ba_constant;
+	if (!value) {
+		// is bf_t
+		if (auto check = tt(constant) | tau::bf_t; check)
+			ss << node::nso_factory::one(get_ba_type_tree<node>(type));
+		// is bf_f
+		else if (auto check = tt(constant) | tau::bf_f; check)
+			ss << node::nso_factory::zero(get_ba_type_tree<node>(type));
+		// is something else but not a BA element
+		else return false;
+	} else ss << (value | tt::ba_constant);
+	DBG(LOG_TRACE << "serialize_constant[ss]: " << ss.str() << "\n";)
+	return true;
 }
 
 template <NodeType node>
-foutputs<node>::foutputs(foutputs&& other) noexcept {
-	types = std::move(other.types);
-	streams = std::move(other.streams);
-}
-
-template <NodeType node>
-foutputs<node>::~foutputs() {
-	// close the streams
-	for (auto& [_, file]: streams) if (file) file.value().close();
-}
-
-template <NodeType node>
-void foutputs<node>::add_output(tref var, size_t type_sid, size_t filename_sid) {
-	if (!types.contains(var)) {
-		types.emplace(var, type_sid);
-		streams.emplace(var, filename_sid == 0
-			? std::optional<std::ofstream>()
-			: std::ofstream(dict(filename_sid)));
-	}
-}
-
-template <NodeType node>
-bool foutputs<node>::write(const assignment<node>& outputs) {
+bool interpreter<node>::write(const assignment<node>& output_values) {
 	// Sort variables in output by time
 	trefs io_vars;
-	for (const auto& [var, _ ] : outputs) {
-		DBG(LOG_TRACE << LOG_FM_TREE(var));
+	for (const auto& [var, _ ] : output_values) {
+		// DBG(LOG_TRACE << "io var: " << LOG_FM_TREE(var));
+		// DBG(LOG_TRACE << "io var dump: " << LOG_FM_DUMP(var));
 		assert(tau::get(var)[0].child_is(tau::io_var));
 		io_vars.push_back(var);
 	}
 	std::ranges::sort(io_vars, constant_io_comp<node>);
 
-	// For formatting, get the maximal length of an output stream name with type information
-	int_t max_length = 0;
-	for (tref io_var : io_vars)
-		max_length = std::max(max_length, (int_t)TAU_TO_STR(io_var).length());
+	// // For formatting, get the maximal length of an output stream name with type information
+	// int_t max_length = 0;
+	// for (tref io_var : io_vars)
+	// 	max_length = std::max(max_length, (int_t)TAU_TO_STR(io_var).length());
 	// for each stream in out.streams, write the value from the solution
 	for (tref io_var : io_vars) {
 		// get the BA element associated with io_var_name
-		DBG(LOG_TRACE << LOG_FM_TREE(io_var));
-		tref var_name = get_var_name_node<node>(io_var);
-		DBG(LOG_TRACE << LOG_FM_TREE(var_name));
-		auto value = tt(outputs.find(io_var)->second) | tau::ba_constant;
+		DBG(LOG_TRACE << "write[io_var]: " << LOG_FM_DUMP(io_var));
+		tref vn = canonize<node>(io_var);
+		assert(vn != nullptr);
+		DBG(LOG_TRACE << "write[canonized]: " << LOG_FM(vn));
+		auto value = tt(output_values.find(io_var)->second) | tau::ba_constant;
 		std::stringstream ss;
-		if (!value) {
-			// is bf_t
-			if (auto check = tt(outputs.find(io_var)->second)
-					| tau::bf_t; check) {
-				size_t type = types.find(var_name)->second;
-				ss << node::nso_factory::one(get_ba_type_tree<node>(type));
-			// is bf_f
-			} else if (auto check = tt(outputs.find(io_var)->second)
-					| tau::bf_f; check) {
-				size_t type = types.find(var_name)->second;
-				ss << node::nso_factory::zero(get_ba_type_tree<node>(type));
-			// is something else but not a BA element
-			} else {
-				LOG_ERROR << "No Boolean algebra element "
-					<< "assigned to output '"
-					<< TAU_TO_STR(io_var) << "'\n";
+		if (!serialize_constant(ss, output_values.find(io_var)->second,
+			ctx.type_of(vn)))
+		{
+			LOG_ERROR << "No Boolean algebra element assigned to "
+				"output '" << TAU_TO_STR(io_var) << "'";
 				return false;
-			}
-		} else {
-			ss << (value | tt::ba_constant);
 		}
-		// get the out_var_name tag
-		if (auto stream = streams.find(var_name); stream != streams.end())
-			if (stream->second) stream->second.value() << ss.str() << "\n";
-			else {
-				const std::string vn = TAU_TO_STR(io_var);
-				const auto spacing = std::string(max_length - vn.length(), ' ');
-				std::cout << vn << spacing << " := " << ss.str() << "\n";
-			}
-		else {
-			if (auto name = get_var_name<node>(var_name);
+		auto it = outputs.find(vn);
+		if (it == outputs.end()) {
+			if (auto name = get_var_name<node>(vn);
 				!name.empty() && name.front() == '_') continue;
-
 			LOG_ERROR << "Failed to find output stream for stream '"
-				<< get_var_name<node>(var_name) << "'\n";
+				<< get_var_name<node>(vn) << "'";
+			DBG(LOG_TRACE << ctx;)
+			DBG(LOG_TRACE << dump_to_str());
+			return false;
+		}
+		// write value to output stream
+		DBG(LOG_TRACE << "write/put(serialized_constant): " << ss.str();)
+		if (!it->second->put(ss.str(), time_point)) {
+			LOG_ERROR << "Failed to write to output stream '"
+				<< get_var_name<node>(vn) << "'";
 			return false;
 		}
 	}
 	return true; // success
 }
 
-template <NodeType node>
-size_t foutputs<node>::type_of(tref var) const {
-	if (auto type = types.find(var); type != types.end())
-		return type->second;
-
-	const std::string& name = get_var_name<node>(var);
-	if (name.size() > 1 && name[0] == '_' && name[1] == 'e') {
-		return get_ba_type_id<node>(sbf_type<node>());
-	}
-
-	// LOG_ERROR << "Failed to find type for stream '" << var << "'\n";
-	return 0;
-}
-
+// TODO should stop interpreting if failed to open an input stream
 template<NodeType node>
-void foutputs<node>::rebuild(const typed_io_vars& outputs) {
-	// Delete old streams
-	types.clear();
-	streams.clear();
+void interpreter<node>::rebuild_inputs(
+	const subtree_map<node, size_t>& current_inputs)
+{
+	// Close all input streams
+	inputs.clear();
 	// open the corresponding streams for input and store them in streams
-	for (const auto& [var_sid, desc] : outputs) {
-		tref var = build_var_name<node>(var_sid);
-		this->types[var] = desc.first;
-		this->streams[var] = desc.second == 0
-			? std::optional<std::ofstream>()
-			: std::ofstream(dict(desc.second));
+	for (auto& [current_var, stream_id] : current_inputs) {
+		DBG(LOG_TRACE << "rebuild_inputs[current_var]: " << LOG_FM_DUMP(current_var) << "\n";)
+		tref var = canonize<node>(current_var);
+		DBG(LOG_TRACE << "rebuild_inputs[var]: " << LOG_FM(var) << "\n";)
+		auto it = ctx.inputs.find(var);
+		if (it == ctx.inputs.end()) {
+			LOG_ERROR << "Failed to find input stream for stream '"
+				<< get_var_name<node>(var) << "'\n";
+			DBG(LOG_TRACE << ctx;)
+			DBG(LOG_TRACE << dump_to_str());
+			continue; // TODO should stop interpreting if failed to open an input stream
+		}
+		std::string vn = get_var_name<node>(var);
+		if (auto it = ctx.input_remaps.find(vn); it != ctx.input_remaps.end()) {
+			inputs.emplace(var, std::move(it->second->rebuild()));
+		} else {
+			if (stream_id == 0) inputs.emplace(var,
+				std::make_shared<console_prompt_input_stream>(vn));
+			else inputs.emplace(var,
+				std::make_shared<file_input_stream>(dict(stream_id)));
+		}
 	}
 }
 
+// TODO should stop interpreting if failed to open an output stream
+template<NodeType node>
+void interpreter<node>::rebuild_outputs(
+	const subtree_map<node, size_t>& current_outputs)
+{
+	// Delete old streams
+	outputs.clear();
+	// open the corresponding streams for output and store them in streams
+	for (auto& [current_var, stream_id] : current_outputs) {
+		tref var = canonize<node>(current_var);
+		auto it = ctx.outputs.find(var);
+		if (it == ctx.outputs.end()) {
+			LOG_ERROR << "Failed to find output stream for stream '"
+				<< get_var_name<node>(var) << "' when rebuilding outputs.";
+			continue; // TODO should stop interpreting if failed to open an output stream
+		}
+		std::string vn = get_var_name<node>(var);
+		if (auto it = ctx.output_remaps.find(vn); it != ctx.output_remaps.end())
+			outputs.emplace(var, std::move(it->second->rebuild()));
+		else {
+			if (stream_id == 0) outputs.emplace(var,
+				std::make_shared<console_prompt_output_stream>(vn));
+			else outputs.emplace(var,
+				std::make_shared<file_output_stream>(dict(stream_id)));
+		}
+	}
+}
 
 // -----------------------------------------------------------------------------
 // interpreter
 
 
-template <NodeType node, typename in_t, typename out_t>
-interpreter<node, in_t, out_t>::interpreter(
+template <NodeType node>
+interpreter<node>::interpreter(
 	trefs& ubt_ctn, auto& original_spec, auto& output_partition,
-	assignment<node>& memory, in_t& input, out_t& output,
-	const spec_context<node>& ctx)
+	assignment<node>& memory,
+	const io_context<node>& ctx)
 	: ubt_ctn(std::move(ubt_ctn)), original_spec(std::move(original_spec)),
-		memory(std::move(memory)), inputs(std::move(input)),
-		outputs(std::move(output)), ctx(ctx),
-		output_partition(std::move(output_partition)) {
+		memory(std::move(memory)), ctx(ctx),
+		output_partition(std::move(output_partition))
+{
 	compute_lookback_and_initial();
 }
 
-template <NodeType node, typename in_t, typename out_t>
-std::optional<interpreter<node, in_t, out_t>>
-	interpreter<node, in_t, out_t>::make_interpreter(tref spec,
-						auto& inputs, auto& outputs,
-						const auto& ctx)
+template <NodeType node>
+std::optional<interpreter<node>>
+	interpreter<node>::make_interpreter(tref spec,
+		const io_context<node>& ctx)
 {
+	DBG(LOG_TRACE << "make_interpreter[spec]: " << LOG_FM_DUMP(spec) << "\n";)
 	// Find a satisfiable unbound continuation from spec
 	spec = normalizer<node>(spec);
 	// For each spec clause, we check if it is executable
@@ -429,17 +288,33 @@ std::optional<interpreter<node, in_t, out_t>>
 		if (!executable) continue;
 		// All parts of spec are realizable
 		assignment<node> memory;
-		return interpreter{ ubt_ctn, spec_partition, output_partition,
-			memory, inputs, outputs, ctx };
+		auto i = interpreter{ ubt_ctn, spec_partition, output_partition,
+			memory, ctx };
+
+		// rebuild io streams according to the spec
+		subtree_map<node, size_t> output_streams;
+		if (!i.collect_output_streams(spec, output_streams)) return {};
+		LOG_TRACE << "interpreter::make_interpreter/rebuild_outputs";
+		i.rebuild_outputs(output_streams);
+		subtree_map<node, size_t> input_streams;
+		if (!i.collect_input_streams(spec, input_streams)) return {};
+		LOG_TRACE << "interpreter::make_interpreter/rebuild_inputs";
+		i.rebuild_inputs(input_streams);
+
+		DBG(LOG_TRACE << "interpreter created\n";)
+		DBG(LOG_TRACE << i.dump_to_str();)
+		// DBG(LOG_TRACE << ctx;)
+
+		return i;
 	}
 	// Given specification is not realizable
 	LOG_ERROR << "Tau specification is unsat\n";
 	return {};
 }
 
-template<NodeType node, typename in_t, typename out_t>
+template <NodeType node>
 std::vector<std::pair<tref, tref>>
-interpreter<node, in_t, out_t>::create_spec_partition(tref spec, auto& output_partition) {
+interpreter<node>::create_spec_partition(tref spec, auto& output_partition) {
 	// Get CNF clauses of DNF clause
 	trefs clauses = get_cnf_wff_clauses<node>(spec);
 	// Split each always statement into conjuncts again
@@ -501,33 +376,54 @@ interpreter<node, in_t, out_t>::create_spec_partition(tref spec, auto& output_pa
 	return partition;
 }
 
-template <NodeType node, typename in_t, typename out_t>
+template <NodeType node>
 std::pair<std::optional<assignment<node>>, bool>
-	interpreter<node, in_t, out_t>::step()
+	interpreter<node>::step()
 {
 	// Compute systems for the current step
 	if (!calculate_initial_spec()) return {};
 	LOG_INFO << "Execution step: " << time_point << "\n";
-	bool auto_continue = false;
 	// Get inputs for this step
-	auto [step_inputs, has_this_stream] = build_inputs_for_step(time_point);
+	auto [step_inputs, _] = build_inputs_for_step(time_point);
 	step_inputs = appear_within_lookback(step_inputs);
 	// Get values for inputs which do not exceed time_point
-	auto [values, is_quit] = inputs.read(step_inputs, time_point);
+	LOG_TRACE << "interpreter::step/read";
+	auto [values, is_quit] = read(step_inputs, time_point);
 	DBG(if (values.has_value())
 			for (auto [k, v] : values.value())
-				LOG_DEBUG << "Input: " << LOG_FM_TREE(k) << " = " << LOG_FM_TREE(v) << "\n";)
+				LOG_DEBUG << "Input: " << LOG_FM_DUMP(k) << " = " << LOG_FM_TREE(v) << "\n";)
 	// Empty input
 	if (is_quit) return {};
 	// Error during input
 	if (!values.has_value()) return { assignment<node>{}, true };
+
+	return step(values.value());
+}
+
+template <NodeType node>
+std::pair<std::optional<assignment<node>>, bool>
+	interpreter<node>::step(const assignment<node>& values)
+{
+	bool auto_continue = false;
 	// Save inputs in memory
-	for (const auto& [var, value] : values.value()) {
+	for (const auto& [var, value] : values) {
+		DBG(LOG_TRACE << "step[var]: " << LOG_FM_DUMP(var);)
 		assert(get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point);
 		// If there is at least one input, continue automatically in execution
 		auto_continue = true;
 		memory[var] = value;
 	}
+	bool has_this_stream = false;
+	for (auto& [var, _] : inputs) {
+		if (get_var_name<node>(var) == "this"
+			&& ctx.type_of(var) == get_ba_type_id<node>(
+							tau_type<node>()))
+		{
+			has_this_stream = true;
+			break;
+		}
+	}
+	DBG(LOG_TRACE << "step/has_this_stream: " << has_this_stream << "\n";)
 	// If the "this" input stream is present, write the current spec into it
 	if (has_this_stream) {
 		tref current_this_stream = build_in_var_at_n<node>(
@@ -554,10 +450,12 @@ std::pair<std::optional<assignment<node>>, bool>
 #ifdef DEBUG
 			LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
 				<< "step/updated: " << LOG_FM(updated) << "\n"
-				<< "step/current: " << LOG_FM(current) << "\n"
+				<< "step/current: " << LOG_FM_DUMP(current) << "\n"
 				<< "step/memory: ";
 			for (const auto& [k, v]: memory)
-				LOG_TRACE << "\t" << k << " := " << v << " ";
+				LOG_TRACE << "\t" << k << " := " << v << "\n"
+					<< "\t\t" << LOG_FM_DUMP(k) << "\n"
+					<< "\t\t" << LOG_FM_DUMP(v) << "\n";
 #endif // DEBUG
 			auto path_solution = solution_with_max_update(current);
 #ifdef DEBUG
@@ -568,20 +466,20 @@ std::pair<std::optional<assignment<node>>, bool>
 				else for (const auto& [k, v]: path_solution.value()) {
 					LOG_TRACE << "\t" << TAU_TO_STR(k) << " := "
 								<< TAU_TO_STR(v) << " ";
-					LOG_TRACE << LOG_FM_TREE(k) << "\n";
-					LOG_TRACE << LOG_FM_TREE(v) << "\n";
+					LOG_TRACE << LOG_FM_DUMP(k) << "\n";
+					LOG_TRACE << LOG_FM_DUMP(v) << "\n";
 				}
 				auto substituted = rewriter::replace<node>(
 						current, path_solution.value());
 				auto check = normalize_non_temp<node>(substituted);
-				LOG_TRACE << "step/check: " << check << "\n";
+				LOG_TRACE << "step/check: " << LOG_FM(check) << "\n";
 			} else {
 				LOG_TRACE << "step/solution: no solution\n";
 			}
 #endif // DEBUG
 			if (path_solution) {
 				solved = true;
-				for (const auto& [var, value]: path_solution.value()) {
+				for (const auto& [var, value] : path_solution.value()) {
 					// Check if we are dealing with a stream variable
 					if (tt(var) | tau::variable | tau::io_var) {
 						DBG(LOG_TRACE << LOG_FM_TREE(value));
@@ -608,10 +506,10 @@ std::pair<std::optional<assignment<node>>, bool>
 		}
 	}
 	// Complete outputs using time_point and current solution
-	for (const auto& [o, _] : outputs.streams) {
-		const size_t ctype = outputs.type_of(o);
+	for (const auto& [o, _] : outputs) {
+		const size_t ctype = ctx.type_of(o);
 		bool is_bv = is_bv_type_family<node>(ctype);
-		tref ot = build_out_var_at_n<node>(o, time_point, ctype);
+		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), time_point, ctype);
 		if (auto it = global.find(ot); it == global.end()) {
 			if (is_bv) {
 				auto zero_bitvector = make_bitvector_bottom_elem(
@@ -639,12 +537,13 @@ std::pair<std::optional<assignment<node>>, bool>
 		++time_point;
 		formula_time_point = time_point;
 	}
+	DBG(LOG_TRACE << dump_to_str();)
 	// TODO (HIGH) remove old values from memory
 	return { global, auto_continue };
 }
 
-template <NodeType node, typename in_t, typename out_t>
-trefs interpreter<node, in_t, out_t>::get_ubt_ctn_at(int_t t) {
+template <NodeType node>
+trefs interpreter<node>::get_ubt_ctn_at(int_t t) {
 	LOG_TRACE << "get_ubt_ctn_at begin \n";
 	LOG_TRACE << "get_ubt_ctn_at[t]: " << t << "\n";
 
@@ -688,8 +587,8 @@ trefs interpreter<node, in_t, out_t>::get_ubt_ctn_at(int_t t) {
 	return upd_ubt_ctn;
 }
 
-template <NodeType node, typename in_t, typename out_t>
-bool interpreter<node, in_t, out_t>::calculate_initial_spec() {
+template <NodeType node>
+bool interpreter<node>::calculate_initial_spec() {
 	LOG_TRACE << "calculate_initial_systems begin \n";
 	if (final_system) return true;
 
@@ -704,38 +603,40 @@ bool interpreter<node, in_t, out_t>::calculate_initial_spec() {
 		step_spec = ubt_ctn;
 		final_system = true;
 	}
-	LOG_TRACE << "calculate_initial_systems[result]: true\n";
-	LOG_TRACE << "calculate_initial_systems end\n";
+	LOG_TRACE << "calculate_initial_systems[result]: true";
+	LOG_TRACE << "calculate_initial_systems end";
 	return true;
 }
 
-template <NodeType node, typename in_t, typename out_t>
-std::pair<trefs, bool> interpreter<node, in_t, out_t>::build_inputs_for_step(
+template <NodeType node>
+std::pair<trefs, bool> interpreter<node>::build_inputs_for_step(
 	const size_t t)
 {
-	LOG_TRACE << "build_inputs_for_step begin\n";
+	LOG_TRACE << "build_inputs_for_step begin";
 	trefs step_inputs;
 	bool has_this_stream = false;
-	for (auto& [var, _] : inputs.streams) {
-		LOG_TRACE << "build_inputs_for_step[var]: " << LOG_FM_TREE(var);
-		LOG_TRACE << "build_inputs_for_step[inputs.type_of(var)] " << inputs.type_of(var) << "\n";
+	if (inputs.empty()) LOG_TRACE << "build_inputs_for_step[inputs]: empty";
+	for (auto& [var, _] : inputs) {
+		LOG_TRACE << "build_inputs_for_step[var]: " << LOG_FM_DUMP(var);
+		LOG_TRACE << "build_inputs_for_step[ctx.type_of(var)] " << LOG_BA_TYPE(ctx.type_of(var));
 		if (get_var_name<node>(var) == "this") {
-			if (size_t vt = inputs.type_of(var);
+			if (size_t vt = ctx.type_of(var);
 				vt == get_ba_type_id<node>(tau_type<node>())) {
 				has_this_stream = true;
-				LOG_TRACE << "build_inputs_for_step[has_this_stream]: true\n";
+				LOG_TRACE << "build_inputs_for_step[has_this_stream]: true";
 				continue;
 			}
 		}
-		step_inputs.emplace_back(tau::trim(
-			build_in_var_at_n<node>(var, t, inputs.type_of(var))));
+		step_inputs.emplace_back(build_in_var_at_n<node>(
+			get_var_name_node<node>(var), t, ctx.type_of(var)));
+		DBG(LOG_TRACE << "build_inputs_for_step[step_input]: " << LOG_FM_DUMP(step_inputs.back());)
 	}
-	LOG_TRACE << "build_inputs_for_step end\n";
-	return {step_inputs, has_this_stream};
+	LOG_TRACE << "build_inputs_for_step end (step_inputs size: " << step_inputs.size() << ")";
+	return { step_inputs, has_this_stream };
 }
 
-template <NodeType node, typename in_t, typename out_t>
-tref interpreter<node, in_t, out_t>::update_to_time_point(
+template <NodeType node>
+tref interpreter<node>::update_to_time_point(
 	tref f, const int_t t) {
 	LOG_TRACE << "update_to_time_point begin\n";
 	// update the f according to current time_point, i.e. for each
@@ -743,13 +644,13 @@ tref interpreter<node, in_t, out_t>::update_to_time_point(
 	// corresponding to the current time_point minus the shift.
 	auto io_vars = tau::get(f).select_top(is_child<node, tau::io_var>);
 	auto result = fm_at_time_point<node>(f, io_vars, t);
-	LOG_TRACE << "update_to_time_point[result]: " << tau::get(result) << "\n";
+	LOG_TRACE << "update_to_time_point[result]: " << LOG_FM_DUMP(result) << "\n";
 	LOG_TRACE << "update_to_time_point end\n";
 	return result;
 }
 
-template <NodeType node, typename in_t, typename out_t>
-bool interpreter<node, in_t, out_t>::is_memory_access_valid(const auto& io_vars)
+template <NodeType node>
+bool interpreter<node>::is_memory_access_valid(const auto& io_vars)
 {
 	// Check for each constant time point accessing memory, if it is available
 	for (tref io_var : io_vars) {
@@ -762,8 +663,8 @@ bool interpreter<node, in_t, out_t>::is_memory_access_valid(const auto& io_vars)
 	return true;
 }
 
-template <NodeType node, typename in_t, typename out_t>
-void interpreter<node, in_t, out_t>::compute_lookback_and_initial() {
+template <NodeType node>
+void interpreter<node>::compute_lookback_and_initial() {
 	trefs io_vars;
 	for (tref ubt_ctn_part : ubt_ctn) {
 		const trefs current_io_vars = tau::get(ubt_ctn_part).select_top(
@@ -776,8 +677,8 @@ void interpreter<node, in_t, out_t>::compute_lookback_and_initial() {
 	highest_initial_pos = get_max_initial<node>(io_vars);
 }
 
-template <NodeType node, typename in_t, typename out_t>
-tref interpreter<node, in_t, out_t>::get_executable_spec(
+template <NodeType node>
+tref interpreter<node>::get_executable_spec(
 	tref& clause, const size_t start_time) {
 	LOG_TRACE << "get_executable_spec begin\n";
 
@@ -823,15 +724,15 @@ tref interpreter<node, in_t, out_t>::get_executable_spec(
 		executable = rewriter::replace<node>(executable, model.value());
 		clause = rewriter::replace<node>(clause, model.value());
 		LOG_INFO << "Resulting Tau specification part: " << TAU_TO_STR(clause) << "\n";
-		LOG_TRACE << "get_executable_spec[spec]: " << TAU_TO_STR(executable) << "\n";
+		LOG_TRACE << "get_executable_spec[spec]: " << LOG_FM(executable) << "\n";
 	}
-	LOG_TRACE << "get_executable_spec[spec]: " << tau::get(executable);
+	LOG_TRACE << "get_executable_spec[spec]: " << LOG_FM(executable);
 	LOG_TRACE << "get_executable_spec end\n";
 	return executable;
 }
 
-template <NodeType node, typename in_t, typename out_t>
-void interpreter<node, in_t, out_t>::update(tref update) {
+template <NodeType node>
+void interpreter<node>::update(tref update) {
 	// TODO: shift spec time according to new lookback from update
 	trefs io_vars = tau::get(update)
 				.select_top(is_child<node, tau::io_var>);
@@ -978,26 +879,28 @@ void interpreter<node, in_t, out_t>::update(tref update) {
 		// The systems for solver need to be recomputed at beginning of next step
 		final_system = false;
 		compute_lookback_and_initial();
-		typed_io_vars output_streams;
+		subtree_map<node, size_t> output_streams;
 		for (tref spec_part : original_spec | std::views::keys) {
-			if (!collect_output_streams(spec_part, output_streams, ctx))
+			if (!collect_output_streams(spec_part, output_streams))
 				return;
 		}
-		outputs.rebuild(output_streams);
-		typed_io_vars input_streams;
+		LOG_TRACE << "interpreter::update/rebuild_outputs";
+		rebuild_outputs(output_streams);
+		subtree_map<node, size_t> input_streams;
 		for (tref spec_part : original_spec | std::views::keys) {
-			if (!collect_input_streams(spec_part, input_streams, ctx))
+			if (!collect_input_streams(spec_part, input_streams))
 				return;
 		}
-		inputs.rebuild(input_streams);
+		LOG_TRACE << "interpreter::update/rebuild_inputs";
+		rebuild_inputs(input_streams);
 		return;
 	}
 	// No more clause left in update and all clauses are not realizable
 	LOG_WARNING << "No update performed: updated specification is unsat\n";
 }
 
-template <NodeType node, typename in_t, typename out_t>
-tref interpreter<node, in_t, out_t>::pointwise_revision(
+template <NodeType node>
+tref interpreter<node>::pointwise_revision(
 	tref spec, tref update, const int_t start_time)
 {
 	spec = normalizer<node>(spec);
@@ -1089,10 +992,14 @@ tref interpreter<node, in_t, out_t>::pointwise_revision(
 	return tau::_F();
 }
 
-template <NodeType node, typename in_t, typename out_t>
-std::optional<assignment<node>> interpreter<node, in_t, out_t>::
-solution_with_max_update(tref spec) {
+template <NodeType node>
+std::optional<assignment<node>> interpreter<node>::solution_with_max_update(
+	tref spec)
+{
+	// using tau = tree<node>;
+	// DBG(LOG_TRACE << "solution_with_max_update/spec: " << LOG_FM_DUMP(spec) << "\n";)
 	auto get_solution = [](const auto& fm) {
+		// DBG(LOG_TRACE << "get_solution/fm: " << LOG_FM_DUMP(fm) << "\n";)
 		// setting proper options for the solver
 		solver_options options = {
 			.splitter_one = node::nso_factory::splitter_one(tau_type<node>()),
@@ -1105,6 +1012,10 @@ solution_with_max_update(tref spec) {
 			LOG_ERROR << "Internal error in solver\n";
 			return std::optional<solution<node>>();
 		}
+// #ifdef DEBUG
+// 		if (s) for (auto [k, v] : s.value()) LOG_TRACE
+// 			<< "get_solution/solution: \n\t\tkey: " << LOG_FM_DUMP(k) << "\n\t\tvalue: " << LOG_FM_DUMP(v);
+// #endif // DEBUG
 		return s;
 	};
 	tref u = build_out_var_at_n<node>("u", time_point,
@@ -1151,16 +1062,16 @@ solution_with_max_update(tref spec) {
 	return get_solution(spec);
 }
 
-template <NodeType node, typename in_t, typename out_t>
-bool interpreter<node, in_t, out_t>::is_excluded_output(tref var) {
+template <NodeType node>
+bool interpreter<node>::is_excluded_output(tref var) {
 	if (tau::get(var).is_input_variable()) return false;
 	const std::string& io_name = get_var_name<node>(var);
 	return io_name[0] == '_' && io_name.size() > 1 &&
 		(io_name[1] == 'e' || io_name[1] == 'f');
 }
 
-template <NodeType node, typename in_t, typename out_t>
-trefs interpreter<node, in_t, out_t>::appear_within_lookback(const trefs& vars){
+template <NodeType node>
+trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
 		for (tref ubt_ctn_part : ubt_ctn) {
@@ -1183,8 +1094,8 @@ trefs interpreter<node, in_t, out_t>::appear_within_lookback(const trefs& vars){
 	return appeared;
 }
 
-template <NodeType node, typename in_t, typename out_t>
-tref interpreter<node, in_t, out_t>::unsqueeze_always(tref cnf_expression) {
+template <NodeType node>
+tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 	// Squeeze always statements again
 	trefs clauses = get_cnf_wff_clauses<node>(cnf_expression);
 	trefs aw_clauses;
@@ -1220,11 +1131,13 @@ bool has_free_vars(tref fm, bool silent = false) {
 		for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
 			if (is_child<node>(*it, tau::io_var)) {
 				const tau& io_var_node = tau::get(*it)[0];
-				if (!io_var_node.is_input_variable() && !
-				io_var_node.is_output_variable()) {
+				if (       !io_var_node.is_input_variable()
+					&& !io_var_node.is_output_variable())
+				{
 					if (!silent) LOG_ERROR << "The stream "
-					<< io_var_node
-					<< " is not defined as an input or output stream\n";
+						<< io_var_node << " is not "
+						<< "defined as an input or "
+						<< "output stream";
 					return true;
 				}
 			} else if (!is_child<node>(*it, tau::uconst_name)) {
@@ -1235,28 +1148,35 @@ bool has_free_vars(tref fm, bool silent = false) {
 		if (has_real_free_vars) {
 			if (!silent) LOG_ERROR << "The following variable(s) must be "
 				<< "quantified and cannot appear free: "
-				<< ss.str() << "\n";
+				<< ss.str();
 			return true;
 		}
 	}
 	return false;
 }
 
-template <NodeType node, typename in_t, typename out_t>
-std::optional<interpreter<node, in_t, out_t>> run(tref form,
-	in_t& inputs, out_t& outputs, const auto& ctx, const size_t steps)
+template <NodeType node>
+std::optional<interpreter<node>> run(tref form, const io_context<node>& ctx,
+	const size_t steps)
 {
 	DBG(LOG_TRACE << "run begin\n";
-		LOG_TRACE << "run[form]: " << LOG_FM(form) << "\n";
-		LOG_TRACE << "run[steps]: " << steps << "\n";)
+		LOG_TRACE << "run[form]: " << LOG_FM(form);
+		LOG_TRACE << "run[steps]: " << steps;)
 
 	using tau = tree<node>;
-	DBG(LOG_TRACE << "run[form]: " << LOG_FM(form) << "\n");
-	auto intrprtr_o = interpreter<node, in_t, out_t>::make_interpreter(
-							form, inputs, outputs,
-							ctx);
+	DBG(LOG_TRACE << "run[form]: " << LOG_FM(form));
+	auto intrprtr_o = interpreter<node>::make_interpreter(form, ctx);
 	if (!intrprtr_o) return {};
 	auto& intrprtr = intrprtr_o.value();
+
+	LOG_TRACE << "run/rebuild_inputs";
+	subtree_map<node, size_t> current_inputs;
+	if (!intrprtr.collect_input_streams(form, current_inputs)) return {};
+	intrprtr.rebuild_inputs(current_inputs);
+	LOG_TRACE << "run/rebuild_outputs";
+	subtree_map<node, size_t> current_outputs;
+	if (!intrprtr.collect_output_streams(form, current_outputs)) return {};
+	intrprtr.rebuild_outputs(current_outputs);
 
 	LOG_INFO << "-----------------------------------------------------------------------------------------------------------";
 	LOG_INFO << "Please provide requested input, or press ENTER to terminate                                               |";
@@ -1271,7 +1191,7 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 			if (output.has_value()) {
 				LOG_TRACE << "{ ";
 				for (const auto& [v, val] : output.value())
-					LOG_TRACE << LOG_FM_TREE(v) << " := " << LOG_FM_TREE(val) << "; ";
+					LOG_TRACE << LOG_FM_DUMP(v) << " := " << LOG_FM_TREE(val) << "; ";
 				LOG_TRACE << "}\n";
 			} else LOG_TRACE << "no output\n";
 			LOG_TRACE << "run[auto_continue]: " << auto_continue << "\n";
@@ -1279,7 +1199,7 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 
 		// If the user provided empty input for an input stream, quit
 		if (!output.has_value()) break;
-		if (!intrprtr.outputs.write(output.value())) break;
+		if (!intrprtr.write(output.value())) break;
 		// If there is no input, ask the user if execution should continue
 		if (!auto_continue && steps == 0) {
 			std::string line;
@@ -1293,7 +1213,7 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 		auto update_stream = build_out_var_at_n<node>(
 			"u", intrprtr.time_point - 1, get_ba_type_id<node>(tau_type<node>()));
 		// Update only if u is of type tau
-		if (size_t t = intrprtr.outputs.type_of(get_var_name_node<node>(update_stream));
+		if (size_t t = intrprtr.ctx.type_of(update_stream);
 			t != 0 && t == get_ba_type_id<node>(tau_type<node>()))
 		{
 			auto it = output.value().find(update_stream);
@@ -1315,95 +1235,128 @@ std::optional<interpreter<node, in_t, out_t>> run(tref form,
 }
 
 template <NodeType node>
-bool collect_input_streams(tref dnf, typed_io_vars& current_inputs,
-	const spec_context<node>& ctx) {
+bool interpreter<node>::collect_input_streams(tref dnf,
+	subtree_map<node, size_t>& current_inputs)
+{
 	using tau = tree<node>;
 	// select current input variables
 	auto is_in_var = [](tref n) {
 		const tau& tn = tau::get(n);
-		if (tn.is(tau::variable))
-			return tn[0].is_input_variable();
+		if (tn.is(tau::variable)) return tn[0].is_input_variable();
 		return false;
 	};
 	trefs in_vars = tau::get(dnf).select_all(is_in_var);
-	for (tref var : in_vars) {
-		size_t var_sid = get_var_name_sid<node>(var);
-		// Get type of current input stream
-		if (size_t type = tau::get(var).get_ba_type(); type > 0) {
-			// input stream has type
-			if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end()) {
-				// Check also predefined streams
-				if (type != it->second.first) {
-					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for "
-					<< tau::get(var).to_str() << "\n";
-					return false;
-				}
-				current_inputs[var_sid] = it->second;
-			} else current_inputs.emplace(var_sid, std::make_pair(type, 0));
-		} else if (auto it = ctx.inputs.find(var_sid); it != ctx.inputs.end()) {
-			// stream has predefined type
-			current_inputs.emplace(var_sid, it->second);
-		} else {
-			// Untyped io stream error
+	for (tref var_node : in_vars) {
+		size_t type_id = tau::get(var_node).get_ba_type();
+		DBG(LOG_TRACE << "collect_input_streams[var_node]: " << LOG_FM_DUMP(var_node) << "\n";)
+		if (type_id == 0) {
 			TAU_LOG_ERROR << "The following input stream must be typed: "
-					<< tau::get(var).to_str() << "\n";
+				<< tau::get(var_node).to_str() << "\n";
 			return false;
+		}
+		tref var = canonize<node>(var_node);
+		// size_t var_sid = get_var_name_sid<node>(var);
+		// update current input streams by known stream id
+		if (auto it = ctx.inputs.find(var); it != ctx.inputs.end())
+			current_inputs[var] = it->second;
+		else {
+			// or default to console input stream
+			DBG(LOG_TRACE << "collect_input_streams[adding default input console]: "
+				<< get_var_name<node>(var) << " "
+				<< LOG_BA_TYPE(type_id);)
+			ctx.add_input_console(get_var_name<node>(var), type_id);
+			current_inputs[var] = ctx.inputs[var];
 		}
 	}
 	return true;
 }
 
 template<NodeType node>
-typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx) {
-	typed_io_vars current_inputs;
-	if (collect_input_streams(dnf, current_inputs, ctx))
+subtree_map<node, size_t> interpreter<node>::collect_input_streams(tref dnf) {
+	subtree_map<node, size_t> current_inputs;
+	if (collect_input_streams(dnf, current_inputs))
 		return current_inputs;
 	else return {};
 }
 
 template <NodeType node>
-bool collect_output_streams(tref dnf, typed_io_vars& current_outputs,
-	const spec_context<node>& ctx) {
+bool interpreter<node>::collect_output_streams(tref dnf,
+	subtree_map<node, size_t>& current_outputs)
+{
 	using tau = tree<node>;
 	// select current output variables
 	auto is_out_var = [](tref n) {
 		const tau& tn = tau::get(n);
-		if (tn.is(tau::variable))
-			return tn[0].is_output_variable();
+		if (tn.is(tau::variable)) return tn[0].is_output_variable();
 		return false;
 	};
 	trefs out_vars = tau::get(dnf).select_all(is_out_var);
-	for (tref var : out_vars) {
-		size_t var_sid = get_var_name_sid<node>(var);
-		// Get type of current output stream
-		if (size_t type = tau::get(var).get_ba_type(); type > 0) {
-			if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end()) {
-				// Check also predefined streams
-				if (type != it->second.first) {
-					TAU_LOG_ERROR << "Type mismatch due to predefinition detected for: "
-					<< tau::get(var).to_str() << "\n";
-					return false;
-				}
-				current_outputs.emplace(var_sid, it->second);
-			} else current_outputs.emplace(var_sid, std::make_pair(type, 0));
-		} else if (auto it = ctx.outputs.find(var_sid); it != ctx.outputs.end()) {
-			// stream has predefined type
-			current_outputs.emplace(var_sid, it->second);
-		} else {
-			// Untyped io stream error
-			TAU_LOG_ERROR << "The following input stream must be typed: "
-					<< tau::get(var).to_str() << "\n";
+	for (tref var_node : out_vars) {
+		size_t type_id = tau::get(var_node).get_ba_type();
+		DBG(LOG_TRACE << "collect_output_streams[var_node]: " << LOG_FM_DUMP(var_node) << "\n";)
+		if (type_id == 0) {
+			TAU_LOG_ERROR << "The following output stream must be typed: "
+				<< tau::get(var_node).to_str() << "\n";
 			return false;
+		}
+		tref var = canonize<node>(var_node);
+		// size_t var_sid = get_var_name_sid<node>(var);
+		// update current output streams by known stream id
+		if (auto it = ctx.outputs.find(var); it != ctx.outputs.end())
+			current_outputs[var] = it->second;
+		else {
+			// or default to console output stream
+			DBG(LOG_TRACE << "collect_output_streams[adding default output console]: "
+				<< get_var_name<node>(var) << " "
+				<< LOG_BA_TYPE(type_id);)
+			ctx.add_output_console(get_var_name<node>(var), type_id);
+			current_outputs[var] = ctx.outputs[var];
 		}
 	}
 	return true;
 }
 
 template<NodeType node>
-typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx) {
-	typed_io_vars current_outputs;
-	if (collect_output_streams(dnf, current_outputs, ctx))
+subtree_map<node, size_t> interpreter<node>::collect_output_streams(tref dnf) {
+	subtree_map<node, size_t> current_outputs;
+	if (collect_output_streams(dnf, current_outputs))
 		return current_outputs;
 	else return {};
 }
+
+template <NodeType node>
+std::ostream& interpreter<node>::dump(std::ostream& os) const {
+	os << "\n" << TC.GREEN() << "=== Interpreter ===" << TC.CLEAR() << "\n";
+	os << "Time point:      " << time_point << "\n";
+	os << "Inputs:         ";
+	if (ctx.inputs.empty()) os << " none";
+	for (const auto& [var, _] : ctx.inputs) os << " " << get_var_name<node>(var);
+	os << "\n";
+	os << "Outputs:        ";
+	if (ctx.outputs.empty()) os << " none";
+	for (const auto& [var, _] : ctx.outputs) os << " " << get_var_name<node>(var);
+	os << "\n";
+	os << "Current inputs: ";
+	if (inputs.empty()) os << " none";
+	for (const auto& [var, _] : inputs) os << " " << get_var_name<node>(var);
+	os << "\n";
+	os << "Current outputs:";
+	if (outputs.empty()) os << " none";
+	for (const auto& [var, _] : outputs) os << " " << get_var_name<node>(var);
+	os << "\n";
+	os << "Memory:         ";
+	if (memory.empty()) os << " empty";
+	os << "\n";
+	for (const auto& [k, v]: memory)
+		os //<< "\t" << k << " := " << v
+			<< "\t" << LOG_FM(k) << " := " << LOG_FM(v) << "\n";
+	return os << "\n";
+}
+
+template <NodeType node>
+std::string interpreter<node>::dump_to_str() const {
+	std::stringstream ss;
+	return dump(ss), ss.str();
+}
+
 } // namespace idni::tau_lang

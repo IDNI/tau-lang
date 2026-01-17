@@ -1,8 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "tau_tree.h"
-#include "ba_types.h"
-#include "interpreter_types.h"
 
 namespace idni::tau_lang {
 
@@ -21,18 +19,12 @@ template <NodeType node>
 rr_sig get_rr_sig(tref n);
 
 template <NodeType node>
-bool get_io_def(tref def, io_defs<node>& in_or_out_defs);
-
-template <NodeType node>
-bool get_io_defs(spec_context<node>& ctx, tref code);
-
-template <NodeType node>
-rewriter::rules get_rec_relations(spec_context<node>& ctx, tref r);
+rewriter::rules get_rec_relations(io_context<node>& ctx, tref r);
 template <NodeType node>
 rewriter::rules get_rec_relations(tref r);
 
 template <NodeType node>
-std::optional<rr<node>> get_nso_rr(spec_context<node>& ctx, tref ref);
+std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref ref);
 template <NodeType node>
 std::optional<rr<node>> get_nso_rr(tref ref);
 
@@ -173,6 +165,8 @@ bool has_semantic_error(tref fm);
 
 #include "ref_types_inference.h"
 #include "ba_types_inference.h"
+
+#include "io_context.h"
 
 #include "tau_tree_node.tmpl.h"
 #include "tau_tree_traverser.tmpl.h"

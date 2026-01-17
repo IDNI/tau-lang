@@ -15,83 +15,24 @@ using assignment = subtree_map<node, tref>;
 // equations of the clause according to its type.
 using system = std::map<size_t, tref>;
 
-// pair of BA type id and filename string id
-using typed_stream = std::pair<size_t, size_t>;
-
-// map of variable string id to a typed_stream
-using typed_io_vars = std::map<size_t, typed_stream>;
+template <NodeType node>
+struct api;
 
 template <NodeType node>
-typed_stream get_typed_stream(const std::string& type,
-				const std::string& filename);
-
-template <NodeType node>
-struct finputs {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	using bac = ba_constants<node>;
-
-	finputs() = delete;
-	finputs(const typed_io_vars& inputs);
-	finputs(finputs&& other) noexcept;
-	~finputs();
-
-	void add_input(tref var, size_t type_sid, size_t filename_sid);
-	std::optional<assignment<node>> read();
-	// Read input from command line and return mapping from in_vars to this input
-	std::pair<std::optional<assignment<node>>, bool> read(
-					trefs& in_vars, size_t time_step);
-
-	size_t type_of(tref var) const;
-
-	void rebuild (const typed_io_vars& inputs);
-
-	// map of var name node to a type id
-	subtree_map<node, size_t> types;
-	// map of var name node to a stream
-	subtree_map<node, std::optional<std::ifstream>> streams;
-
-	size_t time_point = 0;
-};
-
-template <NodeType node>
-struct foutputs {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	using bac = ba_constants<node>;
-
-	foutputs() = delete;
-	foutputs(const typed_io_vars& outputs);
-	foutputs(foutputs&& other) noexcept;
-	~foutputs();
-
-	void add_output(tref var, size_t type_sid, size_t filename_sid);
-	bool write(const assignment<node>& outputs);
-
-	size_t type_of(tref var) const;
-
-	void rebuild (const typed_io_vars& outputs);
-
-	// map of var name node to a type id
-	subtree_map<node, size_t> types;
-	// map of var name node to a stream
-	subtree_map<node, std::optional<std::ofstream>> streams;
-};
-
-template <NodeType node, typename in_t, typename out_t>
 struct interpreter {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	friend struct api<node>;
 
 	interpreter(trefs& ubt_ctn, auto& original_spec, auto& output_partition,
-		assignment<node>& memory, in_t& input, out_t& output,
-		const spec_context<node>& ctx);
+		assignment<node>& memory, const io_context<node>& ctx);
 
 	static std::optional<interpreter> make_interpreter(tref spec,
-						auto& inputs, auto& outputs,
-						const auto& ctx);
+		const io_context<node>& ctx);
 
 	std::pair<std::optional<assignment<node>>, bool> step();
+	std::pair<std::optional<assignment<node>>, bool> step(
+						const assignment<node>& values);
 
 	// Update the interpreter with a given update
 	void update(tref update);
@@ -101,9 +42,9 @@ struct interpreter {
 	std::vector<std::pair<tref, tref>> original_spec;
 	assignment<node> memory;
 	size_t time_point = 0;
-	in_t inputs;
-	out_t outputs;
-	const spec_context<node>& ctx = {};
+	input_streams<node>     inputs;
+	output_streams<node>    outputs;
+	io_context<node> ctx;
 
 private:
 	static bool stream_comp(tref s1, tref s2) {
@@ -118,6 +59,19 @@ private:
 
 	static std::vector<std::pair<tref, tref>>
 	create_spec_partition(tref spec, auto& output_partition);
+
+	std::pair<std::optional<assignment<node>>, bool> read(
+		const trefs& in_vars, size_t time_step);
+	bool write(const assignment<node>& outputs);
+	bool serialize_constant(std::stringstream& ss, tref constant,
+		size_t type) const;
+	void rebuild_inputs(const subtree_map<node, size_t>& current_inputs);
+	void rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
+
+	bool collect_input_streams(tref dnf, subtree_map<node, size_t>& current_inputs);
+	subtree_map<node, size_t> collect_input_streams(tref dnf);
+	bool collect_output_streams(tref dnf, subtree_map<node, size_t>& current_outputs);
+	subtree_map<node, size_t> collect_output_streams(tref dnf);
 
 	trefs get_ubt_ctn_at(int_t t);
 
@@ -150,29 +104,21 @@ private:
 
 	// Utility to unsqueeze always statements without timepoint adjustment
 	static tref unsqueeze_always(tref cnf_expression);
+
+	std::ostream& dump(std::ostream& os) const;
+	std::string dump_to_str() const;
+
+	template <NodeType N>
+	friend std::optional<interpreter<N>> run(tref,
+		const io_context<N>&, const size_t);
 };
 
 template <NodeType node>
 tref unpack_tau_constant(tref constant);
 
-template <NodeType node, typename in_t, typename out_t>
-std::optional<interpreter<node, in_t, out_t>> run(tref form,
-		in_t& inputs, out_t& outputs, const auto& ctx,
-		const size_t steps = 0);
-
 template <NodeType node>
-bool collect_input_streams(tref dnf, typed_io_vars& current_inputs,
-	const spec_context<node>& ctx);
-
-template <NodeType node>
-typed_io_vars collect_input_streams(tref dnf, const spec_context<node>& ctx);
-
-template <NodeType node>
-bool collect_output_streams(tref dnf, typed_io_vars& current_inputs,
-	const spec_context<node>& ctx);
-
-template <NodeType node>
-typed_io_vars collect_output_streams(tref dnf, const spec_context<node>& ctx);
+std::optional<interpreter<node>> run(tref form,
+	const io_context<node>& ctx, const size_t steps = 0);
 
 } // namespace idni::tau_lang
 

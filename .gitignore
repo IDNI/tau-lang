@@ -80,3 +80,9 @@ external/boost
 libboost-mingw-w64
 private/*
 .clangd
+
+# python generated
+__pycache__/
+*.py[codz]
+*$py.class
+.pytest_cache/
