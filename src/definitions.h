@@ -14,7 +14,7 @@ namespace idni::tau_lang {
 template<NodeType node>
 struct definitions {
 	using tau = tree<node>;
-	size_t add (htref head, htref body) {
+	size_t add(htref head, htref body) {
 		// Check if rule is updated
 		for (size_t i = 0; i < heads.size(); ++i) {
 			if (tau::get(heads[i]) == tau::get(head)) {

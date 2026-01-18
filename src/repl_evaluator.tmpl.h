@@ -580,7 +580,7 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	for (size_t i = 0; i < defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
 			<< to_str<node>(defs[i]) << "\n";
-	std::cout << defs.get_io_context();
+	std::cout << *defs.get_io_context();
 }
 
 template <typename... BAs>

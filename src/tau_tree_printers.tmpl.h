@@ -117,18 +117,19 @@ std::ostream& operator<<(std::ostream& os,
 
 template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
+#ifdef DEBUG
 	os << "\n" << TC.GREEN() << "=== IO Context ===" << TC.CLEAR() << "\n";
 
 	os << "IO types:     ";
 	if (ctx.types.empty()) os << " none";
 	os << "\n";
 	for (const auto& [var, type] : ctx.types) os << "\t" << get_var_name<node>(var) << get_ba_type_name<node>(type) << "\n";
-
-	os << "IO streams:   ";
+#endif
+	os << "IO variables:   ";
 	if (ctx.inputs.empty() && ctx.outputs.empty()) os << " none";
 	os << "\n";
 	auto print_io = [&](tref var, size_t s, bool output) {
-		os << "\t" << get_var_name<node>(var)
+		os << "\t" << get_var_name<node>(var) << ":"
 			<< get_ba_type_name<node>(ctx.type_of(var)) << " = "
 			<< (output ? "out" : "in") << " "
 			<< (s == 0 ? "console"
@@ -138,15 +139,18 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	for (const auto& [var, s] : ctx.inputs)  print_io(var, s, false);
 	for (const auto& [var, s] : ctx.outputs) print_io(var, s, true);
 
-	os << "Input remaps: ";
-	if (ctx.input_remaps.size() == 0) os << " none";
-	else for (const auto& [name, stream] : ctx.input_remaps) os << " " << name;
-	os << "\n";
+	if (ctx.input_remaps.size()) {
+		os << "Input remaps: ";
+		for (const auto& [name, _] : ctx.input_remaps) os << " " << name;
+		os << "\n";
+	}
 
-	os << "Output remaps:";
-	if (ctx.output_remaps.size() == 0) os << " none";
-	else for (const auto& [name, stream] : ctx.output_remaps) os << " " << name;
-	return os << "\n\n";
+	if (ctx.output_remaps.size()) {
+		os << "Output remaps:";
+		for (const auto& [name, _] : ctx.output_remaps) os << " " << name;
+		os << "\n";
+	}
+	return os << "\n";
 }
 
 template <NodeType node>
