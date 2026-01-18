@@ -196,7 +196,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 			const auto& io_def = tau::get(x);
 			size_t stream_id = 0;
 			tref stream_node = io_def.first();
-			while (stream_node != nullptr)
+			while (tau::get(stream_node).has_right_sibling())
 				stream_node = tau::get(stream_node).r;
 			if (stream_node != io_def.first()) {
 				const auto& stream = tau::get(stream_node);
