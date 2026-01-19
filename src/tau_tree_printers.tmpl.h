@@ -63,6 +63,9 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			|| nt == tau::bf_f
 			|| nt == tau::bf_t
 			// added for debugging purposes in overloading
+			|| nt == tau::input_def
+			|| nt == tau::output_def
+			|| nt == tau::io_var_name
 			|| nt == tau::fp_fallback
 			|| nt == tau::ref
 			|| nt == tau::bf_ref
