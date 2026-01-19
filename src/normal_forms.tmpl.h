@@ -3694,6 +3694,9 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 		return tau::build_wff_and(
 			tau::build_wff_ex(var, scoped_fm, false), new_fm);
 	}
+
+	// TODO (HIGH) call substitution based quantifier elimination here
+
 	// Check that quantified variable appears
 	if (tau::get(scoped_fm).equals_T()) return new_fm;
 

@@ -634,7 +634,7 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				<< resolver.dump_to_str();)
 		return !error;
 	};
-	
+
 	// Solution to not printing the entire tau command tree for default typing
 	auto update_type_env = [&type_environment](tref n) {
 		const tau& n_t = tau::get(n);
@@ -786,7 +786,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// i1 : tau = in console
 				// o1 : bv[8] = out console
 				// ...
-
 				// We just add the variables to the current (global) scope.
 			}
 			case tau::rec_relation: {
