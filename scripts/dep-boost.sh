@@ -92,7 +92,6 @@ using gcc : mingw64 : x86_64-w64-mingw32-g++
 EOF
 	USER_CONFIG_ARG="--user-config=./user-config.jam"
 	B2_ARGS+=("target-os=windows")
-	B2_ARGS+=("threading=win32")
 else
 	# remove user-config.jam if it exists from previous Windows build
 	rm -f "$BOOST_SOURCE_DIR/user-config.jam"
