@@ -164,6 +164,15 @@ tref base_ba_symbol_simplification(tref symbol, const std::variant<BAs...>& v) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+tref base_ba_term_simplification(tref symbol, const std::variant<BAs...>& v) {
+	auto f = [&](const auto& ba_type) -> tref {
+		return base_ba_term_simplification<BAs...>(symbol, ba_type);
+	};
+	return std::visit(overloaded(f), v);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const bool& l, const std::variant<BAs...>& r) {
 	return r == l;
 }
