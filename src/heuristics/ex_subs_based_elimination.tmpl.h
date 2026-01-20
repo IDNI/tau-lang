@@ -14,7 +14,12 @@ tref merge_and(const std::map<tref, tref>& subs, tref left, tref right) {
 	return nullptr;
 	// We return one of the substitution at hand. This could be refined
 	// in the future to allow more general cases. For example, we could
-	// check for containment between both sides.
+	// check for containment between both sides or a deeper equality test.
+	// For example, if we are dealing with the case:
+	//
+	// o = i & j && o = i
+	//
+	// when eliminating 'o'.
 	return subs.contains(left) ? subs.at(left) : subs.at(right);
 }
 
@@ -25,7 +30,12 @@ tref merge_or(const std::map<tref, tref>& subs, tref left, tref right) {
 		return nullptr;
 	// We check that both sides must have the same substitution, this could
 	// be refined in the future to allow more general cases. For example,
-	// we could check for containment between both sides.
+	// we could check for containment between both sides or a deeper equality
+	// test, for example if we are dealing with the case:
+	//
+	// o = i * { 2 }:bv || o = i << { 1 }:bv
+	//
+	// when eliminating 'o'.
 	if (subs.at(left) != subs.at(right)) return nullptr;
 	return subs.at(left);
 }
