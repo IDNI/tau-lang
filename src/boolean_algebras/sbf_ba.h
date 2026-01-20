@@ -39,6 +39,7 @@ struct sbf_ba_factory {
 inline bool is_closed(const sbf_ba&) { return true; }
 
 inline tref base_ba_symbol_simplification(tref sym, const sbf_ba&) { return sym; }
+inline tref base_ba_term_simplification(tref term, const sbf_ba&) { return term; }
 
 template <typename... BAs>
 requires BAsPack<BAs...>

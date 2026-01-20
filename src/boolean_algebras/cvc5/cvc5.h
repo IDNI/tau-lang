@@ -70,6 +70,7 @@ inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 	const size_t base);
 inline cvc5::Term make_bitvector_bottom_elem(const size_t size = default_bv_size);
 inline cvc5::Term make_bitvector_top_elem(const size_t size = default_bv_size);
+inline cvc5::Term make_bitvector_value(size_t value, size_t size = default_bv_size);
 inline cvc5::Term make_bitvector_true();
 inline cvc5::Term make_bitvector_false();
 

@@ -215,6 +215,10 @@ tref base_ba_symbol_simplification(tref symbol, const auto&) {
 	return symbol;
 }
 
+template<typename ... BAs> requires BAsPack<BAs...>
+tref base_ba_term_simplification(tref term, const auto&) {
+	return term;
+}
 
 template <typename... BAs>
 requires BAsPack<BAs...>
