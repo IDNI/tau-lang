@@ -86,6 +86,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// // "batinf_unscoping",
 	// "execution",
 	// "hooks",
+	"heuristics",
 	"interpreter",
 	// "normal_forms",
 	// "assign_and_reduce",
