@@ -121,7 +121,7 @@ RUN echo "(BUILD) -- Building ${BUILD_TYPE} version: $(head -n 1 VERSION)" && \
 		-DTAU_BUILD_EXECUTABLE=ON
 
 # Argument TESTS=no is used to skip running tests
-ARG TEST=yes
+ARG TESTS=yes
 
 # Build tests and run them if TESTS="yes". Stop the build if they fail
 RUN echo " (BUILD) -- Running tests: $TESTS"
@@ -160,7 +160,7 @@ FROM build AS packages
 ARG BUILD_JOBS=5
 
 # Argument TESTS=no is used to skip running tests
-ARG TEST=yes
+ARG TESTS=yes
 
 WORKDIR /tau-lang
 
@@ -256,7 +256,7 @@ RUN echo "(BUILD) -- Building w64 ${BUILD_TYPE} version: $(head -n 1 VERSION)" &
 # TODO add tests for Windows build
 
 # # Argument TESTS=no is used to skip running tests
-# ARG TEST=yes
+# ARG TESTS=yes
 
 # # Build tests and run them if TESTS="yes". Stop the build if they fail
 # RUN echo " (BUILD) -- Running tests: $TESTS"
