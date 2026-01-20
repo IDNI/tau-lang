@@ -359,12 +359,6 @@ tref apply_all_xor_def(tref fm) {
 	return pre_order<node>(fm).apply_unique(apply_xor_def<node>);
 }
 
-template <NodeType node>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& fm, const tau_f<node>& func)
-{
-	return tt(func(fm.value()));
-}
 // -----------------------------------------------------------------------------
 
 // This function traverses a term fm and normalizes all Boolean algebra constants

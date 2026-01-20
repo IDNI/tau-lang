@@ -62,18 +62,6 @@ tref unsqueeze_wff_neg(tref fm);
 template <NodeType node>
 tref squeeze_wff_neg(tref fm);
 
-template <NodeType node, bool is_wff = true>
-tref to_dnf(tref);
-
-template <NodeType node, bool is_wff = true>
-tref to_cnf(tref);
-
-template <NodeType node, bool is_wff = true>
-tref push_negation_in(tref);
-
-template <NodeType node>
-tref to_nnf(tref fm);
-
 template <NodeType node>
 tref norm_equation(tref eq);
 
@@ -91,22 +79,6 @@ tref apply_xor_def(tref fm);
 
 template <NodeType node>
 tref apply_all_xor_def(tref fm);
-
-// // -----------------------------------------------------------------------------
-// // General operator for tref function application by pipe
-// template <NodeType node>
-// using tt_fn = typename tree<node>::traverser(*)(
-// 					const typename tree<node>::traverser&);
-
-template <NodeType node>
-using tau_f = tref(*)(tref);
-
-// template <NodeType node>
-// typename tree<node>::traverser operator|(
-// 	const typename tree<node>::traverser& fm, const tau_f<node>& func);
-
-// typename tree<node>::traverser operator|(
-// 	const typename tree<node>::traverser& fm, const tau_f<node>& func);
 
 // -----------------------------------------------------------------------------
 
@@ -289,17 +261,17 @@ tref disjunct_cnfs_to_cnf(tref c1, tref c2);
 template <NodeType node, bool is_wff = true>
 tref push_negation_one_in(tref fm);
 
-// Can be used for Tau formula and Boolean function
-template <NodeType node, bool is_wff>
-tref push_negation_in(tref fm);
-
-// Conversion to dnf while applying reductions during the process
-template <NodeType node, bool is_wff>
+template <NodeType node, bool is_wff = true>
 tref to_dnf(tref fm);
 
-// Conversion to cnf while applying reductions during the process
-template <NodeType node, bool is_wff>
+template <NodeType node, bool is_wff = true>
 tref to_cnf(tref fm);
+
+template <NodeType node, bool is_wff = true>
+tref push_negation_in(tref fm);
+
+template <NodeType node>
+tref to_nnf(tref fm);
 
 // Shift the lookback in a formula
 template <NodeType node>
