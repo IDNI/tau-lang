@@ -331,7 +331,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	bool is_integer() const;
 	bool is_num() const;
 	bool is_ba_constant() const;
-	bool is_bv_constant() const;
 	bool is_term() const;
 	bool is_input_variable() const;
 	bool is_output_variable() const;
@@ -350,9 +349,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	size_t get_num() const;
 	size_t get_ba_constant_id() const;
 	constant get_ba_constant() const;
-	size_t get_bv_constant_id() const;
-	idni::tau_lang::bv  get_bv_constant() const;
-	size_t get_bv_size() const;
 	// TODO (LOW) rename to get_ba_type_id and get_ba_type as in constants
 	size_t get_ba_type() const;
 	std::string get_ba_type_name() const;
@@ -609,7 +605,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 				      size_t ba_type_id);
 	static tref build_bf_ba_constant(const constant& constant,
 					 size_t ba_type_id, tref right = nullptr);
-	static tref build_bv_ba_constant(const constant& constant, size_t type_id);
 	static tref build_bf_uconst(
 		const std::string& name1, const std::string& name2, size_t type_id);
 	static tref build_var_name(size_t sid);
