@@ -700,11 +700,6 @@ template <NodeType node>
 bool tree<node>::is_ba_constant() const { return is(ba_constant); }
 
 template <NodeType node>
-bool tree<node>::is_bv_constant() const {
-	return is(ba_constant) && get_ba_type_name() == "bv";
-}
-
-template <NodeType node>
 bool tree<node>::is_term() const { return is_term_nt(this->value.nt) || is(io_var); }
 
 template <NodeType node>
@@ -780,7 +775,7 @@ size_t tree<node>::get_num() const {
 template <NodeType node>
 size_t tree<node>::get_ba_constant_id() const {
 	DBG(LOG_TRACE << LOG_FM_TREE(get()));
-	DBG(assert(is_ba_constant() || is_bv_constant());)
+	DBG(assert(is_ba_constant());)
 	return this->value.data;
 }
 
@@ -788,28 +783,6 @@ template <NodeType node>
 tree<node>::constant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
 	return ba_constants<node>::get(data());
-}
-
-template <NodeType node>
-size_t tree<node>::get_bv_constant_id() const {
-	DBG(assert(is_bv_constant());)
-	return this->value.data;
-}
-
-template <NodeType node>
-idni::tau_lang::bv tree<node>::get_bv_constant() const {
-	DBG(assert(is_bv_constant());)
-	auto cte = ba_constants<node>::get(data());
-	DBG(assert(std::holds_alternative<idni::tau_lang::bv>(cte));)
-	return std::get<idni::tau_lang::bv>(cte);
-}
-
-template <NodeType node>
-size_t tree<node>::get_bv_size() const {
-	DBG(assert(is_bv_constant());)
-	auto cte = ba_constants<node>::get(data());
-	DBG(assert(std::holds_alternative<idni::tau_lang::bv>(cte));)
-	return std::get<idni::tau_lang::bv>(cte).get_size();
 }
 
 template <NodeType node>

@@ -276,6 +276,19 @@ tref term_nand(tref symbol);
 template <typename ...BAs> requires BAsPack<BAs...>
 tref base_ba_symbol_simplification(tref symbol, const bv&);
 
+template <typename ...BAs> requires BAsPack<BAs...>
+tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded);
+
+template <typename ... BAs> requires BAsPack<BAs...>
+tref base_ba_term_simplification(tref term, const bv&);
+
+template <typename ...BAs> requires BAsPack<BAs...>
+bool is_associative_and_commutative(size_t symbol);
+
+template <typename ...BAs> requires BAsPack<BAs...>
+size_t get_inv_sym(size_t symbol);
+
+
 // -----------------------------------------------------------------------------
 
 } // namespace idni::tau_lang

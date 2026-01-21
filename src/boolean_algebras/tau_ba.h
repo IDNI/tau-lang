@@ -256,6 +256,9 @@ bool is_closed(const tau_ba<BAs...>& fm);
 template <typename... BAs> requires BAsPack<BAs...>
 tref base_ba_symbol_simplification(tref symbol, const auto&);
 
+template <typename... BAs> requires BAsPack<BAs...>
+tref base_ba_term_simplification(tref term, const auto&);
+
 /**
  * @brief Template struct representing a tau_ba_factory.
  *
