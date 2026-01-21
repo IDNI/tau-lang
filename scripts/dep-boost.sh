@@ -95,7 +95,11 @@ EOF
 else
 	# remove user-config.jam if it exists from previous Windows build
 	rm -f "$BOOST_SOURCE_DIR/user-config.jam"
+	if [ "$(uname)" = "Darwin" ]; then
+		B2_ARGS+=("target-os=darwin")
+	else
 	B2_ARGS+=("target-os=linux")
+	fi
 fi
 
 

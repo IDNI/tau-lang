@@ -11,6 +11,10 @@ function(install_cvc5 DESTINATION COMPONENT SYSTEM_NAME)
 	set(CVC5_LIB_DIR "${CVC5_DIST_DIR}/lib")
 	set(CVC5_LIB_PATTERN "*.so*")
 	set(CVC5_IS_CROSS_WIN FALSE)
+
+	if(SYSTEM_NAME STREQUAL "Darwin")
+		set(CVC5_LIB_PATTERN "*.dylib")
+	endif()
 	set(CVC5_TOOLCHAIN_DLLS "")
 
 	if(SYSTEM_NAME STREQUAL "Windows")

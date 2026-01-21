@@ -6,6 +6,9 @@ CVC5_TAG=cvc5-1.3.1
 TAU_SHARED_PREFIX="${HOME}/.tau"
 WITH_MINGW64="no"
 BUILD_IF_NOT_EXISTS="libcvc5.so"
+if [ "$(uname)" = "Darwin" ]; then
+	BUILD_IF_NOT_EXISTS="libcvc5.dylib"
+fi
 
 CVC5_SOURCE_DIR="${TAU_SHARED_PREFIX}/cvc5"
 CVC5_BUILD_DIR="build"
