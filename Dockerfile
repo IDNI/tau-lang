@@ -46,7 +46,6 @@ RUN echo "(BUILD) -- Installing dependencies" && \
 	g++=4:13.2.0-7ubuntu1 \
 	mingw-w64=11.0.1-3build1 \
 	libboost-all-dev=1.83.0.1ubuntu2 \
-	libz3-dev=4.8.12-3.1build1 \
 	clang=1:18.0-59~exp2
 
 # create tau-lang directory and set it as the working directory
