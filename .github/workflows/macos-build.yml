@@ -19,8 +19,6 @@ jobs:
         id: install-boost
         with:
           boost_version: "1.86.0"
-          platform_version: "11"
-          toolset: clang
 
       - name: MacOS build
         run: ./dev release -DTAU_BUILD_TESTS=ON
