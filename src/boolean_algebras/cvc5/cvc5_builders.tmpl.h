@@ -136,6 +136,10 @@ inline cvc5::Term make_bitvector_top_elem(const size_t size) {
 	return cvc5_term_manager.mkBitVector(size, std::string(size, '1'), 2);
 }
 
+inline cvc5::Term make_bitvector_value(const size_t value, const size_t size) {
+	return cvc5_term_manager.mkBitVector(size, value);
+}
+
 inline cvc5::Term make_bitvector_true() {
 	return cvc5_term_manager.mkBoolean(true);
 }

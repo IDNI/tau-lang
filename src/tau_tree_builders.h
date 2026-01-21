@@ -243,11 +243,6 @@ template <NodeType node>
 tref build_bf_ba_constant(const typename node::constant& constant,
                           size_t ba_type_id, tref right = nullptr);
 
-/*
-template <NodeType node>
-tref build_bv_constant(const typename node::constant& constant, size_t ba_type_id);
-*/
-
 template <NodeType node>
 tref build_bv_ba_constant(const typename node::constant& constant, size_t ba_type_id);
 
