@@ -18,8 +18,10 @@ jobs:
       - uses: MarkusJx/install-boost@v2
         id: install-boost
         with:
-          boost_version: "1.86.0"
-          platform_version: "15"
+          boost_version: 1.86.0
+          platform_version: 15
+          arch: aarch64
+          toolset: clang
 
       - name: Cache cvc5 (~/.tau/cvc5)
         uses: actions/cache@v4
