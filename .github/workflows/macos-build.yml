@@ -2,6 +2,10 @@ name: Release Packages (macOS)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ "build/MacOS" ]
+  pull_request:
+    branches: [ "build/MacOS" ]
 
 jobs:
   build_and_deploy:
