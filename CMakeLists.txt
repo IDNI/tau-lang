@@ -254,6 +254,9 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU
 	list(APPEND DEP_CVC5_ARGS --w64)
 	set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
 endif()
+if(APPLE)
+	list(APPEND DEP_CVC5_ARGS --darwin)
+endif()
 message(STATUS "DEP_CVC5_ARGS: ${DEP_CVC5_ARGS}")
 message(STATUS "CVC5_LIBDIR: ${CVC5_LIBDIR}")
 execute_process(
@@ -279,18 +282,30 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU
 	list(APPEND DEP_BOOST_ARGS --w64)
 	set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
 endif()
+if(APPLE)
+	list(APPEND DEP_BOOST_ARGS --darwin)
+endif()
 message(STATUS "DEP_BOOST_ARGS: ${DEP_BOOST_ARGS}")
 message(STATUS "BOOST_LIBDIR: ${BOOST_LIBDIR}")
-execute_process(
-	COMMAND bash ./dev dep-boost.sh ${DEP_BOOST_ARGS}
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
+
+if ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	OR TAU_BUILD_PIC)
+		set(TAU_BUILD_BOOST ON)
+else()
+		set(TAU BUILD_BOOST OFF)
+endif()
+
+if(TAU_BUILD_BOOST)
+	execute_process(
+		COMMAND bash ./dev dep-boost.sh ${DEP_BOOST_ARGS}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+	)
+endif()
 
 # cmake_policy(SET CMP0167 NEW) is required in future versions of CMake
 set(Boost_USE_STATIC_LIBS ON)
-if ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	OR TAU_BUILD_PIC)
-		set(Boost_DIR "${BOOST_LIBDIR}/cmake/Boost-1.86.0")
+if (TAU_BUILD_BOOST)
+	set(Boost_DIR "${BOOST_LIBDIR}/cmake/Boost-1.86.0")
 endif()
 find_package(Boost REQUIRED COMPONENTS log)
 if (Boost_FOUND)

@@ -6,9 +6,6 @@ CVC5_TAG=cvc5-1.3.1
 TAU_SHARED_PREFIX="${HOME}/.tau"
 WITH_MINGW64="no"
 BUILD_IF_NOT_EXISTS="libcvc5.so"
-if [ "$(uname)" = "Darwin" ]; then
-	BUILD_IF_NOT_EXISTS="libcvc5.dylib"
-fi
 
 CVC5_SOURCE_DIR="${TAU_SHARED_PREFIX}/cvc5"
 CVC5_BUILD_DIR="build"
@@ -20,6 +17,9 @@ for arg in "${@:1}"; do
 	if [[ $arg == --w64 ]]; then
 		WITH_MINGW64="yes"
 		continue
+	fi
+	if [[ $arg == --darwin ]]; then
+		BUILD_IF_NOT_EXISTS="libcvc5.dylib"
 	fi
 	if [[ $arg == -DTAU_BUILD_JOBS=* ]]; then
 		BUILD_JOBS="${arg#-DTAU_BUILD_JOBS=}"

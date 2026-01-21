@@ -15,6 +15,10 @@ jobs:
         with:
           ref: build/MacOS
 
+      - uses: MarkusJx/install-boost@v2
+        with:
+          boost_version: "1.86.0"
+
       - name: MacOS release build
         run: ./dev release -DTAU_BUILD_TESTS=ON
 

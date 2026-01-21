@@ -14,6 +14,10 @@ for arg in "${@:1}"; do
 		WITH_MINGW64="yes"
 		continue
 	fi
+	if [[ $arg == --darwin ]]; then
+		BUILD_IF_NOT_EXISTS="libboost_log.dylib"
+		continue
+	fi
 	if [[ $arg == -DTAU_BUILD_JOBS=* ]]; then
 		BUILD_JOBS="${arg#-DTAU_BUILD_JOBS=}"
 		continue
@@ -98,11 +102,11 @@ else
 	if [ "$(uname)" = "Darwin" ]; then
 		B2_ARGS+=("target-os=darwin")
 	else
-	B2_ARGS+=("target-os=linux")
+		B2_ARGS+=("target-os=linux")
 	fi
 fi
 
 
 # build boost
 ./bootstrap.sh --with-libraries=log && \
-        ./b2 ${USER_CONFIG_ARG} --prefix=$BOOST_PREFIX "${B2_ARGS[@]}" install
+./b2 ${USER_CONFIG_ARG} --prefix=$BOOST_PREFIX "${B2_ARGS[@]}" install
