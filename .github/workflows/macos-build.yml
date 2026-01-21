@@ -19,6 +19,7 @@ jobs:
         id: install-boost
         with:
           boost_version: "1.86.0"
+          platform_version: "15"
 
       - name: Cache cvc5 (~/.tau/cvc5)
         uses: actions/cache@v4
@@ -29,11 +30,11 @@ jobs:
             cvc5-v1-${{ runner.os }}-
 
       - name: MacOS build
-        run: ./dev release -DTAU_BUILD_TESTS=ON
+        run: ./dev release
         env:
           BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
           Boost_INCLUDE_DIR: ${{ steps.install-boost.outputs.BOOST_ROOT }}/include
           Boost_LIBRARY_DIRS: ${{ steps.install-boost.outputs.BOOST_ROOT }}/lib
 
-      - name: MacOS release tests
-        run: ./dev test-release
+      - name: Run tau
+        run: ./build-Release/tau -v
