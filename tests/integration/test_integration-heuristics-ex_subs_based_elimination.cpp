@@ -16,12 +16,39 @@ tref parse(const std::string& sample) {
 
 TEST_SUITE("ex_subs_based_elimination") {
 
-	TEST_CASE("ex_subs_based_elimination") {
+	TEST_CASE("simple case subs applied (y1)") {
 		const char* sample =
 			"x = a && y = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
 		tref ex_clause = parse(sample);
 		tref result = ex_subs_based_elimination<node_t>(ex_clause, var);
 		CHECK( result != ex_clause );
+	}
+
+	TEST_CASE("simple case subs applied (y2)") {
+		const char* sample =
+			"(x = a || x = c) && x = b";
+		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
+		tref ex_clause = parse(sample);
+		tref result = ex_subs_based_elimination<node_t>(ex_clause, var);
+		CHECK( result != ex_clause );
+	}
+
+	TEST_CASE("simple case no subs applied (y1)") {
+		const char* sample =
+			"x & a = 0 && y = b";
+		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
+		tref ex_clause = parse(sample);
+		tref result = ex_subs_based_elimination<node_t>(ex_clause, var);
+		CHECK( result == ex_clause );
+	}
+
+	TEST_CASE("simple case no subs applied (y2)") {
+		const char* sample =
+			"(x = a || x = c) && x & b = 1";
+		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
+		tref ex_clause = parse(sample);
+		tref result = ex_subs_based_elimination<node_t>(ex_clause, var);
+		CHECK( result == ex_clause );
 	}
 }
