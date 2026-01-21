@@ -36,7 +36,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "{ !i5[t] = <:x> || o5[t] = <:y> } : tau = u[0].";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = normalize_non_temp<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "{ always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau = u[0]:tau");
+		CHECK(tau::get(res).to_str() == "u[0]:tau = { always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau");
 	}
 }
 
@@ -57,7 +57,6 @@ TEST_SUITE("syntactic_path_simplification") {
 		const char* sample = "x & (z' | (y & (k | x'))) & x | x & y | z & (z' | k) & z";
 		tref fm = get_bf_nso_rr("", sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
-		std::cout << "res: " << tau::get(res) << "\n";
 		CHECK((tau::get(res).to_str() == "x&(z'|ky)|xy|zk"));
 	}
 	TEST_CASE("4") {
@@ -79,7 +78,7 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy|zx = 0 && xy = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
-		CHECK(tau::get(res).to_str() == "xy = 0 && zx = 0");
+		CHECK(tau::get(res).to_str() == "xy|zx = 0");
 	}
 	TEST_CASE("2") {
 		const char* sample = "(o1[1]' = 0 && s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 && o1[0]' = 0 || o1[0]o1[1]'|o1[0]' = 0 && s = 0 && (s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 || z|z's != 0 && s != 0 && y|y'w != 0 && w != 0 && (z != 0 || y = 0 || o1[1]' = 0) && (y != 0 || z = 0) || z|z's != 0 && y|y'w != 0 && y != 0 && w != 0 && (s != 0 || o1[1] = 0) && (z != 0 || o1[1]' = 0)) && o1[0]' != 0) && v != 0 && x != 0 && o1[0] != 0.";
@@ -109,7 +108,7 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
-		CHECK(tau::get(res).to_str() == "wv = 0 && xy = 0 && wy = 0 && xv = 0");
+		CHECK(tau::get(res).to_str() == "xy = 0 && wv = 0 && wy = 0 && xv = 0");
 	}
 	TEST_CASE("8") {
 		const char* sample = "xyk|x'yk:bv < 1 && y = 1.";
