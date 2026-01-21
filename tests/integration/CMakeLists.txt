@@ -25,7 +25,7 @@ set(TESTS
 	wff_normalization
 	ba_types_inference
 	semantic
-)
+	heuristics-ex_subs_based_elimination)
 
 foreach(TEST IN LISTS TESTS)
 	set(N "test_integration-${TEST}")

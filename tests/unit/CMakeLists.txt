@@ -19,7 +19,6 @@ set(TESTS
 	ba_types
 	union_find
 	cvc5_solver
-	heuristics-ex_subs_based_elimination
 )
 
 foreach(X IN LISTS TESTS)

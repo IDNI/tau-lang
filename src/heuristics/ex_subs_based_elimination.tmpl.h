@@ -10,8 +10,7 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref merge_and(const std::map<tref, tref>& subs, tref left, tref right) {
 	// At least one side must have a substitution
-	if (!subs.contains(left) && !subs.contains(right))
-	return nullptr;
+	if (!subs.contains(left) && !subs.contains(right)) return nullptr;
 	// We return one of the substitution at hand. This could be refined
 	// in the future to allow more general cases. For example, we could
 	// check for containment between both sides or a deeper equality test.
@@ -41,16 +40,24 @@ tref merge_or(const std::map<tref, tref>& subs, tref left, tref right) {
 }
 
 template <NodeType node>
-tref ex_subs_based_elimination(tref ex_clause, tref var)
+tref postorder(tref ex_clause, tref var)
 {
 	std::map<tref, tref> subs;
 	bool error = false;
 
-	// We visit the formula until reaching atomic formulas
+	// We visit the formula until reaching atomic formulas (eq)
 	auto visit_subtree = [&](tref n) -> bool {
-		return !is_atomic_fm<node>(n);
+		return !is<node>(n, tau::bf_interval)
+			&& !is<node>(n, tau::bf_neq)
+			&& !is<node>(n, tau::bf_lteq)
+			&& !is<node>(n, tau::bf_nlteq)
+			&& !is<node>(n, tau::bf_gt)
+			&& !is<node>(n, tau::bf_ngt)
+			&& !is<node>(n, tau::bf_gteq)
+			&& !is<node>(n, tau::bf_ngteq)
+			&& !is<node>(n, tau::bf_lt)
+			&& !is<node>(n, tau::bf_nlt);
 	};
-
 	auto visit = [&](tref n) -> bool {
 		using tau = tree<node>;
 
@@ -87,25 +94,17 @@ tref ex_subs_based_elimination(tref ex_clause, tref var)
 			case tau::wff_or: {
 				auto left = t[0][0].get();
 				auto right = t[1][0].get();
-				// If we have no compatible substitutions we just fail as it
-				// implies we cannot eliminate the existential variable.
+				// If we have no compatible we just continue, maybe later
+				// we found a substitution.
 				if (auto n_subs = merge_or<node>(subs, left, right); n_subs)
 					subs[n] = n_subs;
-				else
-					error = true;
-				break;
-			}
-			// It's a negation, we just propagate the downward substitution.
-			case tau::wff_neg: {
-				auto child = t[0][0].get();
-				subs[n] = subs[child];
 				break;
 			}
 			default:
 				// Do nothing, just continue.
 				break;
 		}
-		return !error;
+		return true;
 	};
 
 	post_order<node>(ex_clause).search_unique(visit, visit_subtree);
@@ -114,9 +113,70 @@ tref ex_subs_based_elimination(tref ex_clause, tref var)
 	if (error) return ex_clause;
 	// Otherwise, we apply the substitution into the clause and return it if
 	// available.
-	return subs.contains(ex_clause)
-		? rewriter::replace<node>(ex_clause, var, subs[ex_clause])
-		: ex_clause;
+	return subs.contains(ex_clause)	? subs[ex_clause] : nullptr;
+}
+
+
+template <NodeType node>
+tref preorder(tref ex_clause, tref var)
+{
+	tref found = nullptr;
+
+	// We visit the formula until reaching atomic formulas (eq)
+	auto visit_subtree = [&](tref n) -> bool {
+		return !is<node>(n, tau::wff_or)
+			&& !is<node>(n, tau::bf_interval)
+			&& !is<node>(n, tau::bf_neq)
+			&& !is<node>(n, tau::bf_lteq)
+			&& !is<node>(n, tau::bf_nlteq)
+			&& !is<node>(n, tau::bf_gt)
+			&& !is<node>(n, tau::bf_ngt)
+			&& !is<node>(n, tau::bf_gteq)
+			&& !is<node>(n, tau::bf_ngteq)
+			&& !is<node>(n, tau::bf_lt)
+			&& !is<node>(n, tau::bf_nlt);
+	};
+
+	auto visit = [&](tref n) -> bool {
+		using tau = tree<node>;
+
+		// Get the node type
+		auto t = tau::get(n);
+		size_t nt = t.get_type();
+
+		switch (nt) {
+			// It's an atomic formula
+			case tau::bf_eq: {
+				// This is a really simple case. In the future we could
+				// extend this to support more complex substitutions calling
+				// invert procedures (depending on the type).
+				auto left = t[0][0].get();
+				auto right = t[1][0].get();
+				if (left == var) found = right;
+				else if (right == var) found = left;
+				return false;
+			}
+			default:
+				// Do nothing, just continue.
+				break;
+		}
+		return true;
+	};
+
+	auto up = [&](tref) -> void {	return; };
+
+	pre_order<node>(ex_clause).search_unique(visit, visit_subtree, up);
+	return found;
+}
+
+template <NodeType node>
+tref ex_subs_based_elimination(tref ex_clause, tref var)
+{
+	if (auto res = preorder<node>(ex_clause, var); res)
+		return rewriter::replace<node>(ex_clause, var, res);
+	if (auto res = postorder<node>(ex_clause, var); res)
+		return rewriter::replace<node>(ex_clause, var, res);
+	return ex_clause;
 }
 
 } // namespace idni::tau_lang

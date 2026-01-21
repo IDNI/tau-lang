@@ -53,6 +53,7 @@ tau::get_options parse_spec_no_infer() {
 		.reget_with_hooks = false };
 	return opts;
 }
+
 tref parse(const std::string& sample, tau::get_options opts = parse_wff_no_infer()) {
 	auto src = tree<node_t>::get(sample, opts);
 	if (src == nullptr) {
