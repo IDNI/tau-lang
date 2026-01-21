@@ -1730,6 +1730,20 @@ TEST_SUITE("regression tests") {
 		};
 		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
 	}
+
+	TEST_CASE("Andrei's question (y1)") {
+		tref parsed = parse("o11[t]:bv[64] = i3[t]:bv[64]|i4[t]:bv[64]");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+	}
+
+	TEST_CASE("Andrei's question (y2)") {
+		tref parsed = parse("always (i0[t]:tau = 0 || o0[t]:tau = 0 && u[t]:tau = i0[t]:tau) && (i0[t]:tau != 0 || o0[t]:tau' = 0) && i1[t]:bv[64] = o1[t]:bv[64] && (o2[t]:bv[1] = 0 || i2[t]:bv[64] !< o1[t]:bv[64]) && (o2[t]:bv[1]' = 0 || i2[t]:bv[64] < o1[t]:bv[64]) && (o1[t]:bv[64] != 0 || o4[t]:bv[1] = 0) && (o4[t]:bv[1]' = 0 || o1[t]:bv[64] = 0) && (i3[t]:bv[64] != i4[t]:bv[64] || o3[t]:bv[1] = 0) && (o3[t]:bv[1]' = 0 || i3[t]:bv[64] = i4[t]:bv[64]) && o11[t]:bv[64] = 0 && (i4[t]:bv[64]|i3[t]:bv[64] = 0 || o11[t]:bv[64] = i3[t]:bv[64]|i4[t]:bv[64]) && (i4[t]:bv[64]|i3[t]:bv[64] != 0 || o11[t]:bv[64] = i4[t]:bv[64]'i3[t]:bv[64]') && (i4[t]:bv[64]|i3[t]:bv[64] = 0 || o11[t]:bv[64] = i3[t]:bv[64]|i4[t]:bv[64]) && (i4[t]:bv[64]|i3[t]:bv[64] != 0 || o11[t]:bv[64] = i4[t]:bv[64]'i3[t]:bv[64]') && o12[t]:bv[64] = { 1 }:bv[64] && o10[t]:bv[64] = 0 && (i1[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64])|i1[t]:bv[64]'i2[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64]) = 0 || o8[t]:bv[64] = i1[t]:bv[64]&(i3[t]:bv[64]|{ 170 }:bv[64])|i1[t]:bv[64]'i2[t]:bv[64]&(i3[t]:bv[64]|{ 170 }:bv[64])) && (i1[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64])|i1[t]:bv[64]'i2[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64]) != 0 || o8[t]:bv[64] = { 18446744073709551445 }:bv[64] i1[t]:bv[64]i3[t]:bv[64]'|i1[t]:bv[64]'&({ 18446744073709551445 }:bv[64] i3[t]:bv[64]'|i2[t]:bv[64]'))");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+	}
 }
 
 TEST_SUITE("Cleanup") {
