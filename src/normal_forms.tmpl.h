@@ -1880,9 +1880,9 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 template <NodeType node>
 struct simplify_using_equality {
 	using tau = tree<node>;
-	// TODO: For variables, make input < output and lower time step < higher time step
+	// TODO: For variables, make lower time step < higher time step
 	// Create comparator function that orders bfs by making constants smallest
-	// We have 0 < 1 < bf_constant < uninterpreted_constant < variable < rest by node count
+	// We have 0 < 1 < bf_constant < uninterpreted_constant < input stream < output stream < variable < rest by subtree_less
 	static bool term_comp(tref l, tref r) {
 		if (tau::get(l).equals_0()) {
 			if (!tau::get(r).equals_0()) return true;
@@ -1894,24 +1894,39 @@ struct simplify_using_equality {
 			else return false;
 		}
 		if (tau::get(r).equals_1()) return false;
-		if (is_child<node>(l, tau::ba_constant)) {
-			if (!is_child<node>(r, tau::ba_constant)) return true;
+		DBG(assert(tau::get(l).has_child() && tau::get(r).has_child()));
+		const tau& lc = tau::get(l)[0];
+		const tau& rc = tau::get(r)[0];
+		if (lc.is(tau::ba_constant)) {
+			if (!rc.is(tau::ba_constant)) return true;
 			else return tau::subtree_less(l,r);
 		}
-		if (is_child<node>(r, tau::ba_constant)) return false;
-		if (is_child<node>(l, tau::variable)) {
-			if (is_child<node>(r, tau::variable)) {
+		if (rc.is(tau::ba_constant)) return false;
+		if (lc.is(tau::variable)) {
+			if (rc.is(tau::variable)) {
 				// Check for uninterpreted constant
-				if (is_child<node>(tau::trim(l), tau::uconst)) {
-					if (!is_child<node>(tau::trim(r), tau::uconst))
+				if (lc[0].is(tau::uconst_name)) {
+					if (!rc[0].is(tau::uconst_name))
 						return true;
 					else return tau::subtree_less(l,r);
 				}
-				if (is_child<node>(tau::trim(r), tau::uconst)) return false;
+				if (rc[0].is(tau::uconst_name)) return false;
+				if (lc.is_input_variable()) {
+					if (!rc.is_input_variable())
+						return true;
+					else return tau::subtree_less(l, r);
+				}
+				if (rc.is_input_variable()) return false;
+				if (lc.is_output_variable()) {
+					if (!rc.is_output_variable())
+						return true;
+					else return tau::subtree_less(l, r);
+				}
+				if (rc.is_output_variable()) return false;
 				return tau::subtree_less(l,r);
 			} else return true;
 		}
-		if (is_child<node>(r, tau::variable)) return false;
+		if (rc.is(tau::variable)) return false;
 		// TODO: also use free_vars count once constant time
 		return tau::subtree_less(l,r);
 	};
@@ -1946,6 +1961,7 @@ struct simplify_using_equality {
 			}
 			if (cn.is(tau::bf_eq)) {
 				n = syntactic_atomic_formula_simplification<node>(n);
+				n = direct_atm(n);
 				tref s = simplify_equation(uf_stack.back(), n);
 				// If equation was simplified away
 				if (!is_child<node>(s, tau::bf_eq)) return s;
@@ -1953,6 +1969,7 @@ struct simplify_using_equality {
 				else return _F<node>();
 			} else if (is_atomic_fm<node>(n)) {
 				n = syntactic_atomic_formula_simplification<node>(n);
+				n = direct_atm(n);
 				return simplify_equation(uf_stack.back(), n);
 			} else if (cn.is(tau::wff_and)) {
 				// Check if conjunction was already processed
@@ -1960,7 +1977,7 @@ struct simplify_using_equality {
 				// We need to reorder all conjunctions in order
 				// to correctly collect all equalities
 				trefs conjs = get_cnf_wff_clauses<node>(n);
-				sort_equations(conjs);
+				sort_atms(conjs);
 				n = conjs[0];
 				for (size_t i = 1; i < conjs.size(); ++i) {
 					n = tau::build_wff_and(n, conjs[i]);
@@ -2047,7 +2064,24 @@ struct simplify_using_equality {
 		DBG(LOG_TRACE << "Simplifying: " << tau::get(eq) << "\n";)
 		if (tau::get(eq).equals_T() || tau::get(eq).equals_F()) return eq;
 		auto uf_find = [&uf](tref n) {
-			if (uf.contains(n)) return uf.find(n);
+			if (uf.contains(n)) {
+				// Do not replace n if all variables are inputs
+				bool all_inputs = false;
+				auto input_vars = [&all_inputs](tref cur) {
+					if (tau::get(cur).is(tau::variable)) {
+						if (tau::get(cur).is_input_variable()) {
+							all_inputs = true;
+							return true;
+						}
+						// different variable found
+						all_inputs = false;
+						return false;
+					}
+					return true;
+				};
+				pre_order<node>(n).search_unique(input_vars);
+				return all_inputs ? n : uf.find(n);
+			}
 			return n;
 		};
 		tref simp_eq = pre_order<node>(eq).apply(uf_find);
@@ -2058,28 +2092,31 @@ struct simplify_using_equality {
 	}
 
 private:
-	static void sort_equations (auto& conjs) {
-		auto direct_eq = [](tref eq) {
-			if (!is_child<node>(eq, tau::bf_eq)) return eq;
-			tref c1 = tau::get(eq)[0].first();
-			tref c2 = tau::get(eq)[0].second();
-			if (term_comp(c1, c2))
-				return tau::build_bf_eq(c2, c1);
-			return eq;
-		};
+	static void sort_atms (auto& conjs) {
 		auto eq_comp = [](tref l, tref r) {
 			const tau& nl = tau::get(l);
 			const tau& nr = tau::get(r);
 			if (nl.child_is(tau::bf_eq)) {
 				if (!nr.child_is(tau::bf_eq)) return true;
 				// Both are equalities
-				if (term_comp(nl[0].first(), nr[0].first()))
-					return true;
+				// Sort assignments to front
+				if (is_equational_assignment<node>(l))
+					return !is_equational_assignment<node>(r);
 				return false;
 			} else return false;
 		};
-		std::ranges::transform(conjs, conjs.begin(), direct_eq);
 		std::ranges::sort(conjs, eq_comp);
+	}
+
+	static tref direct_atm(tref atm) {
+		const tau& c = tau::get(atm)[0];
+		if (!c.is(tau::bf_eq) && !c.is(tau::bf_neq)) return atm;
+		const size_t sym = c.get_type();
+		tref c1 = tau::get(atm)[0].first();
+		tref c2 = tau::get(atm)[0].second();
+		if (term_comp(c1, c2))
+			return tau::get(tau::wff, tau::get(sym, c2, c1));
+		return atm;
 	}
 };
 
