@@ -51,13 +51,18 @@ case "${CMD}" in
         "bash")
                 run --entrypoint "/bin/bash" "${@:2}"
                 ;;
+        # tau-runner (deb based) without building tests
         "tau")
                 build --target runner --build-arg TESTS="no" -t tau "${@:2}" && \
                 run -t tau
                 ;;
-        "tau-rpm")
-                build --target rpm-runner --build-arg TESTS="no" -t tau:rpm "${@:2}" && \
-                run -t tau:rpm
+        "tau-runner")
+                build --target runner -t tau:runner "${@:2}" && \
+                run -t tau:runner
+                ;;
+        "tau-rpm-runner")
+                build --target rpm-runner -t tau:rpm-runner "${@:2}" && \
+                run -t tau:rpm-runner
                 ;;
         "base")
                 build --target base -t tau:base "${@:2}"
