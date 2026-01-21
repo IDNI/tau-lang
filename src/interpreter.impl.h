@@ -65,7 +65,7 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 		       return {};
 		}
 		std::string line = maybe_line.value();
-		std::cout << line << "\n"; // ???
+		// std::cout << line << "\n"; // ???
 
 		if (line.empty()) return { value, true }; // no more inputs
 		size_t type = ctx.type_of(vn);
