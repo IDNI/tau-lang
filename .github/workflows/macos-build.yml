@@ -20,6 +20,14 @@ jobs:
         with:
           boost_version: "1.86.0"
 
+      - name: Cache cvc5 (~/.tau/cvc5)
+        uses: actions/cache@v4
+        with:
+          path: ~/.tau/cvc5
+          key: cvc5-v1-${{ runner.os }}
+          restore-keys: |
+            cvc5-v1-${{ runner.os }}-
+
       - name: MacOS build
         run: ./dev release -DTAU_BUILD_TESTS=ON
         env:
