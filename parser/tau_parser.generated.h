@@ -190,8 +190,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(32), (NT(33)));
 //G28:  __E_input_def_8(32)  => null.
 	p(NT(32), (nul));
-//G29:  input_def(18)        => io_var_name(31) __E_input_def_8(32) _(11) '=' _(11) 'i' 'n' __(34) stream(35).
-	p(NT(18), (NT(31)+NT(32)+NT(11)+T(3)+NT(11)+T(4)+T(5)+NT(34)+NT(35)));
+//G29:  input_def(18)        => io_var_name(31) __E_input_def_8(32) _(11) ':' '=' _(11) 'i' 'n' __(34) stream(35).
+	p(NT(18), (NT(31)+NT(32)+NT(11)+T(2)+T(3)+NT(11)+T(4)+T(5)+NT(34)+NT(35)));
 //G30:  __E_output_def_9(36) => typed(33).
 	p(NT(36), (NT(33)));
 //G31:  __E_output_def_9(36) => null.
@@ -200,8 +200,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(37), (NT(34)+NT(35)));
 //G33:  __E_output_def_10(37) => null.
 	p(NT(37), (nul));
-//G34:  output_def(19)       => io_var_name(31) __E_output_def_9(36) _(11) '=' _(11) 'o' 'u' 't' __E_output_def_10(37).
-	p(NT(19), (NT(31)+NT(36)+NT(11)+T(3)+NT(11)+T(6)+T(7)+T(8)+NT(37)));
+//G34:  output_def(19)       => io_var_name(31) __E_output_def_9(36) _(11) ':' '=' _(11) 'o' 'u' 't' __E_output_def_10(37).
+	p(NT(19), (NT(31)+NT(36)+NT(11)+T(2)+T(3)+NT(11)+T(6)+T(7)+T(8)+NT(37)));
 //G35:  stream(35)           => 'f' 'i' 'l' 'e' _(11) '(' _(11) q_file_name(38) _(11) ')'.
 	p(NT(35), (T(9)+T(4)+T(10)+T(11)+NT(11)+T(12)+NT(11)+NT(38)+NT(11)+T(13)));
 //G36:  console_sym(39)      => 'c' 'o' 'n' 's' 'o' 'l' 'e'.

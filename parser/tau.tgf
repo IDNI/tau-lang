@@ -16,8 +16,8 @@ spec_multiline         => _ (rec_relation | input_def | output_def | main)
 definitions            => (_ (rec_relation | input_def | output_def) _ '.')*.
 rec_relations          => (_ rec_relation _ '.')*.
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
-input_def              => io_var_name [ typed ] _ '=' _ "in"    __ stream.
-output_def             => io_var_name [ typed ] _ '=' _ "out" [ __ stream ].
+input_def              => io_var_name [ typed ] _ ":=" _ "in"    __ stream.
+output_def             => io_var_name [ typed ] _ ":=" _ "out" [ __ stream ].
 stream                 => "file" _ '(' _ q_file_name  _ ')'
                         | "console":console_sym
                         . # in the future tcp, udp,...
