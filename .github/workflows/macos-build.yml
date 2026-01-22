@@ -43,6 +43,10 @@ jobs:
 
       - name: Build tests
         run: ./dev release -DTAU_BUILD_TESTS=ON
+        env:
+          BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
+          Boost_INCLUDE_DIR: ${{ steps.install-boost.outputs.BOOST_ROOT }}/include
+          Boost_LIBRARY_DIRS: ${{ steps.install-boost.outputs.BOOST_ROOT }}/lib
 
       - name: Run tests
         run: ./dev test-release
@@ -54,6 +58,10 @@ jobs:
 
       - name: Build Python bindings
         run: ./dev binding python
+        env:
+          BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
+          Boost_INCLUDE_DIR: ${{ steps.install-boost.outputs.BOOST_ROOT }}/include
+          Boost_LIBRARY_DIRS: ${{ steps.install-boost.outputs.BOOST_ROOT }}/lib
 
       - name: Run Python test
         run: python3 ./tests/bindings/python/test_direct_api_update.py
