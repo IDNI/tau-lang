@@ -42,7 +42,7 @@ jobs:
         run: ./build-Release/tau -v
 
       - name: Build tests
-        run: ./dev release -DTAU_BUILD_TESTS=ON
+        run: ./dev release -DTAU_BUILD_API_TESTS=ON
         env:
           BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
           Boost_INCLUDE_DIR: ${{ steps.install-boost.outputs.BOOST_ROOT }}/include
