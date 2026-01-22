@@ -52,9 +52,7 @@ jobs:
         run: ./dev test-release
 
       - name: Install nanobind
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install nanobind
+        run: brew install nanobind
 
       - name: Build Python bindings
         run: ./dev binding python
