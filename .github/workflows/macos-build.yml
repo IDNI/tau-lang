@@ -40,3 +40,20 @@ jobs:
 
       - name: Run tau
         run: ./build-Release/tau -v
+
+      - name: Build tests
+        run: ./dev release -DTAU_BUILD_TESTS=ON
+
+      - name: Run tests
+        run: ./dev test-release
+
+      - name: Install nanobind
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install nanobind
+
+      - name: Build Python bindings
+        run: ./dev binding python
+
+      - name: Run Python test
+        run: python3 ./tests/bindings/python/test_direct_api_update.py
