@@ -174,8 +174,8 @@ the inputs and outputs of the specification.
 An example of how to define input and output streams is the following:
 
 ```
-i1 : tau = in console
-o1 : tau = out console
+i1 : tau := in console
+o1 : tau := out console
 ```
 
 In the above case we specify that `i1` and `o1` are of type `tau`, namely that
@@ -187,8 +187,8 @@ Tau specifications themselves abstracted as Boolean algebra elements.
 You can also define files as input or output streams:
 
 ```
-i1 : tau = ii file("input.in")
-o1 : tau = out file("output.out")
+i1 : tau := in file("input.in")
+o1 : tau := out file("output.out")
 ```
 
 The above two examples, `o1[t] = 0` and `o1[t] = i1[t]`, define one program each
@@ -751,22 +751,22 @@ Variables will be taken into account soon.
 
 When typing a stream explicitly in [REPL](#the-tau-repl), the syntax is
 ```
-stream_definition => stream_variable [":" type] "=" stream_type stream
+stream_definition => stream_variable [":" type] ":=" stream_type stream
 ```
 where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`...),
 `stream_type` is either input stream (`in`) or output stream (`out`), and `stream` is either `console` (meaning that the
 stream reads/outputs values from/to the console) or `file(file_name)` which denotes the file from/into which to read/write
 (in quotes if needed). For example,
 ```
-i1 : tau = in console
+i1 : tau := in console
 ```
 or
 ```
-o1 : tau = out console
+o1 : tau := out console
 ```
 or
 ```
-o2 : tau = out file("log.tau")
+o2 : tau := out file("log.tau")
 ```
 
 ### Special streams
@@ -1176,11 +1176,11 @@ recurrence relations. See the Tau Language section
 recurrence relations. See the Tau Language section
 [Functions and predicates](#functions-and-predicates) for more information.
 
-* `<type> i<number> = console | ifile(<filename>)`: defines an input stream variable.
+* `<type> i<number> := console | ifile(<filename>)`: defines an input stream variable.
 The input variable can read values from the console or from a provided file. <br>
 `<type>` can be either `tau` or `sbf` (simple Boolean function) at the moment.
 
-* `<type> o<number> = console | ofile(<filename>)`: defines an output stream variable.
+* `<type> o<number> := console | ofile(<filename>)`: defines an output stream variable.
 The output variable can write values to the console or into a file. <br>
 `<type>` can be either `tau` or `sbf` (simple Boolean function) at the moment.
 

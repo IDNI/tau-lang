@@ -780,6 +780,9 @@ bool is_cli_cmd(tref n);
 template <NodeType node>
 bool has_fallback (tref n);
 
+template <NodeType node>
+bool is_equational_assignment(tref eq);
+
 } // namespace idni::tau_lang
 
 // Hash for tau node
