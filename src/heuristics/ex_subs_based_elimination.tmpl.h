@@ -174,9 +174,10 @@ tref ex_subs_based_elimination(tref ex_clause, tref var)
 {
 	if (auto res = preorder<node>(ex_clause, var); res)
 		return rewriter::replace<node>(ex_clause, var, res);
-	if (auto res = postorder<node>(ex_clause, var); res)
-		return rewriter::replace<node>(ex_clause, var, res);
-	return ex_clause;
+	else return ex_clause;
+	//if (auto res = postorder<node>(ex_clause, var); res)
+	//	return rewriter::replace<node>(ex_clause, var, res);
+	//return ex_clause;
 }
 
 } // namespace idni::tau_lang

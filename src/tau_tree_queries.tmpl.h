@@ -264,5 +264,13 @@ bool has_fallback (tref n) {
 	return f != nullptr && !tau::get(f).is(tau::first_sym) && !tau::get(f).is(tau::last_sym);
 }
 
-
+template<NodeType node>
+bool is_equational_assignment(tref eq) {
+	using tau = tree<node>;
+	DBG(assert(tau::get(eq).child_is(tau::bf_eq)));
+	const tau& t = tau::get(eq)[0];
+	if (t[0].child_is(tau::variable)) return true;
+	if (t[1].child_is(tau::variable)) return true;
+	return false;
+}
 } // namespace idni::tau_lang

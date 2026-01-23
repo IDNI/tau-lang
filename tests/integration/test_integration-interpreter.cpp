@@ -60,7 +60,7 @@ TEST_SUITE("Execution") {
 			"F", "F", "o3[t] = o1[-1] & o2[-2]", "F", "F"
 		};
 		std::vector<std::string> u_expected = {
-			"F", "F", "always o3[t]:tau = o2[-2]:tau o1[-1]:tau", "F", "F"
+			"F", "F", "always o2[-2]:tau o1[-1]:tau = o3[t]:tau", "F", "F"
 		};
 		std::vector<std::string> o3_expected = {
 			"<:x> = 0 && <:y> = 0", "<:x> = 0 && <:y> = 0"
@@ -180,10 +180,10 @@ TEST_SUITE("Execution") {
 			"always o2[t]:tau = 0", "F", "always o3[t]:tau = 0", "F"
 		};
 		std::vector<std::string> o1_expected = {
-			"always i1[t]:tau = u[t]:tau && o1[t]:tau = this[t]:tau",
-			"always i1[t]:tau = u[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always i1[t]:tau = u[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always i1[t]:tau = u[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && o3[t]:tau = 0"
+			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
+			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
+			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
+			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && o3[t]:tau = 0"
 		};
 		io_context<node_t> ctx;
 		auto i1 = std::make_shared<vector_input_stream>(i1_values);
