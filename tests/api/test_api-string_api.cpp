@@ -5,10 +5,22 @@
 
 #include "api.h"
 
+using tau_api = api<node_t>;
+
 TEST_SUITE("String API") {
 
+	TEST_CASE("handle syntax error") {
+		auto maybe_i = tau_api::get_interpreter("o[t] =");
+		CHECK(!maybe_i.has_value());
+	}
+
+	TEST_CASE("handle type error") {
+		auto maybe_i = tau_api::get_interpreter("o[t]:tau = i[t]:sbf");
+		CHECK(!maybe_i.has_value());
+	}
+
+
 	TEST_CASE("using get_inputs_for_step") {
-		using tau_api = api<node_t>;
 
 		// Make the interpreter for a given specification as a string
 		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
@@ -65,7 +77,6 @@ TEST_SUITE("String API") {
 	}
 
 	TEST_CASE("with remapped streams") {
-		using tau_api = api<node_t>;
 
 		// Remap input and output streams from default console to custom streams
 		std::vector<std::string> i_values = { "T", "F", "T" };

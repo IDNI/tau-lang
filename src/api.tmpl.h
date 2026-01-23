@@ -14,6 +14,7 @@ htref api<node>::parse_specification(const std::string& specification,
 	typename tree<node>::get_options options;
 	options.context = &ctx;
 	tref spec = tree<node>::get(specification, options);
+	if (!spec) return {};
 	return tree<node>::geth(spec);
 }
 
@@ -34,6 +35,7 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
 	htref spec = parse_specification(specification, ctx);
+	if (!spec) return {};
 	auto maybe_nso_rr = get_nso_rr<node>(ctx, spec->get());
 	if (!maybe_nso_rr) return {};
 	tref applied = apply_rr_to_formula<node>(maybe_nso_rr.value());
