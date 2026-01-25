@@ -203,10 +203,12 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				if (stream.has_child())
 					stream_id = stream.child_data();
 			}
+
 			DBG(assert(options.context != nullptr));
 			(nt == input_def ? options.context->inputs
 					 : options.context->outputs)
 				[canonize<node>(io_def.first())] = stream_id;
+			options.context->types[canonize<node>(io_def.first())] = io_def.get_ba_type();
 		};
 
 		tref x = nullptr; // result of node transformation
