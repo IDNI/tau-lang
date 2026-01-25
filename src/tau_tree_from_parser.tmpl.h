@@ -193,22 +193,18 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		// extract stream information from a type definition
 		// and store it in io context
 		auto process_io_def = [&nt, &options](tref x) {
-			const auto& io_def = tau::get(x);
 			size_t stream_id = 0;
-			tref stream_node = io_def.first();
-			while (tau::get(stream_node).has_right_sibling())
-				stream_node = tau::get(stream_node).r;
-			if (stream_node != io_def.first()) {
-				const auto& stream = tau::get(stream_node);
-				if (stream.has_child())
-					stream_id = stream.child_data();
+			const auto& io_definition = tau::get(x);
+			if (auto filename = tt(x) | tau::stream | tau::q_file_name
+					| tau::file_name | tt::ref; filename) {
+				stream_id = tau::get(filename).data();
 			}
 
 			DBG(assert(options.context != nullptr));
 			(nt == input_def ? options.context->inputs
 					 : options.context->outputs)
-				[canonize<node>(io_def.first())] = stream_id;
-			options.context->types[canonize<node>(io_def.first())] = io_def.get_ba_type();
+				[canonize<node>(io_definition.first())] = stream_id;
+			options.context->types[canonize<node>(io_definition.first())] = io_definition.get_ba_type();
 		};
 
 		tref x = nullptr; // result of node transformation
