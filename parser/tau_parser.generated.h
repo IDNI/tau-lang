@@ -1,4 +1,4 @@
-// This file is generated from a file tau.tgf by
+// This file is generated from a file parser/tau.tgf by
 //       https://github.com/IDNI/parser/src/tgf
 //
 #ifndef __TAU_PARSER_H__
