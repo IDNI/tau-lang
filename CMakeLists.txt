@@ -362,6 +362,7 @@ endif()
 #
 message("Building parser")
 set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
+set(TAU_PARSER_BUILD_PIC ${TAU_BUILD_PIC} CACHE BOOL "Build position independent code" FORCE)
 add_subdirectory(external/parser)
 
 #
