@@ -201,10 +201,13 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 			}
 
 			DBG(assert(options.context != nullptr));
+
+			auto io_var = tau::get(tau::variable,
+				tau::get(tau::io_var, io_definition.first()));
 			(nt == input_def ? options.context->inputs
 					 : options.context->outputs)
-				[canonize<node>(io_definition.first())] = stream_id;
-			options.context->types[canonize<node>(io_definition.first())] = io_definition.get_ba_type();
+				[io_var] = stream_id;
+			options.context->types[io_var] = io_definition.get_ba_type();
 		};
 
 		tref x = nullptr; // result of node transformation
