@@ -786,7 +786,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// i1 : tau = in console
 				// o1 : bv[8] = out console
 				// ...
-				// We just add the variables to the current (global) scope.
+				// Process during initial transformations
+				skip = true; break;
 			}
 			case tau::rec_relation: {
 				// Samples:
@@ -1010,8 +1011,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		// Depoending on the node type...
 		switch (nt) {
 			case tau::input_def: case tau::output_def: {
-				// Resolve everything in the rec relation and close the scope
-				return;
+				// Process during initial transformations
+				break;
 			}
 			case tau::rec_relation: {
 				// We need to adjust the wrapping around refs in the body and
