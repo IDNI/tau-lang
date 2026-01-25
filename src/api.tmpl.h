@@ -58,6 +58,24 @@ std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
 }
 
 template <NodeType node>
+tref get_update(interpreter<node>& i, const assignment<node>& output) {
+	auto update_stream = build_out_var_at_n<node>(
+		"u", i.time_point - 1, get_ba_type_id<node>(tau_type<node>()));
+	// Update only if u is of type tau
+	if (size_t t = i.ctx.type_of(update_stream);
+		t != 0 && t == get_ba_type_id<node>(tau_type<node>()))
+	{
+		auto it = output.find(update_stream);
+		if (it != output.end()
+			&& !tree<node>::get(it->second).equals_0())
+		{
+			return unpack_tau_constant<node>(it->second);
+		}
+	}
+	return nullptr;
+}
+
+template <NodeType node>
 std::optional<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i, std::map<stream_at, std::string> inputs)
 {
@@ -141,6 +159,11 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		}
 		outputs[{ get_var_name<node>(out), i.time_point }] = ss.str();
 	}
+
+	// Run update if update stream is present and unequal to 0
+	if (tref update = get_update<node>(i, output.value()); update)
+		i.update(update);
+
 	return outputs;
 }
 
@@ -175,6 +198,12 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		outputs[{ get_var_name<node>(out), i.time_point }] =
 							tau::get(val).to_str();
 	}
+
+	// Run update if update stream is present and unequal to 0
+	if (tref update = get_update<node>(i, output.value()); update)
+		i.update(update);
+
+
 	return outputs;
 }
 
