@@ -40,8 +40,9 @@ tref merge_or(const std::map<tref, tref>& subs, tref left, tref right) {
 }
 
 template <NodeType node>
-tref postorder(tref ex_clause, tref var)
-{
+tref postorder(tref ex_clause, tref var) {
+	using tau = tree<node>;
+
 	std::map<tref, tref> subs;
 	bool error = false;
 
@@ -118,8 +119,9 @@ tref postorder(tref ex_clause, tref var)
 
 
 template <NodeType node>
-tref preorder(tref ex_clause, tref var)
-{
+tref preorder(tref ex_clause, tref var) {
+	using tau = tree<node>;
+
 	tref found = nullptr;
 
 	// We visit the formula until reaching atomic formulas (eq)

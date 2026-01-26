@@ -2,6 +2,7 @@
 
 #include "normal_forms.h"
 #include "union_find_with_sets.h"
+#include "heuristics/ex_subs_based_elimination.h"
 
 namespace idni::tau_lang {
 
@@ -3707,6 +3708,7 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 	// Following Corollary 2.3 from Taba book from Ohad
 	tref var = tau::trim2(ex_clause);
 	tref formula = tau::get(ex_clause)[0].second();
+
 	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
 		return formula;
 	tref new_fm = tau::_T();
@@ -3734,7 +3736,14 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 			tau::build_wff_ex(var, scoped_fm, false), new_fm);
 	}
 
-	// TODO (HIGH) call substitution based quantifier elimination here
+
+	// TODO (HIGH) maybe we also need to call substitution based quantifier elimination
+	// somewhere else, check later
+	/*if (auto eliminated = ex_subs_based_elimination<node>(var, scoped_fm); eliminated != scoped_fm) {
+		DBG(LOG_TRACE << "treat_ex_quantified_clause/ex_clause: " << LOG_FM(ex_clause) << "\n"
+			"treat_ex_quantified_clause/eliminated: " << LOG_FM(eliminated) << "\n";)
+		return eliminated;
+	}*/
 
 	// Check that quantified variable appears
 	if (tau::get(scoped_fm).equals_T()) return new_fm;
