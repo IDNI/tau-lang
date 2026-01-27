@@ -40,7 +40,7 @@ tref merge_or(const std::map<tref, tref>& subs, tref left, tref right) {
 }
 
 template <NodeType node>
-tref postorder(tref ex_clause, tref var) {
+tref postorder(tref var, tref ex_clause) {
 	using tau = tree<node>;
 
 	std::map<tref, tref> subs;
@@ -119,65 +119,41 @@ tref postorder(tref ex_clause, tref var) {
 
 
 template <NodeType node>
-tref preorder(tref ex_clause, tref var) {
+tref preorder(tref var, tref ex_clause) {
 	using tau = tree<node>;
 
 	tref found = nullptr;
 
-	// We visit the formula until reaching atomic formulas (eq)
-	auto visit_subtree = [&](tref n) -> bool {
-		return !is<node>(n, tau::wff_or)
-			&& !is<node>(n, tau::bf_interval)
-			&& !is<node>(n, tau::bf_neq)
-			&& !is<node>(n, tau::bf_lteq)
-			&& !is<node>(n, tau::bf_nlteq)
-			&& !is<node>(n, tau::bf_gt)
-			&& !is<node>(n, tau::bf_ngt)
-			&& !is<node>(n, tau::bf_gteq)
-			&& !is<node>(n, tau::bf_ngteq)
-			&& !is<node>(n, tau::bf_lt)
-			&& !is<node>(n, tau::bf_nlt);
-	};
-
 	auto visit = [&](tref n) -> bool {
-		using tau = tree<node>;
-
-		// Get the node type
-		auto t = tau::get(n);
-		size_t nt = t.get_type();
-
-		switch (nt) {
-			// It's an atomic formula
-			case tau::bf_eq: {
-				// This is a really simple case. In the future we could
-				// extend this to support more complex substitutions calling
-				// invert procedures (depending on the type).
-				auto left = t[0][0].get();
-				auto right = t[1][0].get();
-				if (left == var) found = right;
-				else if (right == var) found = left;
-				return false;
-			}
-			default:
-				// Do nothing, just continue.
-				break;
+		if (is<node>(n, tau::bf_eq)) {
+			auto t = tau::get(n);
+			auto left = t[0][0].get();
+			auto right = t[1][0].get();
+			if (left == var) found = right;
+			else if (right == var) found = left;
+			return false;
 		}
 		return true;
 	};
 
-	auto up = [&](tref) -> void {	return; };
+	// We visit the formula until reaching atomic formulas (eq)
+	auto visit_subtree = [&](tref n) -> bool {
+		return is<node>(n, tau::wff) || is<node>(n, tau::wff_and) || is<node>(n, tau::bf_eq);
+	};
+
+	auto up = [&](tref) -> void { return; };
 
 	pre_order<node>(ex_clause).search_unique(visit, visit_subtree, up);
 	return found;
 }
 
 template <NodeType node>
-tref ex_subs_based_elimination(tref ex_clause, tref var)
+tref ex_subs_based_elimination(tref var, tref ex_clause)
 {
-	if (auto res = preorder<node>(ex_clause, var); res)
+	if (auto res = preorder<node>(var, ex_clause); res)
 		return rewriter::replace<node>(ex_clause, var, res);
 	else return ex_clause;
-	//if (auto res = postorder<node>(ex_clause, var); res)
+	//if (auto res = postorder<node>(var, ex_clause); res)
 	//	return rewriter::replace<node>(ex_clause, var, res);
 	//return ex_clause;
 }

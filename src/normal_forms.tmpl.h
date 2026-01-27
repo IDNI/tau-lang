@@ -3736,14 +3736,13 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 			tau::build_wff_ex(var, scoped_fm, false), new_fm);
 	}
 
-
 	// TODO (HIGH) maybe we also need to call substitution based quantifier elimination
 	// somewhere else, check later
-	/*if (auto eliminated = ex_subs_based_elimination<node>(var, scoped_fm); eliminated != scoped_fm) {
-		DBG(LOG_TRACE << "treat_ex_quantified_clause/ex_clause: " << LOG_FM(ex_clause) << "\n"
-			"treat_ex_quantified_clause/eliminated: " << LOG_FM(eliminated) << "\n";)
+	DBG(LOG_TRACE << "treat_ex_quantified_clause/scoped_fm: " << LOG_FM(scoped_fm) << "\n";)
+	if (auto eliminated = ex_subs_based_elimination<node>(var, scoped_fm); eliminated != scoped_fm) {
+		DBG(LOG_TRACE << "treat_ex_quantified_clause/eliminated: " << LOG_FM(eliminated) << "\n";)
 		return eliminated;
-	}*/
+	}
 
 	// Check that quantified variable appears
 	if (tau::get(scoped_fm).equals_T()) return new_fm;
