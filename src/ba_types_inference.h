@@ -19,11 +19,6 @@
 
 namespace idni::tau_lang {
 
-struct parsing_error {
-	tref element;
-	size_t type_id;
-};
-
 // Some type definitions
 template<NodeType node>
 static size_t bv8_type_id = ba_types<node>::id(bv_type<node>(8));
