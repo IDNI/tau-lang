@@ -280,18 +280,47 @@ tref update_ba_symbol(tref n) {
 	return new_n;
 }
 
+struct parse_error {
+	tref element;
+	size_t type_id;
+};
+
+bool is_parse_error(const std::variant<tref, inference_error, parse_error>& v) {
+	return std::holds_alternative<parse_error>(v);
+}
+
+parse_error get_parse_error(const std::variant<tref, inference_error, parse_error>& v) {
+	return std::get<parse_error>(v);
+}
+
+bool is_inference_error(const std::variant<tref, inference_error, parse_error>& v) {
+	return std::holds_alternative<inference_error>(v);
+}
+
+inference_error get_inference_error(const std::variant<tref, inference_error, parse_error>& v) {
+	return std::get<inference_error>(v);
+}
+
+bool is_tref(const std::variant<tref, inference_error, parse_error>& v) {
+	return std::holds_alternative<tref>(v);
+}
+
+tref get_tref(const std::variant<tref, inference_error, parse_error>& v) {
+	return std::get<tref>(v);
+}
+
 // type all symbols according to their children's types
 template<NodeType node>
-tref update_bv_symbol(tref n) {
+std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n) {
 	using tau = tree<node>;
 
 	// We have one child at least and we know that the types of the
 	// children have already been updated and they are consistent.
 	// We only need to check that the type is bv type family.
 	auto t = tau::get(n)[0].get_ba_type();
-	return is_bv_type_family<node>(t)
-		? update_ba_symbol<node>(n)
-		: nullptr;
+	if (is_bv_type_family<node>(t))
+		return update_ba_symbol<node>(n);
+	return inference_error{n, bv_type_id<node>(), t};
 }
 
 // type all symbols according to their children's types
@@ -336,30 +365,32 @@ tref update_tref(tref n, size_t type) {
 }
 
 template<NodeType node>
-tref update_tref(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+std::variant<tref, inference_error, parse_error> update_tref(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+	using tau = tree<node>;
+
 	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return n;
 	// If the tref is typed
 	if (auto type = get_inferred_type<node>(n, canonized, types); type) {
-		if (auto assigned = resolver.assign(canonized, type.value()); is_inference_error(assigned)) return nullptr;
+		if (auto assigned = resolver.assign(canonized, type.value()); is_inference_error(assigned)) return get_inference_error(assigned);
 		return update_tref<node>(n, type.value());
 	}
-	return nullptr;
+	return inference_error{n, types.at(canonized), tau::get(n).get_ba_type()};
 }
 
 template<NodeType node>
-inline tref update_bf_constant(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+inline std::variant<tref, inference_error, parse_error> update_bf_constant(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
 	return update_tref<node>(resolver, n, types);
 }
 
 template<NodeType node>
-inline tref update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+inline std::variant<tref, inference_error, parse_error> update_variable(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
 	return update_tref<node>(resolver, n, types);
 }
 
 template<NodeType node>
-tref update_ba_constant(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
+std::variant<tref, inference_error, parse_error> update_ba_constant(type_scoped_resolver<node>& resolver, tref n, const subtree_map<node, size_t>& types) {
 	using tau = tree<node>;
 
 	// If we have no type information for the element we do nothing
@@ -371,12 +402,7 @@ tref update_ba_constant(type_scoped_resolver<node>& resolver, tref n, const subt
 		// Check that the constant was not parsed yet
 		if (tau::get(n).data() == 0) {
 			n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type.value());
-			if (n == nullptr) {
-				LOG_ERROR << "Unable to parse constant {"
-					<< tau::get(n).child_data() << "} with type "
-					<< get_ba_type_name<node>(type.value()) << "\n";
-				return nullptr;
-			}
+			if (n == nullptr) return parse_error{canonized, type.value()};
 		}
 		return update_tref<node>(n, type.value());
 	}
@@ -411,25 +437,26 @@ tref update_ref(type_scoped_resolver<node>& resolver, tref n, const subtree_map<
 			? tau_type_id<node>()
 			: types.at(canonized);
 
-		if (resolver.assign(canonized, type) == false) return nullptr;
+		if (auto assigned = resolver.assign(canonized, type); is_inference_error(assigned)) return get_inference_error(assigned);
 		return retype<node>(n, type);
 	}
 	return n;
 }
 
 template<NodeType node>
-tref update_functional_fallback(type_scoped_resolver<node>& resolver, tref n) {
+std::variant<tref, inference_error, parse_error> update_functional_fallback(type_scoped_resolver<node>& resolver, tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
 	// First we update the ba_constant, the ariables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
-	if (updated == nullptr) return nullptr;
-	auto sym = tt(updated) | tau::sym | tt::ref;
-	auto ref_args = tt(updated) | tau::ref_args | tt::ref;
-	auto fallback = tt(updated) | tau::fp_fallback | tt::first | tt::ref;
-	auto type = find_ba_type<node>(updated);
+	if (is_inference_error(updated)) return get_inference_error(updated);
+	if (is_parse_error(updated)) return get_parse_error(updated);
+	auto sym = tt(get_tref(updated)) | tau::sym | tt::ref;
+	auto ref_args = tt(get_tref(updated)) | tau::ref_args | tt::ref;
+	auto fallback = tt(get_tref(updated)) | tau::fp_fallback | tt::first | tt::ref;
+	auto type = find_ba_type<node>(get_tref(updated));
 	DBG(assert(!is_untyped<node>(type));)
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get_typed(tau::bf,
@@ -439,17 +466,18 @@ tref update_functional_fallback(type_scoped_resolver<node>& resolver, tref n) {
 }
 
 template<NodeType node>
-tref update_predicate_fallback(type_scoped_resolver<node>& resolver, tref n) {
+std::variant<tref, inference_error, parse_error> update_predicate_fallback(type_scoped_resolver<node>& resolver, tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
 	// First we update the ba_constant, the ariables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
-	if (updated == nullptr) return nullptr;
-	auto sym = tt(updated) | tau::sym | tt::ref;
-	auto ref_args = tt(updated) | tau::ref_args | tt::ref;
-	auto fallback = tt(updated) | tau::fp_fallback | tt::first | tt::ref;
+	if (is_inference_error(updated)) return get_inference_error(updated);
+	if (is_parse_error(updated)) return get_parse_error(updated);
+	auto sym = tt(get_tref(updated)) | tau::sym | tt::ref;
+	auto ref_args = tt(get_tref(updated)) | tau::ref_args | tt::ref;
+	auto fallback = tt(get_tref(updated)) | tau::fp_fallback | tt::first | tt::ref;
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get(tau::wff, tau::get(tau::wff_ref, fallback));
 	fallback = tau::get(tau::fp_fallback, fallback);
@@ -457,20 +485,21 @@ tref update_predicate_fallback(type_scoped_resolver<node>& resolver, tref n) {
 }
 
 template<NodeType node>
-tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n, auto& function_symbols) {
+std::variant<tref, inference_error, parse_error> update_functional_rr(type_scoped_resolver<node>& resolver, tref n, auto& function_symbols) {
 	using tau = tree<node>;
 
 	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
-	if (updated == nullptr) return nullptr;
+	if (is_inference_error(updated)) return get_inference_error(updated);
+	if (is_parse_error(updated)) return get_parse_error(updated);
 	// Finally, we get the new body and reference and create a new rr
 	// assuming the type of the head
-	tref head = untype<node>(tau::get(updated).child(0));
-	tref body = untype<node>(tau::get(updated).child(1));
+	tref head = untype<node>(tau::get(get_tref(updated)).child(0));
+	tref body = untype<node>(tau::get(get_tref(updated)).child(1));
 	// If the body is a formula and not a term, reject
 	if (tau::get(body).is(tau::wff)) return nullptr;
-	size_t type = find_ba_type<node>(updated);
+	size_t type = find_ba_type<node>(get_tref(updated));
 	DBG(assert(!is_untyped<node>(type)));
 	tref new_head = is<node, tau::ref>(head)
 				? tau::get_typed(tau::bf,
@@ -486,22 +515,21 @@ tref update_functional_rr(type_scoped_resolver<node>& resolver, tref n, auto& fu
 	// Add new function definition to available definitions
 	auto sig = get_function_signature<node>(tau::trim2(new_head));
 	function_symbols.insert_or_assign(sig, type);
-
 	return tau::get(tau::rec_relation, { new_head, new_body });
 }
 
 template<NodeType node>
-tref update_predicate_rr(type_scoped_resolver<node>& resolver, tref n) {
+std::variant<tref, inference_error, parse_error> update_predicate_rr(type_scoped_resolver<node>& resolver, tref n) {
 	using tau = tree<node>;
 
 	// First we update the variables in the rr head and body and close
 	// the rr scope
 	auto updated = update<node>(resolver, n, { tau::variable });
-	if (updated == nullptr) return nullptr;
+	if (is_inference_error(updated)) return get_inference_error(updated);
 	// Finally, we get the new body and reference and create a new rr
 	// assuming boolean type
-	auto head = tau::get(updated).child(0);
-	auto body = tau::get(updated).child(1);
+	auto head = tau::get(get_tref(updated)).child(0);
+	auto body = tau::get(get_tref(updated)).child(1);
 	auto new_head = is<node, tau::ref>(head)
 				? tau::get(tau::wff, tau::get(tau::wff_ref, head))
 				: head;
@@ -512,29 +540,31 @@ tref update_predicate_rr(type_scoped_resolver<node>& resolver, tref n) {
 }
 
 template<NodeType node>
-tref update_functional_ref(type_scoped_resolver<node>& resolver, tref n, [[maybe_unused]] tref parent) {
+std::variant<tref, inference_error, parse_error> update_functional_ref(type_scoped_resolver<node>& resolver, tref n, [[maybe_unused]] tref parent) {
 	using tau = tree<node>;
 
 	// First we update the ba_constant, the variables and bf_t/bf_f in the ref
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable });
-	if (updated == nullptr) return nullptr;
+	if (is_inference_error(updated)) return get_inference_error(updated);
+	if (is_parse_error(updated)) return get_parse_error(updated);
 	// Finally, we wrap the new ref accordingly
-	auto type = find_ba_type<node>(updated);
+	auto type = find_ba_type<node>(get_tref(updated));
 	DBG(assert(!is_untyped<node>(type)));
-	auto new_n = untype<node>(updated);
+	auto new_n = untype<node>(get_tref(updated));
 	return tau::get_typed(tau::bf, tau::get_typed(tau::bf_ref, new_n, type), type);
 }
 
 template<NodeType node>
-tref update_predicate_ref(type_scoped_resolver<node>& resolver, tref n, tref parent) {
+std::variant<tref, inference_error, parse_error> update_predicate_ref(type_scoped_resolver<node>& resolver, tref n, tref parent) {
 	using tau = tree<node>;
 
 	// First we update the variables in the ref
 	auto updated = update<node>(resolver, n, { tau::variable });
-	if (updated == nullptr) return nullptr;
+	if (is_inference_error(updated)) return get_inference_error(updated);
 	// Finally, we wrap the new ref accordingly
-	return is<node, tau::wff_ref>(parent) ? updated:
-		tau::get(tau::wff, tau::get(tau::wff_ref, updated));
+	return is<node, tau::wff_ref>(parent)
+		? get_tref(updated)
+		: tau::get(tau::wff, tau::get(tau::wff_ref, get_tref(updated)));
 }
 
 template<NodeType node>
@@ -554,13 +584,13 @@ tref update_default(tref n, subtree_map<node, tref>& changes) {
 };
 
 template<NodeType node>
-tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<size_t> types_to_update) {
+std::variant<tref, inference_error, parse_error> update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<size_t> types_to_update) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
 	subtree_map<node, tref> changes;
 
-	bool error = false;
+	std::variant<tref, inference_error, parse_error> error;
 	auto types = resolver.current_types();
 	auto to_be_updated = std::set<size_t>(types_to_update.begin(), types_to_update.end());
 	std::vector type_environment = {r};
@@ -576,39 +606,44 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 		// Check if n was already processed
 		if (tt(n) | tau::processed) return true;
 		size_t nt = t.get_type();
-		if (error) return false;
+
+		// return error if present
+		if (is_inference_error(error) || is_parse_error(error)) return false;
 
 		switch (nt) {
 			case tau::variable: {
 				if (!to_be_updated.contains(nt)) break;
-				if (auto updated = update_variable<node>(resolver, n, types); updated) {
-					if (updated != n) changes.insert_or_assign(n, updated);
+				auto updated = update_variable<node>(resolver, n, types);
+				if (!is_inference_error(updated)) {
+					if (get_tref(updated) != n) changes.insert_or_assign(n, get_tref(updated));
 					if (using_default_type<node>(n, types)) {
-						default_typing_message<node>(updated, type_environment.back());
+						default_typing_message<node>(get_tref(updated), type_environment.back());
 					}
-				} else error = true;
+				} else error = get_inference_error(updated);
 				break;
 			}
 			case tau::ba_constant: {
 				if (!to_be_updated.contains(nt)) break;
-				if (auto updated = update_ba_constant<node>(resolver, n, types); updated) {
-					if (updated != n) changes.insert_or_assign(n, updated);
+				auto updated = update_ba_constant<node>(resolver, n, types);
+				if (!is_parse_error(updated)) {
+					if (get_tref(updated) != n) changes.insert_or_assign(n, get_tref(updated));
 					if (using_default_type<node>(n, types)) {
-						default_typing_message<node>(updated, type_environment.back());
+						default_typing_message<node>(get_tref(updated), type_environment.back());
 					} else if (using_default_bv_size<node>(n, types)) {
-						default_typing_message<node>(updated, type_environment.back(), true);
+						default_typing_message<node>(get_tref(updated), type_environment.back(), true);
 					}
-				} else error = true;
+				} else error = get_parse_error(updated);
 				break;
 			}
 			case tau::bf_t: case tau::bf_f: {
 				if (!to_be_updated.contains(nt)) break;
-				if (auto updated = update_bf_constant<node>(resolver, n, types); updated) {
-					if (updated != n) changes.insert_or_assign(n, updated);
+				auto updated = update_bf_constant<node>(resolver, n, types);
+				if (!is_inference_error(updated)) {
+					if (get_tref(updated) != n) changes.insert_or_assign(n, get_tref(updated));
 					if (using_default_type<node>(n, types)) {
-						default_typing_message<node>(updated, type_environment.back());
+						default_typing_message<node>(get_tref(updated), type_environment.back());
 					}
-				} else error = true;
+				} else error = get_inference_error(updated);
 				break;
 			}
 			case tau::bf:
@@ -621,8 +656,8 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				auto nn = update_default<node>(n, changes);
 				if(!to_be_updated.contains(nt) && !to_be_updated.contains(tau::typeable_symbol)) {
 					if (nn != n) changes.insert_or_assign(n, nn);
-				} else if (auto updated = update_ba_symbol<node>(nn); n != updated)
-					changes.insert_or_assign(n, updated);
+				} else if (auto updated = update_ba_symbol<node>(nn); get_tref(updated) != n)
+					changes.insert_or_assign(n, get_tref(updated));
 				break;
 			}
 			case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
@@ -633,17 +668,19 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 				auto nn = update_default<node>(n, changes);
 				if(!to_be_updated.contains(nt) && !to_be_updated.contains(tau::typeable_symbol)) {
 					if (nn != n) changes.insert_or_assign(n, nn);
-				} else if (auto updated = update_bv_symbol<node>(nn); n != updated) {
-					if (updated != nullptr)	changes.insert_or_assign(n, updated);
-					else error = true;
+				} else {
+					auto updated = update_bv_symbol<node>(nn);
+					if (is_inference_error(updated)) { error = get_inference_error(updated); break; }
+					if (n != get_tref(updated)) { changes.insert_or_assign(n, get_tref(updated)); }
 				}
+
 				break;
 			}
 			case tau::bf_ref: {
 				auto nn = update_default<node>(n, changes);
 				if(!to_be_updated.contains(nt)) break;
 				if (auto updated = update_bf_ref<node>(nn); updated)
-					if (updated != n) changes.insert_or_assign(n, updated);
+					if (get_tref(updated) != n) changes.insert_or_assign(n, get_tref(updated));
 				break;
 			}
 			default: {
@@ -653,15 +690,15 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 			}
 		}
 
-		if (error)
+		/*if (error)
 			LOG_ERROR << "Incompatible or absent type information in " << tau::get(n) << "\n";
 
 		DBG(if (!error) LOG_TRACE << "infer_ba_types/update/" << LOG_NT(nt) << "/n -> new_n:\n"
 				<< LOG_FM_TREE(n) << " -> "
-				<< LOG_FM_TREE(changes.contains(n) ? changes[n] : n);)
+				<< LOG_FM_TREE(changes.contains(n) ? changes[n] : n);)*/
 		DBG(LOG_TRACE << "infer_ba_types/update/" << LOG_NT(nt) << "/resolver:\n"
 				<< resolver.dump_to_str();)
-		return !error;
+		return !is_inference_error(error) && !is_parse_error(error);
 	};
 
 	// Solution to not printing the entire tau command tree for default typing
@@ -676,7 +713,8 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 		return true;
 	};
 	post_order<node>(r).search(f, update_type_env);
-	if (error) return nullptr;
+	if (is_inference_error(error)) return get_inference_error(error);
+	if (is_parse_error(error)) return get_parse_error(error);
 	return changes.find(r) != changes.end() ? changes[r] : r;
 }
 
@@ -793,7 +831,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	tau::use_hooks = false;
 
 	subtree_map<node, tref> transformed;
-	std::optional<std::variant<inference_error, parsing_error>> error = std::nullopt;
+	std::optional<std::variant<inference_error, parse_error>> error = std::nullopt;
 
 	// We gather info about types and scopes while entering nodes
 	auto on_enter = [&](tref n, tref parent) {
@@ -1061,8 +1099,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				auto updated = is_functional_relation<node>(new_n)
 					? update_functional_rr<node>(resolver, new_n, available_function_symbols)
 					: update_predicate_rr<node>(resolver, new_n);
-				if(updated == nullptr) { error = inference_error{}; break; }
-				if(updated != new_n) transformed.insert_or_assign(n, updated);
+				if (is_parse_error(updated)) { error = get_parse_error(updated); break; }
+				if (is_inference_error(updated)) { error = get_inference_error(updated); break; }
+				if (get_tref(updated) != new_n) transformed.insert_or_assign(n, get_tref(updated));
 				if (!resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = inference_error{};
@@ -1073,8 +1112,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::wff_all: case tau::wff_ex: {
 				tref new_n = update_default<node>(n, transformed);
 				auto updated = update<node>(resolver, new_n, { tau::variable});
-				if(updated == nullptr) { error = inference_error{}; break; }
-				if(updated != new_n) transformed.insert_or_assign(n, updated);
+				if (is_parse_error(updated)) { error = get_parse_error(updated); break; }
+				if (is_inference_error(updated)) { error = get_inference_error(updated); break; }
+				if (get_tref(updated) != new_n) transformed.insert_or_assign(n, get_tref(updated));
 				if(!resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = inference_error{};
@@ -1092,8 +1132,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						auto updated = is_functional_fallback<node>(new_n)
 							? update_functional_fallback<node>(resolver, new_n)
 							: update_predicate_fallback<node>(resolver, new_n);
-						if(updated == nullptr) { error = inference_error{}; break; }
-						if(updated != new_n) transformed.insert_or_assign(n, updated);
+						if (is_parse_error(updated)) { error = get_parse_error(updated); break; }
+						if (is_inference_error(updated)) { error = get_inference_error(updated); break; }
+						if (get_tref(updated) != new_n) transformed.insert_or_assign(n, get_tref(updated));
 						if (!resolver.close()) {
 							DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 							error = inference_error{};
@@ -1102,17 +1143,19 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						break;
 					}
 					auto new_n = update_default<node>(n, transformed);
-					new_n = is_functional_ref<node>(new_n, available_function_symbols)
+					auto updated = is_functional_ref<node>(new_n, available_function_symbols)
 						? update_functional_ref<node>(resolver, new_n, parent)
 						: update_predicate_ref<node>(resolver, new_n, parent);
-					if(new_n == nullptr) { error = inference_error{}; break; }
-					if(new_n != n) transformed.insert_or_assign(n, new_n);
+					if (is_parse_error(updated)) { error = get_parse_error(updated); break; }
+					if (is_inference_error(updated)) { error = get_inference_error(updated); break; }
+					if (get_tref(updated) != new_n) transformed.insert_or_assign(n, get_tref(updated));
 					break;
 				}
 				tref new_n = update_default<node>(n, transformed);
-				new_n = update<node>(resolver, new_n, { tau::variable });
-				if (new_n == nullptr) { error = inference_error{}; break; }
-				if (new_n != n) transformed.insert_or_assign(n, new_n);
+				auto updated = update<node>(resolver, new_n, { tau::variable });
+				if (is_parse_error(updated)) { error = get_parse_error(updated); break; }
+				if (is_inference_error(updated)) { error = get_inference_error(updated); break; }
+				if (get_tref(updated) != new_n) transformed.insert_or_assign(n, get_tref(updated));
 				break;
 			}
 			case tau::ref_arg:
@@ -1123,8 +1166,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
 				auto updated = update<node>(resolver, n, { tau::ref, tau::ba_constant, tau::bf_t, tau::bf_f });
-				if(updated == nullptr) { error = inference_error{}; break; }
-				if(updated != n) transformed.insert_or_assign(n, updated);
+				if (is_parse_error(updated)) { error = get_parse_error(updated); break; }
+				if (is_inference_error(updated)) { error = get_inference_error(updated); break; }
+				if (get_tref(updated) != n) transformed.insert_or_assign(n, get_tref(updated));
 				if (!resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = inference_error{};
@@ -1135,8 +1179,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				tref new_n = update_default<node>(n, transformed);
 				if (is_top_level_bf<node>(parent)) {
 					auto updated = update<node>(resolver, new_n, { tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
-					if(updated == nullptr) { error = inference_error{}; break; }
-					if(updated != new_n) transformed.insert_or_assign(n, updated);
+					if (is_parse_error(updated)) { error = get_parse_error(updated); break; }
+					if (is_inference_error(updated)) { error = get_inference_error(updated); break; }
+					if (get_tref(updated) != new_n) transformed.insert_or_assign(n, get_tref(updated));
 				} else {
 					if (new_n != n) transformed.insert_or_assign(n, new_n);
 				}
@@ -1146,8 +1191,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				tref new_n = update_default<node>(n, transformed);
 				// For the root node, we type untyped variables with tau.
 				if (!parent) {
-					new_n = update<node>(resolver, new_n, { tau::variable });
-					if (new_n == nullptr) { error = inference_error{}; break; }
+					auto updated = update<node>(resolver, new_n, { tau::variable });
+					if (is_parse_error(updated)) { error = get_parse_error(updated); break; }
+					if (is_inference_error(updated)) { error = get_inference_error(updated); break; }
+					if (get_tref(updated) != new_n) transformed.insert_or_assign(n, get_tref(updated));
 				}
 				if (new_n != n) transformed.insert_or_assign(n, new_n);
 				break;
@@ -1172,8 +1219,14 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	tref new_n = transformed.contains(n) ? transformed[n] : n;
 	new_n = bv_defaulting<node>(new_n);
 	if (new_n == nullptr) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
-	new_n = update<node>(resolver, new_n, { tau::typeable_symbol, tau::bf_ref });
-	if (new_n == nullptr) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
+	auto updated = update<node>(resolver, new_n, { tau::typeable_symbol, tau::bf_ref });
+	if (is_inference_error(updated)) {
+		// TODO (HIGH) print error info
+		return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
+	}
+	new_n = get_tref(updated);
+//	new_n = update<node>(resolver, new_n, { tau::typeable_symbol, tau::bf_ref });
+//	if (new_n == nullptr) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 
 	// Remove intermediate tau::processed nodes
 	auto remove_processed = [](tref n) {
