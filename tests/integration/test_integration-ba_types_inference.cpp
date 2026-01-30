@@ -86,61 +86,6 @@ tref parse_spec(const std::string& sample, tau::get_options opts = parse_spec_no
 	return src;
 }
 
-using size_t = size_t;
-
-/*TEST_SUITE("type_scoped_resolver") {
-
-	TEST_CASE("merging in the same scope") {
-		type_scoped_resolver<node_t> r;
-		tref a = parse("T"); // just an existing tref for testing
-		tref b = parse("F"); // just an existing tref for testing
-		r.insert(a);
-		r.insert(b);
-		size_t t = 1;
-		CHECK(r.assign(a, t));
-		CHECK(r.merge(a, b));
-		CHECK(r.type_id_of(a) == r.type_id_of(b));
-		CHECK(r.type_id_of(a) == t);
-	}
-
-	TEST_CASE("merging in different scopes") {
-		type_scoped_resolver<node_t> r;
-		tref a = parse("T"); // just an existing tref for testing
-		tref b = parse("F"); // just an existing tref for testing
-		size_t t = 1;
-		r.insert(a);
-		r.open({{b, t}});
-		CHECK(r.merge(a, b));
-		CHECK(r.type_id_of(a) == r.type_id_of(b));
-		CHECK(r.type_id_of(a) == t);
-	}
-
-	TEST_CASE("merging conflicting types in the same scope") {
-		type_scoped_resolver<node_t> r;
-		tref a = parse("T"); // just an existing tref for testing
-		tref b = parse("F"); // just an existing tref for testing
-		r.insert(a);
-		r.insert(b);
-		size_t t1 = 1;
-		size_t t2 = 2;
-		CHECK(r.assign(a, t1));
-		CHECK(r.assign(b, t2));
-		CHECK(!r.merge(a, b)); // conflicting types
-	}
-
-	TEST_CASE("merging conflicting types in different scopes") {
-		type_scoped_resolver<node_t> r;
-		tref a = parse("T"); // just an existing tref for testing
-		tref b = parse("F"); // just an existing tref for testing
-		size_t t1 = 1;
-		size_t t2 = 2;
-		r.insert(a);
-		CHECK(r.assign(a, t1));
-		r.open({{b, t2}});
-		CHECK(!r.merge(a, b)); // conflicting types
-	}
-}*/
-
 bool check_vars(tref inferred, std::vector<std::pair<std::string, size_t>>& expected) {
 	auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
 	if (vars.empty() && expected.size() > 0) {
