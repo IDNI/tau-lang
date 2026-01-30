@@ -19,6 +19,12 @@
 
 namespace idni::tau_lang {
 
+struct inference_error {
+	tref element;
+	size_t expected;
+	size_t found;
+};
+
 template<NodeType node>
 struct type_scoped_resolver {
 	using element = scoped_union_find<tref, idni::subtree_less<node>>::element;
@@ -28,16 +34,16 @@ struct type_scoped_resolver {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	bool open(const subtree_map<node, type_id>& elements = {});
+	void open(const subtree_map<node, type_id>& elements = {});
 	bool close();
 	element insert(tref n);
 	type_id type_id_of(tref n);
 	scope scope_of(tref n);
-	bool assign(tref a, type_id tid);
+	std::variant<size_t, inference_error> assign(tref a, type_id tid);
 	// merge two trefs if the types are compatible
 	// returns true if merge was successful, false otherwise
-	std::optional<size_t> merge(tref a, tref b);
-	std::optional<size_t> merge(const trefs& ts);
+	std::variant<size_t, inference_error> merge(tref a, tref b);
+	std::variant<size_t, inference_error> merge(const trefs& ts);
 	subtree_map<node, type_id> current_types();
 	subtree_map<node, type_id> all_types();
 
@@ -57,40 +63,63 @@ struct type_scoped_resolver {
 // nodes to its type ids (tau, sbf,...) or maybe just a map of the former type.
 
 template<NodeType node>
-bool insert(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
+std::optional<inference_error> insert(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
 
 template<NodeType node>
-bool insert(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
+std::optional<inference_error> insert(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 template<NodeType node>
-bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, size_t type);
+void open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, size_t type);
 
 template<NodeType node>
-bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, tref type);
+void open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, tref type);
 
 template<NodeType node>
-bool open(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
+void open(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
 
 template<NodeType node>
-bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
+void open(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 template<NodeType node>
-bool open_same_type(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types,
+std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const subtree_set<node>& refs,
 		size_t inferred_type);
 
 template<NodeType node>
-bool open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
+std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types,
 		size_t inferred_type);
 
 template<NodeType node>
-std::optional<size_t> merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
+std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
+		size_t inferred_type);
+
+template<NodeType node>
+std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types);
 
 
 template<NodeType node>
-std::optional<size_t> merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
+std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types);
 
 template<NodeType node>
-std::optional<size_t> unify(const std::map<size_t, subtree_map<node, size_t>>& types, size_t default_type);
+std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<node, size_t>>& types, size_t default_type);
+
+// Helper functions
+
+inline bool is_inference_error(const std::variant<size_t, inference_error>& v) {
+	return std::holds_alternative<inference_error>(v);
+}
+
+inline inference_error get_inference_error(const std::variant<size_t, inference_error>& v) {
+	return std::get<inference_error>(v);
+}
+
+inline bool is_type_id(const std::variant<size_t, inference_error>& v) {
+	return std::holds_alternative<size_t>(v);
+}
+
+inline size_t get_type_id(const std::variant<size_t, inference_error>& v) {
+	return std::get<size_t>(v);
+}
+
 
 } // namespace idni::tau_lang
 

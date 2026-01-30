@@ -16,15 +16,13 @@
 
 namespace idni::tau_lang {
 
-
 template<NodeType node>
-bool type_scoped_resolver<node>::open(const subtree_map<node, typename type_scoped_resolver<node>::type_id>& elements) {
+void type_scoped_resolver<node>::open(const subtree_map<node, typename type_scoped_resolver<node>::type_id>& elements) {
 	scoped.open();
 	for (auto [n, tid] : elements) {
 		auto element = scoped.push(n);
 		type_ids.emplace(element, tid);
 	}
-	return true;
 }
 
 template<NodeType node>
@@ -53,25 +51,25 @@ typename type_scoped_resolver<node>::scope type_scoped_resolver<node>::scope_of(
 }
 
 template<NodeType node>
-bool type_scoped_resolver<node>::assign(tref n, typename type_scoped_resolver<node>::type_id tid) {
+std::variant<size_t, inference_error> type_scoped_resolver<node>::assign(tref n, typename type_scoped_resolver<node>::type_id tid) {
 	auto element = scoped.insert(n);
 	auto root = scoped.root(element);
 	if (auto it = type_ids.find(root); it != type_ids.end()) {
 		auto merged_tid = unify<node>(it->second, tid);
-		if (!merged_tid) return false; // conflicting type info
+		if (!merged_tid) return inference_error{n, it->second, tid}; // conflicting type info
 		type_ids.insert_or_assign(root, merged_tid.value());
-		return true;
+		return merged_tid.value();
 	}
 	type_ids.insert_or_assign(element, tid);
-	return true;
+	return tid;
 }
 
 template<NodeType node>
-std::optional<size_t> type_scoped_resolver<node>::merge(tref a, tref b) {
+std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(tref a, tref b) {
 	auto type_a = type_id_of(a);
 	auto type_b = type_id_of(b);
 	auto merged = unify<node>(type_a, type_b);
-	if (!merged) return std::nullopt; // conflicting type info
+	if (!merged) return inference_error{a, type_a, type_b}; // conflicting type info
 	auto new_root = scoped.merge(a, b);
 	type_ids.insert_or_assign(new_root, merged.value());
 	DBG(LOG_TRACE << "type_scoped_resolver/merge: "
@@ -84,13 +82,13 @@ std::optional<size_t> type_scoped_resolver<node>::merge(tref a, tref b) {
 }
 
 template<NodeType node>
-std::optional<size_t> type_scoped_resolver<node>::merge(const trefs& ts) {
+std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(const trefs& ts) {
 	if (ts.size() < 2) return type_id_of(ts[0]);
 	size_t type_id = 0;
 	for (size_t i = 1; i < ts.size(); ++i) {
 		const auto res = merge(ts[0], ts[i]);
-		if (!res) return std::nullopt;
-		type_id = res.value();
+		if (is_inference_error(res)) return inference_error{ts[i], type_id_of(ts[0]), type_id_of(ts[i])};
+		type_id = get_type_id(res);
 	}
 	return type_id;
 }
@@ -144,29 +142,29 @@ std::string type_scoped_resolver<node>::dump_to_str() {
 // Helper functions
 
 template<NodeType node>
-bool insert(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
+std::optional<inference_error> insert(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
 	for (auto [_, typeables] : types) {
 		for (auto [t, type] : typeables) {
 			resolver.insert(t);
-			if (!resolver.assign(t, type)) return false;
+			if (auto assigned = resolver.assign(t, type); std::holds_alternative<inference_error>(assigned)) return std::get<inference_error>(assigned);
 		}
 	}
-	return true;
+	return std::nullopt;
 }
 
 template<NodeType node>
-bool insert(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
+std::optional<inference_error> insert(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
 	for (auto typeables : types) {
 		for (auto [t, type] : typeables) {
 			resolver.insert(t);
-			if (!resolver.assign(t, type)) return false;
+			if (auto assigned = resolver.assign(t, type); std::holds_alternative<inference_error>(assigned)) return std::get<inference_error>(assigned);
 		}
 	}
-	return true;
+	return std::nullopt;
 }
 
 template<NodeType node>
-bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, size_t type) {
+void open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, size_t type) {
 	subtree_map<node, size_t> scoped;
 	for (auto typeables : ns)
 		for (auto t : typeables)
@@ -175,13 +173,13 @@ bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<tref
 }
 
 template<NodeType node>
-bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, tref type) {
+void open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, tref type) {
 	auto type_id = ba_types<node>::type_id_from_ba_type(type);
 	return open<node>(resolver, ns, type_id);
 }
 
 template<NodeType node>
-bool open(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
+void open(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
 	subtree_map<node, size_t> scoped;
 	for (auto [_, typeables] : types)
 		for (auto [t, type] : typeables)
@@ -190,7 +188,7 @@ bool open(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_m
 }
 
 template<NodeType node>
-bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
+void open(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
 	subtree_map<node, size_t> scoped;
 	for (auto typeables : types)
 		for (auto [t, type] : typeables)
@@ -199,48 +197,52 @@ bool open(type_scoped_resolver<node>& resolver, const std::initializer_list<subt
 }
 
 template<NodeType node>
-bool open_same_type(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types,
-		size_t inferred_type) {
-	subtree_map<node, size_t> scoped;
-	//auto inferred_type = untyped_type_id<node>();
-	for (auto [_, typeables] : types) {
-		for (auto [t, type] : typeables) {
-			if (!unify<node>(type, inferred_type)) return false;
-			scoped[t] = inferred_type;
-		}
+std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const subtree_set<node>& refs,
+		size_t default_type) {
+	for (auto t : refs) {
+		resolver.insert(t);
+		if (auto assigned = resolver.assign(t, default_type); is_inference_error(assigned))
+			return get_inference_error(assigned);
 	}
-	return resolver.open(scoped);
+	return default_type;
 }
 
 template<NodeType node>
-bool open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
-		size_t inferred_type) {
+std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types,
+		size_t default_type) {
+	subtree_set<node> scoped;
+	size_t inferred_type = default_type;
+	for (auto [_, typeables] : types) {
+		for (auto [typeable, type] : typeables) {
+			auto unified = unify<node>(inferred_type, type);
+			if (!unified) return inference_error{typeable, inferred_type, type};
+			else inferred_type = unified.value();
+			scoped.insert(typeable);
+		}
+	}
+	return open_same_type(resolver, scoped, inferred_type);
+}
+
+template<NodeType node>
+std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types,
+		size_t default_type) {
 	subtree_map<node, size_t> scoped;
+	size_t inferred_type = default_type;
 	//auto inferred_type = untyped_type_id<node>();
 	for (auto typeables : types) {
 		for (auto [t, type] : typeables) {
-			if(!unify<node>(inferred_type, type)) return false;
-			scoped[t] = inferred_type;
+			auto unified = unify<node>(inferred_type, type);
+			if (!unified) return inference_error{t, inferred_type, type};
+			else inferred_type = unified.value();
+			scoped[t] = default_type;
 		}
 	}
-	return resolver.open(scoped);
+	resolver.open(scoped);
+	return default_type;
 }
 
 template<NodeType node>
-std::optional<size_t> unify(const std::map<size_t, subtree_map<node, size_t>>& types, size_t default_type) {
-	auto unified_type = default_type;
-	for (auto [_, typeables] : types) {
-		for (auto [_, type] : typeables) {
-			if (auto new_unified_type = unify<node>(unified_type, type); new_unified_type) {
-				unified_type = new_unified_type.value();
-			} else return std::nullopt; // incompatible types
-		}
-	}
-	return { unified_type };
-}
-
-template<NodeType node>
-std::optional<size_t> merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
+std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver, const std::initializer_list<subtree_map<node, size_t>>& types) {
 	trefs mergeables;
 	for (auto typeables : types)
 		for (auto [t, _] : typeables)
@@ -249,12 +251,25 @@ std::optional<size_t> merge(type_scoped_resolver<node>& resolver, const std::ini
 }
 
 template<NodeType node>
-std::optional<size_t> merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
+std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver, const std::map<size_t, subtree_map<node, size_t>>& types) {
 	trefs mergeables;
 	for (auto [_, typeables] : types)
 		for (auto [t, _] : typeables)
 			mergeables.push_back(t);
 	return resolver.merge(mergeables);
+}
+
+template<NodeType node>
+std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<node, size_t>>& types, size_t default_type) {
+	auto unified_type = default_type;
+	for (auto [_, typeables] : types) {
+		for (auto [typeable, type] : typeables) {
+			if (auto unified = unify<node>(unified_type, type); unified) {
+				unified_type = unified.value();
+			} else return inference_error{ typeable, unified_type, type}; // incompatible types
+		}
+	}
+	return unified_type;
 }
 
 } // namespace idni::tau_lang

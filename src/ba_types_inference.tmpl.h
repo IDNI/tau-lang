@@ -80,7 +80,7 @@ std::tuple<size_t, int_t, int_t> get_function_signature(tref func) {
 }
 
 template<NodeType node>
-auto is_top_level_bf = [](tref parent) -> bool {
+bool is_top_level_bf(tref parent) {
 	using tau = tree<node>;
 	if (parent == nullptr) return true;
 	auto nt = tau::get(parent).get_type();
@@ -104,7 +104,7 @@ auto is_top_level_bf = [](tref parent) -> bool {
 		default:
 			return true;
 	}
-};
+}
 
 template<NodeType node>
 tref retype(tref n, const size_t new_type) {
@@ -144,7 +144,7 @@ auto bv_defaulting = [](tref n) -> tref {
 };
 
 template <NodeType node>
-std::optional<std::map<size_t, subtree_map<node, size_t>>> get_typeable_type_ids_by_type(tref n,
+std::variant<std::map<size_t, subtree_map<node, size_t>>, inference_error> get_typeable_type_ids_by_type(tref n,
 		const std::function<bool(tref)>& query = is_typeable<node>,
 		const std::function<bool(tref)>& stop = is<node, tree<node>::offset>) {
 	using tau = tree<node>;
@@ -154,15 +154,13 @@ std::optional<std::map<size_t, subtree_map<node, size_t>>> get_typeable_type_ids
 	for (tref typeable : typeables) {
 		auto canonized = canonize<node>(typeable);
 		auto nt = tau::get(typeable).get_type();
-		if (typeable_type_ids_by_type.find(nt) == typeable_type_ids_by_type.end())
-			typeable_type_ids_by_type[nt] = subtree_map<node, size_t>();
 		if (auto it = typeable_type_ids_by_type[nt].find(canonized); it !=
 				typeable_type_ids_by_type[nt].end()) {
 			if (auto type_id = unify<node>(it->second, tau::get(typeable).get_ba_type()); type_id) {
 				typeable_type_ids_by_type[nt][canonized] = type_id.value();
 				continue;
 			}
-			return std::nullopt; // incompatible types
+			return inference_error{typeable, it->second, tau::get(typeable).get_ba_type()}; // incompatible types
 		}
 		typeable_type_ids_by_type[nt][canonized] = tau::get(typeable).get_ba_type();
 	}
@@ -180,9 +178,34 @@ std::optional<std::map<size_t, subtree_map<node, size_t>>> get_typeable_type_ids
 }
 
 template <NodeType node>
-std::optional<std::map<size_t, subtree_map<node, size_t>>> get_typeable_type_ids_by_type(tref n, const std::initializer_list<size_t>& types) {
+std::variant<std::map<size_t, subtree_map<node, size_t>>, inference_error> get_typeable_type_ids_by_type(tref n, const std::initializer_list<size_t>& types) {
 	return get_typeable_type_ids_by_type<node>(n, is<node>(types));
 }
+
+template <NodeType node>
+inline bool is_type_ids_by_type(const std::variant<std::map<size_t, subtree_map<node, size_t>>, inference_error>& type_ids_by_type) {
+	return std::holds_alternative<std::map<size_t, subtree_map<node, size_t>>>(type_ids_by_type);
+}
+
+template <NodeType node>
+inline std::map<size_t, subtree_map<node, size_t>> get_type_ids_by_type(const std::variant<std::map<size_t, subtree_map<node, size_t>>, inference_error>& type_ids_by_type) {
+	return std::get<std::map<size_t, subtree_map<node, size_t>>>(type_ids_by_type);
+}
+
+template <NodeType node>
+inline bool is_inference_error(const std::variant<std::map<size_t, subtree_map<node, size_t>>, inference_error>& v) {
+	return std::holds_alternative<inference_error>(v);
+}
+
+template <NodeType node>
+inline inference_error get_inference_error(const std::variant<std::map<size_t, subtree_map<node, size_t>>, inference_error>& v) {
+	return std::get<inference_error>(v);
+}
+
+/*template<NodeType node>
+inline bool is_inference_error(const std::variant<std::map<size_t, subtree_map<node, size_t>>, inference_error>& type_ids_by_type) {
+	return std::holds_alternative<inference_error>(type_ids_by_type);
+}*/
 
 template<NodeType node>
 bool is_functional_relation(tref n) {
@@ -319,7 +342,7 @@ tref update_tref(type_scoped_resolver<node>& resolver, tref n, const subtree_map
 	if (!types.contains(canonized)) return n;
 	// If the tref is typed
 	if (auto type = get_inferred_type<node>(n, canonized, types); type) {
-		if (!resolver.assign(canonized, type.value())) return nullptr;
+		if (auto assigned = resolver.assign(canonized, type.value()); is_inference_error(assigned)) return nullptr;
 		return update_tref<node>(n, type.value());
 	}
 	return nullptr;
@@ -344,11 +367,16 @@ tref update_ba_constant(type_scoped_resolver<node>& resolver, tref n, const subt
 	if (!types.contains(canonized)) return nullptr;
 	// If the tref is typed
 	if (auto type = get_inferred_type<node>(n, canonized, types); type) {
-		if (!resolver.assign(canonized, type.value())) return nullptr;
+		if (auto assigned = resolver.assign(canonized, type.value()); is_inference_error(assigned)) return nullptr;
 		// Check that the constant was not parsed yet
 		if (tau::get(n).data() == 0) {
 			n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type.value());
-			if (n == nullptr) return nullptr;
+			if (n == nullptr) {
+				LOG_ERROR << "Unable to parse constant {"
+					<< tau::get(n).child_data() << "} with type "
+					<< get_ba_type_name<node>(type.value()) << "\n";
+				return nullptr;
+			}
 		}
 		return update_tref<node>(n, type.value());
 	}
@@ -627,6 +655,7 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 
 		if (error)
 			LOG_ERROR << "Incompatible or absent type information in " << tau::get(n) << "\n";
+
 		DBG(if (!error) LOG_TRACE << "infer_ba_types/update/" << LOG_NT(nt) << "/n -> new_n:\n"
 				<< LOG_FM_TREE(n) << " -> "
 				<< LOG_FM_TREE(changes.contains(n) ? changes[n] : n);)
@@ -652,7 +681,7 @@ tref update(type_scoped_resolver<node>& resolver, tref r, std::initializer_list<
 }
 
 template <NodeType node>
-bool type_by_function_symbol(type_scoped_resolver<node>& resolver,
+std::variant<size_t, inference_error> type_by_function_symbol(type_scoped_resolver<node>& resolver,
 		std::map<std::tuple<size_t, int_t, int_t>, size_t>& available_function_symbols,
 		size_t type, const auto& type_map) {
 	// If the merged type is untyped, we try to update the type
@@ -668,7 +697,7 @@ bool type_by_function_symbol(type_scoped_resolver<node>& resolver,
 			}
 		}
 	}
-	return true;
+	return untyped_type_id<node>();
 }
 
 // Infers the types of variables and constants in the tree n. It assumes that
@@ -764,7 +793,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	tau::use_hooks = false;
 
 	subtree_map<node, tref> transformed;
-	bool error = false;
+	std::optional<std::variant<inference_error, parsing_error>> error = std::nullopt;
 
 	// We gather info about types and scopes while entering nodes
 	auto on_enter = [&](tref n, tref parent) {
@@ -807,23 +836,23 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					? tau::get(t[0].get()).get_ba_type()
 					: tau::get(t[1].get()).get_ba_type();
 				auto arguments = get_typeable_type_ids_by_type<node>(t[0].get(), { tau::variable });
-				if (!arguments) { error = true; break; } // Incompatible types
-				auto arguments_map = arguments.value();
+				if (std::holds_alternative<inference_error>(arguments)) { error = std::get<inference_error>(arguments); break; } // Incompatible types
+				auto arguments_map = get<std::map<size_t, subtree_map<node, size_t>>>(arguments);
 				if (is_functional_relation<node>(n)) {
 					auto unified = unify<node>(arguments_map, header_type);
-					if (!unified) {	error = true; break; } // Incompatible types
-					auto inferred_type = unified.value();
+					if (std::holds_alternative<inference_error>(unified)) {	error = std::get<inference_error>(unified); break; } // Incompatible types
+					auto inferred_type = std::get<size_t>(unified);
 					// We gather all the data about the body typeables
 					auto rec_type_ids = get_typeable_type_ids_by_type<node>(n, {
 						tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
-					if (!rec_type_ids) { error = true; break; } // Incompatible types
-					auto rec_type_ids_map = rec_type_ids.value();
+					if (std::holds_alternative<inference_error>(rec_type_ids)) { error = std::get<inference_error>(rec_type_ids); break; } // Incompatible types
+					auto rec_type_ids_map = get<std::map<size_t, subtree_map<node, size_t>>>(rec_type_ids);
 					// We create a new scope with all the inferable typeables
 					// taking into account that they should have the same type.
-					if (!open_same_type<node>(resolver, rec_type_ids_map, inferred_type)) { error = true; break; }
+					if (std::holds_alternative<inference_error>(open_same_type<node>(resolver, rec_type_ids_map, inferred_type))) { error = std::get<inference_error>(open_same_type<node>(resolver, rec_type_ids_map, inferred_type)); break; }
 					// We merge all the header and the body typeables together.
-					const auto merged_type = merge<node>(resolver, rec_type_ids_map);
-					if (!merged_type) { error = true; break; }
+					auto merged_type = merge<node>(resolver, rec_type_ids_map);
+					if (std::holds_alternative<inference_error>(merged_type)) { error = std::get<inference_error>(merged_type); break; }
 					// Take type definition due to function symbols into account
 					// First remove current ref definition
 					auto cur_sig = get_function_signature<node>(t.first());
@@ -831,15 +860,16 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						return get_function_signature<node>(el.first) == cur_sig;
 					};
 					std::erase_if(rec_type_ids_map[tau::ref], current_ref);
-					if (!type_by_function_symbol(resolver, available_function_symbols,
-							merged_type.value(), rec_type_ids_map[tau::ref])) {
-						error = true;
+					if (std::holds_alternative<inference_error>(type_by_function_symbol(resolver, available_function_symbols,
+							std::get<size_t>(merged_type), rec_type_ids_map[tau::ref]))) {
+						error = std::get<inference_error>(type_by_function_symbol(resolver, available_function_symbols,
+							std::get<size_t>(merged_type), rec_type_ids_map[tau::ref]));
 					}
 					break;
 				}
 				// Otherwise, we have a predicate relation. We create a new scope
 				// with all the variables in the header.
-				if (!open<node>(resolver, arguments_map)) { error = true; break; }
+				open<node>(resolver, arguments_map);
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 				break;
 			}
@@ -852,9 +882,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// We open a new scope, we get all the quantified variables,
 				// add them to the scope (with the given type if any).
 				auto quantified_vars = get_typeable_type_ids_by_type<node>(t.child(0), { tau::variable });
-				if (!quantified_vars) { error = true; break; } // Incompatible types
-				auto quantified_vars_map = quantified_vars.value();
-				if (!open<node>(resolver, quantified_vars_map)) { error = true; break; }
+				if (is_inference_error(quantified_vars)) { error = get_inference_error(quantified_vars); break; } // Incompatible types
+				auto quantified_vars_map = get_type_ids_by_type<node>(quantified_vars);
+				open<node>(resolver, quantified_vars_map);
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 
 				break;
@@ -868,20 +898,24 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// Otherwise we have to treat it as a global scope
 				auto typeables = get_typeable_type_ids_by_type<node>(n, {
 					tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
-				if (!typeables) { error = true; break; } // Incompatible types
-				auto typeables_map = typeables.value();
-				if (!insert<node>(resolver, {
-					typeables_map[tau::ref],
-					typeables_map[tau::variable],
-					typeables_map[tau::ba_constant],
-					typeables_map[tau::bf_t],
-					typeables_map[tau::bf_f] })) { error = true; break; }
-				const auto merged_type = merge<node>(resolver, typeables_map);
-				if (!merged_type) { error = true; break; }
+				if (is_inference_error(typeables)) { error = get_inference_error(typeables); break; } // Incompatible types
+				auto typeables_map = get_type_ids_by_type<node>(typeables);
+				if (auto inserted = insert<node>(resolver, {
+						typeables_map[tau::ref],
+						typeables_map[tau::variable],
+						typeables_map[tau::ba_constant],
+						typeables_map[tau::bf_t],
+						typeables_map[tau::bf_f] }); inserted) {
+					error = inserted.value(); break;
+				}
+				auto merged_type = merge<node>(resolver, typeables_map);
+				if(is_inference_error(merged_type)) {
+					error = get_inference_error(merged_type); break;
+				}
 				// Take type definition due to function symbols into account
-				if (!type_by_function_symbol(resolver, available_function_symbols,
-						merged_type.value(), typeables_map[tau::ref])) {
-					error = true;
+				if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
+						get_type_id(merged_type), typeables_map[tau::ref]); is_inference_error(typed)) {
+					error = get_inference_error(typed);
 				}
 				break;
 			}
@@ -898,49 +932,53 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						? tau::get(n).get_ba_type()
 						: tau::get(fallback).get_ba_type();
 					auto arguments = get_typeable_type_ids_by_type<node>(n, { tau::variable });
-					if (!arguments) { error = true; break; } // Incompatible types
-					auto arguments_map = arguments.value();
+					if (is_inference_error(arguments)) { error = get_inference_error(arguments); break; } // Incompatible types
+					auto arguments_map = get_type_ids_by_type<node>(arguments);
 					if (is_functional_fallback<node>(n)) {
 						auto unified = unify<node>(arguments_map, header_type);
-						if (!unified) {	error = true; break; } // Incompatible types
-						auto inferred_type = unified.value();
+						if (is_inference_error(unified)) {	error = get_inference_error(unified); break; } // Incompatible types
+						auto inferred_type = get_type_id(unified);
 						// We gather all the data about the body typeables
 						auto rec_type_ids = get_typeable_type_ids_by_type<node>(n, {
 							tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
-						if (!rec_type_ids) { error = true; break; } // Incompatible types
-						auto rec_type_ids_map = rec_type_ids.value();
+						if (is_inference_error(rec_type_ids)) { error = get_inference_error(rec_type_ids); break; } // Incompatible types
+						auto rec_type_ids_map = get_type_ids_by_type<node>(rec_type_ids);
 						// We create a new scope with all the inferable typeables
 						// taking into account that they should have the same type.
-						if (!open_same_type<node>(resolver, rec_type_ids_map, inferred_type)) { error = true; break; }
+						if (auto opened = open_same_type<node>(resolver, rec_type_ids_map, inferred_type); is_inference_error(opened)) { error = get_inference_error(opened); break; }
 						// We merge all the header and the body typeables together.
 						const auto merged_type = merge<node>(resolver, rec_type_ids_map);
-						if (!merged_type) { error = true; break; }
+						if(is_inference_error(merged_type)) {
+							error = get_inference_error(merged_type); break;
+						}
 						// Take type definition due to function symbols into account
-						if (!type_by_function_symbol(resolver, available_function_symbols,
-								merged_type.value(), rec_type_ids_map[tau::ref])) {
-							error = true;
+						if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
+								get_type_id(merged_type), rec_type_ids_map[tau::ref]); is_inference_error(typed)) {
+							error = get_inference_error(typed);
 						}
 						break;
 					}
 					// Otherwise, we have a predicate relation. We create a new scope
 					// with all the variables in the header.
-					if (!open<node>(resolver, arguments_map)) { error = true; break; }
+					open<node>(resolver, arguments_map);
 					DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
 					break;
 				}
 				if (is_functional_ref<node>(n, available_function_symbols)) {
 					auto arguments = get_typeable_type_ids_by_type<node>(n);
-					if (!arguments) { error = true; break; } // Incompatible types
-					auto arguments_map = arguments.value();
-					if (!insert<node>(resolver, arguments_map)) {
-						error = true; break;
+					if (is_inference_error(arguments)) { error = get_inference_error(arguments); break; } // Incompatible types
+					auto arguments_map = get_type_ids_by_type<node>(arguments);
+					if (auto inserted = insert<node>(resolver, arguments_map); inserted) {
+						error = inserted.value(); break;
 					}
 					const auto merged_type = merge<node>(resolver, arguments_map);
-					if (!merged_type) { error = true; break; }
+					if(is_inference_error(merged_type)) {
+						error = get_inference_error(merged_type); break;
+					}
 					// Take type definition due to function symbols into account
-					if (!type_by_function_symbol(resolver, available_function_symbols,
-							merged_type.value(), arguments_map[tau::ref])) {
-						error = true;
+					if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
+							get_type_id(merged_type), arguments_map[tau::ref]); is_inference_error(typed)) {
+						error = get_inference_error(typed);
 					}
 					break;
 				}
@@ -957,23 +995,25 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::bf_interval: {
 				auto typeables = get_typeable_type_ids_by_type<node>(n, {
 					tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
-				if (!typeables) { error = true; break; } // Incompatible types
-				auto typeables_map = typeables.value();
-				if (!open<node>(resolver, {
+				if (is_inference_error(typeables)) { error = get_inference_error(typeables); break; } // Incompatible types
+				auto typeables_map = get_type_ids_by_type<node>(typeables);
+				open<node>(resolver, {
 						typeables_map[tau::ref],
 						typeables_map[tau::ba_constant],
 						typeables_map[tau::bf_t],
-						typeables_map[tau::bf_f] })) { error = true; break; }
+						typeables_map[tau::bf_f] });
 				DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) <<": scope opened\n";)
-				if (!insert<node>(resolver, {
+				if (auto inserted = insert<node>(resolver, {
 						typeables_map[tau::variable]
-						 })) { error = true; break; }
-				const auto merged_type = merge<node>(resolver, typeables_map);
-				if (!merged_type) { error = true; break; }
+						}); inserted) { error = inserted.value(); break; }
+				auto merged_type = merge<node>(resolver, typeables_map);
+				if(is_inference_error(merged_type)) {
+					error = get_inference_error(merged_type); break;
+				}
 				// Take type definition due to function symbols into account
-				if (!type_by_function_symbol(resolver, available_function_symbols,
-						merged_type.value(), typeables_map[tau::ref])) {
-					error = true;
+				if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
+						get_type_id(merged_type), typeables_map[tau::ref]); is_inference_error(typed)) {
+					error = get_inference_error(typed);
 				}
 				break;
 			}
@@ -1021,11 +1061,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				auto updated = is_functional_relation<node>(new_n)
 					? update_functional_rr<node>(resolver, new_n, available_function_symbols)
 					: update_predicate_rr<node>(resolver, new_n);
-				if(updated == nullptr) { error = true; break; }
+				if(updated == nullptr) { error = inference_error{}; break; }
 				if(updated != new_n) transformed.insert_or_assign(n, updated);
 				if (!resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
-					error = true;
+					error = inference_error{};
 					break;
 				}
 				break;
@@ -1033,11 +1073,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::wff_all: case tau::wff_ex: {
 				tref new_n = update_default<node>(n, transformed);
 				auto updated = update<node>(resolver, new_n, { tau::variable});
-				if(updated == nullptr) { error = true; break; }
+				if(updated == nullptr) { error = inference_error{}; break; }
 				if(updated != new_n) transformed.insert_or_assign(n, updated);
 				if(!resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
-					error = true;
+					error = inference_error{};
 					break;
 				}
 				break;
@@ -1052,11 +1092,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						auto updated = is_functional_fallback<node>(new_n)
 							? update_functional_fallback<node>(resolver, new_n)
 							: update_predicate_fallback<node>(resolver, new_n);
-						if(updated == nullptr) { error = true; break; }
+						if(updated == nullptr) { error = inference_error{}; break; }
 						if(updated != new_n) transformed.insert_or_assign(n, updated);
 						if (!resolver.close()) {
 							DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
-							error = true;
+							error = inference_error{};
 							break;
 						}
 						break;
@@ -1065,13 +1105,13 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					new_n = is_functional_ref<node>(new_n, available_function_symbols)
 						? update_functional_ref<node>(resolver, new_n, parent)
 						: update_predicate_ref<node>(resolver, new_n, parent);
-					if(new_n == nullptr) { error = true; break; }
+					if(new_n == nullptr) { error = inference_error{}; break; }
 					if(new_n != n) transformed.insert_or_assign(n, new_n);
 					break;
 				}
 				tref new_n = update_default<node>(n, transformed);
 				new_n = update<node>(resolver, new_n, { tau::variable });
-				if (new_n == nullptr) { error = true; break; }
+				if (new_n == nullptr) { error = inference_error{}; break; }
 				if (new_n != n) transformed.insert_or_assign(n, new_n);
 				break;
 			}
@@ -1083,11 +1123,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
 				auto updated = update<node>(resolver, n, { tau::ref, tau::ba_constant, tau::bf_t, tau::bf_f });
-				if(updated == nullptr) { error = true; break; }
+				if(updated == nullptr) { error = inference_error{}; break; }
 				if(updated != n) transformed.insert_or_assign(n, updated);
 				if (!resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
-					error = true;
+					error = inference_error{};
 				}
 				break;
 			}
@@ -1095,7 +1135,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				tref new_n = update_default<node>(n, transformed);
 				if (is_top_level_bf<node>(parent)) {
 					auto updated = update<node>(resolver, new_n, { tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
-					if(updated == nullptr) { error = true; break; }
+					if(updated == nullptr) { error = inference_error{}; break; }
 					if(updated != new_n) transformed.insert_or_assign(n, updated);
 				} else {
 					if (new_n != n) transformed.insert_or_assign(n, new_n);
@@ -1107,7 +1147,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// For the root node, we type untyped variables with tau.
 				if (!parent) {
 					new_n = update<node>(resolver, new_n, { tau::variable });
-					if (new_n == nullptr) { error = true; break; }
+					if (new_n == nullptr) { error = inference_error{}; break; }
 				}
 				if (new_n != n) transformed.insert_or_assign(n, new_n);
 				break;

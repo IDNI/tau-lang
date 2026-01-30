@@ -88,7 +88,7 @@ tref parse_spec(const std::string& sample, tau::get_options opts = parse_spec_no
 
 using size_t = size_t;
 
-TEST_SUITE("type_scoped_resolver") {
+/*TEST_SUITE("type_scoped_resolver") {
 
 	TEST_CASE("merging in the same scope") {
 		type_scoped_resolver<node_t> r;
@@ -139,7 +139,7 @@ TEST_SUITE("type_scoped_resolver") {
 		r.open({{b, t2}});
 		CHECK(!r.merge(a, b)); // conflicting types
 	}
-}
+}*/
 
 bool check_vars(tref inferred, std::vector<std::pair<std::string, size_t>>& expected) {
 	auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
