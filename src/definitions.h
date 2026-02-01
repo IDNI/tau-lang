@@ -86,6 +86,13 @@ struct definitions {
 		static definitions d;
 		return d;
 	}
+
+	void clear() {
+		heads.clear();
+		bodies.clear();
+		ctx.clear();
+		global_scope.clear();
+	}
 private:
 	definitions() = default;
 
