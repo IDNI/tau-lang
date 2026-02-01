@@ -293,7 +293,7 @@ tref get_ba_type_tree(size_t ba_type_id) {
 template <NodeType node>
 std::string get_ba_type_name(size_t ba_type_id) {
 	// This is needed in order to initialize the type trees
-	if (ba_type_id == 0) return "untyped";
+	if (ba_type_id == 0) return ":untyped";
 	return ba_types<node>::name(ba_type_id);
 }
 
