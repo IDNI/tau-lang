@@ -354,4 +354,13 @@ tref io_context<node>::add_output(const std::string& name, size_t type_id, std::
 	return var;
 }
 
+template <NodeType node>
+void io_context<node>::clear() {
+	types.clear();
+	inputs.clear();
+	outputs.clear();
+	input_remaps.clear();
+	output_remaps.clear();
+}
+
 } // namespace idni::tau_lang
