@@ -112,6 +112,7 @@ std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
 	tref expression = tt(r) | tau::main | tau::wff | tt::ref;
 	if (!expression) expression = tt(r) | tau::main | tau::bf | tt::ref;
 	tref main_fm = resolve_io_vars<node>(ctx, expression);
+	if (!main_fm) return {};
 
 	rewriter::rules rules = get_rec_relations<node>(ctx, r);
 	DBG(LOG_TRACE << "rules: " << rules.size();)
