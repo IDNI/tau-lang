@@ -221,6 +221,7 @@ bool check_bv_ctes(tref inferred, std::vector<size_t>& expected) {
 TEST_SUITE("infer_ba_types: variables and constants") {
 
 	TEST_CASE("simple case 1") {
+		logging::trace();
 		tref parsed = parse("x = 1");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -229,6 +230,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 			{"x", tau_type_id<node_t>()}
 		};
 		CHECK( check_vars(inferred, expected) );
+		logging::info();
 	}
 
 	TEST_CASE("simple case 1 (y2)") {

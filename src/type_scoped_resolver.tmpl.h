@@ -26,7 +26,7 @@ void type_scoped_resolver<node>::open(const subtree_map<node, typename type_scop
 }
 
 template<NodeType node>
-bool type_scoped_resolver<node>::close() {
+std::optional<typename type_scoped_resolver<node>::scope_error> type_scoped_resolver<node>::close() {
 	return scoped.close();
 }
 
