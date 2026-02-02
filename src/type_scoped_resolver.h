@@ -29,13 +29,14 @@ template<NodeType node>
 struct type_scoped_resolver {
 	using element = scoped_union_find<tref, idni::subtree_less<node>>::element;
 	using scope = scoped_union_find<tref, idni::subtree_less<node>>::scope;
+	using scope_error = scoped_union_find<tref, idni::subtree_less<node>>::scope_error;
 	using type_id = size_t;
 
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
 	void open(const subtree_map<node, type_id>& elements = {});
-	bool close();
+	std::optional<scope_error> close();
 	element insert(tref n);
 	type_id type_id_of(tref n);
 	scope scope_of(tref n);

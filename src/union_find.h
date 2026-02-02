@@ -7,15 +7,16 @@
 
 namespace idni::tau_lang {
 
-/**
+
+	/**
  * @brief Union find data structure with set retrieval for tau formulas
  * @tparam comp Comparison function used to decide root after merge,
  * taking the smaller as new root
  * @tparam node Type of tree node
  */
 template <typename data_t, class less_t = std::less<data_t>>
-struct union_find : public std::map<data_t, data_t, less_t> {
 
+struct union_find : public std::map<data_t, data_t, less_t> {
 	// Insert element x if not present. Note that the signature is different
 	// from those of vector	::insert as we want to return the element
 	// inserted/found
@@ -122,6 +123,11 @@ struct scoped_union_find {
 	using scope = size_t;
 	using element = std::pair<scope, data_t>;
 
+	// Error struct for scope closing errors (unbalenced scopes)
+	struct scope_error {
+		data_t element;
+	};
+
 	union_find_by_less<std::pair<size_t, data_t>, scoped_less<data_t, less_t>> uf;
 	scope current = 0;
 	std::deque<size_t> scopes { current };
@@ -134,13 +140,13 @@ struct scoped_union_find {
 		scopes.push_back(current);
 	}
 
-	bool close() {
+	std::optional<scope_error> close() {
 		if (scopes.size() == 1) {
 			DBG(LOG_ERROR << "scoped_union_find/close: cannot close global scope (unbalenced scopes)\n";)
-			return false;
+			return scope_error{};
 		}
 		scopes.pop_back();
-		return true;
+		return std::nullopt;
 	}
 
 	element root(const element& e) {
