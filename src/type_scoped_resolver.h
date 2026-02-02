@@ -102,25 +102,6 @@ std::variant<size_t, inference_error> merge(type_scoped_resolver<node>& resolver
 template<NodeType node>
 std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<node, size_t>>& types, size_t default_type);
 
-// Helper functions
-
-inline bool is_inference_error(const std::variant<size_t, inference_error>& v) {
-	return std::holds_alternative<inference_error>(v);
-}
-
-inline inference_error get_inference_error(const std::variant<size_t, inference_error>& v) {
-	return std::get<inference_error>(v);
-}
-
-inline bool is_type_id(const std::variant<size_t, inference_error>& v) {
-	return std::holds_alternative<size_t>(v);
-}
-
-inline size_t get_type_id(const std::variant<size_t, inference_error>& v) {
-	return std::get<size_t>(v);
-}
-
-
 } // namespace idni::tau_lang
 
 #include "type_scoped_resolver.tmpl.h"
