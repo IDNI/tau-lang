@@ -87,8 +87,8 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(const tr
 	size_t type_id = 0;
 	for (size_t i = 1; i < ts.size(); ++i) {
 		const auto res = merge(ts[0], ts[i]);
-		if (is_inference_error(res)) return inference_error{ts[i], type_id_of(ts[0]), type_id_of(ts[i])};
-		type_id = get_type_id(res);
+		if (std::holds_alternative<inference_error>(res)) return inference_error{ts[i], type_id_of(ts[0]), type_id_of(ts[i])};
+		type_id = std::get<size_t>(res);
 	}
 	return type_id;
 }
@@ -201,8 +201,8 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 		size_t default_type) {
 	for (auto t : refs) {
 		resolver.insert(t);
-		if (auto assigned = resolver.assign(t, default_type); is_inference_error(assigned))
-			return get_inference_error(assigned);
+		if (auto assigned = resolver.assign(t, default_type); std::holds_alternative<inference_error>(assigned))
+			return std::get<inference_error>(assigned);
 	}
 	return default_type;
 }
