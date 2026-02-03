@@ -17,6 +17,8 @@
 
 namespace idni::tau_lang {
 
+using strings = std::vector<std::string>;
+
 using node_t = tau_lang::node<bas_pack>;
 using tau = tree<node_t>;
 using tt = tau::traverser;
@@ -49,7 +51,7 @@ std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* sample) {
 
 std::optional<rr<node_t>> get_nso_rr(const char* sample)
 {
-	TAU_LOG_TRACE << "get_nso_rr: " << sample;
+	// DBG(TAU_LOG_TRACE << "get_nso_rr: " << sample;)
 	tref spec = tau::get(sample);
 	assert(spec != nullptr);
 	return get_nso_rr<node_t>(spec);
@@ -69,12 +71,12 @@ bool normalize_and_check(const char* sample,
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return expect_fail;
 
-	TAU_LOG_DEBUG << "(T) nso_rr: " << to_str<node_t>(nso_rr.value());
+	DBG(TAU_LOG_DEBUG << "(T) nso_rr: " << to_str<node>(nso_rr.value());)
 
-	tref result = normalizer<node_t>(nso_rr.value());
+	tref result = normalizer<node>(nso_rr.value());
 	if (!result) return expect_fail;
 
-	TAU_LOG_DEBUG << "(T) Normalized result: " << TAU_LOG_FM(result);
+	DBG(TAU_LOG_DEBUG << "(T) Normalized result: " << TAU_LOG_FM(result);)
 
 	return tau::get(result).child_is(nt) != expect_fail;
 }
@@ -83,14 +85,60 @@ bool normalize_and_expect_fail(const char* sample, typename node_t::type nt) {
 	return normalize_and_check(sample, nt, true);
 }
 
-bool normalize_and_check(const char* sample, const std::string& expected) {
+bool matches_to_any_of(const std::string& fm_str, const strings& expected) {
+#ifdef DEBUG // check canonicity between versions of Tau
+	const bool canonical = fm_str == expected[0];
+	std::stringstream ss; ss << "expression: " << fm_str;
+	if (!canonical) ss << TAU_LOG_ERROR_COLOR << " is not canonical"
+		<< TC.CLEAR() << ". expected: " << expected[0];
+	TAU_LOG_TRACE << ss.str();
+	return canonical;
+#endif // DEBUG
+	for (const auto& e : expected) if (fm_str == e) {
+		DBG(TAU_LOG_TRACE << "found in expected: " << fm_str;)
+		return true;
+	}
+	DBG(TAU_LOG_TRACE << "not found in expected: " << fm_str;)
+	return false;
+}
+
+bool matches_to_str_to_any_of(tref fm, const strings& expected) {
+	return matches_to_any_of(tau::get(fm).to_str(), expected);
+}
+
+bool values_matches_any_of(const strings& values,
+	const std::vector<strings>& expected)
+{
+	if (values.size() != expected.size()) return false;
+	for (size_t i = 0; i < values.size(); i++) {
+#ifdef DEBUG
+		std::stringstream ss; ss << "\nvalues[" << i << "]:\n\t"
+			<< values[i] << "\nexpected[" << i << "]:\n";
+		for (const auto& e : expected[i]) ss << "\t" << e << "\n";
+		TAU_LOG_TRACE << ss.str();
+#endif
+		if (matches_to_any_of(values[i], expected[i])) {
+			DBG(TAU_LOG_TRACE << "found in expected: " << values[i];)
+		} else {
+			DBG(TAU_LOG_TRACE << "not found in expected: " << values[i];)
+			return false;
+		}
+	}
+	return true;
+}
+
+bool normalize_and_check(const char* sample, const strings& expected) {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;
 
 	tref result = normalizer<node_t>(nso_rr.value());
 	if (!result) return false;
 
-        return tau::get(result).to_str() == expected;
+	return matches_to_str_to_any_of(result, expected);
+}
+
+bool normalize_and_check(const char* sample, const std::string& expected) {
+	return normalize_and_check(sample, strings{ expected });
 }
 
 } // namespace idni::tau_lang
