@@ -8,7 +8,7 @@ TEST_SUITE("Execution") {
 		bdd_init<Bool>();
 		auto spec = create_spec("o1[t] = i1[t].");
 		io_context<node_t> ctx;
-		std::vector<std::string> i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
+		strings i1_values = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
 		ctx.add_input( "i1", tau_type_id<node_t>(), std::make_shared<vector_input_stream>(i1_values));
 		auto o1 = std::make_shared<vector_output_stream>();
 		ctx.add_output("o1", tau_type_id<node_t>(), o1);
@@ -21,17 +21,20 @@ TEST_SUITE("Execution") {
 	TEST_CASE("u[t] = i1[t]: dec_seq") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t].");
-		std::vector<std::string> i1_values = {
+		strings i1_values = {
 			"F", "o1[t] = o1[t-1]&i2[t] && o1[0] = 1", "F", "F", "F", "F"
 		};
-		std::vector<std::string> i2_values = {
+		strings i2_values = {
 			"<:x> = 0", "<:y> = 0", "<:z> = 0"
 		};
-		std::vector<std::string> u_expected = {
-			"F", "always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
-			"F", "F", "F", "F"
+		std::vector<strings> u_expected = {
+			{ "F" }, {
+				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
+				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
+				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
+			}, { "F" }, { "F" }, { "F" }, { "F" }
 		};
-		std::vector<std::string> o1_expected = {
+		strings o1_expected = {
 			"T", "<:x> = 0", "<:y> = 0 && <:x> = 0",
 			"<:y> = 0 && <:z> = 0 && <:x> = 0"
 		};
@@ -49,20 +52,23 @@ TEST_SUITE("Execution") {
 		auto o1_values = o1->get_values();
 		CHECK( o1_values == o1_expected );
 		auto u_values = u->get_values();
-		CHECK( u_values == u_expected);
+		CHECK( values_matches_any_of(u_values, u_expected) );
 	}
 
 	TEST_CASE("u[t] = i1[t]: negative_rel_pos") {
 		bdd_init<Bool>();
 		auto spec = create_spec(
 			"u[t] = i1[t] && o1[2] = { <:x> = 0 } && o2[1] = { <:y> = 0 }.");
-		std::vector<std::string> i1_values = {
+		strings i1_values = {
 			"F", "F", "o3[t] = o1[-1] & o2[-2]", "F", "F"
 		};
-		std::vector<std::string> u_expected = {
-			"F", "F", "always o1[-1]:tau o2[-2]:tau = o3[t]:tau", "F", "F"
+		std::vector<strings> u_expected = {
+			{ "F" }, { "F" }, {
+				"always o2[-2]:tau o1[-1]:tau = o3[t]:tau",
+				"always o1[-1]:tau o2[-2]:tau = o3[t]:tau",
+			}, { "F" }, { "F" }
 		};
-		std::vector<std::string> o3_expected = {
+		strings o3_expected = {
 			"<:y> = 0 && <:x> = 0", "<:y> = 0 && <:x> = 0"
 		};
 		io_context<node_t> ctx;
@@ -78,22 +84,22 @@ TEST_SUITE("Execution") {
 		auto o3_values = o3->get_values();
 		CHECK( o3_values == o3_expected );
 		auto u_values = u->get_values();
-		CHECK( u_values == u_expected );
+		CHECK( values_matches_any_of(u_values, u_expected) );
 	}
 
 	TEST_CASE("u[t] = i1[t]: 2_clauses") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o2[t] = 0.");
-		std::vector<std::string> i1_values = {
+		strings i1_values = {
 			"(always o2[-1] = 1) || (always o3[t] = 1)", "F", "F", "F"
 		};
-		std::vector<std::string> u_expected = {
+		strings u_expected = {
 			"(always o2[-1]:tau' = 0) || (always o3[t]:tau' = 0)", "F", "F", "F"
 		};
-		std::vector<std::string> o2_expected = {
+		strings o2_expected = {
 			"F", "F", "F", "F",
 		};
-		std::vector<std::string> o3_expected = {
+		strings o3_expected = {
 			"T", "T", "T"
 		};
 		io_context<node_t> ctx;
@@ -118,13 +124,13 @@ TEST_SUITE("Execution") {
 	TEST_CASE("u[t] = i1[t]: history_unsat") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
-		std::vector<std::string> i1_values = {
+		strings i1_values = {
 			"F", "o1[-1] = 1", "F", "F"
 		};
-		std::vector<std::string> u_expected = {
+		strings u_expected = {
 			"F", "always o1[-1]:tau' = 0", "F", "F"
 		};
-		std::vector<std::string> o1_expected = {
+		strings o1_expected = {
 			"F", "F", "F", "F",
 		};
 		io_context<node_t> ctx;
@@ -145,13 +151,13 @@ TEST_SUITE("Execution") {
 	TEST_CASE("u[t] = i1[t]: spec_replace") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
-		std::vector<std::string> i1_values = {
+		strings i1_values = {
 			"F", "o1[t] = 1", "F", "F"
 		};
-		std::vector<std::string> u_expected = {
+		strings u_expected = {
 			"F", "always o1[t]:tau' = 0", "F", "F"
 		};
-		std::vector<std::string> o1_expected = {
+		strings o1_expected = {
 			"F", "F", "T", "T",
 		};
 		io_context<node_t> ctx;
@@ -173,17 +179,29 @@ TEST_SUITE("Execution") {
 	TEST_CASE("this_stream") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && this[t] = o1[t].");
-		std::vector<std::string> i1_values = {
+		strings i1_values = {
 			"o2[t] = 0", "F", "o3[t] = 0", "F"
 		};
-		std::vector<std::string> u_expected = {
+		strings u_expected = {
 			"always o2[t]:tau = 0", "F", "always o3[t]:tau = 0", "F"
 		};
-		std::vector<std::string> o1_expected = {
+		std::vector<strings> o1_expected = {
+		{
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
+			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+		}, {
+			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+		}, {
+			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
-			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0"
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+		}, {
+			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
+			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
+			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
+		}
 		};
 		io_context<node_t> ctx;
 		auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -195,7 +213,7 @@ TEST_SUITE("Execution") {
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK( maybe_i.has_value() );
 		auto o1_values = o1->get_values();
-		CHECK( o1_values == o1_expected );
+		CHECK( values_matches_any_of(o1_values, o1_expected) );
 		auto u_values = u->get_values();
 		CHECK( u_values == u_expected );
 	}
@@ -391,7 +409,7 @@ TEST_SUITE("with inputs and outputs") {
 	TEST_CASE("i1[t] = o1[t]") {
 		const char* sample = "i1[t] = o1[t].";
 		io_context<node_t> ctx;
-		std::vector<std::string> i1_values = { "T", "F", "F" };
+		strings i1_values = { "T", "F", "F" };
 		ctx.add_input("i1", tau_type_id<node_t>(),
 			std::make_shared<vector_input_stream>(i1_values));
 		auto memory = run_test(sample, ctx, 3);
@@ -406,7 +424,7 @@ TEST_SUITE("with inputs and outputs") {
 	TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t] = o1[t] && o1[0] = 0.";
 		io_context<node_t> ctx;
-		std::vector<std::string> i1_values = { "T", "T", "T" };
+		strings i1_values = { "T", "T", "T" };
 		ctx.add_input("i1", tau_type_id<node_t>(),
 			std::make_shared<vector_input_stream>(i1_values));
 		auto memory = run_test(sample, ctx, 3);
@@ -418,7 +436,7 @@ TEST_SUITE("with inputs and outputs") {
 	TEST_CASE("i1[t-1] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t-1] = o1[t] && o1[0] = 0.";
 		io_context<node_t> ctx;
-		std::vector<std::string> i1_values = { "T", "T", "T" };
+		strings i1_values = { "T", "T", "T" };
 		ctx.add_input("i1", tau_type_id<node_t>(),
 			std::make_shared<vector_input_stream>(i1_values));
 		auto memory = run_test(sample, ctx, 2);

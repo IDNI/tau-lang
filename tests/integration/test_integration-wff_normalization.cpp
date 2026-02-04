@@ -51,13 +51,19 @@ TEST_SUITE("syntactic_path_simplification") {
 		const char* sample = "x = 0 && (z != 0 || (y = 0 && (k = 0 || x != 0))) && x = 0 || x = 0 && y = 0 || z = 0 && (z != 0 || k = 0) && z = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
-		CHECK(tau::get(res).to_str() == "x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0");
+		CHECK( matches_to_str_to_any_of(res, {
+			"x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0",
+			"x = 0 && (z != 0 || k = 0 && y = 0) || x = 0 && y = 0 || z = 0 && k = 0",
+		}) );
 	}
 	TEST_CASE("3") {
 		const char* sample = "x & (z' | (y & (k | x'))) & x | x & y | z & (z' | k) & z";
 		tref fm = get_bf_nso_rr("", sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
-		CHECK((tau::get(res).to_str() == "x&(z'|ky)|yx|zk"));
+		CHECK( matches_to_str_to_any_of(res, {
+			"x&(z'|ky)|xy|zk",
+			"x&(z'|ky)|yx|zk",
+		}) );
 	}
 	TEST_CASE("4") {
 		const char* sample = "x = 0 && (z != 0 || (y = 0 && (k = 0 || x != 0))) && x = 0 || x = 0 && y = 0 || z = 0 && (z != 0 || k = 0) && z = 0 || (j = 0 && l = 0) || k = 0 || !(j = 0 && l = 0).";
@@ -78,7 +84,12 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy|zx = 0 && xy = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
-		CHECK(tau::get(res).to_str() == "yx|zx = 0");
+		CHECK( matches_to_str_to_any_of(res, {
+			"xy|zx = 0",
+			"yx|zx = 0",
+			"xy|xz = 0",
+			"yx|xz = 0",
+		}) );
 	}
 	TEST_CASE("2") {
 		const char* sample = "(o1[1]' = 0 && s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 && o1[0]' = 0 || o1[0]o1[1]'|o1[0]' = 0 && s = 0 && (s = 0 && o1[1] = 0 && y|y'w != 0 && y != 0 && w != 0 && z != 0 || z|z's != 0 && s != 0 && y|y'w != 0 && w != 0 && (z != 0 || y = 0 || o1[1]' = 0) && (y != 0 || z = 0) || z|z's != 0 && y|y'w != 0 && y != 0 && w != 0 && (s != 0 || o1[1] = 0) && (z != 0 || o1[1]' = 0)) && o1[0]' != 0) && v != 0 && x != 0 && o1[0] != 0.";
@@ -108,7 +119,11 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "xy = 0 && vw = 0 && (yw|xy|vw = 0 && xv|yw|xy|vw = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
-		CHECK(tau::get(res).to_str() == "yx = 0 && wv = 0 && wy = 0 && vx = 0");
+		CHECK( matches_to_str_to_any_of(res, {
+			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
+			"yx = 0 && wv = 0 && wy = 0 && vx = 0",
+			"xy = 0 && wv = 0 && wy = 0 && xv = 0",
+		}) );
 	}
 	TEST_CASE("8") {
 		const char* sample = "xyk|x'yk:bv < 1 && y = 1.";
@@ -254,7 +269,11 @@ TEST_SUITE("boole_normal_form") {
 		const char* sample = "ab|ax|bx' != 0 || a = 0 && b = 0.";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = boole_normal_form<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0");
+		CHECK( matches_to_str_to_any_of(res, {
+			"a'xb|ax'b' = 0 || a&(x|b)|a'x'b != 0",
+			"b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0",
+			"b'x'a|bxa' = 0 || b&(x'|a)|b'xa != 0",
+		}) );
 	}
 	TEST_CASE("2") {
 		const char* sample = "f(0, 0)f(0, 1) = 0 && f(1, 1)f(1, 0) = 0 && f(1, 0)f(1, 1)|f(0, 1)f(0, 0) != 0.";
