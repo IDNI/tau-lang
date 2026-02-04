@@ -6,11 +6,11 @@
 
 # default start symbol
 #
-start                  => spec _.
+start                  => spec.
 
 # start symbol posibilities:
 # spec, inputs, tau_constant_source, cli (bellow)
-spec                   => definitions _ wff:main _ '.'.
+spec                   => definitions _ wff:main _ '.' _.
 spec_multiline         => _ (rec_relation | input_def | output_def | main)
                                                                 [ _ '.' ] _ | _.
 definitions            => (_ (rec_relation | input_def | output_def) _ '.')*.
