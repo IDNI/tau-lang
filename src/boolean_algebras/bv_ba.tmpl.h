@@ -228,6 +228,9 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			auto bv_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
 			return make_bitvector_bottom_elem(bv_size);
 		}
+		case node::type::ctnvar: {
+			return bv_eval_node<node>(form | tt::first, vars, free_vars);
+		}
 		default:
 			return std::nullopt;
 	}
@@ -307,7 +310,8 @@ tref cvc5_tree_to_tau_tree(bv n) {
 
 template <NodeType node>
 bool is_bv_formula_sat(tref form) {
-	using tt = tree<node>::traverser;
+	using tau = tree<node>;
+	using tt = tau::traverser;
 
 	subtree_map<node, bv> vars, free_vars;
 	cvc5::Solver solver(cvc5_term_manager);
@@ -317,6 +321,7 @@ bool is_bv_formula_sat(tref form) {
 	// TODO (MEDIUM) handle this case at an upper level (maybe return an optional)
 	if (!expr) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
+		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
 		return false;
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
@@ -347,6 +352,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	if (!expr) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
+		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
 		return std::nullopt;
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
@@ -382,6 +388,7 @@ template<typename ... BAs> requires BAsPack<BAs...>
 std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree) {
 	using tt = bitvector_parser::tree::traverser;
 	using bv_parser = bitvector_parser::nonterminal;
+
 	if (!parse_tree) return std::nullopt;
 	auto t = bitvector_parser::tree::traverser(parse_tree)
 					| bitvector_parser::bitvector;
@@ -476,10 +483,15 @@ size_t get_inv_sym(size_t symbol) {
 template<NodeType node>
 tref term_add(tref symbol) {
 	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_add/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
 	auto add_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_add(c1, c2);
 		typename node::constant v = {res};
-		return tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_add/add_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
@@ -543,10 +555,15 @@ tref term_add(tref symbol) {
 template<NodeType node>
 tref term_sub(tref symbol) {
 	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_sub/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
 	auto sub_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_sub(c1, c2);
 		typename node::constant v = {res};
-		return tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_sub/sub_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
@@ -618,10 +635,15 @@ tref term_sub(tref symbol) {
 template<NodeType node>
 tref term_mul(tref symbol) {
 	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_mul/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
 	auto mul_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_mul(c1, c2);
 		typename node::constant v = {res};
-		return tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_mul/mul_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
@@ -701,10 +723,15 @@ tref term_mul(tref symbol) {
 template<NodeType node>
 tref term_div(tref symbol) {
 	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_div/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
 	auto div_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_div(c1, c2);
 		typename node::constant v = {res};
-		return tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_div/div_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
@@ -793,10 +820,15 @@ tref term_div(tref symbol) {
 template<NodeType node>
 tref term_mod(tref symbol) {
 	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_mod/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
 	auto mod_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_mod(c1, c2);
 		typename node::constant v = {res};
-		return tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_mod/mod_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
@@ -880,10 +912,15 @@ tref term_mod(tref symbol) {
 template<NodeType node>
 tref term_shr(tref symbol) {
 	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_shr/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
 	auto shr_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_shr(c1, c2);
 		typename node::constant v = {res};
-		return tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_shr/shr_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
@@ -969,10 +1006,15 @@ tref term_shr(tref symbol) {
 template<NodeType node>
 tref term_shl(tref symbol) {
 	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_shl/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
 	auto shl_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_shl(c1, c2);
 		typename node::constant v = {res};
-		return tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		DBG(LOG_TRACE << "term_shl/shl_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
+		return new_symbol;
 	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
@@ -1092,6 +1134,7 @@ template <typename ...BAs> requires BAsPack<BAs...>
 tref base_ba_symbol_simplification(tref symbol, const bv&) {
 	using node_t = node<BAs...>;
 	using tau = tree<node_t>;
+
 	switch (tau::get(symbol)[0].get_type()) {
 		case tau::bf_add: return term_add<node_t>(symbol);
 		case tau::bf_sub: return term_sub<node_t>(symbol);
@@ -1112,6 +1155,7 @@ tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded) {
 	using node_t = node<BAs...>;
 	using tau = tree<node_t>;
 	using tt = tau::traverser;
+
 	// std::cout << "term_tree: " << tau::get(term_tree) << "\n";
 	// We use tau::ctnvar to tag the inverse, since this non-terminal
 	// cannot naturally appear there
@@ -1245,8 +1289,10 @@ tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded) {
 
 template<typename ... BAs> requires BAsPack<BAs...>
 tref base_ba_term_simplification(tref term, const bv&) {
-	using tau = tree<node<BAs...>>;
+	using node_t = node<BAs...>;
+	using tau = tree<node_t>;
 	using tt = tau::traverser;
+
 	// TODO: introduce proper symbol for inverse
 	// We use tau::ctnvar to tag the inverse, since this non-terminal
 	// cannot naturally appear there
@@ -1269,12 +1315,15 @@ tref base_ba_term_simplification(tref term, const bv&) {
 	auto inv_rename = [&](tref n) {
 		if (!tau::get(n).is(tau::bf)) return n;
 		const tau& c = tau::get(n)[0];
-		if (c.is(tau::bf_sub)) 
+		if (c.is(tau::bf_sub))
 			return tau::build_bf_add(c.first(), build_add_inv(c.second()));
 		if (c.is(tau::bf_div))
-			return tau::build_bf_mul(c.first(), build_mult_inv(c.second())); 
+			return tau::build_bf_mul(c.first(), build_mult_inv(c.second()));
 		return n;
 	};
+
+	DBG(LOG_TRACE << "base_ba_term_simplificattion/term" << tau::get(term).tree_to_str() << "\n";)
+
 	term = pre_order<node<BAs...>>(term).apply_unique(inv_rename);
 	// Push inverses in with rules
 	// -(X + Y) == -X + -Y and --X == X and
@@ -1319,6 +1368,8 @@ tref base_ba_term_simplification(tref term, const bv&) {
 	};
 	term = pre_order<node<BAs...>>(term).apply_unique(push_inv_in);
 
+	DBG(LOG_TRACE << "base_ba_term_simplificattion/push_inv_in" << tau::get(term).tree_to_str() << "\n";)
+
 	// Simplify symbols
 	subtree_unordered_set<node<BAs...>> excluded;
 	auto simplify = [&excluded](tref n) {
@@ -1333,6 +1384,9 @@ tref base_ba_term_simplification(tref term, const bv&) {
 		return n;
 	};
 	term = pre_order<node<BAs...>>(term).apply_unique(simplify);
+
+	DBG(LOG_TRACE << "base_ba_term_simplificattion/simplify" << tau::get(term).tree_to_str() << "\n";)
+
 	// Rename inverses back to available symbols
 	auto rename_back = [&](tref n) {
 		if (!tau::get(n).is(tau::bf)) return n;
@@ -1378,6 +1432,9 @@ tref base_ba_term_simplification(tref term, const bv&) {
 		return n;
 	};
 	term = pre_order<node<BAs...>>(term).apply_unique(rename_back);
+
+	DBG(LOG_TRACE << "base_ba_term_simplificattion/rename_back" << tau::get(term).tree_to_str() << "\n";)
+
 	return term;
 }
 
