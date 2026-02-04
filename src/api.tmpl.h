@@ -178,8 +178,8 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	// Step the interpreter
 	auto [output, auto_continue] = i.step();
 	if (!output.has_value()) {
-		TAU_LOG_ERROR << "Failed to step interpreter at time point "
-								<< i.time_point;
+		DBG(TAU_LOG_TRACE << "No input provided or error."
+			<< " Quit at time point " << i.time_point;)
 		return {};
 	}
 
