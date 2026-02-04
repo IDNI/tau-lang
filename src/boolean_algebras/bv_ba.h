@@ -294,5 +294,7 @@ size_t get_inv_sym(size_t symbol);
 } // namespace idni::tau_lang
 
 #include "boolean_algebras/bv_ba.tmpl.h"
+#include "boolean_algebras/bv_ba_solver.tmpl.h"
+#include "boolean_algebras/bv_ba_simplification.tmpl.h"
 
 #endif // __IDNI__TAU__CVC5_H__
