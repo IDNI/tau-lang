@@ -3,7 +3,7 @@
 #ifndef __IDNI__TAU__API_H__
 #define __IDNI__TAU__API_H__
 
-#include "tau.h"
+#include "interpreter.h"
 
 namespace idni::tau_lang {
 
@@ -43,6 +43,7 @@ struct api {
 	// static htref parse_function_def(const std::string& function_def);
 	// static htref parse_predicate_def(const std::string& predicate_def);
 	// static htref parse_stream_def(const std::string& stream_def);
+	static void charvar(bool charvar);
 };
 
 
