@@ -13,12 +13,13 @@ set(TESTS
 	traversal
 	variant_ba
 	interpreter
-	ba_cvc5
 	cvc5
 	ba_types_inference
 	ba_types
 	union_find
-	cvc5_solver
+	ba_bv-solver1
+	ba_bv-solver2
+	ba_bv-simplification
 )
 
 foreach(X IN LISTS TESTS)
