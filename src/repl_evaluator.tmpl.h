@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#include "interpreter.h"
+#include "api.h"
 #include "repl_evaluator.h"
 
 #undef LOG_CHANNEL_NAME
@@ -821,10 +821,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
-	std::set<std::string> guards{
-		(opt.charvar = value) ? "charvar" : "var" };
-	tau_parser::instance().get_grammar().set_enabled_productions(guards);
-	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
+	api<node>::charvar(value);
 	return value;
 }
 

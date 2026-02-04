@@ -207,6 +207,14 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	return outputs;
 }
 
+
+template <NodeType node>
+void api<node>::charvar(bool charvar) {
+	std::set<std::string> guards{ charvar ? "charvar" : "var" };
+	tau_parser::instance().get_grammar().set_enabled_productions(guards);
+	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
+}
+
 // template <NodeType node>
 // bool api<node>::validate_inputs(interpreter<node>& i, std::map<std::string, std::string> inputs) {
 // }
