@@ -79,6 +79,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "tau_ba",
 	"bv_ba",
 	"bv_ba-solver",
+	"bv_ba-hooks",
 	"bv_ba-simplification",
 	// "ba_types",
 	// "ba_constants",
