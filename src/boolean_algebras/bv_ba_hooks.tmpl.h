@@ -652,15 +652,6 @@ tref term_nand(tref symbol) {
 	return tau::build_bf_neg(tau::build_bf_and(c1, c2));
 }
 
-// TODO: make test cases
-// 0+1 = x1 :bv && 1+1 = x2 :bv && 1+0 = x3 :bv &&  1+{8} = x4 :bv &&  {8}+1 = x5 :bv &&  {8} + {8} = x6:bv
-// 0-1 = x1 :bv && 1-1 = x2 :bv && 1-0 = x3 :bv &&  1-{8} = x4 :bv &&  {8}-1 = x5 :bv &&  {8} - {8} = x6:bv
-// 0*1 = x1 :bv && 1*1 = x2 :bv && 1*0 = x3 :bv &&  1*{8} = x4 :bv &&  {8}*1 = x5 :bv &&  {8} * {8} = x6:bv
-// 0/1 = x1 :bv && 1/1 = x2 :bv && 1/0 = x3 :bv &&  1/{8} = x4 :bv &&  {8}/1 = x5 :bv &&  {8} / {8} = x6:bv
-// 0%1 = x1 :bv && 1%1 = x2 :bv && 1%0 = x3 :bv &&  1%{8} = x4 :bv &&  {8}%1 = x5 :bv &&  {8} % {8} = x6:bv
-// 0>>1 = x1 :bv && 1>>1 = x2 :bv && 1>>0 = x3 :bv &&  1>>{8} = x4 :bv &&  {8}>>1 = x5 :bv &&  {8} >> {8} = x6:bv
-// 0<<1 = x1 :bv && 1<<1 = x2 :bv && 1<<0 = x3 :bv &&  1<<{8} = x4 :bv &&  {8}<<1 = x5 :bv &&  {8} << {8} = x6:bv
-
 template <typename ...BAs> requires BAsPack<BAs...>
 tref base_ba_symbol_simplification(tref symbol, const bv&) {
 	using node_t = node<BAs...>;
