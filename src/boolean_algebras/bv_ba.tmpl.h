@@ -89,4 +89,18 @@ bool operator!=(const Term& lhs, const bool& rhs) { return !(lhs == rhs); }
 
 bool operator!=(const bool& lhs, const Term& rhs) { return !(rhs == lhs); }
 
+template <typename ... BAs> requires BAsPack<BAs...>
+tref base_ba_term_simplification(tref term, const bv&) {
+	/*using node_t = node<BAs...>;
+	using tau = tree<node_t>;
+	using tt = tau::traverser;
+
+	subtree_map<node_t, bv> vars, free_vars;
+	auto bv_term = bv_eval_node<node_t>(tt(term), vars, free_vars);
+	if (!bv_term) return term; // Unable to transform to bv
+	auto simplified_bv = normalize(bv_term.value());
+	return cvc5_tree_to_tau_tree<node_t>(simplified_bv);*/
+	return term;
+}
+
 } // namespace idni::tau_lang
