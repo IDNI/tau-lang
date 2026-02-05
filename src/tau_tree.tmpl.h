@@ -177,6 +177,8 @@ bool has_semantic_error(tref fm);
 
 #include "hooks.h"
 
+#include "tau_spec.h"
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "tau_tree"
 

@@ -281,9 +281,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		return true;
 	};
 	// DBG(LOG_TRACE << "reget with hooks: " << options.reget_with_hooks;)
-	DBG(std::stringstream ss;)
 	DBG(LOG_TRACE << "parse tree: "
-			<< (parse_tree::get(ptr.get()).print(ss), ss.str());)
+			<< (parse_tree::get(ptr.get()).print_in_line_to_str());)
 
 	auto using_hooks = tau::use_hooks;
 	tau::use_hooks = false;

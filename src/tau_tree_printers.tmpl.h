@@ -119,6 +119,19 @@ std::ostream& operator<<(std::ostream& os,
 }
 
 template <NodeType node>
+std::ostream& operator<<(std::ostream& os, const tau_spec<node>& spec) {
+	os << "tau_spec {" << std::endl;
+	for (size_t i = 0; i < spec.parts_.size(); ++i) {
+		os << "  part " << i << ": \"" << spec.parts_[i] << "\""
+		<< (spec.parsed_[i] ? " (parsed)" : "")
+		<< std::endl;
+	}
+	os << "}" << std::endl;
+	return os;
+}
+
+
+template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 #ifdef DEBUG
 	os << "\n" << TC.GREEN() << "=== IO Context ===" << TC.CLEAR() << "\n";
