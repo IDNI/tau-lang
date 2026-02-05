@@ -70,6 +70,7 @@ rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	rewriter::rules x;
+	if (!rrs) return x;
 	DBG(LOG_TRACE << "get_rec_relations: " << LOG_FM_DUMP(rrs);)
 	auto t = tt(rrs);
 
