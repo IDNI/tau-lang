@@ -34,6 +34,7 @@ set(TAU_HEADERS
 	ba_types_inference.h
 	runtime.h
 	interpreter.h
+	api.h
 	union_find.h       # union find data structure
 	union_find_with_sets.h
 	nso_factory.h      # abstract template interface

@@ -178,8 +178,8 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	// Step the interpreter
 	auto [output, auto_continue] = i.step();
 	if (!output.has_value()) {
-		TAU_LOG_ERROR << "Failed to step interpreter at time point "
-								<< i.time_point;
+		DBG(TAU_LOG_TRACE << "No input provided or error."
+			<< " Quit at time point " << i.time_point;)
 		return {};
 	}
 
@@ -205,6 +205,14 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 
 
 	return outputs;
+}
+
+
+template <NodeType node>
+void api<node>::charvar(bool charvar) {
+	std::set<std::string> guards{ charvar ? "charvar" : "var" };
+	tau_parser::instance().get_grammar().set_enabled_productions(guards);
+	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
 }
 
 // template <NodeType node>

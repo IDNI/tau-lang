@@ -13,7 +13,7 @@
 #include "boolean_algebras/tau_ba.h"
 #include "boolean_algebras/variant_ba.h"
 #include "runtime.h"
-#include "interpreter.h"
+#include "api.h"
 #else
 #	include "tau.h"
 #endif // DEBUG
@@ -23,6 +23,10 @@
 using namespace std;
 using namespace idni;
 using namespace idni::tau_lang;
+
+using node_t = tau_lang::node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+using tau = tree<node_t>;
+using tau_api = api<node_t>;
 
 cli::options tau_options() {
 	cli::options opts;
@@ -64,8 +68,7 @@ int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 	const string& src)
 {
-	using node = tau_lang::node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
-	using tau = tree<node>;
+	using node = node_t;
 	std::istringstream iss(src);
 	std::string attempt, line, msg;
 	tref main = nullptr;
@@ -145,6 +148,7 @@ std::optional<rr<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>> get_spec_multiline(
 int run_tau_spec(string spec_file, bool charvar, bool /*exp*/,
 	boost::log::trivial::severity_level sev)
 {
+	using node = node_t;
 	logging::set_filter(sev);
 
 	string src = "";
@@ -159,8 +163,6 @@ int run_tau_spec(string spec_file, bool charvar, bool /*exp*/,
 		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}
 	if (src.empty()) return 0;
-
-	using node = tau_lang::node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 
 	std::set<std::string> guards{ charvar ? "charvar" : "var" };
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
@@ -220,7 +222,7 @@ void at_exit() {
 	// On exit we must clean up the ba constants so the rest of the static
 	// constants managers are able to properly clean everything (in particula,
 	// cvc5::TermManager).
-	ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::cleanup();
+	ba_constants<node_t>::cleanup();
 	// On the tests using ba_constants we also need to explicitly call
 	// the clean up in the constants.
 }
@@ -257,9 +259,7 @@ int main(int argc, char** argv) {
 	pretty_printer_indenting    = opts["indenting"].get<bool>();
 
 	bool charvar = opts["charvar"].get<bool>();
-	std::set<std::string> guards{ charvar ? "charvar" : "var" };
-	tau_parser::instance().get_grammar().set_enabled_productions(guards);
-	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
+	tau_api::charvar(charvar);
 
 	bool exp = opts["experimental"].get<bool>();
 
