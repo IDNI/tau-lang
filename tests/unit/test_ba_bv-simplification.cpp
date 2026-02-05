@@ -29,7 +29,7 @@ tref parse(const std::string& sample) {
 	return src;
 }
 
-TEST_SUITE("tree translation and simplification") {
+TEST_SUITE("bv to tau tree translation") {
 
 	TEST_CASE("1") {
 		const char* sample = "(ex x x = { 1 }:bv) && { 16 } : bv[7] - { 8 } = h && asdf' = j+k:bv[4] || !(j = i)";

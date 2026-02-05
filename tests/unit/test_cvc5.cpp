@@ -8,7 +8,7 @@ using namespace cvc5;
 
 static TermManager cvc5_term_manager;
 
-TEST_SUITE("sample cvc5 programs") {
+TEST_SUITE("cvc5 solver") {
 
 	TEST_CASE("forall sample (static)") {
 		/*
@@ -156,6 +156,22 @@ TEST_SUITE("sample cvc5 programs") {
 		BOOST_LOG_TRIVIAL(info) << "Fml: " << fml;
 		BOOST_LOG_TRIVIAL(info) << "Result: " << result;
 		CHECK(result.isSat());
+	}
+}
+
+
+TEST_SUITE("cvc5 simplification") {
+
+	TEST_CASE("x - ( 1 + x)") {
+		Solver cvc5_solver(cvc5_term_manager);
+		auto bv4 = cvc5_term_manager.mkBitVectorSort(4);
+		auto x = cvc5_term_manager.mkVar(bv4, "x");
+		auto y = cvc5_term_manager.mkVar(bv4, "y");
+		auto y_plus_x = cvc5_term_manager.mkTerm(Kind::BITVECTOR_ADD, {	y, x });
+		auto x_minus_one_plus_x = cvc5_term_manager.mkTerm(Kind::BITVECTOR_SUB, {x, y_plus_x });
+		auto result = cvc5_solver.simplify(x_minus_one_plus_x);
+		BOOST_LOG_TRIVIAL(info) << "x - (y + x) = " << result;
+		CHECK(true);
 	}
 }
 
