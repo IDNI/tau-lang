@@ -753,6 +753,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				else out(" ? ");
 				break;
 
+			case definitions:
+			case spec:              out(" "); break;
+
 			case inst_cmd:
 			case subst_cmd:
 				switch (inc_chpos()) {
@@ -776,7 +779,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_neg:            out("'");
 						last_quant_nt = nul; break;
 			case main:
-			case rec_relation:	out(".");break;
+			case input_def:
+			case output_def:
+			case rec_relation:	out("."); break;
 			case constraint:
 			case offsets:
 			case subtype:
