@@ -83,7 +83,6 @@ rewriter::rules get_rec_relations(io_context<node>& ctx, tref rrs) {
 	if (t.is(tau::rec_relation)) return resolve_in_formula(t), x;
 	if (t.is(tau::start)) t = t | tau::spec | tau::definitions;
 	else if (t.is(tau::spec))  t = t | tau::definitions;
-	else if (t.is(tau::tau_constant_source)) t = t | tau::rec_relations;
 	t = t || tau::rec_relation;
 	for (auto& r : t()) resolve_in_formula(r);
 

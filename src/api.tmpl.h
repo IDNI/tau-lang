@@ -2,20 +2,19 @@
 
 #include "api.h"
 
+#include "sbf_parser.generated.h"
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "api"
 
 namespace idni::tau_lang {
 
 template <NodeType node>
-htref api<node>::parse_specification(const std::string& specification,
-	io_context<node>& ctx)
-{
-	typename tree<node>::get_options options;
-	options.context = &ctx;
-	tref spec = tree<node>::get(specification, options);
-	if (!spec) return {};
-	return tree<node>::geth(spec);
+htref api<node>::parse_specification(const std::string& src) {
+	tau_spec<node> spec;
+	spec.parse(src);
+	if (tref s = spec.get(); s) return tau::geth(s);
+	return {};
 }
 
 template <NodeType node>
@@ -34,9 +33,12 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	auto& ctx = *definitions<node>::instance().get_io_context();
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
-	htref spec = parse_specification(specification, ctx);
-	if (!spec) return {};
-	auto maybe_nso_rr = get_nso_rr<node>(ctx, spec->get());
+	tau_spec<node> spec;
+	if (!spec.parse(specification)) {
+		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
+		return {};
+	}
+	auto maybe_nso_rr = spec.get_nso_rr();
 	if (!maybe_nso_rr) return {};
 	tref applied = apply_rr_to_formula<node>(maybe_nso_rr.value());
 	if (!applied) return {};
@@ -141,8 +143,8 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	// Step the interpreter
 	auto [output, auto_continue] = i.step(values);
 	if (!output.has_value()) {
-		TAU_LOG_ERROR << "Failed to step interpreter at time point "
-			<< i.time_point;
+		DBG(TAU_LOG_TRACE << "No input provided or error."
+			<< " Quit at time point " << i.time_point;)
 		return {};
 	}
 	// Build outputs for the step
@@ -163,6 +165,11 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	// Run update if update stream is present and unequal to 0
 	if (tref update = get_update<node>(i, output.value()); update)
 		i.update(update);
+
+	if (!auto_continue) {
+		TAU_LOG_TRACE << "auto continue is false.";
+		return {};
+	}
 
 	return outputs;
 }
@@ -203,6 +210,10 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	if (tref update = get_update<node>(i, output.value()); update)
 		i.update(update);
 
+	if (!auto_continue) {
+		TAU_LOG_TRACE << "auto continue is false.";
+		return {};
+	}
 
 	return outputs;
 }
