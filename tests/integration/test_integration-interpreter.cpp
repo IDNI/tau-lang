@@ -29,14 +29,22 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<strings> u_expected = {
 			{ "F" }, {
+				"always o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau",
 				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
 			}, { "F" }, { "F" }, { "F" }, { "F" }
 		};
-		strings o1_expected = {
-			"T", "<:x> = 0", "<:y> = 0 && <:x> = 0",
-			"<:y> = 0 && <:z> = 0 && <:x> = 0"
+		std::vector<strings> o1_expected = {
+			{ "T" }, { "<:x> = 0" },
+			{
+				"<:x> = 0 && <:y> = 0",
+				"<:y> = 0 && <:x> = 0",
+			},
+			{
+				"<:z> = 0 && <:x> = 0 && <:y> = 0",
+				"<:y> = 0 && <:z> = 0 && <:x> = 0",
+			}
 		};
 		io_context<node_t> ctx;
 		auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -50,7 +58,7 @@ TEST_SUITE("Execution") {
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK( maybe_i.has_value() );
 		auto o1_values = o1->get_values();
-		CHECK( o1_values == o1_expected );
+		CHECK( values_matches_any_of(o1_values, o1_expected) );
 		auto u_values = u->get_values();
 		CHECK( values_matches_any_of(u_values, u_expected) );
 	}
@@ -68,8 +76,14 @@ TEST_SUITE("Execution") {
 				"always o1[-1]:tau o2[-2]:tau = o3[t]:tau",
 			}, { "F" }, { "F" }
 		};
-		strings o3_expected = {
-			"<:y> = 0 && <:x> = 0", "<:y> = 0 && <:x> = 0"
+		std::vector<strings> o3_expected = {
+			{
+				"<:x> = 0 && <:y> = 0",
+				"<:y> = 0 && <:x> = 0",
+			}, {
+				"<:x> = 0 && <:y> = 0",
+				"<:y> = 0 && <:x> = 0",
+			}
 		};
 		io_context<node_t> ctx;
 		auto i1 = std::make_shared<vector_input_stream>(i1_values);
@@ -82,7 +96,7 @@ TEST_SUITE("Execution") {
 		CHECK( maybe_i.has_value() );
 		DBG(TAU_LOG_TRACE << "o3 get values";)
 		auto o3_values = o3->get_values();
-		CHECK( o3_values == o3_expected );
+		CHECK( values_matches_any_of(o3_values, o3_expected) );
 		auto u_values = u->get_values();
 		CHECK( values_matches_any_of(u_values, u_expected) );
 	}
@@ -190,14 +204,17 @@ TEST_SUITE("Execution") {
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 		}, {
+			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 		}, {
+			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 		}, {
+			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o3[t]:tau = 0",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",

@@ -10,10 +10,10 @@ start                  => spec.
 
 # start symbol posibilities:
 # spec, inputs, tau_constant_source, cli (bellow)
-spec                   => definitions _ wff:main _ '.' _.
+spec                   => [ definitions ] _ wff:main _ '.' _.
 spec_multiline         => _ (rec_relation | input_def | output_def | main)
                                                                 [ _ '.' ] _ | _.
-definitions            => (_ (rec_relation | input_def | output_def) _ '.')*.
+definitions            => (_ (rec_relation | input_def | output_def) _ '.')+.
 rec_relations          => (_ rec_relation _ '.')*.
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
 input_def              => io_var_name [ typed ] _ ":=" _ "in"    __ stream.
