@@ -1171,15 +1171,6 @@ std::optional<interpreter<node>> run(tref form, const io_context<node>& ctx,
 	if (!intrprtr_o) return {};
 	auto& intrprtr = intrprtr_o.value();
 
-	LOG_TRACE << "run/rebuild_inputs";
-	subtree_map<node, size_t> current_inputs;
-	if (!intrprtr.collect_input_streams(form, current_inputs)) return {};
-	intrprtr.rebuild_inputs(current_inputs);
-	LOG_TRACE << "run/rebuild_outputs";
-	subtree_map<node, size_t> current_outputs;
-	if (!intrprtr.collect_output_streams(form, current_outputs)) return {};
-	intrprtr.rebuild_outputs(current_outputs);
-
 	LOG_INFO << "-----------------------------------------------------------------------------------------------------------";
 	LOG_INFO << "Please provide requested input, or press ENTER to terminate                                               |";
 	LOG_INFO << "If no input is requested, press ENTER to continue to the next execution step, or type q(uit) to terminate |";
