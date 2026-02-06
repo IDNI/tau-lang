@@ -745,6 +745,31 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 	return untyped_type_id<node>();
 }
 
+template <NodeType node>
+void inference_error_message(
+		const std::variant<inference_error, parse_error,
+		typename type_scoped_resolver<node>::scope_error>& error) {
+	using tau = tree<node>;
+	using scope_error = typename type_scoped_resolver<node>::scope_error;
+
+	if (std::holds_alternative<parse_error>(error)) {
+		auto parse_err = std::get<parse_error>(error);
+		LOG_ERROR << "Unable to parse  " << tau::get(parse_err.element) << " with type "
+			<< ba_types<node>::name(parse_err.type_id) << "\n";
+	} else if (std::holds_alternative<scope_error>(error)) {
+		auto scope_err = std::get<scope_error>(error);
+		LOG_ERROR << "Improper closed scope in "
+			<< tau::get(scope_err.element) << ".\n";
+	} else {
+		DBG(assert(std::holds_alternative<inference_error>(error));)
+		auto inference_err = std::get<inference_error>(error);
+		LOG_ERROR << "Incompatible type information in "
+			<< tau::get(inference_err.element)
+			<< ", expected " << ba_types<node>::name(inference_err.expected)
+			<< ", found " << ba_types<node>::name(inference_err.found) << "\n";
+	}
+}
+
 // Infers the types of variables and constants in the tree n. It assumes that
 // the types of the scoped variables are known when closing the scope.
 // If a variable or constant remains unassigned, it is assigned to tau.
@@ -830,9 +855,11 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	using tt = tau::traverser;
 	using scope_error = typename type_scoped_resolver<node>::scope_error;
 
-	DBG(LOG_TRACE << "================================================";)
-	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
-		<< " for: " << LOG_FM_DUMP(n);)
+#ifdef DEBUG
+	LOG_TRACE << "================================================";
+	LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
+		<< " for: " << LOG_FM_DUMP(n);
+#endif // DEBUG
 
 	// We restore the original value of use_hooks at the end of the function
 	auto using_hooks = tau::use_hooks;
@@ -1062,7 +1089,10 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::bf_interval: {
 				auto typeables = get_typeable_type_ids_by_type<node>(n, {
 					tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
-				if (std::holds_alternative<inference_error>(typeables)) { error = std::get<inference_error>(typeables); break; } // Incompatible types
+				if (std::holds_alternative<inference_error>(typeables)) {
+					error = std::get<inference_error>(typeables);
+					break;
+				} // Incompatible types
 				auto typeables_map = std::get<typeables_type_id_map<node>>(typeables);
 				open<node>(resolver, {
 						typeables_map[tau::ref],
@@ -1079,7 +1109,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				}
 				// Take type definition due to function symbols into account
 				if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
-						std::get<size_t>(merged_type), typeables_map[tau::ref]); std::holds_alternative<inference_error>(typed)) {
+						std::get<size_t>(merged_type), typeables_map[tau::ref]);
+						std::holds_alternative<inference_error>(typed)) {
 					error = std::get<inference_error>(typed);
 				}
 				break;
@@ -1089,20 +1120,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			// without doing anything special in this node.
 			break;
 		}
-		if (error) {
-			auto error_value = error.value();
-			if (std::holds_alternative<parse_error>(error_value)) {
-				LOG_ERROR << "Unable to parse  " << tau::get(n) << " with type"
-					<< tau::get(std::get<parse_error>(error_value).type_id) << "\n";
-			} else {
-				LOG_ERROR << "Incompatible type information in "
-					<< tau::get(std::get<inference_error>(error_value).element)
-					<< ", expected " << tau::get(std::get<inference_error>(error_value).expected)
-					<< ", found " << tau::get(std::get<inference_error>(error_value).found) << "\n";
-			}
-		}
+
+		if (error) inference_error_message<node>(error.value());
+
 		DBG(LOG_TRACE << "infer_ba_types/on_enter/" << LOG_NT(nt) << "/resolver:\n"
 			<< resolver.dump_to_str();)
+
 		// Stop traversal on error
 		return !error && !skip;
 	};
@@ -1256,27 +1279,18 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				break;
 			}
 		}
-		if (error) {
-			auto error_value = error.value();
-			if (std::holds_alternative<parse_error>(error_value)) {
-				LOG_ERROR << "Unable to parse  " << tau::get(n) << " with type "
-					<< ba_types<node>::name(std::get<parse_error>(error_value).type_id) << "\n";
-			} else if (std::holds_alternative<scope_error>(error_value)) {
-				LOG_ERROR << "Improper closed scope in "
-					<< tau::get(std::get<scope_error>(error_value).element) << ".\n";
-			} else {
-				DBG(assert(std::holds_alternative<inference_error>(error_value));)
-				LOG_ERROR << "Incompatible type information in "
-					<< tau::get(std::get<inference_error>(error_value).element)
-					<< ", expected " << ba_types<node>::name(std::get<inference_error>(error_value).expected)
-					<< ", found " << ba_types<node>::name(std::get<inference_error>(error_value).found) << "\n";
-			}
-		}
-		DBG(if (!error) LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) << "/n -> new_n:\n"
-			<< LOG_FM_TREE(n) << " -> "
-			<< LOG_FM_TREE(transformed.contains(n) ? transformed[n] : n);)
-		DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) << "/resolver:\n"
-			<< resolver.dump_to_str();)
+
+		if (error) inference_error_message<node>(error.value());
+
+#ifdef DEBUG
+		if (!error)
+			LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) << "/n -> new_n:\n"
+				<< LOG_FM_TREE(n) << " -> "
+				<< LOG_FM_TREE(transformed.contains(n) ? transformed[n] : n);
+		LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) << "/resolver:\n"
+			<< resolver.dump_to_str();
+#endif // DEBUG
+
 		return;
 	};
 
@@ -1295,8 +1309,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	}
 	new_n = std::get<tref>(updated);
-//	new_n = update<node>(resolver, new_n, { tau::typeable_symbol, tau::bf_ref });
-//	if (new_n == nullptr) return tau::use_hooks = using_hooks, std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 
 	// Remove intermediate tau::processed nodes
 	auto remove_processed = [](tref n) {
@@ -1308,9 +1320,12 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	new_n = pre_order<node>(new_n).apply_unique(remove_processed);
 
 	auto n_global_scope = resolver.current_types();
-	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
-	<< " of: " << LOG_FM(n) << " resulted into: " << LOG_FM_DUMP(new_n);)
-	DBG(LOG_TRACE << "================================================";)
+
+#ifdef DEBUG
+	LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types" << TC.CLEAR()
+		<< " of: " << LOG_FM(n) << " resulted into: " << LOG_FM_DUMP(new_n);
+	LOG_TRACE << "================================================";
+#endif // DEBUG
 
 	tau::use_hooks = using_hooks;
 	return std::pair<tref, subtree_map<node, size_t>>{ new_n, std::move(n_global_scope) };
