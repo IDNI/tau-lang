@@ -153,6 +153,7 @@ struct io_context {
 	tref add_output_file(const std::string& name, size_t type_id, const std::string& filename);
 	tref add_input(const std::string& name, size_t type_id, std::shared_ptr<serialized_constant_input_stream> stream);
 	tref add_output(const std::string& name, size_t type_id, std::shared_ptr<serialized_constant_output_stream> stream);
+	void clear();
 };
 
 template <NodeType node>

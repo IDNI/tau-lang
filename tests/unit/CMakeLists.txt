@@ -1,25 +1,29 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
+	ba_bv-solver1
+	ba_bv-solver2
+	ba_bv-simplification
 	ba_constants
+	ba_types
+	ba_types_inference
 	bool
+	cvc5
 	gc
 	hbdd
+	interpreter
 	normal_forms
 	product_ba
 	sbf_ba_parsing
+	tau_spec
 	tau_tree_from_parser
 	tau_tree_printers
 	traversal
-	variant_ba
-	interpreter
-	ba_cvc5
-	cvc5
-	ba_types_inference
-	ba_types
 	union_find
-	cvc5_solver
+	variant_ba
 )
+
+
 
 foreach(X IN LISTS TESTS)
 	set(N "test_${X}")

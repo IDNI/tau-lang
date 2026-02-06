@@ -3,7 +3,7 @@
 #ifndef __IDNI__TAU__API_H__
 #define __IDNI__TAU__API_H__
 
-#include "tau.h"
+#include "interpreter.h"
 
 namespace idni::tau_lang {
 
@@ -21,6 +21,8 @@ struct interpreter_options {
 
 template <NodeType node>
 struct api {
+	using tau = tree<node>;
+
 	static std::optional<interpreter<node>> get_interpreter(
 		const std::string& specification);
 	static std::optional<interpreter<node>> get_interpreter(
@@ -36,13 +38,13 @@ struct api {
 	// static bool validate_inputs(interpreter<node>& i, std::map<std::string, std::string> inputs);
 
 	// parsing
-	static htref parse_specification(const std::string& specification,
-		io_context<node>& ctx = {});
+	static htref parse_specification(const std::string& specification);
 	// static htref parse_term(const std::string& term);
 	// static htref parse_formula(const std::string& predicate);
 	// static htref parse_function_def(const std::string& function_def);
 	// static htref parse_predicate_def(const std::string& predicate_def);
 	// static htref parse_stream_def(const std::string& stream_def);
+	static void charvar(bool charvar);
 };
 
 

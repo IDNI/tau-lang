@@ -6,15 +6,16 @@
 
 # default start symbol
 #
-start                  => spec _.
+start                  => spec.
 
 # start symbol posibilities:
-# spec, inputs, tau_constant_source, cli (bellow)
-spec                   => definitions _ wff:main _ '.'.
-spec_multiline         => _ (rec_relation | input_def | output_def | main)
-                                                                [ _ '.' ] _ | _.
-definitions            => (_ (rec_relation | input_def | output_def) _ '.')*.
-rec_relations          => (_ rec_relation _ '.')*.
+# spec, spec_multiline, cli (bellow)
+spec                   => [ definitions ] _ wff:main _ '.' _.
+definitions            => (_ (rec_relation | input_def | output_def) _ '.')+.
+
+spec_multiline         => (_ spec_part _ '.')* _ spec_part [ _ '.' ] _ | _.
+spec_part              => rec_relation | input_def | output_def | main.
+
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
 input_def              => io_var_name [ typed ] _ ":=" _ "in"    __ stream.
 output_def             => io_var_name [ typed ] _ ":=" _ "out"   __ stream.
@@ -25,8 +26,6 @@ ref                    => sym [offsets] ref_args [typed] [_ "fallback" __ fp_fal
 fp_fallback            => "first":first_sym | "last":last_sym
                         | capture | ref | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
-
-tau_constant_source    => rec_relations _ main _ [ '.' _ ].
 
 # wff and bf expressions
 #
@@ -274,7 +273,7 @@ unreachable => processed.
         ctnvar, option_name, option_value.
 
 # inline intermediate nodes and eliminate parenthesis
-@inline char classes, chars, q_var, src_c, uconst,
+@inline char classes, chars, q_var, src_c, uconst, spec_part,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg,
         uconst > uconst_name,

@@ -2,6 +2,8 @@
 
 #include "boolean_algebras/tau_ba.h"
 
+#include "tau_spec.h"
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "tau_ba"
 
@@ -226,17 +228,14 @@ std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	parse_tau(const std::string& src)
 {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
-	using tau = tree<node>;
-
 	// parse source
-	auto& defs = definitions<node>::instance();
-	typename tau::get_options opts{ .parse = {
-					.start = tau::tau_constant_source },
-					.definition_heads = defs.get_definition_heads(),
-					.global_scope = defs.get_global_scope() };
-	tref source = tau::get(src, opts);
-	if (!source) return {};
-	auto nso_rr = get_nso_rr<node>(source);
+	tau_spec<node> s;
+	s.parse(src);
+	if (s.errors().size()) {
+		for (const auto& error : s.errors()) TAU_LOG_ERROR << error;
+		return {};
+	}
+	auto nso_rr = s.get_nso_rr();
 	if (!nso_rr) return {};
 	// compute final result
 	return typename node::constant_with_type{

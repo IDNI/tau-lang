@@ -1,4 +1,0 @@
-#
-# order normal form tests
-#
-
