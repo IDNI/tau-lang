@@ -23,6 +23,11 @@ struct inference_error {
 	tref element;
 	size_t expected;
 	size_t found;
+
+	inference_error(tref element, size_t expected, size_t found)
+			: element(element), expected(expected), found(found) {
+		DBG(assert(element != nullptr);)
+	}
 };
 
 template<NodeType node>
