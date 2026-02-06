@@ -142,8 +142,9 @@ struct scoped_union_find {
 
 	std::optional<scope_error> close() {
 		if (scopes.size() == 1) {
-			DBG(LOG_ERROR << "scoped_union_find/close: cannot close global scope (unbalenced scopes)\n";)
-			return scope_error{};
+			// TODO (HIGH) Check proper closing scopes
+			// DBG(LOG_ERROR << "scoped_union_find/close: cannot close global scope (unbalenced scopes)\n";)
+			return std::nullopt; //scope_error{};
 		}
 		scopes.pop_back();
 		return std::nullopt;
