@@ -215,7 +215,7 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 	for (auto [_, typeables] : types) {
 		for (auto [typeable, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
-			if (!unified) return inference_error{typeable, inferred_type, type};
+			if (!unified) return inference_error{typeable, type, inferred_type};
 			else inferred_type = unified.value();
 			scoped.insert(typeable);
 		}
@@ -232,7 +232,7 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 	for (auto typeables : types) {
 		for (auto [t, type] : typeables) {
 			auto unified = unify<node>(inferred_type, type);
-			if (!unified) return inference_error{t, inferred_type, type};
+			if (!unified) return inference_error{t, type, inferred_type};
 			else inferred_type = unified.value();
 			scoped[t] = default_type;
 		}
@@ -266,7 +266,7 @@ std::variant<size_t, inference_error> unify(const std::map<size_t, subtree_map<n
 		for (auto [typeable, type] : typeables) {
 			if (auto unified = unify<node>(unified_type, type); unified) {
 				unified_type = unified.value();
-			} else return inference_error{ typeable, unified_type, type}; // incompatible types
+			} else return inference_error{ typeable, type, unified_type}; // incompatible types
 		}
 	}
 	return unified_type;
