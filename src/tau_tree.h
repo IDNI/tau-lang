@@ -48,6 +48,7 @@ template <NodeType node> struct ba_constants;
 template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
 template <NodeType node> struct io_context;
+template <NodeType node> struct tau_spec;
 
 // -----------------------------------------------------------------------------
 // Tau tree node (tau_tree_node.tmpl.h)

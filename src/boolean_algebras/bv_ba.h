@@ -40,6 +40,7 @@
 
 #include "boolean_algebras/cvc5/cvc5.h"
 #include "tau_tree.h"
+#include "../heuristics/ba_bv_simplification.h"
 #include "splitter_types.h"
 
 namespace idni::tau_lang {
@@ -294,5 +295,6 @@ size_t get_inv_sym(size_t symbol);
 } // namespace idni::tau_lang
 
 #include "boolean_algebras/bv_ba.tmpl.h"
+#include "boolean_algebras/bv_ba_solver.tmpl.h"
 
 #endif // __IDNI__TAU__CVC5_H__

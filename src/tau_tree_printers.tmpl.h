@@ -119,6 +119,19 @@ std::ostream& operator<<(std::ostream& os,
 }
 
 template <NodeType node>
+std::ostream& operator<<(std::ostream& os, const tau_spec<node>& spec) {
+	os << "tau_spec {" << std::endl;
+	for (size_t i = 0; i < spec.parts_.size(); ++i) {
+		os << "  part " << i << ": \"" << spec.parts_[i] << "\""
+		<< (spec.parsed_[i] ? " (parsed)" : "")
+		<< std::endl;
+	}
+	os << "}" << std::endl;
+	return os;
+}
+
+
+template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 #ifdef DEBUG
 	os << "\n" << TC.GREEN() << "=== IO Context ===" << TC.CLEAR() << "\n";
@@ -132,8 +145,8 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	if (ctx.inputs.empty() && ctx.outputs.empty()) os << " none";
 	os << "\n";
 	auto print_io = [&](tref var, size_t s, bool output) {
-		os << "\t" << get_var_name<node>(var) << ":"
-			<< get_ba_type_name<node>(ctx.type_of(var)) << " = "
+		os << "\t" << get_var_name<node>(var)
+			<< get_ba_type_name<node>(ctx.type_of(var)) << " := "
 			<< (output ? "out" : "in") << " "
 			<< (s == 0 ? "console"
 				: "file(\"" + dict(s) + "\")")
@@ -544,8 +557,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				type_printed = false;
 				break;
 			case stream:
-				if (pnt == input_def) out(" = in ");
-				else if (pnt == output_def) out(" = out ");
+				if (pnt == input_def) out(" := in ");
+				else if (pnt == output_def) out(" := out ");
 				break;
 			case wff:
 			case bf:
@@ -590,18 +603,18 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case onf_cmd:           out("onf "); break;
 			case def_print_cmd:
 			case def_rr_cmd:
-			case def_list_cmd:      out("def"); break;
-			case history_list_cmd:  out("history"); break;
+			case def_list_cmd:      out("def "); break;
+			case history_list_cmd:  out("history "); break;
 			case history_print_cmd:
 			case history_store_cmd: out("history "); break;
-			case get_cmd:           out("get"); break;
+			case get_cmd:           out("get "); break;
 			case set_cmd:           out("set "); break;
 			case toggle_cmd:        out("toggle "); break;
-			case quit_cmd:          out("quit"); break;
-			case version_cmd:       out("version"); break;
-			case clear_cmd:         out("clear"); break;
-			case help_cmd:          out("help"); break;
-			case file_cmd:          out("file"); break;
+			case quit_cmd:          out("quit "); break;
+			case version_cmd:       out("version "); break;
+			case clear_cmd:         out("clear "); break;
+			case help_cmd:          out("help "); break;
+			case file_cmd:          out("file "); break;
 			case valid_cmd:         out("valid "); break;
 			case sat_cmd:           out("sat "); break;
 			case unsat_cmd:         out("unsat "); break;
@@ -753,6 +766,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				else out(" ? ");
 				break;
 
+			case definitions:
+			case spec:              out(" "); break;
+
 			case inst_cmd:
 			case subst_cmd:
 				switch (inc_chpos()) {
@@ -775,8 +791,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (nt) {
 			case bf_neg:            out("'");
 						last_quant_nt = nul; break;
-			case main:		out(".");
-			case rec_relation:	break;
+			case main:
+			case input_def:
+			case output_def:
+			case rec_relation:	out("."); break;
 			case constraint:
 			case offsets:
 			case subtype:

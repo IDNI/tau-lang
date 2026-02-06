@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TESTS
 	bf_fixed_point
 	bf_hooks
+	bv_hooks
 	bf_normalization
 	quantifiers
 	nso_rr_execution
@@ -26,7 +27,10 @@ set(TESTS
 	ba_types_inference
 	semantic
 	type_scoped_resolver
-	heuristics-ex_subs_based_elimination)
+	heuristics-ex_subs_based_elimination
+	heuristics-ba_bv_custom_simplification
+	heuristics-ba_bv_cvc5_simplification
+)
 
 foreach(TEST IN LISTS TESTS)
 	set(N "test_integration-${TEST}")

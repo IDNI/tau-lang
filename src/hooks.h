@@ -86,6 +86,7 @@ private:
 
 } // namespace idni::tau_lang
 
+#include "boolean_algebras/bv_ba_hooks.tmpl.h"
 #include "hooks.tmpl.h"
 
 #undef HOOK_LOGGING
