@@ -37,6 +37,15 @@ struct api {
 	// // Given the assigned values to each input stream, it needs to be checked that the values are valid
 	// static bool validate_inputs(interpreter<node>& i, std::map<std::string, std::string> inputs);
 
+	static bool is_formula(tref fm);
+	static bool is_formula(htref fm);
+	static bool is_term(tref term);
+	static bool is_term(htref term);
+	static tref normalize_formula(tref fm);
+	static htref normalize_formula(htref fm);
+	static tref normalize_term(tref term);
+	static htref normalize_term(htref term);
+
 	// parsing
 	static htref parse_specification(const std::string& specification);
 	// static htref parse_term(const std::string& term);
