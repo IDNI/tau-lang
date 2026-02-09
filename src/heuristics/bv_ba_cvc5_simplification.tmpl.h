@@ -91,7 +91,7 @@ tref cvc5_tree_to_tau_tree(bv n) {
 }
 
 template<NodeType node>
-tref ba_bv_cvc5_simplification(tref term) {
+tref bv_ba_cvc5_simplification(tref term) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
