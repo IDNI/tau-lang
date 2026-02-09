@@ -527,6 +527,7 @@ std::pair<std::optional<assignment<node>>, bool>
 		}
 	}
 	if (global.empty()) LOG_INFO << "currently no output is specified";
+	DBG(LOG_TRACE << dump_to_str();)
 	// update time_point and formula_time_point
 	if (time_point < formula_time_point) {
 		// auto continue until lookback
@@ -539,7 +540,6 @@ std::pair<std::optional<assignment<node>>, bool>
 		++time_point;
 		formula_time_point = time_point;
 	}
-	DBG(LOG_TRACE << dump_to_str();)
 	// TODO (HIGH) remove old values from memory
 	return { global, auto_continue };
 }
@@ -735,6 +735,7 @@ tref interpreter<node>::get_executable_spec(
 
 template <NodeType node>
 void interpreter<node>::update(tref update) {
+	DBG(LOG_TRACE << "interpreter::update(update = \"" << LOG_FM(update) << "\")";)
 	// TODO: shift spec time according to new lookback from update
 	trefs io_vars = tau::get(update)
 				.select_top(is_child<node, tau::io_var>);
@@ -1216,7 +1217,6 @@ std::optional<interpreter<node>> run(tref form, const io_context<node>& ctx,
 				if (tref update = unpack_tau_constant<node>(
 					it->second); update != nullptr)
 				{
-					DBG(LOG_TRACE << "update: "	<< update << "\n";)
 					intrprtr.update(update);
 				}
 			}

@@ -168,8 +168,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 					{
 						ba_type = get_ba_type_id<node>(
 							m_ref(ptr.second()));
-						LOG_TRACE << "ba_type: "
-							<< LOG_BA_TYPE(ba_type);
+						// LOG_TRACE << "ba_type: "
+						// 	<< LOG_BA_TYPE(ba_type);
 					}
 					break;
 				}
@@ -183,8 +183,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 						ba_type = get_ba_type_id<node>(
 							m_ref(ptr[3].get()));
 					}
-					LOG_TRACE << "ba_type: "
-						  << LOG_BA_TYPE(ba_type);
+					// LOG_TRACE << "ba_type: "
+					// 	  << LOG_BA_TYPE(ba_type);
 					break;
 				}
 				default: break;
@@ -308,7 +308,6 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		if (transformed) {
 			if (options.context) {
 				options.context->update_types(result.second);
-				DBG(LOG_TRACE << *options.context;)
 			}
 			if (options.global_scope)
 				*options.global_scope = std::move(result.second);
