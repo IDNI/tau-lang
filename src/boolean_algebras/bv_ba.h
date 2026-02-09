@@ -40,7 +40,6 @@
 
 #include "boolean_algebras/cvc5/cvc5.h"
 #include "tau_tree.h"
-#include "../heuristics/ba_bv_simplification.h"
 #include "splitter_types.h"
 
 namespace idni::tau_lang {
@@ -228,12 +227,14 @@ inline cvc5::Term normalize(const cvc5::Term& fm) {
 	// Use general simplification procedure
 	return solver.simplify(fm);
 }
+
 inline bool is_syntactic_zero(const cvc5::Term& fm) {
 	// Check if represented bitvector is just bottom element in Boolean algebra
 	if (!fm.isBitVectorValue()) return false;
 	return fm.getBitVectorValue(2) ==
 		std::string(fm.getSort().getBitVectorSize(), '0');
 }
+
 inline bool is_syntactic_one(const cvc5::Term& fm) {
 	// Check if represented bitvector is just top element in Boolean algebra
 	if (!fm.isBitVectorValue()) return false;
@@ -294,6 +295,7 @@ size_t get_inv_sym(size_t symbol);
 
 } // namespace idni::tau_lang
 
+#include "heuristics/ba_bv_simplification.h"
 #include "boolean_algebras/bv_ba.tmpl.h"
 #include "boolean_algebras/bv_ba_solver.tmpl.h"
 

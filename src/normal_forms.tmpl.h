@@ -2,7 +2,6 @@
 
 #include "normal_forms.h"
 #include "union_find_with_sets.h"
-#include "heuristics/ex_subs_based_elimination.h"
 
 namespace idni::tau_lang {
 

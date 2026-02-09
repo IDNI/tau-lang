@@ -3,8 +3,6 @@
 #ifndef __IDNI__TAU__EX_SUBS_BASED_ELIMINATION_H__
 #define __IDNI__TAU__EX_SUBS_BASED_ELIMINATION_H__
 
-#include "tau_tree.h"
-
 namespace idni::tau_lang {
 
 // We eliminate the existential quiantifier by substituting the variable
