@@ -1,8 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#include "boolean_algebras/bv_ba.h" // Only for IDE resolution, not really needed.
-#include "../parser/bitvector_parser.generated.h"
-
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba-simplification"
 
@@ -93,17 +90,16 @@ tref cvc5_tree_to_tau_tree(bv n) {
 #undef rec
 }
 
-template <typename ... BAs> requires BAsPack<BAs...>
+template<NodeType node>
 tref ba_bv_cvc5_simplification(tref term) {
-	using node_t = node<BAs...>;
-	using tau = tree<node_t>;
+	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	subtree_map<node_t, bv> vars, free_vars;
-	auto bv_term = bv_eval_node<node_t>(tt(term), vars, free_vars);
+	subtree_map<node, bv> vars, free_vars;
+	auto bv_term = bv_eval_node<node>(tt(term), vars, free_vars);
 	if (!bv_term) return term; // Unable to transform to bv
 	auto simplified_bv = normalize(bv_term.value());
-	return cvc5_tree_to_tau_tree<node_t>(simplified_bv);
+	return cvc5_tree_to_tau_tree<node>(simplified_bv);
 }
 
 } // namespace idni::tau_lang

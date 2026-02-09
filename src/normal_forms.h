@@ -364,6 +364,7 @@ tref pnf(tref n);
 
 } // namespace idni::tau_lang
 
+#include "heuristics/ex_subs_based_elimination.h"
 #include "normal_forms.tmpl.h"
 
 #endif // __IDNI__TAU__NORMAL_FORMS_H__
