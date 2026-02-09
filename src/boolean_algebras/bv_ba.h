@@ -295,7 +295,11 @@ size_t get_inv_sym(size_t symbol);
 
 } // namespace idni::tau_lang
 
-#include "heuristics/ba_bv_simplification.h"
+// This is the proper way to include heuristics as the headre mustbe independent
+// of the heuristics themselves and also they could need definitions from the
+// header (as is the case in 'heuristicsbv_ba_simplification.h'. Also, they
+// need to be included before the definitions as they can be used in there.
+#include "heuristics/bv_ba_simplification.h"
 #include "boolean_algebras/bv_ba.tmpl.h"
 #include "boolean_algebras/bv_ba_solver.tmpl.h"
 

@@ -174,7 +174,7 @@ tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded) {
 }
 
 template<typename ... BAs> requires BAsPack<BAs...>
-tref ba_bv_custom_simplification(tref term) {
+tref bv_ba_custom_simplification(tref term) {
 	using node_t = node<BAs...>;
 	using tau = tree<node_t>;
 	using tt = tau::traverser;

@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	ba_bv-solver1
-	ba_bv-solver2
-	ba_bv-simplification
+	bv_ba-solver1
+	bv_ba-solver2
+	bv_ba-simplification
 	ba_constants
 	ba_types
 	ba_types_inference

@@ -30,7 +30,7 @@ TEST_SUITE("ba bv cvc5 simplification") {
 	TEST_CASE("1 + 2") {
 		const char* sample = "{1}:bv[64] + {2}:bv[64]";
 		tref src = parse_bf(sample);
-		tref simplified = ba_bv_cvc5_simplification<node_t>(src);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
 	}
