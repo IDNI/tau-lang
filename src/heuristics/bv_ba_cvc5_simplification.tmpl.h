@@ -97,9 +97,13 @@ tref bv_ba_cvc5_simplification(tref term) {
 
 	subtree_map<node, bv> vars, free_vars;
 	auto bv_term = bv_eval_node<node>(tt(term), vars, free_vars);
+	LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << (bv_term ? bv_term->toString() : "nullopt") << "\n";
 	if (!bv_term) return term; // Unable to transform to bv
 	auto simplified_bv = normalize(bv_term.value());
-	return cvc5_tree_to_tau_tree<node>(simplified_bv);
+	LOG_TRACE << "bv_ba_cvc5_simplification/simplified_bv: " << simplified_bv.toString() << "\n";
+	auto simplified_term = cvc5_tree_to_tau_tree<node>(simplified_bv);
+	LOG_TRACE << "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term).tree_to_str() << "\n";
+	return simplified_term;
 }
 
 } // namespace idni::tau_lang
