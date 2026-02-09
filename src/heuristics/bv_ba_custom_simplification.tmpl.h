@@ -8,9 +8,9 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
-template <typename ...BAs> requires BAsPack<BAs...>
+template<typename node>
 bool is_associative_and_commutative(size_t symbol) {
-	using tau = tree<node<BAs...>>;
+	using tau = tree<node>;
 	switch (symbol) {
 		case tau::bf_add: return true;
 		case tau::bf_sub: return false;
@@ -26,9 +26,9 @@ bool is_associative_and_commutative(size_t symbol) {
 	}
 }
 
-template<typename ... BAs> requires BAsPack<BAs...>
+template<typename node>
 size_t get_inv_sym(size_t symbol) {
-	using tau = tree<node<BAs...>>;
+	using tau = tree<node>;
 	switch (symbol) {
 		case tau::bf_add: return tau::bf_sub;
 		case tau::bf_mul: return tau::bf_div;
@@ -36,9 +36,9 @@ size_t get_inv_sym(size_t symbol) {
 	}
 }
 
-template <typename ...BAs> requires BAsPack<BAs...>
+template<typename node>
 tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded) {
-	using node_t = node<BAs...>;
+	using node_t = node;
 	using tau = tree<node_t>;
 	using tt = tau::traverser;
 
@@ -90,8 +90,8 @@ tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded) {
 		return tau::get(l) < tau::get(r);
 	};
 	auto sym = tau::get(term_tree)[0].get_type();
-	auto inv_sym = get_inv_sym<BAs...>(sym);
-	DBG(assert(is_associative_and_commutative<BAs...>(sym)));
+	auto inv_sym = get_inv_sym<node>(sym);
+	DBG(assert(is_associative_and_commutative<node>(sym)));
 	// Get terms connected by same symbol
 	auto clauses = get_leaves<node_t>(term_tree, sym);
 	// Use associativity and commutativity to sort
@@ -173,10 +173,9 @@ tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded) {
 	return r;
 }
 
-template<typename ... BAs> requires BAsPack<BAs...>
+template<NodeType node>
 tref bv_ba_custom_simplification(tref term) {
-	using node_t = node<BAs...>;
-	using tau = tree<node_t>;
+	using tau = tree<node>;
 	using tt = tau::traverser;
 
 	// TODO: introduce proper symbol for inverse
@@ -210,7 +209,7 @@ tref bv_ba_custom_simplification(tref term) {
 
 	DBG(LOG_TRACE << "base_ba_term_simplificattion/term" << tau::get(term).tree_to_str() << "\n";)
 
-	term = pre_order<node<BAs...>>(term).apply_unique(inv_rename);
+	term = pre_order<node>(term).apply_unique(inv_rename);
 	// Push inverses in with rules
 	// -(X + Y) == -X + -Y and --X == X and
 	// (X * Y)^(-1) == X^(-1) * Y^(-1) and X^(-1)^(-1) = X
@@ -252,24 +251,24 @@ tref bv_ba_custom_simplification(tref term) {
 		}
 		return n;
 	};
-	term = pre_order<node<BAs...>>(term).apply_unique(push_inv_in);
+	term = pre_order<node>(term).apply_unique(push_inv_in);
 
 	DBG(LOG_TRACE << "base_ba_term_simplificattion/push_inv_in" << tau::get(term).tree_to_str() << "\n";)
 
 	// Simplify symbols
-	subtree_unordered_set<node<BAs...>> excluded;
+	subtree_unordered_set<node> excluded;
 	auto simplify = [&excluded](tref n) {
 		if (!tau::get(n).is(tau::bf)) return n;
 		if (excluded.contains(n)) return n;
 		// Get current symbol
 		const tau& c = tau::get(n)[0];
 		// Simplify associative and commutative symbol
-		if (is_associative_and_commutative<BAs...>(c.get_type())) {
-			return canonize_associative_commutative_symbol<BAs...>(n, excluded);
+		if (is_associative_and_commutative<node>(c.get_type())) {
+			return canonize_associative_commutative_symbol<node>(n, excluded);
 		}
 		return n;
 	};
-	term = pre_order<node<BAs...>>(term).apply_unique(simplify);
+	term = pre_order<node>(term).apply_unique(simplify);
 
 	DBG(LOG_TRACE << "base_ba_term_simplificattion/simplify" << tau::get(term).tree_to_str() << "\n";)
 
@@ -298,7 +297,7 @@ tref bv_ba_custom_simplification(tref term) {
 			// Check children for inverses
 			if (is_mult_inv(c.second())) {
 				if (is_mult_inv(c.first())) {
-					const size_t width = get_bv_width<node<BAs...>>(c.get_ba_type_tree());
+					const size_t width = get_bv_width<node>(c.get_ba_type_tree());
 					auto const_1 = tau::build_bf_ba_constant(
 						make_bitvector_value(1, width), c.get_ba_type());
 					return tau::build_bf_div(
@@ -317,7 +316,7 @@ tref bv_ba_custom_simplification(tref term) {
 		}
 		return n;
 	};
-	term = pre_order<node<BAs...>>(term).apply_unique(rename_back);
+	term = pre_order<node>(term).apply_unique(rename_back);
 
 	DBG(LOG_TRACE << "base_ba_term_simplificattion/rename_back" << tau::get(term).tree_to_str() << "\n";)
 
