@@ -175,6 +175,57 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 }
 
 template <NodeType node>
+bool api<node>::is_formula(tref fm) {
+	return tau::get(fm).is(tau::wff);
+}
+
+template <NodeType node>
+bool api<node>::is_formula(htref fm) {
+	return is_formula<node>(fm->get());
+}
+
+template <NodeType node>
+bool api<node>::is_term(tref term) {
+	return tau::get(term).is(tau::bf);
+}
+
+template <NodeType node>
+bool api<node>::is_term(htref term) {
+	return is_term<node>(term->get());
+}
+
+template <NodeType node>
+tref api<node>::normalize_formula(tref fm) {
+	auto maybe_nso_rr = get_nso_rr<node>(fm);
+	if (!maybe_nso_rr || !maybe_nso_rr.value().main
+		|| tau::get(maybe_nso_rr.value().main).is(tau::bf))
+			return nullptr;
+	return normalizer<node>(maybe_nso_rr.value());
+}
+
+template <NodeType node>
+htref api<node>::normalize_formula(htref fm) {
+	return tau::geth(normalizer<node>(fm->get()));
+}
+
+template <NodeType node>
+tref api<node>::normalize_term(tref term) {
+	auto maybe_nso_rr = get_nso_rr<node>(term);
+	if (!maybe_nso_rr) return nullptr;
+	auto& nso_rr = maybe_nso_rr.value();
+	auto& main = nso_rr.main;
+	if (!main || !tau::get(main).is(tau::bf)) return nullptr;
+	if (contains(main.get(), tau::ref))
+		return bf_normalizer_with_rec_relation<node>(nso_rr);
+	return bf_normalizer_without_rec_relation<node>(main.get());
+}
+
+template <NodeType node>
+htref api<node>::normalize_term(htref term) {
+	return tau::geth(normalize_term<node>(term->get()));
+}
+
+template <NodeType node>
 std::optional<std::map<stream_at, std::string>> api<node>::step(
 	interpreter<node>& i)
 {
