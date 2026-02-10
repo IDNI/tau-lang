@@ -25,17 +25,14 @@ tref cvc5_tree_to_tau_tree(bv n) {
 
 	auto get_var = [&](const cvc5::Term& v) -> tref {
 		std::string cvc5_var = v.toString();
-		DBG(LOG_INFO << "get_var/cvc5_var: " << cvc5_var << "\n";)
+		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/cvc5_var: " << cvc5_var << "\n";)
 		// remove leading and trailing spaces `|`
 		if (cvc5_var.front() == '|') cvc5_var.erase(0, 1);
 		if (cvc5_var.back() == '|') cvc5_var.pop_back();
-		// setting parsing options to parse variable as bf
-		typename tau::get_options opts = {
-			.parse = { .start = tau::bf }
-		};
-		// returning parsed variable tree
-		auto result = tau::get(cvc5_var, opts);
-		DBG(LOG_INFO << "cvc5_tree_to_tau_tree/result: " << tau::get(result).tree_to_str() << "\n";)
+		size_t bv_size = v.getSort().getBitVectorSize();
+		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/bv_size: " << bv_size << "\n";)
+		auto result = build_bf_variable<node>(cvc5_var, get_ba_type_id<node>(bv_type<node>(bv_size)));
+		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/result: " << tau::get(result).tree_to_str() << "\n";)
 		return result;
 	};
 
@@ -77,15 +74,14 @@ tref cvc5_tree_to_tau_tree(bv n) {
 		case Kind::BITVECTOR_SUB: return from_collection(n, build_bf_sub<node>);
 		case Kind::BITVECTOR_MULT: return from_collection(n, build_bf_mul<node>);
 		case Kind::BITVECTOR_UDIV: return build_bf_div<node>(rec(n[0]), rec(n[1]));
-		case Kind::BITVECTOR_SMOD: return build_bf_mod<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_UREM: return build_bf_mod<node>(rec(n[0]), rec(n[1]));
 		case Kind::BITVECTOR_SHL: return build_bf_shl<node>(rec(n[0]), rec(n[1]));
 		case Kind::BITVECTOR_LSHR: return build_bf_shr<node>(rec(n[0]), rec(n[1]));
 
 		default:
 			LOG_ERROR << "Unexpected bitvector kind during tree translation: "
 					<< n.getKind() << "\n";
-			DBG(assert(false);)
-			return nullptr;
+		return nullptr;
 	}
 #undef rec
 }
@@ -97,12 +93,16 @@ tref bv_ba_cvc5_simplification(tref term) {
 
 	subtree_map<node, bv> vars, free_vars;
 	auto bv_term = bv_eval_node<node>(tt(term), vars, free_vars);
-	LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << (bv_term ? bv_term->toString() : "nullopt") << "\n";
 	if (!bv_term) return term; // Unable to transform to bv
+	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << bv_term.value().toString() << "\n";)
 	auto simplified_bv = normalize(bv_term.value());
-	LOG_TRACE << "bv_ba_cvc5_simplification/simplified_bv: " << simplified_bv.toString() << "\n";
+	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/simplified_bv: " << simplified_bv.toString() << "\n";)
 	auto simplified_term = cvc5_tree_to_tau_tree<node>(simplified_bv);
-	LOG_TRACE << "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term).tree_to_str() << "\n";
+#ifdef DEBUG
+	if (simplified_term != nullptr)
+		LOG_TRACE << "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term) << "\n"
+			<< "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term).tree_to_str() << "\n";
+#endif // DEBUG
 	return simplified_term;
 }
 

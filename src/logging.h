@@ -78,7 +78,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "sbf_ba",
 	// "tau_ba",
 	"bv_ba",
-	"bv_ba-solver",
+	// "bv_ba-solver",
 	"bv_ba-hooks",
 	"bv_ba-simplification",
 	// "ba_types",
@@ -93,7 +93,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	//"interpreter",
 	// "normal_forms",
 	// "assign_and_reduce",
-	"anti_prenex",
+	// "anti_prenex",
 	// "normalizer",
 	// "nso_rr",
 	// "repl_evaluator",
@@ -109,11 +109,11 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "queries",
 	// "traverser",
 	"testing",
-	"resolver",
-	"inference",
+	// "resolver",
+	// "inference",
 	//"api",
 	//"io_context",
-	"tau_spec",
+	// "tau_spec",
 };
 #else // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS) else
 static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };
