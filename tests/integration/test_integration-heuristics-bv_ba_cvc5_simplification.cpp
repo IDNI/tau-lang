@@ -181,12 +181,32 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 		CHECK( simplified != src);
 	}
 
-	TEST_CASE("multiplication of variable/constant") {
+	TEST_CASE("multiplication of variable/constant (y1)") {
 		const char* sample = "x:bv[8] * {3}:bv[8]";
 		tref src = parse_bf(sample);
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
 		CHECK( simplified != nullptr );
 		CHECK( simplified == src);
+	}
+
+	// When multiplying by a power of two cvc5 simplifies the multiplication
+	// to a concat and an extraction.
+	TEST_CASE("multiplication of variable/constant (y2)") {
+		const char* sample = "x:bv[8] * {2}:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		//  (concat ((_ extract 6 0) x) #b0)
+		CHECK( simplified == nullptr );
+	}
+
+	// When multiplying by a power of two cvc5 simplifies the multiplication
+	// to a concat and an extraction.
+	TEST_CASE("multiplication of variable/constant (y3)") {
+		const char* sample = "x:bv[8] * {4}:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		// (concat ((_ extract 5 0) x) b00)
+		CHECK( simplified == nullptr );
 	}
 
 	TEST_CASE("multiplication of constant/variable") {
