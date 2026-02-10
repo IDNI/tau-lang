@@ -7,18 +7,7 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "testing"
 
-std::vector<std::string> split2(const std::string& str) {
-	std::vector<std::string> result;
-	std::string delimiter = " ";
-	size_t start = 0;
-	size_t pos = 0;
-	while ((pos = str.find(delimiter, start)) != std::string::npos) {
-		result.push_back(str.substr(start, pos - start));
-		start = pos + delimiter.length();
-	}
-	result.push_back(str.substr(start));
-	return result;
-}
+// #define TAU_TEST_MULTILINE_PARSING_BRUTE_FORCE 1
 
 std::vector<std::string> split(const std::string& str, char delimiter) {
 	std::vector<std::string> result;
@@ -222,7 +211,6 @@ TEST_SUITE("specification multiline parsing") {
                 CHECK( ctx.outputs.size() == 1 );
 	}
 
-// #define TAU_TEST_MULTILINE_PARSING_BRUTE_FORCE 1
 #ifdef TAU_TEST_MULTILINE_PARSING_BRUTE_FORCE
 	TEST_CASE_FIXTURE(specification_fixture, "test cases") {
 		size_t start = 0;

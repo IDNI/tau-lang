@@ -9,23 +9,30 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 struct tau_spec {
+	using tau = tree<node>;
+
 	tau_spec();
 	bool parse(const std::string& tau_spec_part);
-	bool eof() const;
+	bool is_eof() const;
 	const std::vector<std::string>& errors() const;
 	tref get();
 	std::optional<rr<node>> get_nso_rr();
 
 private:
-	bool parse_part(size_t part_number);
+	typename tau::get_options get_options() const;
+	bool eof_check(const std::string& error_msg);
+	std::pair<bool, std::string> parse_(
+		const std::string& input,
+		size_t part);
+	bool parse_part(size_t part);
+	bool parse_with_prev_part(size_t part);
 	tref build_parse_tree();
 
 	std::string current_part_{};
 	std::string prev_part_{};
 	std::vector<std::string> parts_{}; // TODO remove this if found unnecessary
 	std::deque<tref> parsed_{};
-	bool eof_ = false;
-	std::string last_eof_msg_{};
+	std::optional<std::string> eof_msg_{};
 	std::vector<std::string> errors_{};
 };
 
