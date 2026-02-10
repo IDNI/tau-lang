@@ -230,18 +230,18 @@ std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	// parse source
 	tau_spec<node> s;
-	s.parse(src);
-	if (s.errors().size()) {
-		for (const auto& error : s.errors()) TAU_LOG_ERROR << error;
+	std::optional<rr<node>> maybe_nso_rr;
+	if (!s.parse(src) || !(maybe_nso_rr = s.get_nso_rr())) {
+		// TODO: pass these errors on so api users can handle them
+		for (const auto& error : s.errors())
+			TAU_LOG_ERROR << "[tau] " << error;
 		return {};
 	}
-	auto nso_rr = s.get_nso_rr();
-	if (!nso_rr) return {};
 	// compute final result
 	return typename node::constant_with_type{
 		std::variant<tau_ba<BAs...>, BAs...>(
-			tau_ba<BAs...>(nso_rr.value().rec_relations,
-				       nso_rr.value().main)),
+			tau_ba<BAs...>(maybe_nso_rr.value().rec_relations,
+				       maybe_nso_rr.value().main)),
 		tau_type<node>() };
 }
 

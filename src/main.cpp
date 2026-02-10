@@ -61,8 +61,7 @@ cli::options tau_options() {
 
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
-int run_tau_spec(string spec_file)
-{
+int run_tau_spec(string spec_file) {
 	string src = "";
 	if (spec_file == "-") {
 		std::ostringstream oss;

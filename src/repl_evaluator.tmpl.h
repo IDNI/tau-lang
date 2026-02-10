@@ -443,8 +443,6 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 
 	std::cout << "solution: {\n";
 	for (auto [var, value]: solution.value()) {
-		DBG(LOG_TRACE << LOG_FM_TREE(var));
-		DBG(LOG_TRACE << LOG_FM_TREE(value));
 		if (auto check = tt(value) | tau::bf_t; check)
 			print_one_case(var);
 		else if (check = tt(value) | tau::bf_f; check)
@@ -821,7 +819,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
-	api<node>::charvar(value);
+	api<node>::charvar(opt.charvar = value);
 	return value;
 }
 
@@ -905,7 +903,7 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 	// Controls how fixpoint information in satisfiability.h should be printed
 	if (!opt.repl_running) use_debug_output_in_sat = true;
 	if (opt.experimental) std::cout << "\n!!! Experimental features "
-		"enabled: new tree API (almost nothing works yet) !!!\n\n";
+		"enabled (expect unstable behavior) !!!\n\n";
 }
 
 template <typename... BAs>
