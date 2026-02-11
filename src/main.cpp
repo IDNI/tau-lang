@@ -141,16 +141,17 @@ int main(int argc, char** argv) {
 		sevstr == "debug" ? boost::log::trivial::debug :
 				boost::log::trivial::info;
 
-	pretty_printer_highlighting = opts["highlighting"].get<bool>();
-	pretty_printer_indenting    = opts["indenting"].get<bool>();
+
+	tau_api::set_highlighting(opts["highlighting"].get<bool>());
+	tau_api::set_indenting(opts["indenting"].get<bool>());
 	bool charvar = opts["charvar"].get<bool>();
 	bool exp = opts["experimental"].get<bool>();
 
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
 							<< files.front();)
-		logging::set_filter(sev);
-		tau_api::charvar(charvar);
+		tau_api::set_severity(sev);
+		tau_api::set_charvar(charvar);
 		return run_tau_spec(files.front());
 	}
 

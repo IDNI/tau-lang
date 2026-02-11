@@ -100,6 +100,7 @@ template <NodeType node>
 std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	if (!r) return {};
 	DBG(LOG_TRACE << "get_nso_rr: " << LOG_FM(r);)
 	const auto& t = tau::get(r).is(tau::start) ? tau::get(r)[0]
 						   : tau::get(r);

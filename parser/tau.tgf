@@ -9,7 +9,7 @@
 start                  => spec.
 
 # start symbol posibilities:
-# spec, spec_multiline, cli (bellow)
+# spec, spec_multiline. cli and start_get_stream_def (bellow)
 spec                   => [ definitions ] _ wff:main _ '.' _.
 definitions            => (_ (rec_relation | input_def | output_def) _ '.')+.
 
@@ -261,6 +261,9 @@ history        => ( "%"
                 | ( "%" :abs_history_sym         history_id) :abs_history.
 
 unreachable => processed.
+
+# starting symbol for parsing
+start_get_stream_def   => input_def | output_def.
 
 # shaping of the parsed tree
 #

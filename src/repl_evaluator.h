@@ -41,6 +41,7 @@
 #define __IDNI__TAU__REPL_EVALUATOR_H__
 
 #include "boolean_algebras/tau_ba.h"
+#include "api.h"
 #include "utility/repl.h"
 
 namespace idni::tau_lang {
@@ -56,6 +57,7 @@ struct repl_evaluator {
 	using history_ref = std::optional<std::pair<history, size_t>>;
 
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
+	using tau_api = api<node>;
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
@@ -143,7 +145,6 @@ private:
 	tref make_cli(const std::string& src);
 
 	// returns if a subtree of a node contains a nonterminal
-	bool contains(const tt& n, typename node::type nt) const;
 	bool update_charvar(bool value);
 
 	// history
@@ -162,12 +163,8 @@ private:
 									const;
 	tref get_bf(tref n, bool suppress_error = false) const;
 	tref get_wff(tref n) const;
-
-	// get nso rr from a provided spec or formula and add definitions to it
-	std::optional<rr<node>> get_nso_rr_with_defs(const tt& spec);
-
-	// apply definitions and rrs to a provided spec or formula
-	tref apply_rr_to_nso_rr_with_defs(const tt& spec);
+	// get argument from input or from history (dont care the type)
+	tref get_any(tref arg) const;
 
 	std::vector<history> H;
 	options opt{};
