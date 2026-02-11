@@ -1,6 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#include "api.h"
 #include "repl_evaluator.h"
 
 #undef LOG_CHANNEL_NAME
@@ -87,52 +86,7 @@ void repl_evaluator<BAs...>::print_history(const htref& mem, const size_t id,
 		std::cout << TC.CLEAR();
 	}
 	std::cout << ": ";
-	tau::get(mem).print(std::cout) << "\n";
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::optional<rr<node<tau_ba<BAs...>, BAs...>>>
-	repl_evaluator<BAs...>::get_nso_rr_with_defs(const tt& spec)
-{
-	rr<node> nso_rr{ nullptr };
-	auto check = get_type_and_arg(spec);
-	if (!check) return {};
-	auto [type, value] = check.value();
-	auto& defs = definitions<node>::instance();
-	io_context<node>& ctx = *defs.get_io_context();
-	if (contains(value, tau::ref)) {
-		if (type == tau::spec) {
-			if (auto x = get_nso_rr<node>(ctx, value); x)
-				nso_rr = x.value();
-			else return {};
-		} else nso_rr = rr<node>(tau::geth(
-				resolve_io_vars<node>(ctx, value)));
-		auto definitions = defs.get_sym_defs();
-		nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
-			definitions.begin(), definitions.end());
-		if (auto [infr, n_global_scope] = infer_ba_types<node>(
-			build_spec<node>(nso_rr), defs.get_global_scope(),
-			defs.get_definition_heads()); infr)
-		{
-			ctx.update_types(n_global_scope);
-			defs.set_global_scope(n_global_scope);
-			if (auto term = tt(infr) | tau::main | tau::bf; term)
-				return rr<node>(tau::geth(term | tt::ref));
-			if (auto infr_rr = get_nso_rr<node>(ctx, infr);	infr_rr)
-				return infr_rr.value();
-			else return {};
-		} else return {};
-	} else return rr<node>(tau::geth(resolve_io_vars<node>(ctx, value)));
-	return {};
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::apply_rr_to_nso_rr_with_defs(const tt& spec) {
-	auto nso_rr = get_nso_rr_with_defs(spec);
-	if (!nso_rr) return {};
-	return apply_rr_to_formula<node>(nso_rr.value());
+	tau_api::print(std::cout, mem) << "\n";
 }
 
 template <typename... BAs>
@@ -202,14 +156,10 @@ tref repl_evaluator<BAs...>::get_wff(tref n) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool repl_evaluator<BAs...>::contains(const tt& n, typename node::type nt) const {
-	bool found = false;
-	const auto searcher = [&nt, &found](tref n) -> bool {
-		if (tau::get(n).get_type() == nt) return found = true, false;
-		return true;
-	};
-	pre_order<node>(n.value()).search(searcher);
-	return found;
+tref repl_evaluator<BAs...>::get_any(tref arg) const {
+	if (auto check = get_type_and_arg(arg); check)
+		return check.value().second;
+	return nullptr;
 }
 
 template <typename... BAs>
@@ -234,39 +184,25 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 	tref arg = n[1].get();
 	tref var = n[2].get();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (applied) return onf<node>(var, applied);
+	if (auto value = get_any(arg); value)
+		if (tref applied = tau_api::apply_all_defs(value); applied)
+			return onf<node>(var, applied);
 	return nullptr;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
-	tref arg = n[1].get();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (applied) {
-		switch (tau::get(applied).get_type()) {
-		case tau::bf:  return reduce<node>(to_dnf<node, false>(applied));
-		case tau::wff: return reduce<node>(to_dnf<node>(applied));
-		default: return invalid_argument();
-		}
-	}
+	if (auto value = get_any(n[1].get()); value)
+		return tau_api::dnf(value);
 	return nullptr;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
-	tref arg = n[1].get();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (applied) {
-		switch (tau::get(applied).get_type()) {
-		case tau::wff: return reduce<node, true>(to_cnf<node>(applied));
-		case tau::bf:  return reduce<node, true>(to_cnf<node, false>(
-					applied));
-		default: return invalid_argument();
-		}
-	}
+	if (auto value = get_any(n[1].get()); value)
+		return tau_api::cnf(value);
 	return nullptr;
 }
 
@@ -274,34 +210,27 @@ tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::nnf_cmd(const tt& n) {
-	tref arg = n[1].get();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (applied) {
-		switch (tau::get(applied).get_type()) {
-		case tau::wff: return to_nnf<node>(applied);
-		case tau::bf:  return push_negation_in<node, false>(applied);
-		default: return invalid_argument();
-		}
-	}
+	if (auto value = get_any(n[1].get()); value)
+		return tau_api::nnf(value);
 	return nullptr;
 }
-
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	tref arg = n[1].get();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (applied) {
-		switch (tau::get(applied).get_type()) {
-		case tau::wff: return unequal_to_not_equal<node>(
+	auto wff_mnf = [](tref applied) {
+		return unequal_to_not_equal<node>(
 			reduce<node>(to_dnf<node>(
-				bf_reduce_canonical<node>()(applied)
-				)));
-		case tau::bf:  return bf_reduced_dnf<node>(applied);
-		default: return invalid_argument();
-		}
-	}
+				bf_reduce_canonical<node>()(applied))));
+	};
+	if (auto value = get_any(arg); value)
+		if (tref applied = tau_api::apply_all_defs(value); applied)
+			switch (tau::get(applied).get_type()) {
+			case tau::wff: return wff_mnf(applied);
+			case tau::bf:  return bf_reduced_dnf<node>(applied);
+			default: return invalid_argument();
+			}
 	return nullptr;
 }
 
@@ -333,7 +262,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
-	return tau::get(in).substitute(thiz, with);
+	return tau_api::substitute(in, thiz, with);
 }
 
 template <typename... BAs>
@@ -353,38 +282,33 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	tref arg = n[1].get();
-	auto opt_nso_rr = get_nso_rr_with_defs(arg);
-	if (!opt_nso_rr || !opt_nso_rr.value().main) return invalid_argument();
-	rr<node> nso_rr = opt_nso_rr.value();
-	const auto& main = tau::get(nso_rr.main);
-	bool contains_ref = contains(main.get(), tau::ref);
-	if (!main.is(tau::bf)) return normalizer<node>(nso_rr);
-	else if (contains_ref) return bf_normalizer_with_rec_relation<node>(nso_rr);
-	return bf_normalizer_without_rec_relation<node>(main.get());
+	auto check = get_type_and_arg(arg);
+	if (!check) return nullptr;
+	auto [type, value] = check.value();
+	switch (type) {
+		case tau::wff: return tau_api::normalize_formula(value);
+		case tau::bf:  return tau_api::normalize_term(value);
+		default: return nullptr;
+	}
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
-	tref arg = n[1].get();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (applied) {
-		applied = anti_prenex<node>(applied);
-		return resolve_quantifiers<node>(applied);
-	}
-	return invalid_argument();
+	if (auto value = get_any(n[1].get()); value)
+		return tau_api::eliminate_quantifiers(value);
+	return nullptr;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
-	tref arg = n[1].get();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (!applied) {
-		invalid_argument();
-		return;
-	}
+	tref value = get_any(n[1].get());
+	if (!value) return;
+
+	tref applied = tau_api::apply_all_defs(value);
+	if (!applied) return;
 
 	DBG(TAU_LOG_DEBUG << "run_cmd/applied: " << TAU_LOG_FM(applied);)
 
@@ -457,35 +381,14 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	// setting solver options
-	solver_options options = {
-		.splitter_one = node::nso_factory::
-			splitter_one(tau_type<node>()),
-		.mode = get_solver_cmd_mode<node>(n.value()),
-	};
-
 	tref arg = n.value_tree().first();
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	if (!applied) {
-		TAU_LOG_ERROR << "Invalid argument(s)\n";
-		return;
-	}
-	// Reject formula involving temporal quantification
-	if (tau::get(applied).find_top(is_temporal_quantifier<node>)) {
-		TAU_LOG_ERROR << "Found temporal quantifier in formula: " << TAU_TO_STR(applied);
-		return;
-	}
-
-	DBG(TAU_LOG_TRACE << "solve_cmd/applied: " << applied << "\n";)
-
-	size_t type = get_solver_cmd_type<node>(applied);
-	bool solve_error = false;
-	auto solution = solve<node>(applied, options, solve_error);
-	if (solve_error) {
-		TAU_LOG_ERROR << "Internal error in solver\n";
-		return;
-	}
+	auto check = get_type_and_arg(arg);
+	if (!check) return;
+	auto [type, value] = check.value();
+	auto solution = tau_api::solve(value,
+		get_solver_cmd_mode<node>(n.value()));
 	if (!solution) { std::cout << "no solution\n"; return; }
 
 	print_solver_cmd_solution<node>(solution, type);
@@ -495,34 +398,20 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	// getting the type
-	size_t type = get_solver_cmd_type<node>(n.value());
-	if (type == 0) {
-		TAU_LOG_ERROR << "Invalid type\n";
-		return;
-	}
+	// TODO compare get_type_and_arg with get_solver_cmd_type
+	// size_t type = get_solver_cmd_type<node>(n.value());
+	// if (type == 0) {
+	// 	TAU_LOG_ERROR << "Invalid type\n";
+	// 	return;
+	// }
 
 	tref arg = n.value_tree().first();
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
-	tref applied = apply_rr_to_nso_rr_with_defs(arg);
-	applied = norm_all_equations<node>(applied);
-	applied = apply_all_xor_def<node>(applied);
-	tref equality = tt(applied) | tau::bf_eq | tt::ref;
-	if (!applied || !equality) {
-		TAU_LOG_ERROR << "Invalid argument(s)\n";
-		return;
-	}
-	// Exclude non-Boolean operations from equation
-	if (tau::get(applied)[0].find_top(is_non_boolean_term<node>) ||
-		tau::get(applied)[1].find_top(is_non_boolean_term<node>)) {
-		TAU_LOG_ERROR << "Found non-Boolean operation in equation\n";
-		return;
-	}
-
-	DBG(TAU_LOG_TRACE << "lgrs_cmd/applied: " << TAU_LOG_FM(applied) << "\n";)
-	DBG(TAU_LOG_TRACE << "lgrs_cmd/equality: " << TAU_LOG_FM(equality) << "\n";)
-
-	auto solution = lgrs<node>(applied);
+	auto check = get_type_and_arg(arg);
+	if (!check) return;
+	auto [type, value] = check.value();
+	auto solution = tau_api::lgrs(arg);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
 	print_solver_cmd_solution<node>(solution, type);
@@ -531,39 +420,31 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
-	tref arg = n[1].get();
-	auto opt_nso_rr = get_nso_rr_with_defs(arg);
-	if (!opt_nso_rr || !opt_nso_rr.value().main) return invalid_argument();
-	rr<node> nso_rr = opt_nso_rr.value();
-	const auto& main = tau::get(nso_rr.main);
-	if (main.is(tau::bf)) return invalid_argument();
-	tref normalized = normalizer<node>(nso_rr);
-	return is_tau_impl<node>(tau::_T(), normalized) ? tau::_T() : tau::_F();
+	if (tref value = get_any(n[1].get()); value)
+		return tau_api::valid(value) ? tau::_T() : tau::_F();
+	return nullptr;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
-	tref arg = n[1].get();
-	auto opt_nso_rr = get_nso_rr_with_defs(arg);
-	if (!opt_nso_rr || !opt_nso_rr.value().main) return invalid_argument();
-	rr<node> nso_rr = opt_nso_rr.value();
-	const auto& main = tau::get(nso_rr.main);
-	if (main.is(tau::bf)) return invalid_argument();
-	tref normalized = normalizer<node>(nso_rr);
-	return is_tau_formula_sat<node>(normalized, 0, true)
-		? tau::_T()	: tau::_F();
+	if (tref value = get_any(n[1].get()); value)
+		return tau_api::sat(value) ? tau::_T() : tau::_F();
+	return nullptr;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
-	return tau::get(sat_cmd(n)).equals_F() ? tau::_T() : tau::_F();
+	if (tref value = get_any(n[1].get()); value)
+		return tau_api::unsat(value) ? tau::_T() : tau::_F();
+	return nullptr;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
+	// TODO this should be stored anytime rec rel is parsed ?
 	auto& defs = definitions<node>::instance();
 	size_t idx = defs.add(tau::geth(n[0][0]), tau::geth(n[0][1]));
 	std::cout << "[" << idx + 1 << "] " << to_str<node>(defs[idx]) << "\n";
@@ -819,7 +700,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
-	api<node>::charvar(opt.charvar = value);
+	api<node>::set_charvar(opt.charvar = value);
 	return value;
 }
 
