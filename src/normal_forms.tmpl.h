@@ -2506,6 +2506,10 @@ auto atm_formula_order_for_simplification = [](tref l, tref r) static {
 template<NodeType node>
 auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
 	auto comp = [&quant_pattern](tref l, tref r) {
+		// Assignments to variables
+		const bool is_assignment_l = is_equational_assignment<node>(l);
+		const bool is_assignment_r = is_equational_assignment<node>(r);
+
 		const trefs& free_vars_l = get_free_vars<node>(l);
 		int_t min_l = 0, max_l = 0;
 		bool is_min_init = false;
@@ -2538,6 +2542,9 @@ auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
 		}
 		if (max_l > max_r) return true;
 		if (max_r > max_l) return false;
+		// Order assignments to front
+		if (is_assignment_l && !is_assignment_r) return true;
+		if (!is_assignment_l && is_assignment_r) return false;
 		if (min_l > min_r) return true;
 		if (min_r > min_l) return false;
 		if (free_vars_l < free_vars_r) return true;
@@ -3592,6 +3599,14 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 			default: return false;
 		}
 	};
+	// Get quantified variable and scoped formula
+	tref var = tau::get(tau::bf, tau::trim2(ex_quant_fm));
+	tref fm = tau::get(ex_quant_fm)[0].second();
+	if (auto eliminated = ex_subs_based_elimination<node>(tau::trim(var), fm); eliminated != fm) {
+		DBG(LOG_TRACE << "ex_quantified_boole_decomposition/eliminated: " <<
+			LOG_FM(eliminated) << "\n";)
+		return eliminated;
+	}
 
 	// Get atomic formulas from pool
 	auto it = pool.find(ex_quant_fm);
@@ -3610,8 +3625,7 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	tref atm = *std::ranges::min_element(atms,
 		atm_formula_order_for_quant_elim<node>(quant_pattern));
 	auto atm_type = tau::get(atm)[0].value.nt;
-	// Get quantified variable
-	tref var = tau::get(tau::bf, tau::trim2(ex_quant_fm));
+
 	// Try syntactic simplifications
 	if (atm_type == tau::bf_eq || atm_type == tau::bf_neq) {
 	tref func = tau::trim2(norm_equation<node>(atm));
@@ -3631,7 +3645,6 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	}
 	// Check does not dependent on var
 	else if (tau::get(func_v_0) == tau::get(func_v_1) && !contains<node>(func_v_0, var)) {
-		tref fm = tau::get(ex_quant_fm)[0].second();
 		tref l = rewriter::replace<node>(fm, atm, tau::_T());
 		l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
 		tref r = rewriter::replace<node>(fm, atm, tau::_F());
@@ -3646,7 +3659,6 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	// Check has a unique zero
 	func_v_1 = push_negation_in<node, false>(tau::build_bf_neg(func_v_1));
 	if (tau::get(func_v_0) == tau::get(func_v_1) && !contains<node>(func_v_0, var)) {
-		tref fm = tau::get(ex_quant_fm)[0].second();
 		tref l = rewriter::replace<node>(fm, atm, tau::_T());
 		l = rewriter::replace<node>(l, var, func_v_0);
 		l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
@@ -3671,7 +3683,6 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	}
 	}
 	// No simplification applied, build Boole decomposition
-	tref fm = tau::get(ex_quant_fm)[0].second();
 	tref l = rewriter::replace<node>(fm, atm, tau::_T());
 	l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
 	tref r = rewriter::replace<node>(fm, atm, tau::_F());
@@ -3735,12 +3746,10 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 			tau::build_wff_ex(var, scoped_fm, false), new_fm);
 	}
 
-	// TODO (HIGH) maybe we also need to call substitution based quantifier elimination
-	// somewhere else, check later
 	DBG(LOG_TRACE << "treat_ex_quantified_clause/scoped_fm: " << LOG_FM(scoped_fm) << "\n";)
 	if (auto eliminated = ex_subs_based_elimination<node>(var, scoped_fm); eliminated != scoped_fm) {
 		DBG(LOG_TRACE << "treat_ex_quantified_clause/eliminated: " << LOG_FM(eliminated) << "\n";)
-		return eliminated;
+		return tau::build_wff_and(eliminated, new_fm);
 	}
 
 	// Check that quantified variable appears
