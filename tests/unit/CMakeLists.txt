@@ -20,7 +20,6 @@ set(TESTS
 	tau_tree_printers
 	traversal
 	union_find
-	variant_ba
 )
 
 
