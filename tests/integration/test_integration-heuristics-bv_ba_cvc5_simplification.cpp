@@ -412,3 +412,10 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 TEST_SUITE("ba bv cvc5 power of 2/variable simplification") {
 
 }
+
+TEST_SUITE("Cleanup") {
+
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}
