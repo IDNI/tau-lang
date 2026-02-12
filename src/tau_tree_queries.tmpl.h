@@ -267,7 +267,7 @@ bool has_fallback (tref n) {
 template<NodeType node>
 bool is_equational_assignment(tref eq) {
 	using tau = tree<node>;
-	DBG(assert(tau::get(eq).child_is(tau::bf_eq)));
+	if (!tau::get(eq).child_is(tau::bf_eq)) return false;
 	const tau& t = tau::get(eq)[0];
 	if (t[0].child_is(tau::variable)) return true;
 	if (t[1].child_is(tau::variable)) return true;
