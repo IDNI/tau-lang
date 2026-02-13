@@ -123,10 +123,10 @@ bool interpreter<node>::serialize_constant(std::stringstream& ss,
 	if (!value) {
 		// is bf_t
 		if (auto check = tt(constant) | tau::bf_t; check)
-			ss << node::nso_factory::one(get_ba_type_tree<node>(type));
+			ss << node::ba::one(get_ba_type_tree<node>(type));
 		// is bf_f
 		else if (auto check = tt(constant) | tau::bf_f; check)
-			ss << node::nso_factory::zero(get_ba_type_tree<node>(type));
+			ss << node::ba::zero(get_ba_type_tree<node>(type));
 		// is something else but not a BA element
 		else return false;
 	} else ss << (value | tt::ba_constant);
@@ -431,7 +431,7 @@ std::pair<std::optional<assignment<node>>, bool>
 		tref current_this_stream = build_in_var_at_n<node>(
 			"this", time_point, get_ba_type_id<node>(tau_type<node>()));
 		tref wrapped_spec = build_bf_ba_constant<node>(
-			node::nso_factory::pack_tau_ba(unsqueeze_always(
+			node::ba::pack_tau_ba(unsqueeze_always(
 				tau::build_wff_and(original_spec | std::views::keys))),
 				get_ba_type_id<node>(tau_type<node>()));
 		memory[current_this_stream] = wrapped_spec;
@@ -707,7 +707,7 @@ tref interpreter<node>::get_executable_spec(
 	if (!tau::get(constraints).equals_T()) {
 		// setting proper options for the solver
 		solver_options options = {
-			.splitter_one = node::nso_factory::splitter_one(
+			.splitter_one = node::ba::splitter_one(
 				tau_type<node>()),
 			.mode = solver_mode::general
 		};
@@ -1005,7 +1005,7 @@ std::optional<assignment<node>> interpreter<node>::solution_with_max_update(
 		// DBG(LOG_TRACE << "get_solution/fm: " << LOG_FM_DUMP(fm) << "\n";)
 		// setting proper options for the solver
 		solver_options options = {
-			.splitter_one = node::nso_factory::splitter_one(tau_type<node>()),
+			.splitter_one = node::ba::splitter_one(tau_type<node>()),
 			.mode = solver_mode::general
 		};
 		// solve the given system of equations
@@ -1118,7 +1118,7 @@ tref unpack_tau_constant(tref constant) {
 	using tau = tree<node>;
 	const auto& c = tree<node>::get(tau::trim(constant));
 	if (!c.is_ba_constant()) return {};
-	tref main = node::nso_factory::unpack_tau_ba(c.get_ba_constant());
+	tref main = node::ba::unpack_tau_ba(c.get_ba_constant());
 	return main;
 }
 
