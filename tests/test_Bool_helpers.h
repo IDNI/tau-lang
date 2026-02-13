@@ -18,8 +18,12 @@ inline tref base_ba_symbol_simplification(tref symbol, const Bool&) {
 	return symbol;
 }
 
+inline tref base_ba_term_simplification(tref term, const Bool&) {
+	return term;
+}
+
 template<>
-struct nso_factory<bv, Bool> {
+struct nso_factory<bv, Bool> : public base_ba_variants<bv, Bool> {
 
 	static std::vector<std::string> types() { return { "bool" }; }
 
@@ -42,7 +46,7 @@ struct nso_factory<bv, Bool> {
 };
 
 template<>
-struct nso_factory<bv, sbf_ba, Bool> {
+struct nso_factory<bv, sbf_ba, Bool> : public base_ba_variants<bv, sbf_ba, Bool> {
 
 	static std::vector<std::string> types() { return { "bool" }; }
 

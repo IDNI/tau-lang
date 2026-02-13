@@ -33,19 +33,19 @@ bool Bool::is_one() const {
 	return b;
 }
 
-Bool normalize(const Bool &b) {
+Bool ba_normalize(const Bool &b) {
 	return b;
 }
 
-bool is_syntactic_one(const Bool& b) {
+bool is_ba_syntactic_one(const Bool& b) {
 	return b.is_one();
 }
 
-bool is_syntactic_zero(const Bool& b) {
+bool is_ba_syntactic_zero(const Bool& b) {
 	return b.is_zero();
 }
 
-bool is_closed(const Bool&) {
+bool is_ba_closed(const Bool&) {
 	return true;
 }
 

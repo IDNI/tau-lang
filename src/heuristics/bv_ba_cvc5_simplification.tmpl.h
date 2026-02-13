@@ -95,7 +95,7 @@ tref bv_ba_cvc5_simplification(tref term) {
 	auto bv_term = bv_eval_node<node>(tt(term), vars, free_vars);
 	if (!bv_term) return term; // Unable to transform to bv
 	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << bv_term.value().toString() << "\n";)
-	auto simplified_bv = normalize(bv_term.value());
+	auto simplified_bv = ba_normalize(bv_term.value());
 	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/simplified_bv: " << simplified_bv.toString() << "\n";)
 	auto simplified_term = cvc5_tree_to_tau_tree<node>(simplified_bv);
 #ifdef DEBUG

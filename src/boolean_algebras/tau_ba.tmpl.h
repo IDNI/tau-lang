@@ -156,7 +156,7 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...> normalize(const tau_ba<BAs...>& fm) {
+tau_ba<BAs...> ba_normalize(const tau_ba<BAs...>& fm) {
 	tref result =
 		apply_rr_to_formula<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
 	result = simp_tau_unsat_valid<node<tau_ba<BAs...>, BAs...>>(result);
@@ -165,13 +165,13 @@ tau_ba<BAs...> normalize(const tau_ba<BAs...>& fm) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_syntactic_one(const tau_ba<BAs...>& fm) {
+bool is_ba_syntactic_one(const tau_ba<BAs...>& fm) {
 	return tree<node<tau_ba<BAs...>, BAs...>>::get(fm.nso_rr.main).equals_T();
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_syntactic_zero(const tau_ba<BAs...>& fm) {
+bool is_ba_syntactic_zero(const tau_ba<BAs...>& fm) {
 	return tree<node<tau_ba<BAs...>, BAs...>>::get(fm.nso_rr.main).equals_F();
 }
 
@@ -191,7 +191,7 @@ tau_ba<BAs...> tau_splitter_one() {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_closed(const tau_ba<BAs...>& fm) {
+bool is_ba_closed(const tau_ba<BAs...>& fm) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
 	tref simp_fm = apply_rr_to_formula<node>(fm.nso_rr);
@@ -211,14 +211,14 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 }
 
 template<typename ... BAs> requires BAsPack<BAs...>
-tref base_ba_symbol_simplification(tref symbol, const auto&) {
+tref base_ba_symbol_simplification(tref symbol, const tau_ba<BAs...>&) {
 	// All symbols for the tau base Boolean algebra are
 	// simplified in general procedure
 	return symbol;
 }
 
 template<typename ... BAs> requires BAsPack<BAs...>
-tref base_ba_term_simplification(tref term, const auto&) {
+tref base_ba_term_simplification(tref term, const tau_ba<BAs...>&) {
 	return term;
 }
 

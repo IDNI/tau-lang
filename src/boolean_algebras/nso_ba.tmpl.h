@@ -158,14 +158,15 @@ const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& lt,
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_zero(const tree<node<BAs...>>& lt) {
-	using tau = tree<node<BAs...>>;
+	using node = node<BAs...>;
+	using tau = tree<node>;
 
 	// trivial cases
 	if (lt.equals_0()) return true;
 	if (lt.equals_1()) return false;
 
 	// more elaborate cases
-	if (lt[0].is_ba_constant()) return is_zero(lt[0].get_ba_constant());
+	if (lt[0].is_ba_constant()) return node::nso_factory::is_zero(lt[0].get_ba_constant());
 	if (lt.is(tau::bf))  return lt.equals_0();
 	if (lt.is(tau::wff)) return lt.equals_F();
 	DBG(throw std::logic_error("nso_ba is_zero: wrong types");)
@@ -175,14 +176,15 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_one(const tree<node<BAs...>>& lt) {
-	using tau = tree<node<BAs...>>;
+	using node = node<BAs...>;
+	using tau = tree<node>;
 
 	// trivial cases
 	if (lt.equals_0()) return false;
 	if (lt.equals_1()) return true;
 
 	// more elaborate cases
-	if (lt[0].is_ba_constant()) return is_one(lt[0].get_ba_constant());
+	if (lt[0].is_ba_constant()) return node::nso_factory::is_one(lt[0].get_ba_constant());
 	if (lt.is(tau::bf))  return lt.equals_1();
 	if (lt.is(tau::wff)) return lt.equals_T();
 	DBG(throw std::logic_error("nso_ba is_one: wrong types");)

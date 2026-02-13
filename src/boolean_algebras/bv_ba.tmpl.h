@@ -76,10 +76,10 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 bool operator==(const Term& lhs, const bool& rhs) {
 	if (rhs) {
 		// Check if lhs equals 1
-		return normalize(lhs) == make_bitvector_top_elem(lhs.getSort().getBitVectorSize());
+		return ba_normalize(lhs) == make_bitvector_top_elem(lhs.getSort().getBitVectorSize());
 	} else {
 		// Check if rhs equals 0
-		return normalize(lhs) == make_bitvector_bottom_elem(lhs.getSort().getBitVectorSize());
+		return ba_normalize(lhs) == make_bitvector_bottom_elem(lhs.getSort().getBitVectorSize());
 	}
 }
 
