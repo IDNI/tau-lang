@@ -115,33 +115,30 @@ tref postorder(tref var, tref ex_clause) {
 	return subs.contains(ex_clause)	? subs[ex_clause] : nullptr;
 }
 
-
 template <NodeType node>
 tref preorder(tref var, tref ex_clause) {
 	using tau = tree<node>;
-
 	tref found = nullptr;
 
-	auto visit = [&](tref n) -> bool {
+	auto visit = [&](tref n) {
 		if (is<node>(n, tau::bf_eq)) {
-			auto t = tau::get(n);
-			auto left = t[0][0].get();
-			auto right = t[1][0].get();
-			if (left == var) found = right;
-			else if (right == var) found = left;
-			return false;
+			const tau& t = tau::get(n);
+			tref left = t[0][0].get();
+			tref right = t[1][0].get();
+			if (tau::get(left) == tau::get(var)) found = right;
+			else if (tau::get(right) == tau::get(var)) found = left;
 		}
-		return true;
 	};
 
 	// We visit the formula until reaching atomic formulas (eq)
 	auto visit_subtree = [&](tref n) -> bool {
+		if (found) return false;
 		return is<node>(n, tau::wff) || is<node>(n, tau::wff_and) || is<node>(n, tau::bf_eq);
 	};
 
 	auto up = [&](tref) -> void { return; };
 
-	pre_order<node>(ex_clause).search_unique(visit, visit_subtree, up);
+	pre_order<node>(ex_clause).visit_unique(visit, visit_subtree, up);
 	return found;
 }
 
