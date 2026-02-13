@@ -1151,7 +1151,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 					}
 				} else skip = true; // if we cannot solve bv part, skip this clause
 			} else {
-				op.splitter_one = node::nso_factory::splitter_one(type_tree);
+				op.splitter_one = node::ba::splitter_one(type_tree);
 				if (auto solution = solve<node>(conjs, op)) {
 					for (const auto& [var, value]: solution.value()) {
 						clause_solution[var] = value;

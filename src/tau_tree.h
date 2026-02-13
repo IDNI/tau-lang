@@ -29,7 +29,7 @@ concept NodeType = requires { // Node Type has to provide
 	typename node::type;
 	// type aliases for the packed variant types
 	typename node::constant;
-	typename node::nso_factory;
+	typename node::ba;
 	// nt is convertible to size_t
 	{ std::declval<node>().nt } -> std::convertible_to<size_t>;
 	// term is convertible to bool
@@ -74,7 +74,7 @@ struct node {
 	using constant = std::variant<BAs...>;
 	using constant_with_type = std::pair<constant, tref>;
 	// alias for nso_factory<BAs...>
-	using nso_factory = tau_lang::nso_factory<BAs...>;
+	using ba = tau_lang::nso_factory<BAs...>;
 
 	using T = size_t; // just to simplify changes or templating it later
 

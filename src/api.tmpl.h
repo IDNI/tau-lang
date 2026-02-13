@@ -385,7 +385,7 @@ std::optional<subtree_map<node, tref>> api<node>::solve(
 	DBG(TAU_LOG_TRACE << "solve: " << LOG_FM(fm);)
 	// setting solver options
 	solver_options options = {
-		.splitter_one = node::nso_factory::
+		.splitter_one = node::ba::
 			splitter_one(tau_type<node>()),
 		.mode = mode
 	};

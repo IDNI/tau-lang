@@ -634,7 +634,7 @@ TEST_SUITE("solve") {
 
 	bool test_solve_min(const std::string system, const tref type = tau_type<node_t>()) {
 		solver_options options = {
-			.splitter_one = node_t::nso_factory::splitter_one(type),
+			.splitter_one = node_t::ba::splitter_one(type),
 			.mode = solver_mode::minimum
 		};
 		return test_solve(system, options);
@@ -642,7 +642,7 @@ TEST_SUITE("solve") {
 
 	bool test_solve_max(const std::string system, const tref type = tau_type<node_t>()) {
 		solver_options options = {
-			.splitter_one = node_t::nso_factory::splitter_one(type),
+			.splitter_one = node_t::ba::splitter_one(type),
 			.mode = solver_mode::maximum
 		};
 		return test_solve(system, options);
@@ -650,7 +650,7 @@ TEST_SUITE("solve") {
 
 	bool test_solve(const std::string system, const tref type = tau_type<node_t>()) {
 		solver_options options = {
-			.splitter_one = node_t::nso_factory::splitter_one(type),
+			.splitter_one = node_t::ba::splitter_one(type),
 			.mode = solver_mode::general
 		};
 		return test_solve(system, options);

@@ -686,7 +686,7 @@ bool has_open_tau_fm_in_constant(tref fm) {
 		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
 		// Special case if the ba_constant is not converted to constant yet
 		if (tau::get(ba_const).get_ba_constant_id() == 0) return false;
-		if (!node::nso_factory::is_closed(tt(ba_const) | tt::ba_constant)) {
+		if (!node::ba::is_closed(tt(ba_const) | tt::ba_constant)) {
 			LOG_ERROR << "A Tau formula constant must be closed: "
 							<< TAU_TO_STR(ba_const);
 			return true;

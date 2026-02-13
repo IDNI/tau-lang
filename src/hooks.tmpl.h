@@ -199,9 +199,9 @@ tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	// Term is currently untyped
 	if (v.ba_type == 0) return tau::get_raw(v, ch, len, r);
 	// Simplifications for bitvector symbols
-	return node::nso_factory::simplify_symbol(
+	return node::ba::simplify_symbol(
 		tau::get_raw(v, ch, len, r),
-		node::nso_factory::to_base_ba_type(
+		node::ba::to_base_ba_type(
 			get_ba_type_tree<node>(v.ba_type)));
 }
 
@@ -477,12 +477,12 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 		const auto& l = tau::get(ch[0]);
 		if (size_t typed = l.get_ba_type(); typed > 0) {
 			HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
-			if (node::nso_factory::is_syntactic_zero(l.get_ba_constant())) {
+			if (node::ba::is_syntactic_zero(l.get_ba_constant())) {
 				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
 				HOOK_LOGGING(applied("is_syntactic_zero");)
 				return tau::get(tau::get(tau::bf, tau::get_raw(
 						node::ba_typed(tau::bf_f, typed))), right);
-			} else if (node::nso_factory::is_syntactic_one(l.get_ba_constant())) {
+			} else if (node::ba::is_syntactic_one(l.get_ba_constant())) {
 				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
 				HOOK_LOGGING(applied("is_syntactic_one");)
 				return tau::get(tau::get(tau::bf, tau::get_raw(

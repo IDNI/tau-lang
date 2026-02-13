@@ -337,7 +337,7 @@ size_t get_solver_cmd_type(tref n) {
 	size_t type = find_ba_type<node>(n);
 	return type > 0 ? type
 		: get_ba_type_id<node>(
-			node::nso_factory::default_type());
+			node::ba::default_type());
 }
 
 template <NodeType node>
@@ -348,13 +348,13 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	using tt = tau::traverser;
 	auto print_zero_case = [&type_id](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory::zero(get_ba_type_tree<node>(type_id))
+			<< node::ba::zero(get_ba_type_tree<node>(type_id))
 			<< "}:" << ba_types<node>::name(type_id) << "\n";
 	};
 
 	auto print_one_case = [&type_id](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory::one(get_ba_type_tree<node>(type_id))
+			<< node::ba::one(get_ba_type_tree<node>(type_id))
 			<< "}:" << ba_types<node>::name(type_id) << "\n";
 	};
 
