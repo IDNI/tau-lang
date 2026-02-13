@@ -219,23 +219,23 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
 
-inline bool is_closed(const cvc5::Term&) { return true; }
+inline bool is_ba_closed(const cvc5::Term&) { return true; }
 
-inline cvc5::Term normalize(const cvc5::Term& fm) {
+inline cvc5::Term ba_normalize(const cvc5::Term& fm) {
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);
 	// Use general simplification procedure
 	return solver.simplify(fm);
 }
 
-inline bool is_syntactic_zero(const cvc5::Term& fm) {
+inline bool is_ba_syntactic_zero(const cvc5::Term& fm) {
 	// Check if represented bitvector is just bottom element in Boolean algebra
 	if (!fm.isBitVectorValue()) return false;
 	return fm.getBitVectorValue(2) ==
 		std::string(fm.getSort().getBitVectorSize(), '0');
 }
 
-inline bool is_syntactic_one(const cvc5::Term& fm) {
+inline bool is_ba_syntactic_one(const cvc5::Term& fm) {
 	// Check if represented bitvector is just top element in Boolean algebra
 	if (!fm.isBitVectorValue()) return false;
 	return fm.getBitVectorValue(2) ==
@@ -275,14 +275,12 @@ tref term_nand(tref symbol);
  * @param symbol The symbol to simplify
  * @return The result of simplification
  */
-template <typename ...BAs> requires BAsPack<BAs...>
-tref base_ba_symbol_simplification(tref symbol, const bv&);
+tref base_ba_symbol_simplification(tref symbol, const bv&) { return symbol; }
 
 template <typename ...BAs> requires BAsPack<BAs...>
 tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded);
 
-template <typename ... BAs> requires BAsPack<BAs...>
-tref base_ba_term_simplification(tref term, const bv&);
+tref base_ba_term_simplification(tref term, const bv&) { return term; }
 
 template <typename ...BAs> requires BAsPack<BAs...>
 bool is_associative_and_commutative(size_t symbol);

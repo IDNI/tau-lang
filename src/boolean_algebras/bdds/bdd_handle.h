@@ -74,13 +74,13 @@ template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
 
 template<typename B, auto o = bdd_options<>::create()>
-hbdd<B, o> normalize (const hbdd<B, o>& x) {return x;}
+hbdd<B, o> ba_normalize (const hbdd<B, o>& x) {return x;}
 
 template<typename B, auto o = bdd_options<>::create()>
-bool is_syntactic_one (const hbdd<B, o>& x) {return x->is_one();}
+bool is_ba_syntactic_one (const hbdd<B, o>& x) {return x->is_one();}
 
 template<typename B, auto o = bdd_options<>::create()>
-bool is_syntactic_zero (const hbdd<B, o>& x) {return x->is_zero();}
+bool is_ba_syntactic_zero (const hbdd<B, o>& x) {return x->is_zero();}
 
 template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> splitter (const hbdd<B, o>& x, splitter_type st) {
@@ -93,7 +93,7 @@ hbdd<B, o> bdd_splitter_one () {
 }
 
 template<typename B, auto o = bdd_options<>::create()>
-bool is_closed (const hbdd<B, o>& ) {
+bool is_ba_closed (const hbdd<B, o>& ) {
 	return true;
 }
 

@@ -39,7 +39,7 @@ set(TAU_HEADERS
 	api.h
 	union_find.h       # union find data structure
 	union_find_with_sets.h
-	nso_factory.h      # abstract template interface
+	# nso_factory.h      # abstract template interface
 	undefs.h           # undefines implementation macros
 )
 

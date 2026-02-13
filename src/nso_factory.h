@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "tau_tree.h"
+#include "splitter_types.h"
 
 #ifndef __IDNI__TAU__NSO_FACTORY_H__
 #define __IDNI__TAU__NSO_FACTORY_H__
@@ -20,6 +21,8 @@ namespace idni::tau_lang {
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct nso_factory {
+
+	using node = node<BAs...>;
 
 	/**
 	 * Returns a vector of available base type names.
@@ -76,6 +79,86 @@ struct nso_factory {
 	 * algebra element
 	 */
 	static std::variant<BAs...> to_base_ba_type(tref type_tree);
+
+	static typename node::constant normalize_ba(const typename node::constant& elem){
+		return std::visit(overloaded(
+			[](const auto& el) {
+				return typename node::constant(normalize(el));
+			}
+		), elem);
+	}
+
+	// used in one place
+	static 	bool is_syntactic_one(const std::variant<BAs...>& elem) {
+		return std::visit(overloaded(
+			[](const auto& el) {
+				return is_syntactic_one(el);
+			}
+		), elem);
+	}
+
+	// used in one place
+	static bool is_syntactic_zero(const std::variant<BAs...>& elem) {
+		return std::visit(overloaded(
+			[](const auto& el) {
+				return is_syntactic_zero(el);
+			}
+		), elem);
+	}
+
+	// used in one place
+	static bool is_closed(const std::variant<BAs...>& elem) {
+		return std::visit(overloaded(
+			[](const auto& el) {
+				return is_closed(el);
+			}
+		), elem);
+	}
+
+	static std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem,
+		splitter_type st)
+	{
+		return std::visit(overloaded(
+			[&st](const auto& el) {
+				return std::variant<BAs...>(splitter(el, st));
+			}
+		), elem);
+	}
+
+	static std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem) {
+		return splitter_ba(elem, splitter_type::upper);
+	}
+
+	static bool is_zero(const std::variant<BAs...>& l) {
+		return std::visit(overloaded(
+			[](const auto& l) -> bool {
+				return l == false;
+			}
+		), l);
+	}
+
+	static bool is_one(const std::variant<BAs...>& l) {
+		return std::visit(overloaded(
+			[](const auto& l) -> bool {
+				return l == true;
+			}
+		), l);
+	}
+
+	static tref base_ba_symbol_simplification(tref symbol, const std::variant<BAs...>& v) {
+		auto f = [&](const auto& ba_type) -> tref {
+			return base_ba_symbol_simplification<BAs...>(symbol, ba_type);
+		};
+		return std::visit(overloaded(f), v);
+	}
+
+	static tref base_ba_term_simplification(tref symbol, const std::variant<BAs...>& v) {
+		auto f = [&](const auto& ba_type) -> tref {
+			return base_ba_term_simplification<BAs...>(symbol, ba_type);
+		};
+		return std::visit(overloaded(f), v);
+	}
+
 };
 
 

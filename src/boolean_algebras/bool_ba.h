@@ -27,10 +27,10 @@ struct Bool {
 	bool b;
 };
 
-Bool normalize (const Bool& b);
-bool is_syntactic_one (const Bool& b);
-bool is_syntactic_zero(const Bool& b);
-bool is_closed(const Bool&);
+Bool ba_normalize (const Bool& b);
+bool is_ba_syntactic_one (const Bool& b);
+bool is_ba_syntactic_zero(const Bool& b);
+bool is_ba_closed(const Bool&);
 
 std::ostream& operator<<(std::ostream& os, const Bool& b);
 

@@ -385,7 +385,7 @@ tref normalize_ba(tref fm) {
 		if (!t.is(tau::ba_constant)) return n;
 		// Node has a Boolean algebra element
 		auto c = t.get_ba_constant();
-		auto nc = normalize_ba<node>(c);
+		auto nc = node::nso_factory::normalize(c);
 		if (c == nc) return n;
 		return tau::get_ba_constant(nc, t.get_ba_type());
 	};
@@ -3329,7 +3329,7 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 template<NodeType node>
 tref term_boole_decomposition(tref term) {
 	using tau = tree<node>;
-	using base_ba = node::nso_factory;
+
 	DBG(LOG_DEBUG << "Term_boole_decomposition on " << LOG_FM(term) << "\n";)
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
@@ -3340,8 +3340,8 @@ tref term_boole_decomposition(tref term) {
 	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
 		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
 			<< tau::get(term) << "\n");
-		term = base_ba_term_simplification(term,
-			base_ba::to_base_ba_type(get_ba_type_tree<node>(
+		term = node::nso_factory::simplify_term(term,
+			node::nso_factory::to_base_ba_type(get_ba_type_tree<node>(
 				get_ba_type<node>(term))));
 		tref res = normalize_ba<node>(term);
 		return res;
@@ -3353,8 +3353,8 @@ tref term_boole_decomposition(tref term) {
 	auto vars = get_free_vars_appearance_order<node>(bd);
 	// No free var, so no boole decomposition step
 	if (vars.empty()) {
-		term = base_ba_term_simplification(term,
-			base_ba::to_base_ba_type(get_ba_type_tree<node>(
+		term = node::nso_factory::simplify_term(term,
+			node::nso_factory::to_base_ba_type(get_ba_type_tree<node>(
 				get_ba_type<node>(term))));
 		bd = normalize_ba<node>(bd);
 		auto func_syms = tau::get(bd).select_top(is<node, tau::bf_ref>);
