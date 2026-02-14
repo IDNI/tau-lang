@@ -79,6 +79,14 @@ struct nso_factory<bv, sbf_ba>: public base_ba_variants<bv, sbf_ba> {
 	using node_t = node<bv, sbf_ba>;
 	using tau = tree<node_t>;
 
+	static bool is_syntactic_one(const std::variant<bv, sbf_ba>& elem);
+
+	static bool is_syntactic_zero(const std::variant<bv, sbf_ba>& elem);
+
+	static bool is_one(const std::variant<bv, sbf_ba>& elem);
+
+	static bool is_zero(const std::variant<bv, sbf_ba>& elem);
+
 	static std::vector<std::string> types();
 
 	static tref default_type();
@@ -107,6 +115,14 @@ template<>
 struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> : public base_ba_variants<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 	using tau = tree<node_t>;
+
+	static 	bool is_syntactic_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+
+	static bool is_syntactic_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+
+	static bool is_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+
+	static bool is_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
 
 	static std::vector<std::string> types();
 

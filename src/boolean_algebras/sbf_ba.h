@@ -45,6 +45,10 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_sbf(const std::string& src);
 
+bool is_sbf_one(const sbf_ba& x) { return x->is_one(); }
+
+bool is_sbf_zero(const sbf_ba& x) { return x->is_zero(); }
+
 } // namespace idni::tau_lang
 
 // Hash for hbdd as specialization of std::hash
