@@ -3347,9 +3347,7 @@ tref term_boole_decomposition(tref term) {
 	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
 		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
 			<< tau::get(term) << "\n");
-		term = node::ba::simplify_term(term,
-			node::ba::to_base_ba_type(get_ba_type_tree<node>(
-				get_ba_type<node>(term))));
+		term = node::ba::simplify_term(term);
 		tref res = normalize_ba<node>(term);
 		return res;
 	}
@@ -3360,9 +3358,7 @@ tref term_boole_decomposition(tref term) {
 	auto vars = get_free_vars_appearance_order<node>(bd);
 	// No free var, so no boole decomposition step
 	if (vars.empty()) {
-		term = node::ba::simplify_term(term,
-			node::ba::to_base_ba_type(get_ba_type_tree<node>(
-				get_ba_type<node>(term))));
+		term = node::ba::simplify_term(term);
 		bd = normalize_ba<node>(bd);
 		auto func_syms = tau::get(bd).select_top(is<node, tau::bf_ref>);
 		std::ranges::sort(func_syms, tau::subtree_less);

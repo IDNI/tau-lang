@@ -24,6 +24,8 @@ inline tref base_ba_term_simplification(tref term, const Bool&) {
 
 template<>
 struct nso_factory<bv, Bool> : public base_ba_variants<bv, Bool> {
+	using node_t = node<bv, Bool>;
+	using tau = tree<node_t>;
 
 	static std::vector<std::string> types() { return { "bool" }; }
 
@@ -49,10 +51,22 @@ struct nso_factory<bv, Bool> : public base_ba_variants<bv, Bool> {
 			? std::variant<bv, Bool>(normalize_bv(std::get<bv>(v)))
 			: std::variant<bv, Bool>(normalize_bool(std::get<Bool>(v)));
 	}
+
+	static tref simplify_symbol(tref symbol) {
+		auto ba_type = tau::get(symbol).get_ba_type();
+		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_symbol<node_t>(symbol) : symbol;
+	}
+
+	static tref simplify_term(tref term) {
+		auto ba_type = tau::get(term).get_ba_type();
+		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_term<node_t>(term) : term;
+	}
 };
 
 template<>
 struct nso_factory<bv, sbf_ba, Bool> : public base_ba_variants<bv, sbf_ba, Bool> {
+	using node_t = node<bv, sbf_ba, Bool>;
+	using tau = tree<node_t>;
 
 	static std::vector<std::string> types() { return { "bool" }; }
 
@@ -71,6 +85,16 @@ struct nso_factory<bv, sbf_ba, Bool> : public base_ba_variants<bv, sbf_ba, Bool>
 
 	static std::variant<bv, sbf_ba, Bool> to_base_ba_type(tref) {
 		return { Bool() };
+	}
+
+	static tref simplify_symbol(tref symbol) {
+		auto ba_type = tau::get(symbol).get_ba_type();
+		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_symbol<node_t>(symbol) : symbol;
+	}
+
+	static tref simplify_term(tref term) {
+		auto ba_type = tau::get(term).get_ba_type();
+		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_term<node_t>(term) : term;
 	}
 };
 

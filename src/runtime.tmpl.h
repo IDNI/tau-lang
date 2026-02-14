@@ -55,6 +55,16 @@ inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::normalize(const std::va
 		: std::variant<bv, sbf_ba>(normalize_sbf(std::get<sbf_ba>(v)));
 }
 
+inline tref nso_factory<bv, sbf_ba>::simplify_symbol(tref symbol) {
+	auto ba_type = tau::get(symbol).get_ba_type();
+	return is_bv_type_family<node_t>(ba_type) ? simplify_bv_symbol<node_t>(symbol) : symbol;
+}
+
+inline tref nso_factory<bv, sbf_ba>::simplify_term(tref term) {
+	auto ba_type = tau::get(term).get_ba_type();
+	return is_bv_type_family<node_t>(ba_type) ? simplify_bv_term<node_t>(term) : term;
+}
+
 inline std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {
 	return { "sbf", "tau", "bv" };
 }
@@ -142,6 +152,18 @@ inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_b
 		return std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>(
 			normalize_sbf(std::get<sbf_ba>(v)));
 	}
+}
+
+inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::simplify_symbol(tref symbol) {
+	auto ba_type = tau::get(symbol).get_ba_type();
+	return is_bv_type_family<node_t>(ba_type)
+		? simplify_bv_symbol<node_t>(symbol) : symbol;
+}
+
+inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::simplify_term(tref term) {
+	auto ba_type = tau::get(term).get_ba_type();
+	return is_bv_type_family<node_t>(ba_type)
+		? simplify_bv_term<node_t>(term) : term;
 }
 
 } // namespace idni::tau_lang

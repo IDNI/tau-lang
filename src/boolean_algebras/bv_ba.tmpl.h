@@ -85,8 +85,8 @@ bool operator!=(const Term& lhs, const bool& rhs) { return !(lhs == rhs); }
 
 bool operator!=(const bool& lhs, const Term& rhs) { return !(rhs == lhs); }
 
-template <typename ... BAs> requires BAsPack<BAs...>
-tref base_ba_term_simplification(tref term, const bv&) {
+template<NodeType node>
+tref simplify_bv_term(tref term) {
 	/*using node_t = node<BAs...>;
 	using tau = tree<node_t>;
 	using tt = tau::traverser;
