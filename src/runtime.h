@@ -72,20 +72,6 @@ struct base_ba_variants {
 			}
 		), l);
 	}
-
-	static tref simplify_symbol(tref symbol, const std::variant<BAs...>& v) {
-		auto f = [&](const auto& ba_type) -> tref {
-			return base_ba_symbol_simplification(symbol, ba_type);
-		};
-		return std::visit(overloaded(f), v);
-	}
-
-	static tref simplify_term(tref symbol, const std::variant<BAs...>& v) {
-		auto f = [&](const auto& ba_type) -> tref {
-			return base_ba_term_simplification(symbol, ba_type);
-		};
-		return std::visit(overloaded(f), v);
-	}
 };
 
 template <>
