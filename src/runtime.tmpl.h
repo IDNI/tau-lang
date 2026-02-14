@@ -49,6 +49,12 @@ inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::to_base_ba_type(tref ty
 	else return {bv()};
 }
 
+inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::normalize(const std::variant<bv, sbf_ba>& v) {
+	return std::holds_alternative<bv>(v)
+		? std::variant<bv, sbf_ba>(normalize_bv(std::get<bv>(v)))
+		: std::variant<bv, sbf_ba>(normalize_sbf(std::get<sbf_ba>(v)));
+}
+
 inline std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {
 	return { "sbf", "tau", "bv" };
 }
@@ -122,4 +128,20 @@ inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_b
 		return { bv() };
 	}
 }
+
+inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_ba>,
+		bv, sbf_ba>::normalize(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v) {
+	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(v)) {
+		return std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>(
+			normalize_tau(std::get<tau_ba<bv, sbf_ba>>(v)));
+	} else if (std::holds_alternative<bv>(v)) {
+		return std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>(
+			normalize_bv(std::get<bv>(v)));
+	} else {
+		DBG(assert(std::holds_alternative<sbf_ba>(v)));
+		return std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>(
+			normalize_sbf(std::get<sbf_ba>(v)));
+	}
+}
+
 } // namespace idni::tau_lang

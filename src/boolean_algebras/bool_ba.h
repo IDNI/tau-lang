@@ -27,7 +27,7 @@ struct Bool {
 	bool b;
 };
 
-Bool ba_normalize (const Bool& b);
+Bool normalize_bool(const Bool& b);
 bool is_ba_syntactic_one (const Bool& b);
 bool is_ba_syntactic_zero(const Bool& b);
 bool is_ba_closed(const Bool&);

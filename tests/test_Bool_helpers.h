@@ -43,6 +43,12 @@ struct nso_factory<bv, Bool> : public base_ba_variants<bv, Bool> {
 	static std::variant<bv, Bool> to_base_ba_type(tref) {
 		return { Bool() };
 	}
+
+	static std::variant<bv, Bool> normalize(const std::variant<bv, Bool>& v) {
+		return std::holds_alternative<bv>(v)
+			? std::variant<bv, Bool>(normalize_bv(std::get<bv>(v)))
+			: std::variant<bv, Bool>(normalize_bool(std::get<Bool>(v)));
+	}
 };
 
 template<>

@@ -33,7 +33,7 @@ bool Bool::is_one() const {
 	return b;
 }
 
-Bool ba_normalize(const Bool &b) {
+Bool normalize_bool(const Bool &b) {
 	return b;
 }
 

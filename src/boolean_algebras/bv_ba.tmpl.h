@@ -74,13 +74,9 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 }
 
 bool operator==(const Term& lhs, const bool& rhs) {
-	if (rhs) {
-		// Check if lhs equals 1
-		return ba_normalize(lhs) == make_bitvector_top_elem(lhs.getSort().getBitVectorSize());
-	} else {
-		// Check if rhs equals 0
-		return ba_normalize(lhs) == make_bitvector_bottom_elem(lhs.getSort().getBitVectorSize());
-	}
+	auto bv_size = lhs.getSort().getBitVectorSize();
+	return (rhs) ? normalize_bv(lhs) == make_bitvector_top_elem(bv_size)
+				: normalize_bv(lhs) == make_bitvector_bottom_elem(bv_size);
 }
 
 bool operator==(const bool& lhs, const Term& rhs) { return rhs == lhs; }
