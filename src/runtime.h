@@ -16,14 +16,6 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 struct base_ba_variants {
 
-	static std::variant<BAs...> normalize(const std::variant<BAs...>& elem){
-		return std::visit(overloaded(
-			[](const auto& el) {
-				return std::variant<BAs...>(ba_normalize(el));
-			}
-		), elem);
-	}
-
 	// used in one place
 	static 	bool is_syntactic_one(const std::variant<BAs...>& elem) {
 		return std::visit(overloaded(
@@ -114,6 +106,8 @@ struct nso_factory<bv, sbf_ba>: public base_ba_variants<bv, sbf_ba> {
 	static std::variant<bv, sbf_ba> pack_tau_ba(tref);
 
 	static std::variant<bv, sbf_ba> to_base_ba_type(tref type_tree);
+
+	static std::variant<bv, sbf_ba> normalize(const std::variant<bv, sbf_ba>& v);
 };
 
 /**
@@ -137,6 +131,8 @@ struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> : public base_ba_variants<tau
 	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> pack_tau_ba(tref c);
 
 	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> to_base_ba_type(tref type_tree);
+
+	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> normalize(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v);
 };
 
 template <>

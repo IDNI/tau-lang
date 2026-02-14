@@ -156,7 +156,7 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tau_ba<BAs...> ba_normalize(const tau_ba<BAs...>& fm) {
+tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	tref result =
 		apply_rr_to_formula<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
 	result = simp_tau_unsat_valid<node<tau_ba<BAs...>, BAs...>>(result);

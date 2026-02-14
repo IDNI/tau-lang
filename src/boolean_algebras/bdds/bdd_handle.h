@@ -74,7 +74,7 @@ template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
 
 template<typename B, auto o = bdd_options<>::create()>
-hbdd<B, o> ba_normalize (const hbdd<B, o>& x) {return x;}
+hbdd<B, o> normalize_sbf(const hbdd<B, o>& x) {return x;}
 
 template<typename B, auto o = bdd_options<>::create()>
 bool is_ba_syntactic_one (const hbdd<B, o>& x) {return x->is_one();}

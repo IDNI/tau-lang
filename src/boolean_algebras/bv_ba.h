@@ -221,7 +221,7 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 
 inline bool is_ba_closed(const cvc5::Term&) { return true; }
 
-inline cvc5::Term ba_normalize(const cvc5::Term& fm) {
+inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);
 	// Use general simplification procedure
