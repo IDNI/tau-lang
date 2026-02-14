@@ -210,18 +210,6 @@ bool is_ba_closed(const tau_ba<BAs...>& fm) {
 	return true;
 }
 
-template<typename ... BAs> requires BAsPack<BAs...>
-tref base_ba_symbol_simplification(tref symbol, const tau_ba<BAs...>&) {
-	// All symbols for the tau base Boolean algebra are
-	// simplified in general procedure
-	return symbol;
-}
-
-template<typename ... BAs> requires BAsPack<BAs...>
-tref base_ba_term_simplification(tref term, const tau_ba<BAs...>&) {
-	return term;
-}
-
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>

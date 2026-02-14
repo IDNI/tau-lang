@@ -248,18 +248,6 @@ requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm);
 
 /**
- * Simplifies a symbol specific to this base Boolean algebra
- * @tparam BAs Base Boolean algebras
- * @param symbol The symbol to simplify
- * @return The result of simplification
- */
-template <typename... BAs> requires BAsPack<BAs...>
-tref base_ba_symbol_simplification(tref symbol, const auto&);
-
-template <typename... BAs> requires BAsPack<BAs...>
-tref base_ba_term_simplification(tref term, const auto&);
-
-/**
  * @brief Template struct representing a tau_ba_factory.
  *
  * @tparam BAs Variadic template parameters.
