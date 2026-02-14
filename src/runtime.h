@@ -17,24 +17,6 @@ requires BAsPack<BAs...>
 struct base_ba_variants {
 
 	// used in one place
-	static 	bool is_syntactic_one(const std::variant<BAs...>& elem) {
-		return std::visit(overloaded(
-			[](const auto& el) {
-				return is_ba_syntactic_one(el);
-			}
-		), elem);
-	}
-
-	// used in one place
-	static bool is_syntactic_zero(const std::variant<BAs...>& elem) {
-		return std::visit(overloaded(
-			[](const auto& el) {
-				return is_ba_syntactic_zero(el);
-			}
-		), elem);
-	}
-
-	// used in one place
 	static bool is_closed(const std::variant<BAs...>& elem) {
 		return std::visit(overloaded(
 			[](const auto& el) {
@@ -57,21 +39,6 @@ struct base_ba_variants {
 		return splitter_ba(elem, splitter_type::upper);
 	}
 
-	static bool is_zero(const std::variant<BAs...>& l) {
-		return std::visit(overloaded(
-			[](const auto& l) -> bool {
-				return l == false;
-			}
-		), l);
-	}
-
-	static bool is_one(const std::variant<BAs...>& l) {
-		return std::visit(overloaded(
-			[](const auto& l) -> bool {
-				return l == true;
-			}
-		), l);
-	}
 };
 
 template <>
