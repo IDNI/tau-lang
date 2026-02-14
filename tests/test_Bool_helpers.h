@@ -27,6 +27,30 @@ struct nso_factory<bv, Bool> : public base_ba_variants<bv, Bool> {
 	using node_t = node<bv, Bool>;
 	using tau = tree<node_t>;
 
+	static bool is_syntactic_one(const std::variant<bv, Bool>& elem) {
+		return std::holds_alternative<bv>(elem)
+			? is_bv_syntactic_one(std::get<bv>(elem))
+			: std::get<Bool>(elem).is_one();
+	}
+
+	static bool is_syntactic_zero(const std::variant<bv, Bool>& elem) {
+		return std::holds_alternative<bv>(elem)
+			? is_bv_syntactic_zero(std::get<bv>(elem))
+			: std::get<Bool>(elem).is_zero();
+	}
+
+	static bool is_one(const std::variant<bv, Bool>& elem) {
+		return std::holds_alternative<bv>(elem)
+			? is_bv_syntactic_one(std::get<bv>(elem))
+			: std::get<Bool>(elem).is_one();
+	}
+
+	static bool is_zero(const std::variant<bv, Bool>& elem) {
+		return std::holds_alternative<bv>(elem)
+			? is_bv_syntactic_zero(std::get<bv>(elem))
+			: std::get<Bool>(elem).is_zero();
+	}
+
 	static std::vector<std::string> types() { return { "bool" }; }
 
 	static tref default_type() { return bool_type(); }
@@ -63,6 +87,38 @@ template<>
 struct nso_factory<bv, sbf_ba, Bool> : public base_ba_variants<bv, sbf_ba, Bool> {
 	using node_t = node<bv, sbf_ba, Bool>;
 	using tau = tree<node_t>;
+
+	static bool is_syntactic_one(const std::variant<bv, sbf_ba, Bool>& elem) {
+		if (std::holds_alternative<bv>(elem))
+			return is_bv_syntactic_one(std::get<bv>(elem));
+		else if (std::holds_alternative<Bool>(elem))
+			return std::get<Bool>(elem).is_one();
+		else return is_sbf_one(std::get<sbf_ba>(elem));
+	}
+
+	static bool is_syntactic_zero(const std::variant<bv, sbf_ba, Bool>& elem) {
+		if (std::holds_alternative<bv>(elem))
+			return is_bv_syntactic_zero(std::get<bv>(elem));
+		else if (std::holds_alternative<Bool>(elem))
+			return std::get<Bool>(elem).is_zero();
+		else return is_sbf_zero(std::get<sbf_ba>(elem));
+	}
+
+	static bool is_one(const std::variant<bv, sbf_ba, Bool>& elem) {
+		if (std::holds_alternative<bv>(elem))
+			return is_bv_syntactic_one(std::get<bv>(elem));
+		else if (std::holds_alternative<Bool>(elem))
+			return std::get<Bool>(elem).is_one();
+		else return is_sbf_one(std::get<sbf_ba>(elem));
+	}
+
+	static bool is_zero(const std::variant<bv, sbf_ba, Bool>& elem) {
+		if (std::holds_alternative<bv>(elem))
+			return is_bv_syntactic_zero(std::get<bv>(elem));
+		else if (std::holds_alternative<Bool>(elem))
+			return std::get<Bool>(elem).is_zero();
+		else return is_sbf_zero(std::get<sbf_ba>(elem));
+	}
 
 	static std::vector<std::string> types() { return { "bool" }; }
 

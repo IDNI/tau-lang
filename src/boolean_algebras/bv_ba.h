@@ -228,14 +228,14 @@ inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
 	return solver.simplify(fm);
 }
 
-inline bool is_ba_syntactic_zero(const cvc5::Term& fm) {
+inline bool is_bv_syntactic_zero(const cvc5::Term& fm) {
 	// Check if represented bitvector is just bottom element in Boolean algebra
 	if (!fm.isBitVectorValue()) return false;
 	return fm.getBitVectorValue(2) ==
 		std::string(fm.getSort().getBitVectorSize(), '0');
 }
 
-inline bool is_ba_syntactic_one(const cvc5::Term& fm) {
+inline bool is_bv_syntactic_one(const cvc5::Term& fm) {
 	// Check if represented bitvector is just top element in Boolean algebra
 	if (!fm.isBitVectorValue()) return false;
 	return fm.getBitVectorValue(2) ==

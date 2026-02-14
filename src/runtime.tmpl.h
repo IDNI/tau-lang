@@ -1,6 +1,37 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 namespace idni::tau_lang {
+
+inline bool nso_factory<bv, sbf_ba>::is_syntactic_one(const std::variant<bv, sbf_ba>& elem) {
+	// Note that syntactic zero and one are the same as semantic zero and one
+	// for bv and sbf, so we can use the same function
+	return (std::holds_alternative<bv>(elem))
+		? is_bv_syntactic_one(std::get<bv>(elem))
+		: is_sbf_one(std::get<sbf_ba>(elem));
+}
+
+inline bool nso_factory<bv, sbf_ba>::is_syntactic_zero(const std::variant<bv, sbf_ba>& elem) {
+	// See bove comment
+	return (std::holds_alternative<bv>(elem))
+		? is_bv_syntactic_zero(std::get<bv>(elem))
+		: is_sbf_zero(std::get<sbf_ba>(elem));
+}
+
+inline bool nso_factory<bv, sbf_ba>::is_one(const std::variant<bv, sbf_ba>& elem) {
+	// See bove comment
+	return (std::holds_alternative<bv>(elem))
+		? is_bv_syntactic_one(std::get<bv>(elem))
+		: is_sbf_one(std::get<sbf_ba>(elem));
+}
+
+inline bool nso_factory<bv, sbf_ba>::is_zero(const std::variant<bv, sbf_ba>& elem) {
+	// See bove comment
+	return (std::holds_alternative<bv>(elem))
+		? is_bv_syntactic_zero(std::get<bv>(elem))
+		: is_sbf_zero(std::get<sbf_ba>(elem));
+}
+
+
 inline std::vector<std::string> nso_factory<bv, sbf_ba>::types() {
 	return { "sbf", "bv" };
 }
@@ -56,6 +87,44 @@ inline tref nso_factory<bv, sbf_ba>::simplify_symbol(tref symbol) {
 inline tref nso_factory<bv, sbf_ba>::simplify_term(tref term) {
 	auto ba_type = tau::get(term).get_ba_type();
 	return is_bv_type_family<node_t>(ba_type) ? simplify_bv_term<node_t>(term) : term;
+}
+
+inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_syntactic_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
+		return std::get<tau_ba<bv, sbf_ba>>(elem).is_one();
+	else if (std::holds_alternative<bv>(elem))
+		return is_bv_syntactic_one(std::get<bv>(elem));
+	// Note that syntactic zero and one are the same as semantic zero and one
+	// for sbf, so we can use the same function
+	else return is_sbf_one(std::get<sbf_ba>(elem));
+}
+
+inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_syntactic_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
+		return std::get<tau_ba<bv, sbf_ba>>(elem).is_zero();
+	else if (std::holds_alternative<bv>(elem))
+		return is_bv_syntactic_zero(std::get<bv>(elem));
+	// See above comment
+	else return is_sbf_zero(std::get<sbf_ba>(elem));
+}
+
+inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
+		return std::get<tau_ba<bv, sbf_ba>>(elem).is_one();
+	else if (std::holds_alternative<bv>(elem))
+		// Note that syntactic zero and one are the same as semantic zero and one
+		// for bv, so we can use the same function
+		return is_bv_syntactic_one(std::get<bv>(elem));
+	else return is_sbf_one(std::get<sbf_ba>(elem));
+}
+
+inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
+		return std::get<tau_ba<bv, sbf_ba>>(elem).is_zero();
+	else if (std::holds_alternative<bv>(elem))
+	// See above comment
+	return is_bv_syntactic_zero(std::get<bv>(elem));
+	else return is_sbf_zero(std::get<sbf_ba>(elem));
 }
 
 inline std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {

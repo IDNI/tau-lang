@@ -165,13 +165,13 @@ tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_ba_syntactic_one(const tau_ba<BAs...>& fm) {
+bool is_tau_syntactic_one(const tau_ba<BAs...>& fm) {
 	return tree<node<tau_ba<BAs...>, BAs...>>::get(fm.nso_rr.main).equals_T();
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_ba_syntactic_zero(const tau_ba<BAs...>& fm) {
+bool is_tau_syntactic_zero(const tau_ba<BAs...>& fm) {
 	return tree<node<tau_ba<BAs...>, BAs...>>::get(fm.nso_rr.main).equals_F();
 }
 
