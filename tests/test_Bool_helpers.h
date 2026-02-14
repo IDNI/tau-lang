@@ -42,10 +42,6 @@ struct nso_factory<bv, Bool> : public base_ba_variants<bv, Bool> {
 
 	static std::variant<bv, Bool> pack_tau_ba(tref) { return {}; }
 
-	static std::variant<bv, Bool> to_base_ba_type(tref) {
-		return { Bool() };
-	}
-
 	static std::variant<bv, Bool> normalize(const std::variant<bv, Bool>& v) {
 		return std::holds_alternative<bv>(v)
 			? std::variant<bv, Bool>(normalize_bv(std::get<bv>(v)))
@@ -82,10 +78,6 @@ struct nso_factory<bv, sbf_ba, Bool> : public base_ba_variants<bv, sbf_ba, Bool>
 	static tref unpack_tau_ba(const std::variant<bv, sbf_ba, Bool>&) { return nullptr; }
 
 	static std::variant<bv, sbf_ba, Bool> pack_tau_ba(tref) { return {}; }
-
-	static std::variant<bv, sbf_ba, Bool> to_base_ba_type(tref) {
-		return { Bool() };
-	}
 
 	static tref simplify_symbol(tref symbol) {
 		auto ba_type = tau::get(symbol).get_ba_type();
