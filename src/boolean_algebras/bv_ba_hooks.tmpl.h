@@ -652,9 +652,8 @@ tref term_nand(tref symbol) {
 	return tau::build_bf_neg(tau::build_bf_and(c1, c2));
 }
 
-template <typename ...BAs> requires BAsPack<BAs...>
-tref base_ba_symbol_simplification(tref symbol, const bv&) {
-	using node_t = node<BAs...>;
+template <NodeType node_t>
+tref simplify_bv_symbol(tref symbol) {
 	using tau = tree<node_t>;
 
 	switch (tau::get(symbol)[0].get_type()) {

@@ -90,6 +90,8 @@ struct base_ba_variants {
 
 template <>
 struct nso_factory<bv, sbf_ba>: public base_ba_variants<bv, sbf_ba> {
+	using node_t = node<bv, sbf_ba>;
+	using tau = tree<node_t>;
 
 	static std::vector<std::string> types();
 
@@ -108,6 +110,10 @@ struct nso_factory<bv, sbf_ba>: public base_ba_variants<bv, sbf_ba> {
 	static std::variant<bv, sbf_ba> to_base_ba_type(tref type_tree);
 
 	static std::variant<bv, sbf_ba> normalize(const std::variant<bv, sbf_ba>& v);
+
+	static tref simplify_symbol(tref symbol);
+
+	static tref simplify_term(tref term);
 };
 
 /**
@@ -115,6 +121,8 @@ struct nso_factory<bv, sbf_ba>: public base_ba_variants<bv, sbf_ba> {
  */
 template<>
 struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> : public base_ba_variants<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
+	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+	using tau = tree<node_t>;
 
 	static std::vector<std::string> types();
 
@@ -133,6 +141,10 @@ struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> : public base_ba_variants<tau
 	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> to_base_ba_type(tref type_tree);
 
 	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> normalize(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v);
+
+	static tref simplify_symbol(tref symbol);
+
+	static tref simplify_term(tref term);
 };
 
 template <>

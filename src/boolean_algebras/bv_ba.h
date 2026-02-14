@@ -270,17 +270,14 @@ tref term_xnor(tref symbol);
 template<NodeType node>
 tref term_nand(tref symbol);
 
-/**
- * Simplifies a symbol specific to this base Boolean algebra
- * @param symbol The symbol to simplify
- * @return The result of simplification
- */
-tref base_ba_symbol_simplification(tref symbol, const bv&) { return symbol; }
+template<NodeType node>
+tref simplify_bv_symbol(tref symbol);
+
+template<NodeType node>
+tref simplify_bv_term(tref term);
 
 template <typename ...BAs> requires BAsPack<BAs...>
 tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded);
-
-tref base_ba_term_simplification(tref term, const bv&) { return term; }
 
 template <typename ...BAs> requires BAsPack<BAs...>
 bool is_associative_and_commutative(size_t symbol);
@@ -293,7 +290,7 @@ size_t get_inv_sym(size_t symbol);
 
 } // namespace idni::tau_lang
 
-// This is the proper way to include heuristics as the headre mustbe independent
+// This is the proper way to include heuristics as the header must be independent
 // of the heuristics themselves and also they could need definitions from the
 // header (as is the case in 'heuristicsbv_ba_simplification.h'. Also, they
 // need to be included before the definitions as they can be used in there.

@@ -199,10 +199,7 @@ tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	// Term is currently untyped
 	if (v.ba_type == 0) return tau::get_raw(v, ch, len, r);
 	// Simplifications for bitvector symbols
-	return node::ba::simplify_symbol(
-		tau::get_raw(v, ch, len, r),
-		node::ba::to_base_ba_type(
-			get_ba_type_tree<node>(v.ba_type)));
+	return node::ba::simplify_symbol(tau::get_raw(v, ch, len, r));
 }
 
 template <NodeType node>
