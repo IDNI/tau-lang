@@ -245,7 +245,7 @@ tau_ba<BAs...> tau_splitter_one();
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_closed(const tau_ba<BAs...>& fm);
+bool is_tau_closed(const tau_ba<BAs...>& fm);
 
 /**
  * @brief Template struct representing a tau_ba_factory.

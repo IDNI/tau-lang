@@ -45,10 +45,6 @@ bool is_ba_syntactic_zero(const Bool& b) {
 	return b.is_zero();
 }
 
-bool is_ba_closed(const Bool&) {
-	return true;
-}
-
 std::ostream& operator<<(std::ostream& os, const Bool& b) {
 	return os << (b.b ? 1 : 0);
 }

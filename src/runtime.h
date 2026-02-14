@@ -16,15 +16,6 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 struct base_ba_variants {
 
-	// used in one place
-	static bool is_closed(const std::variant<BAs...>& elem) {
-		return std::visit(overloaded(
-			[](const auto& el) {
-				return is_ba_closed(el);
-			}
-		), elem);
-	}
-
 	static std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem,
 		splitter_type st)
 	{
@@ -53,6 +44,8 @@ struct nso_factory<bv, sbf_ba>: public base_ba_variants<bv, sbf_ba> {
 	static bool is_one(const std::variant<bv, sbf_ba>& elem);
 
 	static bool is_zero(const std::variant<bv, sbf_ba>& elem);
+
+	static bool is_closed(const std::variant<bv, sbf_ba>& elem);
 
 	static std::vector<std::string> types();
 
@@ -90,6 +83,8 @@ struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> : public base_ba_variants<tau
 	static bool is_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
 
 	static bool is_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+
+	static bool is_closed(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
 
 	static std::vector<std::string> types();
 

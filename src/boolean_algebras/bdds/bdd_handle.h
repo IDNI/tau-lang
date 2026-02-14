@@ -87,11 +87,6 @@ hbdd<B, o> bdd_splitter_one () {
 }
 
 template<typename B, auto o = bdd_options<>::create()>
-bool is_ba_closed (const hbdd<B, o>& ) {
-	return true;
-}
-
-template<typename B, auto o = bdd_options<>::create()>
 struct bdd_handle {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;

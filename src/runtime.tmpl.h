@@ -31,6 +31,10 @@ inline bool nso_factory<bv, sbf_ba>::is_zero(const std::variant<bv, sbf_ba>& ele
 		: is_sbf_zero(std::get<sbf_ba>(elem));
 }
 
+inline bool nso_factory<bv, sbf_ba>::is_closed(const std::variant<bv, sbf_ba>&) {
+	// We return true as bv and sbf are closed (for our pourposes)
+	return true;
+}
 
 inline std::vector<std::string> nso_factory<bv, sbf_ba>::types() {
 	return { "sbf", "bv" };
@@ -125,6 +129,13 @@ inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_zero(const std::vari
 	// See above comment
 	return is_bv_syntactic_zero(std::get<bv>(elem));
 	else return is_sbf_zero(std::get<sbf_ba>(elem));
+}
+
+inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_closed(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+	// We return true as bv and Bool are closed (for our pourposes)
+	return (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
+		? is_tau_closed<bv, sbf_ba>(std::get<tau_ba<bv, sbf_ba>>(elem))
+		: true;
 }
 
 inline std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {

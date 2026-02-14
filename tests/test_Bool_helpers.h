@@ -51,6 +51,11 @@ struct nso_factory<bv, Bool> : public base_ba_variants<bv, Bool> {
 			: std::get<Bool>(elem).is_zero();
 	}
 
+	static bool is_closed(const std::variant<bv, Bool>&) {
+		// We return true as bv and Bool are closed (for our pourposes)
+		return true;
+	}
+
 	static std::vector<std::string> types() { return { "bool" }; }
 
 	static tref default_type() { return bool_type(); }
@@ -118,6 +123,11 @@ struct nso_factory<bv, sbf_ba, Bool> : public base_ba_variants<bv, sbf_ba, Bool>
 		else if (std::holds_alternative<Bool>(elem))
 			return std::get<Bool>(elem).is_zero();
 		else return is_sbf_zero(std::get<sbf_ba>(elem));
+	}
+
+	static bool is_closed(const std::variant<bv, sbf_ba, Bool>&) {
+		// We return true as bv, sbf and Bool are closed (for our pourposes)
+		return true;
 	}
 
 	static std::vector<std::string> types() { return { "bool" }; }
