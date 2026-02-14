@@ -77,12 +77,6 @@ template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> normalize_sbf(const hbdd<B, o>& x) {return x;}
 
 template<typename B, auto o = bdd_options<>::create()>
-bool is_ba_syntactic_one (const hbdd<B, o>& x) {return x->is_one();}
-
-template<typename B, auto o = bdd_options<>::create()>
-bool is_ba_syntactic_zero (const hbdd<B, o>& x) {return x->is_zero();}
-
-template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> splitter (const hbdd<B, o>& x, splitter_type st) {
 	return x->splitter(st);
 }
