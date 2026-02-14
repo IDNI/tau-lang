@@ -191,7 +191,7 @@ tau_ba<BAs...> tau_splitter_one() {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_ba_closed(const tau_ba<BAs...>& fm) {
+bool is_tau_closed(const tau_ba<BAs...>& fm) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
 	tref simp_fm = apply_rr_to_formula<node>(fm.nso_rr);

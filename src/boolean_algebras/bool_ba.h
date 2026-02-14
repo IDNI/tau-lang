@@ -30,7 +30,6 @@ struct Bool {
 Bool normalize_bool(const Bool& b);
 bool is_ba_syntactic_one (const Bool& b);
 bool is_ba_syntactic_zero(const Bool& b);
-bool is_ba_closed(const Bool&);
 
 std::ostream& operator<<(std::ostream& os, const Bool& b);
 

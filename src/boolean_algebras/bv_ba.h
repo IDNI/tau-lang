@@ -219,8 +219,6 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
 
-inline bool is_ba_closed(const cvc5::Term&) { return true; }
-
 inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);

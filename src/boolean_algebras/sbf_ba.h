@@ -36,9 +36,8 @@ struct sbf_ba_factory {
 	//inline static std::map<size_t, std::variant<BAs...>> cache;
 };
 
-inline bool is_closed(const sbf_ba&) { return true; }
-
 inline tref simplify_sbf_symbol(tref sym) { return sym; }
+
 inline tref simplify_sbf_term(tref term) { return term; }
 
 template <typename... BAs>
