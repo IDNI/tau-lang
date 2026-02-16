@@ -67,6 +67,16 @@ inline tref nso_factory<bv, sbf_ba>::splitter_one() {
 		sbf_type<node<bv, sbf_ba>>()));
 }
 
+inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::splitter(const std::variant<bv, sbf_ba>& elem, splitter_type st) {
+	DBG(assert(!std::holds_alternative<bv>(elem));)
+	return std::variant<bv, sbf_ba>(sbf_splitter(std::get<sbf_ba>(elem), st));
+}
+
+inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::splitter(const std::variant<bv, sbf_ba>& elem) {
+	DBG(assert(!std::holds_alternative<bv>(elem));)
+	return splitter(std::get<sbf_ba>(elem), splitter_type::upper);
+}
+
 inline tref nso_factory<bv, sbf_ba>::unpack_tau_ba(const std::variant<bv, sbf_ba>&) {
 	return nullptr; // There is no tau_ba present
 }
@@ -185,6 +195,25 @@ inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
 			tau::get_ba_constant(
 				tau_ba_factory<bv, sbf_ba>::splitter_one(),
 				tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>()));
+}
+
+inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter(
+		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem, splitter_type st) {
+	DBG(assert(!std::holds_alternative<bv>(elem));)
+	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem)) {
+		auto fml = std::get<tau_ba<bv, sbf_ba>>(elem);
+		auto unpacked = unpack_tau_ba(elem);
+		return std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>(
+			tau_splitter<tau_ba<bv, sbf_ba>, bv, sbf_ba>(unpacked, st));
+	}
+	return std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>(
+		sbf_splitter(std::get<sbf_ba>(elem), st));
+}
+
+inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter(
+		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+	DBG(assert(!std::holds_alternative<bv>(elem));)
+	return splitter(std::get<tau_ba<bv, sbf_ba>>(elem), splitter_type::upper);
 }
 
 inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::unpack_tau_ba(

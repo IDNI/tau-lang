@@ -11,29 +11,9 @@
 
 namespace idni::tau_lang {
 
-// Temporal struct to be used during the refactor
-template <typename... BAs>
-requires BAsPack<BAs...>
-struct base_ba_variants {
-
-	static std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem,
-		splitter_type st)
-	{
-		return std::visit(overloaded(
-			[&st](const auto& el) {
-				return std::variant<BAs...>(splitter(el, st));
-			}
-		), elem);
-	}
-
-	static std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem) {
-		return splitter_ba(elem, splitter_type::upper);
-	}
-
-};
 
 template <>
-struct nso_factory<bv, sbf_ba>: public base_ba_variants<bv, sbf_ba> {
+struct nso_factory<bv, sbf_ba> {
 	using node_t = node<bv, sbf_ba>;
 	using tau = tree<node_t>;
 
@@ -57,6 +37,10 @@ struct nso_factory<bv, sbf_ba>: public base_ba_variants<bv, sbf_ba> {
 
 	static tref splitter_one();
 
+	static std::variant<bv, sbf_ba> splitter(const std::variant<bv, sbf_ba>& elem, splitter_type st);
+
+	static std::variant<bv, sbf_ba> splitter(const std::variant<bv, sbf_ba>& elem);
+
 	static tref unpack_tau_ba(const std::variant<bv, sbf_ba>&);
 
 	static std::variant<bv, sbf_ba> pack_tau_ba(tref);
@@ -72,7 +56,7 @@ struct nso_factory<bv, sbf_ba>: public base_ba_variants<bv, sbf_ba> {
  * @brief NSO factory used in REPL
  */
 template<>
-struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> : public base_ba_variants<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
+struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 	using tau = tree<node_t>;
 
@@ -96,6 +80,11 @@ struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> : public base_ba_variants<tau
 
 	static tref splitter_one(tref type_tree);
 
+	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> splitter(
+		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem, splitter_type st);
+	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> splitter(
+		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+
 	static tref unpack_tau_ba(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v);
 
 	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> pack_tau_ba(tref c);
@@ -109,8 +98,7 @@ struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> : public base_ba_variants<tau
 
 template <>
 inline std::optional<ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_constants<node<bv, sbf_ba>>::get(
-		const std::string& constant_source,
-		tref type_tree,
+		const std::string& constant_source,	tref type_tree,
 		[[maybe_unused]] const std::string options) {
 	if (is_bv_type_family<node<bv, sbf_ba>>(type_tree))
 		return parse_bv<bv, sbf_ba>(constant_source, type_tree);
@@ -119,8 +107,7 @@ inline std::optional<ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_cons
 
 template <>
 inline std::optional<typename ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::constant_with_type> ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::get(
-		const std::string& constant_source,
-		tref type_tree,
+		const std::string& constant_source,	tref type_tree,
 		[[maybe_unused]] const std::string options) {
 	if (is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree))
 		return parse_sbf<tau_ba<bv, sbf_ba>, bv, sbf_ba>(constant_source);
