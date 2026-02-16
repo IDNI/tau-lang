@@ -71,7 +71,7 @@ tref tau_splitter(tref fm, splitter_type st);
  */
 template <typename... BAs>
 requires BAsPack<BAs...>
-const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& n,
+const tree<node<BAs...>>& tau_splitter(const tree<node<BAs...>>& n,
     splitter_type st = splitter_type::upper);
 
 } // namespace idni::tau_lang

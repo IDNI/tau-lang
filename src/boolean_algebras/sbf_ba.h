@@ -40,6 +40,8 @@ inline tref simplify_sbf_symbol(tref sym) { return sym; }
 
 inline tref simplify_sbf_term(tref term) { return term; }
 
+inline sbf_ba sbf_splitter(const sbf_ba& elem, splitter_type st);
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_sbf(const std::string& src);

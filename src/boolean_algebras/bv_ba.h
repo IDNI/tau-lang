@@ -183,16 +183,6 @@ std::optional<solution<node>> solve_bv(tref form);
 template <NodeType node>
 std::optional<solution<node>> solve_bv(const trefs& form);
 
-/**
- * @brief Dummy method included for completeness (variant ba). In the case
- * of atomless BAs, it computes the splitter of a given BA element.
- *
- * @param fm The cvc5::Term to be split.
- * @param splitter Reference to the splitter_type used for splitting.
- * @return bv The result of the split operation.
- */
-bv splitter(const cvc5::Term& fm, idni::tau_lang::splitter_type&) { return fm; }
-
 template<typename...BAs>
 requires BAsPack<BAs...>
 std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);

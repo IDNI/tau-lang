@@ -623,7 +623,10 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 					// case 4.1
 					? options.splitter_one
 					// case 4.2
-					: splitter(tau::get(tt(d_cte)
+					// TODO (HIGH) replace call to tau_splitter with a
+					// node::ba::splitter call and maybe remove the corresponding
+					// tau_splitter method
+					: tau_splitter(tau::get(tt(d_cte)
 						| tau::ba_constant
 						| tt::ref)).get();
 

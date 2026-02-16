@@ -170,7 +170,7 @@ tref good_splitter_using_function(tref f, splitter_type st, tref clause,
 			.find_top(is<node, tau::ba_constant>);
 		if (!coeff) return false;
 		DBG(assert(is<node>(coeff, tau::ba_constant));)
-		const tau& scoeff_t = splitter<BAs...>(tau::get(coeff));
+		const tau& scoeff_t = tau_splitter<BAs...>(tau::get(coeff));
 		if (scoeff_t.equals_0()) return false;
 		tref scoeff = scoeff_t.first();
 		if (tau::get(scoeff) != tau::get(coeff)) {
@@ -215,7 +215,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 		// We need to split the negated constant
 		coeff = tau::build_bf_neg(coeff);
 		DBG(assert(is<node>(tau::trim(coeff), tau::ba_constant));)
-		tref s = splitter<BAs...>(tau::get(coeff)[0], st).get();
+		tref s = tau_splitter<BAs...>(tau::get(coeff)[0], st).get();
 		// Negate again to get the reversed splitter
 		return tau::build_bf_neg(s);
 	};
@@ -490,17 +490,13 @@ tref tau_splitter(tref fm, splitter_type st) {
 // Splitter function for a nso tau::ba_constant node holding a BA constant
 template <typename... BAs>
 requires BAsPack<BAs...>
-const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
+const tree<node<BAs...>>& tau_splitter(const tree<node<BAs...>>& t,
 	splitter_type st)
 {
-	// Lambda for calling splitter on n
-	auto _splitter = [&st](const auto& t) -> std::variant<BAs...> {
-		return splitter(t, st);
-	};
 	DBG(assert(t.is_ba_constant());)
 	return tree<node<BAs...>>::get(
 		tree<node<BAs...>>::build_bf_ba_constant(
-			std::visit(_splitter, t.get_ba_constant()),
+			node<BAs...>::ba::splitter(t.get_ba_constant(), st),
 			t.get_ba_type()));
 }
 
