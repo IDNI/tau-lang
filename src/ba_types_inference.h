@@ -24,6 +24,10 @@ static size_t bv16_type_id = ba_types<node>::id(bv_type<node>(16));
 template<NodeType node>
 static size_t bv32_type_id = ba_types<node>::id(bv_type<node>(32));
 
+struct type_inference_options {
+	bool use_defaults = true;
+};
+
 // Infers the types of variables and constants in the tree n. It assumes that
 // the types of the scoped variables are known when closing the scope.
 // If a variable or constant remains unassigned, it is assigned to tau.
@@ -33,7 +37,8 @@ static size_t bv32_type_id = ba_types<node>::id(bv_type<node>(32));
 template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	const subtree_map<node, size_t>* global_scope = nullptr,
-	const std::vector<htref> *definition_heads = nullptr);
+	const std::vector<htref> *definition_heads = nullptr,
+	const type_inference_options& options = {});
 
 } // namespace idni::tau_lang
 
