@@ -8,6 +8,7 @@
 #	include "boolean_algebras/variant_ba.h"
 #   include "ba_constants.h"
 #   include "runtime.h"
+#   include "api.h"
 #else
 #	include "tau.h"
 #endif // DEBUG

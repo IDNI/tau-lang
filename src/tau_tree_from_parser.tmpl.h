@@ -303,6 +303,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		// If type inference failed
 		if (!transformed) {
 			tau::use_hooks = using_hooks;
+			DBG(if (!transformed) { LOG_TRACE << "inferred is nullptr"; })
 			return nullptr;
 		}
 		if (transformed) {
@@ -317,6 +318,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	//Check for semantic errors in expression
 	if (has_semantic_error<node>(transformed)) {
 		tau::use_hooks = using_hooks;
+		DBG(LOG_TRACE << "transformed has semantic error";)
 		return nullptr;
 	}
 	tau::use_hooks = using_hooks;
@@ -350,6 +352,11 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	return transformed;
 }
 
+template <NodeType node>
+tref tree<node>::get(const tau_parser::tree& t, get_options&& options) {
+	return get(t, options);
+}
+
 //------------------------------------------------------------------------------
 
 template <NodeType node>
@@ -362,6 +369,11 @@ tref tree<node>::get(tau_parser::result& result, get_options& options) {
 	}
 	auto pt = parse_tree::get(result.get_shaped_tree2());
 	return tree<node>::get(pt, options);
+}
+
+template <NodeType node>
+tref tree<node>::get(tau_parser::result& result, get_options&& options) {
+	return get(result, options);
 }
 
 template<NodeType node>
@@ -378,9 +390,19 @@ tref tree<node>::get(const std::string& source, get_options& options) {
 }
 
 template <NodeType node>
+tref tree<node>::get(const std::string& source, get_options&& options) {
+	return get(source, options);
+}
+
+template <NodeType node>
 tref tree<node>::get(std::istream& is, get_options& options) {
 	auto result = tau_parser::instance().parse(is, options.parse);
 	return tree<node>::get(result, options);
+}
+
+template <NodeType node>
+tref tree<node>::get(std::istream& is, get_options&& options) {
+	return get(is, options);
 }
 
 template <NodeType node>
@@ -389,6 +411,13 @@ tref tree<node>::get_from_file(const std::string& filename,
 {
 	auto result = tau_parser::instance().parse(filename, options.parse);
 	return tree<node>::get(result, options);
+}
+
+template <NodeType node>
+tref tree<node>::get_from_file(const std::string& filename,
+	get_options&& options)
+{
+	return get_from_file(filename, options);
 }
 
 } // namespace idni::tau_lang

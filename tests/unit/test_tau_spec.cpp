@@ -2,7 +2,6 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "api.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "testing"
