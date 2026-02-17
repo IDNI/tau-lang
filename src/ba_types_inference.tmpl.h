@@ -296,7 +296,7 @@ tref update_bf_ref(tref n) {
 template<NodeType node>
 std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		const subtree_map<node, size_t>& types,
-		[[maybe_unused]] const type_inference_options& options) {
+		const type_inference_options& options) {
 	using tau = tree<node>;
 
 	// TODO (LOW) I think this could be simplified
@@ -309,7 +309,7 @@ std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 			: inferred_type;
 		return unify<node>(current_type, inferred_type);
 	}
-	return (types.at(canonized) == untyped_type_id<node>())
+	return (types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
 		? tau_type_id<node>()
 		: types.at(canonized);
 }
@@ -401,7 +401,7 @@ bool using_default_bv_size(tref n, const subtree_map<node, size_t>& types) {
 template<NodeType node>
 tref update_ref(type_scoped_resolver<node>& resolver, tref n,
 		const subtree_map<node, size_t>& types,
-		[[maybe_unused]] const type_inference_options& options) {
+		const type_inference_options& options) {
 	using tau = tree<node>;
 	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
@@ -409,7 +409,7 @@ tref update_ref(type_scoped_resolver<node>& resolver, tref n,
 	// If the variable is not typed
 	if (tau::get(n).get_ba_type() == untyped_type_id<node>()) {
 		// We type it according to the inferred type or default
-		size_t type = (types.at(canonized) == untyped_type_id<node>())
+		size_t type = (types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
 			? tau_type_id<node>()
 			: types.at(canonized);
 
@@ -533,7 +533,7 @@ std::variant<tref, inference_error, parse_error> update_predicate_rr(
 
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_functional_ref(
-		type_scoped_resolver<node>& resolver, tref n, [[maybe_unused]] tref parent,
+		type_scoped_resolver<node>& resolver, tref n,
 		const type_inference_options& options) {
 	using tau = tree<node>;
 
@@ -545,7 +545,8 @@ std::variant<tref, inference_error, parse_error> update_functional_ref(
 		return std::get<parse_error>(updated);
 	// Finally, we wrap the new ref accordingly
 	auto type = find_ba_type<node>(std::get<tref>(updated));
-	DBG(assert(!is_untyped<node>(type)));
+	// Now we allow untyped
+	//DBG(assert(!is_untyped<node>(type)));
 	auto new_n = untype<node>(std::get<tref>(updated));
 	return tau::get_typed(tau::bf, tau::get_typed(tau::bf_ref, new_n, type), type);
 }
@@ -586,7 +587,7 @@ template<NodeType node>
 std::variant<tref, inference_error, parse_error> update(
 		type_scoped_resolver<node>& resolver, tref r,
 		std::initializer_list<size_t> types_to_update,
-		[[maybe_unused]] const type_inference_options& options) {
+		const type_inference_options& options) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
@@ -621,7 +622,7 @@ std::variant<tref, inference_error, parse_error> update(
 				} else  {
 					if (std::get<tref>(updated) != n)
 						changes.insert_or_assign(n, std::get<tref>(updated));
-					if (using_default_type<node>(n, types)) {
+					if (options.use_defaults && using_default_type<node>(n, types)) {
 						default_typing_message<node>(std::get<tref>(updated), type_environment.back());
 					}
 				}
@@ -637,9 +638,9 @@ std::variant<tref, inference_error, parse_error> update(
 				} else {
 					if (std::get<tref>(updated) != n)
 						changes.insert_or_assign(n, std::get<tref>(updated));
-					if (using_default_type<node>(n, types)) {
+					if (options.use_defaults && using_default_type<node>(n, types)) {
 						default_typing_message<node>(std::get<tref>(updated), type_environment.back());
-					} else if (using_default_bv_size<node>(n, types)) {
+					} else if (options.use_defaults && using_default_bv_size<node>(n, types)) {
 						default_typing_message<node>(std::get<tref>(updated), type_environment.back(), true);
 					}
 				}
@@ -653,7 +654,7 @@ std::variant<tref, inference_error, parse_error> update(
 				} else {
 					if (std::get<tref>(updated) != n)
 						changes.insert_or_assign(n, std::get<tref>(updated));
-					if (using_default_type<node>(n, types)) {
+					if (options.use_defaults && using_default_type<node>(n, types)) {
 						default_typing_message<node>(std::get<tref>(updated), type_environment.back());
 					}
 				}
@@ -745,8 +746,7 @@ template <NodeType node>
 std::variant<size_t, inference_error> type_by_function_symbol(
 		type_scoped_resolver<node>& resolver,
 		std::map<std::tuple<size_t, int_t, int_t>, size_t>& available_function_symbols,
-		size_t type, const auto& type_map,
-		[[maybe_unused]] const type_inference_options& options) {
+		size_t type, const auto& type_map) {
 	// If the merged type is untyped, we try to update the type
 	// information by considering previously defined function definitions
 	// contained in available_function_symbols
@@ -830,7 +830,7 @@ template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
  		const subtree_map<node, size_t>* global_scope,
 		const std::vector<htref>* definition_heads,
-		[[maybe_unused]] const type_inference_options& options) {
+		const type_inference_options& options) {
 	using tau = tree<node>;
 
 	type_scoped_resolver<node> resolver;
@@ -869,7 +869,7 @@ template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	std::map<std::tuple<size_t, int_t, int_t>, size_t>& available_function_symbols,
 	type_scoped_resolver<node>& resolver,
-	[[maybe_unused]] const type_inference_options& options)
+	const type_inference_options& options)
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -970,7 +970,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					};
 					std::erase_if(rec_type_ids_map[tau::ref], current_ref);
 					if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
-							std::get<size_t>(merged_type), rec_type_ids_map[tau::ref], options);
+							std::get<size_t>(merged_type), rec_type_ids_map[tau::ref]);
 							std::holds_alternative<inference_error>(typed)) {
 						error = std::get<inference_error>(typed);
 					}
@@ -1028,7 +1028,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				}
 				// Take type definition due to function symbols into account
 				if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
-						std::get<size_t>(merged_type), typeables_map[tau::ref], options);
+						std::get<size_t>(merged_type), typeables_map[tau::ref]);
 						std::holds_alternative<inference_error>(typed)) {
 					error = std::get<inference_error>(typed);
 				}
@@ -1082,7 +1082,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						} // Incompatible types
 						// Take type definition due to function symbols into account
 						if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
-								std::get<size_t>(merged_type), rec_type_ids_map[tau::ref], options);
+								std::get<size_t>(merged_type), rec_type_ids_map[tau::ref]);
 								std::holds_alternative<inference_error>(typed)) {
 							error = std::get<inference_error>(typed); // Incompatible types
 						}
@@ -1112,7 +1112,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					}
 					// Take type definition due to function symbols into account
 					if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
-							std::get<size_t>(merged_type), arguments_map[tau::ref], options);
+							std::get<size_t>(merged_type), arguments_map[tau::ref]);
 							std::holds_alternative<inference_error>(typed)) {
 						error = std::get<inference_error>(typed);
 					}
@@ -1151,7 +1151,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				}
 				// Take type definition due to function symbols into account
 				if (auto typed = type_by_function_symbol(resolver, available_function_symbols,
-						std::get<size_t>(merged_type), typeables_map[tau::ref], options);
+						std::get<size_t>(merged_type), typeables_map[tau::ref]);
 						std::holds_alternative<inference_error>(typed)) {
 					error = std::get<inference_error>(typed);
 				}
@@ -1266,7 +1266,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					}
 					auto new_n = update_default<node>(n, transformed);
 					auto updated = is_functional_ref<node>(new_n, available_function_symbols)
-						? update_functional_ref<node>(resolver, new_n, parent, options)
+						? update_functional_ref<node>(resolver, new_n, options)
 						: update_predicate_ref<node>(resolver, new_n, parent, options);
 					if (std::holds_alternative<parse_error>(updated)) {
 						error = std::get<parse_error>(updated);
