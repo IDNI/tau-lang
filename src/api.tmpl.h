@@ -145,7 +145,7 @@ bool api<node>::contains(tref expression, typename node::type nt) {
 
 template <NodeType node>
 bool api<node>::is_term(tref term) {
-	return tau::get(term).is(tau::bf);
+	return tau::get(term).is_term();
 }
 
 template <NodeType node>
@@ -279,22 +279,25 @@ tref api<node>::nnf(tref expr) {
 
 template <NodeType node>
 tref api<node>::simplify(tref expr) {
-	if (is_term(expr)) return syntactic_term_simplification(expr);
-	return syntactic_formula_simplification(expr);
+	if (!expr) return nullptr;
+	return canonize_quantifier_ids<node>(tau::reget(expr));
 }
 
 template <NodeType node>
 tref api<node>::syntactic_term_simplification(tref term) {
+	if (!term) return nullptr;
 	return syntactic_path_simplification<node>::on(term);
 }
 
 template <NodeType node>
 tref api<node>::syntactic_formula_simplification(tref fm) {
+	if (!fm) return nullptr;
 	return tau_lang::syntactic_formula_simplification<node>(fm);
 }
 
 template <NodeType node>
 tref api<node>::normalize_formula(tref fm) {
+	if (!fm) return nullptr;
 	auto maybe_nso_rr = get_nso_rr(fm);
 	if (!maybe_nso_rr || !maybe_nso_rr.value().main
 		|| tau::get(maybe_nso_rr.value().main).is(tau::bf))
@@ -304,6 +307,7 @@ tref api<node>::normalize_formula(tref fm) {
 
 template <NodeType node>
 tref api<node>::normalize_term(tref term) {
+	if (!term) return nullptr;
 	auto maybe_nso_rr = get_nso_rr(term);
 	if (!maybe_nso_rr) return nullptr;
 	auto& nso_rr = maybe_nso_rr.value();
