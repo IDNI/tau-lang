@@ -1396,7 +1396,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	}
 
 	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after update): " << TC.CLEAR()
-		<< LOG_FM_DUMP(n);)
+		<< LOG_FM_DUMP(new_n);)
 
 	new_n = std::get<tref>(updated);
 
