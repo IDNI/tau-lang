@@ -66,13 +66,17 @@ void api<node>::set_severity(boost::log::trivial::severity_level level) {
 template <NodeType node>
 tref api<node>::get_term(const std::string& input) {
 	return tau::get(input, typename tau::get_options{
-			.parse = { .start = tau::bf } });
+			.parse = { .start = tau::bf },
+			.infer_ba_types = false,
+			.reget_with_hooks = false });
 }
 
 template <NodeType node>
 tref api<node>::get_formula(const std::string& input) {
 	return tau::get(input, typename tau::get_options{
-			.parse = { .start = tau::wff } });
+			.parse = { .start = tau::wff },
+			.infer_ba_types = false,
+			.reget_with_hooks = false });
 }
 
 template <NodeType node>
@@ -97,7 +101,9 @@ tref api<node>::get_predicate_def(const std::string& predicate_def) {
 template <NodeType node>
 tref api<node>::get_stream_def(const std::string& stream_def) {
 	tref def = tau::get(stream_def, typename tau::get_options{
-			.parse = { .start = tau::start_get_stream_def } });
+			.parse = { .start = tau::stream_def },
+			.infer_ba_types = false,
+			.reget_with_hooks = false });
 	return tau::trim(def);
 }
 
@@ -112,21 +118,26 @@ tref api<node>::get_spec(const std::string& src) {
 template <NodeType node>
 tref api<node>::get_definition(const std::string& definition) {
 	return tau::get(definition, typename tau::get_options{
-			.parse = { .start = tau::rec_relation } });
+			.parse = { .start = tau::rec_relation },
+			.infer_ba_types = false,
+			.reget_with_hooks = false });
 }
 
 template <NodeType node>
 tref api<node>::get_spec_or_term(const std::string& expression) {
-	tref       expr = get_spec(expression);
-	if (!expr) expr = get_term(expression);
+	tref       expr = get_spec(expression); // try multiline first (includes a formula too)
+	if (!expr) expr = get_term(expression); // if it fails, try just a term
 	return expr;
 }
 
 template <NodeType node>
-tref api<node>::get_formula_or_term(const std::string& expression) {
-	tref       expr = get_formula(expression);
-	if (!expr) expr = get_term(expression);
-	return expr;
+tref api<node>::get_formula_or_term(const std::string& expr) {
+	tref e = tau::get(expr, typename tau::get_options{
+			.parse = { .start = tau::fm_or_term },
+			.infer_ba_types = false,
+			.reget_with_hooks = false });
+	if (e) return tau::trim(e);
+	return nullptr;
 }
 
 // Querying
