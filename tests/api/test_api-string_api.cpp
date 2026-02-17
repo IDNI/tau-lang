@@ -3,11 +3,24 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-#include "api.h"
-
 using tau_api = api<node_t>;
 
-TEST_SUITE("String API") {
+#include "test_api-fixture.h"
+
+TEST_SUITE("Tau API - string") {
+	TEST_CASE_FIXTURE(api_fixture, "Querying") {
+		for (const auto& term : terms) {
+			CHECK(tau_api::is_term(term));
+			CHECK(!tau_api::is_formula(term));
+		}
+		for (const auto& formula : formulas) {
+			CHECK(!tau_api::is_term(formula));
+			CHECK(tau_api::is_formula(formula));
+		}
+	}
+}
+
+TEST_SUITE("Tau API - string - execution") {
 
 	TEST_CASE("handle syntax error") {
 		auto maybe_i = tau_api::get_interpreter("o[t] =");
