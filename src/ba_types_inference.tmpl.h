@@ -268,7 +268,8 @@ tref update_ba_symbol(tref n) {
 
 // type all symbols according to their children's types
 template<NodeType node>
-std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n) {
+std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n,
+		const type_inference_options& options) {
 	using tau = tree<node>;
 
 	// We have one child at least and we know that the types of the
@@ -277,6 +278,7 @@ std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n) {
 	auto t = tau::get(n)[0].get_ba_type();
 	if (is_bv_type_family<node>(t))
 		return update_ba_symbol<node>(n);
+	else if (!options.use_defaults) return n;
 	return inference_error{n, bv_type_id<node>(), t};
 }
 
@@ -683,7 +685,7 @@ std::variant<tref, inference_error, parse_error> update(
 				if(!to_be_updated.contains(nt) && !to_be_updated.contains(tau::typeable_symbol)) {
 					if (nn != n) changes.insert_or_assign(n, nn);
 				} else {
-					auto updated = update_bv_symbol<node>(nn);
+					auto updated = update_bv_symbol<node>(nn, options);
 					if (std::holds_alternative<inference_error>(updated)) {
 						error = std::get<inference_error>(updated);
 						break;
@@ -1375,7 +1377,15 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	// We add to the transformed map the untyping of the bf_t's and the bf_f's.
 	// ...some code here...
 	tref new_n = transformed.contains(n) ? transformed[n] : n;
+
+	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after inference): " << TC.CLEAR()
+		<< LOG_FM_DUMP(new_n);)
+
 	new_n = bv_defaulting<node>(new_n);
+
+	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after bv_defaulting): " << TC.CLEAR()
+		<< LOG_FM_DUMP(new_n);)
+
 	if (new_n == nullptr) return tau::use_hooks = using_hooks,
 		std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	auto updated = update<node>(resolver, new_n, { tau::typeable_symbol, tau::bf_ref }, options);
@@ -1384,16 +1394,23 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		return tau::use_hooks = using_hooks,
 			std::pair<tref, subtree_map<node, size_t>>{ nullptr, subtree_map<node, size_t>{} };
 	}
+
+	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after update): " << TC.CLEAR()
+		<< LOG_FM_DUMP(n);)
+
 	new_n = std::get<tref>(updated);
 
 	// Remove intermediate tau::processed nodes
-	auto remove_processed = [](tref n) {
+	auto remove_processed = [&](tref n) {
 		// If the processed node is found, it is the last child
 		if (tt(n) | tau::processed)
 			return tau::remove_child(n);
 		else return n;
 	};
 	new_n = pre_order<node>(new_n).apply_unique(remove_processed);
+
+	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after remove_processed): " << TC.CLEAR()
+		<< LOG_FM_DUMP(new_n);)
 
 	auto n_global_scope = resolver.current_types();
 
