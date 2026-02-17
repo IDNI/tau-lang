@@ -1437,6 +1437,209 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 }
 
+TEST_SUITE("type_inference_options") {
+
+	static auto no_defaults_use = type_inference_options { .use_defaults = false };
+
+	TEST_CASE("use defaults: x >> y") {
+		tref parsed = parse("x >> y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x >> y") {
+		tref parsed = parse("x >> y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x << y") {
+		tref parsed = parse("x << y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x << y") {
+		tref parsed = parse("x << y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x + y") {
+		tref parsed = parse("x + y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x + y") {
+		tref parsed = parse("x + y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x - y") {
+		tref parsed = parse("x - y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x - y") {
+		tref parsed = parse("x - y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x % y") {
+		tref parsed = parse("x % y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x % y") {
+		tref parsed = parse("x % y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x * y") {
+		tref parsed = parse("x * y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x * y") {
+		tref parsed = parse("x * y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x / y") {
+		tref parsed = parse("x / y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x / y") {
+		tref parsed = parse("x / y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x !| y") {
+		tref parsed = parse("x !| y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x !| y") {
+		tref parsed = parse("x !| y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x !^ y") {
+		tref parsed = parse("x !^ y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x !^ y") {
+		tref parsed = parse("x !^ y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x !& y") {
+		tref parsed = parse("x !& y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x !& y") {
+		tref parsed = parse("x !& y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x | y") {
+		tref parsed = parse("x | y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x | y") {
+		tref parsed = parse("x | y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x ^ y") {
+		tref parsed = parse("x ^ y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x ^ y") {
+		tref parsed = parse("x ^ y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: x & y") {
+		tref parsed = parse("x & y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+	}
+
+	TEST_CASE("no use defaults: x & y") {
+		tref parsed = parse("x & y", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+
+	TEST_CASE("use defaults: y'") {
+		logging::trace();
+		tref parsed = parse("y'", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred == nullptr );
+		logging::info();
+	}
+
+	TEST_CASE("no use defaults: y'") {
+		tref parsed = parse("y'", parse_bf_no_infer());
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
+		CHECK( inferred == parsed );
+	}
+}
+
 TEST_SUITE("regression tests") {
 
 	TEST_CASE("satisfiability3/qual_lookback_one_st") {
