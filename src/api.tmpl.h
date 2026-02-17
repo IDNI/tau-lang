@@ -332,7 +332,7 @@ tref api<node>::normalize_term(tref term) {
 template <NodeType node>
 tref api<node>::anti_prenex(tref fm) {
 	if (!fm) return nullptr;
-	return anti_prenex<node>(fm);
+	return tau_lang::anti_prenex<node>(fm);
 }
 
 template <NodeType node>
