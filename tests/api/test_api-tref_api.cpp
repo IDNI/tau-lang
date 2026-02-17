@@ -136,7 +136,7 @@ TEST_SUITE("Tau API - tref - parsing") {
 			DBG(TAU_LOG_TRACE << "get_formula_or_term - formula: " << formula;)
 			tref f = tau_api::get_formula_or_term(formula);
 			CHECK(f);
-			using node = node_t;
+			DBG(using node = node_t;)
 			DBG(TAU_LOG_TRACE << "get_formula_or_term - formula: " << TAU_LOG_FM_DUMP(f);)
 			CHECK(tau::get(f).is(tau::wff));
 		}
@@ -152,7 +152,7 @@ TEST_SUITE("Tau API - tref - parsing") {
 TEST_SUITE("Tau API - tref - querying") {
 
 	TEST_CASE_FIXTURE(api_fixture, "contains") {
-		using node = node_t;
+		DBG(using node = node_t;)
 		tref t = tau_api::get_term("x + 0");
 		DBG(TAU_LOG_TRACE << "contains on term: " << TAU_LOG_FM_DUMP(t);)
 		CHECK(tau_api::contains(t, tau::bf));
