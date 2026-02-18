@@ -264,6 +264,10 @@ tref find_ba_type_tree (tref term);
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);
 
+// Check if the op is buildable
+template <NodeType node>
+bool is_buildable(size_t op, tref n, tref m);
+
 } // namespace idni::tau_lang
 
 #include "ba_types.tmpl.h"

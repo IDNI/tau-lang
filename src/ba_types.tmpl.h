@@ -411,4 +411,30 @@ std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id) {
 	return ba_types<node>::print(os, ba_type_id);
 }
 
+template <NodeType node>
+bool is_buildable(size_t op, tref n, tref m) {
+	using tau = tree<node>;
+
+	auto n_type = tau::get(n).get_type();
+	auto m_type = tau::get(m).get_type();
+	if (n_type != m_type) return false;
+	auto n_ba_type = tau::get(n).get_ba_type();
+	auto m_ba_type = tau::get(m).get_ba_type();
+	if(!unify<node>(n_ba_type, m_ba_type).has_value()) return false;
+	switch (op) {
+		case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
+		case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
+		case tau::bf_shl: case tau::bf_xnor: case tau::bf_nand:
+		case tau::bf_nor: {
+			return is_bv_type_family<node>(n_ba_type);
+		}
+		case tau::bf_or: case tau::bf_xor: case tau::bf_and:
+		case tau::bf_neg: {
+			return true;
+		}
+		default:
+			return false;
+	}
+}
+
 } // namespace idni::tau_lang

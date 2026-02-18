@@ -1424,4 +1424,5 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	return std::pair<tref, subtree_map<node, size_t>>{ new_n, std::move(n_global_scope) };
 }
 
+
 } // namespace idni::tau_lang
