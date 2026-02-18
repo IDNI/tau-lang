@@ -1640,6 +1640,38 @@ TEST_SUITE("type_inference_options") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
+
+	TEST_CASE("incremental construction of terms in api: success") {
+		tref y = parse("y:bv[16]", parse_bf_no_infer());
+		CHECK( y != nullptr );
+		auto inferred_y = infer_ba_types<node_t>(y, nullptr, nullptr, no_defaults_use).first;
+		//CHECK ( inferred_y == y);
+		tref x = parse("x", parse_bf_no_infer());
+		CHECK( x != nullptr );
+		auto inferred_x = infer_ba_types<node_t>(x, nullptr, nullptr, no_defaults_use).first;
+		CHECK( inferred_x == x );
+		CHECK( is_buildable<node_t>(tau::bf_and, inferred_x, inferred_y) );
+		auto x_and_y = build_bf_and<node_t>(inferred_x, inferred_y);
+		auto inferred_x_and_y = infer_ba_types<node_t>(x_and_y, nullptr, nullptr, no_defaults_use).first;
+		CHECK( inferred_x_and_y != nullptr);
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", bv16_type_id<node_t>},
+			{"y", bv16_type_id<node_t>},
+		};
+		CHECK( check_vars(inferred_x_and_y, expected) );
+	}
+
+	TEST_CASE("incremental construction of terms in api: fail") {
+		tref y = parse("y:sbf", parse_bf_no_infer());
+		CHECK( y != nullptr );
+		auto inferred_y = infer_ba_types<node_t>(y, nullptr, nullptr, no_defaults_use).first;
+		//CHECK ( inferred_y == y);
+		tref x = parse("x", parse_bf_no_infer());
+		CHECK( x != nullptr );
+		auto inferred_x = infer_ba_types<node_t>(x, nullptr, nullptr, no_defaults_use).first;
+		CHECK( inferred_x == x );
+		CHECK( !is_buildable<node_t>(tau::bf_add, inferred_x, inferred_y) );
+	}
 }
 
 TEST_SUITE("regression tests") {
