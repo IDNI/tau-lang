@@ -80,49 +80,59 @@ subtree_map<node, tref> simplify(const tref& n, subtree_map<node, tref>& changes
 	tref last_block = nullptr;
 	size_t last_blosk_index = 0;
 
+	auto is_simplifiable_block_start = [&](tref n) -> bool {
+		auto nt = tau::get(n).get_type();
+		switch (nt) {
+			case tau::bf_add: case tau::bf_mul:
+			case tau::bf_sub: case tau::bf_div:
+				return is_variable_or_constant<node>(tau::get(n).first())
+					&& is_variable_or_constant<node>(tau::get(n).second());
+			default: return false;
+		}
+	};
+
+	auto start_simplifiable_block = [&](tref n) {
+		auto nt = tau::get(n).get_type();
+		if (is_simplifiable<node>(nt)) {
+			to_simplify.emplace_back(trefs{tau::get(n).first(), tau::get(n).second()}, trefs{});
+		} else {
+			to_simplify.emplace_back(trefs{tau::get(n).first()}, trefs{tau::get(n).second()});
+		}
+		searching = false, last_block = n, last_blosk_index = to_simplify.size() - 1, operation = nt;
+	};
+
 	auto f = [&](tref n) -> bool {
 		auto nt = tau::get(n).get_type();
 		// we skip bf symbols
 		if (nt == tau::bf) return true;
-		if (searching) { // searching for the start of the block of operations to simplify
-			if (is_simplifiable<node>(nt) // we have two children
-					&& is_variable_or_constant<node>(tau::get(n).first())
-					&& is_variable_or_constant<node>(tau::get(n).second())) {
-				to_simplify.emplace_back(trefs{tau::get(n).first(), tau::get(n).second()}, trefs{});
-				return searching = false, last_block = n, last_blosk_index = to_simplify.size() - 1, operation = nt, true;
-			} else if (is_simplifiable<node>(inverse_of<node>(nt)) // we also have two children
-					&& is_variable_or_constant<node>(tau::get(n).first())
-					&& is_variable_or_constant<node>(tau::get(n).second())) {
-				to_simplify.emplace_back(trefs{tau::get(n).first()}, trefs{tau::get(n).second()});
-				return searching = false, last_block = n, last_blosk_index = to_simplify.size() - 1, operation = nt, true;
-			}
-		}
-		// we reading the block of operations to simplify so we push the leaves
-		if (is_variable_or_constant<node>(n)) {
-			to_simplify.emplace_back(trefs{n}, trefs{});
+		if (searching){ // searching for the start of the block of operations to simplify
+			if (is_simplifiable_block_start(n))
+				start_simplifiable_block(n);
 			return true;
 		}
+		// we reading the block of operations to simplify so we push the leaves
+		if (is_variable_or_constant<node>(n))
+			return to_simplify.emplace_back(trefs{n}, trefs{}), true;
 		// if the operation correspond to the one we are simplifying
-		if (operation == nt) {
+		if ((operation == nt) || (inverse_of<node>(operation) == nt)) {
 			auto [right_args, right_invs] = to_simplify.back();
 			to_simplify.pop_back();
+			auto to_args = (operation == nt) ? right_args : right_invs;
+			auto to_invs = (operation == nt) ? right_invs : right_args;
 			auto [left_args, left_invs] = to_simplify.back();
-			left_args.insert(left_args.end(), right_args.begin(), right_args.end());
-			left_invs.insert(left_invs.end(), right_invs.begin(), right_invs.end());
+			left_args.insert(left_args.end(), to_args.begin(), to_args.end());
+			left_invs.insert(left_invs.end(), to_invs.begin(), to_invs.end());
 			return last_block = n, last_blosk_index = to_simplify.size() - 1, true;
 		}
-		// if the operation is the inverse of the one we are simplifying
-		if (inverse_of<node>(operation) == nt) {
-			auto [right_args, right_invs] = to_simplify.back();
-			to_simplify.pop_back();
-			auto [left_args, left_invs] = to_simplify.back();
-			left_args.insert(left_args.end(), right_invs.begin(), right_invs.end());
-			left_invs.insert(left_invs.end(), right_args.begin(), right_args.end());
-			return last_block = n, last_blosk_index = to_simplify.size() - 1, true;
-		}
-		// otherwise, we simplify the block as other opeartions are involved rightnow
-		changes[last_block] = simplify<node>(to_simplify[last_blosk_index].first, to_simplify[last_blosk_index].second, operation);
-		return to_simplify.clear(), searching = true, last_block = nullptr, last_blosk_index = 0, operation = tau::nul, true;
+		// otherwise, we simplify the last block as other opeartions are involved
+		// rightnow
+		auto [arguments, inverses] = to_simplify[last_blosk_index];
+		changes[last_block] = simplify<node>(arguments, inverses, operation);
+		to_simplify.clear();
+		// finally, we check if the current node is the start of a new block to simplify
+		if (is_simplifiable_block_start(n))
+			return to_simplify.clear(), start_simplifiable_block(n), true;
+		return searching = true, last_block = nullptr, last_blosk_index = 0, operation = tau::nul, true;
 	};
 
 	post_order<node>(n).search(f);
