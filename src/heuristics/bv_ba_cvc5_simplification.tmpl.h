@@ -93,13 +93,13 @@ tref bv_ba_cvc5_simplification(tref term) {
 
 	subtree_map<node, bv> vars, free_vars;
 	auto bv_term = bv_eval_node<node>(tt(term), vars, free_vars);
-	if (!bv_term) return term; // Unable to transform to bv
+	if (!bv_term) return nullptr; // Unable to transform to bv (returning null)
 	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << bv_term.value().toString() << "\n";)
 	auto simplified_bv = normalize_bv(bv_term.value());
 	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/simplified_bv: " << simplified_bv.toString() << "\n";)
 	auto simplified_term = cvc5_tree_to_tau_tree<node>(simplified_bv);
 #ifdef DEBUG
-	if (simplified_term != nullptr)
+	if (simplified_term)
 		LOG_TRACE << "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term) << "\n"
 			<< "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term).tree_to_str() << "\n";
 #endif // DEBUG
