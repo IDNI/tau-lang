@@ -4,7 +4,7 @@
 #include "../parser/bitvector_parser.generated.h"
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "bv_ba-hooks"
+#define LOG_CHANNEL_NAME "bv_ba_hooks"
 
 namespace idni::tau_lang {
 

@@ -87,15 +87,16 @@ bool operator!=(const bool& lhs, const Term& rhs) { return !(rhs == lhs); }
 
 template<NodeType node>
 tref simplify_bv_term(tref term) {
-	/*using node_t = node<BAs...>;
-	using tau = tree<node_t>;
-	using tt = tau::traverser;
+	//using node_t = node<BAs...>;
+	//using tau = tree<node_t>;
+	//using tt = tau::traverser;
 
-	subtree_map<node_t, bv> vars, free_vars;
-	auto bv_term = bv_eval_node<node_t>(tt(term), vars, free_vars);
-	if (!bv_term) return term; // Unable to transform to bv
-	auto simplified_bv = normalize(bv_term.value());
-	return cvc5_tree_to_tau_tree<node_t>(simplified_bv);*/
+	if (auto cvc5_simplified = bv_ba_cvc5_simplification<node>(term)) {
+		return cvc5_simplified;
+	} else if (auto custom_simplified = bv_ba_custom_simplification<node>(term)) {
+		return custom_simplified;
+	}
+	// Unable to simplify, return original term
 	return term;
 }
 
