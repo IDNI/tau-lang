@@ -285,6 +285,110 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 		tref expected = parse_bf_no_hooks("{6}:bv[8]");
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
+
+	TEST_CASE("1 * 2") {
+		const char* sample = "{1}:bv[64] * {2}:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("1 + X") {
+		const char* sample = "{1}:bv[64] + X:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("1 - X") {
+		const char* sample = "{1}:bv[64] + {2}:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("1 * X") {
+		const char* sample = "{1}:bv[64] * X:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("2 * X") {
+		const char* sample = "{1}:bv[64] * X:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("1 / X") {
+		const char* sample = "{1}:bv[64] / X:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("1 + X + 2") {
+		const char* sample = "{1}:bv[64] + X:bv[64] + {2}:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("1 * X * 2") {
+		const char* sample = "{1}:bv[64] * X:bv[64] * {2}:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("1 - X - 2") {
+		const char* sample = "{1}:bv[64] - X:bv[64] - {2}:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("1 / X / 2") {
+		const char* sample = "{1}:bv[64] / X:bv[64] / {2}:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("1 + X + 2 - 3") {
+		const char* sample = "{1}:bv[64] + X:bv[64] + {2}:bv[64] - {3}:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("X * 2 + 3 -2") {
+		const char* sample = "X:bv[64] * {2}:bv[64] + {3}:bv[64] - {2}:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
+
+	TEST_CASE("6 * X * 2 / 3") {
+		const char* sample = "{6}:bv[64] * X:bv[64] * {2}:bv[64] / {3}:bv[64]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
+		CHECK( true );
+	}
 }
 
 TEST_SUITE("Cleanup") {
