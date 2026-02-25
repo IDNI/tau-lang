@@ -20,41 +20,71 @@ size_t inverse_of(size_t operation) {
 }
 
 template<NodeType node>
-tref build_simplification(const trefs& arguments, size_t operation) {
+std::pair<tref, tref> build_simplification(const trefs& arguments, size_t operation, size_t type) {
 	using tau = tree<node>;
 
-	tref ctes = nullptr;
-	tref vars = nullptr;
+	tref ctes = (operation == tau::bf_add) ? _0<node>(type) : _1<node>(type);
+	tref vars = (operation == tau::bf_add) ? _0<node>(type) : _1<node>(type);
 
 	for (const tref& op : arguments) {
 		auto nt = tau::get(op).get_type();
 		switch (nt) {
 			case tau::variable:
-				vars = vars	? tau::get(tau::bf, tau::get(operation, vars, tau::get(tau::bf, op)))
-					: tau::get(tau::bf, op);
+				vars = tau::get(tau::bf, tau::get(operation, vars, tau::get(tau::bf, op)));
 				break;
 			case tau::ba_constant: case tau::bf_t: case tau::bf_f:
-				ctes = ctes ? tau::get(tau::bf, tau::get(operation, ctes, tau::get(tau::bf, op)))
-					: tau::get(tau::bf, op);
+				ctes = tau::get(tau::bf, tau::get(operation, ctes, tau::get(tau::bf, op)));
 				break;
 			default: break;
 		}
 	}
-
-	if (vars && ctes) return tau::get(tau::bf, tau::get(operation, vars, ctes));
-	else if (vars) return vars;
-	else if (ctes) return ctes;
-	else return tau::get(tau::bf, arguments[0]);
+	return {vars, ctes};
 }
 
 template<NodeType node>
-tref build_simplification(const trefs& arguments, const trefs& inverses, size_t operation) {
+tref build_simplification(const trefs& arguments, const trefs& inverses, size_t operation, size_t type) {
 	using tau = tree<node>;
 
-	if (inverses.empty()) return build_simplification<node>(arguments, operation);
-	return tau::get(tau::bf, tau::get(inverse_of<node>(operation),
-		build_simplification<node>(arguments, operation),
-		build_simplification<node>(inverses, operation)));
+	// removing commons elements from arguments and inverses
+	trefs args = arguments;
+	trefs invs = inverses;
+	for (const tref& arg : arguments) {
+		auto it = std::find(invs.begin(), invs.end(), arg);
+		if (it != invs.end()) {
+			invs.erase(it);
+			args.erase(std::find(args.begin(), args.end(), arg));
+		}
+	}
+
+	if (invs.empty()) {
+		auto [vars, ctes] = build_simplification<node>(args, operation, type);
+		if (!vars && !ctes) return _0<node>(type);
+		if (!vars) return ctes;
+		if (!ctes) return vars;
+		return tau::get(tau::bf, tau::get(operation, vars, ctes));
+	}
+
+	if (args.empty()) {
+		auto [vars, ctes] = build_simplification<node>(invs, operation, type);
+		if (!vars && !ctes) return _0<node>(type);
+		if (!vars) return tau::get(tau::bf, tau::get(inverse_of<node>(operation), _0<node>(type), ctes));
+		if (!ctes) return tau::get(tau::bf, tau::get(inverse_of<node>(operation), _0<node>(type), vars));
+		return tau::get(tau::bf,
+			tau::get(inverse_of<node>(operation),
+				_0<node>(type),
+				tau::get(tau::bf,
+					tau::get(operation, vars, ctes))));
+	}
+
+	auto [invs_vars, invs_ctes] = build_simplification<node>(invs, operation, type);
+	auto [args_vars, args_ctes] = build_simplification<node>(args, operation, type);
+
+	return tau::get(tau::bf,
+		tau::get(operation,
+			tau::get(tau::bf,
+				tau::get(inverse_of<node>(operation), args_vars, invs_vars)),
+			tau::get(tau::bf,
+				tau::get(inverse_of<node>(operation), args_ctes, invs_ctes))));
 }
 
 template<NodeType node>
@@ -81,9 +111,10 @@ void apply_block_operation(std::vector<std::pair<trefs, trefs>>& to_simplify, si
 }
 
 template<NodeType node>
-void end_block(std::vector<std::pair<trefs, trefs>>& to_simplify, subtree_map<node, tref>& changes, tref last_operation, size_t operation) {
+void end_block(std::vector<std::pair<trefs, trefs>>& to_simplify,
+		subtree_map<node, tref>& changes, tref last_operation, size_t operation, size_t type) {
 	auto [arguments, inverses] = to_simplify.back(); to_simplify.pop_back();
-	changes[last_operation] = build_simplification<node>(arguments, inverses, operation);
+	changes[last_operation] = build_simplification<node>(arguments, inverses, operation, type);
 
 #ifdef DEBUG
 	using tau = tree<node>;
@@ -100,8 +131,9 @@ void end_block(std::vector<std::pair<trefs, trefs>>& to_simplify, subtree_map<no
 }
 
 template<NodeType node>
-void end_block_and_clear(std::vector<std::pair<trefs, trefs>>& to_simplify, subtree_map<node, tref>& changes, tref last_operation, size_t operation) {
-	end_block(to_simplify, changes, last_operation, operation);
+void end_block_and_clear(std::vector<std::pair<trefs, trefs>>& to_simplify, subtree_map<node, tref>& changes,
+		tref last_operation, size_t operation, size_t type) {
+	end_block(to_simplify, changes, last_operation, operation, type);
 	to_simplify.clear();
 }
 
@@ -115,6 +147,7 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 	bool building_block = false;
 	tref last_operation = nullptr;
 	size_t last_blosk_index = 0;
+	auto type = tau::get(n).get_ba_type();
 
 	auto f = [&](tref n) -> bool {
 		auto nt = tau::get(n).get_type();
@@ -151,35 +184,52 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 				}
 				// we have no other choice to end the current block and start
 				// searching for a block to simplify again
-				end_block<node>(to_simplify, changes, last_operation, operation);
+				end_block<node>(to_simplify, changes, last_operation, operation, type);
 				return building_block = false, true;
 			}
 			case tau::bf_shr: case tau::bf_shl: case tau::bf_mod: case tau::bf_nor:
 			case tau::bf_xnor: case tau::bf_nand: case tau::bf_or: case tau::bf_xor:
 			case tau::bf_and: case tau::bf_neg: {
 				if (!building_block) return true;
-				end_block_and_clear<node>(to_simplify, changes, last_operation, operation);
+				end_block_and_clear<node>(to_simplify, changes, last_operation, operation, type);
 				return building_block = false, last_operation = nullptr, last_blosk_index = 0, operation = tau::nul, true;
 			}
 			default: return true;
 		}
 	};
 
-	// post_order<node>(n).search(f);
-	pre_order<node>(n).search(idni::all,  idni::all, f);
-	if (building_block) end_block<node>(to_simplify, changes, last_operation, operation);
+	post_order<node>(n).search(f);
+	if (building_block) end_block<node>(to_simplify, changes, last_operation, operation, type);
 	return changes;
 }
 
 template<NodeType node>
 tref bv_ba_custom_simplification(const tref term) {
+	using tau = tree<node>;
+
 	auto changes = simplify_blocks<node>(term);
-	auto result = rewriter::replace<node>(term, changes);
+	auto current = rewriter::replace<node>(term, changes);
 
-	DBG(LOG_TRACE << "bv_ba_custom_simplification/term: " << tree<node>::get(term).to_str() << "\n";)
-	DBG(LOG_TRACE << "bv_ba_custom_simplification/result: " << tree<node>::get(result).to_str() << "\n";)
+	// We only do one pass of block simplifications, several ones could be done using
+	// something like the following
+	/*auto current = term;
+	tref next;
 
-	return result;
+	do {
+		next = current;
+		changes = simplify_blocks<node>(current);
+		current = rewriter::replace<node>(current, changes);
+
+		DBG(LOG_TRACE << "bv_ba_custom_simplification/current: " << tau::get(current).to_str() << " (" << current << ")\n";)
+		DBG(LOG_TRACE << "bv_ba_custom_simplification/next: " << tau::get(next).to_str() << " (" << next << ")\n";)
+		DBG(LOG_TRACE << "bv_ba_custom_simplification/current == next: " << (tau::get(current) == tau::get(next)) << "\n";)
+
+	} while (tau::get(current) != tau::get(next));*/
+
+	DBG(LOG_TRACE << "bv_ba_custom_simplification/term: " << tau::get(term).to_str() << "\n";)
+	DBG(LOG_TRACE << "bv_ba_custom_simplification/current: " << tau::get(current).to_str() << "\n";)
+
+	return current;
 }
 
 } // namespace idni::tau_lang
