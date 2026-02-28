@@ -87,15 +87,6 @@ namespace idni::tau_lang {
 #if defined(DEBUG) || defined(TAU_LOG_CHANNELS)
 static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 
-	/* base boolean algebras */
-	// "nso_ba",
-	// "sbf_ba",
-	// "tau_ba",
-	// "bv_ba",
-	// "cvc5",
-	// "bv_ba_hooks",
-	// "bv_ba_solver",
-	// "bv_ba_helpers",
 
 	/* main components*/
 	// "execution",
