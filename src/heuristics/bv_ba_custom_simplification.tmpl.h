@@ -9,7 +9,7 @@ using namespace cvc5;
 using namespace idni;
 
 template<NodeType node>
-size_t inverse_of(size_t operation) {
+typename node::type inverse_of(size_t operation) {
 	using tau = tree<node>;
 
 	if (operation == tau::bf_add) return tau::bf_sub;
