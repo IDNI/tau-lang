@@ -73,7 +73,8 @@ inline cvc5::Term make_bitvector_top_elem(const size_t size = default_bv_size);
 inline cvc5::Term make_bitvector_value(size_t value, size_t size = default_bv_size);
 inline cvc5::Term make_bitvector_true();
 inline cvc5::Term make_bitvector_false();
-
+inline cvc5::Term make_bitvector_zero(const size_t size = default_bv_size);
+inline cvc5::Term make_bitvector_one(const size_t size = default_bv_size);
 // -----------------------------------------------------------------------------
 // Queries
 
