@@ -15,6 +15,7 @@ set(TAU_HEADERS
 	boolean_algebras/bv_ba.h
 	heuristics/bv_ba_simplification.h		# heuristic for simplifying boolean formulas with bitvectors
 	heuristics/ex_subs_based_elimination.h  # heuristic for eliminating existential quantifiers based on substitution
+	heuristics/bv_bitblasting.h             # heuristic for bitblasting bitvector formulas
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
 	tau_tree.h         # tau tree, node, tree traverser, builders,
