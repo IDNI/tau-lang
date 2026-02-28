@@ -23,8 +23,14 @@ template<NodeType node>
 std::pair<tref, tref> build_simplification(const trefs& arguments, size_t operation, size_t type) {
 	using tau = tree<node>;
 
-	tref ctes = (operation == tau::bf_add) ? _0<node>(type) : _1<node>(type);
-	tref vars = (operation == tau::bf_add) ? _0<node>(type) : _1<node>(type);
+	size_t size = get_bv_width<node>(ba_types<node>::type_tree(type));
+	typename node::constant one_variant{make_bitvector_one(size)};
+	typename node::constant zero_variant{make_bitvector_zero(size)};
+	tref one = build_bf_ba_constant<node>(one_variant, type);
+	tref zero = build_bf_ba_constant<node>(zero_variant, type);
+
+	tref ctes = (operation == tau::bf_add) ? zero : one;
+	tref vars = (operation == tau::bf_add) ? zero : one;
 
 	for (const tref& op : arguments) {
 		auto nt = tau::get(op).get_type();
