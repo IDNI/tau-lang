@@ -20,33 +20,33 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 	auto nt = form | tt::nt;
 
 	switch (nt) {
-		case node::type::wff_always:
-		case node::type::wff_sometimes: {
+		case tau::wff_always:
+		case tau::wff_sometimes: {
 			return bv_eval_node<node>(form | tt::first, vars, free_vars);
 		}
 		// due to hooks we should consider wff_t or bf_t
-		case node::type::wff: case node::type::bf:
+		case tau::wff: case tau::bf:
 		// TODO (HIGH) deal with those eq appropiately
-		/*case node::type::bv:*/ {
+		/*case tau::bv:*/ {
 			return bv_eval_node<node>(form | tt::first, vars, free_vars);
 		}
-		case node::type::wff_t: return make_bitvector_true();
-		case node::type::wff_f: return make_bitvector_false();
-		case node::type::wff_neg: {
+		case tau::wff_t: return make_bitvector_true();
+		case tau::wff_f: return make_bitvector_false();
+		case tau::wff_neg: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			return l ? std::optional<bv>(make_term_not(l.value())) : std::nullopt;
 		}
-		case node::type::wff_and: {
+		case tau::wff_and: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_and(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::wff_or: {
+		case tau::wff_or: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_or(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::wff_all: {
+		case tau::wff_all: {
 			tref v = (form | tt::first | tt::ref);
 			DBG(assert(is<node>(v, tau::variable));)
 			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
@@ -59,7 +59,7 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			vars.erase(v);
 			return res;
 		}
-		case node::type::wff_ex: {
+		case tau::wff_ex: {
 			tref v = (form | tt::first | tt::ref);
 			DBG(assert(is<node>(v, tau::variable));)
 			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
@@ -72,7 +72,7 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			vars.erase(v);
 			return res;
 		}
-		case node::type::variable: {
+		case tau::variable: {
 			// check if the variable is alr
 			tref v = form | tt::ref;
 			if (auto it = vars.find(v); it != vars.end()) return it->second;
@@ -84,141 +84,141 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			free_vars.emplace(form | tt::ref, x);
 			return std::optional<bv>(x);
 		}
-		case node::type::bf_eq: {
+		case tau::bf_eq: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_equal(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_neq: {
+		case tau::bf_neq: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_distinct(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_lteq: {
+		case tau::bf_lteq: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_less_equal(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_nlteq: {
+		case tau::bf_nlteq: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_not(make_term_less_equal(l.value(), r.value()))) : std::nullopt;
 		}
-		case node::type::bf_gt: {
+		case tau::bf_gt: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_greater(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_ngt: {
+		case tau::bf_ngt: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_not(make_term_greater(l.value(), r.value()))) : std::nullopt;
 		}
-		case node::type::bf_gteq: {
+		case tau::bf_gteq: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_greater_equal(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_ngteq: {
+		case tau::bf_ngteq: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_not(make_term_greater_equal(l.value(), r.value()))) : std::nullopt;
 		}
-		case node::type::bf_lt: {
+		case tau::bf_lt: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_less(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_nlt: {
+		case tau::bf_nlt: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_term_not(make_term_less(l.value(), r.value()))) : std::nullopt;
 		}
-		case node::type::bf_neg: {
+		case tau::bf_neg: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			return (l) ? std::optional<bv>(make_bitvector_not(l.value())) : std::nullopt;
 		}
-		case node::type::bf_add: {
+		case tau::bf_add: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_add(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_sub: {
+		case tau::bf_sub: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_sub(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_mul: {
+		case tau::bf_mul: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_mul(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_div: {
+		case tau::bf_div: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_div(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_mod: {
+		case tau::bf_mod: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_mod(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_and: {
+		case tau::bf_and: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_and(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_nand: {
+		case tau::bf_nand: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_nand(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_or: {
+		case tau::bf_or: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_or(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_nor: {
+		case tau::bf_nor: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_nor(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_xor: {
+		case tau::bf_xor: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_xor(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_xnor: {
+		case tau::bf_xnor: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_xnor(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_shl: {
+		case tau::bf_shl: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_shl(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::bf_shr: {
+		case tau::bf_shr: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;
 		}
-		case node::type::ba_constant: {
+		case tau::ba_constant: {
 			auto cte = form | tt::ba_constant;
 			DBG(assert(std::holds_alternative<bv>(cte));)
 			return std::optional<bv>(std::get<bv>(cte));
 		}
-		case node::type::bf_t: {
+		case tau::bf_t: {
 			tref c = form | tt::ref;
 			auto bv_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
 			return make_bitvector_top_elem(bv_size);
 		}
-		case node::type::bf_f: {
+		case tau::bf_f: {
 			tref c = form | tt::ref;
 			auto bv_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
 			return make_bitvector_bottom_elem(bv_size);
 		}
-		case node::type::ctnvar: {
+		case tau::ctnvar: {
 			return bv_eval_node<node>(form | tt::first, vars, free_vars);
 		}
 		default:
