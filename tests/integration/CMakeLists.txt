@@ -29,6 +29,7 @@ set(TESTS
 	heuristics-ex_subs_based_elimination
 	heuristics-bv_ba_custom_simplification
 	heuristics-bv_ba_cvc5_simplification
+	heuristics-bv_bitblasting
 )
 
 foreach(TEST IN LISTS TESTS)
