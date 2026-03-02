@@ -14,14 +14,13 @@ tref basic_bitblast(const typename tree<node>::traverser& term) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	auto nt = form | tt::nt;
+	auto node = tau::get(form | tt::ref);
 
 	trefs children;
 	for (auto child : form | tt::children)
 		children.push_back(basic_bitblast(child));
-	// TODO (HIGH) we need a deep copy og all the fields of the original node,
-	// not just the nt and the children
-	return bool_node::get(nt, children);
+	bool_node new_node{node.nt, node.data, node.is_term, node.ba_type, node.ext};
+	return bool_node::get(new_node, children);
 }
 
 // bf_bitblast returns a vector of bits representing the bitblasted term, where
@@ -105,7 +104,69 @@ std::optional<trefs> bf_bitblast(const typename tree<node>::traverser& term) {
 }
 
 template<NodeType node>
-tref wff_bitblast(const typename tree<node>::traverser& term) { return nullptr; }
+tref wff_bitblast(const typename tree<node>::traverser& term) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	static auto _one = bool_node::get_typed(bool_node::bf_t, bool_id);
+	static auto zero = bool_node::get_typed(bool_node::bf_f, bool_id);
+
+	auto nt = form | tt::nt;
+	auto ref = form | tt::ref;
+	auto node = tau::get(ref);
+	auto type = node.get_ba_type();
+	auto bv_size = get_bv_size<node>(type);
+
+	switch (nt) {
+		case tau::wff:
+			return bool_node::get(bool_node::wff, wff_bitblast(form | tt::first));
+		case tau::wff_sometimes: case tau::wff_always:
+		case tau::wff_all: case tau::wff_ex:
+		case tau::wff_neg: case tau::wff_or: case tau::wff_conditional:
+		case tau::wff_imply: case tau::wff_rimply: case tau::wff_equiv:
+		case tau::wff_xor: case tau::interval: case tau::wff_and
+		case tau::bf_lt: case tau::bf_gt: case tau::bf_lteq: case tau::bf_gteq:
+		case tau::bf_nlt: case tau::bf_ngt: case tau::bf_nleq: case tau::bf_ngteq: {
+			// Unsupported operations for now
+			LOG_ERROR << "Unsupported operation in wff bitblasting: " << LOG_NT(nt) << " " <<LOG_FM(form);
+			return nullptr;
+		}
+		case tau::wff_eq: {
+			auto left = bf_bitblast(form | tt::first);
+			auto right = bf_bitblast(form | tt::second);
+			if (!left || !right) return std::nullopt;
+			tref result = _0<bool_node>;
+			for (size_t i = 0; i < bv_size; ++i) {
+				result = build_bf_or<bool_node>(
+					result,
+					build_bf_xor(left.value()[i], right.value()[i]),
+				);
+			}
+			return build_bf_eq_0<bool_node>(result);
+		}
+		case tau::wff_neq: {
+			auto left = bf_bitblast(form | tt::first);
+			auto right = bf_bitblast(form | tt::second);
+			if (!left || !right) return std::nullopt;
+			tref result = _0<bool_node>;
+			for (size_t i = 0; i < bv_size; ++i) {
+				result = build_bf_or(
+					result,
+					build_bf_xor<bool_node>(left.value()[i], right.value()[i]),
+				);
+			}
+			return build_bf_eq_1<bool_node>(result);
+		}
+		case tau::wff_t: case tau::wff_f: {
+			return ref;
+		}
+		default: {
+			// Unsupported operations for now
+			LOG_ERROR << "Unsupported operation in wff bitblasting: " << LOG_NT(nt) << " " <<LOG_FM(form);
+			return nullptr;
+		}
+	}
+}
 
 template<NodeType node>
 std::optional<tref> bitblast(tref term) { return std::nullopt; }
