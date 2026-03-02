@@ -574,6 +574,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_bf_interval(tref x, tref y, tref z);
 	static tref build_bf_eq(tref l, tref r);
 	static tref build_bf_eq_0(tref l);
+	static tref build_bf_eq_1(tref l);
 	static tref build_bf_neq(tref l, tref r);
 	static tref build_bf_neq_0(tref l);
 	static tref build_bf_lteq(tref l, tref r);

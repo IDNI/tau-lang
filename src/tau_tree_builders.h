@@ -134,6 +134,9 @@ template <NodeType node>
 tref build_bf_eq_0(tref l);
 
 template <NodeType node>
+tref build_bf_eq_1(tref l);
+
+template <NodeType node>
 tref build_bf_neq(tref l, tref r);
 
 template <NodeType node>
