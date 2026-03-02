@@ -447,6 +447,14 @@ tref build_bf_eq_0(tref l) {
 	return tau::get(tau::wff, tau::get(tau::bf_eq, l, _0<node>(tau::get(l).get_ba_type())));
 }
 
+template <NodeType node>
+tref build_bf_eq_1(tref l) {
+	DBG(assert(l != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf));)
+	return tau::get(tau::wff, tau::get(tau::bf_eq, l, _1<node>(tau::get(l).get_ba_type())));
+}
+
 template<NodeType node>
 tref build_bf_neq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
@@ -1111,6 +1119,11 @@ tref tree<node>::build_bf_eq(tref l, tref r) {
 template <NodeType node>
 tref tree<node>::build_bf_eq_0(tref l) {
 	return tau_lang::build_bf_eq_0<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_eq_1(tref l) {
+	return tau_lang::build_bf_eq_1<node>(l);
 }
 
 template<NodeType node>
