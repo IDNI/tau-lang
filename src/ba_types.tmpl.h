@@ -203,6 +203,13 @@ size_t get_bv_width(tref t) {
 	return default_bv_size;
 }
 
+template <NodeType node>
+size_t get_bv_width(size_t ba_type_id) {
+	tref t = ba_types<node>::type_tree(ba_type_id);
+	DBG(assert(is_bv_type_family<node>(t)));
+	return get_bv_width<node>(t);
+}
+
 // -----------------------------------------------------------------------------
 // BA types
 

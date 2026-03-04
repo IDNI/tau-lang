@@ -169,6 +169,9 @@ bool is_bv_base_type(size_t ba_type_id);
 template <NodeType node>
 size_t get_bv_width(tref t);
 
+template <NodeType node>
+size_t get_bv_width(size_t ba_type_id);
+
 
 // -----------------------------------------------------------------------------
 // BA types
