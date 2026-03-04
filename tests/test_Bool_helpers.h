@@ -22,7 +22,7 @@ inline tref base_ba_term_simplification(tref term, const Bool&) {
 	return term;
 }
 
-template<>
+/*template<>
 struct nso_factory<bv, Bool> {
 	using node_t = node<bv, Bool>;
 	using tau = tree<node_t>;
@@ -86,7 +86,7 @@ struct nso_factory<bv, Bool> {
 		auto ba_type = tau::get(term).get_ba_type();
 		return is_bv_type_family<node_t>(ba_type) ? simplify_bv_term<node_t>(term) : term;
 	}
-};
+};*/
 
 template<>
 struct nso_factory<bv, sbf_ba, Bool> {
@@ -156,7 +156,7 @@ struct nso_factory<bv, sbf_ba, Bool> {
 	}
 };
 
-template <>
+/*template <>
 std::optional<typename ba_constants<node<bv, Bool>>::constant_with_type> ba_constants<node<bv, Bool>>::get(
 		const std::string& constant_source,
 		[[maybe_unused]] tref type_tree,
@@ -166,7 +166,7 @@ std::optional<typename ba_constants<node<bv, Bool>>::constant_with_type> ba_cons
 	if (constant_source == "0" || constant_source == "false")
 		return ba_constants<node<bv, Bool>>::constant_with_type{ Bool(false), bool_type() };
 	return {};
-}
+}*/
 
 } // namespace idni::tau_lang
 
