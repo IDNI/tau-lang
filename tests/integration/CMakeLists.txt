@@ -30,6 +30,7 @@ set(TESTS
 	heuristics-bv_ba_custom_simplification
 	heuristics-bv_ba_cvc5_simplification
 	heuristics-bv_bitblasting
+	heuristics-bv_bitblasting_predicates
 )
 
 foreach(TEST IN LISTS TESTS)
