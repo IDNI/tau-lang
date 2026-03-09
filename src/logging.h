@@ -99,7 +99,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "nso_rr",
 	// "repl_evaluator",
 	// "satisfiability",
-	// "solver",
+	"solver",
 	// "splitter",
 	// "tau_tree",
 	// "tau_bdd",
