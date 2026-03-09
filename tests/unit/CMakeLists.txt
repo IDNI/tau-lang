@@ -20,6 +20,7 @@ set(TESTS
 	tau_tree_printers
 	traversal
 	union_find
+	bitblasting_predicates
 )
 
 

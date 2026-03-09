@@ -271,10 +271,16 @@ template <NodeType node>
 tref build_variable(const std::string& name, size_t type_id);
 
 template <NodeType node>
+tref build_variable(size_t type_id);
+
+template <NodeType node>
 tref build_bf_variable(tref var_name_node, size_t type_id);
 
 template <NodeType node>
 tref build_bf_variable(const std::string& name, size_t type_id);
+
+template <NodeType node>
+tref build_bf_variable(size_t type_id);
 
 template <NodeType node>
 tref build_in_var(tref var_name_node, size_t type_id);

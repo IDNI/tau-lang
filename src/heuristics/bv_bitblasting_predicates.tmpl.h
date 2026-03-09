@@ -7,6 +7,11 @@ namespace idni::tau_lang {
 
 using bool_node = idni::tau_lang::node<cvc5::Term, Bool>;
 using bool_tree = tree<bool_node>;
+static auto bool_id = bool_type_id<bool_node>();
+
+
+/*using bool_node = idni::tau_lang::node<cvc5::Term, Bool>;
+using bool_tree = tree<bool_node>;
 using bitblast_solution = solution<bool_node>;
 static auto bool_id = bool_type_id<bool_node>();
 
@@ -213,7 +218,176 @@ bool bv_bitblasting_unsat(tref term) {
 template<NodeType node>
 bool bv_bitblasting_valid(tref term) {
 	return bitblast<node>(term);
+}*/
+
+template<NodeType node>
+tref bvadd_predicate([[maybe_unused]] tref result, [[maybe_unused]] tref var) {
+	// Unsupported operations for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
 }
+
+template<NodeType node>
+tref bvadd_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]]	 tref var) {
+	// Unsupported operations for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref bvsub_predicate([[maybe_unused]] tref result, [[maybe_unused]] tref var) {
+	// Unsupported operations for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref bvsub_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
+	// Unsupported operations for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref bvrhl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
+	// Unsupported operations for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref bvshl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
+	// Unsupported operations for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+std::pair<tref /*predicate*/, tref /*term*/> bf_predicate_blasting(tref term) {
+	using tau = tree<node>;
+	//using tt = tau::traverser;
+
+	subtree_map<node, size_t> changes;
+	tref predicate = nullptr;
+
+
+	auto f = [&](tref t) {
+		auto nt = tau::get(t).get_type();
+		auto type_id = tau::get(t).get_ba_type();
+
+		switch (nt) {
+			case tau::bf_add: case tau::bf_sub: {
+				auto var = build_variable<node>(type_id);
+				auto left = tau::get(t).child(0);
+				auto right = tau::get(t).child(1);
+				changes[t] = var;
+				auto current_predicate = (nt == tau::bf_add)
+					? bvadd_predicate<node>(left, right, var)
+					: bvsub_predicate<node>(left, right, var);
+				auto subformula = predicate
+					? build_bf_and<node>(predicate, current_predicate)
+					: current_predicate;
+				predicate = build_wff_ex<node>(var, subformula);
+				break;
+			}
+			case tau::bf_shr: case tau::bf_shl: {
+				auto var = build_bf_var<node>(type_id);
+				auto left = tau::get(t).child(0);
+				changes[t] = var;
+				auto current_predicate = (nt == tau::bf_shl)
+					? bvshl_one_predicate<node>(left, var)
+					: bvrhl_one_predicate<node>(left, var);
+				auto subformula = predicate
+					? build_bf_and<node>(predicate, current_predicate)
+					: current_predicate;
+				predicate = build_wff_ex<node>(var, subformula);
+				break;
+			}
+			case tau::bf_mul: case tau::bf_div: case tau::bf_mod:
+			case tau::bf_nand: case tau::bf_xnor: case tau::bf_nor:{
+				// Unsupported operations for now
+				LOG_ERROR << "Arithmetic operations are not supported yet predicate blasting.";
+				return false;
+			}
+			default: {
+				auto n_t = rewriter::replace<node>(t, changes);
+				if (n_t != t) changes[t] = n_t;
+				break;
+			}
+		}
+		return true;
+	};
+
+	post_order<node>(term).search_unique(f);
+
+	if (changes.find(term) != changes.end()) {
+		DBG(LOG_TRACE << "bv_predicate_blasting/term -> changes[term]: "
+			<< LOG_FM(term) << " -> " << LOG_FM(changes[term]);)
+		return { predicate, changes[term] };
+	}
+	return { nullptr, term };
+}
+
+template<NodeType node>
+tref wff_predicate_blasting(tref term) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	subtree_map<node, size_t> changes;
+	tref predicate = nullptr;
+	auto one = bool_tree::_1(bool_id);
+
+	auto f = [&](tref t) {
+		auto nt = tau::get(t).get_type();
+		auto type_id = tau::get(t).get_ba_type();
+
+		switch (nt) {
+			case tau::bf_interval:
+			case tau::bf_lt: case tau::bf_gt: case tau::bf_lteq: case tau::bf_gteq:
+			case tau::bf_nlt: case tau::bf_ngt: case tau::bf_nlteq: case tau::bf_ngteq: {
+				// Unsupported operations for now
+				LOG_ERROR << "Unsupported comparison in wff predicate blasting: "
+					<< LOG_NT(nt) << " " << LOG_FM(tt(term)|| tt::ref);
+				return false;
+			}
+			case tau::bf_eq: case tau::bf_neq: {
+				auto bv_width = get_bv_width<node>(type_id);
+				auto left = bf_bitblast<node>(tau::get(term)[0]);
+				auto right = bf_bitblast<node>(tau::get(term)[1]);
+				if (!left || !right) return nullptr;
+				tref result = bool_tree::_0(bool_id);
+				for (size_t i = 0; i < bv_width; ++i) {
+					result = build_bf_or<bool_node>(
+						result,
+						build_bf_xor<bool_node>(left.value()[i], right.value()[i])
+					);
+				}
+				return (nt == tau::bf_eq)
+					? build_bf_eq_0<bool_node>(result)
+					: build_bf_eq_0<bool_node>(build_bf_xor<bool_node>(result, one));
+			}
+			case tau::wff_t: case tau::wff_f: {
+				return ref;
+			}
+			default: {
+				// Unsupported operations for now
+				LOG_ERROR << "Unsupported operation in wff bitblasting: " << LOG_NT(nt) << " " << LOG_FM(tt(term)|| tt::ref);
+				return false;
+			}
+		}
+		return true;
+	};
+
+	post_order<node>(term).search_unique(f);
+
+	if (changes.find(term) != changes.end()) {
+		DBG(LOG_TRACE << "bv_predicate_blasting/term -> changes[term]: "
+			<< LOG_FM(term) << " -> " << LOG_FM(changes[term]);)
+		return { predicate, changes[term] };
+	}
+	return term;
+}
+
 
 
 } // namespace idni::tau_lang

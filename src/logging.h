@@ -93,7 +93,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "nso_rr",
 	// "repl_evaluator",
 	// "satisfiability",
-	// "solver",
+	"solver",
 	// "splitter",
 	// "tau_tree",
 	// "builders",
@@ -116,6 +116,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	/* related to heuristics*/
 	"bv_ba_simplification",
 	"ex_subs_based_elimination",
+	"bv_bitblasting",
 
 	/* testing specific */
 	"testing",
