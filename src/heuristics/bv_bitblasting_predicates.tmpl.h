@@ -263,13 +263,12 @@ tref bvshl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) 
 }
 
 template<NodeType node>
-std::pair<tref /*predicate*/, tref /*term*/> bf_predicate_blasting(tref term) {
+tref atomic_predicate_blasting(tref term) {
 	using tau = tree<node>;
 	//using tt = tau::traverser;
 
-	subtree_map<node, size_t> changes;
+	subtree_map<node, tref> changes;
 	tref predicate = nullptr;
-
 
 	auto f = [&](tref t) {
 		auto nt = tau::get(t).get_type();
@@ -323,9 +322,9 @@ std::pair<tref /*predicate*/, tref /*term*/> bf_predicate_blasting(tref term) {
 	if (changes.find(term) != changes.end()) {
 		DBG(LOG_TRACE << "bv_predicate_blasting/term -> changes[term]: "
 			<< LOG_FM(term) << " -> " << LOG_FM(changes[term]);)
-		return { predicate, changes[term] };
+		return changes[term];
 	}
-	return { nullptr, term };
+	return term;
 }
 
 template<NodeType node>
@@ -333,8 +332,7 @@ tref wff_predicate_blasting(tref term) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	subtree_map<node, size_t> changes;
-	tref predicate = nullptr;
+	subtree_map<node, tref> changes;
 	auto one = bool_tree::_1(bool_id);
 
 	auto f = [&](tref t) {
@@ -352,8 +350,8 @@ tref wff_predicate_blasting(tref term) {
 			}
 			case tau::bf_eq: case tau::bf_neq: {
 				auto bv_width = get_bv_width<node>(type_id);
-				auto left = bf_bitblast<node>(tau::get(term)[0]);
-				auto right = bf_bitblast<node>(tau::get(term)[1]);
+				auto left = atomic_predicate_blasting<node>(tau::get(term)[0]);
+				auto right = atomic_predicate_blasting<node>(tau::get(term)[1]);
 				if (!left || !right) return nullptr;
 				tref result = bool_tree::_0(bool_id);
 				for (size_t i = 0; i < bv_width; ++i) {
@@ -383,7 +381,7 @@ tref wff_predicate_blasting(tref term) {
 	if (changes.find(term) != changes.end()) {
 		DBG(LOG_TRACE << "bv_predicate_blasting/term -> changes[term]: "
 			<< LOG_FM(term) << " -> " << LOG_FM(changes[term]);)
-		return { predicate, changes[term] };
+		return changes[term];
 	}
 	return term;
 }
