@@ -5,7 +5,6 @@
 TEST_SUITE("bitblasting predicates") {
 
 	size_t addition(size_t x, size_t y, size_t m) {
-		if (!x) return y % m;
 		if (!y) return x % m;
 		return addition(x ^ y, (x & y) << 1, m) % m;
 	}
