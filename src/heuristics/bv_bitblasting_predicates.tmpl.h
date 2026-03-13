@@ -10,125 +10,6 @@ using bool_tree = tree<bool_node>;
 static auto bool_id = bool_type_id<bool_node>();
 
 template<NodeType node>
-tref bvadd_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref bvmul_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref bvsub_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref bvdiv_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref bvrhl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref bvshl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref eq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref neq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref lt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref gt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref lteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref gteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref nlt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref ngt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref nlteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref ngteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
-tref interval_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operations for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
 tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& vars) {
 	using tau = tree<node>;
 
@@ -170,7 +51,7 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 			}
 			case tau::bf_mul: case tau::bf_div: case tau::bf_mod:
 			case tau::bf_nand: case tau::bf_xnor: case tau::bf_nor:{
-				// Unsupported operations for now
+				// Unsupported operation for now
 				LOG_ERROR << "Operation "
 					<< LOG_NT(nt) << " not supported yet in predicate blasting.";
 				return error = true, false;
@@ -187,6 +68,127 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 	if (error) return nullptr;
 	return predicate;
 }
+
+
+template<NodeType node>
+tref bvadd_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref bvmul_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref bvsub_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref bvdiv_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref bvrhl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref bvshl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref eq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref neq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref lt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref gt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref lteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref gteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref nlt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref ngt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref nlteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref ngteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
+template<NodeType node>
+tref interval_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return nullptr;
+}
+
 template<NodeType node>
 tref atomic_predicate_blasting(tref atomic) {
 
@@ -264,12 +266,10 @@ tref wff_predicate_blasting(tref term) {
 
 	post_order<node>(term).search_unique(f);
 
-	if (changes.find(term) != changes.end()) {
-		DBG(LOG_TRACE << "bv_predicate_blasting/term -> changes[term]: "
-			<< LOG_FM(term) << " -> " << LOG_FM(changes[term]);)
-		return changes[term];
-	}
-	return term;
+	auto n_term = changes.find(term) != changes.end() ? changes[term] : term;
+	DBG(LOG_TRACE << "bv_predicate_blasting/wff/n_term: " << LOG_FM(n_term);)
+
+	return n_term;
 }
 
 
