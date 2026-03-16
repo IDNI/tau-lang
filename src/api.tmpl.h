@@ -107,10 +107,7 @@ tref api<node>::get_predicate_def(const std::string& predicate_def, bool simplif
 
 template <NodeType node>
 tref api<node>::get_stream_def(const std::string& stream_def) {
-	tref def = tau::get(stream_def, typename tau::get_options{
-			.parse = { .start = tau::stream_def },
-			.infer_ba_types = false,
-			.reget_with_hooks = false });
+	tref def = tau::get(stream_def, get_options<node>(tau::stream_def, true));
 	return tau::trim(def);
 }
 
@@ -504,6 +501,29 @@ std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 
 // Execution
 // ------------------------------------------------------------
+
+template <NodeType node>
+std::optional<interpreter<node>> api<node>::get_interpreter(tref spec) {
+	interpreter_options options;
+	return get_interpreter(spec, options);
+}
+
+template <NodeType node>
+std::optional<interpreter<node>> api<node>::get_interpreter(tref spec,
+	interpreter_options& options)
+{
+	auto& ctx = *definitions<node>::instance().get_io_context();
+	ctx.input_remaps = options.input_remaps;
+	ctx.output_remaps = options.output_remaps;
+	auto maybe_nso_rr = tau_lang::get_nso_rr<node>(spec);
+	if (!maybe_nso_rr) return {};
+	tref applied = apply_rr_to_formula<node>(maybe_nso_rr.value());
+	if (!applied) return {};
+	tref normalized = normalizer<node>(applied);
+	if (!normalized) return {};
+	if (has_free_vars<node>(normalized)) return {};
+	return interpreter<node>::make_interpreter(normalized, ctx);
+}
 
 template <NodeType node>
 std::optional<interpreter<node>> api<node>::get_interpreter(
