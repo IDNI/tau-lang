@@ -256,6 +256,7 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	const std::string& specification,
 	interpreter_options& options)
 {
+	DBG(TAU_LOG_TRACE << "get_interpreter/specification: " << specification;);
 	tau_spec<node> spec;
 	if (!spec.parse(specification)) {
 		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
