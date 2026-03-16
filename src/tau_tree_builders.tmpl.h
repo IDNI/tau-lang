@@ -1446,6 +1446,11 @@ tref tree<node>::build_variable(const std::string& name, size_t type_id) {
 }
 
 template <NodeType node>
+tref tree<node>::build_variable(size_t type_id) {
+	return tau_lang::build_variable<node>(type_id);
+}
+
+template <NodeType node>
 tref tree<node>::build_bf_variable(tref var_name_node, size_t type_id) {
 	return tau_lang::build_bf_variable<node>(var_name_node, type_id);
 }
@@ -1453,6 +1458,11 @@ tref tree<node>::build_bf_variable(tref var_name_node, size_t type_id) {
 template <NodeType node>
 tref tree<node>::build_bf_variable(const std::string& name, size_t type_id) {
 	return tau_lang::build_bf_variable<node>(name, type_id);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_variable(size_t type_id) {
+	return tau_lang::build_bf_variable<node>(type_id);
 }
 
 template <NodeType node>

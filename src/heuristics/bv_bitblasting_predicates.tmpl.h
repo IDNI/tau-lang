@@ -70,9 +70,17 @@ struct bv_bitblasting_rules {
 	}
 
 	static rewriter::rules bit([[maybe_unused]] size_t bitwidth, [[maybe_unused]] size_t bit) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		using tau = tree<node>;
+
+		auto bit_offset = tau::get_num(bit);
+		auto bit_cte =
+			tau::get(tau::bf,
+				tau::get_ba_constant(
+					make_bitvector_value(bit, bitwidth)), bv_type_id<node>(bitwidth));
+		auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto header = tau::build_ref("_bit", { bit_offset }, { var }, bv_type_id<node>(bitwidth));
+		auto body = tau::build_bf_and( var, bit_cte);
+		return {rewriter::rule(header, body)};
 	}
 
 	static tref make_bvadd_call([[maybe_unused]] size_t bitwidth) {
@@ -129,10 +137,11 @@ struct bv_bitblasting_rules {
 		return nullptr;
 	}
 
-	static tref make_bit_call([[maybe_unused]] size_t bitwidth, [[maybe_unused]] size_t bit) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bit_call([[maybe_unused]] size_t bit, [[maybe_unused]] size_t bitwidth) {
+		using tau = tree<node>;
+
+		auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		return tau::get(tau::bf, tau::build_ref("_bit", { bit }, { var }, bv_type_id<node>(bitwidth)));
 	}
 };
 
