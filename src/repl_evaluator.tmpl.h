@@ -249,7 +249,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	if (in) { // BF substitution
 		tref thiz = get_bf(arg2), with = get_bf(arg3);
 		if (!in || !thiz || !with) return invalid_argument();
-		return tau::get(in).substitute(thiz, with);
+		return tau_api::substitute(in, thiz, with);
 	}
 	// First argument was not a bf so it must be a wff
 	in = get_wff(arg1);
@@ -304,20 +304,31 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
+	DBG(TAU_LOG_TRACE << "run_cmd: " << TAU_LOG_FM(n.value());)
+
 	tref value = get_any(n[1].get());
 	if (!value) return;
 
-	tref applied = tau_api::apply_all_defs(value);
-	if (!applied) return;
+	DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
+	value = tau_api::infer(value);
+	DBG(TAU_LOG_TRACE << "run_cmd/simplified: " << TAU_LOG_FM(value);)
 
-	DBG(TAU_LOG_DEBUG << "run_cmd/applied: " << TAU_LOG_FM(applied);)
-
-	auto dnf = normalizer<node>(applied);
-
-	// Make sure that there is no free variable in the formula
-	if (has_free_vars<node>(dnf)) return;
-
-	run<node>(dnf, *definitions<node>::instance().get_io_context());
+	auto maybe_i = tau_api::get_interpreter(value);
+	if (!maybe_i) return;
+	auto& i = maybe_i.value();
+	while (true) {
+		auto maybe_outputs = tau_api::step(i);
+		if (!maybe_outputs) {
+			TAU_LOG_INFO << "No input provided."
+				<< " q or quit to terminate."
+				<< " Press ENTER to continue.";
+			std::string line;
+			term::enable_getline_mode();
+			std::getline(std::cin, line);
+			term::disable_getline_mode();
+			if (line == "q" || line == "quit") break;
+		}
+	}
 }
 
 template <NodeType node>
@@ -524,6 +535,9 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	auto t = result.get_shaped_tree2();
 	auto& defs = definitions<node>::instance();
 	typename tau::get_options opts = {
+		.infer_ba_types = true,
+		.use_default_types = false,
+		.reget_with_hooks = true,
 		.definition_heads = defs.get_definition_heads(),
 		.global_scope = defs.get_global_scope(),
 		.context = defs.get_io_context()
