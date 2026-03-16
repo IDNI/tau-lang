@@ -13,6 +13,7 @@
 // TODO (MEDIUM) parsing with `bool simplify = true` argument
 
 #include "interpreter.h"
+#include "utility/measure.h"
 
 namespace idni::tau_lang {
 
@@ -26,6 +27,34 @@ struct stream_at {
 struct interpreter_options {
 	input_streams_remap  input_remaps;
 	output_streams_remap output_remaps;
+};
+
+struct measuring {
+	std::string name;
+	double ms;
+	std::vector<measuring> parts;
+	measuring& part() { return parts.emplace_back(), parts.back(); }
+};
+
+inline std::ostream& operator<<(std::ostream& os, const measuring& m) {
+	os << m.name << ": " << m.ms << " ms";
+	if (!m.parts.empty()) {
+		os << " (";
+		for (size_t i = 0; i < m.parts.size(); ++i) {
+			if (i > 0) os << ", ";
+			os << m.parts[i];
+		}
+		os << ")";
+	}
+	return os << "\n";
+}
+
+struct api_measure {
+	api_measure(std::string name, measuring& m) : name(name), m(m) { t.start(); }
+	~api_measure() { m.name = name; m.ms = t.stop(); }
+	std::string name;
+	measuring& m;
+	idni::measures::timer t;
 };
 
 // API functions are as static methods in a template so it is possible to
@@ -47,10 +76,16 @@ struct api {
 	// Parsing
 	// ------------------------------------------------------------
 	static tref get_term(const std::string& term, bool simplified = true);         // bf
+	static tref get_term(measuring& m, const std::string& term, bool simplified = true);         // bf
+
 	static htref geth_term(const std::string& term, bool simplified = true);
+	static htref geth_term(measuring& m, const std::string& term, bool simplified = true);
 
 	static tref get_formula(const std::string& formula, bool simplified = true);   // wff
+	static tref get_formula(measuring& m, const std::string& formula, bool simplified = true);   // wff
+
 	static htref geth_formula(const std::string& formula, bool simplified = true);
+	static htref geth_formula(measuring& m, const std::string& formula, bool simplified = true);
 
 	// rec_relation { bf_ref { ... } ,  bf { ... } }
 	static tref get_function_def(const std::string& function_def, bool simplified = true);
@@ -188,12 +223,18 @@ struct api {
 	static htref syntactic_formula_simplification(htref formula);
 
 	static optional_string normalize_term(const std::string& term);
+	static optional_string normalize_term(measuring& m, const std::string& term);
 	static tref normalize_term(tref term);
+	static tref normalize_term(measuring& m, tref term);
 	static htref normalize_term(htref term);
+	static htref normalize_term(measuring& m, htref term);
 
 	static optional_string normalize_formula(const std::string& fm);
+	static optional_string normalize_formula(measuring& m, const std::string& fm);
 	static tref normalize_formula(tref fm);
+	static tref normalize_formula(measuring& m, tref fm);
 	static htref normalize_formula(htref fm);
+	static htref normalize_formula(measuring& m, htref fm);
 
 	static optional_string anti_prenex(const std::string& fm);
 	static tref anti_prenex(tref fm);

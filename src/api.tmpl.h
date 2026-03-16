@@ -82,8 +82,20 @@ tref api<node>::get_term(const std::string& input, bool simplified) {
 }
 
 template <NodeType node>
+tref api<node>::get_term(measuring& m, const std::string& input, bool simplified) {
+	api_measure measure("get_term", m);
+	return get_term(input, simplified);
+}
+
+template <NodeType node>
 tref api<node>::get_formula(const std::string& input, bool simplified) {
 	return tau::get(input, get_options<node>(tau::wff, simplified));
+}
+
+template <NodeType node>
+tref api<node>::get_formula(measuring& m, const std::string& input, bool simplified) {
+	api_measure measure("get_formula", m);
+	return get_formula(input, simplified);
 }
 
 template <NodeType node>
@@ -362,6 +374,12 @@ tref api<node>::normalize_formula(tref fm) {
 }
 
 template <NodeType node>
+tref api<node>::normalize_formula(measuring& m, tref fm) {
+	api_measure measure("normalize_formula", m);
+	return normalize_formula(fm);
+}
+
+template <NodeType node>
 tref api<node>::normalize_term(tref term) {
 	if (!term) return nullptr;
 	DBG(TAU_LOG_TRACE << "normalize_term(): " << LOG_FM_DUMP(term);)
@@ -376,6 +394,12 @@ tref api<node>::normalize_term(tref term) {
 	if (contains(main, tau::ref))
 		return bf_normalizer_with_rec_relation<node>(nso_rr);
 	return bf_normalizer_without_rec_relation<node>(main);
+}
+
+template <NodeType node>
+tref api<node>::normalize_term(measuring& m, tref term) {
+	api_measure measure("normalize_term", m);
+	return normalize_term(term);
 }
 
 template <NodeType node>

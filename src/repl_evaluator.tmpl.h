@@ -285,11 +285,15 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	auto check = get_type_and_arg(arg);
 	if (!check) return nullptr;
 	auto [type, value] = check.value();
+	measuring m;
+	tref r;
 	switch (type) {
-		case tau::wff: return tau_api::normalize_formula(value);
-		case tau::bf:  return tau_api::normalize_term(value);
+		case tau::wff: r = tau_api::normalize_formula(m, value); break;
+		case tau::bf:  r = tau_api::normalize_term(m, value); break;
 		default: return nullptr;
 	}
+	std::cout << m;
+	return r;
 }
 
 template <typename... BAs>
