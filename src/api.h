@@ -253,6 +253,11 @@ struct api {
 		const std::string& spec,
 		interpreter_options& options);
 	static std::optional<interpreter<node>> get_interpreter(
+		tref spec);
+	static std::optional<interpreter<node>> get_interpreter(
+		tref spec,
+		interpreter_options& options);
+	static std::optional<interpreter<node>> get_interpreter(
 		tau_spec<node>& spec);
 	static std::optional<interpreter<node>> get_interpreter(
 		tau_spec<node>& spec,
