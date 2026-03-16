@@ -30,8 +30,20 @@ htref api<node>::geth_term(const std::string& input, bool simplified) {
 }
 
 template <NodeType node>
+htref api<node>::geth_term(measuring& m, const std::string& input, bool simplified) {
+	api_measure measure("geth_term", m);
+	return tau::geth(get_term(m.part(), input, simplified));
+}
+
+template <NodeType node>
 htref api<node>::geth_formula(const std::string& input, bool simplified) {
 	return tau::geth(get_formula(input, simplified));
+}
+
+template <NodeType node>
+htref api<node>::geth_formula(measuring& m, const std::string& input, bool simplified) {
+	api_measure measure("geth_formula", m);
+	return tau::geth(get_formula(m.part(), input, simplified));
 }
 
 template <NodeType node>
