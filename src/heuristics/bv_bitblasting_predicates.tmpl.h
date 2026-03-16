@@ -83,65 +83,65 @@ struct bv_bitblasting_rules {
 		return {rewriter::rule(header, body)};
 	}
 
-	static tref make_bvadd_call([[maybe_unused]] size_t bitwidth) {
+	static tref make_bvadd_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
 		return nullptr;
 	}
 
-	static tref make_bvsub_call([[maybe_unused]] size_t bitwidth) {
+	static tref make_bvsub_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
 		return nullptr;
 	}
 
-	static tref make_bvshl_by_one_call([[maybe_unused]] size_t bitwidth) {
+	static tref make_bvshl_by_one_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
 		return nullptr;
 	}
 
-	static tref make_bvrhl_by_one_call([[maybe_unused]] size_t bitwidth) {
+	static tref make_bvrhl_by_one_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
 		return nullptr;
 	}
 
-	static tref make_bvmul_call([[maybe_unused]] size_t bitwidth) {
+	static tref make_bvmul_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
 		return nullptr;
 	}
 
-	static tref make_bvdiv_call([[maybe_unused]] size_t bitwidth) {
+	static tref make_bvdiv_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
 		return nullptr;
 	}
 
-	static tref make_bvmod_call([[maybe_unused]] size_t bitwidth) {
+	static tref make_bvmod_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
 		return nullptr;
 	}
 
-	static tref make_bvshl_call([[maybe_unused]] size_t bitwidth) {
+	static tref make_bvshl_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
 		return nullptr;
 	}
 
-	static tref make_bvrhl_call([[maybe_unused]] size_t bitwidth) {
+	static tref make_bvrhl_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
 		return nullptr;
 	}
 
-	static tref make_bit_call([[maybe_unused]] size_t bit, [[maybe_unused]] size_t bitwidth) {
+	static tref make_bit_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bit, [[maybe_unused]] size_t bitwidth) {
 		using tau = tree<node>;
 
 		auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		return tau::get(tau::bf, tau::build_ref("_bit", { bit }, { var }, bv_type_id<node>(bitwidth)));
+		return tau::get(tau::bf, tau::build_ref("_bit", { bit }, { operand }, bv_type_id<node>(bitwidth)));
 	}
 };
 
