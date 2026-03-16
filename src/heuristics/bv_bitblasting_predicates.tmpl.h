@@ -15,27 +15,125 @@ static auto bool_id = bool_type_id<bool_node>();
 template<NodeType node>
 struct bv_bitblasting_rules {
 
-	static rewriter::rules bvadd(size_t bitwidth);
-	static rewriter::rules bvsub(size_t bitwidth);
-	static rewriter::rules bvshl_by_one(size_t bitwidth);
-	static rewriter::rules bvrhl_by_one(size_t bitwidth);
-	static rewriter::rules bvmul(size_t bitwidth);
-	static rewriter::rules bvdiv(size_t bitwidth);
-	static rewriter::rules bvmod(size_t bitwidth);
-	static rewriter::rules bvshl(size_t bitwidth);
-	static rewriter::rules bvrhl(size_t bitwidth);
-	static rewriter::rules bit(size_t bitwidth, size_t bit);
+	static rewriter::rules bvadd([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
 
-	static tref make_bvadd_call(size_t bitwidth);
-	static tref make_bvsub_call(size_t bitwidth);
-	static tref make_bvshl_by_one_call(size_t bitwidth);
-	static tref make_bvrhl_by_one_call(size_t bitwidth);
-	static tref make_bvmul_call(size_t bitwidth);
-	static tref make_bvdiv_call(size_t bitwidth);
-	static tref make_bvmod_call(size_t bitwidth);
-	static tref make_bvshl_call(size_t bitwidth);
-	static tref make_bvrhl_call(size_t bitwidth);
-	static tref make_bit_call(size_t bitwidth, size_t bit);
+	static rewriter::rules bvsub([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvshl_by_one([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvrhl_by_one([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvmul([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvdiv([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvmod([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvshl([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvrhl([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bit([[maybe_unused]] size_t bitwidth, [[maybe_unused]] size_t bit) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static tref make_bvadd_call([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvsub_call([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvshl_by_one_call([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvrhl_by_one_call([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvmul_call([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvdiv_call([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvmod_call([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvshl_call([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvrhl_call([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bit_call([[maybe_unused]] size_t bitwidth, [[maybe_unused]] size_t bit) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
 };
 
 // This is a factory for creating the predicates needed for each bitvector operation.
@@ -44,14 +142,53 @@ struct bv_bitblasting_rules {
 // for the bitvector operations.
 struct bv_bitblasting_predicates {
 
-	static rewriter::rule bvadd_predicate(size_t bitwidth);
-	static rewriter::rule bvsub_predicate(size_t bitwidth);
-	static rewriter::rule bvshl_by_one_predicate(size_t bitwidth);
-	static rewriter::rule bvmul_predicate(size_t bitwidth);
-	static rewriter::rule bvdiv_predicate(size_t bitwidth);
-	static rewriter::rule bvmod_predicate(size_t bitwidth);
-	static rewriter::rule bvshl_predicate(size_t bitwidth);
-	static rewriter::rule bvrhl_predicate(size_t bitwidth);
+	static rewriter::rule bvadd_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvsub_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvshl_by_one_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvmul_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvdiv_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvmod_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvshl_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvrhl_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
 
 };
 
