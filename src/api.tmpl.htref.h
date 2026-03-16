@@ -25,23 +25,23 @@ std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::geth_term(const std::string& input) {
-	return tau::geth(get_term(input));
+htref api<node>::geth_term(const std::string& input, bool simplified) {
+	return tau::geth(get_term(input, simplified));
 }
 
 template <NodeType node>
-htref api<node>::geth_formula(const std::string& input) {
-	return tau::geth(get_formula(input));
+htref api<node>::geth_formula(const std::string& input, bool simplified) {
+	return tau::geth(get_formula(input, simplified));
 }
 
 template <NodeType node>
-htref api<node>::geth_function_def(const std::string& function_def) {
-	return tau::geth(get_function_def(function_def));
+htref api<node>::geth_function_def(const std::string& function_def, bool simplified) {
+	return tau::geth(get_function_def(function_def, simplified));
 }
 
 template <NodeType node>
-htref api<node>::geth_predicate_def(const std::string& predicate_def) {
-	return tau::geth(get_predicate_def(predicate_def));
+htref api<node>::geth_predicate_def(const std::string& predicate_def, bool simplified) {
+	return tau::geth(get_predicate_def(predicate_def, simplified));
 }
 
 template <NodeType node>
@@ -55,18 +55,18 @@ htref api<node>::geth_spec(const std::string& src) {
 }
 
 template <NodeType node>
-htref api<node>::geth_definition(const std::string& definition) {
-	return tau::geth(get_definition(definition));
+htref api<node>::geth_definition(const std::string& definition, bool simplified) {
+	return tau::geth(get_definition(definition, simplified));
 }
 
 template <NodeType node>
-htref api<node>::geth_spec_or_term(const std::string& expr) {
-	return tau::geth(get_spec_or_term(expr));
+htref api<node>::geth_spec_or_term(const std::string& expr, bool simplified) {
+	return tau::geth(get_spec_or_term(expr, simplified));
 }
 
 template <NodeType node>
-htref api<node>::geth_formula_or_term(const std::string& expr) {
-	return tau::geth(get_formula_or_term(expr));
+htref api<node>::geth_formula_or_term(const std::string& expr, bool simplified) {
+	return tau::geth(get_formula_or_term(expr, simplified));
 }
 
 // Querying
