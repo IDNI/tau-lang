@@ -316,7 +316,6 @@ template <NodeType node> tref build_wff_E(tref n);
 /** @brief Build the strategy-level semantic negation of `n`. */
 template <NodeType node> tref build_wff_semantic_neg(tref n);
 
-
 } // namespace idni::tau_lang
 
 #include "tau_tree_builders.tmpl.h"
