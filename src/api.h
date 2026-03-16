@@ -37,6 +37,8 @@ struct api {
 	using optional_string = std::optional<std::string>;
 	using severity_level = boost::log::trivial::severity_level;
 
+	friend tau;
+
 	static void set_charvar(bool state);
 	static void set_indenting(bool state);
 	static void set_highlighting(bool state);
@@ -44,19 +46,19 @@ struct api {
 
 	// Parsing
 	// ------------------------------------------------------------
-	static tref get_term(const std::string& term);         // bf
-	static htref geth_term(const std::string& term);
+	static tref get_term(const std::string& term, bool simplified = true);         // bf
+	static htref geth_term(const std::string& term, bool simplified = true);
 
-	static tref get_formula(const std::string& formula);   // wff
-	static htref geth_formula(const std::string& formula);
+	static tref get_formula(const std::string& formula, bool simplified = true);   // wff
+	static htref geth_formula(const std::string& formula, bool simplified = true);
 
 	// rec_relation { bf_ref { ... } ,  bf { ... } }
-	static tref get_function_def(const std::string& function_def);
-	static htref geth_function_def(const std::string& function_def);
+	static tref get_function_def(const std::string& function_def, bool simplified = true);
+	static htref geth_function_def(const std::string& function_def, bool simplified = true);
 
 	// rec_relation { wff_ref { ... } , wff { ... } }
-	static tref get_predicate_def(const std::string& predicate_def);
-	static htref geth_predicate_def(const std::string& predicate_def);
+	static tref get_predicate_def(const std::string& predicate_def, bool simplified = true);
+	static htref geth_predicate_def(const std::string& predicate_def, bool simplified = true);
 
 	// input_def, output_def
 	static tref get_stream_def(const std::string& stream_def);
@@ -67,16 +69,19 @@ struct api {
 	static htref geth_spec(const std::string& spec);
 
 	// rec_relation     private?
-	static tref get_definition(const std::string& definition);
-	static htref geth_definition(const std::string& definition);
+	static tref get_definition(const std::string& definition, bool simplified = true);
+	static htref geth_definition(const std::string& definition, bool simplified = true);
 
 	// spec, wff, bf    private?
-	static tref get_spec_or_term(const std::string& expression);
-	static htref geth_spec_or_term(const std::string& expression);
+	static tref get_spec_or_term(const std::string& expression, bool simplified = true);
+	static htref geth_spec_or_term(const std::string& expression, bool simplified = true);
 
 	// wff, bf          private?
-	static tref get_formula_or_term(const std::string& expression);
-	static htref geth_formula_or_term(const std::string& expression);
+	static tref get_formula_or_term(const std::string& expression, bool simplified = true);
+	static htref geth_formula_or_term(const std::string& expression, bool simplified = true);
+
+	// tref api
+	static size_t add_definition(tref head, tref body);
 
 	// Querying
 	// ------------------------------------------------------------
@@ -262,8 +267,9 @@ struct api {
 	static std::optional<std::map<stream_at, std::string>> step(
 		interpreter<node>& i);
 
+	static tref infer(tref expr, bool use_defaults = true);
 private:
-	static std::optional<rr<node>> get_nso_rr(tref expression);
+	static std::optional<rr<node>> get_nso_rr(tref expr);
 };
 
 
