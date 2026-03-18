@@ -15,16 +15,46 @@ static auto bool_id = bool_type_id<bool_node>();
 template<NodeType node>
 struct bv_bitblasting_rules {
 
+	// addition(x,y) = addition(x ^ y, (x & y) << 1, m) mod m;;
 	static rewriter::rules bvadd([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		using tau = tree<node>;
+
+		// general case
+		auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto header = tau::build_ref("_bvadd", { bitwidth }, { left, right, result }, bv_type_id<node>(bitwidth));
+		auto existential_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto shift = make_bvshl_by_one_call(tau::build_bf_and(left, right), existential_var, bitwidth);
+		auto general_call = tau::build_ref("_bvadd", { bitwidth - 1 }, { left, right, result }, bv_type_id<node>(bitwidth));
+		auto general_case = tau::build_wff_ex( existential_var, tau::build_and(shift, general_call));
+		// base case
+		auto base_call = tau::build_ref("_bvadd", { 0 }, { left, right, right }, bv_type_id<node>(bitwidth));
+		rewriter::rules rules;
+		rules.push_back(rewriter::rule(header, base_call));
+		rules.push_back(rewriter::rule(header, general_case));
+		return rules;
 	}
 
+	// subtraction(x,y) = subtraction(x ^ y, (~x & y) << 1, m) mod m;;
 	static rewriter::rules bvsub([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		using tau = tree<node>;
+
+		// general case
+		auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto header = tau::build_ref("_bvsub", { bitwidth }, { left, right, result }, bv_type_id<node>(bitwidth));
+		auto existential_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto shift = make_bvshl_by_one_call(tau::build_bf_and(tau::build_bf_not(left), right), existential_var, bitwidth);
+		auto general_call = tau::build_ref("_bvsub", { bitwidth - 1 }, { left, right, result }, bv_type_id<node>(bitwidth));
+		auto general_case = tau::build_wff_ex( existential_var, tau::build_and(shift, general_call));
+		// base case
+		auto base_call = tau::build_ref("_bvsub", { 0 }, { left, right, left }, bv_type_id<node>(bitwidth));
+		rewriter::rules rules;
+		rules.push_back(rewriter::rule(header, base_call));
+		rules.push_back(rewriter::rule(header, general_case));
+		return rules;
 	}
 
 	static rewriter::rules bvshl_by_one([[maybe_unused]] size_t bitwidth) {
@@ -96,16 +126,16 @@ struct bv_bitblasting_rules {
 		return {rewriter::rule(header, body)};
 	}
 
-	static tref make_bvadd_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvadd_call(tref left, tref right, tref result, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::bf, tau::build_ref("_bvadd", { bitwidth }, { left, right, result }, bv_type_id<node>(bitwidth)));
 	}
 
-	static tref make_bvsub_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvsub_call(tref left, tref right, tref result, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::bf, tau::build_ref("_bvsub", { bitwidth }, { left, right, result }, bv_type_id<node>(bitwidth)));
 	}
 
 	static tref make_bvshl_by_one_call(tref operand,  tref shifted, size_t bitwidth) {
@@ -165,15 +195,49 @@ template<NodeType node>
 struct bv_bitblasting_predicates {
 
 	static rewriter::rule bvadd_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+		static std::map<size_t, rewriter::rule> cache;
+		// if the rule is already computed for the given bitwidth, we return it from the cache
+		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
+		// Otherwise, we compute the rule, store it in the cache and return it.
+		// First we collect all the rules.
+		rewriter::rules rs;
+		rs.insert(bv_bitblasting_rules<node>::bvadd(bitwidth));
+		// Then we build a main term to compute the actual predicate.
+		auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto head = make_bvadd_call(left, right, result, bitwidth);
+		rr<node> temp{rs, head};
+		auto body = apply_rr_to_formula(temp);
+		if (!body) {
+			LOG_ERROR << "Failed to compute bvadd predicate.";
+			return rewriter::rule();
+		}
+		cache[bitwidth] = rewriter::rule(head, body);
+		return cache[bitwidth];
 	}
 
 	static rewriter::rule bvsub_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+		static std::map<size_t, rewriter::rule> cache;
+		// if the rule is already computed for the given bitwidth, we return it from the cache
+		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
+		// Otherwise, we compute the rule, store it in the cache and return it.
+		// First we collect all the rules.
+		rewriter::rules rs;
+		rs.insert(bv_bitblasting_rules<node>::bvsub(bitwidth));
+		// Then we build a main term to compute the actual predicate.
+		auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto head = make_bvsub_call(left, right, result, bitwidth);
+		rr<node> temp{rs, head};
+		auto body = apply_rr_to_formula(temp);
+		if (!body) {
+			LOG_ERROR << "Failed to compute bvsub predicate.";
+			return rewriter::rule();
+		}
+		cache[bitwidth] = rewriter::rule(head, body);
+		return cache[bitwidth];
 	}
 
 	static rewriter::rule bvshl_by_one_predicate([[maybe_unused]] size_t bitwidth) {
@@ -187,9 +251,9 @@ struct bv_bitblasting_predicates {
 		for (size_t i = 0; i < bitwidth; ++i)
 			rs.insert(bv_bitblasting_rules<node>::bit(bitwidth, i));
 		// Then we build a main term to compute the actual predicate.
-		auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto head = make_bvshl_by_one_call(var, shifted, bitwidth);
+		auto operand = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto head = make_bvshl_by_one_call(operand, result, bitwidth);
 		rr<node> temp{rs, head};
 		auto body = apply_rr_to_formula(temp);
 		if (!body) {
@@ -234,10 +298,11 @@ struct bv_bitblasting_predicates {
 
 
 template<NodeType node>
-tref bvadd_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+tref bvadd_predicate(tref left, tref right, tref result) {
+	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
+	auto predicate = bv_bitblasting_predicates<node>::bvadd_predicate(bitwidth);
+	auto call = bv_bitblasting_rules<node>::make_bvadd_call(left, right, result, bitwidth);
+	return apply_rule(predicate, call);
 }
 
 template<NodeType node>
@@ -248,10 +313,11 @@ tref bvmul_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[
 }
 
 template<NodeType node>
-tref bvsub_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+tref bvsub_predicate(tref left, tref right, tref result) {
+	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
+	auto predicate = bv_bitblasting_predicates<node>::bvsub_predicate(bitwidth);
+	auto call = bv_bitblasting_rules<node>::make_bvsub_call(left, right, result, bitwidth);
+	return apply_rule(predicate, call);
 }
 
 template<NodeType node>
