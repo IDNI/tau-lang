@@ -28,9 +28,22 @@ struct bv_bitblasting_rules {
 	}
 
 	static rewriter::rules bvshl_by_one([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		using tau = tree<node>;
+
+		auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto header = tau::build_ref("_bvshl_by_one", {}, { var, shifted }, bv_type_id<node>(bitwidth));
+		// the right most bit is zero, the rest of the bits are the same as the original variable shifted by one
+		auto shifted_bit_bitwidth = build_ref("_bit", { bitwidth - 1 }, { shifted }, bv_type_id<node>(bitwidth));
+		static auto bit_width = tau::_0(bv_type_id<node>(bitwidth));
+		tref body = tau::build_equal(bit_width, shifted_bit_bitwidth);
+		for (size_t i = 1; i < bitwidth; ++i) {
+			auto bit_i = tau::build_ref("_bit", { i }, { var }, bv_type_id<node>(bitwidth));
+			auto bit_i_minus_1 = tau::build_ref("_bit", { i - 1 }, { shifted }, bv_type_id<node>(bitwidth));
+			auto bit_i_eq_bit_i_minus_1 = tau::build_equal(bit_i, bit_i_minus_1);
+			body = body ? tau::build_and(body, bit_i_eq_bit_i_minus_1) : bit_i_eq_bit_i_minus_1;
+		}
+		return {rewriter::rule(header, body)};
 	}
 
 	static rewriter::rules bvrhl_by_one([[maybe_unused]] size_t bitwidth) {
@@ -95,10 +108,10 @@ struct bv_bitblasting_rules {
 		return nullptr;
 	}
 
-	static tref make_bvshl_by_one_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvshl_by_one_call(tref operand,  tref shifted, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::bf, tau::build_ref("_bvshl_by_one", {}, { operand, shifted }, bv_type_id<node>(bitwidth)));
 	}
 
 	static tref make_bvrhl_by_one_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
@@ -140,7 +153,6 @@ struct bv_bitblasting_rules {
 	static tref make_bit_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bit, [[maybe_unused]] size_t bitwidth) {
 		using tau = tree<node>;
 
-		auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 		return tau::get(tau::bf, tau::build_ref("_bit", { bit }, { operand }, bv_type_id<node>(bitwidth)));
 	}
 };
@@ -149,6 +161,7 @@ struct bv_bitblasting_rules {
 // We also include factory methods for creating the calls to easy the creation of
 // calls. We aplly the above rules to create the final predicates
 // for the bitvector operations.
+template<NodeType node>
 struct bv_bitblasting_predicates {
 
 	static rewriter::rule bvadd_predicate([[maybe_unused]] size_t bitwidth) {
@@ -164,9 +177,27 @@ struct bv_bitblasting_predicates {
 	}
 
 	static rewriter::rule bvshl_by_one_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+		static std::map<size_t, rewriter::rule> cache;
+		// if the rule is already computed for the given bitwidth, we return it from the cache
+		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
+		// Otherwise, we compute the rule, store it in the cache and return it.
+		// First we collect all the rules.
+		rewriter::rules rs;
+		rs.insert(bv_bitblasting_rules<node>::bvshl_by_one(bitwidth));
+		for (size_t i = 0; i < bitwidth; ++i)
+			rs.insert(bv_bitblasting_rules<node>::bit(bitwidth, i));
+		// Then we build a main term to compute the actual predicate.
+		auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto head = make_bvshl_by_one_call(var, shifted, bitwidth);
+		rr<node> temp{rs, head};
+		auto body = apply_rr_to_formula(temp);
+		if (!body) {
+			LOG_ERROR << "Failed to compute bvshl_by_one predicate.";
+			return rewriter::rule();
+		}
+		cache[bitwidth] = rewriter::rule(head, body);
+		return cache[bitwidth];
 	}
 
 	static rewriter::rule bvmul_predicate([[maybe_unused]] size_t bitwidth) {
@@ -239,9 +270,10 @@ tref bvrhl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) 
 
 template<NodeType node>
 tref bvshl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
+	auto predicate = bv_bitblasting_predicates<node>::bvshl_by_one_predicate(bitwidth);
+	auto call = bv_bitblasting_rules<node>::make_bvshl_by_one_call(left, var, bitwidth);
+	return apply_rule(predicate, call);
 }
 
 template<NodeType node>

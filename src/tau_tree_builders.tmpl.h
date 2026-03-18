@@ -1029,7 +1029,7 @@ tref build_ref(tref sym, const trefs& offsets, const trefs& args) {
 
 	trefs children;
 	children.push_back(sym);
-	children.push_back(build_ref_offsets<node>(offsets));
+	if (!offsets.empty()) children.push_back(build_ref_offsets<node>(offsets));
 	children.push_back(build_ref_args<node>(args));
 	return tau::get(tau::ref, children);
 }
