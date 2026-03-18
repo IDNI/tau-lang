@@ -47,7 +47,8 @@
 namespace idni::tau_lang {
 
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
-	colors_opt, charvar_opt, highlighting_opt, indenting_opt, debug_opt };
+	colors_opt, charvar_opt, highlighting_opt, indenting_opt,
+	print_benchmarks_opt, debug_opt };
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -68,6 +69,7 @@ struct repl_evaluator {
 		bool error_quits         = false;
 		bool charvar             = true;
 		bool repl_running 	 = true;
+		bool print_benchmarks    = true;
 #ifdef DEBUG
 		bool debug_repl          = true;
 		boost::log::trivial::severity_level
@@ -165,6 +167,9 @@ private:
 	tref get_wff(tref n) const;
 	// get argument from input or from history (dont care the type)
 	tref get_any(tref arg) const;
+
+	std::ostream& benchmarks(measuring& m) const;
+	std::ostream& benchmarks(measuring& m, idni::measures::timer& t) const;
 
 	std::vector<history> H;
 	options opt{};
