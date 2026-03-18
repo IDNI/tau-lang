@@ -45,6 +45,8 @@ cli::options tau_options() {
 		.set_description("indenting of formulas");
 	opts["highlighting"] = cli::option("highlighting", 'H', false)
 		.set_description("syntax highlighting");
+	opts["benchmarks"] = cli::option("benchmarks", 'B', true)
+		.set_description("print benchmarks (enabled by default)");
 	// REPL specific options
 	opts["evaluate"] = cli::option("evaluate", 'e', "")
 		.set_description("REPL command to evaluate");
@@ -61,8 +63,16 @@ cli::options tau_options() {
 
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
-int run_tau_spec(string spec_file) {
+int run_tau_spec(string spec_file, bool print_benchmarks = true) {
+	measuring m("run");
+	idni::measures::timer t;
 	string src = "";
+	t.start();
+	auto result = [&](int r) {
+		m.ms = t.stop();
+		if (print_benchmarks) m(std::cout);
+		return r;
+	};
 	if (spec_file == "-") {
 		std::ostringstream oss;
 		oss << std::cin.rdbuf(), src = oss.str();
@@ -73,25 +83,28 @@ int run_tau_spec(string spec_file) {
 		auto l = ifs.tellg();
 		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}
-	if (src.empty()) return 0;
-
-	auto maybe_i = tau_api::get_interpreter(src);
-	if (!maybe_i) return 1;
+	m.part() = { "reading input", t.pause() };
+	if (src.empty()) return result(0);
+	t.unpause();
+	auto maybe_i = tau_api::get_interpreter(m.part(), src);
+	if (!maybe_i) return result(1);
 	auto& i = maybe_i.value();
 	while (true) {
-		auto maybe_outputs = tau_api::step(i);
+		auto maybe_outputs = tau_api::step(m.part(), i);
 		if (!maybe_outputs) {
 			TAU_LOG_INFO << "No input provided."
 				<< " q or quit to terminate."
 				<< " Press ENTER to continue.";
 			std::string line;
 			term::enable_getline_mode();
+			t.pause();
 			std::getline(std::cin, line);
+			t.unpause();
 			term::disable_getline_mode();
 			if (line == "q" || line == "quit") break;
 		}
 	}
-	return 0;
+	return result(0);
 }
 
 void welcome() {
@@ -152,13 +165,14 @@ int main(int argc, char** argv) {
 							<< files.front();)
 		tau_api::set_severity(sev);
 		tau_api::set_charvar(charvar);
-		return run_tau_spec(files.front());
+		return run_tau_spec(files.front(), opts["benchmarks"].get<bool>());
 	}
 
 	repl_evaluator<bv, sbf_ba> re({
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,
+		.print_benchmarks = opts["benchmarks"].get<bool>(),
 #ifdef DEBUG
 		.debug_repl = opts["debug"].get<bool>(),
 #endif // DEBUG
