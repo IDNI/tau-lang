@@ -379,7 +379,10 @@ template<NodeType node>
 tref build_ref(const std::string& sym_name, const trefs& offsets, const std::vector<std::string>& args, size_t type_id);
 
 template<NodeType node>
-tref build_ref(const std::string& sym_name, const std::vector<size_t>& offsets, const std::vector<std::string>& args, size_t type_id);
+tref build_ref_with_indexes(const std::string& sym_name, const std::vector<size_t>& offsets, const trefs& args);
+
+template<NodeType node>
+tref build_ref_with_indexes(const std::string& sym_name, const std::vector<size_t>& offsets, const std::vector<std::string>& args, size_t type_id);
 
 } // namespace idni::tau_lang
 
