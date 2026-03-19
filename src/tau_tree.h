@@ -666,7 +666,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_ref(tref sym, const trefs& offsets, const trefs& args);
 	static tref build_ref(const std::string& sym_name, const trefs& offsets, const trefs& args);
 	static tref build_ref(const std::string& sym_name, const trefs& offsets, const std::vector<std::string>& args, size_t type_id);
-	static tref build_ref(const std::string& sym_name, const std::vector<size_t>& offsets, const std::vector<std::string>& args, size_t type_id);
+	static tref build_ref_with_indexes(const std::string& sym_name, const std::vector<size_t>& offsets, const trefs& args);
+	static tref build_ref_with_indexes(const std::string& sym_name, const std::vector<size_t>& offsets, const std::vector<std::string>& args, size_t type_id);
 
 private:
 	using tt = traverser;

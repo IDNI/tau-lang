@@ -26,13 +26,31 @@ tref parse_wff(const std::string& sample) {
 	return src;
 }
 
-TEST_SUITE("bv blasting predicates") {
+TEST_SUITE("bitblasting") {
 
-	TEST_CASE("x + y = 0") {
+	TEST_CASE("print bvshl predicates") {
+		using node = node_t;
 
+		for(auto rule : bv_bitblasting_rules<node_t>::bvshl_by_one(2)) {
+			TAU_LOG_INFO << LOG_RULE(rule);
+		}
 	}
-}
 
+	TEST_CASE("print bvadd predicates") {
+		using node = node_t;
+		for(auto rule : bv_bitblasting_rules<node_t>::bvadd(2)) {
+			TAU_LOG_INFO << LOG_RULE(rule);
+		}
+	}
+
+	TEST_CASE("print bvsub predicates") {
+		using node = node_t;
+		for(auto rule : bv_bitblasting_rules<node_t>::bvsub(2)) {
+			TAU_LOG_INFO << LOG_RULE(rule);
+		}
+	}
+
+}
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
