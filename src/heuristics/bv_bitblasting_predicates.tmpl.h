@@ -190,31 +190,31 @@ struct bv_bitblasting_rules {
 	static tref make_bvadd_call_with_index(tref left, tref right, tref result, size_t index) {
 		using tau = tree<node>;
 
-		return tau::get(tau::wff, tau::build_ref_with_indexes("_bvadd", { index }, { left, right, result }));
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvadd", { index }, { left, right, result })));
 	}
 
 	static tref make_bvadd_call(tref left, tref right, tref result, tref offset) {
 		using tau = tree<node>;
 
-		return tau::get(tau::wff, tau::build_ref("_bvadd", { offset }, { left, right, result }));
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvadd", { offset }, { left, right, result })));
 	}
 
 	static tref make_bvsub_call_with_index(tref left, tref right, tref result, size_t index) {
 		using tau = tree<node>;
 
-		return tau::get(tau::wff, tau::build_ref_with_indexes("_bvsub", { index }, { left, right, result }));
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvsub", { index }, { left, right, result })));
 	}
 
 	static tref make_bvsub_call(tref left, tref right, tref result, tref offset) {
 		using tau = tree<node>;
 
-		return tau::get(tau::wff, tau::build_ref("_bvsub", { offset }, { left, right, result }));
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvsub", { offset }, { left, right, result })));
 	}
 
 	static tref make_bvshl_by_one_call(tref operand,  tref shifted) {
 		using tau = tree<node>;
 
-		return tau::get(tau::wff, tau::build_ref("_bvshl_by_one", {}, { operand, shifted }));
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshl_by_one", {}, { operand, shifted })));
 	}
 
 	static tref make_bvrhl_by_one_call([[maybe_unused]] tref operand) {
@@ -226,7 +226,7 @@ struct bv_bitblasting_rules {
 	static tref make_bvmul_call(tref left, size_t right, tref result) {
 		using tau = tree<node>;
 
-		return tau::get(tau::wff, tau::build_ref_with_indexes("_bvmul", { right }, { left, result }));
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvmul", { right }, { left, result })));
 	}
 
 	static tref make_bvdiv_call([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] size_t index) {
@@ -256,7 +256,7 @@ struct bv_bitblasting_rules {
 	static tref make_bit_call(tref operand, size_t bit) {
 		using tau = tree<node>;
 
-		return tau::get(tau::bf, tau::build_ref("_bit", { bit }, { operand }));
+		return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_ref("_bit", { bit }, { operand })));
 	}
 };
 
