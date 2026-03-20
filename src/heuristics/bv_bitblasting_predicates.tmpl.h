@@ -93,6 +93,27 @@ struct bv_bitblasting_rules {
 		return {rewriter::rule( tau::geth(header), tau::geth(body) )};
 	}
 
+
+	static rewriter::rules bvrhl_by_one(size_t bitwidth) {
+		using tau = tree<node>;
+
+		// bvrhl_by_one(x, y) = (bit[n-1](y) = 0) && (bit[0](y) = bit[1](x)) && (bit[1](y) = bit[2](x)) && ... && (bit[n-2](y) = bit[n-1](x))
+		auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto header = tau::build_ref_with_indexes("_bvrhl_by_one", {}, { var, result });
+		// the left most bit is zero, the rest of the bits are the same as the original variable shifted by one
+		auto result_bit_0 = tau::get(tau::bf, tau::build_ref_with_indexes("_bit", { 0 }, { result }));
+		static auto bit_width_minus_1 = tau::_0(bv_type_id<node>(bitwidth));
+		tref body = tau::build_bf_eq(bit_width_minus_1, result_bit_0);
+		for (size_t i = 0; i < bitwidth - 1; ++i) {
+			auto bit_i = tau::get(tau::bf, tau::build_ref_with_indexes("_bit", { i }, { var }));
+			auto bit_i_plus_1 = tau::get(tau::bf, tau::build_ref_with_indexes("_bit", { i + 1 }, { result }));
+			auto bit_i_eq_bit_i_plus_1 = tau::build_bf_eq(bit_i, bit_i_plus_1);
+			body = body ? tau::build_wff_and(body, bit_i_eq_bit_i_plus_1) : bit_i_eq_bit_i_plus_1;
+		}
+		return {rewriter::rule( tau::geth(header), tau::geth(body) )};
+	}
+
 	static rewriter::rules bvmul(size_t y, size_t bitwidth) {
 		using tau = tree<node>;
 
