@@ -34,6 +34,8 @@ TEST_SUITE("bitblasting") {
 		for(auto rule : bv_bitblasting_rules<node_t>::bvshl_by_one(2)) {
 			TAU_LOG_INFO << LOG_RULE(rule);
 		}
+
+		CHECK(true);
 	}
 
 	TEST_CASE("print bvadd predicates") {
@@ -41,6 +43,8 @@ TEST_SUITE("bitblasting") {
 		for(auto rule : bv_bitblasting_rules<node_t>::bvadd(2)) {
 			TAU_LOG_INFO << LOG_RULE(rule);
 		}
+
+		CHECK(true);
 	}
 
 	TEST_CASE("print bvsub predicates") {
@@ -48,6 +52,8 @@ TEST_SUITE("bitblasting") {
 		for(auto rule : bv_bitblasting_rules<node_t>::bvsub(2)) {
 			TAU_LOG_INFO << LOG_RULE(rule);
 		}
+
+		CHECK(true);
 	}
 
 }

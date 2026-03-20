@@ -790,7 +790,7 @@ tref build_variable(size_t type_id) {
 	using tau = tree<node>;
 
 	static size_t counter = 0;
-	auto name = "_" + std::to_string(counter++);
+	auto name = "_X" + std::to_string(counter++);
 	return tau::get_typed(tau::variable, build_var_name<node>(name), type_id);
 }
 
@@ -1051,7 +1051,7 @@ template<NodeType node>
 tref build_ref_with_indexes(const std::string& sym_name, const std::vector<size_t>& offsets, const trefs& args) {
 	using tau = tree<node>;
 
-	trefs offset_refs(offsets.size());
+	trefs offset_refs;
 	for (auto offset: offsets) {
 		offset_refs.push_back(tau::get_num(offset));
 	}
