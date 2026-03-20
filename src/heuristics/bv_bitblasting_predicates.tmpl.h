@@ -173,6 +173,55 @@ struct bv_bitblasting_rules {
 		return rewriter::rules();
 	}
 
+	static rewriter::rules bvlt([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvnlt([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvlteq([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvnlteq([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvgt([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvngt([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+
+	static rewriter::rules bvgteq([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
+	static rewriter::rules bvngteq([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rules();
+	}
+
 	static rewriter::rules bit([[maybe_unused]] size_t bitwidth, [[maybe_unused]] size_t bit) {
 		using tau = tree<node>;
 
@@ -257,6 +306,54 @@ struct bv_bitblasting_rules {
 		using tau = tree<node>;
 
 		return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_ref("_bit", { bit }, { operand })));
+	}
+
+	static tref make_bvlt_call([[maybe_unused]]tref operand, [[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvnlt_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvlteq_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvnlteq_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvgt_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvngt_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvgteq_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
+	}
+
+	static tref make_bvngteq_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return nullptr;
 	}
 };
 
@@ -419,6 +516,53 @@ struct bv_bitblasting_predicates {
 		return rewriter::rule();
 	}
 
+	static rewriter::rule bvlt_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvnlt_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvlteq_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvnlteq_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvgt_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvngt_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvgteq_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
+
+	static rewriter::rule bvngteq_predicate([[maybe_unused]] size_t bitwidth) {
+		// Unsupported operation for now
+		LOG_ERROR << "Not yet implemented.";
+		return rewriter::rule();
+	}
 };
 
 
