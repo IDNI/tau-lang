@@ -292,7 +292,7 @@ struct bv_bitblasting_predicates {
 
 	static rewriter::rule bvsub_predicate(size_t bitwidth) {
 		static std::map<size_t, rewriter::rule> cache;
-		// if the rule is already computed for the given bitwidth, we return it from the cache
+		// If the rule is already computed for the given bitwidth, we return it from the cache
 		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
 		// Otherwise, we compute the rule, store it in the cache and return it.
 		// First we collect all the rules.
@@ -315,7 +315,7 @@ struct bv_bitblasting_predicates {
 
 	static rewriter::rule bvshl_by_one_predicate(size_t bitwidth) {
 		static std::map<size_t, rewriter::rule> cache;
-		// if the rule is already computed for the given bitwidth, we return it from the cache
+		// If the rule is already computed for the given bitwidth, we return it from the cache
 		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
 		// Otherwise, we compute the rule, store it in the cache and return it.
 		// First we collect all the rules.
@@ -337,11 +337,30 @@ struct bv_bitblasting_predicates {
 		return cache[bitwidth];
 	}
 
-	static rewriter::rule bvmul_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvrhl_by_one_predicate(size_t bitwidth) {
+		static std::map<size_t, rewriter::rule> cache;
+		// If the rule is already computed for the given bitwidth, we return it from the cache
+		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
+		// Otherwise, we compute the rule, store it in the cache and return it.
+		// First we collect all the rules.
+		rewriter::rules rs;
+		rs.insert(bv_bitblasting_rules<node>::bvrhl_by_one(bitwidth));
+		for (size_t i = 0; i < bitwidth; ++i)
+			rs.insert(bv_bitblasting_rules<node>::bit(bitwidth, i));
+		// Then we build a main term to compute the actual predicate.
+		auto operand = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto head = make_bvrhl_by_one_call(operand, result, bitwidth);
+		rr<node> temp{rs, head};
+		auto body = apply_rr_to_formula(temp);
+		if (!body) {
+			LOG_ERROR << "Failed to compute bvrhl_by_one predicate.";
+			return rewriter::rule();
+		}
+		cache[bitwidth] = rewriter::rule(head, body);
+		return cache[bitwidth];
 	}
+
 
 	static rewriter::rule bvdiv_predicate([[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
