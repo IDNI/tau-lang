@@ -40,9 +40,25 @@ TEST_SUITE("bitblasting predicates") {
 
 	TEST_CASE("multiplication") {
 		for (size_t m = 2; m != 256; m = m << 1)
-			for (size_t n = 0; n != 255; ++n)
-				for (size_t k = 0; k != 255; ++k)
-					CHECK( multiply(n, k, m) == ((n * k) % m) );
+		for (size_t n = 0; n != 255; ++n)
+		for (size_t k = 0; k != 255; ++k)
+		CHECK( multiply(n, k, m) == ((n * k) % m) );
+	}
+
+	size_t multiply2(size_t x, size_t y, size_t m) {
+		if (y == 0) return 0;
+		if (y & 1) {
+			size_t result = multiply2(x << 1, y >> 1, m);
+			return addition(result, x, m);
+		}
+		return multiply2(x << 1, y >> 1, m);
+	}
+
+	TEST_CASE("multiplication2") {
+		for (size_t m = 2; m != 256; m = m << 1)
+			for (size_t n = 1; n != 255; ++n)
+				for (size_t k = 1; k != 255; ++k)
+					CHECK( multiply2(n, k, m) == ((n * k) % m) );
 	}
 
 	/*std::pair<size_t, size_t> divide(size_t x, size_t y, size_t m) {
