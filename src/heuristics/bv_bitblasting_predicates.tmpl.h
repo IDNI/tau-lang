@@ -362,6 +362,39 @@ struct bv_bitblasting_predicates {
 	}
 
 
+	static rewriter::rule bvmul_predicate(size_t y, size_t bitwidth) {
+		static std::map<size_t, std::map<size_t, rewriter::rule>> cache;
+		static std::map<size_t, std::map<size_t, rewriter::rules>> partial_cache;
+		// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
+		if (cache.find(bitwidth) != cache.end() && partial_cache[bitwidth].find(y) != partial_cache[bitwidth].end())
+			return cache[bitwidth][y];
+		// Otherwise, we compute the rule, store it in the cache and return it.
+		// First we collect all the rules.
+		rewriter::rules rs;
+		auto ny = y;
+		while (ny) {
+			auto rules = bv_bitblasting_rules<node>::bvmul(ny, bitwidth);
+			rs.insert(rs.end(), rules.begin(), rules.end());
+			ny = ny >> 1;
+		}
+		// Insert the new rules in the cache
+		partial_cache[bitwidth][y] = rs;
+
+		// Then we build a main term to compute the actual predicate.
+		auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto head = make_bvmul_call(left, y, result);
+		rr<node> temp{rs, head};
+		auto body = apply_rr_to_formula(temp);
+		if (!body) {
+			LOG_ERROR << "Failed to compute bvmul predicate.";
+			return rewriter::rule();
+		}
+		cache[bitwidth][y] = rewriter::rule(head, body);
+		return cache[bitwidth][y];
+
+	}
+
 	static rewriter::rule bvdiv_predicate([[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
