@@ -286,4 +286,5 @@ fm_or_term     => wff | bf.
         bf_neg_oprnd > bf_parenthesis > bf,
         bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
         bf_and_nosep_2nd_oprnd > bf_parenthesis > bf,
-        bf_and_nosep > bf_parenthesis > bf_and.
+        bf_and_nosep > bf_parenthesis > bf_and,
+        wff, bf.
