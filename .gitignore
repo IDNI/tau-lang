@@ -31,6 +31,9 @@
 *.out
 *.app
 
+# whitelist benchmark stdout *.out logs
+!tests/benchmark/**/*.out
+
 # IDE files
 .idea
 .vscode
