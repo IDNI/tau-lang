@@ -285,5 +285,6 @@ size_t get_inv_sym(size_t symbol);
 #include "heuristics/bv_ba_simplification.h"
 #include "boolean_algebras/bv_ba.tmpl.h"
 #include "boolean_algebras/bv_ba_solver.tmpl.h"
+#include "boolean_algebras/bv_ba_helpers.tmpl.h"
 
 #endif // __IDNI__TAU__CVC5_H__
