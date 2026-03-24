@@ -66,6 +66,7 @@ option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
+option(TAU_USE_CCACHE              "Use ccache when building"              OFF)
 
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
 set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
@@ -321,7 +322,7 @@ if(TAU_BUILD_BOOST)
 	)
 endif()
 
-# cmake_policy(SET CMP0167 NEW) is required in future versions of CMake
+# cmake_policy(SET CMP0167 NEW) # is required in future versions of CMake
 set(Boost_USE_STATIC_LIBS ON)
 if (TAU_BUILD_BOOST)
 	set(Boost_DIR "${BOOST_LIBDIR}/cmake/Boost-1.86.0")
@@ -416,27 +417,27 @@ endif()
 #
 # Build documentation
 #
-
-# check if Doxygen is installed
-find_package(Doxygen)
-if (DOXYGEN_FOUND AND TAU_BUILD_DOC)
-	# set input and output files
-	set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
-	set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
-	# request to configure the file
-	configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-	message("Doxygen build started")
-	# note the option ALL which allows to build the docs together with the application
-	add_custom_target(doc_doxygen ALL
-		COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-		COMMENT "Generating API documentation with Doxygen"
-		VERBATIM
-	)
-else (DOXYGEN_FOUND AND TAU_BUILD_DOC)
-	message("Doxygen need to be installed to generate the doxygen documentation")
-endif (DOXYGEN_FOUND AND TAU_BUILD_DOC)
-
+if (TAU_BUILD_DOC)
+	# check if Doxygen is installed
+	find_package(Doxygen)
+	if (DOXYGEN_FOUND)
+		# set input and output files
+		set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
+		set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+		# request to configure the file
+		configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+		message("Doxygen build started")
+		# note the option ALL which allows to build the docs together with the application
+		add_custom_target(doc_doxygen ALL
+			COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+			COMMENT "Generating API documentation with Doxygen"
+			VERBATIM
+		)
+	else (DOXYGEN_FOUND)
+		message("Doxygen need to be installed to generate the doxygen documentation")
+	endif (DOXYGEN_FOUND)
+endif (TAU_BUILD_DOC)
 #
 # CPack configuration
 #
