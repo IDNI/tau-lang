@@ -182,8 +182,8 @@ std::optional<std::pair<size_t, tref>>
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& repl_evaluator<BAs...>::benchmarks(measuring& m) const {
-	if (opt.print_benchmarks) return m(std::cout);
-	return std::cout;
+	if (opt.print_benchmarks) return m(std::cerr);
+	return std::cerr;
 }
 
 template <typename... BAs>
@@ -192,8 +192,8 @@ std::ostream& repl_evaluator<BAs...>::benchmarks(measuring& m,
 	idni::measures::timer& t) const
 {
 	m.ms = t.stop();
-	if (opt.print_benchmarks) return m(std::cout);
-	return std::cout;
+	if (opt.print_benchmarks) return m(std::cerr);
+	return std::cerr;
 }
 
 template <typename... BAs>
