@@ -47,6 +47,10 @@ cli::options tau_options() {
 		.set_description("syntax highlighting");
 	opts["benchmarks"] = cli::option("benchmarks", 'B', true)
 		.set_description("print benchmarks (enabled by default)");
+	opts["json"] = cli::option("json", 'J', false)
+		.set_description("output in JSON format");
+	opts["quit"] = cli::option("quit", 'q', false)
+		.set_description("quit when no input");
 	// REPL specific options
 	opts["evaluate"] = cli::option("evaluate", 'e', "")
 		.set_description("REPL command to evaluate");
@@ -63,14 +67,14 @@ cli::options tau_options() {
 
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
-int run_tau_spec(string spec_file, bool print_benchmarks = true) {
+int run_tau_spec(string spec_file, cli::options& opts) {
 	measuring m("run");
 	idni::measures::timer t;
 	string src = "";
 	t.start();
 	auto result = [&](int r) {
 		m.ms = t.stop();
-		if (print_benchmarks) m(std::cout);
+		if (opts["benchmarks"].get<bool>()) m(std::cerr);
 		return r;
 	};
 	if (spec_file == "-") {
@@ -92,6 +96,11 @@ int run_tau_spec(string spec_file, bool print_benchmarks = true) {
 	while (true) {
 		auto maybe_outputs = tau_api::step(m.part(), i);
 		if (!maybe_outputs) {
+			if (opts["quit"].get<bool>()) {
+				TAU_LOG_INFO << "No more inputs provided."
+					<< " Terminating.";
+				break;
+			}
 			TAU_LOG_INFO << "No input provided."
 				<< " q or quit to terminate."
 				<< " Press ENTER to continue.";
@@ -157,6 +166,7 @@ int main(int argc, char** argv) {
 
 	tau_api::set_highlighting(opts["highlighting"].get<bool>());
 	tau_api::set_indenting(opts["indenting"].get<bool>());
+	tau_api::set_json(opts["json"].get<bool>());
 	bool charvar = opts["charvar"].get<bool>();
 	bool exp = opts["experimental"].get<bool>();
 
@@ -165,7 +175,7 @@ int main(int argc, char** argv) {
 							<< files.front();)
 		tau_api::set_severity(sev);
 		tau_api::set_charvar(charvar);
-		return run_tau_spec(files.front(), opts["benchmarks"].get<bool>());
+		return run_tau_spec(files.front(), opts);
 	}
 
 	repl_evaluator<bv, sbf_ba> re({
