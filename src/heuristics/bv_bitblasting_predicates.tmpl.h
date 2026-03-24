@@ -183,56 +183,71 @@ struct bv_bitblasting_rules {
 		return rewriter::rules();
 	}
 
-	static rewriter::rules bvlt([[maybe_unused]] size_t bitwidth) {
+	static rewriter::rule bvlt([[maybe_unused]] size_t index, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		return rewriter::rule();
 	}
 
-	static rewriter::rules bvnlt([[maybe_unused]] size_t bitwidth) {
+	static rewriter::rule bvlt([[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		return rewriter::rule();
 	}
 
-	static rewriter::rules bvlteq([[maybe_unused]] size_t bitwidth) {
+	static rewriter::rule bvnlt(size_t bitwidth) {
+		auto r = bvlt(bitwidth);
+		auto header = r.first;
+		auto body = r.second.get()->get();
+		return { header, tau::geth(tau::build_wff_neg(body)) };
+	}
+
+	static rewriter::rule bvlteq([[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		return rewriter::rule();
 	}
 
-	static rewriter::rules bvnlteq([[maybe_unused]] size_t bitwidth) {
+	static rewriter::rule bvnlteq(size_t bitwidth) {
+		auto r = bvlteq(bitwidth);
+		auto header = r.first;
+		auto body = r.second.get()->get();
+		return { header, tau::geth(tau::build_wff_neg(body)) };
+	}
+
+	static rewriter::rule bvgt([[maybe_unused]] size_t index, [[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		return rewriter::rule();
 	}
 
-	static rewriter::rules bvgt([[maybe_unused]] size_t bitwidth) {
+	static rewriter::rule bvgt([[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		return rewriter::rule();
 	}
 
-	static rewriter::rules bvngt([[maybe_unused]] size_t bitwidth) {
+	static rewriter::rule bvngt(size_t bitwidth) {
+		auto r = bvgt(bitwidth);
+		auto header = r.first;
+		auto body = r.second.get()->get();
+		return { header, tau::geth(tau::build_wff_neg(body)) };
+	}
+
+	static rewriter::rule bvgteq([[maybe_unused]] size_t bitwidth) {
 		// Unsupported operation for now
 		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+		return rewriter::rule();
 	}
 
-
-	static rewriter::rules bvgteq([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
+	static rewriter::rule bvngteq(size_t bitwidth) {
+		auto r = bvgteq(bitwidth);
+		auto header = r.first;
+		auto body = r.second.get()->get();
+		return { header, tau::geth(tau::build_wff_neg(body)) };
 	}
 
-	static rewriter::rules bvngteq([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rules();
-	}
-
-	static rewriter::rules bit([[maybe_unused]] size_t bitwidth, [[maybe_unused]] size_t bit) {
+	static rewriter::rule bit(size_t bitwidth, size_t bit) {
 		using tau = tree<node>;
 
 		auto bit_offset = tau::get_num(bit);
@@ -243,7 +258,7 @@ struct bv_bitblasting_rules {
 		auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 		auto header = tau::build_ref_with_indexes("_bit", { bit_offset }, { var });
 		auto body = tau::build_bf_and( var, bit_cte);
-		return {rewriter::rule(header, body)};
+		return rewriter::rule(header, body);
 	}
 
 	static tref make_bvadd_call_with_index(tref left, tref right, tref result, size_t index) {
@@ -277,9 +292,9 @@ struct bv_bitblasting_rules {
 	}
 
 	static tref make_bvrhl_by_one_call([[maybe_unused]] tref operand) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+		using tau = tree<node>;
+
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl_by_one", {}, { operand })));
 	}
 
 	static tref make_bvmul_call(tref left, size_t right, tref result) {
@@ -318,52 +333,52 @@ struct bv_bitblasting_rules {
 		return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_ref("_bit", { bit }, { operand })));
 	}
 
-	static tref make_bvlt_call([[maybe_unused]]tref operand, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvlt_call(tref left, tref right, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvlt", { bitwidth }, { left, right })));
 	}
 
-	static tref make_bvnlt_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvnlt_call(tref left, tref right, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvnlt", { bitwidth }, { left, right })));
 	}
 
-	static tref make_bvlteq_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvlteq_call(tref left, tref right, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvlteq", { bitwidth }, { left, right })));
 	}
 
-	static tref make_bvnlteq_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvnlteq_call(tref left, tref right, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvnlteq", { bitwidth }, { left, right })));
 	}
 
-	static tref make_bvgt_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvgt_call(tref left, tref right, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvgt", { bitwidth }, { left, right })));
 	}
 
-	static tref make_bvngt_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvngt_call(tref left, tref right, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvngt", { bitwidth }, { left, right })));
 	}
 
-	static tref make_bvgteq_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvgteq_call(tref left, tref right, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvgteq", { bitwidth }, { left, right })));
 	}
 
-	static tref make_bvngteq_call([[maybe_unused]] tref operand, [[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return nullptr;
+	static tref make_bvngteq_call(tref left, tref right, size_t bitwidth) {
+		using tau = tree<node>;
+
+		return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref_with_indexes("_bvngteq", { bitwidth }, { left, right })));
 	}
 };
 
@@ -527,52 +542,36 @@ struct bv_bitblasting_predicates {
 		return rewriter::rule();
 	}
 
-	static rewriter::rule bvlt_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvlt_predicate(size_t bitwidth) {
+		return bv_bitblasting_rules<node>::bvlt(bitwidth);
 	}
 
-	static rewriter::rule bvnlt_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvnlt_predicate(size_t bitwidth) {
+		return bv_bitblasting_rules<node>::bvnlt(bitwidth);
 	}
 
-	static rewriter::rule bvlteq_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvlteq_predicate(size_t bitwidth) {
+		return bv_bitblasting_rules<node>::bvlteq(bitwidth);
 	}
 
-	static rewriter::rule bvnlteq_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvnlteq_predicate(size_t bitwidth) {
+		return bv_bitblasting_rules<node>::bvnlteq(bitwidth);
 	}
 
-	static rewriter::rule bvgt_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvgt_predicate(size_t bitwidth) {
+		return bv_bitblasting_rules<node>::bvgt(bitwidth);
 	}
 
-	static rewriter::rule bvngt_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvngt_predicate(size_t bitwidth) {
+		return bv_bitblasting_rules<node>::bvngt(bitwidth);
 	}
 
-	static rewriter::rule bvgteq_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvgteq_predicate(size_t bitwidth) {
+		return bv_bitblasting_rules<node>::bvgteq(bitwidth);
 	}
 
-	static rewriter::rule bvngteq_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvngteq_predicate(size_t bitwidth) {
+		return bv_bitblasting_rules<node>::bvngteq(bitwidth);
 	}
 };
 
