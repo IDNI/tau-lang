@@ -114,24 +114,19 @@ struct bv_bitblasting_rules {
 		return {rewriter::rule( tau::geth(header), tau::geth(body) )};
 	}
 
-	static rewriter::rules bvmul(tref y /* cvc5 constant */, size_t bitwidth) {
+	static rewriter::rule bvmul(tref y /* cvc5 constant */, size_t bitwidth) {
 		using tau = tree<node>;
 
 		DBG( assert(is_bv_constant<node>(y)); )
 
 		auto x = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 		auto z = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		rewriter::rules rules;
 
 		// multiplication[n](x, 0, z) = (z = 0) or multiplication[n](0, x, z) = (z = 0);
 		if (is_zero_bv_constant<node>(y)) {
-			rewriter::rules rules;
-			auto zero_left = tau::build_ref_with_indexes("_bvmul", { y, x, z });
 			auto zero_right = tau::build_ref_with_indexes("_bvmul", { x, y, z });
 			auto body = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), z);
-			rules.push_back(rewriter::rule(tau::geth(zero_left), tau::geth(body)));
-			rules.push_back(rewriter::rule(tau::geth(zero_right), tau::geth(body)));
-			return rules;
+			return rewriter::rule(tau::geth(zero_right), tau::geth(body));
 		}
 
 		auto w = tau::build_variable(bv_type_id<node>(bitwidth));
@@ -150,18 +145,17 @@ struct bv_bitblasting_rules {
 									make_bvmul_call(v, shr_by_one<node>(y), w)),
 								make_bvadd_call(x, w, z)
 			))));
-			rules.push_back(rewriter::rule(tau::geth(odd_right), tau::geth(odd_body)));
-		} else {
-			// case y & 1 = 0: multiplication(x, y, z) = ex v multiplication[y >> 1](x << 1, v) && (z = v);
-			auto even_right = tau::build_ref_with_indexes("_bvmul", { x, y, z });
-			auto even_body = tau::build_wff_ex(w,
-				tau::build_wff_and(
-					make_bvmul_call(tau::build_bf_shl(x), shr_by_one<node>(y), w),
-					tau::build_bf_eq(z, w)
-			));
-			rules.push_back(rewriter::rule(tau::geth(even_right), tau::geth(even_body)));
+			return rewriter::rule(tau::geth(odd_right), tau::geth(odd_body));
 		}
-		return rules;
+
+		// case y & 1 = 0: multiplication(x, y, z) = ex v multiplication[y >> 1](x << 1, v) && (z = v);
+		auto even_right = tau::build_ref_with_indexes("_bvmul", { x, y, z });
+		auto even_body = tau::build_wff_ex(w,
+			tau::build_wff_and(
+				make_bvmul_call(tau::build_bf_shl(x), shr_by_one<node>(y), w),
+				tau::build_bf_eq(z, w)
+		));
+		return rewriter::rule(tau::geth(even_right), tau::geth(even_body));
 	}
 
 
@@ -488,9 +482,9 @@ struct bv_bitblasting_predicates {
 			if (partial_cache[bitwidth].find(ny) != partial_cache[bitwidth].end()) {
 				rs.insert(rs.end(), partial_cache[bitwidth][ny].begin(), partial_cache[bitwidth][ny].end());
 			} else {
-				auto rules = bv_bitblasting_rules<node>::bvmul(ny, bitwidth);
-				rs.insert(rs.end(), rules.begin(), rules.end());
-				partial_cache[bitwidth][ny] = rules;
+				auto rule = bv_bitblasting_rules<node>::bvmul(ny, bitwidth);
+				rs.insert(rule);
+				partial_cache[bitwidth][ny] = { rule };
 			}
 			ny = shr_by_one<node>(ny);
 		}
