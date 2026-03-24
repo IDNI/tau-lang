@@ -35,6 +35,7 @@ struct measuring {
 	std::vector<measuring> parts{};
 	measuring& part();
 	std::ostream& operator()(std::ostream& os, size_t level = 0) const;
+	std::ostream& to_json(std::ostream& os, size_t level = 0) const;
 };
 
 std::ostream& operator<<(std::ostream& os, const measuring& m);
@@ -60,6 +61,7 @@ struct api {
 	static void set_charvar(bool state);
 	static void set_indenting(bool state);
 	static void set_highlighting(bool state);
+	static void set_json(bool state);
 	static void set_severity(severity_level level);
 
 	// Parsing
