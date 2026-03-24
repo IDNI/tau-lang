@@ -209,10 +209,7 @@ struct bv_bitblasting_rules {
 	}
 
 	static rewriter::rule bvnlteq(size_t bitwidth) {
-		auto r = bvlteq(bitwidth);
-		auto header = r.first;
-		auto body = r.second.get()->get();
-		return { header, tau::geth(tau::build_wff_neg(body)) };
+		return bvgt(bitwidth);
 	}
 
 	static rewriter::rule bvgt([[maybe_unused]] size_t index, [[maybe_unused]] size_t bitwidth) {
@@ -241,10 +238,7 @@ struct bv_bitblasting_rules {
 	}
 
 	static rewriter::rule bvngteq(size_t bitwidth) {
-		auto r = bvgteq(bitwidth);
-		auto header = r.first;
-		auto body = r.second.get()->get();
-		return { header, tau::geth(tau::build_wff_neg(body)) };
+		return bvlt(bitwidth);
 	}
 
 	static rewriter::rule bit(size_t bitwidth, size_t bit) {
