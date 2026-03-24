@@ -8,7 +8,9 @@
 namespace idni::tau_lang {
 
 measuring& measuring::part() { return parts.emplace_back(), parts.back(); }
+
 std::ostream& measuring::operator()(std::ostream& os, size_t level) const {
+	if (print_json) return to_json(os) << "\n";
 	auto indent = std::string(level, '\t');
 	os << indent << name << ": " << ms << " ms\n";
 	if (!parts.empty()) {
@@ -20,6 +22,25 @@ std::ostream& measuring::operator()(std::ostream& os, size_t level) const {
 }
 
 inline std::ostream& operator<<(std::ostream& os, const measuring& m) { return m(os); }
+
+std::ostream& measuring::to_json(std::ostream& os, size_t level) const {
+	auto indent0 = std::string(level, '\t');
+	auto indent1 = std::string(level+1, '\t');
+	os << indent0 << "{\n";
+	os << indent1 << "\"measured\": \"" << name << "\",\n";
+	os << indent1 << "\"micros\": " << (ms*1000);
+	if (!parts.empty()) {
+		os << ",\n";
+		os << indent1 << "\"parts\":\n";
+		for (size_t i = 0; i < parts.size(); ++i) {
+			if (i) os << ",\n";
+			parts[i].to_json(os, level + 1);
+		}
+	}
+	os << "\n";
+	os << indent0 << "}";
+	return os;
+}
 
 api_measure::api_measure(std::string name, measuring& m) : m(m) {
 	m.name = name, t.start();

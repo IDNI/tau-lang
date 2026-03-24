@@ -52,6 +52,11 @@ void api<node>::set_highlighting(bool highlighting) {
 }
 
 template <NodeType node>
+void api<node>::set_json(bool json) {
+	print_json = json;
+}
+
+template <NodeType node>
 void api<node>::set_severity(boost::log::trivial::severity_level level) {
 	logging::set_filter(level);
 }

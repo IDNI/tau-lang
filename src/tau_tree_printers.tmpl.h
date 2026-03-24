@@ -331,6 +331,7 @@ int_t get_max_var_name_b_id(tref fm) {
 // pretty printer settings
 inline bool pretty_printer_highlighting = false;
 inline bool pretty_printer_indenting    = false;
+inline bool print_json                  = false;
 
 template <NodeType node>
 std::ostream& tree<node>::print(std::ostream& os) const {
