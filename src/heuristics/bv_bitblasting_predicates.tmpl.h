@@ -114,36 +114,52 @@ struct bv_bitblasting_rules {
 		return {rewriter::rule( tau::geth(header), tau::geth(body) )};
 	}
 
-	static rewriter::rules bvmul(size_t y, size_t bitwidth) {
+	static rewriter::rules bvmul(tref y /* cvc5 constant */, size_t bitwidth) {
 		using tau = tree<node>;
 
-		rewriter::rules rules;
-		// case y = 0: multiplication[0](x, z) = (z = 0);
+		DBG( assert(is_bv_constant<node>(y)); )
+
 		auto x = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 		auto z = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto base_header = tau::build_ref_with_indexes("_bvmul", { 0 }, { x, z });
-		auto base_body = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), z);
-		rules.push_back(rewriter::rule(tau::geth(base_header), tau::geth(base_body)));
+		rewriter::rules rules;
+
+		// multiplication[n](x, 0, z) = (z = 0) or multiplication[n](0, x, z) = (z = 0);
+		if (is_zero_bv_constant<node>(y)) {
+			rewriter::rules rules;
+			auto zero_left = tau::build_ref_with_indexes("_bvmul", { y, x, z });
+			auto zero_right = tau::build_ref_with_indexes("_bvmul", { x, y, z });
+			auto body = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), z);
+			rules.push_back(rewriter::rule(tau::geth(zero_left), tau::geth(body)));
+			rules.push_back(rewriter::rule(tau::geth(zero_right), tau::geth(body)));
+			return rules;
+		}
+
 		auto w = tau::build_variable(bv_type_id<node>(bitwidth));
+
 		// case y & 1 = 1: multiplication[n](x, w) = ex z ex v multiplication[y >> 1](x << 1, v) && addition(x, v, z);
-		if (y & 1) {
-			auto odd_header = tau::build_ref_with_indexes("_bvmul", { y }, { x, z });
+		if (lsb<node>(y)) {
+			auto v = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+			auto odd_right = tau::build_ref_with_indexes("_bvmul", { x, y, z });
 			auto odd_body = tau::build_wff_ex(w,
 				tau::build_wff_ex(w,
 					tau::build_wff_and(
-						make_bvmul_call(tau::build_bf_shl(x), y >> 1, w),
-						make_bvadd_call(x, w, z)
-			)));
-			rules.push_back(rewriter::rule(tau::geth(odd_header), tau::geth(odd_body)));
+						tau::build_wff_ex(v,
+							tau::build_wff_and(
+								tau::build_wff_and(
+									make_bvshl_by_one_call(x, v)),
+									make_bvmul_call(v, shr_by_one<node>(y), w)),
+								make_bvadd_call(x, w, z)
+			))));
+			rules.push_back(rewriter::rule(tau::geth(odd_right), tau::geth(odd_body)));
 		} else {
-			// case y & 1 = 0: multiplication[n](x, z) = ex v multiplication[y >> 1](x << 1, v) && (z = v);
-			auto even_header = tau::build_ref_with_indexes("_bvmul", { y }, { x, z });
+			// case y & 1 = 0: multiplication(x, y, z) = ex v multiplication[y >> 1](x << 1, v) && (z = v);
+			auto even_right = tau::build_ref_with_indexes("_bvmul", { x, y, z });
 			auto even_body = tau::build_wff_ex(w,
 				tau::build_wff_and(
-					make_bvmul_call(tau::build_bf_shl(x), y >> 1, w),
+					make_bvmul_call(tau::build_bf_shl(x), shr_by_one<node>(y), w),
 					tau::build_bf_eq(z, w)
 			));
-			rules.push_back(rewriter::rule(tau::geth(even_header), tau::geth(even_body)));
+			rules.push_back(rewriter::rule(tau::geth(even_right), tau::geth(even_body)));
 		}
 		return rules;
 	}
@@ -459,24 +475,25 @@ struct bv_bitblasting_predicates {
 	}
 
 
-	static rewriter::rule bvmul_predicate(size_t y, size_t bitwidth) {
-		static std::map<size_t, std::map<size_t, rewriter::rule>> cache;
-		static std::map<size_t, std::map<size_t, rewriter::rules>> partial_cache;
+	static rewriter::rule bvmul_predicate(tref y, size_t bitwidth) {
+		static std::map<size_t, std::map<tref, rewriter::rule>> cache;
+		static std::map<size_t, std::map<tref, rewriter::rules>> partial_cache;
 		// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
-		if (cache.find(bitwidth) != cache.end() && partial_cache[bitwidth].find(y) != partial_cache[bitwidth].end())
-			return cache[bitwidth][y];
+		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][y];
 		// Otherwise, we compute the rule, store it in the cache and return it.
 		// First we collect all the rules.
 		rewriter::rules rs;
 		auto ny = y;
-		while (ny) {
-			auto rules = bv_bitblasting_rules<node>::bvmul(ny, bitwidth);
-			rs.insert(rs.end(), rules.begin(), rules.end());
-			ny = ny >> 1;
+		while (!is_zero_bv_constant<node>(ny)) {
+			if (partial_cache[bitwidth].find(ny) != partial_cache[bitwidth].end()) {
+				rs.insert(rs.end(), partial_cache[bitwidth][ny].begin(), partial_cache[bitwidth][ny].end());
+			} else {
+				auto rules = bv_bitblasting_rules<node>::bvmul(ny, bitwidth);
+				rs.insert(rs.end(), rules.begin(), rules.end());
+				partial_cache[bitwidth][ny] = rules;
+			}
+			ny = shr_by_one<node>(ny);
 		}
-		// Insert the new rules in the cache
-		partial_cache[bitwidth][y] = rs;
-
 		// Then we build a main term to compute the actual predicate.
 		auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
