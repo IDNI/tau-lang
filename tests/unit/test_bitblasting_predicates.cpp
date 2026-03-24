@@ -61,26 +61,30 @@ TEST_SUITE("bitblasting predicates") {
 					CHECK( multiply2(n, k, m) == ((n * k) % m) );
 	}
 
-	/*std::pair<size_t, size_t> divide(size_t x, size_t y, size_t m) {
-		if (!y) return {0, 0}; // division by zero is not defined, return 0 for testing purposes
-		size_t q = 0;
-		while (x >= y) {
-			x = subtract(x, y, m);
-			q = addition(q, 1, m);
+
+	std::pair<size_t, size_t> division(size_t a, size_t b) {
+		if (b == 0) return {0, 0}; // division by zero is not defined, return 0 for testing purposes
+		if (a < b) return {0, a};
+		auto [q, r] = division(a, b << 1);
+		q = q << 1;
+		if (r >= b) {
+			q = q + 1;
+			r = r - b;
 		}
-		return {q % m, x % m};
+		return {q, r};
 	}
 
-	TEST_CASE("divide") {
+	TEST_CASE("division & modulo") {
 		for (size_t m = 2; m != 256; m = m << 1)
-			for (size_t n = 0; n != 255; ++n)
-				for (size_t k = 1; k != 255; ++k) { // avoid divide by zero
-					LOG_INFO << "n: " << n << ", k: " << k << ", m: " << m << "\n";
-					LOG_INFO << "quotient: " << divide(n, k, m).first << ", remainder: " << divide(n, k, m).second << "\n";
-					LOG_INFO << "real quotient: " << (n / k) % m << ", remainder: " << (n % k) % m << "\n";
-					CHECK( divide(n, k, m) == std::make_pair((n / k) % m, (n % k) % m) );
+			for (size_t n = 1; n != 255; ++n)
+				for (size_t k = 1; k != 255; ++k) {
+					auto [q, r] = division(n, k);
+					CHECK( q % m == ((n / k) % m) );
+					CHECK( r % m == ((n % k) % m) );
 				}
-	}*/
+	}
+
+
 
 	size_t shr(size_t x, size_t y, size_t m) {
 		return (x >> y) % m;
