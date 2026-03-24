@@ -1,0 +1,17 @@
+{
+  "fixture": "fixture0.tau",
+  "exit_status": 0,
+  "user_time_s": 0.00,
+  "system_time_s": 0.00,
+  "elapsed_wall_s": 0.01,
+  "cpu_percent": 90,
+  "max_rss_kb": 15916,
+  "minor_page_faults": 765,
+  "major_page_faults": 0,
+  "voluntary_context_switches": 1,
+  "involuntary_context_switches": 4,
+  "swaps": 0,
+  "fs_inputs": 0,
+  "fs_outputs": 16,
+  "page_size_bytes": 4096
+}
