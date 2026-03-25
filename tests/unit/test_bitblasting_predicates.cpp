@@ -11,8 +11,8 @@ TEST_SUITE("bitblasting predicates") {
 
 	TEST_CASE("addition") {
 		for (size_t m = 2; m != 256; m = m << 1)
-			for (size_t n = 0; n != 255; ++n)
-				for (size_t k = 0; k != 255; ++k)
+			for (size_t n = 0; n != m; ++n)
+				for (size_t k = 0; k != m; ++k)
 					CHECK( addition(n, k, m) == ((n + k) % m) );
     }
 
@@ -23,8 +23,8 @@ TEST_SUITE("bitblasting predicates") {
 
 	TEST_CASE("subtraction") {
 		for (size_t m = 2; m != 256; m = m << 1)
-			for (size_t n = 0; n != 255; ++n)
-				for (size_t k = 0; k != 255; ++k)
+			for (size_t n = 0; n != m; ++n)
+				for (size_t k = 0; k != m; ++k)
 					CHECK( subtract(n, k, m) == ((n - k) % m) );
 	}
 
@@ -40,8 +40,8 @@ TEST_SUITE("bitblasting predicates") {
 
 	TEST_CASE("multiplication") {
 		for (size_t m = 2; m != 256; m = m << 1)
-		for (size_t n = 0; n != 255; ++n)
-		for (size_t k = 0; k != 255; ++k)
+		for (size_t n = 0; n != m; ++n)
+		for (size_t k = 0; k != m; ++k)
 		CHECK( multiply(n, k, m) == ((n * k) % m) );
 	}
 
@@ -56,11 +56,10 @@ TEST_SUITE("bitblasting predicates") {
 
 	TEST_CASE("multiplication2") {
 		for (size_t m = 2; m != 256; m = m << 1)
-			for (size_t n = 1; n != 255; ++n)
-				for (size_t k = 1; k != 255; ++k)
+			for (size_t n = 1; n != m; ++n)
+				for (size_t k = 1; k != m; ++k)
 					CHECK( multiply2(n, k, m) == ((n * k) % m) );
 	}
-
 
 	std::pair<size_t, size_t> division(size_t a, size_t b) {
 		if (b == 0) return {0, 0}; // division by zero is not defined, return 0 for testing purposes
@@ -74,17 +73,41 @@ TEST_SUITE("bitblasting predicates") {
 		return {q, r};
 	}
 
-	TEST_CASE("division & modulo") {
+	TEST_CASE("division") {
 		for (size_t m = 2; m != 256; m = m << 1)
-			for (size_t n = 1; n != 255; ++n)
-				for (size_t k = 1; k != 255; ++k) {
+			for (size_t n = 1; n != m; ++n)
+				for (size_t k = 1; k != m; ++k) {
 					auto [q, r] = division(n, k);
-					CHECK( q % m == ((n / k) % m) );
-					CHECK( r % m == ((n % k) % m) );
+					CHECK( q == (n / k) );
+					CHECK( r == (n % k) );
 				}
 	}
 
+	bool lt(size_t x, size_t y, size_t m) {
+		if (m == 0) return false;
+		return (((x & m) == (y & m)) && lt(x, y, m >> 1)) || (((x & m) == 0) && ((y & m) != 0));
+	}
 
+	TEST_CASE("less than") {
+		for (size_t m = 2; m != 256; m = m << 1)
+		for (size_t n = 0; n != m; ++n)
+		for (size_t k = 0; k != m; ++k) {
+			CHECK( lt(n, k, m) == (n < k ) );
+		}
+	}
+
+	bool gt(size_t x, size_t y, size_t m) {
+		if (m == 0) return false;
+		return (((x & m) == (y & m)) && gt(x, y, m >> 1)) || (((x & m) != 0) && ((y & m) == 0));
+	}
+
+	TEST_CASE("greater than") {
+		for (size_t m = 2; m != 256; m = m << 1)
+			for (size_t n = 0; n != m; ++n)
+				for (size_t k = 0; k != m; ++k) {
+					CHECK( gt(n, k, m) == (n > k ) );
+		}
+	}
 
 	size_t shr(size_t x, size_t y, size_t m) {
 		return (x >> y) % m;
