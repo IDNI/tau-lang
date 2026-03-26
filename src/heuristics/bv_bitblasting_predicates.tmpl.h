@@ -832,13 +832,6 @@ tref ngteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
 }
 
 template<NodeType node>
-tref interval_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
-}
-
-template<NodeType node>
 tref atomic_predicate_blasting(tref atomic) {
 
 	// We only blast atomic predicates over bitvector terms. If the atomic formula
@@ -861,7 +854,6 @@ tref atomic_predicate_blasting(tref atomic) {
 		case tau::bf_ngt: { predicate = ngt_predicate<node>(atomic, vars); break; }
 		case tau::bf_nlteq: { predicate = nlteq_predicate<node>(atomic, vars); break; }
 		case tau::bf_ngteq: { predicate = ngteq_predicate<node>(atomic, vars); break; }
-		case tau::bf_interval: { predicate = interval_predicate<node>(atomic, vars); break; }
 		default: {
 			// error, unknown atomic predicate, we return nullptr to indicate failure
 			DBG( LOG_DEBUG << "Unknown atomic predicate in blasting: " << LOG_NT(atomic_nt) << ". It will be left unchanged."; )
@@ -892,7 +884,6 @@ tref wff_predicate_blasting(tref term) {
 		auto nt = tau::get(t).get_type();
 
 		switch (nt) {
-			case tau::bf_interval:
 			case tau::bf_lt: case tau::bf_gt: case tau::bf_lteq: case tau::bf_gteq:
 			case tau::bf_nlt: case tau::bf_ngt: case tau::bf_nlteq: case tau::bf_ngteq:
 			case tau::bf_eq: case tau::bf_neq: {
