@@ -425,227 +425,227 @@ static rewriter::rule is_bit_one_rule(size_t bitwidth, size_t bit) {
 	return rewriter::rule(header, body);
 }
 
-// This is a factory for creating the predicates needed for each bitvector operation.
-// We also include factory methods for creating the calls to easy the creation of
-// calls. We aplly the above rules to create the final predicates
-// for the bitvector operations.
+// Factory methods to create predicates from their arguments and the rules defined above.
+// The rules are cached so that they are only computed once per bitwidth (or bv constants
+// argument).
 template<NodeType node>
-struct bv_bitblasting_predicates {
-
-	static rewriter::rule bvadd_predicate(size_t bitwidth) {
-		static std::map<size_t, rewriter::rule> cache;
-		// if the rule is already computed for the given bitwidth, we return it from the cache
-		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
-		// Otherwise, we compute the rule, store it in the cache and return it.
-		// First we collect all the rules.
-		rewriter::rules rs;
-		rs.insert(rs.end(), bvadd_rules<node>(bitwidth).begin(), bvadd_rules<node>(bitwidth).end());
-		// Then we build a main term to compute the actual predicate.
-		auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto head = make_bvadd_call<node>(left, right, result, bitwidth);
-		rr<node> temp{rs, head};
-		auto body = apply_rr_to_formula(temp);
-		if (!body) {
-			LOG_ERROR << "Failed to compute bvadd predicate.";
-			return rewriter::rule();
-		}
-		cache[bitwidth] = rewriter::rule(head, body);
-		return cache[bitwidth];
-	}
-
-	static rewriter::rule bvsub_predicate(size_t bitwidth) {
-		static std::map<size_t, rewriter::rule> cache;
-		// If the rule is already computed for the given bitwidth, we return it from the cache
-		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
-		// Otherwise, we compute the rule, store it in the cache and return it.
-		// First we collect all the rules.
-		rewriter::rules rs;
-		rs.insert(rs.end(), bvsub_rules<node>(bitwidth).begin(), bvsub_rules<node>(bitwidth).end());
-		// Then we build a main term to compute the actual predicate.
-		auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto head = make_bvsub_call<node>(left, right, result, bitwidth);
-		rr<node> temp{rs, head};
-		auto body = apply_rr_to_formula(temp);
-		if (!body) {
-			LOG_ERROR << "Failed to compute bvsub predicate.";
-			return rewriter::rule();
-		}
-		cache[bitwidth] = rewriter::rule(head, body);
-		return cache[bitwidth];
-	}
-
-	static rewriter::rule bvshl_by_one_predicate(size_t bitwidth) {
-		static std::map<size_t, rewriter::rule> cache;
-		// If the rule is already computed for the given bitwidth, we return it from the cache
-		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
-		// Otherwise, we compute the rule, store it in the cache and return it.
-		// First we collect all the rules.
-		rewriter::rules rs;
-		rs.insert(rs.end(), bvshl_by_one_rules<node>(bitwidth).begin(), bvshl_by_one_rules<node>(bitwidth).end());
-		for (size_t i = 0; i < bitwidth; ++i)
-			rs.insert(rs.end(), bit_rules<node>(bitwidth, i).begin(), bit_rules<node>(bitwidth, i).end());
-		// Then we build a main term to compute the actual predicate.
-		auto operand = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto head = make_bvshl_by_one_call<node>(operand, result, bitwidth);
-		rr<node> temp{rs, head};
-		auto body = apply_rr_to_formula(temp);
-		if (!body) {
-			LOG_ERROR << "Failed to compute bvshl_by_one predicate.";
-			return rewriter::rule();
-		}
-		cache[bitwidth] = rewriter::rule(head, body);
-		return cache[bitwidth];
-	}
-
-	static rewriter::rule bvrhl_by_one_predicate(size_t bitwidth) {
-		static std::map<size_t, rewriter::rule> cache;
-		// If the rule is already computed for the given bitwidth, we return it from the cache
-		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
-		// Otherwise, we compute the rule, store it in the cache and return it.
-		// First we collect all the rules.
-		rewriter::rules rs;
-		rs.insert(rs.end(), bvrhl_by_one_rules<node>(bitwidth).begin(), bvrhl_by_one_rules<node>(bitwidth).end());
-		for (size_t i = 0; i < bitwidth; ++i)
-			rs.insert(rs.end(), bit_rules<node>(bitwidth, i).begin(), bit_rules<node>(bitwidth, i).end());
-		// Then we build a main term to compute the actual predicate.
-		auto operand = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto head = make_bvrhl_by_one_call<node>(operand, result, bitwidth);
-		rr<node> temp{rs, head};
-		auto body = apply_rr_to_formula(temp);
-		if (!body) {
-			LOG_ERROR << "Failed to compute bvrhl_by_one predicate.";
-			return rewriter::rule();
-		}
-		cache[bitwidth] = rewriter::rule(head, body);
-		return cache[bitwidth];
-	}
-
-
-	static rewriter::rule bvmul_predicate(tref y, size_t bitwidth) {
-		static std::map<size_t, std::map<tref, rewriter::rule>> cache;
-		static std::map<size_t, std::map<tref, rewriter::rules>> partial_cache;
-		// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
-		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][y];
-		// Otherwise, we compute the rule, store it in the cache and return it.
-		// First we collect all the rules.
-		rewriter::rules rs;
-		auto ny = y;
-		while (!is_zero_bv_constant<node>(ny)) {
-			if (partial_cache[bitwidth].find(ny) != partial_cache[bitwidth].end()) {
-				rs.insert(rs.end(), partial_cache[bitwidth][ny].begin(), partial_cache[bitwidth][ny].end());
-			} else {
-				auto rule = bvmul_rules<node>(ny, bitwidth);
-				rs.insert(rs.end(), rule.begin(), rule.end());
-				partial_cache[bitwidth][ny] = rule;
-			}
-			ny = shr_by_one<node>(ny);
-		}
-		// Then we build a main term to compute the actual predicate.
-		auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto head = make_bvmul_call<node>(left, y, result);
-		rr<node> temp{rs, head};
-		auto body = apply_rr_to_formula(temp);
-		if (!body) {
-			LOG_ERROR << "Failed to compute bvmul predicate.";
-			return rewriter::rule();
-		}
-		cache[bitwidth][y] = rewriter::rule(head, body);
-		return cache[bitwidth][y];
-
-	}
-
-	static rewriter::rule bvdiv_predicate(tref divisor /* bv copnstant */, size_t bitwidth) {
-		static std::map<size_t, std::map<tref, rewriter::rule>> cache;
-		// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
-		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
-		// Otherwise, we compute the rule, store it in the cache and return it.
-		// First we collect all the rules needed for computing the euclidean
-		// division: addition, multiplication, less then,...
-		rewriter::rules rs;
-		rs.insert(rs.end(), bvadd_rules<node>(bitwidth).begin(), bvadd_rules<node>(bitwidth).end());
-		rs.insert(rs.end(), bvmul_rules<node>(bitwidth).begin(), bvmul_rules<node>(bitwidth).end());
-		rs.insert(rs.end(), bvlt_rules<node>(bitwidth).begin(), bvlt_rules<node>(bitwidth).end());
-		// Then we build the main term to compute the actual predicate.
-		auto quotient = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto remainder = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto dividend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto exact = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto main = tau::build_wff_ex(remainder,
-			tau::build_wff_ex(exact,
-				tau::build_wff_and({
-					make_bvsub_call<node>(dividend, remainder, exact),
-					make_bvadd_call<node>(quotient, divisor, exact),
-					make_bvlt_call<node>(remainder, divisor, bitwidth)})));
-		rr<node> temp{rs, main};
-		auto head = make_bvdiv_call<node>(dividend, divisor, quotient);
-		auto body = apply_rr_to_formula(temp);
-		if (!body) {
-			LOG_ERROR << "Failed to compute bvdiv predicate.";
-			return rewriter::rule();
-		}
-		cache[bitwidth][divisor] = rewriter::rule(head, body);
-		return cache[bitwidth][divisor];
-	}
-
-	static rewriter::rule bvmod_predicate(tref divisor /* bv copnstant */, size_t bitwidth) {
-		static std::map<size_t, std::map<tref, rewriter::rule>> cache;
-		// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
-		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
-		// Otherwise, we compute the rule, store it in the cache and return it.
-		// First we collect all the rules needed for computing the euclidean
-		// division: addition, multiplication, less then,...
-		rewriter::rules rs;
-		rs.insert(rs.end(), bvadd_rules<node>(bitwidth).begin(), bvadd_rules<node>(bitwidth).end());
-		rs.insert(rs.end(), bvmul_rules<node>(bitwidth).begin(), bvmul_rules<node>(bitwidth).end());
-		rs.insert(rs.end(), bvlt_rules<node>(bitwidth).begin(), bvlt_rules<node>(bitwidth).end());
-		// Then we build the main term to compute the actual predicate.
-		auto quotient = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto remainder = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto dividend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto exact = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto main = tau::build_wff_ex(quotient,
-			tau::build_wff_ex(exact,
-				tau::build_wff_and({
-					make_bvsub_call<node>(dividend, remainder, exact),
-					make_bvadd_call<node>(quotient, divisor, exact),
-					make_bvlt_call<node>(remainder, divisor, bitwidth)})));
-		rr<node> temp{rs, main};
-		auto head = make_bvmod_call<node>(dividend, divisor, remainder);
-		auto body = apply_rr_to_formula(temp);
-		if (!body) {
-			LOG_ERROR << "Failed to compute bvmod predicate.";
-			return rewriter::rule();
-		}
-		cache[bitwidth][divisor] = rewriter::rule(head, body);
-		return cache[bitwidth][divisor];
-	}
-
-	static rewriter::rule bvshl_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
+static rewriter::rule bvadd_predicate(size_t bitwidth) {
+	static std::map<size_t, rewriter::rule> cache;
+	// if the rule is already computed for the given bitwidth, we return it from the cache
+	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
+	// Otherwise, we compute the rule, store it in the cache and return it.
+	// First we collect all the rules.
+	rewriter::rules rs;
+	rs.insert(rs.end(), bvadd_rules<node>(bitwidth).begin(), bvadd_rules<node>(bitwidth).end());
+	// Then we build a main term to compute the actual predicate.
+	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto head = make_bvadd_call<node>(left, right, result, bitwidth);
+	rr<node> temp{rs, head};
+	auto body = apply_rr_to_formula(temp);
+	if (!body) {
+		LOG_ERROR << "Failed to compute bvadd predicate.";
 		return rewriter::rule();
 	}
+	cache[bitwidth] = rewriter::rule(head, body);
+	return cache[bitwidth];
+}
 
-	static rewriter::rule bvrhl_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
+template<NodeType node>
+static rewriter::rule bvsub_predicate(size_t bitwidth) {
+	static std::map<size_t, rewriter::rule> cache;
+	// If the rule is already computed for the given bitwidth, we return it from the cache
+	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
+	// Otherwise, we compute the rule, store it in the cache and return it.
+	// First we collect all the rules.
+	rewriter::rules rs;
+	rs.insert(rs.end(), bvsub_rules<node>(bitwidth).begin(), bvsub_rules<node>(bitwidth).end());
+	// Then we build a main term to compute the actual predicate.
+	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto head = make_bvsub_call<node>(left, right, result, bitwidth);
+	rr<node> temp{rs, head};
+	auto body = apply_rr_to_formula(temp);
+	if (!body) {
+		LOG_ERROR << "Failed to compute bvsub predicate.";
 		return rewriter::rule();
 	}
+	cache[bitwidth] = rewriter::rule(head, body);
+	return cache[bitwidth];
+}
 
-};
+template<NodeType node>
+static rewriter::rule bvshl_by_one_predicate(size_t bitwidth) {
+	static std::map<size_t, rewriter::rule> cache;
+	// If the rule is already computed for the given bitwidth, we return it from the cache
+	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
+	// Otherwise, we compute the rule, store it in the cache and return it.
+	// First we collect all the rules.
+	rewriter::rules rs;
+	rs.insert(rs.end(), bvshl_by_one_rules<node>(bitwidth).begin(), bvshl_by_one_rules<node>(bitwidth).end());
+	for (size_t i = 0; i < bitwidth; ++i)
+		rs.insert(rs.end(), bit_rules<node>(bitwidth, i).begin(), bit_rules<node>(bitwidth, i).end());
+	// Then we build a main term to compute the actual predicate.
+	auto operand = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto head = make_bvshl_by_one_call<node>(operand, result, bitwidth);
+	rr<node> temp{rs, head};
+	auto body = apply_rr_to_formula(temp);
+	if (!body) {
+		LOG_ERROR << "Failed to compute bvshl_by_one predicate.";
+		return rewriter::rule();
+	}
+	cache[bitwidth] = rewriter::rule(head, body);
+	return cache[bitwidth];
+}
 
+template<NodeType node>
+static rewriter::rule bvrhl_by_one_predicate(size_t bitwidth) {
+	static std::map<size_t, rewriter::rule> cache;
+	// If the rule is already computed for the given bitwidth, we return it from the cache
+	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
+	// Otherwise, we compute the rule, store it in the cache and return it.
+	// First we collect all the rules.
+	rewriter::rules rs;
+	rs.insert(rs.end(), bvrhl_by_one_rules<node>(bitwidth).begin(), bvrhl_by_one_rules<node>(bitwidth).end());
+	for (size_t i = 0; i < bitwidth; ++i)
+		rs.insert(rs.end(), bit_rules<node>(bitwidth, i).begin(), bit_rules<node>(bitwidth, i).end());
+	// Then we build a main term to compute the actual predicate.
+	auto operand = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto head = make_bvrhl_by_one_call<node>(operand, result, bitwidth);
+	rr<node> temp{rs, head};
+	auto body = apply_rr_to_formula(temp);
+	if (!body) {
+		LOG_ERROR << "Failed to compute bvrhl_by_one predicate.";
+		return rewriter::rule();
+	}
+	cache[bitwidth] = rewriter::rule(head, body);
+	return cache[bitwidth];
+}
+
+template<NodeType node>
+static rewriter::rule bvmul_predicate(tref y, size_t bitwidth) {
+	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
+	static std::map<size_t, std::map<tref, rewriter::rules>> partial_cache;
+	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
+	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][y];
+	// Otherwise, we compute the rule, store it in the cache and return it.
+	// First we collect all the rules.
+	rewriter::rules rs;
+	auto ny = y;
+	while (!is_zero_bv_constant<node>(ny)) {
+		if (partial_cache[bitwidth].find(ny) != partial_cache[bitwidth].end()) {
+			rs.insert(rs.end(), partial_cache[bitwidth][ny].begin(), partial_cache[bitwidth][ny].end());
+		} else {
+			auto rule = bvmul_rules<node>(ny, bitwidth);
+			rs.insert(rs.end(), rule.begin(), rule.end());
+			partial_cache[bitwidth][ny] = rule;
+		}
+		ny = shr_by_one<node>(ny);
+	}
+	// Then we build a main term to compute the actual predicate.
+	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto result = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto head = make_bvmul_call<node>(left, y, result);
+	rr<node> temp{rs, head};
+	auto body = apply_rr_to_formula(temp);
+	if (!body) {
+		LOG_ERROR << "Failed to compute bvmul predicate.";
+		return rewriter::rule();
+	}
+	cache[bitwidth][y] = rewriter::rule(head, body);
+	return cache[bitwidth][y];
+}
+
+template<NodeType node>
+static rewriter::rule bvdiv_predicate(tref divisor /* bv copnstant */, size_t bitwidth) {
+	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
+	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
+	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
+	// Otherwise, we compute the rule, store it in the cache and return it.
+	// First we collect all the rules needed for computing the euclidean
+	// division: addition, multiplication, less then,...
+	rewriter::rules rs;
+	rs.insert(rs.end(), bvadd_rules<node>(bitwidth).begin(), bvadd_rules<node>(bitwidth).end());
+	rs.insert(rs.end(), bvmul_rules<node>(bitwidth).begin(), bvmul_rules<node>(bitwidth).end());
+	rs.insert(rs.end(), bvlt_rules<node>(bitwidth).begin(), bvlt_rules<node>(bitwidth).end());
+	// Then we build the main term to compute the actual predicate.
+	auto quotient = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto remainder = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto dividend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto exact = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto main = tau::build_wff_ex(remainder,
+		tau::build_wff_ex(exact,
+			tau::build_wff_and({
+				make_bvsub_call<node>(dividend, remainder, exact),
+				make_bvadd_call<node>(quotient, divisor, exact),
+				make_bvlt_call<node>(remainder, divisor, bitwidth)})));
+	rr<node> temp{rs, main};
+	auto head = make_bvdiv_call<node>(dividend, divisor, quotient);
+	auto body = apply_rr_to_formula(temp);
+	if (!body) {
+		LOG_ERROR << "Failed to compute bvdiv predicate.";
+		return rewriter::rule();
+	}
+	cache[bitwidth][divisor] = rewriter::rule(head, body);
+	return cache[bitwidth][divisor];
+}
+
+template<NodeType node>
+static rewriter::rule bvmod_predicate(tref divisor /* bv copnstant */, size_t bitwidth) {
+	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
+	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
+	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
+	// Otherwise, we compute the rule, store it in the cache and return it.
+	// First we collect all the rules needed for computing the euclidean
+	// division: addition, multiplication, less then,...
+	rewriter::rules rs;
+	rs.insert(rs.end(), bvadd_rules<node>(bitwidth).begin(), bvadd_rules<node>(bitwidth).end());
+	rs.insert(rs.end(), bvmul_rules<node>(bitwidth).begin(), bvmul_rules<node>(bitwidth).end());
+	rs.insert(rs.end(), bvlt_rules<node>(bitwidth).begin(), bvlt_rules<node>(bitwidth).end());
+	// Then we build the main term to compute the actual predicate.
+	auto quotient = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto remainder = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto dividend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto exact = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto main = tau::build_wff_ex(quotient,
+		tau::build_wff_ex(exact,
+			tau::build_wff_and({
+				make_bvsub_call<node>(dividend, remainder, exact),
+				make_bvadd_call<node>(quotient, divisor, exact),
+				make_bvlt_call<node>(remainder, divisor, bitwidth)})));
+	rr<node> temp{rs, main};
+	auto head = make_bvmod_call<node>(dividend, divisor, remainder);
+	auto body = apply_rr_to_formula(temp);
+	if (!body) {
+		LOG_ERROR << "Failed to compute bvmod predicate.";
+		return rewriter::rule();
+	}
+	cache[bitwidth][divisor] = rewriter::rule(head, body);
+	return cache[bitwidth][divisor];
+}
+
+template<NodeType node>
+static rewriter::rule bvshl_predicate([[maybe_unused]] size_t bitwidth) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return rewriter::rule();
+}
+
+template<NodeType node>
+static rewriter::rule bvrhl_predicate([[maybe_unused]] size_t bitwidth) {
+	// Unsupported operation for now
+	LOG_ERROR << "Not yet implemented.";
+	return rewriter::rule();
+}
 
 template<NodeType node>
 tref bvadd_predicate(tref left, tref right, tref result) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bv_bitblasting_predicates<node>::bvadd_predicate(bitwidth);
+	auto predicate = bvadd_predicate<node>(bitwidth);
 	auto call = make_bvadd_call<node>(left, right, result, bitwidth);
 	return apply_rule(predicate, call);
 }
@@ -657,16 +657,15 @@ tref bvmul_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[
 		LOG_ERROR << "Currently only multiplication by constant is supported in predicate blasting.";
 		return nullptr;
 	}
-	auto predicate = bv_bitblasting_predicates<node>::bvmul_predicate(bitwidth);
+	auto predicate = bvmul_predicate<node>(bitwidth);
 	auto call = make_bvmul_call<node>(left, right, var, bitwidth);
 	return apply_rule(predicate, call);
-
 }
 
 template<NodeType node>
 tref bvsub_predicate(tref left, tref right, tref result) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bv_bitblasting_predicates<node>::bvsub_predicate(bitwidth);
+	auto predicate = bvsub_predicate<node>(bitwidth);
 	auto call = make_bvsub_call<node>(left, right, result, bitwidth);
 	return apply_rule(predicate, call);
 }
@@ -681,7 +680,7 @@ tref bvdiv_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[
 template<NodeType node>
 tref bvrhl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bv_bitblasting_predicates<node>::bvrhl_by_one_predicate(bitwidth);
+	auto predicate = bvrhl_by_one_predicate<node>(bitwidth);
 	auto call = make_bvrhl_by_one_call<node>(left, var, bitwidth);
 	return apply_rule(predicate, call);
 }
@@ -689,7 +688,7 @@ tref bvrhl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) 
 template<NodeType node>
 tref bvshl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bv_bitblasting_predicates<node>::bvshl_by_one_predicate(bitwidth);
+	auto predicate = bvshl_by_one_predicate<node>(bitwidth);
 	auto call = make_bvshl_by_one_call<node>(left, var, bitwidth);
 	return apply_rule(predicate, call);
 }
