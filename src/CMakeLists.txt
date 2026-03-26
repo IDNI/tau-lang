@@ -17,6 +17,7 @@ set(TAU_HEADERS
 	heuristics/ex_subs_based_elimination.h  # heuristic for eliminating existential quantifiers based on substitution
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
+    tau_bdd.h          # BDD library over tau trees
 	tau_tree.h         # tau tree, node, tree traverser, builders,
 	                   # extractors, printers, queries, and
 	                   # transformations from the parse tree

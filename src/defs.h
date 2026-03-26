@@ -31,6 +31,14 @@
 // common std::hash templates and specializations
 #include "../external/parser/src/defs.h"
 
+// Macros to ease searching and sorting
+// Binary search of y in x
+#define hasb(x, y) (std::binary_search(x.begin(), x.end(), y))
+// Binary search of y in x using comparator f
+#define hasbc(x, y, f) (std::binary_search(x.begin(), x.end(), y, f))
+// Sorting of x using comparator f
+#define sortc(x, f) (std::sort(x.begin(), x.end(), f))
+
 // -----------------------------------------------------------------------------
 // helper macros for printing
 

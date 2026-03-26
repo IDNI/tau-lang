@@ -15,6 +15,7 @@ set(TESTS
 	normal_forms
 	product_ba
 	sbf_ba_parsing
+    tau_bdd
 	tau_spec
 	tau_tree_from_parser
 	tau_tree_printers
