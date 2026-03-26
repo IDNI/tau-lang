@@ -56,6 +56,7 @@ TEST_SUITE("BDD creation terms") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
+
 		const char* sample = "xyz";
 		tref spec = tau::get(sample, opts);
 		const char* x = "x";
@@ -74,6 +75,9 @@ TEST_SUITE("BDD creation terms") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
 		const char* sample = "xyz";
 		tref spec = tau::get(sample, opts);
 		const char* x = "x";
@@ -92,6 +96,9 @@ TEST_SUITE("BDD creation terms") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
 		const char* sample = "(xyz)'";
 		tref spec = tau::get(sample, opts);
 		const char* x = "x";
@@ -110,6 +117,9 @@ TEST_SUITE("BDD creation terms") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
 		const char* sample = "(xyz)'";
 		tref spec = tau::get(sample, opts);
 		const char* x = "x";
@@ -124,6 +134,9 @@ TEST_SUITE("BDD creation terms") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
 		const char* sample = "xyzqwert";
 		tref spec = tau::get(sample, opts);
 		bdd::order o {};
@@ -139,6 +152,9 @@ TEST_SUITE("BDD and many") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
 		// Vars
 		const char* vs = "v";
 		tref tv = tau::trim(tau::get(vs, opts));
@@ -173,6 +189,9 @@ TEST_SUITE("BDD and many") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
 		// Vars
 		const char* vs = "v";
 		tref tv = tau::trim(tau::get(vs, opts));
@@ -202,6 +221,9 @@ TEST_SUITE("BDD quantification") {
 		tau::get_options opts = {
 			.parse = { .start = tau::bf },
 		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
 		// Vars
 		const char* ss = "s";
 		tref ts = tau::trim(tau::get(ss, opts));

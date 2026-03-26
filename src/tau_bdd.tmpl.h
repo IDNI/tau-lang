@@ -59,6 +59,28 @@ template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::F = tau_term_bdd::ref(
 	tau_term_bdd::get(bdd_node(tree<node>::get(tree<node>::bf_t)), nullptr, nullptr), true);
 
+#ifdef TAU_CACHE
+template<NodeType node>
+tau_term_bdd<node>::cache_and_t tau_term_bdd<node>::and_memo;
+
+template<NodeType node>
+tau_term_bdd<node>::cache_ex_t tau_term_bdd<node>::ex_memo;
+
+template<NodeType node>
+tau_term_bdd<node>::cache_and_many_t tau_term_bdd<node>::and_many_memo;
+
+template<NodeType node>
+tau_term_bdd<node>::cache_quant_t tau_term_bdd<node>::quant_memo;
+
+template<NodeType node>
+void tau_term_bdd<node>::clear_caches() {
+	and_memo.clear();
+	ex_memo.clear();
+	and_many_memo.clear();
+	quant_memo.clear();
+}
+#endif
+
 template<NodeType node>
 void tau_term_bdd<node>::make_canonical(ref& x, ref& y) {
 	if (y < x) std::swap(x,y);
@@ -144,7 +166,7 @@ tau_term_bdd<node> tau_term_bdd<node>::get_node(ref x) {
 
 template<NodeType node>
 tref tau_term_bdd<node>::get_var(ref x) {
-	DBG(using tau = tree<node>;)
+	using tau = tree<node>;
 	tref v = tau_term_bdd::get(x.b).value.v;
 	// If x is a leaf we need to consider inverter
 	if (leaf(x)) {
@@ -255,7 +277,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, tref y) {
 		tau::get(tau::bf, v), tau::get(tau::bf, y))));
 	ref r = add(v, bdd_and(get_high(x), y), bdd_and(get_low(x), y));
 #ifdef TAU_CACHE
-	and_memo.emplace({x, add(y)}, r);
+	and_memo.emplace(std::array<ref, 2>{x, add(y)}, r);
 #endif
 	return r;
 }
@@ -288,7 +310,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, ref y, const order& o
 		r = add(yv, bdd_and(get_high(y), x, o), bdd_and(get_low(y), x, o));
 	}
 #ifdef TAU_CACHE
-	and_memo.emplace({x,y}, r);
+	and_memo.emplace(std::array<ref, 2>{x,y}, r);
 #endif
 	return r;
 }
@@ -331,8 +353,8 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 	// To ease the algorithm, we reverse the pattern
 	quants v_rev (v.rbegin(), v.rend());
 	// Assert that v is ordered correctly according to o
-	auto cmp = [&o](tref e1, tref e2){return less_then(e1,e2, o);};
 #ifdef DEBUG
+	auto cmp = [&o](tref e1, tref e2){return less_then(e1,e2, o);};
 	for (size_t i = 1; i < v_rev.size(); ++i)
 		assert(cmp(v_rev[i-1].first, v_rev[i].first));
 #endif
@@ -350,7 +372,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t
 	using tau = tree<node>;
 	const tref var = get_var(x);
 	if (leaf(x) || less_then(v.back(), var)) return x;
-	if (auto it = memo.find(); it != memo.end()) return it->second;
+	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	// while current variable is bigger, increase index
 	while (less_then(v[i], var, o)) ++i;
 	if (tau::subtree_equals(v[i], var))
@@ -362,28 +384,26 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t
 
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
-	size_t i, const order& o,
-	auto& memo) {
+	size_t i, const order& o, auto& memo) {
 	using tau = tree<node>;
 	const tref var = get_var(x);
 	// If we have passed the last variable in v, we are done
 	if (leaf(x) || less_then(v.back().first, var, o)) return x;
-	if (auto it = memo.find(); it != memo.end()) return it->second;
+	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	// while current variable is bigger, increase index
-	while (less_tehn(v[i].first, var, o)) ++i;
+	while (less_then(v[i].first, var, o)) ++i;
 	if (tau::subtree_equals(v[i].first, var)) {
 		// Eliminate the quantifier
 		if (v[i].second == Quantifier::ex)
 			return bdd_quant(bdd_or(get_high(x),
-				get_low(x), o), v, ++i, o);
+				get_low(x), o), v, ++i, o, memo);
 		// Otherwise Quantifier::all
 		else return bdd_quant(bdd_and(get_high(x),
-			get_low(x), o), v, ++i, o);
+			get_low(x), o), v, ++i, o, memo);
 	}
-	return memo.emplace(x, add(var, bdd_quant(get_high(x), v, i, o),
-		bdd_quant(get_low(x), v, i, o))).first->second;
+	return memo.emplace(x, add(var, bdd_quant(get_high(x), v, i, o, memo),
+		bdd_quant(get_low(x), v, i, o, memo))).first->second;
 }
-
 
 #else
 template<NodeType node>
@@ -508,14 +528,13 @@ size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o) {
 #ifdef TAU_CACHE
-	static typename std::unordered_map<std::array<ref, 2>, ref>::const_iterator jt;
 	for (size_t n = 0; n < v.size(); ++n)
 		for (size_t k = 0; k < n; ++k) {
-			const ref x, y;
+			ref x, y;
 			// Make assignment to x and y canonical
 			if (v[n] < v[k]) x = v[n], y = v[k];
 			else x = v[k], y = v[n];
-			if ((jt = and_memo.find({x, y})) != and_memo.end()) {
+			if (auto jt = and_memo.find({x, y}); jt != and_memo.end()) {
 				v.erase(v.begin()+k);
 				v.erase(v.begin()+n-1);
 				v.push_back(jt->second);
@@ -545,7 +564,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o)
 
 	if (v.size() == 2) {
 #ifdef TAU_CACHE
-		return and_many_memo.emplace(v, bdd_and(v[0], v[1])).first->second;
+		return and_many_memo.emplace(v, bdd_and(v[0], v[1], o)).first->second;
 #endif
 		return bdd_and(v[0], v[1], o);
 	}
@@ -559,7 +578,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o)
 			break;
 		case 1: {
 #ifdef TAU_CACHE
-			return and_many_memo.emplace(v, res), res;
+			return and_many_memo.emplace(v, res).first->second;
 #endif
 			return res;
 		}
@@ -711,9 +730,16 @@ size_t std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto& n) const {
 }
 
 template<typename T>
-std::size_t std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto& r) const {
+size_t std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto& r) const {
 	size_t seed = 0;
 	idni::hash_combine(seed, idni::hash_tref<T>()(r.b), r.inv);
+	return seed;
+}
+
+template<typename T>
+size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto& a) const {
+	size_t seed = 0;
+	idni::hash_combine(seed, a[0], a[1]);
 	return seed;
 }
 
