@@ -3,6 +3,8 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_bitblasting"
 
+#include <bit>
+
 namespace idni::tau_lang {
 
 using bool_node = idni::tau_lang::node<cvc5::Term, Bool>;
@@ -532,16 +534,72 @@ struct bv_bitblasting_predicates {
 
 	}
 
-	static rewriter::rule bvdiv_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvdiv_predicate(tref divisor /* bv copnstant */, size_t bitwidth) {
+		static std::map<size_t, std::map<tref, rewriter::rule>> cache;
+		// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
+		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
+		// Otherwise, we compute the rule, store it in the cache and return it.
+		// First we collect all the rules needed for computing the euclidean
+		// division: addition, multiplication, less then,...
+		rewriter::rules rs;
+		rs.insert(rs.end(), bv_bitblasting_rules<node>::bvadd(bitwidth).begin(),
+			bv_bitblasting_rules<node>::bvadd(bitwidth).end());
+		rs.insert(rs.end(), bv_bitblasting_rules<node>::bvmul(bitwidth));
+		rs.insert(rs.end(), bv_bitblasting_rules<node>::bvlt(bitwidth));
+		// Then we build the main term to compute the actual predicate.
+		auto quotient = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto remainder = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto dividend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto exact = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto main = tau::build_wff_ex(remainder,
+			tau::build_wff_ex(exact,
+				tau::build_wff_and({
+					make_bvsub_call(dividend, remainder, exact),
+					make_bvadd_call(quotient, divisor, exact),
+					make_bvlt_call(remainder, divisor, bitwidth)})));
+		rr<node> temp{rs, main};
+		auto head = make_bvdiv_call(dividend, divisor, quotient);
+		auto body = apply_rr_to_formula(temp);
+		if (!body) {
+			LOG_ERROR << "Failed to compute bvdiv predicate.";
+			return rewriter::rule();
+		}
+		cache[bitwidth][divisor] = rewriter::rule(head, body);
+		return cache[bitwidth][divisor];
 	}
 
-	static rewriter::rule bvmod_predicate([[maybe_unused]] size_t bitwidth) {
-		// Unsupported operation for now
-		LOG_ERROR << "Not yet implemented.";
-		return rewriter::rule();
+	static rewriter::rule bvmod_predicate(tref divisor /* bv copnstant */, size_t bitwidth) {
+		static std::map<size_t, std::map<tref, rewriter::rule>> cache;
+		// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
+		if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
+		// Otherwise, we compute the rule, store it in the cache and return it.
+		// First we collect all the rules needed for computing the euclidean
+		// division: addition, multiplication, less then,...
+		rewriter::rules rs;
+		rs.insert(rs.end(), bv_bitblasting_rules<node>::bvadd(bitwidth).begin(),
+			bv_bitblasting_rules<node>::bvadd(bitwidth).end());
+		rs.insert(rs.end(), bv_bitblasting_rules<node>::bvmul(bitwidth));
+		rs.insert(rs.end(), bv_bitblasting_rules<node>::bvlt(bitwidth));
+		// Then we build the main term to compute the actual predicate.
+		auto quotient = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto remainder = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto dividend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto exact = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+		auto main = tau::build_wff_ex(quotient,
+			tau::build_wff_ex(exact,
+				tau::build_wff_and({
+					make_bvsub_call(dividend, remainder, exact),
+					make_bvadd_call(quotient, divisor, exact),
+					make_bvlt_call(remainder, divisor, bitwidth)})));
+		rr<node> temp{rs, main};
+		auto head = make_bvmod_call(dividend, divisor, remainder);
+		auto body = apply_rr_to_formula(temp);
+		if (!body) {
+			LOG_ERROR << "Failed to compute bvmod predicate.";
+			return rewriter::rule();
+		}
+		cache[bitwidth][divisor] = rewriter::rule(head, body);
+		return cache[bitwidth][divisor];
 	}
 
 	static rewriter::rule bvshl_predicate([[maybe_unused]] size_t bitwidth) {
