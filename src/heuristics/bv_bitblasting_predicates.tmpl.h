@@ -314,13 +314,6 @@ static rewriter::rules bvrhl_rules([[maybe_unused]] size_t bitwidth) {
 }
 
 template<NodeType node>
-static rewriter::rule bvlt_rule([[maybe_unused]] size_t index, [[maybe_unused]] size_t bitwidth) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return rewriter::rule();
-}
-
-template<NodeType node>
 static rewriter::rules bvlt_rules(size_t bitwidth) {
 	using tau = tree<node>;
 
@@ -343,11 +336,29 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
 			tau::build_bf_eq(
 				make_bit_call<node>(x, n),
 				make_bit_call<node>(y, n))),
-		tau::build_wff_and(
+				tau::build_wff_and(
 			make_is_bit_zero_call<node>(x, n),
 			make_is_bit_one_call<node>(y, n)));
 	rules.push_back(rewriter::rule(tau::geth(general_header), tau::geth(general_body)));
 	return rules;
+}
+
+template<NodeType node>
+static rewriter::rule bvlt_rule(size_t bitwidth) {
+	using tau = tree<node>;
+
+	auto x = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto y = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+
+	auto main = make_bvlt_call(x, y, bitwidth);
+	auto rules = bvlt_rules<node>(bitwidth);
+	rr<node> temp{rules, main};
+	auto body = apply_rr_to_formula(temp);
+	if (!body) {
+		LOG_ERROR << "Failed to apply rules for bvlt predicate.";
+		return rewriter::rule();
+	}
+	return rewriter::rule(tau::geth(main), tau::geth(body));
 }
 
 template<NodeType node>
@@ -379,6 +390,25 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 	rules.push_back(rewriter::rule(tau::geth(general_header), tau::geth(general_body)));
 	return rules;
 }
+
+template<NodeType node>
+static rewriter::rules bvgt_rule(size_t bitwidth) {
+	using tau = tree<node>;
+
+	auto x = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto y = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+
+	auto main = make_bvgt_call(x, y, bitwidth);
+	auto rules = bvgt_rules<node>(bitwidth);
+	rr<node> temp{rules, main};
+	auto body = apply_rr_to_formula(temp);
+	if (!body) {
+		LOG_ERROR << "Failed to apply rules for bvgt predicate.";
+		return rewriter::rule();
+	}
+	return rewriter::rule(tau::geth(main), tau::geth(body));
+}
+
 
 template<NodeType node>
 static rewriter::rule bit_rule(size_t bitwidth, size_t bit) {
