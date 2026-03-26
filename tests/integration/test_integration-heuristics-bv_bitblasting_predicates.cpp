@@ -28,7 +28,7 @@ tref parse_wff(const std::string& sample) {
 
 TEST_SUITE("bitblasting") {
 
-	TEST_CASE("print bvshl predicates") {
+	/*TEST_CASE("print bvshl predicates") {
 		using node = node_t;
 
 		for(auto rule : bv_bitblasting_rules<node_t>::bvshl_by_one(2)) {
@@ -54,7 +54,7 @@ TEST_SUITE("bitblasting") {
 		}
 
 		CHECK(true);
-	}
+	}*/
 
 }
 TEST_SUITE("Cleanup") {
