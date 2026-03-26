@@ -445,7 +445,7 @@ static rewriter::rule bvadd_rule(size_t bitwidth) {
 	rr<node> temp{rs, head};
 	auto body = apply_rr_to_formula(temp);
 	if (!body) {
-		LOG_ERROR << "Failed to compute bvadd predicate.";
+		DBG( LOG_DEBUG << "Failed to compute bvadd rule. Returning empty rule."; )
 		return rewriter::rule();
 	}
 	cache[bitwidth] = rewriter::rule(head, body);
@@ -469,7 +469,7 @@ static rewriter::rule bvsub_rule(size_t bitwidth) {
 	rr<node> temp{rs, head};
 	auto body = apply_rr_to_formula(temp);
 	if (!body) {
-		LOG_ERROR << "Failed to compute bvsub predicate.";
+		DBG( LOG_DEBUG << "Failed to compute bvsub rule. Returning empty rule."; )
 		return rewriter::rule();
 	}
 	cache[bitwidth] = rewriter::rule(head, body);
@@ -494,7 +494,7 @@ static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 	rr<node> temp{rs, head};
 	auto body = apply_rr_to_formula(temp);
 	if (!body) {
-		LOG_ERROR << "Failed to compute bvshl_by_one predicate.";
+		DBG( LOG_DEBUG << "Failed to compute bvshl_by_one rule. Returning empty rule."; )
 		return rewriter::rule();
 	}
 	cache[bitwidth] = rewriter::rule(head, body);
@@ -519,7 +519,7 @@ static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
 	rr<node> temp{rs, head};
 	auto body = apply_rr_to_formula(temp);
 	if (!body) {
-		LOG_ERROR << "Failed to compute bvrhl_by_one predicate.";
+		DBG( LOG_DEBUG << "Failed to compute bvrhl_by_one rule. Returning empty rule."; )
 		return rewriter::rule();
 	}
 	cache[bitwidth] = rewriter::rule(head, body);
@@ -553,7 +553,7 @@ static rewriter::rule bvmul_rule(tref y, size_t bitwidth) {
 	rr<node> temp{rs, head};
 	auto body = apply_rr_to_formula(temp);
 	if (!body) {
-		LOG_ERROR << "Failed to compute bvmul predicate.";
+		DBG( LOG_DEBUG << "Failed to compute bvmul rule. Returning empty rule."; )
 		return rewriter::rule();
 	}
 	cache[bitwidth][y] = rewriter::rule(head, body);
@@ -587,7 +587,7 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv copnstant */, size_t bitwidt
 	auto head = make_bvdiv_call<node>(dividend, divisor, quotient);
 	auto body = apply_rr_to_formula(temp);
 	if (!body) {
-		LOG_ERROR << "Failed to compute bvdiv predicate.";
+		DBG( LOG_DEBUG << "Failed to compute bvdiv rule. Returning empty rule."; )
 		return rewriter::rule();
 	}
 	cache[bitwidth][divisor] = rewriter::rule(head, body);
@@ -621,7 +621,7 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */, size_t bitwidt
 	auto head = make_bvmod_call<node>(dividend, divisor, remainder);
 	auto body = apply_rr_to_formula(temp);
 	if (!body) {
-		LOG_ERROR << "Failed to compute bvmod predicate.";
+		DBG( LOG_DEBUG << "Failed to compute bvmod rule. Returning empty rule."; )
 		return rewriter::rule();
 	}
 	cache[bitwidth][divisor] = rewriter::rule(head, body);
@@ -654,7 +654,7 @@ template<NodeType node>
 tref bvmul([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
 	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
 	if (!is_bv_constant<node>(right)) {
-		LOG_ERROR << "Currently only multiplication by constant is supported in predicate blasting.";
+		DBG( LOG_DEBUG << "Currently only multiplication by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
 	auto predicate = bvmul_rule<node>(bitwidth);
