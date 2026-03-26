@@ -626,7 +626,7 @@ struct bv_bitblasting_predicates {
 
 template<NodeType node>
 tref bvadd_predicate(tref left, tref right, tref result) {
-	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
+	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	auto predicate = bv_bitblasting_predicates<node>::bvadd_predicate(bitwidth);
 	auto call = bv_bitblasting_rules<node>::make_bvadd_call(left, right, result, bitwidth);
 	return apply_rule(predicate, call);
@@ -647,7 +647,7 @@ tref bvmul_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[
 
 template<NodeType node>
 tref bvsub_predicate(tref left, tref right, tref result) {
-	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
+	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	auto predicate = bv_bitblasting_predicates<node>::bvsub_predicate(bitwidth);
 	auto call = bv_bitblasting_rules<node>::make_bvsub_call(left, right, result, bitwidth);
 	return apply_rule(predicate, call);
@@ -662,7 +662,7 @@ tref bvdiv_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[
 
 template<NodeType node>
 tref bvrhl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
-	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
+	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	auto predicate = bv_bitblasting_predicates<node>::bvrhl_by_one_predicate(bitwidth);
 	auto call = bv_bitblasting_rules<node>::make_bvrhl_by_one_call(left, var, bitwidth);
 	return apply_rule(predicate, call);
@@ -670,7 +670,7 @@ tref bvrhl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) 
 
 template<NodeType node>
 tref bvshl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
-	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
+	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	auto predicate = bv_bitblasting_predicates<node>::bvshl_by_one_predicate(bitwidth);
 	auto call = bv_bitblasting_rules<node>::make_bvshl_by_one_call(left, var, bitwidth);
 	return apply_rule(predicate, call);
@@ -824,36 +824,38 @@ tref interval_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
 template<NodeType node>
 tref atomic_predicate_blasting(tref atomic) {
 
+	// We only blast atomic predicates over bitvector terms. If the atomic formula
+	// is not over bitvectors, we return it unchanged.
 	auto type_id = tau::get(atomic).get_ba_type();
-	if(!is_bv_type_family<node>(type_id))	return atomic;
+	if(!is_bv_type_family<node>(type_id)) return atomic;
 
-	auto atomic_nt = tau::get(atomic)[0].get_type();
+	auto atomic_nt = tau::get(atomic).get_type();
 	tref predicate;
 	trefs vars;
 
-	tref current;
 	switch (atomic_nt) {
-		case tau::bf_eq: { current = eq_predicate<node>(atomic, vars); break; }
-		case tau::bf_neq: { current = neq_predicate<node>(atomic, vars); break; }
-		case tau::bf_lt: { current = lt_predicate<node>(atomic, vars); break; }
-		case tau::bf_gt: { current = gt_predicate<node>(atomic, vars); break; }
-		case tau::bf_lteq: { current = lteq_predicate<node>(atomic, vars); break; }
-		case tau::bf_gteq: { current = gteq_predicate<node>(atomic, vars); break; }
-		case tau::bf_nlt: { current = nlt_predicate<node>(atomic, vars); break; }
-		case tau::bf_ngt: { current = ngt_predicate<node>(atomic, vars); break; }
-		case tau::bf_nlteq: { current = nlteq_predicate<node>(atomic, vars); break; }
-		case tau::bf_ngteq: { current = ngteq_predicate<node>(atomic, vars); break; }
-		case tau::bf_interval: { current = interval_predicate<node>(atomic, vars); break; }
+		case tau::bf_eq: { predicate = eq_predicate<node>(atomic, vars); break; }
+		case tau::bf_neq: { predicate = neq_predicate<node>(atomic, vars); break; }
+		case tau::bf_lt: { predicate = lt_predicate<node>(atomic, vars); break; }
+		case tau::bf_gt: { predicate = gt_predicate<node>(atomic, vars); break; }
+		case tau::bf_lteq: { predicate = lteq_predicate<node>(atomic, vars); break; }
+		case tau::bf_gteq: { predicate = gteq_predicate<node>(atomic, vars); break; }
+		case tau::bf_nlt: { predicate = nlt_predicate<node>(atomic, vars); break; }
+		case tau::bf_ngt: { predicate = ngt_predicate<node>(atomic, vars); break; }
+		case tau::bf_nlteq: { predicate = nlteq_predicate<node>(atomic, vars); break; }
+		case tau::bf_ngteq: { predicate = ngteq_predicate<node>(atomic, vars); break; }
+		case tau::bf_interval: { predicate = interval_predicate<node>(atomic, vars); break; }
 		default: {
 			// error, unknown atomic predicate, we return nullptr to indicate failure
-			LOG_ERROR << "Unknown atomic predicate: " << LOG_NT(atomic_nt);
-			return nullptr;
+			DBG( LOG_DEBUG << "Unknown atomic predicate in blasting: " << LOG_NT(atomic_nt) << ". It will be left unchanged."; )
+			return atomic;
 		}
 	}
 
-	predicate = predicate
-		? build_bf_and<node>(predicate, current)
-		: current;
+	if (!predicate) {
+		DBG( LOG_DEBUG << "Failed to compute predicate in blasting: " << LOG_FM(atomic) << ". It will be left unchanged."; )
+		return atomic;
+	}
 
 	// we add the existentials for the variables we introduced
 	for (auto it = vars.rbegin(); it != vars.rend(); ++it) {
