@@ -241,7 +241,7 @@ static rewriter::rules bvrhl_by_one_rules(size_t bitwidth) {
 }
 
 template<NodeType node>
-static rewriter::rule bvmul_rule(tref y /* cvc5 constant */, size_t bitwidth) {
+static rewriter::rule bvmul_rec_rule(tref y /* cvc5 constant */, size_t bitwidth) {
 	using tau = tree<node>;
 
 	DBG( assert(is_bv_constant<node>(y)); )
@@ -429,7 +429,7 @@ static rewriter::rule is_bit_one_rule(size_t bitwidth, size_t bit) {
 // The rules are cached so that they are only computed once per bitwidth (or bv constants
 // argument).
 template<NodeType node>
-static rewriter::rule bvadd_predicate(size_t bitwidth) {
+static rewriter::rule bvadd_rule(size_t bitwidth) {
 	static std::map<size_t, rewriter::rule> cache;
 	// if the rule is already computed for the given bitwidth, we return it from the cache
 	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
@@ -453,7 +453,7 @@ static rewriter::rule bvadd_predicate(size_t bitwidth) {
 }
 
 template<NodeType node>
-static rewriter::rule bvsub_predicate(size_t bitwidth) {
+static rewriter::rule bvsub_rule(size_t bitwidth) {
 	static std::map<size_t, rewriter::rule> cache;
 	// If the rule is already computed for the given bitwidth, we return it from the cache
 	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
@@ -477,7 +477,7 @@ static rewriter::rule bvsub_predicate(size_t bitwidth) {
 }
 
 template<NodeType node>
-static rewriter::rule bvshl_by_one_predicate(size_t bitwidth) {
+static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 	static std::map<size_t, rewriter::rule> cache;
 	// If the rule is already computed for the given bitwidth, we return it from the cache
 	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
@@ -502,7 +502,7 @@ static rewriter::rule bvshl_by_one_predicate(size_t bitwidth) {
 }
 
 template<NodeType node>
-static rewriter::rule bvrhl_by_one_predicate(size_t bitwidth) {
+static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
 	static std::map<size_t, rewriter::rule> cache;
 	// If the rule is already computed for the given bitwidth, we return it from the cache
 	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth];
@@ -527,7 +527,7 @@ static rewriter::rule bvrhl_by_one_predicate(size_t bitwidth) {
 }
 
 template<NodeType node>
-static rewriter::rule bvmul_predicate(tref y, size_t bitwidth) {
+static rewriter::rule bvmul_rule(tref y, size_t bitwidth) {
 	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
 	static std::map<size_t, std::map<tref, rewriter::rules>> partial_cache;
 	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
@@ -540,7 +540,7 @@ static rewriter::rule bvmul_predicate(tref y, size_t bitwidth) {
 		if (partial_cache[bitwidth].find(ny) != partial_cache[bitwidth].end()) {
 			rs.insert(rs.end(), partial_cache[bitwidth][ny].begin(), partial_cache[bitwidth][ny].end());
 		} else {
-			auto rule = bvmul_rules<node>(ny, bitwidth);
+			auto rule = bvmul_rec_rule<node>(ny, bitwidth);
 			rs.insert(rs.end(), rule.begin(), rule.end());
 			partial_cache[bitwidth][ny] = rule;
 		}
@@ -561,7 +561,7 @@ static rewriter::rule bvmul_predicate(tref y, size_t bitwidth) {
 }
 
 template<NodeType node>
-static rewriter::rule bvdiv_predicate(tref divisor /* bv copnstant */, size_t bitwidth) {
+static rewriter::rule bvdiv_rule(tref divisor /* bv copnstant */, size_t bitwidth) {
 	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
 	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
 	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
@@ -595,7 +595,7 @@ static rewriter::rule bvdiv_predicate(tref divisor /* bv copnstant */, size_t bi
 }
 
 template<NodeType node>
-static rewriter::rule bvmod_predicate(tref divisor /* bv copnstant */, size_t bitwidth) {
+static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */, size_t bitwidth) {
 	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
 	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
 	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
@@ -629,66 +629,66 @@ static rewriter::rule bvmod_predicate(tref divisor /* bv copnstant */, size_t bi
 }
 
 template<NodeType node>
-static rewriter::rule bvshl_predicate([[maybe_unused]] size_t bitwidth) {
+static rewriter::rule bvshl_rule([[maybe_unused]] size_t bitwidth) {
 	// Unsupported operation for now
 	LOG_ERROR << "Not yet implemented.";
 	return rewriter::rule();
 }
 
 template<NodeType node>
-static rewriter::rule bvrhl_predicate([[maybe_unused]] size_t bitwidth) {
+static rewriter::rule bvrhl_rule([[maybe_unused]] size_t bitwidth) {
 	// Unsupported operation for now
 	LOG_ERROR << "Not yet implemented.";
 	return rewriter::rule();
 }
 
 template<NodeType node>
-tref bvadd_predicate(tref left, tref right, tref result) {
+tref bvadd(tref left, tref right, tref result) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bvadd_predicate<node>(bitwidth);
+	auto predicate = bvadd_rule<node>(bitwidth);
 	auto call = make_bvadd_call<node>(left, right, result, bitwidth);
 	return apply_rule(predicate, call);
 }
 
 template<NodeType node>
-tref bvmul_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
+tref bvmul([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
 	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
 	if (!is_bv_constant<node>(right)) {
 		LOG_ERROR << "Currently only multiplication by constant is supported in predicate blasting.";
 		return nullptr;
 	}
-	auto predicate = bvmul_predicate<node>(bitwidth);
+	auto predicate = bvmul_rule<node>(bitwidth);
 	auto call = make_bvmul_call<node>(left, right, var, bitwidth);
 	return apply_rule(predicate, call);
 }
 
 template<NodeType node>
-tref bvsub_predicate(tref left, tref right, tref result) {
+tref bvsub(tref left, tref right, tref result) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bvsub_predicate<node>(bitwidth);
+	auto predicate = bvsub_rule<node>(bitwidth);
 	auto call = make_bvsub_call<node>(left, right, result, bitwidth);
 	return apply_rule(predicate, call);
 }
 
 template<NodeType node>
-tref bvdiv_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
+tref bvdiv([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
 	// Unsupported operation for now
 	LOG_ERROR << "Not yet implemented.";
 	return nullptr;
 }
 
 template<NodeType node>
-tref bvrhl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
+tref bvrhl_one([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bvrhl_by_one_predicate<node>(bitwidth);
+	auto predicate = bvrhl_by_one_rule<node>(bitwidth);
 	auto call = make_bvrhl_by_one_call<node>(left, var, bitwidth);
 	return apply_rule(predicate, call);
 }
 
 template<NodeType node>
-tref bvshl_one_predicate([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
+tref bvshl_one([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bvshl_by_one_predicate<node>(bitwidth);
+	auto predicate = bvshl_by_one_rule<node>(bitwidth);
 	auto call = make_bvshl_by_one_call<node>(left, var, bitwidth);
 	return apply_rule(predicate, call);
 }
@@ -712,8 +712,8 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 				auto left = changes[tau::get(t).child(0)];
 				auto right = changes[tau::get(t).child(1)];
 				auto current = (nt == tau::bf_add)
-					? bvadd_predicate<node>(left, right, var)
-					: bvsub_predicate<node>(left, right, var);
+					? bvadd<node>(left, right, var)
+					: bvsub<node>(left, right, var);
 				predicate = predicate
 					? build_bf_and<node>(predicate, current)
 					: current;
@@ -727,8 +727,8 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 				auto left = tau::get(t).child(0);
 				changes[t] = var;
 				auto current = (nt == tau::bf_shl)
-					? bvshl_one_predicate<node>(left, var)
-					: bvrhl_one_predicate<node>(left, var);
+					? bvshl_one<node>(left, var)
+					: bvrhl_one<node>(left, var);
 				predicate = predicate
 					? build_bf_and<node>(predicate, current)
 					: current;
