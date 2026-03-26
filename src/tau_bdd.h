@@ -62,18 +62,17 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 #ifdef TAU_CACHE
 	// Caches
 	using cache_and_t = std::unordered_map<std::array<ref, 2>, ref>;
-	static cache_and_t& and_memo =
-		bintree<bdd_node>::template create_cache<cache_and_t>();
 	using cache_and_many_t = std::unordered_map<refs, ref>;
-	static cache_and_many_t& and_many_memo =
-		bintree<bdd_node>::template create_cache<cache_and_many_t>();
 	using cache_ex_t = std::map<trefs, std::unordered_map<ref, ref>>;
-	static cache_ex_t& ex_memo =
-		bintree<bdd_node>::template create_cache<cache_ex_t>();
-	using cache_quant_t = std::map<std::vector<std::pair<tref, Quantifier>>,
-		std::unordered_map<ref, ref>>;
-	static cache_quant_t& quant_memo =
-		bintree<bdd_node>::template create_cache<cache_quant_t>();
+	using cache_quant_t = std::map<quants, std::unordered_map<ref, ref>>;
+
+	// TODO: Make compatible with bintree gc
+	static cache_and_t and_memo;
+	static cache_and_many_t and_many_memo;
+	static cache_ex_t ex_memo;
+	static cache_quant_t quant_memo;
+
+	static void clear_caches();
 #endif
 
 	// Canonical order for ref's
@@ -144,6 +143,8 @@ struct tau_term_bdd_handle {
 	using tbdd = tau_term_bdd<node>;
 	using quants = std::vector<std::pair<tref, typename tbdd::Quantifier>>;
 
+	// TODO: add handle universe in order to reference a handle by id
+
 	// Create a BDD handle from a given ref
 	explicit tau_term_bdd_handle(ref x);
 	tau_term_bdd_handle(tref b, const bool _inv) : h(tbdd::geth(b)),
@@ -184,6 +185,11 @@ struct std::hash<idni::tau_lang::tau_bdd_node<T>> {
 template<typename T>
 struct std::hash<idni::tau_lang::tau_bdd_ref<T>> {
 	size_t operator()(auto& r) const;
+};
+
+template<typename T>
+struct std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>> {
+	size_t operator()(auto& a) const;
 };
 
 #include "tau_bdd.tmpl.h"
