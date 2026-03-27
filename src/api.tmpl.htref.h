@@ -97,7 +97,7 @@ htref api<node>::apply_def(htref def, htref expression) {
 
 template <NodeType node>
 htref api<node>::apply_defs(std::set<htref> defs, htref expression) {
-	std::set<tref> tdefs;
+	subtree_set<node> tdefs;
 	for (htref def : defs) tdefs.insert(def->get());
 	return tau::geth(apply_defs(tdefs, expression->get()));
 }

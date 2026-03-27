@@ -127,7 +127,7 @@ struct api {
 	static optional_string apply_defs(
 		const std::set<std::string>& defs,
 		const std::string& expression);
-	static tref apply_defs(std::set<tref> defs, tref expression);
+	static tref apply_defs(subtree_set<node> defs, tref expression);
 	static htref apply_defs(std::set<htref> defs, htref expression);
 
 	static optional_string apply_all_defs(
@@ -338,7 +338,7 @@ struct api {
 		measuring& m,
 		const std::set<std::string>& defs,
 		const std::string& expression);
-	static tref apply_defs(measuring& m, std::set<tref> defs, tref expression);
+	static tref apply_defs(measuring& m, subtree_set<node> defs, tref expression);
 	static htref apply_defs(measuring& m, std::set<htref> defs, htref expression);
 
 	static optional_string apply_all_defs(
