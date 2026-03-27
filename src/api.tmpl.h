@@ -196,11 +196,11 @@ bool api<node>::is_formula(tref fm) {
 
 template <NodeType node>
 tref api<node>::apply_def(tref def, tref expr) {
-	return apply_defs(std::set<tref>{ def }, expr);
+	return apply_defs(subtree_set<node>{ def }, expr);
 }
 
 template <NodeType node>
-tref api<node>::apply_defs(std::set<tref> defs, tref expr) {
+tref api<node>::apply_defs(subtree_set<node> defs, tref expr) {
 	if (!expr) return nullptr;
 	auto maybe_nso_rr = get_nso_rr(expr);
 	if (!maybe_nso_rr) return nullptr;
@@ -219,7 +219,7 @@ tref api<node>::apply_defs(std::set<tref> defs, tref expr) {
 
 template <NodeType node>
 tref api<node>::apply_all_defs(tref expr) {
-	return apply_defs(std::set<tref>{}, expr);
+	return apply_defs(subtree_set<node>{}, expr);
 }
 
 
