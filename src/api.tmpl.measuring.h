@@ -7,9 +7,9 @@
 
 namespace idni::tau_lang {
 
-measuring& measuring::part() { return parts.emplace_back(), parts.back(); }
+inline measuring& measuring::part() { return parts.emplace_back(), parts.back(); }
 
-std::ostream& measuring::operator()(std::ostream& os, size_t level) const {
+inline std::ostream& measuring::operator()(std::ostream& os, size_t level) const {
 	if (print_json) return to_json(os) << "\n";
 	auto indent = std::string(level, '\t');
 	os << indent << name << ": " << ms << " ms\n";
@@ -23,7 +23,7 @@ std::ostream& measuring::operator()(std::ostream& os, size_t level) const {
 
 inline std::ostream& operator<<(std::ostream& os, const measuring& m) { return m(os); }
 
-std::ostream& measuring::to_json(std::ostream& os, size_t level) const {
+inline std::ostream& measuring::to_json(std::ostream& os, size_t level) const {
 	auto indent0 = std::string(level, '\t');
 	auto indent1 = std::string(level+1, '\t');
 	os << indent0 << "{\n";
@@ -42,10 +42,10 @@ std::ostream& measuring::to_json(std::ostream& os, size_t level) const {
 	return os;
 }
 
-api_measure::api_measure(std::string name, measuring& m) : m(m) {
+inline api_measure::api_measure(std::string name, measuring& m) : m(m) {
 	m.name = name, t.start();
 }
-api_measure::~api_measure() { m.ms = t.stop(); }
+inline api_measure::~api_measure() { m.ms = t.stop(); }
 
 // helper macros
 
@@ -110,7 +110,7 @@ MT(htref, apply_def, (htref def, htref expression), (def, expression))
 MT(std::optional<std::string>, apply_defs,
 	(const std::set<std::string>& defs, const std::string& expression),
 	(defs, expression))
-MT(tref,  apply_defs, (std::set<tref> defs, tref expression), (defs, expression))
+MT(tref,  apply_defs, (subtree_set<node> defs, tref expression), (defs, expression))
 MT(htref, apply_defs, (std::set<htref> defs, htref expression), (defs, expression))
 
 MT(std::optional<std::string>, apply_all_defs, (const std::string& expression), (expression))
