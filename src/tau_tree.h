@@ -189,7 +189,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 
 	// handles
 	tref get() const;
-	static const tree& get(const std::optional<tref>& id);
 	static const tree& get(const tref id);
 	static const tree& get(const htref& h);
 	static htref geth(tref id);
@@ -482,9 +481,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		static const extractor<size_t>              ba_constant_id;
 		static const extractor<size_t>              ba_type;
 		static const extractor<constant>            ba_constant;
-		static const extractor<size_t>              bv_constant_id;
-		static const extractor<constant>            bv_constant;
-		static const extractor<size_t>              bv_size;
 		// children
 		static const extractor<traverser>           only_child;
 		static const extractor<traverser>           first;
