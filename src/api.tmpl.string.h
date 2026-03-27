@@ -45,7 +45,7 @@ template <NodeType node>
 std::optional<std::string> api<node>::apply_defs(
 	const std::set<std::string>& defs, const std::string& expr)
 {
-	std::set<tref> tdefs;
+	subtree_set<node> tdefs;
 	for (const std::string& def : defs) tdefs.insert(get_definition(def));
 	if (tref a = apply_defs(tdefs, get_spec_or_term(expr)); a)
 		return to_str(a);
@@ -94,7 +94,7 @@ std::optional<std::string> api<node>::substitute(
 template <NodeType node>
 std::optional<std::string> api<node>::boole_normal_form(const std::string& expr)
 {
-	if (tref a = apply_all_defs(expr); a)
+	if (tref a = apply_all_defs(get_spec_or_term(expr)); a)
 		if (tref b = tau_lang::boole_normal_form<node>(a); b)
 			return to_str(b);
 	return {};
@@ -164,14 +164,14 @@ std::optional<std::string> api<node>::normalize_formula(
 	const std::string& expr)
 {
 	if (tref fm = get_formula(expr); fm)
-		if (tref n = normalize_formula<node>(fm); n) return to_str(n);
+		if (tref n = normalize_formula(fm); n) return to_str(n);
 	return {};
 }
 
 template <NodeType node>
 std::optional<std::string> api<node>::anti_prenex(const std::string& expr) {
 	if (tref fm = get_formula(expr); fm)
-		if (tref a = anti_prenex<node>(fm); a) return to_str(a);
+		if (tref a = anti_prenex(fm); a) return to_str(a);
 	return {};
 }
 
@@ -226,8 +226,12 @@ std::optional<std::map<std::string, std::string>> api<node>::solve(
 	const std::string& formula,
 	solver_mode mode)
 {
-	if (auto solution = solve(get_formula(formula), mode); solution)
-		return to_str(solution.value());
+	if (auto solution = solve(get_formula(formula), mode); solution) {
+		std::map<std::string, std::string> s;
+		for (auto& [var, val] : solution.value())
+			s.emplace(to_str(var), to_str(val));
+		return s;
+	}
 	return {};
 }
 
@@ -235,8 +239,12 @@ template <NodeType node>
 std::optional<std::map<std::string, std::string>> api<node>::lgrs(
 	const std::string& equation)
 {
-	if (auto solution = lgrs(get_formula(equation)); solution)
-		return to_str(solution.value());
+	if (auto solution = lgrs(get_formula(equation)); solution) {
+		std::map<std::string, std::string> s;
+		for (auto& [var, val] : solution.value())
+			s.emplace(to_str(var), to_str(val));
+		return s;
+	}
 	return {};
 }
 
