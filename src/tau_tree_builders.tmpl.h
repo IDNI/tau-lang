@@ -850,13 +850,13 @@ tref build_in_var_at_t_minus(tref var_name_node, size_t shift, size_t type_id, s
 template <NodeType node>
 tref build_in_var_at_t_minus(const std::string& var_name, size_t shift, size_t type_id, std::string t) {
 	return build_in_var_at_t_minus<node>(
-		build_var_name<node>(var_name), shift, t, type_id);
+		build_var_name<node>(var_name), shift, type_id, t);
 }
 
 template <NodeType node>
 tref build_in_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id, std::string t) {
 	return build_in_var_at_t_minus<node>(
-		build_var_name_indexed<node>(index), shift, t, type_id);
+		build_var_name_indexed<node>(index), shift, type_id, t);
 }
 
 template <NodeType node>
@@ -1368,7 +1368,7 @@ template <NodeType node>
 tref tree<node>::build_in_var_at_t_minus(
 	tref var_name_node, size_t shift, size_t type_id, std::string t)
 {
-	return tau_lang::build_in_var_at_t_minus<node>(var_name_node, shift, t, type_id);
+	return tau_lang::build_in_var_at_t_minus<node>(var_name_node, shift, type_id, t);
 }
 
 template <NodeType node>
