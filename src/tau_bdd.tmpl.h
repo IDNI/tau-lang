@@ -665,7 +665,7 @@ tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle) {
 	using tau = tree<node>;
 
 	static size_t bdd_id = 0;
-	tref tau_node = tau::get(tau::bf, tau::get(tau::bdd_id,
+	tref tau_node = tau::get(tau::bf, tau::get(tau::BDD_ID,
 		tau::get_num(bdd_id)));
 	// Increment id for unique node creation
 	++bdd_id;
