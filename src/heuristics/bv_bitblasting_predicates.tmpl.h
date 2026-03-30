@@ -777,6 +777,47 @@ tref bvshl_one([[maybe_unused]] tref left, [[maybe_unused]] tref var) {
 }
 
 template<NodeType node>
+tref bvrhl(tref var, tref shift) {
+	auto bitwidth = get_bv_type_bitwidth<node>(shift);
+	auto predicate = bvrhl_rule<node>(shift, bitwidth);
+	auto call = make_bvrhl<node>(var, shift, bitwidth);
+	return apply_rule(predicate, call);
+}
+
+template<NodeType node>
+tref bvshl(tref var, tref shift) {
+	auto bitwidth = get_bv_type_bitwidth<node>(shift);
+	auto predicate = bvshl_rule<node>(shift, bitwidth);
+	auto call = make_bvshl<node>(var, shift, bitwidth);
+	return apply_rule(predicate, call);
+}
+
+template <NodeType node>
+std::pair<tref, std::optional<tref>> get_bvmul_arguments(tref term) {
+	using tau = tree<node>;
+
+	auto left = tau::get(term).child(0);
+	auto right = tau::get(term).child(1);
+
+	if (is_bv_constant<node>(left)) return std::make_pair(right, left);
+	if (is_bv_constant<node>(right)) return std::make_pair(left, right);
+
+	return std::make_pair(nullptr, nullptr);
+}
+
+template <NodeType node>
+std::pair<tref, std::optional<tref>> get_bved_arguments(tref term) {
+	using tau = tree<node>;
+
+	auto left = tau::get(term).child(0);
+	auto right = tau::get(term).child(1);
+
+	if (is_bv_constant<node>(left)) return std::make_pair(right, left);
+
+	return std::make_pair(nullptr, nullptr);
+}
+
+template<NodeType node>
 tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& vars) {
 	using tau = tree<node>;
 
@@ -803,39 +844,47 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 				break;
 			}
 			case tau::bf_shl: case tau::bf_shr: {
-				// TODO (HIGH) check for 1 in the by one shift
-				// operations and for general case when we support it.
-				auto var = build_bf_var<node>(type_id);
-				vars.push_back(var);
+				auto [shiftand, count] = get_bvsh_arguments<node>(t);
+				if (!count) break;
+				auto result = build_bf_var<node>(type_id);
+				vars.push_back(result);
 				auto left = tau::get(t).child(0);
-				changes[t] = var;
+				changes[t] = result;
 				auto current = (nt == tau::bf_shl)
-					? bvshl_one<node>(left, var)
-					: bvrhl_one<node>(left, var);
+					? bvshl<node>(left, count, result)
+					: bvrhl<node>(left, count, result);
 				predicate = predicate
 					? build_bf_and<node>(predicate, current)
 					: current;
 				break;
 			}
 			case tau::bf_mul: {
-
+				auto [factor, constant] = get_bvmul_arguments<node>(t);
+				if (!constant) break;
+				auto product = build_bf_var<node>(type_id);
+				vars.push_back(product);
+				changes[t] = product;
+				predicate = predicate
+					? build_bf_and<node>(predicate, bvmul<node>(factor, constant.value(), product))
+					: bvmul<node>(factor, constant, product);
+				break;
 			}
-			case tau::bf_div: {
-
+			case tau::bf_div: case tau::bf_mod: {
+				auto [dividend, divisor] = get_bved_arguments<node>(t);
+				if (!divisor) break;
+				auto result = build_bf_var<node>(type_id);
+				vars.push_back(result);
+				changes[t] = result;
+				auto current = (nt == tau::bf_mod)
+					? bvmod<node>(dividend, divisor, result)
+					: bvdiv<node>(dividend, divisor, result);
+				predicate = predicate
+					? build_bf_and<node>(predicate, current)
+					: current;
+				break;
 			}
-			case tau::bf_mod: {
-				// Unsupported operation for now
-				LOG_ERROR << "Operation "
-					<< LOG_NT(nt) << " not supported yet in predicate blasting.";
-				return error = true, false;
-			}
-			case tau::bf_nand: case tau::bf_xnor: case tau::bf_nor:{
-				// Unsupported operation for now. They must be replaced by their
-				// equivalent in terms of and, or and not for blasting.
-				LOG_ERROR << "Operation "
-					<< LOG_NT(nt) << " not supported yet in predicate blasting.";
-				return error = true, false;
-			}
+			// Nand, nor and xnor are treated in the hooks so we never get those
+			// cases at this point.
 			default: {
 				trefs ch;
 				for (tref c : tau::get(t).children()) {
@@ -845,7 +894,7 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 				}
 
 				if (auto new_n = tau::get(tau::get(t).value, ch.data(), ch.size()); new_n != t)
-					changes.insert_or_assign(t, new_n);
+					changes[t] = new_n;
 				break;
 			}
 		}
@@ -853,9 +902,13 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 	};
 
 	// if we have an unsupported operation, i.e. we have an unsupported operation
-	//we return nullptr to indicate failure
+	// we return nullptr to indicate failure
 	if (error) return nullptr;
-	return predicate;
+	post_order<node>(term).search_unique(f);
+	auto modified = rewriter::replace<node>(term, changes);
+	return (predicate)
+		? tau::build_wff_and(predicate, modified)
+		: term;
 }
 
 
