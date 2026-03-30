@@ -127,14 +127,4 @@ std::optional<size_t> get_bv_constant_value(tref t) {
 	return std::nullopt;
 }
 
-template<NodeType node>
-size_t get_bv_type_bitwidth(tref t) {
-	auto type = tree<node>::get(t).get_ba_type();
-	if (!is_bv_type_family<node>(type)) {
-		LOG_ERROR << "Type is not a bitvector type.";
-		return 0;
-	}
-	return get_bv_width<node>(type);
-}
-
 } // namespace idni::tau_lang
