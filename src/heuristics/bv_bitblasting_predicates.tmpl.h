@@ -687,7 +687,7 @@ tref bvadd(tref left, tref right, tref result) {
 
 template<NodeType node>
 tref bvmul([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
-	auto bitwidth = get_bv_type_bitwidth<node>(tau::get(left));
+	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	if (!is_bv_constant<node>(right)) {
 		DBG( LOG_DEBUG << "Currently only multiplication by constant is supported in predicate blasting."; )
 		return nullptr;
@@ -706,10 +706,27 @@ tref bvsub(tref left, tref right, tref result) {
 }
 
 template<NodeType node>
-tref bvdiv([[maybe_unused]] tref left, [[maybe_unused]] tref right, [[maybe_unused]] tref var) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+tref bvdiv(tref dividend, tref divisor, tref quotient) {
+	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
+	if (!is_bv_constant<node>(divisor)) {
+		DBG( LOG_DEBUG << "Currently only division by constant is supported in predicate blasting."; )
+		return nullptr;
+	}
+	auto rule = bvdiv_rule<node>(divisor, bitwidth);
+	auto call = make_bvdiv_call<node>(dividend, divisor, quotient, bitwidth);
+	return apply_rule(rule, call);
+}
+
+template<NodeType node>
+tref bvmod(tref dividend, tref divisor, tref remainder) {
+	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
+	if (!is_bv_constant<node>(divisor)) {
+		DBG( LOG_DEBUG << "Currently only division by constant is supported in predicate blasting."; )
+		return nullptr;
+	}
+	auto rule = bvdiv_rule<node>(divisor, bitwidth);
+	auto call = make_bvdiv_call<node>(dividend, divisor, remainder, bitwidth);
+	return apply_rule(rule, call);
 }
 
 template<NodeType node>
