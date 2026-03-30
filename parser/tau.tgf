@@ -260,7 +260,8 @@ history        => ( "%"
                   | "%-":rel_history_sym [digits:history_id]):rel_history
                 | ( "%" :abs_history_sym         history_id) :abs_history.
 
-unreachable => processed.
+unreachable => processed | BDD_ID.
+
 
 # starting symbols for parsing
 stream_def     => input_def | output_def.
