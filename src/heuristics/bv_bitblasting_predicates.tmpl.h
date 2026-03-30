@@ -292,34 +292,6 @@ static rewriter::rule bvmul_rec_rule(tref y /* cvc5 constant */, size_t bitwidth
 }
 
 template<NodeType node>
-static rewriter::rules bvdiv_rules([[maybe_unused]] size_t bitwidth) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return rewriter::rules();
-}
-
-template<NodeType node>
-static rewriter::rules bvmod_rules([[maybe_unused]] size_t bitwidth) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return rewriter::rules();
-}
-
-template<NodeType node>
-static rewriter::rules bvshl_rules([[maybe_unused]] size_t bitwidth) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return rewriter::rules();
-}
-
-template<NodeType node>
-static rewriter::rules bvrhl_rules([[maybe_unused]] size_t bitwidth) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return rewriter::rules();
-}
-
-template<NodeType node>
 static rewriter::rules bvlt_rules(size_t bitwidth) {
 	using tau = tree<node>;
 
@@ -664,17 +636,76 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */, size_t bitwidt
 }
 
 template<NodeType node>
-static rewriter::rule bvshl_rule([[maybe_unused]] size_t bitwidth) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return make_rule<node>(tau::geth(nullptr), tau::geth(nullptr));
+static rewriter::rule bvshl_rule(tref shift /* bv constant */, size_t bitwidth) {
+	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
+	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
+	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][shift];
+	// Get bv constant value
+	auto shift_value = get_bv_constant_value<node>(shift);
+	// If the shift is greater or equal to the bitwidth, the result is always zero
+	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto head = make_bvshl_call<node>(var, shift, shifted);
+	if (shift_value >= bitwidth) {
+		auto zero = tau::get(tau::bf, build_bv_zero<node>(bitwidth));
+		auto body = tau::build_bf_eq(shifted, zero);
+		cache[bitwidth][shift] = make_rule<node>(head, body);
+		return cache[bitwidth][shift];
+	}
+	// Otherwise, we compute the rule, store it in the cache and return it.
+	tref body = nullptr;
+	for (size_t i = 0; i < bitwidth; ++i) {
+		if (i + shift_value > bitwidth) {
+			auto shifted_bit = tau::get(tau::bf, tau::build_ref_with_indexes("_bit", { i }, { shifted }));
+			auto zero = tau::get(tau::bf, build_bv_zero<node>(bitwidth));
+			auto shift_eq = tau::build_bf_eq(shifted_bit, zero);
+			body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
+			continue;
+		}
+		auto bit = tau::get(tau::bf, tau::build_ref_with_indexes("_bit", { i }, { var }));
+		auto shifted_bit = tau::get(tau::bf, tau::build_ref_with_indexes("_bit", { i + shift_value }, { shifted }));
+		auto shift_eq = tau::build_bf_eq(shifted_bit, bit);
+		body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
+	}
+	cache[bitwidth][shift] = make_rule<node>(head, body);
+	return cache[bitwidth][shift];
 }
 
 template<NodeType node>
-static rewriter::rule bvrhl_rule([[maybe_unused]] size_t bitwidth) {
+static rewriter::rule bvrhl_rule(tref shift /* bv constant */, size_t bitwidth) {
+	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
+	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
+	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][shift];
 	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return make_rule<node>(tau::geth(nullptr), tau::geth(nullptr));
+	// Get bv constant value
+	auto shift_value = get_bv_constant_value<node>(shift);
+	// If the shift is greater or equal to the bitwidth, the result is always zero
+	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto head = make_bvshl_call<node>(var, shift, shifted);
+	if (shift_value >= bitwidth) {
+		auto zero = tau::get(tau::bf, build_bv_zero<node>(bitwidth));
+		auto body = tau::build_bf_eq(shifted, zero);
+		cache[bitwidth][shift] = make_rule<node>(head, body);
+		return cache[bitwidth][shift];
+	}
+	// Otherwise, we compute the rule, store it in the cache and return it.
+	tref body = nullptr;
+	for (size_t i = 0; i < bitwidth; ++i) {
+		if (i - shift_value < 0) {
+			auto shifted_bit = tau::get(tau::bf, tau::build_ref_with_indexes("_bit", { i }, { shifted }));
+			auto zero = tau::get(tau::bf, build_bv_zero<node>(bitwidth));
+			auto shift_eq = tau::build_bf_eq(shifted_bit, zero);
+			body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
+			continue;
+		}
+		auto bit = tau::get(tau::bf, tau::build_ref_with_indexes("_bit", { i }, { var }));
+		auto shifted_bit = tau::get(tau::bf, tau::build_ref_with_indexes("_bit", { i - shift_value }, { shifted }));
+		auto bit_eq = tau::build_bf_eq(bit, shifted_bit);
+		body = body ? tau::build_wff_and(body, bit_eq) : bit_eq;
+	}
+	cache[bitwidth][shift] = make_rule<node>(head, body);
+	return cache[bitwidth][shift];
 }
 
 template<NodeType node>
@@ -786,7 +817,13 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 					: current;
 				break;
 			}
-			case tau::bf_mul: case tau::bf_div: case tau::bf_mod: {
+			case tau::bf_mul: {
+
+			}
+			case tau::bf_div: {
+
+			}
+			case tau::bf_mod: {
 				// Unsupported operation for now
 				LOG_ERROR << "Operation "
 					<< LOG_NT(nt) << " not supported yet in predicate blasting.";
@@ -800,6 +837,15 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 				return error = true, false;
 			}
 			default: {
+				trefs ch;
+				for (tref c : tau::get(t).children()) {
+					if (changes.find(c) != changes.end())
+						ch.push_back(changes[c]);
+					else ch.push_back(c);
+				}
+
+				if (auto new_n = tau::get(tau::get(t).value, ch.data(), ch.size()); new_n != t)
+					changes.insert_or_assign(t, new_n);
 				break;
 			}
 		}
@@ -822,65 +868,47 @@ tref eq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
 
 template<NodeType node>
 tref neq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	return n;
 }
 
 template<NodeType node>
 tref lt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	return n;
 }
 
 template<NodeType node>
 tref gt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	return n;
 }
 
 template<NodeType node>
 tref lteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	return n;
 }
 
 template<NodeType node>
 tref gteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	return n;
 }
 
 template<NodeType node>
 tref nlt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	return n;
 }
 
 template<NodeType node>
 tref ngt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	return n;
 }
 
 template<NodeType node>
 tref nlteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	return n;
 }
 
 template<NodeType node>
 tref ngteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	return n;
 }
 
 template<NodeType node>
