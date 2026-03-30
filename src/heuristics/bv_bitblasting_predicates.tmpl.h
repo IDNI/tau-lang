@@ -901,11 +901,15 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 		return true;
 	};
 
-	// if we have an unsupported operation, i.e. we have an unsupported operation
-	// we return nullptr to indicate failure
+	// If we have an unsupported operation, we return nullptr to indicate failure
 	if (error) return nullptr;
 	post_order<node>(term).search_unique(f);
 	auto modified = rewriter::replace<node>(term, changes);
+	// We add the existentials for the variables we introduced
+	for (auto it = vars.rbegin(); it != vars.rend(); ++it) {
+		predicate = build_wff_ex<node>(*it, predicate);
+	}
+
 	return (predicate)
 		? tau::build_wff_and(predicate, modified)
 		: term;
@@ -913,54 +917,54 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 
 
 template<NodeType node>
-tref eq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref eq_predicate([[maybe_unused]] tref n) {
 	// Unsupported operation for now
 	LOG_ERROR << "Not yet implemented.";
 	return nullptr;
 }
 
 template<NodeType node>
-tref neq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref neq_predicate([[maybe_unused]] tref n) {
 	return n;
 }
 
 template<NodeType node>
-tref lt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref lt_predicate([[maybe_unused]] tref n) {
 	return n;
 }
 
 template<NodeType node>
-tref gt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref gt_predicate([[maybe_unused]] tref n) {
 	return n;
 }
 
 template<NodeType node>
-tref lteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref lteq_predicate([[maybe_unused]] tref n) {
 	return n;
 }
 
 template<NodeType node>
-tref gteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref gteq_predicate([[maybe_unused]] tref n) {
 	return n;
 }
 
 template<NodeType node>
-tref nlt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref nlt_predicate([[maybe_unused]] tref n) {
 	return n;
 }
 
 template<NodeType node>
-tref ngt_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref ngt_predicate([[maybe_unused]] tref n) {
 	return n;
 }
 
 template<NodeType node>
-tref nlteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref nlteq_predicate([[maybe_unused]] tref n) {
 	return n;
 }
 
 template<NodeType node>
-tref ngteq_predicate([[maybe_unused]] tref n, [[maybe_unused]] trefs& vars) {
+tref ngteq_predicate([[maybe_unused]] tref n) {
 	return n;
 }
 
@@ -969,27 +973,28 @@ tref atomic_predicate_blasting(tref atomic) {
 
 	// We only blast atomic predicates over bitvector terms. If the atomic formula
 	// is not over bitvectors, we return it unchanged.
-	auto type_id = tau::get(atomic).get_ba_type();
-	if(!is_bv_type_family<node>(type_id)) return atomic;
+	auto type = tau::get(atomic).get_ba_type();
+	if(!is_bv_type_family<node>(type)) return atomic;
 
-	auto atomic_nt = tau::get(atomic).get_type();
-	tref predicate;
+	auto nt = tau::get(atomic).get_type();
+	subtree_map<node, tref> changes;
 	trefs vars;
+	tref predicate;
 
-	switch (atomic_nt) {
-		case tau::bf_eq: { predicate = eq_predicate<node>(atomic, vars); break; }
-		case tau::bf_neq: { predicate = neq_predicate<node>(atomic, vars); break; }
-		case tau::bf_lt: { predicate = lt_predicate<node>(atomic, vars); break; }
-		case tau::bf_gt: { predicate = gt_predicate<node>(atomic, vars); break; }
-		case tau::bf_lteq: { predicate = lteq_predicate<node>(atomic, vars); break; }
-		case tau::bf_gteq: { predicate = gteq_predicate<node>(atomic, vars); break; }
-		case tau::bf_nlt: { predicate = nlt_predicate<node>(atomic, vars); break; }
-		case tau::bf_ngt: { predicate = ngt_predicate<node>(atomic, vars); break; }
-		case tau::bf_nlteq: { predicate = nlteq_predicate<node>(atomic, vars); break; }
-		case tau::bf_ngteq: { predicate = ngteq_predicate<node>(atomic, vars); break; }
+	switch (nt) {
+		case tau::bf_eq: { predicate = eq_predicate<node>(atomic); break; }
+		case tau::bf_neq: { predicate = neq_predicate<node>(atomic); break; }
+		case tau::bf_lt: { predicate = lt_predicate<node>(atomic); break; }
+		case tau::bf_gt: { predicate = gt_predicate<node>(atomic); break; }
+		case tau::bf_lteq: { predicate = lteq_predicate<node>(atomic); break; }
+		case tau::bf_gteq: { predicate = gteq_predicate<node>(atomic); break; }
+		case tau::bf_nlt: { predicate = nlt_predicate<node>(atomic); break; }
+		case tau::bf_ngt: { predicate = ngt_predicate<node>(atomic); break; }
+		case tau::bf_nlteq: { predicate = nlteq_predicate<node>(atomic); break; }
+		case tau::bf_ngteq: { predicate = ngteq_predicate<node>(atomic); break; }
 		default: {
 			// error, unknown atomic predicate, we return nullptr to indicate failure
-			DBG( LOG_DEBUG << "Unknown atomic predicate in blasting: " << LOG_NT(atomic_nt) << ". It will be left unchanged."; )
+			DBG( LOG_DEBUG << "Unknown atomic predicate in blasting: " << LOG_NT(nt) << ". It will be left unchanged."; )
 			return atomic;
 		}
 	}
@@ -997,11 +1002,6 @@ tref atomic_predicate_blasting(tref atomic) {
 	if (!predicate) {
 		DBG( LOG_DEBUG << "Failed to compute predicate in blasting: " << LOG_FM(atomic) << ". It will be left unchanged."; )
 		return atomic;
-	}
-
-	// we add the existentials for the variables we introduced
-	for (auto it = vars.rbegin(); it != vars.rend(); ++it) {
-		predicate = build_wff_ex<node>(*it, predicate);
 	}
 
 	return predicate;
