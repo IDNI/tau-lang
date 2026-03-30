@@ -25,6 +25,9 @@ bool bv_bitblasting_unsat(tref term);
 template<NodeType node>
 bool bv_bitblasting_valid(tref term);
 
+template<NodeType node>
+tref bv_bitblasting(tref term);
+
 } // namespace idni::tau_lang
 
 #include "bv_bitblasting.tmpl.h"

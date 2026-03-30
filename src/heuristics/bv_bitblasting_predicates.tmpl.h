@@ -1047,4 +1047,10 @@ tref wff_predicate_blasting(tref term) {
 	return n_term;
 }
 
+template<NodeType node>
+tref bv_blasting(tref term) {
+	return wff_predicate_blasting<node>(term);
+}
+
+
 } // namespace idni::tau_lang
