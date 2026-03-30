@@ -23,7 +23,8 @@ bool is_zero_bv_constant(tref t) {
 }
 
 template<NodeType node>
-tref make_bitvector_zero([[maybe_unused]] size_t bitwidth) {
+tref build_bv_zero([[maybe_unused]] size_t bitwidth) {
+	// TODO (HIGH) exclude bf on the top
 	return nullptr;
 }
 
@@ -53,6 +54,22 @@ size_t get_bv_type_bitwidth(tref t) {
 		return 0;
 	}
 	return get_bv_width<node>(type);
+}
+
+template<NodeType node>
+std::optional<size_t> get_bv_constant_value(tref t) {
+	auto constant = tree<node>::get(t).get_ba_constant();
+	auto bv = std::get<bv>(constant);
+	if (bv.isBitVectorValue()) {
+		auto value_str = bv.getBitVectorValue();
+		try {
+			size_t value = std::stoull(value_str, nullptr, 2);
+			return value;
+		} catch (const std::exception& e) {
+			LOG_ERROR << "Failed to parse bitvector constant value: " << e.what();
+		}
+	}
+	return std::nullopt;
 }
 
 } // namespace idni::tau_lang
