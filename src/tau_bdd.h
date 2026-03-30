@@ -142,8 +142,12 @@ struct tau_term_bdd_handle {
 	using term_handles = std::vector<term_handle>;
 	using tbdd = tau_term_bdd<node>;
 	using quants = std::vector<std::pair<tref, typename tbdd::Quantifier>>;
+	using universe_t = std::unordered_map<tref, term_handle>;
 
-	// TODO: add handle universe in order to reference a handle by id
+	// Map between tau tree and BDD handles to enable gc of BDD depending on tau tree
+	// This storage is not unique in the sense that two different handles can point
+	// to the same BDD
+	static universe_t& U;
 
 	// Create a BDD handle from a given ref
 	explicit tau_term_bdd_handle(ref x);
@@ -154,6 +158,10 @@ struct tau_term_bdd_handle {
 
 	// Build a BDD handle from a Tau term
 	static term_handle build(tref term, const order& o);
+	// Build a Tau node from a BDD handle whose connection is saved in U
+	static tref convert_to_tau_node(term_handle handle);
+	// Build a Tau node pointing to a BDD handle from a Tau term whose connection is saved in U
+	static tref convert_to_tau_node(tref term, const order& o);
 	// Convert the BDD handle to a Tau term
 	tref to_tau_term(size_t term_type);
 
@@ -167,6 +175,9 @@ struct tau_term_bdd_handle {
 	term_handle bdd_quant(const quants& q, const order& o);
 
 	ref get();
+
+	bool operator==(const tau_term_bdd_handle& other) const;
+	bool operator!=(const tau_term_bdd_handle& other) const;
 
 	htref h;
 	bool inv = false;
@@ -190,6 +201,11 @@ struct std::hash<idni::tau_lang::tau_bdd_ref<T>> {
 template<typename T>
 struct std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>> {
 	size_t operator()(auto& a) const;
+};
+
+template<typename T>
+struct std::hash<idni::tau_lang::term_handle<T>> {
+	size_t operator()(auto& th) const;
 };
 
 #include "tau_bdd.tmpl.h"

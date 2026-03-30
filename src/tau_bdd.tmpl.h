@@ -646,6 +646,10 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::abs(ref x) {
 }
 
 template<NodeType node>
+tau_term_bdd_handle<node>::universe_t& tau_term_bdd_handle<node>::U =
+	bintree<node>::template create_cache<universe_t>();
+
+template<NodeType node>
 tau_term_bdd_handle<node>::tau_term_bdd_handle(ref x) {
 	h = tbdd::geth(x.b);
 	inv = x.inv;
@@ -654,6 +658,25 @@ tau_term_bdd_handle<node>::tau_term_bdd_handle(ref x) {
 template<NodeType node>
 tau_term_bdd_handle<node> tau_term_bdd_handle<node>::build(tref term, const order& o) {
 	return term_handle(tbdd::build_bdd(term, o));
+}
+
+template<NodeType node>
+tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle) {
+	using tau = tree<node>;
+
+	static size_t bdd_id = 0;
+	tref tau_node = tau::get(tau::bf, tau::get(tau::bdd_id,
+		tau::get_num(bdd_id)));
+	// Increment id for unique node creation
+	++bdd_id;
+	// Save connection in U
+	U.emplace(tau_node, handle);
+	return tau_node;
+}
+
+template<NodeType node>
+tref tau_term_bdd_handle<node>::convert_to_tau_node(tref term, const order& o) {
+	return convert_to_tau_node(build(term, o));
 }
 
 template<NodeType node>
@@ -684,7 +707,7 @@ bdd_and_many(const term_handles& bdds, const order& o) {
 	std::vector<ref> refs;
 	refs.reserve(bdds.size());
 	for (const term_handle b : bdds) refs.emplace_back(b.get());
-	return term_handle(tbdd::bdd_and_many(refs, o));
+	return term_handle(tbdd::bdd_and_many(std::move(refs), o));
 }
 
 template<NodeType node>
@@ -693,7 +716,7 @@ bdd_or_many(const term_handles& bdds, const order& o) {
 	std::vector<ref> refs;
 	refs.reserve(bdds.size());
 	for (const term_handle b : bdds) refs.emplace_back(b.get());
-	return term_handle(tbdd::bdd_or_many(refs, o));
+	return term_handle(tbdd::bdd_or_many(std::move(refs), o));
 }
 
 template<NodeType node>
@@ -719,6 +742,16 @@ tau_term_bdd_handle<node>::ref tau_term_bdd_handle<node>::get() {
 	return ref(h->get(), inv);
 }
 
+template<NodeType node>
+bool tau_term_bdd_handle<node>::operator==(const tau_term_bdd_handle& other) const {
+	return get() == other.get();
+}
+
+template<NodeType node>
+bool tau_term_bdd_handle<node>::operator!=(const tau_term_bdd_handle& other) const {
+	return !(*this == other);
+}
+
 }
 
 template<typename T>
@@ -740,6 +773,13 @@ template<typename T>
 size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto& a) const {
 	size_t seed = 0;
 	idni::hash_combine(seed, a[0], a[1]);
+	return seed;
+}
+
+template<typename T>
+size_t hash<term_handle<T>>::operator()(auto& th) const {
+	size_t seed = 0;
+	idni::hash_combine(seed, idni::hash_htree<T>()(th.h), th.inv);
 	return seed;
 }
 
