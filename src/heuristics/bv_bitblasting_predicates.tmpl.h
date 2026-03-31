@@ -919,13 +919,10 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 template<NodeType node>
 tref eq_predicate(tref atomic) {
 	// TODO (HIGH) add simplifications to avoid the top level variable if possible
-	using tau = tree<node>;
-
 	subtree_map<node, tref> changes;
 	trefs vars;
 
-	auto blasted = bf_predicate_blasting<node>(atomic, changes, vars);
-	return blasted;
+	return bf_predicate_blasting<node>(atomic, changes, vars);
 }
 
 template<NodeType node>
