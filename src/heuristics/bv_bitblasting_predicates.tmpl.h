@@ -918,54 +918,118 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 
 template<NodeType node>
 tref eq_predicate([[maybe_unused]] tref n) {
-	// Unsupported operation for now
-	LOG_ERROR << "Not yet implemented.";
-	return nullptr;
+	// TODO (HIGH) add simplifications to avoid the top level variable if possible
+	using tau = tree<node>;
+
+	subtree_map<node, tref> changes;
+	trefs vars;
+
+	auto left = tau::get(n).child(0);
+	auto n_left = bf_predicate_blasting<node>(left, changes, vars);
+	if (!n_left) return nullptr;
+	auto right = tau::get(n).child(1);
+	auto n_right = bf_predicate_blasting<node>(right, changes, vars);
+	if (!n_right) return nullptr;
+	return tau::build_bf_eq(n_left, n_right);
 }
 
 template<NodeType node>
 tref neq_predicate([[maybe_unused]] tref n) {
-	return n;
+	using tau = tree<node>;
+
+	return tau::build_wff_neg(eq_predicate<node>(n));
 }
 
 template<NodeType node>
-tref lt_predicate([[maybe_unused]] tref n) {
-	return n;
+tref lt_predicate(tref atomic) {
+	subtree_map<node, tref> changes;
+	trefs vars;
+
+	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
+	auto predicate = bvlt_rule<node>(bitwidth);
+	auto left = tau::get(atomic).child(0);
+	auto n_left = bf_predicate_blasting<node>(left, changes, vars);
+	if (!n_left) return nullptr;
+	auto right = tau::get(atomic).child(1);
+	auto n_right = bf_predicate_blasting<node>(right, changes, vars);
+	if (!n_right) return nullptr;
+	auto call = make_bvlt<node>(n_left, n_right, bitwidth);
+	return apply_rule(predicate, call);
 }
 
 template<NodeType node>
-tref gt_predicate([[maybe_unused]] tref n) {
-	return n;
+tref gt_predicate(tref atomic) {
+	subtree_map<node, tref> changes;
+	trefs vars;
+
+	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
+	auto predicate = bvgt_rule<node>(bitwidth);
+	auto left = tau::get(atomic).child(0);
+	auto n_left = bf_predicate_blasting<node>(left, changes, vars);
+	if (!n_left) return nullptr;
+	auto right = tau::get(atomic).child(1);
+	auto n_right = bf_predicate_blasting<node>(right, changes, vars);
+	if (!n_right) return nullptr;
+	auto call = make_bvgt<node>(n_left, n_right, bitwidth);
+	return apply_rule(predicate, call);
 }
 
 template<NodeType node>
-tref lteq_predicate([[maybe_unused]] tref n) {
-	return n;
+tref lteq_predicate(tref atomic) {
+	using tau = tree<node>;
+
+	subtree_map<node, tref> changes;
+	trefs vars;
+
+	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
+	auto predicate = bvgt_rule<node>(bitwidth);
+	auto left = tau::get(atomic).child(0);
+	auto n_left = bf_predicate_blasting<node>(left, changes, vars);
+	if (!n_left) return nullptr;
+	auto right = tau::get(atomic).child(1);
+	auto n_right = bf_predicate_blasting<node>(right, changes, vars);
+	if (!n_right) return nullptr;
+	auto call = make_bvgt<node>(n_left, n_right, bitwidth);
+	return tau::build_wff_neg(apply_rule(predicate, call));
 }
 
 template<NodeType node>
-tref gteq_predicate([[maybe_unused]] tref n) {
-	return n;
+tref gteq_predicate(tref atomic) {
+	using tau = tree<node>;
+
+	subtree_map<node, tref> changes;
+	trefs vars;
+
+	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
+	auto predicate = bvlt_rule<node>(bitwidth);
+	auto left = tau::get(atomic).child(0);
+	auto n_left = bf_predicate_blasting<node>(left, changes, vars);
+	if (!n_left) return nullptr;
+	auto right = tau::get(atomic).child(1);
+	auto n_right = bf_predicate_blasting<node>(right, changes, vars);
+	if (!n_right) return nullptr;
+	auto call = make_bvlt<node>(n_left, n_right, bitwidth);
+	return tau::build_wff_neg(apply_rule(predicate, call));
 }
 
 template<NodeType node>
-tref nlt_predicate([[maybe_unused]] tref n) {
-	return n;
+tref nlt_predicate(tref atomic) {
+	return gteq_predicate<node>(atomic);
 }
 
 template<NodeType node>
-tref ngt_predicate([[maybe_unused]] tref n) {
-	return n;
+tref ngt_predicate(tref atomic) {
+	return lteq_predicate<node>(atomic);
 }
 
 template<NodeType node>
-tref nlteq_predicate([[maybe_unused]] tref n) {
-	return n;
+tref nlteq_predicate(tref atomic) {
+	return gt_predicate<node>(atomic);
 }
 
 template<NodeType node>
-tref ngteq_predicate([[maybe_unused]] tref n) {
-	return n;
+tref ngteq_predicate(tref atomic) {
+	return lt_predicate<node>(atomic);
 }
 
 template<NodeType node>
@@ -995,7 +1059,7 @@ tref atomic_predicate_blasting(tref atomic) {
 		default: {
 			// error, unknown atomic predicate, we return nullptr to indicate failure
 			DBG( LOG_DEBUG << "Unknown atomic predicate in blasting: " << LOG_NT(nt) << ". It will be left unchanged."; )
-			return atomic;
+			return nullptr;
 		}
 	}
 
