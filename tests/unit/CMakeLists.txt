@@ -4,6 +4,7 @@ set(TESTS
 	bv_ba-solver1
 	bv_ba-solver2
 	bv_ba-simplification
+	bv_ba_helpers
 	ba_constants
 	ba_types
 	ba_types_inference
