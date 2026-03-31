@@ -259,3 +259,63 @@ TEST_SUITE("BDD quantification") {
 		CHECK(tau::get(ct2).equals_1());
 	}
 }
+
+TEST_SUITE("BDD handle creation") {
+	TEST_CASE("creation and gc") {
+		using bdd = tau_term_bdd<node_t>;
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		// Vars
+		const char* ss = "s";
+		tref ts = tau::trim(tau::get(ss, opts));
+		const char* vs = "v";
+		tref tv = tau::trim(tau::get(vs, opts));
+		const char* ws = "w";
+		tref tw = tau::trim(tau::get(ws, opts));
+		const char* xs = "x";
+		tref tx = tau::trim(tau::get(xs, opts));
+		const char* ys = "y";
+		tref ty = tau::trim(tau::get(ys, opts));
+		const char* zs = "z";
+		tref tz = tau::trim(tau::get(zs, opts));
+		// BDDs
+		const char* bdd1s = "(z|y') & (y|z')";
+		tref bdd1 = tau::get(bdd1s, opts);
+		const char* bdd2s = "(w|x') & (x|w')";
+		tref bdd2 = tau::get(bdd2s, opts);
+		const char* bdd3s = "(s|v') & (v|s')";
+		tref bdd3 = tau::get(bdd3s, opts);
+		// Ordering
+		bdd::order o = {{ts, -3}, {tv, -2}, {tw, -1}, {tx, 0}, {ty, 1}, {tz, 2}};
+		// Construction of handles
+		tref node1 = hbdd::convert_to_tau_node(bdd1, o);
+		tref node2 = hbdd::convert_to_tau_node(bdd2, o);
+		tref node3 = hbdd::convert_to_tau_node(bdd3, o);
+		// Keep this reference in U after gc
+		htref node1_handle = tau::geth(node1);
+
+		// tau::get(node1).print_tree(std::cout << "node1 tree: ") << "\n";
+		// tau::get(node2).print_tree(std::cout << "node2 tree: ") << "\n";
+		// tau::get(node3).print_tree(std::cout << "node3 tree: ") << "\n";
+		// std::cout << "U size before gc: " << hbdd::U.size() << "\n";
+
+		auto res = hbdd::U.find(node1)->second.bdd_and(
+			hbdd::U.find(node2)->second, o);
+		res = res.bdd_and(hbdd::U.find(node3)->second, o);
+		htref tau_res = tau::geth(res.to_tau_term(1));
+
+		tau::gc();
+
+		// std::cout << "U size after gc: " << hbdd::U.size() << "\n";
+		CHECK(hbdd::U.size() == 1);
+
+		// tau::get(tau_res->get()).print(std::cout << "res: ") << "\n";
+		CHECK(tau::get(tau_res->get()).to_str() ==
+			"sv&(wx&(yz|y'z')|w'x'&(yz|y'z'))|s'v'&(wx&(yz|y'z')|w'x'&(yz|y'z'))");
+	}
+}
