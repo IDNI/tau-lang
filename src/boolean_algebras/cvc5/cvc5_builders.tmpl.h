@@ -140,6 +140,10 @@ inline cvc5::Term make_bitvector_value(const size_t value, const size_t size) {
 	return cvc5_term_manager.mkBitVector(size, value);
 }
 
+inline cvc5::Term make_bitvector_value(const size_t size, const std::string& value, const size_t base) {
+	return cvc5_term_manager.mkBitVector(size, value, base);
+}
+
 inline cvc5::Term make_bitvector_true() {
 	return cvc5_term_manager.mkBoolean(true);
 }
