@@ -644,7 +644,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_out_var_at_n(const std::string& name, int_t pos, size_t type_id);
 	static tref build_out_var_at_n_indexed(size_t index, int_t pos, size_t type_id);
 	static tref build_out_var_at_t(tref var_name_node, size_t type_id, std::string t = "t");
-	static tref build_out_var_at_t_indexed(size_t index, size_t type_id, std::string t="t");
+	static tref build_out_var_at_t_indexed(size_t index, size_t type_id, std::string t = "t");
 	static tref build_out_var_at_t_minus(
 		tref var_name_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_out_var_at_t_minus(
@@ -659,15 +659,21 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_sym(size_t sid);
 	static tref build_sym(const std::string& sym_name);
 	static tref build_ref_offsets(const trefs& offsets);
+	static tref build_ref_offsets(const std::string& offset);
+	static tref build_ref_offsets(const std::vector<std::string>& offsets);
 	static tref build_ref_shift_offset(tref var, size_t shift);
-	static tref build_ref_shift_offset(const std::string& var_name, size_t type_id, size_t shift);
+	static tref build_ref_shift_offset(const std::string& var_name, size_t shift);
 	static tref build_ref_args(const trefs& args);
 	static tref build_ref_args(const std::vector<std::string>& arg_names, size_t type_id);
-	static tref build_ref(tref sym, const trefs& offsets, const trefs& args);
-	static tref build_ref(const std::string& sym_name, const trefs& offsets, const trefs& args);
-	static tref build_ref(const std::string& sym_name, const trefs& offsets, const std::vector<std::string>& args, size_t type_id);
-	static tref build_ref_with_indexes(const std::string& sym_name, const std::vector<size_t>& offsets, const trefs& args);
-	static tref build_ref_with_indexes(const std::string& sym_name, const std::vector<size_t>& offsets, const std::vector<std::string>& args, size_t type_id);
+	static tref build_ref(tref sym, const trefs& args);
+	static tref build_ref(const std::string& sym_name, const trefs& args);
+	static tref build_rr_ref(tref sym, const trefs& offsets, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, const trefs& offsets, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, const std::string offset, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, size_t offset, const trefs& args);
+	static tref build_rr_ref(tref sym, tref offset, size_t shift, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, tref offset, size_t shift, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, const std::string& offset, size_t shift, const trefs& args);
 
 private:
 	using tt = traverser;

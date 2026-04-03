@@ -358,6 +358,12 @@ template<NodeType node>
 tref build_ref_offsets(const trefs& offsets);
 
 template<NodeType node>
+tref build_ref_offsets(const std::string& offset);
+
+template<NodeType node>
+tref build_ref_offsets(const std::vector<std::string>& offsets);
+
+template<NodeType node>
 tref build_ref_shift_offset(tref var, size_t shift);
 
 template<NodeType node>
@@ -367,22 +373,35 @@ template<NodeType node>
 tref build_ref_args(const trefs& args);
 
 template<NodeType node>
-tref build_ref_args(const std::vector<std::string>& args, size_t type_id);
+tref build_ref_args(const std::vector<std::string>& arg_names, size_t type_id);
 
 template<NodeType node>
-tref build_ref(tref sym, const trefs& offsets, const trefs& args);
+tref build_ref(tref sym, const trefs& args);
 
 template<NodeType node>
-tref build_ref(const std::string& sym_name, const trefs& offsets, const trefs& args);
+tref build_ref(const std::string& sym_name, const trefs& args);
 
 template<NodeType node>
-tref build_ref(const std::string& sym_name, const trefs& offsets, const std::vector<std::string>& args, size_t type_id);
+tref build_rr_ref(tref sym, const trefs& offsets, const trefs& args);
 
 template<NodeType node>
-tref build_ref_with_indexes(const std::string& sym_name, const std::vector<size_t>& offsets, const trefs& args);
+tref build_rr_ref(const std::string& sym_name, const trefs& offsets, const trefs& args);
 
 template<NodeType node>
-tref build_ref_with_indexes(const std::string& sym_name, const std::vector<size_t>& offsets, const std::vector<std::string>& args, size_t type_id);
+tref build_rr_ref(const std::string& sym_name, const std::string offset, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, size_t offset, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(tref sym, tref offset, size_t shift, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, tref offset, size_t shift, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, const std::string& offset, size_t shift, const trefs& args);
+
 
 } // namespace idni::tau_lang
 
