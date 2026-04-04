@@ -23,7 +23,11 @@ inline tref simplify_sbf_symbol(tref sym) { return sym; }
 
 inline tref simplify_sbf_term(tref term) { return term; }
 
-inline sbf_ba sbf_splitter(const sbf_ba& elem, splitter_type st);
+inline sbf_ba sbf_splitter(const sbf_ba& elem, splitter_type st) { return elem->splitter(st); }
+
+inline sbf_ba sbf_splitter_one() { return bdd_handle<Bool>::htrue->splitter(splitter_type::bad); }
+
+inline sbf_ba normalize_sbf(const sbf_ba& elem) { return elem; }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
