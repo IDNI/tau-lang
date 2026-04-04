@@ -89,14 +89,6 @@ std::optional<typename node<BAs...>::constant_with_type> parse_sbf(
 		sbf_type<node<BAs...>>() };
 }
 
-
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::string sbf_ba_factory<BAs...>::zero() {
-	return "0";
-}
-
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() {
