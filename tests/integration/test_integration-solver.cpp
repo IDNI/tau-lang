@@ -9,7 +9,7 @@
 tref splitter_one_bdd() {
 	using node = tau_lang::node<bv, sbf_ba>;
 	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get_ba_constant(typename tau::constant(bdd_splitter_one<Bool>()), sbf_type<node>()));
+	return tau::get(tau::bf, tau::get_ba_constant(typename tau::constant(sbf_splitter_one()), sbf_type<node>()));
 }
 
 template <NodeType node>

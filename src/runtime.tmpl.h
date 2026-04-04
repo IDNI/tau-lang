@@ -63,7 +63,7 @@ inline std::string nso_factory<bv, sbf_ba>::zero(const tref type_tree) {
 inline tref nso_factory<bv, sbf_ba>::splitter_one() {
 	using tau = tree<node<bv, sbf_ba>>;
 	return tau::get(tau::bf, tau::get_ba_constant(
-		typename tau::constant(bdd_splitter_one<Bool>()),
+		typename tau::constant(sbf_splitter_one()),
 		sbf_type<node<bv, sbf_ba>>()));
 }
 
@@ -189,7 +189,7 @@ inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
 	return is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree)
 		? tau::get(tau::bf,
 			tau::get_ba_constant(
-				typename tau::constant(bdd_splitter_one<Bool>()),
+				typename tau::constant(sbf_splitter_one()),
 				sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>()))
 		: tau::get(tau::bf,
 			tau::get_ba_constant(

@@ -74,14 +74,6 @@ template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
 
 template<typename B, auto o = bdd_options<>::create()>
-hbdd<B, o> normalize_sbf(const hbdd<B, o>& x) {return x;}
-
-template<typename B, auto o = bdd_options<>::create()>
-hbdd<B, o> bdd_splitter_one () {
-	return bdd_handle<B,o>::htrue->splitter(splitter_type::bad);
-}
-
-template<typename B, auto o = bdd_options<>::create()>
 struct bdd_handle {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
