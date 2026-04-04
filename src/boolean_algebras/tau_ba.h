@@ -263,21 +263,6 @@ struct tau_ba_factory {
 	 */
 	static std::variant<tau_ba<BAs...>, BAs...> splitter_one();
 
-	/**
-	 * @brief Converts one to string.
-	 *
-	 * @param str Reference to the string.
-	 * @return Converted string.
-	 */
-	static std::string one(std::string&);
-
-	/**
-	 * @brief Converts zero to string.
-	 *
-	 * @param str Reference to the string.
-	 * @return Converted string.
-	 */
-	static std::string zero(std::string&);
 };
 
 template <typename... BAs>

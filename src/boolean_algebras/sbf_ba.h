@@ -27,10 +27,6 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 struct sbf_ba_factory {
 
-	static std::string one();
-
-	static std::string zero();
-
 	static std::variant<BAs...> splitter_one();
 
 	//inline static std::map<size_t, std::variant<BAs...>> cache;
