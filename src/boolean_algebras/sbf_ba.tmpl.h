@@ -89,11 +89,4 @@ std::optional<typename node<BAs...>::constant_with_type> parse_sbf(
 		sbf_type<node<BAs...>>() };
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() {
-	return std::variant<BAs...>(bdd_splitter_one<Bool>());
-}
-
-
 } // namespace idni::tau_lang

@@ -18,19 +18,6 @@ using sbf_ba = hbdd<Bool>;
  */
 inline static std::map<int_t, sbf_ba> var_cache{};
 
-/**
- * @brief Boolean algebra factory for Simple Boolean function
- *
- * @tparam BAs Boolean algebras
- */
-template <typename... BAs>
-requires BAsPack<BAs...>
-struct sbf_ba_factory {
-
-	static std::variant<BAs...> splitter_one();
-
-	//inline static std::map<size_t, std::variant<BAs...>> cache;
-};
 
 inline tref simplify_sbf_symbol(tref sym) { return sym; }
 
