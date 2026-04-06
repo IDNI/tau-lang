@@ -12,111 +12,137 @@
 #include "nso_rr.h"
 
 
-namespace idni::tau_lang {
-
-template <>
-struct base_ba_dispatcher<bv, sbf_ba> {
-	using node_t = node<bv, sbf_ba>;
-	using tau = tree<node_t>;
-
-	static bool is_syntactic_one(const std::variant<bv, sbf_ba>& elem);
-
-	static bool is_syntactic_zero(const std::variant<bv, sbf_ba>& elem);
-
-	static bool is_one(const std::variant<bv, sbf_ba>& elem);
-
-	static bool is_zero(const std::variant<bv, sbf_ba>& elem);
-
-	static bool is_closed(const std::variant<bv, sbf_ba>& elem);
-
-	static std::vector<std::string> types();
-
-	static tref default_type();
-
-	static std::string one(const tref type_tree);
-
-	static std::string zero(const tref type_tree);
-
-	static tref splitter_one();
-
-	static std::variant<bv, sbf_ba> splitter(const std::variant<bv, sbf_ba>& elem, splitter_type st);
-
-	static std::variant<bv, sbf_ba> splitter(const std::variant<bv, sbf_ba>& elem);
-
-	static tref unpack_tau_ba(const std::variant<bv, sbf_ba>&);
-
-	static std::variant<bv, sbf_ba> pack_tau_ba(tref);
-
-	static std::variant<bv, sbf_ba> normalize(const std::variant<bv, sbf_ba>& v);
-
-	static tref simplify_symbol(tref symbol);
-
-	static tref simplify_term(tref term);
-};
 
 /**
- * @brief Base BA dispatcher used in REPL
+ * @namespace idni::tau_lang
+ * Tau language namespace containing Boolean algebra dispatchers and related utilities.
  */
-template<>
-struct base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
-	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+namespace idni::tau_lang {
+
+/**
+ * @brief Dispatcher for base Boolean algebras (BAs...).
+ *
+ * This specialization provides static methods to operate on elements of the
+ * base Boolean algebra types BAs..., delegating to the appropriate
+ * implementation depending on the variant type.
+ */
+template <typename... BAs> requires BAsPack<BAs...>
+struct base_ba_dispatcher {
+	using node_t = node<BAs...>;
 	using tau = tree<node_t>;
 
-	static 	bool is_syntactic_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+	/**
+	 * @brief Checks if the element is the syntactic one (true) value.
+	 * @param elem The Boolean algebra element.
+	 * @return True if the element is syntactic one, false otherwise.
+	 */
+	static bool is_syntactic_one(const std::variant<BAs...>& elem);
 
-	static bool is_syntactic_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+	/**
+	 * @brief Checks if the element is syntactic zero (false) value.
+	 * @param elem The Boolean algebra element.
+	 * @return True if the element is syntactic zero, false otherwise.
+	 */
+	static bool is_syntactic_zero(const std::variant<BAs...>& elem);
 
-	static bool is_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+	/**
+	 * @brief Checks if the element is the semantically one (true) value.
+	 * @param elem The Boolean algebra element.
+	 * @return True if the element is semantic one, false otherwise.
+	 */
+	static bool is_one(const std::variant<BAs...>& elem);
 
-	static bool is_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+	/**
+	 * @brief Checks if the element is semantically zero (false) value.
+	 * @param elem The Boolean algebra element.
+	 * @return True if the element is semantically zero, false otherwise.
+	 */
+	static bool is_zero(const std::variant<BAs...>& elem);
 
-	static bool is_closed(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+	/**
+	 * @brief Checks if the Boolean algebra element is closed.
+	 * @param elem The Boolean algebra element.
+	 * @return True if closed, false otherwise.
+	 */
+	static bool is_closed(const std::variant<BAs...>& elem);
 
+	/**
+	 * @brief Returns the supported Boolean algebra type names.
+	 * @return Vector of type names as strings.
+	 */
 	static std::vector<std::string> types();
 
+	/**
+	 * @brief Returns the default type reference for the Boolean algebra.
+	 * @return The default tref.
+	 */
 	static tref default_type();
 
-	static std::string one(tref type_tree = tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>());
+	/**
+	 * @brief Returns the string representation of the one (true) value for a given type.
+	 * @param type_tree The type reference.
+	 * @return String representation of one.
+	 */
+	static std::string one(const tref type_tree);
 
-	static std::string zero(tref type_tree = tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>());
+	/**
+	 * @brief Returns the string representation of the zero (false) value for a given type.
+	 * @param type_tree The type reference.
+	 * @return String representation of zero.
+	 */
+	static std::string zero(const tref type_tree);
 
+	/**
+	 * @brief Splits the element using the specified splitter type.
+	 * @param elem The Boolean algebra element.
+	 * @param st The splitter type.
+	 * @return The split element as a variant.
+	 */
+	static std::variant<BAs...> splitter(const std::variant<BAs...>& elem, splitter_type st = splitter_type::upper);
+
+	/**
+	 * @brief Splits the element using the default splitter type.
+	 * @param type_tree type of the splitter one element to return.
+	 * @return The split one element as a variant.
+	 */
 	static tref splitter_one(tref type_tree);
 
-	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> splitter(
-		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem, splitter_type st);
-	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> splitter(
-		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem);
+	/**
+	 * @brief Unpacks a tau_ba from the element if present.
+	 * @param elem The Boolean algebra element.
+	 * @return The tref for the unpacked tau_ba, or nullptr if not present.
+	 */
+	static tref unpack_tau_ba(const std::variant<BAs...>& elem);
 
-	static tref unpack_tau_ba(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v);
+	/**
+	 * @brief Packs a tref into a Boolean algebra variant.
+	 * @param t The tref to pack.
+	 * @return The packed variant.
+	 */
+	static std::variant<BAs...> pack_tau_ba(tref t);
 
-	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> pack_tau_ba(tref c);
+	/**
+	 * @brief Normalizes the Boolean algebra element.
+	 * @param v The element to normalize.
+	 * @return The normalized variant.
+	 */
+	static std::variant<BAs...> normalize(const std::variant<BAs...>& v);
 
-	static std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> normalize(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v);
-
+	/**
+	 * @brief Simplifies a symbol tref for the Boolean algebra.
+	 * @param symbol The symbol tref.
+	 * @return The simplified tref.
+	 */
 	static tref simplify_symbol(tref symbol);
 
+	/**
+	 * @brief Simplifies a term tref for the Boolean algebra.
+	 * @param term The term tref.
+	 * @return The simplified tref.
+	 */
 	static tref simplify_term(tref term);
 };
 
-template <>
-inline std::optional<ba_constants<node<bv, sbf_ba>>::constant_with_type> ba_constants<node<bv, sbf_ba>>::get(
-		const std::string& constant_source,	tref type_tree,
-		[[maybe_unused]] const std::string options) {
-	if (is_bv_type_family<node<bv, sbf_ba>>(type_tree))
-		return parse_bv<bv, sbf_ba>(constant_source, type_tree);
-	return parse_sbf<bv, sbf_ba>(constant_source);
-}
-
-template <>
-inline std::optional<typename ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::constant_with_type> ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>::get(
-		const std::string& constant_source,	tref type_tree,
-		[[maybe_unused]] const std::string options) {
-	if (is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree))
-		return parse_sbf<tau_ba<bv, sbf_ba>, bv, sbf_ba>(constant_source);
-	if (is_bv_type_family<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree))
-		return parse_bv<tau_ba<bv, sbf_ba>, bv, sbf_ba>(constant_source, type_tree);
-	return parse_tau<bv, sbf_ba>(constant_source);
-}
 
 } // namespace idni::tau_lang
 
