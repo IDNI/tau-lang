@@ -2,7 +2,7 @@
 
 namespace idni::tau_lang {
 
-inline bool nso_factory<bv, sbf_ba>::is_syntactic_one(const std::variant<bv, sbf_ba>& elem) {
+inline bool base_ba_dispatcher<bv, sbf_ba>::is_syntactic_one(const std::variant<bv, sbf_ba>& elem) {
 	// Note that syntactic zero and one are the same as semantic zero and one
 	// for bv and sbf, so we can use the same function
 	return (std::holds_alternative<bv>(elem))
@@ -10,41 +10,41 @@ inline bool nso_factory<bv, sbf_ba>::is_syntactic_one(const std::variant<bv, sbf
 		: is_sbf_one(std::get<sbf_ba>(elem));
 }
 
-inline bool nso_factory<bv, sbf_ba>::is_syntactic_zero(const std::variant<bv, sbf_ba>& elem) {
+inline bool base_ba_dispatcher<bv, sbf_ba>::is_syntactic_zero(const std::variant<bv, sbf_ba>& elem) {
 	// See bove comment
 	return (std::holds_alternative<bv>(elem))
 		? is_bv_syntactic_zero(std::get<bv>(elem))
 		: is_sbf_zero(std::get<sbf_ba>(elem));
 }
 
-inline bool nso_factory<bv, sbf_ba>::is_one(const std::variant<bv, sbf_ba>& elem) {
+inline bool base_ba_dispatcher<bv, sbf_ba>::is_one(const std::variant<bv, sbf_ba>& elem) {
 	// See bove comment
 	return (std::holds_alternative<bv>(elem))
 		? is_bv_syntactic_one(std::get<bv>(elem))
 		: is_sbf_one(std::get<sbf_ba>(elem));
 }
 
-inline bool nso_factory<bv, sbf_ba>::is_zero(const std::variant<bv, sbf_ba>& elem) {
+inline bool base_ba_dispatcher<bv, sbf_ba>::is_zero(const std::variant<bv, sbf_ba>& elem) {
 	// See bove comment
 	return (std::holds_alternative<bv>(elem))
 		? is_bv_syntactic_zero(std::get<bv>(elem))
 		: is_sbf_zero(std::get<sbf_ba>(elem));
 }
 
-inline bool nso_factory<bv, sbf_ba>::is_closed(const std::variant<bv, sbf_ba>&) {
+inline bool base_ba_dispatcher<bv, sbf_ba>::is_closed(const std::variant<bv, sbf_ba>&) {
 	// We return true as bv and sbf are closed (for our pourposes)
 	return true;
 }
 
-inline std::vector<std::string> nso_factory<bv, sbf_ba>::types() {
+inline std::vector<std::string> base_ba_dispatcher<bv, sbf_ba>::types() {
 	return { "sbf", "bv" };
 }
 
-inline tref nso_factory<bv, sbf_ba>::default_type() {
+inline tref base_ba_dispatcher<bv, sbf_ba>::default_type() {
 	return sbf_type<node<bv,sbf_ba>>();
 }
 
-inline std::string nso_factory<bv, sbf_ba>::one(const tref type_tree) {
+inline std::string base_ba_dispatcher<bv, sbf_ba>::one(const tref type_tree) {
 	using node_t = node<bv, sbf_ba>;
 	if (is_bv_type_family<node_t>(type_tree))
 		return make_bitvector_top_elem(get_bv_size<node_t>(type_tree)
@@ -52,7 +52,7 @@ inline std::string nso_factory<bv, sbf_ba>::one(const tref type_tree) {
 	else return "1";
 }
 
-inline std::string nso_factory<bv, sbf_ba>::zero(const tref type_tree) {
+inline std::string base_ba_dispatcher<bv, sbf_ba>::zero(const tref type_tree) {
 	using node_t = node<bv, sbf_ba>;
 	if (is_bv_type_family<node_t>(type_tree))
 		return make_bitvector_bottom_elem(get_bv_size<node_t>(type_tree)
@@ -60,50 +60,50 @@ inline std::string nso_factory<bv, sbf_ba>::zero(const tref type_tree) {
 	return "0";
 }
 
-inline tref nso_factory<bv, sbf_ba>::splitter_one() {
+inline tref base_ba_dispatcher<bv, sbf_ba>::splitter_one() {
 	using tau = tree<node<bv, sbf_ba>>;
 	return tau::get(tau::bf, tau::get_ba_constant(
 		typename tau::constant(sbf_splitter_one()),
 		sbf_type<node<bv, sbf_ba>>()));
 }
 
-inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::splitter(const std::variant<bv, sbf_ba>& elem, splitter_type st) {
+inline std::variant<bv, sbf_ba> base_ba_dispatcher<bv, sbf_ba>::splitter(const std::variant<bv, sbf_ba>& elem, splitter_type st) {
 	DBG(assert(!std::holds_alternative<bv>(elem));)
 	return std::variant<bv, sbf_ba>(sbf_splitter(std::get<sbf_ba>(elem), st));
 }
 
-inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::splitter(const std::variant<bv, sbf_ba>& elem) {
+inline std::variant<bv, sbf_ba> base_ba_dispatcher<bv, sbf_ba>::splitter(const std::variant<bv, sbf_ba>& elem) {
 	DBG(assert(!std::holds_alternative<bv>(elem));)
 	return splitter(std::get<sbf_ba>(elem), splitter_type::upper);
 }
 
-inline tref nso_factory<bv, sbf_ba>::unpack_tau_ba(const std::variant<bv, sbf_ba>&) {
+inline tref base_ba_dispatcher<bv, sbf_ba>::unpack_tau_ba(const std::variant<bv, sbf_ba>&) {
 	return nullptr; // There is no tau_ba present
 }
 
-inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::pack_tau_ba(
+inline std::variant<bv, sbf_ba> base_ba_dispatcher<bv, sbf_ba>::pack_tau_ba(
 	tref) {
 	// There is no tau_ba
 	return {};
 }
 
-inline std::variant<bv, sbf_ba> nso_factory<bv, sbf_ba>::normalize(const std::variant<bv, sbf_ba>& v) {
+inline std::variant<bv, sbf_ba> base_ba_dispatcher<bv, sbf_ba>::normalize(const std::variant<bv, sbf_ba>& v) {
 	return std::holds_alternative<bv>(v)
 		? std::variant<bv, sbf_ba>(normalize_bv(std::get<bv>(v)))
 		: std::variant<bv, sbf_ba>(normalize_sbf(std::get<sbf_ba>(v)));
 }
 
-inline tref nso_factory<bv, sbf_ba>::simplify_symbol(tref symbol) {
+inline tref base_ba_dispatcher<bv, sbf_ba>::simplify_symbol(tref symbol) {
 	auto ba_type = tau::get(symbol).get_ba_type();
 	return is_bv_type_family<node_t>(ba_type) ? simplify_bv_symbol<node_t>(symbol) : symbol;
 }
 
-inline tref nso_factory<bv, sbf_ba>::simplify_term(tref term) {
+inline tref base_ba_dispatcher<bv, sbf_ba>::simplify_term(tref term) {
 	auto ba_type = tau::get(term).get_ba_type();
 	return is_bv_type_family<node_t>(ba_type) ? simplify_bv_term<node_t>(term) : term;
 }
 
-inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_syntactic_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+inline bool base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_syntactic_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
 	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
 		return std::get<tau_ba<bv, sbf_ba>>(elem).is_one();
 	else if (std::holds_alternative<bv>(elem))
@@ -113,7 +113,7 @@ inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_syntactic_one(const 
 	else return is_sbf_one(std::get<sbf_ba>(elem));
 }
 
-inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_syntactic_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+inline bool base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_syntactic_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
 	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
 		return std::get<tau_ba<bv, sbf_ba>>(elem).is_zero();
 	else if (std::holds_alternative<bv>(elem))
@@ -122,7 +122,7 @@ inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_syntactic_zero(const
 	else return is_sbf_zero(std::get<sbf_ba>(elem));
 }
 
-inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+inline bool base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_one(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
 	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
 		return std::get<tau_ba<bv, sbf_ba>>(elem).is_one();
 	else if (std::holds_alternative<bv>(elem))
@@ -132,7 +132,7 @@ inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_one(const std::varia
 	else return is_sbf_one(std::get<sbf_ba>(elem));
 }
 
-inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+inline bool base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_zero(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
 	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
 		return std::get<tau_ba<bv, sbf_ba>>(elem).is_zero();
 	else if (std::holds_alternative<bv>(elem))
@@ -141,22 +141,22 @@ inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_zero(const std::vari
 	else return is_sbf_zero(std::get<sbf_ba>(elem));
 }
 
-inline bool nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_closed(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
+inline bool base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::is_closed(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
 	// We return true as bv and Bool are closed (for our pourposes)
 	return (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem))
 		? is_tau_closed<bv, sbf_ba>(std::get<tau_ba<bv, sbf_ba>>(elem))
 		: true;
 }
 
-inline std::vector<std::string> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {
+inline std::vector<std::string> base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::types() {
 	return { "sbf", "tau", "bv" };
 }
 
-inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::default_type() {
+inline tref base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::default_type() {
 	return tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>();
 }
 
-inline std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::one(
+inline std::string base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::one(
 	tref type_tree)
 {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
@@ -168,7 +168,7 @@ inline std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::one(
 	} else return "T";
 }
 
-inline std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::zero(
+inline std::string base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::zero(
 	tref type_tree)
 {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
@@ -180,7 +180,7 @@ inline std::string nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::zero(
 	} else return "F";
 }
 
-inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
+inline tref base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
 		tref type_tree)
 {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
@@ -197,7 +197,7 @@ inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
 				tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>()));
 }
 
-inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter(
+inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter(
 		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem, splitter_type st) {
 	DBG(assert(!std::holds_alternative<bv>(elem));)
 	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem)) {
@@ -210,13 +210,13 @@ inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_b
 		sbf_splitter(std::get<sbf_ba>(elem), st));
 }
 
-inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter(
+inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter(
 		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem) {
 	DBG(assert(!std::holds_alternative<bv>(elem));)
 	return splitter(std::get<tau_ba<bv, sbf_ba>>(elem), splitter_type::upper);
 }
 
-inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::unpack_tau_ba(
+inline tref base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::unpack_tau_ba(
 		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v)
 {
 	if (!std::holds_alternative<tau_ba<bv, sbf_ba>>(v)) return {};
@@ -224,13 +224,13 @@ inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::unpack_tau_ba(
 	return unpacked.nso_rr.main->get();
 }
 
-inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_ba>,
-	bv, sbf_ba>::pack_tau_ba(tref c) {
+inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> base_ba_dispatcher<tau_ba<bv, sbf_ba>,
+bv, sbf_ba>::pack_tau_ba(tref c) {
 	tau_ba<bv, sbf_ba> t {c};
 	return {t};
 }
 
-inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_ba>,
+inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> base_ba_dispatcher<tau_ba<bv, sbf_ba>,
 		bv, sbf_ba>::normalize(const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& v) {
 	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(v)) {
 		return std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>(
@@ -245,13 +245,13 @@ inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> nso_factory<tau_ba<bv, sbf_b
 	}
 }
 
-inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::simplify_symbol(tref symbol) {
+inline tref base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::simplify_symbol(tref symbol) {
 	auto ba_type = tau::get(symbol).get_ba_type();
 	return is_bv_type_family<node_t>(ba_type)
 		? simplify_bv_symbol<node_t>(symbol) : symbol;
 }
 
-inline tref nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba>::simplify_term(tref term) {
+inline tref base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::simplify_term(tref term) {
 	auto ba_type = tau::get(term).get_ba_type();
 	return is_bv_type_family<node_t>(ba_type)
 		? simplify_bv_term<node_t>(term) : term;

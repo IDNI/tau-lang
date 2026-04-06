@@ -9,11 +9,11 @@
 #include "boolean_algebras/bv_ba.h"
 #include "nso_rr.h"
 
+
 namespace idni::tau_lang {
 
-
 template <>
-struct nso_factory<bv, sbf_ba> {
+struct base_ba_dispatcher<bv, sbf_ba> {
 	using node_t = node<bv, sbf_ba>;
 	using tau = tree<node_t>;
 
@@ -53,10 +53,10 @@ struct nso_factory<bv, sbf_ba> {
 };
 
 /**
- * @brief NSO factory used in REPL
+ * @brief Base BA dispatcher used in REPL
  */
 template<>
-struct nso_factory<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
+struct base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba> {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 	using tau = tree<node_t>;
 
