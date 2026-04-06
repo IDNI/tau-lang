@@ -7,7 +7,7 @@
 #	include "boolean_algebras/bv_ba.h"
 #	include "boolean_algebras/variant_ba.h"
 #   include "ba_constants.h"
-#   include "runtime.h"
+#   include "base_ba_dispatcher.h"
 #   include "api.h"
 #else
 #	include "tau.h"
