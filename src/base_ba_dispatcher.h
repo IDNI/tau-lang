@@ -1,7 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#ifndef __RUNTIME_H__
-#define __RUNTIME_H__
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+#ifndef __BASE_BA_DISPATCHER_H__
+#define __BASE_BA_DISPATCHER_H__
 
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/sbf_ba.h"
@@ -118,6 +120,6 @@ inline std::optional<typename ba_constants<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>
 
 } // namespace idni::tau_lang
 
-#include "runtime.tmpl.h"
+#include "base_ba_dispatcher.tmpl.h"
 
-#endif // __RUNTIME_H__
+#endif // __BASE_BA_DISPATCHER_H__
