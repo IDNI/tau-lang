@@ -1,6 +1,6 @@
 # Adding new base Boolean Algebras to Tau
 
-This document decsribar how to add new base Boolean algebras (BAs) to Tau.
+This document describes how to add new base Boolean algebras (BAs) to Tau.
 
 
 This is done by implementing the following elements:
