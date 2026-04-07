@@ -1286,7 +1286,7 @@ This is a short list of known issues that will be fixed in a subsequent release:
 
 # **Future work**
 
-* Enabling modular arithmatic using fixed width bitvectors in Tau specifications
+* Enabling modular arithmetic using fixed width bitvectors in Tau specifications
 * Enabling efficient data storage and manipulation in Tau specifications using Boolean functions
 * Overcoming performance issues during normalization of formulas and satisfiability checking of Tau specifications
 * Add support for redefinitions of functions or predicates.
