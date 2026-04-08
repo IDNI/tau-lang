@@ -4,7 +4,7 @@
 #include "test_tau_helpers.h"
 
 #include "boolean_algebras/bv_ba.h"
-#include "heuristics/bv_bitblasting_predicates.tmpl.h"
+//#include "heuristics/bv_bitblasting_predicates.tmpl.h"
 
 TEST_SUITE("configuration") {
 
@@ -26,37 +26,105 @@ tref parse_wff(const std::string& sample) {
 	return src;
 }
 
-TEST_SUITE("bitblasting") {
+/*TEST_SUITE("bitblasting") {
 
-	/*TEST_CASE("print bvshl predicates") {
-		using node = node_t;
-
-		for(auto rule : bv_bitblasting_rules<node_t>::bvshl_by_one(2)) {
-			TAU_LOG_INFO << LOG_RULE(rule);
-		}
-
-		CHECK(true);
+	TEST_CASE("bvmul_rec_rule") {
 	}
 
-	TEST_CASE("print bvadd predicates") {
+	TEST_CASE("bvlt_rule(s)") {
 		using node = node_t;
-		for(auto rule : bv_bitblasting_rules<node_t>::bvadd(2)) {
-			TAU_LOG_INFO << LOG_RULE(rule);
-		}
 
-		CHECK(true);
+		TAU_LOG_INFO << "bvlt_rules:\n";
+		auto rules = bvlt_rules<node>(4);
+		for (const auto& rule : rules)
+			TAU_LOG_INFO << LOG_RULE(rule) << '\n';
+		TAU_LOG_INFO << "---" << '\n';
+		TAU_LOG_INFO << LOG_RULE(bvlt_rule<node>(4)) << "\n\n";
 	}
 
-	TEST_CASE("print bvsub predicates") {
+	TEST_CASE("bvgt_rule") {
 		using node = node_t;
-		for(auto rule : bv_bitblasting_rules<node_t>::bvsub(2)) {
-			TAU_LOG_INFO << LOG_RULE(rule);
-		}
 
-		CHECK(true);
-	}*/
+		TAU_LOG_INFO << "bvgt_rules:\n";
+		auto rules = bvgt_rules<node>(4);
+		for (const auto& rule : rules)
+			TAU_LOG_INFO << LOG_RULE(rule) << '\n';
+		TAU_LOG_INFO << "---" << '\n';
+		TAU_LOG_INFO << LOG_RULE(bvgt_rule<node>(4)) << "\n\n";
+	}
 
-}
+	TEST_CASE("bvshl_by_one_rule") {
+		using node = node_t;
+
+		TAU_LOG_INFO << "bvshl_by_one_rules:\n";
+		TAU_LOG_INFO << LOG_RULE(bvshl_by_one_rule<node>(4)) << "\n\n";
+	}
+
+	TEST_CASE("bvrhl_by_one_rule") {
+		using node = node_t;
+
+		TAU_LOG_INFO << "bvrhl_by_one_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(bvrhl_by_one_rule<node>(4)) << "\n\n";
+	}
+
+	TEST_CASE("is_bit_zero_rule") {
+		using node = node_t;
+
+		TAU_LOG_INFO << "is_bit_zero_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(is_bit_zero_rule<node>(2, 4)) << "\n\n";
+	}
+
+	TEST_CASE("is_bit_one_rule") {
+		using node = node_t;
+
+		TAU_LOG_INFO << "is_bit_one_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(is_bit_one_rule<node>(2, 4)) << "\n\n";
+	}
+
+	TEST_CASE("bit_rule") {
+		using node = node_t;
+
+		TAU_LOG_INFO << "bit_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(bit_rule<node>(1, 2)) << "\n\n";
+	}
+
+	TEST_CASE("bvadd_rule") {
+		//using node = node_t;
+
+		//TAU_LOG_INFO << LOG_RULE(bvadd_rule<node>(4));
+	}
+
+	TEST_CASE("bvsub_rule") {
+		//using node = node_t;
+
+		//TAU_LOG_INFO << LOG_RULE(bvsub_rule<node>(4));
+	}
+
+	TEST_CASE("bvdiv_rule") {
+		//using node = node_t;
+
+		//TAU_LOG_INFO << LOG_RULE(bvdiv_rule<node>(2, 2));
+	}
+
+	TEST_CASE("bvmod_rule") {
+		//using node = node_t;
+
+		//TAU_LOG_INFO << LOG_RULE(bvmod_rule<node>(2, 2));
+	}
+
+	TEST_CASE("bvshl_rule") {
+		//using node = node_t;
+
+		//TAU_LOG_INFO << LOG_RULE(bvshl_rule<node>(2, 2));
+	}
+
+	TEST_CASE("bvrhl_rule") {
+		//using node = node_t;
+
+		//TAU_LOG_INFO << LOG_RULE(bvrhl_rule<node>(2, 2));
+	}
+}*/
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
