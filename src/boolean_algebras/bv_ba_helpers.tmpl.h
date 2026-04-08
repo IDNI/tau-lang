@@ -15,7 +15,7 @@ template<NodeType node>
 bool is_bv_constant(tref t) {
 	using tau = tree<node>;
 
-	DBG( assert(tau::get(t).is_bv_constant()); )
+	DBG( assert(tau::get(t).is_ba_constant()); )
 
 	auto type = tau::get(t).get_ba_type();
 	return is_bv_type_family<node>(type);
@@ -25,12 +25,12 @@ template<NodeType node>
 bool is_zero_bv_constant(tref t) {
 	using tau = tree<node>;
 
-	DBG( assert(tau::get(t).is_bv_constant()); )
+	DBG( assert(tau::get(t).is_ba_constant()); )
 
 	auto constant = tau::get(t).get_ba_constant();
-	auto bv = std::get<bv>(constant);
-	if (!bv.isBitVectorValue()) return false;
-    std::string bv_str = bv.getBitVectorValue();
+	auto cte = std::get<bv>(constant);
+	if (!cte.isBitVectorValue()) return false;
+    std::string bv_str = cte.getBitVectorValue();
     return bv_str == "0";
 }
 
@@ -47,12 +47,12 @@ template<NodeType node>
 bool is_bv_lsb_one(tref t) {
 	using tau = tree<node>;
 
-	DBG( assert(tau::get(t).is_bv_constant()); )
+	DBG( assert(tau::get(t).is_ba_constant()); )
 
 	auto constant = tau::get(t).get_ba_constant();
-	auto bv = std::get<bv>(constant);
-	if (!bv.isBitVectorValue()) return false;
-	std::string bv_str = bv.getBitVectorValue();
+	auto cte = std::get<bv>(constant);
+	if (!cte.isBitVectorValue()) return false;
+	std::string bv_str = cte.getBitVectorValue();
 	return !bv_str.empty() && bv_str.back() == '1';
 }
 
@@ -60,19 +60,20 @@ template<NodeType node>
 tref bv_shr_by_one(tref t) {
 	using tau = tree<node>;
 
-	DBG( assert(tau::get(t).is_bv_constant()); )
+	DBG( assert(tau::get(t).is_ba_constant()); )
 
 	auto type = tau::get(t).get_ba_type();
 	auto bitwidth = get_bv_width<node>(type);
 	auto constant = tau::get(t).get_ba_constant();
-	auto bv = std::get<bv>(constant);
-	if (!bv.isBitVectorValue()) return nullptr;
-	std::string bv_str = bv.getBitVectorValue();
+	auto cte = std::get<bv>(constant);
+	if (!cte.isBitVectorValue()) return nullptr;
+	std::string bv_str = cte.getBitVectorValue();
 	if (bv_str.empty()) return nullptr;
 	bv_str.pop_back();
 	auto shifted_bv_str = bv_str.empty() ? "0" : bv_str;
 	auto shifted_bv = make_bitvector_value(bitwidth, shifted_bv_str);
-	auto new_constant = tau::get_bv_constant(shifted_bv);
+	typename node::constant new_cte = {shifted_bv};
+	auto new_constant = tau::get_ba_constant(new_cte, type);
 	return new_constant;
 }
 
@@ -80,18 +81,19 @@ template<NodeType node>
 tref bv_shl_by_one(tref t) {
 	using tau = tree<node>;
 
-	DBG( assert(tau::get(t).is_bv_constant()); )
+	DBG( assert(tau::get(t).is_ba_constant()); )
 
 	auto type = tau::get(t).get_ba_type();
 	auto bitwidth = get_bv_width<node>(type);
 	auto constant = tau::get(t).get_ba_constant();
-	auto bv = std::get<bv>(constant);
-	if (!bv.isBitVectorValue()) return nullptr;
-	std::string bv_str = bv.getBitVectorValue();
+	auto cte = std::get<bv>(constant);
+	if (!cte.isBitVectorValue()) return nullptr;
+	std::string bv_str = cte.getBitVectorValue();
 	if (bv_str.empty()) return nullptr;
 	bv_str.push_back('0');
 	auto shifted_bv = make_bitvector_value(bitwidth, bv_str);
-	auto new_constant = tau::get_bv_constant(shifted_bv);
+	typename node::constant new_cte = {shifted_bv};
+	auto new_constant = tau::get_ba_constant(new_cte, type);
 	return new_constant;
 }
 
@@ -108,9 +110,9 @@ size_t get_bv_type_bitwidth(tref t) {
 template<NodeType node>
 std::optional<size_t> get_bv_constant_value(tref t) {
 	auto constant = tree<node>::get(t).get_ba_constant();
-	auto bv = std::get<bv>(constant);
-	if (bv.isBitVectorValue()) {
-		auto value_str = bv.getBitVectorValue();
+	auto cte = std::get<bv>(constant);
+	if (cte.isBitVectorValue()) {
+		auto value_str = cte.getBitVectorValue();
 		try {
 			size_t value = std::stoull(value_str, nullptr, 2);
 			return value;
