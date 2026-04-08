@@ -30,7 +30,7 @@ tref bv_bitblasting(tref term);
 
 } // namespace idni::tau_lang
 
-#include "bv_bitblasting.tmpl.h"
+//#include "bv_bitblasting.tmpl.h"
 #include "bv_bitblasting_predicates.tmpl.h"
 
 #endif // __IDNI__TAU__BV_BITBLASTING_H__
