@@ -32,6 +32,23 @@ namespace idni::tau_lang {
 template<NodeType node>
 tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
 
+
+/**
+ * @brief Entry point for predicate blasting on bitvector formulas.
+ *
+ * Rewrites bitvector formulas into equivalent Boolean formulas containing
+ * existentially quantified variables and predicates. Only supports a limited set of
+ * bitvector operations. If unsupported operations or predicates are encountered,
+ * it returns nullptr to indicate failure, and the caller can choose to leave the
+ * formula unchanged.
+ *
+ * See implementation in bv_predicate_blasting.tmpl.h and
+ * bv_predicate_blasting_predicates.tmpl.h for details.
+ *
+ * @tparam node Node type
+ * @param term The formula to blast
+ * @return The formula with predicates blasted, or nullptr on error
+ */
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,
 	std::function<bool(tref)> skip);
