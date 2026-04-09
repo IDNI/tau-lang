@@ -64,7 +64,7 @@ echo ""
 
 # Build the test
 echo "Compiling..."
-./dev debug $BUILD_FLAGS -DTAU_BUILD_JOBS=4 || {
+./dev debug --target $TEST_NAME $BUILD_FLAGS || {
 	echo "Error: Build failed"
 	exit 1
 }
