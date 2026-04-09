@@ -604,7 +604,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case onf_cmd:           out("onf "); break;
 			case def_print_cmd:
 			case def_rr_cmd:
-			case def_list_cmd:      out("def "); break;
+			case def_list_cmd:      out("defs "); break;
 			case history_list_cmd:  out("history "); break;
 			case history_print_cmd:
 			case history_store_cmd: out("history "); break;
