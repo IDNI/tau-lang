@@ -3,6 +3,7 @@
 #include "api.h"
 
 #include "sbf_parser.generated.h"
+#include "tau_tree_builders.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "api"
@@ -128,8 +129,6 @@ template <NodeType node>
 size_t api<node>::add_definition(tref head, tref body) {
 	DBG(TAU_LOG_TRACE << "add_definition/head: " << LOG_FM_DUMP(head);)
 	DBG(TAU_LOG_TRACE << "add_definition/body: " << LOG_FM_DUMP(body);)
-	head = infer(head);
-	body = infer(body);
 	if (!head || !body) {
 		if (!head) {
 			DBG(TAU_LOG_TRACE << "add_definition/head is nullptr";)
@@ -592,7 +591,7 @@ tref api<node>::infer(tref expr, bool use_defaults) {
 		defs.get_global_scope(),
 		defs.get_definition_heads(),
 		{ .use_defaults = use_defaults });
-	tref inferred = result.first;
+	tref inferred = canonize_quantifier_ids<node>(result.first);
 	// If type inference failed
 	if (!inferred) {
 		DBG(LOG_TRACE << "inferred is nullptr";)
