@@ -25,22 +25,22 @@ using tau = tree<node_t>;
 using tt = tau::traverser;
 using bac = ba_constants<node_t>;
 
-tau::get_options parse_bf() {
+inline tau::get_options parse_bf() {
 	static tau::get_options opts{ .parse = { .start = tau::bf } };
 	return opts;
 }
 
-tau::get_options parse_wff() {
+inline tau::get_options parse_wff() {
 	static tau::get_options opts{ .parse = { .start = tau::wff } };
 	return opts;
 }
 
-tau::get_options parse_rec_relations() {
+inline tau::get_options parse_rec_relations() {
 	static tau::get_options opts{ .parse = { .start = tau::definitions } };
 	return opts;
 }
 
-std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* sample) {
+inline std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* sample) {
 	auto prr = parse_rec_relations();
 	rewriter::rules rrs = get_rec_relations<node_t>(
 			tau::get(rec, prr));
@@ -50,7 +50,7 @@ std::optional<rr<node_t>> get_bf_nso_rr(const char* rec, const char* sample) {
 	return rr<node_t>(rrs, tau::geth(main_fm));
 }
 
-std::optional<rr<node_t>> get_nso_rr(const char* sample)
+inline std::optional<rr<node_t>> get_nso_rr(const char* sample)
 {
 	// DBG(TAU_LOG_TRACE << "get_nso_rr: " << sample;)
 	tref spec = tau::get(sample);
@@ -58,14 +58,14 @@ std::optional<rr<node_t>> get_nso_rr(const char* sample)
 	return get_nso_rr<node_t>(spec);
 }
 
-bool get_nso_rr_and_check(const char* sample, typename node_t::type nt){
+inline bool get_nso_rr_and_check(const char* sample, typename node_t::type nt){
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;
 	auto x = tt(nso_rr.value().main) | nt;
 	return x.has_value();
 }
 
-bool normalize_and_check(const char* sample,
+inline bool normalize_and_check(const char* sample,
 	typename node_t::type nt, bool expect_fail = false)
 {
 	using node = node_t;
@@ -82,11 +82,11 @@ bool normalize_and_check(const char* sample,
 	return tau::get(result).child_is(nt) != expect_fail;
 }
 
-bool normalize_and_expect_fail(const char* sample, typename node_t::type nt) {
+inline bool normalize_and_expect_fail(const char* sample, typename node_t::type nt) {
 	return normalize_and_check(sample, nt, true);
 }
 
-bool matches_to_any_of(const std::string& fm_str, const strings& expected) {
+inline bool matches_to_any_of(const std::string& fm_str, const strings& expected) {
 #ifdef DEBUG // check canonicity between versions of Tau
 	const bool canonical = fm_str == expected[0];
 	std::stringstream ss; ss << "expression: " << fm_str;
@@ -103,11 +103,11 @@ bool matches_to_any_of(const std::string& fm_str, const strings& expected) {
 	return false;
 }
 
-bool matches_to_str_to_any_of(tref fm, const strings& expected) {
+inline bool matches_to_str_to_any_of(tref fm, const strings& expected) {
 	return matches_to_any_of(tau::get(fm).to_str(), expected);
 }
 
-bool values_matches_any_of(const strings& values,
+inline bool values_matches_any_of(const strings& values,
 	const std::vector<strings>& expected)
 {
 	if (values.size() != expected.size()) return false;
@@ -128,7 +128,7 @@ bool values_matches_any_of(const strings& values,
 	return true;
 }
 
-bool normalize_and_check(const char* sample, const strings& expected) {
+inline bool normalize_and_check(const char* sample, const strings& expected) {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;
 
@@ -138,7 +138,7 @@ bool normalize_and_check(const char* sample, const strings& expected) {
 	return matches_to_str_to_any_of(result, expected);
 }
 
-bool normalize_and_check(const char* sample, const std::string& expected) {
+inline bool normalize_and_check(const char* sample, const std::string& expected) {
 	return normalize_and_check(sample, strings{ expected });
 }
 
