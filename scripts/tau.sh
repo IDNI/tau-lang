@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./dev release && ./build-Release/tau $@
+./dev release && ./build-Release/tau "$@"
