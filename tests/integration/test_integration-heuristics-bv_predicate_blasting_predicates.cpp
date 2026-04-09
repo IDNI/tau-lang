@@ -4,7 +4,7 @@
 #include "test_tau_helpers.h"
 
 #include "boolean_algebras/bv_ba.h"
-//#include "heuristics/bv_bitblasting_predicates.tmpl.h"
+#include "heuristics/bv_predicate_blasting.h"
 
 TEST_SUITE("configuration") {
 

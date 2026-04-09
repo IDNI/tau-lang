@@ -4,7 +4,7 @@
 #include "test_tau_helpers.h"
 
 #include "boolean_algebras/bv_ba.h"
-#include "heuristics/bv_bitblasting.tmpl.h"
+#include "heuristics/bv_predicate_blasting.h"
 
 TEST_SUITE("configuration") {
 
@@ -28,20 +28,6 @@ tref parse_wff(const std::string& sample) {
 
 TEST_SUITE("bv blasting") {
 
-	TEST_CASE("x | y = 0") {
-		logging::trace();
-		tref src = parse_wff("x:bv[2] | y = 0");
-		auto solution = bv_bitblasting_solve<node_t>(src);
-		if (solution) {
-			TAU_LOG_INFO << "Solution found for: " << src;
-			for (const auto& [var, val] : solution.value()) {
-				TAU_LOG_INFO << "  " << var << " -> " << val;
-			}
-		} else {
-			TAU_LOG_INFO << "No solution found for: " << src;
-		}
-		logging::info();
-	}
 }
 
 TEST_SUITE("Cleanup") {

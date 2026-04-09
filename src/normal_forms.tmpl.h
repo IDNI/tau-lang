@@ -2,7 +2,7 @@
 
 #include "normal_forms.h"
 #include "union_find_with_sets.h"
-#include "heuristics/bv_bitblasting.h"
+#include "heuristics/bv_predicate_blasting.h"
 namespace idni::tau_lang {
 
 #undef LOG_CHANNEL_NAME
@@ -3941,7 +3941,8 @@ tref resolve_quantifiers(tref formula) {
 			// the quantifier
 			tref var = tau::trim2(n);
 			if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
-				if (auto blasted = bv_blasting<node>(n); blasted) return blasted;
+				if (auto blasted = bv_predicate_blasting<node>(n); blasted && blasted != n)
+					return blasted;
 				if (const trefs& free_vars = get_free_vars<node>(n);
 					free_vars.empty()) {
 					// By assumption quantifier is pushed in all the way

@@ -116,7 +116,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	/* related to heuristics*/
 	"bv_ba_simplification",
 	"ex_subs_based_elimination",
-	"bv_bitblasting",
+	"bv_predicate_blasting",
 
 	/* testing specific */
 	"testing",
