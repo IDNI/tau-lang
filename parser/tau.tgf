@@ -10,7 +10,7 @@ start                  => spec.
 
 # start symbol posibilities:
 # spec, spec_multiline. cli, stream_def and fm_or_term (bellow)
-spec                   => [ definitions ] _ wff:main _ '.' _.
+spec                   => [ definitions ] _ wff:main _ ['.' _].
 definitions            => (_ (rec_relation | input_def | output_def) _ '.')+.
 
 spec_multiline         => (_ spec_part _ '.')* _ spec_part [ _ '.' ] _ | _.
@@ -154,7 +154,7 @@ _                      => __ | null.                      # optional whitespace
 
 # cli related rules, using cli as a starting point for parsing
 #
-cli                    => _ | _ cli_command _ ('.' _ cli_command _)*.
+cli                    => _ | _ cli_command _ ('.' _ cli_command _)* ['.' _] .
 cli_command            =>
           ("q" | "quit")   :quit_sym                          :quit_cmd
         | ("v" | "version"):version_sym                       :version_cmd
@@ -164,18 +164,18 @@ cli_command            =>
         | ("file"          :file_sym    __ q_string)          :file_cmd
 # TODO (HIGH) maybe we must also check for validity of wff and bf (the later
 # in the sense that is always 1). Also, what does it means for a spec to be valid?
-        | ("valid"         :valid_sym   __ normalize_cmd_arg) :valid_cmd
+        | ("valid"         :valid_sym   __ spec_arg)          :valid_cmd
 # TODO (HIGH) maybe we should also check for the validity of the wff and bf (the
 # later in the sense that is not always 0)
-        | ("sat"           :sat_sym     __ normalize_cmd_arg) :sat_cmd
-        | ("unsat"         :unsat_sym   __ normalize_cmd_arg) :unsat_cmd
+        | ("sat"           :sat_sym     __ spec_arg)          :sat_cmd
+        | ("unsat"         :unsat_sym   __ spec_arg)          :unsat_cmd
 # TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
 # a wff if possible.
-        | ("solve" :solve_sym [solve_options]  __ wff_cmd_arg):solve_cmd
-        | ("lgrs" :lgrs_sym __ wff_cmd_arg)    :lgrs_cmd
-        | (("r" | "run"):run_sym __ (history | wff))          :run_cmd
+        | ("solve":solve_sym [solve_options] __ wff_cmd_arg)  :solve_cmd
+        | ("lgrs" :lgrs_sym __ wff_cmd_arg)                   :lgrs_cmd
+        | (("r" | "run"):run_sym __ spec_arg)                 :run_cmd
         | (("n" | "normalize")
-                :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
+                  :normalize_sym __ spec_arg)                 :normalize_cmd
 # TODO (MEDIUM) maybe we could remove in the subst and inst commands the
 # possibility of using wff or bf as source expression as is kind of naive
 # to use them in this context. A more interesting feature would be to
@@ -232,7 +232,7 @@ wff_cmd_arg            => history | wff.
 nf_cmd_arg             => history | ref | wff | bf.
 onf_cmd_arg            => history | wff.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
-normalize_cmd_arg      => history | spec | ref | wff | bf.
+spec_arg               => history | spec | ref | wff | bf.
 # TODO (MEDIUM) check if could we only have one case?
 inst_args              =>
           wff_cmd_arg _ '[' _ bf      _ '/' _ bf_cmd_arg  _ ']'
@@ -278,8 +278,7 @@ fm_or_term     => wff | bf.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c, uconst, spec_part,
-        inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
-        normalize_cmd_arg,
+        inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg, spec_arg,
         uconst > uconst_name,
         wff > wff_parenthesis > wff,
         bf > bf_parenthesis > bf,

@@ -52,8 +52,8 @@ TEST_SUITE("syntactic_path_simplification") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
 		CHECK( matches_to_str_to_any_of(res, {
-			"x = 0 && (z != 0 || y = 0 && k = 0) || x = 0 && y = 0 || z = 0 && k = 0",
 			"x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0",
+			"x = 0 && (z != 0 || y = 0 && k = 0) || x = 0 && y = 0 || z = 0 && k = 0",
 			"x = 0 && (z != 0 || k = 0 && y = 0) || x = 0 && y = 0 || z = 0 && k = 0",
 		}) );
 	}
@@ -78,8 +78,8 @@ TEST_SUITE("syntactic_path_simplification") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>::on(fm);
 		CHECK( matches_to_str_to_any_of(res, {
-			"(ex b1 b1 = 0) && (ex b1 b1 != 0)",
 			"(ex b1 b1 != 0) && (ex b1 b1 = 0)",
+			"(ex b1 b1 = 0) && (ex b1 b1 != 0)",
 		}) );
 	}
 }
@@ -90,10 +90,10 @@ TEST_SUITE("simplify_using_equality") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			"yx|xz = 0",
 			"yx|zx = 0",
 			"xy|zx = 0",
 			"xy|xz = 0",
-			"yx|xz = 0",
 		}) );
 	}
 	TEST_CASE("2") {
@@ -125,6 +125,7 @@ TEST_SUITE("simplify_using_equality") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
 			"yx = 0 && wv = 0 && yw = 0 && xv = 0",
 			"yx = 0 && wv = 0 && yw = 0 && vx = 0",
 			"xy = 0 && vw = 0 && wy = 0 && vx = 0",
@@ -277,10 +278,10 @@ TEST_SUITE("boole_normal_form") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = boole_normal_form<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			"b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0",
 			"b'x'a|bxa' = 0 || b&(x'|a)|b'xa != 0",
 			"x'b'a|xba' = 0 || b&(x'|a)|xb'a != 0",
 			"a'xb|ax'b' = 0 || a&(x|b)|a'x'b != 0",
-			"b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0",
 		}) );
 	}
 	TEST_CASE("2") {
