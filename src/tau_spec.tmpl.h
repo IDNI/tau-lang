@@ -38,7 +38,7 @@ template <NodeType node>
 tref tau_spec<node>::get() {
 	auto fail = [&]() -> tref {
 		DBG(for (const auto& error : errors())
-		 	TAU_LOG_TRACE << "[tau] " << error << "\n";)
+		 	TAU_LOG_TRACE << "[tau] " << error;)
 		return nullptr;
 	};
 
@@ -52,10 +52,79 @@ tref tau_spec<node>::get() {
 
 	auto opts = get_options(); // transform to tau tree
 	tref spec = tau::get(tau_parser::tree::get(ptree), opts);
+	errors_.push_back("spec failed to transform to tau tree");
 	if (!spec) return fail();
 
-	DBG(TAU_LOG_TRACE << "getting spec: " << TAU_TO_STR(spec);)
+	using tt = tau::traverser;
+	tt t(spec);
+	tref main = main_ ? tau::get(tau::main, main_)
+			  : (t | tau::main | tt::ref);
+	trefs spec_defs = t | tau::definitions || tt::children || tt::refs;
+	if (defs_.size()) {
+		DBG(TAU_LOG_TRACE << "defs_ contain something: " << defs_.size();)
+		for (tref def : defs_) spec_defs.push_back(def);
+	}
+	if (spec_defs.size()) spec = tau::get(tau::spec,
+		tau::get(tau::definitions, spec_defs), main);
+	else spec = tau::get(tau::spec, main);
+	DBG(TAU_LOG_TRACE << "getting spec: " << TAU_LOG_FM_DUMP(spec);)
+
+	auto& defs = definitions<node>::instance();
+	auto result = infer_ba_types<node>(spec,
+		defs.get_global_scope(),
+		defs.get_definition_heads());
+	spec = result.first;
+	if (!spec) {
+		errors_.push_back("type inference failed");
+		return fail();
+	}
+	defs.get_io_context()->update_types(result.second);
+	defs.set_global_scope(result.second);
+	DBG(TAU_LOG_TRACE << "inferred spec: " << TAU_LOG_FM_DUMP(spec);)
+	spec = canonize_quantifier_ids<node>(tau::reget(spec));
+	if (!spec) {
+		errors_.push_back("simplification failed (reget)");
+		return fail();
+	}
+	DBG(TAU_LOG_TRACE << "simplified spec: " << TAU_LOG_FM_DUMP(spec);)
 	return spec;
+}
+
+template <NodeType node>
+bool tau_spec<node>::add(tref expr) {
+	if (expr == nullptr) return false;
+	DBG(TAU_LOG_TRACE << "add: " << TAU_LOG_FM_DUMP(expr);)
+	using tt = tau::traverser;
+	auto t = tt(expr);
+	auto nt = t || tt::nt;
+	auto add_def = [this](tref def) {
+		defs_.push_back(def);
+		DBG(TAU_LOG_TRACE << "def added: " << TAU_LOG_FM_DUMP(defs_.back());)
+	};
+	auto set_main = [this](tref main) {
+		if (main_) return false;
+		main_ = main;
+		DBG(TAU_LOG_TRACE << "main set: " << TAU_LOG_FM_DUMP(main_);)
+		return true;
+	};
+	switch (nt) {
+	case tau::spec:
+		if (tref wff = t | tau::main | tt::first | tt::ref; wff)
+			set_main(wff);
+		if (trefs defs = t | tau::definitions
+			|| tau::rec_relation || tt::refs; defs.size())
+				for (tref def : defs) add_def(def);
+		break;
+	case tau::bf:
+	case tau::wff:          set_main(expr); break;
+	case tau::input_def:
+	case tau::output_def:
+	case tau::rec_relation: add_def(expr); break;
+	default:
+		DBG(TAU_LOG_TRACE << "unknown node added: " << TAU_LOG_FM_DUMP(expr);)
+		DBG(assert(false);)
+	}
+	return true;
 }
 
 template <NodeType node>
@@ -68,7 +137,11 @@ std::optional<rr<node>> tau_spec<node>::get_nso_rr() {
 template <NodeType node>
 typename tree<node>::get_options tau_spec<node>::get_options() const {
 	auto& defs = definitions<node>::instance();
-	return typename tau::get_options{ .parse = { .start = tau::spec_multiline },
+	return typename tau::get_options{
+		.parse = { .start = tau::spec_multiline },
+		.infer_ba_types = true,
+		.use_default_types = false,
+		.reget_with_hooks = false,
 		.definition_heads = defs.get_definition_heads(),
 		.global_scope = defs.get_global_scope(),
 		.context = defs.get_io_context()
@@ -172,7 +245,7 @@ tref tau_spec<node>::build_parse_tree() {
 		for (tref c : ptree::get(parsed_[i]).children()) {
 			DBG(TAU_LOG_TRACE << "tau_spec::build_parse_tree spec part: " << ptree_to_str(c);)
 			if (tau::get(c).is(tau::main)) {
-				if (!main) { // first main found
+				if (!main_ && !main) { // first main found
 					main = c;
 				} else {
 					std::stringstream ss; ss
@@ -185,7 +258,7 @@ tref tau_spec<node>::build_parse_tree() {
 			} else defs.push_back(c);
 		}
 	}
-	if (errors_.empty() && !main) {
+	if (errors_.empty() && !main && !main_) {
 		errors_.push_back("No main formula");
 		DBG(TAU_LOG_TRACE << "definitions: " << defs.size();)
 		DBG(for (auto c : defs) TAU_LOG_TRACE << "def: " << LOG_FM_DUMP(c);)
@@ -196,8 +269,13 @@ tref tau_spec<node>::build_parse_tree() {
 		return { tau_parser::instance().literal(literal), { 0, 0 } };
 	};
 	auto spec = pnode(tau::spec);
-	if (defs.empty()) return ptree::get(spec, main); // only main formula
-	return ptree::get(spec, // with definitions
+	if (defs.empty()) {
+		if (!main) return ptree::get(spec); // nothing
+		else return ptree::get(spec, main); // only main formula
+	}
+	if (!main) return ptree::get(spec, // with definitions
+		ptree::get(pnode(tau::definitions), defs));
+	else return ptree::get(spec, // with definitions
 		ptree::get(pnode(tau::definitions), defs),
 		main);
 }
