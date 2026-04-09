@@ -472,7 +472,7 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 	HOOK_LOGGING(log("cte", v, ch, len, right);)
 	if (len == 1 && tau::get(ch[0]).is_ba_constant()) {
 		const auto& l = tau::get(ch[0]);
-		if (size_t typed = l.get_ba_type(); typed > 0) {
+		if (size_t typed = l.get_ba_type(); (!l.has_child()) && typed > 0) {
 			HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
 			if (node::ba::is_syntactic_zero(l.get_ba_constant())) {
 				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
