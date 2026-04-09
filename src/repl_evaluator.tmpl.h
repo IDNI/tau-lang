@@ -164,19 +164,58 @@ tref repl_evaluator<BAs...>::get_any(tref arg) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::get_applied(tref arg) const {
+	// create a spec from the arg and add io and rr defs
+	tau_spec<node> spec;
+	spec.add(arg);
+	for (tref d : rr_defs) spec.add(d);
+	for (tref d : io_defs) spec.add(d);
+	auto maybe_nso_rr = spec.get_nso_rr();
+	if (!maybe_nso_rr) {
+		DBG(TAU_LOG_TRACE << "nso_rr has no value";)
+		for (const auto& err : spec.errors()) {
+			TAU_LOG_ERROR << err;
+		}
+		return nullptr;
+	}
+	tref main = maybe_nso_rr.value().main->get();
+	if (!main) {
+		DBG(TAU_LOG_TRACE << "main is nullptr";)
+		return nullptr;
+	}
+	// add defs to global definitions:
+	auto& defs = definitions<node>::instance();
+	for (rewriter::rule& r : maybe_nso_rr.value().rec_relations) {
+		defs.add(r.first, r.second);
+		DBG(TAU_LOG_TRACE << "added def to globals: " << TAU_LOG_RULE(r);)
+	}
+	tref applied = apply_rr_to_formula(maybe_nso_rr.value());
+	// tref applied = tau_api::apply_defs(main);
+	DBG(TAU_LOG_TRACE << "applied: " << TAU_LOG_FM_DUMP(applied);)
+	return applied;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::optional<std::pair<size_t, tref>>
 	repl_evaluator<BAs...>::get_type_and_arg(const tt& n) const
 {
 	auto nt = n | tt::nt;
+	tref r = nullptr;
+	DBG(TAU_LOG_TRACE << "get_type_and_arg: " << TAU_LOG_NT(nt);)
+	DBG(TAU_LOG_TRACE << "arg: " << TAU_LOG_FM_DUMP(n | tt::ref);)
 	switch (nt) {
-	case tau::history:
-		if (auto check = history_retrieve(n); check) {
-			auto [value, _] = check.value();
-			auto mem_type = tt(value) | tt::nt;
-			return { { mem_type, value->get() } };
-		} else return {};
-	default: return { std::pair<size_t, tref>{ nt, n | tt::ref } };
+		case tau::history:
+			if (auto check = history_retrieve(n); check) {
+				auto [value, _] = check.value();
+				nt = tt(value) | tt::nt;
+				r = value->get();
+				break;
+			} else return {};
+		default: r = n | tt::ref;
 	}
+	r = get_applied(r);
+	return { { tau::get(r).get_type(), r } };
 }
 
 template <typename... BAs>
@@ -268,6 +307,7 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
+	// DBG(TAU_LOG_TRACE << "subst_cmd" << LOG_FM_DUMP(n.value());)
 	tref arg1 = n | tt::second | tt::ref;
 	tref arg2 = n | tt::third  | tt::ref;
 	tref arg3 = n | tt::fourth | tt::ref;
@@ -282,6 +322,12 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	if (in) { // BF substitution
 		tref thiz = get_bf(arg2), with = get_bf(arg3);
 		if (!in || !thiz || !with) return invalid_argument();
+		// strip bf of variables so we match also quantifiers
+		if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
+			thiz = tau::trim(thiz),	with = tau::trim(with);
+		// DBG(TAU_LOG_TRACE << "bf in:   " << TAU_LOG_FM_DUMP(in);)
+		// DBG(TAU_LOG_TRACE << "thiz:    " << TAU_LOG_FM_DUMP(thiz);)
+		// DBG(TAU_LOG_TRACE << "with:    " << TAU_LOG_FM_DUMP(with);)
 		tref r = tau_api::substitute(m, in, thiz, with);
 		return benchmarks(m), r;
 	}
@@ -296,6 +342,12 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
+	// strip bf of variables so we match also quantifiers
+	if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
+		thiz = tau::trim(thiz),	with = tau::trim(with);
+	// DBG(TAU_LOG_TRACE << "wff in: " << TAU_LOG_FM_DUMP(in);)
+	// DBG(TAU_LOG_TRACE << "thiz:   " << TAU_LOG_FM_DUMP(thiz);)
+	// DBG(TAU_LOG_TRACE << "with:   " << TAU_LOG_FM_DUMP(with);)
 	tref r = tau_api::substitute(m, in, thiz, with);
 	return benchmarks(m), r;
 }
@@ -303,6 +355,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::inst_cmd(const tt& n) {
+	// DBG(TAU_LOG_TRACE << "inst_cmd" << LOG_FM_DUMP(n.value());)
 	const auto& t = n.value_tree();
 	if (!t[2][0].is(tau::variable)) {
 		TAU_LOG_ERROR << "Invalid argument\n";
@@ -354,7 +407,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	t.start();
 
 	DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
-	value = tau_api::infer(m.part(), value);
+	value = tau_api::simplify(m.part(), value);
 	DBG(TAU_LOG_TRACE << "run_cmd/simplified: " << TAU_LOG_FM(value);)
 
 	auto maybe_i = tau_api::get_interpreter(m.part(), value);
@@ -512,21 +565,25 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
-	// TODO this should be stored anytime rec rel is parsed ?
-	auto& defs = definitions<node>::instance();
-	size_t idx = defs.add(tau::geth(n[0][0]), tau::geth(n[0][1]));
-	std::cout << "[" << idx + 1 << "] " << to_str<node>(defs[idx]) << "\n";
+	rr_defs.push_back(n | tt::first | tt::ref);
+	size_t idx = rr_defs.size() - 1;
+	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(rr_defs[idx]) << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_list_cmd() {
 	auto& defs = definitions<node>::instance();
-	if (defs.size() == 0) std::cout << "Definitions: empty\n";
+	if (rr_defs.empty()) std::cout << "Definitions: empty\n";
 	else std::cout << "Definitions:\n";
-	for (size_t i = 0; i < defs.size(); i++)
+	for (size_t i = 0; i < rr_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< to_str<node>(defs[i]) << "\n";
+			<< TAU_TO_STR(rr_defs[i]) << "\n";
+	if (io_defs.empty()) std::cout << "Streams: empty\n";
+	else std::cout << "Streams:\n";
+	for (size_t i = 0; i < io_defs.size(); i++)
+		std::cout << "    [" << i + 1 << "] "
+			<< TAU_TO_STR(io_defs[i]) << "\n";
 	std::cout << *defs.get_io_context();
 }
 
@@ -536,9 +593,8 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	auto num = command | tau::num;
 	if (!num) return;
 	auto i = num | tt::num;
-	const auto& defs = definitions<node>::instance();
-	if (i && i <= defs.size()) {
-		print<node>(std::cout, defs[i-1]) << "\n";
+	if (i && i <= rr_defs.size()) {
+		std::cout << TAU_TO_STR(rr_defs[i-1]) << "\n";
 		return;
 	}
 	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
@@ -547,22 +603,18 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::def_input_cmd(const tt& /*command*/) {
-	// auto& defs = definitions<node>::instance();
-	// if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_input_defs())) {
-	// 	error = true;
-	// 	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
-	// }
+void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
+	io_defs.push_back(n | tt::first | tt::ref);
+	size_t idx = io_defs.size() - 1;
+	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(io_defs[idx]) << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::def_output_cmd(const tt& /*command*/) {
-	// auto& defs = definitions<node>::instance();
-	// if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_output_defs())){
-	// 	error = true;
-	// 	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
-	// }
+void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
+	io_defs.push_back(n | tt::first | tt::ref);
+	size_t idx = io_defs.size() - 1;
+	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(io_defs[idx]) << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -594,7 +646,7 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	typename tau::get_options opts = {
 		.infer_ba_types = true,
 		.use_default_types = false,
-		.reget_with_hooks = true,
+		.reget_with_hooks = false,
 		.definition_heads = defs.get_definition_heads(),
 		.global_scope = defs.get_global_scope(),
 		.context = defs.get_io_context()

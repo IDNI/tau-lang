@@ -157,6 +157,7 @@ private:
 	std::optional<size_t> get_history_index(const tt& n, const size_t size,
 						bool silent = false) const;
 
+	tref get_applied(tref arg) const;
 	// get argument and type from input or from history
 	std::optional<std::pair<size_t, tref>> get_type_and_arg(
 		const tt& n) const;
@@ -173,6 +174,8 @@ private:
 
 	std::vector<history> H;
 	options opt{};
+	trefs rr_defs;
+	trefs io_defs;
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 	bool error = false;
