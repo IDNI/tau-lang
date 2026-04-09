@@ -20,6 +20,8 @@ Building scripts run cmake with different options. Additional script options pro
 - `debug [<CMAKE_OPTIONS>]`, `release [<CMAKE_OPTIONS>]` and `relwithdebinfo [<CMAKE_OPTIONS>]` call `build` script with `Debug`, `Release`, `RelWithDebInfo` BUILD_TYPE respectively
 - `w64-debug [<CMAKE_OPTIONS>]` and `w64-release [<CMAKE_OPTIONS>]` build for windows using mingw-w64
 - `boost-mingw` builds boost for windows using mingw-w64 (a prerequisite for `w64-debug` and `w64-release`)
+- `binding <BIND_LANG>` builds binding for BIND_LANG. Currently, only `python` is supported.
+- `dep-boost` and `dep-cvc5` build Boost and CVC5 dependencies.
 
 ### Building with clang compiler
 
@@ -38,6 +40,7 @@ Building scripts run cmake with different options. Additional script options pro
 
 - `benchmark [<CMAKE_OPTIONS>]` calls `build` script with `RelWithDebInfo` BUILD_TYPE
 - `save-benchmarks` moves benchmark results to `tests/benchmark/data` directory
+- `bench [<OPTIONS>] [<PROFILE>]` benchmarks fixture specs and stores measuring into PROFILE 
 
 ## Coverage
 
@@ -52,10 +55,16 @@ Packages are created in `build-Release/packages` directory.
 
 ## Testing
 
-- `test-debug` runs ctest with `Debug` BUILD_TYPE
-- `test-release` runs ctest with `Release` BUILD_TYPE
+- `test <TEST_NAME>` compiles a required type of tests and runs the test TEST_NAME
+- `test-debug` compiles all tests with `Debug` BUILD_TYPE and runs ctest
+- `test-release` compiles all tests with  `Release` BUILD_TYPE and runs ctest
 - `test-relwithdebinfo` runs ctest with `RelWithDebInfo` BUILD_TYPE
 - `test-wine` runs tests with wine
+
+## Debugging
+
+- `gdb-tau [<TAU_OPTIONS>]` compiles tau and runs it in gdb debugger
+- `gdb <TEST_NAME>` compiles a required type of tests and runs the test TEST_NAME in gdb debugger
 
 ## Docker
 
