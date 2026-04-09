@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./dev build Debug $@
+./dev build Debug "$@"
