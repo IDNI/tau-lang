@@ -10,7 +10,21 @@ add_library(doctest INTERFACE)
 target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
-add_link_options("-flto")
+function(add test_name)
+	# message(STATUS "adding test: ${test_name}")
+	set(N "${test_name}")
+	add_executable(${N} "${N}.cpp")
+	target_setup(${N})
+	target_include_directories(${N} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest cvc5::cvc5)
+	add_dependencies(${N} tau_header)
+	target_compile_options(${N} PUBLIC -Wno-unused-function)
+	target_compile_definitions_if(${N} PUBLIC TAU_LOG_TRACE_TESTS)
+	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
+	set_tests_properties(${N}
+		PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+		ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$LD_LIBRARY_PATH")
+endfunction()
 
 #
 # Integration testing
