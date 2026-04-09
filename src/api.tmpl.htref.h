@@ -166,11 +166,6 @@ htref api<node>::nnf(htref expr) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-htref api<node>::simplify(htref expr) {
-	return tau::geth(simplify(expr->get()));
-}
-
-template <NodeType node>
 htref api<node>::syntactic_term_simplification(htref term) {
 	return tau::geth(syntactic_term_simplification(term->get()));
 }
@@ -249,6 +244,11 @@ std::optional<std::map<htref, htref>> api<node>::lgrs(htref equation) {
 	if (auto solution = lgrs(equation->get()); solution)
 		return geth(solution.value());
 	return {};
+}
+
+template <NodeType node>
+htref api<node>::simplify(htref expr, bool use_defaults) {
+	return tau::geth(simplify(expr->get(), use_defaults));
 }
 
 } // namespace idni::tau_lang
