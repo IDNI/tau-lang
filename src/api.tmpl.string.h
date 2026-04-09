@@ -125,13 +125,6 @@ std::optional<std::string> api<node>::nnf(const std::string& expr) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-std::optional<std::string> api<node>::simplify(const std::string& expr) {
-	if (tref e = get_formula_or_term(expr); e)
-		if (tref s = simplify(e); s) return to_str(s);
-	return {};
-}
-
-template <NodeType node>
 std::optional<std::string> api<node>::syntactic_term_simplification(
 	const std::string& term)
 {
@@ -423,6 +416,15 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	}
 
 	return outputs;
+}
+
+template <NodeType node>
+std::optional<std::string> api<node>::simplify(const std::string& expr,
+	bool use_defaults)
+{
+	if (tref e = get_formula_or_term(expr); e)
+		if (tref s = simplify(e, use_defaults); s) return to_str(s);
+	return {};
 }
 
 } // namespace idni::tau_lang

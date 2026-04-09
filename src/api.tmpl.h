@@ -263,7 +263,7 @@ tref api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
 
 template <NodeType node>
 tref api<node>::boole_normal_form(tref expr) {
-	expr = infer(expr);
+	expr = simplify(expr);
 	if (!expr) return nullptr;
 	if (tref a = apply_all_defs(expr); a)
 		return tau_lang::boole_normal_form<node>(a);
@@ -272,7 +272,7 @@ tref api<node>::boole_normal_form(tref expr) {
 
 template <NodeType node>
 tref api<node>::dnf(tref expr) {
-	expr = infer(expr);
+	expr = simplify(expr);
 	if (!expr) return nullptr;
 	tref a = apply_all_defs(expr);
 	if (a) {
@@ -287,7 +287,7 @@ tref api<node>::dnf(tref expr) {
 
 template <NodeType node>
 tref api<node>::cnf(tref expr) {
-	expr = infer(expr);
+	expr = simplify(expr);
 	if (!expr) return nullptr;
 	tref a = apply_all_defs(expr);
 	if (a) {
@@ -302,7 +302,7 @@ tref api<node>::cnf(tref expr) {
 
 template <NodeType node>
 tref api<node>::nnf(tref expr) {
-	expr = infer(expr);
+	expr = simplify(expr);
 	if (!expr) return nullptr;
 	tref a = apply_all_defs(expr);
 	if (a) {
@@ -319,23 +319,15 @@ tref api<node>::nnf(tref expr) {
 // ------------------------------------------------------------
 
 template <NodeType node>
-tref api<node>::simplify(tref expr) {
-	if (!expr) return nullptr;
-	expr = canonize_quantifier_ids<node>(tau::reget(expr));
-	DBG(TAU_LOG_TRACE << "simplified: " << LOG_FM_DUMP(expr);)
-	return expr;
-}
-
-template <NodeType node>
 tref api<node>::syntactic_term_simplification(tref term) {
-	term = infer(term);
+	term = simplify(term);
 	if (!term) return nullptr;
 	return syntactic_path_simplification<node>::on(term);
 }
 
 template <NodeType node>
 tref api<node>::syntactic_formula_simplification(tref fm) {
-	fm = infer(fm);
+	fm = simplify(fm);
 	if (!fm) return nullptr;
 	return tau_lang::syntactic_formula_simplification<node>(fm);
 }
@@ -356,7 +348,7 @@ tref api<node>::normalize_formula(tref fm) {
 	std::cout << *defs.get_io_context();
 #endif
 
-	fm = infer(fm);
+	fm = simplify(fm);
 	if (!fm) return nullptr;
 	auto maybe_nso_rr = get_nso_rr(fm);
 	if (!maybe_nso_rr || !maybe_nso_rr.value().main
@@ -369,7 +361,7 @@ template <NodeType node>
 tref api<node>::normalize_term(tref term) {
 	if (!term) return nullptr;
 	DBG(TAU_LOG_TRACE << "normalize_term(): " << LOG_FM_DUMP(term);)
-	term = infer(term);
+	term = simplify(term);
 	if (!term) return nullptr;
 	DBG(TAU_LOG_TRACE << "inferred term: " << LOG_FM_DUMP(term);)
 	auto maybe_nso_rr = get_nso_rr(term);
@@ -385,7 +377,7 @@ tref api<node>::normalize_term(tref term) {
 template <NodeType node>
 tref api<node>::anti_prenex(tref fm) {
 	if (!fm) return nullptr;
-	fm = infer(fm);
+	fm = simplify(fm);
 	if (!fm) return nullptr;
 	return tau_lang::anti_prenex<node>(fm);
 }
@@ -393,7 +385,7 @@ tref api<node>::anti_prenex(tref fm) {
 template <NodeType node>
 tref api<node>::eliminate_quantifiers(tref fm) {
 	if (!fm) return nullptr;
-	fm = infer(fm);
+	fm = simplify(fm);
 	if (!fm) return nullptr;
 	if (tref a = apply_all_defs(fm); a)
 		return resolve_quantifiers<node>(tau_lang::anti_prenex<node>(a));
@@ -402,7 +394,7 @@ tref api<node>::eliminate_quantifiers(tref fm) {
 
 template <NodeType node>
 bool api<node>::realizable(tref fm) {
-	fm = infer(fm);
+	fm = simplify(fm);
 	return fm && is_formula(fm)
 		&& is_tau_formula_sat<node>(normalize_formula(fm), 0, true);
 }
@@ -414,7 +406,7 @@ bool api<node>::unrealizable(tref fm) {
 
 template <NodeType node>
 bool api<node>::sat(tref fm) {
-	fm = infer(fm);
+	fm = simplify(fm);
 	return fm && has_no_boolean_combs_of_models<node>(fm) && realizable(fm);
 }
 
@@ -425,13 +417,13 @@ bool api<node>::unsat(tref fm) {
 
 template <NodeType node>
 bool api<node>::valid(tref fm) {
-	fm = infer(fm);
+	fm = simplify(fm);
 	return fm && has_no_boolean_combs_of_models<node>(fm) && valid_spec(fm);
 }
 
 template <NodeType node>
 bool api<node>::valid_spec(tref fm) {
-	fm = infer(fm);
+	fm = simplify(fm);
 	return fm && is_tau_impl<node>(tau::_T(), normalize_formula(fm));
 }
 
@@ -443,7 +435,7 @@ template <NodeType node>
 std::optional<subtree_map<node, tref>> api<node>::solve(
 	tref fm, solver_mode mode)
 {
-	fm = infer(fm);
+	fm = simplify(fm);
 	if (!fm) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
 		return {};
@@ -478,7 +470,7 @@ std::optional<subtree_map<node, tref>> api<node>::solve(
 template <NodeType node>
 std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 	using tt = tau::traverser;
-	equation = infer(equation);
+	equation = simplify(equation);
 	tref a = apply_all_defs(equation);
 	if (!a) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
@@ -584,8 +576,6 @@ template <NodeType node>
 tref api<node>::infer(tref expr, bool use_defaults) {
 	if (!expr) return nullptr;
 
-	expr = simplify(expr);
-
 	auto& defs = definitions<node>::instance();
 	auto result = infer_ba_types<node>(expr,
 		defs.get_global_scope(),
@@ -617,6 +607,16 @@ tref api<node>::infer(tref expr, bool use_defaults) {
 	std::cout << *defs.get_io_context();
 #endif
 	return inferred;
+}
+
+template <NodeType node>
+tref api<node>::simplify(tref expr, bool use_defaults) {
+	if (!expr) return nullptr;
+	expr = infer(expr, use_defaults);
+	if (!expr) return nullptr;
+	expr = canonize_quantifier_ids<node>(tau::reget(expr));
+	DBG(TAU_LOG_TRACE << "simplified: " << LOG_FM_DUMP(expr);)
+	return expr;
 }
 
 } // namespace idni::tau_lang

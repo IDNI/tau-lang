@@ -189,11 +189,6 @@ struct api {
 
 	// Procedures
 	// ------------------------------------------------------------
-	// Applies local simplifications like 1 & 0 := 0
-	// calls syntactic_formula_simplification
-	static optional_string simplify(const std::string& expression);
-	static tref simplify(tref expression);
-	static htref simplify(htref expression);
 
 	// Applies cheap non-local simplifications like symbolic clause contradiction
 	static optional_string syntactic_term_simplification(
@@ -294,6 +289,12 @@ struct api {
 
 	// simplification and inference
 	static tref infer(tref expr, bool use_defaults = true);
+	// Applies local simplifications like 1 & 0 := 0
+	// calls syntactic_formula_simplification
+	static optional_string simplify(const std::string& expr,
+						bool use_defaults = true);
+	static tref simplify(tref expr, bool use_defaults = true);
+	static htref simplify(htref expr, bool use_defaults = true);
 
 	// with measuring
 	// --------------
@@ -382,11 +383,6 @@ struct api {
 	static optional_string nnf(measuring& m, const std::string& expression);
 	static tref nnf(measuring& m, tref expression);
 	static htref nnf(measuring& m, htref expression);
-
-	static optional_string simplify(measuring& m,
-		const std::string& expression);
-	static tref simplify(measuring& m, tref expression);
-	static htref simplify(measuring& m, htref expression);
 
 	static optional_string syntactic_term_simplification(
 		measuring& m, const std::string& term);
@@ -495,6 +491,11 @@ struct api {
 		interpreter<node>& i);
 
 	static tref infer(measuring& m, tref expr, bool use_defaults = true);
+	static optional_string simplify(measuring& m, const std::string& expr,
+						bool use_defaults = true);
+	static tref simplify(measuring& m, tref expr, bool use_defaults = true);
+	static htref simplify(measuring& m, htref expr, bool use_defaults = true);
+
 private:
 	static std::optional<rr<node>> get_nso_rr(tref expr);
 };
