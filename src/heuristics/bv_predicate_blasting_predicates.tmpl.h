@@ -5,6 +5,13 @@
 namespace idni::tau_lang {
 
 // Custom factory methods for creating rules and rr's.
+/**
+ * @brief Creates a rewriter rule from a head and body term.
+ * @tparam node Node type
+ * @param head The head of the rule
+ * @param body The body of the rule
+ * @return The constructed rewriter rule
+ */
 template<NodeType node>
 inline static rewriter::rule make_rule(tref head, tref body) {
 	using tau = tree<node>;
@@ -12,6 +19,13 @@ inline static rewriter::rule make_rule(tref head, tref body) {
 	return rewriter::rule(tau::geth(head), tau::geth(body));
 }
 
+/**
+ * @brief Creates a recurrence relation (rr) from rules and a main term.
+ * @tparam node Node type
+ * @param rules The set of rules
+ * @param main The main term
+ * @return The constructed recurrence relation
+ */
 template<NodeType node>
 static rr<node> make_rr(const rewriter::rules& rules, tref main) {
 	using tau = tree<node>;
@@ -20,6 +34,16 @@ static rr<node> make_rr(const rewriter::rules& rules, tref main) {
 }
 
 // Helper functions to create calls to the bitblasting recurrence functions and relations.
+
+/**
+ * @brief Creates a call to the indexed bitvector addition recurrence.
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @param index Index for the recurrence
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvadd_call_with_index(tref left, tref right, tref result, size_t index) {
 	using tau = tree<node>;
@@ -27,6 +51,15 @@ static tref make_bvadd_call_with_index(tref left, tref right, tref result, size_
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvadd", { index }, { left, right, result })));
 }
 
+/**
+ * @brief Creates a call to the offset bitvector addition recurrence.
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @param offset Offset for the recurrence
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvadd_call(tref left, tref right, tref result, tref offset) {
 	using tau = tree<node>;
@@ -34,6 +67,14 @@ static tref make_bvadd_call(tref left, tref right, tref result, tref offset) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvadd", { offset }, { left, right, result })));
 }
 
+/**
+ * @brief Creates a call to the bitvector addition recurrence (no offset).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvadd_call(tref left, tref right, tref result) {
 	using tau = tree<node>;
@@ -41,6 +82,15 @@ static tref make_bvadd_call(tref left, tref right, tref result) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvadd", { left, right, result })));
 }
 
+/**
+ * @brief Creates a call to the indexed bitvector subtraction recurrence.
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @param index Index for the recurrence
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvsub_call_with_index(tref left, tref right, tref result, size_t index) {
 	using tau = tree<node>;
@@ -48,6 +98,15 @@ static tref make_bvsub_call_with_index(tref left, tref right, tref result, size_
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvsub", { index }, { left, right, result })));
 }
 
+/**
+ * @brief Creates a call to the offset bitvector subtraction recurrence.
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @param offset Offset for the recurrence
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvsub_call(tref left, tref right, tref result, tref offset) {
 	using tau = tree<node>;
@@ -55,6 +114,14 @@ static tref make_bvsub_call(tref left, tref right, tref result, tref offset) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvsub", { offset }, { left, right, result })));
 }
 
+/**
+ * @brief Creates a call to the bitvector subtraction recurrence (no offset).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvsub_call(tref left, tref right, tref result) {
 	using tau = tree<node>;
@@ -62,6 +129,13 @@ static tref make_bvsub_call(tref left, tref right, tref result) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvsub", { left, right, result })));
 }
 
+/**
+ * @brief Creates a call to the bitvector shift-left-by-one recurrence.
+ * @tparam node Node type
+ * @param operand Operand to shift
+ * @param shifted Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvshl_by_one_call(tref operand,  tref shifted) {
 	using tau = tree<node>;
@@ -69,6 +143,13 @@ static tref make_bvshl_by_one_call(tref operand,  tref shifted) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshl_by_one", { operand, shifted })));
 }
 
+/**
+ * @brief Creates a call to the bitvector right-shift-by-one recurrence.
+ * @tparam node Node type
+ * @param operand Operand to shift
+ * @param shifted Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvrhl_by_one_call(tref operand, tref shifted) {
 	using tau = tree<node>;
@@ -76,6 +157,14 @@ static tref make_bvrhl_by_one_call(tref operand, tref shifted) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl_by_one", { operand, shifted })));
 }
 
+/**
+ * @brief Creates a call to the bitvector multiplication recurrence (constant right operand).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand (constant)
+ * @param result Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvmul_call(tref left, size_t right, tref result) {
 	using tau = tree<node>;
@@ -83,6 +172,14 @@ static tref make_bvmul_call(tref left, size_t right, tref result) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvmul", { right }, { left, result })));
 }
 
+/**
+ * @brief Creates a call to the bitvector multiplication recurrence.
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvmul_call(tref left, tref right, tref result) {
 	using tau = tree<node>;
@@ -90,6 +187,15 @@ static tref make_bvmul_call(tref left, tref right, tref result) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmul", { left, right, result })));
 }
 
+/**
+ * @brief Creates a call to the euclidean division recurrence.
+ * @tparam node Node type
+ * @param dividend Dividend
+ * @param divisor Divisor
+ * @param quotient Quotient variable
+ * @param remainder Remainder variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_euclidean_division_call(tref dividend, tref divisor, tref quotient, tref remainder) {
 	using tau = tree<node>;
@@ -97,6 +203,14 @@ static tref make_euclidean_division_call(tref dividend, tref divisor, tref quoti
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_euclidean_division", { dividend, divisor, quotient, remainder })));
 }
 
+/**
+ * @brief Creates a call to the bitvector division recurrence.
+ * @tparam node Node type
+ * @param dividend Dividend
+ * @param divisor Divisor
+ * @param result Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvdiv_call(tref dividend, tref divisor, tref result) {
 	using tau = tree<node>;
@@ -104,6 +218,14 @@ static tref make_bvdiv_call(tref dividend, tref divisor, tref result) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvdiv", { dividend, divisor, result })));
 }
 
+/**
+ * @brief Creates a call to the bitvector modulo recurrence.
+ * @tparam node Node type
+ * @param dividend Dividend
+ * @param divisor Divisor
+ * @param result Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvmod_call(tref dividend, tref divisor, tref result) {
 	using tau = tree<node>;
@@ -111,6 +233,14 @@ static tref make_bvmod_call(tref dividend, tref divisor, tref result) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmod", { dividend, divisor, result })));
 }
 
+/**
+ * @brief Creates a call to the bitvector shift-left recurrence (constant shift).
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param right Shift amount (constant)
+ * @param result Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvshl_call(tref left, tref right /* bv constant */, tref result) {
 	using tau = tree<node>;
@@ -120,6 +250,14 @@ static tref make_bvshl_call(tref left, tref right /* bv constant */, tref result
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshl", { left, right, result })));
 }
 
+/**
+ * @brief Creates a call to the bitvector right-shift recurrence (constant shift).
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param right Shift amount (constant)
+ * @param result Result variable
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvrhl_call(tref left, tref right /* bv copnstant */, tref result) {
 	using tau = tree<node>;
@@ -129,6 +267,13 @@ static tref make_bvrhl_call(tref left, tref right /* bv copnstant */, tref resul
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl", { left, right, result })));
 }
 
+/**
+ * @brief Creates a call to extract a specific bit from an operand (by index).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit index
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bit_call(tref operand, size_t bit) {
 	using tau = tree<node>;
@@ -136,6 +281,13 @@ static tref make_bit_call(tref operand, size_t bit) {
 	return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_rr_ref("_bit", bit, { operand })));
 }
 
+/**
+ * @brief Creates a call to extract a specific bit from an operand (by tref).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit tref
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bit_call(tref operand, tref bit) {
 	using tau = tree<node>;
@@ -143,6 +295,13 @@ static tref make_bit_call(tref operand, tref bit) {
 	return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_rr_ref("_bit", { bit }, { operand })));
 }
 
+/**
+ * @brief Creates a call to check if a specific bit is zero (by index).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit index
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_is_bit_zero_call(tref operand, size_t bit) {
 	using tau = tree<node>;
@@ -150,6 +309,13 @@ static tref make_is_bit_zero_call(tref operand, size_t bit) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_zero", bit, { operand })));
 }
 
+/**
+ * @brief Creates a call to check if a specific bit is zero (by tref).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit tref
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_is_bit_zero_call(tref operand, tref bit) {
 	using tau = tree<node>;
@@ -157,6 +323,13 @@ static tref make_is_bit_zero_call(tref operand, tref bit) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_zero", { bit }, { operand })));
 }
 
+/**
+ * @brief Creates a call to check if a specific bit is one (by index).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit index
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_is_bit_one_call(tref operand, size_t bit) {
 	using tau = tree<node>;
@@ -164,6 +337,13 @@ static tref make_is_bit_one_call(tref operand, size_t bit) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_one", bit, { operand })));
 }
 
+/**
+ * @brief Creates a call to check if a specific bit is one (by tref).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit tref
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_is_bit_one_call(tref operand, tref bit) {
 	using tau = tree<node>;
@@ -171,6 +351,14 @@ static tref make_is_bit_one_call(tref operand, tref bit) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_one", { bit }, { operand })));
 }
 
+/**
+ * @brief Creates a call to the bitvector less-than recurrence (by index).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param offset Offset (index)
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvlt_call(tref left, tref right, size_t offset) {
 	using tau = tree<node>;
@@ -178,6 +366,14 @@ static tref make_bvlt_call(tref left, tref right, size_t offset) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvlt", offset, { left, right })));
 }
 
+/**
+ * @brief Creates a call to the bitvector less-than recurrence (by tref offset).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param offset Offset (tref)
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvlt_call(tref left, tref right, tref offset) {
 	using tau = tree<node>;
@@ -185,6 +381,14 @@ static tref make_bvlt_call(tref left, tref right, tref offset) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvlt", {offset}, { left, right })));
 }
 
+/**
+ * @brief Creates a call to the bitvector greater-than recurrence (by index).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param offset Offset (index)
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvgt_call(tref left, tref right, size_t offset) {
 	using tau = tree<node>;
@@ -192,6 +396,14 @@ static tref make_bvgt_call(tref left, tref right, size_t offset) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvgt", offset, { left, right })));
 }
 
+/**
+ * @brief Creates a call to the bitvector greater-than recurrence (by tref offset).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param offset Offset (tref)
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvgt_call(tref left, tref right, tref offset) {
 	using tau = tree<node>;
@@ -203,6 +415,15 @@ static tref make_bvgt_call(tref left, tref right, tref offset) {
 // cases (bvadd,...).
 
 // addition(x, y) = addition(x ^ y, (x & y) << 1, m) mod m;
+/**
+ * @brief Returns the rules for bitvector addition recurrence.
+ *
+ * Generates the base and general case rules for bitvector addition.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The set of rules for addition
+ */
 template<NodeType node>
 static rewriter::rules bvadd_rules(size_t bitwidth) {
 	using tau = tree<node>;
@@ -234,6 +455,15 @@ static rewriter::rules bvadd_rules(size_t bitwidth) {
 }
 
 // subtraction(x,y) = subtraction(x ^ y, (~x & y) << 1, m) mod m;
+/**
+ * @brief Returns the rules for bitvector subtraction recurrence.
+ *
+ * Generates the base and general case rules for bitvector subtraction.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The set of rules for subtraction
+ */
 template<NodeType node>
 static rewriter::rules bvsub_rules(size_t bitwidth) {
 	using tau = tree<node>;
@@ -262,6 +492,15 @@ static rewriter::rules bvsub_rules(size_t bitwidth) {
 	return rules;
 }
 
+/**
+ * @brief Returns the rule for bitvector shift-left-by-one recurrence.
+ *
+ * The rightmost bit is zero, the rest are shifted.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operand
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 	using tau = tree<node>;
@@ -283,6 +522,15 @@ static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 	return make_rule<node>(header, body);
 }
 
+/**
+ * @brief Returns the rule for bitvector right-shift-by-one recurrence.
+ *
+ * The leftmost bit is zero, the rest are shifted.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operand
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
 	using tau = tree<node>;
@@ -304,6 +552,16 @@ static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
 	return make_rule<node>(header, body);
 }
 
+/**
+ * @brief Returns the rule for bitvector multiplication recurrence.
+ *
+ * Handles multiplication by constant right operand.
+ *
+ * @tparam node Node type
+ * @param y Right operand (constant)
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvmul_rec_rule(tref y /* cvc5 constant */, size_t bitwidth) {
 	using tau = tree<node>;
@@ -349,6 +607,15 @@ static rewriter::rule bvmul_rec_rule(tref y /* cvc5 constant */, size_t bitwidth
 	return make_rule<node>(even_right, even_body);
 }
 
+/**
+ * @brief Returns the rules for bitvector less-than recurrence.
+ *
+ * Generates the base and general case rules for bitvector less-than.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The set of rules for less-than
+ */
 template<NodeType node>
 static rewriter::rules bvlt_rules(size_t bitwidth) {
 	using tau = tree<node>;
@@ -379,6 +646,15 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
 	return rules;
 }
 
+/**
+ * @brief Returns the rule for bitvector less-than recurrence.
+ *
+ * Applies the rules to construct the main predicate.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvlt_rule(size_t bitwidth) {
 	using tau = tree<node>;
@@ -397,6 +673,15 @@ static rewriter::rule bvlt_rule(size_t bitwidth) {
 	return make_rule<node>(main, body);
 }
 
+/**
+ * @brief Returns the rules for bitvector greater-than recurrence.
+ *
+ * Generates the base and general case rules for bitvector greater-than.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The set of rules for greater-than
+ */
 template<NodeType node>
 static rewriter::rules bvgt_rules(size_t bitwidth) {
 	using tau = tree<node>;
@@ -427,6 +712,15 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 	return rules;
 }
 
+/**
+ * @brief Returns the rule for bitvector greater-than recurrence.
+ *
+ * Applies the rules to construct the main predicate.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvgt_rule(size_t bitwidth) {
 	using tau = tree<node>;
@@ -445,6 +739,14 @@ static rewriter::rule bvgt_rule(size_t bitwidth) {
 	return make_rule<node>(main, body);
 }
 
+/**
+ * @brief Returns the rule for extracting a bit from a bitvector.
+ *
+ * @tparam node Node type
+ * @param bit Bit index
+ * @param bitwidth Bitwidth of the operand
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bit_rule(size_t bit, size_t bitwidth) {
 	using tau = tree<node>;
@@ -460,6 +762,14 @@ static rewriter::rule bit_rule(size_t bit, size_t bitwidth) {
 	return make_rule<node>(head, body);
 }
 
+/**
+ * @brief Returns the rule for checking if a bit is zero in a bitvector.
+ *
+ * @tparam node Node type
+ * @param bit Bit index
+ * @param bitwidth Bitwidth of the operand
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
 	using tau = tree<node>;
@@ -475,6 +785,14 @@ static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
 	return make_rule<node>(head, body);
 }
 
+/**
+ * @brief Returns the rule for checking if a bit is one in a bitvector.
+ *
+ * @tparam node Node type
+ * @param bit Bit index
+ * @param bitwidth Bitwidth of the operand
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
 	using tau = tree<node>;
@@ -493,6 +811,14 @@ static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
 // Factory methods to create predicates from their arguments and the rules defined above.
 // The rules are cached so that they are only computed once per bitwidth (or bv constants
 // argument).
+
+/**
+ * @brief Returns the rule for bitvector addition (caching by bitwidth).
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvadd_rule(size_t bitwidth) {
 	using tau = tree<node>;
@@ -520,6 +846,13 @@ static rewriter::rule bvadd_rule(size_t bitwidth) {
 	return cache[bitwidth];
 }
 
+/**
+ * @brief Returns the rule for bitvector subtraction (caching by bitwidth).
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvsub_rule(size_t bitwidth) {
 	using tau = tree<node>;
@@ -547,6 +880,14 @@ static rewriter::rule bvsub_rule(size_t bitwidth) {
 	return cache[bitwidth];
 }
 
+/**
+ * @brief Returns the rule for bitvector multiplication (caching by bitwidth and right operand).
+ *
+ * @tparam node Node type
+ * @param y Right operand (constant)
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvmul_rule(tref y, size_t bitwidth) {
 	using tau = tree<node>;
@@ -583,6 +924,14 @@ static rewriter::rule bvmul_rule(tref y, size_t bitwidth) {
 	return cache[bitwidth][y];
 }
 
+/**
+ * @brief Returns the rule for bitvector division (caching by bitwidth and divisor).
+ *
+ * @tparam node Node type
+ * @param divisor Divisor (constant)
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvdiv_rule(tref divisor /* bv copnstant */, size_t bitwidth) {
 	using tau = tree<node>;
@@ -620,6 +969,14 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv copnstant */, size_t bitwidt
 	return cache[bitwidth][divisor];
 }
 
+/**
+ * @brief Returns the rule for bitvector modulo (caching by bitwidth and divisor).
+ *
+ * @tparam node Node type
+ * @param divisor Divisor (constant)
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */, size_t bitwidth) {
 	using tau = tree<node>;
@@ -657,6 +1014,14 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */, size_t bitwidt
 	return cache[bitwidth][divisor];
 }
 
+/**
+ * @brief Returns the rule for bitvector shift-left (caching by bitwidth and shift amount).
+ *
+ * @tparam node Node type
+ * @param shift Shift amount (constant)
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvshl_rule(tref shift /* bv constant */, size_t bitwidth) {
 	using tau = tree<node>;
@@ -696,6 +1061,14 @@ static rewriter::rule bvshl_rule(tref shift /* bv constant */, size_t bitwidth) 
 	return cache[bitwidth][shift];
 }
 
+/**
+ * @brief Returns the rule for bitvector right-shift (caching by bitwidth and shift amount).
+ *
+ * @tparam node Node type
+ * @param shift Shift amount (constant)
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ */
 template<NodeType node>
 static rewriter::rule bvrhl_rule(tref shift /* bv constant */, size_t bitwidth) {
 	using tau = tree<node>;
@@ -736,6 +1109,15 @@ static rewriter::rule bvrhl_rule(tref shift /* bv constant */, size_t bitwidth) 
 	return cache[bitwidth][shift];
 }
 
+/**
+ * @brief Applies the bitvector addition rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref bvadd(tref left, tref right, tref result) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
@@ -744,6 +1126,17 @@ tref bvadd(tref left, tref right, tref result) {
 	return nso_rr_apply<node>(rule, call);
 }
 
+/**
+ * @brief Applies the bitvector multiplication rule to the given operands.
+ *
+ * Only supports multiplication by a constant right operand.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand (must be constant)
+ * @param result Result variable
+ * @return The resulting predicate term, or nullptr if unsupported
+ */
 template<NodeType node>
 tref bvmul(tref left, tref right, tref result) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
@@ -756,6 +1149,15 @@ tref bvmul(tref left, tref right, tref result) {
 	return nso_rr_apply<node>(rule, call);
 }
 
+/**
+ * @brief Applies the bitvector subtraction rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref bvsub(tref left, tref right, tref result) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
@@ -764,6 +1166,17 @@ tref bvsub(tref left, tref right, tref result) {
 	return nso_rr_apply<node>(rule, call);
 }
 
+/**
+ * @brief Applies the bitvector division rule to the given operands.
+ *
+ * Only supports division by a constant divisor.
+ *
+ * @tparam node Node type
+ * @param dividend Dividend
+ * @param divisor Divisor (must be constant)
+ * @param quotient Quotient variable
+ * @return The resulting predicate term, or nullptr if unsupported
+ */
 template<NodeType node>
 tref bvdiv(tref dividend, tref divisor, tref quotient) {
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
@@ -776,6 +1189,17 @@ tref bvdiv(tref dividend, tref divisor, tref quotient) {
 	return nso_rr_apply<node>(rule, call);
 }
 
+/**
+ * @brief Applies the bitvector modulo rule to the given operands.
+ *
+ * Only supports modulo by a constant divisor.
+ *
+ * @tparam node Node type
+ * @param dividend Dividend
+ * @param divisor Divisor (must be constant)
+ * @param remainder Remainder variable
+ * @return The resulting predicate term, or nullptr if unsupported
+ */
 template<NodeType node>
 tref bvmod(tref dividend, tref divisor, tref remainder) {
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
@@ -788,6 +1212,14 @@ tref bvmod(tref dividend, tref divisor, tref remainder) {
 	return nso_rr_apply<node>(rule, call);
 }
 
+/**
+ * @brief Applies the bitvector right-shift-by-one rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param shifted Result variable
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref bvrhl_one(tref left, tref shifted) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
@@ -796,6 +1228,14 @@ tref bvrhl_one(tref left, tref shifted) {
 	return nso_rr_apply<node>(predicate, call);
 }
 
+/**
+ * @brief Applies the bitvector shift-left-by-one rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param shifted Result variable
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref bvshl_one(tref left, tref shifted) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
@@ -804,6 +1244,15 @@ tref bvshl_one(tref left, tref shifted) {
 	return nso_rr_apply<node>(predicate, call);
 }
 
+/**
+ * @brief Applies the bitvector right-shift rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param shift Shift amount (constant)
+ * @param shifted Result variable
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref bvrhl(tref left, tref shift, tref shifted) {
 	auto bitwidth = get_bv_type_bitwidth<node>(shift);
@@ -812,6 +1261,15 @@ tref bvrhl(tref left, tref shift, tref shifted) {
 	return nso_rr_apply<node>(predicate, call);
 }
 
+/**
+ * @brief Applies the bitvector shift-left rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param shift Shift amount (constant)
+ * @param shifted Result variable
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref bvshl(tref left, tref shift, tref shifted) {
 	auto bitwidth = get_bv_type_bitwidth<node>(shift);
@@ -820,6 +1278,13 @@ tref bvshl(tref left, tref shift, tref shifted) {
 	return nso_rr_apply<node>(predicate, call);
 }
 
+/**
+ * @brief Blasts an equality predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic equality predicate
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref eq_predicate(tref atomic) {
 	// TODO (HIGH) add simplifications to avoid the top level variable if possible
@@ -829,6 +1294,13 @@ tref eq_predicate(tref atomic) {
 	return bf_predicate_blasting<node>(atomic, changes, vars);
 }
 
+/**
+ * @brief Blasts an inequality predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param n The atomic inequality predicate
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref neq_predicate(tref n) {
 	using tau = tree<node>;
@@ -836,6 +1308,13 @@ tref neq_predicate(tref n) {
 	return tau::build_wff_neg(eq_predicate<node>(n));
 }
 
+/**
+ * @brief Blasts a less-than predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic less-than predicate
+ * @return The resulting predicate term, or nullptr on error
+ */
 template<NodeType node>
 tref lt_predicate(tref atomic) {
 	using tau = tree<node>;
@@ -853,6 +1332,13 @@ tref lt_predicate(tref atomic) {
 	return nso_rr_apply<node>(predicate, call);
 }
 
+/**
+ * @brief Blasts a greater-than predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic greater-than predicate
+ * @return The resulting predicate term, or nullptr on error
+ */
 template<NodeType node>
 tref gt_predicate(tref atomic) {
 	using tau = tree<node>;
@@ -870,6 +1356,13 @@ tref gt_predicate(tref atomic) {
 	return nso_rr_apply<node>(predicate, call);
 }
 
+/**
+ * @brief Blasts a less-than-or-equal predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic less-than-or-equal predicate
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref lteq_predicate(tref atomic) {
 	using tau = tree<node>;
@@ -877,6 +1370,13 @@ tref lteq_predicate(tref atomic) {
 	return tau::build_wff_neg(gt_predicate<node>(atomic));
 }
 
+/**
+ * @brief Blasts a greater-than-or-equal predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic greater-than-or-equal predicate
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref gteq_predicate(tref atomic) {
 	using tau = tree<node>;
@@ -884,21 +1384,49 @@ tref gteq_predicate(tref atomic) {
 	return tau::build_wff_neg(lt_predicate<node>(atomic));
 }
 
+/**
+ * @brief Blasts a not-less-than predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic not-less-than predicate
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref nlt_predicate(tref atomic) {
 	return gteq_predicate<node>(atomic);
 }
 
+/**
+ * @brief Blasts a not-greater-than predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic not-greater-than predicate
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref ngt_predicate(tref atomic) {
 	return lteq_predicate<node>(atomic);
 }
 
+/**
+ * @brief Blasts a not-less-than-or-equal predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic not-less-than-or-equal predicate
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref nlteq_predicate(tref atomic) {
 	return gt_predicate<node>(atomic);
 }
 
+/**
+ * @brief Blasts a not-greater-than-or-equal predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic not-greater-than-or-equal predicate
+ * @return The resulting predicate term
+ */
 template<NodeType node>
 tref ngteq_predicate(tref atomic) {
 	return lt_predicate<node>(atomic);
