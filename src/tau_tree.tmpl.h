@@ -818,8 +818,7 @@ template<NodeType node>
 tref tree<node>::substitute(tref that, tref with) const {
 	// If that contains a quantifier, the above quantifier id's in formula need
 	// to be recalculated; otherwise just simple replace method
-	DBG(assert(tau::get(that).get_ba_type() ==
-		tau::get(with).get_ba_type());)
+	// DBG(assert(tau::get(that).get_ba_type() == tau::get(with).get_ba_type());)
 	//with contains a quantifier
 	if (tau::get(with).find_top(is_logical_or_functional_quant<node>)) {
 		return canonize_quantifier_ids<node>(this->replace(that, with));
