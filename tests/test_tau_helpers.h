@@ -9,7 +9,7 @@
 
 namespace idni::tau_lang {
 
-std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
+inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 	splitter_type st, bool do_normalize = false)
 {
 	auto nso_rr = get_nso_rr(sample);
