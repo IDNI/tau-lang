@@ -154,10 +154,6 @@ MT(htref, nnf, (htref expression), (expression))
 // Procedures
 // ------------------------------------------------------------
 
-MT(std::optional<std::string>, simplify, (const std::string& expression), (expression))
-MT(tref,  simplify, (tref expression), (expression))
-MT(htref, simplify, (htref expression), (expression))
-
 MT(std::optional<std::string>, syntactic_term_simplification, (const std::string& term), (term))
 MT(tref,  syntactic_term_simplification, (tref term), (term))
 MT(htref, syntactic_term_simplification, (htref term), (term))
@@ -297,6 +293,10 @@ api<node>::step(measuring& m, interpreter<node>& i) {
 }
 
 MT(tref, infer, (tref expr, bool use_defaults), (expr, use_defaults))
+
+MT(std::optional<std::string>, simplify, (const std::string& expr, bool use_defaults), (expr, use_defaults))
+MT(tref, simplify, (tref expr, bool use_defaults), (expr, use_defaults))
+MT(htref, simplify, (htref expr, bool use_defaults), (expr, use_defaults))
 
 #undef MH
 #undef MT
