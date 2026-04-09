@@ -1039,7 +1039,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::ref: {
 				// We skip the traversal if the parent is not a wff_ref or
 				// is a functional ref as are treated elsewhere.
-				if (is_functional_relation<node>(parent)) {
+				if (parent && is_functional_relation<node>(parent)) {
 					skip = true; break;
 				}
 				if (has_fallback<node>(n)) {
@@ -1241,7 +1241,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				break;
 			}
 			case tau::ref: {
-				if (is_cli_cmd<node>(parent) || is<node, tau::wff_ref>(parent)) {
+				if (parent && (is_cli_cmd<node>(parent) || is<node, tau::wff_ref>(parent))) {
 					if (has_fallback<node>(n)) {
 						// we must deal with it as a rec relation
 						// We need to adjust the wrapping around refs in the body and
