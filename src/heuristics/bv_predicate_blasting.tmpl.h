@@ -2,6 +2,16 @@
 
 namespace idni::tau_lang {
 
+/**
+ * @brief Extracts the arguments of a bitvector multiplication term.
+ *
+ * If one child is a bitvector constant, returns (non-constant, constant).
+ * Otherwise, returns (nullptr, nullptr).
+ *
+ * @tparam node Node type
+ * @param term The term to analyze
+ * @return Pair of (non-constant, constant) or (nullptr, nullptr)
+ */
 template <NodeType node>
 std::pair<tref, tref> get_bvmul_arguments(tref term) {
 	using tau = tree<node>;
@@ -15,6 +25,16 @@ std::pair<tref, tref> get_bvmul_arguments(tref term) {
 	return std::make_pair(nullptr, nullptr);
 }
 
+/**
+ * @brief Extracts the arguments of a bitvector division/modulo term.
+ *
+ * If the left child is a bitvector constant, returns (left, right).
+ * Otherwise, returns (nullptr, nullptr).
+ *
+ * @tparam node Node type
+ * @param term The term to analyze
+ * @return Pair of (dividend, divisor) or (nullptr, nullptr)
+ */
 template <NodeType node>
 std::pair<tref, tref> get_bved_arguments(tref term) {
 	using tau = tree<node>;
@@ -27,6 +47,16 @@ std::pair<tref, tref> get_bved_arguments(tref term) {
 	return std::make_pair(nullptr, nullptr);
 }
 
+/**
+ * @brief Extracts the arguments of a bitvector shift term.
+ *
+ * If the left child is a bitvector constant, returns (left, right).
+ * Otherwise, returns (nullptr, nullptr).
+ *
+ * @tparam node Node type
+ * @param term The term to analyze
+ * @return Pair of (shiftand, count) or (nullptr, nullptr)
+ */
 template <NodeType node>
 std::pair<tref, tref> get_bvsh_arguments(tref term) {
 	using tau = tree<node>;
@@ -39,6 +69,18 @@ std::pair<tref, tref> get_bvsh_arguments(tref term) {
 	return std::make_pair(nullptr, nullptr);
 }
 
+/**
+ * @brief Performs predicate blasting for bitvector terms.
+ *
+ * Traverses the term, replacing supported bitvector operations with existentially
+ * quantified variables and predicates.
+ *
+ * @tparam node Node type
+ * @param term The term to blast
+ * @param changes Map of subtree replacements
+ * @param vars Vector to collect introduced variables
+ * @return The blasted predicate, or nullptr on error
+ */
 template<NodeType node>
 tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& vars) {
 	using tau = tree<node>;
@@ -137,6 +179,16 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes, trefs& v
 }
 
 
+/**
+ * @brief Blasts atomic bitvector predicates into equivalent formulas.
+ *
+ * Only operates on atomic predicates over bitvector terms. Returns nullptr for
+ * unsupported cases.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic predicate to blast
+ * @return The blasted predicate, or nullptr on error
+ */
 template<NodeType node>
 tref atomic_predicate_blasting(tref atomic) {
 	using tau = tree<node>;
@@ -177,6 +229,15 @@ tref atomic_predicate_blasting(tref atomic) {
 	return predicate;
 }
 
+/**
+ * @brief Recursively blasts all bitvector formulas in a formula.
+ *
+ * Traverses the formula, replacing atomic bitvector predicates with their blasted forms.
+ *
+ * @tparam node Node type
+ * @param term The formula to blast
+ * @return The formula with predicates blasted, or nullptr on error
+ */
 template<NodeType node>
 tref wff_predicate_blasting(tref term) {
 	using tau = tree<node>;
@@ -222,6 +283,15 @@ tref wff_predicate_blasting(tref term) {
 	return n_term;
 }
 
+/**
+ * @brief Entry point for predicate blasting on bitvector formulas.
+ *
+ * Alias for wff_predicate_blasting.
+ *
+ * @tparam node Node type
+ * @param term The formula to blast
+ * @return The formula with predicates blasted, or nullptr on error
+ */
 template<NodeType node>
 tref bv_predicate_blasting(tref term) {
 	return wff_predicate_blasting<node>(term);
