@@ -43,7 +43,6 @@ TEST_NAME="$1"
 shift
 
 # Determine build flags based on test name
-# NOTE: test_api-repl* must be checked before the generic test_api-* pattern
 BUILD_FLAGS=""
 
 if [[ "$TEST_NAME" =~ ^test_integration- ]]; then
@@ -65,7 +64,7 @@ echo ""
 
 # Build the test
 echo "Compiling..."
-./dev debug $BUILD_FLAGS -DTAU_BUILD_JOBS=4 || {
+./dev debug --target $TEST_NAME $BUILD_FLAGS || {
 	echo "Error: Build failed"
 	exit 1
 }
@@ -78,9 +77,7 @@ echo ""
 export LD_LIBRARY_PATH="./external/cvc5/build/src:${LD_LIBRARY_PATH}"
 
 if [[ "$TEST_NAME" =~ ^test_repl- ]]; then
-	echo "NOTE: '$TEST_NAME' is a REPL test — it is not a standalone executable."
-	echo ""
-
+	# Run REPL test with GDB
 	cmd=$(ctest --test-dir build-Debug --output-on-failure -N -V -R "^${TEST_NAME}$" | grep "Test command: " | sed 's/.*"-c"[[:space:]]*//; s/^"//; s/"$//')
 	bash -c "gdb --args $cmd $@"
 	exit $?
