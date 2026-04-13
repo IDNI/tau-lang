@@ -45,7 +45,7 @@ static rr<node> make_rr(const rewriter::rules& rules, tref main) {
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_bvadd_call_with_index(tref left, tref right, tref result, size_t index) {
+static tref make_bvadd_rr_call(tref left, tref right, tref result, size_t index) {
 	using tau = tree<node>;
 
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvadd", { index }, { left, right, result })));
@@ -92,7 +92,7 @@ static tref make_bvadd_call(tref left, tref right, tref result) {
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_bvsub_call_with_index(tref left, tref right, tref result, size_t index) {
+static tref make_bvsub_rr_call(tref left, tref right, tref result, size_t index) {
 	using tau = tree<node>;
 
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvsub", { index }, { left, right, result })));
@@ -289,7 +289,7 @@ static tref make_bit_call(tref operand, size_t bit) {
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_bit_call(tref operand, tref bit) {
+static tref make_bit_rr_call(tref operand, tref bit) {
 	using tau = tree<node>;
 
 	return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_rr_ref("_bit", { bit }, { operand })));
@@ -414,7 +414,6 @@ static tref make_bvgt_call(tref left, tref right, tref offset) {
 // Factory methods returning the rule(s) needed in certain predicate blasting
 // cases (bvadd,...).
 
-// addition(x, y) = addition(x ^ y, (x & y) << 1, m) mod m;
 /**
  * @brief Returns the rules for bitvector addition recurrence.
  *
@@ -426,6 +425,7 @@ static tref make_bvgt_call(tref left, tref right, tref offset) {
  */
 template<NodeType node>
 static rewriter::rules bvadd_rules(size_t bitwidth) {
+	// addition(x, y) = addition(x ^ y, (x & y) << 1, m) mod m;
 	using tau = tree<node>;
 
 	rewriter::rules rules;
@@ -445,7 +445,7 @@ static rewriter::rules bvadd_rules(size_t bitwidth) {
 	));
 
 	// base case: addition[0](x, y, z) = (z = x);
-	auto base_header = make_bvadd_call_with_index<node>(x, y, z, 0);
+	auto base_header = make_bvadd_rr_call<node>(x, y, z, 0);
 	auto base_body = tau::build_bf_eq(x, z);
 
 	// create rules
@@ -492,7 +492,7 @@ static rewriter::rules bvsub_rules(size_t bitwidth) {
 	));
 
 	// base case: subtraction[0](x, y, z) = (z = x);
-	auto base_header = make_bvsub_call_with_index<node>(x, y, z, 0);
+	auto base_header = make_bvsub_rr_call<node>(x, y, z, 0);
 	auto base_body = tau::build_bf_eq(x, z);
 	rules.push_back(make_rule<node>(base_header, base_body));
 	rules.push_back(make_rule<node>(general_header, general_body));
@@ -681,8 +681,8 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
 		tau::build_wff_and(
 			make_bvlt_call<node>(x, y, n_minus_1),
 			tau::build_bf_eq(
-				make_bit_call<node>(x, n),
-				make_bit_call<node>(y, n))),
+				make_bit_rr_call<node>(x, n),
+				make_bit_rr_call<node>(y, n))),
 		tau::build_wff_and(
 			make_is_bit_zero_call<node>(x, n),
 			make_is_bit_one_call<node>(y, n)));
@@ -760,8 +760,8 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 		tau::build_wff_and(
 			make_bvgt_call<node>(x, y, n_minus_1),
 			tau::build_bf_eq(
-				make_bit_call<node>(x, n),
-				make_bit_call<node>(y, n))),
+				make_bit_rr_call<node>(x, n),
+				make_bit_rr_call<node>(y, n))),
 		tau::build_wff_and(
 			make_is_bit_one_call<node>(x, n),
 			make_is_bit_zero_call<node>(y, n)));
@@ -923,7 +923,7 @@ static rewriter::rule bvadd_rule(size_t bitwidth) {
 	auto left = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto right = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto result = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto head = make_bvadd_call_with_index<node>(left, right, result, bitwidth);
+	auto head = make_bvadd_rr_call<node>(left, right, result, bitwidth);
 	auto temp = make_rr<node>(rs, head);
 	auto body = apply_rr_to_formula(temp);
 	auto rule = make_rule<node>(head, body);
@@ -963,7 +963,7 @@ static rewriter::rule bvsub_rule(size_t bitwidth) {
 	auto left = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto right = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto result = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto head = make_bvsub_call_with_index<node>(left, right, result, bitwidth);
+	auto head = make_bvsub_rr_call<node>(left, right, result, bitwidth);
 	auto temp = make_rr<node>(rs, head);
 	auto body = apply_rr_to_formula(temp);
 	auto rule = make_rule<node>(head, body);
@@ -1043,27 +1043,35 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv copnstant */, size_t bitwidt
 	using tau = tree<node>;
 
 	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
-	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
+	// If the rule is already computed for the given bitwidth and right operand,
+	// we return it from the cache
 	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
 	// Otherwise, we compute the rule, store it in the cache and return it.
 	// First we collect all the rules needed for computing the euclidean
 	// division: addition, multiplication, less then,...
 	rewriter::rules rs;
-	rs.insert(rs.end(), bvadd_rules<node>(bitwidth).begin(), bvadd_rules<node>(bitwidth).end());
+	auto add_rules = bvadd_rules<node>(bitwidth);
+	rs.insert(rs.end(), add_rules.begin(), add_rules.end());
 	//rs.push_back(bvmul_rule<node>(bitwidth).end());
-	rs.insert(rs.end(), bvlt_rules<node>(bitwidth).begin(), bvlt_rules<node>(bitwidth).end());
-	// Then we build the main term to compute the actual predicate.
-	auto quotient = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto remainder = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto lt_rules = bvlt_rules<node>(bitwidth);
+	rs.insert(rs.end(), lt_rules.begin(), lt_rules.end());
+	// Then we build the main term to compute the actual predicate, i.e.
+	// dividend = divisor * quotient + remainder, remainder < divisor.
+	auto quotient_var = tau::tau::build_variable(bv_type_id<node>(bitwidth));
+	auto quotient = tau::get(tau::bf, quotient_var);
+	auto remainder_var = tau::tau::build_variable(bv_type_id<node>(bitwidth));
+	auto remainder = tau::get(tau::bf, remainder_var);
 	auto dividend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto exact = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto main = tau::build_wff_ex(remainder,
-		tau::build_wff_ex(exact,
-			tau::build_wff_and(
-				make_bvsub_call<node>(dividend, remainder, exact),
+	auto exact_var = tau::tau::build_variable(bv_type_id<node>(bitwidth));
+	auto exact = tau::get(tau::bf, exact_var);
+	auto main = tau::build_wff_ex(exact_var,
+		tau::build_wff_ex(quotient_var,
+			tau::build_wff_ex(remainder_var,
 				tau::build_wff_and(
-					make_bvadd_call<node>(quotient, divisor, exact),
-					make_bvlt_call<node>(remainder, divisor, bitwidth)))));
+					make_bvsub_call<node>(dividend, remainder, exact),
+					tau::build_wff_and(
+						make_bvmul_call<node>(quotient, divisor, exact),
+						make_bvlt_call<node>(remainder, divisor, bitwidth))))));
 	auto temp = make_rr<node>(rs, main);
 	auto head = make_bvdiv_call<node>(dividend, divisor, quotient);
 	auto body = apply_rr_to_formula(temp);
@@ -1098,23 +1106,27 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */, size_t bitwidt
 	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
 	// First we collect all the rules needed for computing the euclidean
 	// division: addition, multiplication, less then,...
-	rewriter::rules rs;
-	rs.insert(rs.end(), bvadd_rules<node>(bitwidth).begin(), bvadd_rules<node>(bitwidth).end());
+	rewriter::rules rs = bvadd_rules<node>(bitwidth);
 	//rs.push_back(bvmul_rule<node>(bitwidth).end());
-	rs.insert(rs.end(), bvlt_rules<node>(bitwidth));
+	auto lt_rules = bvlt_rules<node>(bitwidth);
+	rs.insert(rs.end(), lt_rules.begin(), lt_rules.end());
 	// Otherwise, we compute the rule, store it in the cache and return it..begin(), bvlt_rules<node>(bitwidth).end());
 	// Then we build the main term to compute the actual predicate.
-	auto quotient = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto remainder = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto quotient_var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto quotient = tau::get(tau::bf, quotient_var);
+	auto remainder_var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto remainder = tau::get(tau::bf, remainder_var);
 	auto dividend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto exact = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto main = tau::build_wff_ex(quotient,
-		tau::build_wff_ex(exact,
-			tau::build_wff_and(
-				make_bvsub_call<node>(dividend, remainder, exact),
+	auto exact_var = tau::tau::build_variable(bv_type_id<node>(bitwidth));
+	auto exact = tau::get(tau::bf, exact_var);
+	auto main =tau::build_wff_ex(exact_var,
+		tau::build_wff_ex(quotient_var,
+			tau::build_wff_ex(remainder_var,
 				tau::build_wff_and(
-					make_bvadd_call<node>(quotient, divisor, exact),
-					make_bvlt_call<node>(remainder, divisor, bitwidth)))));
+					make_bvsub_call<node>(dividend, remainder, exact),
+					tau::build_wff_and(
+						make_bvmul_call<node>(quotient, divisor, exact),
+						make_bvlt_call<node>(remainder, divisor, bitwidth))))));
 	auto temp = make_rr<node>(rs, main);
 	auto head = make_bvmod_call<node>(dividend, divisor, remainder);
 	auto body = apply_rr_to_formula(temp);
@@ -1418,160 +1430,6 @@ tref bvshl(tref left, tref shift, tref shifted) {
 	auto predicate = bvshl_rule<node>(shift, bitwidth);
 	auto call = make_bvshl_call<node>(left, shift, shifted);
 	return nso_rr_apply<node>(predicate, call);
-}
-
-/**
- * @brief Blasts an equality predicate over bitvectors.
- *
- * @tparam node Node type
- * @param atomic The atomic equality predicate
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref eq_predicate(tref atomic) {
-	// TODO (HIGH) add simplifications to avoid the top level variable if possible
-	subtree_map<node, tref> changes;
-	trefs vars;
-
-	return bf_predicate_blasting<node>(atomic, changes, vars);
-}
-
-/**
- * @brief Blasts an inequality predicate over bitvectors.
- *
- * @tparam node Node type
- * @param n The atomic inequality predicate
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref neq_predicate(tref n) {
-	using tau = tree<node>;
-
-	return tau::build_wff_neg(eq_predicate<node>(n));
-}
-
-/**
- * @brief Blasts a less-than predicate over bitvectors.
- *
- * @tparam node Node type
- * @param atomic The atomic less-than predicate
- * @return The resulting predicate term, or nullptr on error
- */
-template<NodeType node>
-tref lt_predicate(tref atomic) {
-	using tau = tree<node>;
-
-	subtree_map<node, tref> changes;
-	trefs vars;
-
-	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
-	auto predicate = bvlt_rule<node>(bitwidth);
-	auto blasted = bf_predicate_blasting<node>(atomic, changes, vars);
-	if (!blasted) return nullptr;
-	auto left = tau::get(blasted).child(0);
-	auto right = tau::get(blasted).child(1);
-	auto call = make_bvlt_call<node>(left, right, bitwidth);
-	return nso_rr_apply<node>(predicate, call);
-}
-
-/**
- * @brief Blasts a greater-than predicate over bitvectors.
- *
- * @tparam node Node type
- * @param atomic The atomic greater-than predicate
- * @return The resulting predicate term, or nullptr on error
- */
-template<NodeType node>
-tref gt_predicate(tref atomic) {
-	using tau = tree<node>;
-
-	subtree_map<node, tref> changes;
-	trefs vars;
-
-	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
-	auto predicate = bvgt_rule<node>(bitwidth);
-	auto blasted = bf_predicate_blasting<node>(atomic, changes, vars);
-	if (!blasted) return nullptr;
-	auto left = tau::get(blasted).child(0);
-	auto right = tau::get(blasted).child(1);
-	auto call = make_bvgt_call<node>(left, right, bitwidth);
-	return nso_rr_apply<node>(predicate, call);
-}
-
-/**
- * @brief Blasts a less-than-or-equal predicate over bitvectors.
- *
- * @tparam node Node type
- * @param atomic The atomic less-than-or-equal predicate
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref lteq_predicate(tref atomic) {
-	using tau = tree<node>;
-
-	return tau::build_wff_neg(gt_predicate<node>(atomic));
-}
-
-/**
- * @brief Blasts a greater-than-or-equal predicate over bitvectors.
- *
- * @tparam node Node type
- * @param atomic The atomic greater-than-or-equal predicate
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref gteq_predicate(tref atomic) {
-	using tau = tree<node>;
-
-	return tau::build_wff_neg(lt_predicate<node>(atomic));
-}
-
-/**
- * @brief Blasts a not-less-than predicate over bitvectors.
- *
- * @tparam node Node type
- * @param atomic The atomic not-less-than predicate
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref nlt_predicate(tref atomic) {
-	return gteq_predicate<node>(atomic);
-}
-
-/**
- * @brief Blasts a not-greater-than predicate over bitvectors.
- *
- * @tparam node Node type
- * @param atomic The atomic not-greater-than predicate
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref ngt_predicate(tref atomic) {
-	return lteq_predicate<node>(atomic);
-}
-
-/**
- * @brief Blasts a not-less-than-or-equal predicate over bitvectors.
- *
- * @tparam node Node type
- * @param atomic The atomic not-less-than-or-equal predicate
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref nlteq_predicate(tref atomic) {
-	return gt_predicate<node>(atomic);
-}
-
-/**
- * @brief Blasts a not-greater-than-or-equal predicate over bitvectors.
- *
- * @tparam node Node type
- * @param atomic The atomic not-greater-than-or-equal predicate
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref ngteq_predicate(tref atomic) {
-	return lt_predicate<node>(atomic);
 }
 
 } // namespace idni::tau_lang

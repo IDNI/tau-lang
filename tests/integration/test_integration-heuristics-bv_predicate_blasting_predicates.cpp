@@ -26,7 +26,7 @@ tref parse_wff(const std::string& sample) {
 	return src;
 }
 
-/*TEST_SUITE("bitblasting") {
+TEST_SUITE("bitblasting") {
 
 	TEST_CASE("bvmul_rec_rule") {
 	}
@@ -89,41 +89,45 @@ tref parse_wff(const std::string& sample) {
 	}
 
 	TEST_CASE("bvadd_rule") {
-		//using node = node_t;
+		using node = node_t;
 
-		//TAU_LOG_INFO << LOG_RULE(bvadd_rule<node>(4));
+		TAU_LOG_INFO << LOG_RULE(bvadd_rule<node>(4));
 	}
 
 	TEST_CASE("bvsub_rule") {
-		//using node = node_t;
+		using node = node_t;
 
-		//TAU_LOG_INFO << LOG_RULE(bvsub_rule<node>(4));
+		TAU_LOG_INFO << LOG_RULE(bvsub_rule<node>(4));
 	}
 
 	TEST_CASE("bvdiv_rule") {
-		//using node = node_t;
+		using node = node_t;
+		using tau = tree<node>;
 
-		//TAU_LOG_INFO << LOG_RULE(bvdiv_rule<node>(2, 2));
+		TAU_LOG_INFO << LOG_RULE(bvdiv_rule<node>(tau::build_ref_offset(2), 2));
 	}
 
 	TEST_CASE("bvmod_rule") {
 		//using node = node_t;
+		//using tau = tree<node>;
 
-		//TAU_LOG_INFO << LOG_RULE(bvmod_rule<node>(2, 2));
+		//TAU_LOG_INFO << LOG_RULE(bvmod_rule<node>(tau::build_ref_offset(2), 2));
 	}
 
-	TEST_CASE("bvshl_rule") {
-		//using node = node_t;
+	/*TEST_CASE("bvshl_rule") {
+		using node = node_t;
+		using tau = tree<node>;
 
-		//TAU_LOG_INFO << LOG_RULE(bvshl_rule<node>(2, 2));
+		TAU_LOG_INFO << LOG_RULE(bvshl_rule<node>(tau::build_ref_offset(2), 2));
 	}
 
 	TEST_CASE("bvrhl_rule") {
-		//using node = node_t;
+		using node = node_t;
+		using tau = tree<node>;
 
-		//TAU_LOG_INFO << LOG_RULE(bvrhl_rule<node>(2, 2));
-	}
-}*/
+		TAU_LOG_INFO << LOG_RULE(bvrhl_rule<node>(tau::build_ref_offset(2), 2));
+	}*/
+}
 
 TEST_SUITE("Cleanup") {
 

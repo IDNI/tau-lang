@@ -1016,6 +1016,13 @@ tref build_ref_shift_offset(tref var, size_t shift) {
 }
 
 template<NodeType node>
+tref build_ref_offset(size_t shift) {
+	using tau = tree<node>;
+
+	return tau::get(tau::offset, tau::get_integer(shift));
+}
+
+template<NodeType node>
 tref build_ref_shift_offset(std::string var_name, size_t type_id, size_t shift) {
 	using tau = tree<node>;
 
@@ -1648,6 +1655,11 @@ tref tree<node>::build_ref_offsets(const std::string& offset) {
 template<NodeType node>
 tref tree<node>::build_ref_offsets(const std::vector<std::string>& offsets) {
 	return tau_lang::build_ref_offsets<node>(offsets);
+}
+
+template<NodeType node>
+tref tree<node>::build_ref_offset(size_t shift) {
+	return tau_lang::build_ref_offset<node>(shift);
 }
 
 template<NodeType node>
