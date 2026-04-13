@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include "bv_predicate_blasting_predicates.tmpl.h"
+
 namespace idni::tau_lang {
 
 /**
@@ -341,6 +343,155 @@ static tref keep_comparison_predicate(tref atomic) {
 		: wff_blasted);
 }
 
+/**
+ * @brief Blasts an equality predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic equality predicate
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref eq_predicate(tref atomic) {
+	// TODO (HIGH) add simplifications to avoid the top level variable if possible
+	subtree_map<node, tref> changes;
+	return bf_predicate_blasting<node>(atomic, changes);
+}
+
+/**
+ * @brief Blasts an inequality predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param n The atomic inequality predicate
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref neq_predicate(tref n) {
+	using tau = tree<node>;
+
+	return tau::build_wff_neg(eq_predicate<node>(n));
+}
+
+/**
+ * @brief Blasts a less-than predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic less-than predicate
+ * @return The resulting predicate term, or nullptr on error
+ */
+template<NodeType node>
+tref lt_predicate(tref atomic) {
+	using tau = tree<node>;
+
+	subtree_map<node, tref> changes;
+
+	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
+	auto predicate = bvlt_rule<node>(bitwidth);
+	auto blasted = bf_predicate_blasting<node>(atomic, changes);
+	if (!blasted) return nullptr;
+	auto left = tau::get(blasted).child(0);
+	auto right = tau::get(blasted).child(1);
+	auto call = make_bvlt_call<node>(left, right, bitwidth);
+	return nso_rr_apply<node>(predicate, call);
+}
+
+/**
+ * @brief Blasts a greater-than predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic greater-than predicate
+ * @return The resulting predicate term, or nullptr on error
+ */
+template<NodeType node>
+tref gt_predicate(tref atomic) {
+	using tau = tree<node>;
+
+	subtree_map<node, tref> changes;
+
+	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
+	auto predicate = bvgt_rule<node>(bitwidth);
+	auto blasted = bf_predicate_blasting<node>(atomic, changes);
+	if (!blasted) return nullptr;
+	auto left = tau::get(blasted).child(0);
+	auto right = tau::get(blasted).child(1);
+	auto call = make_bvgt_call<node>(left, right, bitwidth);
+	return nso_rr_apply<node>(predicate, call);
+}
+
+/**
+ * @brief Blasts a less-than-or-equal predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic less-than-or-equal predicate
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref lteq_predicate(tref atomic) {
+	using tau = tree<node>;
+
+	return tau::build_wff_neg(gt_predicate<node>(atomic));
+}
+
+/**
+ * @brief Blasts a greater-than-or-equal predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic greater-than-or-equal predicate
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref gteq_predicate(tref atomic) {
+	using tau = tree<node>;
+
+	return tau::build_wff_neg(lt_predicate<node>(atomic));
+}
+
+/**
+ * @brief Blasts a not-less-than predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic not-less-than predicate
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref nlt_predicate(tref atomic) {
+	return gteq_predicate<node>(atomic);
+}
+
+/**
+ * @brief Blasts a not-greater-than predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic not-greater-than predicate
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref ngt_predicate(tref atomic) {
+	return lteq_predicate<node>(atomic);
+}
+
+/**
+ * @brief Blasts a not-less-than-or-equal predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic not-less-than-or-equal predicate
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref nlteq_predicate(tref atomic) {
+	return gt_predicate<node>(atomic);
+}
+
+/**
+ * @brief Blasts a not-greater-than-or-equal predicate over bitvectors.
+ *
+ * @tparam node Node type
+ * @param atomic The atomic not-greater-than-or-equal predicate
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref ngteq_predicate(tref atomic) {
+	return lt_predicate<node>(atomic);
+}
 
 /**
  * @brief Blasts an equality predicate over bitvectors.
@@ -670,6 +821,13 @@ static tref wff_predicate_blasting(tref term) {
 				tref right = lteq_predicate<node>(mid_le_hi);
 				if (!left || !right) { error = true; break; }
 				changes[t] = tau::trim(tau::build_wff_and(left, right));
+				break;
+			}
+			case tau::bf_interval: {
+				// TODO (MEDIUM) convert into two predicates and a conjunction,
+				// but for now we just return an error.
+				DBG( LOG_DEBUG << "Interval predicates are currently not supported in blasting."; )
+				return error = true, false;
 				break;
 			}
 			default: {
