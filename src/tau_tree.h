@@ -661,6 +661,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_ref_offsets(const trefs& offsets);
 	static tref build_ref_offsets(const std::string& offset);
 	static tref build_ref_offsets(const std::vector<std::string>& offsets);
+	static tref build_ref_offset(size_t shift);
 	static tref build_ref_shift_offset(tref var, size_t shift);
 	static tref build_ref_shift_offset(const std::string& var_name, size_t shift);
 	static tref build_ref_args(const trefs& args);

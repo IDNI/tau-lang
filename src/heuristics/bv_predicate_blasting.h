@@ -35,7 +35,6 @@ tref bv_predicate_blasting(tref term);
 
 } // namespace idni::tau_lang
 
-#include "bv_predicate_blasting_predicates.tmpl.h"
 #include "bv_predicate_blasting.tmpl.h"
 
 #endif // __IDNI__TAU__BV_BITBLASTING_H__
