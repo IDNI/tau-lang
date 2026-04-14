@@ -32,6 +32,7 @@ namespace idni::tau_lang {
 template<NodeType node>
 tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
 
+bool bv_blasting = true;
 
 /**
  * @brief Entry point for predicate blasting on bitvector formulas.
