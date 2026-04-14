@@ -35,36 +35,6 @@ static tref make_bvlt_call(tref left, tref right, tref offset) {
 }
 
 /**
- * @brief Creates a call to the bitvector greater-than recurrence (by index).
- * @tparam node Node type
- * @param left Left operand
- * @param right Right operand
- * @param offset Offset (index)
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvgt_call(tref left, tref right, size_t offset) {
-	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvgt", offset, { left, right })));
-}
-
-/**
- * @brief Creates a call to the bitvector greater-than recurrence (by tref offset).
- * @tparam node Node type
- * @param left Left operand
- * @param right Right operand
- * @param offset Offset (tref)
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvgt_call(tref left, tref right, tref offset) {
-	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvgt", {offset}, { left, right })));
-}
-
-/**
  * @brief Returns the rules for bitvector less-than recurrence.
  *
  * Generates the base and general case rules for bitvector less-than.
@@ -141,6 +111,36 @@ static rewriter::rule bvlt_rule(size_t bitwidth) {
 	LOG_TRACE << "bvlt_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 	return rule;
+}
+
+/**
+ * @brief Creates a call to the bitvector greater-than recurrence (by index).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param offset Offset (index)
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_bvgt_call(tref left, tref right, size_t offset) {
+	using tau = tree<node>;
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvgt", offset, { left, right })));
+}
+
+/**
+ * @brief Creates a call to the bitvector greater-than recurrence (by tref offset).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param offset Offset (tref)
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_bvgt_call(tref left, tref right, tref offset) {
+	using tau = tree<node>;
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvgt", {offset}, { left, right })));
 }
 
 /**
