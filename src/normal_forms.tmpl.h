@@ -3941,8 +3941,9 @@ tref resolve_quantifiers(tref formula) {
 			// the quantifier
 			tref var = tau::trim2(n);
 			if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
-				if (auto blasted = bv_predicate_blasting<node>(n); blasted && blasted != n)
-					return blasted;
+				if (bv_blasting)
+					if (auto blasted = bv_predicate_blasting<node>(n); blasted && blasted != n)
+						return blasted;
 				if (const trefs& free_vars = get_free_vars<node>(n);
 					free_vars.empty()) {
 					// By assumption quantifier is pushed in all the way
