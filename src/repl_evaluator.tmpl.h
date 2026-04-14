@@ -541,6 +541,7 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "c" || x == "colors"
 		|| x == "color")             return colors_opt;
 	if (x == "V" || x == "charvar")      return charvar_opt;
+	if (x == "B" || x == "blasting")     return blasting_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
@@ -592,6 +593,8 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "colors:              " << pbool[opt.colors] << "\n"; } },
 	{ charvar_opt,      [this]() {
 		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
+	{ blasting_opt,      [this]() {
+		std::cout << "blasting:            " << pbool[opt.blasting] << "\n"; } },
 	{ highlighting_opt, []() {
 		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
 	{ indenting_opt,    []() {
@@ -649,6 +652,8 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		TC.set(update_bool_value(opt.colors)); } },
 	{ charvar_opt,   [&]() {
 		update_charvar(update_bool_value(opt.charvar)); } },
+	{ blasting_opt,   [&]() {
+		update_blasting(update_bool_value(opt.blasting)); } },
 	{ highlighting_opt,   [&]() {
 		update_bool_value(pretty_printer_highlighting); } },
 	{ indenting_opt,   [&]() {
@@ -690,6 +695,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 #endif // DEBUG
 	case colors_opt:       TC.set(update_fn(opt.colors)); break;
 	case charvar_opt:      update_charvar(update_fn(opt.charvar)); break;
+	case blasting_opt:     update_blasting(update_fn(opt.blasting)); break;
 	case highlighting_opt: update_fn(pretty_printer_highlighting); break;
 	case indenting_opt:    update_fn(pretty_printer_indenting); break;
 	case status_opt:       update_fn(opt.status); break;
@@ -701,6 +707,13 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	api<node>::set_charvar(opt.charvar = value);
+	return value;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::update_blasting(bool value) {
+	api<node>::set_blasting(opt.blasting = value);
 	return value;
 }
 

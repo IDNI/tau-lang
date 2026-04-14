@@ -42,6 +42,11 @@ void api<node>::set_charvar(bool charvar) {
 }
 
 template <NodeType node>
+void api<node>::set_blasting(bool blasting) {
+	bv_blasting = blasting;
+}
+
+template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
 	pretty_printer_indenting = indenting;
 }

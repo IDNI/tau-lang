@@ -47,7 +47,7 @@
 namespace idni::tau_lang {
 
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
-	colors_opt, charvar_opt, highlighting_opt, indenting_opt, debug_opt };
+	colors_opt, charvar_opt, blasting_opt, highlighting_opt, indenting_opt, debug_opt };
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -67,6 +67,7 @@ struct repl_evaluator {
 		bool print_history_store = true;
 		bool error_quits         = false;
 		bool charvar             = true;
+		bool blasting            = true;
 		bool repl_running 	 = true;
 #ifdef DEBUG
 		bool debug_repl          = true;
@@ -146,6 +147,8 @@ private:
 
 	// returns if a subtree of a node contains a nonterminal
 	bool update_charvar(bool value);
+
+	bool update_blasting(bool value);
 
 	// history
 	history_ref history_retrieve(const tt& n, bool silent = false) const;

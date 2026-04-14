@@ -36,9 +36,10 @@ cli::options tau_options() {
 		.set_description("show the current Tau executable version");
 	opts["license"] = cli::option("license", 'l', false)
 		.set_description("show license for Tau");
-
 	opts["charvar"] = cli::option("charvar", 'V', true)
 		.set_description("charvar (enabled by default)");
+	opts["blasting"] = cli::option("blasting", 'B', true)
+		.set_description("blasting (enabled by default)");
 	opts["severity"] = cli::option("severity", 'S', "info")
 		.set_description("severity level (trace/debug/info/error)");
 	opts["indenting"] = cli::option("indenting", 'I', false)
@@ -145,13 +146,15 @@ int main(int argc, char** argv) {
 	tau_api::set_highlighting(opts["highlighting"].get<bool>());
 	tau_api::set_indenting(opts["indenting"].get<bool>());
 	bool charvar = opts["charvar"].get<bool>();
+	bool blasting = opts["blasting"].get<bool>();
 	bool exp = opts["experimental"].get<bool>();
 
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
-							<< files.front();)
+			<< files.front();)
 		tau_api::set_severity(sev);
 		tau_api::set_charvar(charvar);
+		tau_api::set_blasting(blasting);
 		return run_tau_spec(files.front());
 	}
 

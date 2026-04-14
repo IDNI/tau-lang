@@ -38,6 +38,7 @@ struct api {
 	using severity_level = boost::log::trivial::severity_level;
 
 	static void set_charvar(bool state);
+	static void set_blasting(bool state);
 	static void set_indenting(bool state);
 	static void set_highlighting(bool state);
 	static void set_severity(severity_level level);

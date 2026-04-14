@@ -13,6 +13,7 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
+bool bv_blasting = true;
 
 /**
  * @brief Entry point for predicate blasting on bitvector formulas.
