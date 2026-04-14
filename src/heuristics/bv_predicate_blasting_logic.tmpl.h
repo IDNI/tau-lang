@@ -5,65 +5,46 @@
 namespace idni::tau_lang {
 
 /**
- * @brief Creates a call to the bitvector shift-left-by-one recurrence.
+ * @brief Creates a call to extract a specific bit from an operand (by tref).
  * @tparam node Node type
- * @param operand Operand to shift
- * @param shifted Result variable
+ * @param operand Operand
+ * @param bit Bit tref
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_bvshl_by_one_call(tref operand,  tref shifted) {
+static tref make_bit_rr_call(tref operand, tref bit) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshl_by_one", { operand, shifted })));
+	return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_rr_ref("_bit", { bit }, { operand })));
 }
 
 /**
- * @brief Creates a call to the bitvector right-shift-by-one recurrence.
+ * @brief Returns the rule for extracting a bit from a bitvector.
+ *
  * @tparam node Node type
- * @param operand Operand to shift
- * @param shifted Result variable
- * @return The constructed call term
+ * @param bit Bit index
+ * @param bitwidth Bitwidth of the operand
+ * @return The constructed rule
  */
 template<NodeType node>
-static tref make_bvrhl_by_one_call(tref operand, tref shifted) {
+static rewriter::rule bit_rule(size_t bit, size_t bitwidth) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl_by_one", { operand, shifted })));
-}
-
-/**
- * @brief Creates a call to the bitvector shift-left recurrence (constant shift).
- * @tparam node Node type
- * @param left Operand to shift
- * @param right Shift amount (constant)
- * @param result Result variable
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvshl_call(tref left, tref right /* bv constant */, tref result) {
-	using tau = tree<node>;
-
-	DBG( assert(is_bv_constant<node>(right)); )
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshl", { left, right, result })));
-}
-
-/**
- * @brief Creates a call to the bitvector right-shift recurrence (constant shift).
- * @tparam node Node type
- * @param left Operand to shift
- * @param right Shift amount (constant)
- * @param result Result variable
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvrhl_call(tref left, tref right /* bv copnstant */, tref result) {
-	using tau = tree<node>;
-
-	DBG( assert(is_bv_constant<node>(right)); )
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl", { left, right, result })));
+	auto bit_offset = tau::get_num(bit);
+	auto bit_cte =
+		tau::get(tau::bf,
+			tau::get_ba_constant(
+				make_bitvector_value(1 <<bit, bitwidth), bv_type_id<node>(bitwidth)));
+	auto var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto head = tau::build_rr_ref("_bit", { bit_offset }, { var });
+	auto body = tau::build_bf_and( var, bit_cte);
+	auto rule = make_rule<node>(head, body);
+#ifdef DEBUG
+	LOG_TRACE << "bit_rule: " << LOG_RULE(rule) << "\n";
+	LOG_TRACE << "bit_rule/header: " << LOG_FM(rule.first->get()) << "\n";
+	LOG_TRACE << "bit_rule/body: " << LOG_FM(rule.second->get()) << "\n";
+#endif // DEBUG
+	return rule;
 }
 
 /**
@@ -81,73 +62,17 @@ static tref make_bit_call(tref operand, size_t bit) {
 }
 
 /**
- * @brief Creates a call to extract a specific bit from an operand (by tref).
+ * @brief Creates a call to the bitvector shift-left-by-one recurrence.
  * @tparam node Node type
- * @param operand Operand
- * @param bit Bit tref
+ * @param operand Operand to shift
+ * @param shifted Result variable
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_bit_rr_call(tref operand, tref bit) {
+static tref make_bvshl_by_one_call(tref operand,  tref shifted) {
 	using tau = tree<node>;
 
-	return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_rr_ref("_bit", { bit }, { operand })));
-}
-
-/**
- * @brief Creates a call to check if a specific bit is zero (by index).
- * @tparam node Node type
- * @param operand Operand
- * @param bit Bit index
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_is_bit_zero_call(tref operand, size_t bit) {
-	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_zero", bit, { operand })));
-}
-
-/**
- * @brief Creates a call to check if a specific bit is zero (by tref).
- * @tparam node Node type
- * @param operand Operand
- * @param bit Bit tref
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_is_bit_zero_call(tref operand, tref bit) {
-	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_zero", { bit }, { operand })));
-}
-
-/**
- * @brief Creates a call to check if a specific bit is one (by index).
- * @tparam node Node type
- * @param operand Operand
- * @param bit Bit index
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_is_bit_one_call(tref operand, size_t bit) {
-	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_one", bit, { operand })));
-}
-
-/**
- * @brief Creates a call to check if a specific bit is one (by tref).
- * @tparam node Node type
- * @param operand Operand
- * @param bit Bit tref
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_is_bit_one_call(tref operand, tref bit) {
-	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_one", { bit }, { operand })));
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshl_by_one", { operand, shifted })));
 }
 
 /**
@@ -187,6 +112,36 @@ static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 }
 
 /**
+ * @brief Applies the bitvector shift-left-by-one rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param shifted Result variable
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref bvshl_one(tref left, tref shifted) {
+	auto bitwidth = get_bv_type_bitwidth<node>(left);
+	auto predicate = bvshl_by_one_rule<node>(bitwidth);
+	auto call = make_bvshl_by_one_call<node>(left, shifted);
+	return nso_rr_apply<node>(predicate, call);
+}
+
+/**
+ * @brief Creates a call to the bitvector right-shift-by-one recurrence.
+ * @tparam node Node type
+ * @param operand Operand to shift
+ * @param shifted Result variable
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_bvrhl_by_one_call(tref operand, tref shifted) {
+	using tau = tree<node>;
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl_by_one", { operand, shifted })));
+}
+
+/**
  * @brief Returns the rule for bitvector right-shift-by-one recurrence.
  *
  * The leftmost bit is zero, the rest are shifted.
@@ -223,32 +178,33 @@ static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
 }
 
 /**
- * @brief Returns the rule for extracting a bit from a bitvector.
+ * @brief Applies the bitvector right-shift-by-one rule to the given operands.
  *
  * @tparam node Node type
- * @param bit Bit index
- * @param bitwidth Bitwidth of the operand
- * @return The constructed rule
+ * @param left Operand to shift
+ * @param shifted Result variable
+ * @return The resulting predicate term
  */
 template<NodeType node>
-static rewriter::rule bit_rule(size_t bit, size_t bitwidth) {
+tref bvrhl_one(tref left, tref shifted) {
+	auto bitwidth = get_bv_type_bitwidth<node>(left);
+	auto predicate = bvrhl_by_one_rule<node>(bitwidth);
+	auto call = make_bvrhl_by_one_call<node>(left, shifted);
+	return nso_rr_apply<node>(predicate, call);
+}
+
+/**
+ * @brief Creates a call to check if a specific bit is zero (by index).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit index
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_is_bit_zero_call(tref operand, size_t bit) {
 	using tau = tree<node>;
 
-	auto bit_offset = tau::get_num(bit);
-	auto bit_cte =
-		tau::get(tau::bf,
-			tau::get_ba_constant(
-				make_bitvector_value(1 <<bit, bitwidth), bv_type_id<node>(bitwidth)));
-	auto var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto head = tau::build_rr_ref("_bit", { bit_offset }, { var });
-	auto body = tau::build_bf_and( var, bit_cte);
-	auto rule = make_rule<node>(head, body);
-#ifdef DEBUG
-	LOG_TRACE << "bit_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bit_rule/header: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bit_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-	return rule;
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_zero", bit, { operand })));
 }
 
 /**
@@ -265,19 +221,47 @@ static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
 
 	auto bit_offset = tau::get_num(bit);
 	auto bit_cte =
-		tau::get(tau::bf,
-			tau::get_ba_constant(
-				make_bitvector_value(1 << bit, bitwidth), bv_type_id<node>(bitwidth)));
-	auto var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto head = tau::build_rr_ref("_is_bit_zero", { bit_offset }, { var });
-	auto body =	tau::build_bf_eq_0(tau::build_bf_and(var, bit_cte));
-	auto rule = make_rule<node>(head, body);
-#ifdef DEBUG
-	LOG_TRACE << "is_bit_zero_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "is_bit_zero_rule/header: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "is_bit_zero_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-	return rule;
+	tau::get(tau::bf,
+		tau::get_ba_constant(
+			make_bitvector_value(1 << bit, bitwidth), bv_type_id<node>(bitwidth)));
+			auto var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+			auto head = tau::build_rr_ref("_is_bit_zero", { bit_offset }, { var });
+			auto body =	tau::build_bf_eq_0(tau::build_bf_and(var, bit_cte));
+			auto rule = make_rule<node>(head, body);
+			#ifdef DEBUG
+			LOG_TRACE << "is_bit_zero_rule: " << LOG_RULE(rule) << "\n";
+			LOG_TRACE << "is_bit_zero_rule/header: " << LOG_FM(rule.first->get()) << "\n";
+			LOG_TRACE << "is_bit_zero_rule/body: " << LOG_FM(rule.second->get()) << "\n";
+			#endif // DEBUG
+			return rule;
+}
+
+/**
+ * @brief Creates a call to check if a specific bit is zero (by tref).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit tref
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_is_bit_zero_call(tref operand, tref bit) {
+	using tau = tree<node>;
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_zero", { bit }, { operand })));
+}
+
+/**
+ * @brief Creates a call to check if a specific bit is one (by index).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit index
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_is_bit_one_call(tref operand, size_t bit) {
+	using tau = tree<node>;
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_one", bit, { operand })));
 }
 
 /**
@@ -307,6 +291,37 @@ static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
 	LOG_TRACE << "is_bit_one_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 	return rule;
+}
+
+/**
+ * @brief Creates a call to check if a specific bit is one (by tref).
+ * @tparam node Node type
+ * @param operand Operand
+ * @param bit Bit tref
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_is_bit_one_call(tref operand, tref bit) {
+	using tau = tree<node>;
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_one", { bit }, { operand })));
+}
+
+/**
+ * @brief Creates a call to the bitvector shift-left recurrence (constant shift).
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param right Shift amount (constant)
+ * @param result Result variable
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_bvshl_call(tref left, tref right /* bv constant */, tref result) {
+	using tau = tree<node>;
+
+	DBG( assert(is_bv_constant<node>(right)); )
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshl", { left, right, result })));
 }
 
 /**
@@ -366,6 +381,40 @@ static rewriter::rule bvshl_rule(tref shift /* bv constant */, size_t bitwidth) 
 #endif // DEBUG
 	cache[bitwidth][shift] = rule;
 	return cache[bitwidth][shift];
+}
+
+/**
+ * @brief Applies the bitvector shift-left rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param shift Shift amount (constant)
+ * @param shifted Result variable
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref bvshl(tref left, tref shift, tref shifted) {
+	auto bitwidth = get_bv_type_bitwidth<node>(shift);
+	auto predicate = bvshl_rule<node>(shift, bitwidth);
+	auto call = make_bvshl_call<node>(left, shift, shifted);
+	return nso_rr_apply<node>(predicate, call);
+}
+
+/**
+ * @brief Creates a call to the bitvector right-shift recurrence (constant shift).
+ * @tparam node Node type
+ * @param left Operand to shift
+ * @param right Shift amount (constant)
+ * @param result Result variable
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_bvrhl_call(tref left, tref right /* bv copnstant */, tref result) {
+	using tau = tree<node>;
+
+	DBG( assert(is_bv_constant<node>(right)); )
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl", { left, right, result })));
 }
 
 /**
@@ -429,38 +478,6 @@ static rewriter::rule bvrhl_rule(tref shift /* bv constant */, size_t bitwidth) 
 }
 
 /**
- * @brief Applies the bitvector right-shift-by-one rule to the given operands.
- *
- * @tparam node Node type
- * @param left Operand to shift
- * @param shifted Result variable
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref bvrhl_one(tref left, tref shifted) {
-	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bvrhl_by_one_rule<node>(bitwidth);
-	auto call = make_bvrhl_by_one_call<node>(left, shifted);
-	return nso_rr_apply<node>(predicate, call);
-}
-
-/**
- * @brief Applies the bitvector shift-left-by-one rule to the given operands.
- *
- * @tparam node Node type
- * @param left Operand to shift
- * @param shifted Result variable
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref bvshl_one(tref left, tref shifted) {
-	auto bitwidth = get_bv_type_bitwidth<node>(left);
-	auto predicate = bvshl_by_one_rule<node>(bitwidth);
-	auto call = make_bvshl_by_one_call<node>(left, shifted);
-	return nso_rr_apply<node>(predicate, call);
-}
-
-/**
  * @brief Applies the bitvector right-shift rule to the given operands.
  *
  * @tparam node Node type
@@ -474,23 +491,6 @@ tref bvrhl(tref left, tref shift, tref shifted) {
 	auto bitwidth = get_bv_type_bitwidth<node>(shift);
 	auto predicate = bvrhl_rule<node>(shift, bitwidth);
 	auto call = make_bvrhl_call<node>(left, shift, shifted);
-	return nso_rr_apply<node>(predicate, call);
-}
-
-/**
- * @brief Applies the bitvector shift-left rule to the given operands.
- *
- * @tparam node Node type
- * @param left Operand to shift
- * @param shift Shift amount (constant)
- * @param shifted Result variable
- * @return The resulting predicate term
- */
-template<NodeType node>
-tref bvshl(tref left, tref shift, tref shifted) {
-	auto bitwidth = get_bv_type_bitwidth<node>(shift);
-	auto predicate = bvshl_rule<node>(shift, bitwidth);
-	auto call = make_bvshl_call<node>(left, shift, shifted);
 	return nso_rr_apply<node>(predicate, call);
 }
 
