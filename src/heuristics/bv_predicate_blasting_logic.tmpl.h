@@ -66,6 +66,7 @@ static rewriter::rule bit_rule(int_t bit, size_t bitwidth) {
 	auto head = make_bit_call_from_index<node>(var, bit);
 	auto body = tau::build_bf_and( var, cte);
 	auto rule = make_rule<node>(head, body);
+
 #ifdef DEBUG
 	LOG_TRACE << "bit_rule: " << LOG_RULE(rule) << "\n";
 	LOG_TRACE << "bit_rule/head: " << LOG_FM(rule.first->get()) << "\n";
@@ -162,11 +163,11 @@ static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 	}
 	auto rule = make_rule<node>(header, body);
 
-	#ifdef DEBUG
+#ifdef DEBUG
 	LOG_TRACE << "bvshl_by_one_rule: " << LOG_RULE(rule) << "\n";
 	LOG_TRACE << "bvshl_by_one_rule/head: " << LOG_FM(rule.first->get()) << "\n";
 	LOG_TRACE << "bvshl_by_one_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-	#endif // DEBUG
+#endif // DEBUG
 
 	cache[bitwidth] = rule;
 	return rule;
