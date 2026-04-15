@@ -15,7 +15,7 @@ namespace idni::tau_lang {
  * @return Pair of (non-constant, constant) or (nullptr, nullptr)
  */
 template <NodeType node>
-std::pair<tref, tref> get_bvmul_arguments(tref term) {
+static std::pair<tref, tref> get_bvmul_arguments(tref term) {
 	using tau = tree<node>;
 
 	auto left = tau::get(term).child(0);
@@ -38,7 +38,7 @@ std::pair<tref, tref> get_bvmul_arguments(tref term) {
  * @return Pair of (dividend, divisor) or (nullptr, nullptr)
  */
 template <NodeType node>
-std::pair<tref, tref> get_bved_arguments(tref term) {
+static std::pair<tref, tref> get_bved_arguments(tref term) {
 	using tau = tree<node>;
 
 	auto left = tau::get(term).child(0);
@@ -60,7 +60,7 @@ std::pair<tref, tref> get_bved_arguments(tref term) {
  * @return Pair of (shiftand, count) or (nullptr, nullptr)
  */
 template <NodeType node>
-std::pair<tref, tref> get_bvsh_arguments(tref term) {
+static std::pair<tref, tref> get_bvsh_arguments(tref term) {
 	using tau = tree<node>;
 
 	auto left = tau::get(term).child(0);
@@ -84,7 +84,7 @@ std::pair<tref, tref> get_bvsh_arguments(tref term) {
  * @return The blasted predicate, or nullptr on error
  */
 template<NodeType node>
-tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes) {
+static tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes) {
 	using tau = tree<node>;
 
 	tref predicate;
@@ -189,7 +189,7 @@ tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref eq_predicate(tref atomic) {
+static tref eq_predicate(tref atomic) {
 	// TODO (HIGH) add simplifications to avoid the top level variable if possible
 	subtree_map<node, tref> changes;
 	return bf_predicate_blasting<node>(atomic, changes);
@@ -203,7 +203,7 @@ tref eq_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref neq_predicate(tref n) {
+static tref neq_predicate(tref n) {
 	using tau = tree<node>;
 
 	return tau::build_wff_neg(eq_predicate<node>(n));
@@ -217,7 +217,7 @@ tref neq_predicate(tref n) {
  * @return The resulting predicate term, or nullptr on error
  */
 template<NodeType node>
-tref lt_predicate(tref atomic) {
+static tref lt_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
@@ -240,7 +240,7 @@ tref lt_predicate(tref atomic) {
  * @return The resulting predicate term, or nullptr on error
  */
 template<NodeType node>
-tref gt_predicate(tref atomic) {
+static tref gt_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
@@ -263,7 +263,7 @@ tref gt_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref lteq_predicate(tref atomic) {
+static tref lteq_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	return tau::build_wff_neg(gt_predicate<node>(atomic));
@@ -277,7 +277,7 @@ tref lteq_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref gteq_predicate(tref atomic) {
+static tref gteq_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	return tau::build_wff_neg(lt_predicate<node>(atomic));
@@ -291,7 +291,7 @@ tref gteq_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref nlt_predicate(tref atomic) {
+static tref nlt_predicate(tref atomic) {
 	return gteq_predicate<node>(atomic);
 }
 
@@ -303,7 +303,7 @@ tref nlt_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref ngt_predicate(tref atomic) {
+static tref ngt_predicate(tref atomic) {
 	return lteq_predicate<node>(atomic);
 }
 
@@ -315,7 +315,7 @@ tref ngt_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref nlteq_predicate(tref atomic) {
+static tref nlteq_predicate(tref atomic) {
 	return gt_predicate<node>(atomic);
 }
 
@@ -327,7 +327,7 @@ tref nlteq_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref ngteq_predicate(tref atomic) {
+static tref ngteq_predicate(tref atomic) {
 	return lt_predicate<node>(atomic);
 }
 
@@ -342,7 +342,7 @@ tref ngteq_predicate(tref atomic) {
  * @return The blasted predicate, or nullptr on error
  */
 template<NodeType node>
-tref atomic_predicate_blasting(tref atomic) {
+static tref atomic_predicate_blasting(tref atomic) {
 	using tau = tree<node>;
 
 	// We only blast atomic predicates over bitvector terms. If the atomic formula
@@ -393,7 +393,7 @@ tref atomic_predicate_blasting(tref atomic) {
  * @return The formula with predicates blasted, or nullptr on error
  */
 template<NodeType node>
-tref wff_predicate_blasting(tref term) {
+static tref wff_predicate_blasting(tref term) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
@@ -456,7 +456,7 @@ tref wff_predicate_blasting(tref term) {
  * @return The formula with predicates blasted, or nullptr on error
  */
 template<NodeType node>
-tref bv_predicate_blasting(tref term) {
+inline tref bv_predicate_blasting(tref term) {
 	return wff_predicate_blasting<node>(term);
 }
 
