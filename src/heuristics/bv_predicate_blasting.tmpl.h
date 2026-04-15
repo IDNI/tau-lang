@@ -826,7 +826,7 @@ static tref wff_predicate_blasting(tref term) {
 			case tau::bf_interval: {
 				// TODO (MEDIUM) convert into two predicates and a conjunction,
 				// but for now we just return an error.
-				DBG( LOG_DEBUG << "Interval predicates are currently not supported in blasting."; )
+				DBG(LOG_DEBUG << "Interval predicates are currently not supported in blasting.";)
 				return error = true, false;
 				break;
 			}
