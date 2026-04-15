@@ -228,7 +228,7 @@ tref lt_predicate(tref atomic) {
 	if (!blasted) return nullptr;
 	auto left = tau::get(blasted).child(0);
 	auto right = tau::get(blasted).child(1);
-	auto call = make_bvlt_call<node>(left, right, bitwidth);
+	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth);
 	return nso_rr_apply<node>(predicate, call);
 }
 
@@ -251,7 +251,7 @@ tref gt_predicate(tref atomic) {
 	if (!blasted) return nullptr;
 	auto left = tau::get(blasted).child(0);
 	auto right = tau::get(blasted).child(1);
-	auto call = make_bvgt_call<node>(left, right, bitwidth);
+	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth);
 	return nso_rr_apply<node>(predicate, call);
 }
 

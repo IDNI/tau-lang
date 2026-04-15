@@ -50,7 +50,7 @@ tref bit(tref operand, int_t bit);
  * @tparam node Node type
  * @param operand Operand to shift
  * @param shifted Result variable
- * @return The resulting predicate term
+ * @return The resulting term
  */
 template<NodeType node>
 tref bvshl_by_one(tref operand, tref shifted);
@@ -61,7 +61,7 @@ tref bvshl_by_one(tref operand, tref shifted);
  * @tparam node Node type
  * @param operand Operand to shift
  * @param shifted Result variable
- * @return The resulting predicate term
+ * @return The resulting predicate
  */
 template<NodeType node>
 tref bvrhl_by_one(tref operand, tref shifted);
@@ -72,7 +72,7 @@ tref bvrhl_by_one(tref operand, tref shifted);
  * @tparam node Node type
  * @param operand Operand to check
  * @param bit Bit index
- * @return The resulting predicate term
+ * @return The resulting predicate
  */
 template<NodeType node>
 tref is_bit_zero(tref operand, int_t bit);
@@ -83,7 +83,7 @@ tref is_bit_zero(tref operand, int_t bit);
  * @tparam node Node type
  * @param operand Operand to check
  * @param bit Bit index
- * @return The resulting predicate term
+ * @return The resulting predicate
  */
 template<NodeType node>
 tref is_bit_one(tref operand, int_t bit);
@@ -96,7 +96,7 @@ tref is_bit_one(tref operand, int_t bit);
  * @param left Operand to shift
  * @param shift Shift amount (constant)
  * @param shifted Result variable
- * @return The resulting predicate term
+ * @return The resulting predicate
  */
 template<NodeType node>
 tref bvshl(tref left, tref shift, tref shifted);
@@ -109,10 +109,106 @@ tref bvshl(tref left, tref shift, tref shifted);
  * @param left Operand to shift
  * @param shift Shift amount (constant)
  * @param shifted Result variable
- * @return The resulting predicate term
+ * @return The resulting predicate
  */
 template<NodeType node>
 tref bvrhl(tref left, tref shift, tref shifted);
+
+/**
+ * @brief Computes a predicate checking if left is less than right as bitvectors.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @return The resulting predicate
+ */
+template<NodeType node>
+tref bvlt(tref left, tref right);
+
+/**
+ * @brief Computes a predicate checking if left is greater than right as bitvectors.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @return The resulting predicate
+ */
+template<NodeType node>
+tref bvgt(tref left, tref right);
+
+/**
+ * @brief Computes a predicate checking if left is less than or equal to right as bitvectors.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @return The resulting predicate
+ */
+template<NodeType node>
+tref bvlteq(tref left, tref right) {
+	using tau = tree<node>;
+
+	return tau::build_wff_neg(bvgt<node>(left, right)); }
+
+/**
+ * @brief Computes a predicate checking if left is greater or equal to right as bitvectors.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @return The resulting predicate
+ */
+template<NodeType node>
+tref bvgteq(tref left, tref right) {
+	using tau = tree<node>;
+
+	return tau::build_wff_neg(bvlt<node>(left, right));
+}
+
+/**
+ * @brief Computes a predicate checking if left is not less than or equal to right as bitvectors.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @return The resulting predicate
+ */
+template<NodeType node>
+tref bvnlteq(tref left, tref right) { return bvlt<node>(left, right); }
+
+/**
+ * @brief Computes a predicate checking if left is not greater or equal to right as bitvectors.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @return The resulting predicate
+ */
+template<NodeType node>
+tref bvngteq(tref left, tref right) { return bvlt<node>(left, right); }
+
+/**
+ * @brief Computes a predicate checking if left is not less than right as bitvectors.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @return The resulting predicate
+ */
+template<NodeType node>
+tref bvnlt(tref left, tref right) { return bvgteq<node>(left, right); }
+
+/**
+ * @brief Computes a predicate checking if left is notgreater than right as bitvectors.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @return The resulting predicate
+ */
+template<NodeType node>
+tref bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
+
 
 } // namespace idni::tau_lang
 
