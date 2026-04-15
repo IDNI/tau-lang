@@ -24,11 +24,12 @@ static std::pair<tref, tref> get_bvmul_arguments(tref term) {
 	if (is_bv_constant<node>(left)) return std::make_pair(right, left);
 	if (is_bv_constant<node>(right)) return std::make_pair(left, right);
 
+	// None of the factors is constant, we cannot blast this multiplication.
 	return std::make_pair(nullptr, nullptr);
 }
 
 /**
- * @brief Extracts the arguments of a bitvector division/modulo term.
+ * @brief Extracts the arguments of a bitvector division/modulo or shift term.
  *
  * If the left child is a bitvector constant, returns (left, right).
  * Otherwise, returns (nullptr, nullptr).
@@ -38,7 +39,7 @@ static std::pair<tref, tref> get_bvmul_arguments(tref term) {
  * @return Pair of (dividend, divisor) or (nullptr, nullptr)
  */
 template <NodeType node>
-static std::pair<tref, tref> get_bved_arguments(tref term) {
+static std::pair<tref, tref> get_arguments(tref term) {
 	using tau = tree<node>;
 
 	auto left = tau::get(term).child(0);
@@ -46,28 +47,7 @@ static std::pair<tref, tref> get_bved_arguments(tref term) {
 
 	if (is_bv_constant<node>(left)) return std::make_pair(left, right);
 
-	return std::make_pair(nullptr, nullptr);
-}
-
-/**
- * @brief Extracts the arguments of a bitvector shift term.
- *
- * If the left child is a bitvector constant, returns (left, right).
- * Otherwise, returns (nullptr, nullptr).
- *
- * @tparam node Node type
- * @param term The term to analyze
- * @return Pair of (shiftand, count) or (nullptr, nullptr)
- */
-template <NodeType node>
-static std::pair<tref, tref> get_bvsh_arguments(tref term) {
-	using tau = tree<node>;
-
-	auto left = tau::get(term).child(0);
-	auto right = tau::get(term).child(1);
-
-	if (is_bv_constant<node>(left)) return std::make_pair(left, right);
-
+	// Divisor/modulo/count is not constant, we cannot blast this division/modulo/shift.
 	return std::make_pair(nullptr, nullptr);
 }
 
@@ -111,8 +91,8 @@ static tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes) {
 				break;
 			}
 			case tau::bf_shl: case tau::bf_shr: {
-				auto [shiftand, count] = get_bvsh_arguments<node>(t);
-				if (!count) break;
+				auto [shiftand, count] = get_arguments<node>(t);
+				if (!count) return error = true, false;
 				auto result = tau::build_bf_variable(type_id);
 				vars.push_back(result);
 				changes[t] = result;
@@ -126,7 +106,7 @@ static tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes) {
 			}
 			case tau::bf_mul: {
 				auto [factor, constant] = get_bvmul_arguments<node>(t);
-				if (!constant) break;
+				if (!constant) return error = true, false;
 				auto product = tau::build_bf_variable(type_id);
 				vars.push_back(product);
 				changes[t] = product;
@@ -136,8 +116,8 @@ static tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes) {
 				break;
 			}
 			case tau::bf_div: case tau::bf_mod: {
-				auto [dividend, divisor] = get_bved_arguments<node>(t);
-				if (!divisor) break;
+				auto [dividend, divisor] = get_arguments<node>(t);
+				if (!divisor) return error = true, false;
 				auto result = tau::build_bf_variable(type_id);
 				vars.push_back(result);
 				changes[t] = result;
@@ -172,13 +152,10 @@ static tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes) {
 	post_order<node>(term).search_unique(f);
 	auto modified = rewriter::replace<node>(term, changes);
 	// We add the existentials for the variables we introduced
-	for (auto it = vars.rbegin(); it != vars.rend(); ++it) {
+	for (auto it = vars.rbegin(); it != vars.rend(); ++it)
 		predicate = build_wff_ex<node>(*it, predicate);
-	}
 
-	return (predicate)
-		? tau::build_wff_and(predicate, modified)
-		: term;
+	return (predicate) ? tau::build_wff_and(predicate, modified) : term;
 }
 
 /**
@@ -373,10 +350,7 @@ static tref atomic_predicate_blasting(tref atomic) {
 	}
 
 	if (!predicate) {
-#ifdef DEBUG
-		LOG_DEBUG << "Failed to compute predicate in blasting: "
-			<< LOG_FM(atomic) << ". It will be left unchanged.";
-#endif // DEBUG
+		DBG(LOG_DEBUG << "Failed to compute predicate blasting in: " << LOG_FM(atomic);)
 		return nullptr;
 	}
 
@@ -414,7 +388,7 @@ static tref wff_predicate_blasting(tref term) {
 			case tau::bf_interval: {
 				// TODO (MEDIUM) convert into two predicates and a conjunction,
 				// but for now we just return an error.
-				DBG( LOG_DEBUG << "Interval predicates are currently not supported in blasting."; )
+				DBG(LOG_DEBUG << "Interval predicates are currently not supported in blasting.";)
 				return error = true, false;
 				break;
 			}
@@ -438,11 +412,13 @@ static tref wff_predicate_blasting(tref term) {
 
 	post_order<node>(term).search_unique(f);
 
-	if (error) return nullptr;
+	if (error) {
+		DBG(LOG_DEBUG << "Failed to compute predicate blasting in: " << LOG_FM(term);)
+		return nullptr;
+	}
 
 	auto n_term = changes.find(term) != changes.end() ? changes[term] : term;
 	DBG(LOG_TRACE << "bv_predicate_blasting/wff/n_term: " << LOG_FM(n_term);)
-
 	return n_term;
 }
 

@@ -292,7 +292,7 @@ tref bvsub(tref left, tref right, tref result) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	auto rule = bvsub_rule<node>(bitwidth);
 	auto call = make_bvsub_call_from_index<node>(left, right, result, bitwidth);
-	auto rr = make_rr<node>(bvsub_rules<node>(bitwidth), call);
+	auto rr = make_rr<node>({ rule }, call);
 	return apply_rr_to_formula(rr);
 }
 
@@ -481,7 +481,7 @@ tref bvmul(tref left, tref right, tref result) {
 	}
 	auto rule = bvmul_rule<node>(right, bitwidth);
 	auto call = make_bvmul_call_from_offset<node>(left, result, right);
-	return nso_rr_apply<node>(rule, call);
+	return nso_rr_apply<node>({ rule }, call);
 }
 
 //
