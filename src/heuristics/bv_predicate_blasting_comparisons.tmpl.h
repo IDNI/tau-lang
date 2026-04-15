@@ -64,8 +64,8 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
 		tau::build_wff_and(
 			make_bvlt_call<node>(x, y, n_minus_1),
 			tau::build_bf_eq(
-				make_bit_rr_call<node>(x, n),
-				make_bit_rr_call<node>(y, n))),
+				make_bit_call_from_offset<node>(x, n),
+				make_bit_call_from_offset<node>(y, n))),
 		tau::build_wff_and(
 			make_is_bit_zero_call<node>(x, n),
 			make_is_bit_one_call<node>(y, n)));
@@ -173,8 +173,8 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 		tau::build_wff_and(
 			make_bvgt_call<node>(x, y, n_minus_1),
 			tau::build_bf_eq(
-				make_bit_rr_call<node>(x, n),
-				make_bit_rr_call<node>(y, n))),
+				make_bit_call_from_offset<node>(x, n),
+				make_bit_call_from_offset<node>(y, n))),
 		tau::build_wff_and(
 			make_is_bit_one_call<node>(x, n),
 			make_is_bit_zero_call<node>(y, n)));
