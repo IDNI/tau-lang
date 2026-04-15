@@ -123,6 +123,7 @@ bool tau_spec<node>::add(tref expr) {
 	default:
 		DBG(TAU_LOG_TRACE << "unknown node added: " << TAU_LOG_FM_DUMP(expr);)
 		DBG(assert(false);)
+		return false;
 	}
 	return true;
 }
