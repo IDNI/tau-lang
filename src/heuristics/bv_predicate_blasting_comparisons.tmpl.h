@@ -125,7 +125,7 @@ static rewriter::rule bvlt_rule(size_t bitwidth) {
 	auto left = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto right = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 
-	auto main = make_bvlt_call_from_index<node>(left, right, bitwidth - 1);
+	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth - 1);
 	auto rules = bvlt_rules<node>(bitwidth);
 	auto bits = bit_rules<node>(bitwidth);
 	auto bit_zeros = is_bit_zero_rules<node>(bitwidth);
@@ -133,9 +133,9 @@ static rewriter::rule bvlt_rule(size_t bitwidth) {
 	rules.insert(rules.end(), bits.begin(), bits.end());
 	rules.insert(rules.end(), bit_zeros.begin(), bit_zeros.end());
 	rules.insert(rules.end(), bit_ones.begin(), bit_ones.end());
-	auto rr = make_rr<node>(rules, main);
+	auto rr = make_rr<node>(rules, call);
 	auto body = apply_rr_to_formula(rr);
-	auto rule = make_rule<node>(main, body);
+	auto rule = make_rule<node>(call, body);
 
 #ifdef DEBUG
 	LOG_TRACE << "bvlt_rule: " << LOG_RULE(rule) << "\n";
@@ -149,12 +149,10 @@ static rewriter::rule bvlt_rule(size_t bitwidth) {
 
 template<NodeType node>
 tref bvlt(tref left, tref right) {
-	using tau = tree<node>;
-
-	auto bitwidth = tau::get_bv_type_size(left);
+	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	auto rule = bvlt_rule<node>(bitwidth);
 	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth - 1);
-	auto rr = make_rr<node>(rule, call);
+	auto rr = make_rr<node>({ rule }, call);
 	return apply_rr_to_formula(rr);
 }
 
@@ -277,7 +275,7 @@ static rewriter::rule bvgt_rule(size_t bitwidth) {
 	auto left = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto right = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 
-	auto main = make_bvgt_call_from_index<node>(left, right, bitwidth);
+	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth);
 	auto rules = bvgt_rules<node>(bitwidth);
 	auto bits = bit_rules<node>(bitwidth);
 	auto bit_zeros = is_bit_zero_rules<node>(bitwidth);
@@ -285,9 +283,9 @@ static rewriter::rule bvgt_rule(size_t bitwidth) {
 	rules.insert(rules.end(), bits.begin(), bits.end());
 	rules.insert(rules.end(), bit_zeros.begin(), bit_zeros.end());
 	rules.insert(rules.end(), bit_ones.begin(), bit_ones.end());
-	auto rr = make_rr<node>(rules, main);
+	auto rr = make_rr<node>(rules, call);
 	auto body = apply_rr_to_formula(rr);
-	auto rule = make_rule<node>(main, body);
+	auto rule = make_rule<node>(call, body);
 
 #ifdef DEBUG
 	LOG_TRACE << "bvgt_rule: " << LOG_RULE(rule) << "\n";
@@ -301,12 +299,10 @@ static rewriter::rule bvgt_rule(size_t bitwidth) {
 
 template<NodeType node>
 tref bvgt(tref left, tref right) {
-	using tau = tree<node>;
-
-	auto bitwidth = tau::get_bv_type_size(left);
+	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	auto rule = bvgt_rule<node>(bitwidth);
 	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth - 1);
-	auto rr = make_rr<node>(rule, call);
+	auto rr = make_rr<node>({ rule }, call);
 	return apply_rr_to_formula(rr);
 }
 

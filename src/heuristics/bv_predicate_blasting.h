@@ -209,6 +209,71 @@ tref bvnlt(tref left, tref right) { return bvgteq<node>(left, right); }
 template<NodeType node>
 tref bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
 
+/**
+ * @brief Applies the bitvector addition rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref bvadd(tref left, tref right, tref result);
+
+/**
+ * @brief Applies the bitvector subtraction rule to the given operands.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param result Result variable
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref bvsub(tref left, tref right, tref result);
+
+/**
+ * @brief Applies the bitvector multiplication rule to the given operands.
+ *
+ * Only supports multiplication by a constant right operand.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand (must be constant)
+ * @param result Result variable
+ * @return The resulting predicate term, or nullptr if unsupported
+ */
+template<NodeType node>
+tref bvmul(tref left, tref right, tref result);
+
+/**
+ * @brief Applies the bitvector division rule to the given operands.
+ *
+ * Only supports division by a constant divisor.
+ *
+ * @tparam node Node type
+ * @param dividend Dividend
+ * @param divisor Divisor (must be constant)
+ * @param quotient Quotient variable
+ * @return The resulting predicate term, or nullptr if unsupported
+ */
+template<NodeType node>
+tref bvdiv(tref dividend, tref divisor, tref quotient);
+
+/**
+ * @brief Applies the bitvector modulo rule to the given operands.
+ *
+ * Only supports modulo by a constant divisor.
+ *
+ * @tparam node Node type
+ * @param dividend Dividend
+ * @param divisor Divisor (must be constant)
+ * @param remainder Remainder variable
+ * @return The resulting predicate term, or nullptr if unsupported
+ */
+template<NodeType node>
+tref bvmod(tref dividend, tref divisor, tref remainder);
 
 } // namespace idni::tau_lang
 
