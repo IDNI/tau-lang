@@ -369,11 +369,13 @@ static rewriter::rule bvmul_rec_rule(tref right /* cvc5 constant */, size_t bitw
 		auto zero_right = tau::build_ref("_bvmul", { left, right, result });
 		auto body = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), result);
 		auto rule = make_rule<node>(zero_right, body);
+
 #ifdef DEBUG
 		LOG_TRACE << "bvmul_rec_rule (zero case): " << LOG_RULE(rule) << "\n";
 		LOG_TRACE << "bvmul_rec_rule/head: " << LOG_FM(rule.first->get()) << "\n";
 		LOG_TRACE << "bvmul_rec_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
+
 		return rule;
 	}
 
@@ -392,11 +394,13 @@ static rewriter::rule bvmul_rec_rule(tref right /* cvc5 constant */, size_t bitw
 							make_bvmul_call_from_offset<node>(v, w, bv_shr_by_one<node>(right))),
 						bvadd<node>(left, w, result)))));
 		auto rule = make_rule<node>(odd_right, odd_body);
+
 #ifdef DEBUG
 		LOG_TRACE << "bvmul_rec_rule (odd case): " << LOG_RULE(rule) << "\n";
 		LOG_TRACE << "bvmul_rec_rule/head: " << LOG_FM(rule.first->get()) << "\n";
 		LOG_TRACE << "bvmul_rec_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
+
 		return rule;
 	}
 
@@ -410,11 +414,13 @@ static rewriter::rule bvmul_rec_rule(tref right /* cvc5 constant */, size_t bitw
 				make_bvmul_call_from_offset<node>(shifted_x, w, bv_shr_by_one<node>(right)),
 				tau::build_bf_eq(result, w))));
 	auto rule = make_rule<node>(even_right, even_body);
+
 #ifdef DEBUG
 	LOG_TRACE << "bvmul_rec_rule (even case): " << LOG_RULE(rule) << "\n";
 	LOG_TRACE << "bvmul_rec_rule/head: " << LOG_FM(rule.first->get()) << "\n";
 	LOG_TRACE << "bvmul_rec_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
+
 	return rule;
 }
 
