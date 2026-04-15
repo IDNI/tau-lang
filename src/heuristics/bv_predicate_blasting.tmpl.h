@@ -351,7 +351,7 @@ static tref keep_comparison_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref eq_predicate(tref atomic) {
+static tref eq_predicate(tref atomic) {
 	// TODO (HIGH) add simplifications to avoid the top level variable if possible
 	subtree_map<node, tref> changes;
 	return bf_predicate_blasting<node>(atomic, changes);
@@ -365,7 +365,7 @@ tref eq_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref neq_predicate(tref n) {
+static tref neq_predicate(tref n) {
 	using tau = tree<node>;
 
 	return tau::build_wff_neg(eq_predicate<node>(n));
@@ -379,7 +379,7 @@ tref neq_predicate(tref n) {
  * @return The resulting predicate term, or nullptr on error
  */
 template<NodeType node>
-tref lt_predicate(tref atomic) {
+static tref lt_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
@@ -402,7 +402,7 @@ tref lt_predicate(tref atomic) {
  * @return The resulting predicate term, or nullptr on error
  */
 template<NodeType node>
-tref gt_predicate(tref atomic) {
+static tref gt_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	subtree_map<node, tref> changes;
@@ -425,7 +425,7 @@ tref gt_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref lteq_predicate(tref atomic) {
+static tref lteq_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	return tau::build_wff_neg(gt_predicate<node>(atomic));
@@ -439,7 +439,7 @@ tref lteq_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref gteq_predicate(tref atomic) {
+static tref gteq_predicate(tref atomic) {
 	using tau = tree<node>;
 
 	return tau::build_wff_neg(lt_predicate<node>(atomic));
@@ -453,7 +453,7 @@ tref gteq_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref nlt_predicate(tref atomic) {
+static tref nlt_predicate(tref atomic) {
 	return gteq_predicate<node>(atomic);
 }
 
@@ -465,7 +465,7 @@ tref nlt_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref ngt_predicate(tref atomic) {
+static tref ngt_predicate(tref atomic) {
 	return lteq_predicate<node>(atomic);
 }
 
@@ -477,7 +477,7 @@ tref ngt_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref nlteq_predicate(tref atomic) {
+static tref nlteq_predicate(tref atomic) {
 	return gt_predicate<node>(atomic);
 }
 
@@ -489,7 +489,7 @@ tref nlteq_predicate(tref atomic) {
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref ngteq_predicate(tref atomic) {
+static tref ngteq_predicate(tref atomic) {
 	return lt_predicate<node>(atomic);
 }
 
