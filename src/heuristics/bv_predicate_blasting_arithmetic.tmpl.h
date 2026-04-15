@@ -536,7 +536,7 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv copnstant */, size_t bitwidt
 					make_bvsub_call<node>(dividend, remainder, exact),
 					tau::build_wff_and(
 						make_bvmul_call<node>(quotient, divisor, exact),
-						make_bvlt_call<node>(remainder, divisor, bitwidth))))));
+						make_bvlt_call_from_index<node>(remainder, divisor, bitwidth))))));
 	auto temp = make_rr<node>(rs, main);
 	auto head = make_bvdiv_call<node>(dividend, divisor, quotient);
 	auto body = apply_rr_to_formula(temp);
