@@ -10,10 +10,6 @@ namespace idni::tau_lang {
 
 using namespace idni;
 
-sbf_ba sbf_splitter(const sbf_ba& elem, splitter_type st) {
-	return elem->splitter(st);
-}
-
 // evaluates a parsed bdd terminal node recursively
 inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	using tt = sbf_parser::tree::traverser;
@@ -88,20 +84,5 @@ std::optional<typename node<BAs...>::constant_with_type> parse_sbf(
 		cache.emplace(sid, std::variant<BAs...>{ v }).first->second,
 		sbf_type<node<BAs...>>() };
 }
-
-
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::string sbf_ba_factory<BAs...>::zero() {
-	return "0";
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() {
-	return std::variant<BAs...>(bdd_splitter_one<Bool>());
-}
-
 
 } // namespace idni::tau_lang

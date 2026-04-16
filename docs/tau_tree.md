@@ -392,13 +392,13 @@ Following static methods stores a new constant into a pool and it returns a pair
 
 TODO
 
-## struct `nso_factory<BAs...>`
+## struct `base_ba_dispatcher<BAs...>`
 
-`nso_factory` is an "abstract" template which can be used by Tau API users to provide custom Boolean algebra (BA) types by creating a template specialization of `nso_factory<YourBA>`.
+`base_ba_dispatcher` is an "abstract" template which can be used by Tau API users to provide custom Boolean algebra (BA) types by creating a template specialization of `base_ba_dispatcher<YourBA>`.
 
-Look into the `nso_factory` API documentation for more details.
+Look into the `base_ba_dispatcher` API documentation for more details.
 
-Most important method in nso_factory is `binding()` which binds the tau object and its type into a tree node, when factory binding is used and constant of your type is encountered.
+Most important method in base_ba_dispatcher is `binding()` which binds the tau object and its type into a tree node, when factory binding is used and constant of your type is encountered.
 ```
 	/**
 	 * Binds the given tau object with the specified type.

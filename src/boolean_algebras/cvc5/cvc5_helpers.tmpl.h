@@ -7,7 +7,7 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
-size_t get_Term_size(const Term& b) {
+inline size_t get_Term_size(const Term& b) {
 	DBG( assert(b.isBitVectorValue()); )
 	return b.getSort().getBitVectorSize();
 }

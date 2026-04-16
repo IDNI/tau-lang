@@ -13,6 +13,7 @@
 // TODO (MEDIUM) parsing with `bool simplify = true` argument
 
 #include "interpreter.h"
+#include "utility/measure.h"
 
 namespace idni::tau_lang {
 
@@ -28,6 +29,24 @@ struct interpreter_options {
 	output_streams_remap output_remaps;
 };
 
+struct measuring {
+	std::string name;
+	double ms = 0;
+	std::vector<measuring> parts{};
+	measuring& part();
+	std::ostream& operator()(std::ostream& os, size_t level = 0) const;
+	std::ostream& to_json(std::ostream& os, size_t level = 0) const;
+};
+
+std::ostream& operator<<(std::ostream& os, const measuring& m);
+
+struct api_measure {
+	api_measure(std::string name, measuring& m);
+	~api_measure();
+	measuring& m;
+	idni::measures::timer t;
+};
+
 // API functions are as static methods in a template so it is possible to
 // alias it with user defined node containing their chosen boolean algebras pack
 // using tau_api = api<node<BAs...>>; tau_api::get_interpreter(...);
@@ -37,27 +56,30 @@ struct api {
 	using optional_string = std::optional<std::string>;
 	using severity_level = boost::log::trivial::severity_level;
 
+	friend tau;
+
 	static void set_charvar(bool state);
 	static void set_blasting(bool state);
 	static void set_indenting(bool state);
 	static void set_highlighting(bool state);
+	static void set_json(bool state);
 	static void set_severity(severity_level level);
 
 	// Parsing
 	// ------------------------------------------------------------
-	static tref get_term(const std::string& term);         // bf
-	static htref geth_term(const std::string& term);
+	static tref get_term(const std::string& term, bool simplified = true);         // bf
+	static htref geth_term(const std::string& term, bool simplified = true);
 
-	static tref get_formula(const std::string& formula);   // wff
-	static htref geth_formula(const std::string& formula);
+	static tref get_formula(const std::string& formula, bool simplified = true);   // wff
+	static htref geth_formula(const std::string& formula, bool simplified = true);
 
 	// rec_relation { bf_ref { ... } ,  bf { ... } }
-	static tref get_function_def(const std::string& function_def);
-	static htref geth_function_def(const std::string& function_def);
+	static tref get_function_def(const std::string& function_def, bool simplified = true);
+	static htref geth_function_def(const std::string& function_def, bool simplified = true);
 
 	// rec_relation { wff_ref { ... } , wff { ... } }
-	static tref get_predicate_def(const std::string& predicate_def);
-	static htref geth_predicate_def(const std::string& predicate_def);
+	static tref get_predicate_def(const std::string& predicate_def, bool simplified = true);
+	static htref geth_predicate_def(const std::string& predicate_def, bool simplified = true);
 
 	// input_def, output_def
 	static tref get_stream_def(const std::string& stream_def);
@@ -68,16 +90,19 @@ struct api {
 	static htref geth_spec(const std::string& spec);
 
 	// rec_relation     private?
-	static tref get_definition(const std::string& definition);
-	static htref geth_definition(const std::string& definition);
+	static tref get_definition(const std::string& definition, bool simplified = true);
+	static htref geth_definition(const std::string& definition, bool simplified = true);
 
 	// spec, wff, bf    private?
-	static tref get_spec_or_term(const std::string& expression);
-	static htref geth_spec_or_term(const std::string& expression);
+	static tref get_spec_or_term(const std::string& expression, bool simplified = true);
+	static htref geth_spec_or_term(const std::string& expression, bool simplified = true);
 
 	// wff, bf          private?
-	static tref get_formula_or_term(const std::string& expression);
-	static htref geth_formula_or_term(const std::string& expression);
+	static tref get_formula_or_term(const std::string& expression, bool simplified = true);
+	static htref geth_formula_or_term(const std::string& expression, bool simplified = true);
+
+	// tref api
+	static size_t add_definition(tref head, tref body);
 
 	// Querying
 	// ------------------------------------------------------------
@@ -103,7 +128,7 @@ struct api {
 	static optional_string apply_defs(
 		const std::set<std::string>& defs,
 		const std::string& expression);
-	static tref apply_defs(std::set<tref> defs, tref expression);
+	static tref apply_defs(subtree_set<node> defs, tref expression);
 	static htref apply_defs(std::set<htref> defs, htref expression);
 
 	static optional_string apply_all_defs(
@@ -165,11 +190,6 @@ struct api {
 
 	// Procedures
 	// ------------------------------------------------------------
-	// Applies local simplifications like 1 & 0 := 0
-	// calls syntactic_formula_simplification
-	static optional_string simplify(const std::string& expression);
-	static tref simplify(tref expression);
-	static htref simplify(htref expression);
 
 	// Applies cheap non-local simplifications like symbolic clause contradiction
 	static optional_string syntactic_term_simplification(
@@ -249,6 +269,11 @@ struct api {
 		const std::string& spec,
 		interpreter_options& options);
 	static std::optional<interpreter<node>> get_interpreter(
+		tref spec);
+	static std::optional<interpreter<node>> get_interpreter(
+		tref spec,
+		interpreter_options& options);
+	static std::optional<interpreter<node>> get_interpreter(
 		tau_spec<node>& spec);
 	static std::optional<interpreter<node>> get_interpreter(
 		tau_spec<node>& spec,
@@ -263,8 +288,217 @@ struct api {
 	static std::optional<std::map<stream_at, std::string>> step(
 		interpreter<node>& i);
 
+	// simplification and inference
+	static tref infer(tref expr, bool use_defaults = true);
+	// Applies local simplifications like 1 & 0 := 0
+	// calls syntactic_formula_simplification
+	static optional_string simplify(const std::string& expr,
+						bool use_defaults = true);
+	static tref simplify(tref expr, bool use_defaults = true);
+	static htref simplify(htref expr, bool use_defaults = true);
+
+	// with measuring
+	// --------------
+
+	static tref get_term(measuring& m, const std::string& term, bool simplified = true);         // bf
+	static htref geth_term(measuring& m, const std::string& term, bool simplified = true);
+
+	static tref get_formula(measuring& m, const std::string& formula, bool simplified = true);   // wff
+	static htref geth_formula(measuring& m, const std::string& formula, bool simplified = true);
+
+	static tref get_function_def(measuring& m, const std::string& function_def, bool simplified = true);
+	static htref geth_function_def(measuring& m, const std::string& function_def, bool simplified = true);
+
+	static tref get_predicate_def(measuring& m, const std::string& predicate_def, bool simplified = true);
+	static htref geth_predicate_def(measuring& m, const std::string& predicate_def, bool simplified = true);
+
+	static tref get_stream_def(measuring& m, const std::string& stream_def);
+	static htref geth_stream_def(measuring& m, const std::string& stream_def);
+
+	static tref get_spec(measuring& m, const std::string& spec);
+	static htref geth_spec(measuring& m, const std::string& spec);
+
+	static tref get_definition(measuring& m, const std::string& definition, bool simplified = true);
+	static htref geth_definition(measuring& m, const std::string& definition, bool simplified = true);
+
+	static tref get_spec_or_term(measuring& m, const std::string& expression, bool simplified = true);
+	static htref geth_spec_or_term(measuring& m, const std::string& expression, bool simplified = true);
+
+	static tref get_formula_or_term(measuring& m, const std::string& expression, bool simplified = true);
+	static htref geth_formula_or_term(measuring& m, const std::string& expression, bool simplified = true);
+
+	static size_t add_definition(measuring& m, tref head, tref body);
+
+	static optional_string apply_def(
+		measuring& m,
+		const std::string& def,
+		const std::string& expression);
+	static tref apply_def(measuring& m, tref def, tref expression);
+	static htref apply_def(measuring& m, htref def, htref expression);
+
+	static optional_string apply_defs(
+		measuring& m,
+		const std::set<std::string>& defs,
+		const std::string& expression);
+	static tref apply_defs(measuring& m, subtree_set<node> defs, tref expression);
+	static htref apply_defs(measuring& m, std::set<htref> defs, htref expression);
+
+	static optional_string apply_all_defs(
+		measuring& m,
+		const std::string& expression);
+	static tref apply_all_defs(measuring& m, tref expression);
+	static htref apply_all_defs(measuring& m, htref expression);
+
+	static optional_string substitute(
+		measuring& m,
+		const std::string& expression,
+		const std::string& that,
+		const std::string& with);
+	static tref substitute(measuring& m, tref expression, tref that, tref with);
+	static htref substitute(measuring& m, htref expression, htref that, htref with);
+
+	static optional_string substitute(
+		measuring& m,
+		const std::string& expression,
+		const std::map<std::string, std::string>& that_with);
+	static tref substitute(measuring& m, tref expression, std::map<tref, tref> that_with);
+	static htref substitute(
+		measuring& m,
+		htref expression,
+		std::map<htref, htref> that_with);
+
+	static optional_string boole_normal_form(
+		measuring& m,
+		const std::string& expression);
+	static tref boole_normal_form(measuring& m, tref expression);
+	static htref boole_normal_form(measuring& m, htref expression);
+
+	static optional_string dnf(measuring& m, const std::string& expression);
+	static tref dnf(measuring& m, tref expression);
+	static htref dnf(measuring& m, htref expression);
+
+	static optional_string cnf(measuring& m, const std::string& expression);
+	static tref cnf(measuring& m, tref expression);
+	static htref cnf(measuring& m, htref expression);
+
+	static optional_string nnf(measuring& m, const std::string& expression);
+	static tref nnf(measuring& m, tref expression);
+	static htref nnf(measuring& m, htref expression);
+
+	static optional_string syntactic_term_simplification(
+		measuring& m, const std::string& term);
+	static tref syntactic_term_simplification(measuring& m, tref term);
+	static htref syntactic_term_simplification(measuring& m, htref term);
+
+	static optional_string syntactic_formula_simplification(
+		measuring& m,
+		const std::string& formula);
+	static tref syntactic_formula_simplification(measuring& m, tref formula);
+	static htref syntactic_formula_simplification(measuring& m, htref formula);
+
+	static optional_string normalize_term(measuring& m, const std::string& term);
+	static tref normalize_term(measuring& m, tref term);
+	static htref normalize_term(measuring& m, htref term);
+
+	static optional_string normalize_formula(measuring& m, const std::string& fm);
+	static tref normalize_formula(measuring& m, tref fm);
+	static htref normalize_formula(measuring& m, htref fm);
+
+	static optional_string anti_prenex(measuring& m, const std::string& fm);
+	static tref anti_prenex(measuring& m, tref fm);
+	static htref anti_prenex(measuring& m, htref fm);
+
+	static optional_string eliminate_quantifiers(measuring& m, const std::string& fm);
+	static tref eliminate_quantifiers(measuring& m, tref fm);
+	static htref eliminate_quantifiers(measuring& m, htref fm);
+
+	static bool realizable(measuring& m, const std::string& spec);
+	static bool realizable(measuring& m, tref spec);
+	static bool realizable(measuring& m, htref spec);
+
+	static bool unrealizable(measuring& m, const std::string& spec);
+	static bool unrealizable(measuring& m, tref spec);
+	static bool unrealizable(measuring& m, htref spec);
+
+	static bool sat(measuring& m, const std::string& formula);
+	static bool sat(measuring& m, tref formula);
+	static bool sat(measuring& m, htref formula);
+
+	static bool unsat(measuring& m, const std::string& formula);
+	static bool unsat(measuring& m, tref formula);
+	static bool unsat(measuring& m, htref formula);
+
+	static bool valid(measuring& m, const std::string& formula);
+	static bool valid(measuring& m, tref formula);
+	static bool valid(measuring& m, htref formula);
+
+	static bool valid_spec(measuring& m, const std::string& spec);
+	static bool valid_spec(measuring& m, tref spec);
+	static bool valid_spec(measuring& m, htref spec);
+
+	static std::optional<std::map<std::string, std::string>> solve(
+		measuring& m,
+		const std::string& formula,
+		solver_mode mode = solver_mode::general);
+	static std::optional<subtree_map<node, tref>> solve(
+		measuring& m,
+		tref formula,
+		solver_mode mode = solver_mode::general);
+	static std::optional<std::map<htref, htref>> solve(
+		measuring& m,
+		htref formula,
+		solver_mode mode = solver_mode::general);
+
+	static std::optional<std::map<std::string, std::string>> lgrs(
+		measuring& m,
+		const std::string& equation);
+	static std::optional<std::map<htref, htref>> lgrs(
+		measuring& m,
+		htref equation);
+	static std::optional<subtree_map<node, tref>> lgrs(
+		measuring& m,
+		tref equation);
+
+	static std::optional<interpreter<node>> get_interpreter(
+		measuring& m,
+		const std::string& spec);
+	static std::optional<interpreter<node>> get_interpreter(
+		measuring& m,
+		const std::string& spec,
+		interpreter_options& options);
+	static std::optional<interpreter<node>> get_interpreter(
+		measuring& m,
+		tref spec);
+	static std::optional<interpreter<node>> get_interpreter(
+		measuring& m,
+		tref spec,
+		interpreter_options& options);
+	static std::optional<interpreter<node>> get_interpreter(
+		measuring& m,
+		tau_spec<node>& spec);
+	static std::optional<interpreter<node>> get_interpreter(
+		measuring& m,
+		tau_spec<node>& spec,
+		interpreter_options& options);
+	static std::vector<stream_at> get_inputs_for_step(
+		measuring& m,
+		interpreter<node>& i);
+	static std::optional<std::map<stream_at, std::string>> step(
+		measuring& m,
+		interpreter<node>& i,
+		std::map<stream_at, std::string> inputs);
+	static std::optional<std::map<stream_at, std::string>> step(
+		measuring& m,
+		interpreter<node>& i);
+
+	static tref infer(measuring& m, tref expr, bool use_defaults = true);
+	static optional_string simplify(measuring& m, const std::string& expr,
+						bool use_defaults = true);
+	static tref simplify(measuring& m, tref expr, bool use_defaults = true);
+	static htref simplify(measuring& m, htref expr, bool use_defaults = true);
+
 private:
-	static std::optional<rr<node>> get_nso_rr(tref expression);
+	static std::optional<rr<node>> get_nso_rr(tref expr);
 };
 
 
@@ -273,5 +507,6 @@ private:
 #include "api.tmpl.h"
 #include "api.tmpl.htref.h"
 #include "api.tmpl.string.h"
+#include "api.tmpl.measuring.h"
 
 #endif // __IDNI__TAU__API_H__

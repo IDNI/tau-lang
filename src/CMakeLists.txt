@@ -35,7 +35,7 @@ set(TAU_HEADERS
 	splitter.h
 	solver.h
 	ba_types_inference.h
-	runtime.h
+	base_ba_dispatcher.h
 	interpreter.h
 	api.h
 	union_find.h       # union find data structure
@@ -185,7 +185,7 @@ endif(TAU_BUILD_SHARED_EXECUTABLE)
 # install
 #
 
-set(BUILD_TARGETS ${TAU_OBJECT_LIB_NAME})
+set(BUILD_TARGETS "")
 if(BUILD_SHARED_LIBRARY)
 	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_SHARED_LIB_NAME})
 endif()

@@ -16,6 +16,7 @@ struct tau_spec {
 	bool is_eof() const;
 	const std::vector<std::string>& errors() const;
 	tref get();
+	bool add(tref expr);
 	std::optional<rr<node>> get_nso_rr();
 
 private:
@@ -34,6 +35,8 @@ private:
 	std::deque<tref> parsed_{};
 	std::optional<std::string> eof_msg_{};
 	std::vector<std::string> errors_{};
+	trefs defs_{};
+	tref main_ = nullptr;
 };
 
 template <NodeType node>
