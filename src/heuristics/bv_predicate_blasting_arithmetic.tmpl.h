@@ -46,7 +46,7 @@ template<NodeType node>
 static tref make_bvadd_call_from_index(tref left, tref right, tref result, size_t index) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_integer(index);
+	auto offset = tau::get_num(index);
 	return make_bvadd_call_from_offset<node>(left, right, result, offset);
 }
 
@@ -79,7 +79,7 @@ static rewriter::rules bvadd_rules(size_t bitwidth) {
 	rules.push_back(make_rule<node>(base_header, base_body));
 	// general case: addition[n](x, y, z) = ex w addition[n-1](x ^ y, w, z) && bv_shr_by_one(x & y, w);
 	auto n = tau::build_variable(untyped_type_id<node>());
-	auto n_minus_1 = tau::build_ref_shift_offset(n, 1);
+	auto n_minus_1 = tau::build_shift(n, 1);
 	auto general_header = make_bvadd_call_from_offset<node>(left, right, result, n);
 	auto w = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_w = tau::get(tau::bf, w);
@@ -193,7 +193,7 @@ template<NodeType node>
 static tref make_bvsub_call_from_index(tref left, tref right, tref result, size_t index) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_integer(index);
+	auto offset = tau::get_num(index);
 	return make_bvsub_call_from_offset<node>(left, right, result, offset);
 }
 
@@ -226,7 +226,7 @@ static rewriter::rules bvsub_rules(size_t bitwidth) {
 	rules.push_back(make_rule<node>(base_header, base_body));
 	// general case: subtraction[n](x, y, z) = ex w subtraction[n-1](x ^ y, w, z) && bv_shr_by_one((~x & y), w);
 	auto n = tau::build_variable(untyped_type_id<node>());
-	auto n_minus_1 = tau::build_ref_shift_offset(n, 1);
+	auto n_minus_1 = tau::build_shift(n, 1);
 	auto general_header = make_bvsub_call_from_offset<node>(left, right, result, n);
 	auto w = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_w = tau::get(tau::bf, w);
@@ -336,7 +336,7 @@ template<NodeType node>
 static tref make_bvmul_call_from_index(tref left, tref result, int_t index) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_integer(index);
+	auto offset = tau::get_num(index);
 	return make_bvmul_call_from_offset<node>(left, result, offset);
 }
 

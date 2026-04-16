@@ -34,10 +34,10 @@ static tref make_bit_call_from_offset(tref operand, tref offset) {
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_bit_call_from_index(tref operand, int_t bit) {
+static tref make_bit_call_from_index(tref operand, size_t bit) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_integer(bit);
+	auto offset = tau::get_num(bit);
 	return make_bit_call_from_offset<node>(operand, offset);
 }
 
@@ -278,10 +278,10 @@ static tref make_is_bit_zero_call_from_offset(tref operand, tref bit) {
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_is_bit_zero_call_from_index(tref operand, int_t bit) {
+static tref make_is_bit_zero_call_from_index(tref operand, size_t bit) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_integer(bit);
+	auto offset = tau::get_num(bit);
 	return make_is_bit_zero_call_from_offset<node>(operand, offset);
 }
 
@@ -382,10 +382,10 @@ static tref make_is_bit_one_call_from_offset(tref operand, tref bit) {
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_is_bit_one_call_from_index(tref operand, int_t bit) {
+static tref make_is_bit_one_call_from_index(tref operand, size_t bit) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_integer(bit);
+	auto offset = tau::get_num(bit);
 	return make_is_bit_one_call_from_offset<node>(operand, offset);
 }
 
