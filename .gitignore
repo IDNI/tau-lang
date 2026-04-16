@@ -89,3 +89,4 @@ __pycache__/
 *.py[codz]
 *$py.class
 .pytest_cache/
+CLAUDE.md
