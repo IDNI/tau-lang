@@ -9,6 +9,23 @@ string(STRIP "${TAU_VERSION}" TAU_VERSION)
 string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" TAU_TARGET_VERSION "${TAU_VERSION}")
 message(STATUS "Tau version: ${TAU_TARGET_VERSION} / ${TAU_VERSION}")
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
+	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
+endif()
+if(TAU_USE_CCACHE)
+	find_program(CCACHE_BINARY ccache)
+	if(CCACHE_BINARY)
+		set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_BINARY}"
+			CACHE STRING "C compiler launcher")
+		set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_BINARY}"
+			CACHE STRING "C++ compiler launcher")
+		message(STATUS "Using ccache: ${CCACHE_BINARY}")
+	else()
+		message(WARNING "TAU_USE_CCACHE is ON but ccache was not found. Disabling ccache.")
+		set(TAU_USE_CCACHE OFF CACHE BOOL "Use ccache to speed up compilation" FORCE)
+	endif()
+endif()
+
 set(namespace "TAU")
 set(PROJECT_NAME tau)
 set(PROJECT_LIB_NAME TAU)
@@ -49,9 +66,12 @@ option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
+option(TAU_USE_CCACHE              "Use ccache when building"              OFF)
 
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
-set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
+if (TAU_BUILD_JOBS STREQUAL "")
+	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
+endif()
 
 message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
 
@@ -95,6 +115,7 @@ set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MACOS_PACKAGE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
 
 # Load local cmake settings
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
@@ -221,6 +242,7 @@ message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
 message(STATUS "TAU_BUILD_API_TESTS: ${TAU_BUILD_API_TESTS}")
 message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
+message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
 message(STATUS "TAU_ADDRESS_SANITIZER: ${TAU_ADDRESS_SANITIZER}")
 message(STATUS "TAU_RPM_PACKAGE: ${TAU_RPM_PACKAGE}")
 message(STATUS "TAU_DEB_PACKAGE: ${TAU_DEB_PACKAGE}")
@@ -230,7 +252,9 @@ message(STATUS "TAU_MACOS_PACKAGE: ${TAU_MACOS_PACKAGE}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
+message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
 
+message(STATUS "CMAKE_CXX_COMPILER_LAUNCHER: ${CMAKE_CXX_COMPILER_LAUNCHER}")
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER_VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
@@ -302,7 +326,7 @@ if(TAU_BUILD_BOOST)
 	)
 endif()
 
-# cmake_policy(SET CMP0167 NEW) is required in future versions of CMake
+# cmake_policy(SET CMP0167 NEW) # is required in future versions of CMake
 set(Boost_USE_STATIC_LIBS ON)
 if (TAU_BUILD_BOOST)
 	set(Boost_DIR "${BOOST_LIBDIR}/cmake/Boost-1.86.0")
@@ -397,27 +421,27 @@ endif()
 #
 # Build documentation
 #
-
-# check if Doxygen is installed
-find_package(Doxygen)
-if (DOXYGEN_FOUND AND TAU_BUILD_DOC)
-	# set input and output files
-	set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
-	set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
-	# request to configure the file
-	configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-	message("Doxygen build started")
-	# note the option ALL which allows to build the docs together with the application
-	add_custom_target(doc_doxygen ALL
-		COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-		COMMENT "Generating API documentation with Doxygen"
-		VERBATIM
-	)
-else (DOXYGEN_FOUND AND TAU_BUILD_DOC)
-	message("Doxygen need to be installed to generate the doxygen documentation")
-endif (DOXYGEN_FOUND AND TAU_BUILD_DOC)
-
+if (TAU_BUILD_DOC)
+	# check if Doxygen is installed
+	find_package(Doxygen)
+	if (DOXYGEN_FOUND)
+		# set input and output files
+		set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
+		set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+		# request to configure the file
+		configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+		message("Doxygen build started")
+		# note the option ALL which allows to build the docs together with the application
+		add_custom_target(doc_doxygen ALL
+			COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+			COMMENT "Generating API documentation with Doxygen"
+			VERBATIM
+		)
+	else (DOXYGEN_FOUND)
+		message("Doxygen need to be installed to generate the doxygen documentation")
+	endif (DOXYGEN_FOUND)
+endif (TAU_BUILD_DOC)
 #
 # CPack configuration
 #

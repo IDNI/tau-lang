@@ -298,7 +298,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 
 	if (options.infer_ba_types) {
 		auto result = infer_ba_types<node>(transformed,
-			options.global_scope, options.definition_heads);
+			options.global_scope, options.definition_heads,
+			{ .use_defaults = options.use_default_types });
 		transformed = result.first;
 		// If type inference failed
 		if (!transformed) {
@@ -339,8 +340,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		if (tau::get(n).is(tau::offset)) return false;
 		return true;
 	};
-	if (options.infer_ba_types && options.reget_with_hooks)
-		pre_order<node>(transformed).visit(check, visit, identity);
+	if (options.infer_ba_types && options.reget_with_hooks &&
+		options.use_default_types) pre_order<node>(transformed)
+						.visit(check, visit, identity);
 #endif
 
 	// As final step, convert the bound variables to a canonical numbered representation

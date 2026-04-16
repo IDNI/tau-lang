@@ -55,8 +55,8 @@ tref canonize(tref t) {
 	if (tau::get(new_t).is(tau::bf)) new_t = tau::trim(new_t);
 	if (auto var_name = tt(new_t) | tau::io_var | tau::var_name | tt::ref; var_name)
 		new_t = tau::get(tau::variable, tau::get(tau::io_var, { var_name }));
-	DBG(LOG_TRACE << "canonize/t -> new_t:\n"
-		<< LOG_FM_TREE(t) << " -> " << LOG_FM_TREE(new_t);)
+	// DBG(LOG_TRACE << "canonize/t -> new_t:\n"
+	// 	<< LOG_FM_TREE(t) << " -> " << LOG_FM_TREE(new_t);)
 	return new_t;
 }
 
@@ -371,11 +371,12 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return nullptr;
 	// If the tref is typed
-	if (auto type = get_inferred_type<node>(n, canonized, types, options); type) {
+	if (auto type = get_inferred_type<node>(n, canonized, types, options); type && type.value()) {
 		if (auto assigned = resolver.assign(canonized, type.value());
 				std::holds_alternative<inference_error>(assigned))
 			return std::get<inference_error>(assigned);
 		// Check that the constant was not parsed yet
+		DBG(LOG_TRACE << "inferred type of a constant: " << LOG_BA_TYPE(type.value());)
 		if (tau::get(n).data() == 0) {
 			n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type.value());
 			if (n == nullptr) return parse_error{canonized, type.value()};
@@ -492,7 +493,8 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 	// If the body is a formula and not a term, reject
 	if (tau::get(body).is(tau::wff)) return nullptr;
 	size_t type = find_ba_type<node>(std::get<tref>(updated));
-	DBG(assert(!is_untyped<node>(type)));
+	// DBG(assert(!is_untyped<node>(type)));
+	if (is_untyped<node>(type)) return updated;
 	tref new_head = is<node, tau::ref>(head)
 				? tau::get_typed(tau::bf,
 					tau::get_typed(tau::bf_ref, head, type),
@@ -1039,7 +1041,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::ref: {
 				// We skip the traversal if the parent is not a wff_ref or
 				// is a functional ref as are treated elsewhere.
-				if (is_functional_relation<node>(parent)) {
+				if (parent && is_functional_relation<node>(parent)) {
 					skip = true; break;
 				}
 				if (has_fallback<node>(n)) {
@@ -1241,7 +1243,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				break;
 			}
 			case tau::ref: {
-				if (is_cli_cmd<node>(parent) || is<node, tau::wff_ref>(parent)) {
+				if (parent && (is_cli_cmd<node>(parent) || is<node, tau::wff_ref>(parent))) {
 					if (has_fallback<node>(n)) {
 						// we must deal with it as a rec relation
 						// We need to adjust the wrapping around refs in the body and

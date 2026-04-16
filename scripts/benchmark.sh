@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./dev build RelWithDebInfo $@
+./dev build RelWithDebInfo "$@"

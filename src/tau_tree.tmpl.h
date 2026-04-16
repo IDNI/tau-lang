@@ -194,11 +194,6 @@ template <NodeType node>
 tref tree<node>::get() const { return base_t::get(); }
 
 template <NodeType node>
-const tree<node>& tree<node>::get(const std::optional<tref>& id) {
-	return id ? (const tree&) base_t::get(*id) : (const tree&) base_t::get();
-}
-
-template <NodeType node>
 const tree<node>& tree<node>::get(const tref id) {
 	DBG(assert(id != nullptr);)
 	return (const tree&) base_t::get(id);
@@ -305,7 +300,7 @@ tref tree<node>::get(const node& v, const node& child) {
 template <NodeType node>
 tref tree<node>::get(const node& v, const node& ch1, const node& ch2)
 {
-	return get(v, ch1, ch2);
+	return get(v, get(ch1), get(ch2));
 }
 
 template <NodeType node>
@@ -823,8 +818,7 @@ template<NodeType node>
 tref tree<node>::substitute(tref that, tref with) const {
 	// If that contains a quantifier, the above quantifier id's in formula need
 	// to be recalculated; otherwise just simple replace method
-	DBG(assert(tau::get(that).get_ba_type() ==
-		tau::get(with).get_ba_type());)
+	// DBG(assert(tau::get(that).get_ba_type() == tau::get(with).get_ba_type());)
 	//with contains a quantifier
 	if (tau::get(with).find_top(is_logical_or_functional_quant<node>)) {
 		return canonize_quantifier_ids<node>(this->replace(that, with));
@@ -845,7 +839,8 @@ tref tree<node>::substitute(const auto& changes) const {
 
 template <NodeType node>
 std::function<bool(const tref&)> or_predicate(
-		const std::function<bool(const tref&)>* query, size_t count) {
+	const std::function<bool(const tref&)>* query, size_t count)
+{
 	return [query, count](const tref& t) {
 		for (size_t i = 0; i < count; ++i) if (query[i](t)) return true;
 		return false;
@@ -854,9 +849,10 @@ std::function<bool(const tref&)> or_predicate(
 
 template <NodeType node>
 std::vector<trefs> select_by_predicates(
-		const trefs refs,
-		const std::function<bool(const tref&)>* queries,
-		const size_t count) {
+	const trefs refs,
+	const std::function<bool(const tref&)>* queries,
+	const size_t count)
+{
 	std::vector<trefs> result(count);
 	for (const tref& r : refs)
 		for (size_t i = 0; i < count; ++i)
@@ -866,91 +862,103 @@ std::vector<trefs> select_by_predicates(
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_top_by_predicates(
-		const std::function<bool(const tref&)>* queries,
-		const size_t count) const {
-	auto refs = select_top(or_predicate<node>(queries, count));
+	const std::function<bool(const tref&)>* queries,
+	const size_t count) const
+{
+	auto refs = this->select_top(or_predicate<node>(queries, count));
 	return select_by_predicates<node>(refs, queries, count);
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_top_by_predicates(
-		const std::initializer_list<std::function<bool(const tref&)>>& queries) const  {
-	auto refs = select_top(or_predicate<node>(queries.begin(), queries.size()));
+	const std::initializer_list<std::function<bool(const tref&)>>& queries) const
+{
+	auto refs = this->select_top(or_predicate<node>(queries.begin(), queries.size()));
 	return select_by_predicates<node>(refs, queries.begin(), queries.size());
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_top_by_predicates(
-		const std::vector<std::function<bool(const tref&)>>& queries) const {
-	auto refs = select_top(or_predicate<node>(queries.data(), queries.size()));
+	const std::vector<std::function<bool(const tref&)>>& queries) const
+{
+	auto refs = this->select_top(or_predicate<node>(queries.data(), queries.size()));
 	return select_by_predicates<node>(refs, queries.data(), queries.size());
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_top_until_by_predicates(
-		const std::function<bool(const tref&)>* queries, const size_t count,
-		const auto& until) const {
+	const std::function<bool(const tref&)>* queries, const size_t count,
+	const auto& until) const
+{
 	auto refs = select_top_until(or_predicate<node>(queries, count), until);
 	return select_by_predicates<node>(refs, queries, count);
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_top_until_by_predicates(
-		const std::initializer_list<std::function<bool(const tref&)>>& queries,
-		const auto& until) const {
+	const std::initializer_list<std::function<bool(const tref&)>>& queries,
+	const auto& until) const
+{
 	auto refs = select_top_until(or_predicate<node>(queries.begin(), queries.size()), until);
-	return select_by_predicate<node>(refs, queries.begin(), queries.size());
+	return select_by_predicates<node>(refs, queries.begin(), queries.size());
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_top_until_by_predicates(
-		const std::vector<std::function<bool(const tref&)>>& queries,
-		const auto& until) const {
+	const std::vector<std::function<bool(const tref&)>>& queries,
+	const auto& until) const
+{
 	auto refs = select_top_until(or_predicate<node>(queries.data(), queries.size()), until);
-	return select_by_predicate<node>(refs, queries.data(), queries.size());
+	return select_by_predicates<node>(refs, queries.data(), queries.size());
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_all_by_predicates(
-		const std::function<bool(const tref&)>* queries, const size_t count) const {
-	auto refs = select_all(or_predicate<node>(queries, count));
-	return select_by_predicate<node>(refs, queries, count);
+	const std::function<bool(const tref&)>* queries, const size_t count) const
+{
+	auto refs = this->select_all(or_predicate<node>(queries, count));
+	return select_by_predicates<node>(refs, queries, count);
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_all_by_predicates(
-		const std::initializer_list<std::function<bool(const tref&)>>& queries) const {
-	auto refs = select_all(or_predicate<node>(queries.begin(), queries.size()));
+	const std::initializer_list<std::function<bool(const tref&)>>& queries) const
+{
+	auto refs = this->select_all(or_predicate<node>(queries.begin(), queries.size()));
 	return select_by_predicates<node>(refs, queries.begin(), queries.size());
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_all_by_predicates(
-		const std::vector<std::function<bool(const tref&)>>& queries) const {
-	auto refs = select_all(or_predicate<node>(queries.data(), queries.size()));
+	const std::vector<std::function<bool(const tref&)>>& queries) const
+{
+	auto refs = this->select_all(or_predicate<node>(queries.data(), queries.size()));
 	return select_by_predicates<node>(refs, queries.data(), queries.size());
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_all_until_by_predicates(
 		const std::function<bool(const tref&)>* queries, const size_t count,
-		const auto& until) const {
+		const auto& until) const
+{
 	auto refs = select_all_until(or_predicate<node>(queries, count), until);
 	return select_by_predicates<node>(refs, queries, count);
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_all_until_by_predicates(
-		const std::initializer_list<std::function<bool(const tref&)>>& queries,
-		const auto& until) const {
+	const std::initializer_list<std::function<bool(const tref&)>>& queries,
+	const auto& until) const
+{
 	auto refs = select_all_until(or_predicate<node>(queries.begin(), queries.size()), until);
 	return select_by_predicates<node>(refs, queries.begin(), queries.size());
 }
 
 template <NodeType node>
 std::vector<trefs> tree<node>::select_all_until_by_predicates(
-		const std::vector<std::function<bool(const tref&)>>& queries,
-		const auto& until) const {
+	const std::vector<std::function<bool(const tref&)>>& queries,
+	const auto& until) const
+{
 	auto refs = select_all_until(
 		or_predicate<node>(queries.data(), queries.size()), until);
 	return select_by_predicates<node>(refs, queries.data(), queries.size());

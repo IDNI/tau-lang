@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./dev w64-build Release $@
+./dev w64-build Release "$@"
