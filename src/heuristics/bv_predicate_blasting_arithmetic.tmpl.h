@@ -351,16 +351,17 @@ static tref make_bvmul_call_from_index(tref left, tref result, int_t index) {
  * @return The constructed rule
  */
 template<NodeType node>
-static rewriter::rule bvmul_rec_rule(tref right /* cvc5 constant */, size_t bitwidth) {
+static rewriter::rule bvmul_rec_rule(tref right /* cvc5 constant */) {
 	using tau = tree<node>;
 
 	DBG( assert(is_bv_constant<node>(right)); )
 
-	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
-	if (cache.find(bitwidth) != cache.end() && cache[bitwidth].find(right) != cache[bitwidth].end()) {
-		return cache[bitwidth][right];
+	static std::map<tref, rewriter::rule> cache;
+	if (cache.find(right) != cache.end()) {
+		return cache[right];
 	}
 
+	auto bitwidth = get_bv_type_bitwidth<node>(right);
 	auto left = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto result = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 
@@ -384,7 +385,7 @@ static rewriter::rule bvmul_rec_rule(tref right /* cvc5 constant */, size_t bitw
 	// case y & 1 = 1: multiplication(x, y, w) = ex z ex v multiplication(x << 1, v) && addition(x, v, z);
 	if (is_bv_lsb_one<node>(right)) {
 		auto v = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-		auto odd_right = tau::build_ref("_bvmul", { left, right, result });
+		auto odd_head = make_bvmul_call_from_offset<node>(left, result, right);
 		auto odd_body = tau::build_wff_ex(w,
 			tau::build_wff_ex(w,
 				tau::build_wff_ex(v,
@@ -393,7 +394,7 @@ static rewriter::rule bvmul_rec_rule(tref right /* cvc5 constant */, size_t bitw
 							bvshl_by_one<node>(left, v),
 							make_bvmul_call_from_offset<node>(v, w, bv_shr_by_one<node>(right))),
 						bvadd<node>(left, w, result)))));
-		auto rule = make_rule<node>(odd_right, odd_body);
+		auto rule = make_rule<node>(odd_head, odd_body);
 
 #ifdef DEBUG
 		LOG_TRACE << "bvmul_rec_rule (odd case): " << LOG_RULE(rule) << "\n";
@@ -405,15 +406,15 @@ static rewriter::rule bvmul_rec_rule(tref right /* cvc5 constant */, size_t bitw
 	}
 
 	// case y & 1 = 0: multiplication(x, y, z) = ex v multiplication[y >> 1](x << 1, v) && (z = v);
-	auto even_right = tau::build_ref("_bvmul", { left, right, result });
-	auto shifted_x = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto even_head = make_bvmul_call_from_offset<node>(left, result, right);
+	auto shifted_right = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto even_body = tau::build_wff_ex(w,
 		tau::build_wff_and(
-			bvshl_by_one<node>(left, shifted_x),
+			bvshl_by_one<node>(left, shifted_right),
 			tau::build_wff_and(
-				make_bvmul_call_from_offset<node>(shifted_x, w, bv_shr_by_one<node>(right)),
+				make_bvmul_call_from_offset<node>(shifted_right, w, bv_shr_by_one<node>(right)),
 				tau::build_bf_eq(result, w))));
-	auto rule = make_rule<node>(even_right, even_body);
+	auto rule = make_rule<node>(even_head, even_body);
 
 #ifdef DEBUG
 	LOG_TRACE << "bvmul_rec_rule (even case): " << LOG_RULE(rule) << "\n";
@@ -433,31 +434,26 @@ static rewriter::rule bvmul_rec_rule(tref right /* cvc5 constant */, size_t bitw
  * @return The constructed rule
  */
 template<NodeType node>
-static rewriter::rule bvmul_rule(tref left, size_t bitwidth) {
+static rewriter::rule bvmul_rule(tref right /* cvc5 constant */) {
 	using tau = tree<node>;
 
-	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
-	static std::map<size_t, std::map<tref, rewriter::rules>> partial_cache;
-	// If the rule is already computed for the given bitwidth and right operand, we return it from the cache
-	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][left];
-	// Otherwise, we compute the rule, store it in the cache and return it.
-	// First we collect all the rules.
+	static std::map<tref, rewriter::rule> cache;
+
+	if (cache.find(right) != cache.end()) return cache[right];
+
 	rewriter::rules rules;
-	auto n_left = left;
-	while (!is_zero_bv_constant<node>(n_left)) {
-		if (partial_cache[bitwidth].find(n_left) != partial_cache[bitwidth].end()) {
-			rules.insert(rules.end(), partial_cache[bitwidth][n_left].begin(), partial_cache[bitwidth][n_left].end());
-		} else {
-			auto rule = bvmul_rec_rule<node>(n_left, bitwidth);
-			rules.push_back(rule);
-			partial_cache[bitwidth][n_left] = { rule };
-		}
-		n_left = bv_shr_by_one<node>(n_left);
+	auto n_right = right;
+	auto bitwidth = get_bv_type_bitwidth<node>(right);
+
+	while (!is_zero_bv_constant<node>(n_right)) {
+		auto rule = bvmul_rec_rule<node>(n_right);
+		rules.push_back(rule);
+		n_right = bv_shr_by_one<node>(n_right);
 	}
 	// Then we build a main term to compute the actual predicate.
-	auto right = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto left = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto result = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto main = make_bvmul_call_from_offset<node>(right, result, left);
+	auto main = make_bvmul_call_from_offset<node>(left, result, right);
 	auto rr = make_rr<node>(rules, main);
 	auto body = apply_rr_to_formula(rr);
 	auto rule = make_rule<node>(main, body);
@@ -468,18 +464,17 @@ static rewriter::rule bvmul_rule(tref left, size_t bitwidth) {
 	LOG_TRACE << "bvmul_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
-	cache[bitwidth][right] = rule;
-	return cache[bitwidth][right];
+	cache[right] = rule;
+	return cache[right];
 }
 
 template<NodeType node>
 tref bvmul(tref left, tref right, tref result) {
-	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	if (!is_bv_constant<node>(right)) {
 		DBG( LOG_DEBUG << "Only multiplication by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
-	auto rule = bvmul_rule<node>(right, bitwidth);
+	auto rule = bvmul_rule<node>(right);
 	auto call = make_bvmul_call_from_offset<node>(left, result, right);
 	return nso_rr_apply<node>({ rule }, call);
 }
@@ -518,11 +513,13 @@ static tref make_bvdiv_call(tref dividend, tref divisor, tref result) {
  * @return The constructed rule
  */
 template<NodeType node>
-static rewriter::rule bvdiv_rule(tref divisor /* bv copnstant */, size_t bitwidth) {
+static rewriter::rule bvdiv_rule(tref divisor /* bv copnstant */) {
 	using tau = tree<node>;
 
-	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
-	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
+	static std::map<tref, rewriter::rule> cache;
+	if (cache.find(divisor) != cache.end()) return cache[divisor];
+
+	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
 	// We build the main term to compute the actual predicate.
 	auto quotient_var = tau::tau::build_variable(bv_type_id<node>(bitwidth));
@@ -549,18 +546,17 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv copnstant */, size_t bitwidt
 	LOG_TRACE << "bvdiv_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
-	cache[bitwidth][divisor] = rule;
-	return cache[bitwidth][divisor];
+	cache[divisor] = rule;
+	return cache[divisor];
 }
 
 template<NodeType node>
 tref bvdiv(tref dividend, tref divisor, tref quotient) {
-	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 	if (!is_bv_constant<node>(divisor)) {
 		DBG( LOG_DEBUG << "Only division by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
-	auto rule = bvdiv_rule<node>(divisor, bitwidth);
+	auto rule = bvdiv_rule<node>(divisor);
 	auto call = make_bvdiv_call<node>(dividend, divisor, quotient);
 	auto rr = make_rr<node>({ rule }, call);
 	return apply_rr_to_formula(rr);
@@ -590,11 +586,13 @@ static tref make_bvmod_call(tref dividend, tref divisor, tref result) {
  * @return The constructed rule
  */
 template<NodeType node>
-static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */, size_t bitwidth) {
+static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
 	using tau = tree<node>;
 
-	static std::map<size_t, std::map<tref, rewriter::rule>> cache;
-	if (cache.find(bitwidth) != cache.end()) return cache[bitwidth][divisor];
+	static std::map<tref, rewriter::rule> cache;
+	if (cache.find(divisor) != cache.end()) return cache[divisor];
+
+	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
 	// We build the main term to compute the actual predicate.
 	auto quotient_var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -622,18 +620,17 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */, size_t bitwidt
 	LOG_TRACE << "bvmod_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
-	cache[bitwidth][divisor] = rule;
-	return cache[bitwidth][divisor];
+	cache[divisor] = rule;
+	return cache[divisor];
 }
 
 template<NodeType node>
 tref bvmod(tref dividend, tref divisor, tref remainder) {
-	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 	if (!is_bv_constant<node>(divisor)) {
 		DBG( LOG_DEBUG << "Only modulo by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
-	auto rule = bvmod_rule<node>(divisor, bitwidth);
+	auto rule = bvmod_rule<node>(divisor);
 	auto call = make_bvmod_call<node>(dividend, divisor, remainder);
 	auto rr = make_rr<node>({ rule }, call);
 	return apply_rr_to_formula(rr);
