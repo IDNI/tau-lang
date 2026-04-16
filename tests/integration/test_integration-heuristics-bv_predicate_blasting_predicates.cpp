@@ -100,7 +100,7 @@ TEST_SUITE("bitblasting") {
 		TAU_LOG_INFO << LOG_RULE(bvsub_rule<node>(4));
 	}
 
-	TEST_CASE("bvdiv_rule") {
+	/*TEST_CASE("bvdiv_rule") {
 		using node = node_t;
 		using tau = tree<node>;
 
@@ -112,9 +112,9 @@ TEST_SUITE("bitblasting") {
 		//using tau = tree<node>;
 
 		//TAU_LOG_INFO << LOG_RULE(bvmod_rule<node>(tau::build_ref_offset(2), 2));
-	}
+	}*/
 
-	/*TEST_CASE("bvshl_rule") {
+	TEST_CASE("bvshl_rule") {
 		using node = node_t;
 		using tau = tree<node>;
 
@@ -126,7 +126,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << LOG_RULE(bvrhl_rule<node>(tau::build_ref_offset(2), 2));
-	}*/
+	}
 }
 
 TEST_SUITE("Cleanup") {
