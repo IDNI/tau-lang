@@ -184,6 +184,7 @@ int main(int argc, char** argv) {
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,
+		.blasting = blasting,
 		.print_benchmarks = opts["benchmarks"].get<bool>(),
 #ifdef DEBUG
 		.debug_repl = opts["debug"].get<bool>(),

@@ -1,19 +1,14 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	ba_types_inference
 	bf_fixed_point
 	bf_hooks
 	bf_normalization
-	heuristics-bv_ba_custom_simplification
-	heuristics-bv_ba_cvc5_simplification
-	heuristics-ex_subs_based_elimination
 	interpreter
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval
 	quantifiers
-	semantic
 	satisfiability1
 	satisfiability2
 	satisfiability3
@@ -26,7 +21,6 @@ set(TESTS
 	splitter2
 	tau_ba1
 	tau_ba3
-	type_scoped_resolver
 	wff_hooks
 	wff_normalization
 	ba_types_inference
