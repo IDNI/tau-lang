@@ -44,7 +44,7 @@ template<NodeType node>
 static tref make_bvlt_call_from_index(tref left, tref right, size_t index) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_integer(index);
+	auto offset = tau::get_num(index);
 	return make_bvlt_call_from_offset<node>(left, right, offset);
 }
 
@@ -71,14 +71,14 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
 
 	rewriter::rules rules;
 
-	// base case: bvlt[0](x, y) = F;
+	// base case: bvlt[0](x, y) = T;
 	auto base_header = make_bvlt_call_from_index<node>(left, right, 0);
-	auto base_body = tau::_F();
+	auto base_body = tau::_T();
 	rules.push_back(make_rule<node>(base_header, base_body));
 	// general case: bvlt[n](x, y) = ((bit[n](x) = 0) && (bit[n](y) = 1))
 	//	 || ((bit[n](x) = bit[n](y)) && bvlt[n-1](x, y));
 	auto n = tau::build_variable(untyped_type_id<node>());
-	auto n_minus_1 = tau::build_ref_shift_offset(n, 1);
+	auto n_minus_1 = tau::build_shift(n, 1);
 	auto general_header = make_bvlt_call_from_offset<node>(left, right, n);
 	auto general_body = tau::build_wff_or(
 		tau::build_wff_and(
@@ -195,7 +195,7 @@ template<NodeType node>
 static tref make_bvgt_call_from_index(tref left, tref right, int_t index) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_integer(index);
+	auto offset = tau::get_num(index);
 	return make_bvgt_call_from_offset<node>(left, right, offset);
 }
 
@@ -222,14 +222,14 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 
 	rewriter::rules rules;
 
-	// base case: bvgt[0](x, y) = F;
+	// base case: bvgt[0](x, y) = T;
 	auto base_header = make_bvgt_call_from_index<node>(left, right, bitwidth);
-	auto base_body = tau::_F();
+	auto base_body = tau::_T();
 	rules.push_back(make_rule<node>(base_header, base_body));
 	// general case: bvgt[n](x, y) = ((bit[n-1](x) = 1) && (bit[n-1](y) = 0))
 	//		|| ((bit[n-1](x) = bit[n-1](y)) && bvgt[n-1](x, y));
 	auto n = tau::build_variable(untyped_type_id<node>());
-	auto n_minus_1 = tau::build_ref_shift_offset(n, 1);
+	auto n_minus_1 = tau::build_shift(n, 1);
 	auto general_header = make_bvgt_call_from_offset<node>(left, right, n);
 	auto general_body = tau::build_wff_or(
 		tau::build_wff_and(

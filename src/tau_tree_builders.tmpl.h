@@ -984,67 +984,55 @@ tref build_sym(const std::string& sym_name) {
 }
 
 template<NodeType node>
-tref build_ref_offsets(const trefs& offsets) {
+tref build_offsets(const trefs& offsets) {
 	using tau = tree<node>;
 
-	return tau::get(tau::offsets, offsets);
-}
-
-template<NodeType node>
-tref build_ref_offsets(const std::string& offset) {
-	using tau = tree<node>;
-
-	return tau::get(tau::offsets, build_variable<node>(offset));
-}
-
-template<NodeType node>
-tref build_ref_offsets(const std::vector<std::string>& offsets) {
-	using tau = tree<node>;
-
-	trefs offset_refs(offsets.size());
-	for (const auto& offset : offsets) {
-		offset_refs.push_back(build_variable<node>(offset));
-	}
+	trefs offset_refs;
+	for (const auto& offset : offsets)
+		offset_refs.push_back(tau::get(tau::offset, offset));
 	return tau::get(tau::offsets, offset_refs);
 }
 
 template<NodeType node>
-tref build_ref_shift_offset(tref var, size_t shift) {
-	using tau = tree<node>;
-
-	return tau::get(tau::offset, tau::get(tau::shift, var, tau::get_num(shift)));
+tref build_offsets(const std::string& offset) {
+	return build_ref_offsets<node>({ build_variable<node>(offset) });
 }
 
 template<NodeType node>
-tref build_ref_offset(size_t shift) {
-	using tau = tree<node>;
-
-	return tau::get(tau::offset, tau::get_integer(shift));
+tref build_offsets(const std::vector<std::string>& offsets) {
+	trefs vars;
+	for (const auto& var : offsets) {
+		vars.push_back(build_variable<node>(var));
+	}
+	return build_offsets<node>(vars);
 }
 
 template<NodeType node>
-tref build_ref_shift_offset(std::string var_name, size_t type_id, size_t shift) {
+tref build_shift(tref var, size_t shift) {
 	using tau = tree<node>;
 
-	return tau::get(tau::offset, tau::get(tau::shift, build_variable<node>(var_name, type_id), tau::get_num(shift)));
+	return tau::get(tau::shift, var, tau::get_num(shift));
+}
+
+template<NodeType node>
+tref build_shift(std::string var_name, size_t type_id, size_t shift) {
+	return build_shift<node>(build_variable<node>(var_name, type_id), shift);
 }
 
 template<NodeType node>
 tref build_ref_args(const trefs& args) {
 	using tau = tree<node>;
 
-	return tau::get(tau::ref_args, args);
+	trefs ref_args;
+	for (auto arg: args) ref_args.push_back(tau::get(tau::ref_arg, arg));
+	return tau::get(tau::ref_args, ref_args);
 }
 
 template<NodeType node>
 tref build_ref_args(const std::vector<std::string>& args, size_t type_id) {
-	using tau = tree<node>;
-
-	trefs arg_refs(args.size());
-	for (auto arg: args) {
-		arg_refs.push_back(build_bf_variable<node>(arg, type_id));
-	}
-	return tau::get(tau::ref_args, arg_refs);
+	trefs vars;
+	for (auto arg: args) vars.push_back(build_bf_variable<node>(arg, type_id));
+	return build_ref_args<node>(vars);
 }
 
 template<NodeType node>
@@ -1068,7 +1056,7 @@ tref build_rr_ref(tref sym, const trefs& offsets, const trefs& args) {
 
 	trefs children;
 	children.push_back(sym);
-	if (!offsets.empty()) children.push_back(build_ref_offsets<node>(offsets));
+	if (!offsets.empty()) children.push_back(build_offsets<node>(offsets));
 	children.push_back(build_ref_args<node>(args));
 	return tau::get(tau::ref, children);
 }
@@ -1080,7 +1068,7 @@ tref build_rr_ref(const std::string& sym_name, const trefs& offsets, const trefs
 
 template<NodeType node>
 tref build_rr_ref(const std::string& sym_name, const std::string offset, const trefs& args) {
-	auto var = build_variable<node>(offset, get_ba_type_id<node>(untyped_type_id<node>()));
+	auto var = build_bf_variable<node>(offset, get_ba_type_id<node>(untyped_type_id<node>()));
 	return build_rr_ref<node>(build_sym<node>(sym_name), {var}, args);
 }
 
@@ -1094,7 +1082,7 @@ tref build_rr_ref(const std::string& sym_name, size_t offset, const trefs& args)
 
 template<NodeType node>
 tref build_rr_ref(tref sym, tref offset, size_t shift, const trefs& args) {
-	auto offset_node = build_ref_shift_offset<node>(offset, shift);
+	auto offset_node = build_shift<node>(offset, shift);
 	return build_rr_ref<node>(sym, {offset_node}, args);
 }
 
@@ -1105,7 +1093,7 @@ tref build_rr_ref(const std::string& sym_name, tref offset, size_t shift, const 
 
 template<NodeType node>
 tref build_rr_ref(const std::string& sym_name, const std::string& offset, size_t shift, const trefs& args) {
-	auto offset_node = build_ref_shift_offset<node>(offset, shift);
+	auto offset_node = build_shift<node>(offset, shift);
 	return build_rr_ref<node>(build_sym<node>(sym_name), {offset_node}, args);
 }
 
@@ -1643,33 +1631,28 @@ tref tree<node>::build_sym(const std::string& sym_name) {
 }
 
 template<NodeType node>
-tref tree<node>::build_ref_offsets(const trefs& offsets) {
-	return tau_lang::build_ref_offsets<node>(offsets);
+tref tree<node>::build_offsets(const trefs& offsets) {
+	return tau_lang::build_offsets<node>(offsets);
 }
 
 template<NodeType node>
-tref tree<node>::build_ref_offsets(const std::string& offset) {
-	return tau_lang::build_ref_offsets<node>(offset);
+tref tree<node>::build_offsets(const std::string& offset) {
+	return tau_lang::build_offsets<node>(offset);
 }
 
 template<NodeType node>
-tref tree<node>::build_ref_offsets(const std::vector<std::string>& offsets) {
-	return tau_lang::build_ref_offsets<node>(offsets);
+tref tree<node>::build_offsets(const std::vector<std::string>& offsets) {
+	return tau_lang::build_offsets<node>(offsets);
 }
 
 template<NodeType node>
-tref tree<node>::build_ref_offset(size_t shift) {
-	return tau_lang::build_ref_offset<node>(shift);
+tref tree<node>::build_shift(tref var, size_t shift) {
+	return tau_lang::build_shift<node>(var, shift);
 }
 
 template<NodeType node>
-tref tree<node>::build_ref_shift_offset(tref var, size_t shift) {
-	return tau_lang::build_ref_shift_offset<node>(var, shift);
-}
-
-template<NodeType node>
-tref tree<node>::build_ref_shift_offset(const std::string& var_name, size_t shift) {
-	return tau_lang::build_ref_shift_offset<node>(var_name, shift);
+tref tree<node>::build_shift(const std::string& var_name, size_t shift) {
+	return tau_lang::build_shift<node>(var_name, shift);
 }
 
 template<NodeType node>
