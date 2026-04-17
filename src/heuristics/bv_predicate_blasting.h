@@ -48,23 +48,23 @@ tref bit(tref operand, int_t bit);
  * @brief Computes a predicate checking if shifted is the result of shifting operand left by one bit.
  *
  * @tparam node Node type
- * @param operand Operand to shift
+ * @param base Operand to shift
  * @param shifted Result variable
  * @return The resulting term
  */
 template<NodeType node>
-tref bvshl_by_one(tref operand, tref shifted);
+tref bvshl_by_one(tref base, tref shifted);
 
 /**
  * @brief Computes a predicate checking if shifted is the result of shifting operand right by one bit.
  *
  * @tparam node Node type
- * @param operand Operand to shift
+ * @param base Operand to shift
  * @param shifted Result variable
  * @return The resulting predicate
  */
 template<NodeType node>
-tref bvrhl_by_one(tref operand, tref shifted);
+tref bvrhl_by_one(tref base, tref shifted);
 
 /**
  * @brief Computes a predicate checking if a specific bit of an operand is zero.
@@ -93,26 +93,26 @@ tref is_bit_one(tref operand, int_t bit);
  * operand left by a constant amount.
  *
  * @tparam node Node type
- * @param left Operand to shift
- * @param shift Shift amount (constant)
+ * @param base Operand to shift
+ * @param count Shift amount (constant)
  * @param shifted Result variable
  * @return The resulting predicate
  */
 template<NodeType node>
-tref bvshl(tref left, tref shift, tref shifted);
+tref bvshl(tref base, tref count, tref shifted);
 
 /**
  * @brief Computes a predicate checking if shifted is the result of shifting
  * operand right by a constant amount.
  *
  * @tparam node Node type
- * @param left Operand to shift
- * @param shift Shift amount (constant)
+ * @param base Operand to shift
+ * @param count Shift amount (constant)
  * @param shifted Result variable
  * @return The resulting predicate
  */
 template<NodeType node>
-tref bvrhl(tref left, tref shift, tref shifted);
+tref bvrhl(tref base, tref count, tref shifted);
 
 /**
  * @brief Computes a predicate checking if left is less than right as bitvectors.
