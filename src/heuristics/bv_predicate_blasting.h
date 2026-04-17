@@ -213,25 +213,25 @@ tref bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
  * @brief Applies the bitvector addition rule to the given operands.
  *
  * @tparam node Node type
- * @param left Left operand
- * @param right Right operand
- * @param result Result variable
+ * @param augend Left operand
+ * @param addend Right operand
+ * @param sum Result variable
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref bvadd(tref left, tref right, tref result);
+tref bvadd(tref augend, tref addend, tref sum);
 
 /**
  * @brief Applies the bitvector subtraction rule to the given operands.
  *
  * @tparam node Node type
- * @param left Left operand
- * @param right Right operand
- * @param result Result variable
+ * @param minuend Left operand
+ * @param subtrahend Right operand
+ * @param difference Result variable
  * @return The resulting predicate term
  */
 template<NodeType node>
-tref bvsub(tref left, tref right, tref result);
+tref bvsub(tref minuend, tref subtrahend, tref difference);
 
 /**
  * @brief Applies the bitvector multiplication rule to the given operands.
@@ -239,13 +239,13 @@ tref bvsub(tref left, tref right, tref result);
  * Only supports multiplication by a constant right operand.
  *
  * @tparam node Node type
- * @param left Left operand
- * @param right Right operand (must be constant)
- * @param result Result variable
+ * @param multiplicand Left operand
+ * @param multiplier Right operand (must be constant)
+ * @param product Result variable
  * @return The resulting predicate term, or nullptr if unsupported
  */
 template<NodeType node>
-tref bvmul(tref left, tref right, tref result);
+tref bvmul(tref multiplicand, tref multiplier, tref product);
 
 /**
  * @brief Applies the bitvector division rule to the given operands.

@@ -548,6 +548,7 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 
 template<NodeType node>
 tref bvshl(tref base, tref count, tref shifted) {
+	// TODO (MEDIUM) check inputs
 	auto rule = bvshl_rule<node>(count);
 	auto call = make_bvshl_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
@@ -633,6 +634,7 @@ static rewriter::rule bvrhl_rule(tref count /* bv constant */) {
 
 template<NodeType node>
 tref bvrhl(tref base, tref count, tref shifted) {
+	// TODO (MEDIUM) check inputs
 	auto rule = bvrhl_rule<node>(count);
 	auto call = make_bvrhl_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
