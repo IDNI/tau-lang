@@ -329,6 +329,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Create a bitvector constant node with @p bitwidth bits and value @p value. */
 	static tref get_bv_constant(size_t bitwidth, size_t value);
 
+
 	// -----------------------------------------------------------------------
 	// Children
 	// -----------------------------------------------------------------------
