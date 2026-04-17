@@ -277,6 +277,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref get_ba_constant(
 		const std::optional<std::pair<constant, tref>>&
 		typed_const);
+	// creates a bv_constant from a number and a bitwidth
+	static tref get_bv_constant(size_t value, size_t bitwidth);
+
 
 	// children
 	size_t children_size() const;

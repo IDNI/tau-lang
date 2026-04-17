@@ -494,6 +494,15 @@ tref tree<node>::get_ba_constant(
 	return get_ba_constant(typed_const.value());
 }
 
+template <NodeType node>
+tref tree<node>::get_bv_constant(size_t value, size_t bitwidth) {
+	auto cte = make_bitvector_value(value, bitwidth);
+	auto type_id = bv_type_id<node>(bitwidth);
+	LOG_TRACE << " -- get_bv_constant(size_t value, size_t bitwidth): `"
+		<<  value << ", " << bitwidth << "`";
+	return get_ba_constant(cte, type_id);
+}
+
 // -----------------------------------------------------------------------------
 // children
 
