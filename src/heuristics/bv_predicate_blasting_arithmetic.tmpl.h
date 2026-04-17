@@ -338,7 +338,7 @@ template<NodeType node>
 static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 	using tau = tree<node>;
 
-	DBG( assert(is_bv_constant<node>(multiplier)); )
+	DBG( assert(tau::get(tau::trim(multiplier)).is(tau::bf_f) || is_bv_constant<node>(tau::trim(multiplier))); )
 
 	static std::map<tref, rewriter::rule> cache;
 	if (cache.find(multiplier) != cache.end()) {
@@ -353,7 +353,7 @@ static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 	auto head = make_bvmul_call<node>(bf_multiplicand, multiplier, bf_product);
 
 	// multiplication[n](x, 0, z) = (z = 0) or multiplication[n](0, x, z) = (z = 0);
-	if (is_zero_bv_constant<node>(tau::trim(multiplier))) {
+	if (tau::get(tau::trim(multiplier)).is(tau::bf_f)) { // || is_zero_bv_constant<node>(tau::trim(multiplier))) {
 		auto zero_case = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), bf_product);
 		auto rule = make_rule<node>(head, zero_case);
 
@@ -424,6 +424,8 @@ template<NodeType node>
 static rewriter::rule bvmul_rule(tref multiplier /* cvc5 constant */) {
 	using tau = tree<node>;
 
+	DBG( LOG_INFO << "Checking if tref " << LOG_FM_TREE(multiplier) << " is a zero bitvector constant.\n"; )
+
 	static std::map<tref, rewriter::rule> cache;
 
 	if (cache.find(multiplier) != cache.end()) return cache[multiplier];
@@ -432,7 +434,7 @@ static rewriter::rule bvmul_rule(tref multiplier /* cvc5 constant */) {
 	auto current = multiplier;
 	auto bitwidth = get_bv_type_bitwidth<node>(multiplier);
 
-	while (!is_zero_bv_constant<node>(tau::trim(current))) {
+	while (!tau::get(tau::trim(current)).is(tau::bf_f)) { //is_zero_bv_constant<node>(tau::trim(current))) {
 		auto rule = bvmul_rec_rule<node>(current);
 		rules.push_back(rule);
 		current = tau::get(tau::bf, bv_shr_by_one<node>(tau::trim(current)));
@@ -457,7 +459,9 @@ static rewriter::rule bvmul_rule(tref multiplier /* cvc5 constant */) {
 
 template<NodeType node>
 tref bvmul(tref multiplicand, tref multiplier, tref product) {
-	if (!is_bv_constant<node>(multiplier)) {
+	using tau = tree<node>;
+
+	if (!tau::get(tau::trim(multiplier)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(multiplier))) {
 		DBG( LOG_DEBUG << "Only multiplication by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
@@ -540,7 +544,9 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv constant */) {
 
 template<NodeType node>
 tref bvdiv(tref dividend, tref divisor, tref quotient) {
-	if (!is_bv_constant<node>(divisor)) {
+	using tau = tree<node>;
+
+	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
 		DBG( LOG_DEBUG << "Only division by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
@@ -614,7 +620,9 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
 
 template<NodeType node>
 tref bvmod(tref dividend, tref divisor, tref remainder) {
-	if (!is_bv_constant<node>(divisor)) {
+	using tau = tree<node>;
+
+	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
 		DBG( LOG_DEBUG << "Only modulo by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
