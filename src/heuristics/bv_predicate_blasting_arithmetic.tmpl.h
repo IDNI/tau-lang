@@ -68,9 +68,9 @@ static rewriter::rules bvadd_rules(size_t bitwidth) {
 		return it->second;
 	}
 
-	auto augend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto addend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto sum = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto augend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto addend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto sum = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 
 	rewriter::rules rules;
 	// base case: addition[0](x, y, z) = (z = x);
@@ -122,9 +122,9 @@ static rewriter::rule bvadd_rule(size_t bitwidth) {
 	auto additions = bvadd_rules<node>(bitwidth);
 	rs.insert(rs.end(), additions.begin(), additions.end());
 
-	auto augend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto addend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto sum = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto augend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto addend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto sum = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 
 	auto head = make_bvadd_call_from_index<node>(augend, addend, sum, bitwidth);
 	auto rr = make_rr<node>(rs, head);
@@ -142,10 +142,10 @@ static rewriter::rule bvadd_rule(size_t bitwidth) {
 }
 
 template<NodeType node>
-tref bvadd(tref left, tref right, tref result) {
-	auto bitwidth = get_bv_type_bitwidth<node>(left);
+tref bvadd(tref augend, tref addend, tref sum) {
+	auto bitwidth = get_bv_type_bitwidth<node>(augend);
 	auto rule = bvadd_rule<node>(bitwidth);
-	auto call = make_bvadd_call_from_index<node>(left, right, result, bitwidth);
+	auto call = make_bvadd_call_from_index<node>(augend, addend, sum, bitwidth);
 	auto rr = make_rr<node>({ rule } , call);
 	return apply_rr_to_formula(rr);
 }
@@ -215,9 +215,9 @@ static rewriter::rules bvsub_rules(size_t bitwidth) {
 		return it->second;
 	}
 
-	auto minuend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto subtrahend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto difference = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto minuend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto subtrahend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto difference = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 
 	rewriter::rules rules;
 	// base case: subtraction[0](x, y, z) = (z = x);
@@ -265,9 +265,9 @@ static rewriter::rule bvsub_rule(size_t bitwidth) {
 		return it->second;
 	}
 
-	auto minuend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto subtrahend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto difference = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto minuend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto subtrahend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto difference = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 
 	rewriter::rules rs;
 	auto substractions = bvsub_rules<node>(bitwidth);
@@ -288,10 +288,10 @@ static rewriter::rule bvsub_rule(size_t bitwidth) {
 }
 
 template<NodeType node>
-tref bvsub(tref left, tref right, tref result) {
-	auto bitwidth = get_bv_type_bitwidth<node>(left);
+tref bvsub(tref minuend, tref subtrahend, tref difference) {
+	auto bitwidth = get_bv_type_bitwidth<node>(minuend);
 	auto rule = bvsub_rule<node>(bitwidth);
-	auto call = make_bvsub_call_from_index<node>(left, right, result, bitwidth);
+	auto call = make_bvsub_call_from_index<node>(minuend, subtrahend, difference, bitwidth);
 	auto rr = make_rr<node>({ rule }, call);
 	return apply_rr_to_formula(rr);
 }
@@ -318,26 +318,10 @@ tref bvsub(tref left, tref right, tref result) {
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_bvmul_call_from_offset(tref multiplicant, tref multiplier, tref product) {
+static tref make_bvmul_call(tref multiplicant, tref multiplier, tref product) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvmul", { multiplier }, { multiplicant, product })));
-}
-
-/**
- * @brief Creates a call to the bitvector multiplication recurrence (constant right operand).
- * @tparam node Node type
- * @param multiplicant Left operand
- * @param multiplier Right operand (constant)
- * @param product Result variable
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvmul_call_from_index(tref multiplicant, int_t multiplier, tref product) {
-	using tau = tree<node>;
-
-	auto offset = tau::get_num(multiplier);
-	return make_bvmul_call_from_offset<node>(multiplicant, offset, product);
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmul", { multiplicant, multiplier, product })));
 }
 
 /**
@@ -362,13 +346,15 @@ static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 	}
 
 	auto bitwidth = get_bv_type_bitwidth<node>(multiplier);
-	auto multiplicand = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto product = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto head = make_bvmul_call_from_offset<node>(multiplicand, multiplier, product);
+	auto multiplicand = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto bf_multiplicand = tau::get(tau::bf, multiplicand);
+	auto product = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto bf_product = tau::get(tau::bf, product);
+	auto head = make_bvmul_call<node>(bf_multiplicand, multiplier, bf_product);
 
 	// multiplication[n](x, 0, z) = (z = 0) or multiplication[n](0, x, z) = (z = 0);
-	if (is_zero_bv_constant<node>(multiplier)) {
-		auto zero_case = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), product);
+	if (is_zero_bv_constant<node>(tau::trim(multiplier))) {
+		auto zero_case = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), bf_product);
 		auto rule = make_rule<node>(head, zero_case);
 
 #ifdef DEBUG
@@ -380,21 +366,22 @@ static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 		return rule;
 	}
 
-	auto w = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_w = tau::get(tau::bf, w);
+	auto shr_multiplier = tau::get(tau::bf, bv_shr_by_one<node>(tau::trim(multiplier)));
+	auto bf_shr_multiplier = tau::get(tau::bf, shr_multiplier);
+	auto subproduct = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto bf_subproduct = tau::get(tau::bf, subproduct);
+	auto shl_multiplicant = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto bf_shl_multiplicant = tau::get(tau::bf, shl_multiplicant);
 
 	// case y & 1 = 1: multiplication(x, y, w) = ex z ex v multiplication(x << 1, v) && addition(x, v, z);
-	if (is_bv_lsb_one<node>(multiplier)) {
-		auto v = tau::build_variable(bv_type_id<node>(bitwidth));
-		auto bf_v = tau::get(tau::bf, v);
-		auto odd_case = tau::build_wff_ex(w,
-			tau::build_wff_ex(w,
-				tau::build_wff_ex(v,
+	if (is_bv_lsb_one<node>(tau::trim(multiplier))) {
+		auto odd_case = tau::build_wff_ex(shl_multiplicant,
+			tau::build_wff_ex(subproduct,
+				tau::build_wff_and(
 					tau::build_wff_and(
-						tau::build_wff_and(
-							bvshl_by_one<node>(multiplicand, bf_v),
-							make_bvmul_call_from_offset<node>(bf_v, bf_w, bv_shr_by_one<node>(multiplier))),
-						bvadd<node>(multiplicand, bf_w, product)))));
+						bvshl_by_one<node>(bf_multiplicand, bf_shl_multiplicant),
+						make_bvmul_call<node>(bf_shl_multiplicant, bf_shr_multiplier, bf_subproduct)),
+					bvadd<node>(bf_multiplicand, bf_subproduct, bf_product))));
 		auto rule = make_rule<node>(head, odd_case);
 
 #ifdef DEBUG
@@ -407,15 +394,13 @@ static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 	}
 
 	// case y & 1 = 0: multiplication(x, y, z) = ex v multiplication[y >> 1](x << 1, v) && (z = v);
-	auto shifted_right = tau::tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_shifted_right = tau::get(tau::bf, shifted_right);
-	auto even_case = tau::build_wff_ex(shifted_right,
-		tau::build_wff_ex(w,
+	auto even_case = tau::build_wff_ex(shl_multiplicant,
+		tau::build_wff_ex(subproduct,
 			tau::build_wff_and(
-				bvshl_by_one<node>(multiplicand, bf_shifted_right),
+				bvshl_by_one<node>(bf_multiplicand, bf_shl_multiplicant),
 				tau::build_wff_and(
-					make_bvmul_call_from_offset<node>(bf_shifted_right, bf_w, bv_shr_by_one<node>(multiplier)),
-					tau::build_bf_eq(product, bf_w)))));
+					make_bvmul_call<node>(bf_shl_multiplicant, bf_shr_multiplier, bf_subproduct),
+					tau::build_bf_eq(bf_product, bf_subproduct)))));
 	auto rule = make_rule<node>(head, even_case);
 
 #ifdef DEBUG
@@ -447,15 +432,15 @@ static rewriter::rule bvmul_rule(tref multiplier /* cvc5 constant */) {
 	auto current = multiplier;
 	auto bitwidth = get_bv_type_bitwidth<node>(multiplier);
 
-	while (!is_zero_bv_constant<node>(current)) {
+	while (!is_zero_bv_constant<node>(tau::trim(current))) {
 		auto rule = bvmul_rec_rule<node>(current);
 		rules.push_back(rule);
-		current = bv_shr_by_one<node>(current);
+		current = tau::get(tau::bf, bv_shr_by_one<node>(tau::trim(current)));
 	}
 	// Then we build a main term to compute the actual predicate.
-	auto multiplicant = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto product = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto call = make_bvmul_call_from_offset<node>(multiplicant, product, multiplier);
+	auto multiplicant = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto product = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto call = make_bvmul_call<node>(multiplicant, product, multiplier);
 	auto rr = make_rr<node>(rules, call);
 	auto body = apply_rr_to_formula(rr);
 	auto rule = make_rule<node>(call, body);
@@ -477,7 +462,7 @@ tref bvmul(tref multiplicand, tref multiplier, tref product) {
 		return nullptr;
 	}
 	auto rule = bvmul_rule<node>(multiplier);
-	auto call = make_bvmul_call_from_offset<node>(multiplicand, multiplier, product);
+	auto call = make_bvmul_call<node>(multiplicand, multiplier, product);
 	return nso_rr_apply<node>({ rule }, call);
 }
 
@@ -524,13 +509,13 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv constant */) {
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
 	// We build the main term to compute the actual predicate.
-	auto quotient = tau::tau::build_variable(bv_type_id<node>(bitwidth));
+	auto quotient = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_quotient = tau::get(tau::bf, quotient);
-	auto remainder = tau::tau::build_variable(bv_type_id<node>(bitwidth));
+	auto remainder = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_remainder = tau::get(tau::bf, remainder);
-	auto dividend = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto dividend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto bf_dividend = tau::get(tau::bf, dividend);
-	auto exact = tau::tau::build_variable(bv_type_id<node>(bitwidth));
+	auto exact = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_exact = tau::get(tau::bf, exact);
 	auto call = make_bvdiv_call<node>(dividend, divisor, bf_quotient);
 	auto body = tau::build_wff_ex(exact,
@@ -598,13 +583,13 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
 	// We build the main term to compute the actual predicate.
-	auto quotient_var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto quotient_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto quotient = tau::get(tau::bf, quotient_var);
-	auto remainder_var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto remainder_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto remainder = tau::get(tau::bf, remainder_var);
-	auto dividend_var = tau::tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto dividend_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto dividend = tau::get(tau::bf, dividend_var);
-	auto exact_var = tau::tau::build_variable(bv_type_id<node>(bitwidth));
+	auto exact_var = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto exact = tau::get(tau::bf, exact_var);
 	auto call = make_bvmod_call<node>(dividend, divisor, remainder);
 	auto body = tau::build_wff_ex(exact_var,
