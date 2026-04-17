@@ -28,57 +28,61 @@ tref parse_wff(const std::string& sample) {
 
 TEST_SUITE("bitblasting") {
 
-	TEST_CASE("bvmul_rec_rule") {
-	}
-
 	TEST_CASE("bvlt_rule(s)") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "bvlt_rules:\n";
-		auto rules = bvlt_rules<node>(4);
+		auto rules = bvlt_rules<node>(2);
 		for (const auto& rule : rules)
 			TAU_LOG_INFO << LOG_RULE(rule) << '\n';
 		TAU_LOG_INFO << "---" << '\n';
-		TAU_LOG_INFO << LOG_RULE(bvlt_rule<node>(4)) << "\n\n";
+		TAU_LOG_INFO << LOG_RULE(bvlt_rule<node>(2)) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
+
 	}
 
 	TEST_CASE("bvgt_rule") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "bvgt_rules:\n";
-		auto rules = bvgt_rules<node>(4);
+		auto rules = bvgt_rules<node>(2);
 		for (const auto& rule : rules)
 			TAU_LOG_INFO << LOG_RULE(rule) << '\n';
 		TAU_LOG_INFO << "---" << '\n';
-		TAU_LOG_INFO << LOG_RULE(bvgt_rule<node>(4)) << "\n\n";
+		TAU_LOG_INFO << LOG_RULE(bvgt_rule<node>(2)) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
 	}
 
 	TEST_CASE("bvshl_by_one_rule") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "bvshl_by_one_rules:\n";
-		TAU_LOG_INFO << LOG_RULE(bvshl_by_one_rule<node>(4)) << "\n\n";
+		TAU_LOG_INFO << LOG_RULE(bvshl_by_one_rule<node>(2)) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
 	}
 
 	TEST_CASE("bvrhl_by_one_rule") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "bvrhl_by_one_rule:\n";
-		TAU_LOG_INFO << LOG_RULE(bvrhl_by_one_rule<node>(4)) << "\n\n";
+		TAU_LOG_INFO << LOG_RULE(bvrhl_by_one_rule<node>(2)) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
 	}
 
 	TEST_CASE("is_bit_zero_rule") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "is_bit_zero_rule:\n";
-		TAU_LOG_INFO << LOG_RULE(is_bit_zero_rule<node>(2, 4)) << "\n\n";
+		TAU_LOG_INFO << LOG_RULE(is_bit_zero_rule<node>(2, 2)) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
 	}
 
 	TEST_CASE("is_bit_one_rule") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "is_bit_one_rule:\n";
-		TAU_LOG_INFO << LOG_RULE(is_bit_one_rule<node>(2, 4)) << "\n\n";
+		TAU_LOG_INFO << LOG_RULE(is_bit_one_rule<node>(2, 2)) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
 	}
 
 	TEST_CASE("bit_rule") {
@@ -86,46 +90,66 @@ TEST_SUITE("bitblasting") {
 
 		TAU_LOG_INFO << "bit_rule:\n";
 		TAU_LOG_INFO << LOG_RULE(bit_rule<node>(1, 2)) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
 	}
 
 	TEST_CASE("bvadd_rule") {
 		using node = node_t;
 
 		TAU_LOG_INFO << LOG_RULE(bvadd_rule<node>(4));
+		TAU_LOG_INFO << "------" << '\n';
 	}
 
 	TEST_CASE("bvsub_rule") {
 		using node = node_t;
 
 		TAU_LOG_INFO << LOG_RULE(bvsub_rule<node>(4));
+		TAU_LOG_INFO << "------" << '\n';
 	}
-
-	/*TEST_CASE("bvdiv_rule") {
-		using node = node_t;
-		using tau = tree<node>;
-
-		TAU_LOG_INFO << LOG_RULE(bvdiv_rule<node>(tau::build_ref_offset(2), 2));
-	}
-
-	TEST_CASE("bvmod_rule") {
-		//using node = node_t;
-		//using tau = tree<node>;
-
-		//TAU_LOG_INFO << LOG_RULE(bvmod_rule<node>(tau::build_ref_offset(2), 2));
-	}*/
 
 	TEST_CASE("bvshl_rule") {
 		using node = node_t;
 		using tau = tree<node>;
 
-		TAU_LOG_INFO << LOG_RULE(bvshl_rule<node>(tau::build_ref_offset(2), 2));
+		TAU_LOG_INFO << "bvshl_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(bvshl_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 1)))) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
 	}
 
 	TEST_CASE("bvrhl_rule") {
 		using node = node_t;
 		using tau = tree<node>;
 
-		TAU_LOG_INFO << LOG_RULE(bvrhl_rule<node>(tau::build_ref_offset(2), 2));
+		TAU_LOG_INFO << "bvrhl_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(bvrhl_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 1)))) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
+	}
+
+	TEST_CASE("bvmul_rule") {
+		using node = node_t;
+		using tau = tree<node>;
+
+		TAU_LOG_INFO << "bvmul_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(bvmul_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
+	}
+
+	TEST_CASE("bvdiv_rule") {
+		using node = node_t;
+		using tau = tree<node>;
+
+		TAU_LOG_INFO << "bvdiv_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(bvdiv_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
+	}
+
+	TEST_CASE("bvmod_rule") {
+		using node = node_t;
+		using tau = tree<node>;
+
+		TAU_LOG_INFO << "bvmod_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(bvmod_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
 	}
 }
 

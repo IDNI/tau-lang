@@ -442,7 +442,7 @@ static rewriter::rule bvmul_rule(tref multiplier /* cvc5 constant */) {
 	// Then we build a main term to compute the actual predicate.
 	auto multiplicant = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto product = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto call = make_bvmul_call<node>(multiplicant, product, multiplier);
+	auto call = make_bvmul_call<node>(multiplicant, multiplier, product);
 	auto rr = make_rr<node>(rules, call);
 	auto body = apply_rr_to_formula(rr);
 	auto rule = make_rule<node>(call, body);
@@ -589,11 +589,11 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
 	// We build the main term to compute the actual predicate.
-	auto quotient_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto quotient_var = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto quotient = tau::get(tau::bf, quotient_var);
-	auto remainder_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto remainder_var = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto remainder = tau::get(tau::bf, remainder_var);
-	auto dividend_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto dividend_var = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto dividend = tau::get(tau::bf, dividend_var);
 	auto exact_var = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto exact = tau::get(tau::bf, exact_var);
