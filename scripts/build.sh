@@ -82,7 +82,8 @@ for arg in "${CMAKE_ARGS[@]}"; do
 	fi
 done
 if [ $TAU_BUILD_JOBS -eq 0 ]; then
-	TAU_BUILD_JOBS=$(cmake -P cmake/processor-counter.cmake 2>&1 || echo "1")
+	TAU_BUILD_JOBS=$(NO_COLOR=1 \
+		cmake -P cmake/processor-counter.cmake 2>&1 || echo "1")
 	TAU_BUILD_JOBS=$((TAU_BUILD_JOBS / 2))
 	echo "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (half of available cores)"
 fi
