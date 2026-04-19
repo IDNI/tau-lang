@@ -75,7 +75,7 @@ function(target_setup target)
 			-Wfloat-equal
 			-Wwrite-strings
 			-Werror           # warning as errors
-			-Wfatal-errors    # first error stops compilation
+			# -Wfatal-errors  # first error stops compilation
 			# -ftemplate-backtrace-limit=0
 		)
 	else()
