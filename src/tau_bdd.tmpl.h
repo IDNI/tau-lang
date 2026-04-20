@@ -248,9 +248,30 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 				bdds.emplace_back(build_bdd(d, o));
 			return bdd_or_many(std::move(bdds), o);
 		}
+		case tau::bf_xor: {
+			const tau& tf = tau::get(f);
+			const ref a = build_bdd(tf.first(), o);
+			const ref b = build_bdd(tf.second(), o);
+			return bdd_or(
+				bdd_and(a, bdd_not(b), o),
+				bdd_and(bdd_not(a), b, o), o);
+		}
 		case tau::bf_neg: {
 			const tau& tf = tau::get(f);
 			return bdd_not(build_bdd(tf.first(), o));
+		}
+		case tau::BDD_ID: {
+			// Get the BDD corresponding to the ID
+			const auto& m = term_handle<node>::U;
+			auto it = m.find(tau::get(tau::bf, f));
+			if (it != m.end()) {
+				return it->second.get();
+			} else {
+				// If the BDD id is not found,
+				// something went wrong
+				DBG(assert(false));
+				return add(f);
+			}
 		}
 		default: {
 			return add(f);
@@ -661,12 +682,12 @@ tau_term_bdd_handle<node> tau_term_bdd_handle<node>::build(tref term, const orde
 }
 
 template<NodeType node>
-tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle) {
+tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle, size_t term_type) {
 	using tau = tree<node>;
 
 	static size_t bdd_id = 0;
-	tref tau_node = tau::get(tau::bf, tau::get(tau::BDD_ID,
-		tau::get_num(bdd_id)));
+	tref tau_node = tau::get_typed(tau::bf, tau::get_typed(tau::BDD_ID,
+		tau::get_num(bdd_id), term_type), term_type);
 	// Increment id for unique node creation
 	++bdd_id;
 	// Save connection in U
@@ -676,28 +697,28 @@ tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle) {
 
 template<NodeType node>
 tref tau_term_bdd_handle<node>::convert_to_tau_node(tref term, const order& o) {
-	return convert_to_tau_node(build(term, o));
+	return convert_to_tau_node(build(term, o), find_ba_type<node>(term));
 }
 
 template<NodeType node>
-tref tau_term_bdd_handle<node>::to_tau_term(size_t term_type) {
+tref tau_term_bdd_handle<node>::to_tau_term(size_t term_type) const {
 	return tbdd::to_tau_term(get(), term_type);
 }
 
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_and(term_handle other, const order& o) {
+bdd_and(term_handle other, const order& o) const {
 	return term_handle(tbdd::bdd_and(get(), other.get(), o));
 }
 
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_or(term_handle other, const order& o) {
+bdd_or(term_handle other, const order& o) const {
 	return term_handle(tbdd::bdd_or(get(), other.get(), o));
 }
 
 template<NodeType node>
-tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::bdd_not() {
+tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::bdd_not() const {
 	return term_handle(h, !inv);
 }
 
@@ -721,24 +742,24 @@ bdd_or_many(const term_handles& bdds, const order& o) {
 
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_ex(const trefs& v, const order& o) {
+bdd_ex(const trefs& v, const order& o) const {
 	return term_handle(tbdd::bdd_ex(get(), v, o));
 }
 
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_all(const trefs& v, const order& o) {
+bdd_all(const trefs& v, const order& o) const {
 	return term_handle(tbdd::bdd_all(get(), v, o));
 }
 
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
-bdd_quant(const quants& q, const order& o) {
+bdd_quant(const quants& q, const order& o) const {
 	return term_handle(tbdd::bdd_quant(get(), q, o));
 }
 
 template<NodeType node>
-tau_term_bdd_handle<node>::ref tau_term_bdd_handle<node>::get() {
+tau_term_bdd_handle<node>::ref tau_term_bdd_handle<node>::get() const {
 	return ref(h->get(), inv);
 }
 

@@ -159,22 +159,22 @@ struct tau_term_bdd_handle {
 	// Build a BDD handle from a Tau term
 	static term_handle build(tref term, const order& o);
 	// Build a Tau node from a BDD handle whose connection is saved in U
-	static tref convert_to_tau_node(term_handle handle);
+	static tref convert_to_tau_node(term_handle handle, size_t term_type);
 	// Build a Tau node pointing to a BDD handle from a Tau term whose connection is saved in U
 	static tref convert_to_tau_node(tref term, const order& o);
 	// Convert the BDD handle to a Tau term
-	tref to_tau_term(size_t term_type);
+	tref to_tau_term(size_t term_type) const;
 
-	term_handle bdd_and(term_handle other, const order& o);
-	term_handle bdd_or(term_handle other, const order& o);
-	term_handle bdd_not();
+	term_handle bdd_and(term_handle other, const order& o) const;
+	term_handle bdd_or(term_handle other, const order& o) const;
+	term_handle bdd_not() const;
 	static term_handle bdd_and_many(const term_handles& bdds, const order& o);
 	static term_handle bdd_or_many(const term_handles& bdds, const order& o);
-	term_handle bdd_ex(const trefs& v, const order& o);
-	term_handle bdd_all(const trefs& v, const order& o);
-	term_handle bdd_quant(const quants& q, const order& o);
+	term_handle bdd_ex(const trefs& v, const order& o) const;
+	term_handle bdd_all(const trefs& v, const order& o) const;
+	term_handle bdd_quant(const quants& q, const order& o) const;
 
-	ref get();
+	ref get() const;
 
 	bool operator==(const tau_term_bdd_handle& other) const;
 	bool operator!=(const tau_term_bdd_handle& other) const;
