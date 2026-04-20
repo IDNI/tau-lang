@@ -358,6 +358,15 @@ TEST_SUITE("bvcast") {
 		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "------\n";
 	}
+
+	TEST_CASE("bved_rule") {
+		using node = node_t;
+		using tau = tree<node>;
+
+		TAU_LOG_INFO << "bved_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(bved_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
+	}
 }
 
 TEST_SUITE("Cleanup") {
