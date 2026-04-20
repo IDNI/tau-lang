@@ -174,7 +174,7 @@ tref bvgteq(tref left, tref right) {
  * @return The resulting predicate
  */
 template<NodeType node>
-tref bvnlteq(tref left, tref right) { return bvlt<node>(left, right); }
+tref bvnlteq(tref left, tref right) { return bvgt<node>(left, right); }
 
 /**
  * @brief Computes a predicate checking if left is not greater or equal to right as bitvectors.
