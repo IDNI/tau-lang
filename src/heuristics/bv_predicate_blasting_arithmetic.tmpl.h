@@ -508,7 +508,7 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv constant */) {
 	using tau = tree<node>;
 
 	static std::map<tref, rewriter::rule> cache;
-	if (cache.find(divisor) != cache.end()) return cache[divisor];
+	if (auto it = cache.find(divisor); it != cache.end()) return it->second;
 
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
@@ -538,8 +538,7 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv constant */) {
 	LOG_TRACE << "bvdiv_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
-	cache[divisor] = rule;
-	return cache[divisor];
+	return cache[divisor] = rule;
 }
 
 template<NodeType node>
@@ -584,7 +583,7 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
 	using tau = tree<node>;
 
 	static std::map<tref, rewriter::rule> cache;
-	if (cache.find(divisor) != cache.end()) return cache[divisor];
+	if (auto it = cache.find(divisor); it != cache.end()) return it->second;
 
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
@@ -614,8 +613,7 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
 	LOG_TRACE << "bvmod_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
-	cache[divisor] = rule;
-	return cache[divisor];
+	return cache[divisor] = rule;
 }
 
 template<NodeType node>
@@ -628,6 +626,85 @@ tref bvmod(tref dividend, tref divisor, tref remainder) {
 	}
 	auto rule = bvmod_rule<node>(divisor);
 	auto call = make_bvmod_call<node>(dividend, divisor, remainder);
+	auto rr = make_rr<node>({ rule }, call);
+	return apply_rr_to_formula(rr);
+}
+
+/**
+ * @brief Creates a call to the bitvector Euclidean division recurrence.
+ * @tparam node Node type
+ * @param dividend Dividend
+ * @param divisor Divisor
+ * @param quotient Quotient result variable
+ * @param remainder Remainder result variable
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_bved_call(tref dividend, tref divisor, tref quotient, tref remainder) {
+	using tau = tree<node>;
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bved", { dividend, divisor, quotient, remainder })));
+}
+
+/**
+ * @brief Returns the rule for bitvector Euclidean division (caching by divisor).
+ *
+ * Exposes both quotient and remainder as outputs. Only the intermediate
+ * value `exact = dividend - remainder` is existentially quantified.
+ *
+ * @tparam node Node type
+ * @param divisor Divisor (bv constant)
+ * @return The constructed rule
+ */
+template<NodeType node>
+static rewriter::rule bved_rule(tref divisor /* bv constant */) {
+	using tau = tree<node>;
+
+	static std::map<tref, rewriter::rule> cache;
+	if (auto it = cache.find(divisor); it != cache.end()) return it->second;
+
+	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
+
+	auto dividend_var  = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto quotient_var  = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto remainder_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
+	auto exact_var     = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto bf_exact      = tau::get(tau::bf, exact_var);
+
+	// head: _bved(dividend, divisor, quotient, remainder)
+	auto call = make_bved_call<node>(dividend_var, divisor, quotient_var, remainder_var);
+
+	// body: ∃ exact:
+	//   bvsub(dividend, remainder, exact)   -- exact = dividend - remainder
+	//   && bvmul(quotient, divisor, exact)  -- quotient * divisor = exact
+	//   && bvlt(remainder, divisor)         -- remainder < divisor
+	auto body = tau::build_wff_ex(exact_var,
+		tau::build_wff_and(
+			bvsub<node>(dividend_var, remainder_var, bf_exact),
+			tau::build_wff_and(
+				bvmul<node>(quotient_var, divisor, bf_exact),
+				bvlt<node>(remainder_var, divisor))));
+	auto rule = make_rule<node>(call, body);
+
+#ifdef DEBUG
+	LOG_TRACE << "bved_rule: " << LOG_RULE(rule) << "\n";
+	LOG_TRACE << "bved_rule/head: " << LOG_FM(rule.first->get()) << "\n";
+	LOG_TRACE << "bved_rule/body: " << LOG_FM(rule.second->get()) << "\n";
+#endif // DEBUG
+
+	return cache[divisor] = rule;
+}
+
+template<NodeType node>
+tref bved(tref dividend, tref divisor, tref quotient, tref remainder) {
+	using tau = tree<node>;
+
+	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
+		DBG( LOG_DEBUG << "Only Euclidean division by constant is supported in predicate blasting."; )
+		return nullptr;
+	}
+	auto rule = bved_rule<node>(divisor);
+	auto call = make_bved_call<node>(dividend, divisor, quotient, remainder);
 	auto rr = make_rr<node>({ rule }, call);
 	return apply_rr_to_formula(rr);
 }
