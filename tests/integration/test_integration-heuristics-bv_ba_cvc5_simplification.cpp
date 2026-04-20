@@ -196,7 +196,7 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 		tref src = parse_bf(sample);
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
 		//  (concat ((_ extract 6 0) x) #b0)
-		CHECK( simplified == nullptr );
+		CHECK( simplified != nullptr );
 	}
 
 	// When multiplying by a power of two cvc5 simplifies the multiplication
@@ -206,7 +206,7 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 		tref src = parse_bf(sample);
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
 		// (concat ((_ extract 5 0) x) b00)
-		CHECK( simplified == nullptr );
+		CHECK( simplified != nullptr );
 	}
 
 	TEST_CASE("multiplication of constant/variable") {
