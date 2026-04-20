@@ -29,8 +29,13 @@ namespace idni::tau_lang {
 template<NodeType node>
 static tref make_bvadd_call_from_offset(tref augend, tref addend, tref sum, tref offset) {
 	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvadd", { offset }, { augend, addend, sum })));
+	DBG( LOG_TRACE << "make_bvadd_call_from_offset/augend: " << LOG_FM(augend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvadd_call_from_offset/addend: " << LOG_FM(addend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvadd_call_from_offset/sum: " << LOG_FM(sum) << "\n"; )
+	DBG( LOG_TRACE << "make_bvadd_call_from_offset/offset: " << LOG_FM(offset) << "\n"; )
+	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvadd", { offset }, { augend, addend, sum })));
+	DBG( LOG_TRACE << "make_bvadd_call_from_offset/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -45,9 +50,14 @@ static tref make_bvadd_call_from_offset(tref augend, tref addend, tref sum, tref
 template<NodeType node>
 static tref make_bvadd_call_from_index(tref minuend, tref subtrahend, tref difference, size_t index) {
 	using tau = tree<node>;
-
+	DBG( LOG_TRACE << "make_bvadd_call_from_index/minuend: " << LOG_FM(minuend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvadd_call_from_index/subtrahend: " << LOG_FM(subtrahend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvadd_call_from_index/difference: " << LOG_FM(difference) << "\n"; )
+	DBG( LOG_TRACE << "make_bvadd_call_from_index/index: " << index << "\n"; )
 	auto offset = tau::get_num(index);
-	return make_bvadd_call_from_offset<node>(minuend, subtrahend, difference, offset);
+	auto result = make_bvadd_call_from_offset<node>(minuend, subtrahend, difference, offset);
+	DBG( LOG_TRACE << "make_bvadd_call_from_index/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -62,9 +72,11 @@ static tref make_bvadd_call_from_index(tref minuend, tref subtrahend, tref diffe
 template<NodeType node>
 static rewriter::rules bvadd_rules(size_t bitwidth) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvadd_rules/bitwidth: " << bitwidth << "\n"; )
 
 	static std::map<size_t, rewriter::rules> cache;
 	if (auto it = cache.find(bitwidth); it != cache.end()) {
+		DBG( LOG_TRACE << "bvadd_rules (cache hit)/bitwidth: " << bitwidth << "\n"; )
 		return it->second;
 	}
 
@@ -112,9 +124,11 @@ static rewriter::rules bvadd_rules(size_t bitwidth) {
 template<NodeType node>
 static rewriter::rule bvadd_rule(size_t bitwidth) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvadd_rule/bitwidth: " << bitwidth << "\n"; )
 
 	static std::map<size_t, rewriter::rule> cache;
 	if (auto it = cache.find(bitwidth); it != cache.end()) {
+		DBG( LOG_TRACE << "bvadd_rule (cache hit)/bitwidth: " << bitwidth << "\n"; )
 		return it->second;
 	}
 
@@ -143,11 +157,16 @@ static rewriter::rule bvadd_rule(size_t bitwidth) {
 
 template<NodeType node>
 tref bvadd(tref augend, tref addend, tref sum) {
+	DBG( LOG_TRACE << "bvadd/augend: " << LOG_FM(augend) << "\n"; )
+	DBG( LOG_TRACE << "bvadd/addend: " << LOG_FM(addend) << "\n"; )
+	DBG( LOG_TRACE << "bvadd/sum: " << LOG_FM(sum) << "\n"; )
 	auto bitwidth = get_bv_type_bitwidth<node>(augend);
 	auto rule = bvadd_rule<node>(bitwidth);
 	auto call = make_bvadd_call_from_index<node>(augend, addend, sum, bitwidth);
 	auto rr = make_rr<node>({ rule } , call);
-	return apply_rr_to_formula(rr);
+	auto result = apply_rr_to_formula(rr);
+	DBG( LOG_TRACE << "bvadd/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 //
@@ -176,8 +195,13 @@ tref bvadd(tref augend, tref addend, tref sum) {
 template<NodeType node>
 static tref make_bvsub_call_from_offset(tref minuend, tref subtrahend, tref difference, tref offset) {
 	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvsub", { offset }, { minuend, subtrahend, difference })));
+	DBG( LOG_TRACE << "make_bvsub_call_from_offset/minuend: " << LOG_FM(minuend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvsub_call_from_offset/subtrahend: " << LOG_FM(subtrahend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvsub_call_from_offset/difference: " << LOG_FM(difference) << "\n"; )
+	DBG( LOG_TRACE << "make_bvsub_call_from_offset/offset: " << LOG_FM(offset) << "\n"; )
+	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvsub", { offset }, { minuend, subtrahend, difference })));
+	DBG( LOG_TRACE << "make_bvsub_call_from_offset/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -192,9 +216,14 @@ static tref make_bvsub_call_from_offset(tref minuend, tref subtrahend, tref diff
 template<NodeType node>
 static tref make_bvsub_call_from_index(tref minuend, tref subtrahend, tref difference, size_t index) {
 	using tau = tree<node>;
-
+	DBG( LOG_TRACE << "make_bvsub_call_from_index/minuend: " << LOG_FM(minuend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvsub_call_from_index/subtrahend: " << LOG_FM(subtrahend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvsub_call_from_index/difference: " << LOG_FM(difference) << "\n"; )
+	DBG( LOG_TRACE << "make_bvsub_call_from_index/index: " << index << "\n"; )
 	auto offset = tau::get_num(index);
-	return make_bvsub_call_from_offset<node>(minuend, subtrahend, difference, offset);
+	auto result = make_bvsub_call_from_offset<node>(minuend, subtrahend, difference, offset);
+	DBG( LOG_TRACE << "make_bvsub_call_from_index/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -209,9 +238,11 @@ static tref make_bvsub_call_from_index(tref minuend, tref subtrahend, tref diffe
 template<NodeType node>
 static rewriter::rules bvsub_rules(size_t bitwidth) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvsub_rules/bitwidth: " << bitwidth << "\n"; )
 
 	static std::map<size_t, rewriter::rules> cache;
 	if (auto it = cache.find(bitwidth); it != cache.end()) {
+		DBG( LOG_TRACE << "bvsub_rules (cache hit)/bitwidth: " << bitwidth << "\n"; )
 		return it->second;
 	}
 
@@ -259,9 +290,11 @@ static rewriter::rules bvsub_rules(size_t bitwidth) {
 template<NodeType node>
 static rewriter::rule bvsub_rule(size_t bitwidth) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvsub_rule/bitwidth: " << bitwidth << "\n"; )
 
 	static std::map<size_t, rewriter::rule> cache;
 	if (auto it = cache.find(bitwidth); it != cache.end()) {
+		DBG( LOG_TRACE << "bvsub_rule (cache hit)/bitwidth: " << bitwidth << "\n"; )
 		return it->second;
 	}
 
@@ -289,11 +322,16 @@ static rewriter::rule bvsub_rule(size_t bitwidth) {
 
 template<NodeType node>
 tref bvsub(tref minuend, tref subtrahend, tref difference) {
+	DBG( LOG_TRACE << "bvsub/minuend: " << LOG_FM(minuend) << "\n"; )
+	DBG( LOG_TRACE << "bvsub/subtrahend: " << LOG_FM(subtrahend) << "\n"; )
+	DBG( LOG_TRACE << "bvsub/difference: " << LOG_FM(difference) << "\n"; )
 	auto bitwidth = get_bv_type_bitwidth<node>(minuend);
 	auto rule = bvsub_rule<node>(bitwidth);
 	auto call = make_bvsub_call_from_index<node>(minuend, subtrahend, difference, bitwidth);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	auto result = apply_rr_to_formula(rr);
+	DBG( LOG_TRACE << "bvsub/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 //
@@ -320,8 +358,12 @@ tref bvsub(tref minuend, tref subtrahend, tref difference) {
 template<NodeType node>
 static tref make_bvmul_call(tref multiplicant, tref multiplier, tref product) {
 	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmul", { multiplicant, multiplier, product })));
+	DBG( LOG_TRACE << "make_bvmul_call/multiplicant: " << LOG_FM(multiplicant) << "\n"; )
+	DBG( LOG_TRACE << "make_bvmul_call/multiplier: " << LOG_FM(multiplier) << "\n"; )
+	DBG( LOG_TRACE << "make_bvmul_call/product: " << LOG_FM(product) << "\n"; )
+	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmul", { multiplicant, multiplier, product })));
+	DBG( LOG_TRACE << "make_bvmul_call/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -337,11 +379,13 @@ static tref make_bvmul_call(tref multiplicant, tref multiplier, tref product) {
 template<NodeType node>
 static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvmul_rec_rule/multiplier: " << LOG_FM(multiplier) << "\n"; )
 
 	DBG( assert(tau::get(tau::trim(multiplier)).is(tau::bf_f) || is_bv_constant<node>(tau::trim(multiplier))); )
 
 	static std::map<tref, rewriter::rule> cache;
 	if (cache.find(multiplier) != cache.end()) {
+		DBG( LOG_TRACE << "bvmul_rec_rule (cache hit)/multiplier: " << LOG_FM(multiplier) << "\n"; )
 		return cache[multiplier];
 	}
 
@@ -423,12 +467,16 @@ static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 template<NodeType node>
 static rewriter::rule bvmul_rule(tref multiplier /* cvc5 constant */) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvmul_rule/multiplier: " << LOG_FM(multiplier) << "\n"; )
 
-	DBG( LOG_INFO << "Checking if tref " << LOG_FM_TREE(multiplier) << " is a zero bitvector constant.\n"; )
+	DBG( LOG_INFO << "Checking if tref " << LOG_FM(multiplier) << " is a zero bitvector constant.\n"; )
 
 	static std::map<tref, rewriter::rule> cache;
 
-	if (cache.find(multiplier) != cache.end()) return cache[multiplier];
+	if (cache.find(multiplier) != cache.end()) {
+		DBG( LOG_TRACE << "bvmul_rule (cache hit)/multiplier: " << LOG_FM(multiplier) << "\n"; )
+		return cache[multiplier];
+	}
 
 	rewriter::rules rules;
 	auto current = multiplier;
@@ -460,6 +508,9 @@ static rewriter::rule bvmul_rule(tref multiplier /* cvc5 constant */) {
 template<NodeType node>
 tref bvmul(tref multiplicand, tref multiplier, tref product) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvmul/multiplicand: " << LOG_FM(multiplicand) << "\n"; )
+	DBG( LOG_TRACE << "bvmul/multiplier: " << LOG_FM(multiplier) << "\n"; )
+	DBG( LOG_TRACE << "bvmul/product: " << LOG_FM(product) << "\n"; )
 
 	if (!tau::get(tau::trim(multiplier)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(multiplier))) {
 		DBG( LOG_DEBUG << "Only multiplication by constant is supported in predicate blasting."; )
@@ -467,7 +518,9 @@ tref bvmul(tref multiplicand, tref multiplier, tref product) {
 	}
 	auto rule = bvmul_rule<node>(multiplier);
 	auto call = make_bvmul_call<node>(multiplicand, multiplier, product);
-	return nso_rr_apply<node>({ rule }, call);
+	auto result = nso_rr_apply<node>({ rule }, call);
+	DBG( LOG_TRACE << "bvmul/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 //
@@ -491,8 +544,12 @@ tref bvmul(tref multiplicand, tref multiplier, tref product) {
 template<NodeType node>
 static tref make_bvdiv_call(tref dividend, tref divisor, tref quotient) {
 	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvdiv", { dividend, divisor, quotient })));
+	DBG( LOG_TRACE << "make_bvdiv_call/dividend: " << LOG_FM(dividend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvdiv_call/divisor: " << LOG_FM(divisor) << "\n"; )
+	DBG( LOG_TRACE << "make_bvdiv_call/quotient: " << LOG_FM(quotient) << "\n"; )
+	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvdiv", { dividend, divisor, quotient })));
+	DBG( LOG_TRACE << "make_bvdiv_call/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -506,9 +563,13 @@ static tref make_bvdiv_call(tref dividend, tref divisor, tref quotient) {
 template<NodeType node>
 static rewriter::rule bvdiv_rule(tref divisor /* bv constant */) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvdiv_rule/divisor: " << LOG_FM(divisor) << "\n"; )
 
 	static std::map<tref, rewriter::rule> cache;
-	if (auto it = cache.find(divisor); it != cache.end()) return it->second;
+	if (auto it = cache.find(divisor); it != cache.end()) {
+		DBG( LOG_TRACE << "bvdiv_rule (cache hit)/divisor: " << LOG_FM(divisor) << "\n"; )
+		return it->second;
+	}
 
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
@@ -544,6 +605,9 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv constant */) {
 template<NodeType node>
 tref bvdiv(tref dividend, tref divisor, tref quotient) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvdiv/dividend: " << LOG_FM(dividend) << "\n"; )
+	DBG( LOG_TRACE << "bvdiv/divisor: " << LOG_FM(divisor) << "\n"; )
+	DBG( LOG_TRACE << "bvdiv/quotient: " << LOG_FM(quotient) << "\n"; )
 
 	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
 		DBG( LOG_DEBUG << "Only division by constant is supported in predicate blasting."; )
@@ -552,7 +616,9 @@ tref bvdiv(tref dividend, tref divisor, tref quotient) {
 	auto rule = bvdiv_rule<node>(divisor);
 	auto call = make_bvdiv_call<node>(dividend, divisor, quotient);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	auto result = apply_rr_to_formula(rr);
+	DBG( LOG_TRACE << "bvdiv/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -566,8 +632,12 @@ tref bvdiv(tref dividend, tref divisor, tref quotient) {
 template<NodeType node>
 static tref make_bvmod_call(tref dividend, tref divisor, tref remainder) {
 	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmod", { dividend, divisor, remainder })));
+	DBG( LOG_TRACE << "make_bvmod_call/dividend: " << LOG_FM(dividend) << "\n"; )
+	DBG( LOG_TRACE << "make_bvmod_call/divisor: " << LOG_FM(divisor) << "\n"; )
+	DBG( LOG_TRACE << "make_bvmod_call/remainder: " << LOG_FM(remainder) << "\n"; )
+	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmod", { dividend, divisor, remainder })));
+	DBG( LOG_TRACE << "make_bvmod_call/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -581,9 +651,13 @@ static tref make_bvmod_call(tref dividend, tref divisor, tref remainder) {
 template<NodeType node>
 static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvmod_rule/divisor: " << LOG_FM(divisor) << "\n"; )
 
 	static std::map<tref, rewriter::rule> cache;
-	if (auto it = cache.find(divisor); it != cache.end()) return it->second;
+	if (auto it = cache.find(divisor); it != cache.end()) {
+		DBG( LOG_TRACE << "bvmod_rule (cache hit)/divisor: " << LOG_FM(divisor) << "\n"; )
+		return it->second;
+	}
 
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
@@ -619,6 +693,9 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
 template<NodeType node>
 tref bvmod(tref dividend, tref divisor, tref remainder) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvmod/dividend: " << LOG_FM(dividend) << "\n"; )
+	DBG( LOG_TRACE << "bvmod/divisor: " << LOG_FM(divisor) << "\n"; )
+	DBG( LOG_TRACE << "bvmod/remainder: " << LOG_FM(remainder) << "\n"; )
 
 	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
 		DBG( LOG_DEBUG << "Only modulo by constant is supported in predicate blasting."; )
@@ -627,7 +704,9 @@ tref bvmod(tref dividend, tref divisor, tref remainder) {
 	auto rule = bvmod_rule<node>(divisor);
 	auto call = make_bvmod_call<node>(dividend, divisor, remainder);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	auto result = apply_rr_to_formula(rr);
+	DBG( LOG_TRACE << "bvmod/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -642,8 +721,13 @@ tref bvmod(tref dividend, tref divisor, tref remainder) {
 template<NodeType node>
 static tref make_bved_call(tref dividend, tref divisor, tref quotient, tref remainder) {
 	using tau = tree<node>;
-
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bved", { dividend, divisor, quotient, remainder })));
+	DBG( LOG_TRACE << "make_bved_call/dividend: " << LOG_FM(dividend) << "\n"; )
+	DBG( LOG_TRACE << "make_bved_call/divisor: " << LOG_FM(divisor) << "\n"; )
+	DBG( LOG_TRACE << "make_bved_call/quotient: " << LOG_FM(quotient) << "\n"; )
+	DBG( LOG_TRACE << "make_bved_call/remainder: " << LOG_FM(remainder) << "\n"; )
+	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bved", { dividend, divisor, quotient, remainder })));
+	DBG( LOG_TRACE << "make_bved_call/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 /**
@@ -659,9 +743,13 @@ static tref make_bved_call(tref dividend, tref divisor, tref quotient, tref rema
 template<NodeType node>
 static rewriter::rule bved_rule(tref divisor /* bv constant */) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bved_rule/divisor: " << LOG_FM(divisor) << "\n"; )
 
 	static std::map<tref, rewriter::rule> cache;
-	if (auto it = cache.find(divisor); it != cache.end()) return it->second;
+	if (auto it = cache.find(divisor); it != cache.end()) {
+		DBG( LOG_TRACE << "bved_rule (cache hit)/divisor: " << LOG_FM(divisor) << "\n"; )
+		return it->second;
+	}
 
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
@@ -698,6 +786,10 @@ static rewriter::rule bved_rule(tref divisor /* bv constant */) {
 template<NodeType node>
 tref bved(tref dividend, tref divisor, tref quotient, tref remainder) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bved/dividend: " << LOG_FM(dividend) << "\n"; )
+	DBG( LOG_TRACE << "bved/divisor: " << LOG_FM(divisor) << "\n"; )
+	DBG( LOG_TRACE << "bved/quotient: " << LOG_FM(quotient) << "\n"; )
+	DBG( LOG_TRACE << "bved/remainder: " << LOG_FM(remainder) << "\n"; )
 
 	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
 		DBG( LOG_DEBUG << "Only Euclidean division by constant is supported in predicate blasting."; )
@@ -706,7 +798,9 @@ tref bved(tref dividend, tref divisor, tref quotient, tref remainder) {
 	auto rule = bved_rule<node>(divisor);
 	auto call = make_bved_call<node>(dividend, divisor, quotient, remainder);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	auto result = apply_rr_to_formula(rr);
+	DBG( LOG_TRACE << "bved/result: " << LOG_FM(result) << "\n"; )
+	return result;
 }
 
 } // namespace idni::tau_lang
