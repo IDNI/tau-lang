@@ -73,6 +73,7 @@ tref bvadd(tref augend, tref addend, tref sum, trefs& aux) {
 template<NodeType node>
 tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvsub_rule/bitwidth: " << bitwidth << "\n"; )
 
 	auto bitwidth = get_bv_type_bitwidth<node>(minuend);
 	if (bitwidth == 0) return nullptr;
@@ -223,6 +224,7 @@ static tref bv_euclidean_constraints(tref dividend, tref divisor,
 	tref quotient, tref remainder, trefs& aux)
 {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvdiv_rule/divisor: " << LOG_FM(divisor) << "\n"; )
 
 	if (!tau::get(tau::trim(divisor)).is_ba_constant()
 		|| !is_bv_constant<node>(tau::trim(divisor))) {
@@ -293,6 +295,9 @@ tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux) {
 template<NodeType node>
 tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux) {
 	using tau = tree<node>;
+	DBG( LOG_TRACE << "bvmod/dividend: " << LOG_FM(dividend) << "\n"; )
+	DBG( LOG_TRACE << "bvmod/divisor: " << LOG_FM(divisor) << "\n"; )
+	DBG( LOG_TRACE << "bvmod/remainder: " << LOG_FM(remainder) << "\n"; )
 
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 	if (bitwidth == 0) return nullptr;
