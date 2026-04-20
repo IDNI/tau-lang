@@ -90,4 +90,5 @@ __pycache__/
 *$py.class
 .pytest_cache/
 CLAUDE.md
-.github/copilot-instructions.md
+.github
+.cluade
