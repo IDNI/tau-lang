@@ -256,6 +256,21 @@ tref bvmul(tref multiplicand, tref multiplier, tref product);
  * @param dividend Dividend
  * @param divisor Divisor (must be constant)
  * @param quotient Quotient variable
+ * @param remainder Remainder variable
+ * @return The resulting predicate term, or nullptr if unsupported
+ */
+template<NodeType node>
+tref bved(tref dividend, tref divisor, tref quotient, tref remainder);
+
+/**
+ * @brief Applies the bitvector division rule to the given operands.
+ *
+ * Only supports division by a constant divisor.
+ *
+ * @tparam node Node type
+ * @param dividend Dividend
+ * @param divisor Divisor (must be constant)
+ * @param quotient Quotient variable
  * @return The resulting predicate term, or nullptr if unsupported
  */
 template<NodeType node>

@@ -151,6 +151,15 @@ TEST_SUITE("bitblasting") {
 		TAU_LOG_INFO << LOG_RULE(bvmod_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n\n";
 		TAU_LOG_INFO << "------" << '\n';
 	}
+
+	TEST_CASE("bved_rule") {
+		using node = node_t;
+		using tau = tree<node>;
+
+		TAU_LOG_INFO << "bved_rule:\n";
+		TAU_LOG_INFO << LOG_RULE(bved_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
+	}
 }
 
 TEST_SUITE("Cleanup") {

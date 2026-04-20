@@ -15,10 +15,12 @@ tref cvc5_tree_to_tau_tree(bv n) {
 
 	DBG(LOG_INFO << "cvc5_tree_to_tau_tree/n: " << n.toString() << "\n";)
 
-	auto from_collection = [](const bv& t, const auto& f) {
+	auto from_collection = [](const bv& t, const auto& f) -> tref {
 		tref res = rec(t[0]);
 		for (size_t i = 1; i < t.getNumChildren(); ++i) {
-			res = f(res, rec(t[i]));
+			auto temp = rec(t[i]);
+			if (temp == nullptr) return nullptr; // Unable to transform to tau (returning null)
+			res = f(res, temp);
 		}
 		return res;
 	};
@@ -104,7 +106,7 @@ tref bv_ba_cvc5_simplification(tref term) {
 			<< "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term).tree_to_str() << "\n";
 #endif // DEBUG
 
-	return simplified_term ? simplified_term : term;
+	return simplified_term != nullptr ? simplified_term : term;
 }
 
 } // namespace idni::tau_lang
