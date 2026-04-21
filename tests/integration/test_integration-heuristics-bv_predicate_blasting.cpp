@@ -30,8 +30,6 @@ tref parse_wff(const std::string& sample) {
 	return src;
 }
 
-// Normalizes a BV wff formula string through the full pipeline and returns
-// "T", "F", or another normalized form.
 static std::string blast_normalize(const std::string& sample) {
 	auto wff = parse_wff(sample);
 	if (!wff) return "parse_error";
@@ -40,7 +38,6 @@ static std::string blast_normalize(const std::string& sample) {
 	return tau::get(result).to_str();
 }
 
-// Runs blast_normalize with a temporary bv size, then restores the original.
 static std::string blast_normalize_with_size(size_t size, const std::string& sample) {
 	auto prev = default_bv_size;
 	default_bv_size = size;
@@ -49,310 +46,465 @@ static std::string blast_normalize_with_size(size_t size, const std::string& sam
 	return result;
 }
 
-// ============================================================
-// Correctness tests for bvadd, bvsub, bvmul, bit, bvshl,
-// bvrhl_by_one, bvshl_by_one, bvdiv, bvmod, bved.
-// ============================================================
-
-// ------------------------------------------------------------
-// bvadd: dividend + addend = sum (mod 2^N)
-// ------------------------------------------------------------
+//
+// bvadd: augend + addend = sum (mod 2^N)
+//
 TEST_SUITE("bvadd") {
 
-	// 3 + 5 = 8  (no overflow)
 	TEST_CASE("bvadd: 3 + 5 = 8") {
 		CHECK(blast_normalize("ex x (x = { 3 }:bv && x + { 5 }:bv = { 8 }:bv)") == "T");
 	}
 
-	// 3 + 5 ≠ 9
 	TEST_CASE("bvadd: 3 + 5 != 9") {
 		CHECK(blast_normalize("ex x (x = { 3 }:bv && x + { 5 }:bv = { 9 }:bv)") == "F");
 	}
 
-	// 0 + 0 = 0
 	TEST_CASE("bvadd: 0 + 0 = 0") {
 		CHECK(blast_normalize("ex x (x = { 0 }:bv && x + { 0 }:bv = { 0 }:bv)") == "T");
 	}
 
-	// 15 + 1 = 0  (4-bit wrap-around: 16 mod 16 = 0)
 	TEST_CASE("bvadd: 15 + 1 = 0 for 4-bit (overflow)") {
 		CHECK(blast_normalize("ex x (x = { 15 }:bv && x + { 1 }:bv = { 0 }:bv)") == "T");
 	}
 
-	// 7 + 9 = 0  (4-bit: 16 mod 16 = 0)
 	TEST_CASE("bvadd: 7 + 9 = 0 for 4-bit (overflow)") {
 		CHECK(blast_normalize("ex x (x = { 7 }:bv && x + { 9 }:bv = { 0 }:bv)") == "T");
 	}
 
-	// ex x: x + x = 2*x is always satisfiable (identity, not a fixed value)
-	TEST_CASE("bvadd: ex x, x + x = x * 2") {
-		// 6 + 6 = 12 for 4-bit (12 < 16, no overflow)
+	TEST_CASE("bvadd: 6 + 6 = 12") {
 		CHECK(blast_normalize("ex x (x = { 6 }:bv && x + { 6 }:bv = { 12 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvadd: x + 0 = x") {
+		CHECK(blast_normalize("all x x:bv + { 0 }:bv = x:bv") == "T");
 	}
 }
 
-// ------------------------------------------------------------
+//
 // bvsub: minuend - subtrahend = difference (mod 2^N)
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvsub") {
 
-	// 8 - 5 = 3
 	TEST_CASE("bvsub: 8 - 5 = 3") {
 		CHECK(blast_normalize("ex x (x = { 8 }:bv && x - { 5 }:bv = { 3 }:bv)") == "T");
 	}
 
-	// 8 - 5 ≠ 4
 	TEST_CASE("bvsub: 8 - 5 != 4") {
 		CHECK(blast_normalize("ex x (x = { 8 }:bv && x - { 5 }:bv = { 4 }:bv)") == "F");
 	}
 
-	// 5 - 5 = 0
 	TEST_CASE("bvsub: 5 - 5 = 0") {
 		CHECK(blast_normalize("ex x (x = { 5 }:bv && x - { 5 }:bv = { 0 }:bv)") == "T");
 	}
 
-	// 0 - 1 = 15  (4-bit underflow/wrap: -1 mod 16 = 15)
 	TEST_CASE("bvsub: 0 - 1 = 15 for 4-bit (underflow)") {
 		CHECK(blast_normalize("ex x (x = { 0 }:bv && x - { 1 }:bv = { 15 }:bv)") == "T");
 	}
 
-	// 3 - 5 = 14  (4-bit: -2 mod 16 = 14)
 	TEST_CASE("bvsub: 3 - 5 = 14 for 4-bit (underflow)") {
 		CHECK(blast_normalize("ex x (x = { 3 }:bv && x - { 5 }:bv = { 14 }:bv)") == "T");
 	}
+
+	TEST_CASE("bvsub: x - x = 0") {
+		CHECK(blast_normalize("all x x:bv - x:bv = { 0 }:bv") == "T");
+	}
 }
 
-// ------------------------------------------------------------
+//
 // bvmul: multiplicand * constant_multiplier = product (mod 2^N)
 // Only multiplication by a constant right operand is supported.
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvmul") {
 
-	// 3 * 4 = 12
 	TEST_CASE("bvmul: 3 * 4 = 12") {
 		CHECK(blast_normalize("ex x (x = { 3 }:bv && x * { 4 }:bv = { 12 }:bv)") == "T");
 	}
 
-	// 3 * 4 ≠ 13
 	TEST_CASE("bvmul: 3 * 4 != 13") {
 		CHECK(blast_normalize("ex x (x = { 3 }:bv && x * { 4 }:bv = { 13 }:bv)") == "F");
 	}
 
-	// x * 0 = 0 for all x
 	TEST_CASE("bvmul: x * 0 = 0") {
 		CHECK(blast_normalize("ex x (x = { 7 }:bv && x * { 0 }:bv = { 0 }:bv)") == "T");
 	}
 
-	// x * 1 = x
 	TEST_CASE("bvmul: x * 1 = x") {
 		CHECK(blast_normalize("ex x (x = { 7 }:bv && x * { 1 }:bv = { 7 }:bv)") == "T");
 	}
 
-	// 3 * 6 = 2  (4-bit: 18 mod 16 = 2)
 	TEST_CASE("bvmul: 3 * 6 = 2 for 4-bit (overflow)") {
 		CHECK(blast_normalize("ex x (x = { 3 }:bv && x * { 6 }:bv = { 2 }:bv)") == "T");
 	}
 
-	// 5 * 3 = 15
 	TEST_CASE("bvmul: 5 * 3 = 15") {
 		CHECK(blast_normalize("ex x (x = { 5 }:bv && x * { 3 }:bv = { 15 }:bv)") == "T");
 	}
 }
 
-// ------------------------------------------------------------
+//
 // bit: bit[i](x) = x & (1 << i)
-// Tested indirectly via equality predicates on the masked value.
-// ------------------------------------------------------------
+// Tested via equality predicates on the masked value.
+//
 TEST_SUITE("bit") {
 
-	// bit[0](5) = 1  (5 = 0101 in 4-bit; bit 0 is 1)
-	// Test: 5 & 1 = 1
 	TEST_CASE("bit[0]: { 5 }:bv & { 1 }:bv = { 1 }:bv") {
 		CHECK(blast_normalize("ex x (x = { 5 }:bv && x & { 1 }:bv = { 1 }:bv)") == "T");
 	}
 
-	// bit[1](5) = 0  (5 = 0101; bit 1 is 0)
-	// Test: 5 & 2 = 0
 	TEST_CASE("bit[1]: { 5 }:bv & { 2 }:bv = { 0 }:bv") {
 		CHECK(blast_normalize("ex x (x = { 5 }:bv && x & { 2 }:bv = { 0 }:bv)") == "T");
 	}
 
-	// bit[2](5) = 1  (5 = 0101; bit 2 is 1)
-	// Test: 5 & 4 = 4
 	TEST_CASE("bit[2]: { 5 }:bv & { 4 }:bv = { 4 }:bv") {
 		CHECK(blast_normalize("ex x (x = { 5 }:bv && x & { 4 }:bv = { 4 }:bv)") == "T");
 	}
 
-	// bit[3](5) = 0  (5 = 0101; bit 3 is 0)
-	// Test: 5 & 8 = 0
 	TEST_CASE("bit[3]: { 5 }:bv & { 8 }:bv = { 0 }:bv") {
 		CHECK(blast_normalize("ex x (x = { 5 }:bv && x & { 8 }:bv = { 0 }:bv)") == "T");
 	}
 
-	// bit[0](6) = 0  (6 = 0110; bit 0 is 0)
 	TEST_CASE("bit[0]: { 6 }:bv & { 1 }:bv = { 0 }:bv") {
 		CHECK(blast_normalize("ex x (x = { 6 }:bv && x & { 1 }:bv = { 0 }:bv)") == "T");
 	}
 
-	// All bits of 0 are 0
 	TEST_CASE("bit: all bits of { 0 }:bv are zero") {
 		CHECK(blast_normalize("ex x (x = { 0 }:bv && x & { 15 }:bv = { 0 }:bv)") == "T");
 	}
 
-	// All bits of 15 are 1
 	TEST_CASE("bit: all bits of { 15 }:bv are one") {
 		CHECK(blast_normalize("ex x (x = { 15 }:bv && x & { 15 }:bv = { 15 }:bv)") == "T");
 	}
 }
 
-// ------------------------------------------------------------
+//
 // bvshl_by_one: shifted = base << 1 (single-step left shift)
-// The LSB of shifted is 0; bit[i+1](shifted) = bit[i](base).
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvshl_by_one") {
 
-	// 1 << 1 = 2  (0001 → 0010)
 	TEST_CASE("bvshl_by_one: 1 << 1 = 2") {
 		CHECK(blast_normalize("ex x ex y (x = { 1 }:bv && x << { 1 }:bv = y && y = { 2 }:bv)") == "T");
 	}
 
-	// 4 << 1 = 8  (0100 → 1000)
 	TEST_CASE("bvshl_by_one: 4 << 1 = 8") {
 		CHECK(blast_normalize("ex x ex y (x = { 4 }:bv && x << { 1 }:bv = y && y = { 8 }:bv)") == "T");
 	}
 
-	// 8 << 1 = 0  (1000 → 0000, MSB shifted out)
 	TEST_CASE("bvshl_by_one: 8 << 1 = 0 for 4-bit (MSB shifts out)") {
 		CHECK(blast_normalize("ex x ex y (x = { 8 }:bv && x << { 1 }:bv = y && y = { 0 }:bv)") == "T");
 	}
 
-	// 6 << 1 = 12  (0110 → 1100)
 	TEST_CASE("bvshl_by_one: 6 << 1 = 12") {
 		CHECK(blast_normalize("ex x ex y (x = { 6 }:bv && x << { 1 }:bv = y && y = { 12 }:bv)") == "T");
 	}
 }
 
-// ------------------------------------------------------------
+//
+// bvshl: left shift by constant amount
+//
+TEST_SUITE("bvshl") {
+
+	TEST_CASE("bvshl: 1 << 1 = 2") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 1 }:bv && x << { 1 }:bv = y && y = { 2 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvshl: 1 << 1 != 3 (low bits must be zero)") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 1 }:bv && x << { 1 }:bv = y && y = { 3 }:bv)") == "F");
+	}
+
+	// 3 = 0011; shift left by 2: 1100 = 12
+	TEST_CASE("bvshl: 3 << 2 = 12") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 3 }:bv && x << { 2 }:bv = y && y = { 12 }:bv)") == "T");
+	}
+
+	// 3 = 0011; shift left by 3: only bit 1 fits => 1000 = 8
+	TEST_CASE("bvshl: 3 << 3 = 8 (boundary: one source bit fits)") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 3 }:bv && x << { 3 }:bv = y && y = { 8 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvshl: 1 << 4 = 0 (full overflow)") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 1 }:bv && x << { 4 }:bv = y && y = { 0 }:bv)") == "T");
+	}
+}
+
+//
 // bvrhl_by_one: shifted = base >> 1 (single-step right shift)
-// The MSB of shifted is 0; bit[i-1](shifted) = bit[i](base).
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvrhl_by_one") {
 
-	// 4 >> 1 = 2  (0100 → 0010)
 	TEST_CASE("bvrhl_by_one: 4 >> 1 = 2") {
 		CHECK(blast_normalize("ex x ex y (x = { 4 }:bv && x >> { 1 }:bv = y && y = { 2 }:bv)") == "T");
 	}
 
-	// 8 >> 1 = 4  (1000 → 0100)
 	TEST_CASE("bvrhl_by_one: 8 >> 1 = 4") {
 		CHECK(blast_normalize("ex x ex y (x = { 8 }:bv && x >> { 1 }:bv = y && y = { 4 }:bv)") == "T");
 	}
 
-	// 1 >> 1 = 0  (0001 → 0000, LSB shifts out)
 	TEST_CASE("bvrhl_by_one: 1 >> 1 = 0 (LSB shifts out)") {
 		CHECK(blast_normalize("ex x ex y (x = { 1 }:bv && x >> { 1 }:bv = y && y = { 0 }:bv)") == "T");
 	}
 
-	// 6 >> 1 = 3  (0110 → 0011)
 	TEST_CASE("bvrhl_by_one: 6 >> 1 = 3") {
 		CHECK(blast_normalize("ex x ex y (x = { 6 }:bv && x >> { 1 }:bv = y && y = { 3 }:bv)") == "T");
 	}
 }
 
-// ------------------------------------------------------------
+//
+// bvrhl: right shift by constant amount
+//
+TEST_SUITE("bvrhl") {
+
+	TEST_CASE("bvrhl: 4 >> 1 = 2") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 4 }:bv && x >> { 1 }:bv = y && y = { 2 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvrhl: 8 >> 2 = 2") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 8 }:bv && x >> { 2 }:bv = y && y = { 2 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvrhl: 6 >> 1 = 3") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 6 }:bv && x >> { 1 }:bv = y && y = { 3 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvrhl: 6 >> 1 != 6 (high bits must be zero)") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 6 }:bv && x >> { 1 }:bv = y && y = { 6 }:bv)") == "F");
+	}
+
+	TEST_CASE("bvrhl: 15 >> 4 = 0 (full shift out)") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 15 }:bv && x >> { 4 }:bv = y && y = { 0 }:bv)") == "T");
+	}
+}
+
+//
+// bvlt: strict less-than, including LSB-only difference cases
+//
+TEST_SUITE("bvlt") {
+
+	TEST_CASE("bvlt: 0 < 8 (MSBs differ)") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv && x < { 8 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvlt: 0 < 1 (differ only at LSB)") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv && x < { 1 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvlt: 2 < 3 (differ only at LSB)") {
+		CHECK(blast_normalize("ex x (x = { 2 }:bv && x < { 3 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvlt: 4 < 5 (differ only at LSB)") {
+		CHECK(blast_normalize("ex x (x = { 4 }:bv && x < { 5 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvlt: x < x is never satisfiable") {
+		CHECK(blast_normalize("ex x x:bv < x:bv") == "F");
+	}
+
+	TEST_CASE("bvlt: 0 < 0 is F") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv && x < { 0 }:bv)") == "F");
+	}
+
+	TEST_CASE("bvlt: 1 < 0 is F") {
+		CHECK(blast_normalize("ex x (x = { 1 }:bv && x < { 0 }:bv)") == "F");
+	}
+
+	TEST_CASE("bvlt: 3 < 2 is F for 2-bit") {
+		CHECK(blast_normalize_with_size(2, "ex x (x = { 3 }:bv && x < { 2 }:bv)") == "F");
+	}
+
+	TEST_CASE("bvlt: 2 < 3 is T for 2-bit (differ only at LSB)") {
+		CHECK(blast_normalize_with_size(2, "ex x (x = { 2 }:bv && x < { 3 }:bv)") == "T");
+	}
+}
+
+//
+// bvgt: strict greater-than
+//
+TEST_SUITE("bvgt") {
+
+	TEST_CASE("bvgt: 8 > 0 (MSBs differ)") {
+		CHECK(blast_normalize("ex x (x = { 8 }:bv && x > { 0 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvgt: 1 > 0 (differ only at LSB)") {
+		CHECK(blast_normalize("ex x (x = { 1 }:bv && x > { 0 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvgt: 3 > 2 (differ only at LSB)") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv && x > { 2 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvgt: x > x is never satisfiable") {
+		CHECK(blast_normalize("ex x x:bv > x:bv") == "F");
+	}
+
+	TEST_CASE("bvgt: 0 > 0 is F") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv && x > { 0 }:bv)") == "F");
+	}
+
+	TEST_CASE("bvgt: 2 > 3 is F for 2-bit (differ only at LSB)") {
+		CHECK(blast_normalize_with_size(2, "ex x (x = { 2 }:bv && x > { 3 }:bv)") == "F");
+	}
+
+	TEST_CASE("bvgt: 3 > 2 is T for 2-bit") {
+		CHECK(blast_normalize_with_size(2, "ex x (x = { 3 }:bv && x > { 2 }:bv)") == "T");
+	}
+}
+
+//
+// bvgteq: greater-than-or-equal
+//
+TEST_SUITE("bvgteq") {
+
+	TEST_CASE("bvgteq: all x, x >= x") {
+		CHECK(blast_normalize("all x x:bv >= x:bv") == "T");
+	}
+
+	TEST_CASE("bvgteq: 3 >= 2 for 2-bit") {
+		CHECK(blast_normalize_with_size(2, "ex x (x = { 3 }:bv && x >= { 2 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvgteq: 2 >= 3 is F for 2-bit") {
+		CHECK(blast_normalize_with_size(2, "ex x (x = { 2 }:bv && x >= { 3 }:bv)") == "F");
+	}
+
+	TEST_CASE("bvgteq: 1 >= 0 (differ only at LSB)") {
+		CHECK(blast_normalize("ex x (x = { 1 }:bv && x >= { 0 }:bv)") == "T");
+	}
+}
+
+//
+// bvlteq: less-than-or-equal
+//
+TEST_SUITE("bvlteq") {
+
+	TEST_CASE("bvlteq: all x, x <= x") {
+		CHECK(blast_normalize("all x x:bv <= x:bv") == "T");
+	}
+
+	TEST_CASE("bvlteq: 2 <= 3 for 2-bit") {
+		CHECK(blast_normalize_with_size(2, "ex x (x = { 2 }:bv && x <= { 3 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvlteq: 3 <= 2 is F for 2-bit") {
+		CHECK(blast_normalize_with_size(2, "ex x (x = { 3 }:bv && x <= { 2 }:bv)") == "F");
+	}
+
+	TEST_CASE("bvlteq: 0 <= 1 (differ only at LSB)") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv && x <= { 1 }:bv)") == "T");
+	}
+}
+
+//
+// bvnlteq: not-less-than-or-equal (= strictly greater-than)
+//
+TEST_SUITE("bvnlteq") {
+
+	TEST_CASE("bvnlteq: 3 !<= 1 is T") {
+		CHECK(blast_normalize_with_size(2, "ex x (x = { 3 }:bv && x !<= { 1 }:bv)") == "T");
+	}
+
+	TEST_CASE("bvnlteq: x !<= x is never satisfiable") {
+		CHECK(blast_normalize("ex x x:bv !<= x:bv") == "F");
+	}
+
+	TEST_CASE("bvnlteq: 1 !<= 0 (differ only at LSB)") {
+		CHECK(blast_normalize("ex x (x = { 1 }:bv && x !<= { 0 }:bv)") == "T");
+	}
+}
+
+//
 // bvdiv: dividend / constant_divisor = quotient
-// Quotient satisfies: dividend = divisor * quotient + remainder,
-// remainder < divisor.
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvdiv") {
 
-	// 10 / 3 = 3  (3*3 + 1 = 10, remainder 1 < 3)
 	TEST_CASE("bvdiv: 10 / 3 = 3") {
 		CHECK(blast_normalize("ex x ex y (x = { 10 }:bv && x / { 3 }:bv = y && y = { 3 }:bv)") == "T");
 	}
 
-	// 10 / 3 ≠ 2
 	TEST_CASE("bvdiv: 10 / 3 != 2") {
 		CHECK(blast_normalize("ex x ex y (x = { 10 }:bv && x / { 3 }:bv = y && y = { 2 }:bv)") == "F");
 	}
 
-	// 9 / 3 = 3  (exact, no remainder)
 	TEST_CASE("bvdiv: 9 / 3 = 3") {
 		CHECK(blast_normalize("ex x ex y (x = { 9 }:bv && x / { 3 }:bv = y && y = { 3 }:bv)") == "T");
 	}
 
-	// 0 / 5 = 0
 	TEST_CASE("bvdiv: 0 / 5 = 0") {
 		CHECK(blast_normalize("ex x ex y (x = { 0 }:bv && x / { 5 }:bv = y && y = { 0 }:bv)") == "T");
 	}
 
-	// 7 / 4 = 1  (4*1 + 3 = 7, remainder 3 < 4)
 	TEST_CASE("bvdiv: 7 / 4 = 1") {
 		CHECK(blast_normalize("ex x ex y (x = { 7 }:bv && x / { 4 }:bv = y && y = { 1 }:bv)") == "T");
 	}
+
+	TEST_CASE("bvdiv: 1 / 1 = 1") {
+		CHECK(blast_normalize("ex x ex y (x = { 1 }:bv && x / { 1 }:bv = y && y = { 1 }:bv)") == "T");
+	}
 }
 
-// ------------------------------------------------------------
+//
 // bvmod: dividend % constant_divisor = remainder
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvmod") {
 
-	// 10 % 3 = 1
 	TEST_CASE("bvmod: 10 % 3 = 1") {
 		CHECK(blast_normalize("ex x ex y (x = { 10 }:bv && x % { 3 }:bv = y && y = { 1 }:bv)") == "T");
 	}
 
-	// 10 % 3 ≠ 2
 	TEST_CASE("bvmod: 10 % 3 != 2") {
 		CHECK(blast_normalize("ex x ex y (x = { 10 }:bv && x % { 3 }:bv = y && y = { 2 }:bv)") == "F");
 	}
 
-	// 9 % 3 = 0  (exact division)
 	TEST_CASE("bvmod: 9 % 3 = 0") {
 		CHECK(blast_normalize("ex x ex y (x = { 9 }:bv && x % { 3 }:bv = y && y = { 0 }:bv)") == "T");
 	}
 
-	// 7 % 4 = 3
 	TEST_CASE("bvmod: 7 % 4 = 3") {
 		CHECK(blast_normalize("ex x ex y (x = { 7 }:bv && x % { 4 }:bv = y && y = { 3 }:bv)") == "T");
 	}
 
-	// remainder is always < divisor: all x, x % 4 < 4
 	TEST_CASE("bvmod: remainder always < divisor") {
 		CHECK(blast_normalize("all x x:bv % { 4 }:bv < { 4 }:bv") == "T");
 	}
+
+	TEST_CASE("bvmod: 0 % 3 = 0") {
+		CHECK(blast_normalize("ex x ex y (x = { 0 }:bv && x % { 3 }:bv = y && y = { 0 }:bv)") == "T");
+	}
 }
 
-// ------------------------------------------------------------
+//
 // bved: Euclidean division — both quotient and remainder at once.
-// bved(dividend, divisor, quotient, remainder) holds iff
-//   dividend = divisor * quotient + remainder  &&  remainder < divisor.
-// ------------------------------------------------------------
+//
 TEST_SUITE("bved") {
 
-	// 10 = 3*3 + 1  (quotient=3, remainder=1)
-	TEST_CASE("bved: bvdiv and bvmod are consistent with bved for 10/3") {
-		// Both quotient and remainder are exposed; check they agree with bvdiv/bvmod.
+	TEST_CASE("bved: 10/3: quotient=3, remainder=1") {
 		CHECK(blast_normalize(
 			"ex x ex q ex r (x = { 10 }:bv && x / { 3 }:bv = q && x % { 3 }:bv = r"
 			" && q = { 3 }:bv && r = { 1 }:bv)") == "T");
 	}
 
-	// 9 = 3*3 + 0  (exact: quotient=3, remainder=0)
-	TEST_CASE("bved: 9/3 exact (quotient=3, remainder=0)") {
+	TEST_CASE("bved: 9/3 exact: quotient=3, remainder=0") {
 		CHECK(blast_normalize(
 			"ex x ex q ex r (x = { 9 }:bv && x / { 3 }:bv = q && x % { 3 }:bv = r"
 			" && q = { 3 }:bv && r = { 0 }:bv)") == "T");
 	}
 
-	// 7 = 4*1 + 3  (quotient=1, remainder=3)
-	TEST_CASE("bved: 7/4 (quotient=1, remainder=3)") {
+	TEST_CASE("bved: 7/4: quotient=1, remainder=3") {
 		CHECK(blast_normalize(
 			"ex x ex q ex r (x = { 7 }:bv && x / { 4 }:bv = q && x % { 4 }:bv = r"
 			" && q = { 1 }:bv && r = { 3 }:bv)") == "T");
 	}
 
-	// Wrong remainder: 10 / 3 with remainder=2 is UNSAT
 	TEST_CASE("bved: wrong remainder is UNSAT") {
 		CHECK(blast_normalize(
 			"ex x ex q ex r (x = { 10 }:bv && x / { 3 }:bv = q && x % { 3 }:bv = r"
@@ -360,7 +512,7 @@ TEST_SUITE("bved") {
 	}
 }
 
-// ------------------------------------------------------------
+//
 // Bug 1: bvlt base case returns T instead of F
 //
 // In bvlt_rules(), the base case at index 0 is set to T:
@@ -372,7 +524,7 @@ TEST_SUITE("bved") {
 // (not bit[n-1] as the comment states), meaning bit 0 (LSB) is never compared.
 // With T as the base, any comparison where all higher bits are equal incorrectly
 // returns True.
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvlt bugs") {
 
 	// x < x must always be False: no value is strictly less than itself.
@@ -408,13 +560,13 @@ TEST_SUITE("bvlt bugs") {
 	}
 }
 
-// ------------------------------------------------------------
+//
 // Bug 2: bvgteq derived from broken bvlt
 //
 // bvgteq(l, r) = neg(bvlt(l, r))
 // With bvlt(x, x) = True (due to T base case), bvgteq(x, x) = False.
 // But x >= x is always True.
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvgteq bugs") {
 
 	// all x: x >= x should be True (universally valid).
@@ -429,7 +581,7 @@ TEST_SUITE("bvgteq bugs") {
 	}
 }
 
-// ------------------------------------------------------------
+//
 // Bug 3: bvnlteq semantic error — returns bvlt instead of bvgt
 //
 // In bv_predicate_blasting.h (line ~177):
@@ -437,7 +589,7 @@ TEST_SUITE("bvgteq bugs") {
 // But the implementation is:
 //   bvnlteq(l, r) { return bvlt<node>(left, right); }   // returns l < r  ← WRONG
 // It should return bvgt(l, r).
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvnlteq bugs") {
 
 	// !(3 <= 1) = !(False) = True, since 3 > 1.
@@ -453,7 +605,7 @@ TEST_SUITE("bvnlteq bugs") {
 	}
 }
 
-// ------------------------------------------------------------
+//
 // Bug 4: bvrhl_rule uses make_bvshl_call for the head
 //
 // In bv_predicate_blasting_logic.tmpl.h (line ~592):
@@ -464,7 +616,7 @@ TEST_SUITE("bvnlteq bugs") {
 // As a result, the right-shift rule is registered under the left-shift name,
 // so right-shift operations use the left-shift rule (i.e., shift left instead
 // of right, giving a completely wrong result).
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvrhl bugs") {
 
 	// {4}:bv[4] = 0100, right shift by 1 = 0010 = 2.
@@ -490,7 +642,7 @@ TEST_SUITE("bvrhl bugs") {
 	}
 }
 
-// ------------------------------------------------------------
+// 
 // Bug 5: bvshl_rule off-by-one and flawed loop logic
 //
 // In bv_predicate_blasting_logic.tmpl.h (line ~525):
@@ -501,7 +653,7 @@ TEST_SUITE("bvrhl bugs") {
 // Furthermore, the loop constrains source-bit index i to zero when its
 // destination overflows, but never zeroes the low destination bits
 // (indices 0 to offset-1), leaving them unconstrained.
-// ------------------------------------------------------------
+//
 TEST_SUITE("bvshl bugs") {
 
 	// {3}:bv[4] = 0011, left shift by 3 = 1000 = 8.
@@ -528,7 +680,7 @@ TEST_SUITE("bvshl bugs") {
 	}
 }
 
-TEST_SUITE("Cleanup") {
+TEST_SUITE("cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();
