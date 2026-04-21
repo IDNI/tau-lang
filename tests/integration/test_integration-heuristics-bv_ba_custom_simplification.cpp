@@ -27,6 +27,68 @@ tref parse_bf(const std::string& sample) {
 
 TEST_SUITE("ba bv custom simplification") {
 
+	// Chained constant addition (should fully flatten)
+	TEST_CASE("chained addition flattening") {
+		const char* sample = "{1}:bv[8] + {2}:bv[8] + {3}:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		// Should be {6}:bv[8] after multi-pass
+		const char* expected_str = "{6}:bv[8]";
+		tref expected = parse_bf(expected_str);
+		CHECK(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
+	}
+
+	// Chained constant subtraction with cancellation
+	TEST_CASE("chained subtraction cancellation") {
+		const char* sample = "{5}:bv[8] - {2}:bv[8] + {2}:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		const char* expected_str = "{5}:bv[8]";
+		tref expected = parse_bf(expected_str);
+		CHECK(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
+	}
+
+	// Division by zero (should not crash, should return nullptr or error node)
+	TEST_CASE("division by zero") {
+		const char* sample = "{5}:bv[8] / {0}:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		// Accept nullptr or a special error node, but must not crash
+		CHECK((simplified == nullptr || simplified != src));
+	}
+
+	// All variables (should not introduce neutral element)
+	TEST_CASE("all variables no neutral element") {
+		const char* sample = "x:bv[8] + y:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		// Should not be 0 + x + y
+		CHECK(simplified != nullptr);
+		std::string str = tree<node_t>::get(simplified).tree_to_str();
+		CHECK(str.find("0:bv[8]") == std::string::npos);
+	}
+
+	// Neutral element elimination (0 + x, 1 * x)
+	TEST_CASE("neutral element elimination") {
+		const char* sample1 = "0:bv[8] + x:bv[8]";
+		tref src1 = parse_bf(sample1);
+		tref simplified1 = bv_ba_custom_simplification<node_t>(src1);
+		const char* expected1 = "x:bv[8]";
+		tref exp1 = parse_bf(expected1);
+		CHECK(simplified1 != nullptr);
+		CHECK(tree<node_t>::get(simplified1) == tree<node_t>::get(exp1));
+
+		const char* sample2 = "1:bv[8] * x:bv[8]";
+		tref src2 = parse_bf(sample2);
+		tref simplified2 = bv_ba_custom_simplification<node_t>(src2);
+		const char* expected2 = "x:bv[8]";
+		tref exp2 = parse_bf(expected2);
+		CHECK(simplified2 != nullptr);
+		CHECK(tree<node_t>::get(simplified2) == tree<node_t>::get(exp2));
+	}
+
 	TEST_CASE("1 + 2") {
 		const char* sample = "{1}:bv[64] + {2}:bv[64]";
 		tref src = parse_bf(sample);

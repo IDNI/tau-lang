@@ -26,6 +26,47 @@ tref parse_bf(const std::string& sample) {
 
 TEST_SUITE("ba bv cvc5 constant simplification") {
 
+	// Division by zero (should not crash, should return nullptr or error node)
+	TEST_CASE("division by zero") {
+		const char* sample = "{5}:bv[8] / {0}:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		// Accept nullptr or a special error node, but must not crash
+		CHECK((simplified == nullptr || simplified != src));
+	}
+
+	// Two's complement negation of constant
+	TEST_CASE("twos complement negation") {
+		const char* sample = "{5}:bv[8]'";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		// Should be 251 (0xFB) for 8-bit two's complement
+		const char* expected_str = "{251}:bv[8]";
+		tref expected = parse_bf(expected_str);
+		CHECK(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
+	}
+
+	// Variable name edge case (should not crash)
+	TEST_CASE("variable name edge case") {
+		const char* sample = "|:bv[8]";
+		tref src = parse_bf(sample);
+		bv_ba_cvc5_simplification<node_t>(src);
+		// Should not crash, may be nullptr if not a valid variable
+		CHECK(true);
+	}
+
+	// Chained constant addition (should fully flatten)
+	TEST_CASE("chained addition flattening") {
+		const char* sample = "{1}:bv[8] + {2}:bv[8] + {3}:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
+		const char* expected_str = "{6}:bv[8]";
+		tref expected = parse_bf(expected_str);
+		CHECK(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
+	}
+
 	TEST_CASE("addition of constants") {
 		const char* sample = "{1}:bv[8] + {3}:bv[8]";
 		tref src = parse_bf(sample);
