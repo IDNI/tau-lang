@@ -73,7 +73,9 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
 
 	// base case: bvlt[0](x, y) = T;
 	auto base_header = make_bvlt_call_from_index<node>(left, right, 0);
-	auto base_body = tau::_F();
+	auto base_body = tau::build_wff_and(
+			make_is_bit_zero_call_from_index<node>(left, 0),
+			make_is_bit_one_call_from_index<node>(right, 0));
 	rules.push_back(make_rule<node>(base_header, base_body));
 	// general case: bvlt[n](x, y) = ((bit[n](x) = 0) && (bit[n](y) = 1))
 	//	 || ((bit[n](x) = bit[n](y)) && bvlt[n-1](x, y));
@@ -151,7 +153,7 @@ template<NodeType node>
 tref bvlt(tref left, tref right) {
 	auto bitwidth = get_bv_type_bitwidth<node>(left);
 	auto rule = bvlt_rule<node>(bitwidth);
-	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth);
+	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth-1);
 	auto rr = make_rr<node>({ rule }, call);
 	return apply_rr_to_formula(rr);
 }
@@ -224,7 +226,9 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 
 	// base case: bvgt[0](x, y) = T;
 	auto base_header = make_bvgt_call_from_index<node>(left, right, bitwidth);
-	auto base_body = tau::_F();
+	auto base_body = tau::build_wff_and(
+			make_is_bit_one_call_from_index<node>(left, 0),
+			make_is_bit_zero_call_from_index<node>(right, 0));
 	rules.push_back(make_rule<node>(base_header, base_body));
 	// general case: bvgt[n](x, y) = ((bit[n-1](x) = 1) && (bit[n-1](y) = 0))
 	//		|| ((bit[n-1](x) = bit[n-1](y)) && bvgt[n-1](x, y));
