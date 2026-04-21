@@ -628,6 +628,140 @@ tref term_shl(tref symbol) {
 	return symbol;
 }
 
+inline int compare_bv_consts(const bv& c1, const bv& c2) {
+	const std::string s1 = c1.getBitVectorValue(2);
+	const std::string s2 = c2.getBitVectorValue(2);
+	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0;
+}
+
+template<NodeType node>
+tref wff_bv_lt(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		bool result = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant())) < 0;
+		return tau::get(result ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+template<NodeType node>
+tref wff_bv_nlt(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		bool result = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant())) >= 0;
+		return tau::get(result ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+template<NodeType node>
+tref wff_bv_lteq(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		bool result = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant())) <= 0;
+		return tau::get(result ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+template<NodeType node>
+tref wff_bv_nlteq(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		bool result = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant())) > 0;
+		return tau::get(result ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+template<NodeType node>
+tref wff_bv_gt(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		bool result = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant())) > 0;
+		return tau::get(result ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+template<NodeType node>
+tref wff_bv_ngt(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		bool result = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant())) <= 0;
+		return tau::get(result ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+template<NodeType node>
+tref wff_bv_gteq(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		bool result = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant())) >= 0;
+		return tau::get(result ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
+template<NodeType node>
+tref wff_bv_ngteq(const tref* ch, tref r) {
+	using tau = tree<node>;
+	const tau& c1 = tau::get(ch[0])[0][0];
+	const tau& c2 = tau::get(ch[0])[1][0];
+	if (c1.is_ba_constant() && c2.is_ba_constant()
+		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		bool result = compare_bv_consts(
+			std::get<bv>(c1.get_ba_constant()),
+			std::get<bv>(c2.get_ba_constant())) < 0;
+		return tau::get(result ? tau::_T() : tau::_F(), r);
+	}
+	return nullptr;
+}
+
 template<NodeType node>
 tref term_nor(tref symbol) {
 	using tau = tree<node>;
