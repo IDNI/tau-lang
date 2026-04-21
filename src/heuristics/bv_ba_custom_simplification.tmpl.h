@@ -211,30 +211,36 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 
 template<NodeType node>
 tref bv_ba_custom_simplification(const tref term) {
-	using tau = tree<node>;
-
-	auto changes = simplify_blocks<node>(term);
-	auto current = rewriter::replace<node>(term, changes);
-
-	// We only do one pass of block simplifications, several ones could be done using
-	// something like the following
-	/*auto current = term;
-	tref next;
+	tref current, next = term;
+	int pass_count = 0;
+	std::unordered_set<tref> visited;
 
 	do {
-		next = current;
-		changes = simplify_blocks<node>(current);
-		current = rewriter::replace<node>(current, changes);
+		current = next;
+		auto changes = simplify_blocks<node>(current);
+		next = rewriter::replace<node>(current, changes);
+		visited.insert(current);
 
-		DBG(LOG_TRACE << "bv_ba_custom_simplification/current: " << tau::get(current).to_str() << " (" << current << ")\n";)
-		DBG(LOG_TRACE << "bv_ba_custom_simplification/next: " << tau::get(next).to_str() << " (" << next << ")\n";)
-		DBG(LOG_TRACE << "bv_ba_custom_simplification/current == next: " << (tau::get(current) == tau::get(next)) << "\n";)
+		pass_count++;
 
-	} while (tau::get(current) != tau::get(next));*/
+#ifdef DEBUG
+		LOG_TRACE << "bv_ba_custom_simplification/pass: " << pass_count << "\n";
+		LOG_TRACE << "bv_ba_custom_simplification/current: " << LOG_FM(current) << "\n";
+#endif // DEBUG
 
-	DBG(LOG_TRACE << "bv_ba_custom_simplification/term: " << tau::get(term).to_str() << "\n";)
-	DBG(LOG_TRACE << "bv_ba_custom_simplification/current: " << tau::get(current).to_str() << "\n";)
+	} while (visited.find(current) == visited.end());
 
+#ifdef DEBUG
+	LOG_TRACE << "bv_ba_custom_simplification/term: " << LOG_FM(term) << "\n";
+	LOG_TRACE << "bv_ba_custom_simplification/final: " << LOG_FM(current) << "\n";
+#endif // DEBUG
+
+	// Error reporting for undefined operations (e.g., division by zero)
+	// This is a placeholder: in a real implementation, you would walk the tree and check for such cases
+	// For now, just log a warning if the result is nullptr
+	if (current == nullptr) {
+		LOG_ERROR << "bv_ba_custom_simplification: result is nullptr (possible undefined operation such as division by zero)\n";
+	}
 	return current;
 }
 
