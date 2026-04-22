@@ -50,13 +50,46 @@ TEST_SUITE("ba bv custom simplification") {
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
 
-	// Division by zero (should not crash, should return nullptr or error node)
+	// Division by zero (is top)
 	TEST_CASE("division by zero") {
+		using node = node_t;
+
 		const char* sample = "{5}:bv[8] / {0}:bv[8]";
 		tref src = parse_bf(sample);
+		const char* expected = "1:bv[8]";
+		tref exp = parse_bf(expected);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		// Accept nullptr or a special error node, but must not crash
-		CHECK((simplified == nullptr || simplified != src));
+		DBG( LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
+		CHECK(tree<node>::get(simplified) == tree<node>::get(exp));
+	}
+
+	// Division by zero (is top)
+	TEST_CASE("division by zero with variables") {
+		using node = node_t;
+
+		const char* sample = "x:bv[8] / {0}:bv[8]";
+		tref src = parse_bf(sample);
+		const char* expected = "1:bv[8]";
+		tref exp = parse_bf(expected);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		// Accept nullptr or a special error node, but must not crash
+		DBG( LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
+		CHECK(tree<node>::get(simplified) == tree<node>::get(exp));
+	}
+
+	// Division by zero (is top)
+	TEST_CASE("division by zero with constants") {
+		using node = node_t;
+
+		const char* sample = "{5}:bv[8] / {0}:bv[8]";
+		tref src = parse_bf(sample);
+		const char* expected = "1:bv[8]";
+		tref exp = parse_bf(expected);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		// Accept nullptr or a special error node, but must not crash
+		DBG( LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
+		CHECK(tree<node>::get(simplified) == tree<node>::get(exp));
 	}
 
 	// All variables (should not introduce neutral element)
@@ -81,15 +114,13 @@ TEST_SUITE("ba bv custom simplification") {
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(exp));
 	}
 
-	// Neutral element elimination (1 * x)
-	TEST_CASE("neutral element elimination multiplication") {
+	// 1:bv[8] = 11111111
+	TEST_CASE("top element multiplication") {
 		const char* sample = "1:bv[8] * x:bv[8]";
 		tref src = parse_bf(sample);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
-		const char* expected = "x:bv[8]";
-		tref exp = parse_bf(expected);
 		CHECK(simplified != nullptr);
-		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(exp));
+		CHECK(simplified == src);
 	}
 
 	TEST_CASE("1 + 2") {

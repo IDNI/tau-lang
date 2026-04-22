@@ -292,15 +292,8 @@ tref term_div(tref symbol) {
 					make_bitvector_top_elem(width),
 					c2.get_ba_type());
 			}
-			// 1 / 0
-			if (c2.is(tau::bf_f)) {
-				DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				return div_consts(
-					make_bitvector_top_elem(width),
-					make_bitvector_bottom_elem(width),
-					c2.get_ba_type());
-			}
+			// 1 / 0 is top
+			if (c2.is(tau::bf_f)) return tau::_1(c2.get_ba_type());
 			break;
 		}
 		// 0 / X
@@ -321,18 +314,9 @@ tref term_div(tref symbol) {
 				}
 			break;
 		}
-		// X / 0
+		// X / 0 is top
 		case tau::bf_f: {
-			if (size_t t = c1.get_ba_type();
-				c1.is_ba_constant() && t > 0) {
-				DBG(assert(is_bv_type_family<node>(t));)
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(t));
-				return div_consts(
-					std::get<bv>(c1.get_ba_constant()),
-					make_bitvector_bottom_elem(width),
-					c1.get_ba_type());
-				}
-			break;
+			return tau::_1(c1.get_ba_type());
 		}
 		default: break;
 	}
