@@ -19,8 +19,9 @@ tref term_add(tref symbol) {
 
 	auto add_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_add(c1, c2);
+		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
-		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_add/add_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
@@ -91,8 +92,9 @@ tref term_sub(tref symbol) {
 
 	auto sub_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_sub(c1, c2);
+		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
-		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_sub/sub_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
@@ -171,8 +173,9 @@ tref term_mul(tref symbol) {
 
 	auto mul_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_mul(c1, c2);
+		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
-		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_mul/mul_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
@@ -259,8 +262,9 @@ tref term_div(tref symbol) {
 
 	auto div_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_div(c1, c2);
+		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
-		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_div/div_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
@@ -356,8 +360,9 @@ tref term_mod(tref symbol) {
 
 	auto mod_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_mod(c1, c2);
+		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
-		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_mod/mod_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
@@ -448,8 +453,9 @@ tref term_shr(tref symbol) {
 
 	auto shr_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_shr(c1, c2);
+		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
-		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_shr/shr_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
@@ -542,8 +548,9 @@ tref term_shl(tref symbol) {
 
 	auto shl_consts = [](const bv& c1, const bv& c2, size_t type_id) {
 		bv res = make_bitvector_shl(c1, c2);
+		res = normalize_bv(res); // Normalize result
 		typename node::constant v = {res};
-		auto new_symbol = tau::build_bf_ba_constant(v, type_id);
+		auto new_symbol = tree<node>::build_bf_ba_constant(v, type_id);
 		DBG(LOG_TRACE << "term_shl/shl_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};

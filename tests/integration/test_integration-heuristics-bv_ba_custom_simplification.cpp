@@ -70,23 +70,26 @@ TEST_SUITE("ba bv custom simplification") {
 		CHECK(str.find("0:bv[8]") == std::string::npos);
 	}
 
-	// Neutral element elimination (0 + x, 1 * x)
+	// Neutral element elimination (0 + x)
 	TEST_CASE("neutral element elimination") {
-		const char* sample1 = "0:bv[8] + x:bv[8]";
-		tref src1 = parse_bf(sample1);
-		tref simplified1 = bv_ba_custom_simplification<node_t>(src1);
-		const char* expected1 = "x:bv[8]";
-		tref exp1 = parse_bf(expected1);
-		CHECK(simplified1 != nullptr);
-		CHECK(tree<node_t>::get(simplified1) == tree<node_t>::get(exp1));
+		const char* sample = "0:bv[8] + x:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		const char* expected = "x:bv[8]";
+		tref exp = parse_bf(expected);
+		CHECK(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(exp));
+	}
 
-		const char* sample2 = "1:bv[8] * x:bv[8]";
-		tref src2 = parse_bf(sample2);
-		tref simplified2 = bv_ba_custom_simplification<node_t>(src2);
-		const char* expected2 = "x:bv[8]";
-		tref exp2 = parse_bf(expected2);
-		CHECK(simplified2 != nullptr);
-		CHECK(tree<node_t>::get(simplified2) == tree<node_t>::get(exp2));
+	// Neutral element elimination (1 * x)
+	TEST_CASE("neutral element elimination multiplication") {
+		const char* sample = "1:bv[8] * x:bv[8]";
+		tref src = parse_bf(sample);
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		const char* expected = "x:bv[8]";
+		tref exp = parse_bf(expected);
+		CHECK(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(exp));
 	}
 
 	TEST_CASE("1 + 2") {
