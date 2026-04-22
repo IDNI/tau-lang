@@ -1,0 +1,9 @@
+n all a:bv[8] all b:bv[8] all c:bv[8] all d:bv[8] (a + b) + (c + d) = (d + c) + (b + a).
+n ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] a < b && b < c && c < d && d - a >= { 3 }:bv[8].
+n all a:bv[8] all b:bv[8] all c:bv[8] all d:bv[8] a & (b | c) | d = (a & b) | (a & c) | d.
+n ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] a > { 0 }:bv[8] && b = a * { 3 }:bv[8] && c = b + a && d = c >> { 2 }:bv[8] && d > { 0 }:bv[8].
+n all a:bv[8] all b:bv[8] all c:bv[8] all d:bv[8] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+n ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] a % { 5 }:bv[8] = { 2 }:bv[8] && b = a + { 3 }:bv[8] && c = a | b && d = c & a && d !>= b.
+n all a:bv[8] all b:bv[8] all c:bv[8] all d:bv[8] a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+n ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] a > { 0 }:bv[8] && b = a << { 1 }:bv[8] && b > a && c = b << { 1 }:bv[8] && d = c >> { 1 }:bv[8] && d = b.
+n ex a:bv[8] b:bv[8] c:bv[8] d:bv[8] a > { 0 }:bv[8] && b = a << { 1 }:bv[8] && b > a && c = b << { 1 }:bv[8] && d = c >> { 1 }:bv[8] && d = b.
