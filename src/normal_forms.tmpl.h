@@ -3885,11 +3885,6 @@ tref push_ex_block_into_clause(tref clause, const trefs& block,
 #endif
 	bool is_quant_removable_in_clause = true;
 	trefs conjs = get_cnf_wff_clauses<node>(clause);
-	// Present quantifiers in conjs need to be removed
-	for (tref& conj : conjs) {
-		if (is_child_quantifier<node>(conj))
-			conj = resolve_quantifiers2<node>(conj, order);
-	}
 	trefs pos, neg;
 	for (tref& conj : conjs) {
 		// By assumption all conjuncts contain at least one variable from the block
@@ -4045,6 +4040,121 @@ tref anti_prenex(tref formula) {
 	formula = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "Anti_prenex result after syntactic simp: " << LOG_FM(formula) << "\n";)
 	return formula;
+}
+
+template<NodeType node>
+tref anti_prenex_block(tref formula, const trefs& block,
+	subtree_unordered_set<node>& used_atms,
+	const auto& quant_pattern,
+	const typename term_handle<node>::order& order) {
+	using tau = tree<node>;
+	// Goal: push the quantifier block as far into clause as possible
+	{
+		bool has_var = false;
+		const trefs& vars = get_free_vars<node>(formula);
+		for (tref v : block) {
+			if (hasbc(vars, v, tau::subtree_less)) {
+				has_var = true;
+				break;
+			}
+		}
+		// Formula does not contain quantified vars
+		if (!has_var) return formula;
+	}
+
+	const tau& ft = tau::get(formula);
+	// Case disjunction
+	if (ft.child_is(tau::wff_or)) {
+		// Push block into disjunction
+		tref c1 = anti_prenex_block<node>(ft[0].first(), block, used_atms, order);
+		if (tau::get(c1).equals_T()) return _T<node>();
+		return tau::build_wff_or(
+			c1, anti_prenex_block<node>(ft[0].second(), block, used_atms, order));
+	}
+
+	// Case conjunction
+	if (ft.child_is(tau::wff_and)) {
+		trefs conjs = get_cnf_wff_clauses<node>(formula);
+		trefs dep;
+		for (tref &conj : conjs) {
+			bool has_var = false;
+			const trefs& vars = get_free_vars<node>(conj);
+			for (tref v : block) {
+				if (hasbc(vars, v, tau::subtree_less)) {
+					has_var = true;
+					break;
+				}
+			}
+			// Conjunct contains quantified var
+			if (has_var) {
+				dep.push_back(conj);
+				conj = _T<node>();
+			}
+		}
+		if (dep.empty()) return formula;
+		formula = tau::build_wff_and(dep);
+		// Check if dependent formula is clause -> push block into clause
+		if (!tau::get(formula).find_top(is<node, tau::wff_or>)) {
+			return tau::build_wff_and(
+				tau::build_wff_and(conjs),
+				resolve_quantifiers2<node>(
+				push_ex_block_into_clause<node>(formula, block, order), order));
+		}
+		// Using the available atomic formulas, do Boole decomposition on best fit
+		auto is_atomic = [&used_atms](tref n) {
+			if (!tau::get(n).is(tau::wff)) return false;
+			// Exclude used atomic fms
+			if (used_atms.contains(n)) return false;
+			const tau& c = tau::get(n)[0];
+			switch (c.value.nt) {
+				case tau::bf_eq:
+				case tau::bf_lt:
+				case tau::bf_lteq: return true;
+				default: return false;
+			}
+		};
+		// Collect current atms
+		const trefs atms = rewriter::select_top_until<node>(formula,
+			is_atomic, is_quantifier<node>);
+		// Sort the atomic formulas and get minimum
+		tref atm = *std::ranges::min_element(atms,
+			atm_formula_order_for_quant_elim<node>(quant_pattern));
+		// TODO: substitution based elimination
+		// TODO: Take care of unique zero of atm
+
+		// Remove/add available atomic formulas in stack-like fashion
+		used_atms.insert(atm);
+		// Do Boole decomposition
+		tref l = rewriter::replace<node>(formula, atm, tau::_T());
+		tref r = rewriter::replace<node>(formula, atm, tau::_F());
+		if (tau::get(l) == tau::get(r))
+			return anti_prenex_block(l, block, used_atms, quant_pattern, order);
+		tref nl = anti_prenex_block(
+			tau::build_wff_and(atm, l), block, used_atms, quant_pattern, order);
+		if (tau::get(nl).equals_T()) return _T<node>();
+		tref nr = anti_prenex_block(
+			tau::build_wff_and(tau::build_wff_neg(atm), l),
+				block, used_atms, quant_pattern, order);
+		used_atms.erase(atm);
+		return tau::build_wff_or(nl, nr);
+	}
+
+	// Connective is not wff_and or wff_or -> quantifiers stay with formula
+	for (auto v = block.rbegin(); v != block.rend(); ++v)
+		formula = build_wff_ex<node>(*v, formula, false);
+	return formula;
+}
+
+template<NodeType node>
+tref anti_prenex_block(tref formula) {
+	// Convert formula to nnf
+	// Syntactically simplify formula
+	// Do substitution based elimination
+	// Build quant_pattern TODO: check if updates are needed
+
+	// For each quantifier block
+	//  Convert terms to BDD according to quantified variables
+	//  Call anti_prenex_block
 }
 
 template<NodeType node>
