@@ -1,0 +1,17 @@
+set blasting off.
+n all a:bv[32] b:bv[32] c:bv[32] d:bv[32] (a + b) + (c + d) = (d + c) + (b + a).
+n ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a < b && b < c && c < d && d - a >= { 3 }:bv[32].
+n all a:bv[32] b:bv[32] c:bv[32] d:bv[32] a & (b | c) | d = (a & b) | (a & c) | d.
+n ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a > { 0 }:bv[32] && b = a * { 3 }:bv[32] && c = b + a && d = c >> { 2 }:bv[32] && d > { 0 }:bv[32}.
+n all a:bv[32] b:bv[32] c:bv[32] d:bv[32] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+n ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a % { 5 }:bv[32] = { 2 }:bv[32] && b = a + { 3 }:bv[32] && c = a | b && d = c & a && d !>= b.
+n all a:bv[32] b:bv[32] c:bv[32] d:bv[32] a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+n ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b.
+n all a:bv[32] b:bv[32] c:bv[32] d:bv[32] (a + b) + (c + d) = (d + c) + (b + a).
+n ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a < b && b < c && c < d && d - a >= { 3 }:bv[32].
+n all a:bv[32] b:bv[32] c:bv[32] d:bv[32] a & (b | c) | d = (a & b) | (a & c) | d.
+n ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a > { 0 }:bv[32] && b = a * { 3 }:bv[32] && c = b + a && d = c >> { 2 }:bv[32] && d > { 0 }:bv[32].
+n all a:bv[32] b:bv[32] c:bv[32] d:bv[32] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+n ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a % { 5 }:bv[32] = { 2 }:bv[32] && b = a + { 3 }:bv[32] && c = a | b && d = c & a && d !>= b.
+n all a:bv[32] b:bv[32] c:bv[32] d:bv[32] a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+n ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b.
