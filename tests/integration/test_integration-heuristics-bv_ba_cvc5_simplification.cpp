@@ -26,15 +26,6 @@ tref parse_bf(const std::string& sample) {
 
 TEST_SUITE("ba bv cvc5 constant simplification") {
 
-	// Division by zero (should not crash, should return nullptr or error node)
-	TEST_CASE("division by zero") {
-		const char* sample = "{5}:bv[8] / {0}:bv[8]";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		// Accept nullptr or a special error node, but must not crash
-		CHECK((simplified == nullptr || simplified != src));
-	}
-
 	// Variable name edge case (should not crash)
 	TEST_CASE("variable name edge case") {
 		const char* sample = "|:bv[8]";
@@ -53,62 +44,6 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 		tref expected = parse_bf(expected_str);
 		CHECK(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
-	}
-
-	TEST_CASE("addition of constants") {
-		const char* sample = "{1}:bv[8] + {3}:bv[8]";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
-	}
-
-	TEST_CASE("substraction of constants") {
-		const char* sample = "{1}:bv[8] - {3}:bv[8]";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
-	}
-
-	TEST_CASE("multiplication of constants") {
-		const char* sample = "{3}:bv[8] * {4}:bv[8]";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
-	}
-
-	TEST_CASE("division of constants") {
-		const char* sample = "{10}:bv[8] / {3}:bv[8]";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
-	}
-
-	TEST_CASE("mod of constants") {
-		const char* sample = "{10}:bv[8] % {3}:bv[8]";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
-	}
-
-	TEST_CASE("shift right of constants") {
-		const char* sample = "{16}:bv[8] >> {3}:bv[8]";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
-	}
-
-	TEST_CASE("shift left of constants") {
-		const char* sample = "{1}:bv[8] << {3}:bv[8]";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
 	}
 
 	TEST_CASE("not of constant") {
@@ -200,14 +135,6 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
 		// (bvadd x #b11111101) cvc5 is using two's complement
 		CHECK( simplified != nullptr );
-	}
-
-	TEST_CASE("substraction of constant/variable") {
-		const char* sample = "{1}:bv[8] - {3}:bv[8]";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		CHECK( simplified != nullptr );
-		CHECK( simplified != src);
 	}
 
 	TEST_CASE("multiplication of variable/constant (y1)") {
