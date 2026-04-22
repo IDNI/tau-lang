@@ -4100,6 +4100,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				resolve_quantifiers2<node>(
 				push_ex_block_into_clause<node>(formula, block, order), order));
 		}
+		// TODO: only != present
 		// Using the available atomic formulas, do Boole decomposition on best fit
 		auto is_atomic = [&used_atms](tref n) {
 			if (!tau::get(n).is(tau::wff)) return false;
@@ -4148,11 +4149,12 @@ tref anti_prenex_block(tref formula, const trefs& block,
 template<NodeType node>
 tref anti_prenex_block(tref formula) {
 	// Convert formula to nnf
-	// Syntactically simplify formula
 	// Do substitution based elimination
-	// Build quant_pattern TODO: check if updates are needed
+	// Syntactically simplify formula
 
-	// For each quantifier block
+	// For each quantifier block in post order
+	//  Partition quantifiers
+	//  Build quant_pattern
 	//  Convert terms to BDD according to quantified variables
 	//  Call anti_prenex_block
 }
