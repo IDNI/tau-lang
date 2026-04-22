@@ -16,8 +16,13 @@ static size_t default_bv_size = 16;
 
 size_t get_cvc5_size(const cvc5::Term& b);
 
-// -----------------------------------------------------------------------------
+// Forward declaration — defined in bv_ba.h; declared here for use in lambdas
+// inside templates where two-phase name lookup applies.
+inline cvc5::Term normalize_bv(const cvc5::Term& fm);
+
+//
 // Basic Boolean algebra operatiors
+//
 
 inline cvc5::Term operator|(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term operator&(const cvc5::Term& lhs, const cvc5::Term& rhs);
@@ -31,8 +36,9 @@ inline cvc5::Term operator%(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term operator<<(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term operator>>(const cvc5::Term& lhs, const cvc5::Term& rhs);
 
-// -----------------------------------------------------------------------------
+//
 // Builders
+//
 
 inline cvc5::Term make_term_not(const cvc5::Term& operand);
 inline cvc5::Term make_term_and(const cvc5::Term& lhs, const cvc5::Term& rhs);
@@ -74,8 +80,6 @@ inline cvc5::Term make_bitvector_true();
 inline cvc5::Term make_bitvector_false();
 inline cvc5::Term make_bitvector_zero(const size_t size = default_bv_size);
 inline cvc5::Term make_bitvector_one(const size_t size = default_bv_size);
-// -----------------------------------------------------------------------------
-// Queries
 
 } // namespace idni::tau_lang
 

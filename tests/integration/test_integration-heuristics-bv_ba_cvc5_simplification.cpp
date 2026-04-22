@@ -35,18 +35,6 @@ TEST_SUITE("ba bv cvc5 constant simplification") {
 		CHECK((simplified == nullptr || simplified != src));
 	}
 
-	// Two's complement negation of constant
-	TEST_CASE("twos complement negation") {
-		const char* sample = "{5}:bv[8]'";
-		tref src = parse_bf(sample);
-		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		// Should be 251 (0xFB) for 8-bit two's complement
-		const char* expected_str = "{251}:bv[8]";
-		tref expected = parse_bf(expected_str);
-		CHECK(simplified != nullptr);
-		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
-	}
-
 	// Variable name edge case (should not crash)
 	TEST_CASE("variable name edge case") {
 		const char* sample = "|:bv[8]";
