@@ -1,0 +1,8 @@
+n all a:bv[128] all b:bv[128] all c:bv[128] all d:bv[128] (a + b) + (c + d) = (d + c) + (b + a).
+n ex a:bv[128] ex b:bv[128] ex c:bv[128] ex d:bv[128] a < b && b < c && c < d && d - a >= { 3 }:bv[128].
+n all a:bv[128] all b:bv[128] all c:bv[128] all d:bv[128] a & (b | c) | d = (a & b) | (a & c) | d.
+n ex a:bv[128] ex b:bv[128] ex c:bv[128] ex d:bv[128] a > { 0 }:bv[128] && b = a * { 3 }:bv[128] && c = b + a && d = c >> { 2 }:bv[128] && d > { 0 }:bv[128].
+n all a:bv[128] all b:bv[128] all c:bv[128] all d:bv[128] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+n ex a:bv[128] ex b:bv[128] ex c:bv[128] ex d:bv[128] a % { 5 }:bv[128] = { 2 }:bv[128] && b = a + { 3 }:bv[128] && c = a | b && d = c & a && d !>= b.
+n all a:bv[128] all b:bv[128] all c:bv[128] all d:bv[128] a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+n ex a:bv[128] ex b:bv[128] ex c:bv[128] ex d:bv[128] a > { 0 }:bv[128] && b = a << { 1 }:bv[128] && b > a && c = b << { 1 }:bv[128] && d = c >> { 1 }:bv[128] && d = b.

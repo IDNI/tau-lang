@@ -1,0 +1,8 @@
+all a:bv[32] all b:bv[32] all c:bv[32] all d:bv[32] (a + b) + (c + d) = (d + c) + (b + a).
+ex a:bv[32] ex b:bv[32] ex c:bv[32] ex d:bv[32] a < b && b < c && c < d && d - a >= { 3 }:bv[32].
+all a:bv[32] all b:bv[32] all c:bv[32] all d:bv[32] a & (b | c) | d = (a & b) | (a & c) | d.
+ex a:bv[32] ex b:bv[32] ex c:bv[32] ex d:bv[32] a > { 0 }:bv[32] && b = a * { 3 }:bv[32] && c = b + a && d = c >> { 2 }:bv[32] && d > { 0 }:bv[32].
+all a:bv[32] all b:bv[32] all c:bv[32] all d:bv[32] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+ex a:bv[32] ex b:bv[32] ex c:bv[32] ex d:bv[32] a % { 5 }:bv[32] = { 2 }:bv[32] && b = a + { 3 }:bv[32] && c = a | b && d = c & a && d !>= b.
+all a:bv[32] all b:bv[32] all c:bv[32] all d:bv[32] a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+ex a:bv[32] ex b:bv[32] ex c:bv[32] ex d:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b.
