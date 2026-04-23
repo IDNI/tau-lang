@@ -176,14 +176,23 @@ static tref eq_predicate(tref atomic) {
  * @brief Blasts an inequality predicate over bitvectors.
  *
  * @tparam node Node type
- * @param n The atomic inequality predicate
- * @return The resulting predicate term
+ * @param atomic The atomic inequality predicate
+ * @return The resulting predicate term, or nullptr on error
  */
 template<NodeType node>
-static tref neq_predicate(tref n) {
+static tref neq_predicate(tref atomic) {
 	using tau = tree<node>;
 
-	return tau::build_wff_neg(eq_predicate<node>(n));
+	subtree_map<node, tref> changes;
+
+	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
+	auto predicate = bvneq_rule<node>(bitwidth);
+	auto blasted = bf_predicate_blasting<node>(atomic, changes);
+	if (!blasted) return nullptr;
+	auto left = tau::get(blasted).child(0);
+	auto right = tau::get(blasted).child(1);
+	auto call = make_bvneq_call_from_index<node>(left, right, bitwidth);
+	return nso_rr_apply<node>(predicate, call);
 }
 
 /**
