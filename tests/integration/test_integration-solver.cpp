@@ -725,4 +725,31 @@ TEST_SUITE("solve") {
 		CHECK ( test_solve_min(system) );
 		CHECK ( test_solve_max(system) );
 	}
+
+	// BV equality without arithmetic: exercises the lgrs fast path
+	TEST_CASE("bv: single var equality x = {0}:bv[8] (lgrs fast path)") {
+		const char* system = "x:bv[8] = {0}:bv[8].";
+		CHECK ( test_solve(system) );
+		CHECK ( test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	TEST_CASE("bv: two var equality x = y (lgrs fast path)") {
+		const char* system = "x:bv[8] = y:bv[8].";
+		CHECK ( test_solve(system) );
+		CHECK ( test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	TEST_CASE("bv: conjunction of two pure equalities (lgrs fast path)") {
+		const char* system = "x:bv[8] = {0}:bv[8] && y:bv[8] = {0}:bv[8].";
+		CHECK ( test_solve(system) );
+		CHECK ( test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	TEST_CASE("bv: unsatisfiable equality (lgrs fast path returns no solution)") {
+		const char* system = "x:bv[8] = {0}:bv[8] && x:bv[8] = {1}:bv[8].";
+		CHECK ( !test_solve(system) );
+	}
 }
