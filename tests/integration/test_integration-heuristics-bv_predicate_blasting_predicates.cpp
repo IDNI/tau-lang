@@ -367,6 +367,18 @@ TEST_SUITE("bvcast") {
 		TAU_LOG_INFO << LOG_RULE(bved_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n\n";
 		TAU_LOG_INFO << "------" << '\n';
 	}
+
+	TEST_CASE("bvneq_rule") {
+		using node = node_t;
+
+		TAU_LOG_INFO << "bvneq_rules:\n";
+		auto rules = bvneq_rules<node>(2);
+		for (const auto& rule : rules)
+			TAU_LOG_INFO << LOG_RULE(rule) << '\n';
+		TAU_LOG_INFO << "---" << '\n';
+		TAU_LOG_INFO << LOG_RULE(bvneq_rule<node>(2)) << "\n\n";
+		TAU_LOG_INFO << "------" << '\n';
+	}
 }
 
 TEST_SUITE("Cleanup") {
