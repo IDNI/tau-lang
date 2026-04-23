@@ -90,3 +90,6 @@ __pycache__/
 *$py.class
 .pytest_cache/
 CLAUDE.md
+.claude
+.gitignore
+.github/copilot-instructions.md
