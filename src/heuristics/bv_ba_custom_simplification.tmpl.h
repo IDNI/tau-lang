@@ -95,7 +95,10 @@ tref build_simplification(const trefs& arguments, const trefs& inverses, size_t 
 
 template<NodeType node>
 void apply_block_operation(std::vector<std::pair<trefs, trefs>>& to_simplify, size_t inverse) {
+
+#ifdef DEBUG
 	using tau = tree<node>;
+#endif // DEBUG
 
 	auto [right_args, right_invs] = to_simplify.back();	to_simplify.pop_back();
 
