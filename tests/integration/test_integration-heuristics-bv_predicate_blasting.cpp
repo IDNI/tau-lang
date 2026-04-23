@@ -513,6 +513,56 @@ TEST_SUITE("bved") {
 }
 
 //
+// bvneq: x != y iff there exists a bit position where one is 0 and the other is 1.
+//
+TEST_SUITE("bvneq") {
+
+	TEST_CASE("bvneq: x != x is never satisfiable") {
+		CHECK(blast_normalize("ex x x:bv != x:bv") == "F");
+	}
+
+	TEST_CASE("bvneq: {0}:bv != {0}:bv is F") {
+		CHECK(blast_normalize("ex x ex y (x = { 0 }:bv && y = { 0 }:bv && x != y)") == "F");
+	}
+
+	TEST_CASE("bvneq: {0}:bv != {1}:bv is T (differ at bit 0)") {
+		CHECK(blast_normalize("ex x ex y (x = { 0 }:bv && y = { 1 }:bv && x != y)") == "T");
+	}
+
+	TEST_CASE("bvneq: {5}:bv != {5}:bv is F") {
+		CHECK(blast_normalize("ex x ex y (x = { 5 }:bv && y = { 5 }:bv && x != y)") == "F");
+	}
+
+	TEST_CASE("bvneq: {5}:bv != {3}:bv is T (differ at bits 0 and 1)") {
+		CHECK(blast_normalize("ex x ex y (x = { 5 }:bv && y = { 3 }:bv && x != y)") == "T");
+	}
+
+	TEST_CASE("bvneq: {8}:bv != {0}:bv is T (differ at MSB for 4-bit)") {
+		CHECK(blast_normalize("ex x ex y (x = { 8 }:bv && y = { 0 }:bv && x != y)") == "T");
+	}
+
+	TEST_CASE("bvneq: {15}:bv != {0}:bv is T (all bits differ for 4-bit)") {
+		CHECK(blast_normalize("ex x ex y (x = { 15 }:bv && y = { 0 }:bv && x != y)") == "T");
+	}
+
+	TEST_CASE("bvneq: {7}:bv != {7}:bv is F") {
+		CHECK(blast_normalize("ex x ex y (x = { 7 }:bv && y = { 7 }:bv && x != y)") == "F");
+	}
+
+	TEST_CASE("bvneq: {6}:bv != {7}:bv is T (differ at bit 0)") {
+		CHECK(blast_normalize("ex x ex y (x = { 6 }:bv && y = { 7 }:bv && x != y)") == "T");
+	}
+
+	TEST_CASE("bvneq: satisfiable inequality (ex x ex y x != y) is T") {
+		CHECK(blast_normalize("ex x ex y x:bv != y:bv") == "T");
+	}
+
+	TEST_CASE("bvneq: all bitvectors are equal to themselves (all x, x != x is F)") {
+		CHECK(blast_normalize("ex x x:bv != x:bv") == "F");
+	}
+}
+
+//
 // Bug 1: bvlt base case returns T instead of F
 //
 // In bvlt_rules(), the base case at index 0 is set to T:

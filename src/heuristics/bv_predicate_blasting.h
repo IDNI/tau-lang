@@ -115,6 +115,17 @@ template<NodeType node>
 tref bvrhl(tref base, tref count, tref shifted);
 
 /**
+ * @brief Computes a predicate checking if left is not equal to right as bitvectors.
+ *
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @return The resulting predicate
+ */
+template<NodeType node>
+tref bvneq(tref left, tref right);
+
+/**
  * @brief Computes a predicate checking if left is less than right as bitvectors.
  *
  * @tparam node Node type
