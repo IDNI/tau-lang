@@ -141,7 +141,8 @@ num                    => digits.
 integer                => [ '-' ] _ digits.
 sym                    => chars.
 capture                => '$' chars.
-typed                  => _ ':' _ type [ _ '[' _ subtype _ ']' _ ].
+typed                  => _ ':' _ type _ '[' _ subtype _ ']'
+                        | _ ':' _ (type & ~"bv").
 type                   => chars.
 subtype                => num.
 

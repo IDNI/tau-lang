@@ -54,6 +54,6 @@ TEST_SUITE("unify") {
 	}
 
 	TEST_CASE("different types") {
-		CHECK(nomatch(2, 3));
+		CHECK(nomatch(1, 2));
 	}
 }

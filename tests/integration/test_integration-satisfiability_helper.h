@@ -8,8 +8,3 @@ tref create_spec(const char* spec) {
 	return nso_rr.value().main->get();
 }
 
-TEST_SUITE("Configuration") {
-	TEST_CASE("init bdd") {
-		default_bv_size = 8;
-	}
-}

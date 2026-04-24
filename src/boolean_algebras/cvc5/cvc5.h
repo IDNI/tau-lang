@@ -12,7 +12,6 @@ namespace idni::tau_lang {
 using bv = cvc5::Term;
 
 static cvc5::TermManager cvc5_term_manager;
-static size_t default_bv_size = 16;
 
 size_t get_cvc5_size(const cvc5::Term& b);
 
@@ -72,14 +71,14 @@ inline cvc5::Term make_bitvector_shl(const cvc5::Term& lhs, const cvc5::Term& rh
 inline cvc5::Term make_bitvector_shr(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 	const size_t base);
-inline cvc5::Term make_bitvector_bottom_elem(const size_t size = default_bv_size);
-inline cvc5::Term make_bitvector_top_elem(const size_t size = default_bv_size);
-inline cvc5::Term make_bitvector_value(size_t value, size_t size = default_bv_size);
+inline cvc5::Term make_bitvector_bottom_elem(size_t size);
+inline cvc5::Term make_bitvector_top_elem(size_t size);
+inline cvc5::Term make_bitvector_value(size_t value, size_t size);
 inline cvc5::Term make_bitvector_value(size_t size, const std::string& value, const size_t base = 2);
 inline cvc5::Term make_bitvector_true();
 inline cvc5::Term make_bitvector_false();
-inline cvc5::Term make_bitvector_zero(const size_t size = default_bv_size);
-inline cvc5::Term make_bitvector_one(const size_t size = default_bv_size);
+inline cvc5::Term make_bitvector_zero(size_t size);
+inline cvc5::Term make_bitvector_one(size_t size);
 
 } // namespace idni::tau_lang
 
