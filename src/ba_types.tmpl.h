@@ -149,22 +149,8 @@ tref bv_type(unsigned short bitwidth) {
 }
 
 template<NodeType node>
-inline size_t bv_type_id() {
-	static size_t id = ba_types<node>::id(bv_type<node>());
-	return id;
-}
-
-template<NodeType node>
 size_t bv_type_id(unsigned short bitwidth) {
 	return ba_types<node>::id(bv_type<node>(bitwidth));
-}
-
-template<NodeType node>
-tref bv_base_type() {
-	using tau = tree<node>;
-
-	tref type = tau::get(tau::type, "bv");
-	return tau::get(tau::typed, type);
 }
 
 template<NodeType node>
@@ -179,18 +165,6 @@ bool is_bv_type_family(size_t ba_type_id) {
 	return is_bv_type_family<node>(ba_types<node>::type_tree(ba_type_id));
 }
 
-template<NodeType node>
-bool is_bv_base_type(tref n) {
-	using tau = tree<node>;
-
-	auto t = tau::get(n);
-	return t[0].get_string() == "bv" && t.children_size() == 1;
-}
-
-template<NodeType node>
-bool is_bv_base_type(size_t ba_type_id) {
-	return is_bv_base_type<node>(ba_types<node>::type_tree(ba_type_id));
-}
 
 template <NodeType node>
 size_t get_bv_width(tref t) {
@@ -198,9 +172,9 @@ size_t get_bv_width(tref t) {
 	using tt = tau::traverser;
 
 	DBG(assert(is_bv_type_family<node>(t)));
-	if (size_t num = tt(t) | tau::subtype | tau::num | tt::num; num)
-		return num;
-	return default_bv_size;
+	size_t num = tt(t) | tau::subtype | tau::num | tt::num;
+	assert(num && "bv type must have explicit bitwidth");
+	return num;
 }
 
 template <NodeType node>
@@ -267,7 +241,6 @@ std::vector<tref>& ba_types<node>::type_trees() {
 	static std::vector<tref> t {
 		untyped_type<node>(),
 		tau_type<node>(),
-		bv_type<node>(),
 		sbf_type<node>() };
 	return t;
 }
@@ -278,8 +251,7 @@ subtree_map<node, size_t>& ba_types<node>::type_tree_to_idx() {
 	static subtree_map<node, size_t> t{
 		{ untyped_type<node>(), 0 },
 		{ tau_type<node>(), 1 },
-		{ bv_type<node>(), 2 },
-		{ sbf_type<node>(), 3 }
+		{ sbf_type<node>(), 2 }
 	};
 	return t;
 }

@@ -123,34 +123,6 @@ tref retype(tref n, const size_t new_type) {
 		: tau::get(t.value.ba_retype(new_type));
 };
 
-template<NodeType node>
-auto bv_defaulting = [](tref n) -> tref {
-	using tau = tree<node>;
-	subtree_map<node, tref> changes;
-
-	auto update = [&](tref n) -> bool {
-		// DBG(LOG_TRACE <<"infer_ba_types/defaulting_bv/tau_use_hooks: " << tau::use_hooks << "\n";)
-		auto new_n = update_default<node>(n, changes);
-		auto t = tau::get(new_n);
-		if (t.get_ba_type() == get_ba_type_id<node>(bv_base_type<node>())) {
-			auto chs = t.get_children();
-			new_n = tau::get_raw(t.value.ba_retype(bv_type_id<node>()), chs.data(), chs.size());
-			DBG(LOG_TRACE << "infer_ba_types/bv_defaulting/n -> new_n:\n"
-				<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(new_n);)
-			changes.insert_or_assign(n, new_n);
-		}
-		return true;
-	};
-
-	post_order<node>(n).search(update);
-	if (changes.find(n) != changes.end()) {
-		DBG(LOG_TRACE << "infer_ba_types/defaulting_bv/n -> changes[n]:\n"
-			<< LOG_FM_TREE(n) << " -> " << LOG_FM_TREE(changes[n]);)
-		return changes[n];
-	}
-	return n;
-};
-
 template <NodeType node>
 std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids_by_type(
 		tref n,	const std::function<bool(tref)>& query = is_typeable<node>,
@@ -279,7 +251,7 @@ std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n,
 	if (is_bv_type_family<node>(t))
 		return update_ba_symbol<node>(n);
 	else if (!options.use_defaults) return n;
-	return inference_error{n, bv_type_id<node>(), t};
+	return inference_error{n, t, untyped_type_id<node>()};
 }
 
 // type all symbols according to their children's types
@@ -306,9 +278,6 @@ std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		// We check that the type is compatible
 		auto current_type = tau::get(n).get_ba_type();
 		auto inferred_type = types.at(canonized);
-		inferred_type = is_bv_base_type<node>(inferred_type)
-			? bv_type_id<node>()
-			: inferred_type;
 		return unify<node>(current_type, inferred_type);
 	}
 	return (types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
@@ -391,14 +360,6 @@ bool using_default_type(tref n, const subtree_map<node, size_t>& types) {
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return false;
 	return types.at(canonized) == untyped_type_id<node>();
-}
-
-template<NodeType node>
-bool using_default_bv_size(tref n, const subtree_map<node, size_t>& types) {
-	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return false;
-	auto type_id = types.at(canonized);
-	return is_bv_base_type<node>(type_id);
 }
 
 template<NodeType node>
@@ -644,8 +605,6 @@ std::variant<tref, inference_error, parse_error> update(
 						changes.insert_or_assign(n, std::get<tref>(updated));
 					if (options.use_defaults && using_default_type<node>(n, types)) {
 						default_typing_message<node>(std::get<tref>(updated), type_environment.back());
-					} else if (options.use_defaults && using_default_bv_size<node>(n, types)) {
-						default_typing_message<node>(std::get<tref>(updated), type_environment.back(), true);
 					}
 				}
 				break;
@@ -1381,11 +1340,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	tref new_n = transformed.contains(n) ? transformed[n] : n;
 
 	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after inference): " << TC.CLEAR()
-		<< LOG_FM_DUMP(new_n);)
-
-	new_n = bv_defaulting<node>(new_n);
-
-	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after bv_defaulting): " << TC.CLEAR()
 		<< LOG_FM_DUMP(new_n);)
 
 	if (new_n == nullptr) return tau::use_hooks = using_hooks,

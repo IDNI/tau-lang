@@ -15,10 +15,9 @@ template<NodeType node>
 size_t get_bv_size(const tref t) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	if (auto subtype = tt(t) | tau::subtype | tt::ref; subtype) {
-		return tau::get(subtype)[0].get_num();
-	}
-	return default_bv_size;
+	auto subtype = tt(t) | tau::subtype | tt::ref;
+	DBG(assert(subtype && "bv type must have explicit bitwidth");)
+	return tau::get(subtype)[0].get_num();
 }
 
 template<typename ... BAs> requires BAsPack<BAs...>
