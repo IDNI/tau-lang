@@ -20,22 +20,18 @@ TEST_SUITE("Configuration") {
 	TEST_CASE("bdd init") {
 		bdd_init<Bool>();
 	}
-
-	TEST_CASE("bv size") {
-		idni::tau_lang::default_bv_size = 4;
-	}
 }
 
 TEST_SUITE("cvc5_satisfiability") {
 
-	TEST_CASE("all x ex y x + y = { #b1 }:bv") {
-		const std::string sample = "all x ex y x + y = { #b1 }:bv";
+	TEST_CASE("all x ex y x + y = { #b1 }:bv[4]") {
+		const std::string sample = "all x ex y x + y = { #b1 }:bv[4]";
 		auto formula = parse_bv_formula(sample);
 		CHECK( is_bv_formula_sat<node_t>(formula) );
 	}
 
-	TEST_CASE("all x x + y = { #b1 }:bv") {
-		const std::string sample = "all x x + y = { #b1 }:bv";
+	TEST_CASE("all x x + y = { #b1 }:bv[4]") {
+		const std::string sample = "all x x + y = { #b1 }:bv[4]";
 		auto formula = parse_bv_formula(sample);
 		// y is implicitlly existentially quantified by cvc5
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
@@ -44,7 +40,7 @@ TEST_SUITE("cvc5_satisfiability") {
 	}
 
 	TEST_CASE("all x x > { 0 }") {
-		const std::string sample = "all x x > { 0 }:bv";
+		const std::string sample = "all x x > { 0 }:bv[4]";
 		auto formula = parse_bv_formula(sample);
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
@@ -52,7 +48,7 @@ TEST_SUITE("cvc5_satisfiability") {
 	}
 
 	TEST_CASE("all x x + { 1 } = { 1 }") {
-		const std::string sample = "all x x + { 1 } = { 1 }:bv";
+		const std::string sample = "all x x + { 1 } = { 1 }:bv[4]";
 		auto formula = parse_bv_formula(sample);
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
@@ -66,15 +62,15 @@ TEST_SUITE("cvc5_satisfiability") {
 	}*/
 
 	TEST_CASE("all x x + { 1 } < { 1 }") {
-		const std::string sample = "all x x + { 1 } < { 1 }:bv";
+		const std::string sample = "all x x + { 1 } < { 1 }:bv[4]";
 		auto formula = parse_bv_formula(sample);
 		CHECK( !is_bv_formula_sat<node_t>(formula) );
 		CHECK( is_bv_formula_unsat<node_t>(formula) );
 		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
 	}
 
-	TEST_CASE("all x x + { 1 }:bv < { 1 }:bv") {
-		const std::string sample = "all x x + { 1 }:bv < { 1 }:bv";
+	TEST_CASE("all x x + { 1 }:bv[4] < { 1 }:bv[4]") {
+		const std::string sample = "all x x + { 1 }:bv[4] < { 1 }:bv[4]";
 		auto formula = parse_bv_formula(sample);
 		// TODO (HIGH) change assertion when supporting overflows
 		CHECK( !is_bv_formula_sat<node_t>(formula) );

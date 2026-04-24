@@ -43,131 +43,131 @@ TEST_SUITE("cvc5_solve simple") {
 		return src;
 	}
 
-	TEST_CASE("X = { 1 }:bv") {
-		const char* sample = "X = { 1 }:bv";
+	TEST_CASE("X = { 1 }:bv[16]") {
+		const char* sample = "X = { 1 }:bv[16]";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X:bv != X") {
-		const char* sample = "X:bv != X";
+	TEST_CASE("X:bv[16] != X") {
+		const char* sample = "X:bv[16] != X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( !solution.has_value() );
 	}
 
-	TEST_CASE("X:bv + { 0 } > { 0 }") {
-		const char* sample = "X:bv + { 0 } > { 0 }";
+	TEST_CASE("X:bv[16] + { 0 } > { 0 }") {
+		const char* sample = "X:bv[16] + { 0 } > { 0 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X:bv !> X") {
-		const char* sample = "X:bv !> X";
+	TEST_CASE("X:bv[16] !> X") {
+		const char* sample = "X:bv[16] !> X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 	}
 
 	// take into account modular arithmetic
-	TEST_CASE("X:bv + { 1 } !> X") {
-		const char* sample = "X:bv + { 1 } !> X";
+	TEST_CASE("X:bv[16] + { 1 } !> X") {
+		const char* sample = "X:bv[16] + { 1 } !> X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X:bv >= X") {
-		const char* sample = "X:bv >= X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
-		CHECK( solution.has_value() );
-	}
-
-	// take into account modular arithmetic
-	TEST_CASE("X:bv >= X + { 1 }") {
-		const char* sample = "X:bv >= X + { 1 }";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
-		CHECK( solution.has_value() );
-	}
-
-	TEST_CASE("X:bv !>= X") {
-		const char* sample = "X:bv !>= X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
-		CHECK( !solution.has_value() );
-	}
-
-	TEST_CASE("X:bv + { 1 } !>= X") {
-		const char* sample = "X:bv + { 1 } !>= X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
-		CHECK( solution.has_value() );
-	}
-
-	TEST_CASE("X:bv <= X") {
-		const char* sample = "X:bv <= X";
+	TEST_CASE("X:bv[16] >= X") {
+		const char* sample = "X:bv[16] >= X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 	}
 
 	// take into account modular arithmetic
-	TEST_CASE("X:bv + { 1 } <= X") {
-		const char* sample = "X:bv + { 1 } <= X";
+	TEST_CASE("X:bv[16] >= X + { 1 }") {
+		const char* sample = "X:bv[16] >= X + { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X:bv !<= X") {
-		const char* sample = "X:bv !<= X";
+	TEST_CASE("X:bv[16] !>= X") {
+		const char* sample = "X:bv[16] !>= X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( !solution.has_value() );
 	}
 
-	TEST_CASE("X:bv + { 1 } !<= X") {
-		const char* sample = "X:bv + { 1 } !<= X";
+	TEST_CASE("X:bv[16] + { 1 } !>= X") {
+		const char* sample = "X:bv[16] + { 1 } !>= X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X:bv < X") {
-		const char* sample = "X:bv < X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
-		CHECK( !solution.has_value() );
-	}
-
-	TEST_CASE("X:bv - { 1 } < X") {
-		const char* sample = "X:bv - { 1 } < X";
-		auto src = parse(sample);
-		auto solution = solve_bv<node_t>(src);
-		CHECK( solution.has_value() );
-	}
-
-	TEST_CASE("X:bv !< X") {
-		const char* sample = "X:bv !< X";
+	TEST_CASE("X:bv[16] <= X") {
+		const char* sample = "X:bv[16] <= X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 	}
 
 	// take into account modular arithmetic
-	TEST_CASE("X:bv - { 1 } !< X") {
-		const char* sample = "X:bv - { 1 } !< X";
+	TEST_CASE("X:bv[16] + { 1 } <= X") {
+		const char* sample = "X:bv[16] + { 1 } <= X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src);
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("X:bv[16] !<= X") {
+		const char* sample = "X:bv[16] !<= X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src);
+		CHECK( !solution.has_value() );
+	}
+
+	TEST_CASE("X:bv[16] + { 1 } !<= X") {
+		const char* sample = "X:bv[16] + { 1 } !<= X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src);
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("X:bv[16] < X") {
+		const char* sample = "X:bv[16] < X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src);
+		CHECK( !solution.has_value() );
+	}
+
+	TEST_CASE("X:bv[16] - { 1 } < X") {
+		const char* sample = "X:bv[16] - { 1 } < X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src);
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("X:bv[16] !< X") {
+		const char* sample = "X:bv[16] !< X";
+		auto src = parse(sample);
+		auto solution = solve_bv<node_t>(src);
+		CHECK( solution.has_value() );
+	}
+
+	// take into account modular arithmetic
+	TEST_CASE("X:bv[16] - { 1 } !< X") {
+		const char* sample = "X:bv[16] - { 1 } !< X";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
 	}
 
 	TEST_CASE("variable") {
-		const char* sample = "X:bv = { 1 }";
+		const char* sample = "X:bv[16] = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -175,7 +175,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_neg") {
-		const char* sample = "X:bv' = { 1 }";
+		const char* sample = "X:bv[16]' = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -183,7 +183,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_add") {
-		const char* sample = "X:bv + { 1 } = { 1 }";
+		const char* sample = "X:bv[16] + { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -191,7 +191,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_sub") {
-		const char* sample = "X:bv - { 1 } = { 1 }";
+		const char* sample = "X:bv[16] - { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -199,7 +199,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_mul") {
-		const char* sample = "X:bv * { 1 } = { 1 }";
+		const char* sample = "X:bv[16] * { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -207,7 +207,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_div") {
-		const char* sample = "X:bv / { 1 } = { 1 }";
+		const char* sample = "X:bv[16] / { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -215,7 +215,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_mod") {
-		const char* sample = "X:bv % { 2 } = { 1 }";
+		const char* sample = "X:bv[16] % { 2 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -223,7 +223,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_and") {
-		const char* sample = "X:bv & { 1 } = { 1 }";
+		const char* sample = "X:bv[16] & { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -231,7 +231,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_nand") {
-		const char* sample = "{ 2 } !& { 1 } = X:bv";
+		const char* sample = "{ 2 } !& { 1 } = X:bv[16]";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -239,7 +239,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_or") {
-		const char* sample = "X:bv | { 1 } = { 1 }";
+		const char* sample = "X:bv[16] | { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -247,7 +247,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_nor") {
-		const char* sample = "{ 2 } !| X:bv = { 1 }";
+		const char* sample = "{ 2 } !| X:bv[16] = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -255,7 +255,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_xor") {
-		const char* sample = "X:bv ^ { 1 } = { 1 }";
+		const char* sample = "X:bv[16] ^ { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -263,7 +263,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_xnor") {
-		const char* sample = "X:bv !^ { 1 } = { 1 }";
+		const char* sample = "X:bv[16] !^ { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -271,7 +271,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_left_shift") {
-		const char* sample = "X:bv << { 1 } = { 2 }";
+		const char* sample = "X:bv[16] << { 1 } = { 2 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -279,7 +279,7 @@ TEST_SUITE("cvc5_solve simple") {
 	}
 
 	TEST_CASE("cvc5_right_shift") {
-		const char* sample = "X:bv >> { 1 } = { 1 }";
+		const char* sample = "X:bv[16] >> { 1 } = { 1 }";
 		auto src = parse(sample);
 		auto solution = solve_bv<node_t>(src);
 		CHECK( solution.has_value() );
@@ -299,7 +299,8 @@ TEST_SUITE("regression") {
 	}
 
 	TEST_CASE("Andrei's example (y2)") {
-		const char* sample = "all b5, b7, b6 b6*b6 != b6 || b6*b6>>{ 3 }:bv[64] < b6*b6 || (all b6, b6 (ex o1[1]:bv[64] b6*b6 = o1[1]:bv[64] && b6*b6 != o1[1]:bv[64]) || b6*b6 = b6*b6)";
+		// Removed unused quantified vars (b5, b7 from outer all; duplicate b6 from inner all)
+		const char* sample = "all b6 b6*b6 != b6 || b6*b6>>{ 3 }:bv[64] < b6*b6 || (all b6 (ex o1[1]:bv[64] b6*b6 = o1[1]:bv[64] && b6*b6 != o1[1]:bv[64]) || b6*b6 = b6*b6)";
 		tref src = parse(sample);
 		// tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
 		subtree_map<node_t, bv> vars, free_vars;

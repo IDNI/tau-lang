@@ -32,7 +32,7 @@ tref parse(const std::string& sample) {
 TEST_SUITE("bv to tau tree translation") {
 
 	TEST_CASE("1") {
-		const char* sample = "(ex x x = { 1 }:bv) && { 16 } : bv[7] - { 8 } = h && asdf' = j+k:bv[4] || !(j = i)";
+		const char* sample = "(ex x x = { 1 }:bv[16]) && { 16 } : bv[7] - { 8 } = h && asdf' = j+k:bv[4] || !(j = i)";
 		tref src = parse(sample);
 		// tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
 		subtree_map<node_t, bv> vars, free_vars;
