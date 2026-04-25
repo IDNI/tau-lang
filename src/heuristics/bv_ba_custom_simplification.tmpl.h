@@ -215,7 +215,7 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 template<NodeType node>
 tref bv_ba_custom_simplification(const tref term) {
 	tref current, next = term;
-	int pass_count = 0;
+	DBG(int pass_count = 0;)
 	std::unordered_set<tref> visited;
 
 	do {
@@ -224,7 +224,7 @@ tref bv_ba_custom_simplification(const tref term) {
 		next = rewriter::replace<node>(current, changes);
 		visited.insert(current);
 
-		pass_count++;
+		DBG(pass_count++;)
 
 #ifdef DEBUG
 		LOG_TRACE << "bv_ba_custom_simplification/pass: " << pass_count << "\n";
