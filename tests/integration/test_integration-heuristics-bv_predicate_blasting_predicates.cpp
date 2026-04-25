@@ -364,8 +364,8 @@ TEST_SUITE("bvcast") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bved_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bved_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << " \n";
-		TAU_LOG_INFO << "------" << '\n';
+		TAU_LOG_INFO << TAU_LOG_RULE(bved_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n";
+		TAU_LOG_INFO << "------" << "\n";
 	}
 
 	TEST_CASE("bvneq_rule") {
@@ -374,10 +374,10 @@ TEST_SUITE("bvcast") {
 		TAU_LOG_INFO << "bvneq_rules:\n";
 		auto rules = bvneq_rules<node>(2);
 		for (const auto& rule : rules)
-			TAU_LOG_INFO << TAU_LOG_RULE(rule) << '\n';
-		TAU_LOG_INFO << "---" << '\n';
-		TAU_LOG_INFO << TAU_LOG_RULE(bvneq_rule<node>(2)) << " \n";
-		TAU_LOG_INFO << "------" << '\n';
+			TAU_LOG_INFO << TAU_LOG_RULE(rule) << "\n";
+		TAU_LOG_INFO << "---" << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvneq_rule<node>(2)) << "\n";
+		TAU_LOG_INFO << "------" << "\n";
 	}
 }
 
