@@ -45,7 +45,7 @@ concept NodeType = requires { // Node Type has to provide
 
 template <NodeType node> struct rr;
 template <NodeType node> struct ba_constants;
-template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
+template <typename... BAs> requires BAsPack<BAs...> struct base_ba_dispatcher;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
 template <NodeType node> struct io_context;
 template <NodeType node> struct tau_spec;
@@ -73,8 +73,8 @@ struct node {
 	// aliases for recreation of the packed variant
 	using constant = std::variant<BAs...>;
 	using constant_with_type = std::pair<constant, tref>;
-	// alias for nso_factory<BAs...>
-	using ba = tau_lang::nso_factory<BAs...>;
+	// alias for base_ba_dispatcher<BAs...>
+	using ba = tau_lang::base_ba_dispatcher<BAs...>;
 
 	using T = size_t; // just to simplify changes or templating it later
 
@@ -189,7 +189,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 
 	// handles
 	tref get() const;
-	static const tree& get(const std::optional<tref>& id);
 	static const tree& get(const tref id);
 	static const tree& get(const htref& h);
 	static htref geth(tref id);
@@ -278,6 +277,9 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref get_ba_constant(
 		const std::optional<std::pair<constant, tref>>&
 		typed_const);
+	// creates a bv_constant from a number and a bitwidth
+	static tref get_bv_constant(size_t bitwidth, size_t value);
+
 
 	// children
 	size_t children_size() const;
@@ -407,6 +409,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		tau_parser::parse_options parse{};
 		std::map<std::string, tref> named_constants{};
 		bool infer_ba_types = true;
+		bool use_default_types = true;
 		bool reget_with_hooks = true;
 		const std::vector<htref>* definition_heads = nullptr;
 		subtree_map<node, size_t>* global_scope = nullptr;
@@ -481,9 +484,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		static const extractor<size_t>              ba_constant_id;
 		static const extractor<size_t>              ba_type;
 		static const extractor<constant>            ba_constant;
-		static const extractor<size_t>              bv_constant_id;
-		static const extractor<constant>            bv_constant;
-		static const extractor<size_t>              bv_size;
 		// children
 		static const extractor<traverser>           only_child;
 		static const extractor<traverser>           first;
@@ -574,6 +574,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_bf_interval(tref x, tref y, tref z);
 	static tref build_bf_eq(tref l, tref r);
 	static tref build_bf_eq_0(tref l);
+	static tref build_bf_eq_1(tref l);
 	static tref build_bf_neq(tref l, tref r);
 	static tref build_bf_neq_0(tref l);
 	static tref build_bf_lteq(tref l, tref r);
@@ -618,9 +619,11 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_var_name(const std::string& name);
 	static tref build_var_name_indexed(size_t index);
 	static tref build_canonized_io_var(const std::string& name);
+	static tref build_variable(size_t type_id);
 	static tref build_variable(tref var_name_node, size_t type_id);
 	static tref build_variable(const std::string& name, size_t type_id);
 	static tref build_bf_variable(tref var_name_node, size_t type_id);
+	static tref build_bf_variable(size_t type_id);
 	static tref build_bf_variable(const std::string& name, size_t type_id);
 	static tref build_in_var(tref var_name_node, size_t type_id);
 	static tref build_in_var(tref var_name_node, tref offset_node, size_t type_id);
@@ -641,7 +644,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_out_var_at_n(const std::string& name, int_t pos, size_t type_id);
 	static tref build_out_var_at_n_indexed(size_t index, int_t pos, size_t type_id);
 	static tref build_out_var_at_t(tref var_name_node, size_t type_id, std::string t = "t");
-	static tref build_out_var_at_t_indexed(size_t index, size_t type_id, std::string t="t");
+	static tref build_out_var_at_t_indexed(size_t index, size_t type_id, std::string t = "t");
 	static tref build_out_var_at_t_minus(
 		tref var_name_node, size_t shift, size_t type_id, std::string t = "t");
 	static tref build_out_var_at_t_minus(
@@ -650,6 +653,27 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		size_t index, size_t shift, size_t type_id, std::string t = "t");
 
 	static tref build_spec(const rr<node>& nso_rr);
+
+	// references and symbols
+
+	static tref build_sym(size_t sid);
+	static tref build_sym(const std::string& sym_name);
+	static tref build_offsets(const trefs& offsets);
+	static tref build_offsets(const std::string& offset);
+	static tref build_offsets(const std::vector<std::string>& offsets);
+	static tref build_shift(tref var, size_t shift);
+	static tref build_shift(const std::string& var_name, size_t shift);
+	static tref build_ref_args(const trefs& args);
+	static tref build_ref_args(const std::vector<std::string>& vars, size_t type_id);
+	static tref build_ref(tref sym, const trefs& args);
+	static tref build_ref(const std::string& sym_name, const trefs& args);
+	static tref build_rr_ref(tref sym, const trefs& offsets, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, const trefs& offsets, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, const std::string offset, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, size_t offset, const trefs& args);
+	static tref build_rr_ref(tref sym, tref offset, size_t shift, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, tref offset, size_t shift, const trefs& args);
+	static tref build_rr_ref(const std::string& sym_name, const std::string& offset, size_t shift, const trefs& args);
 
 private:
 	using tt = traverser;

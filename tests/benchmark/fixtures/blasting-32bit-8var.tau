@@ -1,0 +1,8 @@
+all a:bv[32] all b:bv[32] all c:bv[32] all d:bv[32] all e:bv[32] all f:bv[32] all g:bv[32] all h:bv[32] a + b + c + d = d + c + b + a && e | f | g | h = h | g | f | e.
+ex a:bv[32] ex b:bv[32] ex c:bv[32] ex d:bv[32] ex e:bv[32] ex f:bv[32] ex g:bv[32] ex h:bv[32] a < b && b < c && c < d && d < e && e < f && f < g && g < h && h - a >= { 7 }:bv[32].
+all a:bv[32] all b:bv[32] all c:bv[32] all d:bv[32] all e:bv[32] all f:bv[32] all g:bv[32] all h:bv[32] (a & b) | (c & d) | (e & f) | (g & h) = (b & a) | (d & c) | (f & e) | (h & g).
+ex a:bv[32] ex b:bv[32] ex c:bv[32] ex d:bv[32] ex e:bv[32] ex f:bv[32] ex g:bv[32] ex h:bv[32] a > { 0 }:bv[32] && b = a * { 2 }:bv[32] && b > a && c = b + a && d = c >> { 1 }:bv[32] && e = d + a && f = e % { 7 }:bv[32] && g = f + a && h = g & a && h > { 0 }:bv[32].
+all a:bv[32] all b:bv[32] all c:bv[32] all d:bv[32] all e:bv[32] all f:bv[32] all g:bv[32] all h:bv[32] a ^ b ^ c ^ d = d ^ c ^ b ^ a && e !^ f = f !^ e && g !& h = h !& g.
+ex a:bv[32] ex b:bv[32] ex c:bv[32] ex d:bv[32] ex e:bv[32] ex f:bv[32] ex g:bv[32] ex h:bv[32] a < b && b < c && c < d && e = a + d && f = b + c && g = e ^ f && h = g & { 255 }:bv[32] && h > { 0 }:bv[32].
+all a:bv[32] all b:bv[32] all c:bv[32] all d:bv[32] all e:bv[32] all f:bv[32] all g:bv[32] all h:bv[32] ((a & b) | (c ^ d)) + ((e | f) & (g !^ h)) = ((e | f) & (g !^ h)) + ((a & b) | (c ^ d)).
+ex a:bv[32] ex b:bv[32] ex c:bv[32] ex d:bv[32] ex e:bv[32] ex f:bv[32] ex g:bv[32] ex h:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b && e = a * { 3 }:bv[32] && f = e / { 3 }:bv[32] && f = a && g = a | b && h = g & c && h > { 0 }:bv[32].

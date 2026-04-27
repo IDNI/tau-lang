@@ -287,12 +287,12 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 4") {
-		tref parsed = parse("x = { #b1001 }:bv");
+		tref parsed = parse("x = { #b1001 }:bv[16]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>()}
+			{"x", bv16_type_id<node_t>}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -311,12 +311,12 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 4 (y3)") {
-		tref parsed = parse("x:bv =  { #b1001 }");
+		tref parsed = parse("x:bv[16] =  { #b1001 }");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<size_t> {
-			bv_type_id<node_t>()
+			bv16_type_id<node_t>
 		};
 		CHECK( check_bv_ctes(inferred, expected) );
 	}
@@ -327,7 +327,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<size_t> {
-			bv_type_id<node_t>()
+			bv16_type_id<node_t>
 		};
 		CHECK( check_bv_ctes(inferred, expected) );
 	}
@@ -381,25 +381,25 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 9") {
-		tref parsed = parse("x:bv = y");
+		tref parsed = parse("x:bv[16] = y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>()},
-			{"y", bv_type_id<node_t>()}
+			{"x", bv16_type_id<node_t>},
+			{"y", bv16_type_id<node_t>}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
 
 	TEST_CASE("simple case 9 (y2)") {
-		tref parsed = parse("x = y:bv");
+		tref parsed = parse("x = y:bv[16]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>()},
-			{"y", bv_type_id<node_t>()}
+			{"x", bv16_type_id<node_t>},
+			{"y", bv16_type_id<node_t>}
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -481,14 +481,14 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (bv) left to right") {
-		tref parsed = parse("x:bv = y && y = z");
+		tref parsed = parse("x:bv[16] = y && y = z");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>()},
-			{"y", bv_type_id<node_t>()},
-			{"z", bv_type_id<node_t>()},
+			{"x", bv16_type_id<node_t>},
+			{"y", bv16_type_id<node_t>},
+			{"z", bv16_type_id<node_t>},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -507,14 +507,14 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (bv) right to left") {
-		tref parsed = parse("x = y && y = z:bv");
+		tref parsed = parse("x = y && y = z:bv[16]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>()},
-			{"y", bv_type_id<node_t>()},
-			{"z", bv_type_id<node_t>()},
+			{"x", bv16_type_id<node_t>},
+			{"y", bv16_type_id<node_t>},
+			{"z", bv16_type_id<node_t>},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -536,37 +536,37 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	// so no neede to test them separately
 
 	TEST_CASE("all bv") {
-		tref parsed = parse("all x:bv x = y");
+		tref parsed = parse("all x:bv[16] x = y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>()},
-			{"y", bv_type_id<node_t>()},
+			{"x", bv16_type_id<node_t>},
+			{"y", bv16_type_id<node_t>},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
 
 	TEST_CASE("all bv (y2)") {
-		tref parsed = parse("all x x:bv = y");
+		tref parsed = parse("all x x:bv[16] = y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>()},
-			{"y", bv_type_id<node_t>()},
+			{"x", bv16_type_id<node_t>},
+			{"y", bv16_type_id<node_t>},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
 
 	TEST_CASE("all bv (y3)") {
-		tref parsed = parse("all x x = y:bv");
+		tref parsed = parse("all x x = y:bv[16]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv_type_id<node_t>()},
-			{"y", bv_type_id<node_t>()},
+			{"x", bv16_type_id<node_t>},
+			{"y", bv16_type_id<node_t>},
 		};
 		CHECK( check_vars(inferred, expected) );
 	}
@@ -754,27 +754,27 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple failing case (y5)") {
-		tref parsed = parse("x:tau = x:bv");
+		tref parsed = parse("x:tau = x:bv[16]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("bv constants") {
-		tref parsed = parse("{ #b1 }: bv = { #b0 } : bv & { #b10 }");
+		tref parsed = parse("{ #b1 }:bv[16] = { #b0 } :bv[16] & { #b10 }");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected_ctes = std::vector<size_t> {
-			bv_type_id<node_t>(),
-			bv_type_id<node_t>(),
-			bv_type_id<node_t>()
+			bv16_type_id<node_t>,
+			bv16_type_id<node_t>,
+			bv16_type_id<node_t>
 		};
 		CHECK( check_bv_ctes(inferred, expected_ctes) );
 	}
 
 	TEST_CASE("bv8 constants") {
-		tref parsed = parse("{ #b1 } : bv[8] = { #b0 } : bv[8] & { #b10 } : bv");
+		tref parsed = parse("{ #b1 } : bv[8] = { #b0 } : bv[8] & { #b10 } :bv[8]");
 		CHECK( parsed != nullptr );
 		if (parsed == nullptr) {
 			TAU_LOG_ERROR << "Parsing failed";
@@ -885,7 +885,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 		CHECK( check_vars(inferred, expected) );
 	}
 
-	TEST_CASE("complex case: bv chaining") {
+	TEST_CASE("complex case:bv[16] chaining") {
 		tref parsed = parse("all x x & y = z && y = { 1 }:bv[8]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
@@ -906,7 +906,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("bv specizalization") {
-		tref parsed = parse("ex x : bv x = 1 : bv[8]");
+		tref parsed = parse("ex x :bv[16] x = 1 : bv[8]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		auto expected = std::vector<std::pair<std::string, size_t>> {
@@ -954,11 +954,11 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_eq symbol") {
-		tref parsed = parse("x:bv = y");
+		tref parsed = parse("x:bv[16] = y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_eq>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_eq>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv[8] bf_eq symbol") {
@@ -1082,99 +1082,99 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_interval symbol") {
-		tref parsed = parse("x:bv <= y <= z");
+		tref parsed = parse("x:bv[16] <= y <= z");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_interval>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_interval>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("tau bf_and symbol") {
-		tref parsed = parse_bf("x:bv & y");
+		tref parsed = parse_bf("x:bv[16] & y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_and>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_and>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("tau bf_or symbol") {
-		tref parsed = parse_bf("x:bv | y");
+		tref parsed = parse_bf("x:bv[16] | y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_or>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_or>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("tau bf_xor symbol") {
-		tref parsed = parse_bf("x:bv ^ y");
+		tref parsed = parse_bf("x:bv[16] ^ y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("tau bf_neg symbol") {
-		tref parsed = parse_bf("x:bv'");
+		tref parsed = parse_bf("x:bv[16]'");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_neg>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_neg>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv bf_add symbol") {
-		tref parsed = parse_bf("x:bv + y");
+		tref parsed = parse_bf("x:bv[16] + y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_add>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_add>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv bf_sub symbol") {
-		tref parsed = parse_bf("x:bv - y");
+		tref parsed = parse_bf("x:bv[16] - y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_sub>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_sub>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv bf_mul symbol") {
-		tref parsed = parse_bf("x:bv * y");
+		tref parsed = parse_bf("x:bv[16] * y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_mul>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_mul>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv bf_div symbol") {
-		tref parsed = parse_bf("x:bv / y");
+		tref parsed = parse_bf("x:bv[16] / y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_div>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_div>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv bf_mod symbol") {
-		tref parsed = parse_bf("x:bv % y");
+		tref parsed = parse_bf("x:bv[16] % y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_mod>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_mod>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv bf_shr symbol") {
-		tref parsed = parse_bf("x:bv >> y");
+		tref parsed = parse_bf("x:bv[16] >> y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_shr>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_shr>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv bf_shl symbol") {
-		tref parsed = parse_bf("x:bv << y");
+		tref parsed = parse_bf("x:bv[16] << y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_shl>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_shl>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv[8] bf_shl symbol") {
@@ -1248,27 +1248,27 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv xor symbol") {
-		tref parsed = parse_bf("x:bv ^ y");
+		tref parsed = parse_bf("x:bv[16] ^ y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv xor symbol (y2)") {
-		tref parsed = parse_bf("x:bv ^ 1");
+		tref parsed = parse_bf("x:bv[16] ^ 1");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv16_type_id<node_t>) );
 	}
 
 	TEST_CASE("bv xor symbol (y3)") {
-		tref parsed = parse_bf("1 ^ y:bv");
+		tref parsed = parse_bf("1 ^ y:bv[16]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
-		CHECK( check_symbol<tau::bf_xor>(inferred, bv_type_id<node_t>()) );
+		CHECK( check_symbol<tau::bf_xor>(inferred, bv16_type_id<node_t>) );
 	}
 }
 
@@ -1343,7 +1343,7 @@ TEST_SUITE("bitvectors") {
 
 	TEST_CASE("Propagation of bv type") {
 		//DBG(using node = node_t;)
-		tref parsed = parse("o1[t]:bv = o1[t-1] + o1[t-2] && o1[0] = { 1 } && o1[1] = { 1 }");
+		tref parsed = parse("o1[t]:bv[16] = o1[t-1] + o1[t-2] && o1[0] = { 1 } && o1[1] = { 1 }");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1677,18 +1677,18 @@ TEST_SUITE("type_inference_options") {
 TEST_SUITE("regression tests") {
 
 	TEST_CASE("satisfiability3/qual_lookback_one_st") {
-		tref parsed = parse("(always o1[t-1]:bv = { 0 }) && (sometimes o1[t]:bv = { 1 } && o1[t-1]:bv = { 0 })");
+		tref parsed = parse("(always o1[t-1]:bv[16] = { 0 }) && (sometimes o1[t]:bv[16] = { 1 } && o1[t-1]:bv[16] = { 0 })");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"o1", bv_type_id<node_t>()},
-			{"o1", bv_type_id<node_t>()},
+			{"o1", bv16_type_id<node_t>},
+			{"o1", bv16_type_id<node_t>},
 		};
 		CHECK( check_vars(inferred, expected) );
 		auto expected_ctes = std::vector<size_t> {
-			bv_type_id<node_t>(),
-			bv_type_id<node_t>()
+			bv16_type_id<node_t>,
+			bv16_type_id<node_t>
 		};
 		CHECK( check_ctes(inferred, expected_ctes) );
 	}
@@ -1804,7 +1804,7 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("Lucca's constant parsing example (y1)") {
-		tref parsed = parse("x = {1}:bv && x = y:bv[32]");
+		tref parsed = parse("x = {1}:bv[16] && x = y:bv[32]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
@@ -1870,47 +1870,30 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("Issue 52 (y1)") {
-		size_t bv15_type_id = ba_types<node_t>::id(bv_type<node_t>(15));
-		tref parsed = parse("x:bv = {1}:bv[15]");
+		// Original test used bare :bv which unified with :bv[15].
+		// With mandatory bitwidths, conflicting explicit sizes are a type error.
+		tref parsed = parse("x:bv[16] = {1}:bv[15]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv15_type_id}
-		};
-		CHECK( check_vars(inferred, expected) );
+		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("Issue 52 (y2)") {
-		size_t bv15_type_id = ba_types<node_t>::id(bv_type<node_t>(15));
-		tref parsed = parse("x:bv[15] = {1}:bv");
+		// Original test used bare :bv which unified with :bv[15].
+		// With mandatory bitwidths, conflicting explicit sizes are a type error.
+		tref parsed = parse("x:bv[15] = {1}:bv[16]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv15_type_id}
-		};
-		CHECK( check_vars(inferred, expected) );
-		auto expected_ctes = std::vector<size_t> {
-			bv15_type_id
-		};
-		CHECK( check_ctes(inferred, expected_ctes) );
+		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("Issue 52 (y3)") {
-		size_t bv15_type_id = ba_types<node_t>::id(bv_type<node_t>(15));
-		tref parsed = parse("x:bv[15] = 1:bv");
+		// Original test used bare :bv which unified with :bv[15].
+		// With mandatory bitwidths, conflicting explicit sizes are a type error.
+		tref parsed = parse("x:bv[15] = 1:bv[16]");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
-		CHECK( inferred != nullptr );
-		auto expected = std::vector<std::pair<std::string, size_t>> {
-			{"x", bv15_type_id}
-		};
-		CHECK( check_vars(inferred, expected) );
-		auto expected_bf_ctes = std::vector<size_t> {
-			bv15_type_id
-		};
-		CHECK( check_bf_ctes(inferred, expected_bf_ctes) );
+		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("Andrei's question (y1)") {
@@ -1925,6 +1908,110 @@ TEST_SUITE("regression tests") {
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
+	}
+}
+
+TEST_SUITE("typed annotations as structural children (processed in inference)") {
+
+	// Helper: check no node in tree has a typed structural child
+	static bool no_typed_structural_children(tref root) {
+		bool clean = true;
+		auto f = [&](tref n) {
+			for (auto c : tau::get(n).get_children())
+				if (tau::get(c).is(tau::typed)) { clean = false; return false; }
+			return clean;
+		};
+		pre_order<node_t>(root).search_unique(f);
+		return clean;
+	}
+
+	TEST_CASE("before inference: variable with :sbf has typed structural child") {
+		tref parsed = parse("x:sbf = 1");
+		CHECK( parsed != nullptr );
+		auto vars = tau::get(parsed).select_top(is<node_t, tau::variable>);
+		CHECK( vars.size() == 1 );
+		bool has_typed = false;
+		for (auto c : tau::get(vars[0]).get_children())
+			if (tau::get(c).is(tau::typed)) { has_typed = true; break; }
+		CHECK( has_typed );
+		// And ba_type must be 0 (not pre-stamped)
+		CHECK( tau::get(vars[0]).get_ba_type() == 0 );
+	}
+
+	TEST_CASE("after inference: variable with :sbf has ba_type stamped, no typed child") {
+		tref parsed = parse("x:sbf = 1");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
+		CHECK( vars.size() == 1 );
+		CHECK( tau::get(vars[0]).get_ba_type() == sbf_type_id<node_t>() );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("before inference: bf_t with :sbf has typed structural child") {
+		tref parsed = parse("1:sbf = x");
+		CHECK( parsed != nullptr );
+		auto bfts = tau::get(parsed).select_top(is<node_t, tau::bf_t>);
+		CHECK( bfts.size() == 1 );
+		bool has_typed = false;
+		for (auto c : tau::get(bfts[0]).get_children())
+			if (tau::get(c).is(tau::typed)) { has_typed = true; break; }
+		CHECK( has_typed );
+		CHECK( tau::get(bfts[0]).get_ba_type() == 0 );
+	}
+
+	TEST_CASE("after inference: bf_t with :sbf has ba_type stamped, no typed child") {
+		tref parsed = parse("1:sbf = x");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto bfts = tau::get(inferred).select_top(is<node_t, tau::bf_t>);
+		CHECK( bfts.size() == 1 );
+		CHECK( tau::get(bfts[0]).get_ba_type() == sbf_type_id<node_t>() );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("after inference: bf_f with :tau has ba_type stamped, no typed child") {
+		tref parsed = parse("0:tau = x");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto bffs = tau::get(inferred).select_top(is<node_t, tau::bf_f>);
+		CHECK( bffs.size() == 1 );
+		CHECK( tau::get(bffs[0]).get_ba_type() == tau_type_id<node_t>() );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("after inference: type annotation propagates from bf_t to variable") {
+		tref parsed = parse("x = 1:sbf");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", sbf_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("after inference: type annotation propagates from variable to bf_f") {
+		tref parsed = parse("x:tau = 0");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto bffs = tau::get(inferred).select_top(is<node_t, tau::bf_f>);
+		CHECK( bffs.size() == 1 );
+		CHECK( tau::get(bffs[0]).get_ba_type() == tau_type_id<node_t>() );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("no typed children remain anywhere after inference on complex formula") {
+		tref parsed = parse("x:bv[16] = y && z:sbf = 1");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( no_typed_structural_children(inferred) );
 	}
 }
 

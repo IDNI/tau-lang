@@ -164,19 +164,75 @@ tref repl_evaluator<BAs...>::get_any(tref arg) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::get_applied(tref arg) const {
+	// create a spec from the arg and add io and rr defs
+	tau_spec<node> spec;
+	spec.add(arg);
+	for (tref d : rr_defs) spec.add(d);
+	for (tref d : io_defs) spec.add(d);
+	auto maybe_nso_rr = spec.get_nso_rr();
+	if (!maybe_nso_rr) {
+		DBG(TAU_LOG_TRACE << "nso_rr has no value";)
+		for (const auto& err : spec.errors()) {
+			TAU_LOG_ERROR << err;
+		}
+		return nullptr;
+	}
+	tref main = maybe_nso_rr.value().main->get();
+	if (!main) {
+		DBG(TAU_LOG_TRACE << "main is nullptr";)
+		return nullptr;
+	}
+	// add defs to global definitions:
+	auto& defs = definitions<node>::instance();
+	for (rewriter::rule& r : maybe_nso_rr.value().rec_relations) {
+		defs.add(r.first, r.second);
+		DBG(TAU_LOG_TRACE << "added def to globals: " << TAU_LOG_RULE(r);)
+	}
+	tref applied = apply_rr_to_formula(maybe_nso_rr.value());
+	// tref applied = tau_api::apply_defs(main);
+	DBG(TAU_LOG_TRACE << "applied: " << TAU_LOG_FM_DUMP(applied);)
+	return applied;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::optional<std::pair<size_t, tref>>
 	repl_evaluator<BAs...>::get_type_and_arg(const tt& n) const
 {
 	auto nt = n | tt::nt;
+	tref r = nullptr;
+	DBG(TAU_LOG_TRACE << "get_type_and_arg: " << TAU_LOG_NT(nt);)
+	DBG(TAU_LOG_TRACE << "arg: " << TAU_LOG_FM_DUMP(n | tt::ref);)
 	switch (nt) {
-	case tau::history:
-		if (auto check = history_retrieve(n); check) {
-			auto [value, _] = check.value();
-			auto mem_type = tt(value) | tt::nt;
-			return { { mem_type, value->get() } };
-		} else return {};
-	default: return { std::pair<size_t, tref>{ nt, n | tt::ref } };
+		case tau::history:
+			if (auto check = history_retrieve(n); check) {
+				auto [value, _] = check.value();
+				nt = tt(value) | tt::nt;
+				r = value->get();
+				break;
+			} else return {};
+		default: r = n | tt::ref;
 	}
+	r = get_applied(r);
+	return { { tau::get(r).get_type(), r } };
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::ostream& repl_evaluator<BAs...>::benchmarks(measuring& m) const {
+	if (opt.print_benchmarks) return m(std::cerr);
+	return std::cerr;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::ostream& repl_evaluator<BAs...>::benchmarks(measuring& m,
+	idni::measures::timer& t) const
+{
+	m.ms = t.stop();
+	if (opt.print_benchmarks) return m(std::cerr);
+	return std::cerr;
 }
 
 template <typename... BAs>
@@ -184,40 +240,54 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
 	tref arg = n[1].get();
 	tref var = n[2].get();
+	measuring m("onf");
+	idni::measures::timer t;
+	t.start();
+	tref r = nullptr;
 	if (auto value = get_any(arg); value)
-		if (tref applied = tau_api::apply_all_defs(value); applied)
-			return onf<node>(var, applied);
-	return nullptr;
+		if (tref applied = tau_api::apply_all_defs(m.part(), value); applied)
+			r = onf<node>(var, applied);
+	return benchmarks(m, t), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::dnf_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
 	if (auto value = get_any(n[1].get()); value)
-		return tau_api::dnf(value);
-	return nullptr;
+		r = tau_api::dnf(m, value);
+	return benchmarks(m), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::cnf_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
 	if (auto value = get_any(n[1].get()); value)
-		return tau_api::cnf(value);
-	return nullptr;
+		r = tau_api::cnf(m, value);
+	return benchmarks(m), r;
 }
 
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::nnf_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
 	if (auto value = get_any(n[1].get()); value)
-		return tau_api::nnf(value);
-	return nullptr;
+		r = tau_api::nnf(m, value);
+	return benchmarks(m), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
+	measuring m("mnf");
+	idni::measures::timer t;
+	t.start();
+ 	tref r = nullptr;
 	tref arg = n[1].get();
 	auto wff_mnf = [](tref applied) {
 		return unequal_to_not_equal<node>(
@@ -225,31 +295,41 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 				bf_reduce_canonical<node>()(applied))));
 	};
 	if (auto value = get_any(arg); value)
-		if (tref applied = tau_api::apply_all_defs(value); applied)
+		if (tref applied = tau_api::apply_all_defs(m.part(), value); applied)
 			switch (tau::get(applied).get_type()) {
-			case tau::wff: return wff_mnf(applied);
-			case tau::bf:  return bf_reduced_dnf<node>(applied);
+			case tau::wff: r = wff_mnf(applied); break;
+			case tau::bf:  r = bf_reduced_dnf<node>(applied); break;
 			default: return invalid_argument();
 			}
-	return nullptr;
+	return benchmarks(m, t), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
+	// DBG(TAU_LOG_TRACE << "subst_cmd" << LOG_FM_DUMP(n.value());)
 	tref arg1 = n | tt::second | tt::ref;
 	tref arg2 = n | tt::third  | tt::ref;
 	tref arg3 = n | tt::fourth | tt::ref;
 	// TAU_LOG_TRACE << "subst_cmd arg1: " << TAU_DUMP_TO_STR(arg1);
 	// TAU_LOG_TRACE << "subst_cmd arg2: " << TAU_DUMP_TO_STR(arg2);
 	// TAU_LOG_TRACE << "subst_cmd arg3: " << TAU_DUMP_TO_STR(arg3);
+
+	measuring m;
 	// Since the history command cannot be type-checked we do it here
 	// First try to get bf
 	tref in = get_bf(arg1, true);
 	if (in) { // BF substitution
 		tref thiz = get_bf(arg2), with = get_bf(arg3);
 		if (!in || !thiz || !with) return invalid_argument();
-		return tau::get(in).substitute(thiz, with);
+		// strip bf of variables so we match also quantifiers
+		if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
+			thiz = tau::trim(thiz),	with = tau::trim(with);
+		// DBG(TAU_LOG_TRACE << "bf in:   " << TAU_LOG_FM_DUMP(in);)
+		// DBG(TAU_LOG_TRACE << "thiz:    " << TAU_LOG_FM_DUMP(thiz);)
+		// DBG(TAU_LOG_TRACE << "with:    " << TAU_LOG_FM_DUMP(with);)
+		tref r = tau_api::substitute(m, in, thiz, with);
+		return benchmarks(m), r;
 	}
 	// First argument was not a bf so it must be a wff
 	in = get_wff(arg1);
@@ -262,12 +342,20 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
-	return tau_api::substitute(in, thiz, with);
+	// strip bf of variables so we match also quantifiers
+	if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
+		thiz = tau::trim(thiz),	with = tau::trim(with);
+	// DBG(TAU_LOG_TRACE << "wff in: " << TAU_LOG_FM_DUMP(in);)
+	// DBG(TAU_LOG_TRACE << "thiz:   " << TAU_LOG_FM_DUMP(thiz);)
+	// DBG(TAU_LOG_TRACE << "with:   " << TAU_LOG_FM_DUMP(with);)
+	tref r = tau_api::substitute(m, in, thiz, with);
+	return benchmarks(m), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::inst_cmd(const tt& n) {
+	// DBG(TAU_LOG_TRACE << "inst_cmd" << LOG_FM_DUMP(n.value());)
 	const auto& t = n.value_tree();
 	if (!t[2][0].is(tau::variable)) {
 		TAU_LOG_ERROR << "Invalid argument\n";
@@ -285,39 +373,62 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	auto check = get_type_and_arg(arg);
 	if (!check) return nullptr;
 	auto [type, value] = check.value();
+	measuring m;
+	tref r;
 	switch (type) {
-		case tau::wff: return tau_api::normalize_formula(value);
-		case tau::bf:  return tau_api::normalize_term(value);
+		case tau::wff: r = tau_api::normalize_formula(m, value); break;
+		case tau::bf:  r = tau_api::normalize_term(m, value); break;
 		default: return nullptr;
 	}
+	return benchmarks(m), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
 	if (auto value = get_any(n[1].get()); value)
-		return tau_api::eliminate_quantifiers(value);
-	return nullptr;
+		r = tau_api::eliminate_quantifiers(m, value);
+	return benchmarks(m), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
+	DBG(TAU_LOG_TRACE << "run_cmd: " << TAU_LOG_FM(n.value());)
+	measuring m("run");
+	idni::measures::timer t;
+
 	tref value = get_any(n[1].get());
 	if (!value) return;
 
-	tref applied = tau_api::apply_all_defs(value);
-	if (!applied) return;
+	t.start();
 
-	DBG(TAU_LOG_DEBUG << "run_cmd/applied: " << TAU_LOG_FM(applied);)
+	DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
+	value = tau_api::simplify(m.part(), value);
+	DBG(TAU_LOG_TRACE << "run_cmd/simplified: " << TAU_LOG_FM(value);)
 
-	auto dnf = normalizer<node>(applied);
-
-	// Make sure that there is no free variable in the formula
-	if (has_free_vars<node>(dnf)) return;
-
-	run<node>(dnf, *definitions<node>::instance().get_io_context());
+	auto maybe_i = tau_api::get_interpreter(m.part(), value);
+	if (!maybe_i) return;
+	auto& i = maybe_i.value();
+	while (true) {
+		auto maybe_outputs = tau_api::step(m.part(), i);
+		if (!maybe_outputs) {
+			TAU_LOG_INFO << "No input provided."
+				<< " q or quit to terminate."
+				<< " Press ENTER to continue.";
+			std::string line;
+			term::enable_getline_mode();
+			t.pause();
+			std::getline(std::cin, line);
+			t.unpause();
+			term::disable_getline_mode();
+			if (line == "q" || line == "quit") break;
+		}
+	}
+	benchmarks(m, t);
 }
 
 template <NodeType node>
@@ -387,8 +498,10 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	auto check = get_type_and_arg(arg);
 	if (!check) return;
 	auto [type, value] = check.value();
-	auto solution = tau_api::solve(value,
+	measuring m;
+	auto solution = tau_api::solve(m, value,
 		get_solver_cmd_mode<node>(n.value()));
+	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 
 	print_solver_cmd_solution<node>(solution, type);
@@ -411,7 +524,9 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	auto check = get_type_and_arg(arg);
 	if (!check) return;
 	auto [type, value] = check.value();
-	auto solution = tau_api::lgrs(arg);
+	measuring m;
+	auto solution = tau_api::lgrs(m, arg);
+	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
 	print_solver_cmd_solution<node>(solution, type);
@@ -420,45 +535,55 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::valid_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
 	if (tref value = get_any(n[1].get()); value)
-		return tau_api::valid(value) ? tau::_T() : tau::_F();
-	return nullptr;
+		r = tau_api::valid(m, value) ? tau::_T() : tau::_F();
+	return benchmarks(m), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
 	if (tref value = get_any(n[1].get()); value)
-		return tau_api::sat(value) ? tau::_T() : tau::_F();
-	return nullptr;
+		r = tau_api::sat(m, value) ? tau::_T() : tau::_F();
+	return benchmarks(m), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
 	if (tref value = get_any(n[1].get()); value)
-		return tau_api::unsat(value) ? tau::_T() : tau::_F();
-	return nullptr;
+		r = tau_api::unsat(m, value) ? tau::_T() : tau::_F();
+	return benchmarks(m), r;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
-	// TODO this should be stored anytime rec rel is parsed ?
-	auto& defs = definitions<node>::instance();
-	size_t idx = defs.add(tau::geth(n[0][0]), tau::geth(n[0][1]));
-	std::cout << "[" << idx + 1 << "] " << to_str<node>(defs[idx]) << "\n";
+	rr_defs.push_back(n | tt::first | tt::ref);
+	size_t idx = rr_defs.size() - 1;
+	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(rr_defs[idx]) << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_list_cmd() {
 	auto& defs = definitions<node>::instance();
-	if (defs.size() == 0) std::cout << "Definitions: empty\n";
+	if (rr_defs.empty()) std::cout << "Definitions: empty\n";
 	else std::cout << "Definitions:\n";
-	for (size_t i = 0; i < defs.size(); i++)
+	for (size_t i = 0; i < rr_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< to_str<node>(defs[i]) << "\n";
+			<< TAU_TO_STR(rr_defs[i]) << "\n";
+	if (io_defs.empty()) std::cout << "Streams: empty\n";
+	else std::cout << "Streams:\n";
+	for (size_t i = 0; i < io_defs.size(); i++)
+		std::cout << "    [" << i + 1 << "] "
+			<< TAU_TO_STR(io_defs[i]) << "\n";
 	std::cout << *defs.get_io_context();
 }
 
@@ -468,9 +593,8 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	auto num = command | tau::num;
 	if (!num) return;
 	auto i = num | tt::num;
-	const auto& defs = definitions<node>::instance();
-	if (i && i <= defs.size()) {
-		print<node>(std::cout, defs[i-1]) << "\n";
+	if (i && i <= rr_defs.size()) {
+		std::cout << TAU_TO_STR(rr_defs[i-1]) << "\n";
 		return;
 	}
 	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
@@ -479,22 +603,18 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::def_input_cmd(const tt& /*command*/) {
-	// auto& defs = definitions<node>::instance();
-	// if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_input_defs())) {
-	// 	error = true;
-	// 	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
-	// }
+void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
+	io_defs.push_back(n | tt::first | tt::ref);
+	size_t idx = io_defs.size() - 1;
+	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(io_defs[idx]) << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::def_output_cmd(const tt& /*command*/) {
-	// auto& defs = definitions<node>::instance();
-	// if (!get_io_def<node>(command | tt::only_child | tt::ref, defs.get_output_defs())){
-	// 	error = true;
-	// 	TAU_LOG_ERROR << "Invalid type " << TAU_TO_STR(command.value());
-	// }
+void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
+	io_defs.push_back(n | tt::first | tt::ref);
+	size_t idx = io_defs.size() - 1;
+	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(io_defs[idx]) << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -524,6 +644,9 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	auto t = result.get_shaped_tree2();
 	auto& defs = definitions<node>::instance();
 	typename tau::get_options opts = {
+		.infer_ba_types = true,
+		.use_default_types = false,
+		.reget_with_hooks = false,
 		.definition_heads = defs.get_definition_heads(),
 		.global_scope = defs.get_global_scope(),
 		.context = defs.get_io_context()
@@ -541,10 +664,13 @@ inline repl_option get_opt(const std::string& x) {
 	if (x == "c" || x == "colors"
 		|| x == "color")             return colors_opt;
 	if (x == "V" || x == "charvar")      return charvar_opt;
+	if (x == "B" || x == "blasting")     return blasting_opt;
 	if (x == "H" || x == "highlighting"
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
 		|| x == "indent")            return indenting_opt;
+	if (x == "B" || x == "benchmarks"
+		|| x == "benchmarking")      return print_benchmarks_opt;
 	if (x == "d" || x == "debug"
 		|| x == "dbg")               return debug_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
@@ -592,12 +718,17 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		std::cout << "colors:              " << pbool[opt.colors] << "\n"; } },
 	{ charvar_opt,      [this]() {
 		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
+	{ blasting_opt,      [this]() {
+		std::cout << "blasting:            " << pbool[opt.blasting] << "\n"; } },
 	{ highlighting_opt, []() {
 		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
 	{ indenting_opt,    []() {
 		std::cout << "indenting:           " << pbool[pretty_printer_indenting] << "\n"; } },
 	{ severity_opt,     [this]() {
-		std::cout << "severity:            " << opt.severity << "\n"; } }};
+		std::cout << "severity:            " << opt.severity << "\n"; } },
+	{ print_benchmarks_opt, [this]() {
+		std::cout << "benchmarks:          " << pbool[opt.print_benchmarks] << "\n"; } }
+	};
 	if (o == invalid_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
@@ -649,10 +780,14 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		TC.set(update_bool_value(opt.colors)); } },
 	{ charvar_opt,   [&]() {
 		update_charvar(update_bool_value(opt.charvar)); } },
+	{ blasting_opt,   [&]() {
+		update_blasting(update_bool_value(opt.blasting)); } },
 	{ highlighting_opt,   [&]() {
 		update_bool_value(pretty_printer_highlighting); } },
 	{ indenting_opt,   [&]() {
 		update_bool_value(pretty_printer_indenting); } },
+	{ print_benchmarks_opt, [&]() {
+		update_bool_value(opt.print_benchmarks); } },
 	{ severity_opt, [&]() {
 		auto sev = str2severity(v);
 		if (!sev.has_value()) return;
@@ -688,11 +823,13 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 #ifdef DEBUG
 	case debug_opt: update_fn(opt.debug_repl); break;
 #endif // DEBUG
-	case colors_opt:       TC.set(update_fn(opt.colors)); break;
-	case charvar_opt:      update_charvar(update_fn(opt.charvar)); break;
-	case highlighting_opt: update_fn(pretty_printer_highlighting); break;
-	case indenting_opt:    update_fn(pretty_printer_indenting); break;
-	case status_opt:       update_fn(opt.status); break;
+	case colors_opt:           TC.set(update_fn(opt.colors)); break;
+	case charvar_opt:          update_charvar(update_fn(opt.charvar));break;
+	case blasting_opt:     	   update_blasting(update_fn(opt.blasting)); break;
+	case highlighting_opt:     update_fn(pretty_printer_highlighting);break;
+	case indenting_opt:        update_fn(pretty_printer_indenting); break;
+	case status_opt:           update_fn(opt.status); break;
+	case print_benchmarks_opt: update_fn(opt.print_benchmarks); break;
 	default: TAU_LOG_ERROR << "Invalid option\n", error = true; return;
 	}
 }
@@ -701,6 +838,13 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	api<node>::set_charvar(opt.charvar = value);
+	return value;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::update_blasting(bool value) {
+	api<node>::set_blasting(opt.blasting = value);
 	return value;
 }
 

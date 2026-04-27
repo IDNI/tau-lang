@@ -15,10 +15,12 @@ tref cvc5_tree_to_tau_tree(bv n) {
 
 	DBG(LOG_INFO << "cvc5_tree_to_tau_tree/n: " << n.toString() << "\n";)
 
-	auto from_collection = [](const bv& t, const auto& f) {
+	auto from_collection = [](const bv& t, const auto& f) -> tref {
 		tref res = rec(t[0]);
 		for (size_t i = 1; i < t.getNumChildren(); ++i) {
-			res = f(res, rec(t[i]));
+			auto temp = rec(t[i]);
+			if (temp == nullptr) return nullptr; // Unable to transform to tau (returning null)
+			res = f(res, temp);
 		}
 		return res;
 	};
@@ -93,17 +95,18 @@ tref bv_ba_cvc5_simplification(tref term) {
 
 	subtree_map<node, bv> vars, free_vars;
 	auto bv_term = bv_eval_node<node>(tt(term), vars, free_vars);
-	if (!bv_term) return term; // Unable to transform to bv
+	if (!bv_term) return nullptr; // Unable to transform to bv (returning null)
 	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << bv_term.value().toString() << "\n";)
 	auto simplified_bv = normalize_bv(bv_term.value());
 	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/simplified_bv: " << simplified_bv.toString() << "\n";)
 	auto simplified_term = cvc5_tree_to_tau_tree<node>(simplified_bv);
 #ifdef DEBUG
-	if (simplified_term != nullptr)
+	if (simplified_term)
 		LOG_TRACE << "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term) << "\n"
 			<< "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term).tree_to_str() << "\n";
 #endif // DEBUG
-	return simplified_term;
+
+	return simplified_term != nullptr ? simplified_term : term;
 }
 
 } // namespace idni::tau_lang

@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./dev build Release $@
+./dev build Release "$@"

@@ -52,7 +52,7 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 	}
 	LOG_TRACE << ss.str();
 }
-void applied(const std::string& rule) {
+inline void applied(const std::string& rule) {
 	LOG_TRACE << "[- " << LOG_BRIGHT("APPLIED") << " -] "
 				<< LOG_RULE_COLOR << rule << TC.CLEAR();
 }
@@ -472,7 +472,7 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 	HOOK_LOGGING(log("cte", v, ch, len, right);)
 	if (len == 1 && tau::get(ch[0]).is_ba_constant()) {
 		const auto& l = tau::get(ch[0]);
-		if (size_t typed = l.get_ba_type(); typed > 0) {
+		if (size_t typed = l.get_ba_type(); (!l.has_child()) && typed > 0) {
 			HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
 			if (node::ba::is_syntactic_zero(l.get_ba_constant())) {
 				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
@@ -1186,6 +1186,10 @@ tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+		if (tref bv_r = wff_bv_lt<node>(ch, r)) {
+			HOOK_LOGGING(applied("Using bitvector-specific definition for <.");)
+			return bv_r;
+		}
 		return tau::get_raw(v, ch, len, r);
 	}
 
@@ -1248,6 +1252,10 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+		if (tref bv_r = wff_bv_nlt<node>(ch, r)) {
+			HOOK_LOGGING(applied("Using bitvector-specific definition for !<.");)
+			return bv_r;
+		}
 		return tau::get_raw(v, ch, len, r);
 	}
 
@@ -1311,6 +1319,10 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+		if (tref bv_r = wff_bv_lteq<node>(ch, r)) {
+			HOOK_LOGGING(applied("Using bitvector-specific definition for <=.");)
+			return bv_r;
+		}
 		return tau::get_raw(v, ch, len, r);
 	}
 
@@ -1361,6 +1373,10 @@ tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r
 
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+		if (tref bv_r = wff_bv_nlteq<node>(ch, r)) {
+			HOOK_LOGGING(applied("Using bitvector-specific definition for !<=.");)
+			return bv_r;
+		}
 		return tau::get_raw(v, ch, len, r);
 	}
 
@@ -1411,6 +1427,10 @@ tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+		if (tref bv_r = wff_bv_gt<node>(ch, r)) {
+			HOOK_LOGGING(applied("Using bitvector-specific definition for >.");)
+			return bv_r;
+		}
 		return tau::get_raw(v, ch, len, r);
 	}
 
@@ -1463,6 +1483,10 @@ tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) 
 
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+		if (tref bv_r = wff_bv_ngt<node>(ch, r)) {
+			HOOK_LOGGING(applied("Using bitvector-specific definition for !>.");)
+			return bv_r;
+		}
 		return tau::get_raw(v, ch, len, r);
 	}
 
@@ -1515,6 +1539,10 @@ tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r)
 
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+		if (tref bv_r = wff_bv_gteq<node>(ch, r)) {
+			HOOK_LOGGING(applied("Using bitvector-specific definition for >=.");)
+			return bv_r;
+		}
 		return tau::get_raw(v, ch, len, r);
 	}
 
@@ -1565,6 +1593,10 @@ tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r
 
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+		if (tref bv_r = wff_bv_ngteq<node>(ch, r)) {
+			HOOK_LOGGING(applied("Using bitvector-specific definition for !>=.");)
+			return bv_r;
+		}
 		return tau::get_raw(v, ch, len, r);
 	}
 

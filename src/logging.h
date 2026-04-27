@@ -74,27 +74,27 @@ namespace idni::tau_lang {
 //
 #if defined(DEBUG) || defined(TAU_LOG_CHANNELS)
 static constexpr const char* LOG_ENABLED_CHANNELS[] = {
+
+	/* base boolean algebras */
 	// "nso_ba",
 	// "sbf_ba",
 	// "tau_ba",
 	"bv_ba",
+	"bv_ba_hooks",
 	// "bv_ba-solver",
-	"bv_ba-hooks",
-	"bv_ba-simplification",
-	// "ba_types",
-	// "ba_constants",
+
+	/* main components*/
 	// "execution",
-	// "hooks",
-	"heuristics",
 	//"interpreter",
+	// "hooks",
 	// "normal_forms",
 	// "assign_and_reduce",
 	// "anti_prenex",
-	// "normalizer",
-	// "nso_rr",
+	//"normalizer",
+	//"nso_rr",
 	// "repl_evaluator",
 	// "satisfiability",
-	// "solver",
+	//"solver",
 	// "splitter",
 	// "tau_tree",
 	// "builders",
@@ -104,12 +104,23 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "printers",
 	// "queries",
 	// "traverser",
-	"testing",
-	// "resolver",
-	"inference",
 	//"api",
 	//"io_context",
 	// "tau_spec",
+
+	/* related top types and type inference*/
+	// "ba_types",
+	// "ba_constants",
+	// "resolver",
+	// "inference",
+
+	/* related to heuristics*/
+	"bv_ba_simplification",
+	"ex_subs_based_elimination",
+	"bv_predicate_blasting",
+
+	/* testing specific */
+	"testing",
 };
 #else // #if defined(DEBUG) || defined(TAU_LOG_CHANNELS) else
 static constexpr const char* LOG_ENABLED_CHANNELS[] = { "" };

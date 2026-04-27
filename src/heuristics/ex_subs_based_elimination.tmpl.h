@@ -46,6 +46,8 @@ tref postorder(tref var, tref ex_clause) {
 
 	// We visit the formula until reaching atomic formulas (eq)
 	auto visit_subtree = [&](tref n) -> bool {
+		// TODO (LOW) bf_interval could be removed as is transformed in
+		// hooks and type_checking.
 		return !is<node>(n, tau::bf_interval)
 			&& !is<node>(n, tau::bf_neq)
 			&& !is<node>(n, tau::bf_lteq)

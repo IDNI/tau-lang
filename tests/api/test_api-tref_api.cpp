@@ -153,7 +153,7 @@ TEST_SUITE("Tau API - tref - querying") {
 
 	TEST_CASE_FIXTURE(api_fixture, "contains") {
 		DBG(using node = node_t;)
-		tref t = tau_api::get_term("x + 0");
+		tref t = tau_api::get_term("x + 0", false);
 		DBG(TAU_LOG_TRACE << "contains on term: " << TAU_LOG_FM_DUMP(t);)
 		CHECK(tau_api::contains(t, tau::bf));
 		CHECK(tau_api::contains(t, tau::bf_add));
@@ -164,7 +164,7 @@ TEST_SUITE("Tau API - tref - querying") {
 		CHECK(!tau_api::contains(t, tau::wff_f));
 		CHECK(!tau_api::contains(t, tau::wff_t));
 
-		tref f = tau_api::get_formula("x = 0 && y ^ 1 = 1");
+		tref f = tau_api::get_formula("x = 0 && y ^ 1 = 1", false);
 		DBG(TAU_LOG_TRACE << "contains on formula: " << TAU_LOG_FM_DUMP(f);)
 		CHECK(tau_api::contains(f, tau::wff));
 		CHECK(tau_api::contains(f, tau::wff_and));

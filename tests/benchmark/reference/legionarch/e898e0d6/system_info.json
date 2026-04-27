@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-03-24T14:11:43Z",
+  "profile": "legionarch",
+  "commit_hash": "e898e0d6",
+  "tau_binary": "build-Release/tau",
+  "tau_version": "Tau Language Framework version 0.7.0-alpha (e898e0d6)",
+  "os": {
+    "kernel": "Linux",
+    "kernel_release": "6.19.8-arch1-1",
+    "machine_arch": "x86_64",
+    "distro_name": "Arch Linux"
+  },
+  "cpu": {
+    "model": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "architecture": "x86_64",
+    "max_mhz": "4465.2612",
+    "physical_cores": 8,
+    "logical_cpus": 16,
+    "sockets": 1,
+    "cores_per_socket": 8,
+    "l1d_cache": "256 KiB (8 instances)",
+    "l1i_cache": "256 KiB (8 instances)",
+    "l2_cache": "4 MiB (8 instances)",
+    "l3_cache": "16 MiB (1 instance)"
+  },
+  "memory": {
+    "total_kb": 28577628
+  }
+}

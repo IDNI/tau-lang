@@ -1,0 +1,17 @@
+{
+	"measured": "run",
+	"micros": 5160,
+	"parts":
+	{
+		"measured": "reading input",
+		"micros": 30
+	},
+	{
+		"measured": "get_interpreter",
+		"micros": 4279
+	},
+	{
+		"measured": "step",
+		"micros": 840
+	}
+}

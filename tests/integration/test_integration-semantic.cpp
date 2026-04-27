@@ -3,7 +3,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
-#include "tau.h"
+#include "tau_tree.h"
 
 TEST_SUITE("Semantic checks") {
 

@@ -18,37 +18,24 @@ using sbf_ba = hbdd<Bool>;
  */
 inline static std::map<int_t, sbf_ba> var_cache{};
 
-/**
- * @brief Boolean algebra factory for Simple Boolean function
- *
- * @tparam BAs Boolean algebras
- */
-template <typename... BAs>
-requires BAsPack<BAs...>
-struct sbf_ba_factory {
-
-	static std::string one();
-
-	static std::string zero();
-
-	static std::variant<BAs...> splitter_one();
-
-	//inline static std::map<size_t, std::variant<BAs...>> cache;
-};
 
 inline tref simplify_sbf_symbol(tref sym) { return sym; }
 
 inline tref simplify_sbf_term(tref term) { return term; }
 
-inline sbf_ba sbf_splitter(const sbf_ba& elem, splitter_type st);
+inline sbf_ba sbf_splitter(const sbf_ba& elem, splitter_type st) { return elem->splitter(st); }
+
+inline sbf_ba sbf_splitter_one() { return bdd_handle<Bool>::htrue->splitter(splitter_type::bad); }
+
+inline sbf_ba normalize_sbf(const sbf_ba& elem) { return elem; }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_sbf(const std::string& src);
 
-bool is_sbf_one(const sbf_ba& x) { return x->is_one(); }
+inline bool is_sbf_one(const sbf_ba& x) { return x->is_one(); }
 
-bool is_sbf_zero(const sbf_ba& x) { return x->is_zero(); }
+inline bool is_sbf_zero(const sbf_ba& x) { return x->is_zero(); }
 
 } // namespace idni::tau_lang
 

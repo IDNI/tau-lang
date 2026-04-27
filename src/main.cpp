@@ -12,7 +12,7 @@
 #include "boolean_algebras/nso_ba.h"
 #include "boolean_algebras/tau_ba.h"
 #include "boolean_algebras/variant_ba.h"
-#include "runtime.h"
+#include "base_ba_dispatcher.h"
 #include "api.h"
 #else
 #	include "tau.h"
@@ -36,15 +36,22 @@ cli::options tau_options() {
 		.set_description("show the current Tau executable version");
 	opts["license"] = cli::option("license", 'l', false)
 		.set_description("show license for Tau");
-
 	opts["charvar"] = cli::option("charvar", 'V', true)
 		.set_description("charvar (enabled by default)");
+	opts["blasting"] = cli::option("blasting", 'B', true)
+		.set_description("blasting (enabled by default)");
 	opts["severity"] = cli::option("severity", 'S', "info")
 		.set_description("severity level (trace/debug/info/error)");
 	opts["indenting"] = cli::option("indenting", 'I', false)
 		.set_description("indenting of formulas");
 	opts["highlighting"] = cli::option("highlighting", 'H', false)
 		.set_description("syntax highlighting");
+	opts["benchmarks"] = cli::option("benchmarks", 'B', true)
+		.set_description("print benchmarks (enabled by default)");
+	opts["json"] = cli::option("json", 'J', false)
+		.set_description("output in JSON format");
+	opts["quit"] = cli::option("quit", 'q', false)
+		.set_description("quit when no input");
 	// REPL specific options
 	opts["evaluate"] = cli::option("evaluate", 'e', "")
 		.set_description("REPL command to evaluate");
@@ -61,8 +68,16 @@ cli::options tau_options() {
 
 int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 
-int run_tau_spec(string spec_file) {
+int run_tau_spec(string spec_file, cli::options& opts) {
+	measuring m("run");
+	idni::measures::timer t;
 	string src = "";
+	t.start();
+	auto result = [&](int r) {
+		m.ms = t.stop();
+		if (opts["benchmarks"].get<bool>()) m(std::cerr);
+		return r;
+	};
 	if (spec_file == "-") {
 		std::ostringstream oss;
 		oss << std::cin.rdbuf(), src = oss.str();
@@ -73,25 +88,33 @@ int run_tau_spec(string spec_file) {
 		auto l = ifs.tellg();
 		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}
-	if (src.empty()) return 0;
-
-	auto maybe_i = tau_api::get_interpreter(src);
-	if (!maybe_i) return 1;
+	m.part() = { "reading input", t.pause() };
+	if (src.empty()) return result(0);
+	t.unpause();
+	auto maybe_i = tau_api::get_interpreter(m.part(), src);
+	if (!maybe_i) return result(1);
 	auto& i = maybe_i.value();
 	while (true) {
-		auto maybe_outputs = tau_api::step(i);
+		auto maybe_outputs = tau_api::step(m.part(), i);
 		if (!maybe_outputs) {
+			if (opts["quit"].get<bool>()) {
+				TAU_LOG_INFO << "No more inputs provided."
+					<< " Terminating.";
+				break;
+			}
 			TAU_LOG_INFO << "No input provided."
 				<< " q or quit to terminate."
 				<< " Press ENTER to continue.";
 			std::string line;
 			term::enable_getline_mode();
+			t.pause();
 			std::getline(std::cin, line);
+			t.unpause();
 			term::disable_getline_mode();
 			if (line == "q" || line == "quit") break;
 		}
 	}
-	return 0;
+	return result(0);
 }
 
 void welcome() {
@@ -144,21 +167,25 @@ int main(int argc, char** argv) {
 
 	tau_api::set_highlighting(opts["highlighting"].get<bool>());
 	tau_api::set_indenting(opts["indenting"].get<bool>());
+	tau_api::set_json(opts["json"].get<bool>());
 	bool charvar = opts["charvar"].get<bool>();
+	bool blasting = opts["blasting"].get<bool>();
 	bool exp = opts["experimental"].get<bool>();
 
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
-							<< files.front();)
+			<< files.front();)
 		tau_api::set_severity(sev);
 		tau_api::set_charvar(charvar);
-		return run_tau_spec(files.front());
+		return run_tau_spec(files.front(), opts);
 	}
 
 	repl_evaluator<bv, sbf_ba> re({
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,
+		.blasting = blasting,
+		.print_benchmarks = opts["benchmarks"].get<bool>(),
 #ifdef DEBUG
 		.debug_repl = opts["debug"].get<bool>(),
 #endif // DEBUG

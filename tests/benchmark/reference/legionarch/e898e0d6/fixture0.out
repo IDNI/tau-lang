@@ -1,0 +1,7 @@
+
+Temporal normalization of always specification reached fixpoint after 0 steps, yielding the result: 
+o[t]:tau' = 0
+
+Execution step: 0
+o[0] := T
+No more inputs provided. Terminating.
