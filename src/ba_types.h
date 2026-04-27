@@ -245,6 +245,14 @@ std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<
 template <NodeType node>
 bool has_ba_type (tref term);
 
+// Returns true if the node has ba_type == 0 and no direct typed structural child
+template <NodeType node>
+bool is_untyped_tref(tref t);
+
+// Returns ba_type if non-zero, else reads type id from direct typed structural child
+template <NodeType node>
+size_t get_effective_ba_type(tref t);
+
 template <NodeType node>
 size_t find_ba_type (tref term);
 

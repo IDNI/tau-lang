@@ -138,13 +138,13 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 			typeable_type_ids_by_type[nt] = subtree_map<node, size_t>();
 		if (auto it = typeable_type_ids_by_type[nt].find(canonized); it !=
 				typeable_type_ids_by_type[nt].end()) {
-			if (auto type_id = unify<node>(it->second, tau::get(typeable).get_ba_type()); type_id) {
+			if (auto type_id = unify<node>(it->second, get_effective_ba_type<node>(typeable)); type_id) {
 				typeable_type_ids_by_type[nt][canonized] = type_id.value();
 				continue;
 			}
-			return inference_error{typeable, it->second, tau::get(typeable).get_ba_type()}; // incompatible types
+			return inference_error{typeable, it->second, get_effective_ba_type<node>(typeable)}; // incompatible types
 		}
-		typeable_type_ids_by_type[nt][canonized] = tau::get(typeable).get_ba_type();
+		typeable_type_ids_by_type[nt][canonized] = get_effective_ba_type<node>(typeable);
 	}
 #ifdef DEBUG
 	LOG_TRACE << "get_typeable_type_ids_by_type/typeable_type_ids_by_type:\n";
@@ -172,10 +172,10 @@ bool is_functional_relation(tref n) {
 	auto t = tau::get(n);
 	if (!is<node, tau::rec_relation>(n)) return false;
 	// If the head is typed we have a functional relation.
-	if (!is_untyped<node>(t[0].get_ba_type()) || t[0].is_term()) {
+	if (!is_untyped_tref<node>(t[0].get()) || t[0].is_term()) {
 		return true;
 	}
-	if (!is_untyped<node>(t[1].get_ba_type()) || t[1].is_term()) {
+	if (!is_untyped_tref<node>(t[1].get()) || t[1].is_term()) {
 		return true;
 	}
 	// Otherwise, we have a predicate relation.
@@ -189,13 +189,11 @@ bool is_functional_fallback(tref n) {
 
 	if (!is<node, tau::ref>(n)) return false;
 	// If the head is typed we have a functional relation.
-	if (!is_untyped<node>(tau::get(n).get_ba_type())
-		|| tau::get(n).is_term()) {
+	if (!is_untyped_tref<node>(n) || tau::get(n).is_term()) {
 		return true;
 	}
 	auto fallback = tt(n) | tau::fp_fallback | tt::first | tt::ref;
-	if (!is_untyped<node>(tau::get(fallback).get_ba_type())
-		|| tau::get(fallback).is_term()) {
+	if (!is_untyped_tref<node>(fallback) || tau::get(fallback).is_term()) {
 		return true;
 	}
 	// Otherwise, we have a predicate callback.
@@ -208,7 +206,7 @@ bool is_functional_ref(tref n, const auto& function_symbols) {
 
 	if (!is<node, tau::ref>(n)) return false;
 	// If the head is typed we have a functional relation.
-	if (!is_untyped<node>(tau::get(n).get_ba_type())) {
+	if (!is_untyped_tref<node>(n)) {
 		return true;
 	}
 	// If the head was previously defined as a function we also have a functional ref
@@ -271,12 +269,10 @@ template<NodeType node>
 std::optional<size_t> get_inferred_type(tref n,	tref canonized,
 		const subtree_map<node, size_t>& types,
 		const type_inference_options& options) {
-	using tau = tree<node>;
-
 	// TODO (LOW) I think this could be simplified
 	if (has_ba_type<node>(n)) {
 		// We check that the type is compatible
-		auto current_type = tau::get(n).get_ba_type();
+		auto current_type = get_effective_ba_type<node>(n);
 		auto inferred_type = types.at(canonized);
 		return unify<node>(current_type, inferred_type);
 	}
@@ -289,8 +285,15 @@ template<NodeType node>
 tref update_tref(tref n, size_t type) {
 	using tau = tree<node>;
 
-	n = retype<node>(n, type);
-	return tau::add_child(n, tau::get(tau::processed));
+	auto t = tau::get(n);
+	auto retyped_val = t.value.ba_retype(type);
+	trefs ch;
+	for (auto c : t.get_children())
+		if (!tau::get(c).is(tau::typed)) ch.push_back(c);
+	tref retyped_n = ch.empty()
+		? tau::get(retyped_val)
+		: tau::get(retyped_val, ch);
+	return tau::add_child(retyped_n, tau::get(tau::processed));
 }
 
 template<NodeType node>
@@ -366,12 +369,11 @@ template<NodeType node>
 tref update_ref(type_scoped_resolver<node>& resolver, tref n,
 		const subtree_map<node, size_t>& types,
 		const type_inference_options& options) {
-	using tau = tree<node>;
 	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return n;
 	// If the variable is not typed
-	if (tau::get(n).get_ba_type() == untyped_type_id<node>()) {
+	if (is_untyped_tref<node>(n)) {
 		// We type it according to the inferred type or default
 		size_t type = (types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
 			? tau_type_id<node>()
@@ -871,7 +873,25 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// i1 : tau = in console
 				// o1 : bv[8] = out console
 				// ...
-				// Process during initial transformations
+				// Extract typed annotation if present and seed resolver with io var type
+				{
+					auto& io_def = tau::get(n);
+					tref io_var_name_child = io_def.first();
+					auto io_var = tau::get(tau::variable,
+						tau::get(tau::io_var, io_var_name_child));
+					auto canonized_io_var = canonize<node>(io_var);
+					for (auto c : io_def.get_children()) {
+						if (tau::get(c).is(tau::typed)) {
+							auto type_id = get_ba_type_id<node>(c);
+							resolver.insert(canonized_io_var);
+							if (auto assigned = resolver.assign(canonized_io_var, type_id);
+									std::holds_alternative<inference_error>(assigned)) {
+								error = std::get<inference_error>(assigned);
+							}
+							break;
+						}
+					}
+				}
 				skip = true; break;
 			}
 			case tau::rec_relation: {
@@ -889,8 +909,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 
 				// We open a new scope with all the vars in the header.
 				auto header_type = has_ba_type<node>(t[0].get())
-					? tau::get(t[0].get()).get_ba_type()
-					: tau::get(t[1].get()).get_ba_type();
+					? get_effective_ba_type<node>(t[0].get())
+					: get_effective_ba_type<node>(t[1].get());
 				auto arguments = get_typeable_type_ids_by_type<node>(t[0].get(), { tau::variable });
 				if (std::holds_alternative<inference_error>(arguments)) {
 					error = std::get<inference_error>(arguments);
@@ -1007,8 +1027,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					// we must deal with it as a rec relation
 					auto fallback = tt(n) | tau::fp_fallback | tt::first | tt::ref;
 					auto header_type = has_ba_type<node>(n)
-						? tau::get(n).get_ba_type()
-						: tau::get(fallback).get_ba_type();
+						? get_effective_ba_type<node>(n)
+						: get_effective_ba_type<node>(fallback);
 					auto arguments = get_typeable_type_ids_by_type<node>(n, { tau::variable });
 					if (std::holds_alternative<inference_error>(arguments)) {
 						error = std::get<inference_error>(arguments);
@@ -1156,7 +1176,17 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		// Depoending on the node type...
 		switch (nt) {
 			case tau::input_def: case tau::output_def: {
-				// Process during initial transformations
+				// Strip the typed structural child (type info already seeded in on_enter)
+				auto t2 = tau::get(n);
+				trefs filtered_ch;
+				for (auto c : t2.get_children())
+					if (!tau::get(c).is(tau::typed)) filtered_ch.push_back(c);
+				if (filtered_ch.size() != t2.get_children().size()) {
+					tref new_n = filtered_ch.empty()
+						? tau::get(t2.value)
+						: tau::get_raw(t2.value, filtered_ch.data(), filtered_ch.size());
+					transformed.insert_or_assign(n, new_n);
+				}
 				break;
 			}
 			case tau::rec_relation: {
