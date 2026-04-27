@@ -798,7 +798,7 @@ size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto
 }
 
 template<typename T>
-size_t hash<term_handle<T>>::operator()(auto& th) const {
+size_t std::hash<idni::tau_lang::term_handle<T>>::operator()(auto& th) const {
 	size_t seed = 0;
 	idni::hash_combine(seed, idni::hash_htree<T>()(th.h), th.inv);
 	return seed;
