@@ -425,6 +425,9 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 			std::getline(std::cin, line);
 			t.unpause();
 			term::disable_getline_mode();
+			if (std::cin.eof() || std::cin.fail()) {
+				std::cin.clear(); break;
+			}
 			if (line == "q" || line == "quit") break;
 		}
 	}
