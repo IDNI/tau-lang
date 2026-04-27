@@ -1,326 +1,250 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "bv_ba-simplification"
+#define LOG_CHANNEL_NAME "bv_ba_simplification"
 
 namespace idni::tau_lang {
 
 using namespace cvc5;
 using namespace idni;
 
-template<typename node>
-bool is_associative_and_commutative(size_t symbol) {
+template<NodeType node>
+typename node::type inverse_of(size_t operation) {
 	using tau = tree<node>;
-	switch (symbol) {
-		case tau::bf_add: return true;
-		case tau::bf_sub: return false;
-		case tau::bf_mul: return true;
-		case tau::bf_div: return false;
-		case tau::bf_mod: return false;
-		case tau::bf_shr: return false;
-		case tau::bf_shl: return false;
-		case tau::bf_nor: return false;
-		case tau::bf_xnor: return false;
-		case tau::bf_nand: return false;
-		default: return false;
-	}
-}
 
-template<typename node>
-size_t get_inv_sym(size_t symbol) {
-	using tau = tree<node>;
-	switch (symbol) {
-		case tau::bf_add: return tau::bf_sub;
-		case tau::bf_mul: return tau::bf_div;
-		default: return symbol;
-	}
-}
-
-template<typename node>
-tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded) {
-	using node_t = node;
-	using tau = tree<node_t>;
-	using tt = tau::traverser;
-
-	// std::cout << "term_tree: " << tau::get(term_tree) << "\n";
-	// We use tau::ctnvar to tag the inverse, since this non-terminal
-	// cannot naturally appear there
-	auto build_add_inv = [](tref n) {
-		return tau::get(tau::bf, tau::get(tau::ctnvar, tau::get(tau::bf_sub), n));
-	};
-	auto is_add_inv = [](tref n) {
-		return (tt(n) | tau::ctnvar | tau::bf_sub).has_value();
-	};
-	auto build_mult_inv = [](tref n) {
-		return tau::get(tau::bf, tau::get(tau::ctnvar, tau::get(tau::bf_div), n));
-	};
-	auto is_inv = [](tref n) {
-		return (tt(n) | tau::ctnvar).has_value();
-	};
-	auto get_inv_arg = [](tref n) {
-		return tau::get(n)[0].second();
-	};
-	auto is_const = [](tref n) -> bool {
-		const tau& c = tau::get(n)[0];
-		return c.is(tau::bf_t) || c.is(tau::bf_f) || c.is_ba_constant();
-	};
-	auto is_inv_const = [&](tref n) -> bool {
-		return tau::get(n).child_is(tau::ctnvar) && is_const(get_inv_arg(n));
-	};
-	auto term_comp = [&](tref l, tref r) -> bool {
-		const tau& tl = tau::get(l);
-		const tau& tr = tau::get(r);
-		// Constants first
-		if (tl.equals_0()) return !tau::get(r).equals_0();
-		if (tr.equals_0()) return false;
-		if (tl.equals_1()) return !tau::get(r).equals_1();
-		if (tr.equals_1()) return false;
-		if (tl.child_is(tau::ba_constant))
-			return !tr.child_is(tau::ba_constant);
-		if (tr.child_is(tau::ba_constant)) return false;
-		// Inverted constants after constants
-		if (is_inv_const(l)) return !is_inv_const(r);
-		if (is_inv_const(r)) return false;
-		// All non-constant ignore inversion
-		if (is_inv(l)) {
-			if (is_inv(r)) return tau::get(get_inv_arg(l)) < tau::get(get_inv_arg(r));
-			else return tau::get(get_inv_arg(l)) < tau::get(r);
-		}
-		if (is_inv(r)) return tau::get(l) < tau::get(get_inv_arg(r));
-		return tau::get(l) < tau::get(r);
-	};
-	auto sym = tau::get(term_tree)[0].get_type();
-	auto inv_sym = get_inv_sym<node>(sym);
-	DBG(assert(is_associative_and_commutative<node>(sym)));
-	// Get terms connected by same symbol
-	auto clauses = get_leaves<node_t>(term_tree, sym);
-	// Use associativity and commutativity to sort
-	std::ranges::sort(clauses, term_comp);
-	// Build resulting constants
-	for (size_t i = 1; i < clauses.size(); ++i) {
-		tref& c1 = clauses[i-1];
-		tref& c2 = clauses[i];
-		if (is_const(c1) && is_const(c2)) {
-			c1 = tau::get(tau::bf, tau::get(sym, c1, c2));
-			excluded.insert(c1);
-			clauses.erase(clauses.begin()+i);
-			--i;
-		} else if (is_inv_const(c1) && is_const(c2)) {
-			tref s = get_inv_arg(c1);
-			c1 = tau::get(tau::bf, tau::get(inv_sym, c2, s));
-			excluded.insert(c1);
-			clauses.erase(clauses.begin()+i);
-			--i;
-		} else if (is_const(c1) && is_inv_const(c2)) {
-			tref s = get_inv_arg(c2);
-			c1 = tau::get(tau::bf, tau::get(inv_sym, c1, s));
-			excluded.insert(c1);
-			clauses.erase(clauses.begin()+i);
-			--i;
-		} else if (is_inv_const(c1) && is_inv_const(c2)) {
-			tref newc = tau::get(tau::bf,
-				tau::get(sym, get_inv_arg(c1), get_inv_arg(c2)));
-			if (is_add_inv(c1)) {
-				c1 = build_add_inv(newc);
-			} else c1 = build_mult_inv(newc);
-			excluded.insert(c1);
-			clauses.erase(clauses.begin()+i);
-			--i;
-		} else if (is_inv(c1) && tau::get(get_inv_arg(c1)) == tau::get(c2)) {
-			tref s = get_inv_arg(c1);
-			c1 = tau::get(tau::bf, tau::get(inv_sym, c2, s));
-			excluded.insert(c1);
-			clauses.erase(clauses.begin()+i);
-			--i;
-		} else if (is_inv(c2) && tau::get(get_inv_arg(c2)) == tau::get(c1)) {
-			tref s = get_inv_arg(c2);
-			c1 = tau::get(tau::bf, tau::get(inv_sym, c1, s));
-			excluded.insert(c1);
-			clauses.erase(clauses.begin()+i);
-			--i;
-		}
-	}
-	// We now sort all inversions to the back in order to optimally resolve the temporary
-	// inverse construction later
-	auto inv_comp = [&](tref l, tref r) -> bool {
-		const tau& tl = tau::get(l);
-		const tau& tr = tau::get(r);
-		// All inversions to back
-		if (is_inv(r) || tr.child_is(inv_sym)) {
-			return !(is_inv(l) || tl.child_is(inv_sym));
-		}
-		return false;
-	};
-	std::ranges::sort(clauses, inv_comp);
-	// Avoid parenthesis in output
-	for (size_t i = 1; i < clauses.size(); ++i) {
-		tref& c1 = clauses[i-1];
-		tref& c2 = clauses[i];
-		if (!is_inv(c1) && is_inv(c2)) {
-			c1 = tau::get(tau::bf, tau::get(sym, c1, c2));
-			excluded.insert(c1);
-			clauses.erase(clauses.begin()+i);
-			--i;
-		}
-	}
-	// Rebuild term_tree
-	tref r = clauses[0];
-	for (size_t i = 1; i < clauses.size(); ++i) {
-		r = tau::get(tau::bf, tau::get(sym, r, clauses[i]));
-		// Do not process this node symbol again
-		excluded.insert(r);
-	}
-	return r;
+	if (operation == tau::bf_add) return tau::bf_sub;
+	if (operation == tau::bf_mul) return tau::bf_div;
+	if (operation == tau::bf_sub) return tau::bf_add;
+	if (operation == tau::bf_div) return tau::bf_mul;
+	return tau::nul; // null is not allowed in a term
 }
 
 template<NodeType node>
-tref bv_ba_custom_simplification(tref term) {
+std::pair<tref, tref> build_simplification(const trefs& arguments, size_t operation, size_t type) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 
-	// TODO: introduce proper symbol for inverse
-	// We use tau::ctnvar to tag the inverse, since this non-terminal
-	// cannot naturally appear there
-	auto build_add_inv = [](tref n) {
-		return tau::get(tau::bf, tau::get(tau::ctnvar, tau::get(tau::bf_sub), n));
-	};
-	auto is_add_inv = [](tref n) {
-		return tt(n) | tau::ctnvar | tau::bf_sub;
-	};
-	auto build_mult_inv = [](tref n) {
-		return tau::get(tau::bf, tau::get(tau::ctnvar, tau::get(tau::bf_div), n));
-	};
-	auto is_mult_inv = [](tref n) {
-		return tt(n) | tau::ctnvar | tau::bf_div;
-	};
-	auto get_inv_arg = [](tref n) {
-		return tau::get(n)[0].second();
-	};
-	// Rename x - y to x + (-y) and x / y to x * (/y)
-	auto inv_rename = [&](tref n) {
-		if (!tau::get(n).is(tau::bf)) return n;
-		const tau& c = tau::get(n)[0];
-		if (c.is(tau::bf_sub))
-			return tau::build_bf_add(c.first(), build_add_inv(c.second()));
-		if (c.is(tau::bf_div))
-			return tau::build_bf_mul(c.first(), build_mult_inv(c.second()));
-		return n;
-	};
+	size_t size = get_bv_width<node>(ba_types<node>::type_tree(type));
+	typename node::constant one_variant{make_bitvector_one(size)};
+	typename node::constant zero_variant{make_bitvector_zero(size)};
+	tref one = build_bf_ba_constant<node>(one_variant, type);
+	tref zero = build_bf_ba_constant<node>(zero_variant, type);
 
-	DBG(LOG_TRACE << "base_ba_term_simplificattion/term" << tau::get(term).tree_to_str() << "\n";)
+	tref ctes = (operation == tau::bf_add) ? zero : one;
+	tref vars = (operation == tau::bf_add) ? zero : one;
 
-	term = pre_order<node>(term).apply_unique(inv_rename);
-	// Push inverses in with rules
-	// -(X + Y) == -X + -Y and --X == X and
-	// (X * Y)^(-1) == X^(-1) * Y^(-1) and X^(-1)^(-1) = X
-	auto push_inv_in = [&](tref n) {
-		if (!tau::get(n).is(tau::bf)) return n;
-		// Treat additive inverse
-		if (is_add_inv(n)) {
-			const tau& inv_arg = tau::get(get_inv_arg(n));
-			if (inv_arg.child_is(tau::bf_add)) {
-				tref c1 = inv_arg[0].first();
-				tref c2 = inv_arg[0].second();
+	for (const tref& op : arguments) {
+		auto nt = tau::get(op).get_type();
+		switch (nt) {
+			case tau::variable:
+				vars = tau::get(tau::bf, tau::get(operation, vars, tau::get(tau::bf, op)));
+				break;
+			case tau::ba_constant: case tau::bf_t: case tau::bf_f:
+				ctes = tau::get(tau::bf, tau::get(operation, ctes, tau::get(tau::bf, op)));
+				break;
+			default: break;
+		}
+	}
+	return {vars, ctes};
+}
 
-				if (is_add_inv(c1)) c1 = get_inv_arg(c1);
-				else c1 = build_add_inv(c1);
-				if (is_add_inv(c2)) c2 = get_inv_arg(c2);
-				else c2 = build_add_inv(c2);
+template<NodeType node>
+tref build_simplification(const trefs& arguments, const trefs& inverses, size_t operation, size_t type) {
+	using tau = tree<node>;
 
-				return tau::build_bf_add(c1, c2);
-			} else if (is_add_inv(inv_arg.get())) {
-				return get_inv_arg(inv_arg.get());
+	// removing commons elements from arguments and inverses
+	trefs args = arguments;
+	trefs invs = inverses;
+	for (const tref& arg : arguments) {
+		auto it = std::find(invs.begin(), invs.end(), arg);
+		if (it != invs.end()) {
+			invs.erase(it);
+			args.erase(std::find(args.begin(), args.end(), arg));
+		}
+	}
+
+	if (invs.empty()) {
+		auto [vars, ctes] = build_simplification<node>(args, operation, type);
+		if (!vars && !ctes) return _0<node>(type);
+		if (!vars) return ctes;
+		if (!ctes) return vars;
+		return tau::get(tau::bf, tau::get(operation, vars, ctes));
+	}
+
+	if (args.empty()) {
+		auto [vars, ctes] = build_simplification<node>(invs, operation, type);
+		if (!vars && !ctes) return _0<node>(type);
+		if (!vars) return tau::get(tau::bf, tau::get(inverse_of<node>(operation), _0<node>(type), ctes));
+		if (!ctes) return tau::get(tau::bf, tau::get(inverse_of<node>(operation), _0<node>(type), vars));
+		return tau::get(tau::bf,
+			tau::get(inverse_of<node>(operation),
+				_0<node>(type),
+				tau::get(tau::bf,
+					tau::get(operation, vars, ctes))));
+	}
+
+	auto [invs_vars, invs_ctes] = build_simplification<node>(invs, operation, type);
+	auto [args_vars, args_ctes] = build_simplification<node>(args, operation, type);
+
+	return tau::get(tau::bf,
+		tau::get(operation,
+			tau::get(tau::bf,
+				tau::get(inverse_of<node>(operation), args_vars, invs_vars)),
+			tau::get(tau::bf,
+				tau::get(inverse_of<node>(operation), args_ctes, invs_ctes))));
+}
+
+template<NodeType node>
+void apply_block_operation(std::vector<std::pair<trefs, trefs>>& to_simplify, size_t inverse) {
+
+#ifdef DEBUG
+	using tau = tree<node>;
+#endif // DEBUG
+
+	auto [right_args, right_invs] = to_simplify.back();	to_simplify.pop_back();
+
+	auto from_args = inverse ? right_invs : right_args;
+	auto from_invs = inverse ? right_args : right_invs;
+	//auto [left_args, left_invs] = to_simplify.back();
+
+	to_simplify.back().first.insert(to_simplify.back().first.end(), from_args.begin(), from_args.end());
+	to_simplify.back().second.insert(to_simplify.back().second.end(), from_invs.begin(), from_invs.end());
+
+#ifdef DEBUG
+	LOG_TRACE << "apply_block_operation/left_args: ";
+	for (const auto& arg : to_simplify.back().first) LOG_TRACE << "\t" << tau::get(arg).to_str() << " ";
+	LOG_TRACE << "\n";
+	LOG_TRACE << "apply_block_operation/left_invs: ";
+	for (const auto& inv : to_simplify.back().second) LOG_TRACE << "\t" << tau::get(inv).to_str() << " ";
+	LOG_TRACE << "\n";
+#endif // DEBUG
+}
+
+template<NodeType node>
+void end_block(std::vector<std::pair<trefs, trefs>>& to_simplify,
+		subtree_map<node, tref>& changes, tref last_operation, size_t operation, size_t type) {
+	auto [arguments, inverses] = to_simplify.back(); to_simplify.pop_back();
+	changes[last_operation] = build_simplification<node>(arguments, inverses, operation, type);
+
+#ifdef DEBUG
+	using tau = tree<node>;
+
+	LOG_TRACE << "end_block/operation: " << LOG_NT(operation) << "\n";
+	LOG_TRACE << "end_block/arguments: ";
+	for (const auto& arg : arguments) LOG_TRACE << "\t" <<tau::get(arg).to_str() << " ";
+	LOG_TRACE << "\n";
+	LOG_TRACE << "end_block/inverses: ";
+	for (const auto& inv : inverses) LOG_TRACE << "\t" <<tau::get(inv).to_str() << " ";
+	LOG_TRACE << "\n";
+	LOG_TRACE << "end_block/simplification: " << tau::get(changes[last_operation]).tree_to_str() << "\n";
+#endif // DEBUG
+}
+
+template<NodeType node>
+void end_block_and_clear(std::vector<std::pair<trefs, trefs>>& to_simplify, subtree_map<node, tref>& changes,
+		tref last_operation, size_t operation, size_t type) {
+	end_block(to_simplify, changes, last_operation, operation, type);
+	to_simplify.clear();
+}
+
+template<NodeType node>
+subtree_map<node, tref> simplify_blocks(const tref& n) {
+	using tau = tree<node>;
+
+	subtree_map<node, tref> changes;
+	std::vector<std::pair<trefs, trefs>> to_simplify;
+	size_t operation =  tau::nul;
+	bool building_block = false;
+	tref last_operation = nullptr;
+	size_t last_blosk_index = 0;
+	auto type = tau::get(n).get_ba_type();
+
+	auto f = [&](tref n) -> bool {
+		auto nt = tau::get(n).get_type();
+
+		switch(nt) {
+			case tau::variable: case tau::ba_constant: case tau::bf_t: case tau::bf_f: {
+
+				DBG(LOG_TRACE << "simplify_block/f/" << LOG_NT(nt) << "/n: " << tau::get(n).to_str() << "\n";)
+
+				return to_simplify.emplace_back(trefs{n}, trefs{}), true;
 			}
-		}
-		// Treat multiplicative inverse
-		if (is_mult_inv(n)) {
-			const tau& inv_arg = tau::get(get_inv_arg(n));
-			if (inv_arg.child_is(tau::bf_mul)) {
-				tref c1 = inv_arg[0].first();
-				tref c2 = inv_arg[0].second();
+			case tau::bf_add: case tau::bf_mul:
+			case tau::bf_sub: case tau::bf_div: {
+				auto inverse = (nt == tau::bf_sub || nt == tau::bf_div);
+				if (!building_block) {
+					operation = inverse ? inverse_of<node>(nt) : nt;
+					building_block = true;
 
-				if (is_mult_inv(c1)) c1 = get_inv_arg(c1);
-				else c1 = build_mult_inv(c1);
-				if (is_mult_inv(c2)) c2 = get_inv_arg(c2);
-				else c2 = build_mult_inv(c2);
-
-				return tau::build_bf_mul(c1, c2);
-			} else if (is_add_inv(inv_arg.get())) {
-				return get_inv_arg(inv_arg.get());
-			}
-		}
-		return n;
-	};
-	term = pre_order<node>(term).apply_unique(push_inv_in);
-
-	DBG(LOG_TRACE << "base_ba_term_simplificattion/push_inv_in" << tau::get(term).tree_to_str() << "\n";)
-
-	// Simplify symbols
-	subtree_unordered_set<node> excluded;
-	auto simplify = [&excluded](tref n) {
-		if (!tau::get(n).is(tau::bf)) return n;
-		if (excluded.contains(n)) return n;
-		// Get current symbol
-		const tau& c = tau::get(n)[0];
-		// Simplify associative and commutative symbol
-		if (is_associative_and_commutative<node>(c.get_type())) {
-			return canonize_associative_commutative_symbol<node>(n, excluded);
-		}
-		return n;
-	};
-	term = pre_order<node>(term).apply_unique(simplify);
-
-	DBG(LOG_TRACE << "base_ba_term_simplificattion/simplify" << tau::get(term).tree_to_str() << "\n";)
-
-	// Rename inverses back to available symbols
-	auto rename_back = [&](tref n) {
-		if (!tau::get(n).is(tau::bf)) return n;
-		const tau& c = tau::get(n)[0];
-		if (c.is(tau::bf_add)) {
-			// Check children for inverses
-			if (is_add_inv(c.second())) {
-				if (is_add_inv(c.first())) {
-					return tau::build_bf_sub(
-						tau::build_bf_sub(
-							tau::_0(c.get_ba_type()),
-							get_inv_arg(c.first())),
-							get_inv_arg(c.second()));
+					DBG(LOG_TRACE << "simplify_block/f/" << LOG_NT(nt) << "/operation: " << LOG_NT(operation) << "\n";)
+					DBG(LOG_TRACE << "simplify_block/f/" << LOG_NT(nt) << "/building_block: " << building_block << "\n";)
 				}
-				return tau::build_bf_sub(c.first(), get_inv_arg(c.second()));
-			}
-			if (is_add_inv(c.first())) {
-				// Here second argument is not inverse, hence, swap
-				return tau::build_bf_sub(c.second(), get_inv_arg(c.first()));
-			}
-			return n;
-		} else if (c.is(tau::bf_mul)) {
-			// Check children for inverses
-			if (is_mult_inv(c.second())) {
-				if (is_mult_inv(c.first())) {
-					const size_t width = get_bv_width<node>(c.get_ba_type_tree());
-					auto const_1 = tau::build_bf_ba_constant(
-						make_bitvector_value(1, width), c.get_ba_type());
-					return tau::build_bf_div(
-						tau::build_bf_div(
-							const_1,
-							get_inv_arg(c.first())),
-							get_inv_arg(c.second()));
+
+				DBG(LOG_TRACE << "simplify_block/f/n/" << LOG_NT(nt) << ": " << tau::get(n).to_str() << "\n";)
+
+				if (operation == nt || inverse_of<node>(operation) == nt) {
+					apply_block_operation<node>(to_simplify, inverse);
+					return last_operation = n, last_blosk_index = to_simplify.size() - 1, true;
+				// we have to constants or variables separated to be procexsed
+				// and we could change to a new block with a new operation
+				} else if ((to_simplify.size() - 1) - last_blosk_index >= 2) {
+					operation = inverse ? inverse_of<node>(nt) : nt;
+					apply_block_operation<node>(to_simplify, inverse);
+					return last_operation = n, last_blosk_index = to_simplify.size() - 1, true;
 				}
-				return tau::build_bf_div(c.first(), get_inv_arg(c.second()));
+				// we have no other choice to end the current block and start
+				// searching for a block to simplify again
+				end_block<node>(to_simplify, changes, last_operation, operation, type);
+				return building_block = false, true;
 			}
-			if (is_mult_inv(c.first())) {
-				// Here second argument is not inverse, hence, swap
-				return tau::build_bf_div(c.second(), get_inv_arg(c.first()));
+			case tau::bf_shr: case tau::bf_shl: case tau::bf_mod: case tau::bf_nor:
+			case tau::bf_xnor: case tau::bf_nand: case tau::bf_or: case tau::bf_xor:
+			case tau::bf_and: case tau::bf_neg: {
+				if (!building_block) return true;
+				end_block_and_clear<node>(to_simplify, changes, last_operation, operation, type);
+				return building_block = false, last_operation = nullptr, last_blosk_index = 0, operation = tau::nul, true;
 			}
-			return n;
+			default: return true;
 		}
-		return n;
 	};
-	term = pre_order<node>(term).apply_unique(rename_back);
 
-	DBG(LOG_TRACE << "base_ba_term_simplificattion/rename_back" << tau::get(term).tree_to_str() << "\n";)
+	post_order<node>(n).search(f);
+	if (building_block) end_block<node>(to_simplify, changes, last_operation, operation, type);
+	return changes;
+}
 
-	return term;
+template<NodeType node>
+tref bv_ba_custom_simplification(const tref term) {
+	tref current, next = term;
+	DBG(int pass_count = 0;)
+	std::unordered_set<tref> visited;
+
+	do {
+		current = next;
+		auto changes = simplify_blocks<node>(current);
+		next = rewriter::replace<node>(current, changes);
+		visited.insert(current);
+
+		DBG(pass_count++;)
+
+#ifdef DEBUG
+		LOG_TRACE << "bv_ba_custom_simplification/pass: " << pass_count << "\n";
+		LOG_TRACE << "bv_ba_custom_simplification/current: " << LOG_FM(current) << "\n";
+#endif // DEBUG
+
+	} while (visited.find(current) == visited.end());
+
+#ifdef DEBUG
+	LOG_TRACE << "bv_ba_custom_simplification/term: " << LOG_FM(term) << "\n";
+	LOG_TRACE << "bv_ba_custom_simplification/final: " << LOG_FM(current) << "\n";
+#endif // DEBUG
+
+	// Error reporting for undefined operations (e.g., division by zero)
+	// This is a placeholder: in a real implementation, you would walk the tree and check for such cases
+	// For now, just log a warning if the result is nullptr
+	if (current == nullptr) {
+		LOG_ERROR << "bv_ba_custom_simplification: result is nullptr (possible undefined operation such as division by zero)\n";
+	}
+	return current;
 }
 
 } // namespace idni::tau_lang

@@ -12,12 +12,16 @@ namespace idni::tau_lang {
 using bv = cvc5::Term;
 
 static cvc5::TermManager cvc5_term_manager;
-static size_t default_bv_size = 16;
 
 size_t get_cvc5_size(const cvc5::Term& b);
 
-// -----------------------------------------------------------------------------
+// Forward declaration — defined in bv_ba.h; declared here for use in lambdas
+// inside templates where two-phase name lookup applies.
+inline cvc5::Term normalize_bv(const cvc5::Term& fm);
+
+//
 // Basic Boolean algebra operatiors
+//
 
 inline cvc5::Term operator|(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term operator&(const cvc5::Term& lhs, const cvc5::Term& rhs);
@@ -31,10 +35,9 @@ inline cvc5::Term operator%(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term operator<<(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term operator>>(const cvc5::Term& lhs, const cvc5::Term& rhs);
 
-
-
-// -----------------------------------------------------------------------------
+//
 // Builders
+//
 
 inline cvc5::Term make_term_not(const cvc5::Term& operand);
 inline cvc5::Term make_term_and(const cvc5::Term& lhs, const cvc5::Term& rhs);
@@ -68,14 +71,14 @@ inline cvc5::Term make_bitvector_shl(const cvc5::Term& lhs, const cvc5::Term& rh
 inline cvc5::Term make_bitvector_shr(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 	const size_t base);
-inline cvc5::Term make_bitvector_bottom_elem(const size_t size = default_bv_size);
-inline cvc5::Term make_bitvector_top_elem(const size_t size = default_bv_size);
-inline cvc5::Term make_bitvector_value(size_t value, size_t size = default_bv_size);
+inline cvc5::Term make_bitvector_bottom_elem(size_t size);
+inline cvc5::Term make_bitvector_top_elem(size_t size);
+inline cvc5::Term make_bitvector_value(size_t value, size_t size);
+inline cvc5::Term make_bitvector_value(size_t size, const std::string& value, const size_t base = 2);
 inline cvc5::Term make_bitvector_true();
 inline cvc5::Term make_bitvector_false();
-
-// -----------------------------------------------------------------------------
-// Queries
+inline cvc5::Term make_bitvector_zero(size_t size);
+inline cvc5::Term make_bitvector_one(size_t size);
 
 } // namespace idni::tau_lang
 

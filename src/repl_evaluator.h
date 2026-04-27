@@ -47,7 +47,8 @@
 namespace idni::tau_lang {
 
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
-	colors_opt, charvar_opt, highlighting_opt, indenting_opt, debug_opt };
+	colors_opt, charvar_opt, blasting_opt, highlighting_opt, indenting_opt,
+	print_benchmarks_opt, debug_opt };
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -67,7 +68,9 @@ struct repl_evaluator {
 		bool print_history_store = true;
 		bool error_quits         = false;
 		bool charvar             = true;
+		bool blasting            = true;
 		bool repl_running 	 = true;
+		bool print_benchmarks    = true;
 #ifdef DEBUG
 		bool debug_repl          = true;
 		boost::log::trivial::severity_level
@@ -147,6 +150,8 @@ private:
 	// returns if a subtree of a node contains a nonterminal
 	bool update_charvar(bool value);
 
+	bool update_blasting(bool value);
+
 	// history
 	history_ref history_retrieve(const tt& n, bool silent = false) const;
 	void history_store(tref value);
@@ -155,6 +160,7 @@ private:
 	std::optional<size_t> get_history_index(const tt& n, const size_t size,
 						bool silent = false) const;
 
+	tref get_applied(tref arg) const;
 	// get argument and type from input or from history
 	std::optional<std::pair<size_t, tref>> get_type_and_arg(
 		const tt& n) const;
@@ -166,8 +172,13 @@ private:
 	// get argument from input or from history (dont care the type)
 	tref get_any(tref arg) const;
 
+	std::ostream& benchmarks(measuring& m) const;
+	std::ostream& benchmarks(measuring& m, idni::measures::timer& t) const;
+
 	std::vector<history> H;
 	options opt{};
+	trefs rr_defs;
+	trefs io_defs;
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 	bool error = false;

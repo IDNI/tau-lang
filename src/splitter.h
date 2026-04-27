@@ -5,7 +5,6 @@
 
 #include "splitter_types.h"
 #include "satisfiability.h"
-#include "splitter_types.h"
 
 namespace idni::tau_lang {
 

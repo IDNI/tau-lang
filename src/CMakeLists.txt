@@ -15,6 +15,7 @@ set(TAU_HEADERS
 	boolean_algebras/bv_ba.h
 	heuristics/bv_ba_simplification.h		# heuristic for simplifying boolean formulas with bitvectors
 	heuristics/ex_subs_based_elimination.h  # heuristic for eliminating existential quantifiers based on substitution
+	heuristics/bv_predicate_blasting.h      # heuristic for predicate blasting bitvector formulas
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
     tau_bdd.h          # BDD library over tau trees
@@ -35,7 +36,7 @@ set(TAU_HEADERS
 	splitter.h
 	solver.h
 	ba_types_inference.h
-	runtime.h
+	base_ba_dispatcher.h
 	interpreter.h
 	api.h
 	union_find.h       # union find data structure
@@ -185,7 +186,7 @@ endif(TAU_BUILD_SHARED_EXECUTABLE)
 # install
 #
 
-set(BUILD_TARGETS ${TAU_OBJECT_LIB_NAME})
+set(BUILD_TARGETS "")
 if(BUILD_SHARED_LIBRARY)
 	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_SHARED_LIB_NAME})
 endif()

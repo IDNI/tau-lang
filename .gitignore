@@ -31,6 +31,9 @@
 *.out
 *.app
 
+# whitelist benchmark stdout *.out logs
+!tests/benchmark/**/*.out
+
 # IDE files
 .idea
 .vscode
@@ -86,3 +89,6 @@ __pycache__/
 *.py[codz]
 *$py.class
 .pytest_cache/
+.github
+.claude
+.worktrees

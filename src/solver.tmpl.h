@@ -1049,10 +1049,33 @@ void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments, tref
 	var_assignments.emplace(var, term);
 }
 
+template <NodeType node>
+bool has_bv_arithmetic(tref f) {
+	using tau = tree<node>;
+	return tau::get(f).find_top([](tref n) -> bool {
+		return is<node, tau::bf_add>(n) || is<node, tau::bf_sub>(n)
+			|| is<node, tau::bf_mul>(n) || is<node, tau::bf_div>(n)
+			|| is<node, tau::bf_mod>(n) || is<node, tau::bf_shl>(n)
+			|| is<node, tau::bf_shr>(n) || is<node, tau::bf_nand>(n)
+			|| is<node, tau::bf_nor>(n)  || is<node, tau::bf_xnor>(n);
+	}) != nullptr;
+}
+
+template <NodeType node>
+bool bv_conjs_only_pure_equality(const subtree_set<node>& conjs) {
+	using tau = tree<node>;
+	for (tref conj : conjs) {
+		if (!tau::get(conj).child_is(tau::bf_eq)) return false;
+		if (has_bv_arithmetic<node>(conj)) return false;
+	}
+	return !conjs.empty();
+}
+
 // entry point for the solver
 template <NodeType node>
 std::optional<solution<node>> solve(tref form, solver_options options, bool& error) {
 	using tau = tree<node>;
+	using tt = tau::traverser;
 	if (tau::get(form).equals_T()) return { solution<node>() };
 	if (tau::get(form).equals_F()) return {};
 
@@ -1147,12 +1170,34 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			tref type_tree = ba_types<node>::type_tree(type);
 			op.type_id = get_ba_type_id<node>(type_tree);
 			if (is_bv_type_family<node>(type_tree)) {
-				if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
-					bv_sat = true;
-					for (const auto& [var, value]: bv_solution.value()) {
-						clause_solution[var] = value;
+				if (bv_conjs_only_pure_equality<node>(conjs)) {
+					// BV equalities with no arithmetic: treat as Boolean algebra via lgrs
+					std::optional<equality> squeezed;
+					for (tref raw_eq : conjs) {
+						tref conj = norm_equation<node>(raw_eq);
+						conj = apply_all_xor_def<node>(conj);
+						if (!squeezed.has_value()) {
+							squeezed = conj;
+						} else {
+							tref l = tt(squeezed.value()) | tau::bf_eq | tau::bf | tt::ref;
+							tref r = tt(conj)             | tau::bf_eq | tau::bf | tt::ref;
+							squeezed = build_bf_eq_0<node>((tau::get(l) | tau::get(r)).get());
+						}
 					}
-				} else skip = true; // if we cannot solve bv part, skip this clause
+					DBG(assert(squeezed.has_value());)
+					if (auto lgrs_sol = lgrs<node>(squeezed.value())) {
+						bv_sat = true;
+						for (const auto& [var, value] : lgrs_sol.value())
+							clause_solution[var] = value;
+					} else skip = true;
+				} else {
+					if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
+						bv_sat = true;
+						for (const auto& [var, value]: bv_solution.value()) {
+							clause_solution[var] = value;
+						}
+					} else skip = true; // if we cannot solve bv part, skip this clause
+				}
 			} else {
 				op.splitter_one = node::ba::splitter_one(type_tree);
 				if (auto solution = solve<node>(conjs, op)) {

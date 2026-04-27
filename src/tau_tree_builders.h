@@ -134,6 +134,9 @@ template <NodeType node>
 tref build_bf_eq_0(tref l);
 
 template <NodeType node>
+tref build_bf_eq_1(tref l);
+
+template <NodeType node>
 tref build_bf_neq(tref l, tref r);
 
 template <NodeType node>
@@ -268,10 +271,16 @@ template <NodeType node>
 tref build_variable(const std::string& name, size_t type_id);
 
 template <NodeType node>
+tref build_variable(size_t type_id);
+
+template <NodeType node>
 tref build_bf_variable(tref var_name_node, size_t type_id);
 
 template <NodeType node>
 tref build_bf_variable(const std::string& name, size_t type_id);
+
+template <NodeType node>
+tref build_bf_variable(size_t type_id);
 
 template <NodeType node>
 tref build_in_var(tref var_name_node, size_t type_id);
@@ -335,6 +344,64 @@ tref build_out_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id
 
 template <NodeType node>
 tref build_spec(const rr<node>& nso_rr);
+
+// -----------------------------------------------------------------------------
+// reference and symbol builders
+
+template<NodeType node>
+tref build_sym(size_t sid);
+
+template<NodeType node>
+tref build_sym(const std::string& sym_name);
+
+template<NodeType node>
+tref build_ref_offsets(const trefs& offsets);
+
+template<NodeType node>
+tref build_ref_offsets(const std::string& offset);
+
+template<NodeType node>
+tref build_ref_offsets(const std::vector<std::string>& offsets);
+
+template<NodeType node>
+tref build_ref_shift_offset(tref var, size_t shift);
+
+template<NodeType node>
+tref build_ref_shift_offset(const std::string& var_name, size_t type_id, size_t shift);
+
+template<NodeType node>
+tref build_ref_args(const trefs& args);
+
+template<NodeType node>
+tref build_ref_args(const std::vector<std::string>& arg_names, size_t type_id);
+
+template<NodeType node>
+tref build_ref(tref sym, const trefs& args);
+
+template<NodeType node>
+tref build_ref(const std::string& sym_name, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(tref sym, const trefs& offsets, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, const trefs& offsets, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, const std::string offset, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, size_t offset, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(tref sym, tref offset, size_t shift, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, tref offset, size_t shift, const trefs& args);
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, const std::string& offset, size_t shift, const trefs& args);
+
 
 } // namespace idni::tau_lang
 

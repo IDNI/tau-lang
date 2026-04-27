@@ -23,7 +23,7 @@ inline tref base_ba_term_simplification(tref term, const Bool&) {
 }
 
 template<>
-struct nso_factory<bv, Bool> {
+struct base_ba_dispatcher<bv, Bool> {
 	using node_t = node<bv, Bool>;
 	using tau = tree<node_t>;
 
@@ -89,7 +89,7 @@ struct nso_factory<bv, Bool> {
 };
 
 template<>
-struct nso_factory<bv, sbf_ba, Bool> {
+struct base_ba_dispatcher<bv, sbf_ba, Bool> {
 	using node_t = node<bv, sbf_ba, Bool>;
 	using tau = tree<node_t>;
 

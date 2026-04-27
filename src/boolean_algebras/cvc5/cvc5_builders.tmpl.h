@@ -136,8 +136,12 @@ inline cvc5::Term make_bitvector_top_elem(const size_t size) {
 	return cvc5_term_manager.mkBitVector(size, std::string(size, '1'), 2);
 }
 
-inline cvc5::Term make_bitvector_value(const size_t value, const size_t size) {
+inline cvc5::Term make_bitvector_value(const size_t size, const size_t value) {
 	return cvc5_term_manager.mkBitVector(size, value);
+}
+
+inline cvc5::Term make_bitvector_value(const size_t size, const std::string& value, const size_t base) {
+	return cvc5_term_manager.mkBitVector(size, value, base);
 }
 
 inline cvc5::Term make_bitvector_true() {
@@ -146,6 +150,14 @@ inline cvc5::Term make_bitvector_true() {
 
 inline cvc5::Term make_bitvector_false() {
 	return cvc5_term_manager.mkBoolean(false);
+}
+
+inline cvc5::Term make_bitvector_zero(const size_t size) {
+	return cvc5_term_manager.mkBitVector(size, 1);
+}
+
+inline cvc5::Term make_bitvector_one(const size_t size) {
+	return cvc5_term_manager.mkBitVector(size, 1);
 }
 
 } // namespace idni::tau_lang

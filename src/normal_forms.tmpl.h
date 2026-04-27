@@ -3,7 +3,7 @@
 #include "normal_forms.h"
 #include "tau_bdd.h"
 #include "union_find_with_sets.h"
-
+#include "heuristics/bv_predicate_blasting.h"
 namespace idni::tau_lang {
 
 #undef LOG_CHANNEL_NAME
@@ -3834,15 +3834,19 @@ using tau = tree<node>;
 		if (is_child_quantifier<node>(n)) {
 			// Check if the formula is closed and proceed to eliminate
 			// the quantifier
-			if (is_bv_type_family<node>(tau::get(tau::trim2(n)).get_ba_type())) {
-				if (const trefs& free_vars = get_free_vars<node>(n);
-					free_vars.empty()) {
-					// By assumption quantifier is pushed in all the way
-					// Closed bv formula, simplify to T/F
-					if (is_bv_formula_sat<node>(n))
-						return tau::_T();
-					else return tau::_F();
-				} else excluded.insert(n);
+			tref var = tau::trim2(n);
+			if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
+				if (bv_blasting)
+					if (auto blasted = bv_predicate_blasting<node>(n); blasted && blasted != n)
+						return blasted;
+			if (const trefs& free_vars = get_free_vars<node>(n);
+				free_vars.empty()) {
+				// By assumption quantifier is pushed in all the way
+				// Closed bv formula, simplify to T/F
+				if (is_bv_formula_sat<node>(n))
+					return tau::_T();
+				else return tau::_F();
+			} else excluded.insert(n);
 			}
 		}
 		return n;

@@ -131,24 +131,6 @@ const typename tree<node>::template extractor<size_t>
 
 template <NodeType node>
 const typename tree<node>::template extractor<size_t>
-	tree<node>::traverser::bv_constant_id =
-		typename tree<node>::template extractor<size_t>(
-			[](const traverser& t) -> size_t {
-				if (!t) return 0;
-				return t.value_tree().get_bv_constant_id();
-			});
-
-template <NodeType node>
-const typename tree<node>::template extractor<typename tree<node>::constant>
-	tree<node>::traverser::bv_constant =
-		typename tree<node>::template extractor<constant>(
-			[](const traverser& t) -> constant {
-				return ba_constants<node>::get(
-					t.value_tree().get_bv_constant_id());
-			});
-
-template <NodeType node>
-const typename tree<node>::template extractor<size_t>
 	tree<node>::traverser::ba_constant_id =
 		typename tree<node>::template extractor<size_t>(
 			[](const traverser& t) -> size_t {
@@ -256,10 +238,9 @@ template <NodeType node>
 const typename tree<node>::template extractor<tref_range<node>>
 	tree<node>::traverser::children_range =
 		typename tree<node>::template extractor<tref_range<node>>(
-			[](const traverser& t) {
-				if (!t) return traverser();
-				return traverser(t.value_tree()
-						.children());
+			[](const traverser& t) -> tref_range<node> {
+				if (!t) return tref_range<node>(nullptr);
+				return t.value_tree().children();
 			});
 
 template <NodeType node>
@@ -267,9 +248,8 @@ const typename tree<node>::template extractor<tree_range<tree<node>>>
 	tree<node>::traverser::children_trees_range =
 		typename tree<node>::template extractor<tree_range<tree<node>>>(
 			[](const traverser& t) {
-				if (!t) return traverser();
-				return traverser(t.value_tree()
-						.children_trees());
+				if (!t) return tree_range<tree<node>>(nullptr);
+				return t.value_tree().children_trees();
 			});
 
 template <NodeType node>

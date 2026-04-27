@@ -447,6 +447,14 @@ tref build_bf_eq_0(tref l) {
 	return tau::get(tau::wff, tau::get(tau::bf_eq, l, _0<node>(tau::get(l).get_ba_type())));
 }
 
+template <NodeType node>
+tref build_bf_eq_1(tref l) {
+	DBG(assert(l != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::bf));)
+	return tau::get(tau::wff, tau::get(tau::bf_eq, l, _1<node>(tau::get(l).get_ba_type())));
+}
+
 template<NodeType node>
 tref build_bf_neq(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
@@ -778,15 +786,32 @@ tref build_variable(const std::string& name, size_t type_id) {
 }
 
 template <NodeType node>
+tref build_variable(size_t type_id) {
+	using tau = tree<node>;
+
+	static size_t counter = 0;
+	auto name = "_X" + std::to_string(counter++);
+	return tau::get_typed(tau::variable, build_var_name<node>(name), type_id);
+}
+
+template <NodeType node>
 tref build_bf_variable(tref var_name_node, size_t type_id) {
 	using tau = tree<node>;
-	return tau::get(tau::bf, build_variable<node>(var_name_node, type_id));
+	return tau::get_typed(tau::bf, build_variable<node>(var_name_node, type_id), type_id);
 }
 
 template <NodeType node>
 tref build_bf_variable(const std::string& name, size_t type_id) {
 	using tau = tree<node>;
-	return tau::get(tau::bf, build_variable<node>(name, type_id));
+
+	return tau::get_typed(tau::bf, build_variable<node>(name, type_id), type_id);
+}
+
+template <NodeType node>
+tref build_bf_variable(size_t type_id) {
+	using tau = tree<node>;
+
+	return tau::get_typed(tau::bf, build_variable<node>(type_id), type_id);
 }
 
 template <NodeType node>
@@ -850,13 +875,13 @@ tref build_in_var_at_t_minus(tref var_name_node, size_t shift, size_t type_id, s
 template <NodeType node>
 tref build_in_var_at_t_minus(const std::string& var_name, size_t shift, size_t type_id, std::string t) {
 	return build_in_var_at_t_minus<node>(
-		build_var_name<node>(var_name), shift, t, type_id);
+		build_var_name<node>(var_name), shift, type_id, t);
 }
 
 template <NodeType node>
 tref build_in_var_at_t_minus_indexed(size_t index, size_t shift, size_t type_id, std::string t) {
 	return build_in_var_at_t_minus<node>(
-		build_var_name_indexed<node>(index), shift, t, type_id);
+		build_var_name_indexed<node>(index), shift, type_id, t);
 }
 
 template <NodeType node>
@@ -939,6 +964,137 @@ tref build_spec(const rr<node>& nso_rr) {
 	return tau::get(tau::spec,
 		tau::get(tau::definitions, rels),
 		tau::get(tau::main, nso_rr.main->get()));
+}
+
+// -----------------------------------------------------------------------------
+// reference and symbol builders
+
+template<NodeType node>
+tref build_sym(size_t sid) {
+	using tau = tree<node>;
+
+	return tau::get(node(tau::sym, sid));
+}
+
+template<NodeType node>
+tref build_sym(const std::string& sym_name) {
+	using tau = tree<node>;
+
+	return tau::get(tau::sym, sym_name);
+}
+
+template<NodeType node>
+tref build_offsets(const trefs& offsets) {
+	using tau = tree<node>;
+
+	trefs offset_refs;
+	for (const auto& offset : offsets)
+		offset_refs.push_back(tau::get(tau::offset, offset));
+	return tau::get(tau::offsets, offset_refs);
+}
+
+template<NodeType node>
+tref build_offsets(const std::string& offset) {
+	return build_ref_offsets<node>({ build_variable<node>(offset) });
+}
+
+template<NodeType node>
+tref build_offsets(const std::vector<std::string>& offsets) {
+	trefs vars;
+	for (const auto& var : offsets) {
+		vars.push_back(build_variable<node>(var));
+	}
+	return build_offsets<node>(vars);
+}
+
+template<NodeType node>
+tref build_shift(tref var, size_t shift) {
+	using tau = tree<node>;
+
+	return tau::get(tau::shift, var, tau::get_num(shift));
+}
+
+template<NodeType node>
+tref build_shift(std::string var_name, size_t type_id, size_t shift) {
+	return build_shift<node>(build_variable<node>(var_name, type_id), shift);
+}
+
+template<NodeType node>
+tref build_ref_args(const trefs& args) {
+	using tau = tree<node>;
+
+	trefs ref_args;
+	for (auto arg: args) ref_args.push_back(tau::get(tau::ref_arg, arg));
+	return tau::get(tau::ref_args, ref_args);
+}
+
+template<NodeType node>
+tref build_ref_args(const std::vector<std::string>& args, size_t type_id) {
+	trefs vars;
+	for (auto arg: args) vars.push_back(build_bf_variable<node>(arg, type_id));
+	return build_ref_args<node>(vars);
+}
+
+template<NodeType node>
+tref build_ref(tref sym, const trefs& args) {
+	using tau = tree<node>;
+
+	trefs children;
+	children.push_back(sym);
+	children.push_back(build_ref_args<node>(args));
+	return tau::get(tau::ref, children);
+}
+
+template<NodeType node>
+tref build_ref(const std::string& sym_name, const trefs& args) {
+	return build_ref<node>(build_sym<node>(sym_name), args);
+}
+
+template<NodeType node>
+tref build_rr_ref(tref sym, const trefs& offsets, const trefs& args) {
+	using tau = tree<node>;
+
+	trefs children;
+	children.push_back(sym);
+	if (!offsets.empty()) children.push_back(build_offsets<node>(offsets));
+	children.push_back(build_ref_args<node>(args));
+	return tau::get(tau::ref, children);
+}
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, const trefs& offsets, const trefs& args) {
+	return build_rr_ref<node>(build_sym<node>(sym_name), offsets, args);
+}
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, const std::string offset, const trefs& args) {
+	auto var = build_bf_variable<node>(offset, get_ba_type_id<node>(untyped_type_id<node>()));
+	return build_rr_ref<node>(build_sym<node>(sym_name), {var}, args);
+}
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, size_t offset, const trefs& args) {
+	using tau = tree<node>;
+
+	auto int_node = tau::get_integer(offset);
+	return build_rr_ref<node>(build_sym<node>(sym_name), {int_node}, args);
+}
+
+template<NodeType node>
+tref build_rr_ref(tref sym, tref offset, size_t shift, const trefs& args) {
+	auto offset_node = build_shift<node>(offset, shift);
+	return build_rr_ref<node>(sym, {offset_node}, args);
+}
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, tref offset, size_t shift, const trefs& args) {
+	return build_rr_ref<node>(build_sym<node>(sym_name), offset, shift, args);
+}
+
+template<NodeType node>
+tref build_rr_ref(const std::string& sym_name, const std::string& offset, size_t shift, const trefs& args) {
+	auto offset_node = build_shift<node>(offset, shift);
+	return build_rr_ref<node>(build_sym<node>(sym_name), {offset_node}, args);
 }
 
 // -----------------------------------------------------------------------------
@@ -1111,6 +1267,11 @@ tref tree<node>::build_bf_eq(tref l, tref r) {
 template <NodeType node>
 tref tree<node>::build_bf_eq_0(tref l) {
 	return tau_lang::build_bf_eq_0<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_eq_1(tref l) {
+	return tau_lang::build_bf_eq_1<node>(l);
 }
 
 template<NodeType node>
@@ -1320,6 +1481,11 @@ tref tree<node>::build_variable(const std::string& name, size_t type_id) {
 }
 
 template <NodeType node>
+tref tree<node>::build_variable(size_t type_id) {
+	return tau_lang::build_variable<node>(type_id);
+}
+
+template <NodeType node>
 tref tree<node>::build_bf_variable(tref var_name_node, size_t type_id) {
 	return tau_lang::build_bf_variable<node>(var_name_node, type_id);
 }
@@ -1327,6 +1493,11 @@ tref tree<node>::build_bf_variable(tref var_name_node, size_t type_id) {
 template <NodeType node>
 tref tree<node>::build_bf_variable(const std::string& name, size_t type_id) {
 	return tau_lang::build_bf_variable<node>(name, type_id);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_variable(size_t type_id) {
+	return tau_lang::build_bf_variable<node>(type_id);
 }
 
 template <NodeType node>
@@ -1368,7 +1539,7 @@ template <NodeType node>
 tref tree<node>::build_in_var_at_t_minus(
 	tref var_name_node, size_t shift, size_t type_id, std::string t)
 {
-	return tau_lang::build_in_var_at_t_minus<node>(var_name_node, shift, t, type_id);
+	return tau_lang::build_in_var_at_t_minus<node>(var_name_node, shift, type_id, t);
 }
 
 template <NodeType node>
@@ -1445,5 +1616,99 @@ template <NodeType node>
 tref tree<node>::build_spec(const rr<node>& nso_rr) {
 	return tau_lang::build_spec<node>(nso_rr);
 }
+
+// -----------------------------------------------------------------------------
+// reference and symbol builders
+
+template<NodeType node>
+tref tree<node>::build_sym(size_t sid) {
+	return tau_lang::build_sym<node>(sid);
+}
+
+template<NodeType node>
+tref tree<node>::build_sym(const std::string& sym_name) {
+	return tau_lang::build_sym<node>(sym_name);
+}
+
+template<NodeType node>
+tref tree<node>::build_offsets(const trefs& offsets) {
+	return tau_lang::build_offsets<node>(offsets);
+}
+
+template<NodeType node>
+tref tree<node>::build_offsets(const std::string& offset) {
+	return tau_lang::build_offsets<node>(offset);
+}
+
+template<NodeType node>
+tref tree<node>::build_offsets(const std::vector<std::string>& offsets) {
+	return tau_lang::build_offsets<node>(offsets);
+}
+
+template<NodeType node>
+tref tree<node>::build_shift(tref var, size_t shift) {
+	return tau_lang::build_shift<node>(var, shift);
+}
+
+template<NodeType node>
+tref tree<node>::build_shift(const std::string& var_name, size_t shift) {
+	return tau_lang::build_shift<node>(var_name, shift);
+}
+
+template<NodeType node>
+tref tree<node>::build_ref_args(const trefs& args) {
+	return tau_lang::build_ref_args<node>(args);
+}
+
+template<NodeType node>
+tref tree<node>::build_ref_args(const std::vector<std::string>& args, size_t type_id) {
+	return tau_lang::build_ref_args<node>(args, type_id);
+}
+
+template<NodeType node>
+tref tree<node>::build_ref(tref sym, const trefs& args) {
+	return tau_lang::build_ref<node>(sym, args);
+}
+
+template<NodeType node>
+tref tree<node>::build_ref(const std::string& sym_name, const trefs& args) {
+	return tau_lang::build_ref<node>(sym_name, args);
+}
+
+template<NodeType node>
+tref tree<node>::build_rr_ref(tref sym, const trefs& offsets, const trefs& args) {
+	return tau_lang::build_rr_ref<node>(sym, offsets, args);
+}
+
+template<NodeType node>
+tref tree<node>::build_rr_ref(const std::string& sym_name, const trefs& offsets, const trefs& args) {
+	return tau_lang::build_rr_ref<node>(sym_name, offsets, args);
+}
+
+template<NodeType node>
+tref tree<node>::build_rr_ref(const std::string& sym_name, const std::string offset, const trefs& args) {
+	return tau_lang::build_rr_ref<node>(sym_name, offset, args);
+}
+
+template<NodeType node>
+tref tree<node>::build_rr_ref(const std::string& sym_name, size_t offset, const trefs& args) {
+	return tau_lang::build_rr_ref<node>(sym_name, offset, args);
+}
+
+template<NodeType node>
+tref tree<node>::build_rr_ref(tref sym, tref offset, size_t shift, const trefs& args) {
+	return tau_lang::build_rr_ref<node>(sym, offset, shift, args);
+}
+
+template<NodeType node>
+tref tree<node>::build_rr_ref(const std::string& sym_name, tref offset, size_t shift, const trefs& args) {
+	return tau_lang::build_rr_ref<node>(sym_name, offset, shift, args);
+}
+
+template<NodeType node>
+tref tree<node>::build_rr_ref(const std::string& sym_name, const std::string& offset, size_t shift, const trefs& args) {
+	return tau_lang::build_rr_ref<node>(sym_name, offset, shift, args);
+}
+
 
 } // namespace idni::tau_lang

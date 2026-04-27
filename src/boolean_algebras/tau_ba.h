@@ -247,39 +247,6 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_tau_closed(const tau_ba<BAs...>& fm);
 
-/**
- * @brief Template struct representing a tau_ba_factory.
- *
- * @tparam BAs Variadic template parameters.
- */
-template <typename... BAs>
-requires BAsPack<BAs...>
-struct tau_ba_factory {
-
-	/**
-	 * @brief Splits one.
-	 *
-	 * @return Variant containing the splitter of one in the given BA.
-	 */
-	static std::variant<tau_ba<BAs...>, BAs...> splitter_one();
-
-	/**
-	 * @brief Converts one to string.
-	 *
-	 * @param str Reference to the string.
-	 * @return Converted string.
-	 */
-	static std::string one(std::string&);
-
-	/**
-	 * @brief Converts zero to string.
-	 *
-	 * @param str Reference to the string.
-	 * @return Converted string.
-	 */
-	static std::string zero(std::string&);
-};
-
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>

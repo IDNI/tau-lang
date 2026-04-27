@@ -13,7 +13,7 @@ add_repl_test(history_store_cmd-bf "1" ": 1")
 add_repl_test(history_store_cmd-wff "T" ": T")
 add_repl_test(history_store_cmd-tau "{T.}" "1")
 
-add_repl_test_fail(history_store_cmd-tau_fail "always o1[t]' = {x } i1[t]" "Syntax Error")
+add_repl_test_fail(history_store_cmd-tau_fail "always o1[t]' = {x}:tau i1[t]" "Syntax Error")
 add_repl_test_fail(history_store_cmd-sbf_fail "always o1[t]' = {x = 0}:sbf i1[t]" "Syntax Error")
 
 # history print command
