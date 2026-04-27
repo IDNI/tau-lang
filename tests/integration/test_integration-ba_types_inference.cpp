@@ -1911,6 +1911,110 @@ TEST_SUITE("regression tests") {
 	}
 }
 
+TEST_SUITE("typed annotations as structural children (processed in inference)") {
+
+	// Helper: check no node in tree has a typed structural child
+	static bool no_typed_structural_children(tref root) {
+		bool clean = true;
+		auto f = [&](tref n) {
+			for (auto c : tau::get(n).get_children())
+				if (tau::get(c).is(tau::typed)) { clean = false; return false; }
+			return clean;
+		};
+		pre_order<node_t>(root).search_unique(f);
+		return clean;
+	}
+
+	TEST_CASE("before inference: variable with :sbf has typed structural child") {
+		tref parsed = parse("x:sbf = 1");
+		CHECK( parsed != nullptr );
+		auto vars = tau::get(parsed).select_top(is<node_t, tau::variable>);
+		CHECK( vars.size() == 1 );
+		bool has_typed = false;
+		for (auto c : tau::get(vars[0]).get_children())
+			if (tau::get(c).is(tau::typed)) { has_typed = true; break; }
+		CHECK( has_typed );
+		// And ba_type must be 0 (not pre-stamped)
+		CHECK( tau::get(vars[0]).get_ba_type() == 0 );
+	}
+
+	TEST_CASE("after inference: variable with :sbf has ba_type stamped, no typed child") {
+		tref parsed = parse("x:sbf = 1");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto vars = tau::get(inferred).select_top(is<node_t, tau::variable>);
+		CHECK( vars.size() == 1 );
+		CHECK( tau::get(vars[0]).get_ba_type() == sbf_type_id<node_t>() );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("before inference: bf_t with :sbf has typed structural child") {
+		tref parsed = parse("1:sbf = x");
+		CHECK( parsed != nullptr );
+		auto bfts = tau::get(parsed).select_top(is<node_t, tau::bf_t>);
+		CHECK( bfts.size() == 1 );
+		bool has_typed = false;
+		for (auto c : tau::get(bfts[0]).get_children())
+			if (tau::get(c).is(tau::typed)) { has_typed = true; break; }
+		CHECK( has_typed );
+		CHECK( tau::get(bfts[0]).get_ba_type() == 0 );
+	}
+
+	TEST_CASE("after inference: bf_t with :sbf has ba_type stamped, no typed child") {
+		tref parsed = parse("1:sbf = x");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto bfts = tau::get(inferred).select_top(is<node_t, tau::bf_t>);
+		CHECK( bfts.size() == 1 );
+		CHECK( tau::get(bfts[0]).get_ba_type() == sbf_type_id<node_t>() );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("after inference: bf_f with :tau has ba_type stamped, no typed child") {
+		tref parsed = parse("0:tau = x");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto bffs = tau::get(inferred).select_top(is<node_t, tau::bf_f>);
+		CHECK( bffs.size() == 1 );
+		CHECK( tau::get(bffs[0]).get_ba_type() == tau_type_id<node_t>() );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("after inference: type annotation propagates from bf_t to variable") {
+		tref parsed = parse("x = 1:sbf");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto expected = std::vector<std::pair<std::string, size_t>> {
+			{"x", sbf_type_id<node_t>()}
+		};
+		CHECK( check_vars(inferred, expected) );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("after inference: type annotation propagates from variable to bf_f") {
+		tref parsed = parse("x:tau = 0");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		auto bffs = tau::get(inferred).select_top(is<node_t, tau::bf_f>);
+		CHECK( bffs.size() == 1 );
+		CHECK( tau::get(bffs[0]).get_ba_type() == tau_type_id<node_t>() );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+
+	TEST_CASE("no typed children remain anywhere after inference on complex formula") {
+		tref parsed = parse("x:bv[16] = y && z:sbf = 1");
+		CHECK( parsed != nullptr );
+		auto [inferred, _] = infer_ba_types<node_t>(parsed);
+		CHECK( inferred != nullptr );
+		CHECK( no_typed_structural_children(inferred) );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

@@ -360,9 +360,28 @@ std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<
 }
 
 template<NodeType node>
-bool has_ba_type(tref term) {
+bool is_untyped_tref(tref t) {
 	using tau = tree<node>;
-	return tau::get(term).get_ba_type() != untyped_type_id<node>();
+	if (tau::get(t).get_ba_type() != 0) return false;
+	for (auto c : tau::get(t).get_children())
+		if (tau::get(c).is(tau::typed)) return false;
+	return true;
+}
+
+template<NodeType node>
+size_t get_effective_ba_type(tref t) {
+	using tau = tree<node>;
+	auto ba_type = tau::get(t).get_ba_type();
+	if (ba_type != 0) return ba_type;
+	for (auto c : tau::get(t).get_children())
+		if (tau::get(c).is(tau::typed))
+			return get_ba_type_id<node>(c);
+	return 0;
+}
+
+template<NodeType node>
+bool has_ba_type(tref term) {
+	return !is_untyped_tref<node>(term);
 }
 
 template <NodeType node>

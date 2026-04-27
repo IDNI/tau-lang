@@ -817,10 +817,11 @@ const trefs& tree<node>::get_free_vars() const {
 template<NodeType node>
 tref tree<node>::untype(tref term) {
 	const tau& n = tau::get(term);
-	if (n.has_child())
-		return tau::get(n.value.ba_retype(untyped_type_id<node>()),
-			n.get_children());
-	else return tau::get(n.value.ba_retype(untyped_type_id<node>()));
+	trefs ch;
+	for (auto c : n.get_children())
+		if (!tau::get(c).is(tau::typed)) ch.push_back(c);
+	auto retyped = n.value.ba_retype(untyped_type_id<node>());
+	return ch.empty() ? tau::get(retyped) : tau::get(retyped, ch);
 }
 
 template<NodeType node>
