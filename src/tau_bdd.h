@@ -176,11 +176,22 @@ struct tau_term_bdd_handle {
 
 	ref get() const;
 
+	static const trefs& get_free_tau_vars(tref bdd_tref);
+
 	bool operator==(const tau_term_bdd_handle& other) const;
 	bool operator!=(const tau_term_bdd_handle& other) const;
 
 	htref h;
 	bool inv = false;
+
+private:
+#ifdef TAU_CACHE
+	using bdd_fv_cache_t = std::unordered_map<tref, size_t>;
+	static void get_free_tau_vars_impl(tref bdd_tref, subtree_set<node>& merged,
+		bdd_fv_cache_t& cache);
+#else
+	static void get_free_tau_vars_impl(tref bdd_tref, subtree_set<node>& merged);
+#endif
 };
 
 template<NodeType node>

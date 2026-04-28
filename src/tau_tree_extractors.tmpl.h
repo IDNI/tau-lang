@@ -589,6 +589,16 @@ const trefs& get_free_vars(tref n) {
 			}
 			DBG(LOG_TRACE << "inserting var: " << LOG_FM(n);)
 			free_vars.insert(n);
+		} else if (t.is(tau::BDD_ID)) {
+			// Keys in U were stored without right siblings (via trim/get_typed),
+			// so trim before constructing the lookup key.
+			const tref trimmed = tau::trim_right_sibling(n);
+			const auto& bdd_u = tau_term_bdd_handle<node>::U;
+			if (auto jt = bdd_u.find(tau::get(tau::bf, trimmed));
+				jt != bdd_u.end())
+				for (tref v : tau_term_bdd_handle<node>::get_free_tau_vars(
+					jt->second.get().b))
+					free_vars.insert(v);
 		}
 	};
 	post_order<node>(n).search(collector);

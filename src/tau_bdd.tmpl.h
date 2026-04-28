@@ -263,7 +263,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 		case tau::BDD_ID: {
 			// Get the BDD corresponding to the ID
 			const auto& m = term_handle<node>::U;
-			auto it = m.find(tau::get(tau::bf, f));
+			auto it = m.find(tau::get(tau::bf, tau::trim_right_sibling(f)));
 			if (it != m.end()) {
 				return it->second.get();
 			} else {
@@ -771,6 +771,65 @@ bool tau_term_bdd_handle<node>::operator==(const tau_term_bdd_handle& other) con
 template<NodeType node>
 bool tau_term_bdd_handle<node>::operator!=(const tau_term_bdd_handle& other) const {
 	return !(*this == other);
+}
+
+#ifdef TAU_CACHE
+template<NodeType node>
+void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
+	tref bdd_tref, subtree_set<node>& merged, bdd_fv_cache_t& cache) {
+	using tau = tree<node>;
+	if (!bdd_tref) return;
+	if (auto it = cache.find(bdd_tref); it != cache.end()) {
+		const trefs& cached = free_vars_pool[it->second];
+		merged.insert(cached.begin(), cached.end());
+		return;
+	}
+	const auto& bn = bintree<tau_bdd_node<node>>::get(bdd_tref);
+	const trefs& v_fvs = get_free_vars<node>(tau::get(tau::bf, bn.value.v));
+	merged.insert(v_fvs.begin(), v_fvs.end());
+	get_free_tau_vars_impl(bn.l, merged, cache);
+	get_free_tau_vars_impl(bn.r, merged, cache);
+}
+#else
+template<NodeType node>
+void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
+	tref bdd_tref, subtree_set<node>& merged) {
+	using tau = tree<node>;
+	if (!bdd_tref) return;
+	const auto& bn = bintree<tau_bdd_node<node>>::get(bdd_tref);
+	const trefs& v_fvs = get_free_vars<node>(tau::get(tau::bf, bn.value.v));
+	merged.insert(v_fvs.begin(), v_fvs.end());
+	get_free_tau_vars_impl(bn.l, merged);
+	get_free_tau_vars_impl(bn.r, merged);
+}
+#endif
+
+template<NodeType node>
+const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
+	static const trefs no_free_vars{};
+	if (!bdd_tref) return no_free_vars;
+#ifdef TAU_CACHE
+	static bdd_fv_cache_t& cache =
+		tbdd::template create_cache<bdd_fv_cache_t>();
+	if (auto it = cache.find(bdd_tref); it != cache.end())
+		return free_vars_pool[it->second];
+#endif
+	subtree_set<node> merged;
+#ifdef TAU_CACHE
+	get_free_tau_vars_impl(bdd_tref, merged, cache);
+#else
+	get_free_tau_vars_impl(bdd_tref, merged);
+#endif
+	trefs fv(merged.begin(), merged.end());
+	size_t id = free_vars_pool.size();
+	if (auto it = free_vars_pool_index.find(fv);
+		it != free_vars_pool_index.end()) id = it->second;
+	else free_vars_pool_index.emplace(fv, id),
+		free_vars_pool.emplace_back(std::move(fv));
+#ifdef TAU_CACHE
+	cache.emplace(bdd_tref, id);
+#endif
+	return free_vars_pool[id];
 }
 
 }
