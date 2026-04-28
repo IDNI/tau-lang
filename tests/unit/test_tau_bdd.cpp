@@ -260,6 +260,77 @@ TEST_SUITE("BDD quantification") {
 	}
 }
 
+TEST_SUITE("BDD get_free_tau_vars") {
+	using bdd = tau_term_bdd<node_t>;
+	using hbdd = term_handle<node_t>;
+
+	TEST_CASE("null tref returns empty") {
+		CHECK(hbdd::get_free_tau_vars(nullptr).empty());
+	}
+
+	TEST_CASE("T terminal returns empty") {
+		CHECK(hbdd::get_free_tau_vars(bdd::T.b).empty());
+	}
+
+	TEST_CASE("F terminal returns empty") {
+		CHECK(hbdd::get_free_tau_vars(bdd::F.b).empty());
+	}
+
+	TEST_CASE("same pointer on second call") {
+		// Pool-based deduplication means both calls return the same reference
+		// whether or not TAU_CACHE is active.
+		const trefs& fvs1 = hbdd::get_free_tau_vars(bdd::T.b);
+		const trefs& fvs2 = hbdd::get_free_tau_vars(bdd::T.b);
+		CHECK(&fvs1 == &fvs2);
+	}
+
+	TEST_CASE("multi-node BDD") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
+		bdd::ref xx = bdd::build_bdd(tau::get("xyz", opts), o);
+		const trefs& fvs = hbdd::get_free_tau_vars(xx.b);
+		CHECK(std::is_sorted(fvs.begin(), fvs.end(), tau::subtree_less));
+		CHECK(fvs.size() == 3);
+	}
+
+	TEST_CASE("multi-node BDD with term leaf") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xx = bdd::build_bdd(tau::get("xyz", opts), o);
+		const trefs& fvs = hbdd::get_free_tau_vars(xx.b);
+		CHECK(std::is_sorted(fvs.begin(), fvs.end(), tau::subtree_less));
+		CHECK(fvs.size() == 3);
+	}
+
+	TEST_CASE("BDD_ID: get_free_vars agrees with get_free_tau_vars") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		tref bdd_node = hbdd::convert_to_tau_node(tau::get("xy", opts), o);
+		// Traverse via the BDD_ID collector branch inside get_free_vars
+		const trefs& via_extractor = get_free_vars<node_t>(bdd_node);
+		// Traverse the BDD directly
+		const trefs& direct = hbdd::get_free_tau_vars(
+			hbdd::U.find(bdd_node)->second.get().b);
+		CHECK(via_extractor == direct);
+	}
+}
+
 TEST_SUITE("BDD handle creation") {
 	TEST_CASE("creation and gc") {
 		using bdd = tau_term_bdd<node_t>;
