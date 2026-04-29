@@ -516,7 +516,7 @@ std::optional<interpreter<node>> api<node>::get_interpreter(tref spec,
 	auto& ctx = *definitions<node>::instance().get_io_context();
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
-	auto maybe_nso_rr = tau_lang::get_nso_rr<node>(spec);
+	auto maybe_nso_rr = get_nso_rr(spec);
 	if (!maybe_nso_rr) return {};
 	tref applied = apply_rr_to_formula<node>(maybe_nso_rr.value());
 	if (!applied) return {};
