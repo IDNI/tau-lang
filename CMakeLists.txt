@@ -316,7 +316,7 @@ if ((CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GN
 	OR TAU_BUILD_PIC)
 		set(TAU_BUILD_BOOST ON)
 else()
-		set(TAU BUILD_BOOST OFF)
+		set(TAU_BUILD_BOOST OFF)
 endif()
 
 if(TAU_BUILD_BOOST)
@@ -328,8 +328,9 @@ endif()
 
 # cmake_policy(SET CMP0167 NEW) # is required in future versions of CMake
 set(Boost_USE_STATIC_LIBS ON)
-if (TAU_BUILD_BOOST)
-	set(Boost_DIR "${BOOST_LIBDIR}/cmake/Boost-1.86.0")
+file(GLOB _boost_config "${BOOST_LIBDIR}/cmake/Boost-*/BoostConfig.cmake")
+if (TAU_BUILD_BOOST OR _boost_config)
+	get_filename_component(Boost_DIR "${_boost_config}" DIRECTORY)
 endif()
 find_package(Boost REQUIRED COMPONENTS log)
 if (Boost_FOUND)
