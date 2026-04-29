@@ -80,9 +80,10 @@ tref cvc5_tree_to_tau_tree(bv n) {
 		case Kind::BITVECTOR_SHL: return build_bf_shl<node>(rec(n[0]), rec(n[1]));
 		case Kind::BITVECTOR_LSHR: return build_bf_shr<node>(rec(n[0]), rec(n[1]));
 
-		default:
-			LOG_ERROR << "Unexpected bitvector kind during tree translation: "
-					<< n.getKind() << "\n";
+		default: {
+			DBG(LOG_DEBUG << "Unexpected bitvector kind during tree translation: "
+					<< n.getKind() << "\n";)
+		}
 		return nullptr;
 	}
 #undef rec
