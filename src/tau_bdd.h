@@ -162,6 +162,8 @@ struct tau_term_bdd_handle {
 	static tref convert_to_tau_node(term_handle handle, size_t term_type);
 	// Build a Tau node pointing to a BDD handle from a Tau term whose connection is saved in U
 	static tref convert_to_tau_node(tref term, const order& o);
+	// Convert a tau node back to a BDD handle
+	static term_handle convert_to_handle(tref tau_node);
 	// Convert the BDD handle to a Tau term
 	tref to_tau_term(size_t term_type) const;
 
