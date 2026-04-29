@@ -701,6 +701,15 @@ tref tau_term_bdd_handle<node>::convert_to_tau_node(tref term, const order& o) {
 }
 
 template<NodeType node>
+tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
+convert_to_handle(tref tau_node) {
+	auto it = U.find(tau_node);
+	DBG(assert(it != U.end));
+	if (it != U.end) return it->second;
+	else return term_handle(tbdd::T);
+}
+
+template<NodeType node>
 tref tau_term_bdd_handle<node>::to_tau_term(size_t term_type) const {
 	return tbdd::to_tau_term(get(), term_type);
 }
