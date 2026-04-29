@@ -214,9 +214,10 @@ tref cvc5_tree_to_tau_tree(bv n,
 			return build_bf_and<node>(x, mask_t);
 		}
 
-		default:
-			LOG_ERROR << "Unexpected bitvector kind during tree translation: "
-					<< n.getKind() << "\n";
+		default: {
+			DBG(LOG_DEBUG << "Unexpected bitvector kind during tree translation: "
+					<< n.getKind() << "\n";)
+		}
 		return nullptr;
 	}
 #undef rec
