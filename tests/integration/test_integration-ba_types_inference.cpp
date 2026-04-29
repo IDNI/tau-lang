@@ -1911,7 +1911,7 @@ TEST_SUITE("regression tests") {
 	}
 }
 
-TEST_SUITE("typed annotations as structural children (processed in inference)") {
+TEST_SUITE("typed annotations as structural children") {
 
 	// Helper: check no node in tree has a typed structural child
 	static bool no_typed_structural_children(tref root) {
