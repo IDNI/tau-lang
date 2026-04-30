@@ -289,6 +289,8 @@ void io_context<node>::update_types(
 	// and create a default console stream if not defined
 	for (const auto& [var, type] : update) if (is_io_var<node>(var)) {
 		types[var] = type;
+		// If already registered as input or output during parsing, skip name-based categorization.
+		if (inputs.contains(var) || outputs.contains(var)) continue;
 		std::string name = get_var_name<node>(var);
 		DBG(LOG_TRACE << "updating stream: " << name;)
 		bool is_input = name == "this" || name[0] == 'i';
