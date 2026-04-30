@@ -903,6 +903,20 @@ bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs, const order& 
 }
 
 template<NodeType node>
+tref tau_term_bdd_handle<node>::substitute(tref formula, tref var,
+	term_handle with, const order& o) {
+	using tau = tree<node>;
+	auto subst = [&](tref n) -> tref {
+		if (!tau::get(n).is(tau::bf)) return n;
+		auto it = U.find(n);
+		if (it == U.end()) return n;
+		term_handle result = it->second.bdd_compose(var, with, o);
+		return convert_to_tau_node(result, find_ba_type<node>(n));
+	};
+	return pre_order<node>(formula).apply_until_change(subst);
+}
+
+template<NodeType node>
 tau_term_bdd_handle<node>::ref tau_term_bdd_handle<node>::get() const {
 	return ref(h->get(), inv);
 }
