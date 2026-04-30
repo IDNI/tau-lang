@@ -65,7 +65,7 @@ option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
-option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
+option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 ON)
 option(TAU_USE_CCACHE              "Use ccache when building"              OFF)
 
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
