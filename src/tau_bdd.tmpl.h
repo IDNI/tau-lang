@@ -73,11 +73,15 @@ template<NodeType node>
 tau_term_bdd<node>::cache_quant_t tau_term_bdd<node>::quant_memo;
 
 template<NodeType node>
+tau_term_bdd<node>::cache_ite_t tau_term_bdd<node>::ite_memo;
+
+template<NodeType node>
 void tau_term_bdd<node>::clear_caches() {
 	and_memo.clear();
 	ex_memo.clear();
 	and_many_memo.clear();
 	quant_memo.clear();
+	ite_memo.clear();
 }
 #endif
 
@@ -344,6 +348,57 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_or(ref x, ref y, const order& o)
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_not(ref x) {
 	return x.inv = !x.inv, x;
+}
+
+template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
+	const order& o) {
+	using tau = tree<node>;
+	// Rule 1: normalize complement on f
+	if (f.inv) { f.inv = false; std::swap(g, h); }
+	// Terminal reductions (f.inv == false guaranteed)
+	if (f == T) return g;
+	if (f == F) return h;
+	if (g == h) return g;
+	if (g == T && h == F) return f;
+	if (g == F && h == T) return bdd_not(f);
+	if (g == T) return bdd_or(f, h, o);
+	if (h == F) return bdd_and(f, g, o);
+	if (g == F) return bdd_and(bdd_not(f), h, o);
+	if (h == T) return bdd_or(bdd_not(f), g, o);
+	if (g == f) return bdd_or(f, h, o);
+	if (h == f) return bdd_and(f, g, o);
+	if (g == bdd_not(f)) return bdd_and(bdd_not(f), h, o);
+	if (h == bdd_not(f)) return bdd_or(bdd_not(f), g, o);
+	// All-leaf fallback: delegate to composed form
+	if (leaf(f) && leaf(g) && leaf(h))
+		return bdd_or(bdd_and(f, g, o), bdd_and(bdd_not(f), h, o), o);
+	// Rule 2: normalize common complement on g and h
+	bool out_inv = false;
+	if (g.inv && h.inv) { g.inv = false; h.inv = false; out_inv = true; }
+#ifdef TAU_CACHE
+	const std::array<ref, 3> key = {f, g, h};
+	if (auto it = ite_memo.find(key); it != ite_memo.end())
+		return out_inv ? bdd_not(it->second) : it->second;
+#endif
+	// Top variable: minimum rank among the three BDD roots
+	tref top = get_var(f);
+	auto upd = [&](ref x) {
+		if (!leaf(x)) { tref v = get_var(x); if (less_then(v, top, o)) top = v; }
+	};
+	upd(g); upd(h);
+	// Co-factor inline — no temporary BDD allocation
+	auto cof = [&](ref x, bool hi) -> ref {
+		if (leaf(x) || !tau::subtree_equals(get_var(x), top)) return x;
+		return hi ? get_high(x) : get_low(x);
+	};
+	ref r = add(top,
+		bdd_ite(cof(f, true),  cof(g, true),  cof(h, true),  o),
+		bdd_ite(cof(f, false), cof(g, false), cof(h, false), o));
+#ifdef TAU_CACHE
+	ite_memo.emplace(key, r);
+#endif
+	return out_inv ? bdd_not(r) : r;
 }
 
 template<NodeType node>
@@ -768,6 +823,12 @@ bdd_quant(const quants& q, const order& o) const {
 }
 
 template<NodeType node>
+tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
+bdd_ite(term_handle g, term_handle h, const order& o) const {
+	return term_handle(tbdd::bdd_ite(get(), g.get(), h.get(), o));
+}
+
+template<NodeType node>
 tau_term_bdd_handle<node>::ref tau_term_bdd_handle<node>::get() const {
 	return ref(h->get(), inv);
 }
@@ -862,6 +923,13 @@ template<typename T>
 size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto& a) const {
 	size_t seed = 0;
 	idni::hash_combine(seed, a[0], a[1]);
+	return seed;
+}
+
+template<typename T>
+size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>>::operator()(auto& a) const {
+	size_t seed = 0;
+	idni::hash_combine(seed, a[0], a[1], a[2]);
 	return seed;
 }
 

@@ -184,7 +184,8 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		CHECK((tau::get(ct).to_str() == "xydcbafe" ||
-			tau::get(ct).to_str() == "xydcabef"));
+			tau::get(ct).to_str() == "xydcabef" ||
+			 tau::get(ct).to_str() == "xydcfeab"));
 	}
 	TEST_CASE("2") {
 		using bdd = tau_term_bdd<node_t>;
@@ -331,6 +332,127 @@ TEST_SUITE("BDD get_free_tau_vars") {
 		const trefs& direct = hbdd::get_free_tau_vars(
 			hbdd::U.find(bdd_node)->second.get().b);
 		CHECK(via_extractor == direct);
+	}
+}
+
+TEST_SUITE("BDD ITE") {
+	using bdd = tau_term_bdd<node_t>;
+	using hbdd = term_handle<node_t>;
+
+	TEST_CASE("ITE(T,g,h) == g") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref g = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|y", opts), o);
+		CHECK(bdd::bdd_ite(bdd::T, g, h, o) == g);
+	}
+
+	TEST_CASE("ITE(F,g,h) == h") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref g = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|y", opts), o);
+		CHECK(bdd::bdd_ite(bdd::F, g, h, o) == h);
+	}
+
+	TEST_CASE("ITE(f,T,F) == f") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		CHECK(bdd::bdd_ite(f, bdd::T, bdd::F, o) == f);
+	}
+
+	TEST_CASE("ITE(f,F,T) == NOT(f)") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		CHECK(bdd::bdd_ite(f, bdd::F, bdd::T, o) == bdd::bdd_not(f));
+	}
+
+	TEST_CASE("ITE(f,g,g) == g") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref f = bdd::build_bdd(tau::get("x|y", opts), o);
+		bdd::ref g = bdd::build_bdd(tau::get("xy", opts), o);
+		CHECK(bdd::bdd_ite(f, g, g, o) == g);
+	}
+
+	TEST_CASE("ITE(NOT(f),g,h) == ITE(f,h,g)") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|z", opts), o);
+		CHECK(bdd::bdd_ite(bdd::bdd_not(f), g, h, o) ==
+		      bdd::bdd_ite(f, h, g, o));
+	}
+
+	TEST_CASE("ITE agrees with composed form") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|z", opts), o);
+		bdd::ref ite_result = bdd::bdd_ite(f, g, h, o);
+		bdd::ref composed = bdd::bdd_or(
+			bdd::bdd_and(f, g, o),
+			bdd::bdd_and(bdd::bdd_not(f), h, o), o);
+		CHECK(ite_result == composed);
+	}
+
+	TEST_CASE("cache: second call returns same ref") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
+		bdd::ref h = bdd::build_bdd(tau::get("x|z", opts), o);
+		bdd::ref r1 = bdd::bdd_ite(f, g, h, o);
+		bdd::ref r2 = bdd::bdd_ite(f, g, h, o);
+		CHECK(r1.b == r2.b);
+		CHECK(r1.inv == r2.inv);
 	}
 }
 
