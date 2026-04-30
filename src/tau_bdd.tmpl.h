@@ -404,10 +404,6 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, tref xi, ref g,
 	const order& o) {
-#ifdef DEBUG
-	for (tref v : tau_term_bdd_handle<node>::get_free_tau_vars(g.b))
-		assert(!less_then(v, xi, o));
-#endif
 	std::unordered_map<ref, ref> memo;
 	return bdd_compose_impl(x, xi, g, o, memo);
 }
@@ -426,9 +422,9 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x, tref xi, ref
 			bdd_compose_impl(get_high(x), xi, g, o, memo),
 			bdd_compose_impl(get_low(x), xi, g, o, memo), o);
 	else
-		r = add(var,
+		r = bdd_ite(from_bit(var),
 			bdd_compose_impl(get_high(x), xi, g, o, memo),
-			bdd_compose_impl(get_low(x), xi, g, o, memo));
+			bdd_compose_impl(get_low(x), xi, g, o, memo), o);
 	return memo.emplace(x, r).first->second;
 }
 
@@ -438,11 +434,6 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, subs_t subs,
 	auto cmp = [&o](const auto& a, const auto& b) {
 		return less_then(a.first, b.first, o); };
 	sortc(subs, cmp);
-#ifdef DEBUG
-	for (const auto& [xi, gi] : subs)
-		for (tref v : tau_term_bdd_handle<node>::get_free_tau_vars(gi.b))
-			assert(!less_then(v, xi, o));
-#endif
 	std::unordered_map<ref, ref> memo;
 	return bdd_compose_impl(x, subs, 0, o, memo);
 }
@@ -463,9 +454,9 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x,
 			bdd_compose_impl(get_high(x), subs, i + 1, o, memo),
 			bdd_compose_impl(get_low(x), subs, i + 1, o, memo), o);
 	else
-		r = add(var,
+		r = bdd_ite(from_bit(var),
 			bdd_compose_impl(get_high(x), subs, i, o, memo),
-			bdd_compose_impl(get_low(x), subs, i, o, memo));
+			bdd_compose_impl(get_low(x), subs, i, o, memo), o);
 	return memo.emplace(x, r).first->second;
 }
 

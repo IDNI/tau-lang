@@ -538,6 +538,41 @@ TEST_SUITE("BDD compose") {
 		bdd::ref expected = bdd::build_bdd(tau::get("yz", opts), o);
 		CHECK(bdd::bdd_compose(f, tx, g, o) == expected);
 	}
+
+	TEST_CASE("g has variable above xi: rename xi to xa where xa is above xi") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref ta = tau::trim(tau::get("a", opts));
+		tref tx = tau::trim(tau::get("x", opts));
+		tref tb = tau::trim(tau::get("b", opts));
+		// order: a(0) above x(1) above b(2)
+		bdd::order o {{ta, 0}, {tx, 1}, {tb, 2}};
+		bdd::ref xi = bdd::from_bit(tx);
+		bdd::ref xa = bdd::from_bit(ta);
+		// f = bit(x), replace x with a (a is above x in the order)
+		// result should be bit(a)
+		CHECK(bdd::bdd_compose(xi, tx, xa, o) == xa);
+	}
+
+	TEST_CASE("multi-var: g with variable above xi") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref ta = tau::trim(tau::get("a", opts));
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		// order: a(0) above x(1) above y(2)
+		// f = x AND y, substitute x := a (a is above x), y := a
+		// result = a AND a = a
+		bdd::order o {{ta, 0}, {tx, 1}, {ty, 2}};
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref xa = bdd::from_bit(ta);
+		bdd::subs_t subs {{tx, xa}, {ty, xa}};
+		CHECK(bdd::bdd_compose(f, std::move(subs), o) == xa);
+	}
 }
 
 TEST_SUITE("BDD handle creation") {
