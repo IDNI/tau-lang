@@ -138,6 +138,18 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			return (l) ? std::optional<bv>(make_bitvector_not(l.value())) : std::nullopt;
 		}
+		case tau::bf_cast: {
+			tref c = form | tt::ref;
+			size_t target_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
+			auto src = bv_eval_node<node>(form | tt::first, vars, free_vars);
+			if (!src) return std::nullopt;
+			size_t src_size = src.value().getSort().getBitVectorSize();
+			if (target_size > src_size)
+				return std::optional<bv>(make_bitvector_zero_extend(src.value(), target_size - src_size));
+			if (target_size < src_size)
+				return std::optional<bv>(make_bitvector_extract(src.value(), target_size - 1, 0));
+			return src;
+		}
 		case tau::bf_add: {
 			auto l = bv_eval_node<node>(form | tt::first, vars, free_vars);
 			auto r = bv_eval_node<node>(form | tt::second, vars, free_vars);
