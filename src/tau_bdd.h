@@ -65,12 +65,14 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	using cache_and_many_t = std::unordered_map<refs, ref>;
 	using cache_ex_t = std::map<trefs, std::unordered_map<ref, ref>>;
 	using cache_quant_t = std::map<quants, std::unordered_map<ref, ref>>;
+	using cache_ite_t = std::unordered_map<std::array<ref, 3>, ref>;
 
 	// TODO: Make compatible with bintree gc
 	static cache_and_t and_memo;
 	static cache_and_many_t and_many_memo;
 	static cache_ex_t ex_memo;
 	static cache_quant_t quant_memo;
+	static cache_ite_t ite_memo;
 
 	static void clear_caches();
 #endif
@@ -104,6 +106,8 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 
 	static ref bdd_and_many(refs v, const order& o);
 	static ref bdd_or_many(refs v, const order& o);
+
+	static ref bdd_ite(ref f, ref g, ref h, const order& o);
 
 	static tref to_tau_term(ref x, size_t term_type);
 
@@ -175,6 +179,7 @@ struct tau_term_bdd_handle {
 	term_handle bdd_ex(const trefs& v, const order& o) const;
 	term_handle bdd_all(const trefs& v, const order& o) const;
 	term_handle bdd_quant(const quants& q, const order& o) const;
+	term_handle bdd_ite(term_handle g, term_handle h, const order& o) const;
 
 	ref get() const;
 
@@ -213,6 +218,11 @@ struct std::hash<idni::tau_lang::tau_bdd_ref<T>> {
 
 template<typename T>
 struct std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>> {
+	size_t operator()(auto& a) const;
+};
+
+template<typename T>
+struct std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>> {
 	size_t operator()(auto& a) const;
 };
 
