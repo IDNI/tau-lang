@@ -456,6 +456,90 @@ TEST_SUITE("BDD ITE") {
 	}
 }
 
+TEST_SUITE("BDD compose") {
+	using bdd = tau_term_bdd<node_t>;
+
+	TEST_CASE("identity: compose bit(xi) with xi := bit(xi)") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xi = bdd::from_bit(tx);
+		CHECK(bdd::bdd_compose(xi, tx, xi, o) == xi);
+	}
+
+	TEST_CASE("compose bit(xi) with xi := T") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xi = bdd::from_bit(tx);
+		CHECK(bdd::bdd_compose(xi, tx, bdd::T, o) == bdd::T);
+	}
+
+	TEST_CASE("compose bit(xi) with xi := F") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xi = bdd::from_bit(tx);
+		CHECK(bdd::bdd_compose(xi, tx, bdd::F, o) == bdd::F);
+	}
+
+	TEST_CASE("variable rename: bit(xi) with xi := bit(xj)") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xi = bdd::from_bit(tx);
+		bdd::ref xj = bdd::from_bit(ty);
+		CHECK(bdd::bdd_compose(xi, tx, xj, o) == xj);
+	}
+
+	TEST_CASE("multi-var: AND(xi,xj) with {xi->T, xj->F} == F") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::subs_t subs {{tx, bdd::T}, {ty, bdd::F}};
+		CHECK(bdd::bdd_compose(f, std::move(subs), o) == bdd::F);
+	}
+
+	TEST_CASE("agrees with naive form for non-trivial f") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		// f = x AND y, g = y AND z, replace x with g
+		// result should equal ITE(g, f_hi, f_lo) = ITE(g, y, F) = g AND y = y AND z AND y = yz
+		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
+		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
+		bdd::ref expected = bdd::build_bdd(tau::get("yz", opts), o);
+		CHECK(bdd::bdd_compose(f, tx, g, o) == expected);
+	}
+}
+
 TEST_SUITE("BDD handle creation") {
 	TEST_CASE("creation and gc") {
 		using bdd = tau_term_bdd<node_t>;

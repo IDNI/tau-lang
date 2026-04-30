@@ -402,6 +402,74 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
 }
 
 template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, tref xi, ref g,
+	const order& o) {
+#ifdef DEBUG
+	for (tref v : tau_term_bdd_handle<node>::get_free_tau_vars(g.b))
+		assert(!less_then(v, xi, o));
+#endif
+	std::unordered_map<ref, ref> memo;
+	return bdd_compose_impl(x, xi, g, o, memo);
+}
+
+template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x, tref xi, ref g,
+	const order& o, std::unordered_map<ref, ref>& memo) {
+	using tau = tree<node>;
+	if (leaf(x)) return x;
+	if (auto it = memo.find(x); it != memo.end()) return it->second;
+	tref var = get_var(x);
+	if (less_then(xi, var, o)) return x;
+	ref r;
+	if (tau::subtree_equals(xi, var))
+		r = bdd_ite(g,
+			bdd_compose_impl(get_high(x), xi, g, o, memo),
+			bdd_compose_impl(get_low(x), xi, g, o, memo), o);
+	else
+		r = add(var,
+			bdd_compose_impl(get_high(x), xi, g, o, memo),
+			bdd_compose_impl(get_low(x), xi, g, o, memo));
+	return memo.emplace(x, r).first->second;
+}
+
+template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, subs_t subs,
+	const order& o) {
+	auto cmp = [&o](const auto& a, const auto& b) {
+		return less_then(a.first, b.first, o); };
+	sortc(subs, cmp);
+#ifdef DEBUG
+	for (const auto& [xi, gi] : subs)
+		for (tref v : tau_term_bdd_handle<node>::get_free_tau_vars(gi.b))
+			assert(!less_then(v, xi, o));
+#endif
+	std::unordered_map<ref, ref> memo;
+	return bdd_compose_impl(x, subs, 0, o, memo);
+}
+
+template<NodeType node>
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x,
+	const subs_t& subs, size_t i, const order& o,
+	std::unordered_map<ref, ref>& memo) {
+	using tau = tree<node>;
+	if (leaf(x) || i >= subs.size()) return x;
+	if (auto it = memo.find(x); it != memo.end()) return it->second;
+	tref var = get_var(x);
+	while (i < subs.size() && less_then(subs[i].first, var, o)) ++i;
+	if (i >= subs.size()) return x;
+	ref r;
+	if (tau::subtree_equals(subs[i].first, var))
+		r = bdd_ite(subs[i].second,
+			bdd_compose_impl(get_high(x), subs, i + 1, o, memo),
+			bdd_compose_impl(get_low(x), subs, i + 1, o, memo), o);
+	else
+		r = add(var,
+			bdd_compose_impl(get_high(x), subs, i, o, memo),
+			bdd_compose_impl(get_low(x), subs, i, o, memo));
+	return memo.emplace(x, r).first->second;
+}
+
+template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, trefs& v,
 	const order& o) {
 	// sort v, so the smallest variable is up front
@@ -447,7 +515,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t
 	const order& o, auto& memo) {
 	using tau = tree<node>;
 	const tref var = get_var(x);
-	if (leaf(x) || less_then(v.back(), var)) return x;
+	if (leaf(x) || less_then(v.back(), var, o)) return x;
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	// while current variable is bigger, increase index
 	while (less_then(v[i], var, o)) ++i;
@@ -826,6 +894,21 @@ template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_ite(term_handle g, term_handle h, const order& o) const {
 	return term_handle(tbdd::bdd_ite(get(), g.get(), h.get(), o));
+}
+
+template<NodeType node>
+tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
+bdd_compose(tref xi, term_handle g, const order& o) const {
+	return term_handle(tbdd::bdd_compose(get(), xi, g.get(), o));
+}
+
+template<NodeType node>
+tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
+bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs, const order& o) const {
+	typename tbdd::subs_t raw;
+	raw.reserve(subs.size());
+	for (const auto& [v, th] : subs) raw.emplace_back(v, th.get());
+	return term_handle(tbdd::bdd_compose(get(), std::move(raw), o));
 }
 
 template<NodeType node>
