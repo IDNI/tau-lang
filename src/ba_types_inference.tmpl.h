@@ -68,6 +68,12 @@ trefs canonize(trefs ts) {
 	return new_ts;
 }
 
+// Returns true if n has already been typed (ba_type != 0).
+template<NodeType node>
+bool is_processed(tref n) {
+	return tree<node>::get(n).get_ba_type() != 0;
+}
+
 template <NodeType node>
 std::tuple<size_t, int_t, int_t> get_function_signature(tref func) {
 	using tau = tree<node>;
@@ -290,10 +296,9 @@ tref update_tref(tref n, size_t type) {
 	trefs ch;
 	for (auto c : t.get_children())
 		if (!tau::get(c).is(tau::typed)) ch.push_back(c);
-	tref retyped_n = ch.empty()
+	return ch.empty()
 		? tau::get(retyped_val)
 		: tau::get(retyped_val, ch);
-	return tau::add_child(retyped_n, tau::get(tau::processed));
 }
 
 template<NodeType node>
@@ -556,7 +561,6 @@ std::variant<tref, inference_error, parse_error> update(
 		std::initializer_list<size_t> types_to_update,
 		const type_inference_options& options) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 
 	subtree_map<node, tref> changes;
 
@@ -573,8 +577,6 @@ std::variant<tref, inference_error, parse_error> update(
 		else if (t.is(tau::ref)) type_environment.pop_back();
 		// Do not pop the bf environment
 
-		// Check if n was already processed
-		if (tt(n) | tau::processed) return true;
 		size_t nt = t.get_type();
 
 		// return error if present
@@ -582,11 +584,13 @@ std::variant<tref, inference_error, parse_error> update(
 
 		switch (nt) {
 			case tau::variable: {
+				// Skip variables already typed by a previous infer_ba_types call.
+				if (is_processed<node>(n)) break;
 				if (!to_be_updated.contains(nt)) break;
 				auto updated = update_variable<node>(resolver, n, types, options);
 				if (std::holds_alternative<inference_error>(updated)) {
 					error = std::get<inference_error>(updated);
-				} else  {
+				} else {
 					if (std::get<tref>(updated) != n)
 						changes.insert_or_assign(n, std::get<tref>(updated));
 					if (options.use_defaults && using_default_type<node>(n, types)) {
@@ -596,6 +600,7 @@ std::variant<tref, inference_error, parse_error> update(
 				break;
 			}
 			case tau::ba_constant: {
+				if (is_processed<node>(n)) break;
 				if (!to_be_updated.contains(nt)) break;
 				auto updated = update_ba_constant<node>(resolver, n, types, options);
 				if (std::holds_alternative<inference_error>(updated)) {
@@ -612,6 +617,7 @@ std::variant<tref, inference_error, parse_error> update(
 				break;
 			}
 			case tau::bf_t: case tau::bf_f: {
+				if (is_processed<node>(n)) break;
 				if (!to_be_updated.contains(nt)) break;
 				auto updated = update_bf_constant<node>(resolver, n, types, options);
 				if (std::holds_alternative<inference_error>(updated)) {
@@ -631,7 +637,7 @@ std::variant<tref, inference_error, parse_error> update(
 			case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt: case tau::bf_or:
 			case tau::bf_xor: case tau::bf_and: case tau::bf_neg: {
-				// all types allowed
+				// all types allowed; no is_processed check — always propagate child changes
 				auto nn = update_default<node>(n, changes);
 				if(!to_be_updated.contains(nt) && !to_be_updated.contains(tau::typeable_symbol)) {
 					if (nn != n) changes.insert_or_assign(n, nn);
@@ -704,7 +710,8 @@ std::variant<tref, inference_error, parse_error> update(
 		if (std::holds_alternative<parse_error>(error_value))
 			return std::get<parse_error>(error_value);
 	}
-	return changes.find(r) != changes.end() ? changes[r] : r;
+	bool root_changed = changes.find(r) != changes.end();
+	return root_changed ? changes[r] : r;
 }
 
 template <NodeType node>
@@ -834,7 +841,7 @@ template <NodeType node>
 std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	std::map<std::tuple<size_t, int_t, int_t>, size_t>& available_function_symbols,
 	type_scoped_resolver<node>& resolver,
-	const type_inference_options& options)
+	const type_inference_options& user_options)
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -849,6 +856,8 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 	// We restore the original value of use_hooks at the end of the function
 	auto using_hooks = tau::use_hooks;
 	tau::use_hooks = false;
+
+	type_inference_options options = user_options;
 
 	subtree_map<node, tref> transformed;
 	std::optional<std::variant<inference_error, parse_error, scope_error>> error = std::nullopt;
@@ -1385,18 +1394,6 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 		<< LOG_FM_DUMP(new_n);)
 
 	new_n = std::get<tref>(updated);
-
-	// Remove intermediate tau::processed nodes
-	auto remove_processed = [&](tref n) {
-		// If the processed node is found, it is the last child
-		if (tt(n) | tau::processed)
-			return tau::remove_child(n);
-		else return n;
-	};
-	new_n = pre_order<node>(new_n).apply_unique(remove_processed);
-
-	DBG(LOG_TRACE << LOG_WARNING_COLOR << "infer_ba_types (after remove_processed): " << TC.CLEAR()
-		<< LOG_FM_DUMP(new_n);)
 
 	auto n_global_scope = resolver.current_types();
 
