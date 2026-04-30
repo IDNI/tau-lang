@@ -193,6 +193,8 @@ struct tau_term_bdd_handle {
 	term_handle bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs,
 		const order& o) const;
 
+	static tref substitute(tref formula, tref var, term_handle with, const order& o);
+
 	ref get() const;
 
 	static const trefs& get_free_tau_vars(tref bdd_tref);
