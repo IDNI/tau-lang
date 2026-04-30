@@ -58,6 +58,7 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	static ref T, F;
 
 	using quants = std::vector<std::pair<tref, Quantifier>>;
+	using subs_t = std::vector<std::pair<tref, ref>>;
 
 #ifdef TAU_CACHE
 	// Caches
@@ -109,6 +110,9 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 
 	static ref bdd_ite(ref f, ref g, ref h, const order& o);
 
+	static ref bdd_compose(ref x, tref xi, ref g, const order& o);
+	static ref bdd_compose(ref x, subs_t subs, const order& o);
+
 	static tref to_tau_term(ref x, size_t term_type);
 
 private:
@@ -130,6 +134,10 @@ private:
 	static ref bdd_ex(ref x, const trefs& v, size_t i, const order& o);
 	static ref bdd_quant(ref x, const quants& v, size_t i, const order& o);
 #endif
+	static ref bdd_compose_impl(ref x, tref xi, ref g, const order& o,
+		std::unordered_map<ref, ref>& memo);
+	static ref bdd_compose_impl(ref x, const subs_t& subs, size_t i,
+		const order& o, std::unordered_map<ref, ref>& memo);
 
 };
 
@@ -180,6 +188,10 @@ struct tau_term_bdd_handle {
 	term_handle bdd_all(const trefs& v, const order& o) const;
 	term_handle bdd_quant(const quants& q, const order& o) const;
 	term_handle bdd_ite(term_handle g, term_handle h, const order& o) const;
+
+	term_handle bdd_compose(tref xi, term_handle g, const order& o) const;
+	term_handle bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs,
+		const order& o) const;
 
 	ref get() const;
 
