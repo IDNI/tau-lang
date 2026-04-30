@@ -17,6 +17,8 @@ tref cvc5_tree_to_tau_tree(bv n) {
 
 	auto from_collection = [](const bv& t, const auto& f) -> tref {
 		tref res = rec(t[0]);
+		if (res == nullptr) return nullptr; // Unable to transform to tau (returning null)
+
 		for (size_t i = 1; i < t.getNumChildren(); ++i) {
 			auto temp = rec(t[i]);
 			if (temp == nullptr) return nullptr; // Unable to transform to tau (returning null)
@@ -96,9 +98,10 @@ tref cvc5_tree_to_tau_tree(bv n) {
 			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(target_size)));
 		}
 
-		default:
-			LOG_ERROR << "Unexpected bitvector kind during tree translation: "
-					<< n.getKind() << "\n";
+		default: {
+			DBG(LOG_DEBUG << "Unexpected bitvector kind during tree translation: "
+					<< n.getKind() << "\n";)
+		}
 		return nullptr;
 	}
 #undef rec
