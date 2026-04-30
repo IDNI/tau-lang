@@ -69,6 +69,8 @@ inline cvc5::Term make_bitvector_div(const cvc5::Term& lhs, const cvc5::Term& rh
 inline cvc5::Term make_bitvector_mod(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_bitvector_shl(const cvc5::Term& lhs, const cvc5::Term& rhs);
 inline cvc5::Term make_bitvector_shr(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term make_bitvector_zero_extend(const cvc5::Term& t, size_t extra_bits);
+inline cvc5::Term make_bitvector_extract(const cvc5::Term& t, size_t hi, size_t lo);
 inline cvc5::Term make_bitvector_cte(const size_t size, const std::string& str,
 	const size_t base);
 inline cvc5::Term make_bitvector_bottom_elem(size_t size);

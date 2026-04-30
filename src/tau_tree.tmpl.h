@@ -662,6 +662,7 @@ bool tree<node>::is_term_nt(size_t nt) {
 		case bf_and:
 		case bf_nand:
 		case bf_neg:
+		case bf_cast:
 		case bf_t:
 		case bf_f:
 		case variable:

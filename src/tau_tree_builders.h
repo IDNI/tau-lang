@@ -223,6 +223,9 @@ tref build_bf_div(tref l, tref r);
 template <NodeType node>
 tref build_bf_mod(tref l, tref r);
 
+template <NodeType node>
+tref build_bf_cast(tref operand, size_t target_type_id);
+
 // -----------------------------------------------------------------------------
 // terminals, variables and constants
 

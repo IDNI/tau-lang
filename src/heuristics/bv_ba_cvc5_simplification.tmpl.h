@@ -79,6 +79,22 @@ tref cvc5_tree_to_tau_tree(bv n) {
 		case Kind::BITVECTOR_UREM: return build_bf_mod<node>(rec(n[0]), rec(n[1]));
 		case Kind::BITVECTOR_SHL: return build_bf_shl<node>(rec(n[0]), rec(n[1]));
 		case Kind::BITVECTOR_LSHR: return build_bf_shr<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_ZERO_EXTEND: {
+			tref operand = rec(n[0]);
+			if (!operand) return nullptr;
+			uint32_t extra_bits = n.getOp()[0].getUInt32Value();
+			size_t src_size = n[0].getSort().getBitVectorSize();
+			size_t target_size = src_size + extra_bits;
+			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(target_size)));
+		}
+		case Kind::BITVECTOR_EXTRACT: {
+			tref operand = rec(n[0]);
+			if (!operand) return nullptr;
+			uint32_t hi = n.getOp()[0].getUInt32Value();
+			uint32_t lo = n.getOp()[1].getUInt32Value();
+			size_t target_size = hi - lo + 1;
+			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(target_size)));
+		}
 
 		default:
 			LOG_ERROR << "Unexpected bitvector kind during tree translation: "
