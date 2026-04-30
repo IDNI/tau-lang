@@ -76,10 +76,10 @@ TEST_SUITE("simplify_using_equality") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			"xy|xz = 0",
 			"yx|xz = 0",
 			"yx|zx = 0",
 			"xy|zx = 0",
-			"xy|xz = 0",
 		}) );
 	}
 	TEST_CASE("2") {
@@ -111,6 +111,7 @@ TEST_SUITE("simplify_using_equality") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>::on(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			"xy = 0 && vw = 0 && yw = 0 && xv = 0",
 			"yx = 0 && vw = 0 && yw = 0 && vx = 0",
 			"yx = 0 && wv = 0 && yw = 0 && xv = 0",
 			"yx = 0 && wv = 0 && yw = 0 && vx = 0",
