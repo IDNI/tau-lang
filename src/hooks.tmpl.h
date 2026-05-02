@@ -193,6 +193,7 @@ tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	case tau::bf_and:      return term_and(v, ch, len, r);
 	case tau::bf_neg:      return term_neg(v, ch, len, r);
 	case tau::bf_xor:      return term_xor(v, ch, len, r);
+	case tau::bf_cast:     return term_cast(v, ch, len, r);
 	case tau::ba_constant: return cte(v, ch, len, r);
 	default: break;
 	}
@@ -464,6 +465,29 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 		return cte_xor(v, ch, len, r);
 	}
 	return tau::get_raw(v, ch, len, r);
+}
+
+// Simplify bitvector cast: (bv[N]) constant -> constant with type bv[N]
+template <NodeType node>
+tref get_hook<node>::term_cast(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("term_cast", v, ch, len, r);)
+	DBG(assert(len == 1);)
+
+	// Get the target type from the bf_cast node (ch[0])
+	size_t target_type_id = tau::get(ch[0]).get_ba_type();
+	if (target_type_id == 0) {
+		return tau::get_raw(v, ch, len, r);
+	}
+
+	// Build the raw symbol first
+	tref symbol = tau::get_raw(v, ch, len, r);
+
+	// Call the bitvector-specific cast implementation
+	if (is_bv_type_family<node>(target_type_id)) {
+		return bv_term_cast<node>(symbol, target_type_id);
+	}
+
+	return symbol;
 }
 
 // Simplify constants being syntactically true or false
