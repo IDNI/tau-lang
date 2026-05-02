@@ -52,6 +52,49 @@ static std::pair<tref, tref> get_arguments(tref term) {
 }
 
 /**
+ * @brief Generates a predicate that constrains a bitvector cast operation.
+ *
+ * For zero-extension (src_width < target_width):
+ *   - Low bits of result must match source bits
+ *   - High bits of result must be zero
+ *
+ * For truncation (src_width > target_width):
+ *   - Result bits must match the low bits of source
+ *
+ * For same-size (src_width == target_width):
+ *   - This function is not called; bf_predicate_blasting handles it directly
+ *
+ * @tparam node Node type
+ * @param src Source bitvector
+ * @param result Result bitvector (fresh variable)
+ * @return The conjunction of bit constraints
+ */
+template<NodeType node>
+static tref bvcast(tref src, tref result) {
+	using tau = tree<node>;
+	auto src_width = get_bv_type_bitwidth<node>(src);
+	auto target_width = get_bv_type_bitwidth<node>(result);
+	auto min_width = std::min(src_width, target_width);
+	tref body = nullptr;
+
+	// Constrain shared bits: (bit i of src == 0) <-> (bit i of result == 0)
+	for (size_t i = 0; i < min_width; ++i) {
+		auto src_bit_zero = tau::build_bf_eq_0(bit<node>(src, i));
+		auto res_bit_zero = tau::build_bf_eq_0(bit<node>(result, i));
+		auto bit_eq = tau::build_wff_equiv(src_bit_zero, res_bit_zero);
+		body = body ? tau::build_wff_and(body, bit_eq) : bit_eq;
+	}
+
+	// For zero-extension: constrain extended bits to zero
+	for (size_t i = min_width; i < target_width; ++i) {
+		auto res_bit_zero = tau::build_bf_eq_0(bit<node>(result, i));
+		body = body ? tau::build_wff_and(body, res_bit_zero) : res_bit_zero;
+	}
+
+	return body;
+}
+
+/**
  * @brief Performs predicate blasting for bitvector terms.
  *
  * Traverses the term, replacing supported bitvector operations with existentially
@@ -125,7 +168,28 @@ static tref bf_predicate_blasting(tref term, subtree_map<node, tref>& changes) {
 					? bvmod<node>(dividend, divisor, result)
 					: bvdiv<node>(dividend, divisor, result);
 				predicate = predicate
-					? build_bf_and<node>(predicate, current)
+					? build_wff_and<node>(predicate, current)
+					: current;
+				break;
+			}
+			case tau::bf_cast: {
+				auto child = tau::get(t).child(0);
+				auto src = (changes.find(child) != changes.end()) ? changes[child] : child;
+				auto target_type_id = tau::get(t).get_ba_type();
+				auto result = tau::build_bf_variable(target_type_id);
+				auto src_width = get_bv_type_bitwidth<node>(src);
+				auto target_width = get_bv_type_bitwidth<node>(result);
+				// Same-size cast: just substitute with source
+				if (src_width == target_width) {
+					changes[t] = src;
+					break;
+				}
+				// Different sizes: introduce variable and predicate
+				vars.push_back(result);
+				changes[t] = result;
+				auto current = bvcast<node>(src, result);
+				predicate = predicate
+					? build_wff_and<node>(predicate, current)
 					: current;
 				break;
 			}

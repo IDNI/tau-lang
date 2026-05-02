@@ -51,6 +51,7 @@ private:
 	static tref term_and       (const node& v, const tref* ch, size_t len, tref r);
 	static tref term_neg       (const node& v, const tref* ch, size_t len, tref r);
 	static tref term_xor       (const node& v, const tref* ch, size_t len, tref r);
+	static tref term_cast      (const node& v, const tref* ch, size_t len, tref r);
 	static tref cte            (const node& v, const tref* ch, size_t len, tref r);
 	static tref cte_or         (const node& v, const tref* ch, size_t len, tref r);
 	static tref cte_and        (const node& v, const tref* ch, size_t len, tref r);

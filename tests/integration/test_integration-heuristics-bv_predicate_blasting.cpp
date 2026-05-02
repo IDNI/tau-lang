@@ -681,7 +681,7 @@ TEST_SUITE("bvrhl bugs") {
 	}
 }
 
-// 
+//
 // Bug 5: bvshl_rule off-by-one and flawed loop logic
 //
 // In bv_predicate_blasting_logic.tmpl.h (line ~525):
@@ -716,6 +716,74 @@ TEST_SUITE("bvshl bugs") {
 	TEST_CASE("bvshl: 1 << 1 != 3 for 4-bit (low bits must be zero, not 1)") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 1 }:bv[4] && x << { 1 }:bv[4] = y && y = { 3 }:bv[4])") == "F");
+	}
+}
+
+//
+// bvcast: bitvector casting — zero-extension and truncation
+//
+// Zero-extension (bv[2] -> bv[4]): low bits of result match source,
+// high bits are forced to zero.
+// Truncation (bv[4] -> bv[2]): result equals the low bits of source.
+// Same-size (bv[4] -> bv[4]): no-op, result equals source unchanged.
+//
+TEST_SUITE("bvcast") {
+
+	// Zero-extension: bv[2] -> bv[4]
+	TEST_CASE("bvcast: zext {2}:bv[2] = {2}:bv[4]") {
+		CHECK(blast_normalize("(bv[4]) { 2 }:bv[2] = { 2 }:bv[4]") == "T");
+	}
+
+	// Zero-extension: bv[2] -> bv[4]
+	TEST_CASE("bvcast: zext {2}:bv[2] = {2}:bv[4]") {
+		CHECK(blast_normalize("ex x (x = { 2 }:bv[2] && (bv[4]) x = { 2 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvcast: zext {3}:bv[2] = {3}:bv[4]") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[2] && (bv[4]) x = { 3 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvcast: zext {0}:bv[2] = {0}:bv[4]") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv[2] && (bv[4]) x = { 0 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvcast: zext high bits must be zero") {
+		// 3 zero-extended to bv[4] is {3}:bv[4] = 0011, not {11}:bv[4] = 1011
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[2] && (bv[4]) x = { 11 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("bvcast: zext wrong low bits") {
+		CHECK(blast_normalize("ex x (x = { 2 }:bv[2] && (bv[4]) x = { 3 }:bv[4])") == "F");
+	}
+
+	// Truncation: bv[4] -> bv[2]
+	TEST_CASE("bvcast: trunc {7}:bv[4] to bv[2] = {3}:bv[2]") {
+		// 7 = 0111; low 2 bits = 11 = 3
+		CHECK(blast_normalize("ex x (x = { 7 }:bv[4] && (bv[2]) x = { 3 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bvcast: trunc {14}:bv[4] to bv[2] = {2}:bv[2]") {
+		// 14 = 1110; low 2 bits = 10 = 2
+		CHECK(blast_normalize("ex x (x = { 14 }:bv[4] && (bv[2]) x = { 2 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bvcast: trunc {4}:bv[4] to bv[2] = {0}:bv[2]") {
+		// 4 = 0100; low 2 bits = 00 = 0
+		CHECK(blast_normalize("ex x (x = { 4 }:bv[4] && (bv[2]) x = { 0 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bvcast: trunc wrong value") {
+		// 7 = 0111 truncated to bv[2] is 3, not 0
+		CHECK(blast_normalize("ex x (x = { 7 }:bv[4] && (bv[2]) x = { 0 }:bv[2])") == "F");
+	}
+
+	// Same-size cast is a no-op
+	TEST_CASE("bvcast: same-size cast is identity") {
+		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && (bv[4]) x = { 5 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvcast: same-size wrong value") {
+		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && (bv[4]) x = { 6 }:bv[4])") == "F");
 	}
 }
 
