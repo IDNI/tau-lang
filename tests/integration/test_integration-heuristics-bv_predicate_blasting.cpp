@@ -1729,7 +1729,7 @@ TEST_SUITE("bvrhl bugs") {
 	}
 }
 
-// 
+//
 // Bug 5: bvshl_rule off-by-one and flawed loop logic
 //
 // In bv_predicate_blasting_logic.tmpl.h (line ~525):
