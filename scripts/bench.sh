@@ -280,32 +280,46 @@ echo ""
 PASS=0
 FAIL=0
 
+
+# Discover both .tau and .tau_cli fixtures
 shopt -s nullglob
-fixtures=("$FIXTURE_DIR"/*.tau)
+fixtures=( "$FIXTURE_DIR"/*.tau "$FIXTURE_DIR"/*.tau_cli )
 
 if [[ ${#fixtures[@]} -eq 0 ]]; then
-    echo "WARNING: No .tau fixtures found in $FIXTURE_DIR" >&2
+    echo "WARNING: No .tau or .tau_cli fixtures found in $FIXTURE_DIR" >&2
     exit 0
 fi
 
 for fixture in "${fixtures[@]}"; do
     [[ -f "$fixture" ]] || continue
-    stem=$(basename "$fixture" .tau)
+    fname=$(basename "$fixture")
+    stem="${fname}"
 
-    stdout_file="$OUTPUT_DIR/${stem}.out"             # programs stdout for reference
+    stdout_file="$OUTPUT_DIR/${stem}.out"             # program stdout for reference
     stderr_file="$OUTPUT_DIR/${stem}.measured.json"   # stderr contains measurements in JSON
     time_json_file="$OUTPUT_DIR/${stem}.time.json"    # /usr/bin/time results in JSON
 
-    # Run tau under /usr/bin/time
+    # Run tau under /usr/bin/time, handling .tau and .tau_cli differently
     TIME_TMP=$(mktemp)
-    /usr/bin/time -v -o "$TIME_TMP" "$TAU_EXE" "$fixture" -qJ \
-        > "$stdout_file" \
-        2> "$stderr_file" \
-        || true
-    TAU_EXIT=$?
+    if [[ "$fixture" == *.tau ]]; then
+        /usr/bin/time -v -o "$TIME_TMP" "$TAU_EXE" "$fixture" -qJ \
+            > "$stdout_file" \
+            2> "$stderr_file" \
+            || true
+        TAU_EXIT=$?
+    elif [[ "$fixture" == *.tau_cli ]]; then
+        /usr/bin/time -v -o "$TIME_TMP" bash -c "cat '$fixture' | '$TAU_EXE' -J" \
+            > "$stdout_file" \
+            2> "$stderr_file" \
+            || true
+        TAU_EXIT=$?
+    else
+        echo "  [SKIP] $fname (unknown extension)"
+        continue
+    fi
 
     # Parse into JSON
-    parse_time_to_json "$TIME_TMP" "${stem}.tau" "$TAU_EXIT" "$time_json_file"
+    parse_time_to_json "$TIME_TMP" "$fname" "$TAU_EXIT" "$time_json_file"
 
     # Extract summary values for console output
     elapsed=$(awk -F': +' '/Elapsed \(wall clock\)/ {print $NF}' "$TIME_TMP")
@@ -314,12 +328,12 @@ for fixture in "${fixtures[@]}"; do
     rm -f "$TIME_TMP"
 
     if [[ $TAU_EXIT -eq 0 ]]; then
-        echo "  [OK]   ${stem}.tau  elapsed=${elapsed}  rss=${rss}kB  exit=${TAU_EXIT}"
+        echo "  [OK]   $fname  elapsed=${elapsed}  rss=${rss}kB  exit=${TAU_EXIT}"
         echo
         cat "$stderr_file"
         (( PASS++ )) || true
     else
-        echo "  [FAIL] ${stem}.tau  elapsed=${elapsed}  rss=${rss}kB  exit=${TAU_EXIT}"
+        echo "  [FAIL] $fname  elapsed=${elapsed}  rss=${rss}kB  exit=${TAU_EXIT}"
         (( FAIL++ )) || true
     fi
 done

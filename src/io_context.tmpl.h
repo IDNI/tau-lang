@@ -219,14 +219,16 @@ inline void vector_input_stream::put(const std::string& value) {
 
 inline vector_output_stream::vector_output_stream()
 	: serialized_constant_output_stream(),
-	values(std::make_shared<std::vector<std::string>>())
+	values(std::make_shared<std::vector<std::string>>()),
+	current(std::make_shared<size_t>(0))
 {
 	DBG(LOG_TRACE << "vector_output_stream::vector_output_stream()";)
 }
 
 inline vector_output_stream::vector_output_stream(const std::shared_ptr<std::vector<std::string>>& values)
 	: serialized_constant_output_stream(),
-	values(values)
+	values(values),
+	current(std::make_shared<size_t>(0))
 {
 	DBG(LOG_TRACE << "vector_output_stream::vector_output_stream(values) values.size(): " << values->size();)
 }
