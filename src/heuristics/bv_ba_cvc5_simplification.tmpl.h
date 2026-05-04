@@ -43,10 +43,24 @@ tref cvc5_tree_to_tau_tree(bv n) {
 	switch (n.getKind()) {
 		case Kind::AND: return from_collection(n, build_wff_and<node>);
 		case Kind::OR: return from_collection(n, build_wff_or<node>);
-		case Kind::NOT: return build_wff_neg<node>(rec(n[0]));
-		case Kind::EXISTS: return build_wff_ex<node>(rec(n[0]), rec(n[1]));
-		case Kind::FORALL: return build_wff_all<node>(rec(n[0]), rec(n[1]));
-		case Kind::VARIABLE_LIST: return tau::trim(rec(n[0]));
+		case Kind::NOT: {
+			auto fml = rec(n[0]);
+			return fml != nullptr ? build_wff_neg<node>(fml) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::EXISTS: {
+			auto var_list = rec(n[0]);
+			auto body = rec(n[1]);
+			return (var_list != nullptr && body != nullptr) ? build_wff_ex<node>(var_list, body) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::FORALL: {
+			auto var_list = rec(n[0]);
+			auto body = rec(n[1]);
+			return (var_list != nullptr && body != nullptr) ? build_wff_all<node>(var_list, body) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::VARIABLE_LIST: {
+			auto var_list = rec(n[0]);
+			return var_list != nullptr ? tau::trim(var_list) : nullptr; // Unable to transform to tau (returning null)
+		}
 		case Kind::VARIABLE:
 			return get_var(n);
 
@@ -54,20 +68,49 @@ tref cvc5_tree_to_tau_tree(bv n) {
 			if (n.getBooleanValue()) return tau::_T();
 			else return tau::_F();
 
-		case Kind::EQUAL: return build_bf_eq<node>(rec(n[0]), rec(n[1]));
-		case Kind::DISTINCT: return build_bf_neq<node>(rec(n[0]), rec(n[1]));
-		case Kind::BITVECTOR_ULE: return build_bf_lteq<node>(rec(n[0]), rec(n[1]));
-		case Kind::BITVECTOR_UGT: return build_bf_gt<node>(rec(n[0]), rec(n[1]));
-		case Kind::BITVECTOR_UGE: return build_bf_gteq<node>(rec(n[0]), rec(n[1]));
-		case Kind::BITVECTOR_ULT: return build_bf_lt<node>(rec(n[0]), rec(n[1]));
-
+		case Kind::EQUAL: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_eq<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::DISTINCT: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_neq<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::BITVECTOR_ULE: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_lteq<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::BITVECTOR_UGT: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_gt<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::BITVECTOR_UGE: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_gteq<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::BITVECTOR_ULT: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_lt<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
 		case Kind::CONSTANT: return get_var(n);
 		case Kind::CONST_BITVECTOR: return build_bf_ba_constant<node>(n,
 			get_ba_type_id<node>(bv_type<node>(n.getSort().getBitVectorSize())));
 
-		case Kind::BITVECTOR_NOT: return build_bf_neg<node>(rec(n[0]));
+		case Kind::BITVECTOR_NOT: {
+			auto operand = rec(n[0]);
+			return operand != nullptr ? build_bf_neg<node>(operand) : nullptr; // Unable to transform to tau (returning null)
+		}
 		// TODO (HIGH) should be two's complement
-		case Kind::BITVECTOR_NEG: return build_bf_neg<node>(rec(n[0]));
+		case Kind::BITVECTOR_NEG: {
+			auto operand = rec(n[0]);
+			return operand != nullptr ? build_bf_neg<node>(operand) : nullptr; // Unable to transform to tau (returning null)
+		}
 		case Kind::BITVECTOR_AND: return from_collection(n, build_bf_and<node>);
 		case Kind::BITVECTOR_OR: return from_collection(n, build_bf_or<node>);
 		case Kind::BITVECTOR_XOR: return from_collection(n, build_bf_xor<node>);
@@ -77,10 +120,26 @@ tref cvc5_tree_to_tau_tree(bv n) {
 		case Kind::BITVECTOR_ADD: return from_collection(n, build_bf_add<node>);
 		case Kind::BITVECTOR_SUB: return from_collection(n, build_bf_sub<node>);
 		case Kind::BITVECTOR_MULT: return from_collection(n, build_bf_mul<node>);
-		case Kind::BITVECTOR_UDIV: return build_bf_div<node>(rec(n[0]), rec(n[1]));
-		case Kind::BITVECTOR_UREM: return build_bf_mod<node>(rec(n[0]), rec(n[1]));
-		case Kind::BITVECTOR_SHL: return build_bf_shl<node>(rec(n[0]), rec(n[1]));
-		case Kind::BITVECTOR_LSHR: return build_bf_shr<node>(rec(n[0]), rec(n[1]));
+		case Kind::BITVECTOR_UDIV: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_div<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::BITVECTOR_UREM: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_mod<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::BITVECTOR_SHL: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_shl<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
+		case Kind::BITVECTOR_LSHR: {
+			auto left = rec(n[0]);
+			auto right = rec(n[1]);
+			return (left != nullptr && right != nullptr) ? build_bf_shr<node>(left, right) : nullptr; // Unable to transform to tau (returning null)
+		}
 		case Kind::BITVECTOR_ZERO_EXTEND: {
 			tref operand = rec(n[0]);
 			if (!operand) return nullptr;
