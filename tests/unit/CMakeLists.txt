@@ -16,6 +16,7 @@ set(TESTS
 	product_ba
 	sbf_ba_parsing
 	tau_spec
+	tau_result
 	tau_tree_from_parser
 	tau_tree_printers
 	traversal
