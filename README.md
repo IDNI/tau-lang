@@ -2,8 +2,8 @@
 
 | Build type | Status                                                                                     |
 |------------|--------------------------------------------------------------------------------------------|
-| Release    | ![Release Build](https://github.com/IDNI/tau-lang/actions/workflows/test-release.yml/badge.svg) |
-| Debug      | ![Debug Build](https://github.com/IDNI/tau-lang/actions/workflows/test-debug.yml/badge.svg)     |
+| Release    | ![Release Build](https://github.com/IDNI/tau-ltl/actions/workflows/test-release.yml/badge.svg) |
+| Debug      | ![Debug Build](https://github.com/IDNI/tau-ltl/actions/workflows/test-debug.yml/badge.svg)     |
 
 # Table of contents
 
@@ -14,18 +14,23 @@
 	3. [MacOS (not available yet)](#macos-not-available-yet)
 	2. [Compiling the source code](#compiling-the-source-code)
 3. [Quick start](#quick-start)
+   1. [Run a spec with the interpreter (`tau`)](#run-a-spec-with-the-interpreter-tau)
+   2. [Compile a spec to C++ (`tau_codegen`)](#compile-a-spec-to-c-tau_codegen)
 4. [The Tau Language](#the-tau-language)
     1. [Tau specifications](#tau-specifications)
-    2. [Satisfiability and execution](#satisfiability-and-execution)
-    3. [Boolean functions](#boolean-functions)
-    4. [Bitvectors](#bitvectors)
-    5. [Functions and predicates](#functions-and-predicates)
-    6. [Constants](#constants)
-    7. [Streams](#streams)
-    8. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
-    9. [Type system](#type-system)
-    10. [Pointwise revision](#pointwise-revision)
-    11. [Reserved symbols](#reserved-symbols)
+    2. [Full LTL operators](#full-ltl-operators)
+    3. [CTL\* fragment and semantic negation](#ctl-fragment-and-semantic-negation)
+    4. [Heterogeneous OMCAT function symbols](#heterogeneous-omcat-function-symbols)
+    5. [Satisfiability and execution](#satisfiability-and-execution)
+    6. [Boolean functions](#boolean-functions)
+    7. [Bitvectors](#bitvectors)
+    8. [Functions and predicates](#functions-and-predicates)
+    9. [Constants](#constants)
+    10. [Streams](#streams)
+    11. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
+    12. [Type system](#type-system)
+    13. [Pointwise revision](#pointwise-revision)
+    14. [Reserved symbols](#reserved-symbols)
 5. [Command line interface](#command-line-interface)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
@@ -36,12 +41,19 @@
 	6. [Logical procedures](#logical-procedures)
 	7. [Normal forms](#normal-forms)
 	8. [Specification execution](#specification-execution)
-7. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
-8. [Known issues](#known-issues)
-9. [Future work](#future-work)
-10. [Submitting issues](#submitting-issues)
-11. [License](#license)
-12. [Authors](#authors)
+7. [Web IDE](#web-ide)
+   1. [Running the IDE](#running-the-ide)
+   2. [IDE Features](#ide-features)
+   3. [Grammar Integration](#grammar-integration)
+   4. [Temporal Formula Visualization](#temporal-formula-visualization)
+   5. [AI Assistant (DeepSeek)](#ai-assistant-deepseek)
+8. [Documentation (mdBook)](#documentation-mdbook)
+9. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
+10. [Known issues](#known-issues)
+11. [Future work](#future-work)
+12. [Submitting issues](#submitting-issues)
+13. [License](#license)
+14. [Authors](#authors)
 
 
 # **Introduction**
@@ -81,8 +93,8 @@ All features discussed below in this readme are available but can have performan
 
 Currently, we automatically build the following binaries packages (AMD64 architecture):
 
-* deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
-* rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
+* deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-ltl/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
+* rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-ltl/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
 
 The executable is installed in `/usr/bin/tau`.
 
@@ -91,8 +103,8 @@ The executable is installed in `/usr/bin/tau`.
 For windows, we provide a convenient installer that includes the tau executable
 and also a zip file:
 
-* Installer: [tau-0.7-win64.exe](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.exe)
-* Zip file: [tau-0.7-win64.zip](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.zip)
+* Installer: [tau-0.7-win64.exe](https://github.com/IDNI/tau-ltl/releases/download/v0.7-alpha/tau-0.7-win64.exe)
+* Zip file: [tau-0.7-win64.zip](https://github.com/IDNI/tau-ltl/releases/download/v0.7-alpha/tau-0.7-win64.zip)
 
 ## **MacOS (not available yet)**
 
@@ -102,15 +114,26 @@ A macOS installer will be available in the future.
 
 To compile the source code you need a recent C++ compiler supporting C++23, e.g.
 GCC 13.1.0. You also need at least cmake version 3.22.1 installed in your system.
-The only code dependencies are the Boost C++ Libraries (libboost) and the CVC5 SMT Solver (`libcvc5-dev` in `debian`
-derived distros).
+The code dependencies are the Boost C++ Libraries (including Boost.Log), CVC5,
+libcurl, and Spot (`ltlsynt`/`ltl2tgba`) for LTL synthesis.
 CVC5 is used only in order to support the theory of bitvectors within the language.
 The core language and its algorithms are independent of CVC5.
+
+On Ubuntu 22.04, the CI dependency set can be installed with:
+
+```bash
+./scripts/setup-ubuntu-ci-deps.sh
+```
+
+The CI build intentionally uses fixed tools and pinned transient dependencies:
+GCC/G++ 13, Ninja, Spot from the `home:adl` package repository, cvc5 1.3.1, and
+doctest `v2.4.11` verified by SHA-256 during CMake configure.  This avoids
+depending on moving upstream defaults when reproducing CI locally.
 
 After cloning:
 
 ```bash
-git clone https://github.com/IDNI/tau-lang.git
+git clone https://github.com/IDNI/tau-ltl.git
 ```
 
 you can run either the `release.sh` or `debug.sh` or `relwithdebinfo.sh` scripts
@@ -131,11 +154,83 @@ Once you have compiled the source code you can run the `tau` executable to
 execute Tau specifications. The `tau` executable is located in either `build-Release`
 or `build-Debug` or `build-RelWithDebInfo`.
 
+The same build also produces the `tau_codegen` executable, which compiles a
+realizable tau specification to a self-contained C++17 program header
+(see [Synthesize a C++ program from a spec](#synthesize-a-c-program-from-a-spec)).
+
 
 # **Quick start**
 
+Tau-lang offers two ways to execute a specification:
+
+1. **Interpret** the spec directly — solve each time step on the fly.
+   Use `tau`.  Best for iteration and REPL use.
+2. **Compile** the spec to a C++17 state machine ahead of time.
+   Use `tau_codegen`.  Best for high-throughput deployment.
+
+Both use the same spec language.  You can start with the interpreter while
+authoring a spec and switch to the compiler for production.
+
+## Run a spec with the interpreter (`tau`)
+
+```sh
+# Start the REPL.
+tau
+
+# Or run a spec file directly.
+tau spec.tau
+
+# Or evaluate a REPL command inline.
+tau -e "sat G(o1[t]:bv = i1[t]:bv)"
+```
+
+Full [command-line reference](#command-line-interface).  The interpreter is
+the right choice when you want to iterate on a spec, inspect intermediate
+results, or run short jobs from the shell.
+
+## Compile a spec to C++ (`tau_codegen`)
+
+`tau_codegen` compiles a realizable tau specification to a standalone
+C++17 header.  The generated code is a pure `switch/case` state machine
+with no runtime dependency on libTAU for propositional specs, and compiles
+with `g++ -O3 -flto -std=c++17`.
+
+```sh
+# 1. Write a spec (mirror-input example).
+echo -n 'G(o1[t]:bv = i1[t]:bv)' > spec.tau
+
+# 2. Synthesize + emit a C++ program header in one command.
+tau_codegen spec.tau -o program.h
+
+# 3. Compile your application against it.
+g++ -O3 -flto -std=c++17 main.cpp -o sim
+./sim
+```
+
+Full worked example: `examples/reactive_program/`.
+
+**Performance**: generated programs run at billions of steps per second
+(see `test_cpp_codegen_bench`).
+
+**Correctness**: synthesis produces a program whose behavior is provably
+consistent with the spec on every input trace.  Unrealizable specs are
+rejected up front by `tau_codegen`.
+
+`tau_codegen` is a one-shot compiler: it parses the input Tau spec, runs the
+same LTL(ABA) synthesis pipeline as the interpreter, and emits a C++ strategy
+header.  Pointwise revision (PWR) happens before code generation: a spec
+already produced by PWR can be passed to `tau_codegen`, synthesized, emitted,
+compiled, and stepped like any other realizable spec.  Runtime PWR/spec
+patching remains the interpreter's responsibility, not a feature of generated
+C++ headers.
+
+See the [command-line reference](#command-line-interface) for full details
+on both `tau` and `tau_codegen` options.
+
+---
+
 To start using the Tau Language, download the latest release from the
-[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
+[GitHub page](https://github.com/IDNI/tau-ltl/releases/tag/v0.7-alpha). Once
 you have downloaded and installed the executable (see the Section
 [Installing the Tau Framework](#installing-the-tau-language-framework)), you can run
 it from the command line by typing `tau`.
@@ -243,7 +338,7 @@ g[n](y):sbf := g[n - 1](y)'
 which defines a function (rather than a predicate) and alternates between 0 and 1
 depending on the parity of n in the `sbf` Boolean algebra (see below in [Type System](#type-system)).
 
-In the [demos](https://github.com/IDNI/tau-lang/tree/main/demos) folder you
+In the [demos](https://github.com/IDNI/tau-ltl/tree/main/demos) folder you
 can find lots of examples regarding how to use the Tau Language, its semantics
 and workings.
 
@@ -275,13 +370,13 @@ The following is a general introduction to using the Tau language.
 ## **Tau specifications**
 
 At the top level, a Tau specification (we also say `spec`) is a collection of
-"always" and "sometimes" statements applied to *local specifications*
+`G` ("globally") and `F` ("finally/eventually") statements applied to *local specifications*
 (expressed by `local_spec`, see below),
 combined by the logical
 connectives *and*, *or* and *not*, denoted by `&&`, `||` and `!` respectively.
 For example a well-formed Tau specification is
 ```
-(always local_spec1) && (sometimes local_spec2)
+(G local_spec1) && (F local_spec2)
 ```
 where *local_spec1* and
 *local_spec2* are formulas as described below.
@@ -303,17 +398,27 @@ stream 2 three time-steps ago". For further detail about streams, please refer
 to section [Streams](#streams).
 
 In all above cases, `t` is a free variable and refers to the current time at
-each point in time. The key point now is that an `always` statement will
-quantify all scoped `t` universally, while a `sometimes` statement will quantify
-them existentially. For example the specification `always o1[t] = 0` says that
-at all time-steps the output stream number 1 will write `0`. Similarly, the
-specification `sometimes o1[t] = 0` says that there exists a time-step at which
-the output stream 1 will write `0`. When executing a Tau specification, the first
-time-step is always 0.
+each point in time. The key point now is that a `G` (globally) statement will
+quantify all scoped `t` universally, while an `F` (eventually) statement will
+quantify them existentially. For example the specification `G o1[t] = 0` says
+that at all time-steps the output stream number 1 will write `0`. Similarly,
+the specification `F o1[t] = 0` says that there exists a time-step at which
+the output stream 1 will write `0`. When executing a Tau specification, the
+first time-step is always 0.
+
+A Tau specification without any temporal wrapper is implicitly assumed to be
+a `G` ("globally") statement.
 
 Formally, the grammar for Tau specifications is
 ```
-spec => local_spec | always local_spec | sometimes local_spec
+spec => local_spec
+      | "G" local_spec          -- globally (always)
+      | "F" local_spec          -- eventually (sometimes)
+      | spec "U" spec           -- until
+      | spec "R" spec           -- release
+      | spec "W" spec           -- weak until
+      | spec "S" spec           -- since (past LTL)
+      | spec "T" spec           -- trigger (past LTL)
       | (spec && spec) | (spec || spec) | !spec
 ```
 where `local_spec` is a formula defined by the rules:
@@ -373,23 +478,347 @@ The symbols used have the following meaning, where a formula refers to either `l
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
 `!` > `&&` > `^^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
-`... ? ... : ...` > `always ...`> `sometimes ...`.
-
-A Tau specification without a mentioning of "always" or "sometimes" is implicitly
-assumed to be an "always" statement.
-
-Note that instead of writing `always` and `sometimes` you can also use box `[]`
-and diamond `<>`, respectively.
+`... ? ... : ...` > `F ...` > `G ...` > `... U ...` > `... R ...` > `... W ...` >
+`... S ...` > `... T ...`.
 
 Using this notation, a slightly bigger example of a Tau spec would be
 
 ```
-    ([] o1[t] i1[t] = 0 && (i1[t] != 1 -> o1[t] != 0)) && (<> o1[t] = i1[t]')
+    (G o1[t] i1[t] = 0 && (i1[t] != 1 -> o1[t] != 0)) && (F o1[t] = i1[t]')
 ```
 
 which reads: at each point of time, the output should be disjoint from the input.
 If the input is not 1, then the output is not zero. And, at least once during
 execution, the output equals the complement of the input.
+
+
+## **Full LTL operators**
+
+Tau supports the standard LTL (Linear Temporal Logic) operators for full
+reactive synthesis, extending the `G`/`F` safety fragment with
+liveness and until-style operators.
+
+### Grammar
+
+```
+spec => ...
+      | "F" spec               -- eventually / finally
+      | "G" spec               -- globally
+      | spec "U" spec          -- until
+      | spec "R" spec          -- release
+      | spec "W" spec          -- weak until
+      | spec "S" spec          -- since (past LTL)
+      | spec "T" spec          -- trigger (past LTL)
+```
+
+`G` (globally) and `F` (eventually) are the primary temporal operators.  `U`, `R`,
+`W` extend the language beyond the safety fragment.  `S` (since) and `T` (trigger)
+are the past-LTL duals of `U` and `R` respectively; they are compiled away to
+auxiliary variables before being passed to the synthesis engine.
+
+The operators `X` (neXt) and `Y` (Yesterday) are *not* provided as explicit
+keywords: they are subsumed by time-indexed stream variables.  For example,
+`o1[t+1]` refers to the next output and `i1[t-1]` refers to the previous input,
+so time shifts serve the role of X/Y directly.
+
+Past LTL via lookback indices on io_vars (`i1[t-k]`, `o1[t-k]`) is the
+preferred way to express history constraints.  The `S` and `T` operators provide
+an alternative surface syntax that is automatically reduced to such indices.
+
+### Semantics
+
+| Operator | Meaning |
+|----------|---------|
+| `F φ`   | φ holds at some future time step (eventually) |
+| `G φ`   | φ holds at all future time steps (globally / always) |
+| `φ U ψ` | φ holds continuously until ψ first holds (until) |
+| `φ R ψ` | ψ holds until and including the first time φ holds, or forever if φ never holds (release) |
+| `φ W ψ` | like `U` but ψ need never hold (weak until) |
+| `φ S ψ` | φ has held since (some past time at which) ψ held (since — past dual of U) |
+| `φ T ψ` | ψ has held since (some past time at which) φ held, or ψ has always held (trigger — past dual of R) |
+
+Standard equivalences hold: `F φ ≡ T U φ`, `G φ ≡ F ¬ φ → ⊥ ≡ φ R ⊥`,
+`φ W ψ ≡ G φ ∨ (φ U ψ)`.  Past duals: `φ S ψ` is the since operator and
+`φ T ψ` is its release-like dual.
+
+### Examples
+
+```
+-- Output o1 must eventually be 0
+F (o1[t] = 0)
+
+-- Output o1 must stay 0 until input i1 is 1
+(o1[t] = 0) U (i1[t] = 1)
+
+-- Infinitely often the output must echo the input
+G (F (o1[t] = i1[t]))
+
+-- Release: i1[t] != 0 releases o1[t] = 0
+(i1[t] != 0) R (o1[t] = 0)
+```
+
+### Synthesis game semantics
+
+Tau realizability is defined as a **two-player reactive synthesis game**:
+
+- The **system** (synthesized program) controls all *output* streams (`o1`, `o2`, …).
+- The **environment** (adversarial input) controls all *input* streams (`i1`, `i2`, …).
+- At each time step, the environment provides inputs first; the system then produces outputs.
+  The system may use any past inputs and outputs with lookback index `[t-k]`.
+
+A formula `φ` is:
+- **REALIZABLE** if `∃strategy. ∀env. φ` — the system has a winning strategy that satisfies `φ` for every possible input sequence.
+- **UNREALIZABLE** if `∀strategy. ∃env. ¬φ` — no matter what the system does, the environment can always violate `φ`.
+
+```
+-- REALIZABLE: system can always echo the input
+G (o1[t] = i1[t]).
+
+-- REALIZABLE: system can always output 0 (vacuously satisfies the antecedent)
+G (i1[t] = 1 -> o1[t] = 1).
+
+-- UNREALIZABLE: no output can satisfy both simultaneously
+G (o1[t] = 0) && G (o1[t] = 1).
+
+-- UNREALIZABLE: environment can always choose i1=1 to block the condition
+G (o1[t] = 1 -> i1[t] = 0).
+```
+
+Naming convention: `oN` (N = 1, 2, …) are output stream names; `iN` are input stream names.  These names are required — the synthesis engine uses the `o`/`i` prefix to classify variables as system-controlled vs. environment-controlled.
+
+### Realizability algorithm
+
+LTL(ABA) realizability uses an oracle-assisted synthesis algorithm:
+
+1. **Data atoms** — maximal temporal-operator-free subformulas involving
+   stream variables — are extracted from the formula.
+2. Each data atom is replaced by a propositional variable `d_i`; the result is a
+   pure-propositional LTL skeleton φ*(d₀, …, d_{K-1}).
+3. A type enumeration over the named constants in the formula (T₁ for output
+   memory, T₂ for (memory, input) pairs) builds a propositional formula that
+   encodes which (memory-type, data-pattern) triples are feasible.  The formula
+   also adds input propositions (P-bits) that expose the current input's T₁ type
+   to the synthesizer, enabling type-aware strategies.
+4. Spot's `ltlsynt` decides realizability of the propositional formula and
+   extracts a winning Mealy strategy automaton (HOA format).
+5. The **ABA oracle** (tau-lang's own quantifier-elimination engine) verifies
+   that every strategy transition is consistent with the underlying Boolean
+   algebra: for every input assignment, the system can find output values
+   satisfying the data guard (`∀i. ∃o. guard`).
+
+A formula is **realizable** iff both (4) and (5) succeed.  The external tool
+`ltlsynt` (part of Spot ≥ 2.10) must be on the `PATH` for LTL formulas.
+
+#### Synthesis algorithms
+
+The LTL(ABA) implementation currently exposes the following synthesis paths:
+
+| Algorithm | `TAU_LTL_ALG` | Description |
+|-----------|--------------|-------------|
+| **Algorithm B** (default for input-bearing `qlt`) | unset or `B` | Adds `⌈log₂\|T₂\|⌉` *input* propositions (P-bits) binary-encoding the T₂ type σ = (pos_m, pos_x, rel_mx). The strategy observes the current input's T₁ type, making it sound for formulas with input variables (e.g. `G(o1 > i1)`). Formula structure: `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)` where Φ_I/Ψ_I are env assumptions about P-bits. |
+| **Algorithm A** | automatic for pure-output formulas, or `A` for pure-output formulas | Uses only R-bits for memory type with no input propositions. Fast for pure-output formulas. When input variables are present, Algorithm A is intentionally bypassed because it cannot observe the environment's T₁ type. |
+| **Algorithm D** | `D` | Output-only direct parity-game construction. Builds the propositional synthesis game for φ*(D_i) via `ltlsynt --print-game-hoa`, then solves the data product game (synthesis game × T₁) using Zielonka's recursive attractor solver. D-patterns are decoded by AP name (`d_i`), not by HOA AP order. Input-variable formulas fall through to Algorithm B. |
+
+Algorithm B is the default for formulas over the `qlt` type that contain input
+variables. Pure-output `qlt` formulas route to Algorithm A because no P-bits are
+needed. Algorithm D is accessible via `TAU_LTL_ALG=D`, but remains output-only.
+The algorithm picker follows the same soundness rule: A and D are excluded when
+input variables are present.
+
+**Synthesis timeout**: by default, `ltlsynt` is given 60 seconds to solve
+the propositional skeleton.  Set the environment variable `TAU_LTL_TIMEOUT_SEC`
+to a positive integer to change the limit, or to `0` to disable it entirely.
+
+```bash
+TAU_LTL_TIMEOUT_SEC=120 tau "G (F (o1[t] = i1[t]))."
+```
+
+**LTL synthesis environment variables** (all optional):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TAU_LTL_TIMEOUT_SEC` | 60 | Wall-clock limit for each `ltlsynt` call (0 = disable). |
+| `TAU_LTL_MAX_DEPTH` | 8 | Max temporal-operator nesting depth before early error (0 = disable). |
+| `TAU_LTL_MAX_LOOKBACK` | 5 | Max `[t-k]` lookback before early error (0 = disable). |
+| `TAU_LTL_EXPORT_STRATEGY` | _unset_ | `hoa` prints winning-strategy HOA to stderr; `dot` prints Graphviz dot (falls back to HOA if `autfilt` is unavailable). |
+| `TAU_LTL_EXPORT_STRATEGY_FILE` | _unset_ | If set to a path, also writes the HOA strategy to that file on success. |
+| `TAU_LTL_SIMPLIFICATION` | _ltlsynt default_ | Forwarded to `ltlsynt --simplification=` (`bwoa`\|`sat`\|`bisim-sat`\|`none`). |
+| `TAU_LTL_WITNESS` | _unset_ | When set to `1`, prints an environment counter-strategy (HOA) to stderr on UNREALIZABLE — only available when the UNREAL verdict comes from `ltlsynt` (not from earlier tau-internal rejection). |
+| `TAU_LTL_CACHE` | _unset_ | When set to `1`, enables a thread-safe whole-formula result cache in `is_tau_formula_sat`. Keyed on `(tref, start_time, output)`. Pure-function, no correctness impact. Useful for fuzz loops / REPL workflows with many identical formulas. |
+| `TAU_LTL_ALG` | _unset_ (Algorithm B for input-bearing qlt, Algorithm A for pure-output qlt) | Override synthesis algorithm: `A` = request Algorithm A for pure-output formulas (input-bearing formulas still route to B), `B` = Algorithm B (P_σ binary encoding), `D` = request output-only Algorithm D (input-bearing formulas fall through to B). |
+
+**Execution**: when the interpreter pipeline is given a realizable LTL formula,
+`ltl_to_safety_formula` converts the winning Mealy strategy to an executable
+`G(φ)` formula.  Single-state strategies (common for F, G(F), R, W) use the
+self-loop guard directly.  Multi-state strategies are encoded using one-hot
+auxiliary output bitvector variables (`o__ltl_ms0__`, `o__ltl_ms1__`, …) and
+work for any number of states.
+
+### Operator precedence
+
+LTL operators bind less tightly than propositional connectives:
+
+```
+!  >  &&  >  ^^  >  ||  >  <->  >  <-  >  ->  >  ex  >  all  >  ?:  >  F  >  G  >  U  >  R  >  W  >  S  >  T
+```
+
+### Multi-type LTL formulas
+
+Different LTL sub-formulas may use different BA types (tau, sbf, bv), but each
+*atomic formula* must use exactly one type.  Variables of different types must
+be given different stream names (e.g. `o1:tau` and `o2:sbf`).
+
+Verified working patterns:
+
+| Pattern | Result |
+|---------|--------|
+| `F(tau) && F(sbf)` | REALIZABLE |
+| `F(sbf) && F(bv)` | REALIZABLE |
+| `G(sbf) && F(bv)` | REALIZABLE |
+| `G(tau) && F(bv)` | REALIZABLE |
+| `G(tau) && G(tau)` | Merged to `G(tau && tau)` — works |
+| `G(sbf) && G(sbf)` | Merged to `G(sbf && sbf)` — works |
+| `G(tau) && G(sbf)` | REALIZABLE ✓ (split into independent checks) |
+| `G(tau) && G(bv)` | REALIZABLE ✓ (split into independent checks) |
+
+When combining two `G` sub-formulas of the **same** type, write either
+`G(phi_A && phi_B)` or `G(phi_A) && G(phi_B)` — the two are semantically
+equivalent and tau-lang automatically merges the latter form into a single
+`G` before normalization.
+
+### Lookback initialization
+
+When a specification uses lookback stream variables (e.g. `i1[t-k]` or
+`o1[t-k]`), the interpreter needs `k` warm-up steps before the lookback
+values are available.  During these initial steps all output variables are
+unconstrained and default to the bottom element (`0`/`"F"` for tau,
+`0`/`"F"` for sbf, etc.).  The number of warm-up steps equals the *maximum*
+lookback shift across all stream variables in the formula (the global
+`max_lookback`).  Every output — even those with a smaller individual shift —
+receives `max_lookback` initial default values.
+
+Example: `G(o1[t] = i1[t-1] && o2[t] = i2[t-2])` has `max_lookback = 2`.
+Both `o1` and `o2` will output `"F"` for steps 0 and 1, regardless of their
+individual shifts.
+
+### Known LTL limitations
+
+- **Spec terminator**: every formula string passed to the parser must end with `.`
+  (a period), e.g. `G (o1[t] = 1).`  Omitting the terminator causes a parse error.
+- **Semantic Boolean negation is not implemented**: future docs use `-Φ` for
+  semantic/program-level complement over causal programs.  Current Tau syntax
+  uses `!` for ordinary formula negation; `-` is already used in the grammar for
+  subtraction, integer signs, and stream-index shifts, so any future semantic
+  negation syntax must be added as a typed spec-level grammar extension.
+- **nlang_ba requires DEEPSEEK_API_KEY**: formulas using the `nlang` type require
+  the `DEEPSEEK_API_KEY` environment variable to be set; without it the oracle
+  calls will fail at runtime.
+- **Mixed-type G&&G**: `G(phi_A) && G(phi_B)` where `phi_A` and `phi_B` use
+  different BA types raises "nesting of temporal quantifiers".  Use `F` or
+  `G+F` combinations for mixed-type liveness, or keep each type in its own
+  top-level temporal operator.
+- **fall/fex BF quantifiers**: these parse correctly but are not supported in
+  LTL synthesis (only in safety/always formulas).
+- **Input-only atoms**: formulas consisting entirely of input constraints (no
+  output variables) are checked for satisfiability but cannot be synthesized
+  (the system has no control over pure-input atoms).
+- **Nesting depth**: deeply nested formulas (depth > 6) may exceed stack or memory
+  limits.  Use shallower formulas or increase the process stack size when needed.
+
+## **CTL\* fragment and semantic negation**
+
+The default grammar fragment is **LTL** (linear temporal logic).  To use
+branching-time operators, switch to the CTL\* fragment:
+
+```
+#fragment ctl_star.
+```
+
+To switch back:
+
+```
+#fragment ltl.
+```
+
+### CTL\* operators
+
+The CTL\* fragment extends the LTL grammar with path quantifiers:
+
+| Operator | Syntax | Meaning |
+|----------|--------|---------|
+| **A** (for-all paths) | `A φ` | φ holds on every path from the current state |
+| **E** (exists path) | `E φ` | φ holds on at least one path from the current state |
+
+`A` and `E` quantify over the tree of possible strategy executions, not over
+individual traces.  The equivalence `A φ ≡ ¬E¬φ` holds.
+
+### Semantic negation (`-`)
+
+The CTL\* fragment also introduces **semantic negation** (`-`), which is
+distinct from syntactic negation (`!`):
+
+| Negation | Syntax | Meaning |
+|----------|--------|---------|
+| Syntactic (`!`) | `! φ` | Boolean complement of formula φ |
+| Semantic (`-`) | `- φ` | There is **no** winning strategy for the system satisfying φ |
+
+`- φ` is a strategy-level statement: it asserts that the specification φ is
+**unrealizable** — no matter what the system does, the environment can always
+violate φ.  This differs from `! φ`, which simply flips the truth value of φ on
+a single trace.
+
+### Examples
+
+```
+-- In the CTL* fragment:
+#fragment ctl_star.
+
+-- For all paths, eventually the output is 1
+A F(o1[t] = 1).
+
+-- There exists a path where the output is always 0
+E G(o1[t] = 0).
+
+-- Semantic negation: no strategy can keep output always equal to input
+- G(o1[t] = i1[t]).
+```
+
+### Reduction to LTL
+
+CTL\* formulas are reduced to LTL synthesis problems via the
+Bloem/Schewe/Khalimov witness-output encoding.  Each existential path choice
+is encoded as an additional witness output variable, allowing the existing
+`ltlsynt`-based pipeline to handle the branching-time property.
+
+## **Heterogeneous OMCAT function symbols**
+
+Heterogeneous function symbols allow defining typed functions whose arguments
+and results may come from different OMCAT sorts.  Function declarations use
+the `func` keyword:
+
+```
+func f(Bool) -> Bool dynamic.
+func g(Bool, Bool) -> Bool static.
+```
+
+### Function modes
+
+| Mode | Meaning |
+|------|---------|
+| `dynamic` | The function may vary per time step (window-level) |
+| `static` | The function is fixed for the entire execution (global graph) |
+
+### Function application
+
+Once declared, functions can be applied in formulas:
+
+```
+func inc(Bool) -> Bool dynamic.
+G(o1[t] = inc(i1[t])).
+```
+
+The OCFuncs compilation pipeline handles purification, support bounding,
+profile encoding, and LTL skeleton generation automatically.
 
 
 ## **Satisfiability and execution**
@@ -432,7 +861,7 @@ In each consecutive step the time step is incremented by 1. As a result, we get 
 continues timeline starting at 0 and ending at however far the specification has
 been executed.
 
-Take for a minimal example the specification `always o1[t] = i1[t]`,
+Take for a minimal example the specification `G o1[t] = i1[t]`,
 saying that at each time step `t`, the input `i1` is equal to the output `o1`.
 Executing this specification means to start at `t := 0`. Hence, in the first step
 during execution we have `o1[0] = i1[0]`. The value for `i1[0]` is then requested,
@@ -602,14 +1031,14 @@ number `k`, and essentially rotates the arguments counterclockwise until reachin
 
 A similar but more complex example for predicates is
 ```
-f[0](w,x,y,z) := x & { always o1[t] = 0 } != 0
+f[0](w,x,y,z) := x & { G o1[t] = 0 } != 0
 f[n](w,x,y,z) := f[n-1](x,y,z,w)
 
 h[0](w,x,y,z) := f[0](w,x,y,z)
 h[n](w,x,y,z) := h[n-1](w,x,y,z) && f[n](w,x,y,z)
 ```
 As a result, calling `h[3](w,x,y,z)` checks that none of the arguments `w, x, y, z`
-assumes `sometimes o1[t] != 0`.
+assumes `F o1[t] != 0`.
 
 As can be seen, recurrence relations can also refer to other recurrence relations.
 The rule one must follow is that the `index` at the right-hand side of `:=` is not bigger
@@ -635,15 +1064,16 @@ Constants in the Tau Language are elements of some available Boolean algebra,
 usually different from just `0` and `1`. Constants in a particular Boolean algebra come
 with their own syntax.
 
-In the Tau language, we currently support two non-atomless Boolean algebras,
-which we also call the base Boolean algebras:
+In the Tau language, we currently support the following base types.  Most are
+Boolean algebras; `qlt` is ω-categorical and decidable, and is supported for
+that reason:
 1. the Boolean algebra of Tau specifications (also referred to as Tau Boolean algebra)
-2. the Boolean algebra of simple Boolean functions
-
-As commented before, we also support the Boolean algebra of bitvectors of fixed bit width.
-
-Several others are in development, like the Boolean algebra of bitvectors of fixed bit width and
-the Boolean algebra of Boolean (not just simple) functions in general.
+2. the Boolean algebra of simple Boolean functions (`sbf`)
+3. the Boolean algebra of bitvectors of fixed bit width (`bv`)
+4. the ω-categorical theory of dense linear order without endpoints (`qlt`) — rationals under `<`; ω-categorical and decidable, hence supported
+5. the Boolean algebra of rational intervals `[x, y)` (`qint`) — right-closed, left-open; accepts both rational (`1/4`) and decimal (`0.25`) constants
+6. the Natural Language Boolean Algebra (`nlang`)
+7. the Boolean algebra of lex-half-open polyhedra in ℝ^d (`hsb`) — generalizes `qint` from 1D to d dimensions using canonical halfspaces
 
 The Boolean algebra of Tau specifications is an extensional Boolean
 algebra that encodes Tau specifications over arbitrary available other Boolean algebras.
@@ -660,6 +1090,7 @@ where `base_boolean_algebra_type` is given by:
 
 ```
 base_boolean_algebra_type => "tau" | "sbf" | "bv" [ '[' bit_width ']' ]
+                           | "qlt" | "qint" | "nlang" | "hsb"
 ```
 
 As mentioned, we can have a Tau specification seen as a Boolean algebra element (you can omit
@@ -721,7 +1152,7 @@ Both kinds of streams are indexed by time starting at the time step 0. A stream
 associates to each time step a Boolean algebra element matching the type of the stream.
 
 Which Boolean algebra element is associated, is decided by the Tau specification
-in which the stream is used. For example, the specification `always o1[t] = 0`
+in which the stream is used. For example, the specification `G o1[t] = 0`
 says that `o1` associates `0` to each time step. One can alternatively think about this
 as the value `0` being written into the stream `o1` at each time step.
 
@@ -753,7 +1184,7 @@ When typing a stream explicitly in [REPL](#the-tau-repl), the syntax is
 ```
 stream_definition => stream_variable [":" type] ":=" stream_type stream
 ```
-where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`...),
+where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`, `qlt`, `qint`, `nlang`, `hsb`...),
 `stream_type` is either input stream (`in`) or output stream (`out`), and `stream` is either `console` (meaning that the
 stream reads/outputs values from/to the console) or `file(file_name)` which denotes the file from/into which to read/write
 (in quotes if needed). For example,
@@ -814,8 +1245,12 @@ is then executed with those assignments.
 The Tau Language currently supports the following types:
 
 1. `tau`: the type of Tau specifications,
-2. `sbf`: the type of simple Boolean functions, and
-3. `bv`: the type of bitvectors of fixed bit width.
+2. `sbf`: the type of simple Boolean functions,
+3. `bv`: the type of bitvectors of fixed bit width,
+4. `qlt`: the ω-categorical theory of the rationals under `<` (dense linear order, no endpoints) — ω-categorical and decidable, hence supported,
+5. `qint`: the Boolean algebra of right-closed, left-open rational intervals `[x, y)`; accepts both rational (`1/4`) and decimal (`0.25`) endpoint constants,
+6. `nlang`: the Natural Language Boolean Algebra (requires `DEEPSEEK_API_KEY`), and
+7. `hsb`: the Boolean algebra of lex-half-open polyhedra in ℝ^d — generalizes `qint` from 1D to d dimensions using canonical halfspaces (see [hsb](#hsb--lex-half-open-polyhedra)).
 
 You can type the following elements: variables, streams, recurrence relations,
 constants and (term) constants. In order to do so, you just add the type
@@ -830,6 +1265,145 @@ o1[t] : bv
 ```
 
 are all valid typed elements.
+
+#### `qlt` — ω-categorical dense linear order
+
+`qlt` represents the first-order theory of the rationals under `<`: a dense
+linear order without endpoints.  This theory is ω-categorical, decidable, and
+admits quantifier elimination, which is why tau-lang supports it.  Every
+definable set is a finite Boolean combination of open/half-open/closed
+intervals with rational endpoints.
+
+tau-lang treats `qlt` specially: it is routed through a dedicated DLO
+quantifier-elimination path (`qlt_dlo_qe`), not through the Boolean-algebra
+pipeline (the comparison hooks `<`, `>`, `≤`, `≥` have their own semantics,
+and `bf_*` Boolean-function rewrites do not apply).
+
+Elements are written as interval expressions inside `{...}:qlt`:
+
+```
+{ (0,1) }:qlt          -- open interval between 0 and 1
+{ [0.5,2) }:qlt        -- half-open interval; 0.5 parses as 1/2
+{ (-inf,0) }:qlt       -- everything less than 0
+{ (0,1) | [3,5) }:qlt  -- union of two intervals
+{ 0.45 }:qlt           -- singleton constant (decimal accepted)
+{ 1/3 }:qlt            -- singleton constant (rational form)
+```
+
+Endpoints are exact rationals.  The special symbols `-inf` and `+inf`
+represent the extended line endpoints.  Parentheses `(`, `)` exclude the
+endpoint; brackets `[`, `]` include it.  Both rational (`p/q`) and decimal
+(`0.d…`) literal syntaxes are accepted.
+
+#### `qint` — atomless Boolean algebra of rational intervals
+
+`qint` represents the atomless Boolean algebra of right-closed, left-open
+intervals `[a, b)` over the rationals on the extended real line.  Elements
+are finite unions of such intervals.  The sentinels `-inf` and `+inf` are
+supported as endpoints.
+
+Internally, endpoints are stored as exact fixed-point numbers with scale
+`2^30` (the real value of a raw integer `r` is `r / 2^30`), so only rationals
+whose denominator divides `2^30` are representable as constants; other
+rationals cannot be expressed as `qint` literals.  Both rational (`1/4`) and
+decimal (`0.25`) syntaxes are accepted for representable endpoints.
+
+Elements are written as interval expressions inside `{...}:qint`:
+
+```
+{ [0,1) }:qint           -- unit interval [0, 1)
+{ [1/2,+inf) }:qint      -- from 1/2 to +infinity (rational syntax)
+{ [0.5,+inf) }:qint      -- identical to above (decimal syntax)
+{ [-inf,0) }:qint        -- everything strictly negative
+{ [0,1/2) | [1,2) }:qint -- union of two intervals
+```
+
+Only right-closed, left-open intervals are representable as single atoms;
+arbitrary Boolean combinations produce finite unions of such intervals.
+
+#### `hsb` — lex-half-open polyhedra
+
+`hsb` represents the atomless Boolean algebra of *lex-half-open polyhedra* in
+ℝ^d (LP_d^Q).  It generalizes `qint` from 1D to d dimensions using canonical
+halfspaces.
+
+**Mathematical construction.** For a normal vector w ∈ ℝ^d \ {0}, define:
+- L(w) = min{i : w_i ≠ 0} — the lex-leading index
+- s(w) = sign(w_{L(w)}) ∈ {+1, −1} — the lex-leading sign
+
+The canonical halfspace H_{w,b} is:
+- `{ x : ⟨w,x⟩ + b ≤ 0 }` if s(w) = −1 (closed — boundary included)
+- `{ x : ⟨w,x⟩ + b < 0 }` if s(w) = +1 (open — boundary excluded)
+
+**Key properties:**
+1. **Complement**: ℝ^d \ H_{w,b} = H_{−w,−b}.  Negating the normal flips the
+   lex-leading sign, hence flips open↔closed.
+2. **No equalities**: for any v ≠ 0, exactly one of {⟨v,x⟩ ≤ c} and
+   {⟨v,x⟩ ≥ c} is canonical, so {⟨v,x⟩ = c} is never expressible.
+3. **Atomless**: every non-empty element has non-empty interior (because no
+   equalities → full-dimensional cells).  This is the defining property of an
+   atomless Boolean algebra.
+4. **1D reduction**: when d = 1, H_{w,b} gives exactly the half-open intervals
+   `[a, b)` of `qint`.
+
+Elements are formula trees of canonical halfspaces combined with Boolean
+operations (&, |, ~).  Emptiness checking uses Fourier-Motzkin elimination to
+test LP feasibility of each conjunctive cell in the DNF expansion.
+
+`hsb` is registered in the dispatcher pack and `main.cpp` (available as a
+data-sort alongside `sbf`, `bv`, `qint`, `qlt`, and `nlang`).
+
+**Parsed constant syntax.** The `parse_hsb` function accepts:
+
+| Input | Meaning |
+|-------|---------|
+| `top`, `{ top }` | Universe (ℝ^d) |
+| `bot`, `bottom`, `{ bot }` | Empty set |
+| `x[0] < 0` | Single open halfspace |
+| `x[0] <= 0` | Single closed halfspace |
+| `x[0]*0.5 + 0.7 < 0` | Halfspace with coefficient and bias |
+| `0.5*x[0] + -0.3*x[1] + 0.7 < 0` | Multivariate halfspace |
+| `x[0] < 0 & x[1] < 0` | Conjunction of halfspaces |
+
+Coefficients can appear before (`0.5*x[0]`) or after (`x[0]*0.5`) the variable.
+Conjunctions use `&` as separator.  Disjunctions and negations are composed
+via the Boolean algebra operations at the formula level.
+
+The test suite (`tests/unit/test_hsb.cpp`) covers Fourier-Motzkin elimination,
+complement closure, splitter, Boolean combinations, parser, dispatcher
+integration, and LTL(hsb) realizability.
+
+#### `nlang` — Natural Language Boolean Algebra (experimental)
+
+> **Note:** `nlang` is experimental.  Its semantics depend on an external LLM
+> oracle (DeepSeek) and results may be non-deterministic or inconsistent across
+> API calls.  Use for exploration and prototyping only.
+
+`nlang` represents a Boolean algebra whose elements are natural language concept
+descriptions (strings).  Boolean operations compose descriptions using English
+connectives:
+
+- `{ A }:nlang | { B }:nlang` produces `"(A) or (B)"`
+- `{ A }:nlang & { B }:nlang` produces `"(A) and (B)"`
+- `~{ A }:nlang` produces `"not (A)"`
+
+The DeepSeek API (via the `DEEPSEEK_API_KEY` environment variable) serves as the
+semantic oracle for equality, emptiness, and universality tests.  Without a valid
+API key the system cannot decide Boolean questions over `nlang` elements.
+
+Elements are written as natural language strings inside `{...}:nlang`:
+
+```
+{ mammals }:nlang
+{ large birds }:nlang
+{ X | (Y & Z) }:sbf         -- not nlang; use plain strings for nlang
+```
+
+The content inside `{}` for `nlang` is interpreted as a natural language phrase,
+not a Boolean formula.  Compound descriptions should be expressed as English
+phrases rather than symbolic connectives.
+
+**Requirement**: `DEEPSEEK_API_KEY` must be set in the environment.
 
 In the case of functional recurrence relations (as all arguments must have the
 same type) the syntax is as follows:
@@ -967,7 +1541,7 @@ Running this example in REPL (see [The Tau REPL](#the-tau-repl) below) yields:
 ```
 tau> run u[t] = i1[t]
 
-Temporal normalization of always specification reached fixpoint after 0 steps, yielding the result:
+Temporal normalization of G specification reached fixpoint after 0 steps, yielding the result:
 i1[t]u[t]' = 0 && i1[t]'u[t] = 0
 
 -----------------------------------------------------------------------------------------------------------
@@ -977,10 +1551,10 @@ If no input is requested, press ENTER to continue to the next execution step, or
 
 Execution step: 0
 i1[0] := o1[t] = 1
-u[0] := always o1[t]' = 0
+u[0] := G o1[t]' = 0
 
 Updated specification:
-always o1[t]' = 0 && i1[t]u[t]' = 0 && i1[t]'u[t] = 0
+G o1[t]' = 0 && i1[t]u[t]' = 0 && i1[t]'u[t] = 0
 
 Execution step: 1
 i1[1] := o2[t] = 0 && o2[t] = 1
@@ -990,10 +1564,10 @@ u[1] := F
 Execution step: 2
 i1[2] := o1[t] = 0
 o1[2] := T
-u[2] := always o1[t] = 0
+u[2] := G o1[t] = 0
 
 Updated specification:
-always o1[t] = 0
+G o1[t] = 0
 
 Execution step: 3
 o1[3] := F
@@ -1033,9 +1607,9 @@ the value at `o1[t-k]`. If no such memory position is present, no update is perf
 `t-k` must not be below 0. After replacing all such streams with
 the respective value from the memory, it is checked again if `update` is satisfiable given these memory references.
 If it is unsatisfiable, no update is performed. Otherwise, we move to the next step:
-2) Let us refer to the currently running specification as `spec`. `spec` is composed of a single `always` statement
-and possibly several `sometimes` statements. We denote the `always` part by `aw_spec` and the collection of
-`sometimes` parts by `st_spec`. In the same way `aw_update` denotes the `always` part of `update`.
+2) Let us refer to the currently running specification as `spec`. `spec` is composed of a single `G` statement
+and possibly several `F` statements. We denote the `G` part by `aw_spec` and the collection of
+`F` parts by `st_spec`. In the same way `aw_update` denotes the `G` part of `update`.
 The next candidate for the updated specification, let's call it `U`, is given by <br>
 `U := update && ( (ex [outputs] aw_update && aw_spec) -> aw_spec)`, where `[outputs]` refers to the list of all output streams present
 in `aw_spec` and `aw_update` combined. The meaning is that, whenever possible given the current input at a particular step,
@@ -1043,10 +1617,10 @@ in `aw_spec` and `aw_update` combined. The meaning is that, whenever possible gi
 Note that it is possible to refine the definition of the new specification
 in more advanced ways. We will explore this aspect in the future. <br>
 If `update` is satisfiable, then `U` is satisfiable,
-unless the `sometimes` part of `update`
+unless the `F` part of `update`
 prevents it. If it is prevented, `update` becomes the final updated specification.
 Otherwise, `U` becomes the updated specification and the next step is performed.
-3) As a final step, it is checked if the previous `sometimes` statements `st_spec` are executable along the updated specification `U`.
+3) As a final step, it is checked if the previous `F` statements `st_spec` are executable along the updated specification `U`.
 If this is the case, they are added to the updated specification. Otherwise,
 `U` is accepted as the final update.
 
@@ -1069,37 +1643,104 @@ algebra elements.
 
 # **Command line interface**
 
-The general form of tau executable command line is:
+Tau-lang ships two executables:
+
+- **`tau`** — the interactive / interpreter executable.  Runs a specification
+  by solving each time step through the core solver pipeline.  Best for REPL
+  use, spec authoring, and executing specifications dynamically.
+- **`tau_codegen`** — the ahead-of-time compiler.  Reads a specification,
+  invokes the synthesis pipeline, and emits a standalone C++17 header that
+  implements a synthesized state-machine program.  Best for deploying
+  realized specs at memory-bandwidth speed (billions of steps per second).
+
+Both executables share the same input spec format.  Use whichever matches
+your deployment story.
+
+## `tau` — interpreter and REPL
+
+The general form of the tau executable command line is:
 
 ```bash
 tau [ options ] [ <specification> ]
 ```
 
-where `[ options ]` are the command line options and `[ <specification> ]` is the Tau
-specification you want to run. If you omit the tau specification, the Tau REPL will be
-started.
+where `[ options ]` are the command line options and `[ <specification> ]` is
+the Tau specification file you want to run.  If you omit the tau specification,
+the Tau REPL will be started.
 
 The general options are the following:
 
-| Option             | Description                                           |
-|--------------------|-------------------------------------------------------|
-| -h, --help         | detailed information about options                    |
-| -l, --license      | show the license                                      |
-| -v, --version      | show the version of the executable                    |
-|--------------------|-------------------------------------------------------|
-| -V, --charvar      | charvar (enabled by default)                          |
-| -S, --severity     | severity level (trace/debug/info/error)               |
-| -I, --indenting    | indenting of the formulas                             |
-| -H, --highlighting | syntax highlighting                                   |
+| Option              | Description                                             |
+|---------------------|---------------------------------------------------------|
+| -h, --help          | detailed information about options                      |
+| -l, --license       | show the license                                        |
+| -v, --version       | show the version of the executable                      |
+| -V, --charvar       | char-as-variable short form (enabled by default)        |
+| -S, --severity      | severity level (trace/debug/info/error); default `info` |
+| -I, --indenting     | indent formulas in output                               |
+| -H, --highlighting  | syntax highlighting                                     |
+| -B, --benchmarks    | print benchmarks (enabled by default)                   |
+| -J, --json          | output in JSON format                                   |
+| -q, --quit          | quit when no input is available (scripted runs)         |
+| -x, --experimental  | enable experimental / transitioning features            |
 
-whereas the REPL specific options are:
+Whereas the REPL specific options are:
 
-| Options            | Description                                 |
-|--------------------|---------------------------------------------|
-| -e, --evaluate     | REPL command to be evaluated                |
-| -s, --status       | display status                              |
-| -c, --color        | use colors                                  |
-| -d, --debug        | debug mode                                  |
+| Option             | Description                                  |
+|--------------------|----------------------------------------------|
+| -e, --evaluate     | REPL command to evaluate and exit            |
+| -s, --status       | display status in the REPL prompt            |
+| -c, --color        | use terminal colors                          |
+| -d, --debug        | debug mode (present in debug builds)         |
+
+## `tau_codegen` — synthesis-to-C++ compiler
+
+Compiles a tau specification to a standalone C++17 header containing a
+synthesized program expressed as a `switch/case` state machine.  The generated
+code is a pure switch/case with no runtime dependency on libTAU for
+propositional specs, and compiles with `g++ -O3 -flto -std=c++17`.
+
+```bash
+tau_codegen [ <spec_file> | - ] [ -o <output.h> ] [ --class <Name> ]
+```
+
+| Option              | Description                                                    |
+|---------------------|----------------------------------------------------------------|
+| -h, --help          | show usage and exit                                            |
+| `<spec_file>`       | path to a `.tau` specification; use `-` or omit for stdin      |
+| -o `<output.h>`     | emit to this file; omitted means write to stdout               |
+| --class `<Name>`    | class identifier for the emitted program; default `TauProgram` |
+
+Exit codes:
+
+| Code | Meaning                                                           |
+|------|-------------------------------------------------------------------|
+| 0    | success; header written                                           |
+| 1    | parse error or I/O error                                          |
+| 2    | usage error (unknown flag, missing argument)                      |
+| 3    | specification is UNREALIZABLE                                     |
+
+Example session:
+
+```bash
+echo -n 'G(o1[t]:bv = i1[t]:bv)' > spec.tau
+tau_codegen spec.tau -o program.h --class Echo
+g++ -O3 -flto -std=c++17 driver.cpp -o sim
+./sim
+```
+
+See `examples/reactive_program/` for a fully worked Makefile example.
+
+## When to use which
+
+| Situation                                               | Use         |
+|---------------------------------------------------------|-------------|
+| Interactive spec authoring / debugging                  | `tau` REPL  |
+| One-off running of a spec against inputs                | `tau`       |
+| Checking satisfiability / realizability of a spec       | `tau`       |
+| Deploying a realized spec at high throughput            | `tau_codegen` |
+| Integrating the synthesized behavior into a C++ project | `tau_codegen` |
+| Specs with data atoms requiring runtime witness search  | both: `tau_codegen` emits stubs, `tau` / `libTAU` resolves at runtime |
 
 # **The Tau REPL**
 
@@ -1178,11 +1819,11 @@ recurrence relations. See the Tau Language section
 
 * `<type> i<number> := console | ifile(<filename>)`: defines an input stream variable.
 The input variable can read values from the console or from a provided file. <br>
-`<type>` can be either `tau` or `sbf` (simple Boolean function) at the moment.
+`<type>` can be `tau`, `sbf`, `bv`, `qlt`, `qint`, or `nlang`.
 
 * `<type> o<number> := console | ofile(<filename>)`: defines an output stream variable.
 The output variable can write values to the console or into a file. <br>
-`<type>` can be either `tau` or `sbf` (simple Boolean function) at the moment.
+`<type>` can be `tau`, `sbf`, `bv`, `qlt`, `qint`, or `nlang`.
 
 ## **Memory related commands**
 
@@ -1266,6 +1907,310 @@ Finally, you can run a given Tau specification. The syntax for the commands is:
 
 * `run|r <repl_memory|tau>`: runs the given Tau specification.
 
+* `ltl <repl_memory|tau>`: prints the full LTL(ABA) translation pipeline for a
+  formula containing LTL operators (`F`, `G`, `U`, `R`, `W`).  Shows the data
+  atom extraction, propositional skeleton, ltlsynt result, HOA strategy
+  automaton, ABA oracle feasibility checks, and the synthesized safety formula.
+  Useful for understanding how a full-LTL formula is handled step by step.
+
+# **Web IDE**
+
+A full-featured browser-based IDE for composing, navigating, debugging, and
+running Tau programs.  It is a Python local webserver that wraps the `tau`
+binary and exposes every REPL command through a modern editor UI.
+
+![IDE Editor](https://app.devin.ai/attachments/8db0bb57-41bb-467d-8081-a30bb8c67229/ide-editor.png)
+
+![IDE Visualization](https://app.devin.ai/attachments/8f3de213-52a9-4e3b-9674-bdfb2dd5aac7/ide-visualization.png)
+
+## Running the IDE
+
+### Quick start (one command)
+
+The launcher script handles **everything** — builds the tau binary (if needed),
+creates a Python virtual environment, installs dependencies, and starts the IDE:
+
+```bash
+# Linux / macOS
+./run-ide.sh
+```
+
+```powershell
+# Windows (PowerShell)
+.\run-ide.ps1
+```
+
+Then open **http://localhost:8080** in your browser.
+
+**Options:**
+
+| Flag | Effect |
+|------|--------|
+| `--port 9090` | Use a different port |
+| `--jobs 4` | Parallel build jobs (default: half your cores) |
+| `--skip-build` | Skip C++ build (IDE still works for editing, help, grammar, visualization, AI) |
+| `--help` | Show all options |
+
+> The IDE works for editing, syntax highlighting, help, grammar browsing,
+> visualization, and AI assistance **without** the tau binary.  Execution
+> features (Run, Eval, REPL) activate once the binary is built.
+
+### What the launcher does
+
+1. **Locates Python 3.10+** — tries `python3`, then `python`
+2. **Builds the tau binary** (unless `--skip-build` or already built):
+   - Initializes git submodules
+   - Installs build dependencies on Ubuntu (`scripts/setup-ubuntu-ci-deps.sh`)
+   - Vendors the `ankerl/unordered_dense` header (avoids network issues)
+   - Runs `release.sh` → produces `build-Release/tau`
+3. **Creates a Python venv** at `.venv/` (skipped if it already exists)
+4. **Installs Python deps** from `ide/requirements.txt`
+5. **Starts the IDE server** on the specified port
+
+### Build variants
+
+If you prefer to build manually:
+
+| Script | Binary location | Use case |
+|--------|----------------|----------|
+| `./release.sh` | `build-Release/tau` | Normal use (fastest) |
+| `./debug.sh` | `build-Debug/tau` | Debugging with symbols |
+| `./relwithdebinfo.sh` | `build-RelWithDebInfo/tau` | Profiling |
+
+The IDE server automatically searches all of these directories for the binary.
+
+### Manual setup (if you prefer not to use the launcher)
+
+```bash
+cd tau-ltl
+python3 -m venv .venv
+source .venv/bin/activate      # ⬅ MUST activate before pip install
+pip install -r ide/requirements.txt
+python -m uvicorn ide.server:app --host 0.0.0.0 --port 8080
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `unordered_dense` clone fails during build | The launcher vendors this automatically; if building manually, run: `mkdir -p external/parser/external/ankerl && curl -sL https://raw.githubusercontent.com/martinus/unordered_dense/v4.4.0/include/ankerl/unordered_dense.h -o external/parser/external/ankerl/unordered_dense.h` |
+| `externally-managed-environment` error | You forgot to activate the venv: run `source .venv/bin/activate` first |
+| `pip install` fails with permission error | Use the launcher script or create a venv manually (see above) |
+| `python3: command not found` | Try `python` instead of `python3`; ensure Python 3.10+ is installed |
+| `No module named 'uvicorn'` | Make sure you activated the venv (`source .venv/bin/activate`) before running |
+| Port 8080 already in use | `./run-ide.sh --port 9090` |
+
+### Custom binary location
+
+```bash
+python -m ide.server --port 8080 --tau-binary /path/to/tau
+```
+
+## IDE Features
+
+| Area       | What you get |
+|------------|-------------|
+| **Compose** | Syntax highlighting (grammar-driven), autocomplete from grammar tokens, 8 starter templates, file tabs |
+| **Navigate** | Sidebar explorer with test/example files, symbol search, command palette (`Ctrl+Shift+P`) |
+| **Debug**   | AST viewer panel, `whatis` type inspection, variable hover tooltips |
+| **Run**     | Execute specs (`Shift+Enter`), evaluate formulas (`Ctrl+Enter`), quick actions (SAT / valid / normalize / DNF / CNF / …) |
+| **Help**    | 10 searchable help topics, grammar reference derived from `parser/tau.tgf`, keyboard shortcut reference |
+| **Visualize** | Timeline diagrams for temporal operators, AST tree view, color-coded operator legend |
+| **AI** | DeepSeek-powered NL ↔ Tau translation, context-aware code assistance, code explanations |
+
+### Keyboard shortcuts
+
+| Shortcut          | Action                 |
+|-------------------|------------------------|
+| `Ctrl+Enter`      | Evaluate selection/line |
+| `Shift+Enter`     | Run specification      |
+| `Ctrl+Space`      | Autocomplete           |
+| `Ctrl+/`          | Toggle comment         |
+| `Ctrl+Shift+P`    | Command palette        |
+| `Ctrl+Shift+V`    | Visualize formula      |
+| `Ctrl+N`          | New file               |
+| `Ctrl+O`          | Open file              |
+| `Ctrl+S`          | Save file              |
+| `Ctrl+G`          | Go to line             |
+| `F1`              | Toggle help panel      |
+| `Escape`          | Close palette/panels   |
+
+### Fragment switching
+
+Use the dropdown in the top bar or the REPL command to switch between grammar
+fragments:
+
+```
+fragment ltl.        # default — standard LTL operators
+fragment ctl_star.   # enable CTL* path quantifiers A, E and semantic negation -
+```
+
+## Grammar Integration
+
+The IDE parses `parser/tau.tgf` at server startup and derives:
+
+- **Token categories** for syntax highlighting (keywords, temporal ops, commands,
+  types, operators — all from the grammar)
+- **Autocomplete entries** with documentation for every command, keyword, and
+  operator
+- **Grammar reference panel** in the help sidebar showing every `wff`, `bf`, and
+  CLI production rule with syntax, label, and description
+- **Hover tooltips** — hover a highlighted token in the editor to see its grammar
+  rule and description
+
+If the grammar file changes, restart the server to pick up the new definitions.
+The highlighter and autocomplete update automatically.
+
+## Temporal Formula Visualization
+
+Click the **Viz** button or press `Ctrl+Shift+V` to visualize the current
+formula (or selected text).  The visualization panel shows:
+
+- **Timeline diagram** — SVG rendering showing how temporal operators behave over
+  time steps.  `G` spans all steps, `F` highlights eventual satisfaction, `U`
+  shows the handoff point, etc.
+- **AST tree** — interactive parse tree of the formula with color-coded nodes for
+  each operator type
+- **Operator legend** — all temporal operators with their semantics and colors
+
+This is a presentation/teaching aid — useful for understanding what a formula
+means over time.
+
+## AI Assistant (DeepSeek)
+
+The IDE includes a DeepSeek-powered AI assistant for working with Tau code.
+Click the **AI** button in the top bar or use the AI tab in the bottom panel.
+
+**Setup:** Click the gear icon to enter your DeepSeek API key.  The key is
+stored in browser `localStorage` only — it is never written to disk or sent
+anywhere except directly to the DeepSeek API.
+
+**Three modes:**
+
+1. **Ask (context-aware)** — "How do I add a liveness property to this?" The
+   assistant sees your entire editor content and provides code snippets that
+   integrate with your existing program.
+
+2. **Generate from NL** — Describe what you want in plain English and the
+   assistant generates complete Tau code.  The generation prompt includes the
+   full grammar, language semantics, 15 worked examples, and common-mistake
+   avoidance rules.
+
+3. **Explain code** — Select code (or use the full editor content) and get a
+   structured natural-language explanation: one-sentence summary, operator-by-
+   operator breakdown, I/O behavior, required fragment.
+
+**Models:** Choose between DeepSeek R1 (reasoning, slower, more accurate) and
+DeepSeek V3 (fast chat).
+
+Generated code can be inserted at cursor or replace the editor content with one
+click.
+
+
+# **Developer infrastructure for ω-categorical synthesis**
+
+The following headers (all standalone, header-only, test-covered) implement
+tau-lang's LTL(ABA) synthesis pipeline over ω-categorical theories.
+
+## Core synthesis algorithms
+
+| Header | Status | Purpose |
+|--------|--------|---------|
+| `src/algorithm_b_skeleton.h` | **Default path** | Algorithm B: `build_algorithm_b_skeleton(T1_size, T2_size, K, feasible_set_b, t2_pos_m, phi_star)`. Adds ⌈log₂\|T₂\|⌉ input P-bits encoding T₂ = (pos_m, pos_x, rel_mx). Assembles `(Φ_I ∧ Ψ_I) → (Φ_O^R ∧ Φ_δ ∧ φ*)`. Sound for input-variable formulas. Activated by default or `TAU_LTL_ALG=B`. |
+| `src/algorithm_a_skeleton.h` | Available for pure-output formulas | Algorithm A: `build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star)`. Uses ⌈log₂\|T₁\|⌉ output R-bits for the memory type, no input propositions. Faster for pure-output formulas; bypassed when input variables appear. |
+| `src/algorithm_d_game.h` | Available for output-only formulas (`TAU_LTL_ALG=D`) | Algorithm D: direct parity-game construction. HOA guard evaluator (`eval_guard`); synthesis game parser (`parse_synth_game_hoa`); `build_product_game` (synthesis game × T₁, with T₃ feasibility pruning); `zielonka_win_player1` (recursive attractor + subgame solver, odd priority = system wins). |
+| `src/algorithm_c_skeleton.h` | Available | Algorithm C: oracle-assisted abstract game. `A_{ρ,J}` encoding — O(\|T_1\|·2^K) inputs, K+\|T_1\| outputs, independent of \|T_3\|. |
+
+## Type enumeration (ω-categorical theories)
+
+| Header | Purpose |
+|--------|---------|
+| `src/omcat_types.h` | Rational `Rat` type. `QltType1`/`QltType2`/`QltType3` structs for 1-/2-/3-types of (ℚ,<,Σ). `enumerate_qlt_T1` (2k+1 types from k constants), `enumerate_qlt_T2` (T₂ = (pos_m, pos_x, rel_mx) with forced-relation filtering), `enumerate_qlt_T3` (T₃ with transitivity filter). `realize()` rational witnesses. `Pre_over_T1` controllable-predecessor operator; `nu_fixpoint`/`mu_fixpoint` over 2^{T_1}; `reachable_from` BFS. |
+| `src/omcat_constants.h` | `parse_rat_literal` for rational/decimal strings; `collect_qlt_constants(fm)` harvesting named constants from a formula. |
+| `src/omcat_oracle_cache.h` | Thread-safe runtime cache for atomic oracle answers (tp(m,x) and achievability-set A_{ρ,J}). |
+
+## Supporting infrastructure
+
+| Header | Purpose |
+|--------|---------|
+| `src/gr1_detect.h` | `is_gr1_fragment(fm, &n_safety, &n_liveness)` classifier for `⋀ G(ψ_safe) ∧ ⋀ GF(ψ_live)`. |
+| `src/liveness_decomp.h` | `decompose_liveness(fm)` splits GR(1)-shaped formulas into safety part + GF bodies. |
+| `src/spec.h` | `Spec { transient; invariant; reactive }` with `decompose_spec(fm)` classifier. |
+| `src/parse_error_hint.h` | `classify_parse_error(formula)` for actionable parse error messages. |
+| `src/tau_lang_api.h` | Stable public API: `tau_lang_is_realizable(formula_str)` returning `{REALIZABLE, UNREALIZABLE, ERROR}`. |
+
+## Algorithm A/B soundness rule
+
+Algorithm A has no input propositions, so it is sound only when the formula has
+no input variables. If a `qlt` formula contains input variables, the dispatcher
+uses Algorithm B even if `TAU_LTL_ALG=A` was requested. Algorithm B adds P-bits
+for the current T₂ type, making the synthesized strategy type-aware.
+
+# **Python bindings (ctypes)**
+
+A minimal ctypes-based Python shim is shipped in `bindings/python/` for
+scripted LTL(ABA) realizability decisions.  Configure with
+`-DTAU_BUILD_BINDING_PYTHON=ON`; the `tau_lang` CMake target produces
+`libtau_lang.so` (or `.dylib` / `.dll`).  Usage:
+
+```python
+from tau_lang import decide, Verdict, last_error
+
+v = decide("G ((o1[t]:qlt > {1/4}:qlt) && (o1[t]:qlt < {3/4}:qlt)).")
+if v == Verdict.REALIZABLE:
+    print("realizable")
+elif v == Verdict.UNREALIZABLE:
+    print("unrealizable")
+else:
+    print("error:", last_error())
+```
+
+Set the `TAU_LTL_LIB` environment variable to the absolute path of the
+built shared library if it isn't on the default search path.  The C API
+header (`bindings/python/tau_lang_c_api.h`) is directly usable by other
+foreign-function-interface callers.
+
+The parse-error hint classifier is also exposed as a pure-header
+utility at `src/parse_error_hint.h` — external consumers can call
+`idni::tau_lang::classify_parse_error(formula)` after a failed parse to
+obtain a short, actionable explanation.
+
+# **Documentation (mdBook)**
+
+A comprehensive user guide is available as an [mdBook](https://rust-lang.github.io/mdBook/) site in the `docs/` folder. It covers the full language reference, all APIs (C++, C, Python, REPL, codegen), tutorials, an error catalog, algorithm selection guide, and performance best practices.
+
+## Building the docs
+
+Install mdBook (requires [Rust](https://rustup.rs/)):
+
+```bash
+cargo install mdbook
+```
+
+Or download a prebuilt binary from [mdBook releases](https://github.com/rust-lang/mdBook/releases).
+
+Build and serve locally:
+
+```bash
+cd docs
+mdbook build          # generates docs/book/
+mdbook serve          # live-reload at http://localhost:3000
+```
+
+The generated site is in `docs/book/` and can be deployed to any static hosting (GitHub Pages, Netlify, etc.).
+
+## Contents
+
+| Section | Pages | Description |
+|---------|-------|-------------|
+| Getting Started | 3 | Introduction, installation, quick start |
+| Language Reference | 11 | Types, temporal operators, Boolean functions, streams, constants, variables, functions, quantifiers, PWR, CTL* |
+| API Guide | 5 | C++ API, C API, Python API, REPL, codegen |
+| Tutorials | 5 | First spec, multi-output, input-output, runtime revision, Mealy machine extraction |
+| Reference | 4 | Operator precedence, grammar, error catalog, algorithm selection |
+| Performance | 3 | Best practices, ltlsynt caching, formula complexity |
+
+
 # **The Theory behind the Tau Language**
 
 * GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)
@@ -1282,6 +2227,21 @@ This is a short list of known issues that will be fixed in a subsequent release:
   * Path simplification algorithm does not take equalities between variables
   into account leading to later blow ups.
 * Minor errors in Windows REPL
+* LTL-specific:
+  * Always include time indices `[t]` on io_vars: `G(o1[t]:sbf = i1[t]:sbf)`.
+    Omitting them (e.g. `G(o1:sbf = i1:sbf)`) is a syntax error.
+  * Input variables in the left operand of `U`/`W` cannot be synthesised.
+  * `G(phi_A) && G(phi_B)` with **different** BA types raises "nesting of temporal
+    quantifiers"; use `F`, or `G+F` combinations with different types instead.
+  * `G(phi_A) && G(phi_B)` with the **same** BA type is automatically merged to
+    `G(phi_A && phi_B)` — both forms work.
+  * Mealy strategies with any number of states are executable.
+  * `S` (since) and `T` (trigger) past LTL operators are compiled away to auxiliary
+    variables; ltlsynt integration for pure past operators is pending.
+  * `nlang` type requires `DEEPSEEK_API_KEY` to be set; without it, any oracle call
+    over `nlang` elements will fail at runtime.
+  * **Algorithm A** is intentionally restricted to pure-output formulas. If
+    input variables are present, the dispatcher uses Algorithm B.
 
 
 # **Future work**
@@ -1292,16 +2252,40 @@ This is a short list of known issues that will be fixed in a subsequent release:
 * Add support for redefinitions of functions or predicates.
 * Add support for arbitrary stream names.
 * Improve the performance of Boolean function normalization.
+* **Past LTL S/T operators**: currently compiled away to auxiliary variables; full
+  integration with ltlsynt for pure past-LTL fragments is planned.
+* **Mealy strategy execution for large strategies**: extend the interpreter to
+  support Mealy strategies with more than 8 states.
+* **nlang_ba**: support for additional LLM backends (OpenAI, local models) beyond
+  the current DeepSeek oracle.
+* **qlt/qint synthesis**: further polish of the QE oracle for reactive synthesis
+  over `qlt` (DLO) and `qint` (interval BA) types — decimal and rational constants
+  are supported, the dedicated DLO QE path handles the `qlt` ω-categorical theory,
+  and the data oracle is cross-validated against cvc5 LRA in `test_qlt_oracle`.
+* **Algorithm D Phase 2/3**: Algorithm D currently solves the product game for
+  safety/reachability objectives.  Extension to the full μ/ν fixpoint parity-game
+  formulation (T₃×Q pre-derivation) is planned — this requires derivation of the
+  T₃×Q game from the book's §6.7 algorithm and is blocked on interactive design.
+* **BA type encoding for Algorithm B**: currently only `qlt` (DLO) types use the
+  T₁/T₂ type-enumeration path.  Extension to other BA types (sbf, bv, tau) requires
+  BDD-based type encoding: the type of a BA element relative to the formula's
+  named constants is determined by which atom of the subalgebra generated by those
+  constants the element falls in — equivalently, the element's BDD restricted to
+  the constant variables.
+* **Term algebras**: support for term algebras (theory of trees) as a concrete domain
+  — decidable ω-categorical theories admitting quantifier elimination.
+* **Explicit template instantiations**: reduce compile times by moving hot function
+  templates into separate `.cpp` files with explicit instantiations.
 
 
 # **Submitting issues**
 
-Please submit issues at the following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
+Please submit issues at the following link: [Tau Language issues](https://github.com/IDNI/tau-ltl/issues).
 
 # **License**
 
 Tau Language is licensed under the following terms:
-[Tau Language License](https://github.com/IDNI/tau-lang/blob/main/LICENSE.md)
+[Tau Language License](https://github.com/IDNI/tau-ltl/blob/main/LICENSE.md)
 
 # **Authors**
 

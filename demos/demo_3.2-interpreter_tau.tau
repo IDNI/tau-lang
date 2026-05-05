@@ -16,7 +16,7 @@ tau i1 = console
 tau o1 = console
 
 
-# Now, let us consider a simple tau program which always output the same program
+# Now, let us consider a simple tau program which always outputs the same program
 # (as the output doesn't depends on the inputs, we must specify the number of
 # steps to be performed when running it).:
 
@@ -34,14 +34,14 @@ o1[t] = 0.
 # Let us provide a slightly more complex example:
 
 r o1[t] = i1[t]'
-always o1[t] = 0.
+G o1[t] = 0.
 
 # Now, let us go into the rabbit hole of recursion. Let us consider the above
-# program but let us provide as input a program that sometimes return a program
+# program but let us provide as input a program that eventually (F) returns a program
 # that returns the same program.
 
 r o1[t] = i1[t]'
-sometimes o1[t] =  { o1[t] = i1[t] }.
+F o1[t] =  { o1[t] = i1[t] }.
 
 # In the future we would provide more complex examples, but we
 # guess you have a taste of how the interpreter works, at least in simple cases.
