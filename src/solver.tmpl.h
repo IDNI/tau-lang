@@ -8,7 +8,7 @@
 #define LOG_CHANNEL_NAME "solver"
 
 // In what follows we use the algorithms and notations of TABA book (cf.
-// Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
+// Section 3.2). Check (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
 // for the details.
 
 namespace idni::tau_lang {
@@ -954,6 +954,94 @@ std::optional<solution<node>> solve_system(const equation_system<node>& system,
 	return solve_general_system<node>(system, options);
 }
 
+// Returns true if n is a qlt DLO ordering atom: wff with bf_lt/bf_gt/bf_lteq/bf_gteq child.
+template <NodeType node>
+bool is_qlt_ordering_atom(tref n) {
+	using tau = tree<node>;
+	const auto& fm = tau::get(n);
+	if (!fm.is(tau::wff) || !fm.has_child()) return false;
+	auto op = fm[0].value.nt;
+	return op == tau::bf_lt || op == tau::bf_gt
+	    || op == tau::bf_lteq || op == tau::bf_gteq;
+}
+
+// Pick a concrete witness rational from the first non-empty, non-symbolic piece.
+// Returns nullopt if none found.
+template <NodeType node>
+std::optional<qlt_rational> qlt_pick_witness(const qlt& interval) {
+	for (const auto& p : interval.pieces) {
+		const auto& lo = p.lo.val;
+		const auto& hi = p.hi.val;
+		if (lo.is_sym() || hi.is_sym()) continue;
+		if (lo.is_neg_inf() && hi.is_pos_inf()) return qlt_rational(0, 1);
+		if (lo.is_neg_inf() && hi.is_finite())
+			return qlt_rational(hi.p - hi.q, hi.q); // hi - 1
+		if (lo.is_finite() && hi.is_pos_inf())
+			return qlt_rational(lo.p + lo.q, lo.q); // lo + 1
+		// both finite
+		if (lo == hi) {
+			if (p.lo.bound == qlt_bound::CLOSED && p.hi.bound == qlt_bound::CLOSED)
+				return lo;
+			continue; // empty degenerate interval
+		}
+		return lo.midpoint(hi);
+	}
+	return {};
+}
+
+// Solve a pure qlt DLO ordering inequality system using qlt_dlo_qe.
+// Handles bf_lt/bf_gt/bf_lteq/bf_gteq atoms; picks a concrete witness per variable.
+template <NodeType node>
+std::optional<solution<node>> solve_qlt_ordering_system(
+	const inequality_system<node>& sys, const solver_options& options)
+{
+	if constexpr (ba_variant_includes_v<qlt, typename tree<node>::constant>) {
+		using tau = tree<node>;
+
+		// Collect unique variables (pointer identity suffices for interned nodes)
+		trefs all_vars;
+		for (tref atom : sys) {
+			for (tref v : get_variables<node>(atom)) {
+				bool already = false;
+				for (tref u : all_vars) if (u == v) { already = true; break; }
+				if (!already) all_vars.push_back(v);
+			}
+		}
+		if (all_vars.empty()) return solution<node>{};
+
+		// Build conjunction of all constraints for qlt_dlo_qe
+		tref body = tau::_T();
+		for (tref atom : sys)
+			body = tau::build_wff_and(body, atom);
+
+		solution<node> result;
+		for (tref var : all_vars) {
+			// qlt_dlo_qe expects a raw variable node; get_variables returns bf[variable]
+			tref var_raw = tau::get(var).first();
+			auto interval = qlt_dlo_qe<node>(var_raw, body);
+			// If undetermined (cross-variable or unsupported), bail out
+			if (!interval) return {};
+			if (interval->is_empty()) return {};
+
+			auto witness = qlt_pick_witness<node>(*interval);
+			if (!witness) return {};
+
+			// Build singleton qlt and convert to tree constant
+			qlt_piece p;
+			p.lo = qlt_endpoint{*witness, qlt_bound::CLOSED};
+			p.hi = qlt_endpoint{*witness, qlt_bound::CLOSED};
+			qlt singleton{{p}};
+			typename tau::constant c = qlt{singleton};
+			// ba_constants::get returns a raw ba_constant; wrap in bf for solution value
+			tref witness_raw = ba_constants<node>::get(c, options.type_id);
+			tref witness_node = tau::get(tau::bf, witness_raw);
+			result[var] = witness_node;
+		}
+		return result;
+	}
+	return {};
+}
+
 template <NodeType node>
 std::optional<solution<node>> solve(const equations<node>& eqs,
 					const solver_options& options)
@@ -977,6 +1065,18 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 			}
 		}
 		else system.second.insert(eq);
+	}
+	// For qlt ordering inequality-only systems (no equality), use DLO QE to
+	// find a concrete witness rather than the BA-level solve_inequality_system
+	// which cannot handle bf_lt/bf_gt atoms.
+	if (!system.first.has_value() && !system.second.empty()
+	    && is_omcat_type_family<node>(ba_types<node>::type_tree(options.type_id)))
+	{
+		bool all_ordering = true;
+		for (tref neq : system.second)
+			if (!is_qlt_ordering_atom<node>(neq)) { all_ordering = false; break; }
+		if (all_ordering)
+			return solve_qlt_ordering_system<node>(system.second, options);
 	}
 	return solve_system<node>(system, options);
 }
@@ -1095,8 +1195,18 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			LOG_TRACE << "solve/options.splitter_one:"
 				<< options.splitter_one; break;
 	}
-	// The solver cannot solve temporally quantified formulas
-	assert(!tau::get(form).find_top(is_temporal_quantifier<node>));
+	// Temporal quantifiers (always/sometimes) may wrap atomic equations
+	// and are unwrapped per-conjunct after path splitting (lines 1226+).
+	// Only flag truly unsupported temporal operators (U, F, R, W, S, T).
+	{
+		auto is_unsupported_temporal = [](tref n) {
+			const auto& t = tree<node>::get(n);
+			return t.is(tau::wff_F) || t.is(tau::wff_U)
+				|| t.is(tau::wff_R) || t.is(tau::wff_W)
+				|| t.is(tau::wff_S) || t.is(tau::wff_T);
+		};
+		assert(!tau::get(form).find_top(is_unsupported_temporal));
+	}
 #endif // DEBUG
 	form = normalize_non_temp<node>(form);
 	for (tref path : expression_paths<node>(form)) {
@@ -1150,6 +1260,19 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				path_sat = true;
 				continue;
 			}
+			// Unwrap temporal quantifiers (always/sometimes) to reach the atomic equation
+			{
+				const auto& t = tau::get(conj);
+				if (t.is(tau::wff) && t[0].is(tau::wff_always))
+					conj = t[0].first();
+				else if (t.is(tau::wff) && t[0].is(tau::wff_sometimes))
+					conj = t[0].first();
+			}
+			if (tau::get(conj).equals_T()) {
+				path_sat = true;
+				continue;
+			}
+			if (tau::get(conj).equals_F()) continue;
 			size_t type = find_ba_type<node>(conj);
 			if (!is_atomic_fm<node>(conj) && !(is_bv_type_family<node>(type) && is_child_quantifier<node>(conj))) {
 				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);

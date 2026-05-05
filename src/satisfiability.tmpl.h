@@ -2,6 +2,13 @@
 
 #include "satisfiability.h"
 #include "normalizer.h"
+#include "ltl_aba.h"
+
+#include <cstdlib>
+#include <functional>
+#include <mutex>
+#include <string>
+#include <unordered_map>
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "satisfiability"
@@ -591,13 +598,14 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	LOG_DEBUG << "Continuation at step " << step_num << ": " << LOG_FM(phi);
 
 	int_t lookback = get_max_shift<node>(io_vars);
-	// Find fix point once all initial conditions have been passed and
-	// the time_point is greater equal the step_num
+	// Limit iterations to guard against non-convergent formulas (e.g. bug #47).
 	// SO-1: this search has no convergence guarantee; cap the step count so
 	// a non-converging formula fails loudly instead of hanging forever.
 	// This is a safety net, not full error propagation: callers still
 	// receive a (non-fixpoint) result rather than a failure signal.
 	constexpr int_t max_fixpoint_steps = 1'000'000;
+	// Find fix point once all initial conditions have been passed and
+	// the time_point is greater equal the step_num
 	while (step_num < lookback || !is_nso_impl<node>(phi_prev, phi)){
 		if (step_num >= max_fixpoint_steps) {
 			LOG_ERROR << "find_fixpoint_phi: exceeded " << max_fixpoint_steps
@@ -672,7 +680,7 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	LOG_DEBUG << "Continuation at step " << step_num << ": "
 			<< LOG_FM(rewriter::replace<node>(chi, pholder_to_st));
 
-	// Find fix point once the lookback is greater the step_num
+	// Limit iterations to guard against non-convergent formulas.
 	// SO-1: same unbounded-search concern as find_fixpoint_phi above.
 	constexpr int_t max_fixpoint_steps = 1'000'000;
 	while (step_num < lookback || !is_nso_impl<node>(chi_prev_replc, chi_replc))
@@ -683,6 +691,7 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 			break;
 		}
 		chi_prev = chi, chi_prev_replc = chi_replc, ++step_num;
+
 		chi = build_step_chi<node>(chi_base, st, chi_prev, io_vars,
 			initials, step_num, time_point, cache, pholder_to_st);
 		chi_replc = rewriter::replace<node>(chi, pholder_to_st);
@@ -815,7 +824,8 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 	// We make the variable static so that we can transform different parts of the formula independently
 	static size_t ctn_id = 0;
 	if (reset_ctn_id) ctn_id = 0, reset_ctn_id = false;
-	for (tref ctn : tau::get(fm).select_top(is<node, tau::constraint>)) {
+	auto ctns = tau::get(fm).select_top(is<node, tau::constraint>);
+	for (tref ctn : ctns) {
 		const auto& ct = tau::get(ctn);
 		std::string ctnvar = tau::get(
 			ct.find_top(is<node, tau::ctnvar>)).get_string();
@@ -973,7 +983,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		run = normalize_non_temp<node>(run);
 		if (!is_run_satisfiable<node>(run)) {
 			print_fixpoint_info(
-				"Temporal normalization of always specification reached fixpoint after "
+				"Temporal normalization of G specification reached fixpoint after "
 				+ std::to_string(steps) +
 				" steps, yielding the result: ",
 				TAU_TO_STR(tau::_F()), output);
@@ -984,7 +994,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn);
 	// The following is std::cout because it should always be printed
 	print_fixpoint_info(
-		"Temporal normalization of always specification reached fixpoint after "
+		"Temporal normalization of G specification reached fixpoint after "
 		+ std::to_string(steps) + " steps, yielding the result: ",
 		TAU_TO_STR(tau::get(result).child_is(tau::wff_always)
 			? tau::trim2(result) : result), output);
@@ -1499,6 +1509,59 @@ template <NodeType node>
 bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	using tau = tree<node>;
 	LOG_DEBUG << "Start is_tau_formula_sat: " << LOG_FM(fm);
+	// Merge top-level (G A) && (G B) → G(A && B) up-front.  Direct
+	// callers (the PWR-output → is_realizable path in test_pwr_*,
+	// for example) reach is_tau_formula_sat without going through
+	// api::sat / api::realizable, so the flatten that lives there
+	// would be skipped.  Doing it here too is idempotent and ensures
+	// every entry point sees a normalised conjunction-of-G shape.
+	fm = flatten_always_conjuncts<node>(fm);
+	// CTL* formulas: reduce to LTL first, then check realizability
+	if (has_ctl_star_operators<node>(fm)) {
+		auto reduction = reduce_ctl_star_to_ltl<node>(fm);
+		return is_ltl_aba_realizable<node>(
+			reduction.ltl_formula, start_time, output);
+	}
+	// Route to the full-LTL pipeline whenever the formula has full-LTL
+	// operators OR has Boolean combinations of models that the safety
+	// pipeline can't handle (e.g. (G A) || (G B), !(G A && G B), nested
+	// G inside disjunction).  The flatten pass above has already merged
+	// trivial top-level conjunctions of G into a single G; whatever
+	// survives genuinely needs ltlsynt.
+	//
+	// Exception: formulas whose only temporal operators are wff_always
+	// and wff_sometimes are handled correctly by the safety pipeline
+	// via transform_to_eventual_variables + to_unbounded_continuation.
+	// These should NOT be routed to ltlsynt, which cannot faithfully
+	// encode lookback-atom initial-value semantics as propositional
+	// constraints.
+	if (has_ltl_operators<node>(fm)) {
+		return is_ltl_aba_realizable<node>(fm, start_time, output);
+	}
+	if (!has_no_boolean_combs_of_models<node>(fm)) {
+		// Check if the "boolean combination" is just G(...) && sometimes(...),
+		// which the safety pipeline handles via flag-based unrolling.
+		bool only_always_sometimes = true;
+		tau::get(fm).find_top([&](tref n) {
+			const auto& t = tau::get(n);
+			if (!t.has_child()) return false;
+			auto nt = t[0].value.nt;
+			if (nt == tau::wff_always || nt == tau::wff_sometimes)
+				return false;
+			if (nt == tau_parser::wff_F || nt == tau_parser::wff_U
+			    || nt == tau_parser::wff_R || nt == tau_parser::wff_W
+			    || nt == tau_parser::wff_S || nt == tau_parser::wff_T) {
+				only_always_sometimes = false;
+				return true;
+			}
+			return false;
+		});
+		if (!only_always_sometimes) {
+			return is_ltl_aba_realizable<node>(
+				fm, start_time, output);
+		}
+		// Fall through to the safety pipeline for always+sometimes.
+	}
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
 	// Convert each disjunct to unbounded continuation
 	for (tref clause : expression_paths<node>(normalized_fm)) {

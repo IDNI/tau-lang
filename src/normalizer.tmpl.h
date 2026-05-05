@@ -98,7 +98,7 @@ tref normalize(tref form) {
 			f = eliminate_bv_and_quantifiers<node>(f);
 			// Add quantifier again and save as change
 			if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
-			else changes.emplace(temp, tau::build_wff_sometimes(f));
+			else changes.emplace(temp, tau::build_wff_F(f));
 		}
 		form =  rewriter::replace(form, changes);
 	}
@@ -112,7 +112,7 @@ tref normalize(tref form) {
 }
 
 // Assumes that the formula passed does not have temporal quantifiers
-// This normalization will non perform the temporal normalization
+// This normalization will not perform the temporal normalization
 /** @internal @copydoc normalize_non_temp @endinternal */
 template <NodeType node>
 tref normalize_non_temp(tref fm) {
@@ -251,22 +251,35 @@ tref get_ref(tref n) {
 	return ref.value();
 }
 
-// Check that the Tau formula does not use Boolean combinations of models
-/** @internal @copydoc has_no_boolean_combs_of_models @endinternal */
+// Check that the Tau formula does not use Boolean combinations of models.
+// LTL formulas (containing wff_F / wff_U / wff_R / wff_W) are handled by the
+// LTL(ABA) pipeline and bypass the safety pipeline entirely, so they are
+// exempt from this check.
 template <NodeType node>
 bool has_no_boolean_combs_of_models(tref n) {
 	using tau = tree<node>;
+	// LTL formulas are routed to is_ltl_aba_realizable; don't reject them here.
+	auto is_ltl_op = [](tref x) {
+		const auto& t = tau::get(x);
+		if (!t.has_child()) return false;
+		auto nt = t[0].value.nt;
+		return nt == tau::wff_F || nt == tau::wff_U
+		    || nt == tau::wff_R || nt == tau::wff_W
+		    || nt == tau::wff_A || nt == tau::wff_E
+		    || nt == tau::wff_semantic_neg;
+	};
+	if (tau::get(n).find_top(is_ltl_op)) return true;
 	const auto& fm = tau::get(n);
 	if (is<node>(fm.first(), tau::wff_always)) {
-		// check that there is no wff_always or wff_sometimes in the subtree
+		// check that there is no wff_always or wff_F in the subtree
 		if (fm[0][0].find_top(is<node, tau::wff_always>))
 			return false;
-		if (fm[0][0].find_top(is<node, tau::wff_sometimes>))
+		if (fm[0][0].find_top(is<node, tau::wff_F>))
 			return false;
 	} else {
 		if (fm.find_top(is<node, tau::wff_always>))
 			return false;
-		if (fm.find_top(is<node, tau::wff_sometimes>))
+		if (fm.find_top(is<node, tau::wff_F>))
 			return false;
 	}
 	return true;
@@ -281,7 +294,7 @@ bool is_non_temp_nso_satisfiable(tref n) {
 
 	const auto& fm = tau::get(n);
 	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
-	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
+	DBG(assert(!fm.find_top(is<node, tau::wff_F>));)
 	tref nn = n;
 	const trefs& vars = fm.get_free_vars();
 	nn = tau::build_wff_ex_many(vars, nn);
@@ -319,7 +332,7 @@ bool is_non_temp_nso_unsat(tref n) {
 	using tau = tree<node>;
 	DBG(assert(n != nullptr));
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_always>));)
-	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
+	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_F>));)
 
 	tref nn = n;
 	const trefs& vars = get_free_vars<node>(nn);
@@ -683,10 +696,93 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	return new_clause;
 }
 
+// Collect the top-level wff_and conjuncts of a formula into `out`.
+template <NodeType node>
+static void collect_top_and_conjuncts(tref fm, trefs& out) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.has_child() && t[0].value.nt == tau::wff_and) {
+		collect_top_and_conjuncts<node>(t[0].first(), out);
+		collect_top_and_conjuncts<node>(t[0].second(), out);
+	} else {
+		out.push_back(fm);
+	}
+}
+
+// Rewrite: G(A) && G(B) && ... → G(A && B && ...) at the top level only.
+// Also handles G(A) && G(B) && X, leaving non-G conjuncts unchanged.
+// This is semantically correct: G(A) ∧ G(B) ≡ G(A ∧ B).
+//
+// Strips wff_parenthesis wrappers so that `(G A) && (G B)` (spec syntax)
+// is treated identically to `G A && G B`.
+template <NodeType node>
+inline tref flatten_always_conjuncts(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (!t.has_child()) return fm;
+	auto nt = t[0].value.nt;
+	// Only act on top-level conjunction containing multiple wff_always.
+	if (nt != tau::wff_and) return fm;
+
+	// Collect all top-level conjuncts.
+	trefs conjuncts;
+	collect_top_and_conjuncts<node>(fm, conjuncts);
+
+	// Helper: given a conjunct (a wff tref), peel any wff_parenthesis
+	// wrappers and return the body of the innermost wff_always, or nullptr.
+	auto get_always_body = [](tref c) -> tref {
+		// Walk: wff → (wff_parenthesis | wff_always) → recurse / return
+		while (true) {
+			const auto& ct = tau::get(c);
+			if (!ct.has_child()) return nullptr;
+			auto inner_nt = ct[0].value.nt;
+			if (inner_nt == tau::wff_always)
+				return tau::trim2(c); // strip wff + wff_always
+			if (inner_nt == tau::wff_parenthesis)
+				c = ct[0].first(); // descend into parens: wff_paren → wff
+			else
+				return nullptr;
+		}
+	};
+
+	// Separate wff_always from non-always conjuncts.
+	trefs always_bodies;
+	trefs other_conjuncts;
+	for (tref c : conjuncts) {
+		if (tref body = get_always_body(c); body)
+			always_bodies.push_back(body);
+		else
+			other_conjuncts.push_back(c);
+	}
+
+	// Nothing to merge.
+	if (always_bodies.size() <= 1) return fm;
+
+	// Build G(A && B && ...) from all always bodies.
+	tref combined_body = always_bodies[0];
+	for (size_t i = 1; i < always_bodies.size(); ++i)
+		combined_body = tau::build_wff_and(combined_body, always_bodies[i]);
+	tref merged_always = tau::build_wff_always(combined_body);
+
+	// Reconstruct the full conjunction with non-always parts.
+	other_conjuncts.push_back(merged_always);
+	tref result = other_conjuncts[0];
+	for (size_t i = 1; i < other_conjuncts.size(); ++i)
+		result = tau::build_wff_and(result, other_conjuncts[i]);
+	return result;
+}
+
 /** @internal @copydoc normalize_with_temp_simp @endinternal */
 template <NodeType node>
 tref normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
+	// Merge top-level (G A) && (G B) → G(A && B) before any further
+	// processing.  G is universal, so G(A) ∧ G(B) ≡ G(A ∧ B), and the
+	// downstream pipeline (transform_to_execution, ltl_aba) only finds
+	// the FIRST wff_always in the formula tree — without this merge, the
+	// second G is silently dropped from the satisfiability check, which
+	// can flip a satisfiable spec to UNSAT.
+	fm = flatten_always_conjuncts<node>(fm);
 	fm = normalize<node>(fm);
 	// Substitution based eliminations rebuild nodes without running the
 	// construction hooks, so trivially foldable residues (constant
@@ -1127,7 +1223,14 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	}
 	LOG_DEBUG << "max lookback " << max_lookback;
 
+	// Limit iterations to prevent infinite loops for non-converging sequences.
+	static constexpr size_t MAX_FP_STEPS = 10000;
 	for (size_t i = max_lookback; ; i++) {
+		if (i - max_lookback >= MAX_FP_STEPS) {
+			LOG_ERROR << "Fixed point computation exceeded "
+				  << MAX_FP_STEPS << " steps; aborting";
+			return nullptr;
+		}
 		current = build_enumerated_main_step<node>(
 							form, i, offset_arity);
 		bool changed;

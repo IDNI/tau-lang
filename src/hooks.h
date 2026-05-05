@@ -137,6 +137,9 @@ private:
 	static tref wff_sometimes  (const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_always` (universal-temporal) nodes.
 	static tref wff_always     (const node& v, const tref* ch, size_t len, tref r);
+	static tref wff_A          (const node& v, const tref* ch, size_t len, tref r);
+	static tref wff_E          (const node& v, const tref* ch, size_t len, tref r);
+	static tref wff_semantic_neg(const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_conditional` (if-then-else) nodes.
 	static tref wff_conditional(const node& v, const tref* ch, size_t len, tref r);
 	/// @brief Hook for `wff_imply` (implication) nodes.
@@ -168,6 +171,14 @@ private:
 };
 
 } // namespace idni::tau_lang
+
+// Forward-declare qlt types so hooks.tmpl.h can name them at parse time.
+// (qlt.h includes tau_tree.h which includes hooks.h before qlt is defined;
+// clang's two-phase lookup requires names to be visible at definition time.)
+namespace idni::tau_lang {
+    struct qlt;
+    enum class qlt_bound : uint8_t;
+}
 
 #include "boolean_algebras/bv_ba_hooks.tmpl.h"
 #include "hooks.tmpl.h"
