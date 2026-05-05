@@ -355,7 +355,10 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 		// Check that the constant was not parsed yet
 		DBG(LOG_TRACE << "inferred type of a constant: " << LOG_BA_TYPE(type.value());)
 		if (tau::get(n).data() == 0) {
+			auto saved_hooks = tau::use_hooks;
+			tau::use_hooks = true;
 			n = tau::get_ba_constant_from_source(tau::get(n).child_data(), type.value());
+			tau::use_hooks = saved_hooks;
 			if (n == nullptr) return parse_error{canonized, type.value()};
 		}
 		return update_tref<node>(n, type.value());

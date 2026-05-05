@@ -13,6 +13,7 @@
 #define __IDNI__TAU__REF_TYPES_INFERENCE_H__
 
 #include <functional>
+#include <unordered_map>
 
 #include "tau_tree.h"
 

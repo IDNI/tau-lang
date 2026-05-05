@@ -20,14 +20,14 @@ tref ba_constants<node>::get(const constant& constant, size_t type_id) {
 	const auto p = std::make_pair(constant, type_id);
 	for (size_t i = 0; i < C.size(); ++i) if (C[i] == p) {
 		LOG_TRACE << "-- returning already pooled: "
-						<< i+1 << " " << LOG_FM(T[i]);
-		return T[i];
+						<< i+1 << " " << LOG_FM(T[i]->get());
+		return T[i]->get();
 	}
 	C.emplace_back(std::move(p));
 	size_t constant_id = C.size();
 	node n = node::ba_constant(constant_id, type_id);
 	tref r = tree<node>::get(n);
-	T.push_back(r);
+	T.push_back(tree<node>::geth(r));
 	// LOG_TRACE << "node constant: " << n;
 	// LOG_TRACE << dump_to_str();
 	// const auto& t = tree<node>::get(r);
@@ -58,7 +58,7 @@ template <NodeType node>
 std::ostream& ba_constants<node>::dump(std::ostream& os) {
 	os << "BA constants pool(" << C.size() << "):\n";
 	for (size_t i = 0; i < C.size(); ++i) os << LOG_INDENT << "constant: "
-		<< i+1 << " " << LOG_BA(C[i]) << " : " << LOG_FM(T[i]) << "\n";
+		<< i+1 << " " << LOG_BA(C[i]) << " : " << LOG_FM(T[i]->get()) << "\n";
 	return os;
 }
 

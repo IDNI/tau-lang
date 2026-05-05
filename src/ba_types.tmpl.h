@@ -27,8 +27,16 @@ inline size_t tau_type_id() {
 template<NodeType node>
 bool is_tau_type(tref t) {
 	using tau = tree<node>;
-
-	return tau::get(t)[0].get_string() == "tau";
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "tau";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
 }
 
 template <NodeType node>
@@ -53,8 +61,16 @@ inline size_t nat_type_id() {
 template<NodeType node>
 bool is_nat_type(tref t) {
 	using tau = tree<node>;
-
-	return tau::get(t)[0].get_string() == "nat";
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "nat";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
 }
 
 template<NodeType node>
@@ -74,8 +90,16 @@ inline size_t untyped_type_id() {
 template<NodeType node>
 bool is_untyped(tref t) {
 	using tau = tree<node>;
-
-	return tau::get(t)[0].get_string() == "untyped";
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "untyped";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
 }
 
 template <NodeType node>
@@ -102,8 +126,16 @@ inline size_t sbf_type_id() {
 template<NodeType node>
 bool is_sbf_type(tref t) {
 	using tau = tree<node>;
-
-	return tau::get(t)[0].get_string() == "sbf";
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "sbf";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
 }
 
 template <NodeType node>
@@ -111,6 +143,156 @@ bool is_sbf_type(size_t t) {
 	return is_sbf_type<node>(ba_types<node>::type_tree(t));
 }
 
+
+// qint type definitions
+template<NodeType node>
+tref qint_type() {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "qint");
+	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+inline size_t qint_type_id() {
+	static size_t id = ba_types<node>::id(qint_type<node>());
+	return id;
+}
+
+template<NodeType node>
+bool is_qint_type(tref t) {
+	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "qint";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
+}
+
+template <NodeType node>
+bool is_qint_type(size_t t) {
+	return is_qint_type<node>(ba_types<node>::type_tree(t));
+}
+
+// qlt type definitions
+template<NodeType node>
+tref qlt_type() {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "qlt");
+	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+inline size_t qlt_type_id() {
+	static size_t id = ba_types<node>::id(qlt_type<node>());
+	return id;
+}
+
+template<NodeType node>
+bool is_qlt_type(tref t) {
+	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "qlt";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
+}
+
+template <NodeType node>
+bool is_qlt_type(size_t t) {
+	return is_qlt_type<node>(ba_types<node>::type_tree(t));
+}
+
+
+// omcat (omega-categorical) type family implementation
+// Currently qlt is the only registered omcat type.
+template<NodeType node>
+bool is_omcat_type_family(tref t) {
+	return is_qlt_type<node>(t);
+}
+
+template<NodeType node>
+bool is_omcat_type_family(size_t t) {
+	return is_omcat_type_family<node>(ba_types<node>::type_tree(t));
+}
+
+
+// nlang_ba type definitions
+template<NodeType node>
+tref nlang_type() {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "nlang");
+	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+inline size_t nlang_type_id() {
+	static size_t id = ba_types<node>::id(nlang_type<node>());
+	return id;
+}
+
+template<NodeType node>
+bool is_nlang_type(tref t) {
+	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "nlang";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
+}
+
+template <NodeType node>
+bool is_nlang_type(size_t t) {
+	return is_nlang_type<node>(ba_types<node>::type_tree(t));
+}
+
+// hsb type definitions
+template<NodeType node>
+tref hsb_type() {
+	using tau = tree<node>;
+	tref type = tau::get(tau::type, "hsb");
+	return tau::get(tau::typed, type);
+}
+
+template<NodeType node>
+inline size_t hsb_type_id() {
+	static size_t id = ba_types<node>::id(hsb_type<node>());
+	return id;
+}
+
+template<NodeType node>
+bool is_hsb_type(tref t) {
+	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "hsb";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
+}
+
+template <NodeType node>
+bool is_hsb_type(size_t t) {
+	return is_hsb_type<node>(ba_types<node>::type_tree(t));
+}
 
 // bool type definitions
 template<NodeType node>
@@ -130,8 +312,16 @@ inline size_t bool_type_id() {
 template<NodeType node>
 bool is_bool_type(tref t) {
 	using tau = tree<node>;
-
-	return tau::get(t)[0].get_string() == "bool";
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "bool";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
 }
 
 template <NodeType node>
@@ -158,8 +348,16 @@ size_t bv_type_id(unsigned short bitwidth) {
 template<NodeType node>
 bool is_bv_type_family(tref t) {
 	using tau = tree<node>;
-
-	return tau::get(t)[0].get_string() == "bv";
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == "bv";
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
 }
 
 template<NodeType node>
@@ -196,10 +394,11 @@ size_t get_bv_width(size_t ba_type_id) {
 
 template <NodeType node>
 size_t ba_types<node>::id(tref ba_type) {
+	using tau = tree<node>;
 	if (auto it = type_tree_to_idx().find(ba_type);
 		it != type_tree_to_idx().end()) return it->second;
 	return type_tree_to_idx().emplace(ba_type, type_trees().size()),
-		type_trees().push_back(ba_type), type_trees().size() - 1;
+		type_trees().push_back(tau::geth(ba_type)), type_trees().size() - 1;
 }
 
 // A ba_type_id past the end of type_trees() means the id was corrupted
@@ -212,7 +411,7 @@ tref ba_types<node>::type_tree(size_t ba_type_id) {
 	if (ba_type_id >= type_trees().size())
 		throw std::logic_error("ba_types::type_tree: invalid ba_type_id "
 			+ std::to_string(ba_type_id));
-	return type_trees()[ba_type_id];
+	return type_trees()[ba_type_id]->get();
 }
 
 template <NodeType node>
@@ -232,11 +431,11 @@ std::string ba_types<node>::name(size_t ba_type_id) {
 	using tau = tree<node>;
 	using cache_t = subtree_unordered_map<node, std::string>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	tref type = type_trees()[ba_type_id];
+	tref type = type_trees()[ba_type_id]->get();
 	if (auto it = cache.find(type); it != cache.end()) return it->second;
 	return cache.emplace(type, tau::get(type).to_str()).first->second;
 #endif // TAU_CACHE
-	return tree<node>::get(type_trees()[ba_type_id]).to_str();
+	return tree<node>::get(type_trees()[ba_type_id]->get()).to_str();
 }
 
 template <NodeType node>
@@ -265,22 +464,51 @@ std::string ba_types<node>::dump_to_str() {
 
 // type_sids (index = ba_type id)
 template <NodeType node>
-std::vector<tref>& ba_types<node>::type_trees() {
-	static std::vector<tref> t {
-		untyped_type<node>(),
-		tau_type<node>(),
-		sbf_type<node>() };
+std::vector<htref>& ba_types<node>::type_trees() {
+	using tau = tree<node>;
+	static std::vector<htref> t {
+		tau::geth(untyped_type<node>()),
+		tau::geth(tau_type<node>()),
+		tau::geth(bv_type<node>()),
+		tau::geth(sbf_type<node>()),
+		tau::geth(qint_type<node>()),
+		tau::geth(qlt_type<node>()),
+		tau::geth(nlang_type<node>()) };
 	return t;
 }
 
 // type_sid -> ba_type id
 template <NodeType node>
 subtree_map<node, size_t>& ba_types<node>::type_tree_to_idx() {
+	using tau = tree<node>;
+	// Ensure type_trees() htrefs are created before t is initialized,
+	// so the 7 type-tree nodes survive any subsequent do_gc() calls.
+	static bool tt_init = (type_trees(), true);
+	(void)tt_init;
 	static subtree_map<node, size_t> t{
 		{ untyped_type<node>(), 0 },
 		{ tau_type<node>(), 1 },
-		{ sbf_type<node>(), 2 }
+		{ bv_type<node>(), 2 },
+		{ sbf_type<node>(), 3 },
+		{ qint_type<node>(), 4 },
+		{ qlt_type<node>(), 5 },
+		{ nlang_type<node>(), 6 }
 	};
+	// Register GC callback to rebuild from surviving type_trees() htrefs.
+	static bool gc_registered = false;
+	if (!gc_registered) {
+		gc_registered = true;
+		tau::gc_callbacks.push_back(
+			[](const std::unordered_set<tref>& kept) {
+			auto& tt = type_trees();
+			auto& idx = type_tree_to_idx();
+			idx.clear();
+			for (size_t i = 0; i < tt.size(); ++i) {
+				tref tr = tt[i]->get();
+				if (kept.count(tr)) idx.emplace(tr, i);
+			}
+		});
+	}
 	return t;
 }
 
@@ -415,14 +643,26 @@ bool has_ba_type(tref term) {
 template <NodeType node>
 size_t find_ba_type (tref term) {
 	using tau = tree<node>;
-
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, size_t>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(term); it != cache.end()) return it->second;
+#endif // TAU_CACHE
 	size_t type = tau::get(term).get_ba_type();
-	if (type != 0) return type;
+	if (type != 0) {
+#ifdef TAU_CACHE
+		cache.emplace(term, type);
+#endif // TAU_CACHE
+		return type;
+	}
 	auto f = [&type](const tref n) {
 		type = tau::get(n).get_ba_type();
 		return type == 0;
 	};
 	pre_order<node>(term).search_unique(f);
+#ifdef TAU_CACHE
+	cache.emplace(term, type);
+#endif // TAU_CACHE
 	return type;
 }
 

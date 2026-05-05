@@ -87,7 +87,7 @@ struct ba_constants {
 
 private:
 	inline static std::vector<std::pair<constant, size_t>> C;  // pool of constants
-	inline static trefs T;                  // pool of constant tree nodes with type info
+	inline static htrefs T;                 // pool of constant tree nodes with type info (htref to survive gc)
 };
 
 } // namespace idni::tau_lang

@@ -191,6 +191,136 @@ size_t get_bv_width(tref t);
 template <NodeType node>
 size_t get_bv_width(size_t ba_type_id);
 
+// -----------------------------------------------------------------------------
+// Type definitions for qint — atomless BA of rational intervals [x, y)
+// (right-closed, left-open).  Constant syntax accepts both rationals (1/4)
+// and decimals (0.25).
+
+/**
+ * @brief Create the type tree for the qint (rational intervals) type.
+ * @tparam node Tree node type
+ * @return Tree reference representing qint type tree
+ */
+template <NodeType node>
+tref qint_type();
+
+template <NodeType node>
+inline size_t qint_type_id();
+
+/**
+ * @brief Checks if t represents the qint type.
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return true iff the type tree object represents qint
+ */
+template <NodeType node>
+bool is_qint_type(tref t);
+
+template <NodeType node>
+bool is_qint_type(size_t t);
+
+// -----------------------------------------------------------------------------
+// Type definitions for qlt (Q,<)
+
+/**
+ * @brief Create the type tree for the qlt type
+ * @tparam node Tree node type
+ * @return Tree reference representing qlt type tree
+ */
+template <NodeType node>
+tref qlt_type();
+
+template <NodeType node>
+inline size_t qlt_type_id();
+
+/**
+ * @brief Checks if t represents the qlt type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents a qlt
+ */
+template <NodeType node>
+bool is_qlt_type(tref t);
+
+template <NodeType node>
+bool is_qlt_type(size_t t);
+
+// -----------------------------------------------------------------------------
+// omcat (omega-categorical) type family
+//
+// An omega-categorical theory is one whose countable models are all isomorphic
+// (e.g., (Q,<) — the dense linear order without endpoints).  The qlt type is
+// the only concrete omcat type currently registered.  Use is_omcat_type_family
+// rather than is_qlt_type in dispatch code so that future omcat types are
+// handled automatically.
+
+/**
+ * @brief Checks if t represents any omega-categorical (omcat) type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return true iff the type is any omega-categorical type (currently: qlt)
+ */
+template <NodeType node>
+bool is_omcat_type_family(tref t);
+
+template <NodeType node>
+bool is_omcat_type_family(size_t t);
+
+
+
+// -----------------------------------------------------------------------------
+// Type definitions for nlang_ba
+
+/**
+ * @brief Create the type tree for the nlang type
+ * @tparam node Tree node type
+ * @return Tree reference representing nlang type tree
+ */
+template <NodeType node>
+tref nlang_type();
+
+template <NodeType node>
+inline size_t nlang_type_id();
+
+/**
+ * @brief Checks if t represents the nlang type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents an nlang
+ */
+template <NodeType node>
+bool is_nlang_type(tref t);
+
+template <NodeType node>
+bool is_nlang_type(size_t t);
+
+// -----------------------------------------------------------------------------
+// Type definitions for hsb — atomless BA of lex-half-open polyhedra in R^d
+// (LP_d^Q). Generalizes qint from 1D to d dimensions using canonical
+// halfspaces with the lex-leading sign convention.
+
+/**
+ * @brief Create the type tree for the hsb type.
+ * @tparam node Tree node type
+ * @return Tree reference representing hsb type tree
+ */
+template <NodeType node>
+tref hsb_type();
+
+template <NodeType node>
+inline size_t hsb_type_id();
+
+/**
+ * @brief Checks if t represents the hsb type.
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return true iff the type tree object represents hsb
+ */
+template <NodeType node>
+bool is_hsb_type(tref t);
+
+template <NodeType node>
+bool is_hsb_type(size_t t);
 
 /**
  * @brief Registry mapping BA type trees ↔ integer ids for a specific node type.
@@ -220,7 +350,7 @@ struct ba_types {
 
 private:
 	/// @brief Per-id type-tree vector (index = ba_type id).
-	static std::vector<tref>& type_trees();
+	static std::vector<htref>& type_trees();
 
 	/// @brief Reverse map: type tree → ba_type id.
 	static subtree_map<node, size_t>& type_tree_to_idx();
@@ -309,6 +439,15 @@ std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);
 /** @brief Return `true` if the binary operator @p op can be applied to nodes @p n and @p m. */
 template <NodeType node>
 bool is_buildable(size_t op, tref n, tref m);
+
+// True if type T appears in the std::variant V (used for compile-time BA pack checks)
+template<typename T, typename V>
+struct ba_variant_includes : std::false_type {};
+template<typename T, typename... Ts>
+struct ba_variant_includes<T, std::variant<Ts...>>
+    : std::bool_constant<(std::is_same_v<T, Ts> || ...)> {};
+template<typename T, typename V>
+inline constexpr bool ba_variant_includes_v = ba_variant_includes<T, V>::value;
 
 } // namespace idni::tau_lang
 
