@@ -14,6 +14,13 @@ inline tref bool_type() {
 	return tau::get(tau::typed, type);
 }
 
+template<NodeType node>
+tref bool_type_for() {
+	using t = tree<node>;
+	tref type = t::get(t::type, "bool");
+	return t::get(t::typed, type);
+}
+
 inline tref base_ba_symbol_simplification(tref symbol, const Bool&) {
 	return symbol;
 }

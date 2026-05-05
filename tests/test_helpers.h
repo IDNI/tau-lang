@@ -25,6 +25,13 @@ using tau = tree<node_t>;
 using tt = tau::traverser;
 using bac = ba_constants<node_t>;
 
+// (atexit ba_constants cleanup is registered in test_tau_helpers.h —
+// only the bas_pack with qlt/cvc5 needs the static-destruction-order
+// fix.  Registering it in this header instead caused a double-free
+// in Bool/sbf_ba-only tests where the variant in C is the owner of
+// bdd handles whose pool is already torn down by the time atexit
+// fires.)
+
 inline tau::get_options parse_bf() {
 	static tau::get_options opts{ .parse = { .start = tau::bf } };
 	return opts;
@@ -143,3 +150,36 @@ inline bool normalize_and_check(const char* sample, const std::string& expected)
 }
 
 } // namespace idni::tau_lang
+
+// ── per-test GC listener ──────────────────────────────────────────────────────
+// Optional per-test GC listener. Keep disabled by default: several test cases
+// retain trefs across doctest callbacks, so automatic GC before each TEST_CASE
+// can invalidate cached trees. Heavy suites should call do_gc() explicitly at
+// safe points instead.
+#if !defined(IDNI_TAU_TESTS_GC_LISTENER_REGISTERED) && defined(DOCTEST_LIBRARY_INCLUDED) && defined(TAU_ENABLE_TEST_GC_LISTENER)
+#define IDNI_TAU_TESTS_GC_LISTENER_REGISTERED
+
+#include <unordered_set>
+
+struct TauTestGCListener : doctest::IReporter {
+	using tau_ = idni::tau_lang::tau;
+	TauTestGCListener(const doctest::ContextOptions&) {}
+	void report_query(const doctest::QueryData&) override {}
+	void test_run_start() override {}
+	void test_run_end(const doctest::TestRunStats&) override {}
+	void test_case_start(const doctest::TestCaseData&) override {
+		std::unordered_set<tref> keep;
+		tau_::gc(keep);
+	}
+	void test_case_reenter(const doctest::TestCaseData&) override {}
+	void test_case_end(const doctest::CurrentTestCaseStats&) override {}
+	void test_case_exception(const doctest::TestCaseException&) override {}
+	void subcase_start(const doctest::SubcaseSignature&) override {}
+	void subcase_end() override {}
+	void log_assert(const doctest::AssertData&) override {}
+	void log_message(const doctest::MessageData&) override {}
+	void test_case_skipped(const doctest::TestCaseData&) override {}
+};
+REGISTER_LISTENER("tau_gc", 1, TauTestGCListener);
+
+#endif // IDNI_TAU_TESTS_GC_LISTENER_REGISTERED

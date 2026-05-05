@@ -6,6 +6,7 @@
 #include "doctest.h"
 #include "defs.h"
 #include "logging.h"
+#include "benchmark_listener.h"
 
 using namespace std;
 
