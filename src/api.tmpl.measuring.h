@@ -111,7 +111,7 @@ MT(std::optional<std::string>, apply_defs,
 	(const std::set<std::string>& defs, const std::string& expression),
 	(defs, expression))
 MT(tref,  apply_defs, (subtree_set<node> defs, tref expression), (defs, expression))
-MT(htref, apply_defs, (std::set<htref> defs, htref expression), (defs, expression))
+MT(htref, apply_defs, (const std::set<htref>& defs, htref expression), (defs, expression))
 
 MT(std::optional<std::string>, apply_all_defs, (const std::string& expression), (expression))
 MT(tref,  apply_all_defs, (tref expression), (expression))

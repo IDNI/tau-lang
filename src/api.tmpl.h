@@ -13,6 +13,11 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
+/// Extract the update specification from the interpreter's output assignment.
+/// Looks for a stream variable named "u" at time_point-1 with tau type.
+/// If the output for that variable is non-zero, unpacks and returns it
+/// as a tref that can be fed back into interpreter::update().
+/// @return The unpacked update formula, or nullptr if no update is present.
 template <NodeType node>
 tref get_update(interpreter<node>& i, const assignment<node>& output) {
 	auto update_stream = build_out_var_at_n<node>(
@@ -74,7 +79,9 @@ void api<node>::set_severity(boost::log::trivial::severity_level level) {
 // Parsing
 // ------------------------------------------------------------
 
-// local helper function to get get_options based on simplified flag
+/// Build a get_options struct for tree<node>::get() based on the parse
+/// start symbol and the simplified flag.  When simplified=false, BA type
+/// inference and rewriting hooks are both disabled.
 template <NodeType node>
 inline typename tree<node>::get_options get_options(typename node::type start, bool simplified) {
 	typename tree<node>::get_options options;
@@ -101,6 +108,8 @@ template <NodeType node>
 tref api<node>::get_function_def(const std::string& function_def, [[maybe_unused]] bool simplified) {
 	tref def = get_definition(function_def, true); // Always simplify to resolve refs
 	if (!def) return nullptr;
+	// The second child of a rec_relation is the body;
+	// accept only bf or ref (ref may resolve to a bf later)
 	auto nt = tau::get(def)[1].get_type();
 	if (nt == tau::bf) return def;
 	return nullptr;
@@ -110,8 +119,9 @@ template <NodeType node>
 tref api<node>::get_predicate_def(const std::string& predicate_def, [[maybe_unused]] bool simplified) {
 	tref def = get_definition(predicate_def, true); // Always simplify to resolve refs
 	if (!def) return nullptr;
+	// TODO we could pre resolve all refs to wff
 	auto nt = tau::get(def)[1].get_type();
-	if (nt == tau::wff) return def;
+	if (nt == tau::wff || nt == tau::ref) return def;
 	return nullptr;
 }
 
@@ -162,8 +172,10 @@ tref api<node>::get_definition(const std::string& definition, bool simplified) {
 
 template <NodeType node>
 tref api<node>::get_spec_or_term(const std::string& expression, bool simplified) {
-	tref       expr = get_spec(expression); // try multiline first (includes a formula too)
-	if (!expr) expr = get_term(expression, simplified); // if it fails, try just a term
+	// Try parsing as a full spec first (which handles multiline and
+	// formula inputs); fall back to a bare bf term if that fails.
+	tref       expr = get_spec(expression);
+	if (!expr) expr = get_term(expression, simplified);
 	return expr;
 }
 
@@ -255,6 +267,8 @@ tref api<node>::substitute(tref expr, tref that, tref with) {
 		return nullptr;
 	}
 	DBG(TAU_LOG_TRACE << "substitute: \n" << LOG_FM_DUMP(expr) << "\n" << LOG_FM_DUMP(that) << "\n" << LOG_FM_DUMP(with);)
+	// Enforce that all three are consistently terms or formulas.
+	// Mismatches would produce an ill-typed tree.
 	bool e = is_term(expr), t = is_term(that), w = is_term(with);
 	if ((e && e != t) || (e && e != w) || (!e && t != w)) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
@@ -275,6 +289,7 @@ tref api<node>::substitute(tref expr, std::map<tref, tref> that_with) {
 
 template <NodeType node>
 tref api<node>::boole_normal_form(tref expr) {
+	// Simplify, apply all registered definitions, then compute BNF
 	expr = simplify(expr);
 	if (!expr) return nullptr;
 	if (tref a = apply_all_defs(expr); a)
@@ -288,6 +303,7 @@ tref api<node>::dnf(tref expr) {
 	if (!expr) return nullptr;
 	tref a = apply_all_defs(expr);
 	if (a) {
+		// Dispatch to bf-level or wff-level DNF depending on root type
 		switch (tau::get(a).get_type()) {
 		case tau::bf:  return reduce<node>(to_dnf<node, false>(a));
 		case tau::wff: return reduce<node>(to_dnf<node>(a));
@@ -303,6 +319,7 @@ tref api<node>::cnf(tref expr) {
 	if (!expr) return nullptr;
 	tref a = apply_all_defs(expr);
 	if (a) {
+		// Dispatch to wff-level or bf-level CNF depending on root type
 		switch (tau::get(a).get_type()) {
 		case tau::wff: return reduce<node, true>(to_cnf<node>(a));
 		case tau::bf:  return reduce<node, true>(to_cnf<node, false>(a));
@@ -318,6 +335,7 @@ tref api<node>::nnf(tref expr) {
 	if (!expr) return nullptr;
 	tref a = apply_all_defs(expr);
 	if (a) {
+		// wff: full NNF via De Morgan; bf: push negation into sub-terms
 		switch (tau::get(a).get_type()) {
 		case tau::wff: return to_nnf<node>(a);
 		case tau::bf:  return push_negation_in<node, false>(a);
@@ -407,6 +425,9 @@ tref api<node>::eliminate_quantifiers(tref fm) {
 template <NodeType node>
 bool api<node>::realizable(tref fm) {
 	fm = simplify(fm);
+	// G(A) ∧ G(B) ≡ G(A ∧ B): merge top-level G-conjuncts before
+	// normalization so the downstream pipeline sees a single wff_always.
+	if (fm) fm = flatten_always_conjuncts<node>(fm);
 	return fm && is_formula(fm)
 		&& is_tau_formula_sat<node>(normalize_formula(fm), 0, true);
 }
@@ -419,7 +440,14 @@ bool api<node>::unrealizable(tref fm) {
 template <NodeType node>
 bool api<node>::sat(tref fm) {
 	fm = simplify(fm);
-	return fm && has_no_boolean_combs_of_models<node>(fm) && realizable(fm);
+	// G(A) ∧ G(B) ≡ G(A ∧ B); merge top-level conjunctions of G so the
+	// downstream safety pipeline sees one wff_always.  Non-mergeable
+	// Boolean combinations (disjunction, negation, F-on-non-singletons,
+	// etc.) survive flatten unchanged and are routed to the full-LTL
+	// pipeline by is_tau_formula_sat itself — there's no longer a
+	// pre-check that rejects them at this layer.
+	if (fm) fm = flatten_always_conjuncts<node>(fm);
+	return fm && realizable(fm);
 }
 
 template <NodeType node>
@@ -430,12 +458,14 @@ bool api<node>::unsat(tref fm) {
 template <NodeType node>
 bool api<node>::valid(tref fm) {
 	fm = simplify(fm);
-	return fm && has_no_boolean_combs_of_models<node>(fm) && valid_spec(fm);
+	if (fm) fm = flatten_always_conjuncts<node>(fm);
+	return fm && valid_spec(fm);
 }
 
 template <NodeType node>
 bool api<node>::valid_spec(tref fm) {
 	fm = simplify(fm);
+	// Valid iff T (tautology) implies the normalized formula
 	return fm && is_tau_impl<node>(tau::_T(), normalize_formula(fm));
 }
 
@@ -443,6 +473,7 @@ bool api<node>::valid_spec(tref fm) {
 // Solving
 // ------------------------------------------------------------
 
+// Solve: apply defs, reject temporal quantifiers, then run the solver.
 template <NodeType node>
 std::optional<subtree_map<node, tref>> api<node>::solve(
 	tref fm, solver_mode mode)
@@ -463,7 +494,7 @@ std::optional<subtree_map<node, tref>> api<node>::solve(
 			<< TAU_TO_STR(fm);
 		return {};
 	}
-	DBG(TAU_LOG_TRACE << "solve: " << LOG_FM(fm);)
+	DBG(TAU_LOG_TRACE << "solve: " << LOG_FM(a);)
 	// setting solver options
 	solver_options options = {
 		.splitter_one = node::ba::
@@ -471,7 +502,9 @@ std::optional<subtree_map<node, tref>> api<node>::solve(
 		.mode = mode
 	};
 	bool solve_error = false;
-	auto solution = tau_lang::solve<node>(fm, options, solve_error);
+	// Use fully-expanded formula (a) so function/predicate refs are resolved
+	// before reaching type-specific solvers (fixes bug with typed functions).
+	auto solution = tau_lang::solve<node>(a, options, solve_error);
 	if (solve_error) {
 		TAU_LOG_ERROR << "Internal error in solver";
 		return {};
@@ -479,6 +512,7 @@ std::optional<subtree_map<node, tref>> api<node>::solve(
 	return solution;
 }
 
+// LGRS: normalize the equation, extract the bf_eq equality, then solve.
 template <NodeType node>
 std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 	using tt = tau::traverser;
@@ -571,6 +605,9 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 // private helper methods
 // ------------------------------------------------------------
 
+// Private: extract rr<node> from expression tree.
+// For spec nodes, delegates to tau_lang::get_nso_rr.
+// For bare wff/bf nodes, wraps via resolve_io_vars.
 template <NodeType node>
 std::optional<rr<node>> api<node>::get_nso_rr(tref expr) {
 	rr<node> nso_rr;
@@ -590,6 +627,8 @@ std::optional<rr<node>> api<node>::get_nso_rr(tref expr) {
 	return nso_rr;
 }
 
+// Type inference pipeline: infer BA types → canonize quantifier IDs
+// → unnest G-in-G ambiguity → check semantics → update global scope.
 template <NodeType node>
 tref api<node>::infer(tref expr, bool use_defaults) {
 	if (!expr) return nullptr;
@@ -600,13 +639,20 @@ tref api<node>::infer(tref expr, bool use_defaults) {
 		defs.get_definition_heads(),
 		{ .use_defaults = use_defaults });
 	tref inferred = canonize_quantifier_ids<node>(result.first);
-	// If type inference failed
 	if (!inferred) {
 		DBG(LOG_TRACE << "inferred is nullptr";)
 		return nullptr;
 	}
 	defs.get_io_context()->update_types(result.second);
 	defs.set_global_scope(result.second);
+
+	// Rewrite G(A && G(B)) → G(A) && G(B) before the semantic error check.
+	// This arises because the CFG parser is ambiguous: G(X) && G(Y) can
+	// be parsed as either G(X) && G(Y) (correct) or G(X && G(Y)) (nested).
+	// G(A && G(B)) = G(A) && G(B) semantically, so this rewrite is safe.
+	// Only applies when full-LTL operators (F/U/R/W) are absent; with LTL
+	// operators the nesting check is already bypassed.
+	inferred = unnest_nested_always<node>(inferred);
 
 	//Check for semantic errors in expression
 	if (has_semantic_error<node>(inferred)) {

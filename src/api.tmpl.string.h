@@ -10,6 +10,8 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
+/// Convert a subtree_map<node,tref> to a map<string,string> by
+/// serializing every key and value with to_str().  Null entries are skipped.
 template <NodeType node>
 std::map<std::string, std::string> to_str(const subtree_map<node, tref>& m) {
 	std::map<std::string, std::string> sm;
@@ -18,8 +20,11 @@ std::map<std::string, std::string> to_str(const subtree_map<node, tref>& m) {
 }
 
 // ------------------------------------------------------------
-// String API
+// String API — convenience wrappers that accept/return std::string
 // ------------------------------------------------------------
+// Each method parses its string arguments via the corresponding
+// get_* function, delegates to the tref overload, and serializes
+// the result back to a string (or returns nullopt on failure).
 
 template <NodeType node>
 bool api<node>::is_term(const std::string& term) {
@@ -45,6 +50,8 @@ template <NodeType node>
 std::optional<std::string> api<node>::apply_defs(
 	const std::set<std::string>& defs, const std::string& expr)
 {
+	// Parse each definition string, collecting them into a tref set;
+	// then parse the expression and apply the definitions.
 	subtree_set<node> tdefs;
 	// A definition that fails to parse used to be inserted as nullptr and
 	// then silently skipped by the tref-level apply_defs' "if (def)"
@@ -184,6 +191,7 @@ template <NodeType node>
 std::optional<std::string> api<node>::eliminate_quantifiers(
 	const std::string& expr)
 {
+	// Pipeline: parse → apply all defs → anti-prenex → resolve quantifiers
 	if (tref e = get_formula(expr); e)
 		if (tref a = apply_all_defs(e); a)
 			if (tref r = resolve_quantifiers<node>(
@@ -270,6 +278,8 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	interpreter_options& options)
 {
 	DBG(TAU_LOG_TRACE << "get_interpreter/specification: " << specification;);
+	// Parse the specification string into a tau_spec, logging any
+	// parse errors, then delegate to the tau_spec overload.
 	tau_spec<node> spec;
 	if (!spec.parse(specification)) {
 		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
@@ -280,6 +290,9 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 
 template <NodeType node>
 std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
+	// Build the set of input variables needed at the current time point,
+	// filter to those within the spec's lookback window, and return
+	// as (name, time_point) pairs.
 	auto [step_inputs, _] = i.build_inputs_for_step(i.time_point);
 	std::vector<stream_at> inputs;
 	for (auto& var : i.appear_within_lookback(step_inputs)) {
@@ -291,7 +304,8 @@ std::vector<stream_at> api<node>::get_inputs_for_step(interpreter<node>& i) {
 
 template <NodeType node>
 std::optional<std::map<stream_at, std::string>> api<node>::step(
-	interpreter<node>& i, std::map<stream_at, std::string> inputs)
+	interpreter<node>& i, std::map<stream_at, std::string> inputs,
+	bool interactive)
 {
 	DBG(using tau = tree<node>;)
 
@@ -359,6 +373,13 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 			<< " Quit at time point " << i.time_point;)
 		return {};
 	}
+
+	// Write output values so they are recorded for subsequent steps
+	if (!i.write(output.value())) {
+		TAU_LOG_ERROR << "Failed to write outputs";
+		return {};
+	}
+
 	// Build outputs for the step
 	std::map<stream_at, std::string> outputs;
 	for (const auto& [out, val] : output.value()) {
@@ -378,7 +399,7 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 	if (tref update = get_update<node>(i, output.value()); update)
 		i.update(update);
 
-	if (!auto_continue) {
+	if (interactive && !auto_continue) {
 		TAU_LOG_TRACE << "auto continue is false.";
 		return {};
 	}

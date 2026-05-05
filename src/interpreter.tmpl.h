@@ -1,8 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <algorithm>
+#include <set>
+#include <sstream>
 #include <string>
 
 #include "ba_types.h"
+#include "pointwise_revision.h"
 #include "utility/term.h"
 
 #undef LOG_CHANNEL_NAME
@@ -271,8 +275,80 @@ std::optional<interpreter<node>>
 		const io_context<node>& ctx)
 {
 	DBG(LOG_TRACE << "make_interpreter[spec]: " << LOG_FM_DUMP(spec) << "\n";)
-	// Find a satisfiable unbound continuation from spec
-	spec = normalizer<node>(spec);
+	// Handle G(phi_A) && G(phi_B) with different BA types:
+	// the normalizer merges them into G(phi_A && phi_B) which breaks on mixed
+	// types.  Normalize each G formula independently then combine.
+	if (!has_ltl_operators<node>(spec)) {
+		auto get_g_body = [](tref c) -> tref {
+			const auto& ct = tree<node>::get(c);
+			if (!ct.has_child()) return nullptr;
+			if (ct[0].value.nt == tree<node>::wff_always)
+				return tree<node>::trim2(c);
+			return nullptr;
+		};
+		auto get_ba_type_fm = [](tref body) -> size_t {
+			size_t found = 0;
+			tree<node>::get(body).find_top([&found](tref n) {
+				size_t bt = tree<node>::get(n).value.ba_type;
+				if (bt != 0) { found = bt; return true; }
+				return false;
+			});
+			return found;
+		};
+		std::vector<tref> g_parts, other_parts;
+		std::function<void(tref)> split_g = [&](tref n) {
+			const auto& t = tree<node>::get(n);
+			if (t.has_child() && t[0].value.nt == tree<node>::wff_and) {
+				split_g(t[0].first());
+				split_g(t[0].second());
+			} else if (tref body = get_g_body(n); body)
+				g_parts.push_back(n);
+			else
+				other_parts.push_back(n);
+		};
+		split_g(spec);
+		if (g_parts.size() > 1) {
+			size_t first_type = get_ba_type_fm(get_g_body(g_parts[0]));
+			bool mixed = false;
+			for (size_t i = 1; i < g_parts.size(); ++i)
+				if (get_ba_type_fm(get_g_body(g_parts[i])) != first_type)
+					{ mixed = true; break; }
+			if (mixed) {
+				tref combined = tau::_T();
+				for (tref g : g_parts)
+					combined = tau::build_wff_and(combined, normalizer<node>(g));
+				for (tref o : other_parts)
+					combined = tau::build_wff_and(combined, normalizer<node>(o));
+				spec = combined;
+				goto post_normalization;
+			}
+		}
+	}
+	// Find a satisfiable unbound continuation from spec.
+	// Skip normalizer for LTL formulas — it converts wff_F → wff_sometimes,
+	// which would make has_ltl_operators return false and bypass ltl_to_safety_formula.
+	if (!has_ltl_operators<node>(spec))
+		spec = normalizer<node>(spec);
+post_normalization:
+	// Full LTL formulas (F/U/R/W) need a different execution strategy.
+	// Convert the realizable LTL spec to an equivalent safety (always) formula
+	// that the existing interpreter pipeline can execute step-by-step.
+	//
+	// We use the `_full` variant so that, when ltlsynt produces a strategy
+	// automaton (multi-state or single-state Mealy), we can cache the
+	// LtlAbaSolution on the interpreter for downstream introspection
+	// (current_state, visualise_mealy_dot, determinise, boundary_traces).
+	std::optional<LtlAbaSolution<node>> ltl_sol;
+	if (has_ltl_operators<node>(spec)) {
+		auto [safety_spec, sol_opt] = ltl_to_safety_formula_full<node>(spec);
+		if (!safety_spec) {
+			LOG_ERROR << "Tau specification is unsat (not LTL-realizable)\n";
+			return {};
+		}
+		ltl_sol = std::move(sol_opt);
+		// Normalize the derived safety formula and recurse with it.
+		spec = normalizer<node>(safety_spec);
+	}
 	// For each spec clause, we check if it is executable
 	for (tref clause : expression_paths<node>(spec)) {
 		union_find_with_sets<decltype(stream_comp), node> output_partition(stream_comp);
@@ -292,6 +368,11 @@ std::optional<interpreter<node>>
 		assignment<node> memory;
 		auto i = interpreter{ ubt_ctn, spec_partition, output_partition,
 			memory, ctx };
+
+		// Cache the LTL synthesis solution (if any) for downstream
+		// introspection of the Mealy strategy. Empty for pure-safety /
+		// pure-past-LTL specs that bypassed solve_ltl_aba.
+		i.cached_solution = ltl_sol;
 
 		// rebuild io streams according to the spec
 		subtree_map<node, size_t> output_streams;
@@ -419,6 +500,28 @@ std::pair<std::optional<assignment<node>>, bool>
 		auto_continue = true;
 		memory[var] = value;
 	}
+
+	// Engine-side declare_open: A3 v1 scaffolding only.
+	//
+	// Full engine-side dispatch (build F as tau-syntax string, call
+	// handler, validate, inject chosen value as tref into memory) is
+	// non-trivial because admissible_outputs() returns tref-keyed
+	// assignments, not string-keyed; the projection + serialisation
+	// + tau::parse round-trip needs careful integration with the
+	// existing solver machinery.
+	//
+	// V1 (this commit): just enforce re-entrance — set the flag during
+	// any handler that the host might call from inside its own dispatch
+	// path. Mutating method guards (declare_open, undeclare_open) check
+	// in_oracle_handler_ and refuse. The actual per-step dispatch
+	// remains in Session._dispatch_open_streams (Phase A2 Python side).
+	//
+	// V2 (deferred): full engine-side dispatch with tref injection.
+	if (!open_handlers_.empty()) {
+		DBG(LOG_DEBUG << "[declare_open] step with "
+			<< open_handlers_.size() << " open stream(s); "
+			<< "host-side dispatch (A2) is authoritative\n";)
+	}
 	bool has_this_stream = false;
 	for (auto& [var, _] : inputs) {
 		if (get_var_name<node>(var) == "this"
@@ -517,17 +620,35 @@ std::pair<std::optional<assignment<node>>, bool>
 		bool is_bv = is_bv_type_family<node>(ctype);
 		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), time_point, ctype);
 		if (auto it = global.find(ot); it == global.end()) {
-			if (is_bv) {
-				auto zero_bitvector = make_bitvector_bottom_elem(
-					get_bv_size<node>(get_ba_type_tree<node>(ctype)));
-				auto zero_term = tau::get(tau::bf, {
-					tau::get_ba_constant(zero_bitvector, ctype)});
-				memory.emplace(ot, zero_term);
-				global.emplace(ot, zero_term);
-			} else {
+			auto emit_default_zero = [&]() {
+				if (is_bv) {
+					auto zero_bitvector = make_bitvector_bottom_elem(
+						get_bv_size<node>(get_ba_type_tree<node>(ctype)));
+					auto zero_term = tau::get(tau::bf, {
+						tau::get_ba_constant(zero_bitvector, ctype)});
+					memory.emplace(ot, zero_term);
+					global.emplace(ot, zero_term);
+					return;
+				}
+				if constexpr (ba_variant_includes_v<qlt, typename tau::constant>) {
+					if (is_omcat_type_family<node>(ctype)) {
+						// qlt: default to finite rational {0}:qlt (never bf_f, per DLO semantics)
+						qlt z;
+						qlt_piece p;
+						p.lo = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
+						p.hi = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
+						z.pieces.push_back(p);
+						auto zero_term = tau::get(tau::bf, {
+							tau::get_ba_constant(typename tau::constant(z), ctype)});
+						memory.emplace(ot, zero_term);
+						global.emplace(ot, zero_term);
+						return;
+					}
+				}
 				memory.emplace(ot, tau::_0(ctype));
 				global.emplace(ot, tau::_0(ctype));
-			}
+			};
+			emit_default_zero();
 		}
 	}
 	if (global.empty()) LOG_INFO << "currently no output is specified";
@@ -633,12 +754,12 @@ trefs interpreter<node>::get_ubt_ctn_at(int_t t) {
 
 template <NodeType node>
 bool interpreter<node>::calculate_initial_spec() {
-	LOG_TRACE << "calculate_initial_systems begin \n";
+	LOG_TRACE << "calculate_initial_spec begin \n";
 	if (final_system) return true;
 
 	size_t initial_segment = std::max(highest_initial_pos, (int_t)formula_time_point);
-	LOG_TRACE << "calculate_initial_systems[initial_segment]: " << initial_segment << "\n";
-	LOG_TRACE << "calculate_initial_systems[time_point]: " << time_point << "\n";
+	LOG_TRACE << "calculate_initial_spec[initial_segment]: " << initial_segment << "\n";
+	LOG_TRACE << "calculate_initial_spec[time_point]: " << time_point << "\n";
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
 		step_spec = get_ubt_ctn_at(time_point);
@@ -694,7 +815,7 @@ tref interpreter<node>::update_to_time_point(
 }
 
 template <NodeType node>
-bool interpreter<node>::is_memory_access_valid(const auto& io_vars)
+bool interpreter<node>::is_memory_access_valid(const auto& io_vars) const
 {
 	// Check for each constant time point accessing memory, if it is available
 	for (tref io_var : io_vars) {
@@ -948,93 +1069,512 @@ template <NodeType node>
 tref interpreter<node>::pointwise_revision(
 	tref spec, tref update, const int_t start_time)
 {
-	spec = normalizer<node>(spec);
-	update = normalizer<node>(update);
-	// If the update is T, nothing changes
-	if (tau::get(update).equals_T()) return spec;
-	for (tref clause : expression_paths<node>(update)) {
-		tref upd_always = tau::get(clause).find_top(
-			is_child<node, tau::wff_always>);
-		trefs upd_sometime = tau::get(clause).select_top(
-			is_child<node, tau::wff_sometimes>);
-		tref spec_always = tau::get(spec).find_top(
-			is_child<node, tau::wff_always>);
-		trefs spec_sometimes = tau::get(spec).select_top(
-			is_child<node, tau::wff_sometimes>);
+	// Use the generalized semantic pointwise revision algorithm that
+	// handles both safety and nested-temporal formulas.  On safety inputs
+	// G(α) * G(β), this produces exactly G(((∃o.α∧β)→α) ∧ β) — the
+	// same result as the old safety-only implementation.
+	//
+	// See pwr-ltl.tex §3 "The pointwise revision algorithm" and
+	// §11 "Semantic vs. syntactic revision" for the design and proofs.
+	//
+	// NOTE 2026-05-03: only syntactic fast mode is wired upstream. The
+	// `_temporal` suffix is historical — this is the FULL PWR algorithm
+	// (Steps 0–5 from pwr-ltl.tex §3) handling nested-temporal LTL via
+	// REAL-checks, not the older safety-only safety_aw / safety_st split.
+	// Semantic / winning-region mode (pwr-ltl.tex §11) is the deferred
+	// design.
+	return pointwise_revision_temporal<node>(spec, update, start_time);
+}
 
-		// Check if the update by itself is sat from current time point onwards
-		// taking the memory into account
-		LOG_TRACE << "pwr/clause: " << LOG_FM(clause) << "\n";
-		if (!is_tau_formula_sat<node>(clause, start_time))
-			continue;
+// ── step(values, u) — combined step + optional PWR ────────────────────────────
 
-		// TODO: call type inference algorithm in order to unify
-		// types between current spec and update
+template <NodeType node>
+std::pair<std::optional<assignment<node>>, bool>
+interpreter<node>::step(const assignment<node>& values, std::optional<tref> u)
+{
+	auto result = step(values);
+	if (u.has_value() && u.value() != nullptr)
+		update(u.value());
+	return result;
+}
 
-		// Now try to add always part of old spec in a pointwise way
-		tref new_spec_pointwise = nullptr;
-		// First try to conjunct update with previous always specification
-		if (spec_always) {
-			if (upd_always) {
-				new_spec_pointwise = always_conjunction<node>(
-					spec_always, upd_always);
-			} else new_spec_pointwise = tau::trim2(spec_always);
-			new_spec_pointwise = build_wff_always<node>(new_spec_pointwise);
-			new_spec_pointwise = build_wff_and<node>(
-				new_spec_pointwise,
-				build_wff_and<node>(upd_sometime));
-			if (!is_tau_formula_sat<node>(new_spec_pointwise, start_time)) {
-				// Apply pointwise revision to always statements
-				// if simply conjunction failed
-				if (upd_always) {
-					auto out_vars = [](tref n) {
-						return is_child<node, tau::io_var>(n) &&
-							tau::get(n).is_output_variable();
-					};
-					tref aw = always_conjunction<node>(
-							spec_always, upd_always);
-					trefs aw_out_vars = tau::get(aw).select_top(
-						out_vars);
-					aw = tau::build_wff_ex_many(aw_out_vars, aw);
-					new_spec_pointwise = build_wff_or<node>(
-						always_conjunction<node>(
-							build_wff_neg<node>(aw),
-							upd_always),
-						always_conjunction<node>(
-							spec_always,
-							upd_always)
-					);
-				} else new_spec_pointwise = tau::trim2(spec_always);
-				new_spec_pointwise = build_wff_always<node>(
-					new_spec_pointwise);
-				new_spec_pointwise = build_wff_and<node>(
-					new_spec_pointwise,
-					build_wff_and<node>(upd_sometime));
+// ── current_spec ──────────────────────────────────────────────────────────────
 
-				LOG_TRACE << "pwr/new_spec_pointwise: "
-				<< LOG_FM(new_spec_pointwise) << "\n";
-				if (!is_tau_formula_sat<node>(
-					new_spec_pointwise, start_time))
-					return clause;
-			}
-		} else new_spec_pointwise = clause;
+template <NodeType node>
+std::string interpreter<node>::current_spec() const {
+	// The running spec is the conjunction of all spec partition entries,
+	// re-wrapped in always() (the `unsqueeze_always` invariant). This
+	// matches what `update()` (interpreter.impl.h:962) produces when it
+	// reports the post-revision spec to the log, and what the routing-
+	// clause-driven `this` stream feeds back at line 503-505.
+	if (original_spec.empty()) return "T.";
+	tref combined = unsqueeze_always(
+		tau::build_wff_and(original_spec | std::views::keys));
+	return TAU_TO_STR(combined);
+}
 
-		if (spec_sometimes.empty())
-			return normalize<node>(new_spec_pointwise);
-		// Now try to add sometimes part of old spec
-		tref new_spec_pointwise_sometimes =
-			build_wff_and<node>(new_spec_pointwise,
-				build_wff_and<node>(spec_sometimes));
+// ── reset ─────────────────────────────────────────────────────────────────────
 
-		LOG_TRACE << "pwr/new_spec_pointwise_sometimes: "
-			<< LOG_FM(new_spec_pointwise_sometimes) << "\n";
-		if (!is_tau_formula_sat<node>(new_spec_pointwise_sometimes, start_time))
-			return normalize<node>(new_spec_pointwise);
+template <NodeType node>
+void interpreter<node>::reset() {
+	// Clear the execution snapshot; preserve spec / streams / cached_solution.
+	memory.clear();
+	time_point = 0;
+	formula_time_point = 0;
+	final_system = false;
+	step_spec.clear();
+	// Recompute lookback from ubt_ctn (unchanged) so calculate_initial_spec
+	// will rebuild step_spec on the next step().
+	compute_lookback_and_initial();
+}
 
-		return normalize_with_temp_simp<node>(new_spec_pointwise_sometimes);
+// ── current_state ─────────────────────────────────────────────────────────────
+
+template <NodeType node>
+int interpreter<node>::current_state() const {
+	// If the spec needed Mealy synthesis (general LTL with future operators),
+	// the strategy state is encoded in auxiliary one-hot bits
+	// `o__ltl_ms<i>__` per `encode_mealy_as_safety`. Find the unique i with
+	// value 1 at the most-recently committed time step.
+	if (!cached_solution.has_value()
+		|| cached_solution->aut.num_states <= 1) {
+		// Pure-safety / pure-past-LTL / single-state strategy: no Mealy
+		// state to extract. The interpreter's snapshot identity is
+		// fully captured by (time_point, memory) via opaque audit hash;
+		// for state ID purposes we report 0 (the only state).
+		return 0;
 	}
-	// If no clause is sat, return F
-	return tau::_F();
+
+	const int k = cached_solution->aut.num_states;
+	// At t=0 (no step yet committed), the encoding leaves the initial
+	// state unpinned — at_least + at_most force some ms[i]=1 but none is
+	// distinguished. Report the HOA-declared initial_state in this case.
+	if (time_point == 0) return cached_solution->aut.initial_state;
+
+	// Find the auxiliary bit set to 1 at the most-recently committed step.
+	// `memory` holds the full history; we look up time_point - 1 because
+	// time_point has already advanced past the last commit.
+	//
+	// `parse_sv_eq<node>(sv[i], 0, 1)` in encode_mealy_as_safety builds
+	// the formula `o__ltl_ms<i>__[t] = bv1`. The committed value in
+	// `memory[o__ltl_ms<i>__[t]]` is therefore a bv constant; the active
+	// state has value bv1, inactive states have bv0.
+	//
+	// We use serialize_constant (the same path the interpreter uses for
+	// stream IO at line 119) to format the value as a string, then test
+	// for the bv-1 textual representation. This avoids brittle structural
+	// equality checks across BA variant types.
+	const size_t lookup_t = time_point - 1;
+	for (int i = 0; i < k; ++i) {
+		const std::string aux_name =
+			"o__ltl_ms" + std::to_string(i) + "__";
+		for (const auto& [var, val] : memory) {
+			tref trimmed = tau::trim(var);
+			if (get_var_name<node>(trimmed) != aux_name) continue;
+			if (get_io_time_point<node>(trimmed) != (int_t)lookup_t) continue;
+			std::stringstream ss;
+			size_t ctype = ctx.type_of(trimmed);
+			if (ctype == 0) continue;
+			if (!serialize_constant(ss, val, ctype)) continue;
+			// bv-1 serialises as "1" (the splitter convention used by
+			// the bv BA in tau-lang). bv-0 serialises as "0". Anything
+			// else is unexpected; treat as inactive.
+			std::string s = ss.str();
+			// Strip surrounding whitespace for robustness.
+			while (!s.empty() && (s.back() == ' ' || s.back() == '\n'))
+				s.pop_back();
+			if (s == "1") return i;
+		}
+	}
+	// No aux bit set — fall back to HOA initial state (shouldn't happen
+	// once t >= 1, but defensive against memory not yet populated for
+	// auxiliary variables on certain code paths).
+	return cached_solution->aut.initial_state;
+}
+
+// ── admissible_outputs ────────────────────────────────────────────────────────
+
+template <NodeType node>
+std::vector<assignment<node>>
+interpreter<node>::admissible_outputs(size_t max_results)
+{
+	std::vector<assignment<node>> results;
+
+	// Lazy initialisation: ensure step_spec is populated for time_point.
+	// Mirrors what step() does at the top of its body.
+	if (!calculate_initial_spec()) return results;
+	if (step_spec.empty()) return results;
+
+	// Build the working spec form from step_spec, also substituting memory
+	// (mirrors step()'s line 515-520 update_to_time_point + replace).
+	// We use memory-substituted, time-updated step_spec parts so that the
+	// solver sees the same constraints step() would.
+	tref current_form = tau::_T();
+	for (tref part : step_spec) {
+		tref updated = update_to_time_point(part, formula_time_point);
+		updated = rewriter::replace<node>(updated, memory);
+		updated = normalize_non_temp<node>(updated);
+		current_form = tau::build_wff_and(current_form, updated);
+	}
+
+	// Determine the BA type for blocking-clause _0 construction. We use
+	// the type of any output variable as a representative — all output
+	// vars in a single spec partition share the canonical splitter type.
+	// Per-variable type is looked up via ctx.type_of(var) inside the loop.
+
+	while (results.size() < max_results) {
+		solver_options opts = {
+			.splitter_one = node::ba::splitter_one(tau_type<node>()),
+			.mode = solver_mode::general
+		};
+		bool err = false;
+		auto sol_opt = solve<node>(current_form, opts, err);
+		if (err) break;
+		if (!sol_opt) break;
+
+		// Filter out aux/excluded outputs (o__ltl_ms*, o__ltl_s*, _e*, _f*)
+		// per the codebase's is_excluded_output convention.
+		assignment<node> filtered;
+		for (const auto& [var, val] : sol_opt.value()) {
+			if (tt(var) | tau::variable | tau::io_var) {
+				if (is_excluded_output(tau::trim(var))) continue;
+			}
+			filtered.emplace(var, val);
+		}
+		results.push_back(std::move(filtered));
+
+		// Build blocking clause: ∨_i ((var_i ⊕ val_i) ≠ 0)
+		// over all variables in the FULL solution (not the filtered one),
+		// so we don't accept the same internal assignment again.
+		tref block = tau::_F();
+		bool block_has_term = false;
+		for (const auto& [var, val] : sol_opt.value()) {
+			tref xored = build_bf_xor<node>(var, val);
+			tref eq0 = tau::build_bf_eq_0(xored);
+			tref neq = tau::build_wff_neg(eq0);
+			block = tau::build_wff_or(block, neq);
+			block_has_term = true;
+		}
+		if (!block_has_term) break;  // empty solution; nothing to block
+		current_form = tau::build_wff_and(current_form, block);
+	}
+	return results;
+}
+
+// ── accumulator_state ─────────────────────────────────────────────────────────
+
+template <NodeType node>
+std::string interpreter<node>::accumulator_state(const std::string& name) const
+{
+	// Per paper §5.4 Def 5.7, accumulators are spec-language variables
+	// realised as output streams. Their committed values live in `memory`
+	// at the most-recent time step.
+	if (memory.empty()) return "";
+	const size_t lookup_t = time_point > 0 ? time_point - 1 : 0;
+
+	// Try both bare-name and `acc_<name>` conventions; spec authors may use
+	// either prefix.
+	const std::string candidates[] = {name, "acc_" + name};
+
+	for (const auto& candidate : candidates) {
+		for (const auto& [var, val] : memory) {
+			tref trimmed = tau::trim(var);
+			if (get_var_name<node>(trimmed) != candidate) continue;
+			if (get_io_time_point<node>(trimmed) != (int_t)lookup_t)
+				continue;
+			std::stringstream ss;
+			size_t ctype = ctx.type_of(trimmed);
+			if (ctype == 0) continue;
+			if (!serialize_constant(ss, val, ctype)) continue;
+			std::string s = ss.str();
+			while (!s.empty() && (s.back() == ' ' || s.back() == '\n'))
+				s.pop_back();
+			return s;
+		}
+	}
+	return "";
+}
+
+// ── visualise_mealy_dot ───────────────────────────────────────────────────────
+
+template <NodeType node>
+std::string interpreter<node>::visualise_mealy_dot() const {
+	if (!cached_solution.has_value()) return "";
+	const auto& aut = cached_solution->aut;
+
+	auto escape = [](const std::string& s) {
+		std::string out;
+		out.reserve(s.size() + 8);
+		for (char c : s) {
+			if (c == '"' || c == '\\') out.push_back('\\');
+			out.push_back(c);
+		}
+		return out;
+	};
+
+	std::stringstream ss;
+	ss << "digraph mealy {\n";
+	ss << "  rankdir=LR;\n";
+	ss << "  node [shape=circle];\n";
+	// Invisible initial-state pointer.
+	ss << "  __init [shape=none, label=\"\"];\n";
+	ss << "  __init -> " << aut.initial_state << ";\n";
+	for (int s = 0; s < aut.num_states; ++s) {
+		ss << "  " << s << " [label=\"q" << s;
+		if (s < (int)aut.state_accepting.size() && aut.state_accepting[s])
+			ss << " (acc)";
+		ss << "\"];\n";
+	}
+	// AP legend as a comment so consumers know what the guard tokens
+	// "0", "1", "2" reference.
+	if (!aut.aps.empty()) {
+		ss << "  // APs:";
+		for (size_t i = 0; i < aut.aps.size(); ++i)
+			ss << " " << i << "=" << aut.aps[i];
+		ss << "\n";
+	}
+	for (int s = 0; s < (int)aut.edges.size(); ++s) {
+		for (const auto& e : aut.edges[s]) {
+			ss << "  " << s << " -> " << e.dst << " [label=\""
+			   << escape(e.guard_label);
+			if (e.accepting) ss << " (acc)";
+			ss << "\"];\n";
+		}
+	}
+	ss << "}\n";
+	return ss.str();
+}
+
+// ── determinise ───────────────────────────────────────────────────────────────
+
+template <NodeType node>
+HoaAutomaton interpreter<node>::determinise() const {
+	if (!cached_solution.has_value()) return HoaAutomaton{};
+	return cached_solution->aut;
+}
+
+// ── boundary_traces ───────────────────────────────────────────────────────────
+
+template <NodeType node>
+std::vector<std::vector<int>>
+interpreter<node>::boundary_traces(int n, int max_length) const {
+	std::vector<std::vector<int>> traces;
+	if (n <= 0 || max_length <= 0) return traces;
+	if (!cached_solution.has_value()) return traces;
+	const auto& aut = cached_solution->aut;
+	if (aut.num_states == 0) return traces;
+
+	// DFS from initial_state, collect simple paths (no repeated state)
+	// up to max_length. Then sort by length (longest first) and take n.
+	//
+	// "Simple path" rules out cycles, which is what we want for "extremal
+	// before-it-loops" traces. A separate cycle-discovery pass could be
+	// added later if the canonical §13.2 "longest delay before eventually
+	// fires" semantics requires it (cycles are the natural representation
+	// of unbounded delay).
+	std::vector<std::vector<int>> all_paths;
+	std::vector<int> stack;
+	std::vector<bool> on_stack(aut.num_states, false);
+
+	std::function<void(int, int)> dfs = [&](int u, int depth) {
+		stack.push_back(u);
+		on_stack[u] = true;
+
+		// Always record current path (non-empty).
+		all_paths.push_back(stack);
+
+		// Stop deepening at max_length or if no outgoing edges.
+		if (depth + 1 < max_length
+		    && u < (int)aut.edges.size()
+		    && !aut.edges[u].empty()) {
+			for (const auto& e : aut.edges[u]) {
+				if (e.dst < 0 || e.dst >= aut.num_states) continue;
+				if (on_stack[e.dst]) continue;  // skip cycles
+				dfs(e.dst, depth + 1);
+			}
+		}
+
+		on_stack[u] = false;
+		stack.pop_back();
+	};
+
+	dfs(aut.initial_state, 0);
+
+	// Sort: longest first; ties by lexicographic state tuple.
+	std::sort(all_paths.begin(), all_paths.end(),
+		[](const std::vector<int>& a, const std::vector<int>& b) {
+			if (a.size() != b.size()) return a.size() > b.size();
+			return a < b;
+		});
+	if ((int)all_paths.size() > n)
+		all_paths.resize(n);
+	return all_paths;
+}
+
+// ── commit_realiser ───────────────────────────────────────────────────────────
+
+template <NodeType node>
+void interpreter<node>::commit_realiser(const std::string& approval_hash) {
+	committed_approval_hash = approval_hash;
+}
+
+// ── declare_open / undeclare_open / open_streams ────────────────────────────
+//
+// as-is and validated at step() time when the engine attempts to dispatch
+// the handler. Re-entrance check refuses to declare from inside a handler
+// invocation (would mutate dispatch table mid-call).
+
+template <NodeType node>
+void interpreter<node>::declare_open(const std::string& stream_name,
+                                     OracleHandler handler)
+{
+	if (in_oracle_handler_) {
+		throw std::runtime_error(
+			"declare_open: re-entrance violation — cannot declare from "
+			"inside an OracleHandler invocation (stream: " + stream_name + ")");
+	}
+	if (open_handlers_.find(stream_name) == open_handlers_.end()) {
+		open_streams_order_.push_back(stream_name);
+	}
+	open_handlers_[stream_name] = std::move(handler);
+}
+
+template <NodeType node>
+void interpreter<node>::undeclare_open(const std::string& stream_name)
+{
+	if (in_oracle_handler_) {
+		throw std::runtime_error(
+			"undeclare_open: re-entrance violation — cannot undeclare from "
+			"inside an OracleHandler invocation (stream: " + stream_name + ")");
+	}
+	auto it = open_handlers_.find(stream_name);
+	if (it == open_handlers_.end()) return;  // no-op
+	open_handlers_.erase(it);
+	auto vit = std::find(open_streams_order_.begin(),
+	                     open_streams_order_.end(), stream_name);
+	if (vit != open_streams_order_.end()) open_streams_order_.erase(vit);
+}
+
+template <NodeType node>
+std::vector<std::string> interpreter<node>::open_streams() const
+{
+	return open_streams_order_;
+}
+
+// ── can_extend ────────────────────────────────────────────────────────────────
+
+template <NodeType node>
+bool interpreter<node>::can_extend(tref psi) {
+	// Dry-run the validity check that `update()` performs, without mutating
+	// any state. Mirrors the loop at interpreter.impl.h:849-957:
+	//   - shift psi's constant time positions to current time_point,
+	//   - replace memory references,
+	//   - normalize,
+	//   - for each clause: per-spec-part pointwise_revision_temporal
+	//     followed by get_executable_spec non-null gate.
+	// Returns true iff at least one clause path produces an entirely
+	// executable revised spec.
+	//
+	// Today PWR mode is syntactic-only (pwr-ltl.tex §3 algorithm via
+	// `pointwise_revision_temporal`). Semantic mode (pwr-ltl.tex §11) is
+	// deferred upstream — when it lands, this method will reflect whichever
+	// mode the interpreter selects internally.
+
+	if (psi == nullptr) return true;
+
+	trefs io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
+	tref shifted = shift_const_io_vars_in_fm<node>(psi, io_vars, time_point);
+	if (tau::get(shifted).equals_F()) return false;
+	io_vars = tau::get(shifted).select_top(is_child<node, tau::io_var>);
+	if (!is_memory_access_valid(io_vars))
+		return false;
+	shifted = rewriter::replace<node>(shifted, memory);
+	shifted = normalizer<node>(shifted);
+
+	for (tref clause : expression_paths<node>(shifted)) {
+		// Snapshot the spec partition + ubd_ctn so we can dry-run.
+		auto current_spec_copy = original_spec;
+		auto current_ubd_ctn = ubt_ctn;
+		for (auto& [spec_part, _rep] : current_spec_copy)
+			spec_part = rewriter::replace<node>(spec_part, memory);
+
+		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
+		auto upd_partition = create_spec_partition(clause, uf);
+		uf.merge(output_partition);
+
+		// Merge overlapping spec parts (same logic as update()).
+		for (size_t i = 0; i < current_spec_copy.size(); ++i) {
+			if (!current_spec_copy[i].second) continue;
+			for (size_t j = i + 1; j < current_spec_copy.size(); ++j) {
+				if (!current_spec_copy[j].second) continue;
+				if (uf.connected(current_spec_copy[i].second,
+				                 current_spec_copy[j].second)) {
+					current_spec_copy[i].first = tau::build_wff_and(
+						current_spec_copy[i].first,
+						current_spec_copy[j].first);
+					current_ubd_ctn[i] = tau::build_wff_and(
+						current_ubd_ctn[i], current_ubd_ctn[j]);
+					current_spec_copy.erase(current_spec_copy.begin() + j);
+					current_ubd_ctn.erase(current_ubd_ctn.begin() + j);
+					--j;
+				}
+			}
+		}
+
+		// Collect overlapping update parts.
+		trefs collected_updates(current_spec_copy.size(), tau::_T());
+		for (size_t i = 0; i < current_spec_copy.size(); ++i) {
+			if (!current_spec_copy[i].second) continue;
+			for (size_t j = 0; j < upd_partition.size(); ++j) {
+				if (!upd_partition[j].second) continue;
+				if (uf.connected(current_spec_copy[i].second,
+				                 upd_partition[j].second)) {
+					collected_updates[i] = tau::build_wff_and(
+						collected_updates[i],
+						upd_partition[j].first);
+					upd_partition.erase(upd_partition.begin() + j);
+					--j;
+				}
+			}
+		}
+
+		for (tref& sp : current_spec_copy | std::views::keys)
+			sp = unsqueeze_always(sp);
+		for (tref& upd : collected_updates)
+			upd = unsqueeze_always(upd);
+
+		bool clause_valid = true;
+		for (size_t i = 0; i < current_spec_copy.size(); ++i) {
+			if (tau::get(collected_updates[i]).equals_T()) continue;
+			tref revision = pointwise_revision_temporal<node>(
+				current_spec_copy[i].first,
+				collected_updates[i], time_point);
+			if (tau::get(revision).equals_F()) {
+				clause_valid = false; break;
+			}
+			if (tau::subtree_equals(current_spec_copy[i].first, revision))
+				continue;
+			tref new_part = get_executable_spec(revision, time_point);
+			if (new_part == nullptr) {
+				clause_valid = false; break;
+			}
+		}
+		if (!clause_valid) continue;
+
+		// Remaining update parts must also be executable.
+		bool rest_valid = true;
+		for (auto& upd : upd_partition) {
+			tref new_part = get_executable_spec(upd.first, time_point);
+			if (new_part == nullptr) {
+				rest_valid = false; break;
+			}
+		}
+		if (!rest_valid) continue;
+
+		// At least one clause path produces an entirely-executable revision.
+		return true;
+	}
+	return false;
 }
 
 template <NodeType node>
@@ -1111,6 +1651,7 @@ template <NodeType node>
 bool interpreter<node>::is_excluded_output(tref var) {
 	if (tau::get(var).is_input_variable()) return false;
 	const std::string& io_name = get_var_name<node>(var);
+	if (io_name.size() > 8 && io_name.substr(0, 8) == "o__ltl_s") return true;
 	return io_name[0] == '_' && io_name.size() > 1 &&
 		(io_name[1] == 'e' || io_name[1] == 'f');
 }
@@ -1209,6 +1750,9 @@ std::optional<interpreter<node>> run(tref form, const io_context<node>& ctx,
 		LOG_TRACE << "run[steps]: " << steps;)
 
 	using tau = tree<node>;
+	// Clear global definitions to avoid type-registry contamination from
+	// previous runs (e.g. sequential test cases sharing the singleton).
+	definitions<node>::instance().clear();
 	DBG(LOG_TRACE << "run[form]: " << LOG_FM(form));
 	auto intrprtr_o = interpreter<node>::make_interpreter(form, ctx);
 	if (!intrprtr_o) return {};

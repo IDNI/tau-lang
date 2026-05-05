@@ -10,6 +10,8 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
+/// Convert a subtree_map<node,tref> to a map<htref,htref> by wrapping
+/// every key and value with tree<node>::geth() for GC safety.
 template <NodeType node>
 std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 	std::map<htref, htref> hm;
@@ -18,8 +20,10 @@ std::map<htref, htref> geth(const subtree_map<node, tref>& m) {
 }
 
 // ------------------------------------------------------------
-// htref API
+// htref API — GC-safe handle wrappers
 // ------------------------------------------------------------
+// Each method delegates to the corresponding tref overload and wraps
+// the result with tau::geth() to produce a GC-safe shared-pointer handle.
 
 // Parsing
 // ------------------------------------------------------------
@@ -100,7 +104,7 @@ htref api<node>::apply_def(htref def, htref expression) {
 }
 
 template <NodeType node>
-htref api<node>::apply_defs(std::set<htref> defs, htref expression) {
+htref api<node>::apply_defs(const std::set<htref>& defs, htref expression) {
 	if (!expression) return nullptr;
 	subtree_set<node> tdefs;
 	for (htref def : defs) if (def) tdefs.insert(def->get());
@@ -142,6 +146,7 @@ htref api<node>::substitute(htref expr, htref that, htref with) {
 template <NodeType node>
 htref api<node>::substitute(htref expr, std::map<htref, htref> that_with) {
 	if (!expr) return nullptr;
+	// Apply substitutions sequentially; each step unwraps htref to tref
 	tref e = expr->get();
 	for (auto [that, with] : that_with) {
 		if (!that || !with) continue;
@@ -212,6 +217,8 @@ htref api<node>::anti_prenex(htref fm) {
 template <NodeType node>
 htref api<node>::eliminate_quantifiers(htref fm) {
 	if (!fm) return nullptr;
+	// Apply defs at the tref level before eliminating quantifiers
+	// (the tref overload also calls apply_all_defs internally)
 	if (tref a = apply_all_defs(fm->get()); a)
 		if (tref e = eliminate_quantifiers(a); e) return tau::geth(e);
 	return nullptr;
