@@ -723,6 +723,18 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_wff_sometimes(tref n);
 	/** @brief Build `always n`. */
 	static tref build_wff_always(tref n);
+	// CTL* path quantifiers
+	static tref build_wff_A(tref n);
+	static tref build_wff_E(tref n);
+	// semantic negation (strategy-level)
+	static tref build_wff_semantic_neg(tref n);
+	// LTL(ABA) operators
+	static tref build_wff_F(tref n);
+	static tref build_wff_U(tref l, tref r);
+	static tref build_wff_R(tref l, tref r);
+	static tref build_wff_W(tref l, tref r);
+	static tref build_wff_S(tref l, tref r);
+	static tref build_wff_T(tref l, tref r);
 	/** @brief Build `x ? y : z` conditional. */
 	static tref build_wff_conditional(tref x, tref y, tref z);
 	/** @brief Build `all bound_var. subformula`. */

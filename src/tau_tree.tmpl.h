@@ -155,6 +155,9 @@ bool has_negative_offset(tref fm);
 template <NodeType node>
 bool has_semantic_error(tref fm);
 
+template <NodeType node>
+tref unnest_nested_always(tref fm);
+
 } // namespace idni::tau_lang
 
 #include "dict.h"      // string pool accessed with dict() functions

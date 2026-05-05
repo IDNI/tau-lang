@@ -139,15 +139,15 @@ constexpr node<BAs...> node<BAs...>::extension(T raw_value) {
 	);
 }
 
-#define C(x) static_cast<node<BAs...>::T>(x)
+#define NODE_CAST(x) static_cast<node<BAs...>::T>(x)
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
 	T result = 0;
-	result |= (C(nt) & ((1u << node::nt_bits) - 1u)) << node::nt_shift;
-	result |= (C(term) & 1u) << node::term_shift ;
-	result |= (C(ext) & 1u) << node::ext_shift;
-	result |= C(data) & node::data_mask;
+	result |= (NODE_CAST(nt) & ((1u << node::nt_bits) - 1u)) << node::nt_shift;
+	result |= (NODE_CAST(term) & 1u) << node::term_shift ;
+	result |= (NODE_CAST(ext) & 1u) << node::ext_shift;
+	result |= NODE_CAST(data) & node::data_mask;
 	return result;
 }
 
@@ -157,14 +157,14 @@ std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	// The hash comparison is needed in order to ensure determinism due to
 	// due to different possible storage positions of strings and BA constants
 	if (hash != that.hash) return hash    <=> that.hash;
-	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
+	if (nt   != that.nt)   return NODE_CAST(nt)   <=> NODE_CAST(that.nt);
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
-	//if (term != that.term) return C(term) <=> C(that.term);
-	if (ba_type   != that.ba_type)   return C(ba_type)   <=> C(that.ba_type);
-	if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
-	return C(data) <=> C(that.data);
+	//if (term != that.term) return NODE_CAST(term) <=> NODE_CAST(that.term);
+	if (ba_type   != that.ba_type)   return NODE_CAST(ba_type)   <=> NODE_CAST(that.ba_type);
+	if (ext  != that.ext)  return NODE_CAST(ext)  <=> NODE_CAST(that.ext);
+	return NODE_CAST(data) <=> NODE_CAST(that.data);
 }
-#undef C
+#undef NODE_CAST
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator<(const node& that) const {
@@ -204,8 +204,12 @@ constexpr size_t node<BAs...>::hashit() const {
 	hash_combine(seed, static_cast<size_t>(nt));
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));
-	// In order to have a deterministic hash, we hash the type name
-	hash_combine(seed, get_ba_type_name<node>(ba_type));
+	// Hash ba_type directly (integer).  The BA-type IDs are assigned
+	// deterministically in ba_types::type_tree_to_idx, so identical node
+	// shapes yield identical hashes without having to stringify the type
+	// (which can invoke tree::print on an uninitialised type-tree and
+	// crash on the small variants used in unit tests).
+	hash_combine(seed, ba_type);
 	hash_combine(seed, static_cast<bool>(ext));
 	// Get ba constant from pool
 	if (nt == type::ba_constant && data != 0 && ba_type != 0)

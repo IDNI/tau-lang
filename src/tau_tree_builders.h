@@ -309,6 +309,13 @@ template<NodeType node> tref build_rr_ref(const std::string& sym_name, tref offs
 /** @brief Build `sym_name[offset_str - shift](args)`. */
 template<NodeType node> tref build_rr_ref(const std::string& sym_name, const std::string& offset, size_t shift, const trefs& args);
 
+/** @brief Build CTL* path-quantified formula `A n`. */
+template <NodeType node> tref build_wff_A(tref n);
+/** @brief Build CTL* path-quantified formula `E n`. */
+template <NodeType node> tref build_wff_E(tref n);
+/** @brief Build the strategy-level semantic negation of `n`. */
+template <NodeType node> tref build_wff_semantic_neg(tref n);
+
 
 } // namespace idni::tau_lang
 
