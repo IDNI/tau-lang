@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tau-lang IDE</title>
+
+<!-- CodeMirror 6 via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@codemirror/view@6/dist/index.cjs" type="module"></script>
+<link rel="stylesheet" href="/static/style.css">
+
+<!-- xterm.js for REPL terminal -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+
+<!-- Marked for rendering markdown help -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+
+<style>
+/* Inline critical styles for instant render */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; background: #1e1e2e; color: #cdd6f4; overflow: hidden; height: 100vh; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Top bar -->
+  <header id="topbar">
+    <div class="topbar-left">
+      <span class="logo">&tau;</span>
+      <span class="title">Tau-lang IDE</span>
+      <span class="separator">|</span>
+      <button class="tb-btn" onclick="IDE.newFile()" title="New File (Ctrl+N)">New</button>
+      <button class="tb-btn" onclick="IDE.openFile()" title="Open File (Ctrl+O)">Open</button>
+      <button class="tb-btn" onclick="IDE.saveFile()" title="Save (Ctrl+S)">Save</button>
+      <span class="separator">|</span>
+      <button class="tb-btn run-btn" onclick="IDE.runProgram()" title="Run Specification (Shift+Enter)">&#9654; Run</button>
+      <button class="tb-btn" onclick="IDE.evalSelection()" title="Evaluate (Ctrl+Enter)">Eval</button>
+      <button class="tb-btn" onclick="IDE.visualize()" title="Visualize Formula (Ctrl+Shift+V)" style="color:#94e2d5">&#9673; Viz</button>
+      <span class="separator">|</span>
+      <select id="fragment-select" onchange="IDE.setFragment(this.value)" title="Logic Fragment">
+        <option value="ltl">LTL (default)</option>
+        <option value="ctl_star">CTL*</option>
+      </select>
+    </div>
+    <div class="topbar-right">
+      <span id="status-indicator" class="status-ready">Ready</span>
+      <button class="tb-btn" onclick="IDE.toggleAI()" title="AI Assistant" style="color:#f9e2af">&#9733; AI</button>
+      <button class="tb-btn" onclick="IDE.toggleHelp()" title="Help (F1)">? Help</button>
+    </div>
+  </header>
+
+  <!-- Main layout -->
+  <div id="main-container">
+    <!-- Left sidebar: file browser -->
+    <aside id="sidebar" class="panel">
+      <div class="panel-header">
+        <span>Explorer</span>
+        <button class="icon-btn" onclick="IDE.toggleSidebar()" title="Toggle Sidebar">&times;</button>
+      </div>
+      <div id="file-tree" class="panel-body">
+        <div class="tree-section">
+          <div class="tree-section-header" onclick="IDE.toggleSection(this)">
+            <span class="caret">&#9660;</span> Examples
+          </div>
+          <div class="tree-section-body" id="examples-tree"></div>
+        </div>
+        <div class="tree-section">
+          <div class="tree-section-header" onclick="IDE.toggleSection(this)">
+            <span class="caret">&#9660;</span> Templates
+          </div>
+          <div class="tree-section-body" id="templates-tree"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center: editor + bottom panels -->
+    <div id="center-panel">
+      <!-- Tab bar -->
+      <div id="tab-bar">
+        <div class="tab active" data-id="untitled" onclick="IDE.switchTab('untitled')">
+          <span class="tab-title">untitled.tau</span>
+          <span class="tab-close" onclick="event.stopPropagation(); IDE.closeTab('untitled')">&times;</span>
+        </div>
+      </div>
+
+      <!-- Editor -->
+      <div id="editor-container">
+        <div id="editor"></div>
+        <!-- Minimap / line info -->
+        <div id="editor-status-bar">
+          <span id="cursor-pos">Ln 1, Col 1</span>
+          <span id="file-type">Tau</span>
+          <span id="encoding">UTF-8</span>
+        </div>
+      </div>
+
+      <!-- Bottom panels: REPL, Output, Problems -->
+      <div id="bottom-panel">
+        <div id="bottom-tabs">
+          <button class="btab active" data-panel="repl" onclick="IDE.switchBottomTab('repl')">REPL</button>
+          <button class="btab" data-panel="output" onclick="IDE.switchBottomTab('output')">Output</button>
+          <button class="btab" data-panel="problems" onclick="IDE.switchBottomTab('problems')">Problems</button>
+          <button class="btab" data-panel="ast" onclick="IDE.switchBottomTab('ast')">AST</button>
+          <button class="btab" data-panel="viz" onclick="IDE.switchBottomTab('viz')">Visualize</button>
+          <button class="btab" data-panel="ai" onclick="IDE.switchBottomTab('ai')">AI</button>
+          <div class="btab-spacer"></div>
+          <button class="icon-btn" onclick="IDE.clearBottomPanel()">Clear</button>
+          <button class="icon-btn" onclick="IDE.toggleBottomPanel()">_</button>
+        </div>
+        <div id="bottom-content">
+          <div id="panel-repl" class="bottom-pane active">
+            <div id="repl-output"></div>
+            <div id="repl-input-container">
+              <span class="repl-prompt">tau&gt;</span>
+              <input type="text" id="repl-input" placeholder="Enter command..." autocomplete="off" spellcheck="false">
+            </div>
+          </div>
+          <div id="panel-output" class="bottom-pane">
+            <pre id="output-content"></pre>
+          </div>
+          <div id="panel-problems" class="bottom-pane">
+            <div id="problems-content"></div>
+          </div>
+          <div id="panel-ast" class="bottom-pane">
+            <pre id="ast-content"></pre>
+          </div>
+          <div id="panel-viz" class="bottom-pane">
+            <div id="viz-content" style="overflow:auto;padding:8px;"></div>
+          </div>
+          <div id="panel-ai" class="bottom-pane">
+            <div id="ai-panel" style="display:flex;flex-direction:column;height:100%;">
+              <div id="ai-toolbar" style="display:flex;gap:6px;padding:6px 8px;border-bottom:1px solid #313244;align-items:center;flex-wrap:wrap;">
+                <select id="ai-mode" style="background:#181825;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;padding:3px 6px;font-size:12px;">
+                  <option value="assist">Ask (context-aware)</option>
+                  <option value="generate">Generate from NL</option>
+                  <option value="explain">Explain code</option>
+                </select>
+                <select id="ai-model" style="background:#181825;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;padding:3px 6px;font-size:12px;">
+                  <option value="deepseek-reasoner">DeepSeek R1</option>
+                  <option value="deepseek-chat">DeepSeek V3</option>
+                </select>
+                <button class="tb-btn" onclick="IDE.showAPIKeyDialog()" style="font-size:11px;">&#9881; API Key</button>
+                <span id="ai-status" style="font-size:11px;color:#6c7086;"></span>
+              </div>
+              <div id="ai-input-area" style="display:flex;gap:4px;padding:6px 8px;border-bottom:1px solid #313244;">
+                <input type="text" id="ai-input" placeholder="Ask about your code, describe what to generate, or select code to explain..." style="flex:1;background:#181825;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;padding:6px 10px;font-family:inherit;font-size:12px;" onkeydown="if(event.key==='Enter')IDE.sendAI()">
+                <button class="tb-btn run-btn" onclick="IDE.sendAI()" style="padding:4px 14px;">Send</button>
+              </div>
+              <div id="ai-output" style="flex:1;overflow:auto;padding:8px 12px;font-size:12px;line-height:1.6;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel: help / properties -->
+    <aside id="right-panel" class="panel" style="display:none">
+      <div class="panel-header">
+        <span>Help</span>
+        <button class="icon-btn" onclick="IDE.toggleHelp()">&times;</button>
+      </div>
+      <div id="help-content" class="panel-body">
+        <!-- Navigation -->
+        <div id="help-nav">
+          <input type="text" id="help-search" placeholder="Search help..." oninput="IDE.searchHelp(this.value)">
+          <div id="help-toc"></div>
+        </div>
+        <div id="help-body"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Command Palette -->
+<div id="command-palette" style="display:none">
+  <div class="palette-overlay" onclick="IDE.hideCommandPalette()"></div>
+  <div class="palette-dialog">
+    <input type="text" id="palette-input" placeholder="Type a command..." oninput="IDE.filterCommands(this.value)">
+    <div id="palette-results"></div>
+  </div>
+</div>
+
+<!-- API Key Dialog -->
+<div id="api-key-dialog" style="display:none;position:fixed;inset:0;z-index:10000;">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.6);" onclick="IDE.hideAPIKeyDialog()"></div>
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#1e1e2e;border:1px solid #45475a;border-radius:8px;padding:24px;width:460px;max-width:90vw;">
+    <h3 style="color:#cdd6f4;margin-bottom:12px;">DeepSeek API Key</h3>
+    <p style="color:#a6adc8;font-size:12px;margin-bottom:12px;">Your key is stored in browser localStorage only — never sent to the server storage.</p>
+    <input type="password" id="api-key-input" placeholder="sk-..." style="width:100%;background:#181825;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;padding:8px 12px;font-family:inherit;font-size:13px;margin-bottom:12px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="tb-btn" onclick="IDE.hideAPIKeyDialog()">Cancel</button>
+      <button class="tb-btn run-btn" onclick="IDE.saveAPIKey()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notifications -->
+<div id="toast-container"></div>
+
+<script src="/static/tau-mode.js?v=2"></script>
+<script src="/static/tau-viz.js?v=2"></script>
+<script src="/static/ide.js?v=2"></script>
+</body>
+</html>
