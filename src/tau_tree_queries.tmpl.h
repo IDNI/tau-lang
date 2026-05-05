@@ -58,8 +58,16 @@ bool is_child_quantifier(tref n) {
 template <NodeType node>
 bool is_temporal_quantifier(tref n) {
 	return tree<node>::get(n).is(node::type::wff_always)
-		|| tree<node>::get(n).is(node::type::wff_sometimes);
-
+		|| tree<node>::get(n).is(node::type::wff_sometimes)
+		|| tree<node>::get(n).is(node::type::wff_F)
+		|| tree<node>::get(n).is(node::type::wff_U)
+		|| tree<node>::get(n).is(node::type::wff_R)
+		|| tree<node>::get(n).is(node::type::wff_W)
+		|| tree<node>::get(n).is(node::type::wff_S)
+		|| tree<node>::get(n).is(node::type::wff_T)
+		|| tree<node>::get(n).is(node::type::wff_A)
+		|| tree<node>::get(n).is(node::type::wff_E)
+		|| tree<node>::get(n).is(node::type::wff_semantic_neg);
 }
 
 template <NodeType node>
@@ -236,6 +244,11 @@ int_t node_count (tref fm) {
 	return c;
 }
 
+
+template <NodeType node>
+auto visit_wff = [](tref n) {
+	return !tree<node>::get(n).is_term();
+};
 
 template <NodeType node>
 bool is_non_boolean_term(tref n) {

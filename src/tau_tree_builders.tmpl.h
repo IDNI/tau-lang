@@ -90,18 +90,34 @@ tref _0(size_t type_id) { return get_0<node>(type_id).get(); }
 template <NodeType node>
 tref _1(size_t type_id) { return get_1<node>(type_id).get(); }
 template <NodeType node>
-tref _F() { return get_F<node>().get(); }
+tref _F() {
+	using tau = tree<node>;
+	static htref permanent = tau::geth(tau::get(tau::wff, _F_trimmed<node>()));
+	return permanent->get();
+}
 template <NodeType node>
-tref _T() { return get_T<node>().get(); }
+tref _T() {
+	using tau = tree<node>;
+	static htref permanent = tau::geth(tau::get(tau::wff, _T_trimmed<node>()));
+	return permanent->get();
+}
 
 template <NodeType node>
 tref _0_trimmed(size_t type_id) { return get_0_trimmed<node>(type_id).get(); }
 template <NodeType node>
 tref _1_trimmed(size_t type_id) { return get_1_trimmed<node>(type_id).get(); }
 template <NodeType node>
-tref _F_trimmed() { return get_F_trimmed<node>().get(); }
+tref _F_trimmed() {
+	using tau = tree<node>;
+	static htref permanent = tau::geth(tau::get(tau::wff_f));
+	return permanent->get();
+}
 template <NodeType node>
-tref _T_trimmed() { return get_T_trimmed<node>().get(); }
+tref _T_trimmed() {
+	using tau = tree<node>;
+	static htref permanent = tau::geth(tau::get(tau::wff_t));
+	return permanent->get();
+}
 
 template <NodeType node>
 const tree<node>& get_0(size_t type_id) {
@@ -120,15 +136,13 @@ const tree<node>& get_1(size_t type_id) {
 template <NodeType node>
 const tree<node>& get_F() {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::wff, _F_trimmed<node>()));
-	return tau::get(cached);
+	return tau::get(_F<node>());
 }
 
 template <NodeType node>
 const tree<node>& get_T() {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::wff, _T_trimmed<node>()));
-	return tau::get(cached);
+	return tau::get(_T<node>());
 }
 
 template <NodeType node>
@@ -146,15 +160,13 @@ const tree<node>& get_1_trimmed(size_t type_id) {
 template <NodeType node>
 const tree<node>& get_F_trimmed() {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::wff_f));
-	return tau::get(cached);
+	return tau::get(_F_trimmed<node>());
 }
 
 template <NodeType node>
 const tree<node>& get_T_trimmed() {
 	using tau = tree<node>;
-	static htref cached = tau::geth(tau::get(tau::wff_t));
-	return tau::get(cached);
+	return tau::get(_T_trimmed<node>());
 }
 
 // -----------------------------------------------------------------------------
@@ -176,6 +188,81 @@ tref build_wff_always(tref l) {
 	return tau::get(tau::wff, tau::get(tau::wff_always, l));
 }
 
+// CTL* path quantifiers: A (forall-paths), E (exists-path)
+template <NodeType node>
+tref build_wff_A(tref l) {
+	DBG(assert(l != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_A, l));
+}
+
+template <NodeType node>
+tref build_wff_E(tref l) {
+	DBG(assert(l != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_E, l));
+}
+
+// semantic negation: strategy-level negation (no winning strategy for phi)
+template <NodeType node>
+tref build_wff_semantic_neg(tref l) {
+	DBG(assert(l != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_semantic_neg, l));
+}
+
+// LTL(ABA) operators: F (finally), U (until), R (release), W (weak until), S, T
+template <NodeType node>
+tref build_wff_F(tref l) {
+	DBG(assert(l != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_F, l));
+}
+
+template <NodeType node>
+tref build_wff_U(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_U, l, r));
+}
+
+template <NodeType node>
+tref build_wff_R(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_R, l, r));
+}
+
+template <NodeType node>
+tref build_wff_W(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_W, l, r));
+}
+
+template <NodeType node>
+tref build_wff_S(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_S, l, r));
+}
+
+template <NodeType node>
+tref build_wff_T(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	using tau = tree<node>;
+	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	return tau::get(tau::wff, tau::get(tau::wff_T, l, r));
+}
+
 template <NodeType node>
 tref build_wff_conditional(tref x, tref y, tref z) {
 	DBG(assert(x != nullptr && y != nullptr && z != nullptr);)
@@ -190,7 +277,7 @@ int_t find_biggest_quant_id(tref fm) {
 	using tau = tree<node>;
 	// Find the biggest quantifier id in fm
 	int_t id = 0;
-	auto is_number = [](const std::string& s) static {
+	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
 		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
 		return true;
@@ -330,7 +417,12 @@ template <NodeType node>
 tref build_wff_or(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	// Short-circuit T/F before entering hooks.
+	// _T()/_F() return hash-wrapped nodes, so use address comparison.
+	if (l == tau::_F()) return r;
+	if (r == tau::_F()) return l;
+	if (l == tau::_T()) return l;
+	if (r == tau::_T()) return r;
 	return tau::get(tau::wff, tau::get(tau::wff_or, l, r));
 }
 
@@ -355,7 +447,12 @@ template <NodeType node>
 tref build_wff_and(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
 	using tau = tree<node>;
-	DBG(assert(tau::get(l).is(tau::wff) && tau::get(r).is(tau::wff));)
+	// Short-circuit T/F before entering hooks.
+	// _T()/_F() return hash-wrapped nodes, so use address comparison.
+	if (l == tau::_T()) return r;
+	if (r == tau::_T()) return l;
+	if (l == tau::_F()) return l;
+	if (r == tau::_F()) return r;
 	return tau::get(tau::wff, tau::get(tau::wff_and, l, r));
 }
 
@@ -1158,6 +1255,51 @@ tref tree<node>::build_wff_sometimes(tref l) {
 template <NodeType node>
 tref tree<node>::build_wff_always(tref l) {
 	return tau_lang::build_wff_always<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_A(tref l) {
+	return tau_lang::build_wff_A<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_E(tref l) {
+	return tau_lang::build_wff_E<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_semantic_neg(tref l) {
+	return tau_lang::build_wff_semantic_neg<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_F(tref l) {
+	return tau_lang::build_wff_F<node>(l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_U(tref l, tref r) {
+	return tau_lang::build_wff_U<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_R(tref l, tref r) {
+	return tau_lang::build_wff_R<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_W(tref l, tref r) {
+	return tau_lang::build_wff_W<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_S(tref l, tref r) {
+	return tau_lang::build_wff_S<node>(l, r);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_T(tref l, tref r) {
+	return tau_lang::build_wff_T<node>(l, r);
 }
 
 template <NodeType node>

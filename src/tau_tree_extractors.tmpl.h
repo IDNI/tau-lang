@@ -548,6 +548,18 @@ const trefs& get_free_vars(tref n) {
 
 	using cache_t = subtree_unordered_map<node, size_t>;
 	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
+	// Register once: clear free_vars_pool/index on gc so stale treef keys
+	// don't cause false matches after gc frees and reallocates nodes.
+	static bool pool_gc_registered = false;
+	if (!pool_gc_registered) {
+		pool_gc_registered = true;
+		tau::gc_callbacks.push_back([](const std::unordered_set<tref>&) {
+			free_vars_pool.clear();
+			free_vars_pool.push_back({});
+			free_vars_pool_index.clear();
+			free_vars_pool_index.emplace(trefs{}, 0);
+		});
+	}
 	if (auto it = free_vars_map.find(n); it != free_vars_map.end())
 		return free_vars_pool[it->second];
 
@@ -715,24 +727,22 @@ bool has_open_tau_fm_in_constant(tref fm) {
 }
 
 template<NodeType node>
-bool invalid_nesting_of_temp_quants(tref fm) {
-	using tau = tree<node>;
-	auto temp_statements = rewriter::select_top<node>(fm,
-		is_temporal_quantifier<node>);
-	// Check that in no temp_statement another temporal statement is found
-	for (const auto& temp_st : temp_statements) {
-		if(auto n = rewriter::find_top<node>(tau::trim(temp_st),
-			is_temporal_quantifier<node>); n) {
-			LOG_ERROR << "Nesting of temporal quantifiers is not allowed: "
-			<< "Found \"" << tau::get(n) << "\" in \"" << tau::get(temp_st) << "\"\n";
-			return true;
-		}
-	}
+bool invalid_nesting_of_temp_quants(tref /*fm*/) {
+	// Full LTL is supported: every temporal quantifier may nest freely
+	// inside any other (G(F p), F(G p), G((F p) && q), etc.). The
+	// historical safety-fragment restriction that rejected such nesting
+	// no longer applies.
 	return false;
 }
 
 // If a temporal quantifier is found, all other parts of the formula
-// also have to be in the scope of a temporal quantifier
+// also have to be in the scope of a temporal quantifier.
+//
+// "Boolean glue" connectives (and, or, neg, xor, implication, biconditional,
+// conditional) are not themselves atoms — descending past them is fine,
+// because their operands will be scoped by their own temporal quantifiers.
+// Only a non-glue subterm reached without first crossing a temporal
+// quantifier is a violation.
 template<NodeType node>
 bool missing_temp_quants(tref fm) {
 	using tau = tree<node>;
@@ -743,8 +753,12 @@ bool missing_temp_quants(tref fm) {
 	if (fms.empty()) return false;
 	auto atom = [](tref n) {
 		const tau& n_t = tau::get(n);
-		if (n_t.is(tau::wff) || n_t.is(tau::wff_or) ||
-			n_t.is(tau::wff_and) || n_t.is(tau::wff_neg))
+		if (n_t.is(tau::wff)         || n_t.is(tau::wff_or) ||
+			n_t.is(tau::wff_and)     || n_t.is(tau::wff_neg) ||
+			n_t.is(tau::wff_xor)     ||
+			n_t.is(tau::wff_imply)   || n_t.is(tau::wff_rimply) ||
+			n_t.is(tau::wff_equiv)   ||
+			n_t.is(tau::wff_conditional))
 			return false;
 		return true;
 	};
@@ -823,12 +837,105 @@ bool has_missplaced_fallback(tref fm) {
 
 template<NodeType node>
 bool has_semantic_error(tref fm) {
-	return invalid_nesting_of_quants<node>(fm)
-		     || has_open_tau_fm_in_constant<node>(fm)
-		     || invalid_nesting_of_temp_quants<node>(fm)
-		     || missing_temp_quants<node>(fm)
-		     || has_negative_offset<node>(fm)
-			 || has_missplaced_fallback<node>(fm);
+	if (invalid_nesting_of_quants<node>(fm)) return true;
+	if (has_open_tau_fm_in_constant<node>(fm)) return true;
+	if (invalid_nesting_of_temp_quants<node>(fm)) return true;
+	if (missing_temp_quants<node>(fm)) return true;
+	if (has_negative_offset<node>(fm)) return true;
+	return has_missplaced_fallback<node>(fm);
+}
+
+// Rewrite G(A && G(B)) → G(A) && G(B).
+// The CFG parser produces G(A && G(B)) when the user writes G(A) && G(B)
+// because both are valid parses and the grammar's G rule comes before &&.
+// G(G(x)) = G(x) so the rewrite is semantically transparent.
+template <NodeType node>
+tref unnest_nested_always(tref fm) {
+	using tau = tree<node>;
+	if (!fm) return fm;
+	const auto& t = tau::get(fm);
+	if (!t.has_child()) return fm;
+
+	// Is this a G(body) node? (wff wrapping wff_always)
+	if (t.child_is(tau::wff_always)) {
+		tref body = tau::trim2(fm); // unwrap wff > wff_always > body
+
+		// Collect top-level && conjuncts of the body
+		std::vector<tref> conjuncts;
+		std::function<void(tref)> collect = [&](tref n) {
+			if (!n) return;
+			const auto& tn = tau::get(n);
+			if (tn.child_is(tau::wff_and)) {
+				// n = wff(wff_and(left, right)); [0] = wff_and node
+				collect(tn[0].first());
+				collect(tn[0].second());
+			} else {
+				conjuncts.push_back(n);
+			}
+		};
+		collect(body);
+
+		// Recurse into each conjunct; separate G-parts from plain parts
+		std::vector<tref> g_parts, plain_parts;
+		bool changed = false;
+		for (tref c : conjuncts) {
+			tref rc = unnest_nested_always<node>(c);
+			if (rc != c) changed = true;
+			if (tau::get(rc).child_is(tau::wff_always))
+				g_parts.push_back(rc);
+			else
+				plain_parts.push_back(rc);
+		}
+
+		if (g_parts.empty()) {
+			if (!changed) return fm;
+			tref nb = plain_parts[0];
+			for (size_t i = 1; i < plain_parts.size(); ++i)
+				nb = tau::build_wff_and(nb, plain_parts[i]);
+			return tau::build_wff_always(nb);
+		}
+
+		tref result;
+		if (!plain_parts.empty()) {
+			tref pb = plain_parts[0];
+			for (size_t i = 1; i < plain_parts.size(); ++i)
+				pb = tau::build_wff_and(pb, plain_parts[i]);
+			result = tau::build_wff_always(pb);
+			for (tref g : g_parts) result = tau::build_wff_and(result, g);
+		} else {
+			result = g_parts[0];
+			for (size_t i = 1; i < g_parts.size(); ++i)
+				result = tau::build_wff_and(result, g_parts[i]);
+		}
+		return result;
+	}
+
+	// Do not recurse into ABA comparison nodes (bf_eq, bf_neq, …).
+	// Their internal subtrees (sbf/bv/qlt constants) use a different tree
+	// layout; calling get_children()/get() on them causes SIGSEGV.
+	{
+		auto nt = t[0].value.nt;
+		if (nt == tau::bf_eq   || nt == tau::bf_neq
+		 || nt == tau::bf_lt   || nt == tau::bf_nlt
+		 || nt == tau::bf_lteq || nt == tau::bf_nlteq
+		 || nt == tau::bf_gt   || nt == tau::bf_ngt
+		 || nt == tau::bf_gteq || nt == tau::bf_ngteq
+		 || nt == tau::bf_interval)
+			return fm;
+	}
+
+	// Recurse into all children of non-comparison, non-G nodes.
+	trefs ch = t.get_children();
+	bool changed = false;
+	trefs new_ch;
+	for (tref c : ch) {
+		tref rc = unnest_nested_always<node>(c);
+		if (rc != c) changed = true;
+		new_ch.push_back(rc);
+	}
+	if (!changed) return fm;
+	// Preserve the full node value (including ba_type) with new children.
+	return tau::get(t.value, new_ch);
 }
 
 // Fast extractors (not depending in extractors, just direct access to the tree structure)

@@ -273,6 +273,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		}
 	}
 
+	// Rewrite G(A && G(B)) → G(A) && G(B) before semantic error check.
+	transformed = unnest_nested_always<node>(transformed);
+
 	//Check for semantic errors in expression
 	if (has_semantic_error<node>(transformed)) {
 		tau::use_hooks = using_hooks;
@@ -304,10 +307,9 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 
 	// As final step, convert the bound variables to a canonical numbered representation
 	// This only makes sense in combination with type inference since
-	// otherwise quantified variables cannot be correctly caught
+	// otherwise quantified variables cannot be correctly caught.
 	if (options.infer_ba_types)
 		transformed = canonize_quantifier_ids<node>(transformed);
-	// DBG(LOG_TRACE << "HOOKS ENABLED: " << tau::use_hooks;)
 	return transformed;
 }
 

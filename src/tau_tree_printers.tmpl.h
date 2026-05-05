@@ -308,7 +308,7 @@ int_t get_max_var_name_b_id(tref fm) {
 	// Find all occurrences of bn where n is some number in fm
 	// and return the maximal n + 1
 	using tau = tree<node>;
-	auto is_number = [](const std::string& s) static {
+	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
 		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
 		return true;
@@ -350,7 +350,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	std::unordered_map<tref, size_t> chpos; // child positions if tracked
 	int_t bound_var_id_offset = get_max_var_name_b_id<node>(get());
 
-	auto is_number = [](const std::string& s) static {
+	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
 		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
 		return true;
@@ -358,7 +358,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
 			bf_ref, bf_neg, ba_constant, bf_t,
-			bf_f, wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
+			bf_f, wff_ref, wff_neg, wff_semantic_neg, wff_t, wff_f, constraint, capture,
 			variable, ref_args, start
 		};
 		// priority map (lower number = higher priority)
@@ -389,6 +389,14 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ main,                60 },
 			{ ref,                 80 },
 			{ wff_sometimes,      380 },
+			{ wff_F,              381 },
+			{ wff_A,              377 },
+			{ wff_E,              378 },
+			{ wff_U,              382 },
+			{ wff_R,              383 },
+			{ wff_W,              384 },
+			{ wff_S,              385 },
+			{ wff_T,              386 },
 			{ wff_always,         390 },
 			{ wff_conditional,    400 },
 			{ wff_ex,             430 },
@@ -399,6 +407,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ wff_and,            480 },
 			{ wff_xor,            490 },
 			{ wff_neg,            500 },
+			{ wff_semantic_neg,   501 },
 			{ bf_interval,        501 },
 			{ bf_eq,              502 },
 			{ bf_neq,             503 },
@@ -475,7 +484,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	// };
 	auto inc_indent = [&](size_t nt) {
 		static const std::vector<size_t> indents = {
-			wff_sometimes, wff_always, wff_conditional,
+			wff_sometimes, wff_F, wff_A, wff_E, wff_always, wff_conditional,
 			wff_all, wff_ex, wff_imply, wff_equiv
 		};
 		bool ret = pretty_printer_indenting &&
@@ -536,6 +545,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case wff_f:             out('F'); break;
 			case wff_t:             out('T'); break;
 			case wff_neg:           out("!");
+						last_quant_nt = nul; break;
+			case wff_semantic_neg:  out("-");
 						last_quant_nt = nul; break;
 			case console_sym:       out("console"); break;
 			case first_sym:         out("first"); break;
@@ -602,6 +613,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			}
 
 			case wff_sometimes:     out("sometimes "); break;
+			case wff_F:             out("F "); break;
+			case wff_A:             out("A "); break;
+			case wff_E:             out("E "); break;
 			case wff_always:        out("always "); break;
 
 			case rel_history:       out("%-"); break;
@@ -754,6 +768,16 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case wff_imply:         out(" -> ");
 						last_quant_nt = nul;  break;
 			case wff_equiv:         out(" <-> ");
+						last_quant_nt = nul; break;
+			case wff_U:             out(" U ");
+						last_quant_nt = nul; break;
+			case wff_R:             out(" R ");
+						last_quant_nt = nul; break;
+			case wff_W:             out(" W ");
+						last_quant_nt = nul; break;
+			case wff_S:             out(" S ");
+						last_quant_nt = nul; break;
+			case wff_T:             out(" T ");
 						last_quant_nt = nul; break;
 
 			case bf_interval:       out(" <= "); last_quant_nt = nul; break;
