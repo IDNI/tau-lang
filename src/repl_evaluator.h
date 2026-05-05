@@ -53,6 +53,7 @@
 #include "boolean_algebras/tau_ba.h"
 #include "api.h"
 #include "utility/repl.h"
+#include "parse_error_hint.h"
 
 namespace idni::tau_lang {
 
@@ -60,6 +61,9 @@ namespace idni::tau_lang {
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	colors_opt, charvar_opt, blasting_opt, highlighting_opt, indenting_opt,
 	print_benchmarks_opt, debug_opt };
+
+// Logic fragment: determines which operators are available
+enum logic_fragment { fragment_ltl, fragment_ctl_star };
 
 /**
  * @brief REPL evaluator for the Tau interactive shell.
@@ -100,6 +104,7 @@ struct repl_evaluator {
 			severity = boost::log::trivial::info;
 #endif // DEBUG
 		bool experimental        = false; ///< Enable experimental features.
+		logic_fragment fragment   = fragment_ltl; ///< Active logic fragment (LTL or CTL*).
 	};
 
 	/**
@@ -170,6 +175,11 @@ private:
 	/// @brief Print a "not implemented yet" message.
 	void not_implemented_yet();
 
+	// session management
+	void reset_cmd();
+	// type inspection
+	tref whatis_cmd(const tt& n);
+
 	// Tau API
 	/// @brief Normalize the formula in @p n and return the result.
 	tref normalize_cmd(const tt& n);
@@ -183,17 +193,20 @@ private:
 	tref qelim_cmd(const tt& n);
 	/// @brief Run the specification in @p n.
 	void run_cmd(const tt& n);
+	void ltl_cmd(const tt& n);
 	/// @brief Solve the formula in @p n.
 	void solve_cmd(const tt& n);
 	/// @brief Compute the LGRS solution for the formula in @p n.
 	void lgrs_cmd(const tt& n);
 	// normal forms
+	tref anf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to CNF.
 	tref cnf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to DNF.
 	tref dnf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to NNF.
 	tref nnf_cmd(const tt& n);
+	tref pnf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to MNF.
 	tref mnf_cmd(const tt& n);
 	/// @brief Convert the formula in @p n to ONF.
@@ -213,6 +226,12 @@ private:
 
 	/// @brief Update the blasting option to @p value and return the old value.
 	bool update_blasting(bool value);
+
+	// CTL* fragment gate: returns true if CTL* ops found and fragment not active
+	bool reject_ctl_star_if_disabled(tref fm);
+
+	// fragment command
+	void fragment_cmd(const tt& n);
 
 	// history
 	/// @brief Retrieve the history entry referenced by @p n.

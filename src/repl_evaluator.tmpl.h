@@ -281,6 +281,28 @@ tref repl_evaluator<BAs...>::nnf_cmd(const tt& n) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::anf_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
+	if (auto value = get_any(n[1].get()); value) {
+		constexpr size_t bf_type = 0;
+		r = anf<node, bf_type>(value);
+	}
+	return benchmarks(m), r;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::pnf_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
+	if (auto value = get_any(n[1].get()); value)
+		r = pnf<node>(value);
+	return benchmarks(m), r;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 	measuring m("mnf");
 	idni::measures::timer t;
@@ -393,6 +415,33 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::reset_cmd() {
+	H.clear();
+	rr_defs.clear();
+	io_defs.clear();
+	definitions<node>::instance().clear();
+	std::cout << "Session reset: history, definitions, and IO streams cleared.\n";
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::whatis_cmd(const tt& n) {
+	tref arg = n[1].get();
+	auto check = get_type_and_arg(arg);
+	if (!check) return nullptr;
+	auto [type, value] = check.value();
+	const std::string& node_type = tau::get(value).get_type_name();
+	std::cout << "node type: " << node_type;
+	if (type == tau::bf || type == tau::wff) {
+		size_t ba_type = tau::get(value).get_ba_type();
+		if (ba_type) std::cout << "  BA type: " << ba_types<node>::name(ba_type);
+	}
+	std::cout << "\n";
+	return value;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
 	DBG(TAU_LOG_TRACE << "run_cmd: " << TAU_LOG_FM(n.value());)
@@ -405,10 +454,16 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	t.start();
 
 	DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
-	value = tau_api::simplify(m.part(), value);
-	DBG(TAU_LOG_TRACE << "run_cmd/simplified: " << TAU_LOG_FM(value);)
 
-	auto maybe_i = tau_api::get_interpreter(m.part(), value);
+	// Build a tau_spec from the formula and REPL-defined io/rr defs,
+	// mirroring get_applied(). This uses the tau_spec path which correctly
+	// handles io_var resolution for LTL and safety formulas.
+	tau_spec<node> spec;
+	spec.add(value);
+	for (tref d : rr_defs) spec.add(d);
+	for (tref d : io_defs) spec.add(d);
+
+	auto maybe_i = tau_api::get_interpreter(m.part(), spec);
 	if (!maybe_i) return;
 	auto& i = maybe_i.value();
 	while (true) {
@@ -429,6 +484,23 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 			if (line == "q" || line == "quit") break;
 		}
 	}
+	benchmarks(m, t);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::ltl_cmd(const tt& n) {
+	DBG(TAU_LOG_TRACE << "ltl_cmd: " << TAU_LOG_FM(n.value());)
+	measuring m("ltl");
+	idni::measures::timer t;
+
+	tref value = get_any(n[1].get());
+	if (!value) return;
+
+	t.start();
+	DBG(TAU_LOG_TRACE << "ltl_cmd/value: " << TAU_LOG_FM(value);)
+
+	ltl_explain<node>(value, std::cout);
 	benchmarks(m, t);
 }
 
@@ -566,9 +638,15 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
-	rr_defs.push_back(n | tt::first | tt::ref);
+	tref rr = n | tt::first | tt::ref;
+	rr_defs.push_back(rr);
 	size_t idx = rr_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(rr_defs[idx]) << "\n";
+	// Register definition head early so type inference recognizes it
+	tt rrt(rr);
+	htref head = rrt | tt::first | tt::handle;
+	htref body = rrt | tt::second | tt::handle;
+	if (head) definitions<node>::instance().add(head, body);
 }
 
 template <typename... BAs>
@@ -622,11 +700,19 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
-	// remove ascii char 22 if exists in the input
-	std::string filt = src;
-	filt.erase(remove_if(filt.begin(), filt.end(), [](unsigned char c) {
-		return c == 22;
-	}), filt.end());
+	// remove ascii char 22 and strip # comment lines
+	std::string filt;
+	filt.reserve(src.size());
+	for (size_t i = 0; i < src.size(); ) {
+		if (src[i] == '#') {
+			// skip to end of line
+			while (i < src.size() && src[i] != '\n' && src[i] != '\r') ++i;
+		} else if (static_cast<unsigned char>(src[i]) == 22) {
+			++i; // skip ascii 22
+		} else {
+			filt += src[i++];
+		}
+	}
 	tau_parser::result result = tau_parser::instance()
 		.parse(filt.c_str(), filt.size(), {
 						.start = tau::cli });
@@ -637,7 +723,9 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		if (opt.error_quits
 			|| msg.find("Syntax Error: Unexpected end")!=0)
 		{
-			TAU_LOG_ERROR << "[repl] " << msg << "\n";
+			std::string hint = classify_parse_error(filt);
+			TAU_LOG_ERROR << "[repl] " << msg
+				<< (hint.empty() ? "" : "\nhint: " + hint) << "\n";
 			return fail();
 		}
 		return nullptr; // Unexpected eof, continue with reading input
@@ -813,7 +901,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
 {
 	auto o = get_opt<node>(n);
 	update_bool_opt_cmd(o, update_fn);
-	get_cmd(n);
+	if (!error) get_cmd(n);
 }
 
 template <typename... BAs>
@@ -859,6 +947,41 @@ bool repl_evaluator<BAs...>::update_blasting(bool value) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::reject_ctl_star_if_disabled(tref fm) {
+	if (opt.fragment == fragment_ctl_star || !fm) return false;
+	if (has_ctl_star_operators<node>(fm)) {
+		TAU_LOG_ERROR << "CTL* operators (A/E/-) require the ctl_star "
+			"fragment. Switch with: fragment ctl_star\n";
+		error = true;
+		return true;
+	}
+	return false;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::fragment_cmd(const tt& n) {
+	auto fn = n | tau_parser::fragment_name;
+	if (!fn) {
+		TAU_LOG_ERROR << "Missing fragment name\n";
+		error = true;
+		return;
+	}
+	auto fnt = fn | tt::only_child | tt::nt;
+	if (fnt == tau_parser::fragment_ltl) {
+		opt.fragment = fragment_ltl;
+		std::cout << "fragment: ltl\n";
+	} else if (fnt == tau_parser::fragment_ctl_star) {
+		opt.fragment = fragment_ctl_star;
+		std::cout << "fragment: ctl_star\n";
+	} else {
+		TAU_LOG_ERROR << "Unknown fragment. Available: ltl, ctl_star\n";
+		error = true;
+	}
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	auto command = n | tt::only_child;
 	auto command_type = command | tt::nt;
@@ -882,6 +1005,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 					[](bool& b){ return b = false; });break;
 	case tau::toggle_cmd:         update_bool_opt_cmd(command,
 					[](bool& b){ return b = !b; }); break;
+	case tau::fragment_cmd:       fragment_cmd(command); break;
 	case tau::history_list_cmd:   history_list_cmd(); break;
 	case tau::history_print_cmd:  history_print_cmd(command); break;
 	case tau::history_store_cmd:  history_store_cmd(command); break;
@@ -889,6 +1013,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::normalize_cmd:      result = normalize_cmd(command); break;
 	// execution
 	case tau::run_cmd:            run_cmd(command); break;
+	case tau::ltl_cmd:            ltl_cmd(command); break;
 	case tau::solve_cmd:          solve_cmd(command); break;
 	case tau::lgrs_cmd:           lgrs_cmd(command); break;
 	// substitution and instantiation
@@ -902,10 +1027,9 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::onf_cmd:            result = onf_cmd(command); break;
 	case tau::dnf_cmd:            result = dnf_cmd(command); break;
 	case tau::cnf_cmd:            result = cnf_cmd(command); break;
-//	Commented out because they are not implemented yet
-//	case tau::anf_cmd:            not_implemented_yet(); break;
-//	case tau::pnf_cmd:            not_implemented_yet(); break;
+	case tau::anf_cmd:            result = anf_cmd(command); break;
 	case tau::nnf_cmd:            result = nnf_cmd(command); break;
+	case tau::pnf_cmd:            result = pnf_cmd(command); break;
 	case tau::mnf_cmd:            result = mnf_cmd(command); break;
 	// definition of rec relations to be included during normalization
 	case tau::def_rr_cmd:         def_rr_cmd(command); break;
@@ -916,6 +1040,9 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::def_output_cmd:     def_output_cmd(command); break;
 	// qelim
 	case tau::qelim_cmd:          result = qelim_cmd(command); break;
+	// type inspection and session management
+	case tau::whatis_cmd:         result = whatis_cmd(command); break;
+	case tau::reset_cmd:          reset_cmd(); break;
 	case tau::comment:            break;
 	// error handling
 	default: error = true; std::cout << std::endl;
@@ -1024,6 +1151,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 
 		<< "Run command:\n"
 		<< "  run                     execute a Tau formula as a program\n"
+		<< "  ltl                     print the full LTL(ABA) translation pipeline\n"
 		<< "\n"
 
 		<< "Logical procedures:\n"
@@ -1040,20 +1168,30 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  cnf                     convert a Tau expression to conjunctive normal form\n"
 		<< "  dnf                     convert a Tau expression to disjunctive normal form\n"
 		<< "  mnf                     convert a Tau expression to minterm normal form\n"
-		// << "  anf                     convert to algebraic normal form\n"
+		<< "  anf                     convert a Tau expression to algebraic normal form\n"
 		<< "  nnf                     convert a Tau expression to negation normal form\n"
-		// << "  pnf                     convert to prenex normal form\n"
+		<< "  pnf                     convert a Tau expression to prenex normal form\n"
 		<< "  onf                     convert a Tau formula to order normal form\n"
 		<< "\n"
 
 		<< "History and definitions:\n"
 		<< "  history or hist         show all Tau expressions stored in the repl history\n"
 		<< "  definitions or defs     show stored IO variables and function and predicate definitions\n"
+		<< "  reset                   clear history, definitions, and IO streams\n"
+		<< "\n"
+
+		<< "Inspection commands:\n"
+		<< "  whatis                  show the inferred type of a Tau expression\n"
 		<< "\n"
 
 		<< "Substitution and instantiation command:\n"
 		<< "  substitute, subst or s  substitute a Tau expression in a Tau expression by another\n"
 		<< "  instantiate, inst or i  instantiate a variable in a Tau expression with a Tau term\n"
+		<< "\n"
+
+		<< "Fragment selection:\n"
+		<< "  fragment ltl            use default LTL fragment (no A/E/-)\n"
+		<< "  fragment ctl_star       enable CTL* fragment (adds A, E, - operators)\n"
 		<< "\n"
 
 		<< "Settings commands:\n"
@@ -1077,7 +1215,10 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "quit exits the Tau repl\n";
 		break;
 	case tau::clear_sym: std::cout
-		<< "clear clears the terminal screen\n";
+		<< "clear clears the terminal screen\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  clear or c              clears the terminal screen\n";
 		break;
 	case tau::get_sym: std::cout
 		<< "get                       prints all options and their values\n"
@@ -1136,6 +1277,24 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  qelim <tau>             eliminates non-temporal quantifiers in the given tau formula\n"
 		<< "  qelim <repl_history>    eliminates non-temporal quantifiers in the Tau formula stored at the specified repl history position\n";
 		break;
+	case tau::ltl_sym: std::cout
+		<< "the ltl command prints the full LTL(ABA) translation pipeline\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  ltl <formula>           print the translation pipeline for the given LTL(ABA) formula\n"
+		<< "  ltl <repl_history>      print the pipeline for the formula at the given history position\n"
+		<< "\n"
+		<< "pipeline steps shown:\n"
+		<< "  - data atom extraction: which ABA subformulas map to propositional variables\n"
+		<< "  - input/output classification of each proposition\n"
+		<< "  - ABA consistency constraints added to the LTL skeleton\n"
+		<< "  - LTL skeleton sent to ltlsynt\n"
+		<< "  - ltlsynt result (REALIZABLE/UNREALIZABLE)\n"
+		<< "  - HOA strategy automaton (states, edges with guards)\n"
+		<< "  - ABA oracle feasibility check for each strategy edge\n"
+		<< "  - final synthesized safety formula\n"
+		<< "\n";
+		break;
 	case tau::run_sym: std::cout
 		<< "the run command executes a Tau formula as a program\n"
 		<< "\n"
@@ -1170,6 +1329,22 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  --<type>                uses the specified type for the solution\n"
 		<< "\n";
 		break;
+	case tau::whatis_sym: std::cout
+		<< "the whatis command shows the inferred type of a Tau expression\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  whatis <tau>            shows the type of the given Tau expression\n"
+		<< "  whatis <term>           shows the type of the given term\n"
+		<< "  whatis <repl_history>   shows the type of the expression at the given history position\n"
+		<< "\n"
+		<< "type names: wff, bf, tau, sbf, bv, qint, qlt\n";
+		break;
+	case tau::reset_sym: std::cout
+		<< "the reset command clears the REPL session state\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  reset                   clears history, definitions, and IO streams\n";
+		break;
 	case tau::sat_sym: std::cout
 		<< "the sat command checks if a Tau formula is satisfiable and if so prints T and else F\n\n"
 		<< "a tau formula is satisfiable if there exists a variable assignment to non-temporal variables\n"
@@ -1187,7 +1362,6 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  valid <rr>              checks the given tau formula with additional predicate and function definitions for validity\n"
 		<< "  valid <tau>             checks the given tau formula for validity\n"
 		<< "  valid <repl_history>    checks the Tau formula stored at the specified repl history position for validity\n";
-		break;
 		break;
 	case tau::unsat_sym: std::cout
 		<< "the unsat command checks if a Tau formula is unsatisfiable and if so prints T and else F\n\n"
@@ -1215,8 +1389,12 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  cnf <tau>               converts the given Tau formula to CNF\n"
 		<< "  cnf <repl_history>      converts the Tau expression stored at the specified repl history position to CNF\n";
 		break;
-	// Commented out because they are not implemented yet
-	//case tau::anf_sym: std::cout
+	case tau::anf_sym: std::cout
+		<< "anf converts a Tau expression to algebraic normal form (ANF)\n"
+		<< "\n"
+		<< "NOTE: this command is not yet implemented\n";
+		break;
+	//case tau::anf_sym_dead: std::cout
 	//	<< "anf command converts a boolean formula or a well formed formula to algebraic normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
@@ -1232,8 +1410,12 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  nnf <tau>               converts the given tau formula to NNF\n"
 		<< "  nnf <repl_history>      converts the Tau expression stored at the specified repl history position to NNF\n";
 		break;
-	// Commented out because they are not implemented yet
-	//case tau::pnf_sym: std::cout
+	case tau::pnf_sym: std::cout
+		<< "pnf converts a Tau expression to prenex normal form (PNF)\n"
+		<< "\n"
+		<< "NOTE: this command is not yet implemented\n";
+		break;
+	//case tau::pnf_sym_dead: std::cout
 	//	<< "pnf command converts a boolean formula or a well formed formula to prenex normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
