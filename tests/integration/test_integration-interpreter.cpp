@@ -100,6 +100,7 @@ TEST_SUITE("Execution") {
 		auto o3_values = o3->get_values();
 		CHECK( values_matches_any_of(o3_values, o3_expected) );
 		auto u_values = u->get_values();
+		for (size_t _dbg_i = 0; _dbg_i < u_values.size(); _dbg_i++) std::cerr << "INTERP_U[" << _dbg_i << "]: " << u_values[_dbg_i] << "\n";
 		CHECK( values_matches_any_of(u_values, u_expected) );
 	}
 
@@ -107,7 +108,7 @@ TEST_SUITE("Execution") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && o2[t] = 0.");
 		strings i1_values = {
-			"(always o2[-1] = 1) || (always o3[t] = 1)", "F", "F", "F"
+			"(G o2[-1] = 1) || (G o3[t] = 1)", "F", "F", "F"
 		};
 		strings u_expected = {
 			"(always o2[-1]:tau' = 0) || (always o3[t]:tau' = 0)", "F", "F", "F"
@@ -222,10 +223,13 @@ TEST_SUITE("Execution") {
 			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
+			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
+			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o3[t]:tau = 0",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
-			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
+			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+		"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0",
 		}
 		};
 		io_context<node_t> ctx;
@@ -238,6 +242,7 @@ TEST_SUITE("Execution") {
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK( maybe_i.has_value() );
 		auto o1_values = o1->get_values();
+		for (size_t _dbg_i = 0; _dbg_i < o1_values.size(); _dbg_i++) std::cerr << "THIS_O1[" << _dbg_i << "]: " << o1_values[_dbg_i] << "\n";
 		CHECK( values_matches_any_of(o1_values, o1_expected) );
 		auto u_values = u->get_values();
 		CHECK( u_values == u_expected );
