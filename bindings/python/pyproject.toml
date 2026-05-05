@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tau-ltl"
+version = "0.1.0"
+description = "Python bindings for tau-lang LTL(ABA) realizability."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "../../LICENSE.md" }
+authors = [{ name = "tau-lang contributors" }]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Topic :: Scientific/Engineering :: Mathematics",
+]
+
+[tool.setuptools]
+py-modules = ["tau_lang"]
+
+[tool.setuptools.package-data]
+tau_lang = ["*.so", "*.dylib", "*.dll"]
