@@ -31,7 +31,11 @@ ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 #
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (("sometimes" | "<>")  _ wff)      :wff_sometimes
-                        | (("always"    | "[]")  _ wff)      :wff_always
+                        | (("always"    | "[]"  | "G")  _ wff) :wff_always
+                        | ("F"  _ wff)                       :wff_F
+                        | ("A"  _ wff)                       :wff_A
+                        | ("E"  _ wff)                       :wff_E
+                        | ('-'  _ wff)                       :wff_semantic_neg
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
                         | ("all"     __ q_vars  __ wff)      :wff_all
                         | ("ex"      __ q_vars  __ wff)      :wff_ex
@@ -57,6 +61,11 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "!>"  _ bf)               :bf_ngt
                         | (bf    _ ">="  _ bf)               :bf_gteq
                         | (bf    _ "!>=" _ bf)               :bf_ngteq
+                        | (wff   _ "U"   _ wff)              :wff_U
+                        | (wff   _ "R"   _ wff)              :wff_R
+                        | (wff   _ "W"   _ wff)              :wff_W
+                        | (wff   _ "S"   _ wff)              :wff_S
+                        | (wff   _ "T"   _ wff)              :wff_T
                         |                                     capture.
 # relational operators for base types
 #
@@ -73,6 +82,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                            (bf_parenthesis | ba_constant | variable | bf_ref
                            | bf_t | bf_f | bf_neg | bf_cast | capture)
                                 :bf_cast_oprnd)              :bf_cast
+                        | (func_sym '(' _ func_args _ ')')   :bf_func_app
                         | (bf  _ ">>" _      (bf & ~bf_shr)) :bf_shr
                         | (bf  _ "<<" _      (bf & ~bf_shl)) :bf_shl
                         | (bf  _ '+' _       bf)             :bf_add
@@ -103,6 +113,13 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
+
+# heterogeneous function symbols (OCFuncs)
+func_sym               => chars.
+func_args              => bf (_ ',' _ bf)*.
+func_mode              => "dynamic" :func_dynamic | "static" :func_static.
+func_sort_list         => type (_ ',' _ type)*.
+func_decl              => func_mode __ func_sym _ ':' _ func_sort_list _ "->" _ type.
 
 # constant time constraints
 constraint =>
@@ -179,6 +196,8 @@ cli_command            =>
         | ("solve":solve_sym [solve_options] __ wff_cmd_arg)  :solve_cmd
         | ("lgrs" :lgrs_sym __ wff_cmd_arg)                   :lgrs_cmd
         | (("r" | "run"):run_sym __ spec_arg)                 :run_cmd
+        | ("ltl" :ltl_sym __ spec_arg)                         :ltl_cmd
+        | ("func":func_sym_cmd __ func_decl)                   :func_cmd
         | (("n" | "normalize")
                   :normalize_sym __ spec_arg)                 :normalize_cmd
 # TODO (MEDIUM) maybe we could remove in the subst and inst commands the
@@ -201,6 +220,12 @@ cli_command            =>
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
+# type inspection
+        | ("whatis":whatis_sym __ spec_arg)                   :whatis_cmd
+# session management
+        | ("reset" :reset_sym)                                :reset_cmd
+# fragment selection (default: ltl)
+        | ("fragment":fragment_sym __ fragment_name)           :fragment_cmd
 # option commands
         | ("get":get_sym        [__ option_name])             :get_cmd
         | ("set":set_sym         __ option_name
@@ -230,6 +255,8 @@ q_file_name            => '"' file_name '"'.
 file_name              => printable+.
 option_name            => alnum+.
 option_value           => alnum+.
+fragment_name          => ("ltl" :fragment_ltl | "ctl_star" :fragment_ctl_star
+                        | "ctl*" :fragment_ctl_star).
 
 # command arguments
 #
@@ -252,11 +279,12 @@ help_arg               => help_sym | version_sym | quit_sym
                         | history_sym | abs_history_sym | rel_history_sym
                         | selection_sym | def_sym
                         | inst_sym | subst_sym | normalize_sym | execute_sym
-                        | solve_sym | valid_sym | sat_sym | unsat_sym | run_sym
+                        | solve_sym | lgrs_sym | valid_sym | sat_sym | unsat_sym | run_sym | ltl_sym
                         | dnf_sym | cnf_sym
 # Commented out, not implemented yet
 #                        | anf_sym | pnf_sym
                         | snf_sym | nnf_sym  | mnf_sym | onf_sym | qelim_sym
+                        | whatis_sym | reset_sym | fragment_sym
                         | ("example" 's'?):examples_sym.
 
 # history
