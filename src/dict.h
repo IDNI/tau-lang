@@ -10,7 +10,7 @@
 
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 // -----------------------------------------------------------------------------
 // dict - string <-> size_t map
@@ -29,7 +29,7 @@ inline std::vector<std::string>& S() {
  * @return Integer id for @p s (0 means the empty string).
  */
 inline size_t dict(const std::string& s) {
-	static std::map<std::string, size_t> SM{ { "", 0 } };   // string -> id map
+	static std::unordered_map<std::string, size_t> SM{ { "", 0 } };   // string -> id map
 	if (auto it = SM.find(s); it != SM.end()) return it->second;
 	return SM.emplace(s, S().size()), S().push_back(s), S().size() - 1;
 }

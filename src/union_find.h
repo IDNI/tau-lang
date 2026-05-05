@@ -19,9 +19,9 @@ namespace idni::tau_lang {
 
 	/**
  * @brief Union find data structure with set retrieval for tau formulas
- * @tparam comp Comparison function used to decide root after merge,
+ * @tparam data_t Type of elements stored in the union-find
+ * @tparam less_t Comparison function used to decide root after merge,
  * taking the smaller as new root
- * @tparam node Type of tree node
  */
 template <typename data_t, class less_t = std::less<data_t>>
 
@@ -69,9 +69,9 @@ struct union_find : public std::map<data_t, data_t, less_t> {
 
 /**
  * @brief Union find data structure with set retrieval for tau formulas
- * @tparam comp Comparison function used to decide root after merge,
+ * @tparam data_t Type of elements stored in the union-find
+ * @tparam less_t Comparison function used to decide root after merge,
  * taking the smaller as new root
- * @tparam node Type of tree node
  */
 template <typename data_t, class less_t = std::less<data_t>>
 struct union_find_by_rank : public union_find<data_t, less_t> {
@@ -87,8 +87,10 @@ public:
 	 */
 	data_t merge(data_t x, data_t y) {
 		auto root_x = this->root(x), root_y = this->root(y);
-		auto rank_x = rank.contains(root_x) ? rank[root_x] : 0;
-		auto rank_y = rank.contains(root_y) ? rank[root_y] : 0;
+		auto it_rx = rank.find(root_x);
+		auto it_ry = rank.find(root_y);
+		size_t rank_x = (it_rx != rank.end()) ? it_rx->second : 0;
+		size_t rank_y = (it_ry != rank.end()) ? it_ry->second : 0;
 		if (root_x == root_y) return root_x;
 		// Union by rank
 		if (rank_x < rank_y) {
@@ -99,7 +101,7 @@ public:
 			return root_x;
 		}
 		this->operator[](root_y) = root_x;
-		rank[root_x] = rank.contains(root_x) ? rank[root_x] + 1 : 1;
+		rank[root_x] = rank_x + 1;
 		return root_x;
 	}
 };
@@ -107,9 +109,9 @@ public:
 
 /**
  * @brief Union find data structure with set retrieval for tau formulas
- * @tparam comp Comparison function used to decide root after merge,
+ * @tparam data_t Type of elements stored in the union-find
+ * @tparam less_t Comparison function used to decide root after merge,
  * taking the smaller as new root
- * @tparam node Type of tree node
  */
 template <typename data_t, class less_t = std::less<data_t>>
 struct union_find_by_less : public union_find<data_t, less_t> {
@@ -124,7 +126,7 @@ struct union_find_by_less : public union_find<data_t, less_t> {
 		static const less_t comp;
 		auto root_x = this->root(x), root_y = this->root(y);
 		if (root_x == root_y) return root_x;
-		// Union by rank
+		// Union by comparator
 		if (comp(root_x, root_y)) {
 			this->operator[](root_y) = root_x;
 			return root_x;

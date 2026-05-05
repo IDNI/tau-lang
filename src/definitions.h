@@ -124,6 +124,19 @@ struct definitions {
 	 *  Do not access this singleton from multiple threads concurrently. */
 	static definitions& instance() {
 		static definitions d;
+		// Register gc callback once to clear stale tref keys in global_scope
+		// and io_context types after garbage collection frees their nodes.
+		static bool gc_registered = false;
+		if (!gc_registered) {
+			gc_registered = true;
+			tau::gc_callbacks.push_back([](const std::unordered_set<tref>&) {
+				auto& inst = definitions::instance();
+				inst.global_scope.clear();
+				inst.ctx.types.clear();
+				inst.ctx.inputs.clear();
+				inst.ctx.outputs.clear();
+			});
+		}
 		return d;
 	}
 

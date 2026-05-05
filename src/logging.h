@@ -37,6 +37,8 @@
 #ifndef __IDNI__TAU__LOGGING_H__
 #define __IDNI__TAU__LOGGING_H__
 
+#include <unordered_map>
+
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/sources/severity_channel_logger.hpp>
@@ -429,7 +431,7 @@ struct logging {
 						const std::string& channel_name)
 	{
 		using namespace boost::log;
-		static std::map<std::string, channel_logger_type> loggers;
+		static std::unordered_map<std::string, channel_logger_type> loggers;
 		if (loggers.find(channel_name) == loggers.end())
 			loggers.emplace(channel_name,
 				channel_logger_type(
