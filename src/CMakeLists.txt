@@ -39,6 +39,7 @@ set(TAU_HEADERS
 	ba_types_inference.h
 	base_ba_dispatcher.h
 	interpreter.h
+	pointwise_revision.h
 	api.h
 	union_find.h       # union find data structure
 	union_find_with_sets.h
@@ -48,7 +49,11 @@ set(TAU_HEADERS
 set(TAU_SOURCES
 	boolean_algebras/bool_ba.cpp
 	boolean_algebras/bdds/var_dict.cpp
+	boolean_algebras/nlang_ba.cpp
+	instantiate_test_pack.cpp
 )
+
+find_package(CURL REQUIRED)
 
 set(CLI_SOURCES
 	main.cpp
@@ -102,7 +107,7 @@ add_dependencies(${TAU_OBJECT_LIB_NAME} tau_header)
 add_library(${TAU_STATIC_LIB_NAME} STATIC)
 target_sources(${TAU_STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_STATIC_LIB_NAME})
-target_link_libraries(${TAU_STATIC_LIB_NAME} tauparser Boost::log cvc5::cvc5)
+target_link_libraries(${TAU_STATIC_LIB_NAME} tauparser Boost::log cvc5::cvc5 CURL::libcurl)
 if (TAU_BUILD_PIC)
 	target_compile_options(${TAU_STATIC_LIB_NAME} PRIVATE -fPIC)
 endif()
@@ -128,7 +133,7 @@ endif()
 add_library(${TAU_SHARED_LIB_NAME} SHARED)
 add_library(${namespace}::${TAU_SHARED_LIB_NAME} ALIAS ${TAU_SHARED_LIB_NAME})
 target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
-target_link_libraries(${TAU_SHARED_LIB_NAME} tauparser Boost::log cvc5::cvc5)
+target_link_libraries(${TAU_SHARED_LIB_NAME} tauparser Boost::log cvc5::cvc5 CURL::libcurl)
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
@@ -164,6 +169,22 @@ if(TAU_BUILD_EXECUTABLE)
 	)
 	add_dependencies(${TAU_EXECUTABLE_NAME} tau_header)
 endif(TAU_BUILD_EXECUTABLE)
+
+#
+# tau_codegen: tau→C++ program emitter.
+# Always built; depends on the static library.
+#
+add_executable(tau_codegen tau_codegen_cli.cpp)
+target_setup(tau_codegen)
+target_link_libraries(tau_codegen ${TAU_STATIC_LIB_NAME} cvc5::cvc5)
+target_include_directories(tau_codegen PUBLIC
+	$<BUILD_INTERFACE:${TAU}/src>
+	$<BUILD_INTERFACE:${TAU}/parser>
+	$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
+	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
+)
+add_dependencies(tau_codegen tau_header)
 
 #
 # executable using shared library

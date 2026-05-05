@@ -7,9 +7,7 @@ TAU_SHARED_PREFIX="${HOME}/.tau"
 WITH_MINGW64="no"
 BUILD_IF_NOT_EXISTS="libcvc5.so"
 
-CVC5_SOURCE_DIR="${TAU_SHARED_PREFIX}/cvc5"
 CVC5_BUILD_DIR="build"
-CVC5_PREFIX="${TAU_SHARED_PREFIX}/cvc5/dist"
 CVC5_CONFIGURE_ARGS=()
 
 # Overwrite default values if provided in CLI arguments
@@ -22,7 +20,9 @@ for arg in "${@:1}"; do
 		BUILD_IF_NOT_EXISTS="libcvc5.dylib"
 	fi
 	if [[ $arg == -DTAU_BUILD_JOBS=* ]]; then
-		BUILD_JOBS="${arg#-DTAU_BUILD_JOBS=}"
+		if [ -n "${arg#-DTAU_BUILD_JOBS=}" ]; then
+			BUILD_JOBS="${arg#-DTAU_BUILD_JOBS=}"
+		fi
 		continue
 	fi
 	if [[ $arg == -DTAU_SHARED_PREFIX=* ]]; then
@@ -34,6 +34,10 @@ for arg in "${@:1}"; do
 		continue
 	fi
 done
+
+CVC5_SOURCE_DIR="${TAU_SHARED_PREFIX}/cvc5"
+CVC5_PREFIX="${TAU_SHARED_PREFIX}/cvc5/dist"
+
 if [ "$WITH_MINGW64" = "yes" ]; then
 	CVC5_BUILD_DIR="build-w64"
 	CVC5_PREFIX="${TAU_SHARED_PREFIX}/cvc5/dist-w64"

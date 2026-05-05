@@ -284,13 +284,21 @@ if(APPLE)
 endif()
 message(STATUS "DEP_CVC5_ARGS: ${DEP_CVC5_ARGS}")
 message(STATUS "CVC5_LIBDIR: ${CVC5_LIBDIR}")
-execute_process(
-	COMMAND bash ./dev dep-cvc5.sh ${DEP_CVC5_ARGS}
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
 
-find_package(cvc5 CONFIG REQUIRED
-	PATHS ${CVC5_LIBDIR}/cmake/cvc5)
+if(DEFINED CVC5_DIR AND NOT "${CVC5_DIR}" STREQUAL "")
+	message(STATUS "Using caller-provided CVC5_DIR: ${CVC5_DIR}")
+	find_package(cvc5 CONFIG REQUIRED
+		PATHS ${CVC5_DIR}
+		NO_DEFAULT_PATH)
+else()
+	execute_process(
+		COMMAND bash ./dev dep-cvc5.sh ${DEP_CVC5_ARGS}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMAND_ERROR_IS_FATAL ANY
+	)
+	find_package(cvc5 CONFIG REQUIRED
+		PATHS ${CVC5_LIBDIR}/cmake/cvc5)
+endif()
 message(STATUS "cvc5 found: ${cvc5_FOUND}")
 message(STATUS "cvc5 version: ${cvc5_VERSION}")
 
@@ -416,8 +424,8 @@ endif ()
 # Building Python bindings
 #
 if (TAU_BUILD_BINDING_PYTHON)
-	message(STATUS "Building Python nanobind bindings")
-	add_subdirectory(bindings/python/nanobind)
+	message(STATUS "Building Python bindings (nanobind + ctypes)")
+	add_subdirectory(bindings/python)
 endif()
 
 #

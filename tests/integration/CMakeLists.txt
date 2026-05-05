@@ -6,6 +6,9 @@ set(TESTS
 	bv_hooks
 	bf_normalization
 	interpreter
+	interpreter_ltl_multiio
+	pointwise_revision
+	ltl_aba_execution
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval
@@ -40,6 +43,8 @@ set(TESTS
 	blasting_correctness_check3
 	blasting_correctness_check4
 	blasting_correctness_check5
+	ctl_star
+	ocfuncs
 )
 
 foreach(X IN LISTS TESTS)

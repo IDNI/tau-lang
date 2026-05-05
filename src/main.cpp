@@ -9,6 +9,10 @@
 // #include "tau.h" to avoid error lines pointing to a generated tau.h
 #include "boolean_algebras/bv_ba.h"
 #include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/qint.h"
+#include "boolean_algebras/qlt.h"
+#include "boolean_algebras/nlang_ba.h"
+#include "boolean_algebras/hsb.h"
 #include "boolean_algebras/nso_ba.h"
 #include "boolean_algebras/tau_ba.h"
 #include "boolean_algebras/variant_ba.h"
@@ -24,7 +28,7 @@ using namespace std;
 using namespace idni;
 using namespace idni::tau_lang;
 
-using node_t = tau_lang::node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+using node_t = tau_lang::node<tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>, qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
 using tau = tree<node_t>;
 using tau_api = api<node_t>;
 
@@ -71,7 +75,7 @@ int error(const string& s) { TAU_LOG_ERROR << "" << s; return 1; }
 int run_tau_spec(string spec_file, cli::options& opts) {
 	measuring m("run");
 	idni::measures::timer t;
-	string src = "";
+	string src;
 	t.start();
 	auto result = [&](int r) {
 		m.ms = t.stop();
@@ -184,7 +188,7 @@ int main(int argc, char** argv) {
 		return run_tau_spec(files.front(), opts);
 	}
 
-	repl_evaluator<bv, sbf_ba> re({
+	repl_evaluator<qint, qlt, nlang_ba, bv, sbf_ba, hsb> re({
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,

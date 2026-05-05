@@ -237,7 +237,6 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
 		CHECK(is_splitter<bas_pack>(fm, s, fm));
->>>>>>> 049cbd5f (Sat-solver-splitter test)
 	}
 }
 

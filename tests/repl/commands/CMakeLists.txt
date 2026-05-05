@@ -4,15 +4,15 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 include(test_repl-quit_cmd.cmake)
 include(test_repl-version_cmd.cmake)
-#include(test_repl-clear_cmd.cmake)
 include(test_repl-help_cmd.cmake)
+include(test_repl-help_extended_cmd.cmake)
 
 # options commands
 
 include(test_repl-get_cmd.cmake)
+include(test_repl-get_set_extended_cmd.cmake)
 include(test_repl-set_cmd.cmake)
-#include(test_repl-enable_cmd.cmake)
-#include(test_repl-disable_cmd.cmake)
+include(test_repl-enable_disable_cmd.cmake)
 include(test_repl-toggle_cmd.cmake)
 
 # commands for specs, formulas and terms
@@ -47,6 +47,7 @@ include(test_repl-cnf_cmd.cmake)
 include(test_repl-dnf_cmd.cmake)
 include(test_repl-nnf_cmd.cmake)
 include(test_repl-mnf_cmd.cmake)
+include(test_repl-anf_pnf_cmd.cmake)
 # include(test_repl-onf_cmd.cmake)
 include(test_repl-onf_cmd-crash_regression.cmake)
 
@@ -55,6 +56,10 @@ include(test_repl-history_cmd.cmake)
 include(test_repl-definition_cmd.cmake)
 include(test_repl-io_definition_cmd.cmake)
 
+
+# session management and type inspection
+include(test_repl-reset_cmd.cmake)
+include(test_repl-whatis_cmd.cmake)
 
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command
