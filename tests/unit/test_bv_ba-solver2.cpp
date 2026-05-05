@@ -307,7 +307,7 @@ TEST_SUITE("cvc5_solve simple") {
 TEST_SUITE("regression") {
 
 	TEST_CASE("Andrei's example (y1)") {
-		const char* sample = "always (((i5[t]:bv[64] * i6[t]:bv[64]) !<= ((i5[t]:bv[64] * i6[t]:bv[64]) >> { 3 }:bv[64])) ? o1[t]:bv[64] = (i5[t]:bv[64] * i6[t]:bv[64]) : o1[t]:bv[64] = (0 - (i5[t]:bv[64] * i6[t]:bv[64])))";
+		const char* sample = "G (((i5[t]:bv[64] * i6[t]:bv[64]) !<= ((i5[t]:bv[64] * i6[t]:bv[64]) >> { 3 }:bv[64])) ? o1[t]:bv[64] = (i5[t]:bv[64] * i6[t]:bv[64]) : o1[t]:bv[64] = (0 - (i5[t]:bv[64] * i6[t]:bv[64])))";
 		tref src = parse(sample);
 		// tau::get(src).print_tree(std::cout << "parse tree: ") << "\n";
 		subtree_map<node_t, bv> vars, free_vars;

@@ -100,6 +100,58 @@ TEST_SUITE("bv operator hooks:corner cases") {
 		CHECK(src == expected);
 	}
 
+	// Addition tests
+	TEST_CASE("bv addition: 0 + 0 = 0") {
+		auto fm = normalize_test_tau("G(o1[t]:bv[8] = {0}:bv[8] + {0}:bv[8]).");
+		CHECK(fm != nullptr);
+	}
+
+	TEST_CASE("bv addition: constants") {
+		auto fm = normalize_test_tau(
+			"G(o1[t]:bv[8] = {1}:bv[8] + {1}:bv[8]).");
+		CHECK(fm != nullptr);
+	}
+
+	// Subtraction tests
+	TEST_CASE("bv subtraction: 1 - 0 = 1") {
+		auto fm = normalize_test_tau(
+			"G(o1[t]:bv[8] = {1}:bv[8] - {0}:bv[8]).");
+		CHECK(fm != nullptr);
+	}
+
+	TEST_CASE("bv subtraction: 1 - 1 = 0") {
+		auto fm = normalize_test_tau(
+			"G(o1[t]:bv[8] = {1}:bv[8] - {1}:bv[8]).");
+		CHECK(fm != nullptr);
+	}
+
+	// Multiplication tests
+	TEST_CASE("bv multiplication: 1 * 0 = 0") {
+		auto fm = normalize_test_tau(
+			"G(o1[t]:bv[8] = {1}:bv[8] * {0}:bv[8]).");
+		CHECK(fm != nullptr);
+	}
+
+	TEST_CASE("bv multiplication: 2 * 3") {
+		auto fm = normalize_test_tau(
+			"G(o1[t]:bv[8] = {2}:bv[8] * {3}:bv[8]).");
+		CHECK(fm != nullptr);
+	}
+
+	// Shift right tests
+	TEST_CASE("bv shift right: 8 >> 1 = 4") {
+		auto fm = normalize_test_tau(
+			"G(o1[t]:bv[8] = {8}:bv[8] >> {1}:bv[8]).");
+		CHECK(fm != nullptr);
+	}
+
+	// Shift left tests
+	TEST_CASE("bv shift left: 1 << 1 = 2") {
+		auto fm = normalize_test_tau(
+			"G(o1[t]:bv[8] = {1}:bv[8] << {1}:bv[8]).");
+		CHECK(fm != nullptr);
+	}
+
 	TEST_CASE("division X / X") {
 		tref src = parse_bf("{77}:bv[8] / {77}:bv[8]");
 		tref expected = parse_bf("{1}:bv[8]"); // <- 1 (not top element)

@@ -78,8 +78,8 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		using tau = tree<node>;
 		using bac = ba_constants<node>;
 
-		tref t_ref = tau::get_ba_constant(Bool(true),  bool_type());
-		tref f_ref = tau::get_ba_constant(Bool(false), bool_type());
+		tref t_ref = tau::get_ba_constant(Bool(true),  bool_type_for<node>());
+		tref f_ref = tau::get_ba_constant(Bool(false), bool_type_for<node>());
 		size_t t = tau::get(t_ref).get_ba_constant_id();
 		size_t f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 1 );

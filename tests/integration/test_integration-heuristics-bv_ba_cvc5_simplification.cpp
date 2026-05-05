@@ -150,8 +150,8 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 		tref src = parse_bf(sample);
 		REQUIRE( src != nullptr );
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		// cvc5 rewrites this to concat/extract, which the Tau retranslator does not support.
-		CHECK( simplified == nullptr );
+		//  cvc5 returns (concat ((_ extract 6 0) x) #b0), now translated back
+		CHECK( simplified != nullptr );
 	}
 
 	// When multiplying by a power of two cvc5 simplifies the multiplication
@@ -161,8 +161,8 @@ TEST_SUITE("ba bv cvc5 constant/variable simplification") {
 		tref src = parse_bf(sample);
 		REQUIRE( src != nullptr );
 		tref simplified = bv_ba_cvc5_simplification<node_t>(src);
-		// cvc5 rewrites this to concat/extract, which the Tau retranslator does not support.
-		CHECK( simplified == nullptr );
+		// cvc5 returns (concat ((_ extract 5 0) x) #b00), now translated back
+		CHECK( simplified != nullptr );
 	}
 
 	TEST_CASE("multiplication of constant/variable") {
