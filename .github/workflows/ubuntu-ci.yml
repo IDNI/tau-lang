@@ -1,0 +1,197 @@
+name: Ubuntu CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    env:
+      CC: gcc-13
+      CXX: g++-13
+      CVC5_DIR: ${{ github.workspace }}/.cvc5-dist/lib/cmake/cvc5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ── System deps ───────────────────────────────────────────────────────────
+
+      - name: Install system packages
+        run: ./scripts/setup-ubuntu-ci-deps.sh
+
+      - name: Verify required tools
+        run: |
+          gcc-13 --version
+          g++-13 --version
+          cmake --version
+          ninja --version
+          ltlsynt --version
+          ltl2tgba --version
+
+      # ── ccache ──────────────────────────────────────────────────────────────
+
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ccache-ubuntu-24.04-gcc13
+          max-size: 200M
+
+      # ── cvc5 (prebuilt binary — no more building from source) ───────────────
+      # Pin to the exact release tarball.  Never rebuilds; just downloads once
+      # and caches the extracted dist/ tree forever (keyed on the URL).
+
+      - name: Cache cvc5 prebuilt
+        id: cache-cvc5
+        uses: actions/cache@v4
+        with:
+          path: .cvc5-dist
+          key: cvc5-1.3.1-linux-x86_64-shared
+
+      - name: Download cvc5 prebuilt binary
+        if: steps.cache-cvc5.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          CVC5_URL="https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.1/cvc5-Linux-x86_64-shared.zip"
+          echo "Downloading cvc5 from ${CVC5_URL}..."
+          curl -fsSL -o /tmp/cvc5.zip "${CVC5_URL}"
+          unzip -q /tmp/cvc5.zip -d /tmp/cvc5-extract
+          mv /tmp/cvc5-extract/cvc5-Linux-x86_64-shared .cvc5-dist
+          rm /tmp/cvc5.zip
+          echo "cvc5 installed to .cvc5-dist/"
+          ls -la .cvc5-dist/lib/cmake/cvc5/
+
+      - name: Verify cvc5 package
+        run: |
+          test -d ".cvc5-dist/lib/cmake/cvc5"
+          echo "cvc5 cmake dir: $(ls .cvc5-dist/lib/cmake/cvc5/)"
+
+      # ── Configure & build ─────────────────────────────────────────────────────
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build-ci \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-13 \
+            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DTAU_BUILD_UNIT_TESTS=ON \
+            -DTAU_BUILD_INTEGRATION=ON \
+            -DTAU_BUILD_API_TESTS=ON \
+            -DTAU_BUILD_REPL_TESTS=ON \
+            -DCVC5_DIR="${CVC5_DIR}" \
+            -G Ninja
+
+      - name: Build all targets
+        run: cmake --build build-ci -j$(nproc)
+
+      # ── Run tests ──────────────────────────────────────────────────────────────
+
+      - name: Run all tests
+        working-directory: build-ci
+        run: ctest --output-on-failure --timeout 300 -j$(nproc)
+        env:
+          TAU_LTL_SKIP_PERF: "1"
+          LD_LIBRARY_PATH: ${{ github.workspace }}/.cvc5-dist/lib
+
+      # ── Benchmarks (non-blocking) ─────────────────────────────────────────────
+
+      - name: Collect benchmark timing
+        if: always()
+        working-directory: build-ci
+        run: |
+          mkdir -p benchmark_results
+          for t in \
+            test_ltl_negative \
+            test_ltl_correctness \
+            test_ltl_strategy_exec \
+            test_algorithm_a \
+            test_algorithm_c \
+            test_algorithm_d \
+            test_qlt_oracle \
+            test_omcat_types \
+            test_normal_forms \
+            test_gr1_detect \
+            test_algorithm_picker \
+            test_ltl_aba \
+            test_ltl_adversarial \
+            test_ltl_qlt_bv \
+            test_ltl_deepseek_generated \
+            test_ltl_adversarial2 \
+            test_ltl_deepseek2 \
+            test_hsb \
+            ; do
+            if [ -x "./$t" ]; then
+              echo "=== benchmark: $t ==="
+              TAU_BENCHMARK_FILE="benchmark_results/${t}.json" timeout 300 ./$t || true
+            fi
+          done
+        env:
+          TAU_LTL_SKIP_PERF: "1"
+          LD_LIBRARY_PATH: ${{ github.workspace }}/.cvc5-dist/lib
+
+      # ── Merge benchmark results ─────────────────────────────────────────────
+
+      - name: Merge benchmark timing into single file
+        if: always()
+        working-directory: build-ci
+        run: |
+          python3 -c "
+          import json, glob, os
+          all_tests = []
+          for f in sorted(glob.glob('benchmark_results/*.json')):
+              try:
+                  data = json.load(open(f))
+                  suite_name = os.path.basename(f).replace('.json','')
+                  for t in data.get('tests', []):
+                      t['binary'] = suite_name
+                      all_tests.append(t)
+              except: pass
+          json.dump({'tests': all_tests, 'total_tests': len(all_tests)},
+                    open('benchmark_current.json','w'), indent=2)
+          print(f'Merged {len(all_tests)} test timings')
+          "
+
+      # ── Benchmark regression check ──────────────────────────────────────────
+
+      - name: Restore benchmark baseline
+        if: always()
+        uses: actions/cache/restore@v4
+        with:
+          path: build-ci/benchmark_baseline.json
+          key: benchmark-baseline-${{ github.base_ref || github.ref_name }}
+        id: bench-cache
+
+      - name: Check for performance regressions
+        if: always()
+        working-directory: build-ci
+        run: |
+          python3 ../scripts/benchmark_compare.py \
+            --baseline benchmark_baseline.json \
+            --current benchmark_current.json \
+            --threshold 1.20
+
+      - name: Save benchmark baseline (on push to master)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+        uses: actions/cache/save@v4
+        with:
+          path: build-ci/benchmark_baseline.json
+          key: benchmark-baseline-${{ github.ref_name }}-${{ github.sha }}
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-timing
+          path: |
+            build-ci/benchmark_current.json
+            build-ci/benchmark_regressions.json
+          retention-days: 90

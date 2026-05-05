@@ -1,0 +1,6 @@
+function(version_license template output)
+	file(READ "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md" LICENSE_CONTENT)
+	string(TIMESTAMP BUILD_DATE_ISO "%Y-%m-%dT%H:%M:%SZ" UTC)
+	set(VERSION "${TAU_VERSION}")
+	configure_file("${template}" "${output}" @ONLY)
+endfunction()
