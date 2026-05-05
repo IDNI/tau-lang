@@ -41,7 +41,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_5") {
-		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 0).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -51,7 +51,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 
 
 	TEST_CASE("Tau_splitter_6") {
-		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -60,7 +60,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_7") {
-		const char *sample = "(sometimes o1[t] = 1).";
+		const char *sample = "(F o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -69,7 +69,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_8") {
-		const char *sample = "(always o1[t] = 1).";
+		const char *sample = "(G o1[t] = 1).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -78,7 +78,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_9") {
-		const char *sample = "(always o1[t] = i1[t]).";
+		const char *sample = "(G o1[t] = i1[t]).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -87,7 +87,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	}
 
 	TEST_CASE("Tau_splitter_10") {
-		const char *sample = "(always o1[0] = 0) && (sometimes o1[0]|o1[1] != 0).";
+		const char *sample = "(G o1[0] = 0) && (F o1[0]|o1[1] != 0).";
 		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::upper);
 		CHECK(fm != nullptr);
 		CHECK(s != nullptr);
@@ -198,6 +198,46 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 		CHECK(!is_sbf_zero(s));
 		CHECK(s != elem);
 		CHECK((s & elem) == s);
+	}
+
+	TEST_CASE("Tau_splitter_4") {
+		const char *sample = "x = 0 && w != 0 || y|z != 0.";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s));
+	}
+#ifndef DEBUG
+	TEST_CASE("Tau_splitter_5") {
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 0).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s, fm));
+	}
+
+	TEST_CASE("Tau_splitter_6") {
+		const char *sample = "(G ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (F o1[t] != 0 && o1[t] != 1) && (F o1[t] = 1).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s, fm));
+	}
+#endif
+	TEST_CASE("Tau_splitter_7") {
+		const char *sample = "(F o1[t] = 1).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s, fm));
+	}
+	TEST_CASE("Tau_splitter_8") {
+		const char *sample = "(G o1[t] = 1).";
+		auto [fm, s] = get_nso_rr_tau_splitter(sample, splitter_type::middle);
+		CHECK(fm != nullptr);
+		CHECK(s != nullptr);
+		CHECK(is_splitter<bas_pack>(fm, s, fm));
+>>>>>>> 049cbd5f (Sat-solver-splitter test)
 	}
 }
 
