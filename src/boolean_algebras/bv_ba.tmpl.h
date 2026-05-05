@@ -57,7 +57,14 @@ requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
 		tref type_tree) {
 
-	auto result = bitvector_parser::instance().parse(src.c_str(), src.size());
+	// Normalize 0x/0b prefixes to #x/#b for the bitvector parser
+	std::string normalized = src;
+	if (normalized.size() >= 2 && normalized[0] == '0'
+			&& (normalized[1] == 'x' || normalized[1] == 'X'
+			 || normalized[1] == 'b' || normalized[1] == 'B'))
+		normalized[0] = '#', normalized[1] = std::tolower(normalized[1]);
+
+	auto result = bitvector_parser::instance().parse(normalized.c_str(), normalized.size());
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC);

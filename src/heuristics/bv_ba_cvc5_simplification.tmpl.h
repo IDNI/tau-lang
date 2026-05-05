@@ -177,10 +177,46 @@ tref cvc5_tree_to_tau_tree(bv n,
 			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(target_size)));
 		}
 
-		default: {
-			DBG(LOG_DEBUG << "Unexpected bitvector kind during tree translation: "
-					<< n.getKind() << "\n";)
+		case Kind::BITVECTOR_CONCAT: {
+			// concat(a, b) = (a << width(b)) | b
+			// Both operands widened to result width by cvc5.
+			tref a = rec(n[0]);
+			tref b = rec(n[1]);
+			if (!a || !b) return nullptr;
+			uint32_t bw = n[1].getSort().getBitVectorSize();
+			uint32_t rw = n.getSort().getBitVectorSize();
+			size_t tid = get_ba_type_id<node>(bv_type<node>(rw));
+			// Build shift amount constant
+			cvc5::Term shift_amt = cvc5_term_manager.mkBitVector(rw, bw);
+			tref shift_c = build_bf_ba_constant<node>(shift_amt, tid);
+			return build_bf_or<node>(
+				build_bf_shl<node>(a, shift_c), b);
 		}
+		case Kind::BITVECTOR_EXTRACT: {
+			// extract[hi:lo](x) = (x >> lo) & mask(hi-lo+1)
+			tref x = rec(n[0]);
+			if (!x) return nullptr;
+			auto op = n.getOp();
+			uint32_t hi = op[0].getUInt32Value();
+			uint32_t lo = op[1].getUInt32Value();
+			uint32_t rw = hi - lo + 1;
+			size_t tid = get_ba_type_id<node>(bv_type<node>(rw));
+			if (lo > 0) {
+				uint32_t xw = n[0].getSort().getBitVectorSize();
+				cvc5::Term lo_c = cvc5_term_manager.mkBitVector(xw, lo);
+				tref lo_t = build_bf_ba_constant<node>(lo_c,
+					get_ba_type_id<node>(bv_type<node>(xw)));
+				x = build_bf_shr<node>(x, lo_t);
+			}
+			uint64_t mask_val = (rw >= 64) ? ~0ULL : ((1ULL << rw) - 1);
+			cvc5::Term mask_c = cvc5_term_manager.mkBitVector(rw, mask_val);
+			tref mask_t = build_bf_ba_constant<node>(mask_c, tid);
+			return build_bf_and<node>(x, mask_t);
+		}
+
+		default:
+			LOG_ERROR << "Unexpected bitvector kind during tree translation: "
+					<< n.getKind() << "\n";
 		return nullptr;
 	}
 #undef rec

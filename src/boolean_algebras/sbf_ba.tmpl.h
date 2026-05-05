@@ -66,6 +66,7 @@ requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_sbf(
 	const std::string& src)
 {
+	bdd_init<Bool>(); // ensure BDD is initialized (inline-static initializer may be elided by LTO)
 	static std::map<size_t, std::variant<BAs...>> cache;
 
 	// check source cache
