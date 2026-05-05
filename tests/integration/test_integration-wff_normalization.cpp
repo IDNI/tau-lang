@@ -282,8 +282,10 @@ TEST_SUITE("boole_normal_form") {
 			"ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0",
 			"x'b'a|xba' = 0 || b&(x'|a)|xb'a != 0",
 			"b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0",
+			"xa'b|x'ab' = 0 || a&(x|b)|x'a'b != 0",
 			"b'x'a|bxa' = 0 || b&(x'|a)|b'xa != 0",
 			"a'xb|ax'b' = 0 || a&(x|b)|a'x'b != 0",
+			"ab'x'|a'bx = 0 || a&(b|x)|a'bx' != 0",
 		}) );
 	}
 	TEST_CASE("2") {

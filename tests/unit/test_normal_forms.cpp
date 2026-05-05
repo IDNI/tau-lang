@@ -178,7 +178,7 @@ TEST_SUITE("path_expressions") {
 		}
 	}
 	TEST_CASE("3") {
-		const char* sample = " (sometimes (a=0||b=0)&&x=0&&y=0&&(p=0||f=0)&&(t=0||q=0)) && (always x = 0) || (always y = 0) && (always k = 0).";
+		const char* sample = " (F (a=0||b=0)&&x=0&&y=0&&(p=0||f=0)&&(t=0||q=0)) && (G x = 0) || (G y = 0) && (G k = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		for (tref path : expression_paths<node_t>(fm)) {
 			trefs paths = get_cnf_wff_clauses<node_t>(path);
