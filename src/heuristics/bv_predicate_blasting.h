@@ -115,6 +115,25 @@ template<NodeType node>
 tref bvrhl(tref base, tref count, tref shifted);
 
 /**
+ * @brief Computes a predicate constraining result to be the cast of src to a
+ * different bitwidth.
+ *
+ * For zero-extension (src bitwidth < result bitwidth):
+ *   - Low bits of result match source bits
+ *   - High bits of result are zero
+ *
+ * For truncation (src bitwidth > result bitwidth):
+ *   - Result bits match the low bits of source
+ *
+ * @tparam node Node type
+ * @param src Source bitvector
+ * @param result Result bitvector (fresh variable of target type)
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref bvcast(tref src, tref result);
+
+/**
  * @brief Computes a predicate checking if left is not equal to right as bitvectors.
  *
  * @tparam node Node type
