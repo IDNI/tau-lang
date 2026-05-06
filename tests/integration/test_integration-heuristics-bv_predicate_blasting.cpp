@@ -1819,6 +1819,34 @@ TEST_SUITE("unsupported blasting cases") {
 	}
 }
 
+TEST_SUITE("more complex formulas") {
+
+	TEST_CASE("complex formula 1") {
+		CHECK(blast_normalize("all x:bv[4] all y:bv[4] ex z:bv[4] (x + y = z)") == "T");
+	}
+
+	TEST_CASE("complex formula 2") {
+		CHECK(blast_normalize("all x:bv[4] all y:bv[4] all z:bv[4] (x + y = z)") == "F");
+	}
+
+	TEST_CASE("complex formula 3") {
+		CHECK(blast_normalize("ex x:bv[4] (x * { 3 }:bv[4] = { 1 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("complex formula 4") {
+		CHECK(blast_normalize("all x:bv[4] (x * { 3 }:bv[4] = { 1 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("complex formula 5") {
+		CHECK(blast_normalize("all x:bv[4] (x << { 1 }:bv[4] != { 1 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("complex formula 6") {
+		CHECK(blast_normalize("ex x:bv[4] (x << { 1 }:bv[4] = { 1 }:bv[4])") == "F");
+	}
+
+}
+
 TEST_SUITE("cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
