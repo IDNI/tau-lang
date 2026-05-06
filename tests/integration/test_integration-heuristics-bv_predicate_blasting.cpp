@@ -30,7 +30,12 @@ tref parse_wff(const std::string& sample) {
 static std::string blast_normalize(const std::string& sample) {
 	auto wff = parse_wff(sample);
 	if (!wff) return "parse_error";
-	auto result = normalizer<node_t>(wff);
+	// We blast the formula and then normalize it to check that the blasting is
+	// correct and it is not simplified first by other heuristics. If the blasting
+	// is correct, the result should be T or F.
+	auto blasted = bv_predicate_blasting<node_t>(wff);
+	if (!blasted) return "blast_error";
+	auto result = normalizer<node_t>(blasted);
 	if (!result) return "null";
 	return tau::get(result).to_str();
 }
@@ -785,6 +790,34 @@ TEST_SUITE("bvcast") {
 	TEST_CASE("bvcast: same-size wrong value") {
 		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && (bv[4]) x = { 6 }:bv[4])") == "F");
 	}
+}
+
+TEST_SUITE("more complex formulas") {
+
+	TEST_CASE("complex formula 1") {
+		CHECK(blast_normalize("all x:bv[4] all y:bv[4] ex z:bv[4] (x + y = z)") == "T");
+	}
+
+	TEST_CASE("complex formula 2") {
+		CHECK(blast_normalize("all x:bv[4] all y:bv[4] all z:bv[4] (x + y = z)") == "F");
+	}
+
+	TEST_CASE("complex formula 3") {
+		CHECK(blast_normalize("ex x:bv[4] (x * { 3 }:bv[4] = { 1 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("complex formula 4") {
+		CHECK(blast_normalize("all x:bv[4] (x * { 3 }:bv[4] = { 1 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("complex formula 5") {
+		CHECK(blast_normalize("all x:bv[4] (x << { 1 }:bv[4] != { 1 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("complex formula 6") {
+		CHECK(blast_normalize("ex x:bv[4] (x << { 1 }:bv[4] = { 1 }:bv[4])") == "F");
+	}
+
 }
 
 TEST_SUITE("cleanup") {

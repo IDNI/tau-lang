@@ -79,8 +79,8 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "nso_ba",
 	// "sbf_ba",
 	// "tau_ba",
-	"bv_ba",
-	"bv_ba_hooks",
+	// "bv_ba",
+	// "bv_ba_hooks",
 	// "bv_ba-solver",
 
 	/* main components*/
@@ -115,9 +115,9 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "inference",
 
 	/* related to heuristics*/
-	"bv_ba_simplification",
-	"ex_subs_based_elimination",
-	"bv_predicate_blasting",
+	// "bv_ba_simplification",
+	// "ex_subs_based_elimination",
+	// "bv_predicate_blasting",
 
 	/* testing specific */
 	"testing",

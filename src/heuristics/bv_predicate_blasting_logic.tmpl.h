@@ -520,17 +520,16 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 		return cache[count];
 	}
 	// Otherwise, we compute the rule, store it in the cache and return it.
+	// Iterate over destination bits j: shifted[j] = 0 for j < offset (low bits
+	// are zeroed), shifted[j] = base[j - offset] for j >= offset.
 	tref body = nullptr;
-	for (size_t i = 0; i < bitwidth; ++i) {
-		if (i + offset > bitwidth) {
-			auto shifted_bit = bit<node>(shifted, i);
-			auto shift_eq = tau::build_bf_eq_0(shifted_bit);
-			body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
-			continue;
+	for (size_t j = 0; j < bitwidth; ++j) {
+		tref shift_eq;
+		if (j < offset) {
+			shift_eq = tau::build_bf_eq_0(bit<node>(shifted, j));
+		} else {
+			shift_eq = tau::build_bf_eq(bit<node>(shifted, j), bit<node>(base, j - offset));
 		}
-		auto base_bit = bit<node>(base, i);
-		auto shifted_bit = bit<node>(shifted, i + offset);
-		auto shift_eq = tau::build_bf_eq(shifted_bit, base_bit);
 		body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
 	}
 	auto rule = make_rule<node>(head, body);
@@ -566,7 +565,7 @@ template<NodeType node>
 static tref make_bvrhl_call(tref base, tref count /* bv constant */, tref shifted) {
 	using tau = tree<node>;
 
-	DBG( assert(is_bv_constant<node>(count)); )
+	DBG( assert(is_bv_constant<node>(tau::trim(count))); )
 
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl", { base, count, shifted })));
 }
@@ -589,7 +588,7 @@ static rewriter::rule bvrhl_rule(tref count /* bv constant */) {
 	auto offset = get_bv_constant_value<node>(tau::trim(count)).value();
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto head = make_bvshl_call<node>(base, count, shifted);
+	auto head = make_bvrhl_call<node>(base, count, shifted);
 	// If the shift is greater or equal to the bitwidth, the result is always zero
 	if (offset >= bitwidth) {
 		auto body = tau::build_bf_eq_0(shifted);
@@ -605,18 +604,18 @@ static rewriter::rule bvrhl_rule(tref count /* bv constant */) {
 		return cache[count];
 	}
 	// Otherwise, we compute the rule, store it in the cache and return it.
+	// Iterate over destination bits j: shifted[j] = base[j + offset] for j < bitwidth - offset
+	// (low bits come from higher base bits), shifted[j] = 0 for j >= bitwidth - offset
+	// (high bits are zeroed out, i.e., logical right shift fills with zero).
 	tref body = nullptr;
-	for (size_t i = 0; i < bitwidth; ++i) {
-		if (i < offset) {
-			auto shifted_bit = bit<node>(shifted, i);
-			auto shift_eq = tau::build_bf_eq_0(shifted_bit);
-			body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
-			continue;
+	for (size_t j = 0; j < bitwidth; ++j) {
+		tref shift_eq;
+		if (j + offset >= bitwidth) {
+			shift_eq = tau::build_bf_eq_0(bit<node>(shifted, j));
+		} else {
+			shift_eq = tau::build_bf_eq(bit<node>(shifted, j), bit<node>(base, j + offset));
 		}
-		auto base_bit = bit<node>(base, i);
-		auto shifted_bit = bit<node>(shifted, i - offset);
-		auto bit_eq = tau::build_bf_eq(base_bit, shifted_bit);
-		body = body ? tau::build_wff_and(body, bit_eq) : bit_eq;
+		body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
 	}
 	auto rule = make_rule<node>(head, body);
 
