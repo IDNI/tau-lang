@@ -12,6 +12,8 @@
 #                         (default: ./tests/benchmark/fixtures)
 #   -o, --output-dir DIR  Root output directory
 #                         (default: ./tests/benchmark/data)
+#   -t, --timeout SECS    Kill fixture after SECS seconds (default: unlimited)
+#   -m, --memory MB       Kill fixture if RSS exceeds MB megabytes (default: unlimited)
 #   -h, --help            Show this help and exit
 
 set -euo pipefail
@@ -26,6 +28,8 @@ TAU_BUILD_DIR="${TAU_BUILD_DIR:-$REPO_ROOT/build-Release}"
 FIXTURE_DIR="${FIXTURE_DIR:-$REPO_ROOT/tests/benchmark/fixtures}"
 DATA_ROOT="${DATA_ROOT:-$REPO_ROOT/tests/benchmark/data}"
 PROFILE_NAME=""
+TIMEOUT_SECS=""  # empty = no limit
+MEMORY_MB=""    # empty = no limit
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -35,6 +39,8 @@ while [[ $# -gt 0 ]]; do
         -b|--build-dir)  TAU_BUILD_DIR="$2"; shift 2 ;;
         -f|--fixtures)   FIXTURE_DIR="$2";   shift 2 ;;
         -o|--output-dir) DATA_ROOT="$2";     shift 2 ;;
+        -t|--timeout)    TIMEOUT_SECS="$2";  shift 2 ;;
+        -m|--memory)     MEMORY_MB="$2";     shift 2 ;;
         -h|--help)
             sed -n '/^# Usage:/,/^$/p' "$0"
             exit 0
@@ -104,6 +110,8 @@ echo "  binary   : $TAU_EXE"
 echo "  commit   : $COMMIT_HASH"
 echo "  fixtures : $FIXTURE_DIR"
 echo "  output   : $OUTPUT_DIR"
+echo "  timeout  : ${TIMEOUT_SECS:-unlimited} s"
+echo "  memory   : ${MEMORY_MB:-unlimited} MB"
 echo "============================================================"
 
 # ---------------------------------------------------------------------------
@@ -120,6 +128,30 @@ json_escape() {
     s="${s//$'\r'/\\r}"
     s="${s//$'\t'/\\t}"
     printf '%s' "$s"
+}
+
+# kill_tree <pid>  — SIGKILL a process and all its descendants
+kill_tree() {
+    local pid="$1"
+    local child
+    for child in $(pgrep -P "$pid" 2>/dev/null); do
+        kill_tree "$child"
+    done
+    kill -KILL "$pid" 2>/dev/null || true
+}
+
+# get_tree_rss_kb <pid>  — sum VmRSS (kB) for the entire process subtree
+get_tree_rss_kb() {
+    local pid="$1"
+    local total=0 child rss
+    if [[ -r /proc/$pid/status ]]; then
+        rss=$(awk '/^VmRSS/ {print $2}' /proc/$pid/status 2>/dev/null || echo 0)
+        total=$(( total + ${rss:-0} ))
+    fi
+    for child in $(pgrep -P "$pid" 2>/dev/null); do
+        total=$(( total + $(get_tree_rss_kb "$child") ))
+    done
+    echo "$total"
 }
 
 # ---------------------------------------------------------------------------
@@ -218,9 +250,10 @@ parse_time_to_json() {
     local fixture_name="$2"
     local exit_status="$3"
     local out_file="$4"
+    local kill_reason="${5:-none}"   # "timeout", "memory", or "none"
 
     # Extract fields with awk — GNU time -v format is stable
-    awk -v fixture="$fixture_name" -v exitcode="$exit_status" '
+    awk -v fixture="$fixture_name" -v exitcode="$exit_status" -v kill_reason="$kill_reason" '
     function strip(s,    r) {
         gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
         return s
@@ -250,6 +283,7 @@ parse_time_to_json() {
         printf "{\n"
         printf "  \"fixture\": \"%s\",\n", fixture
         printf "  \"exit_status\": %s,\n", exitcode
+        printf "  \"kill_reason\": \"%s\",\n", kill_reason
         printf "  \"user_time_s\": %s,\n", (user_time  != "" ? user_time  : "null")
         printf "  \"system_time_s\": %s,\n", (sys_time   != "" ? sys_time   : "null")
         printf "  \"elapsed_wall_s\": %s,\n", elapsed_s
@@ -279,6 +313,9 @@ echo ""
 
 PASS=0
 FAIL=0
+KILL=0
+KILL_TIMEOUT=0
+KILL_MEMORY=0
 
 
 # Discover both .tau and .tau_cli fixtures
@@ -301,25 +338,68 @@ for fixture in "${fixtures[@]}"; do
 
     # Run tau under /usr/bin/time, handling .tau and .tau_cli differently
     TIME_TMP=$(mktemp)
+    KILL_FLAG=$(mktemp)   # written by monitor: "timeout" | "memory" | (empty)
     if [[ "$fixture" == *.tau ]]; then
         /usr/bin/time -v -o "$TIME_TMP" "$TAU_EXE" "$fixture" -qJ \
             > "$stdout_file" \
-            2> "$stderr_file" \
-            || true
-        TAU_EXIT=$?
+            2> "$stderr_file" &
+        PROC_PID=$!
     elif [[ "$fixture" == *.tau_cli ]]; then
         /usr/bin/time -v -o "$TIME_TMP" bash -c "cat '$fixture' | '$TAU_EXE' -J" \
             > "$stdout_file" \
-            2> "$stderr_file" \
-            || true
-        TAU_EXIT=$?
+            2> "$stderr_file" &
+        PROC_PID=$!
     else
         echo "  [SKIP] $fname (unknown extension)"
+        rm -f "$TIME_TMP" "$KILL_FLAG"
         continue
     fi
 
+    # Start a resource monitor if any limit is active
+    MONITOR_PID=""
+    if [[ -n "$TIMEOUT_SECS" || -n "$MEMORY_MB" ]]; then
+        (
+            START_S=$SECONDS
+            MEMORY_KB=$(( ${MEMORY_MB:-0} * 1024 ))
+            while kill -0 "$PROC_PID" 2>/dev/null; do
+                # Check timeout
+                if [[ -n "$TIMEOUT_SECS" ]] && (( SECONDS - START_S >= TIMEOUT_SECS )); then
+                    kill_tree "$PROC_PID"
+                    echo "timeout" > "$KILL_FLAG"
+                    exit 0
+                fi
+                # Check memory
+                if [[ -n "$MEMORY_MB" ]]; then
+                    CURRENT_RSS=$(get_tree_rss_kb "$PROC_PID")
+                    if (( CURRENT_RSS > MEMORY_KB )); then
+                        kill_tree "$PROC_PID"
+                        echo "memory" > "$KILL_FLAG"
+                        exit 0
+                    fi
+                fi
+                sleep 0.1
+            done
+        ) &
+        MONITOR_PID=$!
+    fi
+
+    # Wait for the fixture process to finish
+    wait "$PROC_PID" 2>/dev/null || true
+    TAU_EXIT=$?
+
+    # Stop the monitor
+    if [[ -n "$MONITOR_PID" ]]; then
+        kill "$MONITOR_PID" 2>/dev/null || true
+        wait "$MONITOR_PID" 2>/dev/null || true
+    fi
+
+    # Determine kill reason
+    KILL_REASON=$(cat "$KILL_FLAG" 2>/dev/null)
+    KILL_REASON="${KILL_REASON:-none}"
+    rm -f "$KILL_FLAG"
+
     # Parse into JSON
-    parse_time_to_json "$TIME_TMP" "$fname" "$TAU_EXIT" "$time_json_file"
+    parse_time_to_json "$TIME_TMP" "$fname" "$TAU_EXIT" "$time_json_file" "$KILL_REASON"
 
     # Extract summary values for console output
     elapsed=$(awk -F': +' '/Elapsed \(wall clock\)/ {print $NF}' "$TIME_TMP")
@@ -327,7 +407,12 @@ for fixture in "${fixtures[@]}"; do
 
     rm -f "$TIME_TMP"
 
-    if [[ $TAU_EXIT -eq 0 ]]; then
+    if [[ "$KILL_REASON" != "none" ]]; then
+        echo "  [KILL] $fname  elapsed=${elapsed}  rss=${rss}kB  exit=${TAU_EXIT}  reason=${KILL_REASON}"
+        (( KILL++ )) || true
+        if [[ "$KILL_REASON" == "timeout" ]]; then (( KILL_TIMEOUT++ )) || true; fi
+        if [[ "$KILL_REASON" == "memory"  ]]; then (( KILL_MEMORY++  )) || true; fi
+    elif [[ $TAU_EXIT -eq 0 ]]; then
         echo "  [OK]   $fname  elapsed=${elapsed}  rss=${rss}kB  exit=${TAU_EXIT}"
         echo
         cat "$stderr_file"
@@ -340,6 +425,6 @@ done
 
 echo ""
 echo "============================================================"
-echo "  Done.  passed=$PASS  failed=$FAIL"
+echo "  Done.  passed=$PASS  failed=$FAIL  killed=$KILL (timeout=$KILL_TIMEOUT memory=$KILL_MEMORY)"
 echo "  Results stored in: $OUTPUT_DIR"
 echo "============================================================"
