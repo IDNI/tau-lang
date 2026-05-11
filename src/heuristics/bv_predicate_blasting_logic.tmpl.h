@@ -638,4 +638,100 @@ tref bvrhl(tref base, tref count, tref shifted) {
 	return apply_rr_to_formula(rr);
 }
 
+//
+//
+// _bvcast is a predicate that holds between two bitvectors if the second is the
+// result of casting the first to a different bitwidth. For zero-extension, the
+// low bits of the result match the source bits and the high bits are zero. For
+// truncation, the result bits match the low bits of the source.
+//
+//
+
+/**
+ * @brief Creates a call to the bitvector cast predicate.
+ * @tparam node Node type
+ * @param src Source bitvector
+ * @param result Result bitvector
+ * @return The constructed call term
+ */
+template<NodeType node>
+static tref make_bvcast_call(tref src, tref result) {
+	using tau = tree<node>;
+
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvcast", { src, result })));
+}
+
+/**
+ * @brief Returns the rule for bitvector cast (zero-extension or truncation).
+ *
+ * For zero-extension (src_width < target_width):
+ *   - Low bits of result match source bits
+ *   - High bits of result are zero
+ *
+ * For truncation (src_width > target_width):
+ *   - Result bits match the low bits of source
+ *
+ * @tparam node Node type
+ * @param src_width Bitwidth of the source bitvector
+ * @param target_width Bitwidth of the result bitvector
+ * @return The constructed rule
+ */
+template<NodeType node>
+static rewriter::rule bvcast_rule(size_t src_width, size_t target_width) {
+	using tau = tree<node>;
+
+	static std::map<std::pair<size_t, size_t>, rewriter::rule> cache;
+	if (auto it = cache.find({ src_width, target_width }); it != cache.end()) {
+		return it->second;
+	}
+
+	auto src = tau::build_bf_variable(bv_type_id<node>(src_width));
+	auto result = tau::build_bf_variable(bv_type_id<node>(target_width));
+	auto head = make_bvcast_call<node>(src, result);
+	auto min_width = std::min(src_width, target_width);
+	tref body = nullptr;
+
+	// Constrain shared bits: (bit i of src == 0) <-> (bit i of result == 0)
+	for (size_t i = 0; i < min_width; ++i) {
+		auto src_bit_zero = tau::build_bf_eq_0(bit<node>(src, i));
+		auto res_bit_zero = tau::build_bf_eq_0(bit<node>(result, i));
+		auto bit_eq = tau::build_wff_equiv(src_bit_zero, res_bit_zero);
+		body = body ? tau::build_wff_and(body, bit_eq) : bit_eq;
+	}
+
+	// For zero-extension: constrain extended bits to zero
+	for (size_t i = min_width; i < target_width; ++i) {
+		auto res_bit_zero = tau::build_bf_eq_0(bit<node>(result, i));
+		body = body ? tau::build_wff_and(body, res_bit_zero) : res_bit_zero;
+	}
+
+	auto rule = make_rule<node>(head, body);
+
+#ifdef DEBUG
+	LOG_TRACE << "bvcast_rule: " << LOG_RULE(rule) << "\n";
+	LOG_TRACE << "bvcast_rule/head: " << LOG_FM(rule.first->get()) << "\n";
+	LOG_TRACE << "bvcast_rule/body: " << LOG_FM(rule.second->get()) << "\n";
+#endif // DEBUG
+
+	cache[{ src_width, target_width }] = rule;
+	return rule;
+}
+
+/**
+ * @brief Computes a predicate constraining result to be the cast of src.
+ * @tparam node Node type
+ * @param src Source bitvector
+ * @param result Result bitvector (fresh variable of target type)
+ * @return The resulting predicate term
+ */
+template<NodeType node>
+tref bvcast(tref src, tref result) {
+	auto src_width = get_bv_type_bitwidth<node>(src);
+	auto target_width = get_bv_type_bitwidth<node>(result);
+	auto rule = bvcast_rule<node>(src_width, target_width);
+	auto call = make_bvcast_call<node>(src, result);
+	auto rr = make_rr<node>({ rule }, call);
+	return apply_rr_to_formula(rr);
+}
+
 } // namespace idni::tau_lang
