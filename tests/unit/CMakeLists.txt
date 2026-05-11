@@ -26,6 +26,7 @@ set(TESTS
 	interpreter_api_extensions
 	pointwise_revision
 	qint_grammar
+	qlt_grammar
 	#pwr_debug
 	#pwr_deepseek_1
 	#pwr_deepseek_2

@@ -16,6 +16,7 @@
 
 #include "tau_tree.h"
 #include "splitter_types.h"
+#include "../parser/qlt_parser.generated.h"
 
 namespace idni::tau_lang {
 
@@ -591,60 +592,114 @@ inline qlt qlt_splitter_one() {
 }
 
 // --- parsing ---
-// Parse a single interval part.  Accepts:
-//   "(a, b)", "[a, b)", "[a,b]", "(a, b]" — existing interval notation
-//   "r"  where r is a bare rational number — interpreted as singleton [r, r]
-//   "c"  where c is a bare identifier     — uninterpreted constant singleton [c, c]
-inline std::optional<qlt_piece> parse_qlt_piece(const std::string& s) {
-	std::string t = s;
-	t.erase(0, t.find_first_not_of(" \t\n\r"));
-	auto last = t.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) t = t.substr(0, last + 1);
-	if (t.empty()) return {};
 
-	// Interval notation: must start with '[' or '('
-	if (t.front() == '[' || t.front() == '(') {
-		if (t.size() < 5) return {};
-		char hi_brac = t.back();
-		if (hi_brac != ']' && hi_brac != ')') return {};
+inline std::optional<qlt> qlt_eval_interval(
+	const qlt_parser::tree::traverser& interval_node)
+{
+	using tt = qlt_parser::tree::traverser;
+	using type = qlt_parser::nonterminal;
 
-		qlt_bound lo_bound = (t.front() == '[') ? qlt_bound::CLOSED : qlt_bound::OPEN;
-		qlt_bound hi_bound = (hi_brac == ']')   ? qlt_bound::CLOSED : qlt_bound::OPEN;
+	auto children = (interval_node | tt::children)();
 
-		std::string inner = t.substr(1, t.size() - 2);
-		auto comma = inner.find(',');
-		if (comma == std::string::npos) return {};
-		std::string lo_str = inner.substr(0, comma);
-		std::string hi_str = inner.substr(comma + 1);
+	std::vector<std::string> endpoints;
+	qlt_bound lo_b = qlt_bound::OPEN, hi_b = qlt_bound::OPEN;
+	bool found_bracket = false;
 
-		qlt_rational lo, hi;
-		if (!qlt_rational::parse(lo_str, lo)) return {};
-		if (!qlt_rational::parse(hi_str, hi)) return {};
-
-		// For specific rationals: validate lo <= hi
-		if (!lo.is_sym() && !hi.is_sym()) {
-			if (hi < lo) return {};
-			if (lo == hi && !(lo_bound == qlt_bound::CLOSED && hi_bound == qlt_bound::CLOSED))
-				return {};
+	for (auto& child : children) {
+		auto child_nt = child | tt::nonterminal;
+		if      (child_nt == type::interval_cc) { lo_b = qlt_bound::CLOSED; hi_b = qlt_bound::CLOSED; found_bracket = true; }
+		else if (child_nt == type::interval_co) { lo_b = qlt_bound::CLOSED; hi_b = qlt_bound::OPEN;   found_bracket = true; }
+		else if (child_nt == type::interval_oc) { lo_b = qlt_bound::OPEN;   hi_b = qlt_bound::CLOSED; found_bracket = true; }
+		else if (child_nt == type::interval_oo) { lo_b = qlt_bound::OPEN;   hi_b = qlt_bound::OPEN;   found_bracket = true; }
+		else {
+			auto ep = child | tt::terminals;
+			if (!ep.empty()) endpoints.push_back(ep);
 		}
-
-		qlt_piece p;
-		p.lo = qlt_endpoint{lo, lo_bound};
-		p.hi = qlt_endpoint{hi, hi_bound};
-		return p;
 	}
 
-	// Bare value: singleton point — interpreted rational or named constant
-	qlt_rational val;
-	if (!qlt_rational::parse(t, val)) return {};
-	// +inf and -inf are not valid singleton points
-	if (val.is_pos_inf() || val.is_neg_inf()) return {};
-	return qlt_piece{
-		qlt_endpoint{val, qlt_bound::CLOSED},
-		qlt_endpoint{val, qlt_bound::CLOSED}
-	};
+	if (endpoints.size() < 2 || !found_bracket) return std::nullopt;
+
+	qlt_rational lo_r, hi_r;
+	if (!qlt_rational::parse(endpoints[0], lo_r)) return std::nullopt;
+	if (!qlt_rational::parse(endpoints[1], hi_r)) return std::nullopt;
+
+	if (!lo_r.is_sym() && !hi_r.is_sym()) {
+		if (hi_r < lo_r) return std::nullopt;
+		if (lo_r == hi_r &&
+		    !(lo_b == qlt_bound::CLOSED && hi_b == qlt_bound::CLOSED))
+			return std::nullopt;
+	}
+
+	return qlt{{ { qlt_endpoint{lo_r, lo_b}, qlt_endpoint{hi_r, hi_b} } }};
 }
 
+inline std::optional<qlt> qlt_eval_parse_tree(
+	const qlt_parser::tree::traverser& t)
+{
+	using tt = qlt_parser::tree::traverser;
+	using type = qlt_parser::nonterminal;
+
+	auto n  = t | tt::only_child;
+	auto nt = n | tt::nonterminal;
+
+	switch (nt) {
+	case type::qlt_top:
+		return qlt::top();
+
+	case type::qlt_bot:
+		return qlt::bottom();
+
+	case type::qlt_singleton: {
+		auto children = (n | tt::children)();
+		if (children.empty()) return std::nullopt;
+		auto s = children[0] | tt::terminals;
+		qlt_rational val;
+		if (!qlt_rational::parse(s, val)) return std::nullopt;
+		if (val.is_pos_inf() || val.is_neg_inf()) return std::nullopt;
+		return qlt{{ {
+			qlt_endpoint{val, qlt_bound::CLOSED},
+			qlt_endpoint{val, qlt_bound::CLOSED}
+		}}};
+	}
+
+	case type::qlt_single: {
+		auto children = (n | tt::children)();
+		if (children.empty()) return std::nullopt;
+		return qlt_eval_interval(children[0]);
+	}
+
+	case type::qlt_union: {
+		// qlt_union children = [interval, qlt] (after __E_qlt_0 inlining)
+		auto children = (n | tt::children)();
+		if (children.size() < 2) return std::nullopt;
+
+		auto left = qlt_eval_interval(children[0]);
+		if (!left) return std::nullopt;
+
+		auto right = qlt_eval_parse_tree(children[1]);
+		if (!right) return std::nullopt;
+
+		return *left | *right;
+	}
+
+	default:
+		LOG_ERROR << "Unknown qlt node type\n";
+		return std::nullopt;
+	}
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<qlt> parse_qlt_grammar(const std::string& src) {
+	auto result = qlt_parser::instance().parse(src.c_str(), src.size());
+	if (!result.found) return std::nullopt;
+
+	auto t = qlt_parser::tree::traverser(result.get_shaped_tree2())
+		| qlt_parser::qlt;
+	if (!t.has_value()) return std::nullopt;
+
+	return qlt_eval_parse_tree(t);
+}
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -662,45 +717,11 @@ std::optional<typename node<BAs...>::constant_with_type> parse_qlt(
 	last = s.find_last_not_of(" \t\n\r");
 	if (last != std::string::npos) s = s.substr(0, last + 1);
 
-	if (s == "top") {
-		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ qlt::top() },
-			qlt_type<node<BAs...>>() };
-	}
-	if (s == "bot" || s == "bottom") {
-		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ qlt::bottom() },
-			qlt_type<node<BAs...>>() };
-	}
-
-	// split on | (not inside brackets)
-	std::vector<std::string> parts;
-	{
-		std::string cur;
-		int depth = 0;
-		for (size_t i = 0; i < s.size(); ++i) {
-			if (s[i] == '[' || s[i] == '(') ++depth;
-			else if (s[i] == ']' || s[i] == ')') --depth;
-			if (depth == 0 && s[i] == '|') {
-				parts.push_back(cur); cur.clear();
-			} else cur += s[i];
-		}
-		parts.push_back(cur);
-	}
-
-	qlt result = qlt::bottom();
-	for (auto& part : parts) {
-		part.erase(0, part.find_first_not_of(" \t\n\r"));
-		auto lp = part.find_last_not_of(" \t\n\r");
-		if (lp != std::string::npos) part = part.substr(0, lp + 1);
-		if (part.empty()) return {};
-		auto p = parse_qlt_piece(part);
-		if (!p) return {};
-		result = result | qlt{{ *p }};
-	}
+	auto qval = parse_qlt_grammar<BAs...>(s);
+	if (!qval) return std::nullopt;
 
 	return typename node<BAs...>::constant_with_type{
-		std::variant<BAs...>{ result },
+		std::variant<BAs...>{ *qval },
 		qlt_type<node<BAs...>>() };
 }
 

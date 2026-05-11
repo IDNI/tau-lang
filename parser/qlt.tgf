@@ -1,0 +1,51 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+# Grammar for qlt: finite unions of rational intervals on the extended real
+# line, representing definable subsets of the dense linear order (Q, <).
+#
+# Supported top-level forms:
+#   top | bot | bottom
+#   r             (singleton [r, r] for any rational or named constant r)
+#   [lo, hi]      (closed-closed)
+#   [lo, hi)      (closed-open)
+#   (lo, hi]      (open-closed)
+#   (lo, hi)      (open-open)
+#   interval | interval | ...   (union)
+#
+# Endpoint syntax (validated semantically by qlt_rational::parse()):
+#   +inf  inf  -inf
+#   p/q   (any positive integer denominator)
+#   d.dd  (decimal notation)
+#   n     (integer)
+#   id    (named/uninterpreted constant: letter/underscore start, alnum body)
+
+@use char classes space, digit, alpha.
+
+start    => _ qlt _.
+
+qlt      => "top"                      :qlt_top
+          | "bot"                      :qlt_bot
+          | "bottom"                   :qlt_bot
+          | singleton                  :qlt_singleton
+          | interval                   :qlt_single
+          | ( interval _ '|' _ qlt )   :qlt_union.
+
+# Four bracket combinations; bound type is encoded in the nonterminal,
+# so the C++ evaluator never needs to inspect the bracket characters.
+interval => '[' _ endpoint _ ',' _ endpoint _ ']'  :interval_cc
+          | '[' _ endpoint _ ',' _ endpoint _ ')'  :interval_co
+          | '(' _ endpoint _ ',' _ endpoint _ ']'  :interval_oc
+          | '(' _ endpoint _ ',' _ endpoint _ ')'  :interval_oo.
+
+# Bare rational or named constant -> singleton [r, r]
+singleton => ep_char+.
+
+endpoint  => ep_char+.
+
+ep_char   => digit | alpha | '+' | '-' | '.' | '/' | '_'.
+
+_         => [ space _ ].
+
+@trim _.
+@trim all terminals except children of endpoint, ep_char, singleton.
+@inline char classes.
