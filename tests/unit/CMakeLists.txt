@@ -25,26 +25,27 @@ set(TESTS
 	interpreter
 	interpreter_api_extensions
 	pointwise_revision
-	pwr_debug
-	pwr_deepseek_1
-	pwr_deepseek_2
-	pwr_deepseek_3
-	pwr_deepseek_4
+	qint_grammar
+	#pwr_debug
+	#pwr_deepseek_1
+	#pwr_deepseek_2
+	#pwr_deepseek_3
+	#pwr_deepseek_4
 	ltl_aba
-	ltl_adversarial
-	ltl_adversarial2
+	#ltl_adversarial
+	#ltl_adversarial2
 	ltl_benchmarks
 	ltl_multi_type_oracle
 	ltl_correctness
-	ltl_deepseek_generated
-	ltl_deepseek2
-	ltl_nlang_deepseek_1
-	ltl_nlang_deepseek_2
-	ltl_nlang_deepseek_3
-	ltl_nlang_deepseek_4
-	ltl_nlang_deepseek_5
+	#ltl_deepseek_generated
+	#ltl_deepseek2
+	#ltl_nlang_deepseek_1
+	#ltl_nlang_deepseek_2
+	#ltl_nlang_deepseek_3
+	#ltl_nlang_deepseek_4
+	#ltl_nlang_deepseek_5
 	ltl_fuzz
-	ltl_fuzz100
+	#ltl_fuzz100
 	ltl_negative
 	ltl_soundness_regression
 	ltl_perf

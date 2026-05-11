@@ -15,6 +15,7 @@
 
 #include "tau_tree.h"
 #include "splitter_types.h"
+#include "../parser/qint_parser.generated.h"
 
 namespace idni::tau_lang {
 
@@ -395,6 +396,107 @@ inline qint qint_splitter_one() {
 }
 
 // --- parsing ---
+
+// Helper: extract a qint piece from an interval parse tree node.
+// interval has 2 endpoint children; endpoint subtrees contain the terminal chars.
+inline std::optional<qint> qint_eval_interval(
+	const qint_parser::tree::traverser& interval_node)
+{
+	using tt = qint_parser::tree::traverser;
+	auto interval_children = (interval_node | tt::children)();
+
+	std::vector<std::string> endpoints;
+	for (auto& child : interval_children) {
+		auto ep = child | tt::terminals;
+		if (!ep.empty()) endpoints.push_back(ep);
+	}
+
+	if (endpoints.size() < 2) return std::nullopt;
+
+	qint_rational lo, hi;
+	if (!qint_rational::parse(endpoints[0], lo) ||
+	    !qint_rational::parse(endpoints[1], hi))
+		return std::nullopt; // non-dyadic or unparseable endpoint
+
+	if (!(lo < hi)) return std::nullopt; // invalid bounds
+
+	return qint{{ {lo, hi} }};
+}
+
+// Evaluate a parsed qint parse tree node to a qint value.
+// Returns nullopt on semantic errors (invalid bounds, non-dyadic endpoints).
+inline std::optional<qint> qint_eval_parse_tree(
+	const qint_parser::tree::traverser& t)
+{
+	using tt = qint_parser::tree::traverser;
+	using type = qint_parser::nonterminal;
+
+	auto n  = t | tt::only_child;
+	auto nt = n | tt::nonterminal;
+
+	switch (nt) {
+	case type::qint_top:
+		return qint::top();
+
+	case type::qint_bot:
+		return qint::bottom();
+
+	case type::qint_integer: {
+		auto int_str = n | tt::terminals;
+		long long val = 0;
+		auto [ptr, ec] = std::from_chars(int_str.data(),
+			int_str.data() + int_str.size(), val);
+		if (ec != std::errc{}) return std::nullopt;
+
+		if (val == 0) return qint::bottom();
+		if (val == 1) return qint::top();
+
+		qint_rational lo{ val * (1LL << qint_rational::SCALE) };
+		qint_rational hi{ (val + 1) * (1LL << qint_rational::SCALE) };
+		return qint{{ {lo, hi} }};
+	}
+
+	case type::qint_single: {
+		// qint_single => interval
+		auto children = (n | tt::children)();
+		if (children.empty()) return std::nullopt;
+		return qint_eval_interval(children[0]);
+	}
+
+	case type::qint_union: {
+		// ( interval _ '|' _ qint ) :qint_union — after inlining __E_qint_0:
+		// qint_union children = [interval, qint]
+		auto children = (n | tt::children)();
+		if (children.size() < 2) return std::nullopt;
+
+		auto left = qint_eval_interval(children[0]);
+		if (!left) return std::nullopt;
+
+		auto right = qint_eval_parse_tree(children[1]);
+		if (!right) return std::nullopt;
+
+		return *left | *right;
+	}
+
+	default:
+		LOG_ERROR << "Unknown qint node type\n";
+		return std::nullopt;
+	}
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<qint> parse_qint_grammar(const std::string& src) {
+	auto result = qint_parser::instance().parse(src.c_str(), src.size());
+	if (!result.found) return std::nullopt;
+
+	auto t = qint_parser::tree::traverser(result.get_shaped_tree2())
+		| qint_parser::qint;
+	if (!t.has_value()) return std::nullopt;
+
+	return qint_eval_parse_tree(t);
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_qint(
@@ -414,113 +516,12 @@ std::optional<typename node<BAs...>::constant_with_type> parse_qint(
 	last = s.find_last_not_of(" \t\n\r");
 	if (last != std::string::npos) s = s.substr(0, last + 1);
 
-	if (s == "top") {
-		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ qint::top() },
-			qint_type<node<BAs...>>() };
-	}
-	if (s == "bot" || s == "bottom") {
-		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ qint::bottom() },
-			qint_type<node<BAs...>>() };
-	}
-
-	// Handle bare integer literals: 0 → bottom, 1 → top,
-	// other integers n → the interval [n, n+1) in the dyadic scale.
-	{
-		bool is_int = !s.empty();
-		size_t start = 0;
-		if (s.size() > 0 && (s[0] == '+' || s[0] == '-')) start = 1;
-		if (start >= s.size()) is_int = false;
-		for (size_t i = start; i < s.size() && is_int; ++i)
-			if (!std::isdigit((unsigned char)s[i])) is_int = false;
-		if (is_int) {
-			long long val = 0;
-			auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), val);
-			if (ec == std::errc{}) {
-				if (val == 0)
-					return typename node<BAs...>::constant_with_type{
-						std::variant<BAs...>{ qint::bottom() },
-						qint_type<node<BAs...>>() };
-				if (val == 1)
-					return typename node<BAs...>::constant_with_type{
-						std::variant<BAs...>{ qint::top() },
-						qint_type<node<BAs...>>() };
-				// For other integers, create [val, val+1)
-				qint_rational lo{ val * (1LL << qint_rational::SCALE) };
-				qint_rational hi{ (val + 1) * (1LL << qint_rational::SCALE) };
-				return typename node<BAs...>::constant_with_type{
-					std::variant<BAs...>{ qint{{ {lo, hi} }} },
-					qint_type<node<BAs...>>() };
-			}
-		}
-	}
-
-	// parse union of intervals: split on " | "
-	qint result = qint::bottom();
-	// We need to split on | that is not inside brackets
-	std::vector<std::string> parts;
-	{
-		std::string cur;
-		int depth = 0;
-		for (size_t i = 0; i < s.size(); ++i) {
-			if (s[i] == '[' || s[i] == '(') ++depth;
-			else if (s[i] == ']' || s[i] == ')') --depth;
-			if (depth == 0 && s[i] == '|') {
-				parts.push_back(cur);
-				cur.clear();
-			} else {
-				cur += s[i];
-			}
-		}
-		parts.push_back(cur);
-	}
-
-	for (auto& part : parts) {
-		// trim
-		part.erase(0, part.find_first_not_of(" \t\n\r"));
-		auto lp = part.find_last_not_of(" \t\n\r");
-		if (lp != std::string::npos) part = part.substr(0, lp + 1);
-
-		if (part.empty()) {
-			std::cerr << "parse_qint: empty interval part in '" << src << "'\n";
-			return {};
-		}
-
-		// expect [lo, hi)
-		if (part.size() < 5 || part.front() != '[' || part.back() != ')') {
-			std::cerr << "parse_qint: malformed interval '" << part
-				<< "' in '" << src << "'\n";
-			return {};
-		}
-		std::string inner = part.substr(1, part.size() - 2);
-		auto comma = inner.find(',');
-		if (comma == std::string::npos) {
-			std::cerr << "parse_qint: missing comma in interval '" << part
-				<< "' in '" << src << "'\n";
-			return {};
-		}
-		std::string lo_str = inner.substr(0, comma);
-		std::string hi_str = inner.substr(comma + 1);
-
-		qint_rational lo, hi;
-		if (!qint_rational::parse(lo_str, lo) || !qint_rational::parse(hi_str, hi)) {
-			std::cerr << "parse_qint: could not parse bounds in interval '"
-				<< part << "' in '" << src << "'\n";
-			return {};
-		}
-		if (!(lo < hi)) {
-			std::cerr << "parse_qint: invalid bounds (lo >= hi) in interval '"
-				<< part << "' in '" << src << "'\n";
-			return {};
-		}
-
-		qint piece_ba{{ {lo, hi} }};
-		result = result | piece_ba;
-	}
+	// Parse using the qint grammar
+	auto qval = parse_qint_grammar<BAs...>(s);
+	if (!qval) return std::nullopt;
 
 	return typename node<BAs...>::constant_with_type{
-		std::variant<BAs...>{ result },
+		std::variant<BAs...>{ *qval },
 		qint_type<node<BAs...>>() };
 }
 
@@ -539,5 +540,4 @@ struct std::hash<idni::tau_lang::qint> {
 		return h;
 	}
 };
-
-#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__DYADIC_BA_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT_H__

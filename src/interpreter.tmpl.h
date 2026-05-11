@@ -172,6 +172,7 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		}
 		auto it = outputs.find(vn);
 		if (it == outputs.end()) {
+			if (is_excluded_output(vn)) continue;
 			if (auto name = get_var_name<node>(vn);
 				!name.empty() && name.front() == '_') continue;
 			LOG_ERROR << "Failed to find output stream for stream '"
@@ -1651,6 +1652,7 @@ template <NodeType node>
 bool interpreter<node>::is_excluded_output(tref var) {
 	if (tau::get(var).is_input_variable()) return false;
 	const std::string& io_name = get_var_name<node>(var);
+	if (io_name.size() > 9 && io_name.substr(0, 9) == "o__ltl_ms") return true;
 	if (io_name.size() > 8 && io_name.substr(0, 8) == "o__ltl_s") return true;
 	return io_name[0] == '_' && io_name.size() > 1 &&
 		(io_name[1] == 'e' || io_name[1] == 'f');
