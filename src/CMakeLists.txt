@@ -4,6 +4,7 @@ set(TAU_HEADERS
 	../parser/sbf_parser.generated.h
 	../parser/tau_parser.generated.h
 	../parser/bitvector_parser.generated.h
+	../parser/nlang_parser.generated.h
 	boolean_algebras/cvc5/cvc5.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h

@@ -11,6 +11,7 @@
 
 #include "tau_tree.h"
 #include "splitter_types.h"
+#include "../parser/nlang_parser.generated.h"
 
 namespace idni::tau_lang {
 
@@ -273,8 +274,79 @@ inline nlang_ba nlang_splitter_one() {
 }
 
 // --- parsing ---
-// The source string is taken as-is as the natural language description.
-// We strip surrounding braces or quotes if present.
+
+// Walk a shaped nlang parse tree and build a formula tree.
+// t must be a traverser pointing at a 'formula' node.
+inline nlang_ba::fptr nlang_eval_parse_tree(
+	const nlang_parser::tree::traverser& t)
+{
+	using tt = nlang_parser::tree::traverser;
+	using type = nlang_parser::nonterminal;
+
+	auto n  = t | tt::only_child;
+	auto nt = n | tt::nonterminal;
+
+	switch (nt) {
+	case type::nlang_bot: return nlang_ba::formula::mk_bot();
+	case type::nlang_top: return nlang_ba::formula::mk_top();
+
+	case type::nlang_atom: {
+		std::string s = n | tt::terminals;
+		s.erase(0, s.find_first_not_of(" \t\n\r"));
+		auto last = s.find_last_not_of(" \t\n\r");
+		if (last != std::string::npos) s = s.substr(0, last + 1);
+		return nlang_ba::formula::mk_atom(std::move(s));
+	}
+
+	case type::nlang_not: {
+		auto children = (n | tt::children)();
+		if (children.empty()) return nlang_ba::formula::mk_bot();
+		return nlang_ba::formula::mk_not(nlang_eval_parse_tree(children[0]));
+	}
+
+	case type::nlang_and: {
+		auto children = (n | tt::children)();
+		if (children.size() < 2) return nlang_ba::formula::mk_bot();
+		return nlang_ba::formula::mk_and(
+			nlang_eval_parse_tree(children[0]),
+			nlang_eval_parse_tree(children[1]));
+	}
+
+	case type::nlang_or: {
+		auto children = (n | tt::children)();
+		if (children.size() < 2) return nlang_ba::formula::mk_bot();
+		return nlang_ba::formula::mk_or(
+			nlang_eval_parse_tree(children[0]),
+			nlang_eval_parse_tree(children[1]));
+	}
+
+	default:
+		return nlang_ba::formula::mk_atom(t | tt::terminals);
+	}
+}
+
+// Grammar-based parse: returns nullopt if the input doesn't match.
+inline std::optional<nlang_ba::fptr> parse_nlang_grammar(const std::string& s) {
+	auto result = nlang_parser::instance().parse(s.c_str(), s.size());
+	if (!result.found) return std::nullopt;
+
+	auto t = nlang_parser::tree::traverser(result.get_shaped_tree2())
+		| nlang_parser::formula;
+	if (!t.has_value()) return std::nullopt;
+
+	return nlang_eval_parse_tree(t);
+}
+
+// The source string is taken as the natural language description or a
+// structural formula in canonical form (see nlang_ba::formula::to_string()).
+// Surrounding braces and quotes are stripped.
+//
+// Parsing order:
+//   1. Grammar: handles canonical structural forms (nothing, everything,
+//      not (...), (...) and (...), (...) or (...), bare atoms).
+//   2. If grammar yields a bare atom, DeepSeek is tried to decompose it
+//      into a compound formula (handles "A and B" natural language input).
+//   3. Full DeepSeek fallback when grammar fails (e.g. unbalanced parens).
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_nlang(
@@ -300,11 +372,22 @@ std::optional<typename node<BAs...>::constant_with_type> parse_nlang(
 
 	if (s.empty()) return {};
 
-	// Decompose via DeepSeek so compound sentences (e.g. "A and B") become
-	// structural and_(atom(A), atom(B)) trees that the engine can simplify.
-	// Falls back to mk_atom(s) when the API is unavailable or response is malformed.
+	nlang_ba::fptr fm;
+	if (auto gr = parse_nlang_grammar(s); gr) {
+		fm = *gr;
+		// Bare atom from grammar — let DeepSeek try to find compound structure
+		// (handles natural language like "A and B" without explicit parentheses).
+		if (fm->k == nlang_ba::formula::kind::atom) {
+			auto decomposed = deepseek_decompose(fm->atom_str);
+			if (decomposed->k != nlang_ba::formula::kind::atom)
+				fm = decomposed;
+		}
+	} else {
+		fm = deepseek_decompose(s);
+	}
+
 	return typename node<BAs...>::constant_with_type{
-		std::variant<BAs...>{ nlang_ba::from_fm(deepseek_decompose(s)) },
+		std::variant<BAs...>{ nlang_ba::from_fm(std::move(fm)) },
 		nlang_type<node<BAs...>>() };
 }
 
