@@ -1191,7 +1191,7 @@ TEST_CASE("parse single constraint: x[0]*0.5 + 0.7 < 0") {
 }
 
 TEST_CASE("parse conjunction: x[0] < 0 & x[1] < 0") {
-	auto r = parse_hsb<bas_pack>("x[0] < 0 & x[1] < 0");
+	auto r = parse_hsb<bas_pack>("(x[0] < 0 & x[1] < 0)");
 	REQUIRE(r.has_value());
 	auto h = std::get<hsb>(r->first);
 	CHECK(is_hsb_zero(h) == false);
@@ -1237,11 +1237,10 @@ TEST_CASE("parse with whitespace trimming") {
 	REQUIRE(r.has_value());
 }
 
-TEST_CASE("parse empty string returns top") {
+TEST_CASE("parse empty string returns nullopt") {
 	auto r = parse_hsb<bas_pack>("");
-	// Empty input with no constraints => top
-	REQUIRE(r.has_value());
-	CHECK(std::get<hsb>(r->first) == hsb::top());
+	// Empty input is not a valid HSB formula
+	CHECK(!r.has_value());
 }
 
 TEST_CASE("parse multivariate: 0.5*x[0] + -0.3*x[1] + 0.7 < 0") {
@@ -1263,7 +1262,7 @@ TEST_CASE("parse produces correct type tag") {
 TEST_CASE("parsed conjunction feasibility") {
 	// Parse two constraints whose conjunction is feasible
 	auto r = parse_hsb<bas_pack>(
-		"x[0] + 5 < 0 & x[0] + -10 <= 0");
+		"(x[0] + 5 < 0 & x[0] + -10 <= 0)");
 	REQUIRE(r.has_value());
 	CHECK(is_hsb_zero(std::get<hsb>(r->first)) == false);
 }
@@ -1827,10 +1826,10 @@ TEST_CASE("pipeline: G (o1[t]:hsb != { x[0]*0.5 + 0.7 < 0 }:hsb) parses") {
 	REQUIRE(fm != nullptr);
 }
 
-TEST_CASE("pipeline: conjunction { x[0] < 0 & x[1] <= 0 }:hsb parses") {
+TEST_CASE("pipeline: conjunction { (x[0] < 0 & x[1] <= 0) }:hsb parses") {
 	gc_fixture gc;
 	tref fm = spec(
-		"o1[t]:hsb = { x[0] < 0 & x[1] <= 0 }:hsb.");
+		"o1[t]:hsb = { (x[0] < 0 & x[1] <= 0) }:hsb.");
 	REQUIRE(fm != nullptr);
 }
 

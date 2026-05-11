@@ -20,6 +20,7 @@
 #include "tau_tree.h"
 #include "splitter_types.h"
 #include "boolean_algebras/cvc5/cvc5.h"
+#include "../parser/hsb_parser.generated.h"
 
 namespace idni::tau_lang {
 
@@ -699,6 +700,157 @@ inline hsb hsb_splitter_one() {
 	return hsb::from_halfspace(h);
 }
 
+// --- grammar-based parsing helpers ---
+
+namespace hsb_grammar_detail {
+
+using tt   = hsb_parser::tree::traverser;
+using type = hsb_parser::nonterminal;
+
+struct linexpr_result {
+	std::map<size_t, double> coeffs;
+	double bias = 0.0;
+};
+
+// Parse unsigned numeric string: integer, d.dd decimal, or p/q fraction
+inline double parse_unum(const std::string& s) {
+	auto slash = s.find('/');
+	if (slash != std::string::npos)
+		return std::stod(s.substr(0, slash)) / std::stod(s.substr(slash + 1));
+	return std::stod(s);
+}
+
+// var node → variable index via nat child
+inline size_t eval_var(const tt& v) {
+	return static_cast<size_t>(std::stoull((v | tt::only_child) | tt::terminals));
+}
+
+// unum node → double (via collected terminals)
+inline double eval_unum(const tt& u) {
+	return parse_unum(u | tt::terminals);
+}
+
+// lterm node → coefficient map + bias contribution
+inline linexpr_result eval_lterm(const tt& t) {
+	auto child = t | tt::only_child;           // one of lt_coeff_var, lt_var, etc.
+	auto nt    = child | tt::nonterminal;
+	auto ch    = (child | tt::children)();
+	linexpr_result r;
+	switch (nt) {
+	// (unum * var)  — children via __E_lterm_8: [unum, var]
+	case type::lt_coeff_var:
+		r.coeffs[eval_var(ch[1])] = +eval_unum(ch[0]); break;
+	// (var * unum)  — children via __E_lterm_9: [var, unum]
+	case type::lt_var_coeff:
+		r.coeffs[eval_var(ch[0])] = +eval_unum(ch[1]); break;
+	// (- unum * var) — children via __E_lterm_10: [unum, var]
+	case type::lt_neg_coeff_var:
+		r.coeffs[eval_var(ch[1])] = -eval_unum(ch[0]); break;
+	// (- var * unum) — children via __E_lterm_11: [var, unum]
+	case type::lt_neg_var_coeff:
+		r.coeffs[eval_var(ch[0])] = -eval_unum(ch[1]); break;
+	// (- var)  — child via __E_lterm_12: [var]
+	case type::lt_neg_var:
+		r.coeffs[eval_var(ch[0])] = -1.0; break;
+	// (- unum) — child via __E_lterm_13: [unum]
+	case type::lt_neg_const:
+		r.bias = -eval_unum(ch[0]); break;
+	// var
+	case type::lt_var:
+		r.coeffs[eval_var(ch[0])] = +1.0; break;
+	// unum
+	case type::lt_const:
+		r.bias = +eval_unum(ch[0]); break;
+	default: break;
+	}
+	return r;
+}
+
+// linexpr node → coefficient map + bias (left-recursive accumulation)
+inline linexpr_result eval_linexpr(const tt& t) {
+	auto child = t | tt::only_child;    // le_add, le_sub, or le_lterm
+	auto nt    = child | tt::nonterminal;
+	auto ch    = (child | tt::children)();
+	switch (nt) {
+	case type::le_add: {
+		// children via __E_linexpr_6: [linexpr, lterm]
+		auto l = eval_linexpr(ch[0]);
+		auto r = eval_lterm(ch[1]);
+		for (auto& [i, c] : r.coeffs) l.coeffs[i] += c;
+		l.bias += r.bias;
+		return l;
+	}
+	case type::le_sub: {
+		// children via __E_linexpr_7: [linexpr, lterm]
+		auto l = eval_linexpr(ch[0]);
+		auto r = eval_lterm(ch[1]);
+		for (auto& [i, c] : r.coeffs) l.coeffs[i] -= c;
+		l.bias -= r.bias;
+		return l;
+	}
+	case type::le_lterm:
+		// single child: lterm
+		return eval_lterm(ch[0]);
+	default:
+		return {};
+	}
+}
+
+// Build hsb_halfspace from a linexpr result
+inline hsb build_halfspace(const linexpr_result& le) {
+	size_t dim = 0;
+	for (auto& [i, c] : le.coeffs) dim = std::max(dim, i + 1);
+	if (dim == 0) dim = 1;
+	hsb_halfspace h;
+	h.w.assign(dim, 0.0);
+	for (auto& [i, c] : le.coeffs) h.w[i] = c;
+	h.b = le.bias;
+	return hsb::from_halfspace(std::move(h));
+}
+
+// Walk hsb parse tree → hsb value
+inline std::optional<hsb> eval_parse_tree(const tt& t) {
+	auto n  = t | tt::only_child;   // labeled hsb variant
+	auto nt = n | tt::nonterminal;
+	switch (nt) {
+	case type::hsb_top:   return hsb::top();
+	case type::hsb_bot:   return hsb::bottom();
+	case type::hsb_not: {  // (~ hsb) via __E_hsb_0 — transparent single child = inner hsb
+		auto inner = eval_parse_tree(n | tt::only_child);
+		if (!inner) return std::nullopt;
+		return ~(*inner);
+	}
+	case type::hsb_paren: // (( hsb )) via __E_hsb_1 — transparent single child = inner hsb
+		return eval_parse_tree(n | tt::only_child);
+	case type::hsb_and: {
+		// children via __E_hsb_2: [hsb, hsb]
+		auto ch = (n | tt::children)();
+		auto l = eval_parse_tree(ch[0]);
+		auto r = eval_parse_tree(ch[1]);
+		if (!l || !r) return std::nullopt;
+		return *l & *r;
+	}
+	case type::hsb_or: {
+		// children via __E_hsb_3: [hsb, hsb]
+		auto ch = (n | tt::children)();
+		auto l = eval_parse_tree(ch[0]);
+		auto r = eval_parse_tree(ch[1]);
+		if (!l || !r) return std::nullopt;
+		return *l | *r;
+	}
+	case type::hsb_hs: {
+		// hsb_hs => halfspace => hs_leq|hs_lt => linexpr (via __E_halfspace_N)
+		auto hs_child = (n | tt::only_child) | tt::only_child; // hs_leq or hs_lt
+		auto linexpr_node = (hs_child | tt::children)()[0];    // linexpr child
+		return build_halfspace(eval_linexpr(linexpr_node));
+	}
+	default:
+		return std::nullopt;
+	}
+}
+
+} // namespace hsb_grammar_detail
+
 // --- parsing ---
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -709,170 +861,25 @@ parse_hsb(const std::string& src) {
 	s.erase(0, s.find_first_not_of(" \t\n\r"));
 	auto last = s.find_last_not_of(" \t\n\r");
 	if (last != std::string::npos) s = s.substr(0, last + 1);
-
-	// strip outer braces if present
+	// strip outer braces
 	if (!s.empty() && s.front() == '{' && s.back() == '}')
 		s = s.substr(1, s.size() - 2);
 	s.erase(0, s.find_first_not_of(" \t\n\r"));
 	last = s.find_last_not_of(" \t\n\r");
 	if (last != std::string::npos) s = s.substr(0, last + 1);
 
-	if (s == "top") {
-		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ hsb::top() },
-			hsb_type<node<BAs...>>() };
-	}
-	if (s == "bot" || s == "bottom") {
-		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ hsb::bottom() },
-			hsb_type<node<BAs...>>() };
-	}
+	auto result = hsb_parser::instance().parse(s.c_str(), s.size());
+	if (!result.found) return std::nullopt;
 
-	// Parse conjunction of halfspace constraints separated by " & "
-	// Each constraint: x[i]*coeff + ... + bias {<, <=} 0
-	hsb result = hsb::top();
-	std::vector<std::string> parts;
-	{
-		std::string cur;
-		for (size_t i = 0; i < s.size(); ++i) {
-			if (s[i] == '&') {
-				parts.push_back(cur);
-				cur.clear();
-			} else {
-				cur += s[i];
-			}
-		}
-		parts.push_back(cur);
-	}
+	auto t = hsb_parser::tree::traverser(result.get_shaped_tree2())
+		| hsb_parser::hsb;
+	if (!t.has_value()) return std::nullopt;
 
-	auto parse_one_constraint = [](const std::string& part)
-		-> std::optional<hsb_halfspace>
-	{
-		// Extract LHS expression (strict/non-strict determined by lex-leading sign)
-		std::string expr;
-		auto leq = part.find("<=");
-		if (leq != std::string::npos) {
-			expr = part.substr(0, leq);
-		} else {
-			auto lt = part.find('<');
-			if (lt != std::string::npos) {
-				expr = part.substr(0, lt);
-			} else {
-				return std::nullopt;
-			}
-		}
-		// Trim expression
-		while (!expr.empty() && expr.back() == ' ') expr.pop_back();
-
-		// Parse linear expression: sum of "coeff*x[i]" or "x[i]*coeff"
-		// or plain "x[i]" or numeric constants (bias).
-		// Tokens separated by + or - (as binary operators).
-		std::map<size_t, double> coeffs;
-		double bias = 0.0;
-
-		// Normalize: replace " - " with " + -" and "(" with ""
-		std::string norm;
-		for (size_t i = 0; i < expr.size(); ++i) {
-			if (expr[i] == '(' || expr[i] == ')') continue;
-			norm += expr[i];
-		}
-
-		// Split on '+' respecting signs
-		std::vector<std::string> tokens;
-		{
-			std::string cur;
-			for (size_t i = 0; i < norm.size(); ++i) {
-				if (norm[i] == '+' || (norm[i] == '-' && i > 0
-					&& norm[i-1] != '*' && norm[i-1] != 'e'
-					&& norm[i-1] != 'E'))
-				{
-					if (!cur.empty()) tokens.push_back(cur);
-					cur.clear();
-					if (norm[i] == '-') cur = "-";
-				} else {
-					cur += norm[i];
-				}
-			}
-			if (!cur.empty()) tokens.push_back(cur);
-		}
-
-		for (auto& tok : tokens) {
-			// Trim
-			while (!tok.empty() && tok.front() == ' ') tok.erase(0,1);
-			while (!tok.empty() && tok.back() == ' ') tok.pop_back();
-			if (tok.empty()) continue;
-
-			// Check if token contains x[...]
-			auto xpos = tok.find("x[");
-			if (xpos != std::string::npos) {
-				auto bracket_end = tok.find(']', xpos);
-				if (bracket_end == std::string::npos) continue;
-				size_t idx = static_cast<size_t>(std::stoi(
-					tok.substr(xpos + 2, bracket_end - xpos - 2)));
-				// Find coefficient
-				double coeff = 1.0;
-				auto star = tok.find('*');
-				if (star != std::string::npos) {
-					if (star < xpos) {
-						// coeff*x[i]
-						std::string cs = tok.substr(0, star);
-						while (!cs.empty() && cs.back() == ' ') cs.pop_back();
-						while (!cs.empty() && cs.front() == ' ') cs.erase(0,1);
-						if (cs == "-") coeff = -1.0;
-						else if (cs == "+" || cs.empty()) coeff = 1.0;
-						else coeff = std::stod(cs);
-					} else {
-						// x[i]*coeff
-						std::string cs = tok.substr(star + 1);
-						while (!cs.empty() && cs.front() == ' ') cs.erase(0,1);
-						while (!cs.empty() && cs.back() == ' ') cs.pop_back();
-						if (cs == "-") coeff = -1.0;
-						else if (cs == "+" || cs.empty()) coeff = 1.0;
-						else coeff = std::stod(cs);
-					}
-					// Check for leading minus before the term
-					if (xpos > 0 && star > xpos) {
-						// coeff is after x[i], sign might be leading
-					}
-				} else {
-					// Just x[i] with possible sign
-					std::string pre = tok.substr(0, xpos);
-					while (!pre.empty() && pre.back() == ' ') pre.pop_back();
-					if (pre == "-") coeff = -1.0;
-				}
-				coeffs[idx] += coeff;
-			} else {
-				// Pure numeric constant (bias term)
-				bias += std::stod(tok);
-			}
-		}
-
-		// Build the halfspace
-		size_t dim = 1;
-		for (auto& [idx, _] : coeffs)
-			if (idx + 1 > dim) dim = idx + 1;
-
-		hsb_halfspace h;
-		h.w.resize(dim, 0.0);
-		for (auto& [idx, c] : coeffs)
-			h.w[idx] = c;
-		h.b = bias;
-		return h;
-	};
-
-	for (auto& part : parts) {
-		part.erase(0, part.find_first_not_of(" \t\n\r"));
-		auto lp = part.find_last_not_of(" \t\n\r");
-		if (lp != std::string::npos) part = part.substr(0, lp + 1);
-		if (part.empty()) continue;
-
-		auto maybe_h = parse_one_constraint(part);
-		if (!maybe_h) continue;
-		result = result & hsb::from_halfspace(*maybe_h);
-	}
+	auto hval = hsb_grammar_detail::eval_parse_tree(t);
+	if (!hval) return std::nullopt;
 
 	return typename node<BAs...>::constant_with_type{
-		std::variant<BAs...>{ result },
+		std::variant<BAs...>{ *hval },
 		hsb_type<node<BAs...>>() };
 }
 

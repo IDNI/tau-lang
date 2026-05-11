@@ -376,6 +376,8 @@ if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	include(generate-parser)
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/sbf.tgf")
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/qint.tgf")
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/hsb.tgf")
 endif()
 
 #

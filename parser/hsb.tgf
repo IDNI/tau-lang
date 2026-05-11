@@ -1,0 +1,81 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+# Grammar for hsb: atomless Boolean algebra of lex-half-open polyhedra in R^d (LP_d^Q).
+#
+# Supported syntax:
+#   top | bot | bottom
+#   halfspace: linear_expr {< | <=} 0
+#     (strictness is canonical: determined by lex_leading_sign(w), not the operator)
+#   ~hsb                                    (negation, no extra parens required)
+#   ( hsb & hsb )                           (conjunction - parens required)
+#   ( hsb | hsb )                           (disjunction - parens required)
+#   ( hsb )                                 (grouping / explicit parens)
+#
+# Halfspace examples:
+#   x[0] < 0
+#   x[0] <= 0
+#   2*x[0] + x[1] - 3 < 0
+#   -x[0] + 1/2 < 0
+#
+# Boolean combination examples (parens required for & and |):
+#   ~(x[0] < 0)
+#   (x[0] < 0 & x[1] < 0)
+#   ((x[0] < 0 & x[1] < 0) | ~(x[2] < 0))
+
+@use char classes space, digit.
+
+start    => _ hsb _.
+
+# ---- Boolean algebra ----
+# Each alternative is wrapped in () to produce a clean __E_ intermediary,
+# ensuring hsb always has exactly one labeled non-terminal child.
+
+hsb      => "top"                            :hsb_top
+          | "bot"                            :hsb_bot
+          | "bottom"                         :hsb_bot
+          | ( '~' _ hsb )                    :hsb_not
+          | ( '(' _ hsb _ ')' )              :hsb_paren
+          | ( '(' _ hsb _ '&' _ hsb _ ')' )  :hsb_and
+          | ( '(' _ hsb _ '|' _ hsb _ ')' )  :hsb_or
+          | halfspace                         :hsb_hs.
+
+# ---- Halfspace constraint ----
+# Each alternative wrapped in () so hs_leq/hs_lt contain linexpr as their child.
+
+halfspace => ( linexpr _ "<=" _ '0' )        :hs_leq
+           | ( linexpr _ '<'  _ '0' )        :hs_lt.
+
+# ---- Linear expression (left-recursive) ----
+
+linexpr   => ( linexpr _ '+' _ lterm )       :le_add
+           | ( linexpr _ '-' _ lterm )       :le_sub
+           | lterm                           :le_lterm.
+
+# ---- Linear term ----
+# Wrapped in () so each labeled variant has a clean internal structure.
+
+lterm     => ( unum _ '*' _ var )            :lt_coeff_var
+           | ( var _ '*' _ unum )            :lt_var_coeff
+           | ( '-' _ unum _ '*' _ var )      :lt_neg_coeff_var
+           | ( '-' _ var _ '*' _ unum )      :lt_neg_var_coeff
+           | ( '-' _ var )                   :lt_neg_var
+           | ( '-' _ unum )                  :lt_neg_const
+           | var                             :lt_var
+           | unum                            :lt_const.
+
+# ---- Variable and numeric primitives ----
+
+var       => "x[" nat "]".
+nat       => digit+.
+
+# Unsigned number: integer, decimal (d.d), or p/q fraction
+unum      => unum_char+.
+unum_char => digit | '.' | '/'.
+
+# ---- Whitespace ----
+
+_         => [ space _ ].
+
+@trim _.
+@trim all terminals except children of nat, unum_char.
+@inline char classes.
