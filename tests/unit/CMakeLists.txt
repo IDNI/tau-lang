@@ -28,6 +28,7 @@ set(TESTS
 	qint_grammar
 	qlt_grammar
 	hsb_grammar
+	nlang_grammar
 	#pwr_debug
 	#pwr_deepseek_1
 	#pwr_deepseek_2
