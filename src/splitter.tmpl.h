@@ -297,8 +297,8 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 	};
 	tref splitter = expression_paths<node>(fm).apply_only_if(
 		remove_clause, split_equality);
-	// Splitter found
-	if (tau::get(fm) != tau::get(splitter))
+	// Splitter found (guard against null when fm has no expression paths)
+	if (splitter && tau::get(fm) != tau::get(splitter))
 		return {tau::build_wff_or(splitter, curr_clause), st};
 
 	auto split_inequality = [&](tref curr_fm) {
@@ -347,8 +347,8 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 	curr_clause = nullptr;
 	splitter = expression_paths<node>(fm).apply_only_if(
 		remove_clause, split_inequality);
-	// Splitter found
-	if (tau::get(fm) != tau::get(splitter))
+	// Splitter found (guard against null when fm has no expression paths)
+	if (splitter && tau::get(fm) != tau::get(splitter))
 		return {tau::build_wff_or(splitter, curr_clause), st};
 
 	// Split disjunction if possible

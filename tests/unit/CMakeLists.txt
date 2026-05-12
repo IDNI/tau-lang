@@ -10,6 +10,7 @@ set(TESTS
 	bool
 	bounded_cache
 	hsb
+	tau_ba
 	ba_providers
 	composite_ba_provider
 	temporal_connectives
