@@ -57,6 +57,7 @@ set(TESTS
 	ltl_qlt_bv
 	ltl_strategy_exec
 	qlt_oracle
+	sbf
 	sbf_oracle
 	by_grammar
 	algorithm_a
