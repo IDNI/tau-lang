@@ -26,6 +26,7 @@ set(TESTS
 	interpreter
 	interpreter_api_extensions
 	pointwise_revision
+	qint
 	qint_grammar
 	qlt_grammar
 	hsb_grammar
