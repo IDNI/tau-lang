@@ -27,9 +27,6 @@ set(TESTS
 	interpreter_api_extensions
 	pointwise_revision
 	qint
-	qint_grammar
-	qlt_grammar
-	hsb_grammar
 	nlang_grammar
 	qlt
 	#pwr_debug
@@ -61,7 +58,7 @@ set(TESTS
 	qlt_oracle
 	sbf
 	sbf_oracle
-	by_grammar
+
 	algorithm_a
 	algorithm_b
 	algorithm_c
@@ -82,11 +79,9 @@ set(TESTS
 	omcat_types
 	spec_decompose
 	product_ba
-	sbf_ba_parsing
 	sbf_ba_splitter
 	tau_ba
 	tau_bdd
-	tau_spec
 	tau_tree
 	tau_tree_from_parser
 	tau_tree_printers
@@ -108,3 +103,6 @@ target_include_directories(tau_eval PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(tau_eval ${TAU_STATIC_LIB_NAME} cvc5::cvc5)
 add_dependencies(tau_eval tau_header)
 target_compile_options(tau_eval PUBLIC -Wno-unused-function)
+
+# add unit tests for the parser
+add_subdirectory(parser)
