@@ -7,10 +7,7 @@ set(TESTS
 	ba_constants
 	ba_types
 	ba_types_inference
-	bool
 	bounded_cache
-	hsb
-	tau_ba
 	ba_providers
 	composite_ba_provider
 	temporal_connectives
@@ -21,14 +18,11 @@ set(TESTS
 	cvc5
 	execution
 	gc
-	hbdd
 	hooks
 	interpreter
 	interpreter_api_extensions
 	pointwise_revision
-	qint
 	nlang_grammar
-	qlt
 	#pwr_debug
 	#pwr_deepseek_1
 	#pwr_deepseek_2
@@ -56,7 +50,6 @@ set(TESTS
 	ltl_qlt_bv
 	ltl_strategy_exec
 	qlt_oracle
-	sbf
 	sbf_oracle
 
 	algorithm_a
@@ -80,7 +73,6 @@ set(TESTS
 	spec_decompose
 	product_ba
 	sbf_ba_splitter
-	tau_ba
 	tau_bdd
 	tau_tree
 	tau_tree_from_parser
@@ -105,4 +97,5 @@ add_dependencies(tau_eval tau_header)
 target_compile_options(tau_eval PUBLIC -Wno-unused-function)
 
 # add unit tests for the parser
+add_subdirectory(boolean_algebras)
 add_subdirectory(parser)
