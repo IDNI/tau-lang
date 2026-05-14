@@ -17,7 +17,7 @@ inline const std::vector<std::string> symbol_names{
 	"hsb_paren", "__E_hsb_1", "hsb_and", "__E_hsb_2", "hsb_or", "__E_hsb_3", "hsb_hs", "halfspace", "hs_leq", "__E_halfspace_4", 
 	"linexpr", "hs_lt", "__E_halfspace_5", "le_add", "__E_linexpr_6", "lterm", "le_sub", "__E_linexpr_7", "le_lterm", "lt_coeff_var", 
 	"__E_lterm_8", "unum", "var", "lt_var_coeff", "__E_lterm_9", "lt_neg_coeff_var", "__E_lterm_10", "lt_neg_var_coeff", "__E_lterm_11", "lt_neg_var", 
-	"__E_lterm_12", "lt_neg_const", "__E_lterm_13", "lt_var", "lt_const", "nat", "__E_nat_14", "unum_char", "__E_unum_15", "__E___16", 
+	"__E_lterm_12", "lt_neg_const", "__E_lterm_13", "lt_var", "lt_const", "nat", "__E_nat_14", "__E___15", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
@@ -45,7 +45,7 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		},
 		.trim_terminals = true,
 		.dont_trim_terminals_of = {
-			45, 47
+			31, 45
 		},
 		.inline_char_classes = true
 	}
@@ -185,24 +185,18 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(46), (NT(2)+NT(46)));
 //G60:  nat(45)              => __E_nat_14(46).
 	p(NT(45), (NT(46)));
-//G61:  __E_unum_15(48)      => unum_char(47).
-	p(NT(48), (NT(47)));
-//G62:  __E_unum_15(48)      => unum_char(47) __E_unum_15(48).
-	p(NT(48), (NT(47)+NT(48)));
-//G63:  unum(31)             => __E_unum_15(48).
-	p(NT(31), (NT(48)));
-//G64:  unum_char(47)        => digit(2).
-	p(NT(47), (NT(2)));
-//G65:  unum_char(47)        => '.'.
-	p(NT(47), (T(20)));
-//G66:  unum_char(47)        => '/'.
-	p(NT(47), (T(21)));
-//G67:  __E___16(49)         => space(1) _(4).
-	p(NT(49), (NT(1)+NT(4)));
-//G68:  __E___16(49)         => null.
-	p(NT(49), (nul));
-//G69:  _(4)                 => __E___16(49).
-	p(NT(4), (NT(49)));
+//G61:  unum(31)             => nat(45) '.' nat(45).
+	p(NT(31), (NT(45)+T(20)+NT(45)));
+//G62:  unum(31)             => nat(45) '/' nat(45).
+	p(NT(31), (NT(45)+T(21)+NT(45)));
+//G63:  unum(31)             => nat(45).
+	p(NT(31), (NT(45)));
+//G64:  __E___15(47)         => space(1) _(4).
+	p(NT(47), (NT(1)+NT(4)));
+//G65:  __E___15(47)         => null.
+	p(NT(47), (nul));
+//G66:  _(4)                 => __E___15(47).
+	p(NT(4), (NT(47)));
 	#undef T
 	#undef NT
 	return loaded = true, p;
@@ -219,7 +213,7 @@ struct hsb_parser_nonterminals {
 		hsb_paren, __E_hsb_1, hsb_and, __E_hsb_2, hsb_or, __E_hsb_3, hsb_hs, halfspace, hs_leq, __E_halfspace_4, 
 		linexpr, hs_lt, __E_halfspace_5, le_add, __E_linexpr_6, lterm, le_sub, __E_linexpr_7, le_lterm, lt_coeff_var, 
 		__E_lterm_8, unum, var, lt_var_coeff, __E_lterm_9, lt_neg_coeff_var, __E_lterm_10, lt_neg_var_coeff, __E_lterm_11, lt_neg_var, 
-		__E_lterm_12, lt_neg_const, __E_lterm_13, lt_var, lt_const, nat, __E_nat_14, unum_char, __E_unum_15, __E___16, 
+		__E_lterm_12, lt_neg_const, __E_lterm_13, lt_var, lt_const, nat, __E_nat_14, __E___15, 
 	};
 };
 

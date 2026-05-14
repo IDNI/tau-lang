@@ -37,7 +37,7 @@ hsb      => "top"                            :hsb_top
           | ( '(' _ hsb _ ')' )              :hsb_paren
           | ( '(' _ hsb _ '&' _ hsb _ ')' )  :hsb_and
           | ( '(' _ hsb _ '|' _ hsb _ ')' )  :hsb_or
-          | halfspace                         :hsb_hs.
+          | halfspace                        :hsb_hs.
 
 # ---- Halfspace constraint ----
 # Each alternative wrapped in () so hs_leq/hs_lt contain linexpr as their child.
@@ -69,13 +69,14 @@ var       => "x[" nat "]".
 nat       => digit+.
 
 # Unsigned number: integer, decimal (d.d), or p/q fraction
-unum      => unum_char+.
-unum_char => digit | '.' | '/'.
+unum      => nat '.' nat
+           | nat '/' nat
+           | nat.
 
 # ---- Whitespace ----
 
 _         => [ space _ ].
 
 @trim _.
-@trim all terminals except children of nat, unum_char.
+@trim all terminals except children of nat, unum.
 @inline char classes.
