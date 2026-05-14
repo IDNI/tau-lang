@@ -857,18 +857,7 @@ requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type>
 parse_hsb(const std::string& src) {
 	std::string s = src;
-	// trim
-	s.erase(0, s.find_first_not_of(" \t\n\r"));
-	auto last = s.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) s = s.substr(0, last + 1);
-	// strip outer braces
-	if (!s.empty() && s.front() == '{' && s.back() == '}')
-		s = s.substr(1, s.size() - 2);
-	s.erase(0, s.find_first_not_of(" \t\n\r"));
-	last = s.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) s = s.substr(0, last + 1);
-
-	auto result = hsb_parser::instance().parse(s.c_str(), s.size());
+	auto result = hsb_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) return std::nullopt;
 
 	auto t = hsb_parser::tree::traverser(result.get_shaped_tree2())
