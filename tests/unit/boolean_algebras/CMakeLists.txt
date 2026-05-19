@@ -2,6 +2,7 @@ set(TESTS
 	bool
 	hbdd
 	hsb
+	hsb_splitter
 	qint
 	qlt
 	sbf
