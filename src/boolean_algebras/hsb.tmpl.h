@@ -362,6 +362,20 @@ find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 	return pt;
 }
 
+/// Find a feasible point for @p cs that additionally satisfies x[axis] > val (greater_than=true)
+/// or x[axis] < val (greater_than=false).  Returns `nullopt` if infeasible.
+inline std::optional<std::vector<double>>
+find_second_feasible_point(const std::vector<linear_constraint>& cs,
+                           size_t dim, size_t axis, double val, bool greater_than) {
+	auto ext = cs;
+	linear_constraint extra;
+	extra.w.assign(dim, 0.0);
+	if (greater_than) { extra.w[axis] = -1.0; extra.b =  val; extra.strict = true; }
+	else              { extra.w[axis] =  1.0; extra.b = -val; extra.strict = true; }
+	ext.push_back(extra);
+	return find_feasible_point(ext, dim);
+}
+
 // Forward declaration needed by to_dnf.
 inline hsb::node_ptr push_neg(const hsb::node_ptr& n);
 
@@ -523,9 +537,9 @@ inline tref simplify_hsb_term(tref t) { return t; }
 /**
  * @brief Returns a proper sub-element y with `bot < y < x`.
  *
- * Finds a feasible interior point p of @p x via DNF + cvc5, then returns
- * `x & H_{e_1, -p_1}` (the intersection with the splitting halfspace
- * `{x_1 < p_1}`).
+ * For each satisfiable DNF clause of @p x, finds a feasible interior point A via
+ * cvc5, then scans axes from the highest-indexed variable downward to find a second
+ * point B with B[axis] ≠ A[axis].  Returns `x & {x[axis] < (A[axis]+B[axis])/2}`.
  *
  * @param x   A non-zero, non-top hsb element.
  * @param st  Splitter hint (currently unused).
@@ -551,35 +565,26 @@ inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 			if (!detail::collect_conjunction(nd, cs)) { ok = false; break; }
 		if (!ok) continue;
 
-		auto pt = detail::find_feasible_point(cs, dim);
-		if (!pt) continue;
+		auto pt_a = detail::find_feasible_point(cs, dim);
+		if (!pt_a) continue;
 
-		// Try x & {x_0 < p_0}
-		hsb_halfspace h;
-		h.w.assign(dim, 0.0); h.w[0] = 1.0; h.b = -(*pt)[0];
-		hsb split = x & hsb::from_halfspace(h);
-		if (!is_hsb_zero(split) && split != x) return split;
+		// Scan axes from highest to lowest seeking a dimension with thickness.
+		for (size_t axis = dim; axis-- > 0; ) {
+			auto pt_b = detail::find_second_feasible_point(
+				cs, dim, static_cast<size_t>(axis), (*pt_a)[axis], true);
+			if (!pt_b)
+				pt_b = detail::find_second_feasible_point(
+					cs, dim, static_cast<size_t>(axis), (*pt_a)[axis], false);
+			if (!pt_b) continue;
 
-		// Try the other side
-		hsb_halfspace h_neg;
-		h_neg.w.assign(dim, 0.0); h_neg.w[0] = -1.0; h_neg.b = (*pt)[0];
-		split = x & hsb::from_halfspace(h_neg);
-		if (!is_hsb_zero(split) && split != x) return split;
-	}
-
-	// Fallback: try splitting at 0 along the first axis
-	if (x.root->k == hsb::kind::halfspace) {
-		for (double sign : {1.0, -1.0}) {
+			double c = ((*pt_a)[axis] + (*pt_b)[axis]) / 2.0;
+			// s = {x[axis] < c}: w[axis]=1.0, b=-c, s(w)=+1 (strict)
 			hsb_halfspace h;
-			h.w.assign(dim, 0.0); h.w[0] = sign; h.b = 0.0;
-			hsb sub = x & hsb::from_halfspace(h);
-			if (!is_hsb_zero(sub) && sub != x) return sub;
-		}
-	} else {
-		auto leaf = detail::find_leaf_halfspace(x.root);
-		if (leaf) {
-			hsb sub = x & hsb{leaf};
-			if (!is_hsb_zero(sub) && sub != x) return sub;
+			h.w.assign(dim, 0.0); h.w[static_cast<size_t>(axis)] = 1.0; h.b = -c;
+			hsb split = x & hsb::from_halfspace(h);
+			if (!is_hsb_zero(split) && split != x) return split;
+			split = x & ~hsb::from_halfspace(h);
+			if (!is_hsb_zero(split) && split != x) return split;
 		}
 	}
 	return x;
