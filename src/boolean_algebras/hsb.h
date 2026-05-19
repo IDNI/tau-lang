@@ -238,5 +238,6 @@ inline std::ostream& operator<<(std::ostream& os, const hsb& h);
 } // namespace idni::tau_lang
 
 #include "boolean_algebras/hsb.tmpl.h"
+#include "boolean_algebras/hsb_splitter.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_H__
