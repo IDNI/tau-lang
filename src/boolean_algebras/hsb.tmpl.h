@@ -29,9 +29,9 @@ inline bool hsb_halfspace::is_strict() const noexcept {
 }
 
 inline double hsb_halfspace::eval(const std::vector<double>& x) const noexcept {
+	auto dim = std::min(w.size(), x.size());
 	double sum = b;
-	size_t n = std::min(w.size(), x.size());
-	for (size_t i = 0; i < n; ++i) sum += w[i] * x[i];
+	for (size_t i = 0; i < dim; ++i) sum += w[i] * x[i];
 	return sum;
 }
 
@@ -313,10 +313,10 @@ inline linexpr_result eval_linexpr(const tt& t) {
 	}
 }
 
-inline hsb build_halfspace(const linexpr_result& le) {
+inline std::optional<hsb> build_halfspace(const linexpr_result& le) {
 	size_t dim = 0;
 	for (auto& [i, c] : le.coeffs) dim = std::max(dim, i + 1);
-	if (dim == 0) dim = 1;
+	if (dim == 0) return std::nullopt;
 	hsb_halfspace h;
 	h.w.assign(dim, 0.0);
 	for (auto& [i, c] : le.coeffs) h.w[i] = c;

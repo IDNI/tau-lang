@@ -21,6 +21,9 @@ struct linear_constraint {
 
 /// Collect all halfspace constraints from an AND-tree into @p out.
 /// Returns false iff the node is structurally unsatisfiable (contains bot).
+/// @pre This function must only be called on individual DNF clauses
+///      (nodes that are pure conjunctions of halfspaces); or_/not_ nodes
+///      at the root of a clause indicate a programming error.
 inline bool collect_conjunction(const hsb::node_ptr& n,
                                 std::vector<linear_constraint>& out) {
 	if (!n) return false;
@@ -34,15 +37,50 @@ inline bool collect_conjunction(const hsb::node_ptr& n,
 		return collect_conjunction(n->lhs, out)
 		    && collect_conjunction(n->rhs, out);
 	default:
-		return true; // or_ / not_ treated conservatively as satisfiable
+		// or_/not_ should not appear in a DNF clause; treat conservatively.
+		return true;
 	}
 }
 
-/// Check LP feasibility of @p cs using cvc5 QF_LRA.
-inline bool lra_feasible(const std::vector<linear_constraint>& cs, size_t dim) {
-	if (cs.empty()) return true;
+/// Convert double @p v to an exact cvc5 rational term using the IEEE 754
+/// binary representation (frexp-based), avoiding decimal rounding errors.
+/// Falls back to a 20-digit decimal string only for very large exponents.
+/*inline cvc5::Term mk_rational(double v) {
+	if (v == 0.0) return cvc5_term_manager.mkReal(0);
+	int exp = 0;
+	double mant = std::frexp(std::abs(v), &exp);
+	// |v| = mant * 2^exp, mant ∈ [0.5, 1.0).
+	// sig = mant * 2^53 is an exact 53-bit integer (the IEEE significand).
+	int64_t sig = static_cast<int64_t>(std::ldexp(mant, 53));
+	if (v < 0) sig = -sig;
+	int shift = exp - 53; // v = sig * 2^shift
+	if (shift >= 0) {
+		// v is an exact (possibly large) integer.
+		// |sig| < 2^53, so sig * 2^9 < 2^62 < INT64_MAX.
+		if (shift <= 9)
+			return cvc5_term_manager.mkReal(sig * (int64_t(1) << shift));
+		// Very large integer (rare for LP coefficients): fall back.
+		std::ostringstream oss;
+		oss << std::fixed << std::setprecision(20) << v;
+		return cvc5_term_manager.mkReal(oss.str());
+	}
+	int neg_shift = -shift;
+	if (neg_shift <= 62) // 2^62 fits in int64_t
+		return cvc5_term_manager.mkReal(
+			std::to_string(sig) + "/" + std::to_string(int64_t(1) << neg_shift));
+	// Very small value (subnormal range): fall back to decimal.
+	std::ostringstream oss;
+	oss << std::fixed << std::setprecision(20) << v;
+	return cvc5_term_manager.mkReal(oss.str());
+}*/
 
-	cvc5::Solver solver(cvc5_term_manager);
+/// Set up a cvc5 QF_LRA solver, create real variables x0…x_{dim-1}, assert
+/// all constraints in @p cs, and return the variable terms.
+/// The caller owns the solver and must call checkSat() / getValue() itself.
+inline std::vector<cvc5::Term> setup_lra_solver(
+		cvc5::Solver& solver,
+		const std::vector<linear_constraint>& cs,
+		size_t dim) {
 	solver.setOption("produce-models", "true");
 	solver.setLogic("QF_LRA");
 
@@ -72,7 +110,14 @@ inline bool lra_feasible(const std::vector<linear_constraint>& cs, size_t dim) {
 			: cvc5_term_manager.mkTerm(cvc5::Kind::LEQ, {sum, zero});
 		solver.assertFormula(con);
 	}
+	return vars;
+}
 
+/// Check LP feasibility of @p cs using cvc5 QF_LRA.
+inline bool lra_feasible(const std::vector<linear_constraint>& cs, size_t dim) {
+	if (cs.empty()) return true;
+	cvc5::Solver solver(cvc5_term_manager);
+	setup_lra_solver(solver, cs, dim);
 	return solver.checkSat().isSat();
 }
 
@@ -84,35 +129,7 @@ find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 		return std::vector<double>(dim, 0.0);
 
 	cvc5::Solver solver(cvc5_term_manager);
-	solver.setOption("produce-models", "true");
-	solver.setLogic("QF_LRA");
-
-	std::vector<cvc5::Term> vars(dim);
-	for (size_t i = 0; i < dim; ++i)
-		vars[i] = cvc5_term_manager.mkConst(
-			cvc5_term_manager.getRealSort(),
-			"x" + std::to_string(i));
-
-	auto mk_rational = [](double v) -> cvc5::Term {
-		std::ostringstream oss;
-		oss << std::fixed << std::setprecision(20) << v;
-		return cvc5_term_manager.mkReal(oss.str());
-	};
-
-	for (auto& c : cs) {
-		cvc5::Term sum = mk_rational(c.b);
-		for (size_t i = 0; i < std::min(c.w.size(), dim); ++i) {
-			if (hsb_detail::feq(c.w[i], 0.0)) continue;
-			cvc5::Term prod = cvc5_term_manager.mkTerm(
-				cvc5::Kind::MULT, {mk_rational(c.w[i]), vars[i]});
-			sum = cvc5_term_manager.mkTerm(cvc5::Kind::ADD, {sum, prod});
-		}
-		cvc5::Term zero = cvc5_term_manager.mkReal(0);
-		cvc5::Term con = c.strict
-			? cvc5_term_manager.mkTerm(cvc5::Kind::LT,  {sum, zero})
-			: cvc5_term_manager.mkTerm(cvc5::Kind::LEQ, {sum, zero});
-		solver.assertFormula(con);
-	}
+	auto vars = setup_lra_solver(solver, cs, dim);
 
 	if (!solver.checkSat().isSat())
 		return std::nullopt;
@@ -337,6 +354,13 @@ inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 		if (!pt_a) continue;
 
 		// Scan axes from highest to lowest seeking a dimension with thickness.
+		// Another approach would be to compute another feasible point and
+		// consider the midpoint between the two points as the splitting plane.
+		// Also we could keep the solver and reused it pushing additional
+		// constraints to find a second point, which would be more efficient for
+		// large formulas with many clauses.
+		// TODO (MEDIUM) check the best approach for different formula sizes and
+		// shapes.
 		for (size_t axis = dim; axis-- > 0; ) {
 			auto pt_b = detail::find_second_feasible_point(
 				cs, dim, axis, (*pt_a)[axis], true);
@@ -346,13 +370,14 @@ inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 			if (!pt_b) continue;
 
 			double c = ((*pt_a)[axis] + (*pt_b)[axis]) / 2.0;
-			// s = {x[axis] < c}: w[axis]=1.0, b=-c, s(w)=+1 (strict)
+			// Splitting halfspace: x[axis] < c  (w[axis]=1, b=-c, strict).
 			hsb_halfspace h;
 			h.w.assign(dim, 0.0); h.w[axis] = 1.0; h.b = -c;
-			hsb split = x & hsb::from_halfspace(h);
-			if (!is_hsb_zero(split) && split != x) return split;
-			split = x & ~hsb::from_halfspace(h);
-			if (!is_hsb_zero(split) && split != x) return split;
+			hsb hs   = hsb::from_halfspace(h);
+			hsb lower = x & hs;
+			hsb upper = x & ~hs;
+			// Both parts non-empty ⟺ hs is a proper sub-element of x (P1+P3).
+			if (!is_hsb_zero(lower) && !is_hsb_zero(upper)) return lower;
 		}
 	}
 	return x;

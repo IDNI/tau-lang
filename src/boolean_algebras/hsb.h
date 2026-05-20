@@ -26,8 +26,9 @@ namespace idni::tau_lang {
 
 /// @cond INTERNAL
 namespace hsb_detail {
+	/// @brief Returns true iff @p a and @p b are equal (NaN-safe: NaN ≠ NaN).
 	inline bool feq(double a, double b) noexcept {
-		return !(a < b) && !(b < a);
+		return !std::isnan(a) && !std::isnan(b) && !(a < b) && !(b < a);
 	}
 }
 /// @endcond
@@ -71,7 +72,8 @@ struct hsb_halfspace {
 	/// @brief Returns true iff this halfspace uses strict inequality (s(w) = +1).
 	bool is_strict() const noexcept;
 
-	/// @brief Evaluates ⟨w,x⟩ + b.
+	/// @brief Evaluates ⟨w,x⟩ + b. If the point dimension is less than w.size(),
+	/// only the first x.size() components are used and the rest are treated as 0.
 	double eval(const std::vector<double>& x) const noexcept;
 
 	/// @brief Returns true iff x satisfies the halfspace constraint.
@@ -217,6 +219,11 @@ struct hsb {
 	bool operator==(bool b) const;
 	bool operator!=(bool b) const;
 
+	/// @brief Structural ordering via `to_string()` output.
+	/// @note  Ordering is **structural**, not semantic: two semantically equal
+	///        elements with different tree shapes may compare as unequal.
+	///        Avoid using hsb in ordered containers unless structural identity
+	///        is the intended criterion.
 	bool operator<(const hsb& o) const;
 	std::strong_ordering operator<=>(const hsb& o) const;
 
@@ -226,14 +233,17 @@ struct hsb {
 	std::string to_string() const;
 
 	/**
-	 * @brief Parses `"top"`, `"bot"`, or `"bottom"`; returns `bottom()` on failure.
+	 * @brief Recognises the three keywords `"top"`, `"bot"`, `"bottom"`;
+	 *        returns `bottom()` for any other input (including whitespace-only).
+	 * @note  This is a keyword-only helper and does **not** parse general hsb
+	 *        expressions.  Use `parse_hsb` for full expression parsing.
 	 * @param s  Input string (leading/trailing whitespace is stripped).
 	 */
 	static hsb from_string(const std::string& s);
 };
 
 /// @brief Stream output operator for hsb.
-inline std::ostream& operator<<(std::ostream& os, const hsb& h);
+std::ostream& operator<<(std::ostream& os, const hsb& h);
 
 } // namespace idni::tau_lang
 
