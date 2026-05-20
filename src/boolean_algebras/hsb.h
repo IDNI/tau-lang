@@ -90,6 +90,18 @@ struct hsb_halfspace {
 	bool operator==(const hsb_halfspace& o) const noexcept;
 	bool operator!=(const hsb_halfspace& o) const noexcept;
 
+	/**
+	 * @brief Phase-1 normalization: divides w and b by |w[highest-indexed non-zero]|
+	 *        so that the coefficient of the highest-indexed variable is exactly ±1.
+	 *
+	 * Preserves `is_strict()` (scaling by a positive divisor keeps all signs).
+	 * Returns `*this` unchanged if w is the zero vector.
+	 */
+	hsb_halfspace normalize() const;
+
+	/// @brief Lexicographic ordering on (w, b) — used to sort boundary expressions.
+	bool operator<(const hsb_halfspace& o) const noexcept;
+
 	/// @brief Returns a string like "2*x[0] - x[1] + 3 < 0".
 	std::string to_string() const;
 };
@@ -249,5 +261,6 @@ std::ostream& operator<<(std::ostream& os, const hsb& h);
 
 #include "boolean_algebras/hsb.tmpl.h"
 #include "boolean_algebras/hsb_splitter.tmpl.h"
+#include "boolean_algebras/hsb_normalizer.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_H__

@@ -3,6 +3,7 @@ set(TESTS
 	hbdd
 	hsb
 	hsb_splitter
+	hsb_normalizer
 	qint
 	qlt
 	sbf

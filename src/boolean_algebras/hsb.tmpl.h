@@ -60,6 +60,33 @@ inline bool hsb_halfspace::operator!=(const hsb_halfspace& o) const noexcept {
 	return !(*this == o);
 }
 
+inline hsb_halfspace hsb_halfspace::normalize() const {
+	// Find the highest-indexed non-zero coefficient.
+	size_t j = w.size();
+	for (size_t k = w.size(); k > 0; --k)
+		if (!hsb_detail::feq(w[k-1], 0.0)) { j = k - 1; break; }
+	if (j == w.size()) return *this; // zero vector — nothing to do
+
+	double divisor = std::abs(w[j]);
+	hsb_halfspace r;
+	r.w.resize(w.size());
+	for (size_t k = 0; k < w.size(); ++k) r.w[k] = w[k] / divisor;
+	r.b = b / divisor;
+	return r;
+}
+
+inline bool hsb_halfspace::operator<(const hsb_halfspace& o) const noexcept {
+	size_t n = std::max(w.size(), o.w.size());
+	for (size_t k = 0; k < n; ++k) {
+		double lv = k < w.size()   ? w[k]   : 0.0;
+		double rv = k < o.w.size() ? o.w[k] : 0.0;
+		if (hsb_detail::feq(lv, rv)) continue;
+		return lv < rv;
+	}
+	if (hsb_detail::feq(b, o.b)) return false;
+	return b < o.b;
+}
+
 inline std::string hsb_halfspace::to_string() const {
 	std::ostringstream os;
 	bool first = true;
