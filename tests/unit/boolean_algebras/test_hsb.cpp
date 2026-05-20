@@ -36,13 +36,6 @@ static void do_gc() {
 
 struct gc_fixture { gc_fixture() { do_gc(); } };
 
-// Parse a tau spec string and return the main wff tref.
-static tref spec(const char* s) {
-	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
-	if (!nso_rr.has_value()) return nullptr;
-	return nso_rr.value().main->get();
-}
-
 // Parse an hsb string directly through eval_parse_tree.
 static std::optional<hsb> eval_from_str(const std::string& s) {
 	auto result = hsb_parser::instance().parse(s.c_str(), s.size());
@@ -1157,6 +1150,10 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
+		CHECK(h.root->k == hsb::kind::halfspace);
+		CHECK(h.root->hs.w[0] == doctest::Approx(1.0));
+		CHECK(h.root->hs.b == doctest::Approx(0.0));
+		CHECK(h.root->hs.is_strict() == true);
 	}
 
 	TEST_CASE("parse single constraint: x[0]*0.5 + 0.7 < 0") {
@@ -1164,6 +1161,10 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
+		CHECK(h.root->k == hsb::kind::halfspace);
+		CHECK(h.root->hs.w[0] == doctest::Approx(0.5));
+		CHECK(h.root->hs.b == doctest::Approx(0.7));
+		CHECK(h.root->hs.is_strict() == true);
 	}
 
 	TEST_CASE("parse conjunction: x[0] < 0 & x[1] < 0") {
@@ -1174,17 +1175,25 @@ TEST_SUITE("hsb — parser") {
 	}
 
 	TEST_CASE("parse non-strict: x[0] <= 0") {
+		// NOTE: Strictness is canonical — determined by lex_leading_sign(w),
+		// NOT by the comparison operator in the source text.  Here w = [1.0]
+		// gives s(w) = +1, so the parsed halfspace is strict (x[0] < 0)
+		// regardless of the '<=' operator that was written.
 		auto r = parse_hsb<bas_pack>("x[0] <= 0");
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
+		CHECK(h.root->hs.is_strict() == true); // canonical: determined by s(w)=+1
 	}
 
 	TEST_CASE("parse with negative coefficient: -1*x[0] < 0") {
+		// -1*x[0] gives w=[-1], s(w)=-1 → non-strict: -x[0] <= 0, i.e. x[0] >= 0.
 		auto r = parse_hsb<bas_pack>("-1*x[0] < 0");
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
+		CHECK(h.root->hs.w[0] == doctest::Approx(-1.0));
+		CHECK(h.root->hs.is_strict() == false); // canonical: s(w)=-1
 	}
 
 	TEST_CASE("parse with coefficient after variable: x[0]*2 < 0") {
@@ -1199,6 +1208,9 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
+		CHECK(h.root->hs.w[0] == doctest::Approx(1.0));
+		CHECK(h.root->hs.b == doctest::Approx(5.0));
+		CHECK(h.root->hs.is_strict() == true);
 	}
 
 	TEST_CASE("parse with negative bias: x[0] + -3 < 0") {
@@ -1271,7 +1283,7 @@ TEST_SUITE("hsb — parser") {
 
 TEST_SUITE("hsb — dispatcher") {
 
-	TEST_CASE("hsb type is recognized" * doctest::test_suite("hsb — dispatcher")) {
+	TEST_CASE("hsb type is recognized") {
 		gc_fixture gc;
 		auto tt = hsb_type<node_t>();
 		CHECK(is_hsb_type<node_t>(tt) == true);
@@ -1444,6 +1456,13 @@ TEST_SUITE("hsb — dispatcher") {
 
 // LTL realizability tests require ltlsynt (Spot >= 2.10) on PATH.
 // ltlsynt is a required dependency — tests will fail if not installed.
+
+// Parse a tau spec string and return the main wff tref.
+static tref spec(const char* s) {
+	auto nso_rr = get_nso_rr<node_t>(tau::get(s));
+	if (!nso_rr.has_value()) return nullptr;
+	return nso_rr.value().main->get();
+}
 
 TEST_SUITE("hsb — LTL integration") {
 

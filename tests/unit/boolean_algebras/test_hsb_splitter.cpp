@@ -81,8 +81,8 @@ TEST_SUITE("hsb_splitter — 1D partition (P1+P2+P3)") {
 		check_partition(~make_hs({1.0}, -5.0));
 	}
 
-	TEST_CASE("wide 1D interval (-100, 0)") {
-		// x[0] < 0  and  x[0] > -100
+	TEST_CASE("wide 1D interval [-100, 0)") {
+		// x[0] < 0  and  x[0] >= -100
 		auto x = make_hs({1.0}, 0.0) & make_hs({-1.0}, -100.0);
 		check_partition(x);
 	}
@@ -166,9 +166,9 @@ TEST_SUITE("hsb_splitter — 3D partition (P1+P2+P3)") {
 TEST_SUITE("hsb_splitter — disjunctive formulas") {
 
 	TEST_CASE("disjunction of two 1D intervals: partition") {
-		// x[0] < -5  OR  x[0] > 5
+		// x[0] < -5  OR  x[0] >= 5
 		auto left  = make_hs({1.0},  5.0);   // x[0] + 5 < 0  =>  x[0] < -5
-		auto right = make_hs({-1.0}, -5.0);  // -x[0] - 5 < 0 =>  x[0] > 5
+		auto right = make_hs({-1.0}, -5.0);  // -x[0] - 5 <= 0 => x[0] >= 5
 		auto x = left | right;
 		auto s = hsb_splitter(x, splitter_type::lower);
 		CHECK(!is_hsb_zero(s));          // P1
@@ -179,7 +179,7 @@ TEST_SUITE("hsb_splitter — disjunctive formulas") {
 	TEST_CASE("disjunction of three intervals: partition") {
 		auto a = make_hs({1.0},  10.0);  // x[0] < -10
 		auto b = make_hs({-1.0},  0.0) & make_hs({1.0}, -2.0);  // 0 <= x[0] < 2 (ish)
-		auto c = make_hs({-1.0}, -5.0);  // x[0] > 5
+		auto c = make_hs({-1.0}, -5.0);  // x[0] >= 5
 		auto x = a | b | c;
 		auto s = hsb_splitter(x, splitter_type::lower);
 		CHECK(!is_hsb_zero(s));
