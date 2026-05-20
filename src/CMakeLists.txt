@@ -51,6 +51,7 @@ set(TAU_SOURCES
 	boolean_algebras/bool_ba.cpp
 	boolean_algebras/bdds/var_dict.cpp
 	boolean_algebras/nlang_ba.cpp
+	boolean_algebras/qlt.cpp
 	instantiate_test_pack.cpp
 )
 
