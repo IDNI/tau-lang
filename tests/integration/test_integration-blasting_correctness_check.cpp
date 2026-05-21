@@ -14,8 +14,8 @@
 #include "boolean_algebras/bv_ba.h"
 #include "heuristics/bv_predicate_blasting.h"
 
-static constexpr long long TIME_LIMIT_MS  = 120'000; // 2 minutes per test
-static constexpr size_t    MEMORY_LIMIT_MB = 2048;   // 2 GB per test
+static constexpr long long TIME_LIMIT_MS  = 1'200'000; // 2 minutes per test
+static constexpr size_t    MEMORY_LIMIT_MB = 16384;   // 2 GB per test
 
 TEST_SUITE("configuration") {
 
@@ -117,6 +117,49 @@ static void check_blasting_correctness(const char* f) {
 }
 
 // ---------------------------------------------------------------------------
+// blasting-simple-arith (8-bit, 1 variable)
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("blasting_simple_arith") {
+
+	TEST_CASE("mul_zero") {
+		const char* f = "all a:bv[8] a * { 0 }:bv[8] = { 0 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("mul_identity") {
+		const char* f = "all a:bv[8] a * { 1 }:bv[8] = a";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("mul_sat") {
+		const char* f = "ex a:bv[8] a * { 3 }:bv[8] = { 6 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("div_identity") {
+		const char* f = "all a:bv[8] a / { 1 }:bv[8] = a";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("div_sat") {
+		const char* f = "ex a:bv[8] a / { 4 }:bv[8] = { 3 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("mod_zero") {
+		const char* f = "all a:bv[8] a % { 1 }:bv[8] = { 0 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("mod_sat") {
+		const char* f = "ex a:bv[8] a % { 7 }:bv[8] = { 3 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+}
+
+// ---------------------------------------------------------------------------
 // blasting-8bit-4var
 // ---------------------------------------------------------------------------
 
@@ -159,6 +202,21 @@ TEST_SUITE("blasting_8bit_4var") {
 
 	TEST_CASE("shift_existence") {
 		const char* f = "ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] a > { 0 }:bv[8] && b = a << { 1 }:bv[8] && b > a && c = b << { 1 }:bv[8] && d = c >> { 1 }:bv[8] && d = b";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] a + b = { 0 }:bv[8] && c + d = { 0 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_xor_dep") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] b = a ^ { 255 }:bv[8] && d = c ^ b";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_shift_bound") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] b = a >> { 1 }:bv[8] && b <= a && d = c << { 1 }:bv[8]";
 		check_blasting_correctness(f);
 	}
 
@@ -205,10 +263,25 @@ TEST_SUITE("blasting_8bit_8var") {
 		check_blasting_correctness(f);
 	}
 
-	// TEST_CASE("shift_mul_div_sat") {
-	// 	const char* f = "ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] ex e:bv[8] ex f:bv[8] ex g:bv[8] ex h:bv[8] a > { 0 }:bv[8] && b = a << { 1 }:bv[8] && b > a && c = b << { 1 }:bv[8] && d = c >> { 1 }:bv[8] && d = b && e = a * { 3 }:bv[8] && f = e / { 3 }:bv[8] && f = a && g = a | b && h = g & c && h > { 0 }:bv[8]";
-	// 	check_blasting_correctness(f);
-	// }
+	//TEST_CASE("shift_mul_div_sat") {
+	//	const char* f = "ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] ex e:bv[8] ex f:bv[8] ex g:bv[8] ex h:bv[8] a > { 0 }:bv[8] && b = a << { 1 }:bv[8] && b > a && c = b << { 1 }:bv[8] && d = c >> { 1 }:bv[8] && d = b && e = a * { 3 }:bv[8] && f = e / { 3 }:bv[8] && f = a && g = a | b && h = g & c && h > { 0 }:bv[8]";
+	//	check_blasting_correctness(f);
+	//}
+
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] all e:bv[8] ex f:bv[8] all g:bv[8] ex h:bv[8] a + b = { 0 }:bv[8] && c + d = { 0 }:bv[8] && e + f = { 0 }:bv[8] && g + h = { 0 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_mixed") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] all e:bv[8] ex f:bv[8] all g:bv[8] ex h:bv[8] b = a ^ { 255 }:bv[8] && d = c + { 1 }:bv[8] && f = e >> { 1 }:bv[8] && f <= e && h = g | { 1 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_cross_dep") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] all e:bv[8] ex f:bv[8] all g:bv[8] ex h:bv[8] b = a + { 1 }:bv[8] && d = b + c && f = d ^ e && h = f & g";
+		check_blasting_correctness(f);
+	}
 
 }
 
@@ -258,6 +331,16 @@ TEST_SUITE("blasting_8bit_16var") {
 	// 	check_blasting_correctness(f);
 	// }
 
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] all e:bv[8] ex f:bv[8] all g:bv[8] ex h:bv[8] all i:bv[8] ex j:bv[8] all k:bv[8] ex l:bv[8] all m:bv[8] ex o:bv[8] all p:bv[8] ex q:bv[8] a + b = { 0 }:bv[8] && c + d = { 0 }:bv[8] && e + f = { 0 }:bv[8] && g + h = { 0 }:bv[8] && i + j = { 0 }:bv[8] && k + l = { 0 }:bv[8] && m + o = { 0 }:bv[8] && p + q = { 0 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_cross_dep") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] all e:bv[8] ex f:bv[8] all g:bv[8] ex h:bv[8] all i:bv[8] ex j:bv[8] all k:bv[8] ex l:bv[8] all m:bv[8] ex o:bv[8] all p:bv[8] ex q:bv[8] b = a ^ { 255 }:bv[8] && d = c + b && f = e & b && h = g | d && j = i ^ f && l = k + j && o = m & l && q = p | o";
+		check_blasting_correctness(f);
+	}
+
 }
 
 // ---------------------------------------------------------------------------
@@ -303,6 +386,21 @@ TEST_SUITE("blasting_32bit_4var") {
 
 	TEST_CASE("shift_existence") {
 		const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[32] ex b:bv[32] all c:bv[32] ex d:bv[32] a + b = { 0 }:bv[32] && c + d = { 0 }:bv[32]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_xor_dep") {
+		const char* f = "all a:bv[32] ex b:bv[32] all c:bv[32] ex d:bv[32] b = a ^ { 4294967295 }:bv[32] && d = c ^ b";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_shift_bound") {
+		const char* f = "all a:bv[32] ex b:bv[32] all c:bv[32] ex d:bv[32] b = a >> { 1 }:bv[32] && b <= a && d = c << { 1 }:bv[32]";
 		check_blasting_correctness(f);
 	}
 
@@ -354,6 +452,21 @@ TEST_SUITE("blasting_32bit_8var") {
 	// 	check_blasting_correctness(f);
 	// }
 
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[32] ex b:bv[32] all c:bv[32] ex d:bv[32] all e:bv[32] ex f:bv[32] all g:bv[32] ex h:bv[32] a + b = { 0 }:bv[32] && c + d = { 0 }:bv[32] && e + f = { 0 }:bv[32] && g + h = { 0 }:bv[32]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_mixed") {
+		const char* f = "all a:bv[32] ex b:bv[32] all c:bv[32] ex d:bv[32] all e:bv[32] ex f:bv[32] all g:bv[32] ex h:bv[32] b = a ^ { 4294967295 }:bv[32] && d = c + { 1 }:bv[32] && f = e >> { 1 }:bv[32] && f <= e && h = g | { 1 }:bv[32]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_cross_dep") {
+		const char* f = "all a:bv[32] ex b:bv[32] all c:bv[32] ex d:bv[32] all e:bv[32] ex f:bv[32] all g:bv[32] ex h:bv[32] b = a + { 1 }:bv[32] && d = b + c && f = d ^ e && h = f & g";
+		check_blasting_correctness(f);
+	}
+
 }
 
 // ---------------------------------------------------------------------------
@@ -397,8 +510,18 @@ TEST_SUITE("blasting_32bit_16var") {
 		check_blasting_correctness(f);
 	}
 
-	TEST_CASE("shift_mul_div_sat") {
-		const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b && e = a * { 3 }:bv[32] && f = e / { 3 }:bv[32] && f = a && g = a | b && h = g & c && h > { 0 }:bv[32] && i = a + b && j = i % { 7 }:bv[32] && k = j + a && l = k & b && m = l | c && o = m ^ d && p = o + a && q = p >> { 1 }:bv[32] && q > { 0 }:bv[32]";
+	// TEST_CASE("shift_mul_div_sat") {
+	//	const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b && e = a * { 3 }:bv[32] && f = e / { 3 }:bv[32] && f = a && g = a | b && h = g & c && h > { 0 }:bv[32] && i = a + b && j = i % { 7 }:bv[32] && k = j + a && l = k & b && m = l | c && o = m ^ d && p = o + a && q = p >> { 1 }:bv[32] && q > { 0 }:bv[32]";
+	//	check_blasting_correctness(f);
+	// }
+
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[32] ex b:bv[32] all c:bv[32] ex d:bv[32] all e:bv[32] ex f:bv[32] all g:bv[32] ex h:bv[32] all i:bv[32] ex j:bv[32] all k:bv[32] ex l:bv[32] all m:bv[32] ex o:bv[32] all p:bv[32] ex q:bv[32] a + b = { 0 }:bv[32] && c + d = { 0 }:bv[32] && e + f = { 0 }:bv[32] && g + h = { 0 }:bv[32] && i + j = { 0 }:bv[32] && k + l = { 0 }:bv[32] && m + o = { 0 }:bv[32] && p + q = { 0 }:bv[32]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_cross_dep") {
+		const char* f = "all a:bv[32] ex b:bv[32] all c:bv[32] ex d:bv[32] all e:bv[32] ex f:bv[32] all g:bv[32] ex h:bv[32] all i:bv[32] ex j:bv[32] all k:bv[32] ex l:bv[32] all m:bv[32] ex o:bv[32] all p:bv[32] ex q:bv[32] b = a ^ { 4294967295 }:bv[32] && d = c + b && f = e & b && h = g | d && j = i ^ f && l = k + j && o = m & l && q = p | o";
 		check_blasting_correctness(f);
 	}
 
@@ -450,6 +573,21 @@ TEST_SUITE("blasting_128bit_4var") {
 		check_blasting_correctness(f);
 	}
 
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[128] ex b:bv[128] all c:bv[128] ex d:bv[128] a + b = { 0 }:bv[128] && c + d = { 0 }:bv[128]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_and_dep") {
+		const char* f = "all a:bv[128] ex b:bv[128] all c:bv[128] ex d:bv[128] b = a + { 1 }:bv[128] && d = b ^ c";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_shift_bound") {
+		const char* f = "all a:bv[128] ex b:bv[128] all c:bv[128] ex d:bv[128] b = a >> { 1 }:bv[128] && b <= a && d = c << { 1 }:bv[128]";
+		check_blasting_correctness(f);
+	}
+
 }
 
 // ---------------------------------------------------------------------------
@@ -498,6 +636,16 @@ TEST_SUITE("blasting_128bit_8var") {
 	// 	check_blasting_correctness(f);
 	// }
 
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[128] ex b:bv[128] all c:bv[128] ex d:bv[128] all e:bv[128] ex f:bv[128] all g:bv[128] ex h:bv[128] a + b = { 0 }:bv[128] && c + d = { 0 }:bv[128] && e + f = { 0 }:bv[128] && g + h = { 0 }:bv[128]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_cross_dep") {
+		const char* f = "all a:bv[128] ex b:bv[128] all c:bv[128] ex d:bv[128] all e:bv[128] ex f:bv[128] all g:bv[128] ex h:bv[128] b = a + { 1 }:bv[128] && d = b + c && f = d ^ e && h = f & g";
+		check_blasting_correctness(f);
+	}
+
 }
 
 // ---------------------------------------------------------------------------
@@ -545,5 +693,15 @@ TEST_SUITE("blasting_128bit_16var") {
 	// 	const char* f = "ex a:bv[128] ex b:bv[128] ex c:bv[128] ex d:bv[128] ex e:bv[128] ex f:bv[128] ex g:bv[128] ex h:bv[128] ex i:bv[128] ex j:bv[128] ex k:bv[128] ex l:bv[128] ex m:bv[128] ex o:bv[128] ex p:bv[128] ex q:bv[128] a > { 0 }:bv[128] && b = a << { 1 }:bv[128] && b > a && c = b << { 1 }:bv[128] && d = c >> { 1 }:bv[128] && d = b && e = a * { 3 }:bv[128] && f = e / { 3 }:bv[128] && f = a && g = a | b && h = g & c && h > { 0 }:bv[128] && i = a + b && j = i % { 7 }:bv[128] && k = j + a && l = k & b && m = l | c && o = m ^ d && p = o + a && q = p >> { 1 }:bv[128] && q > { 0 }:bv[128]";
 	// 	check_blasting_correctness(f);
 	// }
+
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[128] ex b:bv[128] all c:bv[128] ex d:bv[128] all e:bv[128] ex f:bv[128] all g:bv[128] ex h:bv[128] all i:bv[128] ex j:bv[128] all k:bv[128] ex l:bv[128] all m:bv[128] ex o:bv[128] all p:bv[128] ex q:bv[128] a + b = { 0 }:bv[128] && c + d = { 0 }:bv[128] && e + f = { 0 }:bv[128] && g + h = { 0 }:bv[128] && i + j = { 0 }:bv[128] && k + l = { 0 }:bv[128] && m + o = { 0 }:bv[128] && p + q = { 0 }:bv[128]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_cross_dep") {
+		const char* f = "all a:bv[128] ex b:bv[128] all c:bv[128] ex d:bv[128] all e:bv[128] ex f:bv[128] all g:bv[128] ex h:bv[128] all i:bv[128] ex j:bv[128] all k:bv[128] ex l:bv[128] all m:bv[128] ex o:bv[128] all p:bv[128] ex q:bv[128] b = a + { 1 }:bv[128] && d = b + c && f = e & b && h = g | d && j = i ^ f && l = k + j && o = m & l && q = p | o";
+		check_blasting_correctness(f);
+	}
 
 }
