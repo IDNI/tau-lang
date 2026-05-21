@@ -502,22 +502,8 @@ requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_qint(
 	const std::string& src)
 {
-	std::string s = src;
-	// trim
-	s.erase(0, s.find_first_not_of(" \t\n\r"));
-	auto last = s.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) s = s.substr(0, last + 1);
-
-	// strip outer braces if present
-	if (!s.empty() && s.front() == '{' && s.back() == '}')
-		s = s.substr(1, s.size() - 2);
-	// trim again
-	s.erase(0, s.find_first_not_of(" \t\n\r"));
-	last = s.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) s = s.substr(0, last + 1);
-
 	// Parse using the qint grammar
-	auto qval = parse_qint_grammar<BAs...>(s);
+	auto qval = parse_qint_grammar<BAs...>(src);
 	if (!qval) return std::nullopt;
 
 	return typename node<BAs...>::constant_with_type{

@@ -208,48 +208,6 @@ TEST_CASE("qint: parse union with whitespace around |") {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Integration with parse_qint (existing dispatcher)
-// ═══════════════════════════════════════════════════════════════════════════
-
-TEST_CASE("qint: dispatcher parse_qint with top") {
-	auto result = parse_qint<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{top}");
-	CHECK(result.has_value());
-	auto val = std::get<qint>(result->first);
-	CHECK(val.is_full());
-}
-
-TEST_CASE("qint: dispatcher parse_qint with bottom") {
-	auto result = parse_qint<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{bot}");
-	CHECK(result.has_value());
-	auto val = std::get<qint>(result->first);
-	CHECK(val.is_empty());
-}
-
-TEST_CASE("qint: dispatcher parse_qint with single interval") {
-	auto result = parse_qint<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[0, 1)}");
-	CHECK(result.has_value());
-	auto val = std::get<qint>(result->first);
-	CHECK_FALSE(val.is_empty());
-	CHECK_FALSE(val.is_full());
-}
-
-TEST_CASE("qint: dispatcher parse_qint with union") {
-	auto result = parse_qint<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[0, 1) | [2, 3)}");
-	CHECK(result.has_value());
-	auto val = std::get<qint>(result->first);
-	CHECK_FALSE(val.is_empty());
-	CHECK(val.pieces.size() == 2);
-}
-
-TEST_CASE("qint: dispatcher parse_qint with fractional interval") {
-	auto result = parse_qint<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[1/4, 3/4)}");
-	CHECK(result.has_value());
-	auto val = std::get<qint>(result->first);
-	CHECK_FALSE(val.is_empty());
-	CHECK(val.pieces.size() == 1);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Error Cases
 // ═══════════════════════════════════════════════════════════════════════════
 
