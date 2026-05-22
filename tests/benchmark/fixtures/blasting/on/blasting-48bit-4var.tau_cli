@@ -1,0 +1,13 @@
+all a:bv[48] all b:bv[48] all c:bv[48] all d:bv[48] (a + b) + (c + d) = (d + c) + (b + a).
+ex a:bv[48] ex b:bv[48] ex c:bv[48] ex d:bv[48] a < b && b < c && c < d && d - a >= { 3 }:bv[48].
+all a:bv[48] all b:bv[48] all c:bv[48] all d:bv[48] a & (b | c) | d = (a & b) | (a & c) | d.
+ex a:bv[48] ex b:bv[48] ex c:bv[48] ex d:bv[48] a > { 0 }:bv[48] && b = a * { 3 }:bv[48] && c = b + a && d = c >> { 2 }:bv[48] && d > { 0 }:bv[48].
+all a:bv[48] all b:bv[48] all c:bv[48] all d:bv[48] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+ex a:bv[48] ex b:bv[48] ex c:bv[48] ex d:bv[48] a % { 5 }:bv[48] = { 2 }:bv[48] && b = a + { 3 }:bv[48] && c = a | b && d = c & a && d !>= b.
+all a:bv[48] all b:bv[48] all c:bv[48] all d:bv[48] a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+ex a:bv[48] ex b:bv[48] ex c:bv[48] ex d:bv[48] a > { 0 }:bv[48] && b = a << { 1 }:bv[48] && b > a && c = b << { 1 }:bv[48] && d = c >> { 1 }:bv[48] && d = b.
+all a:bv[48] all b:bv[48] all c:bv[48] all d:bv[48] a * { 4 }:bv[48] = a << { 2 }:bv[48] && b + { 100 }:bv[48] - { 100 }:bv[48] = b.
+ex a:bv[48] ex b:bv[48] ex c:bv[48] ex d:bv[48] a > { 1000 }:bv[48] && b = a % { 11 }:bv[48] && c = a + b && d = c & { 65535 }:bv[48] && d > { 0 }:bv[48].
+all a:bv[48] ex b:bv[48] all c:bv[48] ex d:bv[48] b = a + { 1 }:bv[48] && d = c + { 1 }:bv[48].
+ex a:bv[48] all b:bv[48] ex c:bv[48] all d:bv[48] a = { 1 }:bv[48] && c = b * { 2 }:bv[48] && a * d = d.
+all a:bv[48] ex b:bv[48] ex c:bv[48] all d:bv[48] b = a + { 6 }:bv[48] && c = b - { 6 }:bv[48] && c = a && a + d = d + a.

@@ -1,0 +1,14 @@
+n all a:bv[24] all b:bv[24] all c:bv[24] all d:bv[24] (a + b) + (c + d) = (d + c) + (b + a).
+n ex a:bv[24] ex b:bv[24] ex c:bv[24] ex d:bv[24] a < b && b < c && c < d && d - a >= { 3 }:bv[24].
+n all a:bv[24] all b:bv[24] all c:bv[24] all d:bv[24] a & (b | c) | d = (a & b) | (a & c) | d.
+n ex a:bv[24] ex b:bv[24] ex c:bv[24] ex d:bv[24] a > { 0 }:bv[24] && b = a * { 3 }:bv[24] && c = b + a && d = c >> { 2 }:bv[24] && d > { 0 }:bv[24].
+n all a:bv[24] all b:bv[24] all c:bv[24] all d:bv[24] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+n ex a:bv[24] ex b:bv[24] ex c:bv[24] ex d:bv[24] a % { 5 }:bv[24] = { 2 }:bv[24] && b = a + { 3 }:bv[24] && c = a | b && d = c & a && d !>= b.
+n all a:bv[24] all b:bv[24] all c:bv[24] all d:bv[24] a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+n ex a:bv[24] ex b:bv[24] ex c:bv[24] ex d:bv[24] a > { 0 }:bv[24] && b = a << { 1 }:bv[24] && b > a && c = b << { 1 }:bv[24] && d = c >> { 1 }:bv[24] && d = b.
+n ex a:bv[24] b:bv[24] c:bv[24] d:bv[24] a > { 0 }:bv[24] && b = a << { 1 }:bv[24] && b > a && c = b << { 1 }:bv[24] && d = c >> { 1 }:bv[24] && d = b.
+n all a:bv[24] all b:bv[24] all c:bv[24] all d:bv[24] a * { 4 }:bv[24] = a << { 2 }:bv[24] && b + { 9 }:bv[24] - { 9 }:bv[24] = b.
+n ex a:bv[24] ex b:bv[24] ex c:bv[24] ex d:bv[24] a > { 42 }:bv[24] && b = a % { 11 }:bv[24] && c = a + b && d = c & { 15 }:bv[24] && d > { 0 }:bv[24].
+n all a:bv[24] ex b:bv[24] all c:bv[24] ex d:bv[24] b = a + { 1 }:bv[24] && d = c + { 1 }:bv[24].
+n ex a:bv[24] all b:bv[24] ex c:bv[24] all d:bv[24] a = { 1 }:bv[24] && c = b * { 2 }:bv[24] && a * d = d.
+n all a:bv[24] ex b:bv[24] ex c:bv[24] all d:bv[24] b = a + { 6 }:bv[24] && c = b - { 6 }:bv[24] && c = a && a + d = d + a.
