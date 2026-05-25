@@ -219,7 +219,9 @@ TEST_SUITE("qlt_execution") {
 		auto vals = run_qlt_no_input("F (o1[t]:qlt = {1/3}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
 		bool found = false;
-		for (auto& v : vals) if (v == "1/3") { found = true; break; }
+		for (auto& v : vals) {
+			if (v == "1/3") { found = true; break; }
+		}
 		CHECK(found);
 	}
 	TEST_CASE("QE-04: G(o1>{0}:qlt && o1<{1}:qlt) outputs in (0,1)") {
@@ -617,3 +619,10 @@ TEST_SUITE("grammar_fuzz") {
 	}
 
 } // TEST_SUITE "grammar_fuzz"
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

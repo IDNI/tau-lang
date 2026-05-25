@@ -1661,3 +1661,10 @@ TEST_CASE("[MS-0250] 6-type: comprehensive six-type with varied temporal ops") {
 }
 
 } // TEST_SUITE("many_sorted_ltl")
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

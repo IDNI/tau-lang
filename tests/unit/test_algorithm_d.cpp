@@ -223,3 +223,10 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 		CHECK(alg_d_realizable("G (o1[t]:qlt > i1[t-1]:qlt)."));
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

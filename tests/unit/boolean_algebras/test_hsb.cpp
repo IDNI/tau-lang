@@ -4864,3 +4864,10 @@ TEST_SUITE("hsb — eval_parse_tree") {
 	}
 
 } // TEST_SUITE eval_parse_tree
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

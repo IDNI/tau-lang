@@ -373,7 +373,9 @@ TEST_SUITE("[PWR-M: Multi-clause]") {
 
 	TEST_CASE("[PWR-M-01] Multi-clause update: pick best clause") {
 		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 0) || G (o1[t] = 1).");
+		// Use explicit parentheses: in Tau, G extends through || so
+		// "G A || G B" parses as G(A || G B), not (G A) || (G B).
+		tref u = spec("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
@@ -382,7 +384,9 @@ TEST_SUITE("[PWR-M: Multi-clause]") {
 	}
 
 	TEST_CASE("[PWR-M-02] Multi-clause spec") {
-		tref s = spec("G (o1[t] = 0) || G (o1[t] = 1).");
+		// Use explicit parentheses: in Tau, G extends through || so
+		// "G A || G B" parses as G(A || G B), not (G A) || (G B).
+		tref s = spec("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
 		tref u = spec("G (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
@@ -588,7 +592,8 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 
 	TEST_CASE("[PWR-D-05] Disjunctive update selection") {
 		tref s = spec("G (o1[t] = 0).");
-		tref u = spec("G (o1[t] = 0) || G (o1[t] = 1).");
+		// Use explicit parentheses: in Tau, G extends through ||.
+		tref u = spec("(G (o1[t] = 0)) || (G (o1[t] = 1)).");
 		REQUIRE(s != nullptr);
 		REQUIRE(u != nullptr);
 		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
@@ -744,5 +749,12 @@ TEST_SUITE("[PWR-D: DeepSeek nontrivial]") {
 		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
 		REQUIRE(result != nullptr);
 		CHECK(is_realizable(result));
+	}
+}
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
 	}
 }

@@ -994,6 +994,48 @@ static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
 	return tau::build_wff_always(body);
 }
 
+// Build the fixed-time initial-state and initial-output conditions for a
+// multi-state Mealy encoding.  These are returned separately so the caller
+// can combine them with the safety formula AFTER normalisation (normalising
+// them together can cause the solver to report unsatisfiability at step 0).
+//
+// Returned pair: { sv[initial_state][0]={1},  init_out_disjunction }
+// init_out_disjunction = ∨_e ( guard_e(t=0) ∧ sv[dst_e][1]={1} )
+// If the initial state has no outgoing edges (shouldn't happen for a
+// realizable formula), the second element is nullptr.
+template <NodeType node>
+static std::pair<tref,tref>
+encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
+                                const std::vector<std::string>& sv)
+{
+	using tau = tree<node>;
+	const auto& aut = sol.aut;
+	const int k     = (int)sv.size();
+	const int init_s = aut.initial_state;
+	if (init_s < 0 || init_s >= k) return {nullptr, nullptr};
+
+	// (1) sv[initial_state][0] = {1}
+	tref sv_tmpl = parse_sv_eq<node>(sv[init_s], 0, 1);
+	auto sv_io   = tau::get(sv_tmpl).select_top(is_child<node, tau::io_var>);
+	tref init_sv = fm_at_time_point<node>(sv_tmpl, sv_io, 0);
+
+	// (2) ∨_e ( guard_e(t=0) ∧ sv[dst_e][1]={1} )
+	tref init_out = nullptr;
+	for (const auto& e : aut.edges[init_s]) {
+		if (e.dst < 0 || e.dst >= k) continue;
+		tref gfm   = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
+		auto gvars = tau::get(gfm).select_top(is_child<node, tau::io_var>);
+		tref g0    = fm_at_time_point<node>(gfm, gvars, 0);
+		tref sv_t  = parse_sv_eq<node>(sv[e.dst], 0, 1);
+		auto sv_t_io = tau::get(sv_t).select_top(is_child<node, tau::io_var>);
+		tref sv1   = fm_at_time_point<node>(sv_t, sv_t_io, 1);
+		tref edge  = tau::build_wff_and(g0, sv1);
+		init_out   = init_out ? tau::build_wff_or(init_out, edge) : edge;
+	}
+
+	return {init_sv, init_out};
+}
+
 // ── ltl_to_safety_formula ─────────────────────────────────────────────────────
 //
 // `_full` does the work and returns BOTH the safety formula AND the

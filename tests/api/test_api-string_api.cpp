@@ -224,3 +224,10 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK( o_values == i_values );
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

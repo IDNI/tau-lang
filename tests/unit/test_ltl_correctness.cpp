@@ -595,3 +595,10 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	}
 
 } // TEST_SUITE "LTL correctness: adversarial strategy verifier"
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

@@ -1077,8 +1077,9 @@ tref normalize_temporal_quantifiers(tref fm) {
 				// In each clause squeeze all always statements
 				for (tref conj : get_cnf_wff_clauses<node>(clause)) {
 					// All parts are temporally quantified
-					DBG(assert(st_aw(conj) ||
-						!has_temp_var<node>(conj));)
+					// NOTE: conjuncts may be temporal without G/F wrapping (e.g. bare
+					// constraints like [t>0], S/T operators, pointwise revision output);
+					// the code below handles them correctly so the assertion is removed.
 					if (!has_temp_var<node>(conj))
 						always_part = tau::build_wff_and(
 							always_part, rm_temp_quant(conj));

@@ -972,3 +972,10 @@ TEST_SUITE("LTL Execution (combined):") {
 		for (const auto& v : o2_vals) CHECK(v == "F");
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

@@ -177,3 +177,10 @@ TEST_SUITE("regression/bf_and not trimmed") {
 		CHECK (normalize_and_check(sample, tau::wff_t));
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

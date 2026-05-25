@@ -229,7 +229,6 @@ TEST_SUITE("Execution") {
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
 			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
-		"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0",
 		}
 		};
 		io_context<node_t> ctx;
@@ -622,3 +621,10 @@ TEST_SUITE("with inputs and outputs") {
 // 		CHECK ( outputs.write(output) );
 // 	}
 // }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

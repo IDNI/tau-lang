@@ -324,3 +324,10 @@ TEST_SUITE("Tau_splitter_uniter_const") {
 		CHECK(s_str == "<:split1> = 0 && <:split2> != 0");
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

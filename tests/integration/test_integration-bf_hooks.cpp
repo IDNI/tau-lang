@@ -348,3 +348,10 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( check_type("{o1[t] = 0}^{o2[t] = 0}:tau", tau_type<node_t>()) );
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

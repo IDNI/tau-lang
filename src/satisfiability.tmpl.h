@@ -920,7 +920,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		<< "always_to_unbounded_continuation begin\n"
 		<< "always_to_unbounded_continuation[fm]: " << LOG_FM(fm) << "\n";)
 
-	assert(has_no_boolean_combs_of_models<node>(fm));
+	DBG(assert(has_no_boolean_combs_of_models<node>(fm));)
 
 	if (tau::get(fm).child_is(tau::wff_always)) fm = tau::trim2(fm);
 

@@ -358,3 +358,10 @@ TEST_SUITE("qlt oracle cross-validation (tau vs cvc5 LRA)") {
 		CHECK(lra.exists_sat(phi) == false);
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

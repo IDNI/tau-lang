@@ -228,3 +228,10 @@ TEST_SUITE("[SPWR-A: Algorithm D result]") {
 	}
 
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

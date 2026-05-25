@@ -564,3 +564,10 @@ TEST_CASE("pwr/false-update: u=F leaves spec unchanged") {
 }
 
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

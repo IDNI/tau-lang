@@ -701,8 +701,12 @@ static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
 // `aux_pairs` collects (curr, prev) atom refs for each S operator, used
 // later to add temporal connection constraints G(X(p_prev) <-> p_curr)
 // to the ltlsynt skeleton.
-// `safety_invs` collects G(curr && rhs) — safe execution invariants that
-// avoid backward-propagation issues with the initial aux value.
+// `safety_invs` collects G(curr && rhs) for the outermost S, and
+// G(curr ↔ rhs) for inner (nested) S operators.  The biconditional form
+// for inner S lets the auxiliary variable be false at t=0 without forcing
+// the inner ψ to hold — only the outermost S's ψ is required at t=0.
+// `is_outer` is true for the top-level call and for the first S node
+// encountered; false for S operators nested inside another S's phi/psi.
 template <NodeType node>
 static tref compile_since_trigger_rec(
     tref fm,
@@ -710,7 +714,8 @@ static tref compile_since_trigger_rec(
     int& counter,
     std::vector<std::pair<tref,tref>>& aux_pairs,
     std::vector<tref>& safety_invs,
-    std::vector<tref>& init_conds)
+    std::vector<tref>& init_conds,
+    bool is_outer = true)
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
@@ -725,7 +730,7 @@ static tref compile_since_trigger_rec(
 		tref neg_phi = tau::build_wff_neg(phi);
 		tref neg_psi = tau::build_wff_neg(psi);
 		tref s_node  = tau::build_wff_S(neg_phi, neg_psi);
-		tref s_rewr  = compile_since_trigger_rec<node>(s_node, invariants, counter, aux_pairs, safety_invs, init_conds);
+		tref s_rewr  = compile_since_trigger_rec<node>(s_node, invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
 		return tau::build_wff_neg(s_rewr);
 	}
 
@@ -735,8 +740,11 @@ static tref compile_since_trigger_rec(
 		tref psi = t[0].second();
 
 		// Recursively compile nested S/T inside operands first.
-		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds);
-		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds);
+		// Any S inside phi or psi is by definition inner (nested), so
+		// pass is_outer=false to suppress the always-true requirement
+		// and the psi-at-0 initial condition for those sub-operators.
+		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
+		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
 
 		// Fresh auxiliary output variable name (o-prefix → controllable output).
 		std::string aux_name = "o__ltl_s" + std::to_string(counter++) + "__";
@@ -756,20 +764,30 @@ static tref compile_since_trigger_rec(
 		// constrains ONLY position 0 of the run (LTL semantics evaluate at position 0).
 		tref init_cond = tau::build_wff_neg(prev); // !(aux[t-1]={1})
 		invariants.push_back(init_cond);
-		// For the fast path: at t=0, S semantics forces ψ to hold directly.
-		// Encoding as an initial constraint on the user-facing io_vars (shifted
-		// to t=0) avoids the aux[t-1] reference, which the interpreter's
-		// fixpoint pipeline would mis-treat as a G-unrolled seed.
-		{
+
+		if (is_outer) {
+			// For the outermost S only: at t=0, S semantics forces ψ to hold
+			// directly.  Encoding as an initial constraint on the user-facing
+			// io_vars (shifted to t=0) avoids the aux[t-1] reference, which
+			// the interpreter's fixpoint pipeline would mis-treat as a
+			// G-unrolled seed.
 			auto psi_io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
 			tref psi_at_0 = fm_at_time_point<node>(psi, psi_io_vars, 0);
 			init_conds.push_back(psi_at_0);
-		}
 
-		// Safety execution invariant: G(curr && rhs).
-		// Unlike the biconditional G(curr <-> rhs), this does NOT propagate rhs
-		// backwards through time, so it is safe to use in the streaming interpreter.
-		safety_invs.push_back(tau::build_wff_always(tau::build_wff_and(curr, rhs)));
+			// Outermost S safety invariant: G(curr && rhs).
+			// The top-level spec must ALWAYS hold, so curr must always be 1.
+			// This does NOT propagate rhs backwards in time.
+			safety_invs.push_back(tau::build_wff_always(tau::build_wff_and(curr, rhs)));
+		} else {
+			// Inner S safety invariant: G(curr ↔ rhs).
+			// The inner S auxiliary is NOT required to be 1 at all times —
+			// it is free to be 0 at t=0 when the outermost S's ψ (not this
+			// ψ) is what holds the spec at t=0.  The biconditional correctly
+			// tracks the auxiliary's value without imposing the always-true
+			// requirement that would otherwise force this ψ at t=0.
+			safety_invs.push_back(tau::build_wff_always(tau::build_wff_equiv(curr, rhs)));
+		}
 
 		// Record the (curr, prev) pair so the caller can add the temporal
 		// connection G(X(p_prev) <-> p_curr) to the ltlsynt skeleton.  Without
@@ -784,25 +802,27 @@ static tref compile_since_trigger_rec(
 
 	// Recurse into operator children (covers wff_and, wff_or, wff_neg,
 	// wff_F, wff_U, wff_R, wff_W, wff_always, etc.)
+	// Propagate is_outer so that S operators encountered here (e.g. at
+	// the top level of a conjunction) retain the same is_outer status.
 	const auto& op = t[0];
 	size_t nc = op.children_size();
 	if (nc == 0) return fm;
 
 	if (nc == 1) {
-		tref new_c = compile_since_trigger_rec<node>(op.first(), invariants, counter, aux_pairs, safety_invs, init_conds);
+		tref new_c = compile_since_trigger_rec<node>(op.first(), invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
 		if (new_c == op.first()) return fm;
 		return tau::get(tau::wff, tau::get(nt, new_c));
 	}
 	if (nc == 2) {
-		tref new_l = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds);
-		tref new_r = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds);
+		tref new_l = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
+		tref new_r = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
 		if (new_l == op.first() && new_r == op.second()) return fm;
 		return tau::get(tau::wff, tau::get(nt, new_l, new_r));
 	}
 	if (nc == 3) {
-		tref new_a = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds);
-		tref new_b = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds);
-		tref new_c = compile_since_trigger_rec<node>(op.third(),  invariants, counter, aux_pairs, safety_invs, init_conds);
+		tref new_a = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
+		tref new_b = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
+		tref new_c = compile_since_trigger_rec<node>(op.third(),  invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
 		if (new_a == op.first() && new_b == op.second() && new_c == op.third())
 			return fm;
 		// 3-child case: use build_wff_conditional for wff_conditional,
@@ -816,11 +836,13 @@ static tref compile_since_trigger_rec(
 }
 
 // Top-level S/T compilation pass.
-// Returns {compiled_formula, safety_formula, aux_pairs}.
+// Returns {compiled_formula, safety_formula, init_formula, aux_pairs}.
 // compiled_formula is fm unchanged if there are no S/T nodes.
 // Otherwise: compiled_formula && G_inv_0 && G_inv_1 && ...
-// safety_formula: conjunction of G(curr_k && rhs_k) for each S operator,
-//   safe for streaming execution (no backward-propagation from biconditional).
+// safety_formula: G(outermost_s && rhs) for the top-level S (always-true
+//   requirement), and G(inner_s ↔ rhs) for nested S operators (biconditional
+//   tracks the auxiliary without forcing it to 1 at t=0).
+// init_formula: psi_at_0 for the outermost S only (strong-past t=0 condition).
 // aux_pairs: one entry per S operator: (curr_atom, prev_atom).
 // Callers use aux_pairs to add G(X(p_prev) <-> p_curr) to the ltlsynt skeleton.
 template <NodeType node>

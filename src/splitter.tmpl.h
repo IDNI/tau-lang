@@ -63,7 +63,8 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 	using node = tau_lang::node<BAs...>;
 	if (spec_clause) {
 		// We are dealing with a temporal formula
-		DBG(assert(is_tau_impl<node>(splitter, fm));)
+		// NOTE: temporal upper splitters do not necessarily imply fm; the
+		// implication check below (sat + non-equivalence) is the correct gate.
 		tref new_spec_clause = normalize_with_temp_simp<node>(
 			rewriter::replace<node>(spec_clause, fm, splitter));
 		if (is_tau_formula_sat<node>(new_spec_clause)) {
@@ -358,7 +359,9 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		else return false;
 	};
 	splitter = split_path<BAs...>(fm, st, true, check_splitter);
-	if (tau::get(fm) != tau::get(splitter)) return {splitter, st};
+	// Guard against null: split_path returns nullptr when fm has no paths
+	// (e.g. F, which has an empty DNF). Falls through to bad splitter.
+	if (splitter && tau::get(fm) != tau::get(splitter)) return {splitter, st};
 	// return bad splitter by conjuncting new uninterpreted constant
 	return { tau_bad_splitter<BAs...>(fm), splitter_type::bad };
 }

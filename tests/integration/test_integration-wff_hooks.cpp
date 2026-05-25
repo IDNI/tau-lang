@@ -657,3 +657,10 @@ TEST_SUITE("wff comparator hooks") {
 		CHECK( check_hook("1!>=X", "F") );
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

@@ -153,3 +153,10 @@ TEST_SUITE("SBF expressions") {
 		CHECK( bf_normalize_and_check(sample, tau::ba_constant) );
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

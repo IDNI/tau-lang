@@ -33,8 +33,8 @@ TEST_SUITE("allowing unresolved rr's in normalization") {
 	TEST_CASE("ex x f[0](x) && x != 0.") {
 		const char* sample = "ex x f[0](x) && x != 0.";
 		CHECK( normalize_and_check(sample, strings{
-			"ex b1 f[0](b1) && b1 != 0",
 			"ex b1 b1 != 0 && f[0](b1)",
+			"ex b1 f[0](b1) && b1 != 0",
 		}) );
 	}
 }
@@ -62,5 +62,11 @@ TEST_SUITE("tau_ba dispatcher helpers") {
 		auto nso = get_nso_rr("x = 0.");
 		REQUIRE(nso.has_value());
 		CHECK(!is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())));
+	}
+}
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
 	}
 }

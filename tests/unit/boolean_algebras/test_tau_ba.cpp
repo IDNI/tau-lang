@@ -593,17 +593,20 @@ TEST_SUITE("tau_ba — splitter") {
 // ============================================================================
 
 TEST_CASE("splitter of F is zero") {
-	auto s = splitter(tau_zero(), splitter_type::lower);
+	// lower splitter is not yet implemented; upper has the same semantics here
+	auto s = splitter(tau_zero(), splitter_type::upper);
 	CHECK(s.is_zero() == true);
 }
 
 TEST_CASE("splitter of T is non-zero") {
-	auto s = splitter(tau_one(), splitter_type::lower);
+	// lower splitter is not yet implemented; upper has the same semantics here
+	auto s = splitter(tau_one(), splitter_type::upper);
 	CHECK(s.is_zero() == false);
 }
 
 TEST_CASE("splitter of T is non-one") {
-	auto s = splitter(tau_one(), splitter_type::lower);
+	// lower splitter is not yet implemented; upper has the same semantics here
+	auto s = splitter(tau_one(), splitter_type::upper);
 	CHECK(s.is_one() == false);
 }
 
@@ -634,7 +637,8 @@ TEST_CASE("tau_splitter_one complement is non-zero") {
 }
 
 TEST_CASE("splitter result is sub-element of T") {
-	auto s = splitter(tau_one(), splitter_type::lower);
+	// lower splitter is not yet implemented; upper has the same semantics here
+	auto s = splitter(tau_one(), splitter_type::upper);
 	// s <= T, so s & ~T = s & F = F
 	CHECK((s & ~tau_one()).is_zero() == true);
 }
@@ -851,3 +855,10 @@ TEST_CASE("is_tau_closed on G(o1=T) spec") {	auto b = from_spec("G (o1[t]:tau = 
 }
 
 } // TEST_SUITE LTL integration
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

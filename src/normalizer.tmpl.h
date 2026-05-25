@@ -758,6 +758,17 @@ inline tref flatten_always_conjuncts(tref fm) {
 	// Nothing to merge.
 	if (always_bodies.size() <= 1) return fm;
 
+	// Guard: if any G body itself contains a nested G or F, merging would
+	// produce G(...G(...)...) which the safety pipeline cannot handle.
+	// Leave the formula unchanged; the downstream normalizer will split it.
+	auto has_nested_temporal = [](tref body) {
+		const auto& bt = tau::get(body);
+		return bt.find_top(is_child<node, tau::wff_always>)
+			|| bt.find_top(is_child<node, tau::wff_F>);
+	};
+	for (tref b : always_bodies)
+		if (has_nested_temporal(b)) return fm;
+
 	// Build G(A && B && ...) from all always bodies.
 	tref combined_body = always_bodies[0];
 	for (size_t i = 1; i < always_bodies.size(); ++i)

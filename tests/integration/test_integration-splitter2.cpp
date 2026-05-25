@@ -28,3 +28,10 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		CHECK(is_splitter<bas_pack>(fm, s));
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}

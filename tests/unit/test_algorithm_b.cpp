@@ -210,3 +210,10 @@ TEST_SUITE("[Algorithm B: integration]") {
 		CHECK(result);
 	}
 }
+
+
+TEST_SUITE("Cleanup") {
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}
