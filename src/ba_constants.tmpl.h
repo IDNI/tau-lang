@@ -70,8 +70,15 @@ std::string ba_constants<node>::dump_to_str() {
 
 template <NodeType node>
 void ba_constants<node>::cleanup() {
-	C.clear(); C.shrink_to_fit();
-	T.clear(); T.shrink_to_fit();
+	// Release all elements so cvc5::Term references are dropped before
+	// cvc5's TermManager is destroyed.  Do NOT call shrink_to_fit(): the
+	// atexit callback that invokes cleanup() runs before C and T's own
+	// static destructors.  If shrink_to_fit() frees the backing storage
+	// here, the subsequent static-destructor pass tries to free the same
+	// block a second time, producing a "double free detected" abort.
+	// The backing storage is released exactly once by C/T's own destructors.
+	C.clear();
+	T.clear();
 }
 
 } // namespace idni::tau_lang
