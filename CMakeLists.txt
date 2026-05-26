@@ -13,17 +13,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 endif()
 if(TAU_USE_CCACHE)
-	find_program(CCACHE_BINARY ccache)
-	if(CCACHE_BINARY)
-		set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_BINARY}"
-			CACHE STRING "C compiler launcher")
-		set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_BINARY}"
-			CACHE STRING "C++ compiler launcher")
-		message(STATUS "Using ccache: ${CCACHE_BINARY}")
-	else()
-		message(WARNING "TAU_USE_CCACHE is ON but ccache was not found. Disabling ccache.")
-		set(TAU_USE_CCACHE OFF CACHE BOOL "Use ccache to speed up compilation" FORCE)
-	endif()
+	include(use-ccache.cmake)
 endif()
 
 set(namespace "TAU")
@@ -73,6 +63,13 @@ if (TAU_BUILD_JOBS STREQUAL "")
 	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
 endif()
 
+if(TAU_BUILD_JOBS EQUAL 0 AND DEFINED ENV{TAU_BUILD_JOBS}
+		AND NOT "$ENV{TAU_BUILD_JOBS}" STREQUAL "")
+	set(TAU_BUILD_JOBS "$ENV{TAU_BUILD_JOBS}" CACHE STRING
+		"Number of jobs to use for the build (0 to auto-detect)" FORCE)
+	message(STATUS "TAU_BUILD_JOBS from environment: ${TAU_BUILD_JOBS}")
+endif()
+
 message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
 
 # Set the number of jobs to use for the build
@@ -116,11 +113,6 @@ set_property(CACHE TAU_MACOS_PACKAGE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
-
-# Load local cmake settings
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
-	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
-endif()
 
 if(TAU_BUILD_TESTS)
 	set(TAU_BUILD_UNIT_TESTS ON)

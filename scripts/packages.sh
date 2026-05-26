@@ -1,6 +1,6 @@
 #!/bin/bash
 
-./dev release -DTAU_DEB_PACKAGE=ON $@
+./dev release -DTAU_DEB_PACKAGE=ON "$@"
 cd ./build-Release
 cpack -C Release
 cd ..

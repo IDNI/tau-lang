@@ -3,7 +3,9 @@
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PARSER_ROOT="${REPO_ROOT}/external/parser"
 DEV_ROOT="${PARSER_ROOT}"
+
 source "${PARSER_ROOT}/scripts/devrc"
 
+PRESET_RUN_BIN="tau"
 cd "${REPO_ROOT}"
-test_entry Release -DTAU_BUILD_TESTS=ON "$@"
+preset_entry "$@"
