@@ -5,7 +5,11 @@
 echo "dev - Tau development helper scripts"
 
 help() {
-	echo "Usage: ./dev <SCRIPT> <SCRIPT_OPTIONS>"
+	echo "Usage: ./dev <SCRIPT> [SCRIPT_OPTIONS...]"
+	echo ""
+	echo "  -D options may appear anywhere; see scripts/README.md"
+	echo "  TAU_BUILD_JOBS: -D, env, or auto (half of CPU cores)"
+	echo ""
 	echo "Available scripts:"
 	for script in scripts/*.sh; do
 		if [ -f "$script" ]; then
@@ -33,18 +37,14 @@ if [ "$script_name" == "help" ] || [ "$script_name" == "--help" ] || [ "$script_
 	exit 0
 fi
 
-script_name="${script_name%.sh}"  # remove .sh extension if provided
-script_path=""
-
-# Check if script exists (script must have .sh extension)
-if [ -f "scripts/${script_name}.sh" ]; then
-	script_path="scripts/${script_name}.sh"
-else
-	error "'scripts/${script_name}.sh' not found"
+if [ ! -f external/parser/scripts/devrc ]; then
+	echo "Initializing parser submodule..."
+	git submodule update --init --recursive
 fi
+source external/parser/scripts/devrc
 
-echo "Running: $script_path"
-
-# Execute the script and pass all remaining arguments
-shift  # Remove the first argument (script name)
-exec "$script_path" "$@"
+if resolve_script "$(pwd)" "$@"; then
+	exit 0
+else
+	error "'scripts/${script_name%.sh}.sh' not found"
+fi

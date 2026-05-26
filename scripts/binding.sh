@@ -20,22 +20,6 @@ else
 	esac
 fi
 
-ARGS_STARTS=2
-BUILD_TYPE="${2}"
-if [ -z "${BUILD_TYPE}" ]; then
-	BUILD_TYPE="Release"
-else
-	case "${BUILD_TYPE}" in
-		"Debug"|"Release"|"RelWithDebInfo")
-			ARGS_STARTS=3
-			;;
-		*)
-			echo "Error: build type must be either 'Debug', 'Release', or 'RelWithDebInfo'"
-			exit 1
-		;;
-	esac
-fi
-
-
-./dev build "${BUILD_TYPE}" "${@:$ARGS_STARTS}" "${BUILD_OPTIONS[@]}"
-
+build_args=("${@:2}")
+[[ ${#build_args[@]} -eq 0 ]] && build_args=("Release")
+./dev build "${build_args[@]}" "${BUILD_OPTIONS[@]}"
