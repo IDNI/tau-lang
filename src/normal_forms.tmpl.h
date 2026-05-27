@@ -4156,11 +4156,15 @@ tref anti_prenex_block(tref formula) {
 	// Do substitution based elimination
 	// Syntactically simplify formula
 
+	// For the remaining algorithm pull the negation out of != and
+	// other comparison operators, in order to have only a single operator
+	// without their negated counterparts
+
 	// For each quantifier block in post order
 	//  Partition quantifiers
 	//  Build quant_pattern
 	//  Convert terms to BDD according to quantified variables
-	//  Call anti_prenex_block
+	//  Call already present anti_prenex_block above
 }
 
 template<NodeType node>
