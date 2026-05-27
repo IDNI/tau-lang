@@ -183,6 +183,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 
 			case bf_t:
 			case bf_f: {
+				// Integrate type information
+				/*process_type_tree(nt);*/
 				trefs ch;
 				for (tref c : ptr.children())
 					if (m_ref(c)) ch.push_back(m_ref(c));
@@ -203,6 +205,8 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 			}
 
 			default:
+				// Integrate type information
+				/*process_type_tree(nt);*/
 				if (is_string_nt(nt)) {
 					x = getx_data(
 						dict(ptr.get_terminals()));

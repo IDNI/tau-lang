@@ -156,11 +156,11 @@ bool is_bool_type(size_t t);
  * @return Tree reference representing the type for bitvectors
  */
 template <NodeType node>
-tref bv_type(unsigned short bitwidth);
+tref bv_type(unsigned short bitwidth = default_bv_size);
 
 /** @brief Return the integer type id for a bitvector of @p bitwidth bits. */
 template <NodeType node>
-size_t bv_type_id(unsigned short bitwidth);
+size_t bv_type_id(unsigned short bitwidth = default_bv_size);
 
 /**
  * @brief Checks if t represents a bitvector type
