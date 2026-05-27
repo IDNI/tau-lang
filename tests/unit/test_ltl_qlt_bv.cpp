@@ -55,7 +55,7 @@ static strings run_qlt_with_i1(const char* formula, const strings& i1_vals, size
 static strings run_bv_no_input(const char* formula, size_t steps) {
 	io_context<node_t> ctx;
 	auto o1 = std::make_shared<vector_output_stream>();
-	ctx.add_output("o1", bv_type_id<node_t>(), o1);
+	ctx.add_output("o1", bv_type_id<node_t>(8), o1);
 	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula));
 	if (!nso.has_value()) return {};
 	tref fm = nso.value().main->get();
@@ -66,10 +66,10 @@ static strings run_bv_no_input(const char* formula, size_t steps) {
 
 static strings run_bv_with_i1(const char* formula, const strings& i1_vals, size_t steps) {
 	io_context<node_t> ctx;
-	ctx.add_input("i1", bv_type_id<node_t>(),
+	ctx.add_input("i1", bv_type_id<node_t>(8),
 	              std::make_shared<vector_input_stream>(i1_vals));
 	auto o1 = std::make_shared<vector_output_stream>();
-	ctx.add_output("o1", bv_type_id<node_t>(), o1);
+	ctx.add_output("o1", bv_type_id<node_t>(8), o1);
 	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula));
 	if (!nso.has_value()) return {};
 	tref fm = nso.value().main->get();
@@ -415,65 +415,65 @@ TEST_SUITE("qlt_execution") {
 
 TEST_SUITE("bv_realizability") {
 
-	TEST_CASE("BR-01: G(o1={#b10110101}:bv) is REALIZABLE") {
-		CHECK(realizable("G (o1[t]:bv = {#b10110101}:bv)."));
+	TEST_CASE("BR-01: G(o1={#b10110101}:bv[8]) is REALIZABLE") {
+		CHECK(realizable("G (o1[t]:bv[8] = {#b10110101}:bv[8])."));
 	}
-	TEST_CASE("BR-02: G(o1={#b11110000}:bv) is REALIZABLE") {
-		CHECK(realizable("G (o1[t]:bv = {#b11110000}:bv)."));
+	TEST_CASE("BR-02: G(o1={#b11110000}:bv[8]) is REALIZABLE") {
+		CHECK(realizable("G (o1[t]:bv[8] = {#b11110000}:bv[8])."));
 	}
-	TEST_CASE("BR-03: F(o1={255}:bv) is REALIZABLE") {
-		CHECK(realizable("F (o1[t]:bv = {255}:bv)."));
+	TEST_CASE("BR-03: F(o1={255}:bv[8]) is REALIZABLE") {
+		CHECK(realizable("F (o1[t]:bv[8] = {255}:bv[8])."));
 	}
-	TEST_CASE("BR-04: G(o1!={#b10110101}:bv) is REALIZABLE") {
-		CHECK(realizable("G (o1[t]:bv != {#b10110101}:bv)."));
+	TEST_CASE("BR-04: G(o1!={#b10110101}:bv[8]) is REALIZABLE") {
+		CHECK(realizable("G (o1[t]:bv[8] != {#b10110101}:bv[8])."));
 	}
-	TEST_CASE("BR-05: G(o1=i1[t]:bv) is REALIZABLE (mirror)") {
-		CHECK(realizable("G (o1[t]:bv = i1[t]:bv)."));
+	TEST_CASE("BR-05: G(o1=i1[t]:bv[8]) is REALIZABLE (mirror)") {
+		CHECK(realizable("G (o1[t]:bv[8] = i1[t]:bv[8])."));
 	}
-	TEST_CASE("BR-06: G(o1=i1[t-1]:bv) is REALIZABLE (mirror lookback)") {
-		CHECK(realizable("G (o1[t]:bv = i1[t-1]:bv)."));
+	TEST_CASE("BR-06: G(o1=i1[t-1]:bv[8]) is REALIZABLE (mirror lookback)") {
+		CHECK(realizable("G (o1[t]:bv[8] = i1[t-1]:bv[8])."));
 	}
-	TEST_CASE("BR-07: G(o1!=i1[t]:bv) is REALIZABLE (avoid input)") {
-		CHECK(realizable("G (o1[t]:bv != i1[t]:bv)."));
+	TEST_CASE("BR-07: G(o1!=i1[t]:bv[8]) is REALIZABLE (avoid input)") {
+		CHECK(realizable("G (o1[t]:bv[8] != i1[t]:bv[8])."));
 	}
-	TEST_CASE("BR-08: (o1={#b00001111}:bv) U (o1={#b11110000}:bv) is REALIZABLE") {
-		CHECK(realizable("(o1[t]:bv = {#b00001111}:bv) U (o1[t]:bv = {#b11110000}:bv)."));
+	TEST_CASE("BR-08: (o1={#b00001111}:bv[8]) U (o1={#b11110000}:bv[8]) is REALIZABLE") {
+		CHECK(realizable("(o1[t]:bv[8] = {#b00001111}:bv[8]) U (o1[t]:bv[8] = {#b11110000}:bv[8])."));
 	}
-	TEST_CASE("BR-09: (o1={#b10101010}:bv) S (o1={#b01010101}:bv) is REALIZABLE") {
-		CHECK(realizable("(o1[t]:bv = {#b10101010}:bv) S (o1[t]:bv = {#b01010101}:bv)."));
+	TEST_CASE("BR-09: (o1={#b10101010}:bv[8]) S (o1={#b01010101}:bv[8]) is REALIZABLE") {
+		CHECK(realizable("(o1[t]:bv[8] = {#b10101010}:bv[8]) S (o1[t]:bv[8] = {#b01010101}:bv[8])."));
 	}
-	TEST_CASE("BR-10: G(o1=o1[t-1]:bv) is REALIZABLE (constant output)") {
-		CHECK(realizable("G (o1[t]:bv = o1[t-1]:bv)."));
+	TEST_CASE("BR-10: G(o1=o1[t-1]:bv[8]) is REALIZABLE (constant output)") {
+		CHECK(realizable("G (o1[t]:bv[8] = o1[t-1]:bv[8])."));
 	}
-	TEST_CASE("BR-11: UNREALIZABLE: G(o1=i1[t]:bv && o1!={#b10110101}:bv) (i can equal constant)") {
-		CHECK_FALSE(realizable("G (o1[t]:bv = i1[t]:bv && o1[t]:bv != {#b10110101}:bv)."));
+	TEST_CASE("BR-11: UNREALIZABLE: G(o1=i1[t]:bv[8] && o1!={#b10110101}:bv[8]) (i can equal constant)") {
+		CHECK_FALSE(realizable("G (o1[t]:bv[8] = i1[t]:bv[8] && o1[t]:bv[8] != {#b10110101}:bv[8])."));
 	}
-	TEST_CASE("BR-12: UNREALIZABLE: G(o1=i1[t]:bv) && F(o1!={255}:bv) && G(i1[t]={255}:bv)") {
-		CHECK_FALSE(realizable("G (o1[t]:bv = i1[t]:bv) && F (o1[t]:bv != {255}:bv) && G (i1[t]:bv = {255}:bv)."));
+	TEST_CASE("BR-12: UNREALIZABLE: G(o1=i1[t]:bv[8]) && F(o1!={255}:bv[8]) && G(i1[t]={255}:bv[8])") {
+		CHECK_FALSE(realizable("G (o1[t]:bv[8] = i1[t]:bv[8]) && F (o1[t]:bv[8] != {255}:bv[8]) && G (i1[t]:bv[8] = {255}:bv[8])."));
 	}
-	TEST_CASE("BR-13: UNREALIZABLE: G(o1!=o1[t-1]:bv) && G(o1=o1[t-1]:bv) (contradictory)") {
-		CHECK_FALSE(realizable("G (o1[t]:bv != o1[t-1]:bv) && G (o1[t]:bv = o1[t-1]:bv)."));
+	TEST_CASE("BR-13: UNREALIZABLE: G(o1!=o1[t-1]:bv[8]) && G(o1=o1[t-1]:bv[8]) (contradictory)") {
+		CHECK_FALSE(realizable("G (o1[t]:bv[8] != o1[t-1]:bv[8]) && G (o1[t]:bv[8] = o1[t-1]:bv[8])."));
 	}
-	TEST_CASE("BR-14: UNREALIZABLE: (o1={#b00000000}:bv) U (o1={#b11111111}:bv) && G(o1!={#b11111111}:bv)") {
-		CHECK_FALSE(realizable("(o1[t]:bv = {#b00000000}:bv) U (o1[t]:bv = {#b11111111}:bv) && G (o1[t]:bv != {#b11111111}:bv)."));
+	TEST_CASE("BR-14: UNREALIZABLE: (o1={#b00000000}:bv[8]) U (o1={#b11111111}:bv[8]) && G(o1!={#b11111111}:bv[8])") {
+		CHECK_FALSE(realizable("(o1[t]:bv[8] = {#b00000000}:bv[8]) U (o1[t]:bv[8] = {#b11111111}:bv[8]) && G (o1[t]:bv[8] != {#b11111111}:bv[8])."));
 	}
-	TEST_CASE("BR-15: UNREALIZABLE: G(o1=i1[t-1]:bv) && G(i1[t]:bv!=i1[t-1]:bv) (adversary constant i)") {
-		CHECK_FALSE(realizable("G (o1[t]:bv = i1[t-1]:bv) && G (i1[t]:bv != i1[t-1]:bv)."));
+	TEST_CASE("BR-15: UNREALIZABLE: G(o1=i1[t-1]:bv[8]) && G(i1[t]:bv[8]!=i1[t-1]:bv[8]) (adversary constant i)") {
+		CHECK_FALSE(realizable("G (o1[t]:bv[8] = i1[t-1]:bv[8]) && G (i1[t]:bv[8] != i1[t-1]:bv[8])."));
 	}
-	TEST_CASE("BR-16: REALIZABLE: G(o1={#b10110101}:bv || o1={#b11110000}:bv) (choice)") {
-		CHECK(realizable("G (o1[t]:bv = {#b10110101}:bv || o1[t]:bv = {#b11110000}:bv)."));
+	TEST_CASE("BR-16: REALIZABLE: G(o1={#b10110101}:bv[8] || o1={#b11110000}:bv[8]) (choice)") {
+		CHECK(realizable("G (o1[t]:bv[8] = {#b10110101}:bv[8] || o1[t]:bv[8] = {#b11110000}:bv[8])."));
 	}
-	TEST_CASE("BR-17: REALIZABLE: F(G(o1={255}:bv)) eventually constant") {
-		CHECK(realizable("F (G (o1[t]:bv = {255}:bv))."));
+	TEST_CASE("BR-17: REALIZABLE: F(G(o1={255}:bv[8])) eventually constant") {
+		CHECK(realizable("F (G (o1[t]:bv[8] = {255}:bv[8]))."));
 	}
-	TEST_CASE("BR-18: REALIZABLE: G(F(o1={#b01010101}:bv)) infinitely often") {
-		CHECK(realizable("G (F (o1[t]:bv = {#b01010101}:bv))."));
+	TEST_CASE("BR-18: REALIZABLE: G(F(o1={#b01010101}:bv[8])) infinitely often") {
+		CHECK(realizable("G (F (o1[t]:bv[8] = {#b01010101}:bv[8]))."));
 	}
-	TEST_CASE("BR-19: REALIZABLE: (o1={5}:bv) R (o1={#b00001111}:bv)") {
-		CHECK(realizable("(o1[t]:bv = {5}:bv) R (o1[t]:bv = {#b00001111}:bv)."));
+	TEST_CASE("BR-19: REALIZABLE: (o1={5}:bv[8]) R (o1={#b00001111}:bv[8])") {
+		CHECK(realizable("(o1[t]:bv[8] = {5}:bv[8]) R (o1[t]:bv[8] = {#b00001111}:bv[8])."));
 	}
-	TEST_CASE("BR-20: REALIZABLE: G(o1!=i1[t-1]:bv) (avoid previous input)") {
-		CHECK(realizable("G (o1[t]:bv != i1[t-1]:bv)."));
+	TEST_CASE("BR-20: REALIZABLE: G(o1!=i1[t-1]:bv[8]) (avoid previous input)") {
+		CHECK(realizable("G (o1[t]:bv[8] != i1[t-1]:bv[8])."));
 	}
 
 } // TEST_SUITE "bv_realizability"
@@ -482,68 +482,68 @@ TEST_SUITE("bv_realizability") {
 
 TEST_SUITE("bv_execution") {
 
-	TEST_CASE("BE-01: G(o1={#b10110101}:bv) outputs constant 0xb5") {
+	TEST_CASE("BE-01: G(o1={#b10110101}:bv[8]) outputs constant 0xb5") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("G (o1[t]:bv = {#b10110101}:bv).", 5);
+		auto vals = run_bv_no_input("G (o1[t]:bv[8] = {#b10110101}:bv[8]).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
-	TEST_CASE("BE-02: F(o1={255}:bv) produces non-empty output") {
+	TEST_CASE("BE-02: F(o1={255}:bv[8]) produces non-empty output") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("F (o1[t]:bv = {255}:bv).", 4);
+		auto vals = run_bv_no_input("F (o1[t]:bv[8] = {255}:bv[8]).", 4);
 		REQUIRE(vals.size() == 4);
 		CHECK(!vals[0].empty());
 	}
-	TEST_CASE("BE-03: G(o1=i1[t]:bv) mirrors input") {
+	TEST_CASE("BE-03: G(o1=i1[t]:bv[8]) mirrors input") {
 		bdd_init<Bool>();
 		strings inputs = {"181", "240", "15", "85", "170"};
-		auto vals = run_bv_with_i1("G (o1[t]:bv = i1[t]:bv).", inputs, 5);
+		auto vals = run_bv_with_i1("G (o1[t]:bv[8] = i1[t]:bv[8]).", inputs, 5);
 		REQUIRE(vals.size() == 5);
 		for (size_t i = 0; i < vals.size(); ++i) CHECK(vals[i] == inputs[i]);
 	}
-	TEST_CASE("BE-04: G(o1=i1[t-1]:bv) mirrors previous input") {
+	TEST_CASE("BE-04: G(o1=i1[t-1]:bv[8]) mirrors previous input") {
 		bdd_init<Bool>();
 		strings inputs = {"0", "181", "240", "15", "85"};
-		auto vals = run_bv_with_i1("G (o1[t]:bv = i1[t-1]:bv).", inputs, 5);
+		auto vals = run_bv_with_i1("G (o1[t]:bv[8] = i1[t-1]:bv[8]).", inputs, 5);
 		REQUIRE(vals.size() == 5);
 		// Check step 1 onward mirrors previous input
 		for (size_t i = 1; i < vals.size(); ++i) CHECK(vals[i] == inputs[i-1]);
 	}
-	TEST_CASE("BE-05: G(o1!={#b10110101}:bv) never outputs 181") {
+	TEST_CASE("BE-05: G(o1!={#b10110101}:bv[8]) never outputs 181") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("G (o1[t]:bv != {#b10110101}:bv).", 6);
+		auto vals = run_bv_no_input("G (o1[t]:bv[8] != {#b10110101}:bv[8]).", 6);
 		REQUIRE(vals.size() == 6);
 		// Can't check exact value, just that it's non-empty (no specific constant)
 		for (auto& v : vals) CHECK(!v.empty());
 	}
-	TEST_CASE("BE-06: G(o1={#b11110000}:bv || o1={#b00001111}:bv) outputs only those two") {
+	TEST_CASE("BE-06: G(o1={#b11110000}:bv[8] || o1={#b00001111}:bv[8]) outputs only those two") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("G (o1[t]:bv = {#b11110000}:bv || o1[t]:bv = {#b00001111}:bv).", 6);
+		auto vals = run_bv_no_input("G (o1[t]:bv[8] = {#b11110000}:bv[8] || o1[t]:bv[8] = {#b00001111}:bv[8]).", 6);
 		REQUIRE(vals.size() == 6);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
-	TEST_CASE("BE-07: F(G(o1={255}:bv)) eventually constant") {
+	TEST_CASE("BE-07: F(G(o1={255}:bv[8])) eventually constant") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("F (G (o1[t]:bv = {255}:bv)).", 8);
+		auto vals = run_bv_no_input("F (G (o1[t]:bv[8] = {255}:bv[8])).", 8);
 		REQUIRE(vals.size() == 8);
 		// After some point, all outputs non-empty
 		for (auto& v : vals) CHECK(!v.empty());
 	}
-	TEST_CASE("BE-08: G(F(o1={#b01010101}:bv)) infinitely often") {
+	TEST_CASE("BE-08: G(F(o1={#b01010101}:bv[8])) infinitely often") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("G (F (o1[t]:bv = {#b01010101}:bv)).", 10);
+		auto vals = run_bv_no_input("G (F (o1[t]:bv[8] = {#b01010101}:bv[8])).", 10);
 		REQUIRE(vals.size() == 10);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
-	TEST_CASE("BE-09: (o1={#b00001111}:bv) U (o1={#b11110000}:bv) until pattern") {
+	TEST_CASE("BE-09: (o1={#b00001111}:bv[8]) U (o1={#b11110000}:bv[8]) until pattern") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("(o1[t]:bv = {#b00001111}:bv) U (o1[t]:bv = {#b11110000}:bv).", 5);
+		auto vals = run_bv_no_input("(o1[t]:bv[8] = {#b00001111}:bv[8]) U (o1[t]:bv[8] = {#b11110000}:bv[8]).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
-	TEST_CASE("BE-10: (o1={#b10101010}:bv) W (o1={#b01010101}:bv) weak until") {
+	TEST_CASE("BE-10: (o1={#b10101010}:bv[8]) W (o1={#b01010101}:bv[8]) weak until") {
 		bdd_init<Bool>();
-		auto vals = run_bv_no_input("(o1[t]:bv = {#b10101010}:bv) W (o1[t]:bv = {#b01010101}:bv).", 5);
+		auto vals = run_bv_no_input("(o1[t]:bv[8] = {#b10101010}:bv[8]) W (o1[t]:bv[8] = {#b01010101}:bv[8]).", 5);
 		REQUIRE(vals.size() == 5);
 		for (auto& v : vals) CHECK(!v.empty());
 	}
@@ -557,14 +557,14 @@ TEST_SUITE("grammar_fuzz") {
 	TEST_CASE("GF-01: Depth-1 qlt: G(o1!={1/4}:qlt)") {
 		CHECK(realizable("G (o1[t]:qlt != {1/4}:qlt)."));
 	}
-	TEST_CASE("GF-02: Depth-1 bv: G(o1!={#b10101010}:bv)") {
-		CHECK(realizable("G (o1[t]:bv != {#b10101010}:bv)."));
+	TEST_CASE("GF-02: Depth-1 bv: G(o1!={#b10101010}:bv[8])") {
+		CHECK(realizable("G (o1[t]:bv[8] != {#b10101010}:bv[8])."));
 	}
 	TEST_CASE("GF-03: Depth-2 qlt: G(F(o1!={0}:qlt && o1!={1}:qlt))") {
 		CHECK(realizable("G (F (o1[t]:qlt != {0}:qlt && o1[t]:qlt != {1}:qlt))."));
 	}
-	TEST_CASE("GF-04: Depth-2 bv: F(G(o1={#b11001100}:bv))") {
-		CHECK(realizable("F (G (o1[t]:bv = {#b11001100}:bv))."));
+	TEST_CASE("GF-04: Depth-2 bv: F(G(o1={#b11001100}:bv[8]))") {
+		CHECK(realizable("F (G (o1[t]:bv[8] = {#b11001100}:bv[8]))."));
 	}
 	TEST_CASE("GF-05: Depth-3 qlt: G(F(G(o1={1/2}:qlt)))") {
 		CHECK(realizable("G (F (G (o1[t]:qlt = {1/2}:qlt)))."));
@@ -589,13 +589,13 @@ TEST_SUITE("grammar_fuzz") {
 			if (fm) CHECK(is_tau_formula_sat<node_t>(fm));
 		}
 	}
-	TEST_CASE("GF-09: Multi-output bv: G(o1={#b11110000}:bv && o2={#b00001111}:bv)") {
+	TEST_CASE("GF-09: Multi-output bv: G(o1={#b11110000}:bv[8] && o2={#b00001111}:bv[8])") {
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
 		auto o2 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		ctx.add_output("o2", bv_type_id<node_t>(), o2);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv = {#b11110000}:bv && o2[t]:bv = {#b00001111}:bv)."));
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		ctx.add_output("o2", bv_type_id<node_t>(8), o2);
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv[8] = {#b11110000}:bv[8] && o2[t]:bv[8] = {#b00001111}:bv[8])."));
 		CHECK(nso.has_value());
 		if (nso.has_value()) {
 			tref fm = nso.value().main->get();

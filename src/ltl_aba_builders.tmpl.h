@@ -926,7 +926,10 @@ static tref parse_sv_eq(const std::string& name, int shift, int value)
 {
 	using tau = tree<node>;
 	std::string t_str = (shift == 0) ? "t" : ("t-" + std::to_string(-shift));
-	std::string expr = name + "[" + t_str + "]:bv = { "
+	// Use the default BV bitwidth explicitly — bare ":bv" is rejected by
+	// the grammar since the merge that made bitwidths mandatory.
+	std::string bv_type_str = ":bv[" + std::to_string(default_bv_size) + "]";
+	std::string expr = name + "[" + t_str + "]" + bv_type_str + " = { "
 	                 + std::to_string(value) + " }";
 	// Use wff start symbol; keep all type inference defaults enabled so that
 	// bitvector constants ({0}, {1}) are properly resolved.

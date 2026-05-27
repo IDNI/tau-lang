@@ -296,10 +296,10 @@ TEST_CASE("[SHAPE-G-04] (o1={X}:sbf') U (o2={Y&Z}:sbf')") { tref fm = spec("(o1[
 
 TEST_SUITE("SHAPE-H: BF shift operators in bv constants") {
 
-TEST_CASE("[SHAPE-H-01] F(F(F(o1:bv = {#b10110101}>>{2}:bv)))") { tref fm = spec("F (F (F (o1[t]:bv = {#b10110101}:bv >> {2}:bv)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-H-02] G(F(o1:bv = {#b00001111}<<{1}:bv))") { tref fm = spec("G (F (o1[t]:bv = {#b00001111}:bv << {1}:bv))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-H-03] (o1:bv={#b11110000}>>{1}) U (o2:bv={#b10110101}<<{2})") {
-	tref fm = spec("(o1[t]:bv = {#b11110000}:bv >> {1}:bv) U (o2[t]:bv = {#b10110101}:bv << {2}:bv).");
+TEST_CASE("[SHAPE-H-01] F(F(F(o1:bv[8] = {#b10110101}>>{2}:bv[8])))") { tref fm = spec("F (F (F (o1[t]:bv[8] = {#b10110101}:bv[8] >> {2}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-H-02] G(F(o1:bv[8] = {#b00001111}<<{1}:bv[8]))") { tref fm = spec("G (F (o1[t]:bv[8] = {#b00001111}:bv[8] << {1}:bv[8]))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-H-03] (o1:bv[8]={#b11110000}>>{1}) U (o2:bv[8]={#b10110101}<<{2})") {
+	tref fm = spec("(o1[t]:bv[8] = {#b11110000}:bv[8] >> {1}:bv[8]) U (o2[t]:bv[8] = {#b10110101}:bv[8] << {2}:bv[8]).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
@@ -313,12 +313,12 @@ TEST_SUITE("SHAPE-I: BF quantifiers fall/fex") {
 
 // fall/fex take a BF body (not a WFF comparison); result is a BF, compared outside
 // Parse-only: fall/fex quantifiers parse correctly but LTL synthesis does not support them
-TEST_CASE("[SHAPE-I-01] F(F(F((fall x o1&x)={0}:bv))) parses") { tref fm = spec("F (F (F ((fall x (o1[t]:bv & x:bv)) = {0}:bv)))."); REQUIRE(fm != nullptr); }
-TEST_CASE("[SHAPE-I-02] G((fall x o1&x)={0}:bv) parses") { tref fm = spec("G ((fall x (o1[t]:bv & x:bv)) = {0}:bv)."); REQUIRE(fm != nullptr); }
-TEST_CASE("[SHAPE-I-03] F(F(F((fex x o1&x)=o1:bv))) parses") { tref fm = spec("F (F (F ((fex x (o1[t]:bv & x:bv)) = o1[t]:bv)))."); REQUIRE(fm != nullptr); }
-TEST_CASE("[SHAPE-I-04] G((fex x o1&x)=o1:bv) parses") { tref fm = spec("G ((fex x (o1[t]:bv & x:bv)) = o1[t]:bv)."); REQUIRE(fm != nullptr); }
-TEST_CASE("[SHAPE-I-05] ((fall x o1&x)={0}) U ((fex y o2&y)=o2) parses") { tref fm = spec("((fall x (o1[t]:bv & x:bv)) = {0}:bv) U ((fex y (o2[t]:bv & y:bv)) = o2[t]:bv)."); REQUIRE(fm != nullptr); }
-TEST_CASE("[SHAPE-I-06] G(F((fall x o1&x)={0}:bv)) parses") { tref fm = spec("G (F ((fall x (o1[t]:bv & x:bv)) = {0}:bv))."); REQUIRE(fm != nullptr); }
+TEST_CASE("[SHAPE-I-01] F(F(F((fall x o1&x)={0}:bv[8]))) parses") { tref fm = spec("F (F (F ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8])))."); REQUIRE(fm != nullptr); }
+TEST_CASE("[SHAPE-I-02] G((fall x o1&x)={0}:bv[8]) parses") { tref fm = spec("G ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8])."); REQUIRE(fm != nullptr); }
+TEST_CASE("[SHAPE-I-03] F(F(F((fex x o1&x)=o1:bv[8]))) parses") { tref fm = spec("F (F (F ((fex x (o1[t]:bv[8] & x:bv[8])) = o1[t]:bv[8])))."); REQUIRE(fm != nullptr); }
+TEST_CASE("[SHAPE-I-04] G((fex x o1&x)=o1:bv[8]) parses") { tref fm = spec("G ((fex x (o1[t]:bv[8] & x:bv[8])) = o1[t]:bv[8])."); REQUIRE(fm != nullptr); }
+TEST_CASE("[SHAPE-I-05] ((fall x o1&x)={0}) U ((fex y o2&y)=o2) parses") { tref fm = spec("((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8]) U ((fex y (o2[t]:bv[8] & y:bv[8])) = o2[t]:bv[8])."); REQUIRE(fm != nullptr); }
+TEST_CASE("[SHAPE-I-06] G(F((fall x o1&x)={0}:bv[8])) parses") { tref fm = spec("G (F ((fall x (o1[t]:bv[8] & x:bv[8])) = {0}:bv[8]))."); REQUIRE(fm != nullptr); }
 
 } // SHAPE-I
 
@@ -329,11 +329,11 @@ TEST_CASE("[SHAPE-I-06] G(F((fall x o1&x)={0}:bv)) parses") { tref fm = spec("G 
 TEST_SUITE("SHAPE-J: WFF quantifiers all/ex") {
 
 // wff_all/wff_ex must be inside a temporal operator (G or F) — enforced by design
-TEST_CASE("[SHAPE-J-01] G(all x F(F(F(o1:bv=x:bv))))") { tref fm = spec("G (all x F (F (F (o1[t]:bv = x:bv))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-J-02] G(ex x F(F(F(o1:bv=x:bv))))") { tref fm = spec("G (ex x F (F (F (o1[t]:bv = x:bv))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-J-03] F(all x G(o1:bv=x:bv))") { tref fm = spec("F (all x G (o1[t]:bv = x:bv))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-J-04] F(ex x G(F(o1:bv=x:bv)))") { tref fm = spec("F (ex x G (F (o1[t]:bv = x:bv)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-J-05] G(all x ex y F((o1:bv=x)&&(o2:bv=y)))") { tref fm = spec("G (all x ex y F ((o1[t]:bv = x:bv) && (o2[t]:bv = y:bv)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-J-01] G(all x F(F(F(o1:bv[8]=x:bv[8]))))") { tref fm = spec("G (all x F (F (F (o1[t]:bv[8] = x:bv[8]))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-J-02] G(ex x F(F(F(o1:bv[8]=x:bv[8]))))") { tref fm = spec("G (ex x F (F (F (o1[t]:bv[8] = x:bv[8]))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-J-03] F(all x G(o1:bv[8]=x:bv[8]))") { tref fm = spec("F (all x G (o1[t]:bv[8] = x:bv[8]))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-J-04] F(ex x G(F(o1:bv[8]=x:bv[8])))") { tref fm = spec("F (ex x G (F (o1[t]:bv[8] = x:bv[8])))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-J-05] G(all x ex y F((o1:bv[8]=x)&&(o2:bv[8]=y)))") { tref fm = spec("G (all x ex y F ((o1[t]:bv[8] = x:bv[8]) && (o2[t]:bv[8] = y:bv[8])))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 
 } // SHAPE-J
 
@@ -387,9 +387,9 @@ TEST_CASE("[SHAPE-M-05] sbf: G(F(F(o1={X&Y}:sbf)))") { tref fm = spec("G (F (F (
 TEST_CASE("[SHAPE-M-06] sbf: (o1={X&Y}) U (G(F(o2={X|Z})))") { tref fm = spec("(o1[t]:sbf = {X & Y}:sbf) U (G (F (o2[t]:sbf = {X | Z}:sbf)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 
 // bv type
-TEST_CASE("[SHAPE-M-07] bv: F(F(F(o1={#b10110101}:bv)))") { tref fm = spec("F (F (F (o1[t]:bv = {#b10110101}:bv)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-M-08] bv: G(F(F(o1={#b00001111}:bv)))") { tref fm = spec("G (F (F (o1[t]:bv = {#b00001111}:bv)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-M-09] bv: (o1={#b11110000}) U (G(F(o2={#b10110101})))") { tref fm = spec("(o1[t]:bv = {#b11110000}:bv) U (G (F (o2[t]:bv = {#b10110101}:bv)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-M-07] bv: F(F(F(o1={#b10110101}:bv[8])))") { tref fm = spec("F (F (F (o1[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-M-08] bv: G(F(F(o1={#b00001111}:bv[8])))") { tref fm = spec("G (F (F (o1[t]:bv[8] = {#b00001111}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-M-09] bv: (o1={#b11110000}) U (G(F(o2={#b10110101})))") { tref fm = spec("(o1[t]:bv[8] = {#b11110000}:bv[8]) U (G (F (o2[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 
 // dyadic type
 TEST_CASE("[SHAPE-M-10] dyadic: F(F(F(o1={[1/4,3/4)})))") { tref fm = spec("F (F (F (o1[t]:qint = {[1/4, 3/4)}:qint)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
@@ -423,7 +423,7 @@ TEST_CASE("[SHAPE-N-06] G(F(o1[t-3]>{0}:qlt))") { tref fm = spec("G (F (o1[t-3]:
 TEST_CASE("[SHAPE-N-07] (o1[t-1]>{0}) U (F(o1[t-2]>{0}))") { tref fm = spec("(o1[t-1]:qlt > {0}:qlt) U (F (o1[t-2]:qlt > {0}:qlt))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-N-08] F(F((o1[t-1]>{0}) S (o1[t-2]>{0}))) — S with lookback") { tref fm = spec("F (F ((o1[t-1]:qlt > {0}:qlt) S (o1[t-2]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-N-09] F(F(F(o1[t-1]={X&Y}:sbf))) — sbf+lookback") { tref fm = spec("F (F (F (o1[t-1]:sbf = {X & Y}:sbf)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-N-10] G(F(o1[t-1]={#b10110101}:bv)) — bv+lookback") { tref fm = spec("G (F (o1[t-1]:bv = {#b10110101}:bv))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-N-10] G(F(o1[t-1]={#b10110101}:bv[8])) — bv+lookback") { tref fm = spec("G (F (o1[t-1]:bv[8] = {#b10110101}:bv[8]))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 
 } // SHAPE-N
 
@@ -437,7 +437,7 @@ TEST_CASE("[SHAPE-O-01] F(F(F(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("F (
 TEST_CASE("[SHAPE-O-02] G(F(F(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("G (F (F (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-O-03] F(F(G(i1>{0}:qlt))) UNREALIZABLE") { tref fm = spec("F (F (G (i1[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-O-04] F((i1>{0}) U (F(i2>{0}))) UNREALIZABLE") { tref fm = spec("F ((i1[t]:qlt > {0}:qlt) U (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-O-05] G(F(F(i1={#b10110101}:bv))) UNREALIZABLE") { tref fm = spec("G (F (F (i1[t]:bv = {#b10110101}:bv)))."); REQUIRE(fm != nullptr); CHECK_FALSE(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-O-05] G(F(F(i1={#b10110101}:bv[8]))) UNREALIZABLE") { tref fm = spec("G (F (F (i1[t]:bv[8] = {#b10110101}:bv[8])))."); REQUIRE(fm != nullptr); CHECK_FALSE(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-O-06] (i1>{0}) U (F(F(i2>{0}))) UNREALIZABLE") { tref fm = spec("(i1[t]:qlt > {0}:qlt) U (F (F (i2[t]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK_FALSE(is_tau_formula_sat<node_t>(fm)); }
 
 } // SHAPE-O
@@ -456,7 +456,7 @@ TEST_CASE("[SHAPE-P-05] F((A1 S A2) U G(!A3))") { tref fm = spec("F (((o1[t]:qlt
 TEST_CASE("[SHAPE-P-06] G((A1 W A2) && F(A3||A1))") { tref fm = spec("G (((o1[t]:qlt > {0}:qlt) W (o2[t]:qlt > {0}:qlt)) && (F ((o3[t]:qlt > {0}:qlt) || (o1[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-P-07] F((F(A1)->F(A2)) && (F(A3)->F(A1)))") { tref fm = spec("F (((F (o1[t]:qlt > {0}:qlt)) -> (F (o2[t]:qlt > {0}:qlt))) && ((F (o3[t]:qlt > {0}:qlt)) -> (F (o1[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-P-08] F(F(A1) <-> G(F(A2&&A3)))") { tref fm = spec("F ((F (o1[t]:qlt > {0}:qlt)) <-> (G (F ((o2[t]:qlt > {0}:qlt) && (o3[t]:qlt > {0}:qlt)))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-P-09] G(F(B1:sbf)) && F(G(F(o2:bv)))") { tref fm = spec("(G (F (o1[t]:sbf = {X | (Y & Z)}:sbf))) && (F (G (F (o2[t]:bv = {#b10110101}:bv))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-P-09] G(F(B1:sbf)) && F(G(F(o2:bv[8])))") { tref fm = spec("(G (F (o1[t]:sbf = {X | (Y & Z)}:sbf))) && (F (G (F (o2[t]:bv[8] = {#b10110101}:bv[8]))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-P-10] (A1[t-1] S A2[t-2]) U G(F(A3[t-3]))") { tref fm = spec("((o1[t-1]:qlt > {0}:qlt) S (o2[t-2]:qlt > {0}:qlt)) U (G (F (o3[t-3]:qlt > {0}:qlt)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-P-11] F(A1 ? F(A2 U A3) : G(A3 W A2))") { tref fm = spec("F ((o1[t]:qlt > {0}:qlt) ? (F ((o2[t]:qlt > {0}:qlt) U (o3[t]:qlt > {0}:qlt))) : (G ((o3[t]:qlt > {0}:qlt) W (o2[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-P-12] F(F(F(A1))) && G(G(G(A2))) && F(G(F(A3)))") { tref fm = spec("(F (F (F (o1[t]:qlt > {0}:qlt)))) && (G (G (G (o2[t]:qlt > {0}:qlt)))) && (F (G (F (o3[t]:qlt > {0}:qlt))))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
@@ -596,68 +596,68 @@ TEST_CASE("[SHAPE-Q-20] (F A1 -> G A2) U ((G A3 <- A1 R A2) S (F A3 <-> G A1))")
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHAPE-R: BF arithmetic — bf_add(+), bf_sub(-), bf_mul(*), bf_div(/), bf_mod(%)
-// System controls o1[t]:bv and can pick any value satisfying the equation.
+// System controls o1[t]:bv[8] and can pick any value satisfying the equation.
 // ═══════════════════════════════════════════════════════════════════════════
 
 TEST_SUITE("SHAPE-R: BF arithmetic in bv atoms") {
 
-TEST_CASE("[SHAPE-R-01] bf_add: F(F(F(o1+{2}={7}:bv)))") {
-	tref fm = spec("F (F (F (o1[t]:bv + {2}:bv = {7}:bv))).");
+TEST_CASE("[SHAPE-R-01] bf_add: F(F(F(o1+{2}={7}:bv[8])))") {
+	tref fm = spec("F (F (F (o1[t]:bv[8] + {2}:bv[8] = {7}:bv[8]))).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-02] bf_add: G(F(o1+{3}={8}:bv))") {
-	tref fm = spec("G (F (o1[t]:bv + {3}:bv = {8}:bv)).");
+TEST_CASE("[SHAPE-R-02] bf_add: G(F(o1+{3}={8}:bv[8]))") {
+	tref fm = spec("G (F (o1[t]:bv[8] + {3}:bv[8] = {8}:bv[8])).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-03] bf_sub: F(F(F(o1-{2}={3}:bv)))") {
-	tref fm = spec("F (F (F (o1[t]:bv - {2}:bv = {3}:bv))).");
+TEST_CASE("[SHAPE-R-03] bf_sub: F(F(F(o1-{2}={3}:bv[8])))") {
+	tref fm = spec("F (F (F (o1[t]:bv[8] - {2}:bv[8] = {3}:bv[8]))).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-04] bf_sub: G(F(o1-{1}={4}:bv))") {
-	tref fm = spec("G (F (o1[t]:bv - {1}:bv = {4}:bv)).");
+TEST_CASE("[SHAPE-R-04] bf_sub: G(F(o1-{1}={4}:bv[8]))") {
+	tref fm = spec("G (F (o1[t]:bv[8] - {1}:bv[8] = {4}:bv[8])).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-05] bf_mul: F(F(F(o1*{3}={6}:bv)))") {
-	tref fm = spec("F (F (F (o1[t]:bv * {3}:bv = {6}:bv))).");
+TEST_CASE("[SHAPE-R-05] bf_mul: F(F(F(o1*{3}={6}:bv[8])))") {
+	tref fm = spec("F (F (F (o1[t]:bv[8] * {3}:bv[8] = {6}:bv[8]))).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-06] bf_mul: G(F(o1*{2}={4}:bv))") {
-	tref fm = spec("G (F (o1[t]:bv * {2}:bv = {4}:bv)).");
+TEST_CASE("[SHAPE-R-06] bf_mul: G(F(o1*{2}={4}:bv[8]))") {
+	tref fm = spec("G (F (o1[t]:bv[8] * {2}:bv[8] = {4}:bv[8])).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-07] bf_div: F(F(F(o1/{2}={4}:bv)))") {
-	tref fm = spec("F (F (F (o1[t]:bv / {2}:bv = {4}:bv))).");
+TEST_CASE("[SHAPE-R-07] bf_div: F(F(F(o1/{2}={4}:bv[8])))") {
+	tref fm = spec("F (F (F (o1[t]:bv[8] / {2}:bv[8] = {4}:bv[8]))).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-08] bf_div: G(F(o1/{3}={2}:bv))") {
-	tref fm = spec("G (F (o1[t]:bv / {3}:bv = {2}:bv)).");
+TEST_CASE("[SHAPE-R-08] bf_div: G(F(o1/{3}={2}:bv[8]))") {
+	tref fm = spec("G (F (o1[t]:bv[8] / {3}:bv[8] = {2}:bv[8])).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-09] bf_mod: F(F(F(o1%{3}={1}:bv)))") {
-	tref fm = spec("F (F (F (o1[t]:bv % {3}:bv = {1}:bv))).");
+TEST_CASE("[SHAPE-R-09] bf_mod: F(F(F(o1%{3}={1}:bv[8])))") {
+	tref fm = spec("F (F (F (o1[t]:bv[8] % {3}:bv[8] = {1}:bv[8]))).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-10] bf_mod: G(F(o1%{5}={2}:bv))") {
-	tref fm = spec("G (F (o1[t]:bv % {5}:bv = {2}:bv)).");
+TEST_CASE("[SHAPE-R-10] bf_mod: G(F(o1%{5}={2}:bv[8]))") {
+	tref fm = spec("G (F (o1[t]:bv[8] % {5}:bv[8] = {2}:bv[8])).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-11] arithmetic in U: (o1+{2}={5}) U (o2*{3}={6}:bv) REALIZABLE") {
-	tref fm = spec("(o1[t]:bv + {2}:bv = {5}:bv) U (o2[t]:bv * {3}:bv = {6}:bv).");
+TEST_CASE("[SHAPE-R-11] arithmetic in U: (o1+{2}={5}) U (o2*{3}={6}:bv[8]) REALIZABLE") {
+	tref fm = spec("(o1[t]:bv[8] + {2}:bv[8] = {5}:bv[8]) U (o2[t]:bv[8] * {3}:bv[8] = {6}:bv[8]).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
-TEST_CASE("[SHAPE-R-12] mixed arithmetic ops: F(F((o1+{1}={5}) && (o2-{1}={4}):bv))") {
-	tref fm = spec("F (F ((o1[t]:bv + {1}:bv = {5}:bv) && (o2[t]:bv - {1}:bv = {4}:bv))).");
+TEST_CASE("[SHAPE-R-12] mixed arithmetic ops: F(F((o1+{1}={5}) && (o2-{1}={4}):bv[8]))") {
+	tref fm = spec("F (F ((o1[t]:bv[8] + {1}:bv[8] = {5}:bv[8]) && (o2[t]:bv[8] - {1}:bv[8] = {4}:bv[8]))).");
 	REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm));
 }
 
@@ -672,13 +672,13 @@ TEST_SUITE("SHAPE-S: BF constants 1 and 0") {
 // bf_t (1) — top element
 TEST_CASE("[SHAPE-S-01] F(F(F(o1:sbf = 1))) — bf_t in sbf") { tref fm = spec("F (F (F (o1[t]:sbf = 1)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-S-02] G(F(o1:sbf = 1)) — bf_t in G(F(...))") { tref fm = spec("G (F (o1[t]:sbf = 1))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-S-03] G(F(o1:bv = 1:bv)) — typed bf_t in bv") { tref fm = spec("G (F (o1[t]:bv = 1:bv))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-S-03] G(F(o1:bv[8] = 1:bv[8])) — typed bf_t in bv") { tref fm = spec("G (F (o1[t]:bv[8] = 1:bv[8]))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-S-04] (o1:sbf = 1) U (o2:sbf = 1) — bf_t on both sides of U") { tref fm = spec("(o1[t]:sbf = 1) U (o2[t]:sbf = 1)."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 
 // bf_f (0) — bottom element
 TEST_CASE("[SHAPE-S-05] F(F(F(o1:sbf = 0))) — bf_f in sbf") { tref fm = spec("F (F (F (o1[t]:sbf = 0)))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-S-06] G(F(o1:sbf = 0)) — bf_f in G(F(...))") { tref fm = spec("G (F (o1[t]:sbf = 0))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
-TEST_CASE("[SHAPE-S-07] G(F(o1:bv = 0:bv)) — typed bf_f in bv") { tref fm = spec("G (F (o1[t]:bv = 0:bv))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
+TEST_CASE("[SHAPE-S-07] G(F(o1:bv[8] = 0:bv[8])) — typed bf_f in bv") { tref fm = spec("G (F (o1[t]:bv[8] = 0:bv[8]))."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 TEST_CASE("[SHAPE-S-08] (o1:sbf = 0) S (o2:sbf = 1) — bf_f and bf_t in S") { tref fm = spec("(o1[t]:sbf = 0) S (o2[t]:sbf = 1)."); REQUIRE(fm != nullptr); CHECK(is_tau_formula_sat<node_t>(fm)); }
 
 } // SHAPE-S

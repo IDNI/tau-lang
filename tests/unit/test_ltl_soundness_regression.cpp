@@ -86,9 +86,9 @@ TEST_SUITE("LTL soundness regression (k-ary positive forbids)") {
 
 	TEST_CASE("three bv atoms, independent variables") {
 		CHECK(realizable(
-			"G ((o1[t]:bv = {#b10110101}:bv)"
-			" && (o2[t]:bv = {#b11110000}:bv)"
-			" && (o3[t]:bv = {#b00001111}:bv))."
+			"G ((o1[t]:bv[8] = {#b10110101}:bv[8])"
+			" && (o2[t]:bv[8] = {#b11110000}:bv[8])"
+			" && (o3[t]:bv[8] = {#b00001111}:bv[8]))."
 		));
 	}
 

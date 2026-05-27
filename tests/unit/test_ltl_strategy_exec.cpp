@@ -371,12 +371,12 @@ TEST_SUITE("Strategy execution: sbf type") {
 
 TEST_SUITE("Strategy execution: bv type") {
 
-	TEST_CASE("[EXEC-BV-01] G(o1={#b10110101}:bv) — 4 steps constant bv") {
+	TEST_CASE("[EXEC-BV-01] G(o1={#b10110101}:bv[8]) — 4 steps constant bv") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv = {#b10110101}:bv)."));
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv[8] = {#b10110101}:bv[8])."));
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
 		REQUIRE(fm != nullptr);
@@ -386,12 +386,12 @@ TEST_SUITE("Strategy execution: bv type") {
 		for (auto& v : vals) CHECK(!v.empty());
 	}
 
-	TEST_CASE("[EXEC-BV-02] F(o1={5}:bv) — bv value produced at step 0") {
+	TEST_CASE("[EXEC-BV-02] F(o1={5}:bv[8]) — bv value produced at step 0") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("F (o1[t]:bv = {5}:bv)."));
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("F (o1[t]:bv[8] = {5}:bv[8])."));
 		REQUIRE(nso.has_value());
 		tref fm = nso.value().main->get();
 		REQUIRE(fm != nullptr);

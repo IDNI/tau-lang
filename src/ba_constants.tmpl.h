@@ -70,15 +70,24 @@ std::string ba_constants<node>::dump_to_str() {
 
 template <NodeType node>
 void ba_constants<node>::cleanup() {
-	// Release all elements so cvc5::Term references are dropped before
-	// cvc5's TermManager is destroyed.  Do NOT call shrink_to_fit(): the
-	// atexit callback that invokes cleanup() runs before C and T's own
-	// static destructors.  If shrink_to_fit() frees the backing storage
-	// here, the subsequent static-destructor pass tries to free the same
-	// block a second time, producing a "double free detected" abort.
-	// The backing storage is released exactly once by C/T's own destructors.
+	// Release constant values (which may include cvc5::Term, bdd_handle, etc.)
+	// before those backends' static destructors run.  C.clear() is the only
+	// mandatory step: the cvc5 Terms are stored in C's pair<constant, size_t>
+	// elements, not in T's htree shared-ptrs.
+	//
+	// T is intentionally NOT cleared here.  T holds shared_ptr<htree> whose
+	// control blocks can be corrupted at atexit time if the BDD pool or
+	// htree pool static destructors have already partially run (order is
+	// implementation-defined when static locals in different TUs are involved).
+	// T's own inline-static destructor runs in a safe, well-ordered context and
+	// will release the htrees correctly.
+	//
+	// Do NOT call shrink_to_fit() on either C or T: the atexit callback runs
+	// before C and T's own static destructors.  shrink_to_fit() would free the
+	// backing storage here, and the subsequent static-destructor pass would
+	// attempt to free it a second time, producing a "double free" abort.
 	C.clear();
-	T.clear();
+	// T is left for its own static destructor (safe; htrees hold no cvc5/bdd refs).
 }
 
 } // namespace idni::tau_lang

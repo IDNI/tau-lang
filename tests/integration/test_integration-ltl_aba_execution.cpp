@@ -813,61 +813,61 @@ TEST_SUITE("LTL Execution (sbf): F and U W operators") {
 
 TEST_SUITE("LTL Execution (bv): G constant outputs") {
 
-	// G(o1:bv = {#b10110101}:bv) — nontrivial 8-bit pattern, 4 steps.
-	TEST_CASE("G(o1:bv = {#b10110101}) constant output, 4 steps") {
+	// G(o1:bv[8] = {#b10110101}:bv[8]) — nontrivial 8-bit pattern, 4 steps.
+	TEST_CASE("G(o1:bv[8] = {#b10110101}) constant output, 4 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:bv = {#b10110101}:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 4);
 	}
 
-	// G(o1:bv = {#b00001111}:bv) — lower nibble, 5 steps.
-	TEST_CASE("G(o1:bv = {#b00001111}) constant output, 5 steps") {
+	// G(o1:bv[8] = {#b00001111}:bv[8]) — lower nibble, 5 steps.
+	TEST_CASE("G(o1:bv[8] = {#b00001111}) constant output, 5 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:bv = {#b00001111}:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {#b00001111}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 5);
 	}
 
-	// G(o1:bv = {#b11110000}:bv) — upper nibble, 6 steps.
-	TEST_CASE("G(o1:bv = {#b11110000}) constant output, 6 steps") {
+	// G(o1:bv[8] = {#b11110000}:bv[8]) — upper nibble, 6 steps.
+	TEST_CASE("G(o1:bv[8] = {#b11110000}) constant output, 6 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:bv = {#b11110000}:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 6);
 	}
 
-	// G(o1:bv = {5}:bv) — decimal constant 5, 5 steps.
-	TEST_CASE("G(o1:bv = {5}) decimal constant output, 5 steps") {
+	// G(o1:bv[8] = {5}:bv[8]) — decimal constant 5, 5 steps.
+	TEST_CASE("G(o1:bv[8] = {5}) decimal constant output, 5 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:bv = {5}:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {5}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 5);
 	}
 
-	// G(o1:bv = {255}:bv) — all-ones byte, 7 steps.
-	TEST_CASE("G(o1:bv = {255}) all-ones byte constant output, 7 steps") {
+	// G(o1:bv[8] = {255}:bv[8]) — all-ones byte, 7 steps.
+	TEST_CASE("G(o1:bv[8] = {255}) all-ones byte constant output, 7 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:bv = {255}:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = {255}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 7);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 7);
@@ -881,140 +881,140 @@ TEST_SUITE("LTL Execution (bv): G constant outputs") {
 
 TEST_SUITE("LTL Execution (bv): G input mirroring and LTL operators") {
 
-	// G(o1:bv = i1:bv) — real bv input mirroring, 3 steps.
-	TEST_CASE("G(o1:bv = i1:bv) mirroring, 3 steps") {
+	// G(o1:bv[8] = i1:bv[8]) — real bv input mirroring, 3 steps.
+	TEST_CASE("G(o1:bv[8] = i1:bv[8]) mirroring, 3 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		strings i1_values = {"5", "#b10110101", "255"};
-		ctx.add_input("i1", bv_type_id<node_t>(),
+		ctx.add_input("i1", bv_type_id<node_t>(8),
 		              std::make_shared<vector_input_stream>(i1_values));
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:bv = i1[t]:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = i1[t]:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 3);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 3);
 	}
 
-	// G(o1:bv = i1:bv) — real bv input mirroring, 4 steps with nontrivial patterns.
-	TEST_CASE("G(o1:bv = i1:bv) mirroring, 4 steps") {
+	// G(o1:bv[8] = i1:bv[8]) — real bv input mirroring, 4 steps with nontrivial patterns.
+	TEST_CASE("G(o1:bv[8] = i1:bv[8]) mirroring, 4 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		strings i1_values = {"#b00001111", "#b11110000", "#b10110101", "255"};
-		ctx.add_input("i1", bv_type_id<node_t>(),
+		ctx.add_input("i1", bv_type_id<node_t>(8),
 		              std::make_shared<vector_input_stream>(i1_values));
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:bv = i1[t]:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = i1[t]:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 4);
 	}
 
-	// G(o1:bv = i1:bv) — real bv input mirroring, 5 steps.
-	TEST_CASE("G(o1:bv = i1:bv) mirroring, 5 steps") {
+	// G(o1:bv[8] = i1:bv[8]) — real bv input mirroring, 5 steps.
+	TEST_CASE("G(o1:bv[8] = i1:bv[8]) mirroring, 5 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		strings i1_values = {"5", "#b10110101", "255", "#b00001111", "#b11110000"};
-		ctx.add_input("i1", bv_type_id<node_t>(),
+		ctx.add_input("i1", bv_type_id<node_t>(8),
 		              std::make_shared<vector_input_stream>(i1_values));
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:bv = i1[t]:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = i1[t]:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(o1->get_values().size() == 5);
 	}
 
-	// G(o1:bv = i1[t-1]:bv) — output mirrors bv input with 1-step delay, 5 steps.
-	TEST_CASE("G(o1:bv = i1[t-1]:bv) lookback-1 mirroring, 5 steps") {
+	// G(o1:bv[8] = i1[t-1]:bv[8]) — output mirrors bv input with 1-step delay, 5 steps.
+	TEST_CASE("G(o1:bv[8] = i1[t-1]:bv[8]) lookback-1 mirroring, 5 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		strings i1_values = {"5", "#b10110101", "255", "#b00001111", "#b11110000"};
-		ctx.add_input("i1", bv_type_id<node_t>(),
+		ctx.add_input("i1", bv_type_id<node_t>(8),
 		              std::make_shared<vector_input_stream>(i1_values));
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (o1[t]:bv = i1[t-1]:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (o1[t]:bv[8] = i1[t-1]:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 	}
 
-	// F(o1:bv = {#b10110101}:bv) — eventually outputs nontrivial bit pattern.
-	TEST_CASE("F(o1:bv = {#b10110101}) eventually, 4 steps") {
+	// F(o1:bv[8] = {#b10110101}:bv[8]) — eventually outputs nontrivial bit pattern.
+	TEST_CASE("F(o1:bv[8] = {#b10110101}) eventually, 4 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "F (o1[t]:bv = {#b10110101}:bv).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "F (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());
 	}
 
-	// (o1:bv = {#b00001111}) U (o1:bv = {#b11110000}) — complementary nibbles until.
-	TEST_CASE("({#b00001111}:bv) U ({#b11110000}:bv) until, 5 steps") {
+	// (o1:bv[8] = {#b00001111}) U (o1:bv[8] = {#b11110000}) — complementary nibbles until.
+	TEST_CASE("({#b00001111}:bv[8]) U ({#b11110000}:bv[8]) until, 5 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
 		auto spec = create_spec(ctx,
-			"(o1[t]:bv = {#b00001111}:bv) U (o1[t]:bv = {#b11110000}:bv).");
+			"(o1[t]:bv[8] = {#b00001111}:bv[8]) U (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());
 	}
 
-	// G(F(o1:bv = {255}:bv)) — output equals 255 infinitely often, 6 steps.
-	TEST_CASE("G(F(o1:bv = {255})) inf-often constant output, 6 steps") {
+	// G(F(o1:bv[8] = {255}:bv[8])) — output equals 255 infinitely often, 6 steps.
+	TEST_CASE("G(F(o1:bv[8] = {255})) inf-often constant output, 6 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto spec = create_spec(ctx, "G (F (o1[t]:bv = {255}:bv)).");
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto spec = create_spec(ctx, "G (F (o1[t]:bv[8] = {255}:bv[8])).");
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());
 	}
 
-	// (o1:bv = {5}) W (o1:bv = {#b10110101}) — decimal then binary weak-until, 4 steps.
-	TEST_CASE("({5}:bv) W ({#b10110101}:bv) weak-until, 4 steps") {
+	// (o1:bv[8] = {5}) W (o1:bv[8] = {#b10110101}) — decimal then binary weak-until, 4 steps.
+	TEST_CASE("({5}:bv[8]) W ({#b10110101}:bv[8]) weak-until, 4 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
 		auto spec = create_spec(ctx,
-			"(o1[t]:bv = {5}:bv) W (o1[t]:bv = {#b10110101}:bv).");
+			"(o1[t]:bv[8] = {5}:bv[8]) W (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 4);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());
 	}
 
-	// (o1:bv = {#b00001111}) R (o1:bv = {#b11110000}) — release, 5 steps.
+	// (o1:bv[8] = {#b00001111}) R (o1:bv[8] = {#b11110000}) — release, 5 steps.
 	// p R q: q holds until (and including) when p holds; or q holds forever.
 	// System can always output q (upper nibble), satisfying R vacuously.
-	TEST_CASE("({#b00001111}:bv) R ({#b11110000}:bv) release, 5 steps") {
+	TEST_CASE("({#b00001111}:bv[8]) R ({#b11110000}:bv[8]) release, 5 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
 		auto spec = create_spec(ctx,
-			"(o1[t]:bv = {#b00001111}:bv) R (o1[t]:bv = {#b11110000}:bv).");
+			"(o1[t]:bv[8] = {#b00001111}:bv[8]) R (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		auto maybe_i = run<node_t>(spec, ctx, 5);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());
 	}
 
-	// G(F(o1:bv = {#b10110101})) && G(F(o1:bv != {#b10110101})) — alternating.
+	// G(F(o1:bv[8] = {#b10110101})) && G(F(o1:bv[8] != {#b10110101})) — alternating.
 	// Requires a 2-state Mealy machine — multi-state encoding.
-	TEST_CASE("G(F(o1:bv={#b10110101})) && G(F(o1:bv!={#b10110101})) alternating, 6 steps") {
+	TEST_CASE("G(F(o1:bv[8]={#b10110101})) && G(F(o1:bv[8]!={#b10110101})) alternating, 6 steps") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
 		auto spec = create_spec(ctx,
-			"G (F (o1[t]:bv = {#b10110101}:bv)) && "
-			"G (F (!(o1[t]:bv = {#b10110101}:bv))).");
+			"G (F (o1[t]:bv[8] = {#b10110101}:bv[8])) && "
+			"G (F (!(o1[t]:bv[8] = {#b10110101}:bv[8]))).");
 		auto maybe_i = run<node_t>(spec, ctx, 6);
 		CHECK(maybe_i.has_value());
 		CHECK(!o1->get_values().empty());

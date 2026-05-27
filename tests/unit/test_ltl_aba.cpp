@@ -23,7 +23,7 @@
 //   18. Interpreted tau constants ({T.}:tau / {F.}:tau) in LTL.
 //   19. Execution with input streams: complement strategy verification.
 //   20. sbf type with nontrivial interpreted constants ({X&Y}:sbf etc.).
-//   21. Bitvector type with nontrivial interpreted constants ({#b...}:bv etc.).
+//   21. Bitvector type with nontrivial interpreted constants ({#b...}:bv[8] etc.).
 //   22. Mixed types: tau+sbf, sbf+bv, tau+bv in distinct atomic formulas.
 //   23. Dyadic BA type with interval constants ({[0,1)}:qint etc.).
 //   24. qlt BA type: interval constants + interpreted singletons ({3}:qlt, {1/2}:qlt)
@@ -271,13 +271,13 @@ TEST_SUITE("ABA oracle correctness") {
 TEST_SUITE("Safety fragment regression") {
 
 	TEST_CASE("G realizable spec still realizable") {
-		tref fm = spec("(G o1[t]:bv = { 1 }).");
+		tref fm = spec("(G o1[t]:bv[8] = { 1 }).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	TEST_CASE("G contradictory spec still unrealizable") {
-		tref fm = spec("(G o1[t]:bv = { 0 }) && (G o1[t]:bv = { 1 }).");
+		tref fm = spec("(G o1[t]:bv[8] = { 0 }) && (G o1[t]:bv[8] = { 1 }).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -887,9 +887,9 @@ TEST_SUITE("LTL interpreter dispatch") {
 		CHECK(!out.value().empty());
 	}
 
-	TEST_CASE("make_interpreter succeeds for pure-S with bv: (o1:bv={5}) S (o2:bv={#b10110101})") {
+	TEST_CASE("make_interpreter succeeds for pure-S with bv: (o1:bv[8]={5}) S (o2:bv[8]={#b10110101})") {
 		auto interp = make_ltl_interp(
-		    "(o1[t]:bv = {5}:bv) S (o2[t]:bv = {#b10110101}:bv).");
+		    "(o1[t]:bv[8] = {5}:bv[8]) S (o2[t]:bv[8] = {#b10110101}:bv[8]).");
 		CHECK(interp.has_value());
 	}
 
@@ -1291,105 +1291,105 @@ TEST_SUITE("LTL sbf type with nontrivial constants") {
 // ── 21. Bitvector type with nontrivial interpreted constants ──────────────────
 //
 // Bitvector (bv) constants use {} syntax:
-//   {0}:bv           — bitvector zero
-//   {1}:bv           — bitvector one
-//   {5}:bv           — decimal 5
-//   {255}:bv         — decimal 255
-//   {#b1}:bv         — binary "1"
-//   {#b10110101}:bv  — binary 181 (8-bit nontrivial pattern)
-//   {#b00001111}:bv  — binary 15 (half-nibble pattern)
-//   {#b11110000}:bv  — binary 240 (inverted half-nibble)
+//   {0}:bv[8]           — bitvector zero
+//   {1}:bv[8]           — bitvector one
+//   {5}:bv[8]           — decimal 5
+//   {255}:bv[8]         — decimal 255
+//   {#b1}:bv[8]         — binary "1"
+//   {#b10110101}:bv[8]  — binary 181 (8-bit nontrivial pattern)
+//   {#b00001111}:bv[8]  — binary 15 (half-nibble pattern)
+//   {#b11110000}:bv[8]  — binary 240 (inverted half-nibble)
 
 TEST_SUITE("LTL bitvector type with nontrivial constants") {
 
 	// ── output-only bv formulas ───────────────────────────────────────────────
 
-	TEST_CASE("F(o1:bv = {1}:bv) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv = {1}:bv).");
+	TEST_CASE("F(o1:bv[8] = {1}:bv[8]) is REALIZABLE") {
+		tref fm = spec("F (o1[t]:bv[8] = {1}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1:bv = {0}:bv) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv = {0}:bv).");
+	TEST_CASE("F(o1:bv[8] = {0}:bv[8]) is REALIZABLE") {
+		tref fm = spec("F (o1[t]:bv[8] = {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1:bv = {5}:bv) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv = {5}:bv).");
+	TEST_CASE("F(o1:bv[8] = {5}:bv[8]) is REALIZABLE") {
+		tref fm = spec("F (o1[t]:bv[8] = {5}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1:bv = {255}:bv) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv = {255}:bv).");
+	TEST_CASE("F(o1:bv[8] = {255}:bv[8]) is REALIZABLE") {
+		tref fm = spec("F (o1[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// ── binary-notation nontrivial bv constants ───────────────────────────────
 
-	TEST_CASE("F(o1:bv = {#b1}:bv) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv = {#b1}:bv).");
+	TEST_CASE("F(o1:bv[8] = {#b1}:bv[8]) is REALIZABLE") {
+		tref fm = spec("F (o1[t]:bv[8] = {#b1}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1:bv = {#b10110101}:bv) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:bv = {#b10110101}:bv).");
+	TEST_CASE("F(o1:bv[8] = {#b10110101}:bv[8]) is REALIZABLE") {
+		tref fm = spec("F (o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("({#b00001111}:bv) U ({#b11110000}:bv) is REALIZABLE") {
-		tref fm = spec("(o1[t]:bv = {#b00001111}:bv) U (o1[t]:bv = {#b11110000}:bv).");
+	TEST_CASE("({#b00001111}:bv[8]) U ({#b11110000}:bv[8]) is REALIZABLE") {
+		tref fm = spec("(o1[t]:bv[8] = {#b00001111}:bv[8]) U (o1[t]:bv[8] = {#b11110000}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("G(F(o1:bv = {255}:bv)) is REALIZABLE") {
-		tref fm = spec("G (F (o1[t]:bv = {255}:bv)).");
+	TEST_CASE("G(F(o1:bv[8] = {255}:bv[8])) is REALIZABLE") {
+		tref fm = spec("G (F (o1[t]:bv[8] = {255}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("G(F(o1:bv != {#b0}:bv)) is REALIZABLE") {
-		tref fm = spec("G (F (o1[t]:bv != {#b0}:bv)).");
+	TEST_CASE("G(F(o1:bv[8] != {#b0}:bv[8])) is REALIZABLE") {
+		tref fm = spec("G (F (o1[t]:bv[8] != {#b0}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// ── left-nested U with bv constants ──────────────────────────────────────
 
-	TEST_CASE("({0}:bv U {1}:bv) U (o1:bv != {0}:bv) is REALIZABLE") {
-		tref fm = spec("((o1[t]:bv = {0}:bv) U (o1[t]:bv = {1}:bv)) U (o1[t]:bv != {0}:bv).");
+	TEST_CASE("({0}:bv[8] U {1}:bv[8]) U (o1:bv[8] != {0}:bv[8]) is REALIZABLE") {
+		tref fm = spec("((o1[t]:bv[8] = {0}:bv[8]) U (o1[t]:bv[8] = {1}:bv[8])) U (o1[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("({0}:bv) W (o1:bv != {0}:bv) is REALIZABLE") {
-		tref fm = spec("(o1[t]:bv = {0}:bv) W (o1[t]:bv != {0}:bv).");
+	TEST_CASE("({0}:bv[8]) W (o1:bv[8] != {0}:bv[8]) is REALIZABLE") {
+		tref fm = spec("(o1[t]:bv[8] = {0}:bv[8]) W (o1[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// ── bv R operator — realizable ───────────────────────────────────────────
 
-	TEST_CASE("({0}:bv) R (o1:bv != {0}:bv) is REALIZABLE") {
+	TEST_CASE("({0}:bv[8]) R (o1:bv[8] != {0}:bv[8]) is REALIZABLE") {
 		// p R q ≡ G(q) ∨ (q U (p∧q)).  Here p∧q = (o1=0 ∧ o1≠0) is vacuous,
 		// so the formula reduces to G(o1≠0): always output nonzero.
-		tref fm = spec("(o1[t]:bv = {0}:bv) R (o1[t]:bv != {0}:bv).");
+		tref fm = spec("(o1[t]:bv[8] = {0}:bv[8]) R (o1[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// ── bv UNREALIZABLE case ──────────────────────────────────────────────────
 
-	TEST_CASE("F(o1:bv & i1:bv = {#b10110101}:bv) is UNREALIZABLE") {
+	TEST_CASE("F(o1:bv[8] & i1:bv[8] = {#b10110101}:bv[8]) is UNREALIZABLE") {
 		// System can set o1 to any value, but environment can keep i1=0,
 		// ensuring o1&i1 never matches the target pattern.
-		tref fm = spec("F ((o1[t]:bv & i1[t]:bv) = {#b10110101}:bv).");
+		tref fm = spec("F ((o1[t]:bv[8] & i1[t]:bv[8]) = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1429,37 +1429,37 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 
 	// ── sbf + bv ──────────────────────────────────────────────────────────────
 
-	TEST_CASE("F(o1:sbf={X&Y}) && F(o2:bv={#b10110101}) is REALIZABLE") {
+	TEST_CASE("F(o1:sbf={X&Y}) && F(o2:bv[8]={#b10110101}) is REALIZABLE") {
 		bdd_init<Bool>();
-		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf) && F (o2[t]:bv = {#b10110101}:bv).");
+		tref fm = spec("F (o1[t]:sbf = {X & Y}:sbf) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1:sbf={X|(Y&Z)}) && F(o2:bv={255}) is REALIZABLE") {
+	TEST_CASE("F(o1:sbf={X|(Y&Z)}) && F(o2:bv[8]={255}) is REALIZABLE") {
 		bdd_init<Bool>();
-		tref fm = spec("F (o1[t]:sbf = {X | (Y & Z)}:sbf) && F (o2[t]:bv = {255}:bv).");
+		tref fm = spec("F (o1[t]:sbf = {X | (Y & Z)}:sbf) && F (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("G(o1:sbf={X}:sbf) && F(o2:bv={#b00001111}) is REALIZABLE") {
+	TEST_CASE("G(o1:sbf={X}:sbf) && F(o2:bv[8]={#b00001111}) is REALIZABLE") {
 		bdd_init<Bool>();
-		tref fm = spec("G (o1[t]:sbf = {X}:sbf) && F (o2[t]:bv = {#b00001111}:bv).");
+		tref fm = spec("G (o1[t]:sbf = {X}:sbf) && F (o2[t]:bv[8] = {#b00001111}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// ── tau + bv ──────────────────────────────────────────────────────────────
 
-	TEST_CASE("G(o1:tau={T.}) && F(o2:bv={#b10110101}) is REALIZABLE") {
-		tref fm = spec("G (o1[t]:tau = {T.}:tau) && F (o2[t]:bv = {#b10110101}:bv).");
+	TEST_CASE("G(o1:tau={T.}) && F(o2:bv[8]={#b10110101}) is REALIZABLE") {
+		tref fm = spec("G (o1[t]:tau = {T.}:tau) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1:tau={T.}) && F(o2:bv={255}) is REALIZABLE") {
-		tref fm = spec("F (o1[t]:tau = {T.}:tau) && F (o2[t]:bv = {255}:bv).");
+	TEST_CASE("F(o1:tau={T.}) && F(o2:bv[8]={255}) is REALIZABLE") {
+		tref fm = spec("F (o1[t]:tau = {T.}:tau) && F (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1471,7 +1471,7 @@ TEST_SUITE("LTL mixed types in distinct atoms") {
 		tref fm = spec(
 			"F (o1[t]:tau = {T.}:tau) && "
 			"F (o2[t]:sbf = {X & Y}:sbf) && "
-			"F (o3[t]:bv = {#b10110101}:bv).");
+			"F (o3[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1795,8 +1795,8 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1[t]:bv = i1[t-2]:bv) is REALIZABLE (bv, width 2)") {
-		tref fm = spec("F (o1[t]:bv = i1[t-2]:bv).");
+	TEST_CASE("F(o1[t]:bv[8] = i1[t-2]:bv[8]) is REALIZABLE (bv, width 2)") {
+		tref fm = spec("F (o1[t]:bv[8] = i1[t-2]:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1824,17 +1824,17 @@ TEST_SUITE("LTL with time-shifted io_vars [t-1],[t-2],[t-3]") {
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1[t]:bv = i1[t-3]:bv) is REALIZABLE (bv, width 3)") {
-		tref fm = spec("F (o1[t]:bv = i1[t-3]:bv).");
+	TEST_CASE("F(o1[t]:bv[8] = i1[t-3]:bv[8]) is REALIZABLE (bv, width 3)") {
+		tref fm = spec("F (o1[t]:bv[8] = i1[t-3]:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("(o1[t]={#b11110000}:bv) U (o2[t]=i1[t-3]:bv) is REALIZABLE (bv, width 3)") {
+	TEST_CASE("(o1[t]={#b11110000}:bv[8]) U (o2[t]=i1[t-3]:bv[8]) is REALIZABLE (bv, width 3)") {
 		// Separate bv outputs: o1 holds a nontrivial constant, o2 mirrors the
 		// 3-step-lagged input.  (o1={#b11110000}) & (o2=i1[t-3]) — independent,
 		// ABA-feasible for any i1[t-3].
-		tref fm = spec("(o1[t]:bv = {#b11110000}:bv) U (o2[t]:bv = i1[t-3]:bv).");
+		tref fm = spec("(o1[t]:bv[8] = {#b11110000}:bv[8]) U (o2[t]:bv[8] = i1[t-3]:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -1927,8 +1927,8 @@ TEST_SUITE("G(A) && G(B) same-type merging") {
 	}
 
 	// Three G nodes — must all be merged.
-	TEST_CASE("G(o1:bv) && G(o2:bv) && G(o3:bv) is REALIZABLE (three always)") {
-		tref fm = spec("(G (o1[t]:bv = {#b00001111}:bv)) && (G (o2[t]:bv = {#b10110101}:bv)) && (G (o3[t]:bv = {#b11110000}:bv)).");
+	TEST_CASE("G(o1:bv[8]) && G(o2:bv[8]) && G(o3:bv[8]) is REALIZABLE (three always)") {
+		tref fm = spec("(G (o1[t]:bv[8] = {#b00001111}:bv[8])) && (G (o2[t]:bv[8] = {#b10110101}:bv[8])) && (G (o3[t]:bv[8] = {#b11110000}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2057,7 +2057,7 @@ TEST_SUITE("LTL Since (S) and Trigger (T) operators") {
 // that introduces auxiliary output variables and G-invariants is implemented.
 //
 // TODO(past-LTL): implement the S/T compilation pass:
-//   (phi S psi) → auxiliary output r_i[t]:bv
+//   (phi S psi) → auxiliary output r_i[t]:bv[8]
 //   + always(r_i[t] ↔ psi[t] ∨ (phi[t] ∧ r_i[t-1]))
 //   Then these tests should be updated to CHECK(is_tau_formula_sat<node_t>(fm)).
 //

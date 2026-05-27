@@ -1932,74 +1932,74 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	// --- F(hsb) && F(bv) simple conjunction ---
 
-	TEST_CASE("F(o1:hsb=top) && F(o2:bv=0b10110101) REALIZABLE") {
+	TEST_CASE("F(o1:hsb=top) && F(o2:bv[8]=0b10110101) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"F (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv = {#b10110101}:bv).");
+			"F (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("F(o1:hsb!=bot) && F(o2:bv=255) REALIZABLE") {
+	TEST_CASE("F(o1:hsb!=bot) && F(o2:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"F (o1[t]:hsb != {bot}:hsb) && F (o2[t]:bv = {255}:bv).");
+			"F (o1[t]:hsb != {bot}:hsb) && F (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- G(hsb) && F(bv) ---
 
-	TEST_CASE("G(o1:hsb=top) && F(o2:bv=0b00001111) REALIZABLE") {
+	TEST_CASE("G(o1:hsb=top) && F(o2:bv[8]=0b00001111) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv = {#b00001111}:bv).");
+			"G (o1[t]:hsb = {top}:hsb) && F (o2[t]:bv[8] = {#b00001111}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- G(bv) && F(hsb) ---
 
-	TEST_CASE("G(o1:bv=0b11111111) && F(o2:hsb!=bot) REALIZABLE") {
+	TEST_CASE("G(o1:bv[8]=0b11111111) && F(o2:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o1[t]:bv = {#b11111111}:bv) && F (o2[t]:hsb != {bot}:hsb).");
+			"G (o1[t]:bv[8] = {#b11111111}:bv[8]) && F (o2[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Safety pattern with mixed types ---
 
-	TEST_CASE("G(i:hsb!=bot -> o:bv=0b10110101) REALIZABLE") {
+	TEST_CASE("G(i:hsb!=bot -> o:bv[8]=0b10110101) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv = {#b10110101}:bv).");
+			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
-	TEST_CASE("G(i:bv=255 -> o:hsb=top) REALIZABLE") {
+	TEST_CASE("G(i:bv[8]=255 -> o:hsb=top) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (i1[t]:bv = {255}:bv -> o1[t]:hsb = {top}:hsb).");
+			"G (i1[t]:bv[8] = {255}:bv[8] -> o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Liveness with mixed types ---
 
-	TEST_CASE("GF(o1:hsb!=bot) && GF(o2:bv!=0) REALIZABLE") {
+	TEST_CASE("GF(o1:hsb!=bot) && GF(o2:bv[8]!=0) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o1[t]:hsb != {bot}:hsb)) && "
-			"G (F (o2[t]:bv != {0}:bv)).");
+			"G (F (o2[t]:bv[8] != {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2022,7 +2022,7 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		bdd_init<Bool>();
 		tref fm = spec(
 			"F (o1[t]:hsb = {top}:hsb) && "
-			"F (o2[t]:bv = {#b10110101}:bv) && "
+			"F (o2[t]:bv[8] = {#b10110101}:bv[8]) && "
 			"F (o3[t]:sbf = {X & Y}:sbf).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
@@ -2030,35 +2030,35 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	// --- Multi-output mixed-type: two hsb + one bv ---
 
-	TEST_CASE("G(o1:hsb=top) && G(o2:hsb=top) && F(o3:bv=255) REALIZABLE") {
+	TEST_CASE("G(o1:hsb=top) && G(o2:hsb=top) && F(o3:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o1[t]:hsb = {top}:hsb) && "
 			"G (o2[t]:hsb = {top}:hsb) && "
-			"F (o3[t]:bv = {255}:bv).");
+			"F (o3[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Mixed-type response pattern ---
 
-	TEST_CASE("G(i:bv!=0 -> F(o:hsb!=bot)) REALIZABLE — response pattern") {
+	TEST_CASE("G(i:bv[8]!=0 -> F(o:hsb!=bot)) REALIZABLE — response pattern") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (i1[t]:bv != {0}:bv -> F (o1[t]:hsb != {bot}:hsb)).");
+			"G (i1[t]:bv[8] != {0}:bv[8] -> F (o1[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Mode A spec-model pattern: output token + admissibility ---
 
-	TEST_CASE("G(o_token:bv=0b10110101) && G(o_admit:hsb!=bot) REALIZABLE") {
+	TEST_CASE("G(o_token:bv[8]=0b10110101) && G(o_admit:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o1[t]:bv = {#b10110101}:bv) && "
+			"G (o1[t]:bv[8] = {#b10110101}:bv[8]) && "
 			"G (o2[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
@@ -2066,45 +2066,45 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	// --- Temporal: alternating hsb and bv liveness ---
 
-	TEST_CASE("GF(o1:hsb=top) && GF(o2:bv=0b11111111) alternating REALIZABLE") {
+	TEST_CASE("GF(o1:hsb=top) && GF(o2:bv[8]=0b11111111) alternating REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o1[t]:hsb = {top}:hsb)) && "
-			"G (F (o2[t]:bv = {#b11111111}:bv)).");
+			"G (F (o2[t]:bv[8] = {#b11111111}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Input hsb, output bv: the constrained-decoding pattern ---
 
-	TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv!=0) constrained decoding REALIZABLE") {
+	TEST_CASE("G(i_embed:hsb!=bot -> o_tok:bv[8]!=0) constrained decoding REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv != {0}:bv).");
+			"G (i1[t]:hsb != {bot}:hsb -> o1[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Input bv, output hsb: spec-side hsb constraint ---
 
-	TEST_CASE("G(i_tok:bv=255 -> o_admissibility:hsb=top) REALIZABLE") {
+	TEST_CASE("G(i_tok:bv[8]=255 -> o_admissibility:hsb=top) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (i1[t]:bv = {255}:bv -> o1[t]:hsb = {top}:hsb).");
+			"G (i1[t]:bv[8] = {255}:bv[8] -> o1[t]:hsb = {top}:hsb).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Disjunction across types ---
 
-	TEST_CASE("G(o:hsb=top || o2:bv=255) REALIZABLE") {
+	TEST_CASE("G(o:hsb=top || o2:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o1[t]:hsb = {top}:hsb || o2[t]:bv = {255}:bv).");
+			"G (o1[t]:hsb = {top}:hsb || o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2127,7 +2127,7 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 		bdd_init<Bool>();
 		tref fm = spec(
 			"F (o1[t]:hsb = {top}:hsb) && "
-			"F (o2[t]:bv = {#b10110101}:bv) && "
+			"F (o2[t]:bv[8] = {#b10110101}:bv[8]) && "
 			"F (o3[t]:sbf = {X}:sbf) && "
 			"F (o4[t]:qint = {[0, 1)}:qint).");
 		REQUIRE(fm != nullptr);
@@ -2136,24 +2136,24 @@ TEST_SUITE("hsb — joint LTL(hsb, bv) specs") {
 
 	// --- Until with mixed types ---
 
-	TEST_CASE("(o:hsb=top) U (o2:bv=255) REALIZABLE") {
+	TEST_CASE("(o:hsb=top) U (o2:bv[8]=255) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"(o1[t]:hsb = {top}:hsb) U (o2[t]:bv = {255}:bv).");
+			"(o1[t]:hsb = {top}:hsb) U (o2[t]:bv[8] = {255}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Multiple bv widths + hsb ---
 
-	TEST_CASE("F(o1:bv8=255) && F(o2:hsb=top) && F(o3:bv=0b1) REALIZABLE") {
+	TEST_CASE("F(o1:bv8=255) && F(o2:hsb=top) && F(o3:bv[8]=0b1) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"F (o1[t]:bv = {255}:bv) && "
+			"F (o1[t]:bv[8] = {255}:bv[8]) && "
 			"F (o2[t]:hsb = {top}:hsb) && "
-			"F (o3[t]:bv = {#b1}:bv).");
+			"F (o3[t]:bv[8] = {#b1}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2204,7 +2204,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o_tick[t]:sbf = {tick}:sbf -> o_token[t]:bv != {0}:bv).");
+			"G (o_tick[t]:sbf = {tick}:sbf -> o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2229,7 +2229,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb) && "
-			"G (o_token[t]:bv != {0}:bv -> o_admit[t]:hsb != {bot}:hsb).");
+			"G (o_token[t]:bv[8] != {0}:bv[8] -> o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2253,7 +2253,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv = {0}:bv).");
+			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2264,7 +2264,7 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv = {0}:bv) && "
+			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]) && "
 			"G (F (o_admit[t]:hsb != {bot}:hsb)).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
@@ -2276,18 +2276,18 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o_tick[t]:sbf = {tick}:sbf -> F (o_token[t]:bv != {0}:bv)).");
+			"G (o_tick[t]:sbf = {tick}:sbf -> F (o_token[t]:bv[8] != {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Response: input admissibility implies eventual output token ---
 
-	TEST_CASE("G(i:hsb!=bot -> F(o:bv!=0)) input-to-output response REALIZABLE") {
+	TEST_CASE("G(i:hsb!=bot -> F(o:bv[8]!=0)) input-to-output response REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:bv != {0}:bv)).");
+			"G (i1[t]:hsb != {bot}:hsb -> F (o1[t]:bv[8] != {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2300,8 +2300,8 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
 			"G (o_tick[t]:sbf = {tick}:sbf -> o_admit[t]:hsb != {bot}:hsb) && "
-			"G (o_token[t]:bv != {0}:bv -> o_admit[t]:hsb != {bot}:hsb) && "
-			"G (i_embed[t]:hsb != {bot}:hsb -> o_token[t]:bv != {0}:bv).");
+			"G (o_token[t]:bv[8] != {0}:bv[8] -> o_admit[t]:hsb != {bot}:hsb) && "
+			"G (i_embed[t]:hsb != {bot}:hsb -> o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2335,8 +2335,8 @@ TEST_SUITE("hsb — nested temporal LTL(hsb) specs") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (F (o_token[t]:bv = {255}:bv)) && "
-			"G (F (o_token[t]:bv = {0}:bv)).");
+			"G (F (o_token[t]:bv[8] = {255}:bv[8])) && "
+			"G (F (o_token[t]:bv[8] = {0}:bv[8])).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2703,7 +2703,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv = {0}:bv).");
+			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -2722,7 +2722,7 @@ TEST_SUITE("hsb — multi-variable LTL(hsb) specs") {
 		bdd_init<Bool>();
 		tref fm = spec(
 			"G (F (o_tick[t]:sbf = {tick}:sbf)) && "
-			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv = {0}:bv) && "
+			"G (o_admit[t]:hsb = {bot}:hsb -> o_token[t]:bv[8] = {0}:bv[8]) && "
 			"G (i_commit[t]:hsb != {bot}:hsb -> o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
@@ -3042,12 +3042,12 @@ TEST_SUITE("hsb — guarded LTL(hsb) specs") {
 
 	// --- Thinking budget: thinking tokens bounded ---
 
-	TEST_CASE("G(thinking -> token:bv!=0) && GF(response:sbf) budget pattern REALIZABLE") {
+	TEST_CASE("G(thinking -> token:bv[8]!=0) && GF(response:sbf) budget pattern REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_phase[t]:sbf = {thinking}:sbf -> "
-			"o_token[t]:bv != {0}:bv) && "
+			"o_token[t]:bv[8] != {0}:bv[8]) && "
 			"G (F (o_phase[t]:sbf = {response}:sbf)).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
@@ -3382,11 +3382,11 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 
 	// --- Operational modes: spec-only vs full synthesis ---
 
-	TEST_CASE("Spec-only mode: G(token:bv!=0 -> admit:hsb!=bot) REALIZABLE") {
+	TEST_CASE("Spec-only mode: G(token:bv[8]!=0 -> admit:hsb!=bot) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (i_token[t]:bv != {0}:bv -> "
+			"G (i_token[t]:bv[8] != {0}:bv[8] -> "
 			"o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
@@ -3396,21 +3396,21 @@ TEST_SUITE("hsb — mixed-sort LTL(hsb,sbf) specs") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
-			"G (o_token[t]:bv = {0}:bv) && "
-			"G (o_token[t]:bv != {0}:bv).");
+			"G (o_token[t]:bv[8] = {0}:bv[8]) && "
+			"G (o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(is_tau_formula_sat<node_t>(fm));
 	}
 
 	// --- Full pipeline composition: embedding + spec ---
 
-	TEST_CASE("G(embed:hsb!=bot) && G(embed:hsb!=bot -> token:bv!=0) composition REALIZABLE") {
+	TEST_CASE("G(embed:hsb!=bot) && G(embed:hsb!=bot -> token:bv[8]!=0) composition REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_embed[t]:hsb != {bot}:hsb) && "
 			"G (o_embed[t]:hsb != {bot}:hsb -> "
-			"o_token[t]:bv != {0}:bv).");
+			"o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -3750,12 +3750,12 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 
 	// --- Mode B (spec-only): token + admit constraints ---
 
-	TEST_CASE("Mode B spec-only: G(admit:hsb!=bot) && G(token:bv!=0) REALIZABLE") {
+	TEST_CASE("Mode B spec-only: G(admit:hsb!=bot) && G(token:bv[8]!=0) REALIZABLE") {
 		gc_fixture gc;
 		bdd_init<Bool>();
 		tref fm = spec(
 			"G (o_admit[t]:hsb != {bot}:hsb) && "
-			"G (o_token[t]:bv != {0}:bv).");
+			"G (o_token[t]:bv[8] != {0}:bv[8]).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));
 	}
@@ -3767,7 +3767,7 @@ TEST_SUITE("hsb — spec composition LTL(hsb) specs") {
 		bdd_init<Bool>();
 		tref fm = spec(
 			"G (i_embed[t]:hsb != {bot}:hsb -> "
-			"o_token[t]:bv != {0}:bv) && "
+			"o_token[t]:bv[8] != {0}:bv[8]) && "
 			"G (o_admit[t]:hsb != {bot}:hsb).");
 		REQUIRE(fm != nullptr);
 		CHECK(is_tau_formula_sat<node_t>(fm));

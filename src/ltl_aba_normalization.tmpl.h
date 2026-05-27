@@ -689,7 +689,10 @@ static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
 	using tau = tree<node>;
 	assert(shift <= 0 && "build_bv_eq_aux: shift must be <= 0 (past or current)");
 	std::string t_str = (shift == 0) ? "t" : ("t-" + std::to_string(-shift));
-	std::string expr = name + "[" + t_str + "]:bv = { "
+	// Use the default BV bitwidth explicitly — bare ":bv" is rejected by
+	// the grammar since the merge that made bitwidths mandatory.
+	std::string bv_type_str = ":bv[" + std::to_string(default_bv_size) + "]";
+	std::string expr = name + "[" + t_str + "]" + bv_type_str + " = { "
 	                 + std::to_string(value) + " }";
 	typename tau::get_options opts;
 	opts.parse.start = tau::wff;

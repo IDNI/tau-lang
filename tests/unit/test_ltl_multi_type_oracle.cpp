@@ -48,7 +48,7 @@ TEST_SUITE("multi-type LTL cross-validation") {
 	TEST_CASE("MT-03: G(qlt) && F(bv) ⇒ REAL") {
 		CHECK(realizable(
 			"G ((o1[t]:qlt > {0}:qlt) && (o1[t]:qlt < {1}:qlt))"
-			" && F ((o2[t]:bv = {#b10110101}:bv))."
+			" && F ((o2[t]:bv[8] = {#b10110101}:bv[8]))."
 		));
 	}
 
@@ -57,7 +57,7 @@ TEST_SUITE("multi-type LTL cross-validation") {
 		CHECK(realizable(
 			"(G ((o1[t]:qlt = {1/2}:qlt)))"
 			" && (G ((o2[t]:sbf = {X | (Y & Z)}:sbf)))"
-			" && (G ((o3[t]:bv = {#b11110000}:bv)))."
+			" && (G ((o3[t]:bv[8] = {#b11110000}:bv[8])))."
 		));
 	}
 

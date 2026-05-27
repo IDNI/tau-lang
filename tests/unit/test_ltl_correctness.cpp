@@ -337,10 +337,10 @@ TEST_SUITE("LTL correctness: safety path cross-validation") {
 		CHECK(ltl_r);
 	}
 
-	TEST_CASE("[CROSS-07] G(o={#b10110101}:bv) — LTL agrees with safety path") {
+	TEST_CASE("[CROSS-07] G(o={#b10110101}:bv[8]) — LTL agrees with safety path") {
 		bdd_init<Bool>();
-		bool ltl_r  = realizable("G (o1[t]:bv = {#b10110101}:bv).");
-		bool safe_r = safety_realizable("(o1[t]:bv = {#b10110101}:bv).");
+		bool ltl_r  = realizable("G (o1[t]:bv[8] = {#b10110101}:bv[8]).");
+		bool safe_r = safety_realizable("(o1[t]:bv[8] = {#b10110101}:bv[8]).");
 		CHECK(ltl_r == safe_r);
 		CHECK(ltl_r);
 	}
@@ -581,12 +581,12 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 
 	// ── bv type adversarial ───────────────────────────────────────────────────
 
-	TEST_CASE("[ADV-BV-01] G(o={#b10110101}:bv) — every output is non-empty") {
+	TEST_CASE("[ADV-BV-01] G(o={#b10110101}:bv[8]) — every output is non-empty") {
 		bdd_init<Bool>();
 		io_context<node_t> ctx;
 		auto o1 = std::make_shared<vector_output_stream>();
-		ctx.add_output("o1", bv_type_id<node_t>(), o1);
-		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv = {#b10110101}:bv)."));
+		ctx.add_output("o1", bv_type_id<node_t>(8), o1);
+		auto nso = get_nso_rr<node_t>(ctx, tau::get("G (o1[t]:bv[8] = {#b10110101}:bv[8])."));
 		REQUIRE(nso.has_value());
 		run<node_t>(nso.value().main->get(), ctx, 6);
 		auto vals = o1->get_values();
