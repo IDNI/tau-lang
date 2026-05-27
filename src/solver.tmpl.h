@@ -1160,7 +1160,13 @@ bool has_bv_arithmetic(tref f) {
 			|| is<node, tau::bf_mul>(n) || is<node, tau::bf_div>(n)
 			|| is<node, tau::bf_mod>(n) || is<node, tau::bf_shl>(n)
 			|| is<node, tau::bf_shr>(n) || is<node, tau::bf_nand>(n)
-			|| is<node, tau::bf_nor>(n)  || is<node, tau::bf_xnor>(n);
+			|| is<node, tau::bf_nor>(n)  || is<node, tau::bf_xnor>(n)
+			// CVC5 simplification may convert arithmetic (e.g. bvurem) into
+			// bitwise/logical ops or casts; treat these as non-pure too so
+			// bv_conjs_only_pure_equality routes them to solve_bv, not LGRS.
+			|| is<node, tau::bf_and>(n) || is<node, tau::bf_or>(n)
+			|| is<node, tau::bf_neg>(n) || is<node, tau::bf_xor>(n)
+			|| is<node, tau::bf_cast>(n);
 	}) != nullptr;
 }
 

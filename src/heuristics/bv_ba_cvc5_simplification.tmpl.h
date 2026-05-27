@@ -179,18 +179,31 @@ tref cvc5_tree_to_tau_tree(bv n,
 
 		case Kind::BITVECTOR_CONCAT: {
 			// concat(a, b) = (a << width(b)) | b
-			// Both operands widened to result width by cvc5.
-			tref a = rec(n[0]);
+			// CVC5 frequently represents zero-extension as concat(0_bvN, expr), e.g.
+			// bvurem(x,2) -> concat(#b000...0, extract(0,0,x)).  In that case, emit a
+			// bf_cast (zero-extension) rather than a shift-or, which contains bf_shl
+			// (a non-boolean term) and would block Boole decomposition.
 			tref b = rec(n[1]);
-			if (!a || !b) return nullptr;
+			if (!b) return nullptr;
 			uint32_t bw = n[1].getSort().getBitVectorSize();
 			uint32_t rw = n.getSort().getBitVectorSize();
 			size_t tid = get_ba_type_id<node>(bv_type<node>(rw));
-			// Build shift amount constant
+			// If the upper (left) operand is an all-zero constant, this concat is
+			// simply a zero-extension of the lower part to the result width.
+			if (n[0].getKind() == Kind::CONST_BITVECTOR &&
+				n[0].getBitVectorValue(10) == "0") {
+				return build_bf_cast<node>(b, tid);
+			}
+			// General case: both operands widened to result width via bf_cast, then
+			//   result = (a << width(b)) | b
+			tref a = rec(n[0]);
+			if (!a) return nullptr;
+			tref cast_a = build_bf_cast<node>(a, tid);
+			tref cast_b = build_bf_cast<node>(b, tid);
 			cvc5::Term shift_amt = cvc5_term_manager.mkBitVector(rw, bw);
 			tref shift_c = build_bf_ba_constant<node>(shift_amt, tid);
 			return build_bf_or<node>(
-				build_bf_shl<node>(a, shift_c), b);
+				build_bf_shl<node>(cast_a, shift_c), cast_b);
 		}
 		case Kind::BITVECTOR_EXTRACT: {
 			// extract[hi:lo](x) = (x >> lo) & mask(hi-lo+1)
