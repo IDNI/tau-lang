@@ -1005,6 +1005,31 @@ tref resolve_quantifiers(tref formula) {
 					// Undetermined: fall through to general solver
 				} else excluded.insert(n);
 			}
+		} else if (get_free_vars<node>(n).empty()
+				   && (tau::get(n).child_is(tau::bf_eq)
+				    || tau::get(n).child_is(tau::bf_neq)
+				    || tau::get(n).child_is(tau::bf_lt)
+				    || tau::get(n).child_is(tau::bf_gt)
+				    || tau::get(n).child_is(tau::bf_lteq)
+				    || tau::get(n).child_is(tau::bf_gteq)
+				    || tau::get(n).child_is(tau::bf_nlt)
+				    || tau::get(n).child_is(tau::bf_ngt)
+				    || tau::get(n).child_is(tau::bf_nlteq)
+				    || tau::get(n).child_is(tau::bf_ngteq))
+				   && tau::get(n).find_top([](tref t) -> bool {
+				    	const auto& tn = tau::get(t);
+				    	return tn.is(tau::bf_cast)
+				    	    || (tn.is(tau::ba_constant)
+				    	        && is_bv_type_family<node>(tn.get_ba_type()));
+				   })) {
+			// Ground BV comparison formula (no quantifier, no free variables).
+			// e.g. {2}:bv[4] < {3}:bv[4], or (bv[4]){2}:bv[2] = {2}:bv[4].
+			// wff nodes don't propagate ba_type, so we detect BV context by
+			// looking for bf_cast nodes or ba_constant nodes with a BV type.
+			// Hooks don't evaluate ground BV comparisons (especially bf_lt/bf_gt
+			// or bf_eq with bf_cast). CVC5 handles all of them correctly.
+			if (is_bv_formula_sat<node>(n)) return tau::_T();
+			else return tau::_F();
 		}
 		return n;
 	};
