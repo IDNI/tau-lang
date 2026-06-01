@@ -12,8 +12,6 @@ set(TESTS
 	composite_ba_provider
 	temporal_connectives
 	bv_ba-simplification
-	bv_ba-solver1
-	bv_ba-solver2
 	bv_ba-cast
 	cvc5
 	execution

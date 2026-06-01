@@ -15,7 +15,6 @@ set(TESTS
 	quantifiers
 	sbf1
 	sbf2
-	solver
 	splitter
 	splitter2
 	tau_ba1
@@ -52,3 +51,4 @@ foreach(X IN ITEMS ctl_star ocfuncs)
 endforeach()
 
 add_subdirectory(satisfiability)
+add_subdirectory(solver)
