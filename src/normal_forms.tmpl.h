@@ -3861,7 +3861,7 @@ using tau = tree<node>;
 // TODO: Incorporate bv type/non-atomless types
 template<NodeType node>
 tref push_ex_block_into_clause(tref clause, const trefs& block,
-	const typename term_handle<node>::order& order) {
+	const typename term_handle<node>::order& /*order*/) {
 	using tau = tree<node>;
 	// The clause is assumed to not have negation pushed into equalities
 	DBG(assert(!tau::get(clause).find_top(is<node, tau::bf_neq>)));
@@ -4165,6 +4165,9 @@ tref anti_prenex_block(tref formula) {
 	//  Build quant_pattern
 	//  Convert terms to BDD according to quantified variables
 	//  Call already present anti_prenex_block above
+
+	// TODO (HIGH) implement
+	return formula;
 }
 
 template<NodeType node>
