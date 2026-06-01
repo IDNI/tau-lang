@@ -7,10 +7,11 @@ set(TESTS
 )
 
 foreach(X IN LISTS TESTS)
-	set(TARGET "test_integration-solver-${X}")
-	add(${TARGET})
-	# The add() function uses ${CMAKE_CURRENT_SOURCE_DIR}/.. which resolves to
-	# tests/integration/ from this depth; add the tests/ root explicitly so
-	# test_init.h, test_tau_helpers.h, and test_sbf_ba_helpers.h remain reachable.
-	target_include_directories(${TARGET} PUBLIC ${PROJECT_SOURCE_DIR}/tests)
+	add("test_integration-solver-${X}")
+	# From this depth ${CMAKE_CURRENT_SOURCE_DIR}/.. in add() resolves to
+	# tests/integration/ — add tests/ root so shared headers remain reachable.
+	target_include_directories("test_integration-solver-${X}" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+	# Override working directory to tests/ (same as all other integration tests).
+	set_tests_properties("test_integration-solver-${X}" PROPERTIES
+		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
 endforeach()
