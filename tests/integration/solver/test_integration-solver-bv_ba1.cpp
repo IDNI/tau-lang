@@ -1,0 +1,87 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+#include "test_init.h"
+#include "test_tau_helpers.h"
+
+#include "boolean_algebras/bv_ba.h"
+
+tref parse_bv_formula(const std::string spec) {
+	typename tau::get_options opts{
+		.parse = { .start = tau::wff } };
+	return tau::get(spec, opts);
+}
+
+TEST_SUITE("Configuration") {
+
+	TEST_CASE("logging") {
+		logging::trace();
+	}
+
+	TEST_CASE("bdd init") {
+		bdd_init<Bool>();
+	}
+}
+
+TEST_SUITE("cvc5_satisfiability") {
+
+	TEST_CASE("all x ex y x + y = { #b1 }:bv[4]") {
+		const std::string sample = "all x ex y x + y = { #b1 }:bv[4]";
+		auto formula = parse_bv_formula(sample);
+		CHECK( is_bv_formula_sat<node_t>(formula) );
+	}
+
+	TEST_CASE("all x x + y = { #b1 }:bv[4]") {
+		const std::string sample = "all x x + y = { #b1 }:bv[4]";
+		auto formula = parse_bv_formula(sample);
+		// y is implicitlly existentially quantified by cvc5
+		CHECK( !is_bv_formula_sat<node_t>(formula) );
+		CHECK( is_bv_formula_unsat<node_t>(formula) );
+		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
+	}
+
+	TEST_CASE("all x x > { 0 }") {
+		const std::string sample = "all x x > { 0 }:bv[4]";
+		auto formula = parse_bv_formula(sample);
+		CHECK( !is_bv_formula_sat<node_t>(formula) );
+		CHECK( is_bv_formula_unsat<node_t>(formula) );
+		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
+	}
+
+	TEST_CASE("all x x + { 1 } = { 1 }") {
+		const std::string sample = "all x x + { 1 } = { 1 }:bv[4]";
+		auto formula = parse_bv_formula(sample);
+		CHECK( !is_bv_formula_sat<node_t>(formula) );
+		CHECK( is_bv_formula_unsat<node_t>(formula) );
+		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
+	}
+
+	/*TEST_CASE("all x all y (x + y) * (x + y)  = x * x + y* y + 2 * x * y") {
+		const std::string sample = "all x all y (x + y) * (x + y)  = x * x + y* y + 2 * x * y";
+		auto formula = parse_bv_formula(sample);
+		CHECK( is_bv_formula_sat<node_t>(formula) );
+	}*/
+
+	TEST_CASE("all x x + { 1 } < { 1 }") {
+		const std::string sample = "all x x + { 1 } < { 1 }:bv[4]";
+		auto formula = parse_bv_formula(sample);
+		CHECK( !is_bv_formula_sat<node_t>(formula) );
+		CHECK( is_bv_formula_unsat<node_t>(formula) );
+		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
+	}
+
+	TEST_CASE("all x x + { 1 }:bv[4] < { 1 }:bv[4]") {
+		const std::string sample = "all x x + { 1 }:bv[4] < { 1 }:bv[4]";
+		auto formula = parse_bv_formula(sample);
+		// TODO (HIGH) change assertion when supporting overflows
+		CHECK( !is_bv_formula_sat<node_t>(formula) );
+		CHECK( is_bv_formula_unsat<node_t>(formula) );
+		CHECK( is_bv_formula_valid<node_t>(build_wff_neg<node_t>(formula)) );
+	}
+}
+
+TEST_SUITE("Cleanup") {
+
+	TEST_CASE("ba_constants cleanup") {
+		ba_constants<node_t>::cleanup();
+	}
+}
