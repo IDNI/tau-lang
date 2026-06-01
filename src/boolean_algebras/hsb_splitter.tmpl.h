@@ -21,62 +21,31 @@ struct linear_constraint {
 
 /// Collect all halfspace constraints from an AND-tree into @p out.
 /// Returns false iff the node is structurally unsatisfiable (contains bot).
-/// @pre This function must only be called on individual DNF clauses
-///      (nodes that are pure conjunctions of halfspaces); or_/not_ nodes
-///      at the root of a clause indicate a programming error.
-inline bool collect_conjunction(const hsb::node_ptr& n,
+/// @pre Must only be called on individual DNF clauses (pure conjunctions of
+///      halfspaces); or_/not_ nodes at the clause root indicate a logic error.
+inline bool collect_conjunction(tref n,
                                 std::vector<linear_constraint>& out) {
 	if (!n) return false;
-	switch (n->k) {
-	case hsb::kind::bot:       return false;
-	case hsb::kind::top:       return true;
-	case hsb::kind::halfspace:
-		out.push_back({n->hs.w, n->hs.b, n->hs.is_strict()});
+	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
+	switch (k) {
+	case hsb::kind::bot:  return false;
+	case hsb::kind::top:  return true;
+	case hsb::kind::halfspace: {
+		const auto& hs = hsb_halfspace_pool::get(hsb_tree::get(n).value.data);
+		out.push_back({hs.w, hs.b, hs.is_strict()});
 		return true;
+	}
 	case hsb::kind::and_:
-		return collect_conjunction(n->lhs, out)
-		    && collect_conjunction(n->rhs, out);
+		return collect_conjunction(hsb_tree::get(n).first(), out)
+		    && collect_conjunction(hsb_tree::get(n).second(), out);
 	default:
 		// or_/not_ should not appear in a DNF clause; treat conservatively.
 		return true;
 	}
 }
 
-/// Convert double @p v to an exact cvc5 rational term using the IEEE 754
-/// binary representation (frexp-based), avoiding decimal rounding errors.
-/// Falls back to a 20-digit decimal string only for very large exponents.
-/*inline cvc5::Term mk_rational(double v) {
-	if (v == 0.0) return cvc5_term_manager.mkReal(0);
-	int exp = 0;
-	double mant = std::frexp(std::abs(v), &exp);
-	// |v| = mant * 2^exp, mant ∈ [0.5, 1.0).
-	// sig = mant * 2^53 is an exact 53-bit integer (the IEEE significand).
-	int64_t sig = static_cast<int64_t>(std::ldexp(mant, 53));
-	if (v < 0) sig = -sig;
-	int shift = exp - 53; // v = sig * 2^shift
-	if (shift >= 0) {
-		// v is an exact (possibly large) integer.
-		// |sig| < 2^53, so sig * 2^9 < 2^62 < INT64_MAX.
-		if (shift <= 9)
-			return cvc5_term_manager.mkReal(sig * (int64_t(1) << shift));
-		// Very large integer (rare for LP coefficients): fall back.
-		std::ostringstream oss;
-		oss << std::fixed << std::setprecision(20) << v;
-		return cvc5_term_manager.mkReal(oss.str());
-	}
-	int neg_shift = -shift;
-	if (neg_shift <= 62) // 2^62 fits in int64_t
-		return cvc5_term_manager.mkReal(
-			std::to_string(sig) + "/" + std::to_string(int64_t(1) << neg_shift));
-	// Very small value (subnormal range): fall back to decimal.
-	std::ostringstream oss;
-	oss << std::fixed << std::setprecision(20) << v;
-	return cvc5_term_manager.mkReal(oss.str());
-}*/
-
 /// Set up a cvc5 QF_LRA solver, create real variables x0…x_{dim-1}, assert
 /// all constraints in @p cs, and return the variable terms.
-/// The caller owns the solver and must call checkSat() / getValue() itself.
 inline std::vector<cvc5::Term> setup_lra_solver(
 		cvc5::Solver& solver,
 		const std::vector<linear_constraint>& cs,
@@ -122,7 +91,6 @@ inline bool lra_feasible(const std::vector<linear_constraint>& cs, size_t dim) {
 }
 
 /// Find a feasible point for @p cs via cvc5 model extraction.
-/// Returns `nullopt` if the system is infeasible.
 inline std::optional<std::vector<double>>
 find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 	if (cs.empty())
@@ -147,8 +115,7 @@ find_feasible_point(const std::vector<linear_constraint>& cs, size_t dim) {
 	return pt;
 }
 
-/// Find a feasible point for @p cs that additionally satisfies x[axis] > val (greater_than=true)
-/// or x[axis] < val (greater_than=false).  Returns `nullopt` if infeasible.
+/// Find a feasible point additionally satisfying x[axis] > val or < val.
 inline std::optional<std::vector<double>>
 find_second_feasible_point(const std::vector<linear_constraint>& cs,
                            size_t dim, size_t axis, double val, bool greater_than) {
@@ -162,13 +129,13 @@ find_second_feasible_point(const std::vector<linear_constraint>& cs,
 }
 
 // Forward declaration needed by to_dnf.
-inline hsb::node_ptr push_neg(const hsb::node_ptr& n);
+inline tref push_neg(tref n);
 
 /// Convert a formula node to DNF (vector of conjunctions of halfspace nodes).
-inline void to_dnf(const hsb::node_ptr& n,
-                   std::vector<std::vector<hsb::node_ptr>>& dnf) {
+inline void to_dnf(tref n, std::vector<std::vector<tref>>& dnf) {
 	if (!n) { dnf.clear(); return; }
-	switch (n->k) {
+	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
+	switch (k) {
 	case hsb::kind::bot:
 		break; // contributes nothing
 	case hsb::kind::top:
@@ -178,9 +145,9 @@ inline void to_dnf(const hsb::node_ptr& n,
 		dnf.push_back({n});
 		break;
 	case hsb::kind::and_: {
-		std::vector<std::vector<hsb::node_ptr>> left, right;
-		to_dnf(n->lhs, left);
-		to_dnf(n->rhs, right);
+		std::vector<std::vector<tref>> left, right;
+		to_dnf(hsb_tree::get(n).first(), left);
+		to_dnf(hsb_tree::get(n).second(), right);
 		for (auto& l : left)
 			for (auto& r : right) {
 				auto conj = l;
@@ -190,67 +157,61 @@ inline void to_dnf(const hsb::node_ptr& n,
 		break;
 	}
 	case hsb::kind::or_:
-		to_dnf(n->lhs, dnf);
-		to_dnf(n->rhs, dnf);
+		to_dnf(hsb_tree::get(n).first(), dnf);
+		to_dnf(hsb_tree::get(n).second(), dnf);
 		break;
 	case hsb::kind::not_:
-		to_dnf(push_neg(n->inner), dnf);
+		to_dnf(push_neg(hsb_tree::get(n).first()), dnf);
 		break;
 	}
 }
 
 /// Push negation down to halfspace leaves (NNF step).
-inline hsb::node_ptr push_neg(const hsb::node_ptr& n) {
+inline tref push_neg(tref n) {
 	if (!n) return hsb::mk_bot();
-	switch (n->k) {
+	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
+	switch (k) {
 	case hsb::kind::bot:       return hsb::mk_top();
 	case hsb::kind::top:       return hsb::mk_bot();
-	case hsb::kind::halfspace: return hsb::mk_hs(n->hs.negate());
-	case hsb::kind::not_:      return n->inner; // ~~A = A
-	case hsb::kind::and_:      return hsb::mk_or(push_neg(n->lhs), push_neg(n->rhs));
-	case hsb::kind::or_:       return hsb::mk_and(push_neg(n->lhs), push_neg(n->rhs));
+	case hsb::kind::halfspace: {
+		size_t idx = hsb_tree::get(n).value.data;
+		return hsb::mk_hs_by_index(hsb_halfspace_pool::complement_index(idx));
+	}
+	case hsb::kind::not_:      return hsb_tree::get(n).first(); // ~~A = A
+	case hsb::kind::and_:
+		return hsb::mk_or(push_neg(hsb_tree::get(n).first()),
+		                  push_neg(hsb_tree::get(n).second()));
+	case hsb::kind::or_:
+		return hsb::mk_and(push_neg(hsb_tree::get(n).first()),
+		                   push_neg(hsb_tree::get(n).second()));
 	}
 	return hsb::mk_bot();
 }
 
-/// Convert to NNF (push all negations to leaves).
-inline hsb::node_ptr to_nnf(const hsb::node_ptr& n) {
-	if (!n) return hsb::mk_bot();
-	switch (n->k) {
-	case hsb::kind::bot:
-	case hsb::kind::top:
-	case hsb::kind::halfspace: return n;
-	case hsb::kind::and_:      return hsb::mk_and(to_nnf(n->lhs), to_nnf(n->rhs));
-	case hsb::kind::or_:       return hsb::mk_or(to_nnf(n->lhs), to_nnf(n->rhs));
-	case hsb::kind::not_:      return push_neg(n->inner);
-	}
-	return hsb::mk_bot();
+/// Convert to NNF using post_order — each not_ node has its child push_neg'd.
+inline tref to_nnf(tref root) {
+	auto f = [](tref n) -> tref {
+		auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
+		if (k != hsb::kind::not_) return n;
+		return push_neg(hsb_tree::get(n).first());
+	};
+	return post_order<hsb_node>(root).apply_unique(f);
 }
 
 /// Infer ambient dimension from the formula tree.
-inline size_t infer_dim(const hsb::node_ptr& n) {
+inline size_t infer_dim(tref n) {
 	if (!n) return 0;
-	switch (n->k) {
-	case hsb::kind::halfspace: return n->hs.dimension();
+	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
+	switch (k) {
+	case hsb::kind::halfspace:
+		return hsb_halfspace_pool::get(hsb_tree::get(n).value.data).dimension();
 	case hsb::kind::and_:
-	case hsb::kind::or_:       return std::max(infer_dim(n->lhs), infer_dim(n->rhs));
-	case hsb::kind::not_:      return infer_dim(n->inner);
-	default:                   return 0;
-	}
-}
-
-/// Return the first halfspace leaf found in the formula tree, or nullptr.
-inline hsb::node_ptr find_leaf_halfspace(const hsb::node_ptr& n) {
-	if (!n) return nullptr;
-	switch (n->k) {
-	case hsb::kind::halfspace: return n;
-	case hsb::kind::and_:
-	case hsb::kind::or_: {
-		auto l = find_leaf_halfspace(n->lhs);
-		return l ? l : find_leaf_halfspace(n->rhs);
-	}
-	case hsb::kind::not_: return find_leaf_halfspace(n->inner);
-	default:              return nullptr;
+	case hsb::kind::or_:
+		return std::max(infer_dim(hsb_tree::get(n).first()),
+		                infer_dim(hsb_tree::get(n).second()));
+	case hsb::kind::not_:
+		return infer_dim(hsb_tree::get(n).first());
+	default: return 0;
 	}
 }
 
@@ -262,29 +223,25 @@ inline hsb::node_ptr find_leaf_halfspace(const hsb::node_ptr& n) {
 
 /**
  * @brief Returns true iff @p x is semantically equivalent to bottom (∅).
- *
- * Converts @p x to DNF then checks each disjunct for LP-feasibility via
- * cvc5 QF_LRA.  Returns `true` iff every disjunct is infeasible.
- *
- * @param x  The hsb element to test.
  */
 inline bool is_hsb_zero(const hsb& x) {
-	if (x.root->k == hsb::kind::bot) return true;
-	if (x.root->k == hsb::kind::top) return false;
+	auto k = x.root_kind();
+	if (k == hsb::kind::bot) return true;
+	if (k == hsb::kind::top) return false;
 
-	auto nnf = detail::to_nnf(x.root);
-	std::vector<std::vector<hsb::node_ptr>> dnf;
+	auto nnf = detail::to_nnf(x.root_ref());
+	std::vector<std::vector<tref>> dnf;
 	detail::to_dnf(nnf, dnf);
 
 	if (dnf.empty()) return true;
 
-	size_t dim = detail::infer_dim(x.root);
+	size_t dim = detail::infer_dim(x.root_ref());
 	if (dim == 0) dim = 1;
 
 	for (auto& conj : dnf) {
 		std::vector<detail::linear_constraint> cs;
 		bool ok = true;
-		for (auto& nd : conj)
+		for (auto nd : conj)
 			if (!detail::collect_conjunction(nd, cs)) { ok = false; break; }
 		if (!ok) continue;
 		if (detail::lra_feasible(cs, dim)) return false;
@@ -294,7 +251,6 @@ inline bool is_hsb_zero(const hsb& x) {
 
 /**
  * @brief Returns true iff @p x is semantically equivalent to top (R^d).
- * @param x  The hsb element to test.
  */
 inline bool is_hsb_one(const hsb& x) {
 	return is_hsb_zero(~x);
@@ -321,46 +277,32 @@ inline tref simplify_hsb_term(tref t) { return t; }
 
 /**
  * @brief Returns a proper sub-element y with `bot < y < x`.
- *
- * For each satisfiable DNF clause of @p x, finds a feasible interior point A via
- * cvc5, then scans axes from the highest-indexed variable downward to find a second
- * point B with B[axis] ≠ A[axis].  Returns `x & {x[axis] < (A[axis]+B[axis])/2}`.
- *
- * @param x   A non-zero, non-top hsb element.
- * @param st  Splitter hint (currently unused).
  */
 inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
-	if (x.root->k == hsb::kind::bot) return hsb::bottom();
-	if (x.root->k == hsb::kind::top) {
+	auto k = x.root_kind();
+	if (k == hsb::kind::bot) return hsb::bottom();
+	if (k == hsb::kind::top) {
 		hsb_halfspace h; h.w = {1.0}; h.b = 0.0;
 		return hsb::from_halfspace(h);
 	}
 
-	size_t dim = detail::infer_dim(x.root);
+	size_t dim = detail::infer_dim(x.root_ref());
 	if (dim == 0) dim = 1;
 
-	auto nnf = detail::to_nnf(x.root);
-	std::vector<std::vector<hsb::node_ptr>> dnf;
+	auto nnf = detail::to_nnf(x.root_ref());
+	std::vector<std::vector<tref>> dnf;
 	detail::to_dnf(nnf, dnf);
 
 	for (auto& conj : dnf) {
 		std::vector<detail::linear_constraint> cs;
 		bool ok = true;
-		for (auto& nd : conj)
+		for (auto nd : conj)
 			if (!detail::collect_conjunction(nd, cs)) { ok = false; break; }
 		if (!ok) continue;
 
 		auto pt_a = detail::find_feasible_point(cs, dim);
 		if (!pt_a) continue;
 
-		// Scan axes from highest to lowest seeking a dimension with thickness.
-		// Another approach would be to compute another feasible point and
-		// consider the midpoint between the two points as the splitting plane.
-		// Also we could keep the solver and reused it pushing additional
-		// constraints to find a second point, which would be more efficient for
-		// large formulas with many clauses.
-		// TODO (MEDIUM) check the best approach for different formula sizes and
-		// shapes.
 		for (size_t axis = dim; axis-- > 0; ) {
 			auto pt_b = detail::find_second_feasible_point(
 				cs, dim, axis, (*pt_a)[axis], true);
@@ -370,13 +312,11 @@ inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 			if (!pt_b) continue;
 
 			double c = ((*pt_a)[axis] + (*pt_b)[axis]) / 2.0;
-			// Splitting halfspace: x[axis] < c  (w[axis]=1, b=-c, strict).
 			hsb_halfspace h;
 			h.w.assign(dim, 0.0); h.w[axis] = 1.0; h.b = -c;
 			hsb hs   = hsb::from_halfspace(h);
 			hsb lower = x & hs;
 			hsb upper = x & ~hs;
-			// Both parts non-empty ⟺ hs is a proper sub-element of x (P1+P3).
 			if (!is_hsb_zero(lower) && !is_hsb_zero(upper)) return lower;
 		}
 	}
@@ -384,10 +324,7 @@ inline hsb hsb_splitter(const hsb& x, splitter_type /*st*/) {
 }
 
 /**
- * @brief Returns a fixed non-trivial seed element `{x_1 < 0}`.
- *
- * The seed has lex-leading sign +1 (strict), so it is a canonical open
- * half-space in dimension 1.
+ * @brief Returns a fixed non-trivial seed element `{x[0] < 0}`.
  */
 inline hsb hsb_splitter_one() {
 	hsb_halfspace h; h.w = {1.0}; h.b = 0.0;

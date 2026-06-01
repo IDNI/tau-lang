@@ -43,7 +43,9 @@ static std::optional<hsb> eval_from_str(const std::string& s) {
 	auto t = hsb_parser::tree::traverser(result.get_shaped_tree2())
 		| hsb_parser::hsb;
 	if (!t.has_value()) return std::nullopt;
-	return idni::tau_lang::hsb_grammar_detail::eval_parse_tree(t);
+	auto tval = idni::tau_lang::hsb_grammar_detail::eval_parse_tree(t);
+	if (!tval) return std::nullopt;
+	return hsb(*tval);
 }
 
 TEST_SUITE("hsb — basic construction") {
@@ -64,15 +66,15 @@ TEST_SUITE("hsb — basic construction") {
 		auto h = make_hs({1.0}, 0.0);
 		CHECK(h != hsb::bottom());
 		CHECK(h != hsb::top());
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.is_strict() == true);
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().is_strict() == true);
 	}
 
 	TEST_CASE("from_halfspace non-strict") {
 		// {x_1 <= 0}: w = (-1), b = 0, s(w)=-1 => non-strict
 		auto h = make_hs({-1.0}, 0.0);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.is_strict() == false);
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().is_strict() == false);
 	}
 
 	TEST_CASE("from_string top/bot") {
@@ -83,53 +85,53 @@ TEST_SUITE("hsb — basic construction") {
 
 	TEST_CASE("halfspace with positive bias") {
 		auto h = make_hs({1.0}, 5.0);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.b == doctest::Approx(5.0));
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().b == doctest::Approx(5.0));
 	}
 
 	TEST_CASE("halfspace with negative bias") {
 		auto h = make_hs({1.0}, -5.0);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.b == doctest::Approx(-5.0));
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().b == doctest::Approx(-5.0));
 	}
 
 	TEST_CASE("2D halfspace construction") {
 		auto h = make_hs({1.0, -2.0}, 3.0);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.w.size() == 2);
-		CHECK(h.root->hs.w[0] == doctest::Approx(1.0));
-		CHECK(h.root->hs.w[1] == doctest::Approx(-2.0));
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().w.size() == 2);
+		CHECK(h.root_halfspace().w[0] == doctest::Approx(1.0));
+		CHECK(h.root_halfspace().w[1] == doctest::Approx(-2.0));
 	}
 
 	TEST_CASE("3D halfspace construction") {
 		auto h = make_hs({1.0, 0.0, -3.0}, 2.5);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.w.size() == 3);
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().w.size() == 3);
 	}
 
 	TEST_CASE("halfspace with all-negative normal") {
 		auto h = make_hs({-1.0, -2.0, -3.0}, 0.0);
-		CHECK(h.root->hs.lex_leading_sign() == -1);
-		CHECK(h.root->hs.is_strict() == false);
+		CHECK(h.root_halfspace().lex_leading_sign() == -1);
+		CHECK(h.root_halfspace().is_strict() == false);
 	}
 
 	TEST_CASE("halfspace with all-positive normal") {
 		auto h = make_hs({1.0, 2.0, 3.0}, 0.0);
-		CHECK(h.root->hs.lex_leading_sign() == +1);
-		CHECK(h.root->hs.is_strict() == true);
+		CHECK(h.root_halfspace().lex_leading_sign() == +1);
+		CHECK(h.root_halfspace().is_strict() == true);
 	}
 
 	TEST_CASE("halfspace with leading zero components") {
 		auto h = make_hs({0.0, 0.0, 1.0}, 0.0);
-		CHECK(h.root->hs.lex_leading_sign() == +1);
-		CHECK(h.root->hs.lex_leading_index() == 2);
+		CHECK(h.root_halfspace().lex_leading_sign() == +1);
+		CHECK(h.root_halfspace().lex_leading_index() == 2);
 	}
 
 	TEST_CASE("halfspace with fractional coefficients") {
 		auto h = make_hs({0.5, -0.3}, 0.7);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.w[0] == doctest::Approx(0.5));
-		CHECK(h.root->hs.w[1] == doctest::Approx(-0.3));
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().w[0] == doctest::Approx(0.5));
+		CHECK(h.root_halfspace().w[1] == doctest::Approx(-0.3));
 	}
 
 	TEST_CASE("bottom equals false") {
@@ -160,14 +162,14 @@ TEST_SUITE("hsb — basic construction") {
 
 	TEST_CASE("4D halfspace construction") {
 		auto h = make_hs({1.0, 0.0, -1.0, 2.0}, -0.5);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.w.size() == 4);
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().w.size() == 4);
 	}
 
 	TEST_CASE("5D halfspace construction") {
 		auto h = make_hs({0.1, 0.2, 0.3, 0.4, 0.5}, -1.0);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.w.size() == 5);
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().w.size() == 5);
 		CHECK(is_hsb_zero(h) == false);
 	}
 
@@ -214,22 +216,22 @@ TEST_SUITE("hsb — BA operations") {
 	TEST_CASE("complement of halfspace is negated halfspace") {
 		auto h = make_hs({1.0}, 0.0);
 		auto c = ~h;
-		CHECK(c.root->k == hsb::kind::halfspace);
-		CHECK(c.root->hs.w[0] == doctest::Approx(-1.0));
-		CHECK(c.root->hs.b == doctest::Approx(0.0));
-		CHECK(c.root->hs.is_strict() == false);
+		CHECK(c.root_kind() == hsb::kind::halfspace);
+		CHECK(c.root_halfspace().w[0] == doctest::Approx(-1.0));
+		CHECK(c.root_halfspace().b == doctest::Approx(0.0));
+		CHECK(c.root_halfspace().is_strict() == false);
 	}
 
 	TEST_CASE("complement closure: ~H is canonical") {
 		auto h1 = make_hs({1.0, 0.0}, -0.5);
 		auto c1 = ~h1;
-		CHECK(c1.root->hs.lex_leading_sign() == -1);
-		CHECK(c1.root->hs.is_strict() == false);
+		CHECK(c1.root_halfspace().lex_leading_sign() == -1);
+		CHECK(c1.root_halfspace().is_strict() == false);
 
 		auto h2 = make_hs({-1.0, 0.0}, 0.5);
 		auto c2 = ~h2;
-		CHECK(c2.root->hs.lex_leading_sign() == +1);
-		CHECK(c2.root->hs.is_strict() == true);
+		CHECK(c2.root_halfspace().lex_leading_sign() == +1);
+		CHECK(c2.root_halfspace().is_strict() == true);
 	}
 
 	TEST_CASE("idempotence: A & A = A, A | A = A") {
@@ -248,7 +250,7 @@ TEST_SUITE("hsb — BA operations") {
 		auto a = make_hs({1.0}, 0.0);
 		auto b = make_hs({0.0, 1.0}, 0.0);
 		auto x = a ^ b;
-		CHECK(x.root->k != hsb::kind::bot);
+		CHECK(x.root_kind() != hsb::kind::bot);
 	}
 
 	TEST_CASE("xor with self is bot") {
@@ -332,9 +334,9 @@ TEST_SUITE("hsb — BA operations") {
 	TEST_CASE("complement of 2D halfspace") {
 		auto h = make_hs({1.0, -2.0}, 3.0);
 		auto c = ~h;
-		CHECK(c.root->hs.w[0] == doctest::Approx(-1.0));
-		CHECK(c.root->hs.w[1] == doctest::Approx(2.0));
-		CHECK(c.root->hs.b == doctest::Approx(-3.0));
+		CHECK(c.root_halfspace().w[0] == doctest::Approx(-1.0));
+		CHECK(c.root_halfspace().w[1] == doctest::Approx(2.0));
+		CHECK(c.root_halfspace().b == doctest::Approx(-3.0));
 	}
 
 	TEST_CASE("double complement of 2D compound") {
@@ -718,7 +720,7 @@ TEST_SUITE("hsb — splitter") {
 
 	TEST_CASE("splitter_one is a halfspace") {
 		auto s = hsb_splitter_one();
-		CHECK(s.root->k == hsb::kind::halfspace);
+		CHECK(s.root_kind() == hsb::kind::halfspace);
 	}
 
 	TEST_CASE("splitter of conjunction") {
@@ -899,9 +901,9 @@ TEST_SUITE("hsb — 1D reduction") {
 	TEST_CASE("1D complement produces complementary interval") {
 		auto h = make_hs({1.0}, -3.0);
 		auto c = ~h;
-		CHECK(c.root->hs.w[0] == doctest::Approx(-1.0));
-		CHECK(c.root->hs.b == doctest::Approx(3.0));
-		CHECK(c.root->hs.is_strict() == false);
+		CHECK(c.root_halfspace().w[0] == doctest::Approx(-1.0));
+		CHECK(c.root_halfspace().b == doctest::Approx(3.0));
+		CHECK(c.root_halfspace().is_strict() == false);
 	}
 
 	TEST_CASE("1D interval [0, 1) is non-empty") {
@@ -1099,9 +1101,9 @@ TEST_SUITE("hsb — multi-dimensional") {
 
 	TEST_CASE("2D diagonal halfspace") {
 		auto h = make_hs({1.0, 1.0}, -1.0);
-		CHECK(h.root->hs.is_strict() == true);
+		CHECK(h.root_halfspace().is_strict() == true);
 		CHECK(is_hsb_zero(h) == false);
-		CHECK(h.root->hs.contains({0.0, 0.0}) == true);
+		CHECK(h.root_halfspace().contains({0.0, 0.0}) == true);
 	}
 
 	TEST_CASE("or of disjoint regions is non-empty") {
@@ -1150,10 +1152,10 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.w[0] == doctest::Approx(1.0));
-		CHECK(h.root->hs.b == doctest::Approx(0.0));
-		CHECK(h.root->hs.is_strict() == true);
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().w[0] == doctest::Approx(1.0));
+		CHECK(h.root_halfspace().b == doctest::Approx(0.0));
+		CHECK(h.root_halfspace().is_strict() == true);
 	}
 
 	TEST_CASE("parse single constraint: x[0]*0.5 + 0.7 < 0") {
@@ -1161,10 +1163,10 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
-		CHECK(h.root->k == hsb::kind::halfspace);
-		CHECK(h.root->hs.w[0] == doctest::Approx(0.5));
-		CHECK(h.root->hs.b == doctest::Approx(0.7));
-		CHECK(h.root->hs.is_strict() == true);
+		CHECK(h.root_kind() == hsb::kind::halfspace);
+		CHECK(h.root_halfspace().w[0] == doctest::Approx(0.5));
+		CHECK(h.root_halfspace().b == doctest::Approx(0.7));
+		CHECK(h.root_halfspace().is_strict() == true);
 	}
 
 	TEST_CASE("parse conjunction: x[0] < 0 & x[1] < 0") {
@@ -1183,7 +1185,7 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
-		CHECK(h.root->hs.is_strict() == true); // canonical: determined by s(w)=+1
+		CHECK(h.root_halfspace().is_strict() == true); // canonical: determined by s(w)=+1
 	}
 
 	TEST_CASE("parse with negative coefficient: -1*x[0] < 0") {
@@ -1192,8 +1194,8 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
-		CHECK(h.root->hs.w[0] == doctest::Approx(-1.0));
-		CHECK(h.root->hs.is_strict() == false); // canonical: s(w)=-1
+		CHECK(h.root_halfspace().w[0] == doctest::Approx(-1.0));
+		CHECK(h.root_halfspace().is_strict() == false); // canonical: s(w)=-1
 	}
 
 	TEST_CASE("parse with coefficient after variable: x[0]*2 < 0") {
@@ -1208,9 +1210,9 @@ TEST_SUITE("hsb — parser") {
 		REQUIRE(r.has_value());
 		auto h = std::get<hsb>(r->first);
 		CHECK(is_hsb_zero(h) == false);
-		CHECK(h.root->hs.w[0] == doctest::Approx(1.0));
-		CHECK(h.root->hs.b == doctest::Approx(5.0));
-		CHECK(h.root->hs.is_strict() == true);
+		CHECK(h.root_halfspace().w[0] == doctest::Approx(1.0));
+		CHECK(h.root_halfspace().b == doctest::Approx(5.0));
+		CHECK(h.root_halfspace().is_strict() == true);
 	}
 
 	TEST_CASE("parse with negative bias: x[0] + -3 < 0") {

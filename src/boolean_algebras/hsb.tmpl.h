@@ -1,5 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_TMPL_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_TMPL_H__
+
 #include "boolean_algebras/hsb.h"
 
 namespace idni::tau_lang {
@@ -107,116 +110,172 @@ inline std::string hsb_halfspace::to_string() const {
 }
 
 // =============================================================================
-// hsb::node — method definitions
+// hsb_halfspace_pool — method definitions
 // =============================================================================
 
-inline bool hsb::node::operator==(const node& o) const {
-	if (k != o.k) return false;
-	switch (k) {
-	case kind::bot:
-	case kind::top:       return true;
-	case kind::halfspace: return hs == o.hs;
-	case kind::not_:      return *inner == *o.inner;
-	case kind::and_:
-	case kind::or_:       return *lhs == *o.lhs && *rhs == *o.rhs;
-	}
-	return false;
+inline size_t hsb_halfspace_pool::insert(const hsb_halfspace& h) {
+	auto it = index_.find(h);
+	if (it != index_.end()) return it->second;
+	size_t idx = pool_.size();
+	pool_.push_back(h);
+	index_[h] = idx;
+	return idx;
 }
 
-inline bool hsb::node::is_complement_of(const node& o) const {
-	if (k == kind::not_ && *inner == o) return true;
-	if (o.k == kind::not_ && *o.inner == *this) return true;
-	if (k == kind::halfspace && o.k == kind::halfspace)
-		return hs == o.hs.negate();
-	return false;
+inline const hsb_halfspace& hsb_halfspace_pool::get(size_t idx) {
+	return pool_[idx];
 }
 
-inline std::string hsb::node::to_string() const {
-	switch (k) {
-	case kind::bot:       return "bot";
-	case kind::top:       return "top";
-	case kind::halfspace: return hs.to_string();
-	case kind::not_:      return "~(" + inner->to_string() + ")";
-	case kind::and_:      return "(" + lhs->to_string()
-	                           + " & " + rhs->to_string() + ")";
-	case kind::or_:       return "(" + lhs->to_string()
-	                           + " | " + rhs->to_string() + ")";
-	}
-	return "";
+inline size_t hsb_halfspace_pool::complement_index(size_t idx) {
+	return insert(pool_[idx].negate());
+}
+
+inline size_t hsb_halfspace_pool::size() {
+	return pool_.size();
 }
 
 // =============================================================================
 // hsb — constructor, factory and operator definitions
 // =============================================================================
 
-inline hsb::hsb() : root(mk_bot()) {}
-inline hsb::hsb(node_ptr r) : root(std::move(r)) {}
+inline hsb::hsb() : root(hsb_tree::geth(mk_bot())) {}
+inline hsb::hsb(tref r)  : root(r ? hsb_tree::geth(r) : hsb_tree::geth(mk_bot())) {}
+inline hsb::hsb(htref h) : root(h ? h : hsb_tree::geth(mk_bot())) {}
 
-inline hsb::node_ptr hsb::mk_bot() {
-	auto p = std::make_shared<node>(); p->k = kind::bot; return p;
-}
-inline hsb::node_ptr hsb::mk_top() {
-	auto p = std::make_shared<node>(); p->k = kind::top; return p;
-}
-inline hsb::node_ptr hsb::mk_hs(hsb_halfspace h) {
-	auto p = std::make_shared<node>();
-	p->k = kind::halfspace; p->hs = std::move(h); return p;
-}
-inline hsb::node_ptr hsb::mk_and(node_ptr l, node_ptr r) {
-	auto p = std::make_shared<node>();
-	p->k = kind::and_; p->lhs = std::move(l); p->rhs = std::move(r); return p;
-}
-inline hsb::node_ptr hsb::mk_or(node_ptr l, node_ptr r) {
-	auto p = std::make_shared<node>();
-	p->k = kind::or_; p->lhs = std::move(l); p->rhs = std::move(r); return p;
-}
-inline hsb::node_ptr hsb::mk_not(node_ptr i) {
-	auto p = std::make_shared<node>();
-	p->k = kind::not_; p->inner = std::move(i); return p;
+// ── Static node factories ────────────────────────────────────────────────────
+
+inline tref hsb::mk_bot() {
+	static const htref h = hsb_tree::geth(
+		hsb_tree::get(make_hsb_node(hsb_parser::hsb_bot)));
+	return h->get();
 }
 
-inline hsb hsb::bottom() { return hsb{mk_bot()}; }
-inline hsb hsb::top()    { return hsb{mk_top()}; }
-
-inline hsb hsb::from_halfspace(hsb_halfspace h) {
-	return hsb{mk_hs(std::move(h))};
+inline tref hsb::mk_top() {
+	static const htref h = hsb_tree::geth(
+		hsb_tree::get(make_hsb_node(hsb_parser::hsb_top)));
+	return h->get();
 }
+
+inline tref hsb::mk_hs(const hsb_halfspace& h) {
+	return mk_hs_by_index(hsb_halfspace_pool::insert(h));
+}
+
+inline tref hsb::mk_hs_by_index(size_t pool_idx) {
+	return hsb_tree::get(make_hsb_node(hsb_parser::hsb_hs, pool_idx));
+}
+
+inline tref hsb::mk_and(tref l, tref r) {
+	return hsb_tree::get(make_hsb_node(hsb_parser::hsb_and), l, r);
+}
+
+inline tref hsb::mk_or(tref l, tref r) {
+	return hsb_tree::get(make_hsb_node(hsb_parser::hsb_or), l, r);
+}
+
+inline tref hsb::mk_not(tref inner) {
+	return hsb_tree::get(make_hsb_node(hsb_parser::hsb_not), inner);
+}
+
+// ── Element factories ────────────────────────────────────────────────────────
+
+inline hsb hsb::bottom() { return hsb(mk_bot()); }
+inline hsb hsb::top()    { return hsb(mk_top()); }
+
+inline hsb hsb::from_halfspace(const hsb_halfspace& h) {
+	return hsb(mk_hs(h));
+}
+
+// ── Tree accessor helpers ────────────────────────────────────────────────────
+
+inline hsb::kind hsb::root_kind() const noexcept {
+	if (!root_ref()) return kind::bot;
+	return static_cast<kind>(hsb_tree::get(root_ref()).value.nt);
+}
+
+inline const hsb_halfspace& hsb::root_halfspace() const {
+	return hsb_halfspace_pool::get(hsb_tree::get(root_ref()).value.data);
+}
+
+inline hsb hsb::lhs() const {
+	return hsb(hsb_tree::get(root_ref()).first());
+}
+
+inline hsb hsb::rhs() const {
+	return hsb(hsb_tree::get(root_ref()).second());
+}
+
+inline hsb hsb::inner() const {
+	return hsb(hsb_tree::get(root_ref()).first());
+}
+
+// ── Complement check helper ───────────────────────────────────────────────────
+
+namespace hsb_detail {
+inline bool is_complement_tref(tref a, tref b) {
+	auto ka = static_cast<hsb::kind>(hsb_tree::get(a).value.nt);
+	auto kb = static_cast<hsb::kind>(hsb_tree::get(b).value.nt);
+	if (ka == hsb::kind::not_ && hsb_tree::get(a).first() == b) return true;
+	if (kb == hsb::kind::not_ && hsb_tree::get(b).first() == a) return true;
+	if (ka == hsb::kind::halfspace && kb == hsb::kind::halfspace) {
+		size_t ia = hsb_tree::get(a).value.data;
+		size_t ib = hsb_tree::get(b).value.data;
+		return hsb_halfspace_pool::complement_index(ia) == ib;
+	}
+	return false;
+}
+} // namespace hsb_detail
+
+// ── Boolean operations ────────────────────────────────────────────────────────
 
 inline hsb hsb::operator&(const hsb& o) const {
-	if (root->k == kind::bot || o.root->k == kind::bot) return bottom();
-	if (root->k == kind::top) return o;
-	if (o.root->k == kind::top) return *this;
-	if (*root == *o.root) return *this;
-	if (root->is_complement_of(*o.root)) return bottom();
-	return hsb{mk_and(root, o.root)};
+	tref a = root_ref(), b = o.root_ref();
+	auto ka = root_kind(), kb = o.root_kind();
+	if (ka == kind::bot || kb == kind::bot) return bottom();
+	if (ka == kind::top) return o;
+	if (kb == kind::top) return *this;
+	if (a == b) return *this;
+	if (hsb_detail::is_complement_tref(a, b)) return bottom();
+	return hsb(mk_and(a, b));
 }
 
 inline hsb hsb::operator|(const hsb& o) const {
-	if (root->k == kind::bot) return o;
-	if (o.root->k == kind::bot) return *this;
-	if (root->k == kind::top || o.root->k == kind::top) return top();
-	if (*root == *o.root) return *this;
-	if (root->is_complement_of(*o.root)) return top();
-	return hsb{mk_or(root, o.root)};
+	tref a = root_ref(), b = o.root_ref();
+	auto ka = root_kind(), kb = o.root_kind();
+	if (ka == kind::bot) return o;
+	if (kb == kind::bot) return *this;
+	if (ka == kind::top || kb == kind::top) return top();
+	if (a == b) return *this;
+	if (hsb_detail::is_complement_tref(a, b)) return top();
+	return hsb(mk_or(a, b));
 }
 
 inline hsb hsb::operator~() const {
-	if (root->k == kind::bot) return top();
-	if (root->k == kind::top) return bottom();
-	if (root->k == kind::not_) return hsb{root->inner};
-	if (root->k == kind::halfspace) return hsb{mk_hs(root->hs.negate())};
-	return hsb{mk_not(root)};
+	tref n = root_ref();
+	auto k = root_kind();
+	if (k == kind::bot) return top();
+	if (k == kind::top) return bottom();
+	if (k == kind::not_) return hsb(hsb_tree::get(n).first());
+	if (k == kind::halfspace) {
+		size_t idx = hsb_tree::get(n).value.data;
+		return hsb(mk_hs_by_index(hsb_halfspace_pool::complement_index(idx)));
+	}
+	return hsb(mk_not(n));
 }
 
 inline hsb hsb::operator^(const hsb& o) const {
 	return (*this | o) & ~(*this & o);
 }
 
-inline bool hsb::operator==(const hsb& o) const { return *root == *o.root; }
-inline bool hsb::operator!=(const hsb& o) const { return !(*this == o); }
+inline bool hsb::operator==(const hsb& o) const noexcept {
+	return root_ref() == o.root_ref();
+}
+inline bool hsb::operator!=(const hsb& o) const noexcept {
+	return !(*this == o);
+}
 
 inline bool hsb::operator==(bool b) const {
-	return b ? (root->k == kind::top) : (root->k == kind::bot);
+	auto k = root_kind();
+	return b ? (k == kind::top) : (k == kind::bot);
 }
 inline bool hsb::operator!=(bool b) const { return !(*this == b); }
 
@@ -232,8 +291,32 @@ inline std::strong_ordering hsb::operator<=>(const hsb& o) const {
 		: std::strong_ordering::greater;
 }
 
+// ── Serialization ─────────────────────────────────────────────────────────────
+
+namespace hsb_detail {
+inline std::string to_string_tref(tref n) {
+	if (!n) return "bot";
+	auto k = static_cast<hsb::kind>(hsb_tree::get(n).value.nt);
+	switch (k) {
+	case hsb::kind::bot: return "bot";
+	case hsb::kind::top: return "top";
+	case hsb::kind::halfspace:
+		return hsb_halfspace_pool::get(hsb_tree::get(n).value.data).to_string();
+	case hsb::kind::not_:
+		return "~(" + to_string_tref(hsb_tree::get(n).first()) + ")";
+	case hsb::kind::and_:
+		return "(" + to_string_tref(hsb_tree::get(n).first())
+		     + " & " + to_string_tref(hsb_tree::get(n).second()) + ")";
+	case hsb::kind::or_:
+		return "(" + to_string_tref(hsb_tree::get(n).first())
+		     + " | " + to_string_tref(hsb_tree::get(n).second()) + ")";
+	}
+	return "";
+}
+} // namespace hsb_detail
+
 inline std::string hsb::to_string() const {
-	return root ? root->to_string() : "bot";
+	return hsb_detail::to_string_tref(root_ref());
 }
 
 inline hsb hsb::from_string(const std::string& s) {
@@ -246,9 +329,7 @@ inline hsb hsb::from_string(const std::string& s) {
 	return bottom();
 }
 
-// =============================================================================
-// Non-member operators
-// =============================================================================
+// ── Non-member operators ───────────────────────────────────────────────────────
 
 inline std::ostream& operator<<(std::ostream& os, const hsb& h) {
 	return os << h.to_string();
@@ -256,18 +337,20 @@ inline std::ostream& operator<<(std::ostream& os, const hsb& h) {
 
 } // namespace idni::tau_lang
 
-/// @brief `std::hash` specialisation for `idni::tau_lang::hsb` (hashes via `to_string()`).
+/// @brief `std::hash` specialisation for `idni::tau_lang::hsb`.
+/// Hashes via the tref pointer, consistent with operator== (O(1)).
 template<>
 struct std::hash<idni::tau_lang::hsb> {
 	size_t operator()(const idni::tau_lang::hsb& h) const noexcept {
-		return std::hash<std::string>{}(h.to_string());
+		return std::hash<const void*>{}(
+			static_cast<const void*>(h.root_ref()));
 	}
 };
 
 namespace idni::tau_lang {
 
 // =============================================================================
-// hsb_grammar_detail — parse-tree → hsb evaluation
+// hsb_grammar_detail — parse-tree → hsb tree construction
 // =============================================================================
 
 namespace hsb_grammar_detail {
@@ -340,7 +423,7 @@ inline linexpr_result eval_linexpr(const tt& t) {
 	}
 }
 
-inline std::optional<hsb> build_halfspace(const linexpr_result& le) {
+inline std::optional<hsb_halfspace> build_halfspace(const linexpr_result& le) {
 	size_t dim = 0;
 	for (auto& [i, c] : le.coeffs) dim = std::max(dim, i + 1);
 	if (dim == 0) return std::nullopt;
@@ -348,19 +431,20 @@ inline std::optional<hsb> build_halfspace(const linexpr_result& le) {
 	h.w.assign(dim, 0.0);
 	for (auto& [i, c] : le.coeffs) h.w[i] = c;
 	h.b = le.bias;
-	return hsb::from_halfspace(std::move(h));
+	return h;
 }
 
-inline std::optional<hsb> eval_parse_tree(const tt& t) {
+inline std::optional<tref> eval_parse_tree(const tt& t) {
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 	switch (nt) {
-	case type::hsb_top:   return hsb::top();
-	case type::hsb_bot:   return hsb::bottom();
+	case type::hsb_top:   return hsb::mk_top();
+	case type::hsb_bot:   return hsb::mk_bot();
 	case type::hsb_not: {
 		auto inner = eval_parse_tree(n | tt::only_child);
 		if (!inner) return std::nullopt;
-		return ~(*inner);
+		// reuse short-circuit logic from operator~
+		return (~hsb(*inner)).root_ref();
 	}
 	case type::hsb_paren:
 		return eval_parse_tree(n | tt::only_child);
@@ -369,19 +453,21 @@ inline std::optional<hsb> eval_parse_tree(const tt& t) {
 		auto l = eval_parse_tree(ch[0]);
 		auto r = eval_parse_tree(ch[1]);
 		if (!l || !r) return std::nullopt;
-		return *l & *r;
+		return (hsb(*l) & hsb(*r)).root_ref();
 	}
 	case type::hsb_or: {
 		auto ch = (n | tt::children)();
 		auto l = eval_parse_tree(ch[0]);
 		auto r = eval_parse_tree(ch[1]);
 		if (!l || !r) return std::nullopt;
-		return *l | *r;
+		return (hsb(*l) | hsb(*r)).root_ref();
 	}
 	case type::hsb_hs: {
 		auto hs_child     = (n | tt::only_child) | tt::only_child;
 		auto linexpr_node = (hs_child | tt::children)()[0];
-		return build_halfspace(eval_linexpr(linexpr_node));
+		auto opt_h = build_halfspace(eval_linexpr(linexpr_node));
+		if (!opt_h) return std::nullopt;
+		return hsb::mk_hs(*opt_h);
 	}
 	default:
 		return std::nullopt;
@@ -414,12 +500,14 @@ parse_hsb(const std::string& src) {
 		| hsb_parser::hsb;
 	if (!t.has_value()) return std::nullopt;
 
-	auto hval = hsb_grammar_detail::eval_parse_tree(t);
-	if (!hval) return std::nullopt;
+	auto tval = hsb_grammar_detail::eval_parse_tree(t);
+	if (!tval) return std::nullopt;
 
 	return typename node<BAs...>::constant_with_type{
-		std::variant<BAs...>{ *hval },
+		std::variant<BAs...>{ hsb(*tval) },
 		hsb_type<node<BAs...>>() };
 }
 
 } // namespace idni::tau_lang
+
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_TMPL_H__

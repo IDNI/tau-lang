@@ -36,25 +36,28 @@ static hsb_halfspace make_raw_hs(std::vector<double> w, double b) {
 
 // Count top-level OR clauses in a formula (1 if not an or_ node).
 static size_t count_top_clauses(const hsb& f) {
-	if (!f.root) return 0;
-	if (f.root->k != hsb::kind::or_) return 1;
-	return 1 + count_top_clauses(hsb{f.root->rhs})
-	         + count_top_clauses(hsb{f.root->lhs}) - 1;
+	if (!f.root_ref()) return 0;
+	if (f.root_kind() != hsb::kind::or_) return 1;
+	return 1 + count_top_clauses(f.rhs())
+	         + count_top_clauses(f.lhs()) - 1;
 }
 
 // Return true iff the formula tree contains any kind::not_ node.
-static bool has_negation(const hsb::node_ptr& n) {
-	if (!n) return false;
-	if (n->k == hsb::kind::not_) return true;
-	return has_negation(n->lhs) || has_negation(n->rhs) || has_negation(n->inner);
+static bool has_negation(const hsb& n) {
+	if (!n.root_ref()) return false;
+	auto k = n.root_kind();
+	if (k == hsb::kind::not_) return true;
+	if (k == hsb::kind::and_ || k == hsb::kind::or_)
+		return has_negation(n.lhs()) || has_negation(n.rhs());
+	return false;
 }
 
 // Collect top-level disjuncts of an hsb formula into a flat vector.
 static void collect_clauses(const hsb& f, std::vector<hsb>& out) {
-	if (!f.root) return;
-	if (f.root->k == hsb::kind::or_) {
-		collect_clauses(hsb{f.root->lhs}, out);
-		collect_clauses(hsb{f.root->rhs}, out);
+	if (!f.root_ref()) return;
+	if (f.root_kind() == hsb::kind::or_) {
+		collect_clauses(f.lhs(), out);
+		collect_clauses(f.rhs(), out);
 	} else {
 		out.push_back(f);
 	}
@@ -479,21 +482,21 @@ TEST_SUITE("hsb_normalizer — output structure") {
 	TEST_CASE("non-trivial output has no negation nodes") {
 		auto h = make_hs({1.0}, -5.0);
 		auto n = normalize_hsb(h);
-		if (n.root->k != hsb::kind::bot && n.root->k != hsb::kind::top)
-			CHECK(!has_negation(n.root));
+		if (n.root_kind() != hsb::kind::bot && n.root_kind() != hsb::kind::top)
+			CHECK(!has_negation(n));
 	}
 
 	TEST_CASE("2D conjunction output has no negation nodes") {
 		auto x = make_hs({1.0, 0.0}, -4.0) & make_hs({0.0, 1.0}, -4.0);
 		auto n = normalize_hsb(x);
-		CHECK(!has_negation(n.root));
+		CHECK(!has_negation(n));
 	}
 
 	TEST_CASE("complement of halfspace output has no negation nodes") {
 		auto h = make_hs({1.0, 0.0}, -3.0);
 		auto n = normalize_hsb(~h);
-		if (n.root->k != hsb::kind::bot && n.root->k != hsb::kind::top)
-			CHECK(!has_negation(n.root));
+		if (n.root_kind() != hsb::kind::bot && n.root_kind() != hsb::kind::top)
+			CHECK(!has_negation(n));
 	}
 
 	TEST_CASE("L-shape output has exactly two clauses") {

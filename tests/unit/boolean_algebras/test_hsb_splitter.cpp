@@ -50,7 +50,7 @@ TEST_SUITE("hsb_splitter — trivial inputs") {
 
 	TEST_CASE("splitter_one is a non-trivial halfspace") {
 		auto s = hsb_splitter_one();
-		CHECK(s.root->k == hsb::kind::halfspace);
+		CHECK(s.root_kind() == hsb::kind::halfspace);
 		CHECK(!is_hsb_zero(s));
 		CHECK(!is_hsb_one(s));
 	}

@@ -9,7 +9,6 @@
 #include <compare>
 #include <functional>
 #include <map>
-#include <memory>
 #include <numeric>
 #include <optional>
 #include <sstream>
@@ -20,7 +19,7 @@
 #include "tau_tree.h"
 #include "splitter_types.h"
 #include "boolean_algebras/cvc5/cvc5.h"
-#include "../parser/hsb_parser.generated.h"
+#include "boolean_algebras/hsb_node.h"
 
 namespace idni::tau_lang {
 
@@ -107,22 +106,36 @@ struct hsb_halfspace {
 };
 
 // =============================================================================
+// hsb_halfspace_pool — append-only interned pool of hsb_halfspace values
+// =============================================================================
+
+/// @cond INTERNAL
+struct hsb_halfspace_pool {
+	/// Insert h (after normalizing) and return its pool index.
+	/// Returns an existing index if an equal normalized halfspace is found.
+	static size_t insert(const hsb_halfspace& h);
+
+	/// Retrieve a halfspace by pool index.
+	static const hsb_halfspace& get(size_t idx);
+
+	/// Return the pool index of the complement (~h), inserting if needed.
+	static size_t complement_index(size_t idx);
+
+	static size_t size();
+
+private:
+	inline static std::vector<hsb_halfspace> pool_;
+	inline static std::map<hsb_halfspace, size_t> index_;
+};
+/// @endcond
+
+// =============================================================================
 /**
  * @brief Atomless Boolean algebra of lex-half-open polyhedra in R^d (LP_d^Q).
  *
  * Generalises `qint` (1D half-open intervals) to d dimensions.  Elements are
- * Boolean combinations of canonical halfspaces, represented as formula trees.
- *
- * For w ∈ R^d \ {0}:
- * @code
- *   L(w) = min { i : w_i ≠ 0 }         (lex-leading index)
- *   s(w) = sign(w_{L(w)}) ∈ {+1, -1}   (lex-leading sign)
- * @endcode
- *
- * **Key algebraic properties:**
- *   - Complement: R^d ∖ H_{w,b} = H_{-w,-b}  (sign flip ⟺ open↔closed)
- *   - Atomless: no equality set {⟨v,x⟩ = c} is expressible
- *   - 1D reduction: d = 1 gives exactly the `qint` half-open intervals
+ * Boolean combinations of canonical halfspaces, stored as interned formula
+ * trees (lcrs_tree<hsb_node>).
  *
  * **Boolean operations carry structural short-circuit simplifications:**
  *   - `A & bot = bot`,  `A & top = A`,  `A & A = A`,  `A & ~A = bot`
@@ -134,48 +147,39 @@ struct hsb {
 	// ── Kind ─────────────────────────────────────────────────────────────────
 
 	/// @brief Tag identifying the kind of a formula-tree node.
+	/// Values match hsb_parser::nonterminal for seamless conversion.
 	enum class kind : uint8_t {
-		bot,        ///< Bottom (empty set ∅).
-		top,        ///< Top (full space R^d).
-		halfspace,  ///< A single canonical halfspace H_{w,b}.
-		and_,       ///< Boolean conjunction (A ∧ B).
-		or_,        ///< Boolean disjunction (A ∨ B).
-		not_        ///< Boolean negation (¬A).
+		bot       = hsb_parser::hsb_bot,
+		top       = hsb_parser::hsb_top,
+		halfspace = hsb_parser::hsb_hs,
+		and_      = hsb_parser::hsb_and,
+		or_       = hsb_parser::hsb_or,
+		not_      = hsb_parser::hsb_not
 	};
 
-	// ── Node ─────────────────────────────────────────────────────────────────
+	// ── Root ─────────────────────────────────────────────────────────────────
 
-	/// @brief Internal formula-tree node.  Not part of the public API.
-	struct node {
-		kind k = kind::bot;
-		hsb_halfspace hs;            ///< Payload for `kind::halfspace`.
-		std::shared_ptr<node> lhs;   ///< Left child for `kind::and_` / `kind::or_`.
-		std::shared_ptr<node> rhs;   ///< Right child for `kind::and_` / `kind::or_`.
-		std::shared_ptr<node> inner; ///< Child for `kind::not_`.
-
-		/// @brief Structural (recursive) equality.
-		bool operator==(const node& o) const;
-		/// @brief Returns true iff this node and `o` are semantic complements.
-		bool is_complement_of(const node& o) const;
-		/// @brief Returns a string representation of this node.
-		std::string to_string() const;
-	};
-	using node_ptr = std::shared_ptr<node>;
-
-	node_ptr root;
+	htref root;  ///< GC-safe handle into the lcrs_tree<hsb_node> store.
 
 	hsb();
-	explicit hsb(node_ptr r);
+	explicit hsb(tref r);
+	explicit hsb(htref h);
 
-	// ── Node factories ───────────────────────────────────────────────────────
+	// ── Internal tref access ─────────────────────────────────────────────────
+
+	/// Returns the raw tref of the root node.
+	tref root_ref() const noexcept { return root ? root->get() : nullptr; }
+
+	// ── Node factories (return tref for use in tree construction) ────────────
 
 	/// @cond INTERNAL
-	static node_ptr mk_bot();
-	static node_ptr mk_top();
-	static node_ptr mk_hs(hsb_halfspace h);
-	static node_ptr mk_and(node_ptr l, node_ptr r);
-	static node_ptr mk_or(node_ptr l, node_ptr r);
-	static node_ptr mk_not(node_ptr i);
+	static tref mk_bot();
+	static tref mk_top();
+	static tref mk_hs(const hsb_halfspace& h);
+	static tref mk_hs_by_index(size_t pool_idx);
+	static tref mk_and(tref l, tref r);
+	static tref mk_or(tref l, tref r);
+	static tref mk_not(tref inner);
 	/// @endcond
 
 	// ── Element factories ────────────────────────────────────────────────────
@@ -190,7 +194,24 @@ struct hsb {
 	 * @brief Constructs an hsb from a single halfspace constraint.
 	 * @param h  The halfspace H_{w,b} to wrap.
 	 */
-	static hsb from_halfspace(hsb_halfspace h);
+	static hsb from_halfspace(const hsb_halfspace& h);
+
+	// ── Tree accessor helpers ─────────────────────────────────────────────────
+
+	/// Returns the kind of the root node.
+	kind root_kind() const noexcept;
+
+	/// Returns the halfspace stored at the root (valid only if root_kind() == kind::halfspace).
+	const hsb_halfspace& root_halfspace() const;
+
+	/// Returns the left (first) child as an hsb (valid for and_/or_ nodes).
+	hsb lhs() const;
+
+	/// Returns the right (second) child as an hsb (valid for and_/or_ nodes).
+	hsb rhs() const;
+
+	/// Returns the inner (first) child as an hsb (valid for not_ nodes).
+	hsb inner() const;
 
 	// ── Boolean operations ───────────────────────────────────────────────────
 
@@ -223,19 +244,15 @@ struct hsb {
 
 	// ── Comparisons ──────────────────────────────────────────────────────────
 
-	/// @brief Structural equality (two hsb values are equal iff their trees match).
-	bool operator==(const hsb& o) const;
-	bool operator!=(const hsb& o) const;
+	/// @brief Structural equality (O(1) tref pointer comparison after interning).
+	bool operator==(const hsb& o) const noexcept;
+	bool operator!=(const hsb& o) const noexcept;
 
 	/// @brief Compares with a bool: `true` iff equal to top/bot respectively.
 	bool operator==(bool b) const;
 	bool operator!=(bool b) const;
 
 	/// @brief Structural ordering via `to_string()` output.
-	/// @note  Ordering is **structural**, not semantic: two semantically equal
-	///        elements with different tree shapes may compare as unequal.
-	///        Avoid using hsb in ordered containers unless structural identity
-	///        is the intended criterion.
 	bool operator<(const hsb& o) const;
 	std::strong_ordering operator<=>(const hsb& o) const;
 
@@ -246,10 +263,7 @@ struct hsb {
 
 	/**
 	 * @brief Recognises the three keywords `"top"`, `"bot"`, `"bottom"`;
-	 *        returns `bottom()` for any other input (including whitespace-only).
-	 * @note  This is a keyword-only helper and does **not** parse general hsb
-	 *        expressions.  Use `parse_hsb` for full expression parsing.
-	 * @param s  Input string (leading/trailing whitespace is stripped).
+	 *        returns `bottom()` for any other input.
 	 */
 	static hsb from_string(const std::string& s);
 };
