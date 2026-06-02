@@ -13,11 +13,6 @@ set(TESTS
 	nso_rr_fixed_point
 	nso_rr_partial_eval
 	quantifiers
-	satisfiability1
-	satisfiability2
-	satisfiability3
-	satisfiability4
-	satisfiability5
 	sbf1
 	sbf2
 	solver
@@ -50,3 +45,5 @@ set(TESTS
 foreach(X IN LISTS TESTS)
 	add("test_integration-${X}")
 endforeach()
+
+add_subdirectory(satisfiability)

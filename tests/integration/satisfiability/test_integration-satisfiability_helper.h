@@ -7,4 +7,3 @@ tref create_spec(const char* spec) {
 	auto nso_rr = get_nso_rr<node_t>(tau::get(spec));
 	return nso_rr.value().main->get();
 }
-
