@@ -5,26 +5,12 @@
 #ifdef DEBUG // in release it is included with tau.h
 #	include "solver.h"
 #endif
+#include "test_integration-solver_helper.h"
 
 tref splitter_one_bdd() {
 	using node = tau_lang::node<bv, sbf_ba>;
 	using tau = tree<node>;
 	return tau::get(tau::bf, tau::get_ba_constant(typename tau::constant(sbf_splitter_one()), sbf_type<node>()));
-}
-
-template <NodeType node>
-bool check_solution(tref eq, const solution<node>& sol) {
-	using tau = tree<node>;
-	DBG(TAU_LOG_TRACE << "check_solution/sol:\n" << dump_to_str(sol);)
-	tref substitution = rewriter::replace<node>(eq, sol);
-	tref check = normalizer<node>(substitution);
-#ifdef DEBUG
-	// std::cout << "check_solution/solution: " << dump<node>(sol) << "\n";
-	std::cout << "check_solution/equation: " << TAU_DUMP_TO_STR(eq) << "\n";
-	std::cout << "check_solution/substitution: " << TAU_DUMP_TO_STR(substitution) << "\n";
-	std::cout << "check_solution/check: " << TAU_DUMP_TO_STR(check) << "\n";
-#endif // DEBUG
-	return tau::get(check).equals_T();
 }
 
 TEST_SUITE("minterm_iterator") {
@@ -287,14 +273,7 @@ TEST_SUITE("configuration") {
 TEST_SUITE("find_solution") {
 
 	bool test_find_solution(const char* src) {
-#ifdef DEBUG
-		std::cout << "------------------------------------------------------\n";
-#endif // DEBUG
-		tref equation = get_nso_rr<node_t>(tau::get(src)).value().main->get();
-		equation = norm_all_equations<node_t>(equation);
-		equation = apply_all_xor_def<node_t>(equation);
-		auto solution = find_solution<node_t>(equation);
-		return ( check_solution<node_t>(equation, solution.value()));
+		return ::test_find_solution(src);
 	}
 
 	TEST_CASE("one var: x = 0.") {
@@ -392,27 +371,8 @@ TEST_SUITE("solve_minterm_system") {
 
 TEST_SUITE("solve_inequality_system") {
 
-	bool test_solve_inequality_system(const std::vector<std::string> inequalities) {
-#ifdef DEBUG
-		std::cout << "------------------------------------------------------\n";
-#endif // DEBUG
-		inequality_system<node_t> system;
-		for (const auto& ineq : inequalities)
-			system.insert(get_nso_rr<node_t>(
-				tau::get(ineq)).value().main->get());
-
-		// setting the proper options
-		solver_options options = {
-			.splitter_one = splitter_one_bdd(),
-			.mode = solver_mode::general
-		};
-
-		auto solution = solve_inequality_system<node_t>(system, options);
-		bool check = true;
-		for (tref equation : system)
-			check = check ? check_solution<node_t>(
-					equation, solution.value()) : false;
-		return check;
+	bool test_solve_inequality_system(const std::vector<std::string>& inequalities) {
+		return ::test_solve_inequality_system(inequalities, splitter_one_bdd());
 	}
 
 	// Case 1 of add_minterm_to_disjoint: d = {a}:sbf x and m = {a}:sbf x'
@@ -479,47 +439,9 @@ TEST_SUITE("solve_inequality_system") {
 
 TEST_SUITE("solve_system") {
 
-	bool test_solve_system(const std::string equality,
-			const std::vector<std::string> inequalities)
-	{
-#ifdef DEBUG
-		std::cout << "------------------------------------------------------\n";
-#endif // DEBUG
-		equation_system<node_t> system;
-		if (equality.size() != 0) system.first = get_nso_rr<node_t>(tau::get(equality)).value().main->get();
-#ifdef DEBUG
-		if (system.first)
-			std::cout << "test_solve_system/system.first: " << system.first.value() << "\n";
-#endif // DEBUG
-		for (const auto& ineq : inequalities) {
-			system.second.insert(get_nso_rr<node_t>(tau::get(ineq)).value().main->get());
-#ifdef DEBUG
-			std::cout << "test_solve_system/system.second: " << tau::get(get_nso_rr<node_t>(tau::get(ineq)).value().main).dump_to_str() << "\n";
-#endif // DEBUG
-		}
-
-		// setting the proper options
-		solver_options options = {
-			.splitter_one = splitter_one_bdd(),
-			.mode = solver_mode::general
-		};
-
-		// calling the solver function
-		auto solution = solve_system<node_t>(system, options);
-
-#ifdef DEBUG
-		// if (solution)
-		// 	std::cout << "test_solve_system/solution: " << solution.value() << "\n";
-#endif // DEBUG
-		auto copy = solution.value();
-		bool check = system.first
-			? check_solution<node_t>(system.first.value(), copy)
-			: false;
-		for (const auto& equation: system.second) {
-			auto copy = solution.value();
-			check = check && check_solution<node_t>(equation, copy);
-		}
-		return check;
+	bool test_solve_system(const std::string& equality,
+			const std::vector<std::string>& inequalities) {
+		return ::test_solve_system(equality, inequalities, splitter_one_bdd());
 	}
 
 	TEST_CASE("one var: {a}:sbf x = 0 && {a}:sbf x'  != 0.") {
