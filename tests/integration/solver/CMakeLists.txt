@@ -6,6 +6,7 @@ set(TESTS
 	sbf_ba
 	qint
 	hsb
+	qlt
 )
 
 foreach(X IN LISTS TESTS)
