@@ -46,4 +46,9 @@ foreach(X IN LISTS TESTS)
 	add("test_integration-${X}")
 endforeach()
 
+foreach(X IN ITEMS ctl_star ocfuncs)
+	target_include_directories("test_integration-${X}" PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}/satisfiability)
+endforeach()
+
 add_subdirectory(satisfiability)
