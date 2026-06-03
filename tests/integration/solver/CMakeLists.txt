@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	bv_ba1
-	bv_ba2
-	sbf_ba
+	bv
+	sbf
 	qint
 	hsb
 	qlt
