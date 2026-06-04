@@ -2,6 +2,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "parser_helper.h"
 
 #include "boolean_algebras/bv_ba.h"
 #include "heuristics/bv_predicate_blasting.h"
@@ -34,7 +35,7 @@ static tref blast_formula(const std::string& sample) {
 }
 
 static std::string blast_normalize(const std::string& sample) {
-	auto wff = parse_wff(sample);
+	auto wff = tau::get(sample, parse_opts_wff);
 	if (!wff) return "parse_error";
 	// We blast the formula and then normalize it to check that the blasting is
 	// correct and it is not simplified first by other heuristics. If the blasting

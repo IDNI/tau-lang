@@ -2,17 +2,9 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "parser_helper.h"
 
 #include "heuristics/ex_subs_based_elimination.h"
-
-tref parse(const std::string& sample) {
-	static tau::get_options opts{ .parse = { .start = tau::wff } };
-	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
 
 TEST_SUITE("configuration") {
 
@@ -27,7 +19,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x = a && y = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result != ex_clause );
 	}
@@ -36,7 +28,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"(x = a || x = c) && x = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result != ex_clause );
 	}
@@ -45,7 +37,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x & a = 0 && y = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
@@ -54,7 +46,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"(x = a || x = c) && x & b = 1";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
@@ -63,7 +55,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x' & b = 1";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}

@@ -18,5 +18,6 @@ foreach(X IN LISTS TESTS)
 	# and this directory itself (for test_integration-satisfiability_helper.h).
 	target_include_directories(${X} PUBLIC
 		${PROJECT_SOURCE_DIR}/tests
-		${CMAKE_CURRENT_SOURCE_DIR})
+		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_CURRENT_SOURCE_DIR}/..)
 endforeach()

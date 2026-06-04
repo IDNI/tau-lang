@@ -2,6 +2,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "parser_helper.h"
 
 #include "ba_types_inference.h"
 
@@ -10,80 +11,6 @@ TEST_SUITE("Configuration") {
 	TEST_CASE("bdd init") {
 		bdd_init<Bool>();
 	}
-}
-
-tau::get_options parse_bf_no_infer() {
-	static tau::get_options opts{ .parse = { .start = tau::bf },
-		.infer_ba_types = false,
-		.reget_with_hooks = false };
-	return opts;
-}
-
-tau::get_options parse_wff_no_infer() {
-	static tau::get_options opts{ .parse = { .start = tau::wff },
-		.infer_ba_types = false,
-		.reget_with_hooks = false };
-	return opts;
-}
-
-tau::get_options parse_cli_no_infer() {
-	static tau::get_options opts{ .parse = { .start = tau::cli },
-		.infer_ba_types = false,
-		.reget_with_hooks = false };
-	return opts;
-}
-
-tau::get_options parse_no_infer() {
-	static tau::get_options opts{ .parse = {},
-		.infer_ba_types = false,
-		.reget_with_hooks = false };
-	return opts;
-}
-
-tau::get_options parse_definitions_no_infer() {
-	static tau::get_options opts{ .parse = { .start = tau::definitions },
-		.infer_ba_types = false,
-		.reget_with_hooks = false };
-	return opts;
-}
-
-tau::get_options parse_spec_no_infer() {
-	static tau::get_options opts{ .parse = { .start = tau::definitions },
-		.infer_ba_types = false,
-		.reget_with_hooks = false };
-	return opts;
-}
-
-tref parse(const std::string& sample, tau::get_options opts = parse_wff_no_infer()) {
-	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
-
-tref parse_bf(const std::string& sample, tau::get_options opts = parse_bf_no_infer()) {
-	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
-
-tref parse_definitions(const std::string& sample, tau::get_options opts = parse_definitions_no_infer()) {
-	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
-}
-
-tref parse_spec(const std::string& sample, tau::get_options opts = parse_spec_no_infer()) {
-	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
 }
 
 bool check_vars(tref inferred, std::vector<std::pair<std::string, size_t>>& expected) {
@@ -221,7 +148,7 @@ bool check_bv_ctes(tref inferred, std::vector<size_t>& expected) {
 TEST_SUITE("infer_ba_types: variables and constants") {
 
 	TEST_CASE("simple case 1") {
-		tref parsed = parse("x = 1");
+		tref parsed = tau::get("x = 1", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -232,7 +159,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 1 (y2)") {
-		tref parsed = parse("1 = x");
+		tref parsed = tau::get("1 = x", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -243,7 +170,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 2") {
-		tref parsed = parse("x = 1:sbf");
+		tref parsed = tau::get("x = 1:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -254,7 +181,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 2 (y2)") {
-		tref parsed = parse("1:sbf = x");
+		tref parsed = tau::get("1:sbf = x", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -265,7 +192,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 3") {
-		tref parsed = parse("x = 1:tau");
+		tref parsed = tau::get("x = 1:tau", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -276,7 +203,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 3 (y2)") {
-		tref parsed = parse("1:tau = x");
+		tref parsed = tau::get("1:tau = x", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -287,7 +214,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 4") {
-		tref parsed = parse("x = { #b1001 }:bv[16]");
+		tref parsed = tau::get("x = { #b1001 }:bv[16]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -299,8 +226,8 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 
 	TEST_CASE("simple case 4 (y2)") {
 		// TODO (HIGH) should fail
-		// tref parsed = parse("x = 1:bv[8]");
-		tref parsed = parse("x = { #b1001 }:bv[8]");
+		// tref parsed = tau::get("x = 1:bv[8]", parse_opts_wff_no_infer);
+		tref parsed = tau::get("x = { #b1001 }:bv[8]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -311,7 +238,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 4 (y3)") {
-		tref parsed = parse("x:bv[16] =  { #b1001 }");
+		tref parsed = tau::get("x:bv[16] =  { #b1001 }", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -322,7 +249,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 4 (y4)") {
-		tref parsed = parse("x:bv[16] ={ 1 }");
+		tref parsed = tau::get("x:bv[16] ={ 1 }", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -333,7 +260,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 7") {
-		tref parsed = parse("x:sbf = y");
+		tref parsed = tau::get("x:sbf = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -345,7 +272,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 7 (y2)") {
-		tref parsed = parse("x = y:sbf");
+		tref parsed = tau::get("x = y:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -357,7 +284,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 8") {
-		tref parsed = parse("x:tau = y");
+		tref parsed = tau::get("x:tau = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -369,7 +296,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 8 (y2)") {
-		tref parsed = parse("x = y:tau");
+		tref parsed = tau::get("x = y:tau", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -381,7 +308,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 9") {
-		tref parsed = parse("x:bv[16] = y");
+		tref parsed = tau::get("x:bv[16] = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -393,7 +320,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 9 (y2)") {
-		tref parsed = parse("x = y:bv[16]");
+		tref parsed = tau::get("x = y:bv[16]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -405,7 +332,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 9 (y3)") {
-		tref parsed = parse("x:bv[8] = y");
+		tref parsed = tau::get("x:bv[8] = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -417,7 +344,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple case 9 (y2)") {
-		tref parsed = parse("x = y:bv[8]");
+		tref parsed = tau::get("x = y:bv[8]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -429,7 +356,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (tau) right to left") {
-		tref parsed = parse("x = y && y = z:tau");
+		tref parsed = tau::get("x = y && y = z:tau", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -442,7 +369,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (tau) left to right") {
-		tref parsed = parse("x:tau = y && y = z");
+		tref parsed = tau::get("x:tau = y && y = z", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -455,7 +382,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (sbf) right to left") {
-		tref parsed = parse("x = y && y = z:sbf");
+		tref parsed = tau::get("x = y && y = z:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -468,7 +395,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (sbf) left to right") {
-		tref parsed = parse("x:sbf = y && y = z");
+		tref parsed = tau::get("x:sbf = y && y = z", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -481,7 +408,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (bv) left to right") {
-		tref parsed = parse("x:bv[16] = y && y = z");
+		tref parsed = tau::get("x:bv[16] = y && y = z", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -494,7 +421,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (bv[8]) left to right") {
-		tref parsed = parse("x:bv[8] = y && y = z");
+		tref parsed = tau::get("x:bv[8] = y && y = z", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -507,7 +434,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (bv) right to left") {
-		tref parsed = parse("x = y && y = z:bv[16]");
+		tref parsed = tau::get("x = y && y = z:bv[16]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -520,7 +447,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("type chaining (bv[8]) right to left") {
-		tref parsed = parse("x = y && y = z:bv[8]");
+		tref parsed = tau::get("x = y && y = z:bv[8]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -536,7 +463,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	// so no neede to test them separately
 
 	TEST_CASE("all bv") {
-		tref parsed = parse("all x:bv[16] x = y");
+		tref parsed = tau::get("all x:bv[16] x = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -548,7 +475,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all bv (y2)") {
-		tref parsed = parse("all x x:bv[16] = y");
+		tref parsed = tau::get("all x x:bv[16] = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -560,7 +487,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all bv (y3)") {
-		tref parsed = parse("all x x = y:bv[16]");
+		tref parsed = tau::get("all x x = y:bv[16]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -572,7 +499,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all bv[8]") {
-		tref parsed = parse("all x:bv[8] x = y");
+		tref parsed = tau::get("all x:bv[8] x = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -584,7 +511,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all bv[8] (y2)") {
-		tref parsed = parse("all x x:bv[8] = y");
+		tref parsed = tau::get("all x x:bv[8] = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -596,7 +523,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all bv[8] (y3)") {
-		tref parsed = parse("all x x = y:bv[8]");
+		tref parsed = tau::get("all x x = y:bv[8]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -608,7 +535,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all sbf") {
-		tref parsed = parse("all x:sbf x = y");
+		tref parsed = tau::get("all x:sbf x = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -620,7 +547,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all sbf (y2)") {
-		tref parsed = parse("all x x:sbf = y");
+		tref parsed = tau::get("all x x:sbf = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -632,7 +559,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all sbf (y3)") {
-		tref parsed = parse("all x x = y:sbf");
+		tref parsed = tau::get("all x x = y:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -644,7 +571,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all tau") {
-		tref parsed = parse("all x:tau x = y");
+		tref parsed = tau::get("all x:tau x = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -656,7 +583,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all tau (y2)") {
-		tref parsed = parse("all x x:tau = y");
+		tref parsed = tau::get("all x x:tau = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -668,7 +595,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("all tau (y3)") {
-		tref parsed = parse("all x x = y:tau");
+		tref parsed = tau::get("all x x = y:tau", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -680,7 +607,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple explicit tau constant") {
-		tref parsed = parse("x = { T }:tau");
+		tref parsed = tau::get("x = { T }:tau", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -691,7 +618,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple explicit tau constant  (y2)") {
-		tref parsed = parse("{ T }:tau = x");
+		tref parsed = tau::get("{ T }:tau = x", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -703,7 +630,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 
 	TEST_CASE("simple explicit sbf constant") {
 		bdd_init<Bool>();
-		tref parsed = parse("x = { x }:sbf");
+		tref parsed = tau::get("x = { x }:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -715,7 +642,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 
 	TEST_CASE("simple explicit sbf constant (y2)") {
 		bdd_init<Bool>();
-		tref parsed = parse("{ x }:sbf = x");
+		tref parsed = tau::get("{ x }:sbf = x", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -726,42 +653,42 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("simple failing case") {
-		tref parsed = parse("x:tau = x:sbf");
+		tref parsed = tau::get("x:tau = x:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("simple failing case (y2)") {
-		tref parsed = parse("x:tau = {x}:sbf");
+		tref parsed = tau::get("x:tau = {x}:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("simple failing case (y3)") {
-		tref parsed = parse("x:tau = 1:sbf");
+		tref parsed = tau::get("x:tau = 1:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("simple failing case (y4)") {
-		tref parsed = parse("x:tau ={ 1 }");
+		tref parsed = tau::get("x:tau ={ 1 }", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("simple failing case (y5)") {
-		tref parsed = parse("x:tau = x:bv[16]");
+		tref parsed = tau::get("x:tau = x:bv[16]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("bv constants") {
-		tref parsed = parse("{ #b1 }:bv[16] = { #b0 } :bv[16] & { #b10 }");
+		tref parsed = tau::get("{ #b1 }:bv[16] = { #b0 } :bv[16] & { #b10 }", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -774,7 +701,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("bv8 constants") {
-		tref parsed = parse("{ #b1 } : bv[8] = { #b0 } : bv[8] & { #b10 } :bv[8]");
+		tref parsed = tau::get("{ #b1 } : bv[8] = { #b0 } : bv[8] & { #b10 } :bv[8]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		if (parsed == nullptr) {
 			TAU_LOG_ERROR << "Parsing failed";
@@ -791,7 +718,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("sbf constants") {
-		tref parsed = parse("{ 0 } : sbf = { 1 } { 0 } : sbf");
+		tref parsed = tau::get("{ 0 } : sbf = { 1 } { 0 } : sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		if (parsed == nullptr) {
 			TAU_LOG_ERROR << "Parsing failed";
@@ -807,7 +734,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("sbf constants (y2)") {
-		tref parsed = parse("{ 0 } = { 1 } & { 0 } : sbf");
+		tref parsed = tau::get("{ 0 } = { 1 } & { 0 } : sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		if (parsed == nullptr) {
 			TAU_LOG_ERROR << "Parsing failed";
@@ -823,7 +750,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("tau constants") {
-		tref parsed = parse("{ F } = { T } { F }");
+		tref parsed = tau::get("{ F } = { T } { F }", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		if (parsed == nullptr) {
 			TAU_LOG_ERROR << "Parsing failed";
@@ -839,7 +766,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("complex case: Ohad's example") {
-		tref parsed = parse("all x x = y");
+		tref parsed = tau::get("all x x = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -852,7 +779,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 
 	TEST_CASE("complex case: Ohad's example (y2)") {
 		using node = node_t;
-		tref parsed = parse("(all x x = y) && x = y:sbf");
+		tref parsed = tau::get("(all x x = y) && x = y:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		if (inferred != nullptr) {
@@ -862,7 +789,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("complex case: shadowing") {
-		tref parsed = parse("all x (all x x = 1:sbf)");
+		tref parsed = tau::get("all x (all x x = 1:sbf)", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -874,7 +801,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("complex case: shadowing (y2)") {
-		tref parsed = parse("all x ((all x x = 1:sbf) && x = 1:tau)");
+		tref parsed = tau::get("all x ((all x x = 1:sbf) && x = 1:tau)", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -886,7 +813,7 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("complex case:bv[16] chaining") {
-		tref parsed = parse("all x x & y = z && y = { 1 }:bv[8]");
+		tref parsed = tau::get("all x x & y = z && y = { 1 }:bv[8]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -899,14 +826,14 @@ TEST_SUITE("infer_ba_types: variables and constants") {
 	}
 
 	TEST_CASE("mixed sbf and tau") {
-		tref parsed = parse("ex x ex y x = 0:tau && xy != 0:sbf");
+		tref parsed = tau::get("ex x ex y x = 0:tau && xy != 0:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("bv specizalization") {
-		tref parsed = parse("ex x :bv[16] x = 1 : bv[8]");
+		tref parsed = tau::get("ex x :bv[16] x = 1 : bv[8]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		auto expected = std::vector<std::pair<std::string, size_t>> {
@@ -938,7 +865,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_eq symbol") {
-		tref parsed = parse("x:tau = y");
+		tref parsed = tau::get("x:tau = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -946,7 +873,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("sbf bf_eq symbol") {
-		tref parsed = parse("x:sbf = y");
+		tref parsed = tau::get("x:sbf = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -954,7 +881,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_eq symbol") {
-		tref parsed = parse("x:bv[16] = y");
+		tref parsed = tau::get("x:bv[16] = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -962,7 +889,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv[8] bf_eq symbol") {
-		tref parsed = parse("x:bv[8] = y");
+		tref parsed = tau::get("x:bv[8] = y", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -970,7 +897,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_eq symbol involving constant") {
-		tref parsed = parse("x:tau = { x = 0 }");
+		tref parsed = tau::get("x:tau = { x = 0 }", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -978,7 +905,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_eq symbol involving bf_t") {
-		tref parsed = parse("x:tau = 1");
+		tref parsed = tau::get("x:tau = 1", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -986,7 +913,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_eq symbol involving bf_f") {
-		tref parsed = parse("x:tau = 0");
+		tref parsed = tau::get("x:tau = 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -994,7 +921,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_neq symbol") {
-		tref parsed = parse("x:tau != 0");
+		tref parsed = tau::get("x:tau != 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1002,7 +929,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_lteq symbol") {
-		tref parsed = parse("x:tau <= 0");
+		tref parsed = tau::get("x:tau <= 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1010,7 +937,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_nlteq symbol") {
-		tref parsed = parse("x:tau !<= 0");
+		tref parsed = tau::get("x:tau !<= 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1018,7 +945,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_gt symbol") {
-		tref parsed = parse("x:tau > 0");
+		tref parsed = tau::get("x:tau > 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1026,7 +953,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_ngt symbol") {
-		tref parsed = parse("x:tau !> 0");
+		tref parsed = tau::get("x:tau !> 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1034,7 +961,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_gteq symbol") {
-		tref parsed = parse("x:tau >= 0");
+		tref parsed = tau::get("x:tau >= 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1042,7 +969,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_ngteq symbol") {
-		tref parsed = parse("x:tau !>= 0");
+		tref parsed = tau::get("x:tau !>= 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1050,7 +977,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_lt symbol") {
-		tref parsed = parse("x:tau < 0");
+		tref parsed = tau::get("x:tau < 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1058,7 +985,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_nlt symbol") {
-		tref parsed = parse("x:tau !< 0");
+		tref parsed = tau::get("x:tau !< 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1066,7 +993,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_interval symbol") {
-		tref parsed = parse("x:tau <= y <= z");
+		tref parsed = tau::get("x:tau <= y <= z", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1074,7 +1001,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("sbf bf_interval symbol") {
-		tref parsed = parse("x:sbf <= y <= z");
+		tref parsed = tau::get("x:sbf <= y <= z", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1082,7 +1009,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_interval symbol") {
-		tref parsed = parse("x:bv[16] <= y <= z");
+		tref parsed = tau::get("x:bv[16] <= y <= z", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1090,7 +1017,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_and symbol") {
-		tref parsed = parse_bf("x:bv[16] & y");
+		tref parsed = tau::get("x:bv[16] & y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1098,7 +1025,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_or symbol") {
-		tref parsed = parse_bf("x:bv[16] | y");
+		tref parsed = tau::get("x:bv[16] | y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1106,7 +1033,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_xor symbol") {
-		tref parsed = parse_bf("x:bv[16] ^ y");
+		tref parsed = tau::get("x:bv[16] ^ y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1114,7 +1041,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_neg symbol") {
-		tref parsed = parse_bf("x:bv[16]'");
+		tref parsed = tau::get("x:bv[16]'", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1122,7 +1049,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_add symbol") {
-		tref parsed = parse_bf("x:bv[16] + y");
+		tref parsed = tau::get("x:bv[16] + y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1130,7 +1057,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_sub symbol") {
-		tref parsed = parse_bf("x:bv[16] - y");
+		tref parsed = tau::get("x:bv[16] - y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1138,7 +1065,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_mul symbol") {
-		tref parsed = parse_bf("x:bv[16] * y");
+		tref parsed = tau::get("x:bv[16] * y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1146,7 +1073,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_div symbol") {
-		tref parsed = parse_bf("x:bv[16] / y");
+		tref parsed = tau::get("x:bv[16] / y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1154,7 +1081,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_mod symbol") {
-		tref parsed = parse_bf("x:bv[16] % y");
+		tref parsed = tau::get("x:bv[16] % y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1162,7 +1089,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_shr symbol") {
-		tref parsed = parse_bf("x:bv[16] >> y");
+		tref parsed = tau::get("x:bv[16] >> y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1170,7 +1097,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv bf_shl symbol") {
-		tref parsed = parse_bf("x:bv[16] << y");
+		tref parsed = tau::get("x:bv[16] << y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1178,7 +1105,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv[8] bf_shl symbol") {
-		tref parsed = parse_bf("x:bv[8] << y");
+		tref parsed = tau::get("x:bv[8] << y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1186,21 +1113,21 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau bf_shl symbol") {
-		tref parsed = parse_bf("x:tau << y");
+		tref parsed = tau::get("x:tau << y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("sbf bf_shl symbol") {
-		tref parsed = parse_bf("x:sbf << y");
+		tref parsed = tau::get("x:sbf << y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("sbf xor symbol") {
-		tref parsed = parse_bf("x:sbf ^ y");
+		tref parsed = tau::get("x:sbf ^ y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1208,7 +1135,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("sbf xor symbol (y2)") {
-		tref parsed = parse_bf("x:sbf ^ 1");
+		tref parsed = tau::get("x:sbf ^ 1", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1216,7 +1143,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("sbf xor symbol (y3)") {
-		tref parsed = parse_bf("1 ^ y:sbf");
+		tref parsed = tau::get("1 ^ y:sbf", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1224,7 +1151,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau xor symbol") {
-		tref parsed = parse_bf("x ^ y");
+		tref parsed = tau::get("x ^ y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1232,7 +1159,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau xor symbol (y2)") {
-		tref parsed = parse_bf("x ^ 1");
+		tref parsed = tau::get("x ^ 1", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1240,7 +1167,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("tau xor symbol (y3)") {
-		tref parsed = parse_bf("1 ^ y");
+		tref parsed = tau::get("1 ^ y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1248,7 +1175,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv xor symbol") {
-		tref parsed = parse_bf("x:bv[16] ^ y");
+		tref parsed = tau::get("x:bv[16] ^ y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1256,7 +1183,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv xor symbol (y2)") {
-		tref parsed = parse_bf("x:bv[16] ^ 1");
+		tref parsed = tau::get("x:bv[16] ^ 1", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1264,7 +1191,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 	}
 
 	TEST_CASE("bv xor symbol (y3)") {
-		tref parsed = parse_bf("1 ^ y:bv[16]");
+		tref parsed = tau::get("1 ^ y:bv[16]", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1275,7 +1202,7 @@ TEST_SUITE("infer_ba_types: symbols") {
 TEST_SUITE("infer_ba_types: bf formulas") {
 
 	TEST_CASE("simple case 1") {
-		tref parsed = parse("x", parse_bf_no_infer());
+		tref parsed = tau::get("x", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1286,7 +1213,7 @@ TEST_SUITE("infer_ba_types: bf formulas") {
 	}
 
 	TEST_CASE("simple case 2") {
-		tref parsed = parse("f[8](x)", parse_bf_no_infer());
+		tref parsed = tau::get("f[8](x)", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1301,7 +1228,7 @@ TEST_SUITE("infer_ba_types: bf formulas") {
 TEST_SUITE("infer_ba_types: cli commands") {
 
 	TEST_CASE("simple case (y1)") {
-		tref parsed = parse("x = 1", parse_cli_no_infer());
+		tref parsed = tau::get("x = 1", parse_opts_cli_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1312,7 +1239,7 @@ TEST_SUITE("infer_ba_types: cli commands") {
 	}
 
 	TEST_CASE("simple case (y2)") {
-		tref parsed = parse("n f(x)", parse_cli_no_infer());
+		tref parsed = tau::get("n f(x)", parse_opts_cli_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1326,7 +1253,7 @@ TEST_SUITE("infer_ba_types: cli commands") {
 TEST_SUITE("infer_ba_types: I/O vars") {
 
 	TEST_CASE("different time stamp propagation") {
-		tref parsed = parse("i1[t] = o1[t] && i1[t-1] = 1:sbf");
+		tref parsed = tau::get("i1[t] = o1[t] && i1[t-1] = 1:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1343,7 +1270,7 @@ TEST_SUITE("bitvectors") {
 
 	TEST_CASE("Propagation of bv type") {
 		//DBG(using node = node_t;)
-		tref parsed = parse("o1[t]:bv[16] = o1[t-1] + o1[t-2] && o1[0] = { 1 } && o1[1] = { 1 }");
+		tref parsed = tau::get("o1[t]:bv[16] = o1[t-1] + o1[t-2] && o1[0] = { 1 } && o1[1] = { 1 }", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1362,7 +1289,7 @@ TEST_SUITE("bitvectors") {
 TEST_SUITE("infer_ba_types: definitions") {
 
 	TEST_CASE("absent typing") {
-		tref parsed = parse_definitions("g[n](x) := g[n-1](x).");
+		tref parsed = tau::get("g[n](x) := g[n-1](x).", parse_opts_definitions_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1374,7 +1301,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 
 	TEST_CASE("functional sbf typing: right position") {
-		tref parsed = parse_definitions("g[n](x) := g[n-1](x):sbf.");
+		tref parsed = tau::get("g[n](x) := g[n-1](x):sbf.", parse_opts_definitions_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1386,7 +1313,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 
 	TEST_CASE("functional sbf typing: left position") {
-		tref parsed = parse_definitions("g[n](x):sbf := g[n-1](x).");
+		tref parsed = tau::get("g[n](x):sbf := g[n-1](x).", parse_opts_definitions_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1398,14 +1325,14 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 
 	TEST_CASE("predicate sbf: in the body") {
-		tref parsed = parse_definitions("g[n](x) := g[n-1](x:sbf).");
+		tref parsed = tau::get("g[n](x) := g[n-1](x:sbf).", parse_opts_definitions_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("predicate sbf: in the head") {
-		tref parsed = parse_definitions("g[n](x:sbf) := g[n-1](x) && T.");
+		tref parsed = tau::get("g[n](x:sbf) := g[n-1](x) && T.", parse_opts_definitions_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1417,7 +1344,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 
 	TEST_CASE("predicate sbf: right position") {
-		tref parsed = parse_definitions("g[n](x:sbf) := g[n-1](x).");
+		tref parsed = tau::get("g[n](x:sbf) := g[n-1](x).", parse_opts_definitions_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1429,7 +1356,7 @@ TEST_SUITE("infer_ba_types: definitions") {
 	}
 
 	TEST_CASE("incompatible types") {
-		tref parsed = parse_definitions("g[n](x:tau) := g[n-1](x:sbf).");
+		tref parsed = tau::get("g[n](x:tau) := g[n-1](x:sbf).", parse_opts_definitions_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
@@ -1442,147 +1369,147 @@ TEST_SUITE("type_inference_options") {
 	static auto no_defaults_use = type_inference_options { .use_defaults = false };
 
 	TEST_CASE("use defaults: x >> y") {
-		tref parsed = parse("x >> y", parse_bf_no_infer());
+		tref parsed = tau::get("x >> y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x >> y") {
-		tref parsed = parse("x >> y", parse_bf_no_infer());
+		tref parsed = tau::get("x >> y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x << y") {
-		tref parsed = parse("x << y", parse_bf_no_infer());
+		tref parsed = tau::get("x << y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x << y") {
-		tref parsed = parse("x << y", parse_bf_no_infer());
+		tref parsed = tau::get("x << y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x + y") {
-		tref parsed = parse("x + y", parse_bf_no_infer());
+		tref parsed = tau::get("x + y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x + y") {
-		tref parsed = parse("x + y", parse_bf_no_infer());
+		tref parsed = tau::get("x + y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x - y") {
-		tref parsed = parse("x - y", parse_bf_no_infer());
+		tref parsed = tau::get("x - y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x - y") {
-		tref parsed = parse("x - y", parse_bf_no_infer());
+		tref parsed = tau::get("x - y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x % y") {
-		tref parsed = parse("x % y", parse_bf_no_infer());
+		tref parsed = tau::get("x % y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x % y") {
-		tref parsed = parse("x % y", parse_bf_no_infer());
+		tref parsed = tau::get("x % y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x * y") {
-		tref parsed = parse("x * y", parse_bf_no_infer());
+		tref parsed = tau::get("x * y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x * y") {
-		tref parsed = parse("x * y", parse_bf_no_infer());
+		tref parsed = tau::get("x * y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x / y") {
-		tref parsed = parse("x / y", parse_bf_no_infer());
+		tref parsed = tau::get("x / y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x / y") {
-		tref parsed = parse("x / y", parse_bf_no_infer());
+		tref parsed = tau::get("x / y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x !| y") {
-		tref parsed = parse("x !| y", parse_bf_no_infer());
+		tref parsed = tau::get("x !| y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x !| y") {
-		tref parsed = parse("x !| y", parse_bf_no_infer());
+		tref parsed = tau::get("x !| y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x !^ y") {
-		tref parsed = parse("x !^ y", parse_bf_no_infer());
+		tref parsed = tau::get("x !^ y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x !^ y") {
-		tref parsed = parse("x !^ y", parse_bf_no_infer());
+		tref parsed = tau::get("x !^ y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x !& y") {
-		tref parsed = parse("x !& y", parse_bf_no_infer());
+		tref parsed = tau::get("x !& y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("no use defaults: x !& y") {
-		tref parsed = parse("x !& y", parse_bf_no_infer());
+		tref parsed = tau::get("x !& y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x | y") {
-		tref parsed = parse("x | y", parse_bf_no_infer());
+		tref parsed = tau::get("x | y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1590,14 +1517,14 @@ TEST_SUITE("type_inference_options") {
 	}
 
 	TEST_CASE("no use defaults: x | y") {
-		tref parsed = parse("x | y", parse_bf_no_infer());
+		tref parsed = tau::get("x | y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x ^ y") {
-		tref parsed = parse("x ^ y", parse_bf_no_infer());
+		tref parsed = tau::get("x ^ y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1605,14 +1532,14 @@ TEST_SUITE("type_inference_options") {
 	}
 
 	TEST_CASE("no use defaults: x ^ y") {
-		tref parsed = parse("x ^ y", parse_bf_no_infer());
+		tref parsed = tau::get("x ^ y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: x & y") {
-		tref parsed = parse("x & y", parse_bf_no_infer());
+		tref parsed = tau::get("x & y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1620,14 +1547,14 @@ TEST_SUITE("type_inference_options") {
 	}
 
 	TEST_CASE("no use defaults: x & y") {
-		tref parsed = parse("x & y", parse_bf_no_infer());
+		tref parsed = tau::get("x & y", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("use defaults: y'") {
-		tref parsed = parse("y'", parse_bf_no_infer());
+		tref parsed = tau::get("y'", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1635,18 +1562,18 @@ TEST_SUITE("type_inference_options") {
 	}
 
 	TEST_CASE("no use defaults: y'") {
-		tref parsed = parse("y'", parse_bf_no_infer());
+		tref parsed = tau::get("y'", parse_opts_bf_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed, nullptr, nullptr, no_defaults_use);
 		CHECK( inferred == parsed );
 	}
 
 	TEST_CASE("incremental construction of terms in api: success") {
-		tref y = parse("y:bv[16]", parse_bf_no_infer());
+		tref y = tau::get("y:bv[16]", parse_opts_bf_no_infer);
 		CHECK( y != nullptr );
 		auto inferred_y = infer_ba_types<node_t>(y, nullptr, nullptr, no_defaults_use).first;
 		//CHECK ( inferred_y == y);
-		tref x = parse("x", parse_bf_no_infer());
+		tref x = tau::get("x", parse_opts_bf_no_infer);
 		CHECK( x != nullptr );
 		auto inferred_x = infer_ba_types<node_t>(x, nullptr, nullptr, no_defaults_use).first;
 		CHECK( inferred_x == x );
@@ -1662,11 +1589,11 @@ TEST_SUITE("type_inference_options") {
 	}
 
 	TEST_CASE("incremental construction of terms in api: fail") {
-		tref y = parse("y:sbf", parse_bf_no_infer());
+		tref y = tau::get("y:sbf", parse_opts_bf_no_infer);
 		CHECK( y != nullptr );
 		auto inferred_y = infer_ba_types<node_t>(y, nullptr, nullptr, no_defaults_use).first;
 		//CHECK ( inferred_y == y);
-		tref x = parse("x", parse_bf_no_infer());
+		tref x = tau::get("x", parse_opts_bf_no_infer);
 		CHECK( x != nullptr );
 		auto inferred_x = infer_ba_types<node_t>(x, nullptr, nullptr, no_defaults_use).first;
 		CHECK( inferred_x == x );
@@ -1677,7 +1604,7 @@ TEST_SUITE("type_inference_options") {
 TEST_SUITE("regression tests") {
 
 	TEST_CASE("satisfiability3/qual_lookback_one_st") {
-		tref parsed = parse("(G o1[t-1]:bv[16] = { 0 }) && (F o1[t]:bv[16] = { 1 } && o1[t-1]:bv[16] = { 0 })");
+		tref parsed = tau::get("(G o1[t-1]:bv[16] = { 0 }) && (F o1[t]:bv[16] = { 1 } && o1[t-1]:bv[16] = { 0 })", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1694,7 +1621,7 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("splitter/Tau_splitter_7") {
-		tref parsed = parse("(F o1[t] = 1)");
+		tref parsed = tau::get("(F o1[t] = 1)", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1709,7 +1636,7 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("Lucca's question") {
-		tref parsed = parse("(ex x:sbf x = 0) && (ex x:tau x = 0)");
+		tref parsed = tau::get("(ex x:sbf x = 0) && (ex x:tau x = 0)", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1727,7 +1654,7 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
-		tref parsed = parse("g(x):tau fallback 1", parse_cli_no_infer());
+		tref parsed = tau::get("g(x):tau fallback 1", parse_opts_cli_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1742,14 +1669,14 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("nso_rr_fixed_point/fallback type mismatch") {
-		tref parsed = parse("g(x):tau fallback 1:sbf", parse_cli_no_infer());
+		tref parsed = tau::get("g(x):tau fallback 1:sbf", parse_opts_cli_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("nso_rr_fixed_point/fallback type mismatch (modified)") {
-		tref parsed = parse("g(x) fallback 1:sbf", parse_cli_no_infer());
+		tref parsed = tau::get("g(x) fallback 1:sbf", parse_opts_cli_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1764,7 +1691,7 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("nso_rr_execution/wff_rec_relation: direct substitution") {
-		tref parsed = parse("g(x:tau) fallback T", parse_cli_no_infer());
+		tref parsed = tau::get("g(x:tau) fallback T", parse_opts_cli_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1775,11 +1702,10 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("nso_rr_execution/direct substitution, wff_rec_relation case") {
-		tref parsed = parse(
-			"g[0, 0](y:tau) := y."
+		tref parsed = tau::get("g[0, 0](y:tau) := y."
 			"h[0, 0](y:tau) := y."
 			"g[0, 0](y:tau) && h[0, 0](1:tau)."
-		, parse_no_infer());
+		, parse_opts_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1793,7 +1719,7 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("nso_rr_fixed_point/loop fallback T") {
-		tref parsed = parse("g(x) fallback T", parse_cli_no_infer());
+		tref parsed = tau::get("g(x) fallback T", parse_opts_cli_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1804,35 +1730,35 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("Lucca's constant parsing example (y1)") {
-		tref parsed = parse("x = {1}:bv[16] && x = y:bv[32]");
+		tref parsed = tau::get("x = {1}:bv[16] && x = y:bv[32]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("Lucca's constant parsing example (y2)") {
-		tref parsed = parse("x = 1 && x = y:sbf");
+		tref parsed = tau::get("x = 1 && x = y:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("Andrei's example") {
-		tref parsed = parse("G u[t]:tau = i0[t]:tau && (o2[t]:bv[16] = 0 || i2[t]:bv[16] !< i1[t]:bv[16]) && (o2[t]:bv[16] = { 1 }:bv[16] || i2[t]:bv[16] < i1[t]:bv[16]) && (i3[t]:bv[16] != i4[t]:bv[16] || o3[t]:bv[16] = 0) && (o3[t]:bv[16] = { 1 }:bv[16] || i3[t]:bv[16] = i4[t]:bv[16]) && (i1[t]:bv[16] != 0 || o4[t]:bv[16] = 0) && (o4[t]:bv[16] = { 1 }:bv[16] || i1[t]:bv[16] = 0) && o1[t]:bv[16] = i1[t]:bv[16] && (i0[t]:bv[16]|i1[t]:bv[16] != 0 || i1[t]:bv[16] = 0)");
+		tref parsed = tau::get("G u[t]:tau = i0[t]:tau && (o2[t]:bv[16] = 0 || i2[t]:bv[16] !< i1[t]:bv[16]) && (o2[t]:bv[16] = { 1 }:bv[16] || i2[t]:bv[16] < i1[t]:bv[16]) && (i3[t]:bv[16] != i4[t]:bv[16] || o3[t]:bv[16] = 0) && (o3[t]:bv[16] = { 1 }:bv[16] || i3[t]:bv[16] = i4[t]:bv[16]) && (i1[t]:bv[16] != 0 || o4[t]:bv[16] = 0) && (o4[t]:bv[16] = { 1 }:bv[16] || i1[t]:bv[16] = 0) && o1[t]:bv[16] = i1[t]:bv[16] && (i0[t]:bv[16]|i1[t]:bv[16] != 0 || i1[t]:bv[16] = 0)", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("improper function type inference in formula (y3)") {
-		tref parsed = parse("all x:sbf f(x:tau) = 1");
+		tref parsed = tau::get("all x:sbf f(x:tau) = 1", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("improper function type inference in cli") {
-		tref parsed = parse("f(x):sbf", parse_cli_no_infer());
+		tref parsed = tau::get("f(x):sbf", parse_opts_cli_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		auto expected = std::vector<std::pair<std::string, size_t>> {
@@ -1842,7 +1768,7 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("improper function type inference in formula (y1)") {
-		tref parsed = parse("f(x):sbf = 1");
+		tref parsed = tau::get("f(x):sbf = 1", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		auto expected = std::vector<std::pair<std::string, size_t>> {
@@ -1856,14 +1782,14 @@ TEST_SUITE("regression tests") {
 	}
 
 	TEST_CASE("improper function type inference in formula (y2)") {
-		tref parsed = parse("all x:sbf f(x):tau = 1");
+		tref parsed = tau::get("all x:sbf f(x):tau = 1", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("improper function type inference in formula (y4)") {
-		tref parsed = parse("f(x:tau):sbf = 1");
+		tref parsed = tau::get("f(x:tau):sbf = 1", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
@@ -1872,7 +1798,7 @@ TEST_SUITE("regression tests") {
 	TEST_CASE("Issue 52 (y1)") {
 		// Original test used bare :bv which unified with :bv[15].
 		// With mandatory bitwidths, conflicting explicit sizes are a type error.
-		tref parsed = parse("x:bv[16] = {1}:bv[15]");
+		tref parsed = tau::get("x:bv[16] = {1}:bv[15]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
@@ -1881,7 +1807,7 @@ TEST_SUITE("regression tests") {
 	TEST_CASE("Issue 52 (y2)") {
 		// Original test used bare :bv which unified with :bv[15].
 		// With mandatory bitwidths, conflicting explicit sizes are a type error.
-		tref parsed = parse("x:bv[15] = {1}:bv[16]");
+		tref parsed = tau::get("x:bv[15] = {1}:bv[16]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
@@ -1890,21 +1816,21 @@ TEST_SUITE("regression tests") {
 	TEST_CASE("Issue 52 (y3)") {
 		// Original test used bare :bv which unified with :bv[15].
 		// With mandatory bitwidths, conflicting explicit sizes are a type error.
-		tref parsed = parse("x:bv[15] = 1:bv[16]");
+		tref parsed = tau::get("x:bv[15] = 1:bv[16]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred == nullptr );
 	}
 
 	TEST_CASE("Andrei's question (y1)") {
-		tref parsed = parse("o11[t]:bv[64] = i3[t]:bv[64]|i4[t]:bv[64]");
+		tref parsed = tau::get("o11[t]:bv[64] = i3[t]:bv[64]|i4[t]:bv[64]", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 	}
 
 	TEST_CASE("Andrei's question (y2)") {
-		tref parsed = parse("G (i0[t]:tau = 0 || o0[t]:tau = 0 && u[t]:tau = i0[t]:tau) && (i0[t]:tau != 0 || o0[t]:tau' = 0) && i1[t]:bv[64] = o1[t]:bv[64] && (o2[t]:bv[1] = 0 || i2[t]:bv[64] !< o1[t]:bv[64]) && (o2[t]:bv[1]' = 0 || i2[t]:bv[64] < o1[t]:bv[64]) && (o1[t]:bv[64] != 0 || o4[t]:bv[1] = 0) && (o4[t]:bv[1]' = 0 || o1[t]:bv[64] = 0) && (i3[t]:bv[64] != i4[t]:bv[64] || o3[t]:bv[1] = 0) && (o3[t]:bv[1]' = 0 || i3[t]:bv[64] = i4[t]:bv[64]) && o11[t]:bv[64] = 0 && (i4[t]:bv[64]|i3[t]:bv[64] = 0 || o11[t]:bv[64] = i3[t]:bv[64]|i4[t]:bv[64]) && (i4[t]:bv[64]|i3[t]:bv[64] != 0 || o11[t]:bv[64] = i4[t]:bv[64]'i3[t]:bv[64]') && (i4[t]:bv[64]|i3[t]:bv[64] = 0 || o11[t]:bv[64] = i3[t]:bv[64]|i4[t]:bv[64]) && (i4[t]:bv[64]|i3[t]:bv[64] != 0 || o11[t]:bv[64] = i4[t]:bv[64]'i3[t]:bv[64]') && o12[t]:bv[64] = { 1 }:bv[64] && o10[t]:bv[64] = 0 && (i1[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64])|i1[t]:bv[64]'i2[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64]) = 0 || o8[t]:bv[64] = i1[t]:bv[64]&(i3[t]:bv[64]|{ 170 }:bv[64])|i1[t]:bv[64]'i2[t]:bv[64]&(i3[t]:bv[64]|{ 170 }:bv[64])) && (i1[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64])|i1[t]:bv[64]'i2[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64]) != 0 || o8[t]:bv[64] = { 18446744073709551445 }:bv[64] i1[t]:bv[64]i3[t]:bv[64]'|i1[t]:bv[64]'&({ 18446744073709551445 }:bv[64] i3[t]:bv[64]'|i2[t]:bv[64]'))");
+		tref parsed = tau::get("G (i0[t]:tau = 0 || o0[t]:tau = 0 && u[t]:tau = i0[t]:tau) && (i0[t]:tau != 0 || o0[t]:tau' = 0) && i1[t]:bv[64] = o1[t]:bv[64] && (o2[t]:bv[1] = 0 || i2[t]:bv[64] !< o1[t]:bv[64]) && (o2[t]:bv[1]' = 0 || i2[t]:bv[64] < o1[t]:bv[64]) && (o1[t]:bv[64] != 0 || o4[t]:bv[1] = 0) && (o4[t]:bv[1]' = 0 || o1[t]:bv[64] = 0) && (i3[t]:bv[64] != i4[t]:bv[64] || o3[t]:bv[1] = 0) && (o3[t]:bv[1]' = 0 || i3[t]:bv[64] = i4[t]:bv[64]) && o11[t]:bv[64] = 0 && (i4[t]:bv[64]|i3[t]:bv[64] = 0 || o11[t]:bv[64] = i3[t]:bv[64]|i4[t]:bv[64]) && (i4[t]:bv[64]|i3[t]:bv[64] != 0 || o11[t]:bv[64] = i4[t]:bv[64]'i3[t]:bv[64]') && (i4[t]:bv[64]|i3[t]:bv[64] = 0 || o11[t]:bv[64] = i3[t]:bv[64]|i4[t]:bv[64]) && (i4[t]:bv[64]|i3[t]:bv[64] != 0 || o11[t]:bv[64] = i4[t]:bv[64]'i3[t]:bv[64]') && o12[t]:bv[64] = { 1 }:bv[64] && o10[t]:bv[64] = 0 && (i1[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64])|i1[t]:bv[64]'i2[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64]) = 0 || o8[t]:bv[64] = i1[t]:bv[64]&(i3[t]:bv[64]|{ 170 }:bv[64])|i1[t]:bv[64]'i2[t]:bv[64]&(i3[t]:bv[64]|{ 170 }:bv[64])) && (i1[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64])|i1[t]:bv[64]'i2[t]:bv[64]&({ 170 }:bv[64]|i3[t]:bv[64]) != 0 || o8[t]:bv[64] = { 18446744073709551445 }:bv[64] i1[t]:bv[64]i3[t]:bv[64]'|i1[t]:bv[64]'&({ 18446744073709551445 }:bv[64] i3[t]:bv[64]'|i2[t]:bv[64]'))", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1926,7 +1852,7 @@ TEST_SUITE("typed annotations as structural children") {
 	}
 
 	TEST_CASE("before inference: variable with :sbf has typed structural child") {
-		tref parsed = parse("x:sbf = 1");
+		tref parsed = tau::get("x:sbf = 1", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto vars = tau::get(parsed).select_top(is<node_t, tau::variable>);
 		CHECK( vars.size() == 1 );
@@ -1939,7 +1865,7 @@ TEST_SUITE("typed annotations as structural children") {
 	}
 
 	TEST_CASE("after inference: variable with :sbf has ba_type stamped, no typed child") {
-		tref parsed = parse("x:sbf = 1");
+		tref parsed = tau::get("x:sbf = 1", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1950,7 +1876,7 @@ TEST_SUITE("typed annotations as structural children") {
 	}
 
 	TEST_CASE("before inference: bf_t with :sbf has typed structural child") {
-		tref parsed = parse("1:sbf = x");
+		tref parsed = tau::get("1:sbf = x", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto bfts = tau::get(parsed).select_top(is<node_t, tau::bf_t>);
 		CHECK( bfts.size() == 1 );
@@ -1962,7 +1888,7 @@ TEST_SUITE("typed annotations as structural children") {
 	}
 
 	TEST_CASE("after inference: bf_t with :sbf has ba_type stamped, no typed child") {
-		tref parsed = parse("1:sbf = x");
+		tref parsed = tau::get("1:sbf = x", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1973,7 +1899,7 @@ TEST_SUITE("typed annotations as structural children") {
 	}
 
 	TEST_CASE("after inference: bf_f with :tau has ba_type stamped, no typed child") {
-		tref parsed = parse("0:tau = x");
+		tref parsed = tau::get("0:tau = x", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1984,7 +1910,7 @@ TEST_SUITE("typed annotations as structural children") {
 	}
 
 	TEST_CASE("after inference: type annotation propagates from bf_t to variable") {
-		tref parsed = parse("x = 1:sbf");
+		tref parsed = tau::get("x = 1:sbf", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -1996,7 +1922,7 @@ TEST_SUITE("typed annotations as structural children") {
 	}
 
 	TEST_CASE("after inference: type annotation propagates from variable to bf_f") {
-		tref parsed = parse("x:tau = 0");
+		tref parsed = tau::get("x:tau = 0", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -2007,7 +1933,7 @@ TEST_SUITE("typed annotations as structural children") {
 	}
 
 	TEST_CASE("no typed children remain anywhere after inference on complex formula") {
-		tref parsed = parse("x:bv[16] = y && z:sbf = 1");
+		tref parsed = tau::get("x:bv[16] = y && z:sbf = 1", parse_opts_wff_no_infer);
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );

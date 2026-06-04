@@ -10,6 +10,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "parser_helper.h"
 
 #include "boolean_algebras/bv_ba.h"
 #include "heuristics/bv_predicate_blasting.h"
@@ -29,13 +30,8 @@ TEST_SUITE("configuration") {
 
 }
 
-static tref parse_wff(const std::string& s) {
-	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
-	return tree<node_t>::get(s, opts);
-}
-
 static std::string normalize_blasting_on(const std::string& s) {
-	auto wff = parse_wff(s);
+	auto wff = tau::get(s, parse_opts_wff);
 	if (!wff) return "parse_error";
 	bool saved = bv_blasting; bv_blasting = true;
 	auto r = normalizer<node_t>(wff);
@@ -44,7 +40,7 @@ static std::string normalize_blasting_on(const std::string& s) {
 }
 
 static std::string normalize_blasting_off(const std::string& s) {
-	auto wff = parse_wff(s);
+	auto wff = tau::get(s, parse_opts_wff);
 	if (!wff) return "parse_error";
 	bool saved = bv_blasting; bv_blasting = false;
 	auto r = normalizer<node_t>(wff);

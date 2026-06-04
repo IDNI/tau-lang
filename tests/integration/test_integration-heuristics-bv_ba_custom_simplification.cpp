@@ -2,6 +2,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "parser_helper.h"
 
 #include "boolean_algebras/bv_ba.h"
 
@@ -49,11 +50,11 @@ TEST_SUITE("ba bv custom simplification") {
 	// Chained constant addition (should fully flatten)
 	TEST_CASE("chained addition flattening") {
 		const char* sample = "{1}:bv[8] + {2}:bv[8] + {3}:bv[8]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		// Should be {6}:bv[8] after multi-pass
 		const char* expected_str = "{6}:bv[8]";
-		tref expected = parse_bf(expected_str);
+		tref expected = tau::get(expected_str, parse_opts_bf);
 		CHECK(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
@@ -61,10 +62,10 @@ TEST_SUITE("ba bv custom simplification") {
 	// Chained constant subtraction with cancellation
 	TEST_CASE("chained subtraction cancellation") {
 		const char* sample = "{5}:bv[8] - {2}:bv[8] + {2}:bv[8]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		const char* expected_str = "{5}:bv[8]";
-		tref expected = parse_bf(expected_str);
+		tref expected = tau::get(expected_str, parse_opts_bf);
 		CHECK(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
@@ -74,9 +75,9 @@ TEST_SUITE("ba bv custom simplification") {
 		using node = node_t;
 
 		const char* sample = "{5}:bv[8] / {0}:bv[8]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		const char* expected = "1:bv[8]";
-		tref exp = parse_bf(expected);
+		tref exp = tau::get(expected, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		// Accept nullptr or a special error node, but must not crash
 		DBG( LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
@@ -88,9 +89,9 @@ TEST_SUITE("ba bv custom simplification") {
 		using node = node_t;
 
 		const char* sample = "x:bv[8] / {0}:bv[8]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		const char* expected = "1:bv[8]";
-		tref exp = parse_bf(expected);
+		tref exp = tau::get(expected, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		// Accept nullptr or a special error node, but must not crash
 		DBG( LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
@@ -102,9 +103,9 @@ TEST_SUITE("ba bv custom simplification") {
 		using node = node_t;
 
 		const char* sample = "{5}:bv[8] / {0}:bv[8]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		const char* expected = "1:bv[8]";
-		tref exp = parse_bf(expected);
+		tref exp = tau::get(expected, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		// Accept nullptr or a special error node, but must not crash
 		DBG( LOG_TRACE << "simplified: " << (simplified == nullptr ? "nullptr" : tree<node>::get(simplified).tree_to_str()) << "\n" );
@@ -114,7 +115,7 @@ TEST_SUITE("ba bv custom simplification") {
 	// All variables (should not introduce neutral element)
 	TEST_CASE("all variables no neutral element") {
 		const char* sample = "x:bv[8] + y:bv[8]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		// Should not be 0 + x + y
 		CHECK(simplified != nullptr);
@@ -125,10 +126,10 @@ TEST_SUITE("ba bv custom simplification") {
 	// Neutral element elimination (0 + x)
 	TEST_CASE("neutral element elimination") {
 		const char* sample = "0:bv[8] + x:bv[8]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		const char* expected = "x:bv[8]";
-		tref exp = parse_bf(expected);
+		tref exp = tau::get(expected, parse_opts_bf);
 		CHECK(simplified != nullptr);
 		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(exp));
 	}
@@ -136,7 +137,7 @@ TEST_SUITE("ba bv custom simplification") {
 	// 1:bv[8] = 11111111
 	TEST_CASE("top element multiplication") {
 		const char* sample = "1:bv[8] * x:bv[8]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		CHECK(simplified != nullptr);
 		CHECK(matches_to_str_to_any_of(simplified, { "x*1", "1*x", "(x*1)" }));
@@ -144,7 +145,7 @@ TEST_SUITE("ba bv custom simplification") {
 
 	TEST_CASE("1 + 2") {
 		const char* sample = "{1}:bv[64] + {2}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		tref expected = parse_bf("{3}:bv[64]");
 		REQUIRE(simplified != nullptr);
@@ -288,7 +289,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 * 2") {
 		const char* sample = "{1}:bv[64] * {2}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -296,7 +297,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 + X") {
 		const char* sample = "{1}:bv[64] + X:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -304,7 +305,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 - X") {
 		const char* sample = "{1}:bv[64] + {2}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -312,7 +313,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 * X") {
 		const char* sample = "{1}:bv[64] * X:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -320,7 +321,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("2 * X") {
 		const char* sample = "{1}:bv[64] * X:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -328,7 +329,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 / X") {
 		const char* sample = "{1}:bv[64] / X:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -336,7 +337,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 + X + 2") {
 		const char* sample = "{1}:bv[64] + X:bv[64] + {2}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -344,7 +345,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 * X * 2") {
 		const char* sample = "{1}:bv[64] * X:bv[64] * {2}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -352,7 +353,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 - X - 2") {
 		const char* sample = "{1}:bv[64] - X:bv[64] - {2}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -360,7 +361,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 / X / 2") {
 		const char* sample = "{1}:bv[64] / X:bv[64] / {2}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -368,7 +369,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("1 + X + 2 - 3") {
 		const char* sample = "{1}:bv[64] + X:bv[64] + {2}:bv[64] - {3}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -376,7 +377,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("X * 2 + 3 -2") {
 		const char* sample = "X:bv[64] * {2}:bv[64] + {3}:bv[64] - {2}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );
@@ -384,7 +385,7 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 
 	TEST_CASE("6 * X * 2 / 3") {
 		const char* sample = "{6}:bv[64] * X:bv[64] * {2}:bv[64] / {3}:bv[64]";
-		tref src = parse_bf(sample);
+		tref src = tau::get(sample, parse_opts_bf);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( true );

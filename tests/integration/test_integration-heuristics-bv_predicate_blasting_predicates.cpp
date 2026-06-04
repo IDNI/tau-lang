@@ -2,6 +2,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "parser_helper.h"
 
 #include "boolean_algebras/bv_ba.h"
 #include "heuristics/bv_predicate_blasting.h"
@@ -15,15 +16,6 @@ TEST_SUITE("configuration") {
 	TEST_CASE("logging") {
 		logging::trace();
 	}
-}
-
-tref parse_wff(const std::string& sample) {
-	static tree<node_t>::get_options opts{ .parse = { .start = tree<node_t>::wff }};
-	auto src = tree<node_t>::get(sample, opts);
-	if (src == nullptr) {
-		TAU_LOG_ERROR << "Parsing failed for: " << sample;
-	}
-	return src;
 }
 
 TEST_SUITE("bitblasting") {

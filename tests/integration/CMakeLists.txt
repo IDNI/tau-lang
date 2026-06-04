@@ -43,6 +43,7 @@ set(TESTS
 
 foreach(X IN LISTS TESTS)
 	add("test_integration-${X}")
+	target_include_directories("test_integration-${X}" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
 foreach(X IN ITEMS ctl_star ocfuncs)
