@@ -53,6 +53,7 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			|| nt == tau::bf_and
 			|| nt == tau::bf_nand
 			|| nt == tau::bf_neg
+			|| nt == tau::bf_cast
 			|| nt == tau::bf_add
 			|| nt == tau::bf_sub
 			|| nt == tau::bf_mul
@@ -423,6 +424,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_xor,             730 },
 			{ bf_and,             740 },
 			{ bf_neg,             750 },
+			{ bf_cast,            755 },
 			{ bf,                 790 },
 			{ rec_relation,       900 },
 			{ ref_args,           900 },
@@ -589,6 +591,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (last_quant_nt == bf_fex) out(", ");
 				else last_quant_nt = bf_fex, out("fex ");
 				break;
+
+			case bf_cast: {
+				size_t w = get_bv_width<node>(t.get_ba_type());
+				out("(bv["); out(std::to_string(w)); out("]) ");
+				break;
+			}
 
 			case wff_sometimes:     out("sometimes "); break;
 			case wff_always:        out("always "); break;

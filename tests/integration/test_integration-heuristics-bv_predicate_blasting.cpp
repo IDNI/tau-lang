@@ -30,7 +30,12 @@ tref parse_wff(const std::string& sample) {
 static std::string blast_normalize(const std::string& sample) {
 	auto wff = parse_wff(sample);
 	if (!wff) return "parse_error";
-	auto result = normalizer<node_t>(wff);
+	// We blast the formula and then normalize it to check that the blasting is
+	// correct and it is not simplified first by other heuristics. If the blasting
+	// is correct, the result should be T or F.
+	auto blasted = bv_predicate_blasting<node_t>(wff);
+	if (!blasted) return "blast_error";
+	auto result = normalizer<node_t>(blasted);
 	if (!result) return "null";
 	return tau::get(result).to_str();
 }
@@ -681,7 +686,7 @@ TEST_SUITE("bvrhl bugs") {
 	}
 }
 
-// 
+//
 // Bug 5: bvshl_rule off-by-one and flawed loop logic
 //
 // In bv_predicate_blasting_logic.tmpl.h (line ~525):
@@ -717,6 +722,102 @@ TEST_SUITE("bvshl bugs") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 1 }:bv[4] && x << { 1 }:bv[4] = y && y = { 3 }:bv[4])") == "F");
 	}
+}
+
+//
+// bvcast: bitvector casting — zero-extension and truncation
+//
+// Zero-extension (bv[2] -> bv[4]): low bits of result match source,
+// high bits are forced to zero.
+// Truncation (bv[4] -> bv[2]): result equals the low bits of source.
+// Same-size (bv[4] -> bv[4]): no-op, result equals source unchanged.
+//
+TEST_SUITE("bvcast") {
+
+	// Zero-extension: bv[2] -> bv[4]
+	TEST_CASE("bvcast: zext {2}:bv[2] = {2}:bv[4]") {
+		CHECK(blast_normalize("(bv[4]) { 2 }:bv[2] = { 2 }:bv[4]") == "T");
+	}
+
+	// Zero-extension: bv[2] -> bv[4]
+	TEST_CASE("bvcast: zext {2}:bv[2] = {2}:bv[4]") {
+		CHECK(blast_normalize("ex x (x = { 2 }:bv[2] && (bv[4]) x = { 2 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvcast: zext {3}:bv[2] = {3}:bv[4]") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[2] && (bv[4]) x = { 3 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvcast: zext {0}:bv[2] = {0}:bv[4]") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv[2] && (bv[4]) x = { 0 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvcast: zext high bits must be zero") {
+		// 3 zero-extended to bv[4] is {3}:bv[4] = 0011, not {11}:bv[4] = 1011
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[2] && (bv[4]) x = { 11 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("bvcast: zext wrong low bits") {
+		CHECK(blast_normalize("ex x (x = { 2 }:bv[2] && (bv[4]) x = { 3 }:bv[4])") == "F");
+	}
+
+	// Truncation: bv[4] -> bv[2]
+	TEST_CASE("bvcast: trunc {7}:bv[4] to bv[2] = {3}:bv[2]") {
+		// 7 = 0111; low 2 bits = 11 = 3
+		CHECK(blast_normalize("ex x (x = { 7 }:bv[4] && (bv[2]) x = { 3 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bvcast: trunc {14}:bv[4] to bv[2] = {2}:bv[2]") {
+		// 14 = 1110; low 2 bits = 10 = 2
+		CHECK(blast_normalize("ex x (x = { 14 }:bv[4] && (bv[2]) x = { 2 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bvcast: trunc {4}:bv[4] to bv[2] = {0}:bv[2]") {
+		// 4 = 0100; low 2 bits = 00 = 0
+		CHECK(blast_normalize("ex x (x = { 4 }:bv[4] && (bv[2]) x = { 0 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bvcast: trunc wrong value") {
+		// 7 = 0111 truncated to bv[2] is 3, not 0
+		CHECK(blast_normalize("ex x (x = { 7 }:bv[4] && (bv[2]) x = { 0 }:bv[2])") == "F");
+	}
+
+	// Same-size cast is a no-op
+	TEST_CASE("bvcast: same-size cast is identity") {
+		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && (bv[4]) x = { 5 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvcast: same-size wrong value") {
+		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && (bv[4]) x = { 6 }:bv[4])") == "F");
+	}
+}
+
+TEST_SUITE("more complex formulas") {
+
+	TEST_CASE("complex formula 1") {
+		CHECK(blast_normalize("all x:bv[4] all y:bv[4] ex z:bv[4] (x + y = z)") == "T");
+	}
+
+	TEST_CASE("complex formula 2") {
+		CHECK(blast_normalize("all x:bv[4] all y:bv[4] all z:bv[4] (x + y = z)") == "F");
+	}
+
+	TEST_CASE("complex formula 3") {
+		CHECK(blast_normalize("ex x:bv[4] (x * { 3 }:bv[4] = { 1 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("complex formula 4") {
+		CHECK(blast_normalize("all x:bv[4] (x * { 3 }:bv[4] = { 1 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("complex formula 5") {
+		CHECK(blast_normalize("all x:bv[4] (x << { 1 }:bv[4] != { 1 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("complex formula 6") {
+		CHECK(blast_normalize("ex x:bv[4] (x << { 1 }:bv[4] = { 1 }:bv[4])") == "F");
+	}
+
 }
 
 TEST_SUITE("cleanup") {

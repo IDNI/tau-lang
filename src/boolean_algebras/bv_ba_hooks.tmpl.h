@@ -775,6 +775,70 @@ tref term_nand(tref symbol) {
 	return tau::build_bf_neg(tau::build_bf_and(c1, c2));
 }
 
+// Cast a bitvector constant to a different width (zero-extend or truncate)
+template<NodeType node>
+tref bv_term_cast(tref symbol, size_t target_type_id) {
+	using tau = tree<node>;
+
+	DBG(LOG_TRACE << "term_cast/symbol:" << LOG_FM_TREE(symbol) << "\n";)
+
+	// bf > bf_cast > bf > [operand value]
+	// symbol[0] is bf_cast, symbol[0][0] is the operand bf, symbol[0][0][0] is the value
+	const tau& operand_value = tau::get(symbol)[0][0][0];
+
+	// Get source type from the operand's bf wrapper
+	size_t src_type_id = tau::get(symbol)[0][0].get_ba_type();
+	if (src_type_id == 0) src_type_id = operand_value.get_ba_type();
+	if (src_type_id == 0 || target_type_id == 0) {
+		return symbol;
+	}
+
+	// Only handle bitvector types
+	if (!is_bv_type_family<node>(src_type_id) ||
+		!is_bv_type_family<node>(target_type_id)) {
+		return symbol;
+	}
+
+	const size_t src_width = get_bv_width<node>(get_ba_type_tree<node>(src_type_id));
+	const size_t target_width = get_bv_width<node>(get_ba_type_tree<node>(target_type_id));
+
+	bv src_value;
+
+	// Handle bf_t (syntactic one = all bits set) and bf_f (syntactic zero)
+	if (operand_value.is(tau::bf_t)) {
+		// bf_t means all bits set: 2^src_width - 1
+		src_value = make_bitvector_top_elem(src_width);
+	} else if (operand_value.is(tau::bf_f)) {
+		// bf_f means zero - zero extended is still zero
+		return tau::_0(target_type_id);
+	} else if (operand_value.is_ba_constant()) {
+		// Regular constant
+		src_value = std::get<bv>(operand_value.get_ba_constant());
+	} else {
+		// Not a constant - variables require predicate blasting
+		return symbol;
+	}
+
+	// Perform the cast using CVC5
+	bv result_value;
+	if (target_width > src_width) {
+		// Zero-extend
+		result_value = make_bitvector_zero_extend(src_value, target_width - src_width);
+	} else if (target_width < src_width) {
+		// Truncate (extract lower bits)
+		result_value = make_bitvector_extract(src_value, target_width - 1, 0);
+	} else {
+		// Same width - value stays the same
+		result_value = src_value;
+	}
+
+	result_value = normalize_bv(result_value);
+	typename node::constant v = {result_value};
+	auto new_symbol = tree<node>::build_bf_ba_constant(v, target_type_id);
+	DBG(LOG_TRACE << "term_cast/result:" << LOG_FM_TREE(new_symbol) << "\n";)
+	return new_symbol;
+}
+
 template <NodeType node_t>
 tref simplify_bv_symbol(tref symbol) {
 	using tau = tree<node_t>;

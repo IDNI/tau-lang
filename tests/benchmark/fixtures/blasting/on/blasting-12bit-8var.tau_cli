@@ -1,0 +1,21 @@
+n all a:bv[12], b:bv[12], c:bv[12], d:bv[12], e:bv[12], f:bv[12], g:bv[12], h:bv[12] a + b + c + d = d + c + b + a && e | f | g | h = h | g | f | e
+all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] all e:bv[12] all f:bv[12] all g:bv[12] all h:bv[12] a + b + c + d = d + c + b + a && e | f | g | h = h | g | f | e
+n ex a:bv[12], b:bv[12], c:bv[12], d:bv[12], e:bv[12], f:bv[12], g:bv[12], h:bv[12] a < b && b < c && c < d && d < e && e < f && f < g && g < h && h - a >= { 7 }:bv[12]
+ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] ex e:bv[12] ex f:bv[12] ex g:bv[12] ex h:bv[12] a < b && b < c && c < d && d < e && e < f && f < g && g < h && h - a >= { 7 }:bv[12]
+n all a:bv[12], b:bv[12], c:bv[12], d:bv[12], e:bv[12], f:bv[12], g:bv[12], h:bv[12] (a & b) | (c & d) | (e & f) | (g & h) = (b & a) | (d & c) | (f & e) | (h & g)
+all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] all e:bv[12] all f:bv[12] all g:bv[12] all h:bv[12] (a & b) | (c & d) | (e & f) | (g & h) = (b & a) | (d & c) | (f & e) | (h & g)
+n ex a:bv[12], b:bv[12], c:bv[12], d:bv[12], e:bv[12], f:bv[12], g:bv[12], h:bv[12] a > { 0 }:bv[12] && b = a * { 2 }:bv[12] && b > a && c = b + a && d = c >> { 1 }:bv[12] && e = d + a && f = e % { 7 }:bv[12] && g = f + a && h = g & a && h > { 0 }:bv[12]
+ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] ex e:bv[12] ex f:bv[12] ex g:bv[12] ex h:bv[12] a > { 0 }:bv[12] && b = a * { 2 }:bv[12] && b > a && c = b + a && d = c >> { 1 }:bv[12] && e = d + a && f = e % { 7 }:bv[12] && g = f + a && h = g & a && h > { 0 }:bv[12]
+n all a:bv[12], b:bv[12], c:bv[12], d:bv[12], e:bv[12], f:bv[12], g:bv[12], h:bv[12] a ^ b ^ c ^ d = d ^ c ^ b ^ a && e !^ f = f !^ e && g !& h = h !& g
+all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] all e:bv[12] all f:bv[12] all g:bv[12] all h:bv[12] a ^ b ^ c ^ d = d ^ c ^ b ^ a && e !^ f = f !^ e && g !& h = h !& g
+n ex a:bv[12], b:bv[12], c:bv[12], d:bv[12], e:bv[12], f:bv[12], g:bv[12], h:bv[12] a < b && b < c && c < d && e = a + d && f = b + c && g = e ^ f && h = g & { 15 }:bv[12] && h > { 0 }:bv[12]
+ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] ex e:bv[12] ex f:bv[12] ex g:bv[12] ex h:bv[12] a < b && b < c && c < d && e = a + d && f = b + c && g = e ^ f && h = g & { 15 }:bv[12] && h > { 0 }:bv[12]
+n all a:bv[12], b:bv[12], c:bv[12], d:bv[12], e:bv[12], f:bv[12], g:bv[12], h:bv[12] ((a & b) | (c ^ d)) + ((e | f) & (g !^ h)) = ((e | f) & (g !^ h)) + ((a & b) | (c ^ d))
+all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] all e:bv[12] all f:bv[12] all g:bv[12] all h:bv[12] ((a & b) | (c ^ d)) + ((e | f) & (g !^ h)) = ((e | f) & (g !^ h)) + ((a & b) | (c ^ d))
+n ex a:bv[12], b:bv[12], c:bv[12], d:bv[12], e:bv[12], f:bv[12], g:bv[12], h:bv[12] a > { 0 }:bv[12] && b = a << { 1 }:bv[12] && b > a && c = b << { 1 }:bv[12] && d = c >> { 1 }:bv[12] && d = b && e = a * { 3 }:bv[12] && f = e / { 3 }:bv[12] && f = a && g = a | b && h = g & c && h > { 0 }:bv[12]
+ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] ex e:bv[12] ex f:bv[12] ex g:bv[12] ex h:bv[12] a > { 0 }:bv[12] && b = a << { 1 }:bv[12] && b > a && c = b << { 1 }:bv[12] && d = c >> { 1 }:bv[12] && d = b && e = a * { 3 }:bv[12] && f = e / { 3 }:bv[12] && f = a && g = a | b && h = g & c && h > { 0 }:bv[12]
+all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] all e:bv[12] all f:bv[12] all g:bv[12] all h:bv[12] a * { 4 }:bv[12] = a << { 2 }:bv[12] && b + { 9 }:bv[12] - { 9 }:bv[12] = b && e | f >= e && g & h <= g
+ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] ex e:bv[12] ex f:bv[12] ex g:bv[12] ex h:bv[12] a > { 42 }:bv[12] && b = a % { 11 }:bv[12] && c = a + b && d = c & { 15 }:bv[12] && d > { 0 }:bv[12] && e = d + { 6 }:bv[12] && f = e ^ d && g = f | a && h = g - b && h > { 0 }:bv[12]
+all a:bv[12] ex b:bv[12] all c:bv[12] ex d:bv[12] all e:bv[12] ex f:bv[12] all g:bv[12] ex h:bv[12] b = a + { 1 }:bv[12] && d = c + { 1 }:bv[12] && f = e + { 1 }:bv[12] && h = g + { 1 }:bv[12]
+ex a:bv[12] all b:bv[12] ex c:bv[12] all d:bv[12] ex e:bv[12] all f:bv[12] ex g:bv[12] all h:bv[12] a = { 1 }:bv[12] && c = b * { 2 }:bv[12] && e = d + { 9 }:bv[12] && g = f ^ { 170 }:bv[12] && a * h = h
+all a:bv[12] all b:bv[12] ex c:bv[12] ex d:bv[12] all e:bv[12] all f:bv[12] ex g:bv[12] ex h:bv[12] c = a + { 9 }:bv[12] && d = b + { 9 }:bv[12] && g = e - { 9 }:bv[12] && h = f - { 9 }:bv[12] && c - { 9 }:bv[12] = a && d - { 9 }:bv[12] = b

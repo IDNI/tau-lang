@@ -1,0 +1,14 @@
+set blasting off.
+n all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] (a + b) + (c + d) = (d + c) + (b + a).
+n ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] a < b && b < c && c < d && d - a >= { 3 }:bv[12].
+n all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] a & (b | c) | d = (a & b) | (a & c) | d.
+n ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] a > { 0 }:bv[12] && b = a * { 3 }:bv[12] && c = b + a && d = c >> { 2 }:bv[12] && d > { 0 }:bv[12].
+n all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a.
+n ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] a % { 5 }:bv[12] = { 2 }:bv[12] && b = a + { 3 }:bv[12] && c = a | b && d = c & a && d !>= b.
+n all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] a | b >= a && a | b >= b && c & d <= c && c & d <= d.
+n ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] a > { 0 }:bv[12] && b = a << { 1 }:bv[12] && b > a && c = b << { 1 }:bv[12] && d = c >> { 1 }:bv[12] && d = b.
+n all a:bv[12] all b:bv[12] all c:bv[12] all d:bv[12] a * { 4 }:bv[12] = a << { 2 }:bv[12] && b + { 9 }:bv[12] - { 9 }:bv[12] = b.
+n ex a:bv[12] ex b:bv[12] ex c:bv[12] ex d:bv[12] a > { 42 }:bv[12] && b = a % { 11 }:bv[12] && c = a + b && d = c & { 15 }:bv[12] && d > { 0 }:bv[12].
+n all a:bv[12] ex b:bv[12] all c:bv[12] ex d:bv[12] b = a + { 1 }:bv[12] && d = c + { 1 }:bv[12].
+n ex a:bv[12] all b:bv[12] ex c:bv[12] all d:bv[12] a = { 1 }:bv[12] && c = b * { 2 }:bv[12] && a * d = d.
+n all a:bv[12] ex b:bv[12] ex c:bv[12] all d:bv[12] b = a + { 6 }:bv[12] && c = b - { 6 }:bv[12] && c = a && a + d = d + a.
