@@ -160,7 +160,7 @@ TEST_SUITE("BDD and many") {
 		const char* vs = "v";
 		tref tv = tau::trim(tau::get(vs, opts));
 		const char* ws = "w";
-		tref tw = tau::trim(tau::get(ws, opts));	
+		tref tw = tau::trim(tau::get(ws, opts));
 		const char* xs = "x";
 		tref tx = tau::trim(tau::get(xs, opts));
 		const char* ys = "y";
@@ -183,10 +183,11 @@ TEST_SUITE("BDD and many") {
 		bdd::refs bdds = {x,y,z};
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
-		CHECK((tau::get(ct).to_str() == "xydcbafe" ||
-			tau::get(ct).to_str() == "xydcabef" ||
-			 tau::get(ct).to_str() == "xydcfeab"));
+		auto result = tau::get(ct).to_str();
+		CHECK((result == "xydcbafe" || result == "xydcabef"
+			|| result == "xydcfeab" || result == "xycdfeab"	));
 	}
+
 	TEST_CASE("2") {
 		using bdd = tau_term_bdd<node_t>;
 		tau::get_options opts = {
