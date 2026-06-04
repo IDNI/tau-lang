@@ -189,6 +189,18 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				break;
 			}
 
+			case bf_cast: {
+				// children after @trim: [num(target_width), bf_operand]
+				trefs ch;
+				for (tref c : ptr.children())
+					if (m_ref(c)) ch.push_back(m_ref(c));
+				DBG(assert(ch.size() == 2);)
+				size_t width = tree<node>::get(ch[0]).data();
+				ba_type = get_ba_type_id<node>(bv_type<node>(width));
+				x = getx(trefs{ch[1]});
+				break;
+			}
+
 			default:
 				if (is_string_nt(nt)) {
 					x = getx_data(

@@ -123,6 +123,16 @@ inline Term make_bitvector_shr(const Term& l, const Term& r) {
 	return cvc5_term_manager.mkTerm(Kind::BITVECTOR_LSHR, {l, r});
 }
 
+inline Term make_bitvector_zero_extend(const Term& t, size_t extra_bits) {
+	auto op = cvc5_term_manager.mkOp(Kind::BITVECTOR_ZERO_EXTEND, {(uint32_t)extra_bits});
+	return cvc5_term_manager.mkTerm(op, {t});
+}
+
+inline Term make_bitvector_extract(const Term& t, size_t hi, size_t lo) {
+	auto op = cvc5_term_manager.mkOp(Kind::BITVECTOR_EXTRACT, {(uint32_t)hi, (uint32_t)lo});
+	return cvc5_term_manager.mkTerm(op, {t});
+}
+
 inline cvc5::Term make_bitvector_cte(const size_t size,
 		const std::string& str, const size_t base) {
 	return cvc5_term_manager.mkBitVector(size, str, base);

@@ -69,6 +69,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
                         | ref                                :bf_ref
+                        | ('(' _ "bv" _ '[' _ num _ ']' _ ')' _ bf) :bf_cast
                         | (bf  _ ">>" _      (bf & ~bf_shr)) :bf_shr
                         | (bf  _ "<<" _      (bf & ~bf_shl)) :bf_shl
                         | (bf  _ '+' _       bf)             :bf_add

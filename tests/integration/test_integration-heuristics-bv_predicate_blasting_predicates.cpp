@@ -174,6 +174,47 @@ TEST_SUITE("bitblasting") {
 	}
 }
 
+TEST_SUITE("bvcast") {
+
+	TEST_CASE("bvcast: zero-extension (bv[2] -> bv[4])") {
+		using node = node_t;
+		using tau = tree<node>;
+		auto src    = tau::build_bf_variable(bv_type_id<node>(2));
+		auto result = tau::build_bf_variable(bv_type_id<node>(4));
+		// Expanded bit-equality + zero predicates for a 2->4 zero-extension
+		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0));
+		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0));
+		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1));
+		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1));
+		TAU_LOG_INFO << "bvcast zext bv[2]->bv[4]: bit-equality predicates\n";
+		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
+		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
+		TAU_LOG_INFO << "  bit1 src=0  : " << tau::get(src_b1_zero).to_str()  << "\n";
+		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
+		TAU_LOG_INFO << "  high bit2=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 2))).to_str() << "\n";
+		TAU_LOG_INFO << "  high bit3=0 : " << tau::get(tau::build_bf_eq_0(bit<node>(result, 3))).to_str() << "\n";
+		TAU_LOG_INFO << "------\n";
+	}
+
+	TEST_CASE("bvcast: truncation (bv[4] -> bv[2])") {
+		using node = node_t;
+		using tau = tree<node>;
+		auto src    = tau::build_bf_variable(bv_type_id<node>(4));
+		auto result = tau::build_bf_variable(bv_type_id<node>(2));
+		// Expanded bit-equality predicates for a 4->2 truncation (low 2 bits only)
+		auto src_b0_zero = tau::build_bf_eq_0(bit<node>(src, 0));
+		auto res_b0_zero = tau::build_bf_eq_0(bit<node>(result, 0));
+		auto src_b1_zero = tau::build_bf_eq_0(bit<node>(src, 1));
+		auto res_b1_zero = tau::build_bf_eq_0(bit<node>(result, 1));
+		TAU_LOG_INFO << "bvcast trunc bv[4]->bv[2]: bit-equality predicates\n";
+		TAU_LOG_INFO << "  bit0 src=0  : " << tau::get(src_b0_zero).to_str()  << "\n";
+		TAU_LOG_INFO << "  bit0 res=0  : " << tau::get(res_b0_zero).to_str()  << "\n";
+		TAU_LOG_INFO << "  bit1 src=0  : " << tau::get(src_b1_zero).to_str()  << "\n";
+		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
+		TAU_LOG_INFO << "------\n";
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

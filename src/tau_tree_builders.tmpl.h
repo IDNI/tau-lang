@@ -691,6 +691,14 @@ tref build_bf_mod(tref l, tref r) {
 	return tau::get(tau::bf, tau::get(tau::bf_mod, l, r));
 }
 
+template <NodeType node>
+tref build_bf_cast(tref operand, size_t target_type_id) {
+	DBG(assert(operand != nullptr);)
+	DBG(assert(target_type_id > 0);)
+	using tau = tree<node>;
+	return tau::get(tau::bf, tau::get_typed(tau::bf_cast, operand, target_type_id));
+}
+
 // -----------------------------------------------------------------------------
 // terminals, variables and constants
 

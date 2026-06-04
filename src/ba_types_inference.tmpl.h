@@ -555,6 +555,56 @@ tref update_default(tref n, subtree_map<node, tref>& changes) {
 	return (changes.find(n) != changes.end()) ? changes[n] : n;
 };
 
+// Type variables, constants, and bf nodes in a bf_cast operand subtree
+// purely from their explicit type annotations, without consulting the resolver.
+// This avoids conflicts when the same numeric constant appears with different
+// types inside and outside a bf_cast boundary.
+template<NodeType node>
+tref type_annotated_operands(tref n) {
+	using tau = tree<node>;
+	subtree_map<node, tref> changes;
+
+	auto f = [&](tref x) -> bool {
+		size_t nt = tau::get(x).get_type();
+		tref new_x = update_default<node>(x, changes);
+		if (new_x != x) changes.insert_or_assign(x, new_x);
+		x = new_x;
+
+		if (is_processed<node>(x)) return true;
+		switch (nt) {
+			case tau::variable:
+			case tau::bf_t: case tau::bf_f: {
+				if (size_t type = get_effective_ba_type<node>(x); type) {
+					if (auto typed = update_tref<node>(x, type); typed != x)
+						changes.insert_or_assign(x, typed);
+				}
+				break;
+			}
+			case tau::ba_constant: {
+				if (size_t type = get_effective_ba_type<node>(x); type) {
+					tref typed = x;
+					if (tau::get(typed).data() == 0)
+						typed = tau::get_ba_constant_from_source(
+							tau::get(typed).child_data(), type);
+					if (typed)
+						if (auto retyped = update_tref<node>(typed, type); retyped != x)
+							changes.insert_or_assign(x, retyped);
+				}
+				break;
+			}
+			default:
+				if (tau::is_term_nt(nt))
+					if (auto upd = update_ba_symbol<node>(x); upd != x)
+						changes.insert_or_assign(x, upd);
+				break;
+		}
+		return true;
+	};
+
+	post_order<node>(n).search(f);
+	return changes.contains(n) ? changes[n] : n;
+}
+
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update(
 		type_scoped_resolver<node>& resolver, tref r,
@@ -996,11 +1046,23 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// Be aware that if we have a command with unconnected bf's
 				// this would fail.
 				//
-				// If bf is not a top level one, it must have been treated somewhere else.
-				if (!is_top_level_bf<node>(parent)) { skip = true; break; }
+				// If bf is not a top level one, it must have been treated
+				// somewhere else.  We still let traversal descend when the bf
+				// directly wraps a bf_cast so the cast boundary is processed.
+				if (!is_top_level_bf<node>(parent)) {
+					const auto& ch = tau::get(n).get_children();
+					bool has_cast = std::any_of(ch.begin(), ch.end(),
+						[](tref c){ return tau::get(c).is(tau::bf_cast); });
+					if (!has_cast) { skip = true; break; }
+					break; // has cast child: descend but open no resolver scope
+				}
+				// bf_cast is a type boundary: its operand is typed directly
+				// from annotations in on_leave, not via the resolver.
+				if (parent && tau::get(parent).is(tau::bf_cast)) break;
 				// Otherwise we have to treat it as a global scope
-				auto typeables = get_typeable_type_ids_by_type<node>(n, {
-					tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
+				auto typeables = get_typeable_type_ids_by_type<node>(n,
+					is<node>({tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f}),
+					is<node>({tau::offset, tau::bf_cast}));
 				if (std::holds_alternative<inference_error>(typeables)) {
 					error = std::get<inference_error>(typeables);
 					break;
@@ -1121,8 +1183,9 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
-				auto typeables = get_typeable_type_ids_by_type<node>(n, {
-					tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f });
+				auto typeables = get_typeable_type_ids_by_type<node>(n,
+					is<node>({tau::ref, tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f}),
+					is<node>({tau::offset, tau::bf_cast}));
 				if (std::holds_alternative<inference_error>(typeables)) {
 					error = std::get<inference_error>(typeables);
 					break;
@@ -1301,7 +1364,31 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::bf_gt: case tau::bf_ngt: case tau::bf_gteq: case tau::bf_ngteq:
 			case tau::bf_lt: case tau::bf_nlt:
 			case tau::bf_interval: {
-				auto updated = update<node>(resolver, n, { tau::ref, tau::ba_constant, tau::bf_t, tau::bf_f }, options);
+				// For children that directly wrap a bf_cast, pick up the
+				// pre-typed version from transformed (produced by
+				// type_annotated_operands in bf on_leave).  Leave all other
+				// children untouched so update<node> types them from the
+				// resolver, avoiding stale entries from earlier scopes.
+				tref new_n = n;
+				{
+					const auto& t = tau::get(n);
+					auto ch = t.get_children();
+					bool changed = false;
+					for (auto& c : ch) {
+						if (auto it = transformed.find(c); it != transformed.end()) {
+							const auto& child_chs = tau::get(c).get_children();
+							bool child_has_cast = !child_chs.empty()
+								&& tau::get(child_chs[0]).is(tau::bf_cast);
+							if (child_has_cast) {
+								c = it->second;
+								changed = true;
+							}
+						}
+					}
+					if (changed)
+						new_n = tau::get_raw(t.value, ch.data(), ch.size());
+				}
+				auto updated = update<node>(resolver, new_n, { tau::ref, tau::ba_constant, tau::bf_t, tau::bf_f }, options);
 				if (std::holds_alternative<parse_error>(updated)) {
 					error = std::get<parse_error>(updated);
 					 break;
@@ -1320,17 +1407,25 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::bf: {
 				tref new_n = update_default<node>(n, transformed);
 				if (is_top_level_bf<node>(parent)) {
-					auto updated = update<node>(resolver, new_n,
-						{ tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f }, options);
-					if (std::holds_alternative<parse_error>(updated)) {
-						error = std::get<parse_error>(updated);
-						break;
-					} else if (std::holds_alternative<inference_error>(updated)) {
-						error = std::get<inference_error>(updated);
-						break;
+					if (parent && tau::get(parent).is(tau::bf_cast)) {
+						// bf_cast operand: type directly from annotations,
+						// not via the resolver, to avoid conflicts with the
+						// surrounding context's type scope.
+						tref updated = type_annotated_operands<node>(new_n);
+						if (updated != new_n) transformed.insert_or_assign(n, updated);
+					} else {
+						auto updated = update<node>(resolver, new_n,
+							{ tau::variable, tau::ba_constant, tau::bf_t, tau::bf_f }, options);
+						if (std::holds_alternative<parse_error>(updated)) {
+							error = std::get<parse_error>(updated);
+							break;
+						} else if (std::holds_alternative<inference_error>(updated)) {
+							error = std::get<inference_error>(updated);
+							break;
+						}
+						if (auto updated_ref = std::get<tref>(updated); updated_ref != new_n)
+							transformed.insert_or_assign(n, updated_ref);
 					}
-					if (auto updated_ref = std::get<tref>(updated); updated_ref != new_n)
-						transformed.insert_or_assign(n, updated_ref);
 				} else {
 					if (new_n != n) transformed.insert_or_assign(n, new_n);
 				}

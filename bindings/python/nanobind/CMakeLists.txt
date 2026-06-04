@@ -33,6 +33,7 @@ set_target_properties(${TAU_PYTHON_BINDING_MODULE} PROPERTIES
 	OUTPUT_NAME "tau"
 )
 target_compile_features(${TAU_PYTHON_BINDING_MODULE} PRIVATE cxx_std_23)
+target_compile_definitions_if(${TAU_PYTHON_BINDING_MODULE} PRIVATE "${TAU_DEFINITIONS}")
 target_link_libraries(${TAU_PYTHON_BINDING_MODULE} PRIVATE ${TAU_STATIC_LIB_NAME})
 target_include_directories(${TAU_PYTHON_BINDING_MODULE} PRIVATE
 	"${CMAKE_SOURCE_DIR}/src"

@@ -9,6 +9,7 @@ set(TESTS
 	bv_ba-simplification
 	bv_ba-solver1
 	bv_ba-solver2
+	bv_ba-cast
 	cvc5
 	gc
 	hbdd
