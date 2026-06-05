@@ -245,7 +245,7 @@ tref tau_spec<node>::build_parse_tree() {
 	for (size_t i = 0; i < parts_.size(); ++i) if (parsed_[i]) {
 		for (tref c : ptree::get(parsed_[i]).children()) {
 			DBG(TAU_LOG_TRACE << "tau_spec::build_parse_tree spec part: " << ptree_to_str(c);)
-			if (tau::get(c).is(tau::main)) {
+			if (ptree::get(c).is(tau::main)) {
 				if (!main_ && !main) { // first main found
 					main = c;
 				} else {

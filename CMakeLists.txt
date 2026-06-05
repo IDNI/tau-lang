@@ -67,6 +67,7 @@ option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
 option(TAU_USE_CCACHE              "Use ccache when building"              OFF)
+option(TAU_PARSER_SHMEM_TREE       "Store parser tree nodes in boost::interprocess segment" OFF)
 
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
 if (TAU_BUILD_JOBS STREQUAL "")
@@ -389,6 +390,42 @@ message("Building parser")
 set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
 set(TAU_PARSER_BUILD_PIC ${TAU_BUILD_PIC} CACHE BOOL "Build position independent code" FORCE)
 add_subdirectory(external/parser)
+
+# TAU_PARSER_SHMEM_TREE: store parser tree nodes in boost::interprocess segment
+if (TAU_PARSER_SHMEM_TREE)
+	if (EMSCRIPTEN)
+		message(FATAL_ERROR "TAU_PARSER_SHMEM_TREE and Emscripten are mutually exclusive")
+	endif()
+	# boost::interprocess is header-only; only boost::system needs linking.
+	# Prefer system Boost (already installed) over the vendored copy.
+	find_package(Boost QUIET COMPONENTS system)
+	if (NOT Boost_FOUND)
+		# Fall back to the tau-vendored Boost in ~/.tau
+		set(BOOST_LIBDIR "${TAU_SHARED_PREFIX}/boost/dist/lib")
+		file(GLOB _boost_shmem_config "${TAU_SHARED_PREFIX}/boost/dist/lib/cmake/Boost-*/BoostConfig.cmake")
+		if (_boost_shmem_config)
+			get_filename_component(Boost_DIR "${_boost_shmem_config}" DIRECTORY)
+		endif()
+		find_package(Boost REQUIRED COMPONENTS system)
+	endif()
+	message(STATUS "TAU_PARSER_SHMEM_TREE: ON (Boost ${Boost_VERSION})")
+	# tauparser is an ALIAS of tauparser_static when built as static library.
+	# We must use the underlying target name for property modifications.
+	set(_tau_parser_real_target "")
+	if (TARGET tauparser_static)
+		set(_tau_parser_real_target tauparser_static)
+	elseif (TARGET tauparser_shared)
+		set(_tau_parser_real_target tauparser_shared)
+	else()
+		# Header-only interface library
+		set(_tau_parser_real_target tauparser)
+	endif()
+	# Use PUBLIC (not INTERFACE) so TREE_SHMEM applies to both the library's own
+	# sources (parser.cpp etc.) AND to all consumers.
+	target_compile_definitions(${_tau_parser_real_target} PUBLIC TREE_SHMEM)
+	target_include_directories(${_tau_parser_real_target} PUBLIC ${Boost_INCLUDE_DIRS})
+	target_link_libraries(${_tau_parser_real_target} PUBLIC Boost::system)
+endif()
 
 #
 # load common cmake settings and load functions

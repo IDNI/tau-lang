@@ -325,7 +325,7 @@ tref tree<node>::get(tau_parser::result& result, get_options& options) {
 		LOG_ERROR << "[tau] " << msg << "\n";
 		return nullptr;
 	}
-	auto pt = parse_tree::get(result.get_shaped_tree2());
+	const auto& pt = parse_tree::get(result.get_shaped_tree2());
 	return tree<node>::get(pt, options);
 }
 
