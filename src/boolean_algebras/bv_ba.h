@@ -77,6 +77,7 @@ size_t get_bv_size(const tref t);
 inline void config_cvc5_solver(cvc5::Solver& solver) {
 	// configure the solver
 	solver.setOption("produce-models", "true");
+	solver.setOption("produce-proofs", "false");
 	//solver.setOption("incremental", "true");
 	solver.setLogic("BV");
 }

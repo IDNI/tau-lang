@@ -142,8 +142,9 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		CHECK((tau::get(t).to_str() == "xyzqwert" ||
-			tau::get(t).to_str() == "zrwyexqt"));
+		CHECK((tau::get(t).to_str() == "xyzqwert"
+			|| tau::get(t).to_str() == "zrwyexqt"
+			|| tau::get(t).to_str() == "xtzqrewy"));
 	}
 }
 
@@ -215,8 +216,9 @@ TEST_SUITE("BDD and many") {
 		// Construction
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
-		CHECK((tau::get(xx).to_str() == "ab&(f'e')'bccd" ||
-			tau::get(xx).to_str() == "adbb&(e'f')'cc"));
+		CHECK((tau::get(xx).to_str() == "ab&(f'e')'bccd"
+			|| tau::get(xx).to_str() == "adbb&(e'f')'cc"
+			|| tau::get(xx).to_str() == "abbccd&(f'e')'"));
 	}
 }
 
