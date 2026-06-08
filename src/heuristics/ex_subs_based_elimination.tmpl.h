@@ -149,10 +149,7 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 {
 	if (auto res = preorder<node>(var, ex_clause); res)
 		return rewriter::replace<node>(ex_clause, var, res);
-	else return ex_clause;
-	//if (auto res = postorder<node>(var, ex_clause); res)
-	//	return rewriter::replace<node>(ex_clause, var, res);
-	//return ex_clause;
+	return ex_clause;
 }
 
 } // namespace idni::tau_lang

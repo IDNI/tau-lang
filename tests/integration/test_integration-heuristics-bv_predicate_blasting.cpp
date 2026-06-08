@@ -792,6 +792,112 @@ TEST_SUITE("bvcast") {
 	}
 }
 
+//
+// bvnlt: not-less-than (= greater-than-or-equal)
+//
+TEST_SUITE("bvnlt") {
+
+	TEST_CASE("bvnlt: 3 !< 2 is T for 2-bit") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[2] && x !< { 2 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bvnlt: 1 !< 2 is F") {
+		CHECK(blast_normalize("ex x (x = { 1 }:bv[4] && x !< { 2 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("bvnlt: 2 !< 2 is T (equal case)") {
+		CHECK(blast_normalize("ex x (x = { 2 }:bv[4] && x !< { 2 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvnlt: 0 !< 0 is T (zero case)") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv[4] && x !< { 0 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvnlt: 0 !< 1 is F") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv[4] && x !< { 1 }:bv[4])") == "F");
+	}
+}
+
+//
+// Bug 6: wff_predicate_blasting passes the outer formula to predicates instead
+// of the atomic comparison node, causing bitwidth=0 and malformed blasting.
+//
+// In bv_predicate_blasting.tmpl.h (lines ~403-412):
+//   case tau::bf_nlt: { blast(term, nlt_predicate<node>); break; }  // WRONG
+// should be:
+//   case tau::bf_nlt: { blast(t, nlt_predicate<node>); break; }
+//
+// When the outer formula (type wff, no BA type) is passed instead of the atomic
+// node, get_bv_type_bitwidth returns 0 and the predicate produces a malformed
+// result containing wff_f adjacent to the original comparison — visible as
+// "F{ 2 }:bv[64] !< ..." in output.
+//
+TEST_SUITE("bug6: blast passes outer formula instead of atomic") {
+
+	// nlt with arithmetic in RHS: the bug causes get_bv_type_bitwidth(outer_wff)=0
+	// which generates a degenerate 0-bit comparison instead of a 4-bit one.
+	TEST_CASE("bug6: nlt with bf_neg+bf_sub in rhs is evaluated correctly") {
+		// {1}':bv[4] = NOT(0001) = 1110 = 14; 14 - 3 = 11; 12 !< 11 = (12 >= 11) = T
+		CHECK(blast_normalize(
+			"ex x (x = { 12 }:bv[4] && x !< { 1 }:bv[4]' - { 3 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bug6: nlt with arithmetic in rhs, false case") {
+		// 2 !< 11 = (2 >= 11) = F
+		CHECK(blast_normalize(
+			"ex x (x = { 2 }:bv[4] && x !< { 1 }:bv[4]' - { 3 }:bv[4])") == "F");
+	}
+
+	// gt with arithmetic: analogous bug for bf_gt
+	TEST_CASE("bug6: gt with arithmetic in rhs is evaluated correctly") {
+		// 12 > 11 = T
+		CHECK(blast_normalize(
+			"ex x (x = { 12 }:bv[4] && x > { 1 }:bv[4]' - { 3 }:bv[4])") == "T");
+	}
+}
+
+//
+// Bug 7: bvgt_rules base case uses index 'bitwidth' instead of 0, causing the
+// base case to immediately match the initial call and only check the LSB.
+//
+// In bv_predicate_blasting_comparisons.tmpl.h:
+//   auto base_header = make_bvgt_call_from_index(left, right, bitwidth);  // WRONG
+// should be:
+//   auto base_header = make_bvgt_call_from_index(left, right, 0);
+//
+// And bvgt_rule initial call:
+//   auto call = make_bvgt_call_from_index(left, right, bitwidth);  // WRONG
+// should be:
+//   auto call = make_bvgt_call_from_index(left, right, bitwidth - 1);
+//
+// With the bug, bvgt[bitwidth](x,y) = (x[0]=1 && y[0]=0), checking only the
+// LSB. So 2 > 1 (10 > 01) incorrectly returns F because bit[0](2)=0.
+//
+TEST_SUITE("bug7: bvgt_rules wrong base case index") {
+
+	// 2 > 1 for 2-bit: MSB of 2 is 1, MSB of 1 is 0 => True.
+	// BUG: only LSB is checked: LSB(2)=0, (0=1) => F (wrong).
+	TEST_CASE("bug7: 2 > 1 should be T for 2-bit") {
+		CHECK(blast_normalize("ex x (x = { 2 }:bv[2] && x > { 1 }:bv[2])") == "T");
+	}
+
+	// 4 > 3 for 4-bit: MSB of 4 is 1, MSB of 3 is 0 => True.
+	// BUG: LSB(4)=0, (0=1) => F (wrong).
+	TEST_CASE("bug7: 4 > 3 should be T for 4-bit (MSBs differ)") {
+		CHECK(blast_normalize("ex x (x = { 4 }:bv[4] && x > { 3 }:bv[4])") == "T");
+	}
+
+	// 3 > 2 for 4-bit: same MSB (both 0), check lower bits.
+	TEST_CASE("bug7: 3 > 2 should be T for 4-bit") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[4] && x > { 2 }:bv[4])") == "T");
+	}
+
+	// 1 > 2 should be F.
+	TEST_CASE("bug7: 1 > 2 should be F") {
+		CHECK(blast_normalize("ex x (x = { 1 }:bv[4] && x > { 2 }:bv[4])") == "F");
+	}
+}
+
 TEST_SUITE("more complex formulas") {
 
 	TEST_CASE("complex formula 1") {
