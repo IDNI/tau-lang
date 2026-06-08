@@ -224,8 +224,8 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 
 	rewriter::rules rules;
 
-	// base case: bvgt[0](x, y) = T;
-	auto base_header = make_bvgt_call_from_index<node>(left, right, bitwidth);
+	// base case: bvgt[0](x, y) = (bit[0](x) = 1) && (bit[0](y) = 0);
+	auto base_header = make_bvgt_call_from_index<node>(left, right, 0);
 	auto base_body = tau::build_wff_and(
 			make_is_bit_one_call_from_index<node>(left, 0),
 			make_is_bit_zero_call_from_index<node>(right, 0));
@@ -279,7 +279,7 @@ static rewriter::rule bvgt_rule(size_t bitwidth) {
 	auto left = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto right = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 
-	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth);
+	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth - 1);
 	auto rules = bvgt_rules<node>(bitwidth);
 	auto bits = bit_rules<node>(bitwidth);
 	auto bit_zeros = is_bit_zero_rules<node>(bitwidth);

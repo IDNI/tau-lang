@@ -88,8 +88,10 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto bf_result = tau::get(tau::bf, result);
 				vars.push_back(result);
 				changes[t] = result;
-				auto left = changes[tau::get(t).child(0)];
-				auto right = changes[tau::get(t).child(1)];
+				auto ch0 = tau::get(t).child(0);
+				auto ch1 = tau::get(t).child(1);
+				auto left = (changes.find(ch0) != changes.end()) ? changes[ch0] : ch0;
+				auto right = (changes.find(ch1) != changes.end()) ? changes[ch1] : ch1;
 				auto current = (nt == tau::bf_add)
 					? bvadd<node>(left, right, bf_result)
 					: bvsub<node>(left, right, bf_result);
@@ -99,8 +101,9 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				break;
 			}
 			case tau::bf_shl: case tau::bf_shr: {
-				auto [shiftand, count] = get_arguments<node>(t);
+				auto [shiftand_raw, count] = get_arguments<node>(t);
 				if (!count) { error = true; break; }
+				auto shiftand = (changes.find(shiftand_raw) != changes.end()) ? changes[shiftand_raw] : shiftand_raw;
 				auto shifted = tau::build_variable(type_id);
 				auto bf_shifted = tau::get(tau::bf, shifted);
 				vars.push_back(shifted);
@@ -114,8 +117,9 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				break;
 			}
 			case tau::bf_mul: {
-				auto [factor, constant] = get_bvmul_arguments<node>(t);
+				auto [factor_raw, constant] = get_bvmul_arguments<node>(t);
 				if (!constant) { error = true; break; }
+				auto factor = (changes.find(factor_raw) != changes.end()) ? changes[factor_raw] : factor_raw;
 				auto product = tau::build_variable(type_id);
 				auto bf_product = tau::get(tau::bf, product);
 				vars.push_back(product);
@@ -126,8 +130,9 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				break;
 			}
 			case tau::bf_div: case tau::bf_mod: {
-				auto [dividend, divisor] = get_arguments<node>(t);
+				auto [dividend_raw, divisor] = get_arguments<node>(t);
 				if (!divisor) { error = true; break; }
+				auto dividend = (changes.find(dividend_raw) != changes.end()) ? changes[dividend_raw] : dividend_raw;
 				auto result = tau::build_variable(type_id);
 				auto bf_result = tau::get(tau::bf, result);
 				vars.push_back(result);
@@ -169,7 +174,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				break;
 			}
 		}
-		return error;
+		return !error;
 	};
 
 	// If we have an unsupported operation, we return nullptr to indicate failure
@@ -195,8 +200,11 @@ static tref eq_predicate(tref atomic) {
 	trefs vars;
 	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
 	if (!blasted) return nullptr;
+	if (!predicate && vars.empty()) return blasted;
 
-	predicate = tau::build_wff_ex_many(vars, tau::build_wff_and(predicate, tau::get(tau::wff, blasted)));
+	auto wff_blasted = tau::get(tau::wff, blasted);
+	auto combined = predicate ? tau::build_wff_and(predicate, wff_blasted) : wff_blasted;
+	predicate = tau::build_wff_ex_many(vars, combined);
 
 	return predicate;
 }
@@ -222,9 +230,10 @@ static tref neq_predicate(tref atomic) {
 
 	auto left = tau::get(blasted).child(0);
 	auto right = tau::get(blasted).child(1);
-	auto call = make_bvneq_call_from_index<node>(left, right, bitwidth);
+	auto call = make_bvneq_call_from_index<node>(left, right, bitwidth - 1);
 	auto applied = nso_rr_apply<node>(rule, call);
-	predicate = tau::build_wff_ex_many(vars, tau::build_wff_and(predicate, applied));
+	auto combined_neq = predicate ? tau::build_wff_and(predicate, applied) : applied;
+	predicate = tau::build_wff_ex_many(vars, combined_neq);
 
 	return predicate;
 }
@@ -250,9 +259,10 @@ static tref lt_predicate(tref atomic) {
 
 	auto left = tau::get(blasted).child(0);
 	auto right = tau::get(blasted).child(1);
-	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth);
+	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth - 1);
 	auto applied = nso_rr_apply<node>(rule, call);
-	predicate = tau::build_wff_ex_many(vars, tau::build_wff_and(predicate, applied));
+	auto combined_lt = predicate ? tau::build_wff_and(predicate, applied) : applied;
+	predicate = tau::build_wff_ex_many(vars, combined_lt);
 
 	return predicate;
 }
@@ -278,9 +288,10 @@ static tref gt_predicate(tref atomic) {
 
 	auto left = tau::get(blasted).child(0);
 	auto right = tau::get(blasted).child(1);
-	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth);
+	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth - 1);
 	auto applied = nso_rr_apply<node>(rule, call);
-	predicate = tau::build_wff_ex_many(vars, tau::build_wff_and(predicate, applied));
+	auto combined_gt = predicate ? tau::build_wff_and(predicate, applied) : applied;
+	predicate = tau::build_wff_ex_many(vars, combined_gt);
 
 	return predicate;
 }
@@ -400,16 +411,16 @@ static tref wff_predicate_blasting(tref term) {
 		};
 
 		switch (nt) {
-			case tau::bf_eq: { blast(term, eq_predicate<node>); break; }
-			case tau::bf_neq: { blast(term, neq_predicate<node>); break; }
-			case tau::bf_lt: { blast(term, lt_predicate<node>); break; }
-			case tau::bf_gt: { blast(term, gt_predicate<node>); break; }
-			case tau::bf_lteq: { blast(term, lteq_predicate<node>); break; }
-			case tau::bf_gteq: { blast(term, gteq_predicate<node>); break; }
-			case tau::bf_nlt: { blast(term, nlt_predicate<node>); break; }
-			case tau::bf_ngt: { blast(term, ngt_predicate<node>); break; }
-			case tau::bf_nlteq: { blast(term, nlteq_predicate<node>); break; }
-			case tau::bf_ngteq: { blast(term, ngteq_predicate<node>); break; }
+			case tau::bf_eq: { blast(t, eq_predicate<node>); break; }
+			case tau::bf_neq: { blast(t, neq_predicate<node>); break; }
+			case tau::bf_lt: { blast(t, lt_predicate<node>); break; }
+			case tau::bf_gt: { blast(t, gt_predicate<node>); break; }
+			case tau::bf_lteq: { blast(t, lteq_predicate<node>); break; }
+			case tau::bf_gteq: { blast(t, gteq_predicate<node>); break; }
+			case tau::bf_nlt: { blast(t, nlt_predicate<node>); break; }
+			case tau::bf_ngt: { blast(t, ngt_predicate<node>); break; }
+			case tau::bf_nlteq: { blast(t, nlteq_predicate<node>); break; }
+			case tau::bf_ngteq: { blast(t, ngteq_predicate<node>); break; }
 			case tau::bf_interval: {
 				// TODO (MEDIUM) convert into two predicates and a conjunction,
 				// but for now we just return an error.
@@ -432,7 +443,7 @@ static tref wff_predicate_blasting(tref term) {
 				break;
 			}
 		}
-		return error;
+		return !error;
 	};
 
 	post_order<node>(term).search_unique(f);
