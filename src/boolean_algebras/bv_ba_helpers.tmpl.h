@@ -42,7 +42,7 @@ template<NodeType node>
 tref build_bv_zero(size_t bitwidth) {
 	using tau = tree<node>;
 
-	auto zero = make_bitvector_value(0, bitwidth);
+	auto zero = make_bitvector_value(bitwidth, 0);
 	auto type = bv_type_id<node>(bitwidth);
 	return tau::get_ba_constant(zero, type);
 }

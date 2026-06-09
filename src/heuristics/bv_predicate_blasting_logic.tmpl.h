@@ -61,7 +61,7 @@ static rewriter::rule bit_rule(int_t bit, size_t bitwidth) {
 	auto cte =
 		tau::get(tau::bf,
 			tau::get_ba_constant(
-				make_bitvector_value(1 << bit, bitwidth), bv_type_id<node>(bitwidth)));
+				make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth)));
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bit_call_from_index<node>(base, bit);
 	auto body = tau::build_bf_and( base, cte);
@@ -304,7 +304,7 @@ static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
 
 	auto cte = tau::get(tau::bf,
 		tau::get_ba_constant(
-			make_bitvector_value(1 << bit, bitwidth), bv_type_id<node>(bitwidth)));
+			make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth)));
 	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bit_call_from_index<node>(var, bit);
 	auto body =	tau::build_bf_eq_0(tau::build_bf_and(var, cte));
@@ -409,7 +409,7 @@ static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
 	auto cte =
 		tau::get(tau::bf,
 			tau::get_ba_constant(
-				make_bitvector_value(1 << bit, bitwidth), bv_type_id<node>(bitwidth)));
+				make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth)));
 	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bit_call_from_index<node>(var, bit);
 	auto body =	tau::build_bf_eq(tau::build_bf_and(var, cte), cte);
