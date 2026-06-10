@@ -485,7 +485,7 @@ std::pair<std::optional<assignment<node>>, bool>
 					// Check if we are dealing with a stream variable
 					if (tt(var) | tau::variable | tau::io_var) {
 						DBG(LOG_TRACE << LOG_FM_TREE(value));
-						assert(tau::get(value).is(tau::bf));
+						assert(tau::get(value).is_term());
 						if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
 							// std::cout << "time_point: " << time_point << "\n";
 							// std::cout << "var: " << var << "\n";

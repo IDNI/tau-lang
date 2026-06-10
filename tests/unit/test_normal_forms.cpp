@@ -160,7 +160,7 @@ TEST_SUITE("path_expressions") {
 		for (tref path : expression_paths<node_t>(fm)) {
 			trefs paths = get_cnf_wff_clauses<node_t>(path);
 			CHECK(paths.size() == 5);
-			for (tref p : paths) CHECK(tau::get(p).is(tau::wff));
+			for (tref p : paths) CHECK(tau::get(p).is_wff());
 		}
 	}
 	TEST_CASE("2") {
@@ -169,7 +169,7 @@ TEST_SUITE("path_expressions") {
 		for (tref path : expression_paths<node_t>(fm)) {
 			trefs paths = get_cnf_bf_clauses<node_t>(path);
 			CHECK(paths.size() == 3);
-			for (tref p : paths) CHECK(tau::get(p).is(tau::bf));
+			for (tref p : paths) CHECK(tau::get(p).is_term());
 		}
 	}
 	TEST_CASE("3") {
@@ -178,7 +178,7 @@ TEST_SUITE("path_expressions") {
 		for (tref path : expression_paths<node_t>(fm)) {
 			trefs paths = get_cnf_wff_clauses<node_t>(path);
 			CHECK(paths.size() == 2);
-			for (tref p : paths) CHECK(tau::get(p).is(tau::wff));
+			for (tref p : paths) CHECK(tau::get(p).is_wff());
 		}
 	}
 	TEST_CASE("3") {

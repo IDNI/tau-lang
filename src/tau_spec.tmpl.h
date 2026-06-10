@@ -115,12 +115,14 @@ bool tau_spec<node>::add(tref expr) {
 			|| tau::rec_relation || tt::refs; defs.size())
 				for (tref def : defs) add_def(def);
 		break;
-	case tau::bf:
-	case tau::wff:          set_main(expr); break;
 	case tau::input_def:
 	case tau::output_def:
 	case tau::rec_relation: add_def(expr); break;
 	default:
+		if (tau::is_wff_nt(nt) || tau::is_term_nt(nt)) {
+			set_main(expr);
+			break;
+		}
 		DBG(TAU_LOG_TRACE << "unknown node added: " << TAU_LOG_FM_DUMP(expr);)
 		DBG(assert(false);)
 		return false;
