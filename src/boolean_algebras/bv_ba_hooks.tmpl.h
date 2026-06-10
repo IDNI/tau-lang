@@ -143,6 +143,29 @@ tref term_sub(tref symbol) {
 			}
 			break;
 		}
+		// {const}' - X  (bitwise complement of constant minus something)
+		case tau::bf_neg: {
+			// c1 is bf_neg, so left operand is bf(bf_neg(bf(const)))
+			// c1[0] is bf(const), c1[0][0] is the inner constant
+			const tau& inner = c1[0][0];
+			if (inner.is_ba_constant() && inner.get_ba_type() > 0
+					&& is_bv_type_family<node>(inner.get_ba_type())) {
+				bv neg_c1 = make_bitvector_not(std::get<bv>(inner.get_ba_constant()));
+				neg_c1 = normalize_bv(neg_c1);
+				size_t type_id = inner.get_ba_type();
+				if (c2.is_ba_constant() && c2.get_ba_type() == type_id)
+					return sub_consts(neg_c1, std::get<bv>(c2.get_ba_constant()), type_id);
+				if (c2.is(tau::bf_t)) {
+					const size_t width = get_bv_width<node>(get_ba_type_tree<node>(type_id));
+					return sub_consts(neg_c1, make_bitvector_top_elem(width), type_id);
+				}
+				if (c2.is(tau::bf_f)) {
+					typename node::constant v = {neg_c1};
+					return tree<node>::build_bf_ba_constant(v, type_id);
+				}
+			}
+			break;
+		}
 		default: break;
 	}
 	// X - X

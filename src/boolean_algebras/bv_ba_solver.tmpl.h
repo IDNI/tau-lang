@@ -48,10 +48,16 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		}
 		case tau::wff_all: {
 			tref v = (form | tt::first | tt::ref);
-			DBG(assert(is<node>(v, tau::variable));)
+claude
+			// If the bound "variable" is not actually a variable (e.g., a constant
+			// due to variable capture in substitution), just evaluate the body.
+			if (!is<node>(v, tau::variable))
+				return bv_eval_node<node>(form | tt::second, vars, free_vars);
 			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
 			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
-			vars.emplace(v, x);
+			// Use operator[] to overwrite any outer binding of the same tref
+			// (nested quantifiers sharing the same variable tref due to caching).
+			vars[v] = x;
 
 			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			if (!f) return std::nullopt;
@@ -61,10 +67,14 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		}
 		case tau::wff_ex: {
 			tref v = (form | tt::first | tt::ref);
-			DBG(assert(is<node>(v, tau::variable));)
+			// If the bound "variable" is not actually a variable, just evaluate the body.
+			if (!is<node>(v, tau::variable))
+				return bv_eval_node<node>(form | tt::second, vars, free_vars);
 			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
 			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
-			vars.emplace(v, x);
+			// Use operator[] to overwrite any outer binding of the same tref
+			// (nested quantifiers sharing the same variable tref due to caching).
+			vars[v] = x;
 
 			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			if (!f) return std::nullopt;
