@@ -324,8 +324,8 @@ bool are_bf_equal(tref n1, tref n2) {
 	LOG_TRACE << "n2 " << LOG_FM(n2);
 	const auto& t1 = tau::get(n1);
 	const auto& t2 = tau::get(n2);
-	DBG(assert(t1.is(tau::bf)));
-	DBG(assert(t2.is(tau::bf)));
+	DBG(assert(t1.is_term()));
+	DBG(assert(t2.is_term()));
 
 	if (t1 == t2) {
 		LOG_DEBUG << "End are_bf_equal: true (equal bf)";
@@ -747,12 +747,12 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 		LOG_DEBUG << "current: " << LOG_FM(current);
 
 		LOG_DEBUG << "Normalize step";
-		current = nt == tau::wff ? normalize<node>(current)
+		current = tau::is_wff_nt(nt) ? normalize<node>(current)
 					 : bf_reduced_dnf<node>(current);
 		LOG_DEBUG << "Normalized step";
 		LOG_DEBUG << "current: " << LOG_FM(current);
 
-		if (previous.size() && (nt == tau::wff
+		if (previous.size() && (tau::is_wff_nt(nt)
 			? are_nso_equivalent<node>(current, previous.back())
 			: are_bf_equal<node>(current, previous.back())))
 		{
@@ -761,7 +761,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			LOG_DEBUG << "previous.back(): " << LOG_FM(previous.back());
 			return previous.back();
 		}
-		else if (previous.size() > 1 && (nt == tau::wff
+		else if (previous.size() > 1 && (tau::is_wff_nt(nt)
 			? is_nso_equivalent_to_any_of<node>(current, previous)
 			: is_bf_same_to_any_of<node>(current, previous)))
 		{
@@ -832,7 +832,7 @@ struct fixed_point_transformer {
 
 	tref get_fallback(type nt, tref ref) {
 		auto fallback = tt(ref) | tau::ref | tau::fp_fallback;
-		if (!fallback) return nt == tau::wff
+		if (!fallback) return tau::is_wff_nt(nt)
 		// TODO: Review getting type from ref
 			? tau::_F() : tau::_0(find_ba_type<node>(ref));
 		return fallback | tt::only_child | tt::ref;

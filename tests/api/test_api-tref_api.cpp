@@ -127,7 +127,7 @@ TEST_SUITE("Tau API - tref - parsing") {
 			DBG(TAU_LOG_TRACE << "get_spec_or_term - term: " << term;)
 			tref t = tau_api::get_spec_or_term(term);
 			CHECK(t);
-			CHECK(tau::get(t).is(tau::bf));
+			CHECK(tau::get(t).is_term());
 		}
 	}
 
@@ -138,13 +138,13 @@ TEST_SUITE("Tau API - tref - parsing") {
 			CHECK(f);
 			DBG(using node = node_t;)
 			DBG(TAU_LOG_TRACE << "get_formula_or_term - formula: " << TAU_LOG_FM_DUMP(f);)
-			CHECK(tau::get(f).is(tau::wff));
+			CHECK(tau::get(f).is_wff());
 		}
 		for (const auto& term : terms) {
 			DBG(TAU_LOG_TRACE << "get_formula_or_term - term: " << term;)
 			tref t = tau_api::get_formula_or_term(term);
 			CHECK(t);
-			CHECK(tau::get(t).is(tau::bf));
+			CHECK(tau::get(t).is_term());
 		}
 	}
 }

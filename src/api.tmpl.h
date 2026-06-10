@@ -102,7 +102,9 @@ tref api<node>::get_function_def(const std::string& function_def, bool simplifie
 	tref def = get_definition(function_def, simplified);
 	if (!def) return nullptr;
 	auto nt = tau::get(def)[1].get_type();
-	if (nt == tau::bf || nt == tau::ref) return def; // TODO ref can be wff
+	// note: bare captures stay excluded to preserve pre-kind-split behavior
+	if ((tau::is_term_nt(nt) && !tau::is_capture_nt(nt))
+		|| nt == tau::ref) return def; // TODO ref can be wff
 	return nullptr;
 }
 
@@ -112,7 +114,8 @@ tref api<node>::get_predicate_def(const std::string& predicate_def, bool simplif
 	if (!def) return nullptr;
 	auto nt = tau::get(def)[1].get_type();
 	// TODO we could pre resolve all refs to wff
-	if (nt == tau::wff || nt == tau::ref) return def;
+	if ((tau::is_wff_nt(nt) && !tau::is_capture_nt(nt))
+		|| nt == tau::ref) return def;
 	return nullptr;
 }
 
@@ -192,7 +195,7 @@ bool api<node>::is_term(tref term) {
 
 template <NodeType node>
 bool api<node>::is_formula(tref fm) {
-	return tau::get(fm).is(tau::wff);
+	return tau::get(fm).is_wff();
 }
 
 // Using definitions
@@ -281,11 +284,10 @@ tref api<node>::dnf(tref expr) {
 	if (!expr) return nullptr;
 	tref a = apply_all_defs(expr);
 	if (a) {
-		switch (tau::get(a).get_type()) {
-		case tau::bf:  return reduce<node>(to_dnf<node, false>(a));
-		case tau::wff: return reduce<node>(to_dnf<node>(a));
-		default: return nullptr;
-		}
+		auto nt = tau::get(a).get_type();
+		if (tau::is_term_nt(nt)) return reduce<node>(to_dnf<node, false>(a));
+		if (tau::is_wff_nt(nt))  return reduce<node>(to_dnf<node>(a));
+		return nullptr;
 	}
 	return nullptr;
 }
@@ -296,11 +298,10 @@ tref api<node>::cnf(tref expr) {
 	if (!expr) return nullptr;
 	tref a = apply_all_defs(expr);
 	if (a) {
-		switch (tau::get(a).get_type()) {
-		case tau::wff: return reduce<node, true>(to_cnf<node>(a));
-		case tau::bf:  return reduce<node, true>(to_cnf<node, false>(a));
-		default: return nullptr;
-		}
+		auto nt = tau::get(a).get_type();
+		if (tau::is_wff_nt(nt))  return reduce<node, true>(to_cnf<node>(a));
+		if (tau::is_term_nt(nt)) return reduce<node, true>(to_cnf<node, false>(a));
+		return nullptr;
 	}
 	return nullptr;
 }
@@ -311,11 +312,10 @@ tref api<node>::nnf(tref expr) {
 	if (!expr) return nullptr;
 	tref a = apply_all_defs(expr);
 	if (a) {
-		switch (tau::get(a).get_type()) {
-		case tau::wff: return to_nnf<node>(a);
-		case tau::bf:  return push_negation_in<node, false>(a);
-		default: return nullptr;
-		}
+		auto nt = tau::get(a).get_type();
+		if (tau::is_wff_nt(nt))  return to_nnf<node>(a);
+		if (tau::is_term_nt(nt)) return push_negation_in<node, false>(a);
+		return nullptr;
 	}
 	return nullptr;
 }
@@ -357,7 +357,7 @@ tref api<node>::normalize_formula(tref fm) {
 	if (!fm) return nullptr;
 	auto maybe_nso_rr = get_nso_rr(fm);
 	if (!maybe_nso_rr || !maybe_nso_rr.value().main
-		|| tau::get(maybe_nso_rr.value().main).is(tau::bf))
+		|| tau::get(maybe_nso_rr.value().main).is_term())
 			return nullptr;
 	return normalizer<node>(maybe_nso_rr.value());
 }
@@ -373,7 +373,7 @@ tref api<node>::normalize_term(tref term) {
 	if (!maybe_nso_rr) return nullptr;
 	auto& nso_rr = maybe_nso_rr.value();
 	tref main = nso_rr.main->get();
-	if (!main || !tau::get(main).is(tau::bf)) return nullptr;
+	if (!main || !tau::get(main).is_term()) return nullptr;
 	if (contains(main, tau::ref))
 		return bf_normalizer_with_rec_relation<node>(nso_rr);
 	return bf_normalizer_without_rec_relation<node>(main);

@@ -295,12 +295,12 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& n) {
 				bf_reduce_canonical<node>()(applied))));
 	};
 	if (auto value = get_any(arg); value)
-		if (tref applied = tau_api::apply_all_defs(m.part(), value); applied)
-			switch (tau::get(applied).get_type()) {
-			case tau::wff: r = wff_mnf(applied); break;
-			case tau::bf:  r = bf_reduced_dnf<node>(applied); break;
-			default: return invalid_argument();
-			}
+		if (tref applied = tau_api::apply_all_defs(m.part(), value); applied) {
+			auto nt = tau::get(applied).get_type();
+			if      (tau::is_wff_nt(nt))  r = wff_mnf(applied);
+			else if (tau::is_term_nt(nt)) r = bf_reduced_dnf<node>(applied);
+			else return invalid_argument();
+		}
 	return benchmarks(m, t), r;
 }
 
@@ -375,11 +375,9 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	auto [type, value] = check.value();
 	measuring m;
 	tref r;
-	switch (type) {
-		case tau::wff: r = tau_api::normalize_formula(m, value); break;
-		case tau::bf:  r = tau_api::normalize_term(m, value); break;
-		default: return nullptr;
-	}
+	if      (tau::is_wff_nt(type))  r = tau_api::normalize_formula(m, value);
+	else if (tau::is_term_nt(type)) r = tau_api::normalize_term(m, value);
+	else return nullptr;
 	return benchmarks(m), r;
 }
 
