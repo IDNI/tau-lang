@@ -685,6 +685,42 @@ bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 	}
 }
 
+template <NodeType node>
+bool tree<node>::is_wff_nt(size_t nt) {
+	switch (nt) {
+		case wff: // transitional: wrapper still present until flip completes
+		case wff_sometimes:
+		case wff_always:
+		case wff_conditional:
+		case wff_all:
+		case wff_ex:
+		case wff_ref:
+		case constraint:
+		case wff_imply:
+		case wff_rimply:
+		case wff_equiv:
+		case wff_or:
+		case wff_xor:
+		case wff_and:
+		case wff_neg:
+		case wff_t:
+		case wff_f:
+		case bf_interval:
+		case bf_eq:
+		case bf_neq:
+		case bf_lt:
+		case bf_nlt:
+		case bf_lteq:
+		case bf_nlteq:
+		case bf_gt:
+		case bf_ngt:
+		case bf_gteq:
+		case bf_ngteq:
+			return true;
+		default: return false;
+	}
+}
+
 //------------------------------------------------------------------------------
 // fast access helpers
 
@@ -713,6 +749,9 @@ bool tree<node>::is_ba_constant() const { return is(ba_constant); }
 
 template <NodeType node>
 bool tree<node>::is_term() const { return is_term_nt(this->value.nt) || is(io_var); }
+
+template <NodeType node>
+bool tree<node>::is_wff() const { return is_wff_nt(this->value.nt); }
 
 template <NodeType node>
 bool tree<node>::is_input_variable() const {

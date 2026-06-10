@@ -43,3 +43,43 @@ TEST_SUITE("operator||") {
 		CHECK( (rule | tau::bf_and || tau::bf).size() == 2 );
 	}
 }
+
+TEST_SUITE("wff/bf kind predicates") {
+
+	TEST_CASE("is_wff_nt classifies wff-kind nonterminals") {
+		CHECK( tau::is_wff_nt(tau::wff_and) );
+		CHECK( tau::is_wff_nt(tau::wff_neg) );
+		CHECK( tau::is_wff_nt(tau::wff_t) );
+		CHECK( tau::is_wff_nt(tau::wff_f) );
+		CHECK( tau::is_wff_nt(tau::wff_all) );
+		CHECK( tau::is_wff_nt(tau::wff_sometimes) );
+		CHECK( tau::is_wff_nt(tau::wff_ref) );
+		CHECK( tau::is_wff_nt(tau::constraint) );
+		// comparisons are wff-kind even though named bf_*
+		CHECK( tau::is_wff_nt(tau::bf_eq) );
+		CHECK( tau::is_wff_nt(tau::bf_neq) );
+		CHECK( tau::is_wff_nt(tau::bf_interval) );
+		CHECK( tau::is_wff_nt(tau::bf_lteq) );
+		// terms are not wff-kind
+		CHECK( !tau::is_wff_nt(tau::bf_and) );
+		CHECK( !tau::is_wff_nt(tau::variable) );
+		CHECK( !tau::is_wff_nt(tau::ba_constant) );
+		CHECK( !tau::is_wff_nt(tau::bf_t) );
+		CHECK( !tau::is_wff_nt(tau::capture) );
+		// transitional: the bare wrapper still counts as wff-kind
+		// (removed again in the cleanup phase)
+		CHECK( tau::is_wff_nt(tau::wff) );
+		CHECK( !tau::is_wff_nt(tau::bf) );
+	}
+
+	TEST_CASE("is_wff member on parsed formula") {
+		// trees still carry wrappers in this phase; both wrapper and
+		// operator nodes must satisfy the predicates
+		tref fm = tau::get("x = 0 && y != 0 .");
+		REQUIRE( fm != nullptr );
+		tref w = tau::get(fm).find_top(is<node_t, tau::wff_and>);
+		REQUIRE( w != nullptr );
+		CHECK( tau::get(w).is_wff() );
+		CHECK( !tau::get(w).is_term() );
+	}
+}
