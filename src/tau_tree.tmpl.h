@@ -631,8 +631,8 @@ tref tree<node>::reget(tref n) {
 template <NodeType node>
 bool tree<node>::is_string_nt(size_t nt) {
 	static const std::set<size_t> string_nts{
-		sym, type, source, capture, var_name, uconst_name, file_name,
-		ctnvar, option_name, option_value,
+		sym, type, source, capture, wff_capture, bf_capture, var_name,
+		uconst_name, file_name, ctnvar, option_name, option_value,
 	};
 	return string_nts.contains(nt);
 }
@@ -672,6 +672,7 @@ bool tree<node>::is_term_nt(size_t nt) {
 		case bf_f:
 		case variable:
 		case capture: // capture only appears under terms now, otherwise error
+		case bf_capture:
 			return true;
 		default: return false;
 	}
@@ -716,9 +717,15 @@ bool tree<node>::is_wff_nt(size_t nt) {
 		case bf_ngt:
 		case bf_gteq:
 		case bf_ngteq:
+		case wff_capture:
 			return true;
 		default: return false;
 	}
+}
+
+template <NodeType node>
+bool tree<node>::is_capture_nt(size_t nt) {
+	return nt == capture || nt == wff_capture || nt == bf_capture;
 }
 
 //------------------------------------------------------------------------------
@@ -752,6 +759,9 @@ bool tree<node>::is_term() const { return is_term_nt(this->value.nt) || is(io_va
 
 template <NodeType node>
 bool tree<node>::is_wff() const { return is_wff_nt(this->value.nt); }
+
+template <NodeType node>
+bool tree<node>::is_capture() const { return is_capture_nt(this->value.nt); }
 
 template <NodeType node>
 bool tree<node>::is_input_variable() const {

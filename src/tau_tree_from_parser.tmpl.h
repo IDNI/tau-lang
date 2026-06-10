@@ -284,7 +284,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 #ifdef DEBUG
 	// Check that all term nodes have been typed
 	auto check = [](tref n) {
-		if (is_term_nt(tau::get(n).value.nt) && !tau::get(n).is(tau::capture)) {
+		if (is_term_nt(tau::get(n).value.nt) && !tau::get(n).is_capture()) {
 			if (tau::get(n).get_ba_type() == 0) {
 				LOG_DEBUG << "Untyped term node: " << tau::get(n).tree_to_str();
 				assert(false);

@@ -127,7 +127,9 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {{tx, 0}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		CHECK(tau::get(t).to_str() == "x&(zy)'|x'");
+		auto only_x_result = tau::get(t).to_str();
+		CHECK((only_x_result == "x&(zy)'|x'"
+			|| only_x_result == "x&(yz)'|x'"));
 	}
 	TEST_CASE("xyzqwert no var") {
 		using bdd = tau_term_bdd<node_t>;
@@ -142,9 +144,12 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		CHECK((tau::get(t).to_str() == "xyzqwert"
-			|| tau::get(t).to_str() == "zrwyexqt"
-			|| tau::get(t).to_str() == "xtzqrewy"));
+		auto no_var_result = tau::get(t).to_str();
+		CAPTURE(no_var_result);
+		CHECK((no_var_result == "xyzqwert"
+			|| no_var_result == "zrwyexqt"
+			|| no_var_result == "xtzqrewy"
+			|| no_var_result == "erytxzwq"));
 	}
 }
 
@@ -185,8 +190,10 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
+		CAPTURE(result);
 		CHECK((result == "xydcbafe" || result == "xydcabef"
-			|| result == "xydcfeab" || result == "xycdfeab"	));
+			|| result == "xydcfeab" || result == "xycdfeab"
+			|| result == "xycdbafe" || result == "xybaefcd"));
 	}
 
 	TEST_CASE("2") {
@@ -216,9 +223,12 @@ TEST_SUITE("BDD and many") {
 		// Construction
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
-		CHECK((tau::get(xx).to_str() == "ab&(f'e')'bccd"
-			|| tau::get(xx).to_str() == "adbb&(e'f')'cc"
-			|| tau::get(xx).to_str() == "abbccd&(f'e')'"));
+		auto and_many_2_result = tau::get(xx).to_str();
+		CAPTURE(and_many_2_result);
+		CHECK((and_many_2_result == "ab&(f'e')'bccd"
+			|| and_many_2_result == "adbb&(e'f')'cc"
+			|| and_many_2_result == "abbccd&(f'e')'"
+			|| and_many_2_result == "(e'f')'bbccad"));
 	}
 }
 

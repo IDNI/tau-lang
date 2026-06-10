@@ -97,7 +97,7 @@ bool is_output_var(tref n) {
 template <NodeType node>
 bool is_var_or_capture(tref n) {
 	return tree<node>::get(n).is(node::type::variable)
-		|| tree<node>::get(n).is(node::type::capture);
+		|| tree<node>::get(n).is_capture();
 }
 
 template <NodeType node>

@@ -86,7 +86,7 @@ int_t get_new_var_id(tref fm) {
 	trefs var_nodes = get_vars_from_nso<node>(fm);
 	std::set vars{ 1 };
 	for (tref var : var_nodes) {
-		std::string nam = tau::get(var).is(tau::capture)
+		std::string nam = tau::get(var).is_capture()
 			? tau::get(var).get_string()
 			: get_var_name<node>(var);
 		if (nam[0] == 'x') {
