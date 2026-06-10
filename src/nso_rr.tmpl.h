@@ -14,7 +14,7 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	static const auto is_capture = [](const tref& n) {
-		return tree<node>::get(n).is(node::type::capture);
+		return tree<node>::is_capture_nt(tree<node>::get(n).get_type());
 	};
 
 #ifdef TAU_CACHE
@@ -105,7 +105,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 			auto type = t[0][0].get_ba_type();
 			return tau::get_typed(tau::ref_arg,
 				tau::get_typed(tau::bf,
-					tau::get(node(tau::capture,	t[0][0][0].data()))
+					tau::get(node(tau::bf_capture, t[0][0][0].data()))
 				, type)
 			, type);
 		}
@@ -115,7 +115,7 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 			if (!collecting && !head_vars.contains(n)) return n;
 			auto type = t[0].get_ba_type();
 			return tau::get_typed(tau::bf,
-				tau::get(node(tau::capture,	t[0][0].data())), type);
+				tau::get(node(tau::bf_capture, t[0][0].data())), type);
 		}
 		return n;
 	};

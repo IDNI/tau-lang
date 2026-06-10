@@ -326,6 +326,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static bool is_term_nt(size_t nt, size_t parent_nt);
 	static bool is_term_nt(size_t nt);
 	static bool is_wff_nt(size_t nt);
+	static bool is_capture_nt(size_t nt);
 
 	// fast access helpers
 	size_t data() const;
@@ -338,6 +339,7 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	bool is_ba_constant() const;
 	bool is_term() const;
 	bool is_wff() const;
+	bool is_capture() const;
 	bool is_input_variable() const;
 	bool is_output_variable() const;
 

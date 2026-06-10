@@ -57,7 +57,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "!>"  _ bf)               :bf_ngt
                         | (bf    _ ">="  _ bf)               :bf_gteq
                         | (bf    _ "!>=" _ bf)               :bf_ngteq
-                        |                                     capture.
+                        |                                     capture:wff_capture.
 # relational operators for base types
 #
 # they are named bf_* as they involve boolean functions,
@@ -88,18 +88,18 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                           # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | ba_constant
                           | variable | bf_ref
-                          | bf_t | bf_f | bf_neg | capture)
+                          | bf_t | bf_f | bf_neg | capture:bf_capture)
                                 :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
                         | ((bf_parenthesis | variable
                            | bf_ref | bf_neg
-                           | bf_and_nosep | capture)
+                           | bf_and_nosep | capture:bf_capture)
                                 :bf_and_nosep_1st_oprnd
                            (bf_parenthesis | ba_constant
                            | variable | bf_ref
-                           | bf_neg | capture)
+                           | bf_neg | capture:bf_capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
-                        |                                     capture.
+                        |                                     capture:bf_capture.
 
 # constant time constraints
 constraint =>
@@ -275,8 +275,8 @@ fm_or_term     => wff | bf.
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
         sym, digits, type, subtype, integer,
-        source, capture, var_name, io_var_name, uconst_name, file_name,
-        ctnvar, option_name, option_value.
+        source, capture, wff_capture, bf_capture, var_name, io_var_name,
+        uconst_name, file_name, ctnvar, option_name, option_value.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c, uconst, spec_part,
