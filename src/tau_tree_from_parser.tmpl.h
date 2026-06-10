@@ -110,19 +110,18 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 
 		// q_vars transformation (ex x,y to ex x ex y)
 		auto process_quantifier_vars =
-			[&ptr, &m_get, &getx](type nt) -> tref
+			[&ptr, &m_get, &getx]() -> tref
 		{
 			const auto& q_vars = m_get(ptr.first());
 			const auto& expr = m_get(ptr.second());
 			trefs vars = q_vars.get_children();
 			if (vars.empty()) // TODO (LOW) is this even reachable?
 				return getx(trefs{ q_vars.get(), expr.get() });
-			tref x = expr.only_child();
+			tref x = expr.get();
 			for (size_t vi = 0; vi != vars.size(); ++vi) {
 				// create a new quantifier node with var and new
 				// children. Note the reversed order!
-				x = getx(trefs{ vars[vars.size() - 1 - vi],
-								get(nt, x) });
+				x = getx(trefs{ vars[vars.size() - 1 - vi], x });
 			}
 			return x;
 		};
@@ -176,9 +175,16 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				break;
 
 			case wff_all:
-			case wff_ex: x = process_quantifier_vars(wff); break;
+			case wff_ex:
 			case bf_fall:
-			case bf_fex: x = process_quantifier_vars(bf); break;
+			case bf_fex: x = process_quantifier_vars(); break;
+
+			case wff:
+			case bf:
+				// wff/bf wrapper nonterminals are not part of
+				// the tau tree: a wrapper maps to its child
+				x = m_ref(ptr.only_child());
+				break;
 
 			case bf_t:
 			case bf_f: {

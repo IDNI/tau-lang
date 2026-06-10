@@ -14,18 +14,18 @@ template <NodeType node>
 tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
-	HOOK_LOGGING(if (v.nt==tau::bf || v.nt==tau::wff || v.nt==tau::shift)
-		log("- HOOK    -", v, ch, len, r, true);)
+	HOOK_LOGGING(if (tau::is_term_nt(v.nt) || tau::is_wff_nt(v.nt)
+		|| v.nt==tau::shift) log("- HOOK    -", v, ch, len, r, true);)
 	tref ret = nullptr;
-	if      (v.nt == tau::bf)          ret = term( v, ch, len, r);
-	else if (v.nt == tau::wff)         ret = wff(  v, ch, len, r);
+	if      (tau::is_term_nt(v.nt))    ret = term( v, ch, len, r);
+	else if (tau::is_wff_nt(v.nt))     ret = wff(  v, ch, len, r);
 	else if (v.nt == tau::shift)       ret = shift(v, ch, len, r);
 	else return tau::get_raw(v, ch, len, r);
 
 	if (ret) {
 		HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] " << LOG_FM_DUMP(ret);)
 		DBG(typename node::type nt = tau::get(ret).get_type();)
-		DBG(assert(nt == tau::bf || nt == tau::wff
+		DBG(assert(tau::is_term_nt(nt) || tau::is_wff_nt(nt)
 			|| nt == tau::shift || nt == tau::integer);)
 	} else  { HOOK_LOGGING(LOG_TRACE << "[- RESULT  -] error";) }
 	return ret;
@@ -58,56 +58,44 @@ inline void applied(const std::string& rule) {
 }
 #endif // HOOK_LOGGING_ENABLED
 
+// after wff/bf wrapper removal, hook arguments are the operands themselves:
+// argN and argN_fm both refer to the N-th operand (kept as separate names
+// until the post-flip cleanup merges them)
 template <NodeType node>
 const tree<node>& get_hook<node>::arg1(const tref* ch) {
-	return tau::get(ch[0])[0][0];
+	return tau::get(ch[0]);
 }
 
 template <NodeType node>
 const tree<node>& get_hook<node>::arg2(const tref* ch) {
-	return tau::get(ch[0])[1][0];
+	return tau::get(ch[1]);
 }
 
 template <NodeType node>
 const tree<node>& get_hook<node>::arg3(const tref* ch) {
-	return tau::get(ch[0])[2][0];
+	return tau::get(ch[2]);
 }
 
 template <NodeType node>
 const tree<node>& get_hook<node>::arg1_fm(const tref* ch) {
-	return tau::get(ch[0])[0];
+	return tau::get(ch[0]);
 }
 
 template <NodeType node>
 const tree<node>& get_hook<node>::arg2_fm(const tref* ch) {
-	return tau::get(ch[0])[1];
+	return tau::get(ch[1]);
 }
 
 template <NodeType node>
 const tree<node>& get_hook<node>::arg3_fm(const tref* ch) {
-	return tau::get(ch[0])[2];
+	return tau::get(ch[2]);
 }
 
 template <NodeType node>
-const tree<node>& get_hook<node>::logic_operator(const tref* ch) {
-	return tau::get(ch[0]);
-}
-
-template <NodeType node>
-const tree<node>& get_hook<node>::quantifier(const tref* ch) {
-	return tau::get(ch[0]);
-}
-
-template <NodeType node>
-const tree<node>& get_hook<node>::quantified_formula(const tref* ch) {
-	return tau::get(ch[0])[0];
-}
-
-template <NodeType node>
-bool get_hook<node>::check_type_mismatch(const tref* ch) {
+bool get_hook<node>::check_type_mismatch(const tref* ch, size_t len) {
 	std::set<size_t> types;
-	for (tref c : tau::get(ch[0]).children()) {
-		const auto& t = tau::get(c)[0];
+	for (size_t i = 0; i < len; ++i) {
+		const auto& t = tau::get(ch[i]);
 		if (t.get_ba_type() > 0 || !(t.is(tau::bf_t) || t.is(tau::bf_f)))
 			types.insert(t.get_ba_type());
 		if (types.size() > 1) {
@@ -121,15 +109,13 @@ bool get_hook<node>::check_type_mismatch(const tref* ch) {
 template <NodeType node>
 tref get_hook<node>::_0_typed(size_t ba_type, tref r) {
 	HOOK_LOGGING(LOG_TRACE << "_0_typed " << LOG_BA_TYPE(ba_type);)
-	tref x = tau::get_raw(node::ba_typed(tau::bf_f, ba_type), 0, 0);
-	return tau::get_raw(node::ba_typed(tau::bf, ba_type), &x, 1, r);
+	return tau::get_raw(node::ba_typed(tau::bf_f, ba_type), nullptr, 0, r);
 }
 
 template <NodeType node>
 tref get_hook<node>::_1_typed(size_t ba_type, tref r) {
 	HOOK_LOGGING(LOG_TRACE << "_1_typed " << LOG_BA_TYPE(ba_type);)
-	tref x = tau::get_raw(node::ba_typed(tau::bf_t, ba_type), 0, 0);
-	return tau::get_raw(node::ba_typed(tau::bf, ba_type), &x, 1, r);
+	return tau::get_raw(node::ba_typed(tau::bf_t, ba_type), nullptr, 0, r);
 }
 
 template <NodeType node>
@@ -179,16 +165,7 @@ tref get_hook<node>::_T(const node& v, const tref* ch, size_t len, tref r) {
 template <NodeType node>
 tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("term", v, ch, len, r);)
-#ifdef DEBUG
-	if (len != 1) {
-		LOG_TRACE << "term: " << LOG_NT(v.nt) << " len: " << len;
-		for (size_t i = 0; i < len; ++i) {
-			LOG_TRACE << "ch[" << i << "]: " << LOG_FM(ch[i]);
-		}
-	}
-#endif
-	DBG(assert(len == 1);)
-	switch (tau::get(ch[0]).get_type()) {
+	switch (v.nt) {
 	case tau::bf_or:       return term_or(v, ch, len, r);
 	case tau::bf_and:      return term_and(v, ch, len, r);
 	case tau::bf_neg:      return term_neg(v, ch, len, r);
@@ -206,7 +183,7 @@ tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 template <NodeType node>
 tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
 	HOOK_LOGGING(log("term_or", v, ch, len, r);)
-	DBG(assert(len == 1));
+	DBG(assert(len == 2));
 
 	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
@@ -262,18 +239,14 @@ tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
 		return cte_or(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_3, "$X | $X' := 1.")
-	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
-			negated && negated.value_tree() == arg1_fm(ch))
-	{
+	if (arg2(ch).is(tau::bf_neg) && arg2(ch)[0] == arg1_fm(ch)) {
 		HOOK_LOGGING(applied("$X | $X' := 1.");)
-		return _1_typed(negated.value_tree().get_ba_type(), r);
+		return _1_typed(arg1_fm(ch).get_ba_type(), r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_5, "$X' | $X := 1.")
-	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
-			negated && negated.value_tree() == arg2_fm(ch))
-	{
+	if (arg1(ch).is(tau::bf_neg) && arg1(ch)[0] == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("$X' | $X := 1.");)
-		return _1_typed(negated.value_tree().get_ba_type(), r);
+		return _1_typed(arg2_fm(ch).get_ba_type(), r);
 	}
 	return tau::get_raw(v, ch, len, r);
 }
@@ -282,7 +255,7 @@ template <NodeType node>
 tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 {
 	HOOK_LOGGING(log("term_and", v, ch, len, r);)
-	DBG(assert(len == 1));
+	DBG(assert(len == 2));
 
 	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
@@ -341,18 +314,14 @@ tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 		return cte_and(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_2, "$X & $X' := 0.")
-	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
-			negated && negated.value_tree() == arg1_fm(ch))
-	{
+	if (arg2(ch).is(tau::bf_neg) && arg2(ch)[0] == arg1_fm(ch)) {
 		HOOK_LOGGING(applied("$X & $X' := 0.");)
-		return _0_typed(negated.value_tree().get_ba_type(), r);
+		return _0_typed(arg1_fm(ch).get_ba_type(), r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_4, "$X' & $X := 0.")
-	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
-			negated && negated.value_tree() == arg2_fm(ch))
-	{
+	if (arg1(ch).is(tau::bf_neg) && arg1(ch)[0] == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("$X' & $X := 0.");)
-		return _0_typed(negated.value_tree().get_ba_type(), r);
+		return _0_typed(arg2_fm(ch).get_ba_type(), r);
 	}
 	return tau::get_raw(v, ch, len, r);
 }
@@ -363,27 +332,19 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 	HOOK_LOGGING(log("term_neg", v, ch, len, r);)
 	DBG(assert(len == 1));
 	//RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
-	if (auto neg_one = logic_operator(ch)() | tau::bf | tau::bf_t;
-		neg_one && logic_operator(ch).is(tau::bf_neg))
-	{
+	if (arg1(ch).is(tau::bf_t)) {
 		HOOK_LOGGING(applied("1' := 0.");)
-		size_t type = neg_one.value_tree().get_ba_type();
-		return _0_typed(type, r);
+		return _0_typed(arg1(ch).get_ba_type(), r);
 	}
 	//RULE(BF_SIMPLIFY_ZERO_4, "0' := 1.")
-	if (auto neg_zero = logic_operator(ch)() | tau::bf | tau::bf_f;
-		neg_zero && logic_operator(ch).is(tau::bf_neg))
-	{
+	if (arg1(ch).is(tau::bf_f)) {
 		HOOK_LOGGING(applied("0' := 1.");)
-		size_t type = neg_zero.value_tree().get_ba_type();
-		return _1_typed(type, r);
+		return _1_typed(arg1(ch).get_ba_type(), r);
 	}
 	//RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
-	if (auto double_neg = logic_operator(ch)() | tau::bf | tau::bf_neg;
-		double_neg && logic_operator(ch).is(tau::bf_neg))
-	{
+	if (arg1(ch).is(tau::bf_neg)) {
 		HOOK_LOGGING(applied("$X'' :=  $X.");)
-		return tau::get(double_neg.value_tree().first(), r);
+		return tau::get(arg1(ch).first(), r);
 	}
 	return tau::get_raw(v, ch, len, r);
 }
@@ -392,7 +353,7 @@ template <NodeType node>
 tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 {
 	HOOK_LOGGING(log("term_xor", v, ch, len, r);)
-	DBG(assert(len == 1));
+	DBG(assert(len == 2));
 
 	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
@@ -444,16 +405,12 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 		return _0(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_2, "$X ^ $X' := 1.")
-	if (auto negated = arg2_fm(ch)() | tau::bf_neg | tau::bf;
-			negated && negated.value_tree() == arg1_fm(ch))
-	{
+	if (arg2(ch).is(tau::bf_neg) && arg2(ch)[0] == arg1_fm(ch)) {
 		HOOK_LOGGING(applied("$X ^ $X' := 1.");)
 		return _1(v, ch, len, r);
 	}
 	//RULE(BF_SIMPLIFY_SELF_2, "$X' ^ $X := 1.")
-	if (auto negated = arg1_fm(ch)() | tau::bf_neg | tau::bf;
-			negated && negated.value_tree() == arg2_fm(ch))
-	{
+	if (arg1(ch).is(tau::bf_neg) && arg1(ch)[0] == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("$X' ^ $X := 1.");)
 		return _1(v, ch, len, r);
 	}
@@ -494,24 +451,27 @@ tref get_hook<node>::term_cast(const node& v, const tref* ch, size_t len, tref r
 template <NodeType node>
 tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 	HOOK_LOGGING(log("cte", v, ch, len, right);)
-	if (len == 1 && tau::get(ch[0]).is_ba_constant()) {
-		const auto& l = tau::get(ch[0]);
-		if (size_t typed = l.get_ba_type(); (!l.has_child()) && typed > 0) {
-			HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
-			if (node::ba::is_syntactic_zero(l.get_ba_constant())) {
-				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
-				HOOK_LOGGING(applied("is_syntactic_zero");)
-				return tau::get(tau::get(tau::bf, tau::get_raw(
-						node::ba_typed(tau::bf_f, typed))), right);
-			} else if (node::ba::is_syntactic_one(l.get_ba_constant())) {
-				HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
-				HOOK_LOGGING(applied("is_syntactic_one");)
-				return tau::get(tau::get(tau::bf, tau::get_raw(
-						node::ba_typed(tau::bf_t, typed))), right);
-			}
+	// fires on ba_constant construction: replace syntactic 0/1 constants
+	// by typed bf_f/bf_t leaves
+	tref raw = tau::get_raw(v, ch, len, right);
+	const auto& l = tau::get(raw);
+	if (size_t typed = l.get_ba_type(); (!l.has_child()) && typed > 0) {
+		HOOK_LOGGING(LOG_TRACE << "cte typed: " << LOG_BA_TYPE(typed);)
+		if (node::ba::is_syntactic_zero(l.get_ba_constant())) {
+			HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
+			HOOK_LOGGING(applied("is_syntactic_zero");)
+			return tau::get_raw(
+				node::ba_typed(tau::bf_f, typed), nullptr, 0,
+				right);
+		} else if (node::ba::is_syntactic_one(l.get_ba_constant())) {
+			HOOK_LOGGING(LOG_TRACE << LOG_FM_DUMP(l.get());)
+			HOOK_LOGGING(applied("is_syntactic_one");)
+			return tau::get_raw(
+				node::ba_typed(tau::bf_t, typed), nullptr, 0,
+				right);
 		}
 	}
-	return tau::get_raw(v, ch, len, right);
+	return raw;
 }
 
 template <NodeType node>
@@ -566,7 +526,7 @@ tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
 template <NodeType node>
 tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff", v, ch, len, r);)
-	switch (logic_operator(ch).get_type()) {
+	switch (v.nt) {
 	case tau::wff_and:          return wff_and(v, ch, len, r);
 	case tau::wff_or:           return wff_or(v, ch, len, r);
 	case tau::wff_neg:          return wff_neg(v, ch, len, r);
@@ -623,16 +583,12 @@ tref get_hook<node>::wff_and(const node& v, const tref* ch, size_t len, tref r) 
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(WFF_SIMPLIFY_SELF_2, "$X && ! $X ::= F.")
-	if (auto negated = arg2_fm(ch)() | tau::wff_neg | tau::wff;
-		negated && negated.value_tree() == arg1_fm(ch))
-	{
+	if (arg2(ch).is(tau::wff_neg) && arg2(ch)[0] == arg1_fm(ch)) {
 		HOOK_LOGGING(applied("$X && ! $X ::= F.");)
 		return tau::get(tau::_F(), r);
 	}
 	//RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
-	if (auto negated = arg1_fm(ch)() | tau::wff_neg | tau::wff;
-		negated && negated.value_tree() == arg2_fm(ch))
-	{
+	if (arg1(ch).is(tau::wff_neg) && arg1(ch)[0] == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("!$X && $X ::= F.");)
 		return tau::get(tau::_F(), r);
 	}
@@ -670,16 +626,12 @@ tref get_hook<node>::wff_or(const node& v, const tref* ch, size_t len, tref r) {
 		return tau::get(arg1_fm(ch).get(), r);
 	}
 	//RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
-	if (auto negated = arg2_fm(ch)() | tau::wff_neg | tau::wff;
-			negated && negated.value_tree() == arg1_fm(ch))
-	{
+	if (arg2(ch).is(tau::wff_neg) && arg2(ch)[0] == arg1_fm(ch)) {
 		HOOK_LOGGING(applied("$X || ! $X ::= T.");)
 		return tau::get(tau::_T(), r);
 	}
 	//RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
-	if (auto negated = arg1_fm(ch)() | tau::wff_neg | tau::wff;
-			negated && negated.value_tree() == arg2_fm(ch))
-	{
+	if (arg1(ch).is(tau::wff_neg) && arg1(ch)[0] == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("!$X || $X ::= T.");)
 		return tau::get(tau::_T(), r);
 	}
@@ -692,7 +644,7 @@ template <NodeType node>
 tref get_hook<node>::ctn_neg(const tree<node>& n) {
 	auto num    = n.find_top(is<node, tau::num>);
 	auto ctnvar = n.find_top(is<node, tau::ctnvar>);
-	auto op = n[0][0].get_type();
+	auto op = n[0].get_type();
 	switch (op) {
 		//RULE(BF_PUSH_NEGATION_INWARDS_2, "($X != $Y)' := $X = $Y.")
 	case tau::ctn_neq:
@@ -738,10 +690,9 @@ tref get_hook<node>::wff_neg(const node& v, const tref* ch, size_t len, tref r) 
 		return tau::get(tau::_T(), r);
 	}
 	//RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
-	if (auto double_neg = arg1_fm(ch)() | tau::wff_neg | tau::wff;
-		double_neg) {
+	if (arg1(ch).is(tau::wff_neg)) {
 		HOOK_LOGGING(applied("! ! $X ::=  $X.");)
-		return tau::get(double_neg.value(), r);
+		return tau::get(arg1(ch).first(), r);
 	}
 	if (arg1(ch).is(tau::constraint)) {
 		HOOK_LOGGING(applied("! [a op b] ::=  [a op' b].");)
@@ -771,16 +722,12 @@ tref get_hook<node>::wff_xor([[maybe_unused]] const node& v, const tref* ch,
 		return tau::get(tau::_F(), r);
 	}
 	//RULE(BF_XOR_SIMPLIFY_3, "$X ^ ! $X ::= T.")
-	if (auto negated = arg2_fm(ch)() | tau::wff_neg | tau::wff;
-			negated && negated.value_tree() == arg1_fm(ch))
-	{
+	if (arg2(ch).is(tau::wff_neg) && arg2(ch)[0] == arg1_fm(ch)) {
 		HOOK_LOGGING(applied("$X ^ ! $X ::= T.");)
 		return tau::get(tau::_T(), r);
 	}
 	//RULE(BF_XOR_SIMPLIFY_4, "! $X ^ $X ::= T.")
-	if (auto negated = arg1_fm(ch)() | tau::wff_neg | tau::wff;
-			negated && negated.value_tree() == arg2_fm(ch))
-	{
+	if (arg1(ch).is(tau::wff_neg) && arg1(ch)[0] == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("! $X ^ $X ::= T.");)
 		return tau::get(tau::_T(), r);
 	}
@@ -804,7 +751,7 @@ tref get_hook<node>::wff_ctn(const node& v, const tref* ch, size_t len, tref r) 
 	const auto& t = tau::get(n);
 	tref num    = t.find_top(is<node, tau::num>);
 	tref ctnvar = t.find_top(is<node, tau::ctnvar>);
-	size_t op = t[0][0].get_type();
+	size_t op = t[0].get_type();
 	switch (op) {
 	case tau::ctn_eq: return tau::get(tau::build_wff_and(
 				tau::build_wff_ctn_lteq(ctnvar, num),
@@ -900,9 +847,11 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 template <NodeType node>
 tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq_cte", v, ch, len, r);)
-	auto l = tt(ch[0]) | tau::bf | tau::ba_constant;
-	if (l && (l | tt::ba_constant) == false) return tau::get(tau::_T(), r);
-	else if (l) return tau::get(tau::_F(), r);
+	if (arg1(ch).is(tau::ba_constant)) {
+		if (arg1(ch).get_ba_constant() == false)
+			return tau::get(tau::_T(), r);
+		return tau::get(tau::_F(), r);
+	}
 	return tau::get_raw(v, ch, len, r);
 }
 
@@ -990,10 +939,11 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 template <NodeType node>
 tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neq_cte", v, ch, len, r);)
-	auto l = tt(ch[0]) | tau::bf | tau::ba_constant;
-	if (l.has_value() && (l | tt::ba_constant) == false)
-		return tau::get(tau::_F(), r);
-	else if (l.has_value()) return tau::get(tau::_T(), r);
+	if (arg1(ch).is(tau::ba_constant)) {
+		if (arg1(ch).get_ba_constant() == false)
+			return tau::get(tau::_F(), r);
+		return tau::get(tau::_T(), r);
+	}
 	return tau::get_raw(v, ch, len, r);
 }
 
@@ -1152,14 +1102,12 @@ tref get_hook<node>::wff_equiv([[maybe_unused]] const node& v, const tref* ch,
 		return tau::get(tau::_T(), r);
 	}
 	//RULE(WFF_EQUIV_SIMPLIFY_5, "$X <-> ! $X ::= F.")
-	if (auto negated = tt(arg2_fm(ch)) | tau::wff_neg | tau::wff;
-		negated && tau::get(negated.value()) == arg1_fm(ch)) {
+	if (arg2(ch).is(tau::wff_neg) && arg2(ch)[0] == arg1_fm(ch)) {
 		HOOK_LOGGING(applied("$X <-> ! $X ::= F.");)
 		return tau::get(tau::_F(), r);
 	}
 	//RULE(WFF_EQUIV_SIMPLIFY_6, "! $X <-> $X ::= F.")
-	if (auto negated = tt(arg1_fm(ch)) | tau::wff_neg | tau::wff;
-		negated && tau::get(negated.value()) == arg2_fm(ch)) {
+	if (arg1(ch).is(tau::wff_neg) && arg1(ch)[0] == arg2_fm(ch)) {
 		HOOK_LOGGING(applied("! $X <-> $X ::= F.");)
 		return tau::get(tau::_F(), r);
 	}
