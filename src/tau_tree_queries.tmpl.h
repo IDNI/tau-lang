@@ -106,6 +106,16 @@ inline std::function<bool(tref)> is_var_or_capture() {
 }
 
 template <NodeType node>
+bool is_wff(tref n) {
+	return tree<node>::is_wff_nt(tree<node>::get(n).get_type());
+}
+
+template <NodeType node>
+bool is_term(tref n) {
+	return tree<node>::get(n).is_term();
+}
+
+template <NodeType node>
 bool is_quantifier(tref n) {
 	return tree<node>::get(n).is(node::type::wff_all)
 		|| tree<node>::get(n).is(node::type::wff_ex);
