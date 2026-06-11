@@ -1142,7 +1142,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				continue;
 			}
 			size_t type = find_ba_type<node>(conj);
-			if (!is_atomic_fm<node>(conj) && !(is_bv_type_family<node>(type) && is_child_quantifier<node>(conj))) {
+			if (!is_atomic_fm<node>(conj) && !(is_bv_type_family<node>(type) && is_quantifier<node>(conj))) {
 				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);
 				error = true;
 				break;

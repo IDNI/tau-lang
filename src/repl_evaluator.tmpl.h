@@ -132,7 +132,7 @@ tref repl_evaluator<BAs...>::get_(typename node::type nt, tref n,
 	// nt names the requested kind (tau::wff for formulas, tau::bf for
 	// terms); trees are operator-rooted, so match the kind, not the nt
 	auto matches = [&nt](const auto& t) {
-		return tau::is_wff_nt(nt) ? t.is_wff() : t.is_term();
+		return nt == tau::wff ? t.is_wff() : t.is_term();
 	};
 	if (matches(tau::get(n))) return n;
 	else if (tau::get(n).is(tau::history)) {

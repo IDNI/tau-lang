@@ -68,9 +68,6 @@ template <NodeType node>
 tref norm_equation(tref eq);
 
 template <NodeType node>
-tref norm_trimmed_equation(tref eq);
-
-template <NodeType node>
 tref denorm_equation(tref eq);
 
 template <NodeType node>
