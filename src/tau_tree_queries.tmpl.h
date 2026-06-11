@@ -52,14 +52,6 @@ inline std::function<bool(tref)> is_child(size_t nt) {
 }
 
 template <NodeType node>
-bool is_child_quantifier(tref n) {
-	// transitional alias: receivers used to be wff wrapper nodes; after
-	// the wrapper removal the receiver is the quantifier node itself.
-	// TODO (LOW) redirect callers to is_quantifier and remove (Task 16)
-	return is_quantifier<node>(n);
-}
-
-template <NodeType node>
 bool is_temporal_quantifier(tref n) {
 	return tree<node>::get(n).is(node::type::wff_always)
 		|| tree<node>::get(n).is(node::type::wff_sometimes);

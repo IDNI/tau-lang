@@ -648,7 +648,6 @@ bool tree<node>::is_digital_nt(size_t nt) {
 template <NodeType node>
 bool tree<node>::is_term_nt(size_t nt) {
 	switch (nt) {
-		case bf:
 		case ba_constant:
 		case bf_fall:
 		case bf_fex:
@@ -689,7 +688,6 @@ bool tree<node>::is_term_nt(size_t nt, size_t parent_nt) {
 template <NodeType node>
 bool tree<node>::is_wff_nt(size_t nt) {
 	switch (nt) {
-		case wff: // transitional: wrapper still present until flip completes
 		case wff_sometimes:
 		case wff_always:
 		case wff_conditional:
@@ -766,16 +764,14 @@ bool tree<node>::is_capture() const { return is_capture_nt(this->value.nt); }
 template <NodeType node>
 bool tree<node>::is_input_variable() const {
 	auto x = tt(*this);
-	if (x.is(bf)) x = x | variable;
-	if (x && x.is(variable)) x = x | io_var;
+	if (x.is(variable)) x = x | io_var;
 	return x && x.is(io_var) && (x | tt::data) == 1;
 }
 
 template <NodeType node>
 bool tree<node>::is_output_variable() const {
 	auto x = tt(*this);
-	if (x.is(bf)) x = x | variable;
-	if (x && x.is(variable)) x = x | io_var;
+	if (x.is(variable)) x = x | io_var;
 	return x && x.is(io_var) && (x | tt::data) == 2;
 }
 

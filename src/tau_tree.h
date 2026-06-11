@@ -768,9 +768,6 @@ template <NodeType node>
 inline std::function<bool(tref)> is_child(size_t nt);
 
 template <NodeType node>
-bool is_child_quantifier(tref n);
-
-template <NodeType node>
 bool is_temporal_quantifier(tref n);
 
 template <NodeType node>

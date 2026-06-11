@@ -305,18 +305,6 @@ tref norm_equation(tref eq) {
 	} else return eq;
 }
 
-// Convert X =(!=) Y to X + Y =(!=) 0
-template<NodeType node>
-tref norm_trimmed_equation(tref eq) {
-	using tau = tree<node>;
-	tau e = tau::get(eq);
-	if (e.is(tau::bf_eq)) {
-		return tau::build_bf_eq_0(tau::build_bf_xor(e.first(), e.second()));
-	} else if (e.is(tau::bf_neq)) {
-		return tau::build_bf_neq_0(tau::build_bf_xor(e.first(), e.second()));
-	} else return eq;
-}
-
 template<NodeType node>
 tref denorm_equation(tref eq) {
 	using tau = tree<node>;
@@ -467,7 +455,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 	tref eq = t.find_bottom(is<node, tau::bf_eq>);
 	subtree_map<node, tref> changes;
 	if (eq && tau::get(eq)[0].find_top(has_var)) {
-		eq = norm_trimmed_equation<node>(eq);
+		eq = norm_equation<node>(eq);
 		const auto& eq_v = tau::get(eq);
 		DBG(assert(eq_v[1].is(tau::bf_f));)
 		tref f_0 = tt(rewriter::replace<node>(
@@ -481,7 +469,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 							f_0, var, f_1);
 	}
 	for (tref neq_ref : t.select_all(is<node, tau::bf_neq>)) {
-		neq_ref = norm_trimmed_equation<node>(neq_ref);
+		neq_ref = norm_equation<node>(neq_ref);
 		const auto& neq = tau::get(neq_ref);
 		DBG(assert(neq[1].is(tau::bf_f));)
 		if (!neq[0].find_top(has_var)) continue;
@@ -1763,7 +1751,7 @@ tref squeeze_positives(tref n, size_t type_id) {
 		eqs.size() > 0)
 	{
 		for (tref& eq : eqs) {
-			eq = norm_trimmed_equation<node>(eq);
+			eq = norm_equation<node>(eq);
 		}
 		eqs = tt(eqs) | tt::children | tt::refs;
 		tref res = tau::build_bf_or(eqs, find_ba_type<node>(eqs[0]));
@@ -3774,7 +3762,7 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 		tref nneqs = tau::_T();
 		for (tref neq : neqs) {
 			// Convert to != 0
-			neq = norm_trimmed_equation<node>(neq);
+			neq = norm_equation<node>(neq);
 			// Get term
 			tref g = tau::trim(neq);
 			tref g_0 = rewriter::replace<node>(g, var,

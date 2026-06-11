@@ -69,10 +69,11 @@ TEST_SUITE("wff/bf kind predicates") {
 		CHECK( !tau::is_wff_nt(tau::ba_constant) );
 		CHECK( !tau::is_wff_nt(tau::bf_t) );
 		CHECK( !tau::is_wff_nt(tau::capture) );
-		// transitional: the bare wrapper still counts as wff-kind
-		// (removed again in the cleanup phase)
-		CHECK( tau::is_wff_nt(tau::wff) );
+		// the bare wrappers never appear in trees and are not kinds
+		CHECK( !tau::is_wff_nt(tau::wff) );
 		CHECK( !tau::is_wff_nt(tau::bf) );
+		CHECK( !tau::is_term_nt(tau::bf) );
+		CHECK( !tau::is_term_nt(tau::wff) );
 	}
 
 	TEST_CASE("capture kind split") {
