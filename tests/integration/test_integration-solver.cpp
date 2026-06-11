@@ -9,7 +9,7 @@
 tref splitter_one_bdd() {
 	using node = tau_lang::node<bv, sbf_ba>;
 	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get_ba_constant(typename tau::constant(sbf_splitter_one()), sbf_type<node>()));
+	return tau::get_ba_constant(typename tau::constant(sbf_splitter_one()), sbf_type<node>());
 }
 
 template <NodeType node>
@@ -35,7 +35,7 @@ TEST_SUITE("minterm_iterator") {
 		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
 		using node = node_t;
 		std::cout << "sample: " << TAU_DUMP_TO_STR(n) << "\n";
-		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
+		tref fm = tt(n) | tt::first | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
 		using node = node_t;
@@ -49,7 +49,7 @@ TEST_SUITE("minterm_iterator") {
 	TEST_CASE("with two vars") {
 		const char* sample = "x | y = 0.";
 		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
-		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
+		tref fm = tt(n) | tt::first | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
 		using node = node_t;
@@ -70,7 +70,7 @@ TEST_SUITE("minterm_iterator") {
 		std::cout << "------------------------------------------------------\n";
 		const char* sample = "x | y | z = 0.";
 		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
-		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
+		tref fm = tt(n) | tt::first | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
 		using node = node_t;
@@ -94,7 +94,7 @@ TEST_SUITE("minterm_range") {
 	TEST_CASE("one var") {
 		const char* sample = "x = 0.";
 		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
-		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
+		tref fm = tt(n) | tt::first | tt::ref;
 		minterm_range<node_t> rng(fm);
 		CHECK ( rng.begin() != rng.end() );
 		CHECK ( ++rng.begin() == rng.end() );
@@ -103,7 +103,7 @@ TEST_SUITE("minterm_range") {
 	TEST_CASE("two var") {
 		const char* sample = "x | y = 0.";
 		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
-		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
+		tref fm = tt(n) | tt::first | tt::ref;
 		minterm_range<node_t> rng(fm);
 		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
 		CHECK ( count == 3 );
@@ -112,7 +112,7 @@ TEST_SUITE("minterm_range") {
 	TEST_CASE("three var") {
 		const char* sample = "x | y | z = 0.";
 		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
-		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
+		tref fm = tt(n) | tt::first | tt::ref;
 		minterm_range<node_t> rng(fm);
 		size_t count = 0; for ([[gnu::unused]] const auto& i : rng) count++;
 		CHECK ( count == 7 );

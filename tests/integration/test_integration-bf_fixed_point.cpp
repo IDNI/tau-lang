@@ -12,7 +12,7 @@ bool test_bf_rr_fp(const char* rec, const char* sample,
 	tref result = bf_normalizer_with_rec_relation<node_t>(nso_rr.value());
 	if (!result) return expect_fail;
 
-	return tau::get(result).child_is(nt) != expect_fail;
+	return tau::get(result).is(nt) != expect_fail;
 }
 
 bool test_bf_rr_fp_1(const char* rec, const char* sample) {

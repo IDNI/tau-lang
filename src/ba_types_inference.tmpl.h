@@ -475,7 +475,7 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 	// Finally, we get the new body and reference and create a new rr
 	// assuming the type of the head
 	tref head = untype<node>(tau::get(std::get<tref>(updated)).child(0));
-	tref body = untype<node>(tau::get(std::get<tref>(updated)).child(1));
+	tref body = tau::get(std::get<tref>(updated)).child(1);
 	// If the body is a formula and not a term, reject
 	if (tau::get(body).is_wff()) return nullptr;
 	size_t type = find_ba_type<node>(std::get<tref>(updated));
@@ -484,8 +484,12 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 	tref new_head = is<node, tau::ref>(head)
 				? tau::get_typed(tau::bf_ref, head, type)
 				: head;
+	// Only untype the body when it is a ref that gets re-wrapped in a
+	// typed bf_ref. With the bf wrapper removed, a non-ref body is the
+	// term root itself (possibly a bare leaf like bf_t) and must keep
+	// the type assigned by update<node> above.
 	tref new_body = is<node, tau::ref>(body)
-				? tau::get_typed(tau::bf_ref, body, type)
+				? tau::get_typed(tau::bf_ref, untype<node>(body), type)
 				: body;
 
 	// Add new function definition to available definitions
@@ -1320,6 +1324,23 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)
 					error = scope_error{n};
 					break;
+				}
+				// With the wrappers removed, a quantifier may itself be
+				// the parse root: type its remaining (free) variables
+				// with the global scope, as the wff wrapper root used
+				// to do.
+				if (!parent) {
+					auto updated_vars = update<node>(resolver,
+						std::get<tref>(updated), { tau::variable }, options);
+					if (std::holds_alternative<parse_error>(updated_vars)) {
+						error = std::get<parse_error>(updated_vars);
+						break;
+					} else if (std::holds_alternative<inference_error>(updated_vars)) {
+						error = std::get<inference_error>(updated_vars);
+						break;
+					}
+					if (std::get<tref>(updated_vars) != n)
+						transformed.insert_or_assign(n, std::get<tref>(updated_vars));
 				}
 				break;
 			}

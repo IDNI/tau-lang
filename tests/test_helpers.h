@@ -79,7 +79,7 @@ inline bool normalize_and_check(const char* sample,
 
 	DBG(TAU_LOG_DEBUG << "(T) Normalized result: " << TAU_LOG_FM(result);)
 
-	return tau::get(result).child_is(nt) != expect_fail;
+	return tau::get(result).is(nt) != expect_fail;
 }
 
 inline bool normalize_and_expect_fail(const char* sample, typename node_t::type nt) {

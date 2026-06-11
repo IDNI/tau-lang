@@ -13,12 +13,12 @@ TEST_SUITE("Tau API - settings") {
 		tau_api::set_charvar(false);
 		tref xyz = tau_api::get_term("xyz");
 		CHECK(xyz); // term must be variable, because charvar is false
-		CHECK(tau::get(xyz)[0].is(tau::variable));
+		CHECK(tau::get(xyz).is(tau::variable));
 
 		tau_api::set_charvar(true);
 		xyz = tau_api::get_term("xyz");
 		CHECK(xyz); // term must be bf_and, because charvar is true
-		CHECK(tau::get(xyz)[0].is(tau::bf_and));
+		CHECK(tau::get(xyz).is(tau::bf_and));
 	}
 
 	TEST_CASE("set_indenting") {
@@ -155,7 +155,8 @@ TEST_SUITE("Tau API - tref - querying") {
 		DBG(using node = node_t;)
 		tref t = tau_api::get_term("x + 0", false);
 		DBG(TAU_LOG_TRACE << "contains on term: " << TAU_LOG_FM_DUMP(t);)
-		CHECK(tau_api::contains(t, tau::bf));
+		// bf wrapper nonterminals never appear in trees post-flip
+		CHECK(!tau_api::contains(t, tau::bf));
 		CHECK(tau_api::contains(t, tau::bf_add));
 		CHECK(tau_api::contains(t, tau::variable));
 		CHECK(tau_api::contains(t, tau::bf_f));
@@ -166,12 +167,14 @@ TEST_SUITE("Tau API - tref - querying") {
 
 		tref f = tau_api::get_formula("x = 0 && y ^ 1 = 1", false);
 		DBG(TAU_LOG_TRACE << "contains on formula: " << TAU_LOG_FM_DUMP(f);)
-		CHECK(tau_api::contains(f, tau::wff));
+		// wff wrapper nonterminals never appear in trees post-flip
+		CHECK(!tau_api::contains(f, tau::wff));
 		CHECK(tau_api::contains(f, tau::wff_and));
 		CHECK(tau_api::contains(f, tau::bf_eq));
 		CHECK(tau_api::contains(f, tau::bf_xor));
 		CHECK(tau_api::contains(f, tau::variable));
-		CHECK(tau_api::contains(f, tau::bf));
+		// bf wrapper nonterminals never appear in trees post-flip
+		CHECK(!tau_api::contains(f, tau::bf));
 		CHECK(tau_api::contains(f, tau::bf_f));
 		CHECK(tau_api::contains(f, tau::bf_t));
 		CHECK(!tau_api::contains(f, tau::wff_t));

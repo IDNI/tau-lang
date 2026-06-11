@@ -545,76 +545,88 @@ TEST_SUITE("parsing wwf formulas ") {
 
 	TEST_CASE("!") {
 		const char* sample = "! ( Z = 0 ).";
-		auto neg_formula = get_main(sample) | tau::wff | tau::wff_neg;
-		CHECK( neg_formula.has_value() );
+		auto neg_formula = get_main(sample) | tt::first;
+		REQUIRE( neg_formula.has_value() );
+		CHECK( neg_formula.is(tau::wff_neg) );
 	}
 
 	TEST_CASE("&&") {
 		const char* sample = "( Z = 0 ) && ( X = 0 ).";
-		auto and_formula = get_main(sample) | tau::wff | tau::wff_and;
-		CHECK( and_formula.has_value() );
+		auto and_formula = get_main(sample) | tt::first;
+		REQUIRE( and_formula.has_value() );
+		CHECK( and_formula.is(tau::wff_and) );
 	}
 
 	TEST_CASE("||") {
 		const char* sample = "( Z = 0 ) || ( X = 0 ).";
-		auto or_formula = get_main(sample) | tau::wff | tau::wff_or;
-		CHECK( or_formula.has_value() );
+		auto or_formula = get_main(sample) | tt::first;
+		REQUIRE( or_formula.has_value() );
+		CHECK( or_formula.is(tau::wff_or) );
 	}
 
 	TEST_CASE("^^") {
 		const char* sample = "( Z = 0 ) ^^ ( X = 0 ).";
-		auto xor_formula = get_main(sample) | tau::wff | tau::wff_xor;
-		CHECK( xor_formula.has_value() );
+		auto xor_formula = get_main(sample) | tt::first;
+		REQUIRE( xor_formula.has_value() );
+		CHECK( xor_formula.is(tau::wff_xor) );
 	}
 
 	TEST_CASE("?") {
 		const char* sample = "$X ? $Y : $Z.";
-		auto cond_formula = get_main(sample) | tau::wff | tau::wff_conditional;
-		CHECK( cond_formula.has_value() );
+		auto cond_formula = get_main(sample) | tt::first;
+		REQUIRE( cond_formula.has_value() );
+		CHECK( cond_formula.is(tau::wff_conditional) );
 	}
 
 	TEST_CASE("= 0") {
 		const char* sample = " Z = 0 .";
-		auto eq_formula = get_main(sample) | tau::wff | tau::bf_eq;
-		CHECK( eq_formula.has_value() );
+		auto eq_formula = get_main(sample) | tt::first;
+		REQUIRE( eq_formula.has_value() );
+		CHECK( eq_formula.is(tau::bf_eq) );
 	}
 
 	TEST_CASE("!= 0") {
 		const char* sample = " Z != 0 .";
-		auto neq_formula = get_main(sample) | tau::wff | tau::bf_neq;
-		CHECK( neq_formula.has_value() );
+		auto neq_formula = get_main(sample) | tt::first;
+		REQUIRE( neq_formula.has_value() );
+		CHECK( neq_formula.is(tau::bf_neq) );
 	}
 
 	TEST_CASE("<") {
 		const char* sample = " X < Y .";
-		auto lt_formula = get_main(sample) | tau::wff | tau::bf_lt;
-		CHECK( lt_formula.has_value() );
+		auto lt_formula = get_main(sample) | tt::first;
+		REQUIRE( lt_formula.has_value() );
+		CHECK( lt_formula.is(tau::bf_lt) );
 	}
 
 	TEST_CASE("<=") {
 		const char* sample = " X <= Y .";
-		auto lteq_formula = get_main(sample) | tau::wff | tau::bf_lteq;
-		CHECK( lteq_formula.has_value() );
+		auto lteq_formula = get_main(sample) | tt::first;
+		REQUIRE( lteq_formula.has_value() );
+		CHECK( lteq_formula.is(tau::bf_lteq) );
 	}
 
 	TEST_CASE(">") {
 		const char* sample = "X > Y.";
-		auto gt_formula = get_main(sample) | tau::wff | tau::bf_gt;
-		CHECK( gt_formula.has_value() );
+		auto gt_formula = get_main(sample) | tt::first;
+		REQUIRE( gt_formula.has_value() );
+		CHECK( gt_formula.is(tau::bf_gt) );
 	}
 
 	TEST_CASE("all") {
 		const char* sample =
 			"all Z ( Z = 0 ) .";
-		auto all_formula = get_main(sample) | tau::wff 	| tau::wff_all;
-		CHECK( all_formula.has_value() );
+		auto all_formula = get_main(sample) | tt::first;
+		REQUIRE( all_formula.has_value() );
+		CHECK( all_formula.is(tau::wff_all) );
 	}
 
 	TEST_CASE("ex") {
 		const char* sample =
 			"ex Z ( Z = 0 ) .";
-		auto ex_formula = get_main(sample) | tau::wff 	| tau::wff_ex;
-		CHECK( ex_formula.has_value() );
+		auto ex_formula = get_main(sample) | tt::first;
+		REQUIRE( ex_formula.has_value() );
+		CHECK( ex_formula.is(tau::wff_ex) );
 	}
 }
 

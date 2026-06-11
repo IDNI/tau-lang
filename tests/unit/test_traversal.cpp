@@ -13,7 +13,8 @@ TEST_SUITE("operator|") {
 	}
 
 	TEST_CASE("match one node") {
-		const char* sample = "X & Y";
+		// (X & Y) | Z roots at bf_or; bf_and is a direct child
+		const char* sample = "X & Y | Z";
 		auto pbf = parse_bf();
 		auto rule = tt(tau::get(sample, pbf));
 		CHECK( (rule | tau::bf_and).size() == 1 );
@@ -30,17 +31,19 @@ TEST_SUITE("operator||") {
 	}
 
 	TEST_CASE("match one node") {
-		const char* sample = "X & Y";
+		// (X & Y) | Z roots at bf_or; bf_and is a direct child
+		const char* sample = "X & Y | Z";
 		auto pbf = parse_bf();
 		auto rule = tt(tau::get(sample, pbf));
 		CHECK( (rule || tau::bf_and).size() == 1 );
 	}
 
 	TEST_CASE("match several nodes") {
-		const char* sample = "X & Y";
+		// bf_and operands are bare terms (variables) post wrapper removal
+		const char* sample = "X & Y | Z";
 		auto pbf = parse_bf();
 		auto rule = tt(tau::get(sample, pbf));
-		CHECK( (rule | tau::bf_and || tau::bf).size() == 2 );
+		CHECK( (rule | tau::bf_and || tau::variable).size() == 2 );
 	}
 }
 

@@ -1797,6 +1797,33 @@ tref replace_free_vars_by(tref fm, tref val) {
  * @param var The variable to base the simplifications on
  * @return The simplified atomic formula
  */
+// Substitute keys at Boolean positions of a term. Before the wff/bf flip
+// the keys were bf-wrapped and rewriter::replace_if was gated on
+// is_boolean_operation, which matched the wrapper sitting at every Boolean
+// operand position; with the wrappers removed, a Boolean position is
+// identified by its parent operator (or the term root) instead.
+template<NodeType node>
+tref replace_at_boolean_positions(tref fm,
+	const subtree_map<node, tref>& changes)
+{
+	using tau = tree<node>;
+	auto f = [&changes](tref n, tref parent) {
+		if (parent == nullptr || is_boolean_operation<node>(parent))
+			if (auto it = changes.find(n); it != changes.end())
+				return it->second;
+		return n;
+	};
+	auto visit = [](tref n) { return tau::get(n).is_term(); };
+	return pre_order<node>(fm).apply_unique_until_change(f, visit);
+}
+
+template<NodeType node>
+tref replace_at_boolean_positions(tref fm, tref key, tref with) {
+	subtree_map<node, tref> changes;
+	changes.emplace(key, with);
+	return replace_at_boolean_positions<node>(fm, changes);
+}
+
 template<NodeType node>
 tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	using tau = tree<node>;
@@ -1819,10 +1846,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	tref func1 = tau::get(atomic_fm).first();
 	tref func2 = tau::get(atomic_fm).second();
 	// Make sure that it works only on Boolean parts by using replace_if
-	tref func1_v_0 = rewriter::replace_if<node>(func1, var,
-		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
-	tref func1_v_1 = rewriter::replace_if<node>(func1, var,
-		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+	tref func1_v_0 = replace_at_boolean_positions<node>(func1, var,
+		_0<node>(find_ba_type<node>(var)));
+	tref func1_v_1 = replace_at_boolean_positions<node>(func1, var,
+		_1<node>(find_ba_type<node>(var)));
 	// Is func syntactically identically 0
 	if (tau::get(func1_v_0).equals_0() && tau::get(func1_v_1).equals_0())
 		func1 = tau::_0(find_ba_type<node>(func1));
@@ -1837,10 +1864,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		return denorm_equation<node>(
 			tau::get(atm_type, func1, func2));
 	// Simplify func2
-	tref func2_v_0 = rewriter::replace_if<node>(func2, var,
-		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
-	tref func2_v_1 = rewriter::replace_if<node>(func2, var,
-		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+	tref func2_v_0 = replace_at_boolean_positions<node>(func2, var,
+		_0<node>(find_ba_type<node>(var)));
+	tref func2_v_1 = replace_at_boolean_positions<node>(func2, var,
+		_1<node>(find_ba_type<node>(var)));
 	// Is func syntactically identically 0
 	if (tau::get(func2_v_0).equals_0() && tau::get(func2_v_1).equals_0())
 		func2 = tau::_0(find_ba_type<node>(func2));
@@ -2200,8 +2227,8 @@ class syntactic_path_simplification {
 				else assignments.emplace( l,
 					_1<node>(find_ba_type<node>(l)));
 			}
-			tref simp = rewriter::replace_if(n, assignments,
-				is_boolean_operation<node>);
+			tref simp = replace_at_boolean_positions<node>(
+				n, assignments);
 			// If simp is false, current branch is not sat
 			if (tau::get(simp).equals_0()) {
 				// Remove branch
@@ -3593,9 +3620,9 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	tref func = tau::trim(norm_equation<node>(atm));
 	func = apply_xor_def<node>(func);
 	// We use is_boolean_operation to enable the procedure on non-boolean functions
-	tref func_v_0 = rewriter::replace_if<node>(func, var, tau::_0(find_ba_type<node>(var)), is_boolean_operation<node>);
+	tref func_v_0 = replace_at_boolean_positions<node>(func, var, tau::_0(find_ba_type<node>(var)));
 	func_v_0 = syntactic_path_simplification<node>::on(func_v_0);
-	tref func_v_1 = rewriter::replace_if<node>(func, var, tau::_1(find_ba_type<node>(var)), is_boolean_operation<node>);
+	tref func_v_1 = replace_at_boolean_positions<node>(func, var, tau::_1(find_ba_type<node>(var)));
 	func_v_1 = syntactic_path_simplification<node>::on(func_v_1);
 	// Check identically zero
 	if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0()) {
