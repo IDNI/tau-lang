@@ -48,7 +48,6 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		}
 		case tau::wff_all: {
 			tref v = (form | tt::first | tt::ref);
-claude
 			// If the bound "variable" is not actually a variable (e.g., a constant
 			// due to variable capture in substitution), just evaluate the body.
 			if (!is<node>(v, tau::variable))

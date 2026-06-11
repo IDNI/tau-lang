@@ -67,4 +67,37 @@ TEST_SUITE("ex_subs_based_elimination") {
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
+
+	TEST_CASE("occurs check: no subs when candidate contains var") {
+		// x = x|y is not a valid substitution for x (x occurs in x|y);
+		// substituting would leak the bound variable free
+		const char* sample =
+			"x = x | y && y = b";
+		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
+		tref ex_clause = parse(sample);
+		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
+		CHECK( result == ex_clause );
+	}
+
+	TEST_CASE("occurs check: self-referential eq skipped, valid eq used") {
+		// ex x (x = x|y && x = 0) ≡ y = 0: the candidate x|y must be
+		// rejected but x = 0 is a valid substitution, so the result
+		// must not contain x anymore
+		const char* sample =
+			"x = x | y && x = 0";
+		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
+		tref ex_clause = parse(sample);
+		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
+		CHECK( result != ex_clause );
+		CHECK( !contains<node_t>(result, var) );
+	}
+
+	TEST_CASE("occurs check: trivial self equation ignored") {
+		const char* sample =
+			"x = x && y = b";
+		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
+		tref ex_clause = parse(sample);
+		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
+		CHECK( result == ex_clause );
+	}
 }

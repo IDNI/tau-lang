@@ -127,8 +127,15 @@ tref preorder(tref var, tref ex_clause) {
 			const tau& t = tau::get(n);
 			tref left = t[0][0].get();
 			tref right = t[1][0].get();
-			if (tau::get(left) == tau::get(var)) found = right;
-			else if (tau::get(right) == tau::get(var)) found = left;
+			// Occurs-check: ex x (x = t && phi(x)) ≡ phi(t) only holds
+			// when x does not occur in t; otherwise substituting t for x
+			// and dropping the quantifier leaks the bound variable free
+			if (tau::get(left) == tau::get(var)
+					&& !contains<node>(right, var))
+				found = right;
+			else if (tau::get(right) == tau::get(var)
+					&& !contains<node>(left, var))
+				found = left;
 		}
 	};
 
