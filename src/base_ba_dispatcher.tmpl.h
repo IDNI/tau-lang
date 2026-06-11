@@ -99,9 +99,9 @@ template<>
 inline tref base_ba_dispatcher<bv, sbf_ba>::splitter_one(tref type_tree) {
 	using tau = tree<node<bv, sbf_ba>>;
 	return is_sbf_type<node<bv, sbf_ba>>(type_tree)
-		? tau::get(tau::bf, tau::get_ba_constant(
+		? tau::get_ba_constant(
 			typename tau::constant(sbf_splitter_one()),
-			sbf_type<node<bv, sbf_ba>>()))
+			sbf_type<node<bv, sbf_ba>>())
 		: nullptr; // There is no splitter one for bv
 }
 
@@ -251,14 +251,12 @@ inline tref base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::splitter_one(
 	using tau = tree<node_t>;
 	DBG(assert(!is_bv_type_family<node_t>(type_tree)));
 	return is_sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>(type_tree)
-		? tau::get(tau::bf,
-			tau::get_ba_constant(
-				typename tau::constant(sbf_splitter_one()),
-				sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>()))
-		: tau::get(tau::bf,
-			tau::get_ba_constant(
-				typename tau::constant(tau_splitter_one<bv, sbf_ba>()),
-				tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>()));
+		? tau::get_ba_constant(
+			typename tau::constant(sbf_splitter_one()),
+			sbf_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>())
+		: tau::get_ba_constant(
+			typename tau::constant(tau_splitter_one<bv, sbf_ba>()),
+			tau_type<node<tau_ba<bv, sbf_ba>, bv, sbf_ba>>());
 			}
 
 template<>

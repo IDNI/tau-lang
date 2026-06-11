@@ -24,12 +24,6 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		case tau::wff_sometimes: {
 			return bv_eval_node<node>(form | tt::first, vars, free_vars);
 		}
-		// due to hooks we should consider wff_t or bf_t
-		case tau::wff: case tau::bf:
-		// TODO (HIGH) deal with those eq appropiately
-		/*case tau::bv:*/ {
-			return bv_eval_node<node>(form | tt::first, vars, free_vars);
-		}
 		case tau::wff_t: return make_bitvector_true();
 		case tau::wff_f: return make_bitvector_false();
 		case tau::wff_neg: {
@@ -316,9 +310,9 @@ std::optional<solution<node>> solve_bv(const tref form) {
 		solution<node> s;
 		for (const auto& [tau_var, bv_var] : free_vars) {
 			bv cte = solver.getValue(bv_var);
-			s.emplace(tau::get(tau::bf, tau_var),
-				tau::get(tau::bf, tau::get_ba_constant(cte,
-					bv_type<node>(cte.getSort().getBitVectorSize()))));
+			s.emplace(tau_var,
+				tau::get_ba_constant(cte,
+					bv_type<node>(cte.getSort().getBitVectorSize())));
 		}
 		return s;
 	} else

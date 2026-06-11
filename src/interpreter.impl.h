@@ -41,7 +41,7 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 		if (tau::get(var).is_output_variable())
 			continue;
 		// Skip input stream variables with time point greater time_step
-		if (get_io_time_point<node>(tau::trim(var)) > (int_t)time_step)
+		if (get_io_time_point<node>(var) > (int_t)time_step)
 			continue;
 
 		auto it = inputs.find(canonize<node>(var));
@@ -119,13 +119,13 @@ bool interpreter<node>::serialize_constant(std::stringstream& ss,
 	tref constant, size_t type) const
 {
 	DBG(LOG_TRACE << "serialize_constant[constant]: " << LOG_FM_DUMP(constant) << "\n";)
-	auto value = tt(constant) | tau::ba_constant;
-	if (!value) {
+	auto value = tt(constant);
+	if (!value.is(tau::ba_constant)) {
 		// is bf_t
-		if (auto check = tt(constant) | tau::bf_t; check)
+		if (value.is(tau::bf_t))
 			ss << node::ba::one(get_ba_type_tree<node>(type));
 		// is bf_f
-		else if (auto check = tt(constant) | tau::bf_f; check)
+		else if (value.is(tau::bf_f))
 			ss << node::ba::zero(get_ba_type_tree<node>(type));
 		// is something else but not a BA element
 		else return false;
@@ -141,7 +141,7 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 	for (const auto& [var, _ ] : output_values) {
 		// DBG(LOG_TRACE << "io var: " << LOG_FM_TREE(var));
 		// DBG(LOG_TRACE << "io var dump: " << LOG_FM_DUMP(var));
-		assert(tau::get(var)[0].child_is(tau::io_var));
+		assert(tau::get(var).child_is(tau::io_var));
 		io_vars.push_back(var);
 	}
 	std::ranges::sort(io_vars, constant_io_comp<node>);
@@ -157,7 +157,6 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		tref vn = canonize<node>(io_var);
 		assert(vn != nullptr);
 		DBG(LOG_TRACE << "write[canonized]: " << LOG_FM(vn));
-		auto value = tt(output_values.find(io_var)->second) | tau::ba_constant;
 		std::stringstream ss;
 		if (!serialize_constant(ss, output_values.find(io_var)->second,
 			ctx.type_of(vn)))
@@ -179,7 +178,7 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		// write value to output stream
 		DBG(LOG_TRACE << "write/put(serialized_constant): " << ss.str();)
 		if (!it->second->put(ss.str(),
-			get_io_time_point<node>(tau::trim(io_var))))
+			get_io_time_point<node>(io_var)))
 		{
 			LOG_ERROR << "Failed to write to output stream '"
 				<< get_var_name<node>(vn) << "'";
@@ -321,9 +320,9 @@ interpreter<node>::create_spec_partition(tref spec, auto& output_partition) {
 	trefs clauses = get_cnf_wff_clauses<node>(spec);
 	// Split each always statement into conjuncts again
 	for (size_t i = 0; i < clauses.size(); ++i) {
-		if (tau::get(clauses[i]).child_is(tau::wff_always)) {
+		if (tau::get(clauses[i]).is(tau::wff_always)) {
 			trefs aw_clauses = get_cnf_wff_clauses<node>(
-				tau::trim2(clauses[i]));
+				tau::trim(clauses[i]));
 			DBG(assert(!aw_clauses.empty()));
 			clauses[i] = tau::build_wff_always(aw_clauses[0]);
 			for (size_t j = 1; j < aw_clauses.size(); ++j) {
@@ -410,7 +409,7 @@ std::pair<std::optional<assignment<node>>, bool>
 	// Save inputs in memory
 	for (const auto& [var, value] : values) {
 		DBG(LOG_TRACE << "step[var]: " << LOG_FM_DUMP(var);)
-		assert(get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point);
+		assert(get_io_time_point<node>(var) <= (int_t)time_point);
 		// If there is at least one input, continue automatically in execution
 		auto_continue = true;
 		memory[var] = value;
@@ -483,15 +482,15 @@ std::pair<std::optional<assignment<node>>, bool>
 				solved = true;
 				for (const auto& [var, value] : path_solution.value()) {
 					// Check if we are dealing with a stream variable
-					if (tt(var) | tau::variable | tau::io_var) {
+					if (tt(var) | tau::io_var) {
 						DBG(LOG_TRACE << LOG_FM_TREE(value));
 						assert(tau::get(value).is_term());
-						if (get_io_time_point<node>(tau::trim(var)) <= (int_t)time_point) {
+						if (get_io_time_point<node>(var) <= (int_t)time_point) {
 							// std::cout << "time_point: " << time_point << "\n";
 							// std::cout << "var: " << var << "\n";
 							memory.emplace(var, value);
 							// Exclude temporary streams in solution
-							if (!is_excluded_output(tau::trim(var)))
+							if (!is_excluded_output(var))
 								global.emplace(var, value);
 						}
 					} else {
@@ -516,8 +515,8 @@ std::pair<std::optional<assignment<node>>, bool>
 			if (is_bv) {
 				auto zero_bitvector = make_bitvector_bottom_elem(
 					get_bv_size<node>(get_ba_type_tree<node>(ctype)));
-				auto zero_term = tau::get(tau::bf, {
-					tau::get_ba_constant(zero_bitvector, ctype)});
+				auto zero_term =
+					tau::get_ba_constant(zero_bitvector, ctype);
 				memory.emplace(ot, zero_term);
 				global.emplace(ot, zero_term);
 			} else {
@@ -658,8 +657,7 @@ bool interpreter<node>::is_memory_access_valid(const auto& io_vars)
 	for (tref io_var : io_vars) {
 		if (is_io_initial<node>(io_var) &&
 			get_io_time_point<node>(io_var) < (int_t)time_point) {
-			const auto& v = tau::get(tau::bf, io_var);
-			if (!memory.contains(v)) return false;
+			if (!memory.contains(io_var)) return false;
 		}
 	}
 	return true;
@@ -912,13 +910,13 @@ tref interpreter<node>::pointwise_revision(
 	if (tau::get(update).equals_T()) return spec;
 	for (tref clause : expression_paths<node>(update)) {
 		tref upd_always = tau::get(clause).find_top(
-			is_child<node, tau::wff_always>);
+			is<node, tau::wff_always>);
 		trefs upd_sometime = tau::get(clause).select_top(
-			is_child<node, tau::wff_sometimes>);
+			is<node, tau::wff_sometimes>);
 		tref spec_always = tau::get(spec).find_top(
-			is_child<node, tau::wff_always>);
+			is<node, tau::wff_always>);
 		trefs spec_sometimes = tau::get(spec).select_top(
-			is_child<node, tau::wff_sometimes>);
+			is<node, tau::wff_sometimes>);
 
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
@@ -936,7 +934,7 @@ tref interpreter<node>::pointwise_revision(
 			if (upd_always) {
 				new_spec_pointwise = always_conjunction<node>(
 					spec_always, upd_always);
-			} else new_spec_pointwise = tau::trim2(spec_always);
+			} else new_spec_pointwise = tau::trim(spec_always);
 			new_spec_pointwise = build_wff_always<node>(new_spec_pointwise);
 			new_spec_pointwise = build_wff_and<node>(
 				new_spec_pointwise,
@@ -962,7 +960,7 @@ tref interpreter<node>::pointwise_revision(
 							spec_always,
 							upd_always)
 					);
-				} else new_spec_pointwise = tau::trim2(spec_always);
+				} else new_spec_pointwise = tau::trim(spec_always);
 				new_spec_pointwise = build_wff_always<node>(
 					new_spec_pointwise);
 				new_spec_pointwise = build_wff_and<node>(
@@ -1103,8 +1101,8 @@ tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 	trefs clauses = get_cnf_wff_clauses<node>(cnf_expression);
 	trefs aw_clauses;
 	for (tref& c : clauses) {
-		if (tau::get(c).child_is(tau::wff_always)) {
-			aw_clauses.push_back(tau::trim2(c));
+		if (tau::get(c).is(tau::wff_always)) {
+			aw_clauses.push_back(tau::trim(c));
 			c = tau::_T();
 		}
 	}
@@ -1116,7 +1114,7 @@ tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 template <NodeType node>
 tref unpack_tau_constant(tref constant) {
 	using tau = tree<node>;
-	const auto& c = tree<node>::get(tau::trim(constant));
+	const auto& c = tau::get(constant);
 	if (!c.is_ba_constant()) return {};
 	tref main = node::ba::unpack_tau_ba(c.get_ba_constant());
 	return main;

@@ -36,21 +36,21 @@ std::optional<solution<node>> find_solution(equality eq,
 	// find a variable, say x, in the equality
 	DBG(LOG_TRACE << "find_solution/eq: " << LOG_FM(eq);)
 	auto has_no_var = [](tref f) {
-		return !tau::get(f).find_top(is_child<node, tau::variable>);
+		return !tau::get(f).find_top(is<node, tau::variable>);
 	};
 
-	if (!(tt(eq) | tau::bf_eq).has_value()) {
+	if (!tau::get(eq).is(tau::bf_eq)) {
 		DBG(LOG_TRACE << "find_solution/solution[no_eq]: {}";)
 		return {};
 	}
 
-	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
+	tref f = tt(eq) | tt::first | tt::ref;
 
 	DBG(LOG_TRACE << "find_solution/f: " << LOG_FM(f);)
 
 	// FIXME convert vars to a set
 	if (trefs vars = tau::get(f)
-		.select_top(is_child<node, tau::variable>); vars.size())
+		.select_top(is<node, tau::variable>); vars.size())
 	{
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
@@ -121,7 +121,7 @@ std::optional<solution<node>> find_solution(equality eq,
 template <NodeType node>
 trefs get_variables(equality eq) {
 	using tau = tree<node>;
-	return tau::get(eq).select_top(is_child<node, tau::variable>);
+	return tau::get(eq).select_top(is<node, tau::variable>);
 }
 
 template <NodeType node>
@@ -200,7 +200,7 @@ std::optional<solution<node>> lgrs(equality eq) {
 		DBG(LOG_TRACE << "lgrs/no solution";)
 		return {};
 	}
-	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
+	tref f = tt(eq) | tt::first | tt::ref;
 	solution<node> phi;
 	for (auto [x_i, z_i] : s.value())
 		phi[x_i] = tt((tau::get(z_i) & tau::get(f))
@@ -237,7 +237,7 @@ struct minterm_iterator {
 	minterm_iterator(tref f) {
 		// FIXME convert vars to a set
 		if (trefs vars = tau::get(f)
-				.select_top(is_child<node, tau::variable>);
+				.select_top(is<node, tau::variable>);
 			vars.size())
 		{
 			// we start with the full bf...
@@ -423,7 +423,7 @@ struct minterm_inequality_system_iterator {
 		if (sys.empty()) { exhausted = true; return; }
 		// for each inequality in the system, we create a minterm range
 		for (tref neq : sys) {
-			tref f = tt(neq) | tau::bf_neq | tau::bf | tt::ref;
+			tref f = tt(neq) | tt::first | tt::ref;
 			ranges.push_back(minterm_range<node>(f));
 		}
 		// we initialize the minterm iterators
@@ -531,7 +531,7 @@ tref get_constant(minterm m, size_t type_id) {
 	//auto cte = find_top(m, is_child_non_terminal<tau::ba_constant, node>);
 	//return cte ? cte.value() : _1<node>;
 	auto is_ba_constant = [](const auto& n) -> bool {
-		return is_child<node, tau::ba_constant>(n);
+		return is<node, tau::ba_constant>(n);
 	};
 	// FIXME convert vars to a set
 	trefs all_vs = tau::get(m).select_top(is_ba_constant);
@@ -543,9 +543,9 @@ subtree_set<node> get_exponent(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto is_bf_literal = [](tref n) -> bool {
-		return (tt(n) | tau::variable).has_value()
-			|| (tt(n) | tau::bf_neg | tau::bf | tau::variable)
-								.has_value();
+		return is<node, tau::variable>(n)
+			|| (is<node, tau::bf_neg>(n)
+				&& (tt(n) | tau::variable).has_value());
 	};
 	// FIXME convert vars to a set
 	trefs all_vs = tau::get(n).select_top(is_bf_literal);
@@ -626,9 +626,7 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 					// TODO (HIGH) replace call to tau_splitter with a
 					// node::ba::splitter call and maybe remove the corresponding
 					// tau_splitter method
-					: tau_splitter(tau::get(tt(d_cte)
-						| tau::ba_constant
-						| tt::ref)).get();
+					: tau_splitter(d_cte).get();
 
 				DBG(LOG_TRACE << "add_minterm_to_disjoint"
 					<< "/[case4]/s: " << LOG_FM(s) << "\n";)
@@ -706,7 +704,7 @@ std::optional<solution<node>> solve_minterm_system(
 
 		DBG(LOG_TRACE << "solve_minterm_system/neq: " << LOG_FM(neq);)
 
-		tref nf = tt(neq) | tau::bf_neq | tau::bf
+		tref nf = tt(neq) | tt::first
 			| bf_reduce_canonical<node>() | tt::ref;
 
 		DBG(LOG_TRACE << "solve_minterm_system/nf: " << LOG_FM(nf);)
@@ -960,15 +958,15 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 	// split among equalities and inequalities
 	equation_system<node> system;
 	for (tref eq : eqs) {
-		if (tau::get(eq).child_is(tau::bf_eq)) {
+		if (tau::get(eq).is(tau::bf_eq)) {
 			if (!system.first.has_value())
 				system.first = std::optional<equality>(eq);
 			else {
 				// squeeze the equalities
 				tref l = tt(system.first.value())
-					| tau::bf_eq | tau::bf | tt::ref;
+					| tt::first | tt::ref;
 				tref r = tt(eq)
-					| tau::bf_eq | tau::bf | tt::ref;
+					| tt::first | tt::ref;
 				system.first = build_bf_eq_0<node>(
 					(tau::get(l) | tau::get(r)).get());
 			}
@@ -993,8 +991,6 @@ bool check_var_assignment(auto& var_assignments, tref var, tref term) {
 	// If the variable is already assigned, we cannot add it
 	if (var_assignments.contains(var)) return false;
 	trefs term_vars = get_free_vars<node>(term);
-	// Add bf node in order to align with var and term structure
-	for (tref& tv : term_vars) tv = tau::get(tau::bf, tv);
 	// Make sure that term does not contain var
 	for (tref tv : term_vars) if (tau::get(tv) == tau::get(var))
 		return false;
@@ -1032,11 +1028,10 @@ bool check_var_assignment(auto& var_assignments, tref var, tref term) {
  */
 template <NodeType node>
 void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments, tref var, tref term) {
-	using tau = tree<node>;
+	DBG(using tau = tree<node>;)
 	// For each variable in term, get replacement from var_assignment
 	const trefs& term_vars = get_free_vars<node>(term);
 	for (tref tv : term_vars) {
-		tv = tau::get(tau::bf, tv);
 		if (auto it = var_assignments.find(tv); it != var_assignments.end())
 			term = rewriter::replace<node>(term, tv, it->second);
 	}
@@ -1065,7 +1060,7 @@ template <NodeType node>
 bool bv_conjs_only_pure_equality(const subtree_set<node>& conjs) {
 	using tau = tree<node>;
 	for (tref conj : conjs) {
-		if (!tau::get(conj).child_is(tau::bf_eq)) return false;
+		if (!tau::get(conj).is(tau::bf_eq)) return false;
 		if (has_bv_arithmetic<node>(conj)) return false;
 	}
 	return !conjs.empty();
@@ -1109,7 +1104,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			if (is_bv_type_family<node>(tau::get(n).get_ba_type()))
 				return false;
 			const tau& n_t = tau::get(n);
-			if (n_t[0].child_is(tau::variable)) {
+			if (n_t[0].is(tau::variable)) {
 				// First child is a single variable
 				tref var = n_t.first();
 				tref term = n_t.second();
@@ -1117,7 +1112,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 					assignment_check, var, term))
 					normalize_and_add_assignment<node>(
 						var_assignments, var, term);
-			} else if (n_t[1].child_is(tau::variable)) {
+			} else if (n_t[1].is(tau::variable)) {
 				// Second child is a single variable
 				tref var = n_t.second();
 				tref term = n_t.first();
@@ -1179,8 +1174,8 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 						if (!squeezed.has_value()) {
 							squeezed = conj;
 						} else {
-							tref l = tt(squeezed.value()) | tau::bf_eq | tau::bf | tt::ref;
-							tref r = tt(conj)             | tau::bf_eq | tau::bf | tt::ref;
+							tref l = tt(squeezed.value()) | tt::first | tt::ref;
+							tref r = tt(conj)             | tt::first | tt::ref;
 							squeezed = build_bf_eq_0<node>((tau::get(l) | tau::get(r)).get());
 						}
 					}
@@ -1218,7 +1213,6 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 				// Apply the found solutions
 				const trefs fv_a = get_free_vars<node>(a);
 				for (tref fv : fv_a) {
-					fv = tau::get(tau::bf, fv);
 					// Skip already solved variables
 					if (clause_solution.contains(fv)) continue;
 					if (options.mode == minimum)

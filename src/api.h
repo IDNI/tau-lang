@@ -67,17 +67,17 @@ struct api {
 
 	// Parsing
 	// ------------------------------------------------------------
-	static tref get_term(const std::string& term, bool simplified = true);         // bf
+	static tref get_term(const std::string& term, bool simplified = true);         // parses bf, returns operator-rooted term
 	static htref geth_term(const std::string& term, bool simplified = true);
 
-	static tref get_formula(const std::string& formula, bool simplified = true);   // wff
+	static tref get_formula(const std::string& formula, bool simplified = true);   // parses wff, returns operator-rooted formula
 	static htref geth_formula(const std::string& formula, bool simplified = true);
 
-	// rec_relation { bf_ref { ... } ,  bf { ... } }
+	// rec_relation { bf_ref { ... } ,  <term operator> { ... } }
 	static tref get_function_def(const std::string& function_def, bool simplified = true);
 	static htref geth_function_def(const std::string& function_def, bool simplified = true);
 
-	// rec_relation { wff_ref { ... } , wff { ... } }
+	// rec_relation { wff_ref { ... } , <formula operator> { ... } }
 	static tref get_predicate_def(const std::string& predicate_def, bool simplified = true);
 	static htref geth_predicate_def(const std::string& predicate_def, bool simplified = true);
 
@@ -93,11 +93,11 @@ struct api {
 	static tref get_definition(const std::string& definition, bool simplified = true);
 	static htref geth_definition(const std::string& definition, bool simplified = true);
 
-	// spec, wff, bf    private?
+	// spec, or operator-rooted term    private?
 	static tref get_spec_or_term(const std::string& expression, bool simplified = true);
 	static htref geth_spec_or_term(const std::string& expression, bool simplified = true);
 
-	// wff, bf          private?
+	// operator-rooted formula or term  private?
 	static tref get_formula_or_term(const std::string& expression, bool simplified = true);
 	static htref geth_formula_or_term(const std::string& expression, bool simplified = true);
 
@@ -300,10 +300,10 @@ struct api {
 	// with measuring
 	// --------------
 
-	static tref get_term(measuring& m, const std::string& term, bool simplified = true);         // bf
+	static tref get_term(measuring& m, const std::string& term, bool simplified = true);         // parses bf, returns operator-rooted term
 	static htref geth_term(measuring& m, const std::string& term, bool simplified = true);
 
-	static tref get_formula(measuring& m, const std::string& formula, bool simplified = true);   // wff
+	static tref get_formula(measuring& m, const std::string& formula, bool simplified = true);   // parses wff, returns operator-rooted formula
 	static htref geth_formula(measuring& m, const std::string& formula, bool simplified = true);
 
 	static tref get_function_def(measuring& m, const std::string& function_def, bool simplified = true);

@@ -55,10 +55,10 @@ tref transform_io_var(tref io_var, int_t time_point) {
 	int_t shift = get_io_var_shift<node>(io_var);
 	size_t type = tau::get(io_var).get_ba_type();
 	if (tau::get(io_var).is_input_variable())
-		return tau::trim(build_in_var_at_n<node>(
-			get_var_name_node<node>(io_var), time_point - shift, type));
-	else return tau::trim(build_out_var_at_n<node>(
-			get_var_name_node<node>(io_var), time_point - shift, type));
+		return build_in_var_at_n<node>(
+			get_var_name_node<node>(io_var), time_point - shift, type);
+	else return build_out_var_at_n<node>(
+			get_var_name_node<node>(io_var), time_point - shift, type);
 }
 
 template <NodeType node>
@@ -81,8 +81,8 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
 		if (initials.contains({
 			get_var_name<node>(io_vars[pos]), time_point })) continue;
 		size_t type = tau::get(io_vars[pos]).get_ba_type();
-		tref var = tau::trim(build_out_var_at_n<node>(
-			get_var_name_node<node>(io_vars[pos]), time_point, type));
+		tref var = build_out_var_at_n<node>(
+			get_var_name_node<node>(io_vars[pos]), time_point, type);
 		auto res = cache.emplace(var);
 		// Due to the way that phi/chi infinity are build, we do not
 		// rename the bound variables
@@ -111,8 +111,8 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 		if (initials.contains({
 			get_var_name<node>(io_vars[pos]), time_point })) continue;
 		size_t type = tau::get(io_vars[pos]).get_ba_type();
-		tref var = tau::trim(build_in_var_at_n<node>(
-			get_var_name_node<node>(io_vars[pos]), time_point, type));
+		tref var = build_in_var_at_n<node>(
+			get_var_name_node<node>(io_vars[pos]), time_point, type);
 		auto res = cache.emplace(var);
 		// Due to the way that phi/chi infinity are build, we do not
 		// rename the bound variables
@@ -269,9 +269,6 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 template <NodeType node>
 inline auto constant_io_comp = [](tref v1, tref v2) {
 	using tau = tree<node>;
-	// trim the bf of v1 and v2 if present
-	v1 = tau::get(v1).is(tau::bf) ? tau::trim(v1) : v1;
-	v2 = tau::get(v2).is(tau::bf) ? tau::trim(v2) : v2;
 	if (get_io_time_point<node>(v1) < get_io_time_point<node>(v2))
 		return true;
 	if (get_io_time_point<node>(v1) == get_io_time_point<node>(v2)) {
@@ -388,7 +385,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
 			return tau::get(n) == tau::get(uc);
 		}) == left_uconsts.end())
 			uconst_ctns = tau::build_wff_and(uconst_ctns,
-				tau::build_bf_eq_0(tau::get(tau::bf, uc)));
+				tau::build_bf_eq_0(uc));
 	}
 
 	LOG_DEBUG<<"Formula describing constraints on uninterpreted constants: "
@@ -486,18 +483,18 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 		size_t type = tau::get(io_var).get_ba_type();
 		if (time_point - lookback != 0)
 			transformed_var = tau::get(io_var).is_input_variable()
-				? tau::trim(build_in_var_at_t_minus<node>(
+				? build_in_var_at_t_minus<node>(
 					get_var_name_node<node>(io_var),
-					abs(time_point - lookback), type,"t"))
-				: tau::trim(build_out_var_at_t_minus<node>(
+					abs(time_point - lookback), type,"t")
+				: build_out_var_at_t_minus<node>(
 					get_var_name_node<node>(io_var),
-					abs(time_point - lookback), type,"t"));
+					abs(time_point - lookback), type,"t");
 		else
 			transformed_var = tau::get(io_var).is_input_variable()
-				? tau::trim(build_in_var_at_t<node>(
-					get_var_name_node<node>(io_var), type, "t"))
-				: tau::trim(build_out_var_at_t<node>(
-					get_var_name_node<node>(io_var), type, "t"));
+				? build_in_var_at_t<node>(
+					get_var_name_node<node>(io_var), type, "t")
+				: build_out_var_at_t<node>(
+					get_var_name_node<node>(io_var), type, "t");
 		changes.emplace(io_var, transformed_var);
 	}
 	return rewriter::replace<node>(fm, changes);
@@ -535,7 +532,6 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 		[&flag_initials](tref ctn, tref flag_iovar, const int_t t)
 	{
 		tref flag_init_cond = transform_io_var<node>(flag_iovar, t);
-		flag_init_cond = tau::get(tau::bf, flag_init_cond);
 		flag_initials = tau::build_wff_and(tau::build_bf_eq_0(
 				tau::build_bf_xor(flag_init_cond,
 						calculate_ctn<node>(ctn, t))),
@@ -554,15 +550,15 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 		std::stringstream ss; ss << "_f" << ctn_id++;
 		tref var = tau::build_var_name(ss.str());
 		size_t flag_type = get_ba_type_id<node>(sbf_type<node>());
-		tref flag_iovar = tau::trim(
-			build_out_var_at_t<node>(var, flag_type, ctnvar));
+		tref flag_iovar =
+			build_out_var_at_t<node>(var, flag_type, ctnvar);
 
 		// Take lookback of formula into account for constructing rule
 		tref flag_rule1 = build_prev_flag_on_lookback<node>(
 						var, ctnvar, lookback);
 		tref flag_rule2 = build_flag_on_lookback<node>(
 						var, ctnvar, lookback);
-		changes[ctn] = tau::trim(to_eq_1(tau::get(tau::bf, flag_iovar)));
+		changes[ctn] = to_eq_1(flag_iovar);
 		if (ct() | tau::ctn_gt || ct() | tau::ctn_gteq) {
 			// Add flag rule _fk[lookback] != 0 -> _fk[lookback-1] = 1
 			auto flag_rule = tau::build_wff_or(
@@ -608,7 +604,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 
 	assert(has_no_boolean_combs_of_models<node>(fm));
 
-	if (tau::get(fm).child_is(tau::wff_always)) fm = tau::trim2(fm);
+	if (tau::get(fm).is(tau::wff_always)) fm = tau::trim(fm);
 
 	// Preparation to transform flags to output streams
 	trefs io_vars = tau::get(fm).select_top(is_child<node, tau::io_var>);
@@ -682,8 +678,8 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	print_fixpoint_info(
 		"Temporal normalization of always specification reached fixpoint after "
 		+ std::to_string(steps) + " steps, yielding the result: ",
-		TAU_TO_STR(tau::get(result).child_is(tau::wff_always)
-			? tau::trim2(result) : result), output);
+		TAU_TO_STR(tau::get(result).is(tau::wff_always)
+			? tau::trim(result) : result), output);
 
 	DBG(LOG_TRACE
 		<< "always_to_unbounded_continuation[result]: " << LOG_FM(result) << "\n"
@@ -703,7 +699,7 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 			size_t type = tau::get(io_var).get_ba_type();
 			tref uc = tau::build_bf_uconst("_" + TAU_TO_STR(io_var),
 							std::to_string(number), type);
-			tref cdn = tau::build_bf_eq(tau::get(tau::bf, io_var), uc);
+			tref cdn = tau::build_bf_eq(io_var, uc);
 			guard = tau::build_wff_and(guard, cdn);
 		}
 	}
@@ -717,13 +713,13 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
-	trefs smt_fms = t.select_top(is_child<node, tau::wff_sometimes>);
+	trefs smt_fms = t.select_top(is<node, tau::wff_sometimes>);
 	if (smt_fms.empty()) return { fm, 0 };
-	tref aw_fm = t.find_top(is_child<node, tau::wff_always>);
+	tref aw_fm = t.find_top(is<node, tau::wff_always>);
 
 	int_t max_st_lookback = get_max_shift<node>(
 		t.select_top_until(is_child<node, tau::io_var>,
-					is_child<node, tau::wff_always>));
+					is<node, tau::wff_always>));
 
 	int_t aw_lookback = 0;
 	trefs aw_io_vars;
@@ -769,9 +765,9 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 		// transform `sometimes psi` to:
 		// (_eN[t-1] != 0 && _eN[t] == 0) -> psi (N is nth `sometimes`)
 		tref shifted_sometimes = (max_st_lookback==0 && aw_lookback==0)
-			? shift_io_vars_in_fm<node>(tau::trim2(smt_fms[n]),
+			? shift_io_vars_in_fm<node>(tau::trim(smt_fms[n]),
 				st_io_vars, 1)
-			: shift_io_vars_in_fm<node>(tau::trim2(smt_fms[n]),
+			: shift_io_vars_in_fm<node>(tau::trim(smt_fms[n]),
 				st_io_vars, (max_st_lookback - st_lookback)
 								+ aw_lookback);
 
@@ -809,7 +805,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	tref res = tau::_T();
 	// Check if always part is present
 	if (aw_fm != nullptr) {
-		tref aw = tau::trim2(aw_fm);
+		tref aw = tau::trim(aw_fm);
 		// Conjunct former always part and eventual variable assumptions
 		res = tau::build_wff_always(
 			tau::build_wff_and(aw, ev_assm));
@@ -887,15 +883,15 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 
 	using tau = tree<node>;
 	DBG(assert(has_no_boolean_combs_of_models<node>(ubd_aw_continuation));)
-	DBG(assert(is_child<node>(ev_var_flags, tau::wff_sometimes));)
+	DBG(assert(is<node>(ev_var_flags, tau::wff_sometimes));)
 
-	tref st_flags = tau::trim2(ev_var_flags);
-	tref aw = is_child<node>(ubd_aw_continuation, tau::wff_always)
-				? tau::trim2(ubd_aw_continuation)
+	tref st_flags = tau::trim(ev_var_flags);
+	tref aw = is<node>(ubd_aw_continuation, tau::wff_always)
+				? tau::trim(ubd_aw_continuation)
 				: ubd_aw_continuation;
 	tref ori_aw_ctn = original_aw != nullptr
-				? (is_child<node>(original_aw, tau::wff_always)
-					? tau::trim2(original_aw)
+				? (is<node>(original_aw, tau::wff_always)
+					? tau::trim(original_aw)
 					: original_aw)
 				: tau::_T();
 
@@ -1041,11 +1037,11 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 #endif // TAU_CACHE
 	auto elim_aw = [](tref f) {
 		return tau::get(f)
-			.child_is(tau::wff_always) ? tau::trim2(f) : f;
+			.is(tau::wff_always) ? tau::trim(f) : f;
 	};
 	LOG_DEBUG << "Start transform_to_execution: " << LOG_FM(fm);
 
-	tref aw_fm = tau::get(fm).find_top(is_child<node, tau::wff_always>);
+	tref aw_fm = tau::get(fm).find_top(is<node, tau::wff_always>);
 	std::pair<tref, int_t> ev_t;
 	tref ubd_aw_fm = nullptr;
 	if (aw_fm != nullptr) {
@@ -1084,7 +1080,7 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 		}
 	}
 	auto aw_after_ev = tau::get(ev_t.first)
-				.find_top(is_child<node, tau::wff_always>);
+				.find_top(is<node, tau::wff_always>);
 	if (aw_after_ev == nullptr) {
 #ifdef TAU_CACHE
 		return cache.emplace(std::make_pair(fm, start_time),
@@ -1093,7 +1089,7 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 		return elim_aw(fm);
 	}
 	trefs st = tau::get(ev_t.first)
-				.select_top(is_child<node, tau::wff_sometimes>);
+				.select_top(is<node, tau::wff_sometimes>);
 	DBG(assert(st.size() < 2);)
 
 	tref res;

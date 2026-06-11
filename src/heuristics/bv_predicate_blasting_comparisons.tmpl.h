@@ -29,7 +29,7 @@ template<NodeType node>
 static tref make_bvlt_call_from_offset(tref left, tref right, tref offset) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvlt", { offset }, { left, right })));
+	return tau::get(tau::wff_ref, tau::build_rr_ref("_bvlt", { offset }, { left, right }));
 }
 
 /**
@@ -182,7 +182,7 @@ template<NodeType node>
 static tref make_bvgt_call_from_offset(tref left, tref right, tref offset) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvgt", {offset}, { left, right })));
+	return tau::get(tau::wff_ref, tau::build_rr_ref("_bvgt", {offset}, { left, right }));
 }
 
 /**
@@ -329,7 +329,7 @@ template<NodeType node>
 static tref make_bvneq_call_from_offset(tref left, tref right, tref offset) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvneq", { offset }, { left, right })));
+	return tau::get(tau::wff_ref, tau::build_rr_ref("_bvneq", { offset }, { left, right }));
 }
 
 template<NodeType node>

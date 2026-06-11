@@ -21,11 +21,10 @@ static std::pair<tref, tref> get_bvmul_arguments(tref term) {
 	auto left = tau::get(term).child(0);
 	auto right = tau::get(term).child(1);
 
-	auto tl = tau::trim(left), tr = tau::trim(right);
-	if (tau::get(tl).is_ba_constant() && is_bv_constant<node>(tl)) {
+	if (tau::get(left).is_ba_constant() && is_bv_constant<node>(left)) {
 		return std::make_pair(right, left);
 	}
-	if (tau::get(tr).is_ba_constant() && is_bv_constant<node>(tr)) {
+	if (tau::get(right).is_ba_constant() && is_bv_constant<node>(right)) {
 		return std::make_pair(left, right);
 	}
 
@@ -50,8 +49,7 @@ static std::pair<tref, tref> get_arguments(tref term) {
 	auto left = tau::get(term).child(0);
 	auto right = tau::get(term).child(1);
 
-	auto tr = tau::trim(right);
-	if (tau::get(tr).is_ba_constant() && is_bv_constant<node>(tr)) {
+	if (tau::get(right).is_ba_constant() && is_bv_constant<node>(right)) {
 		return std::make_pair(left, right);
 	}
 
@@ -85,14 +83,13 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 		switch (nt) {
 			case tau::bf_add: case tau::bf_sub: {
 				auto result = build_variable<node>(type_id);
-				auto bf_result = tau::get(tau::bf, result);
 				vars.push_back(result);
 				changes[t] = result;
 				auto left = changes[tau::get(t).child(0)];
 				auto right = changes[tau::get(t).child(1)];
 				auto current = (nt == tau::bf_add)
-					? bvadd<node>(left, right, bf_result)
-					: bvsub<node>(left, right, bf_result);
+					? bvadd<node>(left, right, result)
+					: bvsub<node>(left, right, result);
 				predicate = predicate
 					? build_wff_and<node>(predicate, current)
 					: current;
@@ -102,12 +99,11 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto [shiftand, count] = get_arguments<node>(t);
 				if (!count) { error = true; break; }
 				auto shifted = tau::build_variable(type_id);
-				auto bf_shifted = tau::get(tau::bf, shifted);
 				vars.push_back(shifted);
 				changes[t] = shifted;
 				auto current = (nt == tau::bf_shl)
-					? bvshl<node>(shiftand, count, bf_shifted)
-					: bvrhl<node>(shiftand, count, bf_shifted);
+					? bvshl<node>(shiftand, count, shifted)
+					: bvrhl<node>(shiftand, count, shifted);
 				predicate = predicate
 					? build_wff_and<node>(predicate, current)
 					: current;
@@ -117,24 +113,22 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto [factor, constant] = get_bvmul_arguments<node>(t);
 				if (!constant) { error = true; break; }
 				auto product = tau::build_variable(type_id);
-				auto bf_product = tau::get(tau::bf, product);
 				vars.push_back(product);
 				changes[t] = product;
 				predicate = predicate
-					? build_wff_and<node>(predicate, bvmul<node>(factor, constant, bf_product))
-					: bvmul<node>(factor, constant, bf_product);
+					? build_wff_and<node>(predicate, bvmul<node>(factor, constant, product))
+					: bvmul<node>(factor, constant, product);
 				break;
 			}
 			case tau::bf_div: case tau::bf_mod: {
 				auto [dividend, divisor] = get_arguments<node>(t);
 				if (!divisor) { error = true; break; }
 				auto result = tau::build_variable(type_id);
-				auto bf_result = tau::get(tau::bf, result);
 				vars.push_back(result);
 				changes[t] = result;
 				auto current = (nt == tau::bf_mod)
-					? bvmod<node>(dividend, divisor, bf_result)
-					: bvdiv<node>(dividend, divisor, bf_result);
+					? bvmod<node>(dividend, divisor, result)
+					: bvdiv<node>(dividend, divisor, result);
 				predicate = predicate
 					? build_wff_and<node>(predicate, current)
 					: current;
@@ -145,7 +139,6 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto src = (changes.find(child) != changes.end()) ? changes[child] : child;
 				auto target_type_id = tau::get(t).get_ba_type();
 				auto result = tau::build_variable(target_type_id);
-				auto bf_result = tau::get(tau::bf, result);
 				auto src_width = get_bv_type_bitwidth<node>(src);
 				auto target_width = get_bv_type_bitwidth<node>(result);
 				// Same-size cast: just substitute with source
@@ -156,7 +149,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				// Different sizes: introduce variable and predicate
 				vars.push_back(result);
 				changes[t] = result;
-				auto current = bvcast<node>(src, bf_result);
+				auto current = bvcast<node>(src, result);
 				predicate = predicate
 					? build_wff_and<node>(predicate, current)
 					: current;
@@ -175,7 +168,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 	// If we have an unsupported operation, we return nullptr to indicate failure
 	if (error) return { nullptr, nullptr };
 	post_order<node>(term).search_unique(f);
-	// We reconstruct the original bf and wrap it
+	// We reconstruct the original term applying the collected changes
 	auto modified = rewriter::replace<node>(term, changes);
 	return { predicate, modified };
 }
@@ -189,7 +182,7 @@ static tref keep_comparison_predicate(tref atomic) {
 	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
 	if (!blasted) return nullptr;
 
-	predicate = tau::build_wff_ex_many(vars, tau::build_wff_and(predicate, tau::get(tau::wff, blasted)));
+	predicate = tau::build_wff_ex_many(vars, tau::build_wff_and(predicate, blasted));
 
 	return predicate;
 }

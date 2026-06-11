@@ -36,10 +36,10 @@ std::pair<tref, tref> build_simplification(const trefs& arguments, size_t operat
 		auto nt = tau::get(op).get_type();
 		switch (nt) {
 			case tau::variable:
-				vars = tau::get(tau::bf, tau::get(operation, vars, tau::get(tau::bf, op)));
+				vars = tau::get(operation, vars, op);
 				break;
 			case tau::ba_constant: case tau::bf_t: case tau::bf_f:
-				ctes = tau::get(tau::bf, tau::get(operation, ctes, tau::get(tau::bf, op)));
+				ctes = tau::get(operation, ctes, op);
 				break;
 			default: break;
 		}
@@ -67,30 +67,25 @@ tref build_simplification(const trefs& arguments, const trefs& inverses, size_t 
 		if (!vars && !ctes) return _0<node>(type);
 		if (!vars) return ctes;
 		if (!ctes) return vars;
-		return tau::get(tau::bf, tau::get(operation, vars, ctes));
+		return tau::get(operation, vars, ctes);
 	}
 
 	if (args.empty()) {
 		auto [vars, ctes] = build_simplification<node>(invs, operation, type);
 		if (!vars && !ctes) return _0<node>(type);
-		if (!vars) return tau::get(tau::bf, tau::get(inverse_of<node>(operation), _0<node>(type), ctes));
-		if (!ctes) return tau::get(tau::bf, tau::get(inverse_of<node>(operation), _0<node>(type), vars));
-		return tau::get(tau::bf,
-			tau::get(inverse_of<node>(operation),
-				_0<node>(type),
-				tau::get(tau::bf,
-					tau::get(operation, vars, ctes))));
+		if (!vars) return tau::get(inverse_of<node>(operation), _0<node>(type), ctes);
+		if (!ctes) return tau::get(inverse_of<node>(operation), _0<node>(type), vars);
+		return tau::get(inverse_of<node>(operation),
+			_0<node>(type),
+			tau::get(operation, vars, ctes));
 	}
 
 	auto [invs_vars, invs_ctes] = build_simplification<node>(invs, operation, type);
 	auto [args_vars, args_ctes] = build_simplification<node>(args, operation, type);
 
-	return tau::get(tau::bf,
-		tau::get(operation,
-			tau::get(tau::bf,
-				tau::get(inverse_of<node>(operation), args_vars, invs_vars)),
-			tau::get(tau::bf,
-				tau::get(inverse_of<node>(operation), args_ctes, invs_ctes))));
+	return tau::get(operation,
+		tau::get(inverse_of<node>(operation), args_vars, invs_vars),
+		tau::get(inverse_of<node>(operation), args_ctes, invs_ctes));
 }
 
 template<NodeType node>

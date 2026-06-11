@@ -75,16 +75,16 @@ tref postorder(tref var, tref ex_clause) {
 				// This is a really simple case. In the future we could
 				// extend this to support more complex substitutions calling
 				// invert procedures (depending on the type).
-				auto left = t[0][0].get();
-				auto right = t[1][0].get();
+				auto left = t[0].get();
+				auto right = t[1].get();
 				if (left == var) subs[n] = right;
 				else if (right == var) subs[n] = left;
 				break;
 			}
 			// It's a formula conjunction
 			case tau::wff_and: {
-				auto left = t[0][0].get();
-				auto right = t[1][0].get();
+				auto left = t[0].get();
+				auto right = t[1].get();
 				// If we have no substitutions we just continue, maybe later
 				// we found a substitution.
 				if (auto n_subs = merge_and<node>(subs, left, right); n_subs)
@@ -93,8 +93,8 @@ tref postorder(tref var, tref ex_clause) {
 			}
 			// It's a formula disjunction
 			case tau::wff_or: {
-				auto left = t[0][0].get();
-				auto right = t[1][0].get();
+				auto left = t[0].get();
+				auto right = t[1].get();
 				// If we have no compatible we just continue, maybe later
 				// we found a substitution.
 				if (auto n_subs = merge_or<node>(subs, left, right); n_subs)
@@ -125,17 +125,20 @@ tref preorder(tref var, tref ex_clause) {
 	auto visit = [&](tref n) {
 		if (is<node>(n, tau::bf_eq)) {
 			const tau& t = tau::get(n);
-			tref left = t[0][0].get();
-			tref right = t[1][0].get();
+			tref left = t[0].get();
+			tref right = t[1].get();
 			if (tau::get(left) == tau::get(var)) found = right;
 			else if (tau::get(right) == tau::get(var)) found = left;
 		}
 	};
 
 	// We visit the formula until reaching atomic formulas (eq)
+	// Only descend through top-level conjunctions into equalities: a
+	// substitution coming from an eq under any other connective (e.g. a
+	// disjunction) would not be valid for the whole clause.
 	auto visit_subtree = [&](tref n) -> bool {
 		if (found) return false;
-		return is<node>(n, tau::wff) || is<node>(n, tau::wff_and) || is<node>(n, tau::bf_eq);
+		return is<node>(n, tau::wff_and) || is<node>(n, tau::bf_eq);
 	};
 
 	auto up = [&](tref) -> void { return; };
