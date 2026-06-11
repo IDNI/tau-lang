@@ -135,7 +135,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::add(tref leaf) {
 	if (tl.is(tau::bf_f)) return F;
 	// In case leaf is negated, use inverter
 	if (tl.is(tau::bf_neg)) {
-		const auto bn = bdd_node(tau::trim2(leaf));
+		const auto bn = bdd_node(tau::trim(leaf));
 		return ref(tau_term_bdd::get(bn, nullptr, nullptr), true);
 	} else {
 		const auto bn = bdd_node(leaf);
@@ -174,9 +174,9 @@ tref tau_term_bdd<node>::get_var(ref x) {
 	tref v = tau_term_bdd::get(x.b).value.v;
 	// If x is a leaf we need to consider inverter
 	if (leaf(x)) {
-		if (x.inv) v = tau::get(tau::bf_neg, tau::get(tau::bf, v));
+		if (x.inv) v = tau::get(tau::bf_neg, v);
 	}
-	DBG(assert(!tau::get(v).is(tau::bf)));
+	DBG(assert(tau::get(v).is_term() || tau::get(v).is(tau::BDD_ID)));
 	return v;
 }
 
@@ -231,7 +231,7 @@ bool tau_term_bdd<node>::leaf(ref l) {
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 	using tau = tree<node>;
-	DBG(assert(tau::get(f).get_type() != tau::wff));
+	DBG(assert(tau::get(f).is_term() || tau::get(f).is(tau::BDD_ID)));
 	// If the current tree is considered to be a BDD variable, it is
 	// contained in o
 	if (auto it = o.find(f); it != o.end()) {
@@ -239,7 +239,6 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 		return from_bit(f);
 	}
 	switch (auto nt = tau::get(f).get_type()) {
-		case tau::bf: return build_bdd(tau::trim(f), o);
 		case tau::bf_and: {
 			refs bdds;
 			for (tref c : get_cnf_bf_clauses<node>(f))
@@ -267,7 +266,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 		case tau::BDD_ID: {
 			// Get the BDD corresponding to the ID
 			const auto& m = term_handle<node>::U;
-			auto it = m.find(tau::get(tau::bf, tau::trim_right_sibling(f)));
+			auto it = m.find(tau::trim_right_sibling(f));
 			if (it != m.end()) {
 				return it->second.get();
 			} else {
@@ -298,8 +297,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, tref y) {
 		return it->second;
 #endif
 	tref v = get_var(x);
-	if (leaf(x)) return add(tau::trim(tau::build_bf_and(
-		tau::get(tau::bf, v), tau::get(tau::bf, y))));
+	if (leaf(x)) return add(tau::build_bf_and(v, y));
 	ref r = add(v, bdd_and(get_high(x), y), bdd_and(get_low(x), y));
 #ifdef TAU_CACHE
 	and_memo.emplace(std::array<ref, 2>{x, add(y)}, r);
@@ -584,7 +582,7 @@ tref tau_term_bdd<node>::to_tau_term(ref x, size_t term_type) {
 	if (x == T) return tau::_1(term_type);
 	if (x == F) return tau::_0(term_type);
 
-	tref v = tau::get(tau::bf, get_var(x));
+	tref v = get_var(x);
 	ref h = get_high(x);
 	ref l = get_low(x);
 
@@ -800,8 +798,8 @@ tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle, size_t t
 	using tau = tree<node>;
 
 	static size_t bdd_id = 0;
-	tref tau_node = tau::get_typed(tau::bf, tau::get_typed(tau::BDD_ID,
-		tau::get_num(bdd_id), term_type), term_type);
+	tref tau_node = tau::get_typed(tau::BDD_ID,
+		tau::get_num(bdd_id), term_type);
 	// Increment id for unique node creation
 	++bdd_id;
 	// Save connection in U
@@ -907,7 +905,7 @@ tref tau_term_bdd_handle<node>::substitute(tref formula, tref var,
 	term_handle with, const order& o) {
 	using tau = tree<node>;
 	auto subst = [&](tref n) -> tref {
-		if (!tau::get(n).is(tau::bf)) return n;
+		if (!tau::get(n).is(tau::BDD_ID)) return n;
 		auto it = U.find(n);
 		if (it == U.end()) return n;
 		term_handle result = it->second.bdd_compose(var, with, o);
@@ -935,7 +933,6 @@ bool tau_term_bdd_handle<node>::operator!=(const tau_term_bdd_handle& other) con
 template<NodeType node>
 void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	tref bdd_tref, subtree_set<node>& merged, bdd_fv_cache_t& cache) {
-	using tau = tree<node>;
 	if (!bdd_tref) return;
 	if (auto it = cache.find(bdd_tref); it != cache.end()) {
 		const trefs& cached = free_vars_pool[it->second];
@@ -943,7 +940,7 @@ void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 		return;
 	}
 	const auto& bn = bintree<tau_bdd_node<node>>::get(bdd_tref);
-	const trefs& v_fvs = get_free_vars<node>(tau::get(tau::bf, bn.value.v));
+	const trefs& v_fvs = get_free_vars<node>(bn.value.v);
 	merged.insert(v_fvs.begin(), v_fvs.end());
 	get_free_tau_vars_impl(bn.l, merged, cache);
 	get_free_tau_vars_impl(bn.r, merged, cache);
@@ -952,10 +949,9 @@ void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 template<NodeType node>
 void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	tref bdd_tref, subtree_set<node>& merged) {
-	using tau = tree<node>;
 	if (!bdd_tref) return;
 	const auto& bn = bintree<tau_bdd_node<node>>::get(bdd_tref);
-	const trefs& v_fvs = get_free_vars<node>(tau::get(tau::bf, bn.value.v));
+	const trefs& v_fvs = get_free_vars<node>(bn.value.v);
 	merged.insert(v_fvs.begin(), v_fvs.end());
 	get_free_tau_vars_impl(bn.l, merged);
 	get_free_tau_vars_impl(bn.r, merged);

@@ -53,8 +53,10 @@ inline std::function<bool(tref)> is_child(size_t nt) {
 
 template <NodeType node>
 bool is_child_quantifier(tref n) {
-	return tree<node>::get(n).child_is(node::type::wff_all)
-		|| tree<node>::get(n).child_is(node::type::wff_ex);
+	// transitional alias: receivers used to be wff wrapper nodes; after
+	// the wrapper removal the receiver is the quantifier node itself.
+	// TODO (LOW) redirect callers to is_quantifier and remove (Task 16)
+	return is_quantifier<node>(n);
 }
 
 template <NodeType node>
@@ -159,20 +161,17 @@ bool contains(tref fm, tref sub_fm) {
 template <NodeType node>
 bool is_atomic_fm(tref n) {
 	using tau = tree<node>;
-	auto fm = tau::get(n);
-	if (!fm.is(tau::wff)) return false;
-	const tau& child = fm[0];
-	return fm.is(tau::wff)
-	       && (child.is(tau::bf_eq)
-		   || child.is(tau::bf_neq)
-		   || child.is(tau::bf_lteq)
-		   || child.is(tau::bf_nlteq)
-		   || child.is(tau::bf_gt)
-		   || child.is(tau::bf_ngt)
-		   || child.is(tau::bf_gteq)
-		   || child.is(tau::bf_ngteq)
-		   || child.is(tau::bf_lt)
-		   || child.is(tau::bf_nlt));
+	const tau& fm = tau::get(n);
+	return fm.is(tau::bf_eq)
+	       || fm.is(tau::bf_neq)
+	       || fm.is(tau::bf_lteq)
+	       || fm.is(tau::bf_nlteq)
+	       || fm.is(tau::bf_gt)
+	       || fm.is(tau::bf_ngt)
+	       || fm.is(tau::bf_gteq)
+	       || fm.is(tau::bf_ngteq)
+	       || fm.is(tau::bf_lt)
+	       || fm.is(tau::bf_nlt);
 };
 
 template <NodeType node>
@@ -247,7 +246,7 @@ template <NodeType node>
 auto is_boolean_operation = [](tref n) static {
 	using tau = tree<node>;
 	const tau& t = tau::get(n);
-	if (t.is(tau::bf) || t.is(tau::bf_and) || t.is(tau::bf_or)
+	if (t.is(tau::bf_and) || t.is(tau::bf_or)
 		|| t.is(tau::bf_xor) || t.is(tau::bf_neg)
 		|| t.is(tau::bf_fex) || t.is(tau::bf_fall)) return true;
 	return false;
@@ -277,10 +276,10 @@ bool has_fallback (tref n) {
 template<NodeType node>
 bool is_equational_assignment(tref eq) {
 	using tau = tree<node>;
-	if (!tau::get(eq).child_is(tau::bf_eq)) return false;
-	const tau& t = tau::get(eq)[0];
-	if (t[0].child_is(tau::variable)) return true;
-	if (t[1].child_is(tau::variable)) return true;
+	const tau& t = tau::get(eq);
+	if (!t.is(tau::bf_eq)) return false;
+	if (t[0].is(tau::variable)) return true;
+	if (t[1].is(tau::variable)) return true;
 	return false;
 }
 } // namespace idni::tau_lang

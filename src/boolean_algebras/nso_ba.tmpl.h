@@ -28,17 +28,17 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	if (lt.equals_1()) return rt;
 	if (rt.equals_1()) return lt;
 	// more elaborate cases
-	if (lt.child_is(tau::ba_constant) && rt.child_is(tau::ba_constant))
-		return tau::get(ba_constant_and(lt[0], rt[0]));
+	if (lt.is_ba_constant() && rt.is_ba_constant())
+		return tau::get(ba_constant_and(lt, rt));
 	if (lt.is_term() && rt.is_term())
 		return tau::get(tau::build_bf_and(lt.get(), rt.get()));
-	if (lt.is_term() && rt[0].is(tau::bf_eq)) {
+	if (lt.is_term() && rt.is(tau::bf_eq)) {
 		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
-		return tau::get(tau::build_bf_eq_0((lt & n_rt[0][0]).get()));
+		return tau::get(tau::build_bf_eq_0((lt & n_rt[0]).get()));
 	}
-	if (lt.is_term() && rt[0].is(tau::bf_neq)) {
+	if (lt.is_term() && rt.is(tau::bf_neq)) {
 		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
-		return tau::get(tau::build_bf_neq_0((lt & n_rt[0][0]).get()));
+		return tau::get(tau::build_bf_neq_0((lt & n_rt[0]).get()));
 	}
 	if (lt.is_wff() && rt.is_wff())
 		return tau::get(tau::build_wff_and(lt.get(), rt.get()));
@@ -60,17 +60,17 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 				lt.get_ba_type());
 	};
 
-	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
-		return tau::get(ba_constant_or(lt[0], rt[0]));
+	if (lt.is_ba_constant() && rt.is_ba_constant())
+		return tau::get(ba_constant_or(lt, rt));
 	if (lt.is_term() && rt.is_term())
 		return tau::get(tau::build_bf_or(lt.get(), rt.get()));
-	if (lt.is_term() && rt[0].is(tau::bf_eq)) {
+	if (lt.is_term() && rt.is(tau::bf_eq)) {
 		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
-		return tau::get(tau::build_bf_eq_0((lt | n_rt[0][0]).get()));
+		return tau::get(tau::build_bf_eq_0((lt | n_rt[0]).get()));
 	}
-	if (lt.is_term() && rt[0].is(tau::bf_neq)) {
+	if (lt.is_term() && rt.is(tau::bf_neq)) {
 		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
-		return tau::get(tau::build_bf_neq_0((lt | n_rt[0][0]).get()));
+		return tau::get(tau::build_bf_neq_0((lt | n_rt[0]).get()));
 	}
 	if (lt.is_wff() && rt.is_wff())
 		return tau::get(tau::build_wff_or(lt.get(), rt.get()));
@@ -93,17 +93,17 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	if (lt.equals_1()) return tau::get_0(find_ba_type<node<BAs...>>(lt.get()));
 
 	// more elaborate cases
-	if (lt[0].is_ba_constant())
-		return tau::get(ba_constant_neg(lt[0]));
+	if (lt.is_ba_constant())
+		return tau::get(ba_constant_neg(lt));
 	if (lt.is_term())
 		return tau::get(tau::build_bf_neg(lt.get()));
-	if (lt[0].is(tau::bf_eq)) {
+	if (lt.is(tau::bf_eq)) {
 		tau n_lt = tau::get(norm_equation<node<BAs...>>(lt.get()));
-		return tau::get(tau::build_bf_eq_0((~n_lt[0][0]).get()));
+		return tau::get(tau::build_bf_eq_0((~n_lt[0]).get()));
 	}
-	if (lt[0].is(tau::bf_neq)) {
+	if (lt.is(tau::bf_neq)) {
 		tau n_lt = tau::get(norm_equation<node<BAs...>>(lt.get()));
-		return tau::get(tau::build_bf_neq_0((~n_lt[0][0]).get()));
+		return tau::get(tau::build_bf_neq_0((~n_lt[0]).get()));
 	}
 	if (lt.is_wff())
 		return tau::get(tau::build_wff_neg(lt.get()));
@@ -130,17 +130,17 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	if (rt.equals_0()) return lt;
 
 	// more elaborate cases
-	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
-		return tau::get(ba_constant_xor(lt[0], rt[0]));
+	if (lt.is_ba_constant() && rt.is_ba_constant())
+		return tau::get(ba_constant_xor(lt, rt));
 	if (lt.is_term() && rt.is_term())
 		return tau::get(tau::build_bf_xor(lt.get(), rt.get()));
-	if (lt.is_term() && rt[0].is(tau::bf_eq)) {
+	if (lt.is_term() && rt.is(tau::bf_eq)) {
 		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
-		return tau::get(tau::build_bf_eq_0((lt ^ n_rt[0][0]).get()));
+		return tau::get(tau::build_bf_eq_0((lt ^ n_rt[0]).get()));
 	}
-	if (lt.is_term() && rt[0].is(tau::bf_neq)) {
+	if (lt.is_term() && rt.is(tau::bf_neq)) {
 		tau n_rt = tau::get(norm_equation<node<BAs...>>(rt.get()));
-		return tau::get(tau::build_bf_neq_0((lt ^ n_rt[0][0]).get()));
+		return tau::get(tau::build_bf_neq_0((lt ^ n_rt[0]).get()));
 	}
 	if (lt.is_wff() && rt.is_wff())
 		return tau::get(tau::build_wff_xor(lt.get(), rt.get()));
@@ -165,7 +165,7 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 	if (lt.equals_1()) return false;
 
 	// more elaborate cases
-	if (lt[0].is_ba_constant()) return node::ba::is_zero(lt[0].get_ba_constant());
+	if (lt.is_ba_constant()) return node::ba::is_zero(lt.get_ba_constant());
 	if (lt.is_term())  return lt.equals_0();
 	if (lt.is_wff()) return lt.equals_F();
 	DBG(throw std::logic_error("nso_ba is_zero: wrong types");)
@@ -182,7 +182,7 @@ bool is_one(const tree<node<BAs...>>& lt) {
 	if (lt.equals_1()) return true;
 
 	// more elaborate cases
-	if (lt[0].is_ba_constant()) return node::ba::is_one(lt[0].get_ba_constant());
+	if (lt.is_ba_constant()) return node::ba::is_one(lt.get_ba_constant());
 	if (lt.is_term())  return lt.equals_1();
 	if (lt.is_wff()) return lt.equals_T();
 	DBG(throw std::logic_error("nso_ba is_one: wrong types");)

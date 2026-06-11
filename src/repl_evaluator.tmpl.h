@@ -129,11 +129,16 @@ tref repl_evaluator<BAs...>::get_(typename node::type nt, tref n,
 	bool suppress_error) const
 {
 	// TAU_LOG_TRACE << "get_/n: " << node::name(nt) << "        " << TAU_DUMP_TO_STR(n);
-	if (tau::get(n).is(nt)) return n;
+	// nt names the requested kind (tau::wff for formulas, tau::bf for
+	// terms); trees are operator-rooted, so match the kind, not the nt
+	auto matches = [&nt](const auto& t) {
+		return tau::is_wff_nt(nt) ? t.is_wff() : t.is_term();
+	};
+	if (matches(tau::get(n))) return n;
 	else if (tau::get(n).is(tau::history)) {
 		if (auto check = history_retrieve(n); check) {
 			const auto& h = check.value().first;
-			if (tau::get(h).is(nt)) return h->get();
+			if (matches(tau::get(h))) return h->get();
 			else if (!suppress_error)
 				TAU_LOG_ERROR << "Argument has a wrong type";
 			return nullptr;
@@ -322,9 +327,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	if (in) { // BF substitution
 		tref thiz = get_bf(arg2), with = get_bf(arg3);
 		if (!in || !thiz || !with) return invalid_argument();
-		// strip bf of variables so we match also quantifiers
-		if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
-			thiz = tau::trim(thiz),	with = tau::trim(with);
+		// a bare variable arrives as a variable node directly, which
+		// also matches quantified occurrences, no stripping needed
 		// DBG(TAU_LOG_TRACE << "bf in:   " << TAU_LOG_FM_DUMP(in);)
 		// DBG(TAU_LOG_TRACE << "thiz:    " << TAU_LOG_FM_DUMP(thiz);)
 		// DBG(TAU_LOG_TRACE << "with:    " << TAU_LOG_FM_DUMP(with);)
@@ -342,9 +346,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
-	// strip bf of variables so we match also quantifiers
-	if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
-		thiz = tau::trim(thiz),	with = tau::trim(with);
+	// a bare variable arrives as a variable node directly, which also
+	// matches quantified occurrences, no stripping needed
 	// DBG(TAU_LOG_TRACE << "wff in: " << TAU_LOG_FM_DUMP(in);)
 	// DBG(TAU_LOG_TRACE << "thiz:   " << TAU_LOG_FM_DUMP(thiz);)
 	// DBG(TAU_LOG_TRACE << "with:   " << TAU_LOG_FM_DUMP(with);)
@@ -357,7 +360,7 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::inst_cmd(const tt& n) {
 	// DBG(TAU_LOG_TRACE << "inst_cmd" << LOG_FM_DUMP(n.value());)
 	const auto& t = n.value_tree();
-	if (!t[2][0].is(tau::variable)) {
+	if (!t[2].is(tau::variable)) {
 		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
@@ -457,7 +460,6 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 		size_t type_id)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	auto print_zero_case = [&type_id](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
 			<< node::ba::zero(get_ba_type_tree<node>(type_id))
@@ -479,9 +481,9 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 
 	std::cout << "solution: {\n";
 	for (auto [var, value]: solution.value()) {
-		if (auto check = tt(value) | tau::bf_t; check)
+		if (tau::get(value).is(tau::bf_t))
 			print_one_case(var);
-		else if (check = tt(value) | tau::bf_f; check)
+		else if (tau::get(value).is(tau::bf_f))
 			print_zero_case(var);
 		else
 			print_general_case(var, value);

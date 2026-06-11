@@ -11,23 +11,23 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		opts.parse.start = tau::bf;
 		tref fm = tau::get(sample, opts);
 		tau::get(fm).dump(std::cout << "fm: ") << "\n";
-		CHECK( tau::get(fm)[0].is(tau::bf_t) );
+		CHECK( tau::get(fm).is(tau::bf_t) );
 	}
 
 	TEST_CASE("simple case: T") {
 		const char* sample = "T.";
-		tref fm = tau::get(tau::get(sample))
-			.find_top(is<node_t, tau::wff>);
+		tref fm = tt(tau::get(sample))
+			| tau::spec | tau::main | tt::first | tt::ref;
 		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
-		CHECK( tau::get(fm)[0].is(tau::wff_t) );
+		CHECK( tau::get(fm).is(tau::wff_t) );
 	}
 
 	TEST_CASE("simple case: F") {
 		const char* sample = "F.";
-		tref fm = tau::get(tau::get(sample))
-			.find_top(is<node_t, tau::wff>);
+		tref fm = tt(tau::get(sample))
+			| tau::spec | tau::main | tt::first | tt::ref;
 		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
-		CHECK( tau::get(fm)[0].is(tau::wff_f) );
+		CHECK( tau::get(fm).is(tau::wff_f) );
 	}
 
 	TEST_CASE("simple case: X = 0") {
@@ -35,7 +35,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0.";
 		tref spec = tau::get(sample);
 		TAU_LOG_TRACE << "spec: " << TAU_LOG_FM_DUMP(spec);
-		tref fm = tt(spec) | tau::spec | tau::main | tau::wff | tt::ref;
+		tref fm = tt(spec) | tau::spec | tau::main | tt::first | tt::ref;
 		tref result = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		TAU_LOG_TRACE << "fm:     " << TAU_LOG_FM_DUMP(fm);
 		TAU_LOG_TRACE << "result: " << TAU_LOG_FM_DUMP(result);
@@ -46,7 +46,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X != 0.";
 
 		tref fm = tt(tau::get(sample))
-			| tau::spec | tau::main | tau::wff | tt::ref;
+			| tau::spec | tau::main | tt::first | tt::ref;
 		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		trefs check_eq  = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		trefs check_neg = tau::get(fm).select_all(is<node_t, tau::wff_neg>);
@@ -57,7 +57,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 	TEST_CASE("simple case: X = 0 && Y = 0") {
 		const char* sample = "X = 0 && Y = 0.";
 		tref fm = tt(tau::get(sample))
-			| tau::spec | tau::main | tau::wff | tt::ref;
+			| tau::spec | tau::main | tt::first | tt::ref;
 		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		trefs check_and = tau::get(fm).select_all(is<node_t, tau::wff_and>);
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
@@ -68,7 +68,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 	TEST_CASE("simple case: X != 0 && Y != 0") {
 		const char* sample = "X != 0 && Y != 0.";
 		tref fm = tt(tau::get(sample))
-			| tau::spec | tau::main | tau::wff | tt::ref;
+			| tau::spec | tau::main | tt::first | tt::ref;
 		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		trefs check_neg = tau::get(fm).select_all(is<node_t, tau::wff_neg>);
@@ -81,7 +81,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 	TEST_CASE("simple case: X = 0 || Y = 0") {
 		const char* sample = "X = 0 || Y = 0.";
 		tref fm = tt(tau::get(sample))
-			| tau::spec | tau::main | tau::wff | tt::ref;
+			| tau::spec | tau::main | tt::first | tt::ref;
 		fm = unequal_to_not_equal<node_t>(normalize_non_temp<node_t>(fm));
 		trefs check_eq = tau::get(fm).select_all(is<node_t, tau::bf_eq>);
 		trefs check_or = tau::get(fm).select_all(is<node_t, tau::wff_or>);
@@ -97,7 +97,7 @@ TEST_SUITE("normal forms: bf_reduce_canonical") {
 	TEST_CASE("uninterpreted constants") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		tref fm = tt(tau::get(sample))
-			| tau::spec | tau::main | tau::wff
+			| tau::spec | tau::main | tt::first
 			| bf_reduce_canonical<node_t>() | tt::ref;
 		CHECK( tau::get(fm) == tau::get_T() );
 	}
@@ -123,8 +123,8 @@ TEST_SUITE("normal forms: dnf_bf") {
 	TEST_CASE("uninterpreted constants") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		tref fm = tt(tau::get(sample))
-			| tau::spec | tau::main | tau::wff | tau::bf_eq
-			| tau::bf | tt::f(to_dnf<node_t, false>) | tt::ref;
+			| tau::spec | tau::main | tau::bf_eq
+			| tt::first | tt::f(to_dnf<node_t, false>) | tt::ref;
 		CHECK( tau::get(fm).equals_0() );
 	}
 
@@ -211,10 +211,10 @@ TEST_SUITE("QuantBlockPush") {
 		const char* sample = "ex x ex y xy = 0 && yx = 0 && !(x|y = 0) && !(x = y).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		trefs quant_block;
-		quant_block.push_back(tau::get(fm)[0].first());
-		fm = tau::get(fm)[0].second();
-		quant_block.push_back(tau::get(fm)[0].first());
-		fm = tau::get(fm)[0].second();
+		quant_block.push_back(tau::get(fm).first());
+		fm = tau::get(fm).second();
+		quant_block.push_back(tau::get(fm).first());
+		fm = tau::get(fm).second();
 		term_handle<node_t>::order order;
 		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
 		// tau::get(res).print(std::cout << "res: ") << "\n";
@@ -226,12 +226,12 @@ TEST_SUITE("QuantBlockPush") {
 		fm = unequal_to_not_equal<node_t>(fm);
 		trefs quant_block;
 		term_handle<node_t>::order order;
-		tref uvar = tau::trim2(fm);
+		tref uvar = tau::trim(fm);
 		order.emplace(uvar, 1);
-		fm = tau::get(fm)[0].second();
-		quant_block.push_back(tau::trim2(fm));
-		order.emplace(tau::trim2(fm), 0);
-		fm = tau::get(fm)[0].second();
+		fm = tau::get(fm).second();
+		quant_block.push_back(tau::trim(fm));
+		order.emplace(tau::trim(fm), 0);
+		fm = tau::get(fm).second();
 		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
 		// tau::get(res).print(std::cout << "ex: ") << "\n";
 		res = tau::build_wff_all(uvar, res, false);

@@ -25,9 +25,9 @@ tref term_add(tref symbol) {
 		DBG(LOG_TRACE << "term_add/add_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
-	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
-	const tau& c1 = tau::get(symbol)[0][0][0];
-	const tau& c2 = tau::get(symbol)[0][1][0];
+	// term symbol > (term symbol) (term symbol)
+	const tau& c1 = tau::get(symbol)[0];
+	const tau& c2 = tau::get(symbol)[1];
 	switch (c1.value.nt) {
 		// 1 + X
 		case tau::bf_t: {
@@ -52,7 +52,7 @@ tref term_add(tref symbol) {
 			break;
 		}
 		// 0 + X
-		case tau::bf_f: return tau::trim_right_sibling(tau::get(symbol)[0].second());
+		case tau::bf_f: return tau::trim_right_sibling(tau::get(symbol).second());
 		default: break;
 	}
 	switch (c2.value.nt) {
@@ -71,7 +71,7 @@ tref term_add(tref symbol) {
 		}
 		// x + 0
 		case tau::bf_f:
-			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+			return tau::trim_right_sibling(tau::get(symbol).first());
 		default: break;
 	}
 	// { ... } + { ... }
@@ -99,9 +99,9 @@ tref term_sub(tref symbol) {
 		DBG(LOG_TRACE << "term_sub/sub_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
-	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
-	const tau& c1 = tau::get(symbol)[0][0][0];
-	const tau& c2 = tau::get(symbol)[0][1][0];
+	// term symbol > (term symbol) (term symbol)
+	const tau& c1 = tau::get(symbol)[0];
+	const tau& c2 = tau::get(symbol)[1];
 	switch (c1.value.nt) {
 		// 1 - X
 		case tau::bf_t: {
@@ -145,9 +145,8 @@ tref term_sub(tref symbol) {
 		}
 		// {const}' - X  (bitwise complement of constant minus something)
 		case tau::bf_neg: {
-			// c1 is bf_neg, so left operand is bf(bf_neg(bf(const)))
-			// c1[0] is bf(const), c1[0][0] is the inner constant
-			const tau& inner = c1[0][0];
+			// c1 is bf_neg, c1[0] is the inner constant
+			const tau& inner = c1[0];
 			if (inner.is_ba_constant() && inner.get_ba_type() > 0
 					&& is_bv_type_family<node>(inner.get_ba_type())) {
 				bv neg_c1 = make_bitvector_not(std::get<bv>(inner.get_ba_constant()));
@@ -186,7 +185,7 @@ tref term_sub(tref symbol) {
 		}
 		// x - 0
 		case tau::bf_f:
-			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+			return tau::trim_right_sibling(tau::get(symbol).first());
 		default: break;
 	}
 	// { ... } - { ... }
@@ -214,9 +213,9 @@ tref term_mul(tref symbol) {
 		DBG(LOG_TRACE << "term_mul/mul_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
-	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
-	const tau& c1 = tau::get(symbol)[0][0][0];
-	const tau& c2 = tau::get(symbol)[0][1][0];
+	// term symbol > (term symbol) (term symbol)
+	const tau& c1 = tau::get(symbol)[0];
+	const tau& c2 = tau::get(symbol)[1];
 	switch (c1.value.nt) {
 		// 1 * X
 		case tau::bf_t: {
@@ -267,7 +266,7 @@ tref term_mul(tref symbol) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
 		if (const bv cc = std::get<bv>(c1.get_ba_constant());
 			cc.isBitVectorValue() && cc.getBitVectorValue(10) == "1") {
-			return tau::trim_right_sibling(tau::get(symbol)[0].second());
+			return tau::trim_right_sibling(tau::get(symbol).second());
 		}
 	}
 	// X * {1}
@@ -275,7 +274,7 @@ tref term_mul(tref symbol) {
 		DBG(assert(is_bv_type_family<node>(c2.get_ba_type()));)
 		if (const bv cc = std::get<bv>(c2.get_ba_constant());
 			cc.isBitVectorValue() && cc.getBitVectorValue(10) == "1") {
-			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+			return tau::trim_right_sibling(tau::get(symbol).first());
 		}
 	}
 	// { ... } * { ... }
@@ -303,9 +302,9 @@ tref term_div(tref symbol) {
 		DBG(LOG_TRACE << "term_div/div_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
-	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
-	const tau& c1 = tau::get(symbol)[0][0][0];
-	const tau& c2 = tau::get(symbol)[0][1][0];
+	// term symbol > (term symbol) (term symbol)
+	const tau& c1 = tau::get(symbol)[0];
+	const tau& c2 = tau::get(symbol)[1];
 	switch (c1.value.nt) {
 		// 1 / X
 		case tau::bf_t: {
@@ -388,9 +387,9 @@ tref term_mod(tref symbol) {
 		DBG(LOG_TRACE << "term_mod/mod_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
-	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
-	const tau& c1 = tau::get(symbol)[0][0][0];
-	const tau& c2 = tau::get(symbol)[0][1][0];
+	// term symbol > (term symbol) (term symbol)
+	const tau& c1 = tau::get(symbol)[0];
+	const tau& c2 = tau::get(symbol)[1];
 	switch (c1.value.nt) {
 		// 1 % X
 		case tau::bf_t: {
@@ -434,7 +433,7 @@ tref term_mod(tref symbol) {
 		}
 		// X % 0 is X
 		case tau::bf_f:
-			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+			return tau::trim_right_sibling(tau::get(symbol).first());
 		default: break;
 	}
 	// { ... } % { ... }
@@ -462,9 +461,9 @@ tref term_shr(tref symbol) {
 		DBG(LOG_TRACE << "term_shr/shr_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
-	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
-	const tau& c1 = tau::get(symbol)[0][0][0];
-	const tau& c2 = tau::get(symbol)[0][1][0];
+	// term symbol > (term symbol) (term symbol)
+	const tau& c1 = tau::get(symbol)[0];
+	const tau& c2 = tau::get(symbol)[1];
 	switch (c1.value.nt) {
 		// 1 >> X
 		case tau::bf_t: {
@@ -530,7 +529,7 @@ tref term_shr(tref symbol) {
 		}
 		// X >> 0
 		case tau::bf_f:
-			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+			return tau::trim_right_sibling(tau::get(symbol).first());
 		default: break;
 	}
 	// { ... } >> { ... }
@@ -558,9 +557,9 @@ tref term_shl(tref symbol) {
 		DBG(LOG_TRACE << "term_shl/shl_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
-	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
-	const tau& c1 = tau::get(symbol)[0][0][0];
-	const tau& c2 = tau::get(symbol)[0][1][0];
+	// term symbol > (term symbol) (term symbol)
+	const tau& c1 = tau::get(symbol)[0];
+	const tau& c2 = tau::get(symbol)[1];
 	switch (c1.value.nt) {
 		// 1 << X
 		case tau::bf_t: {
@@ -626,7 +625,7 @@ tref term_shl(tref symbol) {
 		}
 		// X << 0
 		case tau::bf_f:
-			return tau::trim_right_sibling(tau::get(symbol)[0].first());
+			return tau::trim_right_sibling(tau::get(symbol).first());
 		default: break;
 	}
 	// { ... } << { ... }
@@ -649,8 +648,8 @@ inline int compare_bv_consts(const bv& c1, const bv& c2) {
 template<NodeType node>
 tref wff_bv_lt(const tref* ch, tref r) {
 	using tau = tree<node>;
-	const tau& c1 = tau::get(ch[0])[0][0];
-	const tau& c2 = tau::get(ch[0])[1][0];
+	const tau& c1 = tau::get(ch[0]);
+	const tau& c2 = tau::get(ch[1]);
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
@@ -665,8 +664,8 @@ tref wff_bv_lt(const tref* ch, tref r) {
 template<NodeType node>
 tref wff_bv_nlt(const tref* ch, tref r) {
 	using tau = tree<node>;
-	const tau& c1 = tau::get(ch[0])[0][0];
-	const tau& c2 = tau::get(ch[0])[1][0];
+	const tau& c1 = tau::get(ch[0]);
+	const tau& c2 = tau::get(ch[1]);
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
@@ -681,8 +680,8 @@ tref wff_bv_nlt(const tref* ch, tref r) {
 template<NodeType node>
 tref wff_bv_lteq(const tref* ch, tref r) {
 	using tau = tree<node>;
-	const tau& c1 = tau::get(ch[0])[0][0];
-	const tau& c2 = tau::get(ch[0])[1][0];
+	const tau& c1 = tau::get(ch[0]);
+	const tau& c2 = tau::get(ch[1]);
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
@@ -697,8 +696,8 @@ tref wff_bv_lteq(const tref* ch, tref r) {
 template<NodeType node>
 tref wff_bv_nlteq(const tref* ch, tref r) {
 	using tau = tree<node>;
-	const tau& c1 = tau::get(ch[0])[0][0];
-	const tau& c2 = tau::get(ch[0])[1][0];
+	const tau& c1 = tau::get(ch[0]);
+	const tau& c2 = tau::get(ch[1]);
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
@@ -713,8 +712,8 @@ tref wff_bv_nlteq(const tref* ch, tref r) {
 template<NodeType node>
 tref wff_bv_gt(const tref* ch, tref r) {
 	using tau = tree<node>;
-	const tau& c1 = tau::get(ch[0])[0][0];
-	const tau& c2 = tau::get(ch[0])[1][0];
+	const tau& c1 = tau::get(ch[0]);
+	const tau& c2 = tau::get(ch[1]);
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
@@ -729,8 +728,8 @@ tref wff_bv_gt(const tref* ch, tref r) {
 template<NodeType node>
 tref wff_bv_ngt(const tref* ch, tref r) {
 	using tau = tree<node>;
-	const tau& c1 = tau::get(ch[0])[0][0];
-	const tau& c2 = tau::get(ch[0])[1][0];
+	const tau& c1 = tau::get(ch[0]);
+	const tau& c2 = tau::get(ch[1]);
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
@@ -745,8 +744,8 @@ tref wff_bv_ngt(const tref* ch, tref r) {
 template<NodeType node>
 tref wff_bv_gteq(const tref* ch, tref r) {
 	using tau = tree<node>;
-	const tau& c1 = tau::get(ch[0])[0][0];
-	const tau& c2 = tau::get(ch[0])[1][0];
+	const tau& c1 = tau::get(ch[0]);
+	const tau& c2 = tau::get(ch[1]);
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
@@ -761,8 +760,8 @@ tref wff_bv_gteq(const tref* ch, tref r) {
 template<NodeType node>
 tref wff_bv_ngteq(const tref* ch, tref r) {
 	using tau = tree<node>;
-	const tau& c1 = tau::get(ch[0])[0][0];
-	const tau& c2 = tau::get(ch[0])[1][0];
+	const tau& c1 = tau::get(ch[0]);
+	const tau& c2 = tau::get(ch[1]);
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {
 		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
@@ -777,24 +776,24 @@ tref wff_bv_ngteq(const tref* ch, tref r) {
 template<NodeType node>
 tref term_nor(tref symbol) {
 	using tau = tree<node>;
-	tref c1 = tau::trim_right_sibling(tau::get(symbol)[0].first());
-	tref c2 = tau::trim_right_sibling(tau::get(symbol)[0].second());
+	tref c1 = tau::trim_right_sibling(tau::get(symbol).first());
+	tref c2 = tau::trim_right_sibling(tau::get(symbol).second());
 	return tau::build_bf_neg(tau::build_bf_or(c1, c2));
 }
 
 template<NodeType node>
 tref term_xnor(tref symbol) {
 	using tau = tree<node>;
-	tref c1 = tau::trim_right_sibling(tau::get(symbol)[0].first());
-	tref c2 = tau::trim_right_sibling(tau::get(symbol)[0].second());
+	tref c1 = tau::trim_right_sibling(tau::get(symbol).first());
+	tref c2 = tau::trim_right_sibling(tau::get(symbol).second());
 	return tau::build_bf_neg(tau::build_bf_xor(c1, c2));
 }
 
 template<NodeType node>
 tref term_nand(tref symbol) {
 	using tau = tree<node>;
-	tref c1 = tau::trim_right_sibling(tau::get(symbol)[0].first());
-	tref c2 = tau::trim_right_sibling(tau::get(symbol)[0].second());
+	tref c1 = tau::trim_right_sibling(tau::get(symbol).first());
+	tref c2 = tau::trim_right_sibling(tau::get(symbol).second());
 	return tau::build_bf_neg(tau::build_bf_and(c1, c2));
 }
 
@@ -805,13 +804,12 @@ tref bv_term_cast(tref symbol, size_t target_type_id) {
 
 	DBG(LOG_TRACE << "term_cast/symbol:" << LOG_FM_TREE(symbol) << "\n";)
 
-	// bf > bf_cast > bf > [operand value]
-	// symbol[0] is bf_cast, symbol[0][0] is the operand bf, symbol[0][0][0] is the value
-	const tau& operand_value = tau::get(symbol)[0][0][0];
+	// bf_cast > [operand value]
+	// symbol is bf_cast, symbol[0] is the operand value
+	const tau& operand_value = tau::get(symbol)[0];
 
-	// Get source type from the operand's bf wrapper
-	size_t src_type_id = tau::get(symbol)[0][0].get_ba_type();
-	if (src_type_id == 0) src_type_id = operand_value.get_ba_type();
+	// Get source type from the operand
+	size_t src_type_id = operand_value.get_ba_type();
 	if (src_type_id == 0 || target_type_id == 0) {
 		return symbol;
 	}
@@ -866,7 +864,7 @@ template <NodeType node_t>
 tref simplify_bv_symbol(tref symbol) {
 	using tau = tree<node_t>;
 
-	switch (tau::get(symbol)[0].get_type()) {
+	switch (tau::get(symbol).get_type()) {
 		case tau::bf_add: return term_add<node_t>(symbol);
 		case tau::bf_sub: return term_sub<node_t>(symbol);
 		case tau::bf_mul: return term_mul<node_t>(symbol);

@@ -781,22 +781,22 @@ bool tree<node>::is_output_variable() const {
 
 template <NodeType node>
 bool tree<node>::equals_0() const {
-	return is_child<node>(get(), tau::bf_f);
+	return is(tau::bf_f);
 }
 
 template <NodeType node>
 bool tree<node>::equals_1() const {
-	return is_child<node>(get(), tau::bf_t);
+	return is(tau::bf_t);
 }
 
 template <NodeType node>
 bool tree<node>::equals_F() const {
-	return is_child<node>(get(), tau::wff_f);
+	return is(tau::wff_f);
 }
 
 template <NodeType node>
 bool tree<node>::equals_T() const {
-	return is_child<node>(get(), tau::wff_t);
+	return is(tau::wff_t);
 }
 
 template <NodeType node>

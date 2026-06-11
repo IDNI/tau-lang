@@ -33,7 +33,7 @@ static tref make_bvadd_call_from_offset(tref augend, tref addend, tref sum, tref
 	DBG( LOG_TRACE << "make_bvadd_call_from_offset/addend: " << LOG_FM(addend) << "\n"; )
 	DBG( LOG_TRACE << "make_bvadd_call_from_offset/sum: " << LOG_FM(sum) << "\n"; )
 	DBG( LOG_TRACE << "make_bvadd_call_from_offset/offset: " << LOG_FM(offset) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvadd", { offset }, { augend, addend, sum })));
+	auto result = tau::get(tau::wff_ref, tau::build_rr_ref("_bvadd", { offset }, { augend, addend, sum }));
 	DBG( LOG_TRACE << "make_bvadd_call_from_offset/result: " << LOG_FM(result) << "\n"; )
 	return result;
 }
@@ -94,11 +94,10 @@ static rewriter::rules bvadd_rules(size_t bitwidth) {
 	auto n_minus_1 = tau::build_shift(n, 1);
 	auto general_header = make_bvadd_call_from_offset<node>(augend, addend, sum, n);
 	auto w = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_w = tau::get(tau::bf, w);
 	auto general_body = tau::build_wff_ex(w,
 		tau::build_wff_and(
-			make_bvadd_call_from_offset<node>(tau::build_bf_xor(augend, addend), bf_w, sum, n_minus_1),
-			bvshl_by_one<node>(tau::build_bf_and(augend, addend), bf_w)
+			make_bvadd_call_from_offset<node>(tau::build_bf_xor(augend, addend), w, sum, n_minus_1),
+			bvshl_by_one<node>(tau::build_bf_and(augend, addend), w)
 	));
 	rules.push_back(make_rule<node>(general_header, general_body));
 
@@ -199,7 +198,7 @@ static tref make_bvsub_call_from_offset(tref minuend, tref subtrahend, tref diff
 	DBG( LOG_TRACE << "make_bvsub_call_from_offset/subtrahend: " << LOG_FM(subtrahend) << "\n"; )
 	DBG( LOG_TRACE << "make_bvsub_call_from_offset/difference: " << LOG_FM(difference) << "\n"; )
 	DBG( LOG_TRACE << "make_bvsub_call_from_offset/offset: " << LOG_FM(offset) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvsub", { offset }, { minuend, subtrahend, difference })));
+	auto result = tau::get(tau::wff_ref, tau::build_rr_ref("_bvsub", { offset }, { minuend, subtrahend, difference }));
 	DBG( LOG_TRACE << "make_bvsub_call_from_offset/result: " << LOG_FM(result) << "\n"; )
 	return result;
 }
@@ -260,11 +259,10 @@ static rewriter::rules bvsub_rules(size_t bitwidth) {
 	auto n_minus_1 = tau::build_shift(n, 1);
 	auto general_header = make_bvsub_call_from_offset<node>(minuend, subtrahend, difference, n);
 	auto w = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_w = tau::get(tau::bf, w);
 	auto general_body = tau::build_wff_ex(w,
 		tau::build_wff_and(
-			make_bvsub_call_from_offset<node>(tau::build_bf_xor(minuend, subtrahend), bf_w, difference, n_minus_1),
-			bvshl_by_one<node>(tau::build_bf_and(tau::build_bf_neg(minuend), subtrahend), bf_w)
+			make_bvsub_call_from_offset<node>(tau::build_bf_xor(minuend, subtrahend), w, difference, n_minus_1),
+			bvshl_by_one<node>(tau::build_bf_and(tau::build_bf_neg(minuend), subtrahend), w)
 		));
 	rules.push_back(make_rule<node>(general_header, general_body));
 
@@ -361,7 +359,7 @@ static tref make_bvmul_call(tref multiplicant, tref multiplier, tref product) {
 	DBG( LOG_TRACE << "make_bvmul_call/multiplicant: " << LOG_FM(multiplicant) << "\n"; )
 	DBG( LOG_TRACE << "make_bvmul_call/multiplier: " << LOG_FM(multiplier) << "\n"; )
 	DBG( LOG_TRACE << "make_bvmul_call/product: " << LOG_FM(product) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmul", { multiplicant, multiplier, product })));
+	auto result = tau::get(tau::wff_ref, tau::build_ref("_bvmul", { multiplicant, multiplier, product }));
 	DBG( LOG_TRACE << "make_bvmul_call/result: " << LOG_FM(result) << "\n"; )
 	return result;
 }
@@ -381,7 +379,7 @@ static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 	using tau = tree<node>;
 	DBG( LOG_TRACE << "bvmul_rec_rule/multiplier: " << LOG_FM(multiplier) << "\n"; )
 
-	DBG( assert(tau::get(tau::trim(multiplier)).is(tau::bf_f) || is_bv_constant<node>(tau::trim(multiplier))); )
+	DBG( assert(tau::get(multiplier).is(tau::bf_f) || is_bv_constant<node>(multiplier)); )
 
 	static std::map<tref, rewriter::rule> cache;
 	if (cache.find(multiplier) != cache.end()) {
@@ -391,14 +389,12 @@ static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 
 	auto bitwidth = get_bv_type_bitwidth<node>(multiplier);
 	auto multiplicand = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_multiplicand = tau::get(tau::bf, multiplicand);
 	auto product = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_product = tau::get(tau::bf, product);
-	auto head = make_bvmul_call<node>(bf_multiplicand, multiplier, bf_product);
+	auto head = make_bvmul_call<node>(multiplicand, multiplier, product);
 
 	// multiplication[n](x, 0, z) = (z = 0) or multiplication[n](0, x, z) = (z = 0);
-	if (tau::get(tau::trim(multiplier)).is(tau::bf_f)) { // || is_zero_bv_constant<node>(tau::trim(multiplier))) {
-		auto zero_case = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), bf_product);
+	if (tau::get(multiplier).is(tau::bf_f)) { // || is_zero_bv_constant<node>(multiplier)) {
+		auto zero_case = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), product);
 		auto rule = make_rule<node>(head, zero_case);
 
 #ifdef DEBUG
@@ -410,22 +406,19 @@ static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 		return rule;
 	}
 
-	auto shr_multiplier = tau::get(tau::bf, bv_shr_by_one<node>(tau::trim(multiplier)));
-	auto bf_shr_multiplier = tau::get(tau::bf, shr_multiplier);
+	auto shr_multiplier = bv_shr_by_one<node>(multiplier);
 	auto subproduct = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_subproduct = tau::get(tau::bf, subproduct);
 	auto shl_multiplicant = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_shl_multiplicant = tau::get(tau::bf, shl_multiplicant);
 
 	// case y & 1 = 1: multiplication(x, y, w) = ex z ex v multiplication(x << 1, v) && addition(x, v, z);
-	if (is_bv_lsb_one<node>(tau::trim(multiplier))) {
+	if (is_bv_lsb_one<node>(multiplier)) {
 		auto odd_case = tau::build_wff_ex(shl_multiplicant,
 			tau::build_wff_ex(subproduct,
 				tau::build_wff_and(
 					tau::build_wff_and(
-						bvshl_by_one<node>(bf_multiplicand, bf_shl_multiplicant),
-						make_bvmul_call<node>(bf_shl_multiplicant, bf_shr_multiplier, bf_subproduct)),
-					bvadd<node>(bf_multiplicand, bf_subproduct, bf_product))));
+						bvshl_by_one<node>(multiplicand, shl_multiplicant),
+						make_bvmul_call<node>(shl_multiplicant, shr_multiplier, subproduct)),
+					bvadd<node>(multiplicand, subproduct, product))));
 		auto rule = make_rule<node>(head, odd_case);
 
 #ifdef DEBUG
@@ -441,10 +434,10 @@ static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
 	auto even_case = tau::build_wff_ex(shl_multiplicant,
 		tau::build_wff_ex(subproduct,
 			tau::build_wff_and(
-				bvshl_by_one<node>(bf_multiplicand, bf_shl_multiplicant),
+				bvshl_by_one<node>(multiplicand, shl_multiplicant),
 				tau::build_wff_and(
-					make_bvmul_call<node>(bf_shl_multiplicant, bf_shr_multiplier, bf_subproduct),
-					tau::build_bf_eq(bf_product, bf_subproduct)))));
+					make_bvmul_call<node>(shl_multiplicant, shr_multiplier, subproduct),
+					tau::build_bf_eq(product, subproduct)))));
 	auto rule = make_rule<node>(head, even_case);
 
 #ifdef DEBUG
@@ -482,10 +475,10 @@ static rewriter::rule bvmul_rule(tref multiplier /* cvc5 constant */) {
 	auto current = multiplier;
 	auto bitwidth = get_bv_type_bitwidth<node>(multiplier);
 
-	while (!tau::get(tau::trim(current)).is(tau::bf_f)) { //is_zero_bv_constant<node>(tau::trim(current))) {
+	while (!tau::get(current).is(tau::bf_f)) { //is_zero_bv_constant<node>(current))) {
 		auto rule = bvmul_rec_rule<node>(current);
 		rules.push_back(rule);
-		current = tau::get(tau::bf, bv_shr_by_one<node>(tau::trim(current)));
+		current = bv_shr_by_one<node>(current);
 	}
 	// Then we build a main term to compute the actual predicate.
 	auto multiplicant = tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -512,7 +505,7 @@ tref bvmul(tref multiplicand, tref multiplier, tref product) {
 	DBG( LOG_TRACE << "bvmul/multiplier: " << LOG_FM(multiplier) << "\n"; )
 	DBG( LOG_TRACE << "bvmul/product: " << LOG_FM(product) << "\n"; )
 
-	if (!tau::get(tau::trim(multiplier)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(multiplier))) {
+	if (!tau::get(multiplier).is(tau::bf_f) && !is_bv_constant<node>(multiplier)) {
 		DBG( LOG_DEBUG << "Only multiplication by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
@@ -547,7 +540,7 @@ static tref make_bvdiv_call(tref dividend, tref divisor, tref quotient) {
 	DBG( LOG_TRACE << "make_bvdiv_call/dividend: " << LOG_FM(dividend) << "\n"; )
 	DBG( LOG_TRACE << "make_bvdiv_call/divisor: " << LOG_FM(divisor) << "\n"; )
 	DBG( LOG_TRACE << "make_bvdiv_call/quotient: " << LOG_FM(quotient) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvdiv", { dividend, divisor, quotient })));
+	auto result = tau::get(tau::wff_ref, tau::build_ref("_bvdiv", { dividend, divisor, quotient }));
 	DBG( LOG_TRACE << "make_bvdiv_call/result: " << LOG_FM(result) << "\n"; )
 	return result;
 }
@@ -575,22 +568,18 @@ static rewriter::rule bvdiv_rule(tref divisor /* bv constant */) {
 
 	// We build the main term to compute the actual predicate.
 	auto quotient = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_quotient = tau::get(tau::bf, quotient);
 	auto remainder = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_remainder = tau::get(tau::bf, remainder);
 	auto dividend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto bf_dividend = tau::get(tau::bf, dividend);
 	auto exact = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_exact = tau::get(tau::bf, exact);
-	auto call = make_bvdiv_call<node>(dividend, divisor, bf_quotient);
+	auto call = make_bvdiv_call<node>(dividend, divisor, quotient);
 	auto body = tau::build_wff_ex(exact,
 		tau::build_wff_ex(quotient,
 			tau::build_wff_ex(remainder,
 				tau::build_wff_and(
-					bvsub<node>(bf_dividend, bf_remainder, bf_exact),
+					bvsub<node>(dividend, remainder, exact),
 					tau::build_wff_and(
-						bvmul<node>(bf_quotient, divisor, bf_exact),
-						bvlt<node>(bf_remainder, divisor))))));
+						bvmul<node>(quotient, divisor, exact),
+						bvlt<node>(remainder, divisor))))));
 	auto rule = make_rule<node>(call, body);
 
 #ifdef DEBUG
@@ -609,7 +598,7 @@ tref bvdiv(tref dividend, tref divisor, tref quotient) {
 	DBG( LOG_TRACE << "bvdiv/divisor: " << LOG_FM(divisor) << "\n"; )
 	DBG( LOG_TRACE << "bvdiv/quotient: " << LOG_FM(quotient) << "\n"; )
 
-	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
+	if (!tau::get(divisor).is(tau::bf_f) && !is_bv_constant<node>(divisor)) {
 		DBG( LOG_DEBUG << "Only division by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
@@ -635,7 +624,7 @@ static tref make_bvmod_call(tref dividend, tref divisor, tref remainder) {
 	DBG( LOG_TRACE << "make_bvmod_call/dividend: " << LOG_FM(dividend) << "\n"; )
 	DBG( LOG_TRACE << "make_bvmod_call/divisor: " << LOG_FM(divisor) << "\n"; )
 	DBG( LOG_TRACE << "make_bvmod_call/remainder: " << LOG_FM(remainder) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmod", { dividend, divisor, remainder })));
+	auto result = tau::get(tau::wff_ref, tau::build_ref("_bvmod", { dividend, divisor, remainder }));
 	DBG( LOG_TRACE << "make_bvmod_call/result: " << LOG_FM(result) << "\n"; )
 	return result;
 }
@@ -662,18 +651,14 @@ static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
 
 	// We build the main term to compute the actual predicate.
-	auto quotient_var = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto quotient = tau::get(tau::bf, quotient_var);
-	auto remainder_var = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto remainder = tau::get(tau::bf, remainder_var);
-	auto dividend_var = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto dividend = tau::get(tau::bf, dividend_var);
-	auto exact_var = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto exact = tau::get(tau::bf, exact_var);
+	auto quotient = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto remainder = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto dividend = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto exact = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto call = make_bvmod_call<node>(dividend, divisor, remainder);
-	auto body = tau::build_wff_ex(exact_var,
-		tau::build_wff_ex(quotient_var,
-			tau::build_wff_ex(remainder_var,
+	auto body = tau::build_wff_ex(exact,
+		tau::build_wff_ex(quotient,
+			tau::build_wff_ex(remainder,
 				tau::build_wff_and(
 					bvsub<node>(dividend, remainder, exact),
 					tau::build_wff_and(
@@ -697,7 +682,7 @@ tref bvmod(tref dividend, tref divisor, tref remainder) {
 	DBG( LOG_TRACE << "bvmod/divisor: " << LOG_FM(divisor) << "\n"; )
 	DBG( LOG_TRACE << "bvmod/remainder: " << LOG_FM(remainder) << "\n"; )
 
-	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
+	if (!tau::get(divisor).is(tau::bf_f) && !is_bv_constant<node>(divisor)) {
 		DBG( LOG_DEBUG << "Only modulo by constant is supported in predicate blasting."; )
 		return nullptr;
 	}
@@ -725,7 +710,7 @@ static tref make_bved_call(tref dividend, tref divisor, tref quotient, tref rema
 	DBG( LOG_TRACE << "make_bved_call/divisor: " << LOG_FM(divisor) << "\n"; )
 	DBG( LOG_TRACE << "make_bved_call/quotient: " << LOG_FM(quotient) << "\n"; )
 	DBG( LOG_TRACE << "make_bved_call/remainder: " << LOG_FM(remainder) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bved", { dividend, divisor, quotient, remainder })));
+	auto result = tau::get(tau::wff_ref, tau::build_ref("_bved", { dividend, divisor, quotient, remainder }));
 	DBG( LOG_TRACE << "make_bved_call/result: " << LOG_FM(result) << "\n"; )
 	return result;
 }
@@ -757,7 +742,6 @@ static rewriter::rule bved_rule(tref divisor /* bv constant */) {
 	auto quotient_var  = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto remainder_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto exact_var     = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_exact      = tau::get(tau::bf, exact_var);
 
 	// head: _bved(dividend, divisor, quotient, remainder)
 	auto call = make_bved_call<node>(dividend_var, divisor, quotient_var, remainder_var);
@@ -768,9 +752,9 @@ static rewriter::rule bved_rule(tref divisor /* bv constant */) {
 	//   && bvlt(remainder, divisor)         -- remainder < divisor
 	auto body = tau::build_wff_ex(exact_var,
 		tau::build_wff_and(
-			bvsub<node>(dividend_var, remainder_var, bf_exact),
+			bvsub<node>(dividend_var, remainder_var, exact_var),
 			tau::build_wff_and(
-				bvmul<node>(quotient_var, divisor, bf_exact),
+				bvmul<node>(quotient_var, divisor, exact_var),
 				bvlt<node>(remainder_var, divisor))));
 	auto rule = make_rule<node>(call, body);
 
@@ -791,7 +775,7 @@ tref bved(tref dividend, tref divisor, tref quotient, tref remainder) {
 	DBG( LOG_TRACE << "bved/quotient: " << LOG_FM(quotient) << "\n"; )
 	DBG( LOG_TRACE << "bved/remainder: " << LOG_FM(remainder) << "\n"; )
 
-	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
+	if (!tau::get(divisor).is(tau::bf_f) && !is_bv_constant<node>(divisor)) {
 		DBG( LOG_DEBUG << "Only Euclidean division by constant is supported in predicate blasting."; )
 		return nullptr;
 	}

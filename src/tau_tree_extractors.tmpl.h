@@ -105,13 +105,12 @@ std::optional<rr<node>> get_nso_rr(io_context<node>& ctx, tref r) {
 	const auto& t = tau::get(r).is(tau::start) ? tau::get(r)[0]
 						   : tau::get(r);
 	r = t.get();
-	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
+	if (t.is_term() || t.is(tau::ref)) return { { {}, tau::geth(r) } };
 	if (t.is(tau::rec_relation))
 		return { { get_rec_relations<node>(ctx, r), (htref) nullptr } };
 	LOG_TRACE << "get_nso_rr - r: " << LOG_FM_DUMP(r);
 
-	tref expression = tt(r) | tau::main | tau::wff | tt::ref;
-	if (!expression) expression = tt(r) | tau::main | tau::bf | tt::ref;
+	tref expression = tt(r) | tau::main | tt::first | tt::ref;
 	tref main_fm = resolve_io_vars<node>(ctx, expression);
 	if (!main_fm) return {};
 
@@ -151,7 +150,6 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 	auto add_leave = [&branch, &leaves](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(branch)) return true;
-		if (t.child_is(branch)) return true;
 		LOG_TRACE << "adding leaf: " << LOG_FM(n);
 		return leaves.push_back(n), false;
 	};
@@ -205,12 +203,10 @@ tref expression_paths<node>::iterator::operator*() {
 		// In order to catch chained bf_or we need to loop
 		while (check) {
 			if (term) {
-				if (!tau::get(n).is(tau::bf)) return n;
-				const tau& t = tau::get(n)[0];
+				const tau& t = tau::get(n);
 				check = t.is(tau::bf_or) || t.is(tau::bf_xor);
 			} else {
-				if (!tau::get(n).is(tau::wff)) return n;
-				check = tau::get(n)[0].is(tau::wff_or);
+				check = tau::get(n).is(tau::wff_or);
 			}
 			if (check) {
 				if (idx == decisions.size()) {
@@ -218,13 +214,13 @@ tref expression_paths<node>::iterator::operator*() {
 					// Go left with save
 					decisions.push_back(true);
 					++idx;
-					n = tau::get(n)[0].first();
+					n = tau::get(n).first();
 				} else if (decisions[idx++]) {
 					// Go left
-					n = tau::get(n)[0].first();
+					n = tau::get(n).first();
 				} else {
 					// Go right
-					n = tau::get(n)[0].second();
+					n = tau::get(n).second();
 				}
 			}
 		}
@@ -280,12 +276,10 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 		if (removed) return n;
 		bool check;
 		if (term) {
-			if (!tau::get(n).is(tau::bf)) return n;
-			const tau& t = tau::get(n)[0];
+			const tau& t = tau::get(n);
 			check = t.is(tau::bf_or) || t.is(tau::bf_xor);
 		} else {
-			if (!tau::get(n).is(tau::wff)) return n;
-			check = tau::get(n)[0].is(tau::wff_or);
+			check = tau::get(n).is(tau::wff_or);
 		}
 		if (check) {
 			DBG(assert(idx < decisions.size());)
@@ -295,16 +289,16 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 				removed = true;
 				if (decisions.back()) {
 					keep_path = true;
-					return tau::get(n)[0].second();
+					return tau::get(n).second();
 				}
-				else return tau::get(n)[0].first();
+				else return tau::get(n).first();
 			}
 			else if (decisions[idx++]) {
 				// Go left
-				excluded.insert(tau::get(n)[0].second());
+				excluded.insert(tau::get(n).second());
 			} else {
 				// Go right
-				excluded.insert(tau::get(n)[0].first());
+				excluded.insert(tau::get(n).first());
 			}
 		}
 		return n;
@@ -450,12 +444,6 @@ tref get_var_name_node(tref var) {
 	if (auto vn = v | tau::variable | tau::io_var | tau::var_name;
 		vn) return vn.value();
 	if (auto vn = v | tau::variable | tau::uconst_name; vn) return vn.value();
-	if (auto vn = v | tau::bf | tau::variable | tau::var_name;
-		vn) return vn.value();
-	if (auto vn = v | tau::bf | tau::variable | tau::io_var | tau::var_name;
-		vn) return vn.value();
-	if (auto vn = v | tau::bf | tau::variable | tau::uconst_name;
-		vn) return vn.value();
 	return nullptr;
 }
 
@@ -532,8 +520,9 @@ const trefs& get_free_vars(tref n) {
 	static const trefs no_free_vars{};
 
 	if (!n) return no_free_vars;
-	if (typename node::type nt = tau::get(n).get_type();
-		nt != tau::bf && nt != tau::wff) return no_free_vars;
+	if (const auto& t = tau::get(n);
+		!t.is_wff() && !t.is_term() && !t.is(tau::BDD_ID))
+			return no_free_vars;
 
 	using cache_t = subtree_unordered_map<node, size_t>;
 	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
@@ -590,11 +579,11 @@ const trefs& get_free_vars(tref n) {
 			DBG(LOG_TRACE << "inserting var: " << LOG_FM(n);)
 			free_vars.insert(n);
 		} else if (t.is(tau::BDD_ID)) {
-			// Keys in U were stored without right siblings (via trim/get_typed),
-			// so trim before constructing the lookup key.
+			// Keys in U were stored without right siblings (via
+			// get_typed), so trim before the lookup.
 			const tref trimmed = tau::trim_right_sibling(n);
 			const auto& bdd_u = tau_term_bdd_handle<node>::U;
-			if (auto jt = bdd_u.find(tau::get(tau::bf, trimmed));
+			if (auto jt = bdd_u.find(trimmed);
 				jt != bdd_u.end())
 				for (tref v : tau_term_bdd_handle<node>::get_free_tau_vars(
 					jt->second.get().b))
@@ -691,9 +680,9 @@ template <NodeType node>
 bool has_open_tau_fm_in_constant(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
+	trefs consts = tau::get(fm).select_top(is<node, tau::ba_constant>);
 	for (tref c : consts) {
-		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
+		tref ba_const = c;
 		// Special case if the ba_constant is not converted to constant yet
 		if (tau::get(ba_const).get_ba_constant_id() == 0) return false;
 		if (!node::ba::is_closed(tt(ba_const) | tt::ba_constant)) {
@@ -730,12 +719,12 @@ bool missing_temp_quants(tref fm) {
 	if (!tau::get(fm).find_top(is_temporal_quantifier<node>))
 		return false;
 	// All parts of the formula have to be under a temporal quantifier
-	trefs fms = tau::get(fm).select_top(is<node, tau::wff>);
+	trefs fms = tau::get(fm).select_top(is_wff<node>);
 	if (fms.empty()) return false;
 	auto atom = [](tref n) {
 		const tau& n_t = tau::get(n);
-		if (n_t.is(tau::wff) || n_t.is(tau::wff_or) ||
-			n_t.is(tau::wff_and) || n_t.is(tau::wff_neg))
+		if (n_t.is(tau::wff_or) || n_t.is(tau::wff_and)
+			|| n_t.is(tau::wff_neg))
 			return false;
 		return true;
 	};
@@ -801,8 +790,7 @@ bool has_missplaced_fallback(tref fm) {
 		// Maybe reject only the same rr
 		if (is<node>(n, tau::rec_relation)) {
 			return (tt(n) // rec_relation
-				| tt::second // body bf/wff
-				| tt::first // bf_ref/wff_ref
+				| tt::second // body bf_ref/wff_ref
 				| tau::ref
 				| tau::fp_fallback | tt::ref) != nullptr;
 		};

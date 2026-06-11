@@ -474,7 +474,6 @@ std::optional<subtree_map<node, tref>> api<node>::solve(
 
 template <NodeType node>
 std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
-	using tt = tau::traverser;
 	equation = simplify(equation);
 	tref a = apply_all_defs(equation);
 	if (!a) {
@@ -482,7 +481,8 @@ std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 		return {};
 	}
 	tref eq = apply_all_xor_def<node>(norm_all_equations<node>(a));
-	tref equality = tt(eq) | tau::bf_eq | tt::ref;
+	// a single equation is rooted at bf_eq directly
+	tref equality = eq && tau::get(eq).is(tau::bf_eq) ? eq : nullptr;
 	if (!eq || !equality) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
 		return {};

@@ -34,7 +34,6 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	auto is_typeable = [](size_t nt) {
 		return nt == tau::ba_constant
 			|| nt == tau::variable
-			|| nt == tau::bf
 			|| nt == tau::bf_interval
 			|| nt == tau::bf_eq
 			|| nt == tau::bf_neq
@@ -524,6 +523,16 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		if (inc_indent(nt)) indented.insert(ref);
 		if (syntax_highlight(nt)) highlighted.insert(ref);
 
+		// parenthesize operator nodes by precedence (wff/bf wrapper
+		// nodes no longer exist, so decide at the operator itself)
+		if (parent && (is_wff_nt(nt) || is_term_nt(nt))
+			&& is_to_wrap(nt, pnt))
+		{
+			wraps.insert(ref), out("(");
+			last_quant_nt = nul;
+			if (is_wff_nt(nt)) depth++, break_line();
+		}
+
 		// track the position of the child for on_between
 		auto track_chpos = [&]() { chpos[ref] = 0; };
 
@@ -563,18 +572,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				if (pnt == input_def) out(" := in ");
 				else if (pnt == output_def) out(" := out ");
 				break;
-			case wff:
-			case bf:
-				if (parent && is_to_wrap(t.first_tree()
-					.get_type(), pnt))
-				{
-					wraps.insert(ref), out("(");
-					last_quant_nt = nul;
-					if (static_cast<node::type>(nt) == wff)
-							depth++, break_line();
-				}
-				break;
-
 			case wff_all:
 				if (last_quant_nt == wff_all) out(", ");
 				else last_quant_nt = wff_all, out("all ");
@@ -666,12 +663,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		auto is_conj_next_wrapped = [&](const tau& n) {
 			tref tmp = n.get();
 			// Find left-most conjunction, since this is printed next
-			while (get(tmp).child_is(bf_and)) tmp = get(tmp)[0][0].get();
+			while (get(tmp).is(bf_and)) tmp = get(tmp)[0].get();
 			// Check if node is wrapped
-			if (is_to_wrap(get(tmp)[0].get_type(), bf_and)) return true;
+			if (is_to_wrap(get(tmp).get_type(), bf_and)) return true;
 			// Check if node is a wrapped negation
-			else if (get(tmp).child_is(bf_neg)) {
-				return is_to_wrap(get(tmp)[0][0][0].get_type(), bf_neg);
+			else if (get(tmp).is(bf_neg)) {
+				return is_to_wrap(get(tmp)[0].get_type(), bf_neg);
 			} else return false;
 		};
 		if (parent == nullptr) return true;
@@ -690,7 +687,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		switch (pnt) {
 			case bf_and:
 				if (type_printed || isdigit(last_written_char)
-					|| t.child_is(tau::ba_constant)) {
+					|| t.is(tau::ba_constant)) {
 					out(" ");
 				}
 				else if (is_conj_next_wrapped(p[1])) {
@@ -766,7 +763,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_fall:
 			case bf_fex:
 				if (!t.right_sibling_tree()
-					.child_is(last_quant_nt)) out(" ");
+					.is(last_quant_nt)) out(" ");
 				break;
 
 			case cli:               out(". "); break;
@@ -822,14 +819,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_and:
 				type_printed = false;
 				break;
-			case bf:
-			case wff:
-				if (wraps.find(ref) != wraps.end()) {
-					wraps.erase(ref), out(")");
-					if (static_cast<node::type>(nt) == wff)
-							depth--, break_line();
-				}
-				break;
+		}
+		// close parenthesis opened on enter (after any postfix
+		// output of the node itself, e.g. bf_neg's "'")
+		if (wraps.find(ref) != wraps.end()) {
+			wraps.erase(ref), out(")");
+			if (is_wff_nt(nt)) depth--, break_line();
 		}
 		if (pretty_printer_highlighting
 			&& highlighted.find(ref) != highlighted.end())

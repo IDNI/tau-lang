@@ -147,25 +147,25 @@ inline auto is_wff_bdd_var = [](tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
 	DBG(assert(!t.is(tau::bf_neq));)
-	return t.child_is(tau::bf_eq)
-		|| t.child_is(tau::wff_ref)
-		|| t.child_is(tau::wff_ex)
-		|| t.child_is(tau::wff_sometimes)
-		|| t.child_is(tau::wff_always)
-		|| t.child_is(tau::wff_all)
-		|| t.child_is(tau::constraint);
+	return t.is(tau::bf_eq)
+		|| t.is(tau::wff_ref)
+		|| t.is(tau::wff_ex)
+		|| t.is(tau::wff_sometimes)
+		|| t.is(tau::wff_always)
+		|| t.is(tau::wff_all)
+		|| t.is(tau::constraint);
 };
 
 template <NodeType node>
 inline auto is_bf_bdd_var = [](tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
-	return t.child_is(tau::variable)
-		|| t.child_is(tau::bf_capture)
-		|| t.child_is(tau::bf_ref)
-		|| t.child_is(tau::ba_constant)
-		|| t.child_is(tau::bf_fall)
-		|| t.child_is(tau::bf_fex);
+	return t.is(tau::variable)
+		|| t.is(tau::bf_capture)
+		|| t.is(tau::bf_ref)
+		|| t.is(tau::ba_constant)
+		|| t.is(tau::bf_fall)
+		|| t.is(tau::bf_fex);
 };
 // ------------------------------
 

@@ -17,11 +17,7 @@ tref normalize(tref form) {
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	// First resolve quantifiers in formulas below temporal quantifiers
-	auto st_aw = [](tref n) {
-		return is_child<node>(n, tau::wff_sometimes)
-			|| is_child<node>(n, tau::wff_always);
-	};
-	trefs temps = tau::get(form).select_top(st_aw);
+	trefs temps = tau::get(form).select_top(is_temporal_quantifier<node>);
 	// Case that the formula has no temporal quantifier
 	if (temps.empty()) {
 		form = anti_prenex<node>(form);
@@ -29,9 +25,9 @@ tref normalize(tref form) {
 	} else {
 		subtree_map<node, tref> changes;
 		for (tref temp : temps) {
-			bool is_aw = is_child<node>(temp, tau::wff_always);
+			bool is_aw = is<node>(temp, tau::wff_always);
 			// Remove temporal quantifier
-			tref f = tau::trim2(temp);
+			tref f = tau::trim(temp);
 			f = anti_prenex<node>(f);
 			f = resolve_quantifiers<node>(f);
 			// Add quantifier again and save as change
@@ -158,11 +154,11 @@ template <NodeType node>
 bool has_no_boolean_combs_of_models(tref n) {
 	using tau = tree<node>;
 	const auto& fm = tau::get(n);
-	if (is<node>(fm.first(), tau::wff_always)) {
+	if (fm.is(tau::wff_always)) {
 		// check that there is no wff_always or wff_sometimes in the subtree
-		if (fm[0][0].find_top(is<node, tau::wff_always>))
+		if (fm[0].find_top(is<node, tau::wff_always>))
 			return false;
-		if (fm[0][0].find_top(is<node, tau::wff_sometimes>))
+		if (fm[0].find_top(is<node, tau::wff_sometimes>))
 			return false;
 	} else {
 		if (fm.find_top(is<node, tau::wff_always>))
@@ -227,8 +223,8 @@ bool are_nso_equivalent(tref n1, tref n2) {
 
 	const auto& t1 = tau::get(n1);
 	const auto& t2 = tau::get(n2);
-	if (t1[0].is(tau::wff_always)) n1 = t1[0].first();
-	if (t2[0].is(tau::wff_always)) n2 = t2[0].first();
+	if (t1.is(tau::wff_always)) n1 = t1.first();
+	if (t2.is(tau::wff_always)) n2 = t2.first();
 
 	if (tau::get(n1) == tau::get(n2)) {
 		LOG_DEBUG << "-- End are_nso_equivalent: true (equiv nodes)";
@@ -293,8 +289,8 @@ bool is_nso_impl(tref n1, tref n2) {
 
 	const auto& t1 = tau::get(n1);
 	const auto& t2 = tau::get(n2);
-	if (t1[0].is(tau::wff_always)) n1 = t1[0].first();
-	if (t2[0].is(tau::wff_always)) n2 = t2[0].first();
+	if (t1.is(tau::wff_always)) n1 = t1.first();
+	if (t2.is(tau::wff_always)) n2 = t2.first();
 
 	if (tau::get(n1) == tau::get(n2)) {
 		LOG_DEBUG << "End is_nso_impl: true (n1 implies n2)";
@@ -317,7 +313,6 @@ bool is_nso_impl(tref n1, tref n2) {
 template <NodeType node>
 bool are_bf_equal(tref n1, tref n2) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 
 	LOG_DEBUG << "Begin are_bf_equal";
 	LOG_TRACE << "n1 " << LOG_FM(n1);
@@ -340,9 +335,9 @@ bool are_bf_equal(tref n1, tref n2) {
 	tref normalized = normalize_non_temp<node>(bf_equal_fm);
 	LOG_TRACE << "Normalized: " << LOG_FM(normalized);
 
-	auto check = tt(normalized) | tau::wff_t;
-	LOG_DEBUG << "End are_bf_equal: " << check.has_value();
-	return check.has_value();
+	const bool check = tau::get(normalized).equals_T();
+	LOG_DEBUG << "End are_bf_equal: " << check;
+	return check;
 }
 
 template <NodeType node>
@@ -370,8 +365,8 @@ tref normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
 	auto trim_q = [](tref n) {
 		const auto& t =tau::get(n);
-		if (t.child_is(tau::wff_sometimes)
-			|| t.child_is(tau::wff_always)) return t[0].first();
+		if (t.is(tau::wff_sometimes)
+			|| t.is(tau::wff_always)) return t.first();
 		return n;
 	};
 	fm = normalize<node>(fm);
@@ -401,8 +396,8 @@ tref normalize_with_temp_simp(tref fm) {
 	for (tref clause : expression_paths<node>(fm)) {
 		DBG(LOG_TRACE << "    clause: " << LOG_FM(clause);)
 		const auto& t = tau::get(clause);
-		trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
-		trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
+		trefs aw_parts = t.select_top(is<node, tau::wff_always>);
+		trefs st_parts = t.select_top(is<node, tau::wff_sometimes>);
 		if ((aw_parts.size() == 1 && st_parts.empty()) ||
 			(aw_parts.empty() && st_parts.size() == 1)) {
 			nn = tau::build_wff_or(nn, clause);
@@ -564,8 +559,9 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 	for (size_t o = 1; o < offset_arity; ++o)
 		ofs.push_back(tau::get(tau::offset, tau::get_integer(0)));
 
-	// create enumerated replacement
-	const auto& t = tau::get(form)[0][0];
+	// create enumerated replacement (form is a wff_ref/bf_ref node,
+	// its first child is the ref node)
+	const auto& t = tau::get(form)[0];
 	LOG_TRACE << "t: " << LOG_FM_DUMP(t.get());
 	LOG_TRACE << "t.value: " << t.value;
 	LOG_TRACE << "t[0]: " << LOG_FM(t.first());
@@ -702,7 +698,11 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 
 	auto ft = tau::get(fallback).get_type();
 	bool first = ft == tau::first_sym, last = ft == tau::last_sym;
-	if (!first && !last && ft != nt) {
+	// nt is the kind-carrying nt of the fp call (wff_ref/bf_ref) and the
+	// fallback is operator-rooted, so compare kinds instead of exact nts
+	if (!first && !last && !((tau::is_wff_nt(ft) && tau::is_wff_nt(nt))
+		|| (tau::is_term_nt(ft) && tau::is_term_nt(nt))))
+	{
 		LOG_ERROR << "Fallback type mismatch";
 		return nullptr;
 	}
@@ -800,11 +800,9 @@ struct fixed_point_transformer {
 		if (!t.has_child()) return n;
 		if (auto it = changes.find(n); it != changes.end())
 			return it->second;
-		tref ref = t.first();
-		bool is_ref = (t.is(tau::wff) && is<node, tau::wff_ref>(ref))
-			|| (t.is(tau::bf) && is<node, tau::bf_ref>(ref));
-		if (!is_ref) return n;
-		auto sig = get_rr_sig<node>(ref);
+		// a formula/term ref is rooted at wff_ref/bf_ref directly
+		if (!t.is(tau::wff_ref) && !t.is(tau::bf_ref)) return n;
+		auto sig = get_rr_sig<node>(n);
 		if (auto fpopt = fpcall(sig); fpopt) { // is fp call
 			auto offset_arity = fpopt.value().offset_arity;
 			// TODO we don't support FP calc for multiindex offsets yet
@@ -816,18 +814,11 @@ struct fixed_point_transformer {
 			}
 			auto typ = t.get_type();
 			auto fp = calculate_fixed_point<node>(defs, n, typ,
-				offset_arity, get_fallback(typ, ref));
+				offset_arity, get_fallback(typ, n));
 			if (!fp) return nullptr;
 			return changes.emplace(n, fp).first->second;
 		}
-		bool changed = false;
-		trefs ch;
-		if (changes.contains(ref))
-			changed = true, ch.push_back(changes[ref]);
-		else ch.push_back(ref);
-		auto nn = tau::get(t.value, ch);
-		if (changed) changes[n] = nn;
-		return nn;
+		return n;
 	}
 
 	tref get_fallback(type nt, tref ref) {

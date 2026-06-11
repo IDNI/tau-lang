@@ -58,8 +58,9 @@ tref cvc5_tree_to_tau_tree(bv n) {
 			return (var_list != nullptr && body != nullptr) ? build_wff_all<node>(var_list, body) : nullptr; // Unable to transform to tau (returning null)
 		}
 		case Kind::VARIABLE_LIST: {
-			auto var_list = rec(n[0]);
-			return var_list != nullptr ? tau::trim(var_list) : nullptr; // Unable to transform to tau (returning null)
+			// rec returns a bare variable node, or null if unable
+			// to transform to tau
+			return rec(n[0]);
 		}
 		case Kind::VARIABLE:
 			return get_var(n);

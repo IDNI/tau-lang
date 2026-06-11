@@ -23,7 +23,7 @@ template<NodeType node>
 static tref make_bit_call_from_offset(tref operand, tref offset) {
 	using tau = tree<node>;
 
-	return tau::get(tau::bf, tau::get(tau::bf_ref, tau::build_rr_ref("_bit", { offset }, { operand })));
+	return tau::get(tau::bf_ref, tau::build_rr_ref("_bit", { offset }, { operand }));
 }
 
 /**
@@ -59,9 +59,8 @@ static rewriter::rule bit_rule(int_t bit, size_t bitwidth) {
 	}
 
 	auto cte =
-		tau::get(tau::bf,
-			tau::get_ba_constant(
-				make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth)));
+		tau::get_ba_constant(
+			make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth));
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bit_call_from_index<node>(base, bit);
 	auto body = tau::build_bf_and( base, cte);
@@ -130,7 +129,7 @@ template<NodeType node>
 static tref make_bvshl_by_one_call(tref operand,  tref shifted) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshl_by_one", { operand, shifted })));
+	return tau::get(tau::wff_ref, tau::build_ref("_bvshl_by_one", { operand, shifted }));
 }
 
 /**
@@ -194,7 +193,7 @@ template<NodeType node>
 static tref make_bvrhl_by_one_call(tref base, tref shifted) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl_by_one", { base, shifted })));
+	return tau::get(tau::wff_ref, tau::build_ref("_bvrhl_by_one", { base, shifted }));
 }
 
 /**
@@ -267,7 +266,7 @@ template<NodeType node>
 static tref make_is_bit_zero_call_from_offset(tref operand, tref bit) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_zero", { bit }, { operand })));
+	return tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_zero", { bit }, { operand }));
 }
 
 /**
@@ -302,9 +301,8 @@ static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
 		return it->second;
 	}
 
-	auto cte = tau::get(tau::bf,
-		tau::get_ba_constant(
-			make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth)));
+	auto cte = tau::get_ba_constant(
+		make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth));
 	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bit_call_from_index<node>(var, bit);
 	auto body =	tau::build_bf_eq_0(tau::build_bf_and(var, cte));
@@ -371,7 +369,7 @@ template<NodeType node>
 static tref make_is_bit_one_call_from_offset(tref operand, tref bit) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_one", { bit }, { operand })));
+	return tau::get(tau::wff_ref, tau::build_rr_ref("_is_bit_one", { bit }, { operand }));
 }
 
 /**
@@ -407,9 +405,8 @@ static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
 	}
 
 	auto cte =
-		tau::get(tau::bf,
-			tau::get_ba_constant(
-				make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth)));
+		tau::get_ba_constant(
+			make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth));
 	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bit_call_from_index<node>(var, bit);
 	auto body =	tau::build_bf_eq(tau::build_bf_and(var, cte), cte);
@@ -480,9 +477,9 @@ template<NodeType node>
 static tref make_bvshl_call(tref base, tref count /* bv constant */, tref shifted) {
 	using tau = tree<node>;
 
-	DBG( assert(is_bv_constant<node>(tau::trim(count))); )
+	DBG( assert(is_bv_constant<node>(count)); )
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshl", { base, count, shifted })));
+	return tau::get(tau::wff_ref, tau::build_ref("_bvshl", { base, count, shifted }));
 }
 
 /**
@@ -501,7 +498,7 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 	if (cache.find(count) != cache.end()) return cache[count];
 
 	auto bitwidth = get_bv_type_bitwidth<node>(count);
-	auto offset = get_bv_constant_value<node>(tau::trim(count)).value();
+	auto offset = get_bv_constant_value<node>(count).value();
 	// If the shift is greater or equal to the bitwidth, the result is always zero
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -565,9 +562,9 @@ template<NodeType node>
 static tref make_bvrhl_call(tref base, tref count /* bv constant */, tref shifted) {
 	using tau = tree<node>;
 
-	DBG( assert(is_bv_constant<node>(tau::trim(count))); )
+	DBG( assert(is_bv_constant<node>(count)); )
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl", { base, count, shifted })));
+	return tau::get(tau::wff_ref, tau::build_ref("_bvrhl", { base, count, shifted }));
 }
 
 /**
@@ -585,7 +582,7 @@ static rewriter::rule bvrhl_rule(tref count /* bv constant */) {
 	if (cache.find(count) != cache.end()) return cache[count];
 
 	auto bitwidth = get_bv_type_bitwidth<node>(count);
-	auto offset = get_bv_constant_value<node>(tau::trim(count)).value();
+	auto offset = get_bv_constant_value<node>(count).value();
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bvrhl_call<node>(base, count, shifted);
@@ -658,7 +655,7 @@ template<NodeType node>
 static tref make_bvcast_call(tref src, tref result) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvcast", { src, result })));
+	return tau::get(tau::wff_ref, tau::build_ref("_bvcast", { src, result }));
 }
 
 /**

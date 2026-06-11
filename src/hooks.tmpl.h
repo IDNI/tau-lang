@@ -430,8 +430,8 @@ tref get_hook<node>::term_cast(const node& v, const tref* ch, size_t len, tref r
 	HOOK_LOGGING(log("term_cast", v, ch, len, r);)
 	DBG(assert(len == 1);)
 
-	// Get the target type from the bf_cast node (ch[0])
-	size_t target_type_id = tau::get(ch[0]).get_ba_type();
+	// the target type is carried by the bf_cast node itself
+	size_t target_type_id = v.ba_type;
 	if (target_type_id == 0) {
 		return tau::get_raw(v, ch, len, r);
 	}
