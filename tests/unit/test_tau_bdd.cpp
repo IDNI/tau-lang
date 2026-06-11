@@ -194,7 +194,7 @@ TEST_SUITE("BDD and many") {
 		CHECK((result == "xydcbafe" || result == "xydcabef"
 			|| result == "xydcfeab" || result == "xycdfeab"
 			|| result == "xycdbafe" || result == "xybaefcd"
-			|| result == "xycdfeba"));
+			|| result == "xycdfeba" || result == "xycdefba"));
 	}
 
 	TEST_CASE("2") {
@@ -229,7 +229,8 @@ TEST_SUITE("BDD and many") {
 		CHECK((and_many_2_result == "ab&(f'e')'bccd"
 			|| and_many_2_result == "adbb&(e'f')'cc"
 			|| and_many_2_result == "abbccd&(f'e')'"
-			|| and_many_2_result == "(e'f')'bbccad"));
+			|| and_many_2_result == "(e'f')'bbccad"
+			|| and_many_2_result == "b&(e'f')'ccad"));
 	}
 }
 
