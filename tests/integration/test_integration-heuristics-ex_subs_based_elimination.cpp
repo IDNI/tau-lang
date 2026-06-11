@@ -100,4 +100,40 @@ TEST_SUITE("ex_subs_based_elimination") {
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
+
+	TEST_CASE("capture check: no subs when term var is re-bound by inner quantifier") {
+		// x = y && ex y (x & y = 0): substituting x := y inside the inner
+		// 'ex y' scope would capture y, so the substitution must be
+		// rejected entirely. The clause is built programmatically with
+		// calculate_quant_id = false because both the parser and the
+		// default builders alpha-rename bound variables; the eliminators,
+		// however, can produce such repeated-name shapes internally
+		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
+		auto y = build_variable<node_t>("y", tau_type_id<node_t>());
+		auto bx = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		auto by = build_bf_variable<node_t>("y", tau_type_id<node_t>());
+		tref eq = build_bf_eq<node_t>(bx, by);
+		tref inner = build_bf_eq_0<node_t>(build_bf_and<node_t>(bx, by));
+		tref ex_clause = build_wff_and<node_t>(eq,
+			build_wff_ex<node_t>(y, inner, false));
+		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
+		CHECK( result == ex_clause );
+	}
+
+	TEST_CASE("capture check: subs applied when inner binder is distinct from term vars") {
+		// same shape but the inner quantifier binds z, not y, so x := y
+		// is capture-free and must be applied
+		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
+		auto z = build_variable<node_t>("z", tau_type_id<node_t>());
+		auto bx = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		auto by = build_bf_variable<node_t>("y", tau_type_id<node_t>());
+		auto bz = build_bf_variable<node_t>("z", tau_type_id<node_t>());
+		tref eq = build_bf_eq<node_t>(bx, by);
+		tref inner = build_bf_eq_0<node_t>(build_bf_and<node_t>(bx, bz));
+		tref ex_clause = build_wff_and<node_t>(eq,
+			build_wff_ex<node_t>(z, inner, false));
+		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
+		CHECK( result != ex_clause );
+		CHECK( !contains<node_t>(result, var) );
+	}
 }
