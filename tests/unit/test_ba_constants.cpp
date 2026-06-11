@@ -7,10 +7,15 @@ TEST_SUITE("Bool BA") {
 	TEST_CASE("Bool") {
 		tref t_ref = tau::get_ba_constant(Bool(true),  bool_type());
 		tref f_ref = tau::get_ba_constant(Bool(false), bool_type());
-		size_t t = tau::get(t_ref).get_ba_constant_id();
-		size_t f = tau::get(f_ref).get_ba_constant_id();
-		CHECK( t == 1 );
-		CHECK( f == 2 );
+		// post-flip, syntactic 0/1 constants are canonicalized to bare
+		// typed bf_t/bf_f leaves instead of ba_constant nodes
+		CHECK( tau::get(t_ref).is(tau::bf_t) );
+		CHECK( tau::get(f_ref).is(tau::bf_f) );
+		CHECK( tau::get(t_ref).get_ba_type() != 0 );
+		CHECK( tau::get(t_ref).get_ba_type()
+					== tau::get(f_ref).get_ba_type() );
+		// the constants are still pooled with ids 1 and 2
+		size_t t = 1, f = 2;
 		CHECK( bac::get(t) != bac::get(f) );
 		CHECK( bac::get(t) == variant<bv, Bool>(Bool(true)) );
 		CHECK( bac::get(t) != variant<bv, Bool>(Bool(false)) );
@@ -80,10 +85,12 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 
 		tref t_ref = tau::get_ba_constant(Bool(true),  bool_type());
 		tref f_ref = tau::get_ba_constant(Bool(false), bool_type());
-		size_t t = tau::get(t_ref).get_ba_constant_id();
-		size_t f = tau::get(f_ref).get_ba_constant_id();
-		CHECK( t == 1 );
-		CHECK( f == 2 );
+		// post-flip, syntactic 0/1 constants are canonicalized to bare
+		// typed bf_t/bf_f leaves instead of ba_constant nodes
+		CHECK( tau::get(t_ref).is(tau::bf_t) );
+		CHECK( tau::get(f_ref).is(tau::bf_f) );
+		// the constants are still pooled with ids 1 and 2
+		size_t t = 1, f = 2;
 		CHECK( bac::get(t) != bac::get(f) );
 		CHECK( bac::get(t) == variant<bv, sbf_ba, Bool>(Bool(true)) );
 		CHECK( bac::get(t) != variant<bv, sbf_ba, Bool>(Bool(false)) );
@@ -92,10 +99,11 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 
 		t_ref = tau::get_ba_constant(sbf_t, sbf_type<node>());
 		f_ref = tau::get_ba_constant(sbf_f, sbf_type<node>());
-		t = tau::get(t_ref).get_ba_constant_id();
-		f = tau::get(f_ref).get_ba_constant_id();
-		CHECK( t == 3 );
-		CHECK( f == 4 );
+		// sbf true/false are also syntactic 1/0, so they canonicalize
+		// to typed bf_t/bf_f leaves as well; pooled with ids 3 and 4
+		CHECK( tau::get(t_ref).is(tau::bf_t) );
+		CHECK( tau::get(f_ref).is(tau::bf_f) );
+		t = 3, f = 4;
 		CHECK( bac::get(t) != bac::get(f) );
 		CHECK( bac::get(t) == variant<bv, sbf_ba, Bool>(sbf_t) );
 		CHECK( bac::get(t) != variant<bv, sbf_ba, Bool>(sbf_f) );

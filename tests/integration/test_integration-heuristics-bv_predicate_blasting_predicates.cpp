@@ -112,7 +112,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bvshl_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 1)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_rule<node>(tau::get_bv_constant(4, 1))) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -121,7 +121,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bvrhl_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvrhl_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 1)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvrhl_rule<node>(tau::get_bv_constant(4, 1))) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -130,7 +130,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bvmul_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvmul_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvmul_rule<node>(tau::get_bv_constant(4, 2))) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -139,7 +139,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bvdiv_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvdiv_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvdiv_rule<node>(tau::get_bv_constant(4, 2))) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -148,7 +148,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bvmod_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvmod_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvmod_rule<node>(tau::get_bv_constant(4, 2))) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -157,7 +157,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bved_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bved_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bved_rule<node>(tau::get_bv_constant(4, 2))) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 

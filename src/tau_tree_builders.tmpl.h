@@ -729,7 +729,12 @@ template <NodeType node>
 tref build_bf_ba_constant(const typename node::constant& constant,
 		size_t ba_type_id, tref right) {
 	using tau = tree<node>;
-	return tau::get(tau::get_ba_constant(constant, ba_type_id), right);
+	tref c = tau::get_ba_constant(constant, ba_type_id);
+	if (c == nullptr) return nullptr;
+	// re-get through the hook-running get so the cte hook canonicalizes
+	// syntactic 0/1 constants into bare typed bf_f/bf_t leaves (the pooled
+	// node may have been created while hooks were disabled)
+	return tau::get(tau::get(c).value, (const tref*) nullptr, 0, right);
 }
 
 template <NodeType node>

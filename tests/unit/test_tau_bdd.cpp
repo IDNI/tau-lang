@@ -60,11 +60,11 @@ TEST_SUITE("BDD creation terms") {
 		const char* sample = "xyz";
 		tref spec = tau::get(sample, opts);
 		const char* x = "x";
-		tref tx = tau::trim(tau::get(x, opts));
+		tref tx = tau::get(x, opts);
 		const char* y = "y";
-		tref ty = tau::trim(tau::get(y, opts));
+		tref ty = tau::get(y, opts);
 		const char* z = "z";
-		tref tz = tau::trim(tau::get(z, opts));
+		tref tz = tau::get(z, opts);
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
@@ -81,11 +81,11 @@ TEST_SUITE("BDD creation terms") {
 		const char* sample = "xyz";
 		tref spec = tau::get(sample, opts);
 		const char* x = "x";
-		tref tx = tau::trim(tau::get(x, opts));
+		tref tx = tau::get(x, opts);
 		const char* y = "y";
-		tref ty = tau::trim(tau::get(y, opts));
+		tref ty = tau::get(y, opts);
 		const char* z = "z";
-		tref tz = tau::trim(tau::get(z, opts));
+		tref tz = tau::get(z, opts);
 		bdd::order o {{tx, 2}, {ty, 1}, {tz, 0}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
@@ -102,11 +102,11 @@ TEST_SUITE("BDD creation terms") {
 		const char* sample = "(xyz)'";
 		tref spec = tau::get(sample, opts);
 		const char* x = "x";
-		tref tx = tau::trim(tau::get(x, opts));
+		tref tx = tau::get(x, opts);
 		const char* y = "y";
-		tref ty = tau::trim(tau::get(y, opts));
+		tref ty = tau::get(y, opts);
 		const char* z = "z";
-		tref tz = tau::trim(tau::get(z, opts));
+		tref tz = tau::get(z, opts);
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
@@ -123,7 +123,7 @@ TEST_SUITE("BDD creation terms") {
 		const char* sample = "(xyz)'";
 		tref spec = tau::get(sample, opts);
 		const char* x = "x";
-		tref tx = tau::trim(tau::get(x, opts));
+		tref tx = tau::get(x, opts);
 		bdd::order o {{tx, 0}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
@@ -164,15 +164,15 @@ TEST_SUITE("BDD and many") {
 #endif
 		// Vars
 		const char* vs = "v";
-		tref tv = tau::trim(tau::get(vs, opts));
+		tref tv = tau::get(vs, opts);
 		const char* ws = "w";
-		tref tw = tau::trim(tau::get(ws, opts));
+		tref tw = tau::get(ws, opts);
 		const char* xs = "x";
-		tref tx = tau::trim(tau::get(xs, opts));
+		tref tx = tau::get(xs, opts);
 		const char* ys = "y";
-		tref ty = tau::trim(tau::get(ys, opts));
+		tref ty = tau::get(ys, opts);
 		const char* zs = "z";
-		tref tz = tau::trim(tau::get(zs, opts));
+		tref tz = tau::get(zs, opts);
 		// BDDs
 		const char* bdd1s = "xab";
 		tref bdd1 = tau::get(bdd1s, opts);
@@ -193,7 +193,8 @@ TEST_SUITE("BDD and many") {
 		CAPTURE(result);
 		CHECK((result == "xydcbafe" || result == "xydcabef"
 			|| result == "xydcfeab" || result == "xycdfeab"
-			|| result == "xycdbafe" || result == "xybaefcd"));
+			|| result == "xycdbafe" || result == "xybaefcd"
+			|| result == "xycdfeba"));
 	}
 
 	TEST_CASE("2") {
@@ -206,15 +207,15 @@ TEST_SUITE("BDD and many") {
 #endif
 		// Vars
 		const char* vs = "v";
-		tref tv = tau::trim(tau::get(vs, opts));
+		tref tv = tau::get(vs, opts);
 		const char* ws = "w";
-		tref tw = tau::trim(tau::get(ws, opts));
+		tref tw = tau::get(ws, opts);
 		const char* xs = "x";
-		tref tx = tau::trim(tau::get(xs, opts));
+		tref tx = tau::get(xs, opts);
 		const char* ys = "y";
-		tref ty = tau::trim(tau::get(ys, opts));
+		tref ty = tau::get(ys, opts);
 		const char* zs = "z";
-		tref tz = tau::trim(tau::get(zs, opts));
+		tref tz = tau::get(zs, opts);
 		// BDD
 		const char* bdd1s = "((vw'xy'z)'|(vw'xy'z))ab & (e|f) & ((v'|w|x'|y|z')|(vw'xy'z))bc & ((vw'xy'z)|(vw'xy'z)')cd";
 		tref bdd1 = tau::get(bdd1s, opts);
@@ -243,17 +244,17 @@ TEST_SUITE("BDD quantification") {
 #endif
 		// Vars
 		const char* ss = "s";
-		tref ts = tau::trim(tau::get(ss, opts));
+		tref ts = tau::get(ss, opts);
 		const char* vs = "v";
-		tref tv = tau::trim(tau::get(vs, opts));
+		tref tv = tau::get(vs, opts);
 		const char* ws = "w";
-		tref tw = tau::trim(tau::get(ws, opts));
+		tref tw = tau::get(ws, opts);
 		const char* xs = "x";
-		tref tx = tau::trim(tau::get(xs, opts));
+		tref tx = tau::get(xs, opts);
 		const char* ys = "y";
-		tref ty = tau::trim(tau::get(ys, opts));
+		tref ty = tau::get(ys, opts);
 		const char* zs = "z";
-		tref tz = tau::trim(tau::get(zs, opts));
+		tref tz = tau::get(zs, opts);
 		// BDDs
 		const char* bdd1s = "(z|y') & (y|z')";
 		tref bdd1 = tau::get(bdd1s, opts);
@@ -306,9 +307,9 @@ TEST_SUITE("BDD get_free_tau_vars") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
+		tref tz = tau::get("z", opts);
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
 		bdd::ref xx = bdd::build_bdd(tau::get("xyz", opts), o);
 		const trefs& fvs = hbdd::get_free_tau_vars(xx.b);
@@ -321,8 +322,8 @@ TEST_SUITE("BDD get_free_tau_vars") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref xx = bdd::build_bdd(tau::get("xyz", opts), o);
 		const trefs& fvs = hbdd::get_free_tau_vars(xx.b);
@@ -335,8 +336,8 @@ TEST_SUITE("BDD get_free_tau_vars") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		tref bdd_node = hbdd::convert_to_tau_node(tau::get("xy", opts), o);
 		// Traverse via the BDD_ID collector branch inside get_free_vars
@@ -357,8 +358,8 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref g = bdd::build_bdd(tau::get("xy", opts), o);
 		bdd::ref h = bdd::build_bdd(tau::get("x|y", opts), o);
@@ -370,8 +371,8 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref g = bdd::build_bdd(tau::get("xy", opts), o);
 		bdd::ref h = bdd::build_bdd(tau::get("x|y", opts), o);
@@ -383,8 +384,8 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
 		CHECK(bdd::bdd_ite(f, bdd::T, bdd::F, o) == f);
@@ -395,8 +396,8 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
 		CHECK(bdd::bdd_ite(f, bdd::F, bdd::T, o) == bdd::bdd_not(f));
@@ -407,8 +408,8 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref f = bdd::build_bdd(tau::get("x|y", opts), o);
 		bdd::ref g = bdd::build_bdd(tau::get("xy", opts), o);
@@ -420,9 +421,9 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
+		tref tz = tau::get("z", opts);
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
 		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
 		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
@@ -436,9 +437,9 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
+		tref tz = tau::get("z", opts);
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
 		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
 		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
@@ -455,9 +456,9 @@ TEST_SUITE("BDD ITE") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
+		tref tz = tau::get("z", opts);
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
 		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
 		bdd::ref g = bdd::build_bdd(tau::get("yz", opts), o);
@@ -477,8 +478,8 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref xi = bdd::from_bit(tx);
 		CHECK(bdd::bdd_compose(xi, tx, xi, o) == xi);
@@ -489,8 +490,8 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref xi = bdd::from_bit(tx);
 		CHECK(bdd::bdd_compose(xi, tx, bdd::T, o) == bdd::T);
@@ -501,8 +502,8 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref xi = bdd::from_bit(tx);
 		CHECK(bdd::bdd_compose(xi, tx, bdd::F, o) == bdd::F);
@@ -513,8 +514,8 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		bdd::order o {{tx, 0}, {ty, 1}};
 		bdd::ref xi = bdd::from_bit(tx);
 		bdd::ref xj = bdd::from_bit(ty);
@@ -526,9 +527,9 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
+		tref tz = tau::get("z", opts);
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
 		bdd::ref f = bdd::build_bdd(tau::get("xy", opts), o);
 		bdd::subs_t subs {{tx, bdd::T}, {ty, bdd::F}};
@@ -540,9 +541,9 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
-		tref tz = tau::trim(tau::get("z", opts));
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
+		tref tz = tau::get("z", opts);
 		// f = x AND y, g = y AND z, replace x with g
 		// result should equal ITE(g, f_hi, f_lo) = ITE(g, y, F) = g AND y = y AND z AND y = yz
 		bdd::order o {{tx, 0}, {ty, 1}, {tz, 2}};
@@ -557,9 +558,9 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref ta = tau::trim(tau::get("a", opts));
-		tref tx = tau::trim(tau::get("x", opts));
-		tref tb = tau::trim(tau::get("b", opts));
+		tref ta = tau::get("a", opts);
+		tref tx = tau::get("x", opts);
+		tref tb = tau::get("b", opts);
 		// order: a(0) above x(1) above b(2)
 		bdd::order o {{ta, 0}, {tx, 1}, {tb, 2}};
 		bdd::ref xi = bdd::from_bit(tx);
@@ -574,9 +575,9 @@ TEST_SUITE("BDD compose") {
 #ifdef TAU_CACHE
 		bdd::clear_caches();
 #endif
-		tref ta = tau::trim(tau::get("a", opts));
-		tref tx = tau::trim(tau::get("x", opts));
-		tref ty = tau::trim(tau::get("y", opts));
+		tref ta = tau::get("a", opts);
+		tref tx = tau::get("x", opts);
+		tref ty = tau::get("y", opts);
 		// order: a(0) above x(1) above y(2)
 		// f = x AND y, substitute x := a (a is above x), y := a
 		// result = a AND a = a
@@ -600,17 +601,17 @@ TEST_SUITE("BDD handle creation") {
 #endif
 		// Vars
 		const char* ss = "s";
-		tref ts = tau::trim(tau::get(ss, opts));
+		tref ts = tau::get(ss, opts);
 		const char* vs = "v";
-		tref tv = tau::trim(tau::get(vs, opts));
+		tref tv = tau::get(vs, opts);
 		const char* ws = "w";
-		tref tw = tau::trim(tau::get(ws, opts));
+		tref tw = tau::get(ws, opts);
 		const char* xs = "x";
-		tref tx = tau::trim(tau::get(xs, opts));
+		tref tx = tau::get(xs, opts);
 		const char* ys = "y";
-		tref ty = tau::trim(tau::get(ys, opts));
+		tref ty = tau::get(ys, opts);
 		const char* zs = "z";
-		tref tz = tau::trim(tau::get(zs, opts));
+		tref tz = tau::get(zs, opts);
 		// BDDs
 		const char* bdd1s = "(z|y') & (y|z')";
 		tref bdd1 = tau::get(bdd1s, opts);
