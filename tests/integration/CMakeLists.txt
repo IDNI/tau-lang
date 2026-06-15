@@ -6,6 +6,7 @@ set(TESTS
 	bv_hooks
 	bf_normalization
 	interpreter
+	pointwise_revision
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval
