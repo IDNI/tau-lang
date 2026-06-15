@@ -206,6 +206,156 @@ TEST_SUITE("normal forms: onf") {
 	}*/
 }
 
+TEST_SUITE("GetFreeVars") {
+	// The shadowing shapes are built programmatically: the parser
+	// alpha-renames bound variables, so parsed samples cannot contain
+	// a variable that is both free and re-bound
+	TEST_CASE("free occurrence before binder of same variable (B6)") {
+		// (x = 0) && (ex x x = 0): x is free in the left conjunct;
+		// the binder of the right conjunct must not erase it
+		tref eq = get_nso_rr("x = 0.").value().main->get();
+		auto x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = tau::build_wff_and(eq,
+			tau::build_wff_ex(x, eq, false));
+		const trefs& fv = get_free_vars<node_t>(fm);
+		CHECK( fv.size() == 1 );
+		CHECK( (fv.size() == 1 && tau::get(fv[0]).to_str() == "x") );
+	}
+
+	TEST_CASE("free occurrence after binder of same variable (B6 control)") {
+		tref eq = get_nso_rr("x = 0.").value().main->get();
+		auto x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = tau::build_wff_and(
+			tau::build_wff_ex(x, eq, false), eq);
+		const trefs& fv = get_free_vars<node_t>(fm);
+		CHECK( fv.size() == 1 );
+		CHECK( (fv.size() == 1 && tau::get(fv[0]).to_str() == "x") );
+	}
+
+	TEST_CASE("bound occurrences are not free (B6 control)") {
+		tref eq = get_nso_rr("x = 0.").value().main->get();
+		auto x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = tau::build_wff_ex(x, eq, false);
+		const trefs& fv = get_free_vars<node_t>(fm);
+		CHECK( fv.empty() );
+	}
+
+	TEST_CASE("distinct binder leaves other variables free (B6 control)") {
+		// ex y (xy = 0): only x is free
+		tref eq = get_nso_rr("xy = 0.").value().main->get();
+		auto y = build_variable<node_t>("y", tau_type_id<node_t>());
+		tref fm = tau::build_wff_ex(y, eq, false);
+		const trefs& fv = get_free_vars<node_t>(fm);
+		CHECK( fv.size() == 1 );
+		CHECK( (fv.size() == 1 && tau::get(fv[0]).to_str() == "x") );
+	}
+}
+
+TEST_SUITE("TreatExQuantifiedClause") {
+	TEST_CASE("surviving inner quantifier blocks elimination (B5)") {
+		// The inner ex y survived elimination; its equations are not
+		// top-level conjuncts of the outer clause, so the eliminator
+		// must keep the whole quantified clause instead of squeezing
+		// them and silently dropping the inner binder (leaking y free)
+		const char* sample =
+			"ex x (xw = 0 && (ex y (xy = 0 && f(y) != 0))).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		bool quant_eliminated = true;
+		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		CHECK( !quant_eliminated );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+	}
+
+	TEST_CASE("plain clause still eliminated (B5 control)") {
+		const char* sample = "ex x (xw = 0 && xz != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		bool quant_eliminated = true;
+		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		CHECK( quant_eliminated );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+		CHECK( res != fm );
+	}
+}
+
+TEST_SUITE("AntiPrenexBlock") {
+	// Helper: peel the leading ex-quantifier prefix into a block,
+	// innermost variable gets the lowest order index
+	static std::tuple<tref, trefs, term_handle<node_t>::order> peel_block(
+		tref fm)
+	{
+		trefs block;
+		term_handle<node_t>::order order;
+		while (tau::get(fm)[0].is(tau::wff_ex)) {
+			block.push_back(tau::get(fm)[0].first());
+			fm = tau::get(fm)[0].second();
+		}
+		for (size_t i = 0; i < block.size(); ++i)
+			order.emplace(block[i], block.size() - 1 - i);
+		return {fm, block, order};
+	}
+
+	// Helper: run anti_prenex_block on a parsed "ex ... (...)" sample
+	static std::pair<tref, size_t> run_apb(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		auto [body, block, order] = peel_block(fm);
+		subtree_unordered_set<node_t> used_atms;
+		subtree_unordered_map<node_t, int_t> quant_pattern;
+		for (size_t i = 0; i < block.size(); ++i)
+			quant_pattern.emplace(block[i], i + 1);
+		tref res = anti_prenex_block<node_t>(body, block,
+			used_atms, quant_pattern, order);
+		return {res, used_atms.size()};
+	}
+
+	TEST_CASE("disjunction push (B11)") {
+		// The disjunction-case recursions must compile and push the
+		// block into each disjunct independently
+		auto [res, used] = run_apb("ex x (xy = 0 || xw = 0).");
+		CHECK( matches_to_str_to_any_of(res, {
+			"(ex b1 b1 y = 0) || (ex b1 b1 w = 0)",
+			"(ex b1 b1 w = 0) || (ex b1 b1 y = 0)",
+		}) );
+		CHECK( used == 0 );
+	}
+
+	TEST_CASE("decomposition keeps independent conjuncts (B12/B13)") {
+		// z = 0 must survive (B13) and the negative branch must be
+		// built from formula[atm:=F], so the remaining equation gets
+		// resolved by the clause eliminator (B12): for atm = xw = 0
+		// the branch ex x (xw != 0 && xy = 0) resolves to wy' != 0
+		auto [res, used] = run_apb("ex x (z = 0 && (xy = 0 || xw = 0)).");
+		CHECK( matches_to_str_to_any_of(res, {
+			"z = 0 && ((ex b1 b1 w = 0) || !wy' = 0)",
+			"z = 0 && ((ex b1 b1 w = 0) || !y'w = 0)",
+			"z = 0 && ((ex b1 b1 y = 0) || !yw' = 0)",
+			"z = 0 && ((ex b1 b1 y = 0) || !w'y = 0)",
+		}) );
+		CHECK( used == 0 );
+	}
+
+	TEST_CASE("no decomposable atoms keeps block (B14)") {
+		// The dependent part contains only != atoms, which the
+		// decomposition cannot use: the block must be kept on the
+		// dependent part (instead of dereferencing end())
+		auto [res, used] = run_apb("ex x (z = 0 && (xy != 0 || xw != 0)).");
+		CHECK( matches_to_str_to_any_of(res, {
+			"z = 0 && (ex b1 b1 y != 0 || b1 w != 0)",
+			"z = 0 && (ex b1 b1 w != 0 || b1 y != 0)",
+		}) );
+		CHECK( used == 0 );
+	}
+
+	TEST_CASE("T branch shortcut restores used_atms (B15)") {
+		// The positive decomposition branch resolves to T (the clause
+		// ex x (atm && xk = 0) is satisfiable by x := 0), triggering
+		// the early return, which must leave used_atms balanced
+		auto [res, used] = run_apb(
+			"ex x (z = 0 && (xy = 0 || xw = 0) && xk = 0).");
+		CHECK( tau::get(res).to_str() == "z = 0" );
+		CHECK( used == 0 );
+	}
+}
+
 TEST_SUITE("QuantBlockPush") {
 	TEST_CASE("1") {
 		const char* sample = "ex x ex y xy = 0 && yx = 0 && !(x|y = 0) && !(x = y).";
