@@ -24,6 +24,11 @@ tref normalize(tref form) {
 	trefs temps = tau::get(form).select_top(st_aw);
 	// Case that the formula has no temporal quantifier
 	if (temps.empty()) {
+		// Resolve closed quantified bv subformulas before anti_prenex:
+		// pushing the quantifiers of a blasted bitvector formula through
+		// the Boolean normalization is exponential, while the solver
+		// decides the closed formula directly.
+		form = resolve_quantifiers<node>(form);
 		form = anti_prenex<node>(form);
 		form = resolve_quantifiers<node>(form);
 	} else {
@@ -32,6 +37,7 @@ tref normalize(tref form) {
 			bool is_aw = is_child<node>(temp, tau::wff_always);
 			// Remove temporal quantifier
 			tref f = tau::trim2(temp);
+			f = resolve_quantifiers<node>(f);
 			f = anti_prenex<node>(f);
 			f = resolve_quantifiers<node>(f);
 			// Add quantifier again and save as change
@@ -61,7 +67,9 @@ tref normalize_non_temp(tref fm) {
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	tref result = tt(fm)
-		// Push all quantifiers in, eliminate them and normalize result
+		// Resolve closed quantified bv subformulas first (see normalize),
+		// then push all quantifiers in, eliminate them and normalize result
+		| tt::f(resolve_quantifiers<node>)
 		| tt::f(anti_prenex<node>)
 		| tt::f(resolve_quantifiers<node>)
 		| tt::f(term_boole_normal_form<node>)
@@ -365,6 +373,27 @@ tref apply_defs_to_spec (tref spec) {
 	return spec;
 }
 
+// Folds quantifiers whose body is a constant: ex x T = all x T = T and
+// ex x F = all x F = F. Such residues can be left behind by substitution
+// based eliminations, which rebuild nodes without running the construction
+// hooks.
+template <NodeType node>
+tref fold_trivial_quantifiers(tref fm) {
+	using tau = tree<node>;
+	auto f = [](tref n) -> tref {
+		const auto& t = tau::get(n);
+		if (t.is(tau::wff) && (t.child_is(tau::wff_ex)
+			|| t.child_is(tau::wff_all)))
+		{
+			tref body = t[0].second();
+			if (tau::get(body).equals_T()
+				|| tau::get(body).equals_F()) return body;
+		}
+		return n;
+	};
+	return post_order<node>(fm).apply_unique(f);
+}
+
 template <NodeType node>
 tref normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
@@ -375,6 +404,20 @@ tref normalize_with_temp_simp(tref fm) {
 		return n;
 	};
 	fm = normalize<node>(fm);
+	// Substitution based eliminations rebuild nodes without running the
+	// construction hooks, so trivially foldable residues (constant
+	// equations, quantifiers over T/F...) may survive; rebuild with hooks
+	// and fold the remaining trivial quantifiers.
+	fm = fold_trivial_quantifiers<node>(tau::reget(fm));
+	// Residual quantified bv subformulas can survive the substitution
+	// based eliminations (the closed formula check in resolve_quantifiers
+	// runs before they are created); resolve them late and fold again.
+	if (tau::get(fm).find_top(is_quantifier<node>)) {
+		if (auto resolved = resolve_quantifiers<node>(fm);
+			resolved && resolved != fm)
+			fm = fold_trivial_quantifiers<node>(
+				tau::reget(resolved));
+	}
 	// Apply present function/predicate definitions
 	bool changed;
 	do {

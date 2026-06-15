@@ -4,11 +4,35 @@
 
 namespace idni::tau_lang {
 
+/**
+ * @brief Builds the single bit mask constant 2^bit for a given bitwidth.
+ *
+ * The mask is built from its binary string representation, so it stays
+ * correct for any bitwidth (a plain 1 << bit would overflow for bit >= 64).
+ *
+ * @tparam node Node type
+ * @param bit Bit position (0 = least significant)
+ * @param bitwidth Bitwidth of the mask
+ * @return The bf-wrapped mask constant
+ */
+template<NodeType node>
+static tref bit_mask_cte(size_t bit, size_t bitwidth) {
+	using tau = tree<node>;
+
+	DBG(assert(bit < bitwidth);)
+	std::string mask(bitwidth, '0');
+	mask[bitwidth - 1 - bit] = '1';
+	return tau::get(tau::bf,
+		tau::get_ba_constant(
+			make_bitvector_value(bitwidth, mask),
+			bv_type_id<node>(bitwidth)));
+}
+
 //
 //
 // _bit is a functional recurrence relation that computes the value of a specific
 // bit in a bitvector. The idea is really simple, we just compute a bitvector
-// value of 1 << bit and conjunct it with the operand.
+// value of 2^bit and conjunct it with the operand.
 //
 //
 
@@ -37,7 +61,7 @@ template<NodeType node>
 static tref make_bit_call_from_index(tref operand, size_t bit) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_num(bit);
+	auto offset = tau::get_integer((int_t)bit);
 	return make_bit_call_from_offset<node>(operand, offset);
 }
 
@@ -58,10 +82,7 @@ static rewriter::rule bit_rule(int_t bit, size_t bitwidth) {
 		return it->second;
 	}
 
-	auto cte =
-		tau::get(tau::bf,
-			tau::get_ba_constant(
-				make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth)));
+	auto cte = bit_mask_cte<node>(bit, bitwidth);
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto head = make_bit_call_from_index<node>(base, bit);
 	auto body = tau::build_bf_and( base, cte);
@@ -155,11 +176,15 @@ static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto header = make_bvshl_by_one_call<node>(base, shifted);
 	// the rightest bit is zero, the rest of the bits are the same as the
-	// original variable shifted by one
+	// original variable shifted by one. Note that bit<node>(x, i) yields the
+	// masked value x & 2^i, so bits at different positions are related by
+	// equivalence of their zero tests, not by equality of the masked values.
 	auto body = tau::build_bf_eq_0(bit<node>(shifted, 0));
 	for (size_t i = 0; i < bitwidth - 1; ++i) {
-		body = tau::build_wff_and( body,
-			tau::build_bf_eq(bit<node>(base, i),	bit<node>(shifted, i + 1)));
+		body = tau::build_wff_and(body,
+			tau::build_wff_equiv(
+				tau::build_bf_eq_0(bit<node>(base, i)),
+				tau::build_bf_eq_0(bit<node>(shifted, i + 1))));
 	}
 	auto rule = make_rule<node>(header, body);
 
@@ -219,13 +244,14 @@ static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto header = make_bvrhl_by_one_call<node>(base, shifted);
 	// the leftest bit is zero, the rest of the bits are the same as the
-	// original variable shifted by one
+	// original variable shifted by one. Bits at different positions are
+	// related by equivalence of their zero tests (see bvshl_by_one_rule).
 	auto body = tau::build_bf_eq_0(bit<node>(shifted, bitwidth - 1));
 	for (size_t i = 1; i < bitwidth; ++i) {
 		body = tau::build_wff_and(body,
-			tau::build_bf_eq(
-				bit<node>(base, i),
-				bit<node>(shifted, i - 1)));
+			tau::build_wff_equiv(
+				tau::build_bf_eq_0(bit<node>(base, i)),
+				tau::build_bf_eq_0(bit<node>(shifted, i - 1))));
 	}
 	auto rule = make_rule<node>(header, body);
 
@@ -281,7 +307,7 @@ template<NodeType node>
 static tref make_is_bit_zero_call_from_index(tref operand, size_t bit) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_num(bit);
+	auto offset = tau::get_integer((int_t)bit);
 	return make_is_bit_zero_call_from_offset<node>(operand, offset);
 }
 
@@ -302,11 +328,9 @@ static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
 		return it->second;
 	}
 
-	auto cte = tau::get(tau::bf,
-		tau::get_ba_constant(
-			make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth)));
+	auto cte = bit_mask_cte<node>(bit, bitwidth);
 	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto head = make_bit_call_from_index<node>(var, bit);
+	auto head = make_is_bit_zero_call_from_index<node>(var, bit);
 	auto body =	tau::build_bf_eq_0(tau::build_bf_and(var, cte));
 	auto rule = make_rule<node>(head, body);
 
@@ -343,15 +367,6 @@ static rewriter::rules is_bit_zero_rules(size_t bitwidth) {
 	return rules;
 }
 
-template<NodeType node>
-tref is_bit_zero(tref operand, int_t bit) {
-	auto bitwidth = get_bv_type_bitwidth<node>(operand);
-	auto rule = is_bit_zero_rule<node>(bit, bitwidth);
-	auto call = make_is_bit_zero_call<node>(operand, bit);
-	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
-}
-
 //
 //
 // _is_bit_one is a predicate recurrence relation that holds if a specific bit
@@ -385,7 +400,7 @@ template<NodeType node>
 static tref make_is_bit_one_call_from_index(tref operand, size_t bit) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_num(bit);
+	auto offset = tau::get_integer((int_t)bit);
 	return make_is_bit_one_call_from_offset<node>(operand, offset);
 }
 
@@ -406,12 +421,9 @@ static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
 		return it->second;
 	}
 
-	auto cte =
-		tau::get(tau::bf,
-			tau::get_ba_constant(
-				make_bitvector_value(bitwidth, 1 << bit), bv_type_id<node>(bitwidth)));
+	auto cte = bit_mask_cte<node>(bit, bitwidth);
 	auto var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto head = make_bit_call_from_index<node>(var, bit);
+	auto head = make_is_bit_one_call_from_index<node>(var, bit);
 	auto body =	tau::build_bf_eq(tau::build_bf_and(var, cte), cte);
 	auto rule = make_rule<node>(head, body);
 
@@ -446,15 +458,6 @@ static rewriter::rules is_bit_one_rules(size_t bitwidth) {
 
 	cache[bitwidth] = rules;
 	return rules;
-}
-
-template<NodeType node>
-tref is_bit_one(tref operand, int_t bit) {
-	auto bitwidth = get_bv_type_bitwidth<node>(operand);
-	auto rule = is_bit_one_rule<node>(bit, bitwidth);
-	auto call = make_is_bit_one_call<node>(operand, bit);
-	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
 }
 
 //
@@ -521,14 +524,18 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 	}
 	// Otherwise, we compute the rule, store it in the cache and return it.
 	// Iterate over destination bits j: shifted[j] = 0 for j < offset (low bits
-	// are zeroed), shifted[j] = base[j - offset] for j >= offset.
+	// are zeroed), shifted[j] = base[j - offset] for j >= offset. Bits at
+	// different positions are related by equivalence of their zero tests
+	// (see bvshl_by_one_rule).
 	tref body = nullptr;
 	for (size_t j = 0; j < bitwidth; ++j) {
 		tref shift_eq;
 		if (j < offset) {
 			shift_eq = tau::build_bf_eq_0(bit<node>(shifted, j));
 		} else {
-			shift_eq = tau::build_bf_eq(bit<node>(shifted, j), bit<node>(base, j - offset));
+			shift_eq = tau::build_wff_equiv(
+				tau::build_bf_eq_0(bit<node>(shifted, j)),
+				tau::build_bf_eq_0(bit<node>(base, j - offset)));
 		}
 		body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
 	}
@@ -546,7 +553,13 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 
 template<NodeType node>
 tref bvshl(tref base, tref count, tref shifted) {
-	// TODO (MEDIUM) check inputs
+	using tau = tree<node>;
+
+	// The shift amount must be a constant whose value is extractable
+	if (!tau::get(tau::trim(count)).is_ba_constant()
+		|| !is_bv_constant<node>(tau::trim(count))
+		|| !get_bv_constant_value<node>(tau::trim(count)))
+		return nullptr;
 	auto rule = bvshl_rule<node>(count);
 	auto call = make_bvshl_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
@@ -607,13 +620,17 @@ static rewriter::rule bvrhl_rule(tref count /* bv constant */) {
 	// Iterate over destination bits j: shifted[j] = base[j + offset] for j < bitwidth - offset
 	// (low bits come from higher base bits), shifted[j] = 0 for j >= bitwidth - offset
 	// (high bits are zeroed out, i.e., logical right shift fills with zero).
+	// Bits at different positions are related by equivalence of their zero
+	// tests (see bvshl_by_one_rule).
 	tref body = nullptr;
 	for (size_t j = 0; j < bitwidth; ++j) {
 		tref shift_eq;
 		if (j + offset >= bitwidth) {
 			shift_eq = tau::build_bf_eq_0(bit<node>(shifted, j));
 		} else {
-			shift_eq = tau::build_bf_eq(bit<node>(shifted, j), bit<node>(base, j + offset));
+			shift_eq = tau::build_wff_equiv(
+				tau::build_bf_eq_0(bit<node>(shifted, j)),
+				tau::build_bf_eq_0(bit<node>(base, j + offset)));
 		}
 		body = body ? tau::build_wff_and(body, shift_eq) : shift_eq;
 	}
@@ -631,7 +648,13 @@ static rewriter::rule bvrhl_rule(tref count /* bv constant */) {
 
 template<NodeType node>
 tref bvrhl(tref base, tref count, tref shifted) {
-	// TODO (MEDIUM) check inputs
+	using tau = tree<node>;
+
+	// The shift amount must be a constant whose value is extractable
+	if (!tau::get(tau::trim(count)).is_ba_constant()
+		|| !is_bv_constant<node>(tau::trim(count))
+		|| !get_bv_constant_value<node>(tau::trim(count)))
+		return nullptr;
 	auto rule = bvrhl_rule<node>(count);
 	auto call = make_bvrhl_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);

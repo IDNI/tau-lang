@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#ifndef __IDNI__TAU__BV_BITBLASTING_H__
-#define __IDNI__TAU__BV_BITBLASTING_H__
+#ifndef __IDNI__TAU__BV_PREDICATE_BLASTING_H__
+#define __IDNI__TAU__BV_PREDICATE_BLASTING_H__
 
 #include "tau_tree.h"
 
@@ -13,7 +13,7 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
-bool bv_blasting = true;
+inline bool bv_blasting = true;
 
 /**
  * @brief Entry point for predicate blasting on bitvector formulas.
@@ -24,8 +24,10 @@ bool bv_blasting = true;
  * it returns nullptr to indicate failure, and the caller can choose to leave the
  * formula unchanged.
  *
- * See implementation in bv_predicate_blasting.tmpl.h and
- * bv_predicate_blasting_predicates.tmpl.h for details.
+ * See implementation in bv_predicate_blasting.tmpl.h and its companion
+ * files bv_predicate_blasting_logic.tmpl.h,
+ * bv_predicate_blasting_comparisons.tmpl.h and
+ * bv_predicate_blasting_arithmetic.tmpl.h for details.
  *
  * @tparam node Node type
  * @param term The formula to blast
@@ -65,28 +67,6 @@ tref bvshl_by_one(tref base, tref shifted);
  */
 template<NodeType node>
 tref bvrhl_by_one(tref base, tref shifted);
-
-/**
- * @brief Computes a predicate checking if a specific bit of an operand is zero.
- *
- * @tparam node Node type
- * @param operand Operand to check
- * @param bit Bit index
- * @return The resulting predicate
- */
-template<NodeType node>
-tref is_bit_zero(tref operand, int_t bit);
-
-/**
- * @brief Computes a predicate checking if a specific bit of an operand is one.
- *
- * @tparam node Node type
- * @param operand Operand to check
- * @param bit Bit index
- * @return The resulting predicate
- */
-template<NodeType node>
-tref is_bit_one(tref operand, int_t bit);
 
 /**
  * @brief Computes a predicate checking if shifted is the result of shifting
@@ -229,7 +209,7 @@ template<NodeType node>
 tref bvnlt(tref left, tref right) { return bvgteq<node>(left, right); }
 
 /**
- * @brief Computes a predicate checking if left is notgreater than right as bitvectors.
+ * @brief Computes a predicate checking if left is not greater than right as bitvectors.
  *
  * @tparam node Node type
  * @param left Left operand
@@ -240,85 +220,114 @@ template<NodeType node>
 tref bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
 
 /**
- * @brief Applies the bitvector addition rule to the given operands.
+ * @brief Computes a predicate constraining sum to be the addition of the operands.
+ *
+ * The constraint formula is quantifier free; the fresh auxiliary variables it
+ * introduces (the carries) are appended to aux and must be existentially
+ * quantified by the caller.
  *
  * @tparam node Node type
  * @param augend Left operand
  * @param addend Right operand
  * @param sum Result variable
- * @return The resulting predicate term
+ * @param aux Collects the fresh auxiliary variables
+ * @return The resulting predicate term, or nullptr on error
  */
 template<NodeType node>
-tref bvadd(tref augend, tref addend, tref sum);
+tref bvadd(tref augend, tref addend, tref sum, trefs& aux);
 
 /**
- * @brief Applies the bitvector subtraction rule to the given operands.
+ * @brief Computes a predicate constraining difference to be the subtraction
+ * of the operands.
+ *
+ * The constraint formula is quantifier free; the fresh auxiliary variables it
+ * introduces (the borrows) are appended to aux and must be existentially
+ * quantified by the caller.
  *
  * @tparam node Node type
  * @param minuend Left operand
  * @param subtrahend Right operand
  * @param difference Result variable
- * @return The resulting predicate term
+ * @param aux Collects the fresh auxiliary variables
+ * @return The resulting predicate term, or nullptr on error
  */
 template<NodeType node>
-tref bvsub(tref minuend, tref subtrahend, tref difference);
+tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux);
 
 /**
- * @brief Applies the bitvector multiplication rule to the given operands.
+ * @brief Computes a predicate constraining product to be the multiplication
+ * of the operands.
  *
- * Only supports multiplication by a constant right operand.
+ * Only supports multiplication by a constant multiplier. The constraint
+ * formula is quantifier free; the fresh auxiliary variables it introduces
+ * (shifted summands and partial sums) are appended to aux and must be
+ * existentially quantified by the caller.
  *
  * @tparam node Node type
  * @param multiplicand Left operand
  * @param multiplier Right operand (must be constant)
  * @param product Result variable
+ * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr if unsupported
  */
 template<NodeType node>
-tref bvmul(tref multiplicand, tref multiplier, tref product);
+tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux);
 
 /**
- * @brief Applies the bitvector division rule to the given operands.
+ * @brief Computes the Euclidean division predicate constraining quotient and
+ * remainder at once.
  *
- * Only supports division by a constant divisor.
+ * Only supports division by a constant divisor. The constraint formula is
+ * quantifier free; the fresh auxiliary variables it introduces are appended
+ * to aux and must be existentially quantified by the caller.
  *
  * @tparam node Node type
  * @param dividend Dividend
  * @param divisor Divisor (must be constant)
  * @param quotient Quotient variable
  * @param remainder Remainder variable
+ * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr if unsupported
  */
 template<NodeType node>
-tref bved(tref dividend, tref divisor, tref quotient, tref remainder);
+tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
+	trefs& aux);
 
 /**
- * @brief Applies the bitvector division rule to the given operands.
+ * @brief Computes a predicate constraining quotient to be the division of
+ * dividend by divisor.
  *
- * Only supports division by a constant divisor.
+ * Only supports division by a constant divisor. The constraint formula is
+ * quantifier free; the fresh auxiliary variables it introduces are appended
+ * to aux and must be existentially quantified by the caller.
  *
  * @tparam node Node type
  * @param dividend Dividend
  * @param divisor Divisor (must be constant)
  * @param quotient Quotient variable
+ * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr if unsupported
  */
 template<NodeType node>
-tref bvdiv(tref dividend, tref divisor, tref quotient);
+tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux);
 
 /**
- * @brief Applies the bitvector modulo rule to the given operands.
+ * @brief Computes a predicate constraining remainder to be the modulo of
+ * dividend by divisor.
  *
- * Only supports modulo by a constant divisor.
+ * Only supports modulo by a constant divisor. The constraint formula is
+ * quantifier free; the fresh auxiliary variables it introduces are appended
+ * to aux and must be existentially quantified by the caller.
  *
  * @tparam node Node type
  * @param dividend Dividend
  * @param divisor Divisor (must be constant)
  * @param remainder Remainder variable
+ * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr if unsupported
  */
 template<NodeType node>
-tref bvmod(tref dividend, tref divisor, tref remainder);
+tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux);
 
 } // namespace idni::tau_lang
 
@@ -330,4 +339,4 @@ tref bvmod(tref dividend, tref divisor, tref remainder);
 #include "bv_predicate_blasting_arithmetic.tmpl.h"
 #include "bv_predicate_blasting.tmpl.h"
 
-#endif // __IDNI__TAU__BV_BITBLASTING_H__
+#endif // __IDNI__TAU__BV_PREDICATE_BLASTING_H__

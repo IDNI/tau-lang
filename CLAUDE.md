@@ -83,8 +83,7 @@ Checks whether a Tau specification is satisfiable. `solver.h` handles the underl
 ### Heuristics (`src/heuristics/`)
 
 Optimization passes applied before/during solving:
-- `bv_bitblasting.h` — bitblast bitvector operations to Boolean formulas
-- `bv_bitblasting_predicates.tmpl.h` — predicates used during bitblasting
+- `bv_predicate_blasting.h` — blast bitvector operations to Boolean formulas with predicates (implementation split into `bv_predicate_blasting{,_logic,_comparisons,_arithmetic}.tmpl.h`)
 - `bv_ba_simplification.h`, `bv_ba_cvc5_simplification.tmpl.h`, `bv_ba_custom_simplification.tmpl.h` — simplification passes
 - `ex_subs_based_elimination.h` — existential substitution elimination
 
