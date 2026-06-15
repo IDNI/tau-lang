@@ -6,801 +6,300 @@ namespace idni::tau_lang {
 
 //
 //
-// _bvadd is a predicate recurrence relation that computes the addition of two
-// bitvectors. The idea is to define the addition ugin:
+// The arithmetic predicates are built directly over the actual operands,
+// without going through the recurrence relation machinery. Auxiliary
+// variables (carries, borrows, partial products, remainders...) are created
+// fresh per call and returned through the aux output parameter; the caller
+// is responsible for existentially quantifying them (see quantify_aux_vars
+// in bv_predicate_blasting.tmpl.h). The generated constraints contain no
+// quantifiers, which makes the construction capture-free: no bound variable
+// can collide with variables occurring in the operands.
 //
-// 	addition(x, y) = addition(x ^ y, (x & y) << 1, m) mod m;
-//
-// The above translates to the following recurrence rules:
-// - addition[0](x, y, z) = (z = x); (base case: adding zero bits means the result is just x)
-// - addition[n](x, y, z) = ex w addition[n-1](x ^ y, w, z)
-//		&& bv_shl_by_one(x & y, w); (general case: the result of adding n bits is the result of adding n-1 bits of the xor of x and y, and the carry (x & y) shifted left by one)
-//
 //
 
-/**
- * @brief Creates a call to the offset bitvector addition recurrence.
- * @tparam node Node type
- * @param augend Left operand
- * @param addend Right operand (constant)
- * @param sum Result variable
- * @return The constructed call term
- */
+//
+//
+// bvadd computes the addition of two bitvectors by unrolling the classic
+// carry-propagation recurrence
+//
+//	(a, b) -> (a ^ b, (a & b) << 1)
+//
+// bitwidth times. Each step shifts the pending carry one position to the
+// left, so after bitwidth steps the carry is provably zero and the sum
+// equals the accumulated xor term.
+//
+//
+
 template<NodeType node>
-static tref make_bvadd_call_from_offset(tref augend, tref addend, tref sum, tref offset) {
+tref bvadd(tref augend, tref addend, tref sum, trefs& aux) {
 	using tau = tree<node>;
-	DBG( LOG_TRACE << "make_bvadd_call_from_offset/augend: " << LOG_FM(augend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvadd_call_from_offset/addend: " << LOG_FM(addend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvadd_call_from_offset/sum: " << LOG_FM(sum) << "\n"; )
-	DBG( LOG_TRACE << "make_bvadd_call_from_offset/offset: " << LOG_FM(offset) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvadd", { offset }, { augend, addend, sum })));
-	DBG( LOG_TRACE << "make_bvadd_call_from_offset/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
 
-/**
- * @brief Creates a call to the indexed bitvector subtraction recurrence.
- * @tparam node Node type
- * @param minuend Left operand
- * @param subtrahend Right operand
- * @param difference Result variable
- * @param index Index for the recurrence
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvadd_call_from_index(tref minuend, tref subtrahend, tref difference, size_t index) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "make_bvadd_call_from_index/minuend: " << LOG_FM(minuend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvadd_call_from_index/subtrahend: " << LOG_FM(subtrahend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvadd_call_from_index/difference: " << LOG_FM(difference) << "\n"; )
-	DBG( LOG_TRACE << "make_bvadd_call_from_index/index: " << index << "\n"; )
-	auto offset = tau::get_num(index);
-	auto result = make_bvadd_call_from_offset<node>(minuend, subtrahend, difference, offset);
-	DBG( LOG_TRACE << "make_bvadd_call_from_index/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
-
-/**
- * @brief Returns the rules for bitvector addition recurrence.
- *
- * Generates the base and general case rules for bitvector addition.
- *
- * @tparam node Node type
- * @param bitwidth Bitwidth of the operands
- * @return The set of rules for addition
- */
-template<NodeType node>
-static rewriter::rules bvadd_rules(size_t bitwidth) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvadd_rules/bitwidth: " << bitwidth << "\n"; )
-
-	static std::map<size_t, rewriter::rules> cache;
-	if (auto it = cache.find(bitwidth); it != cache.end()) {
-		DBG( LOG_TRACE << "bvadd_rules (cache hit)/bitwidth: " << bitwidth << "\n"; )
-		return it->second;
-	}
-
-	auto augend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto addend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto sum = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-
-	rewriter::rules rules;
-	// base case: addition[0](x, y, z) = (z = x);
-	auto base_header = make_bvadd_call_from_index<node>(augend, addend, sum, 0);
-	auto base_body = tau::build_bf_eq(augend, sum);
-	rules.push_back(make_rule<node>(base_header, base_body));
-	// general case: addition[n](x, y, z) = ex w addition[n-1](x ^ y, w, z) && bv_shr_by_one(x & y, w);
-	auto n = tau::build_variable(untyped_type_id<node>());
-	auto n_minus_1 = tau::build_shift(n, 1);
-	auto general_header = make_bvadd_call_from_offset<node>(augend, addend, sum, n);
-	auto w = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_w = tau::get(tau::bf, w);
-	auto general_body = tau::build_wff_ex(w,
-		tau::build_wff_and(
-			make_bvadd_call_from_offset<node>(tau::build_bf_xor(augend, addend), bf_w, sum, n_minus_1),
-			bvshl_by_one<node>(tau::build_bf_and(augend, addend), bf_w)
-	));
-	rules.push_back(make_rule<node>(general_header, general_body));
-
-#ifdef DEBUG
-	for (const auto& rule : rules) {
-		LOG_TRACE << "bvadd_rules/rule: " << LOG_RULE(rule) << "\n";
-		LOG_TRACE << "bvadd_rules/head: " << LOG_FM(rule.first->get()) << "\n";
-		LOG_TRACE << "bvadd_rules/body: " << LOG_FM(rule.second->get()) << "\n";
-	}
-#endif // DEBUG
-
-	cache[bitwidth] = rules;
-	return rules;
-}
-
-/**
- * @brief Returns the rule for bitvector addition (caching by bitwidth).
- *
- * @tparam node Node type
- * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
- */
-template<NodeType node>
-static rewriter::rule bvadd_rule(size_t bitwidth) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvadd_rule/bitwidth: " << bitwidth << "\n"; )
-
-	static std::map<size_t, rewriter::rule> cache;
-	if (auto it = cache.find(bitwidth); it != cache.end()) {
-		DBG( LOG_TRACE << "bvadd_rule (cache hit)/bitwidth: " << bitwidth << "\n"; )
-		return it->second;
-	}
-
-	rewriter::rules rs;
-	auto additions = bvadd_rules<node>(bitwidth);
-	rs.insert(rs.end(), additions.begin(), additions.end());
-
-	auto augend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto addend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto sum = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-
-	auto head = make_bvadd_call_from_index<node>(augend, addend, sum, bitwidth);
-	auto rr = make_rr<node>(rs, head);
-	auto body = apply_rr_to_formula(rr);
-	auto rule = make_rule<node>(head, body);
-
-#ifdef DEBUG
-	LOG_TRACE << "bvadd_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvadd_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvadd_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-
-	cache[bitwidth] = rule;
-	return cache[bitwidth];
-}
-
-template<NodeType node>
-tref bvadd(tref augend, tref addend, tref sum) {
-	DBG( LOG_TRACE << "bvadd/augend: " << LOG_FM(augend) << "\n"; )
-	DBG( LOG_TRACE << "bvadd/addend: " << LOG_FM(addend) << "\n"; )
-	DBG( LOG_TRACE << "bvadd/sum: " << LOG_FM(sum) << "\n"; )
 	auto bitwidth = get_bv_type_bitwidth<node>(augend);
-	auto rule = bvadd_rule<node>(bitwidth);
-	auto call = make_bvadd_call_from_index<node>(augend, addend, sum, bitwidth);
-	auto rr = make_rr<node>({ rule } , call);
-	auto result = apply_rr_to_formula(rr);
-	DBG( LOG_TRACE << "bvadd/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
+	if (bitwidth == 0) return nullptr;
 
-//
-//
-// _bvsub is a predicate recurrence relation that computes the subtraction of two
-// bitvectors. The idea is to define the subtraction using:
-//
-// subtraction(x, y) = subtraction(x ^ y, (~x & y) << 1, m) mod m;
-//
-// The above translates to the following recurrence rules:
-// - subtraction[0](x, y, z) = (z = x); (base case: subtracting zero bits means the result is just x)
-// - subtraction[n](x, y, z) = ex w subtraction[n-1](x ^ y, w, z)
-// 		&& bv_shr_by_one((~x & y), w); (general case: the result of subtracting n bits is the result of subtracting n-
-//
-//
-
-/**
- * @brief Creates a call to the offset bitvector subtraction recurrence.
- * @tparam node Node type
- * @param minuend Left operand
- * @param subtrahend Right operand
- * @param difference Result variable
- * @param offset Offset for the recurrence
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvsub_call_from_offset(tref minuend, tref subtrahend, tref difference, tref offset) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "make_bvsub_call_from_offset/minuend: " << LOG_FM(minuend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvsub_call_from_offset/subtrahend: " << LOG_FM(subtrahend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvsub_call_from_offset/difference: " << LOG_FM(difference) << "\n"; )
-	DBG( LOG_TRACE << "make_bvsub_call_from_offset/offset: " << LOG_FM(offset) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvsub", { offset }, { minuend, subtrahend, difference })));
-	DBG( LOG_TRACE << "make_bvsub_call_from_offset/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
-
-/**
- * @brief Creates a call to the indexed bitvector subtraction recurrence.
- * @tparam node Node type
- * @param minuend Left operand
- * @param subtrahend Right operand
- * @param difference Result variable
- * @param index Index for the recurrence
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvsub_call_from_index(tref minuend, tref subtrahend, tref difference, size_t index) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "make_bvsub_call_from_index/minuend: " << LOG_FM(minuend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvsub_call_from_index/subtrahend: " << LOG_FM(subtrahend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvsub_call_from_index/difference: " << LOG_FM(difference) << "\n"; )
-	DBG( LOG_TRACE << "make_bvsub_call_from_index/index: " << index << "\n"; )
-	auto offset = tau::get_num(index);
-	auto result = make_bvsub_call_from_offset<node>(minuend, subtrahend, difference, offset);
-	DBG( LOG_TRACE << "make_bvsub_call_from_index/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
-
-/**
- * @brief Returns the rules for bitvector subtraction recurrence.
- *
- * Generates the base and general case rules for bitvector subtraction.
- *
- * @tparam node Node type
- * @param bitwidth Bitwidth of the operands
- * @return The set of rules for subtraction
- */
-template<NodeType node>
-static rewriter::rules bvsub_rules(size_t bitwidth) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvsub_rules/bitwidth: " << bitwidth << "\n"; )
-
-	static std::map<size_t, rewriter::rules> cache;
-	if (auto it = cache.find(bitwidth); it != cache.end()) {
-		DBG( LOG_TRACE << "bvsub_rules (cache hit)/bitwidth: " << bitwidth << "\n"; )
-		return it->second;
+	tref a = augend, b = addend;
+	tref body = nullptr;
+	for (size_t i = 0; i < bitwidth; ++i) {
+		auto carry = tau::build_variable(bv_type_id<node>(bitwidth));
+		auto bf_carry = tau::get(tau::bf, carry);
+		aux.push_back(carry);
+		// carry = (a & b) << 1
+		auto constraint = bvshl_by_one<node>(
+			tau::build_bf_and(a, b), bf_carry);
+		if (!constraint) return nullptr;
+		body = body ? tau::build_wff_and(body, constraint) : constraint;
+		a = tau::build_bf_xor(a, b);
+		b = bf_carry;
 	}
-
-	auto minuend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto subtrahend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto difference = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-
-	rewriter::rules rules;
-	// base case: subtraction[0](x, y, z) = (z = x);
-	auto base_header = make_bvsub_call_from_index<node>(minuend, subtrahend, difference, 0);
-	auto base_body = tau::build_bf_eq(minuend, difference);
-	rules.push_back(make_rule<node>(base_header, base_body));
-	// general case: subtraction[n](x, y, z) = ex w subtraction[n-1](x ^ y, w, z) && bv_shr_by_one((~x & y), w);
-	auto n = tau::build_variable(untyped_type_id<node>());
-	auto n_minus_1 = tau::build_shift(n, 1);
-	auto general_header = make_bvsub_call_from_offset<node>(minuend, subtrahend, difference, n);
-	auto w = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_w = tau::get(tau::bf, w);
-	auto general_body = tau::build_wff_ex(w,
-		tau::build_wff_and(
-			make_bvsub_call_from_offset<node>(tau::build_bf_xor(minuend, subtrahend), bf_w, difference, n_minus_1),
-			bvshl_by_one<node>(tau::build_bf_and(tau::build_bf_neg(minuend), subtrahend), bf_w)
-		));
-	rules.push_back(make_rule<node>(general_header, general_body));
-
-#ifdef DEBUG
-	for (const auto& rule : rules) {
-	LOG_TRACE << "bvsub_rules: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvsub_rules/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvsub_rules/body: " << LOG_FM(rule.second->get()) << "\n";
-	}
-#endif // DEBUG
-
-	cache[bitwidth] = rules;
-	return rules;
+	// after bitwidth steps the pending carry is zero, so sum = a
+	return tau::build_wff_and(body, tau::build_bf_eq(a, sum));
 }
 
-/**
- * @brief Returns the rule for bitvector subtraction (caching by bitwidth).
- *
- * @tparam node Node type
- * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
- */
+//
+//
+// bvsub computes the subtraction of two bitvectors by unrolling the borrow
+// recurrence
+//
+//	(a, b) -> (a ^ b, (a' & b) << 1)
+//
+// bitwidth times: after bitwidth steps the pending borrow is provably zero
+// and the difference equals the accumulated xor term.
+//
+//
+
 template<NodeType node>
-static rewriter::rule bvsub_rule(size_t bitwidth) {
+tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvsub_rule/bitwidth: " << bitwidth << "\n"; )
 
-	static std::map<size_t, rewriter::rule> cache;
-	if (auto it = cache.find(bitwidth); it != cache.end()) {
-		DBG( LOG_TRACE << "bvsub_rule (cache hit)/bitwidth: " << bitwidth << "\n"; )
-		return it->second;
-	}
-
-	auto minuend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto subtrahend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto difference = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-
-	rewriter::rules rs;
-	auto substractions = bvsub_rules<node>(bitwidth);
-	rs.insert(rs.end(), substractions.begin(), substractions.end());
-	auto head = make_bvsub_call_from_index<node>(minuend, subtrahend, difference, bitwidth);
-	auto rr = make_rr<node>(rs, head);
-	auto body = apply_rr_to_formula(rr);
-	auto rule = make_rule<node>(head, body);
-
-#ifdef DEBUG
-	LOG_TRACE << "bvsub_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvsub_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvsub_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-
-	cache[bitwidth] = rule;
-	return cache[bitwidth];
-}
-
-template<NodeType node>
-tref bvsub(tref minuend, tref subtrahend, tref difference) {
-	DBG( LOG_TRACE << "bvsub/minuend: " << LOG_FM(minuend) << "\n"; )
-	DBG( LOG_TRACE << "bvsub/subtrahend: " << LOG_FM(subtrahend) << "\n"; )
-	DBG( LOG_TRACE << "bvsub/difference: " << LOG_FM(difference) << "\n"; )
 	auto bitwidth = get_bv_type_bitwidth<node>(minuend);
-	auto rule = bvsub_rule<node>(bitwidth);
-	auto call = make_bvsub_call_from_index<node>(minuend, subtrahend, difference, bitwidth);
-	auto rr = make_rr<node>({ rule }, call);
-	auto result = apply_rr_to_formula(rr);
-	DBG( LOG_TRACE << "bvsub/result: " << LOG_FM(result) << "\n"; )
-	return result;
+	if (bitwidth == 0) return nullptr;
+
+	tref a = minuend, b = subtrahend;
+	tref body = nullptr;
+	for (size_t i = 0; i < bitwidth; ++i) {
+		auto borrow = tau::build_variable(bv_type_id<node>(bitwidth));
+		auto bf_borrow = tau::get(tau::bf, borrow);
+		aux.push_back(borrow);
+		// borrow = (a' & b) << 1
+		auto constraint = bvshl_by_one<node>(
+			tau::build_bf_and(tau::build_bf_neg(a), b), bf_borrow);
+		if (!constraint) return nullptr;
+		body = body ? tau::build_wff_and(body, constraint) : constraint;
+		a = tau::build_bf_xor(a, b);
+		b = bf_borrow;
+	}
+	// after bitwidth steps the pending borrow is zero, so difference = a
+	return tau::build_wff_and(body, tau::build_bf_eq(a, difference));
 }
 
 //
 //
-// _bvmul is a predicate recurrence relation that computes the multiplication of two
-// bitvectors. The idea is to define the multiplication using:
+// bvmul computes the multiplication of a bitvector by a constant multiplier
+// as the sum of the multiplicand shifted by each set bit position of the
+// multiplier:
 //
-// multiplication(x, y) = if (y & 1) then (x + multiplication(x << 1, y >> 1)) else multiplication(x << 1, y >> 1);
+//	product = sum over { multiplicand << i : bit i of multiplier is 1 }
 //
-// The above translates to the following recurrence rules:
-// - multiplication[0](x, y, z) = (z = 0); (base case: multiplying zero bits means the result is zero)
-// - multiplication[n](x, y, z) = if (y & 1) then (ex v multiplication[n-1](x << 1, y >> 1, v) && (z = x + v)) else (ex v multiplication[n-1](x << 1, y >> 1, v) && (z = v)); (general case: the result of multiplying n bits is the result of multiplying n-1 bits of x shifted left by one and
+// Shifts use the constant-shift predicate bvshl and the additions chain
+// through bvadd, with fresh auxiliary variables for the shifted summands
+// and the partial sums.
 //
 //
-
-/**
- * @brief Creates a call to the bitvector multiplication recurrence (constant right operand).
- * @tparam node Node type
- * @param multiplicant Left operand
- * @param multiplier Right operand (constant)
- * @param product Result variable
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvmul_call(tref multiplicant, tref multiplier, tref product) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "make_bvmul_call/multiplicant: " << LOG_FM(multiplicant) << "\n"; )
-	DBG( LOG_TRACE << "make_bvmul_call/multiplier: " << LOG_FM(multiplier) << "\n"; )
-	DBG( LOG_TRACE << "make_bvmul_call/product: " << LOG_FM(product) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmul", { multiplicant, multiplier, product })));
-	DBG( LOG_TRACE << "make_bvmul_call/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
-
-/**
- * @brief Returns the rule for bitvector multiplication recurrence.
- *
- * Handles multiplication by constant right operand.
- *
- * @tparam node Node type
- * @param multiplier Right operand (bv constant)
- * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
- */
-template<NodeType node>
-static rewriter::rule bvmul_rec_rule(tref multiplier /* cvc5 constant */) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvmul_rec_rule/multiplier: " << LOG_FM(multiplier) << "\n"; )
-
-	DBG( assert(tau::get(tau::trim(multiplier)).is(tau::bf_f) || is_bv_constant<node>(tau::trim(multiplier))); )
-
-	static std::map<tref, rewriter::rule> cache;
-	if (cache.find(multiplier) != cache.end()) {
-		DBG( LOG_TRACE << "bvmul_rec_rule (cache hit)/multiplier: " << LOG_FM(multiplier) << "\n"; )
-		return cache[multiplier];
-	}
-
-	auto bitwidth = get_bv_type_bitwidth<node>(multiplier);
-	auto multiplicand = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_multiplicand = tau::get(tau::bf, multiplicand);
-	auto product = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_product = tau::get(tau::bf, product);
-	auto head = make_bvmul_call<node>(bf_multiplicand, multiplier, bf_product);
-
-	// multiplication[n](x, 0, z) = (z = 0) or multiplication[n](0, x, z) = (z = 0);
-	if (tau::get(tau::trim(multiplier)).is(tau::bf_f)) { // || is_zero_bv_constant<node>(tau::trim(multiplier))) {
-		auto zero_case = tau::build_bf_eq(tau::_0(bv_type_id<node>(bitwidth)), bf_product);
-		auto rule = make_rule<node>(head, zero_case);
-
-#ifdef DEBUG
-		LOG_TRACE << "bvmul_rec_rule (zero case): " << LOG_RULE(rule) << "\n";
-		LOG_TRACE << "bvmul_rec_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-		LOG_TRACE << "bvmul_rec_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-
-		return rule;
-	}
-
-	auto shr_multiplier = tau::get(tau::bf, bv_shr_by_one<node>(tau::trim(multiplier)));
-	auto bf_shr_multiplier = tau::get(tau::bf, shr_multiplier);
-	auto subproduct = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_subproduct = tau::get(tau::bf, subproduct);
-	auto shl_multiplicant = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_shl_multiplicant = tau::get(tau::bf, shl_multiplicant);
-
-	// case y & 1 = 1: multiplication(x, y, w) = ex z ex v multiplication(x << 1, v) && addition(x, v, z);
-	if (is_bv_lsb_one<node>(tau::trim(multiplier))) {
-		auto odd_case = tau::build_wff_ex(shl_multiplicant,
-			tau::build_wff_ex(subproduct,
-				tau::build_wff_and(
-					tau::build_wff_and(
-						bvshl_by_one<node>(bf_multiplicand, bf_shl_multiplicant),
-						make_bvmul_call<node>(bf_shl_multiplicant, bf_shr_multiplier, bf_subproduct)),
-					bvadd<node>(bf_multiplicand, bf_subproduct, bf_product))));
-		auto rule = make_rule<node>(head, odd_case);
-
-#ifdef DEBUG
-		LOG_TRACE << "bvmul_rec_rule (odd case): " << LOG_RULE(rule) << "\n";
-		LOG_TRACE << "bvmul_rec_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-		LOG_TRACE << "bvmul_rec_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-
-		return rule;
-	}
-
-	// case y & 1 = 0: multiplication(x, y, z) = ex v multiplication[y >> 1](x << 1, v) && (z = v);
-	auto even_case = tau::build_wff_ex(shl_multiplicant,
-		tau::build_wff_ex(subproduct,
-			tau::build_wff_and(
-				bvshl_by_one<node>(bf_multiplicand, bf_shl_multiplicant),
-				tau::build_wff_and(
-					make_bvmul_call<node>(bf_shl_multiplicant, bf_shr_multiplier, bf_subproduct),
-					tau::build_bf_eq(bf_product, bf_subproduct)))));
-	auto rule = make_rule<node>(head, even_case);
-
-#ifdef DEBUG
-	LOG_TRACE << "bvmul_rec_rule (even case): " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvmul_rec_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvmul_rec_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-
-	return rule;
-}
-
-/**
- * @brief Returns the rule for bitvector multiplication (caching by bitwidth and right operand).
- *
- * @tparam node Node type
- * @param multiplier Right operand (constant)
- * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
- */
-template<NodeType node>
-static rewriter::rule bvmul_rule(tref multiplier /* cvc5 constant */) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvmul_rule/multiplier: " << LOG_FM(multiplier) << "\n"; )
-
-	DBG( LOG_INFO << "Checking if tref " << LOG_FM(multiplier) << " is a zero bitvector constant.\n"; )
-
-	static std::map<tref, rewriter::rule> cache;
-
-	if (cache.find(multiplier) != cache.end()) {
-		DBG( LOG_TRACE << "bvmul_rule (cache hit)/multiplier: " << LOG_FM(multiplier) << "\n"; )
-		return cache[multiplier];
-	}
-
-	rewriter::rules rules;
-	auto current = multiplier;
-	auto bitwidth = get_bv_type_bitwidth<node>(multiplier);
-
-	while (!tau::get(tau::trim(current)).is(tau::bf_f)) { //is_zero_bv_constant<node>(tau::trim(current))) {
-		auto rule = bvmul_rec_rule<node>(current);
-		rules.push_back(rule);
-		current = tau::get(tau::bf, bv_shr_by_one<node>(tau::trim(current)));
-	}
-	// Then we build a main term to compute the actual predicate.
-	auto multiplicant = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto product = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto call = make_bvmul_call<node>(multiplicant, multiplier, product);
-	auto rr = make_rr<node>(rules, call);
-	auto body = apply_rr_to_formula(rr);
-	auto rule = make_rule<node>(call, body);
-
-#ifdef DEBUG
-	LOG_TRACE << "bvmul_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvmul_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvmul_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-
-	cache[multiplier] = rule;
-	return cache[multiplier];
-}
 
 template<NodeType node>
-tref bvmul(tref multiplicand, tref multiplier, tref product) {
+tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux) {
 	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvmul/multiplicand: " << LOG_FM(multiplicand) << "\n"; )
-	DBG( LOG_TRACE << "bvmul/multiplier: " << LOG_FM(multiplier) << "\n"; )
-	DBG( LOG_TRACE << "bvmul/product: " << LOG_FM(product) << "\n"; )
 
-	if (!tau::get(tau::trim(multiplier)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(multiplier))) {
-		DBG( LOG_DEBUG << "Only multiplication by constant is supported in predicate blasting."; )
+	// zero multiplier (the hooks normalize zero constants to bf_f)
+	if (tau::get(tau::trim(multiplier)).is(tau::bf_f))
+		return tau::build_bf_eq_0(product);
+	if (!tau::get(tau::trim(multiplier)).is_ba_constant()
+		|| !is_bv_constant<node>(tau::trim(multiplier))) {
+		DBG(LOG_DEBUG << "Only multiplication by constant is supported in predicate blasting.";)
 		return nullptr;
 	}
-	auto rule = bvmul_rule<node>(multiplier);
-	auto call = make_bvmul_call<node>(multiplicand, multiplier, product);
-	auto result = nso_rr_apply<node>({ rule }, call);
-	DBG( LOG_TRACE << "bvmul/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
 
-//
-//
-// _bvdiv and _bvmod are predicate recurrence relations that compute the quotient
-// and modulo of two bitvectors (being the right operand a constant). The idea is
-// to define the division and modulo as usual:
-//
-// dividend = divisor * quotient + remainder && remainder < divisor
-//
-//
+	auto bitwidth = get_bv_type_bitwidth<node>(multiplier);
+	if (bitwidth == 0) return nullptr;
 
-/**
- * @brief Creates a call to the bitvector division recurrence.
- * @tparam node Node type
- * @param dividend Dividend
- * @param divisor Divisor
- * @param result Result variable
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bvdiv_call(tref dividend, tref divisor, tref quotient) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "make_bvdiv_call/dividend: " << LOG_FM(dividend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvdiv_call/divisor: " << LOG_FM(divisor) << "\n"; )
-	DBG( LOG_TRACE << "make_bvdiv_call/quotient: " << LOG_FM(quotient) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvdiv", { dividend, divisor, quotient })));
-	DBG( LOG_TRACE << "make_bvdiv_call/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
+	// set bit positions of the multiplier (position 0 = least significant)
+	auto cte = std::get<bv>(
+		tau::get(tau::trim(multiplier)).get_ba_constant());
+	if (!cte.isBitVectorValue()) return nullptr;
+	const std::string bv_str = cte.getBitVectorValue();
+	std::vector<size_t> bits;
+	for (size_t i = 0; i < bv_str.size(); ++i)
+		if (bv_str[bv_str.size() - 1 - i] == '1') bits.push_back(i);
+	if (bits.empty()) return tau::build_bf_eq_0(product);
 
-/**
- * @brief Returns the rule for bitvector division (caching by bitwidth and divisor).
- *
- * @tparam node Node type
- * @param divisor Divisor (constant)
- * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
- */
-template<NodeType node>
-static rewriter::rule bvdiv_rule(tref divisor /* bv constant */) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvdiv_rule/divisor: " << LOG_FM(divisor) << "\n"; )
+	auto shift_count = [&](size_t i) {
+		typename node::constant c = { make_bitvector_value(bitwidth, i) };
+		return tau::build_bf_ba_constant(c, bv_type_id<node>(bitwidth));
+	};
 
-	static std::map<tref, rewriter::rule> cache;
-	if (auto it = cache.find(divisor); it != cache.end()) {
-		DBG( LOG_TRACE << "bvdiv_rule (cache hit)/divisor: " << LOG_FM(divisor) << "\n"; )
-		return it->second;
+	// single summand: constrain the product directly
+	if (bits.size() == 1) {
+		if (bits[0] == 0)
+			return tau::build_bf_eq(multiplicand, product);
+		return bvshl<node>(multiplicand, shift_count(bits[0]), product);
 	}
 
-	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
+	tref body = nullptr;
+	auto conjoin = [&](tref constraint) -> bool {
+		if (!constraint) return false;
+		body = body ? tau::build_wff_and(body, constraint) : constraint;
+		return true;
+	};
 
-	// We build the main term to compute the actual predicate.
-	auto quotient = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_quotient = tau::get(tau::bf, quotient);
-	auto remainder = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_remainder = tau::get(tau::bf, remainder);
-	auto dividend = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto bf_dividend = tau::get(tau::bf, dividend);
+	// shifted summands
+	trefs terms;
+	for (size_t i : bits) {
+		if (i == 0) { terms.push_back(multiplicand); continue; }
+		auto shifted = tau::build_variable(bv_type_id<node>(bitwidth));
+		auto bf_shifted = tau::get(tau::bf, shifted);
+		aux.push_back(shifted);
+		if (!conjoin(bvshl<node>(multiplicand, shift_count(i),
+			bf_shifted))) return nullptr;
+		terms.push_back(bf_shifted);
+	}
+
+	// addition chain; the last partial sum is the product itself
+	tref acc = terms[0];
+	for (size_t k = 1; k < terms.size(); ++k) {
+		tref out;
+		if (k + 1 == terms.size()) out = product;
+		else {
+			auto partial = tau::build_variable(
+				bv_type_id<node>(bitwidth));
+			out = tau::get(tau::bf, partial);
+			aux.push_back(partial);
+		}
+		if (!conjoin(bvadd<node>(acc, terms[k], out, aux)))
+			return nullptr;
+		acc = out;
+	}
+	return body;
+}
+
+//
+//
+// bvdiv, bvmod and bved encode Euclidean division by a constant divisor:
+//
+//	dividend = quotient * divisor + remainder  &&  remainder < divisor
+//
+// expressed over modular arithmetic as
+//
+//	exact = dividend - remainder  &&  quotient * divisor = exact
+//
+// Two extra side conditions make the solution unique under wrap-around
+// (mod 2^bitwidth) semantics:
+//   - remainder <= dividend, so the subtraction cannot wrap, and
+//   - quotient <= (2^bitwidth - 1) / divisor, so the product cannot wrap.
+//
+//
+
+/**
+ * @brief Builds the Euclidean division constraints for a constant divisor.
+ *
+ * @tparam node Node type
+ * @param dividend Dividend term
+ * @param divisor Divisor (bv constant)
+ * @param quotient Quotient term
+ * @param remainder Remainder term
+ * @param aux Collects the fresh auxiliary variables
+ * @return The constraint conjunction, or nullptr if unsupported
+ */
+template<NodeType node>
+static tref bv_euclidean_constraints(tref dividend, tref divisor,
+	tref quotient, tref remainder, trefs& aux)
+{
+	using tau = tree<node>;
+
+	if (!tau::get(tau::trim(divisor)).is_ba_constant()
+		|| !is_bv_constant<node>(tau::trim(divisor))) {
+		DBG(LOG_DEBUG << "Only division/modulo by constant is supported in predicate blasting.";)
+		return nullptr;
+	}
+	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
+	// the quotient bound below is computed with 64 bit arithmetic
+	if (bitwidth == 0 || bitwidth > 64) return nullptr;
+	auto divisor_value = get_bv_constant_value<node>(tau::trim(divisor));
+	// division by zero falls back to the solver semantics
+	if (!divisor_value || *divisor_value == 0) return nullptr;
+
 	auto exact = tau::build_variable(bv_type_id<node>(bitwidth));
 	auto bf_exact = tau::get(tau::bf, exact);
-	auto call = make_bvdiv_call<node>(dividend, divisor, bf_quotient);
-	auto body = tau::build_wff_ex(exact,
-		tau::build_wff_ex(quotient,
-			tau::build_wff_ex(remainder,
-				tau::build_wff_and(
-					bvsub<node>(bf_dividend, bf_remainder, bf_exact),
-					tau::build_wff_and(
-						bvmul<node>(bf_quotient, divisor, bf_exact),
-						bvlt<node>(bf_remainder, divisor))))));
-	auto rule = make_rule<node>(call, body);
+	aux.push_back(exact);
 
-#ifdef DEBUG
-	LOG_TRACE << "bvdiv_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvdiv_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvdiv_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
+	tref body = nullptr;
+	auto conjoin = [&](tref constraint) -> bool {
+		if (!constraint) return false;
+		body = body ? tau::build_wff_and(body, constraint) : constraint;
+		return true;
+	};
 
-	return cache[divisor] = rule;
-}
-
-template<NodeType node>
-tref bvdiv(tref dividend, tref divisor, tref quotient) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvdiv/dividend: " << LOG_FM(dividend) << "\n"; )
-	DBG( LOG_TRACE << "bvdiv/divisor: " << LOG_FM(divisor) << "\n"; )
-	DBG( LOG_TRACE << "bvdiv/quotient: " << LOG_FM(quotient) << "\n"; )
-
-	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
-		DBG( LOG_DEBUG << "Only division by constant is supported in predicate blasting."; )
+	// exact = dividend - remainder
+	if (!conjoin(bvsub<node>(dividend, remainder, bf_exact, aux)))
 		return nullptr;
+	// quotient * divisor = exact
+	if (!conjoin(bvmul<node>(quotient, divisor, bf_exact, aux)))
+		return nullptr;
+	// remainder < divisor
+	if (!conjoin(bvlt<node>(remainder, divisor))) return nullptr;
+	// remainder <= dividend, so the subtraction cannot wrap around
+	auto r_gt_d = bvgt<node>(remainder, dividend);
+	if (!r_gt_d) return nullptr;
+	if (!conjoin(tau::build_wff_neg(r_gt_d))) return nullptr;
+	// quotient <= (2^bitwidth - 1) / divisor, so the product cannot wrap
+	// around; omitted when the bound covers the whole domain
+	const size_t max_value = (bitwidth == 64)
+		? ~size_t(0) : ((size_t(1) << bitwidth) - 1);
+	if (const size_t bound = max_value / *divisor_value;
+		bound < max_value)
+	{
+		typename node::constant c =
+			{ make_bitvector_value(bitwidth, bound) };
+		auto bound_cte = tau::build_bf_ba_constant(c,
+			bv_type_id<node>(bitwidth));
+		auto q_gt_bound = bvgt<node>(quotient, bound_cte);
+		if (!q_gt_bound) return nullptr;
+		if (!conjoin(tau::build_wff_neg(q_gt_bound))) return nullptr;
 	}
-	auto rule = bvdiv_rule<node>(divisor);
-	auto call = make_bvdiv_call<node>(dividend, divisor, quotient);
-	auto rr = make_rr<node>({ rule }, call);
-	auto result = apply_rr_to_formula(rr);
-	DBG( LOG_TRACE << "bvdiv/result: " << LOG_FM(result) << "\n"; )
-	return result;
+	return body;
 }
 
-/**
- * @brief Creates a call to the bitvector modulo recurrence.
- * @tparam node Node type
- * @param dividend Dividend
- * @param divisor Divisor
- * @param remainder Result variable
- * @return The constructed call term
- */
 template<NodeType node>
-static tref make_bvmod_call(tref dividend, tref divisor, tref remainder) {
+tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux) {
 	using tau = tree<node>;
-	DBG( LOG_TRACE << "make_bvmod_call/dividend: " << LOG_FM(dividend) << "\n"; )
-	DBG( LOG_TRACE << "make_bvmod_call/divisor: " << LOG_FM(divisor) << "\n"; )
-	DBG( LOG_TRACE << "make_bvmod_call/remainder: " << LOG_FM(remainder) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvmod", { dividend, divisor, remainder })));
-	DBG( LOG_TRACE << "make_bvmod_call/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
-
-/**
- * @brief Returns the rule for bitvector modulo (caching by bitwidth and divisor).
- *
- * @tparam node Node type
- * @param divisor Divisor (constant)
- * @param bitwidth Bitwidth of the operands
- * @return The constructed rule
- */
-template<NodeType node>
-static rewriter::rule bvmod_rule(tref divisor /* bv copnstant */) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvmod_rule/divisor: " << LOG_FM(divisor) << "\n"; )
-
-	static std::map<tref, rewriter::rule> cache;
-	if (auto it = cache.find(divisor); it != cache.end()) {
-		DBG( LOG_TRACE << "bvmod_rule (cache hit)/divisor: " << LOG_FM(divisor) << "\n"; )
-		return it->second;
-	}
 
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
-
-	// We build the main term to compute the actual predicate.
-	auto quotient_var = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto quotient = tau::get(tau::bf, quotient_var);
-	auto remainder_var = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto remainder = tau::get(tau::bf, remainder_var);
-	auto dividend_var = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto dividend = tau::get(tau::bf, dividend_var);
-	auto exact_var = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto exact = tau::get(tau::bf, exact_var);
-	auto call = make_bvmod_call<node>(dividend, divisor, remainder);
-	auto body = tau::build_wff_ex(exact_var,
-		tau::build_wff_ex(quotient_var,
-			tau::build_wff_ex(remainder_var,
-				tau::build_wff_and(
-					bvsub<node>(dividend, remainder, exact),
-					tau::build_wff_and(
-						bvmul<node>(quotient, divisor, exact),
-						bvlt<node>(remainder, divisor))))));
-	auto rule = make_rule<node>(call, body);
-
-#ifdef DEBUG
-	LOG_TRACE << "bvmod_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvmod_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvmod_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-
-	return cache[divisor] = rule;
+	if (bitwidth == 0) return nullptr;
+	auto remainder = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto bf_remainder = tau::get(tau::bf, remainder);
+	aux.push_back(remainder);
+	return bv_euclidean_constraints<node>(dividend, divisor, quotient,
+		bf_remainder, aux);
 }
 
 template<NodeType node>
-tref bvmod(tref dividend, tref divisor, tref remainder) {
+tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux) {
 	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvmod/dividend: " << LOG_FM(dividend) << "\n"; )
-	DBG( LOG_TRACE << "bvmod/divisor: " << LOG_FM(divisor) << "\n"; )
-	DBG( LOG_TRACE << "bvmod/remainder: " << LOG_FM(remainder) << "\n"; )
-
-	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
-		DBG( LOG_DEBUG << "Only modulo by constant is supported in predicate blasting."; )
-		return nullptr;
-	}
-	auto rule = bvmod_rule<node>(divisor);
-	auto call = make_bvmod_call<node>(dividend, divisor, remainder);
-	auto rr = make_rr<node>({ rule }, call);
-	auto result = apply_rr_to_formula(rr);
-	DBG( LOG_TRACE << "bvmod/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
-
-/**
- * @brief Creates a call to the bitvector Euclidean division recurrence.
- * @tparam node Node type
- * @param dividend Dividend
- * @param divisor Divisor
- * @param quotient Quotient result variable
- * @param remainder Remainder result variable
- * @return The constructed call term
- */
-template<NodeType node>
-static tref make_bved_call(tref dividend, tref divisor, tref quotient, tref remainder) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "make_bved_call/dividend: " << LOG_FM(dividend) << "\n"; )
-	DBG( LOG_TRACE << "make_bved_call/divisor: " << LOG_FM(divisor) << "\n"; )
-	DBG( LOG_TRACE << "make_bved_call/quotient: " << LOG_FM(quotient) << "\n"; )
-	DBG( LOG_TRACE << "make_bved_call/remainder: " << LOG_FM(remainder) << "\n"; )
-	auto result = tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bved", { dividend, divisor, quotient, remainder })));
-	DBG( LOG_TRACE << "make_bved_call/result: " << LOG_FM(result) << "\n"; )
-	return result;
-}
-
-/**
- * @brief Returns the rule for bitvector Euclidean division (caching by divisor).
- *
- * Exposes both quotient and remainder as outputs. Only the intermediate
- * value `exact = dividend - remainder` is existentially quantified.
- *
- * @tparam node Node type
- * @param divisor Divisor (bv constant)
- * @return The constructed rule
- */
-template<NodeType node>
-static rewriter::rule bved_rule(tref divisor /* bv constant */) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bved_rule/divisor: " << LOG_FM(divisor) << "\n"; )
-
-	static std::map<tref, rewriter::rule> cache;
-	if (auto it = cache.find(divisor); it != cache.end()) {
-		DBG( LOG_TRACE << "bved_rule (cache hit)/divisor: " << LOG_FM(divisor) << "\n"; )
-		return it->second;
-	}
 
 	auto bitwidth = get_bv_type_bitwidth<node>(divisor);
-
-	auto dividend_var  = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto quotient_var  = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto remainder_var = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto exact_var     = tau::build_variable(bv_type_id<node>(bitwidth));
-	auto bf_exact      = tau::get(tau::bf, exact_var);
-
-	// head: _bved(dividend, divisor, quotient, remainder)
-	auto call = make_bved_call<node>(dividend_var, divisor, quotient_var, remainder_var);
-
-	// body: ∃ exact:
-	//   bvsub(dividend, remainder, exact)   -- exact = dividend - remainder
-	//   && bvmul(quotient, divisor, exact)  -- quotient * divisor = exact
-	//   && bvlt(remainder, divisor)         -- remainder < divisor
-	auto body = tau::build_wff_ex(exact_var,
-		tau::build_wff_and(
-			bvsub<node>(dividend_var, remainder_var, bf_exact),
-			tau::build_wff_and(
-				bvmul<node>(quotient_var, divisor, bf_exact),
-				bvlt<node>(remainder_var, divisor))));
-	auto rule = make_rule<node>(call, body);
-
-#ifdef DEBUG
-	LOG_TRACE << "bved_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bved_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bved_rule/body: " << LOG_FM(rule.second->get()) << "\n";
-#endif // DEBUG
-
-	return cache[divisor] = rule;
+	if (bitwidth == 0) return nullptr;
+	auto quotient = tau::build_variable(bv_type_id<node>(bitwidth));
+	auto bf_quotient = tau::get(tau::bf, quotient);
+	aux.push_back(quotient);
+	return bv_euclidean_constraints<node>(dividend, divisor, bf_quotient,
+		remainder, aux);
 }
 
 template<NodeType node>
-tref bved(tref dividend, tref divisor, tref quotient, tref remainder) {
-	using tau = tree<node>;
-	DBG( LOG_TRACE << "bved/dividend: " << LOG_FM(dividend) << "\n"; )
-	DBG( LOG_TRACE << "bved/divisor: " << LOG_FM(divisor) << "\n"; )
-	DBG( LOG_TRACE << "bved/quotient: " << LOG_FM(quotient) << "\n"; )
-	DBG( LOG_TRACE << "bved/remainder: " << LOG_FM(remainder) << "\n"; )
-
-	if (!tau::get(tau::trim(divisor)).is(tau::bf_f) && !is_bv_constant<node>(tau::trim(divisor))) {
-		DBG( LOG_DEBUG << "Only Euclidean division by constant is supported in predicate blasting."; )
-		return nullptr;
-	}
-	auto rule = bved_rule<node>(divisor);
-	auto call = make_bved_call<node>(dividend, divisor, quotient, remainder);
-	auto rr = make_rr<node>({ rule }, call);
-	auto result = apply_rr_to_formula(rr);
-	DBG( LOG_TRACE << "bved/result: " << LOG_FM(result) << "\n"; )
-	return result;
+tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
+	trefs& aux)
+{
+	return bv_euclidean_constraints<node>(dividend, divisor, quotient,
+		remainder, aux);
 }
 
 } // namespace idni::tau_lang

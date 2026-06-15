@@ -3778,12 +3778,15 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 
 	// Check that quantified variable appears
 	if (tau::get(scoped_fm).equals_T()) return new_fm;
+	// An existential over F is F, independently of the variable
+	if (tau::get(scoped_fm).equals_F()) return tau::_F();
 
 	// Check if quantified variable is bitvector
 	if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
 		if (const trefs& free_vars = get_free_vars<node>(scoped_fm);
-			free_vars.size() == 1 &&
-			tau::get(free_vars[0]) == tau::get(var)) {
+			(free_vars.empty() || (free_vars.size() == 1 &&
+			tau::get(free_vars[0]) == tau::get(var)))
+			&& is_bv_solvable_formula<node>(scoped_fm)) {
 				// By assumption quantifier is pushed in all the way
 				// Closed bv formula, simplify to T/F
 				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, scoped_fm, false)))
@@ -3863,17 +3866,22 @@ using tau = tree<node>;
 			// the quantifier
 			tref var = tau::trim2(n);
 			if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
+				// A closed, purely bitvector formula is decided
+				// directly by the solver. This is checked before
+				// blasting: the solver handles the bitvector
+				// arithmetic natively, while deciding the blasted
+				// form (with its many auxiliary quantifiers) is
+				// much harder for it. Blasting does not close a
+				// formula, so the check would not succeed later.
+				if (get_free_vars<node>(n).empty()
+					&& is_bv_solvable_formula<node>(n))
+					return is_bv_formula_sat<node>(n)
+						? tau::_T() : tau::_F();
 				if (bv_blasting)
-					if (auto blasted = bv_predicate_blasting<node>(n); blasted && blasted != n)
+					if (auto blasted = bv_predicate_blasting<node>(n);
+						blasted && blasted != n)
 						return blasted;
-			if (const trefs& free_vars = get_free_vars<node>(n);
-				free_vars.empty()) {
-				// By assumption quantifier is pushed in all the way
-				// Closed bv formula, simplify to T/F
-				if (is_bv_formula_sat<node>(n))
-					return tau::_T();
-				else return tau::_F();
-			} else excluded.insert(n);
+				excluded.insert(n);
 			}
 		}
 		return n;

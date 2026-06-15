@@ -67,7 +67,11 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 			}
 			return true;
 		};
-		return rewriter::replace_if<node>(ex_clause, var, res, query);
+		auto replaced = rewriter::replace_if<node>(ex_clause, var, res, query);
+		// replace_if rebuilds nodes without invoking the construction
+		// hooks, so trivially foldable subformulas (constant equations,
+		// T/F connectives...) would survive; rebuild with hooks.
+		return tree<node>::reget(replaced);
 	}
 	else return ex_clause;
 }
