@@ -261,6 +261,44 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		CHECK(tau::get(res).equals_F());
 	}
+	// The next three cases check that squeeze/absorb runs on the scoped
+	// formula of each quantifier inside inner_quant (B4): the redundant
+	// xyz = 0 conjunct must be absorbed into xy = 0 before elimination,
+	// so it cannot survive in the kept clause around the unresolved f
+	TEST_CASE("b4 squeeze_absorb below ex") {
+		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))",
+			"w = 0 || (ex b1 b1 y = 0 && b1 w = 0 && f(b1))",
+			"(ex b1 b1 w = 0 && b1 y = 0 && f(b1)) || w = 0",
+			"(ex b1 b1 y = 0 && b1 w = 0 && f(b1)) || w = 0",
+		}) );
+	}
+	TEST_CASE("b4 squeeze_absorb below all") {
+		const char* sample = "all x !((((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"w != 0 && (all b1 b1 w != 0 || b1 y != 0 || !f(b1))",
+			"w != 0 && (all b1 b1 y != 0 || b1 w != 0 || !f(b1))",
+			"(all b1 b1 w != 0 || b1 y != 0 || !f(b1)) && w != 0",
+			"(all b1 b1 y != 0 || b1 w != 0 || !f(b1)) && w != 0",
+		}) );
+	}
+	TEST_CASE("b4 squeeze_absorb below all, fully eliminated") {
+		// equivalence guard: same scope under a plain all resolves
+		// completely, with and without the squeeze
+		const char* sample = "all x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"y = 0 && w = 0",
+			"w = 0 && y = 0",
+		}) );
+	}
+
 	// Test to see the blow up caused by quantified free function symbols
 	// In particular conversion to Boole normal form causes blow up
 	// TEST_CASE("5") {

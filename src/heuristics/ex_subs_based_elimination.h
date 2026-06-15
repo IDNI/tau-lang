@@ -9,7 +9,7 @@ namespace idni::tau_lang {
 // according to the substitutions found in the formula.
 // If no compatible substitution is found, we return the original clause.
 template <NodeType node>
-tref ex_subs_based_elimination(tref ex_clause, tref var);
+tref ex_subs_based_elimination(tref var, tref ex_clause);
 
 } // namespace idni::tau_lang
 
