@@ -97,3 +97,55 @@ TEST_SUITE("bv cast - no-op (same width)") {
 		CHECK( solution.has_value() );
 	}
 }
+
+//
+// REVIEW (nested casting): temporary suite added while reviewing whether the
+// CVC5 solver path supports nested casts. See private/review-casting.md.
+//
+TEST_SUITE("bv cast - nested") {
+
+	// widen twice: bv[4] -> bv[8] -> bv[16]
+	TEST_CASE("nested widen sat: ((bv[16]) ((bv[8]) X:bv[4])) = { 5 }:bv[16]") {
+		auto src = parse_wff("((bv[16]) ((bv[8]) X:bv[4])) = { 5 }:bv[16]");
+		CHECK( src != nullptr );
+		auto solution = solve_bv<node_t>(src);
+		CHECK( solution.has_value() );
+	}
+
+	// X:bv[4] <= 15, so the doubly-widened value can never be 16
+	TEST_CASE("nested widen unsat: ((bv[16]) ((bv[8]) X:bv[4])) = { 16 }:bv[16]") {
+		auto src = parse_wff("((bv[16]) ((bv[8]) X:bv[4])) = { 16 }:bv[16]");
+		CHECK( src != nullptr );
+		CHECK( is_bv_formula_unsat<node_t>(src) );
+	}
+
+	// widen then truncate: bv[8] -> bv[16] -> bv[4]
+	TEST_CASE("nested widen-trunc sat: ((bv[4]) ((bv[16]) X:bv[8])) = { 5 }:bv[4]") {
+		auto src = parse_wff("((bv[4]) ((bv[16]) X:bv[8])) = { 5 }:bv[4]");
+		CHECK( src != nullptr );
+		auto solution = solve_bv<node_t>(src);
+		CHECK( solution.has_value() );
+	}
+
+	// truncate then widen: after bv[4] the value is <= 15, can never be 16
+	TEST_CASE("nested trunc-widen unsat: ((bv[16]) ((bv[4]) X:bv[8])) = { 16 }:bv[16]") {
+		auto src = parse_wff("((bv[16]) ((bv[4]) X:bv[8])) = { 16 }:bv[16]");
+		CHECK( src != nullptr );
+		CHECK( is_bv_formula_unsat<node_t>(src) );
+	}
+
+	// nested cast of a constant should fold to a constant (hook path)
+	TEST_CASE("nested constant valid: ((bv[16]) ((bv[8]) { 5 }:bv[4])) = { 5 }:bv[16]") {
+		auto src = parse_wff("((bv[16]) ((bv[8]) { 5 }:bv[4])) = { 5 }:bv[16]");
+		CHECK( src != nullptr );
+		CHECK( is_bv_formula_valid<node_t>(src) );
+	}
+
+	// nested cast without inner parentheses (grammar check)
+	TEST_CASE("nested no parens sat: ((bv[16]) (bv[8]) X:bv[4]) = { 5 }:bv[16]") {
+		auto src = parse_wff("((bv[16]) (bv[8]) X:bv[4]) = { 5 }:bv[16]");
+		CHECK( src != nullptr );
+		auto solution = solve_bv<node_t>(src);
+		CHECK( solution.has_value() );
+	}
+}
