@@ -149,3 +149,80 @@ TEST_SUITE("bv cast - nested") {
 		CHECK( solution.has_value() );
 	}
 }
+
+//
+// REVIEW (cast of bounded quantifiers): bf_fall and bf_fex were accidentally
+// omitted from the bf_cast_oprnd alternatives when the right-lazy grammar
+// change was made. This suite documents and tests the regression.
+//
+TEST_SUITE("bv cast - quantifier operand") {
+
+	// (bv[N]) fall x x — cast of a bounded universal quantifier.
+	// In the old grammar any bf was accepted as cast operand; the right-lazy
+	// rewrite restricted the list but forgot bf_fall and bf_fex.
+	TEST_CASE("parse: (bv[8]) fall x x = { 1 }:bv[8]") {
+		auto src = parse_wff("(bv[8]) fall x x = { 1 }:bv[8]");
+		CHECK( src != nullptr );
+	}
+
+	TEST_CASE("parse: (bv[8]) fex x x = { 1 }:bv[8]") {
+		auto src = parse_wff("(bv[8]) fex x x = { 1 }:bv[8]");
+		CHECK( src != nullptr );
+	}
+}
+
+TEST_SUITE("bv cast - negated constant") {
+
+	// Helper: returns true when the tree still contains a bf_cast node.
+	// After constant-folding hooks run the cast should be gone.
+	auto has_cast = [](tref t) -> bool {
+		return tau::get(t).find_top(is<node_t, tau::bf_cast>) != nullptr;
+	};
+
+	// {5}:bv[4] = 0101, bitwise NOT in 4 bits = 1010 = 10
+	// zero-extend to bv[8]: {10}:bv[8]
+	TEST_CASE("zext of negated const: ((bv[8]) ({5}:bv[4])') folds to {10}:bv[8]") {
+		auto src = parse_wff("((bv[8]) ({ 5 }:bv[4])') = { 10 }:bv[8]");
+		CHECK( src != nullptr );
+		// Hooks should have constant-folded the cast: no bf_cast should remain
+		CHECK( !has_cast(src) );
+		CHECK( is_bv_formula_valid<node_t>(src) );
+	}
+
+	// {0}:bv[4] complement = {15}:bv[4], zero-extended = {15}:bv[8]
+	TEST_CASE("zext of negated zero: ((bv[8]) ({0}:bv[4])') folds to {15}:bv[8]") {
+		auto src = parse_wff("((bv[8]) ({ 0 }:bv[4])') = { 15 }:bv[8]");
+		CHECK( src != nullptr );
+		CHECK( !has_cast(src) );
+		CHECK( is_bv_formula_valid<node_t>(src) );
+	}
+
+	// truncate of negated const: {245}:bv[8] = 11110101, complement = 00001010 = 10
+	// truncate to 4 bits: {10}:bv[4]
+	TEST_CASE("trunc of negated const: ((bv[4]) ({245}:bv[8])') folds to {10}:bv[4]") {
+		auto src = parse_wff("((bv[4]) ({ 245 }:bv[8])') = { 10 }:bv[4]");
+		CHECK( src != nullptr );
+		CHECK( !has_cast(src) );
+		CHECK( is_bv_formula_valid<node_t>(src) );
+	}
+
+	// same-width negated constant: ((bv[8]) ({5}:bv[8])') = {250}:bv[8]
+	// {5} = 00000101, complement = 11111010 = 250
+	TEST_CASE("same-width cast of negated const: ((bv[8]) ({5}:bv[8])') folds to {250}:bv[8]") {
+		auto src = parse_wff("((bv[8]) ({ 5 }:bv[8])') = { 250 }:bv[8]");
+		CHECK( src != nullptr );
+		CHECK( !has_cast(src) );
+		CHECK( is_bv_formula_valid<node_t>(src) );
+	}
+}
+
+TEST_SUITE("bv cast - quantifier operand - unambiguous") {
+
+	// Use parentheses around the entire cast expression to force it to be
+	// parsed as bf_parenthesis(bf_cast(fall x x)), not as any other construct.
+	// This MUST fail before adding bf_fall/bf_fex to bf_cast_oprnd.
+	TEST_CASE("parse forced: ((bv[8]) fall x x) = { 1 }:bv[8]") {
+		auto src = parse_wff("((bv[8]) fall x x) = { 1 }:bv[8]");
+		CHECK( src != nullptr );
+	}
+}
