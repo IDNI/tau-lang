@@ -172,6 +172,11 @@ bool has_semantic_error(tref fm);
 #include "tau_tree_traverser.tmpl.h"
 #include "tau_tree_printers.tmpl.h"
 #include "tau_tree_queries.tmpl.h"
+namespace idni::tau_lang {
+	// Forward declaration required by tau_tree_extractors.tmpl.h to handle BDD_ID
+	// nodes in get_free_vars (full definition provided by tau_bdd.h).
+	template <NodeType node> struct tau_term_bdd_handle;
+}
 #include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name?
 #include "tau_tree_from_parser.tmpl.h"
 

@@ -206,6 +206,45 @@ TEST_SUITE("normal forms: onf") {
 	}*/
 }
 
+TEST_SUITE("QuantBlockPush") {
+	TEST_CASE("1") {
+		const char* sample = "ex x ex y xy = 0 && yx = 0 && !(x|y = 0) && !(x = y).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		trefs quant_block;
+		quant_block.push_back(tau::get(fm)[0].first());
+		fm = tau::get(fm)[0].second();
+		quant_block.push_back(tau::get(fm)[0].first());
+		fm = tau::get(fm)[0].second();
+		term_handle<node_t>::order order;
+		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
+		// tau::get(res).print(std::cout << "res: ") << "\n";
+		CHECK(tau::get(res).to_str() == "(ex b2, b1 b2 b1|b1 b2 = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2|b1) = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2^b1) = 0)");
+	}
+	TEST_CASE("2") {
+		const char* sample = "all u ex v (u<v && v<x).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		fm = unequal_to_not_equal<node_t>(fm);
+		trefs quant_block;
+		term_handle<node_t>::order order;
+		tref uvar = tau::trim2(fm);
+		order.emplace(uvar, 1);
+		fm = tau::get(fm)[0].second();
+		quant_block.push_back(tau::trim2(fm));
+		order.emplace(tau::trim2(fm), 0);
+		fm = tau::get(fm)[0].second();
+		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
+		// tau::get(res).print(std::cout << "ex: ") << "\n";
+		res = tau::build_wff_all(uvar, res, false);
+		res = push_quantifiers_in<node_t>(res);
+		// tau::get(res).print(std::cout << "all: ") << "\n";
+		res = resolve_quantifiers2<node_t>(res, order);
+		// tau::get(res).print(std::cout << "res: ") << "\n";
+		CHECK(tau::get(res).equals_F());
+	}
+}
+
+
+
 // // TODO (MEDIUM) add tests for reduce_bf/wff
 // // TODO (MEDIUM) add tests for to_bdd_bf
 // // TODO (MEDIUM) add tests for minimize

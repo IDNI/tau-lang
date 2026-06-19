@@ -7,6 +7,8 @@
 #include <numeric>
 
 #include "execution.h"
+#include "tau_bdd.h"
+
 
 namespace idni::tau_lang {
 
@@ -344,11 +346,27 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 template <NodeType node>
 tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
 
+template<NodeType node>
+tref resolve_quantifiers(tref formula);
+
+template <NodeType node>
+tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order);
+
+template<NodeType node>
+tref push_ex_block_into_clause(tref clause, const trefs& block,
+	const typename term_handle<node>::order& order);
+
 template <NodeType node>
 tref anti_prenex(tref formula);
 
-template <NodeType node>
-tref resolve_quantifiers(tref formula);
+template<NodeType node>
+tref anti_prenex_block(tref formula, const trefs& block,
+	subtree_unordered_set<node>& used_atms,
+	const auto& quant_pattern,
+	const typename term_handle<node>::order& order);
+
+template<NodeType node>
+tref anti_prenex_block(tref formula);
 
 template <NodeType node, bool normalize_scopes = true>
 tref normalize_temporal_quantifiers(tref fm);

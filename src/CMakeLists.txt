@@ -18,6 +18,7 @@ set(TAU_HEADERS
 	heuristics/bv_predicate_blasting.h      # heuristic for predicate blasting bitvector formulas
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
+    tau_bdd.h          # BDD library over tau trees
 	tau_tree.h         # tau tree, node, tree traverser, builders,
 	                   # extractors, printers, queries, and
 	                   # transformations from the parse tree

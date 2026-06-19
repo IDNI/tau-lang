@@ -262,6 +262,8 @@ history        => ( "%"
                   | "%-":rel_history_sym [digits:history_id]):rel_history
                 | ( "%" :abs_history_sym         history_id) :abs_history.
 
+unreachable => BDD_ID.
+
 # starting symbols for parsing
 stream_def     => input_def | output_def.
 fm_or_term     => wff | bf.

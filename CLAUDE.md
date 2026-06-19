@@ -9,6 +9,7 @@ Tau is an expressive, decidable, and executable formal software specification la
 ## Build Commands
 
 Scripts are invoked via `./dev <script> [cmake-options]` from the project root (or directly from `scripts/`). All extra args are forwarded to CMake.
+Always build using the `.\dev` tool. In order to build tests use the proper CMAKE_OPTIONS specified below.
 
 ```bash
 ./dev debug [<CMAKE_OPTIONS>]          # Debug build → build-Debug/
@@ -33,15 +34,25 @@ Key CMake options:
 ./dev test-debug                       # Run all tests in build-Debug/
 ./dev test-release                     # Run all tests in build-Release/
 
-# Run tests matching a pattern (from build dir)
+# Run debug tests matching a pattern (from build dir)
 cd build-Debug && ctest -R <pattern> --output-on-failure
 
-# Run a single compiled test binary directly
+# Run release tests matching a pattern (from build dir)
+cd build-Release && ctest -R <pattern> --output-on-failure
+
+# Run a single compiled debug test binary directly
 ./build-Debug/tests/unit/test_bool
 ./build-Debug/tests/integration/test_integration-satisfiability1
+
+# Run a single compiled release test binary directly
+./build-Release/tests/unit/test_bool
+./build-Release/tests/integration/test_integration-satisfiability1
 ```
 
 Tests use the **doctest** framework (`src/doctest.h`). Test organization uses `TEST_SUITE` / `TEST_CASE` macros. Test helper headers live in `tests/` (e.g., `test_helpers.h`, `test_tau_helpers.h`, `test_integration-satisfiability_helper.h`).
+
+Always follow those guidelines using `./dev` and `ctest` run tests.
+Always run tests in debug AND release mode to ensure proper behavior in both cases.
 
 ## Architecture
 
@@ -72,8 +83,7 @@ Checks whether a Tau specification is satisfiable. `solver.h` handles the underl
 ### Heuristics (`src/heuristics/`)
 
 Optimization passes applied before/during solving:
-- `bv_bitblasting.h` — bitblast bitvector operations to Boolean formulas
-- `bv_bitblasting_predicates.tmpl.h` — predicates used during bitblasting
+- `bv_predicate_blasting.h` — blast bitvector operations to Boolean formulas with predicates (implementation split into `bv_predicate_blasting{,_logic,_comparisons,_arithmetic}.tmpl.h`)
 - `bv_ba_simplification.h`, `bv_ba_cvc5_simplification.tmpl.h`, `bv_ba_custom_simplification.tmpl.h` — simplification passes
 - `ex_subs_based_elimination.h` — existential substitution elimination
 

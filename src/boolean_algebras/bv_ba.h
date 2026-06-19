@@ -77,6 +77,7 @@ size_t get_bv_size(const tref t);
 inline void config_cvc5_solver(cvc5::Solver& solver) {
 	// configure the solver
 	solver.setOption("produce-models", "true");
+	solver.setOption("produce-proofs", "false");
 	//solver.setOption("incremental", "true");
 	solver.setLogic("BV");
 }
@@ -118,6 +119,17 @@ tref cvc5_tree_to_tau_tree (bv n);
  */
 template <NodeType node>
 bool is_bv_formula_sat(tref form);
+
+/**
+ * @brief Checks that the formula can be decided by the bitvector solver:
+ * every variable must have an explicitly sized bitvector type. Mixed-type
+ * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
+ *
+ * @param form The formula to check
+ * @return true if all variables are explicitly sized bitvectors
+ */
+template <NodeType node>
+bool is_bv_solvable_formula(tref form);
 
 /**
  * @brief Checks whether a given bit-vector formula is valid.

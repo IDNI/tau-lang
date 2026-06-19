@@ -350,42 +350,42 @@ TEST_SUITE("blasting_8bit_16var") {
 TEST_SUITE("blasting_32bit_4var") {
 
 	TEST_CASE("add_commutativity") {
-		const char* f = "all a:bv[32] b:bv[32] c:bv[32] d:bv[32] (a + b) + (c + d) = (d + c) + (b + a)";
+		const char* f = "all a:bv[32], b:bv[32], c:bv[32], d:bv[32] (a + b) + (c + d) = (d + c) + (b + a)";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("chain_ineq_gap") {
-		const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a < b && b < c && c < d && d - a >= { 3 }:bv[32]";
+		const char* f = "ex a:bv[32], b:bv[32], c:bv[32], d:bv[32] a < b && b < c && c < d && d - a >= { 3 }:bv[32]";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("distributivity") {
-		const char* f = "all a:bv[32] b:bv[32] c:bv[32] d:bv[32] a & (b | c) | d = (a & b) | (a & c) | d";
+		const char* f = "all a:bv[32], b:bv[32], c:bv[32], d:bv[32] a & (b | c) | d = (a & b) | (a & c) | d";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("arith_composition") {
-		const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a > { 0 }:bv[32] && b = a * { 3 }:bv[32] && c = b + a && d = c >> { 2 }:bv[32] && d > { 0 }:bv[32]";
+		const char* f = "ex a:bv[32], b:bv[32], c:bv[32], d:bv[32] a > { 0 }:bv[32] && b = a * { 3 }:bv[32] && c = b + a && d = c >> { 2 }:bv[32] && d > { 0 }:bv[32]";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("xor_assoc") {
-		const char* f = "all a:bv[32] b:bv[32] c:bv[32] d:bv[32] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a";
+		const char* f = "all a:bv[32], b:bv[32], c:bv[32], d:bv[32] (a ^ b) ^ c = a ^ (b ^ c) && a | d = d | a";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("mod_existence") {
-		const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a % { 5 }:bv[32] = { 2 }:bv[32] && b = a + { 3 }:bv[32] && c = a | b && d = c & a && d !>= b";
+		const char* f = "ex a:bv[32], b:bv[32], c:bv[32], d:bv[32] a % { 5 }:bv[32] = { 2 }:bv[32] && b = a + { 3 }:bv[32] && c = a | b && d = c & a && d !>= b";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("or_and_order") {
-		const char* f = "all a:bv[32] b:bv[32] c:bv[32] d:bv[32] a | b >= a && a | b >= b && c & d <= c && c & d <= d";
+		const char* f = "all a:bv[32], b:bv[32], c:bv[32], d:bv[32] a | b >= a && a | b >= b && c & d <= c && c & d <= d";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("shift_existence") {
-		const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b";
+		const char* f = "ex a:bv[32], b:bv[32], c:bv[32], d:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b";
 		check_blasting_correctness(f);
 	}
 
@@ -476,42 +476,42 @@ TEST_SUITE("blasting_32bit_8var") {
 TEST_SUITE("blasting_32bit_16var") {
 
 	TEST_CASE("add_or_commutativity") {
-		const char* f = "all a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] a + b + c + d + e + f + g + h = h + g + f + e + d + c + b + a && i | j | k | l | m | o | p | q = q | p | o | m | l | k | j | i";
+		const char* f = "all a:bv[32], b:bv[32], c:bv[32], d:bv[32], e:bv[32], f:bv[32], g:bv[32], h:bv[32], i:bv[32], j:bv[32], k:bv[32], l:bv[32], m:bv[32], o:bv[32], p:bv[32], q:bv[32] a + b + c + d + e + f + g + h = h + g + f + e + d + c + b + a && i | j | k | l | m | o | p | q = q | p | o | m | l | k | j | i";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("chain_ineq_gap") {
-		const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] a < b && b < c && c < d && d < e && e < f && f < g && g < h && h < i && i < j && j < k && k < l && l < m && m < o && o < p && p < q && q - a >= { 15 }:bv[32]";
+		const char* f = "ex a:bv[32], b:bv[32], c:bv[32], d:bv[32], e:bv[32], f:bv[32], g:bv[32], h:bv[32], i:bv[32], j:bv[32], k:bv[32], l:bv[32], m:bv[32], o:bv[32], p:bv[32], q:bv[32] a < b && b < c && c < d && d < e && e < f && f < g && g < h && h < i && i < j && j < k && k < l && l < m && m < o && o < p && p < q && q - a >= { 15 }:bv[32]";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("and_commutativity") {
-		const char* f = "all a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] (a & b) | (c & d) | (e & f) | (g & h) | (i & j) | (k & l) | (m & o) | (p & q) = (b & a) | (d & c) | (f & e) | (h & g) | (j & i) | (l & k) | (o & m) | (q & p)";
+		const char* f = "all a:bv[32], b:bv[32], c:bv[32], d:bv[32], e:bv[32], f:bv[32], g:bv[32], h:bv[32], i:bv[32], j:bv[32], k:bv[32], l:bv[32], m:bv[32], o:bv[32], p:bv[32], q:bv[32] (a & b) | (c & d) | (e & f) | (g & h) | (i & j) | (k & l) | (m & o) | (p & q) = (b & a) | (d & c) | (f & e) | (h & g) | (j & i) | (l & k) | (o & m) | (q & p)";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("arith_composition") {
-		const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] a > { 0 }:bv[32] && b = a * { 2 }:bv[32] && b > a && c = b + a && d = c >> { 1 }:bv[32] && e = d + a && f = e % { 7 }:bv[32] && g = f + a && h = g & a && h > { 0 }:bv[32] && i = a | b && j = i ^ c && k = j & d && l = k + e && m = l >> { 1 }:bv[32] && o = m | f && p = o ^ g && q = p & h && q > { 0 }:bv[32]";
+		const char* f = "ex a:bv[32], b:bv[32], c:bv[32], d:bv[32], e:bv[32], f:bv[32], g:bv[32], h:bv[32], i:bv[32], j:bv[32], k:bv[32], l:bv[32], m:bv[32], o:bv[32], p:bv[32], q:bv[32] a > { 0 }:bv[32] && b = a * { 2 }:bv[32] && b > a && c = b + a && d = c >> { 1 }:bv[32] && e = d + a && f = e % { 7 }:bv[32] && g = f + a && h = g & a && h > { 0 }:bv[32] && i = a | b && j = i ^ c && k = j & d && l = k + e && m = l >> { 1 }:bv[32] && o = m | f && p = o ^ g && q = p & h && q > { 0 }:bv[32]";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("xor_xnor_nand_nor_commutativity") {
-		const char* f = "all a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] a ^ b ^ c ^ d ^ e ^ f ^ g ^ h = h ^ g ^ f ^ e ^ d ^ c ^ b ^ a && i !^ j = j !^ i && k !& l = l !& k && m !| o = o !| m && p | q >= p && p | q >= q";
+		const char* f = "all a:bv[32], b:bv[32], c:bv[32], d:bv[32], e:bv[32], f:bv[32], g:bv[32], h:bv[32], i:bv[32], j:bv[32], k:bv[32], l:bv[32], m:bv[32], o:bv[32], p:bv[32], q:bv[32] a ^ b ^ c ^ d ^ e ^ f ^ g ^ h = h ^ g ^ f ^ e ^ d ^ c ^ b ^ a && i !^ j = j !^ i && k !& l = l !& k && m !| o = o !| m && p | q >= p && p | q >= q";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("xor_and_sat") {
-		const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] a < b && b < c && c < d && d < e && e < f && f < g && g < h && i = a + h && j = b + g && k = c + f && l = d + e && m = i ^ j && o = k ^ l && p = m ^ o && q = p + a && q > a";
+		const char* f = "ex a:bv[32], b:bv[32], c:bv[32], d:bv[32], e:bv[32], f:bv[32], g:bv[32], h:bv[32], i:bv[32], j:bv[32], k:bv[32], l:bv[32], m:bv[32], o:bv[32], p:bv[32], q:bv[32] a < b && b < c && c < d && d < e && e < f && f < g && g < h && i = a + h && j = b + g && k = c + f && l = d + e && m = i ^ j && o = k ^ l && p = m ^ o && q = p + a && q > a";
 		check_blasting_correctness(f);
 	}
 
 	TEST_CASE("or_and_order") {
-		const char* f = "all a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] a | b >= a && c | d >= c && e | f >= e && g | h >= g && i & j <= i && k & l <= k && m & o <= m && p & q <= p";
+		const char* f = "all a:bv[32], b:bv[32], c:bv[32], d:bv[32], e:bv[32], f:bv[32], g:bv[32], h:bv[32], i:bv[32], j:bv[32], k:bv[32], l:bv[32], m:bv[32], o:bv[32], p:bv[32], q:bv[32] a | b >= a && c | d >= c && e | f >= e && g | h >= g && i & j <= i && k & l <= k && m & o <= m && p & q <= p";
 		check_blasting_correctness(f);
 	}
 
 	// TEST_CASE("shift_mul_div_sat") {
-	//	const char* f = "ex a:bv[32] b:bv[32] c:bv[32] d:bv[32] e:bv[32] f:bv[32] g:bv[32] h:bv[32] i:bv[32] j:bv[32] k:bv[32] l:bv[32] m:bv[32] o:bv[32] p:bv[32] q:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b && e = a * { 3 }:bv[32] && f = e / { 3 }:bv[32] && f = a && g = a | b && h = g & c && h > { 0 }:bv[32] && i = a + b && j = i % { 7 }:bv[32] && k = j + a && l = k & b && m = l | c && o = m ^ d && p = o + a && q = p >> { 1 }:bv[32] && q > { 0 }:bv[32]";
+	//	const char* f = "ex a:bv[32], b:bv[32], c:bv[32], d:bv[32], e:bv[32], f:bv[32], g:bv[32], h:bv[32], i:bv[32], j:bv[32], k:bv[32], l:bv[32], m:bv[32], o:bv[32], p:bv[32], q:bv[32] a > { 0 }:bv[32] && b = a << { 1 }:bv[32] && b > a && c = b << { 1 }:bv[32] && d = c >> { 1 }:bv[32] && d = b && e = a * { 3 }:bv[32] && f = e / { 3 }:bv[32] && f = a && g = a | b && h = g & c && h > { 0 }:bv[32] && i = a + b && j = i % { 7 }:bv[32] && k = j + a && l = k & b && m = l | c && o = m ^ d && p = o + a && q = p >> { 1 }:bv[32] && q > { 0 }:bv[32]";
 	//	check_blasting_correctness(f);
 	// }
 
