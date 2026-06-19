@@ -10,10 +10,11 @@ namespace idni::tau_lang {
 // bitvectors of a given bitwidth. It is defined recursively based on the bitwise
 // representation of the operands.
 //
-// The key idea is to use the following recurrence predicates:
-// - _bvlt[0](x, y) = F; (base case: no bits means x is not less than y)
-// - _bvlt[n](x, y) = ((bit[n-1](x) = 0) && (bit[n-1](y) = 1))
-//		 || ((bit[n-1](x) = bit[n-1](y)) && _bvlt[n-1](x, y)); (general case: compare the most significant bit and recurse on the rest)
+// The convention is that _bvlt[k](x, y) compares the bits 0..k of x and y:
+// - _bvlt[0](x, y) = (bit[0](x) = 0) && (bit[0](y) = 1); (base case: only bit 0 left)
+// - _bvlt[n](x, y) = ((bit[n](x) = 0) && (bit[n](y) = 1))
+//		 || ((bit[n](x) = bit[n](y)) && _bvlt[n-1](x, y)); (general case: compare the most significant bit and recurse on the rest)
+// The main call starts at k = bitwidth - 1.
 //
 //
 
@@ -44,7 +45,7 @@ template<NodeType node>
 static tref make_bvlt_call_from_index(tref left, tref right, size_t index) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_num(index);
+	auto offset = tau::get_integer((int_t)index);
 	return make_bvlt_call_from_offset<node>(left, right, offset);
 }
 
@@ -71,7 +72,7 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
 
 	rewriter::rules rules;
 
-	// base case: bvlt[0](x, y) = T;
+	// base case: bvlt[0](x, y) compares the least significant bit
 	auto base_header = make_bvlt_call_from_index<node>(left, right, 0);
 	auto base_body = tau::build_wff_and(
 			make_is_bit_zero_call_from_index<node>(left, 0),
@@ -163,10 +164,11 @@ tref bvlt(tref left, tref right) {
 // _bvgt is a predicate that represents the greater-than relation between two
 // bitvectors of a given bitwidth. It is defined recursively based on the bitwise
 // representation of the operands.
-// The key idea is to use the following recurrence predicates:
-// - _bvgt[0](x, y) = F; (base case: no bits means x is not greater than y)
-// - _bvgt[n](x, y) = ((bit[n-1](x) = 1) && (bit[n-1](y) = 0))
-//		|| ((bit[n-1](x) = bit[n-1](y)) && _bvgt[n-1](x, y)); (general case: compare the most significant bit and recurse on the rest)
+// The convention is that _bvgt[k](x, y) compares the bits 0..k of x and y:
+// - _bvgt[0](x, y) = (bit[0](x) = 1) && (bit[0](y) = 0); (base case: only bit 0 left)
+// - _bvgt[n](x, y) = ((bit[n](x) = 1) && (bit[n](y) = 0))
+//		|| ((bit[n](x) = bit[n](y)) && _bvgt[n-1](x, y)); (general case: compare the most significant bit and recurse on the rest)
+// The main call starts at k = bitwidth - 1.
 //
 //
 
@@ -197,7 +199,7 @@ template<NodeType node>
 static tref make_bvgt_call_from_index(tref left, tref right, int_t index) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_num(index);
+	auto offset = tau::get_integer((int_t)index);
 	return make_bvgt_call_from_offset<node>(left, right, offset);
 }
 
@@ -224,7 +226,7 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
 
 	rewriter::rules rules;
 
-	// base case: bvgt[0](x, y) = (bit[0](x) = 1) && (bit[0](y) = 0);
+	// base case: bvgt[0](x, y) compares the least significant bit
 	auto base_header = make_bvgt_call_from_index<node>(left, right, 0);
 	auto base_body = tau::build_wff_and(
 			make_is_bit_one_call_from_index<node>(left, 0),
@@ -336,7 +338,7 @@ template<NodeType node>
 static tref make_bvneq_call_from_index(tref left, tref right, size_t index) {
 	using tau = tree<node>;
 
-	auto offset = tau::get_num(index);
+	auto offset = tau::get_integer((int_t)index);
 	return make_bvneq_call_from_offset<node>(left, right, offset);
 }
 

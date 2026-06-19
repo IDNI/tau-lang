@@ -73,7 +73,7 @@ TEST_SUITE("bitblasting") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "is_bit_zero_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(is_bit_zero_rule<node>(2, 2)) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(is_bit_zero_rule<node>(1, 2)) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -81,7 +81,7 @@ TEST_SUITE("bitblasting") {
 		using node = node_t;
 
 		TAU_LOG_INFO << "is_bit_one_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(is_bit_one_rule<node>(2, 2)) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(is_bit_one_rule<node>(1, 2)) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -93,17 +93,29 @@ TEST_SUITE("bitblasting") {
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
-	TEST_CASE("bvadd_rule") {
+	TEST_CASE("bvadd") {
 		using node = node_t;
+		using tau = tree<node>;
 
-		TAU_LOG_INFO << TAU_LOG_RULE(bvadd_rule<node>(4));
+		trefs aux;
+		auto x = tau::build_bf_variable(bv_type_id<node>(4));
+		auto y = tau::build_bf_variable(bv_type_id<node>(4));
+		auto z = tau::build_bf_variable(bv_type_id<node>(4));
+		TAU_LOG_INFO << "bvadd:\n";
+		TAU_LOG_INFO << tau::get(bvadd<node>(x, y, z, aux)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
-	TEST_CASE("bvsub_rule") {
+	TEST_CASE("bvsub") {
 		using node = node_t;
+		using tau = tree<node>;
 
-		TAU_LOG_INFO << TAU_LOG_RULE(bvsub_rule<node>(4));
+		trefs aux;
+		auto x = tau::build_bf_variable(bv_type_id<node>(4));
+		auto y = tau::build_bf_variable(bv_type_id<node>(4));
+		auto z = tau::build_bf_variable(bv_type_id<node>(4));
+		TAU_LOG_INFO << "bvsub:\n";
+		TAU_LOG_INFO << tau::get(bvsub<node>(x, y, z, aux)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -125,39 +137,56 @@ TEST_SUITE("bitblasting") {
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
-	TEST_CASE("bvmul_rule") {
+	TEST_CASE("bvmul") {
 		using node = node_t;
 		using tau = tree<node>;
 
-		TAU_LOG_INFO << "bvmul_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvmul_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n";
+		trefs aux;
+		auto x = tau::build_bf_variable(bv_type_id<node>(4));
+		auto z = tau::build_bf_variable(bv_type_id<node>(4));
+		auto c = tau::get(tau::bf, tau::get_bv_constant(4, 2));
+		TAU_LOG_INFO << "bvmul:\n";
+		TAU_LOG_INFO << tau::get(bvmul<node>(x, c, z, aux)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
-	TEST_CASE("bvdiv_rule") {
+	TEST_CASE("bvdiv") {
 		using node = node_t;
 		using tau = tree<node>;
 
-		TAU_LOG_INFO << "bvdiv_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvdiv_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n";
+		trefs aux;
+		auto x = tau::build_bf_variable(bv_type_id<node>(4));
+		auto q = tau::build_bf_variable(bv_type_id<node>(4));
+		auto c = tau::get(tau::bf, tau::get_bv_constant(4, 2));
+		TAU_LOG_INFO << "bvdiv:\n";
+		TAU_LOG_INFO << tau::get(bvdiv<node>(x, c, q, aux)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
-	TEST_CASE("bvmod_rule") {
+	TEST_CASE("bvmod") {
 		using node = node_t;
 		using tau = tree<node>;
 
-		TAU_LOG_INFO << "bvmod_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvmod_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n";
+		trefs aux;
+		auto x = tau::build_bf_variable(bv_type_id<node>(4));
+		auto r = tau::build_bf_variable(bv_type_id<node>(4));
+		auto c = tau::get(tau::bf, tau::get_bv_constant(4, 2));
+		TAU_LOG_INFO << "bvmod:\n";
+		TAU_LOG_INFO << tau::get(bvmod<node>(x, c, r, aux)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
-	TEST_CASE("bved_rule") {
+	TEST_CASE("bved") {
 		using node = node_t;
 		using tau = tree<node>;
 
-		TAU_LOG_INFO << "bved_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bved_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 2)))) << "\n";
+		trefs aux;
+		auto x = tau::build_bf_variable(bv_type_id<node>(4));
+		auto q = tau::build_bf_variable(bv_type_id<node>(4));
+		auto r = tau::build_bf_variable(bv_type_id<node>(4));
+		auto c = tau::get(tau::bf, tau::get_bv_constant(4, 2));
+		TAU_LOG_INFO << "bved:\n";
+		TAU_LOG_INFO << tau::get(bved<node>(x, c, q, r, aux)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 

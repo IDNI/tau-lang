@@ -25,7 +25,6 @@ typedef int32_t int_t;
 typedef uint32_t uint_t;
 template<typename T> using sp = std::shared_ptr<T>;
 
-#define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
 #define hash_tri(x, y, z), N fpairing(hash_pair(x, y), neg_to_odd(z))
@@ -1461,7 +1460,6 @@ bool
 
 } // namespace idni::tau_lang
 
-#undef hasbc
 #undef neg_to_odd
 #undef hash_pair
 #undef hash_tri

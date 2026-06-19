@@ -35,6 +35,22 @@ static std::string blast_normalize(const std::string& sample) {
 	// is correct, the result should be T or F.
 	auto blasted = bv_predicate_blasting<node_t>(wff);
 	if (!blasted) return "blast_error";
+	// Blasting must not leave unresolved recurrence references behind
+	if (tau::get(blasted).find_top(is<node_t, tau::ref>))
+		return "unresolved_refs";
+	// If the formula contains blastable arithmetic, blasting must rewrite it;
+	// otherwise the normalizer would decide the formula on its own and the
+	// test would not exercise the blasting at all.
+	auto has_arithmetic = [](tref n) {
+		switch (tau::get(n).get_type()) {
+			case tau::bf_add: case tau::bf_sub: case tau::bf_mul:
+			case tau::bf_div: case tau::bf_mod: case tau::bf_shl:
+			case tau::bf_shr: case tau::bf_cast: return true;
+			default: return false;
+		}
+	};
+	if (tau::get(wff).find_top(has_arithmetic) && blasted == wff)
+		return "not_blasted";
 	auto result = normalizer<node_t>(blasted);
 	if (!result) return "null";
 	return tau::get(result).to_str();
@@ -791,6 +807,7 @@ TEST_SUITE("bvcast") {
 		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && (bv[4]) x = { 6 }:bv[4])") == "F");
 	}
 }
+
 
 //
 // bvnlt: not-less-than (= greater-than-or-equal)

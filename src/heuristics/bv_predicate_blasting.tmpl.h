@@ -1,7 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-//#include "bv_predicate_blasting_predicates.tmpl.h"
-
 namespace idni::tau_lang {
 
 /**
@@ -36,7 +34,7 @@ static std::pair<tref, tref> get_bvmul_arguments(tref term) {
 /**
  * @brief Extracts the arguments of a bitvector division/modulo or shift term.
  *
- * If the left child is a bitvector constant, returns (left, right).
+ * If the right child is a bitvector constant, returns (left, right).
  * Otherwise, returns (nullptr, nullptr).
  *
  * @tparam node Node type
@@ -60,6 +58,52 @@ static std::pair<tref, tref> get_arguments(tref term) {
 }
 
 /**
+ * @brief Existentially quantifies the auxiliary variables introduced during
+ * blasting on top of subformula.
+ *
+ * Unlike build_wff_ex_many, the quantifier ids are chosen above any numeric
+ * variable occurring in subformula -- bound or free. Operands may contain
+ * variables bound by quantifiers outside the atomic being blasted (already
+ * renamed to their canonical numeric form), and reusing such an id here
+ * would capture them.
+ *
+ * @tparam node Node type
+ * @param vars The auxiliary variables to quantify (innermost last)
+ * @param subformula The formula to quantify over
+ * @return The quantified formula
+ */
+template<NodeType node>
+static tref quantify_aux_vars(const trefs& vars, tref subformula) {
+	using tau = tree<node>;
+
+	if (vars.empty()) return subformula;
+	int_t id = find_biggest_quant_id<node>(subformula);
+	auto is_number = [](const std::string& s) {
+		if (s.empty()) return false;
+		for (const unsigned char c : s)
+			if (!std::isdigit(c)) return false;
+		return true;
+	};
+	auto f = [&](tref n) {
+		if (is<node, tau::variable>(n)) {
+			if (const auto& name = get_var_name<node>(n);
+				is_number(name))
+				id = std::max(id, (int_t)std::stoi(name));
+		}
+		return true;
+	};
+	pre_order<node>(subformula).visit_unique(f);
+	subtree_map<node, tref> changes;
+	tref res = subformula;
+	for (tref v : vars | std::views::reverse) {
+		changes.emplace(v, tau::build_variable(std::to_string(++id),
+			tau::get(v).get_ba_type()));
+		res = tau::build_wff_ex(v, res, false);
+	}
+	return rewriter::replace<node>(res, changes);
+}
+
+/**
  * @brief Performs predicate blasting for bitvector terms.
  *
  * Traverses the term, replacing supported bitvector operations with existentially
@@ -79,6 +123,23 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 	bool error = false;
 	auto type_id = tau::get(term).get_ba_type();
 
+	// Operands may have been replaced by fresh variables already (post-order
+	// traversal blasts inner operations first), so resolve them through the
+	// changes map, defaulting to the original subtree.
+	auto lookup = [&changes](tref c) -> tref {
+		auto it = changes.find(c);
+		return it != changes.end() ? it->second : c;
+	};
+
+	// Conjoin a new constraint into the accumulated predicate; a nullptr
+	// constraint (failed blasting) is an error.
+	auto conjoin = [&](tref current) {
+		if (!current) { error = true; return; }
+		predicate = predicate
+			? build_wff_and<node>(predicate, current)
+			: current;
+	};
+
 	auto f = [&](tref t) {
 		auto nt = tau::get(t).get_type();
 
@@ -86,18 +147,13 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 			case tau::bf_add: case tau::bf_sub: {
 				auto result = build_variable<node>(type_id);
 				auto bf_result = tau::get(tau::bf, result);
+				auto left = lookup(tau::get(t).child(0));
+				auto right = lookup(tau::get(t).child(1));
 				vars.push_back(result);
 				changes[t] = result;
-				auto ch0 = tau::get(t).child(0);
-				auto ch1 = tau::get(t).child(1);
-				auto left = (changes.find(ch0) != changes.end()) ? changes[ch0] : ch0;
-				auto right = (changes.find(ch1) != changes.end()) ? changes[ch1] : ch1;
-				auto current = (nt == tau::bf_add)
-					? bvadd<node>(left, right, bf_result)
-					: bvsub<node>(left, right, bf_result);
-				predicate = predicate
-					? build_wff_and<node>(predicate, current)
-					: current;
+				conjoin((nt == tau::bf_add)
+					? bvadd<node>(left, right, bf_result, vars)
+					: bvsub<node>(left, right, bf_result, vars));
 				break;
 			}
 			case tau::bf_shl: case tau::bf_shr: {
@@ -108,12 +164,9 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto bf_shifted = tau::get(tau::bf, shifted);
 				vars.push_back(shifted);
 				changes[t] = shifted;
-				auto current = (nt == tau::bf_shl)
-					? bvshl<node>(shiftand, count, bf_shifted)
-					: bvrhl<node>(shiftand, count, bf_shifted);
-				predicate = predicate
-					? build_wff_and<node>(predicate, current)
-					: current;
+				conjoin((nt == tau::bf_shl)
+					? bvshl<node>(lookup(shiftand), count, bf_shifted)
+					: bvrhl<node>(lookup(shiftand), count, bf_shifted));
 				break;
 			}
 			case tau::bf_mul: {
@@ -124,9 +177,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto bf_product = tau::get(tau::bf, product);
 				vars.push_back(product);
 				changes[t] = product;
-				predicate = predicate
-					? build_wff_and<node>(predicate, bvmul<node>(factor, constant, bf_product))
-					: bvmul<node>(factor, constant, bf_product);
+				conjoin(bvmul<node>(lookup(factor), constant, bf_product, vars));
 				break;
 			}
 			case tau::bf_div: case tau::bf_mod: {
@@ -137,34 +188,30 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto bf_result = tau::get(tau::bf, result);
 				vars.push_back(result);
 				changes[t] = result;
-				auto current = (nt == tau::bf_mod)
-					? bvmod<node>(dividend, divisor, bf_result)
-					: bvdiv<node>(dividend, divisor, bf_result);
-				predicate = predicate
-					? build_wff_and<node>(predicate, current)
-					: current;
+				conjoin((nt == tau::bf_mod)
+					? bvmod<node>(lookup(dividend), divisor, bf_result, vars)
+					: bvdiv<node>(lookup(dividend), divisor, bf_result, vars));
 				break;
 			}
 			case tau::bf_cast: {
 				auto child = tau::get(t).child(0);
-				auto src = (changes.find(child) != changes.end()) ? changes[child] : child;
+				auto src = lookup(child);
 				auto target_type_id = tau::get(t).get_ba_type();
 				auto result = tau::build_variable(target_type_id);
 				auto bf_result = tau::get(tau::bf, result);
 				auto src_width = get_bv_type_bitwidth<node>(src);
 				auto target_width = get_bv_type_bitwidth<node>(result);
-				// Same-size cast: just substitute with source
+				// Same-size cast: just substitute with the source.
+				// src is a bf node while t (bf_cast) sits under a bf
+				// wrapper, so strip the bf level to avoid bf { bf {..} }.
 				if (src_width == target_width) {
-					changes[t] = src;
+					changes[t] = tau::trim(src);
 					break;
 				}
 				// Different sizes: introduce variable and predicate
 				vars.push_back(result);
 				changes[t] = result;
-				auto current = bvcast<node>(src, bf_result);
-				predicate = predicate
-					? build_wff_and<node>(predicate, current)
-					: current;
+				conjoin(bvcast<node>(src, bf_result));
 				break;
 			}
 			// Nand, nor and xnor are treated in the hooks so we never get those
@@ -174,16 +221,36 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				break;
 			}
 		}
+		// The visitor contract is: return true to continue the traversal,
+		// false to abort it (we only abort on error).
 		return !error;
 	};
 
+	post_order<node>(term).search_unique(f);
 	// If we have an unsupported operation, we return nullptr to indicate failure
 	if (error) return { nullptr, nullptr };
-	post_order<node>(term).search_unique(f);
 	// We reconstruct the original bf and wrap it
 	auto modified = rewriter::replace<node>(term, changes);
 	return { predicate, modified };
 }
+
+template<NodeType node>
+static tref keep_comparison_predicate(tref atomic) {
+	using tau = tree<node>;
+
+	subtree_map<node, tref> changes;
+	trefs vars;
+	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
+	if (!blasted) return nullptr;
+
+	// If the atomic contains no blastable arithmetic, predicate is null and
+	// the (unchanged) atomic itself is the result.
+	auto wff_blasted = tau::get(tau::wff, blasted);
+	return quantify_aux_vars<node>(vars, predicate
+		? tau::build_wff_and(predicate, wff_blasted)
+		: wff_blasted);
+}
+
 
 /**
  * @brief Blasts an equality predicate over bitvectors.
@@ -194,19 +261,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
  */
 template<NodeType node>
 static tref eq_predicate(tref atomic) {
-	using tau = tree<node>;
-
-	subtree_map<node, tref> changes;
-	trefs vars;
-	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
-	if (!blasted) return nullptr;
-	if (!predicate && vars.empty()) return blasted;
-
-	auto wff_blasted = tau::get(tau::wff, blasted);
-	auto combined = predicate ? tau::build_wff_and(predicate, wff_blasted) : wff_blasted;
-	predicate = tau::build_wff_ex_many(vars, combined);
-
-	return predicate;
+	return keep_comparison_predicate<node>(atomic);
 }
 
 /**
@@ -218,24 +273,7 @@ static tref eq_predicate(tref atomic) {
  */
 template<NodeType node>
 static tref neq_predicate(tref atomic) {
-	using tau = tree<node>;
-
-	subtree_map<node, tref> changes;
-	trefs vars;
-
-	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
-	auto rule = bvneq_rule<node>(bitwidth);
-	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
-	if (!blasted) return nullptr;
-
-	auto left = tau::get(blasted).child(0);
-	auto right = tau::get(blasted).child(1);
-	auto call = make_bvneq_call_from_index<node>(left, right, bitwidth - 1);
-	auto applied = nso_rr_apply<node>(rule, call);
-	auto combined_neq = predicate ? tau::build_wff_and(predicate, applied) : applied;
-	predicate = tau::build_wff_ex_many(vars, combined_neq);
-
-	return predicate;
+	return keep_comparison_predicate<node>(atomic);
 }
 
 /**
@@ -252,19 +290,17 @@ static tref lt_predicate(tref atomic) {
 	subtree_map<node, tref> changes;
 	trefs vars;
 
-	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
-	auto rule = bvlt_rule<node>(bitwidth);
 	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
 	if (!blasted) return nullptr;
 
 	auto left = tau::get(blasted).child(0);
 	auto right = tau::get(blasted).child(1);
-	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth - 1);
-	auto applied = nso_rr_apply<node>(rule, call);
-	auto combined_lt = predicate ? tau::build_wff_and(predicate, applied) : applied;
-	predicate = tau::build_wff_ex_many(vars, combined_lt);
+	auto applied = bvlt<node>(left, right);
+	if (!applied) return nullptr;
 
-	return predicate;
+	return quantify_aux_vars<node>(vars, predicate
+		? tau::build_wff_and(predicate, applied)
+		: applied);
 }
 
 /**
@@ -281,19 +317,17 @@ static tref gt_predicate(tref atomic) {
 	subtree_map<node, tref> changes;
 	trefs vars;
 
-	auto bitwidth = get_bv_type_bitwidth<node>(atomic);
-	auto rule = bvgt_rule<node>(bitwidth);
 	auto [predicate, blasted] = atomic_blasting<node>(atomic, vars, changes);
 	if (!blasted) return nullptr;
 
 	auto left = tau::get(blasted).child(0);
 	auto right = tau::get(blasted).child(1);
-	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth - 1);
-	auto applied = nso_rr_apply<node>(rule, call);
-	auto combined_gt = predicate ? tau::build_wff_and(predicate, applied) : applied;
-	predicate = tau::build_wff_ex_many(vars, combined_gt);
+	auto applied = bvgt<node>(left, right);
+	if (!applied) return nullptr;
 
-	return predicate;
+	return quantify_aux_vars<node>(vars, predicate
+		? tau::build_wff_and(predicate, applied)
+		: applied);
 }
 
 /**
@@ -307,9 +341,8 @@ template<NodeType node>
 static tref lteq_predicate(tref atomic) {
 	using tau = tree<node>;
 
-	auto applied = tau::build_wff_neg(gt_predicate<node>(atomic));
-
-	return applied;
+	auto inner = gt_predicate<node>(atomic);
+	return inner ? tau::build_wff_neg(inner) : nullptr;
 }
 
 /**
@@ -323,9 +356,8 @@ template<NodeType node>
 static tref gteq_predicate(tref atomic) {
 	using tau = tree<node>;
 
-	auto applied = tau::build_wff_neg(lt_predicate<node>(atomic));
-
-	return applied;
+	auto inner = lt_predicate<node>(atomic);
+	return inner ? tau::build_wff_neg(inner) : nullptr;
 }
 
 /**
@@ -337,9 +369,10 @@ static tref gteq_predicate(tref atomic) {
  */
 template<NodeType node>
 static tref nlt_predicate(tref atomic) {
-	auto applied = gteq_predicate<node>(atomic);
+	using tau = tree<node>;
 
-	return applied;
+	auto inner = lt_predicate<node>(atomic);
+	return inner ? tau::build_wff_neg(inner) : nullptr;
 }
 
 /**
@@ -351,9 +384,10 @@ static tref nlt_predicate(tref atomic) {
  */
 template<NodeType node>
 static tref ngt_predicate(tref atomic) {
-	auto applied = lteq_predicate<node>(atomic);
+	using tau = tree<node>;
 
-	return applied;
+	auto inner = gt_predicate<node>(atomic);
+	return inner ? tau::build_wff_neg(inner) : nullptr;
 }
 
 /**
@@ -366,7 +400,6 @@ static tref ngt_predicate(tref atomic) {
 template<NodeType node>
 static tref nlteq_predicate(tref atomic) {
 	auto applied = gt_predicate<node>(atomic);
-
 	return applied;
 }
 
@@ -380,7 +413,6 @@ static tref nlteq_predicate(tref atomic) {
 template<NodeType node>
 static tref ngteq_predicate(tref atomic) {
 	auto applied = lt_predicate<node>(atomic);
-
 	return applied;
 }
 
@@ -406,7 +438,11 @@ static tref wff_predicate_blasting(tref term) {
 		auto blast = [&](tref atomic, const auto& blaster) -> tref {
 				auto blasted = blaster(atomic);
 				if (!blasted) return error = true, t;
-				changes[t] = blasted;
+				// The atomic being replaced sits under a wff node and
+				// the blasters return wff-level trees, so strip the
+				// wff wrapper to avoid wff { wff { ... } } nestings
+				// that defeat hook-based simplification.
+				changes[t] = tau::trim(blasted);
 				return blasted;
 		};
 
@@ -425,7 +461,7 @@ static tref wff_predicate_blasting(tref term) {
 				// TODO (MEDIUM) convert into two predicates and a conjunction,
 				// but for now we just return an error.
 				DBG(LOG_DEBUG << "Interval predicates are currently not supported in blasting.";)
-				return error = true, false;
+				error = true;
 				break;
 			}
 			default: {
@@ -443,6 +479,8 @@ static tref wff_predicate_blasting(tref term) {
 				break;
 			}
 		}
+		// The visitor contract is: return true to continue the traversal,
+		// false to abort it (we only abort on error).
 		return !error;
 	};
 

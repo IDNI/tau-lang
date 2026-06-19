@@ -51,9 +51,9 @@ inline const std::vector<std::string> symbol_names{
 	"__E_cli_command_160", "history", "history_store_cmd", "__E_cli_command_161", "__E_solve_options_162", "solve_option", "__E_solve_options_163", "__E_solve_option_164", "solver_mode", "solver_mode_minimum", 
 	"__E_solver_mode_165", "solver_mode_maximum", "__E_solver_mode_166", "file_name", "__E_file_name_167", "__E_option_name_168", "__E_option_value_169", "bf_cmd_arg", "abs_history_sym", "rel_history_sym", 
 	"selection_sym", "execute_sym", "snf_sym", "examples_sym", "__E_help_arg_170", "__E___E_help_arg_170_171", "rel_history", "__E_history_172", "__E___E_history_172_173", "history_id", 
-	"abs_history", "__E_history_174", "stream_def", "fm_or_term", "__N_0", "__N_1", "__N_2", "__N_3", "__N_4", "__N_5", 
-	"__N_6", "__N_7", "__N_8", "__N_9", "__N_10", "__N_11", "__N_12", "__N_13", "__N_14", "__N_15", 
-	"__N_16", "__N_17", 
+	"abs_history", "__E_history_174", "unreachable", "BDD_ID", "stream_def", "fm_or_term", "__N_0", "__N_1", "__N_2", "__N_3", 
+	"__N_4", "__N_5", "__N_6", "__N_7", "__N_8", "__N_9", "__N_10", "__N_11", "__N_12", "__N_13", 
+	"__N_14", "__N_15", "__N_16", "__N_17", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
@@ -457,20 +457,20 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(118), (NT(119)));
 //G161: bf(31)               => bf_cast(118).
 	p(NT(31), (NT(118)));
-//G162: __N_0(384)           => bf_shr(121).
-	p(NT(384), (NT(121)));
-//G163: __E___E_bf_48_49(123) => bf(31) & ~( __N_0(384) ).	 # conjunctive
-	p(NT(123), (NT(31)) & ~(NT(384)));
+//G162: __N_0(386)           => bf_shr(121).
+	p(NT(386), (NT(121)));
+//G163: __E___E_bf_48_49(123) => bf(31) & ~( __N_0(386) ).	 # conjunctive
+	p(NT(123), (NT(31)) & ~(NT(386)));
 //G164: __E_bf_48(122)       => bf(31) _(13) '>' '>' _(13) __E___E_bf_48_49(123).
 	p(NT(122), (NT(31)+NT(13)+T(23)+T(23)+NT(13)+NT(123)));
 //G165: bf_shr(121)          => __E_bf_48(122).
 	p(NT(121), (NT(122)));
 //G166: bf(31)               => bf_shr(121).
 	p(NT(31), (NT(121)));
-//G167: __N_1(385)           => bf_shl(124).
-	p(NT(385), (NT(124)));
-//G168: __E___E_bf_50_51(126) => bf(31) & ~( __N_1(385) ).	 # conjunctive
-	p(NT(126), (NT(31)) & ~(NT(385)));
+//G167: __N_1(387)           => bf_shl(124).
+	p(NT(387), (NT(124)));
+//G168: __E___E_bf_50_51(126) => bf(31) & ~( __N_1(387) ).	 # conjunctive
+	p(NT(126), (NT(31)) & ~(NT(387)));
 //G169: __E_bf_50(125)       => bf(31) _(13) '<' '<' _(13) __E___E_bf_50_51(126).
 	p(NT(125), (NT(31)+NT(13)+T(22)+T(22)+NT(13)+NT(126)));
 //G170: bf_shl(124)          => __E_bf_50(125).
@@ -483,20 +483,20 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(127), (NT(128)));
 //G174: bf(31)               => bf_add(127).
 	p(NT(31), (NT(127)));
-//G175: __N_2(386)           => bf_sub(129).
-	p(NT(386), (NT(129)));
-//G176: __E___E_bf_53_54(131) => bf(31) & ~( __N_2(386) ).	 # conjunctive
-	p(NT(131), (NT(31)) & ~(NT(386)));
+//G175: __N_2(388)           => bf_sub(129).
+	p(NT(388), (NT(129)));
+//G176: __E___E_bf_53_54(131) => bf(31) & ~( __N_2(388) ).	 # conjunctive
+	p(NT(131), (NT(31)) & ~(NT(388)));
 //G177: __E_bf_53(130)       => bf(31) _(13) '-' _(13) __E___E_bf_53_54(131).
 	p(NT(130), (NT(31)+NT(13)+T(30)+NT(13)+NT(131)));
 //G178: bf_sub(129)          => __E_bf_53(130).
 	p(NT(129), (NT(130)));
 //G179: bf(31)               => bf_sub(129).
 	p(NT(31), (NT(129)));
-//G180: __N_3(387)           => bf_mod(132).
-	p(NT(387), (NT(132)));
-//G181: __E___E_bf_55_56(134) => bf(31) & ~( __N_3(387) ).	 # conjunctive
-	p(NT(134), (NT(31)) & ~(NT(387)));
+//G180: __N_3(389)           => bf_mod(132).
+	p(NT(389), (NT(132)));
+//G181: __E___E_bf_55_56(134) => bf(31) & ~( __N_3(389) ).	 # conjunctive
+	p(NT(134), (NT(31)) & ~(NT(389)));
 //G182: __E_bf_55(133)       => bf(31) _(13) '%' _(13) __E___E_bf_55_56(134).
 	p(NT(133), (NT(31)+NT(13)+T(39)+NT(13)+NT(134)));
 //G183: bf_mod(132)          => __E_bf_55(133).
@@ -509,40 +509,40 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(135), (NT(136)));
 //G187: bf(31)               => bf_mul(135).
 	p(NT(31), (NT(135)));
-//G188: __N_4(388)           => bf_div(137).
-	p(NT(388), (NT(137)));
-//G189: __E___E_bf_58_59(139) => bf(31) & ~( __N_4(388) ).	 # conjunctive
-	p(NT(139), (NT(31)) & ~(NT(388)));
+//G188: __N_4(390)           => bf_div(137).
+	p(NT(390), (NT(137)));
+//G189: __E___E_bf_58_59(139) => bf(31) & ~( __N_4(390) ).	 # conjunctive
+	p(NT(139), (NT(31)) & ~(NT(390)));
 //G190: __E_bf_58(138)       => bf(31) _(13) '/' _(13) __E___E_bf_58_59(139).
 	p(NT(138), (NT(31)+NT(13)+T(41)+NT(13)+NT(139)));
 //G191: bf_div(137)          => __E_bf_58(138).
 	p(NT(137), (NT(138)));
 //G192: bf(31)               => bf_div(137).
 	p(NT(31), (NT(137)));
-//G193: __N_5(389)           => bf_nor(140).
-	p(NT(389), (NT(140)));
-//G194: __E___E_bf_60_61(142) => bf(31) & ~( __N_5(389) ).	 # conjunctive
-	p(NT(142), (NT(31)) & ~(NT(389)));
+//G193: __N_5(391)           => bf_nor(140).
+	p(NT(391), (NT(140)));
+//G194: __E___E_bf_60_61(142) => bf(31) & ~( __N_5(391) ).	 # conjunctive
+	p(NT(142), (NT(31)) & ~(NT(391)));
 //G195: __E_bf_60(141)       => bf(31) _(13) '!' '|' _(13) __E___E_bf_60_61(142).
 	p(NT(141), (NT(31)+NT(13)+T(34)+T(31)+NT(13)+NT(142)));
 //G196: bf_nor(140)          => __E_bf_60(141).
 	p(NT(140), (NT(141)));
 //G197: bf(31)               => bf_nor(140).
 	p(NT(31), (NT(140)));
-//G198: __N_6(390)           => bf_xnor(143).
-	p(NT(390), (NT(143)));
-//G199: __E___E_bf_62_63(145) => bf(31) & ~( __N_6(390) ).	 # conjunctive
-	p(NT(145), (NT(31)) & ~(NT(390)));
+//G198: __N_6(392)           => bf_xnor(143).
+	p(NT(392), (NT(143)));
+//G199: __E___E_bf_62_63(145) => bf(31) & ~( __N_6(392) ).	 # conjunctive
+	p(NT(145), (NT(31)) & ~(NT(392)));
 //G200: __E_bf_62(144)       => bf(31) _(13) '!' '^' _(13) __E___E_bf_62_63(145).
 	p(NT(144), (NT(31)+NT(13)+T(34)+T(32)+NT(13)+NT(145)));
 //G201: bf_xnor(143)         => __E_bf_62(144).
 	p(NT(143), (NT(144)));
 //G202: bf(31)               => bf_xnor(143).
 	p(NT(31), (NT(143)));
-//G203: __N_7(391)           => bf_nand(146).
-	p(NT(391), (NT(146)));
-//G204: __E___E_bf_64_65(148) => bf(31) & ~( __N_7(391) ).	 # conjunctive
-	p(NT(148), (NT(31)) & ~(NT(391)));
+//G203: __N_7(393)           => bf_nand(146).
+	p(NT(393), (NT(146)));
+//G204: __E___E_bf_64_65(148) => bf(31) & ~( __N_7(393) ).	 # conjunctive
+	p(NT(148), (NT(31)) & ~(NT(393)));
 //G205: __E_bf_64(147)       => bf(31) _(13) '!' '&' _(13) __E___E_bf_64_65(148).
 	p(NT(147), (NT(31)+NT(13)+T(34)+T(33)+NT(13)+NT(148)));
 //G206: bf_nand(146)         => __E_bf_64(147).
@@ -725,12 +725,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(186), (NT(188)+NT(189)));
 //G295: src_c(188)           => alnum(6).
 	p(NT(188), (NT(6)));
-//G296: __N_8(392)           => '{'.
-	p(NT(392), (T(45)));
-//G297: __N_9(393)           => '}'.
-	p(NT(393), (T(46)));
-//G298: src_c(188)           => ~( __N_8(392) ) & ~( __N_9(393) ) & punct(7).	 # conjunctive
-	p(NT(188), ~(NT(392)) & ~(NT(393)) & (NT(7)));
+//G296: __N_8(394)           => '{'.
+	p(NT(394), (T(45)));
+//G297: __N_9(395)           => '}'.
+	p(NT(395), (T(46)));
+//G298: src_c(188)           => ~( __N_8(394) ) & ~( __N_9(395) ) & punct(7).	 # conjunctive
+	p(NT(188), ~(NT(394)) & ~(NT(395)) & (NT(7)));
 //G299: __E_src_c_90(192)    => src_c(188).
 	p(NT(192), (NT(188)));
 //G300: __E_src_c_90(192)    => space(2).
@@ -753,12 +753,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(198), (nul));
 //G309: variable(112)        => __E_variable_92(194) __E_variable_93(198).
 	p(NT(112), (NT(194)+NT(198)));
-//G310: __N_10(394)          => 'F'.
-	p(NT(394), (T(36)));
-//G311: __N_11(395)          => 'T'.
-	p(NT(395), (T(35)));
-//G312: __E_var_name_94(199) => ~( __N_10(394) ) & ~( __N_11(395) ) & alpha(5).	 # conjunctive
-	p(NT(199), ~(NT(394)) & ~(NT(395)) & (NT(5)));
+//G310: __N_10(396)          => 'F'.
+	p(NT(396), (T(36)));
+//G311: __N_11(397)          => 'T'.
+	p(NT(397), (T(35)));
+//G312: __E_var_name_94(199) => ~( __N_10(396) ) & ~( __N_11(397) ) & alpha(5).	 # conjunctive
+	p(NT(199), ~(NT(396)) & ~(NT(397)) & (NT(5)));
 //G313: __E_var_name_95(200) => null.
 	p(NT(200), (nul));
 //G314: __E_var_name_95(200) => digit(3) __E_var_name_95(200).
@@ -766,12 +766,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G315: var_name(197)        => __E_var_name_94(199) __E_var_name_95(200).	 # guarded: charvar
 	p(NT(197), (NT(199)+NT(200)));
 	p.back().guard = "charvar";
-//G316: __N_12(396)          => 'F'.
-	p(NT(396), (T(36)));
-//G317: __N_13(397)          => 'T'.
-	p(NT(397), (T(35)));
-//G318: __E_var_name_96(201) => ~( __N_12(396) ) & ~( __N_13(397) ) & alpha(5).	 # conjunctive
-	p(NT(201), ~(NT(396)) & ~(NT(397)) & (NT(5)));
+//G316: __N_12(398)          => 'F'.
+	p(NT(398), (T(36)));
+//G317: __N_13(399)          => 'T'.
+	p(NT(399), (T(35)));
+//G318: __E_var_name_96(201) => ~( __N_12(398) ) & ~( __N_13(399) ) & alpha(5).	 # conjunctive
+	p(NT(201), ~(NT(398)) & ~(NT(399)) & (NT(5)));
 //G319: __E_var_name_97(202) => alnum(6).
 	p(NT(202), (NT(6)));
 //G320: __E_var_name_97(202) => '_'.
@@ -807,10 +807,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(66), (NT(209)+NT(211)));
 //G335: q_var(209)           => capture(30).
 	p(NT(209), (NT(30)));
-//G336: __N_14(398)          => uconst(195).
-	p(NT(398), (NT(195)));
-//G337: q_var(209)           => variable(112) & ~( __N_14(398) ).	 # conjunctive
-	p(NT(209), (NT(112)) & ~(NT(398)));
+//G336: __N_14(400)          => uconst(195).
+	p(NT(400), (NT(195)));
+//G337: q_var(209)           => variable(112) & ~( __N_14(400) ).	 # conjunctive
+	p(NT(209), (NT(112)) & ~(NT(400)));
 //G338: ctnvar(174)          => chars(205).
 	p(NT(174), (NT(205)));
 //G339: __E_offsets_103(212) => _(13) ',' _(13) offset(204).
@@ -827,18 +827,18 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(204), (NT(30)));
 //G345: offset(204)          => shift(215).
 	p(NT(204), (NT(215)));
-//G346: __N_15(399)          => io_var(196).
-	p(NT(399), (NT(196)));
-//G347: __E_offset_105(216)  => variable(112) & ~( __N_15(399) ).	 # conjunctive
-	p(NT(216), (NT(112)) & ~(NT(399)));
+//G346: __N_15(401)          => io_var(196).
+	p(NT(401), (NT(196)));
+//G347: __E_offset_105(216)  => variable(112) & ~( __N_15(401) ).	 # conjunctive
+	p(NT(216), (NT(112)) & ~(NT(401)));
 //G348: offset(204)          => __E_offset_105(216).
 	p(NT(204), (NT(216)));
 //G349: __E_shift_106(217)   => capture(30).
 	p(NT(217), (NT(30)));
-//G350: __N_16(400)          => io_var(196).
-	p(NT(400), (NT(196)));
-//G351: __E___E_shift_106_107(218) => variable(112) & ~( __N_16(400) ).	 # conjunctive
-	p(NT(218), (NT(112)) & ~(NT(400)));
+//G350: __N_16(402)          => io_var(196).
+	p(NT(402), (NT(196)));
+//G351: __E___E_shift_106_107(218) => variable(112) & ~( __N_16(402) ).	 # conjunctive
+	p(NT(218), (NT(112)) & ~(NT(402)));
 //G352: __E_shift_106(217)   => __E___E_shift_106_107(218).
 	p(NT(217), (NT(218)));
 //G353: shift(215)           => __E_shift_106(217) _(13) '-' _(13) num(120).
@@ -873,10 +873,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(30), (T(48)+NT(205)));
 //G368: typed(34)            => _(13) ':' _(13) type(224) _(13) '[' _(13) subtype(225) _(13) ']'.
 	p(NT(34), (NT(13)+T(2)+NT(13)+NT(224)+NT(13)+T(26)+NT(13)+NT(225)+NT(13)+T(27)));
-//G369: __N_17(401)          => 'b' 'v'.
-	p(NT(401), (T(17)+T(37)));
-//G370: __E_typed_112(226)   => ~( __N_17(401) ) & type(224).	 # conjunctive
-	p(NT(226), ~(NT(401)) & (NT(224)));
+//G369: __N_17(403)          => 'b' 'v'.
+	p(NT(403), (T(17)+T(37)));
+//G370: __E_typed_112(226)   => ~( __N_17(403) ) & type(224).	 # conjunctive
+	p(NT(226), ~(NT(403)) & (NT(224)));
 //G371: typed(34)            => _(13) ':' _(13) __E_typed_112(226).
 	p(NT(34), (NT(13)+T(2)+NT(13)+NT(226)));
 //G372: type(224)            => chars(205).
@@ -1429,14 +1429,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(380), (NT(381)));
 //G646: history(351)         => abs_history(380).
 	p(NT(351), (NT(380)));
-//G647: stream_def(382)      => input_def(20).
-	p(NT(382), (NT(20)));
-//G648: stream_def(382)      => output_def(21).
-	p(NT(382), (NT(21)));
-//G649: fm_or_term(383)      => wff(15).
-	p(NT(383), (NT(15)));
-//G650: fm_or_term(383)      => bf(31).
-	p(NT(383), (NT(31)));
+//G647: unreachable(382)     => BDD_ID(383).
+	p(NT(382), (NT(383)));
+//G648: stream_def(384)      => input_def(20).
+	p(NT(384), (NT(20)));
+//G649: stream_def(384)      => output_def(21).
+	p(NT(384), (NT(21)));
+//G650: fm_or_term(385)      => wff(15).
+	p(NT(385), (NT(15)));
+//G651: fm_or_term(385)      => bf(31).
+	p(NT(385), (NT(31)));
 	#undef T
 	#undef NT
 	return loaded = true, p;
@@ -1487,9 +1489,9 @@ struct tau_parser_nonterminals {
 		__E_cli_command_160, history, history_store_cmd, __E_cli_command_161, __E_solve_options_162, solve_option, __E_solve_options_163, __E_solve_option_164, solver_mode, solver_mode_minimum, 
 		__E_solver_mode_165, solver_mode_maximum, __E_solver_mode_166, file_name, __E_file_name_167, __E_option_name_168, __E_option_value_169, bf_cmd_arg, abs_history_sym, rel_history_sym, 
 		selection_sym, execute_sym, snf_sym, examples_sym, __E_help_arg_170, __E___E_help_arg_170_171, rel_history, __E_history_172, __E___E_history_172_173, history_id, 
-		abs_history, __E_history_174, stream_def, fm_or_term, __N_0, __N_1, __N_2, __N_3, __N_4, __N_5, 
-		__N_6, __N_7, __N_8, __N_9, __N_10, __N_11, __N_12, __N_13, __N_14, __N_15, 
-		__N_16, __N_17, 
+		abs_history, __E_history_174, unreachable, BDD_ID, stream_def, fm_or_term, __N_0, __N_1, __N_2, __N_3, 
+		__N_4, __N_5, __N_6, __N_7, __N_8, __N_9, __N_10, __N_11, __N_12, __N_13, 
+		__N_14, __N_15, __N_16, __N_17, 
 	};
 };
 

@@ -147,9 +147,24 @@ tref preorder(tref var, tref ex_clause) {
 template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause)
 {
-	if (auto res = preorder<node>(var, ex_clause); res)
-		return rewriter::replace<node>(ex_clause, var, res);
-	return ex_clause;
+	if (auto res = preorder<node>(var, ex_clause); res) {
+		// Scope-aware replacement: skip quantifiers that bind var to avoid
+		// replacing their bound variable (variable capture prevention)
+		auto query = [&var](tref n) -> bool {
+			using tau = tree<node>;
+			if (is<node>(n, tau::wff_all) || is<node>(n, tau::wff_ex)) {
+				tref bound = tau::get(n).child(0);
+				if (bound == var) return false;
+			}
+			return true;
+		};
+		auto replaced = rewriter::replace_if<node>(ex_clause, var, res, query);
+		// replace_if rebuilds nodes without invoking the construction
+		// hooks, so trivially foldable subformulas (constant equations,
+		// T/F connectives...) would survive; rebuild with hooks.
+		return tree<node>::reget(replaced);
+	}
+	else return ex_clause;
 }
 
 } // namespace idni::tau_lang

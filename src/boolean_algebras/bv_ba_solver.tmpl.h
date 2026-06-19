@@ -48,10 +48,15 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		}
 		case tau::wff_all: {
 			tref v = (form | tt::first | tt::ref);
-			DBG(assert(is<node>(v, tau::variable));)
+			// If the bound "variable" is not actually a variable (e.g., a constant
+			// due to variable capture in substitution), just evaluate the body.
+			if (!is<node>(v, tau::variable))
+				return bv_eval_node<node>(form | tt::second, vars, free_vars);
 			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
 			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
-			vars.emplace(v, x);
+			// Use operator[] to overwrite any outer binding of the same tref
+			// (nested quantifiers sharing the same variable tref due to caching).
+			vars[v] = x;
 
 			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			if (!f) return std::nullopt;
@@ -61,10 +66,14 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		}
 		case tau::wff_ex: {
 			tref v = (form | tt::first | tt::ref);
-			DBG(assert(is<node>(v, tau::variable));)
+			// If the bound "variable" is not actually a variable, just evaluate the body.
+			if (!is<node>(v, tau::variable))
+				return bv_eval_node<node>(form | tt::second, vars, free_vars);
 			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
 			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
-			vars.emplace(v, x);
+			// Use operator[] to overwrite any outer binding of the same tref
+			// (nested quantifiers sharing the same variable tref due to caching).
+			vars[v] = x;
 
 			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars);
 			if (!f) return std::nullopt;
@@ -247,6 +256,35 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv> vars,
 	return bv_eval_node(t, vars, free_vars);
 }
 
+
+/**
+ * @brief Checks that the formula can be decided by the bitvector solver:
+ * every variable must have an explicitly sized bitvector type. Mixed-type
+ * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
+ *
+ * @tparam node Node type
+ * @param form The formula to check
+ * @return true if all variables are explicitly sized bitvectors
+ */
+template <NodeType node>
+bool is_bv_solvable_formula(tref form) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	bool solvable = true;
+	auto check = [&](tref n) {
+		if (is<node>(n, tau::variable)) {
+			size_t t = tau::get(n).get_ba_type();
+			if (!is_bv_type_family<node>(t)) return solvable = false;
+			// the solver requires an explicit bitwidth
+			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::subtype))
+				return solvable = false;
+		}
+		return solvable;
+	};
+	pre_order<node>(form).search_unique(check);
+	return solvable;
+}
 
 template <NodeType node>
 bool is_bv_formula_sat(tref form) {
