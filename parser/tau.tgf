@@ -69,7 +69,10 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
                         | ref                                :bf_ref
-                        | ('(' _ "bv" _ '[' _ num _ ']' _ ')' _ bf) :bf_cast
+                        | ('(' _ "bv" _ '[' _ num _ ']' _ ')' _
+                           (bf_parenthesis | ba_constant | variable | bf_ref
+                           | bf_t | bf_f | bf_neg | bf_cast | capture)
+                                :bf_cast_oprnd)              :bf_cast
                         | (bf  _ ">>" _      (bf & ~bf_shr)) :bf_shr
                         | (bf  _ "<<" _      (bf & ~bf_shl)) :bf_shl
                         | (bf  _ '+' _       bf)             :bf_add
@@ -285,6 +288,7 @@ fm_or_term     => wff | bf.
         wff > wff_parenthesis > wff,
         bf > bf_parenthesis > bf,
         bf_neg_oprnd > bf_parenthesis > bf,
+        bf_cast_oprnd > bf_parenthesis > bf,
         bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
         bf_and_nosep_2nd_oprnd > bf_parenthesis > bf,
         bf_and_nosep > bf_parenthesis > bf_and.
