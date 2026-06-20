@@ -943,6 +943,50 @@ TEST_SUITE("more complex formulas") {
 
 }
 
+//
+// REVIEW (nested casting): temporary suite added while reviewing whether the
+// blasting path supports nested casts. See private/review-casting.md.
+//
+TEST_SUITE("bvcast nested") {
+
+	// constant folded by hooks or blasted: 2:bv[2] -> bv[4] -> bv[8]
+	TEST_CASE("nested zext constant: (bv[8]) (bv[4]) {2}:bv[2] = {2}:bv[8]") {
+		CHECK(blast_normalize("(bv[8]) (bv[4]) { 2 }:bv[2] = { 2 }:bv[8]") == "T");
+	}
+
+	// variable, no parens around inner cast
+	TEST_CASE("nested zext var: ex x (x = {2}:bv[2] && (bv[8]) (bv[4]) x = {2}:bv[8])") {
+		CHECK(blast_normalize("ex x (x = { 2 }:bv[2] && (bv[8]) (bv[4]) x = { 2 }:bv[8])") == "T");
+	}
+
+	// variable, explicit parens around inner cast
+	TEST_CASE("nested zext var parens: ex x (x = {3}:bv[2] && (bv[8]) ((bv[4]) x) = {3}:bv[8])") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[2] && (bv[8]) ((bv[4]) x) = { 3 }:bv[8])") == "T");
+	}
+
+	// truncate then widen: 7 = 0111 -> bv[2] = 11 = 3 -> bv[8] = 3
+	TEST_CASE("nested trunc-zext: ex x (x = {7}:bv[4] && (bv[8]) (bv[2]) x = {3}:bv[8])") {
+		CHECK(blast_normalize("ex x (x = { 7 }:bv[4] && (bv[8]) (bv[2]) x = { 3 }:bv[8])") == "T");
+	}
+
+	// truncate then widen loses high bits: result cannot be 7
+	TEST_CASE("nested trunc-zext unsat: ex x (x = {7}:bv[4] && (bv[8]) (bv[2]) x = {7}:bv[8])") {
+		CHECK(blast_normalize("ex x (x = { 7 }:bv[4] && (bv[8]) (bv[2]) x = { 7 }:bv[8])") == "F");
+	}
+
+	// nested same-size casts are no-ops
+	TEST_CASE("nested same-size: ex x (x = {5}:bv[4] && (bv[4]) (bv[4]) x = {5}:bv[4])") {
+		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && (bv[4]) (bv[4]) x = { 5 }:bv[4])") == "T");
+	}
+
+	// cast result used in arithmetic via an intermediate variable:
+	// x:bv[2]=3, (bv[4]) x = y, y + 1 = 4
+	TEST_CASE("cast-result in add: ex x ex y (x = {3}:bv[2] && (bv[4]) x = y && y + {1}:bv[4] = {4}:bv[4])") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 3 }:bv[2] && (bv[4]) x = y && y + { 1 }:bv[4] = { 4 }:bv[4])") == "T");
+	}
+}
+
 TEST_SUITE("cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
