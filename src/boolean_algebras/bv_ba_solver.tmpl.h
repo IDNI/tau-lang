@@ -257,6 +257,35 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv> vars,
 }
 
 
+/**
+ * @brief Checks that the formula can be decided by the bitvector solver:
+ * every variable must have an explicitly sized bitvector type. Mixed-type
+ * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
+ *
+ * @tparam node Node type
+ * @param form The formula to check
+ * @return true if all variables are explicitly sized bitvectors
+ */
+template <NodeType node>
+bool is_bv_solvable_formula(tref form) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+
+	bool solvable = true;
+	auto check = [&](tref n) {
+		if (is<node>(n, tau::variable)) {
+			size_t t = tau::get(n).get_ba_type();
+			if (!is_bv_type_family<node>(t)) return solvable = false;
+			// the solver requires an explicit bitwidth
+			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::subtype))
+				return solvable = false;
+		}
+		return solvable;
+	};
+	pre_order<node>(form).search_unique(check);
+	return solvable;
+}
+
 template <NodeType node>
 bool is_bv_formula_sat(tref form) {
 	using tau = tree<node>;
