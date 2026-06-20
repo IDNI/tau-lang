@@ -837,6 +837,25 @@ tref bv_term_cast(tref symbol, size_t target_type_id) {
 	} else if (operand_value.is_ba_constant()) {
 		// Regular constant
 		src_value = std::get<bv>(operand_value.get_ba_constant());
+	} else if (operand_value.is(tau::bf_neg)) {
+		// Negated constant: descend through bf_neg > bf_neg_oprnd > inner value
+		// operand_value[0] is bf_neg_oprnd, operand_value[0][0] is the inner value
+		const tau& neg_inner = operand_value[0][0];
+		if (neg_inner.is(tau::bf_t)) {
+			// ~all-ones = zero
+			return tau::_0(target_type_id);
+		} else if (neg_inner.is(tau::bf_f)) {
+			// ~zero = all-ones in src_width bits
+			src_value = make_bitvector_top_elem(src_width);
+		} else if (neg_inner.is_ba_constant()
+			&& neg_inner.get_ba_type() > 0
+			&& is_bv_type_family<node>(neg_inner.get_ba_type())) {
+			// ~{const}: compute bitwise NOT of the inner constant
+			src_value = make_bitvector_not(std::get<bv>(neg_inner.get_ba_constant()));
+			src_value = normalize_bv(src_value);
+		} else {
+			return symbol;
+		}
 	} else {
 		// Not a constant - variables require predicate blasting
 		return symbol;

@@ -157,8 +157,9 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				break;
 			}
 			case tau::bf_shl: case tau::bf_shr: {
-				auto [shiftand, count] = get_arguments<node>(t);
+				auto [shiftand_raw, count] = get_arguments<node>(t);
 				if (!count) { error = true; break; }
+				auto shiftand = (changes.find(shiftand_raw) != changes.end()) ? changes[shiftand_raw] : shiftand_raw;
 				auto shifted = tau::build_variable(type_id);
 				auto bf_shifted = tau::get(tau::bf, shifted);
 				vars.push_back(shifted);
@@ -169,8 +170,9 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				break;
 			}
 			case tau::bf_mul: {
-				auto [factor, constant] = get_bvmul_arguments<node>(t);
+				auto [factor_raw, constant] = get_bvmul_arguments<node>(t);
 				if (!constant) { error = true; break; }
+				auto factor = (changes.find(factor_raw) != changes.end()) ? changes[factor_raw] : factor_raw;
 				auto product = tau::build_variable(type_id);
 				auto bf_product = tau::get(tau::bf, product);
 				vars.push_back(product);
@@ -179,8 +181,9 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				break;
 			}
 			case tau::bf_div: case tau::bf_mod: {
-				auto [dividend, divisor] = get_arguments<node>(t);
+				auto [dividend_raw, divisor] = get_arguments<node>(t);
 				if (!divisor) { error = true; break; }
+				auto dividend = (changes.find(dividend_raw) != changes.end()) ? changes[dividend_raw] : dividend_raw;
 				auto result = tau::build_variable(type_id);
 				auto bf_result = tau::get(tau::bf, result);
 				vars.push_back(result);

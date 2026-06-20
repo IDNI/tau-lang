@@ -66,10 +66,11 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 		// TODO (LOW) this should be supported directly by the parser
 		auto retype_nonterminal = [&nt]() -> type {
 			switch (nt) { // of intermediate nodes
-				// bf_and_nosep and bf_neg_oprnd
+				// bf_and_nosep, bf_neg_oprnd and bf_cast_oprnd
 				case bf_and_nosep_1st_oprnd:
 				case bf_and_nosep_2nd_oprnd:
 				case bf_neg_oprnd:
+				case bf_cast_oprnd:
 					nt = bf; break;
 				case bf_and_nosep:
 					nt = bf_and; break;
