@@ -360,6 +360,65 @@ tref apply_all_xor_def(tref fm) {
 	return pre_order<node>(fm).apply_unique(apply_xor_def<node>);
 }
 
+// Can be used for Tau formula and Boolean function
+template <NodeType node, bool is_wff = true>
+tref push_negation_one_in(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	// Tau formula rules
+	if constexpr (is_wff) if (t.child_is(tau::wff_neg)) {
+		const tau& ct = t[0][0];
+		if (!ct.has_child()) return fm;
+		switch (ct[0].value.nt) {
+			case tau::wff_and: return tau::build_wff_or(
+						tau::build_wff_neg(ct[0].first()),
+						tau::build_wff_neg(ct[0].second()));
+			case tau::wff_or: return tau::build_wff_and(
+						tau::build_wff_neg(ct[0].first()),
+						tau::build_wff_neg(ct[0].second()));
+			case tau::bf_eq: return tau::build_bf_neq(ct[0].first(), ct[0].second());
+			case tau::bf_neq: return tau::build_bf_eq(ct[0].first(), ct[0].second());
+			case tau::wff_ex: return tau::build_wff_all(ct[0].first(),
+						tau::build_wff_neg(ct[0].second()), false);
+			case tau::wff_all: return tau::build_wff_ex(ct[0].first(),
+						tau::build_wff_neg(ct[0].second()), false);
+			case tau::wff_always: return tau::build_wff_sometimes(
+						tau::build_wff_neg(ct[0].first()));
+			case tau::wff_sometimes: return tau::build_wff_always(
+						tau::build_wff_neg(ct[0].first()));
+			case tau::bf_lt: return tau::build_bf_nlt(ct[0].first(), ct[0].second());
+			case tau::bf_nlt: return tau::build_bf_lt(ct[0].first(), ct[0].second());
+			case tau::bf_lteq: return tau::build_bf_nlteq(ct[0].first(), ct[0].second());
+			case tau::bf_nlteq: return tau::build_bf_lteq(ct[0].first(), ct[0].second());
+			case tau::bf_gt: return tau::build_bf_ngt(ct[0].first(), ct[0].second());
+			case tau::bf_ngt: return tau::build_bf_gt(ct[0].first(), ct[0].second());
+			case tau::bf_gteq: return tau::build_bf_ngteq(ct[0].first(), ct[0].second());
+			case tau::bf_ngteq: return tau::build_bf_gteq(ct[0].first(), ct[0].second());
+			default: return fm;
+		}
+	}
+	// Boolean function rules
+	if constexpr (!is_wff) if (t.child_is(tau::bf_neg)) {
+		const tau& ct = t[0][0];
+		if (!ct.has_child()) return fm;
+		switch (ct[0].value.nt) {
+			case tau::bf_and: return tau::build_bf_or(
+				tau::build_bf_neg(ct[0].first()),
+				tau::build_bf_neg(ct[0].second()));
+			case tau::bf_or: return tau::build_bf_and(
+				tau::build_bf_neg(ct[0].first()),
+				tau::build_bf_neg(ct[0].second()));
+			case tau::bf_xor: {
+				// TODO: strategy for negating first or second argument
+				return tau::build_bf_xor(tau::build_bf_neg(ct[0].first()), ct[0].second());
+			}
+			default: return fm;
+		}
+	}
+	return fm;
+}
+
+// Can be used for Tau formula and Boolean function
 // -----------------------------------------------------------------------------
 
 // This function traverses a term fm and normalizes all Boolean algebra constants
@@ -520,7 +579,7 @@ tref onf(tref n, tref var) {
 
 // Reduce currrent dnf due to update by coeff and variable assignment i
 inline bool reduce_paths(std::vector<int_t>& i,
-	std::vector<std::vector<int_t>>& paths, int_t p, bool surface)
+	std::vector<std::vector<int_t>>& paths, int_t p, bool surface = true)
 {
 	for (size_t j = 0; j < paths.size(); ++j) {
 		if (paths[j].empty()) continue;
@@ -656,7 +715,7 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 // Create assignment in formula and reduce resulting clause
 template <NodeType node>
 bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
-	auto& dnf, const auto& is_var, int_t p, bool is_wff)
+	auto& dnf, const auto& is_var, int_t p = 0, bool is_wff = false)
 {
 	using tau = tree<node>;
 #ifdef DEBUG
@@ -966,7 +1025,7 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
 
 template <NodeType node>
 std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
-	const auto& vars, bool& decided, bool is_cnf, bool all_reductions)
+	const auto& vars, bool& decided, bool is_cnf, bool all_reductions = true)
 {
 	using tau = tree<node>;
 	std::vector<std::vector<int_t>> paths;
@@ -1379,65 +1438,6 @@ tref disjunct_cnfs_to_cnf(tref c1, tref c2) {
 	}
 }
 
-// Can be used for Tau formula and Boolean function
-template <NodeType node, bool is_wff>
-tref push_negation_one_in(tref fm) {
-	using tau = tree<node>;
-	const auto& t = tau::get(fm);
-	// Tau formula rules
-	if constexpr (is_wff) if (t.child_is(tau::wff_neg)) {
-		const tau& ct = t[0][0];
-		if (!ct.has_child()) return fm;
-		switch (ct[0].value.nt) {
-			case tau::wff_and: return tau::build_wff_or(
-						tau::build_wff_neg(ct[0].first()),
-						tau::build_wff_neg(ct[0].second()));
-			case tau::wff_or: return tau::build_wff_and(
-						tau::build_wff_neg(ct[0].first()),
-						tau::build_wff_neg(ct[0].second()));
-			case tau::bf_eq: return tau::build_bf_neq(ct[0].first(), ct[0].second());
-			case tau::bf_neq: return tau::build_bf_eq(ct[0].first(), ct[0].second());
-			case tau::wff_ex: return tau::build_wff_all(ct[0].first(),
-						tau::build_wff_neg(ct[0].second()), false);
-			case tau::wff_all: return tau::build_wff_ex(ct[0].first(),
-						tau::build_wff_neg(ct[0].second()), false);
-			case tau::wff_always: return tau::build_wff_sometimes(
-						tau::build_wff_neg(ct[0].first()));
-			case tau::wff_sometimes: return tau::build_wff_always(
-						tau::build_wff_neg(ct[0].first()));
-			case tau::bf_lt: return tau::build_bf_nlt(ct[0].first(), ct[0].second());
-			case tau::bf_nlt: return tau::build_bf_lt(ct[0].first(), ct[0].second());
-			case tau::bf_lteq: return tau::build_bf_nlteq(ct[0].first(), ct[0].second());
-			case tau::bf_nlteq: return tau::build_bf_lteq(ct[0].first(), ct[0].second());
-			case tau::bf_gt: return tau::build_bf_ngt(ct[0].first(), ct[0].second());
-			case tau::bf_ngt: return tau::build_bf_gt(ct[0].first(), ct[0].second());
-			case tau::bf_gteq: return tau::build_bf_ngteq(ct[0].first(), ct[0].second());
-			case tau::bf_ngteq: return tau::build_bf_gteq(ct[0].first(), ct[0].second());
-			default: return fm;
-		}
-	}
-	// Boolean function rules
-	if constexpr (!is_wff) if (t.child_is(tau::bf_neg)) {
-		const tau& ct = t[0][0];
-		if (!ct.has_child()) return fm;
-		switch (ct[0].value.nt) {
-			case tau::bf_and: return tau::build_bf_or(
-				tau::build_bf_neg(ct[0].first()),
-				tau::build_bf_neg(ct[0].second()));
-			case tau::bf_or: return tau::build_bf_and(
-				tau::build_bf_neg(ct[0].first()),
-				tau::build_bf_neg(ct[0].second()));
-			case tau::bf_xor: {
-				// TODO: strategy for negating first or second argument
-				return tau::build_bf_xor(tau::build_bf_neg(ct[0].first()), ct[0].second());
-			}
-			default: return fm;
-		}
-	}
-	return fm;
-}
-
-// Can be used for Tau formula and Boolean function
 template <NodeType node, bool is_wff>
 tref push_negation_in(tref fm) {
 	auto pn = [](tref n) {
@@ -1630,7 +1630,7 @@ tref always_conjunction(tref fm1_aw, tref fm2_aw) {
 }
 
 template <NodeType node>
-tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded) {
+tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded = nullptr) {
 	using tau = tree<node>;
 	LOG_DEBUG << "push_existential_quantifier_one: " << LOG_FM_DUMP(fm);
 	const auto& t = tau::get(fm);
@@ -1878,6 +1878,11 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
  * @brief Simplify using assumptions from equalities in formula.
  * @tparam node Type of tree node
  */
+
+// Forward declaration required by simplify_using_equality below.
+template <NodeType node>
+tref syntactic_atomic_formula_simplification(tref atomic_formula);
+
 template <NodeType node>
 struct simplify_using_equality {
 	using tau = tree<node>;
@@ -3290,7 +3295,7 @@ tref term_boole_decomposition(tref term, tref var) {
  */
 template<NodeType node>
 tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
-	const bool free_funcs) {
+	const bool free_funcs = false) {
 	using tau = tree<node>;
 	DBG(LOG_TRACE << "Step on " << LOG_FM(term) << "\n";)
 	if (tau::get(term).equals_0()) return term;
