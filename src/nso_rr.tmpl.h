@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "nso_rr.h"
+#include "execution.h"
 
 #ifdef TAU_MEASURE
 #include "utility/measure.h"
@@ -74,6 +75,119 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 	cache[{rs, n}] = nn;
 #endif // TAU_CACHE
 	return nn;
+}
+
+// calculate fixed points called from main and replace them by their results
+template <NodeType node>
+struct fixed_point_transformer {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	using type = typename node::type;
+
+	fixed_point_transformer(const rr<node>& defs)
+		: defs(defs), fpcalls(find_fpcalls(defs)) {}
+
+	tref operator()(tref n) {
+		const auto& t = tau::get(n);
+		if (!t.has_child()) return n;
+		if (auto it = changes.find(n); it != changes.end())
+			return it->second;
+		tref ref = t.first();
+		bool is_ref = (t.is(tau::wff) && is<node, tau::wff_ref>(ref))
+			|| (t.is(tau::bf) && is<node, tau::bf_ref>(ref));
+		if (!is_ref) return n;
+		auto sig = get_rr_sig<node>(ref);
+		if (auto fpopt = fpcall(sig); fpopt) { // is fp call
+			auto offset_arity = fpopt.value().offset_arity;
+			// TODO we don't support FP calc for multiindex offsets yet
+			if (offset_arity > 1) {
+				LOG_ERROR << "Fixed point"
+					" calculation of multiindex offset "
+					"relations is not supported yet";
+				return nullptr;
+			}
+			auto typ = t.get_type();
+			auto fp = calculate_fixed_point<node>(defs, n, typ,
+				offset_arity, get_fallback(typ, ref));
+			if (!fp) return nullptr;
+			return changes.emplace(n, fp).first->second;
+		}
+		bool changed = false;
+		trefs ch;
+		if (changes.contains(ref))
+			changed = true, ch.push_back(changes[ref]);
+		else ch.push_back(ref);
+		auto nn = tau::get(t.value, ch);
+		if (changed) changes[n] = nn;
+		return nn;
+	}
+
+	tref get_fallback(type nt, tref ref) {
+		auto fallback = tt(ref) | tau::ref | tau::fp_fallback;
+		if (!fallback) return nt == tau::wff
+		// TODO: Review getting type from ref
+			? tau::_F() : tau::_0(find_ba_type<node>(ref));
+		return fallback | tt::only_child | tt::ref;
+	}
+
+	std::unordered_map<rr_sig, rr_sig> find_fpcalls(const rr<node>& defs) {
+		std::unordered_map<rr_sig, rr_sig> fpcalls;
+		for (const auto& [head, _] : defs.rec_relations) {
+			rr_sig sig = get_rr_sig<node>(tau::trim(head->get()));
+			DBG(LOG_TRACE << "looking for a fp call for " << LOG_FM(tau::trim(head->get()));)
+			DBG(LOG_TRACE << "signature " << LOG_RR_SIG(sig);)
+			// TODO (LOW) decide how to call fp calculation for various
+			// offset arity rels with otherwise same signature.
+			// We currently call the rel with the least offset arity.
+			// Should we provide a way how to specify exact relation to call?
+			if (sig.offset_arity > 0) {
+				rr_sig fp_sig(sig);
+				fp_sig.offset_arity = 0;
+				if (auto fp_exists = fpcall(fp_sig); fp_exists) {
+					DBG(LOG_TRACE << "FP call " << LOG_RR_SIG(fp_sig) << " -> " << LOG_RR_SIG(sig) << " exists";)
+					if (sig.offset_arity < fp_exists.value().offset_arity)
+						fpcalls[fp_sig] = sig;
+				} else {
+					DBG(LOG_TRACE << "FP call " << LOG_RR_SIG(fp_sig) << " -> " << LOG_RR_SIG(sig) << " does not exist, adding";)
+					fpcalls.emplace(fp_sig, sig);
+				}
+			} DBG(else LOG_TRACE << "FP call for " << LOG_RR_SIG(sig) << " not needed, offset arity is 0";)
+		}
+#ifdef DEBUG
+		LOG_TRACE << fpcalls.size() << " FP calls";
+		for (const auto& [fp_sig, sig] : fpcalls)
+			LOG_TRACE << "FP call: " << LOG_RR_SIG(fp_sig)
+				<< " -> " << LOG_RR_SIG(sig);
+#endif
+		return fpcalls;
+	}
+
+	// returns ref to calculate fp by provided by fp call sig, or no value
+	std::optional<rr_sig> fpcall(const rr_sig& fp_sig) const {
+		if (auto it = fpcalls.find(fp_sig); it != fpcalls.end())
+			return { it->second };
+		return {};
+	}
+
+	subtree_map<node, tref> changes;
+	rr<node> defs;
+	std::unordered_map<rr_sig, rr_sig> fpcalls;
+};
+
+template <NodeType node>
+tref calculate_all_fixed_points(const rr<node>& nso_rr) {
+	if (!is_valid<node>(nso_rr)) return nullptr;
+	// transform fp calculation calls by calculation results
+	fixed_point_transformer<node> fpt(nso_rr);
+	tref new_main = rewriter::post_order_traverser<node, decltype(fpt),
+		decltype(all)>(fpt, all)(nso_rr.main->get());
+	if (!new_main) return nullptr;
+	if (fpt.changes.size()) {
+		new_main = rewriter::replace<node>(new_main, fpt.changes);
+		LOG_DEBUG << "Calculated fixed points.";
+		LOG_DEBUG << "New main: " << LOG_FM(new_main);
+	}
+	return new_main;
 }
 
 template <NodeType node>

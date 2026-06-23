@@ -23,24 +23,6 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n);
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n);
 
-// transform ref args to captures
-// this has to be called before rr apply or before calculating fixed points in normalizer
-// TODO find better place for this? maybe normalization?
-template <NodeType node>
-rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr);
-
-// forward declarations needed by nso_rr_apply(rr) below
-// - calculate_all_fixed_points is defined in normalizer.tmpl.h
-// - step and repeat_all are defined in execution.h
-// these are template-dependent names so the full definitions are resolved
-// at instantiation time; forward declarations are required so the parser
-// knows they are templates (not comparison operators).
-template <NodeType node>
-tref calculate_all_fixed_points(const rr<node>& nso_rr);
-
-template <NodeType node> struct step;
-template <NodeType node, typename step_t> struct repeat_all;
-
 /**
  * @brief Unfold a recurrence relation into a plain formula.
  *
