@@ -137,7 +137,7 @@ static rewriter::rule bvlt_rule(size_t bitwidth) {
 	rules.insert(rules.end(), bit_zeros.begin(), bit_zeros.end());
 	rules.insert(rules.end(), bit_ones.begin(), bit_ones.end());
 	auto rr = make_rr<node>(rules, call);
-	auto body = apply_rr_to_formula(rr);
+	auto body = nso_rr_apply(rr);
 	auto rule = make_rule<node>(call, body);
 
 #ifdef DEBUG
@@ -156,7 +156,7 @@ tref bvlt(tref left, tref right) {
 	auto rule = bvlt_rule<node>(bitwidth);
 	auto call = make_bvlt_call_from_index<node>(left, right, bitwidth-1);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	return nso_rr_apply(rr);
 }
 
 //
@@ -290,7 +290,7 @@ static rewriter::rule bvgt_rule(size_t bitwidth) {
 	rules.insert(rules.end(), bit_zeros.begin(), bit_zeros.end());
 	rules.insert(rules.end(), bit_ones.begin(), bit_ones.end());
 	auto rr = make_rr<node>(rules, call);
-	auto body = apply_rr_to_formula(rr);
+	auto body = nso_rr_apply(rr);
 	auto rule = make_rule<node>(call, body);
 
 #ifdef DEBUG
@@ -309,7 +309,7 @@ tref bvgt(tref left, tref right) {
 	auto rule = bvgt_rule<node>(bitwidth);
 	auto call = make_bvgt_call_from_index<node>(left, right, bitwidth - 1);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	return nso_rr_apply(rr);
 }
 
 //
@@ -417,7 +417,7 @@ static rewriter::rule bvneq_rule(size_t bitwidth) {
 	rules.insert(rules.end(), bit_zeros.begin(), bit_zeros.end());
 	rules.insert(rules.end(), bit_ones.begin(), bit_ones.end());
 	auto rr = make_rr<node>(rules, call);
-	auto body = apply_rr_to_formula(rr);
+	auto body = nso_rr_apply(rr);
 	auto rule = make_rule<node>(call, body);
 
 #ifdef DEBUG
@@ -436,7 +436,7 @@ tref bvneq(tref left, tref right) {
 	auto rule = bvneq_rule<node>(bitwidth);
 	auto call = make_bvneq_call_from_index<node>(left, right, bitwidth - 1);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	return nso_rr_apply(rr);
 }
 
 } // namespace idni::tau_lang

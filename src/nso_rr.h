@@ -29,6 +29,30 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n);
 template <NodeType node>
 rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr);
 
+// forward declarations needed by nso_rr_apply(rr) below
+// - calculate_all_fixed_points is defined in normalizer.tmpl.h
+// - step and repeat_all are defined in execution.h
+// these are template-dependent names so the full definitions are resolved
+// at instantiation time; forward declarations are required so the parser
+// knows they are templates (not comparison operators).
+template <NodeType node>
+tref calculate_all_fixed_points(const rr<node>& nso_rr);
+
+template <NodeType node> struct step;
+template <NodeType node, typename step_t> struct repeat_all;
+
+/**
+ * @brief Unfold a recurrence relation into a plain formula.
+ *
+ * Transforms reference arguments to captures, calculates all fixed points,
+ * then applies all recurrence relation rules via `step` until no rule fires.
+ * @tparam node Tree node type.
+ * @param nso_rr Recurrence relation to unfold.
+ * @return The main formula with all recurrence relation definitions applied.
+ */
+template <NodeType node>
+tref nso_rr_apply(const rr<node>& nso_rr);
+
 } // namespace idni::tau_lang
 
 #include "nso_rr.tmpl.h"

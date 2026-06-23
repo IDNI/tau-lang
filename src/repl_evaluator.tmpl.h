@@ -189,7 +189,7 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 		defs.add(r.first, r.second);
 		DBG(TAU_LOG_TRACE << "added def to globals: " << TAU_LOG_RULE(r);)
 	}
-	tref applied = apply_rr_to_formula(maybe_nso_rr.value());
+	tref applied = nso_rr_apply(maybe_nso_rr.value());
 	// tref applied = tau_api::apply_defs(main);
 	DBG(TAU_LOG_TRACE << "applied: " << TAU_LOG_FM_DUMP(applied);)
 	return applied;

@@ -158,7 +158,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> normalize_tau(const tau_ba<BAs...>& fm) {
 	tref result =
-		apply_rr_to_formula<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
+		nso_rr_apply<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
 	result = simp_tau_unsat_valid<node<tau_ba<BAs...>, BAs...>>(result);
 	return tau_ba<BAs...>(tree<node<tau_ba<BAs...>, BAs...>>::geth(result));
 }
@@ -194,7 +194,7 @@ requires BAsPack<BAs...>
 bool is_tau_closed(const tau_ba<BAs...>& fm) {
 	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
-	tref simp_fm = apply_rr_to_formula<node>(fm.nso_rr);
+	tref simp_fm = nso_rr_apply<node>(fm.nso_rr);
 	if (!simp_fm) return false;
 	simp_fm = apply_defs_to_spec<node>(simp_fm);
 	if (!simp_fm) return false;

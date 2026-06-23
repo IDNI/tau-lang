@@ -368,7 +368,7 @@ tref apply_defs_to_spec (tref spec) {
 		const auto& defs = definitions<node>::instance().get_sym_defs();
 		spec_with_defs.rec_relations.insert(spec_with_defs.rec_relations.end(),
 		       defs.begin(), defs.end());
-		return apply_rr_to_formula(spec_with_defs);
+		return nso_rr_apply(spec_with_defs);
 	}
 	return spec;
 }
@@ -941,26 +941,6 @@ tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
 	return result;
 }
 
-// This function applies the recurrence relations the formula comes with to
-// the formula
-template <NodeType node>
-tref apply_rr_to_formula(const rr<node>& nso_rr) {
-	using tt = typename tree<node>::traverser;
-	LOG_DEBUG << "Start apply_rr_to_formula";
-	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
-	rr<node> rr_ = transform_ref_args_to_captures<node>(nso_rr);
-	tref main = calculate_all_fixed_points<node>(rr_);
-	if (!main) return nullptr;
-	// Substitute function and recurrence relation definitions
-	tref new_main = main
-		| repeat_all<node, step<node>>(step<node>(rr_.rec_relations))
-		| tt::ref;
-	LOG_DEBUG << "End apply_rr_to_formula";
-	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
-	LOG_DEBUG << "New main: " << LOG_FM(new_main);
-	return new_main;
-}
-
 // REVIEW (HIGH) review overall execution
 template <NodeType node>
 tref normalizer(const rr<node>& nso_rr) {
@@ -969,7 +949,7 @@ tref normalizer(const rr<node>& nso_rr) {
 	LOG_DEBUG << "Begin normalizer";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 
-	tref fm = apply_rr_to_formula<node>(nso_rr);
+	tref fm = nso_rr_apply<node>(nso_rr);
 	if (!fm) return nullptr;
 	tref res = normalize_with_temp_simp<node>(fm);
 
