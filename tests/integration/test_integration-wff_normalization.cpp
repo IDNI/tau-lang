@@ -38,6 +38,33 @@ TEST_SUITE("Normalizer") {
 		tref res = normalize_non_temp<node_t>(fm);
 		CHECK(tau::get(res).to_str() == "u[0]:tau = { always i5[t]:tau != <:x> || o5[t]:tau = <:y> }:tau");
 	}
+	// Block-driver tests: exercise anti_prenex_block through normalize
+	TEST_CASE("ex_block_both_zero") {
+		// ∃x ∃y. (x = 0 && y = 0) → T (pick x = 0, y = 0)
+		CHECK( normalize_and_check("ex x ex y x = 0 && y = 0.", tau::wff_t) );
+	}
+	TEST_CASE("ex_block_contradiction") {
+		// ∃x. (x = 0 && x != 0) → F (unsatisfiable)
+		CHECK( normalize_and_check("ex x x = 0 && x != 0.", tau::wff_f) );
+	}
+	TEST_CASE("all_ex_witness") {
+		// ∀x ∃y. (xy = 0 && x'y = 0) → T (y = 0 is always a witness)
+		CHECK( normalize_and_check("all x ex y (xy = 0 && x'y = 0).", tau::wff_t) );
+	}
+	TEST_CASE("all_complement_tautology") {
+		// ∀x. x'x = 0 → T (complement law, tautology)
+		CHECK( normalize_and_check("all x x'x = 0.", tau::wff_t) );
+	}
+	TEST_CASE("all_nonzero_false") {
+		// ∀x. x != 0 → F (x = 0 is a counterexample)
+		CHECK( normalize_and_check("all x x != 0.", tau::wff_f) );
+	}
+	TEST_CASE("ex_quantifier_eliminated") {
+		// ∃x. x|y = 0 → y = 0 (x is eliminated; result has no ex-quantifier)
+		tref fm = get_nso_rr("ex x x|y = 0.").value().main->get();
+		tref res = normalize_non_temp<node_t>(fm);
+		CHECK(!tau::get(res).find_top(is<node_t, tau::wff_ex>));
+	}
 }
 
 TEST_SUITE("syntactic_path_simplification") {
