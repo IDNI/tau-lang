@@ -188,21 +188,9 @@ template <NodeType node>
 tref bf_normalizer_with_rec_relation(const rr<node> &bf);
 
 /**
- * @brief Unfold a recurrence relation into a plain formula.
- *
- * Transforms reference arguments to captures, calculates all fixed points,
- * then applies all recurrence relation rules via `step` until no rule fires.
- * @tparam node Tree node type.
- * @param nso_rr Recurrence relation to unfold.
- * @return The main formula with all recurrence relation definitions applied.
- */
-template <NodeType node>
-tref apply_rr_to_formula(const rr<node>& nso_rr);
-
-/**
  * @brief Full normalizer for a recurrence relation.
  *
- * Combines `apply_rr_to_formula` (to unfold the recurrence) with
+ * Combines `nso_rr_apply` (to unfold the recurrence) with
  * `normalize_with_temp_simp` (to normalize the resulting formula including
  * temporal simplifications).
  * @tparam node Tree node type.

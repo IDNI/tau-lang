@@ -150,4 +150,24 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 	return ret;
 }
 
+// Applies the recurrence relations the formula comes with to the formula.
+// This is the rr-overload of nso_rr_apply, complementing the rule/rules overloads.
+template <NodeType node>
+tref nso_rr_apply(const rr<node>& nso_rr) {
+	using tt = typename tree<node>::traverser;
+	LOG_DEBUG << "Start nso_rr_apply";
+	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
+	rr<node> rr_ = transform_ref_args_to_captures<node>(nso_rr);
+	tref main = calculate_all_fixed_points<node>(rr_);
+	if (!main) return nullptr;
+	// Substitute function and recurrence relation definitions
+	tref new_main = main
+		| repeat_all<node, step<node>>(step<node>(rr_.rec_relations))
+		| tt::ref;
+	LOG_DEBUG << "End nso_rr_apply";
+	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
+	LOG_DEBUG << "New main: " << LOG_FM(new_main);
+	return new_main;
+}
+
 } // namespace idni::tau_lang

@@ -218,7 +218,7 @@ tref api<node>::apply_defs(subtree_set<node> defs, tref expr) {
 				tau::geth(resolve_io_vars<node>(ctx, t.second())));
 		}
 	}
-	return apply_rr_to_formula<node>(nso_rr);
+	return nso_rr_apply<node>(nso_rr);
 }
 
 template <NodeType node>
@@ -518,7 +518,7 @@ std::optional<interpreter<node>> api<node>::get_interpreter(tref spec,
 	ctx.output_remaps = options.output_remaps;
 	auto maybe_nso_rr = get_nso_rr(spec);
 	if (!maybe_nso_rr) return {};
-	tref applied = apply_rr_to_formula<node>(maybe_nso_rr.value());
+	tref applied = nso_rr_apply<node>(maybe_nso_rr.value());
 	if (!applied) return {};
 	tref normalized = normalizer<node>(applied);
 	if (!normalized) return {};
@@ -547,7 +547,7 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
 		return {};
 	}
-	tref applied = apply_rr_to_formula<node>(maybe_nso_rr.value());
+	tref applied = nso_rr_apply<node>(maybe_nso_rr.value());
 	if (!applied) return {};
 	tref normalized = normalizer<node>(applied);
 	if (!normalized) return {};

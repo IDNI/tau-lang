@@ -128,7 +128,7 @@ tref bit(tref operand, int_t bit) {
 	auto rules = bit_rules<node>(bitwidth);
 	auto call = make_bit_call_from_index<node>(operand, bit);
 	auto rr = make_rr<node>(rules, call);
-	return apply_rr_to_formula(rr);
+	return nso_rr_apply(rr);
 }
 
 //
@@ -205,7 +205,7 @@ tref bvshl_by_one(tref base, tref shifted) {
 	auto rule = bvshl_by_one_rule<node>(bitwidth);
 	auto call = make_bvshl_by_one_call<node>(base, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	return nso_rr_apply(rr);
 }
 
 /**
@@ -271,7 +271,7 @@ tref bvrhl_by_one(tref base, tref shifted) {
 	auto rule = bvrhl_by_one_rule<node>(bitwidth);
 	auto call = make_bvrhl_by_one_call<node>(base, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	return nso_rr_apply(rr);
 }
 
 //
@@ -563,7 +563,7 @@ tref bvshl(tref base, tref count, tref shifted) {
 	auto rule = bvshl_rule<node>(count);
 	auto call = make_bvshl_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	return nso_rr_apply(rr);
 }
 
 /**
@@ -658,7 +658,7 @@ tref bvrhl(tref base, tref count, tref shifted) {
 	auto rule = bvrhl_rule<node>(count);
 	auto call = make_bvrhl_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	return nso_rr_apply(rr);
 }
 
 //
@@ -754,7 +754,7 @@ tref bvcast(tref src, tref result) {
 	auto rule = bvcast_rule<node>(src_width, target_width);
 	auto call = make_bvcast_call<node>(src, result);
 	auto rr = make_rr<node>({ rule }, call);
-	return apply_rr_to_formula(rr);
+	return nso_rr_apply(rr);
 }
 
 } // namespace idni::tau_lang
