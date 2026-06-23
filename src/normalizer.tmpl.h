@@ -548,53 +548,6 @@ tref build_main_step(tref form, size_t step) {
 	return rewriter::replace<node>(form, changes);
 }
 
-// Normalizes a Boolean function having no recurrence relation
-template <NodeType node>
-tref bf_normalizer_without_rec_relation(tref bf) {
-	using tau = tree<node>;
-	LOG_DEBUG << "Begin Boolean function normalizer";
-
-	bf = syntactic_path_simplification<node>::on(bf);
-	tref result = bf_reduced_dnf<node>(bf);
-	// Apply present function/predicate definitions
-	bool changed;
-	do {
-		changed = false;
-		// Unresolved symbol is still present
-		if (tau::get(result).find_top(is<node, tau::ref>)) {
-			result = syntactic_path_simplification<node>::on(result);
-			auto resolved_res = apply_defs_to_spec<node>(result);
-			if (resolved_res != result) {
-				result = bf_reduced_dnf<node>(resolved_res);
-				changed = true;
-			}
-		}
-	} while (changed);
-
-	LOG_DEBUG << "End Boolean function normalizer";
-
-	return result;
-}
-
-// Normalizes a Boolean function in which recurrence relations are present
-template <NodeType node>
-tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
-	using tt = typename tree<node>::traverser;
-	rr<node> rr_ = transform_ref_args_to_captures<node>(bf);
-	LOG_DEBUG << "Begin calculate recurrence relation";
-	auto main = calculate_all_fixed_points<node>(rr_);
-	if (!main) return nullptr;
-	tref bf_unfolded = tt(main) | repeat_all<node, step<node>>(
-					step<node>(rr_.rec_relations)) |tt::ref;
-	LOG_DEBUG << "End calculate recurrence relation";
-
-	LOG_DEBUG << "Begin Boolean function normalizer";
-	auto result = bf_normalizer_without_rec_relation<node>(bf_unfolded);
-	LOG_DEBUG << "End Boolean function normalizer";
-
-	return result;
-}
-
 // enumerates index in main with step i - used for finding a fixed point
 template <NodeType node>
 tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
@@ -939,6 +892,53 @@ tref calculate_all_fixed_points(const rr<node>& nso_rr) {
 		LOG_DEBUG << "New main: " << LOG_FM(new_main);
 	}
 	return new_main;
+}
+
+// Normalizes a Boolean function having no recurrence relation
+template <NodeType node>
+tref bf_normalizer_without_rec_relation(tref bf) {
+	using tau = tree<node>;
+	LOG_DEBUG << "Begin Boolean function normalizer";
+
+	bf = syntactic_path_simplification<node>::on(bf);
+	tref result = bf_reduced_dnf<node>(bf);
+	// Apply present function/predicate definitions
+	bool changed;
+	do {
+		changed = false;
+		// Unresolved symbol is still present
+		if (tau::get(result).find_top(is<node, tau::ref>)) {
+			result = syntactic_path_simplification<node>::on(result);
+			auto resolved_res = apply_defs_to_spec<node>(result);
+			if (resolved_res != result) {
+				result = bf_reduced_dnf<node>(resolved_res);
+				changed = true;
+			}
+		}
+	} while (changed);
+
+	LOG_DEBUG << "End Boolean function normalizer";
+
+	return result;
+}
+
+// Normalizes a Boolean function in which recurrence relations are present
+template <NodeType node>
+tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
+	using tt = typename tree<node>::traverser;
+	rr<node> rr_ = transform_ref_args_to_captures<node>(bf);
+	LOG_DEBUG << "Begin calculate recurrence relation";
+	auto main = calculate_all_fixed_points<node>(rr_);
+	if (!main) return nullptr;
+	tref bf_unfolded = tt(main) | repeat_all<node, step<node>>(
+					step<node>(rr_.rec_relations)) |tt::ref;
+	LOG_DEBUG << "End calculate recurrence relation";
+
+	LOG_DEBUG << "Begin Boolean function normalizer";
+	auto result = bf_normalizer_without_rec_relation<node>(bf_unfolded);
+	LOG_DEBUG << "End Boolean function normalizer";
+
+	return result;
 }
 
 // This function applies the recurrence relations the formula comes with to
