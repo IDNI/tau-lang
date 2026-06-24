@@ -152,75 +152,6 @@ template <NodeType node>
 tref onf(tref n, tref var);
 
 /**
- * @brief Lexicographic comparator for Tau formula variables.
- *
- * Compares two variable nodes by the string representation of their sub-trees.
- * Used to define a canonical variable order for BDD construction and DNF
- * reduction.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-auto lex_var_comp = [](tref x, tref y) {
-#ifdef TAU_CACHE
-	using cache_t = std::map<std::pair<tref, tref>, bool,
-				subtree_pair_less<node, tref>>;
-	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find({x,y}); it != cache.end())
-		return it->second;
-#endif // TAU_CACHE
-	// TODO (QUESTION) strings have unique id, use .data() instead?
-	auto xx = tree<node>::get(x).to_str();
-	auto yy = tree<node>::get(y).to_str();
-#ifdef TAU_CACHE
-	return cache.emplace(std::make_pair(x, y), xx < yy).first->second;
-#endif // TAU_CACHE
-	return xx < yy;
-};
-
-/**
- * @brief Predicate that classifies a wff node as a BDD variable.
- *
- * In BDD-based DNF/CNF reductions of well-formed formulas the following node
- * types are treated as atomic BDD variables: `bf_eq`, `wff_ref`, `wff_ex`,
- * `wff_sometimes`, `wff_always`, `wff_all`, and `constraint`.
- * @tparam node Tree node type.
- * @todo Extend for the full grammar.
- */
-template <NodeType node>
-inline auto is_wff_bdd_var = [](tref n) {
-	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	DBG(assert(!t.is(tau::bf_neq));)
-	return t.child_is(tau::bf_eq)
-		|| t.child_is(tau::wff_ref)
-		|| t.child_is(tau::wff_ex)
-		|| t.child_is(tau::wff_sometimes)
-		|| t.child_is(tau::wff_always)
-		|| t.child_is(tau::wff_all)
-		|| t.child_is(tau::constraint);
-};
-
-/**
- * @brief Predicate that classifies a bf node as a BDD variable.
- *
- * In BDD-based reductions of Boolean functions the following node types are
- * treated as atomic BDD variables: `variable`, `capture`, `bf_ref`,
- * `ba_constant`, `bf_fall`, and `bf_fex`.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-inline auto is_bf_bdd_var = [](tref n) {
-	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	return t.child_is(tau::variable)
-		|| t.child_is(tau::capture)
-		|| t.child_is(tau::bf_ref)
-		|| t.child_is(tau::ba_constant)
-		|| t.child_is(tau::bf_fall)
-		|| t.child_is(tau::bf_fex);
-};
-
-/**
  * @brief Reduce a DNF or CNF formula by removing redundant clauses.
  *
  * Converts the formula to a path representation and eliminates dominated or
@@ -403,7 +334,7 @@ tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift);
  * @return Conjunction of the two formulas with aligned lookbacks.
  */
 template <NodeType node>
-tref always_conjunction (tref fm1_aw, tref fm2_aw);
+tref always_conjunction(tref fm1_aw, tref fm2_aw);
 
 /**
  * @brief Collect all positive equalities in `n` of the given BA type and merge them.
@@ -468,32 +399,6 @@ class syntactic_path_simplification;
 template <NodeType node>
 tref syntactic_formula_simplification(tref formula);
 
-/**
- * @brief Squeeze and absorb equations across the Boolean structure of a formula.
- *
- * Collects `= 0` and `!= 0` equations within conjunctions/disjunctions and:
- *   - Squeezes those sharing variables: `f = 0 && g = 0  =>  (f|g) = 0`
- *   - Absorbs into other equations sharing variables, reducing their complexity.
- *
- * This is a lightweight pre-processing step before Boole normal form.
- * @tparam node Tree node type.
- * @param formula The formula to process.
- * @return Formula with equations squeezed and absorbed.
- */
-template <NodeType node>
-tref squeeze_absorb (tref formula);
-
-/**
- * @brief Squeeze and absorb equations sharing a specific variable.
- *
- * Variant of `squeeze_absorb` that only merges equations containing `var`.
- * @tparam node Tree node type.
- * @param formula The formula to process.
- * @param var The shared variable that triggers merging.
- * @return Formula with equations squeezed and absorbed with respect to `var`.
- */
-template <NodeType node>
-tref squeeze_absorb (tref formula, tref var);
 
 /**
  * @brief Convert a formula to Boole Normal Form (full procedure).
@@ -551,35 +456,6 @@ template<NodeType node>
 tref resolve_quantifiers(tref formula);
 
 /**
- * @brief Resolve quantifiers with a custom variable ordering.
- *
- * Variant of `resolve_quantifiers` that uses the provided `order` relation to
- * sort variables before the elimination step.
- * @tparam node Tree node type.
- * @param formula Formula containing quantifiers.
- * @param order Comparison relation for variable ordering.
- * @return Formula with quantifiers resolved.
- */
-template <NodeType node>
-tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order);
-
-/**
- * @brief Push a block of existential quantifiers into a single clause.
- *
- * Given a clause and a block of existentially quantified variables, applies
- * `treat_ex_quantified_clause` for each variable in the block (ordered by
- * `order`), distributing quantifiers into the clause structure.
- * @tparam node Tree node type.
- * @param clause A single conjunct/disjunct clause.
- * @param block Sequence of existentially quantified variables to push in.
- * @param order Variable ordering relation used to prioritize elimination.
- * @return Clause with the quantifier block resolved.
- */
-template<NodeType node>
-tref push_ex_block_into_clause(tref clause, const trefs& block,
-	const typename term_handle<node>::order& order);
-
-/**
  * @brief Apply the anti-prenex transformation to a formula.
  *
  * Drives the full anti-prenex procedure: converts to NNF, identifies
@@ -592,53 +468,6 @@ tref push_ex_block_into_clause(tref clause, const trefs& block,
 template <NodeType node>
 tref anti_prenex(tref formula);
 
-/**
- * @brief Process a quantifier block in the anti-prenex algorithm.
- *
- * Given a formula, a block of existentially quantified variables, the set of
- * atomic formulas already consumed, a `quant_pattern` priority map, and a
- * variable ordering, distributes the block variables into the formula using
- * Boole decomposition.
- * @tparam node Tree node type.
- * @param formula Formula to transform.
- * @param block Variables forming the quantifier block.
- * @param used_atms Set of atomic formulas already used in prior blocks.
- * @param quant_pattern Priority map from variable to quantifier position index.
- * @param order Variable ordering relation.
- * @return Formula with the block processed.
- */
-template<NodeType node>
-tref anti_prenex_block(tref formula, const trefs& block,
-	subtree_unordered_set<node>& used_atms,
-	const auto& quant_pattern,
-	const typename term_handle<node>::order& order);
-
-/**
- * @brief Entry point for anti-prenex processing of a single quantifier block.
- *
- * Convenience overload that sets up `used_atms`, `quant_pattern`, and `order`
- * internally before calling the full `anti_prenex_block`.
- * @tparam node Tree node type.
- * @param formula Formula with quantifier block to process.
- * @return Formula with the block processed.
- */
-template<NodeType node>
-tref anti_prenex_block(tref formula);
-
-/**
- * @brief Normalize temporal quantifiers (`always`/`sometimes`) in a formula.
- *
- * Converts the temporal layer of the formula to DNF, then (when
- * `normalize_scopes` is `true`) normalizes the inner formulas below temporal
- * quantifiers and simplifies temporal implications using `is_nso_impl` and
- * `is_non_temp_nso_unsat`.
- * @tparam node Tree node type.
- * @tparam normalize_scopes When `true` (default) also normalize the inner formulas.
- * @param fm Formula to normalize.
- * @return Formula with normalized temporal quantifiers.
- */
-template <NodeType node, bool normalize_scopes = true>
-tref normalize_temporal_quantifiers(tref fm);
 
 /**
  * @brief Convert a formula to Algebraic Normal Form (ANF) for a given type.

@@ -845,4 +845,89 @@ tref normalizer(tref fm) {
 	return normalize_with_temp_simp<node>(fm);
 }
 
+/**
+ * @brief Converts the temporal layer of a formula to reduced DNF, squeezes the always
+ * statements and ensures that formulas containing temporal variables are
+ * explicitly quantified while non-temporal formulas are not quantified temporally.
+ * @tparam node Tree node type
+ * @tparam normalize_scopes If true, temporally quantified formulas are converted to Boole normal form
+ * @param fm The formula that is to be temporally normalized
+ * @return The resulting formula after normalizing the temporal quantifiers
+ */
+template <NodeType node, bool normalize_scopes>
+tref normalize_temporal_quantifiers(tref fm) {
+	using tau = tree<node>;
+	auto norm = [](tref arg) {
+		return normalize_scopes
+					? term_boole_normal_form<node>(arg)
+					: arg;
+	};
+	auto st_aw = [](tref n) {
+		return is_child<node>(n, tau::wff_sometimes)
+			|| is_child<node>(n, tau::wff_always);
+	};
+	auto rm_temp_quant = [&st_aw](tref n) {
+		if (st_aw(n)) return tau::trim2(n);
+		return n;
+	};
+	if (has_temp_var<node>(fm)) {
+		const bool has_temp_quant = tau::get(fm).find_top(st_aw);
+		if (has_temp_quant) {
+			// By assumption, all temporal variables are explicitly
+			// quantified by temporal quantifier without nesting.
+			// DNF conversion is only done on temporal level
+			fm = temporal_layer_to_dnf<node>(fm);
+			// Simplify temporal layer
+			fm = reduce<node>(fm);
+			trefs clauses = get_dnf_wff_clauses<node>(fm);
+			tref non_temp_clauses = tau::_F();
+			tref res = tau::_F();
+			for (tref clause : clauses) {
+				if (!has_temp_var<node>(clause)) {
+					// Remove all temporal quantifiers
+					clause = pre_order<node>(clause).
+							apply_unique(rm_temp_quant);
+					non_temp_clauses = tau::build_wff_or(
+						non_temp_clauses, clause);
+					continue;
+				}
+				tref always_part = tau::_T();
+				tref staying = tau::_T();
+				// In each clause squeeze all always statements
+				for (tref conj : get_cnf_wff_clauses<node>(clause)) {
+					// All parts are temporally quantified
+					DBG(assert(st_aw(conj) ||
+						!has_temp_var<node>(conj));)
+					if (!has_temp_var<node>(conj))
+						always_part = tau::build_wff_and(
+							always_part, rm_temp_quant(conj));
+					// TODO: always conjunction is inefficient
+					else if (!is_child<node>(conj, tau::wff_sometimes))
+						always_part = always_conjunction<node>(
+							always_part, conj);
+					else staying = tau::build_wff_and(
+						staying,
+						tau::build_wff_sometimes(
+							norm(tau::trim2(conj))));
+				}
+				always_part = tau::build_wff_always(norm(always_part));
+				clause = tau::build_wff_and(always_part, staying);
+				res = tau::build_wff_or(res, clause);
+			}
+			non_temp_clauses = tau::build_wff_always(
+				norm(non_temp_clauses));
+			res = tau::build_wff_or(res, non_temp_clauses);
+			return res;
+		} else {
+			// Temporal variable without temporal quantifier
+			// By assumption we quantify fm universally
+			return build_wff_always<node>(norm(fm));
+		}
+	} else {
+		// No temporal variable, so no temporal quantifier needed
+		fm = pre_order<node>(fm).apply_unique(rm_temp_quant);
+		return norm(fm);
+	}
+}
+
 } // namespace idni::tau_lang
