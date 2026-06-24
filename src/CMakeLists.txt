@@ -30,6 +30,7 @@ set(TAU_HEADERS
 	nso_rr.h           # nso_rr_apply
 	execution.h        # execution of nso rr rules
 	normal_forms.h     # normal form transformations
+	normal_forms_transformations.h
 	normalizer.h
 	satisfiability.h
 	splitter_types.h
