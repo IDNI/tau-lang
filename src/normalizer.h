@@ -211,6 +211,21 @@ tref normalizer(const rr<node>& nso_rr);
 template <NodeType node>
 tref normalizer(tref fm);
 
+/**
+ * @brief Normalize temporal quantifiers (`always`/`sometimes`) in a formula.
+ *
+ * Converts the temporal layer of the formula to DNF, then (when
+ * `normalize_scopes` is `true`) normalizes the inner formulas below temporal
+ * quantifiers and simplifies temporal implications using `is_nso_impl` and
+ * `is_non_temp_nso_unsat`.
+ * @tparam node Tree node type.
+ * @tparam normalize_scopes When `true` (default) also normalize the inner formulas.
+ * @param fm Formula to normalize.
+ * @return Formula with normalized temporal quantifiers.
+ */
+template <NodeType node, bool normalize_scopes = true>
+tref normalize_temporal_quantifiers(tref fm);
+
 } // namespace idni::tau_lang
 
 #include "normalizer.tmpl.h"

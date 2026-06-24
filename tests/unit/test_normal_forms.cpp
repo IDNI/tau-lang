@@ -2,6 +2,7 @@
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
+#include "normal_forms.h"
 
 TEST_SUITE("normal forms: mnf for wffs") {
 

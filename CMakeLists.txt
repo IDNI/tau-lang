@@ -12,6 +12,7 @@ message(STATUS "Tau version: ${TAU_TARGET_VERSION} / ${TAU_VERSION}")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 endif()
+
 if(TAU_USE_CCACHE)
 	find_program(CCACHE_BINARY ccache)
 	if(CCACHE_BINARY)

@@ -807,6 +807,75 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	return report(false);
 }
 
+/**
+ * @brief Lexicographic comparator for Tau formula variables.
+ *
+ * Compares two variable nodes by the string representation of their sub-trees.
+ * Used to define a canonical variable order for BDD construction and DNF
+ * reduction.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+auto lex_var_comp = [](tref x, tref y) {
+#ifdef TAU_CACHE
+	using cache_t = std::map<std::pair<tref, tref>, bool,
+				subtree_pair_less<node, tref>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find({x,y}); it != cache.end())
+		return it->second;
+#endif // TAU_CACHE
+	// TODO (QUESTION) strings have unique id, use .data() instead?
+	auto xx = tree<node>::get(x).to_str();
+	auto yy = tree<node>::get(y).to_str();
+#ifdef TAU_CACHE
+	return cache.emplace(std::make_pair(x, y), xx < yy).first->second;
+#endif // TAU_CACHE
+	return xx < yy;
+};
+
+/**
+ * @brief Predicate that classifies a wff node as a BDD variable.
+ *
+ * In BDD-based DNF/CNF reductions of well-formed formulas the following node
+ * types are treated as atomic BDD variables: `bf_eq`, `wff_ref`, `wff_ex`,
+ * `wff_sometimes`, `wff_always`, `wff_all`, and `constraint`.
+ * @tparam node Tree node type.
+ * @todo Extend for the full grammar.
+ */
+template <NodeType node>
+inline auto is_wff_bdd_var = [](tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	DBG(assert(!t.is(tau::bf_neq));)
+	return t.child_is(tau::bf_eq)
+		|| t.child_is(tau::wff_ref)
+		|| t.child_is(tau::wff_ex)
+		|| t.child_is(tau::wff_sometimes)
+		|| t.child_is(tau::wff_always)
+		|| t.child_is(tau::wff_all)
+		|| t.child_is(tau::constraint);
+};
+
+/**
+ * @brief Predicate that classifies a bf node as a BDD variable.
+ *
+ * In BDD-based reductions of Boolean functions the following node types are
+ * treated as atomic BDD variables: `variable`, `capture`, `bf_ref`,
+ * `ba_constant`, `bf_fall`, and `bf_fex`.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+inline auto is_bf_bdd_var = [](tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	return t.child_is(tau::variable)
+		|| t.child_is(tau::capture)
+		|| t.child_is(tau::bf_ref)
+		|| t.child_is(tau::ba_constant)
+		|| t.child_is(tau::bf_fall)
+		|| t.child_is(tau::bf_fex);
+};
+
 // Given a BF b, calculate the Boole normal form (DNF corresponding to the paths to true in the BDD) of b
 // where the variable order is given by the function lex_var_comp
 template <NodeType node>
@@ -1579,57 +1648,6 @@ tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
 }
 
 template <NodeType node>
-tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
-	using tau = tree<node>;
-	if (shift <= 0) return fm;
-	subtree_map<node, tref> changes;
-	for (tref io_var : io_vars) {
-		if (!is_io_initial<node>(io_var)) continue;
-		int_t tp = get_io_time_point<node>(io_var);
-		// Make sure that the resulting time point is positive
-		if (tp + shift < 0) return tau::_F();
-		size_t type = tau::get(io_var).get_ba_type();
-		changes.emplace(io_var, tau::get(io_var).is_input_variable()
-			? tau::trim(build_in_var_at_n<node>(
-				get_var_name_node<node>(io_var), tp + shift, type))
-			: tau::trim(build_out_var_at_n<node>(
-				get_var_name_node<node>(io_var), tp + shift, type)));
-	}
-	return rewriter::replace<node>(fm, changes);
-}
-
-// Adjust the lookback before conjunction of fm1 and fm2
-template <NodeType node>
-tref always_conjunction(tref fm1_aw, tref fm2_aw) {
-	using tau = tree<node>;
-	// Trim the always node if present
-	auto fm1 = is_child<node>(fm1_aw, tau::wff_always)
-				? tau::trim2(fm1_aw) : fm1_aw;
-	auto fm2 = is_child<node>(fm2_aw, tau::wff_always)
-				? tau::trim2(fm2_aw) : fm2_aw;
-	auto io_vars1 = tau::get(fm1)
-		.select_top(is_child<node, tau::io_var>);
-	auto io_vars2 = tau::get(fm2)
-		.select_top(is_child<node, tau::io_var>);
-	// Get lookbacks
-	int_t lb1 = get_max_shift<node>(io_vars1);
-	int_t lb2 = get_max_shift<node>(io_vars2);
-	if (lb1 < lb2) {
-		// adjust fm1 by lb2 - lb1
-		return tau::build_wff_and(
-			shift_io_vars_in_fm<node>(fm1, io_vars1, lb2 - lb1),
-			fm2);
-	} else if (lb2 < lb1) {
-		// adjust fm2 by lb1 - lb2
-		return tau::build_wff_and(fm1,
-			shift_io_vars_in_fm<node>(fm2, io_vars2, lb1 - lb2));
-	} else {
-		// no adjustment needed
-		return tau::build_wff_and(fm1, fm2);
-	}
-}
-
-template <NodeType node>
 tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded = nullptr) {
 	using tau = tree<node>;
 	LOG_DEBUG << "push_existential_quantifier_one: " << LOG_FM_DUMP(fm);
@@ -1756,31 +1774,6 @@ tref push_quantifiers_in(tref formula) {
 		return visit_wff<node>(n) && !excluded_nodes.contains(n);
 	};
 	return pre_order<node>(formula).apply_unique(push_quantifiers, visit);
-}
-
-// Squeeze all equalities found in n
-template <NodeType node>
-tref squeeze_positives(tref n, size_t type_id) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-	LOG_TRACE << "squeeze_positives: " << LOG_FM(n);
-	auto match = [&type_id](tref n) {
-		return is<node, tau::bf_eq>(n) &&
-			find_ba_type<node>(n) == type_id;
-	};
-	if (trefs eqs = tau::get(n).select_top(match);
-		eqs.size() > 0)
-	{
-		for (tref& eq : eqs) {
-			eq = norm_trimmed_equation<node>(eq);
-		}
-		eqs = tt(eqs) | tt::children | tt::refs;
-		tref res = tau::build_bf_or(eqs, find_ba_type<node>(eqs[0]));
-		LOG_TRACE << "squeeze_positives result: " << LOG_FM(res);
-		return res;
-	}
-	LOG_TRACE << "(I) squeeze_positives result: none";
-	return nullptr;
 }
 
 template <NodeType node>
@@ -3724,6 +3717,220 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	return tau::build_wff_or(nl, nr);
 }
 
+template<NodeType node>
+tref anti_prenex_block(tref formula, const trefs& block,
+	subtree_unordered_set<node>& used_atms,
+	const auto& quant_pattern,
+	const typename term_handle<node>::order& order) {
+	using tau = tree<node>;
+	// Goal: push the quantifier block as far into clause as possible
+	{
+		bool has_var = false;
+		const trefs& vars = get_free_vars<node>(formula);
+		for (tref v : block) {
+			if (hasbc(vars, v, tau::subtree_less)) {
+				has_var = true;
+				break;
+			}
+		}
+		// Formula does not contain quantified vars
+		if (!has_var) return formula;
+	}
+
+	const tau& ft = tau::get(formula);
+	// Case disjunction
+	if (ft.child_is(tau::wff_or)) {
+		// Push block into disjunction
+		tref c1 = anti_prenex_block<node>(
+			ft[0].first(), block, used_atms, quant_pattern, order);
+		if (tau::get(c1).equals_T()) return _T<node>();
+		return tau::build_wff_or(c1, anti_prenex_block<node>(
+			ft[0].second(), block, used_atms, quant_pattern, order));
+	}
+
+	// Case conjunction
+	if (ft.child_is(tau::wff_and)) {
+		trefs conjs = get_cnf_wff_clauses<node>(formula);
+		trefs dep;
+		for (tref &conj : conjs) {
+			bool has_var = false;
+			const trefs& vars = get_free_vars<node>(conj);
+			for (tref v : block) {
+				if (hasbc(vars, v, tau::subtree_less)) {
+					has_var = true;
+					break;
+				}
+			}
+			// Conjunct contains quantified var
+			if (has_var) {
+				dep.push_back(conj);
+				conj = _T<node>();
+			}
+		}
+		if (dep.empty()) return formula;
+		formula = tau::build_wff_and(dep);
+		// Var-free conjuncts; they must be re-attached to every result
+		// built from the dependent part below
+		const tref indep = tau::build_wff_and(conjs);
+		// Check if dependent formula is clause -> push block into clause
+		if (!tau::get(formula).find_top(is<node, tau::wff_or>)) {
+			return tau::build_wff_and(
+				indep,
+				resolve_quantifiers2<node>(
+				push_ex_block_into_clause<node>(formula, block, order), order));
+		}
+		// TODO: only != present
+		// Using the available atomic formulas, do Boole decomposition on best fit
+		auto is_atomic = [&used_atms](tref n) {
+			if (!tau::get(n).is(tau::wff)) return false;
+			// Exclude used atomic fms
+			if (used_atms.contains(n)) return false;
+			const tau& c = tau::get(n)[0];
+			switch (c.value.nt) {
+				case tau::bf_eq:
+				case tau::bf_lt:
+				case tau::bf_lteq: return true;
+				default: return false;
+			}
+		};
+		// Collect current atms
+		const trefs atms = rewriter::select_top_until<node>(formula,
+			is_atomic, is_quantifier<node>);
+		// No decomposable atomic formula available (e.g. only !=
+		// equations or quantified subformulas remain): keep the block
+		// on the dependent part instead of dereferencing end()
+		if (atms.empty()) {
+			for (auto v = block.rbegin(); v != block.rend(); ++v)
+				formula = build_wff_ex<node>(*v, formula, false);
+			return tau::build_wff_and(indep, formula);
+		}
+		// Sort the atomic formulas and get minimum
+		tref atm = *std::ranges::min_element(atms,
+			atm_formula_order_for_quant_elim<node>(quant_pattern));
+		// TODO: substitution based elimination
+		// TODO: Take care of unique zero of atm
+
+		// Remove/add available atomic formulas in stack-like fashion
+		used_atms.insert(atm);
+		// Do Boole decomposition
+		tref l = rewriter::replace<node>(formula, atm, tau::_T());
+		tref r = rewriter::replace<node>(formula, atm, tau::_F());
+		if (tau::get(l) == tau::get(r)) {
+			tref res = anti_prenex_block(
+				l, block, used_atms, quant_pattern, order);
+			used_atms.erase(atm);
+			return tau::build_wff_and(indep, res);
+		}
+		tref nl = anti_prenex_block(
+			tau::build_wff_and(atm, l), block, used_atms, quant_pattern, order);
+		if (tau::get(nl).equals_T()) {
+			used_atms.erase(atm);
+			// dep part is T, only the var-free part remains
+			return indep;
+		}
+		tref nr = anti_prenex_block(
+			tau::build_wff_and(tau::build_wff_neg(atm), r),
+				block, used_atms, quant_pattern, order);
+		used_atms.erase(atm);
+		return tau::build_wff_and(indep, tau::build_wff_or(nl, nr));
+	}
+
+	// Connective is not wff_and or wff_or -> quantifiers stay with formula
+	for (auto v = block.rbegin(); v != block.rend(); ++v)
+		formula = build_wff_ex<node>(*v, formula, false);
+	return formula;
+}
+
+template<NodeType node>
+tref anti_prenex_block(tref formula) {
+	using tau = tree<node>;
+
+	// Step 1: NNF + syntactic simplification
+	formula = to_nnf<node>(formula);
+	formula = syntactic_formula_simplification<node>(formula);
+
+	// Step 2: Substitution-based elimination (innermost first via post_order).
+	// Attempts ex x (x = t && phi(x)) => phi(t) for each existential
+	// conjunctive scope.
+	auto subs_elim = [](tref n) -> tref {
+		if (!is_child<node>(n, tau::wff_ex)) return n;
+		tref var = tau::trim2(n);
+		tref scope = tau::get(n)[0].second();
+		if (tau::get(scope).find_top(is<node, tau::wff_or>)) return n;
+		tref elim = ex_subs_based_elimination<node>(var, scope);
+		return elim != scope ? elim : n;
+	};
+	formula = post_order<node>(formula).apply_unique(subs_elim);
+	formula = syntactic_formula_simplification<node>(formula);
+
+	// Step 3: Normalize non-canonical operators (bf_neq → ¬(bf_eq),
+	// bf_nlteq → bf_lt, etc.) so push_ex_block_into_clause sees only
+	// canonical atoms.
+	formula = normalize_atomic_formula_operators<node>(formula);
+
+	// Step 4: Process each quantifier block in post-order (innermost first).
+	// For each node whose direct child is a quantifier, identify the maximal
+	// block of consecutive same-type quantifiers at the top, push the block
+	// into the body using the 5-arg anti_prenex_block, then eliminate the
+	// remaining quantifiers over atomic formulas via resolve_quantifiers2.
+	// wff_all blocks are handled by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
+	auto process_block = [](tref n) -> tref {
+		if (!is_child_quantifier<node>(n)) return n;
+
+		// Collect the block: consecutive same-type quantifiers at the top
+		trefs block_vars;
+		const bool is_ex = is_child<node>(n, tau::wff_ex);
+		tref curr = n;
+		while (is_child_quantifier<node>(curr)) {
+			if (is_child<node>(curr, tau::wff_ex) != is_ex) break;
+			block_vars.push_back(tau::trim2(curr));
+			curr = tau::get(curr)[0].second();
+		}
+		tref body = curr;
+
+		// Build term BDD variable order: innermost variable gets the
+		// lowest index (= highest BDD priority), which is the precondition
+		// of bdd_quant (innermost = lowest order index).
+		typename term_handle<node>::order ord;
+		for (size_t i = 0; i < block_vars.size(); ++i)
+			ord.emplace(block_vars[block_vars.size() - 1 - i],
+				static_cast<int_t>(i));
+
+		// Build quant_pattern for the Boole decomposition step inside
+		// the 5-arg anti_prenex_block: outermost gets the highest priority
+		// value so the decomposition prefers outermost-dependent atoms.
+		subtree_unordered_map<node, int_t> qp;
+		for (size_t i = 0; i < block_vars.size(); ++i)
+			qp.emplace(block_vars[i],
+				static_cast<int_t>(block_vars.size() - i));
+
+		tref result;
+		if (is_ex) {
+			subtree_unordered_set<node> used_atms;
+			result = anti_prenex_block<node>(
+				body, block_vars, used_atms, qp, ord);
+			result = resolve_quantifiers2<node>(result, ord);
+		} else {
+			// ∀-block: dualize to ∃-block on negated body,
+			// process, then negate the result back.
+			tref neg_body = to_nnf<node>(tau::build_wff_neg(body));
+			// to_nnf may introduce bf_neq; normalize so
+			// push_ex_block_into_clause sees only bf_eq atoms.
+			neg_body = normalize_atomic_formula_operators<node>(neg_body);
+			subtree_unordered_set<node> used_atms;
+			tref pushed = anti_prenex_block<node>(
+				neg_body, block_vars, used_atms, qp, ord);
+			pushed = resolve_quantifiers2<node>(pushed, ord);
+			result = to_nnf<node>(tau::build_wff_neg(pushed));
+		}
+		return result;
+	};
+
+	formula = post_order<node>(formula).apply_unique(
+		process_block, visit_wff<node>);
+	return syntactic_formula_simplification<node>(formula);
+}
+
 // TODO: How to adjust for bitvector that are boolean?
 /**
  * @brief Eliminate the existential quantifier scoping a clause.
@@ -4143,220 +4350,17 @@ tref anti_prenex(tref formula) {
 	return formula;
 }
 
-template<NodeType node>
-tref anti_prenex_block(tref formula, const trefs& block,
-	subtree_unordered_set<node>& used_atms,
-	const auto& quant_pattern,
-	const typename term_handle<node>::order& order) {
-	using tau = tree<node>;
-	// Goal: push the quantifier block as far into clause as possible
-	{
-		bool has_var = false;
-		const trefs& vars = get_free_vars<node>(formula);
-		for (tref v : block) {
-			if (hasbc(vars, v, tau::subtree_less)) {
-				has_var = true;
-				break;
-			}
-		}
-		// Formula does not contain quantified vars
-		if (!has_var) return formula;
-	}
 
-	const tau& ft = tau::get(formula);
-	// Case disjunction
-	if (ft.child_is(tau::wff_or)) {
-		// Push block into disjunction
-		tref c1 = anti_prenex_block<node>(
-			ft[0].first(), block, used_atms, quant_pattern, order);
-		if (tau::get(c1).equals_T()) return _T<node>();
-		return tau::build_wff_or(c1, anti_prenex_block<node>(
-			ft[0].second(), block, used_atms, quant_pattern, order));
-	}
-
-	// Case conjunction
-	if (ft.child_is(tau::wff_and)) {
-		trefs conjs = get_cnf_wff_clauses<node>(formula);
-		trefs dep;
-		for (tref &conj : conjs) {
-			bool has_var = false;
-			const trefs& vars = get_free_vars<node>(conj);
-			for (tref v : block) {
-				if (hasbc(vars, v, tau::subtree_less)) {
-					has_var = true;
-					break;
-				}
-			}
-			// Conjunct contains quantified var
-			if (has_var) {
-				dep.push_back(conj);
-				conj = _T<node>();
-			}
-		}
-		if (dep.empty()) return formula;
-		formula = tau::build_wff_and(dep);
-		// Var-free conjuncts; they must be re-attached to every result
-		// built from the dependent part below
-		const tref indep = tau::build_wff_and(conjs);
-		// Check if dependent formula is clause -> push block into clause
-		if (!tau::get(formula).find_top(is<node, tau::wff_or>)) {
-			return tau::build_wff_and(
-				indep,
-				resolve_quantifiers2<node>(
-				push_ex_block_into_clause<node>(formula, block, order), order));
-		}
-		// TODO: only != present
-		// Using the available atomic formulas, do Boole decomposition on best fit
-		auto is_atomic = [&used_atms](tref n) {
-			if (!tau::get(n).is(tau::wff)) return false;
-			// Exclude used atomic fms
-			if (used_atms.contains(n)) return false;
-			const tau& c = tau::get(n)[0];
-			switch (c.value.nt) {
-				case tau::bf_eq:
-				case tau::bf_lt:
-				case tau::bf_lteq: return true;
-				default: return false;
-			}
-		};
-		// Collect current atms
-		const trefs atms = rewriter::select_top_until<node>(formula,
-			is_atomic, is_quantifier<node>);
-		// No decomposable atomic formula available (e.g. only !=
-		// equations or quantified subformulas remain): keep the block
-		// on the dependent part instead of dereferencing end()
-		if (atms.empty()) {
-			for (auto v = block.rbegin(); v != block.rend(); ++v)
-				formula = build_wff_ex<node>(*v, formula, false);
-			return tau::build_wff_and(indep, formula);
-		}
-		// Sort the atomic formulas and get minimum
-		tref atm = *std::ranges::min_element(atms,
-			atm_formula_order_for_quant_elim<node>(quant_pattern));
-		// TODO: substitution based elimination
-		// TODO: Take care of unique zero of atm
-
-		// Remove/add available atomic formulas in stack-like fashion
-		used_atms.insert(atm);
-		// Do Boole decomposition
-		tref l = rewriter::replace<node>(formula, atm, tau::_T());
-		tref r = rewriter::replace<node>(formula, atm, tau::_F());
-		if (tau::get(l) == tau::get(r)) {
-			tref res = anti_prenex_block(
-				l, block, used_atms, quant_pattern, order);
-			used_atms.erase(atm);
-			return tau::build_wff_and(indep, res);
-		}
-		tref nl = anti_prenex_block(
-			tau::build_wff_and(atm, l), block, used_atms, quant_pattern, order);
-		if (tau::get(nl).equals_T()) {
-			used_atms.erase(atm);
-			// dep part is T, only the var-free part remains
-			return indep;
-		}
-		tref nr = anti_prenex_block(
-			tau::build_wff_and(tau::build_wff_neg(atm), r),
-				block, used_atms, quant_pattern, order);
-		used_atms.erase(atm);
-		return tau::build_wff_and(indep, tau::build_wff_or(nl, nr));
-	}
-
-	// Connective is not wff_and or wff_or -> quantifiers stay with formula
-	for (auto v = block.rbegin(); v != block.rend(); ++v)
-		formula = build_wff_ex<node>(*v, formula, false);
-	return formula;
-}
-
-template<NodeType node>
-tref anti_prenex_block(tref formula) {
-	using tau = tree<node>;
-
-	// Step 1: NNF + syntactic simplification
-	formula = to_nnf<node>(formula);
-	formula = syntactic_formula_simplification<node>(formula);
-
-	// Step 2: Substitution-based elimination (innermost first via post_order).
-	// Attempts ex x (x = t && phi(x)) => phi(t) for each existential
-	// conjunctive scope.
-	auto subs_elim = [](tref n) -> tref {
-		if (!is_child<node>(n, tau::wff_ex)) return n;
-		tref var = tau::trim2(n);
-		tref scope = tau::get(n)[0].second();
-		if (tau::get(scope).find_top(is<node, tau::wff_or>)) return n;
-		tref elim = ex_subs_based_elimination<node>(var, scope);
-		return elim != scope ? elim : n;
-	};
-	formula = post_order<node>(formula).apply_unique(subs_elim);
-	formula = syntactic_formula_simplification<node>(formula);
-
-	// Step 3: Normalize non-canonical operators (bf_neq → ¬(bf_eq),
-	// bf_nlteq → bf_lt, etc.) so push_ex_block_into_clause sees only
-	// canonical atoms.
-	formula = normalize_atomic_formula_operators<node>(formula);
-
-	// Step 4: Process each quantifier block in post-order (innermost first).
-	// For each node whose direct child is a quantifier, identify the maximal
-	// block of consecutive same-type quantifiers at the top, push the block
-	// into the body using the 5-arg anti_prenex_block, then eliminate the
-	// remaining quantifiers over atomic formulas via resolve_quantifiers2.
-	// wff_all blocks are handled by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
-	auto process_block = [](tref n) -> tref {
-		if (!is_child_quantifier<node>(n)) return n;
-
-		// Collect the block: consecutive same-type quantifiers at the top
-		trefs block_vars;
-		const bool is_ex = is_child<node>(n, tau::wff_ex);
-		tref curr = n;
-		while (is_child_quantifier<node>(curr)) {
-			if (is_child<node>(curr, tau::wff_ex) != is_ex) break;
-			block_vars.push_back(tau::trim2(curr));
-			curr = tau::get(curr)[0].second();
-		}
-		tref body = curr;
-
-		// Build term BDD variable order: innermost variable gets the
-		// lowest index (= highest BDD priority), which is the precondition
-		// of bdd_quant (innermost = lowest order index).
-		typename term_handle<node>::order ord;
-		for (size_t i = 0; i < block_vars.size(); ++i)
-			ord.emplace(block_vars[block_vars.size() - 1 - i],
-				static_cast<int_t>(i));
-
-		// Build quant_pattern for the Boole decomposition step inside
-		// the 5-arg anti_prenex_block: outermost gets the highest priority
-		// value so the decomposition prefers outermost-dependent atoms.
-		subtree_unordered_map<node, int_t> qp;
-		for (size_t i = 0; i < block_vars.size(); ++i)
-			qp.emplace(block_vars[i],
-				static_cast<int_t>(block_vars.size() - i));
-
-		tref result;
-		if (is_ex) {
-			subtree_unordered_set<node> used_atms;
-			result = anti_prenex_block<node>(
-				body, block_vars, used_atms, qp, ord);
-			result = resolve_quantifiers2<node>(result, ord);
-		} else {
-			// ∀-block: dualize to ∃-block on negated body,
-			// process, then negate the result back.
-			tref neg_body = to_nnf<node>(tau::build_wff_neg(body));
-			// to_nnf may introduce bf_neq; normalize so
-			// push_ex_block_into_clause sees only bf_eq atoms.
-			neg_body = normalize_atomic_formula_operators<node>(neg_body);
-			subtree_unordered_set<node> used_atms;
-			tref pushed = anti_prenex_block<node>(
-				neg_body, block_vars, used_atms, qp, ord);
-			pushed = resolve_quantifiers2<node>(pushed, ord);
-			result = to_nnf<node>(tau::build_wff_neg(pushed));
-		}
-		return result;
-	};
-
-	formula = post_order<node>(formula).apply_unique(
-		process_block, visit_wff<node>);
-	return syntactic_formula_simplification<node>(formula);
-}
-
+/**
+ * @brief Resolve quantifiers with a custom variable ordering.
+ *
+ * Variant of `resolve_quantifiers` that uses the provided `order` relation to
+ * sort variables before the elimination step.
+ * @tparam node Tree node type.
+ * @param formula Formula containing quantifiers.
+ * @param order Comparison relation for variable ordering.
+ * @return Formula with quantifiers resolved.
+ */
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order) {
 	using tau = tree<node>;
@@ -4436,90 +4440,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 	return pre_order<node>(formula).apply_unique(down_resolver, visit);
 }
 
-/**
- * @brief Converts the temporal layer of a formula to reduced DNF, squeezes the always
- * statements and ensures that formulas containing temporal variables are
- * explicitly quantified while non-temporal formulas are not quantified temporally.
- * @tparam node Tree node type
- * @tparam normalize_scopes If true, temporally quantified formulas are converted to Boole normal form
- * @param fm The formula that is to be temporally normalized
- * @return The resulting formula after normalizing the temporal quantifiers
- */
-template <NodeType node, bool normalize_scopes>
-tref normalize_temporal_quantifiers(tref fm) {
-	using tau = tree<node>;
-	auto norm = [](tref arg) {
-		return normalize_scopes
-					? term_boole_normal_form<node>(arg)
-					: arg;
-	};
-	auto st_aw = [](tref n) {
-		return is_child<node>(n, tau::wff_sometimes)
-			|| is_child<node>(n, tau::wff_always);
-	};
-	auto rm_temp_quant = [&st_aw](tref n) {
-		if (st_aw(n)) return tau::trim2(n);
-		return n;
-	};
-	if (has_temp_var<node>(fm)) {
-		const bool has_temp_quant = tau::get(fm).find_top(st_aw);
-		if (has_temp_quant) {
-			// By assumption, all temporal variables are explicitly
-			// quantified by temporal quantifier without nesting.
-			// DNF conversion is only done on temporal level
-			fm = temporal_layer_to_dnf<node>(fm);
-			// Simplify temporal layer
-			fm = reduce<node>(fm);
-			trefs clauses = get_dnf_wff_clauses<node>(fm);
-			tref non_temp_clauses = tau::_F();
-			tref res = tau::_F();
-			for (tref clause : clauses) {
-				if (!has_temp_var<node>(clause)) {
-					// Remove all temporal quantifiers
-					clause = pre_order<node>(clause).
-							apply_unique(rm_temp_quant);
-					non_temp_clauses = tau::build_wff_or(
-						non_temp_clauses, clause);
-					continue;
-				}
-				tref always_part = tau::_T();
-				tref staying = tau::_T();
-				// In each clause squeeze all always statements
-				for (tref conj : get_cnf_wff_clauses<node>(clause)) {
-					// All parts are temporally quantified
-					DBG(assert(st_aw(conj) ||
-						!has_temp_var<node>(conj));)
-					if (!has_temp_var<node>(conj))
-						always_part = tau::build_wff_and(
-							always_part, rm_temp_quant(conj));
-					// TODO: always conjunction is inefficient
-					else if (!is_child<node>(conj, tau::wff_sometimes))
-						always_part = always_conjunction<node>(
-							always_part, conj);
-					else staying = tau::build_wff_and(
-						staying,
-						tau::build_wff_sometimes(
-							norm(tau::trim2(conj))));
-				}
-				always_part = tau::build_wff_always(norm(always_part));
-				clause = tau::build_wff_and(always_part, staying);
-				res = tau::build_wff_or(res, clause);
-			}
-			non_temp_clauses = tau::build_wff_always(
-				norm(non_temp_clauses));
-			res = tau::build_wff_or(res, non_temp_clauses);
-			return res;
-		} else {
-			// Temporal variable without temporal quantifier
-			// By assumption we quantify fm universally
-			return build_wff_always<node>(norm(fm));
-		}
-	} else {
-		// No temporal variable, so no temporal quantifier needed
-		fm = pre_order<node>(fm).apply_unique(rm_temp_quant);
-		return norm(fm);
-	}
-}
+
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "to_snf"
