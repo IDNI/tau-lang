@@ -1,11 +1,23 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "normalizer.h"
+#include "normal_forms.h"
+#include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normalizer"
 
 namespace idni::tau_lang {
+
+/**
+ * @brief Descriptor of a single reference offset.
+ *
+ * The first element identifies the offset kind (one of `tau_parser::nonterminal`
+ * values: `num`, `capture`, `shift`, or `variable`). The second element holds
+ * the numeric value for `num`, the `rr_dict` identifier for `capture`, or 0 for
+ * `shift` and `variable`.
+ */
+using offset_t = std::pair<tau_parser::nonterminal, size_t>;
 
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template <NodeType node>

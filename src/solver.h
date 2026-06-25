@@ -13,7 +13,7 @@
 #ifndef __IDNI__TAU__SOLVER_H__
 #define __IDNI__TAU__SOLVER_H__
 
-#include "splitter.h"
+#include "tau_tree.h"
 
 namespace idni::tau_lang {
 

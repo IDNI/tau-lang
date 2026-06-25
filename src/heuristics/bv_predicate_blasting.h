@@ -20,9 +20,6 @@
 
 namespace idni::tau_lang {
 
-using namespace cvc5;
-using namespace idni;
-
 inline bool bv_blasting = true;
 
 /**
