@@ -1,9 +1,15 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <list>
+#include <numeric>
+
+#include "nso_rr.h"
+#include "tau_bdd.h"
 #include "normal_forms.h"
 #include "tau_bdd.h"
 #include "union_find_with_sets.h"
 #include "heuristics/bv_predicate_blasting.h"
+
 namespace idni::tau_lang {
 
 #undef LOG_CHANNEL_NAME

@@ -16,8 +16,6 @@
 #include <list>
 #include <numeric>
 
-#include "nso_rr.h"
-#include "tau_bdd.h"
 #include "normal_forms_transformations.h"
 
 namespace idni::tau_lang {

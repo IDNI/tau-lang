@@ -18,8 +18,7 @@
 #ifndef __IDNI__TAU__NORMALIZER_H__
 #define __IDNI__TAU__NORMALIZER_H__
 
-#include "normal_forms.h"
-#include "definitions.h"
+#include "nso_rr.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -27,16 +26,6 @@
 // bindings, etc... instead of sp_tau_node,...
 
 namespace idni::tau_lang {
-
-/**
- * @brief Descriptor of a single reference offset.
- *
- * The first element identifies the offset kind (one of `tau_parser::nonterminal`
- * values: `num`, `capture`, `shift`, or `variable`). The second element holds
- * the numeric value for `num`, the `rr_dict` identifier for `capture`, or 0 for
- * `shift` and `variable`.
- */
-using offset_t = std::pair<tau_parser::nonterminal, size_t>;
 
 /**
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.

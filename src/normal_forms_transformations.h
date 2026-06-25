@@ -12,8 +12,7 @@
 #ifndef __IDNI__TAU__NORMAL_FORMS_TRANSFORMATIONS_H__
 #define __IDNI__TAU__NORMAL_FORMS_TRANSFORMATIONS_H__
 
-#include "nso_rr.h"
-#include "tau_bdd.h"
+#include "tau_tree.h"
 
 namespace idni::tau_lang {
 

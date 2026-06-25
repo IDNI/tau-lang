@@ -15,8 +15,7 @@
 #ifndef __IDNI__TAU__SATISFIABILITY_H__
 #define __IDNI__TAU__SATISFIABILITY_H__
 
-#include "normalizer.h"
-//#include "boolean_algebras/bv_ba.h"
+#include "tau_tree.h"
 
 namespace idni::tau_lang {
 
