@@ -103,6 +103,19 @@ tref split_path(tref fm, const splitter_type st, bool check_temps, const auto& c
 	return fm;
 }
 
+// Splitter function for a nso tau::ba_constant node holding a BA constant
+template <typename... BAs>
+requires BAsPack<BAs...>
+const tree<node<BAs...>>& tau_splitter(const tree<node<BAs...>>& t,
+	splitter_type st = splitter_type::upper)
+{
+	DBG(assert(t.is_ba_constant());)
+	return tree<node<BAs...>>::get(
+		tree<node<BAs...>>::build_bf_ba_constant(
+			node<BAs...>::ba::splitter(t.get_ba_constant(), st),
+			t.get_ba_type()));
+}
+
 // If checking a temporal Tau formula F, we split a single DNF clause.
 // In order to check if the split clause yields a splitter for F, we have that
 // "fm" holds the clause, "splitter" holds the splitter of the clause and
@@ -111,7 +124,7 @@ tref split_path(tref fm, const splitter_type st, bool check_temps, const auto& c
 // the proposed splitter in "splitter".
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool is_splitter(tref fm, tref splitter, tref spec_clause) {
+bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 	using node = tau_lang::node<BAs...>;
 	if (spec_clause) {
 		// We are dealing with a temporal formula
@@ -288,7 +301,7 @@ tref tau_bad_splitter(tref fm) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
-				splitter_type st, tref spec_clause)
+				splitter_type st, tref spec_clause = nullptr)
 {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
@@ -485,19 +498,6 @@ tref tau_splitter(tref fm, splitter_type st) {
 		auto accept = [](tref){return true;};
 		return split_path<BAs...>(fm, st, false, accept);
 	}
-}
-
-// Splitter function for a nso tau::ba_constant node holding a BA constant
-template <typename... BAs>
-requires BAsPack<BAs...>
-const tree<node<BAs...>>& tau_splitter(const tree<node<BAs...>>& t,
-	splitter_type st)
-{
-	DBG(assert(t.is_ba_constant());)
-	return tree<node<BAs...>>::get(
-		tree<node<BAs...>>::build_bf_ba_constant(
-			node<BAs...>::ba::splitter(t.get_ba_constant(), st),
-			t.get_ba_type()));
 }
 
 } // namespace idni::tau_lang
