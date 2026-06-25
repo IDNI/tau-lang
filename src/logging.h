@@ -1,5 +1,15 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+/**
+ * @file logging.h
+ * @brief Boost.Log-based logging infrastructure and helper macros for Tau.
+ *
+ * Defines `LOG_ERROR`, `LOG_WARNING`, `LOG_INFO`, `LOG_DEBUG`, `LOG_TRACE`
+ * stream macros, color-escape helpers (`LOG_BRIGHT`, `LOG_FM`, etc.),
+ * the `logging` singleton that configures the Boost.Log core, and
+ * `LOG_ENABLED_CHANNELS` for compile-time channel filtering.
+ */
+
 // Logging streams:
 //  LOG_ERROR   << "msg";         // "(Error) msg"
 //  LOG_WARNING << "msg";         // "(Warning) msg"
@@ -309,23 +319,31 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(channel_attr, "Channel", std::string)
 BOOST_LOG_ATTRIBUTE_KEYWORD(severity,     "Severity",
 			    boost::log::trivial::severity_level)
 
+/**
+ * @brief Singleton that configures and owns the Boost.Log core for Tau.
+ *
+ * Constructed once at program start via `initialize_logging`. After
+ * construction the default severity is `info`. Call `trace()` / `debug()` etc.
+ * to lower the threshold dynamically.
+ */
 struct logging {
-	// set filter to trace level
+	/** @brief Set log filter to `trace` (most verbose). */
 	inline static void trace()  { set_filter(boost::log::trivial::trace);  }
-	// set filter to debug level
+	/** @brief Set log filter to `debug`. */
 	inline static void debug()  { set_filter(boost::log::trivial::debug);  }
-	// set filter to print info, warning and error messages
+	/** @brief Set log filter to `info` (info, warning, error). */
 	inline static void info()   { set_filter(boost::log::trivial::info);   }
-	// set filter to print warning and error messages
+	/** @brief Set log filter to `warning` (warning + error only). */
 	inline static void warning(){ set_filter(boost::log::trivial::warning);}
-	// set filter to print error messages
+	/** @brief Set log filter to `error` (errors only). */
 	inline static void error()  { set_filter(boost::log::trivial::error);  }
 
+	/** @brief Return the current active severity threshold. */
 	inline static boost::log::trivial::severity_level level() {
 		return set_level;
 	}
 
-	// set filter to a specific level
+	/** @brief Apply severity @p level as the active filter for the Boost.Log core. */
 	inline static void set_filter(boost::log::trivial::severity_level level)
 	{
 		using namespace boost::log;
@@ -392,7 +410,7 @@ struct logging {
 		boost::log::sources::severity_channel_logger_mt<
 			boost::log::trivial::severity_level, std::string>;
 
-	// get a channel logger for a specific header
+	/** @brief Return (creating if needed) the per-channel logger for @p channel_name. */
 	inline static channel_logger_type& get_channel_logger(
 						const std::string& channel_name)
 	{

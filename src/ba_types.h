@@ -1,5 +1,15 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+/**
+ * @file ba_types.h
+ * @brief Boolean-algebra (BA) type registry, type-tree constructors, and query helpers.
+ *
+ * Defines type-tree builders (`tau_type`, `sbf_type`, `bv_type`, etc.),
+ * their corresponding `size_t`-id overloads, `is_*` predicates, and the
+ * `ba_types<node>` registry struct that maps tree refs ↔ integer type ids.
+ * Also provides the `unify` / `get_ba_type_id` / `find_ba_type` free-function API.
+ */
+
 #ifndef __IDNI__TAU__BA_TYPES_H__
 #define __IDNI__TAU__BA_TYPES_H__
 
@@ -16,6 +26,7 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref tau_type();
 
+/** @brief Return the integer type id for the `tau` type under @p node. */
 template <NodeType node>
 inline size_t tau_type_id();
 
@@ -28,6 +39,7 @@ inline size_t tau_type_id();
 template <NodeType node>
 bool is_tau_type(tref t);
 
+/** @brief Return `true` if type id @p t represents the tau type. */
 template <NodeType node>
 bool is_tau_type(size_t t);
 
@@ -39,6 +51,7 @@ bool is_tau_type(size_t t);
 template <NodeType node>
 tref nat_type();
 
+/** @brief Return the integer type id for the `nat` type under @p node. */
 template <NodeType node>
 inline size_t nat_type_id();
 
@@ -59,6 +72,7 @@ bool is_nat_type(tref t);
 template <NodeType node>
 tref untyped_type();
 
+/** @brief Return the integer type id for the `untyped` type under @p node. */
 template <NodeType node>
 inline size_t untyped_type_id();
 
@@ -71,6 +85,7 @@ inline size_t untyped_type_id();
 template <NodeType node>
 bool is_untyped(tref t);
 
+/** @brief Return `true` if type id @p t represents the untyped kind. */
 template <NodeType node>
 bool is_untyped(size_t t);
 
@@ -86,6 +101,7 @@ bool is_untyped(size_t t);
 template <NodeType node>
 tref sbf_type();
 
+/** @brief Return the integer type id for the `sbf` type under @p node. */
 template <NodeType node>
 inline size_t sbf_type_id();
 
@@ -98,6 +114,7 @@ inline size_t sbf_type_id();
 template <NodeType node>
 bool is_sbf_type(tref t);
 
+/** @brief Return `true` if type id @p t represents the sbf type. */
 template <NodeType node>
 bool is_sbf_type(size_t t);
 
@@ -112,6 +129,7 @@ bool is_sbf_type(size_t t);
 template <NodeType node>
 tref bool_type();
 
+/** @brief Return the integer type id for the `bool` type under @p node. */
 template <NodeType node>
 inline size_t bool_type_id();
 
@@ -124,6 +142,7 @@ inline size_t bool_type_id();
 template <NodeType node>
 bool is_bool_type(tref t);
 
+/** @brief Return `true` if type id @p t represents the bool type. */
 template <NodeType node>
 bool is_bool_type(size_t t);
 
@@ -139,6 +158,7 @@ bool is_bool_type(size_t t);
 template <NodeType node>
 tref bv_type(unsigned short bitwidth);
 
+/** @brief Return the integer type id for a bitvector of @p bitwidth bits. */
 template <NodeType node>
 size_t bv_type_id(unsigned short bitwidth);
 
@@ -151,119 +171,138 @@ size_t bv_type_id(unsigned short bitwidth);
 template <NodeType node>
 bool is_bv_type_family(tref t);
 
+/** @brief Return `true` if type id @p ba_type_id belongs to the bitvector family. */
 template <NodeType node>
 bool is_bv_type_family(size_t ba_type_id);
 
+/** @brief Return the bitwidth of the bitvector type tree @p t. */
 template <NodeType node>
 size_t get_bv_width(tref t);
 
+/** @brief Return the bitwidth encoded in type id @p ba_type_id. */
 template <NodeType node>
 size_t get_bv_width(size_t ba_type_id);
 
 
-// -----------------------------------------------------------------------------
-// BA types
-//   contains type map of BA types
-// is templated by NodeType to scope it to the specific BAs... packed node tree
+/**
+ * @brief Registry mapping BA type trees ↔ integer ids for a specific node type.
+ *
+ * Scoped per `node` so each BA pack has its own independent id space.
+ * @tparam node Tree node type satisfying `NodeType`.
+ */
 template <NodeType node>
 struct ba_types {
-	// get the type id from the type name string id
+	/** @brief Return the integer id for type tree @p ba_type, inserting it if absent. */
 	static size_t id(tref ba_type);
 
-	// Get the type tree corresponding to the id
+	/** @brief Return the type tree corresponding to @p ba_type_id. */
 	static tref type_tree(size_t ba_type_id);
 
-	// get the type name from the type map id
+	/** @brief Return the string name for @p ba_type_id. */
 	static std::string name(size_t ba_type_id);
 
-	// print the type name to the stream
+	/** @brief Print the type name for @p ba_type to @p os. */
 	static std::ostream& print(std::ostream& os, size_t ba_type);
 
+	/** @brief Dump the full type registry to @p os. */
 	static std::ostream& dump(std::ostream& os);
 
+	/** @brief Return a string dump of the full type registry. */
 	static std::string dump_to_str();
 
 private:
-	// type_tree (index = ba_type id)
+	/// @brief Per-id type-tree vector (index = ba_type id).
 	static std::vector<tref>& type_trees();
 
-	// type_tree -> ba_type id
+	/// @brief Reverse map: type tree → ba_type id.
 	static subtree_map<node, size_t>& type_tree_to_idx();
 };
 
-// -----------------------------------------------------------------------------
-// functional API to ba_types
+// ---------------------------------------------------------------------------
+// Functional API for ba_types
+// ---------------------------------------------------------------------------
 
-// get the type id from the type name string id
+/** @brief Return the integer id for BA type tree @p ba_type. */
 template <NodeType node>
 size_t get_ba_type_id(tref ba_type);
 
-// Get the ba type ids of references
+/** @brief Return the integer ids for all trees in @p t. */
 template <NodeType node>
 std::vector<size_t> get_ba_type_ids(trefs t);
 
-// Get the type tree corresponding to a type id
+/** @brief Return the type tree for @p ba_type_id. */
 template <NodeType node>
 tref get_ba_type_tree(size_t ba_type_id);
 
-// get the type name from the type map id
+/** @brief Return the string name for @p ba_type_id. */
 template <NodeType node>
 std::string get_ba_type_name(size_t ba_type_id);
 
-// Check if type trees represent same type
+/** @brief Return `true` if @p t1 and @p t2 represent the same BA type. */
 template <NodeType node>
 bool is_same_ba_type(tref t1, tref t2);
 
-// Checks if the base types of t1 and t2 agree
-// and returns the type with more information.
-// If the types do not allow this, returns nullptr
+/**
+ * @brief Unify type trees @p t1 and @p t2.
+ * @return The more informative type if compatible, or `nullptr` on conflict.
+ */
 template <NodeType node>
 tref unify(tref t1, tref t2);
 
-// Checks if the base types of tid1 and tid2 agree
-// and returns the type with more information.
-// If the types do not allow this, returns nullptr
+/**
+ * @brief Unify type ids @p tid1 and @p tid2.
+ * @return The more informative type id if compatible, or `std::nullopt` on conflict.
+ */
 template <NodeType node>
 std::optional<size_t> unify(size_t tid1, size_t tid2);
 
-// Checks if the types of a vector of trefs are compatible with the supplied
-// default type. If so, returns the type and nullptr otherwise.
+/**
+ * @brief Unify the types of all nodes in @p ns against @p default_type.
+ * @return Compatible type, or `nullptr` on conflict.
+ */
 template <NodeType node>
 tref unify(const trefs& ns, tref default_type);
 
+/** @brief Unify nodes from @p ns1 and @p ns2 against @p default_type. */
 template <NodeType node>
 tref unify(const trefs& ns1, const trefs& ns2, tref default_type);
 
-// Checks if the types of a vector of trefs are compatible with the supplied
-// default type. If so, returns type id and nat_type_id otherwise.
+/**
+ * @brief Unify type ids in @p nids against @p default_type.
+ * @return Compatible type id, or `std::nullopt` on conflict.
+ */
 template <NodeType node>
 std::optional<size_t> unify(const std::vector<size_t>& nids, size_t default_type);
 
+/** @brief Unify type ids from @p nids1 and @p nids2 against @p default_type. */
 template <NodeType node>
 std::optional<size_t> unify(const std::vector<size_t>& nids1, const std::vector<size_t>& nids2, size_t default_type);
 
+/** @brief Return `true` if @p term has a non-zero BA type assigned. */
 template <NodeType node>
 bool has_ba_type (tref term);
 
-// Returns true if the node has ba_type == 0 and no direct typed structural child
+/** @brief Return `true` if @p t has `ba_type == 0` and no directly typed structural child. */
 template <NodeType node>
 bool is_untyped_tref(tref t);
 
-// Returns ba_type if non-zero, else reads type id from direct typed structural child
+/** @brief Return the effective BA type id: from `ba_type` if non-zero, else from the typed child. */
 template <NodeType node>
 size_t get_effective_ba_type(tref t);
 
+/** @brief Search @p term and its children for any assigned BA type id; return 0 if not found. */
 template <NodeType node>
 size_t find_ba_type (tref term);
 
+/** @brief Search @p term and its children for any BA type tree; return `nullptr` if not found. */
 template <NodeType node>
 tref find_ba_type_tree (tref term);
 
-// print the type name to the stream
+/** @brief Print the type name for @p ba_type_id to @p os. */
 template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);
 
-// Check if the op is buildable
+/** @brief Return `true` if the binary operator @p op can be applied to nodes @p n and @p m. */
 template <NodeType node>
 bool is_buildable(size_t op, tref n, tref m);
 

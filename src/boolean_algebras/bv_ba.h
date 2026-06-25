@@ -100,10 +100,18 @@ template <NodeType node>
 std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
 	subtree_map<node, bv> vars, subtree_map<node, bv>& free_vars);
 
+/**
+ * @brief Evaluate a `tref` BV formula node; wrapper overload of the traverser version.
+ * @param form Root formula node.
+ * @param vars Bound variable assignments.
+ * @param free_vars Free variable assignments (updated in place).
+ * @return Evaluated BV term, or `nullopt` on failure.
+ */
 template <NodeType node>
 std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv> vars,
 	subtree_map<node, bv>& free_vars);
 
+/** @brief Convert a cvc5 term tree @p n back into a Tau tree reference. */
 template <NodeType node>
 tref cvc5_tree_to_tau_tree (bv n);
 
@@ -195,6 +203,7 @@ std::optional<solution<node>> solve_bv(tref form);
 template <NodeType node>
 std::optional<solution<node>> solve_bv(const trefs& form);
 
+/** @brief Extract a BV constant from a parse-tree node @p parse_tree with type @p type_tree. */
 template<typename...BAs>
 requires BAsPack<BAs...>
 std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);
@@ -221,6 +230,7 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
 
+/** @brief Normalise a BV term via cvc5's simplifier. */
 inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);
@@ -228,6 +238,7 @@ inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
 	return solver.simplify(fm);
 }
 
+/** @brief Return `true` if @p fm is the all-zeros bitvector constant. */
 inline bool is_bv_syntactic_zero(const cvc5::Term& fm) {
 	// Check if represented bitvector is just bottom element in Boolean algebra
 	if (!fm.isBitVectorValue()) return false;
@@ -235,6 +246,7 @@ inline bool is_bv_syntactic_zero(const cvc5::Term& fm) {
 		std::string(fm.getSort().getBitVectorSize(), '0');
 }
 
+/** @brief Return `true` if @p fm is the all-ones bitvector constant. */
 inline bool is_bv_syntactic_one(const cvc5::Term& fm) {
 	// Check if represented bitvector is just top element in Boolean algebra
 	if (!fm.isBitVectorValue()) return false;
@@ -243,45 +255,52 @@ inline bool is_bv_syntactic_one(const cvc5::Term& fm) {
 }
 
 // Bool comparisons
+/** @brief Return `true` if BV term @p lhs equals @p rhs (one/zero). */
 inline bool operator==(const cvc5::Term& lhs, const bool& rhs);
+/** @brief Return `true` if @p lhs (bool) equals BV term @p rhs. */
 inline bool operator==(const bool& lhs, const cvc5::Term& rhs);
+/** @brief Return `true` if BV term @p lhs is not equal to @p rhs. */
 inline bool operator!=(const cvc5::Term& lhs, const bool& rhs);
+/** @brief Return `true` if @p lhs (bool) is not equal to BV term @p rhs. */
 inline bool operator!=(const bool& lhs, const cvc5::Term& rhs);
 
 // Bitvector specific symbol simplification
-template<NodeType node>
-tref term_add(tref symbol);
-template<NodeType node>
-tref term_sub(tref symbol);
-template<NodeType node>
-tref term_mul(tref symbol);
-template<NodeType node>
-tref term_div(tref symbol);
-template<NodeType node>
-tref term_mod(tref symbol);
-template<NodeType node>
-tref term_shr(tref symbol);
-template<NodeType node>
-tref term_shl(tref symbol);
-template<NodeType node>
-tref term_nor(tref symbol);
-template<NodeType node>
-tref term_xnor(tref symbol);
-template<NodeType node>
-tref term_nand(tref symbol);
+/** @brief Simplify an `add` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_add(tref symbol);
+/** @brief Simplify a `sub` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_sub(tref symbol);
+/** @brief Simplify a `mul` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_mul(tref symbol);
+/** @brief Simplify a `div` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_div(tref symbol);
+/** @brief Simplify a `mod` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_mod(tref symbol);
+/** @brief Simplify a `shr` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_shr(tref symbol);
+/** @brief Simplify a `shl` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_shl(tref symbol);
+/** @brief Simplify a `nor` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_nor(tref symbol);
+/** @brief Simplify an `xnor` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_xnor(tref symbol);
+/** @brief Simplify a `nand` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_nand(tref symbol);
 
-template<NodeType node>
-tref simplify_bv_symbol(tref symbol);
+/** @brief Apply all BV symbol-level simplifications to @p symbol. */
+template<NodeType node> tref simplify_bv_symbol(tref symbol);
 
-template<NodeType node>
-tref simplify_bv_term(tref term);
+/** @brief Apply all BV term-level simplifications to @p term. */
+template<NodeType node> tref simplify_bv_term(tref term);
 
+/** @brief Canonise an associative/commutative symbol node, excluding @p excluded nodes. */
 template <typename ...BAs> requires BAsPack<BAs...>
 tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded);
 
+/** @brief Return `true` if @p symbol is an associative and commutative BV operator. */
 template <typename ...BAs> requires BAsPack<BAs...>
 bool is_associative_and_commutative(size_t symbol);
 
+/** @brief Return the inverse symbol id (e.g. nand → and) for @p symbol. */
 template <typename ...BAs> requires BAsPack<BAs...>
 size_t get_inv_sym(size_t symbol);
 

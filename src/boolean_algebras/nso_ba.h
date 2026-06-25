@@ -1,3 +1,12 @@
+/**
+ * @file nso_ba.h
+ * @brief Boolean algebra operators for `tree<node<BAs...>>` (the NSO / Tau BA).
+ *
+ * Provides `operator&`, `|`, `~`, `^`, `+`, comparison operators, and
+ * `is_zero`/`is_one` predicates so that `tree<node<BAs...>>` satisfies the
+ * BA interface expected by the solver infrastructure.
+ */
+
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__NSO_BA_H__
