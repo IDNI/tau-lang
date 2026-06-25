@@ -286,10 +286,6 @@ template<NodeType node> tref build_ref_offsets(const trefs& offsets);
 template<NodeType node> tref build_ref_offsets(const std::string& offset);
 /** @brief Build a ref-offsets node from @p offsets string vector. */
 template<NodeType node> tref build_ref_offsets(const std::vector<std::string>& offsets);
-/** @brief Build a shift-offset node for @p var at @p shift. */
-template<NodeType node> tref build_ref_shift_offset(tref var, size_t shift);
-/** @brief Build a shift-offset node for @p var_name at @p shift with type @p type_id. */
-template<NodeType node> tref build_ref_shift_offset(const std::string& var_name, size_t type_id, size_t shift);
 /** @brief Build a `ref_args` node from @p args. */
 template<NodeType node> tref build_ref_args(const trefs& args);
 /** @brief Build a `ref_args` node from @p arg_names with type @p type_id. */
