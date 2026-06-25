@@ -4,9 +4,10 @@
  * @file normal_forms_transformations.h
  * @brief Shared formula-transformation helpers used by normal-form and interpreter code.
  *
- * This file declares reusable rewrites and simplification helpers that support
+ * This file declares the public rewrite and simplification helpers that support
  * normal-form conversion, quantifier elimination, and interpreter-specific
- * temporal formula alignment.
+ * temporal formula alignment. Internal helpers reside in
+ * normal_forms_transformations.tmpl.h.
  */
 
 #ifndef __IDNI__TAU__NORMAL_FORMS_TRANSFORMATIONS_H__
@@ -79,81 +80,6 @@ tref apply_all_xor_def(tref fm);
 template <NodeType node, bool is_wff = true>
 tref push_negation_in(tref fm);
 
-
-/**
- * @brief Shift all relative (non-initial) IO variable offsets in `fm` by `shift`.
- *
- * Increases the lookback of every `io_var` in `io_vars` that is not an initial
- * condition by adding `shift` to its time offset. Does nothing if `shift <= 0`.
- * @tparam node Tree node type.
- * @param fm Formula whose IO variables are to be shifted.
- * @param io_vars Collection of IO variable nodes to consider.
- * @param shift Number of time steps to add to the lookback.
- * @return Formula with adjusted IO variable offsets.
- */
-template <NodeType node>
-tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift);
-
-
-/**
- * @brief Shift initial-condition IO variables in `fm` by `shift`.
- *
- * Adds `shift` to the absolute time point of every `io_var` that *is* an
- * initial condition. Returns `F` if any resulting time point would be negative.
- * Does nothing if `shift <= 0`.
- * @tparam node Tree node type.
- * @param fm Formula whose initial IO variables are to be shifted.
- * @param io_vars Collection of IO variable nodes to consider.
- * @param shift Time offset to add.
- * @return Formula with adjusted initial IO variable time points, or `F`.
- */
-template <NodeType node>
-tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift);
-
-
-/**
- * @brief Conjoin two `always`-quantified formulas, aligning their lookbacks.
- *
- * Strips the `always` wrapper from `fm1_aw` and `fm2_aw`, determines their
- * maximum shift, and adjusts the formula with the shorter lookback by adding
- * the difference, then returns their conjunction.
- * @tparam node Tree node type.
- * @param fm1_aw First (possibly `always`-wrapped) formula.
- * @param fm2_aw Second (possibly `always`-wrapped) formula.
- * @return Conjunction of the two formulas with aligned lookbacks.
- */
-template <NodeType node>
-tref always_conjunction(tref fm1_aw, tref fm2_aw);
-
-
-/**
- * @brief Collect all positive equalities in `n` of the given BA type and merge them.
- *
- * Finds all `bf_eq` atoms whose BA type matches `type_id`, normalizes each
- * to `f = 0` form, and combines their left-hand sides into a single disjunction
- * `f1 | f2 | ...`. Returns the resulting BF, or `nullptr` if no match is found.
- * @tparam node Tree node type.
- * @param n Formula to search for equalities.
- * @param type_id BA type identifier selecting which equalities to merge.
- * @return Disjunction of all matching left-hand sides, or `nullptr`.
- */
-template <NodeType node>
-tref squeeze_positives(tref n, size_t type_id);
-
-
-/**
- * @brief Replace all free variables in `fm` by the constant `val`.
- *
- * Collects the free variables of `fm` and substitutes each with `val`.
- * @tparam node Tree node type.
- * @param fm Formula whose free variables are to be replaced.
- * @param val The constant value to substitute.
- * @return `fm` with all free variables replaced by `val`.
- */
-template <NodeType node>
-tref replace_free_vars_by(tref fm, tref val);
-
-
 /**
  * @brief Apply full syntactic simplifications to a formula.
  *
@@ -167,8 +93,6 @@ tref replace_free_vars_by(tref fm, tref val);
 template <NodeType node>
 tref syntactic_formula_simplification(tref formula);
 
-
-
 /**
  * @brief Process a single existentially quantified clause in the anti-prenex algorithm.
  *
@@ -181,7 +105,6 @@ tref syntactic_formula_simplification(tref formula);
  */
 template <NodeType node>
 tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
-
 
 /**
  * @brief Resolve/eliminate quantifiers in a formula.

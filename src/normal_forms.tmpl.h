@@ -15,6 +15,9 @@ namespace idni::tau_lang {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
 
+// Forward declaration for impl-only helper used before normal_forms_transformations.tmpl.h is included.
+//template <NodeType node> tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
+
 template <NodeType node>
 tref not_equal_to_unequal(tref fm) {
 	using tau = tree<node>;
