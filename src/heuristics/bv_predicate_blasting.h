@@ -1,3 +1,13 @@
+/**
+ * @file bv_predicate_blasting.h
+ * @brief Bitvector predicate blasting: rewrite BV ops to quantified Boolean predicates.
+ *
+ * Provides `bv_predicate_blasting` (the main entry point) and helpers that
+ * decompose BV relational/arithmetic operations into quantifier-free Boolean
+ * formulas over per-bit variables.  Unsupported operations cause a `nullptr`
+ * return so the caller can fall back to the cvc5 path.
+ */
+
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__BV_PREDICATE_BLASTING_H__

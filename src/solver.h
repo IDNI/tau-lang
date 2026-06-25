@@ -178,9 +178,30 @@ template <NodeType node>
 std::optional<solution<node>> solve(const equations<node>& eqs,
 					const solver_options& options);
 
+/**
+ * @brief Check that assigning @p term to @p var is consistent with existing assignments.
+ *
+ * Returns `false` (and does not modify @p var_assignments) if the assignment
+ * contradicts an existing entry.
+ * @tparam node Tree node type.
+ * @param var_assignments Current variable-to-term map (modified on success).
+ * @param var Variable node to assign.
+ * @param term Term to assign to @p var.
+ * @return `true` if the assignment is consistent and was recorded.
+ */
 template <NodeType node>
 bool check_var_assignment(auto& var_assignments, tref var, tref term);
 
+/**
+ * @brief Normalize @p term and record the assignment @p var → @p term.
+ *
+ * Normalizes the term before inserting it in @p var_assignments so that
+ * later consistency checks compare canonical forms.
+ * @tparam node Tree node type.
+ * @param var_assignments Map to update.
+ * @param var Variable node.
+ * @param term Term to normalize and assign.
+ */
 template <NodeType node>
 void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments,
 tref var, tref term);

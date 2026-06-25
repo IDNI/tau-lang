@@ -13,13 +13,30 @@
 
 namespace idni::tau_lang {
 
-// apply one tau rule to the given expression
-// IDEA maybe this could be operator|
+/**
+ * @brief Apply a single rewriting rule to @p n.
+ *
+ * Tries to match the rule `r` at every position of `n` and returns the
+ * rewritten tree (unchanged if the rule does not match).
+ * @tparam node Tree node type.
+ * @param r Rewriting rule to apply.
+ * @param n Tree node to rewrite.
+ * @return Rewritten node, or @p n if the rule does not apply.
+ * @idea This could be implemented as `operator|`.
+ */
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rule& r, const tref& n);
 
-// apply the given rules to the given expression
-// IDEA maybe this could be operator|
+/**
+ * @brief Apply a sequence of rewriting rules to @p n, one after another.
+ *
+ * Applies each rule in @p rs to the result of the previous application.
+ * @tparam node Tree node type.
+ * @param rs Ordered set of rules to apply.
+ * @param n Starting tree node.
+ * @return Fully rewritten node.
+ * @idea This could be implemented as `operator|`.
+ */
 template <NodeType node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n);
 

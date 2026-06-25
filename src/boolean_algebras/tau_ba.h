@@ -1,3 +1,13 @@
+/**
+ * @file tau_ba.h
+ * @brief `tau_ba<BAs...>` — a Boolean algebra whose elements are Tau specs.
+ *
+ * Embeds Tau recurrence-relation formulas as first-class BA elements, enabling
+ * the Tau BA to be used as a component type inside other BAs (e.g. `variant_ba`).
+ * Implements the full BA interface (AND, OR, XOR, NOT, comparisons) plus the
+ * `normalize`/`splitter` interface required by the solver.
+ */
+
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__
@@ -247,12 +257,17 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_tau_closed(const tau_ba<BAs...>& fm);
 
+/**
+ * @brief Parse @p src as a Tau spec constant; return `nullopt` on failure.
+ * @tparam BAs BA pack.
+ * @param src Source string.
+ */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<tau_ba<BAs...>, BAs...>::constant_with_type>
 	parse_tau(const std::string& src);
 
-// << for printing tau_ba's nso rr
+/** @brief Print the NSO recurrence-relation of a `tau_ba` to @p os. */
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs);

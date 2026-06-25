@@ -1,6 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+/**
+ * @file base_ba_dispatcher.h
+ * @brief Generic dispatcher struct for base Boolean algebra (BA) type packs.
+ *
+ * `base_ba_dispatcher<BAs...>` forwards `nso_factory` operations (is_one, splitter,
+ * normalize, etc.) to the appropriate BA implementation based on the active
+ * `std::variant<BAs...>` alternative.
+ */
 
 #ifndef __BASE_BA_DISPATCHER_H__
 #define __BASE_BA_DISPATCHER_H__
