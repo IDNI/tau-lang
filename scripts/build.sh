@@ -81,6 +81,13 @@ for arg in "${CMAKE_ARGS[@]}"; do
 		break
 	fi
 done
+if [ $TAU_BUILD_JOBS -eq 0 ] && [ -f "CMakeLocalLists.txt" ]; then
+	LOCAL_JOBS=$(sed -n 's/set(TAU_BUILD_JOBS[[:space:]]\+\([0-9]\+\).*/\1/p' CMakeLocalLists.txt | head -1)
+	if [ -n "$LOCAL_JOBS" ] && [ "$LOCAL_JOBS" -ne 0 ]; then
+		TAU_BUILD_JOBS="$LOCAL_JOBS"
+		echo "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (from CMakeLocalLists.txt)"
+	fi
+fi
 if [ $TAU_BUILD_JOBS -eq 0 ]; then
 	TAU_BUILD_JOBS=$(cmake -P cmake/processor-counter.cmake 2>&1 || echo "1")
 	TAU_BUILD_JOBS=$((TAU_BUILD_JOBS / 2))
