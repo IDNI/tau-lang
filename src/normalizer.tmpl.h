@@ -36,12 +36,12 @@ tref normalize(tref form) {
 	trefs temps = tau::get(form).select_top(st_aw);
 	// Case that the formula has no temporal quantifier
 	if (temps.empty()) {
-		// Resolve closed quantified bv subformulas before anti_prenex:
+		// Resolve closed quantified bv subformulas before anti_prenex_block:
 		// pushing the quantifiers of a blasted bitvector formula through
 		// the Boolean normalization is exponential, while the solver
 		// decides the closed formula directly.
 		form = resolve_quantifiers<node>(form);
-		form = anti_prenex<node>(form);
+		form = anti_prenex_block<node>(form);
 		form = resolve_quantifiers<node>(form);
 	} else {
 		subtree_map<node, tref> changes;
@@ -50,7 +50,7 @@ tref normalize(tref form) {
 			// Remove temporal quantifier
 			tref f = tau::trim2(temp);
 			f = resolve_quantifiers<node>(f);
-			f = anti_prenex<node>(f);
+			f = anti_prenex_block<node>(f);
 			f = resolve_quantifiers<node>(f);
 			// Add quantifier again and save as change
 			if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
@@ -82,10 +82,15 @@ tref normalize_non_temp(tref fm) {
 		// Resolve closed quantified bv subformulas first (see normalize),
 		// then push all quantifiers in, eliminate them and normalize result
 		| tt::f(resolve_quantifiers<node>)
-		| tt::f(anti_prenex<node>)
+		| tt::f(anti_prenex_block<node>)
 		| tt::f(resolve_quantifiers<node>)
 		| tt::f(term_boole_normal_form<node>)
 		| tt::ref;
+	// NOTE: Do NOT add fold_trivial_quantifiers or reget here.
+	// tau::reget strips the explicit bitwidth subtype from BV-typed nodes
+	// (io_vars and BV constants) causing get_bv_size assertions downstream.
+	// Residual trivial quantifiers are folded by normalize_with_temp_simp
+	// (which already calls fold_trivial_quantifiers after normalize).
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
@@ -394,12 +399,28 @@ tref fold_trivial_quantifiers(tref fm) {
 	using tau = tree<node>;
 	auto f = [](tref n) -> tref {
 		const auto& t = tau::get(n);
-		if (t.is(tau::wff) && (t.child_is(tau::wff_ex)
-			|| t.child_is(tau::wff_all)))
-		{
-			tref body = t[0].second();
-			if (tau::get(body).equals_T()
-				|| tau::get(body).equals_F()) return body;
+		if (!t.is(tau::wff)) return n;
+		const auto& c = t[0];
+		// ex x T/F → T/F, all x T/F → T/F
+		if (c.is(tau::wff_ex) || c.is(tau::wff_all)) {
+			tref body = c.second();
+			if (tau::get(body).equals_T() || tau::get(body).equals_F())
+				return body;
+		}
+		// Boolean identities: T/F with && and ||
+		if (c.is(tau::wff_and)) {
+			tref l = c.first(), r = c.second();
+			if (tau::get(l).equals_T()) return r;
+			if (tau::get(r).equals_T()) return l;
+			if (tau::get(l).equals_F() || tau::get(r).equals_F())
+				return tau::_F();
+		}
+		if (c.is(tau::wff_or)) {
+			tref l = c.first(), r = c.second();
+			if (tau::get(l).equals_T() || tau::get(r).equals_T())
+				return tau::_T();
+			if (tau::get(l).equals_F()) return r;
+			if (tau::get(r).equals_F()) return l;
 		}
 		return n;
 	};

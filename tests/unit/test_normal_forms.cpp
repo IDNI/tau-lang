@@ -357,6 +357,54 @@ TEST_SUITE("AntiPrenexBlock") {
 	}
 }
 
+TEST_SUITE("AntiPrenexBlock0Arg") {
+	// Tests for the zero-arg anti_prenex_block (the full pipeline:
+	// NNF+simplify → subs_elim → normalize_atomic → process_block post-order).
+
+	static tref run_apb0(const char* sample) {
+		return anti_prenex_block<node_t>(
+			get_nso_rr(sample).value().main->get());
+	}
+
+	TEST_CASE("quantifier-free formula is returned unchanged") {
+		// Short-circuit: no quantifiers → original tref returned as-is.
+		tref fm = get_nso_rr("xy = 0 && wz = 0.").value().main->get();
+		CHECK( anti_prenex_block<node_t>(fm) == fm );
+	}
+
+	TEST_CASE("subs_elim: ex x (xy=0 && x=w) → wy=0") {
+		// Step 2 (subs_elim): ex x (x=w && xy=0) → (xy=0)[x:=w] = wy=0
+		tref res = run_apb0("ex x (xy = 0 && x = w).");
+		CHECK( matches_to_str_to_any_of(res, {"wy = 0", "yw = 0"}) );
+	}
+
+	TEST_CASE("subs_elim: ex x (x=w) → T") {
+		// ex x (x=w): body after subs_elim is empty (T), since the only
+		// conjunct was the substitution witness x=w itself.
+		tref res = run_apb0("ex x (x = w).");
+		CHECK( tau::get(res)[0].is(tau::wff_t) );
+	}
+
+	TEST_CASE("all-block dualization: all x (x=0 || x!=0) → T") {
+		// ∀x. (x=0 ∨ x≠0): law of excluded middle in BA → T.
+		tref res = run_apb0("all x (x = 0 || x != 0).");
+		CHECK( tau::get(res)[0].is(tau::wff_t) );
+	}
+
+	TEST_CASE("all-block dualization: all x (xy!=0) → F") {
+		// ∀x. xy≠0: pick x=0 → 0·y=0=0, contradiction → F.
+		tref res = run_apb0("all x xy != 0.");
+		CHECK( tau::get(res)[0].is(tau::wff_f) );
+	}
+
+	TEST_CASE("ex block conjunction decomposition") {
+		// ∃x. (xy=0 ∧ wz=0): wz=0 is independent of x → factor out;
+		// ∃x. xy=0 → T (pick x=0).  Result: T ∧ wz=0 = wz=0.
+		tref res = run_apb0("ex x (xy = 0 && wz = 0).");
+		CHECK( matches_to_str_to_any_of(res, {"wz = 0", "zw = 0"}) );
+	}
+}
+
 TEST_SUITE("QuantBlockPush") {
 	TEST_CASE("1") {
 		const char* sample = "ex x ex y xy = 0 && yx = 0 && !(x|y = 0) && !(x = y).";
@@ -396,18 +444,129 @@ TEST_SUITE("QuantBlockPush") {
 
 
 
-// // TODO (MEDIUM) add tests for reduce_bf/wff
-// // TODO (MEDIUM) add tests for to_bdd_bf
-// // TODO (MEDIUM) add tests for minimize
+TEST_SUITE("ToNNF") {
+	TEST_CASE("double negation bf") {
+		// !!(a = 0) → a = 0 (push double negation in)
+		const char* sample = "!!(a = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_neg>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
+	}
+	TEST_CASE("de Morgan wff: !(a=0 && b=0) → a!=0 || b!=0") {
+		const char* sample = "!(a = 0 && b = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = to_nnf<node_t>(fm);
+		// No wff_and at top, the result is a disjunction of negated atoms
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_and>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) );
+	}
+}
 
+TEST_SUITE("ToDNF") {
+	TEST_CASE("bf: (a&b)|(a&c) is already DNF") {
+		const char* sample = "ab|ac = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		// fm is the wff node; [0] is the bf_eq child; first() is the bf
+		tref bf = tau::get(fm)[0].first();
+		tref res = to_dnf<node_t, false>(bf);
+		// Result is an OR of AND terms
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_or>) );
+	}
+	TEST_CASE("wff: x=0 && (y=0 || z=0) distributed to DNF") {
+		// (x=0 && y=0) || (x=0 && z=0)
+		const char* sample = "x = 0 && (y = 0 || z = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = to_dnf<node_t, true>(fm);
+		// DNF result must be an OR
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) );
+		// DNF result must contain x=0
+		auto has_x_eq = tau::get(res).find_top(is<node_t, tau::bf_eq>);
+		CHECK( has_x_eq != nullptr );
+	}
+}
 
-// // TODO (MEDIUM) add tests for dnf_bf
-// // TODO (MEDIUM) add tests for dnf_wff
-// // TODO (MEDIUM) add tests for cnf_bf
-// // TODO (MEDIUM) add tests for cnf_wff
-// // TODO (MEDIUM) add tests for nnf_bf
-// // TODO (MEDIUM) add tests for nnf_bf
-// // TODO (MEDIUM) add tests for sno_wwf
-// // TODO (MEDIUM) add tests for sno_wff
-// // TODO (MEDIUM) add tests for mnn_bf
-// // TODO (MEDIUM) add tests for mnn_wff
+TEST_SUITE("ToCNF") {
+	TEST_CASE("bf: (a|b)&(a|c) is already CNF") {
+		const char* sample = "(a|b)&(a|c) = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref bf = tau::get(fm)[0].first();
+		tref res = to_cnf<node_t, false>(bf);
+		// Result is an AND of OR terms
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_and>) );
+	}
+	TEST_CASE("wff: (x=0||y=0) && (z=0||w=0) is already CNF") {
+		const char* sample = "(x = 0 || y = 0) && (z = 0 || w = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = to_cnf<node_t, true>(fm);
+		// Top-level should be an AND
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_and>) );
+	}
+}
+
+TEST_SUITE("ReduceWff") {
+	TEST_CASE("contradiction x=0 && x!=0 → F") {
+		const char* sample = "x = 0 && x != 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( tau::get(res).equals_F() );
+	}
+	TEST_CASE("tautology x=0 || x!=0 → T") {
+		const char* sample = "x = 0 || x != 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( tau::get(res).equals_T() );
+	}
+}
+
+TEST_SUITE("BfReducedDNF") {
+	TEST_CASE("ab|ab' reduces to a") {
+		// ab | ab' = a(b|b') = a·1 = a
+		const char* sample = "ab|ab' = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref bf = tau::get(fm)[0].first();
+		tref res = bf_reduced_dnf<node_t>(bf);
+		CHECK( tau::get(res).to_str() == "a" );
+	}
+	TEST_CASE("ab|a'b reduces to b") {
+		// ab | a'b = (a|a')b = 1·b = b
+		const char* sample = "ab|a'b = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref bf = tau::get(fm)[0].first();
+		tref res = bf_reduced_dnf<node_t>(bf);
+		CHECK( tau::get(res).to_str() == "b" );
+	}
+	TEST_CASE("ab|ab'|a'b|a'b' reduces to 1") {
+		// covers all 4 minterms → 1
+		const char* sample = "ab|ab'|a'b|a'b' = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref bf = tau::get(fm)[0].first();
+		tref res = bf_reduced_dnf<node_t>(bf);
+		CHECK( tau::get(res).equals_1() );
+	}
+}
+
+TEST_SUITE("SyntacticFormulaSimplification") {
+	TEST_CASE("path contradiction x=0 && x!=0 → F") {
+		const char* sample = "x = 0 && x != 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = syntactic_formula_simplification<node_t>(fm);
+		CHECK( tau::get(res).equals_F() );
+	}
+	TEST_CASE("equality propagation x=0 && xy=0 → x=0") {
+		// x=0 implies xy=0, so the conjunct xy=0 is redundant
+		const char* sample = "x = 0 && xy = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = syntactic_formula_simplification<node_t>(fm);
+		CHECK( matches_to_str_to_any_of(res, {
+			"x = 0",
+			"yx = 0",
+		}) );
+	}
+	TEST_CASE("tautological path x=0 || x!=0 → T") {
+		const char* sample = "x = 0 || x != 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = syntactic_formula_simplification<node_t>(fm);
+		CHECK( tau::get(res).equals_T() );
+	}
+}

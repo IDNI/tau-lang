@@ -47,6 +47,21 @@ template <NodeType node>
 tref normalize(tref form);
 
 /**
+ * @brief Fold trivial quantifiers and Boolean identities in a WFF.
+ *
+ * Simplifies:
+ *   - `ex x T → T`, `ex x F → F`, `all x T → T`, `all x F → F`
+ *   - `T && A → A`, `A && T → A`, `F && A → F`, `A && F → F`
+ *   - `T || A → T`, `A || T → T`, `F || A → A`, `A || F → A`
+ *
+ * @tparam node Tree node type.
+ * @param fm Formula to simplify.
+ * @return Simplified formula.
+ */
+template <NodeType node>
+tref fold_trivial_quantifiers(tref fm);
+
+/**
  * @brief Normalize a non-temporal formula.
  *
  * Assumes the formula contains no `always`/`sometimes` quantifiers. Applies
@@ -55,6 +70,7 @@ tref normalize(tref form);
  *   2. `anti_prenex`
  *   3. `resolve_quantifiers`
  *   4. `term_boole_normal_form`
+ *   5. `fold_trivial_quantifiers`
  *
  * @tparam node Tree node type.
  * @param fm Non-temporal formula to normalize.

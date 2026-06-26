@@ -3752,6 +3752,15 @@ template<NodeType node>
 tref anti_prenex_block(tref formula) {
 	using tau = tree<node>;
 
+	// Short-circuit: quantifier-free formulas need no processing here.
+	// to_nnf and syntactic_formula_simplification can alter tau_ba
+	// sub-formulas that the caller expects to be left intact.
+	// Use find_top_until to avoid descending into tau_ba sub-trees, which
+	// may contain wff_all/wff_ex nodes over I/O variables internally.
+	if (!tau::get(formula).find_top_until(is_quantifier<node>,
+		[](tref n) { return !visit_wff<node>(n); }))
+		return formula;
+
 	// Step 1: NNF + syntactic simplification
 	formula = to_nnf<node>(formula);
 	formula = syntactic_formula_simplification<node>(formula);
@@ -3784,6 +3793,19 @@ tref anti_prenex_block(tref formula) {
 	auto process_block = [](tref n) -> tref {
 		if (!is_child_quantifier<node>(n)) return n;
 
+		// BV-typed quantifier blocks: fall back to anti_prenex which handles
+		// them safely. anti_prenex already skips squeeze_absorb for BV scopes
+		// (no BDD operations that would strip inference-assigned types), and
+		// treat_ex_quantified_clause uses CVC5 to resolve closed BV quantifiers
+		// or eliminate trivially vacuous ones (∃x P where x∉fv(P)).
+		{
+			auto is_bv_node = [](tref m) {
+				return is_bv_type_family<node>(tau::get(m).get_ba_type());
+			};
+			if (tau::get(n).find_top(is_bv_node))
+				return anti_prenex<node>(n);
+		}
+
 		// Collect the block: consecutive same-type quantifiers at the top
 		trefs block_vars;
 		const bool is_ex = is_child<node>(n, tau::wff_ex);
@@ -3813,10 +3835,23 @@ tref anti_prenex_block(tref formula) {
 
 		tref result;
 		if (is_ex) {
+			// Normalize before processing: a prior !is_ex result may have
+			// introduced bf_neq via to_nnf(¬...), which push_ex_block_into_clause
+			// cannot accept.
+			body = normalize_atomic_formula_operators<node>(body);
 			subtree_unordered_set<node> used_atms;
 			result = anti_prenex_block<node>(
 				body, block_vars, used_atms, qp, ord);
 			result = resolve_quantifiers2<node>(result, ord);
+			// Fallback for BV/ordered atoms that resolve_quantifiers2
+			// cannot handle (e.g. bf_lt without explicit bitwidth).
+			if (tau::get(result).find_top(is_quantifier<node>))
+				result = resolve_quantifiers<node>(result);
+			// Final fallback: push_ex_block_into_clause marks wff_ref atoms
+			// (stream I/O references) as unremovable and re-wraps the quantifier.
+			// anti_prenex handles them via squeeze_absorb and Schroeder BDD elim.
+			if (tau::get(result).find_top(is_quantifier<node>))
+				result = anti_prenex<node>(result);
 		} else {
 			// ∀-block: dualize to ∃-block on negated body,
 			// process, then negate the result back.
@@ -3828,7 +3863,17 @@ tref anti_prenex_block(tref formula) {
 			tref pushed = anti_prenex_block<node>(
 				neg_body, block_vars, used_atms, qp, ord);
 			pushed = resolve_quantifiers2<node>(pushed, ord);
+			// Fallback for BV/ordered atoms (same as is_ex branch above).
+			if (tau::get(pushed).find_top(is_quantifier<node>))
+				pushed = resolve_quantifiers<node>(pushed);
 			result = to_nnf<node>(tau::build_wff_neg(pushed));
+			// to_nnf may re-introduce bf_neq (¬(A=B) → A≠B); normalize
+			// now so the next process_block call receives clean input.
+			result = normalize_atomic_formula_operators<node>(result);
+			// Final fallback: same as is_ex branch — wff_ref atoms survived
+			// the full pipeline, so let anti_prenex take another pass.
+			if (tau::get(result).find_top(is_quantifier<node>))
+				result = anti_prenex<node>(result);
 		}
 		return result;
 	};
@@ -4093,9 +4138,8 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 			// the quantifier
 			if (is_bv_type_family<node>(tau::get(tau::trim2(n)).get_ba_type())) {
 				if (const trefs& free_vars = get_free_vars<node>(n);
-					free_vars.empty()) {
-					// By assumption quantifier is pushed in all the way
-					// Closed bv formula, simplify to T/F
+					free_vars.empty() && is_bv_solvable_formula<node>(n)) {
+					// Closed bv formula with explicit bitwidth: simplify to T/F
 					if (is_bv_formula_sat<node>(n))
 						return tau::_T();
 					else return tau::_F();
@@ -4118,8 +4162,10 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 				// All quantifiers have been trimmed from tree here
 				const tau& nn = tau::get(n);
 				if (nn.child_is(tau::bf_eq)) {
-					// By construction equal to 0
-					DBG(assert(tau::get(n)[0][1].equals_0()));
+					// Normalize A = B to (A XOR B) = 0 if not already in
+					// canonical form (can occur in tau_ba Boole expansions).
+					if (!tau::get(n)[0][1].equals_0())
+						n = norm_equation<node>(n);
 					// Flip quantifiers due to equality
 					for (auto& [_,q] : quants) {
 						q == bdd::ex ? q = bdd::all : q = bdd::ex;
@@ -4135,8 +4181,9 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 				} else if (nn.child_is(tau::wff_neg) && nn[0][0].child_is(tau::bf_eq)) {
 					// Trim negation
 					n = tau::trim2(n);
-					// By construction equal to 0
-					DBG(assert(tau::get(n)[0][1].equals_0()));
+					// Normalize A = B to (A XOR B) = 0 if needed.
+					if (!tau::get(n)[0][1].equals_0())
+						n = norm_equation<node>(n);
 					// Get the term of the equality
 					n = tau::trim2(n);
 					size_t term_type = tau::get(n).get_ba_type();
@@ -4146,9 +4193,10 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 							to_tau_term(term_type);
 					return tau::build_wff_neg(tau::build_bf_eq_0(n));
 				} else {
-					// Formula under the block is not a single atomic;
-					// return original with quantifier prefix intact.
-					DBG(assert(false));
+					// Formula under the block is not a single atomic
+					// (e.g. a conjunction of bf_lt / bf_gt atoms);
+					// return original with quantifier prefix intact so
+					// the caller's resolve_quantifiers fallback can handle it.
 					return original;
 				}
 			}
