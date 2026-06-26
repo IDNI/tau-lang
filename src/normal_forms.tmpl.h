@@ -2617,6 +2617,43 @@ void update_assms(auto& assms, auto& joins, trefs& additions) {
 	}
 }
 
+// Merges equations in eqs[0..primary_end) that are "connected" per predicate.
+// primary_end and total_end are updated in-place as entries are removed.
+template<NodeType node>
+void squeeze_connected_eqs(trefs& eqs, size_t& primary_end, size_t& total_end,
+	auto&& connected) {
+	for (size_t i = 0; i + 1 < primary_end; ++i) {
+		const trefs& fv1 = get_free_vars<node>(eqs[i]);
+		if (fv1.empty()) continue;
+		for (size_t j = i + 1; j < primary_end; ++j) {
+			const trefs& fv2 = get_free_vars<node>(eqs[j]);
+			if (fv2.empty()) continue;
+			if (connected(fv1, fv2)) {
+				eqs[i] = squeeze<node>(eqs[i], eqs[j]);
+				eqs.erase(eqs.begin() + j);
+				--j; --primary_end; --total_end;
+			}
+		}
+	}
+}
+
+// Folds eqs[0..eq_end) with build_f, marks the equation subresult to prevent
+// revisiting, then folds in eqs[eq_end..size) and returns the combined node.
+template<NodeType node>
+tref build_and_mark_result(trefs& eqs, size_t eq_end,
+	subtree_unordered_set<node>& mark, auto&& build_f) {
+	using tau = tree<node>;
+	tref n = eqs[0];
+	for (size_t i = 1; i < eq_end; ++i)
+		n = build_f(n, eqs[i]);
+	mark.insert(n);
+	auto cr = tau::get(n).children();
+	mark.insert(cr.begin(), cr.end());
+	for (size_t i = eq_end; i < eqs.size(); ++i)
+		n = build_f(n, eqs[i]);
+	return n;
+}
+
 /**
  * @brief The procedure collects all = 0 and != 0 equations within scope
  * (conjunction and disjunction respectively) and squeezes
@@ -2641,6 +2678,53 @@ tref squeeze_absorb(tref formula) {
 	auto uf_comp = [](tref l, tref r) {
 		return tau::subtree_less(l, r);
 	};
+	// Handles one conjunction/disjunction branch inside f.
+	// uf_type: the eq type to union-find (bf_eq for conjs, bf_neq for disjs).
+	// other_type: the complementary eq type.
+	// pre_stk: assumption stack applied before the update step (dual of update_stk).
+	// update_stk: assumption stack updated from primary equations.
+	// update_is_dual: dual flag for update_stk; pre_stk is applied with !update_is_dual.
+	// build_f: binary combinator (build_wff_and or build_wff_or).
+	// Returns nullopt when no equation of interest is found.
+	auto process_eq_branch = [&](trefs clauses, size_t uf_type, size_t other_type,
+		std::vector<trefs>& pre_stk, std::vector<trefs>& update_stk,
+		bool update_is_dual, auto&& build_f) -> std::optional<tref> {
+		size_t eq_idx = 0;
+		auto uf = union_find_with_sets<decltype(uf_comp), node>(uf_comp);
+		for (tref& cl : clauses) {
+			const tau& cl_t = tau::get(cl);
+			if (cl_t.child_is(other_type) && cl_t[0][1].equals_0()) {
+				std::swap(cl, clauses[eq_idx++]);
+			} else if (cl_t.child_is(uf_type) && cl_t[0][1].equals_0()) {
+				const trefs& fv = get_free_vars<node>(cl);
+				for (tref v : fv) uf.merge(fv[0], v);
+				std::swap(cl, clauses[eq_idx++]);
+			}
+		}
+		if (eq_idx == 0) return std::nullopt;
+		DBG(LOG_TRACE << (update_is_dual ? "Disjuncts" : "Conjuncts") << " with eqs first: ";
+			for (tref el : clauses) LOG_TRACE << tau::get(el) << ", ";)
+		for (size_t i = 0; i < eq_idx; ++i)
+			clauses[i] = apply_assms<node>(clauses[i], pre_stk, !update_is_dual);
+		size_t primary_idx = 0;
+		for (size_t i = 0; i < eq_idx; ++i)
+			if (tau::get(clauses[i]).child_is(uf_type))
+				std::swap(clauses[i], clauses[primary_idx++]);
+		squeeze_connected_eqs<node>(clauses, primary_idx, eq_idx,
+			[&uf](const trefs& fv1, const trefs& fv2) {
+				return uf.connected(fv1[0], fv2[0]);
+			});
+		uf.clear();
+		trefs additions;
+		for (size_t i = 0; i < primary_idx; ++i)
+			clauses[i] = apply_assms<node>(clauses[i], update_stk, uf, additions,
+				update_is_dual);
+		update_assms<node>(update_stk, uf, additions);
+		for (size_t i = primary_idx; i < eq_idx; ++i)
+			clauses[i] = apply_assms<node>(clauses[i], update_stk, update_is_dual);
+		return build_and_mark_result<node>(clauses, eq_idx, mark,
+			std::forward<decltype(build_f)>(build_f));
+	};
 	auto f = [&](tref n, tref parent) {
 		if (!tau::get(n).is(tau::wff)) return n;
 		const tau& cn = tau::get(n)[0];
@@ -2655,158 +2739,19 @@ tref squeeze_absorb(tref formula) {
 				dual_assms.push_back(dual_assms.back());
 			}
 		}
-		// Try getting conjunctions
+		// Try getting conjunctions: = 0 are uf_type (updated), != 0 are other_type.
 		if (trefs conjs = get_cnf_wff_clauses<node>(n); conjs.size() > 1) {
-			// Sort the equations in conjs up front and prepare
-			// union find to compute variable overlaps
-			size_t eq_idx = 0;
-			auto uf = union_find_with_sets<decltype(uf_comp), node>(uf_comp);
-			for (tref& conj : conjs) {
-				const tau& conj_t = tau::get(conj);
-				if (conj_t.child_is(tau::bf_neq)) {
-					// Only treat != 0 equations
-					if (!conj_t[0][1].equals_0()) continue;
-					std::swap(conj, conjs[eq_idx++]);
-				} else if (conj_t.child_is(tau::bf_eq)) {
-					// Only treat = 0 equations
-					if (!conj_t[0][1].equals_0()) continue;
-					// merge variables of = 0 equations
-					const trefs& fv = get_free_vars<node>(conj);
-					for (tref v : fv) uf.merge(fv[0], v);
-					std::swap(conj, conjs[eq_idx++]);
-				}
-			}
-			// Return early if no equation present
-			if (eq_idx == 0) return n;
-#ifdef DEBUG
-			// Print sorted conjuncts
-			LOG_TRACE << "Conjuncts with eqs first: ";
-			for (tref el : conjs) LOG_TRACE << tau::get(el) << ", ";
-#endif
-			// Apply dual assumptions to equations
-			for (size_t i = 0; i < eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i], dual_assms, true);
-			// Squeeze = 0 equations that share a variable
-			// First sort = 0 up front
-			size_t pos_eq_idx = 0;
-			for (size_t i = 0; i < eq_idx; ++i) {
-				if (tau::get(conjs[i]).child_is(tau::bf_eq))
-					std::swap(conjs[i], conjs[pos_eq_idx++]);
-			}
-			for (size_t i = 0; i+1 < pos_eq_idx; ++i) {
-				// Get free variables at i
-				const trefs& fv1 = get_free_vars<node>(conjs[i]);
-				if (fv1.empty()) continue;
-				for (size_t j = i+1; j < pos_eq_idx; ++j) {
-					// Get free variables at i + 1
-					const trefs& fv2 = get_free_vars<node>(conjs[j]);
-					if (fv2.empty()) continue;
-					// Squeeze overlapping terms
-					if (uf.connected(fv1[0], fv2[0])) {
-						conjs[i] = squeeze<node>(conjs[i], conjs[j]);
-						conjs.erase(conjs.begin()+j);
-						--j;
-						--pos_eq_idx;
-						--eq_idx;
-					}
-				}
-			}
-			// Apply assumptions to equations while updating them on = 0 equations
-			uf.clear();
-			trefs additions;
-			for (size_t i = 0; i < pos_eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i], assms, uf, additions);
-			update_assms<node>(assms, uf, additions);
-			// Apply updated assumptions to != 0 equations
-			for (size_t i = pos_eq_idx; i < eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i], assms);
-			// Build result node
-			n = conjs[0];
-			for (size_t i = 1; i < eq_idx; ++i)
-				n = tau::build_wff_and(n, conjs[i]);
-			// Exclude equations from being visited again
-			mark.insert(n);
-			auto cr = tau::get(n).children();
-			mark.insert(cr.begin(), cr.end());
-			for (size_t i = eq_idx; i < conjs.size(); ++i)
-				n = tau::build_wff_and(n, conjs[i]);
+			if (auto r = process_eq_branch(std::move(conjs),
+					tau::bf_eq, tau::bf_neq, dual_assms, assms, false,
+					[](tref l, tref r) { return tau::build_wff_and(l, r); }))
+				return *r;
 			return n;
-		// Try getting disjunctions
+		// Try getting disjunctions: != 0 are uf_type (updated), = 0 are other_type.
 		} else if (trefs disjs = get_dnf_wff_clauses<node>(n); disjs.size() > 1) {
-			// Sort equations in disjs up front and prepare union find
-			// to compute variable overlap
-			size_t eq_idx = 0;
-			auto uf = union_find_with_sets<decltype(uf_comp), node>(uf_comp);
-			for (tref& disj : disjs) {
-				const tau& disj_t = tau::get(disj);
-				if (disj_t.child_is(tau::bf_eq)) {
-					// Only treat = 0 equations
-					if (!disj_t[0][1].equals_0()) continue;
-					std::swap(disj, disjs[eq_idx++]);
-				} else if (disj_t.child_is(tau::bf_neq)) {
-					// Only treat != 0 equations
-					if (!disj_t[0][1].equals_0()) continue;
-					// merge variables of != 0 equations
-					const trefs& fv = get_free_vars<node>(disj);
-					for (tref v : fv) uf.merge(fv[0], v);
-					std::swap(disj, disjs[eq_idx++]);
-				}
-			}
-			// Return early if no equation present
-			if (eq_idx == 0) return n;
-#ifdef DEBUG
-			// Print sorted conjuncts
-			LOG_TRACE << "Disjuncts with eqs first: ";
-			for (tref el : disjs) LOG_TRACE << tau::get(el) << ", ";
-#endif
-			// Apply assumptions to equations
-			for (size_t i = 0; i < eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i], assms);
-			// Dual squeeze != 0 equations that share a variable
-			// First sort != 0 up front
-			size_t neg_eq_idx = 0;
-			for (size_t i = 0; i < eq_idx; ++i) {
-				if (tau::get(disjs[i]).child_is(tau::bf_neq))
-					std::swap(disjs[i], disjs[neg_eq_idx++]);
-			}
-			for (size_t i = 0; i+1 < neg_eq_idx; ++i) {
-				// Get free variables at i
-				const trefs& fv1 = get_free_vars<node>(disjs[i]);
-				if (fv1.empty()) continue;
-				for (size_t j = i+1; j < neg_eq_idx; ++j) {
-					// Get free variables at i + 1
-					const trefs& fv2 = get_free_vars<node>(disjs[j]);
-					if (fv2.empty()) continue;
-					// Squeeze overlapping terms
-					if (uf.connected(fv1[0], fv2[0])) {
-						disjs[i] = squeeze<node>(disjs[i], disjs[j]);
-						disjs.erase(disjs.begin()+j);
-						--j;
-						--neg_eq_idx;
-						--eq_idx;
-					}
-				}
-			}
-			// Apply dual assumptions to equations while updating them on != 0 equations
-			uf.clear();
-			trefs additions;
-			for (size_t i = 0; i < neg_eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i],
-					dual_assms, uf, additions, true);
-			update_assms<node>(dual_assms, uf, additions);
-			// Apply updated assumptions to = 0 equations
-			for (size_t i = neg_eq_idx; i < eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i], dual_assms, true);
-			// Build result node
-			n = disjs[0];
-			for (size_t i = 1; i < eq_idx; ++i)
-				n = tau::build_wff_or(n, disjs[i]);
-			// Exclude equations from being visited again
-			mark.insert(n);
-			auto cr = tau::get(n).children();
-			mark.insert(cr.begin(), cr.end());
-			for (size_t i = eq_idx; i < disjs.size(); ++i)
-				n = tau::build_wff_or(n, disjs[i]);
+			if (auto r = process_eq_branch(std::move(disjs),
+					tau::bf_neq, tau::bf_eq, assms, dual_assms, true,
+					[](tref l, tref r) { return tau::build_wff_or(l, r); }))
+				return *r;
 			return n;
 		} else {
 			// No disjuncts or conjuncts present
@@ -2866,6 +2811,50 @@ tref squeeze_absorb(tref formula, tref var) {
 	trefs assms {tau::_0(find_ba_type<node>(var))};
 	trefs dual_assms {tau::_0(find_ba_type<node>(var))};
 	subtree_unordered_set<node> mark;
+	// Handles one conjunction/disjunction branch inside f.
+	// primary_type: sort this eq type to front within eqs (squeezed, updated).
+	// pre_assm: single assumption applied before the update step (dual of update_assm).
+	// update_assm: single assumption updated from primary equations (modified in place).
+	// update_is_dual: dual flag for update_assm; pre_assm is applied with !update_is_dual.
+	// build_f: binary combinator (build_wff_and or build_wff_or).
+	// Returns nullopt when no equation of interest is found.
+	auto process_eq_branch_var = [&](trefs clauses, size_t primary_type,
+		tref& pre_assm, tref& update_assm, bool update_is_dual,
+		auto&& build_f) -> std::optional<tref> {
+		size_t eq_idx = 0;
+		for (tref& cl : clauses) {
+			const tau& cl_t = tau::get(cl);
+			if ((cl_t.child_is(tau::bf_neq) || cl_t.child_is(tau::bf_eq))
+					&& cl_t[0][1].equals_0())
+				std::swap(cl, clauses[eq_idx++]);
+		}
+		if (eq_idx == 0) return std::nullopt;
+		DBG(LOG_TRACE << (update_is_dual ? "Disjuncts" : "Conjuncts") << " with eqs first: ";
+			for (tref el : clauses) LOG_TRACE << tau::get(el) << ", ";)
+		for (size_t i = 0; i < eq_idx; ++i)
+			clauses[i] = apply_assms<node>(clauses[i], pre_assm, var, !update_is_dual);
+		size_t primary_idx = 0;
+		for (size_t i = 0; i < eq_idx; ++i)
+			if (tau::get(clauses[i]).child_is(primary_type))
+				std::swap(clauses[i], clauses[primary_idx++]);
+		squeeze_connected_eqs<node>(clauses, primary_idx, eq_idx,
+			[&var](const trefs& fv1, const trefs& fv2) {
+				return std::binary_search(fv1.begin(), fv1.end(),
+						var, tau::subtree_less)
+				    && std::binary_search(fv2.begin(), fv2.end(),
+						var, tau::subtree_less);
+			});
+		trefs updates;
+		for (size_t i = 0; i < primary_idx; ++i)
+			clauses[i] = apply_assms<node>(clauses[i], update_assm, var, updates,
+				update_is_dual);
+		for (tref upd : updates)
+			update_assm = tau::build_bf_or(update_assm, tau::trim2(upd));
+		for (size_t i = primary_idx; i < eq_idx; ++i)
+			clauses[i] = apply_assms<node>(clauses[i], update_assm, var, update_is_dual);
+		return build_and_mark_result<node>(clauses, eq_idx, mark,
+			std::forward<decltype(build_f)>(build_f));
+	};
 	auto f = [&](tref n, tref parent) {
 		if (!tau::get(n).is(tau::wff)) return n;
 		const tau& cn = tau::get(n)[0];
@@ -2880,158 +2869,19 @@ tref squeeze_absorb(tref formula, tref var) {
 				dual_assms.push_back(dual_assms.back());
 			}
 		}
-		// Try getting conjunctions
+		// Try getting conjunctions: = 0 are primary (updated), != 0 are secondary.
 		if (trefs conjs = get_cnf_wff_clauses<node>(n); conjs.size() > 1) {
-			// Sort the equations in conjs up front
-			size_t eq_idx = 0;
-			for (tref& conj : conjs) {
-				const tau& conj_t = tau::get(conj);
-				if (conj_t.child_is(tau::bf_neq) ||
-					conj_t.child_is(tau::bf_eq)) {
-					// Only treat (!)= 0 equations
-					if (!conj_t[0][1].equals_0()) continue;
-					std::swap(conj, conjs[eq_idx++]);
-				}
-			}
-			// Return early if no equation present
-			if (eq_idx == 0) return n;
-#ifdef DEBUG
-			// Print sorted conjuncts
-			LOG_TRACE << "Conjuncts with eqs first: ";
-			for (tref el : conjs) LOG_TRACE << tau::get(el) << ", ";
-#endif
-			// Apply dual assumptions to equations
-			for (size_t i = 0; i < eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i],
-					dual_assms.back(), var, true);
-			// First sort = 0 up front
-			size_t pos_eq_idx = 0;
-			for (size_t i = 0; i < eq_idx; ++i) {
-				if (tau::get(conjs[i]).child_is(tau::bf_eq))
-					std::swap(conjs[i], conjs[pos_eq_idx++]);
-			}
-			// Squeeze = 0 equations that contain var
-			for (size_t i = 0; i+1 < pos_eq_idx; ++i) {
-				// Get free variables at i
-				const trefs& fv1 = get_free_vars<node>(conjs[i]);
-				if (fv1.empty()) continue;
-				if (!std::binary_search(fv1.begin(),
-					fv1.end(), var, tau::subtree_less))
-					continue;
-				for (size_t j = i+1; j < pos_eq_idx; ++j) {
-					// Get free variables at i + 1
-					const trefs& fv2 = get_free_vars<node>(conjs[j]);
-					if (fv2.empty()) continue;
-					if (!std::binary_search(fv2.begin(),
-						fv2.end(), var, tau::subtree_less))
-						continue;
-					// Squeeze overlapping terms
-					conjs[i] = squeeze<node>(conjs[i], conjs[j]);
-					conjs.erase(conjs.begin()+j);
-					--j;
-					--pos_eq_idx;
-					--eq_idx;
-				}
-			}
-			// Apply assumptions to equations while updating them on = 0 equations
-			trefs updates;
-			for (size_t i = 0; i < pos_eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i],
-					assms.back(), var, updates);
-			for (tref upd : updates) {
-				assms.back() = tau::build_bf_or(
-					assms.back(), tau::trim2(upd));
-			}
-			// Apply updated assumptions to != 0 equations
-			for (size_t i = pos_eq_idx; i < eq_idx; ++i)
-				conjs[i] = apply_assms<node>(conjs[i],
-					assms.back(), var);
-			// Build result node
-			n = conjs[0];
-			for (size_t i = 1; i < eq_idx; ++i)
-				n = tau::build_wff_and(n, conjs[i]);
-			// Exclude equations from being visited again
-			mark.insert(n);
-			auto cr = tau::get(n).children();
-			mark.insert(cr.begin(), cr.end());
-			for (size_t i = eq_idx; i < conjs.size(); ++i)
-				n = tau::build_wff_and(n, conjs[i]);
+			if (auto r = process_eq_branch_var(std::move(conjs), tau::bf_eq,
+					dual_assms.back(), assms.back(), false,
+					[](tref l, tref r) { return tau::build_wff_and(l, r); }))
+				return *r;
 			return n;
-		// Try getting disjunctions
+		// Try getting disjunctions: != 0 are primary (updated), = 0 are secondary.
 		} else if (trefs disjs = get_dnf_wff_clauses<node>(n); disjs.size() > 1) {
-			// Sort equations in disjs up front
-			size_t eq_idx = 0;
-			for (tref& disj : disjs) {
-				const tau& disj_t = tau::get(disj);
-				if (disj_t.child_is(tau::bf_eq) ||
-					disj_t.child_is(tau::bf_neq)) {
-					if (!disj_t[0][1].equals_0()) continue;
-					std::swap(disj, disjs[eq_idx++]);
-				}
-			}
-			// Return early if no equation present
-			if (eq_idx == 0) return n;
-#ifdef DEBUG
-			// Print sorted conjuncts
-			LOG_TRACE << "Disjuncts with eqs first: ";
-			for (tref el : disjs) LOG_TRACE << tau::get(el) << ", ";
-#endif
-			// Apply assumptions to equations
-			for (size_t i = 0; i < eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i],
-					assms.back(), var);
-			// First sort != 0 up front
-			size_t neg_eq_idx = 0;
-			for (size_t i = 0; i < eq_idx; ++i) {
-				if (tau::get(disjs[i]).child_is(tau::bf_neq))
-					std::swap(disjs[i], disjs[neg_eq_idx++]);
-			}
-			// Dual squeeze != 0 equations that contain var
-			for (size_t i = 0; i+1 < neg_eq_idx; ++i) {
-				// Get free variables at i
-				const trefs& fv1 = get_free_vars<node>(disjs[i]);
-				if (fv1.empty()) continue;
-				if (!std::binary_search(fv1.begin(),
-					fv1.end(), var, tau::subtree_less))
-					continue;
-				for (size_t j = i+1; j < neg_eq_idx; ++j) {
-					// Get free variables at j
-					const trefs& fv2 = get_free_vars<node>(disjs[j]);
-					if (fv2.empty()) continue;
-					if (!std::binary_search(fv2.begin(),
-					fv2.end(), var, tau::subtree_less))
-						continue;
-					// Squeeze overlapping terms
-					disjs[i] = squeeze<node>(disjs[i], disjs[j]);
-					disjs.erase(disjs.begin()+j);
-					--j;
-					--neg_eq_idx;
-					--eq_idx;
-				}
-			}
-			// Apply dual assumptions to equations while updating them on != 0 equations
-			trefs updates;
-			for (size_t i = 0; i < neg_eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i],
-					dual_assms.back(), var, updates, true);
-			for (tref upd : updates) {
-				dual_assms.back() = tau::build_bf_or(
-					dual_assms.back(), tau::trim2(upd));
-			}
-			// Apply updated assumptions to = 0 equations
-			for (size_t i = neg_eq_idx; i < eq_idx; ++i)
-				disjs[i] = apply_assms<node>(disjs[i],
-					dual_assms.back(), var, true);
-			// Build result node
-			n = disjs[0];
-			for (size_t i = 1; i < eq_idx; ++i)
-				n = tau::build_wff_or(n, disjs[i]);
-			// Exclude equations from being visited again
-			mark.insert(n);
-			auto cr = tau::get(n).children();
-			mark.insert(cr.begin(), cr.end());
-			for (size_t i = eq_idx; i < disjs.size(); ++i)
-				n = tau::build_wff_or(n, disjs[i]);
+			if (auto r = process_eq_branch_var(std::move(disjs), tau::bf_neq,
+					assms.back(), dual_assms.back(), true,
+					[](tref l, tref r) { return tau::build_wff_or(l, r); }))
+				return *r;
 			return n;
 		} else {
 			// No disjuncts or conjuncts present
@@ -3633,7 +3483,6 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// Sort the atomic formulas and get minimum
 		tref atm = *std::ranges::min_element(atms,
 			atm_formula_order_for_quant_elim<node>(quant_pattern));
-		// TODO: substitution based elimination
 		// TODO: Take care of unique zero of atm
 
 		// Remove/add available atomic formulas in stack-like fashion
@@ -3665,6 +3514,80 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	for (auto v = block.rbegin(); v != block.rend(); ++v)
 		formula = build_wff_ex<node>(*v, formula, false);
 	return formula;
+}
+
+// Processes one quantifier block rooted at n:
+// - BV-typed blocks fall back to anti_prenex (CVC5 / trivially-vacuous elim).
+// - ∃-blocks: push into body with the 5-arg anti_prenex_block, resolve
+//   remaining quantifiers.  ∀-blocks are dualized: ∀x φ ≡ ¬∃x ¬φ.
+template<NodeType node>
+tref process_quantifier_block(tref n) {
+	using tau = tree<node>;
+	if (!is_child_quantifier<node>(n)) return n;
+
+	// BV-typed quantifier blocks fall back to anti_prenex (CVC5 or
+	// trivially-vacuous elimination).
+	{
+		auto is_bv_node = [](tref m) {
+			return is_bv_type_family<node>(tau::get(m).get_ba_type());
+		};
+		if (tau::get(n).find_top(is_bv_node))
+			return anti_prenex<node>(n);
+	}
+
+	// Collect the maximal same-type block at the top.
+	trefs block_vars;
+	const bool is_ex = is_child<node>(n, tau::wff_ex);
+	tref curr = n;
+	while (is_child_quantifier<node>(curr)) {
+		if (is_child<node>(curr, tau::wff_ex) != is_ex) break;
+		block_vars.push_back(tau::trim2(curr));
+		curr = tau::get(curr)[0].second();
+	}
+	tref body = curr;
+
+	// Build BDD variable order (innermost = lowest index = highest priority).
+	typename term_handle<node>::order ord;
+	for (size_t i = 0; i < block_vars.size(); ++i)
+		ord.emplace(block_vars[block_vars.size() - 1 - i],
+			static_cast<int_t>(i));
+
+	// Build quant_pattern (outermost = highest priority for Boole decomposition).
+	subtree_unordered_map<node, int_t> qp;
+	for (size_t i = 0; i < block_vars.size(); ++i)
+		qp.emplace(block_vars[i],
+			static_cast<int_t>(block_vars.size() - i));
+
+	// Run the core ∃-block elimination pipeline on a pre-normalized body b.
+	// normalize_atomic_formula_operators is called here so that
+	// push_ex_block_into_clause always receives bf_eq atoms (not bf_neq).
+	auto resolve_ex_block = [&](tref b) -> tref {
+		b = normalize_atomic_formula_operators<node>(b);
+		subtree_unordered_set<node> used_atms;
+		tref r = anti_prenex_block<node>(b, block_vars, used_atms, qp, ord);
+		r = resolve_quantifiers2<node>(r, ord);
+		// Fallback for BV/ordered atoms that resolve_quantifiers2 cannot handle.
+		if (tau::get(r).find_top(is_quantifier<node>))
+			r = resolve_quantifiers<node>(r);
+		// Final fallback: wff_ref atoms re-wrapped by push_ex_block_into_clause.
+		if (tau::get(r).find_top(is_quantifier<node>))
+			r = anti_prenex<node>(r);
+		return r;
+	};
+
+	tref result;
+	if (is_ex) {
+		result = resolve_ex_block(body);
+	} else {
+		// ∀-block: dualize to ∃-block on negated body, then negate result.
+		tref pushed = resolve_ex_block(
+			to_nnf<node>(tau::build_wff_neg(body)));
+		result = normalize_atomic_formula_operators<node>(
+			to_nnf<node>(tau::build_wff_neg(pushed)));
+		if (tau::get(result).find_top(is_quantifier<node>))
+			result = anti_prenex<node>(result);
+	}
+	return result;
 }
 
 template<NodeType node>
@@ -3709,100 +3632,15 @@ tref anti_prenex_block(tref formula) {
 	// into the body using the 5-arg anti_prenex_block, then eliminate the
 	// remaining quantifiers over atomic formulas via resolve_quantifiers2.
 	// wff_all blocks are handled by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
-	auto process_block = [](tref n) -> tref {
-		if (!is_child_quantifier<node>(n)) return n;
-
-		// BV-typed quantifier blocks: fall back to anti_prenex which handles
-		// them safely. anti_prenex already skips squeeze_absorb for BV scopes
-		// (no BDD operations that would strip inference-assigned types), and
-		// treat_ex_quantified_clause uses CVC5 to resolve closed BV quantifiers
-		// or eliminate trivially vacuous ones (∃x P where x∉fv(P)).
-		{
-			auto is_bv_node = [](tref m) {
-				return is_bv_type_family<node>(tau::get(m).get_ba_type());
-			};
-			if (tau::get(n).find_top(is_bv_node))
-				return anti_prenex<node>(n);
-		}
-
-		// Collect the block: consecutive same-type quantifiers at the top
-		trefs block_vars;
-		const bool is_ex = is_child<node>(n, tau::wff_ex);
-		tref curr = n;
-		while (is_child_quantifier<node>(curr)) {
-			if (is_child<node>(curr, tau::wff_ex) != is_ex) break;
-			block_vars.push_back(tau::trim2(curr));
-			curr = tau::get(curr)[0].second();
-		}
-		tref body = curr;
-
-		// Build term BDD variable order: innermost variable gets the
-		// lowest index (= highest BDD priority), which is the precondition
-		// of bdd_quant (innermost = lowest order index).
-		typename term_handle<node>::order ord;
-		for (size_t i = 0; i < block_vars.size(); ++i)
-			ord.emplace(block_vars[block_vars.size() - 1 - i],
-				static_cast<int_t>(i));
-
-		// Build quant_pattern for the Boole decomposition step inside
-		// the 5-arg anti_prenex_block: outermost gets the highest priority
-		// value so the decomposition prefers outermost-dependent atoms.
-		subtree_unordered_map<node, int_t> qp;
-		for (size_t i = 0; i < block_vars.size(); ++i)
-			qp.emplace(block_vars[i],
-				static_cast<int_t>(block_vars.size() - i));
-
-		tref result;
-		if (is_ex) {
-			// Normalize before processing: a prior !is_ex result may have
-			// introduced bf_neq via to_nnf(¬...), which push_ex_block_into_clause
-			// cannot accept.
-			body = normalize_atomic_formula_operators<node>(body);
-			subtree_unordered_set<node> used_atms;
-			result = anti_prenex_block<node>(
-				body, block_vars, used_atms, qp, ord);
-			result = resolve_quantifiers2<node>(result, ord);
-			// Fallback for BV/ordered atoms that resolve_quantifiers2
-			// cannot handle (e.g. bf_lt without explicit bitwidth).
-			if (tau::get(result).find_top(is_quantifier<node>))
-				result = resolve_quantifiers<node>(result);
-			// Final fallback: push_ex_block_into_clause marks wff_ref atoms
-			// (stream I/O references) as unremovable and re-wraps the quantifier.
-			// anti_prenex handles them via squeeze_absorb and Schroeder BDD elim.
-			if (tau::get(result).find_top(is_quantifier<node>))
-				result = anti_prenex<node>(result);
-		} else {
-			// ∀-block: dualize to ∃-block on negated body,
-			// process, then negate the result back.
-			tref neg_body = to_nnf<node>(tau::build_wff_neg(body));
-			// to_nnf may introduce bf_neq; normalize so
-			// push_ex_block_into_clause sees only bf_eq atoms.
-			neg_body = normalize_atomic_formula_operators<node>(neg_body);
-			subtree_unordered_set<node> used_atms;
-			tref pushed = anti_prenex_block<node>(
-				neg_body, block_vars, used_atms, qp, ord);
-			pushed = resolve_quantifiers2<node>(pushed, ord);
-			// Fallback for BV/ordered atoms (same as is_ex branch above).
-			if (tau::get(pushed).find_top(is_quantifier<node>))
-				pushed = resolve_quantifiers<node>(pushed);
-			result = to_nnf<node>(tau::build_wff_neg(pushed));
-			// to_nnf may re-introduce bf_neq (¬(A=B) → A≠B); normalize
-			// now so the next process_block call receives clean input.
-			result = normalize_atomic_formula_operators<node>(result);
-			// Final fallback: same as is_ex branch — wff_ref atoms survived
-			// the full pipeline, so let anti_prenex take another pass.
-			if (tau::get(result).find_top(is_quantifier<node>))
-				result = anti_prenex<node>(result);
-		}
-		return result;
-	};
-
 	formula = post_order<node>(formula).apply_unique(
-		process_block, visit_wff<node>);
+		process_quantifier_block<node>, visit_wff<node>);
 	return syntactic_formula_simplification<node>(formula);
 }
 
-// TODO: Incorporate bv type/non-atomless types
+// NOTE: BV-typed and non-atomless quantifier blocks are not handled here.
+// process_quantifier_block detects BV-typed nodes and falls back to
+// anti_prenex, which uses CVC5 for closed BV formulas and
+// treat_ex_quantified_clause for trivially vacuous quantifiers.
 template<NodeType node>
 tref push_ex_block_into_clause(tref clause, const trefs& block,
 	const typename term_handle<node>::order& /*order*/) {

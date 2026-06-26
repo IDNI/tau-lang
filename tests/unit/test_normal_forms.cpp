@@ -92,11 +92,14 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 }
 
+static constexpr const char* uninterp_constants_sample =
+	"(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
+
 TEST_SUITE("normal forms: bf_reduce_canonical") {
 
 
 	TEST_CASE("uninterpreted constants") {
-		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
+		const char* sample = uninterp_constants_sample;
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff
 			| bf_reduce_canonical<node_t>() | tt::ref;
@@ -122,7 +125,7 @@ TEST_SUITE("normal forms: reduce_bf") {
 TEST_SUITE("normal forms: dnf_bf") {
 
 	TEST_CASE("uninterpreted constants") {
-		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
+		const char* sample = uninterp_constants_sample;
 		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tau::bf_eq
 			| tau::bf | tt::f(to_dnf<node_t, false>) | tt::ref;
