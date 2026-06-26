@@ -427,15 +427,67 @@ tref fold_trivial_quantifiers(tref fm) {
 	return post_order<node>(fm).apply_unique(f);
 }
 
-template <NodeType node>
-tref normalize_with_temp_simp(tref fm) {
+// Simplifies one temporal clause from the outer DNF of a normalized formula.
+// Returns the simplified clause, or nullopt if the clause is unsatisfiable.
+template<NodeType node>
+std::optional<tref> simplify_temporal_clause(tref clause) {
 	using tau = tree<node>;
 	auto trim_q = [](tref n) {
-		const auto& t =tau::get(n);
+		const auto& t = tau::get(n);
 		if (t.child_is(tau::wff_sometimes)
 			|| t.child_is(tau::wff_always)) return t[0].first();
 		return n;
 	};
+	const auto& t = tau::get(clause);
+	trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
+	trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
+	if ((aw_parts.size() == 1 && st_parts.empty()) ||
+		(aw_parts.empty() && st_parts.size() == 1))
+		return clause;
+
+	// Replace all temporal parts with T to isolate the non-temporal skeleton.
+	subtree_map<node, tref> changes;
+	for (tref aw : aw_parts) changes.emplace(aw, tau::_T());
+	for (tref st : st_parts) changes.emplace(st, tau::_T());
+	tref new_clause = rewriter::replace<node>(clause, changes);
+	DBG(LOG_TRACE << "    new clause: " << LOG_FM(new_clause);)
+
+	// Eliminate parts in a group that are implied by another part in the same group.
+	// repr(parts[i]) returns the formula to use for implication checking.
+	auto eliminate_implied = [](trefs& parts, auto&& repr) {
+		for (size_t i = 0; i < parts.size(); ++i)
+			for (size_t j = i + 1; j < parts.size(); ++j) {
+				if (is_nso_impl<node>(repr(parts[i]), repr(parts[j])))
+					parts[j] = tau::_T();
+				else if (is_nso_impl<node>(repr(parts[j]), repr(parts[i])))
+					parts[i] = tau::_T();
+			}
+	};
+	// Eliminate always parts implied by other always parts.
+	eliminate_implied(aw_parts, [](tref x) { return x; });
+
+	// Clause is unsatisfiable if any always ∧ sometimes pair is unsat.
+	for (tref aw : aw_parts) for (tref st : st_parts) {
+		tref f = tau::build_wff_and(trim_q(aw), trim_q(st));
+		if (is_non_temp_nso_unsat<node>(f)) return std::nullopt;
+	}
+
+	// Eliminate sometimes parts implied by any always part.
+	for (tref aw : aw_parts) for (tref& st : st_parts)
+		if (is_nso_impl<node>(aw, trim_q(st))) st = tau::_T();
+
+	// Eliminate sometimes parts implied by other sometimes parts.
+	eliminate_implied(st_parts, trim_q);
+
+	new_clause = tau::build_wff_and(new_clause, tau::build_wff_and(
+				tau::build_wff_and(aw_parts),
+				tau::build_wff_and(st_parts)));
+	return new_clause;
+}
+
+template <NodeType node>
+tref normalize_with_temp_simp(tref fm) {
+	using tau = tree<node>;
 	fm = normalize<node>(fm);
 	// Substitution based eliminations rebuild nodes without running the
 	// construction hooks, so trivially foldable residues (constant
@@ -476,64 +528,12 @@ tref normalize_with_temp_simp(tref fm) {
 	// The temporal layer of a formula is in DNF
 	for (tref clause : expression_paths<node>(fm)) {
 		DBG(LOG_TRACE << "    clause: " << LOG_FM(clause);)
-		const auto& t = tau::get(clause);
-		trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
-		trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
-		if ((aw_parts.size() == 1 && st_parts.empty()) ||
-			(aw_parts.empty() && st_parts.size() == 1)) {
-			nn = tau::build_wff_or(nn, clause);
+		if (auto simplified = simplify_temporal_clause<node>(clause)) {
+			nn = tau::build_wff_or(nn, *simplified);
 			DBG(LOG_TRACE << "    nn: " << LOG_FM(nn);)
-			continue;
-		}
-
-		// Replace always and sometimes parts by T
-		subtree_map<node, tref> changes;
-		for (tref aw : aw_parts) changes.emplace(aw, tau::_T());
-		for (tref st : st_parts) changes.emplace(st, tau::_T());
-		tref new_clause = rewriter::replace<node>(clause, changes);
-		DBG(LOG_TRACE << "    new clause: " << LOG_FM(nn);)
-
-		// First check if any always statements are implied by others
-		for (size_t i = 0; i < aw_parts.size(); ++i) {
-			for (size_t j = i + 1; j < aw_parts.size(); ++j) {
-				if (is_nso_impl<node>(aw_parts[i], aw_parts[j]))
-					aw_parts[j] = tau::_T();
-				else if (is_nso_impl<node>(
-					aw_parts[j], aw_parts[i]))
-						aw_parts[i] = tau::_T();
-			}
-		}
-		// Check for unsat of always conjuncted with single sometimes part
-		bool clause_false = false;
-		for (tref aw : aw_parts) for (tref st : st_parts) {
-			tref f = tau::build_wff_and(trim_q(aw), trim_q(st));
-			if (is_non_temp_nso_unsat<node>(f)) clause_false = true;
-		}
-		if (clause_false) {
+		} else {
 			DBG(LOG_TRACE << "    clause false";)
-			continue;
 		}
-
-		// Next check if any always statement implies a sometimes statement
-		for (tref aw : aw_parts) for (tref& st : st_parts)
-			if (is_nso_impl<node>(aw, trim_q(st))) st = tau::_T();
-
-		// Now check if any sometimes statement implies another sometimes
-		for (size_t i = 0; i < st_parts.size(); ++i) {
-			for (size_t j = i + 1; j < st_parts.size(); ++j) {
-				if (is_nso_impl<node>(trim_q(st_parts[i]),
-					trim_q(st_parts[j])))
-						st_parts[j] = tau::_T();
-				else if (is_nso_impl<node>(trim_q(st_parts[j]),
-					trim_q(st_parts[i])))
-						st_parts[i] = tau::_T();
-			}
-		}
-		new_clause = tau::build_wff_and(new_clause, tau::build_wff_and(
-					tau::build_wff_and(aw_parts),
-					tau::build_wff_and(st_parts)));
-		nn = tau::build_wff_or(nn, new_clause);
-		DBG(LOG_TRACE << "    nn: " << LOG_FM(nn);)
 	}
 	DBG(assert(nn != nullptr);)
 	DBG(LOG_TRACE << "normalize_with_temp_simp result: " << LOG_FM(nn);)
