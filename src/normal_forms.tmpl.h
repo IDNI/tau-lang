@@ -99,41 +99,6 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 }
 
 template <NodeType node>
-tref unsqueeze_wff(const tref& fm) {
-	// $X | $Y = 0 ::= $X = 0 && $Y = 0
-	// $X | $Y != 0 ::= $X != 0 || $Y != 0
-	using tau = tree<node>;
-	LOG_TRACE << "unsqueeze_wff: " << LOG_FM(fm);
-	auto f = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf_eq) && t[1].equals_0()) {
-			const auto& e = t[0][0];
-			if (e.is(tau::bf_or)) {
-				tref c1 = e.first();
-				tref c2 = e.second();
-				return tau::trim(tau::build_wff_and(
-					tau::build_bf_eq_0(c1),
-					tau::build_bf_eq_0(c2)));
-			}
-		}
-		else if (t.is(tau::bf_neq) && t[1].equals_0()) {
-			const auto& e = t[0][0];
-			if (e.is(tau::bf_or)) {
-				tref c1 = e.first();
-				tref c2 = e.second();
-				return tau::trim(tau::build_wff_or(
-					tau::build_bf_neq_0(c1),
-					tau::build_bf_neq_0(c2)));
-			}
-		}
-		return n;
-	};
-	tref result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
-	LOG_TRACE << "unsqueeze_wff result: " << LOG_FM(result);
-	return result;
-}
-
-template <NodeType node>
 tref squeeze_wff(const tref& fm) {
 	//$X = 0 && $Y = 0 ::= $X | $Y = 0
 	// $X != 0 || $Y != 0 ::= $X | $Y != 0
@@ -176,29 +141,6 @@ tref squeeze_wff(const tref& fm) {
 }
 
 template <NodeType node>
-tref unsqueeze_wff_pos(tref fm) {
-	// $X | $Y = 0 ::= $X = 0 && $Y = 0
-	using tau = tree<node>;
-	LOG_TRACE << "unsqueeze_wff_pos: " << LOG_FM(fm);
-	auto f = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf_eq) && t[1].equals_0()) {
-			const auto& e = t[0][0];
-			if (e.is(tau::bf_or)) {
-				const auto& c1 = e.first(), c2 = e.second();
-				return tau::trim(tau::build_wff_and(
-					tau::build_bf_eq_0(c1),
-					tau::build_bf_eq_0(c2)));
-			}
-		}
-		return n;
-	};
-	auto result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
-	LOG_TRACE << "unsqueeze_wff_pos result: " << LOG_FM(result);
-	return result;
-}
-
-template <NodeType node>
 tref squeeze_wff_pos(tref fm) {
 	// $X = 0 && $Y = 0 ::= $X | $Y = 0
 	using tau = tree<node>;
@@ -221,29 +163,6 @@ tref squeeze_wff_pos(tref fm) {
 	};
 	tref result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
 	LOG_TRACE << "squeeze_wff_pos result: " << LOG_FM(result);
-	return result;
-}
-
-template <NodeType node>
-tref unsqueeze_wff_neg(tref fm) {
-	// $X | $Y != 0 ::= $X != 0 || $Y != 0
-	using tau = tree<node>;
-	LOG_TRACE << "unsqueeze_wff_neg: " << LOG_FM(fm);
-	auto f = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf_neq) && t[1].equals_0()) {
-			const auto& e = t[0][0];
-			if (e.is(tau::bf_or)) {
-				const auto& c1 = e.first(), c2 = e.second();
-				return tau::trim(tau::build_wff_or(
-					tau::build_bf_neq_0(c1),
-					tau::build_bf_neq_0(c2)));
-			}
-		}
-		return n;
-	};
-	auto result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
-	LOG_TRACE << "unsqueeze_wff_neg result: " << LOG_FM(result);
 	return result;
 }
 
