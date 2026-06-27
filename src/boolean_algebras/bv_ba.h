@@ -113,7 +113,8 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv> vars,
 
 /** @brief Convert a cvc5 term tree @p n back into a Tau tree reference. */
 template <NodeType node>
-tref cvc5_tree_to_tau_tree (bv n);
+tref cvc5_tree_to_tau_tree (bv n,
+	const std::map<std::string, tref>& var_map = {});
 
 /**
  * @brief Checks if a given bit-vector formula is satisfiable.
