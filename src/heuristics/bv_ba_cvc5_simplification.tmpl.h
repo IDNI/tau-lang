@@ -9,13 +9,15 @@ using namespace cvc5;
 using namespace idni;
 
 template<NodeType node>
-tref cvc5_tree_to_tau_tree(bv n) {
-#define rec(x) (cvc5_tree_to_tau_tree<node>(x)) // ease recursive calls
+tref cvc5_tree_to_tau_tree(bv n,
+	const std::map<std::string, tref>& var_map) {
+#undef rec
+#define rec(x) (cvc5_tree_to_tau_tree<node>(x, var_map)) // ease recursive calls
 	using tau = tree<node>;
 
 	DBG(LOG_INFO << "cvc5_tree_to_tau_tree/n: " << n.toString() << "\n";)
 
-	auto from_collection = [](const bv& t, const auto& f) -> tref {
+	auto from_collection = [&var_map](const bv& t, const auto& f) -> tref {
 		tref res = rec(t[0]);
 		if (res == nullptr) return nullptr; // Unable to transform to tau (returning null)
 
@@ -30,10 +32,14 @@ tref cvc5_tree_to_tau_tree(bv n) {
 	auto get_var = [&](const cvc5::Term& v) -> tref {
 		std::string cvc5_var = v.toString();
 		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/cvc5_var: " << cvc5_var << "\n";)
-		// remove leading and trailing spaces `|`
+		// remove leading and trailing `|` delimiters added by CVC5
 		if (cvc5_var.front() == '|') cvc5_var.erase(0, 1);
 		if (cvc5_var.back() == '|') cvc5_var.pop_back();
 		size_t bv_size = v.getSort().getBitVectorSize();
+		// return the original tau node (bf-wrapped) if it was registered in the var_map
+		if (auto it = var_map.find(cvc5_var); it != var_map.end())
+			return tau::get_typed(tau::bf, it->second,
+				get_ba_type_id<node>(bv_type<node>(bv_size)));
 		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/bv_size: " << bv_size << "\n";)
 		auto result = build_bf_variable<node>(cvc5_var, get_ba_type_id<node>(bv_type<node>(bv_size)));
 		DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/get_var/result: " << tau::get(result).tree_to_str() << "\n";)
@@ -177,7 +183,15 @@ tref bv_ba_cvc5_simplification(tref term) {
 	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/bv_term: " << bv_term.value().toString() << "\n";)
 	auto simplified_bv = normalize_bv(bv_term.value());
 	DBG(LOG_TRACE << "bv_ba_cvc5_simplification/simplified_bv: " << simplified_bv.toString() << "\n";)
-	auto simplified_term = cvc5_tree_to_tau_tree<node>(simplified_bv);
+	// build reverse lookup so cvc5_tree_to_tau_tree can recover original tau nodes
+	std::map<std::string, tref> var_map;
+	for (const auto& [orig, cvc5_var] : free_vars) {
+		std::string name = cvc5_var.toString();
+		if (!name.empty() && name.front() == '|') name.erase(0, 1);
+		if (!name.empty() && name.back() == '|') name.pop_back();
+		var_map.emplace(name, orig);
+	}
+	auto simplified_term = cvc5_tree_to_tau_tree<node>(simplified_bv, var_map);
 #ifdef DEBUG
 	if (simplified_term)
 		LOG_TRACE << "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term) << "\n"
