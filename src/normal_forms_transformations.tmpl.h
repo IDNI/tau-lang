@@ -5,7 +5,7 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
 
-/** @internal @copydoc unequal_to_not_equal */
+/** @internal @copydoc unequal_to_not_equal @endinternal */
 template <NodeType node>
 tref unequal_to_not_equal(tref fm) {
 	using tau = tree<node>;
@@ -28,7 +28,7 @@ tref unequal_to_not_equal(tref fm) {
 
 
 // Convert X =(!=) Y to X + Y =(!=) 0
-/** @internal @copydoc norm_equation */
+/** @internal @copydoc norm_equation @endinternal */
 template<NodeType node>
 tref norm_equation(tref eq) {
 	using tau = tree<node>;
@@ -42,7 +42,7 @@ tref norm_equation(tref eq) {
 
 
 // Convert all occurrences of X =(!=) Y to X + Y =(!=) 0 in fm
-/** @internal @copydoc norm_all_equations */
+/** @internal @copydoc norm_all_equations @endinternal */
 template <NodeType node>
 tref norm_all_equations (tref fm) {
 	return pre_order<node>(fm).apply_unique(norm_equation<node>,
@@ -50,14 +50,14 @@ tref norm_all_equations (tref fm) {
 }
 
 
-/** @internal @copydoc apply_all_xor_def */
+/** @internal @copydoc apply_all_xor_def @endinternal */
 template<NodeType node>
 tref apply_all_xor_def(tref fm) {
 	return pre_order<node>(fm).apply_unique(apply_xor_def<node>);
 }
 
 
-/** @internal @copydoc push_negation_in */
+/** @internal @copydoc push_negation_in @endinternal */
 template <NodeType node, bool is_wff>
 tref push_negation_in(tref fm) {
 	auto pn = [](tref n) {
@@ -72,6 +72,7 @@ tref push_negation_in(tref fm) {
 
 
 /**
+ * @internal
  * @brief Shift non-initial IO variable time indices in `fm` by `shift`.
  *
  * For each IO variable in `io_vars` that is **not** an initial condition,
@@ -82,7 +83,7 @@ tref push_negation_in(tref fm) {
  * @param io_vars Collection of IO variable nodes to consider.
  * @param shift Time offset to add to non-initial IO variable shifts.
  * @return Formula with adjusted IO variable time indices.
- * @internal
+ * @endinternal
  */
 template <NodeType node>
 tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
@@ -105,6 +106,7 @@ tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
 
 
 /**
+ * @internal
  * @brief Shift initial-condition IO variables in `fm` by `shift`.
  *
  * Adds `shift` to the absolute time point of every `io_var` that *is* an
@@ -115,7 +117,7 @@ tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
  * @param io_vars Collection of IO variable nodes to consider.
  * @param shift Time offset to add.
  * @return Formula with adjusted initial IO variable time points, or `F`.
- * @internal
+ * @endinternal
  */
 template <NodeType node>
 tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
@@ -139,6 +141,7 @@ tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
 
 
 /**
+ * @internal
  * @brief Conjoin two `always`-quantified formulas, aligning their lookbacks.
  *
  * Strips the `always` wrapper from `fm1_aw` and `fm2_aw`, determines their
@@ -148,7 +151,7 @@ tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
  * @param fm1_aw First (possibly `always`-wrapped) formula.
  * @param fm2_aw Second (possibly `always`-wrapped) formula.
  * @return Conjunction of the two formulas with aligned lookbacks.
- * @internal
+ * @endinternal
  */
 template <NodeType node>
 tref always_conjunction(tref fm1_aw, tref fm2_aw) {
@@ -182,6 +185,7 @@ tref always_conjunction(tref fm1_aw, tref fm2_aw) {
 
 
 /**
+ * @internal
  * @brief Collect all positive equalities in `n` of the given BA type and merge them.
  *
  * Finds all `bf_eq` atoms whose BA type matches `type_id`, normalizes each
@@ -191,7 +195,7 @@ tref always_conjunction(tref fm1_aw, tref fm2_aw) {
  * @param n Formula to search for equalities.
  * @param type_id BA type identifier selecting which equalities to merge.
  * @return Disjunction of all matching left-hand sides, or `nullptr`.
- * @internal
+ * @endinternal
  */
 template <NodeType node>
 tref squeeze_positives(tref n, size_t type_id) {
@@ -219,6 +223,7 @@ tref squeeze_positives(tref n, size_t type_id) {
 
 
 /**
+ * @internal
  * @brief Replace all free variables in `fm` with `val`.
  *
  * Collects every free variable in `fm` and substitutes each with `val`.
@@ -227,7 +232,7 @@ tref squeeze_positives(tref n, size_t type_id) {
  * @param fm Formula whose free variables are to be replaced.
  * @param val Replacement value; must not be a bare `bf` node.
  * @return Formula with all free variables replaced by `val`.
- * @internal
+ * @endinternal
  */
 template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val) {
@@ -244,12 +249,13 @@ tref replace_free_vars_by(tref fm, tref val) {
 
 
 /**
+ * @internal
  * @brief Function to apply syntactical simplifications to formula in almost
  * linear time in the formula size and the number of paths found in terms
  * @tparam node tree node type
  * @param formula The formula to simplify
  * @return The simplified formula
- * @internal
+ * @endinternal
  */
 template<NodeType node>
 tref syntactic_formula_simplification(tref formula) {
@@ -260,12 +266,13 @@ tref syntactic_formula_simplification(tref formula) {
 
 // TODO: How to adjust for bitvector that are boolean?
 /**
+ * @internal
  * @brief Eliminate the existential quantifier scoping a clause.
  * @tparam node Tree node type
  * @param ex_clause Existentially quantified clause
  * @param quant_eliminated Indicates whether the quantifier was successfully removed
  * @return The resulting clause after removing the existential quantifier
- * @internal
+ * @endinternal
  */
 template <NodeType node>
 tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
@@ -408,7 +415,7 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 }
 
 
-/** @internal @copydoc resolve_quantifiers */
+/** @internal @copydoc resolve_quantifiers @endinternal */
 template<NodeType node>
 tref resolve_quantifiers(tref formula) {
 using tau = tree<node>;

@@ -10,17 +10,19 @@
 namespace idni::tau_lang {
 
 /**
+ * @internal
  * @brief Descriptor of a single reference offset.
  *
  * The first element identifies the offset kind (one of `tau_parser::nonterminal`
  * values: `num`, `capture`, `shift`, or `variable`). The second element holds
  * the numeric value for `num`, the `rr_dict` identifier for `capture`, or 0 for
  * `shift` and `variable`.
+ * @endinternal
  */
 using offset_t = std::pair<tau_parser::nonterminal, size_t>;
 
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
-/** @internal @copydoc normalize */
+/** @internal @copydoc normalize @endinternal */
 template <NodeType node>
 tref normalize(tref form) {
 	using tau = tree<node>;
@@ -70,7 +72,7 @@ tref normalize(tref form) {
 
 // Assumes that the formula passed does not have temporal quantifiers
 // This normalization will non perform the temporal normalization
-/** @internal @copydoc normalize_non_temp */
+/** @internal @copydoc normalize_non_temp @endinternal */
 template <NodeType node>
 tref normalize_non_temp(tref fm) {
 	using tau = tree<node>;
@@ -99,25 +101,29 @@ tref normalize_non_temp(tref fm) {
 	return result;
 }
 
-/** @brief Collects all variable and capture nodes from tree node @p n using `select_top`.
- *  @internal
- *  @tparam node Tree node type.
- *  @param n The root node to search within.
- *  @return A flat list of all variable and capture sub-nodes found.
+/**
+ * @internal
+ * @brief Collects all variable and capture nodes from tree node @p n using `select_top`.
+ * @tparam node Tree node type.
+ * @param n The root node to search within.
+ * @return A flat list of all variable and capture sub-nodes found.
+ * @endinternal
  */
 template <NodeType node>
 trefs get_vars_from_nso(tref n) {
 	return tree<node>::get(n).select_top(is_var_or_capture<node>());
 }
 
-/** @brief Returns a fresh integer `i` such that variable `x_i` does not already appear in @p fm.
- *  @internal
+/**
+ * @internal
+ * @brief Returns a fresh integer `i` such that variable `x_i` does not already appear in @p fm.
  *
  *  Scans all variable and capture nodes whose names start with `x` or `?x`,
  *  collects their numeric suffixes, and returns one past the maximum found.
- *  @tparam node Tree node type.
- *  @param fm The formula to scan for existing variable identifiers.
- *  @return An integer identifier not yet used by any variable in @p fm.
+ * @tparam node Tree node type.
+ * @param fm The formula to scan for existing variable identifiers.
+ * @return An integer identifier not yet used by any variable in @p fm.
+ * @endinternal
  */
 // Given a tref produce a number such that the variable x_i is
 // neither a bool_variable nor a variable nor a capture
@@ -145,7 +151,7 @@ int_t get_new_var_id(tref fm) {
 
 // Given a tref produce a number i such that the uninterpreted constant const_i is
 // not present
-/** @internal @copydoc get_new_uninterpreted_constant */
+/** @internal @copydoc get_new_uninterpreted_constant @endinternal */
 template <NodeType node>
 tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t type) {
 	using tau = tree<node>;
@@ -162,14 +168,16 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 	return uninter_const;
 }
 
-/** @brief Extracts reference metadata from a `ref` node.
- *  @internal
+/**
+ * @internal
+ * @brief Extracts reference metadata from a `ref` node.
  *
  *  Returns a pair of `rr_sig` (name id and arity) and a vector of `offset_t`
  *  values. Currently only the first offset is considered.
- *  @tparam node Tree node type.
- *  @param ref The `ref` tree node to extract information from.
- *  @return A pair of the recurrence relation signature and its offset list.
+ * @tparam node Tree node type.
+ * @param ref The `ref` tree node to extract information from.
+ * @return A pair of the recurrence relation signature and its offset list.
+ * @endinternal
  */
 // extracts ref info. returns pair of rr_sig (name id and arity)
 // and vector of its offsets (offset_t)
@@ -195,11 +203,13 @@ std::pair<rr_sig, std::vector<offset_t>> get_ref_info(tref ref) {
 	return ret;
 };
 
-/** @brief Traverses @p n downward through single-child nodes to find a `ref` node.
- *  @internal
- *  @tparam node Tree node type.
- *  @param n The node to start the search from.
- *  @return The first `ref` node found, or `nullptr` if none exists.
+/**
+ * @internal
+ * @brief Traverses @p n downward through single-child nodes to find a `ref` node.
+ * @tparam node Tree node type.
+ * @param n The node to start the search from.
+ * @return The first `ref` node found, or `nullptr` if none exists.
+ * @endinternal
  */
 template <NodeType node>
 tref get_ref(tref n) {
@@ -212,7 +222,7 @@ tref get_ref(tref n) {
 }
 
 // Check that the Tau formula does not use Boolean combinations of models
-/** @internal @copydoc has_no_boolean_combs_of_models */
+/** @internal @copydoc has_no_boolean_combs_of_models @endinternal */
 template <NodeType node>
 bool has_no_boolean_combs_of_models(tref n) {
 	using tau = tree<node>;
@@ -232,7 +242,7 @@ bool has_no_boolean_combs_of_models(tref n) {
 	return true;
 }
 
-/** @internal @copydoc is_non_temp_nso_satisfiable */
+/** @internal @copydoc is_non_temp_nso_satisfiable @endinternal */
 template <NodeType node>
 bool is_non_temp_nso_satisfiable(tref n) {
 	using tau = tree<node>;
@@ -257,14 +267,16 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	return t.equals_T();
 }
 
-/** @brief Checks whether a non-temporal NSO formula is unsatisfiable.
- *  @internal
+/**
+ * @internal
+ * @brief Checks whether a non-temporal NSO formula is unsatisfiable.
  *
  *  Wraps free variables with existential quantifiers, normalizes via
  *  `normalize_non_temp`, and returns `true` if the result is `F`.
- *  @tparam node Tree node type.
- *  @param n The non-temporal formula to test.
- *  @return `true` if the formula is unsatisfiable, `false` otherwise.
+ * @tparam node Tree node type.
+ * @param n The non-temporal formula to test.
+ * @return `true` if the formula is unsatisfiable, `false` otherwise.
+ * @endinternal
  */
 template <NodeType node>
 bool is_non_temp_nso_unsat(tref n) {
@@ -283,7 +295,7 @@ bool is_non_temp_nso_unsat(tref n) {
 	return t.equals_F();
 }
 
-/** @internal @copydoc are_nso_equivalent */
+/** @internal @copydoc are_nso_equivalent @endinternal */
 template <NodeType node>
 bool are_nso_equivalent(tref n1, tref n2) {
 	using tau = tree<node>;
@@ -343,14 +355,16 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	return res;
 }
 
-/** @brief Returns `true` if @p n is logically equivalent to any formula in @p previous.
- *  @internal
+/**
+ * @internal
+ * @brief Returns `true` if @p n is logically equivalent to any formula in @p previous.
  *
  *  Equivalence is checked via `are_nso_equivalent`.
- *  @tparam node Tree node type.
- *  @param n The formula to test.
- *  @param previous The list of candidate formulas to compare against.
- *  @return `true` if @p n is equivalent to at least one formula in @p previous.
+ * @tparam node Tree node type.
+ * @param n The formula to test.
+ * @param previous The list of candidate formulas to compare against.
+ * @return `true` if @p n is equivalent to at least one formula in @p previous.
+ * @endinternal
  */
 template <NodeType node>
 bool is_nso_equivalent_to_any_of(tref n, trefs& previous) {
@@ -359,7 +373,7 @@ bool is_nso_equivalent_to_any_of(tref n, trefs& previous) {
 		});
 }
 
-/** @internal @copydoc is_nso_impl */
+/** @internal @copydoc is_nso_impl @endinternal */
 template <NodeType node>
 bool is_nso_impl(tref n1, tref n2) {
 	using tau = tree<node>;
@@ -394,15 +408,17 @@ bool is_nso_impl(tref n1, tref n2) {
 	return res.equals_T();
 }
 
-/** @brief Checks whether two Boolean functions @p n1 and @p n2 are equal.
- *  @internal
+/**
+ * @internal
+ * @brief Checks whether two Boolean functions @p n1 and @p n2 are equal.
  *
  *  Builds `(n1 XOR n2) = 0`, universally quantifies all free variables,
  *  normalizes, and returns `true` if the result is `T`.
- *  @tparam node Tree node type.
- *  @param n1 The first Boolean function.
- *  @param n2 The second Boolean function.
- *  @return `true` if @p n1 and @p n2 are semantically equal.
+ * @tparam node Tree node type.
+ * @param n1 The first Boolean function.
+ * @param n2 The second Boolean function.
+ * @return `true` if @p n1 and @p n2 are semantically equal.
+ * @endinternal
  */
 template <NodeType node>
 bool are_bf_equal(tref n1, tref n2) {
@@ -435,14 +451,16 @@ bool are_bf_equal(tref n1, tref n2) {
 	return check.has_value();
 }
 
-/** @brief Returns `true` if Boolean function @p n is equal to any formula in @p previous.
- *  @internal
+/**
+ * @internal
+ * @brief Returns `true` if Boolean function @p n is equal to any formula in @p previous.
  *
  *  Equality is checked via `are_bf_equal`.
- *  @tparam node Tree node type.
- *  @param n The Boolean function to test.
- *  @param previous The list of candidate Boolean functions to compare against.
- *  @return `true` if @p n equals at least one formula in @p previous.
+ * @tparam node Tree node type.
+ * @param n The Boolean function to test.
+ * @param previous The list of candidate Boolean functions to compare against.
+ * @return `true` if @p n equals at least one formula in @p previous.
+ * @endinternal
  */
 template <NodeType node>
 bool is_bf_same_to_any_of(tref n, trefs& previous) {
@@ -451,14 +469,16 @@ bool is_bf_same_to_any_of(tref n, trefs& previous) {
 	});
 }
 
-/** @brief Applies registered function and predicate definitions to @p spec.
- *  @internal
+/**
+ * @internal
+ * @brief Applies registered function and predicate definitions to @p spec.
  *
  *  Builds an `rr` with the global symbol definitions appended and unfolds it
  *  via `nso_rr_apply`. Returns @p spec unchanged if no `ref` nodes are present.
- *  @tparam node Tree node type.
- *  @param spec The specification formula to expand.
- *  @return The formula with all applicable definitions unfolded.
+ * @tparam node Tree node type.
+ * @param spec The specification formula to expand.
+ * @return The formula with all applicable definitions unfolded.
+ * @endinternal
  */
 template <NodeType node>
 tref apply_defs_to_spec (tref spec) {
@@ -477,7 +497,7 @@ tref apply_defs_to_spec (tref spec) {
 // ex x F = all x F = F. Such residues can be left behind by substitution
 // based eliminations, which rebuild nodes without running the construction
 // hooks.
-/** @internal @copydoc fold_trivial_quantifiers */
+/** @internal @copydoc fold_trivial_quantifiers @endinternal */
 template <NodeType node>
 tref fold_trivial_quantifiers(tref fm) {
 	using tau = tree<node>;
@@ -511,14 +531,16 @@ tref fold_trivial_quantifiers(tref fm) {
 	return post_order<node>(fm).apply_unique(f);
 }
 
-/** @brief Simplifies a single clause from the outer DNF of a normalized temporal formula.
- *  @internal
+/**
+ * @internal
+ * @brief Simplifies a single clause from the outer DNF of a normalized temporal formula.
  *
  *  Removes `always`/`sometimes` sub-formulas that are implied by others in the
  *  same clause, and checks for unsatisfiable `always ∧ sometimes` pairs.
- *  @tparam node Tree node type.
- *  @param clause A conjunctive clause from the temporal DNF to simplify.
- *  @return The simplified clause, or `std::nullopt` if the clause is unsatisfiable.
+ * @tparam node Tree node type.
+ * @param clause A conjunctive clause from the temporal DNF to simplify.
+ * @return The simplified clause, or `std::nullopt` if the clause is unsatisfiable.
+ * @endinternal
  */
 // Simplifies one temporal clause from the outer DNF of a normalized formula.
 // Returns the simplified clause, or nullopt if the clause is unsatisfiable.
@@ -578,7 +600,7 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	return new_clause;
 }
 
-/** @internal @copydoc normalize_with_temp_simp */
+/** @internal @copydoc normalize_with_temp_simp @endinternal */
 template <NodeType node>
 tref normalize_with_temp_simp(tref fm) {
 	using tau = tree<node>;
@@ -634,11 +656,13 @@ tref normalize_with_temp_simp(tref fm) {
 	return nn;
 }
 
-/** @brief Returns the maximum integer lookback offset found in `offsets` nodes of @p form.
- *  @internal
- *  @tparam node Tree node type.
- *  @param form The formula to scan for integer offset values.
- *  @return The largest integer offset value found, or 0 if none exist.
+/**
+ * @internal
+ * @brief Returns the maximum integer lookback offset found in `offsets` nodes of @p form.
+ * @tparam node Tree node type.
+ * @param form The formula to scan for integer offset values.
+ * @return The largest integer offset value found, or 0 if none exist.
+ * @endinternal
  */
 template <NodeType node>
 size_t get_max_lookback_in_rr(tref form) {
@@ -655,14 +679,16 @@ size_t get_max_lookback_in_rr(tref form) {
 	return max;
 }
 
-/** @brief Builds a new shift node from an existing `shift` reference adjusted to `step - offset`.
- *  @internal
+/**
+ * @internal
+ * @brief Builds a new shift node from an existing `shift` reference adjusted to `step - offset`.
  *
  *  Returns the capture node directly when `step == offset`.
- *  @tparam node Tree node type.
- *  @param shift The existing shift node whose numeric offset will be adjusted.
- *  @param step The target step value used to compute the new offset.
- *  @return A new shift node with the adjusted offset, or the capture node if `step == offset`.
+ * @tparam node Tree node type.
+ * @param shift The existing shift node whose numeric offset will be adjusted.
+ * @param step The target step value used to compute the new offset.
+ * @return A new shift node with the adjusted offset, or the capture node if `step == offset`.
+ * @endinternal
  */
 template <NodeType node>
 tref build_shift_from_shift(tref shift, size_t step) {
@@ -676,14 +702,16 @@ tref build_shift_from_shift(tref shift, size_t step) {
 	return rewriter::replace<node>(shift, changes);
 }
 
-/** @brief Replaces all `shift` sub-nodes in @p form with adjusted shifts for the given @p step.
- *  @internal
+/**
+ * @internal
+ * @brief Replaces all `shift` sub-nodes in @p form with adjusted shifts for the given @p step.
  *
  *  Each shift is rewritten by `build_shift_from_shift` to reflect the current step.
- *  @tparam node Tree node type.
- *  @param form The recurrence main formula containing shift nodes.
- *  @param step The current enumeration step used to adjust each shift offset.
- *  @return The formula with all shift nodes replaced by their step-adjusted equivalents.
+ * @tparam node Tree node type.
+ * @param form The recurrence main formula containing shift nodes.
+ * @param step The current enumeration step used to adjust each shift offset.
+ * @return The formula with all shift nodes replaced by their step-adjusted equivalents.
+ * @endinternal
  */
 template <NodeType node>
 tref build_main_step(tref form, size_t step) {
@@ -699,16 +727,18 @@ tref build_main_step(tref form, size_t step) {
 	return rewriter::replace<node>(form, changes);
 }
 
-/** @brief Creates an enumerated (concrete) step of the recurrence main formula.
- *  @internal
+/**
+ * @internal
+ * @brief Creates an enumerated (concrete) step of the recurrence main formula.
  *
  *  Fixes the first offset to @p i and all remaining offsets to 0, then
  *  delegates to `build_main_step` for shift adjustment.
- *  @tparam node Tree node type.
- *  @param form The recurrence main formula to instantiate.
- *  @param i The concrete index to assign to the first offset.
- *  @param offset_arity The total number of offsets to generate.
- *  @return The main formula with the first offset set to @p i and the rest to 0.
+ * @tparam node Tree node type.
+ * @param form The recurrence main formula to instantiate.
+ * @param i The concrete index to assign to the first offset.
+ * @param offset_arity The total number of offsets to generate.
+ * @return The main formula with the first offset set to @p i and the rest to 0.
+ * @endinternal
  */
 // enumerates index in main with step i - used for finding a fixed point
 template <NodeType node>
@@ -736,15 +766,17 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 	return build_main_step<node>(form, i);
 }
 
-/** @brief Validates a recurrence relation.
- *  @internal
+/**
+ * @internal
+ * @brief Validates a recurrence relation.
  *
  *  Checks that the main formula has no relative offsets, that no rule's head
  *  contains a shift offset, and that integer-indexed rules do not depend on
  *  future states.
- *  @tparam node Tree node type.
- *  @param nso_rr The recurrence relation to validate.
- *  @return `true` if all validity conditions are satisfied, `false` otherwise.
+ * @tparam node Tree node type.
+ * @param nso_rr The recurrence relation to validate.
+ * @return `true` if all validity conditions are satisfied, `false` otherwise.
+ * @endinternal
  */
 template <NodeType node>
 bool is_valid(const rr<node>& nso_rr) {
@@ -804,14 +836,16 @@ bool is_valid(const rr<node>& nso_rr) {
 	return true;
 }
 
-/** @brief Checks that a recurrence relation is well-founded.
- *  @internal
+/**
+ * @internal
+ * @brief Checks that a recurrence relation is well-founded.
  *
  *  Requires at least one relative (capture-offset) rule and verifies that the
  *  dependency graph among rule signatures is acyclic.
- *  @tparam node Tree node type.
- *  @param nso_rr The recurrence relation to check.
- *  @return `true` if the relation is well-founded, `false` otherwise.
+ * @tparam node Tree node type.
+ * @param nso_rr The recurrence relation to check.
+ * @return `true` if the relation is well-founded, `false` otherwise.
+ * @endinternal
  */
 template <NodeType node>
 bool is_well_founded(const rr<node>& nso_rr) {
@@ -867,19 +901,21 @@ bool is_well_founded(const rr<node>& nso_rr) {
 	return true;
 }
 
-/** @brief Iterates the recurrence relation to find a fixed point starting from `max_lookback`.
- *  @internal
+/**
+ * @internal
+ * @brief Iterates the recurrence relation to find a fixed point starting from `max_lookback`.
  *
  *  Applies all rules at each step until the result stabilizes (fixed point) or
  *  a loop is detected. Returns the fixed-point formula, or a fallback value when
  *  a loop is found.
- *  @tparam node Tree node type.
- *  @param nso_rr The recurrence relation driving the iteration.
- *  @param form The main formula template to enumerate.
- *  @param nt The non-terminal type (e.g. `wff` or `bf`) determining normalization and equivalence checks.
- *  @param offset_arity The number of offsets in the main formula's reference.
- *  @param fallback The formula to return when a loop (no fixed point) is detected.
- *  @return The fixed-point formula, or @p fallback if the iteration loops without converging.
+ * @tparam node Tree node type.
+ * @param nso_rr The recurrence relation driving the iteration.
+ * @param form The main formula template to enumerate.
+ * @param nt The non-terminal type (e.g. `wff` or `bf`) determining normalization and equivalence checks.
+ * @param offset_arity The number of offsets in the main formula's reference.
+ * @param fallback The formula to return when a loop (no fixed point) is detected.
+ * @return The fixed-point formula, or @p fallback if the iteration loops without converging.
+ * @endinternal
  */
 template <NodeType node>
 tref calculate_fixed_point(const rr<node>& nso_rr,
@@ -977,7 +1013,7 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 }
 
 // Normalizes a Boolean function having no recurrence relation
-/** @internal @copydoc bf_normalizer_without_rec_relation */
+/** @internal @copydoc bf_normalizer_without_rec_relation @endinternal */
 template <NodeType node>
 tref bf_normalizer_without_rec_relation(tref bf) {
 	using tau = tree<node>;
@@ -1006,7 +1042,7 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 }
 
 // Normalizes a Boolean function in which recurrence relations are present
-/** @internal @copydoc bf_normalizer_with_rec_relation */
+/** @internal @copydoc bf_normalizer_with_rec_relation @endinternal */
 template <NodeType node>
 tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
 	tref bf_unfolded = nso_rr_apply<node>(bf);
@@ -1021,7 +1057,7 @@ tref bf_normalizer_with_rec_relation(const rr<node> &bf) {
 }
 
 // REVIEW (HIGH) review overall execution
-/** @internal @copydoc normalizer(const rr<node>&) */
+/** @internal @copydoc normalizer(const rr<node>&) @endinternal */
 template <NodeType node>
 tref normalizer(const rr<node>& nso_rr) {
 	// IDEA extract this to an operator| overload
@@ -1038,21 +1074,22 @@ tref normalizer(const rr<node>& nso_rr) {
 	return res;
 }
 
-/** @internal @copydoc normalizer(tref) */
+/** @internal @copydoc normalizer(tref) @endinternal */
 template <NodeType node>
 tref normalizer(tref fm) {
 	return normalize_with_temp_simp<node>(fm);
 }
 
 /**
+ * @internal
  * @brief Converts the temporal layer of a formula to reduced DNF, squeezes the always
  * statements and ensures that formulas containing temporal variables are
  * explicitly quantified while non-temporal formulas are not quantified temporally.
- * @internal
  * @tparam node Tree node type
  * @tparam normalize_scopes If true, temporally quantified formulas are converted to Boole normal form
  * @param fm The formula that is to be temporally normalized
  * @return The resulting formula after normalizing the temporal quantifiers
+ * @endinternal
  */
 template <NodeType node, bool normalize_scopes>
 tref normalize_temporal_quantifiers(tref fm) {

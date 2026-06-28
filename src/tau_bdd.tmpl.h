@@ -7,7 +7,7 @@
 
 namespace idni::tau_lang {
 
-/** @internal @copydoc tau_bdd_node::operator==(const tau_bdd_node&) const */
+/** @internal @copydoc tau_bdd_node::operator==(const tau_bdd_node&) const @endinternal */
 template <NodeType node>
 bool tau_bdd_node<node>::operator==(const tau_bdd_node<node>& other) const {
 	using tau = tree<node>;
@@ -15,13 +15,13 @@ bool tau_bdd_node<node>::operator==(const tau_bdd_node<node>& other) const {
 		this->inv_l == other.inv_l && tau::subtree_equals(this->v, other.v);
 }
 
-/** @internal @copydoc tau_bdd_node::operator!=(const tau_bdd_node&) const */
+/** @internal @copydoc tau_bdd_node::operator!=(const tau_bdd_node&) const @endinternal */
 template<NodeType node>
 bool tau_bdd_node<node>::operator!=(const tau_bdd_node& other) const {
 	return !(*this == other);
 }
 
-/** @internal @copydoc tau_bdd_node::operator<(const tau_bdd_node&) const */
+/** @internal @copydoc tau_bdd_node::operator<(const tau_bdd_node&) const @endinternal */
 template<NodeType node>
 bool tau_bdd_node<node>::operator<(const tau_bdd_node& other) const {
 	using tau = tree<node>;
@@ -33,7 +33,7 @@ bool tau_bdd_node<node>::operator<(const tau_bdd_node& other) const {
 	return false;
 }
 
-/** @internal @copydoc tau_bdd_ref::operator==(const tau_bdd_ref&) const */
+/** @internal @copydoc tau_bdd_ref::operator==(const tau_bdd_ref&) const @endinternal */
 template<NodeType node>
 bool tau_bdd_ref<node>::operator==(const tau_bdd_ref& other) const {
 	using bdd = bintree<tau_bdd_node<node>>;
@@ -43,13 +43,13 @@ bool tau_bdd_ref<node>::operator==(const tau_bdd_ref& other) const {
 		b_this.r == b_other.r && b_this.value == b_other.value;
 }
 
-/** @internal @copydoc tau_bdd_ref::operator!=(const tau_bdd_ref&) const */
+/** @internal @copydoc tau_bdd_ref::operator!=(const tau_bdd_ref&) const @endinternal */
 template<NodeType node>
 bool tau_bdd_ref<node>::operator!=(const tau_bdd_ref& other) const {
 	return !(*this == other);
 }
 
-/** @internal @copydoc tau_bdd_ref::operator<(const tau_bdd_ref&) const */
+/** @internal @copydoc tau_bdd_ref::operator<(const tau_bdd_ref&) const @endinternal */
 template<NodeType node>
 bool tau_bdd_ref<node>::operator<(const tau_bdd_ref& other) const {
 	using bdd = bintree<tau_bdd_node<node>>;
@@ -81,7 +81,7 @@ tau_term_bdd<node>::cache_quant_t tau_term_bdd<node>::quant_memo;
 template<NodeType node>
 tau_term_bdd<node>::cache_ite_t tau_term_bdd<node>::ite_memo;
 
-/** @internal @copydoc tau_term_bdd::clear_caches() */
+/** @internal @copydoc tau_term_bdd::clear_caches() @endinternal */
 template<NodeType node>
 void tau_term_bdd<node>::clear_caches() {
 	and_memo.clear();
@@ -92,13 +92,13 @@ void tau_term_bdd<node>::clear_caches() {
 }
 #endif
 
-/** @internal @copydoc tau_term_bdd::make_canonical(ref&, ref&) */
+/** @internal @copydoc tau_term_bdd::make_canonical(ref&, ref&) @endinternal */
 template<NodeType node>
 void tau_term_bdd<node>::make_canonical(ref& x, ref& y) {
 	if (y < x) std::swap(x,y);
 }
 
-/** @internal @copydoc tau_term_bdd::less_then(tref, tref, const order&) */
+/** @internal @copydoc tau_term_bdd::less_then(tref, tref, const order&) @endinternal */
 template<NodeType node>
 bool tau_term_bdd<node>::less_then(tref x, tref y, const order& o) {
 	DBG(assert(o.contains(x) && o.contains(y)));
@@ -108,7 +108,7 @@ bool tau_term_bdd<node>::less_then(tref x, tref y, const order& o) {
 	return xiter->second < yiter->second;
 }
 
-/** @internal @copydoc tau_term_bdd::add(tref, ref, ref) */
+/** @internal @copydoc tau_term_bdd::add(tref, ref, ref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::add(tref v, ref h, ref l) {
 	DBG(assert(v != nullptr && h.b != nullptr && l.b != nullptr));
@@ -133,7 +133,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::add(tref v, ref h, ref l) {
 	return r;
 }
 
-/** @internal @copydoc tau_term_bdd::add(tref) */
+/** @internal @copydoc tau_term_bdd::add(tref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::add(tref leaf) {
 	using tau = tree<node>;
@@ -154,7 +154,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::add(tref leaf) {
 	}
 }
 
-/** @internal @copydoc tau_term_bdd::get_node(ref) */
+/** @internal @copydoc tau_term_bdd::get_node(ref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node> tau_term_bdd<node>::get_node(ref x) {
 	// Check for input inverter
@@ -180,7 +180,7 @@ tau_term_bdd<node> tau_term_bdd<node>::get_node(ref x) {
 	}
 }
 
-/** @internal @copydoc tau_term_bdd::get_var(ref) */
+/** @internal @copydoc tau_term_bdd::get_var(ref) @endinternal */
 template<NodeType node>
 tref tau_term_bdd<node>::get_var(ref x) {
 	using tau = tree<node>;
@@ -193,7 +193,7 @@ tref tau_term_bdd<node>::get_var(ref x) {
 	return v;
 }
 
-/** @internal @copydoc tau_term_bdd::get_high(ref) */
+/** @internal @copydoc tau_term_bdd::get_high(ref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::get_high(ref x) {
 	const auto& y = tau_term_bdd::get(x.b);
@@ -211,7 +211,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::get_high(ref x) {
 	}
 }
 
-/** @internal @copydoc tau_term_bdd::get_low(ref) */
+/** @internal @copydoc tau_term_bdd::get_low(ref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::get_low(ref x) {
 	const auto& y = tau_term_bdd::get(x.b);
@@ -229,7 +229,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::get_low(ref x) {
 	}
 }
 
-/** @internal @copydoc tau_term_bdd::leaf(ref) */
+/** @internal @copydoc tau_term_bdd::leaf(ref) @endinternal */
 template<NodeType node>
 bool tau_term_bdd<node>::leaf(ref l) {
 	if (l == T || l == F) return true;
@@ -244,6 +244,7 @@ bool tau_term_bdd<node>::leaf(ref l) {
  * @param o The ordering of tau terms
  * @param o_bound The current highest ordering id
  * @return A reference to the BDD corresponding to f
+ * @endinternal
  */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
@@ -300,13 +301,13 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 	}
 }
 
-/** @internal @copydoc tau_term_bdd::from_bit(tref) */
+/** @internal @copydoc tau_term_bdd::from_bit(tref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::from_bit(tref v) {
 	return add(v, T, F);
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_and(ref, tref) */
+/** @internal @copydoc tau_term_bdd::bdd_and(ref, tref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, tref y) {
 	using tau = tree<node>;
@@ -326,7 +327,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, tref y) {
 	return r;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_and(ref, ref, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_and(ref, ref, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, ref y, const order& o) {
 	// Check trivial cases
@@ -360,19 +361,19 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, ref y, const order& o
 	return r;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_or(ref, ref, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_or(ref, ref, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_or(ref x, ref y, const order& o) {
 	return bdd_not(bdd_and(bdd_not(x), bdd_not(y), o));
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_not(ref) */
+/** @internal @copydoc tau_term_bdd::bdd_not(ref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_not(ref x) {
 	return x.inv = !x.inv, x;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_ite(ref, ref, ref, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_ite(ref, ref, ref, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
 	const order& o) {
@@ -424,7 +425,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ite(ref f, ref g, ref h,
 	return out_inv ? bdd_not(r) : r;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_compose(ref, tref, ref, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_compose(ref, tref, ref, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, tref xi, ref g,
 	const order& o) {
@@ -432,7 +433,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, tref xi, ref g,
 	return bdd_compose_impl(x, xi, g, o, memo);
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_compose_impl(ref, tref, ref, const order&, std::unordered_map<ref, ref>&) */
+/** @internal @copydoc tau_term_bdd::bdd_compose_impl(ref, tref, ref, const order&, std::unordered_map<ref, ref>&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x, tref xi, ref g,
 	const order& o, std::unordered_map<ref, ref>& memo) {
@@ -453,7 +454,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x, tref xi, ref
 	return memo.emplace(x, r).first->second;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_compose(ref, subs_t, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_compose(ref, subs_t, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, subs_t subs,
 	const order& o) {
@@ -464,7 +465,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose(ref x, subs_t subs,
 	return bdd_compose_impl(x, subs, 0, o, memo);
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_compose_impl(ref, const subs_t&, size_t, const order&, std::unordered_map<ref, ref>&) */
+/** @internal @copydoc tau_term_bdd::bdd_compose_impl(ref, const subs_t&, size_t, const order&, std::unordered_map<ref, ref>&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x,
 	const subs_t& subs, size_t i, const order& o,
@@ -487,7 +488,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x,
 	return memo.emplace(x, r).first->second;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_ex(ref, trefs&, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_ex(ref, trefs&, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, trefs& v,
 	const order& o) {
@@ -501,7 +502,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, trefs& v,
 #endif
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_all(ref, trefs, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_all(ref, trefs, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_all(ref x, trefs v,
 	const order& o) {
@@ -509,7 +510,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_all(ref x, trefs v,
 	return bdd_not(bdd_ex(bdd_not(x), v, o));
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 	const order& o) {
@@ -531,7 +532,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 }
 
 #ifdef TAU_CACHE
-/** @internal @copydoc tau_term_bdd::bdd_ex(ref, const trefs&, size_t, const order&, auto&) */
+/** @internal @copydoc tau_term_bdd::bdd_ex(ref, const trefs&, size_t, const order&, auto&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t i,
 	const order& o, auto& memo) {
@@ -548,7 +549,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t
 			bdd_ex(get_low(x), v, i, o))).first->second;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&, size_t, const order&, auto&) */
+/** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&, size_t, const order&, auto&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 	size_t i, const order& o, auto& memo) {
@@ -573,7 +574,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 }
 
 #else
-/** @internal @copydoc tau_term_bdd::bdd_ex(ref, const trefs&, size_t, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_ex(ref, const trefs&, size_t, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t i,
 	const order& o) {
@@ -588,7 +589,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t
 			bdd_ex(get_low(x), v, i, o));
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&, size_t, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&, size_t, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 	size_t i, const order& o) {
@@ -611,7 +612,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 }
 #endif
 
-/** @internal @copydoc tau_term_bdd::to_tau_term(ref, size_t) */
+/** @internal @copydoc tau_term_bdd::to_tau_term(ref, size_t) @endinternal */
 template<NodeType node>
 tref tau_term_bdd<node>::to_tau_term(ref x, size_t term_type) {
 	using tau = tree<node>;
@@ -631,7 +632,7 @@ tref tau_term_bdd<node>::to_tau_term(ref x, size_t term_type) {
 	return tau::build_bf_or(left, right);
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_and_many_iter(const refs&, refs&, refs&, ref&, tref&, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_and_many_iter(const refs&, refs&, refs&, ref&, tref&, const order&) @endinternal */
 template<NodeType node>
 size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 	refs& h, refs& l, ref& res, tref& m, const order& o) {
@@ -696,7 +697,7 @@ size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 	return 0;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_and_many(refs, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_and_many(refs, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o) {
 #ifdef TAU_CACHE
@@ -764,14 +765,14 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o)
 	return add(m, h, l);
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_or_many(refs, const order&) */
+/** @internal @copydoc tau_term_bdd::bdd_or_many(refs, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_or_many(refs v, const order& o) {
 	for (ref& el : v) el = bdd_not(el);
 	return bdd_not(bdd_and_many(v, o));
 }
 
-/** @internal @copydoc tau_term_bdd::am_sort(refs&) */
+/** @internal @copydoc tau_term_bdd::am_sort(refs&) @endinternal */
 template<NodeType node>
 void tau_term_bdd<node>::am_sort(refs& b) {
 	sortc(b, am_cmp);
@@ -788,7 +789,7 @@ void tau_term_bdd<node>::am_sort(refs& b) {
 		else ++n;
 }
 
-/** @internal @copydoc tau_term_bdd::am_simplify(refs&, const std::unordered_map<refs, ref>&) */
+/** @internal @copydoc tau_term_bdd::am_simplify(refs&, const std::unordered_map<refs, ref>&) @endinternal */
 template<NodeType node>
 bool tau_term_bdd<node>::am_simplify(refs& v,
 	const std::unordered_map<refs, ref>& memo) {
@@ -805,7 +806,7 @@ bool tau_term_bdd<node>::am_simplify(refs& v,
 	return false;
 }
 
-/** @internal @copydoc tau_term_bdd::subset(const refs&, const refs&) */
+/** @internal @copydoc tau_term_bdd::subset(const refs&, const refs&) @endinternal */
 template<NodeType node>
 bool tau_term_bdd<node>::subset(const refs& small, const refs& big) {
 	if ( big.size() < small.size() ||
@@ -816,7 +817,7 @@ bool tau_term_bdd<node>::subset(const refs& small, const refs& big) {
 	return true;
 }
 
-/** @internal @copydoc tau_term_bdd::abs(ref) */
+/** @internal @copydoc tau_term_bdd::abs(ref) @endinternal */
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::abs(ref x) {
 	return x.inv = false, x;
@@ -826,20 +827,20 @@ template<NodeType node>
 tau_term_bdd_handle<node>::universe_t& tau_term_bdd_handle<node>::U =
 	bintree<node>::template create_cache<universe_t>();
 
-/** @internal @copydoc tau_term_bdd_handle::tau_term_bdd_handle(ref) */
+/** @internal @copydoc tau_term_bdd_handle::tau_term_bdd_handle(ref) @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::tau_term_bdd_handle(ref x) {
 	h = tbdd::geth(x.b);
 	inv = x.inv;
 }
 
-/** @internal @copydoc tau_term_bdd_handle::build(tref, const order&) */
+/** @internal @copydoc tau_term_bdd_handle::build(tref, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node> tau_term_bdd_handle<node>::build(tref term, const order& o) {
 	return term_handle(tbdd::build_bdd(term, o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::convert_to_tau_node(term_handle, size_t) */
+/** @internal @copydoc tau_term_bdd_handle::convert_to_tau_node(term_handle, size_t) @endinternal */
 template<NodeType node>
 tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle, size_t term_type) {
 	using tau = tree<node>;
@@ -854,13 +855,13 @@ tref tau_term_bdd_handle<node>::convert_to_tau_node(term_handle handle, size_t t
 	return tau_node;
 }
 
-/** @internal @copydoc tau_term_bdd_handle::convert_to_tau_node(tref, const order&) */
+/** @internal @copydoc tau_term_bdd_handle::convert_to_tau_node(tref, const order&) @endinternal */
 template<NodeType node>
 tref tau_term_bdd_handle<node>::convert_to_tau_node(tref term, const order& o) {
 	return convert_to_tau_node(build(term, o), find_ba_type<node>(term));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::convert_to_handle(tref) */
+/** @internal @copydoc tau_term_bdd_handle::convert_to_handle(tref) @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 convert_to_handle(tref tau_node) {
@@ -870,33 +871,33 @@ convert_to_handle(tref tau_node) {
 	else return term_handle(tbdd::T);
 }
 
-/** @internal @copydoc tau_term_bdd_handle::to_tau_term(size_t) const */
+/** @internal @copydoc tau_term_bdd_handle::to_tau_term(size_t) const @endinternal */
 template<NodeType node>
 tref tau_term_bdd_handle<node>::to_tau_term(size_t term_type) const {
 	return tbdd::to_tau_term(get(), term_type);
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_and(term_handle, const order&) const */
+/** @internal @copydoc tau_term_bdd_handle::bdd_and(term_handle, const order&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_and(term_handle other, const order& o) const {
 	return term_handle(tbdd::bdd_and(get(), other.get(), o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_or(term_handle, const order&) const */
+/** @internal @copydoc tau_term_bdd_handle::bdd_or(term_handle, const order&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_or(term_handle other, const order& o) const {
 	return term_handle(tbdd::bdd_or(get(), other.get(), o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_not() const */
+/** @internal @copydoc tau_term_bdd_handle::bdd_not() const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::bdd_not() const {
 	return term_handle(h, !inv);
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_and_many(const term_handles&, const order&) */
+/** @internal @copydoc tau_term_bdd_handle::bdd_and_many(const term_handles&, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_and_many(const term_handles& bdds, const order& o) {
@@ -906,7 +907,7 @@ bdd_and_many(const term_handles& bdds, const order& o) {
 	return term_handle(tbdd::bdd_and_many(std::move(refs), o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_or_many(const term_handles&, const order&) */
+/** @internal @copydoc tau_term_bdd_handle::bdd_or_many(const term_handles&, const order&) @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_or_many(const term_handles& bdds, const order& o) {
@@ -916,42 +917,42 @@ bdd_or_many(const term_handles& bdds, const order& o) {
 	return term_handle(tbdd::bdd_or_many(std::move(refs), o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_ex(const trefs&, const order&) const */
+/** @internal @copydoc tau_term_bdd_handle::bdd_ex(const trefs&, const order&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_ex(const trefs& v, const order& o) const {
 	return term_handle(tbdd::bdd_ex(get(), v, o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_all(const trefs&, const order&) const */
+/** @internal @copydoc tau_term_bdd_handle::bdd_all(const trefs&, const order&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_all(const trefs& v, const order& o) const {
 	return term_handle(tbdd::bdd_all(get(), v, o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_quant(const quants&, const order&) const */
+/** @internal @copydoc tau_term_bdd_handle::bdd_quant(const quants&, const order&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_quant(const quants& q, const order& o) const {
 	return term_handle(tbdd::bdd_quant(get(), q, o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_ite(term_handle, term_handle, const order&) const */
+/** @internal @copydoc tau_term_bdd_handle::bdd_ite(term_handle, term_handle, const order&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_ite(term_handle g, term_handle h, const order& o) const {
 	return term_handle(tbdd::bdd_ite(get(), g.get(), h.get(), o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_compose(tref, term_handle, const order&) const */
+/** @internal @copydoc tau_term_bdd_handle::bdd_compose(tref, term_handle, const order&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_compose(tref xi, term_handle g, const order& o) const {
 	return term_handle(tbdd::bdd_compose(get(), xi, g.get(), o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::bdd_compose(const std::vector<std::pair<tref, term_handle>>&, const order&) const */
+/** @internal @copydoc tau_term_bdd_handle::bdd_compose(const std::vector<std::pair<tref, term_handle>>&, const order&) const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs, const order& o) const {
@@ -961,7 +962,7 @@ bdd_compose(const std::vector<std::pair<tref, term_handle>>& subs, const order& 
 	return term_handle(tbdd::bdd_compose(get(), std::move(raw), o));
 }
 
-/** @internal @copydoc tau_term_bdd_handle::substitute(tref, tref, term_handle, const order&) */
+/** @internal @copydoc tau_term_bdd_handle::substitute(tref, tref, term_handle, const order&) @endinternal */
 template<NodeType node>
 tref tau_term_bdd_handle<node>::substitute(tref formula, tref var,
 	term_handle with, const order& o) {
@@ -976,26 +977,26 @@ tref tau_term_bdd_handle<node>::substitute(tref formula, tref var,
 	return pre_order<node>(formula).apply_until_change(subst);
 }
 
-/** @internal @copydoc tau_term_bdd_handle::get() const */
+/** @internal @copydoc tau_term_bdd_handle::get() const @endinternal */
 template<NodeType node>
 tau_term_bdd_handle<node>::ref tau_term_bdd_handle<node>::get() const {
 	return ref(h->get(), inv);
 }
 
-/** @internal @copydoc tau_term_bdd_handle::operator==(const tau_term_bdd_handle&) const */
+/** @internal @copydoc tau_term_bdd_handle::operator==(const tau_term_bdd_handle&) const @endinternal */
 template<NodeType node>
 bool tau_term_bdd_handle<node>::operator==(const tau_term_bdd_handle& other) const {
 	return get() == other.get();
 }
 
-/** @internal @copydoc tau_term_bdd_handle::operator!=(const tau_term_bdd_handle&) const */
+/** @internal @copydoc tau_term_bdd_handle::operator!=(const tau_term_bdd_handle&) const @endinternal */
 template<NodeType node>
 bool tau_term_bdd_handle<node>::operator!=(const tau_term_bdd_handle& other) const {
 	return !(*this == other);
 }
 
 #ifdef TAU_CACHE
-/** @internal @copydoc tau_term_bdd_handle::get_free_tau_vars_impl(tref, subtree_set<node>&, bdd_fv_cache_t&) */
+/** @internal @copydoc tau_term_bdd_handle::get_free_tau_vars_impl(tref, subtree_set<node>&, bdd_fv_cache_t&) @endinternal */
 template<NodeType node>
 void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	tref bdd_tref, subtree_set<node>& merged, bdd_fv_cache_t& cache) {
@@ -1013,7 +1014,7 @@ void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	get_free_tau_vars_impl(bn.r, merged, cache);
 }
 #else
-/** @internal @copydoc tau_term_bdd_handle::get_free_tau_vars_impl(tref, subtree_set<node>&) */
+/** @internal @copydoc tau_term_bdd_handle::get_free_tau_vars_impl(tref, subtree_set<node>&) @endinternal */
 template<NodeType node>
 void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	tref bdd_tref, subtree_set<node>& merged) {
@@ -1027,7 +1028,7 @@ void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 }
 #endif
 
-/** @internal @copydoc tau_term_bdd_handle::get_free_tau_vars(tref) */
+/** @internal @copydoc tau_term_bdd_handle::get_free_tau_vars(tref) @endinternal */
 template<NodeType node>
 const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
 	static const trefs no_free_vars{};
@@ -1058,7 +1059,7 @@ const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
 
 }
 
-/** @internal @copydoc std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto&) const */
+/** @internal @copydoc std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto& n) const {
 	size_t seed = 0;
@@ -1067,7 +1068,7 @@ size_t std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto& n) const {
 	return seed;
 }
 
-/** @internal @copydoc std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto&) const */
+/** @internal @copydoc std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto& r) const {
 	size_t seed = 0;
@@ -1075,7 +1076,7 @@ size_t std::hash<idni::tau_lang::tau_bdd_ref<T>>::operator()(auto& r) const {
 	return seed;
 }
 
-/** @internal @copydoc std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto&) const */
+/** @internal @copydoc std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto& a) const {
 	size_t seed = 0;
@@ -1083,7 +1084,7 @@ size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 2>>::operator()(auto
 	return seed;
 }
 
-/** @internal @copydoc std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>>::operator()(auto&) const */
+/** @internal @copydoc std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>>::operator()(auto& a) const {
 	size_t seed = 0;
@@ -1091,7 +1092,7 @@ size_t std::hash<std::array<idni::tau_lang::tau_bdd_ref<T>, 3>>::operator()(auto
 	return seed;
 }
 
-/** @internal @copydoc std::hash<idni::tau_lang::term_handle<T>>::operator()(auto&) const */
+/** @internal @copydoc std::hash<idni::tau_lang::term_handle<T>>::operator()(auto&) const @endinternal */
 template<typename T>
 size_t std::hash<idni::tau_lang::term_handle<T>>::operator()(auto& th) const {
 	size_t seed = 0;
