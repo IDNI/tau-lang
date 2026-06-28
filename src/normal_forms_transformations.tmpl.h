@@ -5,6 +5,7 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
 
+/** @internal @copydoc unequal_to_not_equal */
 template <NodeType node>
 tref unequal_to_not_equal(tref fm) {
 	using tau = tree<node>;
@@ -27,6 +28,7 @@ tref unequal_to_not_equal(tref fm) {
 
 
 // Convert X =(!=) Y to X + Y =(!=) 0
+/** @internal @copydoc norm_equation */
 template<NodeType node>
 tref norm_equation(tref eq) {
 	using tau = tree<node>;
@@ -40,6 +42,7 @@ tref norm_equation(tref eq) {
 
 
 // Convert all occurrences of X =(!=) Y to X + Y =(!=) 0 in fm
+/** @internal @copydoc norm_all_equations */
 template <NodeType node>
 tref norm_all_equations (tref fm) {
 	return pre_order<node>(fm).apply_unique(norm_equation<node>,
@@ -47,12 +50,14 @@ tref norm_all_equations (tref fm) {
 }
 
 
+/** @internal @copydoc apply_all_xor_def */
 template<NodeType node>
 tref apply_all_xor_def(tref fm) {
 	return pre_order<node>(fm).apply_unique(apply_xor_def<node>);
 }
 
 
+/** @internal @copydoc push_negation_in */
 template <NodeType node, bool is_wff>
 tref push_negation_in(tref fm) {
 	auto pn = [](tref n) {
@@ -66,7 +71,19 @@ tref push_negation_in(tref fm) {
 }
 
 
-// Shift the lookback in a formula
+/**
+ * @brief Shift non-initial IO variable time indices in `fm` by `shift`.
+ *
+ * For each IO variable in `io_vars` that is **not** an initial condition,
+ * increases its lookback offset by `shift`. Returns `fm` unchanged when
+ * `shift <= 0`.
+ * @tparam node Tree node type.
+ * @param fm Formula whose IO variables are to be shifted.
+ * @param io_vars Collection of IO variable nodes to consider.
+ * @param shift Time offset to add to non-initial IO variable shifts.
+ * @return Formula with adjusted IO variable time indices.
+ * @internal
+ */
 template <NodeType node>
 tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
 	using tau = tree<node>;
@@ -98,6 +115,7 @@ tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) {
  * @param io_vars Collection of IO variable nodes to consider.
  * @param shift Time offset to add.
  * @return Formula with adjusted initial IO variable time points, or `F`.
+ * @internal
  */
 template <NodeType node>
 tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
@@ -130,6 +148,7 @@ tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift){
  * @param fm1_aw First (possibly `always`-wrapped) formula.
  * @param fm2_aw Second (possibly `always`-wrapped) formula.
  * @return Conjunction of the two formulas with aligned lookbacks.
+ * @internal
  */
 template <NodeType node>
 tref always_conjunction(tref fm1_aw, tref fm2_aw) {
@@ -172,6 +191,7 @@ tref always_conjunction(tref fm1_aw, tref fm2_aw) {
  * @param n Formula to search for equalities.
  * @param type_id BA type identifier selecting which equalities to merge.
  * @return Disjunction of all matching left-hand sides, or `nullptr`.
+ * @internal
  */
 template <NodeType node>
 tref squeeze_positives(tref n, size_t type_id) {
@@ -198,6 +218,17 @@ tref squeeze_positives(tref n, size_t type_id) {
 }
 
 
+/**
+ * @brief Replace all free variables in `fm` with `val`.
+ *
+ * Collects every free variable in `fm` and substitutes each with `val`.
+ * Returns `fm` unchanged if it has no free variables.
+ * @tparam node Tree node type.
+ * @param fm Formula whose free variables are to be replaced.
+ * @param val Replacement value; must not be a bare `bf` node.
+ * @return Formula with all free variables replaced by `val`.
+ * @internal
+ */
 template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val) {
 	DBG(using tau = tree<node>;)
@@ -218,6 +249,7 @@ tref replace_free_vars_by(tref fm, tref val) {
  * @tparam node tree node type
  * @param formula The formula to simplify
  * @return The simplified formula
+ * @internal
  */
 template<NodeType node>
 tref syntactic_formula_simplification(tref formula) {
@@ -233,6 +265,7 @@ tref syntactic_formula_simplification(tref formula) {
  * @param ex_clause Existentially quantified clause
  * @param quant_eliminated Indicates whether the quantifier was successfully removed
  * @return The resulting clause after removing the existential quantifier
+ * @internal
  */
 template <NodeType node>
 tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
@@ -375,6 +408,7 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 }
 
 
+/** @internal @copydoc resolve_quantifiers */
 template<NodeType node>
 tref resolve_quantifiers(tref formula) {
 using tau = tree<node>;
