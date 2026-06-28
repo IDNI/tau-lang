@@ -18,6 +18,12 @@ namespace idni::tau_lang {
 // Forward declaration for impl-only helper used before normal_forms_transformations.tmpl.h is included.
 //template <NodeType node> tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
 
+/** @brief Rewrites `!($X = 0)` to `$X != 0` throughout `fm`, the dual of `unequal_to_not_equal`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Formula to transform.
+ * @return Formula with negated equalities replaced by disequalities.
+ */
 template <NodeType node>
 tref not_equal_to_unequal(tref fm) {
 	using tau = tree<node>;
@@ -38,6 +44,12 @@ tref not_equal_to_unequal(tref fm) {
 	return result;
 }
 
+/** @brief Normalizes comparison operators by rewriting `!=`, `nlteq`, `nlt`, `gteq`, `gt`, `ngteq`, and `ngt` to canonical negated `<`, `<=`, or `=` forms.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Formula whose atomic operators are to be normalized.
+ * @return Formula with comparison operators rewritten to canonical form.
+ */
 template<NodeType node>
 tref normalize_atomic_formula_operators(tref fm) {
 	using tau = tree<node>;
@@ -73,6 +85,12 @@ tref normalize_atomic_formula_operators(tref fm) {
 	return result;
 }
 
+/** @brief Rewrites `>` and `>=` (and their negations `ngt`, `ngteq`) to `<` and `<=` by swapping operands.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Formula in which `>` / `>=` operators are to be rewritten.
+ * @return Formula with `>` and `>=` replaced by swapped-operand `<` and `<=`.
+ */
 template<NodeType node>
 tref gt_gteq_to_lt_lteq(tref fm) {
 	using tau = tree<node>;
@@ -98,6 +116,12 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 	return result;
 }
 
+/** @brief Squeezes adjacent positive equalities in conjunctions (`f1=0 && f2=0` → `f1|f2=0`) and adjacent negative equalities in disjunctions (`f1!=0 || f2!=0` → `f1|f2!=0`).
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Formula to squeeze.
+ * @return Formula with combined equalities.
+ */
 template <NodeType node>
 tref squeeze_wff(const tref& fm) {
 	//$X = 0 && $Y = 0 ::= $X | $Y = 0
@@ -140,6 +164,12 @@ tref squeeze_wff(const tref& fm) {
 	return result;
 }
 
+/** @brief Squeezes only positive equalities in conjunctions: `f1=0 && f2=0` → `f1|f2=0`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Formula to squeeze.
+ * @return Formula with combined positive equalities.
+ */
 template <NodeType node>
 tref squeeze_wff_pos(tref fm) {
 	// $X = 0 && $Y = 0 ::= $X | $Y = 0
@@ -166,6 +196,12 @@ tref squeeze_wff_pos(tref fm) {
 	return result;
 }
 
+/** @brief Squeezes only negative equalities in disjunctions: `f1!=0 || f2!=0` → `f1|f2!=0`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Formula to squeeze.
+ * @return Formula with combined negative equalities.
+ */
 template <NodeType node>
 tref squeeze_wff_neg(tref fm) {
 	// $X != 0 || $Y != 0 ::= $X | $Y != 0
@@ -194,6 +230,7 @@ tref squeeze_wff_neg(tref fm) {
 	return result;
 }
 
+/** @internal @copydoc to_nnf */
 template <NodeType node>
 tref to_nnf(tref fm) {
 	LOG_TRACE << "to_nnf: " << LOG_FM(fm);
@@ -202,6 +239,14 @@ tref to_nnf(tref fm) {
 	return result;
 }
 
+/** @brief Normalizes a trimmed (unwrapped) equation or disequality to the form `(X XOR Y) (!)= 0`.
+ * @internal
+ *
+ * Unlike `norm_equation`, the input is not wrapped in `wff`.
+ * @tparam node Tree node type.
+ * @param eq Trimmed equation node (`bf_eq` or `bf_neq`).
+ * @return Normalized equation with XOR of operands compared to zero.
+ */
 // Convert X =(!=) Y to X + Y =(!=) 0
 template<NodeType node>
 tref norm_trimmed_equation(tref eq) {
@@ -214,6 +259,12 @@ tref norm_trimmed_equation(tref eq) {
 	} else return eq;
 }
 
+/** @brief Reverses normalization of equations of the form `(X XOR Y) = 0` or `(X XOR Y) != 0` back to `X = Y` / `X != Y`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param eq Normalized equation wrapped in `wff`.
+ * @return De-normalized equation, or the original node if no XOR pattern is found.
+ */
 template<NodeType node>
 tref denorm_equation(tref eq) {
 	using tau = tree<node>;
@@ -230,6 +281,12 @@ tref denorm_equation(tref eq) {
 	return eq;
 }
 
+/** @brief Expands a single `bf_xor` node: `A XOR B` → `(A & !B) | (!A & B)`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Formula node to expand; must be wrapped in `bf` with a `bf_xor` child.
+ * @return Expanded formula, or `fm` unchanged if no `bf_xor` child is present.
+ */
 template<NodeType node>
 tref apply_xor_def(tref fm) {
 	using tau = tree<node>;
@@ -244,6 +301,15 @@ tref apply_xor_def(tref fm) {
 	return fm;
 }
 
+/** @brief Pushes a single negation one level inward (De Morgan / dualisation).
+ * @internal
+ *
+ * Handles both wff (`wff_neg`) and bf (`bf_neg`) cases controlled by the `is_wff` template parameter.
+ * @tparam node Tree node type.
+ * @tparam is_wff `true` to handle `wff_neg` (default), `false` to handle `bf_neg`.
+ * @param fm Formula node whose outermost negation is to be pushed inward.
+ * @return Formula with the negation pushed one level deeper, or `fm` unchanged if not applicable.
+ */
 // Can be used for Tau formula and Boolean function
 template <NodeType node, bool is_wff = true>
 tref push_negation_one_in(tref fm) {
@@ -305,6 +371,14 @@ tref push_negation_one_in(tref fm) {
 // Can be used for Tau formula and Boolean function
 // -----------------------------------------------------------------------------
 
+/** @brief Normalises Boolean algebra constants in a Boolean function term.
+ * @internal
+ *
+ * Pushes negations into BA constants and calls `node::ba::normalize` on each constant node.
+ * @tparam node Tree node type.
+ * @param fm Boolean function term to normalize.
+ * @return Term with all BA constants normalized.
+ */
 // This function traverses a term fm and normalizes all Boolean algebra constants
 template <NodeType node>
 tref normalize_ba(tref fm) {
@@ -342,6 +416,14 @@ tref normalize_ba(tref fm) {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
 
+/** @brief Finds the deepest quantifier inside `n` and returns a pair of (traverser-to-variable, tref-to-quantified-wff).
+ * @internal
+ *
+ * If no quantifier is present returns an empty traverser and `n` itself.
+ * @tparam node Tree node type.
+ * @param n Formula to search for the innermost quantifier.
+ * @return Pair of traverser pointing to the bound variable and tref to the quantified sub-formula.
+ */
 // return the inner quantifier or the top wff if the formula is not quantified
 template <NodeType node>
 std::pair<typename tree<node>::traverser, tref> get_inner_quantified_wff(tref n) {
@@ -444,6 +526,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 	return rewriter::replace<node>(n, changes);
 }
 
+/** @internal @copydoc operator| */
 template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& t, const onf_wff_t<node>& r)
@@ -451,6 +534,7 @@ typename tree<node>::traverser operator|(
 	return tt(r(t.value()));
 }
 
+/** @internal @copydoc onf */
 template <NodeType node>
 tref onf(tref n, tref var) {
 	using tau = tree<node>;
@@ -461,6 +545,14 @@ tref onf(tref n, tref var) {
 		     | tt::f(to_dnf<node, true>) | tt::ref;
 }
 
+/** @brief Tries to merge two variable assignments that differ in exactly one position (Hamming distance 1) by setting that position to `2` (irrelevant).
+ * @internal
+ * @param i Current assignment vector to attempt merging with an existing path.
+ * @param paths Collection of existing path vectors; updated in place on merge.
+ * @param p Number of variables considered (length of the active prefix).
+ * @param surface `true` when called at the top level; controls which vector absorbs the merge.
+ * @return `true` if a merge occurred (possibly yielding a fully irrelevant path).
+ */
 // Reduce currrent dnf due to update by coeff and variable assignment i
 inline bool reduce_paths(std::vector<int_t>& i,
 	std::vector<std::vector<int_t>>& paths, int_t p, bool surface = true)
@@ -500,6 +592,10 @@ inline bool reduce_paths(std::vector<int_t>& i,
 	return false;
 }
 
+/** @brief Repeatedly merges any two paths in `paths` that differ in exactly one variable or have a subset/superset relation, simplifying the path set in place.
+ * @internal
+ * @param paths Path vectors to simplify; updated in place.
+ */
 inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 	for (int_t i = 0; i < (int_t)paths.size(); ++i) {
 		for (int_t j = 0; j < (int_t)paths.size(); ++j) {
@@ -575,6 +671,15 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 
 // ------------------------------
 
+/** @brief Marks variables in the assignment vector `i` (from position `p+1` onward) as irrelevant (`2`) if they do not appear in the current reduced formula `fm`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Current reduced formula.
+ * @param vars Ordered list of all variables.
+ * @param i Assignment vector to update; entries are set to `2` for absent variables.
+ * @param p Current variable position; positions after `p` are candidates for elimination.
+ * @param is_var Predicate that returns `true` for variable nodes.
+ */
 // Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
 template <NodeType node>
 void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
@@ -596,6 +701,18 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "assign_and_reduce"
 
+/** @brief Recursively enumerates all 0/1 assignments to `vars`, reduces the formula at each assignment, and populates `dnf` with coefficient → path-vector entries.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Formula to enumerate assignments over.
+ * @param vars Ordered list of variables to assign.
+ * @param i Current assignment vector (modified in place during recursion).
+ * @param dnf Output map from reduced coefficients to their path vectors.
+ * @param is_var Predicate that returns `true` for variable nodes.
+ * @param p Current recursion depth (variable index).
+ * @param is_wff `true` when `fm` is a well-formed formula, `false` for Boolean function.
+ * @return `true` when a tautological (all-irrelevant) path is found.
+ */
 // Create assignment in formula and reduce resulting clause
 template <NodeType node>
 bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
@@ -693,6 +810,7 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 
 /**
  * @brief Lexicographic comparator for Tau formula variables.
+ * @internal
  *
  * Compares two variable nodes by the string representation of their sub-trees.
  * Used to define a canonical variable order for BDD construction and DNF
@@ -719,6 +837,7 @@ auto lex_var_comp = [](tref x, tref y) {
 
 /**
  * @brief Predicate that classifies a wff node as a BDD variable.
+ * @internal
  *
  * In BDD-based DNF/CNF reductions of well-formed formulas the following node
  * types are treated as atomic BDD variables: `bf_eq`, `wff_ref`, `wff_ex`,
@@ -742,6 +861,7 @@ inline auto is_wff_bdd_var = [](tref n) {
 
 /**
  * @brief Predicate that classifies a bf node as a BDD variable.
+ * @internal
  *
  * In BDD-based reductions of Boolean functions the following node types are
  * treated as atomic BDD variables: `variable`, `capture`, `bf_ref`,
@@ -762,6 +882,7 @@ inline auto is_bf_bdd_var = [](tref n) {
 
 // Given a BF b, calculate the Boole normal form (DNF corresponding to the paths to true in the BDD) of b
 // where the variable order is given by the function lex_var_comp
+/** @internal @copydoc bf_reduced_dnf */
 template <NodeType node>
 tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	using tau = tree<node>;
@@ -885,6 +1006,14 @@ typename tree<node>::traverser operator|(
 // 	return fm.has_value() ? r(fm.value()) : std::optional<tref>{};
 // }
 
+/** @brief Returns `true` if assignment `i` is contained in (i.e., covered by) some path in `paths`.
+ * @internal
+ *
+ * Handles the "irrelevant" (`2`) wildcard in both `i` and path entries.
+ * @param i Assignment vector to test.
+ * @param paths Existing path vectors; paths matched as a superset are cleared in place.
+ * @return `true` if `i` is covered by an existing path.
+ */
 inline bool is_contained_in(const std::vector<int_t>& i, auto& paths) {
 	// Check if there is a containment of i in any path of paths
 	for (auto& path : paths) {
@@ -922,6 +1051,15 @@ inline bool is_contained_in(const std::vector<int_t>& i, auto& paths) {
 	return false;
 }
 
+/** @brief Converts a single DNF/CNF clause into an integer assignment vector using the variable position map `var_pos`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param clause Clause node to convert.
+ * @param var_pos Map from variable tree references to their index positions.
+ * @param wff `true` when the clause is a well-formed formula, `false` for Boolean function.
+ * @param is_cnf `true` when processing a CNF clause, `false` for DNF.
+ * @return Pair of the assignment vector and a flag indicating whether the clause is trivially decided.
+ */
 template <NodeType node>
 std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
 	const auto& var_pos, const bool wff, const bool is_cnf)
@@ -976,6 +1114,19 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
 	return std::make_pair(std::move(i), clause_is_decided);
 }
 
+/** @brief Collects all path vectors from the leaves of `new_fm`, deduplicates them, and returns the set.
+ * @internal
+ *
+ * Sets `decided` to `false` if at least one non-trivial path is found.
+ * @tparam node Tree node type.
+ * @param new_fm Formula (in DNF or CNF) whose leaf clauses are traversed.
+ * @param wff `true` when `new_fm` is a well-formed formula, `false` for Boolean function.
+ * @param vars Ordered list of BDD variables used to build path vectors.
+ * @param decided Output flag; set to `false` when at least one satisfiable clause is encountered.
+ * @param is_cnf `true` when `new_fm` is in CNF, `false` for DNF.
+ * @param all_reductions Whether to apply `reduce_paths` during collection.
+ * @return Deduplicated list of path vectors.
+ */
 template <NodeType node>
 std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
 	const auto& vars, bool& decided, bool is_cnf, bool all_reductions = true)
@@ -1009,6 +1160,18 @@ std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
 	return paths;
 }
 
+/** @brief Reconstructs a reduced DNF (or CNF) formula from a set of paths and a variable list.
+ * @internal
+ *
+ * Handles the `wff` / `bf` distinction and the `is_cnf` flag.
+ * @tparam node Tree node type.
+ * @param paths Path vectors representing the reduced formula.
+ * @param vars Ordered list of BDD variables corresponding to path positions.
+ * @param is_cnf `true` to build a CNF, `false` for DNF.
+ * @param wff `true` when building a well-formed formula, `false` for Boolean function.
+ * @param type_id BA type identifier used for Boolean function constants.
+ * @return Reconstructed formula tree.
+ */
 template <NodeType node>
 tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 	bool wff, size_t type_id)
@@ -1064,6 +1227,15 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 	return not_equal_to_unequal<node>(reduced_fm);
 }
 
+/** @brief Converts a formula to either reduced DNF or CNF paths.
+ * @internal
+ *
+ * Pushes negations in, identifies BDD variables, and calls `collect_paths` + `join_paths`.
+ * @tparam node Tree node type.
+ * @param fm Formula to reduce.
+ * @param is_cnf `true` to reduce to CNF paths, `false` for DNF.
+ * @return Pair of the deduplicated path vectors and the corresponding BDD variable list.
+ */
 //TODO: decide if to treat xor in bf case
 template<NodeType node>
 std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
@@ -1115,6 +1287,12 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
 	return std::make_pair(std::move(paths), std::move(vars));
 }
 
+/** @brief Factors a DNF (or bf-OR) expression by finding pairs of clauses that share the most common atoms and grouping them under a shared factor.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm DNF formula to factor.
+ * @return Factored formula with pairs of clauses grouped by shared atoms.
+ */
 template <NodeType node>
 tref group_dnf_expression(tref fm) {
 	using tau = tree<node>;
@@ -1223,6 +1401,7 @@ tref group_dnf_expression(tref fm) {
 }
 
 // Assume that fm is in DNF (or CNF -> set is_cnf to true)
+/** @internal @copydoc reduce */
 template<NodeType node, bool is_cnf>
 tref reduce(tref fm) {
 	using tau = tree<node>;
@@ -1268,6 +1447,13 @@ tref reduce(tref fm) {
 	return reduced_fm;
 }
 
+/** @brief Returns `true` when `v1` is a subsequence of `v2` under structural equality (for ordered variable sets).
+ * @internal
+ * @tparam node Tree node type.
+ * @param v1 First ordered sequence to test as a subsequence.
+ * @param v2 Second ordered sequence to search within.
+ * @return `true` if every element of `v1` appears in `v2` in order.
+ */
 template <NodeType node>
 bool is_ordered_subset(const auto& v1, const auto& v2) {
 	using tau = tree<node>;
@@ -1281,6 +1467,14 @@ bool is_ordered_subset(const auto& v1, const auto& v2) {
 	return false;
 }
 
+/** @brief Returns `true` if the sorted sets `v1` and `v2` share at least `i` elements.
+ * @internal
+ * @tparam node Tree node type.
+ * @param i Minimum number of shared elements required.
+ * @param v1 First sorted sequence.
+ * @param v2 Second sorted sequence.
+ * @return `true` if the overlap between `v1` and `v2` is at least `i`.
+ */
 template<NodeType node>
 bool is_ordered_overlap_at_least(size_t i, const trefs& v1, const trefs& v2) {
 	using tau = tree<node>;
@@ -1297,6 +1491,13 @@ bool is_ordered_overlap_at_least(size_t i, const trefs& v1, const trefs& v2) {
 	return i == 0;
 }
 
+/** @brief Returns the number of shared elements between sorted sets `v1` and `v2`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param v1 First sorted sequence.
+ * @param v2 Second sorted sequence.
+ * @return Count of elements appearing in both `v1` and `v2`.
+ */
 template<NodeType node>
 int_t get_ordered_overlap(const trefs& v1, const trefs& v2) {
 	using tau = tree<node>;
@@ -1311,11 +1512,13 @@ int_t get_ordered_overlap(const trefs& v1, const trefs& v2) {
 	return i;
 }
 
+/** @internal @copydoc wff_reduce_dnf */
 template <NodeType node>
 tref wff_reduce_dnf<node>::operator() (tref fm) const {
 	return reduce<node>(fm);
 }
 
+/** @internal @copydoc wff_reduce_cnf */
 template <NodeType node>
 tref wff_reduce_cnf<node>::operator() (tref fm) const {
 	return reduce<node, true>(fm);
@@ -1337,6 +1540,15 @@ typename tree<node>::traverser operator|(
 	return typename tree<node>::traverser(r(fm.value()));
 }
 
+/** @brief Distributes a conjunction of two formulas in DNF, producing their product DNF (cross-product of disjuncts).
+ * @internal
+ *
+ * Handles both wff and bf cases.
+ * @tparam node Tree node type.
+ * @param d1 First DNF formula.
+ * @param d2 Second DNF formula.
+ * @return Product DNF of `d1` and `d2`.
+ */
 template <NodeType node>
 tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
 	using tau = tree<node>;
@@ -1364,6 +1576,15 @@ tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
 	}
 }
 
+/** @brief Distributes a disjunction of two formulas in CNF, producing their product CNF.
+ * @internal
+ *
+ * Handles both wff and bf cases.
+ * @tparam node Tree node type.
+ * @param c1 First CNF formula.
+ * @param c2 Second CNF formula.
+ * @return Product CNF of `c1` and `c2`.
+ */
 template <NodeType node>
 tref disjunct_cnfs_to_cnf(tref c1, tref c2) {
 	using tau = tree<node>;
@@ -1392,6 +1613,7 @@ tref disjunct_cnfs_to_cnf(tref c1, tref c2) {
 }
 
 // Conversion to dnf while applying reductions during the process
+/** @internal @copydoc to_dnf */
 template <NodeType node, bool is_wff>
 tref to_dnf(tref fm) {
 	using tau = tree<node>;
@@ -1435,6 +1657,12 @@ tref to_dnf(tref fm) {
 	return r;
 }
 
+/** @brief Converts the top-level temporal layer of `fm` to DNF by distributing `wff_and` over `wff_or`, stopping at temporal quantifiers.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Formula whose temporal layer is to be converted to DNF.
+ * @return Formula with the temporal layer in DNF.
+ */
 // Conversion of temporal layer to dnf
 template <NodeType node>
 tref temporal_layer_to_dnf(tref fm) {
@@ -1462,6 +1690,7 @@ tref temporal_layer_to_dnf(tref fm) {
 }
 
 // Conversion to cnf while applying reductions during the process
+/** @internal @copydoc to_cnf */
 template <NodeType node, bool is_wff>
 tref to_cnf(tref fm) {
 	using tau = tree<node>;
@@ -1499,6 +1728,13 @@ tref to_cnf(tref fm) {
 					pn, all, layer_to_cnf);
 }
 
+/** @brief Pushes one existential quantifier one level inward: distributes over `wff_or`, pulls out independent conjuncts from `wff_and`, and commutes with other existentials.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Existentially quantified formula to push inward.
+ * @param excluded Optional set to record nodes that should not be revisited.
+ * @return Formula with the quantifier pushed one level deeper.
+ */
 template <NodeType node>
 tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded = nullptr) {
 	using tau = tree<node>;
@@ -1553,6 +1789,12 @@ tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded = null
 	}
 }
 
+/** @brief Pushes one universal quantifier one level inward: distributes over `wff_and`, pulls out independent disjuncts from `wff_or`, and commutes with other universals.
+ * @internal
+ * @tparam node Tree node type.
+ * @param fm Universally quantified formula to push inward.
+ * @return Formula with the quantifier pushed one level deeper.
+ */
 template <NodeType node>
 tref push_universal_quantifier_one(tref fm) {
 	using tau = tree<node>;
@@ -1594,6 +1836,12 @@ tref push_universal_quantifier_one(tref fm) {
 	else return scoped_fm;
 }
 
+/** @brief Iteratively pushes all existential and universal quantifiers inward using `push_existential_quantifier_one` and `push_universal_quantifier_one` until no further push is possible.
+ * @internal
+ * @tparam node Tree node type.
+ * @param formula Formula whose quantifiers are to be pushed inward.
+ * @return Formula with all quantifiers pushed as far inward as possible.
+ */
 template <NodeType node>
 tref push_quantifiers_in(tref formula) {
 	using tau = tree<node>;
@@ -1635,6 +1883,7 @@ tref push_quantifiers_in(tref formula) {
  * @brief The procedure tries to detect, using 0/1 substitutions for the provided
  * variable and syntactic comparison, if the atomic formula is equivalent to T
  * or F or independent of the provided variable.
+ * @internal
  * @tparam node Type of tree node
  * @param atomic_fm The atomic formula, ie an equation, to simplify
  * @param var The variable to base the simplifications on
@@ -1708,6 +1957,7 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 
 /**
  * @brief Simplify using assumptions from equalities in formula.
+ * @internal
  * @tparam node Type of tree node
  */
 
@@ -1960,6 +2210,7 @@ private:
 
 /**
  * @brief Syntactic simplifications for a formula or a term based on its paths.
+ * @internal
  * @tparam node Type of tree node
  */
 template <NodeType node>
@@ -2150,6 +2401,7 @@ public:
  * @brief Comparator for the BDD variable order used during simplification of
  * terms. It is used with std::stable_sort in order to preserve initial order
  * in the found BDD variables.
+ * @internal
  * @tparam node Type of tree node
  */
 template<NodeType node>
@@ -2217,6 +2469,7 @@ auto variable_order_for_simplification = [](tref l, tref r) static {
  * @brief Comparator for the BDD variable order used during simplification of a
  * formula. It is used with std::stable_sort in order to preserve initial order
  * in the found BDD variables.
+ * @internal
  * @tparam node Type of tree node
  */
 template<NodeType node>
@@ -2326,6 +2579,7 @@ auto atm_formula_order_for_simplification = [](tref l, tref r) static {
 
 /**
  * @brief Comparator for the BDD variable order used during anti-prenex algorithm.
+ * @internal
  * @tparam node Type of tree node
  */
 template<NodeType node>
@@ -2389,6 +2643,7 @@ auto atm_formula_order_for_quant_elim(auto& quant_pattern) {
 
 /**
  * @brief Applies syntactic simplifications to an atomic formula, ie an equation.
+ * @internal
  * @tparam node Tree node type
  * @param atomic_formula Formula to simplify
  * @return Simplified formula
@@ -2423,6 +2678,15 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 	return atomic_formula;
 }
 
+/** @brief Merges two equations `eq1` and `eq2` (both of the form `f (!)= 0`) into a single equation `f1|f2 (!)= 0`.
+ * @internal
+ *
+ * Both inputs must have the same sign.
+ * @tparam node Tree node type.
+ * @param eq1 First equation (must be `f1 = 0` or `f1 != 0`).
+ * @param eq2 Second equation (must be `f2 = 0` or `f2 != 0`, same sign as `eq1`).
+ * @return Merged equation `f1|f2 = 0` or `f1|f2 != 0`.
+ */
 // Squeeze two equations equal/unequal to zero into one equation
 template <NodeType node>
 tref squeeze(tref eq1, tref eq2) {
@@ -2445,6 +2709,19 @@ tref squeeze(tref eq1, tref eq2) {
 	return nullptr;
 }
 
+/** @brief Applies collected assumptions to an equation `eq` (stack overload with join tracking).
+ * @internal
+ *
+ * Iterates over the top of the assumption stack, squeezes or absorbs matching assumptions into `eq`,
+ * and records joins via the union-find `joins` and new assumptions in `additions`.
+ * @tparam node Tree node type.
+ * @param eq Equation to apply assumptions to; must be in `f (!)= 0` form.
+ * @param assms Stack of assumption lists; only the back (top) is used.
+ * @param joins Union-find structure tracking which assumptions were merged.
+ * @param additions Output list of new assumptions produced during application.
+ * @param dual `true` to apply dual semantics (swap squeeze and absorb roles).
+ * @return Updated equation.
+ */
 template <NodeType node>
 tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool dual = false) {
 	using tau = tree<node>;
@@ -2495,6 +2772,17 @@ tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool
 	return eq;
 }
 
+/** @brief Applies collected assumptions to an equation `eq` (stack overload).
+ * @internal
+ *
+ * Iterates over the top of the assumption stack, squeezes or absorbs matching assumptions into `eq`.
+ * Unlike the join-tracking overload, no union-find or additions list is maintained.
+ * @tparam node Tree node type.
+ * @param eq Equation to apply assumptions to; must be in `f (!)= 0` form.
+ * @param assms Stack of assumption lists; only the back (top) is used.
+ * @param dual `true` to apply dual semantics (swap squeeze and absorb roles).
+ * @return Updated equation.
+ */
 template <NodeType node>
 tref apply_assms(tref eq, const auto& assms, bool dual = false) {
 	using tau = tree<node>;
@@ -2527,6 +2815,17 @@ tref apply_assms(tref eq, const auto& assms, bool dual = false) {
 	return eq;
 }
 
+/** @brief Applies collected assumptions to an equation `eq` (single-assumption overload with variable guard).
+ * @internal
+ *
+ * Only applies `assm` when the equation contains `var`; uses overlap count to decide whether to squeeze or absorb.
+ * @tparam node Tree node type.
+ * @param eq Equation to apply assumptions to; must be in `f (!)= 0` form.
+ * @param assm Single assumption to apply.
+ * @param var Variable that must be present in `eq` for the assumption to be applied.
+ * @param dual `true` to apply dual semantics (swap squeeze and absorb roles).
+ * @return Updated equation.
+ */
 template <NodeType node>
 tref apply_assms(tref eq, tref assm, tref var, const bool dual = false) {
 	using tau = tree<node>;
@@ -2558,6 +2857,18 @@ tref apply_assms(tref eq, tref assm, tref var, const bool dual = false) {
 	return eq;
 }
 
+/** @brief Applies collected assumptions to an equation `eq` (single-assumption overload with updates output).
+ * @internal
+ *
+ * Only applies `assm` when the equation contains `var`; records the equation in `updates` before applying, then squeezes or absorbs as appropriate.
+ * @tparam node Tree node type.
+ * @param eq Equation to apply assumptions to; must be in `f (!)= 0` form.
+ * @param assm Single assumption to apply.
+ * @param var Variable that must be present in `eq` for the assumption to be applied.
+ * @param updates Output list to which `eq` is appended before application.
+ * @param dual `true` to apply dual semantics (swap squeeze and absorb roles).
+ * @return Updated equation.
+ */
 template <NodeType node>
 tref apply_assms(tref eq, tref assm, tref var, trefs& updates, const bool dual = false) {
 	using tau = tree<node>;
@@ -2591,6 +2902,13 @@ tref apply_assms(tref eq, tref assm, tref var, trefs& updates, const bool dual =
 	return eq;
 }
 
+/** @brief Merges joined assumption groups (tracked via a union-find `joins`) and appends new `additions` into the top of the assumption stack.
+ * @internal
+ * @tparam node Tree node type.
+ * @param assms Assumption stack whose back (top) is updated in place.
+ * @param joins Union-find structure whose sets drive the merging of existing assumptions.
+ * @param additions New assumption terms to append to the top of the stack.
+ */
 template <NodeType node>
 void update_assms(auto& assms, auto& joins, trefs& additions) {
 	using tau = tree<node>;
@@ -2617,6 +2935,14 @@ void update_assms(auto& assms, auto& joins, trefs& additions) {
 	}
 }
 
+/** @brief Squeezes pairs of equations in `eqs[0..primary_end)` that are "connected" according to the predicate, merging them into single equations and updating the end indices.
+ * @internal
+ * @tparam node Tree node type.
+ * @param eqs Vector of equations; modified in place as pairs are merged.
+ * @param primary_end Index past the last primary equation; decremented as equations are merged.
+ * @param total_end Index past all equations; decremented alongside `primary_end`.
+ * @param connected Binary predicate over free-variable lists returning `true` when two equations should be squeezed.
+ */
 // Merges equations in eqs[0..primary_end) that are "connected" per predicate.
 // primary_end and total_end are updated in-place as entries are removed.
 template<NodeType node>
@@ -2637,6 +2963,15 @@ void squeeze_connected_eqs(trefs& eqs, size_t& primary_end, size_t& total_end,
 	}
 }
 
+/** @brief Folds equations `eqs[0..eq_end)` using `build_f`, marks the intermediate result in `mark` to prevent revisiting, then folds in remaining equations `eqs[eq_end..size)`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param eqs Vector of equation nodes to fold.
+ * @param eq_end Index past the primary equations to fold and mark.
+ * @param mark Set of already-visited nodes; updated with the intermediate result.
+ * @param build_f Binary combinator (e.g. `build_wff_and` or `build_wff_or`) used to fold equations.
+ * @return Combined formula node.
+ */
 // Folds eqs[0..eq_end) with build_f, marks the equation subresult to prevent
 // revisiting, then folds in eqs[eq_end..size) and returns the combined node.
 template<NodeType node>
@@ -2664,6 +2999,7 @@ tref build_and_mark_result(trefs& eqs, size_t eq_end,
  * - if A is = 0 and given f != 0, we produce f & A' != 0
  * - if A is != 0 and given f != 0, we produce f|A != 0
  * - if A is != 0 and given f = 0, we produce f & A' = 0
+ * @internal
  * @tparam node Tree node type
  * @param formula The formula to apply the procedure to
  * @return The mutated formula
@@ -2799,6 +3135,7 @@ tref squeeze_absorb(tref formula) {
  * - if A is = 0 and given f != 0, we produce f & A' != 0
  * - if A is != 0 and given f != 0, we produce f|A != 0
  * - if A is != 0 and given f = 0, we produce f & A' = 0
+ * @internal
  * @tparam node Tree node type
  * @param formula The formula to apply the procedure to
  * @param var The shared variable for squeeze/absorb
@@ -2922,6 +3259,7 @@ tref squeeze_absorb(tref formula, tref var) {
 /**
  * @brief Do a single Boole decomposition step on term given the provided variable.
  * Assumes that the decomposition is valid.
+ * @internal
  * @tparam node Tree node type
  * @param term The term on which to apply Boole decomposition step
  * @param var The variable on which to do Boole decomposition
@@ -2956,6 +3294,7 @@ tref term_boole_decomposition(tref term, tref var) {
  * @brief Recursively do Boole decomposition on term using the provided variables
  * starting at idx.
  * Assumes that the decomposition is valid for all provided variables.
+ * @internal
  * @tparam node Tree node type
  * @param term Term on which to do Boole decomposition
  * @param vars The variables to do Boole decomposition on
@@ -3013,6 +3352,7 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 /**
  * @brief Convert term to Boole normal form. Also treats normalization of
  * encountered tau constants.
+ * @internal
  * @tparam node Tree node type
  * @param term The term to do the Boole decomposition on
  * @return The resulting Boole decomposition
@@ -3069,6 +3409,7 @@ tref term_boole_decomposition(tref term) {
  * @brief Recursively do Boole decomposition on formula using the provided variables
  * starting at idx.
  * Assumes that the decomposition is valid for all provided variables.
+ * @internal
  * @tparam node Tree node type
  * @param formula The formula to do Boole decomposition on
  * @param vars The variable to perform the Boole decomposition on
@@ -3116,6 +3457,7 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 /**
  * This procedure converts the formula to Boole normal form. It also converts all
  * terms to Boole normal form.
+ * @internal
  * @tparam node Tree node type
  * @param bnf The formula to convert to Boole normal form
  * @return The resulting Boole normal form
@@ -3204,6 +3546,7 @@ tref boole_normal_form(tref formula) {
 	return eq_bnf;
 }
 
+/** @internal @copydoc term_boole_normal_form */
 template<NodeType node>
 tref term_boole_normal_form(tref formula) {
 	using tau = tree<node>;
@@ -3256,6 +3599,7 @@ tref term_boole_normal_form(tref formula) {
  * @brief Performs a Boole decomposition step on the formula with the goal to push
  * the existential quantifier further in. Since the BDD variables are atomic formulas,
  * the procedure investigates the best Boole decomposition in each situation.
+ * @internal
  * @tparam node Tree node type
  * @param ex_quant_fm Existentially quantified formula on which to perform Boole decomposition step
  * @param pool The pool of variables that can be used for the Boole decomposition
@@ -3393,6 +3737,19 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	return tau::build_wff_or(nl, nr);
 }
 
+/** @brief Core recursive helper for the anti-prenex block algorithm.
+ * @internal
+ *
+ * Pushes a block of existential quantifier variables into a formula by splitting on disjunctions,
+ * isolating dependent conjuncts, and performing Boole decomposition.
+ * @tparam node Tree node type.
+ * @param formula Formula to push the quantifier block into.
+ * @param block Ordered list of existentially quantified variables to push.
+ * @param used_atms Set of atomic formulas already consumed in the current recursion; updated in place.
+ * @param quant_pattern Map from quantified variables to their priority for BDD variable ordering.
+ * @param order Variable ordering relation used by `resolve_quantifiers2`.
+ * @return Formula with the quantifier block pushed as far inward as possible.
+ */
 template<NodeType node>
 tref anti_prenex_block(tref formula, const trefs& block,
 	subtree_unordered_set<node>& used_atms,
@@ -3516,6 +3873,14 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	return formula;
 }
 
+/** @brief Processes one maximal same-type quantifier block rooted at `n`.
+ * @internal
+ *
+ * BV-typed blocks fall back to `anti_prenex`; ∃-blocks are pushed in via the 5-arg `anti_prenex_block`; ∀-blocks are dualized to ∃-blocks.
+ * @tparam node Tree node type.
+ * @param n Formula node whose direct child is a quantifier.
+ * @return Formula with the quantifier block eliminated or pushed inward.
+ */
 // Processes one quantifier block rooted at n:
 // - BV-typed blocks fall back to anti_prenex (CVC5 / trivially-vacuous elim).
 // - ∃-blocks: push into body with the 5-arg anti_prenex_block, resolve
@@ -3590,6 +3955,12 @@ tref process_quantifier_block(tref n) {
 	return result;
 }
 
+/** @brief Drives the full anti-prenex-block pipeline: NNF + syntactic simplification, substitution-based elimination, canonical operator normalization, then post-order application of `process_quantifier_block`.
+ * @internal
+ * @tparam node Tree node type.
+ * @param formula Formula to process.
+ * @return Formula with quantifiers pushed inward as far as possible using the block-based algorithm.
+ */
 template<NodeType node>
 tref anti_prenex_block(tref formula) {
 	using tau = tree<node>;
@@ -3637,6 +4008,16 @@ tref anti_prenex_block(tref formula) {
 	return syntactic_formula_simplification<node>(formula);
 }
 
+/** @brief Pushes a block of existential quantifiers into a single atomic clause.
+ * @internal
+ *
+ * Separates positive (`= 0`) and negative (`!= 0`) equations, squeezes positives into one BDD quantifier call, and adjusts negatives accordingly.
+ * @tparam node Tree node type.
+ * @param clause Atomic clause (conjunction of equations) to push the block into.
+ * @param block Ordered list of existentially quantified variables.
+ * @param order Variable ordering relation (unused currently, reserved for future use).
+ * @return Clause with the quantifier block absorbed or re-attached when not removable.
+ */
 // NOTE: BV-typed and non-atomless quantifier blocks are not handled here.
 // process_quantifier_block detects BV-typed nodes and falls back to
 // anti_prenex, which uses CVC5 for closed BV formulas and
@@ -3728,6 +4109,7 @@ tref push_ex_block_into_clause(tref clause, const trefs& block,
 /**
  * @brief The procedure pushes all quantifiers that are present in formula as far
  * in as possible.
+ * @internal
  * @tparam node Tree node type
  * @param formula The formula to apply the procedure to
  * @return The resulting formula
@@ -3877,6 +4259,7 @@ tref anti_prenex(tref formula) {
 
 /**
  * @brief Resolve quantifiers with a custom variable ordering.
+ * @internal
  *
  * Variant of `resolve_quantifiers` that uses the provided `order` relation to
  * sort variables before the elimination step.
@@ -3972,6 +4355,16 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 #define LOG_CHANNEL_NAME "to_snf"
 
 
+/** @brief Builds a formula that "splits" variables `a` and `b` according to `type`.
+ * @internal
+ *
+ * For `bf_eq` produces `(a & b) | (!a & !b)`; otherwise `(a | !b) & (!a | b)`.
+ * @tparam node Tree node type.
+ * @param type Node type selector; `bf_eq` for the biconditional split, anything else for XOR-style split.
+ * @param a First formula operand.
+ * @param b Second formula operand.
+ * @return Split formula combining `a` and `b` according to `type`.
+ */
 template <NodeType node>
 tref build_split_wff_using(typename node::type type, tref a, tref b) {
 	using tau = tree<node>;
@@ -3986,6 +4379,7 @@ tref build_split_wff_using(typename node::type type, tref a, tref b) {
 		tau::build_wff_or(tau::build_wff_neg(a), b));
 }
 
+/** @internal @copydoc anf */
 template <NodeType node, size_t type>
 tref anf(tref n) {
 	// TODO (MEDIUM) write anf (using?)
@@ -3993,6 +4387,7 @@ tref anf(tref n) {
 	return n;
 }
 
+/** @internal @copydoc pnf */
 template <NodeType node>
 tref pnf(tref n) {
 	// TODO (MEDIUM) write pnf (using?)
