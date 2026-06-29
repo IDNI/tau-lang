@@ -67,7 +67,7 @@ bool simplify_using_equality_term_comp(tref l, tref r) {
 
 // Sort conjuncts so equalities (and equational assignments) come first.
 template <NodeType node>
-void sue_sort_atms(auto& conjs) {
+void simplify_using_equality_sort_atms(auto& conjs) {
 	using tau = tree<node>;
 	auto eq_comp = [](tref l, tref r) {
 		const tau& nl = tau::get(l);
@@ -84,7 +84,7 @@ void sue_sort_atms(auto& conjs) {
 
 // Orient a = b / a != b so the larger side (per term_comp) is on the left.
 template <NodeType node>
-tref sue_direct_atm(tref atm) {
+tref simplify_using_equality_direct_atm(tref atm) {
 	using tau = tree<node>;
 	const tau& c = tau::get(atm)[0];
 	if (!c.is(tau::bf_eq) && !c.is(tau::bf_neq)) return atm;
@@ -194,19 +194,19 @@ tref simplify_using_equality(tref fm) {
 		}
 		if (cn.is(tau::bf_eq)) {
 			n = syntactic_atomic_formula_simplification<node>(n);
-			n = sue_direct_atm<node>(n);
+			n = simplify_using_equality_direct_atm<node>(n);
 			tref s = simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
 			if (!is_child<node>(s, tau::bf_eq)) return s;
 			if (simplify_using_equality_add_equality<node>(uf_stack.back(), s)) return s;
 			else return _F<node>();
 		} else if (is_atomic_fm<node>(n)) {
 			n = syntactic_atomic_formula_simplification<node>(n);
-			n = sue_direct_atm<node>(n);
+			n = simplify_using_equality_direct_atm<node>(n);
 			return simplify_using_equality_simplify_equation<node>(uf_stack.back(), n);
 		} else if (cn.is(tau::wff_and)) {
 			if (mark.contains(n)) return n;
 			trefs conjs = get_cnf_wff_clauses<node>(n);
-			sue_sort_atms<node>(conjs);
+			simplify_using_equality_sort_atms<node>(conjs);
 			n = conjs[0];
 			for (size_t i = 1; i < conjs.size(); ++i) {
 				n = tau::build_wff_and(n, conjs[i]);
