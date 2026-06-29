@@ -32,11 +32,7 @@ tref normalize(tref form) {
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	// First resolve quantifiers in formulas below temporal quantifiers
-	auto st_aw = [](tref n) {
-		return is_child<node>(n, tau::wff_sometimes)
-			|| is_child<node>(n, tau::wff_always);
-	};
-	trefs temps = tau::get(form).select_top(st_aw);
+	trefs temps = tau::get(form).select_top(is_child_temporal_quantifier<node>);
 	// Case that the formula has no temporal quantifier
 	if (temps.empty()) {
 		// Resolve closed quantified bv subformulas before anti_prenex_block:
@@ -547,12 +543,7 @@ tref fold_trivial_quantifiers(tref fm) {
 template<NodeType node>
 std::optional<tref> simplify_temporal_clause(tref clause) {
 	using tau = tree<node>;
-	auto trim_q = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.child_is(tau::wff_sometimes)
-			|| t.child_is(tau::wff_always)) return t[0].first();
-		return n;
-	};
+
 	const auto& t = tau::get(clause);
 	trefs aw_parts = t.select_top(is_child<node, tau::wff_always>);
 	trefs st_parts = t.select_top(is_child<node, tau::wff_sometimes>);
@@ -583,16 +574,18 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 
 	// Clause is unsatisfiable if any always ∧ sometimes pair is unsat.
 	for (tref aw : aw_parts) for (tref st : st_parts) {
-		tref f = tau::build_wff_and(trim_q(aw), trim_q(st));
+		tref f = tau::build_wff_and(
+			get_temporally_quantified_formula<node>(aw),
+			get_temporally_quantified_formula<node>(st));
 		if (is_non_temp_nso_unsat<node>(f)) return std::nullopt;
 	}
 
 	// Eliminate sometimes parts implied by any always part.
 	for (tref aw : aw_parts) for (tref& st : st_parts)
-		if (is_nso_impl<node>(aw, trim_q(st))) st = tau::_T();
+		if (is_nso_impl<node>(aw, get_temporally_quantified_formula<node>(st))) st = tau::_T();
 
 	// Eliminate sometimes parts implied by other sometimes parts.
-	eliminate_implied(st_parts, trim_q);
+	eliminate_implied(st_parts, get_temporally_quantified_formula<node>);
 
 	new_clause = tau::build_wff_and(new_clause, tau::build_wff_and(
 				tau::build_wff_and(aw_parts),
@@ -1099,17 +1092,8 @@ tref normalize_temporal_quantifiers(tref fm) {
 					? term_boole_normal_form<node>(arg)
 					: arg;
 	};
-	auto st_aw = [](tref n) {
-		return is_child<node>(n, tau::wff_sometimes)
-			|| is_child<node>(n, tau::wff_always);
-	};
-	auto rm_temp_quant = [&st_aw](tref n) {
-		if (st_aw(n)) return tau::trim2(n);
-		return n;
-	};
 	if (has_temp_var<node>(fm)) {
-		const bool has_temp_quant = tau::get(fm).find_top(st_aw);
-		if (has_temp_quant) {
+		if (tau::get(fm).find_top(is_temporal_quantifier<node>)) {
 			// By assumption, all temporal variables are explicitly
 			// quantified by temporal quantifier without nesting.
 			// DNF conversion is only done on temporal level
@@ -1123,7 +1107,7 @@ tref normalize_temporal_quantifiers(tref fm) {
 				if (!has_temp_var<node>(clause)) {
 					// Remove all temporal quantifiers
 					clause = pre_order<node>(clause).
-							apply_unique(rm_temp_quant);
+							apply_unique(get_temporally_quantified_formula<node>);
 					non_temp_clauses = tau::build_wff_or(
 						non_temp_clauses, clause);
 					continue;
@@ -1133,19 +1117,16 @@ tref normalize_temporal_quantifiers(tref fm) {
 				// In each clause squeeze all always statements
 				for (tref conj : get_cnf_wff_clauses<node>(clause)) {
 					// All parts are temporally quantified
-					DBG(assert(st_aw(conj) ||
-						!has_temp_var<node>(conj));)
+					DBG(assert(is_child_temporal_quantifier<node>(conj) || !has_temp_var<node>(conj));)
 					if (!has_temp_var<node>(conj))
 						always_part = tau::build_wff_and(
-							always_part, rm_temp_quant(conj));
+							always_part, get_temporally_quantified_formula<node>(conj));
 					// TODO: always conjunction is inefficient
 					else if (!is_child<node>(conj, tau::wff_sometimes))
-						always_part = always_conjunction<node>(
-							always_part, conj);
+						always_part = always_conjunction<node>(always_part, conj);
 					else staying = tau::build_wff_and(
 						staying,
-						tau::build_wff_sometimes(
-							norm(tau::trim2(conj))));
+						tau::build_wff_sometimes(norm(tau::trim2(conj))));
 				}
 				always_part = tau::build_wff_always(norm(always_part));
 				clause = tau::build_wff_and(always_part, staying);
@@ -1162,7 +1143,7 @@ tref normalize_temporal_quantifiers(tref fm) {
 		}
 	} else {
 		// No temporal variable, so no temporal quantifier needed
-		fm = pre_order<node>(fm).apply_unique(rm_temp_quant);
+		fm = pre_order<node>(fm).apply_unique(get_temporally_quantified_formula<node>);
 		return norm(fm);
 	}
 }

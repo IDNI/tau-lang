@@ -35,8 +35,6 @@ inline std::function<bool(tref)> is(std::initializer_list<size_t> nts) {
 	return [nts](tref n) { return is<node>(n, nts); };
 }
 
-
-
 template <NodeType node>
 bool is_child(tref n, size_t nt) {
 	return tree<node>::get(n).child_is(nt);
@@ -61,6 +59,13 @@ template <NodeType node>
 bool is_temporal_quantifier(tref n) {
 	return tree<node>::get(n).is(node::type::wff_always)
 		|| tree<node>::get(n).is(node::type::wff_sometimes);
+
+}
+
+template <NodeType node>
+bool is_child_temporal_quantifier(tref n) {
+	return tree<node>::get(n).child_is(node::type::wff_always)
+		|| tree<node>::get(n).child_is(node::type::wff_sometimes);
 
 }
 
@@ -273,4 +278,13 @@ bool is_equational_assignment(tref eq) {
 	if (t[1].child_is(tau::variable)) return true;
 	return false;
 }
+
+template <NodeType node>
+tref get_temporally_quantified_formula(tref n) {
+	using tau = tree<node>;
+	if (is_child_temporal_quantifier<node>(n)) return tau::trim2(n);
+	else if (is_temporal_quantifier<node>(n)) return tau::trim(n);
+	return n;
+}
+
 } // namespace idni::tau_lang
