@@ -34,7 +34,11 @@ set(TESTS
 	heuristics-bv_ba_cvc5_simplification
 	heuristics-bv_predicate_blasting
 	heuristics-bv_predicate_blasting_predicates
-	blasting_correctness_check
+	blasting_correctness_check1
+	blasting_correctness_check2
+	blasting_correctness_check3
+	blasting_correctness_check4
+	blasting_correctness_check5
 )
 
 foreach(X IN LISTS TESTS)

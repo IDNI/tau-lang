@@ -1,0 +1,72 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+#include "test_integration-blasting_correctness_check.helper.h"
+
+TEST_SUITE("configuration") {
+
+	TEST_CASE("bdd_init") {
+		bdd_init<Bool>();
+	}
+
+	TEST_CASE("logging") {
+		logging::trace();
+	}
+}
+
+// ---------------------------------------------------------------------------
+// blasting-8bit-16var
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("blasting_8bit_16var") {
+
+	TEST_CASE("add_or_commutativity") {
+		const char* f = "all a:bv[8] all b:bv[8] all c:bv[8] all d:bv[8] all e:bv[8] all f:bv[8] all g:bv[8] all h:bv[8] all i:bv[8] all j:bv[8] all k:bv[8] all l:bv[8] all m:bv[8] all o:bv[8] all p:bv[8] all q:bv[8] a + b + c + d + e + f + g + h = h + g + f + e + d + c + b + a && i | j | k | l | m | o | p | q = q | p | o | m | l | k | j | i";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("chain_ineq_gap") {
+		const char* f = "ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] ex e:bv[8] ex f:bv[8] ex g:bv[8] ex h:bv[8] ex i:bv[8] ex j:bv[8] ex k:bv[8] ex l:bv[8] ex m:bv[8] ex o:bv[8] ex p:bv[8] ex q:bv[8] a < b && b < c && c < d && d < e && e < f && f < g && g < h && h < i && i < j && j < k && k < l && l < m && m < o && o < p && p < q && q - a >= { 15 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("and_commutativity") {
+		const char* f = "all a:bv[8] all b:bv[8] all c:bv[8] all d:bv[8] all e:bv[8] all f:bv[8] all g:bv[8] all h:bv[8] all i:bv[8] all j:bv[8] all k:bv[8] all l:bv[8] all m:bv[8] all o:bv[8] all p:bv[8] all q:bv[8] (a & b) | (c & d) | (e & f) | (g & h) | (i & j) | (k & l) | (m & o) | (p & q) = (b & a) | (d & c) | (f & e) | (h & g) | (j & i) | (l & k) | (o & m) | (q & p)";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("arith_composition") {
+		const char* f = "ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] ex e:bv[8] ex f:bv[8] ex g:bv[8] ex h:bv[8] ex i:bv[8] ex j:bv[8] ex k:bv[8] ex l:bv[8] ex m:bv[8] ex o:bv[8] ex p:bv[8] ex q:bv[8] a > { 0 }:bv[8] && b = a * { 2 }:bv[8] && b > a && c = b + a && d = c >> { 1 }:bv[8] && e = d + a && f = e % { 7 }:bv[8] && g = f + a && h = g & a && h > { 0 }:bv[8] && i = a | b && j = i ^ c && k = j & d && l = k + e && m = l >> { 1 }:bv[8] && o = m | f && p = o ^ g && q = p & h && q > { 0 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("xor_xnor_nand_nor_commutativity") {
+		const char* f = "all a:bv[8] all b:bv[8] all c:bv[8] all d:bv[8] all e:bv[8] all f:bv[8] all g:bv[8] all h:bv[8] all i:bv[8] all j:bv[8] all k:bv[8] all l:bv[8] all m:bv[8] all o:bv[8] all p:bv[8] all q:bv[8] a ^ b ^ c ^ d ^ e ^ f ^ g ^ h = h ^ g ^ f ^ e ^ d ^ c ^ b ^ a && i !^ j = j !^ i && k !& l = l !& k && m !| o = o !| m && p | q >= p && p | q >= q";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("xor_and_sat") {
+		const char* f = "ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] ex e:bv[8] ex f:bv[8] ex g:bv[8] ex h:bv[8] ex i:bv[8] ex j:bv[8] ex k:bv[8] ex l:bv[8] ex m:bv[8] ex o:bv[8] ex p:bv[8] ex q:bv[8] a < b && b < c && c < d && d < e && e < f && f < g && g < h && i = a + h && j = b + g && k = c + f && l = d + e && m = i ^ j && o = k ^ l && p = m ^ o && q = p + a && q > a";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("or_and_order") {
+		const char* f = "all a:bv[8] all b:bv[8] all c:bv[8] all d:bv[8] all e:bv[8] all f:bv[8] all g:bv[8] all h:bv[8] all i:bv[8] all j:bv[8] all k:bv[8] all l:bv[8] all m:bv[8] all o:bv[8] all p:bv[8] all q:bv[8] a | b >= a && c | d >= c && e | f >= e && g | h >= g && i & j <= i && k & l <= k && m & o <= m && p & q <= p";
+		check_blasting_correctness(f);
+	}
+
+	// TEST_CASE("shift_mul_div_sat") {
+	// 	const char* f = "ex a:bv[8] ex b:bv[8] ex c:bv[8] ex d:bv[8] ex e:bv[8] ex f:bv[8] ex g:bv[8] ex h:bv[8] ex i:bv[8] ex j:bv[8] ex k:bv[8] ex l:bv[8] ex m:bv[8] ex o:bv[8] ex p:bv[8] ex q:bv[8] a > { 0 }:bv[8] && b = a << { 1 }:bv[8] && b > a && c = b << { 1 }:bv[8] && d = c >> { 1 }:bv[8] && d = b && e = a * { 3 }:bv[8] && f = e / { 3 }:bv[8] && f = a && g = a | b && h = g & c && h > { 0 }:bv[8] && i = a + b && j = i % { 7 }:bv[8] && k = j + a && l = k & b && m = l | c && o = m ^ d && p = o + a && q = p >> { 1 }:bv[8] && q > { 0 }:bv[8]";
+	// 	check_blasting_correctness(f);
+	// }
+
+	TEST_CASE("alt_quant_negation") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] all e:bv[8] ex f:bv[8] all g:bv[8] ex h:bv[8] all i:bv[8] ex j:bv[8] all k:bv[8] ex l:bv[8] all m:bv[8] ex o:bv[8] all p:bv[8] ex q:bv[8] a + b = { 0 }:bv[8] && c + d = { 0 }:bv[8] && e + f = { 0 }:bv[8] && g + h = { 0 }:bv[8] && i + j = { 0 }:bv[8] && k + l = { 0 }:bv[8] && m + o = { 0 }:bv[8] && p + q = { 0 }:bv[8]";
+		check_blasting_correctness(f);
+	}
+
+	TEST_CASE("alt_quant_cross_dep") {
+		const char* f = "all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] all e:bv[8] ex f:bv[8] all g:bv[8] ex h:bv[8] all i:bv[8] ex j:bv[8] all k:bv[8] ex l:bv[8] all m:bv[8] ex o:bv[8] all p:bv[8] ex q:bv[8] b = a ^ { 255 }:bv[8] && d = c + b && f = e & b && h = g | d && j = i ^ f && l = k + j && o = m & l && q = p | o";
+		check_blasting_correctness(f);
+	}
+
+}
