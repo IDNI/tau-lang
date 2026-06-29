@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "normal_forms_transformations.h"
+#include "heuristics/simplify_using_equality.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
@@ -260,7 +261,7 @@ tref replace_free_vars_by(tref fm, tref val) {
  */
 template<NodeType node>
 tref syntactic_formula_simplification(tref formula) {
-	formula = simplify_using_equality<node>::on(formula);
+	formula = simplify_using_equality<node>(formula);
 	return syntactic_path_simplification<node>::on(formula);
 }
 

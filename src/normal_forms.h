@@ -228,18 +228,6 @@ template <NodeType node>
 tref to_nnf(tref fm);
 
 /**
- * @brief Equality-aware simplifier using a union-find data structure.
- *
- * Traverses a formula in pre-order and, at each `bf_eq` node, records the
- * equality in a union-find structure (stacked per disjunction branch). Later
- * occurrences of terms known to be equal are replaced by their canonical
- * representative, potentially simplifying the whole formula to `T` or `F`.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-struct simplify_using_equality;
-
-/**
  * @brief Path-based syntactic simplifier for wff and bf.
  *
  * Detects syntactically contradictory or tautological sub-formulas along every
