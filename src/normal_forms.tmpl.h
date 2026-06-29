@@ -41,7 +41,7 @@ tref not_equal_to_unequal(tref fm) {
 		return n;
 	};
 	tref result = pre_order<node>(fm)
-				.apply_unique(not_eq_to_neq, visit_wff<node>);
+				.apply_unique(not_eq_to_neq, while_is_formula<node>);
 	LOG_TRACE << "not_equal_to_unequal: " << LOG_FM(result);
 	return result;
 }
@@ -84,7 +84,7 @@ tref normalize_atomic_formula_operators(tref fm) {
 		}
 	};
 	tref result = pre_order<node>(fm)
-				.apply_unique(normalize_operators, visit_wff<node>);
+				.apply_unique(normalize_operators, while_is_formula<node>);
 	LOG_TRACE << "End normalize_atomic_formula_operators: " << LOG_FM(result);
 	return result;
 }
@@ -117,7 +117,7 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 		}
 	};
 	tref result = pre_order<node>(fm)
-				.apply_unique(normalize_operators, visit_wff<node>);
+				.apply_unique(normalize_operators, while_is_formula<node>);
 	LOG_TRACE << "gt_gteq_to_lt_lteq: " << LOG_FM(result);
 	return result;
 }
@@ -167,7 +167,7 @@ tref squeeze_wff(const tref& fm) {
 		}
 		return n;
 	};
-	tref result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	tref result = post_order<node>(fm).apply_unique(f, while_is_formula<node>);
 	LOG_TRACE << "squeeze_wff result: " << LOG_FM(result);
 	return result;
 }
@@ -201,7 +201,7 @@ tref squeeze_wff_pos(tref fm) {
 		}
 		return n;
 	};
-	tref result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	tref result = post_order<node>(fm).apply_unique(f, while_is_formula<node>);
 	LOG_TRACE << "squeeze_wff_pos result: " << LOG_FM(result);
 	return result;
 }
@@ -237,7 +237,7 @@ tref squeeze_wff_neg(tref fm) {
 		}
 		return n;
 	};
-	auto result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	auto result = post_order<node>(fm).apply_unique(f, while_is_formula<node>);
 	LOG_TRACE << "squeeze_wff_neg result: " << LOG_FM(result);
 	return result;
 }
@@ -1706,7 +1706,7 @@ tref to_dnf(tref fm) {
 	tref r;
 	if constexpr (is_wff) r = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_dnf_m>(
-					pn, visit_wff<node>, layer_to_dnf);
+					pn, while_is_formula<node>, layer_to_dnf);
 	else r = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_dnf_m>(
 					pn, all, layer_to_dnf);
@@ -1781,7 +1781,7 @@ tref to_cnf(tref fm) {
 	};
 	if constexpr (is_wff) return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf_m>(
-					pn, visit_wff<node>, layer_to_cnf);
+					pn, while_is_formula<node>, layer_to_cnf);
 	else return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf_m>(
 					pn, all, layer_to_cnf);
@@ -1936,7 +1936,7 @@ tref push_quantifiers_in(tref formula) {
 		return n;
 	};
 	auto visit = [&excluded_nodes](tref n) {
-		return visit_wff<node>(n) && !excluded_nodes.contains(n);
+		return is_formula<node>(n) && !excluded_nodes.contains(n);
 	};
 	return pre_order<node>(formula).apply_unique(push_quantifiers, visit);
 }
@@ -1958,7 +1958,9 @@ tref push_quantifiers_in(tref formula) {
 template<NodeType node>
 tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	using tau = tree<node>;
+
 	DBG(assert(tau::get(var).is(tau::variable));)
+
 #ifdef TAU_CACHE
 	using cache_t = std::unordered_map<std::pair<tref, tref>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
@@ -1966,9 +1968,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		tau::trim_right_sibling(var))); it != end(cache))
 		return it->second;
 #endif // TAU_CACHE
+
 	// Return early if atomic_fm is either T or F
-	if (tau::get(atomic_fm).equals_T() || tau::get(atomic_fm).equals_F())
-		return atomic_fm;
+	if (tau::get(atomic_fm).equals_T() || tau::get(atomic_fm).equals_F()) return atomic_fm;
+
 	DBG(LOG_TRACE << "Syntactic_variable_simplification on " << LOG_FM(atomic_fm) << "\n";)
 	DBG(LOG_TRACE << "with var: " << LOG_FM(var) << "\n";)
 	var = tau::get(tau::bf, var);
@@ -1979,9 +1982,9 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	tref func2 = tau::get(atomic_fm)[0].second();
 	// Make sure that it works only on Boolean parts by using replace_if
 	tref func1_v_0 = rewriter::replace_if<node>(func1, var,
-		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+		_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	tref func1_v_1 = rewriter::replace_if<node>(func1, var,
-		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+		_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	// Is func syntactically identically 0
 	if (tau::get(func1_v_0).equals_0() && tau::get(func1_v_1).equals_0())
 		func1 = tau::_0(find_ba_type<node>(func1));
@@ -1997,9 +2000,9 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 			tau::get(tau::wff, tau::get(atm_type, func1, func2)));
 	// Simplify func2
 	tref func2_v_0 = rewriter::replace_if<node>(func2, var,
-		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+		_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	tref func2_v_1 = rewriter::replace_if<node>(func2, var,
-		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+		_1<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	// Is func syntactically identically 0
 	if (tau::get(func2_v_0).equals_0() && tau::get(func2_v_1).equals_0())
 		func2 = tau::_0(find_ba_type<node>(func2));
@@ -2164,7 +2167,7 @@ struct simplify_using_equality {
 		auto visit = [](tref n) {
 			if (is_quantifier<node>(n)) return false;
 			if (is_temporal_quantifier<node>(n)) return false;
-			return visit_wff<node>(n);
+			return is_formula<node>(n);
 		};
 		fm = pre_order<node>(fm).apply(f, visit, up);
 		DBG(LOG_DEBUG << "Simplify_using_equality result: " << LOG_FM(fm) << "\n";)
@@ -2344,7 +2347,7 @@ class syntactic_path_simplification {
 		auto visit = [&skip](tref n) {
 			if (skip != nullptr && tau::get(n) == tau::get(skip))
 				return skip = nullptr, false;
-			return visit_wff<node>(n);
+			return is_formula<node>(n);
 		};
 		return pre_order<node>(root).template
 			apply_unique<synt_path_simp_m>(down, visit);
@@ -2376,7 +2379,7 @@ class syntactic_path_simplification {
 					_1<node>(find_ba_type<node>(l)));
 			}
 			tref simp = rewriter::replace_if(n, assignments,
-				is_boolean_operation<node>);
+				while_is_boolean_operation<node>);
 			// If simp is false, current branch is not sat
 			if (tau::get(simp).equals_0()) {
 				// Remove branch
@@ -2404,7 +2407,7 @@ class syntactic_path_simplification {
 		auto visit = [&](tref n) {
 			if (skip != nullptr && tau::get(n) == tau::get(skip))
 				return skip = nullptr, false;
-			return is_boolean_operation<node>(n);
+			return is_boolean_operation<node>(n) || is<node, tau::bf>(n);
 		};
 		return pre_order<node>(root).template
 			apply_unique<synt_path_simp_m>(down, visit);
@@ -3205,7 +3208,7 @@ tref squeeze_absorb(tref formula) {
 		if (is_quantifier<node>(n)) return false;
 		if (is_temporal_quantifier<node>(n)) return false;
 		if (mark.contains(n)) return false;
-		return visit_wff<node>(n);
+		return is_formula<node>(n);
 	};
 	// Disable intermediate simplifications for the moment
 	tau::use_hooks = false;
@@ -3337,7 +3340,7 @@ tref squeeze_absorb(tref formula, tref var) {
 		if (is_quantifier<node>(n)) return false;
 		if (is_temporal_quantifier<node>(n)) return false;
 		if (mark.contains(n)) return false;
-		return visit_wff<node>(n);
+		return is_formula<node>(n);
 	};
 	// Disable intermediate simplifications for the moment
 	tau::use_hooks = false;
@@ -3602,7 +3605,7 @@ tref boole_normal_form(tref formula) {
 		}
 		return n;
 	};
-	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, while_is_formula<node>);
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(formula) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	bnf = syntactic_formula_simplification<node>(bnf);
@@ -3682,7 +3685,7 @@ tref term_boole_normal_form(tref formula) {
 		}
 		return n;
 	};
-	tbnf = pre_order<node>(tbnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	tbnf = pre_order<node>(tbnf).apply_unique_until_change(simp_eqs, while_is_formula<node>);
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(tbnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	tbnf = syntactic_formula_simplification<node>(tbnf);
@@ -4077,7 +4080,7 @@ tref anti_prenex_block(tref formula) {
 	// Use find_top_until to avoid descending into tau_ba sub-trees, which
 	// may contain wff_all/wff_ex nodes over I/O variables internally.
 	if (!tau::get(formula).find_top_until(is_quantifier<node>,
-		[](tref n) { return !visit_wff<node>(n); }))
+		[](tref n) { return !while_is_formula<node>(n); }))
 		return formula;
 
 	// Step 1: NNF + syntactic simplification
@@ -4110,7 +4113,7 @@ tref anti_prenex_block(tref formula) {
 	// remaining quantifiers over atomic formulas via resolve_quantifiers2.
 	// wff_all blocks are handled by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
 	formula = post_order<node>(formula).apply_unique(
-		process_quantifier_block<node>, visit_wff<node>);
+		process_quantifier_block<node>, while_is_formula<node>);
 	return syntactic_formula_simplification<node>(formula);
 }
 
@@ -4270,7 +4273,7 @@ tref anti_prenex(tref formula) {
 		};
 		auto step_visit = [&] (tref t) {
 			if (excluded.contains(t)) return false;
-			return visit_wff<node>(t);
+			return is_formula<node>(t);
 		};
 		if (!is_child_quantifier<node>(n)) return n;
 		// Here child is quantifier
@@ -4338,7 +4341,7 @@ tref anti_prenex(tref formula) {
 	auto visit = [&](tref n) {
 		if (is_quantifier<node>(n))
 			quant_pattern.insert_or_assign(tau::trim(n), qid++);
-		return visit_wff<node>(n);
+		return is_formula<node>(n);
 	};
 	DBG(LOG_DEBUG << "Anti_prenex on " << LOG_FM(formula) << "\n";)
 	// Initial simplification of formula
@@ -4455,7 +4458,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 	};
 	auto visit = [&](tref n) {
 		if (excluded.contains(n)) return false;
-		return visit_wff<node>(n);
+		return is_formula<node>(n);
 	};
 	return pre_order<node>(formula).apply_unique(down_resolver, visit);
 }
