@@ -7,71 +7,6 @@
 
 namespace idni::tau_lang {
 
-// template <typename... BAs>
-// requires BAsPack<BAs...>
-// tref split(tref fm, typename node<BAs...>::type fm_type, bool is_cnf,
-// 	const splitter_type st, trefs& mem, size_t i, bool check_temps)
-// {
-// 	using node = tau_lang::node<BAs...>;
-// 	using tau = tree<node>;
-// 	// First get clauses if not already in mem
-// 	const bool is_wff = fm_type == tau::wff;
-// 	if (mem.empty()) {
-// 		if (is_wff) {
-// 			mem = is_cnf
-// 				? get_cnf_wff_clauses<node>(fm)
-// 				: get_dnf_wff_clauses<node>(fm);
-// 		} else {
-// 			DBG(assert(fm_type == tau::bf);)
-// 			mem = is_cnf
-// 				? get_cnf_bf_clauses<node>(fm)
-// 				: get_dnf_bf_clauses<node>(fm);
-// 		}
-// 	}
-// 	tref sym = is_wff
-// 		? (is_cnf ? tau::_T() : tau::_F())
-// 		: (is_cnf ? tau::_1() : tau::_0());
-// 	switch (st) {
-// 	case splitter_type::upper: {
-// 		// Remove exactly one clause
-// 		if (mem.size() == 1)
-// 			return fm;
-// 		if (i < mem.size()) {
-// 			// We cannot delete a clause holding a temporary io var
-// 			if (check_temps && has_temporary_io_var<node>(mem[i]))
-// 				return fm;
-// 			return rewriter::replace<node>(fm, mem[i], sym);
-// 		}
-// 		break;
-// 	}
-// 	case splitter_type::middle: {
-// 		// Remove half of the clause
-// 		size_t window = mem.size() / 2;
-// 		subtree_map<node, tref> changes;
-// 		for (size_t j = 0; j < window; ++j) {
-// 			size_t idx = (i + j) % mem.size();
-// 			if (check_temps && has_temporary_io_var<node>(mem[idx]))
-// 				continue;
-// 			changes.emplace(mem[idx], sym);
-// 		}
-// 		if (!changes.empty())
-// 			return rewriter::replace<node>(fm, changes);
-// 		break;
-// 	}
-// 	case splitter_type::lower: {
-// 		// Remove all but one clause
-// 		if (i < mem.size())
-// 			if (check_temps && !has_temporary_io_var<node>(mem[i]))
-// 				return mem[i];
-// 		break;
-// 	}
-// 	case splitter_type::bad:
-// 		// This case must not happen
-// 		assert(false);
-// 	}
-// 	return fm;
-// }
-
 template<typename ... BAs> requires BAsPack<BAs...>
 tref split_path(tref fm, const splitter_type st, bool check_temps, const auto& callback) {
 	using node = node<BAs...>;
@@ -495,8 +430,7 @@ tref tau_splitter(tref fm, splitter_type st) {
 			tau::build_wff_always(tau_bad_splitter<BAs...>()), fm);
 	} else {
 		// By assumption there is more than one clause and all not redundant
-		auto accept = [](tref){return true;};
-		return split_path<BAs...>(fm, st, false, accept);
+		return split_path<BAs...>(fm, st, false, idni::all);
 	}
 }
 
