@@ -21,7 +21,7 @@ tref unequal_to_not_equal(tref fm) {
 		return n;
 	};
 	tref result = pre_order<node>(fm)
-				.apply_unique(neq_to_not_eq, visit_wff<node>);
+				.apply_unique(neq_to_not_eq, while_is_formula<node>);
 	DBG(LOG_TRACE << "unequal_to_not_equal/result: " << LOG_FM(result);)
 	return result;
 }
@@ -47,7 +47,7 @@ tref norm_equation(tref eq) {
 template <NodeType node>
 tref norm_all_equations (tref fm) {
 	return pre_order<node>(fm).apply_unique(norm_equation<node>,
-						visit_wff<node>);
+						while_is_formula<node>);
 }
 
 
@@ -66,7 +66,7 @@ tref push_negation_in(tref fm) {
 	};
 	if constexpr (is_wff) return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::push_negation_in_m>(
-							pn, visit_wff<node>);
+							pn, while_is_formula<node>);
 	else return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::push_negation_in_m>(pn);
 }
@@ -449,7 +449,7 @@ using tau = tree<node>;
 	};
 	auto visit = [&](tref n) {
 		if (excluded.contains(n)) return false;
-		return visit_wff<node>(n);
+		return is_formula<node>(n);
 	};
 	return pre_order<node>(formula).apply_unique(down_resolver, visit);
 }

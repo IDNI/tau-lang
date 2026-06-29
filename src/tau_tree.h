@@ -1134,6 +1134,26 @@ bool has_fallback (tref n);
 template <NodeType node>
 bool is_equational_assignment(tref eq);
 
+/** @brief Return `true` if @p eq is a boolean operation. */
+template <NodeType node>
+bool is_boolean_operation(tref op);
+
+/** @brief Return `true` if @p op is a formula (wff). */
+template <NodeType node>
+bool is_formula(tref op);
+
+// Visiting continuation predicates (for use with `visit`, `find`,...)
+
+/** @brief Return `true` if @p n is a boolean operation or an intermediate bf. */
+template <NodeType node>
+bool while_is_boolean_operation(tref n);
+
+/** @brief Return `true` if @p n is a formula (wff). */
+template <NodeType node>
+bool while_is_formula(tref n);
+
+// Fast extractors (not depending in extractors, just direct access to the tree structure)
+
 /** @brief Return the temporally quantified formula of @p n, n otherwise. */
 template <NodeType node>
 tref get_temporally_quantified_formula(tref n);

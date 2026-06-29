@@ -223,7 +223,7 @@ tref tau_bad_splitter(tref fm) {
 	};
 	auto visit = [&added](tref n) {
 		if (added) return false;
-		else return visit_wff<node>(n);
+		else return is_formula<node>(n);
 	};
 	tref split_fm = post_order<node>(fm).apply_unique(f, visit);
 	if (tau::subtree_equals(split_fm, fm))

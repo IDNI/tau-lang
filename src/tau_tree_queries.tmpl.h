@@ -234,21 +234,6 @@ int_t node_count (tref fm) {
 }
 
 template <NodeType node>
-auto visit_wff = [](tref n) static {
-	return !tree<node>::get(n).is_term();
-};
-
-template <NodeType node>
-auto is_boolean_operation = [](tref n) static {
-	using tau = tree<node>;
-	const tau& t = tau::get(n);
-	if (t.is(tau::bf) || t.is(tau::bf_and) || t.is(tau::bf_or)
-		|| t.is(tau::bf_xor) || t.is(tau::bf_neg)
-		|| t.is(tau::bf_fex) || t.is(tau::bf_fall)) return true;
-	return false;
-};
-
-template <NodeType node>
 auto is_non_boolean_term = [](tref n) static {
 	using tau = tree<node>;
 	const tau& t = tau::get(n);
@@ -280,11 +265,40 @@ bool is_equational_assignment(tref eq) {
 }
 
 template <NodeType node>
-tref get_temporally_quantified_formula(tref n) {
+bool is_boolean_operation(tref op) {
 	using tau = tree<node>;
-	if (is_child_temporal_quantifier<node>(n)) return tau::trim2(n);
-	else if (is_temporal_quantifier<node>(n)) return tau::trim(n);
-	return n;
+
+	const tau& t = tau::get(op);
+	if (t.is(tau::bf_and) || t.is(tau::bf_or)
+		|| t.is(tau::bf_xor) || t.is(tau::bf_neg)
+		|| t.is(tau::bf_fex) || t.is(tau::bf_fall)) return true;
+	return false;
+}
+
+// Just a convinient alias to be used as a predicate.
+template <NodeType node>
+inline bool is_formula(tref n) {
+	return while_is_formula<node>(n);
+}
+
+template <NodeType node>
+bool while_is_formula(tref n) {
+	using tau = tree<node>;
+
+	return !tau::get(n).is_term();
+};
+
+// Visiting continuation predicates (for use with `visit`, `find`,...)
+
+template <NodeType node>
+bool while_is_boolean_operation(tref n) {
+	using tau = tree<node>;
+
+	const tau& t = tau::get(n);
+	if (t.is(tau::bf) || t.is(tau::bf_and) || t.is(tau::bf_or)
+		|| t.is(tau::bf_xor) || t.is(tau::bf_neg)
+		|| t.is(tau::bf_fex) || t.is(tau::bf_fall)) return true;
+	return false;
 }
 
 } // namespace idni::tau_lang

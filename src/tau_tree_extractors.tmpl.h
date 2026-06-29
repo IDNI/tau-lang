@@ -233,7 +233,7 @@ tref expression_paths<node>::iterator::operator*() {
 	auto visit = [](tref n) {
 		if (is_temporal_quantifier<node>(n) || is_quantifier<node>(n))
 			return false;
-		else return visit_wff<node>(n);
+		else return is_formula<node>(n);
 	};
 	tref res = nullptr;
 	if (term) res = pre_order<node>(_expr).apply(f);
@@ -313,7 +313,7 @@ tref expression_paths<node>::iterator::apply(const auto& f) {
 		if (!term && is_temporal_quantifier<node>(n)) return false;
 		if (!term && is_quantifier<node>(n)) return false;
 		if (excluded.contains(n)) return false;
-		else if (!term) return visit_wff<node>(n);
+		else if (!term) return is_formula<node>(n);
 		else return true;
 	};
 	// Remove path from _expr and return res
@@ -817,6 +817,17 @@ bool has_semantic_error(tref fm) {
 		     || missing_temp_quants<node>(fm)
 		     || has_negative_offset<node>(fm)
 			 || has_missplaced_fallback<node>(fm);
+}
+
+// Fast extractors (not depending in extractors, just direct access to the tree structure)
+
+template <NodeType node>
+tref get_temporally_quantified_formula(tref n) {
+	using tau = tree<node>;
+
+	if (is_child_temporal_quantifier<node>(n)) return tau::trim2(n);
+	else if (is_temporal_quantifier<node>(n)) return tau::trim(n);
+	return n;
 }
 
 } // namespace idni::tau_lang
