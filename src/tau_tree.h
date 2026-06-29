@@ -1070,6 +1070,10 @@ bool is_child_quantifier(tref n);
 template <NodeType node>
 bool is_temporal_quantifier(tref n);
 
+/** @brief Return `true` if the first child of @p n is a temporal quantifier (`always`, `sometimes`). */
+template <NodeType node>
+bool is_child_temporal_quantifier(tref n);
+
 /** @brief Return `true` if @p n is a BA element (constant or variable). */
 template <NodeType node>
 bool is_ba_element(tref n);
@@ -1129,6 +1133,10 @@ bool has_fallback (tref n);
 /** @brief Return `true` if @p eq is an equational assignment. */
 template <NodeType node>
 bool is_equational_assignment(tref eq);
+
+/** @brief Return the temporally quantified formula of @p n, n otherwise. */
+template <NodeType node>
+tref get_temporally_quantified_formula(tref n);
 
 } // namespace idni::tau_lang
 

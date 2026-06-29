@@ -9,7 +9,7 @@
 template <NodeType node>
 tref unequal_to_not_equal(tref fm) {
 	using tau = tree<node>;
-	LOG_TRACE << "unequal_to_not_equal: " << LOG_FM(fm);
+	DBG(LOG_TRACE << "unequal_to_not_equal/fm: " << LOG_FM(fm);)
 	auto neq_to_not_eq = [](tref n) {
 		//$X != 0 ::= !($X = 0)
 		if (is<node>(n, tau::bf_neq)) {
@@ -22,10 +22,9 @@ tref unequal_to_not_equal(tref fm) {
 	};
 	tref result = pre_order<node>(fm)
 				.apply_unique(neq_to_not_eq, visit_wff<node>);
-	LOG_TRACE << "unequal_to_not_equal result: " << LOG_FM(result);
+	DBG(LOG_TRACE << "unequal_to_not_equal/result: " << LOG_FM(result);)
 	return result;
 }
-
 
 // Convert X =(!=) Y to X + Y =(!=) 0
 /** @internal @copydoc norm_equation @endinternal */
@@ -33,6 +32,8 @@ template<NodeType node>
 tref norm_equation(tref eq) {
 	using tau = tree<node>;
 	tau e = tau::get(eq);
+	// TODO (MEDIUM) check if the equation already equals/not equals 0, in which
+	// case we don't need to transform it
 	if (e.child_is(tau::bf_eq)) {
 		return tau::build_bf_eq_0(tau::build_bf_xor(e[0].first(), e[0].second()));
 	} else if (e.child_is(tau::bf_neq)) {
@@ -452,4 +453,3 @@ using tau = tree<node>;
 	};
 	return pre_order<node>(formula).apply_unique(down_resolver, visit);
 }
-
