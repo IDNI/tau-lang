@@ -1057,7 +1057,7 @@ const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
 	return free_vars_pool[id];
 }
 
-}
+} // namespace idni::tau_lang
 
 /** @internal @copydoc std::hash<idni::tau_lang::tau_bdd_node<T>>::operator()(auto&) const @endinternal */
 template<typename T>
