@@ -327,7 +327,7 @@ template <NodeType node>
 tref api<node>::syntactic_term_simplification(tref term) {
 	term = simplify(term);
 	if (!term) return nullptr;
-	return syntactic_path_simplification<node>::on(term);
+	return syntactic_path_simplification<node>(term);
 }
 
 template <NodeType node>

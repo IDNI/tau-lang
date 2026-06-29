@@ -228,18 +228,6 @@ template <NodeType node>
 tref to_nnf(tref fm);
 
 /**
- * @brief Path-based syntactic simplifier for wff and bf.
- *
- * Detects syntactically contradictory or tautological sub-formulas along every
- * conjunction/disjunction path and replaces them by `F`/`T` (or `0`/`1` for bf).
- * Works purely syntactically (no semantic normalization) and runs in near-linear
- * time in the formula size.
- * @tparam node Tree node type.
- */
-template <NodeType node>
-class syntactic_path_simplification;
-
-/**
  * @brief Convert a formula to Boole Normal Form (full procedure).
  *
  * The full four-step procedure:
@@ -314,6 +302,7 @@ tref pnf(tref n);
 // header (as is the case in 'heuristicsbv_ba_simplification.h'. Also, they
 // need to be included before the definitions as they can be used in there.
 #include "heuristics/ex_subs_based_elimination.h"
+#include "heuristics/syntactic_path_simplification.h"
 #include "normal_forms.tmpl.h"
 
 #endif // __IDNI__TAU__NORMAL_FORMS_H__
