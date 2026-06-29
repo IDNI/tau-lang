@@ -262,7 +262,7 @@ tref replace_free_vars_by(tref fm, tref val) {
 template<NodeType node>
 tref syntactic_formula_simplification(tref formula) {
 	formula = simplify_using_equality<node>(formula);
-	return syntactic_path_simplification<node>::on(formula);
+	return syntactic_path_simplification<node>(formula);
 }
 
 

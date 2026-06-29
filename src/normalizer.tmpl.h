@@ -1012,7 +1012,7 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 	using tau = tree<node>;
 	LOG_DEBUG << "Begin Boolean function normalizer";
 
-	bf = syntactic_path_simplification<node>::on(bf);
+	bf = syntactic_path_simplification<node>(bf);
 	tref result = bf_reduced_dnf<node>(bf);
 	// Apply present function/predicate definitions
 	bool changed;
@@ -1020,7 +1020,7 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 		changed = false;
 		// Unresolved symbol is still present
 		if (tau::get(result).find_top(is<node, tau::ref>)) {
-			result = syntactic_path_simplification<node>::on(result);
+			result = syntactic_path_simplification<node>(result);
 			auto resolved_res = apply_defs_to_spec<node>(result);
 			if (resolved_res != result) {
 				result = bf_reduced_dnf<node>(resolved_res);
