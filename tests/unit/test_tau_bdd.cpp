@@ -581,6 +581,93 @@ TEST_SUITE("BDD compose") {
 	}
 }
 
+TEST_SUITE("BDD term_handle quantifier elimination") {
+	TEST_CASE("build + bdd_quant + to_tau_term: free leaf is zero after all-x on xa") {
+		using bdd = tau_term_bdd<node_t>;
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		bdd::order o = {{tx, 0}};
+		// "xa": x is the BDD variable, a is a free-variable leaf not in order
+		hbdd h = hbdd::build(tau::get("xa", opts), o);
+		// ∃x at formula level → ∀x at BDD level (Schröder: ∃x(f=0) ↔ (∀x f)=0)
+		hbdd::quants q = {{tx, bdd::all}};
+		tref result = h.bdd_quant(q, o).to_tau_term(1);
+		// ∀x(xa) = cofactor[x=0]·cofactor[x=1] = 0·a = 0
+		CHECK(tau::get(result).equals_0());
+	}
+
+	TEST_CASE("build + bdd_quant + to_tau_term: ITE-form xa|x'b leaves product of free leaves") {
+		using bdd = tau_term_bdd<node_t>;
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		bdd::order o = {{tx, 0}};
+		// ITE(x, a, b): high cofactor (x=1) = a, low cofactor (x=0) = b
+		hbdd h = hbdd::build(tau::get("xa|x'b", opts), o);
+		hbdd::quants q = {{tx, bdd::all}};
+		tref result = h.bdd_quant(q, o).to_tau_term(1);
+		// ∀x(xa|x'b) = cofactor[x=0]·cofactor[x=1] = b·a
+		CHECK(tau::get(result).to_str() == "ba");
+	}
+}
+
+TEST_SUITE("BDD IO variable") {
+	TEST_CASE("initial input var i[0] is a BDD decision node, not a leaf") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		// Build i[0] via the tree builder (returns bf-wrapped IO variable)
+		tref bi_var = build_in_var_at_n<node_t>("i", 0, tau_type_id<node_t>());
+		tref ti = tau::trim(bi_var);    // strip bf wrapper → typed variable node for the BDD key
+		tref ba_var = tau::get("a", opts);  // bf(a) — free leaf not in order
+		// Term: i[0] AND a (both already bf-level)
+		tref term = tau::build_bf_and(bi_var, ba_var);
+		// IO variable i[0] is the only BDD variable; a becomes a leaf atom
+		bdd::order o = {{ti, 0}};
+		bdd::ref br = bdd::build_bdd(term, o);
+		// i[0] must be a decision node (has children), not a leaf
+		CHECK(!bdd::leaf(br));
+		CHECK(tau::subtree_equals(bdd::get_var(br), ti));
+		// Round-trip: the result of to_tau_term contains an io_var sub-node
+		tref result = bdd::to_tau_term(br, 1);
+		CHECK(tau::get(result).find_top(is<node_t, tau::io_var>) != nullptr);
+	}
+}
+
+TEST_SUITE("BDD term_handle substitute") {
+	TEST_CASE("substitute x→z in BDD of xy gives BDD of yz") {
+		using bdd = tau_term_bdd<node_t>;
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		// Order: x(0) < y(1) < z(2); z is above both x and y
+		bdd::order o = {{tx, 0}, {ty, 1}, {tz, 2}};
+		// Build BDD for "xy" and register as a BDD_ID tau node in U
+		tref node_xy = hbdd::convert_to_tau_node(tau::get("xy", opts), o);
+		// Build handle for the substitution value: single-variable BDD of "z"
+		hbdd with_z = hbdd::build(tau::get("z", opts), o);
+		// Substitute x → z across the formula containing the BDD node
+		tref result_node = hbdd::substitute(node_xy, tx, with_z, o);
+		// Retrieve the tau term for the resulting BDD (z has rank 2 > y rank 1, so y is above z)
+		tref result_term = hbdd::U.find(result_node)->second.to_tau_term(1);
+		CHECK(tau::get(result_term).to_str() == "yz");
+	}
+}
+
 TEST_SUITE("BDD handle creation") {
 	TEST_CASE("creation and gc") {
 		using bdd = tau_term_bdd<node_t>;
