@@ -1,7 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "normal_forms_transformations.h"
-#include "heuristics/simplify_using_equality.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
@@ -49,6 +48,123 @@ template <NodeType node>
 tref norm_all_equations (tref fm) {
 	return pre_order<node>(fm).apply_unique(norm_equation<node>,
 						while_is_formula<node>);
+}
+
+
+/**
+ * @internal
+ * @brief Normalizes a trimmed (unwrapped) equation or disequality to the form `(X XOR Y) (!)= 0`.
+ *
+ * Unlike `norm_equation`, the input is not wrapped in `wff`.
+ * @tparam node Tree node type.
+ * @param eq Trimmed equation node (`bf_eq` or `bf_neq`).
+ * @return Normalized equation with XOR of operands compared to zero.
+ * @endinternal
+ */
+// Convert X =(!=) Y to X + Y =(!=) 0
+template<NodeType node>
+tref norm_trimmed_equation(tref eq) {
+	using tau = tree<node>;
+	tau e = tau::get(eq);
+	if (e.is(tau::bf_eq)) {
+		return tau::trim(tau::build_bf_eq_0(tau::build_bf_xor(e.first(), e.second())));
+	} else if (e.is(tau::bf_neq)) {
+		return tau::trim(tau::build_bf_neq_0(tau::build_bf_xor(e.first(), e.second())));
+	} else return eq;
+}
+
+/**
+ * @internal
+ * @brief Pushes a single negation one level inward (De Morgan / dualisation).
+ *
+ * Handles both wff (`wff_neg`) and bf (`bf_neg`) cases controlled by the `is_wff` template parameter.
+ * @tparam node Tree node type.
+ * @tparam is_wff `true` to handle `wff_neg` (default), `false` to handle `bf_neg`.
+ * @param fm Formula node whose outermost negation is to be pushed inward.
+ * @return Formula with the negation pushed one level deeper, or `fm` unchanged if not applicable.
+ * @endinternal
+ */
+// Can be used for Tau formula and Boolean function
+template <NodeType node, bool is_wff = true>
+tref push_negation_one_in(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	// Tau formula rules
+	if constexpr (is_wff) if (t.child_is(tau::wff_neg)) {
+		const tau& ct = t[0][0];
+		if (!ct.has_child()) return fm;
+		switch (ct[0].value.nt) {
+			case tau::wff_and: return tau::build_wff_or(
+						tau::build_wff_neg(ct[0].first()),
+						tau::build_wff_neg(ct[0].second()));
+			case tau::wff_or: return tau::build_wff_and(
+						tau::build_wff_neg(ct[0].first()),
+						tau::build_wff_neg(ct[0].second()));
+			case tau::bf_eq: return tau::build_bf_neq(ct[0].first(), ct[0].second());
+			case tau::bf_neq: return tau::build_bf_eq(ct[0].first(), ct[0].second());
+			case tau::wff_ex: return tau::build_wff_all(ct[0].first(),
+						tau::build_wff_neg(ct[0].second()), false);
+			case tau::wff_all: return tau::build_wff_ex(ct[0].first(),
+						tau::build_wff_neg(ct[0].second()), false);
+			case tau::wff_always: return tau::build_wff_sometimes(
+						tau::build_wff_neg(ct[0].first()));
+			case tau::wff_sometimes: return tau::build_wff_always(
+						tau::build_wff_neg(ct[0].first()));
+			case tau::bf_lt: return tau::build_bf_nlt(ct[0].first(), ct[0].second());
+			case tau::bf_nlt: return tau::build_bf_lt(ct[0].first(), ct[0].second());
+			case tau::bf_lteq: return tau::build_bf_nlteq(ct[0].first(), ct[0].second());
+			case tau::bf_nlteq: return tau::build_bf_lteq(ct[0].first(), ct[0].second());
+			case tau::bf_gt: return tau::build_bf_ngt(ct[0].first(), ct[0].second());
+			case tau::bf_ngt: return tau::build_bf_gt(ct[0].first(), ct[0].second());
+			case tau::bf_gteq: return tau::build_bf_ngteq(ct[0].first(), ct[0].second());
+			case tau::bf_ngteq: return tau::build_bf_gteq(ct[0].first(), ct[0].second());
+			default: return fm;
+		}
+	}
+	// Boolean function rules
+	if constexpr (!is_wff) if (t.child_is(tau::bf_neg)) {
+		const tau& ct = t[0][0];
+		if (!ct.has_child()) return fm;
+		switch (ct[0].value.nt) {
+			case tau::bf_and: return tau::build_bf_or(
+				tau::build_bf_neg(ct[0].first()),
+				tau::build_bf_neg(ct[0].second()));
+			case tau::bf_or: return tau::build_bf_and(
+				tau::build_bf_neg(ct[0].first()),
+				tau::build_bf_neg(ct[0].second()));
+			case tau::bf_xor: {
+				// TODO: strategy for negating first or second argument
+				return tau::build_bf_xor(tau::build_bf_neg(ct[0].first()), ct[0].second());
+			}
+			default: return fm;
+		}
+	}
+	return fm;
+}
+
+// Can be used for Tau formula and Boolean function
+// -----------------------------------------------------------------------------
+
+/**
+ * @internal
+ * @brief Expands a single `bf_xor` node: `A XOR B` → `(A & !B) | (!A & B)`.
+ * @tparam node Tree node type.
+ * @param fm Formula node to expand; must be wrapped in `bf` with a `bf_xor` child.
+ * @return Expanded formula, or `fm` unchanged if no `bf_xor` child is present.
+ * @endinternal
+ */
+template<NodeType node>
+tref apply_xor_def(tref fm) {
+	using tau = tree<node>;
+	tau t = tau::get(fm);
+	if (t.child_is(tau::bf_xor)) {
+		return tau::build_bf_or(
+			tau::build_bf_and(t[0].first(),
+					tau::build_bf_neg(t[0].second())),
+			tau::build_bf_and(tau::build_bf_neg(t[0].first()),
+					t[0].second()));
+	}
+	return fm;
 }
 
 
