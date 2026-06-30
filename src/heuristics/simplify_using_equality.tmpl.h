@@ -158,7 +158,13 @@ tref simplify_using_equality_simplify_equation(auto& uf, tref eq) {
 				}
 				return true;
 			};
-			pre_order<node>(n).search_unique(input_vars);
+			// Skip io_var subtrees: the time-offset inside io_var (e.g. the 't'
+			// in i1[t]) is a plain 'variable' node that is not an input stream,
+			// so visiting it would incorrectly set all_inputs = false.
+			auto skip_io_var = [](tref cur) {
+				return !tau::get(cur).is(tau::io_var);
+			};
+			pre_order<node>(n).search_unique(input_vars, skip_io_var, identity);
 			return all_inputs ? n : uf.find(n);
 		}
 		return n;
