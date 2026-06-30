@@ -92,3 +92,4 @@ __pycache__/
 .github
 .claude
 .worktrees
+CLAUDE.local.md
