@@ -210,6 +210,37 @@ TEST_SUITE("specification multiline parsing") {
                 CHECK( ctx.outputs.size() == 1 );
 	}
 
+TEST_SUITE("TauSpecAdd") {
+	TEST_CASE("add(nullptr) returns false") {
+		// The null-guard at the top of add() must fire immediately
+		tau_spec<node_t> spec;
+		CHECK( !spec.add(nullptr) );
+	}
+
+	TEST_CASE("add pre-built wff formula returns true") {
+		// exercise the non-parsing path: attach a formula tree directly
+		// rather than going through parse()
+		tref wff_fm = get_nso_rr("xy = 0.").value().main->get();
+		tau_spec<node_t> spec;
+		CHECK( spec.add(wff_fm) );
+	}
+
+	TEST_CASE("add spec tref extracts main and sets main_") {
+		// tau_spec::get() builds a proper tau::spec node (not the raw start
+		// node that tau::get(string) returns). The add() spec branch extracts
+		// the inner wff and calls set_main(), exercising the spec-type case.
+		tau_spec<node_t> helper;
+		helper.parse("xy = 0.");
+		tref spec_fm = helper.get();
+		REQUIRE( spec_fm != nullptr );
+		using tt = tau::traverser;
+		auto nt = tt(spec_fm) || tt::nt;
+		REQUIRE( nt == tau::spec );
+		tau_spec<node_t> spec;
+		CHECK( spec.add(spec_fm) );
+	}
+}
+
 #ifdef TAU_TEST_MULTILINE_PARSING_BRUTE_FORCE
 	TEST_CASE_FIXTURE(specification_fixture, "test cases") {
 		size_t start = 0;
