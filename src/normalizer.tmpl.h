@@ -110,41 +110,6 @@ trefs get_vars_from_nso(tref n) {
 	return tree<node>::get(n).select_top(is_var_or_capture<node>());
 }
 
-/**
- * @internal
- * @brief Returns a fresh integer `i` such that variable `x_i` does not already appear in @p fm.
- *
- *  Scans all variable and capture nodes whose names start with `x` or `?x`,
- *  collects their numeric suffixes, and returns one past the maximum found.
- * @tparam node Tree node type.
- * @param fm The formula to scan for existing variable identifiers.
- * @return An integer identifier not yet used by any variable in @p fm.
- * @endinternal
- */
-// Given a tref produce a number such that the variable x_i is
-// neither a bool_variable nor a variable nor a capture
-template <NodeType node>
-int_t get_new_var_id(tref fm) {
-	// TODO (HIGH) why are captures here? don't captures start with '$'?
-	using tau = tree<node>;
-	trefs var_nodes = get_vars_from_nso<node>(fm);
-	std::set vars{ 1 };
-	for (tref var : var_nodes) {
-		std::string nam = tau::get(var).is(tau::capture)
-			? tau::get(var).get_string()
-			: get_var_name<node>(var);
-		if (nam[0] == 'x') {
-			nam.erase(0, 1);
-			if (!nam.empty()) vars.insert(stoi(nam));
-		} else if (nam[0] == '?' && nam[1] == 'x') {
-			nam.erase(0, 2);
-			if (!nam.empty()) vars.insert(stoi(nam));
-		}
-	}
-	return *vars.rbegin() + 1;
-}
-
-
 // Given a tref produce a number i such that the uninterpreted constant const_i is
 // not present
 /** @internal @copydoc get_new_uninterpreted_constant @endinternal */
