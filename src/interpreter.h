@@ -199,6 +199,6 @@ std::optional<interpreter<node>> run(tref form,
 
 } // namespace idni::tau_lang
 
-#include "interpreter.impl.h"
+#include "interpreter.tmpl.h"
 
 # endif //__IDNI__TAU__INTERPRETER_H__
