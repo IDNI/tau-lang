@@ -14,8 +14,38 @@
 #define __IDNI__TAU__NORMAL_FORMS_TRANSFORMATIONS_H__
 
 #include "tau_tree.h"
+// bv_predicate_blasting.h declares bv_blasting (a non-dependent global), which
+// must be visible at template-definition time in normal_forms_transformations.tmpl.h.
+#include "heuristics/bv_predicate_blasting.h"
 
 namespace idni::tau_lang {
+
+/**
+ * @brief Memory slot identifiers for pre-order traversal caching.
+ *
+ * These slots are used as template parameters to `pre_order::apply_unique`
+ * to select a specific static cache that avoids redundant rewriting on
+ * already-visited sub-trees within a single traversal pass.
+ */
+enum MemorySlotPre {
+	normalize_ba_m,          ///< Cache slot for normalize_ba traversals.
+	push_negation_in_m,      ///< Cache slot for push_negation_in traversals.
+	to_dnf_m,                ///< Cache slot for to_dnf traversals.
+	to_cnf_m,                ///< Cache slot for to_cnf traversals.
+	eliminate_quantifiers_m, ///< Cache slot for quantifier elimination traversals.
+	anti_prenex_step_m,      ///< Cache slot for anti-prenex step traversals.
+	synt_path_simp_m         ///< Cache slot for syntactic path simplification traversals.
+};
+
+/**
+ * @brief Memory slot identifiers for post-order traversal caching.
+ *
+ * These slots are used as template parameters to `post_order::apply_unique`
+ * to select a specific static cache.
+ */
+enum MemorySlotPost {
+	anti_prenex_m ///< Cache slot for anti-prenex post-order traversals.
+};
 
 /**
  * @brief Convert `!=` (bf_neq) atoms to negated equalities `!(= 0)`.
@@ -119,9 +149,25 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
 template<NodeType node>
 tref resolve_quantifiers(tref formula);
 
-} // namespace idni::tau_lang
+// Forward declarations needed by .tmpl.h bodies.
+// Full declarations/definitions come from their respective heuristic headers.
+template <NodeType node>
+tref simplify_using_equality(tref fm);
 
-// NOTE: normal_forms_transformations.tmpl.h is included at the end of
-// normal_forms.tmpl.h, after the definitions it depends on are available.
+template <NodeType node>
+tref syntactic_path_simplification(tref fm);
+
+template <NodeType node>
+tref ex_subs_based_elimination(tref var, tref ex_clause);
+
+template <NodeType node>
+tref anti_prenex_block(tref formula);
+
+template <NodeType node>
+tref term_boole_normal_form(tref formula);
+
+#include "normal_forms_transformations.tmpl.h"
+
+} // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__NORMAL_FORMS_TRANSFORMATIONS_H__
