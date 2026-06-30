@@ -286,3 +286,65 @@ TEST_SUITE("boole_normal_form") {
 		CHECK(tau::get(res).equals_T());
 	}
 }
+
+// Helper: returns true if `n` is a wff(wff_always(wff_f)) node — i.e. always(F).
+static bool is_always_F(tref n) {
+	if (!is_child<node_t>(n, tau::wff_always)) return false;
+	return tau::get(tau::trim2(n)).equals_F();
+}
+
+TEST_SUITE("NormalizeTemporalQuantifiers") {
+	// Bug (fixed): when all DNF clauses are temporal, non_temp_clauses stayed
+	// _F() but was unconditionally wrapped in always(_F()) and OR'd into the
+	// result, producing a spurious always(F) disjunct.
+
+	// Note: the `wff_always` construction hook automatically simplifies
+	// `always(F) = F`, and the `wff_or` hook simplifies `X || F = X`.  These
+	// tests therefore catch the bug both at the structural level (no spurious
+	// `always(F)` node exists in the result tree) and at the output level
+	// (the result string equals the expected canonical form).
+
+	TEST_CASE("purely_temporal_always_no_spurious_always_F") {
+		// All clauses of `always o1[t] = 1.` are temporal.
+		// Before the fix the code unconditionally appended always(non_temp_clauses)
+		// when non_temp_clauses was still _F().  The hooks simplify that to _F()
+		// and X||F to X, but the explicit guard added by the fix removes the
+		// redundant call entirely, making the intent clear.
+		auto nso = get_nso_rr("always o1[t] = 1.");
+		REQUIRE(nso.has_value());
+		tref fm = nso.value().main->get();
+		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result != nullptr);
+		// No spurious always(F) node anywhere in the result tree.
+		CHECK(!tau::get(result).find_top(is_always_F));
+		// Result must be a single always(...) formula — not a disjunction.
+		CHECK(is_child<node_t>(result, tau::wff_always));
+	}
+
+	TEST_CASE("purely_temporal_sometimes_no_spurious_always_F") {
+		// Same check for a purely-temporal `sometimes` formula.
+		// sometimes(P) is canonicalized to !always(!P), so the result has
+		// wff_neg at the top (not wff_always directly).
+		auto nso = get_nso_rr("sometimes o1[t] = 1.");
+		REQUIRE(nso.has_value());
+		tref fm = nso.value().main->get();
+		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result != nullptr);
+		CHECK(!tau::get(result).find_top(is_always_F));
+		// Result must not be false (formula is not trivially unsatisfiable).
+		CHECK(!tau::get(result).equals_F());
+	}
+
+	TEST_CASE("purely_temporal_always_and_sometimes_no_spurious_always_F") {
+		// Conjunction of always and sometimes — all clauses still temporal.
+		// Parens required: without them the parser nests sometimes inside always.
+		auto nso = get_nso_rr("(always o1[t] = 1) && (sometimes o2[t] = 0).");
+		REQUIRE(nso.has_value());
+		tref fm = nso.value().main->get();
+		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result != nullptr);
+		CHECK(!tau::get(result).find_top(is_always_F));
+		// Result contains at least one always(...) subformula.
+		CHECK(tau::get(result).find_top(is_child<node_t, tau::wff_always>));
+	}
+}
