@@ -418,4 +418,83 @@ TEST_SUITE("simplify_using_equality") {
 		tref res = simplify_using_equality<node_t>(fm);
 		CHECK(tau::get(res).to_str() == "y' = 0 && 1 !<= k");
 	}
+	// ── 3-level nested OR: uf_stack balance and branch isolation ────────────────
+
+	TEST_CASE("nested_or_3_identical_branches_simplified") {
+		// Three identical branches; each has x=0 so y=x simplifies to y=0.
+		// Exercises the uf_stack push/pop path for 3+ nested disjunctions and
+		// verifies the stack remains balanced (caught by the DBG assert inside
+		// simplify_using_equality).
+		const char* sample =
+			"(x = 0 && y = x) || ((x = 0 && y = x) || (x = 0 && y = x)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "x = 0 && y = 0");
+	}
+
+	TEST_CASE("nested_or_3_branch_isolation") {
+		// x=0 established in branch 1 must NOT propagate into branches 2/3.
+		// If the uf_stack leaks across OR boundaries, y=x and z=x would be
+		// incorrectly simplified to y=0 and z=0.
+		const char* sample = "(x = 0) || (y = x || z = x).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>(fm);
+		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0
+		CHECK(tau::get(res).to_str() == "x = 0 || x = y || z = x");
+	}
+
+	TEST_CASE("nested_or_3_distinct_branches_each_simplified") {
+		// Three distinct branches: each has its own equality that simplifies
+		// a different atom. The equalities must not bleed across branches.
+		const char* sample =
+			"(x = 0 && y = x) || ((x = 1 && z = x) || (x = 0 && w = x)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = simplify_using_equality<node_t>(fm);
+		CHECK(tau::get(res).to_str() ==
+			"x = 0 && y = 0 || x' = 0 && z = 1 || x = 0 && w = 0");
+	}
+
+	// ── IO variable all_inputs guard ─────────────────────────────────────────────
+
+	// ── IO variable all_inputs guard ─────────────────────────────────────────────
+	// The uf_find lambda inside simplify_using_equality_simplify_equation must
+	// preserve subterms whose variables are ALL input streams. The time-offset
+	// variable 't' inside io_var nodes (e.g. i1[t] → variable{io_var{..., t}})
+	// must NOT be treated as a non-input variable — fix uses visit_subtree to
+	// skip io_var subtrees so that 't' is never visited by the input_vars check.
+
+	TEST_CASE("io_output_var_replaced_by_input_var") {
+		// After establishing o1 ↔ i1, a second occurrence of o1 is substituted
+		// with i1. This verifies the output stream IS simplified, and that the
+		// input stream i1[t] contained in the result does NOT trigger the bug
+		// (i.e. i1[t] is not itself further replaced once it appears as a result).
+		const char* s = "o1[t] = i1[t] && o2[t] = o1[t].";
+		tref fm = get_nso_rr(s).value().main->get();
+		tref res = simplify_using_equality<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "o1[t]:tau = i1[t]:tau && i1[t]:tau = o2[t]:tau");
+	}
+
+	TEST_CASE("io_output_var_replaced_when_equality_added_later") {
+		// Same as above but the equalities are in reversed order: o2=o1 comes
+		// first, then o1=i1 is added to the UF. o1 in the first conjunct is
+		// substituted with i2's representative (o2 < o1 by subtree_less).
+		const char* s = "o2[t] = o1[t] && o1[t] = i1[t].";
+		tref fm = get_nso_rr(s).value().main->get();
+		tref res = simplify_using_equality<node_t>(fm);
+		CHECK(tau::get(res).to_str() == "o1[t]:tau = o2[t]:tau && o2[t]:tau = i1[t]:tau");
+	}
+
+	TEST_CASE("io_input_var_not_substituted_despite_being_in_uf") {
+		// After adding i1[t] = 0 to the UF, uf.find(i1[t]) = 0. Without the
+		// all_inputs guard, o1[t] = i1[t] would be simplified to o1[t] = 0.
+		// With the guard, i1[t] is preserved because it is an input stream.
+		// The bug (before fix) was that the time-offset variable 't' inside
+		// i1[t]'s io_var subtree was mistakenly treated as a non-input variable,
+		// setting all_inputs = false and allowing the substitution.
+		const char* s = "i1[t] = 0 && o1[t] = i1[t].";
+		tref fm = get_nso_rr(s).value().main->get();
+		tref res = simplify_using_equality<node_t>(fm);
+		// i1[t] must NOT be replaced by 0 in the second conjunct
+		CHECK(tau::get(res).to_str() == "i1[t]:tau = 0 && o1[t]:tau = i1[t]:tau");
+	}
 }
