@@ -1097,9 +1097,11 @@ tref normalize_temporal_quantifiers(tref fm) {
 				clause = tau::build_wff_and(always_part, staying);
 				res = tau::build_wff_or(res, clause);
 			}
-			non_temp_clauses = tau::build_wff_always(
-				norm(non_temp_clauses));
-			res = tau::build_wff_or(res, non_temp_clauses);
+			if (!tau::get(non_temp_clauses).equals_F()) {
+				non_temp_clauses = tau::build_wff_always(
+					norm(non_temp_clauses));
+				res = tau::build_wff_or(res, non_temp_clauses);
+			}
 			return res;
 		} else {
 			// Temporal variable without temporal quantifier
