@@ -358,6 +358,15 @@ TEST_SUITE("AntiPrenexBlock") {
 		CHECK( tau::get(res).to_str() == "z = 0" );
 		CHECK( used == 0 );
 	}
+
+	TEST_CASE("fallback: plain bf_neq atom re-wraps block (B16)") {
+		// body is a single bf_neq atom (neither wff_or nor wff_and at
+		// the top level): the catch-all fallback re-wraps the quantifier
+		// block around the atom and returns it unchanged
+		auto [res, used] = run_apb("ex x (xy != 0).");
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+		CHECK( used == 0 );
+	}
 }
 
 TEST_SUITE("AntiPrenexBlock0Arg") {
@@ -547,6 +556,26 @@ TEST_SUITE("BfReducedDNF") {
 		tref res = bf_reduced_dnf<node_t>(bf);
 		CHECK( tau::get(res).equals_1() );
 	}
+
+	TEST_CASE("make_paths_disjoint=true: ac|a'b'c preserves disjoint paths") {
+		// ac | a'b'c:
+		//   assign_and_reduce produces paths [a=1,b=*,c=1] and [a=0,b=0,c=1].
+		//   reduce_paths cannot merge them because the b=* entry blocks the
+		//   2-incompatibility rule in reduce_paths.
+		//   join_paths CAN merge them via the subset rule:
+		//     [a=0,b=0,c=1] gets a→* → merged result is ac | b'c.
+		//   With make_paths_disjoint=true, join is skipped and both paths survive,
+		//   so the result retains a bf_or with more terms than the joined form.
+		const char* sample = "ac|a'b'c = 0.";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref bf = tau::get(fm)[0].first();
+		tref res_disjoint = bf_reduced_dnf<node_t>(bf, /*make_paths_disjoint=*/true);
+		tref res_joined   = bf_reduced_dnf<node_t>(bf, /*make_paths_disjoint=*/false);
+		// The two calls must yield structurally different results
+		CHECK( tau::get(res_disjoint) != tau::get(res_joined) );
+		// The disjoint version retains a bf_or (both paths kept)
+		CHECK( tau::get(res_disjoint).find_top(is<node_t, tau::bf_or>) );
+	}
 }
 
 TEST_SUITE("SyntacticFormulaSimplification") {
@@ -571,5 +600,25 @@ TEST_SUITE("SyntacticFormulaSimplification") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_formula_simplification<node_t>(fm);
 		CHECK( tau::get(res).equals_T() );
+	}
+}
+
+TEST_SUITE("PushUniversalQuantifierOneOr") {
+	TEST_CASE("mixed-variable disjunction: x-free clause factored out") {
+		// all x (x = 0 || z = 0):
+		//   x = 0 contains the bound variable x → kept under ∀x
+		//   z = 0 is x-free                     → pulled out as a disjunct
+		// Exercises the wff_or branch where both q_fm and no_q_fm are
+		// non-empty (the partial-removal path that was never exercised).
+		// Result: (all x (x=0 || _F())) || (_F() || z=0)
+		const char* sample = "all x (x = 0 || z = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = push_universal_quantifier_one<node_t>(fm);
+		// The formula must have changed (quantifier was restructured)
+		CHECK( tau::get(res) != tau::get(fm) );
+		// The quantifier must survive (x-dependent clause kept under ∀x)
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+		// A top-level disjunction must appear (x-free clause factored out)
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) != nullptr );
 	}
 }
