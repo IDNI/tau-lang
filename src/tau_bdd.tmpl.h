@@ -5,6 +5,9 @@
 
 #include "tau_bdd.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "tau_bdd"
+
 namespace idni::tau_lang {
 
 template <NodeType node>
