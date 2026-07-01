@@ -193,9 +193,10 @@ cli_command            =>
 # normal forms
         | ("dnf":dnf_sym __ nf_cmd_arg)                       :dnf_cmd
         | ("cnf":cnf_sym __ nf_cmd_arg)                       :cnf_cmd
-        | ("anf":anf_sym __ nf_cmd_arg)                       :anf_cmd
+# Commented out because they are not implemented yet
+#       | ("anf":anf_sym __ nf_cmd_arg)                       :anf_cmd
+#       | ("pnf":pnf_sym __ nf_cmd_arg)                       :pnf_cmd
         | ("nnf":nnf_sym __ nf_cmd_arg)                       :nnf_cmd
-        | ("pnf":pnf_sym __ nf_cmd_arg)                       :pnf_cmd
         | ("mnf":mnf_sym __ nf_cmd_arg)                       :mnf_cmd
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # qelim

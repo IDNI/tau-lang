@@ -189,9 +189,10 @@ bool is_cli_cmd(tref n) {
 		tau::inst_cmd,
 		tau::dnf_cmd,
 		tau::cnf_cmd,
-		tau::anf_cmd,
+	// Commented out because they are not implemented yet
+	//	tau::anf_cmd,
+	//	tau::pnf_cmd,
 		tau::nnf_cmd,
-		tau::pnf_cmd,
 		tau::mnf_cmd,
 		tau::onf_cmd,
 		tau::qelim_cmd,
