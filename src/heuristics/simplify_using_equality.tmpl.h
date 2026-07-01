@@ -3,7 +3,7 @@
 #include "union_find_with_sets.h"
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "heuristics"
+#define LOG_CHANNEL_NAME "simplify_using_equality"
 
 namespace idni::tau_lang {
 
