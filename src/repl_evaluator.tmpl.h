@@ -18,12 +18,6 @@ using namespace cvc5;
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::not_implemented_yet() {
-	std::cout << "Not implemented yet.\n";
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::invalid_argument() const {
 	TAU_LOG_ERROR << "Invalid argument\n";
 	return nullptr;
@@ -896,9 +890,10 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::onf_cmd:            result = onf_cmd(command); break;
 	case tau::dnf_cmd:            result = dnf_cmd(command); break;
 	case tau::cnf_cmd:            result = cnf_cmd(command); break;
-	case tau::anf_cmd:            not_implemented_yet(); break;
+//	Commented out because they are not implemented yet
+//	case tau::anf_cmd:            not_implemented_yet(); break;
+//	case tau::pnf_cmd:            not_implemented_yet(); break;
 	case tau::nnf_cmd:            result = nnf_cmd(command); break;
-	case tau::pnf_cmd:            not_implemented_yet(); break;
 	case tau::mnf_cmd:            result = mnf_cmd(command); break;
 	// definition of rec relations to be included during normalization
 	case tau::def_rr_cmd:         def_rr_cmd(command); break;
@@ -1202,6 +1197,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  cnf <tau>               converts the given Tau formula to CNF\n"
 		<< "  cnf <repl_history>      converts the Tau expression stored at the specified repl history position to CNF\n";
 		break;
+	// Commented out because they are not implemented yet
 	//case tau::anf_sym: std::cout
 	//	<< "anf command converts a boolean formula or a well formed formula to algebraic normal form\n"
 	//	<< "\n"
@@ -1218,6 +1214,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  nnf <tau>               converts the given tau formula to NNF\n"
 		<< "  nnf <repl_history>      converts the Tau expression stored at the specified repl history position to NNF\n";
 		break;
+	// Commented out because they are not implemented yet
 	//case tau::pnf_sym: std::cout
 	//	<< "pnf command converts a boolean formula or a well formed formula to prenex normal form\n"
 	//	<< "\n"

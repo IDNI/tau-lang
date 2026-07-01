@@ -369,9 +369,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ solve_cmd,           50 },
 			{ dnf_cmd,             50 },
 			{ cnf_cmd,             50 },
-			{ anf_cmd,             50 },
+		// Commented out because they are not implemented yet
+		//	{ anf_cmd,             50 },
+		//	{ pnf_cmd,             50 },
 			{ nnf_cmd,             50 },
-			{ pnf_cmd,             50 },
 			{ mnf_cmd,             50 },
 			{ onf_cmd,             50 },
 			{ inst_cmd,            50 },
@@ -605,9 +606,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case abs_history:       out("%"); break;
 			case dnf_cmd:           out("dnf "); break;
 			case cnf_cmd:           out("cnf "); break;
-			case anf_cmd:           out("anf "); break;
+		// Commented out because they are not implemented yet
+		//	case anf_cmd:           out("anf "); break;
+		//	case pnf_cmd:           out("pnf "); break;
 			case nnf_cmd:           out("nnf "); break;
-			case pnf_cmd:           out("pnf "); break;
 			case mnf_cmd:           out("mnf "); break;
 			case onf_cmd:           out("onf "); break;
 			case def_print_cmd:
