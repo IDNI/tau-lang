@@ -214,17 +214,6 @@ requires BAsPack<BAs...>
 bool operator!=(const bool& b, const tau_ba<BAs...>& other);
 
 /**
- * @brief Normalizes the given tau_ba.
- *
- * @tparam BAs Variadic template parameters.
- * @param fm Reference to tau_ba.
- * @return Normalized tau_ba.
- */
-template <typename... BAs>
-requires BAsPack<BAs...>
-tau_ba<BAs...> normalize(const tau_ba<BAs...>& fm);
-
-/**
  * @brief Splits the given tau_ba based on splitter type.
  *
  * @tparam BAs Variadic template parameters.
