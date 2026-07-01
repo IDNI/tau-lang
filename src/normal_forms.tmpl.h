@@ -67,20 +67,17 @@ tref normalize_atomic_formula_operators(tref fm) {
 				return tau::build_wff_neg(
 					tau::build_bf_eq(c.first(), c.second()));
 			case tau::bf_nlteq:
-				return tau::build_bf_gt(c.first(), c.second());
-				break;
+				return tau::build_bf_lt(c.second(), c.first());
 			case tau::bf_nlt:
-				return tau::build_wff_neg(
-					tau::build_bf_lt(c.first(), c.second()));
+				return	tau::build_bf_lteq(c.second(), c.first());
 			case tau::bf_gteq:
-				return tau::build_wff_neg(
-					tau::build_bf_lt(c.first(), c.second()));
+				return tau::build_bf_lteq(c.second(), c.first());
 			case tau::bf_gt:
 				return tau::build_bf_lt(c.second(), c.first());
 			case tau::bf_ngteq:
 				return tau::build_bf_lt(c.first(), c.second());
-			case tau::bf_ngt: return tau::build_wff_neg(
-					tau::build_bf_lt(c.second(), c.first()));
+			case tau::bf_ngt:
+				return tau::build_bf_lteq(c.first(), c.second());
 			default: return n;
 		}
 	};
