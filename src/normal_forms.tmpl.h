@@ -67,7 +67,7 @@ tref normalize_atomic_formula_operators(tref fm) {
 				return tau::build_wff_neg(
 					tau::build_bf_eq(c.first(), c.second()));
 			case tau::bf_nlteq:
-				return tau::build_bf_gt(c.second(), c.first());
+				return tau::build_bf_gt(c.first(), c.second());
 				break;
 			case tau::bf_nlt:
 				return tau::build_wff_neg(
