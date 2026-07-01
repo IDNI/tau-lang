@@ -24,7 +24,7 @@ tref unequal_to_not_equal(tref fm) {
 		return n;
 	};
 	tref result = pre_order<node>(fm)
-				.apply_unique(neq_to_not_eq, visit_wff<node>);
+				.apply_unique(neq_to_not_eq, while_is_wff<node>);
 	LOG_TRACE << "unequal_to_not_equal result: " << LOG_FM(result);
 	return result;
 }
@@ -44,7 +44,7 @@ tref not_equal_to_unequal(tref fm) {
 		return n;
 	};
 	tref result = pre_order<node>(fm)
-				.apply_unique(not_eq_to_neq, visit_wff<node>);
+				.apply_unique(not_eq_to_neq, while_is_wff<node>);
 	LOG_TRACE << "not_equal_to_unequal: " << LOG_FM(result);
 	return result;
 }
@@ -79,7 +79,7 @@ tref normalize_atomic_formula_operators(tref fm) {
 		}
 	};
 	tref result = pre_order<node>(fm)
-				.apply_unique(normalize_operators, visit_wff<node>);
+				.apply_unique(normalize_operators, while_is_wff<node>);
 	LOG_TRACE << "End normalize_atomic_formula_operators: " << LOG_FM(result);
 	return result;
 }
@@ -104,7 +104,7 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 		}
 	};
 	tref result = pre_order<node>(fm)
-				.apply_unique(normalize_operators, visit_wff<node>);
+				.apply_unique(normalize_operators, while_is_wff<node>);
 	LOG_TRACE << "gt_gteq_to_lt_lteq: " << LOG_FM(result);
 	return result;
 }
@@ -139,7 +139,7 @@ tref unsqueeze_wff(const tref& fm) {
 		}
 		return n;
 	};
-	tref result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
+	tref result = pre_order<node>(fm).apply_unique(f, while_is_wff<node>);
 	LOG_TRACE << "unsqueeze_wff result: " << LOG_FM(result);
 	return result;
 }
@@ -181,7 +181,7 @@ tref squeeze_wff(const tref& fm) {
 		}
 		return n;
 	};
-	tref result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	tref result = post_order<node>(fm).apply_unique(f, while_is_wff<node>);
 	LOG_TRACE << "squeeze_wff result: " << LOG_FM(result);
 	return result;
 }
@@ -204,7 +204,7 @@ tref unsqueeze_wff_pos(tref fm) {
 		}
 		return n;
 	};
-	auto result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
+	auto result = pre_order<node>(fm).apply_unique(f, while_is_wff<node>);
 	LOG_TRACE << "unsqueeze_wff_pos result: " << LOG_FM(result);
 	return result;
 }
@@ -230,7 +230,7 @@ tref squeeze_wff_pos(tref fm) {
 		}
 		return n;
 	};
-	tref result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	tref result = post_order<node>(fm).apply_unique(f, while_is_wff<node>);
 	LOG_TRACE << "squeeze_wff_pos result: " << LOG_FM(result);
 	return result;
 }
@@ -253,7 +253,7 @@ tref unsqueeze_wff_neg(tref fm) {
 		}
 		return n;
 	};
-	auto result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
+	auto result = pre_order<node>(fm).apply_unique(f, while_is_wff<node>);
 	LOG_TRACE << "unsqueeze_wff_neg result: " << LOG_FM(result);
 	return result;
 }
@@ -281,7 +281,7 @@ tref squeeze_wff_neg(tref fm) {
 		}
 		return n;
 	};
-	auto result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	auto result = post_order<node>(fm).apply_unique(f, while_is_wff<node>);
 	LOG_TRACE << "squeeze_wff_neg result: " << LOG_FM(result);
 	return result;
 }
@@ -338,7 +338,7 @@ tref denorm_equation(tref eq) {
 template <NodeType node>
 tref norm_all_equations (tref fm) {
 	return pre_order<node>(fm).apply_unique(norm_equation<node>,
-						visit_wff<node>);
+						while_is_wff<node>);
 }
 
 template<NodeType node>
@@ -1445,7 +1445,7 @@ tref push_negation_in(tref fm) {
 	};
 	if constexpr (is_wff) return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::push_negation_in_m>(
-							pn, visit_wff<node>);
+							pn, while_is_wff<node>);
 	else return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::push_negation_in_m>(pn);
 }
@@ -1486,7 +1486,7 @@ tref to_dnf(tref fm) {
 	tref r;
 	if constexpr (is_wff) r = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_dnf_m>(
-					pn, visit_wff<node>, layer_to_dnf);
+					pn, while_is_wff<node>, layer_to_dnf);
 	else r = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_dnf_m>(
 					pn, all, layer_to_dnf);
@@ -1552,7 +1552,7 @@ tref to_cnf(tref fm) {
 	};
 	if constexpr (is_wff) return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf_m>(
-					pn, visit_wff<node>, layer_to_cnf);
+					pn, while_is_wff<node>, layer_to_cnf);
 	else return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf_m>(
 					pn, all, layer_to_cnf);
@@ -1753,7 +1753,7 @@ tref push_quantifiers_in(tref formula) {
 		return n;
 	};
 	auto visit = [&excluded_nodes](tref n) {
-		return visit_wff<node>(n) && !excluded_nodes.contains(n);
+		return while_is_wff<node>(n) && !excluded_nodes.contains(n);
 	};
 	return pre_order<node>(formula).apply_unique(push_quantifiers, visit);
 }
@@ -2010,7 +2010,7 @@ struct simplify_using_equality {
 		auto visit = [](tref n) {
 			if (is_quantifier<node>(n)) return false;
 			if (is_temporal_quantifier<node>(n)) return false;
-			return visit_wff<node>(n);
+			return while_is_wff<node>(n);
 		};
 		fm = pre_order<node>(fm).apply(f, visit, up);
 		DBG(LOG_DEBUG << "Simplify_using_equality result: " << LOG_FM(fm) << "\n";)
@@ -2188,7 +2188,7 @@ class syntactic_path_simplification {
 		auto visit = [&skip](tref n) {
 			if (skip != nullptr && tau::get(n) == tau::get(skip))
 				return skip = nullptr, false;
-			return visit_wff<node>(n);
+			return while_is_wff<node>(n);
 		};
 		return pre_order<node>(root).template
 			apply_unique<synt_path_simp_m>(down, visit);
@@ -2998,7 +2998,7 @@ tref squeeze_absorb(tref formula) {
 		if (is_quantifier<node>(n)) return false;
 		if (is_temporal_quantifier<node>(n)) return false;
 		if (mark.contains(n)) return false;
-		return visit_wff<node>(n);
+		return while_is_wff<node>(n);
 	};
 	// Disable intermediate simplifications for the moment
 	tau::use_hooks = false;
@@ -3223,7 +3223,7 @@ tref squeeze_absorb(tref formula, tref var) {
 		if (is_quantifier<node>(n)) return false;
 		if (is_temporal_quantifier<node>(n)) return false;
 		if (mark.contains(n)) return false;
-		return visit_wff<node>(n);
+		return while_is_wff<node>(n);
 	};
 	// Disable intermediate simplifications for the moment
 	tau::use_hooks = false;
@@ -3478,7 +3478,7 @@ tref boole_normal_form(tref formula) {
 		}
 		return n;
 	};
-	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, while_is_wff<node>);
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(formula) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	bnf = syntactic_formula_simplification<node>(bnf);
@@ -3557,7 +3557,7 @@ tref term_boole_normal_form(tref formula) {
 		}
 		return n;
 	};
-	tbnf = pre_order<node>(tbnf).apply_unique_until_change(simp_eqs, visit_wff<node>);
+	tbnf = pre_order<node>(tbnf).apply_unique_until_change(simp_eqs, while_is_wff<node>);
 	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(tbnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	tbnf = syntactic_formula_simplification<node>(tbnf);
@@ -3861,7 +3861,7 @@ using tau = tree<node>;
 	};
 	auto visit = [&](tref n) {
 		if (excluded.contains(n)) return false;
-		return visit_wff<node>(n);
+		return while_is_wff<node>(n);
 	};
 	return pre_order<node>(formula).apply_unique(down_resolver, visit);
 }
@@ -4002,7 +4002,7 @@ tref anti_prenex(tref formula) {
 		};
 		auto step_visit = [&] (tref t) {
 			if (excluded.contains(t)) return false;
-			return visit_wff<node>(t);
+			return while_is_wff<node>(t);
 		};
 		if (!is_child_quantifier<node>(n)) return n;
 		// Here child is quantifier
@@ -4040,7 +4040,7 @@ tref anti_prenex(tref formula) {
 	auto visit = [&](tref n) {
 		if (is_quantifier<node>(n))
 			quant_pattern.insert_or_assign(tau::trim(n), qid++);
-		return visit_wff<node>(n);
+		return while_is_wff<node>(n);
 	};
 	DBG(LOG_DEBUG << "Anti_prenex on " << LOG_FM(formula) << "\n";)
 	// Initial simplification of formula
@@ -4249,7 +4249,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 	};
 	auto visit = [&](tref n) {
 		if (excluded.contains(n)) return false;
-		return visit_wff<node>(n);
+		return while_is_wff<node>(n);
 	};
 	return pre_order<node>(formula).apply_unique(down_resolver, visit);
 }
