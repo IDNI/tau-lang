@@ -12,9 +12,6 @@
 #ifndef __IDNI__TAU__BA_BV_SIMPLIFICATION_H__
 #define __IDNI__TAU__BA_BV_SIMPLIFICATION_H__
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "ba_bv-simplification"
-
 namespace idni::tau_lang {
 
 using namespace cvc5;

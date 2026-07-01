@@ -15,9 +15,6 @@
 
 #include "tau_tree.h"
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "bv_predicate_blasting"
-
 namespace idni::tau_lang {
 
 inline bool bv_blasting = true;

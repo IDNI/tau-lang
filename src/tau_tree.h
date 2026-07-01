@@ -1152,6 +1152,10 @@ bool while_is_boolean_operation(tref n);
 template <NodeType node>
 bool while_is_formula(tref n);
 
+/** @brief Return `true` if @p n is a non-boolean term. */
+template <NodeType node>
+bool is_non_boolean_term(tref n);
+
 // Fast extractors (not depending in extractors, just direct access to the tree structure)
 
 /** @brief Return the temporally quantified formula of @p n, n otherwise. */

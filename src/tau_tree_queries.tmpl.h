@@ -233,8 +233,9 @@ int_t node_count (tref fm) {
 	return c;
 }
 
+
 template <NodeType node>
-auto is_non_boolean_term = [](tref n) static {
+bool is_non_boolean_term(tref n) {
 	using tau = tree<node>;
 	const tau& t = tau::get(n);
 	if (t.is(tau::bf_add) || t.is(tau::bf_sub) || t.is(tau::bf_mul)
@@ -243,7 +244,7 @@ auto is_non_boolean_term = [](tref n) static {
 			|| t.is(tau::bf_nor) || t.is(tau::bf_xnor))
 		return true;
 	return false;
-};
+}
 
 template <NodeType node>
 bool has_fallback (tref n) {
