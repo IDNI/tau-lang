@@ -1129,7 +1129,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			return false;
 		};
 		pre_order<node>(path).visit_unique(
-			find_assigment, visit_wff<node>, identity);
+			find_assigment, while_is_wff<node>, identity);
 		// Replace found variables with chosen terms
 		DBG(LOG_DEBUG << "solve/Path before: " << tau::get(path) << "\n";)
 		path = rewriter::replace(path, var_assignments);

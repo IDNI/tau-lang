@@ -229,7 +229,7 @@ int_t node_count (tref fm) {
 }
 
 template <NodeType node>
-auto visit_wff = [](tref n) static {
+auto while_is_wff = [](tref n) static {
 	return !tree<node>::get(n).is_term();
 };
 
