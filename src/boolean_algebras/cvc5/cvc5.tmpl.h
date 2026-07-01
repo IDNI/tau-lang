@@ -2,6 +2,9 @@
 
 #include "boolean_algebras/cvc5/cvc5.h" // Only for IDE resolution, not really needed.
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "cvc5"
+
 namespace idni::tau_lang {
 
 using namespace cvc5;
