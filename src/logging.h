@@ -132,6 +132,8 @@ static constexpr const char* LOG_ENABLED_CHANNELS[] = {
 	// "bv_ba_simplification",
 	// "ex_subs_based_elimination",
 	// "bv_predicate_blasting",
+	// "syntactic_path_simplification",
+	// "simplify_using_equality",
 
 	/* testing specific */
 	"testing",
