@@ -156,4 +156,67 @@ TEST_SUITE("trivial_skolem") {
 		CHECK( !contains<node_t>(result, a1) );
 		CHECK( !contains<node_t>(result, a3) );
 	}
+
+	TEST_CASE("elimination works when the defining equation is nested inside a disjunction") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("b = 0 || a1 = c");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		CHECK( result == tau::_T() );
+	}
+
+	TEST_CASE("elimination inside a disjunction nested within a conjunction") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("e = 0 && (b = 0 || a1 = c)");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = parse("e = 0");
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("atom under negation is not substituted, variable stays kept") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("!(a1 = c)");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("atom under negation keeps the variable even when a sibling clause is unaffected") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("!(a1 = c) && d = e");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("a variable with one eligible occurrence and one hidden occurrence is kept") {
+		// a1 occurs once in the eligible atom (a1 = c) and again inside the
+		// negated atom (a1 = d); eliminating a1 via the first occurrence
+		// would leave the second one dangling free once the quantifier is
+		// dropped, so a1 must be kept regardless of the eligible atom.
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("a1 = c && !(a1 = d)");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("a variable shared by a desugared equivalence's negated and positive operand is kept") {
+		// (a1 = c) <-> (b = 0) desugars to and/or/neg with the (a1 = c)
+		// subtree referenced both negated and positively, so a1's global
+		// occurrence count is 2 even though it looks like "one clause" at
+		// the source level.
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("(a1 = c) <-> (b = 0)");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("atom inside a nested quantifier over a different variable is not substituted") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("(ex y a1 = y) && c = 0");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
 }
