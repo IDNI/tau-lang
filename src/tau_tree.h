@@ -1152,6 +1152,10 @@ bool while_is_boolean_operation(tref n);
 template <NodeType node>
 bool while_is_formula(tref n);
 
+/** @brief Return `true` if @p n is a quantified formula. */
+template <NodeType node>
+bool until_is_quantified(tref n);
+
 /** @brief Return `true` if @p n is a non-boolean term. */
 template <NodeType node>
 bool is_non_boolean_term(tref n);

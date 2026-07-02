@@ -283,14 +283,13 @@ inline bool is_formula(tref n) {
 	return while_is_formula<node>(n);
 }
 
+// Visiting continuation predicates (for use with `visit`, `find`,...)
 template <NodeType node>
 bool while_is_formula(tref n) {
 	using tau = tree<node>;
 
 	return !tau::get(n).is_term();
 };
-
-// Visiting continuation predicates (for use with `visit`, `find`,...)
 
 template <NodeType node>
 bool while_is_boolean_operation(tref n) {
@@ -301,6 +300,12 @@ bool while_is_boolean_operation(tref n) {
 		|| t.is(tau::bf_xor) || t.is(tau::bf_neg)
 		|| t.is(tau::bf_fex) || t.is(tau::bf_fall)) return true;
 	return false;
+}
+
+/** @brief Return `true` if @p n is a quantified formula. */
+template <NodeType node>
+bool until_is_quantified(tref n) {
+	return is_quantifier<node>(n);
 }
 
 } // namespace idni::tau_lang
