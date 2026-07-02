@@ -38,7 +38,7 @@ struct product_ba: std::tuple<BAS...> {
 	auto operator<=>(const product_ba<BAS...>& that) const = default;
 
 	/** @brief Component-wise bitwise NOT. */
-	product_ba<BAS...> operator~() {
+	product_ba<BAS...> operator~() const {
 		product_ba<BAS...> result;
 		auto __not = [](auto a, auto& c ) { return c = ~a; };
 		(__not(get<BAS>(*this), get<BAS>(result)), ...);
@@ -46,7 +46,7 @@ struct product_ba: std::tuple<BAS...> {
 	}
 
 	/** @brief Component-wise bitwise AND. */
-	product_ba<BAS...> operator&(product_ba<BAS...>& that) {
+	product_ba<BAS...> operator&(const product_ba<BAS...>& that) const {
 		product_ba<BAS...> result;
 		auto __and = [](auto a, auto b, auto& c ) { return c = (a&b); };
 		(__and(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
@@ -54,7 +54,7 @@ struct product_ba: std::tuple<BAS...> {
 	}
 
 	/** @brief Component-wise bitwise OR. */
-	product_ba<BAS...> operator|(product_ba<BAS...>& that) {
+	product_ba<BAS...> operator|(const product_ba<BAS...>& that) const {
 		product_ba<BAS...> result;
 		auto __or = [](auto a, auto b, auto& c ) { return c = (a|b); };
 		(__or(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
@@ -62,7 +62,7 @@ struct product_ba: std::tuple<BAS...> {
 	}
 
 	/** @brief Component-wise bitwise XOR. */
-	product_ba<BAS...> operator^(product_ba<BAS...>& that) {
+	product_ba<BAS...> operator^(const product_ba<BAS...>& that) const {
 		product_ba<BAS...> result;
 		auto __xor = [](auto a, auto b, auto& c ) { return c = (a^b); };
 		(__xor(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);

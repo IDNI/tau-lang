@@ -60,6 +60,11 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 				lt.get_ba_type());
 	};
 
+	// trivial cases
+	if (lt.equals_1() || rt.equals_1()) return tau::get_1(find_ba_type<node<BAs...>>(lt.get()));
+	if (lt.equals_0()) return rt;
+	if (rt.equals_0()) return lt;
+	// more elaborate cases
 	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
 		return tau::get(ba_constant_or(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))

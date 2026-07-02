@@ -134,7 +134,6 @@ struct bdd_handle {
 	static hbdd<B, o> bit(bool b, uint_t v) {
 		DBG(assert(v > 0);)
 		hbdd<B, o> r = get(bdd<B, o>::bit(b ? v : -v));
-		//hbdd<B, o> r = get(bdd_node(v, bdd<B, o>::T, bdd<B, o>::F));
 		DBG(assert(r);)
 		return r;
 	}
@@ -146,19 +145,15 @@ struct bdd_handle {
 		const bdd<B, o> &xx = x->get();
 		const bdd<B, o> &yy = get();
 		if (xx.leaf()) {
-#ifndef DEBUG
 			if (std::get<B>(xx) == true) return get(*this);
 			if (std::get<B>(xx) == false) return hfalse;
-#endif
 			if (yy.leaf())
 				return	bdd_handle<B, o>::get(
 					std::get<B>(xx) & std::get<B>(yy));
 			return get(bdd<B, o>::bdd_and(b, std::get<B>(xx)));
 		} else if (yy.leaf()) {
-#ifndef DEBUG
 			if (std::get<B, o>(yy) == true) return x;
 			if (std::get<B, o>(yy) == false) return hfalse;
-#endif
 			return get(bdd<B, o>::bdd_and(x->b, std::get<B>(yy)));
 		}
 		return get(bdd<B, o>::bdd_and(x->b, b));
@@ -170,19 +165,15 @@ struct bdd_handle {
 		const bdd<B, o> &xx = x->get();
 		const bdd<B, o> &yy = get();
 		if (xx.leaf()) {
-#ifndef DEBUG
 			if (std::get<B>(xx) == true) return htrue;
 			if (std::get<B>(xx) == false) return get(*this);
-#endif
 			if (yy.leaf())
 				return	bdd_handle<B, o>::get(
 					std::get<B>(xx) | std::get<B>(yy));
 			return get(bdd<B, o>::bdd_or(b, std::get<B>(xx)));
 		} else if (yy.leaf()) {
-#ifndef DEBUG
 			if (std::get<B, o>(yy) == true) return htrue;
 			if (std::get<B, o>(yy) == false) return x;
-#endif
 			return get(bdd<B, o>::bdd_or(x->b, std::get<B>(yy)));
 		}
 		return get(bdd<B, o>::bdd_or(x->b, b));
@@ -204,12 +195,7 @@ struct bdd_handle {
 
 	hbdd<B, o>
 	subst(size_t v, const hbdd<B, o>& x) const {
-#ifdef DEBUG
-//		assert( get(bdd<B, o>::subst(b, v, x->b)) ==
-//			((sub0(v) & ~x) | (sub1(v) & x)));
-#endif
 		return (sub0(v) & ~x) | (sub1(v) & x);
-//		return get(bdd<B, o>::subst(b, v, x->b));
 	}
 
 	hbdd<B, o> sub0(size_t v) const {
@@ -250,12 +236,6 @@ struct bdd_handle {
 	std::map<int_t, B> get_one_zero() const {
 		std::map<int_t, B> m;
 		bdd<B, o>::get_one_zero(b, m);
-//#ifdef DEBUG
-//		auto d = dnf();
-//		bool t = false;
-//		for (auto x : d) t |= (r == x.second);
-//		assert(!t);
-//#endif
 		return m;
 	}
 
@@ -362,7 +342,6 @@ struct bdd_handle<Bool, o> {
 	static hbdd<Bool, o> bit(bool b, uint_t v) {
 		DBG(assert(v > 0);)
 		hbdd<Bool, o> r = get(bdd<Bool, o>::bit(b ? v : -v));
-		//hbdd<Bool, o> r = get(bdd_node(v, bdd<Bool, o>::T, bdd<Bool, o>::F));
 		DBG(assert(r);)
 		return r;
 	}
@@ -398,12 +377,7 @@ struct bdd_handle<Bool, o> {
 	}
 
 	hbdd<Bool, o> subst(size_t v, const hbdd<Bool, o>& x) const {
-#ifdef DEBUG
-//		assert( get(bdd<Bool, o>::subst(b, v, x->b)) ==
-//			((sub0(v) & ~x) | (sub1(v) & x)));
-#endif
 		return (sub0(v) & ~x) | (sub1(v) & x);
-//		return get(bdd<Bool, o>::subst(b, v, x->b));
 	}
 
 	hbdd<Bool, o> sub0(size_t v) const {
@@ -443,12 +417,6 @@ struct bdd_handle<Bool, o> {
 	std::map<int_t, Bool> get_one_zero() const {
 		std::map<int_t, Bool> m;
 		bdd<Bool, o>::get_one_zero(b, m);
-//#ifdef DEBUG
-//		auto d = dnf();
-//		bool t = false;
-//		for (auto x : d) t |= (r == x.second);
-//		assert(!t);
-//#endif
 		return m;
 	}
 
@@ -515,34 +483,10 @@ template<typename B> B get_zero() requires is_sp<B> {
 	return B::element_type::zero();
 }
 
-/*template<typename B> void bdd_init() requires is_sp<B, o> {
-	if (!bdd<B, o>::V.empty()) return;
-#ifdef DEBUG
-	int s;
-	cout << "bdd_init" << '<' <<
-		abi::__cxa_demangle(typeid(bdd<B, o>).name(), 0, 0, &s) <<
-		'>' << endl;
-#endif
-	auto one = get_one<B, o>();
-	bdd<B, o>::V.emplace_back(one);
-	bdd<B, o>::V.emplace_back(one);
-	bdd<B, o>::Mb.emplace(one, 1);
-	bdd<B, o>::F = -(bdd<B, o>::T = 1);
-	bdd_handle<B, o>::hfalse = bdd_handle<B, o>::get(bdd<B, o>::get(-1));
-	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(bdd<B, o>::get(1));
-}*/
-
 template<typename B, auto o = bdd_options<>::create()> void bdd_init() {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
 
 	if (!bdd<B, o>::V.empty()) return;
-#ifdef DEBUG
-//	int s;
-//	cout << "bdd_init" << '<' <<
-//	     abi::__cxa_demangle(typeid(bdd<B, o>).name(), 0, 0, &s) <<
-//	     '>' << endl;
-#endif
-	//bdd<B, o>::Mb.emplace(B::one(), 1);
 	if constexpr (o.has_inv_out()) {
 		bdd<B, o>::T = bdd_ref(0,0,0);
 		bdd<B, o>::F = bdd_ref(0,1,0);

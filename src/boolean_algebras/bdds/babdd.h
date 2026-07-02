@@ -185,7 +185,7 @@ struct bdd_reference<false, INV_ORDER, ID_WIDTH, SHIFT_WIDTH> {
 	}
 
 	static bdd_reference flip_in(const bdd_reference x) {
-		return bdd_ref(x.in == 1 ? 0 : 1, x.out, x.id);
+		return bdd_reference(x.in == 1 ? 0 : 1, x.out, x.id);
 	}
 
 	static bdd_reference flip_out(const bdd_reference x) {
@@ -560,14 +560,7 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if (x == F) return F;
 		if (check_cache(x, add(b), and_memo)) return x;
 		const bdd& xx = get(x);
-		if (xx.leaf()) {
-//#ifdef DEBUG
-//			if constexpr(is_same<B, struct Bool>::value)
-//				if (b == true && !((b & std::get<B>(xx)) == xx))
-//					assert((b & std::get<B>(xx)) == xx);
-//#endif
-			return add(b & std::get<B>(xx));
-		}
+		if (xx.leaf()) return add(b & std::get<B>(xx));
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
 		bdd_ref y = add(nx.v, bdd_and(nx.h, b), bdd_and(nx.l, b));
 #ifdef DEBUG
