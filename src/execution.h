@@ -64,8 +64,8 @@ struct steps {
 };
 
 /**
- * @brief Repeatedly apply a set of steps to a formula, each step once per round,
- *        until no change occurs in a full round.
+ * @brief Repeatedly apply a set of steps to a formula in sequence until a
+ *        fixpoint is reached in each one.
  * @tparam node Tree node type.
  * @tparam step_t Individual step type.
  */
