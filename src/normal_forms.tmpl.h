@@ -475,12 +475,9 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 // Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
 template <NodeType node>
 void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
-	const int_t p, const auto& is_var)
-{
+		const int_t p, const auto& is_var) {
 	using tau = tree<node>;
-	// auto is_var = [](tref n){return
-	// 	is_child<node>(n, tau::variable) ||
-	// 		is_child<node>(n, tau::uconst_name);};
+
 	auto cvars = tau::get(fm).select_all(is_var);
 	subtree_set<node> cur_vars(
 		std::make_move_iterator(cvars.begin()),

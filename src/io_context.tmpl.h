@@ -312,7 +312,7 @@ tref io_context<node>::add_input_console(const std::string& name, size_t type_id
 
 template <NodeType node>
 tref io_context<node>::add_input_console_no_prompt(const std::string& name, size_t type_id) {
-	return add_input_console(name, type_id, std::make_shared<console_input_stream>());
+	return add_input_console(name, type_id);
 }
 
 template <NodeType node>
@@ -333,7 +333,7 @@ tref io_context<node>::add_output_console(const std::string& name, size_t type_i
 
 template <NodeType node>
 tref io_context<node>::add_output_console_no_prompt(const std::string& name, size_t type_id) {
-	return add_output_console(name, type_id, std::make_shared<console_output_stream>());
+	return add_output_console(name, type_id);
 }
 
 template <NodeType node>

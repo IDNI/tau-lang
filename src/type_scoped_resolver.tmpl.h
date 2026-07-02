@@ -174,7 +174,7 @@ void open(type_scoped_resolver<node>& resolver, const std::initializer_list<tref
 
 template<NodeType node>
 void open(type_scoped_resolver<node>& resolver, const std::initializer_list<trefs>& ns, tref type) {
-	auto type_id = ba_types<node>::type_id_from_ba_type(type);
+	auto type_id = ba_types<node>::id(type);
 	return open<node>(resolver, ns, type_id);
 }
 

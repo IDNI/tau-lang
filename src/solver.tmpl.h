@@ -13,16 +13,6 @@
 
 namespace idni::tau_lang {
 
-// not used?
-// template <NodeType node>
-// solution<node> make_removed_vars_solution(const std::vector<var>& originals, tref gh) {
-// 	solution<node> solution;
-// 	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<node>;
-// 	// FIXME convert vars to a set
-// 	auto remaing = select_top(gh, is_child_non_terminal<tau::variable, node>);
-// 	for (auto& v: remaing) solution.erase(v);
-// 	return solution;
-// }
 template <NodeType node>
 std::optional<solution<node>> find_solution(equality eq,
 	solution<node>& substitution, solver_mode mode)
