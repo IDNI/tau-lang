@@ -168,7 +168,7 @@ bool is_atomic_fm(tref n) {
 		   || child.is(tau::bf_ngteq)
 		   || child.is(tau::bf_lt)
 		   || child.is(tau::bf_nlt));
-};
+}
 
 template <NodeType node>
 bool is_cli_cmd(tref n) {
