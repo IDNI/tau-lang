@@ -303,6 +303,10 @@ bool is_bv_formula_sat(tref form) {
 		return false;
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
+	// There are no limits of resources in cvc5, so we can just assert the formula
+	// and check for satisfiability.
+	// TODO (MEDIUM) handle the case where we limit resources to cvc5 and hence,
+	// it could return unknown (timeout) to an upper level
 	solver.assertFormula(expr.value());
 	return solver.checkSat().isSat();
 }
@@ -335,7 +339,10 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
 
-	// solve the equations
+	// There are no limits of resources in cvc5, so we can just assert the formula
+	// and check for satisfiability.
+	// TODO (MEDIUM) handle the case where we limit resources to cvc5 and hence,
+	// it could return unknown (timeout) to an upper level
 	solver.assertFormula(expr.value());
 	LOG_DEBUG << "Solving bitvector formula: " << expr.value();
 	auto result = solver.checkSat();
