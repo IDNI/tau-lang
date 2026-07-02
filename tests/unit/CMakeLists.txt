@@ -15,6 +15,7 @@ set(TESTS
 	hbdd
 	interpreter
 	normal_forms
+	nso_rr
 	product_ba
 	sbf_ba_parsing
     tau_bdd
