@@ -27,11 +27,11 @@ enum class split_sym {
 };
 
 /**
- * @brief Return a "bad" splitter (the `T` constant) for @p fm.
+ * @brief Return a "bad" splitter for @p fm.
  *
  * Assumes @p fm is fully normalized by the normalizer.
  * @tparam BAs Boolean-algebra type pack.
- * @param fm Formula to produce a bad splitter for (default: `T`).
+ * @param fm Formula to produce a bad splitter, (formula defaults `T`).
  * @return `T` constant node as a bad splitter.
  */
 template <typename... BAs>
