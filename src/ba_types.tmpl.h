@@ -221,10 +221,10 @@ std::ostream& ba_types<node>::dump(std::ostream& os) {
 	LOG_TRACE << "BA types pool(" << type_trees().size() << "):\n";
 	os << "BA type_trees pool(" << type_trees().size() << "):\n";
 	for (size_t i = 0; i < type_trees().size(); ++i) {
-		LOG_TRACE << "type: " << i+1;
+		LOG_TRACE << "type: " << i;
 		LOG_TRACE << "val:  " << name(i);
 		os << LOG_INDENT << "type: "
-			<< i+1 << " " << name(i) << "\n";
+			<< i << " " << name(i) << "\n";
 	}
 	return os;
 }
@@ -287,7 +287,7 @@ template <NodeType node>
 tref unify(tref t1, tref t2) {
 	using tau = tree<node>;
 
-	// If either is nat, return nat
+	// Natural type cannot be unified (bar from unification)
 	if (is_nat_type<node>(t1) || is_nat_type<node>(t2)) return nullptr;
 	// If one is untyped return the other
 	if (is_untyped<node>(t1)) return t2;

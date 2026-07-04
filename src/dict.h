@@ -40,7 +40,7 @@ inline size_t dict(const std::string& s) {
  * @return Reference to the corresponding string.
  */
 inline const std::string& dict(size_t id) {
-	DBG(assert(id <= S().size());)
+	DBG(assert(id < S().size());)
 	return S()[id];
 }
 

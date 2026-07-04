@@ -45,3 +45,19 @@
 #undef LOG_INDENT
 #undef LOG_INDENT1
 #undef LOG_INDENT2
+
+// defs.h
+
+#undef hasb
+#undef hasbc
+#undef sortc
+
+#undef TAU_PRINT
+#undef TAU_PRINT_TREE
+#undef TAU_DUMP
+#undef TAU_PRINT_TO
+#undef TAU_PRINT_TREE_TO
+#undef TAU_DUMP_TO
+#undef TAU_TO_STR
+#undef TAU_TREE_TO_STR
+#undef TAU_DUMP_TO_STR
