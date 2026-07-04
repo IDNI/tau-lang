@@ -23,7 +23,7 @@ tref step<node>::operator()(tref n) const {
 
 template <NodeType node, typename step_t>
 steps<node, step_t>::steps(std::vector<step_t> libraries)
-						: libraries(libraries) {}
+						: libraries(std::move(libraries)) {}
 
 template <NodeType node, typename step_t>
 steps<node, step_t>::steps(step_t library) { libraries.push_back(library); }
@@ -50,7 +50,7 @@ template <NodeType node, typename step_t>
 tref repeat_each<node, step_t>::operator()(tref n) const {
 	auto nn = n;
 	for (auto& l: s.libraries) {
-		std::set<tref> visited;
+		std::unordered_set<tref> visited;
 		while (true) {
 			nn = l(nn);
 			if (visited.find(nn) != visited.end()) break;
