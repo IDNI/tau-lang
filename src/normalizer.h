@@ -32,7 +32,7 @@ namespace idni::tau_lang {
  *
  * For formulas without temporal quantifiers (`always`/`sometimes`):
  *   1. Resolves closed quantified bitvector sub-formulas (`resolve_quantifiers`).
- *   2. Applies anti-prenex (`anti_prenex`).
+ *   2. Applies anti-prenex block normalization (`anti_prenex_block`).
  *   3. Resolves remaining quantifiers.
  *
  * For formulas with temporal quantifiers, the same three steps are applied
@@ -67,10 +67,13 @@ tref fold_trivial_quantifiers(tref fm);
  * Assumes the formula contains no `always`/`sometimes` quantifiers. Applies
  * the following pipeline in order:
  *   1. `resolve_quantifiers`
- *   2. `anti_prenex`
+ *   2. `anti_prenex_block`
  *   3. `resolve_quantifiers`
  *   4. `term_boole_normal_form`
- *   5. `fold_trivial_quantifiers`
+ *
+ * Note: `fold_trivial_quantifiers` is deliberately omitted to preserve bitwidth
+ * subtypes (see NOTE in implementation); residual trivial quantifiers are folded
+ * later by `normalize_with_temp_simp`.
  *
  * @tparam node Tree node type.
  * @param fm Non-temporal formula to normalize.
@@ -219,12 +222,12 @@ tref normalizer(tref fm);
 /**
  * @brief Normalize temporal quantifiers (`always`/`sometimes`) in a formula.
  *
- * Converts the temporal layer of the formula to DNF, then (when
- * `normalize_scopes` is `true`) normalizes the inner formulas below temporal
- * quantifiers and simplifies temporal implications using `is_nso_impl` and
- * `is_non_temp_nso_unsat`.
+ * Converts the temporal layer of the formula to DNF and simplifies by
+ * squeezing `always` statements, then (when `normalize_scopes` is `true`)
+ * normalizes the inner formulas below temporal quantifiers.
+ *
  * @tparam node Tree node type.
- * @tparam normalize_scopes When `true` (default) also normalize the inner formulas.
+ * @tparam normalize_scopes When `true` (default) also normalize inner formulas.
  * @param fm Formula to normalize.
  * @return Formula with normalized temporal quantifiers.
  */
