@@ -64,7 +64,7 @@ std::ostream& operator<<(std::ostream& os, const Bool& b);
 
 template<>
 struct std::hash<idni::tau_lang::Bool> {
-	size_t operator()(const idni::tau_lang::Bool& b) {
+	size_t operator()(const idni::tau_lang::Bool& b) const noexcept {
 		return b.b ? 1 : 0;
 	}
 };

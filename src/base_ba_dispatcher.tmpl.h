@@ -266,7 +266,6 @@ inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> base_ba_dispatcher<tau_ba<bv
 		const std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>& elem, splitter_type st) {
 	DBG(assert(!std::holds_alternative<bv>(elem));)
 	if (std::holds_alternative<tau_ba<bv, sbf_ba>>(elem)) {
-		auto fml = std::get<tau_ba<bv, sbf_ba>>(elem);
 		auto unpacked = unpack_tau_ba(elem);
 		return std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba>(
 			tau_splitter<tau_ba<bv, sbf_ba>, bv, sbf_ba>(unpacked, st));

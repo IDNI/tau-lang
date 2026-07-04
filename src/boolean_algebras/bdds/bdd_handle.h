@@ -152,8 +152,8 @@ struct bdd_handle {
 					std::get<B>(xx) & std::get<B>(yy));
 			return get(bdd<B, o>::bdd_and(b, std::get<B>(xx)));
 		} else if (yy.leaf()) {
-			if (std::get<B, o>(yy) == true) return x;
-			if (std::get<B, o>(yy) == false) return hfalse;
+			if (std::get<B>(yy) == true) return x;
+			if (std::get<B>(yy) == false) return hfalse;
 			return get(bdd<B, o>::bdd_and(x->b, std::get<B>(yy)));
 		}
 		return get(bdd<B, o>::bdd_and(x->b, b));
@@ -172,8 +172,8 @@ struct bdd_handle {
 					std::get<B>(xx) | std::get<B>(yy));
 			return get(bdd<B, o>::bdd_or(b, std::get<B>(xx)));
 		} else if (yy.leaf()) {
-			if (std::get<B, o>(yy) == true) return htrue;
-			if (std::get<B, o>(yy) == false) return x;
+			if (std::get<B>(yy) == true) return htrue;
+			if (std::get<B>(yy) == false) return x;
 			return get(bdd<B, o>::bdd_or(x->b, std::get<B>(yy)));
 		}
 		return get(bdd<B, o>::bdd_or(x->b, b));
