@@ -261,8 +261,6 @@ struct minterm_iterator {
 		} else exhausted = true;
 	}
 
-	minterm_iterator();
-
 	minterm_iterator<node>& operator++() {
 		if (exhausted) return *this;
 		make_next_choice();
@@ -427,8 +425,6 @@ struct minterm_inequality_system_iterator {
 		}
 		current = make_current_minterm_system();
 	}
-
-	minterm_inequality_system_iterator();
 
 	minterm_inequality_system_iterator<node> &operator++() {
 		if (exhausted) return *this;
@@ -750,7 +746,6 @@ std::optional<solution<node>> solve_inequality_system(
 	#endif // DEBUG
 	// If no inequality is contained, return an empty solution
 	if (system.empty()) return solution<node>{};
-	//for (auto& ms: minterm_inequality_system_range<node>(system)) {
 	for (auto it = minterm_inequality_system_iterator<node>(system);
 		it != minterm_inequality_system_iterator<node>::end; ++it)
 	{
@@ -1067,6 +1062,7 @@ template <NodeType node>
 std::optional<solution<node>> solve(tref form, solver_options options, bool& error) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	error = false;  // Initialize error flag
 	if (tau::get(form).equals_T()) return { solution<node>() };
 	if (tau::get(form).equals_F()) return {};
 
