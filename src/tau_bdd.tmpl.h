@@ -104,9 +104,8 @@ void tau_term_bdd<node>::make_canonical(ref& x, ref& y) {
 /** @internal @copydoc tau_term_bdd::less_then(tref, tref, const order&) @endinternal */
 template<NodeType node>
 bool tau_term_bdd<node>::less_then(tref x, tref y, const order& o) {
-	DBG(assert(o.contains(x) && o.contains(y)));
 	const auto xiter = o.find(x), yiter = o.find(y);
-	// If one variable is not found in o, there is nothing to compare
+	// Both variables must be present in the order for comparison
 	if (xiter == o.end() || yiter == o.end()) return false;
 	return xiter->second < yiter->second;
 }

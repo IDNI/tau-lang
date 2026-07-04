@@ -60,9 +60,7 @@ tref canonize_quantifier_ids(tref fm) {
 					std::to_string(it->second.back()),
 					tau::get(n).get_ba_type());
 				old_name.emplace(nvar, n);
-				return tau::build_variable(
-					std::to_string(it->second.back()),
-					tau::get(n).get_ba_type());
+				return nvar;
 			}
 		}
 		return n;
@@ -201,7 +199,12 @@ int_t find_biggest_quant_id(tref fm) {
 		if (is_quantifier<node>(n)) {
 			if (auto name = get_var_name<node>(tau::trim(n));
 				is_number(name)) {
-				id = std::max(id, std::stoi(name));
+				try {
+					id = std::max(id, static_cast<int_t>(std::stoll(name)));
+				} catch (const std::out_of_range&) {
+					// Variable name exceeds range; use max id
+					id = std::numeric_limits<int_t>::max();
+				}
 				return false;
 			}
 		}

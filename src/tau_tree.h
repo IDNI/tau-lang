@@ -78,9 +78,10 @@ template <NodeType node> struct tau_spec;
 /**
  * @brief Packed bit-field AST node for Tau formula trees.
  *
- * A `node` encodes the nonterminal id (`nt`), a `term` flag, an extension
- * flag (`ext`), inline data (`data`), and a BA type id (`ba_type`) into a
- * single `size_t`-sized bit-field for cache efficiency.
+ * A `node` encodes the nonterminal id (`nt`) and a `term` flag as bit-fields,
+ * with separate fields for inline data (`data`), a BA type id (`ba_type`),
+ * and a pre-computed hash (`hash`). The term flag indicates whether this is a
+ * term (bf) or formula (wff).
  *
  * `node` also exports type aliases (`constant`, `ba`) so they are accessible
  * everywhere a `node` type parameter is in scope, avoiding repeated template
@@ -182,13 +183,15 @@ struct node {
 	constexpr size_t hashit() const;
 };
 
+/// @brief Placeholder for parser nonterminal grouping.
+/// Defined to support parser integration hooks; may be extended in future.
 struct tau_parser_nonterminal_groups {
-	enum nonterminal {
-		typeable_symbol = 1000
-		// quantifiers
-		// atomic...
+	// Enum for parser infrastructure compatibility
+	enum parser_nt : size_t {
+		typeable_symbol = 1000  ///< Placeholder nonterminal id for typeable symbols
 	};
 };
+
 /**
  * @brief Tau formula AST, extending `lcrs_tree<node>` with Tau-specific operations.
  *
