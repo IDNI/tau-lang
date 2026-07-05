@@ -30,6 +30,13 @@ TEST_SUITE("trivial_skolem") {
 		CHECK( result == tau::_T() );
 	}
 
+	TEST_CASE("direct assignment on the right also eliminates the variable") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("c = a1");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		CHECK( result == tau::_T() );
+	}
+
 	TEST_CASE("leftover clause is preserved when a variable is eliminated") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		tref phi = parse("a1 = c && d = e");
@@ -164,6 +171,13 @@ TEST_SUITE("trivial_skolem") {
 		CHECK( result == tau::_T() );
 	}
 
+	TEST_CASE("elimination also works when the defining equation is the left disjunct") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("a1 = c || b = 0");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		CHECK( result == tau::_T() );
+	}
+
 	TEST_CASE("elimination inside a disjunction nested within a conjunction") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		tref phi = parse("e = 0 && (b = 0 || a1 = c)");
@@ -183,6 +197,30 @@ TEST_SUITE("trivial_skolem") {
 	TEST_CASE("atom under wff xor is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		tref phi = parse("(a1 = c) ^^ (b = 0)");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("atom under reverse implication is not substituted, variable stays kept") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("(b = 0) <- (a1 = c)");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("atom under equivalence is not substituted, variable stays kept") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("(a1 = c) <-> (b = 0)");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("atom under conditional is not substituted, variable stays kept") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("(b = 0) ? (a1 = c) : (d = e)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );

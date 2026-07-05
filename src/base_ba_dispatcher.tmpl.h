@@ -239,6 +239,11 @@ inline tref base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>::unpack_tau_ba(
 template<>
 inline std::variant<tau_ba<bv, sbf_ba>, bv, sbf_ba> base_ba_dispatcher<tau_ba<bv, sbf_ba>,
 bv, sbf_ba>::pack_tau_ba(tref c) {
+	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+	using tau = tree<node_t>;
+	DBG(assert(c != nullptr && tau::get(c).is(tau::wff));)
+	if (c == nullptr || !tau::get(c).is(tau::wff))
+		throw std::logic_error("pack_tau_ba expects a non-null wff");
 	tau_ba<bv, sbf_ba> t {c};
 	return {t};
 }

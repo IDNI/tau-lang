@@ -24,9 +24,8 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 		case tau::wff_sometimes: {
 			return bv_eval_node<node>(form | tt::first, vars, free_vars);
 		}
-		// due to hooks we should consider wff_t or bf_t
+		// Hooks normalize these wrappers to their contained bitvector formulas.
 		case tau::wff: case tau::bf:
-		// TODO (HIGH) deal with those eq appropiately
 		/*case tau::bv:*/ {
 			return bv_eval_node<node>(form | tt::first, vars, free_vars);
 		}

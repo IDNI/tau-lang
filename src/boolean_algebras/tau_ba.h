@@ -135,22 +135,6 @@ struct tau_ba {
 	const rr<node> nso_rr;
 
 private:
-	// /**
-	//  * @brief Renames the given tau_nso_t form.
-	//  *
-	//  * @param form Reference to the tau_nso_t form.
-	//  * @return Renamed tau_nso_t.
-	//  */
-	// tref rename(tref form) const;
-
-	// /**
-	//  * @brief Renames the given rewriter rule.
-	//  *
-	//  * @param rule Reference to the rewriter rule of tau_nso_t.
-	//  * @return Renamed rewriter rule.
-	//  */
-	// rewriter::rule rename(const rewriter::rule<tau_nso_t>& rule) const;
-
 };
 
 /**

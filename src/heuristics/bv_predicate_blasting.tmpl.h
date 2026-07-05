@@ -165,8 +165,8 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				vars.push_back(shifted);
 				changes[t] = shifted;
 				conjoin((nt == tau::bf_shl)
-					? bvshl<node>(lookup(shiftand), count, bf_shifted)
-					: bvshr<node>(lookup(shiftand), count, bf_shifted));
+					? bvshl<node>(shiftand, count, bf_shifted)
+					: bvshr<node>(shiftand, count, bf_shifted));
 				break;
 			}
 			case tau::bf_mul: {
@@ -177,7 +177,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto bf_product = tau::get(tau::bf, product);
 				vars.push_back(product);
 				changes[t] = product;
-				conjoin(bvmul<node>(lookup(factor), constant, bf_product, vars));
+				conjoin(bvmul<node>(factor, constant, bf_product, vars));
 				break;
 			}
 			case tau::bf_div: case tau::bf_mod: {
@@ -189,8 +189,8 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				vars.push_back(result);
 				changes[t] = result;
 				conjoin((nt == tau::bf_mod)
-					? bvmod<node>(lookup(dividend), divisor, bf_result, vars)
-					: bvdiv<node>(lookup(dividend), divisor, bf_result, vars));
+					? bvmod<node>(dividend, divisor, bf_result, vars)
+					: bvdiv<node>(dividend, divisor, bf_result, vars));
 				break;
 			}
 			case tau::bf_cast: {

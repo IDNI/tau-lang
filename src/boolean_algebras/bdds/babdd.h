@@ -446,10 +446,9 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		if (h == l) return h;
 #ifdef DEBUG
 		auto p = get(l), q = get(h);
-		if (!p.leaf() && !q.leaf()) {
-			const auto x = std::get<bdd_node_t>(p);
-			const auto y = std::get<bdd_node_t>(q);
-			if constexpr (!o.has_inv_in()) assert(var_cmp(v, x.v) && var_cmp(v, y.v));
+		if constexpr (!o.has_inv_in()) {
+			if (!p.leaf()) assert(var_cmp(v, std::get<bdd_node_t>(p).v));
+			if (!q.leaf()) assert(var_cmp(v, std::get<bdd_node_t>(q).v));
 		}
 #endif
 		bool in = false, out = false;
@@ -674,6 +673,16 @@ struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_ord
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
 		if (B r = get_eelim(nx.h); r == true) return r;
 		else return r | get_eelim(nx.l);
+	}
+
+	static bdd_ref subst(bdd_ref x, uint_t v, bdd_ref with) {
+		const bdd& xx = get(x);
+		if (xx.leaf()) return x;
+		const bdd_node_t& nx = std::get<bdd_node_t>(xx);
+		if (var_cmp(nx.v, v))
+			return add(nx.v, subst(nx.h, v, with), subst(nx.l, v, with));
+		if (var_cmp(v, nx.v)) return x;
+		return ite(with, nx.h, nx.l);
 	}
 
 	static bdd_ref sub0(bdd_ref x, uint_t v) {
@@ -1018,8 +1027,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 #endif
 		if (h == l) return h;
 #ifdef DEBUG
-		if(!leaf(l) && !leaf(h))
-			assert(var_cmp(v, get(l).v) && var_cmp(v, get(h).v));
+		if (!leaf(l)) assert(var_cmp(v, get(l).v));
+		if (!leaf(h)) assert(var_cmp(v, get(h).v));
 #endif
 		bool in = false, out = false;
 		if constexpr (o.has_inv_in())
@@ -1262,22 +1271,30 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return r;
 	}
 
-	// TODO returns always false
 	static Bool get_uelim(bdd_ref x) {
-		if (x == T) return {true};
-		if (x == F) return {false};
-		const bdd &nx = get(x);
+		const bdd& xx = get(x);
+		if (xx.leaf()) return std::get<Bool>(xx);
+		const bdd_node_t& nx = std::get<bdd_node_t>(xx);
 		if (Bool r = get_uelim(nx.h); r == false) return r;
 		else return r & get_uelim(nx.l);
 	}
 
-	// TODO returns always true
 	static Bool get_eelim(bdd_ref x) {
-		if (x == T) return {true};
-		if (x == F) return {false};
-		const bdd &nx = get(x);
+		const bdd& xx = get(x);
+		if (xx.leaf()) return std::get<Bool>(xx);
+		const bdd_node_t& nx = std::get<bdd_node_t>(xx);
 		if (Bool r = get_eelim(nx.h); r == true) return r;
 		else return r | get_eelim(nx.l);
+	}
+
+	static bdd_ref subst(bdd_ref x, uint_t v, bdd_ref with) {
+		const bdd& xx = get(x);
+		if (xx.leaf()) return x;
+		const bdd_node_t& nx = std::get<bdd_node_t>(xx);
+		if (var_cmp(nx.v, v))
+			return add(nx.v, subst(nx.h, v, with), subst(nx.l, v, with));
+		if (var_cmp(v, nx.v)) return x;
+		return ite(with, nx.h, nx.l);
 	}
 
 	static bdd_ref sub0(bdd_ref x, uint_t v) {

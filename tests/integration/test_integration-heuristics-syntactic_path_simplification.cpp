@@ -66,12 +66,8 @@ TEST_SUITE("syntactic_path_simplification_simplify_wff") {
 	}
 
 	TEST_CASE("non-NNF input with negated disjunction collapses to F") {
-		// This heuristic doesn't normalize negations, so this won't simplify
-		// Let's test a simpler case that actually works
-		tref fm  = get_nso_rr("x = 0 && !(x = 0).").value().main->get();
+		tref fm  = get_nso_rr("x = 0 && !(x = 0 || y = 0).").value().main->get();
 		tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);
-		std::cout << "Input: " << tau::get(fm).to_str() << "\n";
-		std::cout << "Result: " << tau::get(res).to_str() << "\n";
 		CHECK(tau::get(res).equals_F());
 	}
 

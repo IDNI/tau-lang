@@ -30,6 +30,10 @@ tref preorder(tref var, tref ex_clause) {
 	// We visit the formula until reaching atomic formulas (eq)
 	auto visit_subtree = [&](tref n) -> bool {
 		if (found) return false;
+		// Deliberately stop at wff_or: this pass only eliminates from a single
+		// conjunctive obligation x = t inside ex_clause. Substituting through an
+		// arbitrary disjunction would require branch-sensitive reasoning about
+		// which equality actually defines the witness.
 		return is<node>(n, tau::wff) || is<node>(n, tau::wff_and) || is<node>(n, tau::bf_eq);
 	};
 

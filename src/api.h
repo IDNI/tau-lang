@@ -9,6 +9,11 @@
  * Every operation has two flavours: a plain overload and an overload that also
  * records wall-clock timing into a `measuring` tree.
  *
+ * Threading contract: the API mutates shared parser settings, pretty-printer
+ * flags, definition registries, and other caches without synchronization.
+ * Treat the public API, interpreter, and REPL integration as single-threaded
+ * unless callers provide their own external serialization.
+ *
  * **Status:** Highly unstable — contains bugs, subject to change.
  */
 
@@ -96,7 +101,9 @@ struct api_measure {
  * Every method has two overload families:
  * - **Plain** overloads accept `tref`, `htref`, or `std::string` arguments.
  * - **Measuring** overloads take an additional `measuring& m` first argument
- *   and record wall-clock time into @p m.
+ *   and record wall-clock time into @p m. `MT(...)` wrappers populate that
+ *   node directly, while `MH(...)` wrappers record the `geth_*` call in @p m
+ *   and add the delegated `tref` operation as its single child.
  *
  * @tparam node Tree node type satisfying `NodeType`.
  */
