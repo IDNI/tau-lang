@@ -455,20 +455,20 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	auto print_zero_case = [&type_id](tref var) {
-		std::cout << "\t" << TAU_TO_STR(var) << " := {"
+		std::cout << "\t" << tau::get(var).to_str() << " := {"
 			<< node::ba::zero(get_ba_type_tree<node>(type_id))
 			<< "}:" << ba_types<node>::name(type_id) << "\n";
 	};
 
 	auto print_one_case = [&type_id](tref var) {
-		std::cout << "\t" << TAU_TO_STR(var) << " := {"
+		std::cout << "\t" << tau::get(var).to_str() << " := {"
 			<< node::ba::one(get_ba_type_tree<node>(type_id))
 			<< "}:" << ba_types<node>::name(type_id) << "\n";
 	};
 
 	auto print_general_case = [](tref var, tref value) {
-		std::cout << "\t" << TAU_TO_STR(var) << " := "
-			<< TAU_TO_STR(value) << "\n";
+		std::cout << "\t" << tau::get(var).to_str() << " := "
+			<< tau::get(value).to_str() << "\n";
 	};
 
 	if (!solution) { std::cout << "no solution\n"; return; }
@@ -564,7 +564,7 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 	rr_defs.push_back(n | tt::first | tt::ref);
 	size_t idx = rr_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(rr_defs[idx]) << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]).to_str() << "\n";
 }
 
 template <typename... BAs>
@@ -575,12 +575,12 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	else std::cout << "Definitions:\n";
 	for (size_t i = 0; i < rr_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< TAU_TO_STR(rr_defs[i]) << "\n";
+			<< tau::get(rr_defs[i]).to_str() << "\n";
 	if (io_defs.empty()) std::cout << "Streams: empty\n";
 	else std::cout << "Streams:\n";
 	for (size_t i = 0; i < io_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< TAU_TO_STR(io_defs[i]) << "\n";
+			<< tau::get(io_defs[i]).to_str() << "\n";
 	std::cout << *defs.get_io_context();
 }
 
@@ -591,7 +591,7 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	if (!num) return;
 	auto i = num | tt::num;
 	if (i && i <= rr_defs.size()) {
-		std::cout << TAU_TO_STR(rr_defs[i-1]) << "\n";
+		std::cout << tau::get(rr_defs[i-1]).to_str() << "\n";
 		return;
 	}
 	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
@@ -603,7 +603,7 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
 	io_defs.push_back(n | tt::first | tt::ref);
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(io_defs[idx]) << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]).to_str() << "\n";
 }
 
 template <typename... BAs>
@@ -611,7 +611,7 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 	io_defs.push_back(n | tt::first | tt::ref);
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(io_defs[idx]) << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]).to_str() << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.

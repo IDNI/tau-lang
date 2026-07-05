@@ -98,7 +98,7 @@ tref api<node>::get_formula(const std::string& input, bool simplified) {
 }
 
 template <NodeType node>
-tref api<node>::get_function_def(const std::string& function_def, bool simplified) {
+tref api<node>::get_function_def(const std::string& function_def, [[maybe_unused]] bool simplified) {
 	tref def = get_definition(function_def, true); // Always simplify to resolve refs
 	if (!def) return nullptr;
 	auto nt = tau::get(def)[1].get_type();
@@ -107,7 +107,7 @@ tref api<node>::get_function_def(const std::string& function_def, bool simplifie
 }
 
 template <NodeType node>
-tref api<node>::get_predicate_def(const std::string& predicate_def, bool simplified) {
+tref api<node>::get_predicate_def(const std::string& predicate_def, [[maybe_unused]] bool simplified) {
 	tref def = get_definition(predicate_def, true); // Always simplify to resolve refs
 	if (!def) return nullptr;
 	auto nt = tau::get(def)[1].get_type();

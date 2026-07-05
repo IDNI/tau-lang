@@ -182,7 +182,7 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("atom under wff xor is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("(a1 = c) ^ (b = 0)");
+		tref phi = parse("(a1 = c) ^^ (b = 0)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );
@@ -190,7 +190,8 @@ TEST_SUITE("trivial_skolem") {
 
 	TEST_CASE("atom under temporal boundary is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
-		tref phi = parse("(always a1 = c) && d = e");
+		// The entire formula must be under temporal scope
+		tref phi = parse("always (a1 = c && d = e)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
 		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
 		CHECK( result == expected );

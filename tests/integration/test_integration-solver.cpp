@@ -20,9 +20,9 @@ bool check_solution(tref eq, const solution<node>& sol) {
 	tref check = normalizer<node>(substitution);
 #ifdef DEBUG
 	// std::cout << "check_solution/solution: " << dump<node>(sol) << "\n";
-	std::cout << "check_solution/equation: " << TAU_DUMP_TO_STR(eq) << "\n";
-	std::cout << "check_solution/substitution: " << TAU_DUMP_TO_STR(substitution) << "\n";
-	std::cout << "check_solution/check: " << TAU_DUMP_TO_STR(check) << "\n";
+	std::cout << "check_solution/equation: " << tau::get(eq).dump_to_str() << "\n";
+	std::cout << "check_solution/substitution: " << tau::get(substitution).dump_to_str() << "\n";
+	std::cout << "check_solution/check: " << tau::get(check).dump_to_str() << "\n";
 #endif // DEBUG
 	return tau::get(check).equals_T();
 }
@@ -33,15 +33,13 @@ TEST_SUITE("minterm_iterator") {
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
 		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
-		using node = node_t;
-		std::cout << "sample: " << TAU_DUMP_TO_STR(n) << "\n";
+		std::cout << "sample: " << tau::get(n).dump_to_str() << "\n";
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
-		using node = node_t;
 		std::cout << "------------------------------------------------------\n";
-		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
-		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
+		std::cout << "sample: " << tau::get(fm).dump_to_str() << "\n";
+		std::cout << "minterm: " << tau::get(*it).dump_to_str() << "\n";
 #endif // DEBUG
 		CHECK ( ++it == minterm_iterator<node_t>::end );
 	}
@@ -52,15 +50,14 @@ TEST_SUITE("minterm_iterator") {
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
-		using node = node_t;
 		std::cout << "------------------------------------------------------\n";
-		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
-		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
+		std::cout << "sample: " << tau::get(fm).dump_to_str() << "\n";
+		std::cout << "minterm: " << tau::get(*it).dump_to_str() << "\n";
 #endif // DEBUG
 		size_t count = 1;
 		while (it++ != minterm_iterator<node_t>::end) {
 #ifdef DEBUG
-			std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
+			std::cout << "minterm: " << tau::get(*it).dump_to_str() << "\n";
 #endif // DEBUG
 			count++;
 		}
@@ -73,15 +70,14 @@ TEST_SUITE("minterm_iterator") {
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG
-		using node = node_t;
 		std::cout << "------------------------------------------------------\n";
-		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
-		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
+		std::cout << "sample: " << tau::get(fm).dump_to_str() << "\n";
+		std::cout << "minterm: " << tau::get(*it).dump_to_str() << "\n";
 #endif // DEBUG
 		size_t count = 1;
 		while (it++ != minterm_iterator<node_t>::end) {
 #ifdef DEBUG
-			std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
+			std::cout << "minterm: " << tau::get(*it).dump_to_str() << "\n";
 #endif // DEBUG
 			count++;
 		}
