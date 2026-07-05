@@ -99,20 +99,19 @@ tref api<node>::get_formula(const std::string& input, bool simplified) {
 
 template <NodeType node>
 tref api<node>::get_function_def(const std::string& function_def, bool simplified) {
-	tref def = get_definition(function_def, simplified);
+	tref def = get_definition(function_def, true); // Always simplify to resolve refs
 	if (!def) return nullptr;
 	auto nt = tau::get(def)[1].get_type();
-	if (nt == tau::bf || nt == tau::ref) return def; // TODO ref can be wff
+	if (nt == tau::bf) return def;
 	return nullptr;
 }
 
 template <NodeType node>
 tref api<node>::get_predicate_def(const std::string& predicate_def, bool simplified) {
-	tref def = get_definition(predicate_def, simplified);
+	tref def = get_definition(predicate_def, true); // Always simplify to resolve refs
 	if (!def) return nullptr;
 	auto nt = tau::get(def)[1].get_type();
-	// TODO we could pre resolve all refs to wff
-	if (nt == tau::wff || nt == tau::ref) return def;
+	if (nt == tau::wff) return def;
 	return nullptr;
 }
 
@@ -125,7 +124,10 @@ tref api<node>::get_stream_def(const std::string& stream_def) {
 template <NodeType node>
 tref api<node>::get_spec(const std::string& src) {
 	tau_spec<node> spec;
-	if (!spec.parse(src)) return nullptr;
+	if (!spec.parse(src)) {
+		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
+		return nullptr;
+	}
 	if (tref s = spec.get(); s) return s;
 	return nullptr;
 }

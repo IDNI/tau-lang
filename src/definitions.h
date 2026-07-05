@@ -119,7 +119,9 @@ struct definitions {
 		return std::make_pair(heads[i], bodies[i]);
 	}
 
-	/** @brief Return the process-global singleton `definitions` instance. */
+	/** @brief Return the process-global singleton `definitions` instance.
+	 *  NOTE: NOT thread-safe. The tau library assumes single-threaded access.
+	 *  Do not access this singleton from multiple threads concurrently. */
 	static definitions& instance() {
 		static definitions d;
 		return d;

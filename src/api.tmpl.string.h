@@ -283,7 +283,7 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 {
 	DBG(using tau = tree<node>;)
 
-	auto& ctx = *definitions<node>::instance().get_io_context();
+	auto& ctx = i.ctx;
 
 	if (!i.calculate_initial_spec()) return {};
 

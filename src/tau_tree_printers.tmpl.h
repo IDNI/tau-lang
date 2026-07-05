@@ -330,6 +330,8 @@ int_t get_max_var_name_b_id(tref fm) {
 }
 
 // pretty printer settings
+// NOTE: These globals are NOT thread-safe. The tau library assumes single-threaded access.
+// Do not call set_highlighting(), set_indenting(), or set_json() concurrently from multiple threads.
 inline bool pretty_printer_highlighting = false;
 inline bool pretty_printer_indenting    = false;
 inline bool print_json                  = false;

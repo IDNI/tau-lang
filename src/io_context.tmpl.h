@@ -166,7 +166,7 @@ inline file_output_stream::~file_output_stream() {
 inline bool file_output_stream::put(const std::string& value) {
 	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): put(\"" << value << "\")";)
 	file << value << std::endl;
-	return true;
+	return file.good();
 }
 
 // -- vector_input_stream --

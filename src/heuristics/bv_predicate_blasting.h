@@ -17,6 +17,9 @@
 
 namespace idni::tau_lang {
 
+// NOT thread-safe: Controls whether bitvector blasting is enabled.
+// The tau library assumes single-threaded access.
+// Do not call set_blasting() concurrently from multiple threads.
 inline bool bv_blasting = true;
 
 /**
