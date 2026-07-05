@@ -250,10 +250,10 @@ template <NodeType node>
 tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 	auto get_type = [](const node& n, const tref* ch, size_t len) -> size_t {
 		if (n.ba_type != 0) return n.ba_type;
+		// Short-circuit on first non-zero child type
 		for (size_t i = 0; i < len; ++i) {
-			if(tau::get(ch[i]).get_ba_type() != 0) {
-				return tau::get(ch[i]).get_ba_type();
-			}
+			size_t child_type = tau::get(ch[i]).get_ba_type();
+			if (child_type != 0) return child_type;
 		}
 		return n.ba_type;
 	};
@@ -267,9 +267,9 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 		});
 	// We only propagate the type information up
 	// Do not propagate bool type as it is reserved for predicate definitions
-	//TODO Instead of comparing to 4, do bool_type_id<node>() ->
-	// currently inf loop due to bool_type<node>() using this get method
-	if (v.nt != wff && v.ba_type != 4 && v.nt != ref_args && v.nt != fp_fallback) { //&& v.nt != ref_arg && v.nt != ref) {
+	// Use literal 4 instead of bool_type_id<node>() to avoid infinite recursion
+	// (bool_type_id calls this get method, creating a circular dependency)
+	if (v.nt != wff && v.ba_type != 4 && v.nt != ref_args && v.nt != fp_fallback) {
 		size_t ba_type = get_type(v, ch, len);
 		return base_t::get(v.ba_retype(ba_type), ch, len, r);
 	}
@@ -834,8 +834,8 @@ tref tree<node>::untype(tref term) {
 
 template<NodeType node>
 tref tree<node>::substitute(tref that, tref with) const {
-	// If 'with' contains a quantifier, the quantifier ids need to be
-	// recalculated after substitution; otherwise just use simple replace.
+	// If the replacement subtree 'with' contains a quantifier, the quantifier
+	// ids need to be recalculated after substitution; otherwise just use simple replace.
 	if (tau::get(with).find_top(is_logical_or_functional_quant<node>)) {
 		return canonize_quantifier_ids<node>(this->replace(that, with));
 	} else return this->replace(that, with);

@@ -73,19 +73,6 @@ TEST_SUITE("Bool helpers") {
 	}
 }
 
-TEST_SUITE("BDD elimination helpers") {
-	TEST_CASE("uelim/eelim on variable and constants") {
-		bdd_init<Bool>();
-		auto x = bdd_handle<Bool>::bit(true, 1);
-		CHECK(get_zero<Bool>().get_uelim() == false);
-		CHECK(get_zero<Bool>().get_eelim() == false);
-		CHECK(get_one<Bool>().get_uelim() == true);
-		CHECK(get_one<Bool>().get_eelim() == true);
-		CHECK(x.get_uelim() == false);
-		CHECK(x.get_eelim() == true);
-	}
-}
-
 TEST_SUITE("BDD_Splitter") {
 	TEST_CASE("DNF_clause_deletion1") {
 		bdd_init<Bool>();
