@@ -32,7 +32,7 @@ enum class split_sym {
  * Assumes @p fm is fully normalized by the normalizer.
  * @tparam BAs Boolean-algebra type pack.
  * @param fm Formula to produce a bad splitter, (formula defaults `T`).
- * @return `T` constant node as a bad splitter.
+ * @return Formula with fresh uninterpreted constant conjoined at the bottom wff_or.
  */
 template <typename... BAs>
 requires BAsPack<BAs...>

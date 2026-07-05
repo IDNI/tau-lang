@@ -52,7 +52,11 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 		case type::conjunction_nosep:
 			// LOG_TRACE << l << " & " << r << " -> " << (l & r);
 			return l & r;
-		default: return bdd_handle<Bool>::hfalse;
+		default:
+			LOG_ERROR << "[sbf] unrecognized binary nonterminal: "
+				<< (size_t) nt << "\n";
+			DBG(assert(false);)
+			return bdd_handle<Bool>::hfalse;
 		}
 	}
 }

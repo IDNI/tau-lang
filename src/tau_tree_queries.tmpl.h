@@ -151,6 +151,9 @@ bool contains(tref fm, tref sub_fm) {
 	return is_contained;
 }
 
+// Returns true if n is a wff wrapping an atomic Boolean formula predicate.
+// Note: bf_interval and wff_ref are deliberately excluded as they are not
+// treated as atomic predicates for normalization purposes.
 template <NodeType node>
 bool is_atomic_fm(tref n) {
 	using tau = tree<node>;
@@ -288,7 +291,7 @@ bool while_is_formula(tref n) {
 	using tau = tree<node>;
 
 	return !tau::get(n).is_term();
-};
+}
 
 template <NodeType node>
 bool while_is_boolean_operation(tref n) {

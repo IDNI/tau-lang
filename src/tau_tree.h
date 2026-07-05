@@ -638,8 +638,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 		static const extractor<trefs>               refs;           ///< Extract all `tref` values.
 		static const extractor<htref>               handle;         ///< Extract as `htref`.
 		static const extractor<const tree<node>&>   Tree;           ///< Extract the `tree` reference.
-		static const extractor<traverser>           dump;           ///< Dump and return `*this`.
-		static const extractor<traverser>           print_tree;     ///< Print subtree and return `*this`.
+		static const extractor<traverser>           dump;           ///< Debug tool: dump to std::cout and return `*this`.
+		static const extractor<traverser>           print_tree;     ///< Debug tool: print subtree to std::cout and return `*this`.
 		static const extractor<type>                nt;             ///< Extract the nonterminal type.
 		static const extractor<std::string>         string;         ///< Extract stored string.
 		static const extractor<int_t>               integer;        ///< Extract stored integer.

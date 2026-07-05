@@ -287,7 +287,7 @@ template <NodeType node>
 tref unify(tref t1, tref t2) {
 	using tau = tree<node>;
 
-	// Natural type cannot be unified (bar from unification)
+	// Natural type never unifies (barred from BA unification)
 	if (is_nat_type<node>(t1) || is_nat_type<node>(t2)) return nullptr;
 	// If one is untyped return the other
 	if (is_untyped<node>(t1)) return t2;

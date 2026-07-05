@@ -773,7 +773,8 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	subtree_map<node, tref> changes = {};
 	for (tref bf : t.select_top(is<node, tau::bf>)) {
 		if (tau::get(bf).child_is(tau::bf_ref)) {
-			for (tref arg : t[0][0].select_top(is<node, tau::bf>)) {
+			// Iterate the bf_ref's arguments, not the root's children
+			for (tref arg : tau::get(bf)[0][0].select_top(is<node, tau::bf>)) {
 				tref dnf = bf_reduced_dnf<node>(arg);
 				if (tau::get(dnf) != tau::get(arg))
 					changes.emplace(arg, dnf);

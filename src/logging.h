@@ -349,7 +349,15 @@ struct logging {
 		return set_level;
 	}
 
-	/** @brief Apply severity @p level as the active filter for the Boost.Log core. */
+	/**
+	 * @brief Apply severity @p level as the active filter for the Boost.Log core.
+	 * 
+	 * Sets a global severity level filter. Per-channel filtering is supported
+	 * only for trace and debug levels via the compile-time LOG_ENABLED_CHANNELS
+	 * list. For other severity levels, filtering is global only.
+	 * 
+	 * @param level Minimum severity level to log (trace, debug, info, warning, error, fatal)
+	 */
 	inline static void set_filter(boost::log::trivial::severity_level level)
 	{
 		using namespace boost::log;

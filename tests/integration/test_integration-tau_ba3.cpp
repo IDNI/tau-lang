@@ -38,3 +38,29 @@ TEST_SUITE("allowing unresolved rr's in normalization") {
 		}) );
 	}
 }
+
+TEST_SUITE("tau_ba dispatcher helpers") {
+	TEST_CASE("pack/unpack roundtrip preserves main formula") {
+		using dispatcher = base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
+		auto nso = get_nso_rr("x = 0.");
+		REQUIRE(nso.has_value());
+		tref fm = nso->main->get();
+		auto packed = dispatcher::pack_tau_ba(fm);
+		CHECK(std::holds_alternative<tau_ba<bv, sbf_ba>>(packed));
+		tref unpacked = dispatcher::unpack_tau_ba(packed);
+		REQUIRE(unpacked != nullptr);
+		CHECK(tau::get(unpacked) == tau::get(fm));
+	}
+
+	TEST_CASE("is_closed accepts io-only free variables") {
+		auto nso = get_nso_rr("i1[t] = o1[t].");
+		REQUIRE(nso.has_value());
+		CHECK(is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())));
+	}
+
+	TEST_CASE("is_closed rejects ordinary free variables") {
+		auto nso = get_nso_rr("x = 0.");
+		REQUIRE(nso.has_value());
+		CHECK(!is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())));
+	}
+}

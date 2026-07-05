@@ -268,7 +268,9 @@ struct minterm_iterator {
 	}
 
 	minterm_iterator<node> operator++(int) {
-		return ++*this;
+		minterm_iterator tmp = *this;
+		++*this;
+		return tmp;
 	}
 
 	bool operator==(const minterm_iterator<node>& that) const = default;
@@ -373,7 +375,7 @@ template <NodeType node>
 struct minterm_range {
 	explicit minterm_range(tref f): f (f) {}
 
-	bool empty() { return false; }
+	bool empty() { return begin() == end(); }
 
 	minterm_iterator<node> begin() {
 		minterm_iterator<node> begin(f);
@@ -433,7 +435,9 @@ struct minterm_inequality_system_iterator {
 	}
 
 	minterm_inequality_system_iterator<node> operator++(int) {
-		return ++*this;
+		minterm_inequality_system_iterator tmp = *this;
+		++*this;
+		return tmp;
 	}
 
 	bool operator==(const minterm_inequality_system_iterator<node>& that) const = default;

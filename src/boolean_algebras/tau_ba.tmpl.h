@@ -11,6 +11,13 @@ namespace idni::tau_lang {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+static tref normalized_tau_ba_main(const tau_ba<BAs...>& fm) {
+	using node = typename tau_ba<BAs...>::node;
+	return normalize_temporal_quantifiers<node, false>(fm.nso_rr.main->get());
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 tau_ba<BAs...>::tau_ba(const rewriter::rules& rec_relations, htref main)
 		: nso_rr({ rec_relations, main }) {}
 
@@ -39,9 +46,8 @@ requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	// Push the negation in at the end in order to keep normalized forms
 	// after double negation of formulas
-	auto nmain = tau::geth(to_nnf<node>(tau::build_wff_neg(
-			normalize_temporal_quantifiers<node, false>(
-				nso_rr.main->get()))));
+	auto nmain = tau::geth(
+		to_nnf<node>(tau::build_wff_neg(normalized_tau_ba_main(*this))));
 	auto nrec_relations = nso_rr.rec_relations;
 	return tau_ba<BAs...>(nrec_relations, nmain);
 }
@@ -49,11 +55,9 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
-	auto nmain = tau::geth(tau::build_wff_and(
-			normalize_temporal_quantifiers<node, false>(
-				nso_rr.main->get()),
-			normalize_temporal_quantifiers<node, false>(
-				other.nso_rr.main->get())));
+	auto lhs = normalized_tau_ba_main(*this);
+	auto rhs = normalized_tau_ba_main(other);
+	auto nmain = tau::geth(tau::build_wff_and(lhs, rhs));
 	auto nrec_relations =
 		rewriter::merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba<BAs...>(nrec_relations, nmain);
@@ -62,11 +66,9 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
-	auto nmain = tau::geth(tau::build_wff_or(
-			normalize_temporal_quantifiers<node, false>(
-				nso_rr.main->get()),
-			normalize_temporal_quantifiers<node, false>(
-				other.nso_rr.main->get())));
+	auto lhs = normalized_tau_ba_main(*this);
+	auto rhs = normalized_tau_ba_main(other);
+	auto nmain = tau::geth(tau::build_wff_or(lhs, rhs));
 	auto nrec_relations = rewriter::merge(nso_rr.rec_relations,
 					      other.nso_rr.rec_relations);
 	return tau_ba<BAs...>(nrec_relations, nmain);
@@ -75,11 +77,9 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba<BAs...>& other) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba<BAs...>& other) const {
-	auto nmain = tau::geth(tau::build_wff_xor(
-			normalize_temporal_quantifiers<node, false>(
-				nso_rr.main->get()),
-			normalize_temporal_quantifiers<node, false>(
-				other.nso_rr.main->get())));
+	auto lhs = normalized_tau_ba_main(*this);
+	auto rhs = normalized_tau_ba_main(other);
+	auto nmain = tau::geth(tau::build_wff_xor(lhs, rhs));
 	rewriter::rules nrec_relations = rewriter::merge(nso_rr.rec_relations,
 						other.nso_rr.rec_relations);
 	return tau_ba<BAs...>(nrec_relations, nmain);
@@ -104,24 +104,6 @@ bool tau_ba<BAs...>::is_one() const {
 	tref normalized = normalizer<node>(nso_rr);
 	return is_tau_impl<node>(tau::_T(), normalized);
 }
-
-// template <typename... BAs>
-// requires BAsPack<BAs...>
-// tau_<tau_ba<BAs...>, BAs...> tau_ba<BAs...>::rename(
-// 	const tau_<tau_ba<BAs...>, BAs...>& form) const
-// {
-// 	// TODO (MEDIUM) implement properly
-// 	return form;
-// }
-
-// template <typename... BAs>
-// requires BAsPack<BAs...>
-// rewriter::rule<rr<tau_nso<BAs...>>> tau_ba<BAs...>::rename(
-// 	const rewriter::rule<tau_nso_t>& rule) const
-// {
-// 	// TODO (MEDIUM) implement properly
-// 	return rule;
-// }
 
 template <typename... BAs>
 requires BAsPack<BAs...>

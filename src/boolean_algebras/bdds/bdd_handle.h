@@ -195,7 +195,7 @@ struct bdd_handle {
 
 	hbdd<B, o>
 	subst(size_t v, const hbdd<B, o>& x) const {
-		return (sub0(v) & ~x) | (sub1(v) & x);
+		return get(bdd<B, o>::subst(b, v, x->b));
 	}
 
 	hbdd<B, o> sub0(size_t v) const {
@@ -377,7 +377,7 @@ struct bdd_handle<Bool, o> {
 	}
 
 	hbdd<Bool, o> subst(size_t v, const hbdd<Bool, o>& x) const {
-		return (sub0(v) & ~x) | (sub1(v) & x);
+		return get(bdd<Bool, o>::subst(b, v, x->b));
 	}
 
 	hbdd<Bool, o> sub0(size_t v) const {

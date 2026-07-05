@@ -148,6 +148,7 @@ std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	// due to different possible storage positions of strings and BA constants
 	if (hash != that.hash) return hash    <=> that.hash;
 	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
+	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	//if (term != that.term) return C(term) <=> C(that.term);
 	if (ba_type   != that.ba_type)   return C(ba_type)   <=> C(that.ba_type);
 	if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
@@ -177,6 +178,7 @@ constexpr bool node<BAs...>::operator>=(const node& that) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator==(const node& that) const {
+	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	return nt == that.nt /*&& term == that.term*/ && ba_type == that.ba_type
 			&& ext == that.ext && data == that.data;
 }
@@ -190,6 +192,7 @@ requires BAsPack<BAs...>
 constexpr size_t node<BAs...>::hashit() const {
 	std::size_t seed = 0;
 	hash_combine(seed, static_cast<size_t>(nt));
+	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));
 	// In order to have a deterministic hash, we hash the type name
 	hash_combine(seed, get_ba_type_name<node>(ba_type));

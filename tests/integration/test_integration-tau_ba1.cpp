@@ -16,8 +16,20 @@ TEST_SUITE("operators: negation") {
 	}
 }
 
-// TODO (HIGH) add tests for is_zero
-// TODO (HIGH) add tests for is_one
+TEST_SUITE("tau_ba predicates") {
+
+	TEST_CASE("is_zero detects contradiction") {
+		tau_ba<bv, sbf_ba> fm(get_nso_rr("x = 0 && x != 0.")->main->get());
+		CHECK(fm.is_zero());
+		CHECK(!(fm == true));
+	}
+
+	TEST_CASE("is_one detects tautology") {
+		tau_ba<bv, sbf_ba> fm(get_nso_rr("x = 0 || x != 0.")->main->get());
+		CHECK(fm.is_one());
+		CHECK(fm == true);
+	}
+}
 
 TEST_SUITE("operators: conjunction") {
 

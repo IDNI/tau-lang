@@ -442,20 +442,28 @@ tref get_var_name_node(tref var) {
 	using tt = tau::traverser;
 	auto v = tt(var);
 	if (v.is(tau::ba_constant) || v.is(tau::var_name)) return var;
-	// TODO: refactor
-	if (auto vn = v | tau::var_name; vn) return vn.value();
-	if (auto vn = v | tau::io_var | tau::var_name; vn) return vn.value();
-	if (auto vn = v | tau::uconst_name; vn) return vn.value();
-	if (auto vn = v | tau::variable | tau::var_name; vn) return vn.value();
-	if (auto vn = v | tau::variable | tau::io_var | tau::var_name;
-		vn) return vn.value();
-	if (auto vn = v | tau::variable | tau::uconst_name; vn) return vn.value();
-	if (auto vn = v | tau::bf | tau::variable | tau::var_name;
-		vn) return vn.value();
-	if (auto vn = v | tau::bf | tau::variable | tau::io_var | tau::var_name;
-		vn) return vn.value();
-	if (auto vn = v | tau::bf | tau::variable | tau::uconst_name;
-		vn) return vn.value();
+	
+	// Unwrap layers (bf -> variable -> io_var/uconst_name -> var_name)
+	// trying each combination until we find var_name or uconst_name
+	constexpr std::array wrappers = {tau::bf, tau::variable, tau::io_var};
+	constexpr std::array terminals = {tau::var_name, tau::uconst_name};
+	
+	// Try direct terminal access
+	for (auto term : terminals) {
+		if (auto vn = v | term; vn) return vn.value();
+	}
+	
+	// Try unwrapping one layer at a time, checking terminals at each level
+	auto current = v;
+	for (auto wrapper : wrappers) {
+		if (auto next = current | wrapper; next) {
+			current = tt(next.value());
+			for (auto term : terminals) {
+				if (auto vn = current | term; vn) return vn.value();
+			}
+		}
+	}
+	
 	return nullptr;
 }
 
