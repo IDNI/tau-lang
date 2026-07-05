@@ -214,23 +214,14 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 
 template<NodeType node>
 tref bv_ba_custom_simplification(const tref term) {
-	tref current, next = term;
-	DBG(int pass_count = 0;)
+	tref current = term;
 	std::unordered_set<tref> visited;
+	visited.insert(current);
 
 	do {
-		current = next;
 		auto changes = simplify_blocks<node>(current);
-		next = rewriter::replace<node>(current, changes);
+		current = rewriter::replace<node>(current, changes);
 		visited.insert(current);
-
-		DBG(pass_count++;)
-
-#ifdef DEBUG
-		LOG_TRACE << "bv_ba_custom_simplification/pass: " << pass_count << "\n";
-		LOG_TRACE << "bv_ba_custom_simplification/current: " << LOG_FM(current) << "\n";
-#endif // DEBUG
-
 	} while (visited.find(current) == visited.end());
 
 #ifdef DEBUG

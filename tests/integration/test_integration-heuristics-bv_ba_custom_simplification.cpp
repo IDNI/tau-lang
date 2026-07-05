@@ -33,7 +33,7 @@ TEST_SUITE("simplify_blocks") {
 		REQUIRE(simplified != nullptr);
 		std::cout << "Simplified result: " << tree<node_t>::get(simplified).to_str() << "\n";
 		CHECK(matches_to_str_to_any_of(simplified, {
-			//"{ 1 }:bv[8]+X+{ 2 }:bv[8]",  // Canonical form in debug
+			"(X+{ 3 }:bv[8])",  // Canonical form in debug
 			"X:bv[8]+{ 3 }:bv[8]",
 			"{ 3 }:bv[8]+X:bv[8]",
 			"X:bv[8] + { 3 }:bv[8]",
@@ -139,7 +139,7 @@ TEST_SUITE("ba bv custom simplification") {
 		tref src = parse_bf(sample);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		CHECK(simplified != nullptr);
-		CHECK(simplified == src);
+		CHECK(matches_to_str_to_any_of(simplified, { "(x*1)", "1*x" }));
 	}
 
 	TEST_CASE("1 + 2") {
@@ -166,7 +166,7 @@ TEST_SUITE("ba bv custom simplification") {
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		REQUIRE(simplified != nullptr);
 		std::cout << "Simplified result: " << tree<node_t>::get(simplified).to_str() << "\n";
-		CHECK(matches_to_str_to_any_of(simplified, { "{ 1 }:bv[64]+X", "X:bv[64]+{ 1 }:bv[64]", "X+{ 1 }:bv[64]" }));
+		CHECK(matches_to_str_to_any_of(simplified, { "(X+{ 1 }:bv[64])", "{ 1 }:bv[64]+X", "X:bv[64]+{ 1 }:bv[64]", "X+{ 1 }:bv[64]" }));
 	}
 
 	TEST_CASE("1 - X") {
@@ -175,7 +175,7 @@ TEST_SUITE("ba bv custom simplification") {
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		REQUIRE(simplified != nullptr);
 		std::cout << "Simplified result: " << tree<node_t>::get(simplified).to_str() << "\n";
-		CHECK(matches_to_str_to_any_of(simplified, { "{ 1 }:bv[64]-X", "{ 1 }:bv[64]-X:bv[64]", "0:bv[64]-X:bv[64]+{ 1 }:bv[64]" }));
+		CHECK(matches_to_str_to_any_of(simplified, { "(0-X+{ 1 }:bv[64])", "{ 1 }:bv[64]-X", "{ 1 }:bv[64]-X:bv[64]", "0:bv[64]-X:bv[64]+{ 1 }:bv[64]" }));
 	}
 
 	TEST_CASE("1 * X") {
