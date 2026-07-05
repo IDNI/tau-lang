@@ -155,7 +155,7 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 	size_t operation =  tau::nul;
 	bool building_block = false;
 	tref last_operation = nullptr;
-	size_t last_blosk_index = 0;
+	size_t last_block_index = 0;
 	auto type = tau::get(n).get_ba_type();
 
 	auto f = [&](tref n) -> bool {
@@ -183,13 +183,13 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 
 				if (operation == nt || inverse_of<node>(operation) == nt) {
 					apply_block_operation<node>(to_simplify, inverse);
-					return last_operation = n, last_blosk_index = to_simplify.size() - 1, true;
+					return last_operation = n, last_block_index = to_simplify.size() - 1, true;
 				// we have to constants or variables separated to be procexsed
 				// and we could change to a new block with a new operation
-				} else if ((to_simplify.size() - 1) - last_blosk_index >= 2) {
+				} else if ((to_simplify.size() - 1) - last_block_index >= 2) {
 					operation = inverse ? inverse_of<node>(nt) : nt;
 					apply_block_operation<node>(to_simplify, inverse);
-					return last_operation = n, last_blosk_index = to_simplify.size() - 1, true;
+					return last_operation = n, last_block_index = to_simplify.size() - 1, true;
 				}
 				// we have no other choice to end the current block and start
 				// searching for a block to simplify again
@@ -201,7 +201,7 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 			case tau::bf_and: case tau::bf_neg: {
 				if (!building_block) return true;
 				end_block_and_clear<node>(to_simplify, changes, last_operation, operation, type);
-				return building_block = false, last_operation = nullptr, last_blosk_index = 0, operation = tau::nul, true;
+				return building_block = false, last_operation = nullptr, last_block_index = 0, operation = tau::nul, true;
 			}
 			default: return true;
 		}
@@ -238,12 +238,6 @@ tref bv_ba_custom_simplification(const tref term) {
 	LOG_TRACE << "bv_ba_custom_simplification/final: " << LOG_FM(current) << "\n";
 #endif // DEBUG
 
-	// Error reporting for undefined operations (e.g., division by zero)
-	// This is a placeholder: in a real implementation, you would walk the tree and check for such cases
-	// For now, just log a warning if the result is nullptr
-	if (current == nullptr) {
-		LOG_ERROR << "bv_ba_custom_simplification: result is nullptr (possible undefined operation such as division by zero)\n";
-	}
 	return current;
 }
 

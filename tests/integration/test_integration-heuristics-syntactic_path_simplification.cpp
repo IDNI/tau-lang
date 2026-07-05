@@ -65,6 +65,18 @@ TEST_SUITE("syntactic_path_simplification_simplify_wff") {
 		CHECK(tau::get(res).equals_F());
 	}
 
+	TEST_CASE("non-NNF input with negated disjunction collapses to F") {
+		tref fm  = get_nso_rr("x = 0 && !(x != 0 || y = 0).").value().main->get();
+		tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);
+		CHECK(tau::get(res).equals_F());
+	}
+
+	TEST_CASE("negated bf contradiction under wff context collapses to F") {
+		tref fm  = get_nso_rr("y = 0 && !(x & x' = 0).").value().main->get();
+		tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);
+		CHECK(tau::get(res).equals_F());
+	}
+
 	TEST_CASE("duplicate conjunct is simplified") {
 		tref fm  = get_nso_rr("x = 0 && y = 0 && x = 0.").value().main->get();
 		tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);

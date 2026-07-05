@@ -61,11 +61,11 @@ TEST_SUITE("bitblasting") {
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
-	TEST_CASE("bvrhl_by_one_rule") {
+	TEST_CASE("bvshr_by_one_rule") {
 		using node = node_t;
 
-		TAU_LOG_INFO << "bvrhl_by_one_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvrhl_by_one_rule<node>(2)) << "\n";
+		TAU_LOG_INFO << "bvshr_by_one_rule:\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_by_one_rule<node>(2)) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -128,12 +128,12 @@ TEST_SUITE("bitblasting") {
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
-	TEST_CASE("bvrhl_rule") {
+	TEST_CASE("bvshr_rule") {
 		using node = node_t;
 		using tau = tree<node>;
 
-		TAU_LOG_INFO << "bvrhl_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvrhl_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 1)))) << "\n";
+		TAU_LOG_INFO << "bvshr_rule:\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 1)))) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 

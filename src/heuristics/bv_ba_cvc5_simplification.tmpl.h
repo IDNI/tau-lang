@@ -198,7 +198,7 @@ tref bv_ba_cvc5_simplification(tref term) {
 			<< "bv_ba_cvc5_simplification/simplified_term: " << tau::get(simplified_term).tree_to_str() << "\n";
 #endif // DEBUG
 
-	return simplified_term != nullptr ? simplified_term : term;
+	return simplified_term;
 }
 
 } // namespace idni::tau_lang

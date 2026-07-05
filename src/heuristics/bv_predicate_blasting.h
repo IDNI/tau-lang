@@ -70,7 +70,7 @@ tref bvshl_by_one(tref base, tref shifted);
  * @return The resulting predicate
  */
 template<NodeType node>
-tref bvrhl_by_one(tref base, tref shifted);
+tref bvshr_by_one(tref base, tref shifted);
 
 /**
  * @brief Computes a predicate checking if shifted is the result of shifting
@@ -96,7 +96,7 @@ tref bvshl(tref base, tref count, tref shifted);
  * @return The resulting predicate
  */
 template<NodeType node>
-tref bvrhl(tref base, tref count, tref shifted);
+tref bvshr(tref base, tref count, tref shifted);
 
 /**
  * @brief Computes a predicate constraining result to be the cast of src to a

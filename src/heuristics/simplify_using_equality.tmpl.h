@@ -98,6 +98,15 @@ tref simplify_using_equality_direct_atm(tref atm) {
 
 // ── Public helpers ───────────────────────────────────────────────────────────
 
+struct simplify_using_equality_cached_consequences {
+	tref lhs_neg = nullptr;
+	tref rhs_neg = nullptr;
+	tref lhs_and_rhs_neg = nullptr;
+	tref rhs_and_lhs_neg = nullptr;
+	tref lhs_or_rhs_neg = nullptr;
+	tref rhs_or_lhs_neg = nullptr;
+};
+
 // Register a = b in uf, also recording negation/product/sum consequences.
 // Returns false if a syntactic contradiction is detected.
 template <NodeType node>
@@ -108,17 +117,29 @@ bool simplify_using_equality_add_raw_equality(auto& uf, tref eq) {
 	DBG(LOG_TRACE << "Adding equality: " << tau::get(eq) << "\n";)
 	tref lhs = tau::trim2(eq);
 	tref rhs = tau::get(tau::trim(eq)).child(1);
-	tref lhs_neg = push_negation_in<node, false>(build_bf_neg<node>(lhs));
-	tref rhs_neg = push_negation_in<node, false>(build_bf_neg<node>(rhs));
 	size_t type_id = find_ba_type<node>(eq);
+	static std::map<std::pair<tref, tref>, simplify_using_equality_cached_consequences> cache;
+	auto key = std::make_pair(lhs, rhs);
+	auto it = cache.find(key);
+	if (it == cache.end()) {
+		simplify_using_equality_cached_consequences derived;
+		derived.lhs_neg = push_negation_in<node, false>(build_bf_neg<node>(lhs));
+		derived.rhs_neg = push_negation_in<node, false>(build_bf_neg<node>(rhs));
+		derived.lhs_and_rhs_neg = build_bf_and<node>(lhs, derived.rhs_neg);
+		derived.rhs_and_lhs_neg = build_bf_and<node>(rhs, derived.lhs_neg);
+		derived.lhs_or_rhs_neg = build_bf_or<node>(lhs, derived.rhs_neg);
+		derived.rhs_or_lhs_neg = build_bf_or<node>(rhs, derived.lhs_neg);
+		it = cache.emplace(key, derived).first;
+	}
+	const auto& derived = it->second;
 	uf.merge(lhs, rhs);
-	uf.merge(lhs_neg, rhs_neg);
-	uf.merge(build_bf_and<node>(lhs, rhs_neg), _0<node>(type_id));
-	uf.merge(build_bf_and<node>(rhs, lhs_neg), _0<node>(type_id));
-	uf.merge(build_bf_or<node>(lhs, rhs_neg), _1<node>(type_id));
-	uf.merge(build_bf_or<node>(rhs, lhs_neg), _1<node>(type_id));
-	return !uf.connected(lhs, lhs_neg)
-		&& !uf.connected(rhs, rhs_neg)
+	uf.merge(derived.lhs_neg, derived.rhs_neg);
+	uf.merge(derived.lhs_and_rhs_neg, _0<node>(type_id));
+	uf.merge(derived.rhs_and_lhs_neg, _0<node>(type_id));
+	uf.merge(derived.lhs_or_rhs_neg, _1<node>(type_id));
+	uf.merge(derived.rhs_or_lhs_neg, _1<node>(type_id));
+	return !uf.connected(lhs, derived.lhs_neg)
+		&& !uf.connected(rhs, derived.rhs_neg)
 		&& !uf.connected(_0<node>(type_id), _1<node>(type_id));
 }
 
@@ -243,6 +264,11 @@ tref simplify_using_equality(tref fm) {
 	};
 	fm = pre_order<node>(fm).apply(f, visit, up);
 	DBG(LOG_DEBUG << "simplify_using_equality result: " << LOG_FM(fm) << "\n";)
+	if (uf_stack.size() != 1) {
+		LOG_ERROR << "simplify_using_equality: union-find stack imbalance ("
+			<< uf_stack.size() << " active scopes remain)\n";
+		return fm;
+	}
 	DBG(assert(uf_stack.size() == 1);)
 	return fm;
 }

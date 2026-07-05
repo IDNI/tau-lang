@@ -27,6 +27,11 @@ tref parse_wff(const std::string& sample) {
 	return src;
 }
 
+static tref blast_formula(const std::string& sample) {
+	auto wff = parse_wff(sample);
+	return wff ? bv_predicate_blasting<node_t>(wff) : nullptr;
+}
+
 static std::string blast_normalize(const std::string& sample) {
 	auto wff = parse_wff(sample);
 	if (!wff) return "parse_error";
@@ -242,53 +247,53 @@ TEST_SUITE("bvshl") {
 }
 
 //
-// bvrhl_by_one: shifted = base >> 1 (single-step right shift)
+// bvshr_by_one: shifted = base >> 1 (single-step right shift)
 //
-TEST_SUITE("bvrhl_by_one") {
+TEST_SUITE("bvshr_by_one") {
 
-	TEST_CASE("bvrhl_by_one: 4 >> 1 = 2") {
+	TEST_CASE("bvshr_by_one: 4 >> 1 = 2") {
 		CHECK(blast_normalize("ex x ex y (x = { 4 }:bv[4] && x >> { 1 }:bv[4] = y && y = { 2 }:bv[4])") == "T");
 	}
 
-	TEST_CASE("bvrhl_by_one: 8 >> 1 = 4") {
+	TEST_CASE("bvshr_by_one: 8 >> 1 = 4") {
 		CHECK(blast_normalize("ex x ex y (x = { 8 }:bv[4] && x >> { 1 }:bv[4] = y && y = { 4 }:bv[4])") == "T");
 	}
 
-	TEST_CASE("bvrhl_by_one: 1 >> 1 = 0 (LSB shifts out)") {
+	TEST_CASE("bvshr_by_one: 1 >> 1 = 0 (LSB shifts out)") {
 		CHECK(blast_normalize("ex x ex y (x = { 1 }:bv[4] && x >> { 1 }:bv[4] = y && y = { 0 }:bv[4])") == "T");
 	}
 
-	TEST_CASE("bvrhl_by_one: 6 >> 1 = 3") {
+	TEST_CASE("bvshr_by_one: 6 >> 1 = 3") {
 		CHECK(blast_normalize("ex x ex y (x = { 6 }:bv[4] && x >> { 1 }:bv[4] = y && y = { 3 }:bv[4])") == "T");
 	}
 }
 
 //
-// bvrhl: right shift by constant amount
+// bvshr: right shift by constant amount
 //
-TEST_SUITE("bvrhl") {
+TEST_SUITE("bvshr") {
 
-	TEST_CASE("bvrhl: 4 >> 1 = 2") {
+	TEST_CASE("bvshr: 4 >> 1 = 2") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 4 }:bv[4] && x >> { 1 }:bv[4] = y && y = { 2 }:bv[4])") == "T");
 	}
 
-	TEST_CASE("bvrhl: 8 >> 2 = 2") {
+	TEST_CASE("bvshr: 8 >> 2 = 2") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 8 }:bv[4] && x >> { 2 }:bv[4] = y && y = { 2 }:bv[4])") == "T");
 	}
 
-	TEST_CASE("bvrhl: 6 >> 1 = 3") {
+	TEST_CASE("bvshr: 6 >> 1 = 3") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 6 }:bv[4] && x >> { 1 }:bv[4] = y && y = { 3 }:bv[4])") == "T");
 	}
 
-	TEST_CASE("bvrhl: 6 >> 1 != 6 (high bits must be zero)") {
+	TEST_CASE("bvshr: 6 >> 1 != 6 (high bits must be zero)") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 6 }:bv[4] && x >> { 1 }:bv[4] = y && y = { 6 }:bv[4])") == "F");
 	}
 
-	TEST_CASE("bvrhl: 15 >> 4 = 0 (full shift out)") {
+	TEST_CASE("bvshr: 15 >> 4 = 0 (full shift out)") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 15 }:bv[4] && x >> { 4 }:bv[4] = y && y = { 0 }:bv[4])") == "T");
 	}
@@ -367,6 +372,11 @@ TEST_SUITE("bvgt") {
 
 	TEST_CASE("bvgt: 3 > 2 is T for 2-bit") {
 		CHECK(blast_normalize("ex x (x = { 3 }:bv[2] && x > { 2 }:bv[2])") == "T");
+	}
+
+	TEST_CASE("bvgt: boundary width bv[64] right shift keeps top bit") {
+		CHECK(blast_normalize(
+			"ex x ex y (x = { 9223372036854775808 }:bv[64] && x >> { 63 }:bv[64] = y && y = { 1 }:bv[64])") == "T");
 	}
 }
 
@@ -459,6 +469,10 @@ TEST_SUITE("bvdiv") {
 
 	TEST_CASE("bvdiv: 1 / 1 = 1") {
 		CHECK(blast_normalize("ex x ex y (x = { 1 }:bv[4] && x / { 1 }:bv[4] = y && y = { 1 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvdiv: divisor {0} is rejected by blasting") {
+		CHECK(blast_formula("x:bv[4] / { 0 }:bv[4] = y:bv[4]") == nullptr);
 	}
 }
 
@@ -666,37 +680,37 @@ TEST_SUITE("bvnlteq bugs") {
 }
 
 //
-// Bug 4: bvrhl_rule uses make_bvshl_call for the head
+// Bug 4: bvshr_rule uses make_bvshl_call for the head
 //
 // In bv_predicate_blasting_logic.tmpl.h (line ~592):
 //   auto head = make_bvshl_call<node>(base, count, shifted);  // ← WRONG
 // It should be:
-//   auto head = make_bvrhl_call<node>(base, count, shifted);
+//   auto head = make_bvshr_call<node>(base, count, shifted);
 //
 // As a result, the right-shift rule is registered under the left-shift name,
 // so right-shift operations use the left-shift rule (i.e., shift left instead
 // of right, giving a completely wrong result).
 //
-TEST_SUITE("bvrhl bugs") {
+TEST_SUITE("bvshr bugs") {
 
 	// {4}:bv[4] = 0100, right shift by 1 = 0010 = 2.
-	// BUG: bvrhl_rule has wrong head (bvshl), so right shift uses left-shift rule:
+	// BUG: bvshr_rule has wrong head (bvshl), so right shift uses left-shift rule:
 	//      4 << 1 = 8 != 2, making this formula unsatisfiable (wrong).
-	TEST_CASE("bvrhl: 4 >> 1 = 2 for 4-bit") {
+	TEST_CASE("bvshr: 4 >> 1 = 2 for 4-bit") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 4 }:bv[4] && x >> { 1 }:bv[4] = y && y = { 2 }:bv[4])") == "T");
 	}
 
 	// {8}:bv[4] = 1000, right shift by 2 = 0010 = 2.
-	// BUG: bvrhl uses left-shift rule: 8 << 2 = 32 mod 16 = 0 != 2.
-	TEST_CASE("bvrhl: 8 >> 2 = 2 for 4-bit") {
+	// BUG: bvshr uses left-shift rule: 8 << 2 = 32 mod 16 = 0 != 2.
+	TEST_CASE("bvshr: 8 >> 2 = 2 for 4-bit") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 8 }:bv[4] && x >> { 2 }:bv[4] = y && y = { 2 }:bv[4])") == "T");
 	}
 
 	// {6}:bv[4] = 0110, right shift by 1 = 0011 = 3.
 	// BUG: 6 << 1 = 12 != 3.
-	TEST_CASE("bvrhl: 6 >> 1 = 3 for 4-bit") {
+	TEST_CASE("bvshr: 6 >> 1 = 3 for 4-bit") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 6 }:bv[4] && x >> { 1 }:bv[4] = y && y = { 3 }:bv[4])") == "T");
 	}
@@ -805,6 +819,15 @@ TEST_SUITE("bvcast") {
 
 	TEST_CASE("bvcast: same-size wrong value") {
 		CHECK(blast_normalize("ex x (x = { 5 }:bv[4] && (bv[4]) x = { 6 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("bvcast: boundary width zext from bv[1] to bv[64]") {
+		CHECK(blast_normalize("ex x (x = { 1 }:bv[1] && (bv[64]) x = { 1 }:bv[64])") == "T");
+	}
+
+	TEST_CASE("bvcast: signed-extreme truncation from bv[64] to bv[1]") {
+		CHECK(blast_normalize(
+			"ex x (x = { 9223372036854775808 }:bv[64] && (bv[1]) x = { 0 }:bv[1])") == "T");
 	}
 }
 
@@ -984,6 +1007,13 @@ TEST_SUITE("bvcast nested") {
 	TEST_CASE("cast-result in add: ex x ex y (x = {3}:bv[2] && (bv[4]) x = y && y + {1}:bv[4] = {4}:bv[4])") {
 		CHECK(blast_normalize(
 			"ex x ex y (x = { 3 }:bv[2] && (bv[4]) x = y && y + { 1 }:bv[4] = { 4 }:bv[4])") == "T");
+	}
+}
+
+TEST_SUITE("unsupported blasting cases") {
+
+	TEST_CASE("interval predicates are rejected by blasting") {
+		CHECK(blast_formula("{ 0 }:bv[4] <= x:bv[4] <= { 1 }:bv[4]") == nullptr);
 	}
 }
 

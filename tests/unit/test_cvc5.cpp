@@ -171,7 +171,8 @@ TEST_SUITE("cvc5 simplification") {
 		auto x_minus_one_plus_x = cvc5_term_manager.mkTerm(Kind::BITVECTOR_SUB, {x, y_plus_x });
 		auto result = cvc5_solver.simplify(x_minus_one_plus_x);
 		BOOST_LOG_TRIVIAL(info) << "x - (y + x) = " << result;
-		CHECK(true);
+		CHECK(result.getKind() == Kind::BITVECTOR_NEG);
+		CHECK(result[0] == y);
 	}
 }
 

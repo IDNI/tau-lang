@@ -172,6 +172,47 @@ TEST_SUITE("trivial_skolem") {
 		CHECK( result == expected );
 	}
 
+	TEST_CASE("atom under implication is not substituted, variable stays kept") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("(a1 = c) -> (b = 0)");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("atom under wff xor is not substituted, variable stays kept") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("(a1 = c) ^ (b = 0)");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("atom under temporal boundary is not substituted, variable stays kept") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("(always a1 = c) && d = e");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("unique occurrence inside inequality is not eliminated") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		tref phi = parse("a1 != c");
+		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("two target variables sharing one atom are both kept") {
+		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+		auto a2 = build_variable<node_t>("a2", tau_type_id<node_t>());
+		tref phi = parse("a1 = a2");
+		tref result = trivial_skolem_ex<node_t>({ a1, a2 }, phi);
+		tref expected = build_wff_ex_many<node_t>({ a1, a2 }, phi);
+		CHECK( result == expected );
+	}
+
 	TEST_CASE("atom under negation is not substituted, variable stays kept") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		tref phi = parse("!(a1 = c)");

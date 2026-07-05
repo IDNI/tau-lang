@@ -12,13 +12,16 @@
 //
 // High-level flow:
 //  1) `trivial_skolem_ex(vars, phi)` collects every atomic formula in `phi`
-//     via `select_all`, stopping descent at negations, wff-level xor, and
-//     (temporal or plain) quantifiers: an atom under any of those is not in
-//     a monotone position (or, for quantifiers, out of scope for this
-//     pass), so substituting `T` there would not preserve equivalence.
-//     `wff_imply`/`wff_equiv`/`wff_conditional`/`wff_rimply` always desugar
-//     into and/or/neg at construction time, so stopping at negation alone
-//     already protects their negated operands.
+//     via `select_all`, stopping descent at negations, wff-level xor,
+//     implication-style connectives, and (temporal or plain) quantifiers: an
+//     atom under any of those is not in a monotone position (or, for
+//     quantifiers, out of scope for this pass), so substituting `T` there
+//     would not preserve equivalence. Deliberately, descent does *not* stop at
+//     `wff_or`: replacing a defining atom by `T` under disjunction is still
+//     equivalence-preserving as long as the atom is not behind one of the
+//     non-monotone boundaries above. The implication-style nodes usually
+//     desugar into and/or/neg, but the explicit boundary check below keeps the
+//     pass safe on raw or partially normalized inputs too.
 //  2) For each existential variable `v` in `vars`, it first counts every
 //     syntactic occurrence of `v` anywhere in `phi` (expanding shared
 //     subtrees, not deduplicating them) and requires exactly one: `v`
@@ -131,18 +134,22 @@ bool trivial_skolem_invertible_clause(tref clause, tref var,
 	return true;
 }
 
-// Atomic formulas under a negation or a wff-level xor are not in a monotone
-// position (see file overview): `wff_imply`/`wff_equiv`/`wff_conditional`/
-// `wff_rimply` always desugar into and/or/neg at construction time (so
-// stopping at `wff_neg` already protects their negated operands), but
-// `wff_xor` survives as its own node and is non-monotone in both operands
-// regardless of negation. Atoms under a nested (possibly temporal)
-// quantifier are out of scope for this pass. Descent stops at all of these.
+// Atomic formulas under negation, wff-level xor, or implication-style
+// connectives are not in a monotone position (see file overview). We also stop
+// at nested (possibly temporal) quantifiers because those atoms are out of
+// scope for this pass. We intentionally do *not* stop at `wff_or`: once a
+// defining atom is proven equivalent to `T`, replacing it by `T` remains sound
+// under disjunction, and doing so lets the simplifier remove the now-trivial
+// branch.
 template <NodeType node>
 bool trivial_skolem_atom_boundary(tref n) {
 	using tau = tree<node>;
 	return is<node>(n, tau::wff_neg)
 		|| is<node>(n, tau::wff_xor)
+		|| is<node>(n, tau::wff_imply)
+		|| is<node>(n, tau::wff_rimply)
+		|| is<node>(n, tau::wff_equiv)
+		|| is<node>(n, tau::wff_conditional)
 		|| is_quantifier<node>(n)
 		|| is_functional_quantifier<node>(n)
 		|| is_temporal_quantifier<node>(n);
@@ -156,13 +163,16 @@ bool trivial_skolem_atom_boundary(tref n) {
 // even if exactly one of its occurrences sits inside an eligible atom.
 template <NodeType node>
 size_t trivial_skolem_count_occurrences(tref fm, tref var) {
-	size_t count = 0;
-	auto visit = [&](tref n) {
-		if (n == var) { ++count; return false; }
-		return true;
+	using cache_t = std::unordered_map<tref, size_t>;
+	cache_t memo;
+	std::function<size_t(tref)> count = [&](tref n) -> size_t {
+		if (auto it = memo.find(n); it != memo.end()) return it->second;
+		size_t total = (n == var) ? 1 : 0;
+		for (tref child : tree<node>::get(n).children()) total += count(child);
+		memo.emplace(n, total);
+		return total;
 	};
-	pre_order<node>(fm).visit(visit);
-	return count;
+	return count(fm);
 }
 
 template <NodeType node>

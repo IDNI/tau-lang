@@ -137,7 +137,7 @@ tref bit(tref operand, int_t bit) {
 //
 //
 // _bvshl_by_one is a predicate that holds between two bitvectors if the second
-// is the result of left-shifting the first by one. Similarly, _bvrhl_by_one is
+// is the result of left-shifting the first by one. Similarly, _bvshr_by_one is
 // a predicate that holds between two bitvectors if the second is the result of
 // right-shifting the first by one.
 //
@@ -219,10 +219,10 @@ tref bvshl_by_one(tref base, tref shifted) {
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_bvrhl_by_one_call(tref base, tref shifted) {
+static tref make_bvshr_by_one_call(tref base, tref shifted) {
 	using tau = tree<node>;
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl_by_one", { base, shifted })));
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshr_by_one", { base, shifted })));
 }
 
 /**
@@ -235,7 +235,7 @@ static tref make_bvrhl_by_one_call(tref base, tref shifted) {
  * @return The constructed rule
  */
 template<NodeType node>
-static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
+static rewriter::rule bvshr_by_one_rule(size_t bitwidth) {
 	using tau = tree<node>;
 
 	static std::map<size_t, rewriter::rule> cache;
@@ -245,7 +245,7 @@ static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
 
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto header = make_bvrhl_by_one_call<node>(base, shifted);
+	auto header = make_bvshr_by_one_call<node>(base, shifted);
 	// the leftest bit is zero, the rest of the bits are the same as the
 	// original variable shifted by one. Bits at different positions are
 	// related by equivalence of their zero tests (see bvshl_by_one_rule).
@@ -259,9 +259,9 @@ static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
 	auto rule = make_rule<node>(header, body);
 
 #ifdef DEBUG
-	LOG_TRACE << "bvrhl_by_one_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvrhl_by_one_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvrhl_by_one_rule/body: " << LOG_FM(rule.second->get()) << "\n";
+	LOG_TRACE << "bvshr_by_one_rule: " << LOG_RULE(rule) << "\n";
+	LOG_TRACE << "bvshr_by_one_rule/head: " << LOG_FM(rule.first->get()) << "\n";
+	LOG_TRACE << "bvshr_by_one_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
 	cache[bitwidth] = rule;
@@ -269,10 +269,10 @@ static rewriter::rule bvrhl_by_one_rule(size_t bitwidth) {
 }
 
 template<NodeType node>
-tref bvrhl_by_one(tref base, tref shifted) {
+tref bvshr_by_one(tref base, tref shifted) {
 	auto bitwidth = get_bv_type_bitwidth<node>(base);
-	auto rule = bvrhl_by_one_rule<node>(bitwidth);
-	auto call = make_bvrhl_by_one_call<node>(base, shifted);
+	auto rule = bvshr_by_one_rule<node>(bitwidth);
+	auto call = make_bvshr_by_one_call<node>(base, shifted);
 	auto rr = make_rr<node>({ rule }, call);
 	return nso_rr_apply(rr);
 }
@@ -465,7 +465,7 @@ static rewriter::rules is_bit_one_rules(size_t bitwidth) {
 
 //
 //
-// _bvshl and _bvrhl are more complex recurrences that can be defined using
+// _bvshl and _bvshr are more complex recurrences that can be defined using
 // the _bit predicate and checking the relationships between the bits of the
 // operands and the result. We can also define them directly by checking the
 // relationships between the bits of the operands and the result without using
@@ -503,11 +503,11 @@ template<NodeType node>
 static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 	using tau = tree<node>;
 
-	static std::map<tref, rewriter::rule> cache;
-	if (cache.find(count) != cache.end()) return cache[count];
-
+	static std::map<std::pair<size_t, size_t>, rewriter::rule> cache;
 	auto bitwidth = get_bv_type_bitwidth<node>(count);
 	auto offset = get_bv_constant_value<node>(tau::trim(count)).value();
+	auto key = std::make_pair(bitwidth, offset);
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	// If the shift is greater or equal to the bitwidth, the result is always zero
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
@@ -522,8 +522,8 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 		LOG_TRACE << "bvshl_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
-		cache[count] = rule;
-		return cache[count];
+		cache.emplace(key, rule);
+		return rule;
 	}
 	// Otherwise, we compute the rule, store it in the cache and return it.
 	// Iterate over destination bits j: shifted[j] = 0 for j < offset (low bits
@@ -550,8 +550,8 @@ static rewriter::rule bvshl_rule(tref count /* bv constant */) {
 	LOG_TRACE << "bvshl_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
-	cache[count] = rule;
-	return cache[count];
+	cache.emplace(key, rule);
+	return rule;
 }
 
 template<NodeType node>
@@ -578,12 +578,12 @@ tref bvshl(tref base, tref count, tref shifted) {
  * @return The constructed call term
  */
 template<NodeType node>
-static tref make_bvrhl_call(tref base, tref count /* bv constant */, tref shifted) {
+static tref make_bvshr_call(tref base, tref count /* bv constant */, tref shifted) {
 	using tau = tree<node>;
 
 	DBG( assert(is_bv_constant<node>(tau::trim(count))); )
 
-	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvrhl", { base, count, shifted })));
+	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_ref("_bvshr", { base, count, shifted })));
 }
 
 /**
@@ -594,30 +594,30 @@ static tref make_bvrhl_call(tref base, tref count /* bv constant */, tref shifte
  * @return The constructed rule
  */
 template<NodeType node>
-static rewriter::rule bvrhl_rule(tref count /* bv constant */) {
+static rewriter::rule bvshr_rule(tref count /* bv constant */) {
 	using tau = tree<node>;
 
-	static std::map<tref, rewriter::rule> cache;
-	if (cache.find(count) != cache.end()) return cache[count];
-
+	static std::map<std::pair<size_t, size_t>, rewriter::rule> cache;
 	auto bitwidth = get_bv_type_bitwidth<node>(count);
 	auto offset = get_bv_constant_value<node>(tau::trim(count)).value();
+	auto key = std::make_pair(bitwidth, offset);
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
 	auto base = tau::build_bf_variable(bv_type_id<node>(bitwidth));
 	auto shifted = tau::build_bf_variable(bv_type_id<node>(bitwidth));
-	auto head = make_bvrhl_call<node>(base, count, shifted);
+	auto head = make_bvshr_call<node>(base, count, shifted);
 	// If the shift is greater or equal to the bitwidth, the result is always zero
 	if (offset >= bitwidth) {
 		auto body = tau::build_bf_eq_0(shifted);
 		auto rule = make_rule<node>(head, body);
 
 #ifdef DEBUG
-		LOG_TRACE << "bvrhl_rule (zero case): " << LOG_RULE(rule) << "\n";
-		LOG_TRACE << "bvrhl_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-		LOG_TRACE << "bvrhl_rule/body: " << LOG_FM(rule.second->get()) << "\n";
+		LOG_TRACE << "bvshr_rule (zero case): " << LOG_RULE(rule) << "\n";
+		LOG_TRACE << "bvshr_rule/head: " << LOG_FM(rule.first->get()) << "\n";
+		LOG_TRACE << "bvshr_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
-		cache[count] = rule;
-		return cache[count];
+		cache.emplace(key, rule);
+		return rule;
 	}
 	// Otherwise, we compute the rule, store it in the cache and return it.
 	// Iterate over destination bits j: shifted[j] = base[j + offset] for j < bitwidth - offset
@@ -640,17 +640,17 @@ static rewriter::rule bvrhl_rule(tref count /* bv constant */) {
 	auto rule = make_rule<node>(head, body);
 
 #ifdef DEBUG
-	LOG_TRACE << "bvrhl_rule: " << LOG_RULE(rule) << "\n";
-	LOG_TRACE << "bvrhl_rule/head: " << LOG_FM(rule.first->get()) << "\n";
-	LOG_TRACE << "bvrhl_rule/body: " << LOG_FM(rule.second->get()) << "\n";
+	LOG_TRACE << "bvshr_rule: " << LOG_RULE(rule) << "\n";
+	LOG_TRACE << "bvshr_rule/head: " << LOG_FM(rule.first->get()) << "\n";
+	LOG_TRACE << "bvshr_rule/body: " << LOG_FM(rule.second->get()) << "\n";
 #endif // DEBUG
 
-	cache[count] = rule;
-	return cache[count];
+	cache.emplace(key, rule);
+	return rule;
 }
 
 template<NodeType node>
-tref bvrhl(tref base, tref count, tref shifted) {
+tref bvshr(tref base, tref count, tref shifted) {
 	using tau = tree<node>;
 
 	// The shift amount must be a constant whose value is extractable
@@ -658,8 +658,8 @@ tref bvrhl(tref base, tref count, tref shifted) {
 		|| !is_bv_constant<node>(tau::trim(count))
 		|| !get_bv_constant_value<node>(tau::trim(count)))
 		return nullptr;
-	auto rule = bvrhl_rule<node>(count);
-	auto call = make_bvrhl_call<node>(base, count, shifted);
+	auto rule = bvshr_rule<node>(count);
+	auto call = make_bvshr_call<node>(base, count, shifted);
 	auto rr = make_rr<node>({ rule }, call);
 	return nso_rr_apply(rr);
 }
