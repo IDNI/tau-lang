@@ -215,6 +215,7 @@ tref tau_bad_splitter(tref fm) {
 	bool added = false;
 	auto f = [&added, &new_uniter_const](tref n) {
 		if (!added && tau::get(n).is(tau::wff_or)) {
+			added = true;  // Mark that we've added the constraint
 			return tau::trim(tau::build_wff_or(
 				tau::build_wff_and(tau::get(n).first(), new_uniter_const),
 				tau::get(n).second()));

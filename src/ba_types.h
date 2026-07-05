@@ -226,10 +226,6 @@ private:
 template <NodeType node>
 size_t get_ba_type_id(tref ba_type);
 
-/** @brief Return the integer ids for all trees in @p t. */
-template <NodeType node>
-std::vector<size_t> get_ba_type_ids(trefs t);
-
 /** @brief Return the type tree for @p ba_type_id. */
 template <NodeType node>
 tref get_ba_type_tree(size_t ba_type_id);
