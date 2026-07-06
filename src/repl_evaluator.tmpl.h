@@ -233,15 +233,18 @@ std::ostream& repl_evaluator<BAs...>::benchmarks(measuring& m,
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
-	tref arg = n[1].get();
-	tref var = n[2].get();
+	// grammar: "onf" __ variable __ onf_cmd_arg -- n[1] is the variable
+	// itself (must not go through get_any/apply_all_defs, which expect a
+	// formula/history argument), n[2] is the formula.
+	tref var = n[1].get();
+	tref arg = n[2].get();
 	measuring m("onf");
 	idni::measures::timer t;
 	t.start();
 	tref r = nullptr;
 	if (auto value = get_any(arg); value)
 		if (tref applied = tau_api::apply_all_defs(m.part(), value); applied)
-			r = onf<node>(var, applied);
+			r = onf<node>(applied, var);
 	return benchmarks(m, t), r;
 }
 

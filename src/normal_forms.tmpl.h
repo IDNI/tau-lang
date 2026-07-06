@@ -278,7 +278,11 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 	const auto& t = tau::get(n);
 	tref eq = t.find_bottom(is<node, tau::bf_eq>);
 	subtree_map<node, tref> changes;
-	if (eq && tau::get(eq)[0].find_top(has_var)) {
+	if (eq && (tau::get(eq)[0].find_top(has_var)
+			|| tau::get(eq)[1].find_top(has_var))) {
+		// keep the original (pre-normalization) node as the map key: n
+		// contains this node, not the one norm_trimmed_equation rebuilds.
+		tref orig_eq = eq;
 		eq = norm_trimmed_equation<node>(eq);
 		const auto& eq_v = tau::get(eq);
 		DBG(assert(eq_v[1][0].is(tau::bf_f));)
@@ -289,14 +293,15 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 			tau::build_bf_neg(eq_v.first()), var,tau::_1(find_ba_type<node>(var))))
 				| bf_reduce_canonical<node>() | tt::ref;
 
-		changes[eq_v.get()] = tau::trim(tau::build_bf_interval(
+		changes[orig_eq] = tau::trim(tau::build_bf_interval(
 							f_0, var, f_1));
 	}
-	for (tref neq_ref : t.select_all(is<node, tau::bf_neq>)) {
-		neq_ref = norm_trimmed_equation<node>(neq_ref);
+	for (tref orig_neq : t.select_all(is<node, tau::bf_neq>)) {
+		if (!tau::get(orig_neq)[0].find_top(has_var)
+			&& !tau::get(orig_neq)[1].find_top(has_var)) continue;
+		tref neq_ref = norm_trimmed_equation<node>(orig_neq);
 		const auto& neq = tau::get(neq_ref);
 		DBG(assert(neq[1][0].is(tau::bf_f));)
-		if (!neq[0].find_top(has_var)) continue;
 		tref f_0 = tt(rewriter::replace<node>(
 			neq.first(), var,
 			tau::_0(find_ba_type<node>(var))))
@@ -305,7 +310,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 			tau::build_bf_neg(neq.first()), var,
 			tau::_1(find_ba_type<node>(var))))
 				| bf_reduce_canonical<node>() | tt::ref;
-		changes[neq.get()] = tau::trim(tau::build_wff_or(
+		changes[orig_neq] = tau::trim(tau::build_wff_or(
 			tau::build_bf_nlteq(f_0, var),
 			tau::build_bf_nlteq(var, f_1)));
 	}
