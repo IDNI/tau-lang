@@ -52,8 +52,10 @@ tref tau_spec<node>::get() {
 
 	auto opts = get_options(); // transform to tau tree
 	tref spec = tau::get(tau_parser::tree::get(ptree), opts);
-	errors_.push_back("spec failed to transform to tau tree");
-	if (!spec) return fail();
+	if (!spec) {
+		errors_.push_back("spec failed to transform to tau tree");
+		return fail();
+	}
 
 	using tt = tau::traverser;
 	tt t(spec);
