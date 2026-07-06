@@ -65,12 +65,6 @@ TEST_SUITE("syntactic_path_simplification_simplify_wff") {
 		CHECK(tau::get(res).equals_F());
 	}
 
-	TEST_CASE("non-NNF input with negated disjunction collapses to F") {
-		tref fm  = get_nso_rr("x = 0 && !(x = 0 || y = 0).").value().main->get();
-		tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);
-		CHECK(tau::get(res).equals_F());
-	}
-
 	TEST_CASE("negated bf contradiction under wff context collapses to F") {
 		tref fm  = get_nso_rr("y = 0 && !(x & x' = 0).").value().main->get();
 		tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);
@@ -204,5 +198,18 @@ TEST_SUITE("syntactic_path_simplification") {
 			"(ex b1 b1 != 0) && (ex b1 b1 = 0)",
 			"(ex b1 b1 = 0) && (ex b1 b1 != 0)",
 		}) );
+	}
+	// syntactic_path_simplification_simplify_wff (the internal helper used
+	// above) assumes NNF-normalized input: it detects contradictions only
+	// between exact-duplicate top-level conjuncts, so "x = 0" and the
+	// non-NNF "!(x = 0 || y = 0)" are not recognized as contradictory
+	// (the negated disjunction is a different subtree, not "x = 0"
+	// itself). The public entry point normalizes to NNF first, so it
+	// must still collapse this to F.
+	TEST_CASE("non-NNF input with negated disjunction collapses to F") {
+		const char* sample = "x = 0 && !(x = 0 || y = 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = syntactic_path_simplification<node_t>(fm);
+		CHECK(tau::get(res).equals_F());
 	}
 }

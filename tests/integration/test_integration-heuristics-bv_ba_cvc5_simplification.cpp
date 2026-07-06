@@ -369,6 +369,64 @@ TEST_SUITE("ba bv cvc5 power of 2/variable simplification") {
 
 }
 
+TEST_SUITE("cvc5 back-translation correctness") {
+
+	// Regression tests for HE-1 and HE-N1: the cvc5 -> tau back-translator
+	// (cvc5_tree_to_tau_tree) must produce a tau formula that is
+	// semantically equivalent to the original cvc5 term for every
+	// assignment of the free variable(s) involved, not just structurally
+	// plausible. We check this by round-tripping the translated tau tree
+	// back into a cvc5 term (via bv_eval_node, the same forward evaluator
+	// used elsewhere in the pipeline) and proving the two cvc5 terms can
+	// never differ.
+	template <typename term_t>
+	void check_equivalent_to(tref x_tau, const cvc5::Term& x, const term_t& original) {
+		std::map<std::string, tref> var_map{ {"x", x_tau} };
+		tref translated = cvc5_tree_to_tau_tree<node_t>(original, var_map);
+		REQUIRE( translated != nullptr );
+
+		subtree_map<node_t, bv> vars, free_vars;
+		free_vars.emplace(x_tau, x);
+		auto translated_bv = bv_eval_node<node_t>(translated, vars, free_vars);
+		REQUIRE( translated_bv.has_value() );
+
+		cvc5::Solver solver(cvc5_term_manager);
+		config_cvc5_solver(solver);
+		solver.assertFormula(cvc5_term_manager.mkTerm(
+			cvc5::Kind::DISTINCT, { translated_bv.value(), original }));
+		CHECK( solver.checkSat().isUnsat() );
+	}
+
+	TEST_CASE("BITVECTOR_NEG translates to two's complement, not bitwise NOT") {
+		cvc5::Sort bv8 = cvc5_term_manager.mkBitVectorSort(8);
+		cvc5::Term x = cvc5_term_manager.mkConst(bv8, "x");
+		cvc5::Term neg_term = cvc5_term_manager.mkTerm(cvc5::Kind::BITVECTOR_NEG, {x});
+		tref x_tau = build_variable<node_t>("x",
+			get_ba_type_id<node_t>(bv_type<node_t>(8)));
+		check_equivalent_to(x_tau, x, neg_term);
+	}
+
+	TEST_CASE("BITVECTOR_EXTRACT with lo > 0 shifts before truncating") {
+		cvc5::Sort bv8 = cvc5_term_manager.mkBitVectorSort(8);
+		cvc5::Term x = cvc5_term_manager.mkConst(bv8, "x");
+		// bits [7:4]: the upper nibble of an 8-bit variable
+		cvc5::Term extract_term = make_bitvector_extract(x, 7, 4);
+		tref x_tau = build_variable<node_t>("x",
+			get_ba_type_id<node_t>(bv_type<node_t>(8)));
+		check_equivalent_to(x_tau, x, extract_term);
+	}
+
+	TEST_CASE("BITVECTOR_EXTRACT with lo == 0 is unaffected") {
+		cvc5::Sort bv8 = cvc5_term_manager.mkBitVectorSort(8);
+		cvc5::Term x = cvc5_term_manager.mkConst(bv8, "x");
+		// bits [3:0]: the lower nibble of an 8-bit variable
+		cvc5::Term extract_term = make_bitvector_extract(x, 3, 0);
+		tref x_tau = build_variable<node_t>("x",
+			get_ba_type_id<node_t>(bv_type<node_t>(8)));
+		check_equivalent_to(x_tau, x, extract_term);
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

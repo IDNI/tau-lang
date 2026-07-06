@@ -155,6 +155,7 @@ tref api<node>::get_definition(const std::string& definition, bool simplified) {
 	DBG(TAU_LOG_TRACE << "get_definition/definition: " << definition;)
 	tref def = tau::get(definition, get_options<node>(tau::rec_relation, simplified));
 	DBG(TAU_LOG_TRACE << "get_definition/def: " << LOG_FM_DUMP(def);)
+	if (!def) return nullptr;
 	add_definition(tau::get(def).first(), tau::get(def).second());
 	return def;
 }

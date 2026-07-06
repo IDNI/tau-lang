@@ -241,6 +241,21 @@ TEST_SUITE("TauSpecAdd") {
 	}
 }
 
+TEST_SUITE("TauSpecGet") {
+	TEST_CASE("successful get() does not poison errors_ for later parse calls") {
+		// Regression test for TT-16: tau_spec::get() used to push
+		// "spec failed to transform to tau tree" into errors_
+		// unconditionally, even when the transform succeeded. Since
+		// parse_part() bails out whenever errors_ is non-empty, every
+		// parse() call after a successful get() used to silently fail.
+		tau_spec<node_t> spec;
+		REQUIRE( spec.parse("xy = 0.") );
+		REQUIRE( spec.get() != nullptr );
+		CHECK( spec.errors().empty() );
+		CHECK( spec.parse("xy = 1.") );
+	}
+}
+
 #ifdef TAU_TEST_MULTILINE_PARSING_BRUTE_FORCE
 	TEST_CASE_FIXTURE(specification_fixture, "test cases") {
 		size_t start = 0;

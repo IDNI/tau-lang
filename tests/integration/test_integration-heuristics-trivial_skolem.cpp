@@ -218,12 +218,20 @@ TEST_SUITE("trivial_skolem") {
 		CHECK( result == expected );
 	}
 
-	TEST_CASE("atom under conditional is not substituted, variable stays kept") {
+	// "b = 0 ? a1 = c : d = e" desugars (via build_wff_conditional/
+	// build_wff_imply hooks) to "(b != 0 || a1 = c) && (b = 0 || d = e)":
+	// a1 = c occurs exactly once, only under wff_or/wff_and (no negation,
+	// xor, implication or quantifier boundary), so it is in a monotone
+	// position and IS eliminable, unlike the negation/xor/imply/rimply/
+	// equiv cases above where the same atom is duplicated (once positive,
+	// once negated) by the desugaring and is therefore kept by the
+	// occurrence-count check instead.
+	TEST_CASE("atom under desugared conditional is substituted away") {
 		auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
 		tref phi = parse("(b = 0) ? (a1 = c) : (d = e)");
 		tref result = trivial_skolem_ex<node_t>({ a1 }, phi);
-		tref expected = build_wff_ex_many<node_t>({ a1 }, phi);
-		CHECK( result == expected );
+		tref expected = parse("b = 0 || d = e");
+		CHECK( tau::get(result) == tau::get(expected) );
 	}
 
 	TEST_CASE("atom under temporal boundary is not substituted, variable stays kept") {

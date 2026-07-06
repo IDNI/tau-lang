@@ -116,6 +116,14 @@ TEST_SUITE("Tau API - tref - parsing") {
 		}
 	}
 
+	TEST_CASE_FIXTURE(api_fixture, "get_definition with malformed input returns nullptr") {
+		// Regression test for AP-N2: get_definition() used to dereference
+		// the parse result unconditionally, crashing (DBG assert / null
+		// deref in release) instead of returning nullptr on a malformed
+		// definition string.
+		CHECK(tau_api::get_definition("this is not a definition") == nullptr);
+	}
+
 	TEST_CASE_FIXTURE(api_fixture, "get_spec_or_term") {
 		for (const auto& spec : specs) {
 			DBG(TAU_LOG_TRACE << "get_spec_or_term - spec: " << spec;)

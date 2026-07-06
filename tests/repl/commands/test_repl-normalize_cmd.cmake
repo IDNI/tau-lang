@@ -27,3 +27,14 @@ add_repl_test(normalize_cmd_bf_mem_abs "1. normalize %1" "1")
 add_repl_test(normalize_cmd_wff_nonmem "normalize T" ": T")
 add_repl_test(normalize_cmd_wff_mem_rel "T. normalize %-0" "T")
 add_repl_test(normalize_cmd_wff_mem_abs "T. normalize %1" "T")
+
+# Regression test for AP-N3: get_type_and_arg() used to dereference the
+# result of get_applied() unconditionally, crashing (DBG assert / null
+# deref in release) whenever get_applied() failed instead of reporting
+# the error gracefully. get_applied() legitimately returns nullptr when
+# nso_rr_apply()'s fixed-point calculation hits an unsupported multi-index
+# offset relation (see calculate_all_fixed_points), so normalizing a fixed
+# point call on such a relation must report the error, not crash.
+add_repl_test_fail(normalize_cmd-multiindex_fixed_point_call
+	"g[0, 0](Y) := Y = 0. g[n, 0](Y) := g[n - 1, 0](Y). normalize g(Y)"
+	"multiindex offset relations is not supported")

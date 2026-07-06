@@ -25,7 +25,7 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 #endif // TAU_CACHE
 
 #ifdef TAU_MEASURE
-	measures::increase_rule_counter<tau_<BAs...>>(r);
+	measures::increase_rule_counter<htref>(r);
 #endif // TAU_MEASURE
 
 	try {
@@ -45,7 +45,7 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 #endif // DEBUG
 
 #ifdef TAU_MEASURE
-		if (n != nn) measures::increase_rule_hit<tau_<BAs...>>(r);
+		if (n != nn) measures::increase_rule_hit<htref>(r);
 #endif // TAU_MEASURE
 
 #ifdef TAU_CACHE
