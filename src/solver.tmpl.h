@@ -209,6 +209,13 @@ std::optional<solution<node>> lgrs(equality eq) {
 	return phi;
 }
 
+// SO-2: worst-case enumerates all 2^vars polarity combinations with no
+// cutoff or timeout, and solver_options has no budget/deadline field.
+// Capping this iterator would silently truncate the enumeration -- since
+// callers treat it as exhaustive, that would trade a hang for a wrong
+// (incomplete) solve result, so this is left undone pending a real
+// tri-state (sat/unsat/unknown) result contract through the solver
+// pipeline rather than a bolted-on iteration limit.
 template <NodeType node>
 struct minterm_iterator {
 	// iterator traits
@@ -620,6 +627,12 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 					: tau_splitter(tau::get(tt(d_cte)
 						| tau::ba_constant
 						| tt::ref)).get();
+
+				// no splitter available (e.g. options.splitter_one
+				// unset for case 4.1) or the splitter degenerates to 0:
+				// fail explicitly instead of dereferencing a null tref
+				// or silently inserting a bogus 0 minterm.
+				if (!s || tau::get(s).equals_0()) return {};
 
 				DBG(LOG_TRACE << "add_minterm_to_disjoint"
 					<< "/[case4]/s: " << LOG_FM(s) << "\n";)
