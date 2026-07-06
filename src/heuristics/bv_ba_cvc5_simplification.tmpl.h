@@ -112,10 +112,15 @@ tref cvc5_tree_to_tau_tree(bv n,
 			auto operand = rec(n[0]);
 			return operand != nullptr ? build_bf_neg<node>(operand) : nullptr; // Unable to transform to tau (returning null)
 		}
-		// TODO (HIGH) should be two's complement
 		case Kind::BITVECTOR_NEG: {
+			// two's complement negation: -x = NOT(x) + 1
 			auto operand = rec(n[0]);
-			return operand != nullptr ? build_bf_neg<node>(operand) : nullptr; // Unable to transform to tau (returning null)
+			if (operand == nullptr) return nullptr; // Unable to transform to tau (returning null)
+			size_t bitwidth = n[0].getSort().getBitVectorSize();
+			typename node::constant one = { make_bitvector_value(bitwidth, 1) };
+			tref one_term = build_bf_ba_constant<node>(one,
+				get_ba_type_id<node>(bv_type<node>(bitwidth)));
+			return build_bf_add<node>(build_bf_neg<node>(operand), one_term);
 		}
 		case Kind::BITVECTOR_AND: return from_collection(n, build_bf_and<node>);
 		case Kind::BITVECTOR_OR: return from_collection(n, build_bf_or<node>);
@@ -160,6 +165,15 @@ tref cvc5_tree_to_tau_tree(bv n,
 			uint32_t hi = n.getOp()[0].getUInt32Value();
 			uint32_t lo = n.getOp()[1].getUInt32Value();
 			size_t target_size = hi - lo + 1;
+			// bf_cast truncates to the LOW bits of its operand, so shift
+			// the bits of interest down to position 0 before casting.
+			if (lo > 0) {
+				size_t src_size = n[0].getSort().getBitVectorSize();
+				typename node::constant shift = { make_bitvector_value(src_size, lo) };
+				tref shift_term = build_bf_ba_constant<node>(shift,
+					get_ba_type_id<node>(bv_type<node>(src_size)));
+				operand = build_bf_shr<node>(operand, shift_term);
+			}
 			return build_bf_cast<node>(operand, get_ba_type_id<node>(bv_type<node>(target_size)));
 		}
 
