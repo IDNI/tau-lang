@@ -649,6 +649,10 @@ bool tree<node>::is_digital_nt(size_t nt) {
 
 template <NodeType node>
 bool tree<node>::is_term_nt(size_t nt) {
+	// Deliberately wider than the free idni::tau_lang::is_term_nt used by
+	// node's constructor (see tau_tree_node.tmpl.h): this is the full
+	// is-a-term predicate used by is_term(), covering the extended bf
+	// arithmetic/functional operators and capture as well.
 	switch (nt) {
 		case bf:
 		case ba_constant:

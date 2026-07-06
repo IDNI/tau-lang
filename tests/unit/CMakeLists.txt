@@ -19,6 +19,7 @@ set(TESTS
 	sbf_ba_parsing
     tau_bdd
 	tau_spec
+	tau_tree
 	tau_tree_from_parser
 	tau_tree_printers
 	traversal
