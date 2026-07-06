@@ -209,6 +209,7 @@ std::optional<std::pair<size_t, tref>>
 		default: r = n | tt::ref;
 	}
 	r = get_applied(r);
+	if (!r) return {};
 	return { { tau::get(r).get_type(), r } };
 }
 
@@ -704,7 +705,10 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	static std::string pbool[] = { "off", "on" };
-	static std::map<repl_option, std::function<void()>> printers = {
+	// Not static: the lambdas below capture `this` and must be rebuilt on
+	// every call, otherwise a static map would keep referring to whichever
+	// repl_evaluator instance happened to call get_cmd() first.
+	std::map<repl_option, std::function<void()>> printers = {
 #ifdef DEBUG
 	{ debug_opt, [this]() {
 		std::cout << "debug-repl:          " << pbool[opt.debug_repl] << "\n"; } },
@@ -766,7 +770,12 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		else TAU_LOG_ERROR << "Invalid value\n";
 		return opt;
 	};
-	static std::map<repl_option, std::function<void()>> setters = {
+	// Not static: the lambdas below capture `this`, `v` and the local
+	// update_bool_value lambda by reference, all of which are only valid
+	// for the duration of this call. A static map would keep those
+	// references pointing at the FIRST call's (long-gone) stack frame,
+	// causing every later set command to read dangling references.
+	std::map<repl_option, std::function<void()>> setters = {
 #ifdef DEBUG
 	{ debug_opt, [&]() {
 		update_bool_value(opt.debug_repl); } },
