@@ -27,6 +27,7 @@ set(TESTS
 	traversal
 	union_find
 	bitblasting_predicates
+	var_dict
 )
 
 foreach(X IN LISTS TESTS)

@@ -90,7 +90,9 @@ inline void config_cvc5_solver(cvc5::Solver& solver) {
  * with both bound and free variables, and can optionally perform additional checks.
  *
  * @param form Traverser for the boolean algebra tree node to be evaluated.
- * @param vars Mapping from tree nodes to bitvector values for bound variables.
+ * @param vars Mapping from tree nodes to bitvector values for bound variables. Passed
+ * by reference for performance; quantifier cases save and restore any shadowed
+ * outer binding around their recursive call, so it is left unchanged on return.
  * @param free_vars Mapping from tree nodes to bitvector values for free variables (may be updated).
  * @return An optional with the the evaluated bitvector value of the node if possible and
  * an empty optional if not.
@@ -98,7 +100,7 @@ inline void config_cvc5_solver(cvc5::Solver& solver) {
  */
 template <NodeType node>
 std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
-	subtree_map<node, bv> vars, subtree_map<node, bv>& free_vars);
+	subtree_map<node, bv>& vars, subtree_map<node, bv>& free_vars);
 
 /**
  * @brief Evaluate a `tref` BV formula node; wrapper overload of the traverser version.
@@ -108,7 +110,7 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
  * @return Evaluated BV term, or `nullopt` on failure.
  */
 template <NodeType node>
-std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv> vars,
+std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 	subtree_map<node, bv>& free_vars);
 
 /** @brief Convert a cvc5 term tree @p n back into a Tau tree reference. */

@@ -12,7 +12,7 @@ using namespace cvc5;
 using namespace idni;
 
 template <NodeType node>
-std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv> vars,
+std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtree_map<node, bv>& vars,
 			       subtree_map<node, bv>& free_vars) {
 	using tau = tree<node>;
 	using tt = tree<node>::traverser;
@@ -53,15 +53,20 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 				return bv_eval_node<node>(form | tt::second, vars, free_vars);
 			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
 			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
-			// Use operator[] to overwrite any outer binding of the same tref
-			// (nested quantifiers sharing the same variable tref due to caching).
+			// vars is now shared by reference across the whole recursion, so a
+			// shadowed outer binding of the same tref (nested quantifiers
+			// sharing the same variable tref due to caching) must be saved and
+			// restored -- unlike the previous by-value vars, an unconditional
+			// erase here would now also delete that outer binding for the
+			// caller instead of just for this call's own local copy.
+			auto prev = vars.find(v);
+			std::optional<bv> outer = prev != vars.end() ? std::optional(prev->second) : std::nullopt;
 			vars[v] = x;
 
 			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars);
+			if (outer) vars[v] = *outer; else vars.erase(v);
 			if (!f) return std::nullopt;
-			auto res = std::optional<bv>(make_term_forall({x}, f.value()));
-			vars.erase(v);
-			return res;
+			return std::optional<bv>(make_term_forall({x}, f.value()));
 		}
 		case tau::wff_ex: {
 			tref v = (form | tt::first | tt::ref);
@@ -70,15 +75,16 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 				return bv_eval_node<node>(form | tt::second, vars, free_vars);
 			size_t bv_size = get_bv_size<node>(tau::get(v).get_ba_type_tree());
 			bv x = cvc5_term_manager.mkVar(cvc5_term_manager.mkBitVectorSort(bv_size), tau::get(v).to_str());
-			// Use operator[] to overwrite any outer binding of the same tref
-			// (nested quantifiers sharing the same variable tref due to caching).
+			// See the wff_all case above for why the outer binding must be
+			// saved and restored now that vars is passed by reference.
+			auto prev = vars.find(v);
+			std::optional<bv> outer = prev != vars.end() ? std::optional(prev->second) : std::nullopt;
 			vars[v] = x;
 
 			auto f = bv_eval_node<node>(form | tt::second, vars, free_vars);
+			if (outer) vars[v] = *outer; else vars.erase(v);
 			if (!f) return std::nullopt;
-			auto res = std::optional<bv>(make_term_exists({x}, f.value()));
-			vars.erase(v);
-			return res;
+			return std::optional<bv>(make_term_exists({x}, f.value()));
 		}
 		case tau::variable: {
 			// check if the variable is alr
@@ -224,8 +230,14 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			return (l && r) ? std::optional<bv>(make_bitvector_shr(l.value(), r.value())) : std::nullopt;
 		}
 		case tau::ba_constant: {
+			// is_bv_solvable_formula only inspects variable nodes, so a
+			// formula whose variables are all bitvectors but which also
+			// contains a non-bv (e.g. sbf or tau) constant passes that gate;
+			// std::get would then throw std::bad_variant_access in release
+			// (the DBG-only assert doesn't guard it there). Fail gracefully
+			// instead, same as any other untranslatable node.
 			auto cte = form | tt::ba_constant;
-			DBG(assert(std::holds_alternative<bv>(cte));)
+			if (!std::holds_alternative<bv>(cte)) return std::nullopt;
 			return std::optional<bv>(std::get<bv>(cte));
 		}
 		case tau::bf_t: {
@@ -247,7 +259,7 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 }
 
 template<NodeType node>
-std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv> vars,
+std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 	subtree_map<node, bv>& free_vars) {
 	using tau = tree<node>;
 	using tt = tau::traverser;

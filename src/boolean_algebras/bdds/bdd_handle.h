@@ -566,7 +566,7 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 		std::stringstream t;
 		if (!(c.first == true)) t << '{' << c.first << '}';
 		for (int_t v : c.second)
-			if (v < 0) s.insert(std::string(var_dict(-v)) + "'");
+			if (v < 0) s.insert(var_dict(-v) + "'");
 			else s.insert(var_dict(v));
 		bool first = true;
 		for (auto& x : s) {
