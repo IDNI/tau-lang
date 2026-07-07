@@ -74,16 +74,19 @@ htref api<node>::geth_formula_or_term(const std::string& expr, bool simplified) 
 
 template <NodeType node>
 bool api<node>::contains(htref expr, typename node::type nt) {
+	if (!expr) return false;
 	return contains(expr->get(), nt);
 }
 
 template <NodeType node>
 bool api<node>::is_term(htref term) {
+	if (!term) return false;
 	return is_term(term->get());
 }
 
 template <NodeType node>
 bool api<node>::is_formula(htref fm) {
+	if (!fm) return false;
 	return is_formula(fm->get());
 }
 
@@ -92,18 +95,21 @@ bool api<node>::is_formula(htref fm) {
 
 template <NodeType node>
 htref api<node>::apply_def(htref def, htref expression) {
+	if (!def || !expression) return nullptr;
 	return tau::geth(apply_def(def->get(), expression->get()));
 }
 
 template <NodeType node>
 htref api<node>::apply_defs(std::set<htref> defs, htref expression) {
+	if (!expression) return nullptr;
 	subtree_set<node> tdefs;
-	for (htref def : defs) tdefs.insert(def->get());
+	for (htref def : defs) if (def) tdefs.insert(def->get());
 	return tau::geth(apply_defs(tdefs, expression->get()));
 }
 
 template <NodeType node>
 htref api<node>::apply_all_defs(htref expr) {
+	if (!expr) return nullptr;
 	return tau::geth(apply_all_defs(expr->get()));
 }
 
@@ -113,11 +119,13 @@ htref api<node>::apply_all_defs(htref expr) {
 
 template <NodeType node>
 std::ostream& api<node>::print(std::ostream& os, htref expression) {
+	if (!expression) return os;
 	return print(os, expression->get());
 }
 
 template <NodeType node>
 std::string api<node>::to_str(htref expression) {
+	if (!expression) return {};
 	return to_str(expression->get());
 }
 
@@ -127,14 +135,18 @@ std::string api<node>::to_str(htref expression) {
 
 template <NodeType node>
 htref api<node>::substitute(htref expr, htref that, htref with) {
+	if (!expr || !that || !with) return nullptr;
 	return tau::geth(substitute(expr->get(), that->get(), with->get()));
 }
 
 template <NodeType node>
 htref api<node>::substitute(htref expr, std::map<htref, htref> that_with) {
+	if (!expr) return nullptr;
 	tref e = expr->get();
-	for (auto [that, with] : that_with)
+	for (auto [that, with] : that_with) {
+		if (!that || !with) continue;
 		e = substitute(e, that->get(), with->get());
+	}
 	return tau::geth(e);
 }
 
@@ -143,16 +155,19 @@ htref api<node>::substitute(htref expr, std::map<htref, htref> that_with) {
 
 template <NodeType node>
 htref api<node>::boole_normal_form(htref expr) {
+	if (!expr) return nullptr;
 	return tau::geth(boole_normal_form(expr->get()));
 }
 
 template <NodeType node>
 htref api<node>::dnf(htref expr) {
+	if (!expr) return nullptr;
 	return tau::geth(dnf(expr->get()));
 }
 
 template <NodeType node>
 htref api<node>::cnf(htref expr) {
+	if (!expr) return nullptr;
 	return tau::geth(cnf(expr->get()));
 }
 
@@ -167,25 +182,30 @@ htref api<node>::nnf(htref expr) {
 
 template <NodeType node>
 htref api<node>::syntactic_term_simplification(htref term) {
+	if (!term) return nullptr;
 	return tau::geth(syntactic_term_simplification(term->get()));
 }
 
 template <NodeType node>
 htref api<node>::syntactic_formula_simplification(htref fm) {
+	if (!fm) return nullptr;
 	return tau::geth(syntactic_formula_simplification(fm->get()));
 }
 template <NodeType node>
 htref api<node>::normalize_formula(htref fm) {
+	if (!fm) return nullptr;
 	return tau::geth(normalize_formula(fm->get()));
 }
 
 template <NodeType node>
 htref api<node>::normalize_term(htref term) {
+	if (!term) return nullptr;
 	return tau::geth(normalize_term(term->get()));
 }
 
 template <NodeType node>
 htref api<node>::anti_prenex(htref fm) {
+	if (!fm) return nullptr;
 	return tau::geth(anti_prenex(fm->get()));
 }
 
@@ -199,31 +219,37 @@ htref api<node>::eliminate_quantifiers(htref fm) {
 
 template <NodeType node>
 bool api<node>::realizable(htref fm) {
+	if (!fm) return false;
 	return realizable(fm->get());
 }
 
 template <NodeType node>
 bool api<node>::unrealizable(htref fm) {
+	if (!fm) return false;
 	return unrealizable(fm->get());
 }
 
 template <NodeType node>
 bool api<node>::sat(htref fm) {
+	if (!fm) return false;
 	return sat(fm->get());
 }
 
 template <NodeType node>
 bool api<node>::unsat(htref fm) {
+	if (!fm) return false;
 	return unsat(fm->get());
 }
 
 template <NodeType node>
 bool api<node>::valid(htref fm) {
+	if (!fm) return false;
 	return valid(fm->get());
 }
 
 template <NodeType node>
 bool api<node>::valid_spec(htref fm) {
+	if (!fm) return false;
 	return valid_spec(fm->get());
 }
 
@@ -234,6 +260,7 @@ template <NodeType node>
 std::optional<std::map<htref, htref>> api<node>::solve(htref fm,
 	solver_mode mode)
 {
+	if (!fm) return {};
 	if (auto solution = solve(fm->get(), mode); solution)
 		return geth(solution.value());
 	return {};
@@ -241,6 +268,7 @@ std::optional<std::map<htref, htref>> api<node>::solve(htref fm,
 
 template <NodeType node>
 std::optional<std::map<htref, htref>> api<node>::lgrs(htref equation) {
+	if (!equation) return {};
 	if (auto solution = lgrs(equation->get()); solution)
 		return geth(solution.value());
 	return {};
@@ -248,6 +276,7 @@ std::optional<std::map<htref, htref>> api<node>::lgrs(htref equation) {
 
 template <NodeType node>
 htref api<node>::simplify(htref expr, bool use_defaults) {
+	if (!expr) return nullptr;
 	return tau::geth(simplify(expr->get(), use_defaults));
 }
 

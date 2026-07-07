@@ -204,7 +204,12 @@ inline std::shared_ptr<serialized_constant_input_stream>
 }
 
 inline std::optional<std::string> vector_input_stream::get() {
-	if (*current >= values->size()) return {};
+	// Signal exhaustion the same way console_input_stream/file_input_stream
+	// signal EOF: an empty string (the graceful "no more inputs" quit
+	// path in interpreter::read), not nullopt (the hard-error path) --
+	// running out of a finite, pre-supplied input list is the expected
+	// end of a scripted/test run, not a broken stream.
+	if (*current >= values->size()) return std::string{};
 	DBG(LOG_TRACE << "vector_input_stream::get() = \"" << values->at(*current)
 		<< "\" current: " << *current << " values.size(): " << values->size();)
 	return values->at((*current)++);

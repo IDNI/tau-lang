@@ -189,9 +189,8 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 	return true; // success
 }
 
-// TODO should stop interpreting if failed to open an input stream
 template<NodeType node>
-void interpreter<node>::rebuild_inputs(
+bool interpreter<node>::rebuild_inputs(
 	const subtree_map<node, size_t>& current_inputs)
 {
 	// Close all input streams
@@ -207,7 +206,7 @@ void interpreter<node>::rebuild_inputs(
 				<< get_var_name<node>(var) << "'\n";
 			DBG(LOG_TRACE << ctx;)
 			DBG(LOG_TRACE << dump_to_str());
-			continue; // TODO should stop interpreting if failed to open an input stream
+			return false; // stop interpreting: failed to open an input stream
 		}
 		std::string vn = get_var_name<node>(var);
 		if (auto it = ctx.input_remaps.find(vn); it != ctx.input_remaps.end()) {
@@ -219,11 +218,11 @@ void interpreter<node>::rebuild_inputs(
 				std::make_shared<file_input_stream>(dict(stream_id)));
 		}
 	}
+	return true;
 }
 
-// TODO should stop interpreting if failed to open an output stream
 template<NodeType node>
-void interpreter<node>::rebuild_outputs(
+bool interpreter<node>::rebuild_outputs(
 	const subtree_map<node, size_t>& current_outputs)
 {
 	// Delete old streams
@@ -235,7 +234,7 @@ void interpreter<node>::rebuild_outputs(
 		if (it == ctx.outputs.end()) {
 			LOG_ERROR << "Failed to find output stream for stream '"
 				<< get_var_name<node>(var) << "' when rebuilding outputs.";
-			continue; // TODO should stop interpreting if failed to open an output stream
+			return false; // stop interpreting: failed to open an output stream
 		}
 		std::string vn = get_var_name<node>(var);
 		if (auto it = ctx.output_remaps.find(vn); it != ctx.output_remaps.end())
@@ -247,6 +246,7 @@ void interpreter<node>::rebuild_outputs(
 				std::make_shared<file_output_stream>(dict(stream_id)));
 		}
 	}
+	return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -297,11 +297,11 @@ std::optional<interpreter<node>>
 		subtree_map<node, size_t> output_streams;
 		if (!i.collect_output_streams(spec, output_streams)) return {};
 		LOG_TRACE << "interpreter::make_interpreter/rebuild_outputs";
-		i.rebuild_outputs(output_streams);
+		if (!i.rebuild_outputs(output_streams)) return {};
 		subtree_map<node, size_t> input_streams;
 		if (!i.collect_input_streams(spec, input_streams)) return {};
 		LOG_TRACE << "interpreter::make_interpreter/rebuild_inputs";
-		i.rebuild_inputs(input_streams);
+		if (!i.rebuild_inputs(input_streams)) return {};
 
 		DBG(LOG_TRACE << "interpreter created\n";)
 		DBG(LOG_TRACE << i.dump_to_str();)
@@ -394,10 +394,14 @@ std::pair<std::optional<assignment<node>>, bool>
 	DBG(if (values.has_value())
 			for (auto [k, v] : values.value())
 				LOG_DEBUG << "Input: " << LOG_FM_DUMP(k) << " = " << LOG_FM_TREE(v) << "\n";)
-	// Empty input
+	// Empty input: clean end-of-inputs/quit signal
 	if (is_quit) return {};
-	// Error during input
-	if (!values.has_value()) return { assignment<node>{}, true };
+	// Hard error reading/parsing an input (read() already logged it):
+	// stop like the quit case above, not a "successful", auto-continuing
+	// empty step -- that made every caller's driver loop treat a read
+	// error as ordinary progress and keep looping on it instead of
+	// stopping.
+	if (!values.has_value()) return {};
 
 	return step(values.value());
 }
@@ -888,14 +892,14 @@ void interpreter<node>::update(tref update) {
 				return;
 		}
 		LOG_TRACE << "interpreter::update/rebuild_outputs";
-		rebuild_outputs(output_streams);
+		if (!rebuild_outputs(output_streams)) return;
 		subtree_map<node, size_t> input_streams;
 		for (tref spec_part : original_spec | std::views::keys) {
 			if (!collect_input_streams(spec_part, input_streams))
 				return;
 		}
 		LOG_TRACE << "interpreter::update/rebuild_inputs";
-		rebuild_inputs(input_streams);
+		if (!rebuild_inputs(input_streams)) return;
 		return;
 	}
 	// No more clause left in update and all clauses are not realizable
@@ -1200,6 +1204,10 @@ std::optional<interpreter<node>> run(tref form, const io_context<node>& ctx,
 			term::enable_getline_mode();
 			std::getline(std::cin, line);
 			term::disable_getline_mode();
+			// On closed/exhausted stdin, getline never sets line to "q"/
+			// "quit" and keeps returning immediately, spinning this loop
+			// forever; stop the same way repl_evaluator::run_cmd does.
+			if (std::cin.eof() || std::cin.fail()) { std::cin.clear(); break; }
 			if (line == "q" || line == "quit") break;
 		} else std::cout << "\n";
 

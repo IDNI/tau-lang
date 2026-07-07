@@ -250,6 +250,10 @@ std::string api<node>::to_str(tref expression) {
 
 template <NodeType node>
 tref api<node>::substitute(tref expr, tref that, tref with) {
+	if (!expr || !that || !with) {
+		TAU_LOG_ERROR << "Invalid argument(s)";
+		return nullptr;
+	}
 	DBG(TAU_LOG_TRACE << "substitute: \n" << LOG_FM_DUMP(expr) << "\n" << LOG_FM_DUMP(that) << "\n" << LOG_FM_DUMP(with);)
 	bool e = is_term(expr), t = is_term(that), w = is_term(with);
 	if ((e && e != t) || (e && e != w) || (!e && t != w)) {
@@ -516,9 +520,11 @@ template <NodeType node>
 std::optional<interpreter<node>> api<node>::get_interpreter(tref spec,
 	interpreter_options& options)
 {
+	// Assign the remaps into the global io_context only after every
+	// validation step succeeds: assigning them up front left them in
+	// place -- corrupting later, unrelated calls -- on every one of the
+	// early-return failure paths below.
 	auto& ctx = *definitions<node>::instance().get_io_context();
-	ctx.input_remaps = options.input_remaps;
-	ctx.output_remaps = options.output_remaps;
 	auto maybe_nso_rr = get_nso_rr(spec);
 	if (!maybe_nso_rr) return {};
 	tref applied = nso_rr_apply<node>(maybe_nso_rr.value());
@@ -526,6 +532,8 @@ std::optional<interpreter<node>> api<node>::get_interpreter(tref spec,
 	tref normalized = normalizer<node>(applied);
 	if (!normalized) return {};
 	if (has_free_vars<node>(normalized)) return {};
+	ctx.input_remaps = options.input_remaps;
+	ctx.output_remaps = options.output_remaps;
 	return interpreter<node>::make_interpreter(normalized, ctx);
 }
 
@@ -542,9 +550,9 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	tau_spec<node>& spec,
 	interpreter_options& options)
 {
+	// See the tref overload above: remaps are assigned into the global
+	// io_context only once every validation step has succeeded.
 	auto& ctx = *definitions<node>::instance().get_io_context();
-	ctx.input_remaps = options.input_remaps;
-	ctx.output_remaps = options.output_remaps;
 	auto maybe_nso_rr = spec.get_nso_rr();
 	if (!maybe_nso_rr) {
 		for (const auto& error : spec.errors()) TAU_LOG_ERROR << error;
@@ -555,6 +563,8 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	tref normalized = normalizer<node>(applied);
 	if (!normalized) return {};
 	if (has_free_vars<node>(normalized)) return {};
+	ctx.input_remaps = options.input_remaps;
+	ctx.output_remaps = options.output_remaps;
 	return interpreter<node>::make_interpreter(normalized, ctx);
 }
 

@@ -114,9 +114,11 @@ private:
 	bool serialize_constant(std::stringstream& ss, tref constant,
 		size_t type) const;
 	/// @brief Rebuild the input stream map from @p current_inputs.
-	void rebuild_inputs(const subtree_map<node, size_t>& current_inputs);
+	/// @return false if a stream could not be found (interpretation should stop).
+	bool rebuild_inputs(const subtree_map<node, size_t>& current_inputs);
 	/// @brief Rebuild the output stream map from @p current_outputs.
-	void rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
+	/// @return false if a stream could not be found (interpretation should stop).
+	bool rebuild_outputs(const subtree_map<node, size_t>& current_outputs);
 
 	/// @brief Collect all input stream variables from @p dnf into @p current_inputs.
 	bool collect_input_streams(tref dnf, subtree_map<node, size_t>& current_inputs);
