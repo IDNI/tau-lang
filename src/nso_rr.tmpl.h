@@ -54,7 +54,12 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 
 		return nn;
 	} catch (const std::exception& e) {
-		LOG_WARNING << e.what();
+		// LOG_ERROR (not LOG_WARNING): a caught exception here is
+		// indistinguishable from a legitimate non-match to callers, so at
+		// least make it visible; rethrowing is avoided since this is called
+		// pervasively throughout normalization/solving and a single bad
+		// rule application should not abort the whole pipeline.
+		LOG_ERROR << e.what();
 		return n;
 	}
 }

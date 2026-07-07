@@ -11,10 +11,12 @@ set(TESTS
 	bv_ba-solver2
 	bv_ba-cast
 	cvc5
+	execution
 	gc
 	hbdd
 	interpreter
 	normal_forms
+	nso_rr
 	product_ba
 	sbf_ba_parsing
     tau_bdd
