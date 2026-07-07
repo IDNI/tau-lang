@@ -450,6 +450,19 @@ TEST_SUITE("solve_inequality_system") {
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
+	// SO-7: case 4.1 of add_minterm_to_disjoint used options.splitter_one
+	// unchecked; without a caller-supplied hint it defaults to nullptr and
+	// the null tref was dereferenced instead of failing gracefully.
+	TEST_CASE("case 4.1 without a splitter_one hint fails gracefully instead of crashing") {
+		bdd_init<Bool>();
+		inequality_system<node_t> system;
+		for (const auto& ineq : { "x : sbf != 0.", "(x : sbf)' != 0." })
+			system.insert(get_nso_rr<node_t>(tau::get(ineq)).value().main->get());
+		solver_options options; // splitter_one left as nullptr (default)
+		auto solution = solve_inequality_system<node_t>(system, options);
+		CHECK(!solution.has_value());
+	}
+
 	// Case 4.2 of add_minterm_to_disjoint: d = {a}:sbf&{b}:sbf x and
 	// m = ({a}:sbf|{b}:sbf) x' both have different exponents and
 	// d_cte & m_cte != false, d_cte & ~m_cte = false,  ~d_cte & m_cte = false

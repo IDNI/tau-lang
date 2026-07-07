@@ -46,7 +46,7 @@ cli::options tau_options() {
 		.set_description("indenting of formulas");
 	opts["highlighting"] = cli::option("highlighting", 'H', false)
 		.set_description("syntax highlighting");
-	opts["benchmarks"] = cli::option("benchmarks", 'B', true)
+	opts["benchmarks"] = cli::option("benchmarks", 'b', true)
 		.set_description("print benchmarks (enabled by default)");
 	opts["json"] = cli::option("json", 'J', false)
 		.set_description("output in JSON format");
@@ -111,6 +111,10 @@ int run_tau_spec(string spec_file, cli::options& opts) {
 			std::getline(std::cin, line);
 			t.unpause();
 			term::disable_getline_mode();
+			// On closed/exhausted stdin, getline never sets line to "q"/
+			// "quit" and keeps returning immediately, spinning this loop
+			// forever; stop the same way repl_evaluator::run_cmd does.
+			if (std::cin.eof() || std::cin.fail()) { std::cin.clear(); break; }
 			if (line == "q" || line == "quit") break;
 		}
 	}

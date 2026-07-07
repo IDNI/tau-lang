@@ -19,32 +19,57 @@ typename node::type inverse_of(size_t operation) {
 	return tau::nul; // null is not allowed in a term
 }
 
+// Both overloads return/accept *bare* (unwrapped) values: a lone leaf
+// operand as-is, or an unwrapped operation(...)-kind node for two or more
+// folded operands. tau::bf-wrap is applied only where a value is used as an
+// operand of another operation(...) call, never around the final result.
+// The final result replaces either last_operation (a bf_add/bf_sub/bf_mul/
+// bf_div node) or is used as an operand by the caller's own last_operation
+// substitution, and last_operation's own parent already supplies its "bf"
+// wrapper. Wrapping the final result again nests the whole term in one more
+// redundant "bf" layer -- harmless for a lone leaf (leaves aren't
+// re-wrapped by a later round), but for a multi-operand result this
+// re-detects the same operation(...) node as a "new" block on every
+// subsequent round and re-wraps it again, growing the term forever instead
+// of reaching a fixpoint.
 template<NodeType node>
-std::pair<tref, tref> build_simplification(const trefs& arguments, size_t operation, size_t type) {
+std::pair<tref, tref> build_simplification(const trefs& arguments, size_t operation, [[maybe_unused]] size_t type) {
 	using tau = tree<node>;
 
-	size_t size = get_bv_width<node>(ba_types<node>::type_tree(type));
-	typename node::constant one_variant{make_bitvector_one(size)};
-	typename node::constant zero_variant{make_bitvector_zero(size)};
-	tref one = build_bf_ba_constant<node>(one_variant, type);
-	tref zero = build_bf_ba_constant<node>(zero_variant, type);
-
-	tref ctes = (operation == tau::bf_add) ? zero : one;
-	tref vars = (operation == tau::bf_add) ? zero : one;
+	tref ctes = nullptr;
+	tref vars = nullptr;
 
 	for (const tref& op : arguments) {
 		auto nt = tau::get(op).get_type();
 		switch (nt) {
 			case tau::variable:
-				vars = tau::get(tau::bf, tau::get(operation, vars, tau::get(tau::bf, op)));
+				vars = vars ? tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, op))
+					: op;
 				break;
 			case tau::ba_constant: case tau::bf_t: case tau::bf_f:
-				ctes = tau::get(tau::bf, tau::get(operation, ctes, tau::get(tau::bf, op)));
+				ctes = ctes ? tau::get(operation, tau::get(tau::bf, ctes), tau::get(tau::bf, op))
+					: op;
 				break;
 			default: break;
 		}
 	}
 	return {vars, ctes};
+}
+
+// Bare value for "args_side OP^-1 invs_side" (e.g. args_side - invs_side),
+// or nullptr if both sides are absent. Never introduces a spurious identity
+// operand: build_simplification's two build_simplification<node>(...) calls
+// can each independently yield a null vars/ctes (e.g. "1 - X" has a
+// constant only on the args side and a variable only on the invs side), and
+// unconditionally tau::bf-wrapping a null tref crashes tree construction.
+template<NodeType node>
+tref combine_diff(size_t operation, size_t type, tref args_side, tref invs_side) {
+	using tau = tree<node>;
+
+	if (!args_side && !invs_side) return nullptr;
+	if (!invs_side) return args_side;
+	if (!args_side) return tau::get(inverse_of<node>(operation), _0<node>(type), tau::get(tau::bf, invs_side));
+	return tau::get(inverse_of<node>(operation), tau::get(tau::bf, args_side), tau::get(tau::bf, invs_side));
 }
 
 template<NodeType node>
@@ -67,30 +92,29 @@ tref build_simplification(const trefs& arguments, const trefs& inverses, size_t 
 		if (!vars && !ctes) return _0<node>(type);
 		if (!vars) return ctes;
 		if (!ctes) return vars;
-		return tau::get(tau::bf, tau::get(operation, vars, ctes));
+		return tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes));
 	}
 
 	if (args.empty()) {
 		auto [vars, ctes] = build_simplification<node>(invs, operation, type);
 		if (!vars && !ctes) return _0<node>(type);
-		if (!vars) return tau::get(tau::bf, tau::get(inverse_of<node>(operation), _0<node>(type), ctes));
-		if (!ctes) return tau::get(tau::bf, tau::get(inverse_of<node>(operation), _0<node>(type), vars));
-		return tau::get(tau::bf,
-			tau::get(inverse_of<node>(operation),
-				_0<node>(type),
-				tau::get(tau::bf,
-					tau::get(operation, vars, ctes))));
+		if (!vars) return tau::get(inverse_of<node>(operation), _0<node>(type), tau::get(tau::bf, ctes));
+		if (!ctes) return tau::get(inverse_of<node>(operation), _0<node>(type), tau::get(tau::bf, vars));
+		return tau::get(inverse_of<node>(operation),
+			_0<node>(type),
+			tau::get(tau::bf,
+				tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes))));
 	}
 
 	auto [invs_vars, invs_ctes] = build_simplification<node>(invs, operation, type);
 	auto [args_vars, args_ctes] = build_simplification<node>(args, operation, type);
 
-	return tau::get(tau::bf,
-		tau::get(operation,
-			tau::get(tau::bf,
-				tau::get(inverse_of<node>(operation), args_vars, invs_vars)),
-			tau::get(tau::bf,
-				tau::get(inverse_of<node>(operation), args_ctes, invs_ctes))));
+	tref vars = combine_diff<node>(operation, type, args_vars, invs_vars);
+	tref ctes = combine_diff<node>(operation, type, args_ctes, invs_ctes);
+	if (!vars && !ctes) return _0<node>(type);
+	if (!vars) return ctes;
+	if (!ctes) return vars;
+	return tau::get(operation, tau::get(tau::bf, vars), tau::get(tau::bf, ctes));
 }
 
 template<NodeType node>
@@ -214,15 +238,27 @@ subtree_map<node, tref> simplify_blocks(const tref& n) {
 
 template<NodeType node>
 tref bv_ba_custom_simplification(const tref term) {
+	// Loop simplify_blocks to a fixpoint. Previously current was inserted
+	// into visited every iteration right before the loop condition
+	// checked for it, so the condition was always false and the loop ran
+	// exactly once, discarding any further simplification. Guard against
+	// a longer oscillating cycle (as done in repeat_all, see RR-2) with a
+	// visited set, and against an ever-growing rewrite with max_rounds.
 	tref current = term;
-	std::unordered_set<tref> visited;
-	visited.insert(current);
-
-	do {
+	std::unordered_set<tref> visited{current};
+	constexpr size_t max_rounds = 1'000'000;
+	size_t round = 0;
+	for (; round < max_rounds; ++round) {
 		auto changes = simplify_blocks<node>(current);
-		current = rewriter::replace<node>(current, changes);
-		visited.insert(current);
-	} while (visited.find(current) == visited.end());
+		tref next = rewriter::replace<node>(current, changes);
+		if (next == current) break;
+		if (visited.contains(next)) { current = next; break; }
+		visited.insert(next);
+		current = next;
+	}
+	if (round == max_rounds)
+		LOG_ERROR << "bv_ba_custom_simplification: exceeded " << max_rounds
+			<< " rounds without reaching a fixpoint or cycle, giving up";
 
 #ifdef DEBUG
 	LOG_TRACE << "bv_ba_custom_simplification/term: " << LOG_FM(term) << "\n";

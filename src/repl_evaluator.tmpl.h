@@ -233,15 +233,18 @@ std::ostream& repl_evaluator<BAs...>::benchmarks(measuring& m,
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::onf_cmd(const tt& n) {
-	tref arg = n[1].get();
-	tref var = n[2].get();
+	// grammar: "onf" __ variable __ onf_cmd_arg -- n[1] is the variable
+	// itself (must not go through get_any/apply_all_defs, which expect a
+	// formula/history argument), n[2] is the formula.
+	tref var = n[1].get();
+	tref arg = n[2].get();
 	measuring m("onf");
 	idni::measures::timer t;
 	t.start();
 	tref r = nullptr;
 	if (auto value = get_any(arg); value)
 		if (tref applied = tau_api::apply_all_defs(m.part(), value); applied)
-			r = onf<node>(var, applied);
+			r = onf<node>(applied, var);
 	return benchmarks(m, t), r;
 }
 
@@ -523,7 +526,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	if (!check) return;
 	auto [type, value] = check.value();
 	measuring m;
-	auto solution = tau_api::lgrs(m, arg);
+	auto solution = tau_api::lgrs(m, value);
 	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
@@ -936,6 +939,12 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 	if (!opt.repl_running) use_debug_output_in_sat = true;
 	if (opt.experimental) std::cout << "\n!!! Experimental features "
 		"enabled (expect unstable behavior) !!!\n\n";
+	// Propagate the CLI-provided charvar/blasting values to the api's
+	// global state; without this, --charvar/--blasting have no effect in
+	// REPL mode until the user runs "set"/"toggle" (they were only ever
+	// applied to the api in main.cpp's non-interactive spec-file path).
+	update_charvar(opt.charvar);
+	update_blasting(opt.blasting);
 }
 
 template <typename... BAs>

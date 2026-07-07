@@ -5,6 +5,7 @@
 
 #include "boolean_algebras/bv_ba.h"
 #include "heuristics/bv_predicate_blasting.h"
+#include "ba_types_inference.h"
 
 TEST_SUITE("configuration") {
 
@@ -936,6 +937,64 @@ TEST_SUITE("bug7: bvgt_rules wrong base case index") {
 	// 1 > 2 should be F.
 	TEST_CASE("bug7: 1 > 2 should be F") {
 		CHECK(blast_normalize("ex x (x = { 1 }:bv[4] && x > { 2 }:bv[4])") == "F");
+	}
+}
+
+tref parse_wff_no_hooks(const std::string& sample) {
+	static tree<node_t>::get_options opts{
+		.parse = { .start = tree<node_t>::wff },
+		.infer_ba_types = false,
+		.reget_with_hooks = false
+	};
+	return tree<node_t>::get(sample, opts);
+}
+
+// HE-8: the bf_interval case in wff_predicate_blasting unconditionally set
+// error=true, so any formula containing an interval predicate made the
+// whole blasting fail; it is now blasted as (lo<=mid) && (mid<=hi). The
+// wff_interval construction hook desugars bf_interval into that same
+// conjunction for every type, and that hook fires during the type-inference
+// driven node reconstruction regardless of reget_with_hooks, so both
+// infer_ba_types and reget_with_hooks must be disabled at parse time for a
+// literal bf_interval node to survive parsing; types are then inferred
+// separately (as in test_integration-ba_types_inference.cpp) without going
+// through that reconstruction path.
+static std::string blast_normalize_interval(const std::string& sample) {
+	auto wff = parse_wff_no_hooks(sample);
+	if (!wff) return "parse_error";
+	if (!tau::get(wff).find_top(is<node_t, tau::bf_interval>))
+		return "no_interval_in_input";
+	auto [typed, _] = infer_ba_types<node_t>(wff);
+	if (!typed) return "infer_error";
+	if (!tau::get(typed).find_top(is<node_t, tau::bf_interval>))
+		return "no_interval_after_inference";
+	auto blasted = bv_predicate_blasting<node_t>(typed);
+	if (!blasted) return "blast_error";
+	auto result = normalizer<node_t>(blasted);
+	if (!result) return "null";
+	return tau::get(result).to_str();
+}
+
+TEST_SUITE("bf_interval (HE-8)") {
+
+	TEST_CASE("value inside the interval is contained") {
+		CHECK(blast_normalize_interval(
+			"ex x (x = { 3 }:bv[4] && { 2 }:bv[4] <= x <= { 5 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("value below the interval is not contained") {
+		CHECK(blast_normalize_interval(
+			"ex x (x = { 1 }:bv[4] && { 2 }:bv[4] <= x <= { 5 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("value above the interval is not contained") {
+		CHECK(blast_normalize_interval(
+			"ex x (x = { 9 }:bv[4] && { 2 }:bv[4] <= x <= { 5 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("value at the upper boundary is contained") {
+		CHECK(blast_normalize_interval(
+			"ex x (x = { 5 }:bv[4] && { 2 }:bv[4] <= x <= { 5 }:bv[4])") == "T");
 	}
 }
 

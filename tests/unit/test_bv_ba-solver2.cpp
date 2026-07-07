@@ -285,6 +285,23 @@ TEST_SUITE("cvc5_solve simple") {
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}
+
+	// BA-15: bv_eval_node's vars map is now passed by reference for
+	// performance instead of by value per recursive call; the wff_all/
+	// wff_ex cases must save and restore any outer binding they shadow
+	// (nested quantifiers reusing the same tref for the same variable
+	// name), or the outer "x" reference after the inner quantifier closes
+	// would incorrectly fall through to the free-variable case -- leaking
+	// as an unbound free variable in the solution instead of staying
+	// bound by the outer "ex x".
+	TEST_CASE("outer x is still bound after an inner quantifier reuses the same name") {
+		const char* sample =
+			"ex x (x = { 1 }:bv[16] && (ex x (x = { 2 }:bv[16])) && x = { 1 }:bv[16])";
+		tref src = parse(sample);
+		auto solution = solve_bv<node_t>(src);
+		REQUIRE(solution.has_value());
+		CHECK(solution->empty());
+	}
 }
 
 TEST_SUITE("regression") {

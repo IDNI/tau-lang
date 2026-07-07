@@ -118,11 +118,22 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 	using tau = tree<node>;
 	trefs uninter_consts
 		= tau::get(fm).select_top(is<node, tau::uconst_name>);
+	auto is_number = [](const std::string& s) static {
+		if (s.empty()) return false;
+		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
+		return true;
+	};
+	// build_bf_uconst("", name + id, type) stores the name as ":" + name + id
+	// (see build_bf_uconst); only uconsts matching that exact prefix followed
+	// by a numeric suffix belong to this family and should be numbered.
+	const std::string prefix = ":" + name;
 	std::set ids{ 0 };
 	for (tref uninter_const : uninter_consts) {
 		const auto& tmp = tau::get(uninter_const).get_string();
-		std::string id = tmp.substr(name.length() + 1, tmp.size() - 1);
-		if (!tmp.empty()) ids.insert(std::stoi(id));
+		if (tmp.size() <= prefix.size()
+			|| tmp.compare(0, prefix.size(), prefix) != 0) continue;
+		std::string id = tmp.substr(prefix.size());
+		if (is_number(id)) ids.insert(std::stoi(id));
 	}
 	std::string id = std::to_string(*ids.rbegin() + 1);
 	tref uninter_const = tau::build_bf_uconst("", name + id, type);

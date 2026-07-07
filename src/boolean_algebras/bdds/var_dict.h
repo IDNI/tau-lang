@@ -13,7 +13,7 @@ using sym_t = int_t;
 
 sym_t var_dict(const char*);
 sym_t var_dict(const std::string&);
-const char* var_dict(sym_t);
+std::string var_dict(sym_t);
 bool has(sym_t);
 
 } // namespace idni::tau_lang

@@ -469,12 +469,16 @@ tref get_var_name_node(tref var) {
 
 template <NodeType node>
 const std::string& get_var_name(tref var) {
-	return tree<node>::get(get_var_name_node<node>(var)).get_string();
+	tref vn = get_var_name_node<node>(var);
+	if (!vn) { static const std::string empty; return empty; }
+	return tree<node>::get(vn).get_string();
 }
 
 template <NodeType node>
 size_t get_var_name_sid(tref var) {
-	return tree<node>::get(get_var_name_node<node>(var)).data();
+	tref vn = get_var_name_node<node>(var);
+	if (!vn) return 0;
+	return tree<node>::get(vn).data();
 }
 
 // -----------------------------------------------------------------------------

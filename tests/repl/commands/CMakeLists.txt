@@ -35,6 +35,7 @@ include(test_repl-dnf_cmd.cmake)
 include(test_repl-nnf_cmd.cmake)
 include(test_repl-mnf_cmd.cmake)
 # include(test_repl-onf_cmd.cmake)
+include(test_repl-onf_cmd-crash_regression.cmake)
 
 # history and definitions commands
 include(test_repl-history_cmd.cmake)

@@ -45,8 +45,12 @@ template <NodeType node>
 typename ba_constants<node>::constant ba_constants<node>::get(
 	size_t constant_id)
 {
-	DBG(assert(constant_id > 0);)
-	DBG(assert(constant_id <= C.size());)
+	// constant_id == 0 underflows to SIZE_MAX below; the DBG-only asserts
+	// caught both that and an out-of-range id in debug, but release had
+	// no check at all -- an unchecked, likely huge, out-of-bounds access.
+	if (constant_id == 0 || constant_id > C.size())
+		throw std::logic_error("ba_constants::get: invalid constant_id "
+			+ std::to_string(constant_id));
 	return C[constant_id - 1].first;
 }
 

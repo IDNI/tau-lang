@@ -73,13 +73,22 @@ repeat_all<node, step_t>::repeat_all(step_t s)
 template <NodeType node, typename step_t>
 tref repeat_all<node, step_t>::operator()(tref n) const {
 	auto nn = n;
-	std::set<tref> visited;
-	while (true) {
-		for (auto& l: s.libraries) nn = l(nn);
-		auto nnn = s(nn);
-		if (nnn == nn) break;
-		nn = nnn;
+	std::unordered_set<tref> visited;
+	// apply the whole sequence once per round; stop on a fixpoint (s(nn)
+	// == nn) or, using visited, a longer oscillating cycle -- previously
+	// the sequence was applied twice per round (once here, once again via
+	// s(nn)) and visited was never used, so a period-2+ oscillating
+	// sequence looped forever. max_rounds additionally bounds an
+	// ever-growing rewrite (one that never repeats a prior state), which
+	// visited alone cannot detect.
+	constexpr size_t max_rounds = 1'000'000;
+	for (size_t round = 0; round < max_rounds; ++round) {
+		nn = s(nn);
+		if (visited.contains(nn)) return nn;
+		visited.insert(nn);
 	}
+	LOG_ERROR << "repeat_all: exceeded " << max_rounds
+		<< " rounds without reaching a fixpoint or cycle, giving up";
 	return nn;
 }
 

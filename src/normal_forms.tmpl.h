@@ -278,7 +278,11 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 	const auto& t = tau::get(n);
 	tref eq = t.find_bottom(is<node, tau::bf_eq>);
 	subtree_map<node, tref> changes;
-	if (eq && tau::get(eq)[0].find_top(has_var)) {
+	if (eq && (tau::get(eq)[0].find_top(has_var)
+			|| tau::get(eq)[1].find_top(has_var))) {
+		// keep the original (pre-normalization) node as the map key: n
+		// contains this node, not the one norm_trimmed_equation rebuilds.
+		tref orig_eq = eq;
 		eq = norm_trimmed_equation<node>(eq);
 		const auto& eq_v = tau::get(eq);
 		DBG(assert(eq_v[1][0].is(tau::bf_f));)
@@ -289,14 +293,15 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 			tau::build_bf_neg(eq_v.first()), var,tau::_1(find_ba_type<node>(var))))
 				| bf_reduce_canonical<node>() | tt::ref;
 
-		changes[eq_v.get()] = tau::trim(tau::build_bf_interval(
+		changes[orig_eq] = tau::trim(tau::build_bf_interval(
 							f_0, var, f_1));
 	}
-	for (tref neq_ref : t.select_all(is<node, tau::bf_neq>)) {
-		neq_ref = norm_trimmed_equation<node>(neq_ref);
+	for (tref orig_neq : t.select_all(is<node, tau::bf_neq>)) {
+		if (!tau::get(orig_neq)[0].find_top(has_var)
+			&& !tau::get(orig_neq)[1].find_top(has_var)) continue;
+		tref neq_ref = norm_trimmed_equation<node>(orig_neq);
 		const auto& neq = tau::get(neq_ref);
 		DBG(assert(neq[1][0].is(tau::bf_f));)
-		if (!neq[0].find_top(has_var)) continue;
 		tref f_0 = tt(rewriter::replace<node>(
 			neq.first(), var,
 			tau::_0(find_ba_type<node>(var))))
@@ -305,7 +310,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 			tau::build_bf_neg(neq.first()), var,
 			tau::_1(find_ba_type<node>(var))))
 				| bf_reduce_canonical<node>() | tt::ref;
-		changes[neq.get()] = tau::trim(tau::build_wff_or(
+		changes[orig_neq] = tau::trim(tau::build_wff_or(
 			tau::build_bf_nlteq(f_0, var),
 			tau::build_bf_nlteq(var, f_1)));
 	}
@@ -3589,10 +3594,14 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 			if (is_bv_type_family<node>(tau::get(tau::trim2(n)).get_ba_type())) {
 				if (const trefs& free_vars = get_free_vars<node>(n);
 					free_vars.empty() && is_bv_solvable_formula<node>(n)) {
-					// Closed bv formula with explicit bitwidth: simplify to T/F
-					if (is_bv_formula_sat<node>(n))
-						return tau::_T();
-					else return tau::_F();
+					// Closed bv formula with explicit bitwidth: simplify to
+					// T/F, but only on a definite answer -- cvc5 returning
+					// unknown, or translation failing, means we cannot
+					// decide, not that the formula is false.
+					auto status = bv_formula_sat_status<node>(n);
+					if (status == bv_sat_status::sat) return tau::_T();
+					if (status == bv_sat_status::unsat) return tau::_F();
+					excluded.insert(n);
 				} else excluded.insert(n);
 			} // TODO: restrict to atomless types
 			else if (!tau::get(n).find_top(is<node, tau::ref>)) {

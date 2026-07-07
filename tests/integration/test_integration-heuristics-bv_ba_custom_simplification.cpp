@@ -33,12 +33,12 @@ TEST_SUITE("simplify_blocks") {
 		REQUIRE(simplified != nullptr);
 		std::cout << "Simplified result: " << tree<node_t>::get(simplified).to_str() << "\n";
 		CHECK(matches_to_str_to_any_of(simplified, {
-			"(X+{ 3 }:bv[8])",  // Canonical form in debug
+			"X+{ 3 }:bv[8]",  // Canonical form in debug
 			"X:bv[8]+{ 3 }:bv[8]",
 			"{ 3 }:bv[8]+X:bv[8]",
 			"X:bv[8] + { 3 }:bv[8]",
 			"{ 3 }:bv[8] + X:bv[8]",
-			"X+{ 3 }:bv[8]"
+			"(X+{ 3 }:bv[8])"
 		}));
 	}
 
@@ -139,7 +139,7 @@ TEST_SUITE("ba bv custom simplification") {
 		tref src = parse_bf(sample);
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		CHECK(simplified != nullptr);
-		CHECK(matches_to_str_to_any_of(simplified, { "(x*1)", "1*x" }));
+		CHECK(matches_to_str_to_any_of(simplified, { "x*1", "1*x", "(x*1)" }));
 	}
 
 	TEST_CASE("1 + 2") {
@@ -166,7 +166,7 @@ TEST_SUITE("ba bv custom simplification") {
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		REQUIRE(simplified != nullptr);
 		std::cout << "Simplified result: " << tree<node_t>::get(simplified).to_str() << "\n";
-		CHECK(matches_to_str_to_any_of(simplified, { "(X+{ 1 }:bv[64])", "{ 1 }:bv[64]+X", "X:bv[64]+{ 1 }:bv[64]", "X+{ 1 }:bv[64]" }));
+		CHECK(matches_to_str_to_any_of(simplified, { "X+{ 1 }:bv[64]", "{ 1 }:bv[64]+X", "X:bv[64]+{ 1 }:bv[64]", "(X+{ 1 }:bv[64])" }));
 	}
 
 	TEST_CASE("1 - X") {
@@ -175,7 +175,7 @@ TEST_SUITE("ba bv custom simplification") {
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		REQUIRE(simplified != nullptr);
 		std::cout << "Simplified result: " << tree<node_t>::get(simplified).to_str() << "\n";
-		CHECK(matches_to_str_to_any_of(simplified, { "(0-X+{ 1 }:bv[64])", "{ 1 }:bv[64]-X", "{ 1 }:bv[64]-X:bv[64]", "0:bv[64]-X:bv[64]+{ 1 }:bv[64]" }));
+		CHECK(matches_to_str_to_any_of(simplified, { "0-X+{ 1 }:bv[64]", "{ 1 }:bv[64]-X", "{ 1 }:bv[64]-X:bv[64]", "0:bv[64]-X:bv[64]+{ 1 }:bv[64]", "(0-X+{ 1 }:bv[64])" }));
 	}
 
 	TEST_CASE("1 * X") {
@@ -256,6 +256,34 @@ TEST_SUITE("ba bv custom simplification") {
 		tref simplified = bv_ba_custom_simplification<node_t>(src);
 		TAU_LOG_TRACE << "simplified: " << tree<node_t>::get(simplified).tree_to_str() << "\n";
 		CHECK( simplified != nullptr );
+	}
+}
+
+tref parse_bf_no_hooks(const std::string& sample) {
+	static tree<node_t>::get_options opts{
+		.parse = { .start = tree<node_t>::bf },
+		.reget_with_hooks = false
+	};
+	return tree<node_t>::get(sample, opts);
+}
+
+TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
+
+	// HE-6: bv_ba_custom_simplification inserted `current` into `visited`
+	// every iteration right before checking the loop condition against
+	// `visited`, so the condition was always false, the loop ran exactly
+	// once regardless of whether simplify_blocks changed anything, and the
+	// (possibly still-simplifiable) result of that one pass was returned
+	// unconditionally.
+	TEST_CASE("folds a constant-only chain when hooks are disabled at parse time") {
+		// with hooks disabled the constants are not already folded by the
+		// parser, so this only passes if bv_ba_custom_simplification itself
+		// performs (and completes) the folding
+		tref src = parse_bf_no_hooks("{1}:bv[8] + {2}:bv[8] + {3}:bv[8]");
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE(simplified != nullptr);
+		tref expected = parse_bf_no_hooks("{6}:bv[8]");
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
 	}
 }
 

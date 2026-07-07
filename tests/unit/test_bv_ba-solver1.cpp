@@ -79,6 +79,29 @@ TEST_SUITE("cvc5_satisfiability") {
 	}
 }
 
+// BA-1: is_bv_formula_sat collapsed a definite "unsat" and a "cannot
+// decide" (cvc5 unknown, or translation failure) into the same false
+// return. bv_formula_sat_status exposes the distinction; is_bv_formula_sat
+// must still behave exactly as before on top of it.
+TEST_SUITE("bv_formula_sat_status (BA-1)") {
+
+	TEST_CASE("sat formula") {
+		auto formula = parse_bv_formula("ex x x = { 1 }:bv[4]");
+		auto status = bv_formula_sat_status<node_t>(formula);
+		REQUIRE( status.has_value() );
+		CHECK( status.value() == bv_sat_status::sat );
+		CHECK( is_bv_formula_sat<node_t>(formula) );
+	}
+
+	TEST_CASE("unsat formula") {
+		auto formula = parse_bv_formula("all x x + { 1 }:bv[4] < { 1 }:bv[4]");
+		auto status = bv_formula_sat_status<node_t>(formula);
+		REQUIRE( status.has_value() );
+		CHECK( status.value() == bv_sat_status::unsat );
+		CHECK( !is_bv_formula_sat<node_t>(formula) );
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

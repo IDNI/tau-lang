@@ -46,7 +46,19 @@ std::optional<std::string> api<node>::apply_defs(
 	const std::set<std::string>& defs, const std::string& expr)
 {
 	subtree_set<node> tdefs;
-	for (const std::string& def : defs) tdefs.insert(get_definition(def));
+	// A definition that fails to parse used to be inserted as nullptr and
+	// then silently skipped by the tref-level apply_defs' "if (def)"
+	// guard, so the caller had no way to tell a malformed definition was
+	// dropped from a definition that legitimately had no effect. Report
+	// the failure instead of silently continuing without it.
+	for (const std::string& def : defs) {
+		tref d = get_definition(def);
+		if (!d) {
+			TAU_LOG_ERROR << "Failed to parse definition: " << def;
+			return {};
+		}
+		tdefs.insert(d);
+	}
 	if (tref a = apply_defs(tdefs, get_spec_or_term(expr)); a)
 		return to_str(a);
 	return {};

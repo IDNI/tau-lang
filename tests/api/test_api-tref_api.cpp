@@ -228,6 +228,17 @@ TEST_SUITE("Tau API - tref - substitution") {
 	}
 	TEST_CASE_FIXTURE(api_fixture, "substitute map") {
 	}
+
+	// AP-6: substitute(tref, tref, tref) called is_term() on expr/that/with
+	// unconditionally; is_term() dereferences its argument, so a null tref
+	// asserted (debug) or was UB (release) instead of returning nullptr.
+	TEST_CASE_FIXTURE(api_fixture, "substitute with a null argument returns nullptr") {
+		tref x = tau_api::get_term("x");
+		REQUIRE(x != nullptr);
+		CHECK(tau_api::substitute(nullptr, x, x) == nullptr);
+		CHECK(tau_api::substitute(x, nullptr, x) == nullptr);
+		CHECK(tau_api::substitute(x, x, nullptr) == nullptr);
+	}
 }
 
 TEST_SUITE("Tau API - tref - normal forms") {
@@ -281,5 +292,48 @@ TEST_SUITE("Tau API - tref - solving") {
 
 TEST_SUITE("Tau API - tref - execution") {
 	TEST_CASE_FIXTURE(api_fixture, "get_interpreter") {
+	}
+}
+
+// AP-2: htref is a shared_ptr; every htref overload except nnf and
+// eliminate_quantifiers dereferenced it (expr->get()) unconditionally, so a
+// null htref was UB instead of a safe default return. A representative
+// sample across the different return-type shapes (bool, htref, string,
+// optional<map>) is checked here rather than exhaustively covering all ~26
+// overloads.
+TEST_SUITE("Tau API - htref - null guards (AP-2)") {
+	// tau_api::is_term/dnf/solve/etc. are each overloaded on tref and on
+	// htref; a bare `nullptr` literal is ambiguous between "null raw
+	// pointer" and "null shared_ptr" but overload resolution picks the
+	// tref version, silently missing the htref overload under test. Use
+	// an explicit htref{} to unambiguously exercise the htref overload.
+	TEST_CASE_FIXTURE(api_fixture, "bool-returning overloads reject a null htref") {
+		CHECK(tau_api::is_term(htref{}) == false);
+		CHECK(tau_api::is_formula(htref{}) == false);
+		CHECK(tau_api::sat(htref{}) == false);
+		CHECK(tau_api::valid(htref{}) == false);
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "htref-returning overloads reject a null htref") {
+		CHECK(tau_api::dnf(htref{}) == nullptr);
+		CHECK(tau_api::cnf(htref{}) == nullptr);
+		CHECK(tau_api::simplify(htref{}) == nullptr);
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "to_str rejects a null htref") {
+		CHECK(tau_api::to_str(htref{}) == "");
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "solve/lgrs reject a null htref") {
+		CHECK(!tau_api::solve(htref{}, solver_mode::general).has_value());
+		CHECK(!tau_api::lgrs(htref{}).has_value());
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "substitute rejects null htref arguments") {
+		htref x = tau_api::geth_term("x");
+		REQUIRE(x != nullptr);
+		CHECK(tau_api::substitute(htref{}, x, x) == nullptr);
+		CHECK(tau_api::substitute(x, htref{}, x) == nullptr);
+		CHECK(tau_api::substitute(x, x, htref{}) == nullptr);
 	}
 }

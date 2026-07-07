@@ -195,10 +195,16 @@ size_t ba_types<node>::id(tref ba_type) {
 		type_trees().push_back(ba_type), type_trees().size() - 1;
 }
 
+// A ba_type_id past the end of type_trees() means the id was corrupted
+// somewhere upstream; silently clamping it to 0 (untyped) in release --
+// while asserting in debug -- masked that corruption as a valid type,
+// which unify(size_t,size_t) would then happily merge with whatever the
+// other operand's type is. Fail loudly in both configurations instead.
 template<NodeType node>
 tref ba_types<node>::type_tree(size_t ba_type_id) {
-	DBG(assert(ba_type_id < type_trees().size()));
-	if (ba_type_id >= type_trees().size()) ba_type_id = 0;
+	if (ba_type_id >= type_trees().size())
+		throw std::logic_error("ba_types::type_tree: invalid ba_type_id "
+			+ std::to_string(ba_type_id));
 	return type_trees()[ba_type_id];
 }
 
@@ -206,8 +212,9 @@ template <NodeType node>
 std::string ba_types<node>::name(size_t ba_type_id) {
 	using tau = tree<node>;
 
-	DBG(assert(ba_type_id < type_trees().size()));
-	if (ba_type_id >= type_trees().size()) ba_type_id = 0;
+	if (ba_type_id >= type_trees().size())
+		throw std::logic_error("ba_types::name: invalid ba_type_id "
+			+ std::to_string(ba_type_id));
 	return tau::get(type_trees()[ba_type_id]).to_str();
 }
 

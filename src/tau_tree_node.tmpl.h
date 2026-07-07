@@ -61,6 +61,13 @@ constexpr node<BAs...> node<BAs...>::output_variable(size_t ba_tid)
 	return node(type::io_var, 2 /* output */, true, ba_tid);
 }
 
+// Deliberately narrower than tree<node>::is_term_nt (see tau_tree.tmpl.h):
+// this variant only sets the node's `term` bit at construction time for the
+// core bf/io_var nonterminals, excluding the extended bf arithmetic/functional
+// operators and capture. Those are typed later in the pipeline, and the
+// DBG-only "all term nodes are typed" invariant in
+// tree<node>::get(const parser::tree&, get_options&) (tau_tree_from_parser.tmpl.h)
+// relies on this narrower set to avoid false positives on not-yet-typed nodes.
 inline bool is_term_nt(size_t nt) {
 	switch (nt) {
 		case tau_parser::bf:
@@ -121,11 +128,14 @@ constexpr node<BAs...> node<BAs...>::nnull() { return node(); }
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::extension(T raw_value) {
+	// ba_type is not encoded in raw_value (see extension() below), so it
+	// cannot be recovered here and is reset to 0.
 	return node(
 		(raw_value >> node::nt_shift) & node::nt_mask,
+		raw_value & node::data_mask,
 		(raw_value >> node::term_shift) & 1u,
-		(raw_value >> node::ext_shift) & 1u,
-			raw_value & node::data_mask
+		0,
+		(raw_value >> node::ext_shift) & 1u
 	);
 }
 

@@ -19,8 +19,13 @@
 namespace idni::tau_lang {
 
 // rr name-id dict
-static inline std::vector<std::string> rr_v{ "dummy" };
-static inline std::map<std::string, size_t> rr_m{};
+// `inline` alone (no `static`) gives these external, ODR-merged linkage as
+// required for a process-wide registry; `static inline` instead gave each
+// translation unit its own separate copy, so the same rr name could map to
+// different ids depending which TU asked, making rr_sig values (which
+// embed this id) not comparable across TU boundaries.
+inline std::vector<std::string> rr_v{ "dummy" };
+inline std::map<std::string, size_t> rr_m{};
 
 /**
  * @brief Map recurrence-relation name @p s to a stable integer id.
@@ -35,7 +40,11 @@ inline size_t rr_dict(const std::string& s) {
  * @brief Return the recurrence-relation name registered under @p i.
  * @param i Id previously returned by `rr_dict(string)`.
  */
-inline const std::string& rr_dict(size_t i) { return rr_v[i]; };
+inline const std::string& rr_dict(size_t i) {
+	if (i >= rr_v.size())
+		throw std::logic_error("rr_dict: invalid id " + std::to_string(i));
+	return rr_v[i];
+};
 
 /**
  * @brief Signature of a recurrence relation: name, offset arity, and argument arity.

@@ -462,7 +462,17 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	int_t lookback = get_max_shift<node>(io_vars);
 	// Find fix point once all initial conditions have been passed and
 	// the time_point is greater equal the step_num
+	// SO-1: this search has no convergence guarantee; cap the step count so
+	// a non-converging formula fails loudly instead of hanging forever.
+	// This is a safety net, not full error propagation: callers still
+	// receive a (non-fixpoint) result rather than a failure signal.
+	constexpr int_t max_fixpoint_steps = 1'000'000;
 	while (step_num < lookback || !is_nso_impl<node>(phi_prev, phi)){
+		if (step_num >= max_fixpoint_steps) {
+			LOG_ERROR << "find_fixpoint_phi: exceeded " << max_fixpoint_steps
+				<< " steps without reaching a fixpoint, giving up";
+			break;
+		}
 		phi_prev = phi;
 		++step_num;
 
@@ -498,8 +508,15 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 			<< LOG_FM(rewriter::replace<node>(chi, pholder_to_st));
 
 	// Find fix point once the lookback is greater the step_num
+	// SO-1: same unbounded-search concern as find_fixpoint_phi above.
+	constexpr int_t max_fixpoint_steps = 1'000'000;
 	while (step_num < lookback || !is_nso_impl<node>(chi_prev_replc, chi_replc))
 	{
+		if (step_num >= max_fixpoint_steps) {
+			LOG_ERROR << "find_fixpoint_chi: exceeded " << max_fixpoint_steps
+				<< " steps without reaching a fixpoint, giving up";
+			break;
+		}
 		chi_prev = chi, chi_prev_replc = chi_replc, ++step_num;
 		chi = build_step_chi<node>(chi_base, st, chi_prev, io_vars,
 			initials, step_num, time_point, cache, pholder_to_st);

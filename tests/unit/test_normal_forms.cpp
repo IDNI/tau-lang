@@ -3,6 +3,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 #include "normal_forms.h"
+#include "normalizer.h"
 
 TEST_SUITE("normal forms: mnf for wffs") {
 
@@ -208,6 +209,50 @@ TEST_SUITE("normal forms: onf") {
 		CHECK( check.has_value() );
 		CHECK( true );
 	}*/
+
+	// NF-N2: onf_subformula used to key its replacement map with the
+	// re-normalized equation node (a no-op unless the equation was already
+	// in `f eq 0` form) and only searched the LHS operand for the target
+	// variable, so "y = x" (variable on the RHS) was silently left
+	// untransformed while the equivalent "x = y" was handled correctly.
+	TEST_CASE("variable on either side of the equation is transformed the same way") {
+		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm_lhs = get_nso_rr("x = y.").value().main->get();
+		tref fm_rhs = get_nso_rr("y = x.").value().main->get();
+		tref result_lhs = onf<node_t>(fm_lhs, x);
+		tref result_rhs = onf<node_t>(fm_rhs, x);
+		CHECK(tau::get(result_lhs).to_str() == tau::get(result_rhs).to_str());
+		// a genuine onf transformation replaces the bare equation
+		CHECK(tau::get(result_rhs).to_str() != tau::get(fm_rhs).to_str());
+	}
+}
+
+TEST_SUITE("GetNewUninterpretedConstant") {
+
+	// NF-2: get_new_uninterpreted_constant used to substr+stoi every
+	// uconst_name in fm unconditionally, throwing on any uconst whose name
+	// did not follow the "name" + digits convention (the header doc claims
+	// a prefix filter that did not exist in the implementation).
+	TEST_CASE("uconsts not matching the requested name prefix are ignored") {
+		tref foreign = build_bf_uconst<node_t>("", "c", tau_type_id<node_t>());
+		tref fm = tau::build_bf_eq(foreign, tau::_0(tau_type_id<node_t>()));
+		tref result = nullptr;
+		REQUIRE_NOTHROW(result =
+			get_new_uninterpreted_constant<node_t>(fm, "split", tau_type_id<node_t>()));
+		trefs names = tau::get(result).select_top(is<node_t, tau::uconst_name>);
+		REQUIRE(names.size() == 1);
+		CHECK(tau::get(names[0]).get_string() == ":split1");
+	}
+
+	TEST_CASE("fresh constant is numbered one past the largest matching suffix") {
+		tref c1 = build_bf_uconst<node_t>("", "split1", tau_type_id<node_t>());
+		tref c3 = build_bf_uconst<node_t>("", "split3", tau_type_id<node_t>());
+		tref fm = tau::build_bf_or(c1, c3);
+		tref result = get_new_uninterpreted_constant<node_t>(fm, "split", tau_type_id<node_t>());
+		trefs names = tau::get(result).select_top(is<node_t, tau::uconst_name>);
+		REQUIRE(names.size() == 1);
+		CHECK(tau::get(names[0]).get_string() == ":split4");
+	}
 }
 
 TEST_SUITE("GetFreeVars") {

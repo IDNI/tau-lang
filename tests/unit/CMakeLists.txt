@@ -11,19 +11,23 @@ set(TESTS
 	bv_ba-solver2
 	bv_ba-cast
 	cvc5
+	execution
 	gc
 	hbdd
 	interpreter
 	normal_forms
+	nso_rr
 	product_ba
 	sbf_ba_parsing
     tau_bdd
 	tau_spec
+	tau_tree
 	tau_tree_from_parser
 	tau_tree_printers
 	traversal
 	union_find
 	bitblasting_predicates
+	var_dict
 )
 
 foreach(X IN LISTS TESTS)
