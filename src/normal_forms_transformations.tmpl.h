@@ -448,32 +448,36 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 
 	// Check if quantified variable is bitvector
 	if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
+		bool closed_and_solvable = false;
 		if (const trefs& free_vars = get_free_vars<node>(scoped_fm);
 			(free_vars.empty() || (free_vars.size() == 1 &&
 			tau::get(free_vars[0]) == tau::get(var)))
-			&& is_bv_solvable_formula<node>(scoped_fm)) {
-				// By assumption quantifier is pushed in all the way
-				// Closed bv formula, simplify to T/F
-				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, scoped_fm, false)))
-					return new_fm;
-				else return tau::_F();
-			} else {
-				// Non-closed BV quantifier: try predicate blasting to
-				// convert the BV existential to Boolean bit quantifiers
-				// that the atomless-BA path can then eliminate.
-				if (bv_blasting) {
-					tref ex_fm = tau::build_wff_ex(var, scoped_fm, false);
-					if (auto blasted = bv_predicate_blasting<node>(ex_fm);
-							blasted && blasted != ex_fm) {
-						tref cont = anti_prenex_block<node>(blasted);
-						return tau::build_wff_and(cont, new_fm);
-					}
-				}
-				// Quantifier is not resolvable
-				quant_eliminated = false;
-				return tau::build_wff_and(
-					tau::build_wff_ex(var, scoped_fm, false), new_fm);
+			&& is_bv_solvable_formula<node>(scoped_fm))
+				closed_and_solvable = true;
+		if (closed_and_solvable) {
+			// By assumption quantifier is pushed in all the way
+			// Closed bv formula, simplify to T/F -- but only on a
+			// definite answer: cvc5 returning unknown, or translation
+			// failing, means we cannot decide, not that it is false.
+			auto status = bv_formula_sat_status<node>(tau::build_wff_ex(var, scoped_fm, false));
+			if (status == bv_sat_status::sat) return new_fm;
+			if (status == bv_sat_status::unsat) return tau::_F();
+		}
+		// Non-closed BV quantifier, or closed-but-undecided: try
+		// predicate blasting to convert the BV existential to Boolean bit
+		// quantifiers that the atomless-BA path can then eliminate.
+		if (bv_blasting) {
+			tref ex_fm = tau::build_wff_ex(var, scoped_fm, false);
+			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
+					blasted && blasted != ex_fm) {
+				tref cont = anti_prenex_block<node>(blasted);
+				return tau::build_wff_and(cont, new_fm);
 			}
+		}
+		// Quantifier is not resolvable
+		quant_eliminated = false;
+		return tau::build_wff_and(
+			tau::build_wff_ex(var, scoped_fm, false), new_fm);
 	}
 	// Continue with quantifier elimination for atomless BA
 	size_t type_v = find_ba_type<node>(var);
@@ -552,9 +556,14 @@ using tau = tree<node>;
 				// much harder for it. Blasting does not close a
 				// formula, so the check would not succeed later.
 				if (get_free_vars<node>(n).empty()
-					&& is_bv_solvable_formula<node>(n))
-					return is_bv_formula_sat<node>(n)
-						? tau::_T() : tau::_F();
+					&& is_bv_solvable_formula<node>(n)) {
+					// Only commit to T/F on a definite answer: cvc5
+					// returning unknown, or translation failing, means
+					// we cannot decide, not that the formula is false.
+					auto status = bv_formula_sat_status<node>(n);
+					if (status == bv_sat_status::sat) return tau::_T();
+					if (status == bv_sat_status::unsat) return tau::_F();
+				}
 				if (bv_blasting)
 					if (auto blasted = bv_predicate_blasting<node>(n);
 						blasted && blasted != n)

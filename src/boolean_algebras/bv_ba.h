@@ -119,6 +119,30 @@ tref cvc5_tree_to_tau_tree (bv n,
 	const std::map<std::string, tref>& var_map = {});
 
 /**
+ * @brief Tri-state result of deciding a bit-vector formula's satisfiability,
+ * distinct from the translation-failure case (see bv_formula_sat_status).
+ */
+enum class bv_sat_status { sat, unsat, unknown };
+
+/**
+ * @brief Decides satisfiability of a bit-vector formula, distinguishing a
+ * definite answer from cvc5 giving up (unknown, e.g. on a resource limit)
+ * and from translation failure (the formula could not be turned into a
+ * cvc5 term at all -- returned as nullopt, never as bv_sat_status::unknown).
+ *
+ * is_bv_formula_sat below collapses this to a bool for callers that only
+ * care about "is it definitely sat", treating unknown and translation
+ * failure the same as unsat; callers that would otherwise assert a formula
+ * is definitely false based on "not sat" should use this instead and treat
+ * unknown/nullopt as "cannot decide", not as unsat.
+ *
+ * @param form The bit-vector formula to be checked for satisfiability.
+ * @return The tri-state result, or nullopt if translation to cvc5 failed.
+ */
+template <NodeType node>
+std::optional<bv_sat_status> bv_formula_sat_status(tref form);
+
+/**
  * @brief Checks if a given bit-vector formula is satisfiable.
  *
  * This function determines whether the provided bit-vector formula,
@@ -126,7 +150,8 @@ tref cvc5_tree_to_tau_tree (bv n,
  * that makes the formula true (i.e., is satisfiable).
  *
  * @param form The bit-vector formula to be checked for satisfiability.
- * @return true if the formula is satisfiable, false otherwise.
+ * @return true if the formula is satisfiable, false otherwise (including
+ * when cvc5 returns unknown, or when translation to cvc5 fails).
  */
 template <NodeType node>
 bool is_bv_formula_sat(tref form);

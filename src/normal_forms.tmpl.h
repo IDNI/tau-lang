@@ -3594,10 +3594,14 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 			if (is_bv_type_family<node>(tau::get(tau::trim2(n)).get_ba_type())) {
 				if (const trefs& free_vars = get_free_vars<node>(n);
 					free_vars.empty() && is_bv_solvable_formula<node>(n)) {
-					// Closed bv formula with explicit bitwidth: simplify to T/F
-					if (is_bv_formula_sat<node>(n))
-						return tau::_T();
-					else return tau::_F();
+					// Closed bv formula with explicit bitwidth: simplify to
+					// T/F, but only on a definite answer -- cvc5 returning
+					// unknown, or translation failing, means we cannot
+					// decide, not that the formula is false.
+					auto status = bv_formula_sat_status<node>(n);
+					if (status == bv_sat_status::sat) return tau::_T();
+					if (status == bv_sat_status::unsat) return tau::_F();
+					excluded.insert(n);
 				} else excluded.insert(n);
 			} // TODO: restrict to atomless types
 			else if (!tau::get(n).find_top(is<node, tau::ref>)) {

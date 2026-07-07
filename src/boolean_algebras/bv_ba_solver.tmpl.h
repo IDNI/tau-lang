@@ -298,7 +298,7 @@ bool is_bv_solvable_formula(tref form) {
 }
 
 template <NodeType node>
-bool is_bv_formula_sat(tref form) {
+std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
@@ -307,19 +307,29 @@ bool is_bv_formula_sat(tref form) {
 	config_cvc5_solver(solver);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
-	// TODO (MEDIUM) handle this case at an upper level (maybe return an optional)
 	if (!expr) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
-		return false;
+		return std::nullopt;
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
-	// There are no limits of resources in cvc5, so we can just assert the formula
-	// and check for satisfiability.
-	// TODO (MEDIUM) handle the case where we limit resources to cvc5 and hence,
-	// it could return unknown (timeout) to an upper level
 	solver.assertFormula(expr.value());
-	return solver.checkSat().isSat();
+	auto result = solver.checkSat();
+	if (result.isSat()) return bv_sat_status::sat;
+	if (result.isUnknown()) {
+		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
+		return bv_sat_status::unknown;
+	}
+	return bv_sat_status::unsat;
+}
+
+template <NodeType node>
+bool is_bv_formula_sat(tref form) {
+	// Collapses unknown and translation failure into false, same as unsat.
+	// Callers that would otherwise assert the formula is definitely false
+	// on a false return here must use bv_formula_sat_status instead and
+	// treat unknown/nullopt as "cannot decide".
+	return bv_formula_sat_status<node>(form) == bv_sat_status::sat;
 }
 
 template <NodeType node>
@@ -350,10 +360,6 @@ std::optional<solution<node>> solve_bv(const tref form) {
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
 
-	// There are no limits of resources in cvc5, so we can just assert the formula
-	// and check for satisfiability.
-	// TODO (MEDIUM) handle the case where we limit resources to cvc5 and hence,
-	// it could return unknown (timeout) to an upper level
 	solver.assertFormula(expr.value());
 	LOG_DEBUG << "Solving bitvector formula: " << expr.value();
 	auto result = solver.checkSat();
@@ -368,7 +374,15 @@ std::optional<solution<node>> solve_bv(const tref form) {
 					bv_type<node>(cte.getSort().getBitVectorSize()))));
 		}
 		return s;
-	} else
+	}
+	// Callers of this overload (solve_bv(trefs) -> solver.tmpl.h) already
+	// treat "no solution" uniformly as "skip this clause" regardless of
+	// the reason, which is sound for unknown as well as unsat (neither
+	// asserts a definite truth value), so nullopt is returned for both;
+	// only the diagnostic differs.
+	if (result.isUnknown())
+		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
+	else
 		LOG_DEBUG << "Bitvector system is unsat.";
 	return {};
 }
