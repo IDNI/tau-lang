@@ -458,10 +458,17 @@ static tref wff_predicate_blasting(tref term) {
 			case tau::bf_nlteq: { blast(t, nlteq_predicate<node>); break; }
 			case tau::bf_ngteq: { blast(t, ngteq_predicate<node>); break; }
 			case tau::bf_interval: {
-				// TODO (MEDIUM) convert into two predicates and a conjunction,
-				// but for now we just return an error.
-				DBG(LOG_DEBUG << "Interval predicates are currently not supported in blasting.";)
-				error = true;
+				// a <= b <= c is equivalent to (a <= b) && (b <= c);
+				// blast each comparison separately and conjoin the results.
+				tref lo  = tau::get(t)[0].get();
+				tref mid = tau::get(t)[1].get();
+				tref hi  = tau::get(t)[2].get();
+				tref lo_le_mid = tau::get(tau::bf_lteq, lo, mid);
+				tref mid_le_hi = tau::get(tau::bf_lteq, mid, hi);
+				tref left  = lteq_predicate<node>(lo_le_mid);
+				tref right = lteq_predicate<node>(mid_le_hi);
+				if (!left || !right) { error = true; break; }
+				changes[t] = tau::trim(tau::build_wff_and(left, right));
 				break;
 			}
 			default: {
