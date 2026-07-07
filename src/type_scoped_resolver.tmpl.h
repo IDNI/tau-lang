@@ -83,6 +83,7 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(tref a, 
 
 template<NodeType node>
 std::variant<size_t, inference_error> type_scoped_resolver<node>::merge(const trefs& ts) {
+	if (ts.empty()) return untyped_type_id<node>();
 	if (ts.size() < 2) return type_id_of(ts[0]);
 	size_t type_id = 0;
 	for (size_t i = 1; i < ts.size(); ++i) {
