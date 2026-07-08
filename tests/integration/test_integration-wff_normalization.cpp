@@ -244,6 +244,27 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 		// After substitution the body reduces to T.
 		CHECK( normalize_and_check("ex x (x = w).", tau::wff_t) );
 	}
+	// Regression tests: a BV-typed atom unrelated to the (non-BV) block
+	// variable must not force the whole block to fall back to anti_prenex,
+	// nor be dropped/mishandled when it does get pulled into the block's
+	// Boole-decomposition candidate set.
+	TEST_CASE("bv atom alongside block var: ex x ((xy=0||Z=3) && xw=0) -> T") {
+		// x = 0 makes both xy = 0 and xw = 0 true regardless of y, w, Z:
+		// tautology, independently of how the unrelated Z:bv[8] atom is
+		// handled.
+		CHECK( normalize_and_check(
+			"ex x ((xy = 0 || Z:bv[8] = { 3 }:bv[8]) && xw = 0).",
+			tau::wff_t) );
+	}
+	TEST_CASE("bv atom survives block elimination: contradicts outer Z != 3") {
+		// The BV constraint Z = 3 pulled inside the block must still
+		// propagate out intact; ANDed with Z != 3 outside, the whole
+		// formula is unsatisfiable.
+		CHECK( normalize_and_check(
+			"(ex x (xy = 0 && xw = 0 && Z:bv[8] = { 3 }:bv[8])) "
+			"&& Z:bv[8] != { 3 }:bv[8].",
+			tau::wff_f) );
+	}
 }
 
 TEST_SUITE("boole_normal_form") {

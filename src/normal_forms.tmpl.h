@@ -3054,6 +3054,8 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
  * @param used_atms Set of atomic formulas already consumed in the current recursion; updated in place.
  * @param quant_pattern Map from quantified variables to their priority for BDD variable ordering.
  * @param order Variable ordering relation used by `resolve_quantifiers2`.
+ * @param skip Predicate identifying variables/atomic formulas this pass must not
+ *        touch (defaults to BV-typed nodes, which this algorithm cannot decompose).
  * @return Formula with the quantifier block pushed as far inward as possible.
  * @endinternal
  */
@@ -3061,13 +3063,17 @@ template<NodeType node>
 tref anti_prenex_block(tref formula, const trefs& block,
 	subtree_unordered_set<node>& used_atms,
 	const auto& quant_pattern,
-	const typename term_handle<node>::order& order) {
+	const typename term_handle<node>::order& order,
+	std::function<bool(tref)> skip = [](tref t) {
+		return is_bv_type_family<node>(tree<node>::get(t).get_ba_type());
+	}) {
 	using tau = tree<node>;
 	// Goal: push the quantifier block as far into clause as possible
 	{
 		bool has_var = false;
 		const trefs& vars = get_free_vars<node>(formula);
 		for (tref v : block) {
+			if (skip(v)) continue;
 			if (hasbc(vars, v, tau::subtree_less)) {
 				has_var = true;
 				break;
@@ -3082,10 +3088,10 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	if (ft.child_is(tau::wff_or)) {
 		// Push block into disjunction
 		tref c1 = anti_prenex_block<node>(
-			ft[0].first(), block, used_atms, quant_pattern, order);
+			ft[0].first(), block, used_atms, quant_pattern, order, skip);
 		if (tau::get(c1).equals_T()) return _T<node>();
 		return tau::build_wff_or(c1, anti_prenex_block<node>(
-			ft[0].second(), block, used_atms, quant_pattern, order));
+			ft[0].second(), block, used_atms, quant_pattern, order, skip));
 	}
 
 	// Case conjunction
@@ -3096,6 +3102,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			bool has_var = false;
 			const trefs& vars = get_free_vars<node>(conj);
 			for (tref v : block) {
+				if (skip(v)) continue;
 				if (hasbc(vars, v, tau::subtree_less)) {
 					has_var = true;
 					break;
@@ -3121,10 +3128,12 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		}
 		// TODO: only != present
 		// Using the available atomic formulas, do Boole decomposition on best fit
-		auto is_atomic = [&used_atms](tref n) {
+		auto is_atomic = [&used_atms, &skip](tref n) {
 			if (!tau::get(n).is(tau::wff)) return false;
 			// Exclude used atomic fms
 			if (used_atms.contains(n)) return false;
+			// Exclude atomic formulas the caller wants skipped (e.g. BV-typed)
+			if (skip(n)) return false;
 			const tau& c = tau::get(n)[0];
 			switch (c.value.nt) {
 				case tau::bf_eq:
@@ -3156,12 +3165,12 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		tref r = rewriter::replace<node>(formula, atm, tau::_F());
 		if (tau::get(l) == tau::get(r)) {
 			tref res = anti_prenex_block(
-				l, block, used_atms, quant_pattern, order);
+				l, block, used_atms, quant_pattern, order, skip);
 			used_atms.erase(atm);
 			return tau::build_wff_and(indep, res);
 		}
 		tref nl = anti_prenex_block(
-			tau::build_wff_and(atm, l), block, used_atms, quant_pattern, order);
+			tau::build_wff_and(atm, l), block, used_atms, quant_pattern, order, skip);
 		if (tau::get(nl).equals_T()) {
 			used_atms.erase(atm);
 			// dep part is T, only the var-free part remains
@@ -3169,7 +3178,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		}
 		tref nr = anti_prenex_block(
 			tau::build_wff_and(tau::build_wff_neg(atm), r),
-				block, used_atms, quant_pattern, order);
+				block, used_atms, quant_pattern, order, skip);
 		used_atms.erase(atm);
 		return tau::build_wff_and(indep, tau::build_wff_or(nl, nr));
 	}
@@ -3184,30 +3193,24 @@ tref anti_prenex_block(tref formula, const trefs& block,
  * @internal
  * @brief Processes one maximal same-type quantifier block rooted at `n`.
  *
- * BV-typed blocks fall back to `anti_prenex`; ∃-blocks are pushed in via the 5-arg `anti_prenex_block`; ∀-blocks are dualized to ∃-blocks.
+ * Blocks whose quantified variables are BV-typed fall back to `anti_prenex`;
+ * ∃-blocks are pushed in via the 6-arg `anti_prenex_block`, which skips over
+ * any unrelated BV-typed atoms in the body; ∀-blocks are dualized to ∃-blocks.
  * @tparam node Tree node type.
  * @param n Formula node whose direct child is a quantifier.
  * @return Formula with the quantifier block eliminated or pushed inward.
  * @endinternal
  */
 // Processes one quantifier block rooted at n:
-// - BV-typed blocks fall back to anti_prenex (CVC5 / trivially-vacuous elim).
-// - ∃-blocks: push into body with the 5-arg anti_prenex_block, resolve
+// - Blocks with a BV-typed quantified variable fall back to anti_prenex
+//   (CVC5 / trivially-vacuous elim). Unrelated BV-typed atoms elsewhere in
+//   the body do not trigger this fallback.
+// - ∃-blocks: push into body with the 6-arg anti_prenex_block, resolve
 //   remaining quantifiers.  ∀-blocks are dualized: ∀x φ ≡ ¬∃x ¬φ.
 template<NodeType node>
 tref process_quantifier_block(tref n) {
 	using tau = tree<node>;
 	if (!is_child_quantifier<node>(n)) return n;
-
-	// BV-typed quantifier blocks fall back to anti_prenex (CVC5 or
-	// trivially-vacuous elimination).
-	{
-		auto is_bv_node = [](tref m) {
-			return is_bv_type_family<node>(tau::get(m).get_ba_type());
-		};
-		if (tau::get(n).find_top(is_bv_node))
-			return anti_prenex<node>(n);
-	}
 
 	// Collect the maximal same-type block at the top.
 	trefs block_vars;
@@ -3219,6 +3222,18 @@ tref process_quantifier_block(tref n) {
 		curr = tau::get(curr)[0].second();
 	}
 	tref body = curr;
+
+	// A BV-typed block variable falls back to anti_prenex (CVC5 or
+	// trivially-vacuous elimination): the block algorithm's Boole
+	// decomposition cannot eliminate/push bitvector variables. Unrelated
+	// BV-typed atoms elsewhere in the body are left alone by
+	// anti_prenex_block's default `skip` predicate, so their mere
+	// presence no longer forces the whole block to bail out.
+	auto is_bv_var = [](tref v) {
+		return is_bv_type_family<node>(tau::get(v).get_ba_type());
+	};
+	if (std::ranges::any_of(block_vars, is_bv_var))
+		return anti_prenex<node>(n);
 
 	// Build BDD variable order (innermost = lowest index = highest priority).
 	typename term_handle<node>::order ord;
