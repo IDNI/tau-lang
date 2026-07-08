@@ -147,6 +147,11 @@ private:
 	/// @brief Compute and store the lookback and highest initial position.
 	void compute_lookback_and_initial();
 
+	/// @brief Evict memory entries that no future step can read.
+	/// @param completed_time_point Value of `time_point` for the step
+	///        that was just completed, before it was advanced.
+	void prune_memory(size_t completed_time_point);
+
 	/// @brief Find an executable specification clause from DNF.
 	static tref get_executable_spec(tref& clause, const size_t start_time = 0);
 

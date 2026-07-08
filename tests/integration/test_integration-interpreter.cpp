@@ -306,6 +306,21 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.value().empty() );
 	}
 
+	TEST_CASE("o1[0] = 1 && o1[t] = o1[t-1]: memory stays bounded (AP-21)") {
+		// Regression test: interpreter::memory used to grow by one entry
+		// per executed step forever. Only a bounded window around the
+		// current time point (plus the permanent o1[0] anchor, needed for
+		// the lifetime of the run) is ever read again, so memory size
+		// after many steps must stay close to memory size after few steps
+		// instead of growing with the step count.
+		const char* sample = "o1[0] = 1 && o1[t] = o1[t-1].";
+		auto short_run = run_test(sample, 3);
+		auto long_run = run_test(sample, 60);
+		REQUIRE( short_run.has_value() );
+		REQUIRE( long_run.has_value() );
+		CHECK( long_run.value().size() <= short_run.value().size() + 2 );
+	}
+
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] = o1[t-1]") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);

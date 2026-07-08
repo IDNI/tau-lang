@@ -533,6 +533,7 @@ std::pair<std::optional<assignment<node>>, bool>
 	if (global.empty()) LOG_INFO << "currently no output is specified";
 	DBG(LOG_TRACE << dump_to_str();)
 	// update time_point and formula_time_point
+	const size_t completed_time_point = time_point;
 	if (time_point < formula_time_point) {
 		// auto continue until lookback
 		auto_continue = true;
@@ -544,8 +545,45 @@ std::pair<std::optional<assignment<node>>, bool>
 		++time_point;
 		formula_time_point = time_point;
 	}
-	// TODO (HIGH) remove old values from memory
+	prune_memory(completed_time_point);
 	return { global, auto_continue };
+}
+
+template <NodeType node>
+void interpreter<node>::prune_memory(size_t completed_time_point) {
+	// Once calculate_initial_spec() reaches final_system, step_spec is
+	// fixed to ubt_ctn with its literal ("initial") time positions still
+	// embedded, and every future step substitutes memory into it -- so
+	// any entry at or below highest_initial_pos is read for the lifetime
+	// of the interpreter and must never be evicted.
+	//
+	// Every other entry was produced by resolving a relative shift
+	// (see update_to_time_point / fm_at_time_point), and those are only
+	// ever read within [formula_time_point - lookback, formula_time_point]
+	// (see update_to_time_point's use in step() and appear_within_lookback).
+	// formula_time_point is non-decreasing, so once an entry's time point
+	// falls below that window it can never be read by a future step
+	// again -- it would ordinarily be safe to drop.
+	//
+	// However, run()'s driver calls update() *after* step() returns,
+	// referencing completed_time_point (== old time_point) via a literal
+	// shift such as `o2[-1]` (see run()'s use of `time_point - 1` and
+	// is_memory_access_valid). That is a step later than this function
+	// sees, so never evict the step that was just completed -- only
+	// entries strictly older than it -- giving such a caller one full
+	// step to reference it before it is gone.
+	const int_t oldest_needed = std::min(
+		(int_t)formula_time_point - lookback,
+		(int_t)completed_time_point);
+	std::erase_if(memory, [&](const auto& kv) {
+		tref v = tau::trim(kv.first);
+		// Leave non-stream entries (e.g. solved uninterpreted constants)
+		// alone: they are not time-indexed and do not grow with time_point.
+		if (!is_io_var<node>(v) || !is_io_initial<node>(v)) return false;
+		int_t t = get_io_time_point<node>(v);
+		if (t <= highest_initial_pos) return false;
+		return t < oldest_needed;
+	});
 }
 
 template <NodeType node>
