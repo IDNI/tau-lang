@@ -16,6 +16,7 @@ set(TESTS
 	execution
 	gc
 	hbdd
+	hooks
 	interpreter
 	normal_forms
 	nso_ba
