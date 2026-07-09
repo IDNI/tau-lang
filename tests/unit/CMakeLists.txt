@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
+	apply_rule
+	base_ba_dispatcher
 	bv_ba_helpers
 	ba_constants
 	ba_types
@@ -14,12 +16,16 @@ set(TESTS
 	execution
 	gc
 	hbdd
+	hooks
 	interpreter
 	normal_forms
+	nso_ba
 	nso_rr
 	product_ba
 	sbf_ba_parsing
-    tau_bdd
+	sbf_ba_splitter
+	tau_ba
+	tau_bdd
 	tau_spec
 	tau_tree
 	tau_tree_from_parser
@@ -28,6 +34,7 @@ set(TESTS
 	union_find
 	bitblasting_predicates
 	var_dict
+	variant_ba
 )
 
 foreach(X IN LISTS TESTS)

@@ -1079,7 +1079,7 @@ tref build_rr_ref(const std::string& sym_name, const trefs& offsets, const trefs
 
 template<NodeType node>
 tref build_rr_ref(const std::string& sym_name, const std::string offset, const trefs& args) {
-	auto var = build_bf_variable<node>(offset, get_ba_type_id<node>(untyped_type_id<node>()));
+	auto var = build_bf_variable<node>(offset, untyped_type_id<node>());
 	return build_rr_ref<node>(build_sym<node>(sym_name), {var}, args);
 }
 
@@ -1104,7 +1104,8 @@ tref build_rr_ref(const std::string& sym_name, tref offset, size_t shift, const 
 
 template<NodeType node>
 tref build_rr_ref(const std::string& sym_name, const std::string& offset, size_t shift, const trefs& args) {
-	auto offset_node = build_shift<node>(offset, shift);
+	auto offset_node = build_shift<node>(
+		build_variable<node>(offset, untyped_type_id<node>()), shift);
 	return build_rr_ref<node>(build_sym<node>(sym_name), {offset_node}, args);
 }
 

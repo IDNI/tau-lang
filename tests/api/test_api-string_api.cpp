@@ -20,6 +20,88 @@ TEST_SUITE("Tau API - string") {
 	}
 }
 
+// AP-8: only get_interpreter (below) had negative/malformed-input tests;
+// every other string-API parse entry point was untested for the malformed
+// or empty-string case. Each of these mirrors the style of the two
+// get_interpreter negative tests: feed a syntactically invalid (or empty)
+// string in and check the function fails gracefully (no crash, no value)
+// instead of asserting/crashing on the null tref that the underlying parse
+// produces.
+TEST_SUITE("Tau API - string - malformed input") {
+	static const strings malformed = { "", "x ) ( invalid !!!", "o[t] =" };
+
+	TEST_CASE_FIXTURE(api_fixture, "is_term / is_formula reject malformed input") {
+		for (const auto& s : malformed) {
+			CHECK(!tau_api::is_term(s));
+			CHECK(!tau_api::is_formula(s));
+		}
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "apply_def/apply_defs/apply_all_defs reject malformed input") {
+		for (const auto& s : malformed) {
+			CHECK(!tau_api::apply_def(s, "x + 1").has_value());
+			CHECK(!tau_api::apply_def("f(x) := x + 1", s).has_value());
+			CHECK(!tau_api::apply_defs(std::set<std::string>{ s }, "x + 1")
+				.has_value());
+			CHECK(!tau_api::apply_all_defs(s).has_value());
+		}
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "substitute rejects malformed input") {
+		for (const auto& s : malformed) {
+			CHECK(!tau_api::substitute(s, "x", "y").has_value());
+			CHECK(!tau_api::substitute("x", s, "y").has_value());
+			CHECK(!tau_api::substitute("x", "x", s).has_value());
+			CHECK(!tau_api::substitute(
+				s, std::map<std::string, std::string>{ { "x", "y" } })
+				.has_value());
+		}
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "normal forms reject malformed input") {
+		for (const auto& s : malformed) {
+			CHECK(!tau_api::boole_normal_form(s).has_value());
+			CHECK(!tau_api::dnf(s).has_value());
+			CHECK(!tau_api::cnf(s).has_value());
+			CHECK(!tau_api::nnf(s).has_value());
+		}
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "procedures reject malformed input") {
+		for (const auto& s : malformed) {
+			CHECK(!tau_api::syntactic_term_simplification(s).has_value());
+			CHECK(!tau_api::syntactic_formula_simplification(s).has_value());
+			CHECK(!tau_api::normalize_term(s).has_value());
+			CHECK(!tau_api::normalize_formula(s).has_value());
+			CHECK(!tau_api::anti_prenex(s).has_value());
+			CHECK(!tau_api::eliminate_quantifiers(s).has_value());
+			CHECK(!tau_api::simplify(s).has_value());
+		}
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "formula checks reject malformed input") {
+		for (const auto& s : malformed) {
+			// realizable/valid/valid_spec/sat all bottom out on a null
+			// tref, which every one of them treats as "not satisfied".
+			CHECK(!tau_api::realizable(s));
+			CHECK(!tau_api::valid(s));
+			CHECK(!tau_api::valid_spec(s));
+			CHECK(!tau_api::sat(s));
+			// unrealizable/unsat are defined as the negation of the
+			// above, so a malformed input reports true here.
+			CHECK(tau_api::unrealizable(s));
+			CHECK(tau_api::unsat(s));
+		}
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "solve/lgrs reject malformed input") {
+		for (const auto& s : malformed) {
+			CHECK(!tau_api::solve(s, solver_mode::general).has_value());
+			CHECK(!tau_api::lgrs(s).has_value());
+		}
+	}
+}
+
 TEST_SUITE("Tau API - string - execution") {
 
 	TEST_CASE("handle syntax error") {

@@ -46,6 +46,7 @@ tref tau_spec<node>::get() {
 		errors_.push_back(eof_msg_.value());
 		return fail();
 	}
+	if (!errors_.empty()) return fail();
 
 	tref ptree = build_parse_tree();
 	if (!ptree) return fail();

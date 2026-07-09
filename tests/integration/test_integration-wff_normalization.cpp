@@ -368,4 +368,54 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		// Result contains at least one always(...) subformula.
 		CHECK(tau::get(result).find_top(is_child<node_t, tau::wff_always>));
 	}
+
+	// NF-22: a genuinely MIXED top-level disjunction — one disjunct is
+	// already temporal (wrapped in `always`), the other has no temporal
+	// variable at all. Unlike the purely-temporal cases above (where
+	// non_temp_clauses in normalize_temporal_quantifiers stays _F() the
+	// whole time), this actually populates non_temp_clauses alongside a
+	// real temporal clause, which no other test exercises. Regression
+	// target: the non-temporal disjunct must survive (wrapped in its own
+	// `always(...)`, per normalizer.tmpl.h's non_temp_clauses handling)
+	// instead of being silently dropped, and the temporal disjunct must
+	// survive alongside it.
+	//
+	// A bare non-temporal top-level part (e.g. "x = 0") is rejected by the
+	// parser's own "must be scoped by a temporal quantifier" check, so the
+	// formula is built directly with the tau:: builders instead of parsing
+	// it as a whole spec.
+	TEST_CASE("mixed_temporal_and_non_temporal_disjunct_preserves_both_branches") {
+		auto nso = get_nso_rr("always o1[t] = 1.");
+		REQUIRE(nso.has_value());
+		tref temporal_clause = nso.value().main->get();
+
+		tref x = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		tref non_temporal_clause = tau::build_bf_eq(x, tau::_0(tau_type_id<node_t>()));
+		REQUIRE(!has_temp_var<node_t>(non_temporal_clause));
+
+		tref fm = tau::build_wff_or(temporal_clause, non_temporal_clause);
+		REQUIRE(has_temp_var<node_t>(fm));
+
+		tref result = normalize_temporal_quantifiers<node_t>(fm);
+		REQUIRE(result != nullptr);
+
+		// No spurious always(F) node.
+		CHECK(!tau::get(result).find_top(is_always_F));
+
+		// Both branches must survive as separate always(...) disjuncts:
+		// one carrying the temporal (o1) content, the other the
+		// non-temporal (x) content wrapped in `always` by the
+		// non_temp_clauses accumulation.
+		trefs disjuncts = get_dnf_wff_clauses<node_t>(result);
+		bool has_temporal_disjunct = false, has_wrapped_non_temporal_disjunct = false;
+		for (tref d : disjuncts) {
+			REQUIRE(is_child<node_t>(d, tau::wff_always));
+			const std::string inner = tau::get(tau::trim2(d)).to_str();
+			if (inner.find("o1") != std::string::npos) has_temporal_disjunct = true;
+			if (inner.find("x") != std::string::npos)
+				has_wrapped_non_temporal_disjunct = true;
+		}
+		CHECK(has_temporal_disjunct);
+		CHECK(has_wrapped_non_temporal_disjunct);
+	}
 }

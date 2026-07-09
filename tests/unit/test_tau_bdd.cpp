@@ -668,6 +668,46 @@ TEST_SUITE("BDD term_handle substitute") {
 	}
 }
 
+TEST_SUITE("tau_term_bdd::less_then / make_canonical") {
+	using bdd = tau_term_bdd<node_t>;
+	tau::get_options opts = { .parse = { .start = tau::bf } };
+
+	TEST_CASE("less_then compares by order rank") {
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		CHECK(bdd::less_then(tx, ty, o));
+		CHECK(!bdd::less_then(ty, tx, o));
+	}
+
+	TEST_CASE("less_then returns false when a variable is absent from the order") {
+		tref tx = tau::trim(tau::get("x", opts));
+		tref tz = tau::trim(tau::get("z", opts));
+		bdd::order o {{tx, 0}};
+		CHECK(!bdd::less_then(tx, tz, o));
+		CHECK(!bdd::less_then(tz, tx, o));
+	}
+
+	TEST_CASE("make_canonical orders the pair the same way regardless of input order") {
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref a = bdd::build_bdd(tau::get("x", opts), o);
+		bdd::ref b = bdd::build_bdd(tau::get("y", opts), o);
+
+		bdd::ref x1 = a, y1 = b;
+		bdd::make_canonical(x1, y1);
+		bdd::ref x2 = b, y2 = a;
+		bdd::make_canonical(x2, y2);
+
+		CHECK(x1 == x2);
+		CHECK(y1 == y2);
+	}
+}
+
 TEST_SUITE("BDD handle creation") {
 	TEST_CASE("creation and gc") {
 		using bdd = tau_term_bdd<node_t>;

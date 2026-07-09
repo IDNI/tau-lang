@@ -255,6 +255,191 @@ TEST_SUITE("GetNewUninterpretedConstant") {
 	}
 }
 
+// NF-4/NF-22: fold_trivial_quantifiers had zero direct unit tests. It folds
+// `ex x T/F` and `all x T/F` down to their (constant) body.
+TEST_SUITE("FoldTrivialQuantifiers") {
+	TEST_CASE("existential quantifier over T folds to T") {
+		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = tau::build_wff_ex(x, tau::_T(), false);
+		tref res = fold_trivial_quantifiers<node_t>(fm);
+		CHECK( tau::get(res).equals_T() );
+	}
+
+	TEST_CASE("existential quantifier over F folds to F") {
+		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = tau::build_wff_ex(x, tau::_F(), false);
+		tref res = fold_trivial_quantifiers<node_t>(fm);
+		CHECK( tau::get(res).equals_F() );
+	}
+
+	TEST_CASE("universal quantifier over T folds to T") {
+		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = tau::build_wff_all(x, tau::_T(), false);
+		tref res = fold_trivial_quantifiers<node_t>(fm);
+		CHECK( tau::get(res).equals_T() );
+	}
+
+	TEST_CASE("universal quantifier over F folds to F") {
+		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = tau::build_wff_all(x, tau::_F(), false);
+		tref res = fold_trivial_quantifiers<node_t>(fm);
+		CHECK( tau::get(res).equals_F() );
+	}
+
+	TEST_CASE("non-trivial quantifier body is left untouched (control)") {
+		// ex x (x = 0): the body is neither T nor F, so nothing is folded.
+		tref fm = get_nso_rr("ex x x = 0.").value().main->get();
+		tref res = fold_trivial_quantifiers<node_t>(fm);
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+	}
+}
+
+// NF-4: has_no_boolean_combs_of_models had zero direct unit tests. It
+// rejects formulas that combine several "always"/"sometimes"-wrapped models
+// with Boolean connectives, while allowing a plain non-temporal formula or a
+// single top-level `always` wrapper.
+TEST_SUITE("HasNoBooleanCombsOfModels") {
+	TEST_CASE("plain non-temporal formula satisfies the predicate") {
+		tref fm = get_nso_rr("x = 0.").value().main->get();
+		CHECK( has_no_boolean_combs_of_models<node_t>(fm) );
+	}
+
+	TEST_CASE("single top-level always wrapper satisfies the predicate") {
+		tref fm = get_nso_rr("always x = 0.").value().main->get();
+		CHECK( has_no_boolean_combs_of_models<node_t>(fm) );
+	}
+
+	TEST_CASE("boolean combination of two models violates the predicate") {
+		// (always x=0) && (always y=0): a Boolean (&&) combination of two
+		// "always"-wrapped models, which is exactly what the predicate must
+		// reject.
+		tref fm = get_nso_rr(
+			"(always x = 0) && (always y = 0).").value().main->get();
+		CHECK( !has_no_boolean_combs_of_models<node_t>(fm) );
+	}
+
+	TEST_CASE("nested always under always violates the predicate") {
+		// "always (always x = 0)." is rejected at parse time (nesting of
+		// temporal quantifiers is not allowed as source syntax), so the
+		// nested-always tree is built directly instead.
+		tref x = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		tref inner = tau::build_bf_eq(x, tau::_0(tau_type_id<node_t>()));
+		tref fm = tau::build_wff_always(tau::build_wff_always(inner));
+		CHECK( !has_no_boolean_combs_of_models<node_t>(fm) );
+	}
+}
+
+// NF-4: are_nso_equivalent and is_nso_impl had zero direct unit tests; only
+// exercised indirectly through normalizer/simplify_temporal_clause paths.
+TEST_SUITE("AreNsoEquivalentAndIsNsoImpl") {
+	TEST_CASE("are_nso_equivalent: true for semantically equal but "
+		  "syntactically different formulas")
+	{
+		// x=0  and  !(x!=0)  are equivalent, but structurally different,
+		// so this exercises the full normalize_non_temp based check
+		// rather than the structural/ref fast paths.
+		tref n1 = get_nso_rr("x = 0.").value().main->get();
+		tref n2 = get_nso_rr("!(x != 0).").value().main->get();
+		CHECK( are_nso_equivalent<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("are_nso_equivalent: false for non-equivalent formulas") {
+		tref n1 = get_nso_rr("x = 0.").value().main->get();
+		tref n2 = get_nso_rr("y = 0.").value().main->get();
+		CHECK( !are_nso_equivalent<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl: true when the antecedent is stronger") {
+		// x=0 && y=0  implies  x=0
+		tref n1 = get_nso_rr("x = 0 && y = 0.").value().main->get();
+		tref n2 = get_nso_rr("x = 0.").value().main->get();
+		CHECK( is_nso_impl<node_t>(n1, n2) );
+	}
+
+	TEST_CASE("is_nso_impl: false when the consequent is stronger") {
+		// x=0  does not imply  x=0 && y=0 (y is unconstrained)
+		tref n1 = get_nso_rr("x = 0.").value().main->get();
+		tref n2 = get_nso_rr("x = 0 && y = 0.").value().main->get();
+		CHECK( !is_nso_impl<node_t>(n1, n2) );
+	}
+}
+
+// NF-9: reduce_paths and join_paths (dense 0/1/2 path-vector reduction, used
+// by bf_reduced_dnf/assign_and_reduce) had no direct unit test; they were
+// only exercised indirectly through the BfReducedDNF suite. `2` denotes an
+// irrelevant/don't-care variable position.
+TEST_SUITE("ReducePathsAndJoinPaths") {
+	TEST_CASE("reduce_paths: merges an assignment at Hamming distance 1") {
+		// existing path: x=0,y=0 ; new assignment: x=1,y=0
+		// -> merge into x=irrelevant,y=0
+		std::vector<int_t> i{1, 0};
+		std::vector<std::vector<int_t>> paths{ {0, 0} };
+		bool merged = reduce_paths(i, paths, 2);
+		CHECK( merged );
+		REQUIRE( paths.size() == 1 );
+		CHECK( paths[0] == std::vector<int_t>{2, 0} );
+	}
+
+	TEST_CASE("reduce_paths: full collapse clears the path set") {
+		// single variable: existing path x=0, new assignment x=1
+		// covers both values -> the whole path set collapses (tautology)
+		std::vector<int_t> i{1};
+		std::vector<std::vector<int_t>> paths{ {0} };
+		bool merged = reduce_paths(i, paths, 1);
+		CHECK( merged );
+		CHECK( paths.empty() );
+	}
+
+	TEST_CASE("reduce_paths: distance-2 assignment is not merged") {
+		std::vector<int_t> i{1, 1};
+		std::vector<std::vector<int_t>> paths{ {0, 0} };
+		bool merged = reduce_paths(i, paths, 2);
+		CHECK( !merged );
+		REQUIRE( paths.size() == 1 );
+		CHECK( paths[0] == std::vector<int_t>{0, 0} );
+	}
+
+	TEST_CASE("reduce_paths: differing don't-cares are incompatible") {
+		// path has y=irrelevant while the assignment fixes y=1: even
+		// though x differs, the differing irrelevant variable makes the
+		// two incompatible for merging purposes.
+		std::vector<int_t> i{1, 1};
+		std::vector<std::vector<int_t>> paths{ {2, 0} };
+		bool merged = reduce_paths(i, paths, 2);
+		CHECK( !merged );
+		REQUIRE( paths.size() == 1 );
+		CHECK( paths[0] == std::vector<int_t>{2, 0} );
+	}
+
+	TEST_CASE("join_paths: merges complementary paths at Hamming distance 1") {
+		// x=0,y=0 and x=1,y=0 -> x=irrelevant,y=0
+		std::vector<std::vector<int_t>> paths{ {0, 0}, {1, 0} };
+		join_paths(paths);
+		REQUIRE( paths.size() == 1 );
+		CHECK( paths[0] == std::vector<int_t>{2, 0} );
+	}
+
+	TEST_CASE("join_paths: a subsumed (subset) path is removed") {
+		// x=1,y=irrelevant already covers x=1,y=0 -> the more specific
+		// path is redundant and gets erased, regardless of input order.
+		std::vector<std::vector<int_t>> paths1{ {1, 2}, {1, 0} };
+		join_paths(paths1);
+		REQUIRE( paths1.size() == 1 );
+		CHECK( paths1[0] == std::vector<int_t>{1, 2} );
+
+		std::vector<std::vector<int_t>> paths2{ {1, 0}, {1, 2} };
+		join_paths(paths2);
+		REQUIRE( paths2.size() == 1 );
+		CHECK( paths2[0] == std::vector<int_t>{1, 2} );
+	}
+
+	TEST_CASE("join_paths: unrelated paths are left untouched (control)") {
+		std::vector<std::vector<int_t>> paths{ {0, 0}, {1, 1} };
+		join_paths(paths);
+		CHECK( paths.size() == 2 );
+	}
+}
+
 TEST_SUITE("GetFreeVars") {
 	// The shadowing shapes are built programmatically: the parser
 	// alpha-renames bound variables, so parsed samples cannot contain

@@ -226,3 +226,42 @@ TEST_SUITE("bv cast - quantifier operand - unambiguous") {
 		CHECK( src != nullptr );
 	}
 }
+
+// TY-20: the content of a `{...}:bv[N]` ba_constant is parsed by a
+// dedicated sub-grammar (parser/bitvector.tgf -> bitvector_parser.generated.h,
+// used from bv_constant_from_parse_tree() in src/boolean_algebras/bv_ba.tmpl.h)
+// that accepts three literal forms: plain decimal digits (already covered by
+// every other test in this file), "#b" + binary digits, and "#x" + hex
+// digits. This is tau's own literal syntax (not borrowed from cvc5's
+// SMT-LIB "#x..." notation, even though it happens to look the same) --
+// confirmed by reading parser/bitvector.tgf:
+//   bitvector => "#b" binary | decimal | "#x" hexadecimal.
+// This suite exercises the "#x" hexadecimal form and checks it is numerically
+// equivalent to the matching decimal literal.
+TEST_SUITE("bv literal - hexadecimal form") {
+
+	TEST_CASE("hex literal: { #xF }:bv[8] equals decimal { 15 }:bv[8]") {
+		auto src = parse_wff("{ #xF }:bv[8] = { 15 }:bv[8]");
+		CHECK( src != nullptr );
+		CHECK( is_bv_formula_valid<node_t>(src) );
+	}
+
+	TEST_CASE("hex literal: { #xFF }:bv[8] equals decimal { 255 }:bv[8]") {
+		auto src = parse_wff("{ #xFF }:bv[8] = { 255 }:bv[8]");
+		CHECK( src != nullptr );
+		CHECK( is_bv_formula_valid<node_t>(src) );
+	}
+
+	TEST_CASE("hex literal: { #x0A }:bv[4] equals decimal { 10 }:bv[4]") {
+		auto src = parse_wff("{ #x0A }:bv[4] = { 10 }:bv[4]");
+		CHECK( src != nullptr );
+		CHECK( is_bv_formula_valid<node_t>(src) );
+	}
+
+	// Lower-case hex digits must also be accepted (xdigit char class).
+	TEST_CASE("hex literal: { #xff }:bv[8] equals decimal { 255 }:bv[8]") {
+		auto src = parse_wff("{ #xff }:bv[8] = { 255 }:bv[8]");
+		CHECK( src != nullptr );
+		CHECK( is_bv_formula_valid<node_t>(src) );
+	}
+}

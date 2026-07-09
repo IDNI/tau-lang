@@ -254,6 +254,35 @@ TEST_SUITE("TauSpecGet") {
 		CHECK( spec.errors().empty() );
 		CHECK( spec.parse("xy = 1.") );
 	}
+
+	TEST_CASE("is_eof reports true for an incomplete part awaiting continuation") {
+		// TT-21: tau_spec::is_eof() is otherwise untested. An incomplete
+		// part still makes parse() return true (it means "expect more
+		// input", not failure); is_eof() is how a caller distinguishes it
+		// from a genuinely completed parse.
+		tau_spec<node_t> spec;
+		CHECK( spec.parse("o[t] =") ); // incomplete, needs the RHS
+		CHECK( spec.is_eof() );
+		CHECK( spec.parse(" i[t].") ); // completes the expression
+		CHECK( !spec.is_eof() );
+		REQUIRE( spec.get() != nullptr );
+	}
+
+	TEST_CASE("get() after a genuine (non-eof) parse error stays nullptr and does not crash") {
+		// TT-21: repeated get() after an error is otherwise untested.
+		// Regression test: get() used to skip straight to build_parse_tree()
+		// even when errors_ already held a genuine parse error, ending up
+		// with a null main formula and crashing further down instead of
+		// failing cleanly.
+		tau_spec<node_t> spec;
+		CHECK( !spec.parse(") = (") ); // malformed, not an eof/continuation case
+		CHECK( !spec.is_eof() );
+		REQUIRE( !spec.errors().empty() );
+		const size_t n_errors = spec.errors().size();
+		CHECK( spec.get() == nullptr );
+		CHECK( spec.get() == nullptr ); // repeated call: no crash, still nullptr
+		CHECK( spec.errors().size() == n_errors );
+	}
 }
 
 #ifdef TAU_TEST_MULTILINE_PARSING_BRUTE_FORCE

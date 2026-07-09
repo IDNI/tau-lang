@@ -763,4 +763,118 @@ TEST_SUITE("solve") {
 		const char* system = "x:bv[8] = {0}:bv[8] && x:bv[8] = {1}:bv[8].";
 		CHECK ( !test_solve(system) );
 	}
+
+	// SO-26: solve() on the plain Boolean constants T and F (as opposed to
+	// an inequality/equation system). solve(tref, options, error) special
+	// cases both right at its entry point (solver.tmpl.h):
+	//   if (tau::get(form).equals_T()) return { solution<node>() };
+	//   if (tau::get(form).equals_F()) return {};
+	TEST_CASE("solve on the T constant is trivially satisfiable") {
+		bool solve_error = false;
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(tau_type<node_t>()),
+			.mode = solver_mode::general
+		};
+		auto solution = solve<node_t>(tau::_T(), options, solve_error);
+		CHECK ( !solve_error );
+		CHECK ( solution.has_value() );
+		CHECK ( solution.value().empty() );
+	}
+
+	TEST_CASE("solve on the F constant is unsatisfiable") {
+		bool solve_error = false;
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(tau_type<node_t>()),
+			.mode = solver_mode::general
+		};
+		auto solution = solve<node_t>(tau::_F(), options, solve_error);
+		CHECK ( !solve_error );
+		CHECK ( !solution.has_value() );
+	}
+
+	// SO-26: cyclic single-variable assignment, e.g. x = y && y = x. solve()
+	// opportunistically extracts "variable = term" equations and substitutes
+	// them away (solver.tmpl.h). Naively doing so for both x := y and y := x
+	// here would substitute forever; check_var_assignment() guards against
+	// this by rejecting an assignment that would close a cycle given the
+	// ones already collected, leaving the offending equation in place as a
+	// plain equation instead of a substitution. This is a regression test
+	// for that guard (and for the longer, transitive cycle x=y=z=x), not for
+	// the (still approximate) substitution mechanism itself.
+	TEST_CASE("cyclic assignment: x = y && y = x") {
+		const char* system = "x = y && y = x.";
+		CHECK ( test_solve(system) );
+	}
+
+	TEST_CASE("longer cyclic assignment: x = y && y = z && z = x") {
+		const char* system = "x = y && y = z && z = x.";
+		CHECK ( test_solve(system) );
+	}
+
+	// SO-26: quantifier stress test. A hang/blow-up regression guard: check
+	// that solve() still terminates promptly on a system with several
+	// nested ex/all quantifiers over a small bitvector type. The quantified
+	// matrix is chosen to be a tautology so the expected result (satisfiable)
+	// is unambiguous regardless of how the quantifiers get resolved.
+	TEST_CASE("quantifier stress: nested ex/all over bv[8] (tautology)") {
+		// For every a there is a b with a + b = 0 (b = -a), and likewise
+		// for c/d: a genuine alternating-quantifier tautology (mirrors the
+		// pattern used in test_integration-blasting_correctness_check4.cpp)
+		// rather than one that trivially simplifies away before quantifier
+		// elimination/blasting ever runs.
+		const char* system =
+			"all a:bv[8] ex b:bv[8] all c:bv[8] ex d:bv[8] "
+			"a + b = { 0 }:bv[8] && c + d = { 0 }:bv[8].";
+		CHECK ( test_solve(system) );
+	}
+
+	// SO-12: flag_boundary (satisfiability.tmpl.h) is an explicitly
+	// approximate/conservative upper bound on how far to search for a
+	// time point at which the "sometimes" flag of a temporal spec can be
+	// raised within the initial segment, before falling back to the (exact,
+	// but more expensive) fixpoint computation. It scales with both the
+	// lookback of the always-part (get_max_shift) and the highest explicit
+	// initial condition (get_max_initial). These regression tests pin down
+	// current (correct) behavior for specs designed to stress those two
+	// inputs, without asserting anything about the exact numeric bound
+	// (which the TODO at satisfiability.tmpl.h:989 says should be tightened).
+	TEST_CASE("flag_boundary: sat via a high explicit initial condition") {
+		// A high, explicit initial condition (o1[8]) alongside an
+		// always-part with no lookback (time_point == 0). The explicit
+		// numeral 8 grows point_after_inits = get_max_initial(...) + 1
+		// and hence flag_boundary, so this pins down that a "sometimes"
+		// flag anchored at a distant explicit time point is still
+		// correctly found satisfiable (i.e. flag_boundary reaches at
+		// least that far) rather than, say, being missed by an
+		// off-by-a-constant regression in the bound.
+		tref spec = get_nso_rr<node_t>(tau::get(
+			"(always o1[t] = 1) && (sometimes o1[8] = 1).")).value().main->get();
+		CHECK ( is_tau_formula_sat<node_t>(spec) );
+	}
+
+	TEST_CASE("flag_boundary: unsat via a high explicit initial condition") {
+		// A high, explicit initial condition (o1[8]) directly contradicted
+		// at that same time point. This still grows point_after_inits =
+		// get_max_initial(...) + 1 (and hence flag_boundary) the same way
+		// the previous, satisfiable case does, but here the flag can never
+		// be raised, forcing the whole initial segment up to flag_boundary
+		// to be exhausted before correctly falling back to the fixpoint
+		// computation and reporting unsat.
+		tref spec = get_nso_rr<node_t>(tau::get(
+			"(always o1[8] = 0) && (sometimes o1[8] != 0).")).value().main->get();
+		CHECK ( !is_tau_formula_sat<node_t>(spec) );
+	}
+
+	TEST_CASE("flag_boundary: unsat with a larger always-part lookback") {
+		// Scaled-up variant of the "greater_lookback_one_st" pattern from
+		// test_integration-satisfiability1.cpp: the always-part now has
+		// lookback 3 (instead of 1), which raises time_point =
+		// get_max_shift(...) and hence flag_boundary. The recurrence
+		// forces o1 to be periodic with period (dividing) 3, so o1[t]
+		// must equal o1[t-6] whenever both are defined, making the
+		// "sometimes" clause unsatisfiable.
+		tref spec = get_nso_rr<node_t>(tau::get(
+			"(always o1[t] = o1[t-3]) && (sometimes o1[t] != o1[t-6]).")).value().main->get();
+		CHECK ( !is_tau_formula_sat<node_t>(spec) );
+	}
 }
