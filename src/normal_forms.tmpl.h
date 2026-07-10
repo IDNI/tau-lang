@@ -3064,9 +3064,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	subtree_unordered_set<node>& used_atms,
 	const auto& quant_pattern,
 	const typename term_handle<node>::order& order,
-	std::function<bool(tref)> skip = [](tref t) {
-		return is_bv_type_family<node>(tree<node>::get(t).get_ba_type());
-	}) {
+	std::function<bool(tref)> skip) {
 	using tau = tree<node>;
 	// Goal: push the quantifier block as far into clause as possible
 	{
@@ -3208,7 +3206,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 // - ∃-blocks: push into body with the 6-arg anti_prenex_block, resolve
 //   remaining quantifiers.  ∀-blocks are dualized: ∀x φ ≡ ¬∃x ¬φ.
 template<NodeType node>
-tref process_quantifier_block(tref n) {
+tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_bv_type_family<node>) {
 	using tau = tree<node>;
 	if (!is_child_quantifier<node>(n)) return n;
 
@@ -3253,7 +3251,7 @@ tref process_quantifier_block(tref n) {
 	auto resolve_ex_block = [&](tref b) -> tref {
 		b = normalize_atomic_formula_operators<node>(b);
 		subtree_unordered_set<node> used_atms;
-		tref r = anti_prenex_block<node>(b, block_vars, used_atms, qp, ord);
+		tref r = anti_prenex_block<node>(b, block_vars, used_atms, qp, ord, skip);
 		r = resolve_quantifiers2<node>(r, ord);
 		// Fallback for BV/ordered atoms that resolve_quantifiers2 cannot handle.
 		if (tau::get(r).find_top(is_quantifier<node>))
@@ -3279,6 +3277,12 @@ tref process_quantifier_block(tref n) {
 	return result;
 }
 
+/*template<NodeType node>
+bool is_bv_type_family_tref(tref t) {
+	using tau = tree<node>;
+	return is_bv_type_family<node>(tau::get(t).get_ba_type());
+}*/
+
 /**
  * @internal
  * @brief Drives the full anti-prenex-block pipeline: NNF + syntactic simplification, substitution-based elimination, canonical operator normalization, then post-order application of `process_quantifier_block`.
@@ -3288,7 +3292,7 @@ tref process_quantifier_block(tref n) {
  * @endinternal
  */
 template<NodeType node>
-tref anti_prenex_block(tref formula) {
+tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 	using tau = tree<node>;
 
 	// Short-circuit: quantifier-free formulas need no processing here.
@@ -3329,8 +3333,11 @@ tref anti_prenex_block(tref formula) {
 	// into the body using the 5-arg anti_prenex_block, then eliminate the
 	// remaining quantifiers over atomic formulas via resolve_quantifiers2.
 	// wff_all blocks are handled by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
+	auto f = [&](tref n) -> tref {
+		return process_quantifier_block<node>(n, skip);
+	};
 	formula = post_order<node>(formula).apply_unique(
-		process_quantifier_block<node>, while_is_formula<node>);
+		f, while_is_formula<node>);
 	return syntactic_formula_simplification<node>(formula);
 }
 

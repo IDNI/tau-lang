@@ -171,6 +171,14 @@ size_t bv_type_id(unsigned short bitwidth);
 template <NodeType node>
 bool is_bv_type_family(tref t);
 
+/** @brief Return `true` if type tree @p t belongs to the bitvector family (tref variant).
+ *  @tparam node Tree node type.
+ *  @param t tref.
+ *  @return `true` if @p t is of bitvector type, else `false`.
+*/
+template <NodeType node>
+bool is_tref_bv_type_family(tref t);
+
 /** @brief Return `true` if type id @p ba_type_id belongs to the bitvector family. */
 template <NodeType node>
 bool is_bv_type_family(size_t ba_type_id);

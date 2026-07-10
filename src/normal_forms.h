@@ -242,7 +242,6 @@ tref term_boole_normal_form(tref formula);
 template <NodeType node>
 tref anti_prenex(tref formula);
 
-
 /**
  * @brief Convert a formula to Algebraic Normal Form (ANF) for a given type.
  *

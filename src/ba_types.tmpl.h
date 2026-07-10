@@ -165,6 +165,11 @@ bool is_bv_type_family(size_t ba_type_id) {
 	return is_bv_type_family<node>(ba_types<node>::type_tree(ba_type_id));
 }
 
+template<NodeType node>
+bool is_tref_bv_type_family(tref t) {
+	using tau = tree<node>;
+	return is_bv_type_family<node>(tau::get(t).get_ba_type());
+}
 
 template <NodeType node>
 size_t get_bv_width(tref t) {

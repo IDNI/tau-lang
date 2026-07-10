@@ -71,21 +71,25 @@ tref normalize(tref form) {
 /** @internal @copydoc normalize_non_temp @endinternal */
 template <NodeType node>
 tref normalize_non_temp(tref fm) {
+	//	using tt = tau::traverser;
+	#ifdef TAU_CACHE
 	using tau = tree<node>;
-	using tt = tau::traverser;
-#ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-	tref result = tt(fm)
+	tref result = resolve_quantifiers<node>(fm);
+	result = anti_prenex_block<node>(result);
+	result = resolve_quantifiers<node>(result);
+	result = term_boole_normal_form<node>(result);
+/*	tref result = tt(fm)
 		// Resolve closed quantified bv subformulas first (see normalize),
 		// then push all quantifiers in, eliminate them and normalize result
 		| tt::f(resolve_quantifiers<node>)
 		| tt::f(anti_prenex_block<node>)
 		| tt::f(resolve_quantifiers<node>)
 		| tt::f(term_boole_normal_form<node>)
-		| tt::ref;
+		| tt::ref;*/
 	// NOTE: Do NOT add fold_trivial_quantifiers or reget here.
 	// tau::reget strips the explicit bitwidth subtype from BV-typed nodes
 	// (io_vars and BV constants) causing get_bv_size assertions downstream.

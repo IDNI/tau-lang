@@ -536,7 +536,6 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 	return term_boole_normal_form<node>(new_fm);
 }
 
-
 /** @internal @copydoc resolve_quantifiers @endinternal */
 template<NodeType node>
 tref resolve_quantifiers(tref formula) {

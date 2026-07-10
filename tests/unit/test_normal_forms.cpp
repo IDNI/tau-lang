@@ -537,7 +537,7 @@ TEST_SUITE("AntiPrenexBlock") {
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block,
-			used_atms, quant_pattern, order);
+			used_atms, quant_pattern, order, is_tref_bv_type_family<node_t>);
 		return {res, used_atms.size()};
 	}
 

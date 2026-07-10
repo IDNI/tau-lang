@@ -161,7 +161,7 @@ template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause);
 
 template <NodeType node>
-tref anti_prenex_block(tref formula);
+tref anti_prenex_block(tref formula, std::function<bool(tref)> skip = is_tref_bv_type_family<node>);
 
 template <NodeType node>
 tref term_boole_normal_form(tref formula);
