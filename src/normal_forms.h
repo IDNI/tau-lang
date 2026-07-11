@@ -275,6 +275,7 @@ tref pnf(tref n);
 // need to be included before the definitions as they can be used in there.
 #include "heuristics/ex_subs_based_elimination.h"
 #include "heuristics/syntactic_path_simplification.h"
+#include "heuristics/bv_arithmetic_scan.h"
 #include "normal_forms.tmpl.h"
 
 #endif // __IDNI__TAU__NORMAL_FORMS_H__

@@ -376,7 +376,8 @@ tref replace_free_vars_by(tref fm, tref val) {
  * @endinternal
  */
 template<NodeType node>
-tref syntactic_formula_simplification(tref formula) {
+tref syntactic_formula_simplification(tref formula,
+		[[maybe_unused]] std::function<bool(tref)> skip) {
 	formula = simplify_using_equality<node>(formula);
 	return syntactic_path_simplification<node>(formula);
 }
@@ -466,6 +467,12 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 		// Non-closed BV quantifier, or closed-but-undecided: try
 		// predicate blasting to convert the BV existential to Boolean bit
 		// quantifiers that the atomless-BA path can then eliminate.
+		// bv_predicate_blasting already anti-prenexes each blasted atomic's
+		// own freshly-introduced auxiliary quantifiers (scoped locally); the
+		// default-skip anti_prenex_block call below is a separate concern:
+		// it attempts to push/resolve `var`'s own quantifier (still
+		// bv-typed and left untouched by blasting itself) now that the
+		// scope's arithmetic has been simplified to boolean form.
 		if (bv_blasting) {
 			tref ex_fm = tau::build_wff_ex(var, scoped_fm, false);
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);

@@ -21,6 +21,39 @@ namespace idni::tau_lang {
  */
 using offset_t = std::pair<tau_parser::nonterminal, size_t>;
 
+/**
+ * @internal
+ * @brief Push/eliminate all quantifiers in `form`, resolving bitvector
+ * content along the way.
+ *
+ * Sequence: resolve any closed bv (sub-)formula via the solver first
+ * (pushing a blasted bitvector formula's quantifiers through Boolean
+ * normalization before it is closed is exponential, while the solver
+ * decides the closed formula directly); push/eliminate the rest via
+ * `anti_prenex_block` (which, for a block containing bv-typed variables,
+ * attempts predicate blasting on the isolated clause itself); resolve
+ * again; then, since blasting can leave genuinely unsupported bv
+ * arithmetic (e.g. multiplication/division by a non-constant) behind,
+ * collect that residue and run `anti_prenex_block` once more skipping
+ * exactly it, so any quantifier not touching surviving arithmetic still
+ * gets pushed/resolved; a final resolve pass collapses whatever closed bv
+ * (sub-)formula that step produces.
+ * @tparam node Tree node type.
+ * @param form Formula to process.
+ * @return Formula with quantifiers pushed/eliminated as far as possible.
+ * @endinternal
+ */
+template <NodeType node>
+tref eliminate_bv_and_quantifiers(tref form) {
+	form = resolve_quantifiers<node>(form);
+	form = anti_prenex_block<node>(form);
+	form = resolve_quantifiers<node>(form);
+	auto arith_skip = make_bv_arithmetic_skip<node>(form);
+	form = anti_prenex_block<node>(form, arith_skip);
+	form = resolve_quantifiers<node>(form);
+	return form;
+}
+
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 /** @internal @copydoc normalize @endinternal */
 template <NodeType node>
@@ -35,22 +68,14 @@ tref normalize(tref form) {
 	trefs temps = tau::get(form).select_top(is_child_temporal_quantifier<node>);
 	// Case that the formula has no temporal quantifier
 	if (temps.empty()) {
-		// Resolve closed quantified bv subformulas before anti_prenex_block:
-		// pushing the quantifiers of a blasted bitvector formula through
-		// the Boolean normalization is exponential, while the solver
-		// decides the closed formula directly.
-		form = resolve_quantifiers<node>(form);
-		form = anti_prenex_block<node>(form);
-		form = resolve_quantifiers<node>(form);
+		form = eliminate_bv_and_quantifiers<node>(form);
 	} else {
 		subtree_map<node, tref> changes;
 		for (tref temp : temps) {
 			bool is_aw = is_child<node>(temp, tau::wff_always);
 			// Remove temporal quantifier
 			tref f = tau::trim2(temp);
-			f = resolve_quantifiers<node>(f);
-			f = anti_prenex_block<node>(f);
-			f = resolve_quantifiers<node>(f);
+			f = eliminate_bv_and_quantifiers<node>(f);
 			// Add quantifier again and save as change
 			if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
 			else changes.emplace(temp, tau::build_wff_sometimes(f));
@@ -78,18 +103,8 @@ tref normalize_non_temp(tref fm) {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-	tref result = resolve_quantifiers<node>(fm);
-	result = anti_prenex_block<node>(result);
-	result = resolve_quantifiers<node>(result);
+	tref result = eliminate_bv_and_quantifiers<node>(fm);
 	result = term_boole_normal_form<node>(result);
-/*	tref result = tt(fm)
-		// Resolve closed quantified bv subformulas first (see normalize),
-		// then push all quantifiers in, eliminate them and normalize result
-		| tt::f(resolve_quantifiers<node>)
-		| tt::f(anti_prenex_block<node>)
-		| tt::f(resolve_quantifiers<node>)
-		| tt::f(term_boole_normal_form<node>)
-		| tt::ref;*/
 	// NOTE: Do NOT add fold_trivial_quantifiers or reget here.
 	// tau::reget strips the explicit bitwidth subtype from BV-typed nodes
 	// (io_vars and BV constants) causing get_bv_size assertions downstream.

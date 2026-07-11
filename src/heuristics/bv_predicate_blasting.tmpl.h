@@ -100,7 +100,27 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 			tau::get(v).get_ba_type()));
 		res = tau::build_wff_ex(v, res, false);
 	}
-	return rewriter::replace<node>(res, changes);
+	res = rewriter::replace<node>(res, changes);
+	// The aux variables just wrapped (carries/borrows/partial products/...)
+	// retain a bv BA-type tag but are ordinary Boole-decomposable content --
+	// always eliminate/push them here, regardless of nominal bv typing.
+	// Scoped to exactly this local wrapping (not the whole formula being
+	// blasted), so a still-unresolved, genuinely bv-typed quantifier
+	// elsewhere (e.g. a user-level variable `x` still appearing in an
+	// unblasted comparison atom like `x = 3`, since it has no arithmetic
+	// to blast) is not caught up in it.
+	//
+	// Uses resolve_quantifiers2's BDD-based elimination directly, not
+	// anti_prenex_block's generic Boole decomposition: blasted arithmetic
+	// (e.g. XOR-expanded sum/carry constraints) commonly introduces
+	// disjunctions and many atoms, and naive atom-by-atom Boole
+	// decomposition scales combinatorially with atom count where BDD
+	// elimination does not.
+	typename term_handle<node>::order ord;
+	for (size_t i = 0; i < vars.size(); ++i)
+		ord.emplace(changes[vars[vars.size() - 1 - i]],
+			static_cast<int_t>(i));
+	return resolve_quantifiers2<node>(res, ord, [](tref) { return false; });
 }
 
 /**
@@ -498,8 +518,11 @@ static tref wff_predicate_blasting(tref term) {
 		return nullptr;
 	}
 
-	auto n_term = changes.find(term) != changes.end() ? changes[term] : term;
-	return n_term;
+	// quantify_aux_vars already anti-prenexes each blasted atomic's own
+	// freshly-introduced auxiliary quantifiers (scoped locally, so a
+	// still-unresolved genuinely bv-typed quantifier elsewhere in `term`
+	// is left untouched); nothing further to do here.
+	return changes.find(term) != changes.end() ? changes[term] : term;
 }
 
 /**

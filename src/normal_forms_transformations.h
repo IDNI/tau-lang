@@ -118,10 +118,16 @@ tref push_negation_in(tref fm);
  * sequence.
  * @tparam node Tree node type.
  * @param formula Formula to simplify.
+ * @param skip Predicate identifying content this pass must not touch
+ *        (defaults to BV-typed nodes); accepted for interface consistency
+ *        with `anti_prenex_block`'s other steps, but currently unused --
+ *        neither `simplify_using_equality` nor `syntactic_path_simplification`
+ *        has a BV-specific check to guard.
  * @return Simplified formula.
  */
 template <NodeType node>
-tref syntactic_formula_simplification(tref formula);
+tref syntactic_formula_simplification(tref formula,
+	std::function<bool(tref)> skip = is_tref_bv_type_family<node>);
 
 /**
  * @brief Process a single existentially quantified clause in the anti-prenex algorithm.
@@ -160,8 +166,16 @@ tref syntactic_path_simplification(tref fm);
 template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause);
 
+// Note: no default argument for `skip` here -- function templates cannot
+// gain a default argument in a later declaration once an earlier one (the
+// forward declaration in heuristics/bv_predicate_blasting.h, included above)
+// exists without one. The single-argument overload below plays the role of
+// the default, calling through with is_tref_bv_type_family<node>.
 template <NodeType node>
-tref anti_prenex_block(tref formula, std::function<bool(tref)> skip = is_tref_bv_type_family<node>);
+tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
+
+template <NodeType node>
+tref anti_prenex_block(tref formula);
 
 template <NodeType node>
 tref term_boole_normal_form(tref formula);

@@ -3047,15 +3047,20 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
  * @brief Core recursive helper for the anti-prenex block algorithm.
  *
  * Pushes a block of existential quantifier variables into a formula by splitting on disjunctions,
- * isolating dependent conjuncts, and performing Boole decomposition.
+ * isolating dependent conjuncts, and performing Boole decomposition for
+ * block variables not matched by `skip`. Once a leaf clause depends only on
+ * `skip`-matched (e.g. bitvector) block variables, predicate blasting is
+ * attempted on it directly (via the `blast_block` helper) instead of Boole
+ * decomposition, which requires atomless-typed quantified variables.
  * @tparam node Tree node type.
  * @param formula Formula to push the quantifier block into.
  * @param block Ordered list of existentially quantified variables to push.
  * @param used_atms Set of atomic formulas already consumed in the current recursion; updated in place.
  * @param quant_pattern Map from quantified variables to their priority for BDD variable ordering.
  * @param order Variable ordering relation used by `resolve_quantifiers2`.
- * @param skip Predicate identifying variables/atomic formulas this pass must not
- *        touch (defaults to BV-typed nodes, which this algorithm cannot decompose).
+ * @param skip Predicate identifying variables/atomic formulas this pass must
+ *        not Boole-decompose (defaults to BV-typed nodes; diverted to
+ *        predicate blasting instead once nothing else can be pushed).
  * @return Formula with the quantifier block pushed as far inward as possible.
  * @endinternal
  */
@@ -3066,12 +3071,36 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	const typename term_handle<node>::order& order,
 	std::function<bool(tref)> skip) {
 	using tau = tree<node>;
-	// Goal: push the quantifier block as far into clause as possible
+	// Once no non-skip-matched block variable occurs free anymore, the
+	// remaining leaf is entirely skip-matched (e.g. bitvector) content:
+	// wrap the whole block around it and try predicate blasting instead of
+	// the BDD-based elimination below, which requires atomless-typed
+	// quantified variables. bv_predicate_blasting already anti-prenexes
+	// each blasted atomic's own freshly-introduced auxiliary quantifiers
+	// (scoped locally); the default-skip anti_prenex_block call below is a
+	// separate concern: it attempts to push/resolve the block's own
+	// quantifiers (still bv-typed and left untouched by blasting itself)
+	// now that the scope's arithmetic has been simplified to boolean form.
+	auto blast_block = [&](tref dep_formula) -> tref {
+		tref ex_fm = dep_formula;
+		for (auto v = block.rbegin(); v != block.rend(); ++v)
+			ex_fm = build_wff_ex<node>(*v, ex_fm, false);
+		if (bv_blasting)
+			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
+					blasted && blasted != ex_fm)
+				return anti_prenex_block<node>(blasted);
+		return ex_fm;
+	};
+
+	// Goal: push the quantifier block as far into clause as possible.
+	// A block variable is counted here regardless of `skip`: dropping a
+	// skip-matched variable's occurrence from this check would let it be
+	// classified as "independent" below and moved outside the block's
+	// quantifier scope, leaking it free.
 	{
 		bool has_var = false;
 		const trefs& vars = get_free_vars<node>(formula);
 		for (tref v : block) {
-			if (skip(v)) continue;
 			if (hasbc(vars, v, tau::subtree_less)) {
 				has_var = true;
 				break;
@@ -3097,10 +3126,11 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		trefs conjs = get_cnf_wff_clauses<node>(formula);
 		trefs dep;
 		for (tref &conj : conjs) {
+			// See note above: check every block variable's actual
+			// occurrence regardless of `skip`.
 			bool has_var = false;
 			const trefs& vars = get_free_vars<node>(conj);
 			for (tref v : block) {
-				if (skip(v)) continue;
 				if (hasbc(vars, v, tau::subtree_less)) {
 					has_var = true;
 					break;
@@ -3119,10 +3149,12 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		const tref indep = tau::build_wff_and(conjs);
 		// Check if dependent formula is clause -> push block into clause
 		if (!tau::get(formula).find_top(is<node, tau::wff_or>)) {
+			if (std::ranges::any_of(block, skip))
+				return tau::build_wff_and(indep, blast_block(formula));
 			return tau::build_wff_and(
 				indep,
 				resolve_quantifiers2<node>(
-				push_ex_block_into_clause<node>(formula, block, order), order));
+				push_ex_block_into_clause<node>(formula, block, order), order, skip));
 		}
 		// TODO: only != present
 		// Using the available atomic formulas, do Boole decomposition on best fit
@@ -3144,9 +3176,12 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		const trefs atms = rewriter::select_top_until<node>(formula,
 			is_atomic, is_quantifier<node>);
 		// No decomposable atomic formula available (e.g. only !=
-		// equations or quantified subformulas remain): keep the block
-		// on the dependent part instead of dereferencing end()
+		// equations, quantified subformulas, or exclusively skip-matched
+		// atoms remain): try blasting if the block needs it, else keep
+		// the block on the dependent part instead of dereferencing end()
 		if (atms.empty()) {
+			if (std::ranges::any_of(block, skip))
+				return tau::build_wff_and(indep, blast_block(formula));
 			for (auto v = block.rbegin(); v != block.rend(); ++v)
 				formula = build_wff_ex<node>(*v, formula, false);
 			return tau::build_wff_and(indep, formula);
@@ -3181,7 +3216,10 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		return tau::build_wff_and(indep, tau::build_wff_or(nl, nr));
 	}
 
-	// Connective is not wff_and or wff_or -> quantifiers stay with formula
+	// Connective is not wff_and or wff_or (e.g. a single atom or a wff_ref)
+	// -> try blasting if the block needs it, else quantifiers stay with formula
+	if (std::ranges::any_of(block, skip))
+		return blast_block(formula);
 	for (auto v = block.rbegin(); v != block.rend(); ++v)
 		formula = build_wff_ex<node>(*v, formula, false);
 	return formula;
@@ -3191,20 +3229,29 @@ tref anti_prenex_block(tref formula, const trefs& block,
  * @internal
  * @brief Processes one maximal same-type quantifier block rooted at `n`.
  *
- * Blocks whose quantified variables are BV-typed fall back to `anti_prenex`;
- * ∃-blocks are pushed in via the 6-arg `anti_prenex_block`, which skips over
- * any unrelated BV-typed atoms in the body; ∀-blocks are dualized to ∃-blocks.
+ * Delegates the whole block (whether atomless, bitvector-typed, or mixed)
+ * to the 6-arg `anti_prenex_block`, which splits disjunctions/conjuncts,
+ * Boole-decomposes atomless content, and attempts predicate blasting on
+ * whatever leaf clause still needs `skip`-matched (e.g. bitvector) content
+ * resolved -- so a bitvector-typed block variable no longer bails out to
+ * `anti_prenex` (the legacy step-based algorithm) up front. A residual
+ * fallback to `anti_prenex` remains at the end of `resolve_ex_block` for
+ * structural cases unrelated to bitvector content that its
+ * push_existential_quantifier_one/ex_quantified_boole_decomposition
+ * strategy resolves and this algorithm's disjunction/Boole decomposition
+ * does not. ∃-blocks are pushed in directly; ∀-blocks are dualized to
+ * ∃-blocks.
  * @tparam node Tree node type.
  * @param n Formula node whose direct child is a quantifier.
  * @return Formula with the quantifier block eliminated or pushed inward.
  * @endinternal
  */
 // Processes one quantifier block rooted at n:
-// - Blocks with a BV-typed quantified variable fall back to anti_prenex
-//   (CVC5 / trivially-vacuous elim). Unrelated BV-typed atoms elsewhere in
-//   the body do not trigger this fallback.
-// - ∃-blocks: push into body with the 6-arg anti_prenex_block, resolve
-//   remaining quantifiers.  ∀-blocks are dualized: ∀x φ ≡ ¬∃x ¬φ.
+// - ∃-blocks: push into body with the 6-arg anti_prenex_block (which
+//   handles skip-matched/bitvector content itself via blasting), resolve
+//   remaining quantifiers, then fall back to anti_prenex for whatever
+//   structural (non-bitvector) cases still need it. ∀-blocks are dualized:
+//   ∀x φ ≡ ¬∃x ¬φ.
 template<NodeType node>
 tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_bv_type_family<node>) {
 	using tau = tree<node>;
@@ -3220,18 +3267,6 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
 		curr = tau::get(curr)[0].second();
 	}
 	tref body = curr;
-
-	// A BV-typed block variable falls back to anti_prenex (CVC5 or
-	// trivially-vacuous elimination): the block algorithm's Boole
-	// decomposition cannot eliminate/push bitvector variables. Unrelated
-	// BV-typed atoms elsewhere in the body are left alone by
-	// anti_prenex_block's default `skip` predicate, so their mere
-	// presence no longer forces the whole block to bail out.
-	auto is_bv_var = [](tref v) {
-		return is_bv_type_family<node>(tau::get(v).get_ba_type());
-	};
-	if (std::ranges::any_of(block_vars, is_bv_var))
-		return anti_prenex<node>(n);
 
 	// Build BDD variable order (innermost = lowest index = highest priority).
 	typename term_handle<node>::order ord;
@@ -3252,11 +3287,25 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
 		b = normalize_atomic_formula_operators<node>(b);
 		subtree_unordered_set<node> used_atms;
 		tref r = anti_prenex_block<node>(b, block_vars, used_atms, qp, ord, skip);
-		r = resolve_quantifiers2<node>(r, ord);
-		// Fallback for BV/ordered atoms that resolve_quantifiers2 cannot handle.
+		r = resolve_quantifiers2<node>(r, ord, skip);
+		// Fallback for closed bv (sub-)formulas resolve_quantifiers2 leaves
+		// untouched, and a final safety net for blasting failures: try
+		// CVC5/blasting once more via the whole-tree resolve_quantifiers.
 		if (tau::get(r).find_top(is_quantifier<node>))
 			r = resolve_quantifiers<node>(r);
-		// Final fallback: wff_ref atoms re-wrapped by push_ex_block_into_clause.
+		// Final fallback: legacy anti_prenex is a structurally different
+		// (step-based, single-quantifier-at-a-time) algorithm that can
+		// still make progress here in cases unrelated to bitvector content
+		// (blasting is now this algorithm's own job, via blast_block above)
+		// -- e.g. wff_ref atoms re-wrapped by push_ex_block_into_clause,
+		// where treat_ex_quantified_clause knows how to leave them
+		// correctly alone, and other structural cases its
+		// push_existential_quantifier_one/ex_quantified_boole_decomposition
+		// strategy resolves but this algorithm's disjunction/Boole
+		// decomposition does not (confirmed empirically: removing this
+		// fallback regresses satisfiability1-3, solver, splitter(2),
+		// interpreter, wff_normalization, and normal_forms tests, none of
+		// which involve bitvector content).
 		if (tau::get(r).find_top(is_quantifier<node>))
 			r = anti_prenex<node>(r);
 		return r;
@@ -3271,17 +3320,12 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
 			to_nnf<node>(tau::build_wff_neg(body)));
 		result = normalize_atomic_formula_operators<node>(
 			to_nnf<node>(tau::build_wff_neg(pushed)));
+		// Same final fallback as above.
 		if (tau::get(result).find_top(is_quantifier<node>))
 			result = anti_prenex<node>(result);
 	}
 	return result;
 }
-
-/*template<NodeType node>
-bool is_bv_type_family_tref(tref t) {
-	using tau = tree<node>;
-	return is_bv_type_family<node>(tau::get(t).get_ba_type());
-}*/
 
 /**
  * @internal
@@ -3291,6 +3335,11 @@ bool is_bv_type_family_tref(tref t) {
  * @return Formula with quantifiers pushed inward as far as possible using the block-based algorithm.
  * @endinternal
  */
+template<NodeType node>
+tref anti_prenex_block(tref formula) {
+	return anti_prenex_block<node>(formula, is_tref_bv_type_family<node>);
+}
+
 template<NodeType node>
 tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 	using tau = tree<node>;
@@ -3306,7 +3355,7 @@ tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 
 	// Step 1: NNF + syntactic simplification
 	formula = to_nnf<node>(formula);
-	formula = syntactic_formula_simplification<node>(formula);
+	formula = syntactic_formula_simplification<node>(formula, skip);
 
 	// Step 2: Substitution-based elimination (innermost first via post_order).
 	// Attempts ex x (x = t && phi(x)) => phi(t) for each existential
@@ -3320,7 +3369,7 @@ tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 		return elim != scope ? elim : n;
 	};
 	formula = post_order<node>(formula).apply_unique(subs_elim);
-	formula = syntactic_formula_simplification<node>(formula);
+	formula = syntactic_formula_simplification<node>(formula, skip);
 
 	// Step 3: Normalize non-canonical operators (bf_neq → ¬(bf_eq),
 	// bf_nlteq → bf_lt, etc.) so push_ex_block_into_clause sees only
@@ -3338,7 +3387,7 @@ tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 	};
 	formula = post_order<node>(formula).apply_unique(
 		f, while_is_formula<node>);
-	return syntactic_formula_simplification<node>(formula);
+	return syntactic_formula_simplification<node>(formula, skip);
 }
 
 /**
@@ -3354,9 +3403,10 @@ tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
  * @endinternal
  */
 // NOTE: BV-typed and non-atomless quantifier blocks are not handled here.
-// process_quantifier_block detects BV-typed nodes and falls back to
-// anti_prenex, which uses CVC5 for closed BV formulas and
-// treat_ex_quantified_clause for trivially vacuous quantifiers.
+// The 6-arg anti_prenex_block's caller only reaches this function for a
+// dependent clause containing no skip-matched (e.g. bitvector) block
+// variable -- a skip-matched block is diverted to predicate blasting
+// (anti_prenex_block's own blast_block helper) before this point.
 template<NodeType node>
 tref push_ex_block_into_clause(tref clause, const trefs& block,
 	const typename term_handle<node>::order& /*order*/) {
@@ -3595,10 +3645,7 @@ tref anti_prenex(tref formula) {
 
 /**
  * @internal
- * @brief Resolve quantifiers with a custom variable ordering.
- *
- * Variant of `resolve_quantifiers` that uses the provided `order` relation to
- * sort variables before the elimination step.
+ * @brief Resolve quantifiers with a custom variable ordering (default skip).
  * @tparam node Tree node type.
  * @param formula Formula containing quantifiers.
  * @param order Comparison relation for variable ordering.
@@ -3607,13 +3654,33 @@ tref anti_prenex(tref formula) {
  */
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order) {
+	return resolve_quantifiers2<node>(formula, order, is_tref_bv_type_family<node>);
+}
+
+/**
+ * @internal
+ * @brief Resolve quantifiers with a custom variable ordering.
+ *
+ * Variant of `resolve_quantifiers` that uses the provided `order` relation to
+ * sort variables before the elimination step.
+ * @tparam node Tree node type.
+ * @param formula Formula containing quantifiers.
+ * @param order Comparison relation for variable ordering.
+ * @param skip Predicate identifying variables this pass must not eliminate
+ *        (defaults to BV-typed nodes, which need the solver/blasting instead).
+ * @return Formula with quantifiers resolved.
+ * @endinternal
+ */
+template<NodeType node>
+tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,
+		std::function<bool(tref)> skip) {
 	using tau = tree<node>;
 	subtree_set<node> excluded;
 	auto down_resolver = [&](tref n) {
 		if (is_child_quantifier<node>(n)) {
 			// Check if the formula is closed and proceed to eliminate
 			// the quantifier
-			if (is_bv_type_family<node>(tau::get(tau::trim2(n)).get_ba_type())) {
+			if (skip(tau::trim2(n))) {
 				if (const trefs& free_vars = get_free_vars<node>(n);
 					free_vars.empty() && is_bv_solvable_formula<node>(n)) {
 					// Closed bv formula with explicit bitwidth: simplify to

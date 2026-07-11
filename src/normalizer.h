@@ -30,13 +30,16 @@ namespace idni::tau_lang {
 /**
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.
  *
- * For formulas without temporal quantifiers (`always`/`sometimes`):
- *   1. Resolves closed quantified bitvector sub-formulas (`resolve_quantifiers`).
- *   2. Applies anti-prenex block normalization (`anti_prenex_block`).
- *   3. Resolves remaining quantifiers.
+ * For formulas without temporal quantifiers (`always`/`sometimes`), applies
+ * `eliminate_bv_and_quantifiers` (see normalizer.tmpl.h): resolves closed
+ * quantified bitvector sub-formulas, pushes/eliminates the rest via
+ * `anti_prenex_block` (which itself attempts predicate blasting for
+ * bitvector-typed content), resolves again, then runs `anti_prenex_block`
+ * once more skipping only whatever bitvector arithmetic blasting could not
+ * resolve, and resolves a final time.
  *
- * For formulas with temporal quantifiers, the same three steps are applied
- * to each inner formula below a temporal quantifier, then the temporal layer
+ * For formulas with temporal quantifiers, the same pipeline is applied to
+ * each inner formula below a temporal quantifier, then the temporal layer
  * is normalized via `normalize_temporal_quantifiers`.
  *
  * @tparam node Tree node type.
@@ -65,11 +68,8 @@ tref fold_trivial_quantifiers(tref fm);
  * @brief Normalize a non-temporal formula.
  *
  * Assumes the formula contains no `always`/`sometimes` quantifiers. Applies
- * the following pipeline in order:
- *   1. `resolve_quantifiers`
- *   2. `anti_prenex_block`
- *   3. `resolve_quantifiers`
- *   4. `term_boole_normal_form`
+ * `eliminate_bv_and_quantifiers` (see `normalize` and normalizer.tmpl.h),
+ * then `term_boole_normal_form`.
  *
  * Note: `fold_trivial_quantifiers` is deliberately omitted to preserve bitwidth
  * subtypes (see NOTE in implementation); residual trivial quantifiers are folded
