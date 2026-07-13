@@ -244,6 +244,12 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 		// After substitution the body reduces to T.
 		CHECK( normalize_and_check("ex x (x = w).", tau::wff_t) );
 	}
+	// trivial_skolem path: an eligible atom under wff_or is unreachable by
+	// subs_elim (which bails on any wff_or in scope), so only the
+	// trivial_skolem wiring in process_quantifier_block can remove x here.
+	TEST_CASE("trivial_skolem: ex x (x=w || z=0) → T") {
+		CHECK( normalize_and_check("ex x (x = w || z = 0).", tau::wff_t) );
+	}
 	// Regression tests: a BV-typed atom unrelated to the (non-BV) block
 	// variable must not force the whole block to fall back to anti_prenex,
 	// nor be dropped/mishandled when it does get pulled into the block's

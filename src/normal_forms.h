@@ -276,6 +276,7 @@ tref pnf(tref n);
 #include "heuristics/ex_subs_based_elimination.h"
 #include "heuristics/syntactic_path_simplification.h"
 #include "heuristics/bv_arithmetic_scan.h"
+#include "heuristics/trivial_skolem.h"
 #include "normal_forms.tmpl.h"
 
 #endif // __IDNI__TAU__NORMAL_FORMS_H__

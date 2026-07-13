@@ -3268,6 +3268,33 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
 	}
 	tref body = curr;
 
+	// Trivial Skolemization: if every variable in this block is trivially
+	// eliminable (see heuristics/trivial_skolem.h), skip BDD ordering,
+	// Boole decomposition, and predicate blasting below entirely. Only
+	// valid for ∃-blocks. normalize_atomic_formula_operators first so
+	// bf_neq atoms (e.g. from an already-resolved inner block) are
+	// canonical bf_eq before trivial_skolem_ex's bf_eq-only matcher looks
+	// at them.
+	//
+	// Only adopt the result when ALL block variables were eliminated
+	// (trivial_skolem_ex then returns the bare matrix, with no
+	// re-quantification at all). If any variable survives,
+	// trivial_skolem_ex re-wraps survivors via build_wff_ex_many, which
+	// renames every surviving bound variable -- and that renaming is not
+	// capture-safe against variables already free in the body (observed
+	// to corrupt formulas containing leftover synthetic "bN"-named
+	// witnesses from earlier quantifier elimination in this same
+	// pipeline), so any such partial result is discarded here and the
+	// block falls through to the existing pipeline unchanged.
+	if (is_ex) {
+		tref simplified = trivial_skolem_ex<node>(block_vars,
+			normalize_atomic_formula_operators<node>(body));
+		if (!is_child<node>(simplified, tau::wff_ex)) {
+			block_vars.clear();
+			return simplified;
+		}
+	}
+
 	// Build BDD variable order (innermost = lowest index = highest priority).
 	typename term_handle<node>::order ord;
 	for (size_t i = 0; i < block_vars.size(); ++i)

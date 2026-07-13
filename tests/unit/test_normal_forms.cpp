@@ -645,6 +645,28 @@ TEST_SUITE("AntiPrenexBlock0Arg") {
 		tref res = run_apb0("ex x (xy = 0 && wz = 0).");
 		CHECK( matches_to_str_to_any_of(res, {"wz = 0", "zw = 0"}) );
 	}
+
+	TEST_CASE("trivial_skolem wiring: ex x (x=w || z=0) resolves via the block hook") {
+		// x's only occurrence is `x=w`, reachable under wff_or. subs_elim
+		// (Step 2) bails on any wff_or in scope, so only the trivial_skolem
+		// wiring in process_quantifier_block can remove x here.
+		// ex x.(x=w || z=0) is a tautology (x:=w always witnesses the left
+		// disjunct), so it folds all the way to T.
+		tref res = run_apb0("ex x (x = w || z = 0).");
+		CHECK( tau::get(res)[0].is(tau::wff_t) );
+	}
+
+	TEST_CASE("trivial_skolem wiring: mixed block falls back safely when not fully eliminable") {
+		// x occurs once, in `x=c` under an or; y occurs twice (yz=0 and
+		// yw=0), so trivial_skolem_ex keeps y (occurrence count != 1).
+		// Since not every block variable is eliminated, the wiring in
+		// process_quantifier_block discards trivial_skolem_ex's result
+		// (it only adopts full-block eliminations) and falls through to
+		// the existing Boole-decomposition pipeline, which must still
+		// resolve the whole block correctly on its own.
+		tref res = run_apb0("ex x ex y ((x = c || z = 0) && (yz = 0 || yw = 0)).");
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
 }
 
 TEST_SUITE("QuantBlockPush") {
