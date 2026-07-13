@@ -861,6 +861,54 @@ TEST_SUITE("bvnlt") {
 }
 
 //
+// bvngt: not-greater-than (= less-than-or-equal)
+//
+TEST_SUITE("bvngt") {
+
+	TEST_CASE("bvngt: 3 !> 2 is F") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[2] && x !> { 2 }:bv[2])") == "F");
+	}
+
+	TEST_CASE("bvngt: 1 !> 2 is T") {
+		CHECK(blast_normalize("ex x (x = { 1 }:bv[4] && x !> { 2 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvngt: 2 !> 2 is T (equal case)") {
+		CHECK(blast_normalize("ex x (x = { 2 }:bv[4] && x !> { 2 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvngt: 0 !> 0 is T (zero case)") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv[4] && x !> { 0 }:bv[4])") == "T");
+	}
+
+	TEST_CASE("bvngt: 0 !> 1 is T") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv[4] && x !> { 1 }:bv[4])") == "T");
+	}
+}
+
+//
+// bvngteq: not-greater-than-or-equal (= strictly less-than)
+//
+TEST_SUITE("bvngteq") {
+
+	TEST_CASE("bvngteq: 3 !>= 1 is F") {
+		CHECK(blast_normalize("ex x (x = { 3 }:bv[2] && x !>= { 1 }:bv[2])") == "F");
+	}
+
+	TEST_CASE("bvngteq: x !>= x is never satisfiable") {
+		CHECK(blast_normalize("ex x x:bv[4] !>= x:bv[4]") == "F");
+	}
+
+	TEST_CASE("bvngteq: 1 !>= 0 is F") {
+		CHECK(blast_normalize("ex x (x = { 1 }:bv[4] && x !>= { 0 }:bv[4])") == "F");
+	}
+
+	TEST_CASE("bvngteq: 0 !>= 1 is T") {
+		CHECK(blast_normalize("ex x (x = { 0 }:bv[4] && x !>= { 1 }:bv[4])") == "T");
+	}
+}
+
+//
 // Bug 6: wff_predicate_blasting passes the outer formula to predicates instead
 // of the atomic comparison node, causing bitwidth=0 and malformed blasting.
 //

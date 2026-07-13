@@ -11,6 +11,27 @@ tref normalize_atomic_formula_operators(tref fm);
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
+/**
+ * @internal
+ * @brief Strict ordering used to sort conjuncts: equality atoms (`bf_eq`)
+ * sort before non-equality atoms; among same-kind atoms, `subtree_less`
+ * breaks ties.
+ * @tparam node Tree node type.
+ * @param l Left atom.
+ * @param r Right atom.
+ * @return `true` if @p l strictly precedes @p r.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "x = 0" (equality) precedes "y != 0" (non-equality) (see
+ * // tests/integration/test_integration-heuristics-syntactic_path_simplification.cpp:12-17).
+ * tref eq_atm  = get_nso_rr("x = 0.").value().main->get();
+ * tref neq_atm = get_nso_rr("y != 0.").value().main->get();
+ * CHECK( syntactic_path_simplification_wff_comp<node_t>(eq_atm, neq_atm) == true );
+ * CHECK( syntactic_path_simplification_wff_comp<node_t>(neq_atm, eq_atm) == false );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 bool syntactic_path_simplification_wff_comp(tref l, tref r) {
 	using tau = tree<node>;
@@ -25,6 +46,28 @@ bool syntactic_path_simplification_wff_comp(tref l, tref r) {
 	}
 }
 
+/**
+ * @internal
+ * @brief Per-conjunction-path contradiction detection for wff: within each
+ * top-level `wff_and`, collects each conjunct as a `true`/`false`
+ * assignment (treating a bare atom as `true`, a negated atom as `false`),
+ * substitutes them into the rest of the conjunction, and collapses to `F`
+ * if any conjunct contradicts another. Does not descend into `wff_or` or
+ * push negations.
+ * @tparam node Tree node type.
+ * @param root Formula to scan.
+ * @return @p root with contradictory conjunctions collapsed to `F`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "x = 0 && !(x = 0)" collapses to F (see
+ * // tests/integration/test_integration-heuristics-syntactic_path_simplification.cpp:62-66).
+ * tref fm = get_nso_rr("x = 0 && !(x = 0).").value().main->get();
+ * tref res = syntactic_path_simplification_simplify_wff<node_t>(fm);
+ * CHECK( tau::get(res).equals_F() );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 tref syntactic_path_simplification_simplify_wff(tref root) {
 	using tau = tree<node>;
@@ -81,6 +124,26 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
 		apply_unique<synt_path_simp_m>(down, visit);
 }
 
+/**
+ * @internal
+ * @brief The bf-term analog of `syntactic_path_simplification_simplify_wff`:
+ * within each top-level `bf_and`, collects factor/negated-factor
+ * assignments and collapses to `0` if a contradiction (a factor and its
+ * negation both present) is found. Does not descend into `bf_or`.
+ * @tparam node Tree node type.
+ * @param root Boolean term to scan.
+ * @return @p root with contradictory conjunctions collapsed to `0`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "x & x'" collapses to 0 (see
+ * // tests/integration/test_integration-heuristics-syntactic_path_simplification.cpp:111-115).
+ * tref fm = get_bf_nso_rr("", "x & x'").value().main->get();
+ * tref res = syntactic_path_simplification_simplify_bf<node_t>(fm);
+ * CHECK( tau::get(res).equals_0() );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 tref syntactic_path_simplification_simplify_bf(tref root) {
 	using tau = tree<node>;

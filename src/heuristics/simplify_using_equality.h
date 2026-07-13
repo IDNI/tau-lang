@@ -27,6 +27,18 @@ namespace idni::tau_lang {
  * @tparam node Tree node type.
  * @param fm Formula to simplify.
  * @return Simplified formula; `T`/`F` when a branch is trivially true/false.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "xy|zx = 0 && xy = 0": xy=0 registers x~0 (or y~0), which simplifies
+ * // the reoriented "xy|zx=0" clause (see
+ * // tests/integration/test_integration-heuristics-simplify_using_equality.cpp:323-333).
+ * tref fm = get_nso_rr("xy|zx = 0 && xy = 0.").value().main->get();
+ * tref res = simplify_using_equality<node_t>(fm);
+ * // tau::get(res).to_str() matches one of "yx|xz = 0", "xy|xz = 0",
+ * // "yx|zx = 0", "xy|zx = 0" (term-ordering / xz-vs-zx are not canonical
+ * // across builds; see matches_to_str_to_any_of in the cited test)
+ * @endcode
  */
 template <NodeType node>
 tref simplify_using_equality(tref fm);

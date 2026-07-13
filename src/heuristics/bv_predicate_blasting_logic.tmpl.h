@@ -75,6 +75,12 @@ static tref make_bit_call_from_index(tref operand, size_t bit) {
  * @param bit Bit index
  * @param bitwidth Bitwidth of the operand
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Rule head "_bit[0](X)" with body "X & { 1 }:bv[4]" (bit 0's mask)
+ * auto rule = bit_rule<node_t>(0, 4);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule bit_rule(int_t bit, size_t bitwidth) {
@@ -106,7 +112,13 @@ static rewriter::rule bit_rule(int_t bit, size_t bitwidth) {
  *
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operand
- * @return The constructed rule
+ * @return The constructed rules, one per bit position
+ *
+ * @par Example
+ * @code{.cpp}
+ * auto rules = bit_rules<node_t>(4);
+ * // rules.size() == 4, one bit_rule per bit position 0..3
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rules bit_rules(size_t bitwidth) {
@@ -165,6 +177,12 @@ static tref make_bvshl_by_one_call(tref operand,  tref shifted) {
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operand
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Rule: shifted's bit 0 is 0, and shifted's bit i+1 equals base's bit i
+ * auto rule = bvshl_by_one_rule<node_t>(4);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule bvshl_by_one_rule(size_t bitwidth) {
@@ -233,6 +251,12 @@ static tref make_bvshr_by_one_call(tref base, tref shifted) {
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operand
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Rule: shifted's top bit is 0, and shifted's bit i equals base's bit i+1
+ * auto rule = bvshr_by_one_rule<node_t>(4);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule bvshr_by_one_rule(size_t bitwidth) {
@@ -321,6 +345,12 @@ static tref make_is_bit_zero_call_from_index(tref operand, size_t bit) {
  * @param bit Bit index
  * @param bitwidth Bitwidth of the operand
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Rule: "_is_bit_zero[0](X)" holds iff bit(X, 0) equals 0
+ * auto rule = is_bit_zero_rule<node_t>(0, 4);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
@@ -352,7 +382,13 @@ static rewriter::rule is_bit_zero_rule(size_t bit, size_t bitwidth) {
  *
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operand
- * @return The constructed rule
+ * @return The constructed rules, one per bit position
+ *
+ * @par Example
+ * @code{.cpp}
+ * auto rules = is_bit_zero_rules<node_t>(4);
+ * // rules.size() == 4
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rules is_bit_zero_rules(size_t bitwidth) {
@@ -414,6 +450,12 @@ static tref make_is_bit_one_call_from_index(tref operand, size_t bit) {
  * @param bit Bit index
  * @param bitwidth Bitwidth of the operand
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Rule: "_is_bit_one[0](X)" holds iff bit(X, 0) does not equal 0
+ * auto rule = is_bit_one_rule<node_t>(0, 4);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
@@ -445,7 +487,13 @@ static rewriter::rule is_bit_one_rule(size_t bit, size_t bitwidth) {
  *
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operand
- * @return The constructed rule
+ * @return The constructed rules, one per bit position
+ *
+ * @par Example
+ * @code{.cpp}
+ * auto rules = is_bit_one_rules<node_t>(4);
+ * // rules.size() == 4
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rules is_bit_one_rules(size_t bitwidth) {
@@ -498,6 +546,14 @@ static tref make_bvshl_call(tref base, tref count /* bv constant */, tref shifte
  * @param count Shift amount (constant)
  * @param bitwidth Bitwidth of the operands
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // count=3 for a 4-bit operand: shift-out is total once count >= bitwidth
+ * // for smaller widths, or a per-bit shift-by-3 correspondence otherwise
+ * auto count = tau::get(tau::bf, tau::get_bv_constant(4, 3));
+ * auto rule = bvshl_rule<node_t>(count);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule bvshl_rule(tref count /* bv constant */) {
@@ -592,6 +648,13 @@ static tref make_bvshr_call(tref base, tref count /* bv constant */, tref shifte
  * @tparam node Node type
  * @param count Shift count (bv constant)
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // count=1 for a 4-bit operand: equivalent to bvshr_by_one_rule(4)
+ * auto count = tau::get(tau::bf, tau::get_bv_constant(4, 1));
+ * auto rule = bvshr_rule<node_t>(count);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule bvshr_rule(tref count /* bv constant */) {
@@ -701,6 +764,13 @@ static tref make_bvcast_call(tref src, tref result) {
  * @param src_width Bitwidth of the source bitvector
  * @param target_width Bitwidth of the result bitvector
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Zero-extension bv[2] -> bv[4]: see @ref bvcast for a full worked
+ * // WFF-level example ({3}:bv[2] zero-extends to {3}:bv[4], not {11}:bv[4]).
+ * auto rule = bvcast_rule<node_t>(2, 4);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule bvcast_rule(size_t src_width, size_t target_width) {

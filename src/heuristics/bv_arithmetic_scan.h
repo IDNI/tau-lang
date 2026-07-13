@@ -29,6 +29,22 @@ namespace idni::tau_lang {
  * @tparam node Tree node type.
  * @param formula Formula to scan (typically the result of bv predicate blasting).
  * @return Set of variable/atom nodes that still require arithmetic reasoning.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "x * y = z" (non-constant multiplier, unblastable by bvmul): the
+ * // top-level atomic wff is tainted (pass 2). No variables get tainted
+ * // directly here (get_free_vars finds none on this bf-level subtree), so
+ * // the taint set has exactly one member: the whole atom.
+ * tref fm = get_nso_rr("x:bv[4] * y:bv[4] = z:bv[4].").value().main->get();
+ * auto tainted = collect_bv_arithmetic_taint<node_t>(fm);
+ * CHECK( tainted.size() == 1 );
+ * CHECK( tainted.contains(fm) );
+ *
+ * // No arithmetic operator anywhere -> nothing tainted.
+ * tref plain = get_nso_rr("x:bv[4] = y:bv[4].").value().main->get();
+ * CHECK( collect_bv_arithmetic_taint<node_t>(plain).empty() );
+ * @endcode
  */
 template <NodeType node>
 subtree_unordered_set<node> collect_bv_arithmetic_taint(tref formula);
@@ -44,6 +60,16 @@ subtree_unordered_set<node> collect_bv_arithmetic_taint(tref formula);
  * @tparam node Tree node type.
  * @param formula Formula to scan (typically the result of bv predicate blasting).
  * @return Predicate suitable as `anti_prenex_block`'s `skip` argument.
+ *
+ * @par Example
+ * @code{.cpp}
+ * tref fm = get_nso_rr("x:bv[4] * y:bv[4] = z:bv[4].").value().main->get();
+ * auto skip = make_bv_arithmetic_skip<node_t>(fm);
+ * CHECK( skip(fm) );  // fm itself is the tainted atom (see collect_bv_arithmetic_taint)
+ *
+ * tref other = get_nso_rr("x:bv[4] = z:bv[4].").value().main->get();
+ * CHECK( !skip(other) );
+ * @endcode
  */
 template <NodeType node>
 std::function<bool(tref)> make_bv_arithmetic_skip(tref formula);

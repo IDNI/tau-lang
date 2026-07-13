@@ -36,6 +36,22 @@ namespace idni::tau_lang {
  * @param vars Existentially quantified variables to try to eliminate.
  * @param phi Quantifier-free matrix.
  * @return Formula equivalent to `ex vars. phi`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "a1 = c": a1's only occurrence directly isolates it, so "ex a1. phi"
+ * // simplifies all the way to T (see
+ * // tests/integration/test_integration-heuristics-trivial_skolem.cpp:26-31).
+ * auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+ * tref phi1 = get_nso_rr("a1 = c.").value().main->get();
+ * CHECK( trivial_skolem_ex<node_t>({ a1 }, phi1) == tau::_T() );
+ *
+ * // "a1 = c && d = e": a1 is eliminated, the unrelated clause "d = e" survives
+ * // (see tests/integration/test_integration-heuristics-trivial_skolem.cpp:40-46).
+ * tref phi2 = get_nso_rr("a1 = c && d = e.").value().main->get();
+ * tref expected = get_nso_rr("d = e.").value().main->get();
+ * CHECK( trivial_skolem_ex<node_t>({ a1 }, phi2) == expected );
+ * @endcode
  */
 template <NodeType node>
 tref trivial_skolem_ex(const trefs& vars, tref phi);

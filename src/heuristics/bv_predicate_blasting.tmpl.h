@@ -11,6 +11,15 @@ namespace idni::tau_lang {
  * @tparam node Node type
  * @param term The term to analyze
  * @return Pair of (non-constant, constant) or (nullptr, nullptr)
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "x * { 6 }:bv[4]" -> (x, { 6 }:bv[4])
+ * tref fm = get_nso_rr("x * { 6 }:bv[4] = 0.").value().main->get();
+ * tref mul_term = tau::trim(tau::get(fm)[0].first());
+ * auto [var, cst] = get_bvmul_arguments<node_t>(mul_term);
+ * // tau::get(var).to_str() == "x", tau::get(cst).to_str() == "{ 6 }:bv[4]"
+ * @endcode
  */
 template <NodeType node>
 static std::pair<tref, tref> get_bvmul_arguments(tref term) {
@@ -40,6 +49,15 @@ static std::pair<tref, tref> get_bvmul_arguments(tref term) {
  * @tparam node Node type
  * @param term The term to analyze
  * @return Pair of (dividend, divisor) or (nullptr, nullptr)
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "x / { 3 }:bv[4]" -> (x, { 3 }:bv[4])
+ * tref fm = get_nso_rr("x / { 3 }:bv[4] = 0.").value().main->get();
+ * tref div_term = tau::trim(tau::get(fm)[0].first());
+ * auto [dividend, divisor] = get_arguments<node_t>(div_term);
+ * // tau::get(dividend).to_str() == "x", tau::get(divisor).to_str() == "{ 3 }:bv[4]"
+ * @endcode
  */
 template <NodeType node>
 static std::pair<tref, tref> get_arguments(tref term) {
@@ -71,6 +89,20 @@ static std::pair<tref, tref> get_arguments(tref term) {
  * @param vars The auxiliary variables to quantify (innermost last)
  * @param subformula The formula to quantify over
  * @return The quantified formula
+ *
+ * @par Example
+ * This is internal plumbing shared by every `*_predicate` function
+ * (`eq_predicate`, `lt_predicate`, ...) and by `bvadd`/`bvsub`/`bvmul`/
+ * `bvdiv`/`bvmod`/`bved` to close over the fresh carry/borrow/quotient-style
+ * variables their constraints introduce. Conceptually: given `vars = [c0,
+ * c1]` (two fresh carry variables) and a `subformula` whose highest existing
+ * numeric variable id is, say, `5`, this wraps `subformula` in `ex c1 (ex c0
+ * (subformula[c0 -> "6", c1 -> "7"]))`, then immediately eliminates both
+ * quantifiers via `resolve_quantifiers2` (BDD-based, since blasted
+ * arithmetic commonly introduces many disjuncts) rather than leaving them
+ * in the result. See @ref bvadd's example: the two carry variables its
+ * bit-recurrence introduces are exactly the kind of `vars` this function
+ * closes over.
  */
 template<NodeType node>
 static tref quantify_aux_vars(const trefs& vars, tref subformula) {
@@ -134,6 +166,17 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
  * @param changes Map of subtree replacements
  * @param vars Vector to collect introduced variables
  * @return The blasted predicate, or nullptr on error
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Called by every *_predicate function to resolve embedded arithmetic
+ * // before the top-level comparison itself is handled; see @ref lt_predicate
+ * // and @ref bvadd for the arithmetic this rewrites in practice.
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(tref term, trefs& vars, subtree_map<node, tref>& changes) {
@@ -254,6 +297,33 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 	return { predicate, modified };
 }
 
+/**
+ * @internal
+ * @brief Blasts an atomic comparison whose top-level relation itself needs
+ * no per-bit decomposition (equality/inequality), only its arithmetic
+ * sub-terms do.
+ *
+ * Runs `atomic_blasting` to rewrite any embedded arithmetic (e.g. `x+1`)
+ * into a fresh variable plus a conjoined constraint, then returns the
+ * (possibly unchanged) comparison conjoined with that constraint,
+ * existentially quantifying the fresh auxiliary variables. Shared plumbing
+ * for `eq_predicate` and `neq_predicate`.
+ * @tparam node Tree node type.
+ * @param atomic The atomic `=`/`!=` comparison to blast.
+ * @return The blasted predicate, or `nullptr` on error.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "x + { 1 }:bv[4] = { 5 }:bv[4]": the embedded addition is blasted into
+ * // a fresh variable constrained by bvadd, conjoined with the equality.
+ * tref fm = get_nso_rr(
+ *     "x + { 1 }:bv[4] = { 5 }:bv[4].").value().main->get();
+ * tref atomic = tau::trim(tau::get(fm)[0].get());
+ * tref res = keep_comparison_predicate<node_t>(atomic);
+ * CHECK( res != nullptr );
+ * @endcode
+ * @endinternal
+ */
 template<NodeType node>
 static tref keep_comparison_predicate(tref atomic) {
 	using tau = tree<node>;
@@ -278,6 +348,17 @@ static tref keep_comparison_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic equality predicate
  * @return The resulting predicate term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for "=" atoms by wff_predicate_blasting (see bf_eq case);
+ * // exercised e.g. by "x + { 5 }:bv[4] = { 8 }:bv[4]" (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:70-72).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static tref eq_predicate(tref atomic) {
@@ -290,6 +371,15 @@ static tref eq_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic inequality predicate
  * @return The resulting predicate term, or nullptr on error
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for "!=" atoms; x != x is never satisfiable (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:546-547).
+ * tref fm = get_nso_rr("ex x x:bv[4] != x:bv[4].").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_F() );
+ * @endcode
  */
 template<NodeType node>
 static tref neq_predicate(tref atomic) {
@@ -302,6 +392,17 @@ static tref neq_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic less-than predicate
  * @return The resulting predicate term, or nullptr on error
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for "<" atoms, delegating to bvlt after atomic_blasting
+ * // resolves any embedded arithmetic (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:316-317).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 2 }:bv[2] && x < { 3 }:bv[2]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static tref lt_predicate(tref atomic) {
@@ -329,6 +430,15 @@ static tref lt_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic greater-than predicate
  * @return The resulting predicate term, or nullptr on error
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for ">" atoms; x > x is never satisfiable (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:362-363).
+ * tref fm = get_nso_rr("ex x x:bv[4] > x:bv[4].").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_F() );
+ * @endcode
  */
 template<NodeType node>
 static tref gt_predicate(tref atomic) {
@@ -356,6 +466,16 @@ static tref gt_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic less-than-or-equal predicate
  * @return The resulting predicate term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for "<=" atoms: 2 <= 3 for 2-bit bitvectors (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:415-417).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 2 }:bv[2] && x <= { 3 }:bv[2]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static tref lteq_predicate(tref atomic) {
@@ -371,6 +491,15 @@ static tref lteq_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic greater-than-or-equal predicate
  * @return The resulting predicate term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for ">=" atoms: all x, x >= x (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:389-391).
+ * tref fm = get_nso_rr("all x x:bv[4] >= x:bv[4].").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static tref gteq_predicate(tref atomic) {
@@ -386,6 +515,16 @@ static tref gteq_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic not-less-than predicate
  * @return The resulting predicate term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for "!<" atoms: 2 !< 2 is T (equal case) (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:850-851).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 2 }:bv[4] && x !< { 2 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static tref nlt_predicate(tref atomic) {
@@ -401,6 +540,17 @@ static tref nlt_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic not-greater-than predicate
  * @return The resulting predicate term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for "!>" atoms: 2 !> 2 is T (equal case) (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp,
+ * // TEST_SUITE("bvngt"), "bvngt: 2 !> 2 is T (equal case)").
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 2 }:bv[4] && x !> { 2 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static tref ngt_predicate(tref atomic) {
@@ -416,6 +566,16 @@ static tref ngt_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic not-less-than-or-equal predicate
  * @return The resulting predicate term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for "!<=" atoms: 3 !<= 1 is T (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:433-434).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[2] && x !<= { 1 }:bv[2]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static tref nlteq_predicate(tref atomic) {
@@ -429,6 +589,17 @@ static tref nlteq_predicate(tref atomic) {
  * @tparam node Node type
  * @param atomic The atomic not-greater-than-or-equal predicate
  * @return The resulting predicate term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Dispatched for "!>=" atoms: 0 !>= 1 is T (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp,
+ * // TEST_SUITE("bvngteq"), "bvngteq: 0 !>= 1 is T").
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 0 }:bv[4] && x !>= { 1 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static tref ngteq_predicate(tref atomic) {
@@ -444,6 +615,16 @@ static tref ngteq_predicate(tref atomic) {
  * @tparam node Node type
  * @param term The formula to blast
  * @return The formula with predicates blasted, or nullptr on error
+ *
+ * @par Example
+ * @code{.cpp}
+ * // This is what bv_predicate_blasting (the public entry point) calls
+ * // internally; see @ref bv_predicate_blasting for a worked example.
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
+ * tref blasted = wff_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 static tref wff_predicate_blasting(tref term) {

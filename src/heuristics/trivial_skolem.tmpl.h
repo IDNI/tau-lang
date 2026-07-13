@@ -68,10 +68,33 @@
 
 namespace idni::tau_lang {
 
-// Attempts to invert `side = other` for `var`: recursively peels invertible
-// term operators off `side` until `var` is isolated, accumulating the
-// witness expression in `result`. Returns false if `var` can't be isolated
-// this way.
+/**
+ * @internal
+ * @brief Attempts to invert `side = other` for @p var: recursively peels
+ * invertible term operators (negation, xor, add, sub) off @p side until
+ * @p var is isolated, accumulating the witness expression in @p result.
+ * @tparam node Tree node type.
+ * @param side The (possibly composed) side of the equation containing @p var.
+ * @param other The other side of the equation.
+ * @param var The variable to isolate.
+ * @param result Output: the witness expression for @p var, if isolation succeeds.
+ * @return `true` if @p var could be isolated this way, `false` otherwise
+ * (e.g. both or neither operand of a binary operator contains @p var).
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "a1 ^ c = d": xor is invertible, isolating a1 as "d ^ c"
+ * // (see tests/integration/test_integration-heuristics-trivial_skolem.cpp:88-93,
+ * // exercised through trivial_skolem_ex).
+ * auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+ * tref phi = get_nso_rr("a1 ^ c = d.").value().main->get();
+ * tref side  = tau::get(phi)[0].first();
+ * tref other = tau::get(phi)[0].second();
+ * tref witness;
+ * CHECK( trivial_skolem_invert_term<node_t>(side, other, a1, witness) );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 bool trivial_skolem_invert_term(tref side, tref other, tref var, tref& result) {
 	using tau = tree<node>;
@@ -111,9 +134,34 @@ bool trivial_skolem_invert_term(tref side, tref other, tref var, tref& result) {
 	return false;
 }
 
-// Checks whether `clause` (a wff-wrapped formula) is a bf_eq that isolates
-// `var` via invertible operators, with a witness free of every variable in
-// `vars`. On success, `witness` holds the witness expression.
+/**
+ * @internal
+ * @brief Checks whether @p clause (a wff-wrapped formula) is a `bf_eq` with
+ * exactly one side containing @p var, and that side can be inverted (via
+ * `trivial_skolem_invert_term`) to isolate @p var with a witness free of
+ * every variable in @p vars.
+ * @tparam node Tree node type.
+ * @param clause Candidate atomic clause.
+ * @param var The variable to isolate.
+ * @param vars The full set of variables being eliminated in this pass
+ * (the witness must be independent of all of them, not just @p var).
+ * @param witness Output: the accepted witness expression, if any.
+ * @return `true` if @p clause isolates @p var with an acceptable witness.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "a1 = a2 && c = 0": a1 = a2 isolates a1 with witness "a2", but a2 is
+ * // itself one of the variables being eliminated, so the witness is
+ * // rejected (see
+ * // tests/integration/test_integration-heuristics-trivial_skolem.cpp:72-79).
+ * auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+ * auto a2 = build_variable<node_t>("a2", tau_type_id<node_t>());
+ * tref clause = get_nso_rr("a1 = a2.").value().main->get();
+ * tref witness;
+ * CHECK( !trivial_skolem_invertible_clause<node_t>(clause, a1, { a1, a2 }, witness) );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 bool trivial_skolem_invertible_clause(tref clause, tref var,
 	const trefs& vars, tref& witness)
@@ -134,13 +182,35 @@ bool trivial_skolem_invertible_clause(tref clause, tref var,
 	return true;
 }
 
-// Atomic formulas under negation, wff-level xor, or implication-style
-// connectives are not in a monotone position (see file overview). We also stop
-// at nested (possibly temporal) quantifiers because those atoms are out of
-// scope for this pass. We intentionally do *not* stop at `wff_or`: once a
-// defining atom is proven equivalent to `T`, replacing it by `T` remains sound
-// under disjunction, and doing so lets the simplifier remove the now-trivial
-// branch.
+/**
+ * @internal
+ * @brief Predicate marking the non-monotone-position boundaries this pass
+ * must not descend past: negation, wff-level xor/implication-family
+ * connectives, and any (including temporal) quantifier.
+ *
+ * Atomic formulas under negation, wff-level xor, or implication-style
+ * connectives are not in a monotone position (see file overview). We also
+ * stop at nested (possibly temporal) quantifiers because those atoms are
+ * out of scope for this pass. We intentionally do *not* stop at `wff_or`:
+ * once a defining atom is proven equivalent to `T`, replacing it by `T`
+ * remains sound under disjunction, and doing so lets the simplifier remove
+ * the now-trivial branch.
+ * @tparam node Tree node type.
+ * @param n Node to test.
+ * @return `true` if @p n is one of these boundary node types.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // An atom under negation is out of scope (negation is one of the
+ * // boundaries; compare the negation-elimination cases at
+ * // tests/integration/test_integration-heuristics-trivial_skolem.cpp:263-278).
+ * tref neg = get_nso_rr("!(a1 = c).").value().main->get();
+ * tref inner = tau::get(neg)[0].get();
+ * // tau::get(inner).to_str() == "!a1 = c" (the wff_neg node itself)
+ * CHECK( trivial_skolem_atom_boundary<node_t>(inner) );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 bool trivial_skolem_atom_boundary(tref n) {
 	using tau = tree<node>;
@@ -155,12 +225,32 @@ bool trivial_skolem_atom_boundary(tref n) {
 		|| is_temporal_quantifier<node>(n);
 }
 
-// Counts every syntactic occurrence of `var` in `fm`, expanding shared
-// subtrees rather than deduplicating them: `var` could be reachable through
-// more than one path (e.g. an operand shared by a desugared `wff_equiv`,
-// which references it once negated and once positively), and a variable
-// that occurs more than once anywhere in `fm` must never be eliminated,
-// even if exactly one of its occurrences sits inside an eligible atom.
+/**
+ * @internal
+ * @brief Counts every syntactic occurrence of @p var in @p fm, expanding
+ * shared subtrees rather than deduplicating them.
+ *
+ * A variable could be reachable through more than one path (e.g. an operand
+ * shared by a desugared `wff_equiv`, which references it once negated and
+ * once positively), and a variable that occurs more than once anywhere in
+ * @p fm must never be eliminated, even if exactly one of its occurrences
+ * sits inside an otherwise-eligible atom.
+ * @tparam node Tree node type.
+ * @param fm Formula to scan.
+ * @param var Variable to count occurrences of.
+ * @return The number of syntactic occurrences of @p var in @p fm.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // a1 occurs in two separate clauses -> count is 2, so trivial_skolem_ex
+ * // keeps it quantified rather than eliminating it (see
+ * // tests/integration/test_integration-heuristics-trivial_skolem.cpp:56-62).
+ * auto a1 = build_variable<node_t>("a1", tau_type_id<node_t>());
+ * tref phi = get_nso_rr("a1 = c && a1 = d.").value().main->get();
+ * CHECK( trivial_skolem_count_occurrences<node_t>(phi, a1) == 2 );
+ * @endcode
+ * @endinternal
+ */
 template <NodeType node>
 size_t trivial_skolem_count_occurrences(tref fm, tref var) {
 	using cache_t = std::unordered_map<tref, size_t>;

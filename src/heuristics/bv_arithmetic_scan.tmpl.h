@@ -10,9 +10,20 @@ template <NodeType node>
 subtree_unordered_set<node> collect_bv_arithmetic_taint(tref formula) {
 	using tau = tree<node>;
 	subtree_unordered_set<node> tainted;
-	auto is_arith_op = is<node>({ tau::bf_add, tau::bf_sub, tau::bf_mul,
-		tau::bf_div, tau::bf_mod, tau::bf_shl, tau::bf_shr,
-		tau::bf_cast });
+	// Not `is<node>({...})` (the std::function-returning factory overload):
+	// that overload's lambda captures the std::initializer_list by value,
+	// which only copies a pointer to the backing array of the braced-init
+	// temporary: the array's lifetime ends with this statement, so every
+	// later call through the stored std::function reads a dangling array
+	// (UB; silently "worked" under -O0, read garbage and matched nothing
+	// under -O1+). Wrapping the plain (n, initializer_list) overload in our
+	// own lambda instead re-materializes a fresh, live initializer_list on
+	// every call.
+	auto is_arith_op = [](tref n) {
+		return is<node>(n, { tau::bf_add, tau::bf_sub, tau::bf_mul,
+			tau::bf_div, tau::bf_mod, tau::bf_shl, tau::bf_shr,
+			tau::bf_cast });
+	};
 	// Pass 1: bv-typed variables occurring under an arithmetic operator.
 	for (tref op : tau::get(formula).select_all(is_arith_op))
 		for (tref v : get_free_vars<node>(op))

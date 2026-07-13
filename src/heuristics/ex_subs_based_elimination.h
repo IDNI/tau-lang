@@ -25,6 +25,24 @@ namespace idni::tau_lang {
  * @param var The existentially quantified variable to eliminate.
  * @param ex_clause The clause body.
  * @return Quantifier-free formula, or @p ex_clause on failure.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Substitution applied: "x = a && y = b" offers "x = a" as a witness, so
+ * // a is substituted for x and the result differs from the input (see
+ * // tests/integration/test_integration-heuristics-ex_subs_based_elimination.cpp:26-33).
+ * auto var = build_variable<node_t>("x", tau_type_id<node_t>());
+ * tref ex_clause = get_nso_rr("x = a && y = b.").value().main->get();
+ * tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
+ * CHECK( result != ex_clause );
+ *
+ * // Occurs-check rejection: the only equality mentioning x is "x = x|y",
+ * // and x occurs on its own right-hand side, so no substitution is applied
+ * // (see tests/integration/test_integration-heuristics-ex_subs_based_elimination.cpp:71-80).
+ * tref ex_clause2 = get_nso_rr("x = x | y && y = b.").value().main->get();
+ * tref result2 = ex_subs_based_elimination<node_t>(var, ex_clause2);
+ * CHECK( result2 == ex_clause2 );
+ * @endcode
  */
 template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause);

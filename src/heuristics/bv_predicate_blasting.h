@@ -58,6 +58,16 @@ inline bool bv_blasting = true;
  * @tparam node Node type
  * @param term The formula to blast
  * @return The formula with predicates blasted, or nullptr on error
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 3 + 5 = 8 for 4-bit bitvectors (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:70-72).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[4] && x + { 5 }:bv[4] = { 8 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 tref bv_predicate_blasting(tref term);
@@ -68,6 +78,14 @@ tref bv_predicate_blasting(tref term);
  * @param operand Operand
  * @param bit Bit index
  * @return The resulting term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // bit(x, 0) is x masked-and with the { 1 } bit-0 selector
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * tref bit0 = bit<node_t>(x, 0);
+ * CHECK( tau::get(bit0).find_top(is<node_t, tau::bf_and>) != nullptr );
+ * @endcode
  */
 template<NodeType node>
 tref bit(tref operand, int_t bit);
@@ -79,6 +97,15 @@ tref bit(tref operand, int_t bit);
  * @param base Operand to shift
  * @param shifted Result variable
  * @return The resulting term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Constrains bit 0 of "shifted" to 0 and bit i+1 of "shifted" to bit i of x
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto shifted = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * tref constraint = bvshl_by_one<node_t>(x, shifted);
+ * CHECK( is_non_temp_nso_satisfiable<node_t>(constraint) );
+ * @endcode
  */
 template<NodeType node>
 tref bvshl_by_one(tref base, tref shifted);
@@ -90,6 +117,16 @@ tref bvshl_by_one(tref base, tref shifted);
  * @param base Operand to shift
  * @param shifted Result variable
  * @return The resulting predicate
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Constrains the top bit of "shifted" to 0 and bit i of "shifted" to bit
+ * // i+1 of x -- structurally distinct from bvshl_by_one's constraint.
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto shifted = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * tref constraint = bvshr_by_one<node_t>(x, shifted);
+ * CHECK( is_non_temp_nso_satisfiable<node_t>(constraint) );
+ * @endcode
  */
 template<NodeType node>
 tref bvshr_by_one(tref base, tref shifted);
@@ -103,6 +140,17 @@ tref bvshr_by_one(tref base, tref shifted);
  * @param count Shift amount (constant)
  * @param shifted Result variable
  * @return The resulting predicate
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 3 << 3 = 8 for 4-bit: only the lowest source bit still fits (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:239-241).
+ * tref fm = get_nso_rr(
+ *     "ex x ex y (x = { 3 }:bv[4] && x << { 3 }:bv[4] = y && "
+ *     "y = { 8 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 tref bvshl(tref base, tref count, tref shifted);
@@ -116,6 +164,17 @@ tref bvshl(tref base, tref count, tref shifted);
  * @param count Shift amount (constant)
  * @param shifted Result variable
  * @return The resulting predicate
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 15 >> 4 = 0 for 4-bit: the whole value shifts out (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:297-299).
+ * tref fm = get_nso_rr(
+ *     "ex x ex y (x = { 15 }:bv[4] && x >> { 4 }:bv[4] = y && "
+ *     "y = { 0 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 tref bvshr(tref base, tref count, tref shifted);
@@ -135,6 +194,21 @@ tref bvshr(tref base, tref count, tref shifted);
  * @param src Source bitvector
  * @param result Result bitvector (fresh variable of target type)
  * @return The resulting predicate term
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Zero-extending {3}:bv[2] to bv[4] gives {3}:bv[4], not {11}:bv[4] (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:779-789).
+ * tref fm_ok = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[2] && (bv[4]) x = { 3 }:bv[4]).").value().main->get();
+ * CHECK( tau::get(normalizer<node_t>(
+ *     bv_predicate_blasting<node_t>(fm_ok))).equals_T() );
+ *
+ * tref fm_bad = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[2] && (bv[4]) x = { 11 }:bv[4]).").value().main->get();
+ * CHECK( tau::get(normalizer<node_t>(
+ *     bv_predicate_blasting<node_t>(fm_bad))).equals_F() );
+ * @endcode
  */
 template<NodeType node>
 tref bvcast(tref src, tref result);
@@ -146,6 +220,24 @@ tref bvcast(tref src, tref result);
  * @param left Left operand
  * @param right Right operand
  * @return The resulting predicate
+ *
+ * @note Unlike @ref bvlt / @ref bvgt, this function is never invoked by the
+ * WFF dispatcher: `!=` surface syntax routes through `neq_predicate`, which
+ * calls `keep_comparison_predicate` instead of this bit-recurrence. It is a
+ * standalone entry point; both operands must carry a proper bv type (e.g.
+ * built via `bv_type_id<node>(width)`) for the underlying recurrence to
+ * resolve -- a bare `ba_constant` operand does not carry a bitwidth
+ * `get_bv_type_bitwidth` can read, and the recurrence never resolves.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // x != x is never satisfiable (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * // TEST_CASE("bvneq: x != x is never satisfiable")).
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * tref pred = bvneq<node_t>(x, x);
+ * CHECK( tau::get(normalizer<node_t>(pred)).equals_F() );
+ * @endcode
  */
 template<NodeType node>
 tref bvneq(tref left, tref right);
@@ -157,6 +249,16 @@ tref bvneq(tref left, tref right);
  * @param left Left operand
  * @param right Right operand
  * @return The resulting predicate
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 2 < 3 for 2-bit bitvectors, differing only at the LSB (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:340-341).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 2 }:bv[2] && x < { 3 }:bv[2]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 tref bvlt(tref left, tref right);
@@ -168,6 +270,15 @@ tref bvlt(tref left, tref right);
  * @param left Left operand
  * @param right Right operand
  * @return The resulting predicate
+ *
+ * @par Example
+ * @code{.cpp}
+ * // x > x is never satisfiable (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:362-363).
+ * tref fm = get_nso_rr("ex x x:bv[4] > x:bv[4].").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_F() );
+ * @endcode
  */
 template<NodeType node>
 tref bvgt(tref left, tref right);
@@ -179,6 +290,23 @@ tref bvgt(tref left, tref right);
  * @param left Left operand
  * @param right Right operand
  * @return The resulting predicate
+ *
+ * @note Unlike @ref bvlt / @ref bvgt, this wrapper is never invoked by
+ * `wff_predicate_blasting`'s dispatcher: `<=` surface syntax is routed
+ * through `lteq_predicate` instead, which independently negates
+ * `lt_predicate` rather than calling this function. `bvlteq` is a
+ * standalone convenience entry point (see
+ * tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * `TEST_CASE("bvlteq delegates to bvgt")`).
+ *
+ * @par Example
+ * @code{.cpp}
+ * // By construction, bvlteq(l, r) is exactly !bvgt(l, r)
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto y = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * CHECK( tau::get(bvlteq<node_t>(x, y))
+ *     == tau::get(tau::build_wff_neg(bvgt<node_t>(x, y))) );
+ * @endcode
  */
 template<NodeType node>
 tref bvlteq(tref left, tref right) {
@@ -193,6 +321,19 @@ tref bvlteq(tref left, tref right) {
  * @param left Left operand
  * @param right Right operand
  * @return The resulting predicate
+ *
+ * @note Like @ref bvlteq, this is a standalone wrapper never invoked by the
+ * WFF dispatcher (`>=` routes through `gteq_predicate`, which independently
+ * negates `lt_predicate`).
+ *
+ * @par Example
+ * @code{.cpp}
+ * // By construction, bvgteq(l, r) is exactly !bvlt(l, r)
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto y = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * CHECK( tau::get(bvgteq<node_t>(x, y))
+ *     == tau::get(tau::build_wff_neg(bvlt<node_t>(x, y))) );
+ * @endcode
  */
 template<NodeType node>
 tref bvgteq(tref left, tref right) {
@@ -208,6 +349,18 @@ tref bvgteq(tref left, tref right) {
  * @param left Left operand
  * @param right Right operand
  * @return The resulting predicate
+ *
+ * @note Standalone wrapper, never invoked by the WFF dispatcher (`!<=`
+ * routes through `nlteq_predicate`, which independently calls
+ * `gt_predicate`).
+ *
+ * @par Example
+ * @code{.cpp}
+ * // By construction, bvnlteq(l, r) is exactly bvgt(l, r)
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto y = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * CHECK( tau::get(bvnlteq<node_t>(x, y)) == tau::get(bvgt<node_t>(x, y)) );
+ * @endcode
  */
 template<NodeType node>
 tref bvnlteq(tref left, tref right) { return bvgt<node>(left, right); }
@@ -219,6 +372,19 @@ tref bvnlteq(tref left, tref right) { return bvgt<node>(left, right); }
  * @param left Left operand
  * @param right Right operand
  * @return The resulting predicate
+ *
+ * @note Standalone wrapper, never invoked by the WFF dispatcher (`!>=`
+ * routes through `ngteq_predicate`, which independently calls
+ * `lt_predicate`). See tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * `TEST_CASE("bvngteq delegates to bvlt")`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // By construction, bvngteq(l, r) is exactly bvlt(l, r)
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto y = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * CHECK( tau::get(bvngteq<node_t>(x, y)) == tau::get(bvlt<node_t>(x, y)) );
+ * @endcode
  */
 template<NodeType node>
 tref bvngteq(tref left, tref right) { return bvlt<node>(left, right); }
@@ -230,6 +396,17 @@ tref bvngteq(tref left, tref right) { return bvlt<node>(left, right); }
  * @param left Left operand
  * @param right Right operand
  * @return The resulting predicate
+ *
+ * @note Standalone wrapper, never invoked by the WFF dispatcher (`!<`
+ * routes through `nlt_predicate`, which independently calls `lt_predicate`).
+ *
+ * @par Example
+ * @code{.cpp}
+ * // By construction, bvnlt(l, r) is exactly bvgteq(l, r)
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto y = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * CHECK( tau::get(bvnlt<node_t>(x, y)) == tau::get(bvgteq<node_t>(x, y)) );
+ * @endcode
  */
 template<NodeType node>
 tref bvnlt(tref left, tref right) { return bvgteq<node>(left, right); }
@@ -241,6 +418,19 @@ tref bvnlt(tref left, tref right) { return bvgteq<node>(left, right); }
  * @param left Left operand
  * @param right Right operand
  * @return The resulting predicate
+ *
+ * @note Standalone wrapper, never invoked by the WFF dispatcher (`!>` routes
+ * through `ngt_predicate`, which independently calls `gt_predicate`). See
+ * tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * `TEST_CASE("bvngt delegates to bvlteq")`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // By construction, bvngt(l, r) is exactly bvlteq(l, r)
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto y = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * CHECK( tau::get(bvngt<node_t>(x, y)) == tau::get(bvlteq<node_t>(x, y)) );
+ * @endcode
  */
 template<NodeType node>
 tref bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
@@ -258,6 +448,16 @@ tref bvngt(tref left, tref right) { return bvlteq<node>(left, right); }
  * @param sum Result variable
  * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr on error
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 15 + 1 = 0 for 4-bit (overflow wraps mod 2^4) (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:82-84).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 15 }:bv[4] && x + { 1 }:bv[4] = { 0 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 tref bvadd(tref augend, tref addend, tref sum, trefs& aux);
@@ -276,6 +476,16 @@ tref bvadd(tref augend, tref addend, tref sum, trefs& aux);
  * @param difference Result variable
  * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr on error
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 0 - 1 = 15 for 4-bit (underflow wraps mod 2^4) (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:116-118).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 0 }:bv[4] && x - { 1 }:bv[4] = { 15 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux);
@@ -295,6 +505,16 @@ tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux);
  * @param product Result variable
  * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr if unsupported
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 3 * 6 = 2 for 4-bit (18 mod 16 = 2, overflow) (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:151-152).
+ * tref fm = get_nso_rr(
+ *     "ex x (x = { 3 }:bv[4] && x * { 6 }:bv[4] = { 2 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux);
@@ -314,6 +534,30 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux);
  * @param remainder Remainder variable
  * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr if unsupported
+ *
+ * @note Never invoked by the library itself: `atomic_blasting` dispatches
+ * `/` and `%` to @ref bvdiv and @ref bvmod separately rather than fusing
+ * them into a single `bved` call, so this has no WFF-level coverage. See
+ * tests/integration/test_integration-heuristics-bv_predicate_blasting_predicates.cpp,
+ * `TEST_CASE("bved: 10 / 3 gives quotient=3, remainder=1")`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 10 = 3*3 + 1, so quotient=3, remainder=1 satisfies the constraint;
+ * // quotient=3, remainder=2 does not.
+ * trefs aux;
+ * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto q = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto r = tau::build_bf_variable(bv_type_id<node_t>(4));
+ * auto divisor = tau::get(tau::bf, tau::get_bv_constant(4, 3));
+ * tref constraint = bved<node_t>(x, divisor, q, r, aux);
+ * tref x10 = tau::build_bf_eq(x, tau::get(tau::bf, tau::get_bv_constant(4, 10)));
+ * tref q3 = tau::build_bf_eq(q, tau::get(tau::bf, tau::get_bv_constant(4, 3)));
+ * tref r1 = tau::build_bf_eq(r, tau::get(tau::bf, tau::get_bv_constant(4, 1)));
+ * tref good = tau::build_wff_and(tau::build_wff_and(constraint, x10),
+ *     tau::build_wff_and(q3, r1));
+ * CHECK( is_non_temp_nso_satisfiable<node_t>(good) );
+ * @endcode
  */
 template<NodeType node>
 tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
@@ -333,6 +577,17 @@ tref bved(tref dividend, tref divisor, tref quotient, tref remainder,
  * @param quotient Quotient variable
  * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr if unsupported
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 10 / 3 = 3 (integer division) (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:451-452).
+ * tref fm = get_nso_rr(
+ *     "ex x ex y (x = { 10 }:bv[4] && x / { 3 }:bv[4] = y && "
+ *     "y = { 3 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux);
@@ -351,6 +606,17 @@ tref bvdiv(tref dividend, tref divisor, tref quotient, trefs& aux);
  * @param remainder Remainder variable
  * @param aux Collects the fresh auxiliary variables
  * @return The resulting predicate term, or nullptr if unsupported
+ *
+ * @par Example
+ * @code{.cpp}
+ * // 10 % 3 = 1 (see
+ * // tests/integration/test_integration-heuristics-bv_predicate_blasting.cpp:486-487).
+ * tref fm = get_nso_rr(
+ *     "ex x ex y (x = { 10 }:bv[4] && x % { 3 }:bv[4] = y && "
+ *     "y = { 1 }:bv[4]).").value().main->get();
+ * tref blasted = bv_predicate_blasting<node_t>(fm);
+ * CHECK( tau::get(normalizer<node_t>(blasted)).equals_T() );
+ * @endcode
  */
 template<NodeType node>
 tref bvmod(tref dividend, tref divisor, tref remainder, trefs& aux);

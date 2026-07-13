@@ -60,6 +60,15 @@ static tref make_bvlt_call_from_index(tref left, tref right, size_t index) {
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
  * @return The set of rules for less-than
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Base case: _bvlt[0](x,y) := is_bit_zero[0](x) && is_bit_one[0](y).
+ * // General case: _bvlt[n](x,y) := (bit[n](x)=0 && bit[n](y)=1)
+ * //                              || (_bvlt[n-1](x,y) && bit[n](x) = bit[n](y)).
+ * auto rules = bvlt_rules<node_t>(2);
+ * // rules.size() == 2 (one base-case rule, one general recursive rule)
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rules bvlt_rules(size_t bitwidth) {
@@ -118,6 +127,15 @@ static rewriter::rules bvlt_rules(size_t bitwidth) {
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // For bitwidth 2, fully unfolds bvlt_rules + the bit/is_bit_zero/
+ * // is_bit_one rule chains into one concrete rule, e.g. (verified output):
+ * // _bvlt[1](X, Y) := X{2}:bv[2]=0 && Y{2}:bv[2]={2}:bv[2]
+ * //                || X{1}:bv[2]=0 && Y{1}:bv[2]={1}:bv[2] && X{2}:bv[2]=Y{2}:bv[2].
+ * auto rule = bvlt_rule<node_t>(2);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule bvlt_rule(size_t bitwidth) {
@@ -214,6 +232,15 @@ static tref make_bvgt_call_from_index(tref left, tref right, int_t index) {
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
  * @return The set of rules for greater-than
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Base case: _bvgt[0](x,y) := is_bit_one[0](x) && is_bit_zero[0](y).
+ * // General case: _bvgt[n](x,y) := (bit[n](x)=1 && bit[n](y)=0)
+ * //                              || (_bvgt[n-1](x,y) && bit[n](x) = bit[n](y)).
+ * auto rules = bvgt_rules<node_t>(2);
+ * // rules.size() == 2 (one base-case rule, one general recursive rule)
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rules bvgt_rules(size_t bitwidth) {
@@ -271,6 +298,15 @@ static rewriter::rules bvgt_rules(size_t bitwidth) {
  * @tparam node Node type
  * @param bitwidth Bitwidth of the operands
  * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // For bitwidth 2, fully unfolds bvgt_rules + the bit/is_bit_zero/
+ * // is_bit_one rule chains into one concrete rule, e.g. (verified output):
+ * // _bvgt[1](X, Y) := X{2}:bv[2]={2}:bv[2] && Y{2}:bv[2]=0
+ * //                || X{1}:bv[2]={1}:bv[2] && Y{1}:bv[2]=0 && X{2}:bv[2]=Y{2}:bv[2].
+ * auto rule = bvgt_rule<node_t>(2);
+ * @endcode
  */
 template<NodeType node>
 static rewriter::rule bvgt_rule(size_t bitwidth) {
@@ -330,6 +366,14 @@ tref bvgt(tref left, tref right) {
 //
 //
 
+/**
+ * @brief Creates a call to the bitvector not-equal recurrence (by tref offset).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param offset Offset (tref)
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvneq_call_from_offset(tref left, tref right, tref offset) {
 	using tau = tree<node>;
@@ -337,6 +381,14 @@ static tref make_bvneq_call_from_offset(tref left, tref right, tref offset) {
 	return tau::get(tau::wff, tau::get(tau::wff_ref, tau::build_rr_ref("_bvneq", { offset }, { left, right })));
 }
 
+/**
+ * @brief Creates a call to the bitvector not-equal recurrence (by index).
+ * @tparam node Node type
+ * @param left Left operand
+ * @param right Right operand
+ * @param index Bit index
+ * @return The constructed call term
+ */
 template<NodeType node>
 static tref make_bvneq_call_from_index(tref left, tref right, size_t index) {
 	using tau = tree<node>;
@@ -345,6 +397,26 @@ static tref make_bvneq_call_from_index(tref left, tref right, size_t index) {
 	return make_bvneq_call_from_offset<node>(left, right, offset);
 }
 
+/**
+ * @brief Returns the rules for bitvector not-equal recurrence.
+ *
+ * Generates the base and general case rules for bitvector not-equal.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The set of rules for not-equal
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Base case: _bvneq[0](x,y) := (bit[0](x)=0 && bit[0](y)=1)
+ * //                            || (bit[0](x)=1 && bit[0](y)=0).
+ * // General case: _bvneq[n](x,y) := (bit[n](x)=0 && bit[n](y)=1)
+ * //                               || (bit[n](x)=1 && bit[n](y)=0)
+ * //                               || _bvneq[n-1](x,y).
+ * auto rules = bvneq_rules<node_t>(2);
+ * // rules.size() == 2 (one base-case rule, one general recursive rule)
+ * @endcode
+ */
 template<NodeType node>
 static rewriter::rules bvneq_rules(size_t bitwidth) {
 	using tau = tree<node>;
@@ -399,6 +471,22 @@ static rewriter::rules bvneq_rules(size_t bitwidth) {
 	return rules;
 }
 
+/**
+ * @brief Returns the rule for bitvector not-equal recurrence.
+ *
+ * Applies the rules to construct the main predicate.
+ *
+ * @tparam node Node type
+ * @param bitwidth Bitwidth of the operands
+ * @return The constructed rule
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Fully unfolds bvneq_rules + the bit/is_bit_zero/is_bit_one rule chains
+ * // into one concrete rule for the given bitwidth.
+ * auto rule = bvneq_rule<node_t>(2);
+ * @endcode
+ */
 template<NodeType node>
 static rewriter::rule bvneq_rule(size_t bitwidth) {
 	using tau = tree<node>;

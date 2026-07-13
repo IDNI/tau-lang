@@ -211,6 +211,12 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux) {
  * @param remainder Remainder term
  * @param aux Collects the fresh auxiliary variables
  * @return The constraint conjunction, or nullptr if unsupported
+ *
+ * @par Example
+ * Shared by @ref bvdiv, @ref bvmod, and @ref bved (each introduces a fresh
+ * variable for the quotient and/or remainder it doesn't otherwise need and
+ * discards it). See @ref bved's example: `10 / 3` gives quotient 3,
+ * remainder 1, satisfying `exact = 10 - 1 = 9` and `quotient * 3 = 9`.
  */
 template<NodeType node>
 static tref bv_euclidean_constraints(tref dividend, tref divisor,
