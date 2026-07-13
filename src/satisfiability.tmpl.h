@@ -10,6 +10,27 @@ namespace idni::tau_lang {
 
 inline static bool use_debug_output_in_sat = false;
 
+/**
+ * @internal
+ * @brief Print a diagnostic message describing a fixpoint computation's
+ * outcome, if diagnostic output was requested.
+ * @param message Human-readable description of what was computed (e.g. how
+ * many steps a fixpoint search took).
+ * @param result Printed form of the resulting formula.
+ * @param output When `false`, this call is a no-op.
+ * @endinternal
+ *
+ * @par Example
+ * Calling `is_tau_formula_sat<node_t>(spec, 0, true)` (note the `output =
+ * true` argument) propagates `output` down into `transform_to_execution`
+ * and then into `always_to_unbounded_continuation`, which calls
+ * `print_fixpoint_info("Temporal normalization of always specification
+ * reached fixpoint after 3 steps, yielding the result: ", TAU_TO_STR(res),
+ * true)`, printing that message either via `LOG_INFO` or `std::cerr`
+ * depending on the `use_debug_output_in_sat` flag. With the default
+ * `output = false` (as used by every example above), the call does
+ * nothing.
+ */
 inline void print_fixpoint_info(const std::string& message,
 	const std::string& result, const bool output)
 {
@@ -26,6 +47,22 @@ bool has_stream_flag(const tref& fm) {
 		|| tau::get(fm).find_top(is<node, tau::constraint>);
 }
 
+/**
+ * @internal
+ * @brief Compute the greatest constant time point among the constant-time
+ * (initial-condition) IO variables in @p io_vars.
+ * @tparam node Tree node type.
+ * @param io_vars IO variable nodes to inspect (may mix constant-time and
+ * relative-time variables).
+ * @return The largest constant time point found, or `0` if none exist.
+ * @endinternal
+ *
+ * @par Example
+ * Given `io_vars = { o1[0], o1[2], i1[t] }` (`i1[t]` is a relative-time
+ * variable, not a constant-time one, so `is_io_initial` excludes it),
+ * `get_lookback_after_normalization<node>(io_vars)` returns `2`, the
+ * largest constant time point among the remaining `o1[0]` and `o1[2]`.
+ */
 template <NodeType node>
 int_t get_lookback_after_normalization(const trefs& io_vars) {
 	int_t max_lookback = 0;
@@ -48,6 +85,26 @@ bool has_temporary_io_var(tref fm) {
 	return false;
 }
 
+/**
+ * @internal
+ * @brief Instantiate a single relative-time IO variable at a concrete time
+ * point.
+ * @tparam node Tree node type.
+ * @param io_var IO variable node to instantiate (e.g. `o1[t-1]`).
+ * @param time_point Time step the variable's implicit `t` refers to.
+ * @return `io_var` unchanged if it already refers to a constant time
+ * point; otherwise a new IO variable at `time_point` minus @p io_var's
+ * relative shift.
+ * @endinternal
+ *
+ * @par Example
+ * Given the IO variable `o1[t-1]` (relative shift `1`) and `time_point =
+ * 5`, `transform_io_var<node>(io_var, 5)` returns the constant-time
+ * variable `o1[4]` (`5 - 1`). Given `o1[t]` (shift `0`) with the same
+ * `time_point`, it returns `o1[5]`. An already-constant variable such as
+ * `o1[0]` is returned unchanged regardless of `time_point`. This is the
+ * per-variable building block used by `fm_at_time_point`.
+ */
 template <NodeType node>
 tref transform_io_var(tref io_var, int_t time_point) {
 	using tau = tree<node>;
@@ -122,6 +179,23 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 	return fm;
 }
 
+/**
+ * @internal
+ * @brief Evaluate a constant-time constraint (e.g. `t <= 3`) at a concrete
+ * time point, returning the result as a Boolean-algebra constant.
+ * @tparam node Tree node type.
+ * @param constraint Constraint node comparing `t` against a fixed numeral
+ * (`ctn_eq`, `ctn_neq`, `ctn_lt`, `ctn_lteq`, `ctn_gt`, or `ctn_gteq`).
+ * @param time_point Concrete value substituted for `t`.
+ * @return The Boolean-algebra constant `_1` if the constraint holds at
+ * `time_point`, otherwise `_0`.
+ * @endinternal
+ *
+ * @par Example
+ * For the constraint `t <= 3` and `time_point = 2`, `calculate_ctn`
+ * evaluates `2 <= 3` and returns `_1` (true); for `time_point = 5` it
+ * evaluates `5 <= 3` and returns `_0` (false).
+ */
 template <NodeType node>
 tref calculate_ctn(tref constraint, int_t time_point) {
 	DBG(assert(constraint != nullptr);)
@@ -158,6 +232,27 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 	assert(false); return nullptr;
 }
 
+/**
+ * @internal
+ * @brief Check whether @p time_point still lies in the "initial phase" of a
+ * constant-time constraint, i.e. before the point at which its associated
+ * flag stream (built by `transform_ctn_to_streams`) has stabilized and no
+ * longer needs an explicit initial condition.
+ * @tparam node Tree node type.
+ * @param constraint Constraint node, already reduced to one of `ctn_lt`,
+ * `ctn_lteq`, `ctn_gt`, or `ctn_gteq` (equality/inequality constraints must
+ * already have been converted before calling this).
+ * @param time_point Time step to check.
+ * @return `true` if `time_point` is still within the constraint's initial
+ * phase.
+ * @endinternal
+ *
+ * @par Example
+ * For the constraint `t <= 3` (`ctn_lteq`, condition `3`),
+ * `is_initial_ctn_phase` returns `true` while `3 + 1 >= time_point`, i.e.
+ * for `time_point` in `{0, 1, 2, 3, 4}`, and `false` for `time_point >=
+ * 5`.
+ */
 template <NodeType node>
 bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 	using tau = tree<node>;
@@ -266,6 +361,25 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 	return rewriter::replace<node>(prev_fm, changes);
 }
 
+/**
+ * @internal
+ * @brief Comparator for sorting constant-time IO variables into
+ * time-compatible quantification order.
+ * @tparam node Tree node type.
+ * @param v1 First IO variable (or its wrapping `bf`) to compare.
+ * @param v2 Second IO variable (or its wrapping `bf`) to compare.
+ * @return `true` if `v1` should be ordered before `v2`: ascending by time
+ * point first; at equal time points, input variables before output
+ * variables; ties among variables of the same kind broken by variable
+ * name.
+ * @endinternal
+ *
+ * @par Example
+ * Sorting `{ o1[2], i1[2], o1[0] }` with `constant_io_comp<node>` yields
+ * `{ o1[0], i1[2], o1[2] }`: `o1[0]` comes first (smallest time point);
+ * `i1[2]` and `o1[2]` tie on time point `2`, but the input variable `i1[2]`
+ * is ordered before the output variable `o1[2]`.
+ */
 // comparator for sorting constant io variables
 template <NodeType node>
 inline auto constant_io_comp = [](tref v1, tref v2) {
@@ -289,8 +403,39 @@ inline auto constant_io_comp = [](tref v1, tref v2) {
 	} else return false;
 };
 
-// This method is designed to be called on the output of find_fixpoint_phi/chi
-// when the run was started at the earliest well-defined time point
+/**
+ * @internal
+ * @brief Check whether a fully time-instantiated "run" (a formula built
+ * from IO variables at constant time points only, as produced by repeated
+ * `fm_at_time_point` calls) is satisfiable under time-compatible
+ * quantification, i.e. all input streams universally and all output
+ * streams existentially quantified in increasing time order.
+ *
+ * This method is designed to be called on the output of
+ * `find_fixpoint_phi`/`find_fixpoint_chi` when the run was started at the
+ * earliest well-defined time point.
+ * @tparam node Tree node type.
+ * @param fm Formula consisting solely of IO variables at constant time
+ * points.
+ * @return `true` if the time-compatibly quantified formula is satisfiable
+ * (short-circuiting to `true`/`false` immediately if `fm` is already `T`
+ * or `F`).
+ * @endinternal
+ *
+ * @par Example
+ * `always_to_unbounded_continuation` builds up a `run` formula by
+ * conjoining successive `fm_at_time_point<node>(ubd_ctn, io_vars, t)`
+ * instantiations and calls `is_run_satisfiable<node>(run)` after each step
+ * to detect a contradiction as early as possible. For the always-part of
+ * "smaller_lookback_one_st" from
+ * tests/integration/test_integration-satisfiability1.cpp:17
+ * (`o1[t] = o1[t-1] && o1[t-1] = 1`), the run instantiated at times 0 and
+ * 1 (`o1[0] = 1 && (o1[1] = o1[0] && o1[0] = 1)`) is satisfiable, since an
+ * output stream constantly equal to `1` exists; for the always-part of
+ * "equal_lookback_one_st" (line 13, `o1[t-1] = 0`) combined with a run step
+ * that additionally forces `o1[t] = 1`, no such assignment exists and
+ * `is_run_satisfiable` returns `false`.
+ */
 template <NodeType node>
 bool is_run_satisfiable(tref fm) {
 	using tau = tree<node>;
@@ -398,6 +543,39 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
 	return uconst_ctns;
 }
 
+/**
+ * @internal
+ * @brief Compute the unbounded (infinite-horizon) continuation of an
+ * `always`-part `base_fm` by repeatedly unrolling one more time step and
+ * checking for a fixpoint (`is_nso_impl(phi_prev, phi)`), i.e. the point at
+ * which adding another step no longer strengthens the accumulated
+ * formula.
+ * @tparam node Tree node type.
+ * @param base_fm Always-part local specification to unroll.
+ * @param ctn_initials Initial-condition formula for any constant-time
+ * constraint flags occurring in `base_fm`.
+ * @param io_vars IO variable nodes appearing in `base_fm`.
+ * @param initials Set of `(variable name, time point)` pairs marking
+ * positions predefined by explicit initial conditions (skipped when
+ * existentially/universally quantifying).
+ * @param time_point Time step at which unrolling starts.
+ * @return A pair `(phi, steps)`: `phi` is the formula at the fixpoint (or
+ * at the point where the step cap `max_fixpoint_steps` was hit), and
+ * `steps` is the number of steps taken to reach it.
+ * @endinternal
+ *
+ * @par Example
+ * This is a deeper fixpoint-search helper operating on partially unrolled
+ * AST state, so a literal spec-string round trip does not apply; the
+ * following is illustrative rather than a runnable snippet. For the
+ * always-part of "smaller_lookback_one_st" in
+ * tests/integration/test_integration-satisfiability1.cpp:17
+ * (`o1[t] = o1[t-1] && o1[t-1] = 1`), each unrolling step directly
+ * determines `o1` at the new time point from the previous one with no
+ * additional free choices, so the accumulated formula stabilizes (up to
+ * logical implication) after very few steps — `find_fixpoint_phi` returns
+ * that stabilized formula together with the step count it took.
+ */
 template <NodeType node>
 std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	const trefs& io_vars, const auto& initials, int_t time_point)
@@ -440,6 +618,40 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	return std::make_pair(phi_prev, step_num - 1);
 }
 
+/**
+ * @internal
+ * @brief Compute the unbounded continuation of the combined always/flag
+ * ("chi") state used to decide whether a `sometimes` clause's guard flag
+ * can ever be raised, by repeatedly unrolling one more time step
+ * (`build_step_chi`) and checking for a fixpoint against the previous
+ * step's (placeholder-substituted) formula.
+ * @tparam node Tree node type.
+ * @param chi_base Always-part local specification driving the recurrence.
+ * @param st Eventual-variable flag formula (from
+ * `transform_to_eventual_variables`) whose satisfiability is being
+ * tracked.
+ * @param io_vars IO variable nodes appearing in `chi_base`.
+ * @param initials Set of `(variable name, time point)` pairs marking
+ * positions predefined by explicit initial conditions.
+ * @param time_point Time step at which unrolling starts.
+ * @return A pair `(chi, steps)`: `chi` is the (placeholder-substituted)
+ * formula at the fixpoint (or at the point where the step cap
+ * `max_fixpoint_steps` was hit), and `steps` is the number of steps taken.
+ * @endinternal
+ *
+ * @par Example
+ * Like `find_fixpoint_phi`, this operates on partially unrolled,
+ * placeholder-substituted AST state rather than a parseable spec string,
+ * so the following is illustrative only. `to_unbounded_continuation` calls
+ * `find_fixpoint_chi` only after the initial segment up to
+ * `flag_boundary` failed to raise the flag directly; it then unrolls the
+ * always-part together with the flag recurrence until two consecutive
+ * steps agree (up to implication), yielding a formula describing every
+ * time point from which the flag could still be raised, or `F` once
+ * normalized if it never can be (see the "flag_boundary" tests in
+ * tests/integration/test_integration-solver.cpp:841-878 for concrete
+ * sat/unsat outcomes of this overall code path).
+ */
 template <NodeType node>
 std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	const trefs& io_vars, const auto& initials, int_t time_point)
@@ -541,6 +753,44 @@ tref build_prev_flag_on_lookback(tref io_var_node,
 	else return build_out_var_at_t_minus<node>(io_var_node, 1, flag_type, var);
 }
 
+/**
+ * @internal
+ * @brief Replace every constant-time constraint (e.g. `t <= 3`) in @p fm
+ * with a fresh Boolean flag output stream, plus the recurrence rules and
+ * initial conditions needed for that flag to track the constraint over
+ * time.
+ * @tparam node Tree node type.
+ * @param fm Formula possibly containing constant-time constraint nodes.
+ * @param flag_initials [out] Conjunction of initial conditions fixing each
+ * new flag stream's value at the time points within the constraint's
+ * initial phase (see `is_initial_ctn_phase`).
+ * @param flag_rules [out] Conjunction of recurrence rules relating each
+ * flag's value at one time point to the previous one, taking @p lookback
+ * into account.
+ * @param lookback Lookback of the surrounding formula, used to pick which
+ * previous time point the flag rule refers to.
+ * @param start_time Time step at which the run begins (used to seed
+ * initial conditions).
+ * @param reset_ctn_id When `true`, resets the (function-local static)
+ * flag-numbering counter back to `0` before processing @p fm.
+ * @return `fm` with each constraint replaced by `_fK[t] != 0` for a fresh
+ * flag stream `_fK`, or `fm` unchanged if it contains no constraints.
+ * @endinternal
+ *
+ * @par Example
+ * This transforms an internal constraint node into fresh, generated flag
+ * streams (`_f0`, `_f1`, ...), so there is no direct spec-string
+ * round-trip; the following is conceptual. For a constraint `t <= 3`
+ * occurring in a formula, `transform_ctn_to_streams` introduces a flag
+ * stream `_f0[t]` such that `_f0[t] != 0` replaces the constraint,
+ * together with `flag_rules` encoding "once `_f0` drops to `0` it stays
+ * `0`" (or the dual, for `>`/`>=` constraints) and `flag_initials` fixing
+ * `_f0[0..3] = 1` to match `t <= 3` holding at those initial time points.
+ * This underlies the constant-time initial-condition handling exercised
+ * by the "flag_boundary" tests in
+ * tests/integration/test_integration-solver.cpp:841-878 (e.g. `o1[8] =
+ * 1`).
+ */
 template <NodeType node>
 tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 	tref& flag_rules, const int_t lookback, const int_t start_time,
@@ -612,8 +862,44 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 	return fm;
 }
 
-// We assume that the formula has run through the normalizer before
-// and is a single always statement
+/**
+ * @internal
+ * @brief Compute the unbounded (infinite-horizon) continuation of a single
+ * `always` statement: the formula obtained by unrolling the recurrence
+ * until it reaches a fixpoint, then checking that formula stays
+ * satisfiable across every initial time step.
+ *
+ * Assumes the formula has run through the normalizer before and is a
+ * single `always` statement (with the `always` wrapper optionally already
+ * stripped).
+ * @tparam node Tree node type.
+ * @param fm The `always`-part local specification (or the whole `wff_always`
+ * node) to compute the continuation of.
+ * @param start_time Time step at which execution begins.
+ * @param output When `true`, print diagnostic fixpoint information via
+ * `print_fixpoint_info`.
+ * @return `F` if the always-part is unsatisfiable at some initial time
+ * step; otherwise the unbounded continuation formula (still wrapped in
+ * `always` if the recurrence remains open-ended).
+ * @endinternal
+ *
+ * @par Example
+ * `transform_to_execution` calls this on the always-part of a spec before
+ * combining it with any `sometimes` clauses. For the always-part of
+ * "smaller_lookback_one_st" in
+ * tests/integration/test_integration-satisfiability1.cpp:17
+ * (`o1[t] = o1[t-1] && o1[t-1] = 1`), `always_to_unbounded_continuation`
+ * conceptually determines that `o1` is forced to be constantly `1` from
+ * time step 1 onward and returns a formula equivalent to that recurrence
+ * (satisfiable). For the always-part of "equal_lookback_one_st" (line 13,
+ * `o1[t-1] = 0`), it likewise returns a satisfiable continuation (`o1`
+ * constantly `0`); it is the combination with the conflicting `sometimes`
+ * clause elsewhere in `transform_to_execution` that later makes the whole
+ * spec unsatisfiable. This is illustrative rather than a literal
+ * `create_spec`/`CHECK` snippet, since `always_to_unbounded_continuation`
+ * is called on an already-extracted always-part fragment, not a fresh
+ * spec string.
+ */
 template <NodeType node>
 tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	const bool output)
@@ -728,6 +1014,43 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 	return guard;
 }
 
+/**
+ * @internal
+ * @brief Replace every `sometimes` sub-formula in a single normalized Tau
+ * DNF clause with an "eventual variable" flag stream and a corresponding
+ * `always`-part assumption, so that satisfiability of the `sometimes`
+ * clauses can be decided as part of the always-part's fixpoint search.
+ *
+ * Assumes @p fm is a single normalized Tau DNF clause.
+ * @tparam node Tree node type.
+ * @param fm Normalized Tau DNF clause, possibly containing `always` and/or
+ * `sometimes` sub-formulas.
+ * @param reset_ctn_stream Forwarded to `transform_ctn_to_streams` for each
+ * `sometimes` clause, to reset the flag-numbering counter.
+ * @param start_time Time step at which execution begins.
+ * @return A pair `(res, max_st_lookback)`. If @p fm has no `sometimes`
+ * sub-formula, `res` is `fm` unchanged and `max_st_lookback` is `0`.
+ * Otherwise `res` is `fm` with each `sometimes` clause replaced by a flag
+ * assumption folded into the `always`-part, plus a new `sometimes`
+ * clause tracking when all flags have latched to zero, and
+ * `max_st_lookback` is the greatest lookback among the original
+ * `sometimes` clauses.
+ * @endinternal
+ *
+ * @par Example
+ * This is a deeper AST-to-AST transformation introducing generated flag
+ * streams (`_e0`, `_e1`, ...), so the following is conceptual rather than
+ * a literal `create_spec`/`CHECK` snippet. For "smaller_lookback_one_st"
+ * in tests/integration/test_integration-satisfiability1.cpp:17
+ * (`(always o1[t] = o1[t-1] && o1[t-1] = 1) && (sometimes o2[t] = 0)`),
+ * `transform_to_eventual_variables` introduces a flag stream `_e0[t]` and
+ * folds the assumption "once `_e0` transitions from nonzero to zero,
+ * `o2[t] = 0` must hold at that time" into the always-part, replacing the
+ * original `sometimes o2[t] = 0` with `sometimes _e0[t] = 0` (tracking
+ * when the flag has latched). Since `o2` is otherwise unconstrained, this
+ * flag can always be made to latch immediately, reflecting the spec's
+ * satisfiability.
+ */
 // Assumes single normalized Tau DNF clause
 template <NodeType node>
 std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
@@ -893,9 +1216,50 @@ tref make_initial_run(tref aw, const int_t max_st_lookback) {
 	return run;
 }
 
-// Assumes that ubd_aw_continuation is the result of computing the unbounded always continuation of
-// the always part of the output of "transform_to_eventual_variables" and
-// that ev_var_flags is the sometimes part of "transform_to_eventual_variables"
+/**
+ * @internal
+ * @brief Given the unbounded continuation of an always-part combined with
+ * eventual-variable flags (from `transform_to_eventual_variables`),
+ * determine whether the flag guarding the original `sometimes` clause can
+ * ever be raised, first by direct search over an initial time segment and,
+ * failing that, by computing the flag's own unbounded continuation
+ * (`find_fixpoint_chi`).
+ *
+ * Assumes `ubd_aw_continuation` is the result of computing the unbounded
+ * always continuation of the always-part of the output of
+ * `transform_to_eventual_variables`, and that `ev_var_flags` is the
+ * `sometimes` part of that same output.
+ * @tparam node Tree node type.
+ * @param ubd_aw_continuation Unbounded continuation of the always-part.
+ * @param ev_var_flags The `sometimes` flag-tracking formula produced
+ * alongside `ubd_aw_continuation` by `transform_to_eventual_variables`.
+ * @param original_aw The original (pre-continuation) always-part, `T` if
+ * none, conjoined back into a satisfiable result.
+ * @param start_time Time step at which execution begins.
+ * @param max_st_lookback Greatest lookback among the original `sometimes`
+ * clauses, as returned by `transform_to_eventual_variables`.
+ * @param output When `true`, print diagnostic fixpoint information via
+ * `print_fixpoint_info`.
+ * @return `F` if the flag can never be raised (the `sometimes` clause is
+ * unsatisfiable given the always-part); otherwise a formula describing a
+ * run in which the flag is raised, conjoined with `original_aw`.
+ * @endinternal
+ *
+ * @par Example
+ * This operates on already fixpoint-transformed AST fragments, so the
+ * following is conceptual rather than a literal `create_spec`/`CHECK`
+ * snippet. For "smaller_lookback_one_st" in
+ * tests/integration/test_integration-satisfiability1.cpp:17 (whose
+ * `sometimes o2[t] = 0` was turned into a flag by
+ * `transform_to_eventual_variables`), `to_unbounded_continuation` finds
+ * that the flag can be raised within the initial segment (since `o2` is
+ * unconstrained by the always-part), so it returns a satisfying run
+ * immediately, without needing to fall back to `find_fixpoint_chi`. The
+ * "flag_boundary" tests in
+ * tests/integration/test_integration-solver.cpp:841-878 pin down the size
+ * of that initial segment (`flag_boundary`) for specs designed to stress
+ * it, for both the sat and unsat outcomes.
+ */
 template <NodeType node>
 tref to_unbounded_continuation(tref ubd_aw_continuation,
 	tref ev_var_flags, tref original_aw, const int_t start_time,

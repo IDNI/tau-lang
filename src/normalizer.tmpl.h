@@ -41,6 +41,15 @@ using offset_t = std::pair<tau_parser::nonterminal, size_t>;
  * @tparam node Tree node type.
  * @param form Formula to process.
  * @return Formula with quantifiers pushed/eliminated as far as possible.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // ex x (x|y = 0): x is eliminated entirely, leaving just y = 0
+ * tref fm = get_nso_rr("ex x x|y = 0.").value().main->get();
+ * tref res = eliminate_bv_and_quantifiers<node_t>(fm);
+ * // tau::get(res).to_str() == "y = 0"
+ * CHECK( !tau::get(res).find_top(is<node_t, tau::wff_ex>) );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -168,6 +177,15 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
  * @tparam node Tree node type.
  * @param ref The `ref` tree node to extract information from.
  * @return A pair of the recurrence relation signature and its offset list.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "h(Y)" has no bracketed offset and one argument
+ * auto nso_rr = get_bf_nso_rr("h(X):tau := 1.", "h(Y)").value();
+ * tref ref = get_ref<node_t>(nso_rr.main->get());
+ * auto [sig, offsets] = get_ref_info<node_t>(ref);
+ * // offsets.size() == 0, sig.arg_arity == 1
+ * @endcode
  * @endinternal
  */
 // extracts ref info. returns pair of rr_sig (name id and arity)
@@ -200,6 +218,16 @@ std::pair<rr_sig, std::vector<offset_t>> get_ref_info(tref ref) {
  * @tparam node Tree node type.
  * @param n The node to start the search from.
  * @return The first `ref` node found, or `nullptr` if none exists.
+ *
+ * @par Example
+ * @code{.cpp}
+ * auto nso_rr = get_bf_nso_rr("h(X):tau := 1.", "h(Y)").value();
+ * tref ref = get_ref<node_t>(nso_rr.main->get());
+ * // tau::get(ref).to_str() == "h(Y)"
+ *
+ * tref fm_no_ref = get_nso_rr("x = 0.").value().main->get();
+ * CHECK( get_ref<node_t>(fm_no_ref) == nullptr );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -267,6 +295,12 @@ bool is_non_temp_nso_satisfiable(tref n) {
  * @tparam node Tree node type.
  * @param n The non-temporal formula to test.
  * @return `true` if the formula is unsatisfiable, `false` otherwise.
+ *
+ * @par Example
+ * @code{.cpp}
+ * tref fm = get_nso_rr("x = 0 && x != 0.").value().main->get();
+ * CHECK( is_non_temp_nso_unsat<node_t>(fm) );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -355,6 +389,16 @@ bool are_nso_equivalent(tref n1, tref n2) {
  * @param n The formula to test.
  * @param previous The list of candidate formulas to compare against.
  * @return `true` if @p n is equivalent to at least one formula in @p previous.
+ *
+ * @par Example
+ * @code{.cpp}
+ * tref n = get_nso_rr("x = 0.").value().main->get();
+ * trefs previous {
+ *     get_nso_rr("y = 0.").value().main->get(),
+ *     get_nso_rr("!(x != 0).").value().main->get()
+ * };
+ * CHECK( is_nso_equivalent_to_any_of<node_t>(n, previous) ); // matches !(x!=0)
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -409,6 +453,14 @@ bool is_nso_impl(tref n1, tref n2) {
  * @param n1 The first Boolean function.
  * @param n2 The second Boolean function.
  * @return `true` if @p n1 and @p n2 are semantically equal.
+ *
+ * @par Example
+ * @code{.cpp}
+ * auto pbf = parse_bf();
+ * tref n1 = tau::get("X", pbf);
+ * tref n2 = tau::get("X & X", pbf);  // idempotent AND: X&X == X
+ * CHECK( are_bf_equal<node_t>(n1, n2) );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -451,6 +503,16 @@ bool are_bf_equal(tref n1, tref n2) {
  * @param n The Boolean function to test.
  * @param previous The list of candidate Boolean functions to compare against.
  * @return `true` if @p n equals at least one formula in @p previous.
+ *
+ * @par Example
+ * @code{.cpp}
+ * auto pbf = parse_bf();
+ * tref n1 = tau::get("X", pbf);
+ * tref n2 = tau::get("X & X", pbf);
+ * tref n3 = tau::get("Y", pbf);
+ * trefs previous { n3, n2 };
+ * CHECK( is_bf_same_to_any_of<node_t>(n1, previous) ); // matches n2 (X&X == X)
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -469,6 +531,16 @@ bool is_bf_same_to_any_of(tref n, trefs& previous) {
  * @tparam node Tree node type.
  * @param spec The specification formula to expand.
  * @return The formula with all applicable definitions unfolded.
+ *
+ * @par Example
+ * @code{.cpp}
+ * definitions<node_t>::instance().clear();
+ * api<node_t>::get_function_def("f(x) := x + 1");
+ * tref expr = api<node_t>::get_term("f(t)", false);
+ * tref res = apply_defs_to_spec<node_t>(expr);
+ * // tau::get(res).to_str() == "t+1"
+ * CHECK( !tau::get(res).find_top(is<node_t, tau::ref>) );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -531,6 +603,18 @@ tref fold_trivial_quantifiers(tref fm) {
  * @tparam node Tree node type.
  * @param clause A conjunctive clause from the temporal DNF to simplify.
  * @return The simplified clause, or `std::nullopt` if the clause is unsatisfiable.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // (always x=0 && y=0) && (always x=0): the second always is implied by the
+ * // first (x=0 && y=0 => x=0), so it is dropped.
+ * tref p = get_nso_rr("x = 0 && y = 0.").value().main->get();
+ * tref q = get_nso_rr("x = 0.").value().main->get();
+ * tref clause = tau::build_wff_and(tau::build_wff_always(p), tau::build_wff_always(q));
+ * auto res = simplify_temporal_clause<node_t>(clause);
+ * // res.has_value() == true
+ * // tau::get(*res).to_str() == "always x = 0 && y = 0"
+ * @endcode
  * @endinternal
  */
 // Simplifies one temporal clause from the outer DNF of a normalized formula.
@@ -650,6 +734,21 @@ tref normalize_with_temp_simp(tref fm) {
  * @tparam node Tree node type.
  * @param form The formula to scan for integer offset values.
  * @return The largest integer offset value found, or 0 if none exist.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Rule heads f[0], f[2], f[4], f[8] have integer lookbacks 0/2/4/8;
+ * // f[n] has a symbolic (capture) offset, so its lookback is reported as 0.
+ * auto nso_rr = get_bf_nso_rr(
+ *     "f[0](x):tau := 0."
+ *     "f[2](x):tau := 0."
+ *     "f[4](x):tau := 0."
+ *     "f[8](x):tau := 0."
+ *     "f[n](x):tau := 1.",
+ *     "f(x):tau").value();
+ * // get_max_lookback_in_rr<node_t>(nso_rr.rec_relations[3].first->get()) == 8
+ * // get_max_lookback_in_rr<node_t>(nso_rr.rec_relations[4].first->get()) == 0
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -676,6 +775,24 @@ size_t get_max_lookback_in_rr(tref form) {
  * @param shift The existing shift node whose numeric offset will be adjusted.
  * @param step The target step value used to compute the new offset.
  * @return A new shift node with the adjusted offset, or the capture node if `step == offset`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Extract the "n - 1" shift node from the body of "h[n](X):tau := h[n-1](X)'."
+ * auto nso_rr = get_bf_nso_rr(
+ *     "h[n](X):tau := h[n - 1](X)'."
+ *     "h[0](X):tau := X.", "h(Y)").value();
+ * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
+ * tref body = rr_captures.rec_relations[0].second->get(); // h[n-1](X)'
+ * tref ref = get_ref<node_t>(body);
+ * tref shift = (tt(ref) | tau::offsets | tau::offset | tau::shift).value();
+ * // tau::get(shift).to_str() == "n-1"
+ *
+ * tref res1 = build_shift_from_shift<node_t>(shift, 1); // step == offset (1)
+ * // tau::get(res1).to_str() == "n"     (bare capture)
+ * tref res3 = build_shift_from_shift<node_t>(shift, 3);
+ * // tau::get(res3).to_str() == "n-2"   (step - offset = 3 - 1)
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -699,6 +816,15 @@ tref build_shift_from_shift(tref shift, size_t step) {
  * @param form The recurrence main formula containing shift nodes.
  * @param step The current enumeration step used to adjust each shift offset.
  * @return The formula with all shift nodes replaced by their step-adjusted equivalents.
+ *
+ * @par Example
+ * This drives `build_enumerated_main_step`'s use of `build_shift_from_shift`
+ * across every `shift` sub-node of @p form in one pass: for each top-level
+ * `offsets` node found, its `shift` child (if any) is looked up and replaced
+ * by `build_shift_from_shift<node>(shift, step)`. See @ref build_shift_from_shift
+ * for the underlying single-shift adjustment (e.g. the `"n - 1"` shift of an
+ * `h[n](X):tau := h[n-1](X)'.` rule body becomes `"n"` at `step == 1` and
+ * `"n-2"` at `step == 3`).
  * @endinternal
  */
 template <NodeType node>
@@ -726,6 +852,20 @@ tref build_main_step(tref form, size_t step) {
  * @param i The concrete index to assign to the first offset.
  * @param offset_arity The total number of offsets to generate.
  * @return The main formula with the first offset set to @p i and the rest to 0.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "h(Y)" (a fixed-point call, no offset) instantiated at concrete steps
+ * auto nso_rr = get_bf_nso_rr(
+ *     "h[n](X):tau := h[n - 1](X)'."
+ *     "h[0](X):tau := X.", "h(Y)").value();
+ * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
+ * tref main = rr_captures.main->get(); // "h(Y)"
+ * tref step0 = build_enumerated_main_step<node_t>(main, 0, 1);
+ * // tau::get(step0).to_str() == "h[0](Y)"
+ * tref step3 = build_enumerated_main_step<node_t>(main, 3, 1);
+ * // tau::get(step3).to_str() == "h[3](Y)"
+ * @endcode
  * @endinternal
  */
 // enumerates index in main with step i - used for finding a fixed point
@@ -764,6 +904,17 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation to validate.
  * @return `true` if all validity conditions are satisfied, `false` otherwise.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // As in nso_rr_apply, offsets must first be transformed to captures so
+ * // the relative-offset variable ("n") is recognized as such.
+ * auto nso_rr = get_bf_nso_rr(
+ *     "h[n](X):tau := h[n - 1](X)'."
+ *     "h[0](X):tau := X.", "h[8](Y)").value();
+ * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
+ * CHECK( is_valid<node_t>(rr_captures) );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -833,6 +984,18 @@ bool is_valid(const rr<node>& nso_rr) {
  * @tparam node Tree node type.
  * @param nso_rr The recurrence relation to check.
  * @return `true` if the relation is well-founded, `false` otherwise.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Must run after transform_ref_args_to_captures (as nso_rr_apply does)
+ * // so the relative-offset variable "n" is recognized as a capture offset;
+ * // without it, has_relative_rule stays false and this returns false.
+ * auto nso_rr = get_bf_nso_rr(
+ *     "h[n](X):tau := h[n - 1](X)'."
+ *     "h[0](X):tau := X.", "h[8](Y)").value();
+ * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
+ * CHECK( is_well_founded<node_t>(rr_captures) );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -903,6 +1066,21 @@ bool is_well_founded(const rr<node>& nso_rr) {
  * @param offset_arity The number of offsets in the main formula's reference.
  * @param fallback The formula to return when a loop (no fixed point) is detected.
  * @return The fixed-point formula, or @p fallback if the iteration loops without converging.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // h[n](X) := h[n-1](X)' with h[0](X) := X alternates between X and X'
+ * // forever as n grows, so no single value is ever reached: the iteration
+ * // loops and the supplied fallback (0) is returned instead.
+ * auto nso_rr = get_bf_nso_rr(
+ *     "h[n](X):tau := h[n - 1](X)'."
+ *     "h[0](X):tau := X.", "h(Y)").value();
+ * auto rr_captures = transform_ref_args_to_captures<node_t>(nso_rr);
+ * tref main = rr_captures.main->get(); // "h(Y)", the fixed-point call
+ * tref fp = calculate_fixed_point<node_t>(rr_captures, main, tau::bf, 1,
+ *     tau::_0(tau_type_id<node_t>()));
+ * // tau::get(fp).to_str() == "0"   (the fallback, since no fixed point exists)
+ * @endcode
  * @endinternal
  */
 template <NodeType node>

@@ -25,6 +25,14 @@ namespace idni::tau_lang {
  * @tparam node Tree node type.
  * @param fm Formula to transform.
  * @return Formula with negated equalities replaced by disequalities.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // !(x = y) becomes x != y
+ * tref fm = get_nso_rr("!(x = y).").value().main->get();
+ * tref res = not_equal_to_unequal<node_t>(fm);
+ * // tau::get(res).to_str() == "x != y"
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -53,6 +61,15 @@ tref not_equal_to_unequal(tref fm) {
  * @tparam node Tree node type.
  * @param fm Formula whose atomic operators are to be normalized.
  * @return Formula with comparison operators rewritten to canonical form.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // x != y is rewritten to its canonical negated-equality form !(x = y)
+ * tref fm = get_nso_rr("x != y.").value().main->get();
+ * tref res = normalize_atomic_formula_operators<node_t>(fm);
+ * // tau::get(res).to_str() == "!x = y"   (i.e. !(x = y), the dual of
+ * // not_equal_to_unequal's rewrite)
+ * @endcode
  * @endinternal
  */
 template<NodeType node>
@@ -93,6 +110,16 @@ tref normalize_atomic_formula_operators(tref fm) {
  * @tparam node Tree node type.
  * @param fm Formula in which `>` / `>=` operators are to be rewritten.
  * @return Formula with `>` and `>=` replaced by swapped-operand `<` and `<=`.
+ *
+ * @par Example
+ * A raw `bf_gt(a, b)` node (built directly, e.g. via `tau::build_bf_gt`)
+ * becomes `bf_lt(b, a)`; a raw `bf_gteq(a, b)` becomes `bf_lteq(b, a)`, and
+ * likewise for their negations `bf_ngt`/`bf_ngteq`. No compilable
+ * `create_spec`/`get_nso_rr` snippet is given here: for the Boolean-algebra
+ * types this codebase parses by default, `>`/`>=` are already desugared to
+ * an equivalent AND/XOR form before a `bf_gt`/`bf_gteq` node would ever
+ * appear in the parsed tree, so this rewrite is only reachable on
+ * hand-built or not-yet-fully-normalized fragments.
  * @endinternal
  */
 template<NodeType node>
@@ -135,6 +162,18 @@ tref to_nnf(tref fm) {
  * @tparam node Tree node type.
  * @param eq Normalized equation wrapped in `wff`.
  * @return De-normalized equation, or the original node if no XOR pattern is found.
+ *
+ * @par Example
+ * This exactly reverses `norm_trimmed_equation` (normal_forms_transformations.tmpl.h),
+ * which turns `X = Y` into `(X XOR Y) = 0` (and `X != Y` into `(X XOR Y) != 0`)
+ * for use during equation manipulation (e.g. `normal_forms.tmpl.h:284-315`).
+ * Given a node shaped like `(X XOR Y) = 0`, `denorm_equation` returns `X = Y`;
+ * given anything else (including an equation whose LHS is not a `bf_xor`,
+ * e.g. `x = y` as parsed directly from a spec string, which this codebase's
+ * Boolean-algebra printer already renders as `"x = y"` without ever
+ * constructing a literal `bf_xor` node), it returns @p eq unchanged. No
+ * compilable round-trip is given here since parsing `"x = y."` directly does
+ * not produce the `bf_xor`-shaped node this function targets.
  * @endinternal
  */
 template<NodeType node>
@@ -161,6 +200,16 @@ tref denorm_equation(tref eq) {
  * @tparam node Tree node type.
  * @param fm Boolean function term to normalize.
  * @return Term with all BA constants normalized.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // A plain variable term has no BA constants to normalize, so it is
+ * // returned unchanged.
+ * tref fm = get_nso_rr("x = 0.").value().main->get();
+ * tref var = tau::get(fm)[0].first();
+ * tref res = normalize_ba<node_t>(var);
+ * // tau::get(res).to_str() == "x"
+ * @endcode
  * @endinternal
  */
 // This function traverses a term fm and normalizes all Boolean algebra constants
@@ -208,6 +257,16 @@ tref normalize_ba(tref fm) {
  * @tparam node Tree node type.
  * @param n Formula to search for the innermost quantifier.
  * @return Pair of traverser pointing to the bound variable and tref to the quantified sub-formula.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "ex x (x = 0 && y = 0)" has a single (outermost = innermost) quantifier;
+ * // the parser renames the bound variable to "b1" internally.
+ * tref fm = get_nso_rr("ex x (x = 0 && y = 0).").value().main->get();
+ * auto [var_trav, inner] = get_inner_quantified_wff<node_t>(fm);
+ * // var_trav.has_value() == true, tau::get(var_trav.value()).to_str() == "b1"
+ * // tau::get(inner).to_str() == "b1 = 0 && y = 0"
+ * @endcode
  * @endinternal
  */
 // return the inner quantifier or the top wff if the formula is not quantified
@@ -344,6 +403,19 @@ tref onf(tref n, tref var) {
  * @param p Number of variables considered (length of the active prefix).
  * @param surface `true` when called at the top level; controls which vector absorbs the merge.
  * @return `true` if a merge occurred (possibly yielding a fully irrelevant path).
+ *
+ * @par Example
+ * With variables `[a, b]`, path vector `{1, 1}` encodes the clause `ab` and
+ * `{1, -1}` encodes `ab'` (`1` = positive occurrence, `-1` = negated, `2` =
+ * irrelevant). This is exactly the `bf_reduced_dnf(ab|ab')` case (see
+ * @ref bf_reduced_dnf and tests/unit/test_normal_forms.cpp:787-794, which
+ * asserts the reduced result is `a`):
+ * @code{.cpp}
+ * std::vector<int_t> i = {1, -1};              // ab'
+ * std::vector<std::vector<int_t>> paths = {{1, 1}};  // [ab]
+ * bool merged = reduce_paths(i, paths, 2);
+ * // merged == true, paths == {{1, 2}}  (i.e. "a", b marked irrelevant)
+ * @endcode
  * @endinternal
  */
 // Reduce currrent dnf due to update by coeff and variable assignment i
@@ -389,6 +461,20 @@ inline bool reduce_paths(std::vector<int_t>& i,
  * @internal
  * @brief Repeatedly merges any two paths in `paths` that differ in exactly one variable or have a subset/superset relation, simplifying the path set in place.
  * @param paths Path vectors to simplify; updated in place.
+ *
+ * @par Example
+ * With variables `[a, b, c]`, `ac` is `{1, 2, 1}` and `a'b'c` is
+ * `{-1, -1, 1}`. `reduce_paths` cannot merge these (they differ in two
+ * positions once `b`'s wildcard is accounted for), but `a'b'c` is a subset
+ * of the "b unconstrained" shape once `a` is generalized, so `join_paths`
+ * absorbs it: `a'b'c` becomes `b'c` (this is the `make_paths_disjoint=false`
+ * side of tests/unit/test_normal_forms.cpp:812-830, where the comment traces
+ * the same merge on `ac|a'b'c`).
+ * @code{.cpp}
+ * std::vector<std::vector<int_t>> paths = {{1, 2, 1}, {-1, -1, 1}}; // ac, a'b'c
+ * join_paths(paths);
+ * // paths == {{1, 2, 1}, {2, -1, 1}}  (i.e. "ac", "b'c")
+ * @endcode
  * @endinternal
  */
 inline void join_paths(std::vector<std::vector<int_t>>& paths) {
@@ -475,6 +561,15 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
  * @param i Assignment vector to update; entries are set to `2` for absent variables.
  * @param p Current variable position; positions after `p` are candidates for elimination.
  * @param is_var Predicate that returns `true` for variable nodes.
+ *
+ * @par Example
+ * With `vars = [a, b]` and a reduced formula `fm` that is just the term `a`
+ * (i.e. `b` has already dropped out of the reduction), calling this with
+ * `p = 0` scans positions after `a` and, finding no `b` in `fm`, sets
+ * `i[1] = 2`: an assignment vector `{1, 1}` becomes `{1, 2}`, meaning `b` is
+ * irrelevant. This is how `assign_and_reduce` shrinks a fully-assigned path
+ * like `ab` down to just `a` whenever the reduced term no longer mentions
+ * `b` (see the `bf_reduced_dnf(ab|ab')` example, which shrinks to `a`).
  * @endinternal
  */
 // Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
@@ -507,6 +602,15 @@ void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
  * @param p Current recursion depth (variable index).
  * @param is_wff `true` when `fm` is a well-formed formula, `false` for Boolean function.
  * @return `true` when a tautological (all-irrelevant) path is found.
+ *
+ * @par Example
+ * This is the recursive engine behind `bf_reduced_dnf`: for `fm = ab|ab'`
+ * with `vars = [a, b]`, it enumerates `a=0`/`a=1` and, within each,
+ * `b=0`/`b=1`, reduces `fm` at each of the 4 corners, and (via
+ * `elim_vars_in_assignment` and `reduce_paths`) collapses the two paths
+ * where `a=1` (both satisfy `fm`, differing only in `b`) into the single
+ * path `{1, 2}` in `dnf` — i.e. the reduced DNF is just `a` (see
+ * tests/unit/test_normal_forms.cpp:787-794).
  * @endinternal
  */
 // Create assignment in formula and reduce resulting clause
@@ -612,6 +716,14 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
  * Used to define a canonical variable order for BDD construction and DNF
  * reduction.
  * @tparam node Tree node type.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "x" < "y" lexicographically
+ * tref x = tau::get(get_nso_rr("x = 0.").value().main->get())[0].first();
+ * tref y = tau::get(get_nso_rr("y = 0.").value().main->get())[0].first();
+ * CHECK( lex_var_comp<node_t>(x, y) == true );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -641,6 +753,12 @@ auto lex_var_comp = [](tref x, tref y) {
  * `wff_sometimes`, `wff_always`, `wff_all`, and `constraint`.
  * @tparam node Tree node type.
  * @todo Extend for the full grammar.
+ *
+ * @par Example
+ * @code{.cpp}
+ * tref fm = get_nso_rr("x = 0.").value().main->get();
+ * CHECK( is_wff_bdd_var<node_t>(fm) == true );  // fm's child is a bf_eq
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -665,6 +783,13 @@ inline auto is_wff_bdd_var = [](tref n) {
  * treated as atomic BDD variables: `variable`, `capture`, `bf_ref`,
  * `ba_constant`, `bf_fall`, and `bf_fex`.
  * @tparam node Tree node type.
+ *
+ * @par Example
+ * @code{.cpp}
+ * tref fm = get_nso_rr("x = 0.").value().main->get();
+ * tref x = tau::get(fm)[0].first(); // the bf variable x
+ * CHECK( is_bf_bdd_var<node_t>(x) == true );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -862,6 +987,14 @@ inline bool is_contained_in(const std::vector<int_t>& i, auto& paths) {
  * @param wff `true` when the clause is a well-formed formula, `false` for Boolean function.
  * @param is_cnf `true` when processing a CNF clause, `false` for DNF.
  * @return Pair of the assignment vector and a flag indicating whether the clause is trivially decided.
+ *
+ * @par Example
+ * For a DNF clause `ab'` (`bf_and(a, bf_neg(b))`) with `var_pos = {a: 0, b: 1}`,
+ * `wff = false`, `is_cnf = false`: the traversal marks position 0 (`a`) as
+ * `1` (positive occurrence) and position 1 (`b`) as `-1` (negated
+ * occurrence), so the result is `{ {1, -1}, false }` — the vector encodes
+ * `ab'` and `false` means the clause is not trivially decided (neither
+ * always-true nor always-false).
  * @endinternal
  */
 template <NodeType node>
@@ -931,6 +1064,15 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
  * @param is_cnf `true` when `new_fm` is in CNF, `false` for DNF.
  * @param all_reductions Whether to apply `reduce_paths` during collection.
  * @return Deduplicated list of path vectors.
+ *
+ * @par Example
+ * For the DNF formula `ab|ab'` with `vars = [a, b]`, `wff = false`,
+ * `is_cnf = false`, `all_reductions = true`: the two leaf clauses `ab` and
+ * `ab'` convert (via `clause_to_vector`) to `{1, 1}` and `{1, -1}`; since
+ * both are satisfiable, `decided` is set to `false`, and `reduce_paths`
+ * merges the second into the first, leaving a single collected path
+ * `{1, 2}` — i.e. the DNF reduces to just `a` (see
+ * tests/unit/test_normal_forms.cpp:787-794).
  * @endinternal
  */
 template <NodeType node>
@@ -978,6 +1120,14 @@ std::vector<std::vector<int_t>> collect_paths(tref new_fm, bool wff,
  * @param wff `true` when building a well-formed formula, `false` for Boolean function.
  * @param type_id BA type identifier used for Boolean function constants.
  * @return Reconstructed formula tree.
+ *
+ * @par Example
+ * The reverse of the `collect_paths`/`reduce_paths` example: given
+ * `paths = {{1, 2}}` and `vars = [a, b]` with `is_cnf = false`, `wff = false`,
+ * position 0 (`1`) contributes the literal `a`, position 1 (`2`, irrelevant)
+ * contributes nothing, and the single path becomes the term `a` — the
+ * reduced DNF of `ab|ab'` (see @ref bf_reduced_dnf and
+ * tests/unit/test_normal_forms.cpp:787-794).
  * @endinternal
  */
 template <NodeType node>
@@ -1044,6 +1194,19 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
  * @param fm Formula to reduce.
  * @param is_cnf `true` to reduce to CNF paths, `false` for DNF.
  * @return Pair of the deduplicated path vectors and the corresponding BDD variable list.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // A contradiction has no satisfiable path; a tautology reduces to a
+ * // single (fully irrelevant) path with no BDD variables.
+ * tref contradiction = get_nso_rr("x = 0 && x != 0.").value().main->get();
+ * auto [paths1, vars1] = dnf_cnf_to_reduced<node_t>(contradiction, false);
+ * // paths1.size() == 0, vars1.size() == 0
+ *
+ * tref tautology = get_nso_rr("x = 0 || x != 0.").value().main->get();
+ * auto [paths2, vars2] = dnf_cnf_to_reduced<node_t>(tautology, false);
+ * // paths2.size() == 1, vars2.size() == 0
+ * @endcode
  * @endinternal
  */
 //TODO: decide if to treat xor in bf case
@@ -1252,6 +1415,15 @@ typename tree<node>::traverser operator|(
  * @param d1 First DNF formula.
  * @param d2 Second DNF formula.
  * @return Product DNF of `d1` and `d2`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Each side has a single disjunct here, so the product is their conjunction
+ * tref d1 = get_nso_rr("x = 0.").value().main->get();
+ * tref d2 = get_nso_rr("y = 0.").value().main->get();
+ * tref res = conjunct_dnfs_to_dnf<node_t>(d1, d2);
+ * // tau::get(res).to_str() == "x = 0 && y = 0"
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -1290,6 +1462,15 @@ tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
  * @param c1 First CNF formula.
  * @param c2 Second CNF formula.
  * @return Product CNF of `c1` and `c2`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Each side has a single conjunct here, so the product is their disjunction
+ * tref c1 = get_nso_rr("x = 0.").value().main->get();
+ * tref c2 = get_nso_rr("y = 0.").value().main->get();
+ * tref res = disjunct_cnfs_to_cnf<node_t>(c1, c2);
+ * // tau::get(res).to_str() == "x = 0 || y = 0"
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -1444,6 +1625,19 @@ tref to_cnf(tref fm) {
  * @param fm Existentially quantified formula to push inward.
  * @param excluded Optional set to record nodes that should not be revisited.
  * @return Formula with the quantifier pushed one level deeper.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Distributes over || (parser renames the bound variable "x" to "b1"):
+ * tref fm_or = get_nso_rr("ex x (x = 0 || y = 0).").value().main->get();
+ * tref res_or = push_existential_quantifier_one<node_t>(fm_or);
+ * // tau::get(res_or).to_str() == "(ex b1 b1 = 0) || (ex b1 y = 0)"
+ *
+ * // Pulls the independent conjunct "y = 0" out of the && (b1 not free in it):
+ * tref fm_and = get_nso_rr("ex x (x = 0 && y = 0).").value().main->get();
+ * tref res_and = push_existential_quantifier_one<node_t>(fm_and);
+ * // tau::get(res_and).to_str() == "(ex b1 b1 = 0) && y = 0"
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -1506,6 +1700,18 @@ tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded = null
  * @tparam node Tree node type.
  * @param fm Universally quantified formula to push inward.
  * @return Formula with the quantifier pushed one level deeper.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "all x (x = 0 || z = 0)": x = 0 depends on the bound variable x and
+ * // stays under the quantifier, while the x-free disjunct z = 0 is pulled
+ * // out (see tests/unit/test_normal_forms.cpp:859-875).
+ * tref fm = get_nso_rr("all x (x = 0 || z = 0).").value().main->get();
+ * tref res = push_universal_quantifier_one<node_t>(fm);
+ * CHECK( tau::get(res) != tau::get(fm) );
+ * CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+ * CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) != nullptr );
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -1555,6 +1761,16 @@ tref push_universal_quantifier_one(tref fm) {
  * @tparam node Tree node type.
  * @param formula Formula whose quantifiers are to be pushed inward.
  * @return Formula with all quantifiers pushed as far inward as possible.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Unlike a single push_existential_quantifier_one step, this also
+ * // resolves away the now-vacuous "ex b1 y = 0" (b1 not free in y = 0),
+ * // leaving only the genuinely quantified disjunct.
+ * tref fm = get_nso_rr("ex x (x = 0 || y = 0).").value().main->get();
+ * tref res = push_quantifiers_in<node_t>(fm);
+ * // tau::get(res).to_str() == "(ex b1 b1 = 0) || y = 0"
+ * @endcode
  * @endinternal
  */
 template <NodeType node>
@@ -2300,6 +2516,21 @@ tref build_and_mark_result(trefs& eqs, size_t eq_end,
  * @tparam node Tree node type
  * @param formula The formula to apply the procedure to
  * @return The mutated formula
+ *
+ * @par Example
+ * @code{.cpp}
+ * // See tests/integration/test_integration-wff_normalization.cpp:116-121.
+ * tref fm = get_nso_rr(
+ *     "o1[4] = o1[3] && o2[0] != 0 && (o1[3] != o1[1] || o2[2] != 0 || "
+ *     "o2[1] = 0) && (o2[1] != 0 || o2[2] = 0) && (o2[2] = 0 || "
+ *     "o2[3] = 0 && o1[4] != o1[2]).").value().main->get();
+ * tref res = squeeze_absorb<node_t>(fm);
+ * // tau::get(res).to_str() ==
+ * //   "o2[0]:tau != 0 && o1[4]:tau = o1[3]:tau && "
+ * //   "(o2[2]:tau != 0 || o2[1]:tau = 0 || o1[3]:tau != o1[1]:tau) && "
+ * //   "(o2[1]:tau != 0 || o2[2]:tau = 0) && "
+ * //   "(o2[2]:tau = 0 || o2[3]:tau = 0 && o1[4]:tau != o1[2]:tau)"
+ * @endcode
  * @endinternal
  */
 template<NodeType node>
@@ -2438,6 +2669,15 @@ tref squeeze_absorb(tref formula) {
  * @param formula The formula to apply the procedure to
  * @param var The shared variable for squeeze/absorb
  * @return The mutated formula
+ *
+ * @par Example
+ * @code{.cpp}
+ * // See tests/integration/test_integration-wff_normalization.cpp:80-84.
+ * tref fm = get_nso_rr(
+ *     "(((xy) = 0 || f(x)) && (xy)' = 0) || w = 0.").value().main->get();
+ * tref res = squeeze_absorb<node_t>(fm, tau::build_variable("x", 1));
+ * // tau::get(res).to_str() == "w = 0 || (xy)' = 0 && f(x)"
+ * @endcode
  * @endinternal
 */
 template<NodeType node>

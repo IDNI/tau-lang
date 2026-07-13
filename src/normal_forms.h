@@ -67,6 +67,20 @@ typename tree<node>::traverser operator|(
  * @param n Formula to convert.
  * @param var The variable that defines the ordering dimension.
  * @return Formula in ONF with respect to `var`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // "x = y" and "y = x" describe the same equation; ONF w.r.t. x rewrites
+ * // both to the same canonical interval form (see
+ * // tests/unit/test_normal_forms.cpp:218-227).
+ * tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+ * tref fm_lhs = get_nso_rr("x = y.").value().main->get();
+ * tref fm_rhs = get_nso_rr("y = x.").value().main->get();
+ * tref result_lhs = onf<node_t>(fm_lhs, x);
+ * tref result_rhs = onf<node_t>(fm_rhs, x);
+ * // tau::get(result_lhs).to_str() == tau::get(result_rhs).to_str()
+ * //   == "yx' = 0 && xy' = 0"
+ * @endcode
  */
 template <NodeType node>
 tref onf(tref n, tref var);
@@ -80,6 +94,16 @@ tref onf(tref n, tref var);
  * @tparam is_cnf When `true`, treat `fm` as CNF instead of DNF.
  * @param fm Formula in DNF (or CNF when `is_cnf` is `true`).
  * @return Reduced formula.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // A contradiction reduces to F, a tautology to T
+ * // (see tests/unit/test_normal_forms.cpp:771-784).
+ * tref contradiction = get_nso_rr("x = 0 && x != 0.").value().main->get();
+ * tref tautology     = get_nso_rr("x = 0 || x != 0.").value().main->get();
+ * CHECK( tau::get(reduce<node_t>(contradiction)).equals_F() );
+ * CHECK( tau::get(reduce<node_t>(tautology)).equals_T() );
+ * @endcode
  */
 template <NodeType node, bool is_cnf = false>
 tref reduce(tref fm);
@@ -95,6 +119,19 @@ tref reduce(tref fm);
  * @param make_paths_disjoint When `true`, skip the `join_paths` merging step
  *        so that every surviving path is explicitly disjoint.
  * @return Reduced DNF of `fm`.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // ab|ab' = a(b|b') = a; ab|a'b = (a|a')b = b
+ * // (see tests/unit/test_normal_forms.cpp:786-802).
+ * tref fm1 = get_nso_rr("ab|ab' = 0.").value().main->get();
+ * tref bf1 = tau::get(fm1)[0].first();
+ * CHECK( tau::get(bf_reduced_dnf<node_t>(bf1)).to_str() == "a" );
+ *
+ * tref fm2 = get_nso_rr("ab|a'b = 0.").value().main->get();
+ * tref bf2 = tau::get(fm2)[0].first();
+ * CHECK( tau::get(bf_reduced_dnf<node_t>(bf2)).to_str() == "b" );
+ * @endcode
  */
 template <NodeType node>
 tref bf_reduced_dnf(tref fm, bool make_paths_disjoint = false);
@@ -109,6 +146,16 @@ tref bf_reduced_dnf(tref fm, bool make_paths_disjoint = false);
 template <NodeType node>
 struct bf_reduce_canonical {
 	/// @brief Apply canonical DNF reduction to `fm`.
+	///
+	/// @par Example
+	/// @code{.cpp}
+	/// // A tautology over uninterpreted constants <:a>, <:b>, <:c> reduces to T
+	/// // (see tests/unit/test_normal_forms.cpp:96-108).
+	/// tref fm = tt(tau::get(uninterp_constants_sample))
+	///     | tau::spec | tau::main | tau::wff
+	///     | bf_reduce_canonical<node_t>() | tt::ref;
+	/// CHECK( tau::get(fm) == tau::get_T() );
+	/// @endcode
 	tref operator()(tref fm) const;
 };
 
@@ -130,6 +177,14 @@ typename tree<node>::traverser operator|(
 template <NodeType node>
 struct wff_reduce_dnf {
 	/// @brief Reduce `fm` to DNF.
+	///
+	/// @par Example
+	/// @code{.cpp}
+	/// // Thin wrapper over reduce<node, false>: a contradiction reduces to F
+	/// tref fm = get_nso_rr("x = 0 && x != 0.").value().main->get();
+	/// tref res = tt(fm) | wff_reduce_dnf<node_t>() | tt::ref;
+	/// CHECK( tau::get(res).equals_F() );
+	/// @endcode
 	tref operator() (tref fm) const;
 };
 
@@ -142,6 +197,14 @@ struct wff_reduce_dnf {
 template <NodeType node>
 struct wff_reduce_cnf {
 	/// @brief Reduce `fm` to CNF.
+	///
+	/// @par Example
+	/// @code{.cpp}
+	/// // Thin wrapper over reduce<node, true>: a tautology reduces to T
+	/// tref fm = get_nso_rr("x = 0 || x != 0.").value().main->get();
+	/// tref res = tt(fm) | wff_reduce_cnf<node_t>() | tt::ref;
+	/// CHECK( tau::get(res).equals_T() );
+	/// @endcode
 	tref operator() (tref fm) const;
 };
 
@@ -172,6 +235,15 @@ typename tree<node>::traverser operator|(
  * @tparam is_wff `true` for wff, `false` for bf (default: `true`).
  * @param fm Formula to convert.
  * @return Equivalent formula in DNF.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // x=0 && (y=0 || z=0) distributes to (x=0 && y=0) || (x=0 && z=0)
+ * // (see tests/unit/test_normal_forms.cpp:740-750).
+ * tref fm = get_nso_rr("x = 0 && (y = 0 || z = 0).").value().main->get();
+ * tref res = to_dnf<node_t, true>(fm);
+ * // tau::get(res).to_str() == "x = 0 && y = 0 || x = 0 && z = 0"
+ * @endcode
  */
 template <NodeType node, bool is_wff = true>
 tref to_dnf(tref fm);
@@ -185,6 +257,15 @@ tref to_dnf(tref fm);
  * @tparam is_wff `true` for wff, `false` for bf (default: `true`).
  * @param fm Formula to convert.
  * @return Equivalent formula in CNF.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // (x=0||y=0) && (z=0||w=0) is already in CNF, so to_cnf is a no-op here
+ * // (see tests/unit/test_normal_forms.cpp:762-768).
+ * tref fm = get_nso_rr("(x = 0 || y = 0) && (z = 0 || w = 0).").value().main->get();
+ * tref res = to_cnf<node_t, true>(fm);
+ * // tau::get(res).to_str() == "(x = 0 || y = 0) && (z = 0 || w = 0)"
+ * @endcode
  */
 template <NodeType node, bool is_wff = true>
 tref to_cnf(tref fm);
@@ -196,6 +277,19 @@ tref to_cnf(tref fm);
  * @tparam node Tree node type.
  * @param fm Formula to convert.
  * @return Equivalent formula in NNF.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // Double negation collapses; De Morgan's law distributes negation over &&
+ * // (see tests/unit/test_normal_forms.cpp:712-727).
+ * tref fm1 = get_nso_rr("!!(a = 0).").value().main->get();
+ * tref res1 = to_nnf<node_t>(fm1);
+ * // tau::get(res1).to_str() == "a = 0"
+ *
+ * tref fm2 = get_nso_rr("!(a = 0 && b = 0).").value().main->get();
+ * tref res2 = to_nnf<node_t>(fm2);
+ * // tau::get(res2).to_str() == "a != 0 || b != 0"
+ * @endcode
  */
 template <NodeType node>
 tref to_nnf(tref fm);
@@ -212,6 +306,19 @@ tref to_nnf(tref fm);
  * @tparam node Tree node type.
  * @param formula Formula to normalize.
  * @return Formula in Boole normal form.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // f(0,0)f(0,1)=0 && f(1,1)f(1,0)=0 && (f(1,0)f(1,1)|f(0,1)f(0,0) != 0) is
+ * // unsatisfiable: the first two conjuncts force every f(i,j) product to be
+ * // 0, contradicting the third (see
+ * // tests/integration/test_integration-wff_normalization.cpp:288-293).
+ * tref fm = get_nso_rr(
+ *     "f(0, 0)f(0, 1) = 0 && f(1, 1)f(1, 0) = 0 && "
+ *     "f(1, 0)f(1, 1)|f(0, 1)f(0, 0) != 0.").value().main->get();
+ * tref res = boole_normal_form<node_t>(fm);
+ * CHECK( tau::get(res).equals_F() );
+ * @endcode
  */
 template <NodeType node>
 tref boole_normal_form(tref formula);
@@ -225,6 +332,14 @@ tref boole_normal_form(tref formula);
  * @tparam node Tree node type.
  * @param formula Formula to normalize.
  * @return Formula with all terms in Boole normal form.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // xy|xy' = x(y|y') = x
+ * tref fm = get_nso_rr("xy|xy' = 0.").value().main->get();
+ * tref res = term_boole_normal_form<node_t>(fm);
+ * // tau::get(res).to_str() == "x = 0"
+ * @endcode
  */
 template <NodeType node>
 tref term_boole_normal_form(tref formula);
@@ -238,6 +353,19 @@ tref term_boole_normal_form(tref formula);
  * @tparam node Tree node type.
  * @param formula Formula to anti-prenex.
  * @return Formula with quantifiers pushed in as far as possible.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // The inner "ex o2[1],o1[1] o1[1]o2[1]=0" is always satisfiable (pick
+ * // o1[1]=o2[1]=0), so the whole formula reduces to a tautology once the
+ * // quantifier is pushed in and resolved (see
+ * // tests/integration/test_integration-wff_normalization.cpp:131-136).
+ * tref fm = get_nso_rr(
+ *     "all o1[0], o2[0] !o1[0]o2[0] = 0 || o1[0]o2[0] = 0 && "
+ *     "(ex o2[1], o1[1] o1[1]o2[1] = 0).").value().main->get();
+ * tref res = anti_prenex<node_t>(fm);
+ * CHECK( tau::get(res).equals_T() );
+ * @endcode
  */
 template <NodeType node>
 tref anti_prenex(tref formula);
@@ -251,6 +379,10 @@ tref anti_prenex(tref formula);
  * @tparam type BA type identifier.
  * @param n Formula to convert.
  * @return Formula in ANF.
+ *
+ * @warning Not implemented yet (normal_forms.tmpl.h): the current body prints
+ * "Not implemented yet." and returns @p n unchanged. No worked example is
+ * given here since the function is currently the identity.
  */
 template <NodeType node, size_t type>
 tref anf(tref n);
@@ -263,6 +395,10 @@ tref anf(tref n);
  * @tparam node Tree node type.
  * @param n Formula to convert.
  * @return Formula in PNF.
+ *
+ * @warning Not implemented yet (normal_forms.tmpl.h): the current body prints
+ * "Not implemented yet." and returns @p n unchanged. No worked example is
+ * given here since the function is currently the identity.
  */
 template <NodeType node>
 tref pnf(tref n);
