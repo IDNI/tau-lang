@@ -58,8 +58,11 @@ tref parse_bv_formula(const std::string& spec) {
 }
 
 bool is_tainted(tref formula, const std::string& var_name) {
+	// select_all (not get_free_vars) so this also finds variables bound
+	// by a quantifier, not just genuinely free ones.
 	auto skip = make_bv_arithmetic_skip_uf<node_t>(formula);
-	for (tref v : get_free_vars<node_t>(formula))
+	for (tref v : tau::get(formula).select_all(
+		(bool(*)(tref)) is_var_or_capture<node_t>))
 		if (get_var_name<node_t>(v) == var_name)
 			return skip(v);
 	FAIL("variable not found in formula: " << var_name);
@@ -111,5 +114,38 @@ TEST_SUITE("make_bv_arithmetic_skip_uf") {
 		CHECK(new_tainted.size() >= old_tainted.size());
 		for (tref n : old_tainted) CHECK(new_tainted.contains(n));
 		CHECK(is_tainted(fm, "x"));
+	}
+
+	TEST_CASE("unrelated sibling quantifiers with the same variable name don't cross-taint") {
+		// The `x` bound by the second `ex x` is a structurally identical
+		// but logically unrelated variable to the first block's `x`.
+		// Only the first block's `x` participates in arithmetic.
+		const std::string sample =
+			"(ex x x + { 1 }:bv[4] = { 2 }:bv[4]) "
+			"&& (ex x x = { 3 }:bv[4])";
+		tref fm = parse_bv_formula(sample);
+		auto skip = make_bv_arithmetic_skip_uf<node_t>(fm);
+		int arithmetic_atoms = 0, logical_atoms = 0;
+		for (tref atom : tau::get(fm).select_top(is_atomic_fm<node_t>))
+			skip(atom) ? ++arithmetic_atoms : ++logical_atoms;
+		CHECK(arithmetic_atoms == 1);
+		CHECK(logical_atoms == 1);
+	}
+
+	TEST_CASE("taint on an atom inside a nested quantifier surfaces on an outer-scoped variable") {
+		// The first-bound variable (originally "w") is bound by the
+		// outer `ex`; the arithmetic atom lives inside the nested
+		// `ex`'s body but shares it via the equation. Looked up
+		// structurally, not by source name: Tau's parser canonically
+		// renames quantifier-bound variables (e.g. to "b1"/"b2"), so
+		// the original "w"/"y" spelling doesn't survive into the tree.
+		const std::string sample =
+			"ex w ex y w + y * { 1 }:bv[4] = { 2 }:bv[4]";
+		tref fm = parse_bv_formula(sample);
+		auto skip = make_bv_arithmetic_skip_uf<node_t>(fm);
+		auto vars = tau::get(fm).select_all(
+			(bool(*)(tref)) is_var_or_capture<node_t>);
+		REQUIRE(vars.size() == 2);
+		for (tref v : vars) CHECK(skip(v));
 	}
 }
