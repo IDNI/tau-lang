@@ -57,9 +57,21 @@ subtree_unordered_set<node> collect_bv_arithmetic_taint_uf(tref formula) {
 	using tau = tree<node>;
 	subtree_unordered_set<node> tainted;
 	bv_arithmetic_resolver<node> resolver;
-	auto is_arith_op = is<node>({ tau::bf_add, tau::bf_sub, tau::bf_mul,
-		tau::bf_div, tau::bf_mod, tau::bf_shl, tau::bf_shr,
-		tau::bf_cast });
+	// Not is<node>({...}): that factory's returned closure captures a
+	// std::initializer_list by value, whose backing array is a temporary
+	// destroyed at the end of the factory call's full expression --
+	// silently dangling afterward (undefined behavior masked by Debug's
+	// stack layout, reliably wrong under Release's optimizations).
+	auto is_arith_op = [](tref n) {
+		return tau::get(n).is(tau::bf_add)
+			|| tau::get(n).is(tau::bf_sub)
+			|| tau::get(n).is(tau::bf_mul)
+			|| tau::get(n).is(tau::bf_div)
+			|| tau::get(n).is(tau::bf_mod)
+			|| tau::get(n).is(tau::bf_shl)
+			|| tau::get(n).is(tau::bf_shr)
+			|| tau::get(n).is(tau::bf_cast);
+	};
 
 	auto snapshot_scope = [&](typename bv_arithmetic_resolver<node>::scope s) {
 		for (auto [elem, _] : resolver.scoped.uf)
