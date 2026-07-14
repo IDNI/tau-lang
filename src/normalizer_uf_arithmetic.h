@@ -4,12 +4,13 @@
  * @file normalizer_uf_arithmetic.h
  * @brief Scoped-union-find-based bitvector-arithmetic taint tracking.
  *
- * Reimplements the intent of `heuristics/bv_arithmetic_scan.h`'s
- * `make_bv_arithmetic_skip` using a `scoped_union_find` (see
- * `type_scoped_resolver.h` for the established pattern this follows),
- * unifying each atomic formula with its own BV-typed free variables so
- * arithmetic taint propagates to all of them, not just the direct operands
- * of an arithmetic operator. Standalone: not wired into the normalizer.
+ * Identifies bitvector-arithmetic residue left after predicate blasting so
+ * `eliminate_bv_and_quantifiers` (see `normalizer.tmpl.h`) can tell
+ * `anti_prenex_block` which nodes to leave alone rather than Boole-decompose.
+ * Uses a `scoped_union_find` (see `type_scoped_resolver.h` for the
+ * established pattern this follows), unifying each atomic formula with its
+ * own BV-typed free variables so arithmetic taint propagates to all of
+ * them, not just the direct operands of an arithmetic operator.
  */
 
 #ifndef __IDNI__TAU__NORMALIZER_UF_ARITHMETIC_H__

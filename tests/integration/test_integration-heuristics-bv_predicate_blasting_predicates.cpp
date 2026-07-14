@@ -5,7 +5,6 @@
 
 #include "boolean_algebras/bv_ba.h"
 #include "heuristics/bv_predicate_blasting.h"
-#include "heuristics/bv_arithmetic_scan.h"
 
 TEST_SUITE("configuration") {
 
@@ -358,46 +357,6 @@ TEST_SUITE("bvcast") {
 		TAU_LOG_INFO << "  bit1 src=0  : " << tau::get(src_b1_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "  bit1 res=0  : " << tau::get(res_b1_zero).to_str()  << "\n";
 		TAU_LOG_INFO << "------\n";
-	}
-}
-
-TEST_SUITE("bv_arithmetic_scan") {
-
-	// Variable names are deliberately unique to this suite (not the ubiquitous
-	// x/y/z used by hundreds of other cases in this binary): with TAU_CACHE
-	// enabled (Release), structurally-identical subtrees are interned
-	// process-wide, and BA-type-family / free-var caches keyed on those
-	// shared nodes could otherwise pick up a stale result computed under a
-	// different formula's context.
-	TEST_CASE("collect_bv_arithmetic_taint: bvatx*bvaty survives as unblastable, the atom is tainted") {
-		using node = node_t;
-
-		// bvatx * bvaty (non-constant multiplier) cannot be blasted by bvmul,
-		// so a formula containing it unresolved is exactly the kind of
-		// residue this heuristic is meant to flag for the solver: the
-		// top-level atomic wff itself is added to the taint set (pass 2).
-		tref fm = get_nso_rr(
-			"bvatx:bv[4] * bvaty:bv[4] = bvatz:bv[4].").value().main->get();
-		auto tainted = collect_bv_arithmetic_taint<node>(fm);
-		CHECK( tainted.size() == 1 );
-		CHECK( tainted.contains(fm) );
-	}
-
-	TEST_CASE("collect_bv_arithmetic_taint: no arithmetic, nothing tainted") {
-		tref fm = get_nso_rr("bvatx:bv[4] = bvaty:bv[4].").value().main->get();
-		auto tainted = collect_bv_arithmetic_taint<node_t>(fm);
-		CHECK( tainted.empty() );
-	}
-
-	TEST_CASE("make_bv_arithmetic_skip: skip predicate matches the taint set") {
-		using node = node_t;
-
-		tref fm = get_nso_rr(
-			"bvatx:bv[4] * bvaty:bv[4] = bvatz:bv[4].").value().main->get();
-		auto skip = make_bv_arithmetic_skip<node>(fm);
-		tref other = get_nso_rr("bvatx:bv[4] = bvatz:bv[4].").value().main->get();
-		CHECK( skip(fm) );
-		CHECK( !skip(other) );
 	}
 }
 

@@ -411,7 +411,6 @@ tref pnf(tref n);
 // need to be included before the definitions as they can be used in there.
 #include "heuristics/ex_subs_based_elimination.h"
 #include "heuristics/syntactic_path_simplification.h"
-#include "heuristics/bv_arithmetic_scan.h"
 #include "heuristics/trivial_skolem.h"
 #include "normal_forms.tmpl.h"
 

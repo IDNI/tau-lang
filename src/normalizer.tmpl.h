@@ -2,6 +2,7 @@
 
 #include "normalizer.h"
 #include "normal_forms.h"
+#include "normalizer_uf_arithmetic.h"
 #include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
@@ -57,7 +58,7 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	form = resolve_quantifiers<node>(form);
 	form = anti_prenex_block<node>(form);
 	form = resolve_quantifiers<node>(form);
-	auto arith_skip = make_bv_arithmetic_skip<node>(form);
+	auto arith_skip = make_bv_arithmetic_skip_uf<node>(form);
 	form = anti_prenex_block<node>(form, arith_skip);
 	form = resolve_quantifiers<node>(form);
 	return form;

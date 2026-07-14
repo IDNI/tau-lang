@@ -4,7 +4,6 @@
 #include "test_tau_helpers.h"
 
 #include "normalizer_uf_arithmetic.h"
-#include "heuristics/bv_arithmetic_scan.h"
 
 TEST_SUITE("bv_arithmetic_resolver") {
 
@@ -96,23 +95,14 @@ TEST_SUITE("make_bv_arithmetic_skip_uf") {
 		CHECK(is_tainted(fm, "x"));
 	}
 
-	TEST_CASE("quantifier-free formula: new implementation is a superset of the flat heuristics/bv_arithmetic_scan implementation") {
-		// The two implementations are NOT expected to agree exactly: the
-		// existing flat implementation's pass 1 (tagging BV-typed free
-		// vars of an arithmetic operator) calls get_free_vars on the bare
-		// operator node (e.g. bf_add), but get_free_vars only returns
-		// non-empty for nodes of type bf/wff -- so that pass never
-		// actually tags any variable, and its real output is only pass
-		// 2 (tagging the enclosing atomic formula). This new
-		// implementation correctly tags the atom's free variables too
-		// (via a merge keyed on the atomic-formula node, which IS of
-		// type wff), so it must always be a superset of the old result.
+	TEST_CASE("quantifier-free arithmetic formula taints the atom's free variable via merge") {
+		// Taint must reach the atom's free variable through the merge
+		// keyed on the atomic-formula node (which is of type wff), not
+		// just the arithmetic operator's direct operands.
 		const std::string sample = "x + { 1 }:bv[4] = { 2 }:bv[4]";
 		tref fm = parse_bv_formula(sample);
-		auto old_tainted = collect_bv_arithmetic_taint<node_t>(fm);
-		auto new_tainted = collect_bv_arithmetic_taint_uf<node_t>(fm);
-		CHECK(new_tainted.size() >= old_tainted.size());
-		for (tref n : old_tainted) CHECK(new_tainted.contains(n));
+		auto tainted = collect_bv_arithmetic_taint_uf<node_t>(fm);
+		CHECK(!tainted.empty());
 		CHECK(is_tainted(fm, "x"));
 	}
 
