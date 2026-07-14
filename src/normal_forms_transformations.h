@@ -166,6 +166,16 @@ tref syntactic_path_simplification(tref fm);
 template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause);
 
+/**
+ * @brief Skip predicate that skips nothing; suitable as `anti_prenex_block`'s
+ * `skip` argument when no content should be deferred to blasting.
+ * @tparam node Tree node type.
+ * @param t tref (unused).
+ * @return Always `false`.
+ */
+template <NodeType node>
+bool no_skip(tref t);
+
 // Note: no default argument for `skip` here -- function templates cannot
 // gain a default argument in a later declaration once an earlier one (the
 // forward declaration in heuristics/bv_predicate_blasting.h, included above)

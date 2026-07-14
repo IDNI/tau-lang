@@ -383,6 +383,12 @@ tref syntactic_formula_simplification(tref formula,
 }
 
 
+/** @internal @copydoc no_skip @endinternal */
+template <NodeType node>
+bool no_skip(tref) {
+	return false;
+}
+
 // TODO: How to adjust for bitvector that are boolean?
 /**
  * @internal
@@ -469,15 +475,16 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 		// quantifiers that the atomless-BA path can then eliminate.
 		// bv_predicate_blasting already anti-prenexes each blasted atomic's
 		// own freshly-introduced auxiliary quantifiers (scoped locally); the
-		// default-skip anti_prenex_block call below is a separate concern:
-		// it attempts to push/resolve `var`'s own quantifier (still
-		// bv-typed and left untouched by blasting itself) now that the
-		// scope's arithmetic has been simplified to boolean form.
+		// anti_prenex_block call below is a separate concern: it attempts to
+		// push/resolve `var`'s own quantifier (still bv-typed and left
+		// untouched by blasting itself) now that the scope's arithmetic has
+		// been simplified to boolean form, so nothing needs to be skipped
+		// anymore.
 		if (bv_blasting) {
 			tref ex_fm = tau::build_wff_ex(var, scoped_fm, false);
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 					blasted && blasted != ex_fm) {
-				tref cont = anti_prenex_block<node>(blasted);
+				tref cont = anti_prenex_block<node>(blasted, no_skip<node>);
 				return tau::build_wff_and(cont, new_fm);
 			}
 		}

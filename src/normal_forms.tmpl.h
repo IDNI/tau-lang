@@ -3317,10 +3317,11 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	// the BDD-based elimination below, which requires atomless-typed
 	// quantified variables. bv_predicate_blasting already anti-prenexes
 	// each blasted atomic's own freshly-introduced auxiliary quantifiers
-	// (scoped locally); the default-skip anti_prenex_block call below is a
-	// separate concern: it attempts to push/resolve the block's own
-	// quantifiers (still bv-typed and left untouched by blasting itself)
-	// now that the scope's arithmetic has been simplified to boolean form.
+	// (scoped locally); the anti_prenex_block call below is a separate
+	// concern: it attempts to push/resolve the block's own quantifiers
+	// (still bv-typed and left untouched by blasting itself) now that the
+	// scope's arithmetic has been simplified to boolean form, so nothing
+	// needs to be skipped anymore.
 	auto blast_block = [&](tref dep_formula) -> tref {
 		tref ex_fm = dep_formula;
 		for (auto v = block.rbegin(); v != block.rend(); ++v)
@@ -3328,7 +3329,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		if (bv_blasting)
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 					blasted && blasted != ex_fm)
-				return anti_prenex_block<node>(blasted);
+				return anti_prenex_block<node>(blasted, no_skip<node>);
 		return ex_fm;
 	};
 
