@@ -19,6 +19,7 @@ set(TESTS
 	hooks
 	interpreter
 	normal_forms
+	normalizer_uf_arithmetic
 	nso_ba
 	nso_rr
 	product_ba
