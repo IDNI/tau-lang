@@ -52,4 +52,62 @@ bv_arithmetic_resolver<node>::merge(tref a, tref b) {
 	return new_root;
 }
 
+template <NodeType node>
+subtree_unordered_set<node> collect_bv_arithmetic_taint_uf(tref formula) {
+	using tau = tree<node>;
+	subtree_unordered_set<node> tainted;
+	bv_arithmetic_resolver<node> resolver;
+	auto is_arith_op = is<node>({ tau::bf_add, tau::bf_sub, tau::bf_mul,
+		tau::bf_div, tau::bf_mod, tau::bf_shl, tau::bf_shr,
+		tau::bf_cast });
+
+	auto snapshot_scope = [&](typename bv_arithmetic_resolver<node>::scope s) {
+		for (auto [elem, _] : resolver.scoped.uf)
+			if (elem.first == s && resolver.kind_of(elem.second)
+				== arith_kind::arithmetic)
+				tainted.insert(elem.second);
+	};
+
+	auto visit_subtree = [](tref) -> bool { return true; };
+
+	auto visit = [&](tref m) -> bool {
+		if (is_quantifier<node>(m)) {
+			resolver.open();
+			if (tref v = tau::get(m).find_top(
+				(bool(*)(tref)) is_var_or_capture<node>); v)
+				resolver.insert(v, arith_kind::logical);
+			return true;
+		}
+		if (is_atomic_fm<node>(m)) {
+			arith_kind k = tau::get(m).find_top(is_arith_op)
+				? arith_kind::arithmetic : arith_kind::logical;
+			resolver.assign(m, k);
+			for (tref v : get_free_vars<node>(m))
+				if (is_bv_type_family<node>(
+					tau::get(v).get_ba_type()))
+					resolver.merge(m, v);
+			return false;
+		}
+		return true;
+	};
+
+	auto up = [&](tref m) {
+		if (!is_quantifier<node>(m)) return;
+		auto s = resolver.scoped.scopes.back();
+		snapshot_scope(s);
+		resolver.close();
+	};
+
+	idni::pre_order<node>(formula).visit(visit, visit_subtree, up);
+	snapshot_scope(resolver.scoped.global);
+	return tainted;
+}
+
+template <NodeType node>
+std::function<bool(tref)> make_bv_arithmetic_skip_uf(tref formula) {
+	auto tainted = std::make_shared<subtree_unordered_set<node>>(
+		collect_bv_arithmetic_taint_uf<node>(formula));
+	return [tainted](tref n) { return tainted->contains(n); };
+}
+
 } // namespace idni::tau_lang

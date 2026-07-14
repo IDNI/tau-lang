@@ -89,6 +89,30 @@ struct bv_arithmetic_resolver {
 	std::map<element, arith_kind, scoped_less<tref, idni::subtree_less<node>>> kinds;
 };
 
+/**
+ * @brief Collect bitvector-arithmetic-tainted variable/atomic-formula nodes in @p formula.
+ *
+ * Scopes on every quantifier (`wff_ex`/`wff_all`) so two unrelated quantifiers
+ * binding the same variable name/`tref` never cross-taint each other. Unions
+ * each atomic formula with its own BV-typed free variables, so taint
+ * propagates to variables entangled in an arithmetic equation even when they
+ * aren't a direct operand of the arithmetic operator.
+ * @tparam node Tree node type.
+ * @param formula Formula to scan.
+ * @return Set of variable/atomic-formula nodes resolved to `arith_kind::arithmetic`.
+ */
+template <NodeType node>
+subtree_unordered_set<node> collect_bv_arithmetic_taint_uf(tref formula);
+
+/**
+ * @brief Build a `skip` predicate from `collect_bv_arithmetic_taint_uf`'s result.
+ * @tparam node Tree node type.
+ * @param formula Formula to scan.
+ * @return Predicate suitable as `anti_prenex_block`'s `skip` argument.
+ */
+template <NodeType node>
+std::function<bool(tref)> make_bv_arithmetic_skip_uf(tref formula);
+
 } // namespace idni::tau_lang
 
 #include "normalizer_uf_arithmetic.tmpl.h"
