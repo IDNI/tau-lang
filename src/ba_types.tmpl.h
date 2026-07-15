@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <optional>
+
 #include "ba_types.h"
 
 namespace idni::tau_lang {
@@ -220,7 +222,15 @@ std::string ba_types<node>::name(size_t ba_type_id) {
 	if (ba_type_id >= type_trees().size())
 		throw std::logic_error("ba_types::name: invalid ba_type_id "
 			+ std::to_string(ba_type_id));
-	return tau::get(type_trees()[ba_type_id]).to_str();
+	// type_trees() entries are stable once registered (see id()), so the
+	// name is cached here rather than re-stringified on every call: this
+	// is on the hot path of node::hashit(), called for every tree node
+	// constructed with a non-untyped ba_type.
+	static std::vector<std::optional<std::string>> cache;
+	if (ba_type_id >= cache.size()) cache.resize(type_trees().size());
+	if (!cache[ba_type_id])
+		cache[ba_type_id] = tau::get(type_trees()[ba_type_id]).to_str();
+	return *cache[ba_type_id];
 }
 
 template <NodeType node>
