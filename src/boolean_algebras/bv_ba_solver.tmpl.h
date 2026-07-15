@@ -241,13 +241,27 @@ std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form, subtr
 			return std::optional<bv>(std::get<bv>(cte));
 		}
 		case tau::bf_t: {
+			// Same rationale as the ba_constant case above: a non-bv
+			// (e.g. sbf or tau) T/F node can reach here once every
+			// variable has been substituted away, since
+			// is_bv_solvable_formula only inspects variable nodes.
+			// get_bv_size requires an explicit bitwidth; fail
+			// gracefully instead of asserting/crashing.
 			tref c = form | tt::ref;
-			auto bv_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
+			tref type_tree = tau::get(c).get_ba_type_tree();
+			if (!is_bv_type_family<node>(tau::get(c).get_ba_type())
+				|| !(tt(type_tree) | tau::subtype))
+				return std::nullopt;
+			auto bv_size = get_bv_size<node>(type_tree);
 			return make_bitvector_top_elem(bv_size);
 		}
 		case tau::bf_f: {
 			tref c = form | tt::ref;
-			auto bv_size = get_bv_size<node>(tau::get(c).get_ba_type_tree());
+			tref type_tree = tau::get(c).get_ba_type_tree();
+			if (!is_bv_type_family<node>(tau::get(c).get_ba_type())
+				|| !(tt(type_tree) | tau::subtype))
+				return std::nullopt;
+			auto bv_size = get_bv_size<node>(type_tree);
 			return make_bitvector_bottom_elem(bv_size);
 		}
 		case tau::ctnvar: {
