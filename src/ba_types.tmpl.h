@@ -217,7 +217,6 @@ tref ba_types<node>::type_tree(size_t ba_type_id) {
 
 template <NodeType node>
 std::string ba_types<node>::name(size_t ba_type_id) {
-	using tau = tree<node>;
 
 	if (ba_type_id >= type_trees().size())
 		throw std::logic_error("ba_types::name: invalid ba_type_id "
@@ -225,12 +224,19 @@ std::string ba_types<node>::name(size_t ba_type_id) {
 	// type_trees() entries are stable once registered (see id()), so the
 	// name is cached here rather than re-stringified on every call: this
 	// is on the hot path of node::hashit(), called for every tree node
-	// constructed with a non-untyped ba_type.
-	static std::vector<std::optional<std::string>> cache;
-	if (ba_type_id >= cache.size()) cache.resize(type_trees().size());
-	if (!cache[ba_type_id])
-		cache[ba_type_id] = tau::get(type_trees()[ba_type_id]).to_str();
-	return *cache[ba_type_id];
+	// constructed with a non-untyped ba_type. Cached via tree<node>'s
+	// GC-aware cache registry (same pattern as get_free_vars in
+	// tau_tree_extractors.tmpl.h), keyed by the type tree itself since
+	// create_cache requires tref-shaped keys.
+#ifdef TAU_CACHE
+	using tau = tree<node>;
+	using cache_t = subtree_unordered_map<node, std::string>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	tref type = type_trees()[ba_type_id];
+	if (auto it = cache.find(type); it != cache.end()) return it->second;
+	return cache.emplace(type, tau::get(type).to_str()).first->second;
+#endif // TAU_CACHE
+	return tree<node>::get(type_trees()[ba_type_id]).to_str();
 }
 
 template <NodeType node>
