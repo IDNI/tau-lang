@@ -55,12 +55,22 @@ using offset_t = std::pair<tau_parser::nonterminal, size_t>;
  */
 template <NodeType node>
 tref eliminate_bv_and_quantifiers(tref form) {
+	using tau = tree<node>;
+
 	form = resolve_quantifiers<node>(form);
 	form = anti_prenex_block<node>(form);
 	form = resolve_quantifiers<node>(form);
 	auto arith_skip = make_bv_arithmetic_skip_uf<node>(form);
 	form = anti_prenex_block<node>(form, arith_skip);
 	form = resolve_quantifiers<node>(form);
+	if (get_free_vars<node>(form).empty() && is_bv_solvable_formula<node>(form)) {
+		// Only commit to T/F on a definite answer: cvc5
+		// returning unknown, or translation failing, means
+		// we cannot decide, not that the formula is false.
+		auto status = bv_formula_sat_status<node>(form);
+		if (status == bv_sat_status::sat) return tau::_T();
+		if (status == bv_sat_status::unsat) return tau::_F();
+	}
 	return form;
 }
 
