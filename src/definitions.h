@@ -135,6 +135,18 @@ struct definitions {
 		ctx.clear();
 		global_scope.clear();
 	}
+
+	/**
+	 * @brief Insert every raw tref held by this registry into @p keep.
+	 *
+	 * `heads`/`bodies` are htrefs and `ctx.{types,inputs,outputs}` are
+	 * htref-keyed (auto-tracked via the non-expired weak_ptr entries in
+	 * `M`), so only the tref-keyed `global_scope` needs walking.
+	 * @param keep Set of tree nodes to preserve across gc.
+	 */
+	void collect_live_refs(std::unordered_set<tref>& keep) const {
+		for (auto& [k, _] : global_scope) keep.insert(k);
+	}
 private:
 	definitions() = default;
 

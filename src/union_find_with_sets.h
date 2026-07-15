@@ -71,6 +71,18 @@ public:
 	}
 
 	/**
+	 * @brief Insert every tree node held by this structure into @p keep.
+	 *
+	 * `parent` and `next` hold raw trefs, so their keys and values must
+	 * contribute to the keep set passed to `bintree<node>::gc(keep)`.
+	 * @param keep Set of tree nodes to preserve across gc.
+	 */
+	void collect_live_refs(std::unordered_set<tref>& keep) const {
+		for (auto& [k, v] : parent) { keep.insert(k); keep.insert(v); }
+		for (auto& [k, v] : next)   { keep.insert(k); keep.insert(v); }
+	}
+
+	/**
 	 * @brief Return the root of the set containing @p x, inserting @p x first if absent.
 	 *
 	 * Applies path compression on traversal.

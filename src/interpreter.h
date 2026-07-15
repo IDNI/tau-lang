@@ -81,6 +81,18 @@ struct interpreter {
 	 */
 	void update(tref update);
 
+	/**
+	 * @brief Insert every raw tref reachable from this interpreter into @p keep.
+	 *
+	 * This is the walk-collect half of the gc strategy: every container
+	 * that holds raw trefs (`memory`, `step_spec`, `inputs`/`outputs`
+	 * keys, `output_partition`) must contribute here so that
+	 * `bintree<node>::gc(keep)` does not free live nodes. htref-held
+	 * state (`ubt_ctn`, `original_spec`, `ctx`) needs no walk.
+	 * @param keep Set of tree nodes to preserve across gc.
+	 */
+	void collect_live_refs(std::unordered_set<tref>& keep) const;
+
 	htrefs ubt_ctn;
 	/// Partition of spec each with representative for set of output streams.
 	std::vector<std::pair<htref, htref>> original_spec;

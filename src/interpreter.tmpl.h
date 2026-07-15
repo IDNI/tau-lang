@@ -591,6 +591,18 @@ void interpreter<node>::prune_memory(size_t completed_time_point) {
 }
 
 template <NodeType node>
+void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const {
+	// ubt_ctn, original_spec, and ctx.{types,inputs,outputs} hold htrefs
+	// directly; bintree<node>::gc() preserves their nodes via M's
+	// non-expired weak_ptr entries, no walk needed.
+	keep.insert(step_spec.begin(), step_spec.end());
+	for (auto& [k, v] : memory)  { keep.insert(k); keep.insert(v); }
+	for (auto& [k, _] : inputs)  keep.insert(k);
+	for (auto& [k, _] : outputs) keep.insert(k);
+	output_partition.collect_live_refs(keep);
+}
+
+template <NodeType node>
 trefs interpreter<node>::get_ubt_ctn_at(int_t t) {
 	LOG_TRACE << "get_ubt_ctn_at begin \n";
 	LOG_TRACE << "get_ubt_ctn_at[t]: " << t << "\n";
