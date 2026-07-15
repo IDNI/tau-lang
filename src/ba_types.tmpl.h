@@ -198,8 +198,9 @@ template <NodeType node>
 size_t ba_types<node>::id(tref ba_type) {
 	if (auto it = type_tree_to_idx().find(ba_type);
 		it != type_tree_to_idx().end()) return it->second;
-	return type_tree_to_idx().emplace(ba_type, type_trees().size()),
-		type_trees().push_back(ba_type), type_trees().size() - 1;
+	type_tree_to_idx().emplace(ba_type, type_trees().size());
+	type_trees().push_back(tree<node>::geth(ba_type));
+	return type_trees().size() - 1;
 }
 
 // A ba_type_id past the end of type_trees() means the id was corrupted
@@ -212,7 +213,7 @@ tref ba_types<node>::type_tree(size_t ba_type_id) {
 	if (ba_type_id >= type_trees().size())
 		throw std::logic_error("ba_types::type_tree: invalid ba_type_id "
 			+ std::to_string(ba_type_id));
-	return type_trees()[ba_type_id];
+	return type_trees()[ba_type_id]->get();
 }
 
 template <NodeType node>
@@ -232,11 +233,11 @@ std::string ba_types<node>::name(size_t ba_type_id) {
 	using tau = tree<node>;
 	using cache_t = subtree_unordered_map<node, std::string>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
-	tref type = type_trees()[ba_type_id];
+	tref type = type_trees()[ba_type_id]->get();
 	if (auto it = cache.find(type); it != cache.end()) return it->second;
 	return cache.emplace(type, tau::get(type).to_str()).first->second;
 #endif // TAU_CACHE
-	return tree<node>::get(type_trees()[ba_type_id]).to_str();
+	return tree<node>::get(type_trees()[ba_type_id]->get()).to_str();
 }
 
 template <NodeType node>
@@ -263,13 +264,14 @@ std::string ba_types<node>::dump_to_str() {
 	return dump(ss), ss.str();
 }
 
-// type_sids (index = ba_type id)
+// type_trees (index = ba_type id)
 template <NodeType node>
-std::vector<tref>& ba_types<node>::type_trees() {
-	static std::vector<tref> t {
-		untyped_type<node>(),
-		tau_type<node>(),
-		sbf_type<node>() };
+std::vector<htref>& ba_types<node>::type_trees() {
+	static std::vector<htref> t {
+		tree<node>::geth(untyped_type<node>()),
+		tree<node>::geth(tau_type<node>()),
+		tree<node>::geth(sbf_type<node>())
+	};
 	return t;
 }
 

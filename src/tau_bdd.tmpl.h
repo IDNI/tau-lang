@@ -1005,7 +1005,7 @@ void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	using tau = tree<node>;
 	if (!bdd_tref) return;
 	if (auto it = cache.find(bdd_tref); it != cache.end()) {
-		const trefs& cached = free_vars_pool[it->second];
+		const trefs& cached = it->second;
 		merged.insert(cached.begin(), cached.end());
 		return;
 	}
@@ -1035,12 +1035,14 @@ template<NodeType node>
 const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
 	static const trefs no_free_vars{};
 	if (!bdd_tref) return no_free_vars;
-#ifdef TAU_CACHE
+	// The cache stores the free-vars vectors directly (the old global
+	// free_vars_pool indirection was not gc-aware). It is unconditional —
+	// not gated by TAU_CACHE — because the returned reference needs stable
+	// storage; only the recursive per-node memoization stays TAU_CACHE-only.
 	static bdd_fv_cache_t& cache =
 		tbdd::template create_cache<bdd_fv_cache_t>();
 	if (auto it = cache.find(bdd_tref); it != cache.end())
-		return free_vars_pool[it->second];
-#endif
+		return it->second;
 	subtree_set<node> merged;
 #ifdef TAU_CACHE
 	get_free_tau_vars_impl(bdd_tref, merged, cache);
@@ -1048,15 +1050,8 @@ const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
 	get_free_tau_vars_impl(bdd_tref, merged);
 #endif
 	trefs fv(merged.begin(), merged.end());
-	size_t id = free_vars_pool.size();
-	if (auto it = free_vars_pool_index.find(fv);
-		it != free_vars_pool_index.end()) id = it->second;
-	else free_vars_pool_index.emplace(fv, id),
-		free_vars_pool.emplace_back(std::move(fv));
-#ifdef TAU_CACHE
-	cache.emplace(bdd_tref, id);
-#endif
-	return free_vars_pool[id];
+	auto [it, _] = cache.emplace(bdd_tref, std::move(fv));
+	return it->second;
 }
 
 } // namespace idni::tau_lang

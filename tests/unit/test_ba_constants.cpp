@@ -78,8 +78,11 @@ TEST_SUITE("sbf_ba and Bool BAs") {
 		using tau = tree<node>;
 		using bac = ba_constants<node>;
 
-		tref t_ref = tau::get_ba_constant(Bool(true),  bool_type());
-		tref f_ref = tau::get_ba_constant(Bool(false), bool_type());
+		// bool_type<node>() (not the test helper's bool_type()): the helper
+		// builds the type tree in tree<node<bv, Bool>>, a different
+		// instantiation whose trefs are foreign to this test's tree<node>.
+		tref t_ref = tau::get_ba_constant(Bool(true),  bool_type<node>());
+		tref f_ref = tau::get_ba_constant(Bool(false), bool_type<node>());
 		size_t t = tau::get(t_ref).get_ba_constant_id();
 		size_t f = tau::get(f_ref).get_ba_constant_id();
 		CHECK( t == 1 );

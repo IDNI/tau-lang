@@ -237,9 +237,9 @@ protected:
  */
 template <NodeType node>
 struct io_context {
-	subtree_map<node, size_t> types;           ///< IO variable → BA type id.
-	subtree_map<node, size_t> inputs;          ///< IO variable → input stream name id.
-	subtree_map<node, size_t> outputs;         ///< IO variable → output stream name id.
+	subtree_htref_map<node, size_t> types;     ///< IO variable → BA type id.
+	subtree_htref_map<node, size_t> inputs;    ///< IO variable → input stream name id.
+	subtree_htref_map<node, size_t> outputs;   ///< IO variable → output stream name id.
 	input_streams_remap       input_remaps;    ///< Variable name → input stream.
 	output_streams_remap      output_remaps;   ///< Variable name → output stream.
 

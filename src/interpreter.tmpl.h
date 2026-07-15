@@ -255,7 +255,7 @@ bool interpreter<node>::rebuild_outputs(
 
 template <NodeType node>
 interpreter<node>::interpreter(
-	trefs& ubt_ctn, auto& original_spec, auto& output_partition,
+	htrefs& ubt_ctn, auto& original_spec, auto& output_partition,
 	assignment<node>& memory,
 	const io_context<node>& ctx)
 	: ubt_ctn(std::move(ubt_ctn)), original_spec(std::move(original_spec)),
@@ -277,15 +277,16 @@ std::optional<interpreter<node>>
 	for (tref clause : expression_paths<node>(spec)) {
 		union_find_with_sets<decltype(stream_comp), node> output_partition(stream_comp);
 		auto spec_partition = create_spec_partition(clause, output_partition);
-		trefs ubt_ctn;
+		htrefs ubt_ctn;
 		bool executable = true;
 		for (auto& [spec_part, out_rep] : spec_partition) {
-			auto ubd_ctn_part = get_executable_spec(spec_part);
+			tref clause_t = spec_part->get();
+			auto ubd_ctn_part = get_executable_spec(clause_t);
 			if (ubd_ctn_part == nullptr) {
 				// Need to try next clause
 				executable = false; break;
 			}
-			ubt_ctn.push_back(ubd_ctn_part);
+			ubt_ctn.push_back(tree<node>::geth(ubd_ctn_part));
 		}
 		if (!executable) continue;
 		// All parts of spec are realizable
@@ -315,7 +316,7 @@ std::optional<interpreter<node>>
 }
 
 template <NodeType node>
-std::vector<std::pair<tref, tref>>
+std::vector<std::pair<htref, htref>>
 interpreter<node>::create_spec_partition(tref spec, auto& output_partition) {
 	// Get CNF clauses of DNF clause
 	trefs clauses = get_cnf_wff_clauses<node>(spec);
@@ -333,7 +334,7 @@ interpreter<node>::create_spec_partition(tref spec, auto& output_partition) {
 		}
 	}
 	// Compute sets of output streams
-	std::vector<std::pair<tref, tref>> partition;
+	std::vector<std::pair<htref, htref>> partition;
 	for (tref c : clauses) {
 		// Get output streams and uninterpreted constants
 		trefs ostreams;
@@ -354,8 +355,9 @@ interpreter<node>::create_spec_partition(tref spec, auto& output_partition) {
 			output_partition.merge(ostreams[i-1], ostreams[i]);
 		}
 		if (!ostreams.empty())
-			partition.emplace_back(c, output_partition.find(ostreams.front()));
-		else partition.emplace_back(c, nullptr);
+			partition.emplace_back(tree<node>::geth(c),
+				tree<node>::geth(output_partition.find(ostreams.front())));
+		else partition.emplace_back(tree<node>::geth(c), htref{});
 	}
 	for (size_t i = 0; i < partition.size(); ++i) {
 		// If no output/uninterpreted constants are present, skip
@@ -364,16 +366,16 @@ interpreter<node>::create_spec_partition(tref spec, auto& output_partition) {
 			// If no output/uninterpreted constants are present, skip
 			if (!partition[j].second) continue;
 			// Check overlap between output streams of clauses
-			if (output_partition.connected(partition[i].second, partition[j].second)) {
+			if (output_partition.connected(partition[i].second->get(), partition[j].second->get())) {
 				// If there is an overlap, conjunct the spec parts
-				partition[i].first = tau::build_wff_and(
-					partition[i].first, partition[j].first);
+				partition[i].first = tree<node>::geth(tau::build_wff_and(
+					partition[i].first->get(), partition[j].first->get()));
 				partition.erase(partition.begin()+j);
 				--j;
 			}
 		}
 		// Unsqueeze always statements again
-		partition[i].first = unsqueeze_always(partition[i].first);
+		partition[i].first = tree<node>::geth(unsqueeze_always(partition[i].first->get()));
 	}
 	return partition;
 }
@@ -436,7 +438,9 @@ std::pair<std::optional<assignment<node>>, bool>
 			"this", time_point, get_ba_type_id<node>(tau_type<node>()));
 		tref wrapped_spec = build_bf_ba_constant<node>(
 			node::ba::pack_tau_ba(unsqueeze_always(
-				tau::build_wff_and(original_spec | std::views::keys))),
+				tau::build_wff_and(original_spec | std::views::keys
+					| std::views::transform(
+						[](const htref& h) { return h->get(); })))),
 				get_ba_type_id<node>(tau_type<node>()));
 		memory[current_this_stream] = wrapped_spec;
 	}
@@ -595,14 +599,14 @@ trefs interpreter<node>::get_ubt_ctn_at(int_t t) {
 					? (int_t)formula_time_point : t;
 	trefs upd_ubt_ctn;
 	if (t >= std::max(highest_initial_pos, (int_t)formula_time_point)) {
-		for (tref ubt_ctn_part : ubt_ctn)
-			upd_ubt_ctn.push_back(update_to_time_point(ubt_ctn_part, ut));
+		for (const auto& h : ubt_ctn)
+			upd_ubt_ctn.push_back(update_to_time_point(h->get(), ut));
 		return upd_ubt_ctn;
 	}
 	// Adjust ubt_ctn to time_point by eliminating inputs and outputs
 	// which are greater than current time_point in a time-compatible fashion
-	for (tref ubt_ctn_part : ubt_ctn) {
-		auto step_ubt_ctn = update_to_time_point(ubt_ctn_part, ut);
+	for (const auto& h : ubt_ctn) {
+		auto step_ubt_ctn = update_to_time_point(h->get(), ut);
 		auto io_vars = tau::get(step_ubt_ctn).select_top(
 				is_child<node, tau::io_var>);
 		std::sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
@@ -644,7 +648,9 @@ bool interpreter<node>::calculate_initial_spec() {
 		step_spec = get_ubt_ctn_at(time_point);
 	} else if (time_point == initial_segment) {
 		// TODO: update constant time positions with values from memory to simplify step_spec
-		step_spec = ubt_ctn;
+		step_spec.clear();
+		step_spec.reserve(ubt_ctn.size());
+		for (const auto& h : ubt_ctn) step_spec.push_back(h->get());
 		final_system = true;
 	}
 	LOG_TRACE << "calculate_initial_systems[result]: true";
@@ -710,8 +716,8 @@ bool interpreter<node>::is_memory_access_valid(const auto& io_vars)
 template <NodeType node>
 void interpreter<node>::compute_lookback_and_initial() {
 	trefs io_vars;
-	for (tref ubt_ctn_part : ubt_ctn) {
-		const trefs current_io_vars = tau::get(ubt_ctn_part).select_top(
+	for (const auto& h : ubt_ctn) {
+		const trefs current_io_vars = tau::get(h->get()).select_top(
 			is_child<node, tau::io_var>);
 		io_vars.insert(io_vars.end(),
 			current_io_vars.begin(), current_io_vars.end());
@@ -810,9 +816,9 @@ void interpreter<node>::update(tref update) {
 		for (auto& [spec, rep] : current_spec) {
 			// update current spec part with memory
 			// TODO: maybe update constant time positions to current time point in order to avoid loosing initial conditions on restarting updated specification
-			spec = rewriter::replace<node>(spec, memory);
-			LOG_DEBUG << "update/memory replaced spec: " << LOG_FM(spec) << "\n";
-			// std::cout << "update/memory replaced spec: " << LOG_FM(spec) << "\n";
+			spec = tree<node>::geth(rewriter::replace<node>(spec->get(), memory));
+			LOG_DEBUG << "update/memory replaced spec: " << LOG_FM(spec->get()) << "\n";
+			// std::cout << "update/memory replaced spec: " << LOG_FM(spec->get()) << "\n";
 		}
 		// TODO: current_spec = remove_happend_sometimes(current_spec);
 		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
@@ -828,10 +834,10 @@ void interpreter<node>::update(tref update) {
 				// If no output/uninterpreted constant present, skip
 				if (!current_spec[j].second) continue;
 				// std::cout << "spec part j: " << tau::get(current_spec[j].first) << "\n";
-				if (uf.connected(current_spec[i].second, current_spec[j].second)) {
+				if (uf.connected(current_spec[i].second->get(), current_spec[j].second->get())) {
 					// std::cout << "Merged.\n";
-					current_spec[i].first = tau::build_wff_and(current_spec[i].first, current_spec[j].first);
-					current_ubd_ctn[i] = tau::build_wff_and(current_ubd_ctn[i], current_ubd_ctn[j]);
+					current_spec[i].first = tree<node>::geth(tau::build_wff_and(current_spec[i].first->get(), current_spec[j].first->get()));
+					current_ubd_ctn[i] = tree<node>::geth(tau::build_wff_and(current_ubd_ctn[i]->get(), current_ubd_ctn[j]->get()));
 					current_spec.erase(current_spec.begin()+j);
 					current_ubd_ctn.erase(current_ubd_ctn.begin()+j);
 					--j;
@@ -850,10 +856,10 @@ void interpreter<node>::update(tref update) {
 				if (!upd_partition[j].second) continue;
 				// std::cout << "update part j: " << tau::get(upd_partition[j].first) << "\n";
 				// Check if current spec part overlaps with current update part
-				if (uf.connected(current_spec[i].second, upd_partition[j].second)) {
+				if (uf.connected(current_spec[i].second->get(), upd_partition[j].second->get())) {
 					// std::cout << "Merged.\n";
 					// Add current update part to update collection
-					collected_updates[i] = tau::build_wff_and(collected_updates[i], upd_partition[j].first);
+					collected_updates[i] = tau::build_wff_and(collected_updates[i], upd_partition[j].first->get());
 					// Now remove update part from upd_partition
 					upd_partition.erase(upd_partition.begin()+j);
 					--j;
@@ -861,9 +867,9 @@ void interpreter<node>::update(tref update) {
 			}
 		}
 		// Unsqueeze always statements in current_spec and collected_updates
-		for (tref& spec_part: current_spec | std::views::keys) {
+		for (auto& [spec_part, _] : current_spec) {
 			// Unsqueeze always parts in spec_part
-			spec_part = unsqueeze_always(spec_part);
+			spec_part = tree<node>::geth(unsqueeze_always(spec_part->get()));
 		}
 		for (tref& upd: collected_updates) {
 			// Unsqueeze always parts in upd
@@ -878,35 +884,40 @@ void interpreter<node>::update(tref update) {
 			if (tau::get(collected_updates[i]).equals_T()) {
 				continue;
 			}
-			tref revision = pointwise_revision(current_spec[i].first, collected_updates[i], time_point);
-			LOG_DEBUG << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first) << "\n";
-			// std::cout << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first) << "\n";
+			tref revision = pointwise_revision(current_spec[i].first->get(), collected_updates[i], time_point);
+			LOG_DEBUG << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first->get()) << "\n";
+			// std::cout << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first->get()) << "\n";
 			if (tau::get(revision).equals_F()) {
 				update_valid = false;
 				break;
-			} else if (tau::subtree_equals(current_spec[i].first, revision)) {
+			} else if (tau::subtree_equals(current_spec[i].first->get(), revision)) {
 				// Unbound continuation does not need to be updated
 				continue;
 			}
-			current_spec[i].first = revision;
-			tref new_ubd_ctn_part = get_executable_spec(current_spec[i].first, time_point);
+			current_spec[i].first = tree<node>::geth(revision);
+			tref clause_t = current_spec[i].first->get();
+			tref new_ubd_ctn_part = get_executable_spec(clause_t, time_point);
+			// get_executable_spec may rewrite its tref& clause arg.
+			current_spec[i].first = tree<node>::geth(clause_t);
 			if (new_ubd_ctn_part == nullptr) {
 				update_valid = false;
 				break;
 			}
 			// Update unbound continuation
-			current_ubd_ctn[i] = new_ubd_ctn_part;
+			current_ubd_ctn[i] = tree<node>::geth(new_ubd_ctn_part);
 		}
 		if (!update_valid) continue;
 		// Here, all pointwise revisions were successful
 		// We now add the remaining update parts left in upd_partition
 		for (auto& upd : upd_partition) {
-			tref new_ubd_ctn_part = get_executable_spec(upd.first, time_point);
+			tref clause_t = upd.first->get();
+			tref new_ubd_ctn_part = get_executable_spec(clause_t, time_point);
+			upd.first = tree<node>::geth(clause_t);
 			if (new_ubd_ctn_part == nullptr) {
 				update_valid = false;
 				break;
 			}
-			current_ubd_ctn.push_back(new_ubd_ctn_part);
+			current_ubd_ctn.push_back(tree<node>::geth(new_ubd_ctn_part));
 			current_spec.emplace_back(std::move(upd));
 		}
 		if (!update_valid) continue;
@@ -914,7 +925,9 @@ void interpreter<node>::update(tref update) {
 		// The unbound continuation from start_time is possible for all parts,
 		// so it is safe to swap the current spec by update_unbound
 		// Update interpreter and return
-		update = unsqueeze_always(tau::build_wff_and(current_spec | std::views::keys));
+		update = unsqueeze_always(tau::build_wff_and(current_spec | std::views::keys
+			| std::views::transform(
+				[](const htref& h) { return h->get(); })));
 		LOG_INFO << "Updated specification: " << TAU_TO_STR(update) << "\n\n";
 
 		// Set new specification for interpreter
@@ -925,15 +938,15 @@ void interpreter<node>::update(tref update) {
 		final_system = false;
 		compute_lookback_and_initial();
 		subtree_map<node, size_t> output_streams;
-		for (tref spec_part : original_spec | std::views::keys) {
-			if (!collect_output_streams(spec_part, output_streams))
+		for (const auto& [k, _] : original_spec) {
+			if (!collect_output_streams(k->get(), output_streams))
 				return;
 		}
 		LOG_TRACE << "interpreter::update/rebuild_outputs";
 		if (!rebuild_outputs(output_streams)) return;
 		subtree_map<node, size_t> input_streams;
-		for (tref spec_part : original_spec | std::views::keys) {
-			if (!collect_input_streams(spec_part, input_streams))
+		for (const auto& [k, _] : original_spec) {
+			if (!collect_input_streams(k->get(), input_streams))
 				return;
 		}
 		LOG_TRACE << "interpreter::update/rebuild_inputs";
@@ -1119,8 +1132,8 @@ template <NodeType node>
 trefs interpreter<node>::appear_within_lookback(const trefs& vars){
 	trefs appeared;
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
-		for (tref ubt_ctn_part : ubt_ctn) {
-			tref step_ubt_ctn = update_to_time_point(ubt_ctn_part,
+		for (const auto& h : ubt_ctn) {
+			tref step_ubt_ctn = update_to_time_point(h->get(),
 				t < formula_time_point ? formula_time_point : t);
 			step_ubt_ctn = rewriter::replace<node>(step_ubt_ctn, memory);
 			// We only apply a heuristic in order to decide if the variable still appears
@@ -1304,7 +1317,7 @@ bool interpreter<node>::collect_input_streams(tref dnf,
 				<< get_var_name<node>(var) << " "
 				<< LOG_BA_TYPE(type_id);)
 			ctx.add_input_console(get_var_name<node>(var), type_id);
-			current_inputs[var] = ctx.inputs[var];
+			current_inputs[var] = ctx.inputs.find(var)->second;
 		}
 	}
 	return true;
@@ -1349,7 +1362,7 @@ bool interpreter<node>::collect_output_streams(tref dnf,
 				<< get_var_name<node>(var) << " "
 				<< LOG_BA_TYPE(type_id);)
 			ctx.add_output_console(get_var_name<node>(var), type_id);
-			current_outputs[var] = ctx.outputs[var];
+			current_outputs[var] = ctx.outputs.find(var)->second;
 		}
 	}
 	return true;
@@ -1369,11 +1382,11 @@ std::ostream& interpreter<node>::dump(std::ostream& os) const {
 	os << "Time point:      " << time_point << "\n";
 	os << "Inputs:         ";
 	if (ctx.inputs.empty()) os << " none";
-	for (const auto& [var, _] : ctx.inputs) os << " " << get_var_name<node>(var);
+	for (const auto& [var, _] : ctx.inputs) os << " " << get_var_name<node>(var->get());
 	os << "\n";
 	os << "Outputs:        ";
 	if (ctx.outputs.empty()) os << " none";
-	for (const auto& [var, _] : ctx.outputs) os << " " << get_var_name<node>(var);
+	for (const auto& [var, _] : ctx.outputs) os << " " << get_var_name<node>(var->get());
 	os << "\n";
 	os << "Current inputs: ";
 	if (inputs.empty()) os << " none";

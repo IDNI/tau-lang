@@ -47,7 +47,7 @@ struct interpreter {
 	 * @param memory Current memory (variable-to-value map).
 	 * @param ctx I/O context for reading/writing streams.
 	 */
-	interpreter(trefs& ubt_ctn, auto& original_spec, auto& output_partition,
+	interpreter(htrefs& ubt_ctn, auto& original_spec, auto& output_partition,
 		assignment<node>& memory, const io_context<node>& ctx);
 
 	/**
@@ -81,9 +81,9 @@ struct interpreter {
 	 */
 	void update(tref update);
 
-	trefs ubt_ctn;
+	htrefs ubt_ctn;
 	/// Partition of spec each with representative for set of output streams.
-	std::vector<std::pair<tref, tref>> original_spec;
+	std::vector<std::pair<htref, htref>> original_spec;
 	assignment<node> memory;
 	size_t time_point = 0;
 	input_streams<node>     inputs;
@@ -102,7 +102,7 @@ private:
 	int_t lookback = 0;
 
 	/// @brief Partition @p spec by output stream representatives.
-	static std::vector<std::pair<tref, tref>>
+	static std::vector<std::pair<htref, htref>>
 	create_spec_partition(tref spec, auto& output_partition);
 
 	/// @brief Read input variables at the given @p time_step.

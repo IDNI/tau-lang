@@ -75,6 +75,34 @@ template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
 template <NodeType node> struct io_context;
 template <NodeType node> struct tau_spec;
 
+// -----------------------------------------------------------------------------
+// htref-keyed containers
+
+/**
+ * @brief Transparent comparator ordering `htref` keys by `subtree_less` on the
+ * underlying `tref`, enabling heterogeneous lookup by raw `tref`.
+ */
+template <NodeType node>
+struct subtree_htref_less {
+	using is_transparent = void;
+	static tref to_tref(const htref& h) { return h->get(); }
+	static tref to_tref(tref t) { return t; }
+	bool operator()(const auto& a, const auto& b) const {
+		return subtree_less<node>{}(to_tref(a), to_tref(b));
+	}
+};
+
+/**
+ * @brief Ordered map keyed by `htref` with heterogeneous `tref` lookup.
+ *
+ * The `htref` keys pin the referenced bintree nodes alive across
+ * `bintree<node>::gc()` (via the non-expired `weak_ptr` entries in `M`), so
+ * long-lived maps of this type need no explicit keep-walk. Iteration order
+ * matches `subtree_map` (ordered by `subtree_less` on the underlying `tref`).
+ */
+template <NodeType node, typename PT>
+using subtree_htref_map = std::map<htref, PT, subtree_htref_less<node>>;
+
 /**
  * @brief Packed bit-field AST node for Tau formula trees.
  *

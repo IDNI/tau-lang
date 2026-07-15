@@ -284,8 +284,8 @@ struct tau_term_bdd_handle {
 	bool inv = false; ///< @brief Output inverter flag.
 
 private:
+	using bdd_fv_cache_t = std::unordered_map<tref, trefs>;
 #ifdef TAU_CACHE
-	using bdd_fv_cache_t = std::unordered_map<tref, size_t>;
 	static void get_free_tau_vars_impl(tref bdd_tref, subtree_set<node>& merged,
 		bdd_fv_cache_t& cache);
 #else

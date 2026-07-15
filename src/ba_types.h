@@ -220,7 +220,7 @@ struct ba_types {
 
 private:
 	/// @brief Per-id type-tree vector (index = ba_type id).
-	static std::vector<tref>& type_trees();
+	static std::vector<htref>& type_trees();
 
 	/// @brief Reverse map: type tree → ba_type id.
 	static subtree_map<node, size_t>& type_tree_to_idx();
