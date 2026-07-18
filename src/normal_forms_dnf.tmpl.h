@@ -8,7 +8,7 @@ namespace idni::tau_lang {
 
 // Reduce current dnf due to update by coeff and variable assignment i
 inline bool reduce_paths(std::vector<int_t>& i,
-	std::vector<std::vector<int_t>>& paths, int_t p, bool surface)
+	std::vector<std::vector<int_t>>& paths, int_t p, bool surface = true)
 {
 	for (size_t j = 0; j < paths.size(); ++j) {
 		if (paths[j].empty()) continue;
@@ -275,7 +275,7 @@ tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	// unordered_tau_map<std::vector<std::vector<int_t>>, BAs...> dnf;
 	subtree_map<node, std::vector<std::vector<int_t>>> dnf;
 
-	if (assign_and_reduce<node>(fm, vars, i, dnf, is_var, 0)) {
+	if (assign_and_reduce<node>(fm, vars, i, dnf, is_var, 0, false)) {
 		assert(dnf.size() == 1);
 		return trace(dnf.begin()->first);
 	}
@@ -714,7 +714,7 @@ tref reduce(tref fm) {
 	// Terms can only contain bf_neg, bf_and, bf_xor and bf_or
 	if (!is_wff) {
 		if (tau::get(fm).find_top(is_non_boolean_term<node>))
-			return syntactic_path_simplification<node>::on(fm);
+			return syntactic_path_simplification_dnf<node>::on(fm);
 	}
 	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf);
 	if (paths.empty()) {

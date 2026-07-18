@@ -73,10 +73,10 @@ tref bvadd(tref augend, tref addend, tref sum, trefs& aux) {
 template<NodeType node>
 tref bvsub(tref minuend, tref subtrahend, tref difference, trefs& aux) {
 	using tau = tree<node>;
-	DBG( LOG_TRACE << "bvsub_rule/bitwidth: " << bitwidth << "\n"; )
 
 	auto bitwidth = get_bv_type_bitwidth<node>(minuend);
 	if (bitwidth == 0) return nullptr;
+	DBG( LOG_TRACE << "bvsub_rule/bitwidth: " << bitwidth << "\n"; )
 
 	tref a = minuend, b = subtrahend;
 	tref body = nullptr;

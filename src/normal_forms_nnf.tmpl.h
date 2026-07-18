@@ -295,7 +295,7 @@ tref always_conjunction(tref fm1_aw, tref fm2_aw) {
 }
 
 template <NodeType node>
-tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded) {
+tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded = nullptr) {
 	using tau = tree<node>;
 	LOG_DEBUG << "push_existential_quantifier_one: " << LOG_FM_DUMP(fm);
 	const auto& t = tau::get(fm);

@@ -26,10 +26,10 @@ tref term_boole_decomposition(tref term, tref var) {
 	var = tau::get(tau::bf, var);
 	tref p1 = tau::get(term).replace(var, tau::_1(find_ba_type<node>(var)));
 	// Ensure early detection of F
-	p1 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p1);
+	p1 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p1);
 	tref p2 = tau::get(term).replace(var, tau::_0(find_ba_type<node>(var)));
 	// Ensure early detection of F
-	p2 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p2);
+	p2 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p2);
 	if (tau::get(p1) == tau::get(p2)) return p1;
 	// Build Boole decomposition step
 	return tau::build_bf_or(
@@ -51,7 +51,7 @@ tref term_boole_decomposition(tref term, tref var) {
  */
 template<NodeType node>
 tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
-	const bool free_funcs) {
+	const bool free_funcs = false) {
 	using tau = tree<node>;
 	DBG(LOG_TRACE << "Step on " << LOG_FM(term) << "\n";)
 	if (tau::get(term).equals_0()) return term;
@@ -71,10 +71,10 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 	DBG(assert(tau::get(vars[idx]).is(tau::variable) || tau::get(vars[idx]).is(tau::bf_ref));)
 	tref p1 = tau::get(term).replace(vars[idx], tau::_1_trimmed(find_ba_type<node>(vars[idx])));
 	// Ensure early detection of F
-	p1 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p1);
+	p1 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p1);
 	tref p2 = tau::get(term).replace(vars[idx], tau::_0_trimmed(find_ba_type<node>(vars[idx])));
 	// Ensure early detection of F
-	p2 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p2);
+	p2 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p2);
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
 		return rec_term_boole_decomposition<node>(p1, vars, idx + 1);
@@ -191,10 +191,10 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 	DBG(assert(tau::get(vars[idx]).child_is(tau::bf_eq));)
 	tref p1 = tau::get(formula).replace(vars[idx], tau::_T());
 	// Ensure early detection of F
-	p1 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p1);
+	p1 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p1);
 	tref p2 = tau::get(formula).replace(vars[idx], tau::_F());
 	// Ensure early detection of F
-	p2 = syntactic_path_simplification<node>::unsat_on_unchanged_negations(p2);
+	p2 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p2);
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
 		return rec_boole_decomposition<node>(p1, vars, idx + 1);
@@ -298,7 +298,7 @@ tref boole_normal_form(tref formula) {
 	eq_bnf = rec_boole_decomposition<node>(eq_bnf, atms, 0);
 	// Convert !(=) to != again
 	eq_bnf = to_nnf<node>(eq_bnf);
-	eq_bnf = simplify_using_equality<node>::on(eq_bnf);
+	eq_bnf = simplify_using_equality_dnf<node>::on(eq_bnf);
 	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_bnf) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(eq_bnf, eq_bnf);
@@ -415,9 +415,9 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	func = apply_xor_def<node>(func);
 	// We use is_boolean_operation to enable the procedure on non-boolean functions
 	tref func_v_0 = rewriter::replace_if<node>(func, var, tau::_0(find_ba_type<node>(var)), is_boolean_operation<node>);
-	func_v_0 = syntactic_path_simplification<node>::on(func_v_0);
+	func_v_0 = syntactic_path_simplification_dnf<node>::on(func_v_0);
 	tref func_v_1 = rewriter::replace_if<node>(func, var, tau::_1(find_ba_type<node>(var)), is_boolean_operation<node>);
-	func_v_1 = syntactic_path_simplification<node>::on(func_v_1);
+	func_v_1 = syntactic_path_simplification_dnf<node>::on(func_v_1);
 	// Check identically zero
 	if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0()) {
 		return rewriter::replace<node>(ex_quant_fm, atm, tau::_T());
@@ -429,9 +429,9 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	// Check does not dependent on var
 	else if (tau::get(func_v_0) == tau::get(func_v_1) && !contains<node>(func_v_0, var)) {
 		tref l = rewriter::replace<node>(fm, atm, tau::_T());
-		l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
+		l = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(l);
 		tref r = rewriter::replace<node>(fm, atm, tau::_F());
-		r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
+		r = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(r);
 		if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l, false);
 		atm = rewriter::replace<node>(atm, var, tau::_0(find_ba_type<node>(var)));
 		return tau::build_wff_or(
@@ -444,9 +444,9 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	if (tau::get(func_v_0) == tau::get(func_v_1) && !contains<node>(func_v_0, var)) {
 		tref l = rewriter::replace<node>(fm, atm, tau::_T());
 		l = rewriter::replace<node>(l, var, func_v_0);
-		l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
+		l = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(l);
 		tref r = rewriter::replace<node>(fm, atm, tau::_F());
-		r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
+		r = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(r);
 		if (tau::get(l) == tau::get(r)) {
 			if (excluded) excluded->insert(l);
 			return l;
@@ -467,9 +467,9 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	}
 	// No simplification applied, build Boole decomposition
 	tref l = rewriter::replace<node>(fm, atm, tau::_T());
-	l = syntactic_path_simplification<node>::unsat_on_unchanged_negations(l);
+	l = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(l);
 	tref r = rewriter::replace<node>(fm, atm, tau::_F());
-	r = syntactic_path_simplification<node>::unsat_on_unchanged_negations(r);
+	r = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(r);
 	if (tau::get(l) == tau::get(r)) return tau::build_wff_ex(tau::trim(var), l, false);
 	tref boole_atm = tau::get(tau::wff, tau::get(atm_type,
 		term_boole_decomposition<node>(tau::get(atm)[0].first(), tau::trim(var)),
@@ -513,16 +513,25 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 	tref new_fm = tau::_T();
 	bool is_quant_removable_in_clause = true;
 	trefs conjs = get_cnf_wff_clauses<node>(formula);
+	// A conjunct containing the quantified variable that still holds a
+	// binder or an unresolved reference anywhere blocks elimination:
+	// equations under a surviving inner quantifier are not top-level
+	// conjuncts of this clause, and the eliminator below would squeeze
+	// them as if they were, silently dropping the inner binder and
+	// leaking its variable free
+	auto blocks_elimination = [](tref m) {
+		return is_quantifier<node>(m) || is<node>(m, tau::wff_ref);
+	};
 	for (tref& conj : conjs) {
 		if (!contains<node>(conj, var)) {
 			new_fm = tau::build_wff_and(new_fm, conj);
 			conj = tau::_T();
 			continue;
 		}
-		// Check that conjunct is not an unresolved reference
-		if (tau::get(conj).child_is(tau::wff_ref)) {
-			// If the reference contains the quantified variable at this point
-			// we cannot resolve the quantifier in this clause
+		if (tau::get(conj).find_top(blocks_elimination)) {
+			// The quantified variable is entangled with a kept
+			// quantifier or reference, so we cannot resolve the
+			// quantifier in this clause
 			is_quant_removable_in_clause = false;
 		}
 	}
@@ -543,23 +552,48 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 
 	// Check that quantified variable appears
 	if (tau::get(scoped_fm).equals_T()) return new_fm;
+	// An existential over F is F, independently of the variable
+	if (tau::get(scoped_fm).equals_F()) return tau::_F();
 
 	// Check if quantified variable is bitvector
 	if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
+		bool closed_and_solvable = false;
 		if (const trefs& free_vars = get_free_vars<node>(scoped_fm);
-			free_vars.size() == 1 &&
-			tau::get(free_vars[0]) == tau::get(var)) {
-				// By assumption quantifier is pushed in all the way
-				// Closed bv formula, simplify to T/F
-				if (is_bv_formula_sat<node>(tau::build_wff_ex(var, scoped_fm, false)))
-					return new_fm;
-				else return tau::_F();
-			} else {
-				// Quantifier is not resolvable
-				quant_eliminated = false;
-				return tau::build_wff_and(
-					tau::build_wff_ex(var, scoped_fm, false), new_fm);
+			(free_vars.empty() || (free_vars.size() == 1 &&
+			tau::get(free_vars[0]) == tau::get(var)))
+			&& is_bv_solvable_formula<node>(scoped_fm))
+				closed_and_solvable = true;
+		if (closed_and_solvable) {
+			// By assumption quantifier is pushed in all the way
+			// Closed bv formula, simplify to T/F -- but only on a
+			// definite answer: cvc5 returning unknown, or translation
+			// failing, means we cannot decide, not that it is false.
+			auto status = bv_formula_sat_status<node>(tau::build_wff_ex(var, scoped_fm, false));
+			if (status == bv_sat_status::sat) return new_fm;
+			if (status == bv_sat_status::unsat) return tau::_F();
+		}
+		// Non-closed BV quantifier, or closed-but-undecided: try
+		// predicate blasting to convert the BV existential to Boolean bit
+		// quantifiers that the atomless-BA path can then eliminate.
+		// bv_predicate_blasting already anti-prenexes each blasted atomic's
+		// own freshly-introduced auxiliary quantifiers (scoped locally); the
+		// anti_prenex_block call below is a separate concern: it attempts to
+		// push/resolve `var`'s own quantifier (still bv-typed and left
+		// untouched by blasting itself) now that the scope's arithmetic has
+		// been simplified to boolean form, so nothing needs to be skipped
+		// anymore.
+		if (bv_blasting) {
+			tref ex_fm = tau::build_wff_ex(var, scoped_fm, false);
+			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
+					blasted && blasted != ex_fm) {
+				tref cont = anti_prenex_block<node>(blasted, no_skip<node>);
+				return tau::build_wff_and(cont, new_fm);
 			}
+		}
+		// Quantifier is not resolvable
+		quant_eliminated = false;
+		return tau::build_wff_and(
+			tau::build_wff_ex(var, scoped_fm, false), new_fm);
 	}
 	// DLO quantifier elimination for qlt (dense linear order over rationals).
 	// Must run before the atomless-BA path for pure ordering atoms (bf_lt,
@@ -982,14 +1016,27 @@ tref resolve_quantifiers(tref formula) {
 			// the quantifier
 			tref var = tau::trim2(n);
 			if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
-				if (const trefs& free_vars = get_free_vars<node>(n);
-					free_vars.empty()) {
-					// By assumption quantifier is pushed in all the way
-					// Closed bv formula, simplify to T/F
-					if (is_bv_formula_sat<node>(n))
-						return tau::_T();
-					else return tau::_F();
-				} else excluded.insert(n);
+				// A closed, purely bitvector formula is decided
+				// directly by the solver. This is checked before
+				// blasting: the solver handles the bitvector
+				// arithmetic natively, while deciding the blasted
+				// form (with its many auxiliary quantifiers) is
+				// much harder for it. Blasting does not close a
+				// formula, so the check would not succeed later.
+				if (get_free_vars<node>(n).empty()
+					&& is_bv_solvable_formula<node>(n)) {
+					// Only commit to T/F on a definite answer: cvc5
+					// returning unknown, or translation failing, means
+					// we cannot decide, not that the formula is false.
+					auto status = bv_formula_sat_status<node>(n);
+					if (status == bv_sat_status::sat) return tau::_T();
+					if (status == bv_sat_status::unsat) return tau::_F();
+				}
+				if (bv_blasting)
+					if (auto blasted = bv_predicate_blasting<node>(n);
+						blasted && blasted != n)
+						return blasted;
+				excluded.insert(n);
 			} else if (is_omcat_type_family<node>(tau::get(var).get_ba_type())) {
 				if (const trefs& free_vars = get_free_vars<node>(n);
 					free_vars.empty()) {
@@ -1039,6 +1086,592 @@ tref resolve_quantifiers(tref formula) {
 	};
 	return pre_order<node>(formula).apply_unique(resolver, visit);
 }
+
+/**
+ * @tparam node Tree node type.
+ * @param formula Formula to push the quantifier block into.
+ * @param block Ordered list of existentially quantified variables to push.
+ * @param used_atms Set of atomic formulas already consumed in the current recursion; updated in place.
+ * @param quant_pattern Map from quantified variables to their priority for BDD variable ordering.
+ * @param order Variable ordering relation used by `resolve_quantifiers2`.
+ * @param skip Predicate identifying variables/atomic formulas this pass must
+ *        not Boole-decompose (defaults to BV-typed nodes; diverted to
+ *        predicate blasting instead once nothing else can be pushed).
+ * @return Formula with the quantifier block pushed as far inward as possible.
+ * @endinternal
+ */
+template<NodeType node>
+tref anti_prenex_block(tref formula, const trefs& block,
+	subtree_unordered_set<node>& used_atms,
+	const auto& quant_pattern,
+	const typename term_handle<node>::order& order,
+	std::function<bool(tref)> skip) {
+	using tau = tree<node>;
+	// Once no non-skip-matched block variable occurs free anymore, the
+	// remaining leaf is entirely skip-matched (e.g. bitvector) content:
+	// wrap the whole block around it and try predicate blasting instead of
+	// the BDD-based elimination below, which requires atomless-typed
+	// quantified variables. bv_predicate_blasting already anti-prenexes
+	// each blasted atomic's own freshly-introduced auxiliary quantifiers
+	// (scoped locally); the anti_prenex_block call below is a separate
+	// concern: it attempts to push/resolve the block's own quantifiers
+	// (still bv-typed and left untouched by blasting itself) now that the
+	// scope's arithmetic has been simplified to boolean form, so nothing
+	// needs to be skipped anymore.
+	auto blast_block = [&](tref dep_formula) -> tref {
+		tref ex_fm = dep_formula;
+		for (auto v = block.rbegin(); v != block.rend(); ++v)
+			ex_fm = build_wff_ex<node>(*v, ex_fm, false);
+		if (bv_blasting)
+			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
+					blasted && blasted != ex_fm)
+				return anti_prenex_block<node>(blasted, no_skip<node>);
+		return ex_fm;
+	};
+
+	// Goal: push the quantifier block as far into clause as possible.
+	// A block variable is counted here regardless of `skip`: dropping a
+	// skip-matched variable's occurrence from this check would let it be
+	// classified as "independent" below and moved outside the block's
+	// quantifier scope, leaking it free.
+	{
+		bool has_var = false;
+		const trefs& vars = get_free_vars<node>(formula);
+		for (tref v : block) {
+			if (hasbc(vars, v, tau::subtree_less)) {
+				has_var = true;
+				break;
+			}
+		}
+		// Formula does not contain quantified vars
+		if (!has_var) return formula;
+	}
+
+	const tau& ft = tau::get(formula);
+	// Case disjunction
+	if (ft.child_is(tau::wff_or)) {
+		// Push block into disjunction
+		tref c1 = anti_prenex_block<node>(
+			ft[0].first(), block, used_atms, quant_pattern, order, skip);
+		if (tau::get(c1).equals_T()) return _T<node>();
+		return tau::build_wff_or(c1, anti_prenex_block<node>(
+			ft[0].second(), block, used_atms, quant_pattern, order, skip));
+	}
+
+	// Case conjunction
+	if (ft.child_is(tau::wff_and)) {
+		trefs conjs = get_cnf_wff_clauses<node>(formula);
+		trefs dep;
+		for (tref &conj : conjs) {
+			// See note above: check every block variable's actual
+			// occurrence regardless of `skip`.
+			bool has_var = false;
+			const trefs& vars = get_free_vars<node>(conj);
+			for (tref v : block) {
+				if (hasbc(vars, v, tau::subtree_less)) {
+					has_var = true;
+					break;
+				}
+			}
+			// Conjunct contains quantified var
+			if (has_var) {
+				dep.push_back(conj);
+				conj = _T<node>();
+			}
+		}
+		if (dep.empty()) return formula;
+		formula = tau::build_wff_and(dep);
+		// Var-free conjuncts; they must be re-attached to every result
+		// built from the dependent part below
+		const tref indep = tau::build_wff_and(conjs);
+		// Check if dependent formula is clause -> push block into clause
+		if (!tau::get(formula).find_top(is<node, tau::wff_or>)) {
+			if (std::ranges::any_of(block, skip))
+				return tau::build_wff_and(indep, blast_block(formula));
+			return tau::build_wff_and(
+				indep,
+				resolve_quantifiers2<node>(
+				push_ex_block_into_clause<node>(formula, block, order), order, skip));
+		}
+		// TODO: only != present
+		// Using the available atomic formulas, do Boole decomposition on best fit
+		auto is_atomic = [&used_atms, &skip](tref n) {
+			if (!tau::get(n).is(tau::wff)) return false;
+			// Exclude used atomic fms
+			if (used_atms.contains(n)) return false;
+			// Exclude atomic formulas the caller wants skipped (e.g. BV-typed)
+			if (skip(n)) return false;
+			const tau& c = tau::get(n)[0];
+			switch (c.value.nt) {
+				case tau::bf_eq:
+				case tau::bf_lt:
+				case tau::bf_lteq: return true;
+				default: return false;
+			}
+		};
+		// Collect current atms
+		const trefs atms = rewriter::select_top_until<node>(formula,
+			is_atomic, is_quantifier<node>);
+		// No decomposable atomic formula available (e.g. only !=
+		// equations, quantified subformulas, or exclusively skip-matched
+		// atoms remain): try blasting if the block needs it, else keep
+		// the block on the dependent part instead of dereferencing end()
+		if (atms.empty()) {
+			if (std::ranges::any_of(block, skip))
+				return tau::build_wff_and(indep, blast_block(formula));
+			for (auto v = block.rbegin(); v != block.rend(); ++v)
+				formula = build_wff_ex<node>(*v, formula, false);
+			return tau::build_wff_and(indep, formula);
+		}
+		// Sort the atomic formulas and get minimum
+		tref atm = *std::ranges::min_element(atms,
+			atm_formula_order_for_quant_elim<node>(quant_pattern));
+		// TODO: Take care of unique zero of atm
+
+		// Remove/add available atomic formulas in stack-like fashion
+		used_atms.insert(atm);
+		// Do Boole decomposition
+		tref l = rewriter::replace<node>(formula, atm, tau::_T());
+		tref r = rewriter::replace<node>(formula, atm, tau::_F());
+		if (tau::get(l) == tau::get(r)) {
+			tref res = anti_prenex_block(
+				l, block, used_atms, quant_pattern, order, skip);
+			used_atms.erase(atm);
+			return tau::build_wff_and(indep, res);
+		}
+		tref nl = anti_prenex_block(
+			tau::build_wff_and(atm, l), block, used_atms, quant_pattern, order, skip);
+		if (tau::get(nl).equals_T()) {
+			used_atms.erase(atm);
+			// dep part is T, only the var-free part remains
+			return indep;
+		}
+		tref nr = anti_prenex_block(
+			tau::build_wff_and(tau::build_wff_neg(atm), r),
+				block, used_atms, quant_pattern, order, skip);
+		used_atms.erase(atm);
+		return tau::build_wff_and(indep, tau::build_wff_or(nl, nr));
+	}
+
+	// Connective is not wff_and or wff_or (e.g. a single atom or a wff_ref)
+	// -> try blasting if the block needs it, else quantifiers stay with formula
+	if (std::ranges::any_of(block, skip))
+		return blast_block(formula);
+	for (auto v = block.rbegin(); v != block.rend(); ++v)
+		formula = build_wff_ex<node>(*v, formula, false);
+	return formula;
+}
+
+/**
+ * @internal
+ * @brief Processes one maximal same-type quantifier block rooted at `n`.
+ *
+ * Delegates the whole block (whether atomless, bitvector-typed, or mixed)
+ * to the 6-arg `anti_prenex_block`, which splits disjunctions/conjuncts,
+ * Boole-decomposes atomless content, and attempts predicate blasting on
+ * whatever leaf clause still needs `skip`-matched (e.g. bitvector) content
+ * resolved -- so a bitvector-typed block variable no longer bails out to
+ * `anti_prenex` (the legacy step-based algorithm) up front. A residual
+ * fallback to `anti_prenex` remains at the end of `resolve_ex_block` for
+ * structural cases unrelated to bitvector content that its
+ * push_existential_quantifier_one/ex_quantified_boole_decomposition
+ * strategy resolves and this algorithm's disjunction/Boole decomposition
+ * does not. ∃-blocks are pushed in directly; ∀-blocks are dualized to
+ * ∃-blocks.
+ * @tparam node Tree node type.
+ * @param n Formula node whose direct child is a quantifier.
+ * @return Formula with the quantifier block eliminated or pushed inward.
+ * @endinternal
+ */
+// Processes one quantifier block rooted at n:
+// - ∃-blocks: push into body with the 6-arg anti_prenex_block (which
+//   handles skip-matched/bitvector content itself via blasting), resolve
+//   remaining quantifiers, then fall back to anti_prenex for whatever
+//   structural (non-bitvector) cases still need it. ∀-blocks are dualized:
+//   ∀x φ ≡ ¬∃x ¬φ.
+template<NodeType node>
+tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_bv_type_family<node>) {
+	using tau = tree<node>;
+	if (!is_child_quantifier<node>(n)) return n;
+
+	// Collect the maximal same-type block at the top.
+	trefs block_vars;
+	const bool is_ex = is_child<node>(n, tau::wff_ex);
+	tref curr = n;
+	while (is_child_quantifier<node>(curr)) {
+		if (is_child<node>(curr, tau::wff_ex) != is_ex) break;
+		block_vars.push_back(tau::trim2(curr));
+		curr = tau::get(curr)[0].second();
+	}
+	tref body = curr;
+
+	// Trivial Skolemization: if every variable in this block is trivially
+	// eliminable (see heuristics/trivial_skolem.h), skip BDD ordering,
+	// Boole decomposition, and predicate blasting below entirely. Only
+	// valid for ∃-blocks. normalize_atomic_formula_operators first so
+	// bf_neq atoms (e.g. from an already-resolved inner block) are
+	// canonical bf_eq before trivial_skolem_ex's bf_eq-only matcher looks
+	// at them.
+	//
+	// Only adopt the result when ALL block variables were eliminated
+	// (trivial_skolem_ex then returns the bare matrix, with no
+	// re-quantification at all). If any variable survives,
+	// trivial_skolem_ex re-wraps survivors via build_wff_ex_many, which
+	// renames every surviving bound variable -- and that renaming is not
+	// capture-safe against variables already free in the body (observed
+	// to corrupt formulas containing leftover synthetic "bN"-named
+	// witnesses from earlier quantifier elimination in this same
+	// pipeline), so any such partial result is discarded here and the
+	// block falls through to the existing pipeline unchanged.
+	if (is_ex) {
+		tref simplified = trivial_skolem_ex<node>(block_vars,
+			normalize_atomic_formula_operators<node>(body));
+		if (!is_child<node>(simplified, tau::wff_ex)) {
+			block_vars.clear();
+			return simplified;
+		}
+	}
+
+	// Build BDD variable order (innermost = lowest index = highest priority).
+	typename term_handle<node>::order ord;
+	for (size_t i = 0; i < block_vars.size(); ++i)
+		ord.emplace(block_vars[block_vars.size() - 1 - i],
+			static_cast<int_t>(i));
+
+	// Build quant_pattern (outermost = highest priority for Boole decomposition).
+	subtree_unordered_map<node, int_t> qp;
+	for (size_t i = 0; i < block_vars.size(); ++i)
+		qp.emplace(block_vars[i],
+			static_cast<int_t>(block_vars.size() - i));
+
+	// Run the core ∃-block elimination pipeline on a pre-normalized body b.
+	// normalize_atomic_formula_operators is called here so that
+	// push_ex_block_into_clause always receives bf_eq atoms (not bf_neq).
+	auto resolve_ex_block = [&](tref b) -> tref {
+		b = normalize_atomic_formula_operators<node>(b);
+		subtree_unordered_set<node> used_atms;
+		tref r = anti_prenex_block<node>(b, block_vars, used_atms, qp, ord, skip);
+		r = resolve_quantifiers2<node>(r, ord, skip);
+		// Fallback for closed bv (sub-)formulas resolve_quantifiers2 leaves
+		// untouched, and a final safety net for blasting failures: try
+		// CVC5/blasting once more via the whole-tree resolve_quantifiers.
+		if (tau::get(r).find_top(is_quantifier<node>))
+			r = resolve_quantifiers<node>(r);
+		// Final fallback: legacy anti_prenex is a structurally different
+		// (step-based, single-quantifier-at-a-time) algorithm that can
+		// still make progress here in cases unrelated to bitvector content
+		// (blasting is now this algorithm's own job, via blast_block above)
+		// -- e.g. wff_ref atoms re-wrapped by push_ex_block_into_clause,
+		// where treat_ex_quantified_clause knows how to leave them
+		// correctly alone, and other structural cases its
+		// push_existential_quantifier_one/ex_quantified_boole_decomposition
+		// strategy resolves but this algorithm's disjunction/Boole
+		// decomposition does not (confirmed empirically: removing this
+		// fallback regresses satisfiability1-3, solver, splitter(2),
+		// interpreter, wff_normalization, and normal_forms tests, none of
+		// which involve bitvector content).
+		if (tau::get(r).find_top(is_quantifier<node>))
+			r = anti_prenex<node>(r);
+		return r;
+	};
+
+	tref result;
+	if (is_ex) {
+		result = resolve_ex_block(body);
+	} else {
+		// ∀-block: dualize to ∃-block on negated body, then negate result.
+		tref pushed = resolve_ex_block(
+			to_nnf<node>(tau::build_wff_neg(body)));
+		result = normalize_atomic_formula_operators<node>(
+			to_nnf<node>(tau::build_wff_neg(pushed)));
+		// Same final fallback as above.
+		if (tau::get(result).find_top(is_quantifier<node>))
+			result = anti_prenex<node>(result);
+	}
+	return result;
+}
+
+/**
+ * @internal
+ * @brief Drives the full anti-prenex-block pipeline: NNF + syntactic simplification, substitution-based elimination, canonical operator normalization, then post-order application of `process_quantifier_block`.
+ * @tparam node Tree node type.
+ * @param formula Formula to process.
+ * @return Formula with quantifiers pushed inward as far as possible using the block-based algorithm.
+ * @endinternal
+ */
+template<NodeType node>
+tref anti_prenex_block(tref formula) {
+	return anti_prenex_block<node>(formula, is_tref_bv_type_family<node>);
+}
+
+template<NodeType node>
+tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
+	using tau = tree<node>;
+
+	// Short-circuit: quantifier-free formulas need no processing here.
+	// to_nnf and syntactic_formula_simplification can alter tau_ba
+	// sub-formulas that the caller expects to be left intact.
+	// Use find_top_until to avoid descending into tau_ba sub-trees, which
+	// may contain wff_all/wff_ex nodes over I/O variables internally.
+	if (!tau::get(formula).find_top_until(is_quantifier<node>,
+		[](tref n) { return !while_is_formula<node>(n); }))
+		return formula;
+
+	// Step 1: NNF + syntactic simplification
+	formula = to_nnf<node>(formula);
+	formula = syntactic_formula_simplification<node>(formula, skip);
+
+	// Step 2: Substitution-based elimination (innermost first via post_order).
+	// Attempts ex x (x = t && phi(x)) => phi(t) for each existential
+	// conjunctive scope.
+	auto subs_elim = [](tref n) -> tref {
+		if (!is_child<node>(n, tau::wff_ex)) return n;
+		tref var = tau::trim2(n);
+		tref scope = tau::get(n)[0].second();
+		if (tau::get(scope).find_top(is<node, tau::wff_or>)) return n;
+		tref elim = ex_subs_based_elimination<node>(var, scope);
+		return elim != scope ? elim : n;
+	};
+	formula = post_order<node>(formula).apply_unique(subs_elim);
+	formula = syntactic_formula_simplification<node>(formula, skip);
+
+	// Step 3: Normalize non-canonical operators (bf_neq → ¬(bf_eq),
+	// bf_nlteq → bf_lt, etc.) so push_ex_block_into_clause sees only
+	// canonical atoms.
+	formula = normalize_atomic_formula_operators<node>(formula);
+
+	// Step 4: Process each quantifier block in post-order (innermost first).
+	// For each node whose direct child is a quantifier, identify the maximal
+	// block of consecutive same-type quantifiers at the top, push the block
+	// into the body using the 5-arg anti_prenex_block, then eliminate the
+	// remaining quantifiers over atomic formulas via resolve_quantifiers2.
+	// wff_all blocks are handled by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
+	auto f = [&](tref n) -> tref {
+		return process_quantifier_block<node>(n, skip);
+	};
+	formula = post_order<node>(formula).apply_unique(
+		f, while_is_formula<node>);
+	return syntactic_formula_simplification<node>(formula, skip);
+}
+
+/**
+ * @internal
+ * @brief Pushes a block of existential quantifiers into a single atomic clause.
+ *
+ * Separates positive (`= 0`) and negative (`!= 0`) equations, squeezes positives into one BDD quantifier call, and adjusts negatives accordingly.
+ * @tparam node Tree node type.
+ * @param clause Atomic clause (conjunction of equations) to push the block into.
+ * @param block Ordered list of existentially quantified variables.
+ * @param order Variable ordering relation (unused currently, reserved for future use).
+ * @return Clause with the quantifier block absorbed or re-attached when not removable.
+ * @endinternal
+ */
+// NOTE: BV-typed and non-atomless quantifier blocks are not handled here.
+// The 6-arg anti_prenex_block's caller only reaches this function for a
+// dependent clause containing no skip-matched (e.g. bitvector) block
+// variable -- a skip-matched block is diverted to predicate blasting
+// (anti_prenex_block's own blast_block helper) before this point.
+template<NodeType node>
+tref push_ex_block_into_clause(tref clause, const trefs& block,
+	const typename term_handle<node>::order& /*order*/) {
+	using tau = tree<node>;
+	// The clause is assumed to not have negation pushed into equalities
+	DBG(assert(!tau::get(clause).find_top(is<node, tau::bf_neq>)));
+
+	if (tau::get(clause).equals_T() || tau::get(clause).equals_F())
+		return clause;
+	// If there are no quantifiers to remove, the clause can be returned
+	if (block.empty()) return clause;
+
+	// All types in the block and in the clause are the same, otherwise
+	// the quantifiers have not been pushed in correctly
+	size_t clause_type = tau::get(block.front()).get_ba_type();
+#ifdef DEBUG
+	auto type_check = [&](tref n) {
+		if (size_t t = tau::get(n).get_ba_type(); t > 0) {
+			assert(clause_type == t);
+			return false;
+		}
+		return true;
+	};
+	pre_order<node>(clause).visit(type_check);
+	for (tref v : block)
+		if (size_t t = tau::get(v).get_ba_type(); t > 0)
+			assert(clause_type == t);
+#endif
+	bool is_quant_removable_in_clause = true;
+	trefs conjs = get_cnf_wff_clauses<node>(clause);
+	trefs pos, neg;
+	for (tref& conj : conjs) {
+		// By assumption all conjuncts contain at least one variable from the block
+#ifdef DEBUG
+		bool var_contained = false;
+		for (tref v : block) if (contains<node>(conj, v))
+			var_contained = true;
+		assert(var_contained);
+#endif
+		// Check that conjunct is not an unresolved reference
+		const tau& c = tau::get(conj);
+		if (c.child_is(tau::wff_ref) || is_child_quantifier<node>(conj)) {
+			// If the reference contains a quantified variable at this point
+			// we cannot resolve the quantifier in this clause
+			is_quant_removable_in_clause = false;
+		} else if (c.child_is(tau::bf_eq)) {
+			// Convert to f = 0 and save only f
+			pos.push_back(tau::trim2(norm_equation<node>(conj)));
+			conj = _T<node>();
+		} else if (c.child_is(tau::wff_neg) && c[0][0].child_is(tau::bf_eq)) {
+			// Convert to f != 0 and save only f
+			neg.push_back(tau::trim2(norm_equation<node>(c.trim2())));
+			conj = _T<node>();
+		} else {
+			// Unrecognized conjunct (e.g. bf_lt, ¬ref): cannot safely
+			// remove the quantifier block from this clause
+			is_quant_removable_in_clause = false;
+		}
+	}
+	// TODO: create non-removable clause part and continue with rest
+	if (!is_quant_removable_in_clause) {
+		// Since we cannot remove the quantifier in this
+		// clause it needs to be maintained
+		for (auto v = block.rbegin(); v != block.rend(); ++v)
+			clause = build_wff_ex<node>(*v, clause, false);
+		return clause;
+	}
+	// Squeeze positive atomic formulas together -> result is a lazy BDD
+	// By assumption they all have the same type
+	tref f = build_bf_or<node>(pos, clause_type);
+	tref res = build_bf_eq_0<node>(f);
+	for (auto v = block.rbegin(); v != block.rend(); ++v)
+		res = build_wff_ex<node>(*v, res, false);
+	// Update all negative atomic formulas -> result is a lazy BDD
+	for (tref& g : neg) {
+		g = tau::build_bf_and(tau::build_bf_neg(f), g);
+		g = tau::build_wff_neg(tau::build_bf_eq_0(g));
+		for (auto v = block.rbegin(); v != block.rend(); ++v)
+			g = build_wff_ex<node>(*v, g, false);
+	}
+	// Return formula with quantifier prefixes
+	return tau::build_wff_and(res, tau::build_wff_and(neg));
+}
+
+
+
+/**
+ * @internal
+ * @brief Resolve quantifiers with a custom variable ordering (default skip).
+ * @tparam node Tree node type.
+ * @param formula Formula containing quantifiers.
+ * @param order Comparison relation for variable ordering.
+ * @return Formula with quantifiers resolved.
+ * @endinternal
+ */
+template<NodeType node>
+tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order) {
+	return resolve_quantifiers2<node>(formula, order, is_tref_bv_type_family<node>);
+}
+
+/**
+ * @internal
+ * @brief Resolve quantifiers with a custom variable ordering.
+ *
+ * Variant of `resolve_quantifiers` that uses the provided `order` relation to
+ * sort variables before the elimination step.
+ * @tparam node Tree node type.
+ * @param formula Formula containing quantifiers.
+ * @param order Comparison relation for variable ordering.
+ * @param skip Predicate identifying variables this pass must not eliminate
+ *        (defaults to BV-typed nodes, which need the solver/blasting instead).
+ * @return Formula with quantifiers resolved.
+ * @endinternal
+ */
+template<NodeType node>
+tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,
+		std::function<bool(tref)> skip) {
+	using tau = tree<node>;
+	subtree_set<node> excluded;
+	auto down_resolver = [&](tref n) {
+		if (is_child_quantifier<node>(n)) {
+			// Check if the formula is closed and proceed to eliminate
+			// the quantifier
+			if (skip(tau::trim2(n))) {
+				if (const trefs& free_vars = get_free_vars<node>(n);
+					free_vars.empty() && is_bv_solvable_formula<node>(n)) {
+					// Closed bv formula with explicit bitwidth: simplify to
+					// T/F, but only on a definite answer -- cvc5 returning
+					// unknown, or translation failing, means we cannot
+					// decide, not that the formula is false.
+					auto status = bv_formula_sat_status<node>(n);
+					if (status == bv_sat_status::sat) return tau::_T();
+					if (status == bv_sat_status::unsat) return tau::_F();
+					excluded.insert(n);
+				} else excluded.insert(n);
+			} // TODO: restrict to atomless types
+			else if (!tau::get(n).find_top(is<node, tau::ref>)) {
+				using bdd = term_handle<node>::tbdd;
+				// Record quantifier block in quants
+				typename term_handle<node>::quants quants;
+				const tref original = n; // save before stripping quantifiers
+				while (is_child_quantifier<node>(n)) {
+					tref var = tau::trim2(n);
+					if (is_child<node>(n, tau::wff_ex)) {
+						quants.emplace_back(var, bdd::ex);
+					} else {
+						quants.emplace_back(var, bdd::all);
+					}
+					n = tau::get(n)[0].second();
+				}
+				// All quantifiers have been trimmed from tree here
+				const tau& nn = tau::get(n);
+				if (nn.child_is(tau::bf_eq)) {
+					// Normalize A = B to (A XOR B) = 0 if not already in
+					// canonical form (can occur in tau_ba Boole expansions).
+					if (!tau::get(n)[0][1].equals_0())
+						n = norm_equation<node>(n);
+					// Flip quantifiers due to equality
+					for (auto& [_,q] : quants) {
+						q == bdd::ex ? q = bdd::all : q = bdd::ex;
+					}
+					// Get the term of the equality
+					n = tau::trim2(n);
+					size_t term_type = tau::get(n).get_ba_type();
+					// TODO: Syntactically simplify result?
+					n = term_handle<node>::build(n, order).
+						bdd_quant(quants, order).
+							to_tau_term(term_type);
+					return tau::build_bf_eq_0(n);
+				} else if (nn.child_is(tau::wff_neg) && nn[0][0].child_is(tau::bf_eq)) {
+					// Trim negation
+					n = tau::trim2(n);
+					// Normalize A = B to (A XOR B) = 0 if needed.
+					if (!tau::get(n)[0][1].equals_0())
+						n = norm_equation<node>(n);
+					// Get the term of the equality
+					n = tau::trim2(n);
+					size_t term_type = tau::get(n).get_ba_type();
+					// TODO: Syntactically simplify result?
+					n = term_handle<node>::build(n, order).
+						bdd_quant(quants, order).
+							to_tau_term(term_type);
+					return tau::build_wff_neg(tau::build_bf_eq_0(n));
+				} else {
+					// Formula under the block is not a single atomic
+					// (e.g. a conjunction of bf_lt / bf_gt atoms);
+					// return original with quantifier prefix intact so
+					// the caller's resolve_quantifiers fallback can handle it.
+					return original;
+				}
+			}
+		}
+		return n;
+	};
+	auto visit = [&](tref n) {
+		if (excluded.contains(n)) return false;
+		return is_formula<node>(n);
+	};
+	return pre_order<node>(formula).apply_unique(down_resolver, visit);
+}
+
 
 /**
  * @brief Converts the temporal layer of a formula to reduced DNF, squeezes the always
@@ -1121,9 +1754,11 @@ tref normalize_temporal_quantifiers(tref fm) {
 				clause = tau::build_wff_and(always_part, staying);
 				res = tau::build_wff_or(res, clause);
 			}
-			non_temp_clauses = tau::build_wff_always(
-				norm(non_temp_clauses));
-			res = tau::build_wff_or(res, non_temp_clauses);
+			if (!tau::get(non_temp_clauses).equals_F()) {
+				non_temp_clauses = tau::build_wff_always(
+					norm(non_temp_clauses));
+				res = tau::build_wff_or(res, non_temp_clauses);
+			}
 			return res;
 		} else {
 			// Temporal variable without temporal quantifier

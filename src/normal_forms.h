@@ -25,7 +25,98 @@ namespace idni::tau_lang {
 /// @cond FORWARD_DECL
 template <NodeType node>
 struct bf_reduce_canonical;
+
+template <NodeType node>
+class syntactic_path_simplification_dnf;
+
+template <NodeType node>
+tref syntactic_formula_simplification(tref formula,
+	std::function<bool(tref)> skip = is_tref_bv_type_family<node>);
+
+template <NodeType node, bool is_wff = true>
+tref push_negation_one_in(tref fm);
+
+template <NodeType node>
+tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift);
+
+template <NodeType node>
+tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift);
+
+template <NodeType node>
+tref always_conjunction(tref fm1_aw, tref fm2_aw);
+
+template <NodeType node>
+tref squeeze_positives(tref n, size_t type_id);
+
+template <NodeType node>
+tref replace_free_vars_by(tref fm, tref val);
 /// @endcond
+
+/**
+ * @brief Lexicographic ordering over variables, used to fix a canonical
+ * variable order when reducing Boolean functions to DNF (see `bf_reduced_dnf`).
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+auto lex_var_comp = [](tref x, tref y) {
+#ifdef TAU_CACHE
+	using cache_t = std::map<std::pair<tref, tref>, bool,
+				subtree_pair_less<node, tref>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find({x,y}); it != cache.end())
+		return it->second;
+#endif // TAU_CACHE
+	// TODO (QUESTION) strings have unique id, use .data() instead?
+	auto xx = tree<node>::get(x).to_str();
+	auto yy = tree<node>::get(y).to_str();
+#ifdef TAU_CACHE
+	return cache.emplace(std::make_pair(x, y), xx < yy).first->second;
+#endif // TAU_CACHE
+	return xx < yy;
+};
+
+/**
+ * @brief Predicate that classifies a wff node as a BDD variable.
+ *
+ * In BDD-based DNF/CNF reductions of well-formed formulas the following node
+ * types are treated as atomic BDD variables: `bf_eq`, `wff_ref`, `wff_ex`,
+ * `wff_sometimes`, `wff_always`, `wff_all`, and `constraint`.
+ * @tparam node Tree node type.
+ * @todo Extend for the full grammar.
+ */
+template <NodeType node>
+inline auto is_wff_bdd_var = [](tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	DBG(assert(!t.is(tau::bf_neq));)
+	return t.child_is(tau::bf_eq)
+		|| t.child_is(tau::wff_ref)
+		|| t.child_is(tau::wff_ex)
+		|| t.child_is(tau::wff_sometimes)
+		|| t.child_is(tau::wff_always)
+		|| t.child_is(tau::wff_all)
+		|| t.child_is(tau::constraint);
+};
+
+/**
+ * @brief Predicate that classifies a bf node as a BDD variable.
+ *
+ * In BDD-based reductions of Boolean functions the following node types are
+ * treated as atomic BDD variables: `variable`, `capture`, `bf_ref`,
+ * `ba_constant`, `bf_fall`, and `bf_fex`.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+inline auto is_bf_bdd_var = [](tref n) {
+	using tau = tree<node>;
+	const auto& t = tau::get(n);
+	return t.child_is(tau::variable)
+		|| t.child_is(tau::capture)
+		|| t.child_is(tau::bf_ref)
+		|| t.child_is(tau::ba_constant)
+		|| t.child_is(tau::bf_fall)
+		|| t.child_is(tau::bf_fex);
+};
 
 /**
  * @brief Functor that converts a formula to Ordered Normal Form (ONF) w.r.t. a variable.

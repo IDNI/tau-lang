@@ -13,8 +13,10 @@ TEST_SUITE("minterm_iterator") {
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
 		tref n = get_nso_rr<node_t>(tau::get(sample)).value().main->get();
+#ifdef DEBUG
 		using node = node_t;
 		std::cout << "sample: " << TAU_DUMP_TO_STR(n) << "\n";
+#endif // DEBUG
 		tref fm = tt(n) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<node_t> it(fm);
 #ifdef DEBUG

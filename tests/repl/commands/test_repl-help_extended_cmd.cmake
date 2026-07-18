@@ -47,11 +47,17 @@ add_repl_test(help_definitions_cmd "help definitions" "definitions command")
 add_repl_test(help_clear_cmd      "help clear"   "clear")
 add_repl_test(help_c_cmd          "help c"       "clear")
 
-# anf/pnf (not implemented — should still show help)
+# anf/pnf: the anf_cmd/pnf_cmd grammar rules are commented out in
+# parser/tau.tgf ("Commented out, not implemented yet"), so "anf"/"pnf"
+# are not recognized symbols at all -- "help anf"/"help pnf" fall through
+# to generic input instead of showing the command's help text. Marked
+# WILL_FAIL for the same reason as test_repl-anf_pnf_cmd.cmake's tests.
 add_repl_test(help_anf_cmd        "help anf"     "not yet implemented")
 add_repl_test(help_pnf_cmd        "help pnf"     "not yet implemented")
-# Note: help anf/pnf messages use lowercase "not yet implemented"
-# while the anf/pnf commands themselves print "Not implemented yet." (see test_repl-anf_pnf_cmd.cmake)
+set_tests_properties(
+    test_repl-help_anf_cmd test_repl-help_pnf_cmd
+    PROPERTIES WILL_FAIL TRUE
+)
 
 # new commands
 add_repl_test(help_whatis_cmd     "help whatis"  "whatis command")

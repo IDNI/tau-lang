@@ -367,10 +367,14 @@ TEST_SUITE("semantic-error predicates") {
 		CHECK(!has_negative_offset<node_t>(good));
 	}
 
-	TEST_CASE("invalid_nesting_of_temp_quants flags a temporal quantifier nested in another") {
+	TEST_CASE("invalid_nesting_of_temp_quants never flags nesting: full LTL allows it") {
+		// Full LTL supports free nesting of temporal quantifiers (G(F p),
+		// F(G p), etc.); the historical safety-fragment restriction that
+		// rejected such nesting no longer applies (see
+		// invalid_nesting_of_temp_quants's doc comment).
 		tref inner = tau::build_wff_sometimes(x_eq_0("x"));
 		tref nested = tau::build_wff_always(inner);
-		CHECK(invalid_nesting_of_temp_quants<node_t>(nested));
+		CHECK(!invalid_nesting_of_temp_quants<node_t>(nested));
 		CHECK(!invalid_nesting_of_temp_quants<node_t>(tau::build_wff_always(x_eq_0("x"))));
 	}
 

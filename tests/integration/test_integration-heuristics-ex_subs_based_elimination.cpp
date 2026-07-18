@@ -66,7 +66,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x = x | y && y = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}
@@ -78,7 +78,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x = x | y && x = 0";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result != ex_clause );
 		CHECK( !contains<node_t>(result, var) );
@@ -88,7 +88,7 @@ TEST_SUITE("ex_subs_based_elimination") {
 		const char* sample =
 			"x = x && y = b";
 		auto var = build_variable<node_t>("x", tau_type_id<node_t>()); // tau typed variable 'x'
-		tref ex_clause = parse(sample);
+		tref ex_clause = tau::get(sample, parse_opts_wff);
 		tref result = ex_subs_based_elimination<node_t>(var, ex_clause);
 		CHECK( result == ex_clause );
 	}

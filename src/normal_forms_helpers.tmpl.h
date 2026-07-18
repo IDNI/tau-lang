@@ -9,26 +9,6 @@ namespace idni::tau_lang {
 #define LOG_CHANNEL_NAME "normal_forms"
 
 template <NodeType node>
-tref unequal_to_not_equal(tref fm) {
-	using tau = tree<node>;
-	LOG_TRACE << "unequal_to_not_equal: " << LOG_FM(fm);
-	auto neq_to_not_eq = [](tref n) {
-		//$X != 0 ::= !($X = 0)
-		if (is<node>(n, tau::bf_neq)) {
-			return tau::trim(tau::build_wff_neg(
-				tau::build_bf_eq(
-					tau::get(n).first(),
-					tau::get(n).second())));
-		}
-		return n;
-	};
-	tref result = pre_order<node>(fm)
-				.apply_unique(neq_to_not_eq, visit_wff<node>);
-	LOG_TRACE << "unequal_to_not_equal result: " << LOG_FM(result);
-	return result;
-}
-
-template <NodeType node>
 tref not_equal_to_unequal(tref fm) {
 	using tau = tree<node>;
 	LOG_TRACE << "not_equal_to_unequal: " << LOG_FM(fm);
@@ -293,30 +273,6 @@ tref to_nnf(tref fm) {
 	return result;
 }
 
-// Convert X =(!=) Y to X + Y =(!=) 0
-template<NodeType node>
-tref norm_equation(tref eq) {
-	using tau = tree<node>;
-	tau e = tau::get(eq);
-	if (e.child_is(tau::bf_eq)) {
-		return tau::build_bf_eq_0(tau::build_bf_xor(e[0].first(), e[0].second()));
-	} else if (e.child_is(tau::bf_neq)) {
-		return tau::build_bf_neq_0(tau::build_bf_xor(e[0].first(), e[0].second()));
-	} else return eq;
-}
-
-// Convert X =(!=) Y to X + Y =(!=) 0
-template<NodeType node>
-tref norm_trimmed_equation(tref eq) {
-	using tau = tree<node>;
-	tau e = tau::get(eq);
-	if (e.is(tau::bf_eq)) {
-		return tau::trim(tau::build_bf_eq_0(tau::build_bf_xor(e.first(), e.second())));
-	} else if (e.is(tau::bf_neq)) {
-		return tau::trim(tau::build_bf_neq_0(tau::build_bf_xor(e.first(), e.second())));
-	} else return eq;
-}
-
 template<NodeType node>
 tref denorm_equation(tref eq) {
 	using tau = tree<node>;
@@ -331,32 +287,6 @@ tref denorm_equation(tref eq) {
 			return tau::build_bf_neq(ce[0].first(), ce[0].second());
 	}
 	return eq;
-}
-
-// Convert all occurrences of X =(!=) Y to X + Y =(!=) 0 in fm
-template <NodeType node>
-tref norm_all_equations (tref fm) {
-	return pre_order<node>(fm).apply_unique(norm_equation<node>,
-						visit_wff<node>);
-}
-
-template<NodeType node>
-tref apply_xor_def(tref fm) {
-	using tau = tree<node>;
-	tau t = tau::get(fm);
-	if (t.child_is(tau::bf_xor)) {
-		return tau::build_bf_or(
-			tau::build_bf_and(t[0].first(),
-					tau::build_bf_neg(t[0].second())),
-			tau::build_bf_and(tau::build_bf_neg(t[0].first()),
-					t[0].second()));
-	}
-	return fm;
-}
-
-template<NodeType node>
-tref apply_all_xor_def(tref fm) {
-	return pre_order<node>(fm).apply_unique(apply_xor_def<node>);
 }
 
 // -----------------------------------------------------------------------------

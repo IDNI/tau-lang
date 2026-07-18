@@ -256,19 +256,6 @@ inline bool is_hsb_one(const hsb& x) {
 	return is_hsb_zero(~x);
 }
 
-/**
- * @brief Normalises @p x: collapses to `bottom()` or `top()` if semantically
- *        zero or one; otherwise returns @p x unchanged.
- * @param x  The hsb element to normalise.
- */
-inline hsb normalize_hsb(const hsb& x) {
-	if (x.root->k == hsb::kind::bot || x.root->k == hsb::kind::top)
-		return x;
-	if (is_hsb_zero(x)) return hsb::bottom();
-	if (is_hsb_one(x))  return hsb::top();
-	return x;
-}
-
 /// @brief No-op symbol simplifier (required by the tau dispatcher interface).
 inline tref simplify_hsb_symbol(tref sym) { return sym; }
 

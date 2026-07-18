@@ -641,7 +641,7 @@ void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 	tref rr = n | tt::first | tt::ref;
 	rr_defs.push_back(rr);
 	size_t idx = rr_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << TAU_TO_STR(rr_defs[idx]) << "\n";
+	std::cout << "[" << idx + 1 << "] " << tree<node>::get(rr_defs[idx]).to_str() << "\n";
 	// Register definition head early so type inference recognizes it
 	tt rrt(rr);
 	htref head = rrt | tt::first | tt::handle;
@@ -1027,9 +1027,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::onf_cmd:            result = onf_cmd(command); break;
 	case tau::dnf_cmd:            result = dnf_cmd(command); break;
 	case tau::cnf_cmd:            result = cnf_cmd(command); break;
-	case tau::anf_cmd:            result = anf_cmd(command); break;
 	case tau::nnf_cmd:            result = nnf_cmd(command); break;
-	case tau::pnf_cmd:            result = pnf_cmd(command); break;
 	case tau::mnf_cmd:            result = mnf_cmd(command); break;
 	// definition of rec relations to be included during normalization
 	case tau::def_rr_cmd:         def_rr_cmd(command); break;
@@ -1389,19 +1387,6 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  cnf <tau>               converts the given Tau formula to CNF\n"
 		<< "  cnf <repl_history>      converts the Tau expression stored at the specified repl history position to CNF\n";
 		break;
-	case tau::anf_sym: std::cout
-		<< "anf converts a Tau expression to algebraic normal form (ANF)\n"
-		<< "\n"
-		<< "NOTE: this command is not yet implemented\n";
-		break;
-	//case tau::anf_sym_dead: std::cout
-	//	<< "anf command converts a boolean formula or a well formed formula to algebraic normal form\n"
-	//	<< "\n"
-	//	<< "usage:\n"
-	//	<< "  anf <term>              converts the given term to ANF\n"
-	//	<< "  anf <tau>               converts the given tau to ANF\n"
-	//	<< "  anf <history>           converts the history with the given id to ANF\n";
-	//	break;
 	case tau::nnf_sym: std::cout
 		<< "nnf converts a Tau expression to negation normal form (NNF)\n"
 		<< "\n"
@@ -1410,19 +1395,6 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  nnf <tau>               converts the given tau formula to NNF\n"
 		<< "  nnf <repl_history>      converts the Tau expression stored at the specified repl history position to NNF\n";
 		break;
-	case tau::pnf_sym: std::cout
-		<< "pnf converts a Tau expression to prenex normal form (PNF)\n"
-		<< "\n"
-		<< "NOTE: this command is not yet implemented\n";
-		break;
-	//case tau::pnf_sym_dead: std::cout
-	//	<< "pnf command converts a boolean formula or a well formed formula to prenex normal form\n"
-	//	<< "\n"
-	//	<< "usage:\n"
-	//	<< "  pnf <term>              converts the given term to PNF\n"
-	//	<< "  pnf <tau>               converts the given term to PNF\n"
-	//	<< "  pnf <history>           converts the history with the given id to PNF\n";
-	//	break;
 	case tau::mnf_sym: std::cout
 		<< "mnf converts a Tau expression to minterm normal form (MNF)\n"
 		<< "\n"

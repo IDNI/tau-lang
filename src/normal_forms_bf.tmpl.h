@@ -88,7 +88,7 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
  * @tparam node Type of tree node
  */
 template <NodeType node>
-struct simplify_using_equality {
+struct simplify_using_equality_dnf {
 	using tau = tree<node>;
 	// TODO: For variables, make lower time step < higher time step
 	// Create comparator function that orders bfs by making constants smallest
@@ -335,7 +335,7 @@ private:
  * @tparam node Type of tree node
  */
 template <NodeType node>
-class syntactic_path_simplification {
+class syntactic_path_simplification_dnf {
 	using tau = tree<node>;
 
 	static bool wff_comp (tref l, tref r) {
@@ -523,12 +523,18 @@ public:
  * linear time in the formula size and the number of paths found in terms
  * @tparam node tree node type
  * @param formula The formula to simplify
+ * @param skip Predicate identifying content this pass must not touch
+ *        (defaults to BV-typed nodes); accepted for interface consistency
+ *        with `anti_prenex_block`'s other steps, but currently unused --
+ *        neither `simplify_using_equality_dnf` nor
+ *        `syntactic_path_simplification_dnf` has a BV-specific check to guard.
  * @return The simplified formula
  */
 template<NodeType node>
-tref syntactic_formula_simplification(tref formula) {
-	formula = simplify_using_equality<node>::on(formula);
-	return syntactic_path_simplification<node>::on(formula);
+tref syntactic_formula_simplification(tref formula,
+		[[maybe_unused]] std::function<bool(tref)> skip) {
+	formula = simplify_using_equality_dnf<node>::on(formula);
+	return syntactic_path_simplification_dnf<node>::on(formula);
 }
 
 /**
@@ -779,9 +785,9 @@ tref syntactic_atomic_formula_simplification(tref atomic_formula) {
 	atomic_formula = norm_equation<node>(atomic_formula);
 	if (tau::get(atomic_formula).equals_T() ||
 		tau::get(atomic_formula).equals_F()) return atomic_formula;
-	tref func1 = syntactic_path_simplification<node>::on(
+	tref func1 = syntactic_path_simplification_dnf<node>::on(
 		tau::get(atomic_formula)[0].first());
-	tref func2 = syntactic_path_simplification<node>::on(
+	tref func2 = syntactic_path_simplification_dnf<node>::on(
 		tau::get(atomic_formula)[0].second());
 	// Apply syntactic path simplification
 	atomic_formula = tau::get(tau::wff,

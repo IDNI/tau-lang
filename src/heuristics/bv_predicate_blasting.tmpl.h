@@ -673,13 +673,6 @@ static tref wff_predicate_blasting(tref term) {
 				changes[t] = tau::trim(tau::build_wff_and(left, right));
 				break;
 			}
-			case tau::bf_interval: {
-				// TODO (MEDIUM) convert into two predicates and a conjunction,
-				// but for now we just return an error.
-				DBG(LOG_DEBUG << "Interval predicates are currently not supported in blasting.";)
-				return error = true, false;
-				break;
-			}
 			default: {
 				// just replace the children if needed, the current node will be
 				// reconstructed in the post-order traversal
