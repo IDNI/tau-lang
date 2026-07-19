@@ -3,6 +3,25 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
+namespace {
+// tau_ba<bv, sbf_ba> is a different (smaller) node type than the ambient
+// `node_t`/`tau` that test_tau_helpers.h defines for the rest of the suite
+// (the 6-BA tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb> pack). `tref`s are
+// only valid within the tree pool of the node type they were created in, so
+// formulas fed to tau_ba<bv, sbf_ba> must be built via `small_tau`, not the
+// ambient `tau` (see tests/unit/test_base_ba_dispatcher.cpp).
+using small_node = idni::tau_lang::node<
+	idni::tau_lang::tau_ba<idni::tau_lang::bv, idni::tau_lang::sbf_ba>,
+	idni::tau_lang::bv, idni::tau_lang::sbf_ba>;
+using small_tau = idni::tau_lang::tree<small_node>;
+
+std::optional<rr<small_node>> small_get_nso_rr(const char* sample) {
+	tref spec = small_tau::get(sample);
+	if (spec == nullptr) return {};
+	return idni::tau_lang::get_nso_rr<small_node>(spec);
+}
+} // namespace
+
 TEST_SUITE("operators: negation") {
 
 	TEST_CASE("{ F. }' = 0") {
@@ -19,13 +38,13 @@ TEST_SUITE("operators: negation") {
 TEST_SUITE("tau_ba predicates") {
 
 	TEST_CASE("is_zero detects contradiction") {
-		tau_ba<bv, sbf_ba> fm(get_nso_rr("x = 0 && x != 0.")->main->get());
+		tau_ba<bv, sbf_ba> fm(small_get_nso_rr("x = 0 && x != 0.")->main->get());
 		CHECK(fm.is_zero());
 		CHECK(!(fm == true));
 	}
 
 	TEST_CASE("is_one detects tautology") {
-		tau_ba<bv, sbf_ba> fm(get_nso_rr("x = 0 || x != 0.")->main->get());
+		tau_ba<bv, sbf_ba> fm(small_get_nso_rr("x = 0 || x != 0.")->main->get());
 		CHECK(fm.is_one());
 		CHECK(fm == true);
 	}

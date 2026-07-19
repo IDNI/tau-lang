@@ -439,8 +439,14 @@ TEST_SUITE("simplify_using_equality") {
 		const char* sample = "(x = 0) || (y = x || z = x).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0
-		CHECK(tau::get(res).to_str() == "x = 0 || x = y || z = x");
+		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0.
+		// Which side an atom's variable prints on is decided by
+		// simplify_using_equality_term_comp's tau::subtree_less fallback for
+		// two plain variables, a content-hash tie-break that is not a
+		// guaranteed canonical order (see tau_bdd.tmpl.h for the analogous
+		// issue), so accept either orientation for the "z = x" atom.
+		CHECK((tau::get(res).to_str() == "x = 0 || x = y || z = x"
+			|| tau::get(res).to_str() == "x = 0 || x = y || x = z"));
 	}
 
 	TEST_CASE("nested_or_3_distinct_branches_each_simplified") {

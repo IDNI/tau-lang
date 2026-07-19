@@ -20,6 +20,7 @@ namespace idni::tau_lang {
 template<NodeType node>
 tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	using tau = tree<node>;
+	using tt = tau::traverser;
 	DBG(assert(tau::get(var).is(tau::variable));)
 #ifdef TAU_CACHE
 	using cache_t = std::unordered_map<std::pair<tref, tref>, tref>;
@@ -42,8 +43,10 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	// Make sure that it works only on Boolean parts by using replace_if
 	tref func1_v_0 = rewriter::replace_if<node>(func1, var,
 		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+	func1_v_0 = tt(func1_v_0) | bf_reduce_canonical<node>() | tt::ref;
 	tref func1_v_1 = rewriter::replace_if<node>(func1, var,
 		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+	func1_v_1 = tt(func1_v_1) | bf_reduce_canonical<node>() | tt::ref;
 	// Is func syntactically identically 0
 	if (tau::get(func1_v_0).equals_0() && tau::get(func1_v_1).equals_0())
 		func1 = tau::_0(find_ba_type<node>(func1));
@@ -52,16 +55,17 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		func1 = tau::_1(find_ba_type<node>(func1));
 	// func is not dependent on var
 	else if (tau::get(func1_v_0) == tau::get(func1_v_1) && !contains<node>(func1_v_0, var))
-		func1 = rewriter::replace<node>(func1, var,
-			_0<node>(find_ba_type<node>(var)));
+		func1 = func1_v_0;
 	if (tau::get(func2).equals_0())
 		return denorm_equation<node>(
 			tau::get(tau::wff, tau::get(atm_type, func1, func2)));
 	// Simplify func2
 	tref func2_v_0 = rewriter::replace_if<node>(func2, var,
 		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+	func2_v_0 = tt(func2_v_0) | bf_reduce_canonical<node>() | tt::ref;
 	tref func2_v_1 = rewriter::replace_if<node>(func2, var,
 		_1<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
+	func2_v_1 = tt(func2_v_1) | bf_reduce_canonical<node>() | tt::ref;
 	// Is func syntactically identically 0
 	if (tau::get(func2_v_0).equals_0() && tau::get(func2_v_1).equals_0())
 		func2 = tau::_0(find_ba_type<node>(func2));
@@ -70,8 +74,7 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		func2 = tau::_1(find_ba_type<node>(func2));
 	// func is not dependent on var
 	else if (tau::get(func2_v_0) == tau::get(func2_v_1) && !contains<node>(func2_v_0, var))
-		func2 = rewriter::replace<node>(func2, var,
-			_0<node>(find_ba_type<node>(var)));
+		func2 = func2_v_0;
 	tref res = tau::get(tau::wff, tau::get(atm_type, func1, func2));
 	DBG(LOG_TRACE << "Syntactic_variable_simplification result: " << LOG_FM(res) << "\n";)
 #ifdef TAU_CACHE

@@ -484,26 +484,42 @@ size_t get_var_name_sid(tref var) {
 // -----------------------------------------------------------------------------
 // Helpers for variables having io_var as child
 
+// Accept either the `variable` node wrapping `io_var` (the documented
+// contract below) or a bare `io_var` node directly -- mirroring is_io_var's
+// own dual acceptance (tau_tree_queries.tmpl.h). Callers such as
+// interpreter::prune_memory/step key their memory map by whatever shape a
+// variable happens to have where it was captured (some already unwrapped
+// to the bare `variable(io_var(...))` node, others still `bf`-wrapped) and
+// use tau::trim() to peel one wrapper level before querying these helpers;
+// that peels a `bf` wrapper down to `variable(io_var(...))` correctly, but
+// over-strips an already-unwrapped `variable(io_var(...))` down to a bare
+// `io_var(...)`. Normalizing here keeps both trimmed forms working.
+template <NodeType node>
+static tref io_var_node(tref v) {
+	using tau = tree<node>;
+	return tau::get(v).is(tau::io_var) ? v : tau::get(v).child(0);
+}
+
 template <NodeType node>
 bool is_io_initial(tref io_var) {
-	return tree<node>::get(io_var)[0][1][0].is_integer();
+	return tree<node>::get(io_var_node<node>(io_var))[1][0].is_integer();
 }
 
 template <NodeType node>
 bool is_io_shift(tref io_var) {
 	using tau = tree<node>;
-	return tau::get(io_var)[0][1][0].is(tau::shift);
+	return tau::get(io_var_node<node>(io_var))[1][0].is(tau::shift);
 }
 
 template <NodeType node>
 int_t get_io_time_point(tref io_var) {
 	using tau = tree<node>;
-	return tau::get(io_var)[0][1][0].get_integer();
+	return tau::get(io_var_node<node>(io_var))[1][0].get_integer();
 }
 
 template <NodeType node>
 int_t get_io_shift(tref io_var) {
-	return tree<node>::get(io_var)[0][1][0][1].get_num();
+	return tree<node>::get(io_var_node<node>(io_var))[1][0][1].get_num();
 }
 
 template <NodeType node>

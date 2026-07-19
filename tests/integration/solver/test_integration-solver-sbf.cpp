@@ -292,6 +292,20 @@ TEST_SUITE("solve") {
 	using node_t = node<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
 	using tau = tree<node_t>;
 
+	// This node_t's ba_constants pool holds cvc5::Term values (via bv)
+	// exercised by the "bv:" cases below. Without an explicit exit-time
+	// cleanup, global static teardown order between this pool and cvc5's
+	// TermManager is unspecified, so the process can SEGFAULT after
+	// doctest reports all tests passed (see the identical fix/rationale
+	// in tests/test_tau_helpers.h for the qlt/cvc5 bas_pack).
+	namespace test_solver_sbf_init_detail {
+		struct _CleanupRegistrar {
+			__attribute__((used)) _CleanupRegistrar() {
+				std::atexit([]() { ba_constants<node_t>::cleanup(); });
+			}
+		};
+		inline _CleanupRegistrar _ba_constants_cleanup_registrar;
+	}
 
 	bool test_solve(const std::string system, const solver_options& options) {
 #ifdef DEBUG

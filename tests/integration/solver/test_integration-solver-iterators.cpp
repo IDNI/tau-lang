@@ -40,11 +40,13 @@ TEST_SUITE("minterm_iterator") {
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
 #endif // DEBUG
 		size_t count = 1;
-		while (it++ != minterm_iterator<node_t>::end) {
+		++it;
+		while (it != minterm_iterator<node_t>::end) {
 #ifdef DEBUG
 			std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
 #endif // DEBUG
 			count++;
+			++it;
 		}
 		CHECK ( count == 3 );
 	}
@@ -61,11 +63,13 @@ TEST_SUITE("minterm_iterator") {
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
 #endif // DEBUG
 		size_t count = 1;
-		while (it++ != minterm_iterator<node_t>::end) {
+		++it;
+		while (it != minterm_iterator<node_t>::end) {
 #ifdef DEBUG
 			std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
 #endif // DEBUG
 			count++;
+			++it;
 		}
 		CHECK ( count == 7 );
 	}
@@ -125,7 +129,8 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_iterator<node_t> it(sys);
 		size_t count = 1;
-		while (it++ != minterm_inequality_system_iterator<node_t>::end) count++;
+		++it;
+		while (it != minterm_inequality_system_iterator<node_t>::end) { count++; ++it; }
 		CHECK ( count == 3 );
 	}
 
@@ -135,7 +140,8 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 		tref fm = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm);
 		minterm_inequality_system_iterator<node_t> it(sys);
-		size_t count = 1 ; while (it++ != minterm_inequality_system_iterator<node_t>::end) count++;
+		size_t count = 1; ++it;
+		while (it != minterm_inequality_system_iterator<node_t>::end) { count++; ++it; }
 		CHECK ( count == 7 );
 	}
 
@@ -161,7 +167,8 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_iterator<node_t> it(sys);
 		size_t count = 1;
-		while (it++ != minterm_inequality_system_iterator<node_t>::end) count++;
+		++it;
+		while (it != minterm_inequality_system_iterator<node_t>::end) { count++; ++it; }
 		CHECK ( count == 9 );
 	}
 
@@ -174,7 +181,8 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 		tref fm2 = nso_rr.value().main->get();
 		inequality_system<node_t> sys; sys.insert(fm1); sys.insert(fm2);
 		minterm_inequality_system_iterator<node_t> it(sys);
-		size_t count = 1 ; while (it++ != minterm_inequality_system_iterator<node_t>::end) count++;
+		size_t count = 1; ++it;
+		while (it != minterm_inequality_system_iterator<node_t>::end) { count++; ++it; }
 		CHECK ( count == 49 );
 	}
 }

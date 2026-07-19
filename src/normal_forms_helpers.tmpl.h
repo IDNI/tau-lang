@@ -396,9 +396,16 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 	const auto& t = tau::get(n);
 	tref eq = t.find_bottom(is<node, tau::bf_eq>);
 	subtree_map<node, tref> changes;
-	if (eq && tau::get(eq)[0].find_top(has_var)) {
-		eq = norm_trimmed_equation<node>(eq);
-		const auto& eq_v = tau::get(eq);
+	// Search both operands (not just the LHS) for the target variable, so
+	// "y = x" (variable on the RHS) is transformed the same way as "x = y".
+	if (eq && tau::get(eq).find_top(has_var)) {
+		// Key the replacement by the ORIGINAL (pre-normalization) equation
+		// node, since that is the node that actually occurs as a subtree of
+		// `n`. Keying by the re-normalized node instead is a no-op unless
+		// the equation already happened to be in `f = 0` form, since
+		// `rewriter::replace` only rewrites subtrees it finds inside `n`.
+		tref norm_eq = norm_trimmed_equation<node>(eq);
+		const auto& eq_v = tau::get(norm_eq);
 		DBG(assert(eq_v[1][0].is(tau::bf_f));)
 		tref f_0 = tt(rewriter::replace<node>(
 			eq_v.first(), var, tau::_0(find_ba_type<node>(var))))
@@ -407,12 +414,13 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 			tau::build_bf_neg(eq_v.first()), var,tau::_1(find_ba_type<node>(var))))
 				| bf_reduce_canonical<node>() | tt::ref;
 
-		changes[eq_v.get()] = tau::trim(tau::build_bf_interval(
+		changes[eq] = tau::trim(tau::build_bf_interval(
 							f_0, var, f_1));
 	}
 	for (tref neq_ref : t.select_all(is<node, tau::bf_neq>)) {
-		neq_ref = norm_trimmed_equation<node>(neq_ref);
-		const auto& neq = tau::get(neq_ref);
+		// Likewise, key by the original (un-normalized) disequality node.
+		tref norm_neq = norm_trimmed_equation<node>(neq_ref);
+		const auto& neq = tau::get(norm_neq);
 		DBG(assert(neq[1][0].is(tau::bf_f));)
 		if (!neq[0].find_top(has_var)) continue;
 		tref f_0 = tt(rewriter::replace<node>(
@@ -423,7 +431,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 			tau::build_bf_neg(neq.first()), var,
 			tau::_1(find_ba_type<node>(var))))
 				| bf_reduce_canonical<node>() | tt::ref;
-		changes[neq.get()] = tau::trim(tau::build_wff_or(
+		changes[neq_ref] = tau::trim(tau::build_wff_or(
 			tau::build_bf_nlteq(f_0, var),
 			tau::build_bf_nlteq(var, f_1)));
 	}

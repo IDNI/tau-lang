@@ -287,9 +287,15 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
  * every variable must have an explicitly sized bitvector type. Mixed-type
  * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
  *
+ * Also rejects formulas carrying a non-bv-typed ba_constant (e.g. a `qlt`
+ * constant like `{1/3}:qlt`): such a constant can appear in an otherwise
+ * bv-only clause once its variable has already been substituted by a
+ * concrete value (e.g. during interpretation), so checking only `variable`
+ * nodes is not enough to catch the mixed-type case.
+ *
  * @tparam node Node type
  * @param form The formula to check
- * @return true if all variables are explicitly sized bitvectors
+ * @return true if all variables/constants are (explicitly sized) bitvectors
  */
 template <NodeType node>
 bool is_bv_solvable_formula(tref form) {
@@ -303,6 +309,10 @@ bool is_bv_solvable_formula(tref form) {
 			if (!is_bv_type_family<node>(t)) return solvable = false;
 			// the solver requires an explicit bitwidth
 			if (!(tt(tau::get(n).get_ba_type_tree()) | tau::subtype))
+				return solvable = false;
+		} else if (is<node>(n, tau::ba_constant)) {
+			size_t t = tau::get(n).get_ba_type();
+			if (t != 0 && !is_bv_type_family<node>(t))
 				return solvable = false;
 		}
 		return solvable;

@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <algorithm>
+
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 #include "tau_bdd.h"
@@ -127,7 +129,13 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {{tx, 0}};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		CHECK(tau::get(t).to_str() == "x&(yz)'|x'");
+		// y and z are not in the explicit order, so they are combined as
+		// opaque leaf terms; their relative print order is decided by a
+		// content-hash tie-break (see tau_bdd.tmpl.h am_cmp/subtree_less)
+		// that is not a guaranteed canonical order and can flip whenever
+		// the parser grammar changes (nonterminal ids feed the hash).
+		CHECK((tau::get(t).to_str() == "x&(yz)'|x'"
+			|| tau::get(t).to_str() == "x&(zy)'|x'"));
 	}
 	TEST_CASE("xyzqwert no var") {
 		using bdd = tau_term_bdd<node_t>;
@@ -142,10 +150,17 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		CHECK((tau::get(t).to_str() == "xyzqwert"
-			|| tau::get(t).to_str() == "ewytrxzq"
-			|| tau::get(t).to_str() == "zrwyexqt"
-			|| tau::get(t).to_str() == "xtzqrewy"));
+		// None of x,y,z,q,w,e,r,t are in the explicit order, so they are
+		// combined as opaque leaf terms whose relative print order is a
+		// deterministic (see tau_bdd.tmpl.h operator<'s content-string
+		// tie-break), but not alphabetical, function of how the pairwise
+		// merges are structured -- not a property worth pinning down to a
+		// single "canonical" permutation. Check content instead of order:
+		// every one of the 8 variables must appear exactly once.
+		std::string res = tau::get(t).to_str();
+		CHECK(res.size() == 8);
+		for (char c : std::string("xyzqwert"))
+			CHECK(std::count(res.begin(), res.end(), c) == 1);
 	}
 }
 

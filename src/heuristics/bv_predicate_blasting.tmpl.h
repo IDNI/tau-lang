@@ -637,6 +637,20 @@ static tref wff_predicate_blasting(tref term) {
 	auto f = [&](tref t) {
 		auto nt = tau::get(t).get_type();
 
+		auto rebuild_default = [&]() {
+			// just replace the children if needed, the current node will be
+			// reconstructed in the post-order traversal
+			trefs ch;
+			for (tref c : tau::get(t).children()) {
+				if (changes.find(c) != changes.end())
+					ch.push_back(changes[c]);
+				else ch.push_back(c);
+			}
+
+			if (auto new_t = tau::get(tau::get(t).value, ch.data(), ch.size()); new_t != t)
+				changes[t] = new_t;
+		};
+
 		auto blast = [&](tref atomic, const auto& blaster) -> tref {
 				auto blasted = blaster(atomic);
 				if (!blasted) return error = true, t;
@@ -648,23 +662,80 @@ static tref wff_predicate_blasting(tref term) {
 				return blasted;
 		};
 
+		// The ordering relations (<, >, <=, >=, their negations, and the
+		// ternary interval) are bitvector-specific bit-recurrences here:
+		// they unconditionally treat their operands as bitvectors (see
+		// bvlt/bvgt/... in bv_predicate_blasting_comparisons.tmpl.h).
+		// Other BA types (qlt, sbf, tau, hsb, nlang, ...) reuse these
+		// same node kinds for their own orderings, already resolved by
+		// their own hooks (e.g. qlt_singleton_cmp in hooks_tau.tmpl.h).
+		// Blasting a non-bv atom here misreads its operand's bitwidth as
+		// 0 (get_bv_type_bitwidth logs an error and returns 0), which
+		// then underflows bitwidth-1 into a huge index and corrupts
+		// downstream state. Only dispatch to the bv blasters when at
+		// least one operand actually carries a bv BA-type.
+		auto is_bv_operands = [&]() {
+			tref l = tau::get(t).child(0);
+			tref r = tau::get(t).child(1);
+			return is_bv_type_family<node>(tau::get(l).get_ba_type())
+				|| is_bv_type_family<node>(tau::get(r).get_ba_type());
+		};
+
 		switch (nt) {
 			case tau::bf_eq: { blast(t, eq_predicate<node>); break; }
 			case tau::bf_neq: { blast(t, neq_predicate<node>); break; }
-			case tau::bf_lt: { blast(t, lt_predicate<node>); break; }
-			case tau::bf_gt: { blast(t, gt_predicate<node>); break; }
-			case tau::bf_lteq: { blast(t, lteq_predicate<node>); break; }
-			case tau::bf_gteq: { blast(t, gteq_predicate<node>); break; }
-			case tau::bf_nlt: { blast(t, nlt_predicate<node>); break; }
-			case tau::bf_ngt: { blast(t, ngt_predicate<node>); break; }
-			case tau::bf_nlteq: { blast(t, nlteq_predicate<node>); break; }
-			case tau::bf_ngteq: { blast(t, ngteq_predicate<node>); break; }
+			case tau::bf_lt: {
+				if (is_bv_operands()) blast(t, lt_predicate<node>);
+				else rebuild_default();
+				break;
+			}
+			case tau::bf_gt: {
+				if (is_bv_operands()) blast(t, gt_predicate<node>);
+				else rebuild_default();
+				break;
+			}
+			case tau::bf_lteq: {
+				if (is_bv_operands()) blast(t, lteq_predicate<node>);
+				else rebuild_default();
+				break;
+			}
+			case tau::bf_gteq: {
+				if (is_bv_operands()) blast(t, gteq_predicate<node>);
+				else rebuild_default();
+				break;
+			}
+			case tau::bf_nlt: {
+				if (is_bv_operands()) blast(t, nlt_predicate<node>);
+				else rebuild_default();
+				break;
+			}
+			case tau::bf_ngt: {
+				if (is_bv_operands()) blast(t, ngt_predicate<node>);
+				else rebuild_default();
+				break;
+			}
+			case tau::bf_nlteq: {
+				if (is_bv_operands()) blast(t, nlteq_predicate<node>);
+				else rebuild_default();
+				break;
+			}
+			case tau::bf_ngteq: {
+				if (is_bv_operands()) blast(t, ngteq_predicate<node>);
+				else rebuild_default();
+				break;
+			}
 			case tau::bf_interval: {
-				// a <= b <= c is equivalent to (a <= b) && (b <= c);
-				// blast each comparison separately and conjoin the results.
 				tref lo  = tau::get(t)[0].get();
 				tref mid = tau::get(t)[1].get();
 				tref hi  = tau::get(t)[2].get();
+				if (!is_bv_type_family<node>(tau::get(lo).get_ba_type())
+					&& !is_bv_type_family<node>(tau::get(mid).get_ba_type())
+					&& !is_bv_type_family<node>(tau::get(hi).get_ba_type())) {
+					rebuild_default();
+					break;
+				}
+				// a <= b <= c is equivalent to (a <= b) && (b <= c);
+				// blast each comparison separately and conjoin the results.
 				tref lo_le_mid = tau::get(tau::bf_lteq, lo, mid);
 				tref mid_le_hi = tau::get(tau::bf_lteq, mid, hi);
 				tref left  = lteq_predicate<node>(lo_le_mid);
@@ -674,17 +745,7 @@ static tref wff_predicate_blasting(tref term) {
 				break;
 			}
 			default: {
-				// just replace the children if needed, the current node will be
-				// reconstructed in the post-order traversal
-				trefs ch;
-				for (tref c : tau::get(t).children()) {
-					if (changes.find(c) != changes.end())
-						ch.push_back(changes[c]);
-					else ch.push_back(c);
-				}
-
-				if (auto new_t = tau::get(tau::get(t).value, ch.data(), ch.size()); new_t != t)
-					changes[t] = new_t;
+				rebuild_default();
 				break;
 			}
 		}

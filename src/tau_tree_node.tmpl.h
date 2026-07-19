@@ -211,11 +211,12 @@ constexpr size_t node<BAs...>::hashit() const {
 	// crash on the small variants used in unit tests).
 	hash_combine(seed, ba_type);
 	hash_combine(seed, static_cast<bool>(ext));
-	// Get ba constant from pool
-	if (nt == type::ba_constant && data != 0 && ba_type != 0)
+	// Get ba constant from pool (ba_constant.data is always a ba_constants
+	// pool index, regardless of ba_type -- see node::ba_constant()).
+	if (nt == type::ba_constant && data != 0)
 		hash_combine(seed, tau_lang::ba_constants<node>::get(data));
-	// Get string from pool, untyped ba_constant also has string as data
-	else if (tree<node>::is_string_nt(nt) || nt == type::ba_constant)
+	// Get string from pool
+	else if (tree<node>::is_string_nt(nt))
 		hash_combine(seed, dict(data));
 	else hash_combine(seed, static_cast<size_t>(data));
 	return seed;

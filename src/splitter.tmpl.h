@@ -12,7 +12,13 @@ tref split_path(tref fm, const splitter_type st, bool check_temps, const auto& c
 	using node = node<BAs...>;
 	using tau = tree<node>;
 	switch (st) {
-		case splitter_type::upper: {
+		// nso_tau_splitter() implements a single clause-removal strategy
+		// and only special-cases splitter_type::bad at its entry point;
+		// middle/lower requests reach here tagged with their originally
+		// requested type but must be split the same way as upper.
+		case splitter_type::upper:
+		case splitter_type::middle:
+		case splitter_type::lower: {
 			// Remove exactly one clause
 			auto remove_clause = [&](tref clause) {
 				// Do not delete temporary streams
@@ -28,11 +34,10 @@ tref split_path(tref fm, const splitter_type st, bool check_temps, const auto& c
 			return expression_paths<node>(fm).apply_only_if(
 				remove_clause, cb);
 		}
-		case splitter_type::middle:
-		case splitter_type::lower:
 		case splitter_type::bad:
-			// TODO: bring back middle and lower splitter? Maybe just upper splitter is enough...
-			// This case must not happen
+			// nso_tau_splitter() returns tau_bad_splitter() before ever
+			// calling split_path() with st == bad; this case must not
+			// happen.
 			assert(false);
 	}
 	return fm;

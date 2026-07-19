@@ -10,6 +10,28 @@
 
 namespace idni::tau_lang {
 
+// tau_bdd_node<node>::v (and tau_term_bdd<node>::T/F's underlying leaf) are
+// plain trefs into tree<node>'s hash-cons pool, embedded in tau_term_bdd
+// nodes that live in a *separate* hash-cons pool (bintree<tau_bdd_node<node>>)
+// which is never gc()'d itself -- so once a tau_term_bdd node is built for an
+// atom, it (and its embedded atom tref) is retained forever from tbdd's own
+// point of view. But tree<node>::gc() has no visibility into that retention:
+// if nothing else keeps the atom reachable (e.g. a test calling gc() with an
+// empty keep set between test cases), the atom gets collected while stale
+// tau_term_bdd nodes keep dereferencing it, reading freed/reused memory.
+// Anchor every atom that ever becomes a BDD leaf/decision-variable via
+// tau::geth() so tree<node>::gc()'s reachability scan (which treats any live
+// htref as a root) always keeps it around, mirroring how ba_types<node>
+// permanently anchors its registered type trees.
+template <NodeType node>
+static tref protect_bdd_atom(tref v) {
+	using tau = tree<node>;
+	static std::unordered_set<tref> seen;
+	static std::vector<htref> anchors;
+	if (seen.insert(v).second) anchors.push_back(tau::geth(v));
+	return v;
+}
+
 /** @internal @copydoc tau_bdd_node::operator==(const tau_bdd_node&) const @endinternal */
 template <NodeType node>
 bool tau_bdd_node<node>::operator==(const tau_bdd_node<node>& other) const {
@@ -62,11 +84,13 @@ bool tau_bdd_ref<node>::operator<(const tau_bdd_ref& other) const {
 
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::T = tau_term_bdd::ref(
-	tau_term_bdd::get(bdd_node(tree<node>::get(tree<node>::bf_t)), nullptr, nullptr), false);
+	tau_term_bdd::get(bdd_node(protect_bdd_atom<node>(
+		tree<node>::get(tree<node>::bf_t))), nullptr, nullptr), false);
 
 template<NodeType node>
 tau_term_bdd<node>::ref tau_term_bdd<node>::F = tau_term_bdd::ref(
-	tau_term_bdd::get(bdd_node(tree<node>::get(tree<node>::bf_t)), nullptr, nullptr), true);
+	tau_term_bdd::get(bdd_node(protect_bdd_atom<node>(
+		tree<node>::get(tree<node>::bf_t))), nullptr, nullptr), true);
 
 #ifdef TAU_CACHE
 template<NodeType node>
@@ -116,6 +140,7 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::add(tref v, ref h, ref l) {
 	DBG(assert(v != nullptr && h.b != nullptr && l.b != nullptr));
 	using tau = tree<node>;
 	if (h == l) return h;
+	protect_bdd_atom<node>(v);
 	auto bn = bdd_node(v);
 	// Invariant for output inverters: v of h >= v of l
 	if (tau::subtree_less(tau_term_bdd::get(h.b).value.v, tau_term_bdd::get(l.b).value.v)) {
@@ -148,9 +173,12 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::add(tref leaf) {
 	if (tl.is(tau::bf_f)) return F;
 	// In case leaf is negated, use inverter
 	if (tl.is(tau::bf_neg)) {
-		const auto bn = bdd_node(tau::trim2(leaf));
+		tref v = tau::trim2(leaf);
+		protect_bdd_atom<node>(v);
+		const auto bn = bdd_node(v);
 		return ref(tau_term_bdd::get(bn, nullptr, nullptr), true);
 	} else {
+		protect_bdd_atom<node>(leaf);
 		const auto bn = bdd_node(leaf);
 		return ref(tau_term_bdd::get(bn, nullptr, nullptr), false);
 	}

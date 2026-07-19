@@ -98,7 +98,7 @@ tref normalize(tref form) {
 			f = eliminate_bv_and_quantifiers<node>(f);
 			// Add quantifier again and save as change
 			if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
-			else changes.emplace(temp, tau::build_wff_F(f));
+			else changes.emplace(temp, tau::build_wff_sometimes(f));
 		}
 		form =  rewriter::replace(form, changes);
 	}

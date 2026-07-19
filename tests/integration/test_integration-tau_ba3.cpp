@@ -3,6 +3,25 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
+namespace {
+// tau_ba<bv, sbf_ba> is a different (smaller) node type than the ambient
+// `node_t`/`tau` that test_tau_helpers.h defines for the rest of the suite
+// (the 6-BA tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb> pack). `tref`s are
+// only valid within the tree pool of the node type they were created in, so
+// formulas fed to tau_ba<bv, sbf_ba> must be built via `small_tau`, not the
+// ambient `tau` (see tests/unit/test_base_ba_dispatcher.cpp).
+using small_node = idni::tau_lang::node<
+	idni::tau_lang::tau_ba<idni::tau_lang::bv, idni::tau_lang::sbf_ba>,
+	idni::tau_lang::bv, idni::tau_lang::sbf_ba>;
+using small_tau = idni::tau_lang::tree<small_node>;
+
+std::optional<rr<small_node>> small_get_nso_rr(const char* sample) {
+	tref spec = small_tau::get(sample);
+	if (spec == nullptr) return {};
+	return idni::tau_lang::get_nso_rr<small_node>(spec);
+}
+} // namespace
+
 TEST_SUITE("cpp operators") {
 
 	TEST_CASE("Ohad's example: ex X ( { ex X ( X = {ex Y (Y = 0).}). } = 0).") {
@@ -42,24 +61,24 @@ TEST_SUITE("allowing unresolved rr's in normalization") {
 TEST_SUITE("tau_ba dispatcher helpers") {
 	TEST_CASE("pack/unpack roundtrip preserves main formula") {
 		using dispatcher = base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>;
-		auto nso = get_nso_rr("x = 0.");
+		auto nso = small_get_nso_rr("x = 0.");
 		REQUIRE(nso.has_value());
 		tref fm = nso->main->get();
 		auto packed = dispatcher::pack_tau_ba(fm);
 		CHECK(std::holds_alternative<tau_ba<bv, sbf_ba>>(packed));
 		tref unpacked = dispatcher::unpack_tau_ba(packed);
 		REQUIRE(unpacked != nullptr);
-		CHECK(tau::get(unpacked) == tau::get(fm));
+		CHECK(small_tau::get(unpacked) == small_tau::get(fm));
 	}
 
 	TEST_CASE("is_closed accepts io-only free variables") {
-		auto nso = get_nso_rr("i1[t] = o1[t].");
+		auto nso = small_get_nso_rr("i1[t] = o1[t].");
 		REQUIRE(nso.has_value());
 		CHECK(is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())));
 	}
 
 	TEST_CASE("is_closed rejects ordinary free variables") {
-		auto nso = get_nso_rr("x = 0.");
+		auto nso = small_get_nso_rr("x = 0.");
 		REQUIRE(nso.has_value());
 		CHECK(!is_tau_closed(tau_ba<bv, sbf_ba>(nso->main->get())));
 	}
