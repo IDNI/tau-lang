@@ -226,6 +226,8 @@ template <NodeType node> tref build_variable(size_t type_id);
 template <NodeType node> tref build_bf_variable(tref var_name_node, size_t type_id);
 /** @brief Build a bf-level variable from @p name. */
 template <NodeType node> tref build_bf_variable(const std::string& name, size_t type_id);
+/** @brief Build an untyped bf-level variable from @p name. */
+template <NodeType node> tref build_bf_variable(const std::string& name);
 /** @brief Build a bf-level variable with auto name. */
 template <NodeType node> tref build_bf_variable(size_t type_id);
 /** @brief Build an input I/O variable. */

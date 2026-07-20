@@ -880,6 +880,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static tref build_bf_variable(size_t type_id);
 	/** @brief Build a bf-level typed variable from @p name. */
 	static tref build_bf_variable(const std::string& name, size_t type_id);
+	/** @brief Build an untyped bf-level variable from @p name. */
+	static tref build_bf_variable(const std::string& name);
 	/** @brief Build an input I/O variable. */
 	static tref build_in_var(tref var_name_node, size_t type_id);
 	/** @brief Build an input I/O variable with explicit offset node. */
