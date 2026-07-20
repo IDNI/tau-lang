@@ -19,6 +19,7 @@ set(TESTS
 	hooks
 	interpreter
 	interpreter_api_extensions
+	io_context
 	pointwise_revision
 	nlang_grammar
 	#pwr_debug
