@@ -56,4 +56,28 @@ TEST_SUITE("algorithm picker") {
 		CHECK((a == Algorithm::A || a == Algorithm::B
 		    || a == Algorithm::C || a == Algorithm::D));
 	}
+
+	TEST_CASE("estimate_size_C saturates K at 31 to avoid 1<<K overflow") {
+		// K > 31 must clamp to the same estimate as K == 31, rather than
+		// overflowing/wrapping the 1ull << K shift.
+		uint64_t s31 = estimate_size_C(5, 31, 100);
+		uint64_t s100 = estimate_size_C(5, 100, 100);
+		uint64_t s1000 = estimate_size_C(5, 1000, 100);
+		CHECK(s100 == s31);
+		CHECK(s1000 == s31);
+	}
+
+	TEST_CASE("tie between B and C estimates: B wins as the first-checked baseline") {
+		// T1=1,T2=3,T3=1,K=1,phi=0: sB = phi + T1*T2*T3*K = 3;
+		// sC = phi + T1*2^K*K + T1*T1 = 2 + 1 = 3. Equal sizes must not
+		// displace the baseline, since pick() only replaces on strict '<'.
+		// has_input_vars=true excludes A/D so only the B-vs-C tie is exercised.
+		auto a = pick(1, 3, 1, 1, 100, 0, true);
+		CHECK(a == Algorithm::B);
+	}
+
+	TEST_CASE("all-zero inputs: every estimate is 0, baseline B wins the tie") {
+		auto a = pick(0, 0, 0, 0, 0, 0);
+		CHECK(a == Algorithm::B);
+	}
 }

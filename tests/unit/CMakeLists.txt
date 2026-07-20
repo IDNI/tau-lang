@@ -63,11 +63,13 @@ set(TESTS
 	cpp_codegen_data_atoms
 	gr1_detect
 	liveness_decomp
+	mealy_extract
 	normal_forms
 	normalizer_uf_arithmetic
 	nso_ba
 	nso_rr
 	omcat_types
+	rr
 	spec_decompose
 	product_ba
 	sbf_ba_splitter
@@ -77,6 +79,7 @@ set(TESTS
 	tau_tree_printers
 	traversal
 	union_find
+	union_find_with_sets
 	bitblasting_predicates
 	var_dict
 	variant_ba
