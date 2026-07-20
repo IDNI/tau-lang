@@ -230,6 +230,217 @@ TEST_SUITE("[SPWR-A: Algorithm D result]") {
 }
 
 
+// ============================================================================
+// SPWR-W: Win formula construction
+// ============================================================================
+
+TEST_SUITE("[SPWR-W: Win formula construction]") {
+
+	TEST_CASE("[SPWR-W-01] build_win_formula: empty winning region returns nullptr") {
+		alg_d::AlgDResult result;
+		result.T1_size = 1;
+		result.synth_game.num_states = 1;
+		result.K = 1;
+
+		std::vector<omcat::QltType3> T3;
+		omcat::QltType3 t3;
+		t3.pos_m = 0;
+		T3.push_back(t3);
+		std::vector<int> type_A = {1};
+
+		tref atom0 = spec("o1[t] = 1.");
+		REQUIRE(atom0 != nullptr);
+		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
+
+		tref result_formula = build_win_formula<node_t>(result, atoms, T3, type_A);
+		CHECK(result_formula == nullptr);
+	}
+
+	TEST_CASE("[SPWR-W-02] build_win0_formula: empty winning region returns nullptr") {
+		alg_d::AlgDResult result;
+		result.T1_size = 1;
+		result.synth_game.num_states = 1;
+		result.synth_game.init = 0;
+		result.K = 1;
+
+		std::vector<omcat::QltType3> T3;
+		omcat::QltType3 t3;
+		t3.pos_m = 0;
+		T3.push_back(t3);
+		std::vector<int> type_A = {1};
+
+		tref atom0 = spec("o1[t] = 1.");
+		REQUIRE(atom0 != nullptr);
+		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
+
+		tref result_formula = build_win0_formula<node_t>(result, atoms, T3, type_A);
+		CHECK(result_formula == nullptr);
+	}
+
+	TEST_CASE("[SPWR-W-03] build_win_formula: single atom, bit set returns the atom itself") {
+		alg_d::AlgDResult result;
+		result.T1_size = 1;
+		result.synth_game.num_states = 1;
+		result.K = 1;
+		result.winning_region = {0};
+
+		std::vector<omcat::QltType3> T3;
+		omcat::QltType3 t3;
+		t3.pos_m = 0;
+		T3.push_back(t3);
+		std::vector<int> type_A = {1};
+
+		tref atom0 = spec("o1[t] = 1.");
+		REQUIRE(atom0 != nullptr);
+		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
+
+		tref result_formula = build_win_formula<node_t>(result, atoms, T3, type_A);
+		REQUIRE(result_formula != nullptr);
+		CHECK(result_formula == atom0);
+	}
+
+	TEST_CASE("[SPWR-W-04] build_win_formula: single atom, bit clear returns negated atom") {
+		alg_d::AlgDResult result;
+		result.T1_size = 1;
+		result.synth_game.num_states = 1;
+		result.K = 1;
+		result.winning_region = {0};
+
+		std::vector<omcat::QltType3> T3;
+		omcat::QltType3 t3;
+		t3.pos_m = 0;
+		T3.push_back(t3);
+		std::vector<int> type_A = {0};
+
+		tref atom0 = spec("o1[t] = 1.");
+		REQUIRE(atom0 != nullptr);
+		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
+
+		tref result_formula = build_win_formula<node_t>(result, atoms, T3, type_A);
+		REQUIRE(result_formula != nullptr);
+		tref expected = build_wff_neg<node_t>(atom0);
+		CHECK(result_formula == expected);
+	}
+
+	TEST_CASE("[SPWR-W-05] build_win_formula: two winning T3 types yield disjunction of both patterns") {
+		alg_d::AlgDResult result;
+		result.T1_size = 2;
+		result.synth_game.num_states = 1;
+		result.K = 1;
+		result.winning_region = {0, 1};
+
+		std::vector<omcat::QltType3> T3;
+		omcat::QltType3 t3_0;
+		t3_0.pos_m = 0;
+		T3.push_back(t3_0);
+		omcat::QltType3 t3_1;
+		t3_1.pos_m = 1;
+		T3.push_back(t3_1);
+		std::vector<int> type_A = {0, 1};
+
+		tref atom0 = spec("o1[t] = 1.");
+		REQUIRE(atom0 != nullptr);
+		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
+
+		tref result_formula = build_win_formula<node_t>(result, atoms, T3, type_A);
+		REQUIRE(result_formula != nullptr);
+		tref expected = build_wff_or<node_t>(build_wff_neg<node_t>(atom0), atom0);
+		CHECK(result_formula == expected);
+	}
+
+	TEST_CASE("[SPWR-W-06] build_win_formula: two atoms, mixed-bit pattern builds correct conjunction") {
+		alg_d::AlgDResult result;
+		result.T1_size = 1;
+		result.synth_game.num_states = 1;
+		result.K = 2;
+		result.winning_region = {0};
+
+		std::vector<omcat::QltType3> T3;
+		omcat::QltType3 t3;
+		t3.pos_m = 0;
+		T3.push_back(t3);
+		std::vector<int> type_A = {2}; // binary 10: bit0 clear, bit1 set
+
+		tref atom0 = spec("o1[t] = 1.");
+		tref atom1 = spec("o2[t] = 1.");
+		REQUIRE(atom0 != nullptr);
+		REQUIRE(atom1 != nullptr);
+		std::vector<std::pair<tref, std::string>> atoms = {
+			{atom0, "d_0"}, {atom1, "d_1"}};
+
+		tref result_formula = build_win_formula<node_t>(result, atoms, T3, type_A);
+		REQUIRE(result_formula != nullptr);
+		tref expected = build_wff_and<node_t>(build_wff_neg<node_t>(atom0), atom1);
+		CHECK(result_formula == expected);
+	}
+
+	TEST_CASE("[SPWR-W-07] build_win_formula: stub states beyond base_n are ignored") {
+		alg_d::AlgDResult result;
+		result.T1_size = 1;
+		result.synth_game.num_states = 1;
+		result.K = 1;
+		result.winning_region = {0, 5};
+
+		std::vector<omcat::QltType3> T3;
+		omcat::QltType3 t3;
+		t3.pos_m = 0;
+		T3.push_back(t3);
+		std::vector<int> type_A = {1};
+
+		tref atom0 = spec("o1[t] = 1.");
+		REQUIRE(atom0 != nullptr);
+		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
+
+		tref with_stub = build_win_formula<node_t>(result, atoms, T3, type_A);
+
+		alg_d::AlgDResult result_no_stub;
+		result_no_stub.T1_size = 1;
+		result_no_stub.synth_game.num_states = 1;
+		result_no_stub.K = 1;
+		result_no_stub.winning_region = {0};
+
+		tref without_stub = build_win_formula<node_t>(result_no_stub, atoms, T3, type_A);
+
+		REQUIRE(with_stub != nullptr);
+		REQUIRE(without_stub != nullptr);
+		CHECK(with_stub == without_stub);
+		CHECK(with_stub == atom0);
+	}
+
+	TEST_CASE("[SPWR-W-08] build_win_formula vs build_win0_formula: all-states vs initial-state-only") {
+		alg_d::AlgDResult result;
+		result.T1_size = 2;
+		result.synth_game.num_states = 2;
+		result.synth_game.init = 0;
+		result.K = 1;
+		result.winning_region = {0, 3};
+
+		std::vector<omcat::QltType3> T3;
+		omcat::QltType3 t3_0;
+		t3_0.pos_m = 0;
+		T3.push_back(t3_0);
+		omcat::QltType3 t3_1;
+		t3_1.pos_m = 1;
+		T3.push_back(t3_1);
+		std::vector<int> type_A = {1, 0};
+
+		tref atom0 = spec("o1[t] = 1.");
+		REQUIRE(atom0 != nullptr);
+		std::vector<std::pair<tref, std::string>> atoms = {{atom0, "d_0"}};
+
+		tref win = build_win_formula<node_t>(result, atoms, T3, type_A);
+		REQUIRE(win != nullptr);
+		tref expected_win = build_wff_or<node_t>(build_wff_neg<node_t>(atom0), atom0);
+		CHECK(win == expected_win);
+
+		tref win0 = build_win0_formula<node_t>(result, atoms, T3, type_A);
+		REQUIRE(win0 != nullptr);
+		CHECK(win0 == atom0);
+	}
+
+}
+
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();
