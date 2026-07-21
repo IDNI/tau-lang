@@ -734,7 +734,24 @@ tref anti_prenex(tref formula) {
 		}
 #endif // TAU_CACHE
 		tref n_elim = syntactic_formula_simplification<node>(n);
-		n_elim = squeeze_absorb<node>(n_elim, tau::trim2(n_elim));
+		// squeeze_absorb refuses to descend into quantifier nodes (its own
+		// traversal stops at is_quantifier), so it must be applied to the
+		// quantifier's body/bound-var pair directly, not to the whole
+		// quantified node -- otherwise the call below is a no-op.
+		tref q_var = tau::trim2(n_elim);
+		tref q_body = tau::get(n_elim)[0].second();
+		tref squeezed_body = squeeze_absorb<node>(q_body, q_var);
+		if (squeezed_body != q_body) {
+			// Finish the reduction squeeze_absorb deliberately leaves
+			// partial (e.g. "xyz & (xy)'" instead of dropping it once
+			// xy = 0 is known) -- scoped to just this body, not the whole
+			// formula, to avoid the blow-ups a formula-wide canonical
+			// reduction causes elsewhere.
+			squeezed_body = bf_reduce_canonical<node>()(squeezed_body);
+			n_elim = is_child<node>(n_elim, tau::wff_all)
+				? tau::build_wff_all(q_var, squeezed_body, false)
+				: tau::build_wff_ex(q_var, squeezed_body, false);
+		}
 		DBG(LOG_TRACE << "After squeeze_absorb_down " << LOG_FM(n) << "\n";)
 		tref res = nullptr;
 		if (is_child<node>(n_elim, tau::wff_all)) {
