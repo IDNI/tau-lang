@@ -1,8 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <chrono>
 #include <string>
+#ifdef __linux__
+#include <malloc.h>
+#endif
 
 #include "ba_types.h"
+#include "tau_bdd.h"
 #include "utility/term.h"
 
 #undef LOG_CHANNEL_NAME
@@ -550,6 +555,7 @@ std::pair<std::optional<assignment<node>>, bool>
 		formula_time_point = time_point;
 	}
 	prune_memory(completed_time_point);
+	maybe_gc();
 	return { global, auto_continue };
 }
 
@@ -600,6 +606,44 @@ void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const 
 	for (auto& [k, _] : inputs)  keep.insert(k);
 	for (auto& [k, _] : outputs) keep.insert(k);
 	output_partition.collect_live_refs(keep);
+}
+
+template <NodeType node>
+void interpreter<node>::maybe_gc() {
+	if constexpr (gc_growth_factor <= 0.0) return;
+	const size_t m_pre = tau::m_size();
+	// Floor: don't sweep until M is non-trivially large. Bounds peak size
+	// for any workload (a sweep fires no later than M = gc_min_size + growth).
+	if (m_pre < gc_min_size) return;
+	// Amortize: don't sweep unless M grew enough since the last sweep.
+	if ((double)m_pre < gc_growth_factor * (double)m_at_last_gc) return;
+
+	const auto t0 = std::chrono::steady_clock::now();
+	std::unordered_set<tref> keep;
+	collect_live_refs(keep);
+	definitions<node>::instance().collect_live_refs(keep);
+	// The Tau-BDD store holds raw Tau trefs (variables) and is not swept
+	// by bintree<node>::gc(), so its references must be pinned.
+	tau_term_bdd<node>::collect_live_refs(keep);
+	// ba_constants::T, ba_types::type_trees(), ubt_ctn, original_spec and
+	// the io_context maps hold htrefs — gc() preserves their nodes via M's
+	// non-expired weak_ptr entries, no explicit walk needed. Caches made
+	// with tree<node>::create_cache<>() are filtered by gc_callbacks.
+	bintree<node>::gc(keep);
+
+	const size_t m_post = tau::m_size();
+#ifdef __linux__
+	// Return free heap pages to the OS so RSS reflects live allocation
+	// rather than allocator fragmentation. Cheap (microseconds).
+	malloc_trim(0);
+#endif
+	const auto dt_us = std::chrono::duration_cast<std::chrono::microseconds>(
+		std::chrono::steady_clock::now() - t0).count();
+	m_at_last_gc = m_post;
+	LOG_DEBUG << TC.YELLOW() << "interpreter::gc" << TC.CLEAR()
+		<< " M=" << m_pre << "->" << m_post
+		<< " keep=" << keep.size() << " " << dt_us << "us"
+		<< " step=" << time_point;
 }
 
 template <NodeType node>

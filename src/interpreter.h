@@ -113,6 +113,17 @@ private:
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
 
+	/// Adaptive tree-node gc trigger: a sweep fires when bintree<node>::M()
+	/// has both crossed the gc_min_size floor AND grown by at least
+	/// gc_growth_factor since the last sweep. Set gc_growth_factor <= 0 to
+	/// disable. Self-tunes across workloads — fast-growing M triggers
+	/// frequent sweeps at small peak; slow-growing M sweeps rarely.
+	static constexpr size_t gc_min_size      = 256;
+	static constexpr double gc_growth_factor = 1.5;
+	size_t m_at_last_gc = 0;
+	/// @brief Run bintree<node>::gc(keep) if the trigger condition is met.
+	void maybe_gc();
+
 	/// @brief Partition @p spec by output stream representatives.
 	static std::vector<std::pair<htref, htref>>
 	create_spec_partition(tref spec, auto& output_partition);
