@@ -53,6 +53,9 @@
 #include "boolean_algebras/tau_ba.h"
 #include "api.h"
 #include "utility/repl.h"
+#ifdef TAU_PARSER_HAS_FTXUI
+#include "utility/repl_ftxui.h"
+#endif
 
 namespace idni::tau_lang {
 
@@ -72,6 +75,9 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 struct repl_evaluator {
 	friend struct repl<repl_evaluator<BAs...>>;
+#ifdef TAU_PARSER_HAS_FTXUI
+	friend struct repl_ftxui<repl_evaluator<BAs...>>;
+#endif
 	using history = htref;
 	using history_ref = std::optional<std::pair<history, size_t>>;
 
@@ -113,8 +119,8 @@ struct repl_evaluator {
 	 * @return Exit code (0 = success, non-zero = error/quit).
 	 */
 	int eval(const std::string& src);
-	/** @brief Return the prompt string to display before each input line. */
-	std::string prompt();
+	/** @brief Rebuild the prompt string and push it to the active REPL frontend. */
+	void reprompt();
 
 private:
 	// commands
@@ -252,6 +258,9 @@ private:
 	trefs io_defs;
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
+#ifdef TAU_PARSER_HAS_FTXUI
+	repl_ftxui<repl_evaluator<BAs...>>* r_ftx = nullptr;
+#endif
 	bool error = false;
 	term::colors TC{};
 };

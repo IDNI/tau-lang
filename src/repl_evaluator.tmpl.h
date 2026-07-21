@@ -871,7 +871,12 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	tref result = 0;
 	switch (command_type) {
 	case tau::quit_cmd:           return std::cout << "Quit.\n", 1;
-	case tau::clear_cmd:          if (r) r->clear(); break;
+	case tau::clear_cmd:
+		if (r) r->clear();
+#ifdef TAU_PARSER_HAS_FTXUI
+		else if (r_ftx) r_ftx->clear();
+#endif
+		break;
 	case tau::help_cmd:           help_cmd(command); break;
 	case tau::version_cmd:        version_cmd(); break;
 	case tau::get_cmd:            get_cmd(command); break;
@@ -949,7 +954,7 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::string repl_evaluator<BAs...>::prompt() {
+void repl_evaluator<BAs...>::reprompt() {
 	std::stringstream ss;
 	if (opt.status) {
 		std::stringstream status;
@@ -962,7 +967,9 @@ std::string repl_evaluator<BAs...>::prompt() {
 	}
 	ss << (error ? TC_ERROR : TC_PROMPT) << "tau>" << TC.CLEAR() << " ";
 	if (r) r->set_prompt(ss.str());
-	return ss.str();
+#ifdef TAU_PARSER_HAS_FTXUI
+	if (r_ftx) r_ftx->set_prompt(ss.str());
+#endif
 }
 
 template <typename... BAs>
@@ -978,7 +985,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 	} else if (!error) return 2;
 	std::cout << "\n", std::cout.flush();
 	if (error && opt.error_quits) return quit = 1;
-	if (quit == 0) prompt();
+	if (quit == 0) reprompt();
 	return quit;
 }
 

@@ -55,6 +55,8 @@ cli::options tau_options() {
 	// REPL specific options
 	opts["evaluate"] = cli::option("evaluate", 'e', "")
 		.set_description("REPL command to evaluate");
+	opts["legacy-repl"] = cli::option("legacy-repl", 'X', false)
+		.set_description("use legacy terminal REPL instead of FTXUI");
 	opts["status"] = cli::option("status", 's', true)
 		.set_description("display status");
 	opts["color"] = cli::option("color", 'c', true)
@@ -202,9 +204,16 @@ int main(int argc, char** argv) {
 		return re.eval(e);
 	}
 	DBG(TAU_LOG_TRACE << "running REPL";)
-	repl<decltype(re)> r(re, "tau> ", ".tau_history");
 	welcome();
-	re.prompt();
+#ifdef TAU_PARSER_HAS_FTXUI
+	if (!opts["legacy-repl"].get<bool>()) {
+		repl_ftxui<decltype(re)> rftx(re, "tau> ", ".tau_history");
+		re.reprompt();
+		return rftx.run();
+	}
+#endif
+	repl<decltype(re)> r(re, "tau> ", ".tau_history");
+	re.reprompt();
 	return r.run();
 
 }
