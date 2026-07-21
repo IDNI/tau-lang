@@ -215,6 +215,11 @@ htref tree<node>::geth(tref h) {
 }
 
 template <NodeType node>
+size_t tree<node>::m_size() {
+	return bintree<node>::M().size();
+}
+
+template <NodeType node>
 htref tree<node>::geth(const tree& n) {
 	return geth(n.get());
 }

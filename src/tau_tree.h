@@ -261,6 +261,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static htref geth(tref id);
 	/** @brief Return a handle ref for @p n. */
 	static htref geth(const tree& n);
+	/** @brief Number of interned tree nodes (size of `bintree<node>::M()`). */
+	static size_t m_size();
 
 	/** @brief Transform parse tree @p t to a `tref` using @p options. */
 	static tref get(const tau_parser::tree& t, get_options& options);
