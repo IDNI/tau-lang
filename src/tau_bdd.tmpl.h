@@ -825,6 +825,13 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::abs(ref x) {
 	return x.inv = false, x;
 }
 
+/** @internal @copydoc tau_term_bdd::collect_live_refs(std::unordered_set<tref>&) @endinternal */
+template<NodeType node>
+void tau_term_bdd<node>::collect_live_refs(std::unordered_set<tref>& keep) {
+	for (const auto& [bn, _] : bintree<tau_bdd_node<node>>::M())
+		if (bn.value.v) keep.insert(bn.value.v);
+}
+
 template<NodeType node>
 tau_term_bdd_handle<node>::universe_t& tau_term_bdd_handle<node>::U =
 	bintree<node>::template create_cache<universe_t>();

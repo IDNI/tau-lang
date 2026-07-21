@@ -97,6 +97,19 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	enum Quantifier {ex, all}; ///< @brief Quantifier kinds for `bdd_quant`.
 	static ref T, F; ///< @brief Canonical true and false references.
 
+	/**
+	 * @brief Insert every Tau tree reference held by the BDD universe
+	 * into @p keep.
+	 *
+	 * Each interned `tau_bdd_node` stores its variable as a raw Tau
+	 * `tref` (`v`), and this BDD store is never swept by
+	 * `bintree<node>::gc()` — so those variables (and, transitively,
+	 * their subtrees, e.g. the cached free-vars vectors) must be pinned
+	 * whenever the Tau tree is collected.
+	 * @param keep Set of Tau tree nodes to preserve across gc.
+	 */
+	static void collect_live_refs(std::unordered_set<tref>& keep);
+
 	using quants  = std::vector<std::pair<tref, Quantifier>>; ///< @brief Quantifier list.
 	using subs_t  = std::vector<std::pair<tref, ref>>;        ///< @brief Substitution list.
 
