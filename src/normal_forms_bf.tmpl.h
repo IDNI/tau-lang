@@ -830,18 +830,41 @@ tref squeeze(tref eq1, tref eq2) {
 	return nullptr;
 }
 
+/**
+ * @brief Comparison keys used by the no-var squeeze_absorb overload to
+ * decide which "= 0"/"!= 0" conjuncts/disjuncts are related to one another.
+ *
+ * squeeze_absorb groups clauses by shared free variables via
+ * get_free_vars(). Purely self-referential/uninterpreted atoms built from
+ * constant arguments (e.g. `f(0,0)`) contain no plain variable leaves, so
+ * get_free_vars() returns empty for them and squeeze_absorb would otherwise
+ * be unable to relate such atoms to one another at all -- even when they
+ * are the exact same reference. Fall back to the atom's own top-level
+ * bf_ref occurrences as comparison keys in that case.
+ */
+template <NodeType node>
+trefs get_free_vars_or_refs(tref n) {
+	using tau = tree<node>;
+	const trefs& fv = get_free_vars<node>(n);
+	if (!fv.empty()) return fv;
+	subtree_set<node> refs;
+	for (tref r : tau::get(n).select_top(is<node, tau::bf_ref>))
+		refs.insert(r);
+	return trefs(refs.begin(), refs.end());
+}
+
 template <NodeType node>
 tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool dual = false) {
 	using tau = tree<node>;
 	DBG(assert(tau::get(eq)[0][1].equals_0());)
-	const trefs& fv = get_free_vars<node>(eq);
+	const trefs fv = get_free_vars_or_refs<node>(eq);
 	DBG(assert(tau::get(eq).child_is(tau::bf_eq) ||
 		tau::get(eq).child_is(tau::bf_neq));)
 	const bool is_eq_pos = tau::get(eq).child_is(tau::bf_eq);
 	bool joined = false;
 	for (tref assm : assms.back()) {
 		// Check for overlap between current assumption and eq
-		const trefs& fv_a = get_free_vars<node>(assm);
+		const trefs fv_a = get_free_vars_or_refs<node>(assm);
 		if (const int_t count = get_ordered_overlap<node>(fv, fv_a); count > 1 ||
 			(count == 1 && fv.size() == 1)) {
 			// Apply assumption
@@ -884,13 +907,13 @@ template <NodeType node>
 tref apply_assms(tref eq, const auto& assms, bool dual = false) {
 	using tau = tree<node>;
 	DBG(assert(tau::get(eq)[0][1].equals_0());)
-	const trefs& fv = get_free_vars<node>(eq);
+	const trefs fv = get_free_vars_or_refs<node>(eq);
 	DBG(assert(tau::get(eq).child_is(tau::bf_eq) ||
 		tau::get(eq).child_is(tau::bf_neq));)
 	const bool is_eq_pos = tau::get(eq).child_is(tau::bf_eq);
 	for (tref assm : assms.back()) {
 		// Check for overlap between current assumption and eq
-		const trefs& fv_a = get_free_vars<node>(assm);
+		const trefs fv_a = get_free_vars_or_refs<node>(assm);
 		if (const int_t count = get_ordered_overlap<node>(fv, fv_a); count > 1 ||
 			(count == 1 && fv.size() == 1)) {
 			// Apply assumption
@@ -1056,7 +1079,7 @@ tref squeeze_absorb(tref formula) {
 					// Only treat = 0 equations
 					if (!conj_t[0][1].equals_0()) continue;
 					// merge variables of = 0 equations
-					const trefs& fv = get_free_vars<node>(conj);
+					const trefs fv = get_free_vars_or_refs<node>(conj);
 					for (tref v : fv) uf.merge(fv[0], v);
 					std::swap(conj, conjs[eq_idx++]);
 				}
@@ -1080,11 +1103,11 @@ tref squeeze_absorb(tref formula) {
 			}
 			for (size_t i = 0; i+1 < pos_eq_idx; ++i) {
 				// Get free variables at i
-				const trefs& fv1 = get_free_vars<node>(conjs[i]);
+				const trefs fv1 = get_free_vars_or_refs<node>(conjs[i]);
 				if (fv1.empty()) continue;
 				for (size_t j = i+1; j < pos_eq_idx; ++j) {
 					// Get free variables at i + 1
-					const trefs& fv2 = get_free_vars<node>(conjs[j]);
+					const trefs fv2 = get_free_vars_or_refs<node>(conjs[j]);
 					if (fv2.empty()) continue;
 					// Squeeze overlapping terms
 					if (uf.connected(fv1[0], fv2[0])) {
@@ -1132,7 +1155,7 @@ tref squeeze_absorb(tref formula) {
 					// Only treat != 0 equations
 					if (!disj_t[0][1].equals_0()) continue;
 					// merge variables of != 0 equations
-					const trefs& fv = get_free_vars<node>(disj);
+					const trefs fv = get_free_vars_or_refs<node>(disj);
 					for (tref v : fv) uf.merge(fv[0], v);
 					std::swap(disj, disjs[eq_idx++]);
 				}
@@ -1156,11 +1179,11 @@ tref squeeze_absorb(tref formula) {
 			}
 			for (size_t i = 0; i+1 < neg_eq_idx; ++i) {
 				// Get free variables at i
-				const trefs& fv1 = get_free_vars<node>(disjs[i]);
+				const trefs fv1 = get_free_vars_or_refs<node>(disjs[i]);
 				if (fv1.empty()) continue;
 				for (size_t j = i+1; j < neg_eq_idx; ++j) {
 					// Get free variables at i + 1
-					const trefs& fv2 = get_free_vars<node>(disjs[j]);
+					const trefs fv2 = get_free_vars_or_refs<node>(disjs[j]);
 					if (fv2.empty()) continue;
 					// Squeeze overlapping terms
 					if (uf.connected(fv1[0], fv2[0])) {
