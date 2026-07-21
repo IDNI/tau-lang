@@ -213,7 +213,9 @@ bool interpreter<node>::rebuild_inputs(
 			inputs.emplace(var, std::move(it->second->rebuild()));
 		} else {
 			if (stream_id == 0) inputs.emplace(var,
-				std::make_shared<console_prompt_input_stream>(vn));
+				ctx.console_input_factory
+					? ctx.console_input_factory(vn)
+					: std::make_shared<console_prompt_input_stream>(vn));
 			else inputs.emplace(var,
 				std::make_shared<file_input_stream>(dict(stream_id)));
 		}
@@ -385,7 +387,7 @@ std::pair<std::optional<assignment<node>>, bool>
 	// Compute systems for the current step
 	if (!calculate_initial_spec()) return {};
 	if (announced_step_ != (int_t)time_point) { // announce only once
-	LOG_INFO << "Execution step: " << time_point << "\n";
+		LOG_INFO << "Execution step: " << time_point << "\n";
 		announced_step_ = (int_t)time_point;
 	}
 	// Get inputs for this step

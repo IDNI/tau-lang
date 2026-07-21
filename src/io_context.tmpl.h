@@ -83,6 +83,39 @@ inline std::optional<std::string> console_prompt_input_stream::get(size_t time_p
 	return this->get();
 }
 
+// -- repl_pending_input_stream --
+
+inline std::shared_ptr<serialized_constant_input_stream>
+	repl_pending_input_stream::rebuild()
+{
+	return std::make_shared<repl_pending_input_stream>();
+}
+
+inline void repl_pending_input_stream::set(const std::string& value) {
+	pending_value = value;
+	awaiting_ = false;
+}
+
+inline std::optional<std::string> repl_pending_input_stream::get() {
+	return get(0);
+}
+
+inline std::optional<std::string> repl_pending_input_stream::get(
+	size_t time_point)
+{
+	if (pending_value) {
+		std::string value = std::move(*pending_value);
+		pending_value.reset();
+		awaiting_ = false;
+		return value;
+	}
+	// no value yet: flag it and return "" so read() stops the step cleanly
+	// (the REPL scans for the awaiting stream and prompts for a value)
+	awaiting_ = true;
+	awaiting_time_point_ = time_point;
+	return std::string{};
+}
+
 // -- console_prompt_output_stream --
 
 inline console_prompt_output_stream::console_prompt_output_stream(
