@@ -173,8 +173,8 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 					if (!ap.empty() && ap.front() == '"') ap = ap.substr(1, ap.size()-2);
 					g.aps[i] = ap;
 				}
-			} else if (line.substr(0,17) == "controllable-AP:") {
-				auto idxs = parse_int_list(line.substr(17));
+			} else if (line.substr(0,16) == "controllable-AP:") {
+				auto idxs = parse_int_list(line.substr(16));
 				for (int i : idxs) if (i < (int)g.controllable.size()) g.controllable[i] = true;
 			} else if (line.substr(0,17) == "spot-state-player") {
 				// "spot-state-player: 0 1 0 1 ..."

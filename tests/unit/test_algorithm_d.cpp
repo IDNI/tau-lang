@@ -107,6 +107,195 @@ TEST_SUITE("[Algorithm D: guard evaluator]") {
 	}
 }
 
+// ── Phase 1: HOA game parser ──────────────────────────────────────────────
+
+TEST_SUITE("[Algorithm D: HOA game parser]") {
+
+	TEST_CASE("[ALG-D-32] full basic parse: states, aps, controllable, player, "
+	          "trans, all-acceptance priorities") {
+		std::string hoa = R"(HOA: v1
+States: 2
+Start: 0
+AP: 2 "p0" "d_0"
+controllable-AP: 1
+spot-state-player: 0 1
+acc-name: all
+tool: ltlsynt
+--BODY--
+State: 0
+[0] 1
+[!0] 0
+State: 1
+[t] 1
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		CHECK(g.num_states == 2);
+		CHECK(g.init == 0);
+		REQUIRE(g.aps.size() == 2u);
+		CHECK(g.aps[0] == "p0");
+		CHECK(g.aps[1] == "d_0");
+		REQUIRE(g.controllable.size() == 2u);
+		CHECK_FALSE(g.controllable[0]);
+		CHECK(g.controllable[1]);
+		REQUIRE(g.player.size() == 2u);
+		CHECK(g.player[0] == 0);
+		CHECK(g.player[1] == 1);
+		REQUIRE(g.trans.size() == 2u);
+		REQUIRE(g.trans[0].size() == 2u);
+		CHECK(std::get<0>(g.trans[0][0]) == "0");
+		CHECK(std::get<1>(g.trans[0][0]) == 1);
+		CHECK(std::get<0>(g.trans[0][1]) == "!0");
+		CHECK(std::get<1>(g.trans[0][1]) == 0);
+		REQUIRE(g.trans[1].size() == 1u);
+		CHECK(std::get<0>(g.trans[1][0]) == "t");
+		CHECK(std::get<1>(g.trans[1][0]) == 1);
+		REQUIRE(g.state_priority.size() == 2u);
+		CHECK(g.state_priority[0] == 1);
+		CHECK(g.state_priority[1] == 1);
+		REQUIRE(g.edge_priority.size() == 2u);
+		REQUIRE(g.edge_priority[0].size() == 2u);
+		CHECK(g.edge_priority[0][0] == -1);
+		CHECK(g.edge_priority[0][1] == -1);
+	}
+
+	TEST_CASE("[ALG-D-33] Buchi acceptance: colored state and edge get priority 1") {
+		std::string hoa = R"(HOA: v1
+States: 1
+Start: 0
+AP: 1 "p0"
+acc-name: Buchi 1 Inf(0)
+Acceptance: 1 Inf(0)
+--BODY--
+State: 0 {0}
+[t] 0 {0}
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.state_priority.size() == 1u);
+		CHECK(g.state_priority[0] == 1);
+		REQUIRE(g.edge_priority.size() == 1u);
+		REQUIRE(g.edge_priority[0].size() == 1u);
+		CHECK(g.edge_priority[0][0] == 1);
+	}
+
+	TEST_CASE("[ALG-D-34] co-Buchi acceptance: colored state and edge get priority 0") {
+		std::string hoa = R"(HOA: v1
+States: 1
+Start: 0
+AP: 1 "p0"
+acc-name: co-Buchi 1 Fin(0)
+Acceptance: 1 Fin(0)
+--BODY--
+State: 0 {0}
+[t] 0 {0}
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.state_priority.size() == 1u);
+		CHECK(g.state_priority[0] == 0);
+		REQUIRE(g.edge_priority.size() == 1u);
+		REQUIRE(g.edge_priority[0].size() == 1u);
+		CHECK(g.edge_priority[0][0] == 0);
+	}
+
+	TEST_CASE("[ALG-D-35] general/parity acceptance: priority equals color directly") {
+		std::string hoa = R"(HOA: v1
+States: 2
+Start: 0
+AP: 1 "p0"
+acc-name: parity min even 3
+Acceptance: 3 Inf(0)
+--BODY--
+State: 0 {2}
+State: 1
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.state_priority.size() == 2u);
+		CHECK(g.state_priority[0] == 2);
+		CHECK(g.state_priority[1] == 0);
+	}
+
+	TEST_CASE("[ALG-D-36] controllable-AP with multiple indices") {
+		std::string hoa = R"(HOA: v1
+States: 1
+Start: 0
+AP: 3 "a" "b" "c"
+controllable-AP: 0 2
+--BODY--
+State: 0
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.controllable.size() == 3u);
+		CHECK(g.controllable[0]);
+		CHECK_FALSE(g.controllable[1]);
+		CHECK(g.controllable[2]);
+	}
+
+	TEST_CASE("[ALG-D-37] trans-acc detection") {
+		std::string hoa_trans = R"(HOA: v1
+States: 1
+Start: 0
+AP: 1 "p0"
+properties: trans-acc
+--BODY--
+State: 0
+--END--
+)";
+		alg_d::SynthGame g1 = alg_d::parse_synth_game_hoa(hoa_trans);
+		CHECK(g1.trans_acc);
+
+		std::string hoa_no_trans = R"(HOA: v1
+States: 1
+Start: 0
+AP: 1 "p0"
+--BODY--
+State: 0
+--END--
+)";
+		alg_d::SynthGame g2 = alg_d::parse_synth_game_hoa(hoa_no_trans);
+		CHECK_FALSE(g2.trans_acc);
+	}
+
+	TEST_CASE("[ALG-D-38] quoted AP names have surrounding quotes stripped") {
+		std::string hoa = R"(HOA: v1
+States: 1
+Start: 0
+AP: 1 "my_ap"
+--BODY--
+State: 0
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.aps.size() == 1u);
+		CHECK(g.aps[0] == "my_ap");
+	}
+
+	TEST_CASE("[ALG-D-39] stray non-transition body line is skipped without "
+	          "corrupting transition order") {
+		std::string hoa = R"(HOA: v1
+States: 2
+Start: 0
+AP: 1 "p0"
+--BODY--
+State: 0
+[0] 1
+not a transition line
+[1] 0
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.trans.size() == 2u);
+		REQUIRE(g.trans[0].size() == 2u);
+		CHECK(std::get<0>(g.trans[0][0]) == "0");
+		CHECK(std::get<1>(g.trans[0][0]) == 1);
+		CHECK(std::get<0>(g.trans[0][1]) == "1");
+		CHECK(std::get<1>(g.trans[0][1]) == 0);
+	}
+}
+
 // ── Phase 2: DPA extraction regression ───────────────────────────────────
 
 TEST_SUITE("[Algorithm D Phase 1: DPA extraction]") {
