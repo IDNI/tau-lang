@@ -167,6 +167,13 @@ struct simplify_using_equality_cached_consequences {
 	tref rhs_and_lhs_neg = nullptr;
 	tref lhs_or_rhs_neg = nullptr;
 	tref rhs_or_lhs_neg = nullptr;
+	// helper for gc_expand_callbacks
+	template <typename F>
+	void for_each_tref(F&& f) const {
+		f(lhs_neg); f(rhs_neg);
+		f(lhs_and_rhs_neg); f(rhs_and_lhs_neg);
+		f(lhs_or_rhs_neg); f(rhs_or_lhs_neg);
+	}
 };
 
 /**
@@ -203,7 +210,9 @@ bool simplify_using_equality_add_raw_equality(auto& uf, tref eq) {
 	tref lhs = tau::trim2(eq);
 	tref rhs = tau::get(tau::trim(eq)).child(1);
 	size_t type_id = find_ba_type<node>(eq);
-	static std::map<std::pair<tref, tref>, simplify_using_equality_cached_consequences> cache;
+	static auto& cache = tau::template create_cache<std::map<
+		std::pair<tref, tref>,
+		simplify_using_equality_cached_consequences>>();
 	auto key = std::make_pair(lhs, rhs);
 	auto it = cache.find(key);
 	if (it == cache.end()) {
