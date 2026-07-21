@@ -100,6 +100,7 @@ private:
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
+	int_t announced_step_ = -1;
 
 	/// @brief Partition @p spec by output stream representatives.
 	static std::vector<std::pair<tref, tref>>

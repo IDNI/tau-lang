@@ -384,7 +384,10 @@ std::pair<std::optional<assignment<node>>, bool>
 {
 	// Compute systems for the current step
 	if (!calculate_initial_spec()) return {};
+	if (announced_step_ != (int_t)time_point) { // announce only once
 	LOG_INFO << "Execution step: " << time_point << "\n";
+		announced_step_ = (int_t)time_point;
+	}
 	// Get inputs for this step
 	auto [step_inputs, _] = build_inputs_for_step(time_point);
 	step_inputs = appear_within_lookback(step_inputs);
