@@ -3498,6 +3498,20 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
 	using tau = tree<node>;
 	if (!is_child_quantifier<node>(n)) return n;
 
+	// Any BV-typed node anywhere in the formula falls back to anti_prenex.
+	// Narrowing this check to BV-typed block variables only (ac4aac43)
+	// routes tau-quantified blocks with adjacent BV atoms -- e.g. temporal
+	// step formulas mixing tau streams with bv verdict/opcode streams --
+	// into the Boole decomposition, which does not terminate in practical
+	// time on the interpreter (run) path.
+	{
+		auto is_bv_node = [](tref m) {
+			return is_bv_type_family<node>(tau::get(m).get_ba_type());
+		};
+		if (tau::get(n).find_top(is_bv_node))
+			return anti_prenex<node>(n);
+	}
+
 	// Collect the maximal same-type block at the top.
 	trefs block_vars;
 	const bool is_ex = is_child<node>(n, tau::wff_ex);
