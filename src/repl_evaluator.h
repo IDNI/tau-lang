@@ -92,7 +92,7 @@ struct repl_evaluator {
 		bool error_quits         = false; ///< Exit on error.
 		bool charvar             = true;  ///< Use character-variable notation.
 		bool blasting            = true;  ///< Enable bitvector predicate blasting.
-		bool repl_running 	 = true;  ///< Whether the REPL loop is active.
+		bool repl_running 	 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
 #ifdef DEBUG
 		bool debug_repl          = true;

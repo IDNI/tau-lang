@@ -285,7 +285,8 @@ TEST_SUITE("qlt_execution") {
 	// search across step_spec conjuncts in the interpreter's core stepping loop,
 	// which every one of the 415 tests exercises.
 	//
-	// Fails in DEBUG
+	// TODO (HIGH) fix in DEBUG build, then re-enable QE-03/09/15 in unit tests.
+	// For now, skip them in DEBUG.
 	//
 	#ifndef DEBUG
 	TEST_CASE("QE-03: F(o1={1/3}:qlt) outputs 1/3 at least once") {
