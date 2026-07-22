@@ -68,6 +68,7 @@ option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
 option(TAU_USE_CCACHE              "Use ccache when building"              ON)
+option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
 # Load local cmake settings
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
@@ -122,6 +123,7 @@ set_property(CACHE TAU_MACOS_PACKAGE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_DONT_USE_FTXUI          PROPERTY STRINGS "OFF" "ON")
 
 if(TAU_BUILD_TESTS)
 	set(TAU_BUILD_UNIT_TESTS ON)
@@ -254,6 +256,7 @@ message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
+message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
 
 message(STATUS "CMAKE_CXX_COMPILER_LAUNCHER: ${CMAKE_CXX_COMPILER_LAUNCHER}")
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
@@ -389,6 +392,7 @@ endif()
 message("Building parser")
 set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
 set(TAU_PARSER_BUILD_PIC ${TAU_BUILD_PIC} CACHE BOOL "Build position independent code" FORCE)
+set(TAU_PARSER_DONT_USE_FTXUI ${TAU_DONT_USE_FTXUI} CACHE BOOL "Disable FTXUI" FORCE)
 add_subdirectory(external/parser)
 
 #

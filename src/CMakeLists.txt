@@ -150,6 +150,9 @@ endif()
 #
 # executable
 #
+
+include(ftxui)
+
 if(TAU_BUILD_EXECUTABLE)
 	add_executable(${TAU_EXECUTABLE_NAME})
 	target_sources(${TAU_EXECUTABLE_NAME} PRIVATE ${CLI_SOURCES})
@@ -163,6 +166,14 @@ if(TAU_BUILD_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
 	add_dependencies(${TAU_EXECUTABLE_NAME} tau_header)
+	if(TAU_PARSER_HAS_FTXUI_DEP)
+		target_link_libraries(${TAU_EXECUTABLE_NAME}
+			ftxui::screen ftxui::dom ftxui::component)
+		target_compile_definitions(${TAU_EXECUTABLE_NAME} PRIVATE TAU_PARSER_HAS_FTXUI)
+		message(STATUS "tau: FTXUI REPL enabled (legacy via -X)")
+	elseif(NOT TAU_DONT_USE_FTXUI)
+		message(WARNING "tau: FTXUI not available — legacy terminal REPL will be used")
+	endif()
 endif(TAU_BUILD_EXECUTABLE)
 
 #
@@ -181,6 +192,11 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
 	add_dependencies(${TAU_BUILD_SHARED_EXECUTABLE} tau_header)
+	if(TAU_PARSER_HAS_FTXUI_DEP)
+		target_link_libraries(${TAU_EXE_SHARED_NAME}
+			ftxui::screen ftxui::dom ftxui::component)
+		target_compile_definitions(${TAU_EXE_SHARED_NAME} PRIVATE TAU_PARSER_HAS_FTXUI)
+	endif()
 endif(TAU_BUILD_SHARED_EXECUTABLE)
 
 #

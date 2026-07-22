@@ -397,12 +397,9 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
 	DBG(TAU_LOG_TRACE << "run_cmd: " << TAU_LOG_FM(n.value());)
 	measuring m("run");
-	idni::measures::timer t;
 
 	tref value = get_any(n[1].get());
 	if (!value) return;
-
-	t.start();
 
 	DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
 	value = tau_api::simplify(m.part(), value);
@@ -410,27 +407,119 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
 	auto maybe_i = tau_api::get_interpreter(m.part(), value);
 	if (!maybe_i) return;
-	auto& i = maybe_i.value();
-	while (true) {
-		auto maybe_outputs = tau_api::step(m.part(), i);
-		if (!maybe_outputs) {
-			TAU_LOG_INFO << "No input provided."
-				<< " q or quit to terminate."
-				<< " Press ENTER to continue.";
-			std::string line;
-			term::enable_getline_mode();
-			t.pause();
-			std::getline(std::cin, line);
-			t.unpause();
-			term::disable_getline_mode();
-			if (std::cin.eof() || std::cin.fail()) {
-				std::cin.clear(); break;
-			}
-			if (line == "q" || line == "quit") break;
-		}
-	}
-	benchmarks(m, t);
+
+	running = std::make_unique<run_session>(std::move(maybe_i.value()));
+	running->t.start();
+	continue_running();
 }
+
+// Drives a `run` session's step loop, suspending via `pending` (instead of
+// blocking) when it needs input; the next eval() call resumes it.
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::continue_running(
+	std::optional<pending_request> retry)
+{
+	bool first = true;
+	while (running) {
+		auto& step_m = running->m.part();
+		auto maybe_outputs = tau_api::step(step_m, running->interp);
+		// copy this step's timing before dropping the node (step_m is a
+		// reference into m.parts that pop_back() invalidates)
+		measuring step_m_copy = step_m;
+		running->m.parts.pop_back();
+
+		if (!maybe_outputs) {
+			running->t.pause();
+			// a console input stream stopped the step needing a value:
+			// find it and prompt for that value (label/type are ours)
+			for (auto& [var, stream] : running->interp.inputs) {
+				auto rp = std::dynamic_pointer_cast<
+					repl_pending_input_stream>(stream);
+				if (!rp || !rp->awaiting()) continue;
+				size_t tp = rp->awaiting_time_point();
+				size_t tid = running->interp.ctx.type_of(var);
+				std::string type_name = get_ba_type_name<node>(tid);
+				if (!type_name.empty() && type_name.front() == ':')
+					type_name.erase(0, 1);
+				std::stringstream lbl;
+				lbl << get_var_name<node>(var) << "[" << tp << "] : "
+					<< type_name << " := ";
+				pending = { pending_request::stream_value, lbl.str(),
+					rp, tp, get_ba_type_tree<node>(tid) };
+				reprompt();
+				return; // suspend: wait for the answer
+			}
+			// no awaiting stream -> rejected value (re-ask) or end of run
+			if (first && retry) pending = *retry;
+			else pending = { pending_request::continue_or_quit,
+				"continue? [Enter]/[q]: ", nullptr };
+			reprompt();
+			return; // suspend: wait for the answer
+		}
+		// this step produced output: print its timing right after (to
+		// cout, so it stays in order and belongs to the step it measures,
+		// before the next "Execution step"), then a blank line
+		if (opt.print_benchmarks) step_m_copy(std::cout, 1);
+		std::cout << "\n";
+		first = false;
+	}
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::finish_running() {
+	if (running) benchmarks(running->m, running->t);
+	running.reset();
+	pending.reset();
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+bool repl_evaluator<BAs...>::stream_value_incomplete(
+	const std::string& src, tref type_tree) const
+{
+	auto is_unexpected_end = [](const std::string& msg) {
+		return msg.find("Unexpected end of file") != std::string::npos;
+	};
+	if (is_sbf_type<node>(type_tree)) {
+		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
+		return !result.found && is_unexpected_end(result.parse_error
+			.to_str(sbf_parser::error::info_lvl::INFO_BASIC));
+	}
+	if (is_bv_type_family<node>(type_tree)) {
+		auto result = bitvector_parser::instance()
+						.parse(src.c_str(), src.size());
+		return !result.found && is_unexpected_end(result.parse_error
+			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC));
+	}
+	// tau_spec::parse() returns true on EOF-incomplete input, flags is_eof()
+	tau_spec<node> s;
+	s.parse(src);
+	return s.is_eof();
+}
+
+#ifdef TAU_PARSER_HAS_FTXUI
+template <typename... BAs>
+requires BAsPack<BAs...>
+repl_key_action repl_evaluator<BAs...>::on_repl_key(const std::string& key) {
+	// only claim keys while a `run` session is awaiting input
+	if (!pending) return {};
+	if (pending->kind == pending_request::continue_or_quit) {
+		// single-key gate: Enter continues, q (or Ctrl-C) quits
+		if (key == "enter") return { repl_key_action::submit, "" };
+		if (key == "q" || key == "ctrl-c")
+			return { repl_key_action::submit, "q" };
+		return { repl_key_action::consume, {} }; // ignore other keys
+	}
+	// stream value: type normally, but Ctrl-C aborts the whole run
+	if (key == "ctrl-c") {
+		run_abort_ = true;
+		return { repl_key_action::submit, "" };
+	}
+	return {};
+}
+#endif
 
 template <NodeType node>
 solver_mode get_solver_cmd_mode(tref n) {
@@ -871,7 +960,12 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	tref result = 0;
 	switch (command_type) {
 	case tau::quit_cmd:           return std::cout << "Quit.\n", 1;
-	case tau::clear_cmd:          if (r) r->clear(); break;
+	case tau::clear_cmd:
+		if (r) r->clear();
+#ifdef TAU_PARSER_HAS_FTXUI
+		else if (r_ftx) r_ftx->clear();
+#endif
+		break;
 	case tau::help_cmd:           help_cmd(command); break;
 	case tau::version_cmd:        version_cmd(); break;
 	case tau::get_cmd:            get_cmd(command); break;
@@ -945,29 +1039,68 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 	// applied to the api in main.cpp's non-interactive spec-file path).
 	update_charvar(opt.charvar);
 	update_blasting(opt.blasting);
+	// console input streams resolve through the REPL cycle, never blocking
+	definitions<node>::instance().get_io_context()->console_input_factory =
+		[](const std::string&) {
+			return std::make_shared<repl_pending_input_stream>();
+		};
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-std::string repl_evaluator<BAs...>::prompt() {
+void repl_evaluator<BAs...>::reprompt() {
 	std::stringstream ss;
-	if (opt.status) {
-		std::stringstream status;
-		if (H.size()) status << " " << TC_STATUS_OUTPUT << "%"
-			<< H.size() << TC.CLEAR() << TC_STATUS;
-		if (opt.severity != boost::log::trivial::info)
-			status << " " << to_string(opt.severity);
-		if (status.tellp()) ss << TC_STATUS << "["
-			<< status.str() << " ]" << TC.CLEAR() << " ";
+	if (pending) {
+		// pending->label already ends with one trailing space
+		ss << (error ? TC_ERROR : TC_PROMPT) << pending->label
+			<< TC.CLEAR();
+	} else {
+		if (opt.status) {
+			std::stringstream status;
+			if (H.size()) status << " " << TC_STATUS_OUTPUT << "%"
+				<< H.size() << TC.CLEAR() << TC_STATUS;
+			if (opt.severity != boost::log::trivial::info)
+				status << " " << to_string(opt.severity);
+			if (status.tellp()) ss << TC_STATUS << "["
+				<< status.str() << " ]" << TC.CLEAR() << " ";
+		}
+		ss << (error ? TC_ERROR : TC_PROMPT) << "tau>" << TC.CLEAR()
+			<< " ";
 	}
-	ss << (error ? TC_ERROR : TC_PROMPT) << "tau>" << TC.CLEAR() << " ";
 	if (r) r->set_prompt(ss.str());
-	return ss.str();
+#ifdef TAU_PARSER_HAS_FTXUI
+	if (r_ftx) r_ftx->set_prompt(ss.str());
+#endif
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 int repl_evaluator<BAs...>::eval(const std::string& src) {
+	// while a `run` session is pending, src is its answer, not a new command
+	if (pending) {
+		// incomplete value: return 2 so more lines accumulate (multiline)
+		if (!run_abort_ && pending->kind == pending_request::stream_value
+			&& stream_value_incomplete(src, pending->type_tree))
+					return 2;
+		auto req = *pending;
+		pending.reset();
+		if (!run_abort_ && req.kind == pending_request::stream_value)
+			req.stream->set(src);
+		bool stop = run_abort_
+			|| (req.kind == pending_request::continue_or_quit
+				&& (src == "q" || src == "quit"));
+		run_abort_ = false;
+		if (stop) finish_running();
+		else {
+			running->t.unpause();
+			if (req.kind == pending_request::stream_value)
+				continue_running(req);
+			else continue_running();
+		}
+		std::cout << "\n", std::cout.flush();
+		if (!pending) reprompt();
+		return 0;
+	}
 	error = false;
 	auto tau_spec = tt(make_cli(src));
 	int quit = 0;
@@ -978,7 +1111,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 	} else if (!error) return 2;
 	std::cout << "\n", std::cout.flush();
 	if (error && opt.error_quits) return quit = 1;
-	if (quit == 0) prompt();
+	if (quit == 0) reprompt();
 	return quit;
 }
 

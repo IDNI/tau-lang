@@ -112,6 +112,7 @@ private:
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
+	int_t announced_step_ = -1;
 
 	/// Adaptive tree-node gc trigger: a sweep fires when bintree<node>::M()
 	/// has both crossed the gc_min_size floor AND grown by at least
