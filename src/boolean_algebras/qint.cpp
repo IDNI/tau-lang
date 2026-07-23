@@ -258,7 +258,8 @@ std::optional<qint> qint_eval_parse_tree(
 		if (val == 1) return qint::top();
 
 		double lo = static_cast<double>(val);
-		double hi = static_cast<double>(val + 1);
+		double hi = lo + 1.0;
+		if (!(hi > lo)) return std::nullopt;
 		return qint{{ {lo, hi} }};
 	}
 

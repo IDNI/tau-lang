@@ -19,6 +19,7 @@ using idni::tau_lang::is_qint_zero;
 using idni::tau_lang::is_qint_one;
 using idni::tau_lang::normalize_qint;
 using idni::tau_lang::splitter_type;
+using idni::tau_lang::qint_eval_parse_tree;
 
 static constexpr double POS_INF =  std::numeric_limits<double>::infinity();
 static constexpr double NEG_INF = -std::numeric_limits<double>::infinity();
@@ -795,3 +796,62 @@ TEST_CASE("hash of two-piece union is stable") {
 }
 
 } // TEST_SUITE qint — hashing
+
+// ============================================================================
+TEST_SUITE("qint — parse tree evaluation") {
+// ============================================================================
+
+// Parse a qint source string via the qint grammar and evaluate the parse
+// tree, mirroring parse_qint_grammar() (qint.tmpl.h) without needing a
+// BA pack.
+static std::optional<qint> parse_q(const std::string& src) {
+	auto result = qint_parser::instance().parse(src.c_str(), src.size());
+	if (!result.found) return std::nullopt;
+	auto t = qint_parser::tree::traverser(result.get_shaped_tree2())
+		| qint_parser::qint;
+	if (!t.has_value()) return std::nullopt;
+	return qint_eval_parse_tree(t);
+}
+
+TEST_CASE("bare integer 0 parses to bottom") {
+	auto q = parse_q("0");
+	REQUIRE(q.has_value());
+	CHECK(q->is_empty());
+}
+
+TEST_CASE("bare integer 1 parses to top") {
+	auto q = parse_q("1");
+	REQUIRE(q.has_value());
+	CHECK(q->is_full());
+}
+
+TEST_CASE("bare integer 5 parses to unit interval [5, 6)") {
+	auto q = parse_q("5");
+	REQUIRE(q.has_value());
+	REQUIRE(q->intervals.size() == 1);
+	auto [lo, hi] = piece(*q, 0);
+	CHECK(deq(lo, 5.0));
+	CHECK(deq(hi, 6.0));
+}
+
+TEST_CASE("double-exact bare integer 2^52-1 parses to non-empty unit "
+	"interval")
+{
+	auto q = parse_q("4503599627370495");
+	REQUIRE(q.has_value());
+	REQUIRE(q->intervals.size() == 1);
+	auto [lo, hi] = piece(*q, 0);
+	CHECK(deq(lo, 4503599627370495.0));
+	CHECK(deq(hi, 4503599627370496.0));
+	CHECK(lo < hi);
+}
+
+TEST_CASE("bare integer at long long max is rejected, not overflowed") {
+	// LLONG_MAX: the old code computed val + 1 in the integer type
+	// (signed overflow, UB); beyond double's integer resolution
+	// lo + 1.0 == lo, so no non-empty unit interval exists.
+	auto q = parse_q("9223372036854775807");
+	CHECK_FALSE(q.has_value());
+}
+
+} // TEST_SUITE qint — parse tree evaluation
