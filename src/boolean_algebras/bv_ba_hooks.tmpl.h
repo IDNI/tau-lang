@@ -413,10 +413,7 @@ tref term_mod(tref symbol) {
 				return tau::_0(c2.get_ba_type());
 			}
 			// 1 % 0 is top
-			if (c2.is(tau::bf_f)) {
-				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				return tau::build_bf_ba_constant(make_bitvector_value(width, 1), c2.get_ba_type());
-			}
+			if (c2.is(tau::bf_f)) return tau::_1(c2.get_ba_type());
 			break;
 		}
 		// 0 % X

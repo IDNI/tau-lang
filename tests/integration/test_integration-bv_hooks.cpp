@@ -170,6 +170,12 @@ TEST_SUITE("bv operator hooks:corner cases") {
 		CHECK(src == expected);
 	}
 
+	TEST_CASE("modulo top % 0") {
+		tref src = tau::get("1:bv[8] % 0:bv[8]", parse_opts_bf);
+		tref expected = tau::get("1:bv[8]", parse_opts_bf); // <- top element 1111....
+		CHECK(src == expected);
+	}
+
 	TEST_CASE("modulo 0 % 1") {
 		tref src = tau::get("{0}:bv[8] % {1}:bv[8]", parse_opts_bf);
 		tref expected = tau::get("0:bv[8]", parse_opts_bf);

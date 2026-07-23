@@ -63,6 +63,14 @@ TEST_SUITE("bv division hook") {
 	}
 }
 
+TEST_SUITE("bv modulo hook") {
+
+	TEST_CASE("1 % 0 is top") {
+		CHECK(tau::get("1:bv[8] % 0:bv[8]", parse_opts_bf)
+			== tau::get("1:bv[8]", parse_opts_bf)); // <- top element 1111....
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {
