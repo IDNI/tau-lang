@@ -730,10 +730,31 @@ static tref compile_since_trigger_rec(
 	if (nt == tau::wff_T) {
 		tref phi     = t[0].first();
 		tref psi     = t[0].second();
+		// Compile nested S/T inside the operands first (they are inner by
+		// definition), so ψ below is S/T-free; the delegated S call then
+		// finds nothing left to rewrite inside them.
+		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
+		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
 		tref neg_phi = tau::build_wff_neg(phi);
 		tref neg_psi = tau::build_wff_neg(psi);
 		tref s_node  = tau::build_wff_S(neg_phi, neg_psi);
+		size_t n_init   = init_conds.size();
+		size_t n_safety = safety_invs.size();
 		tref s_rewr  = compile_since_trigger_rec<node>(s_node, invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
+		if (is_outer) {
+			// The outer-S sub-call recorded side conditions for ¬φ S ¬ψ,
+			// but those do NOT pass through the outer negation: it pushed
+			// ¬ψ at t=0 into init_conds and G(curr && rhs) into
+			// safety_invs, both with the wrong sign for T.  T semantics
+			// require ψ at t=0, and G(φ T ψ) ≡ G(ψ) gives the correct
+			// always-true requirement.  Replace the appended entries.
+			if (init_conds.size() > n_init) {
+				auto psi_io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
+				init_conds.back() = fm_at_time_point<node>(psi, psi_io_vars, 0);
+			}
+			if (safety_invs.size() > n_safety)
+				safety_invs.back() = tau::build_wff_always(psi);
+		}
 		return tau::build_wff_neg(s_rewr);
 	}
 

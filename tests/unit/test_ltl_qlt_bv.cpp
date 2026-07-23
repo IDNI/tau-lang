@@ -2,7 +2,7 @@
 
 // Comprehensive LTL(ABA) tests for qlt (Q,<) and bv types.
 // Generated with DeepSeek-R1 assistance (2026-04-19).
-// Covers: G/F/U/R/W/S realizability, execution correctness, grammar fuzz.
+// Covers: G/F/U/R/W/S/T realizability, execution correctness, grammar fuzz.
 // Types: qlt and bv ONLY (not tau/sbf).
 
 #include "test_init.h"
@@ -480,6 +480,22 @@ TEST_SUITE("qlt_execution") {
 			if (vals[i] == "1/2") { saw_half = true; break; }
 		}
 	}
+	TEST_CASE("QE-21: (o1={1/4}:qlt) T (o1={3/4}:qlt) — trigger forces 3/4 at t=0") {
+		bdd_init<Bool>();
+		auto vals = run_qlt_no_input("(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).", 4);
+		REQUIRE(vals.size() == 4);
+		// T is the past dual of S: the second operand must hold at t=0
+		// (and, since specs must always hold, G(phi T psi) = G(psi)).
+		CHECK(vals[0] == "3/4");
+	}
+
+	TEST_CASE("QE-22: (o1={3/4}:qlt) T (o1={3/4}:qlt) — realizable, constant 3/4") {
+		bdd_init<Bool>();
+		auto vals = run_qlt_no_input("(o1[t]:qlt = {3/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).", 4);
+		REQUIRE(vals.size() == 4);
+		for (auto& v : vals) CHECK(v == "3/4");
+	}
+
 	TEST_CASE("QE-DEC-01: decimal literal {0.5}:qlt equivalent to {1/2}:qlt") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input("G (o1[t]:qlt = {0.5}:qlt).", 4);
