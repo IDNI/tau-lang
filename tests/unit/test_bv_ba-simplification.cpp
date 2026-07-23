@@ -4,6 +4,7 @@
 #include "test_tau_helpers.h"
 
 #include "boolean_algebras/bv_ba.h"
+#include "integration/parser_helper.h"
 
 
 TEST_SUITE("Configuration") {
@@ -39,6 +40,26 @@ TEST_SUITE("bv to tau tree translation") {
 		bv bv_tree = bv_eval_node<node_t>(src, vars, free_vars).value();
 		tref tau_tree = cvc5_tree_to_tau_tree<node_t>(bv_tree);
 		CHECK(tau::get(src).to_str() == tau::get(tau_tree).to_str());
+	}
+}
+
+TEST_SUITE("bv division hook") {
+
+	TEST_CASE("symbolic X / X is not folded") {
+		tref src = tau::get("X:bv[8] / X:bv[8]", parse_opts_bf);
+		tref folded = tau::get("{1}:bv[8]", parse_opts_bf);
+		CHECK(src != nullptr);
+		CHECK(src != folded);
+	}
+
+	TEST_CASE("{0} / {0} is top") {
+		CHECK(tau::get("{0}:bv[8] / {0}:bv[8]", parse_opts_bf)
+			== tau::get("1:bv[8]", parse_opts_bf)); // <- top element 1111....
+	}
+
+	TEST_CASE("non-zero {c} / {c} is 1") {
+		CHECK(tau::get("{42}:bv[8] / {42}:bv[8]", parse_opts_bf)
+			== tau::get("{1}:bv[8]", parse_opts_bf)); // <- 1 (not top element)
 	}
 }
 

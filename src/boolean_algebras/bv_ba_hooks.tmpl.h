@@ -358,10 +358,15 @@ tref term_div(tref symbol) {
 		}
 		default: break;
 	}
-	// X / X
-	if (c1 == c2) {
-		const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-		return tau::build_bf_ba_constant(make_bitvector_value(width, 1), c2.get_ba_type());
+	// {c} / {c} is 1 for a non-zero constant c (cvc5: bvudiv(0,0) = all_ones)
+	if (c1 == c2 && c1.is_ba_constant() && c1.get_ba_type() > 0) {
+		DBG(assert(is_bv_type_family<node>(c1.get_ba_type()));)
+		if (const bv cc = std::get<bv>(c1.get_ba_constant());
+			cc.isBitVectorValue() && !is_bv_syntactic_zero(cc))
+		{
+			const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c1.get_ba_type()));
+			return tau::build_bf_ba_constant(make_bitvector_value(width, 1), c1.get_ba_type());
+		}
 	}
 	// { ... } / { ... }
 	if (c1.is_ba_constant() && c2.is_ba_constant()

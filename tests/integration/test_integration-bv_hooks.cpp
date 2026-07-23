@@ -150,6 +150,13 @@ TEST_SUITE("bv operator hooks:corner cases") {
 		CHECK(src == expected);
 	}
 
+	TEST_CASE("division symbolic X / X") {
+		tref src = tau::get("X:bv[8] / X:bv[8]", parse_opts_bf);
+		tref folded = tau::get("{1}:bv[8]", parse_opts_bf); // <- must stay unevaluated (bvudiv(0,0) = all_ones)
+		CHECK(src != nullptr);
+		CHECK(src != folded);
+	}
+
 	// --- Modulo corner cases ---
 	TEST_CASE("modulo 0 % 0") {
 		tref src = tau::get("{0}:bv[8] % {0}:bv[8]", parse_opts_bf);
