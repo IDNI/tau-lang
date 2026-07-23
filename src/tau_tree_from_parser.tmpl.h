@@ -154,7 +154,7 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				tau::get(tau::io_var, io_definition.first()));
 			(nt == input_def ? options.context->inputs
 					 : options.context->outputs)
-				[io_var] = stream_id;
+				[tree<node>::geth(io_var)] = stream_id;
 		};
 
 		tref x = nullptr; // result of node transformation

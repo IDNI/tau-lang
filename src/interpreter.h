@@ -53,7 +53,7 @@ struct interpreter {
 	 * @param memory Current memory (variable-to-value map).
 	 * @param ctx I/O context for reading/writing streams.
 	 */
-	interpreter(trefs& ubt_ctn, auto& original_spec, auto& output_partition,
+	interpreter(htrefs& ubt_ctn, auto& original_spec, auto& output_partition,
 		assignment<node>& memory, const io_context<node>& ctx);
 
 	/**
@@ -258,9 +258,21 @@ struct interpreter {
 	// order preserved).
 	std::vector<std::string> open_streams() const;
 
-	trefs ubt_ctn;
+	/**
+	 * @brief Insert every raw tref reachable from this interpreter into @p keep.
+	 *
+	 * This is the walk-collect half of the gc strategy: every container
+	 * that holds raw trefs (`memory`, `step_spec`, `inputs`/`outputs`
+	 * keys, `output_partition`) must contribute here so that
+	 * `bintree<node>::gc(keep)` does not free live nodes. htref-held
+	 * state (`ubt_ctn`, `original_spec`, `ctx`) needs no walk.
+	 * @param keep Set of tree nodes to preserve across gc.
+	 */
+	void collect_live_refs(std::unordered_set<tref>& keep) const;
+
+	htrefs ubt_ctn;
 	/// Partition of spec each with representative for set of output streams.
-	std::vector<std::pair<tref, tref>> original_spec;
+	std::vector<std::pair<htref, htref>> original_spec;
 	assignment<node> memory;
 	size_t time_point = 0;
 	input_streams<node>     inputs;
@@ -300,9 +312,21 @@ private:
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
+	int_t announced_step_ = -1;
+
+	/// Adaptive tree-node gc trigger: a sweep fires when bintree<node>::M()
+	/// has both crossed the gc_min_size floor AND grown by at least
+	/// gc_growth_factor since the last sweep. Set gc_growth_factor <= 0 to
+	/// disable. Self-tunes across workloads — fast-growing M triggers
+	/// frequent sweeps at small peak; slow-growing M sweeps rarely.
+	static constexpr size_t gc_min_size      = 256;
+	static constexpr double gc_growth_factor = 1.5;
+	size_t m_at_last_gc = 0;
+	/// @brief Run bintree<node>::gc(keep) if the trigger condition is met.
+	void maybe_gc();
 
 	/// @brief Partition @p spec by output stream representatives.
-	static std::vector<std::pair<tref, tref>>
+	static std::vector<std::pair<htref, htref>>
 	create_spec_partition(tref spec, auto& output_partition);
 
 	/// @brief Read input variables at the given @p time_step.

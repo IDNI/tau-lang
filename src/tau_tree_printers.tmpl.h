@@ -140,7 +140,9 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	os << "IO types:     ";
 	if (ctx.types.empty()) os << " none";
 	os << "\n";
-	for (const auto& [var, type] : ctx.types) os << "\t" << get_var_name<node>(var) << get_ba_type_name<node>(type) << "\n";
+	for (const auto& [var, type] : ctx.types)
+		os << "\t" << get_var_name<node>(var->get())
+			<< get_ba_type_name<node>(type) << "\n";
 #endif
 	os << "IO variables:   ";
 	if (ctx.inputs.empty() && ctx.outputs.empty()) os << " none";
@@ -153,8 +155,8 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 				: "file(\"" + dict(s) + "\")")
 			<< "\n";
 	};
-	for (const auto& [var, s] : ctx.inputs)  print_io(var, s, false);
-	for (const auto& [var, s] : ctx.outputs) print_io(var, s, true);
+	for (const auto& [var, s] : ctx.inputs)  print_io(var->get(), s, false);
+	for (const auto& [var, s] : ctx.outputs) print_io(var->get(), s, true);
 
 	if (ctx.input_remaps.size()) {
 		os << "Input remaps: ";

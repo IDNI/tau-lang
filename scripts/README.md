@@ -1,87 +1,146 @@
 # Scripts
 
-Helpers for building and testing Tau.
+Helpers for building and testing Tau Language.
 
-These scripts are also available as `./dev <SCRIPT> <SCRIPT_OPTIONS>` from project's root directory.
+Run any script from the project root via `./dev`:
+
+```bash
+./dev <SCRIPT> [SCRIPT_OPTIONS...]
+```
+
+`./dev help` lists available scripts (everything in `scripts/*.sh`).
+
+Shared build helpers ([`devrc`](../../external/parser/scripts/devrc) with
+`normalize_args`, `dev_entry`, `build_entry`, `preset_entry`, `test_entry`)
+live in the parser submodule at `external/parser/scripts/`.
+
+## How `./dev` handles arguments
+
+[`dev`](../dev) runs `scripts/*.sh`. CMake drivers [`build.sh`](build.sh) and
+[`preset.sh`](preset.sh) call `build_entry` / `preset_entry`, which invoke
+`dev_entry` → `normalize_args` (single parse) and `resolve_jobs`.
+
+All of the following may appear **in any order** on the command line:
+
+| Token | Effect |
+|-------|--------|
+| `-D…` | CMake definition (passed to configure/build via `DEV_CMAKE`) |
+| `Debug` / `Release` / `RelWithDebInfo` / `Coverage` | legacy build type |
+| `-v` | verbose build |
+| `--target NAME` | build only this target |
+| `-G NAME` | sets `GENERATOR` (not `DEV_CMAKE`); legacy build defaults to Ninja; preset uses preset generator unless `-G` is passed |
+| preset name (e.g. `release-tests`) | preset to configure |
+| `run` | after preset build: run tests or `tau` |
+| `--` | start of program args (e.g. for `tau`) |
+
+Examples:
+
+```bash
+./dev preset release-tests run -DTAU_BUILD_TESTS=ON
+./dev preset -DTAU_BUILD_TESTS=ON release-tests run
+./dev build -v Debug --target test_bool -DTAU_BUILD_UNIT_TESTS=ON
+./dev debug --target test_bool -DTAU_BUILD_UNIT_TESTS=ON
+```
+
+Use `--` to pass arguments to `tau` when using presets:
+
+```bash
+./dev preset release-tau run -- --help
+```
+
+## Parallel build jobs (`TAU_BUILD_JOBS`)
+
+Resolution order:
+
+1. `-DTAU_BUILD_JOBS=N` on the command line (any position)
+2. `TAU_BUILD_JOBS` already in the environment
+3. Half of detected logical CPU cores (auto)
+
+`-DTAU_BUILD_JOBS` is stripped before `cmake --preset`; the value is applied via
+the exported environment. CMake also reads `$ENV{TAU_BUILD_JOBS}` when the cache
+value is `0` (see [`CMakeLists.txt`](../CMakeLists.txt)).
+
+## Dual build directories
+
+| Path | Used by | Example |
+|------|---------|---------|
+| `build-${BUILD_TYPE}` | [`build.sh`](build.sh), `debug`, `release`, `packages`, … | `build-Release`, `build-Debug` |
+| `build/<lowercase>` | [`preset.sh`](preset.sh), `cmake --preset` | `build/release`, `build/debug` |
+
+Legacy wrappers are unchanged. Prefer presets for new work.
 
 ## Cleaning
 
-- `clean` removes build directories.
+- `clean [all]` — remove build artifacts; with `all`, also `build/` preset trees
 
 ## Regenerating parsers
 
-- `regen` regenerates parsers from grammar files in `parser` directory
+- `regen` — regenerate parsers from grammar files in `parser/`
 
 ## Building
 
-Building scripts run cmake with different options. Additional script options provided to `./dev <script>` are passed as additional arguments to cmake. 
+- `build [<BUILD_TYPE>] [-v] [--target NAME] [-G GENERATOR] [<CMAKE_OPTIONS>]`
+- `debug`, `release`, `relwithdebinfo`, `coverage` — shorthand for `build`
+- `w64-debug`, `w64-release` — Windows cross-build (MinGW toolchain from parser)
+- `clang <SCRIPT> …` — prefix any build script with clang compilers
+- `dep-boost`, `dep-cvc5` — build dependencies into `~/.tau`
+- `binding <BIND_LANG>` — build bindings (currently `python`)
 
-- `build [<BUILD_TYPE> [<CMAKE_OPTIONS>]]` builds Tau Parser Library
-- `debug [<CMAKE_OPTIONS>]`, `release [<CMAKE_OPTIONS>]` and `relwithdebinfo [<CMAKE_OPTIONS>]` call `build` script with `Debug`, `Release`, `RelWithDebInfo` BUILD_TYPE respectively
-- `w64-debug [<CMAKE_OPTIONS>]` and `w64-release [<CMAKE_OPTIONS>]` build for windows using mingw-w64
-- `boost-mingw` builds boost for windows using mingw-w64 (a prerequisite for `w64-debug` and `w64-release`)
-- `binding <BIND_LANG>` builds binding for BIND_LANG. Currently, only `python` is supported.
-- `dep-boost` and `dep-cvc5` build Boost and CVC5 dependencies.
+Build flags for legacy `build.sh`: `-v` (verbose), `--target NAME`, `-G GENERATOR`.
 
-### Building with clang compiler
+### CMake presets
 
-- `clang <SCRIPT> <SCRIPT_OPTIONS>` works as a prefix argument for build scripts
-  Example: `./dev clang release` would run `./dev release` build using clang compiler 
+`preset [<PRESET>] [run] [<CMAKE_OPTIONS>]` — configure (fresh), build, and
+optionally test or run `tau` via [`CMakePresets.json`](../CMakePresets.json).
 
-### Build directories
+```bash
+./dev preset release-tests run
+./dev preset release-all run
+./dev preset release-tau run -- --help
+./dev preset release-packages-deb
+./dev preset release-packages-rpm
+./dev preset release-mingw-packages
+./dev preset debug-asan
+./dev preset coverage
+```
 
-`debug` and `w64-debug` builds are using `build-Debug` directory.
+Default preset name is `release` if omitted.
 
-`release` and `w64-release` builds are using `build-Release` directory.
-
-`relwithdebinfo` build is using `build-RelWithDebInfo` directory.
-
-## Benchmarking
-
-- `benchmark [<CMAKE_OPTIONS>]` calls `build` script with `RelWithDebInfo` BUILD_TYPE
-- `save-benchmarks` moves benchmark results to `tests/benchmark/data` directory
-- `bench [<OPTIONS>] [<PROFILE>]` benchmarks fixture specs and stores measuring into PROFILE 
-
-## Coverage
-
-- `coverage [<CMAKE_OPTIONS>]` calls `build` script with `Coverage` BUILD_TYPE and outputs the report to build-Coverage
+Presets whose name contains **`package`** run `cpack -C Release` after build.
+**`run`** runs `ctest` for test/all presets, otherwise runs `tau` (args after `--`).
 
 ## Building release packages
 
-- `packages [<CMAKE_OPTIONS>]` builds packages for linux
-- `w64-packages [<CMAKE_OPTIONS>]` builds packages for windows
-
-Packages are created in `build-Release/packages` directory.
+- `packages` — legacy: DEB then RPM in `build-Release/packages`
+- `w64-packages` — legacy: Windows NSIS and ZIP
+- Preset: `./dev preset release-packages-deb`, `./dev preset release-packages-rpm`,
+  `./dev preset release-mingw-packages`
 
 ## Testing
 
-- `test <TEST_NAME>` compiles a required type of tests and runs the test TEST_NAME
-- `test-debug` compiles all tests with `Debug` BUILD_TYPE and runs ctest
-- `test-release` compiles all tests with  `Release` BUILD_TYPE and runs ctest
-- `test-relwithdebinfo` runs ctest with `RelWithDebInfo` BUILD_TYPE
-- `test-wine` runs tests with wine
+- `test <TEST_NAME>` — compile and run one test (auto-selects test type)
+- `test-debug`, `test-release`, `test-relwithdebinfo` — build all tests + ctest
+  (pass `-DTAU_BUILD_TESTS=ON` via each script; extra `-D` flags forwarded)
+- `test-wine` — cross-build and run tests under Wine
+
+## Benchmarking
+
+- `benchmark`, `bench`, `save-benchmarks`
 
 ## Debugging
 
-- `gdb-tau [<TAU_OPTIONS>]` compiles tau and runs it in gdb debugger
-- `gdb <TEST_NAME>` compiles a required type of tests and runs the test TEST_NAME in gdb debugger
+- `gdb-tau`, `gdb`, `debug-tau`
 
 ## Docker
 
-`docker <ACTION> <DOCKER OPTIONS>`
+See [`docker.sh`](docker.sh) — `docker tau`, `docker packages`, `docker w64-*`, …
 
-- `docker tau` builds tau runner image with Tau executable and runs it in interactive mode
-- `dockewr tau-rpm` builds tau rpm-based runner image with Tau executable and runs it in interactive mode
-- `docker run -t <IMAGE>` runs docker image in interactive mode
-- `docker bash -t <IMAGE>` runs bash in docker image in interactive mode
-- `docker build` default build (default options with no target)
-- `docker base` builds base image
-- `docker deps` builds deps image
-- `docker build-debug` builds build image with `Debug` BUILD_TYPE and tests
-- `docker build-release` builds build image with `Release` BUILD_TYPE and tests
-- `docker packages` builds packages image and extracts them to `~/.tau/packages`
-- `docker nightly` builds nightly packages image and extracts them to `~/.tau/packages`
-- `docker w64-deps` builds Windows deps image
-- `docker w64-build` builds Windows build image
-- `docker w64-packages` builds Windows packages and extracts them to `~/.tau/packages`
-- `docker w64-nightly` builds Windows nightly packages and extracts them to `~/.tau/packages`
+## Distributed builds (icecream)
+
+[`icecc-terminal-log`](../../external/parser/scripts/icecc-terminal-log) wraps a
+command and tails icecc logs to stderr. Enable icecream via
+[`CMakeLocalLists.txt`](../CMakeLocalLists.txt) (`use-icecream.cmake`).
+
+```bash
+external/parser/scripts/icecc-terminal-log ./dev release
+```

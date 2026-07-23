@@ -75,6 +75,34 @@ template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
 template <NodeType node> struct io_context;
 template <NodeType node> struct tau_spec;
 
+// -----------------------------------------------------------------------------
+// htref-keyed containers
+
+/**
+ * @brief Transparent comparator ordering `htref` keys by `subtree_less` on the
+ * underlying `tref`, enabling heterogeneous lookup by raw `tref`.
+ */
+template <NodeType node>
+struct subtree_htref_less {
+	using is_transparent = void;
+	static tref to_tref(const htref& h) { return h->get(); }
+	static tref to_tref(tref t) { return t; }
+	bool operator()(const auto& a, const auto& b) const {
+		return subtree_less<node>{}(to_tref(a), to_tref(b));
+	}
+};
+
+/**
+ * @brief Ordered map keyed by `htref` with heterogeneous `tref` lookup.
+ *
+ * The `htref` keys pin the referenced bintree nodes alive across
+ * `bintree<node>::gc()` (via the non-expired `weak_ptr` entries in `M`), so
+ * long-lived maps of this type need no explicit keep-walk. Iteration order
+ * matches `subtree_map` (ordered by `subtree_less` on the underlying `tref`).
+ */
+template <NodeType node, typename PT>
+using subtree_htref_map = std::map<htref, PT, subtree_htref_less<node>>;
+
 /**
  * @brief Packed bit-field AST node for Tau formula trees.
  *
@@ -233,6 +261,8 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	static htref geth(tref id);
 	/** @brief Return a handle ref for @p n. */
 	static htref geth(const tree& n);
+	/** @brief Number of interned tree nodes (size of `bintree<node>::M()`). */
+	static size_t m_size();
 
 	/** @brief Transform parse tree @p t to a `tref` using @p options. */
 	static tref get(const tau_parser::tree& t, get_options& options);
@@ -1183,6 +1213,59 @@ bool is_non_boolean_term(tref n);
 /** @brief Return the temporally quantified formula of @p n, n otherwise. */
 template <NodeType node>
 tref get_temporally_quantified_formula(tref n);
+
+// Interned free-var set shared by get_free_vars / get_free_tau_vars: equal sets
+// share one allocation and a cache can hand back a stable trefs&. for_each_tref
+// opts into the gc walk (expand-keep on live key, prune on dead key).
+struct free_vars_ref {
+	std::shared_ptr<const trefs> sp;
+	template <typename F>
+	void for_each_tref(F&& f) const { if (sp) for (tref t : *sp) f(t); }
+};
+
+// Content-hash-bucketed intern pool of live free-var sets (one instance shared
+// across TUs and node types).
+using interned_fv_pool_t =
+	std::unordered_map<size_t, std::vector<std::weak_ptr<const trefs>>>;
+inline interned_fv_pool_t& interned_free_vars_pool() {
+	static interned_fv_pool_t pool;
+	return pool;
+}
+
+inline size_t hash_free_vars(const trefs& fv) {
+	size_t h = fv.size();
+	for (tref t : fv)
+		h ^= std::hash<tref>{}(t) + 0x9e3779b97f4a7c15ull
+			+ (h << 6) + (h >> 2);
+	return h;
+}
+
+// Intern a sorted free-var set. gc-safe: matches only LIVE entries (weak_ptr
+// lock); expired ones are dropped without touching freed trefs.
+inline free_vars_ref intern_free_vars(trefs fv) {
+	auto& bucket = interned_free_vars_pool()[hash_free_vars(fv)];
+	for (auto it = bucket.begin(); it != bucket.end(); ) {
+		if (auto sp = it->lock()) {
+			if (*sp == fv) return { std::move(sp) };
+			++it;
+		} else it = bucket.erase(it);
+	}
+	auto sp = std::make_shared<const trefs>(std::move(fv));
+	bucket.push_back(sp);
+	return { std::move(sp) };
+}
+
+// Drop expired entries and empty buckets. Registered as a gc callback (see
+// get_free_vars); gc-safe since weak_ptr::expired() never derefs a tref.
+inline void sweep_interned_free_vars() {
+	auto& pool = interned_free_vars_pool();
+	for (auto it = pool.begin(); it != pool.end(); ) {
+		std::erase_if(it->second,
+			[](const std::weak_ptr<const trefs>& w) { return w.expired(); });
+		if (it->second.empty()) it = pool.erase(it);
+		else ++it;
+	}
+}
 
 } // namespace idni::tau_lang
 

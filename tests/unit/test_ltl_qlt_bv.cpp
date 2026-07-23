@@ -24,7 +24,8 @@ static strings run_qlt_no_input(const char* formula, size_t steps) {
 	io_context<node_t> ctx;
 	auto o1 = std::make_shared<vector_output_stream>();
 	ctx.add_output("o1", qlt_type_id<node_t>(), o1);
-	subtree_map<node_t, size_t> scope = ctx.types;
+	subtree_map<node_t, size_t> scope;
+	for (const auto& [var, type] : ctx.types) scope[var->get()] = type;
 	tau::get_options opts;
 	opts.global_scope = &scope;
 	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula, opts));
@@ -41,7 +42,8 @@ static strings run_qlt_with_i1(const char* formula, const strings& i1_vals, size
 	              std::make_shared<vector_input_stream>(i1_vals));
 	auto o1 = std::make_shared<vector_output_stream>();
 	ctx.add_output("o1", qlt_type_id<node_t>(), o1);
-	subtree_map<node_t, size_t> scope = ctx.types;
+	subtree_map<node_t, size_t> scope;
+	for (const auto& [var, type] : ctx.types) scope[var->get()] = type;
 	tau::get_options opts;
 	opts.global_scope = &scope;
 	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula, opts));

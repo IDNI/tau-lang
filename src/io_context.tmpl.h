@@ -83,6 +83,39 @@ inline std::optional<std::string> console_prompt_input_stream::get(size_t time_p
 	return this->get();
 }
 
+// -- repl_pending_input_stream --
+
+inline std::shared_ptr<serialized_constant_input_stream>
+	repl_pending_input_stream::rebuild()
+{
+	return std::make_shared<repl_pending_input_stream>();
+}
+
+inline void repl_pending_input_stream::set(const std::string& value) {
+	pending_value = value;
+	awaiting_ = false;
+}
+
+inline std::optional<std::string> repl_pending_input_stream::get() {
+	return get(0);
+}
+
+inline std::optional<std::string> repl_pending_input_stream::get(
+	size_t time_point)
+{
+	if (pending_value) {
+		std::string value = std::move(*pending_value);
+		pending_value.reset();
+		awaiting_ = false;
+		return value;
+	}
+	// no value yet: flag it and return "" so read() stops the step cleanly
+	// (the REPL scans for the awaiting stream and prompts for a value)
+	awaiting_ = true;
+	awaiting_time_point_ = time_point;
+	return std::string{};
+}
+
 // -- console_prompt_output_stream --
 
 inline console_prompt_output_stream::console_prompt_output_stream(
@@ -295,7 +328,8 @@ void io_context<node>::update_types(
 	// update types of inputs and outputs
 	// and create a default console stream if not defined
 	for (const auto& [var, type] : update) if (is_io_var<node>(var)) {
-		types[var] = type;
+		htref hvar = tree<node>::geth(var);
+		types[hvar] = type;
 		// If already registered as input or output during parsing, skip name-based categorization.
 		if (inputs.contains(var) || outputs.contains(var)) continue;
 		std::string name = get_var_name<node>(var);
@@ -303,15 +337,16 @@ void io_context<node>::update_types(
 		bool is_input = name == "this" || name[0] == 'i';
 		DBG(assert(is_input || name == "u" || name[0] == 'o');) // TODO: should this raise an undefined io stream error?
 		auto& streams = is_input ? inputs : outputs;
-		if (streams.find(var) == streams.end()) streams[var] = 0;
+		if (streams.find(var) == streams.end()) streams[hvar] = 0;
 	}
 }
 
 template <NodeType node>
 tref io_context<node>::add_input_console(const std::string& name, size_t type_id) {
 	tref var = build_canonized_io_var<node>(name);
-	types.emplace(var, type_id);
-	inputs.emplace(var, 0);
+	htref hvar = tree<node>::geth(var);
+	types.emplace(hvar, type_id);
+	inputs.emplace(hvar, 0);
 	return var;
 }
 
@@ -323,16 +358,18 @@ tref io_context<node>::add_input_console_no_prompt(const std::string& name, size
 template <NodeType node>
 tref io_context<node>::add_input_file(const std::string& name, size_t type_id, const std::string& filename) {
 	tref var = build_canonized_io_var<node>(name);
-	types.emplace(var, type_id);
-	inputs.emplace(var, dict(filename));
+	htref hvar = tree<node>::geth(var);
+	types.emplace(hvar, type_id);
+	inputs.emplace(hvar, dict(filename));
 	return var;
 }
 
 template <NodeType node>
 tref io_context<node>::add_output_console(const std::string& name, size_t type_id) {
 	tref var = build_canonized_io_var<node>(name);
-	types.emplace(var, type_id);
-	outputs.emplace(var, 0);
+	htref hvar = tree<node>::geth(var);
+	types.emplace(hvar, type_id);
+	outputs.emplace(hvar, 0);
 	return var;
 }
 
@@ -344,8 +381,9 @@ tref io_context<node>::add_output_console_no_prompt(const std::string& name, siz
 template <NodeType node>
 tref io_context<node>::add_output_file(const std::string& name, size_t type_id, const std::string& filename) {
 	tref var = build_canonized_io_var<node>(name);
-	types.emplace(var, type_id);
-	outputs.emplace(var, dict(filename));
+	htref hvar = tree<node>::geth(var);
+	types.emplace(hvar, type_id);
+	outputs.emplace(hvar, dict(filename));
 	return var;
 }
 

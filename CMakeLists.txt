@@ -14,17 +14,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 endif()
 
 if(TAU_USE_CCACHE)
-	find_program(CCACHE_BINARY ccache)
-	if(CCACHE_BINARY)
-		set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_BINARY}"
-			CACHE STRING "C compiler launcher")
-		set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_BINARY}"
-			CACHE STRING "C++ compiler launcher")
-		message(STATUS "Using ccache: ${CCACHE_BINARY}")
-	else()
-		message(WARNING "TAU_USE_CCACHE is ON but ccache was not found. Disabling ccache.")
-		set(TAU_USE_CCACHE OFF CACHE BOOL "Use ccache to speed up compilation" FORCE)
-	endif()
+	include(use-ccache.cmake)
 endif()
 
 set(namespace "TAU")
@@ -68,6 +58,7 @@ option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
 option(TAU_USE_CCACHE              "Use ccache when building"              ON)
+option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
 # Load local cmake settings
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
@@ -77,6 +68,13 @@ endif()
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
 if (TAU_BUILD_JOBS STREQUAL "")
 	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
+endif()
+
+if(TAU_BUILD_JOBS EQUAL 0 AND DEFINED ENV{TAU_BUILD_JOBS}
+		AND NOT "$ENV{TAU_BUILD_JOBS}" STREQUAL "")
+	set(TAU_BUILD_JOBS "$ENV{TAU_BUILD_JOBS}" CACHE STRING
+		"Number of jobs to use for the build (0 to auto-detect)" FORCE)
+	message(STATUS "TAU_BUILD_JOBS from environment: ${TAU_BUILD_JOBS}")
 endif()
 
 message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
@@ -122,6 +120,7 @@ set_property(CACHE TAU_MACOS_PACKAGE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_DONT_USE_FTXUI          PROPERTY STRINGS "OFF" "ON")
 
 if(TAU_BUILD_TESTS)
 	set(TAU_BUILD_UNIT_TESTS ON)
@@ -254,6 +253,7 @@ message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
+message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
 
 message(STATUS "CMAKE_CXX_COMPILER_LAUNCHER: ${CMAKE_CXX_COMPILER_LAUNCHER}")
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
@@ -400,6 +400,7 @@ endif()
 message("Building parser")
 set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
 set(TAU_PARSER_BUILD_PIC ${TAU_BUILD_PIC} CACHE BOOL "Build position independent code" FORCE)
+set(TAU_PARSER_DONT_USE_FTXUI ${TAU_DONT_USE_FTXUI} CACHE BOOL "Disable FTXUI" FORCE)
 add_subdirectory(external/parser)
 
 #

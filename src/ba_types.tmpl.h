@@ -462,7 +462,7 @@ std::string ba_types<node>::dump_to_str() {
 	return dump(ss), ss.str();
 }
 
-// type_sids (index = ba_type id)
+// type_trees (index = ba_type id)
 template <NodeType node>
 std::vector<htref>& ba_types<node>::type_trees() {
 	using tau = tree<node>;

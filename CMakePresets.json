@@ -1,0 +1,534 @@
+{
+	"version": 8,
+	"configurePresets": [
+		{
+			"name": "_generator-make",
+			"hidden": true,
+			"generator": "Unix Makefiles"
+		},
+		{
+			"name": "_generator-ninja",
+			"hidden": true,
+			"generator": "Ninja"
+		},
+		{
+			"name": "_toolchain-gcc",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "gcc",
+				"CMAKE_CXX_COMPILER": "g++"
+			}
+		},
+		{
+			"name": "_toolchain-clang",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "clang",
+				"CMAKE_CXX_COMPILER": "clang++"
+			}
+		},
+		{
+			"name": "_toolchain-mingw",
+			"hidden": true,
+			"toolchainFile": "${sourceDir}/external/parser/cmake/mingw-w64-x86_64.cmake"
+		},
+		{
+			"name": "_build_dir-release",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release"
+		},
+		{
+			"name": "_build_dir-debug",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug"
+		},
+		{
+			"name": "_build_dir-release-clang",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-clang"
+		},
+		{
+			"name": "_build_dir-debug-clang",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-clang"
+		},
+		{
+			"name": "_build_dir-release-mingw",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/release-mingw"
+		},
+		{
+			"name": "_build_dir-debug-mingw",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-mingw"
+		},
+		{
+			"name": "_build_dir-relwithdebinfo",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/relwithdebinfo"
+		},
+		{
+			"name": "_build_dir-coverage",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/coverage"
+		},
+		{
+			"name": "_build-type-debug",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "_build-type-release",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
+			"name": "_build-type-relwithdebinfo",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo"
+			}
+		},
+		{
+			"name": "_build-type-coverage",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Coverage"
+			}
+		},
+		{
+			"name": "_build-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_TESTS": "ON"
+			}
+		},
+		{
+			"name": "_build-executable",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_EXECUTABLE": "ON"
+			}
+		},
+		{
+			"name": "_build-all",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_TESTS": "ON",
+				"TAU_BUILD_EXECUTABLE": "ON"
+			}
+		},
+		{
+			"name": "_build-measure",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_MEASURE": "ON"
+			}
+		},
+		{
+			"name": "_sanitize-address",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_ADDRESS_SANITIZER": "ON"
+			}
+		},
+		{
+			"name": "_deb-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_DEB_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "_rpm-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_RPM_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "_windows-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_WINDOWS_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "_windows-zip-package",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_EXECUTABLE": "ON",
+				"TAU_WINDOWS_ZIP_PACKAGE": "ON"
+			}
+		},
+		{
+			"name": "release-make-gcc",
+			"inherits": [
+				"_build_dir-release",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-make-gcc",
+			"inherits": [
+				"_build_dir-debug",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "release-ninja-gcc",
+			"inherits": [
+				"_build_dir-release",
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-ninja-gcc",
+			"inherits": [
+				"_build_dir-debug",
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "release-make-clang",
+			"inherits": [
+				"_build_dir-release-clang",
+				"_generator-make",
+				"_toolchain-clang",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-make-clang",
+			"inherits": [
+				"_build_dir-debug-clang",
+				"_generator-make",
+				"_toolchain-clang",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "release-ninja-clang",
+			"inherits": [
+				"_build_dir-release-clang",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-ninja-clang",
+			"inherits": [
+				"_build_dir-debug-clang",
+				"_generator-ninja",
+				"_toolchain-clang",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "release-mingw",
+			"inherits": [
+				"_build_dir-release-mingw",
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-mingw",
+			"inherits": [
+				"_build_dir-debug-mingw",
+				"_generator-make",
+				"_toolchain-mingw",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "relwithdebinfo-make-gcc",
+			"inherits": [
+				"_build_dir-relwithdebinfo",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-relwithdebinfo"
+			]
+		},
+		{
+			"name": "coverage-make-gcc",
+			"inherits": [
+				"_build_dir-coverage",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-coverage"
+			]
+		},
+		{
+			"name": "release",
+			"inherits": ["release-make-gcc"]
+		},
+		{
+			"name": "debug",
+			"inherits": ["debug-make-gcc"]
+		},
+		{
+			"name": "release-ninja",
+			"inherits": ["release-ninja-gcc"]
+		},
+		{
+			"name": "debug-ninja",
+			"inherits": ["debug-ninja-gcc"]
+		},
+		{
+			"name": "release-clang",
+			"inherits": ["release-make-clang"]
+		},
+		{
+			"name": "debug-clang",
+			"inherits": ["debug-make-clang"]
+		},
+		{
+			"name": "release-tests",
+			"inherits": ["release", "_build-tests"]
+		},
+		{
+			"name": "debug-tests",
+			"inherits": ["debug", "_build-tests", "_build-type-debug"]
+		},
+		{
+			"name": "release-tau",
+			"inherits": ["release", "_build-executable"]
+		},
+		{
+			"name": "debug-tau",
+			"inherits": ["debug", "_build-executable", "_build-type-debug"]
+		},
+		{
+			"name": "release-all",
+			"inherits": ["release", "_build-all"]
+		},
+		{
+			"name": "debug-all",
+			"inherits": ["debug", "_build-all", "_build-type-debug"]
+		},
+		{
+			"name": "all",
+			"inherits": ["release-all"]
+		},
+		{
+			"name": "debug-asan",
+			"inherits": [
+				"debug",
+				"_sanitize-address",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "relwithdebinfo",
+			"inherits": ["relwithdebinfo-make-gcc"]
+		},
+		{
+			"name": "relwithdebinfo-tests",
+			"inherits": ["relwithdebinfo", "_build-tests"]
+		},
+		{
+			"name": "relwithdebinfo-tau",
+			"inherits": ["relwithdebinfo", "_build-executable"]
+		},
+		{
+			"name": "relwithdebinfo-all",
+			"inherits": ["relwithdebinfo", "_build-all"]
+		},
+		{
+			"name": "coverage",
+			"inherits": ["coverage-make-gcc"]
+		},
+		{
+			"name": "release-measure",
+			"inherits": ["release", "_build-measure"]
+		},
+		{
+			"name": "debug-measure",
+			"inherits": [
+				"debug",
+				"_build-measure",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "release-packages-deb",
+			"inherits": ["release", "_deb-package"]
+		},
+		{
+			"name": "release-packages-rpm",
+			"inherits": ["release", "_rpm-package"]
+		},
+		{
+			"name": "release-mingw-packages",
+			"inherits": [
+				"release-mingw",
+				"_windows-package"
+			]
+		},
+		{
+			"name": "release-mingw-packages-zip",
+			"inherits": [
+				"release-mingw",
+				"_windows-zip-package"
+			]
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "debug",
+			"configurePreset": "debug"
+		},
+		{
+			"name": "release",
+			"configurePreset": "release"
+		},
+		{
+			"name": "release-ninja",
+			"configurePreset": "release-ninja"
+		},
+		{
+			"name": "debug-ninja",
+			"configurePreset": "debug-ninja"
+		},
+		{
+			"name": "release-clang",
+			"configurePreset": "release-clang"
+		},
+		{
+			"name": "debug-clang",
+			"configurePreset": "debug-clang"
+		},
+		{
+			"name": "debug-tests",
+			"configurePreset": "debug-tests"
+		},
+		{
+			"name": "release-tests",
+			"configurePreset": "release-tests"
+		},
+		{
+			"name": "debug-all",
+			"configurePreset": "debug-all"
+		},
+		{
+			"name": "release-all",
+			"configurePreset": "release-all"
+		},
+		{
+			"name": "all",
+			"configurePreset": "all"
+		},
+		{
+			"name": "debug-tau",
+			"configurePreset": "debug-tau"
+		},
+		{
+			"name": "release-tau",
+			"configurePreset": "release-tau"
+		},
+		{
+			"name": "debug-asan",
+			"configurePreset": "debug-asan"
+		},
+		{
+			"name": "release-mingw",
+			"configurePreset": "release-mingw"
+		},
+		{
+			"name": "debug-mingw",
+			"configurePreset": "debug-mingw"
+		},
+		{
+			"name": "relwithdebinfo",
+			"configurePreset": "relwithdebinfo"
+		},
+		{
+			"name": "relwithdebinfo-tests",
+			"configurePreset": "relwithdebinfo-tests"
+		},
+		{
+			"name": "relwithdebinfo-tau",
+			"configurePreset": "relwithdebinfo-tau"
+		},
+		{
+			"name": "relwithdebinfo-all",
+			"configurePreset": "relwithdebinfo-all"
+		},
+		{
+			"name": "coverage",
+			"configurePreset": "coverage"
+		},
+		{
+			"name": "release-measure",
+			"configurePreset": "release-measure"
+		},
+		{
+			"name": "debug-measure",
+			"configurePreset": "debug-measure"
+		},
+		{
+			"name": "release-packages-deb",
+			"configurePreset": "release-packages-deb"
+		},
+		{
+			"name": "release-packages-rpm",
+			"configurePreset": "release-packages-rpm"
+		},
+		{
+			"name": "release-mingw-packages",
+			"configurePreset": "release-mingw-packages"
+		},
+		{
+			"name": "release-mingw-packages-zip",
+			"configurePreset": "release-mingw-packages-zip"
+		}
+	],
+	"testPresets": [
+		{
+			"name": "debug-tests",
+			"configurePreset": "debug-tests"
+		},
+		{
+			"name": "release-tests",
+			"configurePreset": "release-tests"
+		},
+		{
+			"name": "release-all",
+			"configurePreset": "release-all"
+		},
+		{
+			"name": "debug-all",
+			"configurePreset": "debug-all"
+		},
+		{
+			"name": "all",
+			"configurePreset": "all"
+		},
+		{
+			"name": "relwithdebinfo-tests",
+			"configurePreset": "relwithdebinfo-tests"
+		},
+		{
+			"name": "relwithdebinfo-all",
+			"configurePreset": "relwithdebinfo-all"
+		}
+	]
+}

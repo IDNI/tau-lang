@@ -70,12 +70,12 @@ struct definitions {
 	}
 
 	/** @brief Return a reference to the named input-stream definition map. */
-	subtree_map<node, size_t>& get_input_defs() {
+	subtree_htref_map<node, size_t>& get_input_defs() {
 		return ctx.inputs;
 	}
 
 	/** @brief Return a reference to the named output-stream definition map. */
-	subtree_map<node, size_t>& get_output_defs() {
+	subtree_htref_map<node, size_t>& get_output_defs() {
 		return ctx.outputs;
 	}
 
@@ -85,10 +85,11 @@ struct definitions {
 	 * New bindings from the I/O context are inserted into `global_scope` on each call.
 	 */
 	subtree_map<node, size_t>* get_global_scope() {
-		for (auto [var, type] : ctx.types) {
-			if (auto it = global_scope.find(var);
+		for (auto& [var, type] : ctx.types) {
+			tref t = var->get();
+			if (auto it = global_scope.find(t);
 				it == global_scope.end())
-					global_scope[var] = type;
+					global_scope[t] = type;
 		}
 		return &global_scope;
 	}
@@ -99,7 +100,7 @@ struct definitions {
 	}
 
 	/** @brief Return a reference to the per-node type map in the I/O context. */
-	subtree_map<node, size_t>& get_types() {
+	subtree_htref_map<node, size_t>& get_types() {
 		return ctx.types;
 	}
 
@@ -146,6 +147,18 @@ struct definitions {
 		bodies.clear();
 		ctx.clear();
 		global_scope.clear();
+	}
+
+	/**
+	 * @brief Insert every raw tref held by this registry into @p keep.
+	 *
+	 * `heads`/`bodies` are htrefs and `ctx.{types,inputs,outputs}` are
+	 * htref-keyed (auto-tracked via the non-expired weak_ptr entries in
+	 * `M`), so only the tref-keyed `global_scope` needs walking.
+	 * @param keep Set of tree nodes to preserve across gc.
+	 */
+	void collect_live_refs(std::unordered_set<tref>& keep) const {
+		for (auto& [k, _] : global_scope) keep.insert(k);
 	}
 private:
 	definitions() = default;

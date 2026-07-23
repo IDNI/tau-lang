@@ -562,22 +562,15 @@ const trefs& get_free_vars(tref n) {
 	if (typename node::type nt = tau::get(n).get_type();
 		nt != tau::bf && nt != tau::wff) return no_free_vars;
 
-	using cache_t = subtree_unordered_map<node, size_t>;
+	using cache_t = subtree_unordered_map<node, free_vars_ref>;
 	static cache_t& free_vars_map = tau::template create_cache<cache_t>();
-	// Register once: clear free_vars_pool/index on gc so stale treef keys
-	// don't cause false matches after gc frees and reallocates nodes.
-	static bool pool_gc_registered = false;
-	if (!pool_gc_registered) {
-		pool_gc_registered = true;
-		tau::gc_callbacks.push_back([](const std::unordered_set<tref>&) {
-			free_vars_pool.clear();
-			free_vars_pool.push_back({});
-			free_vars_pool_index.clear();
-			free_vars_pool_index.emplace(trefs{}, 0);
-		});
-	}
+	// Sweep the (global) intern pool of expired sets once per gc.
+	static const bool sweep_registered = (tau::gc_callbacks.push_back(
+		[](const std::unordered_set<tref>&) { sweep_interned_free_vars(); }),
+		true);
+	(void) sweep_registered;
 	if (auto it = free_vars_map.find(n); it != free_vars_map.end())
-		return free_vars_pool[it->second];
+		return *it->second.sp;
 
 	DBG(LOG_TRACE << "Begin get_free_vars of " << LOG_FM(n);)
 	// Scope-aware collection: each binder opens a scope; on leaving it,
@@ -647,20 +640,8 @@ const trefs& get_free_vars(tref n) {
 	LOG_TRACE << "End get_free_vars " << LOG_FM(n);
 	for (tref v : fv) LOG_TRACE << "\tfree var: " << LOG_FM(v);
 #endif
-	size_t id = free_vars_pool.size();
-	if (auto it = free_vars_pool_index.find(fv);
-		it != free_vars_pool_index.end()) id = it->second;
-	else free_vars_pool_index.emplace(fv, id),
-		free_vars_pool.emplace_back(std::move(fv));
-	free_vars_map.emplace(n, id);
-#ifdef DEBUG
-	LOG_TRACE << "free_vars_map[" << LOG_FM(n) << "] = " << id;
-	std::stringstream ss;
-	ss << "free_vars_pool[" << id << "] = ";
-	for (tref v : free_vars_pool[id]) ss << LOG_FM(v) << " ";
-	LOG_TRACE << ss.str();
-#endif
-	return free_vars_pool[id];
+	auto [it, _] = free_vars_map.emplace(n, intern_free_vars(std::move(fv)));
+	return *it->second.sp;
 }
 
 template <NodeType node>

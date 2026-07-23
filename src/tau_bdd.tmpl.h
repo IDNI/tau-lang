@@ -853,6 +853,13 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::abs(ref x) {
 	return x.inv = false, x;
 }
 
+/** @internal @copydoc tau_term_bdd::collect_live_refs(std::unordered_set<tref>&) @endinternal */
+template<NodeType node>
+void tau_term_bdd<node>::collect_live_refs(std::unordered_set<tref>& keep) {
+	for (const auto& [bn, _] : bintree<tau_bdd_node<node>>::M())
+		if (bn.value.v) keep.insert(bn.value.v);
+}
+
 template<NodeType node>
 tau_term_bdd_handle<node>::universe_t& tau_term_bdd_handle<node>::U =
 	bintree<node>::template create_cache<universe_t>();
@@ -1033,7 +1040,7 @@ void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	using tau = tree<node>;
 	if (!bdd_tref) return;
 	if (auto it = cache.find(bdd_tref); it != cache.end()) {
-		const trefs& cached = free_vars_pool[it->second];
+		const trefs& cached = *it->second.sp;
 		merged.insert(cached.begin(), cached.end());
 		return;
 	}
@@ -1063,12 +1070,13 @@ template<NodeType node>
 const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
 	static const trefs no_free_vars{};
 	if (!bdd_tref) return no_free_vars;
-#ifdef TAU_CACHE
+	// Cache: BDD node -> interned free-var set (deduped with get_free_vars via
+	// intern_free_vars). Unconditional (not TAU_CACHE-gated) so the returned
+	// reference has stable storage; only per-node memoization is TAU_CACHE-only.
 	static bdd_fv_cache_t& cache =
 		tbdd::template create_cache<bdd_fv_cache_t>();
 	if (auto it = cache.find(bdd_tref); it != cache.end())
-		return free_vars_pool[it->second];
-#endif
+		return *it->second.sp;
 	subtree_set<node> merged;
 #ifdef TAU_CACHE
 	get_free_tau_vars_impl(bdd_tref, merged, cache);
@@ -1076,15 +1084,8 @@ const trefs& tau_term_bdd_handle<node>::get_free_tau_vars(tref bdd_tref) {
 	get_free_tau_vars_impl(bdd_tref, merged);
 #endif
 	trefs fv(merged.begin(), merged.end());
-	size_t id = free_vars_pool.size();
-	if (auto it = free_vars_pool_index.find(fv);
-		it != free_vars_pool_index.end()) id = it->second;
-	else free_vars_pool_index.emplace(fv, id),
-		free_vars_pool.emplace_back(std::move(fv));
-#ifdef TAU_CACHE
-	cache.emplace(bdd_tref, id);
-#endif
-	return free_vars_pool[id];
+	auto [it, _] = cache.emplace(bdd_tref, intern_free_vars(std::move(fv)));
+	return *it->second.sp;
 }
 
 } // namespace idni::tau_lang

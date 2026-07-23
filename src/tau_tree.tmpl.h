@@ -128,9 +128,6 @@ int_t get_max_shift(const trefs& io_vars, bool ignore_temps = false);
 template <NodeType node>
 int_t get_max_initial(const trefs& io_vars);
 
-inline static std::deque<trefs> free_vars_pool{ {} };
-inline static std::map<trefs, size_t> free_vars_pool_index{ { {}, 0 } };
-
 template <NodeType node>
 const trefs& get_free_vars(tref n);
 
@@ -218,6 +215,11 @@ template <NodeType node>
 htref tree<node>::geth(tref h) {
 	DBG(assert(h != nullptr);)
 	return base_t::geth(h);
+}
+
+template <NodeType node>
+size_t tree<node>::m_size() {
+	return bintree<node>::M().size();
 }
 
 template <NodeType node>

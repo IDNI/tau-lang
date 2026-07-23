@@ -13,6 +13,8 @@
 #ifndef __IDNI__TAU__IO_CONTEXT_H__
 #define __IDNI__TAU__IO_CONTEXT_H__
 
+#include <functional>
+
 #include "tau_tree.h"
 
 #undef LOG_CHANNEL_NAME
@@ -122,6 +124,31 @@ struct console_prompt_input_stream : public console_input_stream {
 private:
 	std::string name;
 	inline static size_t max_length = 0;
+};
+
+/** @brief Non-blocking input stream for the REPL's interactive `run`: holds
+ * one `set()` value. `get()` returns it, or (when none is set) marks itself
+ * `awaiting()` and returns "" so the step stops cleanly; the REPL then finds
+ * the awaiting stream and prompts for a value (no exceptions, for WASM). The
+ * prompt label and type handling are the REPL's concern, not the stream's. */
+struct repl_pending_input_stream : public serialized_constant_input_stream {
+	repl_pending_input_stream() = default;
+	virtual ~repl_pending_input_stream() = default;
+	/** @brief Rebuild by returning a new `repl_pending_input_stream`. */
+	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
+	virtual std::optional<std::string> get() override;
+	/** @brief Return the set value, or "" after flagging `awaiting()`. */
+	virtual std::optional<std::string> get(size_t time_point) override;
+	/** @brief Set the value the REPL just read from the user. */
+	void set(const std::string& value);
+	/** @brief True when the last `get()` had no value and wants one. */
+	bool awaiting() const { return awaiting_; }
+	/** @brief Time point of the awaited value (valid when `awaiting()`). */
+	size_t awaiting_time_point() const { return awaiting_time_point_; }
+private:
+	std::optional<std::string> pending_value;
+	bool awaiting_ = false;
+	size_t awaiting_time_point_ = 0;
 };
 
 /**
@@ -237,11 +264,15 @@ protected:
  */
 template <NodeType node>
 struct io_context {
-	subtree_map<node, size_t> types;           ///< IO variable → BA type id.
-	subtree_map<node, size_t> inputs;          ///< IO variable → input stream name id.
-	subtree_map<node, size_t> outputs;         ///< IO variable → output stream name id.
+	subtree_htref_map<node, size_t> types;     ///< IO variable → BA type id.
+	subtree_htref_map<node, size_t> inputs;    ///< IO variable → input stream name id.
+	subtree_htref_map<node, size_t> outputs;   ///< IO variable → output stream name id.
 	input_streams_remap       input_remaps;    ///< Variable name → input stream.
 	output_streams_remap      output_remaps;   ///< Variable name → output stream.
+	/// Optional override for building a stream-id-0 console input stream;
+	/// null keeps the blocking default. The REPL sets a non-blocking one.
+	std::function<std::shared_ptr<serialized_constant_input_stream>(
+		const std::string& name)> console_input_factory;
 
 	/**
 	 * @brief Return the BA type id of IO variable @p var.

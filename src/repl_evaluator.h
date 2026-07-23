@@ -50,10 +50,17 @@
 #ifndef __IDNI__TAU__REPL_EVALUATOR_H__
 #define __IDNI__TAU__REPL_EVALUATOR_H__
 
+#include <memory>
+
 #include "boolean_algebras/tau_ba.h"
 #include "api.h"
+#include "io_context.h"
+#include "tau_spec.h"
 #include "utility/repl.h"
 #include "parse_error_hint.h"
+#ifdef TAU_PARSER_HAS_FTXUI
+#include "utility/repl_ftxui.h"
+#endif
 
 namespace idni::tau_lang {
 
@@ -76,6 +83,9 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 struct repl_evaluator {
 	friend struct repl<repl_evaluator<BAs...>>;
+#ifdef TAU_PARSER_HAS_FTXUI
+	friend struct repl_ftxui<repl_evaluator<BAs...>>;
+#endif
 	using history = htref;
 	using history_ref = std::optional<std::pair<history, size_t>>;
 
@@ -118,10 +128,33 @@ struct repl_evaluator {
 	 * @return Exit code (0 = success, non-zero = error/quit).
 	 */
 	int eval(const std::string& src);
-	/** @brief Return the prompt string to display before each input line. */
-	std::string prompt();
+	/** @brief Rebuild the prompt string and push it to the active REPL frontend. */
+	void reprompt();
+#ifdef TAU_PARSER_HAS_FTXUI
+	/** @brief Single-key hook for the FTXUI REPL: drives the interactive
+	 * `run` continue/quit gate and Ctrl-C abort without a submitted line. */
+	repl_key_action on_repl_key(const std::string& key);
+#endif
 
 private:
+	/// @brief State for one resumable `run` session: the interpreter and
+	/// its benchmarking survive across multiple eval() calls.
+	struct run_session {
+		interpreter<node> interp;
+		measuring m;
+		idni::measures::timer t;
+		run_session(interpreter<node> i) : interp(std::move(i)), m("run") {}
+	};
+	/// @brief What the *next* eval() call's input line answers, while set;
+	/// eval() checks this before parsing src as a normal CLI command.
+	struct pending_request {
+		enum kind_t { continue_or_quit, stream_value } kind;
+		std::string label; ///< prompt text shown while awaiting the answer
+		std::shared_ptr<repl_pending_input_stream> stream; // stream_value only
+		size_t time_point = 0; // stream_value only
+		tref type_tree = nullptr; // stream_value only: for incomplete check
+	};
+
 	// commands
 	/// @brief Execute the `version` command (print version info).
 	void version_cmd();
@@ -194,6 +227,15 @@ private:
 	/// @brief Run the specification in @p n.
 	void run_cmd(const tt& n);
 	void ltl_cmd(const tt& n);
+	/// @brief Resume a `run` session until it finishes or needs input
+	/// (suspends via `pending`); @p retry re-asks it on a rejected value.
+	void continue_running(std::optional<pending_request> retry = std::nullopt);
+	/// @brief Print benchmarks and clear the current `run` session.
+	void finish_running();
+	/// @brief True if @p src is an incomplete (multiline) value of BA type
+	/// @p type_tree, enabling the same continuation as top-level input.
+	bool stream_value_incomplete(const std::string& src,
+		tref type_tree) const;
 	/// @brief Solve the formula in @p n.
 	void solve_cmd(const tt& n);
 	/// @brief Compute the LGRS solution for the formula in @p n.
@@ -271,8 +313,17 @@ private:
 	trefs io_defs;
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
+#ifdef TAU_PARSER_HAS_FTXUI
+	repl_ftxui<repl_evaluator<BAs...>>* r_ftx = nullptr;
+#endif
 	bool error = false;
 	term::colors TC{};
+
+	std::unique_ptr<run_session> running;
+	std::optional<pending_request> pending;
+	// Set by on_repl_key (Ctrl-C) to abort the current run on the next
+	// resume, instead of treating the (empty) submit as a stream value.
+	bool run_abort_ = false;
 };
 
 } //idni::tau_lang namespace

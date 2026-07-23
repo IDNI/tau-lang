@@ -43,4 +43,7 @@ target_include_directories(${TAU_PYTHON_BINDING_MODULE} PRIVATE
 	"${TAU_SHARED_PREFIX}/boost/dist/include"
 )
 
+set_source_files_properties(tau_nanobind.cpp PROPERTIES
+	COMPILE_OPTIONS "-Wno-error")
+
 # target_compile_options(${TAU_PYTHON_BINDING_MODULE} PRIVATE -Wfatal-errors)
