@@ -184,8 +184,16 @@ qint qint_splitter(const qint& x, splitter_type /*st*/) {
 	auto& [lo, hi] = *x.intervals.begin();
 	using namespace qint_detail;
 	if (std::isinf(lo) && std::isinf(hi)) return qint{{ {NEG_INF, 0.0} }};
-	if (std::isinf(lo))                   return qint{{ {NEG_INF, hi - 1.0} }};
-	if (std::isinf(hi))                   return qint{{ {lo, lo + 1.0} }};
+	if (std::isinf(lo)) {
+		double cut = hi - 1.0;
+		if (!(cut < hi)) return qint{{ {lo, hi} }}; // saturated (degenerate)
+		return qint{{ {NEG_INF, cut} }};
+	}
+	if (std::isinf(hi)) {
+		double cut = lo + 1.0;
+		if (!(cut > lo)) return qint{{ {lo, hi} }}; // saturated (degenerate)
+		return qint{{ {lo, cut} }};
+	}
 	double mid = lo / 2.0 + hi / 2.0;
 	if (mid <= lo || mid >= hi) return qint{{ {lo, hi} }}; // degenerate
 	return qint{{ {lo, mid} }};

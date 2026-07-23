@@ -22,6 +22,7 @@ using idni::tau_lang::splitter_type;
 
 static constexpr double POS_INF =  std::numeric_limits<double>::infinity();
 static constexpr double NEG_INF = -std::numeric_limits<double>::infinity();
+static constexpr double DBL_MAXV = std::numeric_limits<double>::max();
 
 // Construct a single-interval qint [lo, hi)
 static qint qi(double lo, double hi) {
@@ -624,6 +625,46 @@ TEST_CASE("splitter of [0, +inf) is subset of [0, +inf)") {
 	auto s = qint_splitter(a, splitter_type::upper);
 	CHECK_FALSE(s.is_empty());
 	CHECK(is_qint_zero(s & ~a));
+}
+
+TEST_CASE("splitter of [-inf, -DBL_MAX) is the input, not a degenerate interval") {
+	// hi - 1.0 saturates at hi == -DBL_MAX: no proper sub-element exists,
+	// so the splitter must return the input unchanged
+	auto a = qi(NEG_INF, -DBL_MAXV);
+	auto s = qint_splitter(a, splitter_type::upper);
+	CHECK(s == a);
+	CHECK_FALSE(s.is_empty());
+	CHECK(s.intervals.size() == 1);
+	CHECK(piece(s, 0).first < piece(s, 0).second); // non-degenerate
+}
+
+TEST_CASE("splitter of [DBL_MAX, +inf) is the input, not a degenerate interval") {
+	// lo + 1.0 saturates at lo == DBL_MAX: no proper sub-element exists,
+	// so the splitter must return the input unchanged
+	auto a = qi(DBL_MAXV, POS_INF);
+	auto s = qint_splitter(a, splitter_type::upper);
+	CHECK(s == a);
+	CHECK_FALSE(s.is_empty());
+	CHECK(s.intervals.size() == 1);
+	CHECK(piece(s, 0).first < piece(s, 0).second); // non-degenerate
+}
+
+TEST_CASE("splitter of [-inf, 0) still splits properly (not saturated)") {
+	auto a = qi(NEG_INF, 0.0);
+	auto s = qint_splitter(a, splitter_type::upper);
+	CHECK_FALSE(s.is_empty());
+	CHECK(is_qint_zero(s & ~a)); // subset of input
+	CHECK(s != a);               // proper sub-element
+	CHECK(deq(piece(s, 0).second, -1.0));
+}
+
+TEST_CASE("splitter of [0, +inf) still splits properly (not saturated)") {
+	auto a = qi(0.0, POS_INF);
+	auto s = qint_splitter(a, splitter_type::upper);
+	CHECK_FALSE(s.is_empty());
+	CHECK(is_qint_zero(s & ~a)); // subset of input
+	CHECK(s != a);               // proper sub-element
+	CHECK(deq(piece(s, 0).second, 1.0));
 }
 
 TEST_CASE("splitter of top: complement is non-empty (middle type)") {
