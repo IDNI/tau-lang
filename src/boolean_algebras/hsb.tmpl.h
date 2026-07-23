@@ -116,6 +116,10 @@ inline std::string hsb_halfspace::to_string() const {
 inline size_t hsb_halfspace_pool::insert(const hsb_halfspace& h) {
 	auto it = index_.find(h);
 	if (it != index_.end()) return it->second;
+	// Index 0 is reserved: hsb_node uses data = 0 as the "no data"
+	// sentinel, so real halfspaces must be 1-indexed. Slot 0 holds an
+	// inert default-constructed entry that is never handed out.
+	if (pool_.empty()) pool_.emplace_back();
 	size_t idx = pool_.size();
 	pool_.push_back(h);
 	index_[h] = idx;
@@ -131,7 +135,8 @@ inline size_t hsb_halfspace_pool::complement_index(size_t idx) {
 }
 
 inline size_t hsb_halfspace_pool::size() {
-	return pool_.size();
+	// Exclude the reserved sentinel entry at index 0.
+	return pool_.empty() ? 0 : pool_.size() - 1;
 }
 
 // =============================================================================

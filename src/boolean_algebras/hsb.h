@@ -110,8 +110,10 @@ struct hsb_halfspace {
 // =============================================================================
 
 /// @cond INTERNAL
+/// Index 0 is reserved (hsb_node uses data = 0 as the "no data" sentinel):
+/// real halfspaces are 1-indexed; slot 0 holds an inert dummy entry.
 struct hsb_halfspace_pool {
-	/// Insert h (after normalizing) and return its pool index.
+	/// Insert h (after normalizing) and return its pool index (never 0).
 	/// Returns an existing index if an equal normalized halfspace is found.
 	static size_t insert(const hsb_halfspace& h);
 
@@ -121,6 +123,7 @@ struct hsb_halfspace_pool {
 	/// Return the pool index of the complement (~h), inserting if needed.
 	static size_t complement_index(size_t idx);
 
+	/// Number of interned halfspaces (excludes the reserved sentinel entry).
 	static size_t size();
 
 private:

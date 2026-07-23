@@ -185,6 +185,61 @@ TEST_SUITE("hsb — basic construction") {
 
 } // TEST_SUITE basic construction
 
+TEST_SUITE("hsb — halfspace pool") {
+
+	using idni::tau_lang::hsb_halfspace_pool;
+
+	// Make a raw halfspace value (not wrapped in an hsb tree).
+	static hsb_halfspace raw_hs(std::vector<double> w, double b) {
+		hsb_halfspace h;
+		h.w = std::move(w);
+		h.b = b;
+		return h;
+	}
+
+	// Regression (D7): index 0 is the hsb_node "no data" sentinel, so the
+	// pool must never hand it out — real halfspaces are 1-indexed.
+	TEST_CASE("insert never returns the reserved index 0") {
+		CHECK(hsb_halfspace_pool::insert(raw_hs({1.0, 7.25}, 0.5)) != 0);
+		CHECK(hsb_halfspace_pool::insert(raw_hs({-1.0, 7.25}, -0.5)) != 0);
+		CHECK(hsb_halfspace_pool::insert(raw_hs({0.0, 3.5}, 2.0)) != 0);
+	}
+
+	TEST_CASE("values round-trip through insert/get") {
+		auto h = raw_hs({2.0, -4.5, 1.0}, 3.75);
+		size_t idx = hsb_halfspace_pool::insert(h);
+		CHECK(idx != 0);
+		CHECK(hsb_halfspace_pool::get(idx) == h);
+	}
+
+	TEST_CASE("equal halfspaces intern to the same index") {
+		auto h = raw_hs({5.0, 0.0, -2.5}, -1.25);
+		size_t i1 = hsb_halfspace_pool::insert(h);
+		size_t i2 = hsb_halfspace_pool::insert(raw_hs({5.0, 0.0, -2.5}, -1.25));
+		CHECK(i1 == i2);
+	}
+
+	TEST_CASE("size counts interned halfspaces, excluding the sentinel") {
+		size_t before = hsb_halfspace_pool::size();
+		auto h = raw_hs({9.0, -6.5}, 4.25);
+		size_t idx = hsb_halfspace_pool::insert(h);
+		CHECK(hsb_halfspace_pool::size() == before + 1);
+		CHECK(hsb_halfspace_pool::insert(h) == idx); // no growth on re-insert
+		CHECK(hsb_halfspace_pool::size() == before + 1);
+	}
+
+	TEST_CASE("complement_index is an involution") {
+		size_t idx = hsb_halfspace_pool::insert(raw_hs({3.0, -1.0}, 2.5));
+		size_t cidx = hsb_halfspace_pool::complement_index(idx);
+		CHECK(cidx != 0);
+		CHECK(cidx != idx);
+		CHECK(hsb_halfspace_pool::complement_index(cidx) == idx);
+		CHECK(hsb_halfspace_pool::get(cidx)
+			== hsb_halfspace_pool::get(idx).negate());
+	}
+
+} // TEST_SUITE halfspace pool
+
 TEST_SUITE("hsb — BA operations") {
 
 	TEST_CASE("and with bot/top") {

@@ -24,7 +24,8 @@ struct hsb_node {
 	using kind = hsb_parser::nonterminal;
 
 	kind   nt   = hsb_parser::hsb_bot;
-	size_t data = 0;    ///< Pool index for hsb_hs; 0 for all others.
+	size_t data = 0;    ///< Pool index for hsb_hs (always ≥ 1; the pool
+	                    ///< reserves index 0); 0 for all others.
 	size_t hash = 0;    ///< Precomputed hash of (nt, data).
 
 	bool operator==(const hsb_node& o) const noexcept {
