@@ -350,6 +350,50 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 		CHECK(W1.empty());  // sys loses (stuck)
 	}
 
+	TEST_CASE("[ALG-D-40] Zielonka: sys dead end with sys-favoring priority "
+	          "is still lost by sys") {
+		// State 0 (sys/player 1), priority 1 (odd = sys-favoring), no
+		// successors.  A stuck player loses immediately regardless of
+		// priority, so sys must NOT win via its own priority parity.
+		alg_d::ProductGame pg;
+		pg.n_states  = 1;
+		pg.init      = 0;
+		pg.player    = {1};
+		pg.priority  = {1};
+		pg.succs     = {{}};  // sys stuck
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.empty());  // sys loses (stuck)
+	}
+
+	TEST_CASE("[ALG-D-41] Zielonka: env dead end with env-favoring priority "
+	          "is still lost by env") {
+		// State 0 (env/player 0), priority 0 (even = env-favoring), no
+		// successors.  Env is stuck, so sys wins despite the priority.
+		alg_d::ProductGame pg;
+		pg.n_states  = 1;
+		pg.init      = 0;
+		pg.player    = {0};
+		pg.priority  = {0};
+		pg.succs     = {{}};  // env stuck
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.count(0));  // env loses (stuck) → sys wins
+	}
+
+	TEST_CASE("[ALG-D-42] Zielonka: chain forcing sys into a terminal dead "
+	          "end is won by env") {
+		// 0 (env) → 1 (sys) → 2 (sys, stuck).  All priorities odd
+		// (sys-favoring), but play is forced into the dead end where sys
+		// is stuck, so env wins the whole chain.
+		alg_d::ProductGame pg;
+		pg.n_states  = 3;
+		pg.init      = 0;
+		pg.player    = {0, 1, 1};
+		pg.priority  = {1, 1, 1};
+		pg.succs     = {{1}, {2}, {}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.empty());  // env wins every state of the chain
+	}
+
 	TEST_CASE("[ALG-D-22] G(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
 		// Output always > 0: always achievable (system sets y > 0 each step)
 		CHECK(alg_d_realizable("G (o1[t]:qlt > {0}:qlt)."));

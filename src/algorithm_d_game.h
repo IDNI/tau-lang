@@ -639,8 +639,31 @@ static std::pair<StateSet,StateSet> solve(
 		for (int v : succs[u])
 			if (V.count(v)) succs_V[u].push_back(v);
 
-	// States with no successors in V: player p loses (stuck)
-	// Add self-loops only for analysis (Zielonka's algorithm handles dead ends)
+	// Dead-end pre-pass: a state whose owner has no move in the current
+	// subgame is lost by that owner immediately, regardless of priority
+	// (plain Zielonka assumes every state has a successor).  The opponent
+	// additionally wins every state from which they can force play into
+	// such a dead end, so take the opponent's attractor of each dead-end
+	// set, remove both attracted regions, recurse on the remainder, and
+	// union the results.  Dead ends created by removing the attracted
+	// regions are caught one recursion deeper, so after this pre-pass
+	// every remaining state has a successor and standard Zielonka applies.
+	StateSet dead0, dead1; // dead ends owned by env (0) / sys (1)
+	for (int u : V)
+		if (succs_V[u].empty()) (plr[u] == 0 ? dead0 : dead1).insert(u);
+	if (!dead0.empty() || !dead1.empty()) {
+		StateSet W1d = dead0.empty() ? StateSet{}
+			: attractor(1, dead0, n, plr, succs_V);
+		StateSet W0d = dead1.empty() ? StateSet{}
+			: attractor(0, dead1, n, plr, succs_V);
+		StateSet Vr;
+		for (int u : V)
+			if (!W0d.count(u) && !W1d.count(u)) Vr.insert(u);
+		auto [W0r, W1r] = solve(Vr, n, plr, pri, succs);
+		for (int u : W0r) W0d.insert(u);
+		for (int u : W1r) W1d.insert(u);
+		return {W0d, W1d};
+	}
 
 	int c_max = -1;
 	for (int u : V) c_max = std::max(c_max, pri[u]);
