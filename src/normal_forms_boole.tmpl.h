@@ -128,7 +128,7 @@ tref term_boole_decomposition(tref term) {
 		// contains non-boolean ops, return as-is to avoid infinite loop.
 		if (simplified == term ||
 		    tau::get(simplified).find_top(is_non_boolean_term<node>)) {
-			LOG_ERROR << "term_boole_decomposition: "
+			LOG_DEBUG << "term_boole_decomposition: "
 				"simplification could not eliminate "
 				"non-boolean term\n";
 			return term;
@@ -1216,9 +1216,12 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			if (!tau::get(n).is(tau::wff)) return false;
 			// Exclude used atomic fms
 			if (used_atms.contains(n)) return false;
+			// wff nodes don't propagate ba_type, so test skip() on the inner
+			// bf term or bv atoms leak past and get Boole-decomposed.
+			tref inner = tau::get(n).first();
 			// Exclude atomic formulas the caller wants skipped (e.g. BV-typed)
-			if (skip(n)) return false;
-			const tau& c = tau::get(n)[0];
+			if (skip(inner)) return false;
+			const tau& c = tau::get(inner);
 			switch (c.value.nt) {
 				case tau::bf_eq:
 				case tau::bf_lt:
