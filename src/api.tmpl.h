@@ -529,8 +529,8 @@ std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 		return {};
 	}
 	// Exclude non-Boolean operations from equation
-	if (tau::get(eq)[0].find_top(is_non_boolean_term<node>) ||
-		tau::get(eq)[1].find_top(is_non_boolean_term<node>)) {
+	if (tau::get(equality)[0].find_top(is_non_boolean_term<node>) ||
+		tau::get(equality)[1].find_top(is_non_boolean_term<node>)) {
 		TAU_LOG_ERROR << "Found non-Boolean operation in equation";
 		return {};
 	}
