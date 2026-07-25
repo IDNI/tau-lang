@@ -399,7 +399,7 @@ post_normalization:
 					get_bv_size<node>(get_ba_type_tree<node>(bv_tid));
 				tref bv_one_val  = tau::get(tau::bf, {
 					tau::get_ba_constant(
-						make_bitvector_value(1, bv_sz), bv_tid)});
+						make_bitvector_value(bv_sz, 1), bv_tid)});
 				tref bv_zero_val = tau::get(tau::bf, {
 					tau::get_ba_constant(
 						make_bitvector_bottom_elem(bv_sz), bv_tid)});
@@ -646,7 +646,7 @@ std::pair<std::optional<assignment<node>>, bool>
 	solve_parts.reserve(step_spec.size());
 	{
 		trefs state_parts;
-	for (tref spec_part : step_spec) {
+		for (tref spec_part : step_spec) {
 			if (mentions_ltl_state_var<node>(spec_part))
 				state_parts.push_back(spec_part);
 			else solve_parts.push_back(spec_part);
