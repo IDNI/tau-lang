@@ -659,14 +659,15 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		arg = tau::get(arg).right_sibling();
 	auto check = get_type_and_arg(arg);
 	if (!check) return;
-	auto [type, value] = check.value();
+	auto [_, value] = check.value();
 	measuring m;
 	auto solution = tau_api::solve(m, value,
 		get_solver_cmd_mode<node>(n.value()));
 	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 
-	print_solver_cmd_solution<node>(solution, type);
+	print_solver_cmd_solution<node>(solution,
+		get_solver_cmd_type<node>(value));
 }
 
 template <typename... BAs>
@@ -685,13 +686,14 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 		arg = tau::get(arg).right_sibling();
 	auto check = get_type_and_arg(arg);
 	if (!check) return;
-	auto [type, value] = check.value();
+	auto [_, value] = check.value();
 	measuring m;
 	auto solution = tau_api::lgrs(m, value);
 	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
-	print_solver_cmd_solution<node>(solution, type);
+	print_solver_cmd_solution<node>(solution,
+		get_solver_cmd_type<node>(value));
 }
 
 template <typename... BAs>
