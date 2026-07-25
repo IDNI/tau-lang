@@ -552,6 +552,33 @@ std::pair<std::optional<assignment<node>>, bool>
 	return step(values.value());
 }
 
+// LTL state-variable names: Mealy "o__ltl_ms<i>__", S-operator "o__ltl_s<i>__".
+template <NodeType node>
+static bool is_ltl_state_var_name(const std::string& name) {
+	return (name.size() > 9 && name.compare(0, 9, "o__ltl_ms") == 0)
+		|| (name.size() > 8 && name.compare(0, 8, "o__ltl_s") == 0);
+}
+
+// True if any io_var inside `part` is one of those state variables.
+template <NodeType node>
+static bool mentions_ltl_state_var(tref part) {
+	using tau = tree<node>;
+	bool found = false;
+	auto f = [&found](tref n) {
+		if (found) return false;
+		if (tau::get(n).is(tau::io_var)
+			&& is_ltl_state_var_name<node>(
+				get_var_name<node>(tau::trim(n))))
+		{
+			found = true;
+			return false;
+		}
+		return true;
+	};
+	pre_order<node>(part).visit_unique(f);
+	return found;
+}
+
 template <NodeType node>
 std::pair<std::optional<assignment<node>>, bool>
 	interpreter<node>::step(const assignment<node>& values)
@@ -612,7 +639,24 @@ std::pair<std::optional<assignment<node>>, bool>
 	}
 
 	solution<node> global;
+	// Solve all state-touching conjuncts jointly: the one-hot state choice
+	// and the transition rules constraining it live in separate conjuncts,
+	// and solving those in order commits to a state with no backtracking.
+	trefs solve_parts;
+	solve_parts.reserve(step_spec.size());
+	{
+		trefs state_parts;
 	for (tref spec_part : step_spec) {
+			if (mentions_ltl_state_var<node>(spec_part))
+				state_parts.push_back(spec_part);
+			else solve_parts.push_back(spec_part);
+		}
+		// State choice must be committed before conjuncts reading it.
+		if (!state_parts.empty()) solve_parts.insert(solve_parts.begin(),
+			state_parts.size() == 1 ? state_parts.front()
+				: tau::build_wff_and(state_parts));
+	}
+	for (tref spec_part : solve_parts) {
 		// Try to solve a path/disjunct of the current step specification part
 		bool solved = false;
 		for (tref path : expression_paths<node>(spec_part)) {
