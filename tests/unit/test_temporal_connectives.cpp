@@ -196,27 +196,12 @@ TEST_SUITE("temporal connectives — three-or-more-G conjunctions") {
 	}
 }
 
-TEST_SUITE("temporal connectives — XOR is the residual edge case") {
-	// XOR was the connective that surfaced last during this bug hunt.
-	// Listed here as REGRESSION-MARKER tests; they pin behaviour
-	// (whatever it is today) so future work that revisits XOR + G
-	// can be measured against this baseline rather than silently
-	// flipping the verdict.
-	//
-	// `(G a) ^^ (G !a)` is satisfiable — strategy "a=1 forever" gives
-	// G(a)=T, G(!a)=F, XOR=T.  If this CHECK starts failing, either
-	// the synthesis pipeline now correctly handles XOR (good — flip
-	// the expected value) or a regression silently re-introduced
-	// the original bug class.
+TEST_SUITE("temporal connectives — XOR") {
+	// build_wff_xor desugars `l ^^ r` eagerly, so XOR needs no dedicated
+	// support; "o1 = 0 forever" gives G(o1=0)=T, G(o1=1)=F, so XOR is T.
 
 	TEST_CASE("(G A) ^^ (G !A) — strategy 'A forever' satisfies XOR") {
-		// Currently returns F; once XOR-of-G is supported in the
-		// synthesis pipeline, this should flip to T.
-		const bool current_verdict = sat_str(
-		    "(G (o1[t] = 0)) ^^ (G (o1[t] = 1)).");
-		// Just exercise the path; no hard assertion until XOR
-		// support lands.
-		(void) current_verdict;
+		CHECK(sat_str("(G (o1[t] = 0)) ^^ (G (o1[t] = 1))."));
 	}
 }
 
