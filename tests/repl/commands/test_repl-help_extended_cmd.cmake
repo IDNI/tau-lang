@@ -21,6 +21,10 @@ add_repl_test(help_sat_cmd        "help sat"     "sat command")
 add_repl_test(help_valid_cmd      "help valid"   "valid command")
 add_repl_test(help_unsat_cmd      "help unsat"   "unsat command")
 
+# realizable/unrealizable
+add_repl_test(help_realizable_cmd   "help realizable"   "realizable command")
+add_repl_test(help_unrealizable_cmd "help unrealizable" "unrealizable command")
+
 # ltl command
 add_repl_test(help_ltl_cmd        "help ltl"     "ltl command")
 

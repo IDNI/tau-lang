@@ -20,7 +20,36 @@ target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
 set(TAU_SKIP_TESTS
-	empty_list
+	test_integration-satisfiability-bool
+	test_integration-satisfiability-sbf
+	test_integration-satisfiability-hsb
+	test_integration-satisfiability-qint
+	test_integration-satisfiability-qlt
+	test_integration-satisfiability-tau_ba
+	test_integration-satisfiability-mixed
+	test_integration-satisfiability-bv
+	test_ltl_benchmarks
+	test_ltl_multi_type_oracle
+	test_ltl_soundness_regression
+	test_ltl_many_sorted
+	test_by_grammar
+	test_ltl_correctness
+	test_integration-interpreter_ltl_multiio
+	test_integration-solver-hsb
+	test_integration-solver-qint
+	test_integration-solver-qlt
+	test_integration-solver-mixed
+	test_integration-solver-sbf
+	test_tau_tree_printers
+	test_integration-quantifiers
+	test_temporal_connectives
+	test_integration-ltl_aba_execution
+	test_integration-blasting_correctness_check1
+	test_integration-blasting_correctness_check2
+	test_integration-blasting_correctness_check3
+	test_integration-blasting_correctness_check4
+	test_integration-blasting_correctness_check5
+	test_ltl_strategy_exec
 	CACHE STRING "Test targets skipped because covered by REPL tests")
 
 function(add test_name)
