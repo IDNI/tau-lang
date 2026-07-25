@@ -56,6 +56,7 @@ set(TAU_SOURCES
 	instantiate_test_pack.cpp
 	base_ba_dispatcher_bv_sbf.cpp
 	base_ba_dispatcher_full_pack.cpp
+	base_ba_dispatcher_bv_bool.cpp
 )
 
 find_package(CURL REQUIRED)
