@@ -302,6 +302,10 @@ bool is_bv_solvable_formula(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
+	// Temporal operators have no cvc5 encoding; bail out before translating.
+	if (tau::get(form).find_top(is_temporal_quantifier<node>))
+		return false;
+
 	bool solvable = true;
 	auto check = [&](tref n) {
 		if (is<node>(n, tau::variable)) {
@@ -332,7 +336,7 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	if (!expr) {
-		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
+		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
 		return std::nullopt;
 	}
@@ -378,7 +382,7 @@ std::optional<solution<node>> solve_bv(const tref form) {
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	if (!expr) {
-		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
+		LOG_DEBUG << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
 		return std::nullopt;
 	}
