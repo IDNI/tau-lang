@@ -458,22 +458,22 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		value = get_any(fc | tt::ref);
 
 	if (value) {
-	DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
+		DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
 		// tau_spec path resolves io_vars for LTL and safety formulas.
-	tau_spec<node> spec;
-	spec.add(value);
-	for (tref d : rr_defs) spec.add(d);
-	for (tref d : io_defs) spec.add(d);
+		tau_spec<node> spec;
+		spec.add(value);
+		for (tref d : rr_defs) spec.add(d);
+		for (tref d : io_defs) spec.add(d);
 
-	auto maybe_i = tau_api::get_interpreter(m.part(), spec);
-	if (!maybe_i) return;
+		auto maybe_i = tau_api::get_interpreter(m.part(), spec);
+		if (!maybe_i) return;
 
 		// A new formula replaces any stored session.
-	running = std::make_unique<run_session>(std::move(maybe_i.value()));
+		running = std::make_unique<run_session>(std::move(maybe_i.value()));
 		running->steps_done   = 0;
 		running->steps_to_run = steps; // 0 = natural
-	running->t.start();
-	continue_running();
+		running->t.start();
+		continue_running();
 		return;
 	}
 
@@ -885,14 +885,12 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
-	// remove ascii char 22 and strip # comment lines
+	// Remove ascii char 22 only. '#' comments are handled by the grammar;
+	// a manual strip here was brace-blind and swallowed {#b...} constants.
 	std::string filt;
 	filt.reserve(src.size());
 	for (size_t i = 0; i < src.size(); ) {
-		if (src[i] == '#') {
-			// skip to end of line
-			while (i < src.size() && src[i] != '\n' && src[i] != '\r') ++i;
-		} else if (static_cast<unsigned char>(src[i]) == 22) {
+		if (static_cast<unsigned char>(src[i]) == 22) {
 			++i; // skip ascii 22
 		} else {
 			filt += src[i++];
