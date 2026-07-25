@@ -334,9 +334,6 @@ private:
 		const trefs& in_vars, size_t time_step);
 	/// @brief Write output assignments to the output context.
 	bool write(const assignment<node>& outputs);
-	/// @brief Serialize @p constant of @p type to @p ss.
-	bool serialize_constant(std::stringstream& ss, tref constant,
-		size_t type) const;
 	/// @brief Rebuild the input stream map from @p current_inputs.
 	/// @return false if a stream could not be found (interpretation should stop).
 	bool rebuild_inputs(const subtree_map<node, size_t>& current_inputs);

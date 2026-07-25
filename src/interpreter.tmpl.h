@@ -124,26 +124,6 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 }
 
 template <NodeType node>
-bool interpreter<node>::serialize_constant(std::stringstream& ss,
-	tref constant, size_t type) const
-{
-	DBG(LOG_TRACE << "serialize_constant[constant]: " << LOG_FM_DUMP(constant) << "\n";)
-	auto value = tt(constant) | tau::ba_constant;
-	if (!value) {
-		// is bf_t
-		if (auto check = tt(constant) | tau::bf_t; check)
-			ss << node::ba::one(get_ba_type_tree<node>(type));
-		// is bf_f
-		else if (auto check = tt(constant) | tau::bf_f; check)
-			ss << node::ba::zero(get_ba_type_tree<node>(type));
-		// is something else but not a BA element
-		else return false;
-	} else ss << (value | tt::ba_constant);
-	DBG(LOG_TRACE << "serialize_constant[ss]: " << ss.str() << "\n";)
-	return true;
-}
-
-template <NodeType node>
 bool interpreter<node>::write(const assignment<node>& output_values) {
 	// Sort variables in output by time
 	trefs io_vars;
@@ -168,7 +148,7 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		DBG(LOG_TRACE << "write[canonized]: " << LOG_FM(vn));
 		auto value = tt(output_values.find(io_var)->second) | tau::ba_constant;
 		std::stringstream ss;
-		if (!serialize_constant(ss, output_values.find(io_var)->second,
+		if (!serialize_constant<node>(ss, output_values.find(io_var)->second,
 			ctx.type_of(vn)))
 		{
 			LOG_ERROR << "No Boolean algebra element assigned to "
@@ -1324,7 +1304,7 @@ int interpreter<node>::current_state() const {
 			std::stringstream ss;
 			size_t ctype = ctx.type_of(trimmed);
 			if (ctype == 0) continue;
-			if (!serialize_constant(ss, val, ctype)) continue;
+			if (!serialize_constant<node>(ss, val, ctype)) continue;
 			// bv-1 serialises as "1" (the splitter convention used by
 			// the bv BA in tau-lang). bv-0 serialises as "0". Anything
 			// else is unexpected; treat as inactive.
@@ -1434,7 +1414,7 @@ std::string interpreter<node>::accumulator_state(const std::string& name) const
 			std::stringstream ss;
 			size_t ctype = ctx.type_of(trimmed);
 			if (ctype == 0) continue;
-			if (!serialize_constant(ss, val, ctype)) continue;
+			if (!serialize_constant<node>(ss, val, ctype)) continue;
 			std::string s = ss.str();
 			while (!s.empty() && (s.back() == ' ' || s.back() == '\n'))
 				s.pop_back();

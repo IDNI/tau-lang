@@ -619,33 +619,23 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	auto print_zero_case = [&type_id](tref var) {
-		std::cout << "\t" << tau::get(var).to_str() << " := {"
-			<< node::ba::zero(get_ba_type_tree<node>(type_id))
-			<< "}:" << ba_types<node>::name(type_id) << "\n";
-	};
-
-	auto print_one_case = [&type_id](tref var) {
-		std::cout << "\t" << tau::get(var).to_str() << " := {"
-			<< node::ba::one(get_ba_type_tree<node>(type_id))
-			<< "}:" << ba_types<node>::name(type_id) << "\n";
-	};
-
-	auto print_general_case = [](tref var, tref value) {
-		std::cout << "\t" << tau::get(var).to_str() << " := "
-			<< tau::get(value).to_str() << "\n";
-	};
-
+	// bf_t/bf_f carry no BA type; serialize_constant renders them as the
+	// type's one/zero. type_id is the fallback for untyped variables.
 	if (!solution) { std::cout << "no solution\n"; return; }
 
 	std::cout << "solution: {\n";
 	for (auto [var, value]: solution.value()) {
-		if (auto check = tt(value) | tau::bf_t; check)
-			print_one_case(var);
-		else if (check = tt(value) | tau::bf_f; check)
-			print_zero_case(var);
-		else
-			print_general_case(var, value);
+		if (tt(value) | tau::ba_constant) {
+			print_binding<node>(std::cout, var, value);
+			continue;
+		}
+		size_t t = find_ba_type<node>(var);
+		if (t == 0) t = type_id;
+		std::stringstream ss;
+		if (!serialize_constant<node>(ss, value, t))
+			print_binding<node>(std::cout, var, value);
+		else std::cout << "\t" << tau::get(var).to_str() << " := {"
+			<< ss.str() << "}" << ba_types<node>::name(t) << "\n";
 	}
 	std::cout << "}\n";
 }

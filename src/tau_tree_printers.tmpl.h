@@ -172,6 +172,30 @@ std::ostream& operator<<(std::ostream& os, const io_context<node>& ctx) {
 	return os << "\n";
 }
 
+// One "\tvar := value" binding line, type-agnostic.
+template <NodeType node>
+std::ostream& print_binding(std::ostream& os, tref var, tref value) {
+	return os << "\t" << tree<node>::get(var).to_str() << " := "
+			<< tree<node>::get(value).to_str() << "\n";
+}
+
+// Serialize a BA constant of @p type. bf_t/bf_f carry no type of their own, so
+// they render as the type's one/zero. False if it is not a BA element.
+template <NodeType node>
+bool serialize_constant(std::stringstream& ss, tref constant, size_t type) {
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	auto value = tt(constant) | tau::ba_constant;
+	if (!value) {
+		if (auto check = tt(constant) | tau::bf_t; check)
+			ss << node::ba::one(get_ba_type_tree<node>(type));
+		else if (auto check = tt(constant) | tau::bf_f; check)
+			ss << node::ba::zero(get_ba_type_tree<node>(type));
+		else return false;
+	} else ss << (value | tt::ba_constant);
+	return true;
+}
+
 template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rule& r) {
 	return os << tree<node>::get(r.first) << " := "
