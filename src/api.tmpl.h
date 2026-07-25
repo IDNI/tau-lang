@@ -422,14 +422,62 @@ tref api<node>::eliminate_quantifiers(tref fm) {
 	return nullptr;
 }
 
+// Whole-query bv fast path: hand a purely bitvector, non-temporal query to
+// cvc5 directly instead of quantifier elimination + predicate blasting,
+// which explodes on free variables under a quantifier. Sound only on the
+// ENTIRE top-level query (sat(fm) is exactly exists-free-vars. fm), and only
+// a definite cvc5 answer is trusted -- unknown falls through unchanged.
+
+/// True iff `fm` is non-temporal and fully bv-typed.
+template <NodeType node>
+bool is_whole_query_bv_solvable(tref fm) {
+	using tau = tree<node>;
+	return fm
+		&& !tau::get(fm).find_top(is_temporal_quantifier<node>)
+		&& is_bv_solvable_formula<node>(fm);
+}
+
+/// Fast path for sat/unsat; nullopt when it does not apply or cvc5 is unsure.
+template <NodeType node>
+std::optional<bool> bv_fast_path_sat(tref fm) {
+	if (!is_whole_query_bv_solvable<node>(fm)) return std::nullopt;
+	auto status = bv_formula_sat_status<node>(fm);
+	if (!status) return std::nullopt; // translation failure: undecided
+	if (*status == bv_sat_status::sat) return true;
+	if (*status == bv_sat_status::unsat) return false;
+	return std::nullopt; // unknown: cannot decide, fall through
+}
+
+/// Fast path for validity: fm is valid iff !fm is unsat.
+template <NodeType node>
+std::optional<bool> bv_fast_path_valid(tref fm) {
+	using tau = tree<node>;
+	if (!is_whole_query_bv_solvable<node>(fm)) return std::nullopt;
+	auto status = bv_formula_sat_status<node>(tau::build_wff_neg(fm));
+	if (!status) return std::nullopt;
+	if (*status == bv_sat_status::unsat) return true;  // no counterexample
+	if (*status == bv_sat_status::sat) return false;   // counterexample found
+	return std::nullopt;
+}
+
 template <NodeType node>
 bool api<node>::realizable(tref fm) {
 	fm = simplify(fm);
 	// G(A) ∧ G(B) ≡ G(A ∧ B): merge top-level G-conjuncts before
 	// normalization so the downstream pipeline sees a single wff_always.
 	if (fm) fm = flatten_always_conjuncts<node>(fm);
-	return fm && is_formula(fm)
-		&& is_tau_formula_sat<node>(normalize_formula(fm), 0, true);
+	if (!fm || !is_formula(fm)) return false;
+	// bv fast path; falls through when undecided.
+	if (auto fast = bv_fast_path_sat<node>(fm); fast.has_value())
+		return fast.value();
+	tref nf = normalize_formula(fm);
+	// A data quantifier under a full-LTL operator survives normalization;
+	// feeding that residue to is_tau_formula_sat breaks its no-quantifier
+	// invariant, so route the RAW formula to the LTL-ABA solver instead.
+	if (nf && has_ltl_operators<node>(fm)
+		&& tau::get(nf).find_top(is_quantifier<node>))
+		return is_tau_formula_sat<node>(fm, 0, true);
+	return is_tau_formula_sat<node>(nf, 0, true);
 }
 
 template <NodeType node>
@@ -465,8 +513,12 @@ bool api<node>::valid(tref fm) {
 template <NodeType node>
 bool api<node>::valid_spec(tref fm) {
 	fm = simplify(fm);
+	if (!fm) return false;
+	// bv fast path; falls through when undecided.
+	if (auto fast = bv_fast_path_valid<node>(fm); fast.has_value())
+		return fast.value();
 	// Valid iff T (tautology) implies the normalized formula
-	return fm && is_tau_impl<node>(tau::_T(), normalize_formula(fm));
+	return is_tau_impl<node>(tau::_T(), normalize_formula(fm));
 }
 
 
