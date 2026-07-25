@@ -305,7 +305,8 @@ bool is_non_temp_nso_satisfiable(tref n) {
 		  << LOG_FM(normalized);)
 
 	DBG(assert((t.equals_T() || t.equals_F()
-		|| t.find_top(is<node, tau::constraint>)));)
+		|| t.find_top(is<node, tau::constraint>)
+		|| t.find_top(is_quantifier<node>)));)
 
 	return t.equals_T();
 }
@@ -339,8 +340,9 @@ bool is_non_temp_nso_unsat(tref n) {
 	nn = tau::build_wff_ex_many(vars, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
-	assert((t.equals_T() || t.equals_F()
-		|| t.find_top(is<node, tau::constraint>)));
+	DBG(assert((t.equals_T() || t.equals_F()
+		|| t.find_top(is<node, tau::constraint>)
+		|| t.find_top(is_quantifier<node>)));)
 	return t.equals_F();
 }
 
@@ -391,14 +393,16 @@ bool are_nso_equivalent(tref n1, tref n2) {
 
 	const tau& tdir1 = tau::get(normalize_non_temp<node>(imp1));
 	DBG(assert((tdir1.equals_T() || tdir1.equals_F()
-		|| tdir1.find_top(is<node, tau::constraint>)));)
+		|| tdir1.find_top(is<node, tau::constraint>)
+		|| tdir1.find_top(is_quantifier<node>)));)
 	if (tdir1.equals_F()) {
 		LOG_DEBUG << "End are_nso_equivalent: " << LOG_FM(tdir1.get());
 		return false;
 	}
 	const tau& tdir2 = tau::get(normalize_non_temp<node>(imp2));
 	DBG(assert((tdir2.equals_T() || tdir2.equals_F()
-		|| tdir2.find_top(is<node, tau::constraint>))));
+		|| tdir2.find_top(is<node, tau::constraint>)
+		|| tdir2.find_top(is_quantifier<node>))));
 	const bool res = (tdir1.equals_T() && tdir2.equals_T());
 	LOG_DEBUG << "End are_nso_equivalent: " << res;
 	return res;
@@ -462,7 +466,8 @@ bool is_nso_impl(tref n1, tref n2) {
 
 	const tau& res = tau::get(normalize_non_temp<node>(imp));
 	DBG(assert((res.equals_T() || res.equals_F()
-		|| res.find_top(is<node, tau::constraint>)));)
+		|| res.find_top(is<node, tau::constraint>)
+		|| res.find_top(is_quantifier<node>)));)
 	LOG_DEBUG << "End is_nso_impl: " << res.get();
 	return res.equals_T();
 }
