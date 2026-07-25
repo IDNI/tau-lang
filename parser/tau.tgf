@@ -191,11 +191,16 @@ cli_command            =>
 # later in the sense that is not always 0)
         | ("sat"           :sat_sym     __ spec_arg)          :sat_cmd
         | ("unsat"         :unsat_sym   __ spec_arg)          :unsat_cmd
+        | ("realizable"    :realizable_sym   __ spec_arg)     :realizable_cmd
+        | ("unrealizable"  :unrealizable_sym __ spec_arg)     :unrealizable_cmd
 # TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
 # a wff if possible.
         | ("solve":solve_sym [solve_options] __ wff_cmd_arg)  :solve_cmd
         | ("lgrs" :lgrs_sym __ wff_cmd_arg)                   :lgrs_cmd
-        | (("r" | "run"):run_sym __ spec_arg)                 :run_cmd
+        | (("r" | "run"):run_sym
+                [__ num __ ("steps" | "step")] [__ spec_arg]) :run_cmd
+        | ("stop":stop_sym)                                   :stop_cmd
+        | ("memory":memory_sym)                               :memory_cmd
         | ("ltl" :ltl_sym __ spec_arg)                         :ltl_cmd
         | ("func":func_sym_cmd __ func_decl)                   :func_cmd
         | (("n" | "normalize")
@@ -246,7 +251,12 @@ cli_command            =>
         .
 
 # options
-solve_options          => (__ solve_option)*.
+# Explicit right recursion, non-empty alternative first: the parser
+# auto-disambiguates by production order.
+#
+# By design the ARGUMENT wins over an option (`--min x` is a valid wff),
+# so parenthesise to pass one: solve --min (x : qint != 0).
+solve_options          => __ solve_option solve_options | null.
 solve_option           => "--" (solver_mode | type).
 solver_mode            => ("minimum" | "min"):solver_mode_minimum
                         | ("maximum" | "max"):solver_mode_maximum.
@@ -279,7 +289,9 @@ help_arg               => help_sym | version_sym | quit_sym
                         | history_sym | abs_history_sym | rel_history_sym
                         | selection_sym | def_sym
                         | inst_sym | subst_sym | normalize_sym | execute_sym
-                        | solve_sym | lgrs_sym | valid_sym | sat_sym | unsat_sym | run_sym | ltl_sym
+                        | solve_sym | lgrs_sym | valid_sym | sat_sym | unsat_sym
+                        | realizable_sym | unrealizable_sym | run_sym | ltl_sym
+                        | stop_sym | memory_sym
                         | dnf_sym | cnf_sym
 # Commented out, not implemented yet
 #                        | anf_sym | pnf_sym

@@ -143,6 +143,9 @@ private:
 		interpreter<node> interp;
 		measuring m;
 		idni::measures::timer t;
+		/// @brief Step budget for `run N steps`; 0 means unbounded.
+		size_t steps_to_run = 0;
+		size_t steps_done   = 0;
 		run_session(interpreter<node> i) : interp(std::move(i)), m("run") {}
 	};
 	/// @brief What the *next* eval() call's input line answers, while set;
@@ -222,10 +225,18 @@ private:
 	tref unsat_cmd(const tt& n);
 	/// @brief Check validity of the formula in @p n.
 	tref valid_cmd(const tt& n);
+	/// @brief Check realizability of the formula in @p n.
+	tref realizable_cmd(const tt& n);
+	/// @brief Check unrealizability of the formula in @p n.
+	tref unrealizable_cmd(const tt& n);
 	/// @brief Eliminate quantifiers from the formula in @p n.
 	tref qelim_cmd(const tt& n);
 	/// @brief Run the specification in @p n.
 	void run_cmd(const tt& n);
+	/// @brief `stop` command: clear the stored `run` session (if any).
+	void stop_cmd();
+	/// @brief `memory` command: print the interpreter's variable map.
+	void memory_cmd();
 	void ltl_cmd(const tt& n);
 	/// @brief Resume a `run` session until it finishes or needs input
 	/// (suspends via `pending`); @p retry re-asks it on a rejected value.

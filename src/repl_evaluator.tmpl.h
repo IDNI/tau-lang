@@ -447,14 +447,19 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	DBG(TAU_LOG_TRACE << "run_cmd: " << TAU_LOG_FM(n.value());)
 	measuring m("run");
 
-	tref value = get_any(n[1].get());
-	if (!value) return;
+	// run [N steps] [<fm>]: new or continued session, bounded or natural.
+	auto num_t = n | tau::num;
+	const bool bounded = (bool) num_t;
+	const size_t steps = bounded ? (size_t)(num_t | tt::num) : 0;
 
+	// Formula is the 3rd child when a count was given, else the 2nd.
+	tref value = nullptr;
+	if (auto fc = bounded ? (n | tt::third) : (n | tt::second))
+		value = get_any(fc | tt::ref);
+
+	if (value) {
 	DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
-
-	// Build a tau_spec from the formula and REPL-defined io/rr defs,
-	// mirroring get_applied(). This uses the tau_spec path which correctly
-	// handles io_var resolution for LTL and safety formulas.
+		// tau_spec path resolves io_vars for LTL and safety formulas.
 	tau_spec<node> spec;
 	spec.add(value);
 	for (tref d : rr_defs) spec.add(d);
@@ -463,9 +468,33 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	auto maybe_i = tau_api::get_interpreter(m.part(), spec);
 	if (!maybe_i) return;
 
+		// A new formula replaces any stored session.
 	running = std::make_unique<run_session>(std::move(maybe_i.value()));
+		running->steps_done   = 0;
+		running->steps_to_run = steps; // 0 = natural
 	running->t.start();
 	continue_running();
+		return;
+	}
+
+	// No formula: continue the stored session (error if none).
+	if (!running) {
+		TAU_LOG_ERROR << "no run to continue; start one with "
+			"`run <formula>` (optionally `run N steps <formula>`)";
+		return;
+	}
+		// `run N steps` runs N more steps; bare `run` continues naturally.
+	running->steps_to_run = bounded ? running->steps_done + steps : 0;
+	running->t.start();
+	continue_running();
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::stop_cmd() {
+	if (!running) { std::cout << "no run in progress\n"; return; }
+	finish_running();
+	std::cout << "run stopped\n";
 }
 
 template <typename... BAs>
@@ -494,7 +523,16 @@ void repl_evaluator<BAs...>::continue_running(
 {
 	bool first = true;
 	while (running) {
+		// At budget: stop cleanly but KEEP the session for a later `run`.
+		if (running->steps_to_run != 0
+			&& running->steps_done >= running->steps_to_run) {
+			running->t.pause();
+			return;
+		}
 		auto& step_m = running->m.part();
+		// time_point advances iff a step produced output; api::step returns
+		// nullopt both when it needs input and when auto_continue is false.
+		const size_t tp_before = running->interp.time_point;
 		auto maybe_outputs = tau_api::step(step_m, running->interp);
 		// copy this step's timing before dropping the node (step_m is a
 		// reference into m.parts that pop_back() invalidates)
@@ -502,6 +540,17 @@ void repl_evaluator<BAs...>::continue_running(
 		running->m.parts.pop_back();
 
 		if (!maybe_outputs) {
+			const bool produced =
+				running->interp.time_point != tp_before;
+			// Input-independent step: output already written.
+			// "continue?" prompt, mirroring C++ run(fm, ctx, N).
+			if (produced && running->steps_to_run != 0) {
+				++running->steps_done;
+				if (opt.print_benchmarks) step_m_copy(std::cout, 1);
+				std::cout << "\n";
+				first = false;
+				continue;
+			}
 			running->t.pause();
 			// a console input stream stopped the step needing a value:
 			// find it and prompt for that value (label/type are ours)
@@ -522,6 +571,8 @@ void repl_evaluator<BAs...>::continue_running(
 				reprompt();
 				return; // suspend: wait for the answer
 			}
+		// Ended before budget (e.g. input EOF): stop, do not prompt.
+			if (running->steps_to_run != 0) return;
 			// no awaiting stream -> rejected value (re-ask) or end of run
 			if (first && retry) pending = *retry;
 			else pending = { pending_request::continue_or_quit,
@@ -532,6 +583,7 @@ void repl_evaluator<BAs...>::continue_running(
 		// this step produced output: print its timing right after (to
 		// cout, so it stays in order and belongs to the step it measures,
 		// before the next "Execution step"), then a blank line
+		++running->steps_done;
 		if (opt.print_benchmarks) step_m_copy(std::cout, 1);
 		std::cout << "\n";
 		first = false;
@@ -640,6 +692,46 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	std::cout << "}\n";
 }
 
+// Prints the interpreter memory plus a binding count. Uses the type-agnostic
+// form because memory entries span BA types and not all have a resolvable one.
+template <NodeType node>
+void print_memory(const assignment<node>& memory) {
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	if (memory.empty()) {
+		std::cout << "memory: {}\n0 bindings\n";
+		return;
+	}
+	// subtree_map order is pointer identity, not stable across runs.
+	// Sort io_var keys by constant_io_comp (matching interpreter::write);
+	// other keys by printed form -- constant_io_comp assumes io_var shape.
+	trefs io_keys, other_keys;
+	io_keys.reserve(memory.size());
+	for (auto [var, value] : memory)
+		((tt(var) | tau::variable | tau::io_var) ? io_keys : other_keys)
+			.push_back(var);
+	std::sort(io_keys.begin(), io_keys.end(), constant_io_comp<node>);
+	std::sort(other_keys.begin(), other_keys.end(), [](tref a, tref b) {
+		return tau::get(a).to_str() < tau::get(b).to_str();
+	});
+	std::cout << "memory: {\n";
+	for (tref var : io_keys)    print_binding<node>(std::cout, var, memory.at(var));
+	for (tref var : other_keys) print_binding<node>(std::cout, var, memory.at(var));
+	std::cout << "}\n" << memory.size() << " binding"
+		<< (memory.size() == 1 ? "" : "s") << "\n";
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::memory_cmd() {
+	if (!running) {
+		std::cout << "no run in progress; memory is only tracked "
+			"during an active `run` session\n";
+		return;
+	}
+	print_memory<node>(running->interp.memory);
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
@@ -663,14 +755,6 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
-	// getting the type
-	// TODO compare get_type_and_arg with get_solver_cmd_type
-	// size_t type = get_solver_cmd_type<node>(n.value());
-	// if (type == 0) {
-	// 	TAU_LOG_ERROR << "Invalid type\n";
-	// 	return;
-	// }
-
 	tref arg = n.value_tree().first();
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
@@ -713,6 +797,26 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 	tref r = nullptr;
 	if (tref value = get_any(n[1].get()); value)
 		r = tau_api::unsat(m, value) ? tau::_T() : tau::_F();
+	return benchmarks(m), r;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::realizable_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
+	if (tref value = get_any(n[1].get()); value)
+		r = tau_api::realizable(m, value) ? tau::_T() : tau::_F();
+	return benchmarks(m), r;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::unrealizable_cmd(const tt& n) {
+	measuring m;
+	tref r = nullptr;
+	if (tref value = get_any(n[1].get()); value)
+		r = tau_api::unrealizable(m, value) ? tau::_T() : tau::_F();
 	return benchmarks(m), r;
 }
 
@@ -1099,6 +1203,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::normalize_cmd:      result = normalize_cmd(command); break;
 	// execution
 	case tau::run_cmd:            run_cmd(command); break;
+	case tau::stop_cmd:           stop_cmd(); break;
+	case tau::memory_cmd:         memory_cmd(); break;
 	case tau::ltl_cmd:            ltl_cmd(command); break;
 	case tau::solve_cmd:          solve_cmd(command); break;
 	case tau::lgrs_cmd:           lgrs_cmd(command); break;
@@ -1109,6 +1215,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::sat_cmd:            result = sat_cmd(command); break;
 	case tau::valid_cmd:          result = valid_cmd(command); break;
 	case tau::unsat_cmd:          result = unsat_cmd(command); break;
+	case tau::realizable_cmd:     result = realizable_cmd(command); break;
+	case tau::unrealizable_cmd:   result = unrealizable_cmd(command); break;
 	// normal forms
 	case tau::onf_cmd:            result = onf_cmd(command); break;
 	case tau::dnf_cmd:            result = dnf_cmd(command); break;
@@ -1274,6 +1382,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 
 		<< "Run command:\n"
 		<< "  run                     execute a Tau formula as a program\n"
+		<< "  stop                    clear the stored run session\n"
+		<< "  memory                  print the current run session's memory (variable-to-value map)\n"
 		<< "  ltl                     print the full LTL(ABA) translation pipeline\n"
 		<< "\n"
 
@@ -1283,6 +1393,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  sat                     check if a Tau formula is satisfiable\n"
 		<< "  unsat                   check if a Tau formula is unsatisfiable\n"
 		<< "  valid                   check if a Tau formula is valid\n"
+		<< "  realizable              check if a Tau specification is realizable\n"
+		<< "  unrealizable            check if a Tau specification is unrealizable\n"
 		<< "  solve                   compute a satisfying assignment for the free variables in a Tau formula\n"
 		<< "  lgrs                    compute a LGRS for a given equation\n"
 		<< "\n"
@@ -1427,6 +1539,28 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "usage:\n"
 		<< "  run <tau>               execute the given Tau formula\n"
 		<< "  run <repl_history>      execute the Tau formula stored at the specified repl history position\n"
+		<< "  run N steps <tau>       execute the given formula for exactly N steps\n"
+		<< "  run N steps             continue the stored run for N more steps\n"
+		<< "  run                     continue the stored run (until it ends or needs input)\n"
+		<< "  stop                    discard the stored run session\n"
+		<< "  memory                  print the stored run session's current memory\n"
+		<< "\n"
+		<< "a new `run <tau>` replaces any stored session; `run` / `run N steps`\n"
+		<< "with no formula continue the stored one. `N step` (singular) also works.\n"
+		<< "\n";
+		break;
+	case tau::memory_sym: std::cout
+		<< "the memory command prints the running interpreter's current\n"
+		<< "memory: the variable-to-value map retained across `run` steps\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  memory                  print the current run session's memory\n"
+		<< "\n"
+		<< "requires an active `run` session (start one with `run <tau>` or\n"
+		<< "`run N steps <tau>`); prints a message instead of a map if none is active.\n"
+		<< "also prints the number of bindings held, since the interpreter prunes\n"
+		<< "memory entries no future step can read, so this count is expected to\n"
+		<< "stay bounded as steps advance rather than grow without limit.\n"
 		<< "\n";
 		break;
 	case tau::solve_sym: std::cout
@@ -1495,6 +1629,26 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  unsat <rr>              checks the given tau formula with additional predicate and function definitions for unsatisfiability\n"
 		<< "  unsat <tau>             checks the given tau formula for unsatisfiability\n"
 		<< "  unsat <repl_history>    checks the Tau formula stored at the specified repl history position for unsatisfiability\n";
+		break;
+	case tau::realizable_sym: std::cout
+		<< "the realizable command checks if a Tau specification is realizable and if so prints T and else F\n\n"
+		<< "a tau specification is realizable if there exists a winning system strategy that, for\n"
+		<< "every possible sequence of inputs, produces outputs satisfying the specification at every point in time\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  realizable <rr>              checks the given tau formula with additional predicate and function definitions for realizability\n"
+		<< "  realizable <tau>             checks the given tau formula for realizability\n"
+		<< "  realizable <repl_history>    checks the Tau formula stored at the specified repl history position for realizability\n";
+		break;
+	case tau::unrealizable_sym: std::cout
+		<< "the unrealizable command checks if a Tau specification is unrealizable and if so prints T and else F\n\n"
+		<< "a tau specification is unrealizable if no system strategy exists that, for every possible\n"
+		<< "sequence of inputs, produces outputs satisfying the specification at every point in time\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  unrealizable <rr>              checks the given tau formula with additional predicate and function definitions for unrealizability\n"
+		<< "  unrealizable <tau>             checks the given tau formula for unrealizability\n"
+		<< "  unrealizable <repl_history>    checks the Tau formula stored at the specified repl history position for unrealizability\n";
 		break;
 	case tau::dnf_sym: std::cout
 		<< "dnf converts a Tau expression to disjunctive normal form (DNF)\n"
