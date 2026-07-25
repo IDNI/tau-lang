@@ -387,7 +387,7 @@ std::optional<std::map<stream_at, std::string>> api<node>::step(
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(out);)
 		DBG(TAU_LOG_TRACE << TAU_LOG_FM_DUMP(val);)
 		std::stringstream ss;
-		if (!i.serialize_constant(ss, val, i.ctx.type_of(out))) {
+		if (!serialize_constant<node>(ss, val, i.ctx.type_of(out))) {
 			TAU_LOG_ERROR << "No Boolean algebra element assigned "
 				"to output '" << TAU_TO_STR(out) << "'";
 			return {};
