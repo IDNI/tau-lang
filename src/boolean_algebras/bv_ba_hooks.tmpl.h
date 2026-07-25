@@ -11,6 +11,8 @@ namespace idni::tau_lang {
 using namespace cvc5;
 using namespace idni;
 
+bool is_bv_syntactic_zero(const cvc5::Term& fm);
+
 template<NodeType node>
 tref term_add(tref symbol) {
 	using tau = tree<node>;
