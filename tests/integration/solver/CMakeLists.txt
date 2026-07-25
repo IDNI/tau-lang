@@ -12,6 +12,9 @@ set(TESTS
 
 foreach(X IN LISTS TESTS)
 	add("test_integration-solver-${X}")
+	if(NOT TARGET "test_integration-solver-${X}")
+		continue()
+	endif()
 	# From this depth ${CMAKE_CURRENT_SOURCE_DIR}/.. in add() resolves to
 	# tests/integration/ — add tests/ root so shared headers remain reachable.
 	target_include_directories("test_integration-solver-${X}" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../..)

@@ -13,6 +13,9 @@ set(TESTS
 
 foreach(X IN LISTS TESTS)
 	add(${X})
+	if(NOT TARGET ${X})
+		continue()
+	endif()
 	# add() sets includes to ${CMAKE_CURRENT_SOURCE_DIR}/.. = tests/integration/
 	# We additionally need: tests/ root (for test_init.h, test_tau_helpers.h)
 	# and this directory itself (for test_integration-satisfiability_helper.h).
