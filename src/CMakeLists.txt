@@ -105,6 +105,14 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 )
 add_dependencies(${TAU_OBJECT_LIB_NAME} tau_header)
 
+# Nothing links the object library: the static and shared libraries each compile
+# TAU_SOURCES themselves, and no other target references it.  Left in the default
+# build it recompiles the whole source set -- including the heaviest full-stack
+# TUs -- for a result no target consumes, which is also what exhausted memory in
+# parallel builds.  Still buildable on demand:
+#   cmake --build <dir> --target TAUo
+exclude(${TAU_OBJECT_LIB_NAME})
+
 #
 # static library
 #
@@ -200,6 +208,13 @@ target_include_directories(tau_codegen PUBLIC
 	$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 )
 add_dependencies(tau_codegen tau_header)
+
+# Kept out of the default build: it is a full-stack translation unit that no
+# test or other target needs (the cpp_codegen tests emit and compile code
+# in-process, they do not run this binary).  Build it on demand with
+#   cmake --build <dir> --target tau_codegen
+# It is slated to be merged into the tau CLI as a compile/codegen subcommand.
+exclude(tau_codegen)
 
 #
 # executable using shared library

@@ -98,6 +98,12 @@ target_link_libraries(tau_eval ${TAU_STATIC_LIB_NAME} cvc5::cvc5)
 add_dependencies(tau_eval tau_header)
 target_compile_options(tau_eval PUBLIC -Wno-unused-function)
 
+# Kept out of the default build.  Nothing references it: test_ltl_fuzz cross-
+# checks against Spot's ltlsynt via popen and calls tau in-process, so this is a
+# hand-driven helper only.  Build it on demand with
+#   cmake --build <dir> --target tau_eval
+exclude(tau_eval)
+
 # add unit tests for the parser
 add_subdirectory(boolean_algebras)
 add_subdirectory(parser)
