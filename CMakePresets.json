@@ -123,6 +123,34 @@
 			}
 		},
 		{
+			"name": "_build-repl-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_REPL_TESTS": "ON"
+			}
+		},
+		{
+			"name": "_build-unit-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_UNIT_TESTS": "ON"
+			}
+		},
+		{
+			"name": "_build-integration-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_INTEGRATION": "ON"
+			}
+		},
+		{
+			"name": "_build-api-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_API_TESTS": "ON"
+			}
+		},
+		{
 			"name": "_build-measure",
 			"hidden": true,
 			"cacheVariables": {
@@ -309,6 +337,38 @@
 			"inherits": ["debug", "_build-tests", "_build-type-debug"]
 		},
 		{
+			"name": "release-repl-tests",
+			"inherits": ["release", "_build-repl-tests"]
+		},
+		{
+			"name": "debug-repl-tests",
+			"inherits": ["debug", "_build-repl-tests", "_build-type-debug"]
+		},
+		{
+			"name": "release-unit-tests",
+			"inherits": ["release", "_build-unit-tests"]
+		},
+		{
+			"name": "debug-unit-tests",
+			"inherits": ["debug", "_build-unit-tests", "_build-type-debug"]
+		},
+		{
+			"name": "release-integration-tests",
+			"inherits": ["release", "_build-integration-tests"]
+		},
+		{
+			"name": "debug-integration-tests",
+			"inherits": ["debug", "_build-integration-tests", "_build-type-debug"]
+		},
+		{
+			"name": "release-api-tests",
+			"inherits": ["release", "_build-api-tests"]
+		},
+		{
+			"name": "debug-api-tests",
+			"inherits": ["debug", "_build-api-tests", "_build-type-debug"]
+		},
+		{
 			"name": "release-tau",
 			"inherits": ["release", "_build-executable"]
 		},
@@ -425,6 +485,38 @@
 			"configurePreset": "release-tests"
 		},
 		{
+			"name": "debug-repl-tests",
+			"configurePreset": "debug-repl-tests"
+		},
+		{
+			"name": "release-repl-tests",
+			"configurePreset": "release-repl-tests"
+		},
+		{
+			"name": "debug-unit-tests",
+			"configurePreset": "debug-unit-tests"
+		},
+		{
+			"name": "release-unit-tests",
+			"configurePreset": "release-unit-tests"
+		},
+		{
+			"name": "debug-integration-tests",
+			"configurePreset": "debug-integration-tests"
+		},
+		{
+			"name": "release-integration-tests",
+			"configurePreset": "release-integration-tests"
+		},
+		{
+			"name": "debug-api-tests",
+			"configurePreset": "debug-api-tests"
+		},
+		{
+			"name": "release-api-tests",
+			"configurePreset": "release-api-tests"
+		},
+		{
 			"name": "debug-all",
 			"configurePreset": "debug-all"
 		},
@@ -509,6 +601,38 @@
 		{
 			"name": "release-tests",
 			"configurePreset": "release-tests"
+		},
+		{
+			"name": "debug-repl-tests",
+			"configurePreset": "debug-repl-tests"
+		},
+		{
+			"name": "release-repl-tests",
+			"configurePreset": "release-repl-tests"
+		},
+		{
+			"name": "debug-unit-tests",
+			"configurePreset": "debug-unit-tests"
+		},
+		{
+			"name": "release-unit-tests",
+			"configurePreset": "release-unit-tests"
+		},
+		{
+			"name": "debug-integration-tests",
+			"configurePreset": "debug-integration-tests"
+		},
+		{
+			"name": "release-integration-tests",
+			"configurePreset": "release-integration-tests"
+		},
+		{
+			"name": "debug-api-tests",
+			"configurePreset": "debug-api-tests"
+		},
+		{
+			"name": "release-api-tests",
+			"configurePreset": "release-api-tests"
 		},
 		{
 			"name": "release-all",

@@ -13,8 +13,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 endif()
 
+option(TAU_USE_CCACHE              "Use ccache when building"              ON)
 if(TAU_USE_CCACHE)
-	include(use-ccache.cmake)
+	include(use-ccache)
 endif()
 
 set(namespace "TAU")
@@ -57,7 +58,6 @@ option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
-option(TAU_USE_CCACHE              "Use ccache when building"              ON)
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
 # Load local cmake settings
