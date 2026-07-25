@@ -54,6 +54,7 @@ set(TAU_SOURCES
 	boolean_algebras/qint.cpp
 	boolean_algebras/qlt.cpp
 	instantiate_test_pack.cpp
+	base_ba_dispatcher_bv_sbf.cpp
 )
 
 find_package(CURL REQUIRED)
