@@ -29,10 +29,22 @@ namespace idni::tau_lang {
 // Mirror tests/test_tau_helpers.h's bas_pack.
 using test_node_t = node<tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>,
                          qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+using bool_node_t = node<bv, Bool>;
+using sbf_node_t  = node<bv, sbf_ba>;
+
 
 // Top-level synthesis entries.
 template bool is_ltl_aba_realizable<test_node_t>(tref, int_t, bool);
 template bool is_tau_formula_sat   <test_node_t>(tref, int_t, bool);
 template bool has_ltl_operators    <test_node_t>(tref);
+
+template struct tree    <test_node_t>;
+template struct get_hook<test_node_t>;
+template struct tau_ba  <qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+
+template struct tree    <bool_node_t>;
+template struct get_hook<bool_node_t>;
+template struct tree    <sbf_node_t>;
+template struct get_hook<sbf_node_t>;
 
 } // namespace idni::tau_lang

@@ -33,10 +33,20 @@ namespace idni::tau_lang {
 
 using test_node_t = node<tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>,
                          qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+using bool_node_t = node<bv, Bool>;
+using sbf_node_t  = node<bv, sbf_ba>;
+
 
 extern template bool is_ltl_aba_realizable<test_node_t>(tref, int_t, bool);
 extern template bool is_tau_formula_sat   <test_node_t>(tref, int_t, bool);
 extern template bool has_ltl_operators    <test_node_t>(tref);
+extern template struct tree    <test_node_t>;
+extern template struct get_hook<test_node_t>;
+extern template struct tau_ba  <qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+extern template struct tree    <bool_node_t>;
+extern template struct get_hook<bool_node_t>;
+extern template struct tree    <sbf_node_t>;
+extern template struct get_hook<sbf_node_t>;
 
 } // namespace idni::tau_lang
 
