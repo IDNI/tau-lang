@@ -233,10 +233,14 @@ TEST_SUITE("BDD and many") {
 		// Construction
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
-		CHECK((tau::get(xx).to_str() == "ab&(f'e')'bccd"
-			|| tau::get(xx).to_str() == "cabb&(e'f')'d"
-			|| tau::get(xx).to_str() == "adbb&(e'f')'cc"
-			|| tau::get(xx).to_str() == "abbccd&(f'e')'"));
+		// TODO (D8): conjunct order is not canonical, so debug and
+		// release disagree; collapse to one string once D8 lands.
+		CHECK(matches_to_any_of(tau::get(xx).to_str(), strings{
+			"ab&(f'e')'bccd",
+			"cabb&(e'f')'d",
+			"adbb&(e'f')'cc",
+			"abbccd&(f'e')'",
+			"(f'e')'dccbba"}));
 	}
 }
 
@@ -629,7 +633,9 @@ TEST_SUITE("BDD term_handle quantifier elimination") {
 		hbdd::quants q = {{tx, bdd::all}};
 		tref result = h.bdd_quant(q, o).to_tau_term(1);
 		// ∀x(xa|x'b) = cofactor[x=0]·cofactor[x=1] = b·a
-		CHECK(tau::get(result).to_str() == "ba");
+		// TODO (D8): conjunct order is not canonical, so debug and
+		// release disagree; collapse to one string once D8 lands.
+		CHECK(matches_to_any_of(tau::get(result).to_str(), strings{"ba", "ab"}));
 	}
 }
 
