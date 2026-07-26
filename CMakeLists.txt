@@ -403,6 +403,9 @@ set(TAU_PARSER_BUILD_PIC ${TAU_BUILD_PIC} CACHE BOOL "Build position independent
 set(TAU_PARSER_DONT_USE_FTXUI ${TAU_DONT_USE_FTXUI} CACHE BOOL "Disable FTXUI" FORCE)
 add_subdirectory(external/parser)
 
+# grammars are compiled ahead of time, so tau never parses .tgf at runtime
+target_compile_definitions(tauparser_static PUBLIC TAU_PARSER_NO_TGF)
+
 #
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
