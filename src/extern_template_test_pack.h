@@ -48,6 +48,14 @@ extern template struct get_hook<bool_node_t>;
 extern template struct tree    <sbf_node_t>;
 extern template struct get_hook<sbf_node_t>;
 
+// Normalizer pipeline; declarations arrive via ltl_aba.h -> normalizer.h.
+extern template tref normalizer               <bool_node_t>(const rr<bool_node_t>&);
+extern template tref normalizer               <bool_node_t>(tref);
+extern template tref nso_rr_apply             <bool_node_t>(const rewriter::rule&, const tref&);
+extern template tref nso_rr_apply             <bool_node_t>(const rewriter::rules&, tref);
+extern template tref nso_rr_apply             <bool_node_t>(const rr<bool_node_t>&);
+extern template tref calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
+
 } // namespace idni::tau_lang
 
 #endif // TAU_USE_DOCTEST

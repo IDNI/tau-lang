@@ -47,4 +47,13 @@ template struct get_hook<bool_node_t>;
 template struct tree    <sbf_node_t>;
 template struct get_hook<sbf_node_t>;
 
+// Normalizer pipeline.  Only the Bool pack is worth hoisting: the tau and
+// sbf packs measured byte-identical objects without it.
+template tref normalizer               <bool_node_t>(const rr<bool_node_t>&);
+template tref normalizer               <bool_node_t>(tref);
+template tref nso_rr_apply             <bool_node_t>(const rewriter::rule&, const tref&);
+template tref nso_rr_apply             <bool_node_t>(const rewriter::rules&, tref);
+template tref nso_rr_apply             <bool_node_t>(const rr<bool_node_t>&);
+template tref calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
+
 } // namespace idni::tau_lang
