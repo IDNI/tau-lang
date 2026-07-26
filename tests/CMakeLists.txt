@@ -80,6 +80,9 @@ function(add test_name)
 	add_dependencies(${N} tau_header)
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
 	target_compile_definitions_if(${N} PUBLIC TAU_LOG_TRACE_TESTS)
+	target_compile_options(${N} PUBLIC -fno-lto)
+	target_link_options(${N} PUBLIC -fno-lto)
+	target_compile_options(${N} PUBLIC -Wstrict-overflow=2 -Wno-error=strict-overflow)
 	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
 	# Heavy adversarial / fuzz suites need more than the ctest default;
 	# their hundred-plus deep LTL+ABA-oracle cases routinely run >600s

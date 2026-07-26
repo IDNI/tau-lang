@@ -32,8 +32,8 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 endif()
 
 set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
-set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG;-flto=auto")
-set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG;-flto=auto;-g")
+set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG;-flto=auto;-ffat-lto-objects")
+set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG;-flto=auto;-ffat-lto-objects;-g")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(COMPILE_OPTIONS "${TAU_DEBUG_OPTIONS}")
