@@ -296,7 +296,8 @@ inline std::vector<int> Pre_over_T1(
 {
 	// Index W for fast membership.
 	std::vector<char> in_W(T1.size(), 0);
-	for (int w : W_indices) in_W[w] = 1;
+	for (int w : W_indices)
+		if (w >= 0 && (size_t)w < in_W.size()) in_W[w] = 1;
 	std::vector<int> result;
 	for (const auto& b : T1) {
 		bool forceable = true;
