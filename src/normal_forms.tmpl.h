@@ -3530,7 +3530,104 @@ tref anti_prenex_block(tref formula, const trefs& block,
 
 /**
  * @internal
- * @brief Processes one maximal same-type quantifier block rooted at `n`.
+ * @brief One maximal quantifier block: the run of consecutive quantifiers
+ * that `process_quantifier_block` eliminates jointly, plus the matrix it
+ * scopes over.
+ *
+ * "Maximal" is bounded by the three things the block elimination requires to
+ * be uniform across the block:
+ *  - the quantifier kind (∃ vs ∀): only same-kind quantifiers commute, so a
+ *    kind change starts a new, inner block;
+ *  - the Boolean-algebra type of the bound variables: the block is resolved
+ *    through a single BDD variable order and a single
+ *    `push_ex_block_into_clause` call, both of which assume one BA type (the
+ *    latter asserts it), so a type change likewise starts a new block;
+ *  - `skip`-matched (e.g. bitvector) variables, which this pass never
+ *    eliminates and which therefore never enter the active block.
+ * @tparam node Tree node type.
+ * @endinternal
+ */
+template<NodeType node>
+struct quantifier_block {
+	// Node the run hangs off: its direct child is the outermost quantifier
+	// of the block. This is the node the eliminated result replaces in the
+	// enclosing tree.
+	tref head = nullptr;
+	// Active (non-skip-matched) bound variables, outermost first. All of
+	// one quantifier kind and one Boolean-algebra type.
+	trefs vars;
+	// skip-matched quantifiers displaced from within the run, outermost
+	// first, each paired with its own kind (true = ∃). Re-wrapped around
+	// the result by process_quantifier_block.
+	std::vector<std::pair<tref, bool>> skipped;
+	// Kind of the block itself (true = ∃). Taken from the first active
+	// quantifier of the run, not from the first quantifier: a leading
+	// skip-matched quantifier is transparent and must not decide the kind
+	// of the block that follows it.
+	bool is_ex = false;
+	// Matrix the whole run scopes over, as found in the tree.
+	tref body = nullptr;
+};
+
+/**
+ * @internal
+ * @brief Collects the maximal quantifier block whose head is `n`.
+ *
+ * Walks the quantifier chain down from `n` (whose direct child must be a
+ * quantifier), accumulating bound variables until the chain ends or reaches
+ * a quantifier that cannot join the block (see `quantifier_block`).
+ * `skip`-matched quantifiers are transparent: they neither end the block nor
+ * join it. They are recorded in `skipped` and re-wrapped later, so that
+ * active quantifiers sitting below them still join *this* block instead of
+ * being stranded in a separate one of their own.
+ * @tparam node Tree node type.
+ * @param n Formula node whose direct child is a quantifier.
+ * @param skip Predicate marking variables this pass must not eliminate.
+ * @return The collected block, including the matrix it scopes over.
+ * @endinternal
+ */
+template<NodeType node>
+quantifier_block<node> collect_quantifier_block(tref n,
+	std::function<bool(tref)> skip)
+{
+	using tau = tree<node>;
+	DBG(assert(is_child_quantifier<node>(n));)
+	quantifier_block<node> blk;
+	blk.head = n;
+	size_t ba_type = 0;
+	bool ba_type_set = false;
+	bool kind_fixed = false;
+	tref curr = n;
+	while (is_child_quantifier<node>(curr)) {
+		const bool curr_is_ex = is_child<node>(curr, tau::wff_ex);
+		tref var = tau::trim2(curr);
+		if (skip(var)) {
+			blk.skipped.emplace_back(var, curr_is_ex);
+			// Provisional only: a run of nothing but skip-matched
+			// quantifiers has no active kind of its own, and
+			// process_quantifier_block still needs one to pick a
+			// branch. An active quantifier below overrides this.
+			if (!kind_fixed) blk.is_ex = curr_is_ex;
+		} else {
+			// The first *active* quantifier fixes the block's kind,
+			// so a leading skip-matched quantifier of the opposite
+			// kind cannot split the run that follows it.
+			if (!kind_fixed) blk.is_ex = curr_is_ex, kind_fixed = true;
+			else if (curr_is_ex != blk.is_ex) break;
+			const size_t vt = tau::get(var).get_ba_type();
+			if (ba_type_set && vt != ba_type) break;
+			ba_type = vt, ba_type_set = true;
+			blk.vars.push_back(var);
+		}
+		curr = tau::get(curr)[0].second();
+	}
+	blk.body = curr;
+	return blk;
+}
+
+/**
+ * @internal
+ * @brief Eliminates one maximal quantifier block over an already-processed matrix.
  *
  * Delegates the whole block (whether atomless, bitvector-typed, or mixed)
  * to the 6-arg `anti_prenex_block`, which splits disjunctions/conjuncts,
@@ -3544,52 +3641,38 @@ tref anti_prenex_block(tref formula, const trefs& block,
  * strategy resolves and this algorithm's disjunction/Boole decomposition
  * does not. ∃-blocks are pushed in directly; ∀-blocks are dualized to
  * ∃-blocks.
+ *
+ * `blk.body` is required to already be free of unresolved quantifier scope:
+ * the pipeline below (`push_ex_block_into_clause` in particular) assumes it
+ * is handed fully resolved, homogeneously typed content. `process_quantifier_blocks`
+ * guarantees this by only ever eliminating innermost blocks.
  * @tparam node Tree node type.
- * @param n Formula node whose direct child is a quantifier.
+ * @param blk The maximal block to eliminate, as returned by `collect_quantifier_block`.
+ * @param skip Predicate marking variables this pass must not eliminate.
  * @return Formula with the quantifier block eliminated or pushed inward.
  * @endinternal
  */
-// Processes one quantifier block rooted at n:
+// Processes one quantifier block:
 // - ∃-blocks: push into body with the 6-arg anti_prenex_block (which
 //   handles skip-matched/bitvector content itself via blasting), resolve
 //   remaining quantifiers, then fall back to anti_prenex for whatever
 //   structural (non-bitvector) cases still need it. ∀-blocks are dualized:
 //   ∀x φ ≡ ¬∃x ¬φ.
 template<NodeType node>
-tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_bv_type_family<node>) {
+tref process_quantifier_block(const quantifier_block<node>& blk,
+	std::function<bool(tref)> skip = is_tref_bv_type_family<node>)
+{
 	using tau = tree<node>;
-	if (!is_child_quantifier<node>(n)) return n;
+	trefs block_vars = blk.vars;
+	tref body = blk.body;
+	const bool is_ex = blk.is_ex;
 
-	// Collect the maximal same-type block at the top, treating
-	// skip-matched (e.g. bitvector) quantifiers as transparent: such a
-	// variable's quantifier is left untouched by this pass regardless of
-	// where it sits, so it commutes with the quantifiers of the rest of
-	// the variables and must be skipped over here rather than ending the
-	// block -- letting active (non-skip) quantifiers found deeper still
-	// join this same active block, instead of being stranded in a
-	// separate block of their own. Displaced skip-matched quantifiers are
-	// recorded (outer-to-inner, alongside their own quantifier type) and
-	// re-wrapped around the final result via wrap_skipped below.
-	trefs block_vars;
-	std::vector<std::pair<tref, bool>> skipped_quants; // (var, is_ex)
-	const bool is_ex = is_child<node>(n, tau::wff_ex);
-	tref curr = n;
-	while (is_child_quantifier<node>(curr)) {
-		const bool curr_is_ex = is_child<node>(curr, tau::wff_ex);
-		tref var = tau::trim2(curr);
-		if (curr_is_ex != is_ex && !skip(var)) break;
-		if (skip(var)) skipped_quants.emplace_back(var, curr_is_ex);
-		else block_vars.push_back(var);
-		curr = tau::get(curr)[0].second();
-	}
-	tref body = curr;
-
-	// Re-wrap quantifiers displaced above around a result, innermost
-	// displaced quantifier first, so the outermost-encountered one ends
-	// up outermost again -- valid regardless of order since they commute
-	// with the rest.
+	// Re-wrap quantifiers displaced by the collection above around a
+	// result, innermost displaced quantifier first, so the
+	// outermost-encountered one ends up outermost again -- valid
+	// regardless of order since they commute with the rest.
 	auto wrap_skipped = [&](tref r) -> tref {
-		for (auto it = skipped_quants.rbegin(); it != skipped_quants.rend(); ++it)
+		for (auto it = blk.skipped.rbegin(); it != blk.skipped.rend(); ++it)
 			r = it->second ? build_wff_ex<node>(it->first, r, false)
 				: build_wff_all<node>(it->first, r, false);
 		return r;
@@ -3683,7 +3766,141 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
 
 /**
  * @internal
- * @brief Drives the full anti-prenex-block pipeline: NNF + syntactic simplification, substitution-based elimination, canonical operator normalization, then post-order application of `process_quantifier_block`.
+ * @brief Collects the innermost maximal quantifier blocks of `fm`.
+ *
+ * A *block head* is a node whose direct child is a quantifier; the block it
+ * heads is the whole run `collect_quantifier_block` walks down from it. A
+ * head is *innermost* when the matrix that run scopes over holds no
+ * quantifier scope of its own -- that is, when its block can be eliminated
+ * over an already-resolved body right now.
+ *
+ * Heads listed in `done` are neither emitted nor descended into: they have
+ * already been handed to `process_quantifier_block`, so re-processing them
+ * would repeat work that has, by definition, converged. Skipping them
+ * instead promotes their *enclosing* head to innermost, which is precisely
+ * what lets an outer run absorb quantifiers an inner block left behind.
+ * @tparam node Tree node type.
+ * @param fm Formula to scan.
+ * @param skip Predicate marking variables this pass must not eliminate.
+ * @param done Heads already processed in this pass.
+ * @param out Collected blocks, appended to.
+ * @endinternal
+ */
+template<NodeType node>
+void select_innermost_blocks(tref fm, std::function<bool(tref)> skip,
+	const subtree_unordered_set<node>& done,
+	std::vector<quantifier_block<node>>& out)
+{
+	// Do not descend into terms: tau_ba sub-trees carry their own internal
+	// wff_ex/wff_all over I/O variables, which this pass must leave intact
+	// (the same guard anti_prenex_block's short-circuit uses).
+	const trefs heads = rewriter::select_top_until<node>(fm,
+		is_child_quantifier<node>,
+		[](tref n) { return !while_is_formula<node>(n); });
+	for (tref head : heads) {
+		if (done.contains(head)) continue;
+		quantifier_block<node> blk =
+			collect_quantifier_block<node>(head, skip);
+		const size_t before = out.size();
+		select_innermost_blocks<node>(blk.body, skip, done, out);
+		// Nothing nested under the run: this block is innermost.
+		if (out.size() == before) out.push_back(std::move(blk));
+	}
+}
+
+/**
+ * @internal
+ * @brief Eliminates every maximal quantifier block in `fm`, innermost first.
+ *
+ * Block elimination is only worth its name when a whole maximal run of
+ * quantifiers reaches `process_quantifier_block` at once: the run is
+ * resolved through one joint BDD variable order and one Boole-decomposition
+ * pivot ranking over all of its variables. Splitting a run across several
+ * calls degrades this to repeated single-quantifier elimination -- the very
+ * thing the block algorithm exists to avoid.
+ *
+ * Two requirements pull in opposite directions:
+ *  - a block must be collected *maximally*, so no quantifier that could join
+ *    the run is eliminated on its own beforehand;
+ *  - a block must be eliminated over a *resolved* matrix, since
+ *    `push_ex_block_into_clause` assumes the clause it is handed holds no
+ *    unresolved, foreign-typed quantifier scope.
+ *
+ * A plain `post_order` traversal satisfies neither: it rewrites a node only
+ * after its children, so by the time the outermost quantifier of
+ * `ex x ex y ex z φ` is reached, `y` and `z` have already been peeled off and
+ * eliminated one at a time -- the maximal block is destroyed before it can
+ * ever be seen. Collecting the run top-down and recursing into its matrix
+ * fixes that but only half-way: the run is then fixed *before* the matrix is
+ * resolved, so quantifiers that resolving the matrix leaves exposed directly
+ * beneath the run (residuals of the `anti_prenex` fallback, or quantifiers
+ * uncovered when an intervening scope vanishes) never join it, and get
+ * eliminated separately -- single-quantifier elimination again, just one
+ * level up.
+ *
+ * This driver therefore works strictly bottom-up and *re-collects* after
+ * every splice. Each round takes the currently innermost blocks
+ * (`select_innermost_blocks`), eliminates each over its already-resolved
+ * matrix, and splices the results back through one `changes` map -- the
+ * usual cached-rewrite pattern, leaving all node rebuilding to the rewriter.
+ * The next round then re-collects blocks from the *updated* tree, so any run
+ * that inner elimination made contiguous is now seen, and eliminated, as the
+ * single maximal block it has become. Rounds continue upward until no
+ * unprocessed block remains.
+ *
+ * Termination: `done` retires both the head handed to
+ * `process_quantifier_block` and the node that replaces it, so every tree
+ * position is processed exactly once however the splice renames it. A round
+ * that finds only retired heads collects nothing and returns; a round that
+ * finds new ones retires them too, and the heads reachable from a finite tree
+ * are finite. Retiring the result is what makes this hold: without it, a run
+ * of nothing but skip-matched quantifiers -- which has no active variable to
+ * eliminate, and which `wrap_skipped` therefore reproduces around a possibly
+ * perturbed body -- would head the same block again under a new tref every
+ * round, and the loop would not terminate.
+ * @tparam node Tree node type.
+ * @param fm Formula to process.
+ * @param skip Predicate marking variables this pass must not eliminate.
+ * @return Formula with every maximal quantifier block eliminated or pushed inward.
+ * @endinternal
+ */
+template<NodeType node>
+tref process_quantifier_blocks(tref fm, std::function<bool(tref)> skip) {
+	subtree_unordered_set<node> done;
+	for (;;) {
+		std::vector<quantifier_block<node>> blocks;
+		select_innermost_blocks<node>(fm, skip, done, blocks);
+		if (blocks.empty()) return fm;
+		subtree_map<node, tref> changes;
+		for (const quantifier_block<node>& blk : blocks) {
+			done.insert(blk.head);
+			tref res = process_quantifier_block<node>(blk, skip);
+			// Retire the result as well, not just the head it
+			// replaces. A block whose run is entirely skip-matched
+			// has no active variable to eliminate, so
+			// process_quantifier_block re-wraps those quantifiers
+			// around a body the pipeline may have perturbed: the
+			// spliced-in node then heads the very same block again
+			// under a fresh tref, which `done` would not recognise,
+			// and the round would repeat forever. Retiring `res`
+			// makes "processed once" hold for the position, not
+			// merely for one node identity. Merging upward is
+			// unaffected -- it happens at the enclosing head, a
+			// different node, whose own collection walks straight
+			// through whatever quantifiers `res` still carries.
+			done.insert(res);
+			if (res != blk.head) changes.emplace(blk.head, res);
+		}
+		// Every innermost block converged: nothing left to lift upward.
+		if (changes.empty()) return fm;
+		fm = rewriter::replace_if<node>(fm, changes,
+			while_is_formula<node>);
+	}
+}
+
+/**
+ * @internal
+ * @brief Drives the full anti-prenex-block pipeline: NNF + syntactic simplification, substitution-based elimination, canonical operator normalization, then maximal-block application of `process_quantifier_block`.
  * @tparam node Tree node type.
  * @param formula Formula to process.
  * @return Formula with quantifiers pushed inward as far as possible using the block-based algorithm.
@@ -3722,17 +3939,13 @@ tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 	// canonical atoms.
 	formula = normalize_atomic_formula_operators<node>(formula);
 
-	// Step 4: Process each quantifier block in post-order (innermost first).
-	// For each node whose direct child is a quantifier, identify the maximal
-	// block of consecutive same-type quantifiers at the top, push the block
-	// into the body using the 5-arg anti_prenex_block, then eliminate the
-	// remaining quantifiers over atomic formulas via resolve_quantifiers2.
-	// wff_all blocks are handled by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
-	auto f = [&](tref n) -> tref {
-		return process_quantifier_block<node>(n, skip);
-	};
-	formula = post_order<node>(formula).apply_unique(
-		f, while_is_formula<node>);
+	// Step 4: Eliminate each maximal quantifier block (innermost blocks
+	// first). For each maximal run of consecutive same-kind, same-BA-type
+	// quantifiers, push the whole run into the body using the 6-arg
+	// anti_prenex_block, then eliminate the remaining quantifiers over
+	// atomic formulas via resolve_quantifiers2. wff_all blocks are handled
+	// by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
+	formula = process_quantifier_blocks<node>(formula, skip);
 	return syntactic_formula_simplification<node>(formula, skip);
 }
 
