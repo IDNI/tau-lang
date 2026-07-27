@@ -707,12 +707,14 @@ static std::pair<StateSet,StateSet> solve(
 	auto [W0pp, W1pp] = solve(V3, n, plr, pri, succs);
 	StateSet W_1b_full = Y;
 	for (int u : Wl) W_1b_full.insert(u);
+	// W_1b_full is the opponent's region, so it collects the opponent's wins
+	// in the residual subgame and is returned in the opponent's slot
 	if (beneficiary == 1) {
-		for (int u : W1pp) W_1b_full.insert(u);
-		return {W0pp, W_1b_full};
-	} else {
 		for (int u : W0pp) W_1b_full.insert(u);
 		return {W_1b_full, W1pp};
+	} else {
+		for (int u : W1pp) W_1b_full.insert(u);
+		return {W0pp, W_1b_full};
 	}
 }
 
