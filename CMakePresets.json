@@ -43,6 +43,11 @@
 			"binaryDir": "${sourceDir}/build/debug"
 		},
 		{
+			"name": "_build_dir-devel",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/devel"
+		},
+		{
 			"name": "_build_dir-release-clang",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/release-clang"
@@ -77,6 +82,13 @@
 			"hidden": true,
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "_build-type-devel",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Devel"
 			}
 		},
 		{
@@ -215,6 +227,24 @@
 			]
 		},
 		{
+			"name": "devel-make-gcc",
+			"inherits": [
+				"_build_dir-devel",
+				"_generator-make",
+				"_toolchain-gcc",
+				"_build-type-devel"
+			]
+		},
+		{
+			"name": "devel-ninja-gcc",
+			"inherits": [
+				"_build_dir-devel",
+				"_generator-ninja",
+				"_toolchain-gcc",
+				"_build-type-devel"
+			]
+		},
+		{
 			"name": "release-ninja-gcc",
 			"inherits": [
 				"_build_dir-release",
@@ -313,8 +343,52 @@
 			"inherits": ["debug-make-gcc"]
 		},
 		{
+			"name": "devel",
+			"inherits": ["devel-make-gcc"]
+		},
+		{
+			"name": "devel-tests",
+			"inherits": ["devel", "_build-tests"]
+		},
+		{
+			"name": "devel-unit-tests",
+			"inherits": ["devel", "_build-unit-tests"]
+		},
+		{
+			"name": "devel-integration-tests",
+			"inherits": ["devel", "_build-integration-tests"]
+		},
+		{
+			"name": "devel-api-tests",
+			"inherits": ["devel", "_build-api-tests"]
+		},
+		{
+			"name": "devel-repl-tests",
+			"inherits": ["devel", "_build-repl-tests"]
+		},
+		{
+			"name": "devel-tau",
+			"inherits": ["devel", "_build-executable"]
+		},
+		{
+			"name": "devel-all",
+			"inherits": ["devel", "_build-all"]
+		},
+		{
 			"name": "release-ninja",
 			"inherits": ["release-ninja-gcc"]
+		},
+		{
+			"name": "release-ninja-tests",
+			"inherits": ["release-ninja-gcc", "_build-tests"]
+		},
+		{
+			"name": "devel-ninja",
+			"inherits": ["devel-ninja-gcc"]
+		},
+		{
+			"name": "devel-ninja-tests",
+			"inherits": ["devel-ninja-gcc", "_build-tests"]
 		},
 		{
 			"name": "debug-ninja",
@@ -457,12 +531,56 @@
 			"configurePreset": "debug"
 		},
 		{
+			"name": "devel",
+			"configurePreset": "devel"
+		},
+		{
+			"name": "devel-tests",
+			"configurePreset": "devel-tests"
+		},
+		{
+			"name": "devel-unit-tests",
+			"configurePreset": "devel-unit-tests"
+		},
+		{
+			"name": "devel-integration-tests",
+			"configurePreset": "devel-integration-tests"
+		},
+		{
+			"name": "devel-api-tests",
+			"configurePreset": "devel-api-tests"
+		},
+		{
+			"name": "devel-repl-tests",
+			"configurePreset": "devel-repl-tests"
+		},
+		{
+			"name": "devel-tau",
+			"configurePreset": "devel-tau"
+		},
+		{
+			"name": "devel-all",
+			"configurePreset": "devel-all"
+		},
+		{
 			"name": "release",
 			"configurePreset": "release"
 		},
 		{
 			"name": "release-ninja",
 			"configurePreset": "release-ninja"
+		},
+		{
+			"name": "release-ninja-tests",
+			"configurePreset": "release-ninja-tests"
+		},
+		{
+			"name": "devel-ninja",
+			"configurePreset": "devel-ninja"
+		},
+		{
+			"name": "devel-ninja-tests",
+			"configurePreset": "devel-ninja-tests"
 		},
 		{
 			"name": "debug-ninja",
@@ -599,8 +717,40 @@
 			"configurePreset": "debug-tests"
 		},
 		{
+			"name": "devel-tests",
+			"configurePreset": "devel-tests"
+		},
+		{
+			"name": "devel-unit-tests",
+			"configurePreset": "devel-unit-tests"
+		},
+		{
+			"name": "devel-integration-tests",
+			"configurePreset": "devel-integration-tests"
+		},
+		{
+			"name": "devel-api-tests",
+			"configurePreset": "devel-api-tests"
+		},
+		{
+			"name": "devel-repl-tests",
+			"configurePreset": "devel-repl-tests"
+		},
+		{
+			"name": "devel-all",
+			"configurePreset": "devel-all"
+		},
+		{
 			"name": "release-tests",
 			"configurePreset": "release-tests"
+		},
+		{
+			"name": "release-ninja-tests",
+			"configurePreset": "release-ninja-tests"
+		},
+		{
+			"name": "devel-ninja-tests",
+			"configurePreset": "devel-ninja-tests"
 		},
 		{
 			"name": "debug-repl-tests",

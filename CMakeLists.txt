@@ -401,6 +401,9 @@ message("Building parser")
 set(TAU_PARSER_BUILD_STATIC_LIBRARY ON CACHE BOOL "Build static library" FORCE)
 set(TAU_PARSER_BUILD_PIC ${TAU_BUILD_PIC} CACHE BOOL "Build position independent code" FORCE)
 set(TAU_PARSER_DONT_USE_FTXUI ${TAU_DONT_USE_FTXUI} CACHE BOOL "Disable FTXUI" FORCE)
+if (CMAKE_BUILD_TYPE STREQUAL "Devel")
+	set(TAU_PARSER_COMPILE_OPTIONS "-O0;-DNDEBUG;-g0")
+endif()
 add_subdirectory(external/parser)
 
 # grammars are compiled ahead of time, so tau never parses .tgf at runtime
