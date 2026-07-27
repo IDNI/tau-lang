@@ -146,7 +146,7 @@ private:
 		/// @brief Step budget for `run N steps`; 0 means unbounded.
 		size_t steps_to_run = 0;
 		size_t steps_done   = 0;
-		run_session(interpreter<node> i) : interp(std::move(i)), m("run") {}
+		run_session(interpreter<node> i) : interp(std::move(i)), m{"run"} {}
 	};
 	/// @brief What the *next* eval() call's input line answers, while set;
 	/// eval() checks this before parsing src as a normal CLI command.
