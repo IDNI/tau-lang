@@ -53,6 +53,10 @@ set(TAU_PARSER_SOURCES
 	../parser/sbf_parser.generated.cpp
 )
 
+# do not optimize parser sources, they are mostly data and optimization takes too longwhat
+set_source_files_properties(${TAU_PARSER_SOURCES}
+	PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
+
 set(TAU_SOURCES
 	${TAU_PARSER_SOURCES}
 	boolean_algebras/bool_ba.cpp
