@@ -8,16 +8,25 @@ if [[ -z "$TGF_FILE" ]]; then
 fi
 
 TGF_DIR="./external/parser"
-TGF="$TGF_DIR/build-Release/tgf"
+TGF="$TGF_DIR/build/release/tgf"
 
 if [[ ! -f "$TGF" ]]; then
 	echo "tgf tool not built. Building..."
 	D=`pwd`
-	cd "$TGF_DIR"
-	./dev release -DTAU_PARSER_BUILD_TGF=1
-	cd "$D"
+	cd "$TGF_DIR" || exit 1
+	./dev preset release-tgf
+	cd "$D" || exit 1
+fi
+
+if [[ ! -f "$TGF" ]]; then
+	echo "tgf tool missing after build: $TGF" >&2
+	exit 1
 fi
 
 echo "Generating parser from $TGF_FILE ..."
-$TGF "$TGF_FILE" gen
+# --header-only false: table goes to a shared TU, never inline in the header
+if ! $TGF "$TGF_FILE" gen --header-only false; then
+	echo "Generation FAILED for $TGF_FILE" >&2
+	exit 1
+fi
 echo "Generation done"

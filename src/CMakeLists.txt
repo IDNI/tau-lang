@@ -47,7 +47,14 @@ set(TAU_HEADERS
 	undefs.h           # undefines implementation macros
 )
 
+# grammar tables, compiled here instead of in every TU including the parser
+set(TAU_PARSER_SOURCES
+	../parser/tau_parser.generated.cpp
+	../parser/sbf_parser.generated.cpp
+)
+
 set(TAU_SOURCES
+	${TAU_PARSER_SOURCES}
 	boolean_algebras/bool_ba.cpp
 	boolean_algebras/bdds/var_dict.cpp
 	boolean_algebras/nlang_ba.cpp
