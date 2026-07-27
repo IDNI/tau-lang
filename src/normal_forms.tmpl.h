@@ -3714,15 +3714,7 @@ tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 	// Step 2: Substitution-based elimination (innermost first via post_order).
 	// Attempts ex x (x = t && phi(x)) => phi(t) for each existential
 	// conjunctive scope.
-	auto subs_elim = [](tref n) -> tref {
-		if (!is_child<node>(n, tau::wff_ex)) return n;
-		tref var = tau::trim2(n);
-		tref scope = tau::get(n)[0].second();
-		if (tau::get(scope).find_top(is<node, tau::wff_or>)) return n;
-		tref elim = ex_subs_based_elimination<node>(var, scope);
-		return elim != scope ? elim : n;
-	};
-	formula = post_order<node>(formula).apply_unique(subs_elim);
+	formula = ex_subs_based_elimination<node>(formula);
 	formula = syntactic_formula_simplification<node>(formula, skip);
 
 	// Step 3: Normalize non-canonical operators (bf_neq → ¬(bf_eq),

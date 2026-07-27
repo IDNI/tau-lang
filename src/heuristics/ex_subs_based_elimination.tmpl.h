@@ -104,4 +104,19 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 	else return ex_clause;
 }
 
+template <NodeType node>
+tref ex_subs_based_elimination(tref fm) {
+	using tau = tree<node>;
+	
+	auto subs_elim = [](tref n) -> tref {
+		if (!is_child<node>(n, tau::wff_ex)) return n;
+		tref var = tau::trim2(n);
+		tref scope = tau::get(n)[0].second();
+		if (tau::get(scope).find_top(is<node, tau::wff_or>)) return n;
+		tref elim = ex_subs_based_elimination<node>(var, scope);
+		return elim != scope ? elim : n;
+	};
+	return post_order<node>(fm).apply_unique(subs_elim);
+}
+
 } // namespace idni::tau_lang

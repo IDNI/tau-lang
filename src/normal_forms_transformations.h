@@ -166,6 +166,9 @@ tref syntactic_path_simplification(tref fm);
 template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause);
 
+template <NodeType node>
+tref ex_subs_based_elimination(tref fm);
+
 /**
  * @brief Skip predicate that skips nothing; suitable as `anti_prenex_block`'s
  * `skip` argument when no content should be deferred to blasting.
