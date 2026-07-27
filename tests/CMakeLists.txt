@@ -17,6 +17,9 @@ endif ()
 
 add_library(doctest INTERFACE)
 target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	target_compile_options(doctest INTERFACE -Wno-c2y-extensions "-Wno-#warnings")
+endif()
 set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
 set(TAU_SKIP_TESTS
@@ -62,16 +65,8 @@ function(add test_name)
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
 	target_include_directories(${N} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-	# Force-include extern template declarations for the test BA packs.
-	# Their bodies are explicitly instantiated in libTAU's
-	# instantiate_test_pack.cpp, so each test TU links to one shared
-	# copy instead of re-instantiating the heaviest pipeline templates
-	# per binary.  Production binaries (main, tau_codegen) use the same
-	# full pack but are intentionally not force-included here.
-	#
-	# Skip the force-include for test_cvc5 — it declares its own
-	# `static TermManager cvc5_term_manager` at file scope, which
-	# would collide with the one transitively brought in by tau.h.
+	# extern template declarations for the test BA packs, instantiated in libTAU
+	# test_cvc5 is skipped: its own file-scope TermManager collides with tau.h's
 	if(NOT "${N}" STREQUAL "test_cvc5")
 		target_compile_options(${N} PUBLIC
 			-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)

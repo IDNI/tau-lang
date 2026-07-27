@@ -1297,14 +1297,14 @@ bool has_ctl_star_operators(tref fm) {
 namespace ctl_star_detail {
 
 // Counter for generating unique witness variable names
-static int witness_counter = 0;
+inline int witness_counter = 0;
 
-static std::string fresh_witness_name() {
+inline std::string fresh_witness_name() {
 	return "w_" + std::to_string(witness_counter++);
 }
 
 // Reset counter for each new reduction
-static void reset_witness_counter() {
+inline void reset_witness_counter() {
 	witness_counter = 0;
 }
 

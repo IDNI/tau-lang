@@ -137,9 +137,8 @@ struct DefaultBAProvider {
 		// using the existing ba_types infrastructure
 		std::set<size_t> seen_sorts;
 		for (const auto& e : ctx.entries) seen_sorts.insert(e.sort_id);
-		size_t idx = 0;
-		for (size_t sid : seen_sorts)
-			result.push_back({idx++, ch});
+		for (size_t idx = 0; idx != seen_sorts.size(); ++idx)
+			result.push_back({idx, ch});
 		return result;
 	}
 
