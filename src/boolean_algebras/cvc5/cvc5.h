@@ -11,7 +11,7 @@ namespace idni::tau_lang {
 
 using bv = cvc5::Term;
 
-inline cvc5::TermManager cvc5_term_manager;
+inline cvc5::TermManager& cvc5_term_manager = *new cvc5::TermManager();
 inline size_t default_bv_size = 16;
 
 size_t get_cvc5_size(const cvc5::Term& b);

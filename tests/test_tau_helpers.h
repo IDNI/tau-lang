@@ -10,31 +10,8 @@
 #include "boolean_algebras/nlang_ba.h"
 #include "boolean_algebras/hsb.h"
 #include "test_helpers.h"
-#include <cstdlib>
 
 namespace idni::tau_lang {
-
-// Register the same exit-time cleanup that src/main.cpp installs for
-// the tau CLI: ba_constants<node_t>::cleanup() must run before cvc5's
-// TermManager destructor, otherwise the static teardown order leaves
-// ba_constants holding dangling cvc5::Term references and the process
-// SEGFAULTs after the doctest summary prints.  Without this hook the
-// tests pass all assertions but exit non-zero, which ctest reports as
-// SEGFAULT — masking the actual test outcomes and inverting the
-// pass/fail signal in CI.
-//
-// Registered here rather than in test_helpers.h because only the
-// qlt/cvc5-bearing bas_pack benefits — Bool/sbf_ba-only tests instead
-// see a double-free when cleanup() races their bdd-pool teardown.
-namespace test_tau_init_detail {
-	struct _CleanupRegistrar {
-		// __attribute__((used)) so LTO does not DCE the registration.
-		__attribute__((used)) _CleanupRegistrar() {
-			std::atexit([]() { ba_constants<node_t>::cleanup(); });
-		}
-	};
-	inline _CleanupRegistrar _ba_constants_cleanup_registrar;
-}
 
 inline tref normalize_test_tau(const char* sample) {
 	auto nso_rr = get_nso_rr(sample);

@@ -25,13 +25,6 @@ using tau = tree<node_t>;
 using tt = tau::traverser;
 using bac = ba_constants<node_t>;
 
-// (atexit ba_constants cleanup is registered in test_tau_helpers.h —
-// only the bas_pack with qlt/cvc5 needs the static-destruction-order
-// fix.  Registering it in this header instead caused a double-free
-// in Bool/sbf_ba-only tests where the variant in C is the owner of
-// bdd handles whose pool is already torn down by the time atexit
-// fires.)
-
 inline tau::get_options parse_bf() {
 	static tau::get_options opts{ .parse = { .start = tau::bf } };
 	return opts;
