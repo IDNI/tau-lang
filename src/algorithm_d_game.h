@@ -325,7 +325,12 @@ inline SynthGame call_ltlsynt_game(
 		if (sec > 0) prefix = "timeout " + std::to_string(sec) + "s ";
 	}
 
-	std::string cmd = prefix + "ltlsynt --formula=\"" + esc + "\"";
+	// --polarity=no: the polarity optimization fuses monotone output APs into a
+	// single conjunctive move, which the data layer may not be able to realize
+	// --decompose=no: a decomposed spec prints one game per part, and the
+	// product game needs a single game carrying every d_i
+	std::string cmd = prefix
+		+ "ltlsynt --polarity=no --decompose=no --formula=\"" + esc + "\"";
 	if (!ins.empty()) {
 		cmd += " --ins=\"";
 		for (int i = 0; i < (int)ins.size(); ++i) {
