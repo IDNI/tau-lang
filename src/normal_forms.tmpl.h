@@ -3364,6 +3364,33 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		return ex_fm;
 	};
 
+	// A block variable this pass could still Boole-decompose (i.e. not
+	// skip-matched). Since a skip-matched variable's quantifier commutes
+	// with the rest and is left untouched either way, it must be ignored
+	// here: only once none of the *active* block variables occur free
+	// anymore is the leaf truly exhausted for this pass, at which point
+	// the whole block (skip-matched variables included) is handed to
+	// blast_block.
+	// Whether `f` still contains any skip-matched (e.g. bitvector) typed
+	// content at all, regardless of whether it is one of `block`'s own
+	// variables. push_ex_block_into_clause assumes its whole input clause
+	// is homogeneously atomless-typed (matching `block`'s type); since
+	// `block` may no longer carry every skip-matched variable in scope
+	// (callers may filter those out before pushing the block in here),
+	// this check -- not block membership -- is what decides whether that
+	// homogeneity assumption actually holds.
+	auto has_skip_content = [&](tref f) {
+		return tau::get(f).find_top(skip);
+	};
+
+	auto has_active_var = [&](tref f) {
+		const trefs& vars = get_free_vars<node>(f);
+		for (tref v : block)
+			if (!skip(v) && hasbc(vars, v, tau::subtree_less))
+				return true;
+		return false;
+	};
+
 	// Goal: push the quantifier block as far into clause as possible.
 	// A block variable is counted here regardless of `skip`: dropping a
 	// skip-matched variable's occurrence from this check would let it be
@@ -3419,9 +3446,13 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// Var-free conjuncts; they must be re-attached to every result
 		// built from the dependent part below
 		const tref indep = tau::build_wff_and(conjs);
-		// Check if dependent formula is clause -> push block into clause
+		// Check if dependent formula is clause -> push block into clause.
+		// push_ex_block_into_clause assumes the whole clause is
+		// homogeneously atomless-typed, so any skip-matched content in it
+		// (not just among `block`'s own variables) must divert to
+		// blast_block instead.
 		if (!tau::get(formula).find_top(is<node, tau::wff_or>)) {
-			if (std::ranges::any_of(block, skip))
+			if (!has_active_var(formula) || has_skip_content(formula))
 				return tau::build_wff_and(indep, blast_block(formula));
 			return tau::build_wff_and(
 				indep,
@@ -3452,7 +3483,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// atoms remain): try blasting if the block needs it, else keep
 		// the block on the dependent part instead of dereferencing end()
 		if (atms.empty()) {
-			if (std::ranges::any_of(block, skip))
+			if (!has_active_var(formula))
 				return tau::build_wff_and(indep, blast_block(formula));
 			for (auto v = block.rbegin(); v != block.rend(); ++v)
 				formula = build_wff_ex<node>(*v, formula, false);
@@ -3490,7 +3521,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 
 	// Connective is not wff_and or wff_or (e.g. a single atom or a wff_ref)
 	// -> try blasting if the block needs it, else quantifiers stay with formula
-	if (std::ranges::any_of(block, skip))
+	if (!has_active_var(formula))
 		return blast_block(formula);
 	for (auto v = block.rbegin(); v != block.rend(); ++v)
 		formula = build_wff_ex<node>(*v, formula, false);
@@ -3529,16 +3560,40 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
 	using tau = tree<node>;
 	if (!is_child_quantifier<node>(n)) return n;
 
-	// Collect the maximal same-type block at the top.
+	// Collect the maximal same-type block at the top, treating
+	// skip-matched (e.g. bitvector) quantifiers as transparent: such a
+	// variable's quantifier is left untouched by this pass regardless of
+	// where it sits, so it commutes with the quantifiers of the rest of
+	// the variables and must be skipped over here rather than ending the
+	// block -- letting active (non-skip) quantifiers found deeper still
+	// join this same active block, instead of being stranded in a
+	// separate block of their own. Displaced skip-matched quantifiers are
+	// recorded (outer-to-inner, alongside their own quantifier type) and
+	// re-wrapped around the final result via wrap_skipped below.
 	trefs block_vars;
+	std::vector<std::pair<tref, bool>> skipped_quants; // (var, is_ex)
 	const bool is_ex = is_child<node>(n, tau::wff_ex);
 	tref curr = n;
 	while (is_child_quantifier<node>(curr)) {
-		if (is_child<node>(curr, tau::wff_ex) != is_ex) break;
-		block_vars.push_back(tau::trim2(curr));
+		const bool curr_is_ex = is_child<node>(curr, tau::wff_ex);
+		tref var = tau::trim2(curr);
+		if (curr_is_ex != is_ex && !skip(var)) break;
+		if (skip(var)) skipped_quants.emplace_back(var, curr_is_ex);
+		else block_vars.push_back(var);
 		curr = tau::get(curr)[0].second();
 	}
 	tref body = curr;
+
+	// Re-wrap quantifiers displaced above around a result, innermost
+	// displaced quantifier first, so the outermost-encountered one ends
+	// up outermost again -- valid regardless of order since they commute
+	// with the rest.
+	auto wrap_skipped = [&](tref r) -> tref {
+		for (auto it = skipped_quants.rbegin(); it != skipped_quants.rend(); ++it)
+			r = it->second ? build_wff_ex<node>(it->first, r, false)
+				: build_wff_all<node>(it->first, r, false);
+		return r;
+	};
 
 	// Trivial Skolemization: if every variable in this block is trivially
 	// eliminable (see heuristics/trivial_skolem.h), skip BDD ordering,
@@ -3563,7 +3618,7 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
 			normalize_atomic_formula_operators<node>(body));
 		if (!is_child<node>(simplified, tau::wff_ex)) {
 			block_vars.clear();
-			return simplified;
+			return wrap_skipped(simplified);
 		}
 	}
 
@@ -3623,7 +3678,7 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
 		if (tau::get(result).find_top(is_quantifier<node>))
 			result = anti_prenex<node>(result);
 	}
-	return result;
+	return wrap_skipped(result);
 }
 
 /**
