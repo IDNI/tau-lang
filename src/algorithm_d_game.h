@@ -134,6 +134,16 @@ inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
 
 inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 	SynthGame g;
+
+	// A decomposed specification prints one game per part. Parsing only the
+	// first would drop the other parts' constraints, and their output APs
+	// with them, which reads downstream as those APs being false.
+	size_t n_games = 0;
+	for (size_t p = hoa_text.find("HOA:"); p != std::string::npos;
+		p = hoa_text.find("HOA:", p + 4))
+		if (p == 0 || hoa_text[p - 1] == '\n') ++n_games;
+	if (n_games > 1) return g;
+
 	std::istringstream ss(hoa_text);
 	std::string line;
 	bool in_body = false;
