@@ -70,6 +70,37 @@ tref not_equal_to_unequal(tref fm) {
  * // tau::get(res).to_str() == "!x = y"   (i.e. !(x = y), the dual of
  * // not_equal_to_unequal's rewrite)
  * @endcode
+ *
+ * This looks redundant at first glance: non-bv `wff_lt/nlt/lteq/nlteq/
+ * gt/ngt/gteq/ngteq` nodes are already decomposed into and/or/eq form by
+ * the construction-time hooks (hooks.tmpl.h), and bv-typed occurrences of
+ * `bf_neq/gt/gteq/nlt/ngt/nlteq/ngteq` are handled directly by predicate
+ * blasting and cvc5 (bv_predicate_blasting.tmpl.h, bv_ba_solver.tmpl.h) --
+ * so it's tempting to drop this pass and rely on those. Both attempts
+ * regressed the test suite, empirically:
+ *  - Removing the pass entirely crashes an assertion in
+ *    push_ex_block_into_clause (`!find_top(is<bf_neq>)`) and aborts most
+ *    of the satisfiability/solver/splitter/interpreter/api tests: several
+ *    downstream matchers (this one, trivial_skolem_ex's bf_eq-only
+ *    matcher, the is_atomic filters gating Boole decomposition) hard-
+ *    assume only bf_eq/bf_lt/bf_lteq atoms ever reach them.
+ *  - Narrowing it to just the bf_neq case (leaving nlteq/nlt/gteq/gt/
+ *    ngteq/ngt untouched) stops the crashes but still regresses Release:
+ *    test_integration-satisfiability2/4 time out (fragmenting the atom
+ *    space hurts pivot selection/memoization in the Boole-decomposition
+ *    pipeline enough to blow up what's normally fast), test_integration-
+ *    wff_normalization prints "Failed to translate the formula to cvc5:
+ *    [t > 3]" (a non-bv atom left unresolved by the generic pipeline
+ *    falls through to the cvc5 fallback and cvc5 rejects it), and
+ *    test_integration-heuristics-syntactic_path_simplification fails on
+ *    formulas containing only `=`/`!=` (to_nnf produces these ordering
+ *    node shapes internally even from pure equality negation, so a
+ *    neq-only fix doesn't cover it).
+ * In short: the hooks and blasting/cvc5 handle *their* construction
+ * paths, but this pass also normalizes comparison atoms produced
+ * internally by the generic, bv-agnostic quantifier-elimination/NNF
+ * machinery (anti_prenex*, onf_wff, to_nnf) -- which is why it can't be
+ * removed or narrowed without a broader rewrite of those consumers.
  * @endinternal
  */
 template<NodeType node>
