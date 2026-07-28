@@ -766,6 +766,18 @@ TEST_SUITE("AntiPrenexBlock") {
 		CHECK( tau::get(res).to_str() == "z = 0" );
 	}
 
+	TEST_CASE("budget: a deeply decomposable formula still terminates") {
+		// Eight independent disjunctive pairs under one block. Without
+		// the fast paths this is 2^8 branches; the budget makes it
+		// impossible for any input to recurse unboundedly. The only
+		// thing asserted is that it returns.
+		auto [res, used] = run_apb_norm(
+			"ex x ((xa = 0 || xb != 0) && (xc = 0 || xd != 0) && "
+			"(xe = 0 || xf != 0) && (xg = 0 || xh != 0)).");
+		CHECK( used == 0 );
+		CHECK( res != nullptr );
+	}
+
 	TEST_CASE("paper 2d: a disjunctive dependent part is re-dispatched") {
 		// After z = 0 is scoped out the dependent part is a bare
 		// disjunction, whose two disjuncts are each a single clause that

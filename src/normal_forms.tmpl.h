@@ -3313,6 +3313,14 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	return tau::build_wff_or(nl, nr);
 }
 
+/// Maximum Boole-decomposition depth before the block algorithm stops
+/// splitting and re-wraps the block instead. Chapter 5's steps 2a/2b/2h keep
+/// the recursion shallow on the shapes they cover; this bounds the residue.
+/// Exceeding it costs precision, not soundness: the caller's
+/// resolve_quantifiers2 -> resolve_quantifiers -> anti_prenex chain absorbs
+/// whatever is left unresolved.
+inline constexpr size_t block_boole_max_depth = 24;
+
 /**
  * @internal
  * @brief Core recursive helper for the anti-prenex block algorithm.
@@ -3332,6 +3340,11 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
  * @param skip Predicate identifying variables/atomic formulas this pass must
  *        not Boole-decompose (defaults to BV-typed nodes; diverted to
  *        predicate blasting instead once nothing else can be pushed).
+ * @param depth Boole-decomposition depth so far. Only the two genuine Shannon
+ *        branches charge against it; distribution over disjunctions and the
+ *        step 2h gamma folds do not enlarge the search and pass it through
+ *        unchanged. On reaching `block_boole_max_depth` the recursion takes the
+ *        graceful re-wrap path instead of splitting further.
  * @return Formula with the quantifier block pushed as far inward as possible.
  * @endinternal
  */
@@ -3340,7 +3353,8 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	subtree_unordered_set<node>& used_atms,
 	const auto& quant_pattern,
 	const typename term_handle<node>::order& order,
-	std::function<bool(tref)> skip) {
+	std::function<bool(tref)> skip,
+	size_t depth = 0) {
 	using tau = tree<node>;
 	// Once no non-skip-matched block variable occurs free anymore, the
 	// remaining leaf is entirely skip-matched (e.g. bitvector) content:
@@ -3489,7 +3503,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		tref acc = _F<node>();
 		for (tref d : disjs) {
 			tref rd = anti_prenex_block<node>(d, block, used_atms,
-				quant_pattern, order, skip);
+				quant_pattern, order, skip, depth);
 			if (tau::get(rd).equals_T()) return _T<node>();
 			acc = syntactic_path_simplification<node>(
 				tau::build_wff_or(acc, rd));
@@ -3529,7 +3543,8 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		if (tau::get(formula).child_is(tau::wff_or))
 			return tau::build_wff_and(indep,
 				anti_prenex_block<node>(formula, block,
-					used_atms, quant_pattern, order, skip));
+					used_atms, quant_pattern, order, skip,
+					depth));
 		// Check if dependent formula is clause -> push block into clause.
 		// push_ex_block_into_clause assumes the whole clause is
 		// homogeneously atomless-typed, so any skip-matched content in it
@@ -3597,7 +3612,11 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// equations, quantified subformulas, or exclusively skip-matched
 		// atoms remain): try blasting if the block needs it, else keep
 		// the block on the dependent part instead of dereferencing end()
-		if (atms.empty()) {
+		if (atms.empty() || depth >= block_boole_max_depth) {
+			DBG(if (depth >= block_boole_max_depth)
+				LOG_TRACE << "anti_prenex_block: Boole budget"
+					" exhausted at depth " << depth
+					<< ", re-wrapping block\n";)
 			if (!has_active_var(formula))
 				return tau::build_wff_and(indep, blast_block(formula));
 			for (auto v = block.rbegin(); v != block.rend(); ++v)
@@ -3641,7 +3660,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 						rewriter::replace<node>(
 							formula, atm, tau::_T()),
 						block, used_atms, quant_pattern,
-						order, skip));
+						order, skip, depth));
 			// gamma3: f is identically 1, so the atom holds for
 			// no value of the variable -- fold it to F.
 			if (an.kind == boole_atom_case::identically_one)
@@ -3650,7 +3669,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 						rewriter::replace<node>(
 							formula, atm, tau::_F()),
 						block, used_atms, quant_pattern,
-						order, skip));
+						order, skip, depth));
 			// gamma4: f does not depend on the variable, so the
 			// atom does not constrain it. Lift the atom out of the
 			// block's scope instead of carrying it into both
@@ -3669,9 +3688,11 @@ tref anti_prenex_block(tref formula, const trefs& block,
 						formula, atm, tau::_F()));
 				used_atms.insert(atm);
 				tref pl = anti_prenex_block<node>(gl, block,
-					used_atms, quant_pattern, order, skip);
+					used_atms, quant_pattern, order, skip,
+					depth);
 				tref pr2 = anti_prenex_block<node>(gr, block,
-					used_atms, quant_pattern, order, skip);
+					used_atms, quant_pattern, order, skip,
+					depth);
 				used_atms.erase(atm);
 				return tau::build_wff_and(indep,
 					tau::build_wff_or(
@@ -3710,7 +3731,8 @@ tref anti_prenex_block(tref formula, const trefs& block,
 						formula, atm, tau::_F()));
 				used_atms.insert(atm);
 				tref rr = anti_prenex_block<node>(wr, block,
-					used_atms, quant_pattern, order, skip);
+					used_atms, quant_pattern, order, skip,
+					depth);
 				used_atms.erase(atm);
 				// The T-branch is quantifier-free by
 				// construction: pivot_var was substituted out
@@ -3735,12 +3757,14 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			<node>(rewriter::replace<node>(formula, atm, tau::_F()));
 		if (tau::get(l) == tau::get(r)) {
 			tref res = anti_prenex_block(
-				l, block, used_atms, quant_pattern, order, skip);
+				l, block, used_atms, quant_pattern, order, skip,
+				depth);
 			used_atms.erase(atm);
 			return tau::build_wff_and(indep, res);
 		}
 		tref nl = anti_prenex_block(
-			tau::build_wff_and(atm, l), block, used_atms, quant_pattern, order, skip);
+			tau::build_wff_and(atm, l), block, used_atms,
+			quant_pattern, order, skip, depth + 1);
 		if (tau::get(nl).equals_T()) {
 			used_atms.erase(atm);
 			// dep part is T, only the var-free part remains
@@ -3748,7 +3772,8 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		}
 		tref nr = anti_prenex_block(
 			tau::build_wff_and(tau::build_wff_neg(atm), r),
-				block, used_atms, quant_pattern, order, skip);
+				block, used_atms, quant_pattern, order, skip,
+				depth + 1);
 		used_atms.erase(atm);
 		return tau::build_wff_and(indep, tau::build_wff_or(nl, nr));
 	}
@@ -3984,7 +4009,8 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	auto resolve_ex_block = [&](tref b) -> tref {
 		b = normalize_atomic_formula_operators<node>(b);
 		subtree_unordered_set<node> used_atms;
-		tref r = anti_prenex_block<node>(b, block_vars, used_atms, qp, ord, skip);
+		tref r = anti_prenex_block<node>(b, block_vars, used_atms, qp,
+			ord, skip, 0);
 		r = resolve_quantifiers2<node>(r, ord, skip);
 		// Fallback for closed bv (sub-)formulas resolve_quantifiers2 leaves
 		// untouched, and a final safety net for blasting failures: try
