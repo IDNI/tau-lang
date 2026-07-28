@@ -5,6 +5,7 @@ set(TESTS
 	base_ba_dispatcher
 	bv_ba_helpers
 	ba_constants
+	ba_descriptor_pack
 	ba_types
 	ba_types_inference
 	bounded_cache
