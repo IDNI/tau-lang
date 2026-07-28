@@ -3391,23 +3391,19 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		return false;
 	};
 
+	// Does any block variable -- skip-matched or not -- occur free in `f`?
+	// Skip-matched variables count here: dropping one would let its
+	// conjunct be classified as independent below and moved outside the
+	// block's quantifier scope, leaking the variable free.
+	auto has_block_var = [&](tref f) {
+		const trefs& vars = get_free_vars<node>(f);
+		for (tref v : block)
+			if (hasbc(vars, v, tau::subtree_less)) return true;
+		return false;
+	};
+
 	// Goal: push the quantifier block as far into clause as possible.
-	// A block variable is counted here regardless of `skip`: dropping a
-	// skip-matched variable's occurrence from this check would let it be
-	// classified as "independent" below and moved outside the block's
-	// quantifier scope, leaking it free.
-	{
-		bool has_var = false;
-		const trefs& vars = get_free_vars<node>(formula);
-		for (tref v : block) {
-			if (hasbc(vars, v, tau::subtree_less)) {
-				has_var = true;
-				break;
-			}
-		}
-		// Formula does not contain quantified vars
-		if (!has_var) return formula;
-	}
+	if (!has_block_var(formula)) return formula;
 
 	const tau& ft = tau::get(formula);
 	// Case disjunction
@@ -3425,18 +3421,8 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		trefs conjs = get_cnf_wff_clauses<node>(formula);
 		trefs dep;
 		for (tref &conj : conjs) {
-			// See note above: check every block variable's actual
-			// occurrence regardless of `skip`.
-			bool has_var = false;
-			const trefs& vars = get_free_vars<node>(conj);
-			for (tref v : block) {
-				if (hasbc(vars, v, tau::subtree_less)) {
-					has_var = true;
-					break;
-				}
-			}
-			// Conjunct contains quantified var
-			if (has_var) {
+			// Conjunct contains a quantified var
+			if (has_block_var(conj)) {
 				dep.push_back(conj);
 				conj = _T<node>();
 			}
@@ -3496,9 +3482,17 @@ tref anti_prenex_block(tref formula, const trefs& block,
 
 		// Remove/add available atomic formulas in stack-like fashion
 		used_atms.insert(atm);
-		// Do Boole decomposition
-		tref l = rewriter::replace<node>(formula, atm, tau::_T());
-		tref r = rewriter::replace<node>(formula, atm, tau::_F());
+		// Do Boole decomposition.
+		// Paper assumption 2: the branch formulas are simplified before
+		// recursing. The node hooks only fold constants, so a
+		// contradiction between two *other* atoms on the same path
+		// survives into the recursion and keeps atoms alive that the
+		// decomposition then splits on for nothing. This is the same
+		// pass legacy ex_quantified_boole_decomposition applies.
+		tref l = syntactic_path_simplification_unsat_on_unchanged_negations
+			<node>(rewriter::replace<node>(formula, atm, tau::_T()));
+		tref r = syntactic_path_simplification_unsat_on_unchanged_negations
+			<node>(rewriter::replace<node>(formula, atm, tau::_F()));
 		if (tau::get(l) == tau::get(r)) {
 			tref res = anti_prenex_block(
 				l, block, used_atms, quant_pattern, order, skip);

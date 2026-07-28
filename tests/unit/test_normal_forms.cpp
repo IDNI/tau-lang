@@ -597,6 +597,25 @@ TEST_SUITE("AntiPrenexBlock") {
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 		CHECK( used == 0 );
 	}
+
+	TEST_CASE("Boole branches are path-simplified (assumption 2)") {
+		// The dependent part carries a contradiction between two atoms
+		// that are NOT the decomposition pivot: !(xz = 0) rules out the
+		// xz = 0 disjunct of (xz = 0 || xk = 0). The node hooks cannot
+		// see it -- they only fold constants and direct `$X && !$X`
+		// siblings -- so without the path-simplification pass the
+		// branches carry it into the recursion and the decomposition
+		// splits on atoms that are already dead, emitting degenerate
+		// terms (z'w'z, z'y'z -- both identically 0) in the result.
+		//
+		// Measured: 8 bf_eq atoms without the pass, 3 with it.
+		auto [res, used] = run_apb(
+			"ex x ((xy = 0 || xw = 0) && !(xz = 0) "
+			"&& (xz = 0 || xk = 0)).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).select_all(is<node_t, tau::bf_eq>).size()
+			== 3 );
+	}
 }
 
 TEST_SUITE("AntiPrenexBlock0Arg") {
