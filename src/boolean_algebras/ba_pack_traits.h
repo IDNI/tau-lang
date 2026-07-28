@@ -60,6 +60,22 @@ inline constexpr bool pack_has_arithmetic_theory_v =
 			std::tuple_size_v<typename Node::bas_tuple>>{});
 
 /**
+ * @brief `true` when @p BA declares it can host the pack's Boolean carrier.
+ *
+ * Optional capability: a BA that does not declare `can_host_bool` simply is not
+ * a carrier. Probed rather than required, so core still names no BA when it
+ * needs the carrier's literals.
+ */
+template <typename Node, typename BA>
+constexpr bool ba_can_host_bool() {
+	if constexpr (requires {
+		{ ba_descriptor<BA, Node>::can_host_bool }
+			-> std::convertible_to<bool>; })
+		return ba_descriptor<BA, Node>::can_host_bool;
+	else return false;
+}
+
+/**
  * @brief Result of @p probe on the first BA of @p Node's pack that returns one.
  *
  * @p probe is invoked as `probe.template operator()<BA>()` for each BA in pack

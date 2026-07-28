@@ -119,6 +119,12 @@ std::string base_ba_dispatcher<BAs...>::one(const tref type_tree) {
 	(void)((ba_descriptor<BAs, node_t>::matches_type(type_tree)
 		? (out = ba_descriptor<BAs, node_t>::literal_one(type_tree), true)
 		: false) || ...);
+	// A type no BA owns -- the untyped type a bf_t carries, for one -- falls
+	// back to the pack's Boolean carrier, which is what the per-pack chains
+	// returned from their trailing clause.
+	if (!out) (void)((ba_can_host_bool<node_t, BAs>()
+		? (out = ba_descriptor<BAs, node_t>::literal_one(type_tree), true)
+		: false) || ...);
 	if (!out) throw std::runtime_error("unsupported type for one");
 	return *out;
 }
@@ -128,6 +134,10 @@ requires BAsPack<BAs...>
 std::string base_ba_dispatcher<BAs...>::zero(const tref type_tree) {
 	std::optional<std::string> out;
 	(void)((ba_descriptor<BAs, node_t>::matches_type(type_tree)
+		? (out = ba_descriptor<BAs, node_t>::literal_zero(type_tree), true)
+		: false) || ...);
+	// See one(): an unowned type falls back to the pack's Boolean carrier.
+	if (!out) (void)((ba_can_host_bool<node_t, BAs>()
 		? (out = ba_descriptor<BAs, node_t>::literal_zero(type_tree), true)
 		: false) || ...);
 	if (!out) throw std::runtime_error("unsupported type for zero");

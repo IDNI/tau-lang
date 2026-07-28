@@ -129,6 +129,15 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 				ba_descriptor<bv, conv_node>::type_tree_for(16)) );
 	}
 
+	TEST_CASE("an unowned type falls back to the Boolean carrier's literals") {
+		// bf_t/bf_f carry the untyped type; the per-pack chains answered such a
+		// type from their trailing clause, which returned sbf's "1"/"0".
+		tref t = untyped_type<conv_node>();
+		REQUIRE(t != nullptr);
+		CHECK( conv_dispatcher::one(t) == "1" );
+		CHECK( conv_dispatcher::zero(t) == "0" );
+	}
+
 	TEST_CASE("qlt is classified as a non-aba omcat, unlike qint") {
 		CHECK_FALSE( ba_descriptor<qlt, conv_node>::atomless );
 		CHECK( ba_descriptor<qlt, conv_node>::non_aba_omcat );
