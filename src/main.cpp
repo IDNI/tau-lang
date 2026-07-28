@@ -4,17 +4,12 @@
 #include <fstream>
 #include <sstream>
 
+#include "tau_pack.h"
+
 #ifdef DEBUG
 // including nso_ba, sbf_ba and interpreter directly instead of
 // #include "tau.h" to avoid error lines pointing to a generated tau.h
-#include "boolean_algebras/bv_ba.h"
-#include "boolean_algebras/sbf/sbf_ba.h"
-#include "boolean_algebras/qint.h"
-#include "boolean_algebras/qlt.h"
-#include "boolean_algebras/nlang_ba.h"
-#include "boolean_algebras/hsb.h"
 #include "boolean_algebras/nso_ba.h"
-#include "boolean_algebras/tau/tau_ba.h"
 #include "boolean_algebras/variant_ba.h"
 #include "base_ba_dispatcher.h"
 #include "api.h"
@@ -28,7 +23,7 @@ using namespace std;
 using namespace idni;
 using namespace idni::tau_lang;
 
-using node_t = tau_lang::node<tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>, qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+using node_t = tau_lang::tau_pack::node_t;
 using tau = tree<node_t>;
 using tau_api = api<node_t>;
 
@@ -179,7 +174,7 @@ int main(int argc, char** argv) {
 		return run_tau_spec(files.front(), opts);
 	}
 
-	repl_evaluator<qint, qlt, nlang_ba, bv, sbf_ba, hsb> re({
+	repl_evaluator<TAU_PACK_BASE_BAS> re({
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,

@@ -11,13 +11,14 @@
 // tau_ba as a BA alternative alongside bv and sbf_ba.
 
 #include "test_init.h"
+#include "tau_pack.h"
 #include "test_tau_helpers.h"
 
 namespace {
 // This file exercises base_ba_dispatcher<tau_ba<bv, sbf_ba>, bv, sbf_ba>,
 // a different (smaller) node type than the ambient `node_t`/`tau` that
 // test_tau_helpers.h defines for the rest of the suite (the 7-BA
-// tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb> pack). `tref`s are only
+// tau_ba<TAU_PACK_BASE_BAS> pack). `tref`s are only
 // valid within the tree pool of the node type they were created in, so
 // every formula fed to `dispatcher` below must be built via `small_tau`,
 // not the ambient `tau`.

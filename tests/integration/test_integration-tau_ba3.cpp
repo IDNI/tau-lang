@@ -1,12 +1,13 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
+#include "tau_pack.h"
 #include "test_tau_helpers.h"
 
 namespace {
 // tau_ba<bv, sbf_ba> is a different (smaller) node type than the ambient
 // `node_t`/`tau` that test_tau_helpers.h defines for the rest of the suite
-// (the 6-BA tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb> pack). `tref`s are
+// (the 6-BA tau_ba<TAU_PACK_BASE_BAS> pack). `tref`s are
 // only valid within the tree pool of the node type they were created in, so
 // formulas fed to tau_ba<bv, sbf_ba> must be built via `small_tau`, not the
 // ambient `tau` (see tests/unit/test_base_ba_dispatcher.cpp).

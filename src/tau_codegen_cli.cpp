@@ -12,14 +12,10 @@
 // data atoms (qlt, bv, etc.) it emits runtime solver call stubs linked
 // against libtau at build time.
 
+#include "tau_pack.h"
+
 #ifdef DEBUG
-#include "boolean_algebras/bv_ba.h"
-#include "boolean_algebras/sbf/sbf_ba.h"
-#include "boolean_algebras/qint.h"
-#include "boolean_algebras/qlt.h"
-#include "boolean_algebras/nlang_ba.h"
 #include "boolean_algebras/nso_ba.h"
-#include "boolean_algebras/tau/tau_ba.h"
 #include "boolean_algebras/variant_ba.h"
 #include "base_ba_dispatcher.h"
 #include "api.h"
@@ -39,7 +35,7 @@
 
 using namespace idni::tau_lang;
 
-using node_t = node<tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>, qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+using node_t = tau_pack::node_t;
 
 static void usage() {
 	std::cerr <<

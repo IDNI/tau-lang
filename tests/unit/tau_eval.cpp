@@ -5,7 +5,8 @@
 // Prints: REALIZABLE, UNREALIZABLE, or PARSE_ERROR
 // Exit codes: 0=REALIZABLE, 1=UNREALIZABLE, 2=PARSE_ERROR
 
-#define bas_pack tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>, qint, qlt, nlang_ba, bv, sbf_ba, hsb
+#include "tau_pack.h"
+#define bas_pack TAU_PACK_FULL_BAS
 
 #include "boolean_algebras/qint.h"
 #include "boolean_algebras/qlt.h"

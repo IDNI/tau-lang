@@ -14,7 +14,8 @@ using namespace idni::tau_lang;
 
 // inner_bas: the base BAs for tau_ba (without tau_ba itself).
 // tau_ba<inner_bas> is the outermost tau_ba type in the test pack.
-#define inner_bas qint, qlt, nlang_ba, bv, sbf_ba, hsb
+#include "tau_pack.h"
+#define inner_bas TAU_PACK_BASE_BAS
 using test_ba = tau_ba<inner_bas>;
 
 // ── helpers ───────────────────────────────────────────────────────────────────

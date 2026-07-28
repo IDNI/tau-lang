@@ -6,6 +6,7 @@
 // atomlessness, parser, dispatcher, and LTL(hsb) integration.
 
 #include "test_init.h"
+#include "tau_pack.h"
 #include "test_tau_helpers.h"
 #include "boolean_algebras/hsb.h"
 
@@ -1368,7 +1369,7 @@ TEST_SUITE("hsb — dispatcher") {
 
 	TEST_CASE("dispatcher types() includes hsb") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		auto types = dispatcher_t::types();
 		bool found = false;
 		for (auto& t : types) if (t == "hsb") found = true;
@@ -1377,52 +1378,52 @@ TEST_SUITE("hsb — dispatcher") {
 
 	TEST_CASE("dispatcher one() returns top for hsb") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		auto s = dispatcher_t::one(hsb_type<node_t>());
 		CHECK(s == "top");
 	}
 
 	TEST_CASE("dispatcher zero() returns bot for hsb") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		auto s = dispatcher_t::zero(hsb_type<node_t>());
 		CHECK(s == "bot");
 	}
 
 	TEST_CASE("dispatcher is_syntactic_one for hsb top") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::top()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
 		CHECK(dispatcher_t::is_syntactic_one(v) == true);
 	}
 
 	TEST_CASE("dispatcher is_syntactic_zero for hsb bot") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::bottom()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::bottom()};
 		CHECK(dispatcher_t::is_syntactic_zero(v) == true);
 	}
 
 	TEST_CASE("dispatcher is_syntactic_one for hsb bot is false") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::bottom()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::bottom()};
 		CHECK(dispatcher_t::is_syntactic_one(v) == false);
 	}
 
 	TEST_CASE("dispatcher is_syntactic_zero for hsb top is false") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::top()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
 		CHECK(dispatcher_t::is_syntactic_zero(v) == false);
 	}
 
 	TEST_CASE("dispatcher normalize for hsb") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		// Create a contradictory element
 		auto contra = make_hs({1.0}, 1.0) & make_hs({-1.0}, 2.0);
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{contra};
+		std::variant<TAU_PACK_BASE_BAS> v{contra};
 		auto result = dispatcher_t::normalize(v);
 		CHECK(std::holds_alternative<hsb>(result));
 		CHECK(std::get<hsb>(result) == hsb::bottom());
@@ -1430,8 +1431,8 @@ TEST_SUITE("hsb — dispatcher") {
 
 	TEST_CASE("dispatcher splitter for hsb") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::top()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
 		auto result = dispatcher_t::splitter(v, splitter_type::lower);
 		CHECK(std::holds_alternative<hsb>(result));
 		auto s = std::get<hsb>(result);
@@ -1441,25 +1442,25 @@ TEST_SUITE("hsb — dispatcher") {
 
 	TEST_CASE("dispatcher is_syntactic_one for halfspace") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		auto h = make_hs({1.0}, 0.0);
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{h};
+		std::variant<TAU_PACK_BASE_BAS> v{h};
 		CHECK(dispatcher_t::is_syntactic_one(v) == false);
 	}
 
 	TEST_CASE("dispatcher is_syntactic_zero for halfspace") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		auto h = make_hs({1.0}, 0.0);
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{h};
+		std::variant<TAU_PACK_BASE_BAS> v{h};
 		CHECK(dispatcher_t::is_syntactic_zero(v) == false);
 	}
 
 	TEST_CASE("dispatcher normalize preserves non-empty hsb") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
 		auto h = make_hs({1.0}, -5.0);
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{h};
+		std::variant<TAU_PACK_BASE_BAS> v{h};
 		auto result = dispatcher_t::normalize(v);
 		CHECK(std::holds_alternative<hsb>(result));
 		CHECK(is_hsb_zero(std::get<hsb>(result)) == false);
@@ -1467,45 +1468,45 @@ TEST_SUITE("hsb — dispatcher") {
 
 	TEST_CASE("dispatcher normalize of top is top") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::top()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
 		auto result = dispatcher_t::normalize(v);
 		CHECK(std::get<hsb>(result) == hsb::top());
 	}
 
 	TEST_CASE("dispatcher normalize of bot is bot") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::bottom()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::bottom()};
 		auto result = dispatcher_t::normalize(v);
 		CHECK(std::get<hsb>(result) == hsb::bottom());
 	}
 
 	TEST_CASE("dispatcher is_zero for top") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::top()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
 		CHECK(dispatcher_t::is_zero(v) == false);
 	}
 
 	TEST_CASE("dispatcher is_zero for bot") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::bottom()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::bottom()};
 		CHECK(dispatcher_t::is_zero(v) == true);
 	}
 
 	TEST_CASE("dispatcher is_one for top") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::top()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::top()};
 		CHECK(dispatcher_t::is_one(v) == true);
 	}
 
 	TEST_CASE("dispatcher is_one for bot") {
 		gc_fixture gc;
-		using dispatcher_t = base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
-		std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb> v{hsb::bottom()};
+		using dispatcher_t = base_ba_dispatcher<TAU_PACK_BASE_BAS>;
+		std::variant<TAU_PACK_BASE_BAS> v{hsb::bottom()};
 		CHECK(dispatcher_t::is_one(v) == false);
 	}
 

@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
+#include "tau_pack.h"
 #include "test_tau_helpers.h"
 #include "../parser/qlt_parser.generated.h"
 
@@ -298,28 +299,28 @@ TEST_CASE("qlt: parse top with surrounding whitespace") {
 // ===========================================================================
 
 TEST_CASE("qlt: dispatcher parse_qlt with top") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{top}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{top}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.is_full());
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt with bottom") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{bot}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{bot}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.is_empty());
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt with bottom keyword") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{bottom}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{bottom}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.is_empty());
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt closed-open interval") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[0, 1)}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{[0, 1)}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK_FALSE(val.is_empty());
@@ -330,7 +331,7 @@ TEST_CASE("qlt: dispatcher parse_qlt closed-open interval") {
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt open-closed interval") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{(0, 1]}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{(0, 1]}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK_FALSE(val.is_empty());
@@ -340,7 +341,7 @@ TEST_CASE("qlt: dispatcher parse_qlt open-closed interval") {
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt closed-closed interval") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[0, 1]}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{[0, 1]}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK_FALSE(val.is_empty());
@@ -350,7 +351,7 @@ TEST_CASE("qlt: dispatcher parse_qlt closed-closed interval") {
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt open-open interval") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{(0, 1)}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{(0, 1)}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK_FALSE(val.is_empty());
@@ -360,7 +361,7 @@ TEST_CASE("qlt: dispatcher parse_qlt open-open interval") {
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt singleton integer") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{3}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{3}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK_FALSE(val.is_empty());
@@ -372,7 +373,7 @@ TEST_CASE("qlt: dispatcher parse_qlt singleton integer") {
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt singleton fraction") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{1/3}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{1/3}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.pieces.size() == 1);
@@ -381,7 +382,7 @@ TEST_CASE("qlt: dispatcher parse_qlt singleton fraction") {
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt singleton identifier") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{myconst}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{myconst}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.pieces.size() == 1);
@@ -390,7 +391,7 @@ TEST_CASE("qlt: dispatcher parse_qlt singleton identifier") {
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt union two intervals") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>(
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>(
 		"{[0, 1) | [2, 3)}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
@@ -399,41 +400,41 @@ TEST_CASE("qlt: dispatcher parse_qlt union two intervals") {
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt without braces") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("[0, 1)");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("[0, 1)");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.pieces.size() == 1);
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt non-dyadic fraction 1/3") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[1/3, 2/3)}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{[1/3, 2/3)}");
 	// qlt accepts any rational denominator (unlike qint)
 	CHECK(result.has_value());
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt fractional interval [1/3, 2/3]") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[1/3, 2/3]}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{[1/3, 2/3]}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.pieces.size() == 1);
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt decimal interval [0.1, 0.9)") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[0.1, 0.9)}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{[0.1, 0.9)}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.pieces.size() == 1);
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt with infinity (-inf, +inf)") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{(-inf, +inf)}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{(-inf, +inf)}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.is_full());
 }
 
 TEST_CASE("qlt: dispatcher parse_qlt symbolic closed-closed [a, b]") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[a, b]}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{[a, b]}");
 	CHECK(result.has_value());
 	auto val = std::get<qlt>(result->first);
 	CHECK(val.pieces.size() == 1);
@@ -446,27 +447,27 @@ TEST_CASE("qlt: dispatcher parse_qlt symbolic closed-closed [a, b]") {
 // ===========================================================================
 
 TEST_CASE("qlt: reject interval with lo > hi") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[1, 0)}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{[1, 0)}");
 	CHECK_FALSE(result.has_value());
 }
 
 TEST_CASE("qlt: reject open singleton (3, 3) — empty interval") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{(3, 3)}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{(3, 3)}");
 	CHECK_FALSE(result.has_value());
 }
 
 TEST_CASE("qlt: reject half-open singleton [3, 3)") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[3, 3)}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{[3, 3)}");
 	CHECK_FALSE(result.has_value());
 }
 
 TEST_CASE("qlt: reject bare +inf as singleton") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{+inf}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{+inf}");
 	CHECK_FALSE(result.has_value());
 }
 
 TEST_CASE("qlt: reject bare -inf as singleton") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{-inf}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{-inf}");
 	CHECK_FALSE(result.has_value());
 }
 
@@ -481,7 +482,7 @@ TEST_CASE("qlt: reject malformed interval (missing comma)") {
 }
 
 TEST_CASE("qlt: reject empty string") {
-	auto result = parse_qlt<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{}");
+	auto result = parse_qlt<TAU_PACK_BASE_BAS>("{}");
 	CHECK_FALSE(result.has_value());
 }
 

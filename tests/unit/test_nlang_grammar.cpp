@@ -2,6 +2,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
+#include "tau_pack.h"
 #include "../parser/nlang_parser.generated.h"
 
 using namespace idni::tau_lang;
@@ -317,21 +318,21 @@ TEST_CASE("nlang: eval atom strips leading/trailing whitespace") {
 // ═══════════════════════════════════════════════════════════════════════════
 
 TEST_CASE("nlang: dispatcher parse_nlang with nothing") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{nothing}");
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>("{nothing}");
 	REQUIRE(result.has_value());
 	auto val = std::get<nlang_ba>(result->first);
 	CHECK(is_nlang_zero(val));
 }
 
 TEST_CASE("nlang: dispatcher parse_nlang with everything") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{everything}");
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>("{everything}");
 	REQUIRE(result.has_value());
 	auto val = std::get<nlang_ba>(result->first);
 	CHECK(is_nlang_one(val));
 }
 
 TEST_CASE("nlang: dispatcher parse_nlang with bare atom") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{it is raining}");
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>("{it is raining}");
 	REQUIRE(result.has_value());
 	auto val = std::get<nlang_ba>(result->first);
 	// Not zero and not one (contingent atomic proposition)
@@ -340,7 +341,7 @@ TEST_CASE("nlang: dispatcher parse_nlang with bare atom") {
 }
 
 TEST_CASE("nlang: dispatcher parse_nlang with quoted atom") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{\"it is raining\"}");
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>("{\"it is raining\"}");
 	REQUIRE(result.has_value());
 	auto val = std::get<nlang_ba>(result->first);
 	CHECK_FALSE(val.fm->k == nlang_ba::formula::kind::bot);
@@ -348,28 +349,28 @@ TEST_CASE("nlang: dispatcher parse_nlang with quoted atom") {
 }
 
 TEST_CASE("nlang: dispatcher parse_nlang with conjunction") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{(A) and (B)}");
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>("{(A) and (B)}");
 	REQUIRE(result.has_value());
 	auto val = std::get<nlang_ba>(result->first);
 	CHECK(val.fm->k == nlang_ba::formula::kind::and_);
 }
 
 TEST_CASE("nlang: dispatcher parse_nlang with disjunction") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{(A) or (B)}");
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>("{(A) or (B)}");
 	REQUIRE(result.has_value());
 	auto val = std::get<nlang_ba>(result->first);
 	CHECK(val.fm->k == nlang_ba::formula::kind::or_);
 }
 
 TEST_CASE("nlang: dispatcher parse_nlang with negation") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{not (A)}");
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>("{not (A)}");
 	REQUIRE(result.has_value());
 	auto val = std::get<nlang_ba>(result->first);
 	CHECK(val.fm->k == nlang_ba::formula::kind::not_);
 }
 
 TEST_CASE("nlang: dispatcher parse_nlang with nested formula") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>(
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>(
 		"{(A) and (not (B))}");
 	REQUIRE(result.has_value());
 	auto val = std::get<nlang_ba>(result->first);
@@ -379,7 +380,7 @@ TEST_CASE("nlang: dispatcher parse_nlang with nested formula") {
 }
 
 TEST_CASE("nlang: dispatcher parse_nlang empty => no value") {
-	auto result = parse_nlang<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{}");
+	auto result = parse_nlang<TAU_PACK_BASE_BAS>("{}");
 	CHECK_FALSE(result.has_value());
 }
 

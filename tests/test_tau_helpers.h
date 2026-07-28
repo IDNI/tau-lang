@@ -4,7 +4,8 @@
 #define __IDNI__TAU__TESTS__TEST_TAU_HELPERS_H__
 
 // helper types and functions for tau with just Bool BA as tree<node<Bool>>
-#define bas_pack tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>, qint, qlt, nlang_ba, bv, sbf_ba, hsb
+#include "tau_pack.h"
+#define bas_pack TAU_PACK_FULL_BAS
 #include "boolean_algebras/qint.h"
 #include "boolean_algebras/qlt.h"
 #include "boolean_algebras/nlang_ba.h"

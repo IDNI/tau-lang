@@ -1,12 +1,9 @@
 // Explicit template instantiations for the BA pack used by every
 // test binary and by the production CLI binaries.
 //
-// The dominant node pack (defined as bas_pack in
-// tests/test_tau_helpers.h and used by 40+ unit tests AND by
-// src/main.cpp / src/tau_codegen_cli.cpp) is:
-//
-//   node<tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>,
-//        qint, qlt, nlang_ba, bv, sbf_ba, hsb>
+// The dominant node pack is the configured one, tau_pack::node_t (also
+// bas_pack in tests/test_tau_helpers.h, used by 40+ unit tests AND by
+// src/main.cpp / src/tau_codegen_cli.cpp).
 //
 // Without explicit instantiations, every consumer TU re-instantiates
 // the heaviest pipeline templates (is_ltl_aba_realizable,
@@ -23,12 +20,12 @@
 // header.
 
 #include "tau.h"
+#include "tau_pack.h"
 
 namespace idni::tau_lang {
 
-// Mirror tests/test_tau_helpers.h's bas_pack.
-using test_node_t = node<tau_ba<qint, qlt, nlang_ba, bv, sbf_ba, hsb>,
-                         qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+// The configured pack; mirrored by tests/test_tau_helpers.h's bas_pack.
+using test_node_t = tau_pack::node_t;
 using bool_node_t = node<bv, Bool>;
 using sbf_node_t  = node<bv, sbf_ba>;
 
@@ -40,7 +37,7 @@ template bool has_ltl_operators    <test_node_t>(tref);
 
 template struct tree    <test_node_t>;
 template struct get_hook<test_node_t>;
-template struct tau_ba  <qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+template struct tau_ba  <TAU_PACK_BASE_BAS>;
 
 template struct tree    <bool_node_t>;
 template struct get_hook<bool_node_t>;

@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
+#include "tau_pack.h"
 #include "test_tau_helpers.h"
 #include "../parser/qint_parser.generated.h"
 
@@ -212,17 +213,17 @@ TEST_CASE("qint: parse union with whitespace around |") {
 // ═══════════════════════════════════════════════════════════════════════════
 
 TEST_CASE("qint: reject invalid interval (lo > hi)") {
-	auto result = parse_qint<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[1, 0)}");
+	auto result = parse_qint<TAU_PACK_BASE_BAS>("{[1, 0)}");
 	CHECK_FALSE(result.has_value());
 }
 
 TEST_CASE("qint: accept non-dyadic fraction 1/3") {
-	auto result = parse_qint<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[1/3, 2/3)}");
+	auto result = parse_qint<TAU_PACK_BASE_BAS>("{[1/3, 2/3)}");
 	CHECK(result.has_value());
 }
 
 TEST_CASE("qint: accept non-dyadic decimal 0.1") {
-	auto result = parse_qint<qint, qlt, nlang_ba, bv, sbf_ba, hsb>("{[0.1, 0.2)}");
+	auto result = parse_qint<TAU_PACK_BASE_BAS>("{[0.1, 0.2)}");
 	CHECK(result.has_value());
 }
 
