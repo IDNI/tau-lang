@@ -4,12 +4,13 @@
 //
 // Post-processes a raw formula string that failed parsing to extract a
 // short, actionable hint that callers can show to the user.  Pure header;
-// no side effects; no dependencies beyond <regex>, <set>, <string>.
+// no side effects; no dependencies beyond <regex>, <set>, <string>, <vector>.
 //
 // The main tau binary, tau_eval, the REPL, and any other consumer can call
-// `tau_lang::classify_parse_error(formula_text)` after `get_nso_rr` / parser
-// failure to produce a human-friendly explanation alongside the raw parser
-// message.
+// `tau_lang::classify_parse_error<node>(formula_text)` after `get_nso_rr` /
+// parser failure to produce a human-friendly explanation alongside the raw
+// parser message.  `node` supplies the configured pack's type names through
+// `node::ba::types()`.
 
 #ifndef __IDNI__TAU__PARSE_ERROR_HINT_H__
 #define __IDNI__TAU__PARSE_ERROR_HINT_H__
@@ -17,11 +18,13 @@
 #include <regex>
 #include <set>
 #include <string>
+#include <vector>
 
 namespace idni::tau_lang {
 
 // Analyze the formula text for common mistakes and return a short hint.
 // Returns empty string if no specific hint applies.
+template <typename node>
 inline std::string classify_parse_error(const std::string& formula) {
 	static const std::regex re_fwd_ref(R"(\[t\s*\+)");
 	static const std::regex re_type_ann(R"([\}a-zA-Z0-9]:\s*[a-zA-Z]\w*)");
@@ -41,21 +44,23 @@ inline std::string classify_parse_error(const std::string& formula) {
 			return "missing spec terminator '.' at end of formula";
 	}
 
-	// Unknown type annotation (after the rename: valid are
-	// tau, sbf, bv, qlt, qint, nlang).
+	// Unknown type annotation; the valid names are the configured pack's.
 	// Syntax: {source}:type or variable:type — match }:word or \w:word.
 	if (std::regex_search(formula, re_type_ann)) {
-		static const std::set<std::string> known_types = {
-			"tau", "sbf", "bv", "qlt", "qint", "nlang"
-		};
+		const std::vector<std::string> names = node::ba::types();
+		const std::set<std::string> known_types(names.begin(), names.end());
 		// Extract all :word occurrences and check each.
 		std::string s = formula;
 		auto it = std::sregex_iterator(s.begin(), s.end(), re_type_extract);
 		for (; it != std::sregex_iterator(); ++it) {
 			std::string t = (*it)[1].str();
-			if (!known_types.count(t))
+			if (!known_types.count(t)) {
+				std::string valid;
+				for (const auto& n : names)
+					valid += (valid.empty() ? "" : ", ") + n;
 				return "unknown type annotation ':" + t
-				     + "' (valid: tau, sbf, bv, qlt, qint, nlang)";
+				     + "' (valid: " + valid + ")";
+			}
 		}
 	}
 

@@ -220,30 +220,30 @@ TEST_SUITE("NEG-CONSIST: determinism — same verdict on repeated evaluation") {
 TEST_SUITE("NEG-HINT: classify_parse_error produces actionable hints") {
 
 	TEST_CASE("NEG-HINT-01: missing trailing dot detected") {
-		auto hint = classify_parse_error("G (o1[t] = 0)");
+		auto hint = classify_parse_error<node<bas_pack>>("G (o1[t] = 0)");
 		CHECK(!hint.empty());
 		CHECK(hint.find("'.'") != std::string::npos);
 	}
 
 	TEST_CASE("NEG-HINT-02: forward time reference [t+k] detected") {
-		auto hint = classify_parse_error("G (o1[t+1] = 0).");
+		auto hint = classify_parse_error<node<bas_pack>>("G (o1[t+1] = 0).");
 		CHECK(!hint.empty());
 		CHECK(hint.find("forward") != std::string::npos);
 	}
 
 	TEST_CASE("NEG-HINT-03: unknown type annotation detected") {
-		auto hint = classify_parse_error("G ({1}:mytype > {0}:mytype).");
+		auto hint = classify_parse_error<node<bas_pack>>("G ({1}:mytype > {0}:mytype).");
 		CHECK(!hint.empty());
 		CHECK(hint.find("mytype") != std::string::npos);
 	}
 
 	TEST_CASE("NEG-HINT-04: valid formula returns empty hint") {
-		auto hint = classify_parse_error("G (o1[t] = 0).");
+		auto hint = classify_parse_error<node<bas_pack>>("G (o1[t] = 0).");
 		CHECK(hint.empty());
 	}
 
 	TEST_CASE("NEG-HINT-05: nested G operators detected") {
-		auto hint = classify_parse_error("G (G (o1[t] = 0)).");
+		auto hint = classify_parse_error<node<bas_pack>>("G (G (o1[t] = 0)).");
 		CHECK(!hint.empty());
 		CHECK(hint.find("nested") != std::string::npos);
 	}

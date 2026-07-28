@@ -906,7 +906,7 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		if (opt.error_quits
 			|| msg.find("Syntax Error: Unexpected end")!=0)
 		{
-			std::string hint = classify_parse_error(filt);
+			std::string hint = classify_parse_error<node>(filt);
 			TAU_LOG_ERROR << "[repl] " << msg
 				<< (hint.empty() ? "" : "\nhint: " + hint) << "\n";
 			return fail();

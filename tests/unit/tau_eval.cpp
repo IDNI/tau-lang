@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
 		// Strip trailing newline for cleaner output.
 		while (!parser_msg.empty() && parser_msg.back() == '\n')
 			parser_msg.pop_back();
-		std::string hint = classify_parse_error(formula);
+		std::string hint = classify_parse_error<node_t>(formula);
 		std::cerr << "parse error: " << parser_msg;
 		if (!hint.empty()) std::cerr << "\nhint: " << hint;
 		std::cerr << "\n";
@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
 
 	auto nso = get_nso_rr<node_t>(tau::get(formula.c_str()));
 	if (!nso.has_value()) {
-		std::string hint = classify_parse_error(formula);
+		std::string hint = classify_parse_error<node_t>(formula);
 		std::cout << "PARSE_ERROR\n";
 		std::cerr << "parse error: formula parsed but could not be resolved";
 		if (!hint.empty()) std::cerr << "\nhint: " << hint;
