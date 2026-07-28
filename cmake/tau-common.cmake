@@ -109,6 +109,10 @@ function(target_setup target)
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")
 	target_compile_features(${target} PRIVATE cxx_std_23)
+	# generated tau_pack.h describing the configured BA pack
+	if(TAU_PACK_INCLUDE_DIR)
+		target_include_directories(${target} PRIVATE ${TAU_PACK_INCLUDE_DIR})
+	endif()
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 			target_compile_options(${target} PRIVATE

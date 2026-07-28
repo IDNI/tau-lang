@@ -415,6 +415,14 @@ target_compile_definitions(tauparser_static PUBLIC TAU_PARSER_NO_TGF)
 include(tau-common)
 
 #
+# resolve the BA pack chosen with -DTAU_BAS= and generate tau_pack.h
+#
+include(tau_bas)
+tau_resolve_ba_pack()
+tau_generate_pack_header()
+message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
+
+#
 # Adding src dir
 #
 message(STATUS "Building src")
