@@ -83,13 +83,27 @@ Always run tests in debug. Always run tests in release before pushing.
 ### Boolean Algebras (`src/boolean_algebras/`)
 
 The core abstraction. Multiple BA implementations are supported:
+- `sbf/` — simple Boolean formulas (BDD-backed), a converted plugin
+- `tau/` — Tau BA (embedding Tau specs as a BA), a converted plugin
 - `bool_ba.h` — classical Boolean algebra
-- `sbf_ba.h` — simple Boolean formulas
 - `nso_ba.h` — non-deterministic string operations
 - `bv_ba.h` — bitvectors (uses CVC5 and/or bitblasting)
-- `tau_ba.h` — Tau BA (embedding Tau specs as a BA)
 - `bdds/` — BDD-based operations underlying several BAs
 - `cvc5/` — CVC5 SMT solver integration for bitvector theory
+
+The BAs of a build are its **pack**, chosen at configure time with
+`-DTAU_BAS=` (default `tau,qint,qlt,nlang,bv,sbf,hsb`). `cmake/tau_bas.cmake`
+globs `src/boolean_algebras/*/ba.cmake` manifests and generates `tau_pack.h`
+into the build tree, providing `tau_pack::node_t`, `TAU_PACK_BASE_BAS` and
+`TAU_PACK_FULL_BAS` — use those instead of spelling a pack literally.
+
+A converted BA reaches core only through `ba_descriptor<BA, node>`
+(`ba_descriptor.h`); `ba_descriptor_complete` lists the mandatory members.
+Unconverted BAs still go through the per-pack specializations in
+`base_ba_dispatcher_*.{h,cpp}`, which disappear as each BA is converted.
+To add a BA, copy `src/boolean_algebras/_template/` and follow
+`docs/adding_base_bas.md`. `scripts/test-external-ba.sh` proves the
+out-of-tree path.
 
 ### Tree Representation (`src/tau_tree*.h`)
 
