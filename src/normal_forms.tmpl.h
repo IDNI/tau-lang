@@ -4032,9 +4032,17 @@ void select_innermost_blocks(tref fm, std::function<bool(tref)> skip,
 		is_child_quantifier<node>,
 		[](tref n) { return !while_is_formula<node>(n); });
 	for (tref head : heads) {
-		if (done.contains(head)) continue;
 		quantifier_block<node> blk =
 			collect_quantifier_block<node>(head, skip);
+		if (done.contains(head)) {
+			// Retired, but chapter 5 step 2k asks for step 2 to be
+			// re-entered wrt *every* quantifier in the resulting
+			// expression: a block nested inside this one's result
+			// has never been seen. Descend without re-emitting the
+			// head itself.
+			select_innermost_blocks<node>(blk.body, skip, done, out);
+			continue;
+		}
 		const size_t before = out.size();
 		select_innermost_blocks<node>(blk.body, skip, done, out);
 		// Nothing nested under the run: this block is innermost.
@@ -4100,11 +4108,32 @@ void select_innermost_blocks(tref fm, std::function<bool(tref)> skip,
  */
 template<NodeType node>
 tref process_quantifier_blocks(tref fm, std::function<bool(tref)> skip) {
+	using tau = tree<node>;
 	subtree_unordered_set<node> done;
+	// A quantifier over a constant scope can appear after its own round: an
+	// outer elimination can reduce a kept inner quantifier's scope to T/F,
+	// and syntactic_formula_simplification does not fold binders. Sound
+	// under the standing non-empty domain assumption. Deliberately NOT
+	// fold_trivial_quantifiers -- normalizer.tmpl.h:128 records that it
+	// breaks bitwidth preservation.
+	auto drop_const_quant = [](tref m) -> tref {
+		if (!is_child_quantifier<node>(m)) return m;
+		tref scoped = tau::get(m)[0].second();
+		if (tau::get(scoped).equals_T() || tau::get(scoped).equals_F())
+			return scoped;
+		return m;
+	};
+	DBG(size_t rounds = 0;)
 	for (;;) {
+		DBG(assert(++rounds < 1000
+			&& "process_quantifier_blocks did not converge");)
 		std::vector<quantifier_block<node>> blocks;
 		select_innermost_blocks<node>(fm, skip, done, blocks);
-		if (blocks.empty()) return fm;
+		DBG(LOG_TRACE << "process_quantifier_blocks round " << rounds
+			<< ": " << blocks.size() << " block(s)\n";)
+		if (blocks.empty())
+			return post_order<node>(fm).apply_unique(
+				drop_const_quant);
 		subtree_map<node, tref> changes;
 		for (const quantifier_block<node>& blk : blocks) {
 			done.insert(blk.head);

@@ -883,6 +883,21 @@ TEST_SUITE("AntiPrenexBlock0Arg") {
 		tref res = run_apb0("ex x ex y ((x = c || z = 0) && (yz = 0 || yw = 0)).");
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
+
+	TEST_CASE("nested alternation: every block is processed") {
+		// The inner ex-block is innermost; the enclosing all-block must
+		// be processed too, and no quantifier may survive.
+		tref res = run_apb0("all a ex b (ab = 0 && bc != 0).");
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	TEST_CASE("no quantifier survives a constant scope") {
+		// ex x ((x|y)x'y' != 0) is F for every y, so `all y` ends up
+		// wrapped around a bare constant. Nothing downstream folds a
+		// binder, so the driver must.
+		tref res = run_apb0("all y ex x ((x|y)x'y' != 0).");
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
 }
 
 TEST_SUITE("BlockAtomProfile") {
