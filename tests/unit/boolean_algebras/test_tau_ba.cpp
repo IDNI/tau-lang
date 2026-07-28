@@ -8,7 +8,7 @@
 #include <sstream>
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/tau/tau_ba.h"
 
 using namespace idni::tau_lang;
 

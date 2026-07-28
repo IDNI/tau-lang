@@ -14,7 +14,7 @@
 #include "boolean_algebras/nlang_ba.h"
 #include "boolean_algebras/hsb.h"
 #include "boolean_algebras/nso_ba.h"
-#include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/tau/tau_ba.h"
 #include "boolean_algebras/variant_ba.h"
 #include "base_ba_dispatcher.h"
 #include "api.h"

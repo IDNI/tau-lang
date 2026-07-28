@@ -27,7 +27,7 @@
 #include "boolean_algebras/bv_ba.h"
 #include "boolean_algebras/sbf/sbf_ba.h"
 #include "boolean_algebras/hsb.h"
-#include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/tau/tau_ba.h"
 
 namespace idni::tau_lang {
 

@@ -12,7 +12,7 @@ set(TAU_HEADERS
 	boolean_algebras/sbf/sbf_ba.h
 	boolean_algebras/variant_ba.h
 	boolean_algebras/nso_ba.h
-	boolean_algebras/tau_ba.h
+	boolean_algebras/tau/tau_ba.h
 	boolean_algebras/bv_ba.h
 	heuristics/bv_ba_simplification.h		# heuristic for simplifying boolean formulas with bitvectors
 	heuristics/ex_subs_based_elimination.h  # heuristic for eliminating existential quantifiers based on substitution

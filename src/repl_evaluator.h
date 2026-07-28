@@ -52,7 +52,7 @@
 
 #include <memory>
 
-#include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/tau/tau_ba.h"
 #include "api.h"
 #include "io_context.h"
 #include "tau_spec.h"

@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/tau/tau_ba.h"
 
 #include "tau_spec.h"
 
