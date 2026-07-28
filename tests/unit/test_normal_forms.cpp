@@ -688,6 +688,63 @@ TEST_SUITE("AntiPrenexBlock0Arg") {
 	}
 }
 
+TEST_SUITE("BlockAtomProfile") {
+	// Chapter 5's steps 2a and 2b are guarded by whole-formula sign
+	// predicates; this is the census that answers them.
+
+	static block_atom_profile<node_t> profile(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		// peel any quantifier prefix; we profile the matrix
+		while (is_child_quantifier<node_t>(fm))
+			fm = tau::get(fm)[0].second();
+		fm = normalize_atomic_formula_operators<node_t>(fm);
+		return profile_block_atoms<node_t>(fm,
+			is_tref_bv_type_family<node_t>);
+	}
+
+	TEST_CASE("all negated") {
+		auto p = profile("ex x (xy != 0 && (xw != 0 || xz != 0)).");
+		CHECK( p.positives == 0 );
+		CHECK( p.negatives == 3 );
+		CHECK( p.others == 0 );
+		CHECK( p.all_negated() );
+		CHECK( !p.all_positive() );
+	}
+
+	TEST_CASE("all positive") {
+		auto p = profile("ex x ((xy = 0 || xw = 0) && xz = 0).");
+		CHECK( p.positives == 3 );
+		CHECK( p.negatives == 0 );
+		CHECK( p.others == 0 );
+		CHECK( p.all_positive() );
+		CHECK( !p.all_negated() );
+	}
+
+	TEST_CASE("mixed is neither") {
+		auto p = profile("ex x (xy = 0 && xw != 0).");
+		CHECK( p.positives == 1 );
+		CHECK( p.negatives == 1 );
+		CHECK( !p.all_positive() );
+		CHECK( !p.all_negated() );
+	}
+
+	TEST_CASE("constants are not atoms") {
+		auto p = profile("ex x (xy != 0 && T).");
+		CHECK( p.negatives == 1 );
+		CHECK( p.others == 0 );
+		CHECK( p.all_negated() );
+	}
+
+	TEST_CASE("a nested quantifier counts as other, and is not descended into") {
+		auto p = profile("ex x (xy != 0 && (ex z (xz = 0))).");
+		CHECK( p.negatives == 1 );
+		CHECK( p.others == 1 );
+		// the inner xz = 0 must NOT have been counted as a positive
+		CHECK( p.positives == 0 );
+		CHECK( !p.all_negated() );
+	}
+}
+
 TEST_SUITE("QuantBlockPush") {
 	TEST_CASE("1") {
 		const char* sample = "ex x ex y xy = 0 && yx = 0 && !(x|y = 0) && !(x = y).";
