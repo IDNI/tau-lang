@@ -4496,6 +4496,26 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 				const tref original = n; // save before stripping quantifiers
 				while (is_child_quantifier<node>(n)) {
 					tref var = tau::trim2(n);
+					// Only collect binders this call can
+					// actually eliminate. A skip-matched
+					// variable belongs to the solver /
+					// blasting path, and a variable absent
+					// from `order` cannot be located by
+					// bdd_quant -- stripping either deletes
+					// the binder and leaves its variable
+					// free in the term, and also makes
+					// less_then inconsistent (it returns
+					// false in both directions for an
+					// unknown variable), which trips
+					// bdd_quant's ordering assertion in
+					// DEBUG and reads out of bounds in
+					// Release. Leave them for the caller's
+					// resolve_quantifiers / anti_prenex
+					// fallback, the same treatment the
+					// non-atomic body case below gets.
+					if (skip(var)
+						|| order.find(var) == order.end())
+						break;
 					if (is_child<node>(n, tau::wff_ex)) {
 						quants.emplace_back(var, bdd::ex);
 					} else {
@@ -4503,6 +4523,9 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 					}
 					n = tau::get(n)[0].second();
 				}
+				// Nothing eliminable here: leave the node as it
+				// was found.
+				if (quants.empty()) return original;
 				// All quantifiers have been trimmed from tree here
 				const tau& nn = tau::get(n);
 				if (nn.child_is(tau::bf_eq)) {

@@ -1004,6 +1004,24 @@ TEST_SUITE("BooleAtomAnalysis") {
 	}
 }
 
+TEST_SUITE("ResolveQuantifiers2Binders") {
+	TEST_CASE("a binder absent from the order is left in place") {
+		// ex x ex y (xy = 0) with an order covering only the outer
+		// variable. bdd_quant can only eliminate what it finds in the
+		// order, so stripping the whole prefix leaves the uncovered
+		// variable free in the resulting term. It must stay bound.
+		tref fm = get_nso_rr("ex x ex y (xy = 0).").value().main->get();
+		tref outer = tau::trim2(fm);
+		term_handle<node_t>::order order;
+		order.emplace(outer, 0);
+		tref res = resolve_quantifiers2<node_t>(fm, order,
+			is_tref_bv_type_family<node_t>);
+		// Whatever was eliminated, no variable may have leaked free.
+		CHECK( get_free_vars<node_t>(res).size()
+			== get_free_vars<node_t>(fm).size() );
+	}
+}
+
 TEST_SUITE("QuantBlockPush") {
 	TEST_CASE("1") {
 		const char* sample = "ex x ex y xy = 0 && yx = 0 && !(x|y = 0) && !(x = y).";
