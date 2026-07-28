@@ -607,13 +607,20 @@ TEST_SUITE("AntiPrenexBlock") {
 	}
 
 	TEST_CASE("no decomposable atoms keeps block (B14)") {
-		// The dependent part contains only != atoms, which the
-		// decomposition cannot use: the block must be kept on the
-		// dependent part (instead of dereferencing end())
+		// The dependent part contains only bf_neq atoms (run_apb does
+		// not normalize, so step 2a's profile counts them as "other"
+		// and declines): the decomposition cannot use them, and the
+		// block must be kept rather than dereferencing end().
+		//
+		// Since chapter 5 step 2d the block is kept *per disjunct*
+		// rather than wrapped around the whole disjunction -- the
+		// distribution ex X (A || B) == ex X A || ex X B, pushed one
+		// level further in. Previously:
+		//   "z = 0 && (ex b1 b1 y != 0 || b1 w != 0)"
 		auto [res, used] = run_apb("ex x (z = 0 && (xy != 0 || xw != 0)).");
 		CHECK( matches_to_str_to_any_of(res, {
-			"z = 0 && (ex b1 b1 y != 0 || b1 w != 0)",
-			"z = 0 && (ex b1 b1 w != 0 || b1 y != 0)",
+			"z = 0 && ((ex b1 b1 w != 0) || (ex b1 b1 y != 0))",
+			"z = 0 && ((ex b1 b1 y != 0) || (ex b1 b1 w != 0))",
 		}) );
 		CHECK( used == 0 );
 	}
@@ -757,6 +764,17 @@ TEST_SUITE("AntiPrenexBlock") {
 			"ex x (((x|y)x'y' = 0 || xk = 0) && z = 0).");
 		CHECK( used == 0 );
 		CHECK( tau::get(res).to_str() == "z = 0" );
+	}
+
+	TEST_CASE("paper 2d: a disjunctive dependent part is re-dispatched") {
+		// After z = 0 is scoped out the dependent part is a bare
+		// disjunction, whose two disjuncts are each a single clause that
+		// the clause eliminator resolves. Before the re-dispatch this
+		// fell through to Boole decomposition instead.
+		auto [res, used] = run_apb_norm(
+			"ex x (z = 0 && (xy != 0 || (xw = 0 && xk != 0))).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
 
 	TEST_CASE("gamma1: unique zero substitutes the witness") {

@@ -3467,12 +3467,35 @@ tref anti_prenex_block(tref formula, const trefs& block,
 
 	// Case disjunction
 	if (ft.child_is(tau::wff_or)) {
-		// Push block into disjunction
-		tref c1 = anti_prenex_block<node>(
-			ft[0].first(), block, used_atms, quant_pattern, order, skip);
-		if (tau::get(c1).equals_T()) return _T<node>();
-		return tau::build_wff_or(c1, anti_prenex_block<node>(
-			ft[0].second(), block, used_atms, quant_pattern, order, skip));
+		// Chapter 5 step 2d: distribute over the disjunction, but
+		// process the disjuncts that fall into steps a, b, c *first*, so
+		// a disjunct that resolves to T short-circuits the rest before
+		// any of them is decomposed. The paper also asks for "unit
+		// elimination after each disjunct", which is what the
+		// simplification of the running accumulator below does: it is
+		// how a T disjunct becomes visible as T at all.
+		trefs disjs = get_dnf_wff_clauses<node>(formula);
+		auto rank = [&](tref d) -> int {
+			const block_atom_profile<node> p =
+				profile_block_atoms<node>(d, skip);
+			if (p.all_negated()) return 0;              // step 2a
+			if (p.all_positive()) return 1;             // step 2b
+			if (!tau::get(d).find_top(is<node, tau::wff_or>))
+				return 2;                           // step 2c
+			return 3;                                   // step 2e..
+		};
+		std::stable_sort(disjs.begin(), disjs.end(),
+			[&](tref a, tref b) { return rank(a) < rank(b); });
+		tref acc = _F<node>();
+		for (tref d : disjs) {
+			tref rd = anti_prenex_block<node>(d, block, used_atms,
+				quant_pattern, order, skip);
+			if (tau::get(rd).equals_T()) return _T<node>();
+			acc = syntactic_path_simplification<node>(
+				tau::build_wff_or(acc, rd));
+			if (tau::get(acc).equals_T()) return _T<node>();
+		}
+		return acc;
 	}
 
 	// Case conjunction
@@ -3497,6 +3520,16 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// every disjunct.
 		if (tref fp = try_fast_paths(formula))
 			return tau::build_wff_and(indep, fp);
+		// Chapter 5 step 2d: distribute over disjunctions as much as
+		// possible before decomposing anything. Once the independent
+		// conjuncts are scoped out the dependent part can be a bare
+		// disjunction; re-dispatch so the wff_or case above handles it
+		// instead of falling through to Boole decomposition. The
+		// recursion terminates: each disjunct is a strict subtree.
+		if (tau::get(formula).child_is(tau::wff_or))
+			return tau::build_wff_and(indep,
+				anti_prenex_block<node>(formula, block,
+					used_atms, quant_pattern, order, skip));
 		// Check if dependent formula is clause -> push block into clause.
 		// push_ex_block_into_clause assumes the whole clause is
 		// homogeneously atomless-typed, so any skip-matched content in it
