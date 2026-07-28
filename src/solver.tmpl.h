@@ -1323,14 +1323,14 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 						for (const auto& [var, value] : lgrs_sol.value())
 							clause_solution[var] = value;
 					} else skip = true;
-				} else {
+				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
 					if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
 						bv_sat = true;
 						for (const auto& [var, value]: bv_solution.value()) {
 							clause_solution[var] = value;
 						}
 					} else skip = true; // if we cannot solve bv part, skip this clause
-				}
+				} else skip = true;
 			} else {
 				op.splitter_one = node::ba::splitter_one(type_tree);
 				if (auto solution = solve<node>(conjs, op)) {

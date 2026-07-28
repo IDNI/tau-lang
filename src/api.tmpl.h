@@ -432,7 +432,8 @@ tref api<node>::eliminate_quantifiers(tref fm) {
 template <NodeType node>
 bool is_whole_query_bv_solvable(tref fm) {
 	using tau = tree<node>;
-	return fm
+	if constexpr (!pack_has_arithmetic_theory_v<node>) return false;
+	else return fm
 		&& !tau::get(fm).find_top(is_temporal_quantifier<node>)
 		&& is_bv_solvable_formula<node>(fm);
 }
@@ -440,24 +441,30 @@ bool is_whole_query_bv_solvable(tref fm) {
 /// Fast path for sat/unsat; nullopt when it does not apply or cvc5 is unsure.
 template <NodeType node>
 std::optional<bool> bv_fast_path_sat(tref fm) {
+	if constexpr (!pack_has_arithmetic_theory_v<node>) return std::nullopt;
+	else {
 	if (!is_whole_query_bv_solvable<node>(fm)) return std::nullopt;
 	auto status = bv_formula_sat_status<node>(fm);
 	if (!status) return std::nullopt; // translation failure: undecided
 	if (*status == bv_sat_status::sat) return true;
 	if (*status == bv_sat_status::unsat) return false;
 	return std::nullopt; // unknown: cannot decide, fall through
+	}
 }
 
 /// Fast path for validity: fm is valid iff !fm is unsat.
 template <NodeType node>
 std::optional<bool> bv_fast_path_valid(tref fm) {
 	using tau = tree<node>;
+	if constexpr (!pack_has_arithmetic_theory_v<node>) return std::nullopt;
+	else {
 	if (!is_whole_query_bv_solvable<node>(fm)) return std::nullopt;
 	auto status = bv_formula_sat_status<node>(tau::build_wff_neg(fm));
 	if (!status) return std::nullopt;
 	if (*status == bv_sat_status::unsat) return true;  // no counterexample
 	if (*status == bv_sat_status::sat) return false;   // counterexample found
 	return std::nullopt;
+	}
 }
 
 template <NodeType node>

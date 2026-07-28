@@ -556,6 +556,7 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 	if (tau::get(scoped_fm).equals_F()) return tau::_F();
 
 	// Check if quantified variable is bitvector
+	if constexpr (pack_has_arithmetic_theory_v<node>)
 	if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
 		bool closed_and_solvable = false;
 		if (const trefs& free_vars = get_free_vars<node>(scoped_fm);
@@ -1040,6 +1041,7 @@ tref resolve_quantifiers(tref formula) {
 				// form (with its many auxiliary quantifiers) is
 				// much harder for it. Blasting does not close a
 				// formula, so the check would not succeed later.
+				if constexpr (pack_has_arithmetic_theory_v<node>) {
 				if (get_free_vars<node>(n).empty()
 					&& is_bv_solvable_formula<node>(n)) {
 					// Only commit to T/F on a definite answer: cvc5
@@ -1053,6 +1055,7 @@ tref resolve_quantifiers(tref formula) {
 					if (auto blasted = bv_predicate_blasting<node>(n);
 						blasted && blasted != n)
 						return blasted;
+				}
 				excluded.insert(n);
 			} else if (is_omcat_type_family<node>(tau::get(var).get_ba_type())) {
 				if (const trefs& free_vars = get_free_vars<node>(n);
@@ -1092,8 +1095,12 @@ tref resolve_quantifiers(tref formula) {
 			// looking for bf_cast nodes or ba_constant nodes with a BV type.
 			// Hooks don't evaluate ground BV comparisons (especially bf_lt/bf_gt
 			// or bf_eq with bf_cast). CVC5 handles all of them correctly.
-			if (is_bv_formula_sat<node>(n)) return tau::_T();
-			else return tau::_F();
+			// unreachable without such a BA: the branch needs a bv-typed
+			// cast or constant to match in the first place
+			if constexpr (pack_has_arithmetic_theory_v<node>) {
+				if (is_bv_formula_sat<node>(n)) return tau::_T();
+				else return tau::_F();
+			}
 		}
 		return n;
 	};
@@ -1139,6 +1146,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		tref ex_fm = dep_formula;
 		for (auto v = block.rbegin(); v != block.rend(); ++v)
 			ex_fm = build_wff_ex<node>(*v, ex_fm, false);
+		if constexpr (pack_has_arithmetic_theory_v<node>)
 		if (bv_blasting)
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 					blasted && blasted != ex_fm)
@@ -1615,6 +1623,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 			// Check if the formula is closed and proceed to eliminate
 			// the quantifier
 			if (skip(tau::trim2(n))) {
+				if constexpr (pack_has_arithmetic_theory_v<node>) {
 				if (const trefs& free_vars = get_free_vars<node>(n);
 					free_vars.empty() && is_bv_solvable_formula<node>(n)) {
 					// Closed bv formula with explicit bitwidth: simplify to
@@ -1625,6 +1634,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 					if (status == bv_sat_status::sat) return tau::_T();
 					if (status == bv_sat_status::unsat) return tau::_F();
 					excluded.insert(n);
+				} else excluded.insert(n);
 				} else excluded.insert(n);
 			} // TODO: restrict to atomless types
 			else if (!tau::get(n).find_top(is<node, tau::ref>)) {

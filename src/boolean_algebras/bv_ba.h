@@ -39,6 +39,7 @@
 #include <cvc5/cvc5.h>
 
 #include "boolean_algebras/cvc5/cvc5.h"
+#include "boolean_algebras/ba_pack_traits.h"
 #include "tau_tree.h"
 #include "splitter_types.h"
 
@@ -49,6 +50,10 @@ using sort = cvc5::Sort;
 using bvs = std::vector<bv>;
 using solver = cvc5::Solver;
 using term_manager = cvc5::TermManager;
+
+/** @brief bv carries bitvector arithmetic and its own decision procedure. */
+template <>
+struct ba_has_arithmetic_theory<bv> : std::true_type {};
 
 template<NodeType node>
 using solution = subtree_map<node, tref>;

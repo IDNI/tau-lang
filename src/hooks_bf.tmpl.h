@@ -492,6 +492,7 @@ tref get_hook<node>::term_cast(const node& v, const tref* ch, size_t len, tref r
 	tref symbol = tau::get_raw(v, ch, len, r);
 
 	// Call the bitvector-specific cast implementation
+	if constexpr (pack_has_arithmetic_theory_v<node>)
 	if (is_bv_type_family<node>(target_type_id)) {
 		return bv_term_cast<node>(symbol, target_type_id);
 	}
