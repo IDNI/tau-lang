@@ -13,7 +13,7 @@
 #define __BASE_BA_DISPATCHER_H__
 
 #include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/sbf/sbf_ba.h"
 #include "boolean_algebras/tau_ba.h"
 #include "boolean_algebras/bv_ba.h"
 #include "boolean_algebras/qint.h"

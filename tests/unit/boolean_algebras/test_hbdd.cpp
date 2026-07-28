@@ -2,7 +2,7 @@
 
 #include "test_init.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
-#include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/sbf/sbf_ba.h"
 
 TEST_SUITE("operator==") {
 

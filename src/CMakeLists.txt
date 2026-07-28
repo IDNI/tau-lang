@@ -9,7 +9,7 @@ set(TAU_HEADERS
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h
-	boolean_algebras/sbf_ba.h
+	boolean_algebras/sbf/sbf_ba.h
 	boolean_algebras/variant_ba.h
 	boolean_algebras/nso_ba.h
 	boolean_algebras/tau_ba.h

@@ -14,7 +14,7 @@
 #include "boolean_algebras/qlt.h"
 #include "boolean_algebras/qint.h"
 #include "boolean_algebras/nlang_ba.h"
-#include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/sbf/sbf_ba.h"
 #include "boolean_algebras/tau_ba.h"
 
 namespace idni::tau_lang {

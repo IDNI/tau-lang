@@ -8,7 +8,7 @@
 // including nso_ba, sbf_ba and interpreter directly instead of
 // #include "tau.h" to avoid error lines pointing to a generated tau.h
 #include "boolean_algebras/bv_ba.h"
-#include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/sbf/sbf_ba.h"
 #include "boolean_algebras/qint.h"
 #include "boolean_algebras/qlt.h"
 #include "boolean_algebras/nlang_ba.h"

@@ -7,7 +7,7 @@
 
 #include "test_init.h"
 #include "test_Bool_helpers.h"
-#include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/sbf/sbf_ba.h"
 
 using namespace idni::tau_lang;
 
