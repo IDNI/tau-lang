@@ -541,30 +541,69 @@ TEST_SUITE("AntiPrenexBlock") {
 		return {res, used_atms.size()};
 	}
 
+	// Helper: like run_apb, but normalizes the matrix first, so negative
+	// atoms reach the core as !(f = 0) rather than bf_neq -- the form the
+	// production pipeline always produces (resolve_ex_block calls
+	// normalize_atomic_formula_operators before the core).
+	static std::pair<tref, size_t> run_apb_norm(const char* sample) {
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		auto [body, block, order] = peel_block(fm);
+		subtree_unordered_set<node_t> used_atms;
+		subtree_unordered_map<node_t, int_t> quant_pattern;
+		for (size_t i = 0; i < block.size(); ++i)
+			quant_pattern.emplace(block[i], i + 1);
+		tref res = anti_prenex_block<node_t>(body, block,
+			used_atms, quant_pattern, order,
+			is_tref_bv_type_family<node_t>);
+		return {res, used_atms.size()};
+	}
+
 	TEST_CASE("disjunction push (B11)") {
 		// The disjunction-case recursions must compile and push the
 		// block into each disjunct independently
+		// Every atom positive, so chapter 5 step 2b squeezes and
+		// distributes: ex x (xy = 0) || ex x (xw = 0), each resolved by
+		// Schroeder to T (x := 0 zeroes either term). Before 2b the
+		// disjunction case pushed the block into each disjunct and the
+		// terminal fallback re-wrapped it unresolved, leaving
+		// "(ex b1 b1 y = 0) || (ex b1 b1 w = 0)".
 		auto [res, used] = run_apb("ex x (xy = 0 || xw = 0).");
-		CHECK( matches_to_str_to_any_of(res, {
-			"(ex b1 b1 y = 0) || (ex b1 b1 w = 0)",
-			"(ex b1 b1 w = 0) || (ex b1 b1 y = 0)",
-		}) );
 		CHECK( used == 0 );
+		CHECK( tau::get(res)[0].is(tau::wff_t) );
 	}
 
 	TEST_CASE("decomposition keeps independent conjuncts (B12/B13)") {
 		// z = 0 must survive (B13) and the negative branch must be
 		// built from formula[atm:=F], so the remaining equation gets
-		// resolved by the clause eliminator (B12): for atm = xw = 0
-		// the branch ex x (xw != 0 && xy = 0) resolves to wy' != 0
-		auto [res, used] = run_apb("ex x (z = 0 && (xy = 0 || xw = 0)).");
-		CHECK( matches_to_str_to_any_of(res, {
-			"z = 0 && ((ex b1 b1 w = 0) || !wy' = 0)",
-			"z = 0 && ((ex b1 b1 w = 0) || !y'w = 0)",
-			"z = 0 && ((ex b1 b1 y = 0) || !yw' = 0)",
-			"z = 0 && ((ex b1 b1 y = 0) || !w'y = 0)",
-		}) );
+		// resolved by the clause eliminator (B12).
+		//
+		// Mixed-sign on purpose: the all-positive form this case used
+		// to carry ("ex x (z = 0 && (xy = 0 || xw = 0))") is now
+		// settled by chapter 5 step 2b before any decomposition runs,
+		// and collapses to plain "z = 0" -- correct, but it no longer
+		// exercises what this case was written for. Adding the negated
+		// atom keeps it on the Boole-decomposition path.
+		auto [res, used] = run_apb_norm(
+			"ex x (z = 0 && (xy = 0 || xw = 0) && xk != 0).");
 		CHECK( used == 0 );
+		// B13: the independent conjunct survives untouched.
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>)
+			!= nullptr );
+		CHECK( tau::get(res).to_str().find("z = 0")
+			!= std::string::npos );
+		// B12: the block is fully resolved, nothing re-wrapped.
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	TEST_CASE("all-positive form of B12/B13 now collapses via step 2b") {
+		// Companion to the case above, without the negated atom. The
+		// independent conjunct z = 0 is separated out first, so step 2b
+		// sees only (xy = 0 || xw = 0), squeezes it to two disjuncts,
+		// and both resolve to T -- leaving just z = 0.
+		auto [res, used] = run_apb("ex x (z = 0 && (xy = 0 || xw = 0)).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).to_str() == "z = 0" );
 	}
 
 	TEST_CASE("no decomposable atoms keeps block (B14)") {
@@ -617,24 +656,6 @@ TEST_SUITE("AntiPrenexBlock") {
 			== 3 );
 	}
 
-	// Helper: like run_apb, but normalizes the matrix first, so negative
-	// atoms reach the core as !(f = 0) rather than bf_neq -- the form the
-	// production pipeline always produces (resolve_ex_block calls
-	// normalize_atomic_formula_operators before the core).
-	static std::pair<tref, size_t> run_apb_norm(const char* sample) {
-		tref fm = normalize_atomic_formula_operators<node_t>(
-			get_nso_rr(sample).value().main->get());
-		auto [body, block, order] = peel_block(fm);
-		subtree_unordered_set<node_t> used_atms;
-		subtree_unordered_map<node_t, int_t> quant_pattern;
-		for (size_t i = 0; i < block.size(); ++i)
-			quant_pattern.emplace(block[i], i + 1);
-		tref res = anti_prenex_block<node_t>(body, block,
-			used_atms, quant_pattern, order,
-			is_tref_bv_type_family<node_t>);
-		return {res, used_atms.size()};
-	}
-
 	TEST_CASE("paper 2a: all-negated formula distributes over every connective") {
 		// Every atom negated -> Corollary 5.1 with J1 empty: the block
 		// distributes over the disjunction (and would over a
@@ -668,6 +689,35 @@ TEST_SUITE("AntiPrenexBlock") {
 		// pipeline handles it and still eliminates x.
 		auto [res, used] = run_apb_norm("ex x (xy = 0 && xw != 0).");
 		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	TEST_CASE("paper 2b: positives are squeezed across a disjunction") {
+		// ex x ((xy = 0 || xw = 0) && xz = 0)
+		//   squeeze (distributing && over || on terms via
+		//   f1=0 && f2=0 == f1|f2=0):  (xy|xz = 0) || (xw|xz = 0)
+		//   distribute the block, Schroeder each: both are satisfiable
+		//   at x := 0, so the whole thing is T.
+		// (used_atms is a balance check only -- it is inserted and
+		// erased on every path, so it never witnesses which path ran.)
+		auto [res, used] = run_apb_norm(
+			"ex x ((xy = 0 || xw = 0) && xz = 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res)[0].is(tau::wff_t) );
+	}
+
+	TEST_CASE("paper 2b: squeeze keeps a genuine constraint") {
+		// z = 0 has no x, so the squeeze couples it into both disjuncts
+		// and it survives elimination.
+		auto [res, used] = run_apb_norm(
+			"ex x ((xy = 0 || w = 0) && z = 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	TEST_CASE("paper 2b: does not fire when a negated atom is present") {
+		auto [res, used] = run_apb_norm(
+			"ex x ((xy = 0 || xw = 0) && xz != 0).");
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
 }

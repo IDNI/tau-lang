@@ -34,6 +34,41 @@ namespace idni::tau_lang {
 template<NodeType node>
 tref distribute_block_over_atoms(tref formula, const trefs& block);
 
+/// Maximum number of squeezed disjuncts chapter 5 step 2b will produce before
+/// declining and letting the general Boole decomposition run instead. The
+/// cross product of an `∧` of `∨`s is multiplicative, so this bounds the fast
+/// path's own blow-up.
+inline constexpr size_t block_squeeze_cap = 64;
+
+/**
+ * @internal
+ * @brief Chapter 5 step 2b.i: squeezes an all-positive formula into a plain
+ * disjunction of single equations.
+ *
+ * Returns the term list `[t₁, …, tₖ]` meaning `t₁ = 0 ∨ … ∨ tₖ = 0`, computed
+ * by:
+ *  - atom `f = 0`  -> `[f]`
+ *  - `A ∨ B`       -> `squeeze(A) ++ squeeze(B)`
+ *  - `A ∧ B`       -> `[ a ∪ b : a ∈ squeeze(A), b ∈ squeeze(B) ]`
+ *    -- this is the "distribute conjunctions over disjunctions" the paper
+ *    calls for, performed on terms rather than on the formula, via the BA
+ *    identity `f₁ = 0 ∧ f₂ = 0 ≡ f₁ ∪ f₂ = 0`
+ *  - `T`           -> `[0]`   (`0 = 0` is true)
+ *  - `F`           -> `[]`    (the empty disjunction is false)
+ *
+ * Returns `std::nullopt` when the cross product would exceed
+ * `block_squeeze_cap`, or when a node that is not one of the above is
+ * reached. The caller must have established
+ * `profile_block_atoms(formula, skip).all_positive()`.
+ * @tparam node Tree node type.
+ * @param formula All-positive matrix.
+ * @param ba_type Boolean-algebra type id used to build the `0` constant.
+ * @return The squeezed term list, or `std::nullopt` if the fast path declines.
+ * @endinternal
+ */
+template<NodeType node>
+std::optional<trefs> squeeze_positive_disjuncts(tref formula, size_t ba_type);
+
 } // namespace idni::tau_lang
 
 #include "block_squeeze.tmpl.h"

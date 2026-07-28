@@ -3405,22 +3405,66 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	// Goal: push the quantifier block as far into clause as possible.
 	if (!has_block_var(formula)) return formula;
 
-	// Chapter 5 step 2a: every atom negated -> distribute the block over
-	// all connectives at once and let resolve_quantifiers2 turn each
-	// `ex X g != 0` into the functional `ex_X g != 0`. Corollary 5.1 with
-	// J1 empty. Tested before the wff_or/wff_and cases below because it is
-	// a whole-formula property that settles the entire subtree in one
-	// step, which is exactly the ordering the paper prescribes (a, b, c,
-	// then d). Guarded on skip content: a skip-matched atom must reach
-	// blast_block / the solver, not be given its own binder here.
-	const block_atom_profile<node> prof =
-		profile_block_atoms<node>(formula, skip);
-	if (prof.all_negated() && has_active_var(formula))
-		return resolve_quantifiers2<node>(
-			distribute_block_over_atoms<node>(formula, block),
-			order, skip);
+	// Chapter 5 steps 2a and 2b: the two whole-formula fast paths, tried
+	// before any Boole decomposition (the paper's a, b, c, then d order).
+	//
+	//  2a -- every atom negated: distribute the block over all connectives
+	//        at once (Corollary 5.1 with J1 empty) and let
+	//        resolve_quantifiers2 turn each `ex X g != 0` into the
+	//        functional `ex_X g != 0`.
+	//  2b -- no atom negated: squeeze the positives until every
+	//        conjunction is gone (distributing `&&` over `||` on terms via
+	//        f1 = 0 && f2 = 0 == f1|f2 = 0), then distribute the block
+	//        over the resulting disjunction.
+	//
+	// Both are guarded on skip content by block_atom_profile: a
+	// skip-matched atom must reach blast_block / the solver, and squeezing
+	// bitvector terms into a bf_or is exactly the work predicate blasting
+	// must do instead.
+	//
+	// Returns nullptr when neither applies. Must be handed a purely
+	// *dependent* formula: squeezing an independent conjunct into every
+	// disjunct is sound but couples it needlessly and undoes the
+	// separation the conjunction case performs.
+	auto try_fast_paths = [&](tref f) -> tref {
+		if (!has_active_var(f)) return nullptr;
+		const block_atom_profile<node> prof =
+			profile_block_atoms<node>(f, skip);
+		if (prof.all_negated())
+			return resolve_quantifiers2<node>(
+				distribute_block_over_atoms<node>(f, block),
+				order, skip);
+		if (prof.all_positive()) {
+			const size_t ba_type =
+				tau::get(block.front()).get_ba_type();
+			auto sq = squeeze_positive_disjuncts<node>(f, ba_type);
+			// Cap exceeded: fall back to the general algorithm.
+			if (!sq) return nullptr;
+			// The empty disjunction is F.
+			if (sq->empty()) return _F<node>();
+			trefs disjs;
+			disjs.reserve(sq->size());
+			for (tref term : *sq) {
+				tref eq = build_bf_eq_0<node>(term);
+				if (has_block_var(eq))
+					for (auto v = block.rbegin();
+						v != block.rend(); ++v)
+						eq = build_wff_ex<node>(
+							*v, eq, false);
+				disjs.push_back(eq);
+			}
+			return resolve_quantifiers2<node>(
+				tau::build_wff_or(disjs), order, skip);
+		}
+		return nullptr;
+	};
 
 	const tau& ft = tau::get(formula);
+	// For a conjunction the fast paths run further down, after the
+	// dependent/independent separation has isolated the dependent part.
+	if (!ft.child_is(tau::wff_and))
+		if (tref fp = try_fast_paths(formula)) return fp;
+
 	// Case disjunction
 	if (ft.child_is(tau::wff_or)) {
 		// Push block into disjunction
@@ -3447,6 +3491,12 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// Var-free conjuncts; they must be re-attached to every result
 		// built from the dependent part below
 		const tref indep = tau::build_wff_and(conjs);
+		// Chapter 5 steps 2a/2b, now that the dependent part is
+		// isolated. Handed `formula` rather than the original
+		// conjunction so an independent conjunct is never squeezed into
+		// every disjunct.
+		if (tref fp = try_fast_paths(formula))
+			return tau::build_wff_and(indep, fp);
 		// Check if dependent formula is clause -> push block into clause.
 		// push_ex_block_into_clause assumes the whole clause is
 		// homogeneously atomless-typed, so any skip-matched content in it
