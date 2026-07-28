@@ -24,6 +24,7 @@
 
 
 #include "defs.h"
+// core's ba_types.h and ltl_aba_* read default_bv_size from here
 #include "boolean_algebras/cvc5/cvc5.h"
 #include "tau_parser.generated.h"
 
@@ -32,18 +33,9 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // concepts
 
-/** @brief Helper: `true` if `T` appears in the pack `Ts...`. */
-template <typename T, typename... Ts>
-constexpr bool pack_contains = (std::is_same_v<T, Ts> || ...);
-
-/**
- * @brief Concept satisfied by a non-empty BA pack that contains `cvc5::Term`.
- *
- * Ensures every supported BA combination includes a CVC5 backend for
- * bitvector reasoning.
- */
+/** @brief Concept satisfied by a non-empty BA pack. */
 template <typename... BAs>
-concept BAsPack = sizeof...(BAs) > 0 && pack_contains<cvc5::Term, BAs...>;
+concept BAsPack = sizeof...(BAs) > 0;
 
 /**
  * @brief Concept satisfied by a valid Tau AST node type.
