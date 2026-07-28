@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "tau_tree.h"
+#include "boolean_algebras/ba_pack_traits.h"
 
 namespace idni::tau_lang {
 
@@ -508,11 +509,16 @@ tref tree<node>::get_ba_constant(
 
 template <NodeType node>
 tref tree<node>::get_bv_constant(size_t bitwidth, size_t value) {
-	auto cte = make_bitvector_value(bitwidth, value);
-	auto type_id = bv_type_id<node>(bitwidth);
-	LOG_TRACE << " -- get_bv_constant(size_t bitwidth, size_t value): `"
-		<<  bitwidth << ", " << value << "`";
-	return get_ba_constant(cte, type_id);
+	if constexpr (!pack_has_arithmetic_theory_v<node>) {
+		(void) bitwidth, (void) value;
+		return nullptr; // no bitvector BA in this pack
+	} else {
+		auto cte = make_bitvector_value(bitwidth, value);
+		auto type_id = bv_type_id<node>(bitwidth);
+		LOG_TRACE << " -- get_bv_constant(size_t bitwidth, size_t value): `"
+			<<  bitwidth << ", " << value << "`";
+		return get_ba_constant(cte, type_id);
+	}
 }
 
 // -----------------------------------------------------------------------------
