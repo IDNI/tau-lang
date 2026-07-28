@@ -1163,7 +1163,7 @@ bool has_bv_arithmetic(tref f) {
 			|| is<node, tau::bf_nor>(n)  || is<node, tau::bf_xnor>(n)
 			// CVC5 simplification may convert arithmetic (e.g. bvurem) into
 			// bitwise/logical ops or casts; treat these as non-pure too so
-			// bv_conjs_only_pure_equality routes them to solve_bv, not LGRS.
+			// bv_conjs_only_pure_equality routes them to the pack solver, not LGRS.
 			|| is<node, tau::bf_and>(n) || is<node, tau::bf_or>(n)
 			|| is<node, tau::bf_neg>(n) || is<node, tau::bf_xor>(n)
 			|| is<node, tau::bf_cast>(n);
@@ -1324,7 +1324,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 							clause_solution[var] = value;
 					} else skip = true;
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
-					if (auto bv_solution = solve_bv<node>(tau::build_wff_and(conjs))) {
+					if (auto bv_solution = pack_solve<node>(tau::build_wff_and(conjs))) {
 						bv_sat = true;
 						for (const auto& [var, value]: bv_solution.value()) {
 							clause_solution[var] = value;

@@ -59,6 +59,103 @@ inline constexpr bool pack_has_arithmetic_theory_v =
 		std::make_index_sequence<
 			std::tuple_size_v<typename Node::bas_tuple>>{});
 
+/** @brief `true` when @p BA's descriptor solves formulas itself. */
+template <typename Node, typename BA, typename Form>
+concept ba_solves = requires(Form f) { ba_descriptor<BA, Node>::solve(f); };
+
+/** @brief `true` when @p BA's descriptor answers satisfiability itself. */
+template <typename Node, typename BA, typename Form>
+concept ba_checks_sat = requires(Form f) { ba_descriptor<BA, Node>::is_sat(f); };
+
+namespace detail {
+
+template <typename Node, typename Form, typename First, typename... Rest>
+auto pack_solve_impl(Form form) {
+	if constexpr (ba_solves<Node, First, Form>)
+		return ba_descriptor<First, Node>::solve(form);
+	else if constexpr (sizeof...(Rest) > 0)
+		return pack_solve_impl<Node, Form, Rest...>(form);
+	else static_assert(sizeof...(Rest) > 0,
+		"pack_solve: no BA in this pack provides solve()");
+}
+
+template <typename Node, typename Form, typename First, typename... Rest>
+bool pack_is_sat_impl(Form form) {
+	if constexpr (ba_checks_sat<Node, First, Form>)
+		return ba_descriptor<First, Node>::is_sat(form);
+	else if constexpr (sizeof...(Rest) > 0)
+		return pack_is_sat_impl<Node, Form, Rest...>(form);
+	else static_assert(sizeof...(Rest) > 0,
+		"pack_is_sat: no BA in this pack provides is_sat()");
+}
+
+} // namespace detail
+
+/**
+ * @brief Solve @p form with the first BA whose descriptor offers a solver.
+ *
+ * Templated on @p Form and returning `auto` so core need not name the solution
+ * type, which would pull solver headers into these traits.
+ */
+template <typename Node, typename Form>
+auto pack_solve(Form form) {
+	return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		return detail::pack_solve_impl<Node, Form,
+			std::tuple_element_t<Is, typename Node::bas_tuple>...>(form);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+}
+
+/** @brief Ask the first BA whose descriptor offers it whether @p form is sat. */
+template <typename Node, typename Form>
+bool pack_is_sat(Form form) {
+	return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		return detail::pack_is_sat_impl<Node, Form,
+			std::tuple_element_t<Is, typename Node::bas_tuple>...>(form);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+}
+
+/** @brief `true` when @p BA's descriptor preprocesses formulas itself. */
+template <typename Node, typename BA, typename Form>
+concept ba_preprocesses = requires(Form f) {
+	ba_descriptor<BA, Node>::preprocess(f);
+};
+
+/**
+ * @brief Run @p form through the preprocessing of every BA that offers it.
+ *
+ * A BA whose preprocessing is disabled returns @p form unchanged, so callers
+ * test the result against the input rather than consulting a flag.
+ */
+template <typename Node, typename Form>
+Form pack_preprocess(Form form) {
+	Form out = form;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_preprocesses<Node, BA, Form>)
+				out = ba_descriptor<BA, Node>::preprocess(out);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
+/** @brief Enable or disable preprocessing on every BA that supports it. */
+template <typename Node>
+void pack_set_preprocessing(bool enabled) {
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (requires {
+				ba_descriptor<BA, Node>::set_preprocessing(enabled); })
+				ba_descriptor<BA, Node>::set_preprocessing(enabled);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+}
+
 /**
  * @brief `true` when @p BA declares it can host the pack's Boolean carrier.
  *

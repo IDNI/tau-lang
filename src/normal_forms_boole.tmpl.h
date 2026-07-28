@@ -583,9 +583,9 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 		// untouched by blasting itself) now that the scope's arithmetic has
 		// been simplified to boolean form, so nothing needs to be skipped
 		// anymore.
-		if (bv_blasting) {
+		{
 			tref ex_fm = tau::build_wff_ex(var, scoped_fm, false);
-			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
+			if (auto blasted = pack_preprocess<node>(ex_fm);
 					blasted && blasted != ex_fm) {
 				tref cont = anti_prenex_block<node>(blasted, no_skip<node>);
 				return tau::build_wff_and(cont, new_fm);
@@ -1051,10 +1051,9 @@ tref resolve_quantifiers(tref formula) {
 					if (status == bv_sat_status::sat) return tau::_T();
 					if (status == bv_sat_status::unsat) return tau::_F();
 				}
-				if (bv_blasting)
-					if (auto blasted = bv_predicate_blasting<node>(n);
-						blasted && blasted != n)
-						return blasted;
+				if (auto blasted = pack_preprocess<node>(n);
+					blasted && blasted != n)
+					return blasted;
 				}
 				excluded.insert(n);
 			} else if (is_omcat_type_family<node>(tau::get(var).get_ba_type())) {
@@ -1098,7 +1097,7 @@ tref resolve_quantifiers(tref formula) {
 			// unreachable without such a BA: the branch needs a bv-typed
 			// cast or constant to match in the first place
 			if constexpr (pack_has_arithmetic_theory_v<node>) {
-				if (is_bv_formula_sat<node>(n)) return tau::_T();
+				if (pack_is_sat<node>(n)) return tau::_T();
 				else return tau::_F();
 			}
 		}
@@ -1147,10 +1146,9 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		for (auto v = block.rbegin(); v != block.rend(); ++v)
 			ex_fm = build_wff_ex<node>(*v, ex_fm, false);
 		if constexpr (pack_has_arithmetic_theory_v<node>)
-		if (bv_blasting)
-			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
-					blasted && blasted != ex_fm)
-				return anti_prenex_block<node>(blasted, no_skip<node>);
+		if (auto blasted = pack_preprocess<node>(ex_fm);
+				blasted && blasted != ex_fm)
+			return anti_prenex_block<node>(blasted, no_skip<node>);
 		return ex_fm;
 	};
 

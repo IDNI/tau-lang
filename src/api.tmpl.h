@@ -49,7 +49,7 @@ void api<node>::set_charvar(bool charvar) {
 
 template <NodeType node>
 void api<node>::set_blasting(bool blasting) {
-	bv_blasting = blasting;
+	pack_set_preprocessing<node>(blasting);
 }
 
 template <NodeType node>
