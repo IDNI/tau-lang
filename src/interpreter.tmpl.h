@@ -730,16 +730,12 @@ std::pair<std::optional<assignment<node>>, bool>
 	// Complete outputs using time_point and current solution
 	for (const auto& [o, _] : outputs) {
 		const size_t ctype = ctx.type_of(o);
-		[[maybe_unused]] bool is_bv = is_bv_type_family<node>(ctype);
 		tref ot = build_out_var_at_n<node>(get_var_name_node<node>(o), time_point, ctype);
 		if (auto it = global.find(ot); it == global.end()) {
 			auto emit_default_zero = [&]() {
-				if constexpr (pack_has_arithmetic_theory_v<node>)
-				if (is_bv) {
-					auto zero_bitvector = make_bitvector_bottom_elem(
-						get_bv_size<node>(get_ba_type_tree<node>(ctype)));
-					auto zero_term = tau::get(tau::bf, {
-						tau::get_ba_constant(zero_bitvector, ctype)});
+				// The owning BA supplies its own zero; nullptr means no BA in
+				// the pack owns this type, so fall through to the cases below.
+				if (tref zero_term = pack_zero_constant<node>(ctype)) {
 					memory.emplace(ot, zero_term);
 					global.emplace(ot, zero_term);
 					return;

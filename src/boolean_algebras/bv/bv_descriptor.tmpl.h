@@ -127,6 +127,14 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	}
 
 	static void set_preprocessing(bool enabled) { bv_blasting = enabled; }
+
+	/** @brief The all-zeros bitvector of @p ba_type, wrapped as a bf constant. */
+	static tref zero_constant(size_t ba_type) {
+		return tau::get(tau::bf, { tau::get_ba_constant(
+			make_bitvector_bottom_elem(
+				get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type))),
+			ba_type) });
+	}
 };
 
 } // namespace idni::tau_lang

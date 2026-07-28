@@ -156,6 +156,36 @@ void pack_set_preprocessing(bool enabled) {
 		std::tuple_size_v<typename Node::bas_tuple>>{});
 }
 
+/** @brief `true` when @p BA's descriptor builds a canonical zero constant. */
+template <typename Node, typename BA>
+concept ba_has_zero_constant = requires(size_t t) {
+	ba_descriptor<BA, Node>::zero_constant(t);
+};
+
+/**
+ * @brief Canonical zero constant for @p ba_type, from the BA that owns it.
+ *
+ * Returns nullptr when no BA in the pack owns the type or offers the
+ * capability, so callers branch on the result rather than on a BA name. Unlike
+ * pack_solve, reaching the empty case here is an ordinary runtime outcome, not
+ * a sign that a gate has drifted. `tref` is spelled out as `const intptr_t*`,
+ * as in ba_descriptor.h, to keep parser headers out of these traits.
+ */
+template <typename Node>
+const intptr_t* pack_zero_constant(size_t ba_type) {
+	const intptr_t* out = nullptr;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_has_zero_constant<Node, BA>)
+				if (!out && ba_descriptor<BA, Node>::owns_type(ba_type))
+					out = ba_descriptor<BA, Node>::zero_constant(ba_type);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
 /**
  * @brief `true` when @p BA declares it can host the pack's Boolean carrier.
  *
