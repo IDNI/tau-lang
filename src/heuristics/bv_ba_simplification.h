@@ -24,10 +24,7 @@ using namespace idni;
  * constant operands together via `simplify_blocks`, iterating to a fixpoint
  * (cycle-detected via a visited-set, capped at 1,000,000 rounds).
  *
- * @tparam node Tree node type (despite the `BAs...` pack shown in this
- * declaration, the template actually instantiated -- see
- * bv_ba_custom_simplification.tmpl.h -- takes a single `NodeType node`; call
- * it as `bv_ba_custom_simplification<node_t>(term)`).
+ * @tparam node Tree node type.
  * @param term BV term to simplify.
  * @return The simplified term.
  *
@@ -42,7 +39,7 @@ using namespace idni;
  * CHECK( tau::get(simplified) == tau::get(expected) );
  * @endcode
  */
-template <typename ... BAs> requires BAsPack<BAs...>
+template<NodeType node>
 tref bv_ba_custom_simplification(tref term);
 
 /**
@@ -52,9 +49,7 @@ tref bv_ba_custom_simplification(tref term);
  * simplifier on it, and translates the result back into a tau tree via
  * `cvc5_tree_to_tau_tree`.
  *
- * @tparam node Tree node type (see the note on @ref bv_ba_custom_simplification
- * about the `BAs...` pack shown here vs. the actual `NodeType node`
- * instantiation; call it as `bv_ba_cvc5_simplification<node_t>(term)`).
+ * @tparam node Tree node type.
  * @param term BV term to simplify.
  * @return The simplified term.
  *
@@ -69,7 +64,7 @@ tref bv_ba_custom_simplification(tref term);
  * CHECK( tau::get(simplified) == tau::get(expected) );
  * @endcode
  */
-template<typename ... BAs> requires BAsPack<BAs...>
+template<NodeType node>
 tref bv_ba_cvc5_simplification(tref term);
 
 } // namespace idni::tau_lang
