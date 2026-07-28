@@ -3574,7 +3574,82 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// Sort the atomic formulas and get minimum
 		tref atm = *std::ranges::min_element(atms,
 			atm_formula_order_for_quant_elim<node>(quant_pattern));
-		// TODO: Take care of unique zero of atm
+
+		// Chapter 5 step 2h: the reduced Boole form. Four of the five
+		// gamma cases are settled by cofactoring the pivot on the
+		// highest-priority active block variable occurring in it, and
+		// none of them needs the general recursion of gamma5.
+		//
+		// Only an *active* (non-skip) variable and a non-skip atom are
+		// cofactored: this is Boolean reasoning, exactly what `skip`
+		// reserves for predicate blasting and the solver.
+		tref pivot_var = nullptr;
+		if (!skip(atm)) {
+			int_t best = -1;
+			const trefs& avars = get_free_vars<node>(atm);
+			for (tref v : block) {
+				if (skip(v)) continue;
+				if (!hasbc(avars, v, tau::subtree_less))
+					continue;
+				auto it = quant_pattern.find(v);
+				const int_t pr = it == quant_pattern.end()
+					? 0 : it->second;
+				if (pr > best) best = pr, pivot_var = v;
+			}
+		}
+		if (pivot_var) {
+			const boole_atom_analysis<node> an =
+				analyze_boole_atom<node>(atm, pivot_var);
+			// gamma2: f is identically 0, so the atom holds for
+			// every value of the variable -- fold it to T.
+			if (an.kind == boole_atom_case::identically_zero)
+				return tau::build_wff_and(indep,
+					anti_prenex_block<node>(
+						rewriter::replace<node>(
+							formula, atm, tau::_T()),
+						block, used_atms, quant_pattern,
+						order, skip));
+			// gamma3: f is identically 1, so the atom holds for
+			// no value of the variable -- fold it to F.
+			if (an.kind == boole_atom_case::identically_one)
+				return tau::build_wff_and(indep,
+					anti_prenex_block<node>(
+						rewriter::replace<node>(
+							formula, atm, tau::_F()),
+						block, used_atms, quant_pattern,
+						order, skip));
+			// gamma4: f does not depend on the variable, so the
+			// atom does not constrain it. Lift the atom out of the
+			// block's scope instead of carrying it into both
+			// branches of a split.
+			if (an.kind == boole_atom_case::independent) {
+				tref out_atm = rewriter::replace<node>(atm,
+					tau::get(tau::bf,
+						tau::trim_right_sibling(
+							pivot_var)),
+					tau::_0(find_ba_type<node>(pivot_var)));
+				tref gl = syntactic_path_simplification_unsat_on_unchanged_negations
+					<node>(rewriter::replace<node>(
+						formula, atm, tau::_T()));
+				tref gr = syntactic_path_simplification_unsat_on_unchanged_negations
+					<node>(rewriter::replace<node>(
+						formula, atm, tau::_F()));
+				used_atms.insert(atm);
+				tref pl = anti_prenex_block<node>(gl, block,
+					used_atms, quant_pattern, order, skip);
+				tref pr2 = anti_prenex_block<node>(gr, block,
+					used_atms, quant_pattern, order, skip);
+				used_atms.erase(atm);
+				return tau::build_wff_and(indep,
+					tau::build_wff_or(
+						tau::build_wff_and(out_atm, pl),
+						tau::build_wff_and(
+							tau::build_wff_neg(
+								out_atm),
+							pr2)));
+			}
+			// TODO (HIGH): gamma1 (unique zero) -- next task.
+		}
 
 		// Remove/add available atomic formulas in stack-like fashion
 		used_atms.insert(atm);

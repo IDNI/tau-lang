@@ -749,6 +749,26 @@ TEST_SUITE("AntiPrenexBlock") {
 			== 4 );
 	}
 
+	TEST_CASE("gamma2 folds the pivot instead of splitting") {
+		// (x|y)x'y' = 0 holds for every x, so step 2h folds it to T
+		// rather than branching. The dependent part then vanishes and
+		// only the independent conjunct is left.
+		auto [res, used] = run_apb_norm(
+			"ex x (((x|y)x'y' = 0 || xk = 0) && z = 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).to_str() == "z = 0" );
+	}
+
+	TEST_CASE("gamma3 folds the pivot to F instead of splitting") {
+		// (x|y')|(x'|y) = 0 holds for no x, so the disjunct dies and
+		// only xk = 0 can satisfy the left conjunct.
+		auto [res, used] = run_apb_norm(
+			"ex x (((x|y')|(x'|y) = 0 || xk = 0) && z = 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+		CHECK( tau::get(res).to_str() == "z = 0" );
+	}
+
 	TEST_CASE("paper 2e: a negated atom is never the pivot") {
 		// The pivot must come from a non-negated position. Only xw = 0
 		// qualifies; the equation inside !(xy = 0) must not be reached
@@ -884,6 +904,68 @@ TEST_SUITE("BlockAtomProfile") {
 		// the inner xz = 0 must NOT have been counted as a positive
 		CHECK( p.positives == 0 );
 		CHECK( !p.all_negated() );
+	}
+}
+
+TEST_SUITE("BooleAtomAnalysis") {
+	// Chapter 5 step 2h splits the Boole decomposition into gamma1..gamma5;
+	// four of the five are decided by cofactoring the pivot.
+
+	static boole_atom_analysis<node_t> analyze(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref var = tau::trim2(fm);
+		tref body = normalize_atomic_formula_operators<node_t>(
+			tau::get(fm)[0].second());
+		return analyze_boole_atom<node_t>(body, var);
+	}
+
+	TEST_CASE("gamma2: identically zero") {
+		// (x|y)x'y' is 0 for x:=0 (y&y' = 0) and for x:=1 (x' = 0), so
+		// `= 0` holds whatever x is. Note the simple spellings (xx' = 0)
+		// are folded to T by the node hooks before an atom ever exists,
+		// so a term the hooks cannot fold syntactically is needed here.
+		auto a = analyze("ex x ((x|y)x'y' = 0).");
+		CHECK( a.kind == boole_atom_case::identically_zero );
+		CHECK( tau::get(a.cofactor_0).equals_0() );
+		CHECK( tau::get(a.cofactor_1).equals_0() );
+	}
+
+	TEST_CASE("gamma3: identically one") {
+		// (x|y')|(x'|y) is 1 for either value of x, so `= 0` holds for
+		// none. Same remark as gamma2 about hook-folded spellings.
+		auto a = analyze("ex x ((x|y')|(x'|y) = 0).");
+		CHECK( a.kind == boole_atom_case::identically_one );
+		CHECK( tau::get(a.cofactor_0).equals_1() );
+		CHECK( tau::get(a.cofactor_1).equals_1() );
+	}
+
+	TEST_CASE("gamma1: unique zero") {
+		// x ^ y is zero exactly at x := y, i.e. f[x<-0] == f[x<-1]'.
+		auto a = analyze("ex x (x ^ y = 0).");
+		CHECK( a.kind == boole_atom_case::unique_zero );
+		CHECK( tau::get(a.cofactor_0).to_str() == "y" );
+		CHECK( tau::get(a.cofactor_1).to_str() == "y'" );
+	}
+
+	TEST_CASE("gamma1: unique zero, xor written out") {
+		// The expanded form of the same function must classify the same.
+		CHECK( analyze("ex x (x'y | xy' = 0).").kind
+			== boole_atom_case::unique_zero );
+	}
+
+	TEST_CASE("gamma4: independent of the variable") {
+		CHECK( analyze("ex x (yz = 0).").kind
+			== boole_atom_case::independent );
+	}
+
+	TEST_CASE("gamma5: general") {
+		CHECK( analyze("ex x (xy = 0).").kind
+			== boole_atom_case::general );
+	}
+
+	TEST_CASE("a non-equation atom is always general") {
+		CHECK( analyze("ex x (x < y).").kind
+			== boole_atom_case::general );
 	}
 }
 
