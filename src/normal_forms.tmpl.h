@@ -3313,13 +3313,19 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	return tau::build_wff_or(nl, nr);
 }
 
-/// Maximum Boole-decomposition depth before the block algorithm stops
-/// splitting and re-wraps the block instead. Chapter 5's steps 2a/2b/2h keep
-/// the recursion shallow on the shapes they cover; this bounds the residue.
-/// Exceeding it costs precision, not soundness: the caller's
+/// Maximum number of Boole (Shannon) splits one block elimination may perform
+/// in total, across the whole recursion rather than along one path. Chapter 5's
+/// steps 2a/2b/2h keep the split count low on the shapes they cover; this bounds
+/// the residue.
+///
+/// It deliberately counts *splits*, not depth: the recursion branches in two, so
+/// a depth bound of d still admits 2^d leaves and does not bound the work at all
+/// (a 30-conjunct formula reaches minutes of runtime under a depth bound of 24).
+///
+/// Exhausting it costs precision, not soundness: the caller's
 /// resolve_quantifiers2 -> resolve_quantifiers -> anti_prenex chain absorbs
 /// whatever is left unresolved.
-inline constexpr size_t block_boole_max_depth = 24;
+inline constexpr size_t block_boole_max_splits = 512;
 
 /**
  * @internal
@@ -3340,11 +3346,12 @@ inline constexpr size_t block_boole_max_depth = 24;
  * @param skip Predicate identifying variables/atomic formulas this pass must
  *        not Boole-decompose (defaults to BV-typed nodes; diverted to
  *        predicate blasting instead once nothing else can be pushed).
- * @param depth Boole-decomposition depth so far. Only the two genuine Shannon
- *        branches charge against it; distribution over disjunctions and the
- *        step 2h gamma folds do not enlarge the search and pass it through
- *        unchanged. On reaching `block_boole_max_depth` the recursion takes the
- *        graceful re-wrap path instead of splitting further.
+ * @param splits_left Remaining Boole-split budget, shared across the whole
+ *        recursion and decremented by each split. Distribution over
+ *        disjunctions and the step 2h gamma folds do not split and so do not
+ *        charge it. On exhaustion the recursion takes the graceful re-wrap path
+ *        instead of splitting further. See `block_boole_max_splits` for why this
+ *        counts splits rather than depth.
  * @return Formula with the quantifier block pushed as far inward as possible.
  * @endinternal
  */
@@ -3354,7 +3361,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	const auto& quant_pattern,
 	const typename term_handle<node>::order& order,
 	std::function<bool(tref)> skip,
-	size_t depth = 0) {
+	size_t& splits_left) {
 	using tau = tree<node>;
 	// Once no non-skip-matched block variable occurs free anymore, the
 	// remaining leaf is entirely skip-matched (e.g. bitvector) content:
@@ -3503,7 +3510,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		tref acc = _F<node>();
 		for (tref d : disjs) {
 			tref rd = anti_prenex_block<node>(d, block, used_atms,
-				quant_pattern, order, skip, depth);
+				quant_pattern, order, skip, splits_left);
 			if (tau::get(rd).equals_T()) return _T<node>();
 			acc = syntactic_path_simplification<node>(
 				tau::build_wff_or(acc, rd));
@@ -3544,7 +3551,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			return tau::build_wff_and(indep,
 				anti_prenex_block<node>(formula, block,
 					used_atms, quant_pattern, order, skip,
-					depth));
+					splits_left));
 		// Check if dependent formula is clause -> push block into clause.
 		// push_ex_block_into_clause assumes the whole clause is
 		// homogeneously atomless-typed, so any skip-matched content in it
@@ -3612,11 +3619,10 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// equations, quantified subformulas, or exclusively skip-matched
 		// atoms remain): try blasting if the block needs it, else keep
 		// the block on the dependent part instead of dereferencing end()
-		if (atms.empty() || depth >= block_boole_max_depth) {
-			DBG(if (depth >= block_boole_max_depth)
-				LOG_TRACE << "anti_prenex_block: Boole budget"
-					" exhausted at depth " << depth
-					<< ", re-wrapping block\n";)
+		if (atms.empty() || splits_left == 0) {
+			DBG(if (splits_left == 0)
+				LOG_TRACE << "anti_prenex_block: Boole split"
+					" budget exhausted, re-wrapping block\n";)
 			if (!has_active_var(formula))
 				return tau::build_wff_and(indep, blast_block(formula));
 			for (auto v = block.rbegin(); v != block.rend(); ++v)
@@ -3660,7 +3666,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 						rewriter::replace<node>(
 							formula, atm, tau::_T()),
 						block, used_atms, quant_pattern,
-						order, skip, depth));
+						order, skip, splits_left));
 			// gamma3: f is identically 1, so the atom holds for
 			// no value of the variable -- fold it to F.
 			if (an.kind == boole_atom_case::identically_one)
@@ -3669,7 +3675,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 						rewriter::replace<node>(
 							formula, atm, tau::_F()),
 						block, used_atms, quant_pattern,
-						order, skip, depth));
+						order, skip, splits_left));
 			// gamma4: f does not depend on the variable, so the
 			// atom does not constrain it. Lift the atom out of the
 			// block's scope instead of carrying it into both
@@ -3689,10 +3695,10 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				used_atms.insert(atm);
 				tref pl = anti_prenex_block<node>(gl, block,
 					used_atms, quant_pattern, order, skip,
-					depth);
+					splits_left);
 				tref pr2 = anti_prenex_block<node>(gr, block,
 					used_atms, quant_pattern, order, skip,
-					depth);
+					splits_left);
 				used_atms.erase(atm);
 				return tau::build_wff_and(indep,
 					tau::build_wff_or(
@@ -3732,7 +3738,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				used_atms.insert(atm);
 				tref rr = anti_prenex_block<node>(wr, block,
 					used_atms, quant_pattern, order, skip,
-					depth);
+					splits_left);
 				used_atms.erase(atm);
 				// The T-branch is quantifier-free by
 				// construction: pivot_var was substituted out
@@ -3758,13 +3764,15 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		if (tau::get(l) == tau::get(r)) {
 			tref res = anti_prenex_block(
 				l, block, used_atms, quant_pattern, order, skip,
-				depth);
+				splits_left);
 			used_atms.erase(atm);
 			return tau::build_wff_and(indep, res);
 		}
+		// One split, charged once against the shared budget.
+		--splits_left;
 		tref nl = anti_prenex_block(
 			tau::build_wff_and(atm, l), block, used_atms,
-			quant_pattern, order, skip, depth + 1);
+			quant_pattern, order, skip, splits_left);
 		if (tau::get(nl).equals_T()) {
 			used_atms.erase(atm);
 			// dep part is T, only the var-free part remains
@@ -3773,7 +3781,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		tref nr = anti_prenex_block(
 			tau::build_wff_and(tau::build_wff_neg(atm), r),
 				block, used_atms, quant_pattern, order, skip,
-				depth + 1);
+				splits_left);
 		used_atms.erase(atm);
 		return tau::build_wff_and(indep, tau::build_wff_or(nl, nr));
 	}
@@ -3785,6 +3793,28 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	for (auto v = block.rbegin(); v != block.rend(); ++v)
 		formula = build_wff_ex<node>(*v, formula, false);
 	return formula;
+}
+
+/**
+ * @internal
+ * @brief Convenience overload of the core block recursion that owns a fresh
+ * Boole-split budget.
+ *
+ * Equivalent to the 7-arg form with `splits_left = block_boole_max_splits`. Use
+ * it when there is no enclosing elimination whose budget should be shared.
+ * @tparam node Tree node type.
+ * @endinternal
+ */
+template<NodeType node>
+tref anti_prenex_block(tref formula, const trefs& block,
+	subtree_unordered_set<node>& used_atms,
+	const auto& quant_pattern,
+	const typename term_handle<node>::order& order,
+	std::function<bool(tref)> skip)
+{
+	size_t splits_left = block_boole_max_splits;
+	return anti_prenex_block<node>(formula, block, used_atms, quant_pattern,
+		order, skip, splits_left);
 }
 
 /**
@@ -4009,8 +4039,11 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	auto resolve_ex_block = [&](tref b) -> tref {
 		b = normalize_atomic_formula_operators<node>(b);
 		subtree_unordered_set<node> used_atms;
+		// One budget per block elimination, shared by its whole
+		// recursion.
+		size_t splits_left = block_boole_max_splits;
 		tref r = anti_prenex_block<node>(b, block_vars, used_atms, qp,
-			ord, skip, 0);
+			ord, skip, splits_left);
 		r = resolve_quantifiers2<node>(r, ord, skip);
 		// Fallback for closed bv (sub-)formulas resolve_quantifiers2 leaves
 		// untouched, and a final safety net for blasting failures: try

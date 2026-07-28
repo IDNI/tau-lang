@@ -766,6 +766,58 @@ TEST_SUITE("AntiPrenexBlock") {
 		CHECK( tau::get(res).to_str() == "z = 0" );
 	}
 
+	TEST_CASE("2b: an unsatisfiable squeeze collapses to F") {
+		// The squeeze of an all-positive part can come out as the empty
+		// disjunction, which is F. Reached here because the conjunction
+		// forces x to be both 0 and 1.
+		auto [res, used] = run_apb_norm("ex x (x = 0 && x' = 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res)[0].is(tau::wff_f) );
+	}
+
+	TEST_CASE("paper 2e: an order atom is used when no equation qualifies") {
+		// Every bf_eq present is either negated or block-variable-free,
+		// so eq_atms comes out empty and the order atom is the only
+		// candidate left. It must be used rather than the whole
+		// decomposition giving up.
+		auto [res, used] = run_apb_norm(
+			"ex x ((!(x = y) || v = 0) && !(x < w)).");
+		CHECK( used == 0 );
+		CHECK( res != nullptr );
+	}
+
+	TEST_CASE("gamma1 declines on a multi-variable block") {
+		// The unique-zero substitution is restricted to blocks whose
+		// only active variable is the pivot; with two active variables
+		// it must fall through to the general decomposition and still
+		// resolve correctly.
+		auto [res, used] = run_apb_norm(
+			"ex x ex y ((x ^ y = 0 || z = 0) && xw != 0).");
+		CHECK( used == 0 );
+		CHECK( res != nullptr );
+	}
+
+	TEST_CASE("budget: the split cap re-wraps instead of recursing") {
+		// 30 conjunct pairs. Under a *depth* bound this shape is
+		// unbounded work -- the recursion branches in two, so bounding
+		// the path length to d still admits 2^d leaves, and this input
+		// ran for minutes. block_boole_max_splits counts total splits
+		// instead, so the graceful re-wrap path is reached and the call
+		// returns promptly.
+		std::string sample = "ex x (";
+		for (size_t i = 0; i < 30; ++i) {
+			if (i) sample += " && ";
+			sample += "(x a" + std::to_string(i) + " = 0 || x b"
+				+ std::to_string(i) + " != 0)";
+		}
+		sample += ").";
+		auto parsed = get_nso_rr(sample.c_str());
+		REQUIRE( parsed.has_value() );
+		auto [res, used] = run_apb_norm(sample.c_str());
+		CHECK( used == 0 );
+		CHECK( res != nullptr );
+	}
+
 	TEST_CASE("budget: a deeply decomposable formula still terminates") {
 		// Eight independent disjunctive pairs under one block. Without
 		// the fast paths this is 2^8 branches; the budget makes it
@@ -959,6 +1011,67 @@ TEST_SUITE("BlockAtomProfile") {
 		CHECK( p.all_negated() );
 	}
 
+	TEST_CASE("F is not an atom either") {
+		auto p = profile("ex x (xy != 0 && (xw != 0 || F)).");
+		CHECK( p.negatives == 2 );
+		CHECK( p.positives == 0 );
+		CHECK( p.others == 0 );
+		CHECK( p.all_negated() );
+	}
+
+	TEST_CASE("an order relation normalizes into equations") {
+		// normalize_atomic_formula_operators rewrites `x < w` into
+		// `xw' = 0 && !(x = w)`, so a bare order relation never reaches
+		// the census as an unhandled atom -- it arrives as one positive
+		// and one negative. Both fast paths must still decline, on
+		// mixed sign rather than on `others`.
+		auto p = profile("ex x (xy = 0 && x < w).");
+		CHECK( p.positives == 2 );
+		CHECK( p.negatives == 1 );
+		CHECK( p.others == 0 );
+		CHECK( !p.all_positive() );
+		CHECK( !p.all_negated() );
+	}
+
+	TEST_CASE("a negated order relation counts as other") {
+		// A negated order relation does survive normalization as a
+		// non-equation atom, which is the one shape that reaches the
+		// `others` counter in ordinary input. Only !(f = 0) is a
+		// "negative", so 2a must decline here -- distributing a
+		// relation it has no rule for would be unjustified.
+		auto p = profile("ex x (xy != 0 && !(x < w)).");
+		CHECK( p.negatives == 1 );
+		CHECK( p.others == 1 );
+		CHECK( !p.all_negated() );
+		CHECK( !p.all_positive() );
+	}
+
+	TEST_CASE("skip-matched content makes both fast paths decline") {
+		// A bitvector atom is reserved for predicate blasting / the
+		// solver. Squeezing it into a bf_or, or handing it its own
+		// binder, is exactly the work skip exists to prevent, so the
+		// census reports skip_content and both guards go false even
+		// though the signs are uniform.
+		// A single positive bv atom: without the skip_content guard the
+		// census would read as all_positive and step 2b would squeeze it.
+		auto p = profile("ex x:bv[8] (x = 0).");
+		CHECK( p.positives == 1 );
+		CHECK( p.skip_content );
+		CHECK( !p.all_positive() );
+		CHECK( !p.all_negated() );
+	}
+
+	TEST_CASE("a formula with no atoms at all is neither") {
+		// Guards the > 0 conditions in all_negated()/all_positive():
+		// zero atoms must not read as "all of them are negated".
+		auto p = profile("ex x (T).");
+		CHECK( p.positives == 0 );
+		CHECK( p.negatives == 0 );
+		CHECK( p.others == 0 );
+		CHECK( !p.all_negated() );
+		CHECK( !p.all_positive() );
+	}
+
 	TEST_CASE("a nested quantifier counts as other, and is not descended into") {
 		auto p = profile("ex x (xy != 0 && (ex z (xz = 0))).");
 		CHECK( p.negatives == 1 );
@@ -966,6 +1079,216 @@ TEST_SUITE("BlockAtomProfile") {
 		// the inner xz = 0 must NOT have been counted as a positive
 		CHECK( p.positives == 0 );
 		CHECK( !p.all_negated() );
+	}
+}
+
+TEST_SUITE("BlockSkipPaths") {
+	// The skip-matched (bitvector) paths through block collection and the
+	// chapter 5 fast paths.
+
+	static quantifier_block<node_t> collect(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		return collect_quantifier_block<node_t>(fm,
+			is_tref_bv_type_family<node_t>);
+	}
+
+	TEST_CASE("an opposite-kind skipped quantifier ends the run") {
+		// `ex a all x:bv[8] phi`. x is skip-matched, so this pass never
+		// eliminates it -- but wrap_skipped re-emits everything in
+		// blk.skipped *outermost*, so absorbing the `all` here would
+		// hoist it out past the `ex` and produce all x ex a phi, which
+		// is not equivalent (only the converse implication holds).
+		// The run must therefore stop at it.
+		auto blk = collect("ex a all x:bv[8] (a = 0 || x = 0).");
+		CHECK( blk.is_ex );
+		CHECK( blk.vars.size() == 1 );
+		CHECK( blk.skipped.empty() );
+		// The `all x` is left at the head of the matrix, where a later
+		// round picks it up as an inner block.
+		CHECK( is_child_quantifier<node_t>(blk.body) );
+	}
+
+	TEST_CASE("a leading skipped quantifier is absorbed and does not fix the kind") {
+		// `all x:bv[8] ex a phi`. The skipped quantifier comes before
+		// any active one, so it stays outermost either way and is safe
+		// to defer. The block's kind must come from the first *active*
+		// quantifier (ex), not from the leading skipped `all`.
+		auto blk = collect("all x:bv[8] ex a (a = 0 || x = 0).");
+		CHECK( blk.skipped.size() == 1 );
+		CHECK( blk.skipped.front().second == false );   // it was an `all`
+		CHECK( blk.is_ex );                             // kind from `ex a`
+		CHECK( blk.vars.size() == 1 );
+	}
+
+	TEST_CASE("a same-kind skipped quantifier is transparent") {
+		// `ex a ex x:bv[8] phi`: same kind, so it commutes with the
+		// block and is deferred without ending the run.
+		auto blk = collect("ex a ex x:bv[8] (a = 0 && x = 0).");
+		CHECK( blk.is_ex );
+		CHECK( blk.vars.size() == 1 );
+		CHECK( blk.skipped.size() == 1 );
+		CHECK( blk.skipped.front().second == true );    // it was an `ex`
+	}
+
+	TEST_CASE("a run of only skipped quantifiers has no active variable") {
+		// Nothing for this pass to eliminate: vars is empty and the
+		// whole run is deferred.
+		auto blk = collect("ex x:bv[8] (x = 0).");
+		CHECK( blk.vars.empty() );
+		CHECK( blk.skipped.size() == 1 );
+	}
+}
+
+TEST_SUITE("BlockSqueeze") {
+	// Direct tests of the two chapter 5 fast-path helpers, so the constant,
+	// cap and decline branches can be reached without having to find a
+	// formula that drives the whole pipeline into them.
+
+	// The matrix of a quantified sample, operator-normalized.
+	static tref body_of(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		while (is_child_quantifier<node_t>(fm))
+			fm = tau::get(fm)[0].second();
+		return normalize_atomic_formula_operators<node_t>(fm);
+	}
+
+	// The bound variables of a quantified sample, outermost first.
+	static trefs block_of(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		trefs block;
+		while (is_child_quantifier<node_t>(fm)) {
+			block.push_back(tau::trim2(fm));
+			fm = tau::get(fm)[0].second();
+		}
+		return block;
+	}
+
+	static size_t ba_type_of(const char* sample) {
+		return tau::get(block_of(sample).front()).get_ba_type();
+	}
+
+	// ---- distribute_block_over_atoms (step 2a) ----
+
+	TEST_CASE("2a: an atom without a block variable gets no binder") {
+		// A vacuous binder would be sound but pure noise downstream, so
+		// only dependent atoms are wrapped.
+		const char* s = "ex x (xy != 0 || vw != 0).";
+		tref res = distribute_block_over_atoms<node_t>(
+			body_of(s), block_of(s));
+		// Exactly one of the two disjuncts acquired a quantifier.
+		CHECK( tau::get(res).select_all(is_quantifier<node_t>).size()
+			== 1 );
+	}
+
+	TEST_CASE("2a: constants are passed through untouched") {
+		const char* s = "ex x (xy != 0 || T).";
+		tref res = distribute_block_over_atoms<node_t>(
+			body_of(s), block_of(s));
+		// T || anything folds to T via the hooks, and no binder is
+		// attached to a constant.
+		CHECK( tau::get(res)[0].is(tau::wff_t) );
+	}
+
+	// ---- squeeze_positive_disjuncts (step 2b) ----
+
+	TEST_CASE("2b: T squeezes to the single term 0") {
+		// T is `0 = 0`, so the disjunct list is [0].
+		const char* s = "ex x (xy = 0).";
+		auto sq = squeeze_positive_disjuncts<node_t>(
+			_T<node_t>(), ba_type_of(s));
+		REQUIRE( sq.has_value() );
+		CHECK( sq->size() == 1 );
+		CHECK( tau::get((*sq)[0]).equals_0() );
+	}
+
+	TEST_CASE("2b: F squeezes to the empty disjunction") {
+		const char* s = "ex x (xy = 0).";
+		auto sq = squeeze_positive_disjuncts<node_t>(
+			_F<node_t>(), ba_type_of(s));
+		REQUIRE( sq.has_value() );
+		CHECK( sq->empty() );
+	}
+
+	TEST_CASE("2b: a single equation squeezes to its own term") {
+		const char* s = "ex x (xy = 0).";
+		auto sq = squeeze_positive_disjuncts<node_t>(
+			body_of(s), ba_type_of(s));
+		REQUIRE( sq.has_value() );
+		CHECK( sq->size() == 1 );
+	}
+
+	TEST_CASE("2b: a conjunction of ors is the cross product") {
+		// (a=0 || b=0) && (c=0 || d=0) -> four disjuncts, each an OR of
+		// one term from either side.
+		const char* s = "ex x ((xa = 0 || xb = 0) && (xc = 0 || xd = 0)).";
+		auto sq = squeeze_positive_disjuncts<node_t>(
+			body_of(s), ba_type_of(s));
+		REQUIRE( sq.has_value() );
+		CHECK( sq->size() == 4 );
+	}
+
+	TEST_CASE("2b: declines on a non-equation atom") {
+		// bf_lt has no squeeze rule, so the whole attempt is abandoned
+		// rather than partially applied.
+		const char* s = "ex x (xa = 0 && x < b).";
+		CHECK( !squeeze_positive_disjuncts<node_t>(
+			body_of(s), ba_type_of(s)).has_value() );
+	}
+
+	TEST_CASE("2b: declines on a negated atom") {
+		const char* s = "ex x (xa = 0 && xb != 0).";
+		CHECK( !squeeze_positive_disjuncts<node_t>(
+			body_of(s), ba_type_of(s)).has_value() );
+	}
+
+	TEST_CASE("2b: declines when the cross product exceeds the cap") {
+		// Four conjuncts of three disjuncts each: 3^4 = 81 > 64, so the
+		// multiplicative blow-up the cap exists to stop is refused and
+		// the general algorithm runs instead.
+		std::string sample = "ex x (";
+		const char* groups[] = {"abc", "def", "ghi", "jkl"};
+		for (size_t g = 0; g < 4; ++g) {
+			if (g) sample += " && ";
+			sample += "(";
+			for (size_t i = 0; i < 3; ++i) {
+				if (i) sample += " || ";
+				sample += std::string("x") + groups[g][i]
+					+ " = 0";
+			}
+			sample += ")";
+		}
+		sample += ").";
+		CHECK( !squeeze_positive_disjuncts<node_t>(
+			body_of(sample.c_str()),
+			ba_type_of(sample.c_str())).has_value() );
+	}
+
+	TEST_CASE("2b: declines when a disjunction exceeds the cap") {
+		// 65 disjuncts: over the cap by addition rather than
+		// multiplication, which is a separate guard.
+		std::string sample = "ex x (";
+		for (size_t i = 0; i < 65; ++i) {
+			if (i) sample += " || ";
+			sample += "x a" + std::to_string(i) + " = 0";
+		}
+		sample += ").";
+		auto parsed = get_nso_rr(sample.c_str());
+		REQUIRE( parsed.has_value() );
+		CHECK( !squeeze_positive_disjuncts<node_t>(
+			body_of(sample.c_str()),
+			ba_type_of(sample.c_str())).has_value() );
+	}
+
+	TEST_CASE("2b: just under the cap still squeezes") {
+		// 3*3*3 = 27 <= 64: the boundary case on the other side, so the
+		// cap is not accidentally rejecting everything.
+		const char* s = "ex x ((xa = 0 || xb = 0 || xc = 0) "
+			"&& (xd = 0 || xe = 0 || xf = 0) "
+			"&& (xg = 0 || xh = 0 || xi = 0)).";
+		auto sq = squeeze_positive_disjuncts<node_t>(
+			body_of(s), ba_type_of(s));
+		REQUIRE( sq.has_value() );
+		CHECK( sq->size() == 27 );
 	}
 }
 
@@ -1025,9 +1348,12 @@ TEST_SUITE("BooleAtomAnalysis") {
 			== boole_atom_case::general );
 	}
 
-	TEST_CASE("a non-equation atom is always general") {
-		CHECK( analyze("ex x (x < y).").kind
-			== boole_atom_case::general );
+	TEST_CASE("a non-equation atom is always general, with no cofactors") {
+		auto a = analyze("ex x (x < y).");
+		CHECK( a.kind == boole_atom_case::general );
+		// Nothing was cofactored, so the caller must not read these.
+		CHECK( a.cofactor_0 == nullptr );
+		CHECK( a.cofactor_1 == nullptr );
 	}
 }
 
