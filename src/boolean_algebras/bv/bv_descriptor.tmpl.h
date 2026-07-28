@@ -29,6 +29,9 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static constexpr bool atomless = false;
 	static constexpr bool non_aba_omcat = false;
 
+	/** @brief bv supports the grammar's arithmetic term operators. */
+	static constexpr bool arith_ops = true;
+
 	static bool matches_type(tref type_tree) {
 		return is_bv_type_family<node_t>(type_tree);
 	}

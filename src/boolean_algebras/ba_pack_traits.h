@@ -156,6 +156,48 @@ void pack_set_preprocessing(bool enabled) {
 		std::tuple_size_v<typename Node::bas_tuple>>{});
 }
 
+/**
+ * @brief `true` when @p BA declares the grammar's arithmetic term operators.
+ *
+ * Optional capability, so a BA that says nothing simply has none.
+ */
+template <typename Node, typename BA>
+constexpr bool ba_has_arith_ops() {
+	if constexpr (requires {
+		{ ba_descriptor<BA, Node>::arith_ops }
+			-> std::convertible_to<bool>; })
+		return ba_descriptor<BA, Node>::arith_ops;
+	else return false;
+}
+
+/** @internal @brief Shared body of the two @ref pack_type_has_arith_ops. */
+template <typename Node, typename Type>
+bool pack_type_has_arith_ops_impl(Type type) {
+	bool out = false;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_has_arith_ops<Node, BA>())
+				if (!out && ba_descriptor<BA, Node>::owns_type(type))
+					out = true;
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
+/** @brief `true` when the BA owning type id @p ba_type declares arith_ops. */
+template <typename Node>
+bool pack_type_has_arith_ops(size_t ba_type) {
+	return pack_type_has_arith_ops_impl<Node>(ba_type);
+}
+
+/** @brief `true` when the BA owning type tree @p type declares arith_ops. */
+template <typename Node>
+bool pack_type_has_arith_ops(const intptr_t* type) {
+	return pack_type_has_arith_ops_impl<Node>(type);
+}
+
 /** @brief `true` when @p BA's descriptor builds a canonical zero constant. */
 template <typename Node, typename BA>
 concept ba_has_zero_constant = requires(size_t t) {

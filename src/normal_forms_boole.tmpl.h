@@ -1427,7 +1427,7 @@ tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_b
  */
 template<NodeType node>
 tref anti_prenex_block(tref formula) {
-	return anti_prenex_block<node>(formula, is_tref_bv_type_family<node>);
+	return anti_prenex_block<node>(formula, pack_tref_has_arith_ops<node>);
 }
 
 template<NodeType node>
@@ -1594,7 +1594,7 @@ tref push_ex_block_into_clause(tref clause, const trefs& block,
  */
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order) {
-	return resolve_quantifiers2<node>(formula, order, is_tref_bv_type_family<node>);
+	return resolve_quantifiers2<node>(formula, order, pack_tref_has_arith_ops<node>);
 }
 
 /**

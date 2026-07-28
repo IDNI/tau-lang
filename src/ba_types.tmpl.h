@@ -371,6 +371,15 @@ bool is_tref_bv_type_family(tref t) {
 	return is_bv_type_family<node>(tau::get(t).get_ba_type());
 }
 
+// Generic counterpart of the above: asks the pack whether the BA owning this
+// node's type declares arithmetic operators, naming no BA.  Lives here rather
+// than in ba_pack_traits.h because it needs tree<node> to read the ba_type.
+template <NodeType node>
+bool pack_tref_has_arith_ops(tref t) {
+	using tau = tree<node>;
+	return pack_type_has_arith_ops<node>(tau::get(t).get_ba_type());
+}
+
 template <NodeType node>
 size_t get_bv_width(tref t) {
 	using tau = tree<node>;

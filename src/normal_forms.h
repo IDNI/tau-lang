@@ -31,7 +31,7 @@ class syntactic_path_simplification_dnf;
 
 template <NodeType node>
 tref syntactic_formula_simplification(tref formula,
-	std::function<bool(tref)> skip = is_tref_bv_type_family<node>);
+	std::function<bool(tref)> skip = pack_tref_has_arith_ops<node>);
 
 template <NodeType node, bool is_wff = true>
 tref push_negation_one_in(tref fm);

@@ -252,7 +252,7 @@ std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n,
 	// children have already been updated and they are consistent.
 	// We only need to check that the type is bv type family.
 	auto t = tau::get(n)[0].get_ba_type();
-	if (is_bv_type_family<node>(t))
+	if (pack_type_has_arith_ops<node>(t))
 		return update_ba_symbol<node>(n);
 	else if (!options.use_defaults) return n;
 	return inference_error{n, t, untyped_type_id<node>()};
