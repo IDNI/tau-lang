@@ -18,7 +18,7 @@
 #include "boolean_algebras/bv_ba.h"
 #include "boolean_algebras/qint/qint.h"
 #include "boolean_algebras/qlt/qlt.h"
-#include "boolean_algebras/nlang_ba.h"
+#include "boolean_algebras/nlang/nlang_ba.h"
 #include "boolean_algebras/hsb/hsb.h"
 #include "nso_rr.h"
 

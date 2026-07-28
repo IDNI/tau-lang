@@ -20,7 +20,7 @@
 #define __IDNI__TAU__LTL_ABA_H__
 
 #include "normalizer.h"
-#include "boolean_algebras/nlang_ba.h"
+#include "boolean_algebras/nlang/nlang_ba.h"
 #include <optional>
 #include <string>
 #include <tuple>

@@ -7,7 +7,7 @@
 
 #include <curl/curl.h>
 
-#include "boolean_algebras/nlang_ba.h"
+#include "boolean_algebras/nlang/nlang_ba.h"
 
 namespace idni::tau_lang {
 

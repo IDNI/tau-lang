@@ -1,0 +1,95 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+/**
+ * @file nlang_descriptor.tmpl.h
+ * @brief Descriptor through which core reaches the nlang Boolean algebra.
+ */
+
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_DESCRIPTOR_TMPL_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_DESCRIPTOR_TMPL_H__
+
+#include "boolean_algebras/ba_descriptor.h"
+#include "ba_types.h"
+
+namespace idni::tau_lang {
+
+template <typename... PackBAs>
+struct ba_descriptor<nlang_ba, node<PackBAs...>> {
+	using node_t = node<PackBAs...>;
+	using tau = tree<node_t>;
+
+	static constexpr const char* type_name = "nlang";
+	static constexpr int default_type_priority = 50;
+	static constexpr bool atomless = true;
+	static constexpr bool non_aba_omcat = false;
+
+	static bool matches_type(tref type_tree) {
+		return is_nlang_type<node_t>(type_tree);
+	}
+
+	static tref type_tree() { return nlang_type<node_t>(); }
+
+	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
+
+	static bool owns_type(size_t ba_type_id) {
+		return is_nlang_type<node_t>(ba_type_id);
+	}
+
+	/** @brief nlang takes no subtype, so a type never carries a parameter. */
+	static std::optional<unsigned short> type_param(tref) {
+		return std::nullopt;
+	}
+
+	static size_t type_id_for(unsigned short) {
+		return nlang_type_id<node_t>();
+	}
+
+	static tref type_tree_for(unsigned short) { return type_tree(); }
+
+	static bool is_syntactic_one(const nlang_ba& x) { return is_nlang_one(x); }
+
+	static bool is_syntactic_zero(const nlang_ba& x) { return is_nlang_zero(x); }
+
+	static bool is_one(const nlang_ba& x) { return is_nlang_one(x); }
+
+	static bool is_zero(const nlang_ba& x) { return is_nlang_zero(x); }
+
+	static bool is_closed(const nlang_ba&) { return true; }
+
+	static std::string literal_one(tref) { return "everything"; }
+
+	static std::string literal_zero(tref) { return "nothing"; }
+
+	static nlang_ba normalize(const nlang_ba& x) { return normalize_nlang(x); }
+
+	static nlang_ba splitter(const nlang_ba& x, splitter_type st) {
+		return nlang_splitter(x, st);
+	}
+
+	static tref splitter_one(tref) {
+		return tau::get(tau::bf, tau::get_ba_constant(
+			typename tau::constant(nlang_splitter_one()),
+			nlang_type<node_t>()));
+	}
+
+	/** @brief nlang holds no Tau spec, so there is nothing to unpack. */
+	static tref unpack(const nlang_ba&) { return nullptr; }
+
+	static std::optional<nlang_ba> pack(tref) { return std::nullopt; }
+
+	static tref simplify_symbol(tref sym) {
+		return simplify_nlang_symbol(sym);
+	}
+
+	static tref simplify_term(tref term) { return simplify_nlang_term(term); }
+
+	static std::optional<typename node_t::constant_with_type>
+	parse(const std::string& src, tref)
+	{
+		return parse_nlang<PackBAs...>(src);
+	}
+};
+
+} // namespace idni::tau_lang
+
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_DESCRIPTOR_TMPL_H__
