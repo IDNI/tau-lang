@@ -4,7 +4,7 @@
 #include "test_tau_helpers.h"
 #include "parser_helper.h"
 
-#include "boolean_algebras/bv_ba.h"
+#include "boolean_algebras/bv/bv_ba.h"
 
 
 TEST_SUITE("Configuration") {

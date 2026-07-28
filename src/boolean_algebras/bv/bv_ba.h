@@ -1,0 +1,367 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+/**
+ * @file bv_ba.h
+ * @brief Bit-vector Boolean Algebra interface for tau-lang using cvc5.
+ *
+ * This header provides type aliases, helper functions, and advanced methods for
+ * manipulating and solving bit-vector formulas using the cvc5 SMT solver within
+ * the tau-lang framework.
+ *
+ * Type Aliases:
+ * - bv: Alias for cvc5::Term representing a bit-vector term.
+ * - sort: Alias for cvc5::Sort representing a sort/type.
+ * - bvs: Alias for std::vector<bv>, a vector of bit-vector terms.
+ * - solver: Alias for cvc5::Solver, the SMT solver instance.
+ * - term_manager: Alias for cvc5::TermManager, manages terms in cvc5.
+ * - solution<node>: Alias for subtree_map<node, tref>, representing a solution mapping.
+ *
+ * Helper Methods:
+ * - get_bv_size: Returns the bit-width of a bit-vector term.
+ * - config_cvc5_solver: Configures a cvc5::Solver for bit-vector logic and model production.
+ *
+ * Advanced Methods:
+ * - bv_eval_node: Evaluates a (bv) tau tree to a bit-vector formula.
+ * - is_bv_formula_sat: Checks satisfiability of a bit-vector formula.
+ * - is_bv_formula_valid: Checks validity of a bit-vector formula.
+ * - is_bv_formula_unsat: Checks unsatisfiability of a bit-vector formula.
+ * - solve_bv: Attempts to solve a bit-vector formula, returning an optional solution.
+ * - splitter: Dummy method included for completeness (variant ba). In the case
+ * of atomless BAs, it computes the splitter of a given BA element.
+ * - parse_bv: Parses a string into a bit-vector constant with type information.
+ *
+ * @note Implementation details are provided in "bv_ba.tmpl.h".
+ */
+
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__
+
+#include <cvc5/cvc5.h>
+
+#include "boolean_algebras/cvc5/cvc5.h"
+#include "boolean_algebras/ba_pack_traits.h"
+#include "tau_tree.h"
+#include "splitter_types.h"
+
+namespace idni::tau_lang {
+
+using bv = cvc5::Term;
+using sort = cvc5::Sort;
+using bvs = std::vector<bv>;
+using solver = cvc5::Solver;
+using term_manager = cvc5::TermManager;
+
+/** @brief bv carries bitvector arithmetic and its own decision procedure. */
+template <>
+struct ba_has_arithmetic_theory<bv> : std::true_type {};
+
+template<NodeType node>
+using solution = subtree_map<node, tref>;
+
+/**
+ * @brief Returns the bit-vector size associated with the given tref.
+ *
+ * This function template retrieves the size (in bits) of the bit-vector
+ * represented by the provided tref object, depending on the specified NodeType.
+ *
+ * @tparam node The type of node for which the bit-vector size is queried.
+ * @param b The tref object representing the bit-vector.
+ * @return The size of the bit-vector in bits.
+ */
+template<NodeType node>
+size_t get_bv_size(const tref t);
+
+/**
+ * @brief Configures the given cvc5 solver instance for bit-vector logic.
+ *
+ * Sets the solver options to produce models and configures the logic to "BV" (Bit-Vector).
+ * This function prepares the solver for solving bit-vector problems.
+ *
+ * @param solver Reference to a cvc5::Solver instance to be configured.
+ */
+inline void config_cvc5_solver(cvc5::Solver& solver) {
+	// configure the solver
+	solver.setOption("produce-models", "true");
+	solver.setOption("produce-proofs", "false");
+	//solver.setOption("incremental", "true");
+	solver.setLogic("BV");
+}
+
+/**
+ * @brief Evaluates a (bv) tau tree to a bitvector formula.
+ *
+ * This function traverses the given tau tree node and computes its
+ * bitvector value based on the provided variable mappings. It supports evaluation
+ * with both bound and free variables, and can optionally perform additional checks.
+ *
+ * @param form Traverser for the boolean algebra tree node to be evaluated.
+ * @param vars Mapping from tree nodes to bitvector values for bound variables. Passed
+ * by reference for performance; quantifier cases save and restore any shadowed
+ * outer binding around their recursive call, so it is left unchanged on return.
+ * @param free_vars Mapping from tree nodes to bitvector values for free variables (may be updated).
+ * @return An optional with the the evaluated bitvector value of the node if possible and
+ * an empty optional if not.
+ *
+ */
+template <NodeType node>
+std::optional<bv> bv_eval_node(const typename tree<node>::traverser& form,
+	subtree_map<node, bv>& vars, subtree_map<node, bv>& free_vars);
+
+/**
+ * @brief Evaluate a `tref` BV formula node; wrapper overload of the traverser version.
+ * @param form Root formula node.
+ * @param vars Bound variable assignments.
+ * @param free_vars Free variable assignments (updated in place).
+ * @return Evaluated BV term, or `nullopt` on failure.
+ */
+template <NodeType node>
+std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
+	subtree_map<node, bv>& free_vars);
+
+/** @brief Convert a cvc5 term tree @p n back into a Tau tree reference. */
+template <NodeType node>
+tref cvc5_tree_to_tau_tree (bv n,
+	const std::map<std::string, tref>& var_map = {});
+
+/**
+ * @brief Tri-state result of deciding a bit-vector formula's satisfiability,
+ * distinct from the translation-failure case (see bv_formula_sat_status).
+ */
+enum class bv_sat_status { sat, unsat, unknown };
+
+/**
+ * @brief Decides satisfiability of a bit-vector formula, distinguishing a
+ * definite answer from cvc5 giving up (unknown, e.g. on a resource limit)
+ * and from translation failure (the formula could not be turned into a
+ * cvc5 term at all -- returned as nullopt, never as bv_sat_status::unknown).
+ *
+ * is_bv_formula_sat below collapses this to a bool for callers that only
+ * care about "is it definitely sat", treating unknown and translation
+ * failure the same as unsat; callers that would otherwise assert a formula
+ * is definitely false based on "not sat" should use this instead and treat
+ * unknown/nullopt as "cannot decide", not as unsat.
+ *
+ * @param form The bit-vector formula to be checked for satisfiability.
+ * @return The tri-state result, or nullopt if translation to cvc5 failed.
+ */
+template <NodeType node>
+std::optional<bv_sat_status> bv_formula_sat_status(tref form);
+
+/**
+ * @brief Checks if a given bit-vector formula is satisfiable.
+ *
+ * This function determines whether the provided bit-vector formula,
+ * represented by the parameter `form`, has at least one assignment
+ * that makes the formula true (i.e., is satisfiable).
+ *
+ * @param form The bit-vector formula to be checked for satisfiability.
+ * @return true if the formula is satisfiable, false otherwise (including
+ * when cvc5 returns unknown, or when translation to cvc5 fails).
+ */
+template <NodeType node>
+bool is_bv_formula_sat(tref form);
+
+/**
+ * @brief Checks that the formula can be decided by the bitvector solver:
+ * every variable must have an explicitly sized bitvector type. Mixed-type
+ * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
+ *
+ * @param form The formula to check
+ * @return true if all variables are explicitly sized bitvectors
+ */
+template <NodeType node>
+bool is_bv_solvable_formula(tref form);
+
+/**
+ * @brief Checks whether a given bit-vector formula is valid.
+ *
+ * This function analyzes the provided formula and determines if it is valid
+ * according to the semantics of bit-vector boolean algebra.
+ *
+ * @param form The formula to be checked for validity.
+ * @return true if the formula is valid, false otherwise.
+ */
+template <NodeType node>
+bool is_bv_formula_valid(tref form);
+
+/**
+ * @brief Checks whether a given bit-vector formula is unsatisfiable.
+ *
+ * This function analyzes the provided formula and determines if there is no possible assignment
+ * to its variables that would make the formula evaluate to true.
+ *
+ * @param form The bit-vector formula to be checked for unsatisfiability.
+ * @return true if the formula is unsatisfiable; false otherwise.
+ */
+template <NodeType node>
+bool is_bv_formula_unsat(tref form);
+
+/**
+ * @brief Solves a Boolean algebra problem over bit-vectors using the provided CVC5 solver.
+ *
+ * This function attempts to find a solution for the given Boolean formula represented by `form`.
+ * It utilizes the specified CVC5 solver instance to perform the computation.
+ *
+ * @param form The Boolean formula to be solved, represented as a `tref`.
+ * @param solver Reference to a CVC5 solver instance used for solving the formula.
+ * @return An optional solution of type `solution<node>`. If a solution exists, it is returned;
+ *         otherwise, `std::nullopt` is returned.
+ */
+template <NodeType node>
+std::optional<solution<node>> solve_bv(tref form, cvc5::Solver& solver);
+
+/**
+ * @brief Solves a boolean algebra problem over bit-vectors.
+ *
+ * Given a term reference representing a formula, attempts to find a solution
+ * that satisfies the formula within the context of bit-vector boolean algebras.
+ *
+ * @param form The term reference representing the formula to solve.
+ * @return An optional solution containing a mapping from nodes to values if a solution exists,
+ *         or std::nullopt if no solution is found.
+ */
+template <NodeType node>
+std::optional<solution<node>> solve_bv(tref form);
+
+/**
+ * @brief Solves a Boolean algebra problem over bit-vectors.
+ *
+ * This function attempts to find a solution to the given Boolean formula
+ * represented by the parameter `form`, which is expressed in terms of bit-vectors.
+ *
+ * @param form The Boolean formula to solve, represented as a collection of term references.
+ * @return An optional solution containing a mapping of nodes if a solution exists;
+ *         std::nullopt otherwise.
+ */
+template <NodeType node>
+std::optional<solution<node>> solve_bv(const trefs& form);
+
+/** @brief Extract a BV constant from a parse-tree node @p parse_tree with type @p type_tree. */
+template<typename...BAs>
+requires BAsPack<BAs...>
+std::optional<bv> bv_constant_from_parse_tree(tref parse_tree, tref type_tree);
+
+/**
+ * @brief Parses a bit-vector constant from a string representation.
+ *
+ * This function attempts to parse the given string `src` as a bit-vector constant,
+ * interpreting it according to the specified `size` (number of bits) and `base` (numerical base).
+ * If parsing is successful, it returns an optional containing the parsed constant with its type;
+ * otherwise, it returns an empty optional.
+ *
+ * @tparam BAs... Variadic template parameters representing Boolean Algebra types.
+ * @param src The string representation of the bit-vector constant to parse.
+ * @param type_tree The type of the bit-vector.
+ * @param base The numerical base to use for parsing (e.g., 2 for binary, 10 for decimal, 16 for hexadecimal). Defaults to 10.
+ * @return std::optional<constant_with_type<BAs...>> The parsed bit-vector constant with type, or std::nullopt if parsing fails.
+ */
+template<typename...BAs>
+requires BAsPack<BAs...>
+std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::string& src,
+	tref type_tree);
+
+// -----------------------------------------------------------------------------
+// Basic Boolean algebra infrastructure
+
+/** @brief Normalise a BV term via cvc5's simplifier. */
+inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
+	cvc5::Solver solver(cvc5_term_manager);
+	config_cvc5_solver(solver);
+	// Use general simplification procedure
+	return solver.simplify(fm);
+}
+
+/** @brief Return `true` if @p fm is the all-zeros bitvector constant. */
+inline bool is_bv_syntactic_zero(const cvc5::Term& fm) {
+	// Check if represented bitvector is just bottom element in Boolean algebra
+	if (!fm.isBitVectorValue()) return false;
+	return fm.getBitVectorValue(2) ==
+		std::string(fm.getSort().getBitVectorSize(), '0');
+}
+
+/** @brief Return `true` if @p fm is the all-ones bitvector constant. */
+inline bool is_bv_syntactic_one(const cvc5::Term& fm) {
+	// Check if represented bitvector is just top element in Boolean algebra
+	if (!fm.isBitVectorValue()) return false;
+	return fm.getBitVectorValue(2) ==
+		std::string(fm.getSort().getBitVectorSize(), '1');
+}
+
+} // namespace idni::tau_lang
+
+// Bool comparisons.  Declared in namespace cvc5, not idni::tau_lang, so that
+// ADL finds them: `bv` is an alias for cvc5::Term, whose only associated
+// namespace is cvc5.  ba_descriptor_complete checks `x == b` from a definition
+// context (ba_descriptor.h) that predates this header, so an operator visible
+// only to unqualified lookup inside idni::tau_lang would not be found there.
+namespace cvc5 {
+
+/** @brief Return `true` if BV term @p lhs equals @p rhs (one/zero). */
+inline bool operator==(const Term& lhs, const bool& rhs);
+/** @brief Return `true` if @p lhs (bool) equals BV term @p rhs. */
+inline bool operator==(const bool& lhs, const Term& rhs);
+/** @brief Return `true` if BV term @p lhs is not equal to @p rhs. */
+inline bool operator!=(const Term& lhs, const bool& rhs);
+/** @brief Return `true` if @p lhs (bool) is not equal to BV term @p rhs. */
+inline bool operator!=(const bool& lhs, const Term& rhs);
+
+} // namespace cvc5
+
+namespace idni::tau_lang {
+
+// Bitvector specific symbol simplification
+/** @brief Simplify an `add` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_add(tref symbol);
+/** @brief Simplify a `sub` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_sub(tref symbol);
+/** @brief Simplify a `mul` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_mul(tref symbol);
+/** @brief Simplify a `div` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_div(tref symbol);
+/** @brief Simplify a `mod` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_mod(tref symbol);
+/** @brief Simplify a `shr` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_shr(tref symbol);
+/** @brief Simplify a `shl` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_shl(tref symbol);
+/** @brief Simplify a `nor` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_nor(tref symbol);
+/** @brief Simplify an `xnor` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_xnor(tref symbol);
+/** @brief Simplify a `nand` bitvector symbol node @p symbol. */
+template<NodeType node> tref term_nand(tref symbol);
+
+/** @brief Apply all BV symbol-level simplifications to @p symbol. */
+template<NodeType node> tref simplify_bv_symbol(tref symbol);
+
+/** @brief Apply all BV term-level simplifications to @p term. */
+template<NodeType node> tref simplify_bv_term(tref term);
+
+/** @brief Canonise an associative/commutative symbol node, excluding @p excluded nodes. */
+template <typename ...BAs> requires BAsPack<BAs...>
+tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded);
+
+/** @brief Return `true` if @p symbol is an associative and commutative BV operator. */
+template <typename ...BAs> requires BAsPack<BAs...>
+bool is_associative_and_commutative(size_t symbol);
+
+/** @brief Return the inverse symbol id (e.g. nand → and) for @p symbol. */
+template <typename ...BAs> requires BAsPack<BAs...>
+size_t get_inv_sym(size_t symbol);
+
+
+// -----------------------------------------------------------------------------
+
+} // namespace idni::tau_lang
+
+// This is the proper way to include heuristics as the header must be independent
+// of the heuristics themselves and also they could need definitions from the
+// header (as is the case in 'heuristicsbv_ba_simplification.h'. Also, they
+// need to be included before the definitions as they can be used in there.
+#include "heuristics/bv_ba_simplification.h"
+#include "boolean_algebras/bv/bv_ba.tmpl.h"
+#include "boolean_algebras/bv/bv_ba_solver.tmpl.h"
+#include "boolean_algebras/bv/bv_ba_helpers.tmpl.h"
+#include "boolean_algebras/bv/bv_descriptor.tmpl.h"
+
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__

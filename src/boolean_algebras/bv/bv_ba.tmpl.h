@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#include "boolean_algebras/bv_ba.h" // Only for IDE resolution, not really needed.
+#include "boolean_algebras/bv/bv_ba.h" // Only for IDE resolution, not really needed.
 #include "../parser/bitvector_parser.generated.h"
 
 #undef LOG_CHANNEL_NAME
@@ -79,10 +79,19 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 	return typename node<BAs...>::constant_with_type{ cte.value(), type_tree };
 }
 
+} // namespace idni::tau_lang
+
+// Definitions of the bool comparisons declared in namespace cvc5 by bv_ba.h;
+// the helpers they call stay in idni::tau_lang and so are qualified.
+namespace cvc5 {
+
 bool operator==(const Term& lhs, const bool& rhs) {
 	auto bv_size = lhs.getSort().getBitVectorSize();
-	return (rhs) ? normalize_bv(lhs) == make_bitvector_top_elem(bv_size)
-				: normalize_bv(lhs) == make_bitvector_bottom_elem(bv_size);
+	return (rhs)
+		? idni::tau_lang::normalize_bv(lhs)
+			== idni::tau_lang::make_bitvector_top_elem(bv_size)
+		: idni::tau_lang::normalize_bv(lhs)
+			== idni::tau_lang::make_bitvector_bottom_elem(bv_size);
 }
 
 bool operator==(const bool& lhs, const Term& rhs) { return rhs == lhs; }
@@ -90,6 +99,10 @@ bool operator==(const bool& lhs, const Term& rhs) { return rhs == lhs; }
 bool operator!=(const Term& lhs, const bool& rhs) { return !(lhs == rhs); }
 
 bool operator!=(const bool& lhs, const Term& rhs) { return !(rhs == lhs); }
+
+} // namespace cvc5
+
+namespace idni::tau_lang {
 
 template<NodeType node>
 tref simplify_bv_term(tref term) {

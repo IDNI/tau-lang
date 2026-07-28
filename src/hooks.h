@@ -180,7 +180,7 @@ namespace idni::tau_lang {
     enum class qlt_bound : uint8_t;
 }
 
-#include "boolean_algebras/bv_ba_hooks.tmpl.h"
+#include "boolean_algebras/bv/bv_ba_hooks.tmpl.h"
 #include "hooks.tmpl.h"
 
 #undef HOOK_LOGGING

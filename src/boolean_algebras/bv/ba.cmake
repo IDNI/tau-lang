@@ -1,4 +1,4 @@
 set(TAU_BA_ID bv)
 set(TAU_BA_TYPE bv)
-set(TAU_BA_HEADER boolean_algebras/bv_ba.h)
+set(TAU_BA_HEADER boolean_algebras/bv/bv_ba.h)
 set(TAU_BA_LINK_LIBS cvc5::cvc5)

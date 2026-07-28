@@ -14,7 +14,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-#include "boolean_algebras/bv_ba.h"
+#include "boolean_algebras/bv/bv_ba.h"
 #include "heuristics/bv_predicate_blasting.h"
 
 static constexpr long long TIME_LIMIT_MS  = 1'200'000; // 2 minutes per test
