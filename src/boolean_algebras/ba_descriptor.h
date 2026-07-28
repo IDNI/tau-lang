@@ -15,6 +15,8 @@
 
 #include <concepts>
 #include <cstdint>
+#include <functional>
+#include <ostream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -61,6 +63,15 @@ concept ba_descriptor_complete =
 	// node<BAs...> keeps constants in a std::variant<BAs...> that generic
 	// code compares directly, so every BA value type must compare equal.
 	std::equality_comparable<BA>
+	// the tree printer streams whichever alternative a constant holds
+ && requires(std::ostream& os, const BA& x) {
+        { os << x } -> std::same_as<std::ostream&>;                  }
+	// constants live in a hashed variant, so the value type must hash
+ && requires(const BA& x) {
+        { std::hash<BA>{}(x) } -> std::convertible_to<size_t>;       }
+	// core compares constants against plain truth values
+ && requires(const BA& x, bool b) {
+        { x == b } -> std::convertible_to<bool>;                     }
 	// identity and classification
  && requires { { ba_descriptor<BA, Node>::type_name }
                    -> std::convertible_to<const char*>;              }

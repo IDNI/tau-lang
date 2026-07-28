@@ -113,6 +113,10 @@ function(target_setup target)
 	if(TAU_PACK_INCLUDE_DIR)
 		target_include_directories(${target} PRIVATE ${TAU_PACK_INCLUDE_DIR})
 	endif()
+	# directories of out-of-tree BAs registered with tau_register_ba()
+	if(TAU_BA_INCLUDE_DIRS)
+		target_include_directories(${target} PRIVATE ${TAU_BA_INCLUDE_DIRS})
+	endif()
 	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
 		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 			target_compile_options(${target} PRIVATE

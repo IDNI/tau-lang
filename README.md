@@ -158,6 +158,27 @@ The same build also produces the `tau_codegen` executable, which compiles a
 realizable tau specification to a self-contained C++17 program header
 (see [Synthesize a C++ program from a spec](#synthesize-a-c-program-from-a-spec)).
 
+## **Selecting Boolean algebras (`-DTAU_BAS=`)**
+
+Each Boolean algebra (BA) is a plugin, and a build contains the set — the
+*pack* — chosen at configure time:
+
+```bash
+./dev preset release                              # the default pack
+./dev preset release -DTAU_BAS=tau,sbf,bv         # drop qlt, qint, nlang, hsb
+./dev preset release -DTAU_BAS=sbf,tau            # smallest useful pack
+```
+
+`tau` is the wrapper algebra that embeds a whole Tau spec as a value; the other
+ids are base algebras. A BA's dependencies are declared in its own manifest, so
+a pack without `bv` and `hsb` does not need CVC5, and one without `nlang` does
+not need libcurl. Referencing the type of an algebra the build does not contain
+is reported as an unknown type annotation, listing the ones it does contain.
+
+To add an algebra — in-tree or from outside the source tree — copy
+`src/boolean_algebras/_template/` and follow
+[docs/adding_base_bas.md](docs/adding_base_bas.md).
+
 
 # **Quick start**
 

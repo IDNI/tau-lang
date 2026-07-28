@@ -418,6 +418,11 @@ include(tau-common)
 # resolve the BA pack chosen with -DTAU_BAS= and generate tau_pack.h
 #
 include(tau_bas)
+# out-of-tree BAs: each file calls tau_register_ba() before the pack resolves
+foreach(_ext_ba ${TAU_EXTERNAL_BAS})
+	message(STATUS "Registering external BA from ${_ext_ba}")
+	include("${_ext_ba}")
+endforeach()
 tau_resolve_ba_pack()
 tau_generate_pack_header()
 message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
