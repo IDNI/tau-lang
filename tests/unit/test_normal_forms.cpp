@@ -759,6 +759,23 @@ TEST_SUITE("AntiPrenexBlock") {
 		CHECK( tau::get(res).to_str() == "z = 0" );
 	}
 
+	TEST_CASE("gamma1: unique zero substitutes the witness") {
+		// The pivot x ^ y = 0 has exactly one zero, x := y. The
+		// T-branch is therefore the body with x substituted away, and
+		// since x is the block's only active variable that branch comes
+		// out quantifier-free without any Schroeder step.
+		// (The classifier itself is covered by the BooleAtomAnalysis
+		// suite; this locks in the wiring. On this input the general
+		// gamma5 path reaches an equivalent result of the same size --
+		// gamma1's gain is skipping the Schroeder elimination on the
+		// T-branch, not a smaller answer.)
+		auto [res, used] = run_apb_norm(
+			"ex x ((x ^ y = 0 || z = 0) && xw != 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+		CHECK( tau::get(res).to_str() == "!yw = 0 || z = 0 && !w = 0" );
+	}
+
 	TEST_CASE("gamma3 folds the pivot to F instead of splitting") {
 		// (x|y')|(x'|y) = 0 holds for no x, so the disjunct dies and
 		// only xk = 0 can satisfy the left conjunct.

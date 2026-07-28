@@ -3648,7 +3648,43 @@ tref anti_prenex_block(tref formula, const trefs& block,
 								out_atm),
 							pr2)));
 			}
-			// TODO (HIGH): gamma1 (unique zero) -- next task.
+			// gamma1: f has a unique zero, so the T-branch has
+			// exactly one witness, pivot_var := f[x<-0].
+			// Substituting it removes the variable outright instead
+			// of leaving a quantifier for the BDD stage.
+			//
+			// TODO (MEDIUM): restricted to blocks whose only active
+			// variable is the pivot. Applying it inside a larger
+			// block needs `block`, `order` and `quant_pattern`
+			// rebuilt without pivot_var before recursing, otherwise
+			// the remaining variables are resolved against an order
+			// that still mentions the substituted one.
+			size_t active_vars = 0;
+			for (tref v : block) if (!skip(v)) ++active_vars;
+			if (an.kind == boole_atom_case::unique_zero
+				&& active_vars == 1)
+			{
+				const tref bf_pivot = tau::get(tau::bf,
+					tau::trim_right_sibling(pivot_var));
+				tref wl = rewriter::replace<node>(
+					formula, atm, tau::_T());
+				wl = rewriter::replace<node>(
+					wl, bf_pivot, an.cofactor_0);
+				wl = syntactic_path_simplification_unsat_on_unchanged_negations
+					<node>(wl);
+				tref wr = syntactic_path_simplification_unsat_on_unchanged_negations
+					<node>(rewriter::replace<node>(
+						formula, atm, tau::_F()));
+				used_atms.insert(atm);
+				tref rr = anti_prenex_block<node>(wr, block,
+					used_atms, quant_pattern, order, skip);
+				used_atms.erase(atm);
+				// The T-branch is quantifier-free by
+				// construction: pivot_var was substituted out
+				// and it was the block's only active variable.
+				return tau::build_wff_and(indep,
+					tau::build_wff_or(wl, rr));
+			}
 		}
 
 		// Remove/add available atomic formulas in stack-like fashion
