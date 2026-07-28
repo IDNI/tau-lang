@@ -8,7 +8,7 @@
 //   (P3) x & ~s ≠ bot       — the complement of s within x is non-empty
 
 #include "test_init.h"
-#include "boolean_algebras/hsb.h"
+#include "boolean_algebras/hsb/hsb.h"
 
 using idni::tau_lang::hsb;
 using idni::tau_lang::hsb_halfspace;

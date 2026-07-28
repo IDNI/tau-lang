@@ -8,7 +8,7 @@
 #include "test_init.h"
 #include "tau_pack.h"
 #include "test_tau_helpers.h"
-#include "boolean_algebras/hsb.h"
+#include "boolean_algebras/hsb/hsb.h"
 
 using idni::tau_lang::hsb;
 using idni::tau_lang::hsb_halfspace;

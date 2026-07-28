@@ -1,11 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_NODE_H__
-#define __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_NODE_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_NODE_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_NODE_H__
 
-#include "../../parser/hsb_parser.generated.h"
-#include "../../external/parser/src/utility/hashing.h"
-#include "../../external/parser/src/utility/tree.h"
+#include "../parser/hsb_parser.generated.h"
+#include "utility/hashing.h"
+#include "utility/tree.h"
 
 namespace idni::tau_lang {
 
@@ -59,4 +59,4 @@ struct std::hash<idni::tau_lang::hsb_node> {
 	}
 };
 
-#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_NODE_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_NODE_H__

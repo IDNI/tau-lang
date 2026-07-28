@@ -32,14 +32,14 @@ ba_constants<mini_node>::get(const std::string&, tref, const std::string);
 // default build rather than only by a reduced-pack configure.  A descriptor no
 // pack names is never instantiated, and compiles as text however broken it is.
 // Add each newly converted BA here and extend the expected types() below.
-using conv_node = node<tau_ba<sbf_ba, qint, qlt>, sbf_ba, qint, qlt>;
+using conv_node = node<tau_ba<sbf_ba, qint, qlt, hsb>, sbf_ba, qint, qlt, hsb>;
 using conv_dispatcher =
-	base_ba_dispatcher<tau_ba<sbf_ba, qint, qlt>, sbf_ba, qint, qlt>;
+	base_ba_dispatcher<tau_ba<sbf_ba, qint, qlt, hsb>, sbf_ba, qint, qlt, hsb>;
 
 static_assert(assert_pack_descriptors_complete<conv_node>(),
 	"a converted BA's descriptor is incomplete");
 
-template struct base_ba_dispatcher<tau_ba<sbf_ba, qint, qlt>, sbf_ba, qint, qlt>;
+template struct base_ba_dispatcher<tau_ba<sbf_ba, qint, qlt, hsb>, sbf_ba, qint, qlt, hsb>;
 template std::optional<typename conv_node::constant_with_type>
 ba_constants<conv_node>::get(const std::string&, tref, const std::string);
 
@@ -70,13 +70,13 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 
 	TEST_CASE("types() folds the descriptors in pack order") {
 		CHECK( conv_dispatcher::types()
-			== std::vector<std::string>{ "tau", "sbf", "qint", "qlt" } );
+			== std::vector<std::string>{ "tau", "sbf", "qint", "qlt", "hsb" } );
 	}
 
 	TEST_CASE("the base BAs' priorities leave the default type to tau") {
 		tref t = conv_dispatcher::default_type();
 		REQUIRE(t != nullptr);
-		CHECK( ba_descriptor<tau_ba<sbf_ba, qint, qlt>, conv_node>
+		CHECK( ba_descriptor<tau_ba<sbf_ba, qint, qlt, hsb>, conv_node>
 			::matches_type(t) );
 	}
 
@@ -89,6 +89,13 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 
 	TEST_CASE("one/zero route to the qlt descriptor's literals") {
 		tref t = qlt_type<conv_node>();
+		REQUIRE(t != nullptr);
+		CHECK( conv_dispatcher::one(t) == "top" );
+		CHECK( conv_dispatcher::zero(t) == "bot" );
+	}
+
+	TEST_CASE("one/zero route to the hsb descriptor's literals") {
+		tref t = hsb_type<conv_node>();
 		REQUIRE(t != nullptr);
 		CHECK( conv_dispatcher::one(t) == "top" );
 		CHECK( conv_dispatcher::zero(t) == "bot" );

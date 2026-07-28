@@ -1,9 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_SPLITTER_TMPL_H__
-#define __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_SPLITTER_TMPL_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_SPLITTER_TMPL_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_SPLITTER_TMPL_H__
 
-#include "boolean_algebras/hsb.h"
+#include "boolean_algebras/hsb/hsb.h"
 
 namespace idni::tau_lang {
 
@@ -320,4 +320,4 @@ inline hsb hsb_splitter_one() {
 
 } // namespace idni::tau_lang
 
-#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB_SPLITTER_TMPL_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_SPLITTER_TMPL_H__

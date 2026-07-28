@@ -12,7 +12,7 @@
 //                                absolute value of the highest-indexed coeff.
 
 #include "test_init.h"
-#include "boolean_algebras/hsb.h"
+#include "boolean_algebras/hsb/hsb.h"
 
 using idni::tau_lang::hsb;
 using idni::tau_lang::hsb_halfspace;

@@ -9,7 +9,7 @@
 #include "boolean_algebras/qint/qint.h"
 #include "boolean_algebras/qlt/qlt.h"
 #include "boolean_algebras/nlang_ba.h"
-#include "boolean_algebras/hsb.h"
+#include "boolean_algebras/hsb/hsb.h"
 #include "test_helpers.h"
 
 namespace idni::tau_lang {
