@@ -45,6 +45,15 @@ struct Bool {
 	Bool operator~() const;
 	/** @brief Three-way comparison (defaulted). */
 	auto operator<=>(const Bool& x) const = default;
+	/**
+	 * @brief Equality against another `Bool`.
+	 *
+	 * Declared explicitly because declaring `operator==(bool)` below
+	 * suppresses the one `<=>` would otherwise generate.
+	 */
+	bool operator==(const Bool& x) const = default;
+	/** @brief Compare against a plain truth value, as core does. */
+	bool operator==(bool x) const { return b == x; }
 
 	/** @brief Return `true` if this element is zero. */
 	bool is_zero() const;

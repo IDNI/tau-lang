@@ -1,13 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// The concrete BA packs' specializations are DECLARED in these headers and
-// defined once each in the matching .cpp (see those files for why).  Included
-// outside the namespace below because they open their own; an explicit
-// specialization must be declared in the namespace its template belongs to.
-#include "base_ba_dispatcher_bv_sbf.h"
-#include "base_ba_dispatcher_full_pack.h"
-#include "base_ba_dispatcher_bv_bool.h"
-
 #include <limits>
 #include <stdexcept>
 
@@ -30,9 +22,18 @@ inline std::optional<typename node<BAs...>::constant_with_type> parse_bool(
 	return {};
 }
 
-// Generic, descriptor-driven definitions.  A pack whose BAs all have a
-// ba_descriptor dispatches through these; the packs declared above keep their
-// explicit specializations, which win over anything here.
+} // namespace idni::tau_lang
+
+// Bool's descriptor lives here rather than beside bool_ba.h: its parse() names
+// parse_bool above, which must be visible in the descriptor's definition
+// context.  Bool is not a TAU_BAS plugin, but packs like node<bv, Bool> reach
+// the generic dispatcher and so need it described.
+#include "boolean_algebras/bool_descriptor.tmpl.h"
+
+namespace idni::tau_lang {
+
+// Generic, descriptor-driven definitions.  Every pack dispatches through these;
+// no hand-written per-pack specialization survives.
 
 namespace detail {
 
