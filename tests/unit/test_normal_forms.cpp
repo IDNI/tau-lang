@@ -616,6 +616,60 @@ TEST_SUITE("AntiPrenexBlock") {
 		CHECK( tau::get(res).select_all(is<node_t, tau::bf_eq>).size()
 			== 3 );
 	}
+
+	// Helper: like run_apb, but normalizes the matrix first, so negative
+	// atoms reach the core as !(f = 0) rather than bf_neq -- the form the
+	// production pipeline always produces (resolve_ex_block calls
+	// normalize_atomic_formula_operators before the core).
+	static std::pair<tref, size_t> run_apb_norm(const char* sample) {
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		auto [body, block, order] = peel_block(fm);
+		subtree_unordered_set<node_t> used_atms;
+		subtree_unordered_map<node_t, int_t> quant_pattern;
+		for (size_t i = 0; i < block.size(); ++i)
+			quant_pattern.emplace(block[i], i + 1);
+		tref res = anti_prenex_block<node_t>(body, block,
+			used_atms, quant_pattern, order,
+			is_tref_bv_type_family<node_t>);
+		return {res, used_atms.size()};
+	}
+
+	TEST_CASE("paper 2a: all-negated formula distributes over every connective") {
+		// Every atom negated -> Corollary 5.1 with J1 empty: the block
+		// distributes over the disjunction (and would over a
+		// conjunction) in one step, each atom becoming ex x (g != 0),
+		// which resolve_quantifiers2 turns into the functional form.
+		// Without 2a each disjunct is a lone negated atom that the
+		// has_active_var fallback simply re-wraps, so a quantifier
+		// survives.
+		auto [res, used] = run_apb_norm("ex x (xy != 0 || xw != 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+		CHECK( matches_to_str_to_any_of(res, {
+			"!y = 0 || !w = 0",
+			"!w = 0 || !y = 0",
+		}) );
+	}
+
+	TEST_CASE("paper 2a: distributes over a conjunction too") {
+		// The half no other path reaches: ex X (A && B) == ex X A && ex X B
+		// for negated atoms. Without 2a this is a pure clause and goes
+		// through push_ex_block_into_clause, which reaches the same
+		// answer; the point here is that 2a gets it in one step and
+		// without consuming any decomposition atom.
+		auto [res, used] = run_apb_norm("ex x (xy != 0 && xw != 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	TEST_CASE("paper 2a: does not fire on a mixed-sign formula") {
+		// One positive atom present -> 2a must not fire; the existing
+		// pipeline handles it and still eliminates x.
+		auto [res, used] = run_apb_norm("ex x (xy = 0 && xw != 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
 }
 
 TEST_SUITE("AntiPrenexBlock0Arg") {

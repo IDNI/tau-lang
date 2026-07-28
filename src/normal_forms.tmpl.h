@@ -3405,6 +3405,21 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	// Goal: push the quantifier block as far into clause as possible.
 	if (!has_block_var(formula)) return formula;
 
+	// Chapter 5 step 2a: every atom negated -> distribute the block over
+	// all connectives at once and let resolve_quantifiers2 turn each
+	// `ex X g != 0` into the functional `ex_X g != 0`. Corollary 5.1 with
+	// J1 empty. Tested before the wff_or/wff_and cases below because it is
+	// a whole-formula property that settles the entire subtree in one
+	// step, which is exactly the ordering the paper prescribes (a, b, c,
+	// then d). Guarded on skip content: a skip-matched atom must reach
+	// blast_block / the solver, not be given its own binder here.
+	const block_atom_profile<node> prof =
+		profile_block_atoms<node>(formula, skip);
+	if (prof.all_negated() && has_active_var(formula))
+		return resolve_quantifiers2<node>(
+			distribute_block_over_atoms<node>(formula, block),
+			order, skip);
+
 	const tau& ft = tau::get(formula);
 	// Case disjunction
 	if (ft.child_is(tau::wff_or)) {
@@ -3445,7 +3460,6 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				resolve_quantifiers2<node>(
 				push_ex_block_into_clause<node>(formula, block, order), order, skip));
 		}
-		// TODO: only != present
 		// Using the available atomic formulas, do Boole decomposition on best fit
 		auto is_atomic = [&used_atms, &skip](tref n) {
 			if (!tau::get(n).is(tau::wff)) return false;

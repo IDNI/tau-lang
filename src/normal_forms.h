@@ -410,6 +410,7 @@ tref pnf(tref n);
 // header (as is the case in 'heuristicsbv_ba_simplification.h'. Also, they
 // need to be included before the definitions as they can be used in there.
 #include "heuristics/block_atom_profile.h"
+#include "heuristics/block_squeeze.h"
 #include "heuristics/ex_subs_based_elimination.h"
 #include "heuristics/syntactic_path_simplification.h"
 #include "heuristics/trivial_skolem.h"
