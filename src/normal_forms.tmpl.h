@@ -3836,6 +3836,23 @@ quantifier_block<node> collect_quantifier_block(tref n,
 		const bool curr_is_ex = is_child<node>(curr, tau::wff_ex);
 		tref var = tau::trim2(curr);
 		if (skip(var)) {
+			// Transparent only while it genuinely commutes with the
+			// block. Same-kind quantifiers do; opposite-kind ones do
+			// not -- `ex a all x phi` is not `all x ex a phi`, and
+			// wrap_skipped re-emits everything in `skipped`
+			// outermost, so absorbing an opposite-kind quantifier
+			// here would hoist it out past the block. Disjoint BA
+			// types do not rescue it: with `a` atomless and `x` a
+			// bitvector, phi = (a = 0 <-> x = 0) makes
+			// `all x ex a phi` true and `ex a all x phi` false.
+			//
+			// A skipped quantifier seen *before* any active one is
+			// always safe: it stays outermost either way.
+			//
+			// Breaking is self-healing: blk.body then starts with
+			// that quantifier and select_innermost_blocks picks it
+			// up as an inner block on a later round.
+			if (kind_fixed && curr_is_ex != blk.is_ex) break;
 			blk.skipped.emplace_back(var, curr_is_ex);
 			// Provisional only: a run of nothing but skip-matched
 			// quantifiers has no active kind of its own, and
@@ -3848,9 +3865,19 @@ quantifier_block<node> collect_quantifier_block(tref n,
 			// kind cannot split the run that follows it.
 			if (!kind_fixed) blk.is_ex = curr_is_ex, kind_fixed = true;
 			else if (curr_is_ex != blk.is_ex) break;
-			const size_t vt = tau::get(var).get_ba_type();
-			if (ba_type_set && vt != ba_type) break;
-			ba_type = vt, ba_type_set = true;
+			// get_ba_type() == 0 means *untyped*, not "a distinct
+			// type": push_ex_block_into_clause's own homogeneity
+			// check ignores type-0 nodes for exactly that reason.
+			// Treating 0 as a type of its own would split a run
+			// whenever one variable happens to be untyped,
+			// degrading block elimination back into the
+			// single-quantifier elimination it exists to avoid.
+			if (const size_t vt = tau::get(var).get_ba_type();
+				vt > 0)
+			{
+				if (ba_type_set && vt != ba_type) break;
+				ba_type = vt, ba_type_set = true;
+			}
 			blk.vars.push_back(var);
 		}
 		curr = tau::get(curr)[0].second();
@@ -4245,8 +4272,16 @@ tref push_ex_block_into_clause(tref clause, const trefs& block,
 	if (block.empty()) return clause;
 
 	// All types in the block and in the clause are the same, otherwise
-	// the quantifiers have not been pushed in correctly
-	size_t clause_type = tau::get(block.front()).get_ba_type();
+	// the quantifiers have not been pushed in correctly.
+	// The first *typed* block variable: collect_quantifier_block lets
+	// untyped (get_ba_type() == 0) variables join a typed run, so
+	// block.front() is not guaranteed to carry the run's type.
+	size_t clause_type = 0;
+	for (tref v : block)
+		if (const size_t t = tau::get(v).get_ba_type(); t > 0) {
+			clause_type = t;
+			break;
+		}
 #ifdef DEBUG
 	auto type_check = [&](tref n) {
 		if (size_t t = tau::get(n).get_ba_type(); t > 0) {
