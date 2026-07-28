@@ -10,7 +10,7 @@
 #include <sstream>
 
 #include "test_init.h"
-#include "boolean_algebras/qint.h"
+#include "boolean_algebras/qint/qint.h"
 
 using idni::tau_lang::qint;
 using idni::tau_lang::qint_splitter;

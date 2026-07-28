@@ -16,7 +16,7 @@
 #include "boolean_algebras/sbf/sbf_ba.h"
 #include "boolean_algebras/tau/tau_ba.h"
 #include "boolean_algebras/bv_ba.h"
-#include "boolean_algebras/qint.h"
+#include "boolean_algebras/qint/qint.h"
 #include "boolean_algebras/qlt.h"
 #include "boolean_algebras/nlang_ba.h"
 #include "boolean_algebras/hsb.h"

@@ -1,9 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT_TMPL_H__
-#define __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT_TMPL_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT__QINT_TMPL_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT__QINT_TMPL_H__
 
-#include "boolean_algebras/qint.h" // Only for IDE resolution, not really needed.
+#include "boolean_algebras/qint/qint.h" // Only for IDE resolution, not really needed.
 
 namespace idni::tau_lang {
 
@@ -46,4 +46,4 @@ std::optional<typename node<BAs...>::constant_with_type> parse_qint(
 
 } // namespace idni::tau_lang
 
-#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT_TMPL_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT__QINT_TMPL_H__
