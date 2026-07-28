@@ -720,6 +720,44 @@ TEST_SUITE("AntiPrenexBlock") {
 			"ex x ((xy = 0 || xw = 0) && xz != 0).");
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 	}
+
+	TEST_CASE("paper 2e: a block-variable-free atom is never the pivot") {
+		// v = 0 mentions no block variable, so splitting on it makes no
+		// progress toward eliminating x. With the 2e filter the
+		// decomposition must pick an atom that actually contains x.
+		auto [res, used] = run_apb_norm(
+			"ex x ((xy = 0 || v = 0) && xk != 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	TEST_CASE("paper 2e: an equation is preferred over an order atom") {
+		// Both x < z and xy = 0 contain the block variable and rank
+		// equally under atm_formula_order_for_quant_elim, which orders
+		// by variable priority only. But only a bf_eq can ever let
+		// push_ex_block_into_clause remove the block: splitting on the
+		// bf_lt sends both branches to the unrecognized-conjunct path,
+		// which re-wraps, so the work is wasted and the result carries
+		// the debris.
+		//
+		// Measured: 7 bf_eq atoms when the order atom is picked,
+		// 4 when the equation is.
+		auto [res, used] = run_apb_norm(
+			"ex x ((x < z || xy = 0) && xk != 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).select_all(is<node_t, tau::bf_eq>).size()
+			== 4 );
+	}
+
+	TEST_CASE("paper 2e: a negated atom is never the pivot") {
+		// The pivot must come from a non-negated position. Only xw = 0
+		// qualifies; the equation inside !(xy = 0) must not be reached
+		// by the candidate scan.
+		auto [res, used] = run_apb_norm(
+			"ex x ((xw = 0 || v = 0) && xy != 0).");
+		CHECK( used == 0 );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
 }
 
 TEST_SUITE("AntiPrenexBlock0Arg") {

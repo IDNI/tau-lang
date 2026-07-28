@@ -3525,9 +3525,41 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				default: return false;
 			}
 		};
-		// Collect current atms
-		const trefs atms = rewriter::select_top_until<node>(formula,
-			is_atomic, is_quantifier<node>);
+		// Collect current atms, applying chapter 5 step 2e's two
+		// constraints on the pivot: it must be a *non-negated* atomic
+		// formula, and the quantified variable must occur explicitly in
+		// it.
+		//
+		// "Non-negated" is enforced by refusing to descend into
+		// negations at all: select_top_until's `until` predicate
+		// suppresses both selection of a node and descent below it, so
+		// the equation inside a `!(f = 0)` is never reachable.
+		//
+		// "x occurs in f" is enforced by dropping candidates with no
+		// active block variable. The ranking already sorts those last,
+		// but it would still pick one when nothing better exists, and
+		// such a split cannot make progress toward eliminating the
+		// block.
+		//
+		// Equations are preferred over order atoms: only a bf_eq can
+		// ever let push_ex_block_into_clause remove the block (a bf_lt
+		// hits its unrecognized-conjunct path and forces a re-wrap), so
+		// splitting on an order atom doubles the formula without ever
+		// paying for itself. Order atoms remain available as a last
+		// resort rather than being dropped outright.
+		auto stop_at = [](tref n) {
+			return is_quantifier<node>(n)
+				|| is<node, tau::wff_neg>(n);
+		};
+		const trefs candidates = rewriter::select_top_until<node>(
+			formula, is_atomic, stop_at);
+		trefs eq_atms, ord_atms;
+		for (tref a : candidates) {
+			if (!has_active_var(a)) continue;
+			if (tau::get(a)[0].is(tau::bf_eq)) eq_atms.push_back(a);
+			else ord_atms.push_back(a);
+		}
+		const trefs& atms = eq_atms.empty() ? ord_atms : eq_atms;
 		// No decomposable atomic formula available (e.g. only !=
 		// equations, quantified subformulas, or exclusively skip-matched
 		// atoms remain): try blasting if the block needs it, else keep
