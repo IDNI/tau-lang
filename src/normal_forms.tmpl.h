@@ -3891,8 +3891,11 @@ tref process_quantifier_blocks(tref fm, std::function<bool(tref)> skip) {
 			done.insert(res);
 			if (res != blk.head) changes.emplace(blk.head, res);
 		}
-		// Every innermost block converged: nothing left to lift upward.
-		if (changes.empty()) return fm;
+		// Every innermost block converged, so the tree is unchanged --
+		// but the blocks *enclosing* them have not been processed yet.
+		// Retiring this round's heads is what promotes those to
+		// innermost, so keep going instead of returning.
+		if (changes.empty()) continue;
 		fm = rewriter::replace_if<node>(fm, changes,
 			while_is_formula<node>);
 	}
