@@ -18,7 +18,7 @@
 #include <string>
 #include <vector>
 
-#include "boolean_algebras/qlt.h"
+#include "boolean_algebras/qlt/qlt.h"
 #include "ba_types.h"
 #include "omcat_types.h"
 #include "tau_tree.h"

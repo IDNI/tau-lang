@@ -8,7 +8,7 @@
 // and test_qlt_oracle.cpp.
 
 #include "test_init.h"
-#include "boolean_algebras/qlt.h"
+#include "boolean_algebras/qlt/qlt.h"
 
 using namespace idni::tau_lang;
 

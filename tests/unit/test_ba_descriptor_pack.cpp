@@ -28,17 +28,20 @@ template struct base_ba_dispatcher<tau_ba<sbf_ba>, sbf_ba>;
 template std::optional<typename mini_node::constant_with_type>
 ba_constants<mini_node>::get(const std::string&, tref, const std::string);
 
-// Each converted BA joins a pack here, so its descriptor is type-checked by
-// the default build rather than only by a reduced-pack configure.
-using qint_node = node<tau_ba<sbf_ba, qint>, sbf_ba, qint>;
-using qint_dispatcher = base_ba_dispatcher<tau_ba<sbf_ba, qint>, sbf_ba, qint>;
+// Every converted BA joins this pack, so its descriptor is type-checked by the
+// default build rather than only by a reduced-pack configure.  A descriptor no
+// pack names is never instantiated, and compiles as text however broken it is.
+// Add each newly converted BA here and extend the expected types() below.
+using conv_node = node<tau_ba<sbf_ba, qint, qlt>, sbf_ba, qint, qlt>;
+using conv_dispatcher =
+	base_ba_dispatcher<tau_ba<sbf_ba, qint, qlt>, sbf_ba, qint, qlt>;
 
-static_assert(assert_pack_descriptors_complete<qint_node>(),
-	"qint descriptor incomplete");
+static_assert(assert_pack_descriptors_complete<conv_node>(),
+	"a converted BA's descriptor is incomplete");
 
-template struct base_ba_dispatcher<tau_ba<sbf_ba, qint>, sbf_ba, qint>;
-template std::optional<typename qint_node::constant_with_type>
-ba_constants<qint_node>::get(const std::string&, tref, const std::string);
+template struct base_ba_dispatcher<tau_ba<sbf_ba, qint, qlt>, sbf_ba, qint, qlt>;
+template std::optional<typename conv_node::constant_with_type>
+ba_constants<conv_node>::get(const std::string&, tref, const std::string);
 
 } // namespace idni::tau_lang
 
@@ -63,24 +66,38 @@ TEST_SUITE("generic dispatcher over a descriptor-complete pack") {
 	}
 }
 
-TEST_SUITE("generic dispatcher over a pack containing qint") {
+TEST_SUITE("generic dispatcher over the converted-BA pack") {
 
 	TEST_CASE("types() folds the descriptors in pack order") {
-		CHECK( qint_dispatcher::types()
-			== std::vector<std::string>{ "tau", "sbf", "qint" } );
+		CHECK( conv_dispatcher::types()
+			== std::vector<std::string>{ "tau", "sbf", "qint", "qlt" } );
 	}
 
-	TEST_CASE("qint's priority leaves the default type to tau") {
-		tref t = qint_dispatcher::default_type();
+	TEST_CASE("the base BAs' priorities leave the default type to tau") {
+		tref t = conv_dispatcher::default_type();
 		REQUIRE(t != nullptr);
-		CHECK( ba_descriptor<tau_ba<sbf_ba, qint>, qint_node>
+		CHECK( ba_descriptor<tau_ba<sbf_ba, qint, qlt>, conv_node>
 			::matches_type(t) );
 	}
 
 	TEST_CASE("one/zero route to the qint descriptor's literals") {
-		tref t = qint_type<qint_node>();
+		tref t = qint_type<conv_node>();
 		REQUIRE(t != nullptr);
-		CHECK( qint_dispatcher::one(t) == "top" );
-		CHECK( qint_dispatcher::zero(t) == "bot" );
+		CHECK( conv_dispatcher::one(t) == "top" );
+		CHECK( conv_dispatcher::zero(t) == "bot" );
+	}
+
+	TEST_CASE("one/zero route to the qlt descriptor's literals") {
+		tref t = qlt_type<conv_node>();
+		REQUIRE(t != nullptr);
+		CHECK( conv_dispatcher::one(t) == "top" );
+		CHECK( conv_dispatcher::zero(t) == "bot" );
+	}
+
+	TEST_CASE("qlt is classified as a non-aba omcat, unlike qint") {
+		CHECK_FALSE( ba_descriptor<qlt, conv_node>::atomless );
+		CHECK( ba_descriptor<qlt, conv_node>::non_aba_omcat );
+		CHECK( ba_descriptor<qint, conv_node>::atomless );
+		CHECK_FALSE( ba_descriptor<qint, conv_node>::non_aba_omcat );
 	}
 }

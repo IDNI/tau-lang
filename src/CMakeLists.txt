@@ -63,7 +63,7 @@ set(TAU_SOURCES
 	boolean_algebras/bdds/var_dict.cpp
 	boolean_algebras/nlang_ba.cpp
 	boolean_algebras/qint/qint.cpp
-	boolean_algebras/qlt.cpp
+	boolean_algebras/qlt/qlt.cpp
 	instantiate_test_pack.cpp
 	base_ba_dispatcher_bv_sbf.cpp
 	base_ba_dispatcher_full_pack.cpp
