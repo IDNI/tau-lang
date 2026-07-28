@@ -20,6 +20,7 @@
 #include <concepts>
 #include <string>
 #include <initializer_list>
+#include <tuple>
 #include <type_traits>
 
 
@@ -115,6 +116,7 @@ struct node {
 	using node_t = node<BAs...>;
 	using type = tau_parser::nonterminal;   ///< Nonterminal enum type.
 	using constant = std::variant<BAs...>;  ///< BA constant variant type.
+	using bas_tuple = std::tuple<BAs...>;   ///< BA pack, for descriptor folds.
 	using constant_with_type = std::pair<constant, tref>;
 	using ba = tau_lang::base_ba_dispatcher<BAs...>; ///< BA dispatcher alias.
 
