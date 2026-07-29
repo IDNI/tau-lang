@@ -124,6 +124,29 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	/** @brief Decide satisfiability of @p form with bv's own solver. */
 	static bool is_sat(tref form) { return is_bv_formula_sat<node_t>(form); }
 
+	/**
+	 * @brief `true` when bv can solve @p form at all.
+	 *
+	 * Every variable must carry an explicit bitwidth; mixed-type formulas
+	 * cannot be translated to cvc5.
+	 */
+	static bool can_solve(tref form) {
+		return is_bv_solvable_formula<node_t>(form);
+	}
+
+	/**
+	 * @brief Definite satisfiability of @p form, or nullopt when undecided.
+	 *
+	 * cvc5 answering unknown, and translation failing, both mean "no definite
+	 * answer" -- never "unsatisfiable".
+	 */
+	static std::optional<bool> sat_status(tref form) {
+		auto status = bv_formula_sat_status<node_t>(form);
+		if (status == bv_sat_status::sat) return true;
+		if (status == bv_sat_status::unsat) return false;
+		return std::nullopt;
+	}
+
 	/** @brief Predicate-blast @p n; returns it unchanged when blasting is off. */
 	static tref preprocess(tref n) {
 		return bv_blasting ? bv_predicate_blasting<node_t>(n) : n;

@@ -557,21 +557,21 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 
 	// Check if quantified variable is bitvector
 	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
+	if (pack_type_has_arith_ops<node>(tau::get(var).get_ba_type())) {
 		bool closed_and_solvable = false;
 		if (const trefs& free_vars = get_free_vars<node>(scoped_fm);
 			(free_vars.empty() || (free_vars.size() == 1 &&
 			tau::get(free_vars[0]) == tau::get(var)))
-			&& is_bv_solvable_formula<node>(scoped_fm))
+			&& pack_can_solve<node>(scoped_fm))
 				closed_and_solvable = true;
 		if (closed_and_solvable) {
 			// By assumption quantifier is pushed in all the way
 			// Closed bv formula, simplify to T/F -- but only on a
 			// definite answer: cvc5 returning unknown, or translation
 			// failing, means we cannot decide, not that it is false.
-			auto status = bv_formula_sat_status<node>(tau::build_wff_ex(var, scoped_fm, false));
-			if (status == bv_sat_status::sat) return new_fm;
-			if (status == bv_sat_status::unsat) return tau::_F();
+			if (auto sat = pack_sat_status<node>(
+					tau::build_wff_ex(var, scoped_fm, false)))
+				return *sat ? new_fm : tau::_F();
 		}
 		// Non-closed BV quantifier, or closed-but-undecided: try
 		// predicate blasting to convert the BV existential to Boolean bit
@@ -1043,13 +1043,12 @@ tref resolve_quantifiers(tref formula) {
 				// formula, so the check would not succeed later.
 				if constexpr (pack_has_arithmetic_theory_v<node>) {
 				if (get_free_vars<node>(n).empty()
-					&& is_bv_solvable_formula<node>(n)) {
+					&& pack_can_solve<node>(n)) {
 					// Only commit to T/F on a definite answer: cvc5
 					// returning unknown, or translation failing, means
 					// we cannot decide, not that the formula is false.
-					auto status = bv_formula_sat_status<node>(n);
-					if (status == bv_sat_status::sat) return tau::_T();
-					if (status == bv_sat_status::unsat) return tau::_F();
+					if (auto sat = pack_sat_status<node>(n))
+						return *sat ? tau::_T() : tau::_F();
 				}
 				if (auto blasted = pack_preprocess<node>(n);
 					blasted && blasted != n)
@@ -1623,14 +1622,13 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 			if (skip(tau::trim2(n))) {
 				if constexpr (pack_has_arithmetic_theory_v<node>) {
 				if (const trefs& free_vars = get_free_vars<node>(n);
-					free_vars.empty() && is_bv_solvable_formula<node>(n)) {
+					free_vars.empty() && pack_can_solve<node>(n)) {
 					// Closed bv formula with explicit bitwidth: simplify to
 					// T/F, but only on a definite answer -- cvc5 returning
 					// unknown, or translation failing, means we cannot
 					// decide, not that the formula is false.
-					auto status = bv_formula_sat_status<node>(n);
-					if (status == bv_sat_status::sat) return tau::_T();
-					if (status == bv_sat_status::unsat) return tau::_F();
+					if (auto sat = pack_sat_status<node>(n))
+						return *sat ? tau::_T() : tau::_F();
 					excluded.insert(n);
 				} else excluded.insert(n);
 				} else excluded.insert(n);

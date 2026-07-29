@@ -65,14 +65,13 @@ tref eliminate_bv_and_quantifiers(tref form) {
 		form = anti_prenex_block<node>(form, arith_skip);
 		form = resolve_quantifiers<node>(form);
 		if (get_free_vars<node>(form).empty()
-			&& is_bv_solvable_formula<node>(form))
+			&& pack_can_solve<node>(form))
 		{
 			// Only commit to T/F on a definite answer: cvc5
 			// returning unknown, or translation failing, means
 			// we cannot decide, not that the formula is false.
-			auto status = bv_formula_sat_status<node>(form);
-			if (status == bv_sat_status::sat) return tau::_T();
-			if (status == bv_sat_status::unsat) return tau::_F();
+			if (auto sat = pack_sat_status<node>(form))
+				return *sat ? tau::_T() : tau::_F();
 		}
 	}
 	return form;

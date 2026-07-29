@@ -116,6 +116,52 @@ bool pack_is_sat(Form form) {
 		std::tuple_size_v<typename Node::bas_tuple>>{});
 }
 
+/** @brief `true` when @p BA's descriptor reports what it can solve. */
+template <typename Node, typename BA, typename Form>
+concept ba_can_solve_c = requires(Form f) {
+	ba_descriptor<BA, Node>::can_solve(f);
+};
+
+/** @brief `true` when @p BA's descriptor reports a definite sat status. */
+template <typename Node, typename BA, typename Form>
+concept ba_reports_sat_status = requires(Form f) { ba_descriptor<BA, Node>::sat_status(f); };
+
+/** @brief `true` when some BA in the pack can solve @p form at all. */
+template <typename Node, typename Form>
+bool pack_can_solve(Form form) {
+	bool out = false;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_can_solve_c<Node, BA, Form>)
+				if (!out) out = ba_descriptor<BA, Node>::can_solve(form);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
+/**
+ * @brief Definite satisfiability of @p form, or nullopt when undecided.
+ *
+ * Deliberately distinct from @ref pack_is_sat: a BA that cannot translate the
+ * formula, or whose solver gives up, must report "cannot decide" rather than
+ * "not satisfiable", so callers never turn an unknown into a false.
+ */
+template <typename Node, typename Form>
+std::optional<bool> pack_sat_status(Form form) {
+	std::optional<bool> out;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_reports_sat_status<Node, BA, Form>)
+				if (!out) out = ba_descriptor<BA, Node>::sat_status(form);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
 /** @brief `true` when @p BA's descriptor preprocesses formulas itself. */
 template <typename Node, typename BA, typename Form>
 concept ba_preprocesses = requires(Form f) {
