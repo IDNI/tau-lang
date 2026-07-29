@@ -17,6 +17,7 @@
 #include <numeric>
 
 #include "normal_forms_transformations.h"
+#include "antiprenexing/antiprenexing.h"
 
 namespace idni::tau_lang {
 
@@ -416,5 +417,6 @@ tref pnf(tref n);
 #include "heuristics/syntactic_path_simplification.h"
 #include "heuristics/trivial_skolem.h"
 #include "normal_forms.tmpl.h"
+#include "antiprenexing/antiprenexing.tmpl.h"
 
 #endif // __IDNI__TAU__NORMAL_FORMS_H__
