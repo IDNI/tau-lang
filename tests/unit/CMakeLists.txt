@@ -24,6 +24,7 @@ set(TESTS
 	nso_ba
 	nso_rr
 	product_ba
+	ref_variables_resolver
 	sbf_ba_parsing
 	sbf_ba_splitter
 	tau_ba
