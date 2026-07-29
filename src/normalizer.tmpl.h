@@ -3,6 +3,7 @@
 #include "normalizer.h"
 #include "normal_forms.h"
 #include "normalizer_uf_arithmetic.h"
+#include "ref_variables_resolver.h"
 #include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
@@ -58,10 +59,35 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	using tau = tree<node>;
 
 	form = resolve_quantifiers<node>(form);
-	form = anti_prenex_block<node>(form);
+	// Mark variables used as an argument of an unresolved predicate
+	// reference (`wff_ref`), or entangled with one through a shared atom,
+	// so they are not Boole-decomposed.
+	//
+	// NOTE: this is currently a no-op in every case measured. The block
+	// machinery already refuses to eliminate across an unresolved
+	// reference at *conjunct* granularity -- push_ex_block_into_clause's
+	// is_quant_removable_in_clause and treat_ex_quantified_clause's
+	// blocks_elimination both test individual conjuncts, independent
+	// conjuncts are split out before either applies, and
+	// ex_subs_based_elimination still substitutes a unique witness. So
+	// `ex y ex z (q(y) && z = 0)` already eliminates z and keeps y
+	// without this skip, and all five probe formulas normalize
+	// identically with and without it. It is retained as a guard for
+	// shapes the conjunct-level checks might miss; if it never earns its
+	// keep, drop it and the two traversals it costs per pass.
+	//
+	// Recomputed before each pass: the set is keyed on tref nodes of the
+	// tree being scanned, and `form` is rebuilt in between.
+	auto ref_skip = make_ref_variables_skip<node>(form);
+	form = anti_prenex_block<node>(form, [ref_skip](tref n) {
+		return is_tref_bv_type_family<node>(n) || ref_skip(n);
+	});
 	form = resolve_quantifiers<node>(form);
 	auto arith_skip = make_bv_arithmetic_skip_uf<node>(form);
-	form = anti_prenex_block<node>(form, arith_skip);
+	auto ref_skip_2 = make_ref_variables_skip<node>(form);
+	form = anti_prenex_block<node>(form, [arith_skip, ref_skip_2](tref n) {
+		return arith_skip(n) || ref_skip_2(n);
+	});
 	form = resolve_quantifiers<node>(form);
 	if (get_free_vars<node>(form).empty() && is_bv_solvable_formula<node>(form)) {
 		// Only commit to T/F on a definite answer: cvc5
