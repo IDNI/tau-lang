@@ -17,6 +17,8 @@
 #include <numeric>
 
 #include "normal_forms_transformations.h"
+// Anti-prenexing declarations must precede normal_forms.tmpl.h, since the
+// latter's definitions use them.
 #include "antiprenexing/antiprenexing.h"
 
 namespace idni::tau_lang {
@@ -391,6 +393,12 @@ tref pnf(tref n);
 #include "heuristics/syntactic_path_simplification.h"
 #include "heuristics/trivial_skolem.h"
 #include "normal_forms.tmpl.h"
+// Must stay after normal_forms.tmpl.h, deliberately breaking the usual
+// .h-includes-its-own-.tmpl.h idiom: the anti-prenexing definitions call
+// back into normal_forms.tmpl.h's internal helpers (to_nnf,
+// normalize_atomic_formula_operators, term_boole_decomposition,
+// squeeze_absorb, atm_formula_order_for_quant_elim), four of which have no
+// header declarations at all. Moving this line earlier breaks the build.
 #include "antiprenexing/antiprenexing.tmpl.h"
 
 #endif // __IDNI__TAU__NORMAL_FORMS_H__

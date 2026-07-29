@@ -7,10 +7,18 @@
  * This file declares the anti-prenex conversion API. Template implementations
  * live in antiprenexing.tmpl.h, which -- unlike the usual convention in this
  * codebase -- is NOT included at the bottom of this header. The definitions
- * call back into normal_forms.tmpl.h helpers, one of which
- * (atm_formula_order_for_quant_elim) has a deduced return type and so cannot
- * be forward-declared. antiprenexing.tmpl.h is therefore included by
- * normal_forms.h *after* normal_forms.tmpl.h.
+ * call back into normal_forms.tmpl.h helpers (normalize_atomic_formula_operators,
+ * term_boole_decomposition, squeeze_absorb, atm_formula_order_for_quant_elim)
+ * that are internal to normal_forms.tmpl.h and have no header declarations of
+ * their own. So src/antiprenexing/ is not a standalone module here -- it is a
+ * continuation of normal_forms.tmpl.h's internal scope, and antiprenexing.tmpl.h
+ * is included by normal_forms.h *after* normal_forms.tmpl.h so those helpers
+ * are already in scope, instead of inventing header declarations for them.
+ *
+ * Note: as a side effect of this move, these definitions now log under the
+ * "anti_prenex" channel rather than their former "normal_forms" (slab C) and
+ * "assign_and_reduce" (slab A) channels; all three are currently commented out
+ * in LOG_ENABLED_CHANNELS (src/logging.h).
  */
 
 #ifndef __IDNI__TAU__ANTIPRENEXING_H__

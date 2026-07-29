@@ -137,12 +137,6 @@ tref simplify_using_equality(tref fm);
 template <NodeType node>
 tref syntactic_path_simplification(tref fm);
 
-template <NodeType node>
-tref ex_subs_based_elimination(tref var, tref ex_clause);
-
-template <NodeType node>
-tref ex_subs_based_elimination(tref fm);
-
 #include "normal_forms_transformations.tmpl.h"
 
 } // namespace idni::tau_lang
