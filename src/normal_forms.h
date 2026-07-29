@@ -17,6 +17,9 @@
 #include <numeric>
 
 #include "normal_forms_transformations.h"
+// Anti-prenexing declarations must precede normal_forms.tmpl.h, since the
+// latter's definitions use them.
+#include "antiprenexing/antiprenexing.h"
 
 namespace idni::tau_lang {
 
@@ -345,32 +348,6 @@ template <NodeType node>
 tref term_boole_normal_form(tref formula);
 
 /**
- * @brief Apply the anti-prenex transformation to a formula.
- *
- * Drives the full anti-prenex procedure: converts to NNF, identifies
- * quantifier blocks, and calls `anti_prenex_block` to push quantifiers into
- * the formula structure as deeply as possible.
- * @tparam node Tree node type.
- * @param formula Formula to anti-prenex.
- * @return Formula with quantifiers pushed in as far as possible.
- *
- * @par Example
- * @code{.cpp}
- * // The inner "ex o2[1],o1[1] o1[1]o2[1]=0" is always satisfiable (pick
- * // o1[1]=o2[1]=0), so the whole formula reduces to a tautology once the
- * // quantifier is pushed in and resolved (see
- * // tests/integration/test_integration-wff_normalization.cpp:131-136).
- * tref fm = get_nso_rr(
- *     "all o1[0], o2[0] !o1[0]o2[0] = 0 || o1[0]o2[0] = 0 && "
- *     "(ex o2[1], o1[1] o1[1]o2[1] = 0).").value().main->get();
- * tref res = anti_prenex<node_t>(fm);
- * CHECK( tau::get(res).equals_T() );
- * @endcode
- */
-template <NodeType node>
-tref anti_prenex(tref formula);
-
-/**
  * @brief Convert a formula to Algebraic Normal Form (ANF) for a given type.
  *
  * The ANF is the XOR-AND normal form where each variable appears at most once
@@ -409,9 +386,19 @@ tref pnf(tref n);
 // of the heuristics themselves and also they could need definitions from the
 // header (as is the case in 'heuristicsbv_ba_simplification.h'. Also, they
 // need to be included before the definitions as they can be used in there.
+#include "antiprenexing/block_atom_profile.h"
+#include "antiprenexing/block_squeeze.h"
+#include "antiprenexing/boole_atom_analysis.h"
 #include "heuristics/ex_subs_based_elimination.h"
 #include "heuristics/syntactic_path_simplification.h"
 #include "heuristics/trivial_skolem.h"
 #include "normal_forms.tmpl.h"
+// Must stay after normal_forms.tmpl.h, deliberately breaking the usual
+// .h-includes-its-own-.tmpl.h idiom: the anti-prenexing definitions call
+// back into normal_forms.tmpl.h's internal helpers (to_nnf,
+// normalize_atomic_formula_operators, term_boole_decomposition,
+// squeeze_absorb, atm_formula_order_for_quant_elim), four of which have no
+// header declarations at all. Moving this line earlier breaks the build.
+#include "antiprenexing/antiprenexing.tmpl.h"
 
 #endif // __IDNI__TAU__NORMAL_FORMS_H__

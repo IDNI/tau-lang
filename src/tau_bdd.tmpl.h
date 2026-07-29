@@ -540,10 +540,11 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t
 	const order& o, auto& memo) {
 	using tau = tree<node>;
 	const tref var = get_var(x);
-	if (leaf(x) || less_then(v.back(), var, o)) return x;
+	if (leaf(x) || i >= v.size() || less_then(v.back(), var, o)) return x;
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	// while current variable is bigger, increase index
-	while (less_then(v[i], var, o)) ++i;
+	while (i < v.size() && less_then(v[i], var, o)) ++i;
+	if (i >= v.size()) return x;
 	if (tau::subtree_equals(v[i], var))
 		return bdd_ex(bdd_or(get_high(x), get_low(x), o), v, ++i, o);
 	return memo.emplace(x,
@@ -558,10 +559,12 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 	using tau = tree<node>;
 	const tref var = get_var(x);
 	// If we have passed the last variable in v, we are done
-	if (leaf(x) || less_then(v.back().first, var, o)) return x;
+	if (leaf(x) || i >= v.size() || less_then(v.back().first, var, o))
+		return x;
 	if (auto it = memo.find(x); it != memo.end()) return it->second;
 	// while current variable is bigger, increase index
-	while (less_then(v[i].first, var, o)) ++i;
+	while (i < v.size() && less_then(v[i].first, var, o)) ++i;
+	if (i >= v.size()) return x;
 	if (tau::subtree_equals(v[i].first, var)) {
 		// Eliminate the quantifier
 		if (v[i].second == Quantifier::ex)
@@ -582,9 +585,10 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t
 	const order& o) {
 	using tau = tree<node>;
 	const tref var = get_var(x);
-	if (leaf(x) || less_then(v.back(), var, o)) return x;
+	if (leaf(x) || i >= v.size() || less_then(v.back(), var, o)) return x;
 	// while current variable is bigger, increase index
-	while (less_then(v[i], var, o)) ++i;
+	while (i < v.size() && less_then(v[i], var, o)) ++i;
+	if (i >= v.size()) return x;
 	if (tau::subtree_equals(v[i], var))
 		return bdd_ex(bdd_or(get_high(x), get_low(x), o), v, ++i, o);
 	return add(var, bdd_ex(get_high(x), v, i, o),
@@ -598,9 +602,11 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_quant(ref x, const quants& v,
 	using tau = tree<node>;
 	const tref var = get_var(x);
 	// If we have passed the last variable in v, we are done
-	if (leaf(x) || less_then(v.back().first, var, o)) return x;
+	if (leaf(x) || i >= v.size() || less_then(v.back().first, var, o))
+		return x;
 	// while current variable is bigger, increase index
-	while (less_then(v[i].first, var, o)) ++i;
+	while (i < v.size() && less_then(v[i].first, var, o)) ++i;
+	if (i >= v.size()) return x;
 	if (tau::subtree_equals(v[i].first, var)) {
 		// Eliminate the quantifier
 		if (v[i].second == Quantifier::ex)
