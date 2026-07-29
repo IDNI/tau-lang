@@ -82,14 +82,24 @@ Always run tests in debug. Always run tests in release before pushing.
 
 ### Boolean Algebras (`src/boolean_algebras/`)
 
-The core abstraction. Multiple BA implementations are supported:
-- `sbf/` — simple Boolean formulas (BDD-backed), a converted plugin
-- `tau/` — Tau BA (embedding Tau specs as a BA), a converted plugin
-- `bool_ba.h` — classical Boolean algebra
+The core abstraction. Every BA is a plugin in its own directory:
+- `sbf/` — simple Boolean formulas (BDD-backed)
+- `tau/` — Tau BA (embedding Tau specs as a BA)
+- `qint/` — rational intervals · `qlt/` — dense linear order (non-aba omcat)
+- `hsb/` — half-open polyhedra in R^d · `nlang/` — natural-language BA
+- `bv/` — bitvectors (CVC5 and/or bitblasting); the only *parameterized* type
+  (`bv[8]` and `bv[16]` are distinct types of one family)
+- `bool_ba.h` + `bool_descriptor.tmpl.h` — classical Boolean algebra; described
+  like the rest but not a `TAU_BAS` entry, since packs such as
+  `node<bv, Bool>` still need it
 - `nso_ba.h` — non-deterministic string operations
-- `bv_ba.h` — bitvectors (uses CVC5 and/or bitblasting)
 - `bdds/` — BDD-based operations underlying several BAs
 - `cvc5/` — CVC5 SMT solver integration for bitvector theory
+
+What remains flat in `src/boolean_algebras/` is not a BA plugin: the descriptor
+interface (`ba_descriptor.h`, `ba_pack_traits.h`), `bool_ba.h` and its
+descriptor, and the `nso_ba` / `variant_ba` / `product_ba` combinators. Include
+a BA as `boolean_algebras/<id>/<id>[_ba].h` — the flat `<id>.h` paths are gone.
 
 The BAs of a build are its **pack**, chosen at configure time with
 `-DTAU_BAS=` (default `tau,qint,qlt,nlang,bv,sbf,hsb`). `cmake/tau_bas.cmake`
@@ -97,13 +107,30 @@ globs `src/boolean_algebras/*/ba.cmake` manifests and generates `tau_pack.h`
 into the build tree, providing `tau_pack::node_t`, `TAU_PACK_BASE_BAS` and
 `TAU_PACK_FULL_BAS` — use those instead of spelling a pack literally.
 
-A converted BA reaches core only through `ba_descriptor<BA, node>`
-(`ba_descriptor.h`); `ba_descriptor_complete` lists the mandatory members.
-Unconverted BAs still go through the per-pack specializations in
-`base_ba_dispatcher_*.{h,cpp}`, which disappear as each BA is converted.
+A BA reaches core only through `ba_descriptor<BA, node>` (`ba_descriptor.h`);
+`ba_descriptor_complete` lists the mandatory members. **There are no
+hand-written per-pack dispatchers left** — one generic descriptor-driven
+`base_ba_dispatcher` serves every pack, default or reduced.
+
+Beyond the mandatory surface, a BA may declare **optional capabilities**, which
+core probes with `requires` and never by BA name. Those in use today live in
+`ba_pack_traits.h` as `pack_*` folds: `solve`, `is_sat`, `can_solve`,
+`sat_status`, `preprocess`/`set_preprocessing`, `zero_constant`, `arith_ops`,
+`can_host_bool`. Each fold's empty case is chosen deliberately — `pack_solve`
+static_asserts (reaching it means a gate drifted), while `pack_zero_constant`
+and `pack_type_has_arith_ops` return nullptr/false because "no BA owns this
+type" is ordinary. When writing a fold, use `if constexpr` inside a per-element
+lambda: a `?:` in a fold expression instantiates both arms for every BA.
+
 To add a BA, copy `src/boolean_algebras/_template/` and follow
-`docs/adding_base_bas.md`. `scripts/test-external-ba.sh` proves the
-out-of-tree path.
+`docs/adding_base_bas.md`. `scripts/test-external-ba.sh` proves the out-of-tree
+path, and `tests/unit/test_ba_descriptor_pack.cpp` is where each BA joins a pack
+so its descriptor is type-checked.
+
+Verify BA work against three configurations, not one: the default pack
+(`build/devel`, `build/release`), a reduced pack containing bv
+(`-DTAU_BAS=sbf,tau,bv`), and one *without* it (`-DTAU_BAS=sbf,tau,qint`) —
+the last is the only thing exercising a capability fold's empty case.
 
 ### Tree Representation (`src/tau_tree*.h`)
 

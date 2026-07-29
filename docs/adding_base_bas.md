@@ -75,6 +75,14 @@ Assert a whole pack at its first instantiation site:
 static_assert(assert_pack_descriptors_complete<my_node_t>());
 ```
 
+A BA whose value type is an alias for a type in **another namespace** must put
+its free operators there too, not in `idni::tau_lang`. `ba_descriptor_complete`
+checks `x == b` from a definition context that precedes your header, so the
+operator is reachable only by ADL — and ADL follows the value type's own
+namespace. `bv` (an alias for `cvc5::Term`) declares its bool comparisons in
+namespace `cvc5` for exactly this reason. A BA defining its own struct, or one
+whose alias names a template with an `idni::tau_lang` argument, is unaffected.
+
 Anything beyond that surface is an **optional capability**, found by
 `requires`-probing rather than by BA name — declare `can_host_bool` to host the
 pack's `true`/`false`, or specialize `ba_has_arithmetic_theory<your_ba>` (in
