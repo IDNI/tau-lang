@@ -26,6 +26,32 @@
 namespace idni::tau_lang {
 
 /**
+ * @brief Apply the anti-prenex transformation to a formula.
+ *
+ * Drives the full anti-prenex procedure: converts to NNF, identifies
+ * quantifier blocks, and calls `anti_prenex_block` to push quantifiers into
+ * the formula structure as deeply as possible.
+ * @tparam node Tree node type.
+ * @param formula Formula to anti-prenex.
+ * @return Formula with quantifiers pushed in as far as possible.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // The inner "ex o2[1],o1[1] o1[1]o2[1]=0" is always satisfiable (pick
+ * // o1[1]=o2[1]=0), so the whole formula reduces to a tautology once the
+ * // quantifier is pushed in and resolved (see
+ * // tests/integration/test_integration-wff_normalization.cpp:131-136).
+ * tref fm = get_nso_rr(
+ *     "all o1[0], o2[0] !o1[0]o2[0] = 0 || o1[0]o2[0] = 0 && "
+ *     "(ex o2[1], o1[1] o1[1]o2[1] = 0).").value().main->get();
+ * tref res = anti_prenex<node_t>(fm);
+ * CHECK( tau::get(res).equals_T() );
+ * @endcode
+ */
+template <NodeType node>
+tref anti_prenex(tref formula);
+
+/**
  * @brief Process a single existentially quantified clause in the anti-prenex algorithm.
  *
  * Applies `ex_quantified_boole_decomposition` repeatedly until the quantifier is
