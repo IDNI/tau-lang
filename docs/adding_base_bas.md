@@ -101,6 +101,7 @@ Omit any that does not apply. The folds live in `ba_pack_traits.h` as `pack_*`.
 | `arith_ops` | that the grammar's arithmetic term operators apply to your type |
 | `can_host_bool` | that one of your types can hold a plain 0 or 1, making you a candidate Boolean carrier |
 | `bool_carrier_type()` | *which* of your types that is, when it is not your `type_tree()` — bv answers `bv[1]`, not its default `bv[16]` |
+| `print_constant(os, x)` | how to render a constant, when your own `operator<<` formats it in a way Tau should not show |
 
 Also specialize `ba_has_arithmetic_theory<your_ba>` (in `ba_pack_traits.h`) when
 the algebra brings arithmetic terms *and* its own decision procedure — that is
