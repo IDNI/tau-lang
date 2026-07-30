@@ -37,6 +37,12 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	static constexpr bool can_host_bool = true;
 	static tref bool_carrier_type() { return bv_type<node_t>(1); }
 
+	/** @brief Render a value in decimal; cvc5's own operator<< does not. */
+	static std::ostream& print_constant(std::ostream& os, const bv& x) {
+		return os << (x.isBitVectorValue()
+			? x.getBitVectorValue(10) : x.toString());
+	}
+
 	static bool matches_type(tref type_tree) {
 		return is_bv_type_family<node_t>(type_tree);
 	}

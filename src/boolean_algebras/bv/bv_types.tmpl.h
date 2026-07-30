@@ -6,6 +6,20 @@
 namespace idni::tau_lang {
 
 template<NodeType node>
+tref bv_type(unsigned short bitwidth) {
+	using tau = tree<node>;
+
+	tref type = tau::get(tau::type, "bv");
+	tref subtype = tau::get(tau::subtype, tau::get_num(bitwidth));
+	return tau::get(tau::typed, type, subtype);
+}
+
+template<NodeType node>
+size_t bv_type_id(unsigned short bitwidth) {
+	return ba_types<node>::id(bv_type<node>(bitwidth));
+}
+
+template<NodeType node>
 bool is_bv_type_family(tref t) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE

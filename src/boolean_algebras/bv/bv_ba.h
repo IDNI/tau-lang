@@ -309,6 +309,12 @@ inline bool operator!=(const bool& lhs, const Term& rhs);
 
 namespace idni::tau_lang {
 
+/** @brief Create the type tree for a bitvector of @p bitwidth bits. */
+template <NodeType node> tref bv_type(unsigned short bitwidth
+	= default_bv_size);
+/** @brief Return the type id for a bitvector of @p bitwidth bits. */
+template <NodeType node> size_t bv_type_id(unsigned short bitwidth
+	= default_bv_size);
 /** @brief Return `true` if type tree @p t is a bitvector type. */
 template <NodeType node> bool is_bv_type_family(tref t);
 /** @brief Return `true` if type id @p ba_type_id is a bitvector type. */

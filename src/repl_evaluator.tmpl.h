@@ -7,8 +7,6 @@
 
 namespace idni::tau_lang {
 
-using namespace cvc5;
-
 namespace repl_detail {
 
 /**

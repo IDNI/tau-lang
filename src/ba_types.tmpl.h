@@ -331,19 +331,6 @@ bool is_bool_type(size_t t) {
 
 // bitvector type definitions
 // TODO: They must go into bv_ba.impl.h -> currently causes compilation error
-template<NodeType node>
-tref bv_type(unsigned short bitwidth) {
-	using tau = tree<node>;
-
-	tref type = tau::get(tau::type, "bv");
-	tref subtype = tau::get(tau::subtype, tau::get_num(bitwidth));
-	return tau::get(tau::typed, type, subtype);
-}
-
-template<NodeType node>
-size_t bv_type_id(unsigned short bitwidth) {
-	return ba_types<node>::id(bv_type<node>(bitwidth));
-}
 
 // Asks the pack whether the BA owning this node's type declares arithmetic
 // operators, naming no BA.  Lives here rather than in ba_pack_traits.h because

@@ -921,22 +921,21 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 // The synthesis chooses the initial state bits si[-1] freely; any valid
 // initialization satisfies the formula (since the strategy is realizable).
 
+// A state bit is set to the carrier type's one, not to the numeric constant 1:
+// at a one-bit carrier those coincide and `= { 1 }` normalizes to `x' = 0`,
+// which the atom's consumers no longer recognize.
 template <NodeType node>
-static tref parse_sv_eq(const std::string& name, int shift, int value)
+static tref build_state_bit_eq(const std::string& name, int shift, bool set)
 {
 	using tau = tree<node>;
-	std::string t_str = (shift == 0) ? "t" : ("t-" + std::to_string(-shift));
-	// The Boolean carrier's type, spelled in full — a bare name without its
-	// parameter is rejected by the grammar.
-	std::string type_str = get_ba_type_name<node>(
-		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
-	std::string expr = name + "[" + t_str + "]" + type_str + " = { "
-	                 + std::to_string(value) + " }";
-	// Use wff start symbol; keep all type inference defaults enabled so that
-	// the constants ({0}, {1}) are properly resolved.
-	typename tau::get_options opts;
-	opts.parse.start = tau::wff;
-	return tau::get(expr, std::move(opts));
+	DBG(assert(shift <= 0 && "build_state_bit_eq: shift must be <= 0");)
+	const size_t tid = get_ba_type_id<node>(pack_bool_carrier_type<node>());
+	tref var = shift == 0
+		? build_out_var_at_t<node>(build_var_name<node>(name), tid)
+		: build_out_var_at_t_minus<node>(name,
+			static_cast<size_t>(-shift), tid);
+	return tau::build_bf_eq(var, set ? build_bf_t_type<node>(tid)
+					 : build_bf_f_type<node>(tid));
 }
 
 template <NodeType node>
@@ -955,15 +954,15 @@ static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
 	// ── (a) One-hot constraint at the current step ────────────────────────
 	tref at_least = tau::_F();
 	for (int i = 0; i < k; ++i)
-		at_least = tau::build_wff_or(at_least, parse_sv_eq<node>(sv[i], 0, 1));
+		at_least = tau::build_wff_or(at_least, build_state_bit_eq<node>(sv[i], 0, true));
 
 	tref at_most = tau::_T();
 	for (int i = 0; i < k; ++i)
 		for (int j = i + 1; j < k; ++j)
 			at_most = tau::build_wff_and(at_most,
 			    tau::build_wff_neg(
-			        tau::build_wff_and(parse_sv_eq<node>(sv[i], 0, 1),
-			                          parse_sv_eq<node>(sv[j], 0, 1))));
+			        tau::build_wff_and(build_state_bit_eq<node>(sv[i], 0, true),
+			                          build_state_bit_eq<node>(sv[j], 0, true))));
 
 	tref one_hot = tau::build_wff_and(at_least, at_most);
 
@@ -972,7 +971,7 @@ static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
 	//   si[t-1]=1  →  ∨_edges_from_s (guard_formula ∧ s_{dst}[t]=1)
 	tref trans = tau::_T();
 	for (int s = 0; s < k; ++s) {
-		tref prev_s = parse_sv_eq<node>(sv[s], -1, 1);
+		tref prev_s = build_state_bit_eq<node>(sv[s], -1, true);
 		tref edges_disj = tau::_F();
 		for (const auto& e : aut.edges[s]) {
 			if (e.dst < 0 || e.dst >= k) {
@@ -982,7 +981,7 @@ static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
 			}
 			tref guard_fm = guard_to_aba<node>(
 			    e.guard_label, aut.aps, sol.atoms);
-			tref next_d = parse_sv_eq<node>(sv[e.dst], 0, 1);
+			tref next_d = build_state_bit_eq<node>(sv[e.dst], 0, true);
 			edges_disj = tau::build_wff_or(edges_disj,
 			    tau::build_wff_and(guard_fm, next_d));
 		}
@@ -1019,7 +1018,7 @@ encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
 	if (init_s < 0 || init_s >= k) return {nullptr, nullptr};
 
 	// (1) sv[initial_state][0] = {1}
-	tref sv_tmpl = parse_sv_eq<node>(sv[init_s], 0, 1);
+	tref sv_tmpl = build_state_bit_eq<node>(sv[init_s], 0, true);
 	auto sv_io   = tau::get(sv_tmpl).select_top(is_child<node, tau::io_var>);
 	tref init_sv = fm_at_time_point<node>(sv_tmpl, sv_io, 0);
 
@@ -1030,7 +1029,7 @@ encode_mealy_initial_conditions(const LtlAbaSolution<node>& sol,
 		tref gfm   = guard_to_aba<node>(e.guard_label, aut.aps, sol.atoms);
 		auto gvars = tau::get(gfm).select_top(is_child<node, tau::io_var>);
 		tref g0    = fm_at_time_point<node>(gfm, gvars, 0);
-		tref sv_t  = parse_sv_eq<node>(sv[e.dst], 0, 1);
+		tref sv_t  = build_state_bit_eq<node>(sv[e.dst], 0, true);
 		auto sv_t_io = tau::get(sv_t).select_top(is_child<node, tau::io_var>);
 		tref sv1   = fm_at_time_point<node>(sv_t, sv_t_io, 1);
 		tref edge  = tau::build_wff_and(g0, sv1);

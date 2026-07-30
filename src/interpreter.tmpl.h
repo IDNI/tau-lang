@@ -155,6 +155,11 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 				"output '" << TAU_TO_STR(io_var) << "'";
 				return false;
 		}
+		// Internal streams are never written, even when one was auto-added
+		// for them: collect_output_streams attaches a default console
+		// stream to every output variable it finds in the spec, which put
+		// the LTL state bits in `outputs` and so past the check below.
+		if (is_excluded_output(vn)) continue;
 		auto it = outputs.find(vn);
 		if (it == outputs.end()) {
 			if (is_excluded_output(vn)) continue;
@@ -393,19 +398,23 @@ post_normalization:
 					sv_names.push_back(
 						"o__ltl_ms" + std::to_string(j) + "__");
 
-				// (1) Memory pre-population: build the Boolean
-				// carrier's constants for 1 and 0 (same pattern
-				// used by complete_outputs: bf-wrap via
-				// tau::get(tau::bf, {...})).
+				// (1) Memory pre-population: the carrier type's
+				// one and zero, matching the atoms
+				// build_state_bit_eq produces -- a numeric 1
+				// would not, at a one-bit carrier.
 				const size_t carrier_tid = get_ba_type_id<node>(
 					pack_bool_carrier_type<node>());
+				// Constants, not bf_t/bf_f: a memory value is committed
+				// to a stream, so it has to be a value. At a one-bit
+				// carrier these are exactly the type's one and zero.
 				tref one_val  = pack_value_constant<node>(carrier_tid, 1);
 				tref zero_val = pack_value_constant<node>(carrier_tid, 0);
 
 				for (int j = 0; j < k; ++j) {
-					// Parse sv_j[t-1]:bv = {0} to get the io_var
-					// structure for sv_j[t-1] (shift=1).
-					tref sv_tmpl = parse_sv_eq<node>(sv_names[j], -1, 0);
+					// Build ms_j[t-1] = 0 to take the io_var
+					// structure for sv_j[t-1] (shift=1) from it.
+					tref sv_tmpl = build_state_bit_eq<node>(
+						sv_names[j], -1, false);
 					trefs sv_io  = tau::get(sv_tmpl)
 						.select_top(is_child<node, tau::io_var>);
 					if (sv_io.empty()) continue;
@@ -657,6 +666,12 @@ std::pair<std::optional<assignment<node>>, bool>
 	for (tref spec_part : solve_parts) {
 		// Try to solve a path/disjunct of the current step specification part
 		bool solved = false;
+		// A state-bit constraint must reach the solver as a constraint. Its
+		// atoms are plain Boolean-algebra facts once the carrier is a single
+		// bit, and normalization answers those with T -- satisfiable, hence
+		// true -- which throws away the very choice the encoding needs
+		// committed, leaving the bits to the zero fill.
+		const bool state_part = mentions_ltl_state_var<node>(spec_part);
 		for (tref path : expression_paths<node>(spec_part)) {
 			// rewriting the inputs and inserting them into memory
 			tref updated = update_to_time_point(path, formula_time_point);
@@ -664,7 +679,7 @@ std::pair<std::optional<assignment<node>>, bool>
 			tref current = rewriter::replace<node>(updated, memory);
 			// Simplify after updating stream variables
 			// TODO: Maybe replace by syntactic simp?
-			current = normalize_non_temp<node>(current);
+			if (!state_part) current = normalize_non_temp<node>(current);
 #ifdef DEBUG
 			LOG_TRACE << "step/equations: " << LOG_FM(path) << "\n"
 				<< "step/updated: " << LOG_FM(updated) << "\n"
@@ -1308,15 +1323,16 @@ int interpreter<node>::current_state() const {
 	// `memory` holds the full history; we look up time_point - 1 because
 	// time_point has already advanced past the last commit.
 	//
-	// `parse_sv_eq<node>(sv[i], 0, 1)` in encode_mealy_as_safety builds
-	// the formula `o__ltl_ms<i>__[t] = bv1`. The committed value in
-	// `memory[o__ltl_ms<i>__[t]]` is therefore a bv constant; the active
-	// state has value bv1, inactive states have bv0.
+	// `build_state_bit_eq<node>(sv[i], 0, true)` in encode_mealy_as_safety
+	// builds `o__ltl_ms<i>__[t] = 1` in the carrier type. The committed value
+	// in `memory[o__ltl_ms<i>__[t]]` is therefore that type's one for an
+	// active state and its zero for an inactive one.
 	//
-	// We use serialize_constant (the same path the interpreter uses for
-	// stream IO at line 119) to format the value as a string, then test
-	// for the bv-1 textual representation. This avoids brittle structural
-	// equality checks across BA variant types.
+	// The bit is read semantically, not by formatting it: a value written as
+	// `bf_t` of the carrier type is the one, and a value written as a
+	// constant is asked whether it *is* the one. Comparing a serialization
+	// against "1" only worked while the carrier's one happened to print that
+	// way, which stops being true as soon as the carrier's width changes.
 	const size_t lookup_t = time_point - 1;
 	for (int i = 0; i < k; ++i) {
 		const std::string aux_name =
@@ -1325,18 +1341,10 @@ int interpreter<node>::current_state() const {
 			tref trimmed = tau::trim(var);
 			if (get_var_name<node>(trimmed) != aux_name) continue;
 			if (get_io_time_point<node>(trimmed) != (int_t)lookup_t) continue;
-			std::stringstream ss;
-			size_t ctype = ctx.type_of(trimmed);
-			if (ctype == 0) continue;
-			if (!serialize_constant<node>(ss, val, ctype)) continue;
-			// bv-1 serialises as "1" (the splitter convention used by
-			// the bv BA in tau-lang). bv-0 serialises as "0". Anything
-			// else is unexpected; treat as inactive.
-			std::string s = ss.str();
-			// Strip surrounding whitespace for robustness.
-			while (!s.empty() && (s.back() == ' ' || s.back() == '\n'))
-				s.pop_back();
-			if (s == "1") return i;
+			const auto& v = tau::get(tau::trim(val));
+			if (v.is(tau::bf_t)) return i;
+			if (v.is_ba_constant()
+				&& node::ba::is_one(v.get_ba_constant())) return i;
 		}
 	}
 	// No aux bit set — fall back to HOA initial state (shouldn't happen
@@ -2050,7 +2058,14 @@ bool interpreter<node>::collect_output_streams(tref dnf,
 			DBG(LOG_TRACE << "collect_output_streams[adding default output console]: "
 				<< get_var_name<node>(var) << " "
 				<< LOG_BA_TYPE(type_id);)
-			ctx.add_output_console(get_var_name<node>(var), type_id);
+			// An internal stream still needs registering -- the outputs map
+			// is what makes it solvable -- but not a *labelled* console
+			// stream: that label widens the name column shared by every
+			// other output, and write() never emits these anyway.
+			if (is_excluded_output(var))
+				ctx.add_output(get_var_name<node>(var), type_id,
+					std::make_shared<vector_output_stream>());
+			else ctx.add_output_console(get_var_name<node>(var), type_id);
 			current_outputs[var] = ctx.outputs.find(var)->second;
 		}
 	}

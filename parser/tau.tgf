@@ -78,7 +78,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ("fall"     __ q_vars  __ bf)      :bf_fall
                         | ("fex"      __ q_vars  __ bf)      :bf_fex
                         | ref                                :bf_ref
-                        | ('(' _ "bv" _ '[' _ num _ ']' _ ')' _
+                        | ('(' _ type _ ['[' _ subtype _ ']'] _ ')' _
                            (bf_parenthesis | ba_constant | variable | bf_ref
                            | bf_t | bf_f | bf_neg | bf_cast | capture)
                                 :bf_cast_oprnd)              :bf_cast
@@ -162,8 +162,7 @@ num                    => digits.
 integer                => [ '-' ] _ digits.
 sym                    => chars.
 capture                => '$' chars.
-typed                  => _ ':' _ type _ '[' _ subtype _ ']'
-                        | _ ':' _ (type & ~"bv").
+typed                  => _ ':' _ type _ ['[' _ subtype _ ']'].
 type                   => chars.
 subtype                => num.
 

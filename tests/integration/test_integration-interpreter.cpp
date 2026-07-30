@@ -219,6 +219,7 @@ TEST_SUITE("Execution") {
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 		}, {
+			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",

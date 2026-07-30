@@ -193,14 +193,41 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 			}
 
 			case bf_cast: {
-				// children after @trim: [num(target_width), bf_operand]
+				// children after @trim: [type, bf_operand] or
+				// [type, subtype, bf_operand].  The target type
+				// is interned from the parsed subtrees, the same
+				// shape a ':name[n]' annotation builds, so no BA
+				// is named here.
 				trefs ch;
 				for (tref c : ptr.children())
 					if (m_ref(c)) ch.push_back(m_ref(c));
-				DBG(assert(ch.size() == 2);)
-				size_t width = tree<node>::get(ch[0]).data();
-				ba_type = get_ba_type_id<node>(bv_type<node>(width));
-				x = getx(trefs{ch[1]});
+				DBG(assert(ch.size() == 2 || ch.size() == 3);)
+				// Reject a type the configured pack does not
+				// have: '(x) y' also parses as an implicit and,
+				// and interning an unowned type here would defer
+				// the complaint to somewhere unrecognizable.
+				std::string tname = tree<node>::get(ch[0])
+					.get_string();
+				bool known = false;
+				for (const auto& n : node::ba::types())
+					if (n == tname) { known = true; break; }
+				if (!known) {
+					std::string valid;
+					for (const auto& n : node::ba::types())
+						valid += (valid.empty() ? "" : ", ")
+							+ n;
+					LOG_ERROR << "[tau] unknown type '" << tname
+						<< "' in cast (valid: " << valid
+						<< ")\n";
+					error = true;
+					break;
+				}
+				ba_type = get_ba_type_id<node>(ch.size() == 3
+					? tree<node>::get(tree<node>::typed,
+						ch[0], ch[1])
+					: tree<node>::get(tree<node>::typed,
+						ch[0]));
+				x = getx(trefs{ch.back()});
 				break;
 			}
 

@@ -201,7 +201,11 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		CHECK((result == "xycdabfe" || result == "xycdabef"
+		// expected[0] is the canonical form (see matches_to_any_of); the
+		// rest are orders earlier packs produced -- conjunct order follows
+		// the ba_type pool indices (D8).
+		CHECK((result == "xyefcdba"
+			|| result == "xycdabfe" || result == "xycdabef"
 			|| result == "xydcbafe" || result == "xydcabef"
 			|| result == "xydcfeab" || result == "xycdfeab" ));
 	}
@@ -236,6 +240,7 @@ TEST_SUITE("BDD and many") {
 		// TODO (D8): conjunct order is not canonical, so debug and
 		// release disagree; collapse to one string once D8 lands.
 		CHECK(matches_to_any_of(tau::get(xx).to_str(), strings{
+			"cdbba&(e'f')'",
 			"ab&(f'e')'bccd",
 			"cabb&(e'f')'d",
 			"adbb&(e'f')'cc",

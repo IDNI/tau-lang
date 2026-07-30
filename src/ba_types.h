@@ -147,23 +147,6 @@ template <NodeType node>
 bool is_bool_type(size_t t);
 
 // -----------------------------------------------------------------------------
-// The bitvector type builders, still here because the parser maps a name plus
-// a width to a type inline (tau_tree_from_parser.tmpl.h); the family
-// predicates and the width accessor live in the bv plugin.
-
-/**
- * @brief Creates the type tree for a bitvector given a bitwidth
- * @tparam node Tree node type
- * @return Tree reference representing the type for bitvectors
- */
-template <NodeType node>
-tref bv_type(unsigned short bitwidth = default_bv_size);
-
-/** @brief Return the integer type id for a bitvector of @p bitwidth bits. */
-template <NodeType node>
-size_t bv_type_id(unsigned short bitwidth = default_bv_size);
-
-// -----------------------------------------------------------------------------
 // Type definitions for qint — atomless BA of rational intervals [x, y)
 // (right-closed, left-open).  Constant syntax accepts both rationals (1/4)
 // and decimals (0.25).

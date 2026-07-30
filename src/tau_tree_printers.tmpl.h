@@ -14,10 +14,15 @@ namespace idni::tau_lang {
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& v) {
-	std::visit(overloaded {
-		[&os](const bv& a) {
-			os << (a.isBitVectorValue() ? a.getBitVectorValue(10) : a.toString()); },
-		[&os](const auto& a) { os << a; }
+	// A BA whose own operator<< renders a constant the wrong way for Tau
+	// says so with a print_constant arm; everyone else just streams.
+	std::visit([&os](const auto& a) {
+		using BA = std::decay_t<decltype(a)>;
+		if constexpr (requires { ba_descriptor<BA,
+			node<BAs...>>::print_constant(os, a); })
+				ba_descriptor<BA, node<BAs...>>
+					::print_constant(os, a);
+		else os << a;
 	}, v);
 	return os;
 }
