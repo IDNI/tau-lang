@@ -115,12 +115,24 @@ hand-written per-pack dispatchers left** — one generic descriptor-driven
 Beyond the mandatory surface, a BA may declare **optional capabilities**, which
 core probes with `requires` and never by BA name. Those in use today live in
 `ba_pack_traits.h` as `pack_*` folds: `solve`, `is_sat`, `can_solve`,
-`sat_status`, `preprocess`/`set_preprocessing`, `zero_constant`, `arith_ops`,
+`sat_status`, `preprocess`/`set_preprocessing`, `zero_constant`,
+`value_constant`, `arith_ops`, `non_aba_omcat`, `literal_incomplete`,
 `can_host_bool`. Each fold's empty case is chosen deliberately — `pack_solve`
 static_asserts (reaching it means a gate drifted), while `pack_zero_constant`
 and `pack_type_has_arith_ops` return nullptr/false because "no BA owns this
 type" is ordinary. When writing a fold, use `if constexpr` inside a per-element
 lambda: a `?:` in a fold expression instantiates both arms for every BA.
+
+**Rewrite hooks are a second, separate mechanism.** `ba_descriptor.h` also
+declares `ba_wff_hooks<BA, Node>` and `ba_term_hooks<BA, Node>` — *defined and
+empty*, unlike `ba_descriptor`, so a BA specializes neither, one, or both, in
+its own `<ba>_ba_hooks_ext.tmpl.h`. Capabilities answer questions; hooks rewrite
+trees, so their routing lives with the hooks (`try_wff_*` in `hooks_wff.tmpl.h`,
+`try_term_cast` in `hooks_bf.tmpl.h`) rather than in the traits. A comparison
+hook needs **two** folds: `try_wff_lt` asks "did some BA fold this", and
+`pack_ba_type_has_wff_lt_hook` asks "does the owner define this operator at
+all" — when the owner declines, the atom must be preserved with `get_raw`
+instead of falling through to the generic Boolean definition.
 
 To add a BA, copy `src/boolean_algebras/_template/` and follow
 `docs/adding_base_bas.md`. `scripts/test-external-ba.sh` proves the out-of-tree
@@ -147,10 +159,18 @@ Checks whether a Tau specification is satisfiable. `solver.h` handles the underl
 
 ### Heuristics (`src/heuristics/`)
 
-Optimization passes applied before/during solving:
-- `bv_predicate_blasting.h` — blast bitvector operations to Boolean formulas with predicates (implementation split into `bv_predicate_blasting{,_logic,_comparisons,_arithmetic}.tmpl.h`)
-- `bv_ba_simplification.h`, `bv_ba_cvc5_simplification.tmpl.h`, `bv_ba_custom_simplification.tmpl.h` — simplification passes
+Optimization passes applied before/during solving. Everything here works on
+generic formula trees and names no BA — a pass belonging to one algebra lives
+in that plugin instead (see below):
 - `ex_subs_based_elimination.h` — existential substitution elimination
+- `simplify_using_equality.h` — congruence-closure simplification
+- `syntactic_path_simplification.h` — path-wise syntactic simplification
+- `trivial_skolem.h` — trivially skolemizable existential blocks
+
+A BA's own passes live under its plugin, e.g.
+`src/boolean_algebras/bv/heuristics/`:
+- `bv_predicate_blasting.h` — blast bitvector operations to Boolean formulas with predicates (implementation split into `bv_predicate_blasting{,_logic,_comparisons,_arithmetic,_helpers}.tmpl.h`)
+- `bv_ba_simplification.h`, `bv_ba_cvc5_simplification.tmpl.h`, `bv_ba_custom_simplification.tmpl.h` — simplification passes
 
 ### Parsers (`parser/`)
 
