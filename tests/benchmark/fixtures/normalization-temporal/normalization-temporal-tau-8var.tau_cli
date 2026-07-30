@@ -1,0 +1,7 @@
+n ((always o3[t]:tau = o3[t-1]:tau) && (sometimes o3[t]:tau = 1)) && ((always o7[t]:tau = o7[t-1]:tau) && (sometimes o7[t]:tau = 1)).
+n ((always o11[t]:tau = 0) && (sometimes o11[t]:tau = 0) && (sometimes o11[t]:tau = 1)) && ((always o15[t]:tau = 0) && (sometimes o15[t]:tau = 0) && (sometimes o15[t]:tau = 1)).
+n ((always o19[t-2]:tau = 1) && (sometimes o19[t-3]:tau = 0) && (sometimes o19[t]:tau = 1)) && ((always o23[t-2]:tau = 1) && (sometimes o23[t-3]:tau = 0) && (sometimes o23[t]:tau = 1)).
+n ((always o27[t]:tau = i25[t]:tau) && (sometimes i25[t]:tau = 1)) && ((always o31[t]:tau = i29[t]:tau) && (sometimes i29[t]:tau = 1)).
+n ((always i33[t]:tau = 1 ? o35[t]:tau = 0 : o35[t]:tau = 1)) && ((always i37[t]:tau = 1 ? o39[t]:tau = 0 : o39[t]:tau = 1)).
+n ((always o44[t]:tau = i41[t]:tau & i42[t]:tau) && (sometimes o44[t]:tau = 1)) && ((always o48[t]:tau = i45[t]:tau & i46[t]:tau) && (sometimes o48[t]:tau = 1)).
+n ((always o51[t]:tau = o51[t-1]:tau && o52[t]:tau = o52[t-1]:tau) || (sometimes o51[t]:tau = 1 && o52[t]:tau = 1)) && (always o55[t]:tau = o55[t-1]:tau && o56[t]:tau = o56[t-1]:tau).
