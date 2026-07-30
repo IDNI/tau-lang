@@ -175,4 +175,6 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 } // namespace idni::tau_lang
 
+#include "boolean_algebras/bv/bv_ba_hooks_ext.tmpl.h"
+
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_DESCRIPTOR_TMPL_H__

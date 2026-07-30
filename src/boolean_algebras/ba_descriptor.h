@@ -34,6 +34,19 @@ namespace idni::tau_lang {
 template <typename BA, typename Node>
 struct ba_descriptor;
 
+/**
+ * @brief Per-BA hook extensions; specialize in `<ba>_ba_hooks_ext.tmpl.h`.
+ *
+ * Unlike ba_descriptor these primaries are defined and empty, so a BA that
+ * defines no hook of a given kind needs no specialization at all: the folds
+ * probe for each member with `requires` and skip a BA that lacks it.
+ */
+template <typename BA, typename Node>
+struct ba_term_hooks {};
+
+template <typename BA, typename Node>
+struct ba_wff_hooks {};
+
 /** @brief `true` when @p BA has a descriptor for @p Node. */
 template <typename Node, typename BA>
 constexpr bool ba_has_descriptor_v = requires {

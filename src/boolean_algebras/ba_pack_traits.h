@@ -305,6 +305,51 @@ const intptr_t* pack_cast(const intptr_t* symbol, size_t ba_type) {
 }
 
 /**
+ * @brief Defines `pack_ba_type_has_<mem>_hook<Node>(ba_type)` for one operator.
+ *
+ * Answers "does the BA owning this type define this comparison at all", which
+ * is what a hook needs in order to stop rather than fall through to another
+ * type family's handling when the owner declines to fold. Distinct from asking
+ * whether the fold produced a result -- an owner that returns nothing still
+ * owns the operator. Unlike the reference this resolves the owner through
+ * `owns_type(size_t)` rather than a type-tree round-trip, keeping these traits
+ * free of ba_types.
+ */
+#define TAU_PACK_TRAITS_WFF_HOOK(mem) \
+	template <typename Node, typename BA> \
+	constexpr bool ba_has_##mem##_hook_v = requires( \
+		const intptr_t* const* ch, const intptr_t* r) { \
+		ba_wff_hooks<BA, Node>::mem(ch, r); \
+	}; \
+	template <typename Node, typename BA> \
+	bool ba_owns_##mem##_hook_type(size_t ba_type) { \
+		if constexpr (!ba_has_descriptor_v<Node, BA>) return false; \
+		else if constexpr (!ba_has_##mem##_hook_v<Node, BA>) return false; \
+		else return ba_descriptor<BA, Node>::owns_type(ba_type); \
+	} \
+	template <typename Node> \
+	bool pack_ba_type_has_##mem##_hook(size_t ba_type) { \
+		if (!ba_type) return false; \
+		return [&]<std::size_t... Is>(std::index_sequence<Is...>) { \
+			using pack = typename Node::bas_tuple; \
+			return (ba_owns_##mem##_hook_type<Node, \
+				std::tuple_element_t<Is, pack>>(ba_type) || ...); \
+		}(std::make_index_sequence< \
+			std::tuple_size_v<typename Node::bas_tuple>>{}); \
+	}
+
+TAU_PACK_TRAITS_WFF_HOOK(wff_lt)
+TAU_PACK_TRAITS_WFF_HOOK(wff_nlt)
+TAU_PACK_TRAITS_WFF_HOOK(wff_lteq)
+TAU_PACK_TRAITS_WFF_HOOK(wff_nlteq)
+TAU_PACK_TRAITS_WFF_HOOK(wff_gt)
+TAU_PACK_TRAITS_WFF_HOOK(wff_ngt)
+TAU_PACK_TRAITS_WFF_HOOK(wff_gteq)
+TAU_PACK_TRAITS_WFF_HOOK(wff_ngteq)
+
+#undef TAU_PACK_TRAITS_WFF_HOOK
+
+/**
  * @brief `true` when @p BA declares it can host the pack's Boolean carrier.
  *
  * Optional capability: a BA that does not declare `can_host_bool` simply is not

@@ -333,6 +333,24 @@ template<NodeType node> tref term_nand(tref symbol);
 /** @brief Cast the constant in `cast` node @p symbol to @p target_type_id. */
 template<NodeType node> tref term_cast(tref symbol, size_t target_type_id);
 
+// Constant comparison folds; nullptr when an operand is not a bv constant.
+/** @brief Fold `<` over the constants in @p ch. */
+template<NodeType node> tref wff_bv_lt(const tref* ch, tref r);
+/** @brief Fold `!<` over the constants in @p ch. */
+template<NodeType node> tref wff_bv_nlt(const tref* ch, tref r);
+/** @brief Fold `<=` over the constants in @p ch. */
+template<NodeType node> tref wff_bv_lteq(const tref* ch, tref r);
+/** @brief Fold `!<=` over the constants in @p ch. */
+template<NodeType node> tref wff_bv_nlteq(const tref* ch, tref r);
+/** @brief Fold `>` over the constants in @p ch. */
+template<NodeType node> tref wff_bv_gt(const tref* ch, tref r);
+/** @brief Fold `!>` over the constants in @p ch. */
+template<NodeType node> tref wff_bv_ngt(const tref* ch, tref r);
+/** @brief Fold `>=` over the constants in @p ch. */
+template<NodeType node> tref wff_bv_gteq(const tref* ch, tref r);
+/** @brief Fold `!>=` over the constants in @p ch. */
+template<NodeType node> tref wff_bv_ngteq(const tref* ch, tref r);
+
 /** @brief Apply all BV symbol-level simplifications to @p symbol. */
 template<NodeType node> tref simplify_bv_symbol(tref symbol);
 

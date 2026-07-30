@@ -303,15 +303,15 @@ tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 		return _F(v, ch, len, r);
 	}
 
-	// The definition for the operator for bitvectors is different
-	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
-		if (tref bv_r = wff_bv_lt<node>(ch, r)) {
-			HOOK_LOGGING(applied("Using bitvector-specific definition for <.");)
-			return bv_r;
-		}
-		return tau::get_raw(v, ch, len, r);
+	// The owning BA may define the operator differently
+	if (auto hook_r = hooks_detail::try_wff_lt<node>(ch, r,
+			arg1_fm(ch).get_ba_type()))
+	{
+		HOOK_LOGGING(applied("Using the BA's own definition for <.");)
+		return *hook_r;
 	}
+	if (pack_ba_type_has_wff_lt_hook<node>(arg1_fm(ch).get_ba_type()))
+		return tau::get_raw(v, ch, len, r);
 	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
 	{
 		auto ba = arg1_fm(ch).get_ba_type();
@@ -386,15 +386,15 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 		return _T(v, ch, len, r);
 	}
 
-	// The definition for the operator for bitvectors is different
-	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
-		if (tref bv_r = wff_bv_nlt<node>(ch, r)) {
-			HOOK_LOGGING(applied("Using bitvector-specific definition for !<.");)
-			return bv_r;
-		}
-		return tau::get_raw(v, ch, len, r);
+	// The owning BA may define the operator differently
+	if (auto hook_r = hooks_detail::try_wff_nlt<node>(ch, r,
+			arg1_fm(ch).get_ba_type()))
+	{
+		HOOK_LOGGING(applied("Using the BA's own definition for !<.");)
+		return *hook_r;
 	}
+	if (pack_ba_type_has_wff_nlt_hook<node>(arg1_fm(ch).get_ba_type()))
+		return tau::get_raw(v, ch, len, r);
 	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
 	{
 		auto ba = arg1_fm(ch).get_ba_type();
@@ -470,15 +470,15 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 		return _T(v, ch, len, r);
 	}
 
-	// The definition for the operator for bitvectors is different
-	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
-		if (tref bv_r = wff_bv_lteq<node>(ch, r)) {
-			HOOK_LOGGING(applied("Using bitvector-specific definition for <=.");)
-			return bv_r;
-		}
-		return tau::get_raw(v, ch, len, r);
+	// The owning BA may define the operator differently
+	if (auto hook_r = hooks_detail::try_wff_lteq<node>(ch, r,
+			arg1_fm(ch).get_ba_type()))
+	{
+		HOOK_LOGGING(applied("Using the BA's own definition for <=.");)
+		return *hook_r;
 	}
+	if (pack_ba_type_has_wff_lteq_hook<node>(arg1_fm(ch).get_ba_type()))
+		return tau::get_raw(v, ch, len, r);
 	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
 	{
 		auto ba = arg1_fm(ch).get_ba_type();
@@ -535,15 +535,15 @@ tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r
 		return _F(v, ch, len, r);
 	}
 
-	// The definition for the operator for bitvectors is different
-	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
-		if (tref bv_r = wff_bv_nlteq<node>(ch, r)) {
-			HOOK_LOGGING(applied("Using bitvector-specific definition for !<=.");)
-			return bv_r;
-		}
-		return tau::get_raw(v, ch, len, r);
+	// The owning BA may define the operator differently
+	if (auto hook_r = hooks_detail::try_wff_nlteq<node>(ch, r,
+			arg1_fm(ch).get_ba_type()))
+	{
+		HOOK_LOGGING(applied("Using the BA's own definition for !<=.");)
+		return *hook_r;
 	}
+	if (pack_ba_type_has_wff_nlteq_hook<node>(arg1_fm(ch).get_ba_type()))
+		return tau::get_raw(v, ch, len, r);
 	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
 	{
 		auto ba = arg1_fm(ch).get_ba_type();
@@ -600,15 +600,15 @@ tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 		return _F(v, ch, len, r);
 	}
 
-	// The definition for the operator for bitvectors is different
-	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
-		if (tref bv_r = wff_bv_gt<node>(ch, r)) {
-			HOOK_LOGGING(applied("Using bitvector-specific definition for >.");)
-			return bv_r;
-		}
-		return tau::get_raw(v, ch, len, r);
+	// The owning BA may define the operator differently
+	if (auto hook_r = hooks_detail::try_wff_gt<node>(ch, r,
+			arg1_fm(ch).get_ba_type()))
+	{
+		HOOK_LOGGING(applied("Using the BA's own definition for >.");)
+		return *hook_r;
 	}
+	if (pack_ba_type_has_wff_gt_hook<node>(arg1_fm(ch).get_ba_type()))
+		return tau::get_raw(v, ch, len, r);
 	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
 	{
 		auto ba = arg1_fm(ch).get_ba_type();
@@ -667,15 +667,15 @@ tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) 
 		return _T(v, ch, len, r);
 	}
 
-	// The definition for the operator for bitvectors is different
-	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
-		if (tref bv_r = wff_bv_ngt<node>(ch, r)) {
-			HOOK_LOGGING(applied("Using bitvector-specific definition for !>.");)
-			return bv_r;
-		}
-		return tau::get_raw(v, ch, len, r);
+	// The owning BA may define the operator differently
+	if (auto hook_r = hooks_detail::try_wff_ngt<node>(ch, r,
+			arg1_fm(ch).get_ba_type()))
+	{
+		HOOK_LOGGING(applied("Using the BA's own definition for !>.");)
+		return *hook_r;
 	}
+	if (pack_ba_type_has_wff_ngt_hook<node>(arg1_fm(ch).get_ba_type()))
+		return tau::get_raw(v, ch, len, r);
 	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
 	{
 		auto ba = arg1_fm(ch).get_ba_type();
@@ -734,15 +734,15 @@ tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r)
 		return _T(v, ch, len, r);
 	}
 
-	// The definition for the operator for bitvectors is different
-	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
-		if (tref bv_r = wff_bv_gteq<node>(ch, r)) {
-			HOOK_LOGGING(applied("Using bitvector-specific definition for >=.");)
-			return bv_r;
-		}
-		return tau::get_raw(v, ch, len, r);
+	// The owning BA may define the operator differently
+	if (auto hook_r = hooks_detail::try_wff_gteq<node>(ch, r,
+			arg1_fm(ch).get_ba_type()))
+	{
+		HOOK_LOGGING(applied("Using the BA's own definition for >=.");)
+		return *hook_r;
 	}
+	if (pack_ba_type_has_wff_gteq_hook<node>(arg1_fm(ch).get_ba_type()))
+		return tau::get_raw(v, ch, len, r);
 	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
 	{
 		auto ba = arg1_fm(ch).get_ba_type();
@@ -799,15 +799,15 @@ tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r
 		return _F(v, ch, len, r);
 	}
 
-	// The definition for the operator for bitvectors is different
-	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
-		if (tref bv_r = wff_bv_ngteq<node>(ch, r)) {
-			HOOK_LOGGING(applied("Using bitvector-specific definition for !>=.");)
-			return bv_r;
-		}
-		return tau::get_raw(v, ch, len, r);
+	// The owning BA may define the operator differently
+	if (auto hook_r = hooks_detail::try_wff_ngteq<node>(ch, r,
+			arg1_fm(ch).get_ba_type()))
+	{
+		HOOK_LOGGING(applied("Using the BA's own definition for !>=.");)
+		return *hook_r;
 	}
+	if (pack_ba_type_has_wff_ngteq_hook<node>(arg1_fm(ch).get_ba_type()))
+		return tau::get_raw(v, ch, len, r);
 	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
 	{
 		auto ba = arg1_fm(ch).get_ba_type();
@@ -829,9 +829,8 @@ tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch
 {
 	HOOK_LOGGING(log("wff_interval", v, ch, len, r);)
 
-	// The definition for the operator for bitvectors is different
-	if constexpr (pack_has_arithmetic_theory_v<node>)
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+	// An arithmetic type defines the interval as a pair of bounds
+	if (pack_type_has_arith_ops<node>(arg1_fm(ch).get_ba_type())) {
 		return tau::build_wff_and(
 			tau::build_bf_lteq(arg1_fm(ch).get(),
 				arg2_fm(ch).get()),

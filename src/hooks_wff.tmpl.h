@@ -5,6 +5,65 @@
 
 namespace idni::tau_lang {
 
+namespace hooks_detail {
+
+/**
+ * Defines `try_wff_<name><node>(ch, r, ba_type)` for one comparison operator:
+ * asks the BA owning `ba_type` to fold the comparison, nullopt when none does.
+ *
+ * Nullopt covers three cases the caller cannot tell apart here -- no owner, an
+ * owner without this hook, and an owner that declined -- so a caller needing
+ * the third asks `pack_ba_type_has_<mem>_hook` as well.
+ */
+#define TAU_HOOKS_DEFINE_WFF_TRY(name, mem) \
+	template <typename node_t, typename BA> \
+	std::optional<tref> try_ba_wff_##name(const tref* ch, tref r, \
+		size_t ba_type) \
+	{ \
+		if (!ba_type) return {}; \
+		if constexpr (!ba_has_descriptor_v<node_t, BA>) return {}; \
+		else { \
+			if (!ba_descriptor<BA, node_t>::owns_type(ba_type)) \
+				return {}; \
+			if constexpr (requires { \
+				ba_wff_hooks<BA, node_t>::mem(ch, r); }) \
+			{ \
+				if (tref out = ba_wff_hooks<BA, node_t>::mem( \
+					ch, r)) return out; \
+			} \
+			return {}; \
+		} \
+	} \
+	template <typename node_t> \
+	std::optional<tref> try_wff_##name(const tref* ch, tref r, \
+		size_t ba_type) \
+	{ \
+		std::optional<tref> out; \
+		[&]<std::size_t... Is>(std::index_sequence<Is...>) { \
+			using pack = typename node_t::bas_tuple; \
+			([&] { \
+				if (out) return; \
+				if (auto x = try_ba_wff_##name<node_t, \
+					std::tuple_element_t<Is, pack>>( \
+					ch, r, ba_type)) out = x; \
+			}(), ...); \
+		}(std::make_index_sequence<std::tuple_size_v< \
+			typename node_t::bas_tuple>>{}); \
+		return out; \
+	}
+
+TAU_HOOKS_DEFINE_WFF_TRY(lt, wff_lt)
+TAU_HOOKS_DEFINE_WFF_TRY(nlt, wff_nlt)
+TAU_HOOKS_DEFINE_WFF_TRY(lteq, wff_lteq)
+TAU_HOOKS_DEFINE_WFF_TRY(nlteq, wff_nlteq)
+TAU_HOOKS_DEFINE_WFF_TRY(gt, wff_gt)
+TAU_HOOKS_DEFINE_WFF_TRY(ngt, wff_ngt)
+TAU_HOOKS_DEFINE_WFF_TRY(gteq, wff_gteq)
+TAU_HOOKS_DEFINE_WFF_TRY(ngteq, wff_ngteq)
+
+#undef TAU_HOOKS_DEFINE_WFF_TRY
+
+} // namespace hooks_detail
 
 template <NodeType node>
 tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
