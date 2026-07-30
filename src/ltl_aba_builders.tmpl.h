@@ -926,13 +926,14 @@ static tref parse_sv_eq(const std::string& name, int shift, int value)
 {
 	using tau = tree<node>;
 	std::string t_str = (shift == 0) ? "t" : ("t-" + std::to_string(-shift));
-	// Use the default BV bitwidth explicitly — bare ":bv" is rejected by
-	// the grammar since the merge that made bitwidths mandatory.
-	std::string bv_type_str = ":bv[" + std::to_string(default_bv_size) + "]";
-	std::string expr = name + "[" + t_str + "]" + bv_type_str + " = { "
+	// The Boolean carrier's type, spelled in full — a bare name without its
+	// parameter is rejected by the grammar.
+	std::string type_str = get_ba_type_name<node>(
+		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
+	std::string expr = name + "[" + t_str + "]" + type_str + " = { "
 	                 + std::to_string(value) + " }";
 	// Use wff start symbol; keep all type inference defaults enabled so that
-	// bitvector constants ({0}, {1}) are properly resolved.
+	// the constants ({0}, {1}) are properly resolved.
 	typename tau::get_options opts;
 	opts.parse.start = tau::wff;
 	return tau::get(expr, std::move(opts));
@@ -1334,11 +1335,12 @@ static tref translate_ctl_star(tref fm,
 		witnesses.push_back(wname);
 		// Build witness as a wff: (o_w_i[t] = 1) serves as the
 		// propositional witness for the E-subformula.
-		// We use the default bv type for the witness output.
-		size_t bv_tid = get_ba_type_id<node>(bv_type<node>());
+		// We use the Boolean carrier's type for the witness output.
+		size_t carrier_tid = get_ba_type_id<node>(
+			pack_bool_carrier_type<node>());
 		tref w_bf = build_out_var_at_t<node>(
-			build_var_name<node>(wname), bv_tid, "t");
-		tref bf_one = build_bf_t_type<node>(bv_tid);
+			build_var_name<node>(wname), carrier_tid, "t");
+		tref bf_one = build_bf_t_type<node>(carrier_tid);
 		tref witness_wff = tau::build_bf_eq(w_bf, bf_one);
 		// Add constraint: G(witness → translated_path)
 		tref implication = tau::build_wff_imply(witness_wff, translated_inner);

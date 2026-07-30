@@ -175,6 +175,19 @@ a pack without `bv` and `hsb` does not need CVC5, and one without `nlang` does
 not need libcurl. Referencing the type of an algebra the build does not contain
 is reported as an unknown type annotation, listing the ones it does contain.
 
+Some internal machinery — the state bits of an LTL synthesis, a CTL* witness
+output — needs a type holding a plain 0 or 1. Which algebra provides it is the
+*Boolean carrier*, chosen from an ordered preference:
+
+```bash
+./dev preset release -DTAU_BOOL_CARRIERS=bv,sbf,bool   # the default order
+./dev preset release -DTAU_BOOL_CARRIERS=sbf           # prefer sbf even when bv is present
+```
+
+The first listed algebra the pack actually contains wins, so one order serves
+every pack: with the default, a pack with `bv` carries bits in `bv[1]` and a
+pack without it falls to `sbf`.
+
 To add an algebra — in-tree or from outside the source tree — copy
 `src/boolean_algebras/_template/` and follow
 [docs/adding_base_bas.md](docs/adding_base_bas.md).

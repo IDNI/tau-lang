@@ -244,6 +244,7 @@ bool pack_type_has_arith_ops(const intptr_t* type) {
 	return pack_type_has_arith_ops_impl<Node>(type);
 }
 
+
 /** @brief `true` when @p BA's descriptor builds a canonical zero constant. */
 template <typename Node, typename BA>
 concept ba_has_zero_constant = requires(size_t t) {
@@ -373,11 +374,11 @@ TAU_PACK_TRAITS_WFF_HOOK(wff_ngteq)
 #undef TAU_PACK_TRAITS_WFF_HOOK
 
 /**
- * @brief `true` when @p BA declares it can host the pack's Boolean carrier.
+ * @brief `true` when @p BA declares one of its types can hold a plain 0 or 1.
  *
  * Optional capability: a BA that does not declare `can_host_bool` simply is not
- * a carrier. Probed rather than required, so core still names no BA when it
- * needs the carrier's literals.
+ * a candidate carrier. Probed rather than required, so core still names no BA
+ * when it needs a bit.
  */
 template <typename Node, typename BA>
 constexpr bool ba_can_host_bool() {
@@ -386,6 +387,84 @@ constexpr bool ba_can_host_bool() {
 			-> std::convertible_to<bool>; })
 		return ba_descriptor<BA, Node>::can_host_bool;
 	else return false;
+}
+
+/**
+ * @brief Position of @p name in the comma-separated @p order, or -1.
+ *
+ * The Boolean-carrier preference order arrives as one string from
+ * `-DTAU_BOOL_CARRIERS`, so ranking a name means scanning it. Blanks are not
+ * skipped; the resolver strips them at configure time.
+ */
+constexpr int ba_carrier_rank(const char* order, const char* name) {
+	int rank = 0;
+	for (const char* p = order; ; ++rank) {
+		const char* q = name;
+		while (*p && *p != ',' && *q && *p == *q) ++p, ++q;
+		if (!*q && (!*p || *p == ',')) return rank;
+		while (*p && *p != ',') ++p;
+		if (!*p) return -1;
+		++p;
+	}
+}
+
+/** @brief @p BA's carrier type, defaulting to its type_tree(). */
+template <typename Node, typename BA>
+const intptr_t* ba_bool_carrier_type() {
+	if constexpr (requires { ba_descriptor<BA, Node>::bool_carrier_type(); })
+		return ba_descriptor<BA, Node>::bool_carrier_type();
+	else return ba_descriptor<BA, Node>::type_tree();
+}
+
+/** @brief `true` when some BA in @p Node's pack can host a Boolean. */
+template <typename Node>
+constexpr bool pack_can_host_bool() {
+	return []<std::size_t... Is>(std::index_sequence<Is...>) {
+		return (ba_can_host_bool<Node,
+			std::tuple_element_t<Is, typename Node::bas_tuple>>()
+				|| ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+}
+
+/**
+ * @brief The type core builds a plain 0/1 in — an LTL state bit, a CTL* witness.
+ *
+ * Resolution is per pack, not per build: of the BAs declaring `can_host_bool`,
+ * the one ranking earliest in `TAU_PACK_BOOL_CARRIERS` wins, and pack order
+ * decides when the configured order ranks none of them. So one configured
+ * order serves the generated pack and every hand-written one, each resolving
+ * to what it actually holds. The names live in the configuration, never here.
+ *
+ * Never null: a pack with nothing to carry a bit fails the static_assert.
+ */
+template <typename Node>
+const intptr_t* pack_bool_carrier_type() {
+	static_assert(pack_can_host_bool<Node>(),
+		"no BA in this pack declares can_host_bool, so core has no type "
+		"to build a plain 0 or 1 in");
+	const intptr_t* out = nullptr;
+	int best = -1;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_can_host_bool<Node, BA>()) {
+#ifdef TAU_PACK_BOOL_CARRIERS
+				constexpr int rank = ba_carrier_rank(
+					TAU_PACK_BOOL_CARRIERS,
+					ba_descriptor<BA, Node>::type_name);
+#else
+				constexpr int rank = -1;
+#endif
+				if (rank >= 0 && (best < 0 || rank < best))
+					best = rank, out = ba_bool_carrier_type<Node, BA>();
+				else if (rank < 0 && best < 0 && !out)
+					out = ba_bool_carrier_type<Node, BA>();
+			}
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
 }
 
 /**

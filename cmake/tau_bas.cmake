@@ -18,6 +18,12 @@ endif()
 set(TAU_BAS "tau,qint,qlt,nlang,bv,sbf,hsb" CACHE STRING
 	"Comma-separated enabled BA ids")
 
+# Ordered preference for the Boolean carrier — the BA whose type core builds a
+# plain 0/1 in. Passed through to the compile-time fold rather than resolved
+# here, so each pack in the build takes the earliest listed id it holds.
+set(TAU_BOOL_CARRIERS "bv,sbf,bool" CACHE STRING
+	"Comma-separated BA ids, most preferred Boolean carrier first")
+
 set(TAU_BA_INCLUDE_DIRS "")
 
 #
@@ -187,6 +193,28 @@ function(tau_generate_pack_header)
 		set(TAU_PACK_HAS_TAU_CPP "true")
 	else()
 		set(TAU_PACK_HAS_TAU_CPP "false")
+	endif()
+
+	# The carrier order reaches the fold as one macro rather than through
+	# tau_pack.h: ba_pack_traits.h cannot include the generated header, which
+	# includes tau_tree.h and so the traits themselves.
+	string(REPLACE " " "" _carriers "${TAU_BOOL_CARRIERS}")
+	if(_carriers STREQUAL "")
+		message(FATAL_ERROR "TAU_BOOL_CARRIERS must name at least one BA id")
+	endif()
+	add_compile_definitions(TAU_PACK_BOOL_CARRIERS="${_carriers}")
+	string(REPLACE "," ";" _carrier_ids "${_carriers}")
+	set(_carrier_in_pack FALSE)
+	foreach(_id ${_carrier_ids})
+		if(_id IN_LIST _ba_ids)
+			set(_carrier_in_pack TRUE)
+		endif()
+	endforeach()
+	if(NOT _carrier_in_pack)
+		message(WARNING
+			"none of TAU_BOOL_CARRIERS='${TAU_BOOL_CARRIERS}' is in "
+			"TAU_BAS='${TAU_BAS}'; each pack falls back to its first BA "
+			"declaring can_host_bool")
 	endif()
 
 	configure_file(

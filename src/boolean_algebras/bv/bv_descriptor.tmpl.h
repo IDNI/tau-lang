@@ -33,6 +33,10 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 	/** @brief bv supports the grammar's arithmetic term operators. */
 	static constexpr bool arith_ops = true;
 
+	/** @brief A bitvector holds a plain 0 or 1; one bit is enough for it. */
+	static constexpr bool can_host_bool = true;
+	static tref bool_carrier_type() { return bv_type<node_t>(1); }
+
 	static bool matches_type(tref type_tree) {
 		return is_bv_type_family<node_t>(type_tree);
 	}

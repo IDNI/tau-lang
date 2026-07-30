@@ -633,8 +633,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				break;
 
 			case bf_cast: {
-				size_t w = get_bv_width<node>(t.get_ba_type());
-				out("(bv["); out(std::to_string(w)); out("]) ");
+				// the target type's children, i.e. the
+				// annotation without its leading ':'
+				out("(");
+				for (tref c : get(t.get_ba_type_tree())
+						.children())
+					out(get(c));
+				out(") ");
 				break;
 			}
 

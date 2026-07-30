@@ -117,7 +117,15 @@ core probes with `requires` and never by BA name. Those in use today live in
 `ba_pack_traits.h` as `pack_*` folds: `solve`, `is_sat`, `can_solve`,
 `sat_status`, `preprocess`/`set_preprocessing`, `zero_constant`,
 `value_constant`, `arith_ops`, `non_aba_omcat`, `literal_incomplete`,
-`can_host_bool`. Each fold's empty case is chosen deliberately — `pack_solve`
+`can_host_bool`/`bool_carrier_type`. Those last two feed
+`pack_bool_carrier_type`, the type core builds a plain 0/1 in (an LTL state bit,
+a CTL* witness): `can_host_bool` marks a candidate (bv, sbf, Bool),
+`bool_carrier_type` names *which* of its types when that is not `type_tree()`
+(bv answers `bv[1]`), and the winner is resolved per pack from the
+`-DTAU_BOOL_CARRIERS=bv,sbf,bool` preference order. The same carrier renders a
+type no BA owns, asked about its own type — do not add a second capability for
+that, `bv[1]`'s literals already are `1`/`0`. Each fold's empty case is chosen
+deliberately — `pack_solve`
 static_asserts (reaching it means a gate drifted), while `pack_zero_constant`
 and `pack_type_has_arith_ops` return nullptr/false because "no BA owns this
 type" is ordinary. When writing a fold, use `if constexpr` inside a per-element

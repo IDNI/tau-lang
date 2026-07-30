@@ -25,7 +25,7 @@
 
 
 #include "defs.h"
-// core's ba_types.h and ltl_aba_* read default_bv_size from here
+// core's ba_types.h reads default_bv_size from here
 #include "boolean_algebras/cvc5/cvc5.h"
 #include "tau_parser.generated.h"
 

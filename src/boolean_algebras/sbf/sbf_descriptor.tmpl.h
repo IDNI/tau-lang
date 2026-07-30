@@ -23,7 +23,7 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;
 
-	/** @brief sbf hosts the Boolean carrier when it is in the pack. */
+	/** @brief sbf can carry a plain 0 or 1. */
 	static constexpr bool can_host_bool = true;
 
 	static bool matches_type(tref type_tree) {

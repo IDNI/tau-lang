@@ -121,11 +121,16 @@ std::string base_ba_dispatcher<BAs...>::one(const tref type_tree) {
 		? (out = ba_descriptor<BAs, node_t>::literal_one(type_tree), true)
 		: false) || ...);
 	// A type no BA owns -- the untyped type a bf_t carries, for one -- falls
-	// back to the pack's Boolean carrier, which is what the per-pack chains
-	// returned from their trailing clause.
-	if (!out) (void)((ba_can_host_bool<node_t, BAs>()
-		? (out = ba_descriptor<BAs, node_t>::literal_one(type_tree), true)
-		: false) || ...);
+	// back to the pack's Boolean carrier asked about its *own* type, which is
+	// what the per-pack chains returned from their trailing clause: "1" from
+	// sbf, and equally "1" from bv[1]. Passing type_tree on instead would ask
+	// a width-dependent literal about a type carrying no width.
+	if constexpr (pack_can_host_bool<node_t>()) if (!out) {
+		const tref carrier = pack_bool_carrier_type<node_t>();
+		(void)((ba_descriptor<BAs, node_t>::matches_type(carrier)
+			? (out = ba_descriptor<BAs, node_t>::literal_one(carrier), true)
+			: false) || ...);
+	}
 	if (!out) throw std::runtime_error("unsupported type for one");
 	return *out;
 }
@@ -137,10 +142,13 @@ std::string base_ba_dispatcher<BAs...>::zero(const tref type_tree) {
 	(void)((ba_descriptor<BAs, node_t>::matches_type(type_tree)
 		? (out = ba_descriptor<BAs, node_t>::literal_zero(type_tree), true)
 		: false) || ...);
-	// See one(): an unowned type falls back to the pack's Boolean carrier.
-	if (!out) (void)((ba_can_host_bool<node_t, BAs>()
-		? (out = ba_descriptor<BAs, node_t>::literal_zero(type_tree), true)
-		: false) || ...);
+	// See one(): an unowned type falls back to the carrier's own literals.
+	if constexpr (pack_can_host_bool<node_t>()) if (!out) {
+		const tref carrier = pack_bool_carrier_type<node_t>();
+		(void)((ba_descriptor<BAs, node_t>::matches_type(carrier)
+			? (out = ba_descriptor<BAs, node_t>::literal_zero(carrier), true)
+			: false) || ...);
+	}
 	if (!out) throw std::runtime_error("unsupported type for zero");
 	return *out;
 }

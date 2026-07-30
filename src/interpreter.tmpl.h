@@ -393,12 +393,14 @@ post_normalization:
 					sv_names.push_back(
 						"o__ltl_ms" + std::to_string(j) + "__");
 
-				// (1) Memory pre-population: build BV constants for 1 and 0
-				// (same pattern used by complete_outputs: bf-wrap via
+				// (1) Memory pre-population: build the Boolean
+				// carrier's constants for 1 and 0 (same pattern
+				// used by complete_outputs: bf-wrap via
 				// tau::get(tau::bf, {...})).
-				const size_t bv_tid = get_ba_type_id<node>(bv_type<node>());
-				tref bv_one_val  = pack_value_constant<node>(bv_tid, 1);
-				tref bv_zero_val = pack_value_constant<node>(bv_tid, 0);
+				const size_t carrier_tid = get_ba_type_id<node>(
+					pack_bool_carrier_type<node>());
+				tref one_val  = pack_value_constant<node>(carrier_tid, 1);
+				tref zero_val = pack_value_constant<node>(carrier_tid, 0);
 
 				for (int j = 0; j < k; ++j) {
 					// Parse sv_j[t-1]:bv = {0} to get the io_var
@@ -413,7 +415,7 @@ post_normalization:
 					// for the lookback var when processing the G body.
 					tref mem_key = transform_io_var<node>(
 						sv_io[0], i.formula_time_point);
-					tref mem_val = (j == init_s) ? bv_one_val : bv_zero_val;
+					tref mem_val = (j == init_s) ? one_val : zero_val;
 					i.memory.emplace(mem_key, mem_val);
 				}
 

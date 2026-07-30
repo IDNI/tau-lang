@@ -129,13 +129,24 @@ TEST_SUITE("generic dispatcher over the converted-BA pack") {
 				ba_descriptor<bv, conv_node>::type_tree_for(16)) );
 	}
 
-	TEST_CASE("an unowned type falls back to the Boolean carrier's literals") {
+	TEST_CASE("an unowned type falls back to the carrier's own literals") {
 		// bf_t/bf_f carry the untyped type; the per-pack chains answered such a
-		// type from their trailing clause, which returned sbf's "1"/"0".
+		// type from their trailing clause, which returned sbf's "1"/"0".  The
+		// carrier here is bv[1], whose literals are the same two strings -- it
+		// is bv[16] that would answer "65535".
 		tref t = untyped_type<conv_node>();
 		REQUIRE(t != nullptr);
 		CHECK( conv_dispatcher::one(t) == "1" );
 		CHECK( conv_dispatcher::zero(t) == "0" );
+	}
+
+	TEST_CASE("the Boolean carrier resolves per pack, from one configured order") {
+		// TAU_BOOL_CARRIERS defaults to bv,sbf,bool: a pack holding bv gets
+		// bv[1] whatever its pack order, and one without bv falls to sbf.
+		CHECK( pack_bool_carrier_type<conv_node>()
+			== ba_descriptor<bv, conv_node>::type_tree_for(1) );
+		CHECK( pack_bool_carrier_type<mini_node>()
+			== ba_descriptor<sbf_ba, mini_node>::type_tree() );
 	}
 
 	TEST_CASE("qlt is classified as a non-aba omcat, unlike qint") {

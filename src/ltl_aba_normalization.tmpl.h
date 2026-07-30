@@ -683,16 +683,17 @@ static bool has_since_trigger(tref fm) {
 	}) != nullptr;
 }
 
-// Build   name[t+shift]:bv = {value}   (shift ≤ 0: -1 → t-1, 0 → t).
+// Build   name[t+shift]:<carrier> = {value}   (shift ≤ 0: -1 → t-1, 0 → t).
 template <NodeType node>
-static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
+static tref build_carrier_eq_aux(const std::string& name, int shift, int value) {
 	using tau = tree<node>;
-	assert(shift <= 0 && "build_bv_eq_aux: shift must be <= 0 (past or current)");
+	assert(shift <= 0 && "build_carrier_eq_aux: shift must be <= 0 (past or current)");
 	std::string t_str = (shift == 0) ? "t" : ("t-" + std::to_string(-shift));
-	// Use the default BV bitwidth explicitly — bare ":bv" is rejected by
-	// the grammar since the merge that made bitwidths mandatory.
-	std::string bv_type_str = ":bv[" + std::to_string(default_bv_size) + "]";
-	std::string expr = name + "[" + t_str + "]" + bv_type_str + " = { "
+	// The Boolean carrier's type, spelled in full — a bare name without its
+	// parameter is rejected by the grammar.
+	std::string type_str = get_ba_type_name<node>(
+		get_ba_type_id<node>(pack_bool_carrier_type<node>()));
+	std::string expr = name + "[" + t_str + "]" + type_str + " = { "
 	                 + std::to_string(value) + " }";
 	typename tau::get_options opts;
 	opts.parse.start = tau::wff;
@@ -774,8 +775,8 @@ static tref compile_since_trigger_rec(
 		std::string aux_name = "o__ltl_s" + std::to_string(counter++) + "__";
 
 		// Atoms: aux[t]=1  and  aux[t-1]=1
-		tref curr = build_bv_eq_aux<node>(aux_name, 0,  1);
-		tref prev = build_bv_eq_aux<node>(aux_name, -1, 1);
+		tref curr = build_carrier_eq_aux<node>(aux_name, 0,  1);
+		tref prev = build_carrier_eq_aux<node>(aux_name, -1, 1);
 
 		// Invariant: G(curr ↔ (ψ ∨ (φ ∧ prev)))
 		tref rhs  = tau::build_wff_or(psi, tau::build_wff_and(phi, prev));

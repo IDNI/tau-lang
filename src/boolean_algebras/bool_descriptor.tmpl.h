@@ -31,7 +31,7 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 	static constexpr bool atomless = false;
 	static constexpr bool non_aba_omcat = false;
 
-	/** @brief Bool is the Boolean carrier itself. */
+	/** @brief Bool is a bit already. */
 	static constexpr bool can_host_bool = true;
 
 	static bool matches_type(tref type_tree) {
