@@ -11,6 +11,7 @@ surface, so what remains after you strip it is exactly what a BA must provide.
 | `my_ba.h` | the value type, the parse declaration, and the includes that pull the rest in |
 | `my_ba.tmpl.h` | the type tree naming the algebra, and constant parsing |
 | `my_ba_descriptor.tmpl.h` | the descriptor — the only interface core uses |
+| `my_ba_ba_hooks_ext.tmpl.h` | optional rewrite hooks; delete it if the algebra has none |
 
 There is deliberately **no `ba.cmake` here**: `cmake/tau_bas.cmake` globs
 `src/boolean_algebras/*/ba.cmake`, so a manifest in this directory would

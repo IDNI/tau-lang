@@ -83,11 +83,56 @@ namespace. `bv` (an alias for `cvc5::Term`) declares its bool comparisons in
 namespace `cvc5` for exactly this reason. A BA defining its own struct, or one
 whose alias names a template with an `idni::tau_lang` argument, is unaffected.
 
-Anything beyond that surface is an **optional capability**, found by
-`requires`-probing rather than by BA name — declare `can_host_bool` to host the
-pack's `true`/`false`, or specialize `ba_has_arithmetic_theory<your_ba>` (in
-`ba_pack_traits.h`) when the algebra brings arithmetic terms and its own
-decision procedure, which is what gates the bitvector machinery in core.
+### Optional capabilities
+
+Anything beyond the mandatory surface is an **optional capability**: core probes
+for it with `requires` and never by BA name, so declaring one is how you opt in.
+Omit any that does not apply. The folds live in `ba_pack_traits.h` as `pack_*`.
+
+| member | what core asks it for |
+|---|---|
+| `solve`, `is_sat` | your own decision procedure for a whole formula |
+| `can_solve` | whether a formula is one you can decide at all |
+| `sat_status` | a *definite* answer — `optional<bool>`, so "unknown" stays distinct from "unsat" |
+| `preprocess`, `set_preprocessing` | a rewriting pass to run before solving |
+| `zero_constant(ba_type)` | the type's default zero, when it is not `bf_f` |
+| `value_constant(ba_type, value)` | a constant of that type holding a plain integer value |
+| `literal_incomplete(src)` | whether a partly-typed literal is truncated rather than malformed, so the REPL keeps reading |
+| `arith_ops` | that the grammar's arithmetic term operators apply to your type |
+| `can_host_bool` | that you can carry the pack's `true`/`false` |
+
+Also specialize `ba_has_arithmetic_theory<your_ba>` (in `ba_pack_traits.h`) when
+the algebra brings arithmetic terms *and* its own decision procedure — that is
+what makes core instantiate the arithmetic pipeline for packs containing you.
+
+Every fold's empty case is deliberate. `pack_zero_constant` and
+`pack_value_constant` return `nullptr`, and `pack_type_has_arith_ops` returns
+`false`, because "no BA owns this type" is an ordinary runtime outcome;
+`pack_solve` `static_assert`s, because its call sites are gated and reaching it
+means a gate drifted. When writing one, put `if constexpr` inside a per-element
+lambda: a `?:` in a fold expression instantiates both arms for every BA.
+
+### Rewrite hooks
+
+Capabilities answer questions; **hooks rewrite trees**, and they are a separate
+mechanism. `ba_descriptor.h` declares
+
+```cpp
+template <typename BA, typename Node> struct ba_term_hooks {};
+template <typename BA, typename Node> struct ba_wff_hooks {};
+```
+
+*defined and empty*, unlike `ba_descriptor` — so specialize neither, one, or
+both, in your own `<id>_ba_hooks_ext.tmpl.h` (see `_template/`), included from
+your descriptor header. `ba_wff_hooks` takes `wff_lt`, `wff_nlt`, `wff_lteq`,
+`wff_nlteq`, `wff_gt`, `wff_ngt`, `wff_gteq`, `wff_ngteq`; `ba_term_hooks` takes
+`term_cast`.
+
+Each returns `nullptr` to decline. **Declining is not the same as having no
+hook**: core asks `pack_ba_type_has_wff_lt_hook` separately, and when your type
+owns the operator but you declined, it preserves the comparison as an atom
+rather than falling through to the generic Boolean definition. So return
+`nullptr` freely for operands you cannot fold — the atom survives for the solver.
 
 ### The manifest
 

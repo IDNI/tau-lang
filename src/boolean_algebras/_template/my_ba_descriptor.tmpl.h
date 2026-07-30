@@ -97,4 +97,8 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 
 } // namespace idni::tau_lang
 
+// Optional rewrite hooks; drop this include together with the file if the
+// algebra defines none.
+#include "boolean_algebras/_template/my_ba_ba_hooks_ext.tmpl.h"
+
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS___TEMPLATE__MY_BA_DESCRIPTOR_TMPL_H__
