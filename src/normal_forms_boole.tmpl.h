@@ -1033,11 +1033,12 @@ tref resolve_quantifiers(tref formula) {
 			// Check if the formula is closed and proceed to eliminate
 			// the quantifier
 			tref var = tau::trim2(n);
-			if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
-				// A closed, purely bitvector formula is decided
+			if (pack_type_has_arith_ops<node>(
+				tau::get(var).get_ba_type())) {
+				// A closed, purely arithmetic formula is decided
 				// directly by the solver. This is checked before
-				// blasting: the solver handles the bitvector
-				// arithmetic natively, while deciding the blasted
+				// blasting: the solver handles the arithmetic
+				// natively, while deciding the blasted
 				// form (with its many auxiliary quantifiers) is
 				// much harder for it. Blasting does not close a
 				// formula, so the check would not succeed later.
@@ -1085,7 +1086,8 @@ tref resolve_quantifiers(tref formula) {
 				    	const auto& tn = tau::get(t);
 				    	return tn.is(tau::bf_cast)
 				    	    || (tn.is(tau::ba_constant)
-				    	        && is_bv_type_family<node>(tn.get_ba_type()));
+				    	        && pack_type_has_arith_ops<node>(
+			    	        	tn.get_ba_type()));
 				   })) {
 			// Ground BV comparison formula (no quantifier, no free variables).
 			// e.g. {2}:bv[4] < {3}:bv[4], or (bv[4]){2}:bv[2] = {2}:bv[4].
@@ -1315,7 +1317,8 @@ tref anti_prenex_block(tref formula, const trefs& block,
 //   structural (non-bitvector) cases still need it. ∀-blocks are dualized:
 //   ∀x φ ≡ ¬∃x ¬φ.
 template<NodeType node>
-tref process_quantifier_block(tref n, std::function<bool(tref)> skip = is_tref_bv_type_family<node>) {
+tref process_quantifier_block(tref n,
+	std::function<bool(tref)> skip = pack_tref_has_arith_ops<node>) {
 	using tau = tree<node>;
 	if (!is_child_quantifier<node>(n)) return n;
 
