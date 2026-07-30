@@ -83,6 +83,43 @@ inline void config_cvc5_solver(cvc5::Solver& solver) {
 }
 
 /**
+ * @brief Let counterexample-guided instantiation consider outer quantifiers.
+ *
+ * By default cvc5 only instantiates the *innermost* quantified subformula
+ * (`cegqi-innermost`), which collapses on interleaved `all`/`ex` over
+ * bitvectors: a 4-level alternating chain with a disjunctive body over
+ * `bv[8]` takes ~14s, and the `bv[16]`, `bv[32]`, `bv[64]` and 6-level
+ * variants do not finish at all. Turning it off decides every one of them
+ * in 13-194ms.
+ *
+ * The cost is confined and small: quantified multiplication is unchanged
+ * (1/4/16ms at `bv[8]`/`bv[16]`/`bv[32]`) and quantified division is the
+ * worst case at roughly 1.8x (25ms to 44ms at `bv[16]`, 133ms to 237ms at
+ * `bv[32]`) -- which is why `bv_formula_sat_status` applies this whenever
+ * the quantification actually alternates, rather than trying to also
+ * exclude arithmetic.
+ *
+ * @note `cegqi-nested-qe` looks like the option for this and is what cvc5's
+ * own command line derives a fast configuration from, but it does nothing
+ * on its own through the C++ API: setting it leaves the search unchanged
+ * (~13s) because the CLI's speedup actually comes from the `pre-skolem-quant`
+ * / `prenex-quant-user` defaults cvc5 derives *from* it, and deriving those
+ * by hand still only reaches ~200ms and does not scale past `bv[8]`.
+ *
+ * @warning Do not pair quantifier-strategy changes with a resource limit
+ * (`rlimit`/`rlimit-per`). A truncated instantiation search can report a
+ * plain `sat` instead of `unknown`: `--cegqi-nested-qe --rlimit-per=2000`
+ * calls the 4-level `bv[16]` chain **sat** when it is unsat (reproducible;
+ * two unbounded strategies agree on unsat). Callers treat a definite answer
+ * as truth, so a bounded run here would silently corrupt results.
+ *
+ * @param solver Reference to a cvc5::Solver instance to be reconfigured.
+ */
+inline void config_cvc5_solver_alternating_quantifiers(cvc5::Solver& solver) {
+	solver.setOption("cegqi-innermost", "false");
+}
+
+/**
  * @brief Evaluates a (bv) tau tree to a bitvector formula.
  *
  * This function traverses the given tau tree node and computes its

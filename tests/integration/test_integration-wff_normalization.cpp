@@ -384,3 +384,69 @@ TEST_SUITE("Normalizer bv mixed-type") {
 			" && s = 0.", tau::wff_f) );
 	}
 }
+
+// Purely bitvector formulas whose quantification alternates, with no type
+// mixing and no arithmetic. These reach cvc5 directly, and cvc5's default
+// counterexample-guided instantiation only instantiates the innermost
+// quantified subformula, which collapses on exactly this shape: the 4-level
+// disjunctive chain over bv[8] took ~13s and the wider and deeper variants
+// never finished. bv_formula_sat_status now turns `cegqi-innermost` off when
+// the quantification alternates, which decides all of them in well under a
+// second. Hang regressions first, value checks second.
+TEST_SUITE("Normalizer bv alternating quantifiers") {
+
+	// The Bernays-Schoenfinkel shape from tests/benchmark (a disjunction of
+	// conjoined comparison steps closing a cycle), across bitwidths, since
+	// the previous behaviour degraded sharply with width.
+	TEST_CASE("bv_alternating_disjunctive_chain_widths") {
+		for (const char* w : { "8", "16", "32", "64" }) {
+			const std::string t = std::string(":bv[") + w + "]";
+			const std::string sample =
+				"all x ex y all z ex w ((x" + t + " < y" + t
+				+ " && y" + t + " < z" + t + ") || (z" + t
+				+ " < w" + t + " && w" + t + " < x" + t + ")).";
+			CAPTURE(w);
+			CHECK( normalize_and_check(sample.c_str(), tau::wff_f) );
+		}
+	}
+
+	// Six alternating quantifiers: the variant tests/benchmark records as OOM
+	// and TEST_CASE("6") above still skips for the atomless case.
+	TEST_CASE("bv_alternating_disjunctive_chain_six_levels") {
+		CHECK( normalize_and_check(
+			"all x ex y all z ex w all u ex v ((x:bv[8] < y:bv[8] &&"
+			" y:bv[8] < z:bv[8]) || (z:bv[8] < w:bv[8] && w:bv[8] <"
+			" u:bv[8]) || (u:bv[8] < v:bv[8] && v:bv[8] < x:bv[8])).",
+			tau::wff_f) );
+	}
+
+	// Both polarities, and both quantifier orders, so a strategy change that
+	// only ever answered F would not pass.
+	TEST_CASE("bv_alternating_quantifier_polarities") {
+		CHECK( normalize_and_check("all x ex y (x:bv[8] <= y:bv[8]).",
+			tau::wff_t) );
+		CHECK( normalize_and_check("ex x all y (x:bv[8] <= y:bv[8]).",
+			tau::wff_t) );
+		CHECK( normalize_and_check("all x ex y (x:bv[8] != y:bv[8]).",
+			tau::wff_t) );
+		CHECK( normalize_and_check("all x ex y (x:bv[8] < y:bv[8]).",
+			tau::wff_f) );
+		CHECK( normalize_and_check("all x ex y (x:bv[8] < y:bv[8] ||"
+			" x:bv[8] = { 255 }:bv[8]).", tau::wff_t) );
+	}
+
+	// Quantified arithmetic keeps the default strategy's strengths: turning
+	// cegqi-innermost off costs it at most ~2x, and these are the cases that
+	// would suffer most if a future change reached for a strategy (such as
+	// cegqi-nested-qe) that cannot handle them at all.
+	TEST_CASE("bv_alternating_quantifier_arithmetic_unaffected") {
+		CHECK( normalize_and_check("all x ex y (x:bv[32] * y:bv[32] ="
+			" { 1 }:bv[32]).", tau::wff_f) );
+		CHECK( normalize_and_check("all x ex y (x:bv[32] / y:bv[32] ="
+			" { 2 }:bv[32]).", tau::wff_f) );
+		CHECK( normalize_and_check("all x ex y (x:bv[64] + y:bv[64] ="
+			" { 0 }:bv[64]).", tau::wff_t) );
+		CHECK( normalize_and_check("all x (x:bv[32] % { 4 }:bv[32] <"
+			" { 4 }:bv[32]).", tau::wff_t) );
+	}
+}

@@ -318,6 +318,15 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 
 	subtree_map<node, bv> vars, free_vars;
 	cvc5::Solver solver(cvc5_term_manager);
+	// Interleaved all/ex over bitvectors needs cvc5 to instantiate outer
+	// quantifiers too, not just the innermost one; without that it does not
+	// finish at all past bv[8]. Applied before the logic is fixed, since
+	// cvc5 resolves its quantifier-module defaults at that point.
+	// See config_cvc5_solver_alternating_quantifiers for the measurements.
+	if (const tau& ft = tau::get(form);
+			ft.find_top(is<node, tau::wff_all>)
+			&& ft.find_top(is<node, tau::wff_ex>))
+		config_cvc5_solver_alternating_quantifiers(solver);
 	config_cvc5_solver(solver);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
