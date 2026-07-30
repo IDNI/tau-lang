@@ -217,48 +217,19 @@ tref get_hook<node>::wff_equiv([[maybe_unused]] const node& v, const tref* ch,
 	return tau::get(tau::build_wff_equiv(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
 }
 
-// Unit elimination for (Q,<): compare two qlt singleton constants.
-// Returns -1/0/+1 if c1 </=/> c2, or nullopt if either side is not a finite
-// qlt singleton constant.
-template<NodeType node>
-static std::optional<int> qlt_singleton_cmp(
-    const tree<node>& c1, const tree<node>& c2)
-{
-    if constexpr (ba_variant_includes_v<qlt, typename tree<node>::constant>) {
-        using tau = tree<node>;
-        // bf_f = -∞, bf_t = +∞ as DLO sentinels; only compare if both sides are known
-        const bool c1_neg_inf = c1.is(tau::bf_f);
-        const bool c1_pos_inf = c1.is(tau::bf_t);
-        const bool c2_neg_inf = c2.is(tau::bf_f);
-        const bool c2_pos_inf = c2.is(tau::bf_t);
-        const bool c1_known = c1_neg_inf || c1_pos_inf || c1.is_ba_constant();
-        const bool c2_known = c2_neg_inf || c2_pos_inf || c2.is_ba_constant();
-        if (!c1_known || !c2_known) return {}; // variable side: undetermined
-        if (c1_neg_inf && c2_neg_inf) return 0;
-        if (c1_pos_inf && c2_pos_inf) return 0;
-        if (c1_neg_inf || c2_pos_inf) return -1; // -∞ < anything, anything < +∞
-        if (c1_pos_inf || c2_neg_inf) return +1; // +∞ > anything, anything > -∞
-
-        if (!c1.is_ba_constant() || !c2.is_ba_constant()) return {};
-        auto v1 = c1.get_ba_constant();
-        auto v2 = c2.get_ba_constant();
-        if (!std::holds_alternative<qlt>(v1) || !std::holds_alternative<qlt>(v2))
-            return {};
-        const auto& q1 = std::get<qlt>(v1);
-        const auto& q2 = std::get<qlt>(v2);
-        if (q1.pieces.size() != 1 || q2.pieces.size() != 1) return {};
-        const auto& p1 = q1.pieces[0];
-        const auto& p2 = q2.pieces[0];
-        if (p1.lo.val != p1.hi.val || p2.lo.val != p2.hi.val) return {};
-        using bound_t = std::remove_cvref_t<decltype(p1.lo.bound)>;
-        if (p1.lo.bound != bound_t::CLOSED || p1.hi.bound != bound_t::CLOSED) return {};
-        if (p2.lo.bound != bound_t::CLOSED || p2.hi.bound != bound_t::CLOSED) return {};
-        if (!p1.lo.val.is_finite() || !p2.lo.val.is_finite()) return {};
-        if (p1.lo.val < p2.lo.val) return -1;
-        if (p1.lo.val > p2.lo.val) return +1;
-        return 0;
-    }
-    return {};
+/**
+ * @brief The type whose BA answers for a comparison of @p ch.
+ *
+ * The left operand's type normally decides, but a non-aba omega-categorical BA
+ * answers from either side: its constants may sit on the right of an otherwise
+ * untyped comparison.
+ */
+template <NodeType node>
+static size_t comparison_ba_type(const tree<node>& a1, const tree<node>& a2) {
+	const size_t tl = a1.get_ba_type();
+	if (pack_type_is_non_aba_omcat<node>(tl)) return tl;
+	const size_t tr = a2.get_ba_type();
+	return pack_type_is_non_aba_omcat<node>(tr) ? tr : tl;
 }
 
 template <NodeType node>
@@ -304,24 +275,13 @@ tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 	}
 
 	// The owning BA may define the operator differently
-	if (auto hook_r = hooks_detail::try_wff_lt<node>(ch, r,
-			arg1_fm(ch).get_ba_type()))
-	{
+	const size_t cmp_ba = comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch));
+	if (auto hook_r = hooks_detail::try_wff_lt<node>(ch, r, cmp_ba)) {
 		HOOK_LOGGING(applied("Using the BA's own definition for <.");)
 		return *hook_r;
 	}
-	if (pack_ba_type_has_wff_lt_hook<node>(arg1_fm(ch).get_ba_type()))
+	if (pack_ba_type_has_wff_lt_hook<node>(cmp_ba))
 		return tau::get_raw(v, ch, len, r);
-	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
-	{
-		auto ba = arg1_fm(ch).get_ba_type();
-		if (!is_omcat_type_family<node>(ba)) ba = arg2_fm(ch).get_ba_type();
-		if (is_omcat_type_family<node>(ba)) {
-			if (auto cmp = qlt_singleton_cmp<node>(arg1(ch), arg2(ch)); cmp)
-				return (*cmp < 0) ? _T(v, ch, len, r) : _F(v, ch, len, r);
-			return tau::get_raw(v, ch, len, r);
-		}
-	}
 
 	return tau::get(build_wff_and<node>(
 		build_bf_eq_0<node>(build_bf_and<node>(arg1_fm(ch).get(),
@@ -387,24 +347,13 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 	}
 
 	// The owning BA may define the operator differently
-	if (auto hook_r = hooks_detail::try_wff_nlt<node>(ch, r,
-			arg1_fm(ch).get_ba_type()))
-	{
+	const size_t cmp_ba = comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch));
+	if (auto hook_r = hooks_detail::try_wff_nlt<node>(ch, r, cmp_ba)) {
 		HOOK_LOGGING(applied("Using the BA's own definition for !<.");)
 		return *hook_r;
 	}
-	if (pack_ba_type_has_wff_nlt_hook<node>(arg1_fm(ch).get_ba_type()))
+	if (pack_ba_type_has_wff_nlt_hook<node>(cmp_ba))
 		return tau::get_raw(v, ch, len, r);
-	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
-	{
-		auto ba = arg1_fm(ch).get_ba_type();
-		if (!is_omcat_type_family<node>(ba)) ba = arg2_fm(ch).get_ba_type();
-		if (is_omcat_type_family<node>(ba)) {
-			if (auto cmp = qlt_singleton_cmp<node>(arg1(ch), arg2(ch)); cmp)
-				return (*cmp >= 0) ? _T(v, ch, len, r) : _F(v, ch, len, r); // !< means >=
-			return tau::get_raw(v, ch, len, r);
-		}
-	}
 
 	return tau::get(build_wff_or<node>(
 		build_bf_neq_0<node>(build_bf_and<node>(arg1_fm(ch).get(),
@@ -471,24 +420,13 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 	}
 
 	// The owning BA may define the operator differently
-	if (auto hook_r = hooks_detail::try_wff_lteq<node>(ch, r,
-			arg1_fm(ch).get_ba_type()))
-	{
+	const size_t cmp_ba = comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch));
+	if (auto hook_r = hooks_detail::try_wff_lteq<node>(ch, r, cmp_ba)) {
 		HOOK_LOGGING(applied("Using the BA's own definition for <=.");)
 		return *hook_r;
 	}
-	if (pack_ba_type_has_wff_lteq_hook<node>(arg1_fm(ch).get_ba_type()))
+	if (pack_ba_type_has_wff_lteq_hook<node>(cmp_ba))
 		return tau::get_raw(v, ch, len, r);
-	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
-	{
-		auto ba = arg1_fm(ch).get_ba_type();
-		if (!is_omcat_type_family<node>(ba)) ba = arg2_fm(ch).get_ba_type();
-		if (is_omcat_type_family<node>(ba)) {
-			if (auto cmp = qlt_singleton_cmp<node>(arg1(ch), arg2(ch)); cmp)
-				return (*cmp <= 0) ? _T(v, ch, len, r) : _F(v, ch, len, r); // <=
-			return tau::get_raw(v, ch, len, r);
-		}
-	}
 
 	return tau::get(build_bf_eq_0<node>(build_bf_and<node>(arg1_fm(ch).get(),
 		build_bf_neg<node>(arg2_fm(ch).get()))), r);
@@ -536,24 +474,13 @@ tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r
 	}
 
 	// The owning BA may define the operator differently
-	if (auto hook_r = hooks_detail::try_wff_nlteq<node>(ch, r,
-			arg1_fm(ch).get_ba_type()))
-	{
+	const size_t cmp_ba = comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch));
+	if (auto hook_r = hooks_detail::try_wff_nlteq<node>(ch, r, cmp_ba)) {
 		HOOK_LOGGING(applied("Using the BA's own definition for !<=.");)
 		return *hook_r;
 	}
-	if (pack_ba_type_has_wff_nlteq_hook<node>(arg1_fm(ch).get_ba_type()))
+	if (pack_ba_type_has_wff_nlteq_hook<node>(cmp_ba))
 		return tau::get_raw(v, ch, len, r);
-	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
-	{
-		auto ba = arg1_fm(ch).get_ba_type();
-		if (!is_omcat_type_family<node>(ba)) ba = arg2_fm(ch).get_ba_type();
-		if (is_omcat_type_family<node>(ba)) {
-			if (auto cmp = qlt_singleton_cmp<node>(arg1(ch), arg2(ch)); cmp)
-				return (*cmp > 0) ? _T(v, ch, len, r) : _F(v, ch, len, r); // !<= means >
-			return tau::get_raw(v, ch, len, r);
-		}
-	}
 
 	return tau::get(build_bf_neq_0<node>(build_bf_and<node>(arg1_fm(ch).get(),
 		build_bf_neg<node>(arg2_fm(ch).get()))), r);
@@ -601,24 +528,13 @@ tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 	}
 
 	// The owning BA may define the operator differently
-	if (auto hook_r = hooks_detail::try_wff_gt<node>(ch, r,
-			arg1_fm(ch).get_ba_type()))
-	{
+	const size_t cmp_ba = comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch));
+	if (auto hook_r = hooks_detail::try_wff_gt<node>(ch, r, cmp_ba)) {
 		HOOK_LOGGING(applied("Using the BA's own definition for >.");)
 		return *hook_r;
 	}
-	if (pack_ba_type_has_wff_gt_hook<node>(arg1_fm(ch).get_ba_type()))
+	if (pack_ba_type_has_wff_gt_hook<node>(cmp_ba))
 		return tau::get_raw(v, ch, len, r);
-	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
-	{
-		auto ba = arg1_fm(ch).get_ba_type();
-		if (!is_omcat_type_family<node>(ba)) ba = arg2_fm(ch).get_ba_type();
-		if (is_omcat_type_family<node>(ba)) {
-			if (auto cmp = qlt_singleton_cmp<node>(arg1(ch), arg2(ch)); cmp)
-				return (*cmp > 0) ? _T(v, ch, len, r) : _F(v, ch, len, r); // >
-			return tau::get_raw(v, ch, len, r);
-		}
-	}
 
 	return tau::get(build_wff_and<node>(
 		build_bf_eq_0<node>(build_bf_and<node>(arg2_fm(ch).get(),
@@ -668,24 +584,13 @@ tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) 
 	}
 
 	// The owning BA may define the operator differently
-	if (auto hook_r = hooks_detail::try_wff_ngt<node>(ch, r,
-			arg1_fm(ch).get_ba_type()))
-	{
+	const size_t cmp_ba = comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch));
+	if (auto hook_r = hooks_detail::try_wff_ngt<node>(ch, r, cmp_ba)) {
 		HOOK_LOGGING(applied("Using the BA's own definition for !>.");)
 		return *hook_r;
 	}
-	if (pack_ba_type_has_wff_ngt_hook<node>(arg1_fm(ch).get_ba_type()))
+	if (pack_ba_type_has_wff_ngt_hook<node>(cmp_ba))
 		return tau::get_raw(v, ch, len, r);
-	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
-	{
-		auto ba = arg1_fm(ch).get_ba_type();
-		if (!is_omcat_type_family<node>(ba)) ba = arg2_fm(ch).get_ba_type();
-		if (is_omcat_type_family<node>(ba)) {
-			if (auto cmp = qlt_singleton_cmp<node>(arg1(ch), arg2(ch)); cmp)
-				return (*cmp <= 0) ? _T(v, ch, len, r) : _F(v, ch, len, r); // !> means <=
-			return tau::get_raw(v, ch, len, r);
-		}
-	}
 
 	return tau::get(build_wff_or<node>(
 		build_bf_neq_0<node>(build_bf_and<node>(arg2_fm(ch).get(),
@@ -735,24 +640,13 @@ tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r)
 	}
 
 	// The owning BA may define the operator differently
-	if (auto hook_r = hooks_detail::try_wff_gteq<node>(ch, r,
-			arg1_fm(ch).get_ba_type()))
-	{
+	const size_t cmp_ba = comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch));
+	if (auto hook_r = hooks_detail::try_wff_gteq<node>(ch, r, cmp_ba)) {
 		HOOK_LOGGING(applied("Using the BA's own definition for >=.");)
 		return *hook_r;
 	}
-	if (pack_ba_type_has_wff_gteq_hook<node>(arg1_fm(ch).get_ba_type()))
+	if (pack_ba_type_has_wff_gteq_hook<node>(cmp_ba))
 		return tau::get_raw(v, ch, len, r);
-	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
-	{
-		auto ba = arg1_fm(ch).get_ba_type();
-		if (!is_omcat_type_family<node>(ba)) ba = arg2_fm(ch).get_ba_type();
-		if (is_omcat_type_family<node>(ba)) {
-			if (auto cmp = qlt_singleton_cmp<node>(arg1(ch), arg2(ch)); cmp)
-				return (*cmp >= 0) ? _T(v, ch, len, r) : _F(v, ch, len, r); // >=
-			return tau::get_raw(v, ch, len, r);
-		}
-	}
 
 	return tau::get(build_bf_eq_0<node>(build_bf_and<node>(arg2_fm(ch).get(),
 				build_bf_neg<node>(arg1_fm(ch).get()))), r);
@@ -800,24 +694,13 @@ tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r
 	}
 
 	// The owning BA may define the operator differently
-	if (auto hook_r = hooks_detail::try_wff_ngteq<node>(ch, r,
-			arg1_fm(ch).get_ba_type()))
-	{
+	const size_t cmp_ba = comparison_ba_type<node>(arg1_fm(ch), arg2_fm(ch));
+	if (auto hook_r = hooks_detail::try_wff_ngteq<node>(ch, r, cmp_ba)) {
 		HOOK_LOGGING(applied("Using the BA's own definition for !>=.");)
 		return *hook_r;
 	}
-	if (pack_ba_type_has_wff_ngteq_hook<node>(arg1_fm(ch).get_ba_type()))
+	if (pack_ba_type_has_wff_ngteq_hook<node>(cmp_ba))
 		return tau::get_raw(v, ch, len, r);
-	// omcat types (e.g., qlt): unit-eliminate ground constant comparisons; pass through for cvc5
-	{
-		auto ba = arg1_fm(ch).get_ba_type();
-		if (!is_omcat_type_family<node>(ba)) ba = arg2_fm(ch).get_ba_type();
-		if (is_omcat_type_family<node>(ba)) {
-			if (auto cmp = qlt_singleton_cmp<node>(arg1(ch), arg2(ch)); cmp)
-				return (*cmp < 0) ? _T(v, ch, len, r) : _F(v, ch, len, r); // !>= means <
-			return tau::get_raw(v, ch, len, r);
-		}
-	}
 
 	return tau::get(build_bf_neq_0<node>(build_bf_and<node>(arg2_fm(ch).get(),
 				build_bf_neg<node>(arg1_fm(ch).get()))), r);

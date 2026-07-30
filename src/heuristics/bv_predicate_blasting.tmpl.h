@@ -668,7 +668,7 @@ static tref wff_predicate_blasting(tref term) {
 		// bvlt/bvgt/... in bv_predicate_blasting_comparisons.tmpl.h).
 		// Other BA types (qlt, sbf, tau, hsb, nlang, ...) reuse these
 		// same node kinds for their own orderings, already resolved by
-		// their own hooks (e.g. qlt_singleton_cmp in hooks_tau.tmpl.h).
+		// their own ba_wff_hooks specialization.
 		// Blasting a non-bv atom here misreads its operand's bitwidth as
 		// 0 (get_bv_type_bitwidth logs an error and returns 0), which
 		// then underflows bitwidth-1 into a huge index and corrupts

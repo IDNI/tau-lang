@@ -305,6 +305,30 @@ const intptr_t* pack_cast(const intptr_t* symbol, size_t ba_type) {
 }
 
 /**
+ * @brief `true` when the BA owning @p ba_type is a non-aba omega-categorical BA.
+ *
+ * Reads the descriptor flag rather than asking whether the pack contains a
+ * particular BA, so core states the property it depends on instead of the name
+ * of the algebra that happens to have it.
+ */
+template <typename Node>
+bool pack_type_is_non_aba_omcat(size_t ba_type) {
+	if (!ba_type) return false;
+	bool out = false;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_has_descriptor_v<Node, BA>)
+				if (!out && ba_descriptor<BA, Node>::non_aba_omcat
+					&& ba_descriptor<BA, Node>::owns_type(ba_type))
+						out = true;
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
+/**
  * @brief Defines `pack_ba_type_has_<mem>_hook<Node>(ba_type)` for one operator.
  *
  * Answers "does the BA owning this type define this comparison at all", which
