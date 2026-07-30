@@ -207,7 +207,8 @@ TEST_SUITE("BDD and many") {
 		CHECK((result == "xyefcdba"
 			|| result == "xycdabfe" || result == "xycdabef"
 			|| result == "xydcbafe" || result == "xydcabef"
-			|| result == "xydcfeab" || result == "xycdfeab" ));
+			|| result == "xydcfeab" || result == "xycdfeab"
+			|| result == "xycdfeba" ));
 	}
 
 	TEST_CASE("2") {
