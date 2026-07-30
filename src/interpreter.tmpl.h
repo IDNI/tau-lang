@@ -734,26 +734,11 @@ std::pair<std::optional<assignment<node>>, bool>
 		if (auto it = global.find(ot); it == global.end()) {
 			auto emit_default_zero = [&]() {
 				// The owning BA supplies its own zero; nullptr means no BA in
-				// the pack owns this type, so fall through to the cases below.
+				// the pack owns this type, so fall back to the generic zero.
 				if (tref zero_term = pack_zero_constant<node>(ctype)) {
 					memory.emplace(ot, zero_term);
 					global.emplace(ot, zero_term);
 					return;
-				}
-				if constexpr (ba_variant_includes_v<qlt, typename tau::constant>) {
-					if (is_omcat_type_family<node>(ctype)) {
-						// qlt: default to finite rational {0}:qlt (never bf_f, per DLO semantics)
-						qlt z;
-						qlt_piece p;
-						p.lo = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
-						p.hi = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
-						z.pieces.push_back(p);
-						auto zero_term = tau::get(tau::bf, {
-							tau::get_ba_constant(typename tau::constant(z), ctype)});
-						memory.emplace(ot, zero_term);
-						global.emplace(ot, zero_term);
-						return;
-					}
 				}
 				memory.emplace(ot, tau::_0(ctype));
 				global.emplace(ot, tau::_0(ctype));

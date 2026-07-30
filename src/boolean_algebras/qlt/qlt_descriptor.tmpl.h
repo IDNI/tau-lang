@@ -86,6 +86,22 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	{
 		return parse_qlt<PackBAs...>(src);
 	}
+
+	/**
+	 * @brief The singleton `{0}`, wrapped as a bf constant.
+	 *
+	 * A dense linear order has no bottom element, so qlt's default is the
+	 * finite rational 0 rather than bf_f.
+	 */
+	static tref zero_constant(size_t ba_type) {
+		qlt z;
+		qlt_piece p;
+		p.lo = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
+		p.hi = qlt_endpoint{qlt_rational(0, 1), qlt_bound::CLOSED};
+		z.pieces.push_back(p);
+		return tau::get(tau::bf, { tau::get_ba_constant(
+			typename node_t::constant(z), ba_type) });
+	}
 };
 
 } // namespace idni::tau_lang
