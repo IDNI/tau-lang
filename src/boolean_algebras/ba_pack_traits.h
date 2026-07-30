@@ -274,6 +274,35 @@ const intptr_t* pack_zero_constant(size_t ba_type) {
 	return out;
 }
 
+/** @brief `true` when @p BA's descriptor builds a constant from a plain value. */
+template <typename Node, typename BA>
+concept ba_has_value_constant = requires(size_t t, size_t v) {
+	ba_descriptor<BA, Node>::value_constant(t, v);
+};
+
+/**
+ * @brief Constant of @p ba_type holding @p value, from the BA that owns it.
+ *
+ * Returns nullptr when no BA owns the type or offers the capability. Lets core
+ * ask for "the constant 1 of this type" without knowing how wide it is or how
+ * the BA represents it.
+ */
+template <typename Node>
+const intptr_t* pack_value_constant(size_t ba_type, size_t value) {
+	const intptr_t* out = nullptr;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
+			if constexpr (ba_has_value_constant<Node, BA>)
+				if (!out && ba_descriptor<BA, Node>::owns_type(ba_type))
+					out = ba_descriptor<BA, Node>::value_constant(
+						ba_type, value);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
 /**
  * @brief `true` when the BA owning @p ba_type is a non-aba omega-categorical BA.
  *

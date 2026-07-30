@@ -397,14 +397,8 @@ post_normalization:
 				// (same pattern used by complete_outputs: bf-wrap via
 				// tau::get(tau::bf, {...})).
 				const size_t bv_tid = get_ba_type_id<node>(bv_type<node>());
-				const size_t bv_sz  =
-					get_bv_size<node>(get_ba_type_tree<node>(bv_tid));
-				tref bv_one_val  = tau::get(tau::bf, {
-					tau::get_ba_constant(
-						make_bitvector_value(bv_sz, 1), bv_tid)});
-				tref bv_zero_val = tau::get(tau::bf, {
-					tau::get_ba_constant(
-						make_bitvector_bottom_elem(bv_sz), bv_tid)});
+				tref bv_one_val  = pack_value_constant<node>(bv_tid, 1);
+				tref bv_zero_val = pack_value_constant<node>(bv_tid, 0);
 
 				for (int j = 0; j < k; ++j) {
 					// Parse sv_j[t-1]:bv = {0} to get the io_var

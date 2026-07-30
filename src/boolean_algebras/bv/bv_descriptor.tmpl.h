@@ -169,6 +169,20 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 			.find("Unexpected end of file") != std::string::npos;
 	}
 
+	/**
+	 * @brief The bitvector of @p ba_type holding @p value, as a bf constant.
+	 *
+	 * The width comes from the type, so callers name a value and a type and
+	 * never a bitwidth.
+	 */
+	static tref value_constant(size_t ba_type, size_t value) {
+		return tau::get(tau::bf, { tau::get_ba_constant(
+			make_bitvector_value(
+				get_bv_size<node_t>(get_ba_type_tree<node_t>(ba_type)),
+				value),
+			ba_type) });
+	}
+
 	/** @brief The all-zeros bitvector of @p ba_type, wrapped as a bf constant. */
 	static tref zero_constant(size_t ba_type) {
 		return tau::get(tau::bf, { tau::get_ba_constant(
