@@ -804,7 +804,7 @@ tref term_nand(tref symbol) {
 
 // Cast a bitvector constant to a different width (zero-extend or truncate)
 template<NodeType node>
-tref bv_term_cast(tref symbol, size_t target_type_id) {
+tref term_cast(tref symbol, size_t target_type_id) {
 	using tau = tree<node>;
 
 	DBG(LOG_TRACE << "term_cast/symbol:" << LOG_FM_TREE(symbol) << "\n";)

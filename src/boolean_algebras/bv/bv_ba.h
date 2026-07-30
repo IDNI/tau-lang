@@ -330,6 +330,8 @@ template<NodeType node> tref term_nor(tref symbol);
 template<NodeType node> tref term_xnor(tref symbol);
 /** @brief Simplify a `nand` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_nand(tref symbol);
+/** @brief Cast the constant in `cast` node @p symbol to @p target_type_id. */
+template<NodeType node> tref term_cast(tref symbol, size_t target_type_id);
 
 /** @brief Apply all BV symbol-level simplifications to @p symbol. */
 template<NodeType node> tref simplify_bv_symbol(tref symbol);
