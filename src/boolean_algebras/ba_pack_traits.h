@@ -274,36 +274,6 @@ const intptr_t* pack_zero_constant(size_t ba_type) {
 	return out;
 }
 
-/** @brief `true` when @p BA's descriptor casts a constant between its types. */
-template <typename Node, typename BA>
-concept ba_has_cast = requires(const intptr_t* s, size_t t) {
-	ba_descriptor<BA, Node>::cast(s, t);
-};
-
-/**
- * @brief Cast @p symbol to @p ba_type, through the BA that owns that type.
- *
- * Returns nullptr when no BA in the pack owns the type or offers the capability,
- * so the caller keeps the symbol it already built rather than branching on a BA
- * name. As with pack_zero_constant, an empty case here is an ordinary runtime
- * outcome, not a sign that a gate has drifted.
- */
-template <typename Node>
-const intptr_t* pack_cast(const intptr_t* symbol, size_t ba_type) {
-	const intptr_t* out = nullptr;
-	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
-		([&] {
-			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
-			if constexpr (ba_has_cast<Node, BA>)
-				if (!out && ba_descriptor<BA, Node>::owns_type(ba_type))
-					out = ba_descriptor<BA, Node>::cast(
-						symbol, ba_type);
-		}(), ...);
-	}(std::make_index_sequence<
-		std::tuple_size_v<typename Node::bas_tuple>>{});
-	return out;
-}
-
 /**
  * @brief `true` when the BA owning @p ba_type is a non-aba omega-categorical BA.
  *

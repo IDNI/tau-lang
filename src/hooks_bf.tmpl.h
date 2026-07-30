@@ -5,6 +5,37 @@
 
 namespace idni::tau_lang {
 
+namespace hooks_detail {
+
+/**
+ * @brief Cast @p symbol to @p ba_type through the BA owning that type.
+ *
+ * Returns nullptr when no BA owns the type or none defines the hook, so the
+ * caller keeps the symbol it already built. An owner that declines the cast
+ * returns @p symbol itself, which is the same answer.
+ */
+template <typename node_t>
+tref try_term_cast(tref symbol, size_t ba_type) {
+	if (!ba_type) return nullptr;
+	tref out = nullptr;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		using pack = typename node_t::bas_tuple;
+		([&] {
+			using BA = std::tuple_element_t<Is, pack>;
+			if constexpr (ba_has_descriptor_v<node_t, BA>
+				&& requires(tref s, size_t t) {
+					ba_term_hooks<BA, node_t>::term_cast(s, t); })
+				if (!out && ba_descriptor<BA, node_t>::owns_type(ba_type))
+					out = ba_term_hooks<BA, node_t>::term_cast(
+						symbol, ba_type);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename node_t::bas_tuple>>{});
+	return out;
+}
+
+} // namespace hooks_detail
+
 // Return a bare wff(wff_t) / wff(wff_f) node with the given right
 // sibling.  Unlike tau::_T()/tau::_F(), these have nonterminal wff(15)
 // so the rewriter and hook assertions accept them.
@@ -492,7 +523,8 @@ tref get_hook<node>::term_cast(const node& v, const tref* ch, size_t len, tref r
 	tref symbol = tau::get_raw(v, ch, len, r);
 
 	// Let the BA owning the target type do the cast, if it offers one
-	if (tref cast = pack_cast<node>(symbol, target_type_id)) return cast;
+	if (tref cast = hooks_detail::try_term_cast<node>(symbol, target_type_id))
+		return cast;
 
 	return symbol;
 }

@@ -46,6 +46,22 @@ struct ba_wff_hooks<bv, node<PackBAs...>> {
 	}
 };
 
+template <typename... PackBAs>
+struct ba_term_hooks<bv, node<PackBAs...>> {
+	using node_t = node<PackBAs...>;
+
+	/**
+	 * @brief Retype the constant in cast node @p symbol to @p ba_type.
+	 *
+	 * Zero-extends or truncates, and returns @p symbol unchanged when the
+	 * operand is not a constant. The call is qualified because this member
+	 * hides the namespace-scope template of the same name.
+	 */
+	static tref term_cast(tref symbol, size_t ba_type) {
+		return idni::tau_lang::term_cast<node_t>(symbol, ba_type);
+	}
+};
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_HOOKS_EXT_TMPL_H__

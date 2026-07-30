@@ -154,16 +154,6 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 	static void set_preprocessing(bool enabled) { bv_blasting = enabled; }
 
-	/**
-	 * @brief Retype the constant in cast node @p symbol to @p ba_type.
-	 *
-	 * Zero-extends or truncates; returns @p symbol when the operand is not a
-	 * constant, so a non-null result never means the cast was folded.
-	 */
-	static tref cast(tref symbol, size_t ba_type) {
-		return term_cast<node_t>(symbol, ba_type);
-	}
-
 	/** @brief The all-zeros bitvector of @p ba_type, wrapped as a bf constant. */
 	static tref zero_constant(size_t ba_type) {
 		return tau::get(tau::bf, { tau::get_ba_constant(
