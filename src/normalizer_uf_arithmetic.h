@@ -2,15 +2,15 @@
 
 /**
  * @file normalizer_uf_arithmetic.h
- * @brief Scoped-union-find-based bitvector-arithmetic taint tracking.
+ * @brief Scoped-union-find-based arithmetic taint tracking.
  *
- * Identifies bitvector-arithmetic residue left after predicate blasting so
+ * Identifies arithmetic residue left after the owning BA's preprocessing so
  * `eliminate_arithmetic_and_quantifiers` (see `normalizer.tmpl.h`) can tell
  * `anti_prenex_block` which nodes to leave alone rather than Boole-decompose.
  * Uses a `scoped_union_find` (see `type_scoped_resolver.h` for the
  * established pattern this follows), unifying each atomic formula with its
- * own BV-typed free variables so arithmetic taint propagates to all of
- * them, not just the direct operands of an arithmetic operator.
+ * own free variables whose type carries arithmetic, so taint propagates to
+ * all of them, not just the direct operands of an arithmetic operator.
  */
 
 #ifndef __IDNI__TAU__NORMALIZER_UF_ARITHMETIC_H__
@@ -51,12 +51,12 @@ inline arith_kind unify(arith_kind a, arith_kind b) {
  * Naming note: `insert` here delegates to the underlying union-find's
  * `push` (current-scope-only, no search) -- the opposite of
  * `type_scoped_resolver::insert`, which delegates to the union-find's
- * `insert` (search-enclosing-then-global). `bv_arithmetic_resolver` only
+ * `insert` (search-enclosing-then-global). `arithmetic_resolver` only
  * ever needs the direct-declare variant as its own public method.
  * @tparam node Tree node type satisfying `NodeType`.
  */
 template<NodeType node>
-struct bv_arithmetic_resolver {
+struct arithmetic_resolver {
 	using uf_t = scoped_union_find<tref, idni::subtree_less<node>>;
 	using element = typename uf_t::element;
 	using scope = typename uf_t::scope;
@@ -91,11 +91,11 @@ struct bv_arithmetic_resolver {
 };
 
 /**
- * @brief Collect bitvector-arithmetic-tainted variable/atomic-formula nodes in @p formula.
+ * @brief Collect arithmetic-tainted variable/atomic-formula nodes in @p formula.
  *
  * Scopes on every quantifier (`wff_ex`/`wff_all`) so two unrelated quantifiers
  * binding the same variable name/`tref` never cross-taint each other. Unions
- * each atomic formula with its own BV-typed free variables, so taint
+ * each atomic formula with its own arithmetic-typed free variables, so taint
  * propagates to variables entangled in an arithmetic equation even when they
  * aren't a direct operand of the arithmetic operator.
  * @tparam node Tree node type.
@@ -103,16 +103,16 @@ struct bv_arithmetic_resolver {
  * @return Set of variable/atomic-formula nodes resolved to `arith_kind::arithmetic`.
  */
 template <NodeType node>
-subtree_unordered_set<node> collect_bv_arithmetic_taint_uf(tref formula);
+subtree_unordered_set<node> collect_arithmetic_taint_uf(tref formula);
 
 /**
- * @brief Build a `skip` predicate from `collect_bv_arithmetic_taint_uf`'s result.
+ * @brief Build a `skip` predicate from `collect_arithmetic_taint_uf`'s result.
  * @tparam node Tree node type.
  * @param formula Formula to scan.
  * @return Predicate suitable as `anti_prenex_block`'s `skip` argument.
  */
 template <NodeType node>
-std::function<bool(tref)> make_bv_arithmetic_skip_uf(tref formula);
+std::function<bool(tref)> make_arithmetic_skip_uf(tref formula);
 
 } // namespace idni::tau_lang
 

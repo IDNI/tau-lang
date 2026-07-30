@@ -61,7 +61,7 @@ tref eliminate_arithmetic_and_quantifiers(tref form) {
 	form = anti_prenex_block<node>(form);
 	form = resolve_quantifiers<node>(form);
 	if constexpr (pack_has_arithmetic_theory_v<node>) {
-		auto arith_skip = make_bv_arithmetic_skip_uf<node>(form);
+		auto arith_skip = make_arithmetic_skip_uf<node>(form);
 		form = anti_prenex_block<node>(form, arith_skip);
 		form = resolve_quantifiers<node>(form);
 		if (get_free_vars<node>(form).empty()

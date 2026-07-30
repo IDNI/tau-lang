@@ -5,17 +5,17 @@
 
 #include "normalizer_uf_arithmetic.h"
 
-TEST_SUITE("bv_arithmetic_resolver") {
+TEST_SUITE("arithmetic_resolver") {
 
 	TEST_CASE("insert declares in current scope, kind_of defaults to logical") {
-		bv_arithmetic_resolver<node_t> r;
+		arithmetic_resolver<node_t> r;
 		tref x = tau::build_variable("x", untyped_type_id<node_t>());
 		r.insert(x, arith_kind::logical);
 		CHECK(r.kind_of(x) == arith_kind::logical);
 	}
 
 	TEST_CASE("assign joins kinds: logical then arithmetic becomes arithmetic") {
-		bv_arithmetic_resolver<node_t> r;
+		arithmetic_resolver<node_t> r;
 		tref x = tau::build_variable("x", untyped_type_id<node_t>());
 		r.assign(x, arith_kind::logical);
 		r.assign(x, arith_kind::arithmetic);
@@ -23,7 +23,7 @@ TEST_SUITE("bv_arithmetic_resolver") {
 	}
 
 	TEST_CASE("merge joins two nodes' kinds and unifies their sets") {
-		bv_arithmetic_resolver<node_t> r;
+		arithmetic_resolver<node_t> r;
 		tref x = tau::build_variable("x", untyped_type_id<node_t>());
 		tref y = tau::build_variable("y", untyped_type_id<node_t>());
 		r.assign(x, arith_kind::logical);
@@ -34,7 +34,7 @@ TEST_SUITE("bv_arithmetic_resolver") {
 	}
 
 	TEST_CASE("open/close isolate a same-named variable across sibling scopes") {
-		bv_arithmetic_resolver<node_t> r;
+		arithmetic_resolver<node_t> r;
 		tref x1 = tau::build_variable("x", untyped_type_id<node_t>());
 		r.open();
 		r.insert(x1, arith_kind::logical);
@@ -59,7 +59,7 @@ tref parse_bv_formula(const std::string& spec) {
 bool is_tainted(tref formula, const std::string& var_name) {
 	// select_all (not get_free_vars) so this also finds variables bound
 	// by a quantifier, not just genuinely free ones.
-	auto skip = make_bv_arithmetic_skip_uf<node_t>(formula);
+	auto skip = make_arithmetic_skip_uf<node_t>(formula);
 	for (tref v : tau::get(formula).select_all(
 		(bool(*)(tref)) is_var_or_capture<node_t>))
 		if (get_var_name<node_t>(v) == var_name)
@@ -70,7 +70,7 @@ bool is_tainted(tref formula, const std::string& var_name) {
 
 } // namespace
 
-TEST_SUITE("make_bv_arithmetic_skip_uf") {
+TEST_SUITE("make_arithmetic_skip_uf") {
 
 	TEST_CASE("x + y * z = w taints w, not just y and z") {
 		// y*z is arithmetic; y and z are direct operands. w is only
@@ -101,7 +101,7 @@ TEST_SUITE("make_bv_arithmetic_skip_uf") {
 		// just the arithmetic operator's direct operands.
 		const std::string sample = "x + { 1 }:bv[4] = { 2 }:bv[4]";
 		tref fm = parse_bv_formula(sample);
-		auto tainted = collect_bv_arithmetic_taint_uf<node_t>(fm);
+		auto tainted = collect_arithmetic_taint_uf<node_t>(fm);
 		CHECK(!tainted.empty());
 		CHECK(is_tainted(fm, "x"));
 	}
@@ -114,7 +114,7 @@ TEST_SUITE("make_bv_arithmetic_skip_uf") {
 			"(ex x x + { 1 }:bv[4] = { 2 }:bv[4]) "
 			"&& (ex x x = { 3 }:bv[4])";
 		tref fm = parse_bv_formula(sample);
-		auto skip = make_bv_arithmetic_skip_uf<node_t>(fm);
+		auto skip = make_arithmetic_skip_uf<node_t>(fm);
 		int arithmetic_atoms = 0, logical_atoms = 0;
 		for (tref atom : tau::get(fm).select_top(is_atomic_fm<node_t>))
 			skip(atom) ? ++arithmetic_atoms : ++logical_atoms;
@@ -132,7 +132,7 @@ TEST_SUITE("make_bv_arithmetic_skip_uf") {
 		const std::string sample =
 			"ex w ex y w + y * { 1 }:bv[4] = { 2 }:bv[4]";
 		tref fm = parse_bv_formula(sample);
-		auto skip = make_bv_arithmetic_skip_uf<node_t>(fm);
+		auto skip = make_arithmetic_skip_uf<node_t>(fm);
 		auto vars = tau::get(fm).select_all(
 			(bool(*)(tref)) is_var_or_capture<node_t>);
 		REQUIRE(vars.size() == 2);

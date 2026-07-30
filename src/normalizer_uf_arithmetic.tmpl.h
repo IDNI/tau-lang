@@ -6,34 +6,34 @@
 namespace idni::tau_lang {
 
 template<NodeType node>
-void bv_arithmetic_resolver<node>::open() {
+void arithmetic_resolver<node>::open() {
 	scoped.open();
 }
 
 template<NodeType node>
-std::optional<typename bv_arithmetic_resolver<node>::uf_t::scope_error>
-bv_arithmetic_resolver<node>::close() {
+std::optional<typename arithmetic_resolver<node>::uf_t::scope_error>
+arithmetic_resolver<node>::close() {
 	return scoped.close();
 }
 
 template<NodeType node>
-typename bv_arithmetic_resolver<node>::element
-bv_arithmetic_resolver<node>::insert(tref n, arith_kind k) {
+typename arithmetic_resolver<node>::element
+arithmetic_resolver<node>::insert(tref n, arith_kind k) {
 	auto e = scoped.push(n);
 	kinds.emplace(e, k);
 	return e;
 }
 
 template<NodeType node>
-arith_kind bv_arithmetic_resolver<node>::kind_of(tref n) {
+arith_kind arithmetic_resolver<node>::kind_of(tref n) {
 	auto root = scoped.root(scoped.insert(n));
 	if (auto it = kinds.find(root); it != kinds.end()) return it->second;
 	return kinds.emplace(root, arith_kind::logical).first->second;
 }
 
 template<NodeType node>
-typename bv_arithmetic_resolver<node>::element
-bv_arithmetic_resolver<node>::assign(tref n, arith_kind k) {
+typename arithmetic_resolver<node>::element
+arithmetic_resolver<node>::assign(tref n, arith_kind k) {
 	auto e = scoped.insert(n);
 	auto root = scoped.root(e);
 	if (auto it = kinds.find(root); it != kinds.end())
@@ -43,8 +43,8 @@ bv_arithmetic_resolver<node>::assign(tref n, arith_kind k) {
 }
 
 template<NodeType node>
-typename bv_arithmetic_resolver<node>::element
-bv_arithmetic_resolver<node>::merge(tref a, tref b) {
+typename arithmetic_resolver<node>::element
+arithmetic_resolver<node>::merge(tref a, tref b) {
 	auto ka = kind_of(a);
 	auto kb = kind_of(b);
 	auto new_root = scoped.merge(a, b);
@@ -53,10 +53,10 @@ bv_arithmetic_resolver<node>::merge(tref a, tref b) {
 }
 
 template <NodeType node>
-subtree_unordered_set<node> collect_bv_arithmetic_taint_uf(tref formula) {
+subtree_unordered_set<node> collect_arithmetic_taint_uf(tref formula) {
 	using tau = tree<node>;
 	subtree_unordered_set<node> tainted;
-	bv_arithmetic_resolver<node> resolver;
+	arithmetic_resolver<node> resolver;
 	// Not is<node>({...}): that factory's returned closure captures a
 	// std::initializer_list by value, whose backing array is a temporary
 	// destroyed at the end of the factory call's full expression --
@@ -73,7 +73,7 @@ subtree_unordered_set<node> collect_bv_arithmetic_taint_uf(tref formula) {
 			|| tau::get(n).is(tau::bf_cast);
 	};
 
-	auto snapshot_scope = [&](typename bv_arithmetic_resolver<node>::scope s) {
+	auto snapshot_scope = [&](typename arithmetic_resolver<node>::scope s) {
 		for (auto [elem, _] : resolver.scoped.uf)
 			if (elem.first == s && resolver.kind_of(elem.second)
 				== arith_kind::arithmetic)
@@ -95,7 +95,7 @@ subtree_unordered_set<node> collect_bv_arithmetic_taint_uf(tref formula) {
 				? arith_kind::arithmetic : arith_kind::logical;
 			resolver.assign(m, k);
 			for (tref v : get_free_vars<node>(m))
-				if (is_bv_type_family<node>(
+				if (pack_type_has_arith_ops<node>(
 					tau::get(v).get_ba_type()))
 					resolver.merge(m, v);
 			return false;
@@ -116,9 +116,9 @@ subtree_unordered_set<node> collect_bv_arithmetic_taint_uf(tref formula) {
 }
 
 template <NodeType node>
-std::function<bool(tref)> make_bv_arithmetic_skip_uf(tref formula) {
+std::function<bool(tref)> make_arithmetic_skip_uf(tref formula) {
 	auto tainted = std::make_shared<subtree_unordered_set<node>>(
-		collect_bv_arithmetic_taint_uf<node>(formula));
+		collect_arithmetic_taint_uf<node>(formula));
 	return [tainted](tref n) { return tainted->contains(n); };
 }
 
