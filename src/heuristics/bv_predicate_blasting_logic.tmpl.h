@@ -551,7 +551,7 @@ static tref make_bvshl_call(tref base, tref count /* bv constant */, tref shifte
  * @code{.cpp}
  * // count=3 for a 4-bit operand: shift-out is total once count >= bitwidth
  * // for smaller widths, or a per-bit shift-by-3 correspondence otherwise
- * auto count = tau::get(tau::bf, tau::get_bv_constant(4, 3));
+ * auto count = tau::get(tau::bf, bv_constant<node_t>(4, 3));
  * auto rule = bvshl_rule<node_t>(count);
  * @endcode
  */
@@ -652,7 +652,7 @@ static tref make_bvshr_call(tref base, tref count /* bv constant */, tref shifte
  * @par Example
  * @code{.cpp}
  * // count=1 for a 4-bit operand: equivalent to bvshr_by_one_rule(4)
- * auto count = tau::get(tau::bf, tau::get_bv_constant(4, 1));
+ * auto count = tau::get(tau::bf, bv_constant<node_t>(4, 1));
  * auto rule = bvshr_rule<node_t>(count);
  * @endcode
  */

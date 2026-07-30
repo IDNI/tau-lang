@@ -31,6 +31,18 @@ inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 	return std::make_pair(fm, s);
 }
 
+/**
+ * @brief A bitvector constant node of @p bitwidth bits holding @p value.
+ *
+ * Lives here rather than on tree<node>: core never builds a bv constant of a
+ * given width, only the blasting-predicate tests do.
+ */
+template <NodeType node>
+static tref bv_constant(size_t bitwidth, size_t value) {
+	return tree<node>::get_ba_constant(
+		make_bitvector_value(bitwidth, value), bv_type_id<node>(bitwidth));
+}
+
 // Bitvector type-id shorthands. These live here rather than in core: nothing
 // in src/ reads them, only the type-inference integration tests.
 /** @brief Cached type id for bitvector-8 under node @p node. */

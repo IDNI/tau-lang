@@ -547,11 +547,11 @@ tref bvmul(tref multiplicand, tref multiplier, tref product, trefs& aux);
  * auto x = tau::build_bf_variable(bv_type_id<node_t>(4));
  * auto q = tau::build_bf_variable(bv_type_id<node_t>(4));
  * auto r = tau::build_bf_variable(bv_type_id<node_t>(4));
- * auto divisor = tau::get(tau::bf, tau::get_bv_constant(4, 3));
+ * auto divisor = tau::get(tau::bf, bv_constant<node_t>(4, 3));
  * tref constraint = bved<node_t>(x, divisor, q, r, aux);
- * tref x10 = tau::build_bf_eq(x, tau::get(tau::bf, tau::get_bv_constant(4, 10)));
- * tref q3 = tau::build_bf_eq(q, tau::get(tau::bf, tau::get_bv_constant(4, 3)));
- * tref r1 = tau::build_bf_eq(r, tau::get(tau::bf, tau::get_bv_constant(4, 1)));
+ * tref x10 = tau::build_bf_eq(x, tau::get(tau::bf, bv_constant<node_t>(4, 10)));
+ * tref q3 = tau::build_bf_eq(q, tau::get(tau::bf, bv_constant<node_t>(4, 3)));
+ * tref r1 = tau::build_bf_eq(r, tau::get(tau::bf, bv_constant<node_t>(4, 1)));
  * tref good = tau::build_wff_and(tau::build_wff_and(constraint, x10),
  *     tau::build_wff_and(q3, r1));
  * CHECK( is_non_temp_nso_satisfiable<node_t>(good) );

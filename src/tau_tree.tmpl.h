@@ -507,19 +507,6 @@ tref tree<node>::get_ba_constant(
 	return get_ba_constant(typed_const.value());
 }
 
-template <NodeType node>
-tref tree<node>::get_bv_constant(size_t bitwidth, size_t value) {
-	if constexpr (!pack_has_arithmetic_theory_v<node>) {
-		(void) bitwidth, (void) value;
-		return nullptr; // no bitvector BA in this pack
-	} else {
-		auto cte = make_bitvector_value(bitwidth, value);
-		auto type_id = bv_type_id<node>(bitwidth);
-		LOG_TRACE << " -- get_bv_constant(size_t bitwidth, size_t value): `"
-			<<  bitwidth << ", " << value << "`";
-		return get_ba_constant(cte, type_id);
-	}
-}
 
 // -----------------------------------------------------------------------------
 // children

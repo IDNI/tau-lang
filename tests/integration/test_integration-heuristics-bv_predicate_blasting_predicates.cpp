@@ -139,7 +139,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bvshl_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 1)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvshl_rule<node>(tau::get(tau::bf, bv_constant<node_t>(4, 1)))) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -148,7 +148,7 @@ TEST_SUITE("bitblasting") {
 		using tau = tree<node>;
 
 		TAU_LOG_INFO << "bvshr_rule:\n";
-		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_rule<node>(tau::get(tau::bf, tau::get_bv_constant(4, 1)))) << "\n";
+		TAU_LOG_INFO << TAU_LOG_RULE(bvshr_rule<node>(tau::get(tau::bf, bv_constant<node_t>(4, 1)))) << "\n";
 		TAU_LOG_INFO << "------" << "\n";
 	}
 
@@ -159,7 +159,7 @@ TEST_SUITE("bitblasting") {
 		trefs aux;
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto z = tau::build_bf_variable(bv_type_id<node>(4));
-		auto c = tau::get(tau::bf, tau::get_bv_constant(4, 2));
+		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 2));
 		TAU_LOG_INFO << "bvmul:\n";
 		TAU_LOG_INFO << tau::get(bvmul<node>(x, c, z, aux)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
@@ -172,7 +172,7 @@ TEST_SUITE("bitblasting") {
 		trefs aux;
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto q = tau::build_bf_variable(bv_type_id<node>(4));
-		auto c = tau::get(tau::bf, tau::get_bv_constant(4, 2));
+		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 2));
 		TAU_LOG_INFO << "bvdiv:\n";
 		TAU_LOG_INFO << tau::get(bvdiv<node>(x, c, q, aux)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
@@ -185,7 +185,7 @@ TEST_SUITE("bitblasting") {
 		trefs aux;
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto r = tau::build_bf_variable(bv_type_id<node>(4));
-		auto c = tau::get(tau::bf, tau::get_bv_constant(4, 2));
+		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 2));
 		TAU_LOG_INFO << "bvmod:\n";
 		TAU_LOG_INFO << tau::get(bvmod<node>(x, c, r, aux)).to_str() << "\n";
 		TAU_LOG_INFO << "------" << "\n";
@@ -204,12 +204,12 @@ TEST_SUITE("bitblasting") {
 		auto x = tau::build_bf_variable(bv_type_id<node>(4));
 		auto q = tau::build_bf_variable(bv_type_id<node>(4));
 		auto r = tau::build_bf_variable(bv_type_id<node>(4));
-		auto c = tau::get(tau::bf, tau::get_bv_constant(4, 3));
+		auto c = tau::get(tau::bf, bv_constant<node_t>(4, 3));
 		tref constraint = bved<node>(x, c, q, r, aux);
-		tref x10 = tau::build_bf_eq(x, tau::get(tau::bf, tau::get_bv_constant(4, 10)));
-		tref q3 = tau::build_bf_eq(q, tau::get(tau::bf, tau::get_bv_constant(4, 3)));
-		tref r1 = tau::build_bf_eq(r, tau::get(tau::bf, tau::get_bv_constant(4, 1)));
-		tref r2 = tau::build_bf_eq(r, tau::get(tau::bf, tau::get_bv_constant(4, 2)));
+		tref x10 = tau::build_bf_eq(x, tau::get(tau::bf, bv_constant<node_t>(4, 10)));
+		tref q3 = tau::build_bf_eq(q, tau::get(tau::bf, bv_constant<node_t>(4, 3)));
+		tref r1 = tau::build_bf_eq(r, tau::get(tau::bf, bv_constant<node_t>(4, 1)));
+		tref r2 = tau::build_bf_eq(r, tau::get(tau::bf, bv_constant<node_t>(4, 2)));
 		tref good = tau::build_wff_and(tau::build_wff_and(constraint, x10),
 			tau::build_wff_and(q3, r1));
 		tref bad = tau::build_wff_and(tau::build_wff_and(constraint, x10),
