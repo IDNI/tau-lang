@@ -1618,7 +1618,10 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  whatis <term>           shows the type of the given term\n"
 		<< "  whatis <repl_history>   shows the type of the expression at the given history position\n"
 		<< "\n"
-		<< "type names: wff, bf, tau, sbf, bv, qint, qlt\n";
+		<< "type names: wff, bf";
+		// the BA type names are whatever the configured pack holds
+		for (const auto& n : node::ba::types()) std::cout << ", " << n;
+		std::cout << "\n";
 		break;
 	case tau::reset_sym: std::cout
 		<< "the reset command clears the REPL session state\n"
