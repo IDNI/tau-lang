@@ -9,6 +9,39 @@ namespace idni::tau_lang {
 
 using namespace cvc5;
 
+namespace repl_detail {
+
+/**
+ * @brief Is @p src a truncated literal of @p type_tree, per its owning BA?
+ *
+ * nullopt when no BA owns the type or none offers the capability, leaving the
+ * caller to fall back on tau's own parser. A definite `false` means the owner
+ * looked and found the literal complete, which is not the same answer.
+ */
+template <typename node_t>
+std::optional<bool> try_literal_incomplete(tref type_tree,
+	const std::string& src)
+{
+	if (!type_tree) return {};
+	std::optional<bool> out;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		using pack = typename node_t::bas_tuple;
+		([&] {
+			using BA = std::tuple_element_t<Is, pack>;
+			if constexpr (ba_has_descriptor_v<node_t, BA>
+				&& requires(const std::string& s) {
+					{ ba_descriptor<BA, node_t>::literal_incomplete(s) }
+						-> std::convertible_to<bool>; })
+				if (!out && ba_descriptor<BA, node_t>::owns_type(type_tree))
+					out = ba_descriptor<BA, node_t>::literal_incomplete(src);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename node_t::bas_tuple>>{});
+	return out;
+}
+
+} // namespace repl_detail
+
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
 #define TC_STATUS_OUTPUT TC(term::color::GREEN, term::color::BG_LIGHT_CYAN, \
 							term::color::BRIGHT)
@@ -603,24 +636,17 @@ requires BAsPack<BAs...>
 bool repl_evaluator<BAs...>::stream_value_incomplete(
 	const std::string& src, tref type_tree) const
 {
-	auto is_unexpected_end = [](const std::string& msg) {
-		return msg.find("Unexpected end of file") != std::string::npos;
-	};
-	if (is_sbf_type<node>(type_tree)) {
-		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
-		return !result.found && is_unexpected_end(result.parse_error
-			.to_str(sbf_parser::error::info_lvl::INFO_BASIC));
+	// The BA owning the type answers for its own literals.
+	if (auto r = repl_detail::try_literal_incomplete<node>(type_tree, src))
+		return *r;
+	// Only a tau value is a spec; tau_spec::parse() returns true on
+	// EOF-incomplete input and flags is_eof().
+	if (type_tree && is_tau_type<node>(type_tree)) {
+		tau_spec<node> s;
+		s.parse(src);
+		return s.is_eof();
 	}
-	if (is_bv_type_family<node>(type_tree)) {
-		auto result = bitvector_parser::instance()
-						.parse(src.c_str(), src.size());
-		return !result.found && is_unexpected_end(result.parse_error
-			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC));
-	}
-	// tau_spec::parse() returns true on EOF-incomplete input, flags is_eof()
-	tau_spec<node> s;
-	s.parse(src);
-	return s.is_eof();
+	return false;
 }
 
 #ifdef TAU_PARSER_HAS_FTXUI

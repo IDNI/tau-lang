@@ -8,6 +8,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT__QINT_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT__QINT_DESCRIPTOR_TMPL_H__
 
+#include "../parser/qint_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
 
@@ -83,6 +84,19 @@ struct ba_descriptor<qint, node<PackBAs...>> {
 	parse(const std::string& src, tref)
 	{
 		return parse_qint<PackBAs...>(src);
+	}
+	/**
+	 * @brief `true` when @p src is a truncated qint literal, not a bad one.
+	 *
+	 * Distinct from `parse` failing, which cannot tell the two apart; the REPL
+	 * keeps reading on truncation and stops on a genuine syntax error.
+	 */
+	static bool literal_incomplete(const std::string& src) {
+		auto result = qint_parser::instance()
+			.parse(src.c_str(), src.size());
+		return !result.found && result.parse_error
+			.to_str(qint_parser::error::info_lvl::INFO_BASIC)
+			.find("Unexpected end of file") != std::string::npos;
 	}
 };
 

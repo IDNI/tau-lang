@@ -8,6 +8,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF__SBF_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF__SBF_DESCRIPTOR_TMPL_H__
 
+#include "../parser/sbf_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 
 namespace idni::tau_lang {
@@ -85,6 +86,19 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	parse(const std::string& src, tref)
 	{
 		return parse_sbf<PackBAs...>(src);
+	}
+
+	/**
+	 * @brief `true` when @p src is a truncated sbf literal, not a bad one.
+	 *
+	 * Distinct from `parse` failing, which cannot tell the two apart; the REPL
+	 * keeps reading on truncation and stops on a genuine syntax error.
+	 */
+	static bool literal_incomplete(const std::string& src) {
+		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
+		return !result.found && result.parse_error
+			.to_str(sbf_parser::error::info_lvl::INFO_BASIC)
+			.find("Unexpected end of file") != std::string::npos;
 	}
 };
 

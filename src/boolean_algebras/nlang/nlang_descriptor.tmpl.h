@@ -8,6 +8,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_DESCRIPTOR_TMPL_H__
 
+#include "../parser/nlang_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
 
@@ -87,6 +88,19 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	parse(const std::string& src, tref)
 	{
 		return parse_nlang<PackBAs...>(src);
+	}
+	/**
+	 * @brief `true` when @p src is a truncated nlang literal, not a bad one.
+	 *
+	 * Distinct from `parse` failing, which cannot tell the two apart; the REPL
+	 * keeps reading on truncation and stops on a genuine syntax error.
+	 */
+	static bool literal_incomplete(const std::string& src) {
+		auto result = nlang_parser::instance()
+			.parse(src.c_str(), src.size());
+		return !result.found && result.parse_error
+			.to_str(nlang_parser::error::info_lvl::INFO_BASIC)
+			.find("Unexpected end of file") != std::string::npos;
 	}
 };
 

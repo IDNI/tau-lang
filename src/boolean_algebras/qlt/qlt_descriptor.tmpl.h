@@ -8,6 +8,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__
 
+#include "../parser/qlt_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
 
@@ -85,6 +86,20 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 	parse(const std::string& src, tref)
 	{
 		return parse_qlt<PackBAs...>(src);
+	}
+
+	/**
+	 * @brief `true` when @p src is a truncated qlt literal, not a bad one.
+	 *
+	 * Distinct from `parse` failing, which cannot tell the two apart; the REPL
+	 * keeps reading on truncation and stops on a genuine syntax error.
+	 */
+	static bool literal_incomplete(const std::string& src) {
+		auto result = qlt_parser::instance()
+			.parse(src.c_str(), src.size());
+		return !result.found && result.parse_error
+			.to_str(qlt_parser::error::info_lvl::INFO_BASIC)
+			.find("Unexpected end of file") != std::string::npos;
 	}
 
 	/**
