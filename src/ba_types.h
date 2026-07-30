@@ -147,8 +147,9 @@ template <NodeType node>
 bool is_bool_type(size_t t);
 
 // -----------------------------------------------------------------------------
-// Type definitions for bitvector
-// TODO: They must go into bv_ba.h -> currently causes compilation error
+// The bitvector type builders, still here because the parser maps a name plus
+// a width to a type inline (tau_tree_from_parser.tmpl.h); the family
+// predicates and the width accessor live in the bv plugin.
 
 /**
  * @brief Creates the type tree for a bitvector given a bitwidth
@@ -161,35 +162,6 @@ tref bv_type(unsigned short bitwidth = default_bv_size);
 /** @brief Return the integer type id for a bitvector of @p bitwidth bits. */
 template <NodeType node>
 size_t bv_type_id(unsigned short bitwidth = default_bv_size);
-
-/**
- * @brief Checks if t represents a bitvector type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents a bitvector
- */
-template <NodeType node>
-bool is_bv_type_family(tref t);
-
-/** @brief Return `true` if type tree @p t belongs to the bitvector family (tref variant).
- *  @tparam node Tree node type.
- *  @param t tref.
- *  @return `true` if @p t is of bitvector type, else `false`.
-*/
-template <NodeType node>
-bool is_tref_bv_type_family(tref t);
-
-/** @brief Return `true` if type id @p ba_type_id belongs to the bitvector family. */
-template <NodeType node>
-bool is_bv_type_family(size_t ba_type_id);
-
-/** @brief Return the bitwidth of the bitvector type tree @p t. */
-template <NodeType node>
-size_t get_bv_width(tref t);
-
-/** @brief Return the bitwidth encoded in type id @p ba_type_id. */
-template <NodeType node>
-size_t get_bv_width(size_t ba_type_id);
 
 // -----------------------------------------------------------------------------
 // Type definitions for qint — atomless BA of rational intervals [x, y)

@@ -309,6 +309,17 @@ inline bool operator!=(const bool& lhs, const Term& rhs);
 
 namespace idni::tau_lang {
 
+/** @brief Return `true` if type tree @p t is a bitvector type. */
+template <NodeType node> bool is_bv_type_family(tref t);
+/** @brief Return `true` if type id @p ba_type_id is a bitvector type. */
+template <NodeType node> bool is_bv_type_family(size_t ba_type_id);
+/** @brief Return `true` if node @p t carries a bitvector type. */
+template <NodeType node> bool is_tref_bv_type_family(tref t);
+/** @brief Return the bitwidth of the bitvector type tree @p t. */
+template <NodeType node> size_t get_bv_width(tref t);
+/** @brief Return the bitwidth encoded in type id @p ba_type_id. */
+template <NodeType node> size_t get_bv_width(size_t ba_type_id);
+
 // Bitvector specific symbol simplification
 /** @brief Simplify an `add` bitvector symbol node @p symbol. */
 template<NodeType node> tref term_add(tref symbol);
@@ -379,6 +390,7 @@ size_t get_inv_sym(size_t symbol);
 // header (as is the case in 'boolean_algebras/bv/heuristics/bv_ba_simplification.h'. Also, they
 // need to be included before the definitions as they can be used in there.
 #include "boolean_algebras/bv/heuristics/bv_ba_simplification.h"
+#include "boolean_algebras/bv/bv_types.tmpl.h"
 #include "boolean_algebras/bv/bv_ba.tmpl.h"
 #include "boolean_algebras/bv/bv_ba_solver.tmpl.h"
 #include "boolean_algebras/bv/bv_ba_helpers.tmpl.h"

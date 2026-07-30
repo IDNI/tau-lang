@@ -345,57 +345,13 @@ size_t bv_type_id(unsigned short bitwidth) {
 	return ba_types<node>::id(bv_type<node>(bitwidth));
 }
 
-template<NodeType node>
-bool is_bv_type_family(tref t) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(t); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(t)[0].get_string() == "bv";
-#ifdef TAU_CACHE
-	cache.emplace(t, result);
-#endif // TAU_CACHE
-	return result;
-}
-
-template<NodeType node>
-bool is_bv_type_family(size_t ba_type_id) {
-	return is_bv_type_family<node>(ba_types<node>::type_tree(ba_type_id));
-}
-
-template<NodeType node>
-bool is_tref_bv_type_family(tref t) {
-	using tau = tree<node>;
-	return is_bv_type_family<node>(tau::get(t).get_ba_type());
-}
-
-// Generic counterpart of the above: asks the pack whether the BA owning this
-// node's type declares arithmetic operators, naming no BA.  Lives here rather
-// than in ba_pack_traits.h because it needs tree<node> to read the ba_type.
+// Asks the pack whether the BA owning this node's type declares arithmetic
+// operators, naming no BA.  Lives here rather than in ba_pack_traits.h because
+// it needs tree<node> to read the ba_type.
 template <NodeType node>
 bool pack_tref_has_arith_ops(tref t) {
 	using tau = tree<node>;
 	return pack_type_has_arith_ops<node>(tau::get(t).get_ba_type());
-}
-
-template <NodeType node>
-size_t get_bv_width(tref t) {
-	using tau = tree<node>;
-	using tt = tau::traverser;
-
-	DBG(assert(is_bv_type_family<node>(t)));
-	size_t num = tt(t) | tau::subtype | tau::num | tt::num;
-	assert(num && "bv type must have explicit bitwidth");
-	return num;
-}
-
-template <NodeType node>
-size_t get_bv_width(size_t ba_type_id) {
-	tref t = ba_types<node>::type_tree(ba_type_id);
-	DBG(assert(is_bv_type_family<node>(t)));
-	return get_bv_width<node>(t);
 }
 
 // -----------------------------------------------------------------------------
@@ -706,7 +662,8 @@ bool is_buildable(size_t op, tref n, tref m) {
 		case tau::bf_div: case tau::bf_mod: case tau::bf_shr:
 		case tau::bf_shl: case tau::bf_xnor: case tau::bf_nand:
 		case tau::bf_nor: {
-			return is_bv_type_family<node>(unified.value()) || is_untyped<node>(unified.value());
+			return pack_type_has_arith_ops<node>(unified.value())
+				|| is_untyped<node>(unified.value());
 		}
 		case tau::bf_or: case tau::bf_xor: case tau::bf_and:
 		case tau::bf_neg: {
