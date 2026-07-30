@@ -25,6 +25,64 @@ using offset_t = std::pair<tau_parser::nonterminal, size_t>;
 
 /**
  * @internal
+ * @brief Lift conjuncts that do not mention a quantified variable out of that
+ * variable's scope: `Q x (A && B)` becomes `A && Q x B` whenever `x` is not
+ * free in `A`. Sound for both quantifier kinds, and dropping a binder whose
+ * scope no longer mentions it is sound under the standing non-empty-domain
+ * assumption `process_quantifier_blocks` already relies on.
+ *
+ * Bit-blasting rewrites bv arithmetic in place, so a mixed-type conjunction
+ * such as `ex x ex y (x + y = 0 && s = 0)` (with `s` atomless) keeps the
+ * foreign conjunct `s = 0` inside the bv quantifiers' scope. That single
+ * conjunct is enough to make `is_bv_solvable_formula` reject the whole scope,
+ * so neither the solver nor `resolve_quantifiers2` can decide it, and the
+ * blasted bits fall through to generic Boole decomposition instead --
+ * hundreds of bv-typed atoms, each split copying the entire formula, with
+ * every BDD node operation on a bv leaf allocating solver terms. Scoping the
+ * foreign conjuncts out first leaves a closed, purely bitvector scope that
+ * the solver settles directly.
+ *
+ * Applied bottom-up so an inner lift exposes the next one further out.
+ * @tparam node Tree node type.
+ * @param fm Formula to rewrite.
+ * @return Formula with independent conjuncts scoped out of every quantifier.
+ * @endinternal
+ */
+template <NodeType node>
+tref scope_out_independent_conjuncts(tref fm) {
+	using tau = tree<node>;
+	auto lift = [](tref n) -> tref {
+		if (!is_child_quantifier<node>(n)) return n;
+		tref var = tau::trim2(n);
+		tref body = tau::get(n)[0].second();
+		// A binder whose scope never mentions it contributes nothing, so
+		// drop it outright -- the same non-empty-domain reasoning as the
+		// `dep.empty()` case below, just without requiring a conjunction.
+		// Worth doing here because a skip-matched block is re-wrapped
+		// verbatim by process_quantifier_block's wrap_skipped, so a bv
+		// binder left vacuous by earlier simplification would otherwise
+		// survive into the output.
+		if (!hasbc(get_free_vars<node>(body), var, tau::subtree_less))
+			return body;
+		if (!tau::get(body).child_is(tau::wff_and)) return n;
+		trefs dep, indep;
+		for (tref c : get_cnf_wff_clauses<node>(body)) {
+			if (hasbc(get_free_vars<node>(c), var, tau::subtree_less))
+				dep.push_back(c);
+			else indep.push_back(c);
+		}
+		if (indep.empty()) return n;
+		tref kept = tau::build_wff_and(indep);
+		if (dep.empty()) return kept;
+		return tau::build_wff_and(kept, is_child<node>(n, tau::wff_ex)
+			? build_wff_ex<node>(var, tau::build_wff_and(dep), false)
+			: build_wff_all<node>(var, tau::build_wff_and(dep), false));
+	};
+	return post_order<node>(fm).apply_unique(lift);
+}
+
+/**
+ * @internal
  * @brief Push/eliminate all quantifiers in `form`, resolving bitvector
  * content along the way.
  *
@@ -58,6 +116,15 @@ template <NodeType node>
 tref eliminate_bv_and_quantifiers(tref form) {
 	using tau = tree<node>;
 
+	// Before anything blasts or decomposes: a foreign-typed sibling conjunct
+	// inside a bitvector quantifier's scope makes the whole scope fail
+	// `is_bv_solvable_formula`, so the solver shortcut below is skipped and
+	// the scope gets blasted instead -- and eliminating the auxiliary bit
+	// variables blasting introduces is itself exponential in the bitwidth.
+	// Scoping those conjuncts out first leaves a closed, purely bitvector
+	// scope the solver decides directly, keeping the common mixed-type case
+	// off the blasting path entirely.
+	form = scope_out_independent_conjuncts<node>(form);
 	form = resolve_quantifiers<node>(form);
 	// Mark variables used as an argument of an unresolved predicate
 	// reference (`wff_ref`), or entangled with one through a shared atom,
@@ -85,8 +152,22 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	form = resolve_quantifiers<node>(form);
 	auto arith_skip = make_bv_arithmetic_skip_uf<node>(form);
 	auto ref_skip_2 = make_ref_variables_skip<node>(form);
+	// bv-typed content is skipped here as well, not just the arithmetic
+	// residue `arith_skip` marks. Blasting rewrites arithmetic into per-bit
+	// equality/comparison atoms that are still bv-typed but no longer
+	// arithmetic-tainted, so `arith_skip` stops matching them and they became
+	// eligible for generic Boole decomposition -- hundreds of atoms per
+	// blasted operation, each split copying the whole formula, and every BDD
+	// node operation on a bv leaf allocating cvc5 terms (bv BDD leaves are
+	// solver-term-backed, so this is never the cheap path atomless content
+	// enjoys). Skipping them leaves the quantifier in place instead, which is
+	// sound; whatever is closeable has already been decided by the solver via
+	// scope_out_independent_conjuncts and the resolve passes above, and a
+	// genuinely open bv scope (e.g. `ex x (x + y = 0)` with `y` free) could
+	// not be reduced by decomposing it anyway.
 	form = anti_prenex_block<node>(form, [arith_skip, ref_skip_2](tref n) {
-		return arith_skip(n) || ref_skip_2(n);
+		return is_tref_bv_type_family<node>(n) || arith_skip(n)
+			|| ref_skip_2(n);
 	});
 	form = resolve_quantifiers<node>(form);
 	if (get_free_vars<node>(form).empty() && is_bv_solvable_formula<node>(form)) {

@@ -404,10 +404,37 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		tref ex_fm = dep_formula;
 		for (auto v = block.rbegin(); v != block.rend(); ++v)
 			ex_fm = build_wff_ex<node>(*v, ex_fm, false);
+		// A closed, purely bitvector formula is decided directly by the
+		// solver, same as in resolve_quantifiers/treat_ex_quantified_clause:
+		// deciding the blasted form (with its many auxiliary quantifiers) is
+		// much harder for it than solving the unblasted arithmetic natively.
+		// Wrapping in `block`'s own quantifiers closes `ex_fm` whenever the
+		// only surviving free variables were exactly the block's -- which is
+		// always true here, since blast_block is only reached once no active
+		// (non-skip) block variable remains free in `dep_formula`.
+		if (get_free_vars<node>(ex_fm).empty()
+				&& is_bv_solvable_formula<node>(ex_fm)) {
+			auto status = bv_formula_sat_status<node>(ex_fm);
+			if (status == bv_sat_status::sat) return tau::_T();
+			if (status == bv_sat_status::unsat) return tau::_F();
+		}
 		if (bv_blasting)
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 					blasted && blasted != ex_fm)
-				return anti_prenex_block<node>(blasted, no_skip<node>);
+				// Re-enter skipping bv-typed content rather than no_skip:
+				// blasting rewrites arithmetic into equality/comparison
+				// atoms that are still bv-typed (e.g. bit-mask equalities),
+				// not atomless-typed booleans. Treating them as ordinary
+				// decomposable atoms hands their elimination to the general
+				// Boole-decomposition/BDD machinery, whose BDD leaves for
+				// bv content are backed by actual solver terms -- orders of
+				// magnitude more expensive per node than atomless (sbf)
+				// BDD leaves. Keeping them skip-matched routes them back
+				// through this same solver-first/blast_block path (a no-op
+				// once nothing is left to blast) instead.
+				return anti_prenex_block<node>(blasted,	no_skip<node>);
+//				return anti_prenex_block<node>(blasted,
+//					is_tref_bv_type_family<node>);
 		return ex_fm;
 	};
 
@@ -1819,15 +1846,22 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 		// bv_predicate_blasting already anti-prenexes each blasted atomic's
 		// own freshly-introduced auxiliary quantifiers (scoped locally); the
 		// anti_prenex_block call below is a separate concern: it attempts to
-		// push/resolve `var`'s own quantifier (still bv-typed and left
-		// untouched by blasting itself) now that the scope's arithmetic has
-		// been simplified to boolean form, so nothing needs to be skipped
-		// anymore.
+		// push/resolve `var`'s own quantifier now that the scope's
+		// arithmetic has been rewritten into equality/comparison atoms.
+		// Those atoms remain bv-typed (e.g. bit-mask equalities), not
+		// atomless-typed booleans, so re-entering with no_skip would hand
+		// their elimination to the general Boole-decomposition/BDD
+		// machinery, whose BDD leaves for bv content are backed by actual
+		// solver terms -- orders of magnitude more expensive per node than
+		// atomless (sbf) BDD leaves. Keeping them skip-matched routes them
+		// back through the solver-first/blast_block path instead (a no-op
+		// once nothing is left to blast).
 		if (bv_blasting) {
 			tref ex_fm = tau::build_wff_ex(var, scoped_fm, false);
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 					blasted && blasted != ex_fm) {
-				tref cont = anti_prenex_block<node>(blasted, no_skip<node>);
+				tref cont = anti_prenex_block<node>(blasted,
+					is_tref_bv_type_family<node>);
 				return tau::build_wff_and(cont, new_fm);
 			}
 		}
@@ -1904,21 +1938,47 @@ using tau = tree<node>;
 			// the quantifier
 			tref var = tau::trim2(n);
 			if (is_bv_type_family<node>(tau::get(var).get_ba_type())) {
-				// A closed, purely bitvector formula is decided
-				// directly by the solver. This is checked before
-				// blasting: the solver handles the bitvector
-				// arithmetic natively, while deciding the blasted
-				// form (with its many auxiliary quantifiers) is
-				// much harder for it. Blasting does not close a
-				// formula, so the check would not succeed later.
-				if (get_free_vars<node>(n).empty()
-					&& is_bv_solvable_formula<node>(n)) {
+				// A purely bitvector formula is decided directly by
+				// the solver, closed or not (see the two branches
+				// below). This is checked before blasting: the
+				// solver handles the bitvector arithmetic natively,
+				// while deciding the blasted form (with its many
+				// auxiliary quantifiers) is much harder for it --
+				// and blasting neither closes a formula nor makes
+				// this check succeed later.
+				if (is_bv_solvable_formula<node>(n)) {
 					// Only commit to T/F on a definite answer: cvc5
 					// returning unknown, or translation failing, means
 					// we cannot decide, not that the formula is false.
-					auto status = bv_formula_sat_status<node>(n);
-					if (status == bv_sat_status::sat) return tau::_T();
-					if (status == bv_sat_status::unsat) return tau::_F();
+					const trefs& fv = get_free_vars<node>(n);
+					if (fv.empty()) {
+						auto status = bv_formula_sat_status<node>(n);
+						if (status == bv_sat_status::sat) return tau::_T();
+						if (status == bv_sat_status::unsat) return tau::_F();
+					} else {
+						// Open bv scope: `n` is equivalent to T exactly
+						// when it is valid, and to F exactly when it is
+						// unsatisfiable. Closing its free variables the
+						// two opposite ways turns both into closed
+						// queries the solver decides directly -- so an
+						// open scope (e.g. `ex x (x + y = 0)` with `y`
+						// free, which is valid) need not be blasted
+						// either. Worth the two extra queries: blasting
+						// such a scope instead means eliminating one
+						// auxiliary bit variable per bit, which is
+						// exponential in the bitwidth.
+						tref univ = n, exis = n;
+						for (auto it = fv.rbegin(); it != fv.rend(); ++it) {
+							univ = tau::build_wff_all(*it, univ, false);
+							exis = tau::build_wff_ex(*it, exis, false);
+						}
+						// `all Y n` sat (it is closed) <=> n valid.
+						if (bv_formula_sat_status<node>(univ)
+							== bv_sat_status::sat) return tau::_T();
+						// `ex Y n` unsat <=> no assignment satisfies n.
+						if (bv_formula_sat_status<node>(exis)
+							== bv_sat_status::unsat) return tau::_F();
+					}
 				}
 				if (bv_blasting)
 					if (auto blasted = bv_predicate_blasting<node>(n);

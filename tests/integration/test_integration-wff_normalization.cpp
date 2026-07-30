@@ -273,3 +273,114 @@ TEST_SUITE("NormalizeTemporalQuantifiers") {
 		CHECK(has_wrapped_non_temporal_disjunct);
 	}
 }
+
+// Bitvector content sharing a formula with a foreign-typed (sbf) conjunct.
+//
+// A foreign-typed sibling conjunct inside a bv quantifier's scope makes the
+// whole scope fail is_bv_solvable_formula, which used to divert it away from
+// the solver and into blasting plus generic Boole decomposition -- hundreds of
+// bv-typed atoms whose BDD leaves are backed by solver terms. Every case below
+// ran for minutes (or never finished) before scope_out_independent_conjuncts
+// lifted such conjuncts out; they now complete in milliseconds. They are
+// therefore hang regressions first and value checks second: a regression shows
+// up as the suite timing out, not as a wrong answer.
+TEST_SUITE("Normalizer bv mixed-type") {
+
+	// Every arithmetic operator, since each blasts to its own per-bit
+	// recurrence and only the solver-first path avoids blasting them at all.
+	TEST_CASE("bv_arith_with_sbf_conjunct") {
+		for (const char* op : { "+", "-", "*", "/", "%", "<<", ">>",
+					"!&", "!|", "!^" }) {
+			const std::string sample = std::string(
+				"ex x ex y (x:bv[8] ") + op
+				+ " y:bv[8] = { 0 }:bv[8]) && s = 0.";
+			CAPTURE(op);
+			CHECK( normalize_and_check(sample.c_str(), "s = 0") );
+		}
+	}
+
+	// Blasting cost grows with the bitwidth, so the widths are what turned a
+	// slow case into an unbounded one; the solver is insensitive to them.
+	TEST_CASE("bv_arith_with_sbf_conjunct_widths") {
+		for (const char* w : { "8", "16", "32", "64" }) {
+			const std::string ty = std::string(":bv[") + w + "]";
+			const std::string sample = "ex x ex y (x" + ty + " + y"
+				+ ty + " = { 0 }" + ty + ") && s = 0.";
+			CAPTURE(w);
+			CHECK( normalize_and_check(sample.c_str(), "s = 0") );
+		}
+	}
+
+	// The lift must not change what the formula means: an unsatisfiable
+	// bitvector part still forces F, and a conjunct that genuinely depends on
+	// the bound variable must stay inside the scope.
+	TEST_CASE("bv_arith_with_sbf_conjunct_unsat") {
+		CHECK( normalize_and_check("ex x (x:bv[4] = { 3 }:bv[4] && x:bv[4]"
+			" + { 5 }:bv[4] = { 9 }:bv[4]) && s = 0.", tau::wff_f) );
+	}
+
+	TEST_CASE("bv_arith_dependent_conjunct_kept_sat") {
+		CHECK( normalize_and_check("ex x (x:bv[4] + { 1 }:bv[4] ="
+			" { 2 }:bv[4] && x:bv[4] = { 1 }:bv[4]).", tau::wff_t) );
+	}
+
+	TEST_CASE("bv_arith_dependent_conjunct_kept_unsat") {
+		CHECK( normalize_and_check("ex x (x:bv[4] + { 1 }:bv[4] ="
+			" { 2 }:bv[4] && x:bv[4] = { 5 }:bv[4]).", tau::wff_f) );
+	}
+
+	// Universal blocks dualize to existential ones, so they take the same
+	// path and need the same coverage.
+	TEST_CASE("bv_arith_under_all_with_sbf_conjunct") {
+		CHECK( normalize_and_check("all x (x:bv[8] + { 0 }:bv[8] ="
+			" x:bv[8] && s = 0).", "s = 0") );
+		CHECK( normalize_and_check("all x (x:bv[8] + { 1 }:bv[8] ="
+			" x:bv[8] && s = 0).", tau::wff_f) );
+	}
+
+	// Several independent conjuncts must all be lifted, not just the first.
+	TEST_CASE("bv_arith_with_two_sbf_conjuncts") {
+		CHECK( normalize_and_check("ex x ex y (x:bv[8] + y:bv[8] ="
+			" { 0 }:bv[8]) && s = 0 && r = 0.", "s = 0 && r = 0") );
+	}
+
+	// A scope left open by a free bitvector variable cannot be closed by
+	// lifting, so it used to be blasted -- one auxiliary bit variable per
+	// bit, eliminated pairwise, i.e. exponential in the bitwidth (bv[8] took
+	// ~24s, bv[16] and up never finished). resolve_quantifiers now closes the
+	// free variables both ways and asks the solver instead: `ex x (x + y = 0)`
+	// is valid, so the whole scope collapses and only `s = 0` is left.
+	TEST_CASE("bv_arith_open_scope_with_sbf_conjunct") {
+		for (const char* w : { "8", "16", "32", "64" }) {
+			const std::string ty = std::string(":bv[") + w + "]";
+			const std::string sample = "ex x (x" + ty + " + y" + ty
+				+ " = { 0 }" + ty + ") && s = 0.";
+			CAPTURE(w);
+			CHECK( normalize_and_check(sample.c_str(), "s = 0") );
+		}
+	}
+
+	// Free bitvector variables with no quantifier at all must stay put: there
+	// is nothing to decide, so the arithmetic atom survives verbatim.
+	TEST_CASE("bv_arith_all_free_with_sbf_conjunct") {
+		CHECK( normalize_and_check("x:bv[8] + y:bv[8] = { 0 }:bv[8]"
+			" && s = 0.", strings{ "x+y = 0 && s = 0",
+					       "s = 0 && x+y = 0" }) );
+	}
+
+	// Interleaved all/ex over bv comparison chains mixed with an sbf
+	// conjunct: explosive before the lift even though no arithmetic is
+	// involved. Depths 2/4/6 to catch a reintroduced dependence on
+	// alternation depth.
+	TEST_CASE("bv_alternating_quantifier_chain_with_sbf_conjunct") {
+		CHECK( normalize_and_check("all x ex y (x:bv[8] < y:bv[8])"
+			" && s = 0.", tau::wff_f) );
+		CHECK( normalize_and_check("all a ex b all c ex d (a:bv[8] <"
+			" b:bv[8] && b:bv[8] < c:bv[8] && c:bv[8] < d:bv[8])"
+			" && s = 0.", tau::wff_f) );
+		CHECK( normalize_and_check("all a ex b all c ex d all e ex f"
+			" (a:bv[8] < b:bv[8] && b:bv[8] < c:bv[8] && c:bv[8] <"
+			" d:bv[8] && d:bv[8] < e:bv[8] && e:bv[8] < f:bv[8])"
+			" && s = 0.", tau::wff_f) );
+	}
+}
