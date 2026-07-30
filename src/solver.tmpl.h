@@ -1224,9 +1224,10 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 		subtree_map<node, subtree_set<node>> assignment_check;
 		auto find_assigment = [&](tref n) {
 			if (!is<node, tau::bf_eq>(n)) return true;
-			// Do not extract variable assignments from bitvector
-			// due to possible quantification
-			if (is_bv_type_family<node>(tau::get(n).get_ba_type()))
+			// Do not extract variable assignments from an
+			// arithmetic type due to possible quantification
+			if (pack_type_has_arith_ops<node>(
+					tau::get(n).get_ba_type()))
 				return false;
 			const tau& n_t = tau::get(n);
 			if (n_t[0].child_is(tau::variable)) {
@@ -1280,12 +1281,12 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			}
 			if (tau::get(conj).equals_F()) continue;
 			size_t type = find_ba_type<node>(conj);
-			if (!is_atomic_fm<node>(conj) && !(is_bv_type_family<node>(type) && is_child_quantifier<node>(conj))) {
+			if (!is_atomic_fm<node>(conj) && !(pack_type_has_arith_ops<node>(type) && is_child_quantifier<node>(conj))) {
 				LOG_ERROR << "Found clause containing non-equation: " << TAU_TO_STR(path);
 				error = true;
 				break;
 			}
-			if (!is_bv_type_family<node>(type)) {
+			if (!pack_type_has_arith_ops<node>(type)) {
 				conj = norm_equation<node>(conj);
 				conj = apply_all_xor_def<node>(conj);
 			}
@@ -1302,7 +1303,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			solver_options op = options;
 			tref type_tree = ba_types<node>::type_tree(type);
 			op.type_id = get_ba_type_id<node>(type_tree);
-			if (is_bv_type_family<node>(type_tree)) {
+			if (pack_type_has_arith_ops<node>(type_tree)) {
 				if (bv_conjs_only_pure_equality<node>(conjs)) {
 					// BV equalities with no arithmetic: treat as Boolean algebra via lgrs
 					std::optional<equality> squeezed;
