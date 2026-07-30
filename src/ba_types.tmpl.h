@@ -471,18 +471,26 @@ std::string ba_types<node>::dump_to_str() {
 	return dump(ss), ss.str();
 }
 
-// type_trees (index = ba_type id)
+// type_trees (index = ba_type id): untyped at 0, then each BA of the pack in
+// pack order, asking its descriptor for its own type. Pack order is the only
+// order there is -- no id outside this file is a fixed number.
 template <NodeType node>
 std::vector<htref>& ba_types<node>::type_trees() {
 	using tau = tree<node>;
-	static std::vector<htref> t {
-		tau::geth(untyped_type<node>()),
-		tau::geth(tau_type<node>()),
-		tau::geth(bv_type<node>()),
-		tau::geth(sbf_type<node>()),
-		tau::geth(qint_type<node>()),
-		tau::geth(qlt_type<node>()),
-		tau::geth(nlang_type<node>()) };
+	static std::vector<htref> t = [] {
+		std::vector<htref> v { tau::geth(untyped_type<node>()) };
+		[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+			([&] {
+				using BA = std::tuple_element_t<Is,
+					typename node::bas_tuple>;
+				if constexpr (ba_has_descriptor_v<node, BA>)
+					v.push_back(tau::geth(ba_descriptor<BA,
+						node>::type_tree()));
+			}(), ...);
+		}(std::make_index_sequence<
+			std::tuple_size_v<typename node::bas_tuple>>{});
+		return v;
+	}();
 	return t;
 }
 
@@ -490,19 +498,15 @@ std::vector<htref>& ba_types<node>::type_trees() {
 template <NodeType node>
 subtree_map<node, size_t>& ba_types<node>::type_tree_to_idx() {
 	using tau = tree<node>;
-	// Ensure type_trees() htrefs are created before t is initialized,
-	// so the 7 type-tree nodes survive any subsequent do_gc() calls.
-	static bool tt_init = (type_trees(), true);
-	(void)tt_init;
-	static subtree_map<node, size_t> t{
-		{ untyped_type<node>(), 0 },
-		{ tau_type<node>(), 1 },
-		{ bv_type<node>(), 2 },
-		{ sbf_type<node>(), 3 },
-		{ qint_type<node>(), 4 },
-		{ qlt_type<node>(), 5 },
-		{ nlang_type<node>(), 6 }
-	};
+	// type_trees() first, so its htrefs exist before t is initialized and the
+	// pack's type-tree nodes survive any subsequent do_gc().
+	static subtree_map<node, size_t> t = [] {
+		subtree_map<node, size_t> m;
+		auto& tt = type_trees();
+		for (size_t i = 0; i < tt.size(); ++i)
+			m.emplace(tt[i]->get(), i);
+		return m;
+	}();
 	// Register GC callback to rebuild from surviving type_trees() htrefs.
 	static bool gc_registered = false;
 	if (!gc_registered) {

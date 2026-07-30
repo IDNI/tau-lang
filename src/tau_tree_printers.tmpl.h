@@ -77,7 +77,8 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	};
 	if (bool print_nt_ids  = false; print_nt_ids) os << "(" << n.nt << ")";
 	//if (bool print_is_term = true; print_is_term && n.term) os << "*";
-	if (n.term == 0 && n.ba_type == 1 && n.nt == tau_parser::ref)
+	if (n.term == 0 && n.ba_type == tau_type_id<node>()
+		&& n.nt == tau_parser::ref)
 		os << LOG_WARNING_COLOR << "?" << TC.CLEAR();
 	if (n.data) os << "[" << n.data << "]";
 	if (bool print_ba_type = true; print_ba_type && is_typeable(n.nt))
