@@ -13,7 +13,7 @@
 #include "parser_helper.h"
 
 #include "boolean_algebras/bv/bv_ba.h"
-#include "heuristics/bv_predicate_blasting.h"
+#include "boolean_algebras/bv/heuristics/bv_predicate_blasting.h"
 
 static constexpr long long TIME_LIMIT_MS  = 1'200'000; // 2 minutes per test
 static constexpr size_t    MEMORY_LIMIT_MB = 16384;   // 2 GB per test

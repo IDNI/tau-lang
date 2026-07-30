@@ -156,7 +156,7 @@ bool no_skip(tref t);
 
 // Note: no default argument for `skip` here -- function templates cannot gain
 // a default argument in a later declaration once an earlier one exists without
-// one, and heuristics/bv_predicate_blasting.h forward-declares this function.
+// one, and boolean_algebras/bv/heuristics/bv_predicate_blasting.h forward-declares this function.
 // The single-argument overload below plays the role of the default.
 template <NodeType node>
 tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);

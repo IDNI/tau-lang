@@ -498,7 +498,7 @@ tref pnf(tref n);
 
 // This is the proper way to include heuristics as the header must be independent
 // of the heuristics themselves and also they could need definitions from the
-// header (as is the case in 'heuristics/bv_ba_simplification.h'). Also, they
+// header (as is the case in 'boolean_algebras/bv/heuristics/bv_ba_simplification.h'). Also, they
 // need to be included before the definitions as they can be used in there.
 #include "heuristics/ex_subs_based_elimination.h"
 #include "heuristics/syntactic_path_simplification.h"

@@ -376,14 +376,14 @@ size_t get_inv_sym(size_t symbol);
 
 // This is the proper way to include heuristics as the header must be independent
 // of the heuristics themselves and also they could need definitions from the
-// header (as is the case in 'heuristicsbv_ba_simplification.h'. Also, they
+// header (as is the case in 'boolean_algebras/bv/heuristics/bv_ba_simplification.h'. Also, they
 // need to be included before the definitions as they can be used in there.
-#include "heuristics/bv_ba_simplification.h"
+#include "boolean_algebras/bv/heuristics/bv_ba_simplification.h"
 #include "boolean_algebras/bv/bv_ba.tmpl.h"
 #include "boolean_algebras/bv/bv_ba_solver.tmpl.h"
 #include "boolean_algebras/bv/bv_ba_helpers.tmpl.h"
 #include "boolean_algebras/bv/bv_ba_hooks.tmpl.h"
-#include "heuristics/bv_predicate_blasting.h"
+#include "boolean_algebras/bv/heuristics/bv_predicate_blasting.h"
 #include "boolean_algebras/bv/bv_descriptor.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_BA_H__

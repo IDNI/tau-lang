@@ -5,7 +5,7 @@
 #include "parser_helper.h"
 
 #include "boolean_algebras/bv/bv_ba.h"
-#include "heuristics/bv_predicate_blasting.h"
+#include "boolean_algebras/bv/heuristics/bv_predicate_blasting.h"
 #include "ba_types_inference.h"
 
 TEST_SUITE("configuration") {
