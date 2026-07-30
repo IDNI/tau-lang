@@ -1,0 +1,7 @@
+sat ((always o1[t]:sbf = o1[t-1]:sbf) && (sometimes o1[t]:sbf = 1)).
+sat ((always o1[t]:sbf = 0) && (sometimes o1[t]:sbf = 0) && (sometimes o1[t]:sbf = 1)).
+sat ((always o1[t-2]:sbf = 1) && (sometimes o1[t-3]:sbf = 0) && (sometimes o1[t]:sbf = 1)).
+sat ((always o1[t]:sbf = i1[t]:sbf) && (sometimes i1[t]:sbf = 1)).
+sat ((always i1[t]:sbf = 1 ? o1[t]:sbf = 0 : o1[t]:sbf = 1)).
+sat ((always o2[t]:sbf = i1[t]:sbf & i2[t]:sbf) && (sometimes o2[t]:sbf = 1)).
+sat ((always o1[t]:sbf = o1[t-1]:sbf && o2[t]:sbf = o2[t-1]:sbf) || (sometimes o1[t]:sbf = 1 && o2[t]:sbf = 1)).
