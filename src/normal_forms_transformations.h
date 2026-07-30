@@ -14,9 +14,6 @@
 #define __IDNI__TAU__NORMAL_FORMS_TRANSFORMATIONS_H__
 
 #include "tau_tree.h"
-// bv_predicate_blasting.h declares bv_blasting (a non-dependent global), which
-// must be visible at template-definition time in normal_forms_transformations.tmpl.h.
-#include "heuristics/bv_predicate_blasting.h"
 
 namespace idni::tau_lang {
 
@@ -157,11 +154,10 @@ tref ex_subs_based_elimination(tref var, tref ex_clause);
 template <NodeType node>
 bool no_skip(tref t);
 
-// Note: no default argument for `skip` here -- function templates cannot
-// gain a default argument in a later declaration once an earlier one (the
-// forward declaration in heuristics/bv_predicate_blasting.h, included above)
-// exists without one. The single-argument overload below plays the role of
-// the default, calling through with is_tref_bv_type_family<node>.
+// Note: no default argument for `skip` here -- function templates cannot gain
+// a default argument in a later declaration once an earlier one exists without
+// one, and heuristics/bv_predicate_blasting.h forward-declares this function.
+// The single-argument overload below plays the role of the default.
 template <NodeType node>
 tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
 

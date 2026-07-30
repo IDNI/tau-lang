@@ -8,7 +8,6 @@
 #include "normal_forms.h"
 #include "ba_types.h"
 #include "union_find_with_sets.h"
-#include "heuristics/bv_predicate_blasting.h"
 #include "heuristics/simplify_using_equality.h"
 
 // Split into logical sub-files for readability.

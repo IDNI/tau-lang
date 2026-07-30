@@ -21,7 +21,6 @@
 
 #include "tau_tree.h"
 #include "union_find.h"
-#include "boolean_algebras/bv/bv_ba.h"
 #include "ba_types.h"
 
 #undef LOG_CHANNEL_NAME

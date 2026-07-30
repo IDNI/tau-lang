@@ -31,6 +31,18 @@ inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 	return std::make_pair(fm, s);
 }
 
+// Bitvector type-id shorthands. These live here rather than in core: nothing
+// in src/ reads them, only the type-inference integration tests.
+/** @brief Cached type id for bitvector-8 under node @p node. */
+template<NodeType node>
+static size_t bv8_type_id = ba_types<node>::id(bv_type<node>(8));
+/** @brief Cached type id for bitvector-16 under node @p node. */
+template<NodeType node>
+static size_t bv16_type_id = ba_types<node>::id(bv_type<node>(16));
+/** @brief Cached type id for bitvector-32 under node @p node. */
+template<NodeType node>
+static size_t bv32_type_id = ba_types<node>::id(bv_type<node>(32));
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__TESTS__TEST_TAU_HELPERS_H__

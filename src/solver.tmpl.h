@@ -1,7 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#include <cvc5/cvc5.h>
-
 #include "splitter.h"
 
 #undef LOG_CHANNEL_NAME

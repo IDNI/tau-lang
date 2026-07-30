@@ -8,7 +8,6 @@
 
 #include "tau_tree.h"
 #include "union_find.h"
-#include "boolean_algebras/bv/bv_ba.h"
 #include "ba_types.h"
 #include "type_scoped_resolver.h"
 

@@ -22,11 +22,9 @@ namespace idni::tau_lang {
 
 // Forward declarations needed by wff_predicate_blasting/quantify_aux_vars
 // (bv_predicate_blasting.tmpl.h) to anti-prenex/eliminate its own
-// freshly-introduced auxiliary bv-typed quantifiers. The full
-// declarations/definitions come from
-// normal_forms_transformations.h/normal_forms.tmpl.h; including those
-// headers directly here would create a header include cycle
-// (normal_forms_transformations.h includes this file). No default argument
+// freshly-introduced auxiliary bv-typed quantifiers. They stay forward
+// declarations because resolve_quantifiers2 is only ever defined, in
+// normal_forms_boole.tmpl.h, with no header declaring it. No default argument
 // is given here, since a default cannot be redeclared and these call sites
 // always pass an explicit predicate.
 template<NodeType node>
