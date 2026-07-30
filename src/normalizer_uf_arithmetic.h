@@ -5,7 +5,7 @@
  * @brief Scoped-union-find-based bitvector-arithmetic taint tracking.
  *
  * Identifies bitvector-arithmetic residue left after predicate blasting so
- * `eliminate_bv_and_quantifiers` (see `normalizer.tmpl.h`) can tell
+ * `eliminate_arithmetic_and_quantifiers` (see `normalizer.tmpl.h`) can tell
  * `anti_prenex_block` which nodes to leave alone rather than Boole-decompose.
  * Uses a `scoped_union_find` (see `type_scoped_resolver.h` for the
  * established pattern this follows), unifying each atomic formula with its

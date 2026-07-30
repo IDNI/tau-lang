@@ -1153,7 +1153,7 @@ void normalize_and_add_assignment(subtree_map<node, tref>& var_assignments, tref
 }
 
 template <NodeType node>
-bool has_bv_arithmetic(tref f) {
+bool has_compound_term_ops(tref f) {
 	using tau = tree<node>;
 	return tau::get(f).find_top([](tref n) -> bool {
 		return is<node, tau::bf_add>(n) || is<node, tau::bf_sub>(n)
@@ -1161,9 +1161,9 @@ bool has_bv_arithmetic(tref f) {
 			|| is<node, tau::bf_mod>(n) || is<node, tau::bf_shl>(n)
 			|| is<node, tau::bf_shr>(n) || is<node, tau::bf_nand>(n)
 			|| is<node, tau::bf_nor>(n)  || is<node, tau::bf_xnor>(n)
-			// CVC5 simplification may convert arithmetic (e.g. bvurem) into
-			// bitwise/logical ops or casts; treat these as non-pure too so
-			// bv_conjs_only_pure_equality routes them to the pack solver, not LGRS.
+			// A BA's own simplification may turn arithmetic into bitwise or
+			// logical ops or casts; those count as compound too, so
+			// conjs_only_pure_equality routes them to the pack solver, not LGRS.
 			|| is<node, tau::bf_and>(n) || is<node, tau::bf_or>(n)
 			|| is<node, tau::bf_neg>(n) || is<node, tau::bf_xor>(n)
 			|| is<node, tau::bf_cast>(n);
@@ -1171,11 +1171,11 @@ bool has_bv_arithmetic(tref f) {
 }
 
 template <NodeType node>
-bool bv_conjs_only_pure_equality(const subtree_set<node>& conjs) {
+bool conjs_only_pure_equality(const subtree_set<node>& conjs) {
 	using tau = tree<node>;
 	for (tref conj : conjs) {
 		if (!tau::get(conj).child_is(tau::bf_eq)) return false;
-		if (has_bv_arithmetic<node>(conj)) return false;
+		if (has_compound_term_ops<node>(conj)) return false;
 	}
 	return !conjs.empty();
 }
@@ -1304,7 +1304,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 			tref type_tree = ba_types<node>::type_tree(type);
 			op.type_id = get_ba_type_id<node>(type_tree);
 			if (pack_type_has_arith_ops<node>(type_tree)) {
-				if (bv_conjs_only_pure_equality<node>(conjs)) {
+				if (conjs_only_pure_equality<node>(conjs)) {
 					// BV equalities with no arithmetic: treat as Boolean algebra via lgrs
 					std::optional<equality> squeezed;
 					for (tref raw_eq : conjs) {

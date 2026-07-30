@@ -31,11 +31,11 @@ namespace idni::tau_lang {
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.
  *
  * For formulas without temporal quantifiers (`always`/`sometimes`), applies
- * `eliminate_bv_and_quantifiers` (see normalizer.tmpl.h): resolves closed
- * quantified bitvector sub-formulas, pushes/eliminates the rest via
- * `anti_prenex_block` (which itself attempts predicate blasting for
- * bitvector-typed content), resolves again, then runs `anti_prenex_block`
- * once more skipping only whatever bitvector arithmetic blasting could not
+ * `eliminate_arithmetic_and_quantifiers` (see normalizer.tmpl.h): resolves closed
+ * quantified arithmetic sub-formulas, pushes/eliminates the rest via
+ * `anti_prenex_block` (which itself attempts the owning BA's preprocessing for
+ * arithmetic-typed content), resolves again, then runs `anti_prenex_block`
+ * once more skipping only whatever arithmetic that preprocessing could not
  * resolve, and resolves a final time.
  *
  * For formulas with temporal quantifiers, the same pipeline is applied to
@@ -95,7 +95,7 @@ tref fold_trivial_quantifiers(tref fm);
  * @brief Normalize a non-temporal formula.
  *
  * Assumes the formula contains no `always`/`sometimes` quantifiers. Applies
- * `eliminate_bv_and_quantifiers` (see `normalize` and normalizer.tmpl.h),
+ * `eliminate_arithmetic_and_quantifiers` (see `normalize` and normalizer.tmpl.h),
  * then `term_boole_normal_form`.
  *
  * Note: `fold_trivial_quantifiers` is deliberately omitted to preserve bitwidth
@@ -251,7 +251,7 @@ bool is_nso_impl(tref n1, tref n2);
  * Full normalization pipeline including:
  *   1. `normalize` (with temporal quantifiers).
  *   2. `fold_trivial_quantifiers` (remove vacuous quantifiers after substitution).
- *   3. Late `resolve_quantifiers` for residual bitvector sub-formulas.
+ *   3. Late `resolve_quantifiers` for residual arithmetic sub-formulas.
  *   4. Application of registered function/predicate definitions (iterating until
  *      a fixed point).
  *   5. Temporal layer simplification: removes implied `always`/`sometimes` parts.

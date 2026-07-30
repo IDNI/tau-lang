@@ -422,15 +422,15 @@ tref api<node>::eliminate_quantifiers(tref fm) {
 	return nullptr;
 }
 
-// Whole-query bv fast path: hand a purely bitvector, non-temporal query to
-// cvc5 directly instead of quantifier elimination + predicate blasting,
-// which explodes on free variables under a quantifier. Sound only on the
-// ENTIRE top-level query (sat(fm) is exactly exists-free-vars. fm), and only
-// a definite cvc5 answer is trusted -- unknown falls through unchanged.
+// Whole-query fast path: hand a non-temporal query the owning BA can decide to
+// its own solver instead of quantifier elimination + preprocessing, which
+// explodes on free variables under a quantifier. Sound only on the ENTIRE
+// top-level query (sat(fm) is exactly exists-free-vars. fm), and only a
+// definite answer is trusted -- an undecided one falls through unchanged.
 
-/// True iff `fm` is non-temporal and fully bv-typed.
+/// True iff `fm` is non-temporal and the owning BA can solve it whole.
 template <NodeType node>
-bool is_whole_query_bv_solvable(tref fm) {
+bool is_whole_query_ba_solvable(tref fm) {
 	using tau = tree<node>;
 	if constexpr (!pack_has_arithmetic_theory_v<node>) return false;
 	else return fm
@@ -438,24 +438,24 @@ bool is_whole_query_bv_solvable(tref fm) {
 		&& pack_can_solve<node>(fm);
 }
 
-/// Fast path for sat/unsat; nullopt when it does not apply or cvc5 is unsure.
+/// Fast path for sat/unsat; nullopt when it does not apply or is undecided.
 template <NodeType node>
-std::optional<bool> bv_fast_path_sat(tref fm) {
+std::optional<bool> ba_fast_path_sat(tref fm) {
 	if constexpr (!pack_has_arithmetic_theory_v<node>) return std::nullopt;
 	else {
-	if (!is_whole_query_bv_solvable<node>(fm)) return std::nullopt;
-	// nullopt already covers both translation failure and cvc5's unknown.
+	if (!is_whole_query_ba_solvable<node>(fm)) return std::nullopt;
+	// nullopt already covers both translation failure and an unknown answer.
 	return pack_sat_status<node>(fm);
 	}
 }
 
 /// Fast path for validity: fm is valid iff !fm is unsat.
 template <NodeType node>
-std::optional<bool> bv_fast_path_valid(tref fm) {
+std::optional<bool> ba_fast_path_valid(tref fm) {
 	using tau = tree<node>;
 	if constexpr (!pack_has_arithmetic_theory_v<node>) return std::nullopt;
 	else {
-	if (!is_whole_query_bv_solvable<node>(fm)) return std::nullopt;
+	if (!is_whole_query_ba_solvable<node>(fm)) return std::nullopt;
 	// valid iff the negation is unsat, so the answer inverts.
 	if (auto sat = pack_sat_status<node>(tau::build_wff_neg(fm)))
 		return !*sat;
@@ -470,8 +470,8 @@ bool api<node>::realizable(tref fm) {
 	// normalization so the downstream pipeline sees a single wff_always.
 	if (fm) fm = flatten_always_conjuncts<node>(fm);
 	if (!fm || !is_formula(fm)) return false;
-	// bv fast path; falls through when undecided.
-	if (auto fast = bv_fast_path_sat<node>(fm); fast.has_value())
+	// whole-query BA fast path; falls through when undecided.
+	if (auto fast = ba_fast_path_sat<node>(fm); fast.has_value())
 		return fast.value();
 	tref nf = normalize_formula(fm);
 	// A data quantifier under a full-LTL operator survives normalization;
@@ -517,8 +517,8 @@ template <NodeType node>
 bool api<node>::valid_spec(tref fm) {
 	fm = simplify(fm);
 	if (!fm) return false;
-	// bv fast path; falls through when undecided.
-	if (auto fast = bv_fast_path_valid<node>(fm); fast.has_value())
+	// whole-query BA fast path; falls through when undecided.
+	if (auto fast = ba_fast_path_valid<node>(fm); fast.has_value())
 		return fast.value();
 	// Valid iff T (tautology) implies the normalized formula
 	return is_tau_impl<node>(tau::_T(), normalize_formula(fm));

@@ -24,21 +24,21 @@ using offset_t = std::pair<tau_parser::nonterminal, size_t>;
 
 /**
  * @internal
- * @brief Push/eliminate all quantifiers in `form`, resolving bitvector
+ * @brief Push/eliminate all quantifiers in `form`, resolving arithmetic
  * content along the way.
  *
- * Sequence: resolve any closed bv (sub-)formula via the solver first
- * (pushing a blasted bitvector formula's quantifiers through Boolean
- * normalization before it is closed is exponential, while the solver
+ * Sequence: resolve any closed arithmetic (sub-)formula through the owning
+ * BA's solver first (pushing a preprocessed formula's quantifiers through
+ * Boolean normalization before it is closed is exponential, while the solver
  * decides the closed formula directly); push/eliminate the rest via
- * `anti_prenex_block` (which, for a block containing bv-typed variables,
- * attempts predicate blasting on the isolated clause itself); resolve
- * again; then, since blasting can leave genuinely unsupported bv
- * arithmetic (e.g. multiplication/division by a non-constant) behind,
- * collect that residue and run `anti_prenex_block` once more skipping
- * exactly it, so any quantifier not touching surviving arithmetic still
- * gets pushed/resolved; a final resolve pass collapses whatever closed bv
- * (sub-)formula that step produces.
+ * `anti_prenex_block` (which, for a block containing arithmetic-typed
+ * variables, attempts the BA's preprocessing on the isolated clause itself);
+ * resolve again; then, since preprocessing can leave genuinely unsupported
+ * arithmetic (e.g. multiplication/division by a non-constant) behind, collect
+ * that residue and run `anti_prenex_block` once more skipping exactly it, so
+ * any quantifier not touching surviving arithmetic still gets pushed/resolved;
+ * a final resolve pass collapses whatever closed (sub-)formula that step
+ * produces.
  * @tparam node Tree node type.
  * @param form Formula to process.
  * @return Formula with quantifiers pushed/eliminated as far as possible.
@@ -47,14 +47,14 @@ using offset_t = std::pair<tau_parser::nonterminal, size_t>;
  * @code{.cpp}
  * // ex x (x|y = 0): x is eliminated entirely, leaving just y = 0
  * tref fm = get_nso_rr("ex x x|y = 0.").value().main->get();
- * tref res = eliminate_bv_and_quantifiers<node_t>(fm);
+ * tref res = eliminate_arithmetic_and_quantifiers<node_t>(fm);
  * // tau::get(res).to_str() == "y = 0"
  * CHECK( !tau::get(res).find_top(is<node_t, tau::wff_ex>) );
  * @endcode
  * @endinternal
  */
 template <NodeType node>
-tref eliminate_bv_and_quantifiers(tref form) {
+tref eliminate_arithmetic_and_quantifiers(tref form) {
 	using tau = tree<node>;
 
 	form = resolve_quantifiers<node>(form);
@@ -67,9 +67,9 @@ tref eliminate_bv_and_quantifiers(tref form) {
 		if (get_free_vars<node>(form).empty()
 			&& pack_can_solve<node>(form))
 		{
-			// Only commit to T/F on a definite answer: cvc5
-			// returning unknown, or translation failing, means
-			// we cannot decide, not that the formula is false.
+			// Only commit to T/F on a definite answer: an unknown
+			// result, or translation failing, means we cannot
+			// decide, not that the formula is false.
 			if (auto sat = pack_sat_status<node>(form))
 				return *sat ? tau::_T() : tau::_F();
 		}
@@ -91,14 +91,14 @@ tref normalize(tref form) {
 	trefs temps = tau::get(form).select_top(is_child_temporal_quantifier<node>);
 	// Case that the formula has no temporal quantifier
 	if (temps.empty()) {
-		form = eliminate_bv_and_quantifiers<node>(form);
+		form = eliminate_arithmetic_and_quantifiers<node>(form);
 	} else {
 		subtree_map<node, tref> changes;
 		for (tref temp : temps) {
 			bool is_aw = is_child<node>(temp, tau::wff_always);
 			// Remove temporal quantifier
 			tref f = tau::trim2(temp);
-			f = eliminate_bv_and_quantifiers<node>(f);
+			f = eliminate_arithmetic_and_quantifiers<node>(f);
 			// Add quantifier again and save as change
 			if (is_aw) changes.emplace(temp, tau::build_wff_always(f));
 			else changes.emplace(temp, tau::build_wff_sometimes(f));
@@ -126,11 +126,11 @@ tref normalize_non_temp(tref fm) {
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
-	tref result = eliminate_bv_and_quantifiers<node>(fm);
+	tref result = eliminate_arithmetic_and_quantifiers<node>(fm);
 	result = term_boole_normal_form<node>(result);
 	// NOTE: Do NOT add fold_trivial_quantifiers or reget here.
-	// tau::reget strips the explicit bitwidth subtype from BV-typed nodes
-	// (io_vars and BV constants) causing get_bv_size assertions downstream.
+	// tau::reget strips a parameterized type's explicit subtype from its
+	// nodes (io_vars and constants), tripping width assertions downstream.
 	// Residual trivial quantifiers are folded by normalize_with_temp_simp
 	// (which already calls fold_trivial_quantifiers after normalize).
 #ifdef TAU_CACHE
@@ -808,7 +808,7 @@ tref normalize_with_temp_simp(tref fm) {
 	// equations, quantifiers over T/F...) may survive; rebuild with hooks
 	// and fold the remaining trivial quantifiers.
 	fm = fold_trivial_quantifiers<node>(tau::reget(fm));
-	// Residual quantified bv subformulas can survive the substitution
+	// Residual quantified arithmetic subformulas can survive the substitution
 	// based eliminations (the closed formula check in resolve_quantifiers
 	// runs before they are created); resolve them late and fold again.
 	if (tau::get(fm).find_top(is_quantifier<node>)) {
