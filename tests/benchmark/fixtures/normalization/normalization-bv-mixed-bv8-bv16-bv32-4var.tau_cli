@@ -1,0 +1,5 @@
+n all v1:bv[8] all v2:bv[8] all v3:bv[16] all v4:bv[32] (v1 + v2) = (v2 + v1) && v3 + { 1 }:bv[16] > v3 && v4 + { 1 }:bv[32] > v4.
+n ex v1:bv[8] ex v2:bv[8] ex v3:bv[16] ex v4:bv[32] v2 = v1 + { 1 }:bv[8] && v3 + { 1 }:bv[16] != v3 && v4 + { 1 }:bv[32] != v4.
+n all v1:bv[8] all v2:bv[8] all v3:bv[16] all v4:bv[32] v2 = (v1 << { 1 }:bv[8]) >> { 1 }:bv[8] && v3 & v3 = v3 && v4 & v4 = v4.
+n ex v1:bv[8] ex v2:bv[8] ex v3:bv[16] ex v4:bv[32] v1 < v2 && v3 = v3 && v4 = v4.
+n all v1:bv[8] ex v2:bv[8] all v3:bv[16] all v4:bv[32] v2 = v1 + { 1 }:bv[8] && v3 + { 1 }:bv[16] != v3 && v4 + { 1 }:bv[32] != v4.
