@@ -382,6 +382,7 @@ size_t get_inv_sym(size_t symbol);
 #include "boolean_algebras/bv/bv_ba.tmpl.h"
 #include "boolean_algebras/bv/bv_ba_solver.tmpl.h"
 #include "boolean_algebras/bv/bv_ba_helpers.tmpl.h"
+#include "boolean_algebras/bv/bv_ba_hooks.tmpl.h"
 #include "heuristics/bv_predicate_blasting.h"
 #include "boolean_algebras/bv/bv_descriptor.tmpl.h"
 
