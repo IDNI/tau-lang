@@ -36,6 +36,7 @@ set(TAU_HEADERS
 	satisfiability.h
 	splitter_types.h
 	splitter.h
+	solver_types.h
 	solver.h
 	ba_types_inference.h
 	base_ba_dispatcher.h

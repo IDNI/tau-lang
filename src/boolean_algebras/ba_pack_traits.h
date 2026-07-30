@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <tuple>
 #include <type_traits>
 
@@ -485,6 +486,59 @@ auto pack_first_owner(Probe&& probe) {
 				|| ...);
 		return out;
 	}(std::make_index_sequence<std::tuple_size_v<pack>>{});
+}
+
+/** @brief `true` when @p BA eliminates a quantifier over its own theory. */
+template <typename Node, typename BA>
+concept ba_has_omcat_qe = ba_has_descriptor_v<Node, BA>
+	&& requires(tref var, tref body) {
+		ba_descriptor<BA, Node>::omcat_qe(var, body);
+	};
+
+/**
+ * @brief Ask the BA owning @p ba_type_id to eliminate a quantifier over @p var.
+ *
+ * `true`/`false` answer satisfiability of the quantified @p body; `nullopt` says
+ * the theory could not decide it, which is also the answer when no BA owns the
+ * type or its owner has no theory-specific elimination -- all three fall through
+ * to the atomless-BA path, so core needs no third state.
+ */
+template <typename Node>
+std::optional<bool> pack_omcat_qe(size_t ba_type_id, tref var, tref body) {
+	return pack_first_owner<Node>([&]<typename BA>() -> std::optional<bool> {
+		if constexpr (ba_has_omcat_qe<Node, BA>)
+			if (ba_descriptor<BA, Node>::owns_type(ba_type_id))
+				return ba_descriptor<BA, Node>::omcat_qe(
+					var, body);
+		return std::nullopt;
+	});
+}
+
+/** @brief `true` when @p BA spells a witness of its own for generated code. */
+template <typename Node, typename BA>
+concept ba_has_codegen_witness = ba_has_descriptor_v<Node, BA>
+	&& requires(tref var, tref conj) {
+		ba_descriptor<BA, Node>::codegen_witness(var, conj);
+	};
+
+/**
+ * @brief A C++ literal satisfying @p conj, from the BA owning @p ba_type_id.
+ *
+ * The literal's spelling and its type are the owner's, so the emitter places a
+ * value it never has to name; nullopt means no owner contributes one.
+ */
+template <typename Node>
+std::optional<std::string> pack_codegen_witness(size_t ba_type_id, tref var,
+	tref conj)
+{
+	return pack_first_owner<Node>([&]<typename BA>()
+		-> std::optional<std::string> {
+			if constexpr (ba_has_codegen_witness<Node, BA>)
+				if (ba_descriptor<BA, Node>::owns_type(ba_type_id))
+					return ba_descriptor<BA, Node>
+						::codegen_witness(var, conj);
+			return std::nullopt;
+		});
 }
 
 } // namespace idni::tau_lang

@@ -127,47 +127,13 @@ inline std::vector<std::pair<int,bool>> parse_guard_lits(const std::string& g) {
 	return lits;
 }
 
-// Pick a concrete double witness from a non-empty qlt interval.
-inline double witness_from_qlt_interval(const qlt& interval) {
-	if (interval.is_empty()) return 0.0;
-	const auto& piece = interval.pieces[0];
-	const auto& lo = piece.lo.val;
-	const auto& hi = piece.hi.val;
-	if (lo.is_neg_inf() && hi.is_pos_inf()) return 0.0;
-	if (lo.is_neg_inf()) {
-		if (hi.is_sym()) return -1.0;
-		return (double)hi.p / (double)hi.q - 1.0;
-	}
-	if (hi.is_pos_inf()) {
-		if (lo.is_sym()) return 1.0;
-		return (double)lo.p / (double)lo.q + 1.0;
-	}
-	// Bounded: midpoint
-	if (lo.is_sym() || hi.is_sym()) return 0.0;
-	double l = (double)lo.p / (double)lo.q;
-	double h = (double)hi.p / (double)hi.q;
-	return (l + h) / 2.0;
-}
-
-// Format a double as a C++ literal with full precision.
-inline std::string double_to_cpp(double v) {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "%.17g", v);
-	// Ensure the literal looks like a floating-point constant
-	std::string s(buf);
-	bool has_dot_or_e = false;
-	for (char c : s) if (c == '.' || c == 'e' || c == 'E') { has_dot_or_e = true; break; }
-	if (!has_dot_or_e) s += ".0";
-	return s;
-}
-
 // Classification of a single data atom for the codegen.
 enum class AtomKind { BOOL, OUTPUT_QLT, INPUT_QLT };
 
 struct AtomMeta {
 	AtomKind kind  = AtomKind::BOOL;
 	std::string var_name;      // "o1" or "i1" for QLT atoms
-	tref io_var_ref = nullptr; // io_var tref (for qlt_dlo_qe)
+	tref io_var_ref = nullptr; // io_var tref (for the witness query)
 };
 
 // Classify a data atom as BOOL, OUTPUT_QLT, or INPUT_QLT.
@@ -413,7 +379,7 @@ inline void emit_cpp_program_prop(
 //
 // For each HOA edge the emitter:
 //   1. Collects positive output-qlt atoms grouped by variable name.
-//   2. Builds their conjunction and calls qlt_dlo_qe to get the feasible interval.
+//   2. Builds their conjunction and asks the owning BA for a witness literal.
 //   3. Picks a concrete double witness from the interval and embeds it as a literal.
 //
 // Output atoms of non-qlt type still get `bool` fields in Outputs (propositional
@@ -565,19 +531,16 @@ void emit_cpp_program_data(
 				}
 			}
 
-			// Compute qlt witnesses at code-generation time.
-			std::map<std::string, double> witnesses;
-			if constexpr (ba_variant_includes_v<qlt, typename tau::constant>) {
-				for (auto& [var, atom_refs] : var_pos_atoms) {
-					tref conj = atom_refs[0];
-					for (size_t ai = 1; ai < atom_refs.size(); ++ai)
-						conj = tau::build_wff_and(conj, atom_refs[ai]);
-					tref io_ref = var_io_ref[var];
-					if (auto interval = qlt_dlo_qe<node>(io_ref, conj); interval)
-						witnesses[var] = witness_from_qlt_interval(interval.value());
-					else
-						witnesses[var] = 1.0; // qlt_dlo_qe undetermined: use 1.0 as fallback
-				}
+			// Ask each variable's own BA for a witness literal.
+			std::map<std::string, std::string> witnesses;
+			for (auto& [var, atom_refs] : var_pos_atoms) {
+				tref conj = atom_refs[0];
+				for (size_t ai = 1; ai < atom_refs.size(); ++ai)
+					conj = tau::build_wff_and(conj, atom_refs[ai]);
+				tref io_ref = var_io_ref[var];
+				if (auto w = pack_codegen_witness<node>(
+					tau::get(io_ref).get_ba_type(), io_ref, conj))
+						witnesses[var] = *w;
 			}
 
 			// Emit edge.
@@ -586,7 +549,7 @@ void emit_cpp_program_data(
 			for (auto& var : out_qlt_vars) {
 				if (witnesses.count(var))
 					out << "\t\t\t\to." << sanitize(var) << " = "
-					    << double_to_cpp(witnesses[var]) << ";\n";
+					    << witnesses[var] << ";\n";
 				// If no positive atom for this var on this edge: leave default 0.0.
 			}
 			for (auto& [prop, val] : bool_asgns)

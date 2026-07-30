@@ -11,8 +11,21 @@
 #include "../parser/qlt_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
+#include "solver_types.h"
 
 namespace idni::tau_lang {
+
+// Defined in the qlt_qe / qlt_solver templates this file includes at its end;
+// declared here so the descriptor's own definition context can name them.
+template <NodeType node>
+static std::optional<bool> qlt_omcat_qe(tref var, tref body);
+
+template <NodeType node>
+static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
+	const inequality_system<node>& sys, const solver_options& options);
+
+template <NodeType node>
+static std::optional<std::string> qlt_codegen_witness(tref var, tref conj);
 
 template <typename... PackBAs>
 struct ba_descriptor<qlt, node<PackBAs...>> {
@@ -117,10 +130,37 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		return tau::get(tau::bf, { tau::get_ba_constant(
 			typename node_t::constant(z), ba_type) });
 	}
+
+	/**
+	 * @brief Decide a quantifier over a qlt variable by DLO elimination.
+	 *
+	 * Answers satisfiability rather than the satisfying interval, which stays
+	 * qlt's own: nullopt says the body is not a DLO conjunction this can
+	 * resolve, and core falls through to the atomless-BA path.
+	 */
+	static std::optional<bool> omcat_qe(tref var, tref body) {
+		return qlt_omcat_qe<node_t>(var, body);
+	}
+
+	/** @brief A rational witness for @p var, spelled for generated C++. */
+	static std::optional<std::string> codegen_witness(tref var, tref conj) {
+		return qlt_codegen_witness<node_t>(var, conj);
+	}
+
+	/** @brief Solve a pure ordering system, which a BA-level solve cannot. */
+	static std::optional<solution<node_t>> omcat_solve_inequality_system(
+		const inequality_system<node_t>& sys,
+		const solver_options& options)
+	{
+		return qlt_omcat_solve_inequality_system<node_t>(sys, options);
+	}
 };
 
 } // namespace idni::tau_lang
 
 #include "boolean_algebras/qlt/qlt_ba_hooks_ext.tmpl.h"
+#include "boolean_algebras/qlt/qlt_qe.tmpl.h"
+#include "boolean_algebras/qlt/qlt_solver.tmpl.h"
+#include "boolean_algebras/qlt/qlt_codegen.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__

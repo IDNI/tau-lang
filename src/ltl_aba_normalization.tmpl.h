@@ -150,26 +150,25 @@ static bool aba_existential_feasible(tref fm) {
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	auto compute = [&]() -> bool {
-		// For qlt formulas: use qlt_dlo_qe directly on each free variable.
-		if constexpr (ba_variant_includes_v<qlt, typename tau::constant>) {
-			const trefs& free_vars = tau::get(fm).get_free_vars();
-			if (!free_vars.empty()) {
-				bool all_qlt = true;
-				for (tref v : free_vars)
-					if (!is_omcat_type_family<node>(tree<node>::get(v).get_ba_type()))
-						{ all_qlt = false; break; }
-				if (all_qlt) {
-					bool all_determined = true;
-					for (tref v : free_vars) {
-						if (auto r = qlt_dlo_qe<node>(v, fm); r) {
-							if (r.value().is_empty()) return false;
-						} else {
-							all_determined = false; break;
-						}
-					}
-					if (all_determined) return true;
-				}
+		// Over a non-aba omcat theory, ask that theory per free variable
+		// rather than the general satisfiability path below.
+		const trefs& free_vars = tau::get(fm).get_free_vars();
+		bool all_omcat = !free_vars.empty();
+		for (tref v : free_vars)
+			if (!pack_type_is_non_aba_omcat<node>(
+				tree<node>::get(v).get_ba_type()))
+					{ all_omcat = false; break; }
+		if (all_omcat) {
+			bool all_determined = true;
+			for (tref v : free_vars) {
+				if (auto sat = pack_omcat_qe<node>(
+					tree<node>::get(v).get_ba_type(), v, fm);
+					sat)
+				{
+					if (!*sat) return false;
+				} else { all_determined = false; break; }
 			}
+			if (all_determined) return true;
 		}
 		constexpr bool has_nlang_ba = ba_variant_includes_v<nlang_ba, typename tau::constant>;
 		if constexpr (has_nlang_ba) {
