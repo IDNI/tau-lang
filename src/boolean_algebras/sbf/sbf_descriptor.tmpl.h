@@ -8,6 +8,8 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF__SBF_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF__SBF_DESCRIPTOR_TMPL_H__
 
+#include <set>
+
 #include "../parser/sbf_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 
@@ -25,6 +27,13 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 
 	/** @brief sbf can carry a plain 0 or 1. */
 	static constexpr bool can_host_bool = true;
+
+	/** @brief Keep sbf's own grammar in step with core's var/charvar mode. */
+	static void set_charvar(bool charvar) {
+		std::set<std::string> guards{ charvar ? "charvar" : "var" };
+		sbf_parser::instance().get_grammar()
+			.set_enabled_productions(guards);
+	}
 
 	static bool matches_type(tref type_tree) {
 		return is_sbf_type<node_t>(type_tree);

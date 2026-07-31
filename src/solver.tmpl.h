@@ -1246,7 +1246,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 		}
 		if (error) return {};
 
-		bool bv_sat = false, skip = false;
+		bool theory_sat = false, skip = false;
 		solution<node> clause_solution;
 		for (auto& [type, conjs] : type_partition) {
 			// The options for the solver depend on the equation type
@@ -1270,14 +1270,14 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 					}
 					DBG(assert(squeezed.has_value());)
 					if (auto lgrs_sol = lgrs<node>(squeezed.value())) {
-						bv_sat = true;
+						theory_sat = true;
 						for (const auto& [var, value] : lgrs_sol.value())
 							clause_solution[var] = value;
 					} else skip = true;
 				} else if constexpr (pack_has_arithmetic_theory_v<node>) {
-					if (auto bv_solution = pack_solve<node>(tau::build_wff_and(conjs))) {
-						bv_sat = true;
-						for (const auto& [var, value]: bv_solution.value()) {
+					if (auto theory_solution = pack_solve<node>(tau::build_wff_and(conjs))) {
+						theory_sat = true;
+						for (const auto& [var, value]: theory_solution.value()) {
 							clause_solution[var] = value;
 						}
 					} else skip = true; // theory part unsolved, skip this clause
@@ -1296,7 +1296,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 		if (skip) continue;
 		// It can happen that there is no free variable in bitvector formula
 		// causing empty solutions which are still sat
-		if (!clause_solution.empty() || bv_sat || path_sat) {
+		if (!clause_solution.empty() || theory_sat || path_sat) {
 			// Add variables defined by assignments to solution
 			for (auto& [v, a] : var_assignments) {
 				// Apply the found solutions

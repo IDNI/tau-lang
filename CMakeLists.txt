@@ -404,11 +404,15 @@ message(STATUS "CMAKE_BUILD_WITH_RPATH: ${CMAKE_BUILD_WITH_RPATH}")
 #
 if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	include(generate-parser)
-	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf")
-	generate_parser("${PROJECT_SOURCE_DIR}/parser/sbf.tgf")
-	generate_parser("${PROJECT_SOURCE_DIR}/parser/qint.tgf")
-	generate_parser("${PROJECT_SOURCE_DIR}/parser/hsb.tgf")
-	generate_parser("${PROJECT_SOURCE_DIR}/parser/nlang.tgf")
+	# Every grammar, globbed rather than listed: the hand-written list had
+	# drifted and bitvector.tgf and qlt.tgf were never regenerated at all.
+	# This deliberately does not follow -DTAU_BAS=; the generated parsers are
+	# committed and shared, so a reduced pack regenerating only its own
+	# grammars would leave the rest stale and commit a partial update.
+	file(GLOB TAU_GRAMMARS "${PROJECT_SOURCE_DIR}/parser/*.tgf")
+	foreach(_tgf ${TAU_GRAMMARS})
+		generate_parser("${_tgf}")
+	endforeach()
 endif()
 
 #

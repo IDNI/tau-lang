@@ -690,7 +690,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case subst_cmd:         track_chpos();
 						out("substitute "); break;
 			case wff_conditional:   track_chpos(); break;
-			/*case bv_constant:
+			/*case ba_constant:
 				if (auto first = tau::tt(ref) | tt::first | tt::ref; first) out(first);
 				else out(t.get_bv_constant());
 				out(" : ");

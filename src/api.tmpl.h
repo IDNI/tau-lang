@@ -2,7 +2,6 @@
 
 #include "api.h"
 
-#include "sbf_parser.generated.h"
 #include "tau_tree_builders.h"
 
 #undef LOG_CHANNEL_NAME
@@ -44,7 +43,7 @@ template <NodeType node>
 void api<node>::set_charvar(bool charvar) {
 	std::set<std::string> guards{ charvar ? "charvar" : "var" };
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
-	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
+	pack_set_charvar<node>(charvar);
 }
 
 template <NodeType node>

@@ -189,6 +189,26 @@ Form pack_preprocess(Form form) {
 	return out;
 }
 
+/**
+ * @brief Switch every BA with a grammar of its own between var and charvar.
+ *
+ * A BA that parses its own literals has its own grammar to keep in step with
+ * core's; one that does not simply declares nothing.
+ */
+template <typename Node>
+void pack_set_charvar(bool charvar) {
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is,
+				typename Node::bas_tuple>;
+			if constexpr (requires {
+				ba_descriptor<BA, Node>::set_charvar(charvar); })
+				ba_descriptor<BA, Node>::set_charvar(charvar);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+}
+
 /** @brief Enable or disable preprocessing on every BA that supports it. */
 template <typename Node>
 void pack_set_preprocessing(bool enabled) {
