@@ -33,10 +33,24 @@ struct block_atom_profile {
 	size_t others = 0;
 	/// Any `skip`-matched node anywhere in the formula.
 	bool skip_content = false;
+	/// Any node carrying a BA type from a *finite* (hence atomic) family --
+	/// `bv[n]` or `bool`. Only computed when the sign census would otherwise
+	/// let `all_negated()` fire, since that is the only guard that needs it.
+	bool finite_ba_content = false;
 
 	/// Paper step 2a's guard.
+	///
+	/// `distribute_block_over_atoms`, the law this guards, is Corollary 5.1
+	/// with J1 empty and holds only in an *atomless* Boolean algebra: for
+	/// `bv[1]`, `ex x (x != 0 && x' != 0)` is F while the distributed
+	/// `ex x (x != 0) && ex x (x' != 0)` is T. Its header names the
+	/// precondition and delegates it to the caller, but the caller only ever
+	/// established `!skip_content` -- i.e. atomlessness rode entirely on the
+	/// caller's choice of `skip`, which is exactly what went wrong when
+	/// `blast_block` re-entered with `no_skip`. `finite_ba_content` checks it
+	/// directly instead.
 	bool all_negated() const {
-		return !skip_content && others == 0
+		return !skip_content && !finite_ba_content && others == 0
 			&& positives == 0 && negatives > 0;
 	}
 	/// Paper step 2b's guard.

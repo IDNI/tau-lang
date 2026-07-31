@@ -340,3 +340,76 @@ TEST_SUITE("recurrence relation validity") {
 			tau::bf, 1, tau::_0(tau_type_id<node_t>())) == nullptr );
 	}
 }
+
+// --- Regressions for the Medium findings fixed in this round -----------------
+
+// NF-4. syntactic_variable_simplification's cache had two independent defects:
+// the lookup key was the untouched input while the store key was the value
+// *after* gt_gteq_to_lt_lteq and norm_equation had rebound the local (and the
+// var key was the bf-wrapped one, not the plain variable), and the eq/neq early
+// return -- the path norm_equation sends the overwhelming majority of atoms
+// down -- bypassed the store entirely. Both are only observable with TAU_CACHE
+// on, i.e. in Release; these cases pin the behaviour that must hold either way.
+TEST_SUITE("syntactic_variable_simplification caching") {
+
+	TEST_CASE("repeated calls agree, canonical input") {
+		tref atom = wff("x y = 0");
+		tref x = tau::build_variable("x", 0);
+		tref first = syntactic_variable_simplification<node_t>(atom, x);
+		tref again = syntactic_variable_simplification<node_t>(atom, x);
+		CHECK( tau::get(first) == tau::get(again) );
+	}
+
+	// A non-canonical input is the case a mis-keyed store could answer wrongly:
+	// `x = y` is rewritten to `x+y = 0` inside the function, so the store used
+	// to be filed under the rewritten form while every lookup asked for the
+	// original.
+	TEST_CASE("repeated calls agree, non-canonical input") {
+		tref x = tau::build_variable("x", 0);
+		for (const char* s : { "x = y", "x y != 0", "x | y = 0" }) {
+			tref atom = wff(s);
+			tref first = syntactic_variable_simplification<node_t>(
+				atom, x);
+			tref again = syntactic_variable_simplification<node_t>(
+				atom, x);
+			CAPTURE(s);
+			CHECK( tau::get(first) == tau::get(again) );
+			CHECK( are_nso_equivalent<node_t>(first, atom) );
+		}
+	}
+
+	// Two different variables must not collide on one entry.
+	TEST_CASE("the variable is part of the key") {
+		tref atom = wff("x y = 0");
+		tref rx = syntactic_variable_simplification<node_t>(
+			atom, tau::build_variable("x", 0));
+		tref ry = syntactic_variable_simplification<node_t>(
+			atom, tau::build_variable("y", 0));
+		CHECK( are_nso_equivalent<node_t>(rx, atom) );
+		CHECK( are_nso_equivalent<node_t>(ry, atom) );
+	}
+}
+
+// NF-5. rec_term_boole_decomposition's three recursive calls dropped
+// free_funcs, so every leaf of an entry made with free_funcs = true re-entered
+// the !free_funcs block -- another normalize_ba, another select_top(bf_ref) and
+// another nested decomposition -- terminating only because substituting a
+// top-level bf_ref also removes the nested ones. That is an unstated invariant;
+// forwarding the flag removes the dependency on it. The observable result is
+// unchanged, which is what these pin.
+TEST_SUITE("term Boole decomposition over function symbols") {
+
+	TEST_CASE("a term containing a bf_ref still normalizes") {
+		tref fm = wff("x g(y) | x' g(y) = 0");
+		tref res = term_boole_normal_form<node_t>(fm);
+		REQUIRE( res != nullptr );
+		CHECK( are_nso_equivalent<node_t>(res, fm) );
+	}
+
+	TEST_CASE("two function symbols in one term") {
+		tref fm = wff("g(y) h(z) = 0");
+		tref res = term_boole_normal_form<node_t>(fm);
+		REQUIRE( res != nullptr );
+		CHECK( are_nso_equivalent<node_t>(res, fm) );
+	}
+}

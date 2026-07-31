@@ -146,7 +146,7 @@ bool no_skip(tref t);
 // single-argument overload below plays the role of the default, calling
 // through with is_tref_bv_type_family<node>.
 template <NodeType node>
-tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
+tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip);
 
 template <NodeType node>
 tref anti_prenex_block(tref formula);

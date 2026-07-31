@@ -284,12 +284,13 @@ std::optional<bv> bv_eval_node(tref form, subtree_map<node, bv>& vars,
 
 /**
  * @brief Checks that the formula can be decided by the bitvector solver:
- * every variable must have an explicitly sized bitvector type. Mixed-type
+ * every variable must have an explicitly sized bitvector type, and the formula
+ * must contain no node kind `bv_eval_node` cannot translate. Mixed-type
  * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
  *
  * @tparam node Node type
  * @param form The formula to check
- * @return true if all variables are explicitly sized bitvectors
+ * @return true if the formula is within the translator's reach
  */
 template <NodeType node>
 bool is_bv_solvable_formula(tref form) {
@@ -298,6 +299,30 @@ bool is_bv_solvable_formula(tref form) {
 
 	bool solvable = true;
 	auto check = [&](tref n) {
+		// Reject references. Checking variables alone was not enough: a
+		// wff_ref's arguments are perfectly good bv-typed variables, so the
+		// whole formula was declared solvable, and `bv_eval_node` then hit the
+		// reference, returned nullopt and logged "Failed to translate the
+		// formula to cvc5" -- once per resolve pass plus the final gate, four
+		// times for a single normalize_non_temp -- each time after a
+		// cvc5::Solver had been constructed and the tree walked. `ref` covers
+		// both wff_ref and bf_ref: they are named alternatives of the same
+		// `ref` nonterminal.
+		//
+		// Only `ref`, deliberately. It is tempting to reject every node kind
+		// bv_eval_node's switch lacks a case for -- io_var and capture in
+		// particular -- but the grammar makes that wrong: `variable =>
+		// (uconst | io_var | var_name) [typed]`, so an io_var is always
+		// *inside* a variable node and `case tau::variable` translates it by
+		// name, which is exactly how every bv io_var formula gets solved. The
+		// same holds for a capture used as an io_var offset. Rejecting them
+		// costs both correctness and time: measured on
+		// test_integration-satisfiability3, whose six cases are all bv[16]
+		// over io_vars, adding io_var to this list turned 1.4s and all-pass
+		// into a >1500s timeout with a wrong answer, because every scope then
+		// missed the solver shortcut and went to blasting instead.
+		if (is<node>(n, tau::ref))
+			return solvable = false;
 		if (is<node>(n, tau::variable)) {
 			size_t t = tau::get(n).get_ba_type();
 			if (!is_bv_type_family<node>(t)) return solvable = false;
@@ -339,6 +364,28 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
+#ifdef TAU_CACHE
+	// One cvc5::Solver construction plus one checkSat per call, and the callers
+	// ask repeatedly: resolve_quantifiers is a whole-tree pre_order run at
+	// least three times per eliminate_bv_and_quantifiers, and its open-scope
+	// branch asks twice per scope. The answer depends only on `form` --
+	// config_cvc5_solver and config_cvc5_solver_alternating_quantifiers read no
+	// mutable global, and the alternation test is a function of the formula --
+	// so the formula alone is a complete key. Unlike anti_prenex's memo (which
+	// had to be split per bv_blasting setting) there is nothing else to key on.
+	// nullopt is cached too: a formula the translator rejects gets rejected the
+	// same way every time, and re-deriving that costs a full tree walk.
+	using cache_t = std::unordered_map<tref, std::optional<bv_sat_status>>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	tref key = tau::trim_right_sibling(form);
+	if (auto it = cache.find(key); it != end(cache)) return it->second;
+	auto memo = [&key](std::optional<bv_sat_status> r) {
+		return cache.emplace(key, r).first->second;
+	};
+#else
+	auto memo = [](std::optional<bv_sat_status> r) { return r; };
+#endif // TAU_CACHE
+
 	subtree_map<node, bv> vars, free_vars;
 	cvc5::Solver solver(cvc5_term_manager);
 	// Interleaved all/ex over bitvectors needs cvc5 to instantiate outer
@@ -360,17 +407,17 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	if (!expr) {
 		LOG_ERROR << "Failed to translate the formula to cvc5: " << LOG_FM(form);
 		DBG(LOG_TRACE << LOG_FM_TREE(form) << "\n";)
-		return std::nullopt;
+		return memo(std::nullopt);
 	}
 	DBG( LOG_TRACE << "CVC5 translated formula: " << expr.value(); )
 	solver.assertFormula(expr.value());
 	auto result = solver.checkSat();
-	if (result.isSat()) return bv_sat_status::sat;
+	if (result.isSat()) return memo(bv_sat_status::sat);
 	if (result.isUnknown()) {
 		LOG_DEBUG << "cvc5 could not decide satisfiability (unknown) for: " << expr.value();
-		return bv_sat_status::unknown;
+		return memo(bv_sat_status::unknown);
 	}
-	return bv_sat_status::unsat;
+	return memo(bv_sat_status::unsat);
 }
 
 template <NodeType node>

@@ -1196,3 +1196,86 @@ TEST_SUITE("DistributeBlockOverAtoms") {
 		CHECK( qs.size() == 1 );
 	}
 }
+
+// Regression tests for the Medium findings fixed in this round.
+TEST_SUITE("BlockAtomProfileAtomlessness") {
+
+	// AP-11. distribute_block_over_atoms -- the body of step 2a, which
+	// all_negated() guards -- is Corollary 5.1 with J1 empty and holds only in
+	// an *atomless* Boolean algebra. Over bv[1], `ex x (x != 0 && x' != 0)` is
+	// F while the distributed `ex x (x != 0) && ex x (x' != 0)` is T. The guard
+	// used to encode sign uniformity plus !skip_content only, so atomlessness
+	// rode entirely on the caller's choice of `skip` -- and blast_block
+	// re-entering with no_skip is exactly how that failed. `no_skip` here
+	// reproduces that caller.
+	static block_atom_profile<node_t> profile_no_skip(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		while (is_child_quantifier<node_t>(fm))
+			fm = tau::get(fm)[0].second();
+		fm = normalize_atomic_formula_operators<node_t>(fm);
+		return profile_block_atoms<node_t>(fm, no_skip<node_t>);
+	}
+
+	TEST_CASE("all_negated declines on bv content even under no_skip") {
+		auto p = profile_no_skip("ex x:bv[8] (x != { 0 }:bv[8]).");
+		// no_skip means the old guard saw uniform signs and nothing else.
+		CHECK( !p.skip_content );
+		CHECK( p.negatives == 1 );
+		CHECK( p.others == 0 );
+		CHECK( p.finite_ba_content );
+		CHECK( !p.all_negated() );
+	}
+
+	TEST_CASE("atomless content still qualifies for step 2a") {
+		// Control: the same shape over the default (atomless) type must keep
+		// firing, so the new guard is not simply blocking everything.
+		auto p = profile_no_skip("ex x (x y != 0 && x z != 0).");
+		CHECK( !p.finite_ba_content );
+		CHECK( p.all_negated() );
+	}
+
+	TEST_CASE("step 2b is not gated on atomlessness") {
+		// all_positive() needs no atomlessness: squeezing
+		// `f1 = 0 && f2 = 0` into `f1|f2 = 0` and distributing `ex` over a
+		// disjunction are valid in any Boolean algebra. finite_ba_content is
+		// therefore not even computed for a positive census.
+		auto p = profile_no_skip("ex x (x y = 0 && x z = 0).");
+		CHECK( p.all_positive() );
+		CHECK( !p.finite_ba_content );
+	}
+}
+
+TEST_SUITE("TreatExQuantifiedClauseNegatives") {
+
+	// AP-4. squeeze_positives selects with select_top(is<bf_eq>), and
+	// select_top descends through wff_neg, so the equation inside a `!(g = 0)`
+	// was folded into the *positive* squeeze while the `neqs` scan matched only
+	// bf_neq and never re-added the negation: the disequation was inverted and
+	// dropped, turning this clause into T. The precondition ("negatives appear
+	// as bf_neq") held only by accident of call order; it is now established in
+	// the function itself.
+	TEST_CASE("a wff_neg(bf_eq) conjunct is not folded into the positives") {
+		const char* sample = "ex x (x a = 0 && !(x b = 0)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		REQUIRE( fm != nullptr );
+		bool quant_eliminated = true;
+		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		REQUIRE( res != nullptr );
+		// `ex x (xa = 0 && xb != 0)` is satisfiable but not valid: for a = b
+		// no x satisfies both, so T would be wrong.
+		CHECK( !tau::get(res).equals_T() );
+		CHECK( are_nso_equivalent<node_t>(res, fm) );
+	}
+
+	TEST_CASE("the bf_neq spelling of the same clause agrees") {
+		// Control: the two spellings must now give the same answer.
+		tref neg = get_nso_rr("ex x (x a = 0 && !(x b = 0)).")
+			.value().main->get();
+		tref neq = get_nso_rr("ex x (x a = 0 && x b != 0).")
+			.value().main->get();
+		bool e1 = true, e2 = true;
+		tref r1 = treat_ex_quantified_clause<node_t>(neg, e1);
+		tref r2 = treat_ex_quantified_clause<node_t>(neq, e2);
+		CHECK( are_nso_equivalent<node_t>(r1, r2) );
+	}
+}

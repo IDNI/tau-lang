@@ -31,11 +31,11 @@ namespace idni::tau_lang {
 // is given here, since a default cannot be redeclared and these call sites
 // always pass an explicit predicate.
 template<NodeType node>
-tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
+tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip);
 
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,
-	std::function<bool(tref)> skip);
+	const std::function<bool(tref)>& skip);
 
 // NOT thread-safe: Controls whether bitvector blasting is enabled.
 // The tau library assumes single-threaded access.

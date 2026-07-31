@@ -1691,9 +1691,21 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 #ifdef TAU_CACHE
 	using cache_t = std::unordered_map<std::pair<tref, tref>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find(std::make_pair(tau::trim_right_sibling(atomic_fm),
-		tau::trim_right_sibling(var))); it != end(cache))
-		return it->second;
+	// The key has to be built from the untouched inputs: both parameters are
+	// rebound further down (var is wrapped into a bf, atomic_fm is rewritten
+	// by gt_gteq_to_lt_lteq and norm_equation), so keying the store on the
+	// rewritten values means an input that is not already in canonical form
+	// can never hit its own entry.
+	const std::pair<tref, tref> key { tau::trim_right_sibling(atomic_fm),
+		tau::trim_right_sibling(var) };
+	if (auto it = cache.find(key); it != end(cache)) return it->second;
+	// Every non-trivial exit stores through this, in particular the func2 == 0
+	// early return below: norm_equation brings every bf_eq/bf_neq to `f (!)= 0`,
+	// so that return is the path taken by the vast majority of the calls, and
+	// storing only at the end left the cache write-never for them.
+	auto memo = [&key](tref r) { return cache.emplace(key, r).first->second; };
+#else
+	auto memo = [](tref r) { return r; };
 #endif // TAU_CACHE
 
 	// Return early if atomic_fm is either T or F
@@ -1723,9 +1735,11 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		func1 = rewriter::replace<node>(func1, var,
 			_0<node>(find_ba_type<node>(var)));
 	if (tau::get(func2).equals_0())
-		return denorm_equation<node>(
-			tau::get(tau::wff, tau::get(atm_type, func1, func2)));
-	// Simplify func2
+		return memo(denorm_equation<node>(
+			tau::get(tau::wff, tau::get(atm_type, func1, func2))));
+	// Simplify func2. Reached only for bf_lt/bf_lteq atoms: norm_equation
+	// zeroes the right-hand side of every bf_eq/bf_neq, which the return above
+	// then catches.
 	tref func2_v_0 = rewriter::replace_if<node>(func2, var,
 		_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	tref func2_v_1 = rewriter::replace_if<node>(func2, var,
@@ -1742,13 +1756,7 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 			_0<node>(find_ba_type<node>(var)));
 	tref res = tau::get(tau::wff, tau::get(atm_type, func1, func2));
 	DBG(LOG_TRACE << "Syntactic_variable_simplification result: " << LOG_FM(res) << "\n";)
-#ifdef TAU_CACHE
-	cache.emplace(std::make_pair(tau::trim_right_sibling(res),
-		tau::trim_right_sibling(var)), res);
-	return cache.emplace(std::make_pair(tau::trim_right_sibling(atomic_fm),
-		tau::trim_right_sibling(var)), res).first->second;
-#endif // TAU_CACHE
-	return res;
+	return memo(res);
 }
 
 /**
@@ -2518,13 +2526,21 @@ tref squeeze_absorb(tref formula) {
 		if (mark.contains(n)) return false;
 		return is_formula<node>(n);
 	};
-	// Disable intermediate simplifications for the moment
-	tau::use_hooks = false;
-	tref res = pre_order<node>(formula).apply(f, visit, up);
-	DBG(assert(assms.size() == 1);)
-	DBG(assert(dual_assms.size() == 1);)
-	// Re-enable intermediate simplifications
-	tau::use_hooks = true;
+	// Disable intermediate simplifications for the duration of the traversal.
+	// The guard restores the previous value on every exit, including an
+	// exception thrown out of `apply` -- this subsystem's bv paths do throw,
+	// and an unwound `use_hooks = false` would disable hooks for the rest of
+	// the process. Restoring rather than assigning `true` also leaves a caller
+	// that deliberately disabled hooks alone.
+	tref res = nullptr;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		res = pre_order<node>(formula).apply(f, visit, up);
+		DBG(assert(assms.size() == 1);)
+		DBG(assert(dual_assms.size() == 1);)
+	}
+	// Hooks are back on here, which is what makes the `reget` below re-apply
+	// the intermediate simplifications skipped during the traversal.
 	DBG(LOG_DEBUG << "Ended squeeze_absorb");
 	return tau::reget(res);
 }
@@ -2659,13 +2675,21 @@ tref squeeze_absorb(tref formula, tref var) {
 		if (mark.contains(n)) return false;
 		return is_formula<node>(n);
 	};
-	// Disable intermediate simplifications for the moment
-	tau::use_hooks = false;
-	tref res = pre_order<node>(formula).apply(f, visit, up);
-	DBG(assert(assms.size() == 1);)
-	DBG(assert(dual_assms.size() == 1);)
-	// Re-enable intermediate simplifications
-	tau::use_hooks = true;
+	// Disable intermediate simplifications for the duration of the traversal.
+	// The guard restores the previous value on every exit, including an
+	// exception thrown out of `apply` -- this subsystem's bv paths do throw,
+	// and an unwound `use_hooks = false` would disable hooks for the rest of
+	// the process. Restoring rather than assigning `true` also leaves a caller
+	// that deliberately disabled hooks alone.
+	tref res = nullptr;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		res = pre_order<node>(formula).apply(f, visit, up);
+		DBG(assert(assms.size() == 1);)
+		DBG(assert(dual_assms.size() == 1);)
+	}
+	// Hooks are back on here, which is what makes the `reget` below re-apply
+	// the intermediate simplifications skipped during the traversal.
 	DBG(LOG_DEBUG << "Ended squeeze_absorb");
 	return tau::reget(res);
 }
@@ -2743,12 +2767,18 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 	tref p2 = tau::get(term).replace(vars[idx], tau::_0_trimmed(find_ba_type<node>(vars[idx])));
 	// Ensure early detection of F
 	p2 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p2);
+	// free_funcs has to be forwarded: without it every leaf of the recursion
+	// re-entered the !free_funcs block above -- another normalize_ba, another
+	// select_top(bf_ref) and another nested decomposition -- and terminated
+	// only because substituting a top-level bf_ref also removes the nested
+	// ones, i.e. on an invariant nothing states.
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
-		return rec_term_boole_decomposition<node>(p1, vars, idx + 1);
+		return rec_term_boole_decomposition<node>(p1, vars, idx + 1,
+								free_funcs);
 	}
-	p1 = rec_term_boole_decomposition<node>(p1, vars, idx + 1);
-	p2 = rec_term_boole_decomposition<node>(p2, vars, idx + 1);
+	p1 = rec_term_boole_decomposition<node>(p1, vars, idx + 1, free_funcs);
+	p2 = rec_term_boole_decomposition<node>(p2, vars, idx + 1, free_funcs);
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
 		return p1;

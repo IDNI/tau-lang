@@ -86,7 +86,14 @@ tref scope_out_independent_conjuncts(tref fm) {
 			? build_wff_ex<node>(var, tau::build_wff_and(dep), false)
 			: build_wff_all<node>(var, tau::build_wff_and(dep), false));
 	};
-	return post_order<node>(fm).apply_unique(lift);
+	// Do not descend into terms: tau_ba sub-trees carry their own wff_ex/wff_all
+	// over I/O variables, which this pass must leave intact -- the same guard
+	// select_innermost_blocks and anti_prenex_block use, and for the same
+	// reason. Without it `is_child_quantifier` matches those internal binders
+	// and both the vacuous-binder drop and the conjunct lift rebuild the
+	// enclosing term, which additionally loses inference-assigned bitwidths on
+	// bv-containing scopes.
+	return post_order<node>(fm).apply_unique(lift, while_is_formula<node>);
 }
 
 /**
@@ -173,6 +180,17 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// scope_out_independent_conjuncts and the resolve passes above, and a
 	// genuinely open bv scope (e.g. `ex x (x + y = 0)` with `y` free) could
 	// not be reduced by decomposing it anyway.
+	//
+	// The completeness this gives up is bounded and pinned. "Already decided
+	// by the solver" holds only for a scope `is_bv_solvable_formula` accepts;
+	// a *closed* scope it rejects (bv arithmetic plus an unresolved wff_ref,
+	// say) is neither decided here nor decomposable afterwards, so it comes
+	// back with its quantifier intact. That is the intended outcome, not an
+	// oversight: it is what `is_non_temp_nso_*`'s check_decided fallback
+	// reports rather than asserts, and it is pinned by
+	// "undecidable closed bv scope keeps its quantifier"
+	// (test_integration-wff_normalization.cpp) together with the
+	// UndecidableNormalizationFallback suite (test_normal_forms.cpp).
 	form = anti_prenex_block<node>(form, [arith_skip, ref_skip_2](tref n) {
 		return is_tref_bv_type_family<node>(n) || arith_skip(n)
 			|| ref_skip_2(n);
@@ -1282,7 +1300,22 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	if (!is_well_founded<node>(nso_rr)) return nullptr;
 
 	trefs previous;
+	// Identity index over `previous`, so a repeated value is recognised in O(1)
+	// instead of one full normalize_non_temp-based equivalence proof per stored
+	// step. It only *pre-empts* the semantic scan below -- normalization is not
+	// canonical, so two equivalent steps need not be structurally identical and
+	// dropping the semantic check would weaken loop detection.
+	subtree_unordered_set<node> seen;
 	tref current;
+
+	// Termination cap. Without one, a recurrence whose normalized steps are all
+	// distinct (e.g. one that keeps growing) iterates forever, and each
+	// iteration runs a full normalization plus up to `previous.size()`
+	// equivalence proofs. Same reasoning as satisfiability's
+	// `max_fixpoint_steps`: real recurrences settle in single-digit steps, so
+	// this is a very wide margin that still bounds the search.
+	constexpr size_t max_enumeration_steps = 500;
+	size_t steps = 0;
 
 	size_t max_lookback = 0;
 	std::vector<size_t> lookbacks;
@@ -1296,6 +1329,14 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	LOG_DEBUG << "max lookback " << max_lookback;
 
 	for (size_t i = max_lookback; ; i++) {
+		if (++steps > max_enumeration_steps) {
+			LOG_ERROR << "calculate_fixed_point: no fixed point and no "
+				"loop after " << max_enumeration_steps
+				<< " enumeration steps for " << LOG_FM(form)
+				<< "; giving up. This is a bound on the search, "
+				"not a proof that no fixed point exists.";
+			return nullptr;
+		}
 		current = build_enumerated_main_step<node>(
 							form, i, offset_arity);
 		bool changed;
@@ -1333,9 +1374,9 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			LOG_DEBUG << "previous.back(): " << LOG_FM(previous.back());
 			return previous.back();
 		}
-		else if (previous.size() > 1 && (nt == tau::wff
+		else if (previous.size() > 1 && (seen.contains(current) || (nt == tau::wff
 			? is_nso_equivalent_to_any_of<node>(current, previous)
-			: is_bf_same_to_any_of<node>(current, previous)))
+			: is_bf_same_to_any_of<node>(current, previous))))
 		{
 			LOG_DEBUG << "End enumeration step - loop "
 				<< "(no fixed point) detected at step: "
@@ -1352,8 +1393,10 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 			<< "at step: " << i << " incrementing";
 		LOG_DEBUG << "current: " << LOG_FM(current);
 		previous.push_back(current);
+		seen.insert(current);
 	}
-	DBG(assert(0);)
+	// Unreachable: every exit from the loop above is a return, and the step cap
+	// guarantees one is taken.
 	return nullptr;
 }
 
@@ -1475,6 +1518,28 @@ tref normalize_temporal_quantifiers(tref fm) {
 					if (!has_temp_var<node>(conj))
 						always_part = tau::build_wff_and(
 							always_part, get_temporally_quantified_formula<node>(conj));
+					// The assert above used to be the only thing standing
+					// between a malformed temporal layer and a wrong
+					// answer. In Release a conjunct that has a temporal
+					// variable but is headed by neither wff_always nor
+					// wff_sometimes (a negated temporal operator, a
+					// disjunction the DNF pass failed to lift) fell into
+					// the always branch below and was silently
+					// re-quantified universally -- and, if it carries a
+					// temporal quantifier of its own, nested inside the
+					// always wrapper added at the end of the clause,
+					// against this function's stated no-nesting
+					// assumption. Decline loudly instead: `fm` here is the
+					// DNF-reduced input, so returning it leaves the
+					// temporal layer unnormalized rather than wrong.
+					else if (!is_child_temporal_quantifier<node>(conj)) {
+						LOG_ERROR << "normalize_temporal_quantifiers: conjunct "
+							<< LOG_FM(conj) << " has a temporal variable but no"
+							" temporal quantifier of its own; leaving the"
+							" temporal layer unnormalized. This is a"
+							" conservative fallback, not a normal form.";
+						return fm;
+					}
 					// TODO: always conjunction is inefficient
 					else if (!is_child<node>(conj, tau::wff_sometimes))
 						always_part = always_conjunction<node>(always_part, conj);

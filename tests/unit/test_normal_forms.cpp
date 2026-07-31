@@ -730,3 +730,50 @@ TEST_SUITE("UndecidableNormalizationFallback") {
 		CHECK( is_non_temp_nso_satisfiable<node_t>(taut) );
 	}
 }
+
+// NF-6 / AP-16. squeeze_absorb disables the process-global tree<node>::use_hooks
+// for the duration of its traversal and used to re-enable it by assigning
+// `true` unconditionally at the end. Two ways that goes wrong: an exception
+// thrown out of the traversal (this subsystem's bv paths do throw) skips the
+// re-enable and leaves hooks disabled for the rest of the process, and a caller
+// that had deliberately disabled them gets them force-enabled on return.
+TEST_SUITE("UseHooksGuard") {
+
+	TEST_CASE("restores the previous value on scope exit") {
+		const bool before = tau::use_hooks;
+		{
+			use_hooks_guard<node_t> g(false);
+			CHECK( tau::use_hooks == false );
+		}
+		CHECK( tau::use_hooks == before );
+	}
+
+	TEST_CASE("restores a false previous value, not `true`") {
+		// The old code's second failure mode: it did not save, it assigned.
+		tau::use_hooks = false;
+		{
+			use_hooks_guard<node_t> g(false);
+			CHECK( tau::use_hooks == false );
+		}
+		CHECK( tau::use_hooks == false );
+		tau::use_hooks = true;
+	}
+
+	TEST_CASE("restores on an exception thrown through the scope") {
+		const bool before = tau::use_hooks;
+		try {
+			use_hooks_guard<node_t> g(false);
+			throw std::runtime_error("unwind");
+		} catch (const std::runtime_error&) {}
+		CHECK( tau::use_hooks == before );
+	}
+
+	TEST_CASE("squeeze_absorb leaves hooks as it found them") {
+		const bool before = tau::use_hooks;
+		tref fm = get_nso_rr("x y = 0 && x z != 0.").value().main->get();
+		tref var = tau::get(fm).find_top(is<node_t, tau::variable>);
+		REQUIRE( var != nullptr );
+		squeeze_absorb<node_t>(fm, var);
+		CHECK( tau::use_hooks == before );
+	}
+}

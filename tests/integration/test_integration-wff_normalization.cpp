@@ -457,11 +457,17 @@ TEST_SUITE("Normalizer bv alternating quantifiers") {
 TEST_SUITE("Normalizer bv undecidable and scoping") {
 
 	// TC-3. The 21 bv test cases above all pin *decidable* formulas. This one
-	// pins what happens when the closed bv scope cannot be decided at all:
-	// `is_bv_solvable_formula` accepts the formula (it inspects only variable
-	// nodes, so the wff_ref passes its gate), cvc5 then fails to translate the
-	// reference, and the quantifier must survive untouched rather than
-	// collapsing to F. Normalization must also not abort.
+	// pins what happens when the closed bv scope cannot be decided at all: the
+	// unresolved wff_ref is outside the cvc5 translator's reach, so the solver
+	// shortcut does not apply and the quantifier must survive untouched rather
+	// than collapsing to F. Normalization must also not abort.
+	//
+	// The route to that outcome changed with SO-2: `is_bv_solvable_formula` now
+	// rejects the formula up front (it used to inspect only variable nodes, so
+	// the ref's bv-typed arguments made the whole formula look solvable and the
+	// failure surfaced as a "Failed to translate" log from inside the solver,
+	// four times per normalization). The observable behaviour pinned here is
+	// deliberately the same either way.
 	TEST_CASE("undecidable closed bv scope keeps its quantifier") {
 		tref fm = get_nso_rr("ex y ex x (x:bv[8] * y:bv[8] ="
 			" { 1 }:bv[8] && q(x)).").value().main->get();
@@ -482,6 +488,30 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		REQUIRE( res != nullptr );
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
 		CHECK( are_nso_equivalent<node_t>(res, fm) );
+	}
+
+	// AP-7. Every neighbouring pass documents the term guard as load-bearing:
+	// select_innermost_blocks passes `until = !while_is_formula` with the note
+	// "Do not descend into terms: tau_ba sub-trees carry their own
+	// wff_ex/wff_all over I/O variables, which this pass must leave intact",
+	// and anti_prenex_block uses find_top_until for the same reason.
+	// scope_out_independent_conjuncts traversed with no visit_subtree at all,
+	// so is_child_quantifier matched those internal binders and both the
+	// vacuous-binder drop and the conjunct lift rebuilt the enclosing term --
+	// which additionally loses inference-assigned bitwidths on bv-containing
+	// scopes.
+	TEST_CASE("a tau_ba constant's internal binders are left intact") {
+		const char* sample = "{ !i5[t] = <:x> || o5[t] = <:y> } : tau = u[0].";
+		tref fm = get_nso_rr(sample).value().main->get();
+		REQUIRE( fm != nullptr );
+		// Give the constant its internal `always` binder, the shape the
+		// normalizer actually produces for it (see TEST_CASE("8")).
+		tref with_binder = normalize_non_temp<node_t>(fm);
+		REQUIRE( with_binder != nullptr );
+		const std::string before = tau::get(with_binder).to_str();
+		tref res = scope_out_independent_conjuncts<node_t>(with_binder);
+		REQUIRE( res != nullptr );
+		CHECK( tau::get(res).to_str() == before );
 	}
 
 	TEST_CASE("a vacuous universal binder is dropped too") {
