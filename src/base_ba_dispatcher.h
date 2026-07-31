@@ -12,13 +12,13 @@
 #ifndef __BASE_BA_DISPATCHER_H__
 #define __BASE_BA_DISPATCHER_H__
 
+// bool_ba.h stays: bool_descriptor.tmpl.h, which base_ba_dispatcher.tmpl.h
+// includes because its parse() names parse_bool defined there, needs Bool. The
+// concrete BAs of a pack arrive with whoever spells the pack -- tau_pack.h
+// includes each configured BA's header -- so this file names none of them.
+#include "boolean_algebras/ba_descriptor.h"
+#include "boolean_algebras/ba_pack_traits.h"
 #include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/sbf/sbf_ba.h"
-#include "boolean_algebras/tau/tau_ba.h"
-#include "boolean_algebras/qint/qint.h"
-#include "boolean_algebras/qlt/qlt.h"
-#include "boolean_algebras/nlang/nlang_ba.h"
-#include "boolean_algebras/hsb/hsb.h"
 #include "nso_rr.h"
 
 

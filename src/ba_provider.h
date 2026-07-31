@@ -13,7 +13,6 @@
 #define __IDNI__TAU__BA_PROVIDER_H__
 
 #include "ba_types.h"
-#include "ba_type_traits.h"
 #include <set>
 #include <vector>
 #include <string>

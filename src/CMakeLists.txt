@@ -8,18 +8,16 @@ set(TAU_HEADERS
 	boolean_algebras/cvc5/cvc5.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
-	boolean_algebras/bool_ba.h
-	boolean_algebras/sbf/sbf_ba.h
+	boolean_algebras/bool_ba.h	# described but not a TAU_BAS entry
+	${TAU_BA_HEADERS}		# the configured pack, from cmake/tau_bas.cmake
 	boolean_algebras/variant_ba.h
 	boolean_algebras/nso_ba.h
-	boolean_algebras/tau/tau_ba.h
-	boolean_algebras/bv/bv_ba.h
 	boolean_algebras/bv/heuristics/bv_ba_simplification.h		# heuristic for simplifying boolean formulas with bitvectors
 	heuristics/ex_subs_based_elimination.h  # heuristic for eliminating existential quantifiers based on substitution
 	boolean_algebras/bv/heuristics/bv_predicate_blasting.h      # heuristic for predicate blasting bitvector formulas
 	defs.h             # common macro and types definitions
 	logging.h          # logging and its macros
-    tau_bdd.h          # BDD library over tau trees
+	tau_bdd.h          # BDD library over tau trees
 	tau_tree.h         # tau tree, node, tree traverser, builders,
 	                   # extractors, printers, queries, and
 	                   # transformations from the parse tree
