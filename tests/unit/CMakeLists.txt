@@ -95,7 +95,7 @@ endforeach()
 add_executable(tau_eval tau_eval.cpp)
 target_setup(tau_eval)
 target_include_directories(tau_eval PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-target_link_libraries(tau_eval ${TAU_STATIC_LIB_NAME} cvc5::cvc5)
+target_link_libraries(tau_eval ${TAU_STATIC_LIB_NAME} ${TAU_BA_LINK_LIBS})
 add_dependencies(tau_eval tau_header)
 target_compile_options(tau_eval PUBLIC -Wno-unused-function)
 

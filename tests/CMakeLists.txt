@@ -71,7 +71,7 @@ function(add test_name)
 		target_compile_options(${N} PUBLIC
 			-include ${PROJECT_SOURCE_DIR}/src/extern_template_test_pack.h)
 	endif()
-	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest cvc5::cvc5)
+	target_link_libraries(${N} ${TAU_STATIC_LIB_NAME} doctest ${TAU_BA_LINK_LIBS})
 	add_dependencies(${N} tau_header)
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
 	target_compile_definitions_if(${N} PUBLIC TAU_LOG_TRACE_TESTS)

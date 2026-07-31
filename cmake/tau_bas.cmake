@@ -149,6 +149,7 @@ function(tau_resolve_ba_pack)
 	endforeach()
 	list(JOIN _type_name_literals ", " _type_names_str)
 
+	set(TAU_PACK_BA_IDS "${_ba_ids}" PARENT_SCOPE)
 	set(TAU_BA_HEADERS "${_headers}" PARENT_SCOPE)
 	set(TAU_BA_SOURCES_EXTRA "${_sources_extra}" PARENT_SCOPE)
 	set(TAU_BA_LINK_LIBS "${_link_libs}" PARENT_SCOPE)

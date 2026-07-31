@@ -268,39 +268,58 @@ message(STATUS "CMAKE_INSTALL_LIBDIR: ${CMAKE_INSTALL_LIBDIR}")
 message(STATUS "CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
 
 #
-# Add cvc5 library
+# resolve the BA pack chosen with -DTAU_BAS= and generate tau_pack.h
 #
-set(DEP_CVC5_ARGS
-	-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
-	-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX})
-set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX}/cvc5)
-set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	list(APPEND DEP_CVC5_ARGS --w64)
-	set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
-endif()
-if(APPLE)
-	list(APPEND DEP_CVC5_ARGS --darwin)
-endif()
-message(STATUS "DEP_CVC5_ARGS: ${DEP_CVC5_ARGS}")
-message(STATUS "CVC5_LIBDIR: ${CVC5_LIBDIR}")
+include(tau_bas)
+# out-of-tree BAs: each file calls tau_register_ba() before the pack resolves
+foreach(_ext_ba ${TAU_EXTERNAL_BAS})
+	message(STATUS "Registering external BA from ${_ext_ba}")
+	include("${_ext_ba}")
+endforeach()
+tau_resolve_ba_pack()
+tau_generate_pack_header()
+message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
 
-if(DEFINED CVC5_DIR AND NOT "${CVC5_DIR}" STREQUAL "")
-	message(STATUS "Using caller-provided CVC5_DIR: ${CVC5_DIR}")
-	find_package(cvc5 CONFIG REQUIRED
-		PATHS ${CVC5_DIR}
-		NO_DEFAULT_PATH)
+#
+# Add cvc5 library, only when a BA of the configured pack requires it.
+# This gates the dependency build too: dep-cvc5.sh is what makes a pack
+# without bv or hsb pay for cvc5 it never links.
+#
+if("cvc5" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+	set(DEP_CVC5_ARGS
+		-DTAU_BUILD_JOBS=${TAU_BUILD_JOBS}
+		-DTAU_SHARED_PREFIX=${TAU_SHARED_PREFIX})
+	set(CVC5_SOURCE_DIR ${TAU_SHARED_PREFIX}/cvc5)
+	set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist/${CMAKE_INSTALL_LIBDIR})
+	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+		list(APPEND DEP_CVC5_ARGS --w64)
+		set(CVC5_LIBDIR ${CVC5_SOURCE_DIR}/dist-w64/${CMAKE_INSTALL_LIBDIR})
+	endif()
+	if(APPLE)
+		list(APPEND DEP_CVC5_ARGS --darwin)
+	endif()
+	message(STATUS "DEP_CVC5_ARGS: ${DEP_CVC5_ARGS}")
+	message(STATUS "CVC5_LIBDIR: ${CVC5_LIBDIR}")
+
+	if(DEFINED CVC5_DIR AND NOT "${CVC5_DIR}" STREQUAL "")
+		message(STATUS "Using caller-provided CVC5_DIR: ${CVC5_DIR}")
+		find_package(cvc5 CONFIG REQUIRED
+			PATHS ${CVC5_DIR}
+			NO_DEFAULT_PATH)
+	else()
+		execute_process(
+			COMMAND bash ./dev dep-cvc5.sh ${DEP_CVC5_ARGS}
+			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+			COMMAND_ERROR_IS_FATAL ANY
+		)
+		find_package(cvc5 CONFIG REQUIRED
+			PATHS ${CVC5_LIBDIR}/cmake/cvc5)
+	endif()
+	message(STATUS "cvc5 found: ${cvc5_FOUND}")
+	message(STATUS "cvc5 version: ${cvc5_VERSION}")
 else()
-	execute_process(
-		COMMAND bash ./dev dep-cvc5.sh ${DEP_CVC5_ARGS}
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-		COMMAND_ERROR_IS_FATAL ANY
-	)
-	find_package(cvc5 CONFIG REQUIRED
-		PATHS ${CVC5_LIBDIR}/cmake/cvc5)
+	message(STATUS "cvc5 not required by TAU_BAS=${TAU_BAS}; skipping")
 endif()
-message(STATUS "cvc5 found: ${cvc5_FOUND}")
-message(STATUS "cvc5 version: ${cvc5_VERSION}")
 
 #
 # Add Boost log library
@@ -413,19 +432,6 @@ target_compile_definitions(tauparser_static PUBLIC TAU_PARSER_NO_TGF)
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
 include(tau-common)
-
-#
-# resolve the BA pack chosen with -DTAU_BAS= and generate tau_pack.h
-#
-include(tau_bas)
-# out-of-tree BAs: each file calls tau_register_ba() before the pack resolves
-foreach(_ext_ba ${TAU_EXTERNAL_BAS})
-	message(STATUS "Registering external BA from ${_ext_ba}")
-	include("${_ext_ba}")
-endforeach()
-tau_resolve_ba_pack()
-tau_generate_pack_header()
-message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
 
 #
 # Adding src dir
