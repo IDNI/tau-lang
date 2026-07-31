@@ -21,6 +21,7 @@
 
 #include "normalizer.h"
 #include "boolean_algebras/nlang/nlang_ba.h"
+#include "ltl_aba_result.h"
 #include <optional>
 #include <string>
 #include <tuple>
@@ -96,23 +97,7 @@ std::pair<bool, std::string> call_ltlsynt(
     const std::vector<std::string>& input_props,
     const std::vector<std::string>& output_props);
 
-// ── HOA automaton ─────────────────────────────────────────────────────────────
-
-struct HoaEdge {
-    std::string guard_label;  // Boolean formula over AP indices, e.g. "0&!1"
-    int dst = 0;
-    bool accepting = false;   // true if this edge carries an acceptance mark
-};
-
-struct HoaAutomaton {
-    int num_states = 0;
-    int initial_state = 0;
-    std::vector<std::string> aps;       // atomic proposition names
-    std::vector<std::vector<HoaEdge>> edges; // edges[src] = list of outgoing edges
-    std::vector<bool> state_accepting;  // true if state has acceptance mark
-};
-
-HoaAutomaton parse_hoa(const std::string& hoa_text);
+// The HOA automaton and parse_hoa live in ltl_aba_result.h.
 
 // ── DPA (Deterministic Parity Automaton) — Algorithm D Phase 1 ───────────────
 //
@@ -217,8 +202,6 @@ bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output);
 // signature below — the type only needs to be complete at instantiation
 // sites (interpreter.impl.h, cpp_codegen.tmpl.h), which include the tmpl
 // chain that defines it.
-template <NodeType node>
-struct LtlAbaSolution;
 
 // Convert a realizable LTL formula to a tau-lang safety formula (always(phi))
 // that the existing interpreter pipeline can execute.

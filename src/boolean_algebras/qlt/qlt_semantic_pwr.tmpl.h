@@ -1,25 +1,32 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-// Semantic PWR (Optimal Mode): winning-region-based revision.
-//
-// Implements pwr-ltl.tex §11 "Semantic vs. syntactic revision":
-//   θ = ψ ∧ G(Win)
-// where Win encodes "the current product-game state is in the winning
-// region W" and W comes from Zielonka on the product game for C ∧ ψ.
-//
-// Integration: fast mode by default; optimal mode as fallback when fast
-// mode drops a clause entirely.  On safety formulas, the winning region
-// collapses to the per-step atom formula (identical to fast mode).
+/**
+ * @file qlt_semantic_pwr.tmpl.h
+ * @brief qlt's winning-region revision, the optimal mode of pointwise revision.
+ *
+ * Implements pwr-ltl.tex §11: θ = ψ ∧ G(Win), where Win says the product-game
+ * state is in the winning region computed by Zielonka over the T_3 order types.
+ * Every part of that is (Q,<) theory, so all of it lives here and core reaches
+ * it through one capability.
+ *
+ * Included from qlt_descriptor.tmpl.h and nowhere else. satisfiability.h and
+ * ltl_aba.h are unreachable here (both lead to normalizer.h), so what core
+ * supplies is forward-declared and completed at instantiation.
+ */
 
-#ifndef __IDNI__TAU__SEMANTIC_PWR_H__
-#define __IDNI__TAU__SEMANTIC_PWR_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_SEMANTIC_PWR_TMPL_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_SEMANTIC_PWR_TMPL_H__
+
+#include <set>
+#include <string>
+#include <vector>
 
 #include "algorithm_d_game.h"
-#include "ltl_aba.h"
+#include "boolean_algebras/qlt/qlt_ltl_synthesis.tmpl.h"
 #include "omcat_constants.h"
-#include "satisfiability.h"
 
 namespace idni::tau_lang {
+
 
 // ---------------------------------------------------------------------------
 // Build the Win formula from a winning region.
@@ -145,11 +152,12 @@ tref build_win0_formula(
 //   4. Build θ = ψ ∧ G(Win)
 //      (using Win_0 ∧ G(Win → X Win) ≡ G(Win) when Win_0 ⊆ Win)
 //
-// Returns nullptr if optimal mode is not applicable or fails.
+// Returns nullptr if optimal mode is not applicable or fails. The caller
+// checks that θ is realizable -- that question is not order-type theory.
 // ---------------------------------------------------------------------------
 
 template <NodeType node>
-tref semantic_pwr_optimal(tref clause, tref update, const int_t start_time) {
+tref qlt_semantic_pwr_optimal(tref clause, tref update) {
 	using tau = tree<node>;
 
 	// Build the conjunction C ∧ ψ for Algorithm D.
@@ -232,16 +240,12 @@ tref semantic_pwr_optimal(tref clause, tref update, const int_t start_time) {
 	tref g_win = tau::build_wff_always(win);
 	tref theta = build_wff_and<node>(update, g_win);
 
-	// Verify θ is realizable.
-	if (!is_tau_formula_sat<node>(theta, start_time)) {
-		LOG_DEBUG << "[semantic_pwr] theta unrealizable; falling back";
-		return nullptr;
-	}
-
-	LOG_DEBUG << "[semantic_pwr] optimal mode succeeded";
+	// Whether θ is realizable is an ordinary satisfiability question, so the
+	// caller asks it; nothing here is (Q,<) theory any more.
+	LOG_DEBUG << "[semantic_pwr] optimal mode produced a revision";
 	return theta;
 }
 
 } // namespace idni::tau_lang
 
-#endif // __IDNI__TAU__SEMANTIC_PWR_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_SEMANTIC_PWR_TMPL_H__

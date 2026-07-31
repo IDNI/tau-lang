@@ -514,6 +514,36 @@ std::optional<bool> pack_omcat_qe(size_t ba_type_id, tref var, tref body) {
 	});
 }
 
+/** @brief `true` when @p BA revises a clause by its own winning region. */
+template <typename Node, typename BA>
+concept ba_has_semantic_pwr = ba_has_descriptor_v<Node, BA>
+	&& requires(tref clause, tref update) {
+		ba_descriptor<BA, Node>::semantic_pwr_optimal(clause, update);
+	};
+
+/**
+ * @brief Revise @p clause against @p update through a BA's winning region.
+ *
+ * Takes no type id: the capability decides for itself whether the clause is
+ * its own, so nullptr covers both "not mine" and "no revision found" -- the
+ * caller falls back to the syntactic mode either way.
+ */
+template <typename Node>
+tref pack_semantic_pwr_optimal(tref clause, tref update) {
+	tref out = nullptr;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is,
+				typename Node::bas_tuple>;
+			if constexpr (ba_has_semantic_pwr<Node, BA>)
+				if (!out) out = ba_descriptor<BA, Node>
+					::semantic_pwr_optimal(clause, update);
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
 /** @brief `true` when @p BA spells a witness of its own for generated code. */
 template <typename Node, typename BA>
 concept ba_has_codegen_witness = ba_has_descriptor_v<Node, BA>

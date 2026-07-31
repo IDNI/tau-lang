@@ -15,7 +15,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 #include "pointwise_revision.h"
-#include "semantic_pwr.h"
+#include "boolean_algebras/qlt/qlt.h"
 
 using namespace idni::tau_lang;
 

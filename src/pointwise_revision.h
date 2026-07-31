@@ -16,7 +16,6 @@
 #define __IDNI__TAU__POINTWISE_REVISION_H__
 
 #include "satisfiability.h"
-#include "semantic_pwr.h"
 
 namespace idni::tau_lang {
 
@@ -443,8 +442,12 @@ tref pointwise_revision_temporal(
 			// returned the update clause unchanged (dropped the spec
 			// clause), try semantic winning-region revision.
 			if (r == best || r == update) {
-				tref opt = semantic_pwr_optimal<node>(
-					sc, update, start_time);
+				tref opt = pack_semantic_pwr_optimal<node>(
+					sc, update);
+				// A revision only helps if it is realizable.
+				if (opt && !is_tau_formula_sat<node>(
+					opt, start_time))
+						opt = nullptr;
 				if (opt) {
 					revised.push_back(opt);
 					continue;

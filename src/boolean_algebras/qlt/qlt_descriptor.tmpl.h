@@ -11,6 +11,7 @@
 #include "../parser/qlt_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
+#include "ltl_aba_result.h"
 #include "solver_types.h"
 
 namespace idni::tau_lang {
@@ -26,6 +27,13 @@ static std::optional<solution<node>> qlt_omcat_solve_inequality_system(
 
 template <NodeType node>
 static std::optional<std::string> qlt_codegen_witness(tref var, tref conj);
+
+template <NodeType node>
+static propositional_synthesis<node> qlt_try_propositional_synthesis(tref fm,
+	const std::vector<std::pair<tref, std::string>>& atoms);
+
+template <NodeType node>
+tref qlt_semantic_pwr_optimal(tref clause, tref update);
 
 template <typename... PackBAs>
 struct ba_descriptor<qlt, node<PackBAs...>> {
@@ -147,6 +155,24 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 		return qlt_codegen_witness<node_t>(var, conj);
 	}
 
+	/**
+	 * @brief Synthesise an LTL formula over qlt atoms propositionally.
+	 *
+	 * Algorithms A, B and D encode the (Q,<) order types exactly, so no ABA
+	 * oracle is needed when they apply. Declining and proving unrealizable
+	 * are separate answers -- see @ref propositional_synthesis.
+	 */
+	static propositional_synthesis<node_t> try_propositional_synthesis(
+		tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
+	{
+		return qlt_try_propositional_synthesis<node_t>(fm, atoms);
+	}
+
+	/** @brief Revise @p clause by the winning region of its product game. */
+	static tref semantic_pwr_optimal(tref clause, tref update) {
+		return qlt_semantic_pwr_optimal<node_t>(clause, update);
+	}
+
 	/** @brief Solve a pure ordering system, which a BA-level solve cannot. */
 	static std::optional<solution<node_t>> omcat_solve_inequality_system(
 		const inequality_system<node_t>& sys,
@@ -162,5 +188,7 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 #include "boolean_algebras/qlt/qlt_qe.tmpl.h"
 #include "boolean_algebras/qlt/qlt_solver.tmpl.h"
 #include "boolean_algebras/qlt/qlt_codegen.tmpl.h"
+#include "boolean_algebras/qlt/qlt_ltl_synthesis.tmpl.h"
+#include "boolean_algebras/qlt/qlt_semantic_pwr.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__

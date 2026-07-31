@@ -107,7 +107,7 @@ static std::pair<std::string, int> spawn_capture(
 // command line (autfilt --dot, ltlfilt -f).  These paths will be migrated
 // in a follow-up; for now they incur the popen-shell cost only on rarely-
 // hit fallbacks.
-static std::pair<std::string, int> run_cmd(const std::string& cmd) {
+inline std::pair<std::string, int> run_cmd(const std::string& cmd) {
 	std::array<char, 4096> buf;
 	std::string result;
 	FILE* raw = popen(cmd.c_str(), "r");
