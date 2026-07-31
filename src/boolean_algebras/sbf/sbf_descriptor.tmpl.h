@@ -36,15 +36,20 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	}
 
 	static bool matches_type(tref type_tree) {
-		return is_sbf_type<node_t>(type_tree);
+		return ba_types_detail::type_tree_name_is<sbf_ba, node_t>(
+			type_tree, type_name);
 	}
 
-	static tref type_tree() { return sbf_type<node_t>(); }
+	static tref type_tree() {
+		return ba_types_detail::make_syntactic_type_tree<node_t>(
+			type_name);
+	}
 
 	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
 
 	static bool owns_type(size_t ba_type_id) {
-		return is_sbf_type<node_t>(ba_type_id);
+		return ba_types_detail::type_tree_name_is<sbf_ba, node_t>(
+			ba_type_id, type_name);
 	}
 
 	/** @brief sbf takes no subtype, so a type never carries a parameter. */
@@ -52,7 +57,10 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 		return std::nullopt;
 	}
 
-	static size_t type_id_for(unsigned short) { return sbf_type_id<node_t>(); }
+	static size_t type_id_for(unsigned short) {
+		static const size_t id = ba_types<node_t>::id(type_tree());
+		return id;
+	}
 
 	static tref type_tree_for(unsigned short) { return type_tree(); }
 
@@ -79,7 +87,7 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 	static tref splitter_one(tref) {
 		return tau::get(tau::bf, tau::get_ba_constant(
 			typename tau::constant(sbf_splitter_one()),
-			sbf_type<node_t>()));
+			type_tree()));
 	}
 
 	/** @brief sbf holds no Tau spec, so there is nothing to unpack. */

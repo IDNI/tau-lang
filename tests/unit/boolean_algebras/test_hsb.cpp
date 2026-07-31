@@ -1344,13 +1344,13 @@ TEST_SUITE("hsb — dispatcher") {
 	TEST_CASE("hsb type is recognized") {
 		gc_fixture gc;
 		auto tt = hsb_type<node_t>();
-		CHECK(is_hsb_type<node_t>(tt) == true);
+		CHECK(ba_descriptor<hsb, node_t>::owns_type(tt) == true);
 	}
 
 	TEST_CASE("hsb type is not qint type") {
 		gc_fixture gc;
 		auto tt = hsb_type<node_t>();
-		CHECK(is_qint_type<node_t>(tt) == false);
+		CHECK(ba_descriptor<qint, node_t>::owns_type(tt) == false);
 	}
 
 	TEST_CASE("ba_constants::get for hsb top") {

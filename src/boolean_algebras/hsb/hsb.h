@@ -23,32 +23,15 @@
 
 namespace idni::tau_lang {
 
+/** @brief Type tree of the hsb type. */
+template <NodeType node> tref hsb_type();
+/** @brief Type id of the hsb type. */
+template <NodeType node> size_t hsb_type_id();
+
+
 // Type definitions for hsb — atomless BA of lex-half-open polyhedra in R^d
 // (LP_d^Q). Generalizes qint from 1D to d dimensions using canonical
 // halfspaces with the lex-leading sign convention.
-
-/**
- * @brief Create the type tree for the hsb type.
- * @tparam node Tree node type
- * @return Tree reference representing hsb type tree
- */
-template <NodeType node>
-tref hsb_type();
-
-template <NodeType node>
-inline size_t hsb_type_id();
-
-/**
- * @brief Checks if t represents the hsb type.
- * @tparam node Tree node type
- * @param t Type tree object
- * @return true iff the type tree object represents hsb
- */
-template <NodeType node>
-bool is_hsb_type(tref t);
-
-template <NodeType node>
-bool is_hsb_type(size_t t);
 
 
 /// @cond INTERNAL
@@ -304,11 +287,11 @@ std::ostream& operator<<(std::ostream& os, const hsb& h);
 
 } // namespace idni::tau_lang
 
-#include "boolean_algebras/hsb/hsb_types.tmpl.h"
 #include "boolean_algebras/hsb/hsb.tmpl.h"
 #include "boolean_algebras/hsb/hsb_splitter.tmpl.h"
 #include "boolean_algebras/hsb/hsb_normalizer.tmpl.h"
 // after the three above: the descriptor names what they define
 #include "boolean_algebras/hsb/hsb_descriptor.tmpl.h"
+#include "boolean_algebras/hsb/hsb_types.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_H__

@@ -151,6 +151,38 @@ bool pack_tref_has_arith_ops(tref t) {
 	return pack_type_has_arith_ops<node>(tau::get(t).get_ba_type());
 }
 
+namespace ba_types_detail {
+
+template <NodeType node>
+tref make_syntactic_type_tree(const char* name) {
+	using tau = tree<node>;
+
+	return tau::get(tau::typed, tau::get(tau::type, name));
+}
+
+template <typename BA, NodeType node>
+bool type_tree_name_is(tref t, const char* name) {
+	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, bool>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(t); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	bool result = tau::get(t)[0].get_string() == name;
+#ifdef TAU_CACHE
+	cache.emplace(t, result);
+#endif // TAU_CACHE
+	return result;
+}
+
+template <typename BA, NodeType node>
+bool type_tree_name_is(size_t ba_type_id, const char* name) {
+	return type_tree_name_is<BA, node>(ba_types<node>::type_tree(ba_type_id),
+		name);
+}
+
+} // namespace ba_types_detail
+
 // -----------------------------------------------------------------------------
 // BA types
 

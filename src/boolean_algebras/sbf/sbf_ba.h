@@ -17,6 +17,12 @@
 
 namespace idni::tau_lang {
 
+/** @brief Type tree of the sbf type. */
+template <NodeType node> tref sbf_type();
+/** @brief Type id of the sbf type. */
+template <NodeType node> size_t sbf_type_id();
+
+
 /**
  * @brief Simple Boolean function Boolean algebra represented by bdd
  */
@@ -47,16 +53,6 @@ inline sbf_ba normalize_sbf(const sbf_ba& elem) { return elem; }
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_sbf(const std::string& src);
-
-/** @brief Create the type tree for the sbf type. */
-template <NodeType node> tref sbf_type();
-/** @brief Return the integer type id for the sbf type. */
-template <NodeType node> inline size_t sbf_type_id();
-/** @brief Return `true` if type tree @p t is the sbf type. */
-template <NodeType node> bool is_sbf_type(tref t);
-/** @brief Return `true` if type id @p t is the sbf type. */
-template <NodeType node> bool is_sbf_type(size_t t);
-
 /** @brief Return `true` if @p x is the SBF one (BDD `true`). */
 inline bool is_sbf_one(const sbf_ba& x) { return x->is_one(); }
 
@@ -75,7 +71,7 @@ struct std::hash<idni::tau_lang::hbdd<idni::tau_lang::Bool>> {
 	}
 };
 
-#include "boolean_algebras/sbf/sbf_types.tmpl.h"
 #include "boolean_algebras/sbf/sbf_ba.tmpl.h"
 #include "boolean_algebras/sbf/sbf_descriptor.tmpl.h"
+#include "boolean_algebras/sbf/sbf_types.tmpl.h"
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF__SBF_BA_H__

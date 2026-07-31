@@ -15,30 +15,13 @@
 
 namespace idni::tau_lang {
 
+/** @brief Type tree of the nlang type. */
+template <NodeType node> tref nlang_type();
+/** @brief Type id of the nlang type. */
+template <NodeType node> size_t nlang_type_id();
+
+
 // Type definitions for nlang_ba
-
-/**
- * @brief Create the type tree for the nlang type
- * @tparam node Tree node type
- * @return Tree reference representing nlang type tree
- */
-template <NodeType node>
-tref nlang_type();
-
-template <NodeType node>
-inline size_t nlang_type_id();
-
-/**
- * @brief Checks if t represents the nlang type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents an nlang
- */
-template <NodeType node>
-bool is_nlang_type(tref t);
-
-template <NodeType node>
-bool is_nlang_type(size_t t);
 
 
 // -----------------------------------------------------------------------------
@@ -414,7 +397,7 @@ std::optional<typename node<BAs...>::constant_with_type> parse_nlang(
 
 	return typename node<BAs...>::constant_with_type{
 		std::variant<BAs...>{ nlang_ba::from_fm(std::move(fm)) },
-		nlang_type<node<BAs...>>() };
+		ba_descriptor<nlang_ba, node<BAs...>>::type_tree() };
 }
 
 } // namespace idni::tau_lang
@@ -427,7 +410,7 @@ struct std::hash<idni::tau_lang::nlang_ba> {
 	}
 };
 
-#include "boolean_algebras/nlang/nlang_types.tmpl.h"
 #include "boolean_algebras/nlang/nlang_descriptor.tmpl.h"
+#include "boolean_algebras/nlang/nlang_types.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_BA_H__

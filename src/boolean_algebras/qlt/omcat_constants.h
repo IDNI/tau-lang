@@ -82,7 +82,7 @@ inline std::vector<Rat> collect_qlt_constants(tref fm) {
 	for (tref c : tau::get(fm).select_all(is<node, tau::ba_constant>)) {
 		const tau& t = tau::get(c);
 		// get_ba_type_name() returns ":qlt" (with leading colon); use type ID.
-		if (!is_qlt_type<node>(t.get_ba_type())) continue;
+		if (!ba_descriptor<qlt, node>::owns_type(t.get_ba_type())) continue;
 		auto cv = t.get_ba_constant();
 		if (std::holds_alternative<qlt>(cv)) {
 			const qlt& qba = std::get<qlt>(cv);

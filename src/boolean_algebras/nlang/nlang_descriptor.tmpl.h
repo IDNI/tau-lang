@@ -38,15 +38,20 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	static constexpr bool output_always_satisfiable_by_system = true;
 
 	static bool matches_type(tref type_tree) {
-		return is_nlang_type<node_t>(type_tree);
+		return ba_types_detail::type_tree_name_is<nlang_ba, node_t>(
+			type_tree, type_name);
 	}
 
-	static tref type_tree() { return nlang_type<node_t>(); }
+	static tref type_tree() {
+		return ba_types_detail::make_syntactic_type_tree<node_t>(
+			type_name);
+	}
 
 	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
 
 	static bool owns_type(size_t ba_type_id) {
-		return is_nlang_type<node_t>(ba_type_id);
+		return ba_types_detail::type_tree_name_is<nlang_ba, node_t>(
+			ba_type_id, type_name);
 	}
 
 	/** @brief nlang takes no subtype, so a type never carries a parameter. */
@@ -55,7 +60,8 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	}
 
 	static size_t type_id_for(unsigned short) {
-		return nlang_type_id<node_t>();
+		static const size_t id = ba_types<node_t>::id(type_tree());
+		return id;
 	}
 
 	static tref type_tree_for(unsigned short) { return type_tree(); }
@@ -83,7 +89,7 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	static tref splitter_one(tref) {
 		return tau::get(tau::bf, tau::get_ba_constant(
 			typename tau::constant(nlang_splitter_one()),
-			nlang_type<node_t>()));
+			type_tree()));
 	}
 
 	/** @brief nlang holds no Tau spec, so there is nothing to unpack. */

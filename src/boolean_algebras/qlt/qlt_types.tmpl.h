@@ -5,38 +5,15 @@
 
 namespace idni::tau_lang {
 
-// qlt type definitions
-template<NodeType node>
+// Derived from the descriptor, which builds both from its own type_name.
+template <NodeType node>
 tref qlt_type() {
-	using tau = tree<node>;
-	tref type = tau::get(tau::type, "qlt");
-	return tau::get(tau::typed, type);
-}
-
-template<NodeType node>
-inline size_t qlt_type_id() {
-	static size_t id = ba_types<node>::id(qlt_type<node>());
-	return id;
-}
-
-template<NodeType node>
-bool is_qlt_type(tref t) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, bool>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(t); it != cache.end()) return it->second;
-#endif // TAU_CACHE
-	bool result = tau::get(t)[0].get_string() == "qlt";
-#ifdef TAU_CACHE
-	cache.emplace(t, result);
-#endif // TAU_CACHE
-	return result;
+	return ba_descriptor<qlt, node>::type_tree();
 }
 
 template <NodeType node>
-bool is_qlt_type(size_t t) {
-	return is_qlt_type<node>(ba_types<node>::type_tree(t));
+size_t qlt_type_id() {
+	return ba_descriptor<qlt, node>::type_id_for(0);
 }
 
 } // namespace idni::tau_lang

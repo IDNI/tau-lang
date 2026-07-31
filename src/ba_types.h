@@ -151,6 +151,32 @@ private:
 	static subtree_map<node, size_t>& type_tree_to_idx();
 };
 
+// -----------------------------------------------------------------------------
+// Deriving a BA's type surface from its descriptor's type_name
+//
+// Every unparameterized BA's type tree is `:name` and its type check is a
+// comparison against that name, so a descriptor states the name once and these
+// derive the rest. Naming no algebra, they stay core. bv is not a client: its
+// types carry a subtype and it matches a family, not a name.
+namespace ba_types_detail {
+
+/** @brief Build the syntactic type tree `:name`. */
+template <NodeType node>
+tref make_syntactic_type_tree(const char* name);
+
+// Templated on the owning BA so the memo is per algebra, as it was when each
+// BA carried its own is_<ba>_type; one cache shared across names would answer
+// a later name from an earlier name's entry.
+/** @brief Return `true` if type tree @p t is named @p name. */
+template <typename BA, NodeType node>
+bool type_tree_name_is(tref t, const char* name);
+
+/** @brief Return `true` if type id @p ba_type_id is named @p name. */
+template <typename BA, NodeType node>
+bool type_tree_name_is(size_t ba_type_id, const char* name);
+
+} // namespace ba_types_detail
+
 // ---------------------------------------------------------------------------
 // Functional API for ba_types
 // ---------------------------------------------------------------------------

@@ -81,7 +81,7 @@ static bool is_algorithm_a_applicable(
 	using tau = tree<node>;
 	if (atoms.empty()) return false;
 	for (auto& [f, _] : atoms) {
-		if (!is_qlt_type<node>(find_ba_type<node>(f))) return false;
+		if (!ba_descriptor<qlt, node>::owns_type(find_ba_type<node>(f))) return false;
 		auto bad = tau::get(f).find_top([](tref n) {
 			if (!is_child<node>(n, tau::io_var)) return false;
 			return get_io_var_shift<node>(n) > 1;
