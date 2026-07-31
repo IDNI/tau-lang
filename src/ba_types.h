@@ -4,7 +4,7 @@
  * @file ba_types.h
  * @brief Boolean-algebra (BA) type registry, type-tree constructors, and query helpers.
  *
- * Defines type-tree builders (`tau_type`, `sbf_type`, `bv_type`, etc.),
+ * Defines type-tree builders (`tau_type`, `bool_type`, etc.),
  * their corresponding `size_t`-id overloads, `is_*` predicates, and the
  * `ba_types<node>` registry struct that maps tree refs ↔ integer type ids.
  * Also provides the `unify` / `get_ba_type_id` / `find_ba_type` free-function API.
@@ -90,35 +90,6 @@ template <NodeType node>
 bool is_untyped(size_t t);
 
 // -----------------------------------------------------------------------------
-// Type definitions for sbf
-// TODO: They must go into sbf_ba.h -> currently causes compilation error
-
-/**
- * @brief Create the type tree for the sbf type
- * @tparam node Tree node type
- * @return Tree reference representing sbf type tree
- */
-template <NodeType node>
-tref sbf_type();
-
-/** @brief Return the integer type id for the `sbf` type under @p node. */
-template <NodeType node>
-inline size_t sbf_type_id();
-
-/**
- * @brief Checks if t represents the sbf type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents a sbf
- */
-template <NodeType node>
-bool is_sbf_type(tref t);
-
-/** @brief Return `true` if type id @p t represents the sbf type. */
-template <NodeType node>
-bool is_sbf_type(size_t t);
-
-// -----------------------------------------------------------------------------
 // Type definitions for bool
 
 /**
@@ -145,137 +116,6 @@ bool is_bool_type(tref t);
 /** @brief Return `true` if type id @p t represents the bool type. */
 template <NodeType node>
 bool is_bool_type(size_t t);
-
-// -----------------------------------------------------------------------------
-// Type definitions for qint — atomless BA of rational intervals [x, y)
-// (right-closed, left-open).  Constant syntax accepts both rationals (1/4)
-// and decimals (0.25).
-
-/**
- * @brief Create the type tree for the qint (rational intervals) type.
- * @tparam node Tree node type
- * @return Tree reference representing qint type tree
- */
-template <NodeType node>
-tref qint_type();
-
-template <NodeType node>
-inline size_t qint_type_id();
-
-/**
- * @brief Checks if t represents the qint type.
- * @tparam node Tree node type
- * @param t Type tree object
- * @return true iff the type tree object represents qint
- */
-template <NodeType node>
-bool is_qint_type(tref t);
-
-template <NodeType node>
-bool is_qint_type(size_t t);
-
-// -----------------------------------------------------------------------------
-// Type definitions for qlt (Q,<)
-
-/**
- * @brief Create the type tree for the qlt type
- * @tparam node Tree node type
- * @return Tree reference representing qlt type tree
- */
-template <NodeType node>
-tref qlt_type();
-
-template <NodeType node>
-inline size_t qlt_type_id();
-
-/**
- * @brief Checks if t represents the qlt type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents a qlt
- */
-template <NodeType node>
-bool is_qlt_type(tref t);
-
-template <NodeType node>
-bool is_qlt_type(size_t t);
-
-// -----------------------------------------------------------------------------
-// omcat (omega-categorical) type family
-//
-// An omega-categorical theory is one whose countable models are all isomorphic
-// (e.g., (Q,<) — the dense linear order without endpoints).  The qlt type is
-// the only concrete omcat type currently registered.  Use is_omcat_type_family
-// rather than is_qlt_type in dispatch code so that future omcat types are
-// handled automatically.
-
-/**
- * @brief Checks if t represents any omega-categorical (omcat) type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return true iff the type is any omega-categorical type (currently: qlt)
- */
-template <NodeType node>
-bool is_omcat_type_family(tref t);
-
-template <NodeType node>
-bool is_omcat_type_family(size_t t);
-
-
-
-// -----------------------------------------------------------------------------
-// Type definitions for nlang_ba
-
-/**
- * @brief Create the type tree for the nlang type
- * @tparam node Tree node type
- * @return Tree reference representing nlang type tree
- */
-template <NodeType node>
-tref nlang_type();
-
-template <NodeType node>
-inline size_t nlang_type_id();
-
-/**
- * @brief Checks if t represents the nlang type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents an nlang
- */
-template <NodeType node>
-bool is_nlang_type(tref t);
-
-template <NodeType node>
-bool is_nlang_type(size_t t);
-
-// -----------------------------------------------------------------------------
-// Type definitions for hsb — atomless BA of lex-half-open polyhedra in R^d
-// (LP_d^Q). Generalizes qint from 1D to d dimensions using canonical
-// halfspaces with the lex-leading sign convention.
-
-/**
- * @brief Create the type tree for the hsb type.
- * @tparam node Tree node type
- * @return Tree reference representing hsb type tree
- */
-template <NodeType node>
-tref hsb_type();
-
-template <NodeType node>
-inline size_t hsb_type_id();
-
-/**
- * @brief Checks if t represents the hsb type.
- * @tparam node Tree node type
- * @param t Type tree object
- * @return true iff the type tree object represents hsb
- */
-template <NodeType node>
-bool is_hsb_type(tref t);
-
-template <NodeType node>
-bool is_hsb_type(size_t t);
 
 /**
  * @brief Registry mapping BA type trees ↔ integer ids for a specific node type.

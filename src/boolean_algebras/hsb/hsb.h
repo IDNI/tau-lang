@@ -23,6 +23,34 @@
 
 namespace idni::tau_lang {
 
+// Type definitions for hsb — atomless BA of lex-half-open polyhedra in R^d
+// (LP_d^Q). Generalizes qint from 1D to d dimensions using canonical
+// halfspaces with the lex-leading sign convention.
+
+/**
+ * @brief Create the type tree for the hsb type.
+ * @tparam node Tree node type
+ * @return Tree reference representing hsb type tree
+ */
+template <NodeType node>
+tref hsb_type();
+
+template <NodeType node>
+inline size_t hsb_type_id();
+
+/**
+ * @brief Checks if t represents the hsb type.
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return true iff the type tree object represents hsb
+ */
+template <NodeType node>
+bool is_hsb_type(tref t);
+
+template <NodeType node>
+bool is_hsb_type(size_t t);
+
+
 /// @cond INTERNAL
 namespace hsb_detail {
 	/// @brief Returns true iff @p a and @p b are equal (NaN-safe: NaN ≠ NaN).
@@ -276,6 +304,7 @@ std::ostream& operator<<(std::ostream& os, const hsb& h);
 
 } // namespace idni::tau_lang
 
+#include "boolean_algebras/hsb/hsb_types.tmpl.h"
 #include "boolean_algebras/hsb/hsb.tmpl.h"
 #include "boolean_algebras/hsb/hsb_splitter.tmpl.h"
 #include "boolean_algebras/hsb/hsb_normalizer.tmpl.h"

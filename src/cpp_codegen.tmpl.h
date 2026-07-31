@@ -146,11 +146,11 @@ struct AtomMeta {
 template <NodeType node>
 AtomMeta classify_atom_for_data(tref atom_ref, bool is_output) {
 	AtomMeta m;
-	if (!is_omcat_type_family<node>(find_ba_type<node>(atom_ref))) return m;
+	if (!pack_type_is_non_aba_omcat<node>(find_ba_type<node>(atom_ref))) return m;
 	const trefs& fvars = get_free_vars<node>(atom_ref);
 	if (fvars.empty()) return m;
 	for (tref v : fvars)
-		if (!is_omcat_type_family<node>(tree<node>::get(v).get_ba_type())) return m;
+		if (!pack_type_is_non_aba_omcat<node>(tree<node>::get(v).get_ba_type())) return m;
 	std::string var_name;
 	tref io_ref = nullptr;
 	for (tref v : fvars) {

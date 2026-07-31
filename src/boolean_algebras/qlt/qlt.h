@@ -20,6 +20,32 @@
 
 namespace idni::tau_lang {
 
+// Type definitions for qlt (Q,<)
+
+/**
+ * @brief Create the type tree for the qlt type
+ * @tparam node Tree node type
+ * @return Tree reference representing qlt type tree
+ */
+template <NodeType node>
+tref qlt_type();
+
+template <NodeType node>
+inline size_t qlt_type_id();
+
+/**
+ * @brief Checks if t represents the qlt type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents a qlt
+ */
+template <NodeType node>
+bool is_qlt_type(tref t);
+
+template <NodeType node>
+bool is_qlt_type(size_t t);
+
+
 // -----------------------------------------------------------------------------
 // qlt — the theory (Q, <).
 //
@@ -208,6 +234,7 @@ struct std::hash<idni::tau_lang::qlt> {
 	}
 };
 
+#include "boolean_algebras/qlt/qlt_types.tmpl.h"
 #include "boolean_algebras/qlt/qlt.tmpl.h"
 #include "boolean_algebras/qlt/qlt_descriptor.tmpl.h"
 

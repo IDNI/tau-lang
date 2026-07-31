@@ -15,6 +15,32 @@
 
 namespace idni::tau_lang {
 
+// Type definitions for nlang_ba
+
+/**
+ * @brief Create the type tree for the nlang type
+ * @tparam node Tree node type
+ * @return Tree reference representing nlang type tree
+ */
+template <NodeType node>
+tref nlang_type();
+
+template <NodeType node>
+inline size_t nlang_type_id();
+
+/**
+ * @brief Checks if t represents the nlang type
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return If the type tree object represents an nlang
+ */
+template <NodeType node>
+bool is_nlang_type(tref t);
+
+template <NodeType node>
+bool is_nlang_type(size_t t);
+
+
 // -----------------------------------------------------------------------------
 // nlang_ba — Natural Language Boolean Algebra (Lindenbaum-Tarski algebra)
 //
@@ -401,6 +427,7 @@ struct std::hash<idni::tau_lang::nlang_ba> {
 	}
 };
 
+#include "boolean_algebras/nlang/nlang_types.tmpl.h"
 #include "boolean_algebras/nlang/nlang_descriptor.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_BA_H__

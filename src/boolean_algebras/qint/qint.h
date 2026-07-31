@@ -15,6 +15,34 @@
 
 namespace idni::tau_lang {
 
+// Type definitions for qint — atomless BA of rational intervals [x, y)
+// (right-closed, left-open).  Constant syntax accepts both rationals (1/4)
+// and decimals (0.25).
+
+/**
+ * @brief Create the type tree for the qint (rational intervals) type.
+ * @tparam node Tree node type
+ * @return Tree reference representing qint type tree
+ */
+template <NodeType node>
+tref qint_type();
+
+template <NodeType node>
+inline size_t qint_type_id();
+
+/**
+ * @brief Checks if t represents the qint type.
+ * @tparam node Tree node type
+ * @param t Type tree object
+ * @return true iff the type tree object represents qint
+ */
+template <NodeType node>
+bool is_qint_type(tref t);
+
+template <NodeType node>
+bool is_qint_type(size_t t);
+
+
 // -----------------------------------------------------------------------------
 // qint — atomless Boolean algebra of left-closed right-open intervals [a, b)
 // on the extended real line.
@@ -108,6 +136,7 @@ struct std::hash<idni::tau_lang::qint> {
 	size_t operator()(const idni::tau_lang::qint& d) const noexcept;
 };
 
+#include "boolean_algebras/qint/qint_types.tmpl.h"
 #include "boolean_algebras/qint/qint.tmpl.h"
 #include "boolean_algebras/qint/qint_descriptor.tmpl.h"
 
