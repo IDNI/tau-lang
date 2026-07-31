@@ -4,7 +4,7 @@
  * @file ba_types.h
  * @brief Boolean-algebra (BA) type registry, type-tree constructors, and query helpers.
  *
- * Defines type-tree builders (`tau_type`, `bool_type`, etc.),
+ * Defines type-tree builders (`tau_type`, `untyped_type`, etc.),
  * their corresponding `size_t`-id overloads, `is_*` predicates, and the
  * `ba_types<node>` registry struct that maps tree refs ↔ integer type ids.
  * Also provides the `unify` / `get_ba_type_id` / `find_ba_type` free-function API.
@@ -90,32 +90,30 @@ template <NodeType node>
 bool is_untyped(size_t t);
 
 // -----------------------------------------------------------------------------
-// Type definitions for bool
+// Deriving a BA's type surface from its descriptor's type_name
+//
+// Every unparameterized BA's type tree is `:name` and its type check is a
+// comparison against that name, so a descriptor states the name once and these
+// derive the rest. A BA whose types carry a subtype, and which therefore matches
+// a family rather than a name, builds its own instead.
+namespace ba_types_detail {
 
-/**
- * @brief Create the type tree for the bool type
- * @tparam node Tree node type
- * @return Tree reference representing bool type tree
- */
+/** @brief Build the syntactic type tree `:name`. */
 template <NodeType node>
-tref bool_type();
+tref make_syntactic_type_tree(const char* name);
 
-/** @brief Return the integer type id for the `bool` type under @p node. */
-template <NodeType node>
-inline size_t bool_type_id();
+// Templated on the owning BA so the memo is per algebra, as it was when each
+// BA carried its own is_<ba>_type; one cache shared across names would answer
+// a later name from an earlier name's entry.
+/** @brief Return `true` if type tree @p t is named @p name. */
+template <typename BA, NodeType node>
+bool type_tree_name_is(tref t, const char* name);
 
-/**
- * @brief Checks if t represents the bool type
- * @tparam node Tree node type
- * @param t Type tree object
- * @return If the type tree object represents a bool
- */
-template <NodeType node>
-bool is_bool_type(tref t);
+/** @brief Return `true` if type id @p ba_type_id is named @p name. */
+template <typename BA, NodeType node>
+bool type_tree_name_is(size_t ba_type_id, const char* name);
 
-/** @brief Return `true` if type id @p t represents the bool type. */
-template <NodeType node>
-bool is_bool_type(size_t t);
+} // namespace ba_types_detail
 
 /**
  * @brief Registry mapping BA type trees ↔ integer ids for a specific node type.
@@ -150,32 +148,6 @@ private:
 	/// @brief Reverse map: type tree → ba_type id.
 	static subtree_map<node, size_t>& type_tree_to_idx();
 };
-
-// -----------------------------------------------------------------------------
-// Deriving a BA's type surface from its descriptor's type_name
-//
-// Every unparameterized BA's type tree is `:name` and its type check is a
-// comparison against that name, so a descriptor states the name once and these
-// derive the rest. Naming no algebra, they stay core. bv is not a client: its
-// types carry a subtype and it matches a family, not a name.
-namespace ba_types_detail {
-
-/** @brief Build the syntactic type tree `:name`. */
-template <NodeType node>
-tref make_syntactic_type_tree(const char* name);
-
-// Templated on the owning BA so the memo is per algebra, as it was when each
-// BA carried its own is_<ba>_type; one cache shared across names would answer
-// a later name from an earlier name's entry.
-/** @brief Return `true` if type tree @p t is named @p name. */
-template <typename BA, NodeType node>
-bool type_tree_name_is(tref t, const char* name);
-
-/** @brief Return `true` if type id @p ba_type_id is named @p name. */
-template <typename BA, NodeType node>
-bool type_tree_name_is(size_t ba_type_id, const char* name);
-
-} // namespace ba_types_detail
 
 // ---------------------------------------------------------------------------
 // Functional API for ba_types

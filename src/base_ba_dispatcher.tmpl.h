@@ -15,10 +15,10 @@ inline std::optional<typename node<BAs...>::constant_with_type> parse_bool(
 		const std::string& src) {
 	if (src == "0" || src == "false" || src == "F")
 		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ Bool(false) }, bool_type<node<BAs...>>() };
+			std::variant<BAs...>{ Bool(false) }, ba_descriptor<Bool, node<BAs...>>::type_tree() };
 	if (src == "1" || src == "true" || src == "T")
 		return typename node<BAs...>::constant_with_type{
-			std::variant<BAs...>{ Bool(true) }, bool_type<node<BAs...>>() };
+			std::variant<BAs...>{ Bool(true) }, ba_descriptor<Bool, node<BAs...>>::type_tree() };
 	return {};
 }
 
@@ -29,6 +29,8 @@ inline std::optional<typename node<BAs...>::constant_with_type> parse_bool(
 // context.  Bool is not a TAU_BAS plugin, but packs like node<bv, Bool> reach
 // the generic dispatcher and so need it described.
 #include "boolean_algebras/bool_descriptor.tmpl.h"
+// after the descriptor: bool_type/bool_type_id derive from it
+#include "boolean_algebras/bool_types.tmpl.h"
 
 namespace idni::tau_lang {
 
