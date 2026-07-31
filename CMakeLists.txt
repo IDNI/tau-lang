@@ -322,6 +322,17 @@ else()
 endif()
 
 #
+# Add curl, only when a BA of the configured pack requires it (nlang's HTTP
+# oracle). Found here rather than in src/, because find_package's imported
+# targets are directory-scoped and TAU_BA_LINK_LIBS is consumed in tests/ too.
+#
+if("CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES)
+	find_package(CURL REQUIRED)
+else()
+	message(STATUS "curl not required by TAU_BAS=${TAU_BAS}; skipping")
+endif()
+
+#
 # Add Boost log library
 #
 set(DEP_BOOST_ARGS

@@ -66,10 +66,6 @@ set(TAU_SOURCES
 	instantiate_test_pack.cpp
 )
 
-# nlang talks to an HTTP oracle; no other BA needs curl.
-if("CURL" IN_LIST TAU_BA_REQUIRED_PACKAGES)
-	find_package(CURL REQUIRED)
-endif()
 
 set(CLI_SOURCES
 	main.cpp
