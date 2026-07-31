@@ -105,11 +105,27 @@ tref transform_io_var(tref io_var, int_t time_point) {
 	if (is_io_initial<node>(io_var)) return io_var;
 	int_t shift = get_io_var_shift<node>(io_var);
 	size_t type = tau::get(io_var).get_ba_type();
+	// The input/output data bit is assigned while parsing a *spec*; it is not
+	// derived from the `i`/`o` name prefix. So an io_var that reached here
+	// without going through spec parsing is neither is_input_variable() nor
+	// is_output_variable(), and testing only the former and falling to an
+	// `else` silently rebuilt such a variable as an *output*:
+	// transform_io_var(i1[t-2], 5) returned i1[3] with is_output_variable()
+	// == true. Every production caller does work on spec-parsed trees, which
+	// is exactly why the unclassified case must be loud rather than defaulted
+	// -- it is otherwise a wrong answer nothing reports.
 	if (tau::get(io_var).is_input_variable())
 		return tau::trim(build_in_var_at_n<node>(
 			get_var_name_node<node>(io_var), time_point - shift, type));
-	else return tau::trim(build_out_var_at_n<node>(
+	if (tau::get(io_var).is_output_variable())
+		return tau::trim(build_out_var_at_n<node>(
 			get_var_name_node<node>(io_var), time_point - shift, type));
+	DBG(assert(false && "transform_io_var: io_var is neither input nor output");)
+	LOG_ERROR << "transform_io_var: " << LOG_FM(io_var) << " is classified"
+		" neither as input nor as output (the in/out bit comes from spec"
+		" parsing, not from the name prefix); returning it unchanged rather"
+		" than rebuilding it as an output variable.";
+	return io_var;
 }
 
 template <NodeType node>
@@ -120,7 +136,11 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<int_t> quantifiable_o_vars;
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i) {
-		// Skip input streams
+		// Skip input streams. An io_var classified as neither (see
+		// transform_io_var) would be quantified existentially below as if it
+		// were an output; make that loud instead of defaulting silently.
+		DBG(assert(tau::get(io_vars[i])[0].is_input_variable()
+			|| tau::get(io_vars[i])[0].is_output_variable());)
 		if (tau::get(io_vars[i])[0].is_input_variable()) continue;
 		// Skip initial conditions
 		if (is_io_initial<node>(io_vars[i])) continue;
@@ -1038,7 +1058,11 @@ tref create_guard(const trefs& io_vars, const int_t number) {
 	using tau = tree<node>;
 	tref guard = tau::_T();
 	for (tref io_var : io_vars) {
-		// Check if input stream variable
+		// Check if input stream variable. An io_var classified as neither (see
+		// transform_io_var) contributes no conjunct, so the guard silently
+		// comes out as `T`; make that loud instead.
+		DBG(assert(tau::get(io_var).is_input_variable()
+			|| tau::get(io_var).is_output_variable());)
 		if (tau::get(io_var).is_input_variable()) {
 			// Give name of io_var and make it non-user definable with "_"
 			size_t type = tau::get(io_var).get_ba_type();

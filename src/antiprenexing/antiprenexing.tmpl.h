@@ -2110,7 +2110,31 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 	if (tau::get(formula).equals_T() || tau::get(formula).equals_F())
 		return formula;
 	tref new_fm = tau::_T();
-	bool is_quant_removable_in_clause = true;
+
+	// AP-5: honour the caller's reservation for reference-entangled variables.
+	// Neither of the two fallbacks that reach this function
+	// (resolve_quantifiers, anti_prenex) takes a `skip` predicate, so the
+	// reservation `eliminate_bv_and_quantifiers` makes -- `ref_skip_2`, i.e.
+	// make_ref_variables_skip -- does not arrive here. `blocks_elimination`
+	// below covers the case where the reference sits in the *same* conjunct as
+	// `var`, but not one where `var` is entangled with it across conjuncts
+	// through a shared atom, which is exactly what that predicate computes.
+	//
+	// Recomputing it here rather than threading a predicate in is what keeps
+	// this memo-safe: the answer is a function of `ex_clause` alone, which is
+	// already anti_prenex's cache key, whereas a threaded std::function could
+	// not be part of any key (cf. the bv_blasting key bug). It also avoids
+	// conflating skip's two meanings -- for bv content skip means "defer to the
+	// solver/blasting", and the bv branch below *is* that destination.
+	//
+	// Gated on a reference being present at all, since without one no
+	// entanglement is possible and the union-find walk would be pure cost.
+	bool ref_entangled = false;
+	if (tau::get(ex_clause).find_top(is<node, tau::ref>))
+		ref_entangled = collect_used_ref_variables<node>(ex_clause)
+			.contains(tau::trim_right_sibling(var));
+
+	bool is_quant_removable_in_clause = !ref_entangled;
 	trefs conjs = get_cnf_wff_clauses<node>(formula);
 	// A conjunct containing the quantified variable that still holds a
 	// binder or an unresolved reference anywhere blocks elimination:

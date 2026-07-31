@@ -43,6 +43,18 @@ static trefs spec_io_vars(const char* spec) {
 	return io_vars_of(create_spec(spec));
 }
 
+// The matrix of `always <wff>.`, spec-parsed so its io_vars carry the in/out
+// data bit. Any test that hands a whole formula to a helper which classifies
+// io_vars must build it this way, not with wff_of.
+static tref spec_always_body(const char* spec) {
+	tref fm = create_spec(spec);
+	REQUIRE(fm != nullptr);
+	// The wff *wrapping* the wff_always, so trim2 yields the scoped formula.
+	tref aw = tau::get(fm).find_top(is_child<node_t, tau::wff_always>);
+	REQUIRE(aw != nullptr);
+	return tau::trim2(aw);
+}
+
 static tref io_var_named(const trefs& vs, const std::string& name) {
 	for (tref v : vs) if (get_var_name<node_t>(v) == name) return v;
 	return nullptr;
@@ -168,8 +180,17 @@ TEST_SUITE("satisfiability helpers") {
 	// reached indirectly. The three cases are the ones argued in its doc
 	// comment at src/satisfiability.tmpl.h:100-106.
 	TEST_CASE("transform_io_var: relative, current and constant time points") {
-		// o1[t-1] @ 5 -> o1[4]  (time_point minus relative shift)
-		tref v_prev = first_io_var("o1[t-1] = 0");
+		// Every case here goes through create_spec, because the in/out data
+		// bit is assigned by *spec* parsing (see spec_io_vars). This used to
+		// use bare wff parses, which left the io_vars classified as neither --
+		// and the function's `else` branch then rebuilt them as outputs, which
+		// happens to be the right answer for an `o`-named variable. So the
+		// test passed while pinning the defect NEW-1 describes; it now
+		// exercises the real is_output_variable() branch.
+		trefs prev_vars = spec_io_vars("always o1[t-1] = 0.");
+		tref v_prev = io_var_named(prev_vars, "o1");
+		REQUIRE( v_prev != nullptr );
+		REQUIRE( tau::get(v_prev).is_output_variable() );
 		REQUIRE( get_io_var_shift<node_t>(v_prev) == 1 );
 		tref r_prev = transform_io_var<node_t>(v_prev, 5);
 		CHECK( is_io_initial<node_t>(r_prev) );
@@ -182,13 +203,16 @@ TEST_SUITE("satisfiability helpers") {
 		CHECK( tau::get(r_prev).to_str() == "o1[4]:tau" );
 
 		// o1[t] @ 5 -> o1[5]  (shift 0)
-		tref v_now = first_io_var("o1[t] = 0");
+		tref v_now = io_var_named(spec_io_vars("always o1[t] = 0."), "o1");
+		REQUIRE( v_now != nullptr );
 		REQUIRE( get_io_var_shift<node_t>(v_now) == 0 );
 		tref r_now = transform_io_var<node_t>(v_now, 5);
 		CHECK( is_io_initial<node_t>(r_now) );
 		CHECK( get_io_time_point<node_t>(r_now) == 5 );
 
-		// o1[0] is already constant and must be returned unchanged
+		// o1[0] is already constant and must be returned unchanged. This one
+		// takes the is_io_initial early return before classification is ever
+		// consulted, so a bare wff parse is fine here.
 		tref v_const = first_io_var("o1[0] = 0");
 		REQUIRE( is_io_initial<node_t>(v_const) );
 		CHECK( transform_io_var<node_t>(v_const, 5) == v_const );
@@ -206,7 +230,11 @@ TEST_SUITE("satisfiability helpers") {
 	// Closes: `fm_at_time_point` (src/satisfiability.tmpl.h:277) is declared
 	// public in src/satisfiability.h:41 but had no test.
 	TEST_CASE("fm_at_time_point: instantiates a whole formula") {
-		tref fm = wff_of("o1[t] = o1[t-1]");
+		// Spec-parsed: fm_at_time_point calls transform_io_var, which needs the
+		// in/out classification (see spec_io_vars). A wff_of parse leaves it
+		// unset, and the old `else`-defaults-to-output behaviour made that look
+		// like it worked for `o`-named variables.
+		tref fm = spec_always_body("always o1[t] = o1[t-1].");
 		REQUIRE( fm != nullptr );
 		trefs vs = io_vars_of(fm);
 		REQUIRE( vs.size() == 2 );
@@ -230,7 +258,8 @@ TEST_SUITE("satisfiability helpers") {
 	}
 
 	TEST_CASE("fm_at_time_point: constant time points are left alone") {
-		tref fm = wff_of("o1[t] = o1[0]");
+		// Spec-parsed for the same reason as the case above.
+		tref fm = spec_always_body("always o1[t] = o1[0].");
 		REQUIRE( fm != nullptr );
 		trefs vs = io_vars_of(fm);
 		REQUIRE( vs.size() == 2 );
@@ -548,7 +577,9 @@ TEST_SUITE("satisfiability helpers") {
 
 	// Closes: `make_initial_run` (src/satisfiability.tmpl.h:1203) had no test.
 	TEST_CASE("make_initial_run: nullptr for zero lookback, instantiated run otherwise") {
-		tref aw = wff_of("o1[t] = o1[t-1]");
+		// Spec-parsed: make_initial_run instantiates through
+		// transform_io_var, which needs the in/out classification.
+		tref aw = spec_always_body("always o1[t] = o1[t-1].");
 		REQUIRE( aw != nullptr );
 		// the loop body never runs, so `run` stays nullptr
 		CHECK( make_initial_run<node_t>(aw, 0) == nullptr );

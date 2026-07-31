@@ -27,6 +27,11 @@
 #include <functional>
 
 #include "tau_tree.h"
+// For collect_used_ref_variables: treat_ex_quantified_clause needs to know
+// whether the variable it is about to eliminate is entangled with an
+// unresolved predicate reference. Self-contained (tau_tree/union_find/ba_types
+// only), so it introduces no cycle with the block headers below.
+#include "ref_variables_resolver.h"
 #include "block_atom_profile.h"
 #include "block_squeeze.h"
 #include "boole_atom_analysis.h"

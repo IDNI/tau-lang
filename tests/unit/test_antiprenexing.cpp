@@ -1279,3 +1279,106 @@ TEST_SUITE("TreatExQuantifiedClauseNegatives") {
 		CHECK( are_nso_equivalent<node_t>(r1, r2) );
 	}
 }
+
+// AP-5. Neither fallback treat_ex_quantified_clause is reached through
+// (resolve_quantifiers, anti_prenex) takes a `skip` predicate, so the
+// reservation eliminate_bv_and_quantifiers makes for reference-entangled
+// variables never arrived. blocks_elimination covered a reference sitting in
+// the same conjunct as the quantified variable; a variable entangled with one
+// across conjuncts, through a shared atom, was eliminated anyway.
+TEST_SUITE("TreatExQuantifiedClauseRefEntanglement") {
+
+	static tref treat(const char* sample, bool& eliminated) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		REQUIRE( fm != nullptr );
+		eliminated = true;
+		return treat_ex_quantified_clause<node_t>(fm, eliminated);
+	}
+
+	TEST_CASE("a variable entangled with a reference across conjuncts is kept") {
+		// `x` shares the atom `x y = 0` with `y`, and `y` is an argument of the
+		// unresolved predicate reference `q(y)`. No single conjunct holds both
+		// `x` and the reference, so blocks_elimination alone does not fire.
+		// A wff_ref (a predicate used as a formula) is what
+		// collect_used_ref_variables seeds on -- a bf_ref inside an atom, as
+		// in `f(y) != 0`, is not a seed.
+		bool eliminated = true;
+		tref res = treat("ex x (x y = 0 && q(y)).", eliminated);
+		CHECK( !eliminated );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+	}
+
+	TEST_CASE("a variable sharing its conjunct with a reference is kept") {
+		// Control for the pre-existing path: here the reference is inside a
+		// conjunct that mentions `x`, which blocks_elimination already caught.
+		bool eliminated = true;
+		tref res = treat("ex x (x y = 0 && q(x)).", eliminated);
+		CHECK( !eliminated );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+	}
+
+	TEST_CASE("a reference elsewhere in the clause does not block an unrelated variable") {
+		// `x` shares no atom with `z`, so it is not entangled with `q(z)` and
+		// must still be eliminated -- otherwise the guard would be a blanket
+		// "any reference anywhere blocks everything".
+		bool eliminated = true;
+		tref res = treat("ex x (x y = 0 && q(z)).", eliminated);
+		CHECK( eliminated );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	TEST_CASE("a reference-free clause is unaffected") {
+		bool eliminated = true;
+		tref res = treat("ex x (x y = 0 && x z != 0).", eliminated);
+		CHECK( eliminated );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+	}
+}
+
+// AP-20 / AP-21. anti_prenex's memo is Release-only (TAU_CACHE is OFF in the
+// Debug preset), which is why AP-20 -- a cache keyed on the formula alone while
+// the result also depends on the runtime-mutable `bv_blasting` global -- had no
+// regression test at all. Guarding the case on TAU_CACHE rather than on the
+// build type is what makes it testable: it is compiled out of the Debug run and
+// exercised by the Release one, which is the configuration the cache exists in.
+//
+// The assertions deliberately avoid committing to a normal form for either
+// setting. What is pinned is the relation between the three answers: blasting
+// must change the result at all (otherwise the case is vacuous), and switching
+// back must return the first answer rather than the second. With a single
+// formula-keyed cache the third call is served the second call's entry.
+#ifdef TAU_CACHE
+TEST_SUITE("AntiPrenexBlastingCache") {
+
+	TEST_CASE("the memo is keyed on bv_blasting") {
+		// An *open* bv scope over blastable arithmetic. Both properties are
+		// needed: `y` free makes treat_ex_quantified_clause's
+		// closed-and-solvable test fail, so the solver does not decide it
+		// first, and `+ { 1 }` is arithmetic bv_predicate_blasting can actually
+		// rewrite -- with `&`, or with multiplication by a non-constant,
+		// blasting is a no-op and both settings give the same answer, which
+		// would make this case vacuous. Observed here: blasting off keeps
+		// `ex b1 b1+1 = y`, blasting on returns the bit-level expansion.
+		tref fm = get_nso_rr("ex x (x:bv[4] + { 1 }:bv[4] = y:bv[4]).")
+			.value().main->get();
+		REQUIRE( fm != nullptr );
+
+		const bool saved = bv_blasting;
+		bv_blasting = false;
+		tref off1 = anti_prenex<node_t>(fm);
+		bv_blasting = true;
+		tref on = anti_prenex<node_t>(fm);
+		bv_blasting = false;
+		tref off2 = anti_prenex<node_t>(fm);
+		bv_blasting = saved;
+
+		REQUIRE( off1 != nullptr );
+		REQUIRE( on != nullptr );
+		REQUIRE( off2 != nullptr );
+		// Not vacuous: the setting really does change the answer.
+		CHECK( tau::get(off1) != tau::get(on) );
+		// The regression: switching back must not be served the on-entry.
+		CHECK( tau::get(off2) == tau::get(off1) );
+	}
+}
+#endif // TAU_CACHE

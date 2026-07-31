@@ -224,3 +224,45 @@ TEST_SUITE("Tau API - string - execution") {
 		CHECK( o_values == i_values );
 	}
 }
+
+// NF-1 / NF-2 regression: api::boole_normal_form(const std::string&) used
+// get_spec_or_term, so it handed a `spec` node to a function that requires a
+// wff and aborted on *every* well-formed input; and boole_normal_form's own
+// is_atomic admits bf_lt/bf_lteq while its two consumers asserted bf_eq, so a
+// bitvector comparison aborted too. Both were Debug-only aborts (the asserts do
+// not exist in Release) and neither had a test, because the only existing test
+// for this entry point feeds it malformed strings.
+TEST_SUITE("Tau API - boole_normal_form regressions") {
+
+	TEST_CASE_FIXTURE(api_fixture, "NF-1: valid input no longer aborts") {
+		auto eq = tau_api::boole_normal_form("x = 0");
+		REQUIRE( eq.has_value() );
+		CHECK( *eq == "x = 0" );
+		auto taut = tau_api::boole_normal_form("x = 0 || x != 0");
+		REQUIRE( taut.has_value() );
+		CHECK( *taut == "T" );
+		auto contra = tau_api::boole_normal_form("x = 0 && x != 0");
+		REQUIRE( contra.has_value() );
+		CHECK( *contra == "F" );
+		auto reduced = tau_api::boole_normal_form("xy|xy' = 0");
+		REQUIRE( reduced.has_value() );
+		CHECK( *reduced == "x = 0" );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "NF-2: bitvector comparisons no longer abort") {
+		// Non-bv `<` is expanded by the construction hooks, but a bv one is
+		// not, so it reaches the BDD-variable selection as a bf_lt.
+		for (const char* s : { "x:bv[8] < y:bv[8]", "x:bv[8] <= y:bv[8]",
+					"x:bv[8] > y:bv[8]", "x:bv[8] != y:bv[8]",
+					"x:bv[8] < y:bv[8] && z = 0" }) {
+			CAPTURE(s);
+			auto r = tau_api::boole_normal_form(s);
+			CHECK( r.has_value() );
+		}
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "malformed input still rejected") {
+		for (const char* s : { "", "x ) ( invalid !!!", "o[t] =" })
+			CHECK( !tau_api::boole_normal_form(s).has_value() );
+	}
+}
