@@ -3,6 +3,7 @@
 #include "satisfiability.h"
 #include "normalizer.h"
 #include "ltl_aba.h"
+#include "boolean_algebras/ba_pack_traits.h"
 
 #include <cstdlib>
 #include <functional>
@@ -213,7 +214,7 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 	int_t condition;
 	bool is_left;
 	auto to_ba = [](const bool c) {
-		const size_t type = sbf_type_id<node>();
+		const size_t type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
 		return c ? tau::_1(type) : tau::_0(type);
 	};
 
@@ -349,7 +350,8 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 	// We need a placeholder symbol in order to substitute during the next step
 	tref c_chi = rewriter::replace<node>(chi, changes);
 	tref c_pholder = build_out_var_at_n<node>("_pholder",
-							time_point + step_num, sbf_type_id<node>());
+							time_point + step_num,
+							get_ba_type_id<node>(pack_bool_carrier_type<node>()));
 	c_pholder = tau::build_bf_eq_0(c_pholder);
 	tref c_st = rewriter::replace<node>(st, changes);
 	pholder_to_st.emplace(c_pholder, c_st);
@@ -746,7 +748,7 @@ template <NodeType node>
 tref build_flag_on_lookback(tref var_name_node, const std::string& var,
 							const int_t lookback)
 {
-	size_t flag_type = get_ba_type_id<node>(sbf_type<node>());
+	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
 	if (lookback >= 2) return build_out_var_at_t_minus<node>(
 		var_name_node, lookback - 1, flag_type, var);
 	else return build_out_var_at_t<node>(var_name_node, flag_type, var);
@@ -756,7 +758,7 @@ template <NodeType node>
 tref build_prev_flag_on_lookback(tref io_var_node,
 				const std::string& var, const int_t lookback)
 {
-	size_t flag_type = get_ba_type_id<node>(sbf_type<node>());
+	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
 	if (lookback >= 2)
 		return build_out_var_at_t_minus<node>(io_var_node, lookback, flag_type, var);
 	else return build_out_var_at_t_minus<node>(io_var_node, 1, flag_type, var);
@@ -831,7 +833,7 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 			ct.find_top(is<node, tau::ctnvar>)).get_string();
 		std::stringstream ss; ss << "_f" << ctn_id++;
 		tref var = tau::build_var_name(ss.str());
-		size_t flag_type = get_ba_type_id<node>(sbf_type<node>());
+		size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
 		tref flag_iovar = tau::trim(
 			build_out_var_at_t<node>(var, flag_type, ctnvar));
 
@@ -1085,7 +1087,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	}
 
 	LOG_TRACE << "transforming eventual variables: " << LOG_FM(fm);
-	size_t flag_type = sbf_type_id<node>();
+	size_t flag_type = get_ba_type_id<node>(pack_bool_carrier_type<node>());
 	tref ev_assm = tau::_T();
 	tref ev_collection = tau::_0(flag_type);
 	for (size_t n = 0; n < smt_fms.size(); ++n) {
