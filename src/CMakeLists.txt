@@ -50,20 +50,28 @@ set(TAU_HEADERS ${TAU_CORE_HEADERS} ${TAU_BA_HEADERS})
 # grammar tables, compiled here instead of in every TU including the parser
 set(TAU_PARSER_SOURCES
 	../parser/tau_parser.generated.cpp
-	../parser/sbf_parser.generated.cpp
 )
 
-# do not optimize parser sources, they are mostly data and optimization takes too longwhat
-set_source_files_properties(${TAU_PARSER_SOURCES}
+# Grammar tables are mostly data and optimizing them takes too long. A BA's
+# parser arrives through its manifest, so pick those out of the pack's sources
+# rather than naming them here.
+set(TAU_GENERATED_PARSER_SOURCES ${TAU_PARSER_SOURCES})
+foreach(_ba_src ${TAU_BA_SOURCES_EXTRA})
+	if(_ba_src MATCHES "_parser\\.generated\\.cpp$")
+		list(APPEND TAU_GENERATED_PARSER_SOURCES ${_ba_src})
+	endif()
+endforeach()
+set_source_files_properties(${TAU_GENERATED_PARSER_SOURCES}
 	PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 
+# Only what every pack has. A BA's own translation units are declared by its
+# ba.cmake and arrive via TAU_BA_SOURCES_EXTRA, so a pack without a BA does not
+# compile it. bool_ba.cpp stays: described like a BA, but in every pack.
 set(TAU_SOURCES
 	${TAU_PARSER_SOURCES}
+	${TAU_BA_SOURCES_EXTRA}
 	boolean_algebras/bool_ba.cpp
 	boolean_algebras/bdds/var_dict.cpp
-	boolean_algebras/nlang/nlang_ba.cpp
-	boolean_algebras/qint/qint.cpp
-	boolean_algebras/qlt/qlt.cpp
 	instantiate_test_pack.cpp
 )
 
