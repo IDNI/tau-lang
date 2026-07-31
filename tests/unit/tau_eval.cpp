@@ -5,13 +5,10 @@
 // Prints: REALIZABLE, UNREALIZABLE, or PARSE_ERROR
 // Exit codes: 0=REALIZABLE, 1=UNREALIZABLE, 2=PARSE_ERROR
 
+// tau_pack.h includes the header of every configured BA, so none is named here.
 #include "tau_pack.h"
 #define bas_pack TAU_PACK_FULL_BAS
 
-#include "boolean_algebras/qint/qint.h"
-#include "boolean_algebras/qlt/qlt.h"
-#include "boolean_algebras/nlang/nlang_ba.h"
-#include "boolean_algebras/hsb/hsb.h"
 #include "test_helpers.h"
 
 #include <boost/log/core.hpp>

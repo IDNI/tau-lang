@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 
 bool fp_test(const char* sample, typename node_t::type nt, bool expect_fail = false) {
 	return normalize_and_check(sample, nt, expect_fail);

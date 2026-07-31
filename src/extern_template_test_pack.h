@@ -34,17 +34,11 @@ extern template struct tree    <test_node_t>;
 extern template struct get_hook<test_node_t>;
 extern template struct tau_ba  <TAU_PACK_BASE_BAS>;
 
-// bool_node_t/sbf_node_t hoisting hardcodes bv; matches the guard in
-// src/instantiate_test_pack.cpp.
-#ifdef TAU_PACK_HAS_BA_BV
-
-using bool_node_t = node<bv, Bool>;
-using sbf_node_t  = node<bv, sbf_ba>;
+// Mirrors src/instantiate_test_pack.cpp, guards included.
+using bool_node_t = node<Bool>;
 
 extern template struct tree    <bool_node_t>;
 extern template struct get_hook<bool_node_t>;
-extern template struct tree    <sbf_node_t>;
-extern template struct get_hook<sbf_node_t>;
 
 // Normalizer pipeline; declarations arrive via ltl_aba.h -> normalizer.h.
 extern template tref normalizer               <bool_node_t>(const rr<bool_node_t>&);
@@ -54,6 +48,21 @@ extern template tref nso_rr_apply             <bool_node_t>(const rewriter::rule
 extern template tref nso_rr_apply             <bool_node_t>(const rr<bool_node_t>&);
 extern template tref calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
 
+#ifdef TAU_PACK_HAS_BA_BV
+
+using bv_bool_node_t = node<bv, Bool>;
+
+extern template struct tree    <bv_bool_node_t>;
+extern template struct get_hook<bv_bool_node_t>;
+
+#ifdef TAU_PACK_HAS_BA_SBF
+
+using bv_sbf_node_t = node<bv, sbf_ba>;
+
+extern template struct tree    <bv_sbf_node_t>;
+extern template struct get_hook<bv_sbf_node_t>;
+
+#endif // TAU_PACK_HAS_BA_SBF
 #endif // TAU_PACK_HAS_BA_BV
 
 } // namespace idni::tau_lang

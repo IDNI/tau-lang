@@ -3,7 +3,9 @@
 #ifndef __IDNI__TAU__TESTS__TEST_SBF_BA_HELPERS_H__
 #define __IDNI__TAU__TESTS__TEST_SBF_BA_HELPERS_H__
 
-// helper types and functions for tau with just sbf_ba BA as tree<node<sbf_ba>>
+// Deliberately hardcoded fixture: the bv + sbf combination specifically,
+// independent of -DTAU_BAS=. Do not switch to TAU_PACK_*; tests including this
+// are gated on bv and sbf.
 #define bas_pack bv, sbf_ba
 #include "test_helpers.h"
 

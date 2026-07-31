@@ -4,12 +4,9 @@
 #define __IDNI__TAU__TESTS__TEST_TAU_HELPERS_H__
 
 // helper types and functions for tau with just Bool BA as tree<node<Bool>>
+// tau_pack.h includes the header of every configured BA, so none is named here.
 #include "tau_pack.h"
 #define bas_pack TAU_PACK_FULL_BAS
-#include "boolean_algebras/qint/qint.h"
-#include "boolean_algebras/qlt/qlt.h"
-#include "boolean_algebras/nlang/nlang_ba.h"
-#include "boolean_algebras/hsb/hsb.h"
 #include "test_helpers.h"
 
 namespace idni::tau_lang {
@@ -30,6 +27,8 @@ inline std::pair<tref, tref> get_nso_rr_tau_splitter(const char *sample,
 	tref s = tau_splitter<bas_pack>(fm, st);
 	return std::make_pair(fm, s);
 }
+
+#ifdef TAU_PACK_HAS_BA_BV
 
 /**
  * @brief A bitvector constant node of @p bitwidth bits holding @p value.
@@ -54,6 +53,8 @@ static size_t bv16_type_id = ba_types<node>::id(bv_type<node>(16));
 /** @brief Cached type id for bitvector-32 under node @p node. */
 template<NodeType node>
 static size_t bv32_type_id = ba_types<node>::id(bv_type<node>(32));
+
+#endif // TAU_PACK_HAS_BA_BV
 
 } // namespace idni::tau_lang
 

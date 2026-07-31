@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 
 // The following test suites represent correct sentences of a tau nso_rr or
 // library and as such must be parsed correctly and satisfy the structural checks

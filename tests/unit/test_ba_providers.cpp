@@ -3,7 +3,7 @@
 // BAProvider / CompositeBAProvider conformance tests.
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 #include "composite_ba_provider.h"
 
 using idni::tau_lang::BAProvider;

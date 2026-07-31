@@ -11,13 +11,13 @@
 // find/merge/connected -- maintains a circular next-pointer ring per set so
 // that `get_set(x)` can enumerate every element sharing x's set in O(n).
 //
-// This file uses the lightweight node_t = node<bv, Bool> pack from
-// test_Bool_helpers.h (the same one test_gc.cpp uses) rather than the full
+// This file uses the lightweight node_t = node<Bool> pack from
+// test_bool_only_helpers.h (the same one test_gc.cpp uses) rather than the full
 // bas_pack, since these tests only need plain variable trefs and no BA
 // simplification/solving machinery.
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 #include "union_find_with_sets.h"
 
 using namespace idni::tau_lang;

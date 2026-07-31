@@ -2,9 +2,10 @@
 
 #ifdef DEBUG
 // including instead of #include "tau.h" to avoid errors pointing to the generated tau.h
+// tau_pack.h brings tau_tree.h and the header of every configured BA, so no BA
+// is named here.
+#	include "tau_pack.h"
 #	include "boolean_algebras/nso_ba.h"
-#	include "boolean_algebras/sbf/sbf_ba.h"
-#	include "boolean_algebras/bv/bv_ba.h"
 #	include "boolean_algebras/variant_ba.h"
 #	include "ba_constants.h"
 #	include "base_ba_dispatcher.h"

@@ -36,17 +36,12 @@ template struct tree    <test_node_t>;
 template struct get_hook<test_node_t>;
 template struct tau_ba  <TAU_PACK_BASE_BAS>;
 
-// bool_node_t/sbf_node_t hoisting hardcodes bv; only worth doing, and only
-// possible, when bv is part of the configured pack.
-#ifdef TAU_PACK_HAS_BA_BV
-
-using bool_node_t = node<bv, Bool>;
-using sbf_node_t  = node<bv, sbf_ba>;
+// The pack-agnostic fixture of tests/test_bool_only_helpers.h; Bool is
+// described in every pack, so this needs no guard.
+using bool_node_t = node<Bool>;
 
 template struct tree    <bool_node_t>;
 template struct get_hook<bool_node_t>;
-template struct tree    <sbf_node_t>;
-template struct get_hook<sbf_node_t>;
 
 // Normalizer pipeline.  Only the Bool pack is worth hoisting: the tau and
 // sbf packs measured byte-identical objects without it.
@@ -57,6 +52,23 @@ template tref nso_rr_apply             <bool_node_t>(const rewriter::rules&, tre
 template tref nso_rr_apply             <bool_node_t>(const rr<bool_node_t>&);
 template tref calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
 
+// The hardcoded fixtures of tests/test_Bool_helpers.h and
+// tests/test_sbf_ba_helpers.h, which name bv and sbf whatever the pack is.
+#ifdef TAU_PACK_HAS_BA_BV
+
+using bv_bool_node_t = node<bv, Bool>;
+
+template struct tree    <bv_bool_node_t>;
+template struct get_hook<bv_bool_node_t>;
+
+#ifdef TAU_PACK_HAS_BA_SBF
+
+using bv_sbf_node_t = node<bv, sbf_ba>;
+
+template struct tree    <bv_sbf_node_t>;
+template struct get_hook<bv_sbf_node_t>;
+
+#endif // TAU_PACK_HAS_BA_SBF
 #endif // TAU_PACK_HAS_BA_BV
 
 } // namespace idni::tau_lang

@@ -6,7 +6,7 @@
 // interface expected by the solver infrastructure.
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 
 TEST_SUITE("configuration") {
 

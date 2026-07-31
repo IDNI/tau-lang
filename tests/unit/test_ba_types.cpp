@@ -1,6 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
+// the bv fixture, not test_bool_only_helpers.h: unify's cases need two distinct
+// concrete ba_type ids, which a one-BA pack does not have
 #include "test_Bool_helpers.h"
 
 #include "ba_types.h"

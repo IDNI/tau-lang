@@ -3,6 +3,8 @@
 #include <algorithm>
 
 #include "test_init.h"
+// the bv fixture, not test_bool_only_helpers.h: "BDD and many" pins a conjunct
+// order that follows the ba_type pool indices (D8)
 #include "test_Bool_helpers.h"
 #include "tau_bdd.h"
 

@@ -9,7 +9,7 @@
 // the hash_combine-based hash were never actually exercised.
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 #include "rr.h"
 #include <unordered_set>
 

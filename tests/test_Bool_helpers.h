@@ -3,7 +3,10 @@
 #ifndef __IDNI__TAU__TESTS__TEST_BOOL_HELPERS_H__
 #define __IDNI__TAU__TESTS__TEST_BOOL_HELPERS_H__
 
-// helper types and functions for tau with just Bool BA as tree<node<Bool>>
+// Deliberately hardcoded fixture: a bv + Bool pack plus an explicit
+// base_ba_dispatcher specialization for bv + sbf_ba + Bool, independent of
+// -DTAU_BAS=. Do not switch to TAU_PACK_*; tests including this are gated on bv
+// and sbf. Tests needing neither use test_bool_only_helpers.h.
 #define bas_pack bv, Bool
 #include "test_helpers.h"
 

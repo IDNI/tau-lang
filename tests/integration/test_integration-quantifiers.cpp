@@ -4,7 +4,7 @@
 // quantifiers: all, ex
 
 #include "test_init.h"
-#include "test_Bool_helpers.h"
+#include "test_bool_only_helpers.h"
 
 using test_case = array<string, 3>;
 using test_cases = vector<test_case>;
