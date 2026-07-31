@@ -5,7 +5,6 @@
 #include "algorithm_a_skeleton.h"
 #include "algorithm_b_skeleton.h"
 #include "algorithm_d_game.h"
-#include "omcat_constants.h"
 #include "ba_type_traits.h"
 
 #undef LOG_CHANNEL_NAME

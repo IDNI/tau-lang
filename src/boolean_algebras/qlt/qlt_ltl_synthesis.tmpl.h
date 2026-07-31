@@ -27,9 +27,9 @@
 #include "algorithm_b_skeleton.h"
 #include "algorithm_d_game.h"
 #include "ba_types.h"
+#include "boolean_algebras/qlt/omcat_constants.h"
 #include "boolean_algebras/qlt/qlt.h"
 #include "ltl_aba_result.h"
-#include "omcat_constants.h"
 
 namespace idni::tau_lang {
 

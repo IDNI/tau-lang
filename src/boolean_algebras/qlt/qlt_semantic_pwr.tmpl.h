@@ -23,7 +23,7 @@
 
 #include "algorithm_d_game.h"
 #include "boolean_algebras/qlt/qlt_ltl_synthesis.tmpl.h"
-#include "omcat_constants.h"
+#include "boolean_algebras/qlt/omcat_constants.h"
 
 namespace idni::tau_lang {
 

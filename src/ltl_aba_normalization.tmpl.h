@@ -170,12 +170,11 @@ static bool aba_existential_feasible(tref fm) {
 			}
 			if (all_determined) return true;
 		}
-		constexpr bool has_nlang_ba = ba_variant_includes_v<nlang_ba, typename tau::constant>;
-		if constexpr (has_nlang_ba) {
-			const trefs& fvars = tau::get(fm).get_free_vars();
-			for (tref v : fvars)
-				if (is_nlang_type<node>(tree<node>::get(v).get_ba_type())) return true;
-		}
+		// A free variable whose algebra can always satisfy its own outputs
+		// makes the formula feasible without asking the solver.
+		for (tref v : tau::get(fm).get_free_vars())
+			if (pack_type_output_always_satisfiable<node>(
+				tree<node>::get(v).get_ba_type())) return true;
 		return is_non_temp_nso_satisfiable<node>(fm);
 	};
 	bool result = compute();
@@ -192,8 +191,8 @@ static bool aba_existential_feasible(tref fm) {
 //
 //   - Pure-input formulas → EXISTENTIAL: pure-input constraints are env
 //     assumptions, not system obligations; ∃i captures env freedom.
-//   - Omcat (qlt) output-only formulas → EXISTENTIAL: system sets outputs
-//     directly; qlt conjunctions are brittle under safety synthesis.
+//   - Non-aba omcat output-only formulas → EXISTENTIAL: system sets outputs
+//     directly; such conjunctions are brittle under safety synthesis.
 //   - Input-bearing or non-omcat formulas → SYNTHESIS: env picks inputs
 //     adversarially; system needs ∀i.∃o guarantees.
 //
@@ -204,18 +203,12 @@ template <NodeType node>
 static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input) {
 	if (pure_input) return aba_existential_feasible<node>(fm);
 	size_t ti = find_ba_type<node>(fm);
-	if (is_omcat_type_family<node>(ti) && !has_input)
+	if (pack_type_is_non_aba_omcat<node>(ti) && !has_input)
 		return aba_existential_feasible<node>(fm);
-	// nlang: for pure-output formulas the system can always satisfy o=p by
-	// setting its output to the proposition p. Route to existential feasibility
-	// to avoid the safety fixpoint (which is expensive for nlang and unnecessary
-	// when there are no inputs to adversarially constrain the output).
-	using dispatch_tau = tree<node>;
-	constexpr bool has_nlang_ba2 = ba_variant_includes_v<nlang_ba, typename dispatch_tau::constant>;
-	if constexpr (has_nlang_ba2) {
-		if (is_nlang_type<node>(ti) && !has_input)
-			return aba_existential_feasible<node>(fm);
-	}
+	// An algebra that can always satisfy its own outputs needs no safety
+	// fixpoint when nothing constrains those outputs adversarially.
+	if (pack_type_output_always_satisfiable<node>(ti) && !has_input)
+		return aba_existential_feasible<node>(fm);
 	return aba_synthesis_feasible<node>(fm);
 }
 

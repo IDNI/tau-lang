@@ -5,7 +5,7 @@
 
 #include "test_init.h"
 #include "omcat_types.h"
-#include "omcat_constants.h"
+#include "boolean_algebras/qlt/omcat_constants.h"
 
 using namespace idni::tau_lang;
 using omcat::QltType1;

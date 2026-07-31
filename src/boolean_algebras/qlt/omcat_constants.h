@@ -8,11 +8,12 @@
 // distinct constants, so precise collection keeps the type spaces
 // minimal.
 //
-// Depends on tau_tree.h (for tree walking) and omcat_types.h (for the Rat
-// type).  Keeps the heavy tau-lang template machinery encapsulated.
+// Depends on tau_tree.h (for tree walking) and core's omcat_types.h (for the
+// Rat type, which Algorithm D shares).  Reachable only with qlt in the pack,
+// so it needs no guard of its own.
 
-#ifndef __IDNI__TAU__OMCAT_CONSTANTS_H__
-#define __IDNI__TAU__OMCAT_CONSTANTS_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__OMCAT_CONSTANTS_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__OMCAT_CONSTANTS_H__
 
 #include <algorithm>
 #include <string>
@@ -78,29 +79,27 @@ inline std::vector<Rat> collect_qlt_constants(tref fm) {
 	std::vector<Rat> out;
 	if (!fm) return out;
 
-	if constexpr (ba_variant_includes_v<qlt, typename tau::constant>) {
-		for (tref c : tau::get(fm).select_all(is<node, tau::ba_constant>)) {
-			const tau& t = tau::get(c);
-			// get_ba_type_name() returns ":qlt" (with leading colon); use type ID.
-			if (!is_omcat_type_family<node>(t.get_ba_type())) continue;
-			auto cv = t.get_ba_constant();
-			if (std::holds_alternative<qlt>(cv)) {
-				const qlt& qba = std::get<qlt>(cv);
-				// Collect all finite rational endpoints across all pieces.
-				for (const auto& piece : qba.pieces) {
-					if (piece.lo.val.is_finite())
-						out.push_back(Rat(piece.lo.val.p, piece.lo.val.q));
-					if (piece.hi.val.is_finite()
-					    && !(piece.lo.val.is_finite() && piece.lo.val == piece.hi.val))
-						out.push_back(Rat(piece.hi.val.p, piece.hi.val.q));
-				}
-				continue;
+	for (tref c : tau::get(fm).select_all(is<node, tau::ba_constant>)) {
+		const tau& t = tau::get(c);
+		// get_ba_type_name() returns ":qlt" (with leading colon); use type ID.
+		if (!is_qlt_type<node>(t.get_ba_type())) continue;
+		auto cv = t.get_ba_constant();
+		if (std::holds_alternative<qlt>(cv)) {
+			const qlt& qba = std::get<qlt>(cv);
+			// Collect all finite rational endpoints across all pieces.
+			for (const auto& piece : qba.pieces) {
+				if (piece.lo.val.is_finite())
+					out.push_back(Rat(piece.lo.val.p, piece.lo.val.q));
+				if (piece.hi.val.is_finite()
+				    && !(piece.lo.val.is_finite() && piece.lo.val == piece.hi.val))
+					out.push_back(Rat(piece.hi.val.p, piece.hi.val.q));
 			}
-			// Fall back to source-string for uncompiled parse-time constants.
-			if (tref src = tt(c) | tau::source | tt::ref; src) {
-				Rat r = parse_rat_literal(tau::get(src).get_string());
-				if (r.q != 0) out.push_back(r);
-			}
+			continue;
+		}
+		// Fall back to source-string for uncompiled parse-time constants.
+		if (tref src = tt(c) | tau::source | tt::ref; src) {
+			Rat r = parse_rat_literal(tau::get(src).get_string());
+			if (r.q != 0) out.push_back(r);
 		}
 	}
 
@@ -115,4 +114,4 @@ inline std::vector<Rat> collect_qlt_constants(tref fm) {
 
 } // namespace idni::tau_lang::omcat
 
-#endif // __IDNI__TAU__OMCAT_CONSTANTS_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__OMCAT_CONSTANTS_H__

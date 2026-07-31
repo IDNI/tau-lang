@@ -571,6 +571,35 @@ std::optional<std::string> pack_codegen_witness(size_t ba_type_id, tref var,
 		});
 }
 
+/**
+ * @brief `true` when the BA owning @p ba_type is one whose outputs a system
+ *        can always satisfy on its own.
+ *
+ * A claim about the algebra, not about a formula -- "the system can meet
+ * `o = p` by setting its output to `p`" -- which is why the capability is a
+ * flag. It lets a pure-output formula take existential feasibility instead of
+ * the safety fixpoint.
+ */
+template <typename Node>
+bool pack_type_output_always_satisfiable(size_t ba_type) {
+	if (!ba_type) return false;
+	bool out = false;
+	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
+		([&] {
+			using BA = std::tuple_element_t<Is,
+				typename Node::bas_tuple>;
+			if constexpr (ba_has_descriptor_v<Node, BA>
+				&& requires { requires ba_descriptor<BA, Node>
+					::output_always_satisfiable_by_system; })
+				if (!out && ba_descriptor<BA, Node>
+					::owns_type(ba_type))
+						out = true;
+		}(), ...);
+	}(std::make_index_sequence<
+		std::tuple_size_v<typename Node::bas_tuple>>{});
+	return out;
+}
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BA_PACK_TRAITS_H__

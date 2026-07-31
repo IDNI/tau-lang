@@ -24,6 +24,19 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;
 
+	/**
+	 * @brief No past output can leave the current constraint unsatisfiable.
+	 *
+	 * There is no operation here by which history exhausts the admissible
+	 * outputs: `o = p` is met by emitting `p` whatever came before, and being
+	 * atomless, even a chain such as `o[t] < o[t-1]` can always be continued.
+	 * So satisfiable at one step means satisfiable at every step, and core may
+	 * answer a formula no input constrains by feasibility alone instead of the
+	 * safety fixpoint. A bounded or finite algebra must not declare this --
+	 * `bv[8]` runs out of room at `o[t] = o[t-1] + 1`.
+	 */
+	static constexpr bool output_always_satisfiable_by_system = true;
+
 	static bool matches_type(tref type_tree) {
 		return is_nlang_type<node_t>(type_tree);
 	}
