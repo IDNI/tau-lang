@@ -321,18 +321,20 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 		return _T(v, ch, len, r);
 	}
 	//RULE(BF_DEF_SIMPLIFY_N, "$X !< 1 ::= $X' = 0.")
-	// Skip for qlt (omcat): BF-specific rewrite, not valid in DLO.
+	// Rewriting an order comparison into a complement equality holds only
+	// where < is a Boolean lattice order, not where it is a linear one.
 	if (arg2(ch).is(tau::bf_t)
-		&& !is_omcat_type_family<node>(arg1_fm(ch).get_ba_type())
-		&& !is_omcat_type_family<node>(arg2_fm(ch).get_ba_type())) {
+		&& !pack_type_is_non_aba_omcat<node>(arg1_fm(ch).get_ba_type())
+		&& !pack_type_is_non_aba_omcat<node>(arg2_fm(ch).get_ba_type())) {
 		HOOK_LOGGING(applied("$X !< 1 ::= $X' = 0.");)
 		return tau::get(tau::build_bf_eq_0(tau::build_bf_neg(arg1_fm(ch).get())), r);
 	}
 	//RULE(BF_DEF_SIMPLIFY_N, "0 !< $X ::= $X = 0.")
-	// Skip for qlt (omcat): BF-specific rewrite, not valid in DLO.
+	// Rewriting an order comparison into a complement equality holds only
+	// where < is a Boolean lattice order, not where it is a linear one.
 	if (arg1(ch).is(tau::bf_f)
-		&& !is_omcat_type_family<node>(arg1_fm(ch).get_ba_type())
-		&& !is_omcat_type_family<node>(arg2_fm(ch).get_ba_type())) {
+		&& !pack_type_is_non_aba_omcat<node>(arg1_fm(ch).get_ba_type())
+		&& !pack_type_is_non_aba_omcat<node>(arg2_fm(ch).get_ba_type())) {
 		HOOK_LOGGING(applied("0 !< $X ::= $X = 0.");)
 		return tau::get(tau::build_bf_eq_0(arg2_fm(ch).get()), r);
 	}
@@ -393,19 +395,21 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 		return _T(v, ch, len, r);
 	}
 	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "1 <= $X ::= $X' = 0.") @CP
-	// Skip for qlt (omcat): BF-specific rewrite, not valid in DLO.
+	// Rewriting an order comparison into a complement equality holds only
+	// where < is a Boolean lattice order, not where it is a linear one.
 	if (arg1(ch).is(tau::bf_t)
-		&& !is_omcat_type_family<node>(arg1_fm(ch).get_ba_type())
-		&& !is_omcat_type_family<node>(arg2_fm(ch).get_ba_type())) {
+		&& !pack_type_is_non_aba_omcat<node>(arg1_fm(ch).get_ba_type())
+		&& !pack_type_is_non_aba_omcat<node>(arg2_fm(ch).get_ba_type())) {
 		HOOK_LOGGING(applied("1 <= $X ::= $X' = 0.");)
 		return tau::get(tau::build_bf_eq_0(
 			tau::build_bf_neg(arg2_fm(ch).get())), r);
 	}
 	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "$X <= 0 ::= X = 0.") @CP
-	// Skip for qlt (omcat): BF-specific rewrite, not valid in DLO.
+	// Rewriting an order comparison into a complement equality holds only
+	// where < is a Boolean lattice order, not where it is a linear one.
 	if (arg2(ch).is(tau::bf_f)
-		&& !is_omcat_type_family<node>(arg1_fm(ch).get_ba_type())
-		&& !is_omcat_type_family<node>(arg2_fm(ch).get_ba_type())) {
+		&& !pack_type_is_non_aba_omcat<node>(arg1_fm(ch).get_ba_type())
+		&& !pack_type_is_non_aba_omcat<node>(arg2_fm(ch).get_ba_type())) {
 		HOOK_LOGGING(applied("$X <= 0 ::= X = 0.");)
 		return tau::get(tau::build_bf_eq_0(arg1_fm(ch).get()), r);
 	}
