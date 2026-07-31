@@ -5,6 +5,7 @@
 #include "algorithm_a_skeleton.h"
 #include "algorithm_b_skeleton.h"
 #include "algorithm_d_game.h"
+#include "satisfiability.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "ltl_aba"
@@ -30,15 +31,6 @@
 #include <fcntl.h>
 
 extern char **environ;
-
-namespace idni::tau_lang {
-
-// Forward declaration: is_tau_formula_sat is defined in satisfiability.tmpl.h
-// which includes this file, so we forward-declare to avoid a circular include.
-template <NodeType node>
-bool is_tau_formula_sat(tref fm, int_t start_time, bool output);
-
-} // namespace idni::tau_lang
 
 // Split into logical sub-files for readability.
 // Include order matches the original code order.
