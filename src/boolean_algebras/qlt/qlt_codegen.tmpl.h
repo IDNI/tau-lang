@@ -17,39 +17,24 @@
 
 #include "boolean_algebras/qlt/qlt.h"
 #include "boolean_algebras/qlt/qlt_qe.tmpl.h"
+#include "boolean_algebras/qlt/qlt_solver.tmpl.h"
 
 namespace idni::tau_lang {
 
-// Pick a concrete double witness from a non-empty qlt interval.
-inline double witness_from_qlt_interval(const qlt& interval) {
-	if (interval.is_empty()) return 0.0;
-	const auto& piece = interval.pieces[0];
-	const auto& lo = piece.lo.val;
-	const auto& hi = piece.hi.val;
-	if (lo.is_neg_inf() && hi.is_pos_inf()) return 0.0;
-	if (lo.is_neg_inf()) {
-		if (hi.is_sym()) return -1.0;
-		return (double)hi.p / (double)hi.q - 1.0;
-	}
-	if (hi.is_pos_inf()) {
-		if (lo.is_sym()) return 1.0;
-		return (double)lo.p / (double)lo.q + 1.0;
-	}
-	// Bounded: midpoint
-	if (lo.is_sym() || hi.is_sym()) return 0.0;
-	double l = (double)lo.p / (double)lo.q;
-	double h = (double)hi.p / (double)hi.q;
-	return (l + h) / 2.0;
-}
-
-// Format a double as a C++ literal with full precision.
-inline std::string double_to_cpp(double v) {
+// Format a rational as a C++ double literal.
+//
+// The rational is exact; this conversion is the one place a value is rounded,
+// and it is a real limitation: a double cannot represent every rational, so a
+// midpoint of a narrow interval can still land outside it. Emitting the
+// rational itself is what removes that, and needs the emitted value type.
+inline std::string rational_to_cpp(const qlt_rational& r) {
 	char buf[64];
-	snprintf(buf, sizeof(buf), "%.17g", v);
-	// Ensure the literal looks like a floating-point constant
+	snprintf(buf, sizeof(buf), "%.17g", (double)r.p / (double)r.q);
 	std::string s(buf);
 	bool has_dot_or_e = false;
-	for (char c : s) if (c == '.' || c == 'e' || c == 'E') { has_dot_or_e = true; break; }
+	for (char c : s) if (c == '.' || c == 'e' || c == 'E') {
+		has_dot_or_e = true; break;
+	}
 	if (!has_dot_or_e) s += ".0";
 	return s;
 }
@@ -59,9 +44,13 @@ inline std::string double_to_cpp(double v) {
 // yields a literal, since the ABA oracle has already found the edge feasible.
 template <NodeType node>
 static std::optional<std::string> qlt_codegen_witness(tref var, tref conj) {
-	auto interval = qlt_dlo_qe_interval<node>(var, conj);
-	return double_to_cpp(interval
-		? witness_from_qlt_interval(*interval) : 1.0);
+	if (auto interval = qlt_dlo_qe_interval<node>(var, conj); interval)
+		if (auto witness = qlt_pick_witness<node>(*interval); witness)
+			return rational_to_cpp(*witness);
+	// No determined interval, or none of its pieces yields a witness. The ABA
+	// oracle has already found the edge feasible, so emit a value rather than
+	// refusing: 1.0 is what this has always emitted here.
+	return rational_to_cpp(qlt_rational(1, 1));
 }
 
 } // namespace idni::tau_lang
