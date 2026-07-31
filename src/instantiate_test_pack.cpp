@@ -26,9 +26,6 @@ namespace idni::tau_lang {
 
 // The configured pack; mirrored by tests/test_tau_helpers.h's bas_pack.
 using test_node_t = tau_pack::node_t;
-using bool_node_t = node<bv, Bool>;
-using sbf_node_t  = node<bv, sbf_ba>;
-
 
 // Top-level synthesis entries.
 template bool is_ltl_aba_realizable<test_node_t>(tref, int_t, bool);
@@ -38,6 +35,13 @@ template bool has_ltl_operators    <test_node_t>(tref);
 template struct tree    <test_node_t>;
 template struct get_hook<test_node_t>;
 template struct tau_ba  <TAU_PACK_BASE_BAS>;
+
+// bool_node_t/sbf_node_t hoisting hardcodes bv; only worth doing, and only
+// possible, when bv is part of the configured pack.
+#ifdef TAU_PACK_HAS_BA_BV
+
+using bool_node_t = node<bv, Bool>;
+using sbf_node_t  = node<bv, sbf_ba>;
 
 template struct tree    <bool_node_t>;
 template struct get_hook<bool_node_t>;
@@ -52,5 +56,7 @@ template tref nso_rr_apply             <bool_node_t>(const rewriter::rule&, cons
 template tref nso_rr_apply             <bool_node_t>(const rewriter::rules&, tref);
 template tref nso_rr_apply             <bool_node_t>(const rr<bool_node_t>&);
 template tref calculate_all_fixed_points<bool_node_t>(const rr<bool_node_t>&);
+
+#endif // TAU_PACK_HAS_BA_BV
 
 } // namespace idni::tau_lang
