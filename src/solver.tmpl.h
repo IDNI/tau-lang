@@ -1280,7 +1280,7 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 						for (const auto& [var, value]: bv_solution.value()) {
 							clause_solution[var] = value;
 						}
-					} else skip = true; // if we cannot solve bv part, skip this clause
+					} else skip = true; // theory part unsolved, skip this clause
 				} else skip = true;
 			} else {
 				op.splitter_one = node::ba::splitter_one(type_tree);

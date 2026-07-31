@@ -507,7 +507,7 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 	return tau::get_raw(v, ch, len, r);
 }
 
-// Simplify bitvector cast: (bv[N]) constant -> constant with type bv[N]
+// Simplify a cast of a constant: (T) constant -> constant of type T
 template <NodeType node>
 tref get_hook<node>::term_cast(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("term_cast", v, ch, len, r);)

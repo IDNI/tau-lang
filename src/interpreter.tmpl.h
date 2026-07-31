@@ -382,11 +382,11 @@ post_normalization:
 		//     get_ubt_ctn_at's QE loop, which retains time-0 vars and
 		//     existentially eliminates time>0 vars.
 		//
-		// Note: init_sv (BV equation ms_j[t=0]={1}) is intentionally NOT
-		// added to ubt_ctn because raw BV io_var equations are not handled
-		// by solution_with_max_update in the same way as qlt constraints;
-		// memory pre-population achieves the same goal safely.
-		// the state vars it pre-populates are bv-typed
+		// Note: init_sv (the carrier equation ms_j[t=0]={1}) is
+		// intentionally NOT added to ubt_ctn: a raw carrier io_var equation
+		// is not handled by solution_with_max_update the way an ordered
+		// theory's constraints are, and memory pre-population achieves the
+		// same goal safely.
 		if constexpr (pack_has_arithmetic_theory_v<node>)
 		if (ltl_sol && ltl_sol->aut.num_states > 1
 				&& i.formula_time_point >= 1) {

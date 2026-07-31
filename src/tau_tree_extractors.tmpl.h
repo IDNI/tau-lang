@@ -1,7 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-//#include <cvc5/cvc5.h>
-
 #include "tau_tree.h"
 #include "definitions.h"
 
@@ -908,7 +906,7 @@ tref unnest_nested_always(tref fm) {
 	}
 
 	// Do not recurse into ABA comparison nodes (bf_eq, bf_neq, …).
-	// Their internal subtrees (sbf/bv/qlt constants) use a different tree
+	// Their internal subtrees (BA constants) use a different tree
 	// layout; calling get_children()/get() on them causes SIGSEGV.
 	{
 		auto nt = t[0].value.nt;

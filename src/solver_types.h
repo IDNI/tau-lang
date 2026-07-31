@@ -95,8 +95,7 @@ using solution = subtree_map<node, tref>;
 enum solver_mode {
 	maximum, /**< Maximum mode */
 	minimum, /**< Minimum mode */
-	general, /**< General mode */
-	bitvector /**< cvc5 mode */
+	general  /**< General mode */
 };
 
 /**
