@@ -1,6 +1,13 @@
+include(tau_repl_pack)
+
 # include(add_repl_test) to use new tree
 
 function(add_repl_test test_name test_cmd test_regex)
+	tau_repl_unsupported(_tau_skip "${test_cmd}")
+	if(_tau_skip)
+		tau_repl_record_skip("${test_name}")
+		return()
+	endif()
 	add_test(NAME "test_repl-${test_name}"
 		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"${test_cmd}\" -S trace")
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
@@ -10,6 +17,11 @@ function(add_repl_test test_name test_cmd test_regex)
 endfunction()
 
 function(add_repl_test_fail test_name test_cmd test_regex)
+	tau_repl_unsupported(_tau_skip "${test_cmd}")
+	if(_tau_skip)
+		tau_repl_record_skip("${test_name}")
+		return()
+	endif()
 	add_test(NAME "test_repl-${test_name}"
 		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -e \"${test_cmd}\" -S trace")
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
@@ -18,6 +30,11 @@ function(add_repl_test_fail test_name test_cmd test_regex)
 endfunction()
 
 function(add_echo_repl_test test_name test_cmd test_regex)
+	tau_repl_unsupported(_tau_skip "${test_cmd}")
+	if(_tau_skip)
+		tau_repl_record_skip("${test_name}")
+		return()
+	endif()
 	add_test(NAME "test_repl-${test_name}"
 		COMMAND bash -c "echo \"${test_cmd}. q\" | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 	set_tests_properties("test_repl-${test_name}" PROPERTIES
@@ -27,6 +44,11 @@ function(add_echo_repl_test test_name test_cmd test_regex)
 endfunction()
 
 function(add_echo_repl_test_fail test_name test_cmd test_regex)
+	tau_repl_unsupported(_tau_skip "${test_cmd}")
+	if(_tau_skip)
+		tau_repl_record_skip("${test_name}")
+		return()
+	endif()
 	add_test(NAME "test_repl-${test_name}"
 		COMMAND bash -c "echo \"${test_cmd}. q\" | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 	set_tests_properties("test_repl-${test_name}" PROPERTIES

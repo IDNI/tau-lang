@@ -1,3 +1,5 @@
+include(tau_repl_pack)
+
 # include(add_blasting_test) to register blasting on/off equivalence tests.
 
 # Per-test timeout (s); matches the C++ helper TIME_LIMIT_MS constant.
@@ -7,6 +9,11 @@ set(TAU_BLASTING_TEST_TIMEOUT 1200)
 set(TAU_BLASTING_CHECKER "${CMAKE_CURRENT_LIST_DIR}/compare_blasting.sh")
 
 function(add_blasting_equiv_test test_name formula)
+	tau_repl_unsupported(_tau_skip "${formula}")
+	if(_tau_skip)
+		tau_repl_record_skip("${test_name}")
+		return()
+	endif()
 	add_test(NAME "test_repl-${test_name}"
 		COMMAND bash "${TAU_BLASTING_CHECKER}"
 			"$<TARGET_FILE:${TAU_EXECUTABLE_NAME}>" "${formula}")

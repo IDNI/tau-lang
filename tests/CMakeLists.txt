@@ -55,6 +55,30 @@ set(TAU_SKIP_TESTS
 	test_ltl_strategy_exec
 	CACHE STRING "Test targets skipped because covered by REPL tests")
 
+#
+# Which BAs a test needs, read from the test's own source.
+#
+# A test that names a Boolean algebra cannot build in a pack without it, so a
+# reduced -DTAU_BAS= must skip it rather than fail. This is derived at configure
+# time instead of from a hand-kept list, so a new test classifies itself and no
+# list drifts. The match is deliberately loose on the trailing side, to catch
+# `sbf_ba`, `nlang_ba` and `bv[8]` as well as bare ids; the cost of a false
+# positive is one test skipped in a reduced pack, which the skip message below
+# makes visible. For the full pack nothing is skipped and the build is unchanged.
+#
+function(tau_test_required_bas out src)
+	set(_req "")
+	if(EXISTS "${src}")
+		file(READ "${src}" _tau_src)
+		foreach(_id bv sbf qlt qint hsb nlang)
+			if(_tau_src MATCHES "[^A-Za-z0-9_]${_id}")
+				list(APPEND _req ${_id})
+			endif()
+		endforeach()
+	endif()
+	set(${out} "${_req}" PARENT_SCOPE)
+endfunction()
+
 function(add test_name)
 	# message(STATUS "adding test: ${test_name}")
 	if(test_name IN_LIST TAU_SKIP_TESTS)
@@ -62,6 +86,14 @@ function(add test_name)
 		return()
 	endif()
 	set(N "${test_name}")
+	tau_test_required_bas(_tau_req "${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp")
+	foreach(_id ${_tau_req})
+		if(NOT _id IN_LIST TAU_PACK_BA_IDS)
+			message(STATUS
+				"Skipping ${N}: needs BA '${_id}', not in TAU_BAS")
+			return()
+		endif()
+	endforeach()
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
 	target_include_directories(${N} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
