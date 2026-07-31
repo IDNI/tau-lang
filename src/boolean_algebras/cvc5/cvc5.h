@@ -24,17 +24,6 @@ inline cvc5::Term normalize_bv(const cvc5::Term& fm);
 // Basic Boolean algebra operatiors
 //
 
-inline cvc5::Term operator|(const cvc5::Term& lhs, const cvc5::Term& rhs);
-inline cvc5::Term operator&(const cvc5::Term& lhs, const cvc5::Term& rhs);
-inline cvc5::Term operator^(const cvc5::Term& lhs, const cvc5::Term& rhs);
-inline cvc5::Term operator~(const cvc5::Term& operand);
-inline cvc5::Term operator+(const cvc5::Term& lhs, const cvc5::Term& rhs);
-inline cvc5::Term operator-(const cvc5::Term& lhs, const cvc5::Term& rhs);
-inline cvc5::Term operator*(const cvc5::Term& lhs, const cvc5::Term& rhs);
-inline cvc5::Term operator/(const cvc5::Term& lhs, const cvc5::Term& rhs);
-inline cvc5::Term operator%(const cvc5::Term& lhs, const cvc5::Term& rhs);
-inline cvc5::Term operator<<(const cvc5::Term& lhs, const cvc5::Term& rhs);
-inline cvc5::Term operator>>(const cvc5::Term& lhs, const cvc5::Term& rhs);
 
 //
 // Builders
@@ -84,6 +73,26 @@ inline cvc5::Term make_bitvector_zero(size_t size);
 inline cvc5::Term make_bitvector_one(size_t size);
 
 } // namespace idni::tau_lang
+
+namespace cvc5 {
+
+// Bitwise and arithmetic operators on Term. In cvc5's namespace, not ours:
+// they take a cvc5 type, so this is where argument-dependent lookup finds them.
+inline cvc5::Term operator|(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term operator&(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term operator^(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term operator~(const cvc5::Term& operand);
+inline cvc5::Term operator+(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term operator-(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term operator*(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term operator/(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term operator%(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term operator<<(const cvc5::Term& lhs, const cvc5::Term& rhs);
+inline cvc5::Term operator>>(const cvc5::Term& lhs, const cvc5::Term& rhs);
+
+} // namespace cvc5
+
+
 
 #include "boolean_algebras/cvc5/cvc5_helpers.tmpl.h"
 #include "boolean_algebras/cvc5/cvc5_builders.tmpl.h"

@@ -5,10 +5,9 @@
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "cvc5"
 
-namespace idni::tau_lang {
+namespace cvc5 {
 
-using namespace cvc5;
-using namespace idni;
+using namespace idni::tau_lang;
 
 Term operator|(const Term& lhs, const Term& rhs) {
 	return make_bitvector_or(lhs, rhs);
@@ -54,4 +53,4 @@ Term operator>>(const Term& lhs, const Term& rhs) {
 	return make_bitvector_shr(lhs, rhs);
 }
 
-} // namespace idni::tau_lang
+} // namespace cvc5
