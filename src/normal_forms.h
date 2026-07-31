@@ -357,9 +357,9 @@ tref term_boole_normal_form(tref formula);
  * @param n Formula to convert.
  * @return Formula in ANF.
  *
- * @warning Not implemented yet (normal_forms.tmpl.h): the current body prints
- * "Not implemented yet." and returns @p n unchanged. No worked example is
- * given here since the function is currently the identity.
+ * @warning Not implemented yet (normal_forms.tmpl.h): the current body logs an
+ * error on the "normal_forms" channel and returns @p n unchanged. No worked
+ * example is given here since the function is currently the identity.
  */
 template <NodeType node, size_t type>
 tref anf(tref n);
@@ -373,9 +373,9 @@ tref anf(tref n);
  * @param n Formula to convert.
  * @return Formula in PNF.
  *
- * @warning Not implemented yet (normal_forms.tmpl.h): the current body prints
- * "Not implemented yet." and returns @p n unchanged. No worked example is
- * given here since the function is currently the identity.
+ * @warning Not implemented yet (normal_forms.tmpl.h): the current body logs an
+ * error on the "normal_forms" channel and returns @p n unchanged. No worked
+ * example is given here since the function is currently the identity.
  */
 template <NodeType node>
 tref pnf(tref n);

@@ -16,6 +16,8 @@ set(TESTS
 	satisfiability3
 	satisfiability4
 	satisfiability5
+	satisfiability6
+	normalizer_helpers
 	sbf1
 	sbf2
 	solver

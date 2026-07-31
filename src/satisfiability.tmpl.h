@@ -40,13 +40,6 @@ inline void print_fixpoint_info(const std::string& message,
 	else std::cerr << message << "\n" << result << "\n";
 }
 
-template <NodeType node>
-bool has_stream_flag(const tref& fm) {
-	using tau = tree<node>;
-	return tau::get(fm).find_top(is<node, tau::wff_sometimes>)
-		|| tau::get(fm).find_top(is<node, tau::constraint>);
-}
-
 /**
  * @internal
  * @brief Compute the greatest constant time point among the constant-time
@@ -228,8 +221,12 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 	if (t | tau::ctn_lt)
 		return is_left  ? to_ba(condition < time_point)
 				: to_ba(time_point < condition);
-	// The above is exhaustive for possible children of constraint
-	assert(false); return nullptr;
+	// The above is exhaustive for the possible children of a constraint. A
+	// plain assert is a no-op under NDEBUG and the nullptr it then returns
+	// flows into build_bf_xor at the create_initial call site, so fail loudly
+	// in every configuration instead.
+	LOG_ERROR << "Unrecognized constraint kind in " << TAU_TO_STR(constraint);
+	throw std::logic_error("Unrecognized constraint kind");
 }
 
 /**
@@ -264,13 +261,24 @@ bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 	auto t = ctn();
 	DBG(assert(!(t | tau::ctn_neq) && !(t | tau::ctn_eq));)
 
+	// Unlike calculate_ctn, which branches on whether the numeral is the left
+	// or the right operand, the tests below are deliberately side-agnostic.
+	// The initial phase is "up to and including the time point at which the
+	// flag stream has settled", and that point depends only on `condition`,
+	// not on the direction of the comparison: `c >= t` settles at t = c and
+	// `t >= c` settles at t = c as well (the flag is constant on either side
+	// of c), so both are covered by `condition >= time_point`; `c > t` and
+	// `t > c` likewise both settle one step later, hence the `+ 1`. The bound
+	// is intentionally an over-approximation -- an extra initial condition is
+	// harmless, a missing one is not.
 	if (t | tau::ctn_gteq) return condition >= time_point;
 	if (t | tau::ctn_gt)   return condition + 1 >= time_point;
 	if (t | tau::ctn_lteq) return condition + 1 >= time_point;
 	if (t | tau::ctn_lt)   return condition >= time_point;
 
-	// The above is exhaustive for possible children of constraints
-	assert(false); return {};
+	// The above is exhaustive for the possible children of a constraint.
+	LOG_ERROR << "Unrecognized constraint kind in "	<< TAU_TO_STR(constraint);
+	throw std::logic_error("Unrecognized constraint kind");
 }
 
 template <NodeType node>
@@ -503,14 +511,13 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
 		}
 		auto& v = io_vars.back();
 
-		for (auto it = free_io_vars.begin();
-			it != free_io_vars.end(); ++it)
-		{
-			if (tau::subtree_equals(*it, v)) {
+		// free_io_vars is a copy of get_free_vars' result, which is sorted
+		// by subtree_less, so locate v by binary search instead of scanning
+		// the whole vector per io_var.
+		if (auto it = std::lower_bound(free_io_vars.begin(),
+			free_io_vars.end(), v, tau::subtree_less);
+			it != free_io_vars.end() && tau::subtree_equals(*it, v))
 				free_io_vars.erase(it);
-				break;
-			}
-		}
 		uconst_ctns = tau::get(v).is_input_variable()
 			? tau::build_wff_all(v, uconst_ctns, false)
 			: tau::build_wff_ex( v, uconst_ctns, false);
@@ -755,6 +762,25 @@ tref build_prev_flag_on_lookback(tref io_var_node,
 
 /**
  * @internal
+ * @brief The flag-stream numbering counter used by `transform_ctn_to_streams`.
+ *
+ * Held in one place, per node type, instead of as a function-local `static`
+ * inside `transform_ctn_to_streams`: callers reset it explicitly via that
+ * function's `reset_ctn_id` argument, and tests can inspect or reset it
+ * directly. Still process-global (and therefore still single-thread only, like
+ * the rest of this subsystem), but no longer hidden.
+ * @tparam node Tree node type.
+ * @return Reference to the counter for @p node.
+ * @endinternal
+ */
+template <NodeType node>
+size_t& ctn_flag_counter() {
+	static size_t ctn_id = 0;
+	return ctn_id;
+}
+
+/**
+ * @internal
  * @brief Replace every constant-time constraint (e.g. `t <= 3`) in @p fm
  * with a fresh Boolean flag output stream, plus the recurrence rules and
  * initial conditions needed for that flag to track the constraint over
@@ -794,7 +820,7 @@ tref build_prev_flag_on_lookback(tref io_var_node,
 template <NodeType node>
 tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 	tref& flag_rules, const int_t lookback, const int_t start_time,
-	bool reset_ctn_id)
+	const bool reset_ctn_id)
 {
 	using tau = tree<node>;
 	auto to_eq_1 = [](tref n) {
@@ -811,10 +837,12 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 	};
 	flag_initials = tau::_T();
 	subtree_map<node, tref> changes;
-	// transform constraints to their respective output streams and add required conditions
-	// We make the variable static so that we can transform different parts of the formula independently
-	static size_t ctn_id = 0;
-	if (reset_ctn_id) ctn_id = 0, reset_ctn_id = false;
+	// The flag counter is owned by the caller (see ctn_flag_counter) so that
+	// different parts of one formula can be transformed independently without
+	// the numbering being shared, unsynchronised, across every formula and
+	// node type -- which is what a function-local static gave.
+	size_t& ctn_id = ctn_flag_counter<node>();
+	if (reset_ctn_id) ctn_id = 0;
 	for (tref ctn : tau::get(fm).select_top(is<node, tau::constraint>)) {
 		const auto& ct = tau::get(ctn);
 		std::string ctnvar = tau::get(
@@ -910,7 +938,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		<< "always_to_unbounded_continuation begin\n"
 		<< "always_to_unbounded_continuation[fm]: " << LOG_FM(fm) << "\n";)
 
-	assert(has_no_boolean_combs_of_models<node>(fm));
+	DBG(assert(has_no_boolean_combs_of_models<node>(fm));)
 
 	if (tau::get(fm).child_is(tau::wff_always)) fm = tau::trim2(fm);
 
@@ -1180,26 +1208,6 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 }
 
 template <NodeType node>
-tref add_st_ctn(tref st, const int_t timepoint, const int_t steps) {
-	using tau = tree<node>;
-	tref st_ctn = tau::_T();
-	trefs io_vars = tau::get(st).select_top(is_child<node, tau::io_var>);
-	for (int_t s = 0; s <= steps; ++s) {
-		subtree_map<node, tref> changes;
-		for (size_t i = 0; i < io_vars.size(); ++i) {
-			tref new_io_var =
-				transform_io_var<node>(io_vars[i], timepoint + s);
-			changes[io_vars[i]] = new_io_var;
-		}
-		if (s == steps) st_ctn = tau::build_wff_and(st_ctn,
-						tau::replace(st, changes));
-		else st_ctn = tau::build_wff_and(st_ctn,
-			tau::build_wff_neg(rewriter::replace<node>(st, changes)));
-	}
-	return st_ctn;
-}
-
-template <NodeType node>
 tref make_initial_run(tref aw, const int_t max_st_lookback) {
 	// get lookback of aw
 	using tau = tree<node>;
@@ -1289,7 +1297,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	const int_t time_point = get_max_shift<node>(io_vars);
 
 	// There must not be a constant time constraint at this point
-	assert(!tau::get(aw).find_top(is<node, tau::constraint>));
+	DBG(assert(!tau::get(aw).find_top(is<node, tau::constraint>));)
 
 	int_t point_after_inits = get_max_initial<node>(io_vars) + 1;
 	// Shift flags in order to match lookback of always part
@@ -1467,6 +1475,12 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 	}
 	auto aw_after_ev = tau::get(ev_t.first)
 				.find_top(is_child<node, tau::wff_always>);
+	// Both producers of ev_t above wrap their result in build_wff_always
+	// whenever they transformed anything (and the untransformed cases already
+	// returned), so this should not happen. If it ever does, returning the
+	// untransformed `fm` discards the eventual-variable transformation just
+	// computed -- assert rather than let that pass silently.
+	DBG(assert(aw_after_ev != nullptr);)
 	if (aw_after_ev == nullptr) {
 #ifdef TAU_CACHE
 		return cache.emplace(std::make_pair(fm, start_time),

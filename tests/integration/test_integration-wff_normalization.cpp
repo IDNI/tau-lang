@@ -450,3 +450,76 @@ TEST_SUITE("Normalizer bv alternating quantifiers") {
 			" { 4 }:bv[32]).", tau::wff_t) );
 	}
 }
+
+// Coverage for the normalization behaviours the 2026-07-30 review found
+// unpinned (report items TC-3, NZ-6 and the resolve_quantifiers open-scope
+// branch listed in section 5.8).
+TEST_SUITE("Normalizer bv undecidable and scoping") {
+
+	// TC-3. The 21 bv test cases above all pin *decidable* formulas. This one
+	// pins what happens when the closed bv scope cannot be decided at all:
+	// `is_bv_solvable_formula` accepts the formula (it inspects only variable
+	// nodes, so the wff_ref passes its gate), cvc5 then fails to translate the
+	// reference, and the quantifier must survive untouched rather than
+	// collapsing to F. Normalization must also not abort.
+	TEST_CASE("undecidable closed bv scope keeps its quantifier") {
+		tref fm = get_nso_rr("ex y ex x (x:bv[8] * y:bv[8] ="
+			" { 1 }:bv[8] && q(x)).").value().main->get();
+		REQUIRE( fm != nullptr );
+		tref res = normalize_non_temp<node_t>(fm);
+		REQUIRE( res != nullptr );
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( !tau::get(res).equals_T() );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+	}
+
+	// NZ-6: scope_out_independent_conjuncts drops a binder whose scope never
+	// mentions it, which is the branch a skip-matched (bv) block would
+	// otherwise carry through the pipeline verbatim.
+	TEST_CASE("a vacuous binder is dropped") {
+		tref fm = get_nso_rr("ex x (y = 0).").value().main->get();
+		tref res = scope_out_independent_conjuncts<node_t>(fm);
+		REQUIRE( res != nullptr );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+		CHECK( are_nso_equivalent<node_t>(res, fm) );
+	}
+
+	TEST_CASE("a vacuous universal binder is dropped too") {
+		tref fm = get_nso_rr("all x (y = 0).").value().main->get();
+		tref res = scope_out_independent_conjuncts<node_t>(fm);
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) == nullptr );
+		CHECK( are_nso_equivalent<node_t>(res, fm) );
+	}
+
+	TEST_CASE("an independent conjunct is lifted, a dependent one is not") {
+		tref fm = get_nso_rr("ex x (x y = 0 && z = 0).")
+			.value().main->get();
+		tref res = scope_out_independent_conjuncts<node_t>(fm);
+		REQUIRE( res != nullptr );
+		CHECK( are_nso_equivalent<node_t>(res, fm) );
+		// z = 0 is out of the scope, so exactly one binder survives and the
+		// lifted conjunct is a top-level conjunct.
+		trefs conjs = get_cnf_wff_clauses<node_t>(res);
+		CHECK( conjs.size() == 2 );
+	}
+
+	TEST_CASE("nothing is lifted when every conjunct depends on the binder") {
+		tref fm = get_nso_rr("ex x (x y = 0 && x z = 0).")
+			.value().main->get();
+		CHECK( scope_out_independent_conjuncts<node_t>(fm) == fm );
+	}
+
+	// resolve_quantifiers' open-scope branch: `ex x (x + y = 0)` is valid for
+	// every y, so closing the free variable universally lets the solver settle
+	// it (the T direction). The F direction -- `ex Y n` unsat -- had no test.
+	TEST_CASE("open bv scope: the valid direction collapses to T") {
+		CHECK( normalize_and_check("ex x (x:bv[8] + y:bv[8] ="
+			" { 0 }:bv[8]).", tau::wff_t) );
+	}
+
+	TEST_CASE("open bv scope: the unsatisfiable direction collapses to F") {
+		// x < x is false for every x and every y, so `ex Y n` is unsat.
+		CHECK( normalize_and_check("ex x (x:bv[8] < x:bv[8] && y:bv[8] <"
+			" y:bv[8]).", tau::wff_f) );
+	}
+}

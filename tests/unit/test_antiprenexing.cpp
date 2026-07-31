@@ -951,3 +951,248 @@ TEST_SUITE("PushUniversalQuantifierOneOr") {
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) != nullptr );
 	}
 }
+
+// Coverage for the anti-prenexing functions the 2026-07-30 review found
+// untested (report section 5.8), plus the AP-1 gamma4 guard added while fixing
+// that finding.
+
+TEST_SUITE("PushQuantifierOne") {
+
+	static tref peel(const char* sample) {
+		return get_nso_rr(sample).value().main->get();
+	}
+
+	// push_existential_quantifier_one had no test at all: it has no reference
+	// anywhere outside antiprenexing.tmpl.h and its three branches were only
+	// exercised incidentally through anti_prenex.
+	TEST_CASE("existential push distributes over a disjunction") {
+		tref fm = peel("ex x (x y = 0 || x z = 0).");
+		tref res = push_existential_quantifier_one<node_t>(fm);
+		// Both disjuncts must end up separately quantified.
+		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_ex>);
+		CHECK( qs.size() == 2 );
+	}
+
+	TEST_CASE("existential push splits off an independent conjunct") {
+		tref fm = peel("ex x (x y = 0 && z = 0).");
+		tref res = push_existential_quantifier_one<node_t>(fm);
+		CHECK( res != fm );
+		// z = 0 does not mention x, so it must leave the scope; exactly one
+		// binder survives, around the dependent part.
+		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_ex>);
+		CHECK( qs.size() == 1 );
+	}
+
+	TEST_CASE("existential push commutes with an inner existential") {
+		tref fm = peel("ex x ex y (x y = 0).");
+		tref res = push_existential_quantifier_one<node_t>(fm);
+		CHECK( res != nullptr );
+		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_ex>);
+		CHECK( qs.size() == 2 );
+	}
+
+	TEST_CASE("existential push leaves a fully dependent atom alone") {
+		tref fm = peel("ex x (x y = 0).");
+		CHECK( push_existential_quantifier_one<node_t>(fm) == fm );
+	}
+
+	// AP-14's Release guard (return the input unchanged on a shape mismatch)
+	// is deliberately not unit-tested: the DBG assert documenting the same
+	// contract fires first in a Debug build, which is the only build these
+	// unit tests run in. The guard exists so that Release does not read the
+	// wrong children instead of aborting.
+
+	// push_universal_quantifier_one had one test (the wff_or branch); the
+	// conjunction-distribute and commute branches had none.
+	TEST_CASE("universal push distributes over a conjunction") {
+		tref fm = peel("all x (x y = 0 && x z = 0).");
+		tref res = push_universal_quantifier_one<node_t>(fm);
+		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_all>);
+		CHECK( qs.size() == 2 );
+	}
+
+	TEST_CASE("universal push commutes with an inner universal") {
+		tref fm = peel("all x all y (x y = 0).");
+		tref res = push_universal_quantifier_one<node_t>(fm);
+		CHECK( res != nullptr );
+		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_all>);
+		CHECK( qs.size() == 2 );
+	}
+}
+
+TEST_SUITE("ExQuantifiedBooleDecomposition") {
+	// ex_quantified_boole_decomposition had zero test references. Its result
+	// must stay equivalent to the input whatever branch it takes.
+
+	static tref run_ebd(const char* sample, bool& no_atms) {
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		subtree_unordered_map<node_t, tref> pool;
+		subtree_unordered_map<node_t, int_t> quant_pattern;
+		tref var = tau::trim2(fm);
+		quant_pattern.emplace(var, 1);
+		no_atms = false;
+		return ex_quantified_boole_decomposition<node_t>(fm, pool,
+			quant_pattern, nullptr, no_atms);
+	}
+
+	TEST_CASE("decomposition preserves meaning") {
+		for (const char* s : { "ex x (x y = 0 && x z != 0).",
+					"ex x (x y = 0 || x z = 0).",
+					"ex x (x y = 0).",
+					"ex x (x y = 0 && z = 0)." }) {
+			CAPTURE(s);
+			bool no_atms = false;
+			tref fm = normalize_atomic_formula_operators<node_t>(
+				get_nso_rr(s).value().main->get());
+			tref res = run_ebd(s, no_atms);
+			REQUIRE( res != nullptr );
+			CHECK( are_nso_equivalent<node_t>(res, fm) );
+		}
+	}
+
+	TEST_CASE("no decomposable atom sets no_atms") {
+		// A wff_ref body has no bf_eq/bf_lt/bf_lteq atom to pivot on.
+		bool no_atms = false;
+		tref res = run_ebd("ex x f(x).", no_atms);
+		CHECK( no_atms );
+		CHECK( res != nullptr );
+	}
+}
+
+TEST_SUITE("ProcessQuantifierBlocks") {
+	// process_quantifier_blocks and select_innermost_blocks had no direct
+	// test; the multi-round re-collection and the `done` retirement that
+	// AP-12's termination argument rests on were unpinned.
+
+	TEST_CASE("select_innermost_blocks finds the innermost block first") {
+		tref fm = get_nso_rr("ex a all b (a b = 0).").value().main->get();
+		subtree_unordered_set<node_t> done;
+		std::vector<quantifier_block<node_t>> blocks;
+		select_innermost_blocks<node_t>(fm, is_tref_bv_type_family<node_t>,
+			done, blocks);
+		REQUIRE( blocks.size() == 1 );
+		// The innermost run is the universal one.
+		CHECK( !blocks[0].is_ex );
+		CHECK( blocks[0].vars.size() == 1 );
+	}
+
+	TEST_CASE("select_innermost_blocks skips retired heads") {
+		tref fm = get_nso_rr("ex a (a b = 0).").value().main->get();
+		subtree_unordered_set<node_t> done;
+		std::vector<quantifier_block<node_t>> blocks;
+		select_innermost_blocks<node_t>(fm, is_tref_bv_type_family<node_t>,
+			done, blocks);
+		REQUIRE( blocks.size() == 1 );
+		done.insert(blocks[0].head);
+		blocks.clear();
+		select_innermost_blocks<node_t>(fm, is_tref_bv_type_family<node_t>,
+			done, blocks);
+		CHECK( blocks.empty() );
+	}
+
+	TEST_CASE("the driver converges on nested alternating blocks") {
+		// Two rounds at least: the inner block is processed first, and
+		// retiring its head is what promotes the outer one.
+		tref fm = get_nso_rr("ex a all b ex c (a b = 0 || c = 0).")
+			.value().main->get();
+		tref res = process_quantifier_blocks<node_t>(fm,
+			is_tref_bv_type_family<node_t>);
+		REQUIRE( res != nullptr );
+		CHECK( are_nso_equivalent<node_t>(res, fm) );
+	}
+
+	TEST_CASE("no_skip skips nothing") {
+		CHECK( !no_skip<node_t>(get_nso_rr("x = 0.").value().main->get()) );
+		CHECK( !no_skip<node_t>(nullptr) );
+	}
+}
+
+TEST_SUITE("Gamma4Guard") {
+	// AP-1: gamma4 lifts the pivot atom out of the block's quantifier scope,
+	// but the binders are only re-attached inside the recursive results, so an
+	// atom still mentioning another block variable must NOT be lifted. The
+	// guard added for AP-1 makes that exact rather than relying on the
+	// construction hooks happening to fold such atoms away first.
+	static bool no_block_var_escapes(const char* sample) {
+		tref fm = normalize_atomic_formula_operators<node_t>(
+			get_nso_rr(sample).value().main->get());
+		trefs block;
+		term_handle<node_t>::order order;
+		tref body = fm;
+		while (tau::get(body)[0].is(tau::wff_ex)) {
+			block.push_back(tau::get(body)[0].first());
+			body = tau::get(body)[0].second();
+		}
+		for (size_t i = 0; i < block.size(); ++i)
+			order.emplace(block[i], block.size() - 1 - i);
+		subtree_unordered_set<node_t> used_atms;
+		subtree_unordered_map<node_t, int_t> quant_pattern;
+		for (size_t i = 0; i < block.size(); ++i)
+			quant_pattern.emplace(block[i], i + 1);
+		tref res = anti_prenex_block<node_t>(body, block, used_atms,
+			quant_pattern, order, is_tref_bv_type_family<node_t>);
+		const trefs& fv = get_free_vars<node_t>(res);
+		for (tref v : block) {
+			tref tv = tau::trim_right_sibling(v);
+			for (tref f : fv)
+				if (tau::get(f) == tau::get(tv)) return false;
+		}
+		return true;
+	}
+
+	TEST_CASE("no block variable escapes its scope") {
+		for (const char* s : {
+			"ex x ex y (((x|y')(x'|y') = 0 || w = 0) && x y != 0).",
+			"ex x ex y ((y|y')x = 0 && x y != 0).",
+			"ex x ex y (((y|y')x = 0 || w = 0) && x y != 0).",
+			"ex x ex y ((y|y')(x|z) = 0 && x y != 0).",
+			"ex x ex y ex z ((z|z')(x y) = 0 && x y != 0)." }) {
+			CAPTURE(s);
+			CHECK( no_block_var_escapes(s) );
+		}
+	}
+}
+
+TEST_SUITE("DistributeBlockOverAtoms") {
+	// The wff_and recursion branch of distribute_block_over_atoms
+	// (block_squeeze.tmpl.h:9-12) was only reached end-to-end via step 2a.
+	// The block variables must be the parsed ones (tau::trim2 of each
+	// quantifier), not freshly built ones -- the parser renames and types
+	// them, so a rebuilt `x` matches nothing and no binder is emitted.
+
+	static tref body_of2(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		while (is_child_quantifier<node_t>(fm))
+			fm = tau::get(fm)[0].second();
+		return normalize_atomic_formula_operators<node_t>(fm);
+	}
+
+	static trefs block_of2(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		trefs block;
+		while (is_child_quantifier<node_t>(fm)) {
+			block.push_back(tau::trim2(fm));
+			fm = tau::get(fm)[0].second();
+		}
+		return block;
+	}
+
+	TEST_CASE("distributes over a conjunction of negated atoms") {
+		const char* sample = "ex x (x y != 0 && x z != 0).";
+		tref res = distribute_block_over_atoms<node_t>(
+			body_of2(sample), block_of2(sample));
+		REQUIRE( res != nullptr );
+		// One binder per conjunct after distribution.
+		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_ex>);
+		CHECK( qs.size() == 2 );
+	}
+
+	TEST_CASE("a single atom gets a single binder") {
+		const char* sample = "ex x (x y != 0).";
+		tref res = distribute_block_over_atoms<node_t>(
+			body_of2(sample), block_of2(sample));
+		trefs qs = tau::get(res).select_all(is<node_t, tau::wff_ex>);
+		CHECK( qs.size() == 1 );
+	}
+}

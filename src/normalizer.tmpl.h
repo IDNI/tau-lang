@@ -62,6 +62,11 @@ tref scope_out_independent_conjuncts(tref fm) {
 		// verbatim by process_quantifier_block's wrap_skipped, so a bv
 		// binder left vacuous by earlier simplification would otherwise
 		// survive into the output.
+		// `var` comes from trim2 and still has its right sibling, while
+		// get_free_vars stores trim_right_sibling'ed nodes. Searching one
+		// against the other is safe because subtree_less bottoms out in
+		// lcrs_tree::operator<, which compares value and left child only
+		// and ignores the right sibling.
 		if (!hasbc(get_free_vars<node>(body), var, tau::subtree_less))
 			return body;
 		if (!tau::get(body).child_is(tau::wff_and)) return n;
@@ -73,6 +78,9 @@ tref scope_out_independent_conjuncts(tref fm) {
 		}
 		if (indep.empty()) return n;
 		tref kept = tau::build_wff_and(indep);
+		// Unreachable: a body in which no conjunct mentions `var` was
+		// already returned by the vacuous-binder check above.
+		DBG(assert(!dep.empty());)
 		if (dep.empty()) return kept;
 		return tau::build_wff_and(kept, is_child<node>(n, tau::wff_ex)
 			? build_wff_ex<node>(var, tau::build_wff_and(dep), false)
@@ -674,10 +682,11 @@ tref apply_defs_to_spec (tref spec) {
 	return spec;
 }
 
-// Folds quantifiers whose body is a constant: ex x T = all x T = T and
-// ex x F = all x F = F. Such residues can be left behind by substitution
-// based eliminations, which rebuild nodes without running the construction
-// hooks.
+// Folds constants out of quantifiers, negations and the binary connectives:
+// ex x T = all x T = T, ex x F = all x F = F, !T = F, !F = T, plus the usual
+// T/F identities for && and ||. Such residues can be left behind by
+// substitution based eliminations, which rebuild nodes without running the
+// construction hooks.
 /** @internal @copydoc fold_trivial_quantifiers @endinternal */
 template <NodeType node>
 tref fold_trivial_quantifiers(tref fm) {
@@ -691,6 +700,12 @@ tref fold_trivial_quantifiers(tref fm) {
 			tref body = c.second();
 			if (tau::get(body).equals_T() || tau::get(body).equals_F())
 				return body;
+		}
+		// !T → F, !F → T
+		if (c.is(tau::wff_neg)) {
+			tref b = c.first();
+			if (tau::get(b).equals_T()) return tau::_F();
+			if (tau::get(b).equals_F()) return tau::_T();
 		}
 		// Boolean identities: T/F with && and ||
 		if (c.is(tau::wff_and)) {
@@ -758,13 +773,24 @@ std::optional<tref> simplify_temporal_clause(tref clause) {
 	// Eliminate parts in a group that are implied by another part in the same group.
 	// repr(parts[i]) returns the formula to use for implication checking.
 	auto eliminate_implied = [](trefs& parts, auto&& repr) {
-		for (size_t i = 0; i < parts.size(); ++i)
+		for (size_t i = 0; i < parts.size(); ++i) {
+			// Skip parts already replaced by T: is_nso_impl(x, T) is
+			// trivially true and would only re-assign T, so the pair
+			// cannot eliminate anything and the two full
+			// normalizations it costs are wasted. Deliberately no
+			// `break` when parts[i] itself becomes T: the remaining
+			// is_nso_impl(T, parts[j]) checks still ask whether
+			// parts[j] is valid, and dropping that would change which
+			// parts survive, not just how long it takes.
+			if (tau::get(parts[i]).equals_T()) continue;
 			for (size_t j = i + 1; j < parts.size(); ++j) {
+				if (tau::get(parts[j]).equals_T()) continue;
 				if (is_nso_impl<node>(repr(parts[i]), repr(parts[j])))
 					parts[j] = tau::_T();
 				else if (is_nso_impl<node>(repr(parts[j]), repr(parts[i])))
 					parts[i] = tau::_T();
 			}
+		}
 	};
 	// Eliminate always parts implied by other always parts.
 	eliminate_implied(aw_parts, [](tref x) { return x; });
@@ -1313,7 +1339,9 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 		if (tau::get(result).find_top(is<node, tau::ref>)) {
 			result = syntactic_path_simplification<node>(result);
 			auto resolved_res = apply_defs_to_spec<node>(result);
-			if (resolved_res != result) {
+			// Structural comparison, matching the analogous loop in
+			// normalize_with_temp_simp.
+			if (tau::get(resolved_res) != tau::get(result)) {
 				result = bf_reduced_dnf<node>(resolved_res);
 				changed = true;
 			}

@@ -311,6 +311,29 @@ bool is_bv_solvable_formula(tref form) {
 	return solvable;
 }
 
+/**
+ * @brief Does @p form contain a quantifier of one kind nested inside one of the
+ * other kind?
+ *
+ * cvc5's default counterexample-guided instantiation only instantiates the
+ * innermost quantified subformula, which collapses on interleaved `all`/`ex`
+ * over bitvectors; `bv_formula_sat_status` turns that default off when this
+ * predicate holds. A formula whose quantifiers all point the same way, or whose
+ * two kinds sit in unrelated branches, does not need it.
+ * @tparam node Tree node type.
+ * @param form Formula to inspect.
+ * @return `true` if some `wff_all` has a `wff_ex` below it, or vice versa.
+ */
+template <NodeType node>
+bool has_alternating_quantifiers(tref form) {
+	using tau = tree<node>;
+	for (tref q : tau::get(form).select_all(is<node, tau::wff_all>))
+		if (tau::get(q).find_top(is<node, tau::wff_ex>)) return true;
+	for (tref q : tau::get(form).select_all(is<node, tau::wff_ex>))
+		if (tau::get(q).find_top(is<node, tau::wff_all>)) return true;
+	return false;
+}
+
 template <NodeType node>
 std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	using tau = tree<node>;
@@ -323,9 +346,13 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// finish at all past bv[8]. Applied before the logic is fixed, since
 	// cvc5 resolves its quantifier-module defaults at that point.
 	// See config_cvc5_solver_alternating_quantifiers for the measurements.
-	if (const tau& ft = tau::get(form);
-			ft.find_top(is<node, tau::wff_all>)
-			&& ft.find_top(is<node, tau::wff_ex>))
+	// Genuine alternation, not merely "both kinds occur somewhere": a
+	// quantifier of one kind must sit *below* one of the other kind. Testing
+	// find_top(wff_all) && find_top(wff_ex) also matched non-alternating
+	// shapes such as `(ex x P(x)) && (all y Q(y))`, which then paid the
+	// strategy change's cost (up to ~1.8x on quantified division, see
+	// config_cvc5_solver_alternating_quantifiers) for no benefit.
+	if (has_alternating_quantifiers<node>(form))
 		config_cvc5_solver_alternating_quantifiers(solver);
 	config_cvc5_solver(solver);
 

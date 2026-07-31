@@ -796,7 +796,11 @@ template <NodeType node>
 inline auto is_wff_bdd_var = [](tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
-	DBG(assert(!t.is(tau::bf_neq));)
+	// `n` is a wff wrapper, so the invariant to check is on its child: the
+	// caller (dnf_cnf_to_reduced) establishes it with unequal_to_not_equal.
+	// Asserting `t.is(bf_neq)` instead would be vacuously true and check
+	// nothing.
+	DBG(assert(!t.child_is(tau::bf_neq));)
 	return t.child_is(tau::bf_eq)
 		|| t.child_is(tau::wff_ref)
 		|| t.child_is(tau::wff_ex)
@@ -1176,8 +1180,8 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 		bool first_var = true;
 		tref var_path = is_cnf  ? (wff ? tau::_F() : tau::_0(type_id))
 					: (wff ? tau::_T() : tau::_1(type_id));
-	for (size_t k = 0; k < vars.size(); ++k) {
 		DBG(assert(path.size() == vars.size());)
+	for (size_t k = 0; k < vars.size(); ++k) {
 		if (path[k] == 2) continue;
 		if (first_var) var_path = path[k] == 1 ? vars[k]
 			: wff ? tau::build_wff_neg(vars[k])
@@ -1212,7 +1216,7 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 		: (wff  ? tau::build_wff_or( reduced_fm, var_path)
 			: tau::build_bf_or(  reduced_fm, var_path));
 	}
-	assert(reduced_fm != nullptr);
+	DBG(assert(reduced_fm != nullptr);)
 	return not_equal_to_unequal<node>(reduced_fm);
 }
 
@@ -1307,8 +1311,16 @@ tref reduce(tref fm) {
 	DBG(LOG_TRACE << "Formula to reduce: " << LOG_FM(fm);)
 	// Terms can only contain bf_neg, bf_and, bf_xor and bf_or
 	if (!is_wff) {
-		if (tau::get(fm).find_top(is_non_boolean_term<node>))
-			return syntactic_path_simplification<node>(fm);
+		if (tau::get(fm).find_top(is_non_boolean_term<node>)) {
+			tref res = syntactic_path_simplification<node>(fm);
+			// Cache this branch too, like every other exit: bv and
+			// tau-constant terms would otherwise be re-simplified on
+			// every call.
+#ifdef TAU_CACHE
+			return cache.emplace(fm, res).first->second;
+#endif // TAU_CACHE
+			return res;
+		}
 	}
 	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf);
 	if (paths.empty()) {
@@ -1336,28 +1348,6 @@ tref reduce(tref fm) {
 	return cache.emplace(fm, reduced_fm).first->second;
 #endif // TAU_CACHE
 	return reduced_fm;
-}
-
-/**
- * @internal
- * @brief Returns `true` when `v1` is a subsequence of `v2` under structural equality (for ordered variable sets).
- * @tparam node Tree node type.
- * @param v1 First ordered sequence to test as a subsequence.
- * @param v2 Second ordered sequence to search within.
- * @return `true` if every element of `v1` appears in `v2` in order.
- * @endinternal
- */
-template <NodeType node>
-bool is_ordered_subset(const auto& v1, const auto& v2) {
-	using tau = tree<node>;
-	if (v1.size() > v2.size()) return false;
-	if (v1.size() == 0) return true;
-	size_t j = 0;
-	for (size_t i = 0; i < v2.size(); ++i) {
-		if (tau::get(v1[j]) == tau::get(v2[i])) ++j;
-		if (j == v1.size()) return true;
-	}
-	return false;
 }
 
 /**
@@ -1554,8 +1544,9 @@ tref to_dnf(tref fm) {
 			if (t.child_is(tau::bf_and)) {
 				auto conj = conjunct_dnfs_to_dnf<node>(
 					t[0].first(), t[0].second());
-				// Perform simplification
-				if (conj != n)
+				// Perform simplification. Structural comparison, as in the
+				// wff branch above (see to_cnf for the rationale).
+				if (tau::get(conj) != tau::get(n))
 					return reduce<node>(conj);
 				else return n;
 			}
@@ -1628,11 +1619,15 @@ tref to_cnf(tref fm) {
 				else return n;
 			}
 		}
-		if constexpr (!is_wff) if (t.child_is(tau::bf_or)) {
+		if constexpr (!is_wff) if (t.is(tau::bf) && t.child_is(tau::bf_or)) {
 				auto dis = disjunct_cnfs_to_cnf<node>(
 						t[0].first(), t[0].second());
-				// Perform simplification
-				if (dis != n)
+				// Perform simplification. Compare structurally, as the wff
+				// branch above does: `dis` is a freshly built root with no
+				// right sibling while `n` generally has one, so a raw tref
+				// comparison reports "changed" even for a no-op
+				// distribution and pays a full reduce for nothing.
+				if (tau::get(dis) != tau::get(n))
 					return reduce<node, true>(dis);
 				else return n;
 			}
@@ -2755,8 +2750,16 @@ tref term_boole_decomposition(tref term) {
 	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
 		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
 			<< tau::get(term) << "\n");
+		[[maybe_unused]] const tref orig = term;
 		term = node::ba::simplify_term(term);
 		tref res = normalize_ba<node>(term);
+		// Cache this branch too: it is the bv/tau-constant path, i.e. the
+		// expensive one (simplify_term + normalize_ba), and callers hit it
+		// repeatedly through apply_unique_until_change.
+#ifdef TAU_CACHE
+		cache.emplace(res, res);
+		return cache.emplace(orig, res).first->second;
+#endif // TAU_CACHE
 		return res;
 	}
 	// Simple cases
@@ -2779,7 +2782,7 @@ tref term_boole_decomposition(tref term) {
 	}
 	std::ranges::stable_sort(vars, variable_order_for_simplification<node>);
 	bd = rec_term_boole_decomposition<node>(bd, vars, 0);
-	DBG(LOG_DEBUG << "Term_boole_decomposition result: " << LOG_FM(term) << "\n";)
+	DBG(LOG_DEBUG << "Term_boole_decomposition result: " << LOG_FM(bd) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(bd, bd);
 	return cache.emplace(term, bd).first->second;
@@ -2862,7 +2865,7 @@ tref boole_normal_form(tref formula) {
 		return formula;
 	// Step 1: Syntactically simplify formula
 	tref bnf = syntactic_formula_simplification<node>(formula);
-	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
 	// Squeeze and absorb for additional simplifications during term normalization
 	// -> causes mayor blow ups
 	bnf = squeeze_absorb<node>(bnf);
@@ -2890,10 +2893,10 @@ tref boole_normal_form(tref formula) {
 		return n;
 	};
 	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, while_is_formula<node>);
-	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(formula) << "\n";)
+	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(bnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	bnf = syntactic_formula_simplification<node>(bnf);
-	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
 	// Step 4: Convert formula to Boole normal form
 	// First get atomic formulas without !=
 	auto is_atomic = [](tref n) {
@@ -2946,7 +2949,7 @@ tref term_boole_normal_form(tref formula) {
 		return formula;
 	// Step 1: Syntactically simplify formula
 	tref tbnf = syntactic_formula_simplification<node>(formula);
-	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(tbnf) << "\n";)
 	auto simp_eqs = [](tref n) {
 		if (tau::get(n).child_is(tau::bf_eq)) {
 			if (tau::get(n).equals_T() || tau::get(n).equals_F())
@@ -2985,37 +2988,15 @@ tref term_boole_normal_form(tref formula) {
 #define LOG_CHANNEL_NAME "to_snf"
 
 
-/**
- * @internal
- * @brief Builds a formula that "splits" variables `a` and `b` according to `type`.
- *
- * For `bf_eq` produces `(a & b) | (!a & !b)`; otherwise `(a | !b) & (!a | b)`.
- * @tparam node Tree node type.
- * @param type Node type selector; `bf_eq` for the biconditional split, anything else for XOR-style split.
- * @param a First formula operand.
- * @param b Second formula operand.
- * @return Split formula combining `a` and `b` according to `type`.
- * @endinternal
- */
-template <NodeType node>
-tref build_split_wff_using(typename node::type type, tref a, tref b) {
-	using tau = tree<node>;
-	// TODO (HIGH) check formulas, should depend on the type
-	if (type == tau::bf_eq)
-		return tau::build_wff_or(
-			tau::build_wff_and(a, b),
-			tau::build_wff_and(tau::build_wff_neg(a),
-					   tau::build_wff_neg(b)));
-	else return tau::build_wff_and(
-		tau::build_wff_or(a, tau::build_wff_neg(b)),
-		tau::build_wff_or(tau::build_wff_neg(a), b));
-}
-
 /** @internal @copydoc anf @endinternal */
 template <NodeType node, size_t type>
 tref anf(tref n) {
 	// TODO (MEDIUM) write anf (using?)
-	std::cout << "Not implemented yet.\n";
+	// Diagnostics go through the logging channel, not std::cout: this is a
+	// library entry point and a caller redirecting stdout must not receive
+	// stray text. The input is returned unchanged (see the @warning on the
+	// declaration in normal_forms.h).
+	LOG_ERROR << "anf is not implemented yet; returning the input unchanged";
 	return n;
 }
 
@@ -3023,7 +3004,7 @@ tref anf(tref n) {
 template <NodeType node>
 tref pnf(tref n) {
 	// TODO (MEDIUM) write pnf (using?)
-	std::cout << "Not implemented yet.\n";
+	LOG_ERROR << "pnf is not implemented yet; returning the input unchanged";
 	return n;
 }
 

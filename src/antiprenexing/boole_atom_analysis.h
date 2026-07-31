@@ -52,9 +52,16 @@ struct boole_atom_analysis {
  *
  * Returns `general` for anything that is not a `bf_eq`-headed atomic formula,
  * so `bf_lt`/`bf_lteq` pivots fall straight through to the existing recursion.
- * Substitution is done with `replace_if(..., is_boolean_operation)` so that
- * non-Boolean sub-terms are left alone, matching the legacy implementation in
- * `ex_quantified_boole_decomposition`.
+ * Substitution is done with `replace_if(..., while_is_boolean_operation)` so
+ * that non-Boolean sub-terms are left alone. Note the predicate: this
+ * deliberately *differs from* the legacy `ex_quantified_boole_decomposition`,
+ * which passes `is_boolean_operation`. `replace_if` forwards its predicate as
+ * the traversal's `visit_subtree` and `apply_unique_until_change` returns the
+ * root untouched when that predicate rejects it -- and `is_boolean_operation`
+ * does not accept a `tau::bf` node, which is exactly what the substitution root
+ * is here. With that predicate both cofactors come back equal to the input, so
+ * the legacy substitutions are no-ops; `while_is_boolean_operation` also accepts
+ * `tau::bf` and makes the cofactoring actually happen.
  *
  * The caller must have established that @p var is an *active* (non-`skip`)
  * block variable and that `skip(atm)` is false: this function performs

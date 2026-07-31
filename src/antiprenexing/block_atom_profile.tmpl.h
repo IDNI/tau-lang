@@ -13,12 +13,19 @@ namespace detail {
  * @endinternal
  */
 template<NodeType node>
-void profile_block_atoms_rec(tref n, block_atom_profile<node>& p) {
+void profile_block_atoms_rec(tref n, block_atom_profile<node>& p,
+	bool guards_only = false)
+{
 	using tau = tree<node>;
+	// Neither guard can fire once a non-fast-path atom was seen, or once
+	// both signs are present. Exact for the guards; the counts are then
+	// lower bounds, which is why this is opt-in.
+	if (guards_only && (p.others > 0
+		|| (p.positives > 0 && p.negatives > 0))) return;
 	const tau& t = tau::get(n);
 	if (t.child_is(tau::wff_and) || t.child_is(tau::wff_or)) {
-		profile_block_atoms_rec<node>(t[0].first(), p);
-		profile_block_atoms_rec<node>(t[0].second(), p);
+		profile_block_atoms_rec<node>(t[0].first(), p, guards_only);
+		profile_block_atoms_rec<node>(t[0].second(), p, guards_only);
 		return;
 	}
 	// Constants are not atoms.
@@ -37,12 +44,12 @@ void profile_block_atoms_rec(tref n, block_atom_profile<node>& p) {
 
 template<NodeType node>
 block_atom_profile<node> profile_block_atoms(tref formula,
-	const std::function<bool(tref)>& skip)
+	const std::function<bool(tref)>& skip, bool guards_only)
 {
 	using tau = tree<node>;
 	block_atom_profile<node> p;
 	p.skip_content = tau::get(formula).find_top(skip) != nullptr;
-	detail::profile_block_atoms_rec<node>(formula, p);
+	detail::profile_block_atoms_rec<node>(formula, p, guards_only);
 	return p;
 }
 

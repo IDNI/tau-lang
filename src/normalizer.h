@@ -31,12 +31,21 @@ namespace idni::tau_lang {
  * @brief Normalize a Tau formula, handling both temporal and non-temporal cases.
  *
  * For formulas without temporal quantifiers (`always`/`sometimes`), applies
- * `eliminate_bv_and_quantifiers` (see normalizer.tmpl.h): resolves closed
- * quantified bitvector sub-formulas, pushes/eliminates the rest via
- * `anti_prenex_block` (which itself attempts predicate blasting for
- * bitvector-typed content), resolves again, then runs `anti_prenex_block`
- * once more skipping only whatever bitvector arithmetic blasting could not
- * resolve, and resolves a final time.
+ * `eliminate_bv_and_quantifiers` (see normalizer.tmpl.h), whose five steps are:
+ *  1. `scope_out_independent_conjuncts` -- lift every conjunct that does not
+ *     mention a quantified variable out of that variable's scope, so a
+ *     foreign-typed sibling conjunct cannot stop a bitvector scope from being
+ *     recognised as closed and solvable;
+ *  2. `resolve_quantifiers` -- decide or blast bitvector-typed scopes;
+ *  3. `anti_prenex_block` skipping bitvector-typed content and any variable
+ *     entangled with an unresolved `wff_ref`, then `resolve_quantifiers` again;
+ *  4. `anti_prenex_block` once more, skipping bitvector-typed content, the
+ *     bitvector arithmetic residue blasting could not resolve, and the
+ *     `wff_ref`-entangled variables, then a final `resolve_quantifiers`;
+ *  5. if the result is closed and bitvector-solvable, ask the solver for a
+ *     definite `sat`/`unsat` and collapse to `T`/`F` on one -- an `unknown`
+ *     or a failed translation leaves the formula as it is, quantifiers
+ *     included, since "cannot decide" is not "false".
  *
  * For formulas with temporal quantifiers, the same pipeline is applied to
  * each inner formula below a temporal quantifier, then the temporal layer

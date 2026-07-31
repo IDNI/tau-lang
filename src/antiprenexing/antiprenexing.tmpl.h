@@ -7,6 +7,17 @@ namespace idni::tau_lang {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "anti_prenex"
 
+// Forward declaration: anti_prenex_block calls push_ex_block_into_clause far
+// above its definition. Without this the call resolves only because it is
+// dependent and its argument types associate idni::tau_lang (C++20 P0846
+// ADL-at-instantiation) -- change the last parameter to a non-associating type
+// and it silently stops resolving. Same reason
+// heuristics/bv_predicate_blasting.h forward-declares anti_prenex_block and
+// resolve_quantifiers2.
+template<NodeType node>
+tref push_ex_block_into_clause(tref clause, const trefs& block,
+	const typename term_handle<node>::order& order);
+
 /**
  * @internal
  * @brief Pushes one existential quantifier one level inward: distributes over `wff_or`, pulls out independent conjuncts from `wff_and`, and commutes with other existentials.
@@ -35,6 +46,8 @@ tref push_existential_quantifier_one(tref fm, subtree_set<node>* excluded = null
 	LOG_DEBUG << "push_existential_quantifier_one: " << LOG_FM_DUMP(fm);
 	const auto& t = tau::get(fm);
 	DBG(assert(t.child_is(tau::wff_ex));)
+	// Release must not read the wrong children on a shape mismatch.
+	if (!t.child_is(tau::wff_ex)) return fm;
 	const tref scoped_fm = t[0].second();
 	const tref quant_var = t[0].first();
 
@@ -108,6 +121,8 @@ tref push_universal_quantifier_one(tref fm) {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
 	DBG(assert(t.child_is(tau::wff_all));)
+	// Release must not read the wrong children on a shape mismatch.
+	if (!t.child_is(tau::wff_all)) return fm;
 	const tref scoped_fm = t[0].second();
 	const tref quant_var = t[0].first();
 
@@ -167,7 +182,11 @@ tref push_quantifiers_in(tref formula) {
 	using tau = tree<node>;
 	subtree_unordered_set<node> excluded_nodes;
 	auto push_quantifiers = [&excluded_nodes](tref n) {
-		// static size_t counter = 0; DBG(assert(counter++ < 12);)
+		// No progress counter here: termination comes from apply_unique
+		// never re-applying `f` to its own output plus the strict decrease
+		// in scope depth at each push. (A previous attempt used a
+		// process-global `static` counter, which would have fired on the
+		// 13th push of the entire run rather than of this call.)
 		if (is_child<node>(n, tau::wff_ex)) {
 			LOG_DEBUG << "push_quantifiers existential: " << LOG_FM(n);
 			tref pushed = push_existential_quantifier_one<node>(n);
@@ -190,6 +209,17 @@ tref push_quantifiers_in(tref formula) {
 		LOG_DEBUG << "push_quantifiers nothing to do: " << LOG_FM(n);
 		return n;
 	};
+	// NOTE: `push_quantifiers` mutates `excluded_nodes`, which apply_unique's
+	// contract asks callbacks not to do ("Must not have side effects due to
+	// memorization"). The deviation is deliberate and safe here: the
+	// traverse-local cache only suppresses re-invocation for a node already
+	// seen, whose memoized result is reused anyway, so a skipped insertion
+	// cannot change the outcome -- it can only fail to prune a subtree that
+	// is about to be answered from the cache regardless. The same applies to
+	// the `excluded` sets in anti_prenex, resolve_quantifiers2 and
+	// resolve_quantifiers. It does *not* apply to a heuristic whose value
+	// depends on how many times it is updated: see anti_prenex's
+	// quant_pattern, which is node-multiplicity-dependent for this reason.
 	auto visit = [&excluded_nodes](tref n) {
 		return is_formula<node>(n) && !excluded_nodes.contains(n);
 	};
@@ -242,7 +272,6 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	trefs atms = rewriter::select_top_until<node>(curr_pool,
 		is_atomic, is_quantifier<node>);
 	if (atms.empty()) {
-		// std::cout << "ex_quant_fm: " << tau::get(ex_quant_fm) << "\n";
 		no_atms = true;
 		if (excluded) excluded->insert(ex_quant_fm);
 		return ex_quant_fm;
@@ -252,8 +281,10 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 		atm_formula_order_for_quant_elim<node>(quant_pattern));
 	auto atm_type = tau::get(atm)[0].value.nt;
 
-	// Try syntactic simplifications
-	if (atm_type == tau::bf_eq || atm_type == tau::bf_neq) {
+	// Try syntactic simplifications. Only bf_eq is possible here: is_atomic
+	// admits bf_eq/bf_lt/bf_lteq only, and the assert above rules out bf_neq
+	// for the whole formula.
+	if (atm_type == tau::bf_eq) {
 	tref func = tau::trim2(norm_equation<node>(atm));
 	func = apply_xor_def<node>(func);
 	// We use is_boolean_operation to enable the procedure on non-boolean functions
@@ -303,9 +334,18 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 		// Key the pool by the form the driver looks up: it rewrites
 		// the result with to_nnf and, on the next visit,
 		// normalize_atomic_formula_operators before the pool lookup
-		pool.insert_or_assign(
-			normalize_atomic_formula_operators<node>(to_nnf<node>(nr)),
-			rewriter::replace<node>(curr_pool, atm, tau::_F()));
+		{
+			// A collision means two branches normalized to the same
+			// key and the later one silently replaces the earlier
+			// one's candidate set (a precision, not a soundness,
+			// issue). Keep last-write-wins -- the pool only ever
+			// restricts which atoms remain available -- but make the
+			// collision visible.
+			tref key = normalize_atomic_formula_operators<node>(to_nnf<node>(nr));
+			DBG(if (pool.contains(key))
+				LOG_TRACE << "atomic_pool key collision on " << LOG_FM(key);)
+			pool.insert_or_assign(key, rewriter::replace<node>(curr_pool, atm, tau::_F()));
+		}
 		atm = rewriter::replace<node>(atm, var, func_v_0);
 		atm = tau::build_wff_and(atm, l);
 		if (excluded) excluded->insert(atm);
@@ -408,15 +448,22 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// solver, same as in resolve_quantifiers/treat_ex_quantified_clause:
 		// deciding the blasted form (with its many auxiliary quantifiers) is
 		// much harder for it than solving the unblasted arithmetic natively.
-		// Wrapping in `block`'s own quantifiers closes `ex_fm` whenever the
-		// only surviving free variables were exactly the block's -- which is
-		// always true here, since blast_block is only reached once no active
-		// (non-skip) block variable remains free in `dep_formula`.
+		// Wrapping in `block`'s own quantifiers closes `ex_fm` when the only
+		// surviving free variables were exactly the block's. That is not
+		// guaranteed: the has_skip_content call site below reaches
+		// blast_block with active variables still free, and a free variable
+		// that is not a block variable at all is never bound by this wrap.
+		// The explicit get_free_vars emptiness check on the next line is
+		// therefore the actual guard, not an optimization.
 		if (get_free_vars<node>(ex_fm).empty()
 				&& is_bv_solvable_formula<node>(ex_fm)) {
-			auto status = bv_formula_sat_status<node>(ex_fm);
+			// Spelled out: bv_formula_sat_status returns an optional, and a
+			// nullopt (cvc5 answered unknown, or the translation failed)
+			// means undecided, not false. `auto` hid that.
+			std::optional<bv_sat_status> status = bv_formula_sat_status<node>(ex_fm);
 			if (status == bv_sat_status::sat) return tau::_T();
 			if (status == bv_sat_status::unsat) return tau::_F();
+			DBG(if (!status) LOG_ERROR << "solver undecided on " << LOG_FM(ex_fm);)
 		}
 		if (bv_blasting)
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
@@ -432,7 +479,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				// BDD leaves. Keeping them skip-matched routes them back
 				// through this same solver-first/blast_block path (a no-op
 				// once nothing is left to blast) instead.
-				return anti_prenex_block<node>(blasted,	no_skip<node>);
+				return anti_prenex_block<node>(blasted, no_skip<node>);
 //				return anti_prenex_block<node>(blasted,
 //					is_tref_bv_type_family<node>);
 		return ex_fm;
@@ -453,15 +500,23 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	// (callers may filter those out before pushing the block in here),
 	// this check -- not block membership -- is what decides whether that
 	// homogeneity assumption actually holds.
-	auto has_skip_content = [&](tref f) {
-		return tau::get(f).find_top(skip);
+	// Memoized for the duration of this invocation: has_skip_content is
+	// called at several sites below (including once per disjunct), and
+	// find_top(skip) is a full subtree walk through an erased predicate. The
+	// memo is not shared across recursion levels -- each recursive call builds
+	// its own lambda -- which would need it threaded as a parameter.
+	auto skip_content_memo = std::make_shared<subtree_unordered_map<node, bool>>();
+	auto has_skip_content = [&skip, skip_content_memo](tref f) -> bool {
+		auto& memo = *skip_content_memo;
+		if (auto it = memo.find(f); it != memo.end()) return it->second;
+		const bool r = tree<node>::get(f).find_top(skip) != nullptr;
+		return memo.emplace(f, r).first->second;
 	};
 
 	auto has_active_var = [&](tref f) {
 		const trefs& vars = get_free_vars<node>(f);
 		for (tref v : block)
-			if (!skip(v) && hasbc(vars, v, tau::subtree_less))
-				return true;
+			if (!skip(v) && hasbc(vars, v, tau::subtree_less)) return true;
 		return false;
 	};
 
@@ -473,6 +528,17 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		const trefs& vars = get_free_vars<node>(f);
 		for (tref v : block)
 			if (hasbc(vars, v, tau::subtree_less)) return true;
+		return false;
+	};
+
+	// Does any block variable *other than* `except` occur free in `f`?
+	// gamma4 needs this before lifting an atom out of the block's scope.
+	auto has_block_var_other_than = [&](tref f, tref except) {
+		const trefs& vars = get_free_vars<node>(f);
+		for (tref v : block) {
+			if (tau::get(v) == tau::get(except)) continue;
+			if (hasbc(vars, v, tau::subtree_less)) return true;
+		}
 		return false;
 	};
 
@@ -502,8 +568,10 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	// separation the conjunction case performs.
 	auto try_fast_paths = [&](tref f) -> tref {
 		if (!has_active_var(f)) return nullptr;
-		const block_atom_profile<node> prof =
-			profile_block_atoms<node>(f, skip);
+		// guards_only: stop the census as soon as neither fast path can
+		// fire. Exact for all_negated()/all_positive(), which is all this
+		// caller reads.
+		const block_atom_profile<node> prof = profile_block_atoms<node>(f, skip, true);
 		if (prof.all_negated())
 			return resolve_quantifiers2<node>(
 				distribute_block_over_atoms<node>(f, block),
@@ -550,8 +618,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// how a T disjunct becomes visible as T at all.
 		trefs disjs = get_dnf_wff_clauses<node>(formula);
 		auto rank = [&](tref d) -> int {
-			const block_atom_profile<node> p =
-				profile_block_atoms<node>(d, skip);
+			const block_atom_profile<node> p = profile_block_atoms<node>(d, skip, true);
 			if (p.all_negated()) return 0;              // step 2a
 			if (p.all_positive()) return 1;             // step 2b
 			if (!tau::get(d).find_top(is<node, tau::wff_or>))
@@ -739,6 +806,18 @@ tref anti_prenex_block(tref formula, const trefs& block,
 						tau::trim_right_sibling(
 							pivot_var)),
 					tau::_0(find_ba_type<node>(pivot_var)));
+				// `out_atm` is conjoined at *this* level while the
+				// block's binders are only re-attached inside the
+				// recursive results below, so any other block
+				// variable still present in it would end up free.
+				// analyze_boole_atom only establishes independence
+				// from `pivot_var`, not from the rest of the
+				// block, so check the rest explicitly and fall
+				// through to the general split when the lift is
+				// not safe. gamma1 guards against the same hazard
+				// more coarsely, with `active_vars == 1` (see its
+				// TODO below).
+				if (!has_block_var_other_than(out_atm, pivot_var)) {
 				tref gl = syntactic_path_simplification_unsat_on_unchanged_negations
 					<node>(rewriter::replace<node>(
 						formula, atm, tau::_T()));
@@ -760,6 +839,10 @@ tref anti_prenex_block(tref formula, const trefs& block,
 							tau::build_wff_neg(
 								out_atm),
 							pr2)));
+				}
+				// Otherwise out_atm still mentions another block
+				// variable: lifting it would leak that variable
+				// free, so leave this atom to the general split.
 			}
 			// gamma1: f has a unique zero, so the T-branch has
 			// exactly one witness, pivot_var := f[x<-0].
@@ -1069,7 +1152,6 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		tref simplified = trivial_skolem_ex<node>(block_vars,
 			normalize_atomic_formula_operators<node>(body));
 		if (!is_child<node>(simplified, tau::wff_ex)) {
-			block_vars.clear();
 			return wrap_skipped(simplified);
 		}
 	}
@@ -1290,6 +1372,14 @@ tref process_quantifier_blocks(tref fm, std::function<bool(tref)> skip) {
 			// unaffected -- it happens at the enclosing head, a
 			// different node, whose own collection walks straight
 			// through whatever quantifiers `res` still carries.
+			//
+			// `done` is sibling-insensitive, so this retires every
+			// structurally identical occurrence of `res`, not just
+			// this position. That costs precision -- another block
+			// headed by the same subtree elsewhere is only descended
+			// into, never emitted, so its quantifiers survive -- and
+			// is accepted deliberately: keying on (position, node)
+			// would break the termination argument above.
 			done.insert(res);
 			if (res != blk.head) changes.emplace(blk.head, res);
 		}
@@ -1305,10 +1395,13 @@ tref process_quantifier_blocks(tref fm, std::function<bool(tref)> skip) {
 
 /**
  * @internal
- * @brief Drives the full anti-prenex-block pipeline: NNF + syntactic simplification, substitution-based elimination, canonical operator normalization, then maximal-block application of `process_quantifier_block`.
+ * @brief Convenience overload: the pipeline with the default `skip`
+ * (`is_tref_bv_type_family`). See the 2-argument overload below for what it
+ * actually does.
  * @tparam node Tree node type.
  * @param formula Formula to process.
- * @return Formula with quantifiers pushed inward as far as possible using the block-based algorithm.
+ * @return Formula with quantifiers pushed inward as far as possible using the
+ * block-based algorithm.
  * @endinternal
  */
 template<NodeType node>
@@ -1316,6 +1409,25 @@ tref anti_prenex_block(tref formula) {
 	return anti_prenex_block<node>(formula, is_tref_bv_type_family<node>);
 }
 
+/**
+ * @internal
+ * @brief Drives the full anti-prenex-block pipeline: NNF + syntactic
+ * simplification, substitution-based elimination, canonical operator
+ * normalization, then maximal-block application of `process_quantifier_block`.
+ *
+ * @warning `skip` is honoured by the block machinery itself
+ * (`collect_quantifier_block`, `try_fast_paths`, `profile_block_atoms`,
+ * `blast_block`) but **not** by every step of this pipeline:
+ * `syntactic_formula_simplification` takes no skip predicate at all, and its
+ * `simplify_using_equality` step ends in `to_nnf`, which does rewrite
+ * bitvector comparison atoms. Nor do the two fallbacks `resolve_ex_block`
+ * reaches for -- `resolve_quantifiers` and `anti_prenex` -- accept one.
+ * @tparam node Tree node type.
+ * @param formula Formula to process.
+ * @param skip Predicate marking content this pass must not Boole-decompose.
+ * @return Formula with quantifiers pushed inward as far as possible.
+ * @endinternal
+ */
 template<NodeType node>
 tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 	using tau = tree<node>;
@@ -1331,13 +1443,13 @@ tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 
 	// Step 1: NNF + syntactic simplification
 	formula = to_nnf<node>(formula);
-	formula = syntactic_formula_simplification<node>(formula, skip);
+	formula = syntactic_formula_simplification<node>(formula);
 
 	// Step 2: Substitution-based elimination (innermost first via post_order).
 	// Attempts ex x (x = t && phi(x)) => phi(t) for each existential
 	// conjunctive scope.
 	formula = ex_subs_based_elimination<node>(formula);
-	formula = syntactic_formula_simplification<node>(formula, skip);
+	formula = syntactic_formula_simplification<node>(formula);
 
 	// Step 3: Normalize non-canonical operators (bf_neq → ¬(bf_eq),
 	// bf_nlteq → bf_lt, etc.) so push_ex_block_into_clause sees only
@@ -1351,7 +1463,7 @@ tref anti_prenex_block(tref formula, std::function<bool(tref)> skip) {
 	// atomic formulas via resolve_quantifiers2. wff_all blocks are handled
 	// by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
 	formula = process_quantifier_blocks<node>(formula, skip);
-	return syntactic_formula_simplification<node>(formula, skip);
+	return syntactic_formula_simplification<node>(formula);
 }
 
 /**
@@ -1438,7 +1550,7 @@ tref push_ex_block_into_clause(tref clause, const trefs& block,
 			is_quant_removable_in_clause = false;
 		}
 	}
-	// TODO: create non-removable clause part and continue with rest
+	// TODO (MEDIUM): create non-removable clause part and continue with rest
 	if (!is_quant_removable_in_clause) {
 		// Since we cannot remove the quantifier in this
 		// clause it needs to be maintained
@@ -1483,22 +1595,21 @@ tref anti_prenex(tref formula) {
 		subtree_set<node> excluded;
 		auto anti_prenex_step = [&](tref n) {
 			while (tau::get(n).child_is(tau::wff_ex)) {
-				// TODO: if all atomic formulas are !=
+				// TODO (LOW): if all atomic formulas are !=
 
 				// If n is single DNF clause -> treat quantifier
 				if (!tau::get(n).find_top(is<node, tau::wff_or>)) {
 					DBG(LOG_TRACE << "Before treat_ex_quantified_clause: " << LOG_FM(n) << "\n";)
 					n = treat_ex_quantified_clause<node>(n, quant_eliminated);
-					// std::cout << "excluded: " << tau::get(n) << "\n";
 					excluded.insert(n);
 					DBG(LOG_TRACE << "After treat_ex_quantified_clause: " << LOG_FM(n) << "\n";)
 					return n;
 				}
 				// Try push quant down
-				// std::cout << "push n: " << tau::get(n) << "\n";
 				auto pushed = push_existential_quantifier_one<node>(n, &excluded);
 				if (pushed != n) {
-					// TODO: sort disjunctions to priorities
+					// TODO (LOW): sort disjunctions to priorities (the block algorithm's step
+		// 2d ranking already does this; only this legacy path does not)
 					DBG(LOG_TRACE << "Before push_existential_quantifier_one: " << LOG_FM(n) << "\n";)
 					DBG(LOG_TRACE << "After push_existential_quantifier_one: " << LOG_FM(pushed) << "\n";)
 					return pushed;
@@ -1659,12 +1770,17 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 					// T/F, but only on a definite answer -- cvc5 returning
 					// unknown, or translation failing, means we cannot
 					// decide, not that the formula is false.
-					auto status = bv_formula_sat_status<node>(n);
+					std::optional<bv_sat_status> status = bv_formula_sat_status<node>(n);
 					if (status == bv_sat_status::sat) return tau::_T();
 					if (status == bv_sat_status::unsat) return tau::_F();
+					DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
 					excluded.insert(n);
 				} else excluded.insert(n);
-			} // TODO: restrict to atomless types
+			}
+			// TODO (HIGH): restrict to atomless types --
+			// distribute_block_over_atoms and
+			// push_ex_block_into_clause's negative-atom handling are
+			// only valid in an atomless BA, and nothing checks that.
 			else if (!tau::get(n).find_top(is<node, tau::ref>)) {
 				using bdd = term_handle<node>::tbdd;
 				// Record quantifier block in quants
@@ -1716,7 +1832,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 					// Get the term of the equality
 					n = tau::trim2(n);
 					size_t term_type = tau::get(n).get_ba_type();
-					// TODO: Syntactically simplify result?
+					// TODO (LOW): Syntactically simplify result?
 					n = term_handle<node>::build(n, order).
 						bdd_quant(quants, order).
 							to_tau_term(term_type);
@@ -1730,7 +1846,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 					// Get the term of the equality
 					n = tau::trim2(n);
 					size_t term_type = tau::get(n).get_ba_type();
-					// TODO: Syntactically simplify result?
+					// TODO (LOW): Syntactically simplify result?
 					n = term_handle<node>::build(n, order).
 						bdd_quant(quants, order).
 							to_tau_term(term_type);
@@ -1759,7 +1875,7 @@ bool no_skip(tref) {
 	return false;
 }
 
-// TODO: How to adjust for bitvector that are boolean?
+// TODO (MEDIUM): How to adjust for bitvector that are boolean?
 /**
  * @internal
  * @brief Eliminate the existential quantifier scoping a clause.
@@ -1836,9 +1952,11 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 			// Closed bv formula, simplify to T/F -- but only on a
 			// definite answer: cvc5 returning unknown, or translation
 			// failing, means we cannot decide, not that it is false.
-			auto status = bv_formula_sat_status<node>(tau::build_wff_ex(var, scoped_fm, false));
+			std::optional<bv_sat_status> status = bv_formula_sat_status<node>(
+				tau::build_wff_ex(var, scoped_fm, false));
 			if (status == bv_sat_status::sat) return new_fm;
 			if (status == bv_sat_status::unsat) return tau::_F();
+			DBG(if (!status) LOG_TRACE << "solver undecided";)
 		}
 		// Non-closed BV quantifier, or closed-but-undecided: try
 		// predicate blasting to convert the BV existential to Boolean bit
@@ -1874,10 +1992,10 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 	size_t type_v = find_ba_type<node>(var);
 	tref f = squeeze_positives<node>(scoped_fm, type_v);
 	tref f_0 = f ? rewriter::replace<node>(f, var, tau::_0_trimmed(type_v)) : tau::_0(type_v);
-	// std::cout << "f_0: " << tau::get(f_0) << "\n";
 	tref f_1 = f ? rewriter::replace<node>(f, var, tau::_1_trimmed(type_v)) : tau::_0(type_v);
-	// std::cout << "f_1: " << tau::get(f_1) << "\n";
-	// TODO: instead of != use !(=)
+	// TODO (HIGH): instead of != use !(=) -- squeeze_positives folds a
+	// !(f = 0) into the *positive* squeeze, so this function silently
+	// depends on its input being in bf_neq form (see its @pre)
 	trefs neqs = tau::get(scoped_fm).select_top(is<node, tau::bf_neq>);
 	if (neqs.size()) {
 		tref nneqs = tau::_T();
@@ -1888,10 +2006,8 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 			tref g = tau::trim(neq);
 			tref g_0 = rewriter::replace<node>(g, var,
 						tau::_0_trimmed(find_ba_type<node>(var)));
-			// std::cout << "g_0: " << tau::get(g_0) << "\n";
 			tref g_1 = rewriter::replace<node>(g, var,
 						tau::_1_trimmed(find_ba_type<node>(var)));
-			// std::cout << "g_1: " << tau::get(g_1) << "\n";
 			// If both are 1 then inequality is implied by f_0f_1 = 0
 			if (tau::get(g_0).equals_1() && tau::get(g_1).equals_1())
 				continue;
@@ -1952,9 +2068,11 @@ using tau = tree<node>;
 					// we cannot decide, not that the formula is false.
 					const trefs& fv = get_free_vars<node>(n);
 					if (fv.empty()) {
-						auto status = bv_formula_sat_status<node>(n);
+						std::optional<bv_sat_status> status =
+							bv_formula_sat_status<node>(n);
 						if (status == bv_sat_status::sat) return tau::_T();
 						if (status == bv_sat_status::unsat) return tau::_F();
+						DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
 					} else {
 						// Open bv scope: `n` is equivalent to T exactly
 						// when it is valid, and to F exactly when it is

@@ -61,12 +61,20 @@ struct block_atom_profile {
  * @tparam node Tree node type.
  * @param formula Matrix of a quantifier block.
  * @param skip Predicate marking content this pass must not rewrite.
+ * @param guards_only When `true`, stop the census as soon as neither
+ *        `all_negated()` nor `all_positive()` can still hold. Both predicates
+ *        stay exact -- they require `others == 0` and one of the sign counts to
+ *        be zero -- but the individual counts become lower bounds. Callers that
+ *        read `positives`/`negatives`/`others` directly must leave it `false`
+ *        (the default); the two hot call sites in `anti_prenex_block` only read
+ *        the guards, and pay a full traversal per node per recursion level
+ *        without this.
  * @return The census.
  * @endinternal
  */
 template<NodeType node>
 block_atom_profile<node> profile_block_atoms(tref formula,
-	const std::function<bool(tref)>& skip);
+	const std::function<bool(tref)>& skip, bool guards_only = false);
 
 } // namespace idni::tau_lang
 

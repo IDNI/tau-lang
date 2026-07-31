@@ -631,3 +631,55 @@ TEST_SUITE("SyntacticFormulaSimplification") {
 		CHECK( tau::get(res).equals_T() );
 	}
 }
+
+// TC-4: simplify_temporal_clause's `return std::nullopt` at
+// normalizer.tmpl.h:777 is the only way a temporal clause is dropped, and it
+// had no test -- the existing coverage exercises the implied-always path only.
+TEST_SUITE("SimplifyTemporalClauseUnsat") {
+
+	TEST_CASE("an unsatisfiable always/sometimes pair drops the clause") {
+		tref p = get_nso_rr("x = 0.").value().main->get();
+		tref q = get_nso_rr("x != 0.").value().main->get();
+		// always x = 0 && sometimes x != 0: the pair is unsatisfiable, so
+		// the whole clause is dropped.
+		tref clause = tau::build_wff_and(tau::build_wff_always(p),
+			tau::build_wff_sometimes(q));
+		CHECK( !simplify_temporal_clause<node_t>(clause).has_value() );
+	}
+
+	TEST_CASE("a satisfiable always/sometimes pair keeps the clause") {
+		tref p = get_nso_rr("x = 0.").value().main->get();
+		tref q = get_nso_rr("y = 0.").value().main->get();
+		tref clause = tau::build_wff_and(tau::build_wff_always(p),
+			tau::build_wff_sometimes(q));
+		auto res = simplify_temporal_clause<node_t>(clause);
+		REQUIRE( res.has_value() );
+		CHECK( *res != nullptr );
+	}
+
+	// A sometimes part implied by an always part is replaced by T rather than
+	// dropping the clause (normalizer.tmpl.h:781-782).
+	TEST_CASE("a sometimes part implied by an always part is eliminated") {
+		tref strong = get_nso_rr("x = 0 && y = 0.").value().main->get();
+		tref weak = get_nso_rr("x = 0.").value().main->get();
+		tref clause = tau::build_wff_and(tau::build_wff_always(strong),
+			tau::build_wff_sometimes(weak));
+		auto res = simplify_temporal_clause<node_t>(clause);
+		REQUIRE( res.has_value() );
+		// The sometimes part is gone; only the always part is left.
+		CHECK( !tau::get(*res).find_top(is<node_t, tau::wff_sometimes>) );
+	}
+
+	// The single-part short-circuit at normalizer.tmpl.h:747-749.
+	TEST_CASE("a clause with a single temporal part is returned as is") {
+		tref p = get_nso_rr("x = 0.").value().main->get();
+		tref only_aw = tau::build_wff_always(p);
+		auto r1 = simplify_temporal_clause<node_t>(only_aw);
+		REQUIRE( r1.has_value() );
+		CHECK( *r1 == only_aw );
+		tref only_st = tau::build_wff_sometimes(p);
+		auto r2 = simplify_temporal_clause<node_t>(only_st);
+		REQUIRE( r2.has_value() );
+		CHECK( *r2 == only_st );
+	}
+}

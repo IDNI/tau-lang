@@ -94,6 +94,10 @@ tref push_negation_one_in(tref fm) {
 		const tau& ct = t[0][0];
 		if (!ct.has_child()) return fm;
 		switch (ct[0].value.nt) {
+			// !!A ::= A. Without this case to_nnf cannot remove a
+			// double negation and depends on the construction hooks
+			// doing it -- which squeeze_absorb switches off.
+			case tau::wff_neg: return ct[0].first();
 			case tau::wff_and: return tau::build_wff_or(
 						tau::build_wff_neg(ct[0].first()),
 						tau::build_wff_neg(ct[0].second()));
@@ -126,6 +130,8 @@ tref push_negation_one_in(tref fm) {
 		const tau& ct = t[0][0];
 		if (!ct.has_child()) return fm;
 		switch (ct[0].value.nt) {
+			// A'' ::= A, the bf dual of the wff_neg case above.
+			case tau::bf_neg: return ct[0].first();
 			case tau::bf_and: return tau::build_bf_or(
 				tau::build_bf_neg(ct[0].first()),
 				tau::build_bf_neg(ct[0].second()));
@@ -324,6 +330,15 @@ tref squeeze_positives(tref n, size_t type_id) {
 		return is<node, tau::bf_eq>(n) &&
 			find_ba_type<node>(n) == type_id;
 	};
+	// select_top descends through wff_neg, so a bf_eq inside a `!(f = 0)`
+	// would be collected here as if it were positive and its negation
+	// dropped. Callers must therefore hand this an NNF formula, in which a
+	// negated equation is a bf_neq; the assert makes that precondition loud
+	// rather than leaving it to the to_nnf ordering around the call site.
+	DBG(assert(!tau::get(n).find_top([](tref m) {
+		return is<node, tau::wff_neg>(m)
+			&& tree<node>::get(m).child_is(tau::bf_eq);
+	}));)
 	if (trefs eqs = tau::get(n).select_top(match);
 		eqs.size() > 0)
 	{
@@ -331,6 +346,12 @@ tref squeeze_positives(tref n, size_t type_id) {
 			eq = norm_trimmed_equation<node>(eq);
 		}
 		eqs = tt(eqs) | tt::children | tt::refs;
+		// The reshape above can in principle change the vector's size, so
+		// re-check before indexing it.
+		if (eqs.empty()) {
+			LOG_TRACE << "(I) squeeze_positives result: none (reshaped away)";
+			return nullptr;
+		}
 		tref res = tau::build_bf_or(eqs, find_ba_type<node>(eqs[0]));
 		LOG_TRACE << "squeeze_positives result: " << LOG_FM(res);
 		return res;
@@ -376,8 +397,7 @@ tref replace_free_vars_by(tref fm, tref val) {
  * @endinternal
  */
 template<NodeType node>
-tref syntactic_formula_simplification(tref formula,
-		[[maybe_unused]] std::function<bool(tref)> skip) {
+tref syntactic_formula_simplification(tref formula) {
 	formula = simplify_using_equality<node>(formula);
 	return syntactic_path_simplification<node>(formula);
 }
