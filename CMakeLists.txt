@@ -14,7 +14,14 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 endif()
 
 if(TAU_USE_CCACHE)
-	include(use-ccache.cmake)
+	# include(<module>), not include(<file>): an argument carrying the .cmake
+	# extension is treated as a *path* relative to CMAKE_CURRENT_SOURCE_DIR and
+	# is never looked up on CMAKE_MODULE_PATH, which is where use-ccache.cmake
+	# actually lives (external/parser/cmake). With the extension this failed
+	# with "include could not find requested file: use-ccache.cmake" on every
+	# reconfigure whenever TAU_USE_CCACHE was ON -- latent until something
+	# forced a regenerate, e.g. adding a test target.
+	include(use-ccache)
 endif()
 
 set(namespace "TAU")

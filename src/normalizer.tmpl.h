@@ -387,6 +387,43 @@ bool has_no_boolean_combs_of_models(tref n) {
 	return true;
 }
 
+/**
+ * @internal
+ * @brief Report a formula that `normalize_non_temp` could not decide.
+ *
+ * The predicates below all normalize a closed formula and read the result as
+ * `T` or `F`. That is not guaranteed: a closed bitvector scope the solver cannot
+ * settle -- cvc5 answering `unknown`, or a translation failure such as an
+ * unresolved `wff_ref` inside bv arithmetic -- comes back with its quantifier
+ * intact, and `is_bv_solvable_formula` does not reject it because it inspects
+ * only `variable` nodes. Asserting decidability here aborted Debug builds on a
+ * user-reachable input; the predicates now fall back to their negative answer,
+ * which is the conservative direction for every current caller
+ * (`api::is_valid` reports "not valid", `simplify_temporal_clause` declines to
+ * eliminate a part, `find_fixpoint_phi`/`chi` keep unrolling until their step
+ * cap) -- and say so loudly instead of silently.
+ *
+ * The proper fix is a tri-state (`true`/`false`/`undecided`) contract threaded
+ * through these predicates and their callers; until then this at least makes the
+ * case diagnosable.
+ * @tparam node Tree node type.
+ * @param who Name of the calling predicate, for the log line.
+ * @param normalized The normalized formula to check.
+ * @return `true` if the formula was decided (`T`, `F`, or a constraint).
+ * @endinternal
+ */
+template <NodeType node>
+bool check_decided(const char* who, tref normalized) {
+	using tau = tree<node>;
+	const auto& t = tau::get(normalized);
+	if (t.equals_T() || t.equals_F()
+		|| t.find_top(is<node, tau::constraint>)) return true;
+	LOG_ERROR << who << ": normalization could not decide "
+		<< LOG_FM(normalized) << "; answering negatively. This is a "
+		"conservative fallback, not a proof.";
+	return false;
+}
+
 /** @internal @copydoc is_non_temp_nso_satisfiable @endinternal */
 template <NodeType node>
 bool is_non_temp_nso_satisfiable(tref n) {
@@ -406,8 +443,7 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	DBG(LOG_TRACE << "is_non_temp_nso_satisfiable/normalized: "
 		  << LOG_FM(normalized);)
 
-	DBG(assert((t.equals_T() || t.equals_F()
-		|| t.find_top(is<node, tau::constraint>)));)
+	check_decided<node>("is_non_temp_nso_satisfiable", normalized);
 
 	return t.equals_T();
 }
@@ -441,8 +477,7 @@ bool is_non_temp_nso_unsat(tref n) {
 	nn = tau::build_wff_ex_many(vars, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
-	assert((t.equals_T() || t.equals_F()
-		|| t.find_top(is<node, tau::constraint>)));
+	check_decided<node>("is_non_temp_nso_unsat", normalized);
 	return t.equals_F();
 }
 
@@ -491,16 +526,16 @@ bool are_nso_equivalent(tref n1, tref n2) {
 
 	LOG_DEBUG << "wff: " << LOG_FM(tau::build_wff_and(imp1, imp2));
 
-	const tau& tdir1 = tau::get(normalize_non_temp<node>(imp1));
-	DBG(assert((tdir1.equals_T() || tdir1.equals_F()
-		|| tdir1.find_top(is<node, tau::constraint>)));)
+	tref ndir1 = normalize_non_temp<node>(imp1);
+	const tau& tdir1 = tau::get(ndir1);
+	check_decided<node>("are_nso_equivalent", ndir1);
 	if (tdir1.equals_F()) {
 		LOG_DEBUG << "End are_nso_equivalent: " << LOG_FM(tdir1.get());
 		return false;
 	}
-	const tau& tdir2 = tau::get(normalize_non_temp<node>(imp2));
-	DBG(assert((tdir2.equals_T() || tdir2.equals_F()
-		|| tdir2.find_top(is<node, tau::constraint>))));
+	tref ndir2 = normalize_non_temp<node>(imp2);
+	const tau& tdir2 = tau::get(ndir2);
+	check_decided<node>("are_nso_equivalent", ndir2);
 	const bool res = (tdir1.equals_T() && tdir2.equals_T());
 	LOG_DEBUG << "End are_nso_equivalent: " << res;
 	return res;
@@ -562,9 +597,9 @@ bool is_nso_impl(tref n1, tref n2) {
 
 	LOG_DEBUG << "wff: " << LOG_FM(imp);
 
-	const tau& res = tau::get(normalize_non_temp<node>(imp));
-	DBG(assert((res.equals_T() || res.equals_F()
-		|| res.find_top(is<node, tau::constraint>)));)
+	tref nres = normalize_non_temp<node>(imp);
+	const tau& res = tau::get(nres);
+	check_decided<node>("is_nso_impl", nres);
 	LOG_DEBUG << "End is_nso_impl: " << res.get();
 	return res.equals_T();
 }

@@ -604,7 +604,15 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	// a non-converging formula fails loudly instead of hanging forever.
 	// This is a safety net, not full error propagation: callers still
 	// receive a (non-fixpoint) result rather than a failure signal.
-	constexpr int_t max_fixpoint_steps = 1'000'000;
+	//
+	// The cap has to be reachable to be a cap. Every step runs a full
+	// normalize_non_temp plus an is_nso_impl over a formula that grows with
+	// the step count, so the previous 1'000'000 could never be hit in a
+	// human timescale -- a non-converging spec still hung. Real specs settle
+	// in a handful of steps (the flag_boundary tests in
+	// tests/integration/test_integration-solver.cpp reach single digits), so
+	// this leaves a very wide margin while remaining finite.
+	constexpr int_t max_fixpoint_steps = 500;
 	while (step_num < lookback || !is_nso_impl<node>(phi_prev, phi)){
 		if (step_num >= max_fixpoint_steps) {
 			LOG_ERROR << "find_fixpoint_phi: exceeded " << max_fixpoint_steps
@@ -680,8 +688,9 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 			<< LOG_FM(rewriter::replace<node>(chi, pholder_to_st));
 
 	// Find fix point once the lookback is greater the step_num
-	// SO-1: same unbounded-search concern as find_fixpoint_phi above.
-	constexpr int_t max_fixpoint_steps = 1'000'000;
+	// SO-1: same unbounded-search concern, and the same reachable cap, as
+	// find_fixpoint_phi above.
+	constexpr int_t max_fixpoint_steps = 500;
 	while (step_num < lookback || !is_nso_impl<node>(chi_prev_replc, chi_replc))
 	{
 		if (step_num >= max_fixpoint_steps) {
@@ -1383,7 +1392,33 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	}
 	// Here we know that the formula is satisfiable at some point
 	// Since the initial segment is already checked we continue from there
+	//
+	// SO-1: the "guaranteed to be sat at some point" argument below rests on
+	// the is_run_satisfiable check *above*, made before this loop starts
+	// conjoining !current_flag into `run` on every iteration -- so the
+	// property it depends on is not preserved and the search is not
+	// guaranteed to terminate. Cap it: a give-up here reports unsatisfiable,
+	// which is wrong but bounded and loud, where before it hung forever.
+	// Deciding this properly needs a tri-state (sat/unsat/unknown) result
+	// threaded through transform_to_execution.
+	constexpr int_t max_flag_search_steps = 500;
+	const int_t flag_search_limit = flag_boundary + 1 + max_flag_search_steps;
 	for (int_t i = flag_boundary + 1; true; ++i) {
+		if (i > flag_search_limit) {
+			LOG_ERROR << "to_unbounded_continuation: the eventual "
+				"variable flag could not be raised within "
+				<< max_flag_search_steps << " steps past the flag "
+				"boundary; giving up and reporting unsatisfiable. "
+				"This is a bounded failure, not a proof of "
+				"unsatisfiability.";
+			print_fixpoint_info("Temporal normalization of Tau "
+				"specification gave up after " +
+				std::to_string(steps) + " fixpoint steps and " +
+				std::to_string(max_flag_search_steps) +
+				" flag search steps, yielding the result: ",
+				TAU_TO_STR(tau::_F()), output);
+			return tau::_F();
+		}
 		auto current_aw = fm_at_time_point<node>(aw, io_vars, i);
 		run = tau::build_wff_and(run, current_aw);
 		auto current_flag

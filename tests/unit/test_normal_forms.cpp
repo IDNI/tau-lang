@@ -683,3 +683,50 @@ TEST_SUITE("SimplifyTemporalClauseUnsat") {
 		CHECK( *r2 == only_st );
 	}
 }
+
+// NZ-1 regression. normalize_non_temp can legitimately return a formula that is
+// neither T nor F: a closed bv scope the solver cannot settle (here bv
+// arithmetic plus an unresolved wff_ref, which is_bv_solvable_formula accepts
+// because it inspects only variable nodes, and which cvc5 then fails to
+// translate) comes back with its quantifier intact. All three predicates below
+// asserted that could not happen, so each aborted a Debug build on this input.
+// They now fall back to their negative answer and log it.
+TEST_SUITE("UndecidableNormalizationFallback") {
+
+	static tref undecidable() {
+		return get_nso_rr("ex x (x:bv[8] * y:bv[8] = { 1 }:bv[8]"
+			" && q(x)).").value().main->get();
+	}
+
+	TEST_CASE("normalize_non_temp leaves it quantified") {
+		tref res = normalize_non_temp<node_t>(undecidable());
+		REQUIRE( res != nullptr );
+		CHECK( !tau::get(res).equals_T() );
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+	}
+
+	TEST_CASE("is_nso_impl answers false instead of aborting") {
+		CHECK( !is_nso_impl<node_t>(tau::_T(), undecidable()) );
+	}
+
+	TEST_CASE("is_non_temp_nso_unsat answers false instead of aborting") {
+		CHECK( !is_non_temp_nso_unsat<node_t>(undecidable()) );
+	}
+
+	TEST_CASE("is_non_temp_nso_satisfiable answers false instead of aborting") {
+		CHECK( !is_non_temp_nso_satisfiable<node_t>(undecidable()) );
+	}
+
+	TEST_CASE("are_nso_equivalent answers false instead of aborting") {
+		CHECK( !are_nso_equivalent<node_t>(tau::_T(), undecidable()) );
+	}
+
+	// Control: a decidable formula still gets a real answer.
+	TEST_CASE("decidable formulas are unaffected") {
+		tref taut = get_nso_rr("x = 0 || x != 0.").value().main->get();
+		CHECK( is_nso_impl<node_t>(tau::_T(), taut) );
+		CHECK( !is_non_temp_nso_unsat<node_t>(taut) );
+		CHECK( is_non_temp_nso_satisfiable<node_t>(taut) );
+	}
+}

@@ -287,10 +287,20 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 	if (atm_type == tau::bf_eq) {
 	tref func = tau::trim2(norm_equation<node>(atm));
 	func = apply_xor_def<node>(func);
-	// We use is_boolean_operation to enable the procedure on non-boolean functions
-	tref func_v_0 = rewriter::replace_if<node>(func, var, tau::_0(find_ba_type<node>(var)), is_boolean_operation<node>);
+	// while_is_boolean_operation, not is_boolean_operation: replace_if forwards
+	// its predicate as the traversal's visit_subtree and
+	// apply_unique_until_change returns the root untouched when the predicate
+	// rejects it. `func` is a tau::bf node (norm_equation builds
+	// wff(bf_eq(bf,bf)) and trim2 takes the first bf), and
+	// is_boolean_operation does not accept tau::bf -- so with it both
+	// substitutions were no-ops, func_v_0 == func_v_1 == func always, and the
+	// unique-zero branch below (which needs func == !func syntactically) was
+	// dead code. while_is_boolean_operation also accepts tau::bf, which is what
+	// analyze_boole_atom and syntactic_variable_simplification use for this
+	// same cofactoring.
+	tref func_v_0 = rewriter::replace_if<node>(func, var, tau::_0(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	func_v_0 = syntactic_path_simplification<node>(func_v_0);
-	tref func_v_1 = rewriter::replace_if<node>(func, var, tau::_1(find_ba_type<node>(var)), is_boolean_operation<node>);
+	tref func_v_1 = rewriter::replace_if<node>(func, var, tau::_1(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	func_v_1 = syntactic_path_simplification<node>(func_v_1);
 	// Check identically zero
 	if (tau::get(func_v_0).equals_0() && tau::get(func_v_1).equals_0()) {
@@ -479,9 +489,8 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				// BDD leaves. Keeping them skip-matched routes them back
 				// through this same solver-first/blast_block path (a no-op
 				// once nothing is left to blast) instead.
-				return anti_prenex_block<node>(blasted, no_skip<node>);
-//				return anti_prenex_block<node>(blasted,
-//					is_tref_bv_type_family<node>);
+				return anti_prenex_block<node>(blasted,
+					is_tref_bv_type_family<node>);
 		return ex_fm;
 	};
 
@@ -1344,10 +1353,21 @@ tref process_quantifier_blocks(tref fm, std::function<bool(tref)> skip) {
 			return scoped;
 		return m;
 	};
-	DBG(size_t rounds = 0;)
+	// The cap is unconditional: the termination argument documented below is
+	// subtle enough that a regression in it must fail loudly rather than hang
+	// Release forever. The DBG assert stays so a Debug run stops at the
+	// offending formula instead of silently returning it unprocessed.
+	constexpr size_t max_rounds = 1000;
+	size_t rounds = 0;
 	for (;;) {
-		DBG(assert(++rounds < 1000
+		DBG(assert(rounds < max_rounds
 			&& "process_quantifier_blocks did not converge");)
+		if (++rounds > max_rounds) {
+			LOG_ERROR << "process_quantifier_blocks: no convergence "
+				"after " << max_rounds << " rounds, returning the "
+				"formula unprocessed: " << LOG_FM(fm);
+			return fm;
+		}
 		std::vector<quantifier_block<node>> blocks;
 		select_innermost_blocks<node>(fm, skip, done, blocks);
 		DBG(LOG_TRACE << "process_quantifier_blocks round " << rounds
@@ -1641,7 +1661,18 @@ tref anti_prenex(tref formula) {
 		// but the heuristic is context-blind on a hit
 		using cache_t = subtree_unordered_map<node,
 						std::pair<tref, bool>>;
-		static cache_t& cache = tree<node>::template create_cache<cache_t>();
+		// One cache per bv_blasting setting. The result genuinely depends
+		// on it (treat_ex_quantified_clause either blasts or gives up and
+		// keeps the quantifier), bv_blasting is a runtime-mutable global
+		// that api::set_blasting flips from the REPL, and create_cache
+		// registers only GC callbacks -- nothing flushes on a toggle. With
+		// a single formula-keyed cache, `disable blasting; normalize F;
+		// enable blasting; normalize F` returned the stale first answer.
+		static cache_t& cache_blasting =
+			tree<node>::template create_cache<cache_t>();
+		static cache_t& cache_no_blasting =
+			tree<node>::template create_cache<cache_t>();
+		cache_t& cache = bv_blasting ? cache_blasting : cache_no_blasting;
 		if (auto it = cache.find(n); it != cache.end()) {
 			// Reset the variable's priority only if the cached
 			// result actually eliminated the quantifier

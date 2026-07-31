@@ -827,6 +827,30 @@ inline auto is_wff_bdd_var = [](tref n) {
  * @endcode
  * @endinternal
  */
+/**
+ * @internal
+ * @brief The atomic formula kinds `boole_normal_form` treats as BDD variables:
+ * `bf_eq`, `bf_lt` and `bf_lteq`.
+ *
+ * Kept as one predicate so the filter that selects them and the two consumers
+ * that assert on them cannot drift apart -- they did, and a bitvector
+ * comparison (which the construction hooks do not expand) aborted Debug builds
+ * while Release decomposed it correctly.
+ * @tparam node Tree node type.
+ * @endinternal
+ */
+template <NodeType node>
+bool is_atomic_bdd_var(tref n) {
+	using tau = tree<node>;
+	if (!tau::get(n).is(tau::wff)) return false;
+	switch (tau::get(n)[0].value.nt) {
+		case tau::bf_eq:
+		case tau::bf_lt:
+		case tau::bf_lteq: return true;
+		default: return false;
+	}
+}
+
 template <NodeType node>
 inline auto is_bf_bdd_var = [](tref n) {
 	using tau = tree<node>;
@@ -1745,6 +1769,17 @@ auto variable_order_for_simplification = [](tref l, tref r) static {
 	DBG(assert(tau::get(r).is(tau::variable));)
 	// Reject equal
 	if (tau::get(l) == tau::get(r)) return false;
+	// Non-io variables form a single class ordered *after* every io variable,
+	// as the comment above states ("... < input < output < other variable").
+	// This also makes the relation a valid strict weak ordering: the previous
+	// version returned false for every pair involving a non-io variable in
+	// both directions, which made each non-io variable equivalent to each io
+	// variable while io variables stayed strictly ordered among themselves --
+	// so incomparability was not transitive and std::ranges::stable_sort's
+	// precondition was violated, leaving the BDD variable order (and hence the
+	// normal form) unspecified.
+	if (!is_io_var<node>(l)) return false;
+	if (!is_io_var<node>(r)) return true;
 	if (is_io_var<node>(l)) {
 		// Check if r is also stream
 		if (is_io_var<node>(r)) {
@@ -1792,8 +1827,8 @@ auto variable_order_for_simplification = [](tref l, tref r) static {
 					} else return false;
 				} else return false;
 			}
-		} else return false; // compare equal
-	} else return false; // compare equal
+		} else return false; // unreachable: handled by the guard above
+	} else return false; // unreachable: handled by the guard above
 };
 
 /**
@@ -1810,9 +1845,12 @@ auto atm_formula_order_for_simplification = [](tref l, tref r) static {
 	// 1) lowest time points in free variables have priority, then
 	// 2) lowest highest time points in free variables and last
 	// 3) number of free io variables
-	DBG(using tau = tree<node>;)
-	DBG(assert(tau::get(l).child_is(tau::bf_eq));)
-	DBG(assert(tau::get(r).child_is(tau::bf_eq));)
+	// boole_normal_form's is_atomic admits bf_eq, bf_lt and bf_lteq, so all
+	// three reach this comparator (a bv `<` is not expanded by the
+	// construction hooks and survives intact). Ordering only reads free
+	// variables, which every atom kind has.
+	DBG(assert(is_atomic_bdd_var<node>(l));)
+	DBG(assert(is_atomic_bdd_var<node>(r));)
 	// For l
 	std::pair<bool, int_t> low_t_l {true, 0}, high_t_l {true, 0};
 	bool is_high_init = false;
@@ -2814,7 +2852,10 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(formula) << "\n";)
 		return formula;
 	}
-	DBG(assert(tau::get(vars[idx]).child_is(tau::bf_eq));)
+	// Same three atom kinds as boole_normal_form's is_atomic: decomposing on
+	// an order atom treats it as an opaque Boolean variable, which is sound
+	// and is what Release has always done here (the assert is DBG-only).
+	DBG(assert(is_atomic_bdd_var<node>(vars[idx]));)
 	tref p1 = tau::get(formula).replace(vars[idx], tau::_T());
 	// Ensure early detection of F
 	p1 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p1);
@@ -2899,19 +2940,9 @@ tref boole_normal_form(tref formula) {
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
 	// Step 4: Convert formula to Boole normal form
 	// First get atomic formulas without !=
-	auto is_atomic = [](tref n) {
-		if (!tau::get(n).is(tau::wff)) return false;
-		const tau& c = tau::get(n)[0];
-		switch (c.value.nt) {
-			case tau::bf_eq:
-			case tau::bf_lt:
-			case tau::bf_lteq: return true;
-			default: return false;
-		}
-	};
 	tref eq_bnf = normalize_atomic_formula_operators<node>(bnf);
 	trefs atms = rewriter::select_top_until<node>(eq_bnf,
-		is_atomic, is_quantifier<node>);
+		is_atomic_bdd_var<node>, is_quantifier<node>);
 	// No variables for Boole decomposition
 	if (atms.empty()) {
 #ifdef TAU_CACHE
