@@ -36,16 +36,23 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 	static constexpr bool non_aba_omcat = false;
 
 	// ── type system ─────────────────────────────────────────────────────
+	// Derived from type_name above, so the name is written once. The helper
+	// is templated on your value type so its memo is yours alone.
 	static bool matches_type(tref type_tree) {
-		return tau::get(type_tree)[0].get_string() == type_name;
+		return ba_types_detail::type_tree_name_is<my_ba, node_t>(
+			type_tree, type_name);
 	}
 
-	static tref type_tree() { return my_ba_type<node_t>(); }
+	static tref type_tree() {
+		return ba_types_detail::make_syntactic_type_tree<node_t>(
+			type_name);
+	}
 
 	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
 
 	static bool owns_type(size_t ba_type_id) {
-		return matches_type(ba_types<node_t>::type_tree(ba_type_id));
+		return ba_types_detail::type_tree_name_is<my_ba, node_t>(
+			ba_type_id, type_name);
 	}
 
 	/** @brief Return the subtype for a parameterized type (`bv[8]`). */
@@ -54,7 +61,8 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 	}
 
 	static size_t type_id_for(unsigned short) {
-		return ba_types<node_t>::id(type_tree());
+		static const size_t id = ba_types<node_t>::id(type_tree());
+		return id;
 	}
 
 	static tref type_tree_for(unsigned short) { return type_tree(); }

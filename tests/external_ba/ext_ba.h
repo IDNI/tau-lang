@@ -48,8 +48,7 @@ inline std::ostream& operator<<(std::ostream& os, const ext_ba& x) {
 /** @brief Type tree naming this algebra in an annotation (`x:ext`). */
 template <NodeType node>
 tref ext_ba_type() {
-	using tau = tree<node>;
-	return tau::get(tau::typed, tau::get(tau::type, "ext"));
+	return ba_descriptor<ext_ba, node>::type_tree();
 }
 
 template <typename... BAs>
@@ -74,15 +73,20 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 	static constexpr bool non_aba_omcat = false;
 
 	static bool matches_type(tref type_tree) {
-		return tau::get(type_tree)[0].get_string() == type_name;
+		return ba_types_detail::type_tree_name_is<ext_ba, node_t>(
+			type_tree, type_name);
 	}
 
-	static tref type_tree() { return ext_ba_type<node_t>(); }
+	static tref type_tree() {
+		return ba_types_detail::make_syntactic_type_tree<node_t>(
+			type_name);
+	}
 
 	static bool owns_type(tref type_tree) { return matches_type(type_tree); }
 
 	static bool owns_type(size_t ba_type_id) {
-		return matches_type(ba_types<node_t>::type_tree(ba_type_id));
+		return ba_types_detail::type_tree_name_is<ext_ba, node_t>(
+			ba_type_id, type_name);
 	}
 
 	static std::optional<unsigned short> type_param(tref) {
@@ -90,7 +94,8 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 	}
 
 	static size_t type_id_for(unsigned short) {
-		return ba_types<node_t>::id(type_tree());
+		static const size_t id = ba_types<node_t>::id(type_tree());
+		return id;
 	}
 
 	static tref type_tree_for(unsigned short) { return type_tree(); }

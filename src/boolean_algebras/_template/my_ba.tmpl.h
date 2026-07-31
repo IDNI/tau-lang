@@ -8,10 +8,11 @@
 namespace idni::tau_lang {
 
 /** @brief Type tree naming this algebra in a type annotation (`x:my_ba`). */
+// Derived from the descriptor, which builds it from its own type_name. Keep it
+// if your own code wants the short spelling; core never calls it.
 template <NodeType node>
 tref my_ba_type() {
-	using tau = tree<node>;
-	return tau::get(tau::typed, tau::get(tau::type, "my_ba"));
+	return ba_descriptor<my_ba, node>::type_tree();
 }
 
 template <typename... BAs>
