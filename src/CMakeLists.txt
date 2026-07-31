@@ -1,11 +1,14 @@
 set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
-set(TAU_HEADERS
+# The amalgamated tau.h is built from TAU_CORE_HEADERS -- generic core only, so
+# its content does not change with -DTAU_BAS=. The pack arrives through the
+# generated tau_pack.h, which tau.h.in includes last, so a consumer still needs
+# only #include "tau.h". TAU_HEADERS stays the full list for dependency tracking.
+set(TAU_CORE_HEADERS
 	../parser/tau_parser.generated.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h	# described but not a TAU_BAS entry
-	${TAU_BA_HEADERS}		# the configured pack, from cmake/tau_bas.cmake
 	boolean_algebras/variant_ba.h
 	boolean_algebras/nso_ba.h
 	heuristics/ex_subs_based_elimination.h  # heuristic for eliminating existential quantifiers based on substitution
@@ -37,8 +40,12 @@ set(TAU_HEADERS
 	api.h
 	union_find.h       # union find data structure
 	union_find_with_sets.h
-	undefs.h           # undefines implementation macros
 )
+# undefs.h is not listed above: it undefines the implementation macros, so it
+# has to come after the pack that tau.h.in includes last, not before it.
+
+# core plus the configured pack: what the build depends on and installs
+set(TAU_HEADERS ${TAU_CORE_HEADERS} ${TAU_BA_HEADERS})
 
 # grammar tables, compiled here instead of in every TU including the parser
 set(TAU_PARSER_SOURCES
@@ -77,7 +84,7 @@ message(STATUS "TAU_SOURCE_DIR: ${TAU_SOURCE_DIR}")
 add_custom_command(
 	OUTPUT ${TAU_HEADER}
 	COMMAND ${CMAKE_COMMAND}
-		-DTAU_HEADERS="${TAU_HEADERS}"
+		-DTAU_HEADERS="${TAU_CORE_HEADERS}"
 		-DTAU_HEADER_TEMPLATE="${TAU_HEADER_TEMPLATE}"
 		-DTAU_HEADER="${TAU_HEADER}"
 		-DTAU_SOURCE_DIR="${TAU_SOURCE_DIR}"

@@ -10,4 +10,11 @@
 
 @TAU_HEADER_CONTENT@
 
+// The configured BA pack, generated into the build tree. Last, because the
+// plugin headers it pulls in are written against the core above.
+#include "tau_pack.h"
+
+// last of all: undefines the implementation macros the pack above still uses
+#include "undefs.h"
+
 #endif // __IDNI__TAU__TAU_H__
