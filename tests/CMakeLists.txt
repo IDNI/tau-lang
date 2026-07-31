@@ -61,18 +61,59 @@ set(TAU_SKIP_TESTS
 # A test that names a Boolean algebra cannot build in a pack without it, so a
 # reduced -DTAU_BAS= must skip it rather than fail. This is derived at configure
 # time instead of from a hand-kept list, so a new test classifies itself and no
-# list drifts. The match is deliberately loose on the trailing side, to catch
-# `sbf_ba`, `nlang_ba` and `bv[8]` as well as bare ids; the cost of a false
-# positive is one test skipped in a reduced pack, which the skip message below
-# makes visible. For the full pack nothing is skipped and the build is unchanged.
+# list drifts. The match is deliberately loose on both sides, to catch `sbf_ba`,
+# `nlang_ba`, `bv[8]` and `is_tref_bv_type_family` as well as bare ids; only a
+# letter or digit adjoining the id rejects it, so `bvector` does not match. The
+# cost of a false positive is one test skipped in a reduced pack, which the skip
+# message below makes visible. For the full pack nothing is skipped and the build
+# is unchanged.
 #
+# A fixture helper pins its own pack instead of following TAU_BAS, so it is
+# scanned along with any test including it. Pack-agnostic helpers name no BA and
+# need no entry here.
+#
+set(TAU_TEST_FIXTURE_HELPERS test_Bool_helpers.h test_sbf_ba_helpers.h)
+set(_TAU_TEST_HELPER_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
 function(tau_test_required_bas out src)
 	set(_req "")
 	if(EXISTS "${src}")
 		file(READ "${src}" _tau_src)
+		foreach(_h ${TAU_TEST_FIXTURE_HELPERS})
+			if(_tau_src MATCHES "${_h}")
+				file(READ "${_TAU_TEST_HELPER_DIR}/${_h}" _tau_fixture)
+				string(APPEND _tau_src "${_tau_fixture}")
+			endif()
+		endforeach()
 		foreach(_id bv sbf qlt qint hsb nlang)
-			if(_tau_src MATCHES "[^A-Za-z0-9_]${_id}")
+			if(_tau_src MATCHES "[^A-Za-z0-9]${_id}")
 				list(APPEND _req ${_id})
+			endif()
+		endforeach()
+	endif()
+	set(${out} "${_req}" PARENT_SCOPE)
+endfunction()
+
+#
+# Which external packages a test needs, read the same way.
+#
+# A test may use a dependency directly rather than through a BA -- cvc5 as a
+# cross-validation oracle -- and that dependency is only configured when some BA
+# in the pack requires it. Maps a dependency's include prefix to the package name
+# the BA manifests declare.
+#
+set(TAU_TEST_DEP_HEADERS "cvc5/=cvc5" "curl/=CURL")
+
+function(tau_test_required_packages out src)
+	set(_req "")
+	if(EXISTS "${src}")
+		file(READ "${src}" _tau_src)
+		foreach(_entry ${TAU_TEST_DEP_HEADERS})
+			string(REPLACE "=" ";" _pair "${_entry}")
+			list(GET _pair 0 _hdr)
+			list(GET _pair 1 _pkg)
+			if(_tau_src MATCHES "include[ \t]*<${_hdr}")
+				list(APPEND _req ${_pkg})
 			endif()
 		endforeach()
 	endif()
@@ -91,6 +132,14 @@ function(add test_name)
 		if(NOT _id IN_LIST TAU_PACK_BA_IDS)
 			message(STATUS
 				"Skipping ${N}: needs BA '${_id}', not in TAU_BAS")
+			return()
+		endif()
+	endforeach()
+	tau_test_required_packages(_tau_pkgs "${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp")
+	foreach(_pkg ${_tau_pkgs})
+		if(NOT _pkg IN_LIST TAU_BA_REQUIRED_PACKAGES)
+			message(STATUS
+				"Skipping ${N}: needs package '${_pkg}', which no BA in TAU_BAS requires")
 			return()
 		endif()
 	endforeach()
