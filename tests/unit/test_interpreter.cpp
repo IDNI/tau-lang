@@ -91,3 +91,95 @@ TEST_SUITE("interpreter") {
 		CHECK(maybe_outputs.value().at({ "o", 1 }) == "T");
 	}
 }
+
+// Coverage-driven additions (2026-08-01). interpreter.tmpl.h measured 79.6%
+// line coverage. A large share of the gap is its I/O failure handling in
+// read()/write(): what happens when an input stream errors outright, yields a
+// value that is not a parseable BA constant, or an output stream refuses a
+// write. No test supplied a misbehaving stream, so none of those branches ran.
+//
+// interpreter_options::input_remaps / output_remaps make these reachable from
+// the public API with purpose-built streams, which is what the suite below
+// does. Note the distinction the interpreter draws between the two ways an
+// input stream can decline to produce a value: an EMPTY STRING means "no more
+// inputs" and ends the run gracefully, whereas NULLOPT is a read error.
+namespace {
+
+// get() fails outright, as opposed to signalling end-of-input with "".
+struct failing_input_stream : serialized_constant_input_stream {
+	std::shared_ptr<serialized_constant_input_stream> rebuild() override {
+		return std::make_shared<failing_input_stream>();
+	}
+	std::optional<std::string> get() override { return std::nullopt; }
+};
+
+// get() yields a value that is not a parseable BA constant.
+struct garbage_input_stream : serialized_constant_input_stream {
+	std::shared_ptr<serialized_constant_input_stream> rebuild() override {
+		return std::make_shared<garbage_input_stream>();
+	}
+	std::optional<std::string> get() override {
+		return std::string{ "! ) ( not a constant" };
+	}
+};
+
+// put() reports failure for every write.
+struct failing_output_stream : serialized_constant_output_stream {
+	std::shared_ptr<serialized_constant_output_stream> rebuild() override {
+		return std::make_shared<failing_output_stream>();
+	}
+	bool put(const std::string&) override { return false; }
+};
+
+} // namespace
+
+TEST_SUITE("interpreter: misbehaving streams") {
+
+	TEST_CASE("an input stream that errors makes the step fail") {
+		interpreter_options opts;
+		opts.input_remaps["i"] = std::make_shared<failing_input_stream>();
+		opts.output_remaps["o"] = std::make_shared<vector_output_stream>();
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		CHECK(!tau_api::step(maybe_i.value()).has_value());
+	}
+
+	TEST_CASE("an unparseable input value makes the step fail") {
+		interpreter_options opts;
+		opts.input_remaps["i"] = std::make_shared<garbage_input_stream>();
+		opts.output_remaps["o"] = std::make_shared<vector_output_stream>();
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		CHECK(!tau_api::step(maybe_i.value()).has_value());
+	}
+
+	TEST_CASE("an output stream that refuses the write makes the step fail") {
+		interpreter_options opts;
+		opts.input_remaps["i"] = std::make_shared<vector_input_stream>(
+			std::vector<std::string>{ "T", "F" });
+		opts.output_remaps["o"] = std::make_shared<failing_output_stream>();
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		CHECK(!tau_api::step(maybe_i.value()).has_value());
+	}
+
+	// Contrast: an EMPTY value is the graceful "no more inputs" signal rather
+	// than an error, so the run ends without the step reporting failure the
+	// way the error cases above do.
+	TEST_CASE("an exhausted vector input stream ends the run gracefully") {
+		auto in = std::make_shared<vector_input_stream>(
+			std::vector<std::string>{ "T" });
+		auto out = std::make_shared<vector_output_stream>();
+		interpreter_options opts;
+		opts.input_remaps["i"] = in;
+		opts.output_remaps["o"] = out;
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+		// First step consumes the only value and produces an output.
+		CHECK(tau_api::step(i).has_value());
+		CHECK(out->get_values().size() == 1);
+		// The stream is now exhausted and returns "", ending the run.
+		CHECK(!tau_api::step(i).has_value());
+	}
+}
