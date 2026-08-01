@@ -266,3 +266,227 @@ TEST_SUITE("Tau API - boole_normal_form regressions") {
 			CHECK( !tau_api::boole_normal_form(s).has_value() );
 	}
 }
+
+// Coverage-driven additions (2026-08-01). api.tmpl.string.h measured 73.4% line
+// / 31.0% branch -- the worst branch coverage of any file in src/. The cause is
+// visible in the suites above: every string-API entry point had *malformed*
+// input tests (AP-8) but almost none had a test for the SUCCESS return, so the
+// `if (tref x = ...; x) return to_str(x);` line of each wrapper was cold.
+//
+// These suites cover those success returns. Where the exact output string is
+// stable it is asserted directly, in the style of the boole_normal_form
+// regressions above; otherwise the assertion is the round-trip invariant that
+// actually matters for a string API -- what comes out must parse back in.
+TEST_SUITE("Tau API - string - normal form success paths") {
+
+	TEST_CASE_FIXTURE(api_fixture, "dnf / cnf / nnf return re-parseable formulas") {
+		for (const char* s : { "x = 0 && (y = 0 || z = 0)",
+					"x = 0 || y = 0",
+					"!(x = 0 && y = 0)" }) {
+			CAPTURE(s);
+			auto d = tau_api::dnf(s);
+			REQUIRE( d.has_value() );
+			CHECK( tau_api::is_formula(*d) );
+			auto c = tau_api::cnf(s);
+			REQUIRE( c.has_value() );
+			CHECK( tau_api::is_formula(*c) );
+			auto n = tau_api::nnf(s);
+			REQUIRE( n.has_value() );
+			CHECK( tau_api::is_formula(*n) );
+		}
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "normalize_formula reduces a tautology") {
+		auto taut = tau_api::normalize_formula("x = 0 || x != 0");
+		REQUIRE( taut.has_value() );
+		CHECK( *taut == "T" );
+		auto contra = tau_api::normalize_formula("x = 0 && x != 0");
+		REQUIRE( contra.has_value() );
+		CHECK( *contra == "F" );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "normalize_term returns a re-parseable term") {
+		auto t = tau_api::normalize_term("x & x");
+		REQUIRE( t.has_value() );
+		CHECK( tau_api::is_term(*t) );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "syntactic simplification success paths") {
+		auto term = tau_api::syntactic_term_simplification("x & x");
+		REQUIRE( term.has_value() );
+		CHECK( tau_api::is_term(*term) );
+
+		auto fm = tau_api::syntactic_formula_simplification(
+			"x = 0 && x = 0");
+		REQUIRE( fm.has_value() );
+		CHECK( tau_api::is_formula(*fm) );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "simplify success path") {
+		auto s = tau_api::simplify("x & x", true);
+		REQUIRE( s.has_value() );
+		auto s2 = tau_api::simplify("x & x", false);
+		REQUIRE( s2.has_value() );
+	}
+}
+
+TEST_SUITE("Tau API - string - quantifier handling success paths") {
+
+	TEST_CASE_FIXTURE(api_fixture, "anti_prenex returns a re-parseable formula") {
+		auto a = tau_api::anti_prenex("ex x (x = 0 && y = 0)");
+		REQUIRE( a.has_value() );
+		CHECK( tau_api::is_formula(*a) );
+	}
+
+	// eliminate_quantifiers chains apply_all_defs -> anti_prenex ->
+	// resolve_quantifiers; all three success lines were uncovered.
+	TEST_CASE_FIXTURE(api_fixture, "eliminate_quantifiers removes the quantifier") {
+		auto r = tau_api::eliminate_quantifiers("ex x x = 0");
+		REQUIRE( r.has_value() );
+		CHECK( tau_api::is_formula(*r) );
+		CHECK( r->find("ex ") == std::string::npos );
+
+		auto r2 = tau_api::eliminate_quantifiers("all x (x = 0 || x != 0)");
+		REQUIRE( r2.has_value() );
+		CHECK( r2->find("all ") == std::string::npos );
+	}
+}
+
+TEST_SUITE("Tau API - string - substitution success paths") {
+
+	TEST_CASE_FIXTURE(api_fixture, "substitute one term for another") {
+		auto r = tau_api::substitute("x + y", "x", "z");
+		REQUIRE( r.has_value() );
+		CHECK( tau_api::is_term(*r) );
+		CHECK( r->find('z') != std::string::npos );
+		CHECK( r->find('x') == std::string::npos );
+	}
+
+	// The map overload loops, substituting each pair in turn.
+	TEST_CASE_FIXTURE(api_fixture, "substitute several terms at once") {
+		auto r = tau_api::substitute("x + y",
+			std::map<std::string, std::string>{ {"x", "z"}, {"y", "w"} });
+		REQUIRE( r.has_value() );
+		CHECK( tau_api::is_term(*r) );
+		CHECK( r->find('z') != std::string::npos );
+		CHECK( r->find('w') != std::string::npos );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "substitute rejects malformed arguments") {
+		// Each of the three parse sites in the three-argument overload.
+		CHECK( !tau_api::substitute("! ) (", "x", "z").has_value() );
+		CHECK( !tau_api::substitute("x + y", "! ) (", "z").has_value() );
+		CHECK( !tau_api::substitute("x + y", "x", "! ) (").has_value() );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "substitute rejects a malformed pair") {
+		CHECK( !tau_api::substitute("x + y",
+			std::map<std::string, std::string>{ {"x", "! ) ("} })
+			.has_value() );
+		CHECK( !tau_api::substitute("x + y",
+			std::map<std::string, std::string>{ {"! ) (", "z"} })
+			.has_value() );
+	}
+
+	// apply_defs' success return was uncovered: the existing tests only feed
+	// it malformed definitions.
+	TEST_CASE_FIXTURE(api_fixture, "apply_defs expands a valid definition") {
+		auto r = tau_api::apply_defs(
+			std::set<std::string>{ "f(x) := x + 1" }, "f(y)");
+		REQUIRE( r.has_value() );
+		CHECK( !r->empty() );
+	}
+}
+
+TEST_SUITE("Tau API - string - solving success paths") {
+
+	// solve/lgrs each build a std::map<std::string, std::string> from the
+	// tref-level solution; those five-line blocks were entirely uncovered.
+	TEST_CASE_FIXTURE(api_fixture, "solve returns a variable to value map") {
+		auto s = tau_api::solve("x = 0");
+		REQUIRE( s.has_value() );
+		CHECK( !s->empty() );
+		for (const auto& [var, val] : *s) {
+			CAPTURE(var);
+			CAPTURE(val);
+			CHECK( !var.empty() );
+		}
+	}
+
+	// api::lgrs is NOT called here with a single equality such as "x = 0",
+	// because it aborts. That abort is a known pre-existing bug (see the note
+	// on the "lgrs" case in tests/api/test_api-tref_api.cpp) and it is
+	// reachable from the string API too, not only from the tref overload.
+	//
+	// LOCALIZED (2026-08-01): the abort is src/api.tmpl.h:498-499, which does
+	//     tau::get(eq)[0] ... tau::get(eq)[1]
+	// where `eq` is the whole wff. For a single equality that wff has exactly
+	// ONE child, so [1] is null and tree::operator[] -> child_tree() trips
+	// `assert(c != nullptr)` (src/tau_tree.tmpl.h:579). The line above it
+	// already extracted the equality itself into `equality`, whose two
+	// children are the sides being checked for non-Boolean operations.
+	//
+	// Verified by experiment: substituting `equality` for `eq` on those two
+	// lines makes lgrs("x = 0") both stop aborting AND return a solution.
+	// The fix is left to src/ owners -- this is a tests-only change -- but it
+	// is a two-token edit, not the norm_all_equations()/apply_all_xor_def()
+	// preprocessing issue the older note in test_api-tref_api.cpp guesses at.
+	//
+	// A disjunction takes an earlier exit and so is safe to call: `equality`
+	// comes back null (the top node is wff_or, not bf_eq) and lgrs reports
+	// "Invalid argument(s)" gracefully. That guard is what is covered here.
+	TEST_CASE_FIXTURE(api_fixture, "lgrs rejects a non-equality gracefully") {
+		CHECK( !tau_api::lgrs("x = 0 || y = 0").has_value() );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "solve and lgrs reject malformed input") {
+		for (const char* s : { "", "x ) ( invalid !!!" }) {
+			CAPTURE(s);
+			CHECK( !tau_api::solve(s).has_value() );
+			CHECK( !tau_api::lgrs(s).has_value() );
+		}
+	}
+}
+
+TEST_SUITE("Tau API - string - step error paths") {
+
+	// step() looks each supplied input name up in the interpreter's context
+	// and bails when it is absent. Previously uncovered.
+	TEST_CASE("step rejects an unknown input stream name") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		inputs[stream_at{ "no_such_stream", 0 }] = "T.";
+		CHECK( !tau_api::step(i, inputs).has_value() );
+	}
+
+	// A syntactically valid stream name with an unparseable value hits the
+	// "Failed to parse input value" branch.
+	TEST_CASE("step rejects an unparseable input value") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		inputs[stream_at{ "i", 0 }] = "! ) ( not a constant";
+		CHECK( !tau_api::step(i, inputs).has_value() );
+	}
+
+	// The "this" pseudo-stream is skipped rather than looked up.
+	TEST_CASE("step skips the \"this\" pseudo-stream") {
+		auto maybe_i = tau_api::get_interpreter("o[t] = i[t].");
+		REQUIRE( maybe_i.has_value() );
+		auto& i = maybe_i.value();
+		std::map<stream_at, std::string> inputs;
+		inputs[stream_at{ "this", 0 }] = "ignored";
+		inputs[stream_at{ "i", 0 }] = "T.";
+		CHECK( tau_api::step(i, inputs).has_value() );
+	}
+
+	// get_interpreter's own parse-failure branch: note that "o[t] =" (used by
+	// the "handle syntax error" case above) still parses as a spec and fails
+	// later, so a harder malformed string is needed to reach it.
+	TEST_CASE("get_interpreter reports spec parse failure") {
+		CHECK( !tau_api::get_interpreter("x ) ( invalid !!!").has_value() );
+	}
+}
