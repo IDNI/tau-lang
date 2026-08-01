@@ -406,3 +406,163 @@ TEST_SUITE("semantic-error predicates") {
 		CHECK(!has_semantic_error<node_t>(get_nso_rr("x=0.").value().main->get()));
 	}
 }
+
+// ── expression_paths: multi-level paths, terms, iterator equality ───────────
+//
+// Coverage-driven additions (2026-08-01). tau_tree_extractors.tmpl.h measured
+// 85.3% line coverage, and its single largest cold region is inside
+// expression_paths<node>::iterator::apply(). The TT-12 suite above uses
+// "(a=0||b=0)&&x=0." -- exactly ONE wff_or -- so `decisions` never holds more
+// than one element and three groups of lines never ran:
+//
+//   * the "go left" / "go right" arms that exclude the not-taken branch when
+//     the current disjunction is NOT the last decision (needs >= 2 wff_or on
+//     one path),
+//   * the `term` arm, which looks for bf_or/bf_xor rather than wff_or (needs
+//     expression_paths over a Boolean function rather than a formula),
+//   * iterator::operator==' s two asymmetric branches, which compare decision
+//     vectors of differing length.
+
+TEST_SUITE("expression_paths: multi-level and term paths") {
+
+	// Collect paths with a range-for. This is the only safe way: see the
+	// ITERATOR CONTRACT note at the end of this suite -- building a container
+	// from begin()/end() corrupts the heap.
+	auto collect = [](tref e) {
+		trefs out;
+		for (tref p : expression_paths<node_t>(e)) out.push_back(p);
+		return out;
+	};
+
+	// Two independent disjunctions -> 2 * 2 = 4 paths, and decisions grows to
+	// size 2, so the non-final-decision arms of the remove lambda run.
+	TEST_CASE("two disjunctions enumerate four paths") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&x=0.")
+			.value().main->get();
+		trefs paths = collect(fm);
+		CHECK(paths.size() == 4);
+		// every enumerated path is a distinct formula
+		for (size_t i = 0; i < paths.size(); ++i)
+			for (size_t j = i + 1; j < paths.size(); ++j)
+				CHECK(paths[i] != paths[j]);
+	}
+
+	TEST_CASE("three disjunctions enumerate eight paths") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&(e=0||f=0).")
+			.value().main->get();
+		trefs paths = collect(fm);
+		CHECK(paths.size() == 8);
+	}
+
+	// apply() over a multi-level expression exercises the excluded-subtree
+	// bookkeeping that a single-disjunction expression never reaches.
+	TEST_CASE("apply over two disjunctions visits every path") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&x=0.")
+			.value().main->get();
+		trefs seen;
+		auto record = [&](tref res) { seen.push_back(res); return true; };
+		auto identity = [](tref path) { return path; };
+		expression_paths<node_t>(fm).apply(identity, record);
+		// pre-check protocol: one call per path plus a final one
+		CHECK(seen.size() == 5);
+		CHECK(seen.front() == nullptr);
+	}
+
+	TEST_CASE("apply_only_if over two disjunctions undoes all on rejection") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&x=0.")
+			.value().main->get();
+		auto reject_all = [](tref) { return false; };
+		auto to_T = [](tref) { return tau::_T(); };
+		tref result = expression_paths<node_t>(fm)
+			.apply_only_if(to_T, reject_all);
+		CHECK(result == fm);   // fully restored
+	}
+
+	// The `term` arm: over a Boolean function, the split points are bf_or and
+	// bf_xor rather than wff_or, and exhaustion yields _0 rather than _F.
+	TEST_CASE("paths over a term split on bf_or") {
+		static tau::get_options bf_opts{ .parse = { .start = tau::bf } };
+		tref term = tau::get("a|b", bf_opts);
+		REQUIRE(term != nullptr);
+		trefs paths = collect(term);
+		CHECK(paths.size() == 2);
+	}
+
+	TEST_CASE("paths over a term split on bf_xor") {
+		static tau::get_options bf_opts{ .parse = { .start = tau::bf } };
+		tref term = tau::get("a^b", bf_opts);
+		REQUIRE(term != nullptr);
+		trefs paths = collect(term);
+		CHECK(paths.size() >= 2);
+	}
+
+	TEST_CASE("apply over a term transforms a path") {
+		static tau::get_options bf_opts{ .parse = { .start = tau::bf } };
+		tref term = tau::get("a|b", bf_opts);
+		REQUIRE(term != nullptr);
+		size_t calls = 0;
+		auto accept_first = [&](tref) { ++calls; return true; };
+		auto to_0 = [](tref) { return tau::_0(0); };
+		tref result = expression_paths<node_t>(term)
+			.apply_only_if(to_0, accept_first);
+		CHECK(calls == 1);
+		REQUIRE(result != nullptr);
+	}
+
+	// iterator::operator== compares decision vectors, and has separate arms
+	// for "mine is shorter" and "theirs is shorter"; a begin() iterator (no
+	// decisions yet) against an advanced one reaches both, depending on
+	// which side is on the left.
+	TEST_CASE("iterators at different decision depths compare correctly") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&x=0.")
+			.value().main->get();
+		expression_paths<node_t> paths(fm);
+		auto first = paths.begin();
+		auto advanced = paths.begin();
+		++advanced;
+		CHECK(first != advanced);
+		CHECK(advanced != first);   // exercises the mirrored branch
+		auto same = paths.begin();
+		CHECK(first == same);
+		// an exhausted iterator equals end() from either side
+		auto it = paths.begin();
+		size_t guard = 0;
+		while (it != paths.end() && guard++ < 16) ++it;
+		CHECK(it == paths.end());
+		CHECK(paths.end() == it);
+	}
+
+	// ITERATOR CONTRACT BUG found while writing this suite (2026-08-01).
+	//
+	// expression_paths<node>::iterator declares
+	//     using iterator_category = std::forward_iterator_tag;
+	// (src/tau_tree.tmpl.h:57) but it is NOT a forward iterator:
+	//
+	//   * operator*() is non-const and mutates the iterator's state, and
+	//   * operator++() carries the comment "WARNING: Only use after calling
+	//     operator*() at least once on current state".
+	//
+	// That is a single-pass, dereference-before-increment iterator, i.e. at
+	// most an input iterator. Standard algorithms trust the declared tag, and
+	// for a forward iterator std::vector's range constructor is entitled to
+	// call std::distance(first, last) to size its buffer -- which increments
+	// WITHOUT dereferencing, violating the documented precondition.
+	//
+	// The observable result of
+	//     trefs p{ ep.begin(), ep.end() };
+	// is heap corruption ("free(): invalid size" / "corrupted size vs.
+	// prev_size") once the expression has more than one path. The assertions
+	// still pass and the path count is still right, so the damage is silent
+	// and only aborts later in unrelated code.
+	//
+	// No production caller hits this: every use in src/ is either a range-for
+	// over a single temporary or apply()/apply_only_if(), all of which are
+	// genuine single passes that dereference before incrementing.
+	// tests/unit/test_normal_forms.cpp ("normal forms: dnf paths" case 4) does
+	// use the begin()/end() form and survives only because its sample yields
+	// exactly one path.
+	//
+	// Fix belongs in src/: declare std::input_iterator_tag, which makes the
+	// standard library stop assuming multi-pass and takes the distance-first
+	// path out of play.
+}
