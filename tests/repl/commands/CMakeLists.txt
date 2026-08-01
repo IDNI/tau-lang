@@ -14,6 +14,7 @@ include(test_repl-set_cmd.cmake)
 include(test_repl-enable_cmd.cmake)
 include(test_repl-disable_cmd.cmake)
 include(test_repl-toggle_cmd.cmake)
+include(test_repl-option_aliases.cmake)
 
 # commands for specs, formulas and terms
 
