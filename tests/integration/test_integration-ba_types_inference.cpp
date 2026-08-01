@@ -2103,3 +2103,106 @@ TEST_SUITE("ba_types_inference: type conflicts are rejected") {
 		CHECK( infers_wff("((bv[16]) x:bv[8]) = y:bv[16]") );
 	}
 }
+
+// ── Branch pass: the rr / ref / fallback error arms ─────────────────────────
+//
+// Coverage-driven addition (2026-08-01), branch pass. The suite above covers
+// the conflict arms for variables, equations, quantifiers and terms. What
+// remained cold in ba_types_inference.tmpl.h were the SAME
+// `holds_alternative<inference_error>(updated)` propagation arms in the five
+// functions that handle definitions and references:
+// update_functional_fallback, update_predicate_fallback, update_functional_rr,
+// update_predicate_rr and update_functional_ref.
+//
+// Those positions are only reachable through a recurrence relation or a
+// reference to one, which none of the wff/bf-level cases above construct.
+namespace {
+
+// True when the definitions block parses AND type inference succeeds.
+bool infers_defs(const std::string& src) {
+	tref parsed = tree<node_t>::get(src, parse_definitions_no_infer());
+	if (!parsed) return false;
+	auto [inferred, _] = infer_ba_types<node_t>(parsed);
+	return inferred != nullptr;
+}
+
+// Same, for a whole spec (definitions plus a main formula).
+bool infers_spec(const std::string& src) {
+	tref parsed = tree<node_t>::get(src, parse_no_infer());
+	if (!parsed) return false;
+	auto [inferred, _] = infer_ba_types<node_t>(parsed);
+	return inferred != nullptr;
+}
+
+} // namespace
+
+TEST_SUITE("ba_types_inference: conflicts in definitions and references") {
+
+	TEST_CASE("a functional definition body conflicting with its parameter") {
+		CHECK( !infers_defs("f(x:bv[8]) := x:sbf.") );
+	}
+
+	TEST_CASE("a predicate definition body conflicting with its parameter") {
+		CHECK( !infers_defs("f(x:bv[8]) := x:sbf = 0.") );
+	}
+
+	// TI-1 -- argument types do NOT propagate across a reference.
+	// `f` takes a bv[8] and `g` hands it an sbf, which inference accepts.
+	// That is consistent with per-definition type scoping (the resolver is
+	// a type_scoped_resolver: each rec_relation gets its own scope, so a
+	// callee's parameter type is not visible at the call site), but it does
+	// mean a plainly wrong argument family passes the checker in silence.
+	// Pinning the observed behaviour; whether it is intended is a question
+	// for whoever owns the scoping rule.
+	TEST_CASE("TI-1: a reference argument of the wrong family is accepted") {
+		CHECK( infers_defs("f(x:bv[8]) := x."
+				   "g(y:sbf) := f(y).") );
+	}
+
+	// fp_fallback accepts first | last | capture | ref | wff | bf
+	// (parser/tau.tgf), so a fallback carries its own inferable expression
+	// and its own conflict arm, separate from the definition it guards.
+
+	// These stop at infer_ba_types and never execute the spec -- see TI-2
+	// for why executing one of them is not an option.
+
+	// TI-2 -- a fallback whose type conflicts with the reference it guards
+	// is ACCEPTED by inference. The same annotation one position to the
+	// left ("a functional definition body conflicting with its parameter"
+	// above) is rejected, so this is a hole in the fallback arm rather than
+	// a family that unifies.
+	//
+	// It matters because of what happens next: running this exact spec
+	// through the interpreter (tau <spec> -q) produced no result within a
+	// 120s timeout, where the same spec with a matching fallback reaches
+	// execution immediately. Not proven to be an infinite loop -- only that
+	// it does not finish in 120s -- but the checker is the natural place to
+	// stop it, and today it does not. That is also why this suite asserts
+	// at the inference level only: an execution-level assertion here would
+	// hang the suite rather than fail it.
+	TEST_CASE("TI-2: a conflicting bf fallback is accepted by inference") {
+		CHECK( infers_spec("g[n](x:bv[8]) := g[n-1](x)."
+				   "g[0](x:bv[8]) := x."
+				   "all x:bv[8] g(x) fallback x:sbf = 0.") );
+	}
+
+	TEST_CASE("a matching bf fallback is accepted") {
+		CHECK( infers_spec("g[n](x:bv[8]) := g[n-1](x)."
+				   "g[0](x:bv[8]) := x."
+				   "all x:bv[8] g(x) fallback x = 0.") );
+	}
+
+	TEST_CASE("a reference used as the fallback is itself typed") {
+		CHECK( infers_spec("f(x:bv[8]) := x."
+				   "g[n](x:bv[8]) := g[n-1](x)."
+				   "g[0](x:bv[8]) := x."
+				   "all x:bv[8] g(x) fallback f(x) = 0.") );
+	}
+
+	TEST_CASE("consistent definitions and references are accepted") {
+		CHECK( infers_defs("f(x:bv[8]) := x.") );
+		CHECK( infers_defs("f(x:bv[8]) := x:bv[8] = 0.") );
+		CHECK( infers_defs("f(x:bv[8]) := x."
+				   "g(y:bv[8]) := f(y).") );
+	}
+}
