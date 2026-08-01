@@ -56,6 +56,10 @@ include(test_repl-definition_cmd.cmake)
 include(test_repl-io_definition_cmd.cmake)
 
 
+# CLI entry points of the tau executable itself (not REPL commands):
+# --version, the interactive REPL loop, and the specification-file path.
+include(test_repl-cli.cmake)
+
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command
 # TODO (VERY_HIGH) add tests  definition command
