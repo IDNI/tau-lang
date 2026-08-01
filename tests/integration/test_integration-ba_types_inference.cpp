@@ -2021,3 +2021,85 @@ TEST_SUITE("Cleanup") {
 		ba_constants<node_t>::cleanup();
 	}
 }
+
+// Coverage-driven additions (2026-08-01). ba_types_inference.tmpl.h measured
+// 84.8% line coverage; the 122 uncovered lines are almost entirely the
+// error-propagation arms (parse_error / inference_error / scope_error) that
+// infer_ba_types raises per syntactic position. Every pre-existing test in this
+// file asserts the SUCCESS shape (`inferred != nullptr`), so the conflict paths
+// never ran.
+//
+// infer_ba_types returns {nullptr, {}} on a type conflict. The rejection cases
+// below were each confirmed empirically to be rejected today; the accepting
+// cases are positive controls, so a change that made the checker reject
+// everything could not make this suite pass vacuously.
+namespace {
+
+// True when the input parses AND type inference succeeds.
+bool infers(const std::string& src, tau::get_options opts) {
+	tref parsed = tree<node_t>::get(src, opts);
+	if (!parsed) return false;             // did not even parse
+	auto [inferred, _] = infer_ba_types<node_t>(parsed);
+	return inferred != nullptr;
+}
+
+bool infers_wff(const std::string& src) {
+	return infers(src, parse_wff_no_infer());
+}
+
+bool infers_bf(const std::string& src) {
+	return infers(src, parse_bf_no_infer());
+}
+
+} // namespace
+
+TEST_SUITE("ba_types_inference: type conflicts are rejected") {
+
+	// Two different BA families on the two sides of one equation.
+	TEST_CASE("conflicting families across an equation") {
+		CHECK( !infers_wff("x:bv[8] = y:sbf") );
+		CHECK( !infers_wff("o[t]:tau = i[t]:sbf") );
+	}
+
+	// Same variable annotated twice with incompatible types. This exercises
+	// the resolver's unification failure rather than a local mismatch.
+	TEST_CASE("one variable annotated with two families") {
+		CHECK( !infers_wff("x:bv[8] = 0 && x:sbf = 0") );
+	}
+
+	// Bitvectors of different widths are distinct types, not implicitly
+	// widened -- an explicit ((bv[16]) x:bv[8]) cast is required.
+	TEST_CASE("bitvector widths do not implicitly unify") {
+		CHECK( !infers_wff("x:bv[8] = y:bv[16]") );
+	}
+
+	// The conflict arms are per syntactic position, so a conflict nested
+	// inside a quantifier body goes through the wff_ex / wff_all arms.
+	TEST_CASE("conflicts inside quantifier bodies") {
+		CHECK( !infers_wff("ex x (x:bv[8] = 0 && x:sbf = 0)") );
+		CHECK( !infers_wff("all x (x:bv[8] = 0 && x:sbf = 0)") );
+	}
+
+	// A quantifier that binds a typed variable whose body contradicts the
+	// binder's annotation.
+	TEST_CASE("quantifier binder conflicting with its body") {
+		CHECK( !infers_wff("ex x:bv[8] (x:sbf = 0)") );
+	}
+
+	// Terms, not just formulas, reject mixed families.
+	TEST_CASE("conflicting families inside a term") {
+		CHECK( !infers_bf("x:sbf + y:bv[8]") );
+	}
+
+	// Positive controls: consistent annotations must still be accepted, so
+	// the rejections above are meaningful.
+	TEST_CASE("consistent annotations are accepted") {
+		CHECK( infers_wff("x:bv[8] = y:bv[8]") );
+		CHECK( infers_wff("x:sbf = y:sbf") );
+		CHECK( infers_wff("ex x:bv[8] (x = 0)") );
+		CHECK( infers_wff("all x:bv[8] (x = 0)") );
+		CHECK( infers_bf("x:bv[8] + y:bv[8]") );
+		// An explicit cast is the sanctioned way to cross widths.
+		CHECK( infers_wff("((bv[16]) x:bv[8]) = y:bv[16]") );
+	}
+}
