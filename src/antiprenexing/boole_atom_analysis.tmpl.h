@@ -8,14 +8,16 @@ boole_atom_analysis<node> analyze_boole_atom(tref atm, tref var) {
 	boole_atom_analysis<node> r;
 	if (!tau::get(atm)[0].is(tau::bf_eq)) return r;
 
-	// Same shape as legacy ex_quantified_boole_decomposition: the variable
-	// is wrapped in a bf node, and replace_if with is_boolean_operation
-	// keeps the substitution out of non-Boolean sub-terms.
+	// Same shape as legacy ex_quantified_boole_decomposition -- the variable
+	// is wrapped in a bf node -- but with while_is_boolean_operation rather
+	// than the legacy is_boolean_operation, which does not accept the
+	// tau::bf substitution root and therefore makes the whole replace_if a
+	// no-op (see the note on the declaration).
 	//
 	// trim_right_sibling first: the variable taken off a quantifier node
-	// still carries the scope as its right sibling, and in an LCRS tree
-	// that is a different tref from the sibling-free occurrences inside
-	// the term, so the substitution would silently match nothing.
+	// still carries the scope as its right sibling. tau::get(tau::bf, ...)
+	// re-parents it and so would drop the sibling anyway, but trimming here
+	// keeps the intent explicit and independent of get_raw's behaviour.
 	const tref bf_var = tau::get(tau::bf, tau::trim_right_sibling(var));
 	const size_t vt = find_ba_type<node>(bf_var);
 	tref func = tau::trim2(norm_equation<node>(atm));

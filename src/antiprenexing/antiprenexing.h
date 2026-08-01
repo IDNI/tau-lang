@@ -27,6 +27,11 @@
 #include <functional>
 
 #include "tau_tree.h"
+// For collect_used_ref_variables: treat_ex_quantified_clause needs to know
+// whether the variable it is about to eliminate is entangled with an
+// unresolved predicate reference. Self-contained (tau_tree/union_find/ba_types
+// only), so it introduces no cycle with the block headers below.
+#include "ref_variables_resolver.h"
 #include "block_atom_profile.h"
 #include "block_squeeze.h"
 #include "boole_atom_analysis.h"
@@ -34,11 +39,27 @@
 namespace idni::tau_lang {
 
 /**
- * @brief Apply the anti-prenex transformation to a formula.
+ * @brief Apply the legacy, per-quantifier anti-prenex transformation.
  *
- * Drives the full anti-prenex procedure: converts to NNF, identifies
- * quantifier blocks, and calls `anti_prenex_block` to push quantifiers into
- * the formula structure as deeply as possible.
+ * Walks @p formula bottom-up and, at every existentially quantified
+ * subformula, alternates `push_existential_quantifier_one` (distribute the
+ * binder over the connective below it) with `ex_quantified_boole_decomposition`
+ * (split on one atomic formula) until the binder can no longer be moved or
+ * split; a clause is then handed to `treat_ex_quantified_clause`, which may
+ * remove it outright. Universal quantifiers are dualized by the surrounding
+ * NNF machinery, not here.
+ *
+ * This is *not* the block-based algorithm. `anti_prenex_block` collects maximal
+ * same-kind quantifier blocks and applies the chapter-5 fast paths to each, and
+ * that is what the normalizer pipeline calls; `anti_prenex` is the fallback
+ * `resolve_ex_block` reaches for when a block survives its own elimination.
+ * Neither `anti_prenex` nor `resolve_quantifiers` accepts a `skip` predicate,
+ * so content a caller reserved for blasting or the solver is protected on this
+ * path only by the internal checks of the eliminators themselves.
+ *
+ * Inputs pass through `syntactic_formula_simplification` (whose last step is
+ * `to_nnf`) before each elimination step, so a negated equation reaches the
+ * eliminators as `bf_neq` rather than as `wff_neg` over `bf_eq`.
  * @tparam node Tree node type.
  * @param formula Formula to anti-prenex.
  * @return Formula with quantifiers pushed in as far as possible.
@@ -60,10 +81,29 @@ template <NodeType node>
 tref anti_prenex(tref formula);
 
 /**
- * @brief Process a single existentially quantified clause in the anti-prenex algorithm.
+ * @brief Eliminate the binder of a single existentially quantified clause.
  *
- * Applies `ex_quantified_boole_decomposition` repeatedly until the quantifier is
- * eliminated or no further simplification is possible.
+ * Applies Corollary 2.3 of the Taba book once (it does not loop, and it never
+ * calls `ex_quantified_boole_decomposition`): the clause's conjuncts are split
+ * into those mentioning the bound variable and those that do not, the latter
+ * being lifted out; a substitution-based witness is tried first
+ * (`ex_subs_based_elimination`); bitvector content goes to the solver or to
+ * predicate blasting; otherwise the positive equations are squeezed into a
+ * single term `f` (`squeeze_positives`) and the binder removed via
+ * `f[x<-0] & f[x<-1] = 0`, conjoined with the surviving disequations. The
+ * repetition lives in `anti_prenex`'s own loop, not here.
+ *
+ * A conjunct that mentions the bound variable but still holds a quantifier or
+ * an unresolved `wff_ref` blocks elimination: its equations are not top-level
+ * conjuncts of this clause, so squeezing them would drop the inner binder and
+ * leak its variable free.
+ *
+ * @pre The clause must be in NNF, i.e. a negated equation appears as `bf_neq`
+ * and never as `wff_neg` over `bf_eq`. `squeeze_positives` selects `bf_eq`
+ * atoms with `select_top`, which descends through `wff_neg`, so a `!(f = 0)`
+ * conjunct would be squeezed as if it were positive and its negation silently
+ * dropped. Note this is the *opposite* of `push_ex_block_into_clause`'s
+ * precondition, which requires no `bf_neq` at all.
  * @tparam node Tree node type.
  * @param ex_clause An existentially quantified formula (a single clause).
  * @param[out] quant_eliminated Set to `true` if the quantifier was removed.
@@ -73,14 +113,23 @@ template <NodeType node>
 tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
 
 /**
- * @brief Resolve/eliminate quantifiers in a formula.
+ * @brief Decide or blast bitvector-typed quantifier scopes.
  *
- * Pushes quantifiers inward (via `push_quantifiers_in`), then applies Boole
- * decomposition to eliminate remaining existential quantifiers. Handles
- * bitvector formulas by delegating to the CVC5 solver when the formula is closed.
+ * Visits every quantified subformula whose bound variable is bitvector-typed
+ * and tries, in order: the cvc5 solver on a closed scope; the solver on an
+ * *open* scope by closing its free variables the two opposite ways (`all Y s`
+ * sat means `s` is valid, `ex Y s` unsat means `s` is unsatisfiable); then
+ * predicate blasting. A scope the solver cannot decide -- it answered
+ * `unknown`, or the translation failed -- is left exactly as it was, since
+ * "cannot decide" is not "false".
+ *
+ * Quantifiers over any other type are left untouched: this function neither
+ * pushes quantifiers inward nor performs Boole decomposition. Those are
+ * `push_quantifiers_in` and `anti_prenex` / `anti_prenex_block`.
  * @tparam node Tree node type.
- * @param formula Formula containing quantifiers to eliminate.
- * @return Quantifier-free formula, or a formula with as few quantifiers as possible.
+ * @param formula Formula containing quantifiers to resolve.
+ * @return Formula with bitvector-typed scopes decided or blasted where
+ * possible; every other quantifier is preserved.
  */
 template<NodeType node>
 tref resolve_quantifiers(tref formula);
@@ -102,7 +151,7 @@ bool no_skip(tref t);
 // single-argument overload below plays the role of the default, calling
 // through with is_tref_bv_type_family<node>.
 template <NodeType node>
-tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
+tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip);
 
 template <NodeType node>
 tref anti_prenex_block(tref formula);

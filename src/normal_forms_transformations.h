@@ -116,18 +116,21 @@ tref push_negation_in(tref fm);
  * Combines `simplify_using_equality` (equality propagation) and
  * `syntactic_path_simplification` (path contradiction/tautology removal) in
  * sequence.
+ *
+ * @note This pass takes no `skip` predicate, and deliberately so: it used to
+ * accept one for interface consistency with `anti_prenex_block`'s other steps
+ * and then discard it, which read as a guarantee it never gave. Neither
+ * `simplify_using_equality` nor `syntactic_path_simplification` has a
+ * BV-specific check to guard, so a caller that skips bitvector content
+ * elsewhere in the pipeline must not assume this step leaves it alone --
+ * `simplify_using_equality` ends in `to_nnf`, which does rewrite bitvector
+ * comparison atoms.
  * @tparam node Tree node type.
  * @param formula Formula to simplify.
- * @param skip Predicate identifying content this pass must not touch
- *        (defaults to BV-typed nodes); accepted for interface consistency
- *        with `anti_prenex_block`'s other steps, but currently unused --
- *        neither `simplify_using_equality` nor `syntactic_path_simplification`
- *        has a BV-specific check to guard.
  * @return Simplified formula.
  */
 template <NodeType node>
-tref syntactic_formula_simplification(tref formula,
-	std::function<bool(tref)> skip = is_tref_bv_type_family<node>);
+tref syntactic_formula_simplification(tref formula);
 
 // Forward declarations needed by .tmpl.h bodies.
 // Full declarations/definitions come from their respective heuristic headers.

@@ -112,7 +112,25 @@ tref ex_subs_based_elimination(tref fm) {
 		if (!is_child<node>(n, tau::wff_ex)) return n;
 		tref var = tau::trim2(n);
 		tref scope = tau::get(n)[0].second();
-		if (tau::get(scope).find_top(is<node, tau::wff_or>)) return n;
+		// No "scope contains a wff_or -> decline" guard here. It used to
+		// bail out whenever a disjunction appeared *anywhere* in the scope,
+		// which is far stronger than what soundness needs and is what made
+		// `run` hang on specs built from nested conditionals: those compile
+		// to a conjunction of disjunctions, so a scope like
+		// `ex x (x = c && (p || q) && (r || s))` was left untouched even
+		// though `x = c` is a plain top-level conjunct. The quantifier then
+		// survived into the Boole-decomposition stage, which is exponential
+		// in the number of atoms and has no total budget once the block
+		// algorithm's own `block_boole_max_splits` is spent.
+		//
+		// `ex x (x = t && phi)` == `phi[x := t]` needs three things, all
+		// checked where they belong and none of them a property of `phi`'s
+		// connectives: the witness must come from a conjunctive obligation
+		// (`preorder`'s visit_subtree descends only through wff/wff_and/bf_eq,
+		// so it never takes one from under a wff_or or a wff_neg), `x` must
+		// not occur in `t` (occurs-check in `preorder`), and `t` must not be
+		// captured by a binder inside the scope (capture-check in the
+		// two-argument overload, which declines the substitution outright).
 		tref elim = ex_subs_based_elimination<node>(var, scope);
 		return elim != scope ? elim : n;
 	};

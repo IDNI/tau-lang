@@ -631,3 +631,149 @@ TEST_SUITE("SyntacticFormulaSimplification") {
 		CHECK( tau::get(res).equals_T() );
 	}
 }
+
+// TC-4: simplify_temporal_clause's `return std::nullopt` at
+// normalizer.tmpl.h:777 is the only way a temporal clause is dropped, and it
+// had no test -- the existing coverage exercises the implied-always path only.
+TEST_SUITE("SimplifyTemporalClauseUnsat") {
+
+	TEST_CASE("an unsatisfiable always/sometimes pair drops the clause") {
+		tref p = get_nso_rr("x = 0.").value().main->get();
+		tref q = get_nso_rr("x != 0.").value().main->get();
+		// always x = 0 && sometimes x != 0: the pair is unsatisfiable, so
+		// the whole clause is dropped.
+		tref clause = tau::build_wff_and(tau::build_wff_always(p),
+			tau::build_wff_sometimes(q));
+		CHECK( !simplify_temporal_clause<node_t>(clause).has_value() );
+	}
+
+	TEST_CASE("a satisfiable always/sometimes pair keeps the clause") {
+		tref p = get_nso_rr("x = 0.").value().main->get();
+		tref q = get_nso_rr("y = 0.").value().main->get();
+		tref clause = tau::build_wff_and(tau::build_wff_always(p),
+			tau::build_wff_sometimes(q));
+		auto res = simplify_temporal_clause<node_t>(clause);
+		REQUIRE( res.has_value() );
+		CHECK( *res != nullptr );
+	}
+
+	// A sometimes part implied by an always part is replaced by T rather than
+	// dropping the clause (normalizer.tmpl.h:781-782).
+	TEST_CASE("a sometimes part implied by an always part is eliminated") {
+		tref strong = get_nso_rr("x = 0 && y = 0.").value().main->get();
+		tref weak = get_nso_rr("x = 0.").value().main->get();
+		tref clause = tau::build_wff_and(tau::build_wff_always(strong),
+			tau::build_wff_sometimes(weak));
+		auto res = simplify_temporal_clause<node_t>(clause);
+		REQUIRE( res.has_value() );
+		// The sometimes part is gone; only the always part is left.
+		CHECK( !tau::get(*res).find_top(is<node_t, tau::wff_sometimes>) );
+	}
+
+	// The single-part short-circuit at normalizer.tmpl.h:747-749.
+	TEST_CASE("a clause with a single temporal part is returned as is") {
+		tref p = get_nso_rr("x = 0.").value().main->get();
+		tref only_aw = tau::build_wff_always(p);
+		auto r1 = simplify_temporal_clause<node_t>(only_aw);
+		REQUIRE( r1.has_value() );
+		CHECK( *r1 == only_aw );
+		tref only_st = tau::build_wff_sometimes(p);
+		auto r2 = simplify_temporal_clause<node_t>(only_st);
+		REQUIRE( r2.has_value() );
+		CHECK( *r2 == only_st );
+	}
+}
+
+// NZ-1 regression. normalize_non_temp can legitimately return a formula that is
+// neither T nor F: a closed bv scope the solver cannot settle (here bv
+// arithmetic plus an unresolved wff_ref, which is_bv_solvable_formula accepts
+// because it inspects only variable nodes, and which cvc5 then fails to
+// translate) comes back with its quantifier intact. All three predicates below
+// asserted that could not happen, so each aborted a Debug build on this input.
+// They now fall back to their negative answer and log it.
+TEST_SUITE("UndecidableNormalizationFallback") {
+
+	static tref undecidable() {
+		return get_nso_rr("ex x (x:bv[8] * y:bv[8] = { 1 }:bv[8]"
+			" && q(x)).").value().main->get();
+	}
+
+	TEST_CASE("normalize_non_temp leaves it quantified") {
+		tref res = normalize_non_temp<node_t>(undecidable());
+		REQUIRE( res != nullptr );
+		CHECK( !tau::get(res).equals_T() );
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
+	}
+
+	TEST_CASE("is_nso_impl answers false instead of aborting") {
+		CHECK( !is_nso_impl<node_t>(tau::_T(), undecidable()) );
+	}
+
+	TEST_CASE("is_non_temp_nso_unsat answers false instead of aborting") {
+		CHECK( !is_non_temp_nso_unsat<node_t>(undecidable()) );
+	}
+
+	TEST_CASE("is_non_temp_nso_satisfiable answers false instead of aborting") {
+		CHECK( !is_non_temp_nso_satisfiable<node_t>(undecidable()) );
+	}
+
+	TEST_CASE("are_nso_equivalent answers false instead of aborting") {
+		CHECK( !are_nso_equivalent<node_t>(tau::_T(), undecidable()) );
+	}
+
+	// Control: a decidable formula still gets a real answer.
+	TEST_CASE("decidable formulas are unaffected") {
+		tref taut = get_nso_rr("x = 0 || x != 0.").value().main->get();
+		CHECK( is_nso_impl<node_t>(tau::_T(), taut) );
+		CHECK( !is_non_temp_nso_unsat<node_t>(taut) );
+		CHECK( is_non_temp_nso_satisfiable<node_t>(taut) );
+	}
+}
+
+// NF-6 / AP-16. squeeze_absorb disables the process-global tree<node>::use_hooks
+// for the duration of its traversal and used to re-enable it by assigning
+// `true` unconditionally at the end. Two ways that goes wrong: an exception
+// thrown out of the traversal (this subsystem's bv paths do throw) skips the
+// re-enable and leaves hooks disabled for the rest of the process, and a caller
+// that had deliberately disabled them gets them force-enabled on return.
+TEST_SUITE("UseHooksGuard") {
+
+	TEST_CASE("restores the previous value on scope exit") {
+		const bool before = tau::use_hooks;
+		{
+			use_hooks_guard<node_t> g(false);
+			CHECK( tau::use_hooks == false );
+		}
+		CHECK( tau::use_hooks == before );
+	}
+
+	TEST_CASE("restores a false previous value, not `true`") {
+		// The old code's second failure mode: it did not save, it assigned.
+		tau::use_hooks = false;
+		{
+			use_hooks_guard<node_t> g(false);
+			CHECK( tau::use_hooks == false );
+		}
+		CHECK( tau::use_hooks == false );
+		tau::use_hooks = true;
+	}
+
+	TEST_CASE("restores on an exception thrown through the scope") {
+		const bool before = tau::use_hooks;
+		try {
+			use_hooks_guard<node_t> g(false);
+			throw std::runtime_error("unwind");
+		} catch (const std::runtime_error&) {}
+		CHECK( tau::use_hooks == before );
+	}
+
+	TEST_CASE("squeeze_absorb leaves hooks as it found them") {
+		const bool before = tau::use_hooks;
+		tref fm = get_nso_rr("x y = 0 && x z != 0.").value().main->get();
+		tref var = tau::get(fm).find_top(is<node_t, tau::variable>);
+		REQUIRE( var != nullptr );
+		squeeze_absorb<node_t>(fm, var);
+		CHECK( tau::use_hooks == before );
+	}
+}

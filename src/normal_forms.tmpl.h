@@ -796,7 +796,11 @@ template <NodeType node>
 inline auto is_wff_bdd_var = [](tref n) {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
-	DBG(assert(!t.is(tau::bf_neq));)
+	// `n` is a wff wrapper, so the invariant to check is on its child: the
+	// caller (dnf_cnf_to_reduced) establishes it with unequal_to_not_equal.
+	// Asserting `t.is(bf_neq)` instead would be vacuously true and check
+	// nothing.
+	DBG(assert(!t.child_is(tau::bf_neq));)
 	return t.child_is(tau::bf_eq)
 		|| t.child_is(tau::wff_ref)
 		|| t.child_is(tau::wff_ex)
@@ -823,6 +827,30 @@ inline auto is_wff_bdd_var = [](tref n) {
  * @endcode
  * @endinternal
  */
+/**
+ * @internal
+ * @brief The atomic formula kinds `boole_normal_form` treats as BDD variables:
+ * `bf_eq`, `bf_lt` and `bf_lteq`.
+ *
+ * Kept as one predicate so the filter that selects them and the two consumers
+ * that assert on them cannot drift apart -- they did, and a bitvector
+ * comparison (which the construction hooks do not expand) aborted Debug builds
+ * while Release decomposed it correctly.
+ * @tparam node Tree node type.
+ * @endinternal
+ */
+template <NodeType node>
+bool is_atomic_bdd_var(tref n) {
+	using tau = tree<node>;
+	if (!tau::get(n).is(tau::wff)) return false;
+	switch (tau::get(n)[0].value.nt) {
+		case tau::bf_eq:
+		case tau::bf_lt:
+		case tau::bf_lteq: return true;
+		default: return false;
+	}
+}
+
 template <NodeType node>
 inline auto is_bf_bdd_var = [](tref n) {
 	using tau = tree<node>;
@@ -1176,8 +1204,8 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 		bool first_var = true;
 		tref var_path = is_cnf  ? (wff ? tau::_F() : tau::_0(type_id))
 					: (wff ? tau::_T() : tau::_1(type_id));
-	for (size_t k = 0; k < vars.size(); ++k) {
 		DBG(assert(path.size() == vars.size());)
+	for (size_t k = 0; k < vars.size(); ++k) {
 		if (path[k] == 2) continue;
 		if (first_var) var_path = path[k] == 1 ? vars[k]
 			: wff ? tau::build_wff_neg(vars[k])
@@ -1212,7 +1240,7 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 		: (wff  ? tau::build_wff_or( reduced_fm, var_path)
 			: tau::build_bf_or(  reduced_fm, var_path));
 	}
-	assert(reduced_fm != nullptr);
+	DBG(assert(reduced_fm != nullptr);)
 	return not_equal_to_unequal<node>(reduced_fm);
 }
 
@@ -1307,8 +1335,16 @@ tref reduce(tref fm) {
 	DBG(LOG_TRACE << "Formula to reduce: " << LOG_FM(fm);)
 	// Terms can only contain bf_neg, bf_and, bf_xor and bf_or
 	if (!is_wff) {
-		if (tau::get(fm).find_top(is_non_boolean_term<node>))
-			return syntactic_path_simplification<node>(fm);
+		if (tau::get(fm).find_top(is_non_boolean_term<node>)) {
+			tref res = syntactic_path_simplification<node>(fm);
+			// Cache this branch too, like every other exit: bv and
+			// tau-constant terms would otherwise be re-simplified on
+			// every call.
+#ifdef TAU_CACHE
+			return cache.emplace(fm, res).first->second;
+#endif // TAU_CACHE
+			return res;
+		}
 	}
 	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf);
 	if (paths.empty()) {
@@ -1336,28 +1372,6 @@ tref reduce(tref fm) {
 	return cache.emplace(fm, reduced_fm).first->second;
 #endif // TAU_CACHE
 	return reduced_fm;
-}
-
-/**
- * @internal
- * @brief Returns `true` when `v1` is a subsequence of `v2` under structural equality (for ordered variable sets).
- * @tparam node Tree node type.
- * @param v1 First ordered sequence to test as a subsequence.
- * @param v2 Second ordered sequence to search within.
- * @return `true` if every element of `v1` appears in `v2` in order.
- * @endinternal
- */
-template <NodeType node>
-bool is_ordered_subset(const auto& v1, const auto& v2) {
-	using tau = tree<node>;
-	if (v1.size() > v2.size()) return false;
-	if (v1.size() == 0) return true;
-	size_t j = 0;
-	for (size_t i = 0; i < v2.size(); ++i) {
-		if (tau::get(v1[j]) == tau::get(v2[i])) ++j;
-		if (j == v1.size()) return true;
-	}
-	return false;
 }
 
 /**
@@ -1554,8 +1568,9 @@ tref to_dnf(tref fm) {
 			if (t.child_is(tau::bf_and)) {
 				auto conj = conjunct_dnfs_to_dnf<node>(
 					t[0].first(), t[0].second());
-				// Perform simplification
-				if (conj != n)
+				// Perform simplification. Structural comparison, as in the
+				// wff branch above (see to_cnf for the rationale).
+				if (tau::get(conj) != tau::get(n))
 					return reduce<node>(conj);
 				else return n;
 			}
@@ -1628,11 +1643,15 @@ tref to_cnf(tref fm) {
 				else return n;
 			}
 		}
-		if constexpr (!is_wff) if (t.child_is(tau::bf_or)) {
+		if constexpr (!is_wff) if (t.is(tau::bf) && t.child_is(tau::bf_or)) {
 				auto dis = disjunct_cnfs_to_cnf<node>(
 						t[0].first(), t[0].second());
-				// Perform simplification
-				if (dis != n)
+				// Perform simplification. Compare structurally, as the wff
+				// branch above does: `dis` is a freshly built root with no
+				// right sibling while `n` generally has one, so a raw tref
+				// comparison reports "changed" even for a no-op
+				// distribution and pays a full reduce for nothing.
+				if (tau::get(dis) != tau::get(n))
 					return reduce<node, true>(dis);
 				else return n;
 			}
@@ -1672,9 +1691,21 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 #ifdef TAU_CACHE
 	using cache_t = std::unordered_map<std::pair<tref, tref>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find(std::make_pair(tau::trim_right_sibling(atomic_fm),
-		tau::trim_right_sibling(var))); it != end(cache))
-		return it->second;
+	// The key has to be built from the untouched inputs: both parameters are
+	// rebound further down (var is wrapped into a bf, atomic_fm is rewritten
+	// by gt_gteq_to_lt_lteq and norm_equation), so keying the store on the
+	// rewritten values means an input that is not already in canonical form
+	// can never hit its own entry.
+	const std::pair<tref, tref> key { tau::trim_right_sibling(atomic_fm),
+		tau::trim_right_sibling(var) };
+	if (auto it = cache.find(key); it != end(cache)) return it->second;
+	// Every non-trivial exit stores through this, in particular the func2 == 0
+	// early return below: norm_equation brings every bf_eq/bf_neq to `f (!)= 0`,
+	// so that return is the path taken by the vast majority of the calls, and
+	// storing only at the end left the cache write-never for them.
+	auto memo = [&key](tref r) { return cache.emplace(key, r).first->second; };
+#else
+	auto memo = [](tref r) { return r; };
 #endif // TAU_CACHE
 
 	// Return early if atomic_fm is either T or F
@@ -1704,9 +1735,11 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		func1 = rewriter::replace<node>(func1, var,
 			_0<node>(find_ba_type<node>(var)));
 	if (tau::get(func2).equals_0())
-		return denorm_equation<node>(
-			tau::get(tau::wff, tau::get(atm_type, func1, func2)));
-	// Simplify func2
+		return memo(denorm_equation<node>(
+			tau::get(tau::wff, tau::get(atm_type, func1, func2))));
+	// Simplify func2. Reached only for bf_lt/bf_lteq atoms: norm_equation
+	// zeroes the right-hand side of every bf_eq/bf_neq, which the return above
+	// then catches.
 	tref func2_v_0 = rewriter::replace_if<node>(func2, var,
 		_0<node>(find_ba_type<node>(var)), while_is_boolean_operation<node>);
 	tref func2_v_1 = rewriter::replace_if<node>(func2, var,
@@ -1723,13 +1756,7 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 			_0<node>(find_ba_type<node>(var)));
 	tref res = tau::get(tau::wff, tau::get(atm_type, func1, func2));
 	DBG(LOG_TRACE << "Syntactic_variable_simplification result: " << LOG_FM(res) << "\n";)
-#ifdef TAU_CACHE
-	cache.emplace(std::make_pair(tau::trim_right_sibling(res),
-		tau::trim_right_sibling(var)), res);
-	return cache.emplace(std::make_pair(tau::trim_right_sibling(atomic_fm),
-		tau::trim_right_sibling(var)), res).first->second;
-#endif // TAU_CACHE
-	return res;
+	return memo(res);
 }
 
 /**
@@ -1750,6 +1777,17 @@ auto variable_order_for_simplification = [](tref l, tref r) static {
 	DBG(assert(tau::get(r).is(tau::variable));)
 	// Reject equal
 	if (tau::get(l) == tau::get(r)) return false;
+	// Non-io variables form a single class ordered *after* every io variable,
+	// as the comment above states ("... < input < output < other variable").
+	// This also makes the relation a valid strict weak ordering: the previous
+	// version returned false for every pair involving a non-io variable in
+	// both directions, which made each non-io variable equivalent to each io
+	// variable while io variables stayed strictly ordered among themselves --
+	// so incomparability was not transitive and std::ranges::stable_sort's
+	// precondition was violated, leaving the BDD variable order (and hence the
+	// normal form) unspecified.
+	if (!is_io_var<node>(l)) return false;
+	if (!is_io_var<node>(r)) return true;
 	if (is_io_var<node>(l)) {
 		// Check if r is also stream
 		if (is_io_var<node>(r)) {
@@ -1797,8 +1835,8 @@ auto variable_order_for_simplification = [](tref l, tref r) static {
 					} else return false;
 				} else return false;
 			}
-		} else return false; // compare equal
-	} else return false; // compare equal
+		} else return false; // unreachable: handled by the guard above
+	} else return false; // unreachable: handled by the guard above
 };
 
 /**
@@ -1815,9 +1853,12 @@ auto atm_formula_order_for_simplification = [](tref l, tref r) static {
 	// 1) lowest time points in free variables have priority, then
 	// 2) lowest highest time points in free variables and last
 	// 3) number of free io variables
-	DBG(using tau = tree<node>;)
-	DBG(assert(tau::get(l).child_is(tau::bf_eq));)
-	DBG(assert(tau::get(r).child_is(tau::bf_eq));)
+	// boole_normal_form's is_atomic admits bf_eq, bf_lt and bf_lteq, so all
+	// three reach this comparator (a bv `<` is not expanded by the
+	// construction hooks and survives intact). Ordering only reads free
+	// variables, which every atom kind has.
+	DBG(assert(is_atomic_bdd_var<node>(l));)
+	DBG(assert(is_atomic_bdd_var<node>(r));)
 	// For l
 	std::pair<bool, int_t> low_t_l {true, 0}, high_t_l {true, 0};
 	bool is_high_init = false;
@@ -2485,13 +2526,21 @@ tref squeeze_absorb(tref formula) {
 		if (mark.contains(n)) return false;
 		return is_formula<node>(n);
 	};
-	// Disable intermediate simplifications for the moment
-	tau::use_hooks = false;
-	tref res = pre_order<node>(formula).apply(f, visit, up);
-	DBG(assert(assms.size() == 1);)
-	DBG(assert(dual_assms.size() == 1);)
-	// Re-enable intermediate simplifications
-	tau::use_hooks = true;
+	// Disable intermediate simplifications for the duration of the traversal.
+	// The guard restores the previous value on every exit, including an
+	// exception thrown out of `apply` -- this subsystem's bv paths do throw,
+	// and an unwound `use_hooks = false` would disable hooks for the rest of
+	// the process. Restoring rather than assigning `true` also leaves a caller
+	// that deliberately disabled hooks alone.
+	tref res = nullptr;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		res = pre_order<node>(formula).apply(f, visit, up);
+		DBG(assert(assms.size() == 1);)
+		DBG(assert(dual_assms.size() == 1);)
+	}
+	// Hooks are back on here, which is what makes the `reget` below re-apply
+	// the intermediate simplifications skipped during the traversal.
 	DBG(LOG_DEBUG << "Ended squeeze_absorb");
 	return tau::reget(res);
 }
@@ -2626,13 +2675,21 @@ tref squeeze_absorb(tref formula, tref var) {
 		if (mark.contains(n)) return false;
 		return is_formula<node>(n);
 	};
-	// Disable intermediate simplifications for the moment
-	tau::use_hooks = false;
-	tref res = pre_order<node>(formula).apply(f, visit, up);
-	DBG(assert(assms.size() == 1);)
-	DBG(assert(dual_assms.size() == 1);)
-	// Re-enable intermediate simplifications
-	tau::use_hooks = true;
+	// Disable intermediate simplifications for the duration of the traversal.
+	// The guard restores the previous value on every exit, including an
+	// exception thrown out of `apply` -- this subsystem's bv paths do throw,
+	// and an unwound `use_hooks = false` would disable hooks for the rest of
+	// the process. Restoring rather than assigning `true` also leaves a caller
+	// that deliberately disabled hooks alone.
+	tref res = nullptr;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		res = pre_order<node>(formula).apply(f, visit, up);
+		DBG(assert(assms.size() == 1);)
+		DBG(assert(dual_assms.size() == 1);)
+	}
+	// Hooks are back on here, which is what makes the `reget` below re-apply
+	// the intermediate simplifications skipped during the traversal.
 	DBG(LOG_DEBUG << "Ended squeeze_absorb");
 	return tau::reget(res);
 }
@@ -2710,12 +2767,18 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 	tref p2 = tau::get(term).replace(vars[idx], tau::_0_trimmed(find_ba_type<node>(vars[idx])));
 	// Ensure early detection of F
 	p2 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p2);
+	// free_funcs has to be forwarded: without it every leaf of the recursion
+	// re-entered the !free_funcs block above -- another normalize_ba, another
+	// select_top(bf_ref) and another nested decomposition -- and terminated
+	// only because substituting a top-level bf_ref also removes the nested
+	// ones, i.e. on an invariant nothing states.
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
-		return rec_term_boole_decomposition<node>(p1, vars, idx + 1);
+		return rec_term_boole_decomposition<node>(p1, vars, idx + 1,
+								free_funcs);
 	}
-	p1 = rec_term_boole_decomposition<node>(p1, vars, idx + 1);
-	p2 = rec_term_boole_decomposition<node>(p2, vars, idx + 1);
+	p1 = rec_term_boole_decomposition<node>(p1, vars, idx + 1, free_funcs);
+	p2 = rec_term_boole_decomposition<node>(p2, vars, idx + 1, free_funcs);
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
 		return p1;
@@ -2755,8 +2818,16 @@ tref term_boole_decomposition(tref term) {
 	if (tau::get(term).find_top(is_non_boolean_term<node>)) {
 		DBG(LOG_TRACE << "term_boole_decomposition/Non boolean term: "
 			<< tau::get(term) << "\n");
+		[[maybe_unused]] const tref orig = term;
 		term = node::ba::simplify_term(term);
 		tref res = normalize_ba<node>(term);
+		// Cache this branch too: it is the bv/tau-constant path, i.e. the
+		// expensive one (simplify_term + normalize_ba), and callers hit it
+		// repeatedly through apply_unique_until_change.
+#ifdef TAU_CACHE
+		cache.emplace(res, res);
+		return cache.emplace(orig, res).first->second;
+#endif // TAU_CACHE
 		return res;
 	}
 	// Simple cases
@@ -2779,7 +2850,7 @@ tref term_boole_decomposition(tref term) {
 	}
 	std::ranges::stable_sort(vars, variable_order_for_simplification<node>);
 	bd = rec_term_boole_decomposition<node>(bd, vars, 0);
-	DBG(LOG_DEBUG << "Term_boole_decomposition result: " << LOG_FM(term) << "\n";)
+	DBG(LOG_DEBUG << "Term_boole_decomposition result: " << LOG_FM(bd) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(bd, bd);
 	return cache.emplace(term, bd).first->second;
@@ -2811,7 +2882,10 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(formula) << "\n";)
 		return formula;
 	}
-	DBG(assert(tau::get(vars[idx]).child_is(tau::bf_eq));)
+	// Same three atom kinds as boole_normal_form's is_atomic: decomposing on
+	// an order atom treats it as an opaque Boolean variable, which is sound
+	// and is what Release has always done here (the assert is DBG-only).
+	DBG(assert(is_atomic_bdd_var<node>(vars[idx]));)
 	tref p1 = tau::get(formula).replace(vars[idx], tau::_T());
 	// Ensure early detection of F
 	p1 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p1);
@@ -2862,7 +2936,7 @@ tref boole_normal_form(tref formula) {
 		return formula;
 	// Step 1: Syntactically simplify formula
 	tref bnf = syntactic_formula_simplification<node>(formula);
-	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
 	// Squeeze and absorb for additional simplifications during term normalization
 	// -> causes mayor blow ups
 	bnf = squeeze_absorb<node>(bnf);
@@ -2890,25 +2964,15 @@ tref boole_normal_form(tref formula) {
 		return n;
 	};
 	bnf = pre_order<node>(bnf).apply_unique_until_change(simp_eqs, while_is_formula<node>);
-	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(formula) << "\n";)
+	DBG(LOG_DEBUG << "After term_boole_decomposition: " << LOG_FM(bnf) << "\n";)
 	// Step 3: Syntactically simplify resulting formula again after normalization of terms
 	bnf = syntactic_formula_simplification<node>(bnf);
-	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
 	// Step 4: Convert formula to Boole normal form
 	// First get atomic formulas without !=
-	auto is_atomic = [](tref n) {
-		if (!tau::get(n).is(tau::wff)) return false;
-		const tau& c = tau::get(n)[0];
-		switch (c.value.nt) {
-			case tau::bf_eq:
-			case tau::bf_lt:
-			case tau::bf_lteq: return true;
-			default: return false;
-		}
-	};
 	tref eq_bnf = normalize_atomic_formula_operators<node>(bnf);
 	trefs atms = rewriter::select_top_until<node>(eq_bnf,
-		is_atomic, is_quantifier<node>);
+		is_atomic_bdd_var<node>, is_quantifier<node>);
 	// No variables for Boole decomposition
 	if (atms.empty()) {
 #ifdef TAU_CACHE
@@ -2946,7 +3010,7 @@ tref term_boole_normal_form(tref formula) {
 		return formula;
 	// Step 1: Syntactically simplify formula
 	tref tbnf = syntactic_formula_simplification<node>(formula);
-	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(formula) << "\n";)
+	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(tbnf) << "\n";)
 	auto simp_eqs = [](tref n) {
 		if (tau::get(n).child_is(tau::bf_eq)) {
 			if (tau::get(n).equals_T() || tau::get(n).equals_F())
@@ -2985,37 +3049,15 @@ tref term_boole_normal_form(tref formula) {
 #define LOG_CHANNEL_NAME "to_snf"
 
 
-/**
- * @internal
- * @brief Builds a formula that "splits" variables `a` and `b` according to `type`.
- *
- * For `bf_eq` produces `(a & b) | (!a & !b)`; otherwise `(a | !b) & (!a | b)`.
- * @tparam node Tree node type.
- * @param type Node type selector; `bf_eq` for the biconditional split, anything else for XOR-style split.
- * @param a First formula operand.
- * @param b Second formula operand.
- * @return Split formula combining `a` and `b` according to `type`.
- * @endinternal
- */
-template <NodeType node>
-tref build_split_wff_using(typename node::type type, tref a, tref b) {
-	using tau = tree<node>;
-	// TODO (HIGH) check formulas, should depend on the type
-	if (type == tau::bf_eq)
-		return tau::build_wff_or(
-			tau::build_wff_and(a, b),
-			tau::build_wff_and(tau::build_wff_neg(a),
-					   tau::build_wff_neg(b)));
-	else return tau::build_wff_and(
-		tau::build_wff_or(a, tau::build_wff_neg(b)),
-		tau::build_wff_or(tau::build_wff_neg(a), b));
-}
-
 /** @internal @copydoc anf @endinternal */
 template <NodeType node, size_t type>
 tref anf(tref n) {
 	// TODO (MEDIUM) write anf (using?)
-	std::cout << "Not implemented yet.\n";
+	// Diagnostics go through the logging channel, not std::cout: this is a
+	// library entry point and a caller redirecting stdout must not receive
+	// stray text. The input is returned unchanged (see the @warning on the
+	// declaration in normal_forms.h).
+	LOG_ERROR << "anf is not implemented yet; returning the input unchanged";
 	return n;
 }
 
@@ -3023,7 +3065,7 @@ tref anf(tref n) {
 template <NodeType node>
 tref pnf(tref n) {
 	// TODO (MEDIUM) write pnf (using?)
-	std::cout << "Not implemented yet.\n";
+	LOG_ERROR << "pnf is not implemented yet; returning the input unchanged";
 	return n;
 }
 
