@@ -1331,7 +1331,9 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	// equivalence proofs. Same reasoning as satisfiability's
 	// `max_fixpoint_steps`: real recurrences settle in single-digit steps, so
 	// this is a very wide margin that still bounds the search.
-	constexpr size_t max_enumeration_steps = 500;
+	//
+	// TODO (MEDIUM) this must be an option in the cli and/or the repl
+	constexpr size_t max_enumeration_steps = std::numeric_limits<size_t>::max();
 	size_t steps = 0;
 
 	size_t max_lookback = 0;

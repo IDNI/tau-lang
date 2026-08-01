@@ -1789,7 +1789,9 @@ tref anti_prenex(tref formula) {
 			// quantifier one level, or decompose an atom), so a real
 			// formula needs a handful; the cap only fires if a round
 			// makes no progress while still reporting some.
-			constexpr size_t max_steps = 500;
+			//
+			// TODO (MEDIUM) this must be an option in the cli and/or the repl
+			constexpr size_t max_steps = std::numeric_limits<size_t>::max();
 			size_t steps = 0;
 			while (tau::get(n).child_is(tau::wff_ex)) {
 				if (++steps > max_steps) {
