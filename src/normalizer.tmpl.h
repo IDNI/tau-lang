@@ -191,9 +191,26 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// "undecidable closed bv scope keeps its quantifier"
 	// (test_integration-wff_normalization.cpp) together with the
 	// UndecidableNormalizationFallback suite (test_normal_forms.cpp).
-	form = anti_prenex_block<node>(form, [arith_skip, ref_skip_2](tref n) {
-		return is_tref_bv_type_family<node>(n) || arith_skip(n)
-			|| ref_skip_2(n);
+	//
+	// ...but "intended outcome" only holds where the caller can live with an
+	// undecided formula. `interpreter::step` cannot: a surviving quantifier
+	// leaves its step system unsolvable and the run reports "Tau
+	// specification is unexpectedly unsat". So the blanket bv skip is applied
+	// only where its own justification above holds -- where the solver could
+	// own this bv content. A formula carrying a constant of another Boolean
+	// algebra (a `:tau` spec constant, say, as every `run` over mixed `:tau`
+	// and `:bv[N]` streams produces) is one cvc5 cannot translate at all, so
+	// neither the resolve passes nor blasting will ever decide its bv scopes;
+	// skipping them there strands the quantifier for good. Boole decomposition
+	// is the only route left, so let it have them -- `arith_skip` still keeps
+	// genuinely unsupported bv arithmetic out of it, and the atom counts in a
+	// mixed formula are the spec's own, not blasting's per-bit residue.
+	const bool bv_is_solver_owned = !has_foreign_ba_constant<node>(form);
+	form = anti_prenex_block<node>(form,
+		[arith_skip, ref_skip_2, bv_is_solver_owned](tref n)
+	{
+		return (bv_is_solver_owned && is_tref_bv_type_family<node>(n))
+			|| arith_skip(n) || ref_skip_2(n);
 	});
 	form = resolve_quantifiers<node>(form);
 	if (get_free_vars<node>(form).empty() && is_bv_solvable_formula<node>(form)) {

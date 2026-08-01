@@ -198,11 +198,32 @@ bool is_bv_formula_sat(tref form);
  * every variable must have an explicitly sized bitvector type. Mixed-type
  * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
  *
+ * @note It inspects variable and `ref` nodes only, so a formula whose
+ * variables are all bitvectors but which carries a constant of another
+ * Boolean algebra still passes -- `bv_eval_node` then fails on that constant
+ * and returns `nullopt`. Use `has_foreign_ba_constant` when the distinction
+ * matters.
+ *
  * @param form The formula to check
  * @return true if all variables are explicitly sized bitvectors
  */
 template <NodeType node>
 bool is_bv_solvable_formula(tref form);
+
+/**
+ * @brief Does @p form carry a constant (or typed `T`/`F`) of a Boolean algebra
+ * other than the bitvector family?
+ *
+ * Such content is invisible to `bv_eval_node`, so no bv scope sharing a
+ * formula with it can be decided by cvc5 -- callers use this to tell "the
+ * solver owns this bv content" apart from "nothing here will ever decide it".
+ * Untyped `T`/`F` carries no algebra of its own and does not count.
+ *
+ * @param form The formula to scan
+ * @return true if a foreign-algebra constant occurs in @p form
+ */
+template <NodeType node>
+bool has_foreign_ba_constant(tref form);
 
 /**
  * @brief Checks whether a given bit-vector formula is valid.

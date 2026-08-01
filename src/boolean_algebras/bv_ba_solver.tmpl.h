@@ -336,6 +336,21 @@ bool is_bv_solvable_formula(tref form) {
 	return solvable;
 }
 
+/** @copydoc has_foreign_ba_constant */
+template <NodeType node>
+bool has_foreign_ba_constant(tref form) {
+	using tau = tree<node>;
+
+	auto foreign = [](tref n) {
+		const tau& t = tau::get(n);
+		if (!t.is_ba_constant() && !t.is(tau::bf_t) && !t.is(tau::bf_f))
+			return false;
+		const size_t ty = t.get_ba_type();
+		return ty != 0 && !is_bv_type_family<node>(ty);
+	};
+	return tau::get(form).find_top(foreign) != nullptr;
+}
+
 /**
  * @brief Does @p form contain a quantifier of one kind nested inside one of the
  * other kind?

@@ -479,6 +479,34 @@ TEST_SUITE("Normalizer bv undecidable and scoping") {
 		CHECK( tau::get(res).find_top(is_quantifier<node_t>) != nullptr );
 	}
 
+	// `has_foreign_ba_constant` is what tells eliminate_bv_and_quantifiers
+	// "cvc5 cannot read this formula at all" apart from "the solver owns this
+	// bv content", and the second anti-prenex pass only skips bv-typed
+	// content in the latter case. Getting this wrong is not a slowdown but a
+	// wrong answer: see "nested conditionals over mixed tau/bv streams stay
+	// sat" in test_integration-interpreter.cpp, where a skipped-and-therefore
+	// unresolvable `all i2[1]:bv[8]` block made a satisfiable run report
+	// "Tau specification is unexpectedly unsat".
+	TEST_CASE("a foreign-algebra constant is detected") {
+		// The `:tau` constant is kept in the tree by the `:tau` variable it
+		// is equated with; a closed Tau atom would be decided at build time
+		// and the constant would vanish before this could see it.
+		tref mixed = get_nso_rr("y:tau = { o1[t] = 1 }:tau"
+			" && x:bv[8] = { 1 }:bv[8].").value().main->get();
+		REQUIRE( mixed != nullptr );
+		REQUIRE( tau::get(mixed).find_top(
+			is<node_t, tau::ba_constant>) != nullptr );
+		CHECK( has_foreign_ba_constant<node_t>(mixed) );
+
+		// bv constants are exactly what cvc5 reads, so a bv-only formula is
+		// not foreign content -- and neither is untyped T/F, which carries no
+		// algebra of its own.
+		tref pure = get_nso_rr("x:bv[8] = { 1 }:bv[8]"
+			" && y:bv[8] != { 0 }:bv[8].").value().main->get();
+		REQUIRE( pure != nullptr );
+		CHECK( !has_foreign_ba_constant<node_t>(pure) );
+	}
+
 	// NZ-6: scope_out_independent_conjuncts drops a binder whose scope never
 	// mentions it, which is the branch a skip-matched (bv) block would
 	// otherwise carry through the pipeline verbatim.
