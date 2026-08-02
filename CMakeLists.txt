@@ -188,8 +188,10 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
 	set(TAU_BUILD_UNIT_TESTS ON)
 	set(TAU_BUILD_INTEGRATION ON)
-	set(TAU_BUILD_API_TESTS OFF)
-	set(TAU_BUILD_REPL_TESTS OFF)
+	set(TAU_BUILD_API_TESTS ON)
+	# repl tests drive the `tau` executable, so it has to be built too
+	set(TAU_BUILD_REPL_TESTS ON)
+	set(TAU_BUILD_EXECUTABLE ON)
 	set(TAU_BUILD_BENCHMARK OFF)
 endif()
 

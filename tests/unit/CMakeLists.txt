@@ -5,6 +5,7 @@ set(TESTS
 	antiprenexing
 	base_ba_dispatcher
 	bv_ba_helpers
+	bv_ba_hooks
 	ba_constants
 	ba_types
 	ba_types_inference
@@ -19,6 +20,7 @@ set(TESTS
 	hbdd
 	hooks
 	interpreter
+	io_context
 	normal_forms
 	normalizer_uf_arithmetic
 	nso_ba

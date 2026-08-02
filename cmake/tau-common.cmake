@@ -34,9 +34,16 @@ endif()
 set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG;-flto=auto")
 set(TAU_RELWITHDEBINFO_OPTIONS "-O3;-DNDEBUG;-flto=auto;-g")
+# Coverage mirrors Debug semantics; --coverage itself is added in CMakeLists.txt.
+# Without -DDEBUG (and with no -DNDEBUG) asserts stay live while bdd_handle::b is
+# private, which does not compile -- see bdd_handle.h.
+set(TAU_COVERAGE_OPTIONS "-O0;-DDEBUG;-ggdb3")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(COMPILE_OPTIONS "${TAU_DEBUG_OPTIONS}")
+	set(TAU_LINK_OPTIONS "")
+elseif (CMAKE_BUILD_TYPE STREQUAL "Coverage")
+	set(COMPILE_OPTIONS "${TAU_COVERAGE_OPTIONS}")
 	set(TAU_LINK_OPTIONS "")
 elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 	set(COMPILE_OPTIONS "${TAU_RELWITHDEBINFO_OPTIONS}")
