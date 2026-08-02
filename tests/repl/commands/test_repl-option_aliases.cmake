@@ -31,21 +31,25 @@ add_repl_test(option_alias-benchmarks   "get benchmarks"   "benchmarks:")
 add_repl_test(option_alias-benchmarking "get benchmarking" "benchmarks:")
 # The debug option itself only exists in a build that defines DEBUG; a release
 # build answers "Debug option not available in release build" instead of
-# printing a value. Either message proves what these three tests are actually
-# about -- that get_opt resolved the alias to debug_opt rather than falling
-# through to its invalid_opt arm -- so both are accepted, and add_repl_test_fail
-# is used because the release message trips the plain helper's
-# FAIL_REGULAR_EXPRESSION "Error".
-add_repl_test_fail(option_alias-d     "get d"     "debug-repl:|Debug option not available")
-add_repl_test_fail(option_alias-debug "get debug" "debug-repl:|Debug option not available")
-add_repl_test_fail(option_alias-dbg   "get dbg"   "debug-repl:|Debug option not available")
+# printing a value. Either message proves what these three tests are about --
+# that get_opt resolved the alias to debug_opt rather than falling through to
+# its invalid_opt arm.
+#
+# RE-2 (FIXED): that release answer used to be logged at ERROR level, which is
+# why these three needed add_repl_test_fail. Answering a query about an option
+# this build does not carry is not an error condition, so it is reported at
+# info level now and the plain helper -- which fails on "Error" -- applies.
+add_repl_test(option_alias-d     "get d"     "debug-repl:|Debug option not available")
+add_repl_test(option_alias-debug "get debug" "debug-repl:|Debug option not available")
+add_repl_test(option_alias-dbg   "get dbg"   "debug-repl:|Debug option not available")
 
-# RE-1: "B" is declared twice in get_opt -- first for blasting, then again for
-# benchmarks. The first match wins, so the benchmarks arm's `x == "B"` is
-# unreachable and `get B` is always blasting. Pinning the behaviour that
-# actually ships; if the duplicate is ever resolved the other way, this test
-# fails and says so.
-add_repl_test(option_alias-B_resolves_to_blasting "get B" "blasting:")
+# RE-1 (FIXED): "B" used to be declared twice in get_opt -- first for blasting,
+# then again for benchmarks -- so the benchmarks arm was unreachable and
+# `get B` silently meant blasting. Benchmarks now owns the previously free
+# lowercase "b" and blasting keeps "B". Both are asserted so the two can never
+# collide again unnoticed.
+add_repl_test(option_alias-B_is_blasting   "get B" "blasting:")
+add_repl_test(option_alias-b_is_benchmarks "get b" "benchmarks:")
 
 # get_opt's error arm. add_repl_test_fail is required here: the plain helper
 # sets FAIL_REGULAR_EXPRESSION "Error", and the error IS the expected output.

@@ -759,7 +759,11 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
 		|| x == "indent")            return indenting_opt;
-	if (x == "B" || x == "benchmarks"
+	// RE-1: this arm used to claim "B" as well, but blasting_opt above
+	// already matches it, so the benchmarks short option was unreachable
+	// and `get B` silently meant blasting. Benchmarks gets the still-free
+	// lowercase "b" instead, which leaves blasting's "B" alone.
+	if (x == "b" || x == "benchmarks"
 		|| x == "benchmarking")      return print_benchmarks_opt;
 	if (x == "d" || x == "debug"
 		|| x == "dbg")               return debug_opt;
@@ -824,8 +828,11 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	};
 	if (o == invalid_opt) return;
 #ifndef DEBUG
+	// RE-2: answering a query about an option this build does not carry is
+	// not an error condition, it is the answer. Reported at info level so a
+	// plain `get debug` no longer prints "(Error)" in a release build.
 	if (o == debug_opt) {
-		TAU_LOG_ERROR << "Debug option not available in release build\n";
+		TAU_LOG_INFO << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG
@@ -849,8 +856,10 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	using namespace boost::log;
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
+	// RE-2: a warning, not an error -- the command was understood, it just
+	// cannot take effect in a build without DEBUG.
 	if (o == debug_opt) {
-		TAU_LOG_ERROR << "Debug option not available\n";
+		TAU_LOG_WARNING << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG
@@ -912,8 +921,10 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 {
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
+	// RE-2: a warning, not an error -- the command was understood, it just
+	// cannot take effect in a build without DEBUG.
 	if (o == debug_opt) {
-		TAU_LOG_ERROR << "Debug option not available\n";
+		TAU_LOG_WARNING << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG
