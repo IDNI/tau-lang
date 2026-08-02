@@ -502,6 +502,87 @@ TEST_SUITE("ToNNF") {
 		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_and>) );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) );
 	}
+
+	// Negation normal form is `&&`, `||` and negated atoms and nothing
+	// else. The sugar connectives never survive `tau::get` -- the
+	// construction hooks rewrite them away, which is why they have to be
+	// built with hooks off here. That is not a contrivance: a Tau-BA
+	// constant is parsed exactly that way (`tau_spec` sets
+	// `reget_with_hooks = false`) and, unlike every other parsed formula,
+	// never goes through `api::simplify`, whose `reget` is what desugars
+	// them. to_nnf leaving them in place made every consumer of its output
+	// read the tree wrong; simplify_using_equality took an implication's
+	// antecedent for an asserted fact (issue #69).
+
+	// Builds `wff(sym(args...))` without the hooks that would desugar it.
+	static auto raw_sugar = [](typename node_t::type sym,
+		const trefs& args)
+	{
+		use_hooks_guard<node_t> hooks_off(false);
+		return tau::get(tau::wff, tau::get(sym, args));
+	};
+
+	TEST_CASE("sugar: a = 0 -> b = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_imply, { a, b });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_imply>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_imply>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) );
+	}
+
+	TEST_CASE("sugar: !(a = 0 -> b = 0)") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_neg,
+			{ raw_sugar(tau::wff_imply, { a, b }) });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_imply>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_imply>) );
+		// !(a=0 -> b=0) is a=0 && b!=0
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_and>) );
+	}
+
+	TEST_CASE("sugar: a = 0 <- b = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_rimply, { a, b });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_rimply>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_rimply>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_or>) );
+	}
+
+	TEST_CASE("sugar: a = 0 <-> b = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_equiv, { a, b });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_equiv>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_equiv>) );
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_imply>) );
+	}
+
+	TEST_CASE("sugar: a = 0 ^^ b = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_xor, { a, b });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_xor>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_xor>) );
+	}
+
+	TEST_CASE("sugar: a = 0 ? b = 0 : c = 0") {
+		tref a = get_nso_rr("a = 0.").value().main->get();
+		tref b = get_nso_rr("b = 0.").value().main->get();
+		tref c = get_nso_rr("c = 0.").value().main->get();
+		tref fm = raw_sugar(tau::wff_conditional, { a, b, c });
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_conditional>) );
+		tref res = to_nnf<node_t>(fm);
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_conditional>) );
+		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_imply>) );
+	}
 }
 
 TEST_SUITE("ToDNF") {

@@ -122,8 +122,52 @@ tref push_negation_one_in(tref fm) {
 			case tau::bf_ngt: return tau::build_bf_gt(ct[0].first(), ct[0].second());
 			case tau::bf_gteq: return tau::build_bf_ngteq(ct[0].first(), ct[0].second());
 			case tau::bf_ngteq: return tau::build_bf_gteq(ct[0].first(), ct[0].second());
+			// Negated sugar connectives, dualised with the same builders
+			// the construction hooks use. See the bare-sugar block below
+			// for why these can reach to_nnf at all.
+			case tau::wff_imply: return tau::build_wff_and(
+						ct[0].first(),
+						tau::build_wff_neg(ct[0].second()));
+			case tau::wff_rimply: return tau::build_wff_and(
+						ct[0].second(),
+						tau::build_wff_neg(ct[0].first()));
+			case tau::wff_equiv: return tau::build_wff_xor(
+						ct[0].first(), ct[0].second());
+			case tau::wff_xor: return tau::build_wff_equiv(
+						ct[0].first(), ct[0].second());
+			case tau::wff_conditional: return tau::build_wff_conditional(
+						ct[0].first(),
+						tau::build_wff_neg(ct[0].child(1)),
+						tau::build_wff_neg(ct[0].child(2)));
 			default: return fm;
 		}
+	}
+	// The sugar connectives the construction hooks always rewrite away
+	// (`->`, `<-`, `<->`, `^^`, `? :`) can still reach here: a tree built
+	// with hooks off keeps them, and a Tau-BA constant is parsed exactly
+	// that way -- `tau_spec` sets `reget_with_hooks = false` and, unlike
+	// every other parsed formula, a constant never goes through
+	// `api::simplify` (whose `reget` is what desugars them everywhere
+	// else). Negation normal form means `&&`, `||` and negated atoms and
+	// nothing else, and every consumer of it reads the tree that way:
+	// `simplify_using_equality` walked into an implication and registered
+	// its antecedent as an *asserted* equality of the enclosing conjunctive
+	// scope, rewriting and dropping the surrounding conjuncts and returning
+	// a formula that was neither implied by nor implying the input
+	// (issue #69). Rewrite them here with the hooks' own builders so the
+	// contract to_nnf's callers rely on actually holds.
+	if constexpr (is_wff) if (t.has_child()) switch (t[0].value.nt) {
+		case tau::wff_imply: return tau::build_wff_imply(
+					t[0].first(), t[0].second());
+		case tau::wff_rimply: return tau::build_wff_rimply(
+					t[0].first(), t[0].second());
+		case tau::wff_equiv: return tau::build_wff_equiv(
+					t[0].first(), t[0].second());
+		case tau::wff_xor: return tau::build_wff_xor(
+					t[0].first(), t[0].second());
+		case tau::wff_conditional: return tau::build_wff_conditional(
+					t[0].first(), t[0].child(1), t[0].child(2));
+		default: break;
 	}
 	// Boolean function rules
 	if constexpr (!is_wff) if (t.child_is(tau::bf_neg)) {
