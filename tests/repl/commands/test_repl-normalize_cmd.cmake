@@ -49,6 +49,25 @@ add_repl_test_fail(normalize_cmd-oscillating_definition
 	"f(x) := f(x)'. normalize f(1)"
 	"oscillates without reaching a normal form")
 
+# Issue 28's own script, and the wff spelling @pt7k gave in its thread. Both
+# are the same oscillation: `'` only works on sbf, hence the `!` variant.
+add_repl_test_fail(normalize_cmd-self_negating_recurrence_bf
+	"g[0](y) := 0. g[n](y) := g[n](y)'. normalize g[5](1)"
+	"oscillates without reaching a normal form")
+add_repl_test_fail(normalize_cmd-self_negating_recurrence_wff
+	"g[0](y) := F. g[n](y) := !g[n](y). normalize g[5](1)"
+	"oscillates without reaching a normal form")
+
+# The corrected form from the same thread, referring to the previous step,
+# normalizes to 1. It used to print "Failed to translate the formula to cvc5: 1"
+# first: a formula with no bitvector content at all passed
+# is_bv_solvable_formula vacuously and was handed to a solver that cannot
+# translate it, making a working normalization look like it had failed.
+# add_repl_test fails the test on any "Error" in the output, which is the point.
+add_repl_test(normalize_cmd-prior_step_recurrence_no_cvc5_error
+	"g[0](y) := 0. g[n](y) := g[n-1](y)'. normalize g[5](1)"
+	"1")
+
 # A definition set whose unfolding grows instead of oscillating is not covered
 # here: no revisit check can catch it, only repeat_all's round cap, which is
 # unbounded pending the runtime parameter it is marked TODO (HIGH) for. Once a

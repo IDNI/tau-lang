@@ -298,6 +298,14 @@ bool is_bv_solvable_formula(tref form) {
 	using tt = tau::traverser;
 
 	bool solvable = true;
+	// A formula with no bv content at all satisfied every rejection below
+	// vacuously and was declared solvable, so a plain constant such as `1`
+	// was handed to cvc5, which cannot translate it -- printing
+	// "Failed to translate the formula to cvc5: 1" before the (correct)
+	// result, and making a working normalization look like it had failed.
+	// Reported on issue 28's corrected script, `g[0](y) := 0.
+	// g[n](y) := g[n-1](y)'. n g[5](1)`.
+	bool has_bv = false;
 	auto check = [&](tref n) {
 		// Reject references. Checking variables alone was not enough: a
 		// wff_ref's arguments are perfectly good bv-typed variables, so the
@@ -323,6 +331,8 @@ bool is_bv_solvable_formula(tref form) {
 		// missed the solver shortcut and went to blasting instead.
 		if (is<node>(n, tau::ref))
 			return solvable = false;
+		if (is_bv_type_family<node>(tau::get(n).get_ba_type()))
+			has_bv = true;
 		if (is<node>(n, tau::variable)) {
 			size_t t = tau::get(n).get_ba_type();
 			if (!is_bv_type_family<node>(t)) return solvable = false;
@@ -333,7 +343,7 @@ bool is_bv_solvable_formula(tref form) {
 		return solvable;
 	};
 	pre_order<node>(form).search_unique(check);
-	return solvable;
+	return solvable && has_bv;
 }
 
 /** @copydoc has_foreign_ba_constant */
