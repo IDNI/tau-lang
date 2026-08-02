@@ -334,8 +334,24 @@ void io_context<node>::update_types(
 		if (inputs.contains(var) || outputs.contains(var)) continue;
 		std::string name = get_var_name<node>(var);
 		DBG(LOG_TRACE << "updating stream: " << name;)
-		bool is_input = name == "this" || name[0] == 'i';
-		DBG(assert(is_input || name == "u" || name[0] == 'o');) // TODO: should this raise an undefined io stream error?
+		const bool is_input  = name == "this"
+					|| (!name.empty() && name[0] == 'i');
+		const bool is_output = name == "u"
+					|| (!name.empty() && name[0] == 'o');
+		// EX-2: this used to be a DBG assert carrying a TODO asking
+		// whether it should raise an undefined-io-stream error. It
+		// should. As written, a name matching neither shape aborted a
+		// debug build outright, while a release build (assert compiled
+		// out) silently filed it under `outputs` -- so `zzz[t] = 0.`
+		// crashed one configuration and became an output stream in the
+		// other. Report it and register nothing: both configurations
+		// now reach get_nso_rr's "I/O variable is not defined".
+		if (!is_input && !is_output) {
+			LOG_ERROR << "Undefined I/O stream: " << name
+				<< " (a stream name must be \"this\", \"u\", or"
+				   " start with 'i' or 'o')\n";
+			continue;
+		}
 		auto& streams = is_input ? inputs : outputs;
 		if (streams.find(var) == streams.end()) streams[hvar] = 0;
 	}

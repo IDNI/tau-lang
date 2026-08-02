@@ -637,54 +637,56 @@ TEST_SUITE("resolve_io_vars direction classification") {
 	// The context lookups run before the name heuristic, so a name the
 	// heuristic would reject is still resolved once it is registered.
 
-	// EX-1 -- the io_context lookups above the name heuristic are DEAD CODE.
+	// EX-1 (FIXED) -- the io_context lookups used to be dead code.
 	//
-	// resolve_io_vars' lambda fires on the `io_var` node and looks the
-	// context up with canonize<node>(n). But canonize expects the enclosing
+	// resolve_io_vars' lambda fires on the `io_var` node and used to look
+	// the context up with canonize<node>(n). canonize expects the enclosing
 	// `variable` node: it does `tt(new_t) | tau::io_var | tau::var_name`,
-	// i.e. it descends into an io_var CHILD. Handed the io_var itself that
-	// selector finds nothing, canonize returns its argument unchanged --
-	// offset subtree and all -- and the result can never equal a key
-	// registered by add_input_console/add_output_console, which store
+	// i.e. descends into an io_var CHILD. Handed the io_var itself that
+	// selector found nothing, canonize returned its argument unchanged --
+	// offset subtree and all -- so the key could never equal one registered
+	// by add_input_console/add_output_console, which store
 	// build_canonized_io_var<node>(name) == variable(io_var(var_name)).
+	// Both lookups were therefore unreachable and classification always
+	// fell through to the name heuristic.
 	//
-	// Verified directly:
-	//   canonize(variable node) == build_canonized_io_var(name)   -- matches
-	//   canonize(io_var node)   != build_canonized_io_var(name)   -- differs
-	//
-	// So ctx.inputs/ctx.outputs never hit and classification ALWAYS falls
-	// through to the name heuristic. gcovr agrees: the two replace_value
-	// returns are cold across the whole 270-test suite.
-	//
-	// Nothing observably breaks today only because io_context::update_stream
-	// asserts every registered name already satisfies the heuristic
-	// (`is_input || name == "u" || name[0] == 'o'`, io_context.tmpl.h, with a
-	// standing TODO). The two cases below therefore pin the CURRENT
-	// behaviour: registering a stream does not make an unprefixed name
-	// resolvable. If the lookup is ever fixed to canonize the `variable`
-	// node, both flip to resolved and these tests should be inverted.
+	// resolve_io_vars now builds the key the registrars' way, so an
+	// explicitly registered stream resolves whatever its name looks like.
 
-	TEST_CASE("EX-1: a registered input does NOT resolve an unprefixed name") {
+	TEST_CASE("EX-1: a registered input resolves an unprefixed name") {
 		io_context<node_t> ctx;
 		ctx.add_input_console("zzz", tau_type_id<node_t>());
 		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("zzz"));
-		CHECK(!tau::get(r).is_input_variable());
+		CHECK(tau::get(r).is_input_variable());
 	}
 
-	TEST_CASE("EX-1: a registered output does NOT resolve an unprefixed name") {
+	TEST_CASE("EX-1: a registered output resolves an unprefixed name") {
 		io_context<node_t> ctx;
 		ctx.add_output_console("zzz", tau_type_id<node_t>());
 		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("zzz"));
-		CHECK(!tau::get(r).is_output_variable());
+		CHECK(tau::get(r).is_output_variable());
 	}
 
-	TEST_CASE("EX-1: canonize disagrees with the registered key shape") {
+	TEST_CASE("EX-1: the context wins over the name heuristic") {
+		// "o1" would be classified an output by name alone; registering
+		// it as an input must take precedence, which only works if the
+		// lookup actually hits.
+		io_context<node_t> ctx;
+		ctx.add_input_console("o1", tau_type_id<node_t>());
+		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("o1"));
+		CHECK(tau::get(r).is_input_variable());
+	}
+
+	// canonize itself is unchanged: it is still only correct on the
+	// enclosing `variable` node. This pins that contract so a future caller
+	// cannot repeat EX-1 by handing it an io_var and assuming it copes.
+	TEST_CASE("EX-1: canonize is only correct on the enclosing variable") {
 		tref v = unresolved_io_var("zzz");
 		tref var_node = tau::get(v)[0].get();
 		tref io_node = tau::get(var_node)[0].get();
 		tref key = build_canonized_io_var<node_t>("zzz");
-		CHECK(canonize<node_t>(var_node) == key);  // what the lookup wants
-		CHECK(canonize<node_t>(io_node) != key);   // what it actually passes
+		CHECK(canonize<node_t>(var_node) == key);  // the shape it wants
+		CHECK(canonize<node_t>(io_node) != key);   // the shape it cannot take
 	}
 }
 
