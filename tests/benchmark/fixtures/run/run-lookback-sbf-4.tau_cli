@@ -1,0 +1,3 @@
+i1:sbf := in file("tests/benchmark/fixtures/run/inputs/sbf-16.in").
+run o1[0]:sbf = 0 && o1[1]:sbf = 0 && o1[2]:sbf = 0 && o1[3]:sbf = 0 && o1[t]:sbf = i1[t]:sbf ^ o1[t-1]:sbf ^ o1[t-2]:sbf ^ o1[t-3]:sbf ^ o1[t-4]:sbf.
+q
