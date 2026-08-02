@@ -1,0 +1,7 @@
+n ((always o3[t]:bv[16] = o3[t-1]:bv[16]) && (sometimes o3[t]:bv[16] = { 1 }:bv[16])) && ((always o7[t]:bv[16] = o7[t-1]:bv[16]) && (sometimes o7[t]:bv[16] = { 1 }:bv[16])).
+n ((always o11[t]:bv[16] = { 0 }:bv[16]) && (sometimes o11[t]:bv[16] = { 0 }:bv[16]) && (sometimes o11[t]:bv[16] = { 1 }:bv[16])) && ((always o15[t]:bv[16] = { 0 }:bv[16]) && (sometimes o15[t]:bv[16] = { 0 }:bv[16]) && (sometimes o15[t]:bv[16] = { 1 }:bv[16])).
+n ((always o19[t-2]:bv[16] = { 1 }:bv[16]) && (sometimes o19[t-3]:bv[16] = { 0 }:bv[16]) && (sometimes o19[t]:bv[16] = { 1 }:bv[16])) && ((always o23[t-2]:bv[16] = { 1 }:bv[16]) && (sometimes o23[t-3]:bv[16] = { 0 }:bv[16]) && (sometimes o23[t]:bv[16] = { 1 }:bv[16])).
+n ((always o27[t]:bv[16] = i25[t]:bv[16]) && (sometimes i25[t]:bv[16] = { 1 }:bv[16])) && ((always o31[t]:bv[16] = i29[t]:bv[16]) && (sometimes i29[t]:bv[16] = { 1 }:bv[16])).
+n ((always i33[t]:bv[16] = { 1 }:bv[16] ? o35[t]:bv[16] = { 0 }:bv[16] : o35[t]:bv[16] = { 1 }:bv[16])) && ((always i37[t]:bv[16] = { 1 }:bv[16] ? o39[t]:bv[16] = { 0 }:bv[16] : o39[t]:bv[16] = { 1 }:bv[16])).
+n ((always o44[t]:bv[16] = i41[t]:bv[16] + i42[t]:bv[16]) && (sometimes o44[t]:bv[16] = { 1 }:bv[16])) && ((always o48[t]:bv[16] = i45[t]:bv[16] + i46[t]:bv[16]) && (sometimes o48[t]:bv[16] = { 1 }:bv[16])).
+n ((always o51[t]:bv[16] = o51[t-1]:bv[16] && o52[t]:bv[16] = o52[t-1]:bv[16]) || (sometimes o51[t]:bv[16] = { 1 }:bv[16] && o52[t]:bv[16] = { 1 }:bv[16])) && (always o55[t]:bv[16] = o55[t-1]:bv[16] && o56[t]:bv[16] = o56[t-1]:bv[16]).

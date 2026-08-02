@@ -1,0 +1,3 @@
+i1:tau := in file("tests/benchmark/fixtures/run/inputs/tau-16.in").
+run always (ex x:tau (o1[t]:tau = i1[t]:tau | x && i1[t]:tau & x = 0)).
+q

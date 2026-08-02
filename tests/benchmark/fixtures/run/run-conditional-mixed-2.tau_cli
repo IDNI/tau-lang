@@ -1,0 +1,4 @@
+i1:tau := in file("tests/benchmark/fixtures/run/inputs/tau-16.in").
+i2:bv[8] := in file("tests/benchmark/fixtures/run/inputs/bv8-16.in").
+run o0seal[0]:tau = 1 && o0law[0]:tau = 1 && ( (i2[t]:bv[8] = { 1 }:bv[8]) ? ((o0seal[t]:tau = o0law[t-1]:tau) && (o0law[t]:tau = o0law[t-1]:tau) && (o0res[t]:bv[8] = { 5 }:bv[8])) : ((o0seal[t]:tau = o0seal[t-1]:tau) && (((o0law[t-1]:tau & i1[t]:tau) != 0) ? ((o0law[t]:tau = o0law[t-1]:tau & i1[t]:tau) && (o0res[t]:bv[8] = { 9 }:bv[8])) : ((o0law[t]:tau = o0law[t-1]:tau) && (o0res[t]:bv[8] = { 8 }:bv[8])))) ).
+q

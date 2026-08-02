@@ -1,0 +1,4 @@
+i1:sbf := in file("tests/benchmark/fixtures/run/inputs/sbf-16.in").
+i2:sbf := in file("tests/benchmark/fixtures/run/inputs/sbf-alt-16.in").
+run always (o1[t]:sbf = i1[t]:sbf && o2[t]:sbf = i2[t]:sbf' && o3[t]:sbf = o1[t]:sbf & o2[t]:sbf && o4[t]:sbf = o1[t]:sbf | o2[t]:sbf && o5[t]:sbf = o3[t]:sbf ^ o4[t]:sbf && o6[t]:sbf = o3[t]:sbf | o4[t]:sbf' && o7[t]:sbf = o5[t]:sbf & o6[t]:sbf && o8[t]:sbf = o5[t]:sbf | o6[t]:sbf).
+q

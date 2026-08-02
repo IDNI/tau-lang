@@ -1,0 +1,7 @@
+sat ((always o1[t]:bv[8] = o1[t-1]:bv[8]) && (sometimes o1[t]:bv[8] = { 1 }:bv[8])) && ((always o3[t]:bv[8] = o3[t-1]:bv[8]) && (sometimes o3[t]:bv[8] = { 1 }:bv[8])).
+sat ((always o1[t]:bv[8] = { 0 }:bv[8]) && (sometimes o1[t]:bv[8] = { 0 }:bv[8]) && (sometimes o1[t]:bv[8] = { 1 }:bv[8])) && ((always o3[t]:bv[8] = { 0 }:bv[8]) && (sometimes o3[t]:bv[8] = { 0 }:bv[8]) && (sometimes o3[t]:bv[8] = { 1 }:bv[8])).
+sat ((always o1[t-2]:bv[8] = { 1 }:bv[8]) && (sometimes o1[t-3]:bv[8] = { 0 }:bv[8]) && (sometimes o1[t]:bv[8] = { 1 }:bv[8])) && ((always o3[t-2]:bv[8] = { 1 }:bv[8]) && (sometimes o3[t-3]:bv[8] = { 0 }:bv[8]) && (sometimes o3[t]:bv[8] = { 1 }:bv[8])).
+sat ((always o1[t]:bv[8] = i1[t]:bv[8]) && (sometimes i1[t]:bv[8] = { 1 }:bv[8])) && ((always o3[t]:bv[8] = i3[t]:bv[8]) && (sometimes i3[t]:bv[8] = { 1 }:bv[8])).
+sat ((always i1[t]:bv[8] = { 1 }:bv[8] ? o1[t]:bv[8] = { 0 }:bv[8] : o1[t]:bv[8] = { 1 }:bv[8])) && ((always i3[t]:bv[8] = { 1 }:bv[8] ? o3[t]:bv[8] = { 0 }:bv[8] : o3[t]:bv[8] = { 1 }:bv[8])).
+sat ((always o2[t]:bv[8] = i1[t]:bv[8] + i2[t]:bv[8]) && (sometimes o2[t]:bv[8] = { 1 }:bv[8])) && ((always o4[t]:bv[8] = i3[t]:bv[8] + i4[t]:bv[8]) && (sometimes o4[t]:bv[8] = { 1 }:bv[8])).
+sat ((always o1[t]:bv[8] = o1[t-1]:bv[8] && o2[t]:bv[8] = o2[t-1]:bv[8]) || (sometimes o1[t]:bv[8] = { 1 }:bv[8] && o2[t]:bv[8] = { 1 }:bv[8])) && ((always o3[t]:bv[8] = o3[t-1]:bv[8] && o4[t]:bv[8] = o4[t-1]:bv[8]) || (sometimes o3[t]:bv[8] = { 1 }:bv[8] && o4[t]:bv[8] = { 1 }:bv[8])).

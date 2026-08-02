@@ -1,0 +1,7 @@
+sat ((always o1[t]:bv[16] = o1[t-1]:bv[16]) && (sometimes o1[t]:bv[16] = { 1 }:bv[16])).
+sat ((always o1[t]:bv[16] = { 0 }:bv[16]) && (sometimes o1[t]:bv[16] = { 0 }:bv[16]) && (sometimes o1[t]:bv[16] = { 1 }:bv[16])).
+sat ((always o1[t-2]:bv[16] = { 1 }:bv[16]) && (sometimes o1[t-3]:bv[16] = { 0 }:bv[16]) && (sometimes o1[t]:bv[16] = { 1 }:bv[16])).
+sat ((always o1[t]:bv[16] = i1[t]:bv[16]) && (sometimes i1[t]:bv[16] = { 1 }:bv[16])).
+sat ((always i1[t]:bv[16] = { 1 }:bv[16] ? o1[t]:bv[16] = { 0 }:bv[16] : o1[t]:bv[16] = { 1 }:bv[16])).
+sat ((always o2[t]:bv[16] = i1[t]:bv[16] + i2[t]:bv[16]) && (sometimes o2[t]:bv[16] = { 1 }:bv[16])).
+sat ((always o1[t]:bv[16] = o1[t-1]:bv[16] && o2[t]:bv[16] = o2[t-1]:bv[16]) || (sometimes o1[t]:bv[16] = { 1 }:bv[16] && o2[t]:bv[16] = { 1 }:bv[16])).

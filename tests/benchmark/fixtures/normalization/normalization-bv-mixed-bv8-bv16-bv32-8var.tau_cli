@@ -1,0 +1,5 @@
+n all v1:bv[8] all v2:bv[8] all v3:bv[8] all v4:bv[16] all v5:bv[16] all v6:bv[16] all v7:bv[32] all v8:bv[32] (v1 + v2 + v3) = (v3 + v2 + v1) && (v4 + v5 + v6) = (v6 + v5 + v4) && (v7 + v8) = (v8 + v7).
+n ex v1:bv[8] ex v2:bv[8] ex v3:bv[8] ex v4:bv[16] ex v5:bv[16] ex v6:bv[16] ex v7:bv[32] ex v8:bv[32] v2 = v1 + { 1 }:bv[8] && v3 = v2 + { 1 }:bv[8] && v5 = v4 + { 1 }:bv[16] && v6 = v5 + { 1 }:bv[16] && v8 = v7 + { 1 }:bv[32].
+n all v1:bv[8] all v2:bv[8] all v3:bv[8] all v4:bv[16] all v5:bv[16] all v6:bv[16] all v7:bv[32] all v8:bv[32] v2 = (v1 << { 1 }:bv[8]) >> { 1 }:bv[8] && v3 = (v2 << { 1 }:bv[8]) >> { 1 }:bv[8] && v5 = (v4 << { 1 }:bv[16]) >> { 1 }:bv[16] && v6 = (v5 << { 1 }:bv[16]) >> { 1 }:bv[16] && v8 = (v7 << { 1 }:bv[32]) >> { 1 }:bv[32].
+n ex v1:bv[8] ex v2:bv[8] ex v3:bv[8] ex v4:bv[16] ex v5:bv[16] ex v6:bv[16] ex v7:bv[32] ex v8:bv[32] v1 < v2 && v2 < v3 && v4 < v5 && v5 < v6 && v7 < v8.
+n all v1:bv[8] ex v2:bv[8] all v3:bv[8] all v4:bv[16] ex v5:bv[16] all v6:bv[16] all v7:bv[32] ex v8:bv[32] v2 = v1 + { 1 }:bv[8] && v3 = v2 + { 1 }:bv[8] && v5 = v4 + { 1 }:bv[16] && v6 = v5 + { 1 }:bv[16] && v8 = v7 + { 1 }:bv[32].
