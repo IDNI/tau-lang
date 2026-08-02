@@ -78,4 +78,31 @@ TEST_SUITE("execution: repeat_all") {
 		repeat_all<node_t, step<node_t>> ra(s);
 		CHECK( ra(x) == z );
 	}
+
+	// Regression test for issue 36. `x -> x'` rewrites the x inside its own
+	// output, so every round produces a strictly larger formula and no
+	// state is ever revisited: the visited-set cycle check cannot fire and
+	// only max_rounds ends the loop. The cap used to be 1'000'000 rounds
+	// over an ever-growing formula -- unreachable in practice, which is
+	// what made `normalize` hang -- and on exhaustion the half-rewritten
+	// formula was returned as if it were a result.
+	//
+	// Hooks have to be off for the whole case: with them on, the
+	// construction hook folds each new double negation away, so the rewrite
+	// oscillates between x and x' instead of growing and is caught by
+	// visited -- the other failure mode, not this one.
+	//
+	// max_rounds is currently unbounded pending the runtime parameter it is
+	// marked TODO (HIGH) for, and this case does not terminate without a
+	// finite cap. It runs as soon as one is set.
+	TEST_CASE("ever-growing rewrite is bounded and reports failure"
+		* doctest::skip(repeat_all<node_t, step<node_t>>::max_rounds
+			== std::numeric_limits<size_t>::max()))
+	{
+		use_hooks_guard<node_t> g(false);
+		tref x = bf_var("x");
+		step<node_t> grow({ swap_rule(x, build_bf_neg<node_t>(x)) });
+		repeat_all<node_t, step<node_t>> ra(grow);
+		CHECK( ra(x) == nullptr );
+	}
 }

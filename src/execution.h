@@ -102,9 +102,26 @@ struct repeat_all {
 	/**
 	 * @brief Apply all steps, restarting until no step fires.
 	 * @param n Formula to rewrite.
-	 * @return Fixpoint formula.
+	 * @return Fixpoint formula, or `nullptr` if neither a fixpoint nor a
+	 *         cycle was reached within `max_rounds` rounds.
 	 */
 	tref operator()(tref n) const;
+
+	/**
+	 * @brief Round cap for a rewrite that neither settles nor cycles.
+	 *
+	 * A rewriting system given by user definitions need not terminate, and a
+	 * non-terminating one typically *grows* the formula rather than revisiting
+	 * an earlier state, so the `visited` cycle check never fires. Each round
+	 * costs at least one full traversal of a formula that is itself growing,
+	 * so the cap has to be small enough that hitting it is reported in
+	 * seconds. Legitimate definition expansion needs far fewer rounds than
+	 * this: a round rewrites every match in the formula at once and applies
+	 * the whole rule set, so a call chain of depth k collapses in O(k) rounds
+	 * at worst and usually far fewer.
+	 */
+	// TODO (HIGH) This should be a runtime parameter, not a compile-time constant.
+	static constexpr size_t max_rounds = std::numeric_limits<size_t>::max();
 
 	steps<node, step_t> s; ///< Steps to repeat.
 };

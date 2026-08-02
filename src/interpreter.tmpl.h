@@ -946,6 +946,10 @@ void interpreter<node>::update(tref update) {
 				continue;
 			}
 			tref revision = pointwise_revision(current_spec[i].first->get(), collected_updates[i], time_point);
+			// nullptr when the definitions in the clause do not
+			// settle; without a revised clause the update cannot
+			// be accepted.
+			if (!revision) { update_valid = false; break; }
 			LOG_DEBUG << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first->get()) << "\n";
 			// std::cout << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first->get()) << "\n";
 			if (tau::get(revision).equals_F()) {

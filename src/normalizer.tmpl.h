@@ -752,6 +752,64 @@ tref apply_defs_to_spec (tref spec) {
 	return spec;
 }
 
+/**
+ * @internal
+ * @brief Unfolds the registered definitions in @p fm until none applies.
+ *
+ *  Alternates `apply_defs_to_spec` with a simplification pass, since a
+ *  definition can become applicable only after the previous unfolding has been
+ *  simplified. @p pre runs before each unfolding, @p post on the result of an
+ *  unfolding that changed the formula.
+ *
+ *  User-supplied definitions need not terminate, and a single pass cannot tell
+ *  that they do not: `f(x) := f(x)'` unfolds one level per pass and the
+ *  simplifier folds the new double negation straight back, so the formula
+ *  oscillates forever between two states, while a growing definition never
+ *  revisits a state at all. The first needs a revisit check, the second a pass
+ *  cap. Both mean the formula has no normal form, so neither may return the
+ *  formula reached so far -- a half-expanded term is indistinguishable from a
+ *  real result to every caller.
+ * @tparam node Tree node type.
+ * @param fm Formula whose references are to be expanded.
+ * @param pre Simplification applied before each unfolding.
+ * @param post Simplification applied after an unfolding that changed @p fm.
+ * @return The expanded formula, or `nullptr` if the expansion never settles.
+ * @endinternal
+ */
+template <NodeType node>
+tref expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
+	using tau = tree<node>;
+	// A real definition set settles in a handful of passes: each pass
+	// unfolds every applicable definition at every position at once. The
+	// cap only has to be out of reach of those.
+	// TODO (HIGH) this should be a parameter, not a hardcoded constant.
+	constexpr size_t max_passes = std::numeric_limits<size_t>::max();;
+	std::unordered_set<tref> visited;
+	for (size_t pass = 0; pass != max_passes; ++pass) {
+		// Unresolved symbol is still present
+		if (!tau::get(fm).find_top(is<node, tau::ref>)) return fm;
+		fm = pre(fm);
+		if (!fm) return nullptr;
+		tref expanded = apply_defs_to_spec<node>(fm);
+		if (!expanded) return nullptr;
+		// Structural comparison: unfolding may rebuild equal nodes.
+		if (tau::get(expanded) == tau::get(fm)) return fm;
+		fm = post(expanded);
+		if (!fm) return nullptr;
+		if (!visited.insert(fm).second) {
+			LOG_ERROR << "Definition expansion oscillates without "
+				"reaching a normal form; the definitions in use "
+				"are most likely non-terminating for this "
+				"argument";
+			return nullptr;
+		}
+	}
+	LOG_ERROR << "Definition expansion did not settle after " << max_passes
+		<< " passes; the definitions in use are most likely "
+		"non-terminating for this argument";
+	return nullptr;
+}
+
 // Folds constants out of quantifiers, negations and the binary connectives:
 // ex x T = all x T = T, ex x F = all x F = F, !T = F, !F = T, plus the usual
 // T/F identities for && and ||. Such residues can be left behind by
@@ -906,18 +964,9 @@ tref normalize_with_temp_simp(tref fm) {
 				tau::reget(resolved));
 	}
 	// Apply present function/predicate definitions
-	bool changed;
-	do {
-		changed = false;
-		// Unresolved symbol is still present
-		if (tau::get(fm).find_top(is<node, tau::ref>)) {
-			tref resolved_red_fm = apply_defs_to_spec<node>(fm);
-			if (tau::get(resolved_red_fm) != tau::get(fm)) {
-				fm = normalize<node>(resolved_red_fm);
-				changed = true;
-			}
-		}
-	} while (changed);
+	fm = expand_defs_until_settled<node>(fm, [](tref n) { return n; },
+		[](tref n) { return normalize<node>(n); });
+	if (!fm) return nullptr;
 
 	DBG(LOG_TRACE << "fm: " << LOG_FM(fm) << "\n";)
 	if (tau::get(fm).equals_T() || tau::get(fm).equals_F())
@@ -1423,27 +1472,14 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 /** @internal @copydoc bf_normalizer_without_rec_relation @endinternal */
 template <NodeType node>
 tref bf_normalizer_without_rec_relation(tref bf) {
-	using tau = tree<node>;
 	LOG_DEBUG << "Begin Boolean function normalizer";
 
 	bf = syntactic_path_simplification<node>(bf);
 	tref result = bf_reduced_dnf<node>(bf);
 	// Apply present function/predicate definitions
-	bool changed;
-	do {
-		changed = false;
-		// Unresolved symbol is still present
-		if (tau::get(result).find_top(is<node, tau::ref>)) {
-			result = syntactic_path_simplification<node>(result);
-			auto resolved_res = apply_defs_to_spec<node>(result);
-			// Structural comparison, matching the analogous loop in
-			// normalize_with_temp_simp.
-			if (tau::get(resolved_res) != tau::get(result)) {
-				result = bf_reduced_dnf<node>(resolved_res);
-				changed = true;
-			}
-		}
-	} while (changed);
+	result = expand_defs_until_settled<node>(result,
+		[](tref n) { return syntactic_path_simplification<node>(n); },
+		[](tref n) { return bf_reduced_dnf<node>(n); });
 
 	LOG_DEBUG << "End Boolean function normalizer";
 

@@ -81,15 +81,18 @@ tref repeat_all<node, step_t>::operator()(tref n) const {
 	// sequence looped forever. max_rounds additionally bounds an
 	// ever-growing rewrite (one that never repeats a prior state), which
 	// visited alone cannot detect.
-	constexpr size_t max_rounds = 1'000'000;
 	for (size_t round = 0; round < max_rounds; ++round) {
 		nn = s(nn);
 		if (visited.contains(nn)) return nn;
 		visited.insert(nn);
 	}
-	LOG_ERROR << "repeat_all: exceeded " << max_rounds
-		<< " rounds without reaching a fixpoint or cycle, giving up";
-	return nn;
+	// Returning the partially rewritten formula would hand the caller a
+	// half-expanded term indistinguishable from a real result; a rewrite
+	// that never settles has no result, so report the failure instead.
+	LOG_ERROR << "Rewriting did not reach a fixpoint after " << max_rounds
+		<< " rounds and is still growing; the definitions in use are "
+		"most likely non-terminating for this argument";
+	return nullptr;
 }
 
 // -----------------------------------------------------------------------------
