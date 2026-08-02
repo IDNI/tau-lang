@@ -507,11 +507,24 @@ TEST_SUITE("Tau API - tref - solving") {
 	}
 	TEST_CASE_FIXTURE(api_fixture, "lgrs") {
 		// NOTE: as of this writing, tau_api::lgrs(tref) aborts (assertion
-		// failure in tree<node>::child_tree, hit inside its internal
-		// norm_all_equations()/apply_all_xor_def() preprocessing) for
-		// every non-null equation tried here -- reproducible directly via
-		// the REPL's `lgrs` command too (e.g. `tau -e "lgrs x = y"`),
-		// independent of this test change. That is a pre-existing bug in
+		// failure in tree<node>::child_tree) for every non-null equation
+		// tried here -- reproducible directly via the REPL's `lgrs` command
+		// too (e.g. `tau -e "lgrs x = y"`), independent of this test change.
+		//
+		// LOCALIZED (2026-08-01, coverage sweep): this comment previously
+		// guessed the abort was inside the internal norm_all_equations() /
+		// apply_all_xor_def() preprocessing. It is not. The abort is
+		// src/api.tmpl.h:498-499:
+		//     tau::get(eq)[0] ... tau::get(eq)[1]
+		// where `eq` is the whole wff. For a single equality that wff has
+		// exactly ONE child, so [1] is null and operator[] -> child_tree()
+		// trips assert(c != nullptr) (src/tau_tree.tmpl.h:579). The line
+		// above already extracted the equality into `equality`, whose two
+		// children are the sides meant to be checked. Verified by
+		// experiment: substituting `equality` for `eq` on those two lines
+		// makes lgrs("x = 0") stop aborting and return a solution.
+		//
+		// That is a pre-existing bug in
 		// src/ and out of scope for a tests-only change, so only the
 		// documented graceful-failure path is exercised here; the
 		// underlying `subtree_map` solving machinery itself is already

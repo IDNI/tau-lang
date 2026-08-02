@@ -4,16 +4,17 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 include(test_repl-quit_cmd.cmake)
 include(test_repl-version_cmd.cmake)
-#include(test_repl-clear_cmd.cmake)
+include(test_repl-clear_cmd.cmake)
 include(test_repl-help_cmd.cmake)
 
 # options commands
 
 include(test_repl-get_cmd.cmake)
 include(test_repl-set_cmd.cmake)
-#include(test_repl-enable_cmd.cmake)
-#include(test_repl-disable_cmd.cmake)
+include(test_repl-enable_cmd.cmake)
+include(test_repl-disable_cmd.cmake)
 include(test_repl-toggle_cmd.cmake)
+include(test_repl-option_aliases.cmake)
 
 # commands for specs, formulas and terms
 
@@ -55,6 +56,13 @@ include(test_repl-history_cmd.cmake)
 include(test_repl-definition_cmd.cmake)
 include(test_repl-io_definition_cmd.cmake)
 
+
+# the `run` command: interactive interpreter execution driven from stdin
+include(test_repl-run_cmd.cmake)
+
+# CLI entry points of the tau executable itself (not REPL commands):
+# --version, the interactive REPL loop, and the specification-file path.
+include(test_repl-cli.cmake)
 
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command

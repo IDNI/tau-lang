@@ -1,0 +1,72 @@
+#
+# run command (repl_evaluator::run_cmd / continue_running / eval's pending resume)
+#
+# Coverage-driven additions (2026-08-01). repl_evaluator.tmpl.h measured 64.5%
+# line coverage -- the largest remaining gap in src/ -- and its single biggest
+# cold region is the `run` command: run_cmd() plus continue_running() plus the
+# pending-request resume path in eval(), roughly 120 uncovered lines. There was
+# no test for `run` at all.
+#
+# `run` is interactive: continue_running() steps the interpreter and, when a
+# console input stream needs a value, SUSPENDS by setting `pending` and
+# reprompting rather than blocking. The next eval() call treats its input as the
+# answer to that request instead of as a new command. So driving it needs a
+# sequence of lines on stdin, which is what these tests do via -X (the legacy
+# terminal REPL, the branch that works without a tty).
+#
+# Each input sequence below was confirmed by hand against the built binary
+# before being turned into an assertion.
+#
+
+# --- the main step loop ------------------------------------------------------
+# `always` spec: every step needs an input, so this exercises the stream_value
+# pending path repeatedly and prints an output per step.
+add_test(NAME "test_repl-run_cmd-steps"
+	COMMAND bash -c "printf 'run o[t] = i[t].\\nT.\\nF.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-steps" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o\\[0\\] := T")
+
+# The per-step prompt carries the stream name, time point and BA type, built in
+# continue_running() from the awaiting repl_pending_input_stream.
+add_test(NAME "test_repl-run_cmd-prompt_label"
+	COMMAND bash -c "printf 'run o[t] = i[t].\\nT.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-prompt_label" PROPERTIES
+	PASS_REGULAR_EXPRESSION "i\\[0\\] : tau :=")
+
+# Successive steps advance the time point in both the prompt and the output.
+add_test(NAME "test_repl-run_cmd-advances_time_point"
+	COMMAND bash -c "printf 'run o[t] = i[t].\\nT.\\nF.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-advances_time_point" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o\\[1\\] := F")
+
+# --- rejected value re-asks the same step -----------------------------------
+# An unparseable value leaves the step unsatisfied. continue_running() is
+# re-entered with the previous request as `retry`, so the SAME time point is
+# prompted again rather than the run ending. No FAIL_REGULAR_EXPRESSION here:
+# the parse error is the expected output.
+add_test(NAME "test_repl-run_cmd-retry_on_bad_value"
+	COMMAND bash -c "printf 'run o[t] = i[t].\\nzzz.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-retry_on_bad_value" PROPERTIES
+	PASS_REGULAR_EXPRESSION "Failed to parse input value")
+
+# --- the continue-or-quit gate and finish_running ----------------------------
+# A spec constraining only time point 0 stops needing input, so the step loop
+# reaches the "no awaiting stream" case and asks whether to continue. Answering
+# q runs finish_running(), which prints the run's benchmark totals.
+add_test(NAME "test_repl-run_cmd-continue_or_quit_prompt"
+	COMMAND bash -c "printf 'run o[0] = i[0].\\nT.\\n\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-continue_or_quit_prompt" PROPERTIES
+	PASS_REGULAR_EXPRESSION "continue\\?")
+
+add_test(NAME "test_repl-run_cmd-quit_finishes_run"
+	COMMAND bash -c "printf 'run o[0] = i[0].\\nT.\\n\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-quit_finishes_run" PROPERTIES
+	PASS_REGULAR_EXPRESSION "run: ")
+
+# --- a specification that cannot be run -------------------------------------
+# run_cmd returns early when the argument does not yield a formula or an
+# interpreter; the REPL must stay usable rather than crash or hang.
+add_test(NAME "test_repl-run_cmd-invalid_spec"
+	COMMAND bash -c "printf 'run x ) ( invalid\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-invalid_spec" PROPERTIES
+	PASS_REGULAR_EXPRESSION "Quit")

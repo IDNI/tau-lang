@@ -411,6 +411,19 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	auto fallback = tt(std::get<tref>(updated)) | tau::fp_fallback | tt::first | tt::ref;
 	auto type = find_ba_type<node>(std::get<tref>(updated));
 	DBG(assert(!is_untyped<node>(type));)
+	// TI-2: a ref-shaped fallback gets wrapped in the reference's type
+	// below, but a plain term fallback was never checked against it, so
+	// `g(x) fallback x:sbf` with a bv[8] `g` sailed through inference --
+	// even though the same annotation one position to the left, in the
+	// definition body, is rejected. Unify the two and report a conflict.
+	if (!is<node, tau::ref>(fallback)) {
+		size_t fallback_type = get_effective_ba_type<node>(fallback);
+		if (fallback_type && !is_untyped<node>(fallback_type)
+			&& !is_untyped<node>(type)
+			&& !unify<node>(fallback_type, type))
+				return inference_error{ fallback, type,
+					fallback_type };
+	}
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get_typed(tau::bf,
 			tau::get_typed(tau::bf_ref, fallback, type), type);
@@ -781,6 +794,22 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 				return resolver.assign(func, it->second);
 			}
 		}
+		return untyped_type_id<node>();
+	}
+	// TI-1: when the scope already has a type, this used to return
+	// immediately and never look at what the callee was declared as, so
+	// `f(x:bv[8]) := x. g(y:sbf) := f(y).` passed -- a reference handing a
+	// bv[8] function an sbf. A definition carries ONE type across its head,
+	// body and parameters (update_functional_rr unifies its arguments with
+	// the header type), so a call site whose own type disagrees with the
+	// callee's recorded type is inconsistent with that same model.
+	for (auto [func, _] : type_map) {
+		auto it = available_function_symbols.find(
+			get_function_signature<node>(func));
+		if (it == available_function_symbols.end()
+			|| is_untyped<node>(it->second)
+			|| unify<node>(type, it->second)) continue;
+		return inference_error{ func, it->second, type };
 	}
 	return untyped_type_id<node>();
 }
@@ -1106,6 +1135,44 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						break;
 					} // Incompatible types
 					auto arguments_map = std::get<typeables_type_id_map<node>>(arguments);
+					// TI-2: a fallback is written at the call site, inside
+					// whatever scope encloses the reference, so its
+					// annotations have to agree with that scope. Both
+					// branches below open a fresh scope -- right for the
+					// reference's own arguments, which are treated as a rec
+					// relation -- but that let a fallback's `x:sbf` shadow an
+					// enclosing `x:bv[8]` instead of conflicting with it, so
+					// `all x:bv[8] g(x) fallback x:sbf = 0.` was accepted
+					// while the same annotation in a definition body is
+					// rejected. Check the fallback against the enclosing
+					// scope before the new one hides it.
+					if (tref fb = tt(n) | tau::fp_fallback | tt::first | tt::ref; fb) {
+						auto fb_types = get_typeable_type_ids_by_type<node>(
+							fb, { tau::variable });
+						if (std::holds_alternative<inference_error>(fb_types)) {
+							error = std::get<inference_error>(fb_types);
+							break;
+						}
+						bool conflict = false;
+						for (const auto& [_, by_node] : std::get<
+							typeables_type_id_map<node>>(fb_types))
+						{
+							for (const auto& [canonized, tid] : by_node) {
+								size_t outer = resolver.type_id_of(canonized);
+								if (!outer || !tid
+									|| is_untyped<node>(outer)
+									|| is_untyped<node>(tid)
+									|| unify<node>(outer, tid))
+										continue;
+								error = inference_error{ canonized,
+									outer, tid };
+								conflict = true;
+								break;
+							}
+							if (conflict) break;
+						}
+						if (conflict) break;
+					}
 					if (is_functional_fallback<node>(n)) {
 						auto unified = unify<node>(arguments_map, header_type);
 						if (std::holds_alternative<inference_error>(unified)) {
