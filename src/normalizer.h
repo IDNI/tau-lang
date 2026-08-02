@@ -203,6 +203,41 @@ template <NodeType node>
 bool is_non_temp_nso_satisfiable(tref n);
 
 /**
+ * @brief Find a relative offset in a definition that its head cannot bind.
+ *
+ * A head declaring no offsets binds no offset variable, so a reference in the
+ * body carrying a relative offset is free — `f(x) := o1[n] = r[n](x)` has
+ * nothing to give `n` a value. Expanding such a definition can only put a
+ * relative offset into the main formula, which `is_valid` rejects; but the
+ * expansion is driven by that very offset (`r[n]` → `r[n-1]` → `r[n-1-1]` →
+ * …) and never terminates, so the main never gets far enough to be checked.
+ * Callers reject the definition up front instead.
+ *
+ * Offsets on stream variables (`o1[n]`) are unaffected: those are resolved per
+ * time step by the interpreter, not by unfolding a definition.
+ * @tparam node Tree node type.
+ * @param head The definition's head (its `ref`, or a node wrapping one).
+ * @param body The definition's body.
+ * @return The offending `ref` node, or `nullptr` when the definition is fine.
+ *
+ * @par Example
+ * @code{.cpp}
+ * // `f` declares no offset, so the `n` in `r[n](x)` is unbound
+ * auto spec = get_nso_rr("r[0](x) := 1. r[n](x) := r[n-1](x)'."
+ *     "f(x) := o1[n] = r[n](x). f(1).").value();
+ * const auto& f = spec.rec_relations[2];
+ * CHECK( get_unbindable_relative_offset<node_t>(
+ *     f.first->get(), f.second->get()) != nullptr );
+ * // `r` declares `[n]`, which binds the `n-1` in its own body
+ * const auto& r = spec.rec_relations[1];
+ * CHECK( get_unbindable_relative_offset<node_t>(
+ *     r.first->get(), r.second->get()) == nullptr );
+ * @endcode
+ */
+template <NodeType node>
+tref get_unbindable_relative_offset(tref head, tref body);
+
+/**
  * @brief Check whether two non-temporal NSO formulas are logically equivalent.
  *
  * Handles three fast paths:

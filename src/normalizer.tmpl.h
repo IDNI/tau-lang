@@ -1180,10 +1180,47 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
  * @endcode
  * @endinternal
  */
+/** @internal @copydoc get_unbindable_relative_offset @endinternal */
+template <NodeType node>
+tref get_unbindable_relative_offset(tref head, tref body) {
+	using tau = tree<node>;
+	// Every variable an offset in the head mentions is bound for the body.
+	// That is not only the head's own offset -- `r[n](x)` -- but also one
+	// nested in an argument: `pred(int[t](1)) := int[t-1](1)` binds `t`
+	// just as well, and rejecting it would break ordinary definitions.
+	// Captures and variables share a name id (transform_ref_args_to_captures
+	// builds a capture from its var_name's data), so one set covers this
+	// running either before or after that transformation.
+	auto offset_vars = [](tref n, std::set<size_t>& out) {
+		for (tref offsets : tau::get(n).select_all(is<node, tau::offsets>))
+			for (tref v : tau::get(offsets).select_all(
+				is<node>({ tau::var_name, tau::capture })))
+					out.insert(tau::get(v).value.data);
+	};
+	std::set<size_t> bound;
+	offset_vars(head, bound);
+	for (tref ref : tau::get(body).select_all(is<node, tau::ref>)) {
+		std::set<size_t> used;
+		offset_vars(ref, used);
+		for (size_t v : used) if (!bound.contains(v)) return ref;
+	}
+	return nullptr;
+}
+
 template <NodeType node>
 bool is_valid(const rr<node>& nso_rr) {
 	using tau = tree<node>;
 	LOG_TRACE << "-- is_valid: " << LOG_RR(nso_rr);
+	for (const auto& r : nso_rr.rec_relations)
+		if (tref ref = get_unbindable_relative_offset<node>(
+			r.first->get(), r.second->get()); ref)
+	{
+		LOG_ERROR << "Recurrence relation "
+			<< TAU_TO_STR(r.first->get()) << " cannot use the "
+			"relative offset of " << TAU_TO_STR(ref)
+			<< ": its head declares no offset to bind it";
+		return false;
+	}
 	for (tref main_offsets : tau::get(nso_rr.main)
 		.select_all(is<node,tau::offsets>)) if (tau::get(main_offsets)
 			.find_top(is<node, tau::capture>))

@@ -70,3 +70,22 @@ add_test(NAME "test_repl-run_cmd-invalid_spec"
 	COMMAND bash -c "printf 'run x ) ( invalid\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-run_cmd-invalid_spec" PROPERTIES
 	PASS_REGULAR_EXPRESSION "Quit")
+
+# --- issue 20: a definition whose head cannot bind its body's relative offset -
+# `f` declares no offset, so the `n` in `r[n](x)` is free. Unfolding `f(1)` then
+# rewrites r[n] -> r[n-1] -> r[n-1-1] -> ... forever, which is what hung the
+# runner with no output and no message. Written out directly the same spec is
+# already rejected ("Main ... cannot contain a relative offset"); hiding it
+# behind a definition must be rejected too, and at definition time, so the bad
+# definition never reaches the runner or the definition list.
+add_test(NAME "test_repl-run_cmd-unbindable_relative_offset"
+	COMMAND bash -c "printf 'r[0](x) := 1.\\nr[n](x) := r[n-1](x).\\nf(x) := o1[n] = r[n](x).\\nrun f(1)\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-unbindable_relative_offset" PROPERTIES
+	PASS_REGULAR_EXPRESSION "its head declares no offset to bind it")
+
+# The same definition with an offset on the head binds `n` and stays accepted.
+add_test(NAME "test_repl-run_cmd-bound_relative_offset_accepted"
+	COMMAND bash -c "printf 'r[0](x) := 1.\\nr[n](x) := r[n-1](x).\\nf[n](x) := o1[n] = r[n](x).\\ndefs\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-bound_relative_offset_accepted" PROPERTIES
+	PASS_REGULAR_EXPRESSION "\\[3\\] f\\[n\\]\\(x\\)"
+	FAIL_REGULAR_EXPRESSION "Error")

@@ -658,7 +658,23 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
-	rr_defs.push_back(n | tt::first | tt::ref);
+	// grammar: rec_relation => ref ":=" (capture | ref | wff | bf)
+	tref def = n | tt::first | tt::ref;
+	const auto& t = tau::get(def);
+	// Reject a definition that can never be used before it is stored, so
+	// that using it hangs the unfolding (issue 20) and so that it does not
+	// invalidate every later command by sitting in the definition list.
+	if (tref ref = get_unbindable_relative_offset<node>(
+		t[0].get(), t[1].get()); ref)
+	{
+		TAU_LOG_ERROR << "Definition " << tau::get(def).to_str()
+			<< " cannot use the relative offset of "
+			<< tau::get(ref).to_str() << ": its head declares no "
+			"offset to bind it. Give the head an offset, as in "
+			"f[n](x), or use a fixed offset";
+		return;
+	}
+	rr_defs.push_back(def);
 	size_t idx = rr_defs.size() - 1;
 	std::cout << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]).to_str() << "\n";
 }
