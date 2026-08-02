@@ -506,32 +506,22 @@ TEST_SUITE("Tau API - tref - solving") {
 		CHECK(!solution.value().empty());
 	}
 	TEST_CASE_FIXTURE(api_fixture, "lgrs") {
-		// NOTE: as of this writing, tau_api::lgrs(tref) aborts (assertion
-		// failure in tree<node>::child_tree) for every non-null equation
-		// tried here -- reproducible directly via the REPL's `lgrs` command
-		// too (e.g. `tau -e "lgrs x = y"`), independent of this test change.
-		//
-		// LOCALIZED (2026-08-01, coverage sweep): this comment previously
-		// guessed the abort was inside the internal norm_all_equations() /
-		// apply_all_xor_def() preprocessing. It is not. The abort is
-		// src/api.tmpl.h:498-499:
+		// FIXED (issue-60): this used to abort for every non-null
+		// equation. The abort was src/api.tmpl.h's non-Boolean screen
 		//     tau::get(eq)[0] ... tau::get(eq)[1]
 		// where `eq` is the whole wff. For a single equality that wff has
-		// exactly ONE child, so [1] is null and operator[] -> child_tree()
-		// trips assert(c != nullptr) (src/tau_tree.tmpl.h:579). The line
-		// above already extracted the equality into `equality`, whose two
-		// children are the sides meant to be checked. Verified by
-		// experiment: substituting `equality` for `eq` on those two lines
-		// makes lgrs("x = 0") stop aborting and return a solution.
-		//
-		// That is a pre-existing bug in
-		// src/ and out of scope for a tests-only change, so only the
-		// documented graceful-failure path is exercised here; the
-		// underlying `subtree_map` solving machinery itself is already
-		// covered by the "solve" test above and by the "lgrs" test suite
-		// in tests/integration/test_integration-solver.cpp (which calls
-		// the free `lgrs<node>()` function directly, bypassing this
-		// wrapper).
+		// exactly ONE child, so [1] was null and operator[] ->
+		// child_tree() tripped assert(c != nullptr)
+		// (src/tau_tree.tmpl.h:579). The line above had already extracted
+		// the equality into `equality`, whose two children are the sides
+		// meant to be checked; the screen now indexes that instead.
+		tref eq = tau_api::get_formula("x | y = 0");
+		REQUIRE(eq);
+		auto solution = tau_api::lgrs(eq);
+		REQUIRE(solution.has_value());
+		CHECK(!solution.value().empty());
+	}
+	TEST_CASE_FIXTURE(api_fixture, "lgrs rejects a null tref") {
 		auto solution = tau_api::lgrs(static_cast<tref>(nullptr));
 		CHECK(!solution.has_value());
 	}

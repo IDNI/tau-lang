@@ -494,9 +494,13 @@ std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
 		return {};
 	}
-	// Exclude non-Boolean operations from equation
-	if (tau::get(eq)[0].find_top(is_non_boolean_term<node>) ||
-		tau::get(eq)[1].find_top(is_non_boolean_term<node>)) {
+	// Exclude non-Boolean operations from equation. The two sides live under
+	// the bf_eq, not under `eq`: `eq` is the wff wrapping it and has a
+	// single child, so indexing it with [1] tripped the `c != nullptr`
+	// assert in tree<node>::child_tree (Debug) and read a null child
+	// (Release).
+	if (tau::get(equality)[0].find_top(is_non_boolean_term<node>) ||
+		tau::get(equality)[1].find_top(is_non_boolean_term<node>)) {
 		TAU_LOG_ERROR << "Found non-Boolean operation in equation";
 		return {};
 	}

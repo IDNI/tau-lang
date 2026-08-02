@@ -547,16 +547,23 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	auto print_zero_case = [&type_id](tref var) {
-		std::cout << "\t" << tau::get(var).to_str() << " := {"
-			<< node::ba::zero(get_ba_type_tree<node>(type_id))
-			<< "}:" << ba_types<node>::name(type_id) << "\n";
+	// ba_types::name() renders the `typed` node, which already prints its
+	// own leading ':', and BA constants are printed as `{ c }` elsewhere
+	// (see the ba_constant case in tau_tree_printers), so match that form
+	// here -- this branch never ran before, and printed `{c}::sbf`.
+	auto print_constant_case = [&type_id](tref var, const std::string& c) {
+		std::cout << "\t" << tau::get(var).to_str() << " := { " << c
+			<< " }" << ba_types<node>::name(type_id) << "\n";
 	};
 
-	auto print_one_case = [&type_id](tref var) {
-		std::cout << "\t" << tau::get(var).to_str() << " := {"
-			<< node::ba::one(get_ba_type_tree<node>(type_id))
-			<< "}:" << ba_types<node>::name(type_id) << "\n";
+	auto print_zero_case = [&](tref var) {
+		print_constant_case(var,
+			node::ba::zero(get_ba_type_tree<node>(type_id)));
+	};
+
+	auto print_one_case = [&](tref var) {
+		print_constant_case(var,
+			node::ba::one(get_ba_type_tree<node>(type_id)));
 	};
 
 	auto print_general_case = [](tref var, tref value) {
@@ -585,41 +592,37 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	tref arg = n.value_tree().first();
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
-	auto check = get_type_and_arg(arg);
-	if (!check) return;
-	auto [type, value] = check.value();
+	tref value = get_any(arg);
+	if (!value) return;
 	measuring m;
 	auto solution = tau_api::solve(m, value,
 		get_solver_cmd_mode<node>(n.value()));
 	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 
-	print_solver_cmd_solution<node>(solution, type);
+	// the printer needs the BA type of the solution, not the grammar
+	// nonterminal of the argument that get_type_and_arg also returns
+	print_solver_cmd_solution<node>(solution,
+		get_solver_cmd_type<node>(value));
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
-	// getting the type
-	// TODO compare get_type_and_arg with get_solver_cmd_type
-	// size_t type = get_solver_cmd_type<node>(n.value());
-	// if (type == 0) {
-	// 	TAU_LOG_ERROR << "Invalid type\n";
-	// 	return;
-	// }
-
 	tref arg = n.value_tree().first();
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
-	auto check = get_type_and_arg(arg);
-	if (!check) return;
-	auto [type, value] = check.value();
+	tref value = get_any(arg);
+	if (!value) return;
 	measuring m;
 	auto solution = tau_api::lgrs(m, value);
 	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
-	print_solver_cmd_solution<node>(solution, type);
+	// same as solve_cmd: the printer takes a BA type id, not the grammar
+	// nonterminal that get_type_and_arg also returns
+	print_solver_cmd_solution<node>(solution,
+		get_solver_cmd_type<node>(value));
 }
 
 template <typename... BAs>
