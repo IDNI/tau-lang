@@ -2146,17 +2146,16 @@ TEST_SUITE("ba_types_inference: conflicts in definitions and references") {
 		CHECK( !infers_defs("f(x:bv[8]) := x:sbf = 0.") );
 	}
 
-	// TI-1 -- argument types do NOT propagate across a reference.
-	// `f` takes a bv[8] and `g` hands it an sbf, which inference accepts.
-	// That is consistent with per-definition type scoping (the resolver is
-	// a type_scoped_resolver: each rec_relation gets its own scope, so a
-	// callee's parameter type is not visible at the call site), but it does
-	// mean a plainly wrong argument family passes the checker in silence.
-	// Pinning the observed behaviour; whether it is intended is a question
-	// for whoever owns the scoping rule.
-	TEST_CASE("TI-1: a reference argument of the wrong family is accepted") {
-		CHECK( infers_defs("f(x:bv[8]) := x."
-				   "g(y:sbf) := f(y).") );
+	// TI-1 (FIXED) -- argument types now propagate across a reference.
+	// `f` takes a bv[8] and `g` handed it an sbf, which inference used to
+	// accept. type_by_function_symbol only consulted a callee's recorded
+	// type when the calling scope was still untyped, so a call site that
+	// already had a type of its own never compared itself against the
+	// callee at all. A definition carries one type across head, body and
+	// parameters, so a disagreeing call site is a conflict in that model.
+	TEST_CASE("TI-1: a reference argument of the wrong family is rejected") {
+		CHECK( !infers_defs("f(x:bv[8]) := x."
+				    "g(y:sbf) := f(y).") );
 	}
 
 	// fp_fallback accepts first | last | capture | ref | wff | bf
@@ -2166,24 +2165,27 @@ TEST_SUITE("ba_types_inference: conflicts in definitions and references") {
 	// These stop at infer_ba_types and never execute the spec -- see TI-2
 	// for why executing one of them is not an option.
 
-	// TI-2 -- a fallback whose type conflicts with the reference it guards
-	// is ACCEPTED by inference. The same annotation one position to the
-	// left ("a functional definition body conflicting with its parameter"
-	// above) is rejected, so this is a hole in the fallback arm rather than
-	// a family that unifies.
+	// TI-2 (FIXED) -- a fallback whose type conflicts with the reference it
+	// guards used to be ACCEPTED, while the same annotation one position to
+	// the left (a definition body) was rejected.
 	//
-	// It matters because of what happens next: running this exact spec
-	// through the interpreter (tau <spec> -q) produced no result within a
-	// 120s timeout, where the same spec with a matching fallback reaches
-	// execution immediately. Not proven to be an infinite loop -- only that
-	// it does not finish in 120s -- but the checker is the natural place to
-	// stop it, and today it does not. That is also why this suite asserts
-	// at the inference level only: an execution-level assertion here would
-	// hang the suite rather than fail it.
-	TEST_CASE("TI-2: a conflicting bf fallback is accepted by inference") {
-		CHECK( infers_spec("g[n](x:bv[8]) := g[n-1](x)."
-				   "g[0](x:bv[8]) := x."
-				   "all x:bv[8] g(x) fallback x:sbf = 0.") );
+	// Cause: a fallback is written at the call site, inside whatever scope
+	// encloses the reference, but infer_ba_types opened a fresh scope for
+	// the whole ref-with-fallback ("we must deal with it as a rec
+	// relation"). That is right for the reference's own arguments and wrong
+	// for the fallback: `x:sbf` shadowed the enclosing `x:bv[8]` instead of
+	// conflicting with it. The fallback's typeables are now checked against
+	// the enclosing scope before the new scope hides them.
+	//
+	// It mattered beyond tidiness: `tau <spec> -q` on this exact sample
+	// produced no result within a 120s timeout, where the matching-fallback
+	// version below reaches execution immediately. That is also why this
+	// suite asserts at inference level only -- an execution-level assertion
+	// would have hung the suite rather than failed it.
+	TEST_CASE("TI-2: a conflicting bf fallback is rejected") {
+		CHECK( !infers_spec("g[n](x:bv[8]) := g[n-1](x)."
+				    "g[0](x:bv[8]) := x."
+				    "all x:bv[8] g(x) fallback x:sbf = 0.") );
 	}
 
 	TEST_CASE("a matching bf fallback is accepted") {
