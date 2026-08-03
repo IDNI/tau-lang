@@ -4,9 +4,9 @@
  * @file defs.h
  * @brief Core macros, compile-time helpers, and GIT version constants for Tau.
  *
- * Defines `hasb`/`hasbc`/`sortc` search/sort macros, the `TAU_PRINT*` family
- * of tree-printing macros, and the `Pack_size` / `Pack_bitsize` template
- * helpers. Also initializes logging and includes the external parser's `defs.h`.
+ * Defines `hasb`/`hasbc`/`sortc` search/sort macros and the `TAU_PRINT*`
+ * family of tree-printing macros. Also initializes logging and includes the
+ * external parser's `defs.h`.
  */
 
 #ifndef __IDNI__TAU__DEFS_H__
@@ -76,15 +76,6 @@
 #define TAU_DUMP_TO_STR(ref) (tree<node>::get(ref).dump_to_str())
 
 namespace idni::tau_lang {
-
-/** @brief Number of types in a parameter pack (same as `sizeof...(Pack)`). */
-template <typename... Pack>
-constexpr size_t Pack_size = std::variant_size<std::variant<Pack...>>::value;
-
-/** @brief Minimum number of bits required to index all types in @p Pack. */
-template <typename... Pack>
-constexpr size_t Pack_bitsize = Pack_size<Pack...> <= 1 ? 1 :
-        (sizeof(size_t) * 8 - __builtin_clzl(Pack_size<Pack...> - 1));
 
 } // namespace idni::tau_lang
 

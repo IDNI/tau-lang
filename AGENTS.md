@@ -107,6 +107,14 @@ globs `src/boolean_algebras/*/ba.cmake` manifests and generates `tau_pack.h`
 into the build tree, providing `tau_pack::node_t`, `TAU_PACK_BASE_BAS` and
 `TAU_PACK_FULL_BAS` — use those instead of spelling a pack literally.
 
+Which type names that pack owns is answered by `node::ba::types()` (owning
+strings), `type_names()` and `types_joined()` (both `constexpr`, from the
+descriptors' `type_name`). Core validates a spec's annotations against them
+through `pack_owns_ba_type[_name]` in `ba_types.h`, matching by family name so
+`bv[8]` needs `bv` in the pack; the type ids core reserves for itself
+(`tau_type_id`, `nat_type_id`, `untyped_type_id`) are exempt, and no BA is
+named to do it.
+
 A BA reaches core only through `ba_descriptor<BA, node>` (`ba_descriptor.h`);
 `ba_descriptor_complete` lists the mandatory members. **There are no
 hand-written per-pack dispatchers left** — one generic descriptor-driven

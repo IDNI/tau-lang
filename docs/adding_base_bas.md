@@ -32,6 +32,14 @@ listed ids, and generates `tau_pack.h` into the build tree:
 `tau` is a reserved id: the wrapper BA embedding a whole Tau spec. When listed,
 the resolver emits `node<tau_ba<base...>, base...>`.
 
+At runtime the pack answers for itself: `node::ba::types()` returns the
+descriptors' `type_name`s in pack order, `type_names()` the same as a
+`constexpr std::array<std::string_view, N>`, and `types_joined()` them
+comma-joined as a `string_view` over a `constexpr` buffer. A spec annotating a
+type the pack does not own is rejected against that list — including a
+parameterized one, matched by family name, so `:bv[8]` needs `bv` in the pack.
+`tau --version` prints the same list.
+
 ## What a BA must provide
 
 ### The value type
