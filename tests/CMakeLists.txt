@@ -143,9 +143,16 @@ function(add test_name)
 			return()
 		endif()
 	endforeach()
-	add_executable(${N} "${N}.cpp")
+	_tau_add_test_target("${N}" "${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/..")
+endfunction()
+
+# Build and register one test target from an explicit source path, so a suite
+# can live outside the directory that adds it -- a BA's own tests do.
+function(_tau_add_test_target N src work_dir)
+	add_executable(${N} "${src}")
 	target_setup(${N})
-	target_include_directories(${N} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+	target_include_directories(${N} PUBLIC ${work_dir})
 	# extern template declarations for the test BA packs, instantiated in libTAU
 	# test_cvc5 is skipped: its own file-scope TermManager collides with tau.h's
 	if(NOT "${N}" STREQUAL "test_cvc5")
@@ -169,9 +176,34 @@ function(add test_name)
 		set(_TAU_TEST_TIMEOUT 600)
 	endif()
 	set_tests_properties(${N}
-		PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+		PROPERTIES WORKING_DIRECTORY ${work_dir}
 		ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$LD_LIBRARY_PATH"
 		TIMEOUT ${_TAU_TEST_TIMEOUT})
+endfunction()
+
+# Register the suites the pack's BAs declare in their manifests. Ownership
+# decides them, so unlike add() they need no requirement read from the source.
+function(tau_add_owned_ba_tests)
+	foreach(_src ${TAU_BA_TESTS_RESOLVED})
+		get_filename_component(_n "${_src}" NAME_WE)
+		if(_n IN_LIST TAU_SKIP_TESTS)
+			message(STATUS
+				"Skipping C++ test ${_n} (covered by REPL test)")
+			continue()
+		endif()
+		if(NOT EXISTS "${_src}")
+			message(FATAL_ERROR
+				"BA manifest declares a missing test: ${_src}")
+		endif()
+		_tau_add_test_target("${_n}" "${_src}"
+			"${PROJECT_SOURCE_DIR}/tests")
+		# shared fixtures a BA-owned suite includes by bare name
+		target_include_directories("${_n}" PUBLIC
+			${PROJECT_SOURCE_DIR}/tests/unit
+			${PROJECT_SOURCE_DIR}/tests/integration
+			${PROJECT_SOURCE_DIR}/tests/integration/satisfiability
+			${PROJECT_SOURCE_DIR}/tests/integration/solver)
+	endforeach()
 endfunction()
 
 #
@@ -194,6 +226,16 @@ set_property(CACHE TAU_BUILD_UNIT_TESTS PROPERTY STRINGS "OFF" "ON")
 if (TAU_BUILD_UNIT_TESTS)
 	enable_testing()
 	add_subdirectory(unit)
+endif ()
+
+#
+# Suites owned by the pack's BAs
+#
+# One registration for both kinds: a manifest lists what the algebra owns, not
+# where it used to live.
+if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION)
+	enable_testing()
+	tau_add_owned_ba_tests()
 endif ()
 
 #
