@@ -14,8 +14,14 @@ build="${1:-$root/build/external-ba}"
 jobs="${2:-4}"
 register="$root/tests/external_ba/register.cmake"
 
-echo "== configuring $build with the out-of-tree BA"
-cmake -S "$root" -B "$build" \
+generator="Unix Makefiles"
+if command -v ninja > /dev/null 2>&1 \
+		|| command -v ninja-build > /dev/null 2>&1; then
+	generator="Ninja"
+fi
+
+echo "== configuring $build with the out-of-tree BA using $generator"
+cmake -S "$root" -B "$build" -G "$generator" \
 	-DCMAKE_BUILD_TYPE=Devel \
 	-DTAU_BUILD_EXECUTABLE=ON \
 	-DTAU_EXTERNAL_BAS="$register" \
