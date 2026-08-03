@@ -273,7 +273,7 @@ static bool guard_is_aba_feasible(
 
 	// Full guard check: group by BA type and verify each type-partition is
 	// ABA-feasible.  Different BA types involve independent variables.
-	auto types_seen = FormulaTypeSet<node>::from_atoms(atoms);
+	auto types_seen = formula_type_set<node>::from_atoms(atoms);
 	if (types_seen.single_type()) {
 		// Fast path: single type — build full conjunction and check.
 		tref conj = tau::_T();

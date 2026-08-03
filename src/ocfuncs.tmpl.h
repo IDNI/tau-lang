@@ -360,17 +360,6 @@ void resolve_func_decl_types(std::vector<FuncDecl>& decls) {
 		resolve_func_decl_types<node>(d);
 }
 
-// ── Generic compile with BAProvider ──────────────────────────────────────────
-
-template <NodeType node, BAProvider Provider>
-tref ocfuncs_compile(tref fm, const std::vector<FuncDecl>& decls,
-		Provider& /* provider */) {
-	// Currently delegates to the standard pipeline.
-	// The provider will be used for type enumeration and satisfaction
-	// as the individual steps are made provider-aware.
-	return ocfuncs_compile<node>(fm, decls);
-}
-
 // ── Detection ────────────────────────────────────────────────────────────────
 
 template <NodeType node>

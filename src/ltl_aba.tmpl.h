@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "ltl_aba.h"
-#include "ba_provider.h"
+#include "formula_type_set.h"
 #include "algorithm_a_skeleton.h"
 #include "algorithm_b_skeleton.h"
 #include "algorithm_d_game.h"

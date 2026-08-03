@@ -9,8 +9,6 @@ set(TESTS
 	ba_types
 	ba_types_inference
 	bounded_cache
-	ba_providers
-	composite_ba_provider
 	temporal_connectives
 	bv_ba-simplification
 	bv_ba-cast

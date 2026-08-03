@@ -13,7 +13,6 @@
 #define __IDNI__TAU__OCFUNCS_H__
 
 #include "normalizer.h"
-#include "ba_provider.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -189,14 +188,6 @@ void resolve_func_decl_types(std::vector<FuncDecl>& decls);
 // Check if a formula contains function applications
 template <NodeType node>
 bool has_func_applications(tref fm);
-
-// ── Generic compile with provider ────────────────────────────────────────────
-
-// Compile with an explicit BAProvider (for generic use across all ABAs).
-// The provider is used for type enumeration, projection, satisfaction checks.
-template <NodeType node, BAProvider Provider>
-tref ocfuncs_compile(tref fm, const std::vector<FuncDecl>& decls,
-	Provider& provider);
 
 } // namespace idni::tau_lang
 
