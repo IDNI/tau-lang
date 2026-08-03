@@ -23,6 +23,9 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 	static constexpr int default_type_priority = 50;
 	static constexpr bool atomless = true;
 	static constexpr bool non_aba_omcat = false;
+	// answers come from an LLM oracle, so comparing two constants can leave
+	// the process and need not be reproducible
+	static constexpr bool uses_oracle = true;
 
 	/**
 	 * @brief No past output can leave the current constraint unsatisfiable.

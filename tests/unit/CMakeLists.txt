@@ -4,6 +4,7 @@ set(TESTS
 	apply_rule
 	base_ba_dispatcher
 	ba_constants
+	ba_conformance
 	ba_descriptor_pack
 	ba_types
 	ba_types_inference

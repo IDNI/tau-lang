@@ -31,6 +31,7 @@ cmake --fresh -S "$root" -B "$build" -G "$generator" \
 	"${compiler_args[@]}" \
 	-DCMAKE_BUILD_TYPE=Devel \
 	-DTAU_BUILD_EXECUTABLE=ON \
+	-DTAU_BUILD_UNIT_TESTS=ON \
 	-DTAU_EXTERNAL_BAS="$register" \
 	-DTAU_BAS=tau,sbf,ext
 
@@ -41,8 +42,12 @@ grep -q 'TAU_PACK_HAS_BA_EXT' "$pack_header" \
 grep -q 'ext_ba' "$pack_header" \
 	|| { echo "FAIL: ext_ba missing from the pack node type"; exit 1; }
 
-echo "== building the tau CLI"
+echo "== building the tau CLI and the unit suite"
 cmake --build "$build" -j"$jobs"
+
+echo "== checking the algebra against the descriptor contract"
+"$build/test_ba_conformance" \
+	|| { echo "FAIL: the out-of-tree BA breaks the descriptor contract"; exit 1; }
 
 echo "== smoke-running the binary"
 out="$(printf 'sat {1}:ext = {1}:ext.\nq\n' | "$build/tau" 2>&1)"
