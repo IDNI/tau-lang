@@ -24,6 +24,8 @@
 
 #include "tau_tree.h"
 #include "union_find_with_sets.h"
+#include "ba_types.h"
+#include "normalizer_uf_arithmetic.h"
 
 namespace idni::tau_lang {
 

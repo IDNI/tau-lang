@@ -15,9 +15,18 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 	const trefs& conjuncts, const analysis_context<node>& ctx)
 {
 	using tau = tree<node>;
-	(void) ctx; // bitvector seeds arrive in Task 3
 	block_eliminability<node> res;
 	if (block_vars.empty()) return res;
+
+	// Gated: a block with no bitvector content pays for neither pass.
+	bool block_has_bv = false;
+	for (tref v : block_vars)
+		if (is_tref_bv_type_family<node>(v)) { block_has_bv = true; break; }
+	subtree_unordered_set<node> arith_tainted;
+	if (block_has_bv)
+		for (tref conj : conjuncts)
+			for (tref t : collect_bv_arithmetic_taint_uf<node>(conj))
+				arith_tainted.insert(t);
 
 	union_find_with_sets<decltype(eliminability_comp<node>), node>
 		uf(eliminability_comp<node>);
@@ -102,18 +111,49 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 				return false;
 			}
 			if (is_atomic_fm<node>(m)) {
-				// Propagation channel: the atom contributes no
-				// verdict of its own -- assign(..., eliminable) is
-				// a verdict no-op (eliminable is the join
-				// identity); its real job is inserting m into the
-				// union-find via find() so the merge below has a
-				// root to work from. Unioning m with its free
-				// variables makes every variable sharing an atom
-				// share a root. Order-independent -- the second
-				// merge joins the sets and `join` lifts the result.
-				assign(m, elim_verdict::eliminable);
-				for (tref v : get_free_vars<node>(m))
-					merge(m, v);
+				// Propagation channel: the atom's own verdict is
+				// now seeded below (bv content only; otherwise
+				// still the eliminable no-op), but its main job
+				// remains inserting m into the union-find via
+				// find() so the merge below has a root to work
+				// from. Unioning m with its free variables makes
+				// every variable sharing an atom share a root.
+				// Order-independent -- the second merge joins the
+				// sets and `join` lifts the result.
+				//
+				// Seed order matters only through `join`, which
+				// is commutative -- but the *criterion* does not
+				// commute with itself. `solver_owned` keys on
+				// bitvector TYPE, deliberately not on arithmetic
+				// taint: blasting rewrites arithmetic into
+				// per-bit atoms that are still bv-typed but no
+				// longer tainted, and if those fell back to
+				// `eliminable` they would reach generic Boole
+				// decomposition -- hundreds of atoms per blasted
+				// operation, each split copying the formula,
+				// every BDD leaf allocating a cvc5 term. That is
+				// a blow-up, not a wrong answer, so it must be
+				// pinned by timing as well as by assertion.
+				// An atom is a `wff` (a formula), not a term -- its
+				// own `get_ba_type()` is the untyped/default id, so
+				// `is_tref_bv_type_family<node>(m)` is silently
+				// false no matter what it compares. bv-ness has to
+				// be read off the atom's VARIABLES instead, the same
+				// way collect_bv_arithmetic_taint_uf does it
+				// (normalizer_uf_arithmetic.tmpl.h:98-99).
+				const trefs& fvs = get_free_vars<node>(m);
+				bool atom_is_bv = false;
+				for (tref fv : fvs)
+					if (is_tref_bv_type_family<node>(fv)) {
+						atom_is_bv = true; break;
+					}
+				elim_verdict seed = elim_verdict::eliminable;
+				if (block_has_bv && atom_is_bv && ctx.bv_is_solver_owned)
+					seed = elim_verdict::solver_owned;
+				if (arith_tainted.contains(m))
+					seed = join(seed, elim_verdict::arith_residue);
+				assign(m, seed);
+				for (tref v : fvs) merge(m, v);
 				return false;
 			}
 			if (tau::get(m).is(tau::wff) && !is_transparent_connective(m)) {

@@ -133,4 +133,46 @@ TEST_SUITE("eliminability") {
 		CHECK(a.verdict_of(unanalysed) == elim_verdict::eliminable);
 		CHECK(a.conjuncts_of(unanalysed).empty());
 	}
+
+	TEST_CASE("bv-typed atoms are solver_owned when the solver owns bv") {
+		tref c = get_nso_rr("x:bv[4] & y:bv[4] = 0:bv[4].")
+			.value().main->get();
+		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
+		for (tref v : conj_vars(c))
+			CHECK(a.verdict_of(v) == elim_verdict::solver_owned);
+	}
+
+	TEST_CASE("bv atoms are eliminable when the solver cannot own them") {
+		// A formula carrying a constant of another Boolean algebra is one
+		// cvc5 cannot translate at all, so its bv scopes will never be
+		// decided. Boole decomposition is the only route left -- let it
+		// have them, or the quantifier is stranded for good.
+		tref c = get_nso_rr("x:bv[4] & y:bv[4] = 0:bv[4].")
+			.value().main->get();
+		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = false;
+		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
+		for (tref v : conj_vars(c))
+			CHECK(a.verdict_of(v) != elim_verdict::solver_owned);
+	}
+
+	TEST_CASE("arith_residue outranks solver_owned on the same atom") {
+		// Multiplication by a non-constant is arithmetic blasting cannot
+		// express, so it must not be routed to the solver even though the
+		// atom is bv-typed.
+		tref c = get_nso_rr("x:bv[4] * y:bv[4] = 0:bv[4].")
+			.value().main->get();
+		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
+		for (tref v : conj_vars(c))
+			CHECK(a.verdict_of(v) == elim_verdict::arith_residue);
+	}
+
+	TEST_CASE("a reference outranks every bv verdict") {
+		tref c1 = get_nso_rr("f(x:bv[4]).").value().main->get();
+		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		auto a = analyse_block<node_t>(conj_vars(c1), { c1 }, ctx);
+		for (tref v : conj_vars(c1))
+			CHECK(a.verdict_of(v) == elim_verdict::frozen);
+	}
 }
