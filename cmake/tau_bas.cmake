@@ -170,6 +170,13 @@ function(tau_resolve_ba_pack)
 	endforeach()
 	list(REMOVE_DUPLICATES _required_packages)
 
+	# Pack-independent core runtime sources, compiled regardless of TAU_BAS, so a
+	# consumer (e.g. emitted codegen CMakeLists) names no concrete file itself.
+	set(_core_sources
+		boolean_algebras/bool_ba.cpp
+		backends/bdds/var_dict.cpp)
+
+	set(TAU_PACK_CORE_SOURCES "${_core_sources}" PARENT_SCOPE)
 	set(TAU_PACK_BA_IDS "${_ba_ids}" PARENT_SCOPE)
 	set(TAU_BA_HEADERS "${_headers}" PARENT_SCOPE)
 	set(TAU_BA_SOURCES_EXTRA "${_sources_extra}" PARENT_SCOPE)

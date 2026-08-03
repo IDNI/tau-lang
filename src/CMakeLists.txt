@@ -54,13 +54,13 @@ set_source_files_properties(${TAU_GENERATED_PARSER_SOURCES}
 	PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 
 # Only what every pack has. A BA's own translation units are declared by its
-# ba.cmake and arrive via TAU_BA_SOURCES_EXTRA, so a pack without a BA does not
-# compile it. bool_ba.cpp stays: described like a BA, but in every pack.
+# ba.cmake and arrive via TAU_BA_SOURCES_EXTRA; TAU_PACK_CORE_SOURCES is the
+# resolver's pack-independent list (bool_ba.cpp stays: described like a BA,
+# but in every pack), so a pack without a BA does not compile that BA's own.
 set(TAU_SOURCES
 	${TAU_GENERATED_PARSER_SOURCES}
 	${TAU_BA_SOURCES_EXTRA}
-	boolean_algebras/bool_ba.cpp
-	backends/bdds/var_dict.cpp
+	${TAU_PACK_CORE_SOURCES}
 	instantiate_test_pack.cpp
 )
 
