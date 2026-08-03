@@ -1,40 +1,47 @@
-# To run it you need to compile the project using release.sh (customized with
-# your settings if needed) and then execute the run.sh whithin the demo directory
-# as follows:
+# Normalization and quantifier elimination.
 #
-# ./run.sh demo_1.4-normalization.tau
-#
-# This demo should work under any *nix flavour due to the paths used for files.
-# To run it under windows you will need to change the paths to the files.
+# See demos/README.md for how to run this script.
 
-# Let us demonstrate several commands related to normalization and its inner workings.
+# The qelim command eliminates the non-temporal quantifiers from a formula.
 
-# The qelim command eliminate the inner quantifier from a formula.
+qelim all X (X = 0)
+qelim ex X (X != 0)
 
-qelim all X (X = 0) # eliminate one quantifier from a simple formula given as argument
+# As with every command, the argument may be a history position instead of a
+# literal formula:
 
-# As before, you can also pass a formula stored in history.
+all X ex Y (X Y' = 0)
+qelim %
 
-# Finally, the following example ilustrates the use of the new Boolean
-# function normalize and the new quantifier elimination algorithm.
-# It uses the normalize command to prove the validity of a formula in the
-# first order theory of atomless Boolean algebra. This is because we assume
-# non-typed variables to be of this type by default. In fact, our procedure can
-# decide the validity for any formula in the first order theory of atomless
-# Boolean algebra.
+# The normalize command, abbreviated n, is the central procedure. Applied to a
+# formula it decides validity in the first order theory of countable atomless
+# Boolean algebras: a valid formula normalizes to T and an unsatisfiable one to
+# F. Untyped variables are exactly variables of that theory, which is why the
+# formula below can be decided at all:
 
-n all x ex y all v ex w x'y = 0 && v + w = 0
+n all x ex y all v ex w x'y = 0 && v ^ w = 0
 
-# The new Boolean function normalization procedure can minimize redundant parts
-# of a formula
+# And one that is not valid:
+
+n all x ex y (x y = 0 && x' y != 0)
+
+# The sat, unsat and valid commands answer the same kind of question directly,
+# reporting T or F rather than returning a normalized formula:
+
+valid all x (x x' = 0)
+sat all x (x = 0)
+
+# Applied to a term, normalize minimizes it, dropping the parts that the rest
+# already covers. Everything below is subsumed by x:
 
 n xyzvw | xyzv | xyz | xy | x
 
-# It also gives canonical output, meaning two equivalent but syntactically different
-# Boolean functions will be normalized to the same syntactical expression. The
-# following is a simple example of this.
+# The output is also canonical: two terms that denote the same Boolean function
+# normalize to the same expression, however differently they were written. Note
+# that the second command below reports the *same* history position as the first,
+# because the result it produced was already stored there:
 
-n xa + ya'
-n a'y + ax
+n xa ^ ya'
+n a'y ^ ax
 
-quit # quit the Tau REPL
+quit

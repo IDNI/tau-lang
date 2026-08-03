@@ -1,0 +1,37 @@
+# The solver: minimum and maximum solutions.
+#
+# See demos/README.md for how to run this script.
+
+# The solutions of a system of Boolean equations are ordered by inclusion, so a
+# system may have a least and a greatest solution. The --min and --max options
+# ask solve for those, in the sense of Theorem 2.6 in Rudeanu 1974. Both have
+# long spellings, --minimum and --maximum.
+
+# Starting with the basics. Here the minimum solution is {F}:tau:
+solve --min x != 1
+# but there is no maximum, since x cannot be everything:
+solve --max x != 1
+
+# Neither bound need exist. In the sbf Boolean algebra, an x that is neither 0
+# nor 1 has no least and no greatest such value:
+solve --min x != 0:sbf && x != 1:sbf
+solve --max x != 0:sbf && x != 1:sbf
+# yet the system is solvable, so plain solve still answers:
+solve x != 0:sbf && x != 1:sbf
+
+# With neither option given, solve tries for a maximum solution first, then a
+# minimum, then any solution at all, and returns the first one it finds.
+
+# Bounds can be asked for on larger systems in the same way:
+solve --max {a}:sbf x != 0 && {b}:sbf x ^ {a}:sbf y = 0
+
+# Finally, a --<type> option states which Boolean algebra to solve over, for
+# formulas that carry no constant to fix it. Over sbf there is no element
+# strictly between 0 and 1, so this system has no minimum solution:
+solve --min --sbf x != 0 && x' != 0
+
+# Over the Tau Boolean algebra the same system is solvable, because a splitter
+# can be introduced (see demo_2.1-solver.tau):
+solve --tau x != 0 && x' != 0
+
+quit
