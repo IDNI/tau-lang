@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include <string>
+#include <cstdio>
 #include <cstdlib>
 #include <unordered_map>
 #include <mutex>
@@ -10,6 +11,53 @@
 #include "boolean_algebras/nlang/nlang_ba.h"
 
 namespace idni::tau_lang {
+
+// --- Configuration from environment ---
+
+// Null when unset or empty, so a blank key reads as "no oracle" everywhere.
+static const char* llm_api_key() {
+	const char* key = std::getenv("TAU_LLM_API_KEY");
+	if (!key || !*key) key = std::getenv("OPENAI_API_KEY"); // fallback
+	return (key && *key) ? key : nullptr;
+}
+
+// One-time warning when the oracle is needed but no API key is configured.
+static void warn_llm_unavailable() {
+	static bool warned = false;
+	if (warned) return;
+	warned = true;
+	fprintf(stderr,
+		"WARNING: nlang oracle requires TAU_LLM_API_KEY (or OPENAI_API_KEY).\n"
+		"  Set TAU_LLM_API_KEY, and optionally TAU_LLM_ENDPOINT / TAU_LLM_MODEL.\n"
+		"  Without the API key, all oracle queries return conservative defaults\n"
+		"  (NOT empty, NOT universal, NOT equivalent), which may produce\n"
+		"  incorrect results for nlang formulas with irreducible atoms.\n");
+}
+
+// One-time warning when the endpoint answered but not with success.
+static void warn_llm_http_status(long status) {
+	static bool warned = false;
+	if (warned) return;
+	warned = true;
+	fprintf(stderr,
+		"WARNING: nlang oracle endpoint returned HTTP %ld; the query is treated\n"
+		"  as unanswered and a conservative default is used. If the endpoint\n"
+		"  requires an explicit model, set TAU_LLM_MODEL.\n", status);
+}
+
+static std::string llm_endpoint() {
+	const char* ep = std::getenv("TAU_LLM_ENDPOINT");
+	if (ep && *ep) return ep;
+	return "https://api.openai.com/v1";
+}
+
+// Empty when unset: the request then names no model and the endpoint picks.
+static std::string llm_model() {
+	const char* m = std::getenv("TAU_LLM_MODEL");
+	return (m && *m) ? m : "";
+}
+
+// --- cURL helpers ---
 
 static size_t nlang_curl_write_cb(char* ptr, size_t size, size_t nmemb,
 	std::string* out)
@@ -154,9 +202,9 @@ static nlang_ba::fptr parse_formula_json(const std::string& json,
 
 } // namespace
 
-std::string deepseek_query(const std::string& prompt) {
-	const char* key = std::getenv("DEEPSEEK_API_KEY");
-	if (!key || std::string(key).empty()) return "";
+std::string llm_query(const std::string& prompt) {
+	const char* key = llm_api_key();
+	if (!key) return "";
 
 	CURL* curl = curl_easy_init();
 	if (!curl) return "";
@@ -177,9 +225,12 @@ std::string deepseek_query(const std::string& prompt) {
 		return out;
 	};
 
+	std::string model = llm_model();
 	std::string body =
-		"{\"model\":\"deepseek-chat\","
-		"\"messages\":[{\"role\":\"user\",\"content\":\""
+		"{"
+		+ (model.empty() ? std::string()
+			: "\"model\":\"" + escape_json(model) + "\",")
+		+ "\"messages\":[{\"role\":\"user\",\"content\":\""
 		+ escape_json(prompt) +
 		"\"}],"
 		"\"temperature\":0}";
@@ -190,7 +241,8 @@ std::string deepseek_query(const std::string& prompt) {
 	headers = curl_slist_append(headers, "Content-Type: application/json");
 	headers = curl_slist_append(headers, auth_header.c_str());
 
-	curl_easy_setopt(curl, CURLOPT_URL, "https://api.deepseek.com/chat/completions");
+	std::string url = llm_endpoint() + "/chat/completions";
+	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 	curl_easy_setopt(curl, CURLOPT_POST, 1L);
 	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -199,13 +251,19 @@ std::string deepseek_query(const std::string& prompt) {
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
 
 	CURLcode res = curl_easy_perform(curl);
+	long status = 0;
+	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
 	curl_slist_free_all(headers);
 	curl_easy_cleanup(curl);
 
 	if (res != CURLE_OK) return "";
+	if (status < 200 || status >= 300) {
+		warn_llm_http_status(status);
+		return "";
+	}
 
 	// Extract "content" value from the last occurrence to skip any
-	// "reasoning_content" that deepseek-chat may emit in extended mode.
+	// "reasoning_content" that a model may emit in extended mode.
 	auto extract_content = [](const std::string& json) -> std::string {
 		size_t pos = json.rfind("\"content\":");
 		if (pos == std::string::npos) return "";
@@ -236,7 +294,7 @@ std::string deepseek_query(const std::string& prompt) {
 	return extract_content(response);
 }
 
-bool deepseek_is_empty(const std::string& description) {
+bool llm_is_empty(const std::string& description) {
 	if (description == "nothing") return true;
 	if (description == "everything") return false;
 	auto& cache = get_cache();
@@ -245,8 +303,8 @@ bool deepseek_is_empty(const std::string& description) {
 		auto it = cache.is_empty_cache.find(description);
 		if (it != cache.is_empty_cache.end()) return it->second;
 	}
-	const char* key = std::getenv("DEEPSEEK_API_KEY");
-	if (!key || std::string(key).empty()) {
+	if (!llm_api_key()) {
+		warn_llm_unavailable();
 		std::lock_guard<std::mutex> lk(cache.mtx);
 		return cache.is_empty_cache.emplace(description, false).first->second;
 	}
@@ -255,7 +313,7 @@ bool deepseek_is_empty(const std::string& description) {
 		+ description
 		+ "' a logical contradiction (always false, impossible)?"
 		  " Answer with only YES or NO.";
-	auto ans = deepseek_query(prompt);
+	auto ans = llm_query(prompt);
 	bool result = false;
 	for (auto& c : ans) {
 		if (c == 'N' || c == 'n') { result = false; break; }
@@ -265,7 +323,7 @@ bool deepseek_is_empty(const std::string& description) {
 	return cache.is_empty_cache.emplace(description, result).first->second;
 }
 
-bool deepseek_is_universal(const std::string& description) {
+bool llm_is_universal(const std::string& description) {
 	if (description == "everything") return true;
 	if (description == "nothing") return false;
 	auto& cache = get_cache();
@@ -274,8 +332,8 @@ bool deepseek_is_universal(const std::string& description) {
 		auto it = cache.is_universal_cache.find(description);
 		if (it != cache.is_universal_cache.end()) return it->second;
 	}
-	const char* key = std::getenv("DEEPSEEK_API_KEY");
-	if (!key || std::string(key).empty()) {
+	if (!llm_api_key()) {
+		warn_llm_unavailable();
 		std::lock_guard<std::mutex> lk(cache.mtx);
 		return cache.is_universal_cache.emplace(description, false).first->second;
 	}
@@ -284,7 +342,7 @@ bool deepseek_is_universal(const std::string& description) {
 		+ description
 		+ "' a tautology (always true, necessarily true in all situations)?"
 		  " Answer with only YES or NO.";
-	auto ans = deepseek_query(prompt);
+	auto ans = llm_query(prompt);
 	bool result = false;
 	for (auto& c : ans) {
 		if (c == 'Y' || c == 'y') { result = true;  break; }
@@ -294,7 +352,7 @@ bool deepseek_is_universal(const std::string& description) {
 	return cache.is_universal_cache.emplace(description, result).first->second;
 }
 
-bool deepseek_equivalent(const std::string& a, const std::string& b) {
+bool llm_equivalent(const std::string& a, const std::string& b) {
 	if (a == b) return true;
 	if ((a == "nothing") != (b == "nothing")) return false;
 	if ((a == "everything") != (b == "everything")) return false;
@@ -305,8 +363,8 @@ bool deepseek_equivalent(const std::string& a, const std::string& b) {
 		auto it = cache.equivalent_cache.find(key_pair);
 		if (it != cache.equivalent_cache.end()) return it->second;
 	}
-	const char* key = std::getenv("DEEPSEEK_API_KEY");
-	if (!key || std::string(key).empty()) {
+	if (!llm_api_key()) {
+		warn_llm_unavailable();
 		std::lock_guard<std::mutex> lk(cache.mtx);
 		return cache.equivalent_cache.emplace(key_pair, false).first->second;
 	}
@@ -315,7 +373,7 @@ bool deepseek_equivalent(const std::string& a, const std::string& b) {
 		+ a + "' and '" + b
 		+ "' logically equivalent (true in exactly the same situations)?"
 		  " Answer with only YES or NO.";
-	auto ans = deepseek_query(prompt);
+	auto ans = llm_query(prompt);
 	bool result = false;
 	for (auto& c : ans) {
 		if (c == 'Y' || c == 'y') { result = true;  break; }
@@ -325,7 +383,7 @@ bool deepseek_equivalent(const std::string& a, const std::string& b) {
 	return cache.equivalent_cache.emplace(key_pair, result).first->second;
 }
 
-std::string deepseek_stronger_statement(const std::string& description) {
+std::string llm_stronger_statement(const std::string& description) {
 	if (description == "nothing") return "nothing";
 	if (description == "everything") return "it is raining";
 	auto& cache = get_cache();
@@ -334,8 +392,8 @@ std::string deepseek_stronger_statement(const std::string& description) {
 		auto it = cache.sub_cache.find(description);
 		if (it != cache.sub_cache.end()) return it->second;
 	}
-	const char* key = std::getenv("DEEPSEEK_API_KEY");
-	if (!key || std::string(key).empty()) {
+	if (!llm_api_key()) {
+		warn_llm_unavailable();
 		std::string fallback = description + " and specifically so";
 		std::lock_guard<std::mutex> lk(cache.mtx);
 		return cache.sub_cache.emplace(description, fallback).first->second;
@@ -345,7 +403,7 @@ std::string deepseek_stronger_statement(const std::string& description) {
 		+ description
 		+ "' but is not equivalent to it."
 		  " Reply with only the statement, no punctuation.";
-	auto ans = deepseek_query(prompt);
+	auto ans = llm_query(prompt);
 	if (ans.empty()) ans = description + " and specifically so";
 	ans.erase(0, ans.find_first_not_of(" \t\n\r."));
 	auto last = ans.find_last_not_of(" \t\n\r.");
@@ -355,7 +413,7 @@ std::string deepseek_stronger_statement(const std::string& description) {
 	return cache.sub_cache.emplace(description, ans).first->second;
 }
 
-nlang_ba::fptr deepseek_decompose(const std::string& s) {
+nlang_ba::fptr llm_decompose(const std::string& s) {
 	using F = nlang_ba::formula;
 	if (s == "nothing")     return F::mk_bot();
 	if (s == "everything")  return F::mk_top();
@@ -367,8 +425,8 @@ nlang_ba::fptr deepseek_decompose(const std::string& s) {
 		if (it != cache.decompose_cache.end()) return it->second;
 	}
 
-	const char* key = std::getenv("DEEPSEEK_API_KEY");
-	if (!key || std::string(key).empty()) {
+	if (!llm_api_key()) {
+		warn_llm_unavailable();
 		auto result = F::mk_atom(s);
 		std::lock_guard<std::mutex> lk(cache.mtx);
 		return cache.decompose_cache.emplace(s, result).first->second;
@@ -386,7 +444,7 @@ nlang_ba::fptr deepseek_decompose(const std::string& s) {
 		"by logical 'and', 'or', or 'not'.\n"
 		"Statement: \"" + s + "\"";
 
-	auto response = deepseek_query(prompt);
+	auto response = llm_query(prompt);
 	auto json = extract_outermost_json(response);
 
 	nlang_ba::fptr result;

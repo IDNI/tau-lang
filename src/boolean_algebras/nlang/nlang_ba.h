@@ -30,8 +30,8 @@ template <NodeType node> size_t nlang_type_id();
 // Elements are natural language propositions/statements represented as
 // structural formula trees. The logical engine catches contradictions and
 // tautologies structurally — A & ~A = bottom, A | ~A = top, ~~A = A —
-// without any LLM calls. The DeepSeek oracle is only invoked on atomic
-// propositions (leaf nodes of the formula tree).
+// without any LLM calls. An OpenAI-compatible language model is only
+// invoked on atomic propositions (leaf nodes of the formula tree).
 //
 // This minimises LLM mistakes: compound formulas built by the engine are
 // simplified algebraically; only irreducible atoms need semantic judgement.
@@ -41,13 +41,23 @@ template <NodeType node> size_t nlang_type_id();
 // propositions p < q there always exists r with p < r < q.
 // -----------------------------------------------------------------------------
 
-// --- DeepSeek API helpers (implemented in nlang_ba.cpp, linked via libTAU) ---
-std::string deepseek_query(const std::string& prompt);
-bool deepseek_is_empty(const std::string& description);
-bool deepseek_is_universal(const std::string& description);
-bool deepseek_equivalent(const std::string& a, const std::string& b);
-std::string deepseek_stronger_statement(const std::string& description);
-// deepseek_decompose declared after nlang_ba struct (return type needs nlang_ba::fptr)
+// Configuration (environment variables):
+//   TAU_LLM_API_KEY   — required; OpenAI-compatible API key (falls back to
+//                       OPENAI_API_KEY). Without it every oracle query
+//                       returns a conservative default and a warning is
+//                       printed once.
+//   TAU_LLM_ENDPOINT  — optional; API base URL (default:
+//                       https://api.openai.com/v1)
+//   TAU_LLM_MODEL     — optional; when unset no model is sent and the
+//                       endpoint picks its own.
+
+// --- LLM API helpers (implemented in nlang_ba.cpp, linked via libTAU) ---
+std::string llm_query(const std::string& prompt);
+bool llm_is_empty(const std::string& description);
+bool llm_is_universal(const std::string& description);
+bool llm_equivalent(const std::string& a, const std::string& b);
+std::string llm_stronger_statement(const std::string& description);
+// llm_decompose declared after nlang_ba struct (return type needs nlang_ba::fptr)
 
 // -----------------------------------------------------------------------------
 // nlang_ba struct
@@ -172,7 +182,7 @@ struct nlang_ba {
 	// Semantic equality: fast structural path first, then oracle
 	bool operator==(const nlang_ba& o) const {
 		if (fm->struct_eq(*o.fm)) return true;
-		return deepseek_equivalent(to_string(), o.to_string());
+		return llm_equivalent(to_string(), o.to_string());
 	}
 	bool operator!=(const nlang_ba& o) const { return !(*this == o); }
 
@@ -196,7 +206,7 @@ inline std::ostream& operator<<(std::ostream& os, const nlang_ba& n) {
 // Decompose a natural language string into a structural formula tree via DeepSeek.
 // Returns mk_atom(s) as fallback when the API is unavailable or response is malformed.
 // Declared here (after nlang_ba) because the return type is nlang_ba::fptr.
-nlang_ba::fptr deepseek_decompose(const std::string& s);
+nlang_ba::fptr llm_decompose(const std::string& s);
 
 // --- Mutually recursive structural emptiness/universality checks ---
 // Oracle is only called on atomic leaf nodes.
@@ -211,13 +221,13 @@ inline bool nlang_struct_is_empty(const nlang_ba::fptr& f) {
 	switch (f->k) {
 	case K::bot:  return true;
 	case K::top:  return false;
-	case K::atom: return deepseek_is_empty(f->atom_str);
+	case K::atom: return llm_is_empty(f->atom_str);
 	case K::not_: return nlang_struct_is_one(f->inner);
 	case K::and_:
 		// A & B = bottom if A=bottom, B=bottom, A=~B, or semantically incompatible
 		if (nlang_struct_is_empty(f->lhs) || nlang_struct_is_empty(f->rhs)) return true;
 		if (f->lhs->is_complement_of(*f->rhs)) return true;
-		return deepseek_is_empty(f->to_string());  // oracle fallback for non-structural cases
+		return llm_is_empty(f->to_string());  // oracle fallback for non-structural cases
 	case K::or_:
 		// A | B = bottom iff both A=bottom and B=bottom (purely structural)
 		return nlang_struct_is_empty(f->lhs) && nlang_struct_is_empty(f->rhs);
@@ -230,13 +240,13 @@ inline bool nlang_struct_is_one(const nlang_ba::fptr& f) {
 	switch (f->k) {
 	case K::top:  return true;
 	case K::bot:  return false;
-	case K::atom: return deepseek_is_universal(f->atom_str);
+	case K::atom: return llm_is_universal(f->atom_str);
 	case K::not_: return nlang_struct_is_empty(f->inner);
 	case K::or_:
 		// A | B = top if A=top, B=top, A=~B, or semantically universal
 		if (nlang_struct_is_one(f->lhs) || nlang_struct_is_one(f->rhs)) return true;
 		if (f->lhs->is_complement_of(*f->rhs)) return true;
-		return deepseek_is_universal(f->to_string());  // oracle fallback for non-structural cases
+		return llm_is_universal(f->to_string());  // oracle fallback for non-structural cases
 	case K::and_:
 		// A & B = top iff both A=top and B=top (purely structural)
 		return nlang_struct_is_one(f->lhs) && nlang_struct_is_one(f->rhs);
@@ -274,7 +284,7 @@ inline nlang_ba nlang_splitter(const nlang_ba& x, splitter_type /*st*/) {
 	using K = nlang_ba::formula::kind;
 	if (x.fm->k == K::bot) return nlang_ba::bottom();
 	if (x.fm->k == K::or_) { nlang_ba r; r.fm = x.fm->lhs; return r; }
-	return nlang_ba{deepseek_stronger_statement(x.to_string())};
+	return nlang_ba{llm_stronger_statement(x.to_string())};
 }
 
 // A fixed non-trivial contingent proposition (neither tautology nor contradiction).
@@ -387,12 +397,12 @@ std::optional<typename node<BAs...>::constant_with_type> parse_nlang(
 		// Bare atom from grammar — let DeepSeek try to find compound structure
 		// (handles natural language like "A and B" without explicit parentheses).
 		if (fm->k == nlang_ba::formula::kind::atom) {
-			auto decomposed = deepseek_decompose(fm->atom_str);
+			auto decomposed = llm_decompose(fm->atom_str);
 			if (decomposed->k != nlang_ba::formula::kind::atom)
 				fm = decomposed;
 		}
 	} else {
-		fm = deepseek_decompose(s);
+		fm = llm_decompose(s);
 	}
 
 	return typename node<BAs...>::constant_with_type{
