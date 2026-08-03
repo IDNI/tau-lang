@@ -8,7 +8,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT__QLT_DESCRIPTOR_TMPL_H__
 
-#include "../parser/qlt_parser.generated.h"
+#include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
 #include "ltl_aba_result.h"

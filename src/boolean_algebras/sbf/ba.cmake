@@ -1,7 +1,8 @@
 set(TAU_BA_ID sbf)
 set(TAU_BA_TYPE sbf_ba)
 set(TAU_BA_HEADER boolean_algebras/sbf/sbf_ba.h)
-set(TAU_BA_SOURCES ../parser/sbf_parser.generated.cpp)
+set(TAU_BA_GRAMMAR parser/sbf.tgf)
+set(TAU_BA_SOURCES boolean_algebras/sbf/parser/sbf_parser.generated.cpp)
 set(TAU_BA_TESTS
 	tests/test_integration-satisfiability-sbf.cpp
 	tests/test_integration-sbf1.cpp

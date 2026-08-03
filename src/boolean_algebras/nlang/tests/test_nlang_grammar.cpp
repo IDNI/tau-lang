@@ -3,7 +3,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 #include "tau_pack.h"
-#include "../parser/nlang_parser.generated.h"
+#include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
 
 using namespace idni::tau_lang;
 using namespace nlang_parser_data;

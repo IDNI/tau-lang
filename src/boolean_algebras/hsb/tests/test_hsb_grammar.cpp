@@ -2,7 +2,7 @@
 
 #include "test_init.h"
 #include "test_tau_helpers.h"
-#include "../parser/hsb_parser.generated.h"
+#include "boolean_algebras/hsb/parser/hsb_parser.generated.h"
 
 using namespace idni::tau_lang;
 using namespace hsb_parser_data;

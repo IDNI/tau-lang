@@ -12,7 +12,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV__BV_DESCRIPTOR_TMPL_H__
 
-#include "../parser/bitvector_parser.generated.h"
+#include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
 

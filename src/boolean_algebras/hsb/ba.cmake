@@ -1,6 +1,7 @@
 set(TAU_BA_ID hsb)
 set(TAU_BA_TYPE hsb)
 set(TAU_BA_HEADER boolean_algebras/hsb/hsb.h)
+set(TAU_BA_GRAMMAR parser/hsb.tgf)
 set(TAU_BA_LINK_LIBS cvc5::cvc5)
 set(TAU_BA_REQUIRES_PACKAGES cvc5)
 set(TAU_BA_TESTS

@@ -3,7 +3,7 @@
 #include "test_init.h"
 #include "tau_pack.h"
 #include "test_tau_helpers.h"
-#include "../parser/qlt_parser.generated.h"
+#include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
 
 using namespace idni::tau_lang;
 using namespace qlt_parser_data;

@@ -1,6 +1,7 @@
 set(TAU_BA_ID bv)
 set(TAU_BA_TYPE bv)
 set(TAU_BA_HEADER boolean_algebras/bv/bv_ba.h)
+set(TAU_BA_GRAMMAR parser/bitvector.tgf)
 set(TAU_BA_LINK_LIBS cvc5::cvc5)
 set(TAU_BA_REQUIRES_PACKAGES cvc5)
 set(TAU_BA_TESTS

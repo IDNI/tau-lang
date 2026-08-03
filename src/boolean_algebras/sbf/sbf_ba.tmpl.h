@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "boolean_algebras/sbf/sbf_ba.h"
-#include "../parser/sbf_parser.generated.h"
+#include "boolean_algebras/sbf/parser/sbf_parser.generated.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "sbf_ba"

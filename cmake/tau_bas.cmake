@@ -30,7 +30,7 @@ set(TAU_BA_INCLUDE_DIRS "")
 # Register an out-of-tree BA. Call before tau_resolve_ba_pack().
 #
 macro(tau_register_ba NAME)
-	set(_one_value PATH HEADER TYPE)
+	set(_one_value PATH HEADER TYPE GRAMMAR)
 	set(_multi_value LINK_LIBS REQUIRES_PACKAGES TESTS)
 	cmake_parse_arguments(_reg "" "${_one_value}" "${_multi_value}" ${ARGN})
 	if(NOT _reg_PATH OR NOT _reg_HEADER OR NOT _reg_TYPE)
@@ -43,6 +43,8 @@ macro(tau_register_ba NAME)
 	set(TAU_BA_${NAME}_TYPE "${_reg_TYPE}")
 	set(TAU_BA_${NAME}_SOURCES "")
 	set(TAU_BA_${NAME}_TESTS "${_reg_TESTS}")
+	set(TAU_BA_${NAME}_GRAMMAR "${_reg_GRAMMAR}")
+	list(APPEND _TAU_BA_REGISTERED_IDS "${NAME}")
 	set(TAU_BA_${NAME}_LINK_LIBS "${_reg_LINK_LIBS}")
 	set(TAU_BA_${NAME}_REQUIRES_PACKAGES "${_reg_REQUIRES_PACKAGES}")
 	list(APPEND TAU_BA_INCLUDE_DIRS "${_reg_PATH}")
@@ -60,6 +62,7 @@ macro(_tau_load_ba_registry)
 			unset(TAU_BA_TYPE)
 			unset(TAU_BA_HEADER)
 			unset(TAU_BA_SOURCES)
+			unset(TAU_BA_GRAMMAR)
 			unset(TAU_BA_TESTS)
 			unset(TAU_BA_LINK_LIBS)
 			unset(TAU_BA_REQUIRES_PACKAGES)
@@ -69,7 +72,9 @@ macro(_tau_load_ba_registry)
 			endif()
 			# a manifest's own directory: what its TESTS paths are relative to
 			get_filename_component(TAU_BA_${TAU_BA_ID}_PATH "${_mf}" DIRECTORY)
+			list(APPEND _TAU_BA_REGISTERED_IDS "${TAU_BA_ID}")
 			set(TAU_BA_${TAU_BA_ID}_TESTS "${TAU_BA_TESTS}")
+			set(TAU_BA_${TAU_BA_ID}_GRAMMAR "${TAU_BA_GRAMMAR}")
 			# a suite may need algebras beyond its owner; keep each list under
 			# the owner so the next manifest cannot inherit it
 			foreach(_t ${TAU_BA_TESTS})
@@ -240,4 +245,23 @@ function(tau_generate_pack_header)
 		@ONLY)
 
 	add_custom_target(tau_pack_header ALL DEPENDS "${TAU_PACK_HEADER}")
+endfunction()
+
+#
+# Every registered BA's grammar, whatever the pack.
+#
+# Generation is not gated on TAU_BAS: the generated parsers are committed and
+# shared, so regenerating only the pack's grammars would leave the rest stale
+# and commit a partial update.
+#
+function(tau_all_ba_grammars out)
+	_tau_load_ba_registry()
+	set(_grammars "")
+	foreach(_id ${_TAU_BA_REGISTERED_IDS})
+		if(TAU_BA_${_id}_GRAMMAR)
+			list(APPEND _grammars
+				"${TAU_BA_${_id}_PATH}/${TAU_BA_${_id}_GRAMMAR}")
+		endif()
+	endforeach()
+	set(${out} "${_grammars}" PARENT_SCOPE)
 endfunction()

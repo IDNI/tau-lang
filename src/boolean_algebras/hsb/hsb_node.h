@@ -3,7 +3,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_NODE_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__HSB__HSB_NODE_H__
 
-#include "../parser/hsb_parser.generated.h"
+#include "boolean_algebras/hsb/parser/hsb_parser.generated.h"
 #include "utility/hashing.h"
 #include "utility/tree.h"
 

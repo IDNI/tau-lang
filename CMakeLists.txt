@@ -404,15 +404,18 @@ message(STATUS "CMAKE_BUILD_WITH_RPATH: ${CMAKE_BUILD_WITH_RPATH}")
 #
 if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	include(generate-parser)
-	# Every grammar, globbed rather than listed: the hand-written list had
-	# drifted and bitvector.tgf and qlt.tgf were never regenerated at all.
-	# This deliberately does not follow -DTAU_BAS=; the generated parsers are
-	# committed and shared, so a reduced pack regenerating only its own
-	# grammars would leave the rest stale and commit a partial update.
+	# Core grammars live in parser/; each BA's own is declared by its manifest
+	# through TAU_BA_GRAMMAR, so a plugin -- in-tree or registered from outside
+	# -- brings its grammar with it. Every registered BA is covered whatever
+	# TAU_BAS holds: the generated parsers are committed and shared, so
+	# regenerating only the pack's would commit a partial update.
 	file(GLOB TAU_GRAMMARS "${PROJECT_SOURCE_DIR}/parser/*.tgf")
-	foreach(_tgf ${TAU_GRAMMARS})
+	tau_all_ba_grammars(TAU_BA_GRAMMARS)
+	set(TAU_GENERATED_PARSER_HEADERS "")
+	foreach(_tgf ${TAU_GRAMMARS} ${TAU_BA_GRAMMARS})
 		generate_parser("${_tgf}")
 	endforeach()
+	add_custom_target(tau_parsers ALL DEPENDS ${TAU_GENERATED_PARSER_HEADERS})
 endif()
 
 #

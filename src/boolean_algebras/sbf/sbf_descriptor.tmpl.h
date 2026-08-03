@@ -10,7 +10,7 @@
 
 #include <set>
 
-#include "../parser/sbf_parser.generated.h"
+#include "boolean_algebras/sbf/parser/sbf_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 
 namespace idni::tau_lang {

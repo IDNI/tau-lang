@@ -16,7 +16,7 @@
 
 #include "tau_tree.h"
 #include "splitter_types.h"
-#include "../parser/qlt_parser.generated.h"
+#include "boolean_algebras/qlt/parser/qlt_parser.generated.h"
 
 namespace idni::tau_lang {
 

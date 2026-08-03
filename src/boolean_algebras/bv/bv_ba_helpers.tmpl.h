@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "boolean_algebras/bv/bv_ba.h" // Only for IDE resolution, not really needed.
-#include "../parser/bitvector_parser.generated.h"
+#include "boolean_algebras/bv/parser/bitvector_parser.generated.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "bv_ba_helpers"

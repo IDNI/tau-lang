@@ -8,7 +8,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT__QINT_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__QINT__QINT_DESCRIPTOR_TMPL_H__
 
-#include "../parser/qint_parser.generated.h"
+#include "boolean_algebras/qint/parser/qint_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
 

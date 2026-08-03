@@ -11,7 +11,7 @@
 
 #include "tau_tree.h"
 #include "splitter_types.h"
-#include "../parser/nlang_parser.generated.h"
+#include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
 
 namespace idni::tau_lang {
 

@@ -8,7 +8,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_DESCRIPTOR_TMPL_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__NLANG__NLANG_DESCRIPTOR_TMPL_H__
 
-#include "../parser/nlang_parser.generated.h"
+#include "boolean_algebras/nlang/parser/nlang_parser.generated.h"
 #include "boolean_algebras/ba_descriptor.h"
 #include "ba_types.h"
 

@@ -3,7 +3,7 @@
 #include "test_init.h"
 #include "tau_pack.h"
 #include "test_tau_helpers.h"
-#include "../parser/qint_parser.generated.h"
+#include "boolean_algebras/qint/parser/qint_parser.generated.h"
 
 using namespace idni::tau_lang;
 using namespace qint_parser_data;
