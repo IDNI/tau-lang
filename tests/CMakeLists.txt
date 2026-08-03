@@ -181,49 +181,60 @@ function(_tau_add_test_target N src work_dir)
 		TIMEOUT ${_TAU_TEST_TIMEOUT})
 endfunction()
 
+# Register a backend's own suites, e.g. the cvc5 smoke tests. A backend serves
+# whichever algebras ask for it rather than being one, so what decides its
+# suites is the package: they are skipped unless a BA of the pack requires it,
+# which _tau_add_owned_test() checks from the source's own includes.
+function(tau_add_backend_tests)
+	file(GLOB _srcs "${PROJECT_SOURCE_DIR}/src/backends/*/tests/*.cpp")
+	foreach(_src ${_srcs})
+		_tau_add_owned_test("${_src}")
+	endforeach()
+endfunction()
+
+# Build and register one suite owned by a plugin or a backend: the source lives
+# outside tests/, so it needs the shared fixture directories on its include path
+# and the package check add() applies to central suites.
+function(_tau_add_owned_test src)
+	get_filename_component(_n "${src}" NAME_WE)
+	if(_n IN_LIST TAU_SKIP_TESTS)
+		message(STATUS "Skipping C++ test ${_n} (covered by REPL test)")
+		return()
+	endif()
+	if(NOT EXISTS "${src}")
+		message(FATAL_ERROR "declared test does not exist: ${src}")
+	endif()
+	foreach(_req ${TAU_BA_TEST_REQUIRES_${_n}})
+		if(NOT _req IN_LIST TAU_PACK_BA_IDS)
+			message(STATUS
+				"Skipping ${_n}: needs BA '${_req}', not in TAU_BAS")
+			return()
+		endif()
+	endforeach()
+	# a suite may use a dependency directly -- cvc5 as an oracle -- which is
+	# configured only when some BA in the pack requires it
+	tau_test_required_packages(_pkgs "${src}")
+	foreach(_pkg ${_pkgs})
+		if(NOT _pkg IN_LIST TAU_BA_REQUIRED_PACKAGES)
+			message(STATUS
+				"Skipping ${_n}: needs package '${_pkg}', which no BA in TAU_BAS requires")
+			return()
+		endif()
+	endforeach()
+	_tau_add_test_target("${_n}" "${src}" "${PROJECT_SOURCE_DIR}/tests")
+	# shared fixtures such a suite includes by bare name
+	target_include_directories("${_n}" PUBLIC
+		${PROJECT_SOURCE_DIR}/tests/unit
+		${PROJECT_SOURCE_DIR}/tests/integration
+		${PROJECT_SOURCE_DIR}/tests/integration/satisfiability
+		${PROJECT_SOURCE_DIR}/tests/integration/solver)
+endfunction()
+
 # Register the suites the pack's BAs declare in their manifests. Ownership
 # decides them, so unlike add() they need no requirement read from the source.
 function(tau_add_owned_ba_tests)
 	foreach(_src ${TAU_BA_TESTS_RESOLVED})
-		get_filename_component(_n "${_src}" NAME_WE)
-		if(_n IN_LIST TAU_SKIP_TESTS)
-			message(STATUS
-				"Skipping C++ test ${_n} (covered by REPL test)")
-			continue()
-		endif()
-		if(NOT EXISTS "${_src}")
-			message(FATAL_ERROR
-				"BA manifest declares a missing test: ${_src}")
-		endif()
-		set(_skip FALSE)
-		foreach(_req ${TAU_BA_TEST_REQUIRES_${_n}})
-			if(NOT _req IN_LIST TAU_PACK_BA_IDS)
-				message(STATUS
-					"Skipping ${_n}: needs BA '${_req}', not in TAU_BAS")
-				set(_skip TRUE)
-			endif()
-		endforeach()
-		# a suite may use a dependency directly -- cvc5 as an oracle -- which is
-		# configured only when some BA in the pack requires it
-		tau_test_required_packages(_pkgs "${_src}")
-		foreach(_pkg ${_pkgs})
-			if(NOT _pkg IN_LIST TAU_BA_REQUIRED_PACKAGES)
-				message(STATUS
-					"Skipping ${_n}: needs package '${_pkg}', which no BA in TAU_BAS requires")
-				set(_skip TRUE)
-			endif()
-		endforeach()
-		if(_skip)
-			continue()
-		endif()
-		_tau_add_test_target("${_n}" "${_src}"
-			"${PROJECT_SOURCE_DIR}/tests")
-		# shared fixtures a BA-owned suite includes by bare name
-		target_include_directories("${_n}" PUBLIC
-			${PROJECT_SOURCE_DIR}/tests/unit
-			${PROJECT_SOURCE_DIR}/tests/integration
-			${PROJECT_SOURCE_DIR}/tests/integration/satisfiability
-			${PROJECT_SOURCE_DIR}/tests/integration/solver)
+		_tau_add_owned_test("${_src}")
 	endforeach()
 endfunction()
 
@@ -257,6 +268,7 @@ endif ()
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION)
 	enable_testing()
 	tau_add_owned_ba_tests()
+	tau_add_backend_tests()
 endif ()
 
 #
