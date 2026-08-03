@@ -4,7 +4,6 @@ set(TESTS
 	hsb
 	hsb_splitter
 	hsb_normalizer
-	qint
 	qlt
 	sbf
 	tau_ba

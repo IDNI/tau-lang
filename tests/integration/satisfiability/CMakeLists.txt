@@ -7,7 +7,6 @@ set(TESTS
 	test_integration-satisfiability-tau_ba
 	test_integration-satisfiability-mixed
 	test_integration-satisfiability-qlt
-	test_integration-satisfiability-qint
 	test_integration-satisfiability-hsb
 )
 

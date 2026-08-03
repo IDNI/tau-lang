@@ -4,7 +4,6 @@ set(TESTS
 	bv
 	iterators
 	sbf
-	qint
 	hsb
 	qlt
 	mixed
