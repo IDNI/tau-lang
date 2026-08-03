@@ -1365,7 +1365,8 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::version_cmd() {
-	std::cout << full_version << "\n";
+	std::cout << full_version << "\n"
+		<< "algebras: " << node::ba::types_joined() << "\n";
 }
 
 template <typename... BAs>
@@ -1616,10 +1617,8 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  whatis <term>           shows the type of the given term\n"
 		<< "  whatis <repl_history>   shows the type of the expression at the given history position\n"
 		<< "\n"
-		<< "type names: wff, bf";
 		// the BA type names are whatever the configured pack holds
-		for (const auto& n : node::ba::types()) std::cout << ", " << n;
-		std::cout << "\n";
+		<< "type names: wff, bf, " << node::ba::types_joined() << "\n";
 		break;
 	case tau::reset_sym: std::cout
 		<< "the reset command clears the REPL session state\n"

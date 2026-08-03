@@ -148,7 +148,8 @@ int main(int argc, char** argv) {
 
 	if (opts["help"].get<bool>()) return cl.help(), 0;
 	if (opts["version"].get<bool>())
-				return std::cout << full_version << "\n", 0;
+		return std::cout << full_version << "\n"
+			<< "algebras: " << node_t::ba::types_joined() << "\n", 0;
 	if (opts["license"].get<bool>()) return std::cout << license, 0;
 
 	std::string sevstr = opts["severity"].get<string>();
