@@ -56,43 +56,60 @@ set(TAU_SKIP_TESTS
 	CACHE STRING "Test targets skipped because covered by REPL tests")
 
 #
-# Which BAs a test needs, read from the test's own source.
+# Which BAs a central suite needs.
 #
-# A test that names a Boolean algebra cannot build in a pack without it, so a
-# reduced -DTAU_BAS= must skip it rather than fail. This is derived at configure
-# time instead of from a hand-kept list, so a new test classifies itself and no
-# list drifts. The match is deliberately loose on both sides, to catch `sbf_ba`,
-# `nlang_ba`, `bv[8]` and `is_tref_bv_type_family` as well as bare ids; only a
-# letter or digit adjoining the id rejects it, so `bvector` does not match. The
-# cost of a false positive is one test skipped in a reduced pack, which the skip
-# message below makes visible. For the full pack nothing is skipped and the build
-# is unchanged.
+# A suite a plugin or backend owns declares this in its manifest; these are the
+# ones belonging to no single algebra, plus core tests that merely mention one.
+# A suite naming an algebra cannot build in a pack without it, so a reduced
+# -DTAU_BAS= skips it rather than failing.
 #
-# A fixture helper pins its own pack instead of following TAU_BAS, so it is
-# scanned along with any test including it. Pack-agnostic helpers name no BA and
-# need no entry here.
+# Derived once from what each source names, so some entries are broader than the
+# suite truly needs -- a mention in a comment reads the same as a use. Dropping
+# one is a matter of proving it in a pack without that algebra.
 #
-set(TAU_TEST_FIXTURE_HELPERS test_Bool_helpers.h test_sbf_ba_helpers.h)
-set(_TAU_TEST_HELPER_DIR "${CMAKE_CURRENT_LIST_DIR}")
-
-function(tau_test_required_bas out src)
-	set(_req "")
-	if(EXISTS "${src}")
-		file(READ "${src}" _tau_src)
-		foreach(_h ${TAU_TEST_FIXTURE_HELPERS})
-			if(_tau_src MATCHES "${_h}")
-				file(READ "${_TAU_TEST_HELPER_DIR}/${_h}" _tau_fixture)
-				string(APPEND _tau_src "${_tau_fixture}")
-			endif()
-		endforeach()
-		foreach(_id bv sbf qlt qint hsb nlang)
-			if(_tau_src MATCHES "[^A-Za-z0-9]${_id}")
-				list(APPEND _req ${_id})
-			endif()
-		endforeach()
-	endif()
-	set(${out} "${_req}" PARENT_SCOPE)
-endfunction()
+set(TAU_TEST_REQUIRES_test_algorithm_a qlt)
+set(TAU_TEST_REQUIRES_test_algorithm_b qlt)
+set(TAU_TEST_REQUIRES_test_algorithm_d qlt sbf)
+set(TAU_TEST_REQUIRES_test_ba_constants bv sbf)
+set(TAU_TEST_REQUIRES_test_ba_descriptor_pack bv hsb nlang qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_ba_types bv sbf)
+set(TAU_TEST_REQUIRES_test_ba_types_inference sbf)
+set(TAU_TEST_REQUIRES_test_base_ba_dispatcher bv sbf)
+set(TAU_TEST_REQUIRES_test_by_grammar bv nlang qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_cpp_codegen_bench bv)
+set(TAU_TEST_REQUIRES_test_cpp_codegen_data_atoms bv qlt)
+set(TAU_TEST_REQUIRES_test_hbdd sbf)
+set(TAU_TEST_REQUIRES_test_hooks bv)
+set(TAU_TEST_REQUIRES_test_integration-ba_types_inference bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-bf_hooks sbf)
+set(TAU_TEST_REQUIRES_test_integration-bf_normalization sbf)
+set(TAU_TEST_REQUIRES_test_integration-ctl_star bv)
+set(TAU_TEST_REQUIRES_test_integration-heuristics-simplify_using_equality bv)
+set(TAU_TEST_REQUIRES_test_integration-heuristics-trivial_skolem bv)
+set(TAU_TEST_REQUIRES_test_integration-interpreter sbf)
+set(TAU_TEST_REQUIRES_test_integration-ltl_aba_execution bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-pointwise_revision sbf)
+set(TAU_TEST_REQUIRES_test_integration-satisfiability-mixed bv hsb qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_integration-solver-iterators bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-solver-mixed hsb qint qlt)
+set(TAU_TEST_REQUIRES_test_integration-splitter bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-tau_ba1 bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-tau_ba3 bv sbf)
+set(TAU_TEST_REQUIRES_test_integration-type_scoped_resolver sbf)
+set(TAU_TEST_REQUIRES_test_integration-wff_hooks sbf)
+set(TAU_TEST_REQUIRES_test_integration-wff_normalization bv)
+set(TAU_TEST_REQUIRES_test_ltl_aba bv nlang qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_benchmarks sbf)
+set(TAU_TEST_REQUIRES_test_ltl_correctness bv sbf)
+set(TAU_TEST_REQUIRES_test_ltl_many_sorted bv hsb qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_multi_type_oracle bv qint qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_negative sbf)
+set(TAU_TEST_REQUIRES_test_ltl_soundness_regression bv qlt sbf)
+set(TAU_TEST_REQUIRES_test_ltl_strategy_exec bv sbf)
+set(TAU_TEST_REQUIRES_test_normal_forms bv sbf)
+set(TAU_TEST_REQUIRES_test_normalizer_uf_arithmetic bv)
+set(TAU_TEST_REQUIRES_test_tau_bdd bv sbf)
+set(TAU_TEST_REQUIRES_test_variant_ba bv sbf)
 
 #
 # Which external packages a test needs, read the same way.
@@ -127,8 +144,7 @@ function(add test_name)
 		return()
 	endif()
 	set(N "${test_name}")
-	tau_test_required_bas(_tau_req "${CMAKE_CURRENT_SOURCE_DIR}/${N}.cpp")
-	foreach(_id ${_tau_req})
+	foreach(_id ${TAU_TEST_REQUIRES_${N}})
 		if(NOT _id IN_LIST TAU_PACK_BA_IDS)
 			message(STATUS
 				"Skipping ${N}: needs BA '${_id}', not in TAU_BAS")
