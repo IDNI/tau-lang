@@ -148,6 +148,27 @@ tref repl_evaluator<BAs...>::get_wff(tref n) const {
 	return get_(tau::wff, n, false);
 }
 
+// Puts an expression into the type-annotated form that substitution matching
+// compares against.
+//
+// Matching is sensitive to the resolved BA type id on each node. A history
+// entry produced by dnf/cnf/normalize has already been through inference and
+// carries those ids, whereas an expression parsed straight off the command line
+// carries none, so the two never match even when they print identically. Both
+// sides therefore have to be inferred before they are compared.
+//
+// Inference is idempotent on an already inferred tree, so this is safe to apply
+// to every argument. An expression inference rejects is returned unchanged
+// rather than turned into an error, which keeps this from failing substitutions
+// that used to work.
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::infer_for_match(tref n) const {
+	if (!n) return n;
+	tref inferred = tau_api::infer(n);
+	return inferred ? inferred : n;
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_any(tref arg) const {
@@ -320,6 +341,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	if (in) { // BF substitution
 		tref thiz = get_bf(arg2), with = get_bf(arg3);
 		if (!in || !thiz || !with) return invalid_argument();
+		in = infer_for_match(in), thiz = infer_for_match(thiz),
+			with = infer_for_match(with);
 		// strip bf of variables so we match also quantifiers
 		if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
 			thiz = tau::trim(thiz),	with = tau::trim(with);
@@ -340,6 +363,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
+	in = infer_for_match(in), thiz = infer_for_match(thiz),
+		with = infer_for_match(with);
 	// strip bf of variables so we match also quantifiers
 	if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
 		thiz = tau::trim(thiz),	with = tau::trim(with);

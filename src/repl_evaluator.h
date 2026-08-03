@@ -282,6 +282,9 @@ private:
 	tref get_wff(tref n) const;
 	/// @brief Extract any formula from @p arg or from history.
 	tref get_any(tref arg) const;
+	/// @brief Infer @p n's BA types so it can be matched against an
+	/// already inferred expression. Returns @p n if inference fails.
+	tref infer_for_match(tref n) const;
 
 	/// @brief Print benchmark measurements from @p m.
 	std::ostream& benchmarks(measuring& m) const;
