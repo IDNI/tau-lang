@@ -6,8 +6,6 @@
 #ifndef __IDNI__TAU__TAU_PACK_H__
 #define __IDNI__TAU__TAU_PACK_H__
 
-#include <array>
-
 @TAU_PACK_BA_DEFINES@
 #include "tau_tree.h"
 @TAU_PACK_INCLUDES@
@@ -19,9 +17,6 @@ using node_t = node<@TAU_PACK_NODE_ARGS@>;
 
 /** @brief Whether the tau wrapper BA is part of the configured pack. */
 inline constexpr bool has_tau_ba = @TAU_PACK_HAS_TAU_CPP@;
-
-/** @brief Type names of the configured pack, in pack order. */
-inline constexpr std::array type_names = { @TAU_PACK_TYPE_NAMES@ };
 
 } // namespace idni::tau_lang::tau_pack
 

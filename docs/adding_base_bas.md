@@ -27,7 +27,6 @@ listed ids, and generates `tau_pack.h` into the build tree:
 | `tau_pack::node_t` | the node type of the configured pack |
 | `TAU_PACK_BASE_BAS` | the base BAs, for templates that build `tau_ba<BAs...>` |
 | `TAU_PACK_FULL_BAS` | the full variant list, wrapper included; use for `node<...>` |
-| `tau_pack::type_names` | the pack's type names, in pack order |
 | `TAU_PACK_HAS_BA_<ID>` | one define per enabled BA |
 
 `tau` is a reserved id: the wrapper BA embedding a whole Tau spec. When listed,
