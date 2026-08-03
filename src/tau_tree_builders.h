@@ -204,8 +204,6 @@ template <NodeType node> tref build_bf_f_type(const std::string& type);
 template <NodeType node> tref build_ba_constant(const typename node::constant& constant, size_t ba_type_id);
 /** @brief Build a `bf` BA-constant node, optionally with right sibling @p right. */
 template <NodeType node> tref build_bf_ba_constant(const typename node::constant& constant, size_t ba_type_id, tref right = nullptr);
-/** @brief Build a bitvector BA-constant node. */
-template <NodeType node> tref build_bv_ba_constant(const typename node::constant& constant, size_t ba_type_id);
 /** @brief Build an uninterpreted constant node from names @p n1, @p n2. */
 template <NodeType node> tref build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id);
 /** @brief Build a variable-name node from string id @p sid. */
