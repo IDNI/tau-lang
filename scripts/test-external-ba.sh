@@ -20,8 +20,15 @@ if command -v ninja > /dev/null 2>&1 \
 	generator="Ninja"
 fi
 
+compiler_args=()
+if command -v clang++ > /dev/null 2>&1 \
+		&& command -v clang > /dev/null 2>&1; then
+	compiler_args=(-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++)
+fi
+
 echo "== configuring $build with the out-of-tree BA using $generator"
-cmake -S "$root" -B "$build" -G "$generator" \
+cmake --fresh -S "$root" -B "$build" -G "$generator" \
+	"${compiler_args[@]}" \
 	-DCMAKE_BUILD_TYPE=Devel \
 	-DTAU_BUILD_EXECUTABLE=ON \
 	-DTAU_EXTERNAL_BAS="$register" \
