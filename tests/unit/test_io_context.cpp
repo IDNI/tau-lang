@@ -375,13 +375,26 @@ TEST_SUITE("repl_pending_input_stream") {
 		CHECK(!s.awaiting());
 	}
 
-	// The pending value is consumed exactly once.
-	TEST_CASE("the pending value is consumed once") {
+	// A step needing several console inputs is entered once per value the
+	// REPL collects (interpreter::read() stops at the first stream without
+	// one), so every attempt re-reads the streams that already answered.
+	// The value therefore stays available for the whole time point.
+	TEST_CASE("the value is re-delivered within the same time point") {
 		repl_pending_input_stream s;
 		s.set("once");
-		CHECK(s.get() == std::optional<std::string>("once"));
-		CHECK(s.get() == std::optional<std::string>(std::string{}));
+		CHECK(s.get(3) == std::optional<std::string>("once"));
+		CHECK(s.get(3) == std::optional<std::string>("once"));
+		CHECK(!s.awaiting());
+	}
+
+	// ... and is gone once the step that asked for it has completed.
+	TEST_CASE("the value does not carry over to the next time point") {
+		repl_pending_input_stream s;
+		s.set("once");
+		CHECK(s.get(3) == std::optional<std::string>("once"));
+		CHECK(s.get(4) == std::optional<std::string>(std::string{}));
 		CHECK(s.awaiting());
+		CHECK(s.awaiting_time_point() == 4);
 	}
 
 	TEST_CASE("rebuild yields a fresh, non-awaiting stream") {

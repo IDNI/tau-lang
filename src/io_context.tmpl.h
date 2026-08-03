@@ -104,11 +104,24 @@ inline std::optional<std::string> repl_pending_input_stream::get(
 	size_t time_point)
 {
 	if (pending_value) {
-		std::string value = std::move(*pending_value);
+		delivered_value = std::move(*pending_value);
+		delivered_time_point_ = time_point;
 		pending_value.reset();
 		awaiting_ = false;
-		return value;
+		return *delivered_value;
 	}
+	// interpreter::read() aborts the whole step at the first stream without
+	// a value, and the REPL then collects exactly one value before entering
+	// the step again -- so a step needing several console inputs re-reads
+	// the streams that already answered. Hand the same value out again for
+	// the same time point; consuming it once made each restart re-prompt the
+	// earlier streams and lose their values.
+	if (delivered_value && delivered_time_point_ == time_point) {
+		awaiting_ = false;
+		return *delivered_value;
+	}
+	// A new time point: the step this value belonged to is done with it.
+	delivered_value.reset();
 	// no value yet: flag it and return "" so read() stops the step cleanly
 	// (the REPL scans for the awaiting stream and prompts for a value)
 	awaiting_ = true;
