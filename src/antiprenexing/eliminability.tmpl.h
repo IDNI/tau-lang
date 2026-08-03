@@ -18,12 +18,24 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 	block_eliminability<node> res;
 	if (block_vars.empty()) return res;
 
-	// Gated: a block with no bitvector content pays for neither pass.
-	bool block_has_bv = false;
-	for (tref v : block_vars)
-		if (is_tref_bv_type_family<node>(v)) { block_has_bv = true; break; }
+	// Gates only the `arith_tainted` PRECOMPUTE below -- never the seeds
+	// themselves. Must be derived from the CONJUNCTS' own free variables,
+	// not the block variables': a block can bind only non-bv variables
+	// (e.g. `ex b ((b = 0) -> (x:bv[4] * y:bv[4] = 0:bv[4]))`) while its
+	// body still carries bv content that must be seeded. Gating on
+	// block_vars instead let such content fall through to `eliminable`
+	// and reach generic Boole decomposition -- exactly the blow-up this
+	// task exists to prevent.
+	bool any_bv_content = false;
+	for (tref conj : conjuncts) {
+		for (tref v : get_free_vars<node>(conj))
+			if (is_tref_bv_type_family<node>(v)) {
+				any_bv_content = true; break;
+			}
+		if (any_bv_content) break;
+	}
 	subtree_unordered_set<node> arith_tainted;
-	if (block_has_bv)
+	if (any_bv_content)
 		for (tref conj : conjuncts)
 			for (tref t : collect_bv_arithmetic_taint_uf<node>(conj))
 				arith_tainted.insert(t);
@@ -148,7 +160,7 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 						atom_is_bv = true; break;
 					}
 				elim_verdict seed = elim_verdict::eliminable;
-				if (block_has_bv && atom_is_bv && ctx.bv_is_solver_owned)
+				if (atom_is_bv && ctx.bv_is_solver_owned)
 					seed = elim_verdict::solver_owned;
 				if (arith_tainted.contains(m))
 					seed = join(seed, elim_verdict::arith_residue);

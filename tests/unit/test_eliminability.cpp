@@ -153,7 +153,7 @@ TEST_SUITE("eliminability") {
 		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = false;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c))
-			CHECK(a.verdict_of(v) != elim_verdict::solver_owned);
+			CHECK(a.verdict_of(v) == elim_verdict::eliminable);
 	}
 
 	TEST_CASE("arith_residue outranks solver_owned on the same atom") {
@@ -174,5 +174,26 @@ TEST_SUITE("eliminability") {
 		auto a = analyse_block<node_t>(conj_vars(c1), { c1 }, ctx);
 		for (tref v : conj_vars(c1))
 			CHECK(a.verdict_of(v) == elim_verdict::frozen);
+	}
+
+	TEST_CASE("a block with no bv-typed bound variable still seeds bv content in its body") {
+		// F1 regression: the arith_tainted precompute's cheap-path gate
+		// must be read from the CONJUNCTS' free variables, never from
+		// block_vars' types -- and must never gate the seed itself. `b`
+		// is the block's only bound variable and is not bv-typed, but
+		// the conjunct's body still carries bv content (x, y) that must
+		// be seeded solver_owned. Gating on block_vars let this fall
+		// through to eliminable and reach generic Boole decomposition --
+		// the exact blow-up this task exists to prevent -- because the
+		// deliberately coarse per-conjunct union still ties b's verdict
+		// to the same component as the bv atom.
+		tref c = get_nso_rr(
+			"(b = 0) -> (x:bv[4] & y:bv[4] = 0:bv[4]).").value().main->get();
+		trefs fvs = conj_vars(c);
+		tref b = *std::find_if(fvs.begin(), fvs.end(),
+			[](tref v) { return !is_tref_bv_type_family<node_t>(v); });
+		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		auto a = analyse_block<node_t>({ b }, { c }, ctx);
+		CHECK(a.verdict_of(b) == elim_verdict::solver_owned);
 	}
 }

@@ -141,8 +141,8 @@ bool eliminability_comp(tref l, tref r);
  * `frozen` is seeded at every unresolved reference, at every kept binder, and
  * -- fail closed -- at every wff-level shape this analysis does not otherwise
  * recognise, so an unhandled shape cannot silently leave its variables
- * `eliminable`. @p ctx is threaded through but not yet consulted; the
- * bitvector seeds it will drive are added by a later change.
+ * `eliminable`. @p ctx.bv_is_solver_owned is consulted when seeding a
+ * bv-typed atom: `solver_owned` only applies while it holds.
  *
  * Only a *bound* variable's own scope can constrain it -- it cannot occur
  * outside it -- so analysing the block body is not merely cheaper than
