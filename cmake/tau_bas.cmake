@@ -70,6 +70,14 @@ macro(_tau_load_ba_registry)
 			# a manifest's own directory: what its TESTS paths are relative to
 			get_filename_component(TAU_BA_${TAU_BA_ID}_PATH "${_mf}" DIRECTORY)
 			set(TAU_BA_${TAU_BA_ID}_TESTS "${TAU_BA_TESTS}")
+			# a suite may need algebras beyond its owner; keep each list under
+			# the owner so the next manifest cannot inherit it
+			foreach(_t ${TAU_BA_TESTS})
+				get_filename_component(_tn "${_t}" NAME_WE)
+				set(TAU_BA_${TAU_BA_ID}_REQUIRES_${_tn}
+					"${TAU_BA_TEST_REQUIRES_${_tn}}")
+				unset(TAU_BA_TEST_REQUIRES_${_tn})
+			endforeach()
 			set(TAU_BA_${TAU_BA_ID}_HEADER "${TAU_BA_HEADER}")
 			if(TAU_BA_TYPE)
 				set(TAU_BA_${TAU_BA_ID}_TYPE "${TAU_BA_TYPE}")
@@ -112,9 +120,13 @@ function(tau_resolve_ba_pack)
 			list(APPEND _sources_extra ${TAU_BA_${_id}_SOURCES})
 		endif()
 		# a suite the manifest owns is registered when its BA is in the pack,
-		# so it needs no requirement guessed from its source
+		# so it needs no requirement guessed from its source; a suite naming
+		# further algebras declares them and is skipped without them
 		foreach(_t ${TAU_BA_${_id}_TESTS})
+			get_filename_component(_tn "${_t}" NAME_WE)
 			list(APPEND _ba_tests "${TAU_BA_${_id}_PATH}/${_t}")
+			set(TAU_BA_TEST_REQUIRES_${_tn}
+				"${TAU_BA_${_id}_REQUIRES_${_tn}}" PARENT_SCOPE)
 		endforeach()
 		if(TAU_BA_${_id}_LINK_LIBS)
 			list(APPEND _link_libs ${TAU_BA_${_id}_LINK_LIBS})

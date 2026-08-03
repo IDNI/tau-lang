@@ -3,16 +3,12 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TESTS
 	apply_rule
 	base_ba_dispatcher
-	bv_ba_helpers
 	ba_constants
 	ba_descriptor_pack
 	ba_types
 	ba_types_inference
 	bounded_cache
 	temporal_connectives
-	bv_ba-simplification
-	bv_ba-cast
-	cvc5
 	execution
 	gc
 	hooks
@@ -20,7 +16,6 @@ set(TESTS
 	interpreter_api_extensions
 	io_context
 	pointwise_revision
-	nlang_grammar
 	#pwr_debug
 	#pwr_deepseek_1
 	#pwr_deepseek_2
@@ -45,17 +40,13 @@ set(TESTS
 	ltl_soundness_regression
 	ltl_perf
 	ltl_many_sorted
-	ltl_qlt_bv
 	ltl_strategy_exec
-	qlt_oracle
-	sbf_oracle
 
 	algorithm_a
 	algorithm_b
 	algorithm_c
 	algorithm_d
 	algorithm_picker
-	semantic_pwr
 	cpp_codegen
 	cpp_codegen_pwr
 	cpp_codegen_roundtrip
@@ -68,11 +59,9 @@ set(TESTS
 	normalizer_uf_arithmetic
 	nso_ba
 	nso_rr
-	omcat_types
 	rr
 	spec_decompose
 	product_ba
-	sbf_ba_splitter
 	tau_bdd
 	tau_tree
 	tau_tree_from_parser

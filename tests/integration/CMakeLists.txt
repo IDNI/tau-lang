@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TESTS
 	bf_fixed_point
 	bf_hooks
-	bv_hooks
 	bf_normalization
 	interpreter
 	interpreter_ltl_multiio
@@ -13,8 +12,6 @@ set(TESTS
 	nso_rr_fixed_point
 	nso_rr_partial_eval
 	quantifiers
-	sbf1
-	sbf2
 	splitter
 	splitter2
 	tau_ba1
@@ -27,16 +24,7 @@ set(TESTS
 	heuristics-simplify_using_equality
 	heuristics-syntactic_path_simplification
 	heuristics-ex_subs_based_elimination
-	heuristics-bv_ba_custom_simplification
-	heuristics-bv_ba_cvc5_simplification
-	heuristics-bv_predicate_blasting
-	heuristics-bv_predicate_blasting_predicates
 	heuristics-trivial_skolem
-	blasting_correctness_check1
-	blasting_correctness_check2
-	blasting_correctness_check3
-	blasting_correctness_check4
-	blasting_correctness_check5
 	ctl_star
 	ocfuncs
 )

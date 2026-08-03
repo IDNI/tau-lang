@@ -2,12 +2,8 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
 	test_integration-satisfiability-bool
-	test_integration-satisfiability-bv
-	test_integration-satisfiability-sbf
 	test_integration-satisfiability-tau_ba
 	test_integration-satisfiability-mixed
-	test_integration-satisfiability-qlt
-	test_integration-satisfiability-hsb
 )
 
 foreach(X IN LISTS TESTS)

@@ -1,8 +1,5 @@
 set(TESTS
 	by_grammar
-	hsb_grammar
-	qlt_grammar
-	sbf_ba_parsing
 	tau_spec
 )
 

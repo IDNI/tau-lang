@@ -1,11 +1,6 @@
 set(TESTS
 	bool
 	hbdd
-	hsb
-	hsb_splitter
-	hsb_normalizer
-	qlt
-	sbf
 	tau_ba
 )
 

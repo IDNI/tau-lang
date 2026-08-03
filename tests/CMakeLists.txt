@@ -195,6 +195,27 @@ function(tau_add_owned_ba_tests)
 			message(FATAL_ERROR
 				"BA manifest declares a missing test: ${_src}")
 		endif()
+		set(_skip FALSE)
+		foreach(_req ${TAU_BA_TEST_REQUIRES_${_n}})
+			if(NOT _req IN_LIST TAU_PACK_BA_IDS)
+				message(STATUS
+					"Skipping ${_n}: needs BA '${_req}', not in TAU_BAS")
+				set(_skip TRUE)
+			endif()
+		endforeach()
+		# a suite may use a dependency directly -- cvc5 as an oracle -- which is
+		# configured only when some BA in the pack requires it
+		tau_test_required_packages(_pkgs "${_src}")
+		foreach(_pkg ${_pkgs})
+			if(NOT _pkg IN_LIST TAU_BA_REQUIRED_PACKAGES)
+				message(STATUS
+					"Skipping ${_n}: needs package '${_pkg}', which no BA in TAU_BAS requires")
+				set(_skip TRUE)
+			endif()
+		endforeach()
+		if(_skip)
+			continue()
+		endif()
 		_tau_add_test_target("${_n}" "${_src}"
 			"${PROJECT_SOURCE_DIR}/tests")
 		# shared fixtures a BA-owned suite includes by bare name
