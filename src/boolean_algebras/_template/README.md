@@ -27,10 +27,18 @@ register a phantom BA in every build. Write one when you copy the directory.
    set(TAU_BA_ID <id>)
    set(TAU_BA_TYPE <value type>)
    set(TAU_BA_HEADER boolean_algebras/<id>/<id>.h)
-   # optional, when the algebra needs a library:
-   # set(TAU_BA_LINK_LIBS <target>)
+   # optional, each relative to this manifest:
    # set(TAU_BA_SOURCES boolean_algebras/<id>/<id>.cpp)
+   # set(TAU_BA_GRAMMAR parser/<id>.tgf)
+   # set(TAU_BA_TESTS tests/test_<id>.cpp)
+   # set(TAU_BA_LINK_LIBS <target>)
+   # set(TAU_BA_REQUIRES_PACKAGES <package>)
    ```
+
+   Sources, grammar and suites are all the plugin's own: `<id>/parser/<id>.tgf`
+   is generated into the build tree when the BA is in the pack, `<id>/tests/`
+   is registered then too, and a suite needing another algebra says so with
+   `set(TAU_BA_TEST_REQUIRES_test_<name> bv qlt)`.
 
 3. Configure with the id in the pack: `./dev preset debug -DTAU_BAS=tau,sbf,<id>`.
 
@@ -43,9 +51,11 @@ Keep the directory anywhere and register it before the pack is resolved:
 
 ```cmake
 tau_register_ba(<id>
-    PATH   /abs/path/to/<id>
-    HEADER <id>.h
-    TYPE   <value type>
+    PATH    /abs/path/to/<id>
+    HEADER  <id>.h
+    TYPE    <value type>
+    GRAMMAR parser/<id>.tgf
+    TESTS   tests/test_<id>.cpp
     LINK_LIBS <targets…>)
 ```
 

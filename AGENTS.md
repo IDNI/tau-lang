@@ -135,7 +135,11 @@ core probes with `requires` and never by BA name. Those in use today live in
 `ba_pack_traits.h` as `pack_*` folds: `solve`, `is_sat`, `can_solve`,
 `sat_status`, `preprocess`/`set_preprocessing`, `zero_constant`,
 `value_constant`, `arith_ops`, `non_aba_omcat`, `literal_incomplete`,
-`can_host_bool`/`bool_carrier_type`, `print_constant`. The carrier pair feeds
+`can_host_bool`/`bool_carrier_type`, `print_constant`, `uses_oracle`. The last
+is declared by nlang alone — deciding a question there leaves the process, so
+generic checks that compare two constants sit it out; absent means decided
+in-process, which is what every other algebra says by saying nothing. The
+carrier pair feeds
 `pack_bool_carrier_type`, the type core builds a plain 0/1 in (an LTL state bit,
 a CTL* witness): `can_host_bool` marks a candidate (bv, sbf, Bool),
 `bool_carrier_type` names *which* of its types when that is not `type_tree()`
@@ -162,9 +166,16 @@ all" — when the owner declines, the atom must be preserved with `get_raw`
 instead of falling through to the generic Boolean definition.
 
 To add a BA, copy `src/boolean_algebras/_template/` and follow
-`docs/adding_base_bas.md`. `scripts/test-external-ba.sh` proves the out-of-tree
-path, and `tests/unit/test_ba_descriptor_pack.cpp` is where each BA joins a pack
-so its descriptor is type-checked.
+`docs/adding_base_bas.md`. A manifest declares everything the plugin owns —
+sources, its grammar (`TAU_BA_GRAMMAR`) and its suites (`TAU_BA_TESTS`, with
+`TAU_BA_TEST_REQUIRES_<target>` for a suite needing another algebra) — so no
+central list names an algebra. `tests/unit/test_ba_descriptor_pack.cpp` is where
+each BA joins a pack so its descriptor is type-checked, and
+`tests/unit/test_ba_conformance.cpp` runs one battery against every algebra of
+the configured pack, checking that the descriptor behaves rather than merely
+compiles. `scripts/test-external-ba.sh` proves the out-of-tree path end to end:
+it builds every suite that pack can run and checks the registered algebra
+against the same contract.
 
 Verify BA work against three configurations, not one: the default pack
 (`build/devel`, `build/release`), a reduced pack containing bv

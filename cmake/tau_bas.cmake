@@ -267,3 +267,14 @@ function(tau_pack_ba_grammars out)
 	endforeach()
 	set(${out} "${_out}" PARENT_SCOPE)
 endfunction()
+
+#
+# Every registered BA id, in-tree or registered from outside, whatever the pack.
+#
+# What a consumer matching names in text must compare against, so a new or
+# out-of-tree algebra needs no list edited.
+#
+function(tau_registered_ba_ids out)
+	_tau_load_ba_registry()
+	set(${out} "${_TAU_BA_REGISTERED_IDS}" PARENT_SCOPE)
+endfunction()

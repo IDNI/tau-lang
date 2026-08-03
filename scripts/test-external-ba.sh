@@ -31,7 +31,7 @@ cmake --fresh -S "$root" -B "$build" -G "$generator" \
 	"${compiler_args[@]}" \
 	-DCMAKE_BUILD_TYPE=Devel \
 	-DTAU_BUILD_EXECUTABLE=ON \
-	-DTAU_BUILD_UNIT_TESTS=ON \
+	-DTAU_BUILD_TESTS=ON \
 	-DTAU_EXTERNAL_BAS="$register" \
 	-DTAU_BAS=tau,sbf,ext
 
@@ -42,12 +42,16 @@ grep -q 'TAU_PACK_HAS_BA_EXT' "$pack_header" \
 grep -q 'ext_ba' "$pack_header" \
 	|| { echo "FAIL: ext_ba missing from the pack node type"; exit 1; }
 
-echo "== building the tau CLI and the unit suite"
+echo "== building the tau CLI and every suite the pack can run"
 cmake --build "$build" -j"$jobs"
 
-echo "== checking the algebra against the descriptor contract"
-"$build/test_ba_conformance" \
-	|| { echo "FAIL: the out-of-tree BA breaks the descriptor contract"; exit 1; }
+echo "== running every suite the pack can run"
+# each suite gates itself on the algebras it declares, so a three-BA pack runs
+# what is pack-agnostic plus what names only sbf, tau or ext -- including the
+# conformance suite, which checks ext against the descriptor contract, and the
+# REPL cases, which are the only ones exercising the CLI with ext in the pack
+ctest --test-dir "$build" -j"$jobs" --timeout 600 --output-on-failure \
+	|| { echo "FAIL: the out-of-tree BA does not pass the pack's suites"; exit 1; }
 
 echo "== smoke-running the binary"
 out="$(printf 'sat {1}:ext = {1}:ext.\nq\n' | "$build/tau" 2>&1)"

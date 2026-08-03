@@ -10,8 +10,10 @@
 # reduced pack reports what it dropped instead of quietly running fewer tests.
 
 # Sets <out> to TRUE when <cmd> names a BA that is not in the configured pack.
+# The ids come from the registry, so an algebra added in-tree or registered from
+# outside is matched without editing a list here.
 function(tau_repl_unsupported out cmd)
-	foreach(_id bv sbf qlt qint hsb nlang)
+	foreach(_id ${TAU_REGISTERED_BA_IDS})
 		if("${cmd}" MATCHES "[^A-Za-z0-9_]${_id}"
 			AND NOT _id IN_LIST TAU_PACK_BA_IDS)
 			set(${out} TRUE PARENT_SCOPE)

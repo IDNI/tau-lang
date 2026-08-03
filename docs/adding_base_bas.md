@@ -82,6 +82,14 @@ Assert a whole pack at its first instantiation site:
 static_assert(assert_pack_descriptors_complete<my_node_t>());
 ```
 
+That the members exist is checked when they compile; that they *behave* is
+checked by `tests/unit/test_ba_conformance.cpp`, which folds over the configured
+pack and runs the same battery against every algebra in it — yours included, and
+an out-of-tree one too. It exercises the type-system round trips, the literals
+and what they parse back to, the predicate implications, and the Boolean laws
+over normalized values. Nothing there names an algebra, so joining a pack is all
+it takes to be covered.
+
 A BA whose value type is an alias for a type in **another namespace** must put
 its free operators there too, not in `idni::tau_lang`. `ba_descriptor_complete`
 checks `x == b` from a definition context that precedes your header, so the
@@ -109,6 +117,7 @@ Omit any that does not apply. The folds live in `ba_pack_traits.h` as `pack_*`.
 | `can_host_bool` | that one of your types can hold a plain 0 or 1, making you a candidate Boolean carrier |
 | `bool_carrier_type()` | *which* of your types that is, when it is not your `type_tree()` — bv answers `bv[1]`, not its default `bv[16]` |
 | `print_constant(os, x)` | how to render a constant, when your own `operator<<` formats it in a way Tau should not show |
+| `uses_oracle` | that deciding a question can leave the process — comparing two constants asks a service, and need not be reproducible. Absent means decided here, which is what nearly every algebra declares by saying nothing |
 
 Also specialize `ba_has_arithmetic_theory<your_ba>` (in `ba_pack_traits.h`) when
 the algebra brings arithmetic terms *and* its own decision procedure — that is
@@ -145,17 +154,38 @@ rather than falling through to the generic Boolean definition. So return
 
 ### The manifest
 
-`src/boolean_algebras/<id>/ba.cmake`, three lines and up:
+`src/boolean_algebras/<id>/ba.cmake`, three lines and up. It is where the plugin
+declares everything it owns — sources, grammar, suites — so no list elsewhere
+names your algebra:
 
 ```cmake
 set(TAU_BA_ID <id>)
 set(TAU_BA_TYPE <value type>)
 set(TAU_BA_HEADER boolean_algebras/<id>/<id>.h)
 # set(TAU_BA_SOURCES boolean_algebras/<id>/<id>.cpp)   # if it has any
+# set(TAU_BA_GRAMMAR parser/<id>.tgf)                  # if it parses constants
 # set(TAU_BA_LINK_LIBS <target>)                       # if it needs a library
+# set(TAU_BA_REQUIRES_PACKAGES <package>)              # found only for packs
+                                                       # holding this BA
+# set(TAU_BA_TESTS tests/test_<id>.cpp …)              # registered with the BA
 ```
 
-Dependencies declared here are linked only when the BA is in the pack.
+Paths are relative to the manifest, so a plugin is one directory:
+`<id>/parser/<id>.tgf` beside `<id>/tests/`. Dependencies are found and linked
+only when the BA is in the pack, its grammar is generated into the build tree
+only then, and its suites are registered only then.
+
+A suite of yours that also needs *another* algebra says so, one line per suite:
+
+```cmake
+set(TAU_BA_TEST_REQUIRES_test_<id>_mixed bv qlt)
+```
+
+Without every named algebra in the pack that suite is skipped with a message,
+while your other suites still run. Nothing infers this from the source, so a
+requirement hiding in a fixture header or an `#include <cvc5/…>` must be
+declared — the exception being external packages, which are read from the
+includes.
 
 ## Out-of-tree
 
@@ -163,14 +193,18 @@ Keep the directory anywhere and register it before the pack resolves:
 
 ```cmake
 tau_register_ba(<id>
-    PATH   /abs/path/to/<id>
-    HEADER <id>.h
-    TYPE   <value type>)
+    PATH    /abs/path/to/<id>
+    HEADER  <id>.h
+    TYPE    <value type>
+    GRAMMAR parser/<id>.tgf
+    TESTS   tests/test_<id>.cpp)
 ```
 
 Pass that file to the configure as `-DTAU_EXTERNAL_BAS=/abs/path/register.cmake`.
 `tests/external_ba/` is a complete working example, built and run in one command
-by `scripts/test-external-ba.sh`.
+by `scripts/test-external-ba.sh`, which configures from scratch, builds every
+suite the pack can run, and checks the algebra against the descriptor contract
+before smoke-running the CLI.
 
 ## Constants and grammar
 

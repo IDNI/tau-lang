@@ -274,6 +274,7 @@ foreach(_ext_ba ${TAU_EXTERNAL_BAS})
 	include("${_ext_ba}")
 endforeach()
 tau_resolve_ba_pack()
+tau_registered_ba_ids(TAU_REGISTERED_BA_IDS)
 tau_generate_pack_header()
 message(STATUS "BA pack (TAU_BAS=${TAU_BAS}): node<${TAU_PACK_NODE_ARGS}>")
 
