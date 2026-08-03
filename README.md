@@ -12,7 +12,7 @@
 	1. [Linux](#linux)
 	2. [Windows](#windows)
 	3. [MacOS (not available yet)](#macos-not-available-yet)
-	2. [Compiling the source code](#compiling-the-source-code)
+	4. [Compiling the source code](#compiling-the-source-code)
 3. [Quick start](#quick-start)
 4. [The Tau Language](#the-tau-language)
     1. [Tau specifications](#tau-specifications)
@@ -24,8 +24,9 @@
     7. [Streams](#streams)
     8. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
     9. [Type system](#type-system)
-    10. [Pointwise revision](#pointwise-revision)
-    11. [Reserved symbols](#reserved-symbols)
+    10. [Constant time constraints](#constant-time-constraints)
+    11. [Pointwise revision](#pointwise-revision)
+    12. [Reserved symbols](#reserved-symbols)
 5. [Command line interface](#command-line-interface)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
@@ -36,12 +37,13 @@
 	6. [Logical procedures](#logical-procedures)
 	7. [Normal forms](#normal-forms)
 	8. [Specification execution](#specification-execution)
-7. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
-8. [Known issues](#known-issues)
-9. [Future work](#future-work)
-10. [Submitting issues](#submitting-issues)
-11. [License](#license)
-12. [Authors](#authors)
+7. [The C++ API and language bindings](#the-c-api-and-language-bindings)
+8. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
+9. [Known issues](#known-issues)
+10. [Future work](#future-work)
+11. [Submitting issues](#submitting-issues)
+12. [License](#license)
+13. [Authors](#authors)
 
 
 # **Introduction**
@@ -102,8 +104,8 @@ A macOS installer will be available in the future.
 
 To compile the source code you need a recent C++ compiler supporting C++23, e.g.
 GCC 13.1.0. You also need at least cmake version 3.22.1 installed in your system.
-The only code dependencies are the Boost C++ Libraries (libboost) and the CVC5 SMT Solver (`libcvc5-dev` in `debian`
-derived distros).
+The only external code dependencies are the Boost C++ Libraries (the `log` component)
+and the CVC5 SMT Solver.
 CVC5 is used only in order to support the theory of bitvectors within the language.
 The core language and its algorithms are independent of CVC5.
 
@@ -113,23 +115,66 @@ After cloning:
 git clone https://github.com/IDNI/tau-lang.git
 ```
 
-you can run either the `release.sh` or `debug.sh` or `relwithdebinfo.sh` scripts
-to build the binaries.
+all build and test operations go through the `./dev` helper, which dispatches to
+the scripts in [`scripts/`](scripts). Run `./dev` with no arguments to list them,
+and see [`scripts/README.md`](scripts/README.md) for the details of option
+handling, parallel jobs and build directories.
 
-To build with doxygen documentation:
+The parser is a git submodule at `external/parser/`; `./dev` initializes it
+automatically on first use.
+
+CVC5 is built into `~/.tau/cvc5` by the CMake configure step if it is not there
+yet. Boost is taken from the system by default, and only built into `~/.tau/boost`
+when that is required (cross-compiling for Windows, or a position-independent
+build). You can also build either dependency explicitly:
 
 ```bash
-# Compiles the source code in release mode and also the documentation
-./release.sh -DBUILD_DOC=ON
-# Compiles the source code in debug mode and also the documentation
-./debug.sh -DBUILD_DOC=ON
-# Compiles the source code in release mode with debug information and also the documentation
-./relwithdebinfo.sh -DBUILD_DOC=ON
+./dev dep-boost
+./dev dep-cvc5
+```
+
+To build the binaries:
+
+```bash
+./dev release          # Release build          -> build-Release/
+./dev debug            # Debug build            -> build-Debug/
+./dev relwithdebinfo   # Release + debug info   -> build-RelWithDebInfo/
+```
+
+Alternatively, use the CMake presets declared in
+[`CMakePresets.json`](CMakePresets.json), which build into `build/<build type>` (e.g. `build/release`):
+
+```bash
+./dev preset release-tau run -- --help
+./dev preset release-tests run
+```
+
+To build with doxygen documentation, pass `-DTAU_BUILD_DOC=ON` to any of the
+build scripts:
+
+```bash
+./dev release -DTAU_BUILD_DOC=ON
+```
+
+To build and run the test suites (please run both, as Debug and Release builds
+enable different assertions):
+
+```bash
+./dev test-release
+./dev test-debug
+```
+
+To build the Python bindings (see
+[The C++ API and language bindings](#the-c-api-and-language-bindings)):
+
+```bash
+./dev binding python
 ```
 
 Once you have compiled the source code you can run the `tau` executable to
 execute Tau specifications. The `tau` executable is located in either `build-Release`
-or `build-Debug` or `build-RelWithDebInfo`.
+or `build-Debug` or `build-RelWithDebInfo` (or in `build/<build type>` when building
+with presets).
 
 
 # **Quick start**
@@ -291,7 +336,9 @@ We say local specification because such a formula can only talk about a fixed
 In order for a specification to communicate with the outside world, so-called *streams*
 are use. Those streams come in two flavors: input and output streams. Input
 streams are used in a `local_spec` to receive input from a user, while output streams
-are used for presenting output to a user. Each stream in the specification
+are used for presenting output to a user. Streams can be given arbitrary names;
+the names `i1`, `o1`, ... used throughout this document are just a convention
+(see section [Streams](#streams)). Each stream in the specification
 is associated with a relative or constant point in time.
 For example the output stream variable `o1[t-2]` means
 "the value in output stream number 1 two time-steps ago". So `o1[t]` would mean
@@ -311,64 +358,79 @@ specification `sometimes o1[t] = 0` says that there exists a time-step at which
 the output stream 1 will write `0`. When executing a Tau specification, the first
 time-step is always 0.
 
-Formally, the grammar for Tau specifications is
+Formally, a specification is a (possibly empty) list of definitions followed by
+a single formula, its *main* formula:
 ```
-spec => local_spec | always local_spec | sometimes local_spec
-      | (spec && spec) | (spec || spec) | !spec
+spec        => [ definitions ] local_spec [ "." ]
+definitions => ( (function_def | predicate_def | stream_def) "." )+
 ```
 where `local_spec` is a formula defined by the rules:
 
 ```
-local_spec => (local_spec "&&" local_spec)
-            | ("!" local_spec)
-            | (local_spec "^^" local_spec)
-            | (local_spec "||" local_spec)
-            | (local_spec "->" local_spec)
-            | (local_spec "<->" local_spec)
+local_spec => ("(" local_spec ")")
+            | (("sometimes" | "<>") local_spec)
+            | (("always"    | "[]") local_spec)
             | (local_spec "?" local_spec ":" local_spec)
+            | ("all" variable ("," variable)* local_spec)
+            | ("ex"  variable ("," variable)* local_spec)
+            | (local_spec "->"  local_spec)
+            | (local_spec "<-"  local_spec)
+            | (local_spec "<->" local_spec)
+            | (local_spec "||"  local_spec)
+            | (local_spec "^^"  local_spec)
+            | (local_spec "&&"  local_spec)
+            | ("!" local_spec)
             | (term "=" term) | (term "!=" term)
             | (term "<" term) | (term "!<" term) | (term "<=" term) | (term "!<=" term)
             | (term ">" term) | (term "!>" term) | (term ">=" term)| (term "!>=" term)
-            | "all" variable local_spec
-            | "ex" variable local_spec
+            | (term "<=" term "<=" term)
+            | time_constraint
             | predicate
             | T | F
 ```
-The naming conventions for `variable` are discussed in [Variables](#variables).
-Furthermore, `term` is discussed in the section [Boolean functions](#boolean-functions)
-and `bv_term`, bitvector term, is discussed in the section [Bitvectors](#bitvectors).
+The naming conventions for `variable` are discussed in
+[Variables and uninterpreted constants](#variables-and-uninterpreted-constants).
+Furthermore, `term` is discussed in the sections
+[Boolean functions](#boolean-functions) and [Bitvectors](#bitvectors).
+Note that `always` and `sometimes` are ordinary formula-level operators, and a
+specification with no `always` or `sometimes` at all is implicitly an `always` statement.
 The `predicate` non-terminal in the above grammar describes how
 to add predicate definitions directly into a formula. See the subsection
 [Functions and predicates](#functions-and-predicates) for the
-grammar definition of `predicate`.
-In the REPL ([The Tau REPL](#the-tau-repl)) they
+grammar definition of `predicate`, and
+[Constant time constraints](#constant-time-constraints) for `time_constraint`.
+In the REPL ([The Tau REPL](#the-tau-repl)) definitions
 can be provided as explained in subsection
 [Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables).
 
 The symbols used have the following meaning, where a formula refers to either `local_spec` or `spec`:
 
-| Symbol            | Meaning                                                 |
-|-------------------|---------------------------------------------------------|
-| `!`               | negation of formula                                     |
-| `&&`              | conjunction of formulas                                 |
-| `^^`              | xor of formulas                                         |
-| `\|\|`            | disjunction of formulas                                 |
-| `<->`             | equivalence of formulas                                 |
-| `<-`              | left-implication of formulas                            |
-| `->`              | right-implication of formulas                           |
-| `ex`              | existential quantification of `variable`                |
-| `all`             | universal quantification of `variable`                  |
-| `... ? ... : ...` | if ... then ... else ...                                |
-| `=`               | standard equality relation in BA or bitvectors          |
-| `!=`              | standard inequality relation in BA or bitvectors        |
-| `<`               | standard less relation in BA or bitvectors              |
-| `!<`              | standard not-less relation in BA or bitvectors          |
-| `<=`              | standard less-equal relation in BA or bitvectors        |
-| `!<=`             | standard not-less-equal relation in BA or bitvectors    |
-| `>`               | standard greater relation in BA or bitvectors           |
-| `!>`              | standard not-greater relation in BA or bitvectors       |
-| `>=`              | standard greater-equal relation in BA or bitvectors     |
-| `!>=`             | standard not-greater-equal relation in BA or bitvectors |
+| Symbol              | Meaning                                                 |
+|---------------------|---------------------------------------------------------|
+| `!`                 | negation of formula                                     |
+| `&&`                | conjunction of formulas                                 |
+| `^^`                | xor of formulas                                         |
+| `\|\|`              | disjunction of formulas                                 |
+| `<->`               | equivalence of formulas                                 |
+| `<-`                | left-implication of formulas                            |
+| `->`                | right-implication of formulas                           |
+| `ex`                | existential quantification of one or more `variable`s   |
+| `all`               | universal quantification of one or more `variable`s     |
+| `... ? ... : ...`   | if ... then ... else ...                                |
+| `=`                 | standard equality relation in BA or bitvectors          |
+| `!=`                | standard inequality relation in BA or bitvectors        |
+| `<`                 | standard less relation in BA or bitvectors              |
+| `!<`                | standard not-less relation in BA or bitvectors          |
+| `<=`                | standard less-equal relation in BA or bitvectors        |
+| `!<=`               | standard not-less-equal relation in BA or bitvectors    |
+| `>`                 | standard greater relation in BA or bitvectors           |
+| `!>`                | standard not-greater relation in BA or bitvectors       |
+| `>=`                | standard greater-equal relation in BA or bitvectors     |
+| `!>=`               | standard not-greater-equal relation in BA or bitvectors |
+| `... <= ... <= ...` | interval: the middle term lies between the outer two    |
+
+A quantifier can bind several variables at once, so `all x, y, z ...` is
+shorthand for `all x all y all z ...`, and likewise for `ex`.
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
@@ -476,8 +538,10 @@ function has a unique type being this chosen Boolean algebra.
 They are given by the following grammar:
 
 ```
-term => (term "&" term) | term "'"
+term => ("(" term ")") | (term "&" term) | term "'"
       | (term "^" term) | (term "|" term)
+      | ("fall" variable ("," variable)* term)
+      | ("fex"  variable ("," variable)* term)
       | function | constant | uninterpreted_constant
       | variable | stream_variable | "0" | "1"
 
@@ -488,6 +552,13 @@ where
 * `term` stands for a well-formed subformula representing a Boolean function and the operators `&`, `'`,
 `^` and `|` respectively stand for conjunction, negation, exclusive-or
 and disjunction,
+* `fall` and `fex` are the *functional* (term-level) universal and existential
+quantifiers. Unlike `all` and `ex`, which build a formula, these build a Boolean
+function: `fall x f` denotes the meet and `fex x f` the join of `f` over all
+values of `x`. They are currently parsed and preserved through normalization as
+atomic terms, but not yet evaluated,
+* the conjunction operator `&` may be omitted between two operands, so `xy` is
+the same as `x & y`,
 * `function` is the non-terminal symbol used to incorporate function definitions (see the subsection
 [Functions and Predicates](#functions-and-predicates)),
 * `constant` stands for an element from an available Boolean algebra. The type of the constant
@@ -501,14 +572,18 @@ uninterpreted_constant => "<" [name] ":" name ">"
 ```
 
 * `variable` is a variable over the fixed Boolean algebra (see subsection
-[Variables](#variables) for details),
+[Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
+for details),
 * `stream_variable` represents an input or output
-stream. The type of a stream also determines the type of the Boolean function (see also subsection [Variables](#variables)) and
+stream. The type of a stream also determines the type of the Boolean function
+(see also subsection [Streams](#streams)) and
 * `0` and `1` stand for the bottom and top element in the fixed Boolean
 algebra.
 
 The order of the operations is the following (from higher precedence
-to lower): `'` > `&` > `^` > `|`.
+to lower): `'` > `&` > `^` > `|` > `fex ... ...` > `fall ... ...`.
+The full ordering including the bitvector operators is given in the section
+[Bitvectors](#bitvectors) below.
 
 If no type information is present within a Boolean function, it is assumed to be of the
 general type `countable atomless Boolean algebra`. Since all such Boolean algebras are
@@ -532,7 +607,7 @@ They add the following to the above grammar for terms:
 term => (term _ '+' _ term) | (term _ '-' _ term) | (term _ '*' _ term)
       | (term _ '/' _ term) | (term _ '%' _ term) | (term _ "!&" _ term)
       | (term _ "!|" _ term) | (term _ "!^" _ term) | (term _ "<<" _ term)
-      | (term _ ">>" _ term)
+      | (term _ ">>" _ term) | ("(" "bv" "[" bit_width "]" ")" _ term)
 ```
 
 where `term` is as above are as above and
@@ -550,10 +625,30 @@ the new operators meaning is given in the following table:
 | `!^`              | bitwise xnor of bitvectors                             |
 | `<<`              | left shift of bitvector by a number of bits            |
 | `>>`              | right shift of bitvector by a number of bits           |
+| `(bv[n])`         | cast of a term to a bitvector of width `n`             |
 
+The last entry is a cast. It converts its operand to the bitvector type of the
+given width, for example:
 
-The order of the operations is the following (from higher precedence
-to lower): `*` > `/` > `%` > `+` > `-` > `!&` > `!|` > `!^` > `<<` > `>>`.
+```
+(bv[8]) x = { #x1f } : bv[8]
+```
+
+The cast operand must be a parenthesized term, a constant, a variable, a
+function call, `0`, `1`, a negation, a functional quantifier or another cast;
+wrap anything else in parentheses.
+
+The order of *all* term operations, bitvector and Boolean alike, is the
+following (from higher precedence to lower):
+
+```
+(bv[n]) > ' > & > ^ > | > !& > !^ > !| > / > * > % > - > + > << > >> > fex > fall
+```
+
+Note that this differs from the conventions of most programming languages in two
+respects: `/` binds tighter than `*`, and `-` binds tighter than `+`. Each
+operator sits at its own precedence level, so parenthesize whenever the intent is
+not obvious.
 
 ## **Functions and predicates**
 
@@ -619,12 +714,34 @@ recurrence relation definitions in use.
 Furthermore, we support the calculation of a fixpoint of a defined recurrence relation during normalization.
 The syntax is to call a defined recurrence relation as
 ```
-name "(" [ variable ("," variable)* ] ")" [":" type]"
+name "(" [ variable ("," variable)* ] ")" [":" type] [ "fallback" fp_fallback ]
 ```
 hence, omitting the `index`. For example, using the recurrence relation `h` from above,
 we can call the fix point by typing into [REPL](#the-tau-repl) `normalize h(x,y,z,w)`.
-Not all recurrence relations have a fixpoint. In this case, by default, `0` is returned for functions and
-`F` for predicates.
+
+Not all recurrence relations have a fixpoint. The enumeration of the successive
+steps may instead enter a loop, and the optional `fallback` clause says what to
+return in that case:
+
+```
+fp_fallback => "first" | "last" | term | local_spec
+```
+
+* `first` returns the step at which the loop was detected,
+* `last` returns the step just before it, and
+* any term or formula returns that value verbatim (it must have the same type as
+  the recurrence relation).
+
+If no `fallback` clause is given, the default is `0` for functions and `F` for
+predicates. For example:
+
+```
+normalize h(x,y,z,w) fallback last
+```
+
+Note that the fixpoint search is also bounded: if neither a fixpoint nor a loop
+is found after 500 enumeration steps, the search gives up with an error. This is
+a bound on the search, not a proof that no fixpoint exists.
 
 It should be noted that recurrence relations in the Tau language are a conservative extension,
 meaning that they do not add to the general expressiveness.
@@ -635,15 +752,14 @@ Constants in the Tau Language are elements of some available Boolean algebra,
 usually different from just `0` and `1`. Constants in a particular Boolean algebra come
 with their own syntax.
 
-In the Tau language, we currently support two non-atomless Boolean algebras,
+In the Tau language, we currently support three non-atomless Boolean algebras,
 which we also call the base Boolean algebras:
 1. the Boolean algebra of Tau specifications (also referred to as Tau Boolean algebra)
 2. the Boolean algebra of simple Boolean functions
+3. the Boolean algebra of bitvectors of fixed bit width
 
-As commented before, we also support the Boolean algebra of bitvectors of fixed bit width.
-
-Several others are in development, like the Boolean algebra of bitvectors of fixed bit width and
-the Boolean algebra of Boolean (not just simple) functions in general.
+Several others are in development, like the Boolean algebra of Boolean (not just
+simple) functions in general.
 
 The Boolean algebra of Tau specifications is an extensional Boolean
 algebra that encodes Tau specifications over arbitrary available other Boolean algebras.
@@ -659,8 +775,13 @@ constant => "{" (spec | term) "}" [":" base_boolean_algebra_type]
 where `base_boolean_algebra_type` is given by:
 
 ```
-base_boolean_algebra_type => "tau" | "sbf" | "bv" [ '[' bit_width ']' ]
+base_boolean_algebra_type => "tau" | "sbf" | "bv" '[' bit_width ']'
 ```
+
+Note that the bit width of a bitvector type is mandatory: `bv[8]` is a type, while
+a bare `bv` is not. Beware that omitting the width is not reported as an error —
+`bv` is simply not recognized as a type name, and the expression is reinterpreted
+as something else (`x:bv = 0` parses as `xv = 0`, a conjunction of two variables).
 
 As mentioned, we can have a Tau specification seen as a Boolean algebra element (you can omit
 the type, since `tau` is the default type). For example, the following is a valid
@@ -710,12 +831,25 @@ communication with the outside world, so to speak.
 We currently have two kinds of them: input streams and output streams.
 The syntax is given by
 
-`stream_variable => "o(number)[" index "]" | "i(number)[" index "]"`
+`stream_variable => name "[" index "]"`
 
-where `index` is defined in subsection [Functions and predicates](#functions-and-predicates).
-Hence, `o1[t]` is a valid output stream, whereas `i1[t]` is a valid input stream.
-In the future we will allow arbitrary names for streams, but for now `number`
-is used as an identifier, while `o` denotes an output and `i` an input stream.
+where `name` is a sequence of letters, numbers and `_` starting with a letter, and
+`index` is defined in subsection
+[Functions and predicates](#functions-and-predicates).
+Hence, `o1[t]`, `i1[t]`, `sensor[t]` and `log_out[t-1]` are all valid stream
+variables.
+
+Whether a stream is an input or an output is determined in one of two ways:
+
+1. by an explicit stream definition (`:= in ...` / `:= out ...`, see below), or
+2. otherwise by its name: a name starting with `i` (or the special name `this`)
+   is an input, and a name starting with `o` (or the special name `u`) is an
+   output.
+
+A stream that is neither declared nor matches one of those naming conventions
+cannot be resolved as an input or an output. This is why the conventional names
+`i1`, `i2`, ... and `o1`, `o2`, ... used throughout this document work without any
+declaration.
 
 Both kinds of streams are indexed by time starting at the time step 0. A stream
 associates to each time step a Boolean algebra element matching the type of the stream.
@@ -731,32 +865,26 @@ but input streams can be used in these same ways:
 2. `o1[t-k]` refers to the time point k steps ago while executing a specification
 3. `o1[k]` refers to the fixed time point k while executing a specification
 
-There are currently two ways to assign a type to a stream: either explicitly in
-the REPL (see also subsection
-[Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables))
-or implicitly by using typed constants. In the later case the type for a stream is inferred.
-In a nutshell, the inference process works as follows:
-1. Typing a constant in a Boolean function, types the whole Boolean function.
-Any stream appearing in this Boolean function will be assigned this type.
-2. Streams that have been typed in a single Boolean function, are automatically typed
-in all Boolean functions.
-3. Streams that appear in a Boolean function, in which a different stream has been typed,
-are typed accordingly.
-4. If a stream cannot be typed by (possibly repeated application of) any of the above rules, it is assigned the default type `tau`.
+There are currently two ways to assign a type to a stream: either explicitly in a
+stream definition (see below) or implicitly, by type inference from the context in
+which the stream is used. The inference is performed by the general type system
+described in section [Type system](#type-system), so constants, variables and
+other streams occurring in the same atomic formula all contribute to the inferred
+type. A stream that remains untyped after inference is assigned the default type
+`tau`.
 
-Note that this stream type inference only happens if you start executing a Tau specification.
-In case a type mismatch is detected, the execution does not start and is terminated.
-Furthermore, types are currently not propagated using variables. The process only considers constants and streams.
-Variables will be taken into account soon.
+In case a type mismatch is detected, the specification is rejected and execution
+does not start.
 
-When typing a stream explicitly in [REPL](#the-tau-repl), the syntax is
+The syntax of a stream definition is
 ```
-stream_definition => stream_variable [":" type] ":=" stream_type stream
+stream_definition => stream_name [":" type] ":=" ("in" | "out") stream
 ```
-where `stream_variable` is the name of the stream, `type` is a supported type (`tau`, `sbf`, `bv`, `bv[8]`...),
-`stream_type` is either input stream (`in`) or output stream (`out`), and `stream` is either `console` (meaning that the
-stream reads/outputs values from/to the console) or `file(file_name)` which denotes the file from/into which to read/write
-(in quotes if needed). For example,
+where `stream_name` is the name of the stream, `type` is a supported type (`tau`,
+`sbf`, `bv[8]`, ...), `in` marks an input stream and `out` an output stream, and
+`stream` is either `console` (meaning that the stream reads/outputs values
+from/to the console) or `file(file_name)` which denotes the file from/into which
+to read/write (in quotes if needed). For example,
 ```
 i1 : tau := in console
 ```
@@ -768,6 +896,14 @@ or
 ```
 o2 : tau := out file("log.tau")
 ```
+or, using an arbitrary stream name,
+```
+sensor : bv[8] := in file("samples.in")
+```
+
+Stream definitions can be given either as part of a specification's definitions
+(each terminated by `.`) or entered directly in the REPL — see subsection
+[Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables).
 
 ### Special streams
 
@@ -815,7 +951,7 @@ The Tau Language currently supports the following types:
 
 1. `tau`: the type of Tau specifications,
 2. `sbf`: the type of simple Boolean functions, and
-3. `bv`: the type of bitvectors of fixed bit width.
+3. `bv[n]`: the type of bitvectors of bit width `n`.
 
 You can type the following elements: variables, streams, recurrence relations,
 constants and (term) constants. In order to do so, you just add the type
@@ -823,13 +959,19 @@ information after a colon `:`. For example,
 
 ```
 x : sbf
-o1[t] : bv
+o1[t] : bv[8]
 { #b00001111 } : bv[16]
 { ex x ex y (x & y) = 0 } : tau
 1: tau
 ```
 
 are all valid typed elements.
+
+The bit width of a bitvector type is mandatory: `x : bv[8]` is well-formed, while
+`x : bv` is not a bitvector annotation at all (see [Constants](#constants)). Each
+width is a distinct type, so `bv[8]` and `bv[16]` never unify — unifying them is a
+type error, not an implicit widening (use an explicit cast, see
+[Bitvectors](#bitvectors)).
 
 In the case of functional recurrence relations (as all arguments must have the
 same type) the syntax is as follows:
@@ -848,9 +990,9 @@ q[n](x : sbf, y : tau) := ...
 ```
 
 In general, if no type information is present, the default type `tau` is assumed.
-Also note that the type `bv` actually represents a family of types, one for each bit width.
+Also note that `bv` actually denotes a family of types, one for each bit width.
 For example, `bv[8]` is the type of bitvectors of width 8, while `bv[16]` is the type
-of bitvectors of width 16 (the default bit width is 16 if not specified or inferred otherwise).
+of bitvectors of width 16.
 
 ### Type inference
 
@@ -902,9 +1044,9 @@ Here are some small examples to illustrate the type inference system:
       - `y` is inferred to be of the same type as `z`, i.e. `sbf`,
       - no type mismatch occurs.
 
-2. `all x:bv x = y`:
-      - `x` is typed `bv` (`bv[16] by default),
-      - `y` is inferred to be of the same type as `x`, i.e. `bv`,
+2. `all x:bv[16] x = y`:
+      - `x` is typed `bv[16]`,
+      - `y` is inferred to be of the same type as `x`, i.e. `bv[16]`,
       - no type mismatch occurs.
 3. `all x x = y`:
       - `x` is inferred to be of the default type `tau`, as no type information is present,
@@ -914,15 +1056,49 @@ Here are some small examples to illustrate the type inference system:
       - `x` is inferred to be of the same type as `y` in the first part, i.e. `tau`, as no type information is present,
       - `y` is inferred to be of type `sbf` in the outer formula which is not compatible with the previous type assigned (`tau`).
       - a type mismatch occurs.
-4. `all x (all x x = 1:sbf)`:
+5. `all x (all x x = 1:sbf)`:
       - the inner `x` is inferred to be of type `sbf`,
       - the outer `x` is inferred to be of the default type `tau`,
       - no type mismatch occurs as both `x` are in different scopes.
-5. `ex x : bv x = 1 : bv[8]`:
-      - `x` is typed as `bv`,
+6. `ex x x = 1 : bv[8]`:
       - the constant `1` is typed as `bv[8]`,
       - `x` is inferred to be of the same type as the constant `1`, i.e. `bv[8]`,
       - no type mismatch occurs.
+7. `x:bv[8] = {1}:bv[16]`:
+      - `x` is typed as `bv[8]` and the constant as `bv[16]`,
+      - the two bitvector widths are distinct types and do not unify,
+      - a type mismatch occurs.
+
+## **Constant time constraints**
+
+Besides the relations between terms, a formula can also constrain the *time point*
+at which it applies. Such a constraint is written in square brackets and compares
+a time variable against a constant:
+
+```
+time_constraint => "[" ctnvar rel num "]" | "[" num rel ctnvar "]"
+rel             => "=" | "!=" | "<" | "<=" | ">" | ">="
+```
+
+where `ctnvar` is a time variable (typically `t`) and `num` a non-negative
+integer. The constraint evaluates to `T` at the time points that satisfy it and
+to `F` elsewhere, so it acts as a guard on the rest of the formula. For example:
+
+```
+[t <= 3] && o1[t] = 0
+```
+
+only holds during the first four time steps, whereas
+
+```
+always ([t < 3] -> o1[t] = 0) && ([t >= 3] -> o1[t] = 1)
+```
+
+writes `0` into `o1` for the first three time steps and `1` afterwards.
+
+Note that the operand order matters and is *not* normalized: `[t >= 3]` means
+"the current time point is at least 3", whereas `[3 >= t]` means "3 is at least
+the current time point", i.e. at most 3.
 
 ## **Pointwise revision**
 
@@ -1072,12 +1248,13 @@ algebra elements.
 The general form of tau executable command line is:
 
 ```bash
-tau [ options ] [ <specification> ]
+tau [ options ] [ <specification file> ]
 ```
 
-where `[ options ]` are the command line options and `[ <specification> ]` is the Tau
-specification you want to run. If you omit the tau specification, the Tau REPL will be
-started.
+where `[ options ]` are the command line options and `[ <specification file> ]` is
+the path to a file containing the Tau specification you want to run. Use `-` to
+read the specification from standard input. If you omit the file, the Tau REPL
+will be started.
 
 The general options are the following:
 
@@ -1088,24 +1265,36 @@ The general options are the following:
 | -v, --version      | show the version of the executable                    |
 |--------------------|-------------------------------------------------------|
 | -V, --charvar      | charvar (enabled by default)                          |
+| -B, --blasting     | bitvector predicate blasting (enabled by default)     |
 | -S, --severity     | severity level (trace/debug/info/error)               |
 | -I, --indenting    | indenting of the formulas                             |
 | -H, --highlighting | syntax highlighting                                   |
+| -b, --benchmarks   | print benchmarks (enabled by default)                 |
+| -J, --json         | output in JSON format                                 |
+| -q, --quit         | quit when no input is available                       |
 
 whereas the REPL specific options are:
 
-| Options            | Description                                 |
-|--------------------|---------------------------------------------|
-| -e, --evaluate     | REPL command to be evaluated                |
-| -s, --status       | display status                              |
-| -c, --color        | use colors                                  |
-| -d, --debug        | debug mode                                  |
+| Options            | Description                                            |
+|--------------------|--------------------------------------------------------|
+| -e, --evaluate     | REPL command to be evaluated                           |
+| -s, --status       | display status (enabled by default)                    |
+| -c, --color        | use colors (enabled by default)                        |
+| -X, --legacy-repl  | use the legacy terminal REPL instead of the FTXUI one  |
+| -x, --experimental | enable transitioning features                          |
+| -d, --debug        | debug mode (Debug builds only)                         |
 
 # **The Tau REPL**
 
 The Tau REPL is a command line application that allows you to interact with the Tau
 Language. It is a simple and easy to use tool that enables you to write and
 execute Tau specifications on the fly.
+
+By default the REPL uses a full-screen terminal interface based on
+[FTXUI](https://github.com/ArthurSonzogni/FTXUI), with command history persisted
+in `.tau_history`. Pass `-X` (`--legacy-repl`) for the plain line-oriented REPL,
+which is also what you get if the project was configured with
+`-DTAU_DONT_USE_FTXUI=ON`.
 
 ## **Basic REPL commands**
 
@@ -1115,6 +1304,8 @@ the commands is the following:
 
 * `help|h [<command>]`: shows a general help message or the help message of a
 specific command.
+
+* `help|h example[s]`: shows examples of the Tau language syntax.
 
 * `version|v`: shows the version of the Tau REPL. The version of the Tau REPL
 corresponds to the repo commit.
@@ -1133,6 +1324,10 @@ one if its name is provided.
 
 * `set <option> [=] <value>`: sets a configurable option to a desired value.
 
+* `enable <option>`: sets a boolean option to on.
+
+* `disable <option>`: sets a boolean option to off.
+
 * `toggle <option>`: toggle an option between on/off.
 
 The options you have at your disposal are the following:
@@ -1143,19 +1338,28 @@ output. It's on by default.
 * `s|status`: Can be on/off. Controls status visibility in the prompt. It's on
 by default.
 
-* `sev|severity`: Possible values are trace/debug/info/error. The value determines
-how much information the REPL will provide. This is set to error by default.
+* `S|sev|severity`: Possible values are trace/debug/info/error. The value determines
+how much information the REPL will provide. It's `info` by default in Release
+builds and `debug` in Debug builds.
 
-* `h|hilight|highlight`: Can be on/off. Controls usage of highlighting in the
+* `H|hilight|highlight|highlighting`: Can be on/off. Controls usage of
+highlighting in the output of commands. It's off by default.
+
+* `I|indent|indenting`: Can be on/off. Controls usage of indentation in the
 output of commands. It's off by default.
 
-* `i|indent|indentation`: Can be on/off. Controls usage of indentation in the
-output of commands. It's on by default.
-
-* `charvar|v`: Can be on/off. Controls usage of character variables in the
+* `V|charvar`: Can be on/off. Controls usage of character variables in the
 REPL. It's on by default.
 
-* `d|dbg|debug`: Can be on/off. Controls debug mode. It's off by default.
+* `B|blasting`: Can be on/off. Controls bitvector predicate blasting, i.e.
+whether bitvector predicates are expanded into their bit-level encoding. It's on
+by default.
+
+* `benchmarks|benchmarking`: Can be on/off. Controls printing of timing
+benchmarks after each command. It's on by default.
+
+* `d|dbg|debug`: Can be on/off. Controls debug mode. Only available in Debug
+builds, where it's on by default.
 
 ## **Functions, predicates and input/output stream variables**
 
@@ -1176,13 +1380,23 @@ recurrence relations. See the Tau Language section
 recurrence relations. See the Tau Language section
 [Functions and predicates](#functions-and-predicates) for more information.
 
-* `<type> i<number> := console | ifile(<filename>)`: defines an input stream variable.
-The input variable can read values from the console or from a provided file. <br>
-`<type>` can be either `tau` or `sbf` (simple Boolean function) at the moment.
+* `<name> [: <type>] := in console | in file(<filename>)`: defines an input stream
+variable. The input variable can read values from the console or from a provided
+file.
 
-* `<type> o<number> := console | ofile(<filename>)`: defines an output stream variable.
-The output variable can write values to the console or into a file. <br>
-`<type>` can be either `tau` or `sbf` (simple Boolean function) at the moment.
+* `<name> [: <type>] := out console | out file(<filename>)`: defines an output
+stream variable. The output variable can write values to the console or into a
+file.
+
+In both cases `<name>` is any stream name and `<type>` is `tau`, `sbf` or `bv[n]`
+(see [Streams](#streams) and [Type system](#type-system)). If the type is omitted
+the stream is left untyped and its type is inferred on use. For example:
+
+```
+i1 : tau := in console
+o1 : tau := out console
+sensor : bv[8] := in file("samples.in")
+```
 
 ## **Memory related commands**
 
@@ -1234,13 +1448,21 @@ The syntax of the commands is the following:
 
 * `unsat <repl_memory|tau>`: checks if the given specification is unsatisfiable.
 
-* `solve <repl_memory|tau>`: solves the given system of equations given by the
-well-formed formula. It only computes one solution.
+* `solve [<options>] <repl_memory|tau>`: solves the given system of equations given
+by the well-formed formula, computing a single satisfying assignment for its free
+variables. The available options are:
+	* `--min|--minimum`: computes a minimum solution of the system,
+	* `--max|--maximum`: computes a maximum solution of the system,
+	* `--<type>`: uses the given type (`sbf`, `tau`, ...) for the solution.
+
+* `lgrs [--<type>] <repl_memory|tau>`: computes a least general reproductive
+solution (LGRS) for the given equation.
 
 * `normalize|n <repl_memory|rr|ref|tau|term>`: normalizes the given expression. See
 the TABA book for details.
 
-* `qelim <repl_memory|tau>`: performs quantifier elimination on the given expression.
+* `qelim <repl_memory|tau>`: eliminates the non-temporal quantifiers in the given
+expression.
 
 ## **Normal forms**
 
@@ -1266,6 +1488,50 @@ Finally, you can run a given Tau specification. The syntax for the commands is:
 
 * `run|r <repl_memory|tau>`: runs the given Tau specification.
 
+# **The C++ API and language bindings**
+
+Besides the executable and the REPL, the framework is usable as a library.
+
+The public C++ API is [`src/api.h`](src/api.h). All operations are exposed as
+static methods on `api<node>`, and cover parsing (`get_spec`, `get_formula`,
+`get_term`, `get_definition`, ...), printing, substitution and instantiation,
+the logical procedures, the normal forms and the execution of specifications
+(`get_interpreter`, `get_inputs_for_step`, `step`). Global switches such as
+`set_charvar`, `set_blasting`, `set_indenting`, `set_highlighting`, `set_json` and
+`set_severity` mirror the command line options.
+
+The underlying tree representation is documented in
+[`docs/tau_tree.md`](docs/tau_tree.md), and
+[`docs/adding_base_bas.md`](docs/adding_base_bas.md) describes how to add a new
+base Boolean algebra. For development conventions, standalone runners and testing
+notes see [`DEVELOPMENT.md`](DEVELOPMENT.md).
+
+Python bindings are provided via
+[nanobind](https://github.com/wjakob/nanobind) in
+[`bindings/python`](bindings/python) and built with `./dev binding python`. They
+expose the interpreter part of the API together with a set of stream
+implementations (console, file, and in-memory vector streams) so that inputs and
+outputs can be driven from Python:
+
+```python
+import tau   # the built module lives in <build dir>/bindings/python/nanobind
+
+i_stream = tau.vector_input_stream(["T", "F", "T"])
+o_stream = tau.vector_output_stream()
+
+opts = tau.interpreter_options()
+opts.input_remaps["i"] = i_stream
+opts.output_remaps["o"] = o_stream
+
+interpreter = tau.get_interpreter("o[t] = i[t].", opts)
+for _ in range(3):
+    tau.step(interpreter)
+
+print(o_stream.get_values())   # ['T', 'F', 'T']
+```
+
+Further examples are in [`tests/bindings/python`](tests/bindings/python).
+
 # **The Theory behind the Tau Language**
 
 * GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)
@@ -1281,18 +1547,25 @@ This is a short list of known issues that will be fixed in a subsequent release:
   * Simplification of Boolean equations may take longer time in a few cases.
   * Path simplification algorithm does not take equalities between variables
   into account leading to later blow ups.
+* Several procedures are bounded rather than complete, and report an error
+  instead of an answer when the bound is reached. This is the case for the
+  fixpoint enumeration of recurrence relations and for the satisfiability
+  fixpoint search. Such a bound is a limit on the search, not a proof about the
+  input.
+* Fixpoint calculation is not supported for recurrence relations with more than
+  one offset index.
+* The `anf` (algebraic normal form) and `pnf` (prenex normal form) commands are
+  not implemented and are currently not reachable from the REPL grammar.
 * Minor errors in Windows REPL
 
 
 # **Future work**
 
-* Enabling modular arithmetic using fixed width bitvectors in Tau specifications
 * Enabling efficient data storage and manipulation in Tau specifications using Boolean functions
 * Overcoming performance issues during normalization of formulas and satisfiability checking of Tau specifications
 * Add support for redefinitions of functions or predicates.
-* Add support for arbitrary stream names.
+* Support the Boolean algebra of Boolean (not just simple) functions in general.
 * Improve the performance of Boolean function normalization.
-
 
 # **Submitting issues**
 
