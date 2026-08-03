@@ -61,6 +61,83 @@ inline elim_verdict join(elim_verdict a, elim_verdict b) {
 		std::max(static_cast<int>(a), static_cast<int>(b)));
 }
 
+/**
+ * @brief Formula-wide inputs the per-block analysis cannot derive from a block.
+ *
+ * `bv_is_solver_owned` is genuinely a property of the whole formula: a
+ * constant of another Boolean algebra (a `:tau` spec constant, say) is one
+ * cvc5 cannot translate at all, so *no* bitvector scope anywhere in the
+ * formula will ever be decided by the solver. Computed once at pipeline entry
+ * with `!has_foreign_ba_constant<node>(form)` and carried down.
+ */
+template <NodeType node>
+struct analysis_context {
+	bool bv_is_solver_owned = true;
+};
+
+/**
+ * @brief Result of analysing one quantifier block over its own body.
+ * @tparam node Tree node type.
+ */
+template <NodeType node>
+struct block_eliminability {
+	/** @brief Verdict for @p var; `eliminable` if it was not analysed. */
+	elim_verdict verdict_of(tref var) const {
+		if (auto it = verdicts.find(var); it != verdicts.end())
+			return it->second;
+		return elim_verdict::eliminable;
+	}
+
+	/** @brief Conjuncts in @p var's component; empty if it was not analysed. */
+	const trefs& conjuncts_of(tref var) const {
+		static const trefs none;
+		if (auto it = components.find(var); it != components.end())
+			return it->second;
+		return none;
+	}
+
+	/** @brief `true` if the analysed body holds any unresolved reference. */
+	bool has_reference() const { return has_ref; }
+
+	subtree_unordered_map<node, elim_verdict> verdicts;
+	subtree_unordered_map<node, trefs> components;
+	bool has_ref = false;
+};
+
+/**
+ * @brief Comparator selecting a union-find root. Total over distinct nodes.
+ *
+ * `union_find_with_sets::merge` refuses to merge elements that compare equal
+ * in both directions, so this must be a total order on distinct trefs --
+ * `subtree_less` is. Declared as a free function template rather than a lambda
+ * because `union_find_with_sets` stores its comparator **by reference**; a
+ * temporary lambda would dangle.
+ */
+template <NodeType node>
+bool eliminability_comp(tref l, tref r);
+
+/**
+ * @brief Classify each of @p block_vars against the atoms of @p conjuncts.
+ *
+ * One pass: every atomic formula is unioned with its own free variables, so a
+ * verdict propagates to every variable sharing an atom rather than only within
+ * a conjunct. `frozen` is seeded at every unresolved reference and at every
+ * kept binder; the bitvector seeds are applied per @p ctx.
+ *
+ * Only a *bound* variable's own scope can constrain it -- it cannot occur
+ * outside it -- so analysing the block body is not merely cheaper than
+ * analysing the whole formula, it is equally informative and strictly fresher
+ * (`process_quantifier_blocks` rebuilds the tree every round, and this map is
+ * tref-keyed).
+ *
+ * @param block_vars Variables bound by the block.
+ * @param conjuncts Top-level conjuncts of the block body.
+ * @param ctx Formula-wide inputs.
+ */
+template <NodeType node>
+block_eliminability<node> analyse_block(const trefs& block_vars,
+	const trefs& conjuncts, const analysis_context<node>& ctx);
+
 } // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__ANTIPRENEXING_ELIMINABILITY_H__

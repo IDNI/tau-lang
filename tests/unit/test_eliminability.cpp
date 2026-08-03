@@ -46,4 +46,79 @@ TEST_SUITE("eliminability") {
 		for (elim_verdict a : all) for (elim_verdict b : all)
 			CHECK(join(a, b) == join(b, a));
 	}
+
+	// Helper: the free variables of a parsed conjunct, so tests never have to
+	// guess whether a hand-built tau::build_variable matches a parsed one
+	// (they can differ by inferred BA type).
+	static trefs conj_vars(tref c) { return get_free_vars<node_t>(c); }
+
+	TEST_CASE("a variable sharing no atom with a reference is eliminable") {
+		// x reaches f; y does not.
+		tref c1 = get_nso_rr("f(x).").value().main->get();
+		tref c2 = get_nso_rr("y w = 0.").value().main->get();
+		trefs vars = conj_vars(c1);
+		vars.push_back(conj_vars(c2)[0]);
+		auto a = analyse_block<node_t>(vars, { c1, c2 },
+			analysis_context<node_t>{});
+		CHECK(a.has_reference());
+		CHECK(a.verdict_of(conj_vars(c1)[0]) == elim_verdict::frozen);
+		CHECK(a.verdict_of(conj_vars(c2)[0]) == elim_verdict::eliminable);
+	}
+
+	TEST_CASE("frozen propagates across a shared atom, not just into arguments") {
+		// z is not an argument of f, but shares the atom `x z = 0` with x,
+		// which is. This is the case the conjunct-level guards missed --
+		// entanglement *across* conjuncts through a shared atom.
+		tref c1 = get_nso_rr("f(x).").value().main->get();
+		tref c2 = get_nso_rr("x z = 0.").value().main->get();
+		trefs vars = conj_vars(c2); // {x, z} in some order
+		auto a = analyse_block<node_t>(vars, { c1, c2 },
+			analysis_context<node_t>{});
+		for (tref v : vars) CHECK(a.verdict_of(v) == elim_verdict::frozen);
+	}
+
+	TEST_CASE("conjuncts_of returns exactly the component's conjuncts") {
+		tref c1 = get_nso_rr("f(x).").value().main->get();
+		tref c2 = get_nso_rr("y w = 0.").value().main->get();
+		trefs vars = conj_vars(c1);
+		tref y = conj_vars(c2)[0];
+		vars.push_back(y);
+		auto a = analyse_block<node_t>(vars, { c1, c2 },
+			analysis_context<node_t>{});
+		CHECK(a.conjuncts_of(y).size() == 1);
+		CHECK(tau::get(a.conjuncts_of(y)[0]) == tau::get(c2));
+	}
+
+	TEST_CASE("a kept binder freezes its component") {
+		// Equations under a surviving inner quantifier are not top-level
+		// conjuncts of this clause; squeezing them would drop the binder
+		// and leak its variable free. Same soundness the deleted
+		// `blocks_elimination` guard provided, now at component
+		// granularity instead of whole-clause.
+		tref c1 = get_nso_rr("ex q (q x = 0).").value().main->get();
+		tref c2 = get_nso_rr("y w = 0.").value().main->get();
+		trefs vars = conj_vars(c1);
+		tref y = conj_vars(c2)[0];
+		vars.push_back(y);
+		auto a = analyse_block<node_t>(vars, { c1, c2 },
+			analysis_context<node_t>{});
+		CHECK(a.verdict_of(conj_vars(c1)[0]) == elim_verdict::frozen);
+		CHECK(a.verdict_of(y) == elim_verdict::eliminable);
+	}
+
+	TEST_CASE("a reference-free block costs no reference pass") {
+		tref c = get_nso_rr("x y = 0.").value().main->get();
+		auto a = analyse_block<node_t>(conj_vars(c), { c },
+			analysis_context<node_t>{});
+		CHECK(!a.has_reference());
+		for (tref v : conj_vars(c))
+			CHECK(a.verdict_of(v) == elim_verdict::eliminable);
+	}
+
+	TEST_CASE("verdict_of on an unanalysed variable defaults to eliminable") {
+		tref c = get_nso_rr("x y = 0.").value().main->get();
+		auto a = analyse_block<node_t>({}, { c }, analysis_context<node_t>{});
+		CHECK(a.verdict_of(conj_vars(c)[0]) == elim_verdict::eliminable);
+		CHECK(a.conjuncts_of(conj_vars(c)[0]).empty());
+	}
 }
