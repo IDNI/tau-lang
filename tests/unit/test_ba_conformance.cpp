@@ -14,6 +14,8 @@
 // wired to the wrong predicate, not enough to test an algebra's theory, which
 // stays with its own suite.
 
+#include <optional>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -134,14 +136,189 @@ void check_boolean_laws() {
 	CHECK(desc::normalize(desc::normalize(one)) == desc::normalize(one));
 }
 
+// ── Optional capabilities ────────────────────────────────────────────────────
+//
+// Every block below is probed with `if constexpr (requires { … })` and never by
+// name, the way ba_pack_traits.h dispatches. A block that no algebra of the
+// configured pack implements compiles to nothing, which is the point: the empty
+// case is what a reduced pack exercises.
+
+// Classification is a law, not a convention: an algebra is a Boolean algebra or
+// an omega-categorical non-BA theory, never both. The folds core actually asks
+// must agree with what the descriptor declares -- that seam is the whole point
+// of a capability, and nothing else checks it.
+template <typename BA>
+void check_classification() {
+	using desc = ba_descriptor<BA, node_t>;
+	const size_t ba_type = ba_types<node_t>::id(desc::type_tree());
+
+	static_assert(!(desc::atomless && desc::non_aba_omcat),
+		"a BA is atomless or non-ABA omcat, never both");
+
+	// doctest cannot decompose && inside its macros, so a predicate compared
+	// here is named first rather than written inline
+	const bool omcat_fold = pack_type_is_non_aba_omcat<node_t>(ba_type);
+	CHECK(omcat_fold == desc::non_aba_omcat);
+
+	constexpr bool declares_arith = requires { requires desc::arith_ops; };
+	const bool arith_fold = pack_type_has_arith_ops<node_t>(ba_type);
+	CHECK(arith_fold == declares_arith);
+}
+
+// Atomlessness is the claim that between any two distinct elements a third
+// exists; splitter is its constructive witness, so an algebra declaring the
+// first owes a working second. Comparison-based, so an oracle-backed algebra
+// sits it out.
+template <typename BA>
+void check_splitter() {
+	using desc = ba_descriptor<BA, node_t>;
+	if constexpr (!desc::atomless) return;
+	else {
+		tref type = desc::type_tree();
+		auto one_opt = parsed_literal<BA>(desc::literal_one(type), type);
+		auto zero_opt = parsed_literal<BA>(desc::literal_zero(type), type);
+		REQUIRE(one_opt.has_value());
+		REQUIRE(zero_opt.has_value());
+		const BA one = one_opt.value(), zero = zero_opt.value();
+		auto eq = [](const BA& a, const BA& b) {
+			return desc::normalize(a) == desc::normalize(b);
+		};
+
+		for (auto st : { splitter_type::lower, splitter_type::middle,
+				splitter_type::upper })
+		{
+			const BA y = desc::normalize(desc::splitter(one, st));
+			// a proper sub-element: neither endpoint, and below one
+			CHECK_FALSE(eq(y, zero));
+			CHECK_FALSE(eq(y, one));
+			CHECK(eq(y | one, one));
+			CHECK(eq(y & one, y));
+		}
+
+		if constexpr (requires { desc::splitter_one(type); }) {
+			tref s = desc::splitter_one(type);
+			CHECK(s != nullptr);
+		}
+	}
+}
+
+// The constant a term carries, located rather than indexed: how deeply a
+// builder wraps it is not part of any contract. Empty when the term carries
+// none, which is the ordinary case for a canonicalized zero or one.
+template <typename BA>
+std::optional<BA> constant_of(tref n) {
+	if (n == nullptr) return std::nullopt;
+	tref cn = tau::get(n).find_top(
+		[](tref x) { return is<node_t>(x, tau::ba_constant); });
+	if (cn == nullptr) return std::nullopt;
+	auto c = tau::get(cn).get_ba_constant();
+	if (!std::holds_alternative<BA>(c)) return std::nullopt;
+	return std::get<BA>(c);
+}
+
+// What a term-producing capability owes: what it hands back must read back as
+// the same value.
+//
+// The shape it hands back varies and that is core's business, not the
+// algebra's: a syntactically zero or one constant is canonicalized into a
+// *typed* bf_f/bf_t (hooks_bf.tmpl.h, cte), so bv's zero carries no ba_constant
+// at all while qlt's {0} -- not qlt's zero, a dense linear order having no
+// bottom -- stays one. serialize_constant renders both as the type's own
+// literal, so the round trip is one statement covering both.
+template <typename BA>
+void check_term_round_trip(tref term, size_t ba_type, tref type) {
+	using desc = ba_descriptor<BA, node_t>;
+	using tt = typename tau::traverser;
+
+	std::stringstream ss;
+	REQUIRE(serialize_constant<node_t>(ss, term, ba_type));
+	const std::string src = ss.str();
+	REQUIRE(src.size() > 0);
+
+	auto back = parsed_literal<BA>(src, type);
+	REQUIRE(back.has_value());
+
+	if (auto carried = constant_of<BA>(term))
+		CHECK(desc::normalize(back.value())
+			== desc::normalize(carried.value()));
+	else if (tt(term) | tau::bf_f) CHECK(desc::is_zero(back.value()));
+	else if (tt(term) | tau::bf_t) CHECK(desc::is_one(back.value()));
+}
+
+// zero_constant is the term core initializes an output of this type to
+// (interpreter.tmpl.h, emit_default_zero), which for an algebra with no bottom
+// is not its zero -- so what is asserted is the round trip, not the value.
+template <typename BA>
+void check_constant_builders() {
+	using desc = ba_descriptor<BA, node_t>;
+	tref type = desc::type_tree();
+	const size_t ba_type = ba_types<node_t>::id(type);
+
+	if constexpr (requires { desc::zero_constant(ba_type); }) {
+		tref zt = desc::zero_constant(ba_type);
+		REQUIRE(zt != nullptr);
+		CHECK(is<node_t>(zt, tau::bf));
+		if (auto z = constant_of<BA>(zt)) CHECK(desc::is_closed(z.value()));
+		check_term_round_trip<BA>(zt, ba_type, type);
+	}
+
+	if constexpr (requires { desc::value_constant(ba_type, size_t{0}); }) {
+		tref vt = desc::value_constant(ba_type, 0);
+		REQUIRE(vt != nullptr);
+		CHECK(is<node_t>(vt, tau::bf));
+		if (auto v = constant_of<BA>(vt)) CHECK(desc::is_closed(v.value()));
+		check_term_round_trip<BA>(vt, ba_type, type);
+	}
+}
+
+// How an algebra renders, when its own operator<< is not what Tau should print,
+// and whether the algebra offered as the Boolean carrier can really carry one.
+template <typename BA>
+void check_rendering() {
+	using desc = ba_descriptor<BA, node_t>;
+	tref type = desc::type_tree();
+
+	if constexpr (requires { desc::print_constant(std::declval<BA>()); }) {
+		auto one = parsed_literal<BA>(desc::literal_one(type), type);
+		auto zero = parsed_literal<BA>(desc::literal_zero(type), type);
+		REQUIRE(one.has_value());
+		REQUIRE(zero.has_value());
+		const std::string po = desc::print_constant(one.value());
+		const std::string pz = desc::print_constant(zero.value());
+		CHECK(po.size() > 0);
+		CHECK(pz.size() > 0);
+		CHECK(po != pz);
+	}
+
+	if constexpr (requires { requires desc::can_host_bool; }) {
+		// the carrier's own type, which need not be type_tree()
+		tref carrier = type;
+		if constexpr (requires { desc::bool_carrier_type(); })
+			carrier = desc::bool_carrier_type();
+		REQUIRE(carrier != nullptr);
+		// a carrier must render and parse back a plain 1 and 0
+		auto one = parsed_literal<BA>(desc::literal_one(carrier), carrier);
+		auto zero = parsed_literal<BA>(desc::literal_zero(carrier), carrier);
+		REQUIRE(one.has_value());
+		REQUIRE(zero.has_value());
+		CHECK(desc::is_one(one.value()));
+		CHECK(desc::is_zero(zero.value()));
+	}
+}
+
 template <typename BA>
 void check_ba() {
 	using desc = ba_descriptor<BA, node_t>;
 	SUBCASE(desc::type_name) {
 		check_type_system<BA>();
 		check_literals_and_predicates<BA>();
-		if constexpr (!requires { requires desc::uses_oracle; })
+		check_classification<BA>();
+		check_constant_builders<BA>();
+		check_rendering<BA>();
+		if constexpr (!requires { requires desc::uses_oracle; }) {
 			check_boolean_laws<BA>();
+			check_splitter<BA>();
+		}
 	}
 }
 
