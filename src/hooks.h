@@ -172,14 +172,6 @@ private:
 
 } // namespace idni::tau_lang
 
-// Forward-declare qlt types so hooks.tmpl.h can name them at parse time.
-// (qlt.h includes tau_tree.h which includes hooks.h before qlt is defined;
-// clang's two-phase lookup requires names to be visible at definition time.)
-namespace idni::tau_lang {
-    struct qlt;
-    enum class qlt_bound : uint8_t;
-}
-
 #include "hooks.tmpl.h"
 
 #undef HOOK_LOGGING

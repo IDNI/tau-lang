@@ -5,7 +5,6 @@
 
 #include <type_traits>
 
-#include "boolean_algebras/qlt/qlt.h"
 #include "ba_types.h"
 #include "hooks.h"  // Only for IDE resolution, not really needed.
 
