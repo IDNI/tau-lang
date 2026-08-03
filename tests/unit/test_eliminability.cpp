@@ -78,8 +78,13 @@ TEST_SUITE("eliminability") {
 	}
 
 	TEST_CASE("conjuncts_of returns exactly the component's conjuncts") {
+		// c2 is deliberately NOT an atom (get_cnf_wff_clauses' leaves often
+		// aren't -- a negated equation is wff(wff_neg(wff(bf_eq ...)))).
+		// Without the conjunct itself joining its variables' component, the
+		// leaf node never enters the union-find and conjuncts_of() silently
+		// drops it.
 		tref c1 = get_nso_rr("f(x).").value().main->get();
-		tref c2 = get_nso_rr("y w = 0.").value().main->get();
+		tref c2 = get_nso_rr("!(y w = 0).").value().main->get();
 		trefs vars = conj_vars(c1);
 		tref y = conj_vars(c2)[0];
 		vars.push_back(y);
@@ -116,9 +121,16 @@ TEST_SUITE("eliminability") {
 	}
 
 	TEST_CASE("verdict_of on an unanalysed variable defaults to eliminable") {
+		// block_vars is non-empty (holds `other`) so this exercises the
+		// per-variable map-miss default in verdict_of/conjuncts_of, not the
+		// block_vars.empty() early return.
 		tref c = get_nso_rr("x y = 0.").value().main->get();
-		auto a = analyse_block<node_t>({}, { c }, analysis_context<node_t>{});
-		CHECK(a.verdict_of(conj_vars(c)[0]) == elim_verdict::eliminable);
-		CHECK(a.conjuncts_of(conj_vars(c)[0]).empty());
+		trefs vars = conj_vars(c); // {x, y} in some order
+		tref other = vars[0];
+		tref unanalysed = vars[1];
+		auto a = analyse_block<node_t>({ other }, { c },
+			analysis_context<node_t>{});
+		CHECK(a.verdict_of(unanalysed) == elim_verdict::eliminable);
+		CHECK(a.conjuncts_of(unanalysed).empty());
 	}
 }

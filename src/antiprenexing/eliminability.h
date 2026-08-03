@@ -96,7 +96,16 @@ struct block_eliminability {
 		return none;
 	}
 
-	/** @brief `true` if the analysed body holds any unresolved reference. */
+	/**
+	 * @brief `true` if a top-level `wff_ref` was seen directly under this
+	 * block's conjuncts.
+	 *
+	 * A conservative signal, not an exhaustive scan: a reference pruned
+	 * under a kept binder (the traversal stops at the binder and never
+	 * looks inside it) and a `bf_ref` inside an atom's arguments are not
+	 * counted here -- parity with the guard this analysis replaces, which
+	 * did not distinguish them either.
+	 */
 	bool has_reference() const { return has_ref; }
 
 	subtree_unordered_map<node, elim_verdict> verdicts;
@@ -119,10 +128,19 @@ bool eliminability_comp(tref l, tref r);
 /**
  * @brief Classify each of @p block_vars against the atoms of @p conjuncts.
  *
- * One pass: every atomic formula is unioned with its own free variables, so a
- * verdict propagates to every variable sharing an atom rather than only within
- * a conjunct. `frozen` is seeded at every unresolved reference and at every
- * kept binder; the bitvector seeds are applied per @p ctx.
+ * One pass: every atomic formula, and every conjunct itself, is unioned with
+ * its own free variables, so a verdict propagates to every variable sharing
+ * an atom -- or sharing a non-atomic conjunct, such as a negated equation or
+ * a disjunctive clause -- rather than only within an already-atomic conjunct.
+ * That per-conjunct union is deliberately conservative: it merges all of a
+ * conjunct's variables transitively, which is coarser than atom-level
+ * sharing, but over-freezing is sound where under-freezing is not.
+ *
+ * `frozen` is seeded at every unresolved reference, at every kept binder, and
+ * -- fail closed -- at every wff-level shape this analysis does not otherwise
+ * recognise, so an unhandled shape cannot silently leave its variables
+ * `eliminable`. @p ctx is threaded through but not yet consulted; the
+ * bitvector seeds it will drive are added by a later change.
  *
  * Only a *bound* variable's own scope can constrain it -- it cannot occur
  * outside it -- so analysing the block body is not merely cheaper than

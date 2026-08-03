@@ -51,7 +51,38 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 		return t.is(tau::wff) && t.child_is(tau::wff_ref);
 	};
 
+	// Boolean connectives whose own shape carries no eliminability
+	// information: their operands are wff nodes in their own right and get
+	// visited (and classified) individually as the traversal descends into
+	// them, so it is safe to fall through here without seeding anything.
+	auto is_transparent_connective = [](tref n) {
+		const auto& t = tau::get(n);
+		if (!t.is(tau::wff)) return false;
+		return t.child_is(tau::wff_and)   || t.child_is(tau::wff_or)
+			|| t.child_is(tau::wff_xor)   || t.child_is(tau::wff_neg)
+			|| t.child_is(tau::wff_imply) || t.child_is(tau::wff_rimply)
+			|| t.child_is(tau::wff_equiv) || t.child_is(tau::wff_conditional)
+			|| t.child_is(tau::wff_sometimes)
+			|| t.child_is(tau::wff_always)
+			|| t.child_is(tau::wff_parenthesis);
+	};
+
 	for (tref conj : conjuncts) {
+		// The conjunct itself joins its variables' component.
+		// get_cnf_wff_clauses returns the leaves of the wff_and spine, and a
+		// leaf is often not an atom (a negated equation is
+		// wff(wff_neg(wff(bf_eq ...)))). Without this the traversal seeds
+		// only the inner atom, the leaf node never enters the union-find,
+		// and conjuncts_of() drops it -- which would let a caller re-wrap a
+		// binder around a part not containing its own variable.
+		//
+		// Deliberately conservative: this unions ALL of a conjunct's
+		// variables transitively (e.g. a disjunctive leaf unions its
+		// disjuncts' variables together), which is coarser than atom-level
+		// sharing. Over-freezing is sound; under-freezing is not.
+		uf.insert(conj);
+		for (tref v : get_free_vars<node>(conj)) merge(conj, v);
+
 		auto visit = [&](tref m) -> bool {
 			if (is_ref_fm(m) || is_child_quantifier<node>(m)) {
 				// Two distinct reasons, one verdict. A reference
@@ -72,12 +103,28 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 			}
 			if (is_atomic_fm<node>(m)) {
 				// Propagation channel: the atom contributes no
-				// verdict of its own, but unioning it with its
-				// free variables makes every variable sharing an
-				// atom share a root. Order-independent -- the
-				// second merge joins the sets and `join` lifts
-				// the result.
+				// verdict of its own -- assign(..., eliminable) is
+				// a verdict no-op (eliminable is the join
+				// identity); its real job is inserting m into the
+				// union-find via find() so the merge below has a
+				// root to work from. Unioning m with its free
+				// variables makes every variable sharing an atom
+				// share a root. Order-independent -- the second
+				// merge joins the sets and `join` lifts the result.
 				assign(m, elim_verdict::eliminable);
+				for (tref v : get_free_vars<node>(m))
+					merge(m, v);
+				return false;
+			}
+			if (tau::get(m).is(tau::wff) && !is_transparent_connective(m)) {
+				// A wff-level shape none of the above recognise --
+				// e.g. wff_t/wff_f, a bf_interval leaf (deliberately
+				// excluded from is_atomic_fm,
+				// tau_tree_queries.tmpl.h:155), or a constraint.
+				// Fail closed: this analysis has no rule for it, so
+				// freeze rather than silently leaving its variables
+				// `eliminable`.
+				assign(m, elim_verdict::frozen);
 				for (tref v : get_free_vars<node>(m))
 					merge(m, v);
 				return false;
@@ -92,7 +139,7 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 		res.verdicts.insert_or_assign(v, verdict_of_root(v));
 		trefs comp;
 		for (tref conj : conjuncts)
-			if (uf.contains(conj) && uf.connected(v, conj))
+			if (uf.connected(v, conj))
 				comp.push_back(conj);
 		res.components.insert_or_assign(v, std::move(comp));
 	}
