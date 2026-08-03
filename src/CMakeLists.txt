@@ -97,7 +97,7 @@ add_custom_command(
 		-DTAU_HEADER="${TAU_HEADER}"
 		-DTAU_SOURCE_DIR="${TAU_SOURCE_DIR}"
 		-P ${PROJECT_SOURCE_DIR}/cmake/header.cmake
-	DEPENDS ${TAU_HEADERS} ${TAU_HEADER_TEMPLATE}
+	DEPENDS ${TAU_CORE_HEADERS} ${TAU_HEADER_TEMPLATE}
 	COMMENT "Building tau.h file"
 )
 
