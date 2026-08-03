@@ -109,9 +109,17 @@ function(target_setup target)
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")
 	target_compile_features(${target} PRIVATE cxx_std_23)
-	# generated tau_pack.h describing the configured BA pack
+	# grammars are compiled ahead of time, so tau never parses .tgf at runtime
+	target_compile_definitions(${target} PRIVATE TAU_PARSER_NO_TGF)
+	# generated tau_pack.h describing the configured BA pack, and beside it the
+	# BA parsers generated from the pack's grammars
 	if(TAU_PACK_INCLUDE_DIR)
 		target_include_directories(${target} PRIVATE ${TAU_PACK_INCLUDE_DIR})
+	endif()
+	# generated core parsers, which core includes by bare name
+	if(TAU_GENERATED_PARSER_DIR)
+		target_include_directories(${target} PRIVATE
+			${TAU_GENERATED_PARSER_DIR})
 	endif()
 	# directories of out-of-tree BAs registered with tau_register_ba()
 	if(TAU_BA_INCLUDE_DIRS)

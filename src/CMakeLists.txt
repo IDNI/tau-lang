@@ -5,7 +5,7 @@ set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 # generated tau_pack.h, which tau.h.in includes last, so a consumer still needs
 # only #include "tau.h". TAU_HEADERS stays the full list for dependency tracking.
 set(TAU_CORE_HEADERS
-	../parser/tau_parser.generated.h
+	${TAU_GENERATED_PARSER_DIR}/tau_parser.generated.h
 	backends/bdds/babdd.h
 	backends/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h	# described but not a TAU_BAS entry
@@ -47,20 +47,9 @@ set(TAU_CORE_HEADERS
 # core plus the configured pack: what the build depends on and installs
 set(TAU_HEADERS ${TAU_CORE_HEADERS} ${TAU_BA_HEADERS})
 
-# grammar tables, compiled here instead of in every TU including the parser
-set(TAU_PARSER_SOURCES
-	../parser/tau_parser.generated.cpp
-)
-
-# Grammar tables are mostly data and optimizing them takes too long. A BA's
-# parser arrives through its manifest, so pick those out of the pack's sources
-# rather than naming them here.
-set(TAU_GENERATED_PARSER_SOURCES ${TAU_PARSER_SOURCES})
-foreach(_ba_src ${TAU_BA_SOURCES_EXTRA})
-	if(_ba_src MATCHES "_parser\\.generated\\.cpp$")
-		list(APPEND TAU_GENERATED_PARSER_SOURCES ${_ba_src})
-	endif()
-endforeach()
+# Grammar tables are mostly data and optimizing them takes too long. Every
+# parser of this build -- core's and the pack's BAs' -- is generated, so the
+# list comes from the generation rules rather than being named here.
 set_source_files_properties(${TAU_GENERATED_PARSER_SOURCES}
 	PROPERTIES COMPILE_OPTIONS "-O0;-fno-lto")
 
@@ -68,7 +57,7 @@ set_source_files_properties(${TAU_GENERATED_PARSER_SOURCES}
 # ba.cmake and arrive via TAU_BA_SOURCES_EXTRA, so a pack without a BA does not
 # compile it. bool_ba.cpp stays: described like a BA, but in every pack.
 set(TAU_SOURCES
-	${TAU_PARSER_SOURCES}
+	${TAU_GENERATED_PARSER_SOURCES}
 	${TAU_BA_SOURCES_EXTRA}
 	boolean_algebras/bool_ba.cpp
 	backends/bdds/var_dict.cpp

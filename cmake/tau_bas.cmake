@@ -248,20 +248,22 @@ function(tau_generate_pack_header)
 endfunction()
 
 #
-# Every registered BA's grammar, whatever the pack.
+# The configured pack's BA grammars, as "<id>|<absolute .tgf path>" entries.
 #
-# Generation is not gated on TAU_BAS: the generated parsers are committed and
-# shared, so regenerating only the pack's grammars would leave the rest stale
-# and commit a partial update.
+# The registry's per-BA variables live in the scope of whoever loads it, so a
+# caller outside tau_resolve_ba_pack() asks through here rather than spelling
+# TAU_BA_<id>_* itself.
 #
-function(tau_all_ba_grammars out)
+function(tau_pack_ba_grammars out)
 	_tau_load_ba_registry()
-	set(_grammars "")
-	foreach(_id ${_TAU_BA_REGISTERED_IDS})
-		if(TAU_BA_${_id}_GRAMMAR)
-			list(APPEND _grammars
-				"${TAU_BA_${_id}_PATH}/${TAU_BA_${_id}_GRAMMAR}")
+	string(REPLACE " " "" _bas_nospace "${TAU_BAS}")
+	string(REPLACE "," ";" _ids "${_bas_nospace}")
+	set(_out "")
+	foreach(_id ${_ids})
+		if(NOT _id STREQUAL "" AND TAU_BA_${_id}_GRAMMAR)
+			list(APPEND _out
+				"${_id}|${TAU_BA_${_id}_PATH}/${TAU_BA_${_id}_GRAMMAR}")
 		endif()
 	endforeach()
-	set(${out} "${_grammars}" PARENT_SCOPE)
+	set(${out} "${_out}" PARENT_SCOPE)
 endfunction()

@@ -4,7 +4,14 @@ string(REPLACE " " ";" TAU_HEADERS_LIST "${TAU_HEADERS}")
 
 # CONTENT
 foreach(header_file ${TAU_HEADERS_LIST})
-        file(READ "${TAU_SOURCE_DIR}/${header_file}" HEADER_CONTENT ENCODING UTF-8)
+        # a generated header arrives as an absolute build-tree path; a source
+        # one is relative to TAU_SOURCE_DIR
+        if(IS_ABSOLUTE "${header_file}")
+                set(_path "${header_file}")
+        else()
+                set(_path "${TAU_SOURCE_DIR}/${header_file}")
+        endif()
+        file(READ "${_path}" HEADER_CONTENT ENCODING UTF-8)
         string(APPEND TAU_HEADER_CONTENT "\
 \n\
 // -----------------------------------------------------------------------------\n\

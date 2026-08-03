@@ -1,25 +1,32 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
-# Regenerate one grammar's parser as a build rule rather than at configure time,
-# so only a grammar whose .tgf changed is regenerated and whatever includes the
-# generated header waits for it.
+# Generate one grammar's parser into the build tree.
 #
-# The output sits beside its .tgf and is committed, so a build without
-# TAU_GENERATE_PARSERS never needs the tgf tool.
-function(generate_parser tgf_filename)
-	get_filename_component(_dir "${tgf_filename}" DIRECTORY)
+# A build rule rather than a configure-time step, so only a grammar whose .tgf
+# changed is regenerated, and whatever includes the header waits for it. The
+# outputs live in the build tree, so nothing is written into the source tree and
+# each build directory keeps its own copy.
+#
+# `--header-only false` puts the grammar table in a .cpp compiled once, instead
+# of in the header where every including TU pays for it.
+function(generate_parser tgf_filename out_dir)
 	get_filename_component(_stem "${tgf_filename}" NAME_WE)
-	set(_header "${_dir}/${_stem}_parser.generated.h")
+	set(_header "${out_dir}/${_stem}_parser.generated.h")
+	set(_source "${out_dir}/${_stem}_parser.generated.cpp")
 
 	add_custom_command(
-		OUTPUT "${_header}"
-		COMMAND "${PROJECT_SOURCE_DIR}/parser/gen" "${tgf_filename}"
-		DEPENDS "${tgf_filename}"
-		WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+		OUTPUT "${_header}" "${_source}"
+		COMMAND ${CMAKE_COMMAND} -E make_directory "${out_dir}"
+		COMMAND $<TARGET_FILE:tgf> "${tgf_filename}" gen
+			--header-only false --output-dir "${out_dir}"
+		DEPENDS tgf "${tgf_filename}"
 		COMMENT "Generating parser from ${_stem}.tgf"
 		VERBATIM)
 
 	list(APPEND TAU_GENERATED_PARSER_HEADERS "${_header}")
+	list(APPEND TAU_GENERATED_PARSER_SOURCES "${_source}")
 	set(TAU_GENERATED_PARSER_HEADERS "${TAU_GENERATED_PARSER_HEADERS}"
+		PARENT_SCOPE)
+	set(TAU_GENERATED_PARSER_SOURCES "${TAU_GENERATED_PARSER_SOURCES}"
 		PARENT_SCOPE)
 endfunction(generate_parser)

@@ -17,7 +17,7 @@ struct nlang_parser_instance : public idni::parser<char, char> {
 
 	nlang_parser_instance() : idni::parser<char, char>(
 		nlang_parser_data::grammar,
-		nlang_parser_data::parser_options) {}
+		nlang_parser_data::make_parser_options()) {}
 
 	size_t id(const std::basic_string<char>& name) {
 		return nlang_parser_data::nts.get(name);

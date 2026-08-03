@@ -27,7 +27,7 @@ to `build/<preset>` (e.g. `build/debug`, `build/release`).
 ./dev preset debug-clang               # Clang build → build/debug-clang/
 ./dev preset debug-asan                # Debug + AddressSanitizer
 ./dev clean [all]                      # Remove build dirs (all: also build/ preset trees)
-./dev regen                            # Regenerate parsers from .tgf grammar files
+./dev regen [build-dir]                # Build the parser generation target (default build/devel)
 ```
 
 Other presets: `{debug,release}-{ninja,all,measure}`, `relwithdebinfo-{tests,tau,all}`,
@@ -199,9 +199,16 @@ A BA's own passes live under its plugin, e.g.
 - `bv_predicate_blasting.h` — blast bitvector operations to Boolean formulas with predicates (implementation split into `bv_predicate_blasting{,_logic,_comparisons,_arithmetic,_helpers}.tmpl.h`)
 - `bv_ba_simplification.h`, `bv_ba_cvc5_simplification.tmpl.h`, `bv_ba_custom_simplification.tmpl.h` — simplification passes
 
-### Parsers (`parser/`)
+### Parsers
 
-Grammars are written in `.tgf` format and compiled to `*_parser.generated.h` headers via `./dev regen`. Don't hand-edit generated parser files.
+Grammars are written in `.tgf`: the language grammar in `parser/`, each BA's in
+its own plugin (`src/boolean_algebras/<id>/parser/<id>.tgf`, declared by the
+manifest's `TAU_BA_GRAMMAR`). The build generates their parsers with the `tgf`
+tool it builds itself, into `<build>/generated/` — core's beside the include
+path, a BA's under `boolean_algebras/<id>/parser/`. Nothing generated is
+committed, so editing a `.tgf` and building is the whole loop; `./dev regen`
+only builds the `tau_parsers` target of an existing build directory. Only the
+configured pack's grammars are generated.
 
 ### Public API (`src/api.h`)
 
