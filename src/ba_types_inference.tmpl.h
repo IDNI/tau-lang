@@ -310,6 +310,13 @@ std::variant<tref, inference_error, parse_error> update_tref(
 	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return n;
+	// Reject an explicit annotation naming a type the configured pack does
+	// not own; an untyped n (no explicit annotation) is not checked here.
+	if (has_ba_type<node>(n)) {
+		size_t own_type = get_effective_ba_type<node>(n);
+		if (!pack_owns_ba_type<node>(own_type))
+			return parse_error{canonized, own_type};
+	}
 	// If the tref is typed
 	if (auto type = get_inferred_type<node>(n, canonized, types, options); type) {
 		if (auto assigned = resolver.assign(canonized, type.value());
@@ -346,6 +353,13 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 	// If we have no type information for the element we do nothing
 	tref canonized = canonize<node>(n);
 	if (!types.contains(canonized)) return nullptr;
+	// Reject an explicit annotation naming a type the configured pack does
+	// not own, the same check update_tref applies to variables and bf_t/bf_f.
+	if (has_ba_type<node>(n)) {
+		size_t own_type = get_effective_ba_type<node>(n);
+		if (!pack_owns_ba_type<node>(own_type))
+			return parse_error{canonized, own_type};
+	}
 	// If the tref is typed
 	if (auto type = get_inferred_type<node>(n, canonized, types, options); type && type.value()) {
 		if (auto assigned = resolver.assign(canonized, type.value());
@@ -642,6 +656,8 @@ std::variant<tref, inference_error, parse_error> update(
 				auto updated = update_variable<node>(resolver, n, types, options);
 				if (std::holds_alternative<inference_error>(updated)) {
 					error = std::get<inference_error>(updated);
+				} else if (std::holds_alternative<parse_error>(updated)) {
+					error = std::get<parse_error>(updated);
 				} else {
 					if (std::get<tref>(updated) != n)
 						changes.insert_or_assign(n, std::get<tref>(updated));
@@ -674,6 +690,8 @@ std::variant<tref, inference_error, parse_error> update(
 				auto updated = update_bf_constant<node>(resolver, n, types, options);
 				if (std::holds_alternative<inference_error>(updated)) {
 					error = std::get<inference_error>(updated);
+				} else if (std::holds_alternative<parse_error>(updated)) {
+					error = std::get<parse_error>(updated);
 				} else {
 					if (std::get<tref>(updated) != n)
 						changes.insert_or_assign(n, std::get<tref>(updated));
@@ -797,7 +815,8 @@ void inference_error_message(
 	if (std::holds_alternative<parse_error>(error)) {
 		auto parse_err = std::get<parse_error>(error);
 		LOG_ERROR << "Unable to parse  " << tau::get(parse_err.element) << " with type "
-			<< ba_types<node>::name(parse_err.type_id) << "\n";
+			<< ba_types<node>::name(parse_err.type_id) << " (valid: "
+			<< node::ba::types_joined() << ")\n";
 	} else if (std::holds_alternative<scope_error>(error)) {
 		auto scope_err = std::get<scope_error>(error);
 		LOG_ERROR << "Improper closed scope in "

@@ -474,7 +474,8 @@ tref tree<node>::get_ba_constant_from_source(
 					ba_types<node>::type_tree(ba_type_id)));
 	if (r == nullptr) LOG_ERROR << "Parsing constant `"
 		<< dict(constant_source_sid) << "` failed for type `"
-		<< ba_types<node>::name(ba_type_id) << "`.";
+		<< ba_types<node>::name(ba_type_id) << "` (valid: "
+		<< node::ba::types_joined() << ").";
 	else LOG_TRACE << " -- result: " << LOG_FM(r);
 	return r;
 }

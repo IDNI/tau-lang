@@ -208,16 +208,10 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 				// the complaint to somewhere unrecognizable.
 				std::string tname = tree<node>::get(ch[0])
 					.get_string();
-				bool known = false;
-				for (const auto& n : node::ba::types())
-					if (n == tname) { known = true; break; }
-				if (!known) {
-					std::string valid;
-					for (const auto& n : node::ba::types())
-						valid += (valid.empty() ? "" : ", ")
-							+ n;
+				if (!pack_owns_ba_type_name<node>(tname)) {
 					LOG_ERROR << "[tau] unknown type '" << tname
-						<< "' in cast (valid: " << valid
+						<< "' in cast (valid: "
+						<< node::ba::types_joined()
 						<< ")\n";
 					error = true;
 					break;

@@ -68,14 +68,14 @@ TEST_SUITE("is_untyped_tref") {
 
 	TEST_CASE("node with stamped ba_type and no typed child is NOT untyped") {
 		// After inference, variable has ba_type stamped, no typed child
-		tref parsed = parse_no_infer("x:sbf = 1");
+		tref parsed = parse_no_infer("x:bool = 1");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		tref var = find_first<tau::variable>(inferred);
 		CHECK( var != nullptr );
-		// ba_type should be sbf
-		CHECK( tau::get(var).get_ba_type() == sbf_type_id<node_t>() );
+		// ba_type should be bool
+		CHECK( tau::get(var).get_ba_type() == bool_type_id<node_t>() );
 		// No typed structural child should remain
 		bool has_typed_child = false;
 		for (auto c : tau::get(var).get_children())
@@ -128,7 +128,7 @@ TEST_SUITE("get_effective_ba_type") {
 TEST_SUITE("typed child stripping after inference") {
 
 	TEST_CASE("variable typed child is stripped after inference") {
-		tref parsed = parse_no_infer("x:sbf = y");
+		tref parsed = parse_no_infer("x:bool = y");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
@@ -142,14 +142,14 @@ TEST_SUITE("typed child stripping after inference") {
 	}
 
 	TEST_CASE("bf_t typed child is stripped after inference") {
-		// 1:sbf = x -- the 1:sbf should have its typed child stripped
-		tref parsed = parse_no_infer("1:sbf = x");
+		// 1:bool = x -- the 1:bool should have its typed child stripped
+		tref parsed = parse_no_infer("1:bool = x");
 		CHECK( parsed != nullptr );
 		auto [inferred, _] = infer_ba_types<node_t>(parsed);
 		CHECK( inferred != nullptr );
 		tref bft = find_first<tau::bf_t>(inferred);
 		CHECK( bft != nullptr );
-		CHECK( tau::get(bft).get_ba_type() == sbf_type_id<node_t>() );
+		CHECK( tau::get(bft).get_ba_type() == bool_type_id<node_t>() );
 		bool has_typed = false;
 		for (auto c : tau::get(bft).get_children())
 			if (tau::get(c).is(tau::typed)) { has_typed = true; break; }

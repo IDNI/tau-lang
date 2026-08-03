@@ -4,21 +4,20 @@
 //
 // Post-processes a raw formula string that failed parsing to extract a
 // short, actionable hint that callers can show to the user.  Pure header;
-// no side effects; no dependencies beyond <regex>, <set>, <string>, <vector>.
+// no side effects; no dependencies beyond <algorithm>, <regex>, <string>.
 //
 // The main tau binary, tau_eval, the REPL, and any other consumer can call
 // `tau_lang::classify_parse_error<node>(formula_text)` after `get_nso_rr` /
 // parser failure to produce a human-friendly explanation alongside the raw
 // parser message.  `node` supplies the configured pack's type names through
-// `node::ba::types()`.
+// `node::ba::type_names()` and `node::ba::types_joined()`.
 
 #ifndef __IDNI__TAU__PARSE_ERROR_HINT_H__
 #define __IDNI__TAU__PARSE_ERROR_HINT_H__
 
+#include <algorithm>
 #include <regex>
-#include <set>
 #include <string>
-#include <vector>
 
 namespace idni::tau_lang {
 
@@ -47,20 +46,16 @@ inline std::string classify_parse_error(const std::string& formula) {
 	// Unknown type annotation; the valid names are the configured pack's.
 	// Syntax: {source}:type or variable:type — match }:word or \w:word.
 	if (std::regex_search(formula, re_type_ann)) {
-		const std::vector<std::string> names = node::ba::types();
-		const std::set<std::string> known_types(names.begin(), names.end());
+		constexpr auto known_types = node::ba::type_names();
 		// Extract all :word occurrences and check each.
 		std::string s = formula;
 		auto it = std::sregex_iterator(s.begin(), s.end(), re_type_extract);
 		for (; it != std::sregex_iterator(); ++it) {
 			std::string t = (*it)[1].str();
-			if (!known_types.count(t)) {
-				std::string valid;
-				for (const auto& n : names)
-					valid += (valid.empty() ? "" : ", ") + n;
+			if (std::ranges::find(known_types, t) == known_types.end())
 				return "unknown type annotation ':" + t
-				     + "' (valid: " + valid + ")";
-			}
+				     + "' (valid: "
+				     + std::string(node::ba::types_joined()) + ")";
 		}
 	}
 

@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <algorithm>
+#include <array>
 #include <optional>
 
 #include "ba_types.h"
@@ -401,6 +403,45 @@ size_t get_effective_ba_type(tref t) {
 template<NodeType node>
 bool has_ba_type(tref term) {
 	return !is_untyped_tref<node>(term);
+}
+
+// The types core builds for itself: the default type of an untyped element,
+// nat and the untyped marker, none of which a BA owns.
+template <NodeType node>
+bool is_reserved_ba_type(size_t ba_type_id) {
+	return ba_type_id == tau_type_id<node>()
+		|| ba_type_id == nat_type_id<node>()
+		|| ba_type_id == untyped_type_id<node>();
+}
+
+template <NodeType node>
+bool is_reserved_ba_type_name(const std::string& name) {
+	using tau = tree<node>;
+	auto family = [](tref type_tree) {
+		return tau::get(type_tree)[0].get_string();
+	};
+	static const std::array<std::string, 3> reserved = {
+		family(tau_type<node>()), family(nat_type<node>()),
+		family(untyped_type<node>()) };
+	return std::ranges::find(reserved, name) != reserved.end();
+}
+
+template <NodeType node>
+bool pack_owns_ba_type_name(const std::string& name) {
+	if (is_reserved_ba_type_name<node>(name)) return true;
+	for (const auto& n : node::ba::type_names())
+		if (n == name) return true;
+	return false;
+}
+
+// The type tree is 'typed(type(family)[, subtype])'; only the family name
+// (e.g. "bv" for bv[8]) is compared against the pack's owned types.
+template <NodeType node>
+bool pack_owns_ba_type(size_t ba_type_id) {
+	using tau = tree<node>;
+	if (is_reserved_ba_type<node>(ba_type_id)) return true;
+	return pack_owns_ba_type_name<node>(
+		tau::get(ba_types<node>::type_tree(ba_type_id))[0].get_string());
 }
 
 template <NodeType node>

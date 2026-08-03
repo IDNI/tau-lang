@@ -217,6 +217,22 @@ bool is_untyped_tref(tref t);
 template <NodeType node>
 size_t get_effective_ba_type(tref t);
 
+/** @brief Whether @p ba_type_id is one of the type ids core reserves for itself, which no BA owns. */
+template <NodeType node>
+bool is_reserved_ba_type(size_t ba_type_id);
+
+/** @brief Whether @p name names one of the type trees core reserves for itself. */
+template <NodeType node>
+bool is_reserved_ba_type_name(const std::string& name);
+
+/** @brief Whether @p name is a reserved type or a family name (e.g. "bv" for `bv[8]`) the configured pack owns. */
+template <NodeType node>
+bool pack_owns_ba_type_name(const std::string& name);
+
+/** @brief Whether @p ba_type_id is reserved or owned by the configured pack, compared by family name. */
+template <NodeType node>
+bool pack_owns_ba_type(size_t ba_type_id);
+
 /** @brief Search @p term and its children for any assigned BA type id; return 0 if not found. */
 template <NodeType node>
 size_t find_ba_type (tref term);
