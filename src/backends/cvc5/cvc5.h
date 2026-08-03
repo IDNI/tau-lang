@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__CVC5_H__
-#define __IDNI__TAU__BOOLEAN_ALGEBRAS__CVC5_H__
+#ifndef __IDNI__TAU__BACKENDS__CVC5_H__
+#define __IDNI__TAU__BACKENDS__CVC5_H__
 
 #include <cvc5/cvc5.h>
 
@@ -94,8 +94,8 @@ inline cvc5::Term operator>>(const cvc5::Term& lhs, const cvc5::Term& rhs);
 
 
 
-#include "boolean_algebras/cvc5/cvc5_helpers.tmpl.h"
-#include "boolean_algebras/cvc5/cvc5_builders.tmpl.h"
-#include "boolean_algebras/cvc5/cvc5.tmpl.h"
+#include "backends/cvc5/cvc5_helpers.tmpl.h"
+#include "backends/cvc5/cvc5_builders.tmpl.h"
+#include "backends/cvc5/cvc5.tmpl.h"
 
-#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__CVC5_H__
+#endif // __IDNI__TAU__BACKENDS__CVC5_H__

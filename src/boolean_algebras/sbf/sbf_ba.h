@@ -12,7 +12,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF__SBF_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF__SBF_BA_H__
 
-#include "boolean_algebras/bdds/bdd_handle.h"
+#include "backends/bdds/bdd_handle.h"
 #include "tau_tree.h"
 
 namespace idni::tau_lang {

@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
+#include "backends/bdds/bdd_handle.h"
 #include "boolean_algebras/sbf/sbf_ba.h"
 
 TEST_SUITE("operator==") {

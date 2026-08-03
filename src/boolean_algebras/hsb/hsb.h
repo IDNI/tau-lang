@@ -18,7 +18,7 @@
 
 #include "tau_tree.h"
 #include "splitter_types.h"
-#include "boolean_algebras/cvc5/cvc5.h"
+#include "backends/cvc5/cvc5.h"
 #include "boolean_algebras/hsb/hsb_node.h"
 
 namespace idni::tau_lang {

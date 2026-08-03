@@ -6,8 +6,8 @@ set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 # only #include "tau.h". TAU_HEADERS stays the full list for dependency tracking.
 set(TAU_CORE_HEADERS
 	../parser/tau_parser.generated.h
-	boolean_algebras/bdds/babdd.h
-	boolean_algebras/bdds/bdd_handle.h
+	backends/bdds/babdd.h
+	backends/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h	# described but not a TAU_BAS entry
 	boolean_algebras/variant_ba.h
 	boolean_algebras/nso_ba.h
@@ -71,7 +71,7 @@ set(TAU_SOURCES
 	${TAU_PARSER_SOURCES}
 	${TAU_BA_SOURCES_EXTRA}
 	boolean_algebras/bool_ba.cpp
-	boolean_algebras/bdds/var_dict.cpp
+	backends/bdds/var_dict.cpp
 	instantiate_test_pack.cpp
 )
 

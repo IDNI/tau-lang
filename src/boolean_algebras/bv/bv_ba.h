@@ -38,7 +38,7 @@
 
 #include <cvc5/cvc5.h>
 
-#include "boolean_algebras/cvc5/cvc5.h"
+#include "backends/cvc5/cvc5.h"
 #include "boolean_algebras/ba_pack_traits.h"
 #include "tau_tree.h"
 #include "splitter_types.h"

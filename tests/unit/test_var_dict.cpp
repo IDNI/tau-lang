@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #include "test_init.h"
-#include "boolean_algebras/bdds/var_dict.h"
+#include "backends/bdds/var_dict.h"
 
 using namespace idni::tau_lang;
 

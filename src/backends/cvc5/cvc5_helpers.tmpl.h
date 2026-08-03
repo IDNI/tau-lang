@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#include "boolean_algebras/cvc5/cvc5.h" // Only for IDE resolution, not really needed.
+#include "backends/cvc5/cvc5.h" // Only for IDE resolution, not really needed.
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "cvc5"

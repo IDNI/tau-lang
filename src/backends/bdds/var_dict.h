@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__VAR_DICT_H__
-#define __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__VAR_DICT_H__
+#ifndef __IDNI__TAU__BACKENDS__BDDS__VAR_DICT_H__
+#define __IDNI__TAU__BACKENDS__BDDS__VAR_DICT_H__
 
 #include <string>
 
@@ -18,4 +18,4 @@ bool has(sym_t);
 
 } // namespace idni::tau_lang
 
-#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__VAR_DICT_H__
+#endif // __IDNI__TAU__BACKENDS__BDDS__VAR_DICT_H__

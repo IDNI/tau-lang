@@ -93,13 +93,23 @@ The core abstraction. Every BA is a plugin in its own directory:
   like the rest but not a `TAU_BAS` entry, since packs such as
   `node<bv, Bool>` still need it
 - `nso_ba.h` — non-deterministic string operations
-- `bdds/` — BDD-based operations underlying several BAs
-- `cvc5/` — CVC5 SMT solver integration for bitvector theory
 
 What remains flat in `src/boolean_algebras/` is not a BA plugin: the descriptor
 interface (`ba_descriptor.h`, `ba_pack_traits.h`), `bool_ba.h` and its
 descriptor, and the `nso_ba` / `variant_ba` / `product_ba` combinators. Include
 a BA as `boolean_algebras/<id>/<id>[_ba].h` — the flat `<id>.h` paths are gone.
+
+### Backends (`src/backends/`)
+
+What algebras stand on, and no algebra itself — no manifest, no descriptor, no
+`TAU_BAS` id:
+- `bdds/` — the BDD library sbf is built on, plus `var_dict`, its variable
+  symbol table; core's `tau_bdd.h` uses it directly, so it is in `tau.h`
+- `cvc5/` — the CVC5 wrapper bv and hsb share; deliberately **out** of `tau.h`,
+  so an out-of-tree BA needs no CVC5 headers to include it
+
+A backend is compiled and linked only when a pack member asks for it, through
+that BA's `TAU_BA_REQUIRES_PACKAGES` / `TAU_BA_LINK_LIBS`.
 
 The BAs of a build are its **pack**, chosen at configure time with
 `-DTAU_BAS=` (default `tau,qint,qlt,nlang,bv,sbf,hsb`). `cmake/tau_bas.cmake`

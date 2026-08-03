@@ -17,7 +17,7 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 #include "boolean_algebras/variant_ba.h"
-#include "boolean_algebras/cvc5/cvc5.h"
+#include "backends/cvc5/cvc5.h"
 
 namespace {
 

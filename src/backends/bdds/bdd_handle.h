@@ -1,10 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
-#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BDD_HANDLE_H__
-#define __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BDD_HANDLE_H__
+#ifndef __IDNI__TAU__BACKENDS__BDDS__BDD_HANDLE_H__
+#define __IDNI__TAU__BACKENDS__BDDS__BDD_HANDLE_H__
 
-#include "boolean_algebras/bdds/babdd.h"
-#include "boolean_algebras/bdds/var_dict.h"
+#include "backends/bdds/babdd.h"
+#include "backends/bdds/var_dict.h"
 #include "splitter_types.h"
 
 namespace idni::tau_lang {
