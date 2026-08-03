@@ -111,6 +111,42 @@ std::vector<std::string> base_ba_dispatcher<BAs...>::types() {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
+constexpr std::array<std::string_view, sizeof...(BAs)>
+base_ba_dispatcher<BAs...>::type_names() {
+	return { std::string_view(ba_descriptor<BAs, node_t>::type_name)... };
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+consteval std::size_t base_ba_dispatcher<BAs...>::types_joined_length() {
+	constexpr auto names = type_names();
+	std::size_t total = 0;
+	for (std::size_t i = 0; i < names.size(); ++i) {
+		total += names[i].size();
+		if (i) total += 2; // ", " separator before every name but the first
+	}
+	return total;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+constexpr std::string_view base_ba_dispatcher<BAs...>::types_joined() {
+	constexpr std::size_t n = types_joined_length();
+	static constexpr std::array<char, n> chars = [] {
+		constexpr auto names = type_names();
+		std::array<char, n> buf{};
+		std::size_t pos = 0;
+		for (std::size_t i = 0; i < names.size(); ++i) {
+			if (i) { buf[pos++] = ','; buf[pos++] = ' '; }
+			for (char c : names[i]) buf[pos++] = c;
+		}
+		return buf;
+	}();
+	return std::string_view(chars.data(), chars.size());
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref base_ba_dispatcher<BAs...>::default_type() {
 	return detail::default_type_for_pack<BAs...>();
 }

@@ -16,6 +16,9 @@
 // includes because its parse() names parse_bool defined there, needs Bool. The
 // concrete BAs of a pack arrive with whoever spells the pack -- tau_pack.h
 // includes each configured BA's header -- so this file names none of them.
+#include <array>
+#include <string_view>
+
 #include "boolean_algebras/ba_descriptor.h"
 #include "boolean_algebras/ba_pack_traits.h"
 #include "boolean_algebras/bool_ba.h"
@@ -81,6 +84,25 @@ struct base_ba_dispatcher {
 	 * @return Vector of type names as strings.
 	 */
 	static std::vector<std::string> types();
+
+	/**
+	 * @brief Returns the supported Boolean algebra type names as compile-time
+	 * string views, in pack order.
+	 */
+	static constexpr std::array<std::string_view, sizeof...(BAs)> type_names();
+
+	/**
+	 * @brief Total length of the comma-joined type name list (no separator
+	 * after the last name, no null terminator).
+	 */
+	static consteval std::size_t types_joined_length();
+
+	/**
+	 * @brief Returns the supported Boolean algebra type names as one
+	 * comma-joined string, e.g. "tau, qint, qlt, nlang, bv, sbf, hsb".
+	 * @return A view over a static constexpr character array.
+	 */
+	static constexpr std::string_view types_joined();
 
 	/**
 	 * @brief Returns the default type reference for the Boolean algebra.
