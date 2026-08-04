@@ -66,7 +66,12 @@ namespace idni::tau_lang {
 /** @brief Identifiers for configurable REPL options. */
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	colors_opt, charvar_opt, blasting_opt, highlighting_opt, indenting_opt,
-	print_benchmarks_opt, debug_opt };
+	print_benchmarks_opt, debug_opt,
+	// Numeric, unlike every option above: they take a count, not a flag, so
+	// enable/disable/toggle do not apply to them. Full names only -- the
+	// single-letter space is exhausted (see the RE-1 note at the name
+	// lookup: "b" is benchmarks and "B" is blasting).
+	block_max_splits_opt, block_max_rounds_opt };
 
 /**
  * @brief REPL evaluator for the Tau interactive shell.
@@ -100,6 +105,12 @@ struct repl_evaluator {
 		bool blasting            = true;  ///< Enable bitvector predicate blasting.
 		bool repl_running 	 = true;  ///< Whether the REPL loop is active.
 		bool print_benchmarks    = true;  ///< Print timing benchmarks.
+		/// Per-block Boole-decomposition split budget; see
+		/// `block_boole_max_splits`. Mirrors the library global so `get`
+		/// can report what was set through the REPL.
+		size_t block_max_splits  = 512;
+		/// Anti-prenex driver round cap; see `block_max_rounds`.
+		size_t block_max_rounds  = 1000;
 #ifdef DEBUG
 		bool debug_repl          = true;
 		boost::log::trivial::severity_level

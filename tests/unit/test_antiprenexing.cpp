@@ -1417,3 +1417,29 @@ TEST_SUITE("CanonicalQuantifierIds") {
 		}
 	}
 }
+
+// The two resource limits the block algorithm charges. Both are runtime
+// parameters rather than header constants, per the project's standing policy;
+// `bv_blasting` (heuristics/bv_predicate_blasting.h) is the precedent.
+TEST_SUITE("BlockLimits") {
+
+	TEST_CASE("exhausting the split budget keeps quantifiers and does not hang") {
+		// With a budget of 1 the core cannot finish the decomposition.
+		// The contract is: keep the quantifiers, log, return -- never
+		// hang, and never claim an answer it did not compute.
+		const size_t saved = block_boole_max_splits;
+		block_boole_max_splits = 1;
+		const char* sample =
+			"ex x, y, z ((x a = 0 || y b = 0) && (z c = 0 || x d = 0)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = anti_prenex<node_t>(fm);
+		block_boole_max_splits = saved;
+		CHECK( res != nullptr );
+		CHECK( !tau::get(res).equals_F() );
+	}
+
+	TEST_CASE("the limits are at their documented defaults") {
+		CHECK( block_boole_max_splits == 512 );
+		CHECK( block_max_rounds == 1000 );
+	}
+}

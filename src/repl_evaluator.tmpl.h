@@ -786,6 +786,17 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "benchmarking")      return print_benchmarks_opt;
 	if (x == "d" || x == "debug"
 		|| x == "dbg")               return debug_opt;
+	// Full names only: every single letter that would fit is taken (see
+	// RE-1 above). These two are numeric options, not flags.
+	//
+	// No underscore in the spelling: the grammar has
+	// `option_name => alnum+` (parser/tau.tgf:231), so `block_max_splits`
+	// does not even parse as an option name. Every existing option is a
+	// single alnum word for the same reason (`charvar`, `benchmarks`).
+	if (x == "maxsplits"
+		|| x == "blockmaxsplits")    return block_max_splits_opt;
+	if (x == "maxrounds"
+		|| x == "blockmaxrounds")    return block_max_rounds_opt;
 	TAU_LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
@@ -843,7 +854,14 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	{ severity_opt,     [this]() {
 		std::cout << "severity:            " << opt.severity << "\n"; } },
 	{ print_benchmarks_opt, [this]() {
-		std::cout << "benchmarks:          " << pbool[opt.print_benchmarks] << "\n"; } }
+		std::cout << "benchmarks:          " << pbool[opt.print_benchmarks] << "\n"; } },
+	// Read from the library globals, not from `opt`: they are what the
+	// algorithm actually consults, and a caller using the api setters
+	// directly would otherwise be misreported here.
+	{ block_max_splits_opt, []() {
+		std::cout << "maxsplits:           " << block_boole_max_splits << "\n"; } },
+	{ block_max_rounds_opt, []() {
+		std::cout << "maxrounds:           " << block_max_rounds << "\n"; } }
 	};
 	if (o == invalid_opt) return;
 #ifndef DEBUG
@@ -882,6 +900,26 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		return;
 	}
 #endif // DEBUG
+	// A positive count. Zero is rejected rather than accepted: both limits
+	// are budgets the algorithm decrements, and a budget of zero means
+	// "never do any work", which is not a tuning anyone wants by accident.
+	auto str2count = [&v](void) -> std::optional<size_t> {
+		size_t n = 0;
+		if (v.empty()) { TAU_LOG_ERROR << "Invalid value\n"; return {}; }
+		for (char c : v) {
+			if (c < '0' || c > '9') {
+				TAU_LOG_ERROR << "Invalid value: expected a "
+					"positive count\n";
+				return {};
+			}
+			n = n * 10 + static_cast<size_t>(c - '0');
+		}
+		if (n == 0) {
+			TAU_LOG_ERROR << "Invalid value: must be positive\n";
+			return {};
+		}
+		return n;
+	};
 	auto update_bool_value = [&v](bool& opt) {
 		if (v == "t" || v == "true" || v == "on" || v == "1"
 			|| v == "y" || v == "yes") opt = true;
@@ -919,6 +957,18 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		if (!sev.has_value()) return;
 		opt.severity = sev.value();
 		logging::set_filter(opt.severity);
+	} },
+	{ block_max_splits_opt, [&]() {
+		if (auto n = str2count(); n) {
+			opt.block_max_splits = *n;
+			api<node>::set_block_max_splits(*n);
+		}
+	} },
+	{ block_max_rounds_opt, [&]() {
+		if (auto n = str2count(); n) {
+			opt.block_max_rounds = *n;
+			api<node>::set_block_max_rounds(*n);
+		}
 	} } };
 	setters[o]();
 }
@@ -958,6 +1008,11 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case indenting_opt:        update_fn(pretty_printer_indenting); break;
 	case status_opt:           update_fn(opt.status); break;
 	case print_benchmarks_opt: update_fn(opt.print_benchmarks); break;
+	case block_max_splits_opt:
+	case block_max_rounds_opt:
+		TAU_LOG_ERROR << "This option takes a count, not a flag: use "
+			"`set <option> <n>`\n", error = true;
+		return;
 	default: TAU_LOG_ERROR << "Invalid option\n", error = true; return;
 	}
 }

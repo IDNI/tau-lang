@@ -122,6 +122,23 @@ struct api {
 	static void set_charvar(bool state);
 	/** @brief Enable/disable BV blasting. */
 	static void set_blasting(bool state);
+	/**
+	 * @brief Set the per-block Boole-decomposition split budget.
+	 *
+	 * Bounds the Shannon splits ONE block elimination may charge, across its
+	 * whole recursion rather than along one path. Exhausting it costs
+	 * precision, not soundness: the elimination takes its graceful re-wrap
+	 * path and leaves the quantifier in place. Default 512.
+	 */
+	static void set_block_max_splits(size_t n);
+	/**
+	 * @brief Set the anti-prenex driver's maximum round count.
+	 *
+	 * Bounds how many times the driver re-collects innermost blocks before
+	 * giving up and returning the formula unprocessed, with a log line.
+	 * Default 1000; convergence is normally reached in well under 20.
+	 */
+	static void set_block_max_rounds(size_t n);
 	/** @brief Enable/disable indenting in pretty-printed output. */
 	static void set_indenting(bool state);
 	/** @brief Enable/disable ANSI colour highlighting in output. */

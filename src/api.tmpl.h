@@ -48,6 +48,16 @@ void api<node>::set_blasting(bool blasting) {
 }
 
 template <NodeType node>
+void api<node>::set_block_max_splits(size_t n) {
+	block_boole_max_splits = n;
+}
+
+template <NodeType node>
+void api<node>::set_block_max_rounds(size_t n) {
+	block_max_rounds = n;
+}
+
+template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
 	pretty_printer_indenting = indenting;
 }

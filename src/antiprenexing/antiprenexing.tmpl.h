@@ -432,7 +432,17 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 /// Exhausting it costs precision, not soundness: the caller's
 /// resolve_quantifiers2 -> resolve_quantifiers -> anti_prenex chain absorbs
 /// whatever is left unresolved.
-inline constexpr size_t block_boole_max_splits = 512;
+/// Runtime-tunable via `api::set_block_max_splits`. Resource limits belong in a
+/// runtime parameter, never a header constant -- `bv_blasting`
+/// (heuristics/bv_predicate_blasting.h) is the precedent. Like it, this is NOT
+/// thread-safe: the tau library assumes single-threaded access.
+inline size_t block_boole_max_splits = 512;
+
+/// Maximum rounds `process_quantifier_blocks` may take before giving up.
+/// Unconditional: the termination argument at its use site is subtle enough
+/// that a regression must fail loudly rather than hang Release forever.
+/// Runtime-tunable via `api::set_block_max_rounds`, same caveats as above.
+inline size_t block_max_rounds = 1000;
 
 /// TEMPORARY (removed together with the legacy algorithm): lets the suite be run
 /// with the legacy `anti_prenex` fallback disabled, to prove that partial clause
@@ -1579,7 +1589,9 @@ tref process_quantifier_blocks(tref fm, const std::function<bool(tref)>& skip,
 	// subtle enough that a regression in it must fail loudly rather than hang
 	// Release forever. The DBG assert stays so a Debug run stops at the
 	// offending formula instead of silently returning it unprocessed.
-	constexpr size_t max_rounds = 1000;
+	// Read once into a local: a caller retuning it mid-pass would otherwise
+	// move the goalposts between the assert and the comparison.
+	const size_t max_rounds = block_max_rounds;
 	size_t rounds = 0;
 	for (;;) {
 		DBG(assert(rounds < max_rounds
