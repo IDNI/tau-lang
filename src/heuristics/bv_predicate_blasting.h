@@ -31,7 +31,7 @@ namespace idni::tau_lang {
 // is given here, since a default cannot be redeclared and these call sites
 // always pass an explicit predicate.
 template<NodeType node>
-tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip);
+tref anti_prenex(tref formula, const std::function<bool(tref)>& skip);
 
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,

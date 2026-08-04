@@ -3,11 +3,9 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-// The entry point is anti_prenex_block, not the legacy anti_prenex: the
-// partition these cases exercise lives in eliminate_block_over_clause, which only
-// the block algorithm reaches (legacy anti_prenex goes through
-// treat_ex_quantified_clause and its own blocks_elimination guard, which Task 6
-// covers).
+// The partition these cases exercise lives in eliminate_block_over_clause,
+// reached through the block pipeline (`anti_prenex` since the legacy
+// algorithm's deletion).
 TEST_SUITE("partial clause elimination") {
 
 	TEST_CASE("a reference freezes only its own component") {
@@ -16,7 +14,7 @@ TEST_SUITE("partial clause elimination") {
 		// clause was kept with both binders intact.
 		const char* sample = "ex x, y (f(x) && y w = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex_block<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm);
 		// x's binder survives around f; y's does not survive anywhere.
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) );
 		// Exactly one existential binder is left.
@@ -29,7 +27,7 @@ TEST_SUITE("partial clause elimination") {
 		// what it was.
 		const char* sample = "ex x, y (f(x) && x y = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex_block<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm);
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ref>) );
 		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}
@@ -37,7 +35,7 @@ TEST_SUITE("partial clause elimination") {
 	TEST_CASE("a reference-free clause is unaffected") {
 		const char* sample = "ex x, y (x w = 0 && y w = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
-		tref res = anti_prenex_block<node_t>(fm);
+		tref res = anti_prenex<node_t>(fm);
 		CHECK( !tau::get(res).find_top(is<node_t, tau::wff_ex>) );
 	}
 }

@@ -36,7 +36,7 @@ namespace idni::tau_lang {
 // argument here -- a default cannot be redeclared, and that call site always
 // passes an explicit predicate.
 template<NodeType node>
-tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip);
+tref anti_prenex(tref formula, const std::function<bool(tref)>& skip);
 
 /**
  * @brief Eliminate @p block over the single clause @p clause.

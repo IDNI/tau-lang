@@ -341,7 +341,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 			tref ex_fm = tau::build_wff_ex(v, scoped, false);
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 				blasted && blasted != ex_fm)
-				return with_kept(anti_prenex_block<node>(blasted,
+				return with_kept(anti_prenex<node>(blasted,
 					is_tref_bv_type_family<node>));
 		}
 		// Not resolvable: keep this binder around the scoped part.

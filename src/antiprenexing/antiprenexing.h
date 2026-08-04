@@ -27,9 +27,9 @@
 #include <functional>
 
 #include "tau_tree.h"
-// For collect_used_ref_variables: treat_ex_quantified_clause needs to know
-// whether the variable it is about to eliminate is entangled with an
-// unresolved predicate reference. Self-contained (tau_tree/union_find/ba_types
+// For collect_used_ref_variables (historically used by the deleted
+// treat_ex_quantified_clause; still used by make_ref_variables_skip's
+// callers in the normalizer). Self-contained (tau_tree/union_find/ba_types
 // only), so it introduces no cycle with the block headers below.
 #include "ref_variables_resolver.h"
 #include "block_atom_profile.h"
@@ -39,27 +39,22 @@
 namespace idni::tau_lang {
 
 /**
- * @brief Apply the legacy, per-quantifier anti-prenex transformation.
+ * @brief The anti-prenex pipeline: push every quantifier as far inward as
+ * possible, eliminating what can be eliminated on the way.
  *
- * Walks @p formula bottom-up and, at every existentially quantified
- * subformula, alternates `push_existential_quantifier_one` (distribute the
- * binder over the connective below it) with `ex_quantified_boole_decomposition`
- * (split on one atomic formula) until the binder can no longer be moved or
- * split; a clause is then handed to `treat_ex_quantified_clause`, which may
- * remove it outright. Universal quantifiers are dualized by the surrounding
- * NNF machinery, not here.
+ * NNF + syntactic simplification, substitution-based elimination, canonical
+ * operator normalization, then maximal-block elimination
+ * (`process_quantifier_blocks`), with quantifier ids canonicalised at entry
+ * and exit. The two-argument overload takes a `skip` predicate marking
+ * content this pass must not Boole-decompose (bitvector content headed for
+ * the solver or blasting, reference-entangled variables); the one-argument
+ * overload uses `is_tref_bv_type_family`.
  *
- * This is *not* the block-based algorithm. `anti_prenex_block` collects maximal
- * same-kind quantifier blocks and applies the chapter-5 fast paths to each, and
- * that is what the normalizer pipeline calls; `anti_prenex` is the fallback
- * `resolve_ex_block` reaches for when a block survives its own elimination.
- * Neither `anti_prenex` nor `resolve_quantifiers` accepts a `skip` predicate,
- * so content a caller reserved for blasting or the solver is protected on this
- * path only by the internal checks of the eliminators themselves.
- *
- * Inputs pass through `syntactic_formula_simplification` (whose last step is
- * `to_nnf`) before each elimination step, so a negated equation reaches the
- * eliminators as `bf_neq` rather than as `wff_neg` over `bf_eq`.
+ * Until 2026-08-04 this name belonged to a step-based, per-quantifier
+ * algorithm, and the block pipeline lived at `anti_prenex_block`; the legacy
+ * algorithm was deleted once both full suites passed without it, and the
+ * pipeline took the name. The block *core* -- the 5..8-argument recursion --
+ * still goes by `anti_prenex_block`.
  * @tparam node Tree node type.
  * @param formula Formula to anti-prenex.
  * @return Formula with quantifiers pushed in as far as possible.
@@ -80,37 +75,15 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref anti_prenex(tref formula);
 
-/**
- * @brief Eliminate the binder of a single existentially quantified clause.
- *
- * Applies Corollary 2.3 of the Taba book once (it does not loop, and it never
- * calls `ex_quantified_boole_decomposition`): the clause's conjuncts are split
- * into those mentioning the bound variable and those that do not, the latter
- * being lifted out; a substitution-based witness is tried first
- * (`ex_subs_based_elimination`); bitvector content goes to the solver or to
- * predicate blasting; otherwise the positive equations are squeezed into a
- * single term `f` (`squeeze_positives`) and the binder removed via
- * `f[x<-0] & f[x<-1] = 0`, conjoined with the surviving disequations. The
- * repetition lives in `anti_prenex`'s own loop, not here.
- *
- * A conjunct that mentions the bound variable but still holds a quantifier or
- * an unresolved `wff_ref` blocks elimination: its equations are not top-level
- * conjuncts of this clause, so squeezing them would drop the inner binder and
- * leak its variable free.
- *
- * @pre The clause must be in NNF, i.e. a negated equation appears as `bf_neq`
- * and never as `wff_neg` over `bf_eq`. `squeeze_positives` selects `bf_eq`
- * atoms with `select_top`, which descends through `wff_neg`, so a `!(f = 0)`
- * conjunct would be squeezed as if it were positive and its negation silently
- * dropped. Note this is the *opposite* of `eliminate_block_over_clause`'s
- * precondition, which requires no `bf_neq` at all.
- * @tparam node Tree node type.
- * @param ex_clause An existentially quantified formula (a single clause).
- * @param[out] quant_eliminated Set to `true` if the quantifier was removed.
- * @return Simplified (possibly quantifier-free) formula.
- */
+/** @brief The pipeline with an explicit `skip` predicate; see above. */
+// Note: no default argument for `skip` here -- function templates cannot
+// gain a default argument in a later declaration once an earlier one (the
+// forward declaration in heuristics/bv_predicate_blasting.h, included before
+// this header via normal_forms_transformations.h) exists without one. The
+// one-argument overload above plays the role of the default, calling through
+// with is_tref_bv_type_family<node>.
 template <NodeType node>
-tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
+tref anti_prenex(tref formula, const std::function<bool(tref)>& skip);
 
 /**
  * @brief Decide or blast bitvector-typed quantifier scopes.
@@ -125,7 +98,7 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated);
  *
  * Quantifiers over any other type are left untouched: this function neither
  * pushes quantifiers inward nor performs Boole decomposition. Those are
- * `push_quantifiers_in` and `anti_prenex` / `anti_prenex_block`.
+ * `anti_prenex`'s job.
  * @tparam node Tree node type.
  * @param formula Formula containing quantifiers to resolve.
  * @return Formula with bitvector-typed scopes decided or blasted where
@@ -135,8 +108,8 @@ template<NodeType node>
 tref resolve_quantifiers(tref formula);
 
 /**
- * @brief Skip predicate that skips nothing; suitable as `anti_prenex_block`'s
- * `skip` argument when no content should be deferred to blasting.
+ * @brief Skip predicate that skips nothing; suitable as a `skip` argument for
+ * the block machinery when no content should be deferred to blasting.
  * @tparam node Tree node type.
  * @param t tref (unused).
  * @return Always `false`.
@@ -144,17 +117,6 @@ tref resolve_quantifiers(tref formula);
 template <NodeType node>
 bool no_skip(tref t);
 
-// Note: no default argument for `skip` here -- function templates cannot
-// gain a default argument in a later declaration once an earlier one (the
-// forward declaration in heuristics/bv_predicate_blasting.h, included before
-// this header via normal_forms_transformations.h) exists without one. The
-// single-argument overload below plays the role of the default, calling
-// through with is_tref_bv_type_family<node>.
-template <NodeType node>
-tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip);
-
-template <NodeType node>
-tref anti_prenex_block(tref formula);
 
 } // namespace idni::tau_lang
 

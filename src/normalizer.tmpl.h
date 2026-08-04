@@ -181,7 +181,7 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// the `skip` predicate. Collapsing needs those rewired to the analysis
 	// first (the plan's own Task 9 step 2), not merely one call deleted.
 	auto ref_skip = make_ref_variables_skip<node>(form);
-	form = anti_prenex_block<node>(form, [ref_skip](tref n) {
+	form = anti_prenex<node>(form, [ref_skip](tref n) {
 		return is_tref_bv_type_family<node>(n) || ref_skip(n);
 	});
 	form = resolve_quantifiers<node>(form);
@@ -226,7 +226,7 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// genuinely unsupported bv arithmetic out of it, and the atom counts in a
 	// mixed formula are the spec's own, not blasting's per-bit residue.
 	const bool bv_is_solver_owned = !has_foreign_ba_constant<node>(form);
-	form = anti_prenex_block<node>(form,
+	form = anti_prenex<node>(form,
 		[arith_skip, ref_skip_2, bv_is_solver_owned](tref n)
 	{
 		return (bv_is_solver_owned && is_tref_bv_type_family<node>(n))

@@ -20,21 +20,10 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-// Both public entries are pinned in every case. Neither fails today: the
-// collapse is latent, reachable only once the two paths share one leaf
-// handler. These are the guard rails for that merge, not red tests -- they
-// pass before it and must keep passing after.
+// These were written against BOTH public entry points while the legacy
+// step-based algorithm still existed; since its deletion there is one entry,
+// the block pipeline, which now carries the `anti_prenex` name.
 namespace {
-
-// The two public entry points into quantifier elimination. `anti_prenex` is
-// the legacy step-based algorithm, `anti_prenex_block` the block one; the
-// merged leaf handler is reached through both.
-tref by_legacy(tref fm) { return anti_prenex<node_t>(fm); }
-tref by_block(tref fm)  { return anti_prenex_block<node_t>(fm); }
-
-using entry = tref (*)(tref);
-const std::pair<const char*, entry> entries[] = {
-	{ "anti_prenex", by_legacy }, { "anti_prenex_block", by_block } };
 
 tref parse(const char* sample) {
 	return get_nso_rr(sample).value().main->get();
@@ -46,8 +35,8 @@ TEST_SUITE("leaf_clause") {
 
 	// The hazard reached through the single-variable path.
 	TEST_CASE("a disequation is not silently dropped, single variable") {
-		for (const auto& [name, run] : entries) {
-			CAPTURE(name);
+		{
+			auto run = [](tref f) { return anti_prenex<node_t>(f); };
 			CHECK( !tau::get(run(parse(
 				"ex x (x a = 0 && !(x b = 0))."))).equals_T() );
 		}
@@ -56,8 +45,8 @@ TEST_SUITE("leaf_clause") {
 	// The same hazard reached through the block path, which has the
 	// opposite precondition.
 	TEST_CASE("a disequation is not silently dropped, block") {
-		for (const auto& [name, run] : entries) {
-			CAPTURE(name);
+		{
+			auto run = [](tref f) { return anti_prenex<node_t>(f); };
 			CHECK( !tau::get(run(parse(
 				"ex x, y (x y a = 0 && !(x y b = 0))."))).equals_T() );
 		}
@@ -65,8 +54,8 @@ TEST_SUITE("leaf_clause") {
 
 	// Both spellings of the same disequation must reach the same answer.
 	TEST_CASE("the bf_neq spelling gives the same answer as !(= 0)") {
-		for (const auto& [name, run] : entries) {
-			CAPTURE(name);
+		{
+			auto run = [](tref f) { return anti_prenex<node_t>(f); };
 			tref a = run(parse("ex x (x a = 0 && x b != 0)."));
 			tref b = run(parse("ex x (x a = 0 && !(x b = 0))."));
 			CHECK( tau::get(a) == tau::get(b) );
@@ -76,8 +65,8 @@ TEST_SUITE("leaf_clause") {
 	// A conjunct free of every block variable does not belong under the
 	// binder, and the binder itself is fully eliminable here.
 	TEST_CASE("an independent conjunct is lifted out of the binder") {
-		for (const auto& [name, run] : entries) {
-			CAPTURE(name);
+		{
+			auto run = [](tref f) { return anti_prenex<node_t>(f); };
 			CHECK( !tau::get(run(parse("ex x (x a = 0 && w = 0).")))
 				.find_top(is<node_t, tau::wff_ex>) );
 		}

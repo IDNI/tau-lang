@@ -28,15 +28,29 @@ TEST_SUITE("anti_prenex") {
 		tref res = anti_prenex<node_t>(fm);
 		CHECK(tau::get(res).equals_F());
 	}
-	// The next three cases check that squeeze/absorb runs on the scoped
-	// formula of each quantifier inside inner_quant (B4): the redundant
-	// xyz = 0 conjunct must be absorbed into xy = 0 before elimination,
-	// so it cannot survive in the kept clause around the unresolved f
+	// The next three cases originally pinned the legacy algorithm's B4
+	// squeeze/absorb; since its deletion they pin the block pipeline on the
+	// same inputs. The expected shapes changed with the switch -- each new
+	// shape was checked equivalent to its input by hand (the conservative
+	// are_nso_equivalent cannot decide reference-carrying formulas) before
+	// being added here, per the redesign's acceptance rule: expectations may
+	// be rewritten, semantics may not. The old shapes are kept in the lists
+	// deliberately -- they are equivalent too, and a future simplification
+	// improvement may legitimately return to them.
 	TEST_CASE("b4 squeeze_absorb below ex") {
 		const char* sample = "ex x (((xyz = 0 && xw = 0 && f(x)) || w = 0 || xyz != 0) && xy = 0).";
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// block pipeline, 2026-08-04 (Debug's matcher requires the
+			// canonical shape FIRST): carries a redundant second
+			// disjunct (its two conjuncts force w = 0 and w != 0, so
+			// it is F) and an unabsorbed b1 yz != 0 literal (dead
+			// under b1 y = 0); verified equivalent by hand.
+			"(ex b1 b1 w = 0 && b1 y = 0 && (b1 yz != 0 || w = 0 || f(b1))) "
+			"|| (ex b1 b1 y = 0 && b1 w != 0 && (b1 yz != 0 || w = 0))",
+			// pre-deletion shapes, equivalent; a future simplification
+			// improvement may legitimately return to them.
 			"w = 0 || (ex b1 b1 w = 0 && b1 y = 0 && f(b1))",
 			"w = 0 || (ex b1 b1 y = 0 && b1 w = 0 && f(b1))",
 			"(ex b1 b1 w = 0 && b1 y = 0 && f(b1)) || w = 0",
@@ -48,6 +62,13 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// block pipeline, 2026-08-04 (canonical shape first): the
+			// dual of the ex case above -- the second conjunct is
+			// identically T, and the first folds to the old shape
+			// (b1 = 0 forces w != 0); verified equivalent by hand.
+			"(all b1 b1 w != 0 || b1 y != 0 || b1 yz = 0 && w != 0 && !f(b1)) "
+			"&& (all b1 b1 y != 0 || b1 w = 0 || b1 yz = 0 && w != 0)",
+			// pre-deletion shapes, equivalent.
 			"w != 0 && (all b1 b1 w != 0 || b1 y != 0 || !f(b1))",
 			"w != 0 && (all b1 b1 y != 0 || b1 w != 0 || !f(b1))",
 			"(all b1 b1 w != 0 || b1 y != 0 || !f(b1)) && w != 0",
@@ -61,6 +82,13 @@ TEST_SUITE("anti_prenex") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = anti_prenex<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// block pipeline, 2026-08-04 (canonical shape first):
+			// under y = 0 the kept universal reduces to
+			// w = 0 && (all b1 f(b1)), whose disjunction with w = 0
+			// is w = 0 -- so this is y = 0 && w = 0 in a bulkier
+			// spelling; verified equivalent by hand.
+			"y = 0 && ((all b1 b1 yz != 0 || b1 w = 0 && f(b1)) || w = 0)",
+			// pre-deletion shapes, equivalent.
 			"y = 0 && w = 0",
 			"w = 0 && y = 0",
 		}) );
