@@ -263,9 +263,23 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// it is satisfiable. Bisected to the leaf_clause extraction commit, and
 	// pinned by disabling exactly this loop -- nothing else in the module
 	// changes the answer, and every individual substitution it performs
-	// looks correct in isolation, so the fault is in applying it to the
-	// FREE part of an already-partitioned clause rather than to a whole
-	// existential scope.
+	// looks correct in isolation.
+	//
+	// Refined 2026-08-04: the loop is probably not unsound BY ITSELF. The
+	// partition invariant it would need does hold -- instrumented over the
+	// repro, no live variable ever occurs in a kept conjunct or in the
+	// lifted independent part, so substituting inside `scoped` alone is
+	// legitimate. What the loop does is REDUCE the clause enough for the
+	// squeeze below to fire, and it is that squeeze on a substituted clause
+	// that produces the wrong answer. Re-adding the loop therefore needs
+	// the squeeze audited first, not just a better-placed substitution.
+	//
+	// Removing it costs completeness, and the cost is visible: with the
+	// legacy fallback off, `test_integration-interpreter` goes back to
+	// diverging (1500 s timeout) and satisfiability2 to ~327 s, because
+	// blocks this loop used to discharge now survive and multiply across
+	// driver rounds. Soundness first: a surviving quantifier is a bounded
+	// loss, a wrong F is not.
 	//
 	// Nothing is lost by dropping it: `anti_prenex_block`'s pipeline
 	// already runs `ex_subs_based_elimination` over the whole formula at
