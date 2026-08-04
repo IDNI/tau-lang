@@ -1277,20 +1277,33 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	//
 	// Only adopt the result when ALL block variables were eliminated
 	// (trivial_skolem_ex then returns the bare matrix, with no
-	// re-quantification at all). If any variable survives,
-	// trivial_skolem_ex re-wraps survivors via build_wff_ex_many, which
-	// renames every surviving bound variable -- and that renaming is not
-	// capture-safe against variables already free in the body (observed
-	// to corrupt formulas containing leftover synthetic "bN"-named
-	// witnesses from earlier quantifier elimination in this same
-	// pipeline), so any such partial result is discarded here and the
-	// block falls through to the existing pipeline unchanged.
+	// re-quantification at all).
+	//
+	// The redesign plan's Task 7 proposed adopting a *partial* result too,
+	// on the reading that the discard existed solely to dodge
+	// build_wff_ex_many's capture-unsafe rename of survivors, and that
+	// canonical ids (step 0 of the pipeline) had made that rename moot.
+	// Measured 2026-08-04, both halves of that turned out wrong:
+	//
+	//  - `if (simplified != body) return wrap_skipped(simplified);`, the
+	//    plan's exact replacement, fails four tests. There is a SECOND
+	//    reason for the discard the plan did not account for: returning a
+	//    partial result short-circuits the rest of this function, which is
+	//    what would have eliminated the survivors. Adopting it trades a
+	//    fully eliminated block for a partly eliminated one.
+	//  - Continuing from the simplified body instead of returning it does
+	//    keep the suite green -- and never once fires. Instrumented across
+	//    test_antiprenexing, test_leaf_clause, satisfiability1,
+	//    wff_normalization and splitter, trivial_skolem_ex returned a
+	//    partial result exactly zero times. There is nothing here to adopt.
+	//
+	// So the discard stays. Do not "fix" it without an input that actually
+	// produces a partial trivial-Skolem result.
 	if (is_ex) {
 		tref simplified = trivial_skolem_ex<node>(block_vars,
 			normalize_atomic_formula_operators<node>(body));
-		if (!is_child<node>(simplified, tau::wff_ex)) {
+		if (!is_child<node>(simplified, tau::wff_ex))
 			return wrap_skipped(simplified);
-		}
 	}
 
 	// Build BDD variable order (innermost = lowest index = highest priority).
@@ -1680,6 +1693,20 @@ tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip) {
 	// below can introduce a foreign BA constant that is not already there.
 	const bool ctx_bv_is_solver_owned = !has_foreign_ba_constant<node>(formula);
 
+	// Step 0: canonicalise quantifier ids once, here, so nothing below has
+	// to rename. Every binder this pass builds therefore passes
+	// `calculate_quant_id = false`, which also stops `find_biggest_quant_id`
+	// -- a full pre_order walk -- from running once per binder built, which
+	// is quadratic in nesting depth in the split-heavy core.
+	//
+	// `canonize_quantifier_ids` maintains a *stack* per original variable,
+	// so shadowing is handled correctly; `build_wff_ex_many`'s flat rename
+	// map is not, which is what made a partial trivial-Skolem result unsafe
+	// to adopt before this. Ids are NOT used as a memo key anywhere -- two
+	// formulas differing only in binder names are genuinely the same
+	// formula here, but nothing relies on that.
+	formula = canonize_quantifier_ids<node>(formula);
+
 	// Step 1: NNF + syntactic simplification
 	formula = to_nnf<node>(formula);
 	formula = syntactic_formula_simplification<node>(formula);
@@ -1703,7 +1730,13 @@ tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip) {
 	// by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
 	formula = process_quantifier_blocks<node>(formula, skip,
 		ctx_bv_is_solver_owned);
-	return syntactic_formula_simplification<node>(formula);
+	// Step 5: canonicalise again on the way out. The pass builds binders
+	// with calculate_quant_id = false throughout, so ids inside the result
+	// are whatever entry assigned them plus whatever survived the rewriting;
+	// re-canonicalising restores the invariant callers outside this file
+	// (api.tmpl.h, tau_tree_from_parser.tmpl.h) already maintain.
+	return canonize_quantifier_ids<node>(
+		syntactic_formula_simplification<node>(formula));
 }
 
 

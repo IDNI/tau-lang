@@ -1384,3 +1384,36 @@ TEST_SUITE("AntiPrenexBlastingCache") {
 	}
 }
 #endif // TAU_CACHE
+
+// Quantifier ids are canonicalised once at pipeline entry and once at exit, and
+// every binder the pass builds runs with calculate_quant_id = false -- which
+// also stops find_biggest_quant_id, a full pre_order walk, from running once per
+// binder built.
+//
+// These pin that the renaming is invisible from outside: a block that mixes a
+// trivially eliminable variable with one frozen by a reference must come back
+// with exactly the frozen binder, through both entry points.
+//
+// The design's other id hazard -- a free variable named like a canonical id --
+// is not reachable from the surface syntax and so has no case here.
+// `canonize_quantifier_ids` renames a bound variable to the decimal string of
+// its id ("1", "2"), while the printer displays those as `b1`, `b2`; parsing
+// `b1` yields the distinct internal name "b1". Checked by hand:
+// `ex x (x a = 0) && b1 c = 0.` normalises to `b1 c = 0`, uncaptured.
+TEST_SUITE("CanonicalQuantifierIds") {
+
+	TEST_CASE("a frozen binder survives alone, under canonical ids") {
+		// x is trivially eliminable; y is frozen by the reference f.
+		// Exactly one binder survives, and the reference is intact.
+		const char* sample = "ex x, y (x = 0 && y w = 0 && f(y)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		for (tref res : { anti_prenex<node_t>(fm),
+			anti_prenex_block<node_t>(fm) })
+		{
+			CHECK( tau::get(res).select_top(
+				is<node_t, tau::wff_ex>).size() == 1 );
+			CHECK( tau::get(res).find_top(
+				is<node_t, tau::wff_ref>) );
+		}
+	}
+}
