@@ -255,69 +255,42 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	live = occurring_in(live, scoped);
 	if (live.empty()) return with_kept(scoped);
 
-	// NO substitution witness here, deliberately. Extracting this module
-	// added a per-live-variable `ex_subs_based_elimination` loop, on the
-	// reading that `treat_ex_quantified_clause` did the same. It does not
-	// belong in this position and it is UNSOUND here: with the legacy
-	// fallback off it makes the issue #70 step formula normalise to F when
-	// it is satisfiable. Bisected to the leaf_clause extraction commit, and
-	// pinned by disabling exactly this loop -- nothing else in the module
-	// changes the answer, and every individual substitution it performs
-	// looks correct in isolation.
+	// ---- A substitution witness, per live variable -----------------------
 	//
-	// Refined 2026-08-04: the loop is probably not unsound BY ITSELF. The
-	// partition invariant it would need does hold -- instrumented over the
-	// repro, no live variable ever occurs in a kept conjunct or in the
-	// lifted independent part, so substituting inside `scoped` alone is
-	// legitimate. What the loop does is REDUCE the clause enough for the
-	// squeeze below to fire, and it is that squeeze on a substituted clause
-	// that produces the wrong answer. Re-adding the loop therefore needs
-	// the squeeze audited first, not just a better-placed substitution.
+	// Absorbed from `treat_ex_quantified_clause`: `ex x (x = t && phi(x))`
+	// becomes `phi(t)`. Cheaper and more precise than the squeeze, so it is
+	// tried first; a variable it settles leaves `live` and never reaches the
+	// BDD. Re-checked against the *current* `scoped` each time, since an
+	// earlier substitution can create the witness for a later variable.
 	//
-	// Localised further 2026-08-04 with a GROUND-EVALUATION oracle (assign
-	// 0/1 to every free variable, normalise the closed instance, compare --
-	// T and F are both definite, so a disagreement is proof). Re-enabling
-	// the loop and checking every call site:
-	//
-	//   * every `eliminate_block_over_clause` call is equivalence-preserving
-	//   * every `resolve_quantifiers2` call is equivalence-preserving
-	//   * `anti_prenex_block`'s CORE recursion is NOT: on
-	//     `ex b2 (<conjunction of disjunctions>)` it returns a result that
-	//     disagrees at `b3=0, o0seal[0]=1, o0law[0]=1`.
-	//
-	// So the wrong answer lives in the core's disjunction-distribution /
-	// Boole-decomposition path, and the substitution loop merely FEEDS it
-	// that shape -- which is why disabling the loop hides it. Fix the core
-	// first; the loop can then come back and with it the completeness lost
-	// below. Declining to squeeze bv-typed clauses does NOT help (tried).
-	//
-	// A caution for whoever picks this up: the in-run finding above is
-	// sound (it compares the actual body and result of a real call), but
-	// attempts to REDUCE it to a standalone case have not succeeded. A
-	// tree-level reducer driving `anti_prenex_block` directly does report a
-	// small body whose result disagrees with its own ground evaluation --
-	// but the same formula, and every variant of it tried, normalises
-	// CORRECTLY through the full pipeline, including with vacuous extra
-	// block variables. So the reducer harness still differs from the real
-	// call in something not yet identified (the enclosing BDD variable
-	// order and quantifier pattern are the untested candidates), and its
-	// minimal body must NOT be treated as a confirmed counterexample.
-	// Note also that such a reducer MUST recompute `analyse_block` for each
-	// candidate body -- reusing the original `elim` is stale by
-	// construction and produces artefacts.
-	//
-	// Removing it costs completeness, and the cost is visible: with the
-	// legacy fallback off, `test_integration-interpreter` goes back to
-	// diverging (1500 s timeout) and satisfiability2 to ~327 s, because
-	// blocks this loop used to discharge now survive and multiply across
-	// driver rounds. Soundness first: a surviving quantifier is a bounded
-	// loss, a wrong F is not.
-	//
-	// Nothing is lost by dropping it: `anti_prenex_block`'s pipeline
-	// already runs `ex_subs_based_elimination` over the whole formula at
-	// step 2, before any block is collected, which is where legacy applied
-	// it too.
-	trefs still_live = live;
+	// History, because this loop was once removed as "unsound": with the
+	// legacy fallback off it made the issue #70 step formula normalise to F.
+	// The fault was NOT here -- it was the γ1 cofactor branch of
+	// `anti_prenex_block` dropping `¬atm` from its F-branch (see the fix
+	// comment there), and this loop merely fed the core the reduced shapes
+	// that reached γ1. With that fixed, the loop is back, and with it the
+	// completeness it provides: without it, blocks it would discharge
+	// survive and multiply across driver rounds
+	// (`test_integration-interpreter` diverges, satisfiability2 is ~13x
+	// slower).
+	trefs still_live;
+	for (size_t i = 0; i < live.size(); ++i) {
+		if (tau::get(scoped).equals_T()
+			|| tau::get(scoped).equals_F())
+		{
+			// Decided: every variable not yet visited is settled
+			// too, since neither T nor F constrains any of them.
+			still_live.clear();
+			break;
+		}
+		if (tref e = ex_subs_based_elimination<node>(live[i], scoped);
+			e != scoped)
+		{
+			scoped = e;
+			continue;
+		}
+		still_live.push_back(live[i]);
+	}
 
 	if (tau::get(scoped).equals_T()) return with_kept(_T<node>());
 	// An existential over F is F, independently of the variables.

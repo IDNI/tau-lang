@@ -1005,9 +1005,23 @@ tref anti_prenex_block(tref formula, const trefs& block,
 					wl, bf_pivot, an.cofactor_0);
 				wl = syntactic_path_simplification_unsat_on_unchanged_negations
 					<node>(wl);
+				// The F-branch needs ¬atm CONJOINED, exactly as the
+				// general split below does (`¬atm && r`): replacing the
+				// atom's occurrences by F does not make the atom false,
+				// and a constraint that lived only in those occurrences
+				// vanishes with them. Found by ground evaluation on
+				// `ex q (!(q = 0) && (a q = 0 || q = 0))`: γ1 fires on
+				// the pivot `q = 0`, the F-branch became `a q = 0`
+				// (the `q != 0` constraint gone), and the elimination
+				// answered T where the truth is `a' != 0`. This was the
+				// wrong-F the legacy fallback had been repairing on the
+				// issue #70 interpreter spec. Legacy's own γ1 analogue
+				// conjoins `¬boole_atm`, so this now matches it.
 				tref wr = syntactic_path_simplification_unsat_on_unchanged_negations
-					<node>(rewriter::replace<node>(
-						formula, atm, tau::_F()));
+					<node>(tau::build_wff_and(
+						tau::build_wff_neg(atm),
+						rewriter::replace<node>(
+							formula, atm, tau::_F())));
 				used_atms.insert(atm);
 				tref rr = anti_prenex_block<node>(wr, block,
 					used_atms, quant_pattern, order, skip,
@@ -1403,112 +1417,34 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// strategy resolves but this algorithm's disjunction/Boole
 		// decomposition does not.
 		//
-		// Re-measured 2026-08-04 with `legacy_antiprenex_fallback = false`,
-		// twice: once after partial clause elimination landed, and again
-		// after the leaf_clause merge. The second run cleared most of the
-		// original list -- satisfiability1-3, solver, splitter, splitter2,
-		// wff_normalization, normal_forms and normalizer_helpers all pass
-		// without the fallback, and the elimination no longer diverges
-		// (test_integration-interpreter went from over 600 s back to
-		// 1.8 s). One blocker is left, and it is not an incompleteness:
+		// 2026-08-04, FINAL STATE OF THE FALLBACK EXPERIMENT: with
+		// `legacy_antiprenex_fallback = false`, BOTH full suites pass,
+		// 319/319 in Debug and Release. The road there, so the record does
+		// not have to be re-derived:
 		//
-		// **Where the F first becomes visible, and what that does and does
-		// not prove.** Tracing the pipeline step by step on the reduced
-		// repro below, with the fallback off: every step up to and
-		// including `process_quantifier_blocks` leaves the formula not-F,
-		// and step 5's `syntactic_formula_simplification` -- specifically
-		// its `simplify_using_equality` half, not
-		// `syntactic_path_simplification` -- returns F.
+		//  1. Partial clause elimination (the eliminability partition)
+		//     recovered satisfiability1-3, solver, splitter2,
+		//     wff_normalization and normal_forms.
+		//  2. The leaf_clause merge recovered splitter (the
+		//     types_homogeneous assert) and normalizer_helpers (vacuous
+		//     binder pruning routes `bf_ref` clauses to the single-variable
+		//     squeeze, which substitutes into reference arguments).
+		//  3. The last blocker was a WRONG ANSWER this fallback had been
+		//     silently repairing: the γ1 cofactor branch above dropped
+		//     `¬atm` from its F-branch, so on the issue #70 interpreter
+		//     spec the whole normalization answered F for a satisfiable
+		//     step system. Found by ground evaluation (assign 0/1 to every
+		//     free variable and normalise the closed instance -- T and F
+		//     are both definite there, unlike `are_nso_equivalent`, which
+		//     answers negatively when undecided and therefore CANNOT be
+		//     used to bisect this). Pinned by
+		//     tests/unit/test_antiprenexing.cpp's Gamma1NegatedBranch.
 		//
-		// That locates where F APPEARS. It is NOT proof that
-		// `simplify_using_equality` is wrong: a step that maps a
-		// not-syntactically-F formula to F may simply be the one that
-		// DETECTS a contradiction already present in its input. Both
-		// readings are still open, and the evidence currently leans away
-		// from blaming it -- every atom-level F traced inside it was
-		// locally legitimate (each was an equation contradicting facts
-		// already asserted in its own disjunct scope), and its scope
-		// bookkeeping reported no union-find imbalance.
-		//
-		// What IS established about this algorithm: it is only INCOMPLETE
-		// here, never unsound. A legacy oracle run at block granularity
-		// (comparing `anti_prenex(ex block . body)` against this pass's
-		// result for the same body) reported 10 mismatches on the repro and
-		// ALL TEN were `block=notF, legacy=F` -- this pass keeping a
-		// quantifier the legacy one could discharge. Not one was the other
-		// way round. So whatever is wrong, this pass is not answering F
-		// where it should not.
-		//
-		// Ruled out by direct probing, so do not re-spend time on them:
-		//   * `simplify_using_equality` being wrong. It is NOT: asked
-		//     directly, the formula it maps to F really is unsatisfiable
-		//     (`are_nso_equivalent(pre, F)` proves it). It is the step that
-		//     DETECTS the contradiction, not the one that creates it.
-		//   * shared/untyped BA constants in that union-find -- skipping
-		//     the `_0`/`_1` anchors when `find_ba_type` returns 0 does not
-		//     change the answer, and mixed `:tau`/`:bv[8]`/`:sbf` constant
-		//     pairs all simplify correctly by hand;
-		//   * equalities leaking out of `ex`/`all` scopes (the traversal
-		//     declines to descend into quantifiers) or across repeated,
-		//     hash-consed disjunction parents;
-		//   * `rewriter::replace_if`'s predicate, and multiple-occurrence
-		//     splicing: on the repro the offending head occurs EXACTLY
-		//     ONCE, and a plain `rewriter::replace` gives the identical
-		//     result;
-		//   * `bv_predicate_blasting`'s solver call, the 2b fast path, and
-		//     `eliminate_block_over_clause` -- none returns F on the repro;
-		//   * "a bv algebra has atoms, so Boole elimination is unsound":
-		//     Boole's identity is a theorem of Boolean algebras generally,
-		//     and the squeeze's arithmetic checked out on traced terms.
-		//
-		// **READ THIS BEFORE BISECTING AGAIN -- the obvious method does not
-		// work here.** `are_nso_equivalent` (and every `is_non_temp_nso_*`
-		// predicate) answers NEGATIVELY when it cannot decide -- that is
-		// `check_decided`'s documented conservative fallback, not a proof.
-		// So "is this intermediate formula satisfiable?" really reads "is
-		// it NOT PROVEN unsatisfiable?", and a step-by-step satisfiability
-		// trace localises where unsatisfiability became PROVABLE, not where
-		// it was introduced. Bisecting the pipeline that way produces a
-		// confident but meaningless answer; it pointed successively at
-		// `process_quantifier_blocks`, then at the `replace_if` splice, and
-		// each pointer dissolved on a direct check:
-		//
-		//   * every block elimination preserves equivalence -- an oracle
-		//     comparing `anti_prenex(ex block . body)` against this pass's
-		//     result for the same body found 0 mismatches on the repro;
-		//   * the one spliced (head, result) pair at the apparent flip was
-		//     PROVED equivalent, occurs once, and splices identically under
-		//     a plain replace. A single-occurrence substitution of a proved
-		//     equivalent subformula cannot change satisfiability, so the
-		//     "flip" was the oracle gaining power, not the formula changing
-		//     meaning.
-		//
-		// What is needed next is a TRUSTWORTHY oracle -- e.g. ground-instance
-		// evaluation, or cvc5 on a closed instance -- not more bisection
-		// with the conservative one. What remains solid is the top-level
-		// fact: the run is satisfiable by construction (it is issue #70's
-		// regression spec, with a valid run), and the fallback-off pipeline
-		// answers F.
-		//
-		// bv is what makes it reachable: retyping the repro to pure `:tau`
-		// leaves it merely incomplete rather than wrong. Measured on the
-		// issue #70 step formula, all three combinations:
-		//
-		//   bv skipped,     no fallback -> quantifier survives (incomplete)
-		//   bv NOT skipped, no fallback -> **F, and the formula is SAT**
-		//   bv NOT skipped, with fallback -> correct
-		//
-		// The formula reaching step 5 is saved verbatim at
-		// `private/2026-08-04-simplify_using_equality-wrong-F.txt`. It does
-		// NOT round-trip through print/parse (io_vars plus the
-		// `{ 1 }:bv[8]` spelling), so reduce it at tree level, not as text.
-		//
-		// Reduced repro, on `normalize` with the fallback off:
-		//   all i1[1]:tau, i2[1]:bv[8]
-		//     ex o0law[1]:tau, o0res[1]:bv[8], o0seal[1]:tau (...)
-		// -- the three-conjunct reduction of the interpreter test's step-0
-		// system; it answers F where the same input with the fallback on
-		// answers `o0law[0]:tau' = 0 && o0seal[0]:tau' = 0`.
+		// Remaining cost of running without the fallback, measured:
+		// test_integration-satisfiability2 is ~17-20x slower (47 s vs 2.7 s
+		// Release, 435 s vs 21 s Debug) -- under the plan's 50x red line
+		// but the reason this fallback still exists. Everything else is at
+		// baseline (interpreter 2.3 s vs 3.1 s, solver 0.51 s vs 0.48 s).
 		if (legacy_antiprenex_fallback && has_live_quantifier(r))
 			r = anti_prenex<node>(r);
 		return r;

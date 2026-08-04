@@ -1443,3 +1443,93 @@ TEST_SUITE("BlockLimits") {
 		CHECK( block_max_rounds == 1000 );
 	}
 }
+
+// The γ1 (unique-zero) cofactor fold and the constraint its F-branch must
+// carry. Driven through the 8-arg core directly: the full pipeline's
+// simplification steps resolve this shape before the core sees it, so a
+// pipeline-level test would pass even with the bug present.
+TEST_SUITE("Gamma1NegatedBranch") {
+	static tref g1_core(const char* sample) {
+		tref fm = get_nso_rr(sample).value().main->get();
+		trefs block;
+		term_handle<node_t>::order order;
+		tref body = fm;
+		while (tau::get(body)[0].is(tau::wff_ex)) {
+			block.push_back(tau::get(body)[0].first());
+			body = tau::get(body)[0].second();
+		}
+		for (size_t i = 0; i < block.size(); ++i)
+			order.emplace(block[i], block.size() - 1 - i);
+		body = normalize_atomic_formula_operators<node_t>(body);
+		subtree_unordered_set<node_t> used_atms;
+		subtree_unordered_map<node_t, int_t> qp;
+		for (size_t i = 0; i < block.size(); ++i)
+			qp.emplace(block[i], i + 1);
+		size_t sl = block_boole_max_splits;
+		analysis_context<node_t> ac;
+		const block_eliminability<node_t> elim = analyse_block<node_t>(
+			block, get_cnf_wff_clauses<node_t>(body), ac);
+		return anti_prenex_block<node_t>(body, block, used_atms, qp,
+			order, is_tref_bv_type_family<node_t>, sl, elim);
+	}
+
+	// The named free variable of @p fm -- the PARSED node, since a node
+	// built by hand would differ (type inference) and replace() would
+	// silently miss it.
+	static tref g1_var(tref fm, const char* name) {
+		for (tref v : get_free_vars<node_t>(fm))
+			if (tau::get(v).to_str() == name) return v;
+		return nullptr;
+	}
+
+	// Ground truth of a one-free-variable result: substitute the constant
+	// and read the normalized closed instance. T and F are both definite.
+	static bool g1_holds_at(tref res, tref var, bool one) {
+		const size_t ty = tau::get(var).get_ba_type();
+		tref g = rewriter::replace<node_t>(res, var,
+			one ? tau::_1_trimmed(ty) : tau::_0_trimmed(ty));
+		return tau::get(normalize_non_temp<node_t>(tau::reget(g)))
+			.equals_T();
+	}
+
+	TEST_CASE("the unique-zero fold keeps the pivot's negation") {
+		// ∃q (q ≠ 0 ∧ (a q = 0 ∨ q = 0)) ≡ a' ≠ 0: T at a=0, F at a=1.
+		// γ1 fires on the pivot `q = 0` (f = q has its unique zero at
+		// q := 0). Before the fix the F-branch was φ[atm→F] with ¬atm
+		// dropped, so the `q ≠ 0` constraint -- which lives only in
+		// occurrences of the atom -- vanished, and the core answered T
+		// at a=1 as well. This is the wrong answer the legacy fallback
+		// had been silently repairing on the issue #70 interpreter spec.
+		const char* sample = "ex q (!(q = 0) && (a q = 0 || q = 0)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = g1_core(sample);
+		tref var = g1_var(fm, "a");
+		REQUIRE( var != nullptr );
+		CHECK( g1_holds_at(res, var, false) );
+		CHECK( !g1_holds_at(res, var, true) );
+	}
+
+	TEST_CASE("the five-conjunct interpreter shape stays sound") {
+		// The shape the issue #70 step system actually produced, reduced
+		// by tree-level delta debugging. Same truth table: T at a=0,
+		// F at a=1 (s does not matter; check both values).
+		const char* sample =
+			"ex q (!(q = 0) && (a q = 0 || q = 0) && "
+			"(!(q = a) || !(s' = 0) || a q = q || !(q = 0)) && "
+			"(!(a' = 0) || !(s' = 0) || a q = a || a = q || !(q = 0)) && "
+			"(!(a q = q) || !(s' = 0) || q = a || a q = 0 || q = 0)).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = g1_core(sample);
+		tref a = g1_var(fm, "a");
+		tref s = g1_var(fm, "s");
+		REQUIRE( a != nullptr );
+		REQUIRE( s != nullptr );
+		const size_t st = tau::get(s).get_ba_type();
+		tref r0 = rewriter::replace<node_t>(res, s, tau::_0_trimmed(st));
+		tref r1 = rewriter::replace<node_t>(res, s, tau::_1_trimmed(st));
+		CHECK( g1_holds_at(r0, a, false) );
+		CHECK( !g1_holds_at(r0, a, true) );
+		CHECK( g1_holds_at(r1, a, false) );
+		CHECK( !g1_holds_at(r1, a, true) );
+	}
+}
