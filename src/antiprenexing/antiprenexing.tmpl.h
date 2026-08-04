@@ -1441,19 +1441,55 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// where it should not.
 		//
 		// Ruled out by direct probing, so do not re-spend time on them:
-		//   * shared/untyped BA constants in `simplify_using_equality`'s
-		//     union-find -- skipping the `_0`/`_1` anchors when
-		//     `find_ba_type` returns 0 does not change the answer, and
-		//     mixed `:tau`/`:bv[8]`/`:sbf` constant pairs all simplify
-		//     correctly by hand;
+		//   * `simplify_using_equality` being wrong. It is NOT: asked
+		//     directly, the formula it maps to F really is unsatisfiable
+		//     (`are_nso_equivalent(pre, F)` proves it). It is the step that
+		//     DETECTS the contradiction, not the one that creates it.
+		//   * shared/untyped BA constants in that union-find -- skipping
+		//     the `_0`/`_1` anchors when `find_ba_type` returns 0 does not
+		//     change the answer, and mixed `:tau`/`:bv[8]`/`:sbf` constant
+		//     pairs all simplify correctly by hand;
 		//   * equalities leaking out of `ex`/`all` scopes (the traversal
 		//     declines to descend into quantifiers) or across repeated,
 		//     hash-consed disjunction parents;
+		//   * `rewriter::replace_if`'s predicate, and multiple-occurrence
+		//     splicing: on the repro the offending head occurs EXACTLY
+		//     ONCE, and a plain `rewriter::replace` gives the identical
+		//     result;
 		//   * `bv_predicate_blasting`'s solver call, the 2b fast path, and
 		//     `eliminate_block_over_clause` -- none returns F on the repro;
 		//   * "a bv algebra has atoms, so Boole elimination is unsound":
 		//     Boole's identity is a theorem of Boolean algebras generally,
 		//     and the squeeze's arithmetic checked out on traced terms.
+		//
+		// **READ THIS BEFORE BISECTING AGAIN -- the obvious method does not
+		// work here.** `are_nso_equivalent` (and every `is_non_temp_nso_*`
+		// predicate) answers NEGATIVELY when it cannot decide -- that is
+		// `check_decided`'s documented conservative fallback, not a proof.
+		// So "is this intermediate formula satisfiable?" really reads "is
+		// it NOT PROVEN unsatisfiable?", and a step-by-step satisfiability
+		// trace localises where unsatisfiability became PROVABLE, not where
+		// it was introduced. Bisecting the pipeline that way produces a
+		// confident but meaningless answer; it pointed successively at
+		// `process_quantifier_blocks`, then at the `replace_if` splice, and
+		// each pointer dissolved on a direct check:
+		//
+		//   * every block elimination preserves equivalence -- an oracle
+		//     comparing `anti_prenex(ex block . body)` against this pass's
+		//     result for the same body found 0 mismatches on the repro;
+		//   * the one spliced (head, result) pair at the apparent flip was
+		//     PROVED equivalent, occurs once, and splices identically under
+		//     a plain replace. A single-occurrence substitution of a proved
+		//     equivalent subformula cannot change satisfiability, so the
+		//     "flip" was the oracle gaining power, not the formula changing
+		//     meaning.
+		//
+		// What is needed next is a TRUSTWORTHY oracle -- e.g. ground-instance
+		// evaluation, or cvc5 on a closed instance -- not more bisection
+		// with the conservative one. What remains solid is the top-level
+		// fact: the run is satisfiable by construction (it is issue #70's
+		// regression spec, with a valid run), and the fallback-off pipeline
+		// answers F.
 		//
 		// bv is what makes it reachable: retyping the repro to pure `:tau`
 		// leaves it merely incomplete rather than wrong. Measured on the
