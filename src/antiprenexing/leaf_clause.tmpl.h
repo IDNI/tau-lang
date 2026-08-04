@@ -291,6 +291,21 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// first; the loop can then come back and with it the completeness lost
 	// below. Declining to squeeze bv-typed clauses does NOT help (tried).
 	//
+	// A caution for whoever picks this up: the in-run finding above is
+	// sound (it compares the actual body and result of a real call), but
+	// attempts to REDUCE it to a standalone case have not succeeded. A
+	// tree-level reducer driving `anti_prenex_block` directly does report a
+	// small body whose result disagrees with its own ground evaluation --
+	// but the same formula, and every variant of it tried, normalises
+	// CORRECTLY through the full pipeline, including with vacuous extra
+	// block variables. So the reducer harness still differs from the real
+	// call in something not yet identified (the enclosing BDD variable
+	// order and quantifier pattern are the untested candidates), and its
+	// minimal body must NOT be treated as a confirmed counterexample.
+	// Note also that such a reducer MUST recompute `analyse_block` for each
+	// candidate body -- reusing the original `elim` is stale by
+	// construction and produces artefacts.
+	//
 	// Removing it costs completeness, and the cost is visible: with the
 	// legacy fallback off, `test_integration-interpreter` goes back to
 	// diverging (1500 s timeout) and satisfiability2 to ~327 s, because
