@@ -453,6 +453,7 @@ inline size_t block_max_rounds = 1000;
 /// way.
 inline bool legacy_antiprenex_fallback = true;
 
+
 /**
  * @internal
  * @brief Core recursive helper for the anti-prenex block algorithm.
@@ -1412,51 +1413,60 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// (test_integration-interpreter went from over 600 s back to
 		// 1.8 s). One blocker is left, and it is not an incompleteness:
 		//
-		// **The blocker is NOT in this algorithm. It is
-		// `simplify_using_equality`, which returns F for a satisfiable
-		// formula, and this fallback is what has been hiding it.**
+		// **Where the F first becomes visible, and what that does and does
+		// not prove.** Tracing the pipeline step by step on the reduced
+		// repro below, with the fallback off: every step up to and
+		// including `process_quantifier_blocks` leaves the formula not-F,
+		// and step 5's `syntactic_formula_simplification` -- specifically
+		// its `simplify_using_equality` half, not
+		// `syntactic_path_simplification` -- returns F.
 		//
-		// Localised 2026-08-04 by tracing the pipeline step by step on the
-		// reduced repro below. With the fallback off, `anti_prenex_block`
-		// step 5's `syntactic_formula_simplification` -- specifically its
-		// `simplify_using_equality` half, not `syntactic_path_simplification`
-		// -- turns a not-F formula into F. Every earlier step (to_nnf, the
-		// two other simplifications, ex_subs, normalize_atomic_formula_
-		// operators, process_quantifier_blocks) still had it not-F.
+		// That locates where F APPEARS. It is NOT proof that
+		// `simplify_using_equality` is wrong: a step that maps a
+		// not-syntactically-F formula to F may simply be the one that
+		// DETECTS a contradiction already present in its input. Both
+		// readings are still open, and the evidence currently leans away
+		// from blaming it -- every atom-level F traced inside it was
+		// locally legitimate (each was an equation contradicting facts
+		// already asserted in its own disjunct scope), and its scope
+		// bookkeeping reported no union-find imbalance.
 		//
-		// So the block algorithm itself is only INCOMPLETE here, never
-		// unsound: a legacy oracle run at block granularity (compare
-		// `anti_prenex(ex block . body)` against this pass's result for the
-		// same body) reported 10 mismatches on the repro and ALL TEN were
-		// `block=notF, legacy=F` -- this pass keeping a quantifier the
-		// legacy one could discharge. Not one was the other way round.
+		// What IS established about this algorithm: it is only INCOMPLETE
+		// here, never unsound. A legacy oracle run at block granularity
+		// (comparing `anti_prenex(ex block . body)` against this pass's
+		// result for the same body) reported 10 mismatches on the repro and
+		// ALL TEN were `block=notF, legacy=F` -- this pass keeping a
+		// quantifier the legacy one could discharge. Not one was the other
+		// way round. So whatever is wrong, this pass is not answering F
+		// where it should not.
 		//
-		// `simplify_using_equality` builds a union-find of asserted
-		// equalities and answers F when 0 and 1 become connected. It is
-		// shared by both algorithms and is reached with mixed `:tau` /
-		// `:bv[8]` content here. Simple mixed cases are fine -- checked by
-		// hand: `x:tau = 1 && y:bv[8] = { #x01 }:bv[8]`, the bv/bv and
-		// tau/tau pairs, and equalities under `ex`/`all` binders all
-		// simplify correctly and do not leak across scopes -- so it needs
-		// the larger structure. The offending formula is saved verbatim at
-		// `private/2026-08-04-simplify_using_equality-wrong-F.txt` (it does
-		// NOT round-trip through print/parse: io_vars plus the
-		// `{ 1 }:bv[8]` spelling, so reduce it at tree level, not as text).
+		// Ruled out by direct probing, so do not re-spend time on them:
+		//   * shared/untyped BA constants in `simplify_using_equality`'s
+		//     union-find -- skipping the `_0`/`_1` anchors when
+		//     `find_ba_type` returns 0 does not change the answer, and
+		//     mixed `:tau`/`:bv[8]`/`:sbf` constant pairs all simplify
+		//     correctly by hand;
+		//   * equalities leaking out of `ex`/`all` scopes (the traversal
+		//     declines to descend into quantifiers) or across repeated,
+		//     hash-consed disjunction parents;
+		//   * `bv_predicate_blasting`'s solver call, the 2b fast path, and
+		//     `eliminate_block_over_clause` -- none returns F on the repro;
+		//   * "a bv algebra has atoms, so Boole elimination is unsound":
+		//     Boole's identity is a theorem of Boolean algebras generally,
+		//     and the squeeze's arithmetic checked out on traced terms.
 		//
-		// Measured on the issue #70 step formula, all three combinations:
+		// bv is what makes it reachable: retyping the repro to pure `:tau`
+		// leaves it merely incomplete rather than wrong. Measured on the
+		// issue #70 step formula, all three combinations:
 		//
 		//   bv skipped,     no fallback -> quantifier survives (incomplete)
 		//   bv NOT skipped, no fallback -> **F, and the formula is SAT**
 		//   bv NOT skipped, with fallback -> correct
 		//
-		// bv is what makes it reachable: retyping the repro to pure `:tau`
-		// leaves it merely incomplete rather than wrong.
-		//
-		// Beware the plausible-but-wrong explanation: "a bv algebra has
-		// atoms, so Boole elimination is unsound there". Boole's identity
-		// `ex x (f(x) = 0) == f(0)*f(1) = 0` is a theorem of Boolean
-		// algebras generally, and the squeeze's own arithmetic checked out
-		// on the traced terms.
+		// The formula reaching step 5 is saved verbatim at
+		// `private/2026-08-04-simplify_using_equality-wrong-F.txt`. It does
+		// NOT round-trip through print/parse (io_vars plus the
+		// `{ 1 }:bv[8]` spelling), so reduce it at tree level, not as text.
 		//
 		// Reduced repro, on `normalize` with the fallback off:
 		//   all i1[1]:tau, i2[1]:bv[8]
