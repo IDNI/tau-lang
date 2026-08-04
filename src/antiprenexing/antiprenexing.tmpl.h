@@ -453,6 +453,40 @@ inline size_t block_max_rounds = 1000;
 /// way.
 inline bool legacy_antiprenex_fallback = true;
 
+// SCRATCH: witness-based satisfiability oracle. Substitutes every free
+// variable with 0/1 and normalizes the closed instance; a single T is a
+// POSITIVE proof of satisfiability, unlike are_nso_equivalent's conservative
+// negative answer.
+inline bool scratch_in_oracle = false;
+template <NodeType node> tref normalize_non_temp(tref);
+template <NodeType node>
+bool scratch_has_witness(tref f, int& tried) {
+	using tau = tree<node>;
+	if (scratch_in_oracle) return false;
+	const trefs fv = get_free_vars<node>(f);
+	if (fv.size() > 12) return false;
+	const size_t n = fv.size();
+	scratch_in_oracle = true;
+	const bool saved = legacy_antiprenex_fallback;
+	legacy_antiprenex_fallback = true;
+	bool found = false;
+	for (size_t mask = 0; mask < (size_t{1} << n) && !found; ++mask) {
+		tref g = f;
+		for (size_t i = 0; i < n; ++i) {
+			const size_t ty = tau::get(fv[i]).get_ba_type();
+			g = rewriter::replace<node>(g, fv[i],
+				(mask >> i) & 1 ? tau::_1_trimmed(ty)
+					: tau::_0_trimmed(ty));
+		}
+		++tried;
+		if (tau::get(normalize_non_temp<node>(tau::reget(g))).equals_T())
+			found = true;
+	}
+	legacy_antiprenex_fallback = saved;
+	scratch_in_oracle = false;
+	return found;
+}
+
 
 /**
  * @internal
@@ -1721,8 +1755,59 @@ tref process_quantifier_blocks(tref fm, const std::function<bool(tref)>& skip,
 		// Retiring this round's heads is what promotes those to
 		// innermost, so keep going instead of returning.
 		if (changes.empty()) continue;
+		{ // SCRATCH
+		tref before = fm;
 		fm = rewriter::replace_if<node>(fm, changes,
 			while_is_formula<node>);
+		if (std::getenv("TAU_WIT2") && !scratch_in_oracle) {
+			int t1 = 0, t2 = 0;
+			const bool wb = scratch_has_witness<node>(before, t1);
+			const bool wa = scratch_has_witness<node>(fm, t2);
+			if (wb && !wa) {
+				LOG_ERROR << "SCRATCH ROUND " << rounds
+					<< " LOST SAT; changes=" << changes.size();
+				for (const auto& [h, r] : changes) {
+					int u1 = 0, u2 = 0;
+					const bool wh = scratch_has_witness<node>(h, u1);
+					const bool wr = scratch_has_witness<node>(r, u2);
+					LOG_ERROR << "  head wit=" << wh
+						<< " res wit=" << wr
+						<< (wh && !wr ? "  <<< THIS BLOCK" : "");
+					if (wh && !wr) {
+						LOG_ERROR << "  HEAD " << LOG_FM(h);
+						LOG_ERROR << "  RES  " << LOG_FM(r);
+						// evaluate BOTH under every assignment
+						const trefs fv = get_free_vars<node>(h);
+						scratch_in_oracle = true;
+						const bool sv2 = legacy_antiprenex_fallback;
+						legacy_antiprenex_fallback = true;
+						for (size_t m = 0;
+							m < (size_t{1} << fv.size()); ++m) {
+							tref gh = h, gr = r;
+							std::string a;
+							for (size_t i = 0; i < fv.size(); ++i) {
+								const size_t ty = tau::get(fv[i]).get_ba_type();
+								tref c = (m >> i) & 1
+									? tau::_1_trimmed(ty)
+									: tau::_0_trimmed(ty);
+								a += tau::get(fv[i]).to_str();
+								a += ((m >> i) & 1) ? "=1 " : "=0 ";
+								gh = rewriter::replace<node>(gh, fv[i], c);
+								gr = rewriter::replace<node>(gr, fv[i], c);
+							}
+							tref nh = normalize_non_temp<node>(tau::reget(gh));
+							tref nr = normalize_non_temp<node>(tau::reget(gr));
+							LOG_ERROR << "   [" << a << "] HEAD="
+								<< tau::get(nh).to_str()
+								<< " RES=" << tau::get(nr).to_str();
+						}
+						legacy_antiprenex_fallback = sv2;
+						scratch_in_oracle = false;
+					}
+				}
+			}
+		}
+		}
 	}
 }
 
@@ -1818,6 +1903,18 @@ tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip) {
 	// anti_prenex_block, then eliminate the remaining quantifiers over
 	// atomic formulas via resolve_quantifiers2. wff_all blocks are handled
 	// by negation (dualization): ∀x φ ≡ ¬∃x ¬φ.
+	if (std::getenv("TAU_WIT") && !scratch_in_oracle) { // SCRATCH
+		int t1 = 0, t2 = 0;
+		tref in = formula;
+		tref out = process_quantifier_blocks<node>(formula, skip,
+			ctx_bv_is_solver_owned);
+		const bool wi = scratch_has_witness<node>(in, t1);
+		const bool wo = scratch_has_witness<node>(out, t2);
+		LOG_ERROR << "SCRATCH WITNESS in=" << (wi ? "SAT" : "none")
+			<< "/" << t1 << " out=" << (wo ? "SAT" : "none")
+			<< "/" << t2
+			<< (wi && !wo ? "  <<< BLOCKS LOST SATISFIABILITY" : "");
+	}
 	formula = process_quantifier_blocks<node>(formula, skip,
 		ctx_bv_is_solver_owned);
 	// Step 5: canonicalise again on the way out. The pass builds binders

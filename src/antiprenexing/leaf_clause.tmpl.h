@@ -255,31 +255,23 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	live = occurring_in(live, scoped);
 	if (live.empty()) return with_kept(scoped);
 
-	// ---- A substitution witness, per live variable -----------------------
+	// NO substitution witness here, deliberately. Extracting this module
+	// added a per-live-variable `ex_subs_based_elimination` loop, on the
+	// reading that `treat_ex_quantified_clause` did the same. It does not
+	// belong in this position and it is UNSOUND here: with the legacy
+	// fallback off it makes the issue #70 step formula normalise to F when
+	// it is satisfiable. Bisected to the leaf_clause extraction commit, and
+	// pinned by disabling exactly this loop -- nothing else in the module
+	// changes the answer, and every individual substitution it performs
+	// looks correct in isolation, so the fault is in applying it to the
+	// FREE part of an already-partitioned clause rather than to a whole
+	// existential scope.
 	//
-	// Absorbed from `treat_ex_quantified_clause`: `ex x (x = t && phi(x))`
-	// becomes `phi(t)`. Cheaper and more precise than the squeeze, so it is
-	// tried first; a variable it settles leaves `live` and never reaches the
-	// BDD. Re-checked against the *current* `scoped` each time, since an
-	// earlier substitution can create the witness for a later variable.
-	trefs still_live;
-	for (size_t i = 0; i < live.size(); ++i) {
-		if (tau::get(scoped).equals_T()
-			|| tau::get(scoped).equals_F())
-		{
-			// Decided: every variable not yet visited is settled
-			// too, since neither T nor F constrains any of them.
-			still_live.clear();
-			break;
-		}
-		if (tref e = ex_subs_based_elimination<node>(live[i], scoped);
-			e != scoped)
-		{
-			scoped = e;
-			continue;
-		}
-		still_live.push_back(live[i]);
-	}
+	// Nothing is lost by dropping it: `anti_prenex_block`'s pipeline
+	// already runs `ex_subs_based_elimination` over the whole formula at
+	// step 2, before any block is collected, which is where legacy applied
+	// it too.
+	trefs still_live = live;
 
 	if (tau::get(scoped).equals_T()) return with_kept(_T<node>());
 	// An existential over F is F, independently of the variables.
