@@ -7,23 +7,6 @@ namespace idni::tau_lang {
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "anti_prenex"
 
-// Forward declaration: anti_prenex_block calls push_ex_block_into_clause far
-// above its definition. Without this the call resolves only because it is
-// dependent and its argument types associate idni::tau_lang (C++20 P0846
-// ADL-at-instantiation) -- change the last parameter to a non-associating type
-// and it silently stops resolving. Same reason
-// heuristics/bv_predicate_blasting.h forward-declares anti_prenex_block and
-// resolve_quantifiers2.
-// The `elim` default is spelled here, on the declaration, and deliberately not
-// repeated on the definition below: a function template default argument may be
-// given in only one declaration. An empty analysis means "every variable is
-// eliminable", which reproduces the pre-analysis behaviour exactly -- that is
-// what the direct unit-test call sites and the 6-arg anti_prenex_block overload
-// get.
-template<NodeType node>
-tref push_ex_block_into_clause(tref clause, const trefs& block,
-	const typename term_handle<node>::order& order,
-	const block_eliminability<node>& elim = block_eliminability<node>{});
 
 /**
  * @internal
@@ -486,12 +469,12 @@ inline bool legacy_antiprenex_fallback = true;
  *        instead of splitting further. See `block_boole_max_splits` for why this
  *        counts splits rather than depth.
  * @param elim Per-block eliminability analysis of the block's *original* body,
- *        carried down to `push_ex_block_into_clause`. Only its
+ *        carried down to `eliminate_block_over_clause`. Only its
  *        `verdict_of` is meaningful this deep: verdicts are keyed on the block
  *        variables, which this recursion never changes, whereas
  *        `conjuncts_of` is keyed on the original body's conjuncts and goes
  *        stale as soon as a split or a gamma fold rebuilds one. That is why
- *        `push_ex_block_into_clause` re-derives the reserved conjunct set from
+ *        `eliminate_block_over_clause` re-derives the reserved conjunct set from
  *        the clause actually in front of it instead of trusting
  *        `conjuncts_of` outright. Defaults to the empty analysis (everything
  *        eliminable), which is the pre-analysis behaviour.
@@ -587,7 +570,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	// blast_block.
 	// Whether `f` still contains any skip-matched (e.g. bitvector) typed
 	// content at all, regardless of whether it is one of `block`'s own
-	// variables. push_ex_block_into_clause assumes its whole input clause
+	// variables. eliminate_block_over_clause assumes its whole input clause
 	// is homogeneously atomless-typed (matching `block`'s type); since
 	// `block` may no longer carry every skip-matched variable in scope
 	// (callers may filter those out before pushing the block in here),
@@ -676,7 +659,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			// block.front() is not guaranteed to carry the run's type,
 			// and squeeze_positive_disjuncts seeds its accumulator from
 			// _0<node>(ba_type) without asserting anything about it.
-			// This is the same scan push_ex_block_into_clause performs,
+			// This is the same scan eliminate_block_over_clause performs,
 			// which is the other consumer of that assumption.
 			size_t ba_type = 0;
 			bool homogeneous = true;
@@ -804,7 +787,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 					used_atms, quant_pattern, order, skip,
 					splits_left, elim));
 		// Check if dependent formula is clause -> push block into clause.
-		// push_ex_block_into_clause assumes the whole clause is
+		// eliminate_block_over_clause assumes the whole clause is
 		// homogeneously atomless-typed, so any skip-matched content in it
 		// (not just among `block`'s own variables) must divert to
 		// blast_block instead.
@@ -814,7 +797,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			return tau::build_wff_and(
 				indep,
 				resolve_quantifiers2<node>(
-				push_ex_block_into_clause<node>(formula, block, order, elim), order, skip));
+				eliminate_block_over_clause<node>(formula, block, elim, order), order, skip));
 		}
 		// Using the available atomic formulas, do Boole decomposition on best fit
 		auto is_atomic = [&used_atms, &skip](tref n) {
@@ -848,7 +831,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// block.
 		//
 		// Equations are preferred over order atoms: only a bf_eq can
-		// ever let push_ex_block_into_clause remove the block (a bf_lt
+		// ever let eliminate_block_over_clause remove the block (a bf_lt
 		// hits its unrecognized-conjunct path and forces a re-wrap), so
 		// splitting on an order atom doubles the formula without ever
 		// paying for itself. Order atoms remain available as a last
@@ -1082,7 +1065,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
  *
  * Equivalent to the 7-arg form with `splits_left = block_boole_max_splits`. Use
  * it when there is no enclosing elimination whose budget should be shared. It
- * carries no eliminability analysis either, so `push_ex_block_into_clause` sees
+ * carries no eliminability analysis either, so `eliminate_block_over_clause` sees
  * the empty one (everything eliminable) -- the pre-analysis behaviour.
  * @tparam node Tree node type.
  * @endinternal
@@ -1111,7 +1094,7 @@ tref anti_prenex_block(tref formula, const trefs& block,
  *    kind change starts a new, inner block;
  *  - the Boolean-algebra type of the bound variables: the block is resolved
  *    through a single BDD variable order and a single
- *    `push_ex_block_into_clause` call, both of which assume one BA type (the
+ *    `eliminate_block_over_clause` call, both of which assume one BA type (the
  *    latter asserts it), so a type change likewise starts a new block;
  *  - `skip`-matched (e.g. bitvector) variables, which this pass never
  *    eliminates and which therefore never enter the active block.
@@ -1203,7 +1186,7 @@ quantifier_block<node> collect_quantifier_block(tref n,
 			if (!kind_fixed) blk.is_ex = curr_is_ex, kind_fixed = true;
 			else if (curr_is_ex != blk.is_ex) break;
 			// get_ba_type() == 0 means *untyped*, not "a distinct
-			// type": push_ex_block_into_clause's own homogeneity
+			// type": eliminate_block_over_clause's own homogeneity
 			// check ignores type-0 nodes for exactly that reason.
 			// Treating 0 as a type of its own would split a run
 			// whenever one variable happens to be untyped,
@@ -1241,7 +1224,7 @@ quantifier_block<node> collect_quantifier_block(tref n,
  * ∃-blocks.
  *
  * `blk.body` is required to already be free of unresolved quantifier scope:
- * the pipeline below (`push_ex_block_into_clause` in particular) assumes it
+ * the pipeline below (`eliminate_block_over_clause` in particular) assumes it
  * is handed fully resolved, homogeneously typed content. `process_quantifier_blocks`
  * guarantees this by only ever eliminating innermost blocks.
  * @tparam node Tree node type.
@@ -1323,8 +1306,11 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 			static_cast<int_t>(block_vars.size() - i));
 
 	// Run the core ∃-block elimination pipeline on a pre-normalized body b.
-	// normalize_atomic_formula_operators is called here so that
-	// push_ex_block_into_clause always receives bf_eq atoms (not bf_neq).
+	// normalize_atomic_formula_operators is called here so the block core's
+	// own conjunct classification (try_fast_paths, profile_block_atoms) sees
+	// canonical atoms. eliminate_block_over_clause no longer depends on it:
+	// it establishes whichever spelling each of its two squeeze paths needs,
+	// locally -- and they need opposite ones.
 	auto resolve_ex_block = [&](tref b) -> tref {
 		b = normalize_atomic_formula_operators<node>(b);
 		// Per-block eliminability analysis, computed over the body this
@@ -1387,7 +1373,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// (step-based, single-quantifier-at-a-time) algorithm that can
 		// still make progress here in cases unrelated to bitvector content
 		// (blasting is now this algorithm's own job, via blast_block above)
-		// -- e.g. wff_ref atoms re-wrapped by push_ex_block_into_clause,
+		// -- e.g. wff_ref atoms re-wrapped by eliminate_block_over_clause,
 		// where treat_ex_quantified_clause knows how to leave them
 		// correctly alone, and other structural cases its
 		// push_existential_quantifier_one/ex_quantified_boole_decomposition
@@ -1513,9 +1499,9 @@ void select_innermost_blocks(tref fm, const std::function<bool(tref)>& skip,
  * Two requirements pull in opposite directions:
  *  - a block must be collected *maximally*, so no quantifier that could join
  *    the run is eliminated on its own beforehand;
- *  - a block must be eliminated over a *resolved* matrix, since
- *    `push_ex_block_into_clause` assumes the clause it is handed holds no
- *    unresolved, foreign-typed quantifier scope.
+ *  - a block must be eliminated over a *resolved* matrix, since a clause
+ *    holding an unresolved, foreign-typed quantifier scope has no top-level
+ *    conjunct structure for `eliminate_block_over_clause` to squeeze.
  *
  * A plain `post_order` traversal satisfies neither: it rewrites a node only
  * after its children, so by the time the outermost quantifier of
@@ -1705,8 +1691,8 @@ tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip) {
 	formula = syntactic_formula_simplification<node>(formula);
 
 	// Step 3: Normalize non-canonical operators (bf_neq → ¬(bf_eq),
-	// bf_nlteq → bf_lt, etc.) so push_ex_block_into_clause sees only
-	// canonical atoms.
+	// bf_nlteq → bf_lt, etc.) so the block core's conjunct classification
+	// sees only canonical atoms.
 	formula = normalize_atomic_formula_operators<node>(formula);
 
 	// Step 4: Eliminate each maximal quantifier block (innermost blocks
@@ -1720,237 +1706,6 @@ tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip) {
 	return syntactic_formula_simplification<node>(formula);
 }
 
-/**
- * @internal
- * @brief Pushes a block of existential quantifiers into a single atomic clause.
- *
- * Separates positive (`= 0`) and negative (`!= 0`) equations, squeezes positives into one BDD quantifier call, and adjusts negatives accordingly.
- *
- * The clause is first *partitioned* by `elim`'s component structure: the
- * conjuncts reached by a variable the analysis refuses to eliminate are set
- * aside and re-wrapped with only that variable's own binders, and only the
- * remainder is squeezed. This is the standing `TODO (MEDIUM)` this function
- * used to carry -- "create non-removable clause part and continue with rest" --
- * which the all-or-nothing guard could not express.
- * @tparam node Tree node type.
- * @param clause Atomic clause (conjunction of equations) to push the block into.
- * @param block Ordered list of existentially quantified variables.
- * @param order Variable ordering relation (unused currently, reserved for future use).
- * @param elim Per-block eliminability analysis. Used as a *seed* only: see the
- *        partition below for why its verdicts survive the caller's recursion
- *        but its conjunct lists do not.
- * @return Clause with the quantifier block absorbed or re-attached when not removable.
- * @endinternal
- */
-// NOTE: BV-typed and non-atomless quantifier blocks are not handled here.
-// The 6-arg anti_prenex_block's caller only reaches this function for a
-// dependent clause containing no skip-matched (e.g. bitvector) block
-// variable -- a skip-matched block is diverted to predicate blasting
-// (anti_prenex_block's own blast_block helper) before this point.
-template<NodeType node>
-tref push_ex_block_into_clause(tref clause, const trefs& block,
-	const typename term_handle<node>::order& /*order*/,
-	const block_eliminability<node>& elim) {
-	using tau = tree<node>;
-	// The clause is assumed to not have negation pushed into equalities.
-	// Unlike the type-homogeneity check below this one needs no runtime
-	// counterpart: a surviving bf_neq conjunct matches neither the bf_eq nor
-	// the wff_neg(bf_eq) case in the loop further down, so it falls into the
-	// unrecognized-conjunct branch, clears is_quant_removable_in_clause and
-	// the block is re-wrapped. Release therefore already declines rather than
-	// answering wrongly; the assert only makes the violated precondition loud.
-	DBG(assert(!tau::get(clause).find_top(is<node, tau::bf_neq>)));
-
-	if (tau::get(clause).equals_T() || tau::get(clause).equals_F())
-		return clause;
-	// If there are no quantifiers to remove, the clause can be returned
-	if (block.empty()) return clause;
-
-	// All types in the block and in the clause are the same, otherwise
-	// the quantifiers have not been pushed in correctly.
-	// The first *typed* block variable: collect_quantifier_block lets
-	// untyped (get_ba_type() == 0) variables join a typed run, so
-	// block.front() is not guaranteed to carry the run's type.
-	size_t clause_type = 0;
-	bool types_homogeneous = true;
-	auto note_type = [&](size_t t) {
-		if (t == 0) return;
-		if (clause_type == 0) clause_type = t;
-		else if (clause_type != t) types_homogeneous = false;
-	};
-	for (tref v : block) note_type(tau::get(v).get_ba_type());
-	// This check used to live entirely inside #ifdef DEBUG, which left Release
-	// silently mixing BA types: build_bf_or below seeds its accumulator from
-	// _0<node>(clause_type) and asserts nothing, so a heterogeneous clause
-	// produced a wrongly-typed term with no diagnostic. It is a runtime guard
-	// now, taking the is_quant_removable_in_clause = false re-wrap path further
-	// down -- a surviving quantifier instead of a wrong answer. The scan also
-	// falls back to the clause's own first typed node when the whole block is
-	// untyped, which the block-only scan could not do.
-	auto type_scan = [&](tref n) {
-		const size_t t = tau::get(n).get_ba_type();
-		if (t == 0) return true;
-		note_type(t);
-		return false;
-	};
-	pre_order<node>(clause).visit(type_scan);
-	DBG(assert(types_homogeneous);)
-	if (!types_homogeneous) {
-		LOG_ERROR << "push_ex_block_into_clause: clause mixes BA types, "
-			"keeping the quantifier block: " << LOG_FM(clause);
-		for (auto v = block.rbegin(); v != block.rend(); ++v)
-			clause = build_wff_ex<node>(*v, clause, false);
-		return clause;
-	}
-	const trefs conjs = get_cnf_wff_clauses<node>(clause);
-
-	// ---- Partition the block by eliminability component ------------------
-	//
-	// A variable whose component reaches an unresolved reference or a kept
-	// binder is re-wrapped around only *its own* conjuncts; the rest of the
-	// clause is eliminated as normal. This closes the standing
-	// `TODO (MEDIUM)` -- "create non-removable clause part and continue with
-	// rest" -- which the union-find component structure finally makes
-	// expressible.
-	//
-	// `elim` is a SEED, not the last word. `verdict_of` is keyed on the
-	// block variables, which the caller's recursion never rewrites, so a
-	// verdict stays meaningful however deep this call sits. `conjuncts_of`
-	// is keyed on the conjuncts of the block's *original* body, and the
-	// recursion above rebuilds conjuncts (Boole splits, gamma folds, the
-	// `atm && l` re-conjunction), so those trefs can be stale here. Trusting
-	// them outright would let a rewritten conjunct still holding a kept
-	// variable land in the eliminated part and leak that variable free.
-	// So the reserved set is closed to a fixpoint against the conjuncts
-	// actually in front of us, which yields the two invariants the split
-	// needs -- no kept variable occurs in a free conjunct, and no live
-	// variable occurs in a kept conjunct -- by construction rather than by
-	// assumption.
-	subtree_unordered_set<node> kept_set, reserved;
-	for (tref v : block)
-		if (elim.verdict_of(v) != elim_verdict::eliminable)
-			kept_set.insert(v);
-	// Marking by identity rather than by index keeps this correct when two
-	// kept variables share a conjunct. Entries that are stale (not among
-	// `conjs`) simply never match and are inert.
-	for (tref v : block)
-		if (kept_set.contains(v))
-			for (tref c : elim.conjuncts_of(v)) reserved.insert(c);
-	// `contains` (syntactic subtree occurrence), not `get_free_vars`: it is
-	// a superset of free occurrence -- it also counts an occurrence under a
-	// nested binder -- and over-reserving is sound where under-reserving is
-	// not. It is the same test the DBG assertion below already uses.
-	for (bool changed = true; changed; ) {
-		changed = false;
-		for (tref c : conjs) {
-			bool touches_kept = reserved.contains(c);
-			if (!touches_kept)
-				for (tref v : block)
-					if (kept_set.contains(v)
-						&& contains<node>(c, v))
-					{
-						touches_kept = true;
-						break;
-					}
-			if (!touches_kept) continue;
-			if (reserved.insert(c).second) changed = true;
-			for (tref v : block)
-				if (!kept_set.contains(v)
-					&& contains<node>(c, v))
-				{
-					kept_set.insert(v);
-					changed = true;
-				}
-		}
-	}
-	trefs live, kept_vars;
-	for (tref v : block)
-		(kept_set.contains(v) ? kept_vars : live).push_back(v);
-	trefs kept_conjs, free_conjs;
-	for (tref c : conjs)
-		(reserved.contains(c) ? kept_conjs : free_conjs).push_back(c);
-
-	if (live.empty()) {
-		// Nothing left to eliminate: reproduce the old whole-clause keep
-		// verbatim rather than rebuilding an equivalent conjunction.
-		for (auto v = block.rbegin(); v != block.rend(); ++v)
-			clause = build_wff_ex<node>(*v, clause, false);
-		return clause;
-	}
-
-	bool is_quant_removable_in_clause = true;
-	trefs pos, neg;
-	for (tref conj : free_conjs) {
-		// By assumption all conjuncts contain at least one variable from the
-		// block. Also DBG-only on purpose: violating it costs separation, not
-		// correctness -- squeezing an independent conjunct into the positives
-		// still uses the valid `f1 = 0 && f2 = 0 == f1|f2 = 0` identity, and
-		// distributing the block over a term it does not occur in is sound.
-#ifdef DEBUG
-		bool var_contained = false;
-		for (tref v : block) if (contains<node>(conj, v))
-			var_contained = true;
-		assert(var_contained);
-#endif
-		const tau& c = tau::get(conj);
-		if (c.child_is(tau::bf_eq)) {
-			// Convert to f = 0 and save only f
-			pos.push_back(tau::trim2(norm_equation<node>(conj)));
-		} else if (c.child_is(tau::wff_neg) && c[0][0].child_is(tau::bf_eq)) {
-			// Convert to f != 0 and save only f
-			neg.push_back(tau::trim2(norm_equation<node>(c.trim2())));
-		} else {
-			// Unrecognized conjunct: a shape the analysis does not
-			// classify (bf_lt, ¬ref), or one it does but whose
-			// component the caller's rewriting has since detached
-			// from any kept variable -- a wff_ref or a nested binder
-			// reaching here now falls in this branch rather than
-			// having one of its own, since the partition above owns
-			// that decision. Task 6 folds this remainder into the
-			// analysis.
-			is_quant_removable_in_clause = false;
-		}
-	}
-	if (!is_quant_removable_in_clause) {
-		// Since we cannot remove the quantifier in this clause it needs
-		// to be maintained. The whole clause and the whole block, not
-		// just the free part: the offending conjunct sits in the part
-		// whose variables the partition declared eliminable, so there is
-		// no kept binder to hand it to.
-		for (auto v = block.rbegin(); v != block.rend(); ++v)
-			clause = build_wff_ex<node>(*v, clause, false);
-		return clause;
-	}
-	// The non-removable part: its conjuncts carry no live variable and its
-	// binders bind no variable occurring outside it, so it detaches from the
-	// squeeze below as an ordinary conjunct.
-	tref kept_part = _T<node>();
-	if (!kept_conjs.empty()) {
-		kept_part = tau::build_wff_and(kept_conjs);
-		for (auto v = kept_vars.rbegin(); v != kept_vars.rend(); ++v)
-			kept_part = build_wff_ex<node>(*v, kept_part, false);
-	}
-	// A kept variable with no conjunct of its own occurs nowhere in the
-	// clause at all (see the invariants above), so dropping its binder here
-	// is sound under the standing non-empty domain assumption.
-
-	// Squeeze positive atomic formulas together -> result is a lazy BDD
-	// By assumption they all have the same type
-	tref f = build_bf_or<node>(pos, clause_type);
-	tref res = build_bf_eq_0<node>(f);
-	for (auto v = live.rbegin(); v != live.rend(); ++v)
-		res = build_wff_ex<node>(*v, res, false);
-	// Update all negative atomic formulas -> result is a lazy BDD
-	for (tref& g : neg) {
-		g = tau::build_bf_and(tau::build_bf_neg(f), g);
-		g = tau::build_wff_neg(tau::build_bf_eq_0(g));
-		for (auto v = live.rbegin(); v != live.rend(); ++v)
-			g = build_wff_ex<node>(*v, g, false);
-	}
-	// Return formula with quantifier prefixes
-	return tau::build_wff_and(kept_part,
-		tau::build_wff_and(res, tau::build_wff_and(neg)));
-}
 
 /**
  * @internal
@@ -2188,7 +1943,7 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 			}
 			// TODO (HIGH): restrict to atomless types --
 			// distribute_block_over_atoms and
-			// push_ex_block_into_clause's negative-atom handling are
+			// eliminate_block_over_clause's negative-atom handling are
 			// only valid in an atomless BA, and nothing checks that.
 			else if (!tau::get(n).find_top(is<node, tau::ref>)) {
 				using bdd = term_handle<node>::tbdd;
@@ -2430,7 +2185,7 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 	// into the *positive* squeeze -- while the `neqs` scan below matches only
 	// bf_neq and never re-adds the negation. On `ex x (x a = 0 && !(x b = 0))`
 	// that yields f = x(a|b) and f_0*f_1 = 0 => T: the disequation inverted and
-	// dropped. Note this is the exact opposite of push_ex_block_into_clause's
+	// dropped. Note this is the exact opposite of eliminate_block_over_clause's
 	// precondition, which DBG-asserts the clause is bf_neq-*free*.
 	//
 	// It held only by accident of call order (every production caller arrives

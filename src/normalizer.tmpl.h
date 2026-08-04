@@ -147,7 +147,7 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	//
 	// NOTE: this is currently a no-op in every case measured. The block
 	// machinery already refuses to eliminate across an unresolved
-	// reference at *conjunct* granularity -- push_ex_block_into_clause's
+	// reference at *conjunct* granularity -- eliminate_block_over_clause's
 	// is_quant_removable_in_clause and treat_ex_quantified_clause's
 	// blocks_elimination both test individual conjuncts, independent
 	// conjuncts are split out before either applies, and

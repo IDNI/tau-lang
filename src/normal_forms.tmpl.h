@@ -79,7 +79,7 @@ tref not_equal_to_unequal(tref fm) {
  * so it's tempting to drop this pass and rely on those. Both attempts
  * regressed the test suite, empirically:
  *  - Removing the pass entirely crashes an assertion in
- *    push_ex_block_into_clause (`!find_top(is<bf_neq>)`) and aborts most
+ *    eliminate_block_over_clause (`!find_top(is<bf_neq>)`) and aborts most
  *    of the satisfiability/solver/splitter/interpreter/api tests: several
  *    downstream matchers (this one, trivial_skolem_ex's bf_eq-only
  *    matcher, the is_atomic filters gating Boole decomposition) hard-

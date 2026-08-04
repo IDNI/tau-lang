@@ -22,6 +22,7 @@ set(TESTS
 	hooks
 	interpreter
 	io_context
+	leaf_clause
 	normal_forms
 	normalizer_uf_arithmetic
 	nso_ba

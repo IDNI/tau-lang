@@ -5,7 +5,7 @@
  * @brief Per-block union-find analysis deciding which block variables may be
  * eliminated, and why the others may not.
  *
- * Replaces the conjunct-level guards `push_ex_block_into_clause`'s
+ * Replaces the conjunct-level guards `eliminate_block_over_clause`'s
  * `is_quant_removable_in_clause` and `treat_ex_quantified_clause`'s
  * `blocks_elimination` used to apply. Those were all-or-nothing per clause;
  * this is per *component*, so a reference freezes only the variables that
@@ -111,7 +111,7 @@ struct block_eliminability {
 	 * The `bf_ref` half of that parity is a known gap, not just a
 	 * simplification: `analyse_block`'s `is_ref_fm` recognises only
 	 * `wff_ref`, so `g(y) = 0` is classified an ordinary eliminable atom and
-	 * `push_ex_block_into_clause` squeezes it into a BDD that cannot
+	 * `eliminate_block_over_clause` squeezes it into a BDD that cannot
 	 * eliminate through an unresolved reference. It is invisible today
 	 * because the legacy `anti_prenex` fallback resolves the residue, and it
 	 * is the reason `test_integration-normalizer_helpers` fails with

@@ -102,7 +102,7 @@ tref anti_prenex(tref formula);
  * and never as `wff_neg` over `bf_eq`. `squeeze_positives` selects `bf_eq`
  * atoms with `select_top`, which descends through `wff_neg`, so a `!(f = 0)`
  * conjunct would be squeezed as if it were positive and its negation silently
- * dropped. Note this is the *opposite* of `push_ex_block_into_clause`'s
+ * dropped. Note this is the *opposite* of `eliminate_block_over_clause`'s
  * precondition, which requires no `bf_neq` at all.
  * @tparam node Tree node type.
  * @param ex_clause An existentially quantified formula (a single clause).

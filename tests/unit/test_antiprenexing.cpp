@@ -203,7 +203,7 @@ TEST_SUITE("AntiPrenexBlock") {
 	TEST_CASE("paper 2a: distributes over a conjunction too") {
 		// The half no other path reaches: ex X (A && B) == ex X A && ex X B
 		// for negated atoms. Without 2a this is a pure clause and goes
-		// through push_ex_block_into_clause, which reaches the same
+		// through eliminate_block_over_clause, which reaches the same
 		// answer; the point here is that 2a gets it in one step and
 		// without consuming any decomposition atom.
 		auto [res, used] = run_apb_norm("ex x (xy != 0 && xw != 0).");
@@ -262,7 +262,7 @@ TEST_SUITE("AntiPrenexBlock") {
 		// Both x < z and xy = 0 contain the block variable and rank
 		// equally under atm_formula_order_for_quant_elim, which orders
 		// by variable priority only. But only a bf_eq can ever let
-		// push_ex_block_into_clause remove the block: splitting on the
+		// eliminate_block_over_clause remove the block: splitting on the
 		// bf_lt sends both branches to the unrecognized-conjunct path,
 		// which re-wraps, so the work is wasted and the result carries
 		// the debris.
@@ -905,7 +905,8 @@ TEST_SUITE("QuantBlockPush") {
 		quant_block.push_back(tau::get(fm)[0].first());
 		fm = tau::get(fm)[0].second();
 		term_handle<node_t>::order order;
-		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
+		tref res = eliminate_block_over_clause<node_t>(fm, quant_block,
+			block_eliminability<node_t>{}, order);
 		// tau::get(res).print(std::cout << "res: ") << "\n";
 		CHECK(tau::get(res).to_str() == "(ex b2, b1 b2 b1|b1 b2 = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2|b1) = 0) && (ex b2, b1 !(b2 b1|b1 b2)'&(b2^b1) = 0)");
 	}
@@ -921,7 +922,8 @@ TEST_SUITE("QuantBlockPush") {
 		quant_block.push_back(tau::trim2(fm));
 		order.emplace(tau::trim2(fm), 0);
 		fm = tau::get(fm)[0].second();
-		tref res = push_ex_block_into_clause<node_t>(fm, quant_block, order);
+		tref res = eliminate_block_over_clause<node_t>(fm, quant_block,
+			block_eliminability<node_t>{}, order);
 		// tau::get(res).print(std::cout << "ex: ") << "\n";
 		res = tau::build_wff_all(uvar, res, false);
 		res = push_quantifiers_in<node_t>(res);

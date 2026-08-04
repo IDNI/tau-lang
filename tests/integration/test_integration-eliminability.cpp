@@ -4,7 +4,7 @@
 #include "test_tau_helpers.h"
 
 // The entry point is anti_prenex_block, not the legacy anti_prenex: the
-// partition these cases exercise lives in push_ex_block_into_clause, which only
+// partition these cases exercise lives in eliminate_block_over_clause, which only
 // the block algorithm reaches (legacy anti_prenex goes through
 // treat_ex_quantified_clause and its own blocks_elimination guard, which Task 6
 // covers).
