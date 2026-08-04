@@ -1412,53 +1412,51 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// (test_integration-interpreter went from over 600 s back to
 		// 1.8 s). One blocker is left, and it is not an incompleteness:
 		//
-		// **Handing bv-typed content to the Boole/BDD path produces a
-		// WRONG ANSWER on at least one shape, and this fallback is what
-		// has been hiding it.**
+		// **The blocker is NOT in this algorithm. It is
+		// `simplify_using_equality`, which returns F for a satisfiable
+		// formula, and this fallback is what has been hiding it.**
 		//
-		// `eliminate_bv_and_quantifiers` makes the bv skip CONDITIONAL on
-		// `bv_is_solver_owned`, so a formula carrying a foreign BA constant
-		// (every `run` over mixed `:tau` / `:bv[N]` streams) has its bv
-		// content handed to the decomposition on purpose. Measured on the
-		// issue #70 step formula, all three combinations:
+		// Localised 2026-08-04 by tracing the pipeline step by step on the
+		// reduced repro below. With the fallback off, `anti_prenex_block`
+		// step 5's `syntactic_formula_simplification` -- specifically its
+		// `simplify_using_equality` half, not `syntactic_path_simplification`
+		// -- turns a not-F formula into F. Every earlier step (to_nnf, the
+		// two other simplifications, ex_subs, normalize_atomic_formula_
+		// operators, process_quantifier_blocks) still had it not-F.
+		//
+		// So the block algorithm itself is only INCOMPLETE here, never
+		// unsound: a legacy oracle run at block granularity (compare
+		// `anti_prenex(ex block . body)` against this pass's result for the
+		// same body) reported 10 mismatches on the repro and ALL TEN were
+		// `block=notF, legacy=F` -- this pass keeping a quantifier the
+		// legacy one could discharge. Not one was the other way round.
+		//
+		// `simplify_using_equality` builds a union-find of asserted
+		// equalities and answers F when 0 and 1 become connected. It is
+		// shared by both algorithms and is reached with mixed `:tau` /
+		// `:bv[8]` content here. Simple mixed cases are fine -- checked by
+		// hand: `x:tau = 1 && y:bv[8] = { #x01 }:bv[8]`, the bv/bv and
+		// tau/tau pairs, and equalities under `ex`/`all` binders all
+		// simplify correctly and do not leak across scopes -- so it needs
+		// the larger structure. The offending formula is saved verbatim at
+		// `private/2026-08-04-simplify_using_equality-wrong-F.txt` (it does
+		// NOT round-trip through print/parse: io_vars plus the
+		// `{ 1 }:bv[8]` spelling, so reduce it at tree level, not as text).
+		//
+		// Measured on the issue #70 step formula, all three combinations:
 		//
 		//   bv skipped,     no fallback -> quantifier survives (incomplete)
 		//   bv NOT skipped, no fallback -> **F, and the formula is SAT**
 		//   bv NOT skipped, with fallback -> correct
 		//
-		// So production correctness on that shape rests on a step that
-		// answers F for a satisfiable formula, repaired afterwards by this
-		// fallback. Deleting the fallback without fixing that turns a
-		// surviving quantifier into a wrong answer.
+		// bv is what makes it reachable: retyping the repro to pure `:tau`
+		// leaves it merely incomplete rather than wrong.
 		//
-		// It IS bv-specific. Retyping the same reduced repro from
-		// `:bv[8]` to `:tau` throughout -- same structure, same nesting,
-		// constants replaced by `:tau` ones -- leaves the block path merely
-		// INCOMPLETE (it returns `all b2, b1 ...` with the block intact)
-		// rather than wrong. Only the bv version answers F.
-		//
-		// One concrete lead: the squeeze does compute over bv constants.
-		// Tracing the repro shows it building terms such as
-		// `{ (bvand #b00001001 #b00001000) }:bv[8]'&({ 9 }:bv[8]'{ 8 }
-		// :bv[8]')' = 0` -- the `f_0 * f_1 = 0` construction with bv
-		// constants substituted for the bound variable. That particular
-		// term evaluates correctly (it is the F of `ex b1 (b1 = 9 && b1 =
-		// 8)`), so the arithmetic is not obviously wrong; what to check is
-		// whether equations from DIFFERENT decomposition branches are
-		// reaching one squeeze.
-		//
-		// The cause is NOT identified yet, and the obvious guess is wrong:
-		// Boole's elimination `ex x (f(x) = 0) == f(0)*f(1) = 0` is a
-		// theorem of Boolean algebras generally, so "a bv algebra has
-		// atoms" does not explain it. What was ruled out by tracing the
-		// reduced repro: no leftover quantifier reaches the end of
-		// `eliminate_bv_and_quantifiers`; no `F` is returned by
-		// `eliminate_block_over_clause`, by `blast_block`'s solver call, or
-		// by the 2b fast path; and every per-block `F` inspected was
-		// locally correct (each such body was genuinely contradictory). So
-		// a satisfiable branch is being lost somewhere in the
-		// disjunction/decomposition bookkeeping, not by any single site
-		// deciding F. Start there.
+		// Beware the plausible-but-wrong explanation: "a bv algebra has
+		// atoms, so Boole elimination is unsound there". Boole's identity
+		// `ex x (f(x) = 0) == f(0)*f(1) = 0` is a theorem of Boolean
+		// algebras generally, and the squeeze's own arithmetic checked out
+		// on the traced terms.
 		//
 		// Reduced repro, on `normalize` with the fallback off:
 		//   all i1[1]:tau, i2[1]:bv[8]
