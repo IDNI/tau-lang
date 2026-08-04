@@ -160,6 +160,26 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	//
 	// Recomputed before each pass: the set is keyed on tref nodes of the
 	// tree being scanned, and `form` is rebuilt in between.
+	//
+	// The two passes are NOT collapsible into one, measured 2026-08-04. The
+	// redesign plan's Task 9 proposed replacing them with a single call, on
+	// the reading that the second pass's skip subsumes the first's and that
+	// the per-block eliminability analysis has made the staging redundant.
+	// Both single-pass variants fail `test_integration-interpreter`'s
+	// "nested conditionals over mixed tau/bv streams stay sat" -- the issue
+	// #70 regression test -- in both configurations: keeping the second
+	// pass's conditional bv skip reports "Tau specification is unsat", and
+	// keeping the first pass's unconditional one SIGSEGVs. What the second
+	// pass depends on is not the first pass's *predicate* but its having
+	// already run: it works on a formula whose non-bv structure is resolved.
+	//
+	// The analysis cannot substitute for that today, and the plan's premise
+	// that it could does not hold as built: `solver_owned` is consumed only
+	// inside `eliminate_block_over_clause`, whereas the decisions that
+	// matter here -- which quantifiers `collect_quantifier_block` treats as
+	// transparent, and what `blast_block` hands to the solver -- still read
+	// the `skip` predicate. Collapsing needs those rewired to the analysis
+	// first (the plan's own Task 9 step 2), not merely one call deleted.
 	auto ref_skip = make_ref_variables_skip<node>(form);
 	form = anti_prenex_block<node>(form, [ref_skip](tref n) {
 		return is_tref_bv_type_family<node>(n) || ref_skip(n);
