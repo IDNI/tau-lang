@@ -274,6 +274,23 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// that produces the wrong answer. Re-adding the loop therefore needs
 	// the squeeze audited first, not just a better-placed substitution.
 	//
+	// Localised further 2026-08-04 with a GROUND-EVALUATION oracle (assign
+	// 0/1 to every free variable, normalise the closed instance, compare --
+	// T and F are both definite, so a disagreement is proof). Re-enabling
+	// the loop and checking every call site:
+	//
+	//   * every `eliminate_block_over_clause` call is equivalence-preserving
+	//   * every `resolve_quantifiers2` call is equivalence-preserving
+	//   * `anti_prenex_block`'s CORE recursion is NOT: on
+	//     `ex b2 (<conjunction of disjunctions>)` it returns a result that
+	//     disagrees at `b3=0, o0seal[0]=1, o0law[0]=1`.
+	//
+	// So the wrong answer lives in the core's disjunction-distribution /
+	// Boole-decomposition path, and the substitution loop merely FEEDS it
+	// that shape -- which is why disabling the loop hides it. Fix the core
+	// first; the loop can then come back and with it the completeness lost
+	// below. Declining to squeeze bv-typed clauses does NOT help (tried).
+	//
 	// Removing it costs completeness, and the cost is visible: with the
 	// legacy fallback off, `test_integration-interpreter` goes back to
 	// diverging (1500 s timeout) and satisfiability2 to ~327 s, because
