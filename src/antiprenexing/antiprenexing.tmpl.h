@@ -451,6 +451,15 @@ tref ex_quantified_boole_decomposition(tref ex_quant_fm, auto& pool,
 /// whatever is left unresolved.
 inline constexpr size_t block_boole_max_splits = 512;
 
+/// TEMPORARY (removed together with the legacy algorithm): lets the suite be run
+/// with the legacy `anti_prenex` fallback disabled, to prove that partial clause
+/// elimination has replaced it, without deleting code that would be painful to
+/// restore. It guards only the two *legacy* fallback calls in
+/// `process_quantifier_block`, not the `resolve_quantifiers` call before them --
+/// that one is this algorithm's own solver/blasting retry, which stays either
+/// way.
+inline bool legacy_antiprenex_fallback = true;
+
 /**
  * @internal
  * @brief Core recursive helper for the anti-prenex block algorithm.
@@ -1383,11 +1392,38 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// correctly alone, and other structural cases its
 		// push_existential_quantifier_one/ex_quantified_boole_decomposition
 		// strategy resolves but this algorithm's disjunction/Boole
-		// decomposition does not (confirmed empirically: removing this
-		// fallback regresses satisfiability1-3, solver, splitter(2),
-		// interpreter, wff_normalization, and normal_forms tests, none of
-		// which involve bitvector content).
-		if (has_live_quantifier(r))
+		// decomposition does not.
+		//
+		// Re-measured 2026-08-04 with `legacy_antiprenex_fallback = false`,
+		// after partial clause elimination landed. Partial elimination did
+		// recover most of the old list -- satisfiability1-3, solver,
+		// splitter2, wff_normalization and normal_forms all pass without the
+		// fallback now -- but three things still need it:
+		//
+		//  1. test_integration-interpreter DIVERGES (2.1 s -> over 600 s,
+		//     both configurations). A block this algorithm leaves unresolved
+		//     is re-collected by process_quantifier_blocks every round, and
+		//     the disjunction split duplicates it: the round's block count
+		//     runs 1 -> 10 -> 1200 -> 2030 instead of staying at 1-3. The
+		//     fallback is what actually *closes* a residual block, and
+		//     nothing else does. Reproduced with the partition disabled too,
+		//     so it is a standing gap in this algorithm, not a regression
+		//     from partial elimination. test_integration-satisfiability2 is
+		//     the same mechanism, milder: it still passes but 13-19x slower.
+		//  2. test_integration-normalizer_helpers fails: a bound variable
+		//     inside a *bf_ref argument* (`g(y) = 0`) is left quantified.
+		//     The eliminability analysis reads `bf_ref` as an ordinary atom
+		//     -- it only recognises `wff_ref` -- so the atom is squeezed into
+		//     the BDD, which cannot eliminate through an unresolved
+		//     reference. Legacy resolves it by substituting constants into
+		//     the argument (`g(0)`, `g(1)`).
+		//  3. test_integration-splitter aborts in Debug only: the
+		//     `types_homogeneous` assert above fires on a mixed-BA-type
+		//     clause that the runtime guard beside it already declines
+		//     gracefully. Behaviour is right; the assert states a
+		//     precondition that no longer holds once this algorithm owns
+		//     these shapes.
+		if (legacy_antiprenex_fallback && has_live_quantifier(r))
 			r = anti_prenex<node>(r);
 		return r;
 	};
@@ -1402,8 +1438,10 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		result = normalize_atomic_formula_operators<node>(
 			to_nnf<node>(tau::build_wff_neg(pushed)));
 		// Same final fallback as above, with the same term guard.
-		if (tree<node>::get(result).find_top_until(is_quantifier<node>,
-			[](tref k) { return !while_is_formula<node>(k); }))
+		if (legacy_antiprenex_fallback
+			&& tree<node>::get(result).find_top_until(
+				is_quantifier<node>,
+				[](tref k) { return !while_is_formula<node>(k); }))
 			result = anti_prenex<node>(result);
 	}
 	return wrap_skipped(result);
