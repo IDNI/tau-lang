@@ -107,6 +107,18 @@ struct block_eliminability {
 	 * looks inside it) and a `bf_ref` inside an atom's arguments are not
 	 * counted here -- parity with the guard this analysis replaces, which
 	 * did not distinguish them either.
+	 *
+	 * The `bf_ref` half of that parity is a known gap, not just a
+	 * simplification: `analyse_block`'s `is_ref_fm` recognises only
+	 * `wff_ref`, so `g(y) = 0` is classified an ordinary eliminable atom and
+	 * `push_ex_block_into_clause` squeezes it into a BDD that cannot
+	 * eliminate through an unresolved reference. It is invisible today
+	 * because the legacy `anti_prenex` fallback resolves the residue, and it
+	 * is the reason `test_integration-normalizer_helpers` fails with
+	 * `legacy_antiprenex_fallback = false`. Closing it means freezing such
+	 * atoms *and* teaching the block path the legacy constant-substitution
+	 * step (`g(0)`, `g(1)`); freezing alone trades a wrong answer for a
+	 * surviving quantifier.
 	 */
 	bool has_reference() const { return has_ref; }
 
