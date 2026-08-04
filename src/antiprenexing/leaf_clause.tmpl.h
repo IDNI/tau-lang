@@ -66,44 +66,6 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// If there are no quantifiers to remove, the clause can be returned
 	if (block.empty()) return clause;
 
-	// All types in the block and in the clause are the same, otherwise
-	// the quantifiers have not been pushed in correctly.
-	// The first *typed* block variable: collect_quantifier_block lets
-	// untyped (get_ba_type() == 0) variables join a typed run, so
-	// block.front() is not guaranteed to carry the run's type.
-	size_t clause_type = 0;
-	bool types_homogeneous = true;
-	auto note_type = [&](size_t t) {
-		if (t == 0) return;
-		if (clause_type == 0) clause_type = t;
-		else if (clause_type != t) types_homogeneous = false;
-	};
-	for (tref v : block) note_type(tau::get(v).get_ba_type());
-	// A runtime guard, deliberately with no DBG assert beside it. It used to
-	// carry one, on the reading that a heterogeneous clause meant the
-	// quantifiers had been pushed in wrongly upstream. The 2026-08-04
-	// fallback experiment disproved that: with `legacy_antiprenex_fallback`
-	// off, `test_integration-splitter` reaches this line with
-	// `!b5' = 0 && b6 = 0 && b3 = 0 && b4' = 0 && (ex b2, b1 ...)` and
-	// aborts Debug, while Release takes the re-wrap below and passes 26/26.
-	// The behaviour was right and the assertion was wrong -- mixing BA types
-	// is a shape this algorithm now legitimately meets, so declining is the
-	// answer, not dying.
-	auto type_scan = [&](tref n) {
-		const size_t t = tau::get(n).get_ba_type();
-		if (t == 0) return true;
-		note_type(t);
-		return false;
-	};
-	pre_order<node>(clause).visit(type_scan);
-	if (!types_homogeneous) {
-		LOG_ERROR << "eliminate_block_over_clause: clause mixes BA "
-			"types, keeping the quantifier block: " << LOG_FM(clause);
-		for (auto v = block.rbegin(); v != block.rend(); ++v)
-			clause = build_wff_ex<node>(*v, clause, false);
-		return clause;
-	}
-
 	// ---- Lift the conjuncts no block variable touches --------------------
 	//
 	// Absorbed from `treat_ex_quantified_clause`. A conjunct free of every
@@ -124,6 +86,59 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// Nothing in the clause depends on the block at all: under the standing
 	// non-empty domain assumption every binder drops.
 	if (conjs.empty()) return indep;
+
+	// ---- BA-type homogeneity, over the DEPENDENT conjuncts only ----------
+	//
+	// The squeeze needs one BA type: `build_bf_or` seeds its accumulator
+	// from `_0<node>(clause_type)`, so a heterogeneous input silently
+	// produces a wrongly-typed term.
+	//
+	// Scanned AFTER the lift, and over `conjs` rather than the whole clause,
+	// which is what makes this usable at all. A mixed `:tau` / `:bv[N]` spec
+	// -- every `run` over mixed streams -- reaches here with a clause whose
+	// conjuncts are individually homogeneous but collectively are not, and
+	// the block's own variables only ever occur in conjuncts of the block's
+	// type. Scanning the whole clause declined all of those: measured
+	// 2026-08-04, that is what left the `all i2[1]:bv[8] (...)` block
+	// standing in `test_integration-interpreter`'s "nested conditionals over
+	// mixed tau/bv streams stay sat" (issue #70) once the legacy fallback
+	// stopped rescuing it, making the step system unsolvable and the run
+	// report "Tau specification is unexpectedly unsat".
+	//
+	// A runtime guard, deliberately with no DBG assert beside it. It used to
+	// carry one, on the reading that a heterogeneous clause meant the
+	// quantifiers had been pushed in wrongly upstream. The same experiment
+	// disproved that: `test_integration-splitter` reaches this line
+	// legitimately and Release, which only had the guard, passed 26/26.
+	// Mixing BA types is a shape this algorithm meets; declining is the
+	// answer, not dying.
+	size_t clause_type = 0;
+	bool types_homogeneous = true;
+	auto note_type = [&](size_t t) {
+		if (t == 0) return;
+		if (clause_type == 0) clause_type = t;
+		else if (clause_type != t) types_homogeneous = false;
+	};
+	// The first *typed* block variable: collect_quantifier_block lets
+	// untyped (get_ba_type() == 0) variables join a typed run, so
+	// block.front() is not guaranteed to carry the run's type.
+	for (tref v : block) note_type(tau::get(v).get_ba_type());
+	auto type_scan = [&](tref n) {
+		const size_t t = tau::get(n).get_ba_type();
+		if (t == 0) return true;
+		note_type(t);
+		return false;
+	};
+	for (tref c : conjs) pre_order<node>(c).visit(type_scan);
+	if (!types_homogeneous) {
+		LOG_ERROR << "eliminate_block_over_clause: dependent conjuncts "
+			"mix BA types, keeping the quantifier block: "
+			<< LOG_FM(clause);
+		tref kept = tau::build_wff_and(conjs);
+		for (auto v = block.rbegin(); v != block.rend(); ++v)
+			kept = build_wff_ex<node>(*v, kept, false);
+		return tau::build_wff_and(indep, kept);
+	}
 
 	// ---- Partition the block by eliminability component ------------------
 	//
@@ -221,6 +236,25 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 
 	tref scoped = tau::build_wff_and(free_conjs);
 
+	// Drop live binders that bind nothing. A variable occurring nowhere in
+	// the part about to be squeezed is unconstrained, so under the standing
+	// non-empty domain assumption its binder simply goes -- the same identity
+	// the `live.empty()` and independent-conjunct paths above already use.
+	//
+	// This is routing, not just tidying. The squeeze below has two paths, and
+	// only the single-variable one substitutes constants INTO reference
+	// arguments (`g(0)`, `g(1)`), which is the only way to settle a variable
+	// under an unresolved `bf_ref`. A vacuous second binder is enough to send
+	// a clause that the single-variable path would resolve to the block path,
+	// which cannot: `ex b1, b2 (g(b1) != 0)` is exactly that shape.
+	auto occurring_in = [&](const trefs& vs, tref in) {
+		trefs r;
+		for (tref v : vs) if (contains<node>(in, v)) r.push_back(v);
+		return r;
+	};
+	live = occurring_in(live, scoped);
+	if (live.empty()) return with_kept(scoped);
+
 	// ---- A substitution witness, per live variable -----------------------
 	//
 	// Absorbed from `treat_ex_quantified_clause`: `ex x (x = t && phi(x))`
@@ -250,6 +284,9 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	if (tau::get(scoped).equals_T()) return with_kept(_T<node>());
 	// An existential over F is F, independently of the variables.
 	if (tau::get(scoped).equals_F()) return _F<node>();
+	// Again after substitution: eliminating one variable can remove the last
+	// occurrence of another.
+	still_live = occurring_in(still_live, scoped);
 	if (still_live.empty()) return with_kept(scoped);
 
 	// ---- Bitvector content: the solver, then blasting --------------------

@@ -1404,34 +1404,47 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// decomposition does not.
 		//
 		// Re-measured 2026-08-04 with `legacy_antiprenex_fallback = false`,
-		// after partial clause elimination landed. Partial elimination did
-		// recover most of the old list -- satisfiability1-3, solver,
-		// splitter2, wff_normalization and normal_forms all pass without the
-		// fallback now -- but three things still need it:
+		// twice: once after partial clause elimination landed, and again
+		// after the leaf_clause merge. The second run cleared most of the
+		// original list -- satisfiability1-3, solver, splitter, splitter2,
+		// wff_normalization, normal_forms and normalizer_helpers all pass
+		// without the fallback, and the elimination no longer diverges
+		// (test_integration-interpreter went from over 600 s back to
+		// 1.8 s). One blocker is left, and it is not an incompleteness:
 		//
-		//  1. test_integration-interpreter DIVERGES (2.1 s -> over 600 s,
-		//     both configurations). A block this algorithm leaves unresolved
-		//     is re-collected by process_quantifier_blocks every round, and
-		//     the disjunction split duplicates it: the round's block count
-		//     runs 1 -> 10 -> 1200 -> 2030 instead of staying at 1-3. The
-		//     fallback is what actually *closes* a residual block, and
-		//     nothing else does. Reproduced with the partition disabled too,
-		//     so it is a standing gap in this algorithm, not a regression
-		//     from partial elimination. test_integration-satisfiability2 is
-		//     the same mechanism, milder: it still passes but 13-19x slower.
-		//  2. test_integration-normalizer_helpers fails: a bound variable
-		//     inside a *bf_ref argument* (`g(y) = 0`) is left quantified.
-		//     The eliminability analysis reads `bf_ref` as an ordinary atom
-		//     -- it only recognises `wff_ref` -- so the atom is squeezed into
-		//     the BDD, which cannot eliminate through an unresolved
-		//     reference. Legacy resolves it by substituting constants into
-		//     the argument (`g(0)`, `g(1)`).
-		//  3. test_integration-splitter aborts in Debug only: the
-		//     `types_homogeneous` assert above fires on a mixed-BA-type
-		//     clause that the runtime guard beside it already declines
-		//     gracefully. Behaviour is right; the assert states a
-		//     precondition that no longer holds once this algorithm owns
-		//     these shapes.
+		// **Boole decomposition over bv-typed content is UNSOUND, and this
+		// fallback is what has been hiding it.** The decomposition rests on
+		// `ex x (f(x) = 0) == f(0)*f(1) = 0`, which holds in an ATOMLESS
+		// Boolean algebra. A bitvector algebra has atoms, so the identity
+		// does not hold there -- which is the real reason bv content is
+		// skip-matched, over and above the cost argument recorded in
+		// `eliminate_bv_and_quantifiers`.
+		//
+		// `eliminate_bv_and_quantifiers` makes that skip CONDITIONAL on
+		// `bv_is_solver_owned`, so a formula carrying a foreign BA constant
+		// (every `run` over mixed `:tau` / `:bv[N]` streams) has its bv
+		// content handed to the decomposition on purpose. Measured on the
+		// issue #70 step formula, all three combinations:
+		//
+		//   bv skipped,     no fallback -> quantifier survives (incomplete)
+		//   bv NOT skipped, no fallback -> **F, and the formula is SAT**
+		//   bv NOT skipped, with fallback -> correct
+		//
+		// So production correctness on that shape currently rests on an
+		// unsound step being repaired by this fallback. Deleting the
+		// fallback without first making bv quantifier elimination sound
+		// turns a surviving quantifier into a wrong answer. The route is
+		// blasting -- `bv_predicate_blasting` rewrites bv arithmetic into
+		// per-bit Boolean atoms, which ARE atomless and so ARE decomposable
+		// -- applied where the conditional skip currently just lets the
+		// decomposition have the raw bv atoms.
+		//
+		// Reduced repro, on `normalize` with the fallback off:
+		//   all i1[1]:tau, i2[1]:bv[8]
+		//     ex o0law[1]:tau, o0res[1]:bv[8], o0seal[1]:tau (...)
+		// -- the three-conjunct reduction of the interpreter test's step-0
+		// system; it answers F where the same input with the fallback on
+		// answers `o0law[0]:tau' = 0 && o0seal[0]:tau' = 0`.
 		if (legacy_antiprenex_fallback && has_live_quantifier(r))
 			r = anti_prenex<node>(r);
 		return r;
@@ -1747,8 +1760,34 @@ tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip) {
 	// are whatever entry assigned them plus whatever survived the rewriting;
 	// re-canonicalising restores the invariant callers outside this file
 	// (api.tmpl.h, tau_tree_from_parser.tmpl.h) already maintain.
-	return canonize_quantifier_ids<node>(
-		syntactic_formula_simplification<node>(formula));
+	// Step 6: drop binders that bind nothing and scopes that are constant.
+	// Neither is a legitimate output of quantifier elimination, and both are
+	// reachable: the re-wrap paths above put the WHOLE block back around a
+	// part, which can leave a variable bound that no longer occurs in it, and
+	// a scope can fold to T/F after the wrap.
+	//
+	// This is not cosmetic. `check_decided` (normalizer.tmpl.h) reads the
+	// normalized formula as T, F or "undecided", and it runs on
+	// `normalize_non_temp`'s output -- before `normalize_with_temp_simp`'s
+	// `fold_trivial_quantifiers`. So a residual `all b2, b1 T` is reported as
+	// a formula normalization *could not decide*, and `are_nso_equivalent`
+	// answers negatively on a formula that is plainly T. Folding here, where
+	// the residue is created, is what stops that.
+	auto fold_vacuous_quant = [](tref n) -> tref {
+		if (!is_child_quantifier<node>(n)) return n;
+		tref scoped = tau::get(n)[0].second();
+		// ex x T/F = all x T/F = T/F.
+		if (tau::get(scoped).equals_T() || tau::get(scoped).equals_F())
+			return scoped;
+		// A binder over a variable absent from its scope is vacuous
+		// under the standing non-empty domain assumption.
+		if (!contains<node>(scoped, tau::get(n)[0].first()))
+			return scoped;
+		return n;
+	};
+	formula = syntactic_formula_simplification<node>(formula);
+	formula = post_order<node>(formula).apply_unique(fold_vacuous_quant);
+	return canonize_quantifier_ids<node>(formula);
 }
 
 

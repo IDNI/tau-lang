@@ -295,11 +295,24 @@ tref normalize_non_temp(tref fm) {
 #endif // TAU_CACHE
 	tref result = eliminate_bv_and_quantifiers<node>(fm);
 	result = term_boole_normal_form<node>(result);
-	// NOTE: Do NOT add fold_trivial_quantifiers or reget here.
-	// tau::reget strips the explicit bitwidth subtype from BV-typed nodes
-	// (io_vars and BV constants) causing get_bv_size assertions downstream.
-	// Residual trivial quantifiers are folded by normalize_with_temp_simp
-	// (which already calls fold_trivial_quantifiers after normalize).
+	// NOTE: Do NOT add `tau::reget` here. It strips the explicit bitwidth
+	// subtype from BV-typed nodes (io_vars and BV constants), causing
+	// get_bv_size assertions downstream. `fold_trivial_quantifiers` is a
+	// different matter and IS wanted: it rebuilds only the ancestors of the
+	// nodes it folds, not every node, so it does not have that effect.
+	//
+	// It has to run here, not only in normalize_with_temp_simp. Every
+	// `is_non_temp_nso_*` / `are_nso_equivalent` predicate reads THIS
+	// function's result as T, F or "undecided" via check_decided, and that
+	// happens well before normalize_with_temp_simp's fold. A residual
+	// `all b2, b1 T` -- which the resolve passes above can leave behind when
+	// a scope folds to a constant after its quantifier prefix was already
+	// re-attached -- was therefore being reported as a formula normalization
+	// could not decide, and `are_nso_equivalent` answered negatively on a
+	// formula that is plainly T. Pinned by
+	// "a term containing a bf_ref still normalizes"
+	// (test_integration-normalizer_helpers.cpp).
+	result = fold_trivial_quantifiers<node>(result);
 #ifdef TAU_CACHE
 	cache.emplace(fm, result);
 #endif // TAU_CACHE
