@@ -1412,15 +1412,11 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// (test_integration-interpreter went from over 600 s back to
 		// 1.8 s). One blocker is left, and it is not an incompleteness:
 		//
-		// **Boole decomposition over bv-typed content is UNSOUND, and this
-		// fallback is what has been hiding it.** The decomposition rests on
-		// `ex x (f(x) = 0) == f(0)*f(1) = 0`, which holds in an ATOMLESS
-		// Boolean algebra. A bitvector algebra has atoms, so the identity
-		// does not hold there -- which is the real reason bv content is
-		// skip-matched, over and above the cost argument recorded in
-		// `eliminate_bv_and_quantifiers`.
+		// **Handing bv-typed content to the Boole/BDD path produces a
+		// WRONG ANSWER on at least one shape, and this fallback is what
+		// has been hiding it.**
 		//
-		// `eliminate_bv_and_quantifiers` makes that skip CONDITIONAL on
+		// `eliminate_bv_and_quantifiers` makes the bv skip CONDITIONAL on
 		// `bv_is_solver_owned`, so a formula carrying a foreign BA constant
 		// (every `run` over mixed `:tau` / `:bv[N]` streams) has its bv
 		// content handed to the decomposition on purpose. Measured on the
@@ -1430,14 +1426,39 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		//   bv NOT skipped, no fallback -> **F, and the formula is SAT**
 		//   bv NOT skipped, with fallback -> correct
 		//
-		// So production correctness on that shape currently rests on an
-		// unsound step being repaired by this fallback. Deleting the
-		// fallback without first making bv quantifier elimination sound
-		// turns a surviving quantifier into a wrong answer. The route is
-		// blasting -- `bv_predicate_blasting` rewrites bv arithmetic into
-		// per-bit Boolean atoms, which ARE atomless and so ARE decomposable
-		// -- applied where the conditional skip currently just lets the
-		// decomposition have the raw bv atoms.
+		// So production correctness on that shape rests on a step that
+		// answers F for a satisfiable formula, repaired afterwards by this
+		// fallback. Deleting the fallback without fixing that turns a
+		// surviving quantifier into a wrong answer.
+		//
+		// It IS bv-specific. Retyping the same reduced repro from
+		// `:bv[8]` to `:tau` throughout -- same structure, same nesting,
+		// constants replaced by `:tau` ones -- leaves the block path merely
+		// INCOMPLETE (it returns `all b2, b1 ...` with the block intact)
+		// rather than wrong. Only the bv version answers F.
+		//
+		// One concrete lead: the squeeze does compute over bv constants.
+		// Tracing the repro shows it building terms such as
+		// `{ (bvand #b00001001 #b00001000) }:bv[8]'&({ 9 }:bv[8]'{ 8 }
+		// :bv[8]')' = 0` -- the `f_0 * f_1 = 0` construction with bv
+		// constants substituted for the bound variable. That particular
+		// term evaluates correctly (it is the F of `ex b1 (b1 = 9 && b1 =
+		// 8)`), so the arithmetic is not obviously wrong; what to check is
+		// whether equations from DIFFERENT decomposition branches are
+		// reaching one squeeze.
+		//
+		// The cause is NOT identified yet, and the obvious guess is wrong:
+		// Boole's elimination `ex x (f(x) = 0) == f(0)*f(1) = 0` is a
+		// theorem of Boolean algebras generally, so "a bv algebra has
+		// atoms" does not explain it. What was ruled out by tracing the
+		// reduced repro: no leftover quantifier reaches the end of
+		// `eliminate_bv_and_quantifiers`; no `F` is returned by
+		// `eliminate_block_over_clause`, by `blast_block`'s solver call, or
+		// by the 2b fast path; and every per-block `F` inspected was
+		// locally correct (each such body was genuinely contradictory). So
+		// a satisfiable branch is being lost somewhere in the
+		// disjunction/decomposition bookkeeping, not by any single site
+		// deciding F. Start there.
 		//
 		// Reduced repro, on `normalize` with the fallback off:
 		//   all i1[1]:tau, i2[1]:bv[8]
