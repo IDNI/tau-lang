@@ -74,13 +74,30 @@ bool is_processed(tref n) {
 	return tree<node>::get(n).get_ba_type() != 0;
 }
 
+// Descends through the single-child wrappers the grammar puts around a
+// reference (`bf` > `bf_ref` > `ref`, `wff` > `wff_ref` > `ref`, and the
+// `wff` > `wff_ref` > `bf` > `bf_ref` > `ref` mix a reclassified head can
+// carry) and returns the `ref` inside, or nullptr if @p n does not wrap one.
+template<NodeType node>
+tref unwrap_to_ref(tref n) {
+	using tau = tree<node>;
+	while (n && !tau::get(n).is(tau::ref)) {
+		const auto& t = tau::get(n);
+		if (t.children_size() != 1) return nullptr;
+		n = t.first();
+	}
+	return n;
+}
+
 template <NodeType node>
 std::tuple<size_t, int_t, int_t> get_function_signature(tref func) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	// We make this function accept also bf > bf_ref > ref
-	if (tau::get(func).is(tau::bf)) func = tau::trim2(func);
+	// We accept any of the wrappers a reference can come in, not just
+	// bf > bf_ref > ref: a definition head reclassified as functional is
+	// still wrapped in the wff_ref the parser gave it.
+	if (tref ref = unwrap_to_ref<node>(func); ref) func = ref;
 	DBG(assert(tau::get(func).is(tau::ref)));
 
 	const tau& ref_head = tau::get(func);
@@ -172,7 +189,7 @@ std::variant<typeables_type_id_map<node>, inference_error> get_typeable_type_ids
 }
 
 template<NodeType node>
-bool is_functional_relation(tref n) {
+bool is_functional_relation(tref n, const auto& function_symbols) {
 	using tau = tree<node>;
 
 	auto t = tau::get(n);
@@ -184,6 +201,22 @@ bool is_functional_relation(tref n) {
 	if (!is_untyped_tref<node>(t[1].get()) || t[1].is_term()) {
 		return true;
 	}
+	// A relation whose body is nothing but a reference says nothing about
+	// being a formula; it was classified as a predicate only because
+	// neither side carried a type. If its head symbol is also called from a
+	// term position, it is a function. Without this,
+	// `pred(int[t](1)) := int[t-1](1)` got a `wff_ref` head while every
+	// call `add(pred(x), ...)` is a `bf_ref`, so the definition silently
+	// never matched at the call site (issue 36). A body that is a genuine
+	// formula (`p(x) := x' = 0`) stays a predicate: calling it from a term
+	// position is a type error, not a reason to reinterpret it.
+	if (unwrap_to_ref<node>(t[1].get()))
+		if (tref head = unwrap_to_ref<node>(t[0].get()); head
+			&& function_symbols.contains(
+				get_function_signature<node>(head)))
+		{
+			return true;
+		}
 	// Otherwise, we have a predicate relation.
 	return false;
 }
@@ -414,6 +447,19 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	auto fallback = tt(std::get<tref>(updated)) | tau::fp_fallback | tt::first | tt::ref;
 	auto type = find_ba_type<node>(std::get<tref>(updated));
 	DBG(assert(!is_untyped<node>(type));)
+	// TI-2: a ref-shaped fallback gets wrapped in the reference's type
+	// below, but a plain term fallback was never checked against it, so
+	// `g(x) fallback x:sbf` with a bv[8] `g` sailed through inference --
+	// even though the same annotation one position to the left, in the
+	// definition body, is rejected. Unify the two and report a conflict.
+	if (!is<node, tau::ref>(fallback)) {
+		size_t fallback_type = get_effective_ba_type<node>(fallback);
+		if (fallback_type && !is_untyped<node>(fallback_type)
+			&& !is_untyped<node>(type)
+			&& !unify<node>(fallback_type, type))
+				return inference_error{ fallback, type,
+					fallback_type };
+	}
 	if (is<node, tau::ref>(fallback))
 		fallback = tau::get_typed(tau::bf,
 			tau::get_typed(tau::bf_ref, fallback, type), type);
@@ -461,6 +507,19 @@ std::variant<tref, inference_error, parse_error> update_functional_rr(
 	// assuming the type of the head
 	tref head = untype<node>(tau::get(std::get<tref>(updated)).child(0));
 	tref body = untype<node>(tau::get(std::get<tref>(updated)).child(1));
+	// A relation reclassified as functional because its symbol is called
+	// from a term position still carries the wff_ref the parser gave it,
+	// and rewrapping that as-is yields a wff_ref holding a bf, which
+	// matches nothing. Strip that wrapper so the rewrap below sees the bare
+	// reference. A bf wrapper is left untouched: it is already the right
+	// shape and carries the types just established.
+	auto unwrap_wff_ref = [](tref n) {
+		if (!tau::get(n).is(tau::wff)) return n;
+		tref ref = unwrap_to_ref<node>(n);
+		return ref ? ref : n;
+	};
+	head = unwrap_wff_ref(head);
+	body = unwrap_wff_ref(body);
 	// If the body is a formula and not a term, reject
 	if (tau::get(body).is(tau::wff)) return nullptr;
 	size_t type = find_ba_type<node>(std::get<tref>(updated));
@@ -779,11 +838,31 @@ std::variant<size_t, inference_error> type_by_function_symbol(
 		for (auto [func, _] : type_map) {
 			if (auto it = available_function_symbols.find(get_function_signature<node>(func));
 					it != available_function_symbols.end()) {
+				// A signature recorded only to mark the symbol as a
+				// function carries no type; assigning it would
+				// pin the scope to untyped.
+				if (is_untyped<node>(it->second)) continue;
 				// Found previous function definition and return as soon as
 				// possible
 				return resolver.assign(func, it->second);
 			}
 		}
+		return untyped_type_id<node>();
+	}
+	// TI-1: when the scope already has a type, this used to return
+	// immediately and never look at what the callee was declared as, so
+	// `f(x:bv[8]) := x. g(y:sbf) := f(y).` passed -- a reference handing a
+	// bv[8] function an sbf. A definition carries ONE type across its head,
+	// body and parameters (update_functional_rr unifies its arguments with
+	// the header type), so a call site whose own type disagrees with the
+	// callee's recorded type is inconsistent with that same model.
+	for (auto [func, _] : type_map) {
+		auto it = available_function_symbols.find(
+			get_function_signature<node>(func));
+		if (it == available_function_symbols.end()
+			|| is_untyped<node>(it->second)
+			|| unify<node>(type, it->second)) continue;
+		return inference_error{ func, it->second, type };
 	}
 	return untyped_type_id<node>();
 }
@@ -912,6 +991,19 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 
 	type_inference_options options = user_options;
 
+	// A reference the grammar put under a `bf_ref` sits in a term position,
+	// so its definition is a function definition -- whatever that
+	// definition's own head and body look like in isolation. Recording
+	// those signatures before the traversal starts means the classification
+	// does not depend on whether the definition or its first use is seen
+	// first. The type is left untyped: this only settles predicate versus
+	// function, the type comes from the definition itself.
+	for (tref bf_ref : tau::get(n).select_all(is<node, tau::bf_ref>))
+		if (tref ref = unwrap_to_ref<node>(bf_ref); ref)
+			available_function_symbols.try_emplace(
+				get_function_signature<node>(ref),
+				untyped_type_id<node>());
+
 	subtree_map<node, tref> transformed;
 	std::optional<std::variant<inference_error, parse_error, scope_error>> error = std::nullopt;
 
@@ -979,7 +1071,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					break;
 				} // Incompatible types
 				auto arguments_map = get<typeables_type_id_map<node>>(arguments);
-				if (is_functional_relation<node>(n)) {
+				if (is_functional_relation<node>(n, available_function_symbols)) {
 					auto unified = unify<node>(arguments_map, header_type);
 					if (std::holds_alternative<inference_error>(unified)) {
 						error = std::get<inference_error>(unified);
@@ -1094,7 +1186,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 			case tau::ref: {
 				// We skip the traversal if the parent is not a wff_ref or
 				// is a functional ref as are treated elsewhere.
-				if (parent && is_functional_relation<node>(parent)) {
+				if (parent && is_functional_relation<node>(parent, available_function_symbols)) {
 					skip = true; break;
 				}
 				if (has_fallback<node>(n)) {
@@ -1109,6 +1201,44 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 						break;
 					} // Incompatible types
 					auto arguments_map = std::get<typeables_type_id_map<node>>(arguments);
+					// TI-2: a fallback is written at the call site, inside
+					// whatever scope encloses the reference, so its
+					// annotations have to agree with that scope. Both
+					// branches below open a fresh scope -- right for the
+					// reference's own arguments, which are treated as a rec
+					// relation -- but that let a fallback's `x:sbf` shadow an
+					// enclosing `x:bv[8]` instead of conflicting with it, so
+					// `all x:bv[8] g(x) fallback x:sbf = 0.` was accepted
+					// while the same annotation in a definition body is
+					// rejected. Check the fallback against the enclosing
+					// scope before the new one hides it.
+					if (tref fb = tt(n) | tau::fp_fallback | tt::first | tt::ref; fb) {
+						auto fb_types = get_typeable_type_ids_by_type<node>(
+							fb, { tau::variable });
+						if (std::holds_alternative<inference_error>(fb_types)) {
+							error = std::get<inference_error>(fb_types);
+							break;
+						}
+						bool conflict = false;
+						for (const auto& [_, by_node] : std::get<
+							typeables_type_id_map<node>>(fb_types))
+						{
+							for (const auto& [canonized, tid] : by_node) {
+								size_t outer = resolver.type_id_of(canonized);
+								if (!outer || !tid
+									|| is_untyped<node>(outer)
+									|| is_untyped<node>(tid)
+									|| unify<node>(outer, tid))
+										continue;
+								error = inference_error{ canonized,
+									outer, tid };
+								conflict = true;
+								break;
+							}
+							if (conflict) break;
+						}
+						if (conflict) break;
+					}
 					if (is_functional_fallback<node>(n)) {
 						auto unified = unify<node>(arguments_map, header_type);
 						if (std::holds_alternative<inference_error>(unified)) {
@@ -1268,7 +1398,7 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 				// We need to adjust the wrapping around refs in the body and
 				// the header accordingly.
 				auto new_n = update_default<node>(n, transformed);
-				auto updated = is_functional_relation<node>(new_n)
+				auto updated = is_functional_relation<node>(new_n, available_function_symbols)
 					? update_functional_rr<node>(resolver, new_n, available_function_symbols, options)
 					: update_predicate_rr<node>(resolver, new_n, options);
 				if (std::holds_alternative<parse_error>(updated)) {

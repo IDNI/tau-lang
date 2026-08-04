@@ -273,16 +273,18 @@ rr<node> transform_ref_args_to_captures(const rr<node>& nso_rr) {
 // This is the rr-overload of nso_rr_apply, complementing the rule/rules overloads.
 template <NodeType node>
 tref nso_rr_apply(const rr<node>& nso_rr) {
-	using tt = typename tree<node>::traverser;
 	LOG_DEBUG << "Start nso_rr_apply";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	rr<node> rr_ = transform_ref_args_to_captures<node>(nso_rr);
 	tref main = calculate_all_fixed_points<node>(rr_);
 	if (!main) return nullptr;
-	// Substitute function and recurrence relation definitions
-	tref new_main = main
-		| repeat_all<node, step<node>>(step<node>(rr_.rec_relations))
-		| tt::ref;
+	// Substitute function and recurrence relation definitions. Called
+	// directly rather than through the traverser pipe so that the
+	// non-termination signal (nullptr) is checked instead of being fed to
+	// `tt::ref`.
+	tref new_main =
+		repeat_all<node, step<node>>(step<node>(rr_.rec_relations))(main);
+	if (!new_main) return nullptr;
 	LOG_DEBUG << "End nso_rr_apply";
 	LOG_DEBUG << "Spec: " << LOG_RR(nso_rr);
 	LOG_DEBUG << "New main: " << LOG_FM(new_main);

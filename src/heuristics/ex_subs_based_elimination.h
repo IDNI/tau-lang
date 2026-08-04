@@ -47,6 +47,19 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref ex_subs_based_elimination(tref var, tref ex_clause);
 
+/**
+ * @brief Eliminate existential quantifiers in a formula by substitution.
+ *
+ * Applies substitution-based elimination to all existential quantifiers found
+ * in the given formula (if possible).
+ *
+ * @tparam node Tree node type.
+ * @param fm The formula containing existential quantifiers to eliminate.
+ * @return Formula with existential quantifiers eliminated via substitution (if possible).
+ */
+template <NodeType node>
+tref ex_subs_based_elimination(tref fm);
+
 } // namespace idni::tau_lang
 
 #include "ex_subs_based_elimination.tmpl.h"

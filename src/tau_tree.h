@@ -1267,6 +1267,39 @@ inline void sweep_interned_free_vars() {
 	}
 }
 
+/**
+ * @brief RAII guard for the process-global `tree<node>::use_hooks` flag.
+ *
+ * `use_hooks` is a static member, so a pass that disables construction hooks
+ * for the duration of a traversal has to restore it on *every* exit, including
+ * an exceptional one -- the bitvector paths do throw (see the
+ * `std::bad_variant_access` discussion in `bv_ba_solver.tmpl.h`), and leaving
+ * hooks disabled corrupts every tree built afterwards in the process. Assigning
+ * `true` unconditionally at the end is wrong for the same reason: it force-enables
+ * hooks for a caller that had deliberately disabled them.
+ *
+ * @par Example
+ * @code
+ * {
+ *     use_hooks_guard<node> g(false); // hooks off inside this scope
+ *     res = pre_order<node>(fm).apply(f, visit, up);
+ * }                                   // previous value restored here
+ * @endcode
+ */
+template <NodeType node>
+struct use_hooks_guard {
+	explicit use_hooks_guard(bool enable)
+		: previous_(tree<node>::use_hooks)
+	{
+		tree<node>::use_hooks = enable;
+	}
+	~use_hooks_guard() { tree<node>::use_hooks = previous_; }
+	use_hooks_guard(const use_hooks_guard&) = delete;
+	use_hooks_guard& operator=(const use_hooks_guard&) = delete;
+private:
+	bool previous_;
+};
+
 } // namespace idni::tau_lang
 
 /** @brief Hash specialization for `node<BAs...>` enabling use in unordered containers. */

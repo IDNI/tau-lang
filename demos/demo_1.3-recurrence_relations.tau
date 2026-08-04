@@ -1,32 +1,75 @@
-# To run it you need to compile the project using release.sh (customized with
-# your settings if needed) and then execute the run.sh whithin the demo directory
-# as follows:
+# Defining functions and predicates, including by recurrence relations.
 #
-# ./run.sh demo_1.3-recurrence_relations.tau
-#
-# This demo should work under any *nix flavour due to the paths used for files.
-# To run it under windows you will need to change the paths to the files.
+# See demos/README.md for how to run this script.
 
-# Apart from the Boolean functions and Tau formulas, you can define your own
-# recurrence relations:
+# Besides typing expressions, you can name them. A definition whose body is a
+# term defines a function; one whose body is a formula defines a predicate. Both
+# are written with :=
 
-f(x) := x +1        # base case
-f(x) := x + f(x)    # general case
+f(x) := x'          # a function: its body is a term
+p(x) := x' = 0      # a predicate: its body is a formula
 
-# or also
+# A definition is used by applying it, and the application is expanded during
+# normalization:
 
-p[1](x, y) := {all x ex y x' y = o1[t]}    # base case
-p[n](x, y) := p[n-1](y, z)                 # general case
+n f(Y)
+n p(Y)
 
-# As with history, such definitions are stored in a array like structure. You can
-# check them as follows:
+# Definitions may also be recursive, in which case they are indexed by an offset
+# written in brackets after the name. A recurrence relation needs a base case,
+# giving a fixed offset, and a step case, referring to a smaller offset:
+
+h[0](x) := 1             # base case
+h[n](x) := x ^ h[n-1](x) # step case
+
+# Applying it at a concrete offset unfolds the recurrence down to the base case.
+# Seven exclusive-ors of x with 1 come out as the complement of x:
+
+n h[7](x)
+
+# So h[7](x) is not everywhere nonzero, since it is zero when x is 1:
+
+n all x h[7](x) != 0
+
+# The head of a definition may carry a type, which fixes the Boolean algebra the
+# definition works over. This pair alternates between 0 and 1 with the parity of
+# the offset, in the sbf Boolean algebra:
+
+g[0](y):sbf := 0
+g[n](y):sbf := g[n-1](y)'
+
+n g[4](y:sbf)
+n g[5](y:sbf)
+
+# Predicates take offsets in exactly the same way:
+
+q[0](x) := x = 0
+q[n](x) := q[n-1](x) && x != 1
+
+n q[3](Y)
+
+# Definitions live in their own store, separate from the history. To list them,
+# or print one by position:
 
 defs
+defs 1
 
-# In order to use them, you should just invoke them by their name.
+# Two rules are worth knowing, because breaking either is the usual way a
+# definition goes wrong.
 
-h[0](x) := 1 		        # base case
-h[n](x) := x + h[n-1](x) 	# general case
-n all x h[7](x) != 0 	    # normalize a formula involving the above h
+# First, a relative offset in the body has to be bound by an offset on the head.
+# Without one there is nothing to count down from, so the definition below is
+# rejected as it is entered rather than looping later:
 
-quit # quit the Tau REPL
+r[0](x) := 1
+r[n](x) := r[n-1](x)
+f2(x) := o1[n] = r[n](x)
+
+# Second, a recursive definition has to make progress towards its base case.
+# This one rewrites to itself forever, which is detected and reported instead of
+# hanging:
+
+f3(x) := f3(x)'
+n f3(1)
+
+quit

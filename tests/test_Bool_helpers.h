@@ -6,8 +6,27 @@
 // helper types and functions for tau with just Bool BA as tree<node<Bool>>
 #define bas_pack bv, Bool
 #include "test_helpers.h"
+#include <cstdlib>
 
 namespace idni::tau_lang {
+
+// This pack carries `bv`, whose constants are cvc5::Terms, so it needs the
+// same exit-time cleanup test_tau_helpers.h registers for the tau pack (and
+// src/main.cpp installs for the CLI): ba_constants<node_t>::cleanup() must
+// run before cvc5's TermManager destructor, or the pool is left holding
+// dangling cvc5::Term references and the process SEGFAULTs after the doctest
+// summary prints -- every assertion passes and ctest still reports SEGFAULT.
+// Only tests that actually build bv constants reached that teardown, which is
+// why it stayed hidden until bv cases were added to the tests using this pack.
+namespace test_Bool_init_detail {
+	struct _CleanupRegistrar {
+		// __attribute__((used)) so LTO does not DCE the registration.
+		__attribute__((used)) _CleanupRegistrar() {
+			std::atexit([]() { ba_constants<node_t>::cleanup(); });
+		}
+	};
+	inline _CleanupRegistrar _ba_constants_cleanup_registrar;
+}
 
 inline tref bool_type() {
 	tref type = tau::get(tau::type, "bool");

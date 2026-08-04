@@ -1,0 +1,3 @@
+i1:bv[8] := in file("tests/benchmark/fixtures/run/inputs/bv8-16.in").
+run o1[0]:bv[8] = { 0 }:bv[8] && o1[t]:bv[8] = i1[t]:bv[8] + o1[t-1]:bv[8].
+q

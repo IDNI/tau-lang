@@ -500,8 +500,8 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 		bool first_var = true;
 		tref var_path = is_cnf  ? (wff ? tau::_F() : tau::_0(type_id))
 					: (wff ? tau::_T() : tau::_1(type_id));
-	for (size_t k = 0; k < vars.size(); ++k) {
 		DBG(assert(path.size() == vars.size());)
+	for (size_t k = 0; k < vars.size(); ++k) {
 		if (path[k] == 2) continue;
 		if (first_var) var_path = path[k] == 1 ? vars[k]
 			: wff ? tau::build_wff_neg(vars[k])
@@ -536,7 +536,7 @@ tref build_reduced_formula(const auto& paths, const auto& vars, bool is_cnf,
 		: (wff  ? tau::build_wff_or( reduced_fm, var_path)
 			: tau::build_bf_or(  reduced_fm, var_path));
 	}
-	assert(reduced_fm != nullptr);
+	DBG(assert(reduced_fm != nullptr);)
 	return not_equal_to_unequal<node>(reduced_fm);
 }
 
@@ -713,8 +713,16 @@ tref reduce(tref fm) {
 	DBG(LOG_TRACE << "Formula to reduce: " << LOG_FM(fm);)
 	// Terms can only contain bf_neg, bf_and, bf_xor and bf_or
 	if (!is_wff) {
-		if (tau::get(fm).find_top(is_non_boolean_term<node>))
-			return syntactic_path_simplification_dnf<node>::on(fm);
+		if (tau::get(fm).find_top(is_non_boolean_term<node>)) {
+			tref res = syntactic_path_simplification_dnf<node>::on(fm);
+			// Cache this branch too, like every other exit: bv and
+			// tau-constant terms would otherwise be re-simplified on
+			// every call.
+#ifdef TAU_CACHE
+			return cache.emplace(fm, res).first->second;
+#endif // TAU_CACHE
+			return res;
+		}
 	}
 	auto [paths, vars] = dnf_cnf_to_reduced<node>(fm, is_cnf);
 	if (paths.empty()) {
@@ -742,19 +750,6 @@ tref reduce(tref fm) {
 	return cache.emplace(fm, reduced_fm).first->second;
 #endif // TAU_CACHE
 	return reduced_fm;
-}
-
-template <NodeType node>
-bool is_ordered_subset(const auto& v1, const auto& v2) {
-	using tau = tree<node>;
-	if (v1.size() > v2.size()) return false;
-	if (v1.size() == 0) return true;
-	size_t j = 0;
-	for (size_t i = 0; i < v2.size(); ++i) {
-		if (tau::get(v1[j]) == tau::get(v2[i])) ++j;
-		if (j == v1.size()) return true;
-	}
-	return false;
 }
 
 template<NodeType node>

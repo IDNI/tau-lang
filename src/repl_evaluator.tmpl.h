@@ -148,6 +148,27 @@ tref repl_evaluator<BAs...>::get_wff(tref n) const {
 	return get_(tau::wff, n, false);
 }
 
+// Puts an expression into the type-annotated form that substitution matching
+// compares against.
+//
+// Matching is sensitive to the resolved BA type id on each node. A history
+// entry produced by dnf/cnf/normalize has already been through inference and
+// carries those ids, whereas an expression parsed straight off the command line
+// carries none, so the two never match even when they print identically. Both
+// sides therefore have to be inferred before they are compared.
+//
+// Inference is idempotent on an already inferred tree, so this is safe to apply
+// to every argument. An expression inference rejects is returned unchanged
+// rather than turned into an error, which keeps this from failing substitutions
+// that used to work.
+template <typename... BAs>
+requires BAsPack<BAs...>
+tref repl_evaluator<BAs...>::infer_for_match(tref n) const {
+	if (!n) return n;
+	tref inferred = tau_api::infer(n);
+	return inferred ? inferred : n;
+}
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_any(tref arg) const {
@@ -342,6 +363,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	if (in) { // BF substitution
 		tref thiz = get_bf(arg2), with = get_bf(arg3);
 		if (!in || !thiz || !with) return invalid_argument();
+		in = infer_for_match(in), thiz = infer_for_match(thiz),
+			with = infer_for_match(with);
 		// strip bf of variables so we match also quantifiers
 		if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
 			thiz = tau::trim(thiz),	with = tau::trim(with);
@@ -362,6 +385,8 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 		TAU_LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
+	in = infer_for_match(in), thiz = infer_for_match(thiz),
+		with = infer_for_match(with);
 	// strip bf of variables so we match also quantifiers
 	if (is<node, tau::bf>(thiz) && is_child<node, tau::variable>(thiz))
 		thiz = tau::trim(thiz),	with = tau::trim(with);
@@ -619,16 +644,23 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	auto print_zero_case = [&type_id](tref var) {
-		std::cout << "\t" << tau::get(var).to_str() << " := {"
-			<< node::ba::zero(get_ba_type_tree<node>(type_id))
-			<< "}:" << ba_types<node>::name(type_id) << "\n";
+	// ba_types::name() renders the `typed` node, which already prints its
+	// own leading ':', and BA constants are printed as `{ c }` elsewhere
+	// (see the ba_constant case in tau_tree_printers), so match that form
+	// here -- this branch never ran before, and printed `{c}::sbf`.
+	auto print_constant_case = [&type_id](tref var, const std::string& c) {
+		std::cout << "\t" << tau::get(var).to_str() << " := { " << c
+			<< " }" << ba_types<node>::name(type_id) << "\n";
 	};
 
-	auto print_one_case = [&type_id](tref var) {
-		std::cout << "\t" << tau::get(var).to_str() << " := {"
-			<< node::ba::one(get_ba_type_tree<node>(type_id))
-			<< "}:" << ba_types<node>::name(type_id) << "\n";
+	auto print_zero_case = [&](tref var) {
+		print_constant_case(var,
+			node::ba::zero(get_ba_type_tree<node>(type_id)));
+	};
+
+	auto print_one_case = [&](tref var) {
+		print_constant_case(var,
+			node::ba::one(get_ba_type_tree<node>(type_id)));
 	};
 
 	auto print_general_case = [](tref var, tref value) {
@@ -657,41 +689,37 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	tref arg = n.value_tree().first();
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
-	auto check = get_type_and_arg(arg);
-	if (!check) return;
-	auto [type, value] = check.value();
+	tref value = get_any(arg);
+	if (!value) return;
 	measuring m;
 	auto solution = tau_api::solve(m, value,
 		get_solver_cmd_mode<node>(n.value()));
 	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 
-	print_solver_cmd_solution<node>(solution, type);
+	// the printer needs the BA type of the solution, not the grammar
+	// nonterminal of the argument that get_type_and_arg also returns
+	print_solver_cmd_solution<node>(solution,
+		get_solver_cmd_type<node>(value));
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
-	// getting the type
-	// TODO compare get_type_and_arg with get_solver_cmd_type
-	// size_t type = get_solver_cmd_type<node>(n.value());
-	// if (type == 0) {
-	// 	TAU_LOG_ERROR << "Invalid type\n";
-	// 	return;
-	// }
-
 	tref arg = n.value_tree().first();
 	while (tau::get(arg).has_right_sibling())
 		arg = tau::get(arg).right_sibling();
-	auto check = get_type_and_arg(arg);
-	if (!check) return;
-	auto [type, value] = check.value();
+	tref value = get_any(arg);
+	if (!value) return;
 	measuring m;
 	auto solution = tau_api::lgrs(m, value);
 	benchmarks(m);
 	if (!solution) { std::cout << "no solution\n"; return; }
 	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
-	print_solver_cmd_solution<node>(solution, type);
+	// same as solve_cmd: the printer takes a BA type id, not the grammar
+	// nonterminal that get_type_and_arg also returns
+	print_solver_cmd_solution<node>(solution,
+		get_solver_cmd_type<node>(value));
 }
 
 template <typename... BAs>
@@ -727,12 +755,27 @@ tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
-	tref rr = n | tt::first | tt::ref;
-	rr_defs.push_back(rr);
+	// grammar: rec_relation => ref ":=" (capture | ref | wff | bf)
+	tref def = n | tt::first | tt::ref;
+	const auto& t = tau::get(def);
+	// Reject a definition that can never be used before it is stored, so
+	// that using it hangs the unfolding (issue 20) and so that it does not
+	// invalidate every later command by sitting in the definition list.
+	if (tref ref = get_unbindable_relative_offset<node>(
+		t[0].get(), t[1].get()); ref)
+	{
+		TAU_LOG_ERROR << "Definition " << tau::get(def).to_str()
+			<< " cannot use the relative offset of "
+			<< tau::get(ref).to_str() << ": its head declares no "
+			"offset to bind it. Give the head an offset, as in "
+			"f[n](x), or use a fixed offset";
+		return;
+	}
+	rr_defs.push_back(def);
 	size_t idx = rr_defs.size() - 1;
 	std::cout << "[" << idx + 1 << "] " << tree<node>::get(rr_defs[idx]).to_str() << "\n";
 	// Register definition head early so type inference recognizes it
-	tt rrt(rr);
+	tt rrt(def);
 	htref head = rrt | tt::first | tt::handle;
 	htref body = rrt | tt::second | tt::handle;
 	if (head) definitions<node>::instance().add(head, body);
@@ -847,7 +890,11 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "highlight")         return highlighting_opt;
 	if (x == "I" || x == "indenting"
 		|| x == "indent")            return indenting_opt;
-	if (x == "B" || x == "benchmarks"
+	// RE-1: this arm used to claim "B" as well, but blasting_opt above
+	// already matches it, so the benchmarks short option was unreachable
+	// and `get B` silently meant blasting. Benchmarks gets the still-free
+	// lowercase "b" instead, which leaves blasting's "B" alone.
+	if (x == "b" || x == "benchmarks"
 		|| x == "benchmarking")      return print_benchmarks_opt;
 	if (x == "d" || x == "debug"
 		|| x == "dbg")               return debug_opt;
@@ -912,8 +959,11 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	};
 	if (o == invalid_opt) return;
 #ifndef DEBUG
+	// RE-2: answering a query about an option this build does not carry is
+	// not an error condition, it is the answer. Reported at info level so a
+	// plain `get debug` no longer prints "(Error)" in a release build.
 	if (o == debug_opt) {
-		TAU_LOG_ERROR << "Debug option not available in release build\n";
+		TAU_LOG_INFO << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG
@@ -937,8 +987,10 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	using namespace boost::log;
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
+	// RE-2: a warning, not an error -- the command was understood, it just
+	// cannot take effect in a build without DEBUG.
 	if (o == debug_opt) {
-		TAU_LOG_ERROR << "Debug option not available\n";
+		TAU_LOG_WARNING << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG
@@ -1000,8 +1052,10 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 {
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
+	// RE-2: a warning, not an error -- the command was understood, it just
+	// cannot take effect in a build without DEBUG.
 	if (o == debug_opt) {
-		TAU_LOG_ERROR << "Debug option not available\n";
+		TAU_LOG_WARNING << "Debug option not available in release build\n";
 		return;
 	}
 #endif // DEBUG

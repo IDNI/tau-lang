@@ -2,8 +2,10 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
 	apply_rule
+	antiprenexing
 	base_ba_dispatcher
 	bv_ba_helpers
+	bv_ba_hooks
 	ba_constants
 	ba_types
 	ba_types_inference
@@ -73,6 +75,7 @@ set(TESTS
 	rr
 	spec_decompose
 	product_ba
+	ref_variables_resolver
 	sbf_ba_splitter
 	tau_bdd
 	tau_tree

@@ -72,6 +72,9 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause = nullptr) {
 		// implication check below (sat + non-equivalence) is the correct gate.
 		tref new_spec_clause = normalize_with_temp_simp<node>(
 			rewriter::replace<node>(spec_clause, fm, splitter));
+		// nullptr when the definitions in the clause do not settle;
+		// no normalized clause means no splitter to report.
+		if (!new_spec_clause) return false;
 		if (is_tau_formula_sat<node>(new_spec_clause)) {
 			if (!are_tau_equivalent<node>(new_spec_clause, spec_clause))
 				return true;

@@ -101,7 +101,18 @@ tref api<node>::get_term(const std::string& input, bool simplified) {
 
 template <NodeType node>
 tref api<node>::get_formula(const std::string& input, bool simplified) {
-	return tau::get(input, get_options<node>(tau::wff, simplified));
+	tref fm = tau::get(input, get_options<node>(tau::wff, simplified));
+	if (!fm) return fm;
+	// An io_var's input/output bit is set while parsing a *spec*, so parsing
+	// a bare wff leaves every io_var classified as neither -- and consumers
+	// that need the distinction (transform_io_var,
+	// existentially_quantify_output_streams, the LTL/PWR pipelines) then
+	// reject it or, worse, silently treat inputs as outputs. Resolve here so
+	// the same text yields the same classification whether it arrives as a
+	// formula or inside a spec; this mirrors what get_nso_rr already does for
+	// a bare wff/bf.
+	return resolve_io_vars<node>(
+		*definitions<node>::instance().get_io_context(), fm);
 }
 
 template <NodeType node>
@@ -528,9 +539,13 @@ std::optional<subtree_map<node, tref>> api<node>::lgrs(tref equation) {
 		TAU_LOG_ERROR << "Invalid argument(s)";
 		return {};
 	}
-	// Exclude non-Boolean operations from equation
-	if (tau::get(eq)[0].find_top(is_non_boolean_term<node>) ||
-		tau::get(eq)[1].find_top(is_non_boolean_term<node>)) {
+	// Exclude non-Boolean operations from equation. The two sides live under
+	// the bf_eq, not under `eq`: `eq` is the wff wrapping it and has a
+	// single child, so indexing it with [1] tripped the `c != nullptr`
+	// assert in tree<node>::child_tree (Debug) and read a null child
+	// (Release).
+	if (tau::get(equality)[0].find_top(is_non_boolean_term<node>) ||
+		tau::get(equality)[1].find_top(is_non_boolean_term<node>)) {
 		TAU_LOG_ERROR << "Found non-Boolean operation in equation";
 		return {};
 	}

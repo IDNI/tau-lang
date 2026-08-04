@@ -504,3 +504,77 @@ TEST_SUITE("simplify_using_equality") {
 		CHECK(tau::get(res).to_str() == "i1[t]:tau = 0 && o1[t]:tau = i1[t]:tau");
 	}
 }
+
+// ── Sub-formulas that are not facts of the enclosing scope ───────────────────
+//
+// The pass models a conjunction (its conjuncts are facts of the current
+// scope), a disjunction (which opens a scope) and atomic formulas. `to_nnf`,
+// which it runs first, is what guarantees nothing else appears. When that
+// guarantee did not hold, descending into an implication registered its
+// antecedent and consequent as asserted equalities of the enclosing
+// conjunctive scope: `(x=0 -> y=0) && (y=0 -> z=0)` came back as
+// `(x=0 -> y=0) && z = 0`, with the second link turned into an assertion --
+// a formula equivalent to neither the input nor its negation (issue #69).
+//
+// The sugar node has to be built with the construction hooks off, since they
+// are what desugars `->`. That is not a contrivance: a Tau-BA constant is
+// parsed exactly that way (`tau_spec` sets `reget_with_hooks = false`) and,
+// unlike every other parsed formula, never goes through `api::simplify`,
+// whose `reget` is what desugars them.
+//
+// The fix is in `to_nnf`, so what these pin is the contract -- whatever shape
+// the input arrives in, the result must still mean the same thing. The
+// `visit` guard added alongside is defence in depth for a shape `to_nnf`
+// might not cover and is not reachable from here.
+
+// Builds `wff(sym(args...))` without the hooks that would desugar it.
+static tref raw_sugar(typename node_t::type sym, const trefs& args) {
+	use_hooks_guard<node_t> hooks_off(false);
+	return tau::get(tau::wff, tau::get(sym, args));
+}
+
+TEST_SUITE("simplify_using_equality: non-conjunctive sub-formulas") {
+
+	TEST_CASE("implication chain keeps both links") {
+		tref x0 = get_nso_rr("x = 0.").value().main->get();
+		tref y0 = get_nso_rr("y = 0.").value().main->get();
+		tref z0 = get_nso_rr("z = 0.").value().main->get();
+		tref fm = tau::build_wff_and(
+			raw_sugar(tau::wff_imply, { x0, y0 }),
+			raw_sugar(tau::wff_imply, { y0, z0 }));
+		tref res = simplify_using_equality<node_t>(fm);
+		// The same chain built through the hooks, i.e. desugared.
+		tref expected = tau::build_wff_and(
+			tau::build_wff_imply(x0, y0),
+			tau::build_wff_imply(y0, z0));
+		CHECK( are_nso_equivalent<node_t>(res, expected) );
+	}
+
+	TEST_CASE("reverse implication chain keeps both links") {
+		tref x0 = get_nso_rr("x = 0.").value().main->get();
+		tref y0 = get_nso_rr("y = 0.").value().main->get();
+		tref z0 = get_nso_rr("z = 0.").value().main->get();
+		tref fm = tau::build_wff_and(
+			raw_sugar(tau::wff_rimply, { y0, x0 }),
+			raw_sugar(tau::wff_rimply, { z0, y0 }));
+		tref res = simplify_using_equality<node_t>(fm);
+		tref expected = tau::build_wff_and(
+			tau::build_wff_rimply(y0, x0),
+			tau::build_wff_rimply(z0, y0));
+		CHECK( are_nso_equivalent<node_t>(res, expected) );
+	}
+
+	TEST_CASE("equivalence chain keeps both links") {
+		tref x0 = get_nso_rr("x = 0.").value().main->get();
+		tref y0 = get_nso_rr("y = 0.").value().main->get();
+		tref z0 = get_nso_rr("z = 0.").value().main->get();
+		tref fm = tau::build_wff_and(
+			raw_sugar(tau::wff_equiv, { x0, y0 }),
+			raw_sugar(tau::wff_equiv, { y0, z0 }));
+		tref res = simplify_using_equality<node_t>(fm);
+		tref expected = tau::build_wff_and(
+			tau::build_wff_equiv(x0, y0),
+			tau::build_wff_equiv(y0, z0));
+		CHECK( are_nso_equivalent<node_t>(res, expected) );
+	}
+}

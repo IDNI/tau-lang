@@ -696,7 +696,14 @@ static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
 	                 + std::to_string(value) + " }";
 	typename tau::get_options opts;
 	opts.parse.start = tau::wff;
-	return tau::get(expr, std::move(opts));
+	tref fm = tau::get(expr, std::move(opts));
+	// See parse_sv_eq in ltl_aba_builders.tmpl.h: a bare wff parse never sets
+	// the io_var input/output bit (that happens during spec parsing), leaving
+	// these aux variables classified as neither, which transform_io_var and
+	// existentially_quantify_output_streams both reject. Resolve them the way
+	// get_nso_rr resolves a bare formula -- the "o" prefix marks them outputs.
+	return resolve_io_vars<node>(
+		*definitions<node>::instance().get_io_context(), fm);
 }
 
 // Recursively rewrite all wff_S / wff_T nodes.

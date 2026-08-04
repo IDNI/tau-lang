@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
+	antiprenexing
 	bf_fixed_point
 	bf_hooks
 	bv_hooks
@@ -13,6 +14,8 @@ set(TESTS
 	nso_rr_fixed_point
 	nso_rr_partial_eval
 	quantifiers
+	satisfiability6
+	normalizer_helpers
 	sbf1
 	sbf2
 	splitter
@@ -46,7 +49,7 @@ foreach(X IN LISTS TESTS)
 	target_include_directories("test_integration-${X}" PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
-foreach(X IN ITEMS ctl_star ocfuncs)
+foreach(X IN ITEMS ctl_star ocfuncs satisfiability6)
 	target_include_directories("test_integration-${X}" PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}/satisfiability)
 endforeach()

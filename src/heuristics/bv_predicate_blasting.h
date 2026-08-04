@@ -23,18 +23,19 @@ namespace idni::tau_lang {
 // Forward declarations needed by wff_predicate_blasting/quantify_aux_vars
 // (bv_predicate_blasting.tmpl.h) to anti-prenex/eliminate its own
 // freshly-introduced auxiliary bv-typed quantifiers. The full
-// declarations/definitions come from
-// normal_forms_transformations.h/normal_forms.tmpl.h; including those
-// headers directly here would create a header include cycle
-// (normal_forms_transformations.h includes this file). No default argument
+// declarations/definitions come from antiprenexing/antiprenexing.h and
+// antiprenexing/antiprenexing.tmpl.h. This file is included (via
+// normal_forms_transformations.h) before
+// antiprenexing.h in normal_forms.h, so these are forward-declared here
+// rather than including antiprenexing.h directly. No default argument
 // is given here, since a default cannot be redeclared and these call sites
 // always pass an explicit predicate.
 template<NodeType node>
-tref anti_prenex_block(tref formula, std::function<bool(tref)> skip);
+tref anti_prenex_block(tref formula, const std::function<bool(tref)>& skip);
 
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,
-	std::function<bool(tref)> skip);
+	const std::function<bool(tref)>& skip);
 
 // NOT thread-safe: Controls whether bitvector blasting is enabled.
 // The tau library assumes single-threaded access.

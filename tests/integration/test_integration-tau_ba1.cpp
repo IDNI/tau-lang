@@ -197,6 +197,78 @@ TEST_SUITE("regression/bf_and not trimmed") {
 	}
 }
 
+// -----------------------------------------------------------------------------
+// Regression: sugar connectives inside a Tau-BA constant (issue #69)
+//
+// A `{ ... }:tau` constant is parsed by `parse_tau` with reget_with_hooks off
+// and, unlike every other parsed formula, never goes through `api::simplify`.
+// Its main therefore used to reach the normalizer still carrying the sugar
+// connectives (`->`, `<-`, `<->`, `^`, `? :`) that the construction hooks
+// desugar everywhere else. Every pass below assumes NNF (only `&&`, `||` and
+// negated atoms); `simplify_using_equality` in particular walked into an
+// implication and registered its antecedent and consequent as *asserted*
+// equalities of the enclosing conjunctive scope, which silently rewrote or
+// dropped the surrounding conjuncts. The error went both ways: an
+// unsatisfiable formula came back with a satisfiable residual, and a
+// satisfiable one came back as `0`.
+//
+// Each case below is paired with the same formula written without sugar; the
+// two must normalize to the same verdict.
+
+TEST_SUITE("tau_ba constants: sugar connectives") {
+
+	TEST_CASE("implication chain is unsatisfiable") {
+		// o7=1 forces o9=1 forces o11=1, contradicting o11=0.
+		const char* sample = "{ (o7[t]=1 -> o9[t]=1) "
+			"&& (o9[t]=1 -> o11[t]=1) "
+			"&& o7[t]=1 && o11[t]=0 } = 0.";
+		CHECK (normalize_and_check(sample, tau::wff_t));
+	}
+
+	TEST_CASE("implication chain is unsatisfiable (desugared)") {
+		const char* sample = "{ (!o7[t]=1 || o9[t]=1) "
+			"&& (!o9[t]=1 || o11[t]=1) "
+			"&& o7[t]=1 && o11[t]=0 } = 0.";
+		CHECK (normalize_and_check(sample, tau::wff_t));
+	}
+
+	TEST_CASE("implication chain is satisfiable without the antecedent") {
+		// Same chain, but o7=1 is not asserted, so o7=0 satisfies it.
+		// Treating the antecedents as facts wrongly made this `0`.
+		const char* sample = "{ (o7[t]=1 -> o9[t]=1) "
+			"&& (o9[t]=1 -> o11[t]=1) && o11[t]=0 } = 0.";
+		CHECK (normalize_and_check(sample, tau::wff_f));
+	}
+
+	TEST_CASE("implication chain is satisfiable without the antecedent"
+		" (desugared)") {
+		const char* sample = "{ (!o7[t]=1 || o9[t]=1) "
+			"&& (!o9[t]=1 || o11[t]=1) && o11[t]=0 } = 0.";
+		CHECK (normalize_and_check(sample, tau::wff_f));
+	}
+
+	TEST_CASE("reverse implication chain is satisfiable"
+		" without the antecedent") {
+		const char* sample = "{ (o9[t]=1 <- o7[t]=1) "
+			"&& (o11[t]=1 <- o9[t]=1) && o11[t]=0 } = 0.";
+		CHECK (normalize_and_check(sample, tau::wff_f));
+	}
+
+	TEST_CASE("equivalence chain is satisfiable") {
+		// o7=o9=o11=0 satisfies it; o11=0 only forces o9 and o7 off.
+		const char* sample = "{ (o7[t]=1 <-> o9[t]=1) "
+			"&& (o9[t]=1 <-> o11[t]=1) && o11[t]=0 } = 0.";
+		CHECK (normalize_and_check(sample, tau::wff_f));
+	}
+
+	TEST_CASE("equivalence chain is satisfiable (desugared)") {
+		const char* sample = "{ (o7[t]=1 && o9[t]=1 "
+			"|| !o7[t]=1 && !o9[t]=1) "
+			"&& (o9[t]=1 && o11[t]=1 "
+			"|| !o9[t]=1 && !o11[t]=1) && o11[t]=0 } = 0.";
+		CHECK (normalize_and_check(sample, tau::wff_f));
+	}
+}
 
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {

@@ -837,7 +837,14 @@ tref tree<node>::untype(tref term) {
 	trefs ch;
 	for (auto c : n.get_children())
 		if (!tau::get(c).is(tau::typed)) ch.push_back(c);
-	auto retyped = n.value.ba_retype(untyped_type_id<node>());
+	// A ba_constant's data field is a BA constants pool index while the node
+	// is typed, and a string id for the constant's source text while it is
+	// not; node::hashit() decides which to read from the ba_type. Clearing
+	// the ba_type here would leave the pool index in place and make every
+	// later read of that node interpret it as a string id. Constants of
+	// different types are distinct anyway, so there is nothing to erase.
+	auto retyped = n.is(tau::ba_constant) ? n.value
+		: n.value.ba_retype(untyped_type_id<node>());
 	return ch.empty() ? tau::get(retyped) : tau::get(retyped, ch);
 }
 

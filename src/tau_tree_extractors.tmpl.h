@@ -31,7 +31,22 @@ tref resolve_io_vars(io_context<node>& ctx, tref fm) {
 	auto resolve = [&ctx](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::io_var)) {
-			tref var = canonize<node>(n);
+			// EX-1: this used to be canonize<node>(n), but canonize
+			// expects the enclosing `variable` node -- it selects an
+			// io_var CHILD (tt(x) | tau::io_var | tau::var_name).
+			// Handed the io_var itself it matched nothing and returned
+			// its argument unchanged, offset subtree and all, so the
+			// key could never equal what add_input_console/
+			// add_output_console register
+			// (build_canonized_io_var == variable(io_var(var_name))).
+			// Both context lookups below were therefore dead, and
+			// classification always fell through to the name heuristic.
+			// Build the key the registrars' way instead.
+			tref var_name = get_var_name_node<node>(n);
+			tref var = var_name
+				? tau::get(tau::variable,
+					tau::get(tau::io_var, { var_name }))
+				: canonize<node>(n);
 			if (auto it = ctx.inputs.find(var); it != ctx.inputs.end())
 				return t.replace_value(
 					t.value.replace_data(1));

@@ -25,9 +25,21 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 #ifdef TAU_CACHE
 	using cache_t = std::unordered_map<std::pair<tref, tref>, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
-	if (auto it = cache.find(std::make_pair(tau::trim_right_sibling(atomic_fm),
-		tau::trim_right_sibling(var))); it != end(cache))
-		return it->second;
+	// The key has to be built from the untouched inputs: both parameters are
+	// rebound further down (var is wrapped into a bf, atomic_fm is rewritten
+	// by gt_gteq_to_lt_lteq and norm_equation), so keying the store on the
+	// rewritten values means an input that is not already in canonical form
+	// can never hit its own entry.
+	const std::pair<tref, tref> key { tau::trim_right_sibling(atomic_fm),
+		tau::trim_right_sibling(var) };
+	if (auto it = cache.find(key); it != end(cache)) return it->second;
+	// Every non-trivial exit stores through this, in particular the func2 == 0
+	// early return below: norm_equation brings every bf_eq/bf_neq to `f (!)= 0`,
+	// so that return is the path taken by the vast majority of the calls, and
+	// storing only at the end left the cache write-never for them.
+	auto memo = [&key](tref r) { return cache.emplace(key, r).first->second; };
+#else
+	auto memo = [](tref r) { return r; };
 #endif // TAU_CACHE
 	// Return early if atomic_fm is either T or F
 	if (tau::get(atomic_fm).equals_T() || tau::get(atomic_fm).equals_F())
@@ -57,9 +69,11 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 	else if (tau::get(func1_v_0) == tau::get(func1_v_1) && !contains<node>(func1_v_0, var))
 		func1 = func1_v_0;
 	if (tau::get(func2).equals_0())
-		return denorm_equation<node>(
-			tau::get(tau::wff, tau::get(atm_type, func1, func2)));
-	// Simplify func2
+		return memo(denorm_equation<node>(
+			tau::get(tau::wff, tau::get(atm_type, func1, func2))));
+	// Simplify func2. Reached only for bf_lt/bf_lteq atoms: norm_equation
+	// zeroes the right-hand side of every bf_eq/bf_neq, which the return above
+	// then catches.
 	tref func2_v_0 = rewriter::replace_if<node>(func2, var,
 		_0<node>(find_ba_type<node>(var)), is_boolean_operation<node>);
 	func2_v_0 = tt(func2_v_0) | bf_reduce_canonical<node>() | tt::ref;
@@ -77,13 +91,7 @@ tref syntactic_variable_simplification(tref atomic_fm, tref var) {
 		func2 = func2_v_0;
 	tref res = tau::get(tau::wff, tau::get(atm_type, func1, func2));
 	DBG(LOG_TRACE << "Syntactic_variable_simplification result: " << LOG_FM(res) << "\n";)
-#ifdef TAU_CACHE
-	cache.emplace(std::make_pair(tau::trim_right_sibling(res),
-		tau::trim_right_sibling(var)), res);
-	return cache.emplace(std::make_pair(tau::trim_right_sibling(atomic_fm),
-		tau::trim_right_sibling(var)), res).first->second;
-#endif // TAU_CACHE
-	return res;
+	return memo(res);
 }
 
 /**
@@ -526,16 +534,17 @@ public:
  * linear time in the formula size and the number of paths found in terms
  * @tparam node tree node type
  * @param formula The formula to simplify
- * @param skip Predicate identifying content this pass must not touch
- *        (defaults to BV-typed nodes); accepted for interface consistency
- *        with `anti_prenex_block`'s other steps, but currently unused --
- *        neither `simplify_using_equality_dnf` nor
- *        `syntactic_path_simplification_dnf` has a BV-specific check to guard.
  * @return The simplified formula
+ *
+ * @note This pass takes no `skip` predicate, and deliberately so: it used to
+ * accept one for interface consistency with `anti_prenex_block`'s other steps
+ * and then discard it, which read as a guarantee it never gave. Neither
+ * `simplify_using_equality_dnf` nor `syntactic_path_simplification_dnf` has a
+ * BV-specific check to guard, so a caller that skips bitvector content
+ * elsewhere in the pipeline must not assume this step leaves it alone.
  */
 template<NodeType node>
-tref syntactic_formula_simplification(tref formula,
-		[[maybe_unused]] std::function<bool(tref)> skip) {
+tref syntactic_formula_simplification(tref formula) {
 	formula = simplify_using_equality_dnf<node>::on(formula);
 	return syntactic_path_simplification_dnf<node>::on(formula);
 }
@@ -556,6 +565,17 @@ auto variable_order_for_simplification = [](tref l, tref r) {
 	DBG(assert(tau::get(r).is(tau::variable));)
 	// Reject equal
 	if (tau::get(l) == tau::get(r)) return false;
+	// Non-io variables form a single class ordered *after* every io variable,
+	// as the comment above states ("... < input < output < other variable").
+	// This also makes the relation a valid strict weak ordering: the previous
+	// version returned false for every pair involving a non-io variable in
+	// both directions, which made each non-io variable equivalent to each io
+	// variable while io variables stayed strictly ordered among themselves --
+	// so incomparability was not transitive and std::ranges::stable_sort's
+	// precondition was violated, leaving the BDD variable order (and hence the
+	// normal form) unspecified.
+	if (!is_io_var<node>(l)) return false;
+	if (!is_io_var<node>(r)) return true;
 	if (is_io_var<node>(l)) {
 		// Check if r is also stream
 		if (is_io_var<node>(r)) {
@@ -603,8 +623,8 @@ auto variable_order_for_simplification = [](tref l, tref r) {
 					} else return false;
 				} else return false;
 			}
-		} else return false; // compare equal
-	} else return false; // compare equal
+		} else return false; // unreachable: handled by the guard above
+	} else return false; // unreachable: handled by the guard above
 };
 
 /**
@@ -619,9 +639,12 @@ auto atm_formula_order_for_simplification = [](tref l, tref r) {
 	// 1) lowest time points in free variables have priority, then
 	// 2) lowest highest time points in free variables and last
 	// 3) number of free io variables
-	DBG(using tau = tree<node>;)
-	DBG(assert(tau::get(l).child_is(tau::bf_eq));)
-	DBG(assert(tau::get(r).child_is(tau::bf_eq));)
+	// boole_normal_form's is_atomic admits bf_eq, bf_lt and bf_lteq, so all
+	// three reach this comparator (a bv `<` is not expanded by the
+	// construction hooks and survives intact). Ordering only reads free
+	// variables, which every atom kind has.
+	DBG(assert(is_atomic_bdd_var<node>(l));)
+	DBG(assert(is_atomic_bdd_var<node>(r));)
 	// For l
 	std::pair<bool, int_t> low_t_l {true, 0}, high_t_l {true, 0};
 	bool is_high_init = false;
@@ -1241,13 +1264,21 @@ tref squeeze_absorb(tref formula) {
 		if (mark.contains(n)) return false;
 		return visit_wff<node>(n);
 	};
-	// Disable intermediate simplifications for the moment
-	tau::use_hooks = false;
-	tref res = pre_order<node>(formula).apply(f, visit, up);
-	DBG(assert(assms.size() == 1);)
-	DBG(assert(dual_assms.size() == 1);)
-	// Re-enable intermediate simplifications
-	tau::use_hooks = true;
+	// Disable intermediate simplifications for the duration of the traversal.
+	// The guard restores the previous value on every exit, including an
+	// exception thrown out of `apply` -- this subsystem's bv paths do throw,
+	// and an unwound `use_hooks = false` would disable hooks for the rest of
+	// the process. Restoring rather than assigning `true` also leaves a caller
+	// that deliberately disabled hooks alone.
+	tref res = nullptr;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		res = pre_order<node>(formula).apply(f, visit, up);
+		DBG(assert(assms.size() == 1);)
+		DBG(assert(dual_assms.size() == 1);)
+	}
+	// Hooks are back on here, which is what makes the `reget` below re-apply
+	// the intermediate simplifications skipped during the traversal.
 	DBG(LOG_DEBUG << "Ended squeeze_absorb");
 	return tau::reget(res);
 }
@@ -1466,13 +1497,21 @@ tref squeeze_absorb(tref formula, tref var) {
 		if (mark.contains(n)) return false;
 		return visit_wff<node>(n);
 	};
-	// Disable intermediate simplifications for the moment
-	tau::use_hooks = false;
-	tref res = pre_order<node>(formula).apply(f, visit, up);
-	DBG(assert(assms.size() == 1);)
-	DBG(assert(dual_assms.size() == 1);)
-	// Re-enable intermediate simplifications
-	tau::use_hooks = true;
+	// Disable intermediate simplifications for the duration of the traversal.
+	// The guard restores the previous value on every exit, including an
+	// exception thrown out of `apply` -- this subsystem's bv paths do throw,
+	// and an unwound `use_hooks = false` would disable hooks for the rest of
+	// the process. Restoring rather than assigning `true` also leaves a caller
+	// that deliberately disabled hooks alone.
+	tref res = nullptr;
+	{
+		use_hooks_guard<node> hooks_off(false);
+		res = pre_order<node>(formula).apply(f, visit, up);
+		DBG(assert(assms.size() == 1);)
+		DBG(assert(dual_assms.size() == 1);)
+	}
+	// Hooks are back on here, which is what makes the `reget` below re-apply
+	// the intermediate simplifications skipped during the traversal.
 	DBG(LOG_DEBUG << "Ended squeeze_absorb");
 	return tau::reget(res);
 }

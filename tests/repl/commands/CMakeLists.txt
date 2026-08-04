@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 include(test_repl-quit_cmd.cmake)
 include(test_repl-version_cmd.cmake)
+include(test_repl-clear_cmd.cmake)
 include(test_repl-help_cmd.cmake)
 include(test_repl-help_extended_cmd.cmake)
 
@@ -12,8 +13,12 @@ include(test_repl-help_extended_cmd.cmake)
 include(test_repl-get_cmd.cmake)
 include(test_repl-get_set_extended_cmd.cmake)
 include(test_repl-set_cmd.cmake)
+# enable_disable_cmd.cmake supersedes main's separate enable_cmd/disable_cmd
+# files: it covers every option they did (and more) under the same test names,
+# so including all three would collide on duplicate ctest names.
 include(test_repl-enable_disable_cmd.cmake)
 include(test_repl-toggle_cmd.cmake)
+include(test_repl-option_aliases.cmake)
 
 # commands for specs, formulas and terms
 
@@ -23,18 +28,18 @@ include(test_repl-unsat_cmd.cmake)
 # AP-35: solver_cmd.cmake (not solve_cmd.cmake -- no such file ever existed,
 # which is why the commented-out include below never worked) already
 # covers the `solve` command's happy path with a bitvector/cvc5 equation.
-# A plain, non-bv equation (e.g. `solve x | y = 0`, `solve x = 0`) currently
-# aborts the REPL (std::logic_error "ba_types::type_tree: invalid
-# ba_type_id" inside print_solver_cmd_solution), reproducible independent
-# of any change here, so no additional `solve` test is added for that case.
+# issue-60: plain, non-bv equations (`solve x:sbf = 1`, `solve x = 0`, ...)
+# used to abort the REPL with std::logic_error "ba_types::type_tree: invalid
+# ba_type_id" inside print_solver_cmd_solution; solve_cmd was passing it a
+# grammar nonterminal instead of a BA type id. Fixed, and covered here.
 include(test_repl-solver_cmd.cmake)
-# `lgrs` is not wired in: every equation tried (bf, bv, with/without cvc5)
-# currently aborts the REPL (assertion failure in tree<node>::child_tree,
-# hit inside api<node>::lgrs(tref)'s norm_all_equations()/
-# apply_all_xor_def() preprocessing -- see also the "lgrs" test in
-# tests/api/test_api-tref_api.cpp for the same finding at the API level).
-# That is a pre-existing bug in src/, out of scope for a tests-only change,
-# so there is currently no working `lgrs` REPL command to test.
+# issue-60: `lgrs` used to abort on every equation tried (bf, bv, with/without
+# cvc5) -- an assertion failure in tree<node>::child_tree, hit inside
+# api<node>::lgrs(tref), which indexed the wff rather than the bf_eq when
+# screening for non-Boolean operations. On top of that it shared solve_cmd's
+# BA-type-id defect. Both fixed; see also the "lgrs" test in
+# tests/api/test_api-tref_api.cpp for the API-level view.
+include(test_repl-lgrs_cmd.cmake)
 include(test_repl-normalize_cmd.cmake)
 include(test_repl-qelim_cmd.cmake)
 
@@ -60,6 +65,13 @@ include(test_repl-io_definition_cmd.cmake)
 # session management and type inspection
 include(test_repl-reset_cmd.cmake)
 include(test_repl-whatis_cmd.cmake)
+
+# the `run` command: interactive interpreter execution driven from stdin
+include(test_repl-run_cmd.cmake)
+
+# CLI entry points of the tau executable itself (not REPL commands):
+# --version, the interactive REPL loop, and the specification-file path.
+include(test_repl-cli.cmake)
 
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command

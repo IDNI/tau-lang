@@ -935,7 +935,15 @@ static tref parse_sv_eq(const std::string& name, int shift, int value)
 	// bitvector constants ({0}, {1}) are properly resolved.
 	typename tau::get_options opts;
 	opts.parse.start = tau::wff;
-	return tau::get(expr, std::move(opts));
+	tref fm = tau::get(expr, std::move(opts));
+	// The input/output bit of an io_var is set while parsing a *spec*, so a
+	// bare wff parse leaves these aux variables unclassified. Everything
+	// downstream (transform_io_var, existentially_quantify_output_streams)
+	// then treats them as neither input nor output. Resolve them here the
+	// same way get_nso_rr resolves a bare formula: the "o" name prefix marks
+	// them as the outputs they are.
+	return resolve_io_vars<node>(
+		*definitions<node>::instance().get_io_context(), fm);
 }
 
 template <NodeType node>

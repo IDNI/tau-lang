@@ -485,6 +485,44 @@ TEST_SUITE("with inputs and outputs") {
 		CHECK ( !memory.value().empty() );
 	}
 
+	// Regression test: nested conditionals over a mix of `:tau` and `:bv[N]`
+	// streams reported "Internal error: Tau specification is unexpectedly
+	// unsat" at step 0 instead of producing a solution.
+	//
+	// Nested conditionals compile to a conjunction of disjunctions in which
+	// the bitvector and Tau atoms sit in the same clauses, so no lift can
+	// separate them. eliminate_bv_and_quantifiers used to skip all bv-typed
+	// content in its second anti-prenex pass on the grounds that the solver
+	// had already decided whatever was closeable -- which does not hold for a
+	// scope the bv translator cannot read at all (it holds a `:tau`
+	// constant). The `all i2[1]:bv[8] (...)` block was then left standing with
+	// nothing able to resolve it, the step system became unsolvable, and the
+	// run declared the spec unsat.
+	TEST_CASE("nested conditionals over mixed tau/bv streams stay sat") {
+		const char* sample =
+			"o0seal[0]:tau = 1 && o0law[0]:tau = 1 && "
+			"( (i2[t]:bv[8] = { #x01 }:bv[8]) "
+			"  ? ( (o0seal[t]:tau = o0law[t-1]:tau) "
+			"      && (o0law[t]:tau = o0law[t-1]:tau) "
+			"      && (o0res[t]:bv[8] = { #x05 }:bv[8]) ) "
+			"  : ( (o0seal[t]:tau = o0seal[t-1]:tau) && "
+			"      ( ((o0law[t-1]:tau & i1[t]:tau) != 0) "
+			"        ? ( (o0law[t]:tau = o0law[t-1]:tau & i1[t]:tau) "
+			"            && (o0res[t]:bv[8] = { #x09 }:bv[8]) ) "
+			"        : ( (o0law[t]:tau = o0law[t-1]:tau) "
+			"            && (o0res[t]:bv[8] = { #x08 }:bv[8]) ) ) ) ).";
+		io_context<node_t> ctx;
+		strings i1_values = { "T", "T" };
+		strings i2_values = { "{ #x01 }:bv[8]", "{ #x01 }:bv[8]" };
+		ctx.add_input("i1", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i1_values));
+		ctx.add_input("i2", bv_type_id<node_t>(8),
+			std::make_shared<vector_input_stream>(i2_values));
+		auto memory = run_test(sample, ctx, 1);
+		REQUIRE( memory.has_value() );
+		CHECK ( !memory.value().empty() );
+	}
+
 }
 
 // -----------------------------------------------------------------------------

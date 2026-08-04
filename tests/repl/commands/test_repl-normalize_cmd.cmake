@@ -38,3 +38,54 @@ add_repl_test(normalize_cmd_wff_mem_abs "T. normalize %1" "T")
 add_repl_test_fail(normalize_cmd-multiindex_fixed_point_call
 	"g[0, 0](Y) := Y = 0. g[n, 0](Y) := g[n - 1, 0](Y). normalize g(Y)"
 	"multiindex offset relations is not supported")
+
+# Regression tests for issue 36 (REPL hangs when normalizing undefined terms).
+
+# A definition set that does not terminate for the given argument used to run
+# forever with no output, no error and no interruption point. Here the
+# unfolding oscillates: each pass adds a negation that the simplifier folds
+# straight back, so no state is ever a fixpoint and none is ever new either.
+add_repl_test_fail(normalize_cmd-oscillating_definition
+	"f(x) := f(x)'. normalize f(1)"
+	"oscillates without reaching a normal form")
+
+# Issue 28's own script, and the wff spelling @pt7k gave in its thread. Both
+# are the same oscillation: `'` only works on sbf, hence the `!` variant.
+add_repl_test_fail(normalize_cmd-self_negating_recurrence_bf
+	"g[0](y) := 0. g[n](y) := g[n](y)'. normalize g[5](1)"
+	"oscillates without reaching a normal form")
+add_repl_test_fail(normalize_cmd-self_negating_recurrence_wff
+	"g[0](y) := F. g[n](y) := !g[n](y). normalize g[5](1)"
+	"oscillates without reaching a normal form")
+
+# The corrected form from the same thread, referring to the previous step,
+# normalizes to 1. It used to print "Failed to translate the formula to cvc5: 1"
+# first: a formula with no bitvector content at all passed
+# is_bv_solvable_formula vacuously and was handed to a solver that cannot
+# translate it, making a working normalization look like it had failed.
+# add_repl_test fails the test on any "Error" in the output, which is the point.
+add_repl_test(normalize_cmd-prior_step_recurrence_no_cvc5_error
+	"g[0](y) := 0. g[n](y) := g[n-1](y)'. normalize g[5](1)"
+	"1")
+
+# A definition set whose unfolding grows instead of oscillating is not covered
+# here: no revisit check can catch it, only repeat_all's round cap, which is
+# unbounded pending the runtime parameter it is marked TODO (HIGH) for. Once a
+# finite cap exists, `g(x) := h(g(x)). normalize g(1)` reports
+# "did not reach a fixpoint" and belongs here (see the matching skipped case in
+# tests/unit/test_execution.cpp).
+
+# A definition whose head and body are both untyped is classified as a
+# predicate relation, so its head used to be recorded as a wff reference. Every
+# call from an argument position is a bf reference, so the rule never matched
+# there and the call was silently left unexpanded.
+add_repl_test(normalize_cmd-pred_shaped_def_used_as_argument
+	"foo(a) := bar(a). baz(x) := x. normalize baz(foo(1))"
+	"bar")
+
+# End-to-end check of the same defect on the script from the issue thread: the
+# `add(int[0](1), x) := x` base case only terminates if `pred` is expanded
+# inside `add`'s argument, which is exactly what did not happen.
+add_repl_test(normalize_cmd-recursive_defs_in_argument_position
+	"succ(int[0](1)) := int[1](1). succ(int[1](1)) := int[2](1). pred(int[t](1)) := int[t-1](1). add(int[0](1), x) := x. add(x, int[0](1)) := x. add(x, y) := add(pred(x), succ(y)). normalize add(int[3](1), int[10](1))"
+	"succ.*succ.*succ.*int")

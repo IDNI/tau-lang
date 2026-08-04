@@ -410,3 +410,433 @@ TEST_SUITE("semantic-error predicates") {
 		CHECK(!has_semantic_error<node_t>(get_nso_rr("x=0.").value().main->get()));
 	}
 }
+
+// ── expression_paths: multi-level paths, terms, iterator equality ───────────
+//
+// Coverage-driven additions (2026-08-01). tau_tree_extractors.tmpl.h measured
+// 85.3% line coverage, and its single largest cold region is inside
+// expression_paths<node>::iterator::apply(). The TT-12 suite above uses
+// "(a=0||b=0)&&x=0." -- exactly ONE wff_or -- so `decisions` never holds more
+// than one element and three groups of lines never ran:
+//
+//   * the "go left" / "go right" arms that exclude the not-taken branch when
+//     the current disjunction is NOT the last decision (needs >= 2 wff_or on
+//     one path),
+//   * the `term` arm, which looks for bf_or/bf_xor rather than wff_or (needs
+//     expression_paths over a Boolean function rather than a formula),
+//   * iterator::operator==' s two asymmetric branches, which compare decision
+//     vectors of differing length.
+
+TEST_SUITE("expression_paths: multi-level and term paths") {
+
+	// Collect paths with a range-for. This is the only safe way: see the
+	// ITERATOR CONTRACT note at the end of this suite -- building a container
+	// from begin()/end() corrupts the heap.
+	auto collect = [](tref e) {
+		trefs out;
+		for (tref p : expression_paths<node_t>(e)) out.push_back(p);
+		return out;
+	};
+
+	// Two independent disjunctions -> 2 * 2 = 4 paths, and decisions grows to
+	// size 2, so the non-final-decision arms of the remove lambda run.
+	TEST_CASE("two disjunctions enumerate four paths") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&x=0.")
+			.value().main->get();
+		trefs paths = collect(fm);
+		CHECK(paths.size() == 4);
+		// every enumerated path is a distinct formula
+		for (size_t i = 0; i < paths.size(); ++i)
+			for (size_t j = i + 1; j < paths.size(); ++j)
+				CHECK(paths[i] != paths[j]);
+	}
+
+	TEST_CASE("three disjunctions enumerate eight paths") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&(e=0||f=0).")
+			.value().main->get();
+		trefs paths = collect(fm);
+		CHECK(paths.size() == 8);
+	}
+
+	// apply() over a multi-level expression exercises the excluded-subtree
+	// bookkeeping that a single-disjunction expression never reaches.
+	TEST_CASE("apply over two disjunctions visits every path") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&x=0.")
+			.value().main->get();
+		trefs seen;
+		auto record = [&](tref res) { seen.push_back(res); return true; };
+		auto identity = [](tref path) { return path; };
+		expression_paths<node_t>(fm).apply(identity, record);
+		// pre-check protocol: one call per path plus a final one
+		CHECK(seen.size() == 5);
+		CHECK(seen.front() == nullptr);
+	}
+
+	TEST_CASE("apply_only_if over two disjunctions undoes all on rejection") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&x=0.")
+			.value().main->get();
+		auto reject_all = [](tref) { return false; };
+		auto to_T = [](tref) { return tau::_T(); };
+		tref result = expression_paths<node_t>(fm)
+			.apply_only_if(to_T, reject_all);
+		CHECK(result == fm);   // fully restored
+	}
+
+	// The `term` arm: over a Boolean function, the split points are bf_or and
+	// bf_xor rather than wff_or, and exhaustion yields _0 rather than _F.
+	TEST_CASE("paths over a term split on bf_or") {
+		static tau::get_options bf_opts{ .parse = { .start = tau::bf } };
+		tref term = tau::get("a|b", bf_opts);
+		REQUIRE(term != nullptr);
+		trefs paths = collect(term);
+		CHECK(paths.size() == 2);
+	}
+
+	TEST_CASE("paths over a term split on bf_xor") {
+		static tau::get_options bf_opts{ .parse = { .start = tau::bf } };
+		tref term = tau::get("a^b", bf_opts);
+		REQUIRE(term != nullptr);
+		trefs paths = collect(term);
+		CHECK(paths.size() >= 2);
+	}
+
+	TEST_CASE("apply over a term transforms a path") {
+		static tau::get_options bf_opts{ .parse = { .start = tau::bf } };
+		tref term = tau::get("a|b", bf_opts);
+		REQUIRE(term != nullptr);
+		size_t calls = 0;
+		auto accept_first = [&](tref) { ++calls; return true; };
+		auto to_0 = [](tref) { return tau::_0(0); };
+		tref result = expression_paths<node_t>(term)
+			.apply_only_if(to_0, accept_first);
+		CHECK(calls == 1);
+		REQUIRE(result != nullptr);
+	}
+
+	// iterator::operator== compares decision vectors, and has separate arms
+	// for "mine is shorter" and "theirs is shorter"; a begin() iterator (no
+	// decisions yet) against an advanced one reaches both, depending on
+	// which side is on the left.
+	TEST_CASE("iterators at different decision depths compare correctly") {
+		tref fm = get_nso_rr("(a=0||b=0)&&(c=0||d=0)&&x=0.")
+			.value().main->get();
+		expression_paths<node_t> paths(fm);
+		auto first = paths.begin();
+		auto advanced = paths.begin();
+		++advanced;
+		CHECK(first != advanced);
+		CHECK(advanced != first);   // exercises the mirrored branch
+		auto same = paths.begin();
+		CHECK(first == same);
+		// an exhausted iterator equals end() from either side
+		auto it = paths.begin();
+		size_t guard = 0;
+		while (it != paths.end() && guard++ < 16) ++it;
+		CHECK(it == paths.end());
+		CHECK(paths.end() == it);
+	}
+
+	// ITERATOR CONTRACT BUG found while writing this suite (2026-08-01).
+	//
+	// expression_paths<node>::iterator declares
+	//     using iterator_category = std::forward_iterator_tag;
+	// (src/tau_tree.tmpl.h:57) but it is NOT a forward iterator:
+	//
+	//   * operator*() is non-const and mutates the iterator's state, and
+	//   * operator++() carries the comment "WARNING: Only use after calling
+	//     operator*() at least once on current state".
+	//
+	// That is a single-pass, dereference-before-increment iterator, i.e. at
+	// most an input iterator. Standard algorithms trust the declared tag, and
+	// for a forward iterator std::vector's range constructor is entitled to
+	// call std::distance(first, last) to size its buffer -- which increments
+	// WITHOUT dereferencing, violating the documented precondition.
+	//
+	// The observable result of
+	//     trefs p{ ep.begin(), ep.end() };
+	// is heap corruption ("free(): invalid size" / "corrupted size vs.
+	// prev_size") once the expression has more than one path. The assertions
+	// still pass and the path count is still right, so the damage is silent
+	// and only aborts later in unrelated code.
+	//
+	// No production caller hits this: every use in src/ is either a range-for
+	// over a single temporary or apply()/apply_only_if(), all of which are
+	// genuine single passes that dereference before incrementing.
+	// tests/unit/test_normal_forms.cpp ("normal forms: dnf paths" case 4) does
+	// use the begin()/end() form and survives only because its sample yields
+	// exactly one path.
+	//
+	// Fix belongs in src/: declare std::input_iterator_tag, which makes the
+	// standard library stop assuming multi-pass and takes the distance-first
+	// path out of play.
+}
+
+// ── TT-22: extractor branch coverage ────────────────────────────────────────
+//
+// Coverage-driven additions (2026-08-01), branch pass. After correcting the
+// raw gcovr numbers for template-instantiation multiplicity (see
+// private/add-tests-whole-code.md 6.1) and for the permanently one-sided
+// branch that every LOG_TRACE/LOG_DEBUG contributes (BOOST_LOG_STREAM_SEV
+// tests "is this channel enabled", which is always false in a test run),
+// tau_tree_extractors.tmpl.h sat at 54.6% real branch coverage -- the worst
+// of any substantial file whose gaps are reachable from a unit test.
+//
+// The suites below take the *untested polarity* of conditionals whose lines
+// already execute. That is the class of gap line coverage cannot see: the
+// line runs, but only ever one way.
+
+namespace {
+
+// An io_var as it exists before resolve_io_vars classifies it: data() == 0,
+// i.e. neither an input nor an output yet.
+tref unresolved_io_var(const std::string& name) {
+	return tau::get(tau::bf, tau::get_typed(tau::variable,
+		tau::get(tau::io_var, { build_var_name<node_t>(name),
+			tau::get(tau::offset,
+				tau::build_shift(std::string("t"), 0)) }),
+		tau_type_id<node_t>()));
+}
+
+} // namespace
+
+TEST_SUITE("resolve_io_vars direction classification") {
+
+	// io_prefixed_io_var is a four-way condition
+	//   (name[0]=='i' || name=="this") ? IN
+	//                                  : (name[0]=='o' || name=="u") ? OUT
+	//                                                                : unresolved
+	// and only the leading-'i' arm had ever been taken.
+
+	TEST_CASE("a leading 'i' marks an input") {
+		io_context<node_t> ctx;
+		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("i1"));
+		CHECK(tau::get(r).is_input_variable());
+	}
+
+	TEST_CASE("the name \"this\" marks an input") {
+		io_context<node_t> ctx;
+		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("this"));
+		CHECK(tau::get(r).is_input_variable());
+	}
+
+	TEST_CASE("a leading 'o' marks an output") {
+		io_context<node_t> ctx;
+		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("o1"));
+		CHECK(tau::get(r).is_output_variable());
+	}
+
+	TEST_CASE("the name \"u\" marks an output") {
+		io_context<node_t> ctx;
+		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("u"));
+		CHECK(tau::get(r).is_output_variable());
+	}
+
+	TEST_CASE("an unprefixed name stays unresolved") {
+		io_context<node_t> ctx;
+		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("zzz"));
+		CHECK(!tau::get(r).is_input_variable());
+		CHECK(!tau::get(r).is_output_variable());
+	}
+
+	// The context lookups run before the name heuristic, so a name the
+	// heuristic would reject is still resolved once it is registered.
+
+	// EX-1 (FIXED) -- the io_context lookups used to be dead code.
+	//
+	// resolve_io_vars' lambda fires on the `io_var` node and used to look
+	// the context up with canonize<node>(n). canonize expects the enclosing
+	// `variable` node: it does `tt(new_t) | tau::io_var | tau::var_name`,
+	// i.e. descends into an io_var CHILD. Handed the io_var itself that
+	// selector found nothing, canonize returned its argument unchanged --
+	// offset subtree and all -- so the key could never equal one registered
+	// by add_input_console/add_output_console, which store
+	// build_canonized_io_var<node>(name) == variable(io_var(var_name)).
+	// Both lookups were therefore unreachable and classification always
+	// fell through to the name heuristic.
+	//
+	// resolve_io_vars now builds the key the registrars' way, so an
+	// explicitly registered stream resolves whatever its name looks like.
+
+	TEST_CASE("EX-1: a registered input resolves an unprefixed name") {
+		io_context<node_t> ctx;
+		ctx.add_input_console("zzz", tau_type_id<node_t>());
+		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("zzz"));
+		CHECK(tau::get(r).is_input_variable());
+	}
+
+	TEST_CASE("EX-1: a registered output resolves an unprefixed name") {
+		io_context<node_t> ctx;
+		ctx.add_output_console("zzz", tau_type_id<node_t>());
+		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("zzz"));
+		CHECK(tau::get(r).is_output_variable());
+	}
+
+	TEST_CASE("EX-1: the context wins over the name heuristic") {
+		// "o1" would be classified an output by name alone; registering
+		// it as an input must take precedence, which only works if the
+		// lookup actually hits.
+		io_context<node_t> ctx;
+		ctx.add_input_console("o1", tau_type_id<node_t>());
+		tref r = resolve_io_vars<node_t>(ctx, unresolved_io_var("o1"));
+		CHECK(tau::get(r).is_input_variable());
+	}
+
+	// canonize itself is unchanged: it is still only correct on the
+	// enclosing `variable` node. This pins that contract so a future caller
+	// cannot repeat EX-1 by handing it an io_var and assuming it copes.
+	TEST_CASE("EX-1: canonize is only correct on the enclosing variable") {
+		tref v = unresolved_io_var("zzz");
+		tref var_node = tau::get(v)[0].get();
+		tref io_node = tau::get(var_node)[0].get();
+		tref key = build_canonized_io_var<node_t>("zzz");
+		CHECK(canonize<node_t>(var_node) == key);  // the shape it wants
+		CHECK(canonize<node_t>(io_node) != key);   // the shape it cannot take
+	}
+}
+
+TEST_SUITE("get_nso_rr early returns") {
+
+	// get_nso_rr accepts more than a whole spec; three of its four entry
+	// shapes had no test, and each returns a differently-shaped rr.
+
+	TEST_CASE("a null tree yields no rr") {
+		CHECK(!get_nso_rr<node_t>(nullptr).has_value());
+	}
+
+	TEST_CASE("a bare bf becomes an rr that is all main and no relations") {
+		tref b = tau::get("x", parse_bf());
+		REQUIRE(b != nullptr);
+		auto r = get_nso_rr<node_t>(b);
+		REQUIRE(r.has_value());
+		CHECK(r->rec_relations.empty());
+		CHECK(r->main->get() == b);
+	}
+
+	TEST_CASE("a lone rec_relation becomes an rr that is all relations and no main") {
+		tref defs = tau::get("f(x) := x.", parse_rec_relations());
+		REQUIRE(defs != nullptr);
+		tref rel = tau::get(defs)[0].get();
+		REQUIRE(tau::get(rel).is(tau::rec_relation));
+		auto r = get_nso_rr<node_t>(rel);
+		REQUIRE(r.has_value());
+		CHECK(r->rec_relations.size() == 1);
+		CHECK(r->main == nullptr);
+	}
+}
+
+TEST_SUITE("get_var_name_node unwrapping") {
+
+	// get_var_name_node tries the terminals directly, then peels one
+	// wrapper at a time (bf -> variable -> io_var). Only the plain
+	// bf/variable route was exercised.
+
+	TEST_CASE("a var_name node is its own name node") {
+		tref vn = build_var_name<node_t>("x");
+		CHECK(get_var_name_node<node_t>(vn) == vn);
+		CHECK(get_var_name<node_t>(vn) == "x");
+	}
+
+	TEST_CASE("a ba_constant is returned as-is, not descended into") {
+		// A bv literal is used rather than a :tau one: a :tau
+		// ba_constant only survives parsing when a :tau variable
+		// anchors it, which would drag a whole spec into this test.
+		tref c = tau::get("{1}:bv[8]", parse_bf());
+		REQUIRE(c != nullptr);
+		tref cte = tau::get(c).find_top(is<node_t, tau::ba_constant>);
+		REQUIRE(cte != nullptr);
+		CHECK(get_var_name_node<node_t>(cte) == cte);
+	}
+
+	TEST_CASE("unwraps bf -> variable -> var_name") {
+		tref v = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		REQUIRE(tau::get(v).is(tau::bf));
+		CHECK(get_var_name<node_t>(v) == "x");
+	}
+
+	TEST_CASE("unwraps an io_var down to its var_name") {
+		tref v = unresolved_io_var("i1");
+		CHECK(get_var_name<node_t>(v) == "i1");
+		CHECK(get_var_name_sid<node_t>(v) == dict("i1"));
+	}
+
+	TEST_CASE("finds a uconst_name rather than a var_name") {
+		tref u = build_bf_uconst<node_t>("a", "b", tau_type_id<node_t>());
+		REQUIRE(u != nullptr);
+		tref n = get_var_name_node<node_t>(u);
+		REQUIRE(n != nullptr);
+		CHECK(tau::get(n).is(tau::uconst_name));
+	}
+}
+
+TEST_SUITE("semantic-error predicates: the untested polarity") {
+
+	// Each predicate below runs inside tau::get (tau_tree_from_parser.tmpl.h
+	// calls has_semantic_error and returns nullptr when it fires), so the
+	// rejection IS the observable contract. Asserting on tau::get also walks
+	// the has_semantic_error || chain past the earlier predicates, which is
+	// where most of its uncovered branches were.
+
+	TEST_CASE("an open tau constant is rejected, a closed one accepted") {
+		CHECK(tau::get("x:tau = { y = 0 }.") == nullptr);
+		CHECK(tau::get("x:tau = { all y y = 0 }.") != nullptr);
+	}
+
+	TEST_CASE("a fallback inside a rec_relation body is rejected") {
+		// `fallback` belongs on the main formula's reference. In a
+		// definition body it is misplaced and has_missplaced_fallback
+		// -- the last arm of the has_semantic_error chain -- rejects it.
+		CHECK(tau::get("g[n](x) := g[n-1](x) fallback T."
+			"g[0](x) := T."
+			"g(x).") == nullptr);
+		CHECK(tau::get("g[n](x) := !g[n-1](x)."
+			"g[0](x) := T."
+			"g(x) fallback T.") != nullptr);
+	}
+
+	TEST_CASE("nested temporal quantifiers are accepted") {
+		// Full LTL allows temporal quantifiers to nest (G(F p), F(G p));
+		// the historical safety-fragment restriction that rejected such
+		// nesting is gone, so this parses rather than erroring out. See
+		// "invalid_nesting_of_temp_quants never flags nesting: full LTL
+		// allows it" in the suite above, which pins the predicate that
+		// used to reject it.
+		CHECK(tau::get("always (sometimes x = 0).") != nullptr);
+		CHECK(tau::get("always x = 0.") != nullptr);
+	}
+}
+
+TEST_SUITE("get_free_vars edge inputs") {
+
+	TEST_CASE("a null tree has no free variables") {
+		CHECK(get_free_vars<node_t>(nullptr).empty());
+	}
+
+	TEST_CASE("a node that is neither bf nor wff has no free variables") {
+		// The early type guard: only bf/wff roots are analysed.
+		CHECK(get_free_vars<node_t>(build_var_name<node_t>("x")).empty());
+	}
+
+	// get_free_vars' is_binder covers four node types; only the two wff
+	// quantifiers had ever been seen. The functional (bf) quantifiers bind
+	// exactly the same way.
+
+	TEST_CASE("bf_fall binds its variable, leaving the other free") {
+		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
+		tref body = tau::build_bf_and(
+			build_bf_variable<node_t>("x", tau_type_id<node_t>()),
+			build_bf_variable<node_t>("y", tau_type_id<node_t>()));
+		const trefs& fv = get_free_vars<node_t>(tau::build_bf_fall(x, body));
+		REQUIRE(fv.size() == 1);
+		CHECK(get_var_name<node_t>(fv[0]) == "y");
+	}
+
+	TEST_CASE("bf_fex binds its variable, leaving the other free") {
+		tref x = tau::build_variable(std::string("x"), tau_type_id<node_t>());
+		tref body = tau::build_bf_and(
+			build_bf_variable<node_t>("x", tau_type_id<node_t>()),
+			build_bf_variable<node_t>("y", tau_type_id<node_t>()));
+		const trefs& fv = get_free_vars<node_t>(tau::build_bf_fex(x, body));
+		REQUIRE(fv.size() == 1);
+		CHECK(get_var_name<node_t>(fv[0]) == "y");
+	}
+}

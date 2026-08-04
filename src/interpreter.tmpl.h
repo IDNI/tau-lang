@@ -151,6 +151,16 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		// DBG(LOG_TRACE << "io var: " << LOG_FM_TREE(var));
 		// DBG(LOG_TRACE << "io var dump: " << LOG_FM_DUMP(var));
 		assert(tau::get(var)[0].child_is(tau::io_var));
+		// The write loop below already skips the LTL aux state bits
+		// (o__ltl_s*, o__ltl_ms*) via is_excluded_output -- they are
+		// internal encoding artefacts, not user-visible streams, and no
+		// output stream is registered for them. Skip them here instead, ie.
+		// before the sort: an aux bit can reach this map in a node shape
+		// constant_io_comp cannot read a time point from, and then the sort
+		// dies (Debug assert / Release segfault) long before the skip below
+		// is ever reached. Filtering first is equivalent for every var that
+		// does sort, since those are dropped a few lines down anyway.
+		if (is_excluded_output(var)) continue;
 		io_vars.push_back(var);
 	}
 	std::ranges::sort(io_vars, constant_io_comp<node>);
@@ -1140,6 +1150,10 @@ void interpreter<node>::update(tref update) {
 				continue;
 			}
 			tref revision = pointwise_revision(current_spec[i].first->get(), collected_updates[i], time_point);
+			// nullptr when the definitions in the clause do not
+			// settle; without a revised clause the update cannot
+			// be accepted.
+			if (!revision) { update_valid = false; break; }
 			LOG_DEBUG << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first->get()) << "\n";
 			// std::cout << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first->get()) << "\n";
 			if (tau::get(revision).equals_F()) {

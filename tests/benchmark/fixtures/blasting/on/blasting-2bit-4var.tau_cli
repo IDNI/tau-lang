@@ -6,7 +6,6 @@ n all a:bv[2] all b:bv[2] all c:bv[2] all d:bv[2] (a ^ b) ^ c = a ^ (b ^ c) && a
 n ex a:bv[2] ex b:bv[2] ex c:bv[2] ex d:bv[2] a % { 1 }:bv[2] = { 2 }:bv[2] && b = a + { 3 }:bv[2] && c = a | b && d = c & a && d !>= b.
 n all a:bv[2] all b:bv[2] all c:bv[2] all d:bv[2] a | b >= a && a | b >= b && c & d <= c && c & d <= d.
 n ex a:bv[2] ex b:bv[2] ex c:bv[2] ex d:bv[2] a > { 0 }:bv[2] && b = a << { 1 }:bv[2] && b > a && c = b << { 1 }:bv[2] && d = c >> { 1 }:bv[2] && d = b.
-n ex a:bv[2] b:bv[2] c:bv[2] d:bv[2] a > { 0 }:bv[2] && b = a << { 1 }:bv[2] && b > a && c = b << { 1 }:bv[2] && d = c >> { 1 }:bv[2] && d = b.
 n all a:bv[2] all b:bv[2] all c:bv[2] all d:bv[2] a * { 0 }:bv[2] = a << { 2 }:bv[2] && b + { 1 }:bv[2] - { 1 }:bv[2] = b.
 n ex a:bv[2] ex b:bv[2] ex c:bv[2] ex d:bv[2] a > { 2 }:bv[2] && b = a % { 3 }:bv[2] && c = a + b && d = c & { 3 }:bv[2] && d > { 0 }:bv[2].
 n all a:bv[2] ex b:bv[2] all c:bv[2] ex d:bv[2] b = a + { 1 }:bv[2] && d = c + { 1 }:bv[2].

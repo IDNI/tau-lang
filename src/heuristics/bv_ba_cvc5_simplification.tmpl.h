@@ -15,7 +15,7 @@ tref cvc5_tree_to_tau_tree(bv n,
 #define rec(x) (cvc5_tree_to_tau_tree<node>(x, var_map)) // ease recursive calls
 	using tau = tree<node>;
 
-	DBG(LOG_INFO << "cvc5_tree_to_tau_tree/n: " << n.toString() << "\n";)
+	DBG(LOG_TRACE << "cvc5_tree_to_tau_tree/n: " << n.toString() << "\n";)
 
 	auto from_collection = [&var_map](const bv& t, const auto& f) -> tref {
 		tref res = rec(t[0]);

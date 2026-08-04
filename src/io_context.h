@@ -147,6 +147,10 @@ struct repl_pending_input_stream : public serialized_constant_input_stream {
 	size_t awaiting_time_point() const { return awaiting_time_point_; }
 private:
 	std::optional<std::string> pending_value;
+	// Value already handed out for `delivered_time_point_`, kept so that a
+	// step re-entered for another stream's value reads the same input again.
+	std::optional<std::string> delivered_value;
+	size_t delivered_time_point_ = 0;
 	bool awaiting_ = false;
 	size_t awaiting_time_point_ = 0;
 };
