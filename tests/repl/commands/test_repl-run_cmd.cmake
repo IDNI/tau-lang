@@ -39,6 +39,30 @@ add_test(NAME "test_repl-run_cmd-advances_time_point"
 set_tests_properties("test_repl-run_cmd-advances_time_point" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o\\[1\\] := F")
 
+# --- more than one console input stream in a single step ---------------------
+# read() aborts the whole step at the FIRST stream with no value yet, so a step
+# needing N console inputs is entered N times, once per value the REPL collects.
+# Each of those attempts re-reads the streams that already answered, so the
+# pending stream must hand the same value out again for the same time point;
+# consuming it once made the run re-prompt i1 after i2 was given, burn 2^N-1
+# input lines per step and then use the wrong values.
+add_test(NAME "test_repl-run_cmd-two_input_streams"
+	COMMAND bash -c "printf 'run (o1[t] = i1[t]) && (o2[t] = i2[t]).\\nT.\\nF.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-two_input_streams" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o1\\[0\\] := T")
+
+add_test(NAME "test_repl-run_cmd-two_input_streams-second_value"
+	COMMAND bash -c "printf 'run (o1[t] = i1[t]) && (o2[t] = i2[t]).\\nT.\\nF.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-two_input_streams-second_value" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o2\\[0\\] := F")
+
+# Two streams, two steps: the re-delivered value must be dropped once the step
+# it belongs to completes, otherwise step 1 silently reuses step 0's inputs.
+add_test(NAME "test_repl-run_cmd-two_input_streams-next_step"
+	COMMAND bash -c "printf 'run (o1[t] = i1[t]) && (o2[t] = i2[t]).\\nT.\\nF.\\nF.\\nT.\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-run_cmd-two_input_streams-next_step" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o1\\[1\\] := F")
+
 # --- rejected value re-asks the same step -----------------------------------
 # An unparseable value leaves the step unsatisfied. continue_running() is
 # re-entered with the previous request as `retry`, so the SAME time point is
