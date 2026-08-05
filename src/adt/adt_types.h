@@ -86,9 +86,17 @@ struct adt_registry {
 
 	/** @brief Return `true` if @p name_sid has a `type_def` in this registry. */
 	bool defines(size_t name_sid) const;
-	/** @brief Return `true` if @p name_sid resolves to a flat member list. */
+	/**
+	 * @brief Return `true` if @p name_sid resolves to a flat member list.
+	 * Safe probe: `false` (not a throw) for a @p name_sid this registry
+	 * does not define -- the common case for an ordinary base-typed name.
+	 */
 	bool is_tuple(size_t name_sid) const;
-	/** @brief Return `true` if @p name_sid resolves to a base type alias. */
+	/**
+	 * @brief Return `true` if @p name_sid resolves to a base type alias.
+	 * Safe probe: `false` (not a throw) for a @p name_sid this registry
+	 * does not define.
+	 */
 	bool is_alias(size_t name_sid) const;
 	/** @brief Return the aliased base type tree for @p name_sid. @pre `is_alias(name_sid)`. */
 	tref alias_target(size_t name_sid) const;

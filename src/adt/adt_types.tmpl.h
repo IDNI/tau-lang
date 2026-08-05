@@ -195,12 +195,14 @@ bool adt_registry<node>::defines(size_t name_sid) const {
 
 template <NodeType node>
 bool adt_registry<node>::is_tuple(size_t name_sid) const {
-	return resolved_.at(name_sid).is_tuple;
+	auto it = resolved_.find(name_sid);
+	return it != resolved_.end() && it->second.is_tuple;
 }
 
 template <NodeType node>
 bool adt_registry<node>::is_alias(size_t name_sid) const {
-	return !resolved_.at(name_sid).is_tuple;
+	auto it = resolved_.find(name_sid);
+	return it != resolved_.end() && !it->second.is_tuple;
 }
 
 template <NodeType node>

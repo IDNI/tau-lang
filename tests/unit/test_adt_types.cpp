@@ -47,4 +47,16 @@ TEST_SUITE("adt registry") {
 		REQUIRE(r); CHECK(r->members(sid("A"))[0].base_type != nullptr);
 	}
 	TEST_CASE("empty registry") { auto r = reg("x = 0."); REQUIRE(r); CHECK(r->empty()); }
+	TEST_CASE("is_tuple/is_alias are safe probes on an unregistered name") {
+		// sbf has no type_def in this spec, and neither does an arbitrary
+		// unused name: is_tuple/is_alias must return false, not throw --
+		// this is the natural guard pattern for the common (base-typed) case.
+		auto r = reg("type A = {m: sbf}. x = 0.");
+		REQUIRE(r);
+		CHECK_FALSE(r->defines(sid("sbf")));
+		CHECK_FALSE(r->is_tuple(sid("sbf")));
+		CHECK_FALSE(r->is_alias(sid("sbf")));
+		CHECK_FALSE(r->is_tuple(sid("not_a_registered_type")));
+		CHECK_FALSE(r->is_alias(sid("not_a_registered_type")));
+	}
 }
