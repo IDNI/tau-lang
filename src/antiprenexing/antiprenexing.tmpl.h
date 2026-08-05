@@ -73,8 +73,6 @@ inline size_t block_boole_max_splits = std::numeric_limits<size_t>::max();
 /// Runtime-tunable via `api::set_block_max_rounds`, same caveats as above.
 inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
 
-} // namespace idni::tau_lang
-
 /**
  * @internal
  * @brief Core recursive helper for the anti-prenex block algorithm.
