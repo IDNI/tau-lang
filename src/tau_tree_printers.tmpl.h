@@ -662,6 +662,22 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 					// Adjust id to not clash with any free variable name
 					id = id + bound_var_id_offset;
 					out("b" + std::to_string(id));
+				} else if (pnt == io_var
+						&& t.get_string().find('.') != std::string::npos) {
+					// A flattened ADT member folds its dotted member path
+					// into the io_var's own var_name
+					// (adt_flatten_build_flat_var, src/adt/adt_flatten.tmpl.h
+					// -- so canonize<node> keeps telling members apart; see
+					// adt_stream_component::io_var's comment, io_context.h).
+					// Restore the source round-trip form here: print only
+					// the base name now (before the offset bracket); the
+					// dotted member suffix prints after the bracket closes,
+					// in io_var's own on_leave case below -- together
+					// rendering `p[t].a`, which re-parses as io_var `p[t]`
+					// + member_path `.a` and re-flattens back to this exact
+					// tree.
+					const std::string& s = t.get_string();
+					out(s.substr(0, s.find('.')));
 				} else out(t.get_string());
 				break;
 			default:
@@ -825,13 +841,39 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case offset:            if (pnt == io_var) out("]");
 						break;
 			case ref_args:          out(")"); break;
-			case io_var:
-				// Print type information if present
-				if (parent) {
+			case io_var: {
+				// Counterpart to the var_name case in on_enter above: print
+				// the dotted member suffix (if any) now that the offset
+				// bracket has closed -- a flattened member's var_name
+				// printed only its base name earlier (e.g. "p" out of
+				// "p.a"), so print the rest here (".a"), together
+				// rendering `p[t].a` / `l[t-1].p.x`.
+				const std::string& full = get(t.first()).get_string();
+				if (auto dot = full.find('.'); dot != std::string::npos)
+					out(full.substr(dot));
+				// Print type information if present. Guarded against
+				// "untyped": pre-inference (the syntactic `typed` child, if
+				// any, not yet stripped -- see the "typed child stripping
+				// after inference" convention elsewhere), the variable's own
+				// `ba_type` field is still its default/untyped value, so
+				// printing it here UNCONDITIONALLY, as this line used to,
+				// double-annotates any io_var occurrence that already
+				// carries a syntactic `typed` child (which prints
+				// separately below, via `case typed:`, when present) --
+				// e.g. a flattened ADT member (always explicitly typed by
+				// adt_flatten_build_flat_var) or simply a user writing
+				// `p[t]:sbf = 0` directly and printing pre-inference. This
+				// was a latent, previously unobserved bug (no prior test
+				// printed a `typed`-annotated io_var occurrence
+				// pre-inference with an exact-string comparison) -- not
+				// specific to ADT flattening or to the dotted-member case
+				// above, so the fix is general.
+				if (parent && !is_untyped<node>(tau::get(parent).get_ba_type())) {
 					out(tau::get(tau::get(parent).get_ba_type_tree()));
 					type_printed = true;
 				}
 				break;
+			}
 			case bf_and:
 				type_printed = false;
 				break;

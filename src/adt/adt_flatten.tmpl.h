@@ -112,6 +112,11 @@ struct adt_resolution {
 	std::string flat_name;         ///< valid iff kind == k_full_leaf
 	tref base_type = nullptr;      ///< valid iff kind == k_full_leaf
 	std::vector<std::pair<std::string, tref>> members; ///< valid iff kind == k_partial
+	tref head = nullptr;           ///< the occurrence's own head (io_var/var_name/
+	                                ///< uconst), always set; used by
+	                                ///< adt_flatten_build_flat_var to preserve an
+	                                ///< io_var's offset/shift when synthesizing a
+	                                ///< flat member variable (see that function).
 };
 
 /**
@@ -130,6 +135,7 @@ std::optional<adt_resolution<node>> adt_resolve_var(tref var_node,
 
 	adt_resolution<node> r;
 	tref head = tau::get(var_node).first();
+	r.head = head;
 	tref member_path_node = adt_flatten_find_child<node>(var_node, tau::member_path);
 	tref typed_node = adt_flatten_find_child<node>(var_node, tau::typed);
 
@@ -214,6 +220,41 @@ std::optional<adt_resolution<node>> adt_resolve_var(tref var_node,
 	return r;
 }
 
+// Build a flattened member `variable` node named @p name (already the full
+// dotted path, e.g. "p.a"), based on @p head -- the ORIGINAL occurrence's
+// own head node (io_var/var_name/uconst). For an io_var head, the member
+// name replaces the io_var's own var_name while its offset/shift subtree is
+// carried over UNCHANGED, so the flattened member keeps its own place in
+// io_context's inputs/outputs maps (keyed by the SAME construction, see
+// adt_flatten_rewrite_io_def below and adt_stream_component::io_var's
+// comment in io_context.h): `canonize<node>` (ba_types_inference.tmpl.h),
+// used by the interpreter's read()/write() and left untouched by the ADT
+// feature, only ever inspects an io_var's own `var_name` child -- never a
+// sibling `member_path` -- so folding the member name into that `var_name`
+// (rather than keeping the member access as a `member_path` sibling, which
+// is what a non-io occurrence's print form might suggest) is what keeps
+// `p.a`/`p.b` distinguishable to it. The visible cost is cosmetic: this
+// prints as `p.a[t]` (var_name text, then the offset bracket) rather than
+// `p[t].a`. For any other head kind (plain var_name, uconst), this is the
+// ordinary rule-1 rewrite: a fresh bare var_name node.
+template <NodeType node>
+tref adt_flatten_build_flat_var(tref head, const std::string& name,
+		tref base_type, bool with_type)
+{
+	using tau = tree<node>;
+	tref head_node;
+	if (head && tau::get(head).is(tau::io_var)) {
+		trefs kids = tau::get(head).get_children();
+		trefs new_kids{ tau::build_var_name(name) };
+		for (size_t i = 1; i < kids.size(); ++i) new_kids.push_back(kids[i]);
+		head_node = tau::get(tau::io_var, new_kids);
+	} else {
+		head_node = tau::build_var_name(name);
+	}
+	return with_type ? tau::get(tau::variable, head_node, base_type)
+			  : tau::get(tau::variable, head_node);
+}
+
 // -----------------------------------------------------------------------------
 // Pass 1: scope-aware ADT typing.
 //
@@ -241,6 +282,30 @@ bool adt_flatten_collect_local(tref n, const adt_registry<node>& reg,
 	auto t = tau::get(n);
 	if (is_logical_or_functional_quant<node>(n)) return true; // nested scope
 	if (t.is(tau::rec_relation)) return true; // rec_relation's own scope
+	if (t.is(tau::input_def) || t.is(tau::output_def)) {
+		// An io def's own head/typed are NOT wrapped in a `variable` node
+		// (input_def => io_var_name [member_path] [typed] ... stream, per
+		// parser/tau.tgf) -- unlike every other ADT-typing source (a
+		// quantifier binder, a ref formal), so it needs its own branch here
+		// rather than falling through to the `variable` case below. A
+		// tuple-typed io def (`p:Point := in console.`) is the io-grouping
+		// case adt_flatten_rewrite_io_def expands; registering its type here
+		// is what lets member-path uses of `p` elsewhere in this (global)
+		// scope -- e.g. `p[t] = 0` or `p[t].a` -- resolve at all.
+		if (tref typed_node = adt_flatten_find_child<node>(n, tau::typed); typed_node) {
+			size_t tname = tt(typed_node) | tau::type | tt::data;
+			if (reg.defines(tname)) {
+				size_t key = tau::get(t.first()).data(); // io def's var_name
+				auto [it, inserted] = local.try_emplace(key, adt_scope_entry{ tname, false });
+				if (!inserted && it->second.adt_sid != tname) {
+					LOG_ERROR << "(Error) ADT: conflicting type annotations "
+						"for variable '" << dict(key) << "'\n";
+					return false;
+				}
+			}
+		}
+		return true;
+	}
 	if (t.is(tau::variable)) {
 		if (tref typed_node = adt_flatten_find_child<node>(n, tau::typed); typed_node) {
 			size_t tname = tt(typed_node) | tau::type | tt::data;
@@ -267,7 +332,7 @@ bool adt_flatten_collect_local(tref n, const adt_registry<node>& reg,
 
 template <NodeType node>
 std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
-		adt_scope_stack scopes);
+		adt_scope_stack scopes, io_context<node>* ctx);
 
 // Rule 1 (generic context) / rule 5 (errors): a `variable` node reached
 // anywhere other than as a quantifier's bound variable or a direct bf_eq/
@@ -292,10 +357,8 @@ std::optional<tref> adt_flatten_rewrite_variable(tref n,
 		// stays bare, exactly like an ordinary quantified variable. A free
 		// (unbound) tuple-typed variable has no binder to carry the
 		// annotation, so every flattened occurrence keeps it.
-		return res->is_bound
-			? tau::get(tau::variable, tau::build_var_name(res->flat_name))
-			: tau::get(tau::variable, tau::build_var_name(res->flat_name),
-				res->base_type);
+		return adt_flatten_build_flat_var<node>(res->head, res->flat_name,
+			res->base_type, !res->is_bound);
 	case adt_resolution<node>::k_partial:
 		LOG_ERROR << "(Error) ADT: tuple-typed term '"
 			<< adt_flatten_describe_var<node>(n) << "' used outside an "
@@ -310,7 +373,8 @@ std::optional<tref> adt_flatten_rewrite_variable(tref n,
 // rewritten in place (alias -> base type) if needed.
 template <NodeType node>
 std::optional<tref> adt_flatten_rewrite_quantifier(tref n, size_t nt,
-		const adt_registry<node>& reg, adt_scope_stack scopes)
+		const adt_registry<node>& reg, adt_scope_stack scopes,
+		io_context<node>* ctx)
 {
 	using tau = tree<node>;
 	tref bound_var = tau::get(n).first();
@@ -341,16 +405,17 @@ std::optional<tref> adt_flatten_rewrite_quantifier(tref n, size_t nt,
 			: bound_var);
 		break;
 	case adt_resolution<node>::k_full_leaf:
-		member_vars.push_back(tau::get(tau::variable,
-			tau::build_var_name(res->flat_name), res->base_type));
+		member_vars.push_back(adt_flatten_build_flat_var<node>(
+			res->head, res->flat_name, res->base_type, true));
 		break;
 	case adt_resolution<node>::k_partial:
 		for (auto& [name, bt] : res->members)
-			member_vars.push_back(tau::get(tau::variable, tau::build_var_name(name), bt));
+			member_vars.push_back(adt_flatten_build_flat_var<node>(
+				res->head, name, bt, true));
 		break;
 	}
 
-	auto new_body = adt_flatten_rewrite<node>(body, reg, scopes);
+	auto new_body = adt_flatten_rewrite<node>(body, reg, scopes, ctx);
 	if (!new_body) return std::nullopt;
 
 	tref subformula = *new_body; // already wrapped (wff for wff_all/ex, bf for bf_fall/fex)
@@ -398,7 +463,8 @@ std::optional<tref> adt_flatten_rewrite_quantifier(tref n, size_t nt,
 template <NodeType node>
 std::optional<std::pair<trefs, bool>> adt_flatten_rewrite_ref_args(
 		tref ref_args_node, const adt_registry<node>& reg,
-		const adt_scope_stack& scopes, bool head_style)
+		const adt_scope_stack& scopes, bool head_style,
+		io_context<node>* ctx)
 {
 	using tau = tree<node>;
 	trefs new_args;
@@ -413,15 +479,14 @@ std::optional<std::pair<trefs, bool>> adt_flatten_rewrite_ref_args(
 				changed = true;
 				bool bare = !head_style && res->is_bound;
 				for (auto& [name, bt] : res->members) {
-					tref v = bare
-						? tau::get(tau::variable, tau::build_var_name(name))
-						: tau::get(tau::variable, tau::build_var_name(name), bt);
+					tref v = adt_flatten_build_flat_var<node>(
+						res->head, name, bt, !bare);
 					new_args.push_back(tau::get(tau::ref_arg, tau::get(tau::bf, v)));
 				}
 				continue;
 			}
 		}
-		auto rc = adt_flatten_rewrite<node>(ra, reg, scopes);
+		auto rc = adt_flatten_rewrite<node>(ra, reg, scopes, ctx);
 		if (!rc) return std::nullopt;
 		changed = changed || (*rc != ra);
 		new_args.push_back(*rc);
@@ -446,7 +511,7 @@ std::optional<std::pair<trefs, bool>> adt_flatten_rewrite_ref_args(
 // dispatched from `case tau::ref:`).
 template <NodeType node>
 std::optional<tref> adt_flatten_rewrite_ref(tref n, const adt_registry<node>& reg,
-		const adt_scope_stack& scopes, bool head_style)
+		const adt_scope_stack& scopes, bool head_style, io_context<node>* ctx)
 {
 	using tau = tree<node>;
 	using tt = typename tau::traverser;
@@ -457,7 +522,7 @@ std::optional<tref> adt_flatten_rewrite_ref(tref n, const adt_registry<node>& re
 	tref fallback_node = adt_flatten_find_child<node>(n, tau::fp_fallback);
 	tref offsets_node = adt_flatten_find_child<node>(n, tau::offsets);
 
-	auto args_res = adt_flatten_rewrite_ref_args<node>(ref_args_node, reg, scopes, head_style);
+	auto args_res = adt_flatten_rewrite_ref_args<node>(ref_args_node, reg, scopes, head_style, ctx);
 	if (!args_res) return std::nullopt;
 	auto& [new_args, changed] = *args_res;
 
@@ -477,7 +542,7 @@ std::optional<tref> adt_flatten_rewrite_ref(tref n, const adt_registry<node>& re
 
 	tref new_fallback = fallback_node;
 	if (fallback_node) {
-		auto rc = adt_flatten_rewrite<node>(fallback_node, reg, scopes);
+		auto rc = adt_flatten_rewrite<node>(fallback_node, reg, scopes, ctx);
 		if (!rc) return std::nullopt;
 		new_fallback = *rc;
 		changed = changed || (new_fallback != fallback_node);
@@ -485,7 +550,7 @@ std::optional<tref> adt_flatten_rewrite_ref(tref n, const adt_registry<node>& re
 
 	tref new_offsets = offsets_node;
 	if (offsets_node) {
-		auto rc = adt_flatten_rewrite<node>(offsets_node, reg, scopes);
+		auto rc = adt_flatten_rewrite<node>(offsets_node, reg, scopes, ctx);
 		if (!rc) return std::nullopt;
 		new_offsets = *rc;
 		changed = changed || (new_offsets != offsets_node);
@@ -515,7 +580,8 @@ std::optional<tref> adt_flatten_rewrite_ref(tref n, const adt_registry<node>& re
 // adt_flatten_rewrite_ref/adt_flatten_rewrite_ref_args above).
 template <NodeType node>
 std::optional<tref> adt_flatten_rewrite_rec_relation(tref n,
-		const adt_registry<node>& reg, adt_scope_stack scopes)
+		const adt_registry<node>& reg, adt_scope_stack scopes,
+		io_context<node>* ctx)
 {
 	using tau = tree<node>;
 	tref head = tau::get(n).first();
@@ -533,9 +599,9 @@ std::optional<tref> adt_flatten_rewrite_rec_relation(tref n,
 		}
 	scopes.push_back(std::move(local));
 
-	auto new_head = adt_flatten_rewrite_ref<node>(head, reg, scopes, true);
+	auto new_head = adt_flatten_rewrite_ref<node>(head, reg, scopes, true, ctx);
 	if (!new_head) return std::nullopt;
-	auto new_body = adt_flatten_rewrite<node>(body, reg, scopes);
+	auto new_body = adt_flatten_rewrite<node>(body, reg, scopes, ctx);
 	if (!new_body) return std::nullopt;
 	if (*new_head == head && *new_body == body) return n;
 	return tau::get(tau::rec_relation, *new_head, *new_body);
@@ -547,7 +613,8 @@ std::optional<tref> adt_flatten_rewrite_rec_relation(tref n,
 // anything else is a shape mismatch.
 template <NodeType node>
 std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
-		const adt_registry<node>& reg, const adt_scope_stack& scopes)
+		const adt_registry<node>& reg, const adt_scope_stack& scopes,
+		io_context<node>* ctx)
 {
 	using tau = tree<node>;
 
@@ -555,13 +622,13 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 	tref l_content = tau::get(l_bf).first(), r_content = tau::get(r_bf).first();
 
 	struct side { bool is_partial = false; bool is_bound = false;
-		std::vector<std::pair<std::string, tref>> members; };
+		std::vector<std::pair<std::string, tref>> members; tref head = nullptr; };
 	auto classify = [&](tref content) -> std::optional<side> {
 		if (!tau::get(content).is(tau::variable)) return side{};
 		auto res = adt_resolve_var<node>(content, reg, scopes);
 		if (!res) return std::nullopt;
 		if (res->kind == adt_resolution<node>::k_partial)
-			return side{ true, res->is_bound, std::move(res->members) };
+			return side{ true, res->is_bound, std::move(res->members), res->head };
 		return side{};
 	};
 	auto lc = classify(l_content); if (!lc) return std::nullopt;
@@ -585,17 +652,21 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 	};
 	// Same bare-if-bound rule as adt_flatten_rewrite_variable's k_full_leaf
 	// case: an expanded member atom of a bound tuple variable stays bare
-	// (the binder already carries the type), a free one keeps it.
-	auto mk_var_bf = [&](const std::string& name, tref base_type, bool is_bound) -> tref {
-		tref v = is_bound ? tau::get(tau::variable, tau::build_var_name(name))
-			: tau::get(tau::variable, tau::build_var_name(name), base_type);
+	// (the binder already carries the type), a free one keeps it. @p head is
+	// the ORIGINAL side's own head (io_var/var_name/uconst), threaded through
+	// so an io_var side keeps its offset/shift (see
+	// adt_flatten_build_flat_var).
+	auto mk_var_bf = [&](tref head, const std::string& name, tref base_type,
+			bool is_bound) -> tref
+	{
+		tref v = adt_flatten_build_flat_var<node>(head, name, base_type, !is_bound);
 		return tau::get(tau::bf, v);
 	};
 
 	if (!lc->is_partial && !rc->is_partial) {
-		auto nl = adt_flatten_rewrite<node>(l_bf, reg, scopes);
+		auto nl = adt_flatten_rewrite<node>(l_bf, reg, scopes, ctx);
 		if (!nl) return std::nullopt;
-		auto nr = adt_flatten_rewrite<node>(r_bf, reg, scopes);
+		auto nr = adt_flatten_rewrite<node>(r_bf, reg, scopes, ctx);
 		if (!nr) return std::nullopt;
 		return tau::get(make_atom(*nl, *nr)).first();
 	}
@@ -619,15 +690,15 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 				return std::nullopt;
 			}
 			atoms.push_back(make_atom(
-				mk_var_bf(lc->members[i].first, lc->members[i].second, lc->is_bound),
-				mk_var_bf(rc->members[i].first, rc->members[i].second, rc->is_bound)));
+				mk_var_bf(lc->head, lc->members[i].first, lc->members[i].second, lc->is_bound),
+				mk_var_bf(rc->head, rc->members[i].first, rc->members[i].second, rc->is_bound)));
 		}
 	} else if (lc->is_partial && r_const) {
 		for (auto& [name, bt] : lc->members)
-			atoms.push_back(make_atom(mk_var_bf(name, bt, lc->is_bound), r_bf));
+			atoms.push_back(make_atom(mk_var_bf(lc->head, name, bt, lc->is_bound), r_bf));
 	} else if (rc->is_partial && l_const) {
 		for (auto& [name, bt] : rc->members)
-			atoms.push_back(make_atom(l_bf, mk_var_bf(name, bt, rc->is_bound)));
+			atoms.push_back(make_atom(l_bf, mk_var_bf(rc->head, name, bt, rc->is_bound)));
 	} else {
 		bool l_is_tuple = lc->is_partial;
 		LOG_ERROR << "(Error) ADT: shape mismatch: '"
@@ -641,6 +712,93 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 	tref combined = atoms[0];
 	for (size_t i = 1; i < atoms.size(); ++i) combined = combine(combined, atoms[i]);
 	return tau::get(combined).first();
+}
+
+// Rewrite one `input_def`/`output_def` node (`io_var_name [member_path]
+// [typed] stream`, per parser/tau.tgf -- never wrapped in a `variable`
+// node). A non-registry `typed` (an ordinary base type) passes through
+// untouched, same as everywhere else. An alias-typed def (`i:byte := in
+// console.`) rewrites its `typed` to the alias target, same as any other
+// alias annotation (adt_flatten_rewrite_ref's own `typed` handling). A
+// tuple-typed def (`p:Point := in console.`) is design section 4's io
+// grouping: `process_io_def` (tau_tree_from_parser.tmpl.h) already
+// registered the bare root under `ctx->inputs`/`outputs` during tree
+// construction, before the flattener ever runs -- that entry is REPLACED
+// here by one entry per flat member (dotted name, same stream_id), the
+// layout is recorded in `ctx->adt_streams` (keyed by the root's own name
+// sid), and the def statement itself is dropped from the rebuilt tree
+// (returning a null tref, the same "drop me" signal `definitions`/
+// `spec_multiline` already use for an erased type_def -- see their cases in
+// adt_flatten_rewrite below, which are the only callers of this function).
+// The formula side (`p[t] = 0`, `p[t].a`, ...) is flattened member-wise
+// through the ordinary equality/quantifier/ref-arg rules elsewhere in this
+// file, using the SAME per-member io_var construction
+// (adt_flatten_build_flat_var) as the member entries registered here, so
+// canonize<node> (ba_types_inference.tmpl.h, unmodified by the ADT feature)
+// resolves a live occurrence to the same key a member was registered under.
+template <NodeType node>
+std::optional<tref> adt_flatten_rewrite_io_def(tref n,
+		const adt_registry<node>& reg, io_context<node>* ctx)
+{
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+
+	tref head = tau::get(n).first(); // io def's own var_name (bare, no `variable` wrapper)
+	tref typed_node = adt_flatten_find_child<node>(n, tau::typed);
+	if (!typed_node) return n; // no annotation at all: nothing to do
+
+	size_t tname = tt(typed_node) | tau::type | tt::data;
+	if (!reg.defines(tname)) return n; // ordinary base type: untouched
+
+	if (reg.is_alias(tname)) {
+		trefs children;
+		for (tref c : tau::get(n).get_children())
+			children.push_back(c == typed_node ? reg.alias_target(tname) : c);
+		return tau::get_typed(tau::get(n).get_type(), children, tau::get(n).get_ba_type());
+	}
+
+	// Tuple type: split into one member io var per flat member.
+	if (!ctx) {
+		// No io_context to record the layout in -- the interpreter would
+		// have nowhere to route the members -- but the def statement still
+		// cannot survive as-is (its `typed` names a registry tuple type,
+		// meaningless to infer_ba_types); drop it. Consistent with
+		// process_io_def itself, which only registers a root when
+		// `options.context` is set (tau_tree_from_parser.tmpl.h:222-223), so
+		// there is no root entry to preserve here either.
+		return tref{ nullptr };
+	}
+
+	size_t root_sid = tau::get(head).data();
+	std::string root_name = dict(root_sid);
+	bool is_input = tau::get(n).is(tau::input_def);
+	auto& root_map = is_input ? ctx->inputs : ctx->outputs;
+
+	tref root_var = build_canonized_io_var<node>(root_name);
+	htref root_hvar = tau::geth(root_var);
+	size_t stream_id = 0;
+	if (auto it = root_map.find(root_hvar); it != root_map.end()) {
+		stream_id = it->second;
+		root_map.erase(it);
+	}
+
+	adt_stream_layout<node> layout;
+	layout.root_name_sid = root_sid;
+	layout.is_input = is_input;
+	layout.stream_id = stream_id;
+
+	for (const auto& m : reg.members(tname)) {
+		std::string name = root_name;
+		for (size_t sid : m.path) name += "." + dict(sid);
+		tref member_var = build_canonized_io_var<node>(name);
+		htref member_hvar = tau::geth(member_var);
+		root_map[member_hvar] = stream_id;
+		layout.components.push_back(adt_stream_component<node>{
+			m.path, member_hvar, m.base_type });
+	}
+
+	ctx->adt_streams[root_sid] = std::move(layout);
+	return tref{ nullptr }; // drop the def statement
 }
 
 // Generic recursive dispatch: quantifiers and `=`/`!=` are special-cased,
@@ -667,34 +825,44 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 // above the root that turns out to be.
 template <NodeType node>
 std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
-		adt_scope_stack scopes)
+		adt_scope_stack scopes, io_context<node>* ctx)
 {
 	using tau = tree<node>;
 	auto t = tau::get(n);
 	auto nt = t.get_type(); // node::type; kept as such (not size_t) so it can
 	                         // be passed straight to tau::get_typed() below
+	// An input_def/output_def can ONLY ever appear as a direct child of
+	// `definitions`/`spec_multiline` (parser/tau.tgf's `spec_part`) -- never
+	// nested inside a quantifier/rec_relation/ref/equality -- so this is the
+	// only place that needs to special-case it (adt_flatten_rewrite_io_def
+	// is never reached any other way).
+	auto rewrite_child = [&](tref g) -> std::optional<tref> {
+		if (tau::get(g).is(tau::input_def) || tau::get(g).is(tau::output_def))
+			return adt_flatten_rewrite_io_def<node>(g, reg, ctx);
+		return adt_flatten_rewrite<node>(g, reg, scopes, ctx);
+	};
 	switch (nt) {
 	case tau::wff_all: case tau::wff_ex:
 	case tau::bf_fall:  case tau::bf_fex:
-		return adt_flatten_rewrite_quantifier<node>(n, nt, reg, std::move(scopes));
+		return adt_flatten_rewrite_quantifier<node>(n, nt, reg, std::move(scopes), ctx);
 	case tau::bf_eq: case tau::bf_neq:
-		return adt_flatten_rewrite_equality<node>(n, nt, reg, scopes);
+		return adt_flatten_rewrite_equality<node>(n, nt, reg, scopes, ctx);
 	case tau::variable:
 		return adt_flatten_rewrite_variable<node>(n, reg, scopes);
 	case tau::ref:
 		// A CALL SITE ref (inside wff_ref/bf_ref, or a rec_relation body
 		// that is itself a bare ref) -- a rec_relation's own HEAD ref is
 		// never reached here, see adt_flatten_rewrite_rec_relation.
-		return adt_flatten_rewrite_ref<node>(n, reg, scopes, false);
+		return adt_flatten_rewrite_ref<node>(n, reg, scopes, false, ctx);
 	case tau::rec_relation:
-		return adt_flatten_rewrite_rec_relation<node>(n, reg, std::move(scopes));
+		return adt_flatten_rewrite_rec_relation<node>(n, reg, std::move(scopes), ctx);
 	case tau::definitions: {
 		trefs kept;
 		for (tref g : t.get_children()) {
 			if (tau::get(g).is(tau::type_def)) continue; // erased
-			auto rc = adt_flatten_rewrite<node>(g, reg, scopes);
+			auto rc = rewrite_child(g);
 			if (!rc) return std::nullopt;
-			kept.push_back(*rc);
+			if (*rc) kept.push_back(*rc); // *rc == nullptr: a tuple-typed io def, dropped
 		}
 		if (kept.empty()) return tref{ nullptr }; // signal: drop this node
 		return tau::get(tau::definitions, kept);
@@ -703,9 +871,9 @@ std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 		trefs kept;
 		for (tref g : t.get_children()) {
 			if (tau::get(g).is(tau::type_def)) continue; // erased
-			auto rc = adt_flatten_rewrite<node>(g, reg, scopes);
+			auto rc = rewrite_child(g);
 			if (!rc) return std::nullopt;
-			kept.push_back(*rc);
+			if (*rc) kept.push_back(*rc); // *rc == nullptr: a tuple-typed io def, dropped
 		}
 		return tau::get(tau::spec_multiline, kept); // may legitimately be empty
 	}
@@ -718,7 +886,7 @@ std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 	new_kids.reserve(kids.size());
 	bool changed = false;
 	for (tref c : kids) {
-		auto rc = adt_flatten_rewrite<node>(c, reg, scopes);
+		auto rc = adt_flatten_rewrite<node>(c, reg, scopes, ctx);
 		if (!rc) return std::nullopt;
 		if (*rc == nullptr) { changed = true; continue; } // dropped (emptied definitions)
 		changed = changed || (*rc != c);
@@ -732,7 +900,7 @@ std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 // Top-level entry point.
 
 template <NodeType node>
-tref adt_flatten(tref spec, [[maybe_unused]] io_context<node>* ctx) {
+tref adt_flatten(tref spec, io_context<node>* ctx) {
 	auto reg_opt = adt_registry<node>::build(spec);
 	if (!reg_opt) return nullptr; // adt_registry::build already LOG_ERROR'd
 
@@ -758,7 +926,7 @@ tref adt_flatten(tref spec, [[maybe_unused]] io_context<node>* ctx) {
 	// by adt_flatten_rewrite wherever normal recursive descent from @p spec
 	// reaches it -- see that function's header comment. No special-casing of
 	// @p spec's own shape is needed here.
-	auto rc = adt_flatten_rewrite<node>(spec, reg, scopes);
+	auto rc = adt_flatten_rewrite<node>(spec, reg, scopes, ctx);
 	return (rc && *rc) ? *rc : nullptr;
 }
 

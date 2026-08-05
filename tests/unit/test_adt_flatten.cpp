@@ -142,6 +142,133 @@ TEST_SUITE("adt flatten refs") {
 	}
 }
 
+TEST_SUITE("adt io defs") {
+	// Unlike every other suite in this file, these need an io_context, so
+	// they call tau::get directly (mirroring test_io_context.cpp's own
+	// construction style: a plain default-constructed io_context<node_t>)
+	// rather than going through this file's flat()/check_flat() helpers,
+	// which never pass one. `.infer_ba_types = false` isolates the
+	// flattener's own ctx-mutation and tree-rewriting behaviour (this
+	// task's actual responsibility) from whether the REWRITTEN dotted-name
+	// io vars also survive inference/update_types end to end -- that full
+	// pipeline is exercised by the interpreter integration tests (Task 8/10),
+	// not here, matching how every other suite in this file already isolates
+	// flattening from inference.
+	TEST_CASE("tuple input def expands into context") {
+		io_context<node_t> ctx;
+		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+		REQUIRE(t != nullptr);
+		auto it = ctx.adt_streams.find(dict("p"));
+		REQUIRE(it != ctx.adt_streams.end());
+		CHECK(it->second.is_input);
+		CHECK(it->second.stream_id == 0);
+		REQUIRE(it->second.components.size() == 2);
+		CHECK(it->second.components[0].path == std::vector<size_t>{dict("a")});
+		CHECK(it->second.components[1].path == std::vector<size_t>{dict("b")});
+		CHECK(ctx.inputs.size() == 2);      // members registered, root removed
+		CHECK(ctx.outputs.empty());
+		// Each member is registered under its own canonized io var handle
+		// (see adt_stream_component::io_var's comment, io_context.h) --
+		// built the same way the flattener itself builds it (looked up
+		// through the map's own transparent comparator, rather than
+		// comparing htref values with `==`, which is only pointer identity
+		// on the underlying shared_ptr<htree> and not guaranteed to reflect
+		// structural equality).
+		tref a_var = build_canonized_io_var<node_t>("p.a");
+		tref b_var = build_canonized_io_var<node_t>("p.b");
+		CHECK(ctx.inputs.contains(a_var));
+		CHECK(ctx.inputs.contains(b_var));
+		CHECK(ctx.inputs.find(it->second.components[0].io_var) != ctx.inputs.end());
+		CHECK(ctx.inputs.find(it->second.components[1].io_var) != ctx.inputs.end());
+		// formula flattened member-wise, printed as "p[t].a" / "p[t].b":
+		// internally the flattener folds the member name into the io_var's
+		// OWN var_name ("p.a", offset unchanged -- see
+		// adt_flatten_build_flat_var's comment, src/adt/adt_flatten.tmpl.h,
+		// and adt_stream_component::io_var's comment, io_context.h, for why
+		// -- in short, so canonize<node>, unmodified by this task, keeps
+		// telling members apart), but the pretty-printer (tau_tree_printers.tmpl.h,
+		// the `var_name`/`io_var` cases) special-cases a dotted var_name
+		// under an io_var to print the base name, then the offset bracket,
+		// then the dotted suffix -- restoring the design note's source form
+		// and its re-parse round-trip (see the "io member occurrence
+		// round-trips through print/reparse" test below).
+		std::string printed = tau::get(t).to_str();
+		CHECK(printed.find("p[t].a") != std::string::npos);
+		CHECK(printed.find("p[t].b") != std::string::npos);
+		CHECK(printed.find("p.a[t]") == std::string::npos);
+		CHECK(printed.find("p.b[t]") == std::string::npos);
+	}
+	TEST_CASE("io member occurrence round-trips through print/reparse") {
+		io_context<node_t> ctx1;
+		tref t1 = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+			"always p[t].a = 0.", { .infer_ba_types = false, .context = &ctx1 });
+		REQUIRE(t1 != nullptr);
+		std::string printed = tau::get(t1).to_str();
+		// Direct print assertion: renders as "p[t].a", not the internal
+		// folded-var_name form "p.a[t]".
+		CHECK(printed.find("p[t].a") != std::string::npos);
+		CHECK(printed.find("p.a[t]") == std::string::npos);
+
+		// Re-parse the printed form. The printed spec no longer has "type
+		// Point"/"p:Point := in console." (both already erased/dropped by
+		// the first flatten), so this second parse's registry is empty --
+		// adt_flatten's fast path leaves the tree untouched -- and "p[t].a"
+		// re-parses as an ordinary (now non-ADT) io_var `p[t]` plus a
+		// sibling `member_path` ".a", a DIFFERENT tree shape from the first
+		// parse's folded "p.a[t]" io_var than what produced this text, yet
+		// prints back out to the exact same text -- the round-trip property
+		// that matters here (print . reparse . print == print), which is
+		// what a `this`-stream spec-as-a-value round trip actually relies
+		// on, not tree-shape identity.
+		io_context<node_t> ctx2;
+		tref t2 = tau::get(printed, { .infer_ba_types = false, .context = &ctx2 });
+		REQUIRE(t2 != nullptr);
+		CHECK(tau::get(t2).to_str() == printed);
+	}
+	TEST_CASE("tuple io def removed from tree") {
+		io_context<node_t> ctx;
+		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+		REQUIRE(t != nullptr);
+		CHECK(tau::get(t).to_str().find("Point") == std::string::npos);
+	}
+	TEST_CASE("tuple output def registers under outputs") {
+		io_context<node_t> ctx;
+		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := out console. "
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+		REQUIRE(t != nullptr);
+		auto it = ctx.adt_streams.find(dict("p"));
+		REQUIRE(it != ctx.adt_streams.end());
+		CHECK_FALSE(it->second.is_input);
+		CHECK(ctx.outputs.size() == 2);
+		CHECK(ctx.inputs.empty());
+	}
+	TEST_CASE("non-tuple io def is left alone") {
+		// A registered type (Point) is present, so adt_flatten does NOT take
+		// its empty-registry fast path and adt_flatten_rewrite_io_def does
+		// run for "i:sbf" -- exercising its "ordinary base type: untouched"
+		// branch specifically (as opposed to the fast path skipping io defs
+		// entirely, which a registry-less spec would instead exercise).
+		io_context<node_t> ctx;
+		tref t = tau::get("type Point = {a: sbf, b: sbf}. i:sbf := in console. "
+			"always i[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+		REQUIRE(t != nullptr);
+		CHECK(ctx.adt_streams.empty());
+		CHECK(ctx.inputs.size() == 1); // the plain (non-ADT) root, untouched
+		CHECK(tau::get(t).to_str().find("Point") == std::string::npos); // type_def still erased
+	}
+	TEST_CASE("alias-typed io def rewrites the annotation, stays one stream") {
+		io_context<node_t> ctx;
+		tref t = tau::get("type byte = bv[8]. i:byte := in console. always i[t] = 0.",
+			{ .infer_ba_types = false, .context = &ctx });
+		REQUIRE(t != nullptr);
+		CHECK(ctx.adt_streams.empty());
+		CHECK(ctx.inputs.size() == 1); // still ONE root stream, not split into members
+		CHECK(tau::get(t).to_str().find("byte") == std::string::npos); // alias rewritten away
+	}
+}
+
 TEST_SUITE("adt flatten hook") {
 	TEST_CASE("default get flattens and infers") {
 		// no manual adt_flatten call -- default options

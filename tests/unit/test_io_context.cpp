@@ -490,6 +490,129 @@ TEST_SUITE("console_prompt_input_stream") {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// ADT tuple streams (adt_tuple_reader / adt_tuple_writer)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// component.io_var/base_type are unused by adt_tuple_reader/adt_tuple_writer
+// (both only ever consult component.path -- see adt_build_shape and
+// adt_tuple_writer::format in io_context.tmpl.h), so these tests leave them
+// default (null) and only fill in the paths that actually drive behaviour.
+adt_stream_component<node_t> adt_test_component(std::vector<std::string> path) {
+	adt_stream_component<node_t> c;
+	for (const auto& p : path) c.path.push_back(dict(p));
+	c.io_var = htref{};
+	c.base_type = nullptr;
+	return c;
+}
+
+// layout: { a }, { p, x } -- matches the "a"/"p.x" shape used throughout
+// this suite (mirrors the brief's own sketch).
+adt_stream_layout<node_t> adt_test_layout() {
+	adt_stream_layout<node_t> layout;
+	layout.root_name_sid = dict("root");
+	layout.is_input = true;
+	layout.stream_id = 0;
+	layout.components = {
+		adt_test_component({"a"}),
+		adt_test_component({"p", "x"}),
+	};
+	return layout;
+}
+
+} // namespace
+
+TEST_SUITE("adt tuple streams") {
+
+	TEST_CASE("reader routes leaves") {
+		// Also exercises per-time-point memoization: the vector stream
+		// supplies only ONE line, so if leaf() re-read the physical stream
+		// for the second member instead of reusing the first parse, the
+		// sequential vector_input_stream would already be exhausted and the
+		// second leaf() call below would fail.
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: \"0\", p: { x: \"1\" } }"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::optional<std::string>("0"));
+		CHECK(reader.leaf(0, { dict("p"), dict("x") }) == std::optional<std::string>("1"));
+	}
+
+	TEST_CASE("reader rejects missing key") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: \"0\" }"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+	}
+
+	TEST_CASE("reader rejects unknown key") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: \"0\", z: \"1\" }"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+	}
+
+	TEST_CASE("reader rejects duplicate key") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: \"0\", a: \"1\", p: { x: \"1\" } }"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+	}
+
+	TEST_CASE("reader rejects a leaf where an object is expected") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: \"0\", p: \"1\" }"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+	}
+
+	TEST_CASE("reader rejects malformed wire input") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"not a tuple literal"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+	}
+
+	TEST_CASE("writer formats when complete") {
+		auto layout = adt_test_layout();
+		auto values = std::make_shared<std::vector<std::string>>();
+		adt_tuple_writer<node_t> writer(
+			std::make_unique<vector_output_stream>(values), layout);
+		CHECK(writer.collect(0, { dict("a") }, "0"));       // still buffering
+		CHECK(writer.collect(0, { dict("p"), dict("x") }, "1")); // completes the record
+		REQUIRE(values->size() == 1);
+		CHECK(values->at(0) == "{ a: \"0\", p: { x: \"1\" } }");
+	}
+
+	TEST_CASE("writer keeps separate time points separate") {
+		auto layout = adt_test_layout();
+		auto values = std::make_shared<std::vector<std::string>>();
+		adt_tuple_writer<node_t> writer(
+			std::make_unique<vector_output_stream>(values), layout);
+		writer.collect(0, { dict("a") }, "0");
+		writer.collect(1, { dict("a") }, "10");
+		CHECK(values->empty()); // neither time point complete yet
+		writer.collect(0, { dict("p"), dict("x") }, "1");
+		writer.collect(1, { dict("p"), dict("x") }, "11");
+		REQUIRE(values->size() == 2);
+		CHECK(values->at(0) == "{ a: \"0\", p: { x: \"1\" } }");
+		CHECK(values->at(1) == "{ a: \"10\", p: { x: \"11\" } }");
+	}
+}
+
 TEST_SUITE("console_prompt_output_stream") {
 
 	TEST_CASE("put prints the labelled value") {
