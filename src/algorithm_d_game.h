@@ -176,8 +176,13 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 			} else if (line.substr(0,16) == "controllable-AP:") {
 				auto idxs = parse_int_list(line.substr(16));
 				for (int i : idxs) if (i < (int)g.controllable.size()) g.controllable[i] = true;
-			} else if (line.substr(0,17) == "spot-state-player") {
-				// "spot-state-player: 0 1 0 1 ..."
+			} else if (line.substr(0,17) == "spot.state-player"
+				|| line.substr(0,17) == "spot-state-player") {
+				// "spot.state-player: 0 1 0 1 ..."
+				// Spot (--print-game-hoa) spells the header name with a
+				// dot; the dashed form is accepted too for hand-written
+				// and legacy fixtures.  Getting this wrong silently
+				// leaves every state env-owned.
 				size_t colon = line.find(':');
 				if (colon != std::string::npos) {
 					auto players = parse_int_list(line.substr(colon+1));
@@ -238,7 +243,12 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 	// Convention: odd priority = good for player 1 (sys = controller).
 	//   is_all: priority 1 everywhere (player 1 always "wins" structurally)
 	//   is_buchi   Inf(0): color 0 → priority 1, else priority 0
-	//   is_cobuchi Fin(0): color 0 → priority 0, else priority 1
+	//   is_cobuchi Fin(0): color 0 → priority 2, else priority 1
+	//     Color 0 marks the rejecting states: a run visiting them
+	//     infinitely often must lose for sys, so color 0 needs an EVEN
+	//     priority that DOMINATES the uncolored (odd) one.  Mapping it to
+	//     0 instead would let any run that also revisits an uncolored
+	//     state have max recurring priority 1 (odd) and be scored sys-win.
 	//   parity/Streett: color → priority directly
 	for (int q = 0; q < g.num_states; ++q) {
 		int c = g.state_color[q];
@@ -247,7 +257,7 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 		else if (is_buchi)
 			g.state_priority[q] = (c == 0) ? 1 : 0;
 		else if (is_cobuchi)
-			g.state_priority[q] = (c == 0) ? 0 : 1;
+			g.state_priority[q] = (c == 0) ? 2 : 1;
 		else
 			g.state_priority[q] = (c >= 0) ? c : 0;  // general parity
 	}
@@ -264,7 +274,9 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 			} else if (is_buchi) {
 				g.edge_priority[q][j] = (ec == 0) ? 1 : 0;
 			} else if (is_cobuchi) {
-				g.edge_priority[q][j] = (ec == 0) ? 0 : 1;
+				// see the state_priority comment: Fin(0)'s color 0
+				// must map to a dominant EVEN priority
+				g.edge_priority[q][j] = (ec == 0) ? 2 : 1;
 			} else {
 				g.edge_priority[q][j] = ec;
 			}

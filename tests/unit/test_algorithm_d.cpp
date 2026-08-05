@@ -179,7 +179,11 @@ State: 0 {0}
 		CHECK(g.edge_priority[0][0] == 1);
 	}
 
-	TEST_CASE("[ALG-D-34] co-Buchi acceptance: colored state and edge get priority 0") {
+	TEST_CASE("[ALG-D-34] co-Buchi acceptance: colored state and edge get the "
+	          "dominant even priority") {
+		// Fin(0): colour 0 marks the *rejecting* states.  Visiting them
+		// infinitely often must lose for sys, so colour 0 has to map to an
+		// even priority that dominates the uncoloured (odd) priority 1.
 		std::string hoa = R"(HOA: v1
 States: 1
 Start: 0
@@ -193,10 +197,10 @@ State: 0 {0}
 )";
 		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 1u);
-		CHECK(g.state_priority[0] == 0);
+		CHECK(g.state_priority[0] == 2);
 		REQUIRE(g.edge_priority.size() == 1u);
 		REQUIRE(g.edge_priority[0].size() == 1u);
-		CHECK(g.edge_priority[0][0] == 0);
+		CHECK(g.edge_priority[0][0] == 2);
 	}
 
 	TEST_CASE("[ALG-D-35] general/parity acceptance: priority equals color directly") {
@@ -294,6 +298,35 @@ not a transition line
 		CHECK(std::get<0>(g.trans[0][1]) == "1");
 		CHECK(std::get<1>(g.trans[0][1]) == 0);
 	}
+
+	TEST_CASE("[ALG-D-41] Spot's dotted 'spot.state-player' header assigns "
+	          "ownership") {
+		// Spot (--print-game-hoa) writes the header name with a dot.  If the
+		// parser only matches the dashed spelling every state stays env-owned
+		// and the sys branch of build_product_game is never taken.
+		std::string hoa = R"(HOA: v1
+States: 3
+Start: 0
+AP: 2 "p0" "d_0"
+controllable-AP: 1
+spot.state-player: 0 1 1
+acc-name: all
+tool: ltlsynt
+--BODY--
+State: 0
+[0] 1
+State: 1
+[t] 2
+State: 2
+[t] 1
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.player.size() == 3u);
+		CHECK(g.player[0] == 0);
+		CHECK(g.player[1] == 1);
+		CHECK(g.player[2] == 1);
+	}
 }
 
 // ── Phase 2: DPA extraction regression ───────────────────────────────────
@@ -348,6 +381,45 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 		pg.succs     = {{}};  // sys stuck
 		auto W1 = alg_d::zielonka_win_player1(pg);
 		CHECK(W1.empty());  // sys loses (stuck)
+	}
+
+	TEST_CASE("[ALG-D-42] co-Buchi Fin(0): a run revisiting a rejecting state "
+	          "infinitely often is env-win") {
+		// Two-state cycle 0 → 1 → 0, colour 0 (= Fin(0) rejecting) on state 0
+		// only.  The single run of this game visits the rejecting state
+		// infinitely often, so under Fin(0) it must be scored env-win.
+		// Both states are env-owned, so the verdict is decided purely by the
+		// priorities the parser assigns — no ownership or attractor choice is
+		// involved.
+		std::string hoa = R"(HOA: v1
+States: 2
+Start: 0
+AP: 1 "p0"
+acc-name: co-Buchi 1 Fin(0)
+Acceptance: 1 Fin(0)
+--BODY--
+State: 0 {0}
+[t] 1
+State: 1
+[t] 0
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.state_priority.size() == 2u);
+		// The rejecting colour must dominate the uncoloured priority and be
+		// even (even = env wins under the max-odd convention).
+		CHECK(g.state_priority[0] > g.state_priority[1]);
+		CHECK(g.state_priority[0] % 2 == 0);
+		CHECK(g.state_priority[1] % 2 == 1);
+
+		alg_d::ProductGame pg;
+		pg.n_states = 2;
+		pg.init     = 0;
+		pg.player   = {0, 0};
+		pg.priority = {g.state_priority[0], g.state_priority[1]};
+		pg.succs    = {{1}, {0}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.empty());  // sys wins nowhere
 	}
 
 	TEST_CASE("[ALG-D-22] G(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
