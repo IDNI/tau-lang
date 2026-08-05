@@ -64,6 +64,43 @@ static strings run_no_input(const char* formula, size_t n) {
 	return o1->get_values();
 }
 
+// Run a qlt-typed formula with no inputs for N steps, return o1 values.
+static strings run_qlt_no_input(const char* formula, size_t n) {
+	io_context<node_t> ctx;
+	auto o1 = std::make_shared<vector_output_stream>();
+	ctx.add_output("o1", qlt_type_id<node_t>(), o1);
+	subtree_map<node_t, size_t> scope;
+	for (const auto& [var, type] : ctx.types) scope[var->get()] = type;
+	tau::get_options opts;
+	opts.global_scope = &scope;
+	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula, opts));
+	if (!nso.has_value()) return {};
+	tref fm = nso.value().main->get();
+	if (!fm) return {};
+	run<node_t>(fm, ctx, n);
+	return o1->get_values();
+}
+
+// Run a qlt-typed formula with a given i1 stream for N steps, return o1 values.
+static strings run_qlt_with_i1(const char* formula, const strings& i1_vals,
+                               size_t n) {
+	io_context<node_t> ctx;
+	ctx.add_input("i1", qlt_type_id<node_t>(),
+	              std::make_shared<vector_input_stream>(i1_vals));
+	auto o1 = std::make_shared<vector_output_stream>();
+	ctx.add_output("o1", qlt_type_id<node_t>(), o1);
+	subtree_map<node_t, size_t> scope;
+	for (const auto& [var, type] : ctx.types) scope[var->get()] = type;
+	tau::get_options opts;
+	opts.global_scope = &scope;
+	auto nso = get_nso_rr<node_t>(ctx, tau::get(formula, opts));
+	if (!nso.has_value()) return {};
+	tref fm = nso.value().main->get();
+	if (!fm) return {};
+	run<node_t>(fm, ctx, n);
+	return o1->get_values();
+}
+
 // ── semantic checkers (independent of synthesis engine) ───────────────────────
 
 // Check G(o=c): every value must equal c.
@@ -110,6 +147,31 @@ static bool check_W(const strings& vals,
 		if (v != left)  return false;
 	}
 	return true; // left held forever — also satisfies W
+}
+
+// Check (φ T ψ) at index i of a finite trace, written straight from the
+// definition and independent of the compile-away pass:
+//     trace ⊨ φ T ψ at i   iff   ∀ j ≤ i : ψ(j) ∨ ∃ k ∈ (j, i] : φ(k)
+// (φ T ψ is the past dual of Release: φ T ψ ≡ ¬(¬φ S ¬ψ).)
+static bool check_trigger_at(const std::vector<bool>& phi,
+                             const std::vector<bool>& psi, size_t i) {
+	for (size_t j = 0; j <= i; ++j) {
+		if (psi[j]) continue;            // ψ discharges this j
+		bool excused = false;            // …otherwise some later φ must
+		for (size_t k = j + 1; k <= i; ++k)
+			if (phi[k]) { excused = true; break; }
+		if (!excused) return false;
+	}
+	return true;
+}
+
+// A tau spec must hold at every step of the run, so check φ T ψ at every i.
+static bool check_trigger_always(const std::vector<bool>& phi,
+                                 const std::vector<bool>& psi) {
+	if (phi.empty() || phi.size() != psi.size()) return false;
+	for (size_t i = 0; i < phi.size(); ++i)
+		if (!check_trigger_at(phi, psi, i)) return false;
+	return true;
 }
 
 // Check G(o=i): every output equals paired input.
@@ -595,6 +657,127 @@ TEST_SUITE("LTL correctness: adversarial strategy verifier") {
 	}
 
 } // TEST_SUITE "LTL correctness: adversarial strategy verifier"
+
+// ── TRG: Trigger (T) semantics ───────────────────────────────────────────────
+//
+// Hand derivation of the Trigger operator, used by every case below.
+//
+//   φ T ψ  is the past dual of Release:   φ T ψ  ≡  ¬(¬φ S ¬ψ)
+//
+//   π,i ⊨ φ S ψ   iff  ∃ j ≤ i : π,j ⊨ ψ  and  ∀ k ∈ (j,i] : π,k ⊨ φ
+//   π,i ⊨ φ T ψ   iff  ∀ j ≤ i : π,j ⊨ ψ  or   ∃ k ∈ (j,i] : π,k ⊨ φ
+//
+//   Read operationally: ψ must hold from the most recent point where φ held
+//   (or from 0, when φ never held) up to and INCLUDING i.  "Including i"
+//   because j = i is in range and its excuse window (i,i] is empty, so
+//
+//        π,i ⊨ φ T ψ   ⇒   π,i ⊨ ψ        (for every i, unconditionally)
+//
+//   A tau spec must hold at every step of the run (the pure-past execution
+//   path in compile_since_trigger encodes the top-level operator as a
+//   G-invariant), therefore
+//
+//        spec "φ T ψ."   ⇒   ψ holds at EVERY step, t = 0 included.
+//
+// The bug this suite pins (LT-1): the T→S rewrite used to funnel is_outer
+// into the S case, which asserts G(since) and ¬ψ@0 — i.e. exactly the
+// negation of the required obligation, forcing ¬ψ at t=0 and forbidding ψ
+// afterwards.
+
+TEST_SUITE("LTL correctness: Trigger (T) semantics") {
+
+	// ── execution ────────────────────────────────────────────────────────────
+
+	// φ = (o1 = 1/4), ψ = (o1 = 3/4).
+	// ψ is required at every step (j = i arm), so o1 = 3/4 always; and then
+	// φ never holds (3/4 ≠ 1/4), which is the "φ never fires ⇒ ψ forever"
+	// arm of the definition — consistent, so the spec is satisfiable.
+	// Expected trace:  3/4, 3/4, 3/4, 3/4
+	TEST_CASE("[TRG-EXEC-01] (o1={1/4}:qlt) T (o1={3/4}:qlt) — ψ at every step") {
+		bdd_init<Bool>();
+		auto vals = run_qlt_no_input(
+		    "(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).", 4);
+		REQUIRE(vals.size() == 4);
+		for (auto& v : vals) CHECK(v == "3/4");
+		std::vector<bool> phi, psi;
+		for (auto& v : vals) {
+			phi.push_back(v == "1/4");
+			psi.push_back(v == "3/4");
+		}
+		CHECK(check_trigger_always(phi, psi));
+	}
+
+	// t = 0 edge, "φ fires at every step" arm.
+	// φ = (o1 > 1/2), ψ = (o1 = 3/4).  Whenever ψ holds so does φ (3/4 > 1/2),
+	// so every j < i is excused by k = i.  Only j = i is left, and its window
+	// (i,i] is empty ⇒ ψ(i) required.  At i = 0 that is the ONLY obligation:
+	// the very first emitted value must satisfy ψ.
+	// Expected trace:  3/4, 3/4, 3/4, 3/4   (first value load-bearing)
+	TEST_CASE("[TRG-EXEC-02] (o1>{1/2}:qlt) T (o1={3/4}:qlt) — ψ at t=0") {
+		bdd_init<Bool>();
+		auto vals = run_qlt_no_input(
+		    "(o1[t]:qlt > {1/2}:qlt) T (o1[t]:qlt = {3/4}:qlt).", 4);
+		REQUIRE(vals.size() == 4);
+		CHECK(vals[0] == "3/4");   // t = 0 edge: inverted encoding forces ≠ 3/4
+		for (auto& v : vals) CHECK(v == "3/4");
+	}
+
+	// Adversarial environment: φ lives on the input stream, so the environment
+	// chooses when the trigger fires.  It cannot help: ψ is still required at
+	// every i (j = i arm), independently of i1.  A trace where o1 lapses from
+	// 3/4 at any step — in particular after a firing of φ at t=0 or t=2 —
+	// violates the spec and must not be produced.
+	// i1 = 1/4, 1/2, 1/4, 1/2  ⇒  expected o1 = 3/4, 3/4, 3/4, 3/4
+	TEST_CASE("[TRG-EXEC-03] (i1={1/4}:qlt) T (o1={3/4}:qlt) — env cannot excuse ψ") {
+		bdd_init<Bool>();
+		const strings i1_vals = {"1/4", "1/2", "1/4", "1/2"};
+		auto vals = run_qlt_with_i1(
+		    "(i1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).", i1_vals, 4);
+		REQUIRE(vals.size() == 4);
+		for (auto& v : vals) CHECK(v == "3/4");
+		std::vector<bool> phi, psi;
+		for (size_t k = 0; k < vals.size(); ++k) {
+			phi.push_back(i1_vals[k] == "1/4");
+			psi.push_back(vals[k] == "3/4");
+		}
+		CHECK(check_trigger_always(phi, psi));
+	}
+
+	// ── satisfiability (mirrors the execution cases) ─────────────────────────
+
+	TEST_CASE("[TRG-SAT-01] (o1={1/4}:qlt) T (o1={3/4}:qlt) is REALIZABLE") {
+		bdd_init<Bool>();
+		CHECK(realizable("(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt)."));
+	}
+
+	// Violating requirement rejected: the T forces ψ at every step, the second
+	// conjunct forbids it at every step.
+	TEST_CASE("[TRG-SAT-02] (φ T ψ) && G(¬ψ) is UNREALIZABLE") {
+		bdd_init<Bool>();
+		CHECK_FALSE(realizable(
+		    "(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt) "
+		    "&& G (o1[t]:qlt != {3/4}:qlt)."));
+	}
+
+	// ψ is a pure-input atom: the environment falsifies it and ψ is required
+	// at every step, so no strategy exists.
+	TEST_CASE("[TRG-SAT-03] (o1={1/4}:qlt) T (i1={3/4}:qlt) is UNREALIZABLE") {
+		bdd_init<Bool>();
+		CHECK_FALSE(realizable(
+		    "(o1[t]:qlt = {1/4}:qlt) T (i1[t]:qlt = {3/4}:qlt)."));
+	}
+
+	// Duality: φ T ψ ≡ ¬(¬φ S ¬ψ) — both must get the same verdict.
+	TEST_CASE("[TRG-SAT-04] φ T ψ ≡ ¬(¬φ S ¬ψ): same realizability") {
+		bdd_init<Bool>();
+		bool r1 = realizable("(o1[t]:qlt = {1/4}:qlt) T (o1[t]:qlt = {3/4}:qlt).");
+		bool r2 = realizable("! ((! (o1[t]:qlt = {1/4}:qlt)) "
+		                     "S (! (o1[t]:qlt = {3/4}:qlt))).");
+		CHECK(r1 == r2);
+		CHECK(r1);
+	}
+
+} // TEST_SUITE "LTL correctness: Trigger (T) semantics"
 
 
 TEST_SUITE("Cleanup") {

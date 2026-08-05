@@ -715,8 +715,10 @@ static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
 // G(curr ↔ rhs) for inner (nested) S operators.  The biconditional form
 // for inner S lets the auxiliary variable be false at t=0 without forcing
 // the inner ψ to hold — only the outermost S's ψ is required at t=0.
-// `is_outer` is true for the top-level call and for the first S node
-// encountered; false for S operators nested inside another S's phi/psi.
+// For an outermost T the S it rewrites to is always compiled as inner, and
+// the outer obligation is added as G(¬curr) — the negated compiled formula.
+// `is_outer` is true for the top-level call and for the first S/T node
+// encountered; false for operators nested inside another S/T's phi/psi.
 template <NodeType node>
 static tref compile_since_trigger_rec(
     tref fm,
@@ -734,14 +736,52 @@ static tref compile_since_trigger_rec(
 	auto nt = t[0].value.nt;
 
 	// wff_T: φ T ψ = ¬(¬φ S ¬ψ)
+	//
+	// Trigger semantics (past dual of Release):
+	//   π,i ⊨ φ T ψ  iff  ∀ j ≤ i : ψ@j  ∨  ∃ k ∈ (j,i] : φ@k
+	// j = i is in range and its excuse window (i,i] is empty, so φ T ψ at i
+	// requires ψ at i unconditionally.
 	if (nt == tau::wff_T) {
-		tref phi     = t[0].first();
-		tref psi     = t[0].second();
+		tref phi = t[0].first();
+		tref psi = t[0].second();
+
+		// Compile nested S/T inside the operands first (always inner), so
+		// that the ψ used for the t=0 initial condition below is the
+		// compiled one, matching what goes into the rewritten S.
+		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
+		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
+
 		tref neg_phi = tau::build_wff_neg(phi);
 		tref neg_psi = tau::build_wff_neg(psi);
 		tref s_node  = tau::build_wff_S(neg_phi, neg_psi);
-		tref s_rewr  = compile_since_trigger_rec<node>(s_node, invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
-		return tau::build_wff_neg(s_rewr);
+
+		// The rewritten S must NOT inherit is_outer: the outer obligation
+		// belongs to ¬(the S), not to the S.  Funnelling is_outer through
+		// here made the S branch assert G(since) and ¬ψ@0 — i.e. exactly
+		// G(¬(φ T ψ)) plus the negation of the required t=0 condition.
+		// With is_outer=false the S contributes only its tracking
+		// invariant G(curr ↔ rhs), and the obligation is encoded below
+		// from the negated compiled formula.
+		tref s_rewr  = compile_since_trigger_rec<node>(s_node, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
+		tref compiled = tau::build_wff_neg(s_rewr);
+
+		if (is_outer) {
+			// Outermost T safety invariant: G(¬curr).  Together with the
+			// inner S's G(curr ↔ rhs) this pins the Since auxiliary to 0
+			// and forces ψ at every step, which is what φ T ψ holding at
+			// every step means.
+			safety_invs.push_back(tau::build_wff_always(compiled));
+
+			// t=0 condition: Trigger requires ψ (not ¬ψ) at position 0.
+			// Encoded on the user-facing io_vars shifted to t=0, as the S
+			// branch does, so the interpreter's fixpoint pipeline never
+			// has to reason about aux[t-1] at time 0.
+			auto psi_io_vars = tau::get(psi).select_top(is_child<node, tau::io_var>);
+			tref psi_at_0 = fm_at_time_point<node>(psi, psi_io_vars, 0);
+			init_conds.push_back(psi_at_0);
+		}
+
+		return compiled;
 	}
 
 	// wff_S: φ S ψ
@@ -850,9 +890,11 @@ static tref compile_since_trigger_rec(
 // compiled_formula is fm unchanged if there are no S/T nodes.
 // Otherwise: compiled_formula && G_inv_0 && G_inv_1 && ...
 // safety_formula: G(outermost_s && rhs) for the top-level S (always-true
-//   requirement), and G(inner_s ↔ rhs) for nested S operators (biconditional
-//   tracks the auxiliary without forcing it to 1 at t=0).
-// init_formula: psi_at_0 for the outermost S only (strong-past t=0 condition).
+//   requirement), G(¬outermost_s) for a top-level T (which is ¬S), and
+//   G(inner_s ↔ rhs) for nested S operators (biconditional tracks the
+//   auxiliary without forcing it to 1 at t=0).
+// init_formula: psi_at_0 for the outermost S/T only (t=0 condition; for T it
+//   is the un-negated psi, since φ T ψ requires ψ at position 0).
 // aux_pairs: one entry per S operator: (curr_atom, prev_atom).
 // Callers use aux_pairs to add G(X(p_prev) <-> p_curr) to the ltlsynt skeleton.
 template <NodeType node>
