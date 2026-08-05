@@ -64,6 +64,11 @@ static qlt closed_pos_inf(long long a) { // [a, +inf)
 		qlt_rational(a, 1),            qlt_bound::CLOSED,
 		qlt_rational::make_pos_inf(),  qlt_bound::OPEN);
 }
+static qlt sym_singleton(const std::string& name) { // {c} = [c, c]
+	return make_interval(
+		qlt_rational::make_sym(name), qlt_bound::CLOSED,
+		qlt_rational::make_sym(name), qlt_bound::CLOSED);
+}
 
 // ─── qlt_rational ─────────────────────────────────────────────────────────────
 
@@ -856,6 +861,216 @@ TEST_CASE("union absorbs sub-interval: (0,2) | (0,1) = (0,2)") {
 }
 
 } // TEST_SUITE BA operations
+
+// ─── BA operations on symbolic (named-constant) endpoints ────────────────────
+//
+// A named constant `c` denotes an unknown rational.  `qlt_rational::operator<`
+// is a *canonical* order (it sorts syms after +inf) and must never be read as
+// the semantic order of Q.  Semantically only three things are known about a
+// named constant: it is above -inf, below +inf, and equal to itself.  Those
+// three are decided exactly.  Anything else -- `c` against a specific
+// rational, or against a differently-named constant -- is genuinely unknown,
+// and there the algebra over-approximates: the piece is kept whole (the same
+// convention `qlt_piece_empty` already documents with "different symbolic
+// endpoints: assume non-empty").  Over-approximating is the safe direction
+// here because these values feed satisfiability verdicts: dropping the piece
+// would turn `x = {c} && 0 <= x <= 1` into a wrong UNSAT.
+//
+// What must never happen is the third option the old code took: inventing a
+// mixed endpoint pair such as `[c,1]`, which is a subset of neither operand.
+
+TEST_SUITE("qlt — BA operations with symbolic endpoints") {
+
+TEST_CASE("complement of {c} is (-inf,c) | (c,+inf)") {
+	auto a = sym_singleton("c");
+	auto n = ~a;
+	CHECK(n.pieces.size() == 2);
+	CHECK(n.pieces[0].lo.val.is_neg_inf());
+	CHECK(n.pieces[0].hi.val == qlt_rational::make_sym("c"));
+	CHECK(n.pieces[0].hi.bound == qlt_bound::OPEN);
+	CHECK(n.pieces[1].lo.val == qlt_rational::make_sym("c"));
+	CHECK(n.pieces[1].lo.bound == qlt_bound::OPEN);
+	CHECK(n.pieces[1].hi.val.is_pos_inf());
+}
+
+TEST_CASE("complement law: {c} & ~{c} = bot") {
+	auto a = sym_singleton("c");
+	CHECK((a & ~a) == qlt::bottom());
+}
+
+TEST_CASE("complement law: {c} | ~{c} = top") {
+	auto a = sym_singleton("c");
+	CHECK((a | ~a) == qlt::top());
+}
+
+TEST_CASE("idempotence: {c} | {c} = {c}") {
+	auto a = sym_singleton("c");
+	auto r = a | a;
+	CHECK(r.pieces.size() == 1);
+	CHECK(r == a);
+}
+
+TEST_CASE("idempotence: {c} & {c} = {c}") {
+	auto a = sym_singleton("c");
+	CHECK((a & a) == a);
+}
+
+TEST_CASE("{c} & top = {c}") {
+	auto a = sym_singleton("c");
+	CHECK((a & qlt::top()) == a);
+	CHECK((qlt::top() & a) == a);
+}
+
+TEST_CASE("{c} | top = top") {
+	auto a = sym_singleton("c");
+	CHECK((a | qlt::top()) == qlt::top());
+}
+
+TEST_CASE("{c} & bot = bot") {
+	auto a = sym_singleton("c");
+	CHECK((a & qlt::bottom()) == qlt::bottom());
+}
+
+// The position of `c` relative to 0 and 1 is unknown, so the intersection is
+// undecidable and is over-approximated by the symbolic piece kept whole --
+// the correct over-approximation of "{c} if c in [0,1], else bot".  It must
+// be neither bot (that would make `x = {c} && 0 <= x <= 1` wrongly UNSAT) nor
+// the bogus `[c,1]` (a subset of neither operand).
+TEST_CASE("{c} & [0,1] over-approximates to {c}") {
+	auto a = sym_singleton("c");
+	CHECK((a & cc(0, 1)) == a);
+	CHECK((cc(0, 1) & a) == a);
+}
+
+// The equal-sym path is exact, so the undecidable over-approximation above
+// does not leak into a case that is decidable.
+TEST_CASE("({c} & [0,1]) & ~{c} is still bot") {
+	auto a = sym_singleton("c");
+	CHECK(((a & cc(0, 1)) & ~a) == qlt::bottom());
+}
+
+TEST_CASE("{c} & {d} with different names stays non-empty and commutes") {
+	auto a = sym_singleton("c");
+	auto b = sym_singleton("d");
+	CHECK((a & b) != qlt::bottom());
+	CHECK((a & b) == (b & a));
+	CHECK((a & b).pieces.size() == 1);
+}
+
+// Union cannot merge pieces whose relative order is unknown; keeping both is
+// the correct set, only the canonical form is lost.
+TEST_CASE("{c} | [0,1] keeps both pieces") {
+	auto a = sym_singleton("c");
+	auto r = a | cc(0, 1);
+	CHECK(r.pieces.size() == 2);
+}
+
+// ({c} | {d}) & [0,1] loses {d} if the intersection walks the two piece lists
+// as a sorted merge-sweep: the sweep advances on an upper-endpoint comparison
+// that is undecidable here.
+TEST_CASE("no symbolic piece is lost by the intersection") {
+	auto a = sym_singleton("c") | sym_singleton("d");
+	REQUIRE(a.pieces.size() == 2);
+	auto r = a & cc(0, 1);
+	CHECK(r.pieces.size() == 2);
+	CHECK(r == a);
+}
+
+TEST_CASE("qlt_sem_cmp: the canonical order is not the semantic order") {
+	auto c = qlt_rational::make_sym("c");
+	// canonical: a sym sorts after +inf; semantic: a sym is below +inf
+	CHECK(qlt_rational::make_pos_inf() < c);
+	CHECK(qlt_sem_cmp(c, qlt_rational::make_pos_inf())
+		== std::partial_ordering::less);
+	CHECK(qlt_sem_cmp(qlt_rational::make_pos_inf(), c)
+		== std::partial_ordering::greater);
+	CHECK(qlt_sem_cmp(c, qlt_rational::make_neg_inf())
+		== std::partial_ordering::greater);
+	CHECK(qlt_sem_cmp(qlt_rational::make_neg_inf(), c)
+		== std::partial_ordering::less);
+	CHECK(qlt_sem_cmp(c, c) == std::partial_ordering::equivalent);
+	CHECK(qlt_sem_cmp(c, qlt_rational::make_sym("d"))
+		== std::partial_ordering::unordered);
+	CHECK(qlt_sem_cmp(c, qlt_rational(0, 1))
+		== std::partial_ordering::unordered);
+	CHECK(qlt_sem_cmp(qlt_rational(0, 1), c)
+		== std::partial_ordering::unordered);
+	// non-symbolic values keep the old, exact behaviour
+	CHECK(qlt_sem_cmp(qlt_rational(0, 1), qlt_rational(1, 1))
+		== std::partial_ordering::less);
+	CHECK(qlt_sem_cmp(qlt_rational(1, 1), qlt_rational(1, 1))
+		== std::partial_ordering::equivalent);
+	CHECK(qlt_sem_cmp(qlt_rational::make_neg_inf(), qlt_rational::make_pos_inf())
+		== std::partial_ordering::less);
+}
+
+TEST_CASE("qlt_hi_min: a symbolic upper bound is below +inf") {
+	qlt_endpoint s{qlt_rational::make_sym("c"), qlt_bound::CLOSED};
+	qlt_endpoint pi{qlt_rational::make_pos_inf(), qlt_bound::OPEN};
+	auto r = qlt_hi_min(s, pi);
+	REQUIRE(r.has_value());
+	CHECK(r->val == qlt_rational::make_sym("c"));
+	auto r2 = qlt_hi_min(pi, s);
+	REQUIRE(r2.has_value());
+	CHECK(r2->val == qlt_rational::make_sym("c"));
+}
+
+TEST_CASE("qlt_lo_max: a symbolic lower bound is above -inf") {
+	qlt_endpoint s{qlt_rational::make_sym("c"), qlt_bound::CLOSED};
+	qlt_endpoint ni{qlt_rational::make_neg_inf(), qlt_bound::OPEN};
+	auto r = qlt_lo_max(s, ni);
+	REQUIRE(r.has_value());
+	CHECK(r->val == qlt_rational::make_sym("c"));
+	auto r2 = qlt_lo_max(ni, s);
+	REQUIRE(r2.has_value());
+	CHECK(r2->val == qlt_rational::make_sym("c"));
+}
+
+TEST_CASE("qlt_hi_min / qlt_lo_max report undecidable comparisons") {
+	qlt_endpoint s{qlt_rational::make_sym("c"), qlt_bound::CLOSED};
+	qlt_endpoint d{qlt_rational::make_sym("d"), qlt_bound::CLOSED};
+	qlt_endpoint one{qlt_rational(1, 1), qlt_bound::CLOSED};
+	CHECK(!qlt_hi_min(s, one).has_value());
+	CHECK(!qlt_lo_max(s, one).has_value());
+	CHECK(!qlt_hi_min(s, d).has_value());
+	CHECK(!qlt_lo_max(s, d).has_value());
+	CHECK(!qlt_hi_min(one, s).has_value());
+	CHECK(!qlt_lo_max(one, s).has_value());
+	// the decidable cases still answer
+	CHECK(qlt_lo_max(s, s).has_value());
+	CHECK(qlt_hi_min(s, s).has_value());
+}
+
+// (-inf,0) and (-inf,c) do overlap, but their union is (-inf, max(0,c)),
+// which is not representable: merging them would drop one upper bound.
+TEST_CASE("qlt_pieces_mergeable: overlap is not enough") {
+	qlt_piece a{qlt_endpoint{qlt_rational::make_neg_inf(), qlt_bound::OPEN},
+		    qlt_endpoint{qlt_rational(0, 1), qlt_bound::OPEN}};
+	qlt_piece b{qlt_endpoint{qlt_rational::make_neg_inf(), qlt_bound::OPEN},
+		    qlt_endpoint{qlt_rational::make_sym("c"), qlt_bound::OPEN}};
+	CHECK(qlt_pieces_overlap(a, b));
+	CHECK(!qlt_pieces_mergeable(a, b));
+	auto r = neg_inf_open(0) | qlt{{b}};
+	CHECK(r.pieces.size() == 2);
+}
+
+// Pieces touching at the same named constant are adjacent; that is what makes
+// {c} | ~{c} collapse to top.
+TEST_CASE("qlt_pieces_adjacent: touching at the same named constant") {
+	qlt_piece a{qlt_endpoint{qlt_rational::make_neg_inf(), qlt_bound::OPEN},
+		    qlt_endpoint{qlt_rational::make_sym("c"), qlt_bound::OPEN}};
+	qlt_piece b{qlt_endpoint{qlt_rational::make_sym("c"), qlt_bound::CLOSED},
+		    qlt_endpoint{qlt_rational::make_sym("c"), qlt_bound::CLOSED}};
+	CHECK(qlt_pieces_adjacent(a, b));
+	CHECK(qlt_pieces_mergeable(a, b));
+	// but not at two different names
+	qlt_piece d{qlt_endpoint{qlt_rational::make_sym("d"), qlt_bound::CLOSED},
+		    qlt_endpoint{qlt_rational::make_sym("d"), qlt_bound::CLOSED}};
+	CHECK(!qlt_pieces_adjacent(a, d));
+	CHECK(!qlt_pieces_mergeable(a, d));
+}
+
+} // TEST_SUITE BA operations with symbolic endpoints
 
 // ─── is_zero / is_one ─────────────────────────────────────────────────────────
 

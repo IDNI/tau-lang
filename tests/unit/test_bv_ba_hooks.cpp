@@ -230,6 +230,28 @@ TEST_SUITE("bv term_div: top and bottom element operands") {
 	}
 }
 
+// SMT-LIB defines bvudiv(x, 0) = all ones, so `X / X` is 1 only for X != 0
+// and is the top element for X = 0. A rewrite of `X / X` to the value 1
+// therefore cannot fire on anything that may be zero.
+TEST_SUITE("bv term_div: X / X") {
+
+	TEST_CASE("a variable divided by itself is not folded to one") {
+		CHECK(bf("x:bv[8] / x:bv[8]") != bf("{1}:bv[8]"));
+		// nor to anything else: it stays the unevaluated division
+		CHECK(bf("x:bv[8] / x:bv[8]") != bf("0:bv[8]"));
+		CHECK(bf("x:bv[8] / x:bv[8]") != bf("1:bv[8]"));
+	}
+
+	TEST_CASE("{0} / {0} is the top element") {
+		CHECK(bf("{0}:bv[8] / {0}:bv[8]") == bf("1:bv[8]"));
+	}
+
+	TEST_CASE("a nonzero constant divided by itself is one") {
+		CHECK(bf("{5}:bv[8] / {5}:bv[8]") == bf("{1}:bv[8]"));
+		CHECK(bf("{200}:bv[8] / {200}:bv[8]") == bf("{1}:bv[8]"));
+	}
+}
+
 TEST_SUITE("bv term_mod: top and bottom element operands") {
 
 	TEST_CASE("1 % X") {                       // 255 % 10 = 5

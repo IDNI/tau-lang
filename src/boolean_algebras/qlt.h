@@ -76,7 +76,9 @@ struct qlt_rational {
 
 	// Total order for normalisation: -inf < finite < +inf < sym (lex).
 	// For symbolic endpoints this is purely a canonical order — it does NOT
-	// imply a semantic ordering relative to specific rationals.
+	// imply a semantic ordering relative to specific rationals.  Use
+	// `qlt_sem_cmp` (below) wherever the *semantic* order is meant; reading
+	// this one as semantic is what made `{c} & ~{c}` evaluate to `(c,+inf)`.
 	bool operator<(const qlt_rational& o) const;
 	bool operator<=(const qlt_rational& o) const { return !(o < *this); }
 	bool operator>(const qlt_rational& o) const  { return o < *this; }
@@ -117,17 +119,33 @@ struct qlt_piece {
 
 // --- free function declarations ---
 
+// Semantic order of two endpoint values, as opposed to the canonical order of
+// `qlt_rational::operator<`.  A named constant denotes an unknown rational, so
+// only three facts about it are decidable: it is above -inf, below +inf, and
+// equal to itself.  Everything else -- a named constant against a specific
+// rational, or against a differently-named constant -- is genuinely unknown
+// and is reported as `unordered`.
+std::partial_ordering qlt_sem_cmp(const qlt_rational& a, const qlt_rational& b);
+
 bool qlt_lo_less(const qlt_piece& a, const qlt_piece& b);
 bool qlt_above_lo(const qlt_endpoint& lo, const qlt_rational& x);
 bool qlt_below_hi(const qlt_endpoint& hi, const qlt_rational& x);
 bool qlt_hi_less(const qlt_endpoint& a, const qlt_endpoint& b);
-qlt_endpoint qlt_lo_max(const qlt_endpoint& a, const qlt_endpoint& b);
-qlt_endpoint qlt_hi_min(const qlt_endpoint& a, const qlt_endpoint& b);
+// The intersection endpoints.  `nullopt` means the two endpoints are not
+// semantically comparable (see qlt_sem_cmp), so no exact answer exists;
+// callers over-approximate rather than invent one.
+std::optional<qlt_endpoint> qlt_lo_max(const qlt_endpoint& a, const qlt_endpoint& b);
+std::optional<qlt_endpoint> qlt_hi_min(const qlt_endpoint& a, const qlt_endpoint& b);
 qlt_endpoint qlt_hi_max(const qlt_endpoint& a, const qlt_endpoint& b);
 bool qlt_piece_empty(const qlt_piece& p);
 bool qlt_pieces_overlap(const qlt_piece& a, const qlt_piece& b);
 bool qlt_pieces_adjacent(const qlt_piece& a, const qlt_piece& b);
+bool qlt_pieces_mergeable(const qlt_piece& a, const qlt_piece& b);
 qlt_piece qlt_merge(const qlt_piece& a, const qlt_piece& b);
+// Intersection of two pieces; `nullopt` when the result is empty.  When the
+// endpoints are not comparable the intersection is over-approximated (see the
+// definition in qlt.cpp).
+std::optional<qlt_piece> qlt_piece_intersect(const qlt_piece& a, const qlt_piece& b);
 
 // -----------------------------------------------------------------------------
 // qlt: finite normalised union of intervals
@@ -140,6 +158,12 @@ struct qlt {
 	static qlt top();
 
 	bool is_empty() const { return pieces.empty(); }
+	// NOTE: structural, so it can under-report.  With symbolic endpoints
+	// `normalise` cannot always merge (the union of two pieces whose relative
+	// order is unknown is not representable), so a value covering all of Q may
+	// still be held as several pieces.  For the same reason `==` and hence
+	// associativity of `|` are structural, not semantic, once named constants
+	// are involved.
 	bool is_full() const;
 
 	bool operator==(const qlt& o) const { return pieces == o.pieces; }

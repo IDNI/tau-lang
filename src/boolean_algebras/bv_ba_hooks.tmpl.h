@@ -358,11 +358,14 @@ tref term_div(tref symbol) {
 		}
 		default: break;
 	}
-	// X / X
-	if (c1 == c2) {
-		const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-		return tau::build_bf_ba_constant(make_bitvector_value(width, 1), c2.get_ba_type());
-	}
+	// No `X / X -> 1` rule: SMT-LIB defines bvudiv(0,0) as all ones (the same
+	// convention the `1 / 0` and `X / 0` arms above follow), so the quotient
+	// of a term by itself is 1 only when the term is known to be nonzero.
+	// `c1 == c2` is plain subtree equality and matches variables too, so the
+	// rule fired on `x / x` and rewrote it to the constant 1 -- wrong for
+	// x = 0, and enough to make any sat/normalization result built on it
+	// wrong. Equal *constants* need no special case: they fall through to
+	// div_consts below, where cvc5 computes bvudiv exactly, 0/0 included.
 	// { ... } / { ... }
 	if (c1.is_ba_constant() && c2.is_ba_constant()
 		&& c1.get_ba_type() > 0 && c2.get_ba_type() == c1.get_ba_type()) {

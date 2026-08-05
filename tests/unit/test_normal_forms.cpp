@@ -639,6 +639,74 @@ TEST_SUITE("ReduceWff") {
 		tref res = reduce<node_t>(fm);
 		CHECK( tau::get(res).equals_T() );
 	}
+
+	// NF-1. The construction hooks leave a bv comparison as a raw `bf_lt`
+	// atom (they only expand comparisons for plain BAs), so `reduce`'s
+	// BDD-variable classifier has to treat it as an opaque atom.  When it did
+	// not, clause_to_vector matched no branch for the atom and just descended
+	// past it: the atom was left out of the path vector and
+	// build_reduced_formula rebuilt the clause without it.  With the
+	// comparison as the *only* atom the variable set came out empty and
+	// reduce answered F for a perfectly satisfiable formula.
+	TEST_CASE("bv comparison as the only atom is not reduced to F") {
+		const char* sample = "x:bv[8] < y:bv[8].";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::bf_lt>) );
+		tref res = reduce<node_t>(fm);
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lt>) );
+	}
+
+	TEST_CASE("bv comparison is not dropped from a conjunction") {
+		const char* sample = "x:bv[8] < y:bv[8] && z:bv[8] = 0.";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lt>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
+	}
+
+	// A negated comparison does not reach the BDD-variable selection as a
+	// `wff_neg` wrapper: `dnf_cnf_to_reduced` runs `push_negation_in` first,
+	// and that rewrites `!(a < b)` into the `bf_nlt` atom
+	// (normal_forms_nnf.tmpl.h). So the negated comparison kinds have to be
+	// classified as BDD variables in their own right -- classifying only
+	// `bf_lt`/`bf_lteq` would still drop these.
+	TEST_CASE("negated bv comparison as the only atom is not reduced to F") {
+		const char* sample = "!(x:bv[8] < y:bv[8]).";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( (tau::get(res).find_top(is<node_t, tau::bf_nlt>)
+			|| tau::get(res).find_top(is<node_t, tau::bf_lt>)) );
+	}
+
+	TEST_CASE("negated bv comparison is not dropped from a conjunction") {
+		const char* sample = "!(x:bv[8] < y:bv[8]) && z:bv[8] = 0.";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( !tau::get(res).equals_F() );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
+		CHECK( (tau::get(res).find_top(is<node_t, tau::bf_nlt>)
+			|| tau::get(res).find_top(is<node_t, tau::bf_lt>)) );
+	}
+
+	TEST_CASE("bv <= comparison is not dropped from a conjunction") {
+		const char* sample = "x:bv[8] <= y:bv[8] && z:bv[8] = 0.";
+		auto rr = get_nso_rr(sample);
+		REQUIRE( rr.has_value() );
+		tref fm = rr.value().main->get();
+		tref res = reduce<node_t>(fm);
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_lteq>) );
+		CHECK( tau::get(res).find_top(is<node_t, tau::bf_eq>) );
+	}
 }
 
 TEST_SUITE("BfReducedDNF") {
