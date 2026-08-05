@@ -27,3 +27,9 @@ add_repl_test(valid_cmd-mem_rel  "T.  valid %-0"  "T")
 add_repl_test(valid_cmd-mem_abs  "T.  valid %1"   "T")
 add_repl_test(valid_cmd-mem_last "T.  valid %"    "T")
 add_repl_test(valid_cmd-mem_F    "F.  valid %"    "F")
+
+# AP1-1: the same null normalize_formula result, reached through valid_spec's
+# is_tau_impl call instead of is_tau_formula_sat. As above, the verdict line is
+# the crash-distinguishing match.
+add_repl_test_fail(valid_cmd-oscillating_definition
+	"f(x) := f(x)'. valid f(1) = 0" ": F")

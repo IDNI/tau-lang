@@ -1409,6 +1409,20 @@ std::pair<tref, subtree_map<node, size_t>> infer_ba_types(tref n,
 					error = std::get<inference_error>(updated);
 					break;
 				}
+				// update_functional_rr rejects a function
+				// definition whose body is a formula (e.g.
+				// `p(x):sbf := x = 0.`) by returning a null tref
+				// rather than an inference_error. Storing that
+				// null gives the parent rec_relations node a null
+				// child, which the final update pass then
+				// dereferences -- report the rejection as an
+				// inference failure instead. The type ids are
+				// left at 0: the rejection is about the body's
+				// wff/bf shape, not about two conflicting types.
+				if (std::get<tref>(updated) == nullptr) {
+					error = inference_error{ new_n, 0, 0 };
+					break;
+				}
 				if (std::get<tref>(updated) != new_n) transformed.insert_or_assign(n, std::get<tref>(updated));
 				if (resolver.close()) {
 					DBG(LOG_TRACE << "infer_ba_types/on_leave/" << LOG_NT(nt) <<": scope closed\n";)

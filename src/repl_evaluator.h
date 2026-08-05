@@ -312,8 +312,13 @@ private:
 
 	std::vector<history> H;
 	options opt{};
-	trefs rr_defs;
-	trefs io_defs;
+	// Held as htrefs, not raw trefs: interpreter::step() calls maybe_gc(),
+	// and bintree<node>::gc() destroys every node that is neither reachable
+	// from a live htref nor in the keep set collect_live_refs() builds --
+	// which never mentions the REPL. A `run` would otherwise free the
+	// definitions this session keeps reading afterwards.
+	htrefs rr_defs;
+	htrefs io_defs;
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 #ifdef TAU_PARSER_HAS_FTXUI

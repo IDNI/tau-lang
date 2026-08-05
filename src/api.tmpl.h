@@ -439,8 +439,19 @@ bool api<node>::realizable(tref fm) {
 	// G(A) ∧ G(B) ≡ G(A ∧ B): merge top-level G-conjuncts before
 	// normalization so the downstream pipeline sees a single wff_always.
 	if (fm) fm = flatten_always_conjuncts<node>(fm);
-	return fm && is_formula(fm)
-		&& is_tau_formula_sat<node>(normalize_formula(fm), 0, true);
+	if (!fm || !is_formula(fm)) return false;
+	// normalize_formula() returns nullptr on failures that are reachable
+	// from user input: a non-well-founded recurrence, a definition set
+	// whose expansion never settles, a fallback type mismatch, or a
+	// get_nso_rr failure. is_tau_formula_sat() dereferences its argument
+	// immediately, so the null has to be caught here.
+	tref nfm = normalize_formula(fm);
+	if (!nfm) {
+		TAU_LOG_ERROR << "Could not normalize the formula; "
+			"its satisfiability cannot be decided";
+		return false;
+	}
+	return is_tau_formula_sat<node>(nfm, 0, true);
 }
 
 template <NodeType node>
@@ -476,8 +487,17 @@ bool api<node>::valid(tref fm) {
 template <NodeType node>
 bool api<node>::valid_spec(tref fm) {
 	fm = simplify(fm);
+	if (!fm) return false;
+	// Same null contract as realizable(): is_tau_impl() normalizes both
+	// arguments straight away and cannot be handed a null formula.
+	tref nfm = normalize_formula(fm);
+	if (!nfm) {
+		TAU_LOG_ERROR << "Could not normalize the formula; "
+			"its validity cannot be decided";
+		return false;
+	}
 	// Valid iff T (tautology) implies the normalized formula
-	return fm && is_tau_impl<node>(tau::_T(), normalize_formula(fm));
+	return is_tau_impl<node>(tau::_T(), nfm);
 }
 
 

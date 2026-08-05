@@ -224,3 +224,30 @@ TEST_SUITE("untype of a ba_constant") {
 		CHECK( tau::get(untype<node_t>(v)).get_ba_type() == 0 );
 	}
 }
+
+TEST_SUITE("regression/typed rec-relation head with a wff body") {
+
+	// BA2-2: `p(x):sbf := x = 0.` is classified as a functional relation
+	// (its head is typed) but its body is a formula, which
+	// update_functional_rr rejects by returning nullptr. The rec_relation
+	// on_leave handler only looked for parse_error/inference_error and
+	// stored that nullptr as a child of the rec_relations node; the final
+	// update pass then dereferenced it. The rejection must surface as an
+	// inference failure (whole parse yields nullptr), never as a crash.
+	TEST_CASE("a typed head with a wff body is rejected without crashing") {
+		tref n = tau::get("p(x):sbf := x = 0. T.");
+		CHECK( n == nullptr );
+	}
+
+	// The neighbouring accepted shapes from the same sample table must
+	// keep parsing, so the rejection stays narrow.
+	TEST_CASE("a typed head with a bf body still parses") {
+		tref n = tau::get("p(x):sbf := x'. T.");
+		CHECK( n != nullptr );
+	}
+
+	TEST_CASE("an untyped head with a wff body still parses") {
+		tref n = tau::get("p(x:sbf) := x = 0. T.");
+		CHECK( n != nullptr );
+	}
+}

@@ -27,3 +27,14 @@ add_repl_test(sat_cmd-mem_rel  "T.   sat %-0"  "T")
 add_repl_test(sat_cmd-mem_abs  "T.   sat %1"   "T")
 add_repl_test(sat_cmd-mem_last "T.   sat %"    "T")
 add_repl_test(sat_cmd-mem_F    "F.   sat %"    "F")
+
+# AP1-1: a definition set whose expansion oscillates (`f(x) := f(x)'`, the
+# same shape as the normalize_cmd regressions above) makes normalize_formula
+# return nullptr. `sat` used to hand that null straight to is_tau_formula_sat,
+# which dereferences it. The expected output is the verdict, not the
+# diagnostic: the "oscillates" message is printed *before* the crash point, so
+# matching on it would not tell a crash apart from a clean rejection, whereas
+# the ": F" line can only be reached after sat returns.
+# add_repl_test_fail is used because the diagnostic contains "Error".
+add_repl_test_fail(sat_cmd-oscillating_definition
+	"f(x) := f(x)'. sat f(1) = 0" ": F")

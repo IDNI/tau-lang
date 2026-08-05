@@ -183,8 +183,8 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 	// create a spec from the arg and add io and rr defs
 	tau_spec<node> spec;
 	spec.add(arg);
-	for (tref d : rr_defs) spec.add(d);
-	for (tref d : io_defs) spec.add(d);
+	for (const htref& d : rr_defs) spec.add(d->get());
+	for (const htref& d : io_defs) spec.add(d->get());
 	auto maybe_nso_rr = spec.get_nso_rr();
 	if (!maybe_nso_rr) {
 		DBG(TAU_LOG_TRACE << "nso_rr has no value";)
@@ -482,8 +482,8 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	// handles io_var resolution for LTL and safety formulas.
 	tau_spec<node> spec;
 	spec.add(value);
-	for (tref d : rr_defs) spec.add(d);
-	for (tref d : io_defs) spec.add(d);
+	for (const htref& d : rr_defs) spec.add(d->get());
+	for (const htref& d : io_defs) spec.add(d->get());
 
 	auto maybe_i = tau_api::get_interpreter(m.part(), spec);
 	if (!maybe_i) return;
@@ -771,9 +771,9 @@ void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 			"f[n](x), or use a fixed offset";
 		return;
 	}
-	rr_defs.push_back(def);
+	rr_defs.push_back(tau::geth(def));
 	size_t idx = rr_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tree<node>::get(rr_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]->get()).to_str() << "\n";
 	// Register definition head early so type inference recognizes it
 	tt rrt(def);
 	htref head = rrt | tt::first | tt::handle;
@@ -789,12 +789,12 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	else std::cout << "Definitions:\n";
 	for (size_t i = 0; i < rr_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< tau::get(rr_defs[i]).to_str() << "\n";
+			<< tau::get(rr_defs[i]->get()).to_str() << "\n";
 	if (io_defs.empty()) std::cout << "Streams: empty\n";
 	else std::cout << "Streams:\n";
 	for (size_t i = 0; i < io_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< tau::get(io_defs[i]).to_str() << "\n";
+			<< tau::get(io_defs[i]->get()).to_str() << "\n";
 	std::cout << *defs.get_io_context();
 }
 
@@ -805,7 +805,7 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	if (!num) return;
 	auto i = num | tt::num;
 	if (i && i <= rr_defs.size()) {
-		std::cout << tau::get(rr_defs[i-1]).to_str() << "\n";
+		std::cout << tau::get(rr_defs[i-1]->get()).to_str() << "\n";
 		return;
 	}
 	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
@@ -815,17 +815,31 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
-	io_defs.push_back(n | tt::first | tt::ref);
+	tref def = n | tt::first | tt::ref;
+	// tree<node>::geth() asserts on a null tref, and the read sites
+	// below would dereference it anyway.
+	if (!def) {
+		TAU_LOG_ERROR << "Invalid stream definition";
+		return;
+	}
+	io_defs.push_back(tau::geth(def));
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
-	io_defs.push_back(n | tt::first | tt::ref);
+	tref def = n | tt::first | tt::ref;
+	// tree<node>::geth() asserts on a null tref, and the read sites
+	// below would dereference it anyway.
+	if (!def) {
+		TAU_LOG_ERROR << "Invalid stream definition";
+		return;
+	}
+	io_defs.push_back(tau::geth(def));
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -1281,7 +1295,14 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 		return 0;
 	}
 	error = false;
-	auto tau_spec = tt(make_cli(src));
+	tref cli = make_cli(src);
+	// Pin the parsed command line for the whole evaluation: a `run` among
+	// its commands steps the interpreter, which calls maybe_gc(), and the
+	// commands still queued behind it live in this very tree. A line that
+	// failed to parse has no tree and needs no pin -- tree<node>::geth()
+	// asserts on a null tref, unlike bintree's.
+	htref cli_pin = cli ? tau::geth(cli) : htref{};
+	auto tau_spec = tt(cli);
 	int quit = 0;
 	if (tau_spec) {
 		auto commands = tau_spec || tau::cli_command;
