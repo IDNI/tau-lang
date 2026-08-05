@@ -58,4 +58,37 @@ TEST_SUITE("adt flatten") {
 		tref twice = adt_flatten<node_t>(once);
 		CHECK(tau::get(once).to_str() == tau::get(twice).to_str());
 	}
+	TEST_CASE("rec_relation formals get their own scope, not the enclosing one") {
+		// Two unrelated definitions each locally annotate a formal parameter
+		// named "x" with a different registry type. Per design section 3,
+		// pass 1, a ref formal's annotation is a valid ADT-typing source for
+		// member paths used on it in that definition's own body -- but it
+		// must not leak into the enclosing (here: global) scope, or these
+		// two definitions' same-named-but-unrelated formals would
+		// spuriously "conflict". Ref-arg arity EXPANSION of a tuple-typed
+		// formal itself (turning `f(x:Point)` into `f(x.a,x.b)`) is Task 6's
+		// job -- this task only needs the scoping right: the formal's own
+		// occurrence in the ref head is left untouched, while each body's
+		// member-path use of its own (correctly, locally scoped) formal is
+		// still resolved and rewritten. This only asserts flattening
+		// succeeds (no spurious conflict); it does not assert anything
+		// about the head's shape, which Task 6 will change.
+		CHECK(flat("type Point = {a: sbf, b: sbf}. type Q = {c: sbf}. "
+			"f(x:Point) := x.a = 0. g(x:Q) := x.c = 0. y = 0.") != nullptr);
+	}
+	TEST_CASE("type defs erased under spec_multiline") {
+		// spec_multiline (used e.g. for REPL scripting) inlines spec_part
+		// directly, so type_def sits as a direct child alongside
+		// rec_relation/input_def/output_def/main -- same erasure rule as
+		// under `definitions`, exercised here via an explicit parse start
+		// symbol since check_flat's normal `spec` start never produces a
+		// spec_multiline node to erase from.
+		tau::get_options opts{ .parse = { .start = tau::spec_multiline },
+			.infer_ba_types = false };
+		tref t = tau::get(std::string(PT "x = 0."), opts);
+		REQUIRE(t != nullptr);
+		tref flattened = adt_flatten<node_t>(t);
+		REQUIRE(flattened != nullptr);
+		CHECK(tau::get(flattened).select_all(is<node_t, tau::type_def>).empty());
+	}
 }

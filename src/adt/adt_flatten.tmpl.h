@@ -85,6 +85,18 @@ std::string adt_flatten_head_str(tref head) {
 	return dict(adt_flatten_var_key<node>(head));
 }
 
+// Dotted description of a `variable` node (head + member_path, ignoring any
+// `typed` child) for error messages -- e.g. `x` or `l.p.a`.
+template <NodeType node>
+std::string adt_flatten_describe_var(tref var_node) {
+	using tau = tree<node>;
+	std::string s = adt_flatten_head_str<node>(tau::get(var_node).first());
+	if (tref mp = adt_flatten_find_child<node>(var_node, tau::member_path); mp)
+		for (tref c : tau::get(mp).get_children())
+			s += "." + dict(tau::get(c).data());
+	return s;
+}
+
 // -----------------------------------------------------------------------------
 // Shared ADT-type resolution for one `variable` node (bare or with a member
 // path), used identically by generic-context rewriting, tuple-equality
@@ -208,7 +220,13 @@ std::optional<adt_resolution<node>> adt_resolve_var(tref var_node,
 // Collects the LOCAL registry-type annotations of one scope (the region
 // spanned by a quantifier's bound variable and body, or the whole spec for
 // the outermost/global scope), without crossing into a nested quantifier's
-// own scope. Called once per scope, at scope-open time, so that "an
+// own scope, NOR into a rec_relation's own scope (a definition's formal
+// parameters and body are that definition's own scope, isolated from
+// whatever contains the definitions list -- see
+// adt_flatten_rewrite_rec_relation; without this, a tuple-typed formal's
+// annotation would leak into the enclosing, often global, scope and could
+// spuriously "conflict" with an unrelated definition's own same-named
+// formal). Called once per scope, at scope-open time, so that "an
 // annotation anywhere in the scope fixes it" holds regardless of where in
 // the scope's text the annotation and the member access appear relative to
 // each other.
@@ -222,6 +240,7 @@ bool adt_flatten_collect_local(tref n, const adt_registry<node>& reg,
 	if (!n) return true;
 	auto t = tau::get(n);
 	if (is_logical_or_functional_quant<node>(n)) return true; // nested scope
+	if (t.is(tau::rec_relation)) return true; // rec_relation's own scope
 	if (t.is(tau::variable)) {
 		if (tref typed_node = adt_flatten_find_child<node>(n, tau::typed); typed_node) {
 			size_t tname = tt(typed_node) | tau::type | tt::data;
@@ -278,7 +297,8 @@ std::optional<tref> adt_flatten_rewrite_variable(tref n,
 			: tau::get(tau::variable, tau::build_var_name(res->flat_name),
 				res->base_type);
 	case adt_resolution<node>::k_partial:
-		LOG_ERROR << "(Error) ADT: tuple-typed term used outside an "
+		LOG_ERROR << "(Error) ADT: tuple-typed term '"
+			<< adt_flatten_describe_var<node>(n) << "' used outside an "
 			"equality or quantifier context\n";
 		return std::nullopt;
 	}
@@ -345,6 +365,35 @@ std::optional<tref> adt_flatten_rewrite_quantifier(tref n, size_t nt,
 	return tau::get(subformula).first(); // unwrap: caller rewraps
 }
 
+// A rec_relation (`f(args) := body`) is its own scope: its formal
+// parameters' annotations (a valid ADT-typing source per design section 3,
+// pass 1: "a ref formal") are visible to member-path resolution in its own
+// body only, isolated from whatever contains the definitions list (sibling
+// definitions, `main`) -- see adt_flatten_collect_local's matching stop
+// condition. The head (`ref` + `ref_args`, i.e. the formal parameter list
+// itself) is left completely untouched: expanding a tuple-typed formal's
+// arity into one flat parameter per member is Task 6's ref-arg rule: this
+// task only needs the formals' own annotations visible for resolving member
+// paths used on them in the body, not the formals themselves rewritten.
+template <NodeType node>
+std::optional<tref> adt_flatten_rewrite_rec_relation(tref n,
+		const adt_registry<node>& reg, adt_scope_stack scopes)
+{
+	using tau = tree<node>;
+	tref head = tau::get(n).first();
+	tref body = tau::get(n).second();
+
+	std::map<size_t, adt_scope_entry> local;
+	if (!adt_flatten_collect_local<node>(head, reg, local)) return std::nullopt;
+	if (!adt_flatten_collect_local<node>(body, reg, local)) return std::nullopt;
+	scopes.push_back(std::move(local));
+
+	auto new_body = adt_flatten_rewrite<node>(body, reg, scopes);
+	if (!new_body) return std::nullopt;
+	if (*new_body == body) return n;
+	return tau::get(tau::rec_relation, head, *new_body);
+}
+
 // Rule 2: `=`/`!=` with a tuple-typed side expands into a conjunction (for
 // `=`) / disjunction (for `!=`) of member-wise atoms. The other side must be
 // a same-shaped tuple term or the constant 0/1 (broadcast to every member);
@@ -372,6 +421,14 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 	auto rc = classify(r_content); if (!rc) return std::nullopt;
 	bool l_const = tau::get(l_content).is(tau::bf_t) || tau::get(l_content).is(tau::bf_f);
 	bool r_const = tau::get(r_content).is(tau::bf_t) || tau::get(r_content).is(tau::bf_f);
+	const char* op = nt == tau::bf_eq ? "equality" : "inequality";
+	auto describe_side = [&](tref content) -> std::string {
+		if (tau::get(content).is(tau::variable))
+			return adt_flatten_describe_var<node>(content);
+		if (tau::get(content).is(tau::bf_t)) return "1";
+		if (tau::get(content).is(tau::bf_f)) return "0";
+		return "<term>";
+	};
 
 	auto make_atom = [&](tref lo, tref ro) -> tref {
 		return nt == tau::bf_eq ? tau::build_bf_eq(lo, ro) : tau::build_bf_neq(lo, ro);
@@ -399,12 +456,19 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 	std::vector<tref> atoms;
 	if (lc->is_partial && rc->is_partial) {
 		if (lc->members.size() != rc->members.size()) {
-			LOG_ERROR << "(Error) ADT: shape mismatch in tuple equality\n";
+			LOG_ERROR << "(Error) ADT: shape mismatch in tuple " << op << ": '"
+				<< describe_side(l_content) << "' has " << lc->members.size()
+				<< " member(s), '" << describe_side(r_content) << "' has "
+				<< rc->members.size() << "\n";
 			return std::nullopt;
 		}
 		for (size_t i = 0; i < lc->members.size(); ++i) {
 			if (!is_same_ba_type<node>(lc->members[i].second, rc->members[i].second)) {
-				LOG_ERROR << "(Error) ADT: shape mismatch in tuple equality\n";
+				LOG_ERROR << "(Error) ADT: shape mismatch in tuple " << op
+					<< " between '" << describe_side(l_content) << "' and '"
+					<< describe_side(r_content) << "': member types differ ('"
+					<< lc->members[i].first << "' vs '" << rc->members[i].first
+					<< "')\n";
 				return std::nullopt;
 			}
 			atoms.push_back(make_atom(
@@ -418,7 +482,12 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 		for (auto& [name, bt] : rc->members)
 			atoms.push_back(make_atom(l_bf, mk_var_bf(name, bt, rc->is_bound)));
 	} else {
-		LOG_ERROR << "(Error) ADT: shape mismatch in tuple equality\n";
+		bool l_is_tuple = lc->is_partial;
+		LOG_ERROR << "(Error) ADT: shape mismatch: '"
+			<< describe_side(l_is_tuple ? l_content : r_content)
+			<< "' is tuple-typed but '"
+			<< describe_side(l_is_tuple ? r_content : l_content)
+			<< "' is not a matching tuple term or the constant 0/1\n";
 		return std::nullopt;
 	}
 
@@ -428,20 +497,27 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 }
 
 // Generic recursive dispatch: quantifiers and `=`/`!=` are special-cased,
-// `variable` nodes are resolved/rewritten in place, `definitions` has its
-// `type_def` children erased, `wff`/`bf` wrappers and every other node kind
-// (`spec`/`start`, `main`, wff_and, bf_or, ref, ref_args, offsets, ...) are
-// rebuilt bottom-up with recursively rewritten children, reusing the
-// original node (no reconstruction) when nothing under it changed. This is
-// deliberately agnostic about which nonterminal is the tree's actual root
-// (`spec` vs. whatever the grammar's start symbol really materializes as):
-// `definitions` is found and erased wherever normal recursive descent from
-// the root reaches it, and if erasing every type_def empties it, a child
-// that comes back as a null tref (adt_flatten_rewrite's own "drop me"
-// signal, distinct from std::nullopt's "error") is simply omitted from its
-// parent's rebuilt children list -- so an emptied `definitions` node
-// disappears the same way it would if the source had no definitions at all,
-// however many/few levels above the root that turns out to be.
+// `variable` nodes are resolved/rewritten in place, rec_relation opens its
+// own scope (formals untouched, see adt_flatten_rewrite_rec_relation),
+// `definitions`/`spec_multiline` have their `type_def` children erased,
+// `wff`/`bf` wrappers and every other node kind (`spec`/`start`, `main`,
+// wff_and, bf_or, ref, ref_args, offsets, ...) are rebuilt bottom-up with
+// recursively rewritten children, reusing the original node (no
+// reconstruction) when nothing under it changed. This is deliberately
+// agnostic about which nonterminal is the tree's actual root (`spec` vs.
+// whatever the grammar's start symbol really materializes as, or
+// `spec_multiline` when a caller parses with that start symbol instead --
+// e.g. REPL scripting): `definitions`/`spec_multiline` are found and erased
+// wherever normal recursive descent from the root reaches them, and if
+// erasing every type_def empties a `definitions` (which, unlike
+// `spec_multiline`, cannot itself be empty per the grammar's `+` repetition
+// -- `spec_multiline`'s own `_` alternative already allows zero items, so an
+// emptied one is a legitimately printable node as-is), a child that comes
+// back as a null tref (adt_flatten_rewrite's own "drop me" signal, distinct
+// from std::nullopt's "error") is simply omitted from its parent's rebuilt
+// children list -- so an emptied `definitions` node disappears the same way
+// it would if the source had no definitions at all, however many/few levels
+// above the root that turns out to be.
 template <NodeType node>
 std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 		adt_scope_stack scopes)
@@ -458,6 +534,8 @@ std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 		return adt_flatten_rewrite_equality<node>(n, nt, reg, scopes);
 	case tau::variable:
 		return adt_flatten_rewrite_variable<node>(n, reg, scopes);
+	case tau::rec_relation:
+		return adt_flatten_rewrite_rec_relation<node>(n, reg, std::move(scopes));
 	case tau::definitions: {
 		trefs kept;
 		for (tref g : t.get_children()) {
@@ -468,6 +546,16 @@ std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 		}
 		if (kept.empty()) return tref{ nullptr }; // signal: drop this node
 		return tau::get(tau::definitions, kept);
+	}
+	case tau::spec_multiline: {
+		trefs kept;
+		for (tref g : t.get_children()) {
+			if (tau::get(g).is(tau::type_def)) continue; // erased
+			auto rc = adt_flatten_rewrite<node>(g, reg, scopes);
+			if (!rc) return std::nullopt;
+			kept.push_back(*rc);
+		}
+		return tau::get(tau::spec_multiline, kept); // may legitimately be empty
 	}
 	default: break;
 	}
