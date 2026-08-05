@@ -65,13 +65,15 @@ struct blast_reentry_guard {
 /// runtime parameter, never a header constant -- `bv_blasting`
 /// (heuristics/bv_predicate_blasting.h) is the precedent. Like it, this is NOT
 /// thread-safe: the tau library assumes single-threaded access.
-inline size_t block_boole_max_splits = 512;
+inline size_t block_boole_max_splits = std::numeric_limits<size_t>::max();
 
 /// Maximum rounds `process_quantifier_blocks` may take before giving up.
 /// Unconditional: the termination argument at its use site is subtle enough
 /// that a regression must fail loudly rather than hang Release forever.
 /// Runtime-tunable via `api::set_block_max_rounds`, same caveats as above.
-inline size_t block_max_rounds = 1000;
+inline size_t block_max_rounds = std::numeric_limits<size_t>::max();
+
+} // namespace idni::tau_lang
 
 /**
  * @internal
