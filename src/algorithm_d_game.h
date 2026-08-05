@@ -679,14 +679,20 @@ static std::pair<StateSet,StateSet> solve(
 	StateSet V3;
 	for (int u : V) if (!Y.count(u)) V3.insert(u);
 	auto [W0pp, W1pp] = solve(V3, n, plr, pri, succs);
+	// Standard Zielonka: the opponent (player 1-b) wins on Y — the states from
+	// which it can force the play into its sub-game winning set W'_{1-b} — plus
+	// whatever it wins in the remaining sub-game V \ Y.  The beneficiary keeps
+	// only its own share of that sub-game.
 	StateSet W_1b_full = Y;
 	for (int u : Wl) W_1b_full.insert(u);
 	if (beneficiary == 1) {
-		for (int u : W1pp) W_1b_full.insert(u);
-		return {W0pp, W_1b_full};
-	} else {
+		// opponent is player 0
 		for (int u : W0pp) W_1b_full.insert(u);
 		return {W_1b_full, W1pp};
+	} else {
+		// opponent is player 1
+		for (int u : W1pp) W_1b_full.insert(u);
+		return {W0pp, W_1b_full};
 	}
 }
 

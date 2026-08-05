@@ -422,6 +422,67 @@ State: 1
 		CHECK(W1.empty());  // sys wins nowhere
 	}
 
+	TEST_CASE("[ALG-D-40] Zielonka recursive branch: the opponent attractor "
+	          "goes to the opponent's winning set") {
+		// Hand-built game reaching the recursive branch of zielonka_impl::solve
+		// (the branch taken when the sub-game's loser set is non-empty).
+		// Two env-owned states, priorities {1, 0}, edges 0 → 1 and 1 → 1.
+		// Every play ends in the self-loop on state 1, whose priority 0 is
+		// even, so env wins from both states and sys wins nowhere.
+		//
+		// Hand trace (max-parity, even = env):
+		//   V = {0,1}, c_max = 1 (state 0), beneficiary = 1 (sys).
+		//   X = attr_1({0}) = {0}   (state 0 has no predecessors).
+		//   solve({1}) → c_max = 0, beneficiary = 0, attractor swallows {1},
+		//                sub-game loser set empty → returns W0' = {1}, W1' = {}.
+		//   Back at the top: Wl = W0' = {1} is NON-empty, so the early return
+		//   at the top of the branch is skipped and the recursion runs:
+		//   Y = attr_0({1}) = {0,1}, V3 = {} → W0'' = W1'' = {}.
+		//   Correct Zielonka: Y ∪ Wl belongs to the OPPONENT (player 0 here),
+		//   so W0 = {0,1}, W1 = {}.
+		alg_d::ProductGame pg;
+		pg.n_states = 2;
+		pg.init     = 0;
+		pg.player   = {0, 0};
+		pg.priority = {1, 0};
+		pg.succs    = {{1}, {1}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.empty());  // env wins everywhere
+	}
+
+	TEST_CASE("[ALG-D-43] Zielonka: flipping ownership of the choice state "
+	          "flips the winner") {
+		// Three states: 0 is a choice state with successors 1 and 2;
+		// state 1 self-loops at priority 1 (odd → sys), state 2 self-loops at
+		// priority 0 (even → env).  Whoever owns state 0 steers to its own
+		// sink, so ownership alone decides the verdict at state 0 — while
+		// states 1 and 2 keep their verdicts in both variants.
+		//
+		// Both variants take the recursive branch: c_max = 1 selects A = {1},
+		// the beneficiary-1 attractor never covers the even sink 2, so the
+		// sub-game hands back a non-empty player-0 set.  Under the swapped
+		// merge the opponent attractor Y (which contains sink 2) is credited
+		// to sys in both variants, so sys is reported to win everywhere and
+		// the flip disappears.
+		alg_d::ProductGame env_owns;
+		env_owns.n_states = 3;
+		env_owns.init     = 0;
+		env_owns.player   = {0, 1, 0};
+		env_owns.priority = {0, 1, 0};
+		env_owns.succs    = {{1, 2}, {1}, {2}};
+		auto W1_env = alg_d::zielonka_win_player1(env_owns);
+		CHECK(!W1_env.count(0));  // env steers to the even sink
+		CHECK(W1_env.count(1));
+		CHECK(!W1_env.count(2));
+
+		alg_d::ProductGame sys_owns = env_owns;
+		sys_owns.player = {1, 1, 0};  // only the choice state changes hands
+		auto W1_sys = alg_d::zielonka_win_player1(sys_owns);
+		CHECK(W1_sys.count(0));   // sys steers to the odd sink
+		CHECK(W1_sys.count(1));
+		CHECK(!W1_sys.count(2));
+	}
+
 	TEST_CASE("[ALG-D-22] G(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
 		// Output always > 0: always achievable (system sets y > 0 each step)
 		CHECK(alg_d_realizable("G (o1[t]:qlt > {0}:qlt)."));
