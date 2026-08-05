@@ -3,11 +3,14 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
-// helper: parse a spec source into a tau tree without inference. Task 5 adds
-// the automatic flatten-on-parse hook (get_options.flatten_adts); until then
-// adt_flatten is called manually here.
+// helper: parse a spec source into a tau tree without inference, and WITHOUT
+// the automatic flatten-on-parse hook (get_options.flatten_adts, added by
+// task 5) so that the explicit adt_flatten<node_t> call below is the thing
+// actually under test here, not a no-op re-run of an already-flattened tree
+// (adt_flatten's empty-registry fast path would otherwise make the second
+// call vacuous once type_defs are already erased by the hook).
 static tref flat(const std::string& src) {
-	tref t = tau::get(src, { .infer_ba_types = false });
+	tref t = tau::get(src, { .infer_ba_types = false, .flatten_adts = false });
 	if (!t) return nullptr;
 	return adt_flatten<node_t>(t);
 }
@@ -84,11 +87,32 @@ TEST_SUITE("adt flatten") {
 		// symbol since check_flat's normal `spec` start never produces a
 		// spec_multiline node to erase from.
 		tau::get_options opts{ .parse = { .start = tau::spec_multiline },
-			.infer_ba_types = false };
+			.infer_ba_types = false, .flatten_adts = false };
 		tref t = tau::get(std::string(PT "x = 0."), opts);
 		REQUIRE(t != nullptr);
 		tref flattened = adt_flatten<node_t>(t);
 		REQUIRE(flattened != nullptr);
 		CHECK(tau::get(flattened).select_all(is<node_t, tau::type_def>).empty());
+	}
+}
+
+TEST_SUITE("adt flatten hook") {
+	TEST_CASE("default get flattens and infers") {
+		// no manual adt_flatten call -- default options
+		tref t = tau::get("type Point = {a: sbf, b: sbf}. ex x:Point x = 0.");
+		REQUIRE(t != nullptr);
+		tref e = tau::get("ex x.a:sbf, x.b:sbf (x.a = 0 && x.b = 0).");
+		REQUIRE(e != nullptr);
+		CHECK(tau::get(t).to_str() == tau::get(e).to_str());
+	}
+	TEST_CASE("round trip: print, reparse, same tree") {
+		tref t = tau::get("type Point = {a: sbf, b: sbf}. ex x:Point x != 1.");
+		REQUIRE(t != nullptr);
+		tref r = tau::get(tau::get(t).to_str());
+		REQUIRE(r != nullptr);
+		CHECK(tau::get(t).to_str() == tau::get(r).to_str());
+	}
+	TEST_CASE("adt error fails the whole get") {
+		CHECK(tau::get("type Point = {a: sbf, b: sbf}. ex x:Point x.c = 0.") == nullptr);
 	}
 }

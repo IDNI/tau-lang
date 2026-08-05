@@ -9,10 +9,8 @@
 
 // helper: parse a spec source into a tau tree without inference
 static tref parse_no_infer(const std::string& src) {
-	return tau::get(src, { .infer_ba_types = false });
+	return tau::get(src, { .infer_ba_types = false, .flatten_adts = false });
 }
-// NOTE for this task only: get_options.flatten_adts does not exist yet —
-// omit it here and add it in Task 5; use { .infer_ba_types = false }.
 
 TEST_SUITE("adt grammar") {
 	TEST_CASE("type_def alias")   { CHECK(parse_no_infer("type byte = bv[8]. x = 0.") != nullptr); }

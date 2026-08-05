@@ -3,9 +3,12 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
-// helper: parse a spec source into a tau tree without inference
+// helper: parse a spec source into a tau tree without inference or
+// flattening: adt_registry::build (below) needs the raw type_defs still
+// present in the tree -- task 5's default get_options.flatten_adts = true
+// would otherwise erase them before the registry ever sees them.
 static tref parse_no_infer(const std::string& src) {
-	return tau::get(src, { .infer_ba_types = false });
+	return tau::get(src, { .infer_ba_types = false, .flatten_adts = false });
 }
 
 static std::optional<adt_registry<node_t>> reg(const std::string& src) {

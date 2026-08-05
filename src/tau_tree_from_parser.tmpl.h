@@ -253,6 +253,14 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	DBG(LOG_TRACE << "trans. tree: " << m_get(ptr.get()).dump_to_str();)
 	tref transformed = m_ref(ptr.get());
 
+	if (options.flatten_adts) {
+		transformed = adt_flatten<node>(transformed, options.context);
+		if (!transformed) {
+			tau::use_hooks = using_hooks;
+			return nullptr;
+		}
+	}
+
 	if (options.infer_ba_types) {
 		auto result = infer_ba_types<node>(transformed,
 			options.global_scope, options.definition_heads,
