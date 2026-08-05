@@ -805,6 +805,36 @@ template <NodeType node>
 bool adt_tuple_writer<node>::collect(size_t time_point,
 	const std::vector<size_t>& path, const std::string& leaf)
 {
+	// Completeness is judged by which PATHS have been collected, not by
+	// rec.size() alone: a repeated collect() for the same (time_point,
+	// path) -- an interpreter retry, a Task 8 wiring bug, a spec writing
+	// the same output var twice in one step -- must never overwrite the
+	// original entry in place, since map::operator[] assignment keeps
+	// rec.size() unchanged on an overwrite, silently making the record
+	// permanently one member short of ever completing (a real bug: no
+	// LOG_ERROR, no exception, just a pending entry that never fires). A
+	// repeat is treated as record corruption: LOG_ERROR (naming the
+	// stream, path, and time point) and discard the ENTIRE pending record
+	// for this time point -- no partial trust in a record one of whose
+	// members has already proven unreliable, mirroring the reader's own
+	// discipline (a duplicate key anywhere in a wire literal fails the
+	// WHOLE parse, not just that key). Any components that had already
+	// arrived for this time point are lost; if the genuinely-missing
+	// member(s) arrive afterward, they start a FRESH record that -- having
+	// lost the discarded contributions -- can only complete if every
+	// component (including the one that just repeated) is collected again
+	// from scratch; in the common case (each output stream calls collect()
+	// exactly once per time point) that means the record for this time
+	// point is never emitted, which is the intended fail-safe: better a
+	// silently-dropped step (logged) than a step written from stale data.
+	auto pit = pending.find(time_point);
+	if (pit != pending.end() && pit->second.contains(path)) {
+		LOG_ERROR << "(Error) ADT: duplicate write to '"
+			<< dict(layout.root_name_sid) << "." << adt_path_str(path)
+			<< "' for time point " << time_point << "\n";
+		pending.erase(pit);
+		return false;
+	}
 	auto& rec = pending[time_point];
 	rec[path] = leaf;
 	if (rec.size() < layout.components.size()) return true; // still buffering

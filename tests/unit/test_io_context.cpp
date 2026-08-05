@@ -611,6 +611,28 @@ TEST_SUITE("adt tuple streams") {
 		CHECK(values->at(0) == "{ a: \"0\", p: { x: \"1\" } }");
 		CHECK(values->at(1) == "{ a: \"10\", p: { x: \"11\" } }");
 	}
+
+	TEST_CASE("writer rejects a repeated write to the same path at the same time point") {
+		// Semantics implemented: a repeat is treated as record corruption --
+		// the ENTIRE pending record for that time point is discarded (not
+		// just the repeated path), so the record can never complete
+		// afterward, even once the genuinely-missing member arrives (it
+		// starts a fresh record missing the contributions lost when the
+		// duplicate discarded the old one). See adt_tuple_writer::collect's
+		// comment (io_context.tmpl.h) for the full rationale.
+		auto layout = adt_test_layout();
+		auto values = std::make_shared<std::vector<std::string>>();
+		adt_tuple_writer<node_t> writer(
+			std::make_unique<vector_output_stream>(values), layout);
+		CHECK(writer.collect(0, { dict("a") }, "0"));       // first write: buffers
+		CHECK_FALSE(writer.collect(0, { dict("a") }, "1")); // repeat: hard error
+		// The genuinely-missing member arriving afterward starts a FRESH
+		// record (still buffering, since it's the only entry so far) that
+		// can never complete: "a" was lost when the repeat discarded the
+		// old record, and nothing collects it again in this test.
+		CHECK(writer.collect(0, { dict("p"), dict("x") }, "1"));
+		CHECK(values->empty());
+	}
 }
 
 TEST_SUITE("console_prompt_output_stream") {
