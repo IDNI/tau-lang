@@ -648,6 +648,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				out(tau::get(t.get_ba_type_tree()));
 				break;*/
 			case source: break; // is printed from bf_constant
+			case member_name:
+				// Each segment of a member_path is written `.name` (the
+				// grammar's own separator); inside a type_def's `tuple`
+				// `member` (member_name typed), there is no leading dot.
+				if (pnt == member_path) out(".");
+				out(dict(t.data()));
+				break;
 			case var_name:
 				// Only bound variable names are numbers
 				if (is_number(t.get_string())) {

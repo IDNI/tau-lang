@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TESTS
 	apply_rule
 	antiprenexing
+	adt_flatten
 	adt_parsing
 	adt_types
 	adt_wire_parsing

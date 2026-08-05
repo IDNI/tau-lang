@@ -24,6 +24,7 @@ set(TAU_HEADERS
 	                   # transformations from the parse tree
 	ba_types.h         # BA types
 	adt/adt_types.h    # ADT type registry
+	adt/adt_flatten.h  # ADT flattener
 	ba_constants.h     # BA constants pool and binder
 	dict.h             # dictionaries of bdd var names and strings
 	definitions.h      # Storage for function and predicate definitions

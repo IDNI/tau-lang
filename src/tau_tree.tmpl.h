@@ -169,6 +169,9 @@ bool has_semantic_error(tref fm);
 // traverser and select_all, not yet defined here) is included further below,
 // next to tau_tree_from_parser.tmpl.h -- see adt_types.h's file header.
 #include "adt/adt_types.h"
+// ADT flattener declarations; same split as adt_types.h/.tmpl.h, for the
+// same reason -- see adt_flatten.h's file header.
+#include "adt/adt_flatten.h"
 
 #include "tau_tree_node.tmpl.h"
 #include "tau_tree_traverser.tmpl.h"
@@ -189,6 +192,11 @@ namespace idni::tau_lang {
 // (tau_tree_traverser.tmpl.h, tau_tree_queries.tmpl.h). See adt_types.h's
 // file header for why this is split from its own include.
 #include "adt/adt_types.tmpl.h"
+// adt_flatten.tmpl.h uses adt_registry (just included above), the traverser,
+// is<node,...>, and tree<node>::build_* (declared in tau_tree.h, included at
+// the top of this file, with tau_tree_builders.h/.tmpl.h already pulled in
+// via tau_tree_builders.h above) -- see adt_flatten.h's file header.
+#include "adt/adt_flatten.tmpl.h"
 
 #include "hooks.h"
 
