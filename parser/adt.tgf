@@ -1,0 +1,13 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
+
+@use char classes eof, space, alpha, alnum, printable.
+
+start        => _ tuple_value _.
+tuple_value  => '{' _ member_value (_ ',' _ member_value)* _ '}'.
+member_value => member_key _ ':' _ (leaf_value | tuple_value).
+member_key   => member_name | '"' member_name '"'.
+member_name  => chars.
+leaf_value   => '"' value_chars '"'.
+value_chars  => (printable & ~'"')*.
+chars        => alpha (alnum | '_')*.
+_            => space*.
