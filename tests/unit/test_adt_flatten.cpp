@@ -68,14 +68,11 @@ TEST_SUITE("adt flatten") {
 		// member paths used on it in that definition's own body -- but it
 		// must not leak into the enclosing (here: global) scope, or these
 		// two definitions' same-named-but-unrelated formals would
-		// spuriously "conflict". Ref-arg arity EXPANSION of a tuple-typed
-		// formal itself (turning `f(x:Point)` into `f(x.a,x.b)`) is Task 6's
-		// job -- this task only needs the scoping right: the formal's own
-		// occurrence in the ref head is left untouched, while each body's
-		// member-path use of its own (correctly, locally scoped) formal is
-		// still resolved and rewritten. This only asserts flattening
-		// succeeds (no spurious conflict); it does not assert anything
-		// about the head's shape, which Task 6 will change.
+		// spuriously "conflict". This only asserts flattening succeeds (no
+		// spurious conflict); it does not assert anything about the heads'
+		// resulting shape -- see the "adt flatten refs" suite below (Task 6)
+		// for the actual ref-arg expansion (`f(x:Point)` -> `f(x.a,x.b)`)
+		// this scoping enables.
 		CHECK(flat("type Point = {a: sbf, b: sbf}. type Q = {c: sbf}. "
 			"f(x:Point) := x.a = 0. g(x:Q) := x.c = 0. y = 0.") != nullptr);
 	}
@@ -93,6 +90,55 @@ TEST_SUITE("adt flatten") {
 		tref flattened = adt_flatten<node_t>(t);
 		REQUIRE(flattened != nullptr);
 		CHECK(tau::get(flattened).select_all(is<node_t, tau::type_def>).empty());
+	}
+}
+
+TEST_SUITE("adt flatten refs") {
+	TEST_CASE("formal and call site expand") {
+		check_flat(PT "f(x:Point, v) := x.a = v && x.b = 0. ex y:Point f(y, 1).",
+			"f(x.a:sbf, x.b:sbf, v) := x.a = v && x.b = 0. "
+			"ex y.a:sbf, y.b:sbf f(y.a, y.b, 1).");
+	}
+	TEST_CASE("call with non-variable tuple arg fails") {
+		// NOTE: the brief's own `f(y | y)` is not usable here -- `y | y`
+		// (identical operand on both sides of `|`) folds to bare `y` during
+		// PARSING itself (Boolean idempotence, before adt_flatten ever
+		// runs), so the ref_arg the flattener would actually see is just a
+		// plain variable, not an error case. `y'` (negation) has no such
+		// self-folding and exercises the same "any other bf ... = error"
+		// path (rule 5, via adt_flatten_rewrite_variable's k_partial
+		// branch, reached through the ordinary generic recursive rewrite
+		// that adt_flatten_rewrite_ref_args falls back to for a non-variable
+		// ref_arg).
+		CHECK(flat(PT "f(x:Point) := x.a = 0. ex y:Point f(y').") == nullptr);
+	}
+	TEST_CASE("tuple-typed ref result fails") {
+		CHECK(flat(PT "f(v):Point := v = 0. f(0) = 0.") == nullptr);
+	}
+	TEST_CASE("tuple-typed capture fails") {
+		// $X:Point is rejected at the grammar level already (capture has no
+		// `typed` production, see Task 4/parser/tau.tgf's `capture` rule) --
+		// flat() fails here because tau::get() itself returns nullptr, not
+		// because of anything adt_flatten does.
+		CHECK(flat(PT "ex x:Point $X:Point = x.") == nullptr);
+	}
+	TEST_CASE("fp_fallback with tuple-typed content fails") {
+		CHECK(flat(PT "g(v) := v = 0. ex x:Point (g(1) fallback x) = 0.") == nullptr);
+	}
+	TEST_CASE("alias-typed formal rewrites to alias target") {
+		check_flat("type byte = bv[8]. f(x:byte) := x = 0. f(1) = 0.",
+			"f(x:bv[8]) := x = 0. f(1) = 0.");
+	}
+	TEST_CASE("alias-typed ref result rewrites to alias target") {
+		check_flat("type byte = bv[8]. f(v):byte := v = 0. f(0) = 0.",
+			"f(v):bv[8] := v = 0. f(0) = 0.");
+	}
+	TEST_CASE("call site full member path reaching nested tuple expands") {
+		check_flat(
+			"type Point = {a: sbf, b: sbf}. type Line = {p: Point, q: Point}. "
+			"h(w:Point) := w.a = 0. ex l:Line h(l.p).",
+			"h(w.a:sbf, w.b:sbf) := w.a = 0. "
+			"ex l.p.a:sbf, l.p.b:sbf, l.q.a:sbf, l.q.b:sbf h(l.p.a, l.p.b).");
 	}
 }
 

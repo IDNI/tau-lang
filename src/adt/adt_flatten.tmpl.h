@@ -365,16 +365,154 @@ std::optional<tref> adt_flatten_rewrite_quantifier(tref n, size_t nt,
 	return tau::get(subformula).first(); // unwrap: caller rewraps
 }
 
+// Rule 4 (ref-argument expansion): shared arg-list rewriter used both for a
+// rec_relation's own HEAD (formal declarations: `f(x:Point, v)`, dispatched
+// from adt_flatten_rewrite_rec_relation below) and for an ordinary CALL SITE
+// ref's actual arguments (`f(y, w)`, dispatched from this file's generic
+// switch via `case tau::ref:`, for wff_ref/bf_ref call sites and for a
+// rec_relation body that is itself a bare ref). A ref_arg whose bf is a
+// plain variable or a full member path reaching a tuple type -- the only two
+// shapes design section 3 rule 4 allows to fill a tuple-typed slot -- splices
+// into one ref_arg per flat member (both shapes already resolve to
+// adt_resolve_var's k_partial: an empty member_path lists every flat member,
+// a path landing on a nested tuple boundary lists that subtree's). Anything
+// else is delegated to the ordinary generic recursive rewrite: a tuple-typed
+// variable nested inside some other bf operation (`y'`, `y | z`, ...) already
+// errors there via rule 5's "used outside an equality or quantifier context"
+// (adt_flatten_rewrite_variable's k_partial branch) -- exactly the "any other
+// bf ... = error" design rule, with no extra code needed here. (NOTE: `y | y`
+// -- same operand on both sides -- is not a usable example here: it folds to
+// bare `y` during parsing itself, before adt_flatten ever runs, per Boolean
+// idempotence; the "non-variable tuple arg" test below uses `y'` instead.)
+//
+// @p head_style selects how a flat member is annotated: true (a
+// rec_relation's own formal declarations) always types every flat member,
+// mirroring how a quantifier types its own binder (adt_flatten_rewrite_quantifier);
+// false (an actual call-site argument) types a flat member only if the
+// source variable is free in the current scope (!adt_resolution::is_bound),
+// mirroring every other occurrence rewrite in this file
+// (adt_flatten_rewrite_variable's k_full_leaf case, mk_var_bf in
+// adt_flatten_rewrite_equality) -- a bound tuple variable's members are typed
+// once, on their binder, and stay bare everywhere else, including as call
+// arguments.
+template <NodeType node>
+std::optional<std::pair<trefs, bool>> adt_flatten_rewrite_ref_args(
+		tref ref_args_node, const adt_registry<node>& reg,
+		const adt_scope_stack& scopes, bool head_style)
+{
+	using tau = tree<node>;
+	trefs new_args;
+	bool changed = false;
+	for (tref ra : tau::get(ref_args_node).get_children()) {
+		tref arg_bf = tau::get(ra).first();
+		tref content = tau::get(arg_bf).first();
+		if (tau::get(content).is(tau::variable)) {
+			auto res = adt_resolve_var<node>(content, reg, scopes);
+			if (!res) return std::nullopt;
+			if (res->kind == adt_resolution<node>::k_partial) {
+				changed = true;
+				bool bare = !head_style && res->is_bound;
+				for (auto& [name, bt] : res->members) {
+					tref v = bare
+						? tau::get(tau::variable, tau::build_var_name(name))
+						: tau::get(tau::variable, tau::build_var_name(name), bt);
+					new_args.push_back(tau::get(tau::ref_arg, tau::get(tau::bf, v)));
+				}
+				continue;
+			}
+		}
+		auto rc = adt_flatten_rewrite<node>(ra, reg, scopes);
+		if (!rc) return std::nullopt;
+		changed = changed || (*rc != ra);
+		new_args.push_back(*rc);
+	}
+	return std::make_pair(std::move(new_args), changed);
+}
+
+// Rewrites one `ref` node (`sym [offsets] ref_args [typed] [fallback]`) in
+// full: its ref_args (adt_flatten_rewrite_ref_args above); its own result
+// `typed` -- a tuple-typed result (`f(v):Point`) is always an error per
+// design section 5 (this used to silently pass through and crash downstream
+// inference instead of failing cleanly here); an alias-typed result is
+// rewritten to the alias target, same as any other alias annotation; a
+// non-registry result type passes through untouched, same as everywhere
+// else; its `fallback` and any `offsets`, both recursed into generically (a
+// tuple-typed term surfacing there other than through a ref_arg slot already
+// errors via the same rule-5 path as everything else -- see
+// "fp_fallback with tuple-typed content fails" test). Used for both a
+// rec_relation's own head (@p head_style true, called directly from
+// adt_flatten_rewrite_rec_relation -- a rec_relation head is never reached
+// through the generic dispatch below) and an ordinary call site (false,
+// dispatched from `case tau::ref:`).
+template <NodeType node>
+std::optional<tref> adt_flatten_rewrite_ref(tref n, const adt_registry<node>& reg,
+		const adt_scope_stack& scopes, bool head_style)
+{
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+
+	tref sym = tau::get(n).first();
+	tref ref_args_node = adt_flatten_find_child<node>(n, tau::ref_args);
+	tref typed_node = adt_flatten_find_child<node>(n, tau::typed);
+	tref fallback_node = adt_flatten_find_child<node>(n, tau::fp_fallback);
+	tref offsets_node = adt_flatten_find_child<node>(n, tau::offsets);
+
+	auto args_res = adt_flatten_rewrite_ref_args<node>(ref_args_node, reg, scopes, head_style);
+	if (!args_res) return std::nullopt;
+	auto& [new_args, changed] = *args_res;
+
+	tref new_typed = typed_node;
+	if (typed_node) {
+		size_t tname = tt(typed_node) | tau::type | tt::data;
+		if (reg.defines(tname)) {
+			if (!reg.is_alias(tname)) {
+				LOG_ERROR << "(Error) ADT: tuple-typed ref result on '"
+					<< adt_flatten_head_str<node>(sym) << "' is not allowed\n";
+				return std::nullopt;
+			}
+			new_typed = reg.alias_target(tname);
+			changed = true;
+		}
+	}
+
+	tref new_fallback = fallback_node;
+	if (fallback_node) {
+		auto rc = adt_flatten_rewrite<node>(fallback_node, reg, scopes);
+		if (!rc) return std::nullopt;
+		new_fallback = *rc;
+		changed = changed || (new_fallback != fallback_node);
+	}
+
+	tref new_offsets = offsets_node;
+	if (offsets_node) {
+		auto rc = adt_flatten_rewrite<node>(offsets_node, reg, scopes);
+		if (!rc) return std::nullopt;
+		new_offsets = *rc;
+		changed = changed || (new_offsets != offsets_node);
+	}
+
+	if (!changed) return n;
+	trefs children{ sym };
+	if (new_offsets) children.push_back(new_offsets);
+	children.push_back(tau::get(tau::ref_args, new_args));
+	if (new_typed) children.push_back(new_typed);
+	if (new_fallback) children.push_back(new_fallback);
+	return tau::get(tau::ref, children);
+}
+
 // A rec_relation (`f(args) := body`) is its own scope: its formal
 // parameters' annotations (a valid ADT-typing source per design section 3,
 // pass 1: "a ref formal") are visible to member-path resolution in its own
 // body only, isolated from whatever contains the definitions list (sibling
 // definitions, `main`) -- see adt_flatten_collect_local's matching stop
-// condition. The head (`ref` + `ref_args`, i.e. the formal parameter list
-// itself) is left completely untouched: expanding a tuple-typed formal's
-// arity into one flat parameter per member is Task 6's ref-arg rule: this
-// task only needs the formals' own annotations visible for resolving member
-// paths used on them in the body, not the formals themselves rewritten.
+// condition. Each formal found in the collected local scope is additionally
+// marked as this scope's own binder -- exactly like a quantifier's bound
+// variable (adt_flatten_rewrite_quantifier) -- so that, like a bound
+// variable's flat members, the HEAD's own flattened formal always carries
+// its type (adt_flatten_rewrite_ref_args's head_style=true) while every BODY
+// occurrence of it resolves is_bound and stays bare, matching a quantified
+// variable's binder-vs-body split exactly (Task 6's ref-arg rule: see
+// adt_flatten_rewrite_ref/adt_flatten_rewrite_ref_args above).
 template <NodeType node>
 std::optional<tref> adt_flatten_rewrite_rec_relation(tref n,
 		const adt_registry<node>& reg, adt_scope_stack scopes)
@@ -386,12 +524,21 @@ std::optional<tref> adt_flatten_rewrite_rec_relation(tref n,
 	std::map<size_t, adt_scope_entry> local;
 	if (!adt_flatten_collect_local<node>(head, reg, local)) return std::nullopt;
 	if (!adt_flatten_collect_local<node>(body, reg, local)) return std::nullopt;
+	if (tref ref_args_node = adt_flatten_find_child<node>(head, tau::ref_args); ref_args_node)
+		for (tref ra : tau::get(ref_args_node).get_children()) {
+			tref content = tau::get(tau::get(ra).first()).first();
+			if (!tau::get(content).is(tau::variable)) continue;
+			size_t key = adt_flatten_var_key<node>(tau::get(content).first());
+			if (auto it = local.find(key); it != local.end()) it->second.is_binder = true;
+		}
 	scopes.push_back(std::move(local));
 
+	auto new_head = adt_flatten_rewrite_ref<node>(head, reg, scopes, true);
+	if (!new_head) return std::nullopt;
 	auto new_body = adt_flatten_rewrite<node>(body, reg, scopes);
 	if (!new_body) return std::nullopt;
-	if (*new_body == body) return n;
-	return tau::get(tau::rec_relation, head, *new_body);
+	if (*new_head == head && *new_body == body) return n;
+	return tau::get(tau::rec_relation, *new_head, *new_body);
 }
 
 // Rule 2: `=`/`!=` with a tuple-typed side expands into a conjunction (for
@@ -534,6 +681,11 @@ std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 		return adt_flatten_rewrite_equality<node>(n, nt, reg, scopes);
 	case tau::variable:
 		return adt_flatten_rewrite_variable<node>(n, reg, scopes);
+	case tau::ref:
+		// A CALL SITE ref (inside wff_ref/bf_ref, or a rec_relation body
+		// that is itself a bare ref) -- a rec_relation's own HEAD ref is
+		// never reached here, see adt_flatten_rewrite_rec_relation.
+		return adt_flatten_rewrite_ref<node>(n, reg, scopes, false);
 	case tau::rec_relation:
 		return adt_flatten_rewrite_rec_relation<node>(n, reg, std::move(scopes));
 	case tau::definitions: {
