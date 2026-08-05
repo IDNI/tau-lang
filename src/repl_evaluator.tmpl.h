@@ -518,6 +518,12 @@ bool repl_evaluator<BAs...>::stream_value_incomplete(
 		return !result.found && is_unexpected_end(result.parse_error
 			.to_str(bitvector_parser::error::info_lvl::INFO_BASIC));
 	}
+	// By REPL convention a '.'-terminated line is a completed tau value.
+	// member_path makes "name." a valid prefix (of "name.member"), which
+	// would otherwise reclassify bad values as incomplete and leave the
+	// run silently waiting for more input.
+	if (auto p = src.find_last_not_of(" \t\r\n");
+		p != std::string::npos && src[p] == '.') return false;
 	// tau_spec::parse() returns true on EOF-incomplete input, flags is_eof()
 	tau_spec<node> s;
 	s.parse(src);

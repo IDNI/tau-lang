@@ -127,6 +127,9 @@ TEST_SUITE("boole_normal_form") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = boole_normal_form<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
+			// verified: valid ((xa'b|x'ab' = 0 || a&(x|b)|x'a'b != 0) <->
+			// (ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0)) => T
+			"xa'b|x'ab' = 0 || a&(x|b)|x'a'b != 0",
 			"ba'x|b'ax' = 0 || b&(a|x')|b'ax != 0",
 			"x'b'a|xba' = 0 || b&(x'|a)|xb'a != 0",
 			"b'ax'|ba'x = 0 || b&(a|x')|b'ax != 0",
@@ -340,8 +343,10 @@ TEST_SUITE("Normalizer bv mixed-type") {
 
 	// Several independent conjuncts must all be lifted, not just the first.
 	TEST_CASE("bv_arith_with_two_sbf_conjuncts") {
+		// verified: valid ((r = 0 && s = 0) <-> (s = 0 && r = 0)) => T
 		CHECK( normalize_and_check("ex x ex y (x:bv[8] + y:bv[8] ="
-			" { 0 }:bv[8]) && s = 0 && r = 0.", "s = 0 && r = 0") );
+			" { 0 }:bv[8]) && s = 0 && r = 0.",
+			strings{"r = 0 && s = 0", "s = 0 && r = 0"}) );
 	}
 
 	// A scope left open by a free bitvector variable cannot be closed by

@@ -29,10 +29,10 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<strings> u_expected = {
 			{ "F" }, {
+				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
 				"always i2[t]:tau o1[t-1]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[t-1]:tau i2[t]:tau = o1[t]:tau && o1[0]:tau' = 0",
 				"always o1[0]:tau' = 0 && o1[t-1]:tau i2[t]:tau = o1[t]:tau",
-				"always o1[0]:tau' = 0 && i2[t]:tau o1[t-1]:tau = o1[t]:tau",
 			}, { "F" }, { "F" }, { "F" }, { "F" }
 		};
 		std::vector<strings> o1_expected = {
@@ -42,9 +42,9 @@ TEST_SUITE("Execution") {
 				"<:y> = 0 && <:x> = 0",
 			},
 			{
+				"<:z> = 0 && <:x> = 0 && <:y> = 0",
 				"<:x> = 0 && <:y> = 0 && <:z> = 0",
 				"<:y> = 0 && <:x> = 0 && <:z> = 0",
-				"<:z> = 0 && <:x> = 0 && <:y> = 0",
 				"<:y> = 0 && <:z> = 0 && <:x> = 0",
 			}
 		};
@@ -203,21 +203,25 @@ TEST_SUITE("Execution") {
 		};
 		std::vector<strings> o1_expected = {
 		{
-			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 		}, {
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 		}, {
-			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
+			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 		}, {
+			// verified: valid ((p = 0 && q = 0 && r = 0 && s = 0) <-> (q = 0 &&
+			// p = 0 && r = 0 && s = 0)) => T (AND-commutativity of the o2/o3
+			// conjuncts; "always" preserves pointwise logical equivalence)
+			"always o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always o3[t]:tau = 0 && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau",

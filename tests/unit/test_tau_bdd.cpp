@@ -142,10 +142,18 @@ TEST_SUITE("BDD creation terms") {
 		bdd::order o {};
 		bdd::ref xx = bdd::build_bdd(spec, o);
 		tref t = bdd::to_tau_term(xx, 1);
-		CHECK((tau::get(t).to_str() == "xyzqwert"
-			|| tau::get(t).to_str() == "ewytrxzq"
-			|| tau::get(t).to_str() == "zrwyexqt"
-			|| tau::get(t).to_str() == "xtzqrewy"));
+		auto result = tau::get(t).to_str();
+		// "qxywrezt" (Release-only variant) verified: valid (qxywrezt =
+		// xyzqwert) => T — same 8 distinct positive literals, pure
+		// AND-commutative permutation (bdd_and_many/BDD-build merge order is
+		// a hash/nt-id-order-dependent tie-break, same mechanism as elsewhere
+		// in this suite). Appended, not placed at [0], to keep Debug's
+		// existing canonical entry unchanged.
+		CHECK((result == "xyzqwert"
+			|| result == "ewytrxzq"
+			|| result == "zrwyexqt"
+			|| result == "xtzqrewy"
+			|| result == "qxywrezt"));
 	}
 }
 
@@ -186,7 +194,11 @@ TEST_SUITE("BDD and many") {
 		bdd::ref c = bdd::bdd_and_many(std::move(bdds), o);
 		tref ct = bdd::to_tau_term(c, 1);
 		auto result = tau::get(ct).to_str();
-		CHECK((result == "xycdabfe" || result == "xycdabef"
+		// "xyfedcab" verified: valid (xyfedcab = xycdabfe) => T (bdd_and_many's
+		// merge order is a hash/nt-id-order-dependent tie-break, same as the
+		// other node-hash-derived orderings elsewhere in this suite).
+		CHECK((result == "xyfedcab"
+			|| result == "xycdabfe" || result == "xycdabef"
 			|| result == "xydcbafe" || result == "xydcabef"
 			|| result == "xydcfeab" || result == "xycdfeab" ));
 	}
@@ -218,10 +230,18 @@ TEST_SUITE("BDD and many") {
 		// Construction
 		bdd::ref x = bdd::build_bdd(bdd1, o);
 		tref xx = bdd::to_tau_term(x, 1);
-		CHECK((tau::get(xx).to_str() == "ab&(f'e')'bccd"
-			|| tau::get(xx).to_str() == "cabb&(e'f')'d"
-			|| tau::get(xx).to_str() == "adbb&(e'f')'cc"
-			|| tau::get(xx).to_str() == "abbccd&(f'e')'"));
+		auto result = tau::get(xx).to_str();
+		// "(f'e')'adbbcc" (Release-only variant) verified: valid
+		// ((f'e')'adbbcc = ab&(f'e')'bccd) => T — same term multiset
+		// {a:1, b:2, c:2, d:1, (f'e')':1}, pure AND-commutative permutation
+		// (same hash/nt-id-order-dependent merge-order tie-break as elsewhere
+		// in this suite). Appended, not placed at [0], to keep Debug's
+		// existing canonical entry unchanged.
+		CHECK((result == "ab&(f'e')'bccd"
+			|| result == "cabb&(e'f')'d"
+			|| result == "adbb&(e'f')'cc"
+			|| result == "abbccd&(f'e')'"
+			|| result == "(f'e')'adbbcc"));
 	}
 }
 

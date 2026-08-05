@@ -168,8 +168,8 @@ TEST_SUITE("syntactic_path_simplification") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
-			"x = 0 && (z != 0 || k = 0 && y = 0) || x = 0 && y = 0 || z = 0 && k = 0",
 			"x = 0 && (z != 0 || y = 0 && k = 0) || y = 0 && x = 0 || z = 0 && k = 0",
+			"x = 0 && (z != 0 || k = 0 && y = 0) || x = 0 && y = 0 || z = 0 && k = 0",
 			"x = 0 && (z != 0 || y = 0 && k = 0) || x = 0 && y = 0 || z = 0 && k = 0",
 		}) );
 	}
@@ -178,8 +178,8 @@ TEST_SUITE("syntactic_path_simplification") {
 		tref fm = get_bf_nso_rr("", sample).value().main->get();
 		tref res = syntactic_path_simplification<node_t>(fm);
 		CHECK( matches_to_str_to_any_of(res, {
-			"x&(z'|ky)|yx|zk",
 			"x&(z'|yk)|xy|zk",
+			"x&(z'|ky)|yx|zk",
 			"x&(z'|yk)|yx|zk",
 			"x&(z'|ky)|xy|zk",
 		}) );

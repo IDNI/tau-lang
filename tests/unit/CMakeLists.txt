@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TESTS
 	apply_rule
 	antiprenexing
+	adt_parsing
 	base_ba_dispatcher
 	bv_ba_helpers
 	bv_ba_hooks

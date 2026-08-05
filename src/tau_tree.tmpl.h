@@ -636,7 +636,7 @@ template <NodeType node>
 bool tree<node>::is_string_nt(size_t nt) {
 	static const std::set<size_t> string_nts{
 		sym, type, source, capture, var_name, uconst_name, file_name,
-		ctnvar, option_name, option_value,
+		ctnvar, option_name, option_value, type_name, member_name,
 	};
 	return string_nts.contains(nt);
 }

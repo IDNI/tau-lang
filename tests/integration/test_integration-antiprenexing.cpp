@@ -120,7 +120,7 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 	TEST_CASE("subs_elim: ex x (xy=0 && x=w) → wy=0") {
 		// Step 2 of anti_prenex_block substitutes x:=w giving wy=0.
 		CHECK( normalize_and_check("ex x (xy = 0 && x = w).",
-			strings{"wy = 0", "yw = 0"}) );
+			strings{"yw = 0", "wy = 0"}) );
 	}
 	TEST_CASE("subs_elim: ex x (x=w) → T") {
 		// After substitution the body reduces to T.
