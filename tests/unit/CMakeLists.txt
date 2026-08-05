@@ -4,6 +4,7 @@ set(TESTS
 	apply_rule
 	antiprenexing
 	adt_parsing
+	adt_types
 	adt_wire_parsing
 	base_ba_dispatcher
 	bv_ba_helpers

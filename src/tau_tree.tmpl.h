@@ -165,6 +165,11 @@ bool has_semantic_error(tref fm);
 
 #include "io_context.h"
 
+// ADT type registry declarations. adt_types.tmpl.h (which needs the
+// traverser and select_all, not yet defined here) is included further below,
+// next to tau_tree_from_parser.tmpl.h -- see adt_types.h's file header.
+#include "adt/adt_types.h"
+
 #include "tau_tree_node.tmpl.h"
 #include "tau_tree_traverser.tmpl.h"
 #include "tau_tree_printers.tmpl.h"
@@ -178,6 +183,12 @@ namespace idni::tau_lang {
 
 #include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name?
 #include "tau_tree_from_parser.tmpl.h"
+
+// Must come after tau_tree_from_parser.tmpl.h: adt_types.tmpl.h uses the
+// traverser (`tt`) and `select_all`, defined earlier in this same block
+// (tau_tree_traverser.tmpl.h, tau_tree_queries.tmpl.h). See adt_types.h's
+// file header for why this is split from its own include.
+#include "adt/adt_types.tmpl.h"
 
 #include "hooks.h"
 
