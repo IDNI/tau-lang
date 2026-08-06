@@ -415,6 +415,11 @@ tref ba_types<node>::type_tree(size_t ba_type_id) {
 }
 
 template <NodeType node>
+size_t ba_types<node>::count() {
+	return type_trees().size();
+}
+
+template <NodeType node>
 std::string ba_types<node>::name(size_t ba_type_id) {
 
 	if (ba_type_id >= type_trees().size())
@@ -523,6 +528,11 @@ size_t get_ba_type_id(tref ba_type) {
 template<NodeType node>
 tref get_ba_type_tree(size_t ba_type_id) {
 	return ba_types<node>::type_tree(ba_type_id);
+}
+
+template <NodeType node>
+size_t get_ba_type_count() {
+	return ba_types<node>::count();
 }
 
 template <NodeType node>

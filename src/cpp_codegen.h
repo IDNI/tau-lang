@@ -28,6 +28,7 @@
 #ifndef __IDNI__TAU__CPP_CODEGEN_H__
 #define __IDNI__TAU__CPP_CODEGEN_H__
 
+#include <optional>
 #include <ostream>
 #include <string>
 

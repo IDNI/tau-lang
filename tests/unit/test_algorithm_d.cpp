@@ -483,6 +483,71 @@ State: 1
 		CHECK(!W1_sys.count(2));
 	}
 
+	// ── LG-32: dead ends lose for their owner ────────────────────────────
+	//
+	// Parity-game semantics: a player who cannot move loses the finite play.
+	// `zielonka_impl::solve` had no dead-end handling at all — a successor-less
+	// state was simply scored by its own priority's parity, so a stuck sys
+	// state with an odd priority was counted a sys WIN.  ALG-D-21 uses an even
+	// priority, where parity and the correct answer coincide, so it never
+	// discriminated.  `build_product_game` can produce successor-less sys
+	// states whenever T3 feasibility prunes every D-pattern of a product
+	// state, which became reachable once LG-1 gave states real ownership.
+
+	TEST_CASE("[ALG-D-44] a stuck sys state loses even at an odd priority") {
+		// Single sys-owned state, priority 1 (odd = sys under max-parity),
+		// no successors.  Sys cannot move → sys loses.
+		alg_d::ProductGame pg;
+		pg.n_states = 1;
+		pg.init     = 0;
+		pg.player   = {1};
+		pg.priority = {1};
+		pg.succs    = {{}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.empty());
+	}
+
+	TEST_CASE("[ALG-D-45] a stuck env state loses even at an even priority") {
+		// Mirror image: env-owned, priority 0 (even = env), no successors.
+		// Env cannot move → sys wins the state.
+		alg_d::ProductGame pg;
+		pg.n_states = 1;
+		pg.init     = 0;
+		pg.player   = {0};
+		pg.priority = {0};
+		pg.succs    = {{}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.count(0));
+	}
+
+	TEST_CASE("[ALG-D-46] a dead end propagates through the attractor") {
+		// 0 (sys) → 1 (sys, stuck).  Sys is forced into the dead end from
+		// state 0, so sys loses both — despite both priorities being odd.
+		alg_d::ProductGame pg;
+		pg.n_states = 2;
+		pg.init     = 0;
+		pg.player   = {1, 1};
+		pg.priority = {1, 1};
+		pg.succs    = {{1}, {}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.empty());
+	}
+
+	TEST_CASE("[ALG-D-47] a dead end does not poison a live alternative") {
+		// 0 (sys) chooses between the stuck state 1 and the good odd sink 2.
+		// Sys avoids the dead end and wins from 0 and 2; state 1 stays lost.
+		alg_d::ProductGame pg;
+		pg.n_states = 3;
+		pg.init     = 0;
+		pg.player   = {1, 1, 1};
+		pg.priority = {1, 1, 1};
+		pg.succs    = {{1, 2}, {}, {2}};
+		auto W1 = alg_d::zielonka_win_player1(pg);
+		CHECK(W1.count(0));
+		CHECK(!W1.count(1));
+		CHECK(W1.count(2));
+	}
+
 	TEST_CASE("[ALG-D-22] G(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
 		// Output always > 0: always achievable (system sets y > 0 each step)
 		CHECK(alg_d_realizable("G (o1[t]:qlt > {0}:qlt)."));

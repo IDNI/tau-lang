@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <sys/wait.h>
 #include <map>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
@@ -121,6 +122,155 @@ static bool eval(const std::string& s, size_t& i, int bitmask, int n_aps) {
 		v |= eval_and(s, i, bitmask, n_aps);
 	}
 	return v;
+}
+
+
+// ── HOA guard → DNF (sum of products) ────────────────────────────────────
+//
+// The evaluator above answers "does this label hold under this assignment".
+// Consumers that must EMIT code for a label (tau_codegen) or reason about it
+// symbolically (the ABA oracle) need its cubes instead, and both used to
+// hand-lex it — identically wrongly.  The digit loop
+// `for (char c : idx_str) if (isdigit(c)) idx = idx*10+(c-'0')` SKIPS '|', '('
+// and ')' instead of rejecting them, so `0|1` was read as the single literal
+// `1` (wrong AP, other disjunct lost) and `(0|1)` was dropped entirely,
+// silently widening the guard to `true`.  Spot prints strategy edge labels as
+// sums of products, so those shapes are the normal case, not a corner (LG-4).
+//
+// `to_dnf` returns nullopt when the label does not parse or the expansion
+// exceeds `max_cubes`.  Callers must REFUSE the edge in that case: falling
+// back to a partial reading is exactly the defect this replaces.
+
+struct lit { int ap; bool pos; };
+using cube = std::vector<lit>;   // conjunction; empty cube == true
+// A DNF is a vector of cubes; an empty vector == false.
+
+namespace dnf_detail {
+
+// Normalise a cube: sort by AP, drop duplicates, reject if an AP appears with
+// both polarities (the cube is then unsatisfiable).
+inline bool normalise_cube(cube& c) {
+	std::sort(c.begin(), c.end(), [](const lit& a, const lit& b) {
+		return a.ap != b.ap ? a.ap < b.ap : (int)a.pos < (int)b.pos;
+	});
+	cube out;
+	for (const auto& l : c) {
+		if (!out.empty() && out.back().ap == l.ap) {
+			if (out.back().pos != l.pos) return false;  // p & !p
+			continue;                                   // duplicate
+		}
+		out.push_back(l);
+	}
+	c.swap(out);
+	return true;
+}
+
+struct parser {
+	const std::string& s;
+	size_t i = 0;
+	size_t max_cubes;
+	bool failed = false;
+
+	explicit parser(const std::string& str, size_t cap) : s(str), max_cubes(cap) {}
+
+	static std::vector<cube> dnf_true()  { return { cube{} }; }
+	static std::vector<cube> dnf_false() { return {}; }
+
+	std::vector<cube> conj(const std::vector<cube>& a, const std::vector<cube>& b) {
+		std::vector<cube> r;
+		for (const auto& ca : a)
+			for (const auto& cb : b) {
+				if (r.size() >= max_cubes) { failed = true; return {}; }
+				cube m = ca;
+				m.insert(m.end(), cb.begin(), cb.end());
+				if (normalise_cube(m)) r.push_back(std::move(m));
+			}
+		return r;
+	}
+
+	std::vector<cube> disj(std::vector<cube> a, const std::vector<cube>& b) {
+		for (const auto& cb : b) {
+			if (a.size() >= max_cubes) { failed = true; return {}; }
+			a.push_back(cb);
+		}
+		return a;
+	}
+
+	// ¬(c1 ∨ … ∨ cn) = ∧_i (∨_l ¬l)
+	std::vector<cube> negate(const std::vector<cube>& a) {
+		std::vector<cube> r = dnf_true();
+		for (const auto& c : a) {
+			if (c.empty()) return dnf_false();   // ¬true
+			std::vector<cube> d;
+			for (const auto& l : c) d.push_back(cube{ lit{ l.ap, !l.pos } });
+			r = conj(r, d);
+			if (failed) return {};
+		}
+		return r;
+	}
+
+	std::vector<cube> parse_atom() {
+		skip_ws(s, i);
+		if (i >= s.size()) { failed = true; return {}; }
+		if (s[i] == 't') { ++i; return dnf_true(); }
+		if (s[i] == 'f') { ++i; return dnf_false(); }
+		if (s[i] == '(') {
+			++i;
+			auto v = parse_or();
+			skip_ws(s, i);
+			if (i < s.size() && s[i] == ')') ++i;
+			else failed = true;
+			return v;
+		}
+		if (s[i] == '!') { ++i; return negate(parse_atom()); }
+		if (std::isdigit((unsigned char)s[i])) {
+			size_t j = i;
+			while (j < s.size() && std::isdigit((unsigned char)s[j])) ++j;
+			int ap = std::stoi(s.substr(i, j - i));
+			i = j;
+			return { cube{ lit{ ap, true } } };
+		}
+		failed = true;
+		return {};
+	}
+
+	std::vector<cube> parse_and() {
+		auto v = parse_atom();
+		while (!failed) {
+			skip_ws(s, i);
+			if (i >= s.size() || s[i] != '&') break;
+			++i;
+			v = conj(v, parse_atom());
+		}
+		return v;
+	}
+
+	std::vector<cube> parse_or() {
+		auto v = parse_and();
+		while (!failed) {
+			skip_ws(s, i);
+			if (i >= s.size() || s[i] != '|') break;
+			++i;
+			v = disj(std::move(v), parse_and());
+		}
+		return v;
+	}
+};
+
+} // namespace dnf_detail
+
+inline std::optional<std::vector<cube>> to_dnf(
+	const std::string& label, size_t max_cubes = 512)
+{
+	// An empty label is the unconditional guard, same convention the
+	// evaluator and the ABA guard parser use.
+	std::string s = label;
+	dnf_detail::parser p(s, max_cubes);
+	if (s.empty()) return dnf_detail::parser::dnf_true();
+	auto r = p.parse_or();
+	skip_ws(s, p.i);
+	if (p.failed || p.i != s.size()) return std::nullopt;
+	return r;
 }
 
 } // namespace hoa_guard
@@ -651,8 +801,13 @@ static std::pair<StateSet,StateSet> solve(
 		for (int v : succs[u])
 			if (V.count(v)) succs_V[u].push_back(v);
 
-	// States with no successors in V: player p loses (stuck)
-	// Add self-loops only for analysis (Zielonka's algorithm handles dead ends)
+	// NOTE on dead ends (LG-32): they are corrected ONCE, after the recursion,
+	// in `zielonka_win_player1` — deliberately NOT here.  Inside the recursion
+	// "no successor in V" is not the same statement as "cannot move": the
+	// sub-games Zielonka builds are traps for one player only, so the OTHER
+	// player may still have moves that leave V, and declaring it stuck would
+	// be wrong.  Only a state that is successor-less in the FULL game truly
+	// cannot move.
 
 	int c_max = -1;
 	for (int u : V) c_max = std::max(c_max, pri[u]);
@@ -702,7 +857,64 @@ static std::pair<StateSet,StateSet> solve(
 inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
 	std::set<int> V;
 	for (int s = 0; s < pg.n_states; ++s) V.insert(s);
+
+	// LG-32: dead ends.  Parity-game semantics say the player who cannot move
+	// LOSES the finite play, but `solve` scores every state by its priority's
+	// parity, so a successor-less sys state with an ODD priority was counted a
+	// sys WIN.  `build_product_game` produces exactly such states: a sys state
+	// (q, rho) gets no successor at all when the T3 feasibility table admits
+	// no D-pattern from rho.
+	//
+	// The correction is applied as an OVERRIDE on the solver's answer, over
+	// two facts that are true unconditionally and locally:
+	//
+	//   1. a state with no successor in the FULL game cannot move, so it is
+	//      lost for its owner;
+	//   2. a state whose owner is that same player and ALL of whose full-game
+	//      successors are already lost for that player is lost too.
+	//
+	// Both are read off `pg.succs` directly, so neither depends on which
+	// sub-game Zielonka happens to be looking at.  An earlier attempt put the
+	// test inside `solve` instead, where "no successor in V" is NOT the same
+	// statement as "cannot move" (a Zielonka sub-game is a trap for one player
+	// only), and it short-circuited the parity recursion.
+	//
+	// What is deliberately NOT done: the OPPONENT's attractor of the dead-end
+	// set is not awarded to the opponent, even though that is the textbook
+	// treatment.  `build_product_game`'s env transitions ignore the T3
+	// feasibility filter entirely — an env edge is added whenever its guard is
+	// satisfiable by ANY assignment — so env's ability to "force" the play into
+	// a state where sys has no feasible D-pattern is an artifact of that
+	// over-approximation, not a real environment move.  Leaning on it turns the
+	// realizable `G(o1>0) U (o1<0)` into UNREALIZABLE (ALG-D-28).  Fixing the
+	// env-move modelling is its own piece of work; until then the rule is
+	// applied only where it cannot be wrong.
+	auto closure_of_dead_ends = [&](int stuck_player) {
+		std::set<int> lost;
+		for (int u = 0; u < pg.n_states; ++u)
+			if (pg.succs[u].empty() && pg.player[u] == stuck_player)
+				lost.insert(u);
+		if (lost.empty()) return lost;
+		for (bool changed = true; changed; ) {
+			changed = false;
+			for (int u = 0; u < pg.n_states; ++u) {
+				if (lost.count(u)) continue;
+				if (pg.player[u] != stuck_player) continue;
+				if (pg.succs[u].empty()) continue;   // already seeded
+				bool all_lost = true;
+				for (int v : pg.succs[u])
+					if (!lost.count(v)) { all_lost = false; break; }
+				if (all_lost) { lost.insert(u); changed = true; }
+			}
+		}
+		return lost;
+	};
+	const std::set<int> sys_lost = closure_of_dead_ends(1);
+	const std::set<int> env_lost = closure_of_dead_ends(0);
+
 	auto [W0, W1] = zielonka_impl::solve(V, pg.n_states, pg.player, pg.priority, pg.succs);
+	for (int u : sys_lost) W1.erase(u);    // sys cannot move there
+	for (int u : env_lost) W1.insert(u);   // env cannot move there
 	return W1;
 }
 

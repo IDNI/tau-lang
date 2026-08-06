@@ -96,35 +96,38 @@ inline std::vector<std::string> label_aps(
 	return labels;
 }
 
-// Parse HOA guard label into (AP-index, polarity) literals.
-// "0&!1&2" → [(0,true),(1,false),(2,true)].
-// "t" and "f" → empty list (handled separately by caller).
-inline std::vector<std::pair<int,bool>> parse_guard_lits(const std::string& g) {
-	std::vector<std::pair<int,bool>> lits;
-	if (g.empty() || g == "t" || g == "f") return lits;
-	// Tokenize by top-level '&'
-	std::vector<std::string> conjuncts;
-	int depth = 0;
-	std::string cur;
-	for (char c : g) {
-		if (c == '(') { ++depth; cur += c; }
-		else if (c == ')') { --depth; cur += c; }
-		else if (c == '&' && depth == 0) { conjuncts.push_back(cur); cur.clear(); }
-		else cur += c;
+// A cube: one product of the guard's sum-of-products, as (AP index, polarity).
+using guard_cube = std::vector<std::pair<int,bool>>;
+
+// Parse an HOA guard label into its DNF cubes.
+//
+// LG-4: every emitter used to tokenise the label by top-level '&' and then
+// read each conjunct with `for (char c : idx_str) if (isdigit(c)) idx =
+// idx*10+(c-'0')`.  That loop SKIPS '|', '(' and ')' rather than rejecting
+// them, so `0|1` came out as the single literal (1, true) — wrong AP, and the
+// other disjunct silently gone — while `(0|1)` failed the leading isdigit test
+// and was dropped entirely, widening the guard to `true`.  Spot prints
+// strategy edge labels as sums of products, so both shapes are normal.
+//
+// The expansion is delegated to the one guard parser that implements the full
+// grammar (`alg_d::hoa_guard::to_dnf`, the same module whose evaluator the
+// Algorithm-D game already uses).  A nullopt result means the label did not
+// parse or its expansion blew the cube cap; callers must REFUSE the edge in
+// that case rather than emit a partial reading.
+inline std::optional<std::vector<guard_cube>> parse_guard_cubes(
+	const std::string& g)
+{
+	auto d = alg_d::hoa_guard::to_dnf(g);
+	if (!d) return std::nullopt;
+	std::vector<guard_cube> cubes;
+	cubes.reserve(d->size());
+	for (const auto& c : *d) {
+		guard_cube gc;
+		gc.reserve(c.size());
+		for (const auto& l : c) gc.emplace_back(l.ap, l.pos);
+		cubes.push_back(std::move(gc));
 	}
-	conjuncts.push_back(cur);
-	for (auto& cj : conjuncts) {
-		std::string t;
-		for (char c : cj) if (!std::isspace((unsigned char)c)) t += c;
-		if (t.empty()) continue;
-		bool pos = !(t[0] == '!');
-		std::string idx_str = pos ? t : t.substr(1);
-		if (idx_str.empty() || !std::isdigit((unsigned char)idx_str[0])) continue;
-		int idx = 0;
-		for (char c : idx_str) if (std::isdigit((unsigned char)c)) idx = idx*10+(c-'0');
-		lits.emplace_back(idx, pos);
-	}
-	return lits;
+	return cubes;
 }
 
 // Pick a concrete double witness from a non-empty qlt interval.
@@ -236,11 +239,21 @@ inline void emit_cpp_program_prop(
 	out << "#include <cstdint>\n\n";
 	out << "class " << class_name << " {\n";
 	out << "public:\n";
-	out << "\tenum class State : std::uint32_t {\n";
-	for (int s = 0; s < aut.num_states; ++s) {
-		out << "\t\tq" << s << (s + 1 < aut.num_states ? "," : "") << "\n";
+	// LG-5: `num_states == 0` is solve_ltl_aba's "trivially realizable"
+	// marker — the constant-output fast path proved that SOME fixed output
+	// works without producing an automaton.  Emitting the normal shape for it
+	// produced an EMPTY enum body while still writing
+	// `State state_ = State::q0;`, so the generated header did not compile
+	// and the CLI exited 0 without a word.  Emit a stateless, always-ok
+	// program instead.
+	const bool trivial = (aut.num_states == 0);
+	if (!trivial) {
+		out << "\tenum class State : std::uint32_t {\n";
+		for (int s = 0; s < aut.num_states; ++s) {
+			out << "\t\tq" << s << (s + 1 < aut.num_states ? "," : "") << "\n";
+		}
+		out << "\t};\n\n";
 	}
-	out << "\t};\n\n";
 
 	// Input struct: one bool per input AP.
 	out << "\tstruct Inputs {\n";
@@ -256,6 +269,18 @@ inline void emit_cpp_program_prop(
 	out << "\t};\n\n";
 
 	out << "\t" << class_name << "() = default;\n\n";
+
+	if (trivial) {
+		out << "\t// Trivially realizable: synthesis proved a constant\n";
+		out << "\t// output satisfies the specification, so there is no\n";
+		out << "\t// automaton and no state to track.\n";
+		out << "\tOutputs step(const Inputs& in) noexcept {\n";
+		out << "\t\t(void)in;\n";
+		out << "\t\treturn Outputs{};\n";
+		out << "\t}\n";
+		out << "};\n";
+		return;
+	}
 
 	out << "\tState state() const noexcept { return state_; }\n\n";
 
@@ -276,122 +301,52 @@ inline void emit_cpp_program_prop(
 		const auto& edges = aut.edges.size() > (size_t)s ? aut.edges[s] : std::vector<HoaEdge>{};
 		bool first = true;
 		for (const auto& e : edges) {
-			// Separate guard APs into input-guard (constrains env) and
-			// output-assignments (what we must set).  Under Spot's Mealy
-			// convention, outputs in the guard are *assignments* we realize.
-			auto aps_in_guard = guard_aps(e.guard_label);
-			// Build input-only guard string.
-			std::string input_guard;
-			{
-				std::ostringstream ig;
-				bool any = false;
-				auto emit_cond = [&](const std::string& cond) {
-					if (any) ig << " && ";
-					ig << "(" << cond << ")";
-					any = true;
-				};
-				// Rewrite guard: outputs substituted by `true` (since we will assign them).
-				// Simpler approach: emit the raw guard as-is with output APs replaced by `true`
-				// so the dispatch depends only on input APs. We keep the output assignments separate.
-				// To accomplish that cleanly, build a replaced guard.
-				std::string modified = e.guard_label;
-				// We'll compute the full boolean expression using both inputs and
-				// assigned outputs; outputs are still "true" by assumption so the
-				// resulting C++ expression reduces to an input predicate after we
-				// substitute ap[out_idx] = true. This is done at evaluation time.
-				emit_cond(guard_to_cpp(modified));
-				input_guard = any ? ig.str() : "true";
+			// One dispatch branch per CUBE of the guard's sum of
+			// products: `(0|1)&2` yields two branches instead of one
+			// mis-parsed conjunction, and `0|1` no longer collapses to
+			// the single literal `1` (LG-4).
+			auto cubes = codegen_detail::parse_guard_cubes(e.guard_label);
+			if (!cubes) {
+				out << "\t\t\t// guard [" << e.guard_label
+				    << "] could not be expanded — edge omitted\n";
+				continue;
 			}
-
-			// Determine output assignments from the guard: for each output AP,
-			// if the guard is a conjunctive clause that includes `ap[o]` we assign true;
-			// if it includes `!ap[o]` we assign false. For general DNF/disjunctive
-			// guards, we fall back to evaluating the full expression under the
-			// assumption and picking any satisfying assignment.
-			//
-			// Pragmatic heuristic for Spot's "Mealy" output: Spot emits a single
-			// conjunction per edge ("0&!1&2"), so the polarity of each output AP
-			// is direct. For general HOA we would SAT-solve the guard.
-			std::string assignments;
-			{
-				// Tokenize by '&' at top level.
-				std::vector<std::string> conjuncts;
-				int depth = 0;
-				std::string cur;
-				for (char c : e.guard_label) {
-					if (c == '(') { ++depth; cur += c; }
-					else if (c == ')') { --depth; cur += c; }
-					else if (c == '&' && depth == 0) {
-						if (!cur.empty()) conjuncts.push_back(cur);
-						cur.clear();
-					} else cur += c;
-				}
-				if (!cur.empty()) conjuncts.push_back(cur);
-
-				std::ostringstream asg;
-				for (const auto& conj : conjuncts) {
-					// strip whitespace
-					std::string t;
-					for (char c : conj) if (!std::isspace((unsigned char)c)) t += c;
-					if (t.empty()) continue;
-					bool neg = !t.empty() && t[0] == '!';
-					std::string idx = neg ? t.substr(1) : t;
-					if (idx.empty() || !std::isdigit((unsigned char)idx[0])) continue;
-					int ap_i = 0;
-					for (char c : idx) { if (std::isdigit((unsigned char)c)) ap_i = ap_i*10 + (c - '0'); }
-					// Only emit for output APs.
+			for (const auto& cube : *cubes) {
+				// Under Spot's Mealy convention the output literals
+				// in a guard are assignments we realise; the input
+				// literals are the branch condition.
+				std::ostringstream asg, ig;
+				bool any_in = false;
+				for (const auto& [ap_i, positive] : cube) {
+					if (ap_i < 0 || ap_i >= (int)aut.aps.size())
+						continue;
 					bool is_out = false;
-					for (int oi : out_idx) if (oi == ap_i) { is_out = true; break; }
-					if (!is_out) continue;
-					asg << "\t\t\t\to." << labels[ap_i] << " = " << (neg ? "false" : "true") << ";\n";
-				}
-				assignments = asg.str();
-			}
-
-			// Build an input-only guard by substituting outputs with the values
-			// we just decided to assign.
-			std::string effective_input_guard;
-			{
-				std::ostringstream ig;
-				bool any = false;
-				// For each conjunct whose AP is an input, emit the same sign; for outputs, skip (they're assigned).
-				std::vector<std::string> conjuncts;
-				int depth = 0;
-				std::string cur;
-				for (char c : e.guard_label) {
-					if (c == '(') { ++depth; cur += c; }
-					else if (c == ')') { --depth; cur += c; }
-					else if (c == '&' && depth == 0) {
-						if (!cur.empty()) conjuncts.push_back(cur);
-						cur.clear();
-					} else cur += c;
-				}
-				if (!cur.empty()) conjuncts.push_back(cur);
-				for (const auto& conj : conjuncts) {
-					std::string t;
-					for (char c : conj) if (!std::isspace((unsigned char)c)) t += c;
-					if (t.empty()) continue;
-					bool neg = !t.empty() && t[0] == '!';
-					std::string idx = neg ? t.substr(1) : t;
-					if (idx.empty() || !std::isdigit((unsigned char)idx[0])) continue;
-					int ap_i = 0;
-					for (char c : idx) if (std::isdigit((unsigned char)c)) ap_i = ap_i*10 + (c - '0');
+					for (int oi : out_idx)
+						if (oi == ap_i) { is_out = true; break; }
+					if (is_out) {
+						asg << "\t\t\t\to." << labels[ap_i] << " = "
+						    << (positive ? "true" : "false") << ";\n";
+						continue;
+					}
 					bool is_in = false;
-					for (int ii : in_idx) if (ii == ap_i) { is_in = true; break; }
+					for (int ii : in_idx)
+						if (ii == ap_i) { is_in = true; break; }
 					if (!is_in) continue;
-					if (any) ig << " && ";
-					ig << (neg ? "!in." : "in.") << labels[ap_i];
-					any = true;
+					if (any_in) ig << " && ";
+					ig << (positive ? "in." : "!in.") << labels[ap_i];
+					any_in = true;
 				}
-				effective_input_guard = any ? ig.str() : "true";
-			}
+				std::string effective_input_guard =
+					any_in ? ig.str() : "true";
 
-			out << (first ? "\t\t\tif (" : "\t\t\telse if (") << effective_input_guard << ") {\n";
-			out << assignments;
-			out << "\t\t\t\tstate_ = State::q" << e.dst << ";\n";
-			out << "\t\t\t\treturn o;\n";
-			out << "\t\t\t}\n";
-			first = false;
+				out << (first ? "\t\t\tif (" : "\t\t\telse if (")
+				    << effective_input_guard << ") {\n";
+				out << asg.str();
+				out << "\t\t\t\tstate_ = State::q" << e.dst << ";\n";
+				out << "\t\t\t\treturn o;\n";
+				out << "\t\t\t}\n";
+				first = false;
+			}
 		}
 		out << "\t\t\to.ok = false; return o;\n";
 		out << "\t\t}\n";
@@ -466,10 +421,16 @@ void emit_cpp_program_data(
 	out << "#include <cstdint>\n\n";
 	out << "class " << class_name << " {\n";
 	out << "public:\n";
-	out << "\tenum class State : std::uint32_t {\n";
-	for (int s = 0; s < sol.aut.num_states; ++s)
-		out << "\t\tq" << s << (s+1 < sol.aut.num_states ? "," : "") << "\n";
-	out << "\t};\n\n";
+	// LG-5: see emit_cpp_program_prop — `num_states == 0` means trivially
+	// realizable, and the normal shape emits an empty enum body while still
+	// naming State::q0 in the state_ member.
+	const bool trivial = (sol.aut.num_states == 0);
+	if (!trivial) {
+		out << "\tenum class State : std::uint32_t {\n";
+		for (int s = 0; s < sol.aut.num_states; ++s)
+			out << "\t\tq" << s << (s+1 < sol.aut.num_states ? "," : "") << "\n";
+		out << "\t};\n\n";
+	}
 
 	// Inputs struct: input props remain bool (caller evaluates condition).
 	out << "\tstruct Inputs {\n";
@@ -494,6 +455,19 @@ void emit_cpp_program_data(
 	out << "\t};\n\n";
 
 	out << "\t" << class_name << "() = default;\n\n";
+
+	if (trivial) {
+		out << "\t// Trivially realizable: synthesis proved a constant\n";
+		out << "\t// output satisfies the specification, so there is no\n";
+		out << "\t// automaton and no state to track.\n";
+		out << "\tOutputs step(const Inputs& in) noexcept {\n";
+		out << "\t\t(void)in;\n";
+		out << "\t\treturn Outputs{};\n";
+		out << "\t}\n";
+		out << "};\n";
+		return;
+	}
+
 	out << "\tState state() const noexcept { return state_; }\n\n";
 
 	// Input AP index lookup (for step() dispatch).
@@ -518,7 +492,16 @@ void emit_cpp_program_data(
 		bool first = true;
 
 		for (const auto& e : edges) {
-			auto guard_lits = parse_guard_lits(e.guard_label);
+			// One branch per cube of the guard's sum of products
+			// (LG-4); a label that cannot be expanded is refused
+			// outright rather than read partially.
+			auto cubes = parse_guard_cubes(e.guard_label);
+			if (!cubes) {
+				out << "\t\t\t// guard [" << e.guard_label
+				    << "] could not be expanded — edge omitted\n";
+				continue;
+			}
+			for (const auto& guard_lits : *cubes) {
 
 			// Build the input-only guard condition.
 			std::string in_guard;
@@ -596,6 +579,7 @@ void emit_cpp_program_data(
 			out << "\t\t\t\treturn o;\n";
 			out << "\t\t\t}\n";
 			first = false;
+			} // per-cube
 		}
 		out << "\t\t\to.ok = false; return o;\n";
 		out << "\t\t}\n";
@@ -668,6 +652,13 @@ inline void emit_cpp_program_open_prop(
 	std::ostringstream prop_emit;
 	emit_cpp_program_prop(aut, input_props, output_props, prop_emit, class_name);
 	std::string source = prop_emit.str();
+
+	// LG-5: for a trivially-realizable solution the prop emit above is a
+	// stateless stub with no State type, and every piece of the declare_open
+	// scaffolding below is State-typed (admissible_values_mask(State q, …),
+	// the dispatch switch).  There is no automaton to expose, so emit the
+	// stub as it stands.
+	if (aut.num_states == 0) { out << source; return; }
 
 	// Inject extra headers right after #pragma once.
 	// <map> / <string> for v1 registration; <cstring> for std::strstr in
@@ -825,45 +816,26 @@ inline void emit_cpp_program_open_prop(
 			const auto& qedges = aut.edges.size() > (size_t)q
 				? aut.edges[q] : std::vector<HoaEdge>{};
 			for (const auto& e : qedges) {
-				// Walk the guard's top-level conjuncts for ap_idx.
-				// We use the same conjunct-tokenisation as the v1
-				// step() emit (line ~318) to stay consistent.
-				bool found_pos = false, found_neg = false;
-				int depth = 0;
-				std::string cur;
-				std::vector<std::string> conjuncts;
-				for (char c : e.guard_label) {
-					if (c == '(') { ++depth; cur += c; }
-					else if (c == ')') { --depth; cur += c; }
-					else if (c == '&' && depth == 0) {
-						if (!cur.empty()) conjuncts.push_back(cur);
-						cur.clear();
-					} else cur += c;
+				// A value is admissible for this edge if SOME cube of
+				// the guard admits it.  The old scan tokenised only by
+				// top-level '&', so a disjunctive or parenthesised
+				// label reported the wrong mask (LG-4).
+				auto cubes = codegen_detail::parse_guard_cubes(
+					e.guard_label);
+				if (!cubes) continue;   // unexpandable: contributes nothing
+				for (const auto& cube : *cubes) {
+					bool found_pos = false, found_neg = false;
+					for (const auto& [parsed, positive] : cube) {
+						if (parsed != ap_idx) continue;
+						if (positive) found_pos = true;
+						else          found_neg = true;
+					}
+					// A cube that does not mention ap_idx leaves both
+					// values admissible (don't-care over the AP).
+					if (!found_pos && !found_neg) { mask |= 0x3; continue; }
+					if (found_pos) mask |= 0x2;  // true admissible
+					if (found_neg) mask |= 0x1;  // false admissible
 				}
-				if (!cur.empty()) conjuncts.push_back(cur);
-				for (const auto& conj : conjuncts) {
-					std::string t;
-					for (char c : conj)
-						if (!std::isspace((unsigned char)c)) t += c;
-					if (t.empty()) continue;
-					bool neg = !t.empty() && t[0] == '!';
-					std::string idx = neg ? t.substr(1) : t;
-					if (idx.empty() ||
-					    !std::isdigit((unsigned char)idx[0])) continue;
-					int parsed = 0;
-					for (char c : idx)
-						if (std::isdigit((unsigned char)c))
-							parsed = parsed*10 + (c - '0');
-					if (parsed != ap_idx) continue;
-					if (neg) found_neg = true;
-					else found_pos = true;
-				}
-				// If the guard didn't mention ap_idx at all, both values
-				// are admissible for this edge (don't-care over the AP).
-				bool mentions = found_pos || found_neg;
-				if (!mentions) { mask |= 0x3; continue; }
-				if (found_pos) mask |= 0x2;  // true admissible
-				if (found_neg) mask |= 0x1;  // false admissible
 			}
 			out << "\t\t\t\tcase State::q" << q << ": return 0x"
 			    << std::hex << (int)mask << std::dec << ";\n";
@@ -964,39 +936,35 @@ inline void emit_cpp_program_open_prop(
 			    e.guard_label) << ") {\n";
 
 			// Assign undeclared output APs from this edge's guard.
-			// Walk conjuncts; for output APs not in declared_idx, set
-			// the polarity from the guard.
-			int depth = 0;
-			std::string cur;
-			std::vector<std::string> conjuncts;
-			for (char c : e.guard_label) {
-				if (c == '(') { ++depth; cur += c; }
-				else if (c == ')') { --depth; cur += c; }
-				else if (c == '&' && depth == 0) {
-					if (!cur.empty()) conjuncts.push_back(cur);
-					cur.clear();
-				} else cur += c;
-			}
-			if (!cur.empty()) conjuncts.push_back(cur);
-			for (const auto& conj : conjuncts) {
-				std::string t;
-				for (char c : conj)
-					if (!std::isspace((unsigned char)c)) t += c;
-				if (t.empty()) continue;
-				bool neg = !t.empty() && t[0] == '!';
-				std::string idxstr = neg ? t.substr(1) : t;
-				if (idxstr.empty() ||
-				    !std::isdigit((unsigned char)idxstr[0])) continue;
-				int parsed = 0;
-				for (char c : idxstr)
-					if (std::isdigit((unsigned char)c))
-						parsed = parsed*10 + (c - '0');
-				bool is_out = false;
-				for (int oi : out_idx) if (oi == parsed) { is_out = true; break; }
-				if (!is_out) continue;
-				if (declared_idx.count(parsed)) continue;  // oracle set it
-				out << "\t\t\t\to." << labels[parsed] << " = "
-				    << (neg ? "false" : "true") << ";\n";
+			//
+			// The guard is evaluated in full above, so the branch is
+			// already correct for a disjunctive label; only the
+			// assignments need the cubes.  An AP whose polarity differs
+			// between cubes is not determined by the guard alone, so it
+			// is left at its default rather than guessed (LG-4 — the old
+			// tokenisation would have taken whichever spelling happened
+			// to survive its digit scan).
+			{
+				auto cubes = codegen_detail::parse_guard_cubes(
+					e.guard_label);
+				std::map<int, int> polarity;  // ap → +1 / -1 / 0 (conflict)
+				if (cubes) for (const auto& cube : *cubes)
+					for (const auto& [parsed, positive] : cube) {
+						int want = positive ? 1 : -1;
+						auto it2 = polarity.find(parsed);
+						if (it2 == polarity.end()) polarity[parsed] = want;
+						else if (it2->second != want) it2->second = 0;
+					}
+				for (const auto& [parsed, pol] : polarity) {
+					if (pol == 0) continue;
+					bool is_out = false;
+					for (int oi : out_idx)
+						if (oi == parsed) { is_out = true; break; }
+					if (!is_out) continue;
+					if (declared_idx.count(parsed)) continue;  // oracle set it
+					out << "\t\t\t\to." << labels[parsed] << " = "
+					    << (pol > 0 ? "true" : "false") << ";\n";
+				}
 			}
 			out << "\t\t\t\tstate_ = State::q" << e.dst << ";\n";
 			out << "\t\t\t\treturn o;\n";
@@ -1071,7 +1039,7 @@ inline void emit_cpp_program_pwr(
     const std::string& class_name)
 {
 	using codegen_detail::sanitize;
-	using codegen_detail::parse_guard_lits;
+	using codegen_detail::parse_guard_cubes;
 
 	// Partition APs into inputs and outputs (an AP not in input_props is output).
 	std::vector<int> in_idx, out_idx;
@@ -1095,6 +1063,28 @@ inline void emit_cpp_program_pwr(
 
 	out << "class " << class_name << " {\n";
 	out << "public:\n";
+
+	// LG-5: a trivially-realizable solution has no automaton.  The table
+	// below would be emitted with num_states = 0, and the generated step()
+	// would index strat_.edges[state_] on an empty vector.  Emit a stateless
+	// stub; there is no strategy to revise either.
+	if (aut.num_states == 0) {
+		out << "\t// Trivially realizable: synthesis proved a constant output\n";
+		out << "\t// satisfies the specification, so there is no strategy table.\n";
+		out << "\tstruct Inputs {\n";
+		for (int i : in_idx) out << "\t\tbool " << labels[i] << " = false;\n";
+		out << "\t};\n\n";
+		out << "\tstruct Outputs {\n";
+		for (int i : out_idx) out << "\t\tbool " << labels[i] << " = false;\n";
+		out << "\t\tbool ok = true;\n";
+		out << "\t};\n\n";
+		out << "\tOutputs step(const Inputs& in) noexcept {\n";
+		out << "\t\t(void)in;\n";
+		out << "\t\treturn Outputs{};\n";
+		out << "\t}\n";
+		out << "};\n";
+		return;
+	}
 
 	// --- Edge and Strategy types ---
 	out << "\t// Each AP literal in a guard: +1 = positive, -1 = negative, 0 = don't care.\n";
@@ -1195,20 +1185,29 @@ inline void emit_cpp_program_pwr(
 	for (int s = 0; s < aut.num_states; ++s) {
 		const auto& edges = aut.edges.size() > (size_t)s ? aut.edges[s] : std::vector<HoaEdge>{};
 		for (const auto& e : edges) {
-			// Build guard literal array.
-			auto lits = parse_guard_lits(e.guard_label);
-			std::vector<int> guard(num_aps, 0);
-			for (auto& [idx, pos] : lits) {
-				if (idx >= 0 && idx < num_aps)
-					guard[idx] = pos ? +1 : -1;
+			// One table entry per CUBE: a Strategy guard is a single
+			// literal vector, so a disjunctive label needs one edge per
+			// product.  Dispatch is first-match, which makes the
+			// expansion equivalent (LG-4).
+			auto cubes = parse_guard_cubes(e.guard_label);
+			if (!cubes) {
+				out << "\t\t// guard [" << e.guard_label
+				    << "] could not be expanded — edge omitted\n";
+				continue;
 			}
-			// Handle "t" (true) guard — all zeros (don't care).
-			out << "\t\tstrat_.edges[" << s << "].push_back({{";
-			for (int k = 0; k < num_aps; ++k) {
-				if (k > 0) out << ",";
-				out << guard[k];
+			for (const auto& cube : *cubes) {
+				std::vector<int> guard(num_aps, 0);
+				for (const auto& [idx, pos] : cube)
+					if (idx >= 0 && idx < num_aps)
+						guard[idx] = pos ? +1 : -1;
+				// A "t" (true) guard is all zeros — don't care.
+				out << "\t\tstrat_.edges[" << s << "].push_back({{";
+				for (int k = 0; k < num_aps; ++k) {
+					if (k > 0) out << ",";
+					out << guard[k];
+				}
+				out << "}, " << e.dst << "});\n";
 			}
-			out << "}, " << e.dst << "});\n";
 		}
 	}
 	out << "\t\tstate_ = strat_.initial_state;\n";
@@ -1226,7 +1225,7 @@ inline void emit_strategy_initializer(
     const std::vector<std::string>& output_props,
     std::ostream& out)
 {
-	using codegen_detail::parse_guard_lits;
+	using codegen_detail::parse_guard_cubes;
 	(void)input_props;
 	(void)output_props;
 
@@ -1239,18 +1238,20 @@ inline void emit_strategy_initializer(
 		out << "\t\t{ // state " << s << "\n";
 		const auto& edges = aut.edges.size() > (size_t)s ? aut.edges[s] : std::vector<HoaEdge>{};
 		for (const auto& e : edges) {
-			auto lits = parse_guard_lits(e.guard_label);
-			std::vector<int> guard(num_aps, 0);
-			for (auto& [idx, pos] : lits) {
-				if (idx >= 0 && idx < num_aps)
-					guard[idx] = pos ? +1 : -1;
+			auto cubes = parse_guard_cubes(e.guard_label);
+			if (!cubes) continue;   // unexpandable guard: emit no entry
+			for (const auto& cube : *cubes) {
+				std::vector<int> guard(num_aps, 0);
+				for (const auto& [idx, pos] : cube)
+					if (idx >= 0 && idx < num_aps)
+						guard[idx] = pos ? +1 : -1;
+				out << "\t\t\t{{";
+				for (int k = 0; k < num_aps; ++k) {
+					if (k > 0) out << ",";
+					out << guard[k];
+				}
+				out << "}, " << e.dst << "},\n";
 			}
-			out << "\t\t\t{{";
-			for (int k = 0; k < num_aps; ++k) {
-				if (k > 0) out << ",";
-				out << guard[k];
-			}
-			out << "}, " << e.dst << "},\n";
 		}
 		out << "\t\t},\n";
 	}
