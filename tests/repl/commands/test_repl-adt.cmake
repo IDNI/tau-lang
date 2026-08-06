@@ -97,14 +97,58 @@ add_repl_test_fail(adt-unknown_member
 # for its ctx-mutating registration side effect, while (unlike the
 # definitions/spec_multiline case) keeping the def's own child intact
 # afterward -- def_input_cmd()/def_output_cmd() (repl_evaluator.tmpl.h)
-# still need it to store/echo. See task-9-report.md for the full root-cause
-# trace and the fix's diff. UNVERIFIED AGAINST A REBUILT BINARY (this test's
-# expectation follows directly from continue_running's/adt_tuple_writer's
-# documented grouped-prompt format -- lbl << root_name << "[" << tp << "]
-# := " << adt_wire_hint(...) for the input prompt,
-# console_prompt_output_stream::put(value, tp) printing "<root>[<tp>] :=
-# <value>" for the grouped output -- not from an actual run of this fix).
+# still need it to store/echo.
+#
+# Round 4 review caught that the fix above was incomplete: that SAME kept-
+# intact, still-unflattened io_defs entry is re-spliced into every later
+# get_applied() call (normalize/sat/solve/run all go through it), which
+# used to fabricate a SECOND, un-grouped "bare root" stream registration in
+# ctx alongside the correct per-member one -- rebuild_inputs then also tried
+# to read through that stray registration, producing a live
+# "(Error) Failed to read from input stream 'i.a'" during THIS test, which
+# passed anyway because a raw add_test with only PASS_REGULAR_EXPRESSION
+# (no FAIL_REGULAR_EXPRESSION) can't catch it. Fixed in get_applied()
+# (repl_evaluator.tmpl.h): an io_defs entry whose root is already present in
+# ctx->adt_streams (i.e. a tuple-typed def, already fully registered by its
+# own original parse) is now skipped rather than re-spliced -- see that
+# function's own comment for why this loses nothing (an ADT-typed def's
+# consumer is always in the SAME parse as the def itself, per the
+# cross-line-visibility finding above, so there is no later-line use case
+# left needing the splice, unlike an ordinary cross-line io def).
+#
+# FAIL_REGULAR_EXPRESSION "Error" added below per that review, matching the
+# rest of this file's add_repl_test-based cases (which get it for free) --
+# this is the one raw add_test in this file and the only one that lacked it.
+# The old "T./F.q.q" step-loop termination style used by
+# test_repl-run_cmd.cmake legitimately produces a "Failed to parse input
+# value" error as part of ending an "always" (needs-input-every-step) run,
+# which would fail this stricter check -- so the spec below is deliberately
+# a single-time-point run (`o[0] = i[0]`, like
+# test_repl-run_cmd-continue_or_quit_prompt/quit_finishes_run), which stops
+# needing input after step 0 and reaches the continue-or-quit gate; a
+# literal "q" there quits cleanly via finish_running(), with no error at
+# any point in the transcript.
+#
+# Round 5: FAIL_REGULAR_EXPRESSION "Error" (just above) caught a second,
+# unrelated defect once round 4's fix was actually rebuilt: the very FIRST
+# read attempt on the "i" prompt logged "(Error) Failed to read from input
+# stream 'i.a'" before the prompt was even shown, because adt_tuple_reader's
+# leaf() (src/io_context.h/.tmpl.h) turned the physical stream's ordinary
+# "no value yet" empty read into nullopt, which interpreter::read()
+# (interpreter.tmpl.h) treats as a hard failure -- unlike a plain stream,
+# whose own get() already returns a PRESENT-but-empty string for the same
+# situation, hitting read()'s quiet end-of-input path instead. Fixed by
+# making leaf() propagate an empty physical read as an empty string (not
+# nullopt); malformed non-empty literals still hard-error as before. See
+# tests/unit/test_io_context.cpp's new "reader propagates an empty physical
+# read..."/"an empty read is not memoized as a failure" cases and
+# task-9-report.md for the fix.
+# UNVERIFIED AGAINST A REBUILT BINARY (the get_applied fix, the
+# adt_tuple_reader empty-propagation fix, and this test's expectations are
+# all read from the relevant code paths, not from an actual run --
+# see task-9-report.md).
 add_test(NAME "test_repl-adt-run"
-	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[t] = i[t].\\n{ a: \"1\", b: \"0\" }\\nq\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-adt-run" PROPERTIES
-	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}")
+	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}"
+	FAIL_REGULAR_EXPRESSION "Error")

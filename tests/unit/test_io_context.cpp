@@ -541,6 +541,47 @@ TEST_SUITE("adt tuple streams") {
 		CHECK(reader.leaf(0, { dict("p"), dict("x") }) == std::optional<std::string>("1"));
 	}
 
+	// Regression test for a Critical review finding on the REPL `run`
+	// integration (repl_evaluator.tmpl.h/interpreter.tmpl.h): an empty
+	// physical read (the REPL's non-blocking repl_pending_input_stream
+	// "awaiting" a value, or a plain exhausted vector_input_stream/
+	// file_input_stream/EOF console) used to make leaf() return nullopt --
+	// the SAME thing a genuine parse/validation failure returns -- so
+	// interpreter::read() took its noisy `!maybe_line.has_value()`
+	// LOG_ERROR branch on every single awaiting/EOF cycle, not just on an
+	// actual failure. A plain (non-tuple) stream's own get() never has
+	// this problem: it already returns a PRESENT-but-empty string for
+	// exactly this case ("exhaustion yields an empty string, not nullopt",
+	// vector_input_stream suite above) which read() treats as its quiet
+	// `line.empty()` end-of-input path. leaf() must mirror that contract.
+	TEST_CASE("reader propagates an empty physical read as an empty leaf, "
+		  "not an error")
+	{
+		auto layout = adt_test_layout();
+		// A default-constructed vector_input_stream is immediately
+		// exhausted: get() returns std::optional<std::string>("").
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(), layout);
+		auto leaf = reader.leaf(0, { dict("a") });
+		CHECK(leaf.has_value());             // NOT nullopt/an error
+		CHECK(*leaf == "");
+	}
+
+	// Two calls for the SAME time point, both empty: the empty result must
+	// not be memoized as a permanent failure (unlike a genuine parse
+	// failure, see "reader rejects malformed wire input" below) -- a later
+	// call for the same time point (the REPL re-driving this reader's
+	// physical stream after the user answers) has to re-consult the
+	// physical stream each time, not get stuck on a stale "no value yet".
+	TEST_CASE("an empty read is not memoized as a failure") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(), layout);
+		CHECK(reader.leaf(0, { dict("a") }).has_value());
+		CHECK(*reader.leaf(0, { dict("a") }) == "");
+		CHECK(*reader.leaf(0, { dict("p"), dict("x") }) == "");
+	}
+
 	TEST_CASE("reader rejects missing key") {
 		auto layout = adt_test_layout();
 		adt_tuple_reader<node_t> reader(

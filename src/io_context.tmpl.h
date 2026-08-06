@@ -721,8 +721,11 @@ adt_tuple_reader<node>::adt_tuple_reader(
 }
 
 template <NodeType node>
-bool adt_tuple_reader<node>::read_time_point(size_t time_point) {
-	if (memo_time_point && *memo_time_point == time_point) return memo_ok;
+typename adt_tuple_reader<node>::read_status
+	adt_tuple_reader<node>::read_time_point(size_t time_point)
+{
+	if (memo_time_point && *memo_time_point == time_point)
+		return memo_ok ? read_status::ok : read_status::failed;
 
 	auto line = physical->get(time_point);
 	if (!line) {
@@ -731,7 +734,7 @@ bool adt_tuple_reader<node>::read_time_point(size_t time_point) {
 		memo_time_point = time_point;
 		memo_leaves.clear();
 		memo_ok = false;
-		return false;
+		return read_status::failed;
 	}
 	if (line->empty()) {
 		// No value YET (a non-blocking console stream -- e.g. the REPL's
@@ -746,25 +749,42 @@ bool adt_tuple_reader<node>::read_time_point(size_t time_point) {
 		// stream, not reuse a stale "no value yet" memo forever. Leaving
 		// memo_time_point untouched also means whatever time_point it
 		// already held (a prior successful or genuinely-failed read) stays
-		// validly memoized for ITS OWN time_point.
-		return false;
+		// validly memoized for ITS OWN time_point. Returning `empty` (not
+		// `failed`) is what lets `leaf()` propagate this quietly instead of
+		// logging an error -- see `leaf()`'s own comment.
+		return read_status::empty;
 	}
 
 	memo_time_point = time_point;
 	memo_leaves.clear();
 	memo_ok = false;
 	auto wv = adt_parse_wire(*line);
-	if (!wv) return false;
+	if (!wv) return read_status::failed;
 	std::vector<size_t> path;
-	if (!adt_validate_collect(shape, *wv, path, memo_leaves)) return false;
-	return memo_ok = true;
+	if (!adt_validate_collect(shape, *wv, path, memo_leaves)) return read_status::failed;
+	memo_ok = true;
+	return read_status::ok;
 }
 
 template <NodeType node>
 std::optional<std::string> adt_tuple_reader<node>::leaf(size_t time_point,
 	const std::vector<size_t>& path)
 {
-	if (!read_time_point(time_point)) return std::nullopt;
+	switch (read_time_point(time_point)) {
+	case read_status::failed: return std::nullopt; // already LOG_ERROR'd
+	case read_status::empty:
+		// Propagate the physical stream's own emptiness AS an empty leaf
+		// (not nullopt): interpreter::read() (interpreter.tmpl.h) treats a
+		// present-but-empty value as its quiet "no value yet"/EOF path
+		// (`if (line.empty()) return { value, true };`), exactly like a
+		// plain (non-tuple) stream's own `get()` already does -- returning
+		// nullopt here instead (the pre-fix behavior) took the read()'s
+		// OTHER branch, `!maybe_line.has_value()`, which LOG_ERRORs
+		// "Failed to read from input stream" on every single awaiting/EOF
+		// cycle, not just on an actual failure.
+		return std::string{};
+	case read_status::ok: break;
+	}
 	auto it = memo_leaves.find(path);
 	if (it == memo_leaves.end()) {
 		LOG_ERROR << "(Error) ADT: no leaf at '" << adt_path_str(path)

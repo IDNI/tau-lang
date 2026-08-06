@@ -425,10 +425,20 @@ struct adt_tuple_reader {
 	 * @brief Return the raw leaf string at @p path for @p time_point.
 	 * @param time_point Simulation step number.
 	 * @param path Member path (dict ids, outer -> inner) to read.
-	 * @return The leaf string, or `std::nullopt` (after `LOG_ERROR`) on a
-	 * physical read failure, a wire-format parse failure, or a
-	 * missing/duplicate/unknown key or leaf/object shape mismatch against
-	 * the layout.
+	 * @return The leaf string; an empty string (`""`, `has_value()`) if the
+	 * PHYSICAL stream's own read for @p time_point was itself empty -- no
+	 * value yet (a non-blocking console stream, e.g. the REPL's
+	 * `repl_pending_input_stream`, flags itself "awaiting" and returns `""`
+	 * instead of blocking) or genuinely no more input (an exhausted
+	 * `vector_input_stream`/`file_input_stream` signals end-of-input the
+	 * same way) -- mirroring exactly what a plain (non-tuple) stream
+	 * already does for `interpreter::read()`'s own `line.empty()` quiet
+	 * path (`interpreter.tmpl.h`), so a tuple stream's "no value yet"/EOF
+	 * is handled identically to a plain stream's, not logged as an error;
+	 * or `std::nullopt` (after `LOG_ERROR`) on an actual physical read
+	 * failure, a wire-format parse failure, or a missing/duplicate/unknown
+	 * key or leaf/object shape mismatch against the layout -- those keep
+	 * hard-error + memoized-failure semantics, unchanged.
 	 */
 	std::optional<std::string> leaf(size_t time_point,
 		const std::vector<size_t>& path);
@@ -445,7 +455,14 @@ struct adt_tuple_reader {
 		return physical;
 	}
 private:
-	bool read_time_point(size_t time_point);
+	/// @brief `read_time_point`'s outcome for @p time_point: `ok` (parsed
+	/// and validated, memoized), `empty` (the physical stream itself had
+	/// no value yet/EOF -- deliberately NOT memoized, so a later call for
+	/// the same @p time_point re-consults the physical stream once it has
+	/// something), or `failed` (a physical read/parse/validation error,
+	/// already `LOG_ERROR`'d and memoized).
+	enum class read_status { ok, empty, failed };
+	read_status read_time_point(size_t time_point);
 
 	std::shared_ptr<serialized_constant_input_stream> physical;
 	adt_stream_layout<node> layout;
