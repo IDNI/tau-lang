@@ -780,6 +780,156 @@ TEST_SUITE("LTL correctness: Trigger (T) semantics") {
 } // TEST_SUITE "LTL correctness: Trigger (T) semantics"
 
 
+// ── LT-2: outer-flag propagation on the pure-past execution path ─────────────
+//
+// `compile_since_trigger_rec` gives the OUTERMOST S the treatment
+// `G(curr && rhs)` — "this Since must hold at every step".  That treatment is
+// only correct when the S is asserted positively by the top-level conjunct
+// spine.  Propagating `is_outer` through negation and disjunction makes the
+// derived safety formula demand `φ S ψ` always even when the spec says the
+// opposite (`!(φ S ψ)`) or offers an alternative (`(φ S ψ) || χ`).
+//
+// The second half of the same defect is that `ltl_to_safety_formula_full`
+// returns only `safety_fm && init_fm` and DISCARDS the compiled formula, so
+// the Boolean structure around the S never reaches the interpreter at all.
+//
+// Both cases below are executed, not merely checked for satisfiability: the
+// sat path uses the independent ppLTLTT tester encoding, which is not affected.
+
+TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
+
+	// `!(φ S ψ)` with φ = (o1 = 1/4), ψ = (o1 = 3/4).
+	//
+	// Strong-past semantics give `φ S ψ` ≡ ψ at t = 0, and the spec must hold
+	// at every step, so the correct reading is `G(¬(φ S ψ))`.  With the aux
+	// tracking invariant `G(curr ↔ (ψ ∨ (φ ∧ prev)))` and the obligation
+	// `G(¬curr)`, that forces `G(¬ψ)`: o1 is never 3/4.
+	//
+	// Under the outer-flag bug the S inherits is_outer through the negation,
+	// so the safety formula becomes `G(curr && rhs) && ψ@0` — the exact
+	// opposite — and the first emitted value is 3/4.
+	TEST_CASE("[LT2-EXEC-01] !((o1={1/4}:qlt) S (o1={3/4}:qlt)) never emits ψ") {
+		bdd_init<Bool>();
+		auto vals = run_qlt_no_input(
+		    "! ((o1[t]:qlt = {1/4}:qlt) S (o1[t]:qlt = {3/4}:qlt)).", 4);
+		REQUIRE(vals.size() == 4);
+		for (auto& v : vals) CHECK(v != "3/4");
+	}
+
+	// `(α S α) || (β S β)`.  Since `χ S χ ≡ χ`, this is just `G(α || β)`
+	// with α = (i1 = 3/4) on the input stream and β = (o1 = 1/2) on the
+	// output.  The environment never plays 3/4, so the system must emit 1/2
+	// at every step.
+	//
+	// Three properties of this shape are load-bearing:
+	//
+	//  * BOTH operands are temporal.  A bare `(o1 = 1/2)` disjunct is
+	//    rejected outright by `missing_temp_quants` ("must be scoped by a
+	//    temporal quantifier"), which is what the first draft hit.
+	//  * α is false at every step INCLUDING t=0, and it is both the φ and
+	//    the ψ of its Since, so `curr ↔ (ψ ∨ (φ ∧ prev))` pins that
+	//    auxiliary to 0 without needing a t=0 anchor — the unconstrained
+	//    `aux[-1]` cannot leak in through a false φ.  That keeps the
+	//    expected trace deterministic while the inner-S anchor stays out
+	//    (see the KNOWN GAP note in compile_since_trigger_rec).
+	//  * neither disjunct is an `always`, so the obligation wraps as
+	//    `G(curr0 || curr1)` rather than a nested `G(… || G(…))`.
+	//
+	// Under the outer-flag bug BOTH Sinces inherit is_outer through the `||`
+	// and are forced to hold at every step; the first then demands
+	// `i1 = 3/4` always, which this input stream makes impossible, so the
+	// spec is rejected and nothing is emitted at all.
+	TEST_CASE("[LT2-EXEC-02] ((i1={3/4}) S (i1={3/4})) || ((o1={1/2}) S (o1={1/2}))") {
+		bdd_init<Bool>();
+		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
+		auto vals = run_qlt_with_i1(
+		    "((i1[t]:qlt = {3/4}:qlt) S (i1[t]:qlt = {3/4}:qlt)) "
+		    "|| ((o1[t]:qlt = {1/2}:qlt) S (o1[t]:qlt = {1/2}:qlt)).",
+		    i1_vals, 4);
+		REQUIRE(vals.size() == 4);
+		for (auto& v : vals) CHECK(v == "1/2");
+	}
+
+	// Regression guard for the half of the propagation that must NOT change:
+	// on a top-level conjunct spine the S keeps the outer treatment, so ψ is
+	// still required at every step.  The second conjunct carries its own
+	// temporal quantifier for the same `missing_temp_quants` reason.
+	TEST_CASE("[LT2-EXEC-03] conjunct spine keeps the outer treatment") {
+		bdd_init<Bool>();
+		auto vals = run_qlt_no_input(
+		    "((o1[t]:qlt = {1/4}:qlt) S (o1[t]:qlt = {3/4}:qlt)) "
+		    "&& always (o1[t]:qlt != {1/2}:qlt).", 4);
+		REQUIRE(vals.size() == 4);
+		for (auto& v : vals) CHECK(v == "3/4");
+	}
+
+	// Sat-path cross-check: the ppLTLTT tester encoding (independent of the
+	// execution encoding) must agree that both LT2 specs are realizable.
+	TEST_CASE("[LT2-SAT-01] both LT-2 shapes are REALIZABLE") {
+		bdd_init<Bool>();
+		CHECK(realizable(
+		    "! ((o1[t]:qlt = {1/4}:qlt) S (o1[t]:qlt = {3/4}:qlt))."));
+		CHECK(realizable(
+		    "((i1[t]:qlt = {3/4}:qlt) S (i1[t]:qlt = {3/4}:qlt)) "
+		    "|| ((o1[t]:qlt = {1/2}:qlt) S (o1[t]:qlt = {1/2}:qlt))."));
+	}
+
+} // TEST_SUITE "LTL correctness: S under negation / disjunction (LT-2)"
+
+
+// ── LT-6: solutions that carry no encodable strategy ─────────────────────────
+//
+// `solve_ltl_aba_algorithm_b` returns a solution with an EMPTY `atoms` vector
+// (only `aut` is set), and the constant-output fast path returns one with
+// `num_states == 0`.  `ltl_to_safety_formula_full` mapped both to
+// `{tau::_T(), sol}` under the comment "purely propositional: realizable but
+// no data constraints to encode" — but realizability there depended on a
+// concrete output strategy (the P/D-bit machinery, or a specific constant
+// output combination) that the safety formula never encodes.  The interpreter
+// then executes `always T` and emits default outputs, which can violate the
+// very spec that was reported REALIZABLE.
+//
+// The assertions below are deliberately verdict-shaped rather than
+// trace-shaped: it is acceptable for the interpreter to refuse the spec
+// ("not executable"), and it is acceptable for a future implementation to
+// encode the strategy properly — what is NOT acceptable is emitting a trace
+// that violates the spec.
+
+TEST_SUITE("LTL correctness: strategy must survive into execution (LT-6)") {
+
+	// Algorithm B path: qlt atoms with an input variable, one output var.
+	// The liveness conjunct F(o1 = 1/2) is exactly the obligation that
+	// `always T` drops on the floor.
+	TEST_CASE("[LT6-EXEC-01] Algorithm-B spec does not execute as `always T`") {
+		bdd_init<Bool>();
+		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
+		auto vals = run_qlt_with_i1(
+		    "F (o1[t]:qlt = {1/2}:qlt) "
+		    "&& G (o1[t]:qlt != i1[t]:qlt).", i1_vals, 4);
+		bool refused   = vals.empty();
+		bool satisfied = false;
+		for (auto& v : vals) if (v == "1/2") satisfied = true;
+		CHECK((refused || satisfied));
+	}
+
+	// Constant-output fast path: `constant_output_realizable` succeeds, so the
+	// solution comes back with num_states == 0 and no automaton at all.
+	TEST_CASE("[LT6-EXEC-02] constant-output spec does not execute as `always T`") {
+		bdd_init<Bool>();
+		const strings i1_vals = {"1/4", "1/4", "1/4", "1/4"};
+		auto vals = run_qlt_with_i1(
+		    "F (o1[t]:qlt = {1/2}:qlt) "
+		    "&& G (i1[t]:qlt = {1/4}:qlt -> o1[t]:qlt != {3/4}:qlt).",
+		    i1_vals, 4);
+		bool refused   = vals.empty();
+		bool satisfied = false;
+		for (auto& v : vals) if (v == "1/2") satisfied = true;
+		CHECK((refused || satisfied));
+	}
+
+} // TEST_SUITE "LTL correctness: strategy must survive into execution (LT-6)"
+
+
 TEST_SUITE("Cleanup") {
 	TEST_CASE("ba_constants cleanup") {
 		ba_constants<node_t>::cleanup();

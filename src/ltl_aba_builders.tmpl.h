@@ -535,6 +535,10 @@ solve_ltl_aba_algorithm_b(
 
 	LtlAbaSolution<node> sol;
 	sol.aut = parse_hoa(hoa_text);
+	// The strategy is over the P_σ / R bookkeeping bits, not over the user's
+	// data atoms (`sol.atoms` is intentionally left empty), so it cannot be
+	// re-encoded as a safety formula.  See LtlAbaSolution::executable (LT-6).
+	sol.executable = false;
 	return sol;
 }
 
@@ -746,6 +750,11 @@ solve_ltl_aba(tref fm)
 					LtlAbaSolution<node> trivial;
 					trivial.atoms = sol.atoms;
 					// num_states = 0 signals trivially realizable.
+					// The check proves that SOME fixed output
+					// combination works but does not record
+					// which, so there is nothing to encode
+					// for execution (LT-6).
+					trivial.executable = false;
 					return trivial;
 				}
 				// Has input vars: Algorithm B required for soundness.
@@ -834,6 +843,13 @@ solve_ltl_aba(tref fm)
 template <NodeType node>
 bool is_ltl_aba_realizable(tref fm, int_t start_time, bool output) {
 	LOG_DEBUG << "[ltl_aba] is_ltl_aba_realizable: " << LOG_FM(fm);
+
+	// LT-5 backstop: a `wff_semantic_neg` that reaches here has no encoding
+	// (see apply_semantic_negation) and would be flattened to the constant
+	// "1" by skeleton_wff.  Refuse rather than answer wrongly.
+	if (has_semantic_negation<node>(fm))
+		throw ltl_synthesis_error(
+		    "semantic negation (-) over data formulas is not implemented");
 
 	// Safety fast-path: if the formula has no full-LTL operators AND
 	// no Boolean combinations of models, it is a pure G/safety formula
@@ -1071,7 +1087,40 @@ ltl_to_safety_formula_full(tref fm) {
 		if (!has_ltl_operators<node>(compiled_fast)) {
 			LOG_DEBUG << "[ltl_aba] ltl_to_safety_formula: "
 			          << "pure past-LTL, returning safety formula";
-			return {tau::build_wff_and(safety_fm, init_fm), std::nullopt};
+			// LT-2: the compiled formula used to be DISCARDED here, so the
+			// Boolean structure around each S never reached the interpreter
+			// and only the per-operator invariants survived.  A tau spec must
+			// hold at every step, so the obligation is G(compiled).
+			//
+			// The wrap is distributed over top-level conjuncts and skips a
+			// conjunct that is already an `always`, so `(φ S ψ) && G(χ)` gives
+			// `G(curr) && G(χ)` rather than the nested `G(curr && G(χ))` that
+			// the normalizer would then have to unpick.
+			std::function<tref(tref)> wrap_always = [&](tref n) -> tref {
+				tref lhs = nullptr, rhs = nullptr;
+				{
+					// Read the children out BEFORE recursing: the
+					// recursive calls build nodes, and nothing here
+					// should depend on a reference into the tree
+					// store surviving that.
+					const auto& nt_ = tau::get(n);
+					if (nt_.equals_T()) return n;
+					if (!nt_.has_child())
+						return tau::build_wff_always(n);
+					auto k = nt_[0].value.nt;
+					if (k == tau::wff_always) return n;
+					if (k != tau::wff_and)
+						return tau::build_wff_always(n);
+					lhs = nt_[0].first();
+					rhs = nt_[0].second();
+				}
+				return tau::build_wff_and(wrap_always(lhs),
+				                          wrap_always(rhs));
+			};
+			tref obligation = wrap_always(compiled_fast);
+			tref out = tau::build_wff_and(obligation,
+			           tau::build_wff_and(safety_fm, init_fm));
+			return {out, std::nullopt};
 		}
 	}
 
@@ -1082,6 +1131,27 @@ ltl_to_safety_formula_full(tref fm) {
 	}
 
 	auto& sol = *maybe;
+
+	// LT-6: Algorithm B and the constant-output fast path decide
+	// realizability by routes whose strategy is not expressible over the
+	// user's data atoms.  Both used to be mapped to `{tau::_T(), sol}` under
+	// the comment "purely propositional: realizable but no data constraints
+	// to encode", which is wrong for them — realizability depended on a
+	// concrete output strategy (the P_σ / D-bit machinery, or a specific
+	// constant output combination) that `always T` does not encode.  The
+	// interpreter then ran `always T` and emitted default outputs that can
+	// violate the very spec that was reported REALIZABLE (an `F(o1={c})`
+	// component, for instance, is simply never enforced).
+	//
+	// Refusing to execute is the honest answer; the realizability verdict
+	// from `is_ltl_aba_realizable` is unaffected.
+	if (!sol.executable) {
+		LOG_ERROR << "[ltl_aba] specification is REALIZABLE but the "
+		             "synthesised strategy cannot be encoded as a safety "
+		             "formula (Algorithm B / constant-output fast path) — "
+		             "it is not executable\n";
+		return {nullptr, std::nullopt};
+	}
 
 	// Purely propositional: realizable but no data constraints to encode.
 	if (sol.atoms.empty()) return {tau::_T(), std::move(sol)};
@@ -1368,13 +1438,24 @@ static tref translate_ctl_star(tref fm,
 		return tau::build_wff_neg(translated_e);
 	}
 
-	// Handle semantic negation -φ: unrealizability check
-	// -φ means "φ is not realizable by the system"
-	// Equivalent to: the environment can force ¬φ
-	// We encode as: swap inputs/outputs in the inner formula
+	// Handle semantic negation -φ: unrealizability check.
+	//
+	// -φ means "φ is not realizable by the system", i.e. the environment can
+	// force ¬φ.  Deciding it needs the input/output roles to be swapped for
+	// the subformula, which is NOT implemented (LT-5): the case used to call
+	// `apply_semantic_negation`, which only re-wraps the node — and without
+	// translating the children, so any E/A inside survived too.  The
+	// surviving node then reached `skeleton_wff`'s default case and, because
+	// it contains io_vars, came out as the propositional constant "1", so
+	// every non-constant `-φ` was answered REALIZABLE regardless of φ.
+	//
+	// Refuse rather than answer wrongly.  The hooks fold `-T`/`-F` before
+	// anything gets here, so constant semantic negations still work.
 	if (nt == tau::wff_semantic_neg) {
-		tref inner = t[0].child(0);
-		return apply_semantic_negation<node>(inner);
+		throw ltl_synthesis_error(
+		    "semantic negation (-) over data formulas is not implemented: "
+		    "the input/output role swap it requires has no implementation, "
+		    "and answering it as propositional TRUE would be unsound");
 	}
 
 	// For all other nodes, recursively translate children
@@ -1433,6 +1514,17 @@ static tref translate_ctl_star(tref fm,
 	return fm;
 }
 
+// True iff the formula contains a `wff_semantic_neg` node.
+template <NodeType node>
+bool has_semantic_negation(tref fm) {
+	using tau = tree<node>;
+	return tau::get(fm).find_top([](tref n) {
+		const auto& t = tree<node>::get(n);
+		if (!t.has_child()) return false;
+		return t[0].value.nt == tau::wff_semantic_neg;
+	}) != nullptr;
+}
+
 template <NodeType node>
 CtlStarReduction<node> reduce_ctl_star_to_ltl(tref fm) {
 	using tau = tree<node>;
@@ -1454,22 +1546,20 @@ CtlStarReduction<node> reduce_ctl_star_to_ltl(tref fm) {
 
 // ── Semantic negation implementation ─────────────────────────────────────────
 //
-// -φ means "there is no winning system strategy satisfying φ"
-// Equivalent to: the environment wins for ¬φ
-// In synthesis terms: swap input/output roles and synthesize ¬φ
+// -φ means "there is no winning system strategy satisfying φ", i.e. the
+// environment wins for ¬φ.  In synthesis terms: swap the input/output roles
+// and synthesize ¬φ.
 //
-// For the AST level, semantic negation rewrites the formula to prepare it for
-// synthesis with swapped roles. The actual role swap happens at the synthesis
-// call site.
+// NOT IMPLEMENTED (LT-5).  This function is an AST constructor and nothing
+// more: it wraps `fm` in a `wff_semantic_neg` node.  The previous comment
+// claimed "the actual role swap happens at the synthesis call site" — there is
+// no such site anywhere in src/, which is exactly why every non-constant `-φ`
+// used to be decided as propositional TRUE.  `translate_ctl_star` and
+// `is_ltl_aba_realizable` now reject a surviving `wff_semantic_neg` instead.
 
 template <NodeType node>
 tref apply_semantic_negation(tref fm) {
 	using tau = tree<node>;
-	// Semantic negation at the AST level is represented as wff_semantic_neg.
-	// The actual player-role swap (input ↔ output) is performed at the
-	// synthesis layer when the satisfiability / realizability check is
-	// invoked. Here we simply wrap the formula in the semantic negation
-	// node so downstream passes can detect and handle it.
 	return tau::build_wff_semantic_neg(fm);
 }
 

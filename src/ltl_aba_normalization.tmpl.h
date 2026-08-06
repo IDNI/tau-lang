@@ -139,6 +139,148 @@ static bool aba_synthesis_feasible(tref fm) {
 	return result;
 }
 
+// ── LT-4: joint satisfiability of a conjunction of qlt order atoms ───────────
+//
+// `aba_existential_feasible`'s qlt fast path eliminates each free variable
+// SEPARATELY against the original formula, and `qlt_dlo_qe` only detects a
+// contradiction when the same subtree bounds the eliminated variable from both
+// sides.  A transitivity chain over three or more variables —
+// `o1 < o2 ∧ o2 < o3 ∧ ¬(o1 < o3)` — therefore survives every single
+// elimination while being jointly UNSAT, so the oracle passes an infeasible
+// strategy edge and the specification comes back falsely REALIZABLE.
+//
+// `qlt_dlo_qe`'s API returns an interval, not a residual formula, so the
+// "eliminate sequentially, substituting the residual" variant of the fix is not
+// available.  Instead: qlt's comparisons are a dense linear order, and a
+// conjunction of order literals over one is unsatisfiable exactly when the
+// implied ≤-graph contains a cycle carrying at least one strict edge.  Build
+// that graph over the atoms' operand subtrees — structurally equal operands are
+// interned to the same tref, so identity is the right key — and close it.
+//
+// The check is ONE-DIRECTIONAL by construction: `true` means "provably UNSAT",
+// `false` means only "not proven UNSAT".  Disjunctions, `≠` literals and order
+// facts between distinct constants are ignored, which can only ever hide a
+// contradiction (making the caller fall through to the general solver), never
+// invent one.  That is the safe direction: a spurious "infeasible" would turn
+// into a spurious UNREALIZABLE verdict.
+template <NodeType node>
+static bool qlt_order_conj_unsat(tref fm) {
+	using tau = tree<node>;
+
+	// Term identity MUST be structural, not tref identity.  `o1[t]:qlt`
+	// occurring in `o1 < o2` and again in `!(o1 < o3)` is the same term but not
+	// necessarily the same tref — that is exactly why the codebase carries
+	// `subtree_map` / `subtree_set` (see extract_data_atoms' "structural
+	// equality (subtree_equals)" note, and `qlt_dlo_qe`, which only detects
+	// `fv < var && var < fv` across two atoms because its endpoint sets are
+	// `subtree_set`).  Keying by raw tref turned the three chain variables into
+	// six disconnected graph nodes, so no cycle could ever close.
+	std::vector<tref> terms;
+	subtree_map<node, int> term_idx;
+	auto idx_of = [&](tref n) -> int {
+		if (auto it = term_idx.find(n); it != term_idx.end()) return it->second;
+		int id = (int)terms.size();
+		terms.push_back(n);
+		term_idx.emplace(n, id);
+		return id;
+	};
+
+	// rel: 0 = ignore, 1 = a <= b, 2 = a < b, 3 = a == b.
+	std::vector<std::tuple<int,int,int>> rels; // (lhs_idx, rhs_idx, rel)
+
+	std::function<void(tref,bool)> walk = [&](tref n, bool neg) {
+		const auto& t = tau::get(n);
+		if (!t.has_child()) return;
+		auto op = t[0].value.nt;
+		if (op == tau::wff_neg) { walk(t[0].first(), !neg); return; }
+		// Only descend through connectives that are conjunctive under the
+		// current polarity; anything else is ignored (see the one-directional
+		// note above).  ¬(A ∧ B) is a disjunction and must NOT be split.
+		//
+		// wff_and / wff_or are N-ARY: `A && B && C` is ONE node with three
+		// children, not a nested pair.  Reading only first()/second() silently
+		// dropped every conjunct past the second, which is precisely long
+		// enough to hide a three-variable transitivity chain.
+		if ((!neg && op == tau::wff_and) || (neg && op == tau::wff_or)) {
+			const auto& cop = t[0];
+			for (size_t i = 0; i < cop.children_size(); ++i)
+				walk(cop.child(i), neg);
+			return;
+		}
+		if (op == tau::wff) { walk(t[0].first(), neg); return; }
+
+		// Order atoms only.  An atom whose BA type is known and is NOT in the
+		// omcat/qlt family is skipped; an atom whose type cannot be determined
+		// still participates, since operands only ever join the graph when
+		// they are the same subtree and a strict-order cycle is a
+		// contradiction in any linearly ordered BA.
+		{
+			size_t atom_ti = find_ba_type<node>(n);
+			if (atom_ti != 0 && !is_omcat_type_family<node>(atom_ti)) return;
+		}
+
+		tref l = t[0].first();
+		tref r = t[0].second();
+		if (!l || !r) return;
+
+		// Normalise to (lhs, rhs, rel) with the "n"-prefixed spellings the
+		// tau tree uses for already-negated comparisons folded in.
+		int rel = 0;
+		bool flip = false;
+		switch (op) {
+		case tau::bf_lt:    rel = 2;              break;  // l <  r
+		case tau::bf_lteq:  rel = 1;              break;  // l <= r
+		case tau::bf_gt:    rel = 2; flip = true; break;  // r <  l
+		case tau::bf_gteq:  rel = 1; flip = true; break;  // r <= l
+		case tau::bf_eq:    rel = 3;              break;  // l == r
+		case tau::bf_nlt:   rel = 1; flip = true; break;  // !(l<r)  ≡ r <= l
+		case tau::bf_nlteq: rel = 2; flip = true; break;  // !(l<=r) ≡ r <  l
+		case tau::bf_ngt:   rel = 1;              break;  // !(l>r)  ≡ l <= r
+		case tau::bf_ngteq: rel = 2;              break;  // !(l>=r) ≡ l <  r
+		default:            return;                       // incl. bf_neq
+		}
+		if (neg) {
+			// Complement: ¬(a<b) ≡ b<=a, ¬(a<=b) ≡ b<a; a negated equality
+			// carries no order content.
+			if      (rel == 2) { rel = 1; flip = !flip; }
+			else if (rel == 1) { rel = 2; flip = !flip; }
+			else               return;
+		}
+		if (flip) { tref tmp = l; l = r; r = tmp; }
+		rels.emplace_back(idx_of(l), idx_of(r), rel);
+	};
+	walk(fm, false);
+
+	const int n = (int)terms.size();
+	if (n == 0 || rels.empty()) return false;
+
+	// best[i][j]: 0 = no known relation, 1 = i <= j, 2 = i < j.
+	std::vector<int> best((size_t)n * n, 0);
+	auto at = [&](int i, int j) -> int& { return best[(size_t)i * n + j]; };
+	for (auto& [i, j, rel] : rels) {
+		if (rel == 3) {                       // i == j: both directions, ≤
+			at(i, j) = std::max(at(i, j), 1);
+			at(j, i) = std::max(at(j, i), 1);
+		} else {
+			at(i, j) = std::max(at(i, j), rel);
+		}
+	}
+	// Transitive closure keeping track of whether a strict edge is on the path.
+	for (int k = 0; k < n; ++k)
+		for (int i = 0; i < n; ++i) {
+			if (!at(i, k)) continue;
+			for (int j = 0; j < n; ++j) {
+				if (!at(k, j)) continue;
+				int w = (at(i, k) == 2 || at(k, j) == 2) ? 2 : 1;
+				if (w > at(i, j)) at(i, j) = w;
+			}
+		}
+	// A cycle through a strict edge means some x satisfies x < x.
+	for (int i = 0; i < n; ++i)
+		if (at(i, i) == 2) return true;
+	return false;
+}
+
 template <NodeType node>
 static bool aba_existential_feasible(tref fm) {
 	using tau = tree<node>;
@@ -151,9 +293,43 @@ static bool aba_existential_feasible(tref fm) {
 #endif // TAU_CACHE
 	auto compute = [&]() -> bool {
 		// For qlt formulas: use qlt_dlo_qe directly on each free variable.
+		//
+		// LT-4: this is a PER-VARIABLE check, and "every variable is
+		// individually non-empty" is NOT joint satisfiability.  `qlt_dlo_qe`'s
+		// symbolic free-var bounds only detect a contradiction when the same
+		// subtree appears as both a lower and an upper bound of the variable
+		// being eliminated, so a transitivity chain over three or more qlt
+		// variables — `o1<o2 ∧ o2<o3 ∧ ¬(o1<o3)` — survives every single
+		// elimination while being jointly UNSAT.  The oracle would then pass
+		// an infeasible strategy edge and report a false REALIZABLE.
+		//
+		// Two complementary guards are applied:
+		//   * `qlt_order_conj_unsat` proves joint UNSAT for order chains — it
+		//     is what actually catches the transitivity case, since neither
+		//     the per-variable QE nor `is_non_temp_nso_satisfiable` does;
+		//   * the free-variable cap below keeps the per-variable path from
+		//     claiming SAT in the ≥3-variable cases it cannot decide.
+		// With at most two free variables the residual after eliminating one
+		// is a constraint on a single remaining variable, so per-variable
+		// emptiness and joint emptiness coincide and the fast path is exact.
+		// Above that we fall through to the general solver.
+		//
+		// The cap is a runtime parameter, not a compile-time constant:
+		// TAU_LTL_QLT_QE_MAX_VARS (default 2).  Setting it higher restores
+		// the old — unsound — behaviour and is only useful for measuring
+		// what the fast path was buying.
 		if constexpr (ba_variant_includes_v<qlt, typename tau::constant>) {
+			// Joint check first: it is the only thing that catches a
+			// transitivity chain, and it is exact when it fires.
+			if (qlt_order_conj_unsat<node>(fm)) return false;
+
 			const trefs& free_vars = tau::get(fm).get_free_vars();
-			if (!free_vars.empty()) {
+			size_t qe_max_vars = 2;
+			if (const char* env_cap = std::getenv("TAU_LTL_QLT_QE_MAX_VARS")) {
+				int v = std::atoi(env_cap);
+				if (v > 0) qe_max_vars = (size_t)v;
+			}
+			if (!free_vars.empty() && free_vars.size() <= qe_max_vars) {
 				bool all_qlt = true;
 				for (tref v : free_vars)
 					if (!is_omcat_type_family<node>(tree<node>::get(v).get_ba_type()))
@@ -227,6 +403,37 @@ static bool aba_feasible_dispatch(tref fm, bool pure_input, bool has_input) {
 // CONDITIONALLY (for specific input values), so the oracle's job is only to
 // verify ABA consistency at that edge, not to prove global synthesis-feasibility.
 
+// Split a parsed guard formula into its top-level disjuncts / conjuncts.
+// The guard parser builds plain wff_or / wff_and spines, so a flat walk is
+// enough; the helpers exist only so the oracle does not have to re-implement
+// the traversal twice.
+// wff_or / wff_and are N-ARY: `a | b | c` is one node with three children.
+template <NodeType node>
+static void collect_guard_or(tref fm, trefs& out) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.has_child() && t[0].value.nt == tau::wff_or) {
+		const auto& op = t[0];
+		for (size_t i = 0; i < op.children_size(); ++i)
+			collect_guard_or<node>(op.child(i), out);
+		return;
+	}
+	out.push_back(fm);
+}
+
+template <NodeType node>
+static void collect_guard_and(tref fm, trefs& out) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	if (t.has_child() && t[0].value.nt == tau::wff_and) {
+		const auto& op = t[0];
+		for (size_t i = 0; i < op.children_size(); ++i)
+			collect_guard_and<node>(op.child(i), out);
+		return;
+	}
+	out.push_back(fm);
+}
+
 template <NodeType node>
 static bool guard_is_aba_feasible(
     const std::string& guard_label,
@@ -235,75 +442,100 @@ static bool guard_is_aba_feasible(
 {
 	using tau = tree<node>;
 
-	// Parse guard label into (atom_fm, negated, is_pure_input) tuples.
-	struct GuardLit { tref atom; bool neg; bool pure_input; };
-	std::vector<GuardLit> lits;
-	{
-		std::string s = guard_label;
-		size_t pos = 0;
-		auto skip_ws = [&]{ while (pos < s.size() && s[pos]==' ') ++pos; };
-		skip_ws();
-		while (pos < s.size()) {
-			if (s[pos] == '&') { ++pos; skip_ws(); continue; }
-			bool neg = false;
-			if (s[pos] == '!') { neg = true; ++pos; skip_ws(); }
-			if (pos >= s.size() || !std::isdigit(s[pos])) break;
-			size_t start = pos;
-			while (pos < s.size() && std::isdigit(s[pos])) ++pos;
-			int idx = std::stoi(s.substr(start, pos - start));
-			skip_ws();
-			tref atom_fm = nullptr;
-			if (idx >= 0 && idx < (int)aps.size()) {
-				for (auto& [f, name] : atoms)
-					if (name == aps[idx]) { atom_fm = f; break; }
-			}
-			if (!atom_fm) continue; // bookkeeping/tester AP — skip
-			lits.push_back({atom_fm, neg, is_pure_input_atom<node>(atom_fm)});
-		}
-	}
+	// LT-3: this used to hand-lex the label, accepting only '!', digits and
+	// '&' and `break`ing on '|' or '('.  Spot prints strategy edge labels as
+	// sums of products (e.g. `[0&1 | !0&!1]`), so that lexer
+	//   (a) truncated a disjunctive label to its FIRST product — if that
+	//       product was infeasible the oracle returned a spurious
+	//       UNREALIZABLE for the whole specification; and
+	//   (b) produced an EMPTY literal list for a label starting with '(' —
+	//       which the per-type check then read as the empty conjunction ⊤,
+	//       declaring the edge feasible without checking anything.
+	//
+	// The production parser (`parse_guard_expr` / `guard_to_aba`) already
+	// implements the full grammar, including '|' and parentheses, precisely
+	// because ltlsynt emits them.  Reuse it, split the result into top-level
+	// disjuncts, and accept the edge iff SOME disjunct passes — which is
+	// exactly what "the edge fires when the label holds" means.
+	tref guard_fm = guard_to_aba<node>(guard_label, aps, atoms);
 
-	// Dead-edge check: if the input-only literals are already infeasible,
-	// the environment can never trigger this guard — skip it (return true).
-	// This handles the case where ltlsynt emits "catch-all" edges covering
-	// input combinations excluded by G(!(pi && pj)) assumptions.
-	{
-		tref input_conj = tau::_T();
-		bool has_input = false;
-		for (auto& gl : lits) {
-			if (!gl.pure_input) continue;
-			has_input = true;
-			tref lit = gl.neg ? tau::build_wff_neg(gl.atom) : gl.atom;
-			input_conj = tau::build_wff_and(input_conj, lit);
-		}
-		if (has_input && !aba_existential_feasible<node>(input_conj))
-			return true; // Dead edge — env can never make these inputs hold.
-	}
+	// A label that parses to FALSE ('f', or a product containing both an atom
+	// and its negation after bookkeeping APs drop out) is a DEAD edge: the
+	// environment can never trigger it, so it is not evidence of
+	// infeasibility.  Same convention as the input-only dead-edge check below.
+	if (tau::get(guard_fm).equals_F()) return true;
 
-	// Full guard check: group by BA type and verify each type-partition is
-	// ABA-feasible.  Different BA types involve independent variables.
+	trefs disjuncts;
+	collect_guard_or<node>(guard_fm, disjuncts);
+
 	auto types_seen = FormulaTypeSet<node>::from_atoms(atoms);
-	if (types_seen.single_type()) {
-		// Fast path: single type — build full conjunction and check.
-		tref conj = tau::_T();
-		for (auto& gl : lits) {
-			tref lit = gl.neg ? tau::build_wff_neg(gl.atom) : gl.atom;
-			conj = tau::build_wff_and(conj, lit);
+	const bool single_type = types_seen.single_type();
+
+	// Per-disjunct literal record.  `atom` is the underlying comparison and
+	// `neg` its polarity, recovered from the parsed literal so that the BA
+	// type and the pure-input classification are read off the atom rather
+	// than off its negation.
+	struct GuardLit { tref lit; tref atom; bool pure_input; };
+
+	for (tref d : disjuncts) {
+		if (tau::get(d).equals_F()) continue;   // dead product
+
+		trefs raw_lits;
+		collect_guard_and<node>(d, raw_lits);
+
+		std::vector<GuardLit> lits;
+		bool product_is_false = false;
+		for (tref l : raw_lits) {
+			const auto& lt = tau::get(l);
+			if (lt.equals_T()) continue;        // bookkeeping AP
+			if (lt.equals_F()) { product_is_false = true; break; }
+			tref atom = l;
+			if (lt.has_child() && lt[0].value.nt == tau::wff_neg)
+				atom = lt[0].first();
+			lits.push_back({l, atom, is_pure_input_atom<node>(atom)});
 		}
-		return aba_existential_feasible<node>(conj);
+		if (product_is_false) continue;         // dead product
+
+		// Dead-edge check: if the input-only literals are already
+		// infeasible, the environment can never trigger this product —
+		// treat it as firing vacuously and accept the edge.  This handles
+		// the "catch-all" edges ltlsynt emits for input combinations that
+		// the G(!(pi && pj)) assumptions already exclude.
+		{
+			tref input_conj = tau::_T();
+			bool has_input = false;
+			for (auto& gl : lits) {
+				if (!gl.pure_input) continue;
+				has_input = true;
+				input_conj = tau::build_wff_and(input_conj, gl.lit);
+			}
+			if (has_input && !aba_existential_feasible<node>(input_conj))
+				return true;
+		}
+
+		// Full product check.  Group by BA type and verify each partition
+		// independently: different BA types involve independent variables.
+		if (single_type) {
+			tref conj = tau::_T();
+			for (auto& gl : lits) conj = tau::build_wff_and(conj, gl.lit);
+			if (aba_existential_feasible<node>(conj)) return true;
+			continue;
+		}
+
+		std::map<size_t, std::vector<tref>> per_type;
+		for (auto& gl : lits)
+			per_type[find_ba_type<node>(gl.atom)].push_back(gl.lit);
+		bool all_ok = true;
+		for (auto& [tid, type_lits] : per_type) {
+			tref conj = tau::_T();
+			for (auto& lit : type_lits) conj = tau::build_wff_and(conj, lit);
+			if (!aba_existential_feasible<node>(conj)) { all_ok = false; break; }
+		}
+		if (all_ok) return true;
 	}
 
-	// Cross-type: split by BA type, check each partition independently.
-	std::map<size_t, std::vector<tref>> per_type;
-	for (auto& gl : lits) {
-		tref lit = gl.neg ? tau::build_wff_neg(gl.atom) : gl.atom;
-		per_type[find_ba_type<node>(gl.atom)].push_back(lit);
-	}
-	for (auto& [tid, type_lits] : per_type) {
-		tref conj = tau::_T();
-		for (auto& lit : type_lits) conj = tau::build_wff_and(conj, lit);
-		if (!aba_existential_feasible<node>(conj)) return false;
-	}
-	return true;
+	// Every product of the sum is infeasible.
+	return false;
 }
 
 
@@ -658,6 +890,20 @@ struct LtlAbaSolution {
 	std::vector<std::string> output_props;
 	std::string skeleton;         // skeleton sent to ltlsynt
 	HoaAutomaton aut;
+
+	// False when realizability was decided by a route whose strategy CANNOT
+	// be re-expressed as a safety formula over the user's data atoms:
+	//
+	//   - Algorithm B: the strategy lives over the P_σ / R bits and the
+	//     returned solution carries no `atoms` at all;
+	//   - the constant-output fast path: `num_states == 0` records "some
+	//     fixed output combination works", not which one.
+	//
+	// The verdict is still sound — `is_ltl_aba_realizable` uses it as before
+	// — but `ltl_to_safety_formula_full` must refuse to execute such a
+	// solution instead of encoding it as `always T`, which silently drops
+	// every obligation the strategy was carrying (LT-6).
+	bool executable = true;
 };
 
 // ── S/T compile-away pass ─────────────────────────────────────────────────────
@@ -717,8 +963,25 @@ static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
 // the inner ψ to hold — only the outermost S's ψ is required at t=0.
 // For an outermost T the S it rewrites to is always compiled as inner, and
 // the outer obligation is added as G(¬curr) — the negated compiled formula.
-// `is_outer` is true for the top-level call and for the first S/T node
-// encountered; false for operators nested inside another S/T's phi/psi.
+//
+// `spine_pol` records how the current node's truth is asserted by the
+// top-level conjunct spine:
+//
+//    +1  asserted positively (an even number of negations on the spine)
+//    -1  asserted negatively (an odd number of negations)
+//     0  not on the spine at all (below a disjunction, an implication, a
+//        temporal operator, or inside another S/T's operands)
+//
+// An S is "outer" — i.e. gets the always-true treatment G(curr && rhs) —
+// only at `spine_pol == +1`.  This is the LT-2 fix: the old boolean
+// `is_outer` was propagated unchanged through wff_neg and wff_or, so EVERY
+// S not nested inside another S was forced to hold at every step.  Both
+// `!(φ S ψ)` and `(φ S ψ) || χ` therefore compiled to a safety formula
+// demanding `φ S ψ` always — the exact opposite of the first, and an
+// over-constraint of the second.  Off the spine the S keeps only its
+// biconditional tracking invariant plus a t=0 anchor, and its Boolean
+// context is carried by the compiled formula that
+// `ltl_to_safety_formula_full` now conjoins (it used to discard it).
 template <NodeType node>
 static tref compile_since_trigger_rec(
     tref fm,
@@ -727,12 +990,13 @@ static tref compile_since_trigger_rec(
     std::vector<std::pair<tref,tref>>& aux_pairs,
     std::vector<tref>& safety_invs,
     std::vector<tref>& init_conds,
-    bool is_outer = true)
+    int spine_pol = 1)
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
 	if (!t.has_child()) return fm;
 
+	const bool is_outer = (spine_pol > 0);
 	auto nt = t[0].value.nt;
 
 	// wff_T: φ T ψ = ¬(¬φ S ¬ψ)
@@ -748,8 +1012,8 @@ static tref compile_since_trigger_rec(
 		// Compile nested S/T inside the operands first (always inner), so
 		// that the ψ used for the t=0 initial condition below is the
 		// compiled one, matching what goes into the rewritten S.
-		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
-		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
+		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
+		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
 
 		tref neg_phi = tau::build_wff_neg(phi);
 		tref neg_psi = tau::build_wff_neg(psi);
@@ -762,7 +1026,7 @@ static tref compile_since_trigger_rec(
 		// With is_outer=false the S contributes only its tracking
 		// invariant G(curr ↔ rhs), and the obligation is encoded below
 		// from the negated compiled formula.
-		tref s_rewr  = compile_since_trigger_rec<node>(s_node, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
+		tref s_rewr  = compile_since_trigger_rec<node>(s_node, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
 		tref compiled = tau::build_wff_neg(s_rewr);
 
 		if (is_outer) {
@@ -793,8 +1057,8 @@ static tref compile_since_trigger_rec(
 		// Any S inside phi or psi is by definition inner (nested), so
 		// pass is_outer=false to suppress the always-true requirement
 		// and the psi-at-0 initial condition for those sub-operators.
-		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
-		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds, /*is_outer=*/false);
+		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
+		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
 
 		// Fresh auxiliary output variable name (o-prefix → controllable output).
 		std::string aux_name = "o__ltl_s" + std::to_string(counter++) + "__";
@@ -837,6 +1101,23 @@ static tref compile_since_trigger_rec(
 			// tracks the auxiliary's value without imposing the always-true
 			// requirement that would otherwise force this ψ at t=0.
 			safety_invs.push_back(tau::build_wff_always(tau::build_wff_equiv(curr, rhs)));
+
+			// KNOWN GAP, deliberately not closed here.  `rhs` mentions
+			// aux[t-1], which nothing constrains at time 0, so an off-spine
+			// S can still be claimed to hold at t=0 via (φ ∧ prev) even
+			// though ψ never held.  The outermost branch gets the anchor for
+			// free from `ψ@0` plus G(curr && rhs); an inner one would need it
+			// stated.
+			//
+			// The obvious statement — `curr@0 ↔ ψ@0` in `init_conds` — was
+			// tried and reverted: `curr` is the bv[8] auxiliary and ψ is in
+			// the user's BA (qlt here), so it is a CROSS-BA-TYPE biconditional
+			// outside any `always`, at absolute time 0.  That shape made the
+			// interpreter reject an otherwise satisfiable spec in Debug and
+			// crash in Release (the same mixed-type fragility the interpreter
+			// documents at make_interpreter's G(phi_A) && G(phi_B) special
+			// case).  Closing this needs a single-type encoding of the t=0
+			// condition, which is its own piece of work.
 		}
 
 		// Record the (curr, prev) pair so the caller can add the temporal
@@ -852,27 +1133,40 @@ static tref compile_since_trigger_rec(
 
 	// Recurse into operator children (covers wff_and, wff_or, wff_neg,
 	// wff_F, wff_U, wff_R, wff_W, wff_always, etc.)
-	// Propagate is_outer so that S operators encountered here (e.g. at
-	// the top level of a conjunction) retain the same is_outer status.
+	//
+	// The spine polarity is propagated, NOT the old boolean is_outer:
+	//   wff_and  keeps a positive spine (asserting A ∧ B asserts both);
+	//            under a negative spine it drops off — ¬(A ∧ B) asserts
+	//            neither operand.
+	//   wff_or   is the dual: it keeps a NEGATIVE spine (¬(A ∨ B) asserts
+	//            ¬A and ¬B) and drops off a positive one.
+	//   wff_neg  flips the sign.
+	//   everything else (implications, temporal operators, conditionals)
+	//            drops off the spine entirely.
 	const auto& op = t[0];
 	size_t nc = op.children_size();
 	if (nc == 0) return fm;
 
+	int child_pol = 0;
+	if      (nt == tau::wff_neg) child_pol = -spine_pol;
+	else if (nt == tau::wff_and) child_pol = (spine_pol > 0) ?  1 : 0;
+	else if (nt == tau::wff_or)  child_pol = (spine_pol < 0) ? -1 : 0;
+
 	if (nc == 1) {
-		tref new_c = compile_since_trigger_rec<node>(op.first(), invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
+		tref new_c = compile_since_trigger_rec<node>(op.first(), invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
 		if (new_c == op.first()) return fm;
 		return tau::get(tau::wff, tau::get(nt, new_c));
 	}
 	if (nc == 2) {
-		tref new_l = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
-		tref new_r = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
+		tref new_l = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
+		tref new_r = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
 		if (new_l == op.first() && new_r == op.second()) return fm;
 		return tau::get(tau::wff, tau::get(nt, new_l, new_r));
 	}
 	if (nc == 3) {
-		tref new_a = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
-		tref new_b = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
-		tref new_c = compile_since_trigger_rec<node>(op.third(),  invariants, counter, aux_pairs, safety_invs, init_conds, is_outer);
+		tref new_a = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
+		tref new_b = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
+		tref new_c = compile_since_trigger_rec<node>(op.third(),  invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
 		if (new_a == op.first() && new_b == op.second() && new_c == op.third())
 			return fm;
 		// 3-child case: use build_wff_conditional for wff_conditional,
@@ -887,14 +1181,23 @@ static tref compile_since_trigger_rec(
 
 // Top-level S/T compilation pass.
 // Returns {compiled_formula, safety_formula, init_formula, aux_pairs}.
-// compiled_formula is fm unchanged if there are no S/T nodes.
-// Otherwise: compiled_formula && G_inv_0 && G_inv_1 && ...
-// safety_formula: G(outermost_s && rhs) for the top-level S (always-true
-//   requirement), G(¬outermost_s) for a top-level T (which is ¬S), and
-//   G(inner_s ↔ rhs) for nested S operators (biconditional tracks the
+//
+// compiled_formula is fm with every S/T node replaced by its auxiliary atom,
+// and fm unchanged when there are no S/T nodes.  It is the BARE compiled
+// formula: the `invariants` vector is deliberately NOT conjoined into it.
+// Those entries duplicate the biconditionals already in `safety_invs` and add
+// one position-0-only term (`¬aux[t-1]`) that must never be wrapped in G, so
+// mixing them into the returned formula would make the caller's obligation
+// `G(compiled)` unsound.  Callers that want the Boolean structure of the spec
+// take compiled_formula and wrap it themselves.
+//
+// safety_formula: G(outermost_s && rhs) for a positively-asserted top-level S
+//   (always-true requirement), G(¬outermost_s) for a top-level T (which is
+//   ¬S), and G(inner_s ↔ rhs) for every other S (biconditional tracks the
 //   auxiliary without forcing it to 1 at t=0).
-// init_formula: psi_at_0 for the outermost S/T only (t=0 condition; for T it
-//   is the un-negated psi, since φ T ψ requires ψ at position 0).
+// init_formula: psi_at_0 for an outermost S/T (t=0 condition; for T it is the
+//   un-negated psi, since φ T ψ requires ψ at position 0), and the strong-past
+//   anchor `curr@0 ↔ psi@0` for every off-spine S.
 // aux_pairs: one entry per S operator: (curr_atom, prev_atom).
 // Callers use aux_pairs to add G(X(p_prev) <-> p_curr) to the ltlsynt skeleton.
 template <NodeType node>
@@ -911,10 +1214,6 @@ compile_since_trigger(tref fm) {
 	int counter = 0;
 	tref compiled = compile_since_trigger_rec<node>(fm, invariants, counter, aux_pairs, safety_invs, init_conds);
 
-	tref result = compiled;
-	for (tref inv : invariants)
-		result = tau::build_wff_and(result, inv);
-
 	tref safety_fm = tau::_T();
 	for (tref si : safety_invs)
 		safety_fm = tau::build_wff_and(safety_fm, si);
@@ -925,7 +1224,7 @@ compile_since_trigger(tref fm) {
 
 	LOG_DEBUG << "[ltl_aba] S/T compile-away: "
 	          << invariants.size() << " auxiliary variable(s) introduced";
-	return {result, safety_fm, init_fm, std::move(aux_pairs)};
+	return {compiled, safety_fm, init_fm, std::move(aux_pairs)};
 }
 
 } // namespace idni::tau_lang

@@ -197,10 +197,28 @@ inline std::pair<bool, std::string> call_ltlsynt(
 	std::remove(tmpfile_path.c_str());
 	LOG_DEBUG << "[ltl_aba] ltlsynt output (exit=" << exit_code << "): " << out;
 
-	if (exit_code == 127) {
+	// LT-7: only exit 127 used to be special-cased, so a watchdog kill
+	// (128 + SIGTERM = 143) or a usage error fell into the `out.empty()`
+	// branch below and every caller read the result as a definitive
+	// UNREALIZABLE.  A slow-but-realizable specification therefore got a
+	// wrong answer with nothing but a LOG_DEBUG trace behind it.
+	switch (classify_spot_exit(exit_code, out)) {
+	case spot_exit_kind::not_found:
 		LOG_ERROR << "[ltl_aba] ltlsynt not found on PATH. "
 		             "Install Spot (>= 2.10) and ensure ltlsynt is on PATH.\n";
 		return {false, ""};
+	case spot_exit_kind::failed: {
+		std::string msg = "ltlsynt produced no verdict (exit "
+		                + std::to_string(exit_code) + ")";
+		if (exit_code == 143)
+			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
+			     + std::to_string(timeout_sec) + "s)";
+		LOG_ERROR << "[ltl_aba] " << msg
+		          << "; the realizability of this specification is UNKNOWN\n";
+		throw ltl_synthesis_error(msg);
+	}
+	case spot_exit_kind::ok:
+		break;
 	}
 	if (out.empty() || out.substr(0, 12) == "UNREALIZABLE") {
 		// Q40-UX3: on UNREAL, optionally produce env counter-strategy.
@@ -367,7 +385,24 @@ inline std::string call_ltl2tgba_dpa(const std::string& ltl_formula) {
 	std::vector<std::string> argv = {
 	    "ltl2tgba", "--parity=min even", "-D", "--complete", "-f", ltl_formula
 	};
-	auto [out, _rc] = spawn_capture(argv, timeout_sec);
+	auto [out, rc] = spawn_capture(argv, timeout_sec);
+	// LT-7: the exit code used to be discarded, so a watchdog kill or a
+	// usage error was indistinguishable from "this formula has no DPA".
+	// ltl2tgba exits 0 on success, so anything else is a failure here.
+	if (rc == 127) {
+		LOG_ERROR << "[ltl_aba] ltl2tgba not found on PATH. "
+		             "Install Spot (>= 2.10) and ensure ltl2tgba is on PATH.\n";
+		return {};
+	}
+	if (rc != 0) {
+		std::string msg = "ltl2tgba produced no automaton (exit "
+		                + std::to_string(rc) + ")";
+		if (rc == 143)
+			msg += " — killed by the TAU_LTL_TIMEOUT_SEC watchdog ("
+			     + std::to_string(timeout_sec) + "s)";
+		LOG_ERROR << "[ltl_aba] " << msg << "\n";
+		throw ltl_synthesis_error(msg);
+	}
 	return out;
 }
 

@@ -22,6 +22,7 @@
 #include "normalizer.h"
 #include "boolean_algebras/nlang_ba.h"
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -89,8 +90,44 @@ bool is_pure_input_atom(tref atom);
 
 // ── Spot interface ────────────────────────────────────────────────────────────
 
+// Raised when a Spot subprocess could not deliver a verdict (LT-7).  A failed
+// or killed ltlsynt is NOT an UNREALIZABLE answer, and reporting it as one
+// turns a slow-but-realizable specification into a silently wrong result.
+struct ltl_synthesis_error : std::runtime_error {
+	using std::runtime_error::runtime_error;
+};
+
+// How to read a (exit_code, stdout) pair from a Spot subprocess.
+//
+//   ok         a verdict was produced (REALIZABLE / UNREALIZABLE).
+//   not_found  the binary is not on PATH — spawn_capture maps ENOENT to 127.
+//   failed     no verdict: the TAU_LTL_TIMEOUT_SEC watchdog killed the child
+//              (exit 128 + SIGTERM = 143), the spawn itself failed (-1), the
+//              tool reported a usage/internal error, or it exited non-zero
+//              with nothing on stdout.
+enum class spot_exit_kind { ok, not_found, failed };
+
+inline spot_exit_kind classify_spot_exit(int exit_code, const std::string& out) {
+	if (exit_code == 127) return spot_exit_kind::not_found;
+	// Negative: spawn_capture could not create the pipe or the process.
+	// >= 128: killed by signal 128 + N — in particular 143 = SIGTERM, which
+	// is exactly what the timeout watchdog sends.
+	if (exit_code < 0 || exit_code >= 128) return spot_exit_kind::failed;
+	// ltlsynt exits 0 on REALIZABLE and 1 on UNREALIZABLE; every other code
+	// is a usage or internal error.
+	if (exit_code != 0 && exit_code != 1) return spot_exit_kind::failed;
+	// A non-zero exit with no output at all carries no verdict either.
+	if (exit_code != 0 && out.empty()) return spot_exit_kind::failed;
+	return spot_exit_kind::ok;
+}
+
 // Invoke ltlsynt as a subprocess and return {realizable, hoa_strategy_text}.
 // hoa_strategy_text is non-empty only when realizable == true.
+//
+// Throws ltl_synthesis_error when the subprocess produced no verdict (see
+// classify_spot_exit).  A missing binary keeps the historical behaviour of
+// logging an error and returning {false, ""} so that environments without
+// Spot degrade rather than abort.
 std::pair<bool, std::string> call_ltlsynt(
     const std::string& ltl_formula,
     const std::vector<std::string>& input_props,
@@ -184,8 +221,24 @@ bool has_ctl_star_operators(tref fm);
 
 // ── Semantic negation ─────────────────────────────────────────────────────────
 //
-// Semantic negation -φ means "φ is unrealizable by the system".
-// Implementation: swap input/output roles and check realizability of ¬φ.
+// Semantic negation -φ means "φ is unrealizable by the system", i.e. the
+// environment can force ¬φ.  Deciding it means swapping the input/output roles
+// for the subformula and checking realizability of ¬φ.
+//
+// THAT ROLE SWAP IS NOT IMPLEMENTED (LT-5).  `apply_semantic_negation` only
+// re-wraps its argument in a `wff_semantic_neg` node; the header used to claim
+// the swap happened "at the synthesis call site", but no such site exists.
+// The surviving node then reached `skeleton_wff`'s default case which, because
+// the subformula contains io_vars, emitted the propositional constant "1" — so
+// every non-constant `-φ` was silently decided REALIZABLE regardless of φ.
+//
+// Until the swap exists, a `wff_semantic_neg` that survives constant folding
+// is REJECTED with `ltl_synthesis_error` rather than answered wrongly.  The
+// hook-level folding of `-T` → F and `-F` → T is unaffected and keeps working.
+
+// True iff the formula contains a `wff_semantic_neg` node.
+template <NodeType node>
+bool has_semantic_negation(tref fm);
 
 template <NodeType node>
 tref apply_semantic_negation(tref fm);

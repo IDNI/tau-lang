@@ -245,6 +245,20 @@ static std::string skeleton_wff(
 		     + " -> " + skeleton_str<node>(inner.second(), atoms)
 		     + ") & (!" + skeleton_str<node>(inner.first(), atoms)
 		     + " -> " + skeleton_str<node>(inner.third(), atoms) + "))";
+	case tau::wff_A:
+	case tau::wff_E:
+	case tau::wff_semantic_neg:
+		// LT-5: these used to fall into the default case below, which — for
+		// anything containing io_vars — returns the propositional constant
+		// "1".  A path quantifier or a semantic negation that survives
+		// `reduce_ctl_star_to_ltl` therefore vanished from the skeleton and
+		// the whole specification was decided as if it were TRUE.  Fail
+		// loudly instead: reaching here means the CTL* reduction did not
+		// handle the node, which is a defect, not a value.
+		throw ltl_synthesis_error(
+		    "CTL* node (A / E / semantic negation) survived the CTL* "
+		    "reduction and reached the propositional skeleton; it has no "
+		    "sound propositional encoding");
 	default: {
 		// Unknown node or ABA comparison without io_vars.
 		// If it has io_vars, it should have been extracted as a data atom.
