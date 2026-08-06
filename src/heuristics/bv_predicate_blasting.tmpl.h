@@ -188,12 +188,32 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 	bool error = false;
 	auto type_id = tau::get(term).get_ba_type();
 
+	// The result variable of an operation must carry that operation's own BA
+	// type, not the atomic's. Under a width-changing cast the two differ:
+	// for `(bv[4]) (a + b) = c` with `a, b : bv[8]` the atomic is bv[4], so
+	// the addend's result variable would be 4 bits wide while `bvadd`
+	// derives its bit count from the 8-bit augend, and the constraint mixes
+	// two widths (cvc5 raises "Subexpressions must have the same type").
+	// The atomic's type stays as the fallback for an untyped operation node.
+	auto result_type_of = [type_id](tref t) {
+		size_t t_id = tau::get(t).get_ba_type();
+		return t_id ? t_id : type_id;
+	};
+
 	// Operands may have been replaced by fresh variables already (post-order
 	// traversal blasts inner operations first), so resolve them through the
 	// changes map, defaulting to the original subtree.
+	//
+	// `changes` is keyed by the *bare* operation node, while every probe
+	// passes the parent's child, which the grammar wraps in a `bf`
+	// (`bf_add => bf '+' bf`). The key is therefore trimmed on lookup, and
+	// the fresh variable re-wrapped on a hit, so the operand shape a caller
+	// gets back is the same either way. Probing with the wrapped child never
+	// matched, which left the outer constraint built over the raw inner
+	// arithmetic term instead of the inner fresh variable.
 	auto lookup = [&changes](tref c) -> tref {
-		auto it = changes.find(c);
-		return it != changes.end() ? it->second : c;
+		auto it = changes.find(tau::trim(c));
+		return it != changes.end() ? tau::get(tau::bf, it->second) : c;
 	};
 
 	// Conjoin a new constraint into the accumulated predicate; a nullptr
@@ -210,7 +230,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 
 		switch (nt) {
 			case tau::bf_add: case tau::bf_sub: {
-				auto result = build_variable<node>(type_id);
+				auto result = build_variable<node>(result_type_of(t));
 				auto bf_result = tau::get(tau::bf, result);
 				auto left = lookup(tau::get(t).child(0));
 				auto right = lookup(tau::get(t).child(1));
@@ -225,7 +245,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto [shiftand_raw, count] = get_arguments<node>(t);
 				if (!count) { error = true; break; }
 				auto shiftand = lookup(shiftand_raw);
-				auto shifted = tau::build_variable(type_id);
+				auto shifted = tau::build_variable(result_type_of(t));
 				auto bf_shifted = tau::get(tau::bf, shifted);
 				vars.push_back(shifted);
 				changes[t] = shifted;
@@ -238,7 +258,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto [factor_raw, constant] = get_bvmul_arguments<node>(t);
 				if (!constant) { error = true; break; }
 				auto factor = lookup(factor_raw);
-				auto product = tau::build_variable(type_id);
+				auto product = tau::build_variable(result_type_of(t));
 				auto bf_product = tau::get(tau::bf, product);
 				vars.push_back(product);
 				changes[t] = product;
@@ -249,7 +269,7 @@ static std::pair<tref /* predicate */, tref /* transformed */> atomic_blasting(t
 				auto [dividend_raw, divisor] = get_arguments<node>(t);
 				if (!divisor) { error = true; break; }
 				auto dividend = lookup(dividend_raw);
-				auto result = tau::build_variable(type_id);
+				auto result = tau::build_variable(result_type_of(t));
 				auto bf_result = tau::get(tau::bf, result);
 				vars.push_back(result);
 				changes[t] = result;

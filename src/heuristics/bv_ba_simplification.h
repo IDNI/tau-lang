@@ -22,7 +22,14 @@ using namespace idni;
  *
  * Repeatedly groups runs of `+`/`-`/`*`/`/` into blocks and folds their
  * constant operands together via `simplify_blocks`, iterating to a fixpoint
- * (cycle-detected via a visited-set, capped at 1,000,000 rounds).
+ * (cycle-detected via a visited-set, capped at 1,000,000 rounds). Additive
+ * blocks fold fully (Z/2^n is a group under `+`); a multiplicative block is
+ * folded only when it contains no division, since `bvudiv` neither inverts
+ * `bvmul` nor reassociates.
+ *
+ * @note Fallback only by contract: `simplify_bv_term` dispatches
+ * @ref bv_ba_cvc5_simplification first and calls this one only when that
+ * returns `nullptr`.
  *
  * @tparam node Tree node type (despite the `BAs...` pack shown in this
  * declaration, the template actually instantiated -- see

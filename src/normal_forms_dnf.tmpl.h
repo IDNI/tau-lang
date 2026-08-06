@@ -714,7 +714,7 @@ tref reduce(tref fm) {
 	// Terms can only contain bf_neg, bf_and, bf_xor and bf_or
 	if (!is_wff) {
 		if (tau::get(fm).find_top(is_non_boolean_term<node>)) {
-			tref res = syntactic_path_simplification_dnf<node>::on(fm);
+			tref res = syntactic_path_simplification<node>(fm);
 			// Cache this branch too, like every other exit: bv and
 			// tau-constant terms would otherwise be re-simplified on
 			// every call.

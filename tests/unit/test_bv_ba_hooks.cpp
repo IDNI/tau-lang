@@ -252,6 +252,32 @@ TEST_SUITE("bv term_div: X / X") {
 	}
 }
 
+// Same class as `X / X`: bvudiv(0, 0) is all ones, not zero, so `0 / X` folds
+// to zero only when the divisor is known to be nonzero. An all-zeros literal
+// is canonicalised to the bottom element, so any surviving bv `ba_constant`
+// divisor is nonzero; a variable divisor is not.
+TEST_SUITE("bv term_div: 0 / X") {
+
+	TEST_CASE("zero divided by a variable is not folded") {
+		CHECK(bf("0:bv[8] / x:bv[8]") != bf("0:bv[8]"));
+		CHECK(bf("0:bv[8] / x:bv[8]") != bf("1:bv[8]"));
+		CHECK(bf("0:bv[8] / x:bv[8]") != bf("{1}:bv[8]"));
+		// `{0}` is the same node as the bottom element
+		CHECK(bf("{0}:bv[8] / x:bv[8]") != bf("0:bv[8]"));
+	}
+
+	TEST_CASE("zero divided by a nonzero constant is zero") {
+		CHECK(bf("0:bv[8] / {5}:bv[8]") == bf("0:bv[8]"));
+		CHECK(bf("0:bv[8] / {1}:bv[8]") == bf("0:bv[8]"));
+		// the top element (255) is nonzero too
+		CHECK(bf("0:bv[8] / 1:bv[8]") == bf("0:bv[8]"));
+	}
+
+	TEST_CASE("0 / 0 is the top element") {
+		CHECK(bf("0:bv[8] / 0:bv[8]") == bf("1:bv[8]"));
+	}
+}
+
 TEST_SUITE("bv term_mod: top and bottom element operands") {
 
 	TEST_CASE("1 % X") {                       // 255 % 10 = 5

@@ -30,9 +30,6 @@ template <NodeType node>
 struct bf_reduce_canonical;
 
 template <NodeType node>
-class syntactic_path_simplification_dnf;
-
-template <NodeType node>
 tref syntactic_formula_simplification(tref formula);
 
 template <NodeType node, bool is_wff = true>

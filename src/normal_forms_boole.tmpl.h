@@ -26,10 +26,10 @@ tref term_boole_decomposition(tref term, tref var) {
 	var = tau::get(tau::bf, var);
 	tref p1 = tau::get(term).replace(var, tau::_1(find_ba_type<node>(var)));
 	// Ensure early detection of F
-	p1 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p1);
+	p1 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p1);
 	tref p2 = tau::get(term).replace(var, tau::_0(find_ba_type<node>(var)));
 	// Ensure early detection of F
-	p2 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p2);
+	p2 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p2);
 	if (tau::get(p1) == tau::get(p2)) return p1;
 	// Build Boole decomposition step
 	return tau::build_bf_or(
@@ -71,10 +71,10 @@ tref rec_term_boole_decomposition(tref term, const trefs& vars, const int_t idx,
 	DBG(assert(tau::get(vars[idx]).is(tau::variable) || tau::get(vars[idx]).is(tau::bf_ref));)
 	tref p1 = tau::get(term).replace(vars[idx], tau::_1_trimmed(find_ba_type<node>(vars[idx])));
 	// Ensure early detection of F
-	p1 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p1);
+	p1 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p1);
 	tref p2 = tau::get(term).replace(vars[idx], tau::_0_trimmed(find_ba_type<node>(vars[idx])));
 	// Ensure early detection of F
-	p2 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p2);
+	p2 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p2);
 	// free_funcs has to be forwarded: without it every leaf of the recursion
 	// re-entered the !free_funcs block above -- another normalize_ba, another
 	// select_top(bf_ref) and another nested decomposition -- and terminated
@@ -208,10 +208,10 @@ tref rec_boole_decomposition(tref formula, const trefs& vars, const int_t idx) {
 	DBG(assert(is_atomic_bdd_var<node>(vars[idx]));)
 	tref p1 = tau::get(formula).replace(vars[idx], tau::_T());
 	// Ensure early detection of F
-	p1 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p1);
+	p1 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p1);
 	tref p2 = tau::get(formula).replace(vars[idx], tau::_F());
 	// Ensure early detection of F
-	p2 = syntactic_path_simplification_dnf<node>::unsat_on_unchanged_negations(p2);
+	p2 = syntactic_path_simplification_unsat_on_unchanged_negations<node>(p2);
 	if (tau::get(p1) == tau::get(p2)) {
 		DBG(LOG_TRACE << "Result: " << LOG_FM(p1) << "\n";)
 		return rec_boole_decomposition<node>(p1, vars, idx + 1);
@@ -305,7 +305,7 @@ tref boole_normal_form(tref formula) {
 	eq_bnf = rec_boole_decomposition<node>(eq_bnf, atms, 0);
 	// Convert !(=) to != again
 	eq_bnf = to_nnf<node>(eq_bnf);
-	eq_bnf = simplify_using_equality_dnf<node>::on(eq_bnf);
+	eq_bnf = simplify_using_equality<node>(eq_bnf);
 	DBG(LOG_DEBUG << "Boole_normal_form result: " << LOG_FM(eq_bnf) << "\n";)
 #ifdef TAU_CACHE
 	cache.emplace(eq_bnf, eq_bnf);

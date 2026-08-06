@@ -303,6 +303,18 @@ tref term_div(tref symbol) {
 		DBG(LOG_TRACE << "term_div/div_constant:" << LOG_FM_TREE(new_symbol) << "\n";)
 		return new_symbol;
 	};
+	// A divisor that is provably nonzero: the top element (all ones) or a
+	// bitvector constant with at least one bit set. Anything else -- a
+	// variable, a compound term, the bottom element -- may be zero.
+	auto is_nonzero_divisor = [](const tau& c) {
+		if (c.is(tau::bf_t)) return true;
+		if (!c.is_ba_constant()) return false;
+		const size_t t = c.get_ba_type();
+		if (t == 0 || !is_bv_type_family<node>(t)) return false;
+		auto value = std::get<bv>(c.get_ba_constant());
+		if (!value.isBitVectorValue()) return false;
+		return value.getBitVectorValue().find('1') != std::string::npos;
+	};
 	// bf > term symbol > (bf > term symbol) (bf > term_symbol)
 	const tau& c1 = tau::get(symbol)[0][0][0];
 	const tau& c2 = tau::get(symbol)[0][1][0];
@@ -335,7 +347,12 @@ tref term_div(tref symbol) {
 		case tau::bf_f:
 			// 0 / 0 is top (cvc5: bvudiv(0,0) = all_ones)
 			if (c2.is(tau::bf_f)) return tau::_1(c1.get_ba_type());
-			return tau::_0(c2.get_ba_type());
+			// `0 / X -> 0` holds only for a divisor known to be nonzero:
+			// SMT-LIB defines bvudiv(0, 0) as all ones, so with a divisor
+			// that may be zero the quotient is not determined. Same class
+			// as the `X / X -> 1` rule removed below.
+			if (is_nonzero_divisor(c2)) return tau::_0(c2.get_ba_type());
+			break;
 		default: break;
 	}
 	switch (c2.value.nt) {
