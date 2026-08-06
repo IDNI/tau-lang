@@ -343,10 +343,27 @@ void io_context<node>::update_types(
 	// and create a default console stream if not defined
 	for (const auto& [var, type] : update) if (is_io_var<node>(var)) {
 		htref hvar = tree<node>::geth(var);
+		std::string name = get_var_name<node>(var);
+		// C2: a bare occurrence of a tuple stream's own ROOT name (e.g.
+		// "p") can reach here for the REPL specifically: def_input_cmd/
+		// def_output_cmd (repl_evaluator.tmpl.h) keep the ORIGINAL,
+		// un-flattened def node (still carrying its `typed: <ADT name>`
+		// annotation) in the tree for echo, alongside the flattener's own
+		// real per-member registration (adt_flatten_rewrite_io_def,
+		// src/adt/adt_flatten.tmpl.h -- which also erases any prior
+		// ctx->types entry for the root, but cannot stop THIS pass, which
+		// runs afterward in the SAME parse, from seeing that surviving raw
+		// copy). Ordinary (ADT-unaware) BA type inference resolves that
+		// surviving root occurrence as if `<ADT name>` (e.g. "Point") were
+		// any other opaque custom base type, handing it back here as a
+		// plain io var needing a type/stream -- which would otherwise
+		// silently recreate the bare root's types/inputs/outputs entries
+		// right after the flattener erased them, and keep flowing this
+		// phantom BA type into every later reference to the same bare name.
+		if (adt_streams.contains(dict(name))) continue;
 		types[hvar] = type;
 		// If already registered as input or output during parsing, skip name-based categorization.
 		if (inputs.contains(var) || outputs.contains(var)) continue;
-		std::string name = get_var_name<node>(var);
 		DBG(LOG_TRACE << "updating stream: " << name;)
 		const bool is_input  = name == "this"
 					|| (!name.empty() && name[0] == 'i');
@@ -575,12 +592,12 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 		tref name_node = key_node
 			? adt_wire_find(key_node, adt_parser::member_name) : nullptr;
 		if (!name_node) {
-			LOG_ERROR << "(Error) ADT wire: malformed member key\n";
+			LOG_ERROR << "ADT wire: malformed member key\n";
 			return std::nullopt;
 		}
 		size_t key_sid = dict(adt_parser::tree::get(name_node).get_terminals());
 		if (result.object.contains(key_sid)) {
-			LOG_ERROR << "(Error) ADT wire: duplicate key '"
+			LOG_ERROR << "ADT wire: duplicate key '"
 				<< dict(key_sid) << "'\n";
 			return std::nullopt;
 		}
@@ -591,7 +608,7 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 			v.leaf = vc ? adt_parser::tree::get(vc).get_terminals() : std::string{};
 		} else {
 			if (!nested_node) {
-				LOG_ERROR << "(Error) ADT wire: malformed member value for '"
+				LOG_ERROR << "ADT wire: malformed member value for '"
 					<< dict(key_sid) << "'\n";
 				return std::nullopt;
 			}
@@ -608,7 +625,7 @@ inline std::optional<adt_wire_value> adt_parse_wire_tuple(tref tuple_value_node)
 inline std::optional<adt_wire_value> adt_parse_wire(const std::string& src) {
 	auto result = adt_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
-		LOG_ERROR << "(Error) ADT wire: "
+		LOG_ERROR << "ADT wire: "
 			<< result.parse_error.to_str(adt_parser::error::info_lvl::INFO_BASIC)
 			<< "\n";
 		return std::nullopt;
@@ -616,7 +633,7 @@ inline std::optional<adt_wire_value> adt_parse_wire(const std::string& src) {
 	tref shaped = result.get_shaped_tree2();
 	tref tv = adt_wire_find(shaped, adt_parser::tuple_value);
 	if (!tv) {
-		LOG_ERROR << "(Error) ADT wire: no tuple literal found in '" << src << "'\n";
+		LOG_ERROR << "ADT wire: no tuple literal found in '" << src << "'\n";
 		return std::nullopt;
 	}
 	return adt_parse_wire_tuple(tv);
@@ -632,7 +649,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 {
 	if (shape.is_leaf) {
 		if (!wv.is_leaf) {
-			LOG_ERROR << "(Error) ADT wire: expected a leaf value at '"
+			LOG_ERROR << "ADT wire: expected a leaf value at '"
 				<< adt_path_str(path) << "', got a nested object\n";
 			return false;
 		}
@@ -640,14 +657,14 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 		return true;
 	}
 	if (wv.is_leaf) {
-		LOG_ERROR << "(Error) ADT wire: expected a nested object at '"
+		LOG_ERROR << "ADT wire: expected a nested object at '"
 			<< adt_path_str(path) << "', got a leaf value\n";
 		return false;
 	}
 	for (const auto& [key_sid, child_val] : wv.object) {
 		auto it = shape.children.find(key_sid);
 		if (it == shape.children.end()) {
-			LOG_ERROR << "(Error) ADT wire: unknown key '" << dict(key_sid)
+			LOG_ERROR << "ADT wire: unknown key '" << dict(key_sid)
 				<< "' at '" << adt_path_str(path) << "'\n";
 			return false;
 		}
@@ -660,7 +677,7 @@ inline bool adt_validate_collect(const adt_shape_node& shape,
 		for (const auto& [key_sid, child_shape] : shape.children) {
 			(void)child_shape;
 			if (!wv.object.contains(key_sid)) {
-				LOG_ERROR << "(Error) ADT wire: missing key '" << dict(key_sid)
+				LOG_ERROR << "ADT wire: missing key '" << dict(key_sid)
 					<< "' at '" << adt_path_str(path) << "'\n";
 				return false;
 			}
@@ -751,7 +768,7 @@ typename adt_tuple_reader<node>::read_status
 
 	auto line = physical->get(time_point);
 	if (!line) {
-		LOG_ERROR << "(Error) ADT: failed to read tuple stream at time point "
+		LOG_ERROR << "ADT: failed to read tuple stream at time point "
 			<< time_point << "\n";
 		memo_time_point = time_point;
 		memo_raw_line.clear();
@@ -822,7 +839,7 @@ std::optional<std::string> adt_tuple_reader<node>::leaf(size_t time_point,
 	}
 	auto it = memo_leaves.find(path);
 	if (it == memo_leaves.end()) {
-		LOG_ERROR << "(Error) ADT: no leaf at '" << adt_path_str(path)
+		LOG_ERROR << "ADT: no leaf at '" << adt_path_str(path)
 			<< "' for time point " << time_point << "\n";
 		return std::nullopt;
 	}
@@ -904,7 +921,7 @@ bool adt_tuple_writer<node>::collect(size_t time_point,
 	// silently-dropped step (logged) than a step written from stale data.
 	auto pit = pending.find(time_point);
 	if (pit != pending.end() && pit->second.contains(path)) {
-		LOG_ERROR << "(Error) ADT: duplicate write to '"
+		LOG_ERROR << "ADT: duplicate write to '"
 			<< dict(layout.root_name_sid) << "." << adt_path_str(path)
 			<< "' for time point " << time_point << "\n";
 		pending.erase(pit);

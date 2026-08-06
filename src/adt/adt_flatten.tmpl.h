@@ -111,7 +111,16 @@ struct adt_resolution {
 	                                ///< binds this variable (k_full_leaf/k_partial only)
 	std::string flat_name;         ///< valid iff kind == k_full_leaf
 	tref base_type = nullptr;      ///< valid iff kind == k_full_leaf
-	std::vector<std::pair<std::string, tref>> members; ///< valid iff kind == k_partial
+	// One reachable member under a k_partial resolution: its full dotted
+	// display name (head + full path), base type, and PATH SUFFIX relative
+	// to the resolved prefix (adt_member::path with the matched prefix
+	// stripped). The suffix -- not the display name, which starts with
+	// whatever head/prefix reached it -- is what structurally IDENTIFIES a
+	// member, so two k_partial resolutions reached through different
+	// variables/prefixes can still be compared member-for-member (see
+	// adt_flatten_rewrite_equality's shape check, C1).
+	struct member_ref { std::string name; tref base_type; std::vector<size_t> suffix; };
+	std::vector<member_ref> members; ///< valid iff kind == k_partial
 	tref head = nullptr;           ///< the occurrence's own head (io_var/var_name/
 	                                ///< uconst), always set; used by
 	                                ///< adt_flatten_build_flat_var to preserve an
@@ -159,7 +168,7 @@ std::optional<adt_resolution<node>> adt_resolve_var(tref var_node,
 	}
 	if (!have) {
 		if (!path_sids.empty()) {
-			LOG_ERROR << "(Error) ADT: member access on '"
+			LOG_ERROR << "ADT: member access on '"
 				<< adt_flatten_head_str<node>(head)
 				<< "' with no known ADT type in scope\n";
 			return std::nullopt;
@@ -169,7 +178,7 @@ std::optional<adt_resolution<node>> adt_resolve_var(tref var_node,
 	}
 	if (reg.is_alias(adt_sid)) {
 		if (!path_sids.empty()) {
-			LOG_ERROR << "(Error) ADT: member access on '"
+			LOG_ERROR << "ADT: member access on '"
 				<< adt_flatten_head_str<node>(head)
 				<< "' through a non-tuple type\n";
 			return std::nullopt;
@@ -192,10 +201,26 @@ std::optional<adt_resolution<node>> adt_resolve_var(tref var_node,
 			if (m.path.size() < path_sids.size()
 				&& std::equal(m.path.begin(), m.path.end(), path_sids.begin()))
 				{ overflow = true; break; }
-		LOG_ERROR << "(Error) ADT: "
-			<< (overflow ? "member access on a non-tuple member of '"
-				: "unknown member in '")
-			<< adt_flatten_head_str<node>(head) << "'\n";
+		if (overflow) {
+			LOG_ERROR << "ADT: member access on a non-tuple member of '"
+				<< adt_flatten_head_str<node>(head) << "'\n";
+		} else {
+			// Name the specific failing path segment: the first component of
+			// @p path_sids past the longest prefix any registered member's
+			// own path actually shares with it.
+			size_t match_len = 0;
+			for (const auto& m : mems) {
+				size_t k = 0;
+				while (k < path_sids.size() && k < m.path.size()
+					&& m.path[k] == path_sids[k]) ++k;
+				match_len = std::max(match_len, k);
+			}
+			std::string seg = match_len < path_sids.size()
+				? "." + dict(path_sids[match_len]) : "";
+			LOG_ERROR << "ADT: unknown member '" << seg << "' in '"
+				<< adt_flatten_head_str<node>(head) << "' (type "
+				<< dict(adt_sid) << ")\n";
+		}
 		return std::nullopt;
 	}
 
@@ -215,7 +240,8 @@ std::optional<adt_resolution<node>> adt_resolve_var(tref var_node,
 	for (auto* m : cands) {
 		std::string name = hs;
 		for (size_t sid : m->path) name += "." + dict(sid);
-		r.members.emplace_back(std::move(name), m->base_type);
+		std::vector<size_t> suffix(m->path.begin() + path_sids.size(), m->path.end());
+		r.members.push_back({ std::move(name), m->base_type, std::move(suffix) });
 	}
 	return r;
 }
@@ -285,7 +311,10 @@ bool adt_flatten_collect_local(tref n, const adt_registry<node>& reg,
 	if (t.is(tau::input_def) || t.is(tau::output_def)) {
 		// An io def's own head/typed are NOT wrapped in a `variable` node
 		// (input_def => io_var_name [member_path] [typed] ... stream, per
-		// parser/tau.tgf) -- unlike every other ADT-typing source (a
+		// parser/tau.tgf -- the grammar's own [member_path] on the DEF
+		// itself is always rejected before this point is ever reached, by
+		// adt_flatten's upfront adt_flatten_check_io_def_head scan, I4-alt
+		// final review) -- unlike every other ADT-typing source (a
 		// quantifier binder, a ref formal), so it needs its own branch here
 		// rather than falling through to the `variable` case below. A
 		// tuple-typed io def (`p:Point := in console.`) is the io-grouping
@@ -298,7 +327,7 @@ bool adt_flatten_collect_local(tref n, const adt_registry<node>& reg,
 				size_t key = tau::get(t.first()).data(); // io def's var_name
 				auto [it, inserted] = local.try_emplace(key, adt_scope_entry{ tname, false });
 				if (!inserted && it->second.adt_sid != tname) {
-					LOG_ERROR << "(Error) ADT: conflicting type annotations "
+					LOG_ERROR << "ADT: conflicting type annotations "
 						"for variable '" << dict(key) << "'\n";
 					return false;
 				}
@@ -313,7 +342,7 @@ bool adt_flatten_collect_local(tref n, const adt_registry<node>& reg,
 				size_t key = adt_flatten_var_key<node>(t.first());
 				auto [it, inserted] = local.try_emplace(key, adt_scope_entry{ tname, false });
 				if (!inserted && it->second.adt_sid != tname) {
-					LOG_ERROR << "(Error) ADT: conflicting type annotations "
+					LOG_ERROR << "ADT: conflicting type annotations "
 						"for variable '" << adt_flatten_head_str<node>(t.first())
 						<< "'\n";
 					return false;
@@ -360,7 +389,7 @@ std::optional<tref> adt_flatten_rewrite_variable(tref n,
 		return adt_flatten_build_flat_var<node>(res->head, res->flat_name,
 			res->base_type, !res->is_bound);
 	case adt_resolution<node>::k_partial:
-		LOG_ERROR << "(Error) ADT: tuple-typed term '"
+		LOG_ERROR << "ADT: tuple-typed term '"
 			<< adt_flatten_describe_var<node>(n) << "' used outside an "
 			"equality or quantifier context\n";
 		return std::nullopt;
@@ -409,9 +438,9 @@ std::optional<tref> adt_flatten_rewrite_quantifier(tref n, size_t nt,
 			res->head, res->flat_name, res->base_type, true));
 		break;
 	case adt_resolution<node>::k_partial:
-		for (auto& [name, bt] : res->members)
+		for (auto& m : res->members)
 			member_vars.push_back(adt_flatten_build_flat_var<node>(
-				res->head, name, bt, true));
+				res->head, m.name, m.base_type, true));
 		break;
 	}
 
@@ -478,9 +507,9 @@ std::optional<std::pair<trefs, bool>> adt_flatten_rewrite_ref_args(
 			if (res->kind == adt_resolution<node>::k_partial) {
 				changed = true;
 				bool bare = !head_style && res->is_bound;
-				for (auto& [name, bt] : res->members) {
+				for (auto& m : res->members) {
 					tref v = adt_flatten_build_flat_var<node>(
-						res->head, name, bt, !bare);
+						res->head, m.name, m.base_type, !bare);
 					new_args.push_back(tau::get(tau::ref_arg, tau::get(tau::bf, v)));
 				}
 				continue;
@@ -531,7 +560,7 @@ std::optional<tref> adt_flatten_rewrite_ref(tref n, const adt_registry<node>& re
 		size_t tname = tt(typed_node) | tau::type | tt::data;
 		if (reg.defines(tname)) {
 			if (!reg.is_alias(tname)) {
-				LOG_ERROR << "(Error) ADT: tuple-typed ref result on '"
+				LOG_ERROR << "ADT: tuple-typed ref result on '"
 					<< adt_flatten_head_str<node>(sym) << "' is not allowed\n";
 				return std::nullopt;
 			}
@@ -622,7 +651,8 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 	tref l_content = tau::get(l_bf).first(), r_content = tau::get(r_bf).first();
 
 	struct side { bool is_partial = false; bool is_bound = false;
-		std::vector<std::pair<std::string, tref>> members; tref head = nullptr; };
+		std::vector<typename adt_resolution<node>::member_ref> members;
+		tref head = nullptr; };
 	auto classify = [&](tref content) -> std::optional<side> {
 		if (!tau::get(content).is(tau::variable)) return side{};
 		auto res = adt_resolve_var<node>(content, reg, scopes);
@@ -674,34 +704,48 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 	std::vector<tref> atoms;
 	if (lc->is_partial && rc->is_partial) {
 		if (lc->members.size() != rc->members.size()) {
-			LOG_ERROR << "(Error) ADT: shape mismatch in tuple " << op << ": '"
+			LOG_ERROR << "ADT: shape mismatch in tuple " << op << ": '"
 				<< describe_side(l_content) << "' has " << lc->members.size()
 				<< " member(s), '" << describe_side(r_content) << "' has "
 				<< rc->members.size() << "\n";
 			return std::nullopt;
 		}
 		for (size_t i = 0; i < lc->members.size(); ++i) {
-			if (!is_same_ba_type<node>(lc->members[i].second, rc->members[i].second)) {
-				LOG_ERROR << "(Error) ADT: shape mismatch in tuple " << op
+			const auto& lm = lc->members[i];
+			const auto& rm = rc->members[i];
+			// Structural comparison per design section 3 rule 2: two
+			// same-arity tuple sides only actually match member-for-member
+			// when each pair also resolves to the SAME member path (its
+			// registry-path SUFFIX relative to whatever prefix reached it --
+			// see adt_resolution::member_ref), not merely the same base
+			// type at each position. Without this, two same-arity,
+			// same-base-type but differently NAMED tuples (or a same-arity
+			// tuple reached at a different nesting depth) would silently
+			// expand positionally instead of failing (C1).
+			bool same_path = lm.suffix == rm.suffix;
+			bool same_type = is_same_ba_type<node>(lm.base_type, rm.base_type);
+			if (!same_path || !same_type) {
+				LOG_ERROR << "ADT: shape mismatch in tuple " << op
 					<< " between '" << describe_side(l_content) << "' and '"
-					<< describe_side(r_content) << "': member types differ ('"
-					<< lc->members[i].first << "' vs '" << rc->members[i].first
-					<< "')\n";
+					<< describe_side(r_content) << "': member '" << lm.name
+					<< "' vs '" << rm.name << "' "
+					<< (!same_path ? "have different member paths"
+						: "differ in member type") << "\n";
 				return std::nullopt;
 			}
 			atoms.push_back(make_atom(
-				mk_var_bf(lc->head, lc->members[i].first, lc->members[i].second, lc->is_bound),
-				mk_var_bf(rc->head, rc->members[i].first, rc->members[i].second, rc->is_bound)));
+				mk_var_bf(lc->head, lm.name, lm.base_type, lc->is_bound),
+				mk_var_bf(rc->head, rm.name, rm.base_type, rc->is_bound)));
 		}
 	} else if (lc->is_partial && r_const) {
-		for (auto& [name, bt] : lc->members)
-			atoms.push_back(make_atom(mk_var_bf(lc->head, name, bt, lc->is_bound), r_bf));
+		for (auto& m : lc->members)
+			atoms.push_back(make_atom(mk_var_bf(lc->head, m.name, m.base_type, lc->is_bound), r_bf));
 	} else if (rc->is_partial && l_const) {
-		for (auto& [name, bt] : rc->members)
-			atoms.push_back(make_atom(l_bf, mk_var_bf(rc->head, name, bt, rc->is_bound)));
+		for (auto& m : rc->members)
+			atoms.push_back(make_atom(l_bf, mk_var_bf(rc->head, m.name, m.base_type, rc->is_bound)));
 	} else {
 		bool l_is_tuple = lc->is_partial;
-		LOG_ERROR << "(Error) ADT: shape mismatch: '"
+		LOG_ERROR << "ADT: shape mismatch: '"
 			<< describe_side(l_is_tuple ? l_content : r_content)
 			<< "' is tuple-typed but '"
 			<< describe_side(l_is_tuple ? r_content : l_content)
@@ -716,7 +760,9 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 
 // Rewrite one `input_def`/`output_def` node (`io_var_name [member_path]
 // [typed] stream`, per parser/tau.tgf -- never wrapped in a `variable`
-// node). A non-registry `typed` (an ordinary base type) passes through
+// node; a member_path on the def itself never reaches here, rejected
+// earlier by adt_flatten's upfront scan, I4-alt final review). A
+// non-registry `typed` (an ordinary base type) passes through
 // untouched, same as everywhere else. An alias-typed def (`i:byte := in
 // console.`) rewrites its `typed` to the alias target, same as any other
 // alias annotation (adt_flatten_rewrite_ref's own `typed` handling). A
@@ -747,13 +793,28 @@ std::optional<tref> adt_flatten_rewrite_io_def(tref n,
 	using tt = typename tau::traverser;
 
 	tref head = tau::get(n).first(); // io def's own var_name (bare, no `variable` wrapper)
+	size_t root_sid = tau::get(head).data();
+	// A redefinition of this SAME root name under a non-tuple annotation (or
+	// none at all) retires any STALE ctx->adt_streams entry a PRIOR
+	// tuple-typed declaration of the same root left behind (C2/minor #8).
+	// Without this: (1) repl_evaluator::get_applied's own
+	// adt_streams-contains skip (repl_evaluator.tmpl.h) would keep treating
+	// this now-plain stream as an already-registered tuple forever, silently
+	// dropping every later normalize/sat/solve/run reference to it; (2)
+	// io_context::update_types' own adt_streams-contains skip (added for
+	// C2's phantom-type fix, io_context.tmpl.h) would likewise keep refusing
+	// to (re)type/register the redefined plain stream at all. Harmless when
+	// there was nothing to retire (map::erase on a missing key is a no-op).
+	auto retire_stale_adt_stream = [&] { if (ctx) ctx->adt_streams.erase(root_sid); };
+
 	tref typed_node = adt_flatten_find_child<node>(n, tau::typed);
-	if (!typed_node) return n; // no annotation at all: nothing to do
+	if (!typed_node) { retire_stale_adt_stream(); return n; } // no annotation at all: nothing to do
 
 	size_t tname = tt(typed_node) | tau::type | tt::data;
-	if (!reg.defines(tname)) return n; // ordinary base type: untouched
+	if (!reg.defines(tname)) { retire_stale_adt_stream(); return n; } // ordinary base type: untouched
 
 	if (reg.is_alias(tname)) {
+		retire_stale_adt_stream();
 		trefs children;
 		for (tref c : tau::get(n).get_children())
 			children.push_back(c == typed_node ? reg.alias_target(tname) : c);
@@ -772,7 +833,6 @@ std::optional<tref> adt_flatten_rewrite_io_def(tref n,
 		return tref{ nullptr };
 	}
 
-	size_t root_sid = tau::get(head).data();
 	std::string root_name = dict(root_sid);
 	bool is_input = tau::get(n).is(tau::input_def);
 	auto& root_map = is_input ? ctx->inputs : ctx->outputs;
@@ -784,6 +844,17 @@ std::optional<tref> adt_flatten_rewrite_io_def(tref n,
 		stream_id = it->second;
 		root_map.erase(it);
 	}
+	// C2: the root's own BA type entry -- if any (e.g. left behind by a
+	// PRIOR REPL line's own inference pass over this same root name, or by
+	// this very parse's inference once it reaches the def_input_cmd/
+	// def_output_cmd path's preserved, un-flattened echo copy of this def --
+	// see io_context::update_types' own adt_streams-contains guard for that
+	// second half of the fix) -- is meaningless once only this def's flat
+	// members survive in the tree. Erasing it here keeps ctx->types
+	// consistent with ctx->inputs/outputs at the point this function itself
+	// controls; update_types' guard (io_context.tmpl.h) is what keeps it
+	// from being reinstated afterward within the SAME parse.
+	ctx->types.erase(root_hvar);
 
 	adt_stream_layout<node> layout;
 	layout.root_name_sid = root_sid;
@@ -923,13 +994,55 @@ std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 	return tau::get_typed(nt, new_kids, t.get_ba_type());
 }
 
+// I4-alt (final review): an io stream def's own head may never carry a
+// member_path. parser/tau.tgf's grammar still allows one syntactically
+// (`input_def/output_def => io_var_name [member_path] [typed] ...` --
+// changing the grammar itself re-drifted unrelated nonterminal-id-derived
+// test orderings AND deterministically tripped a latent, pre-existing DBG
+// assertion in anti_prenex/hooks.tmpl.h on an unrelated test, so per the
+// final reviewer's sanctioned alternative the grammar stays as committed
+// and this is rejected here instead), but it is always meaningless:
+// input_def/output_def are never wrapped in a `variable` node (see
+// adt_flatten_collect_local's own comment on this same shape), so nothing
+// downstream ever resolves a path against a registry for it, and
+// process_io_def (tau_tree_from_parser.tmpl.h) would silently register the
+// stream under the BARE head name regardless, discarding the path --
+// exactly the "p.a := in console." mis-registers under "p" silently bug
+// the finding called out.
+template <NodeType node>
+bool adt_flatten_check_io_def_head(tref n) {
+	using tau = tree<node>;
+	tref mp = adt_flatten_find_child<node>(n, tau::member_path);
+	if (!mp) return true;
+	LOG_ERROR << "ADT: io stream definitions take a plain stream name; "
+		"declare the stream with a tuple type instead ('"
+		<< adt_flatten_describe_var<node>(n) << "' := "
+		<< (tau::get(n).is(tau::input_def) ? "in" : "out")
+		<< " ...)\n";
+	return false;
+}
+
 // -----------------------------------------------------------------------------
 // Top-level entry point.
 
 template <NodeType node>
 tref adt_flatten(tref spec, io_context<node>* ctx) {
+	using tau = tree<node>;
 	auto reg_opt = adt_registry<node>::build(spec);
 	if (!reg_opt) return nullptr; // adt_registry::build already LOG_ERROR'd
+
+	// Reject every input_def/output_def whose own head carries a
+	// member_path, unconditionally -- BEFORE the empty-registry fast path
+	// below, so this applies even to a spec with no type_defs at all (e.g.
+	// a plain `p.a := in console.`, no ADTs involved). select_all finds an
+	// input_def/output_def wherever it sits in the tree, so this covers
+	// both a spec-file def (under definitions/spec_multiline) and a REPL
+	// def (under def_input_cmd/def_output_cmd) alike, with no separate
+	// per-path handling needed.
+	for (tref d : tau::get(spec).select_all(is<node, tau::input_def>))
+		if (!adt_flatten_check_io_def_head<node>(d)) return nullptr;
+	for (tref d : tau::get(spec).select_all(is<node, tau::output_def>))
+		if (!adt_flatten_check_io_def_head<node>(d)) return nullptr;
 
 	// Fast path. Idempotence relies on this being solely "registry empty",
 	// not also "no member_path nodes": the first flatten erases every

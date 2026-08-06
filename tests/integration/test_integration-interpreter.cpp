@@ -211,12 +211,22 @@ TEST_SUITE("Execution") {
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
+			// Nonterminal-id re-drift (I4) produced a Release-only ordering
+			// not previously listed; verified: valid ((o1[t] = this[t] &&
+			// u[t] = i1[t] && o2[t] = 0) <-> (o1[t] = this[t] && o2[t] = 0
+			// && u[t] = i1[t])) => T ("always" preserves pointwise logical
+			// equivalence, same as the index-3 case below). Appended, not
+			// placed at [0], to keep Debug's existing canonical unchanged.
+			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 		}, {
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau",
 			"always o2[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau",
 			"always o1[t]:tau = this[t]:tau && o2[t]:tau = 0 && u[t]:tau = i1[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
+			// Same new Release-only ordering as the previous block, appended
+			// for the same reason.
+			"always o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 		}, {
 			// verified: valid ((p = 0 && q = 0 && r = 0 && s = 0) <-> (q = 0 &&
 			// p = 0 && r = 0 && s = 0)) => T (AND-commutativity of the o2/o3
@@ -230,6 +240,12 @@ TEST_SUITE("Execution") {
 			"always u[t]:tau = i1[t]:tau && o2[t]:tau = 0 && o3[t]:tau = 0 && o1[t]:tau = this[t]:tau",
 			"always o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o1[t]:tau = this[t]:tau && o2[t]:tau = 0",
 			"always o2[t]:tau = 0 && o1[t]:tau = this[t]:tau && u[t]:tau = i1[t]:tau && o3[t]:tau = 0",
+			// Nonterminal-id re-drift (I4) produced another Release-only
+			// ordering not previously listed; verified: valid ((o1[t] =
+			// this[t] && o3[t] = 0 && u[t] = i1[t] && o2[t] = 0) <->
+			// (o2[t] = 0 && o3[t] = 0 && o1[t] = this[t] && u[t] = i1[t]))
+			// => T. Appended, not placed at [0].
+			"always o1[t]:tau = this[t]:tau && o3[t]:tau = 0 && u[t]:tau = i1[t]:tau && o2[t]:tau = 0",
 		}
 		};
 		io_context<node_t> ctx;

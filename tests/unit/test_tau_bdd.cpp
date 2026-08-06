@@ -149,11 +149,14 @@ TEST_SUITE("BDD creation terms") {
 		// a hash/nt-id-order-dependent tie-break, same mechanism as elsewhere
 		// in this suite). Appended, not placed at [0], to keep Debug's
 		// existing canonical entry unchanged.
+		// "qyrtxwze" (I4's nonterminal-id re-drift, Release-only) verified:
+		// valid (qyrtxwze = xyzqwert) => T — same mechanism, also appended.
 		CHECK((result == "xyzqwert"
 			|| result == "ewytrxzq"
 			|| result == "zrwyexqt"
 			|| result == "xtzqrewy"
-			|| result == "qxywrezt"));
+			|| result == "qxywrezt"
+			|| result == "qyrtxwze"));
 	}
 }
 
@@ -197,7 +200,12 @@ TEST_SUITE("BDD and many") {
 		// "xyfedcab" verified: valid (xyfedcab = xycdabfe) => T (bdd_and_many's
 		// merge order is a hash/nt-id-order-dependent tie-break, same as the
 		// other node-hash-derived orderings elsewhere in this suite).
+		// "xycdbafe" (I4's nonterminal-id re-drift; same in both Debug and
+		// Release) verified: valid (xycdbafe = xyfedcab) => T -- same
+		// multiset {a,b,c,d,e,f} as every other variant here, pure
+		// AND-commutative permutation.
 		CHECK((result == "xyfedcab"
+			|| result == "xycdbafe"
 			|| result == "xycdabfe" || result == "xycdabef"
 			|| result == "xydcbafe" || result == "xydcabef"
 			|| result == "xydcfeab" || result == "xycdfeab" ));
@@ -237,11 +245,15 @@ TEST_SUITE("BDD and many") {
 		// (same hash/nt-id-order-dependent merge-order tie-break as elsewhere
 		// in this suite). Appended, not placed at [0], to keep Debug's
 		// existing canonical entry unchanged.
+		// "bccda&(f'e')'" (I4's nonterminal-id re-drift, Release-only)
+		// verified: valid (bccda&(f'e')' = ab&(f'e')'bccd) => T — same
+		// mechanism, also appended.
 		CHECK((result == "ab&(f'e')'bccd"
 			|| result == "cabb&(e'f')'d"
 			|| result == "adbb&(e'f')'cc"
 			|| result == "abbccd&(f'e')'"
-			|| result == "(f'e')'adbbcc"));
+			|| result == "(f'e')'adbbcc"
+			|| result == "bccda&(f'e')'"));
 	}
 }
 
@@ -634,7 +646,11 @@ TEST_SUITE("BDD term_handle quantifier elimination") {
 		hbdd::quants q = {{tx, bdd::all}};
 		tref result = h.bdd_quant(q, o).to_tau_term(1);
 		// ∀x(xa|x'b) = cofactor[x=0]·cofactor[x=1] = b·a
-		CHECK(tau::get(result).to_str() == "ba");
+		// "ab" (Release-only variant) verified: valid (ab = ba) => T --
+		// pure AND-commutative permutation (same hash/nt-id-order-dependent
+		// tie-break as elsewhere in this suite).
+		auto result_str = tau::get(result).to_str();
+		CHECK((result_str == "ba" || result_str == "ab"));
 	}
 }
 

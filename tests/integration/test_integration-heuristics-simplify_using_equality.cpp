@@ -447,6 +447,13 @@ TEST_SUITE("simplify_using_equality") {
 		CHECK( matches_to_str_to_any_of(res, {
 			"x = 0 || y = x || z = x",
 			"x = 0 || x = y || z = x",
+			// A grammar edit tried during Task 12's fix wave (later reverted;
+			// see the design doc) re-drifted this to a THIRD variant with
+			// BOTH equations flipped -- verified: valid ((x = 0 || x = y ||
+			// x = z) <-> (x = 0 || y = x || z = x)) => T. Kept appended
+			// (harmless in an any-of list) in case a future grammar change
+			// lands on it again.
+			"x = 0 || x = y || x = z",
 		}) );
 	}
 

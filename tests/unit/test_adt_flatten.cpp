@@ -54,6 +54,40 @@ TEST_SUITE("adt flatten") {
 	TEST_CASE("tuple var in inequality op")  { CHECK(flat(PT "ex x:Point ex y:Point x < y.") == nullptr); }
 	TEST_CASE("unknown member")              { CHECK(flat(PT "ex x:Point x.c = 0.") == nullptr); }
 	TEST_CASE("shape mismatch")              { CHECK(flat(PT "type Q = {a: sbf}. ex x:Point ex y:Q x = y.") == nullptr); }
+	// C1 (final review): tuple equality's shape check used to compare only
+	// member COUNT and pairwise BASE TYPES, so two same-arity, same-base-
+	// type-per-position but otherwise unrelated tuples expanded positionally
+	// instead of failing. The fix also compares each member's path SUFFIX
+	// relative to the resolved prefix.
+	TEST_CASE("cross-name same-arity equality fails") {
+		// Same arity (2) and same base types (sbf, sbf) at each position,
+		// but DIFFERENT member names -- the pre-fix positional check would
+		// have accepted this and expanded x.a = y.c, x.b = y.d.
+		CHECK(flat("type A = {a: sbf, b: sbf}. type B = {c: sbf, d: sbf}. "
+			"ex x:A ex y:B x = y.") == nullptr);
+	}
+	TEST_CASE("cross-depth same-base-types equality fails") {
+		// C's one member "p" splices A's own two members in, giving C the
+		// SAME arity (2) and SAME base types (sbf, sbf) as A itself -- but
+		// at different, differently-named member paths ("a"/"b" vs
+		// "p.a"/"p.b"). The pre-fix positional check would have accepted
+		// this too.
+		CHECK(flat("type A = {a: sbf, b: sbf}. type C = {p: A}. "
+			"ex x:A ex y:C x = y.") == nullptr);
+	}
+	TEST_CASE("cross-depth same-shape equality via a different route still expands") {
+		// l.p (a partial path into Line reaching Point) and x (a bare
+		// Point) reach the SAME member paths ("a"/"b") by different routes
+		// -- this positive case (previously untested) confirms the new
+		// structural check compares PATH SUFFIXES, not raw dotted names, so
+		// this still expands correctly rather than being caught as a
+		// false-positive mismatch.
+		check_flat(
+			"type Point = {a: sbf, b: sbf}. type Line = {p: Point, q: Point}. "
+			"ex l:Line ex x:Point l.p = x.",
+			"ex l.p.a:sbf, l.p.b:sbf, l.q.a:sbf, l.q.b:sbf "
+			"ex x.a:sbf, x.b:sbf (l.p.a = x.a && l.p.b = x.b).");
+	}
 	TEST_CASE("conflicting annotations")     { CHECK(flat(PT "type Q = {a: sbf}. ex x:Point x.a = 0 && x:Q x.a = 1.") == nullptr); }
 	TEST_CASE("idempotent") {
 		tref once = flat(PT "ex x:Point x = 0.");
@@ -266,6 +300,51 @@ TEST_SUITE("adt io defs") {
 		CHECK(ctx.adt_streams.empty());
 		CHECK(ctx.inputs.size() == 1); // still ONE root stream, not split into members
 		CHECK(tau::get(t).to_str().find("byte") == std::string::npos); // alias rewritten away
+	}
+	// C2 (final review): adt_flatten_rewrite_io_def erased the tuple root
+	// from ctx.inputs/outputs but left its ctx.types entry (if any) behind.
+	TEST_CASE("tuple io def root has no BA type entry after flattening") {
+		io_context<node_t> ctx;
+		tref t = tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx });
+		REQUIRE(t != nullptr);
+		tref root_var = build_canonized_io_var<node_t>("p");
+		CHECK(ctx.type_of(root_var) == 0); // untyped: no phantom "p:Point" entry
+	}
+	// C2's actual live repro: the REPL's def_input_cmd/def_output_cmd path
+	// (parser/tau.tgf's `cli` grammar) keeps the ORIGINAL, un-flattened def
+	// node (still typed `Point`) in the tree for echo (see
+	// adt_flatten_rewrite's `case tau::def_input_cmd` in adt_flatten.tmpl.h),
+	// so -- unlike every other case in this suite, which parses with the
+	// `spec`/`spec_multiline` start and .infer_ba_types = false -- this one
+	// parses with the `cli` start and .infer_ba_types left at its true
+	// default, exactly like the REPL's own make_cli (repl_evaluator.tmpl.h).
+	// Before the fix, ordinary BA type inference resolved that surviving raw
+	// copy's `typed: Point` annotation as if it were any other opaque custom
+	// base type, and io_context::update_types then recreated the bare root's
+	// ctx.types/ctx.inputs entries right after the flattener had erased them
+	// -- all within this SAME parse -- so a later reference to the bare
+	// root name (e.g. a separate REPL line's `i[t]`) would pick up a
+	// phantom "Point" type.
+	TEST_CASE("tuple io def root stays untyped through the REPL's cli grammar too") {
+		io_context<node_t> ctx;
+		// Mirrors repl_evaluator<BAs...>::make_cli's own options
+		// (repl_evaluator.tmpl.h) as closely as a direct tau::get() call
+		// allows, so this actually exercises the same pipeline the REPL
+		// itself runs a `type ... ` + io def line through.
+		tau::get_options opts{
+			.parse = { .start = tau::cli },
+			.infer_ba_types = true,
+			.use_default_types = false,
+			.reget_with_hooks = false,
+			.context = &ctx
+		};
+		tref t = tau::get(std::string(PT "p:Point := in console."), opts);
+		REQUIRE(t != nullptr);
+		tref root_var = build_canonized_io_var<node_t>("p");
+		CHECK(ctx.type_of(root_var) == 0);   // no phantom "p:Point" entry
+		CHECK(ctx.inputs.size() == 2);       // members only, root not reinstated
+		CHECK_FALSE(ctx.inputs.contains(root_var));
 	}
 }
 
