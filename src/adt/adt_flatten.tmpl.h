@@ -726,10 +726,13 @@ std::optional<tref> adt_flatten_rewrite_equality(tref n, size_t nt,
 // construction, before the flattener ever runs -- that entry is REPLACED
 // here by one entry per flat member (dotted name, same stream_id), the
 // layout is recorded in `ctx->adt_streams` (keyed by the root's own name
-// sid), and the def statement itself is dropped from the rebuilt tree
-// (returning a null tref, the same "drop me" signal `definitions`/
-// `spec_multiline` already use for an erased type_def -- see their cases in
-// adt_flatten_rewrite below, which are the only callers of this function).
+// sid), and the def statement's caller is told to drop it (returning a null
+// tref) -- called from adt_flatten_rewrite's `definitions`/`spec_multiline`
+// case, which actually drops it, and its `def_input_cmd`/`def_output_cmd`
+// case (the REPL form of the same def), which does NOT: that case keeps the
+// original child for def_input_cmd()/def_output_cmd() (repl_evaluator) to
+// still store/echo, while this function's registration side effect on
+// `ctx` has already happened by the time it returns.
 // The formula side (`p[t] = 0`, `p[t].a`, ...) is flattened member-wise
 // through the ordinary equality/quantifier/ref-arg rules elsewhere in this
 // file, using the SAME per-member io_var construction
@@ -831,11 +834,15 @@ std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 	auto t = tau::get(n);
 	auto nt = t.get_type(); // node::type; kept as such (not size_t) so it can
 	                         // be passed straight to tau::get_typed() below
-	// An input_def/output_def can ONLY ever appear as a direct child of
-	// `definitions`/`spec_multiline` (parser/tau.tgf's `spec_part`) -- never
-	// nested inside a quantifier/rec_relation/ref/equality -- so this is the
-	// only place that needs to special-case it (adt_flatten_rewrite_io_def
-	// is never reached any other way).
+	// An input_def/output_def appears as a direct child of `definitions`/
+	// `spec_multiline` (parser/tau.tgf's `spec_part`) in a spec-file-shaped
+	// tree, or as the sole child of a `def_input_cmd`/`def_output_cmd` node
+	// (parser/tau.tgf's `input_def :def_input_cmd` / `output_def
+	// :def_output_cmd`) in the REPL's `cli` grammar -- never nested inside a
+	// quantifier/rec_relation/ref/equality -- so these are the only two
+	// places that need to special-case it (adt_flatten_rewrite_io_def is
+	// never reached any other way). See the `case tau::def_input_cmd`
+	// below for the REPL path.
 	auto rewrite_child = [&](tref g) -> std::optional<tref> {
 		if (tau::get(g).is(tau::input_def) || tau::get(g).is(tau::output_def))
 			return adt_flatten_rewrite_io_def<node>(g, reg, ctx);
@@ -856,6 +863,26 @@ std::optional<tref> adt_flatten_rewrite(tref n, const adt_registry<node>& reg,
 		return adt_flatten_rewrite_ref<node>(n, reg, scopes, false, ctx);
 	case tau::rec_relation:
 		return adt_flatten_rewrite_rec_relation<node>(n, reg, std::move(scopes), ctx);
+	case tau::def_input_cmd: case tau::def_output_cmd: {
+		// REPL form of an io def. adt_flatten_rewrite_io_def's registration
+		// side effect (ctx->adt_streams plus the per-member ctx->inputs/
+		// outputs entries -- what lets Task 8's grouped reader/writer and
+		// continue_running's combined tuple-literal prompt find a tuple
+		// stream's members) must run here too, exactly like the
+		// definitions/spec_multiline case above. Unlike that case, though,
+		// a REPL command is never erased: def_input_cmd()/def_output_cmd()
+		// (repl_evaluator.tmpl.h) need their own child intact afterward, to
+		// store and echo it back to the user -- so a tuple-typed def's
+		// "drop me" (nullptr) signal is deliberately NOT propagated
+		// upward here; only an alias rewrite (a non-null, changed tref)
+		// replaces the child, and the original child is kept otherwise.
+		tref g = t.first();
+		auto rc = adt_flatten_rewrite_io_def<node>(g, reg, ctx);
+		if (!rc) return std::nullopt;
+		tref new_child = *rc ? *rc : g;
+		if (new_child == g) return n;
+		return tau::get_typed(nt, trefs{ new_child }, t.get_ba_type());
+	}
 	case tau::definitions: {
 		trefs kept;
 		for (tref g : t.get_children()) {

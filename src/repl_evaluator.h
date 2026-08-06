@@ -199,6 +199,8 @@ private:
 	void def_input_cmd(const tt& n);
 	/// @brief Define an output stream from @p n.
 	void def_output_cmd(const tt& n);
+	/// @brief Define an ADT type from @p n.
+	void def_type_cmd(const tt& n);
 
 	/// @brief Print a "not implemented yet" message.
 	void not_implemented_yet();
@@ -295,6 +297,10 @@ private:
 	options opt{};
 	trefs rr_defs;
 	trefs io_defs;
+	// ADT type_def statements accepted via def_type_cmd, kept so they can be
+	// prepended (before rr_defs/io_defs) wherever a spec is assembled from
+	// stored definitions -- see get_applied().
+	trefs type_defs;
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 #ifdef TAU_PARSER_HAS_FTXUI

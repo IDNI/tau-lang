@@ -561,6 +561,25 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case typed:
 				type_printed = true;
 				out(":"); break;
+			// ADT type declarations (parser/tau.tgf: type_def => "type" __
+			// type_name [(__ "of" __ | _ '/' _) type_parents]
+			// (__ "is" __ | _ '=' _) type_body; type_body => tuple |
+			// type [_ '[' _ subtype _ ']']). Printed canonically as
+			// `type Name [of (Parent, ...)] = Body` -- always the
+			// "of"/"=" spelling, never "/"/"is", both grammar-legal
+			// alternatives for the same production. type_name itself
+			// (type_def's own name, or each type_parents entry) needs no
+			// case: it's a plain `chars` leaf, already handled by the
+			// `is_string_nt` default below. A `tuple` type_body's own
+			// `member` (member_name typed) also needs no case: member_name
+			// prints via that same default, immediately followed by
+			// `typed`'s ":" case above -- e.g. "a:sbf", the same colon
+			// convention `typed` prints everywhere else (a variable
+			// annotation, an io def, ...), not a space-separated "a: sbf".
+			case type_def:          out("type "); break;
+			case type_parents:      out(" of ("); break;
+			case type_body:         out(" = "); break;
+			case tuple:             out("{"); break;
 			case bf_and:
 				type_printed = false;
 				break;
@@ -785,7 +804,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 			case rec_relation:      out(" := "); break;
 			case ref_args:
-			case offsets:           out(", "); break;
+			case offsets:
+			case type_parents:      // ", "-separated type_name list
+			case tuple:             out(", "); break; // ", "-separated member list
 			case shift:             out("-"); break;
 			case variable:
 			case ba_constant:       break;
@@ -838,6 +859,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case subtype:
 			case inst_cmd:
 			case subst_cmd:         out("]"); break;
+			case type_parents:      out(")"); break;
+			case tuple:             out("}"); break;
 			case offset:            if (pnt == io_var) out("]");
 						break;
 			case ref_args:          out(")"); break;

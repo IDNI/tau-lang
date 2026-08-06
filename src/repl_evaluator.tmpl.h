@@ -183,6 +183,9 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 	// create a spec from the arg and add io and rr defs
 	tau_spec<node> spec;
 	spec.add(arg);
+	// type_defs first: the registry must see every type before rr_defs/
+	// io_defs are added, regardless of the order they were declared in.
+	for (tref d : type_defs) spec.add(d);
 	for (tref d : rr_defs) spec.add(d);
 	for (tref d : io_defs) spec.add(d);
 	auto maybe_nso_rr = spec.get_nso_rr();
@@ -794,6 +797,15 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
 	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]).to_str() << "\n";
 }
 
+template <typename... BAs>
+requires BAsPack<BAs...>
+void repl_evaluator<BAs...>::def_type_cmd(const tt& n) {
+	type_defs.push_back(n | tt::first | tt::ref);
+	size_t idx = type_defs.size() - 1;
+	std::cout << "[" << idx + 1 << "] "
+		<< tau::get(type_defs[idx]).to_str() << "\n";
+}
+
 // make a nso_rr from the given tau source and binder.
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -1106,6 +1118,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	// definitions of i/o streams
 	case tau::def_input_cmd:      def_input_cmd(command); break;
 	case tau::def_output_cmd:     def_output_cmd(command); break;
+	// definition of ADT types
+	case tau::def_type_cmd:       def_type_cmd(command); break;
 	// qelim
 	case tau::qelim_cmd:          result = qelim_cmd(command); break;
 	case tau::comment:            break;
@@ -1522,6 +1536,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		<< "  <term_rec_relation>     defines a tau function\n"
 		<< "  <def_input_cmd>         defines an input stream variable\n"
 		<< "  <def_output_cmd>        defines an output stream variable\n"
+		<< "  <def_type_cmd>          defines an ADT type\n"
 		<< "  definitions             lists all definitions present in repl\n"
 		<< "  definitions <number>    prints predicate or function at specified position\n"
 		<< "\n"
