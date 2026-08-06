@@ -383,9 +383,13 @@ message(STATUS "CMAKE_BUILD_WITH_RPATH: ${CMAKE_BUILD_WITH_RPATH}")
 #
 if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	include(generate-parser)
+	# Keep this list in sync with scripts/regen.sh — every parser/*.tgf
+	# with a checked-in *_parser.generated.h must appear in both.
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/sbf.tgf")
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/bitvector.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/qint.tgf")
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/qlt.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/hsb.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/nlang.tgf")
 endif()
@@ -427,7 +431,8 @@ add_subdirectory("src")
 # Testing
 #
 if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_INTEGRATION
- OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS)
+ OR TAU_BUILD_API_TESTS OR TAU_BUILD_REPL_TESTS
+ OR TAU_BUILD_BENCHMARK)
 	message(STATUS "Building tests")
 	include(CTest)
 	add_subdirectory(tests)

@@ -483,9 +483,11 @@ for fixture in "${fixtures[@]}"; do
         MONITOR_PID=$!
     fi
 
-    # Wait for the fixture process to finish
-    wait "$PROC_PID" 2>/dev/null || true
-    TAU_EXIT=$?
+    # Wait for the fixture process to finish.
+    # `|| TAU_EXIT=$?` (not `|| true`) keeps `set -e` happy *and* preserves the
+    # real status; with `|| true` the following `$?` would always read 0.
+    TAU_EXIT=0
+    wait "$PROC_PID" 2>/dev/null || TAU_EXIT=$?
 
     # Stop the monitor
     if [[ -n "$MONITOR_PID" ]]; then

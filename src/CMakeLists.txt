@@ -215,7 +215,7 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/include>
 		$<BUILD_INTERFACE:${TAU}/external/cvc5/build/include>
 	)
-	add_dependencies(${TAU_BUILD_SHARED_EXECUTABLE} tau_header)
+	add_dependencies(${TAU_EXE_SHARED_NAME} tau_header)
 	if(TAU_PARSER_HAS_FTXUI_DEP)
 		target_link_libraries(${TAU_EXE_SHARED_NAME}
 			ftxui::screen ftxui::dom ftxui::component)
