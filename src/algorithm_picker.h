@@ -8,8 +8,12 @@
 // O(1); estimation formulas come from LTL_ABA_DESIGN.md per-algorithm
 // complexity analyses.
 //
-// Callers can override the pick with an env var `TAU_LTL_ALG ∈
-// {A, B, C, D, auto}`; `auto` invokes this heuristic.
+// NOT WIRED UP (LS-8).  `algpick::pick()` has no caller in src/ — only
+// tests/unit/test_algorithm_picker.cpp — so nothing in the pipeline consults
+// this heuristic.  The env var that DOES have an effect is `TAU_LTL_ALG`, read
+// directly in ltl_aba_builders.tmpl.h, and it recognises only A, B and D:
+// unset behaves as B, and any other value (there is no "auto") disables every
+// gate and falls through to the default ABA-oracle path with a warning.
 
 #ifndef __IDNI__TAU__ALGORITHM_PICKER_H__
 #define __IDNI__TAU__ALGORITHM_PICKER_H__

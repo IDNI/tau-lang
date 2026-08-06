@@ -542,6 +542,67 @@ solve_ltl_aba_algorithm_b(
 	return sol;
 }
 
+// ── Algorithm A/B soundness guards (shared with semantic_pwr_optimal) ────────
+//
+// Both guards below gate the T_3 symbolic encoding.  They were inline in
+// `solve_ltl_aba` and `semantic_pwr_optimal` ran the SAME encoding without
+// either of them (LS-2), so they are factored out here and called from both.
+
+// Algorithm A's T_3 encoding only handles atoms whose truth value is decidable
+// from a T_3 type plus the formula's named rational constants.  Atoms
+// involving the qlt extremes `{top}:qlt` / `{bot}:qlt` — or any constant whose
+// finite-rational witness is empty — yield `qlt_atom_holds_in_type3 ==
+// nullopt` for every type, leaving the atom completely unconstrained in the
+// symbolic encoding.  Without this guard ltlsynt happily synthesises a
+// strategy where `α` and `¬α` both hold simultaneously, returning REALIZABLE
+// for direct contradictions like `F(o1={top}) && G(o1!={top})`.
+template <NodeType node>
+static bool alg_a_can_classify(
+    tref fm, const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	auto a_constants = omcat::collect_qlt_constants<node>(fm);
+	auto a_T3        = omcat::enumerate_qlt_T3(a_constants);
+	if (a_T3.empty()) return false;
+	for (auto& [f, _] : atoms) {
+		bool any_determined = false;
+		for (auto& t : a_T3)
+			if (qlt_atom_holds_in_type3<node>(f, t, a_constants)
+			        .has_value())
+				{ any_determined = true; break; }
+		if (!any_determined) return false;
+	}
+	return true;
+}
+
+// Algorithm A's T_3 encoding has a SINGLE current-output slot (Y) and a SINGLE
+// past-output slot (M).  Two distinct output variables get conflated into the
+// same slot, so `o1[t]>0 && o2[t]<0` becomes "Y>0 && Y<0" — unsatisfiable in
+// any T_3 type — and the encoding returns a spurious verdict.  Multi-input is
+// fine: t3_role_of merges i_k → X but those flow through Algorithm B's P_σ
+// encoding, which is distinguisher-friendly; the conflation is harmful only on
+// the OUTPUT side.
+template <NodeType node>
+static size_t count_distinct_output_vars(
+    const std::vector<std::pair<tref, std::string>>& atoms)
+{
+	std::set<std::string> names;
+	for (auto& [f, _] : atoms) {
+		const auto& t = tree<node>::get(f);
+		if (!t.has_child()) continue;
+		auto add_side = [&](tref side) {
+			if (!side) return;
+			tref iv = tree<node>::get(side).find_top([](tref n) {
+				return is_child<node>(n, tree<node>::io_var); });
+			if (!iv) return;
+			const std::string& nm = get_var_name<node>(iv);
+			if (!nm.empty() && nm[0] == 'o') names.insert(nm);
+		};
+		add_side(t[0].first());
+		add_side(t[0].second());
+	}
+	return names.size();
+}
+
 template <NodeType node>
 static std::optional<LtlAbaSolution<node>>
 solve_ltl_aba(tref fm)
@@ -641,6 +702,23 @@ solve_ltl_aba(tref fm)
 		const char* alg_env = std::getenv("TAU_LTL_ALG");
 		const bool alg_b_mode = !alg_env || std::string_view(alg_env) == "B";
 		const bool alg_a_mode = alg_env && std::string_view(alg_env) == "A";
+		// LS-8: only A, B and D are recognised.  Anything else — "C", "auto",
+		// a typo — silently disables every gate and falls through to the
+		// default ABA-oracle path, which is not what the documentation used
+		// to describe.  Say so, once.
+		if (alg_env && *alg_env) {
+			std::string_view v(alg_env);
+			if (v != "A" && v != "B" && v != "D") {
+				static bool warned = false;
+				if (!warned) {
+					warned = true;
+					LOG_WARNING << "[ltl_aba] TAU_LTL_ALG=\"" << v
+					            << "\" is not recognised (only A, B and D "
+					               "are); falling through to the default "
+					               "ABA-oracle path\n";
+				}
+			}
+		}
 		if (is_algorithm_a_applicable<node>(sol.atoms)) {
 			// Check whether any atom has an input variable.
 			bool any_input = false;
@@ -661,31 +739,12 @@ solve_ltl_aba(tref fm)
 			// `F(o1={top}) && G(o1!={top})`.  Falling through to
 			// the default add_consistency_constraints + ABA-oracle
 			// path catches these correctly.
-			bool alg_a_can_classify = true;
-			{
-				auto a_constants = omcat::collect_qlt_constants<node>(fm);
-				auto a_T3        = omcat::enumerate_qlt_T3(a_constants);
-				if (a_T3.empty())
-					alg_a_can_classify = false;
-				else for (auto& [f, _] : sol.atoms) {
-					bool any_determined = false;
-					for (auto& t : a_T3) {
-						auto h = qlt_atom_holds_in_type3<node>(
-						    f, t, a_constants);
-						if (h.has_value()) {
-							any_determined = true;
-							break;
-						}
-					}
-					if (!any_determined) {
-						alg_a_can_classify = false;
-						LOG_DEBUG << "[ltl_aba] atom outside T_3 "
-						             "(top/bot qlt constant?) — "
-						             "skipping Algorithm A";
-						break;
-					}
-				}
-			}
+			bool alg_a_can_classify_ok =
+				alg_a_can_classify<node>(fm, sol.atoms);
+			if (!alg_a_can_classify_ok)
+				LOG_DEBUG << "[ltl_aba] atom outside T_3 "
+				             "(top/bot qlt constant?) — "
+				             "skipping Algorithm A";
 
 			// Algorithm A's T_3 encoding has a SINGLE current-output slot
 			// (Y) and a SINGLE past-output slot (M).  Two distinct output
@@ -701,32 +760,18 @@ solve_ltl_aba(tref fm)
 			// flow through Algorithm B's P_σ encoding which is
 			// distinguisher-friendly.  The conflation is harmful only on
 			// the OUTPUT side.)
-			std::set<std::string> distinct_output_names;
-			for (auto& [f, _] : sol.atoms) {
-				const auto& t = tree<node>::get(f);
-				if (!t.has_child()) continue;
-				auto add_side = [&](tref side) {
-					if (!side) return;
-					tref iv = tree<node>::get(side).find_top([](tref n) {
-						return is_child<node>(n, tree<node>::io_var); });
-					if (!iv) return;
-					const std::string& nm = get_var_name<node>(iv);
-					if (!nm.empty() && nm[0] == 'o')
-						distinct_output_names.insert(nm);
-				};
-				add_side(t[0].first());
-				add_side(t[0].second());
-			}
-			if (distinct_output_names.size() > 1) {
-				alg_a_can_classify = false;
+			const size_t n_out_vars =
+				count_distinct_output_vars<node>(sol.atoms);
+			if (n_out_vars > 1) {
+				alg_a_can_classify_ok = false;
 				LOG_DEBUG << "[ltl_aba] multiple output vars ("
-				          << distinct_output_names.size()
+				          << n_out_vars
 				          << ") — Algorithm A's single-Y/M slot would "
 				             "conflate them; falling through to default "
 				             "ABA-oracle path";
 			}
 
-			if (!any_input && alg_a_can_classify) {
+			if (!any_input && alg_a_can_classify_ok) {
 				// Pure-output: Algorithm A is sound and fast.
 				LOG_DEBUG << "[ltl_aba] using Algorithm A (pure-output)";
 				return solve_ltl_aba_algorithm_a<node>(fm, sol.atoms);
@@ -739,7 +784,7 @@ solve_ltl_aba(tref fm)
 			// must fall through to the default add_consistency_constraints
 			// path, which uses the ABA oracle directly and catches the
 			// pairwise-infeasibility constraints those atoms induce.
-			if (alg_b_mode && alg_a_can_classify) {
+			if (alg_b_mode && alg_a_can_classify_ok) {
 				// Fast-path: constant-output strategy check. If the system
 				// can pick fixed output values that reduce the formula to a
 				// tautology over remaining (input) atoms, REALIZABLE.
@@ -761,7 +806,7 @@ solve_ltl_aba(tref fm)
 				LOG_DEBUG << "[ltl_aba] using Algorithm B (P_σ binary encoding)";
 				return solve_ltl_aba_algorithm_b<node>(fm, sol.atoms);
 			}
-			if (!alg_a_can_classify)
+			if (!alg_a_can_classify_ok)
 				LOG_DEBUG << "[ltl_aba] T_3 cannot classify atoms — "
 				             "falling through to default ABA-oracle path";
 		} else if (alg_b_mode) {

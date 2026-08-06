@@ -167,6 +167,33 @@ tref semantic_pwr_optimal(tref clause, tref update, const int_t start_time) {
 	if (has_input) return nullptr;
 	if (!is_algorithm_a_applicable<node>(atoms)) return nullptr;
 
+	// LS-2: the encoding below is Algorithm A's T_3 encoding, but it used to
+	// run WITHOUT either of the two soundness guards `solve_ltl_aba` applies
+	// to that same encoding.  Both matter here for the same reasons:
+	//
+	//   * an atom no T_3 type can classify (a `{top}:qlt` / `{bot}:qlt`
+	//     constant) gives `qlt_atom_holds_in_type3 == nullopt` for every
+	//     type, and the `h != false` test below maps nullopt to "the atom
+	//     holds" — so the atom is silently asserted rather than left out;
+	//   * two or more distinct output variables share the single Y slot, so
+	//     `o1 < c && o2 > c` collapses to a constraint on one witness.
+	//
+	// Either way `type_A` and the winning region are garbage, and the final
+	// `is_tau_formula_sat(theta)` does not catch it: that only checks that θ
+	// is realizable, not that G(Win) encodes the real winning region.  Fall
+	// back to fast mode instead.
+	if (!alg_a_can_classify<node>(clause_and_update, atoms)) {
+		LOG_DEBUG << "[semantic_pwr] atom outside T_3 (top/bot qlt "
+		             "constant?) — optimal mode not applicable";
+		return nullptr;
+	}
+	if (size_t n_out = count_distinct_output_vars<node>(atoms); n_out > 1) {
+		LOG_DEBUG << "[semantic_pwr] " << n_out << " output variables — "
+		             "Algorithm A's single Y/M slot would conflate them; "
+		             "optimal mode not applicable";
+		return nullptr;
+	}
+
 	// Collect qlt constants and enumerate T3 types.
 	auto constants = omcat::collect_qlt_constants<node>(clause_and_update);
 	auto T3 = omcat::enumerate_qlt_T3(constants);

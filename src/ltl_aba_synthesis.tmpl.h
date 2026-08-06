@@ -372,6 +372,83 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 	return aut;
 }
 
+// ── Algorithm D: ltlsynt → parity game ───────────────────────────────────────
+//
+// Declared in algorithm_d_game.h and defined here so it can use the same
+// tempfile + posix_spawn mechanism `call_ltlsynt` uses (LS-10).
+//
+// It used to be popen + an inline `--formula="…"` with hand-rolled escaping of
+// only `" \ $ \``.  That is the exact pattern `call_ltlsynt` retired: a single
+// argument is capped at the Linux MAX_ARG_STRLEN of 131072, so a grown φ*
+// (Algorithm B with many constants, or the semantic-PWR fallback) hits E2BIG
+// and comes back as an empty game — which every caller reads as
+// "unrealizable".  `-F path` has no such cap and needs no escaping at all.
+
+namespace alg_d {
+
+inline SynthGame call_ltlsynt_game(
+	const std::string& phi_prop,
+	const std::vector<std::string>& ins,
+	const std::vector<std::string>& outs)
+{
+	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).
+	struct game_cache_key {
+		std::string formula;
+		std::vector<std::string> ins, outs;
+		bool operator==(const game_cache_key& o) const {
+			return formula == o.formula && ins == o.ins && outs == o.outs;
+		}
+	};
+	struct game_cache_hash {
+		size_t operator()(const game_cache_key& k) const {
+			size_t h = std::hash<std::string>{}(k.formula);
+			for (auto& s : k.ins)  h ^= std::hash<std::string>{}(s) + 0x9e3779b9 + (h << 6) + (h >> 2);
+			for (auto& s : k.outs) h ^= std::hash<std::string>{}(s) + 0x517cc1b7 + (h << 6) + (h >> 2);
+			return h;
+		}
+	};
+	static std::unordered_map<game_cache_key, SynthGame, game_cache_hash> cache;
+	game_cache_key key{phi_prop, ins, outs};
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+
+	// Configurable timeout (same env var as call_ltlsynt).
+	int timeout_sec = 60;
+	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
+		timeout_sec = std::atoi(env_sec);
+		if (timeout_sec < 0) timeout_sec = 0;
+	}
+
+	std::string tmpfile_path = write_tempfile("tau_lang_game", phi_prop + "\n");
+	if (tmpfile_path.empty()) {
+		LOG_ERROR << "[ltl_aba] failed to write temp file for ltlsynt input\n";
+		return {};  // transient — don't cache
+	}
+
+	std::vector<std::string> argv = {
+	    "ltlsynt", "-F", tmpfile_path, "--print-game-hoa"};
+	auto csv = [](const std::vector<std::string>& v) {
+		std::string r;
+		for (size_t i = 0; i < v.size(); ++i) { if (i) r += ","; r += v[i]; }
+		return r;
+	};
+	if (!ins.empty())  argv.push_back("--ins="  + csv(ins));
+	if (!outs.empty()) argv.push_back("--outs=" + csv(outs));
+
+	auto [hoa, exit_code] = spawn_capture(argv, timeout_sec);
+	std::remove(tmpfile_path.c_str());
+
+	// Don't cache a timeout, a missing binary, or any other transient failure:
+	// the output may be partial even when non-empty.  ltlsynt exits 0 for
+	// REALIZABLE and 1 for UNREALIZABLE — both are definitive.
+	if (exit_code != 0 && exit_code != 1) return {};
+	if (hoa.empty()) { cache[key] = {}; return {}; }
+	auto result = parse_synth_game_hoa(hoa);
+	cache[key] = result;
+	return result;
+}
+
+} // namespace alg_d
+
 // ── DPA extraction — Algorithm D Phase 1 ─────────────────────────────────────
 
 inline std::string call_ltl2tgba_dpa(const std::string& ltl_formula) {

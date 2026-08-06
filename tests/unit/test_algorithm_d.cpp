@@ -548,6 +548,30 @@ State: 1
 		CHECK(W1.count(2));
 	}
 
+	// ── LS-10: call_ltlsynt_game's input mechanism ───────────────────────
+	//
+	// `call_ltlsynt` retired inline `--formula="…"` for tempfile +
+	// posix_spawn precisely because a grown formula (Algorithm B with many
+	// constants) blows past the Linux MAX_ARG_STRLEN cap of 131072 on a
+	// single argument.  `call_ltlsynt_game` — the entry point for Algorithm D
+	// and for semantic_pwr_optimal — kept the old popen path, so the same
+	// formula comes back as an empty game, which every caller reads as
+	// "unrealizable".
+	TEST_CASE("[ALG-D-48] a formula past MAX_ARG_STRLEN still produces a game") {
+		// Skip when ltlsynt is not on PATH: nothing to compare against.
+		auto small = alg_d::call_ltlsynt_game("d_0", {}, {"d_0"});
+		if (small.num_states == 0) return;
+
+		// 140000 characters — just past the 131072-byte single-argument cap.
+		// The conjunction is trivially reducible, so ltlsynt itself is cheap;
+		// only the argument length is under test.
+		std::string big = "d_0";
+		big.reserve(150000);
+		while (big.size() < 140000) big += " & d_0";
+		auto g = alg_d::call_ltlsynt_game(big, {}, {"d_0"});
+		CHECK(g.num_states > 0);
+	}
+
 	TEST_CASE("[ALG-D-22] G(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
 		// Output always > 0: always achievable (system sets y > 0 each step)
 		CHECK(alg_d_realizable("G (o1[t]:qlt > {0}:qlt)."));

@@ -437,81 +437,15 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 
 // ── Call ltlsynt and get parity game ──────────────────────────────────────
 
+// Run ltlsynt on `phi_prop` and parse `--print-game-hoa` into a SynthGame.
+//
+// DEFINED IN ltl_aba_synthesis.tmpl.h, not here (LS-10).  It needs
+// `write_tempfile` + `spawn_capture`, which live in that header and are
+// included after this one; the callers below need only this declaration.
 inline SynthGame call_ltlsynt_game(
 	const std::string& phi_prop,
 	const std::vector<std::string>& ins,
-	const std::vector<std::string>& outs)
-{
-	// Cache: avoid re-running ltlsynt on identical (formula, ins, outs).
-	struct game_cache_key {
-		std::string formula;
-		std::vector<std::string> ins, outs;
-		bool operator==(const game_cache_key& o) const {
-			return formula == o.formula && ins == o.ins && outs == o.outs;
-		}
-	};
-	struct game_cache_hash {
-		size_t operator()(const game_cache_key& k) const {
-			size_t h = std::hash<std::string>{}(k.formula);
-			for (auto& s : k.ins)  h ^= std::hash<std::string>{}(s) + 0x9e3779b9 + (h << 6) + (h >> 2);
-			for (auto& s : k.outs) h ^= std::hash<std::string>{}(s) + 0x517cc1b7 + (h << 6) + (h >> 2);
-			return h;
-		}
-	};
-	static std::unordered_map<game_cache_key, SynthGame, game_cache_hash> cache;
-	game_cache_key key{phi_prop, ins, outs};
-	if (auto it = cache.find(key); it != cache.end()) return it->second;
-
-	// Shell-escape
-	std::string esc;
-	for (char c : phi_prop) {
-		if (c == '"' || c == '\\' || c == '$' || c == '`') esc += '\\';
-		esc += c;
-	}
-
-	// Configurable timeout (same env var as call_ltlsynt).
-	std::string prefix;
-	{
-		const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC");
-		int sec = env_sec ? std::atoi(env_sec) : 60;
-		if (sec > 0) prefix = "timeout " + std::to_string(sec) + "s ";
-	}
-
-	std::string cmd = prefix + "ltlsynt --formula=\"" + esc + "\"";
-	if (!ins.empty()) {
-		cmd += " --ins=\"";
-		for (int i = 0; i < (int)ins.size(); ++i) {
-			if (i) cmd += ",";
-			cmd += ins[i];
-		}
-		cmd += "\"";
-	}
-	if (!outs.empty()) {
-		cmd += " --outs=\"";
-		for (int i = 0; i < (int)outs.size(); ++i) {
-			if (i) cmd += ",";
-			cmd += outs[i];
-		}
-		cmd += "\"";
-	}
-	cmd += " --print-game-hoa 2>/dev/null";
-
-	FILE* fp = popen(cmd.c_str(), "r");
-	if (!fp) return {}; // transient error — don't cache
-	std::string hoa;
-	char buf[512];
-	while (fgets(buf, sizeof(buf), fp)) hoa += buf;
-	int status = pclose(fp);
-	int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-	// Don't cache timeout (124), not-found (127), or other transient errors —
-	// output may be partial/truncated even when non-empty.
-	// ltlsynt exits 0 for REALIZABLE, 1 for UNREALIZABLE — both are definitive.
-	if (exit_code != 0 && exit_code != 1) return {};
-	if (hoa.empty()) { cache[key] = {}; return {}; }
-	auto result = parse_synth_game_hoa(hoa);
-	cache[key] = result;
-	return result;
-}
+	const std::vector<std::string>& outs);
 
 // ── Product game (game × T_1) ─────────────────────────────────────────────
 //

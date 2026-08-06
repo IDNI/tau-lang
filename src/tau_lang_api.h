@@ -19,7 +19,15 @@
 //   - F, U, R, W, S use the full LTL(ABA) pipeline (Spot + ABA oracle).
 //
 // Environment variables that affect synthesis:
-//   TAU_LTL_ALG=A|B|D      Select synthesis algorithm (default: heuristic)
+//   TAU_LTL_ALG=A|B|D      Select the synthesis algorithm.  There is no
+//                          heuristic: unset behaves as B, i.e. Algorithm B is
+//                          gated on and the default ABA-oracle path is used
+//                          when B does not apply.  Only A, B and D are
+//                          recognised; any other value (including "C" and
+//                          "auto") disables every gate, falls through to the
+//                          default path, and is reported with a warning.
+//                          Pure-output qlt formulas take Algorithm A
+//                          unconditionally, whatever this is set to.
 //   TAU_LTL_TIMEOUT_SEC=N   Synthesis wall-clock timeout in seconds (default 60)
 //   TAU_LTL_EXPORT_STRATEGY=hoa|dot  Print synthesized strategy to stderr
 //   TAU_LTL_EXPORT_STRATEGY_FILE=<path>  Write strategy HOA to file

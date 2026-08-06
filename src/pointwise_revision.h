@@ -303,7 +303,33 @@ template <NodeType node>
 tref and_distribute(tref fm) {
 	using tau = tree<node>;
 	auto op = get_temporal_op<node>(fm);
-	if (op == temporal_op::NONE) return fm;
+	if (op == temporal_op::NONE) {
+		// LS-1: only the ROOT operator used to be inspected, so a top-level
+		// conjunction came straight back unchanged.  `pointwise_revision_
+		// temporal` calls this once on the whole spec BEFORE
+		// `gather_top_conjuncts`, and the interpreter feeds it exactly the
+		// shape `unsqueeze_always` produces — `G(∧ inners) ∧ (∧ rest)` —
+		// whenever any non-always clause exists.  A spec like
+		// `G(a ∧ b) ∧ F(c)` was therefore never distributed and its whole
+		// G-block was revised or dropped wholesale, contrary to pwr-ltl §3
+		// Step 0.  Recurse through the conjunction instead.
+		const auto& t = tau::get(fm);
+		if (!t.has_child() || t[0].value.nt != tau::wff_and) return fm;
+		std::vector<tref> conjs;
+		gather_top_conjuncts<node>(fm, conjs);
+		if (conjs.size() < 2) return fm;
+		tref result = nullptr;
+		bool changed = false;
+		for (tref c : conjs) {
+			tref d = and_distribute<node>(c);
+			if (d != c) changed = true;
+			result = result ? build_wff_and<node>(result, d) : d;
+		}
+		// Preserve identity when nothing distributed: `gather_top_conjuncts`
+		// flattens an n-ary wff_and, so rebuilding would hand back a
+		// differently-shaped tree for no reason.
+		return changed ? result : fm;
+	}
 
 	// Only distribute for binary operators with a conjunction in the
 	// invariant slot.
