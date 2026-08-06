@@ -29,7 +29,9 @@ when standard input is a pipe rather than a terminal.
 
 The demos use `../tests/integration/test_files/` for sample stream inputs and
 `/tmp` for stream outputs, so they assume a \*nix filesystem layout. On Windows,
-adjust those paths.
+adjust those paths. `demo_4.1-abstract_data_types.tau` instead uses its own
+`fixture/` subdirectory (relative to `demos/`) for its tuple-typed file stream
+examples.
 
 ## The demos
 

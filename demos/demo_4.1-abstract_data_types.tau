@@ -50,6 +50,20 @@ type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. typ
 
 type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. n ex l:Line (l.tag = 0 && l.p.a = 0)
 
+# Nesting is not limited to one level: a tuple type's own member can itself be
+# a tuple type, not just a base type. Segment below nests Line two levels
+# deep -- s.line.p.a reaches the a coordinate of Line's own p member, so the
+# member path has three components (line, p, a):
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. n ex s:Segment (s.line.p.a = 0 && s.line.tag = 0)
+
+# Member-wise expansion works at any depth, not only at the leaves. Below,
+# s:Segment = s and t:Segment = t fix s and t's type without constraining them
+# (each is trivially true), leaving only s.line = t.line -- which still
+# expands to all five of Line's flattened members, now three levels deep:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. n (s:Segment = s) && (t:Segment = t) && (s.line = t.line)
+
 # solve reports a solution per flattened member, not as a single tuple value --
 # x:Point = x fixes x's type via the equality (which keeps x free, unlike
 # ex x:Point ...) so the solver can solve for it:
@@ -68,6 +82,48 @@ type Point = {a: sbf, b: sbf}. solve x:Point = x && x.a = 1 && x.b = 0
 type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0] && o[1] = i[1].
 { a: "1", b: "0" }
 { a: "0", b: "1" }
+q
+
+# A tuple-typed stream can also read from a file instead of the console, one
+# wire literal per line, exactly like a plain-typed file stream (demo_3.1).
+# demos/fixture/point-length_3.in holds three Point literals:
+#
+#   { a: "1", b: "0" }
+#   { a: "0", b: "1" }
+#   { a: "1", b: "1" }
+#
+# o[t] = i[t] needs a value at every time point, so the run stops on its own
+# once the file is exhausted -- after the three lines above, it reaches the
+# continue-or-quit prompt without asking for further input, the same way a
+# plain sbf file stream does:
+
+type Point = {a: sbf, b: sbf}. i:Point := in file("fixture/point-length_3.in"). o:Point := out console. run o[t] = i[t].
+q
+
+# An output stream can target a file too, and /dev/stdout is a valid target
+# for one -- the written tuple literals show up right here, inline in this
+# transcript, with no "o[t] := " label (a file stream just writes the bare
+# value, one per line, unlike the console's labelled prompt):
+
+type Point = {a: sbf, b: sbf}. i:Point := in file("fixture/point-length_3.in"). o:Point := out file("/dev/stdout"). run o[t] = i[t].
+q
+
+# The wire format nests exactly like the type declaration, not like the
+# dotted flattened member paths -- so a Segment literal nests a whole Line
+# literal under "line", which itself nests two Point literals under "p" and
+# "q". demos/fixture/segment-length_2.in holds two such literals:
+#
+#   { tag: "5", line: { tag: "9", p: { a: "1", b: "0" }, q: { a: "0", b: "1" } } }
+#   { tag: "2", line: { tag: "7", p: { a: "0", b: "0" }, q: { a: "1", b: "1" } } }
+#
+# Reading them through a run reconstructs the same nested shape on the way
+# out, even though internally every one of Segment's six flattened members
+# was read and compared separately. (si/so, not i/o, because a stream name
+# keeps the type it was first declared with for the rest of the session --
+# i/o are already Point above, so reusing them here for a different tuple
+# type would conflict.)
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. si:Segment := in file("fixture/segment-length_2.in"). so:Segment := out console. run so[t] = si[t].
 q
 
 quit
