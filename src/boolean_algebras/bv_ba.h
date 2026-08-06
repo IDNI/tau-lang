@@ -226,6 +226,39 @@ template <NodeType node>
 bool has_foreign_ba_constant(tref form);
 
 /**
+ * @brief Does @p form contain the residue of a blasted bitvector predicate?
+ *
+ * `bit` (bv_predicate_blasting_logic.tmpl.h) extracts bit @e i of an operand as
+ * `operand & bit_mask_cte(i)`, a conjunction with a bitvector constant having
+ * exactly one bit set. Every blasted comparison and every blasted arithmetic
+ * constraint is built out of those bit extractions, so a one-hot masking
+ * conjunction is what blasting leaves behind and nothing else in the pipeline
+ * produces in bulk.
+ *
+ * `resolve_quantifiers` uses this to keep its "ask the solver before blasting"
+ * rule true across passes: it queries cvc5 for a bv scope because cvc5 handles
+ * bitvector arithmetic natively, but `eliminate_bv_and_quantifiers` runs
+ * `resolve_quantifiers` three times and is itself re-entered from the
+ * interpreter's fixpoint loops, so a later pass can meet a scope an earlier one
+ * already blasted. Only its *open*-scope branch screens on this, because only
+ * that branch synthesises the universal block which -- wrapped around the
+ * auxiliary quantifiers blasting introduced -- gives cvc5's
+ * counterexample-guided instantiation the alternation it does not terminate on.
+ * See that branch for the measurements and the reproducing spec.
+ *
+ * A hand-written `x & { 1 }:bv[N]` matches too. That costs nothing beyond the
+ * solver shortcut for that one open scope -- blasting, the same fallback taken
+ * for any scope the solver cannot own, still applies, and by the caller's own
+ * reasoning blasting "neither closes a formula nor makes this check succeed
+ * later", so no scope that cvc5 would have decided is lost.
+ *
+ * @param form The formula to scan
+ * @return true if a one-hot bitvector masking conjunction occurs in @p form
+ */
+template <NodeType node>
+bool has_blasting_residue(tref form);
+
+/**
  * @brief Checks whether a given bit-vector formula is valid.
  *
  * This function analyzes the provided formula and determines if it is valid

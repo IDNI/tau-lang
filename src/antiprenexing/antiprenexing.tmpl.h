@@ -2326,6 +2326,16 @@ using tau = tree<node>;
 				// auxiliary quantifiers) is much harder for it --
 				// and blasting neither closes a formula nor makes
 				// this check succeed later.
+				//
+				// "Before blasting" holds within one pass only.
+				// eliminate_bv_and_quantifiers calls this function
+				// three times and is itself re-entered from the
+				// interpreter's fixpoint loops, so a later pass meets
+				// scopes an earlier one already blasted -- measured on
+				// the spec below, 15623 scopes reached this point and
+				// only the first 6 predated any blasting, with 1530
+				// blasting rewrites in between. That is why the open
+				// branch below screens for blasting residue; see there.
 				if (is_bv_solvable_formula<node>(n)) {
 					// Only commit to T/F on a definite answer: cvc5
 					// returning unknown, or translation failing, means
@@ -2337,7 +2347,41 @@ using tau = tree<node>;
 						if (status == bv_sat_status::sat) return tau::_T();
 						if (status == bv_sat_status::unsat) return tau::_F();
 						DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
-					} else {
+					} else if (!has_blasting_residue<node>(n)) {
+						// The residue screen is what keeps this branch
+						// from hanging the process. Closing the free
+						// variables of an already-blasted scope wraps the
+						// auxiliary quantifiers blasting introduced in a
+						// universal block; that alternation turns on
+						// cegqi-innermost=false (see
+						// config_cvc5_solver_alternating_quantifiers) and
+						// cvc5's counterexample-guided instantiation then
+						// does not terminate -- stack samples show >1300
+						// nested CegInstantiator::constructInstantiation
+						// frames inside one checkSat, memory climbing, no
+						// result. checkSat carries no time or resource
+						// bound and none can be added (a truncated
+						// instantiation search reports a definite wrong
+						// answer: see the warning on
+						// config_cvc5_solver_alternating_quantifiers), so
+						// the whole run hangs with no output. On
+						//
+						//   r always u[t] = i0[t]
+						//   always ( (((i1[t]:bv[4] + i2[t]:bv[4])
+						//     + (i5[t]:bv[4] !^ i6[t]:bv[4])) >= {1}:bv[4])
+						//     || (((i1[t]:bv[4] + i2[t]:bv[4])
+						//     + (i5[t]:bv[4] !^ i6[t]:bv[4])) < {1}:bv[4]) ).
+						//
+						// this took cvc5 from 15623 queries, the last of
+						// which never returned, to 51 that all do.
+						//
+						// Deliberately only this branch: the closed query
+						// above synthesises no binder, so it cannot build
+						// that alternation, and screening it too costs
+						// real time (~78s -> ~112s on the 2-clause
+						// variant of the spec above) by pushing scopes
+						// cvc5 decides cheaply into Boole decomposition.
+						//
 						// Open bv scope: `n` is equivalent to T exactly
 						// when it is valid, and to F exactly when it is
 						// unsatisfiable. Closing its free variables the
