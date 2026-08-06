@@ -192,6 +192,11 @@ inline std::optional<std::string> file_input_stream::get() {
 inline file_output_stream::file_output_stream(const std::string& filename)
 	: serialized_constant_output_stream(), filename(filename)
 {
+	// See the class doc comment (io_context.h) for why /dev/stdout and
+	// /dev/stderr specifically route through the process's own std::cout/
+	// std::cerr instead of opening a private, same-file ofstream.
+	if (filename == "/dev/stdout") { shared_stream = &std::cout; return; }
+	if (filename == "/dev/stderr") { shared_stream = &std::cerr; return; }
 	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): open";)
 	file.open(filename);
 	if (!file.is_open())
@@ -206,12 +211,19 @@ inline std::shared_ptr<serialized_constant_output_stream>
 }
 
 inline file_output_stream::~file_output_stream() {
+	// shared_stream aliases std::cout/std::cerr and is never owned here --
+	// nothing to close for it (file stays unopened in that case, so the
+	// is_open() check below is already false and a no-op).
 	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): close";)
 	if (file.is_open()) file.close();
 }
 
 inline bool file_output_stream::put(const std::string& value) {
 	DBG(LOG_TRACE << "file_output_stream(\"" << filename << "\"): put(\"" << value << "\")";)
+	if (shared_stream) {
+		*shared_stream << value << std::endl;
+		return shared_stream->good();
+	}
 	file << value << std::endl;
 	return file.good();
 }

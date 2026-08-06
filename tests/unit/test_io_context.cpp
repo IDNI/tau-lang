@@ -43,6 +43,14 @@ struct cout_capture {
 	std::string str() const { return oss.str(); }
 };
 
+struct cerr_capture {
+	std::ostringstream oss;
+	std::streambuf* saved;
+	cerr_capture() : saved(std::cerr.rdbuf(oss.rdbuf())) {}
+	~cerr_capture() { std::cerr.rdbuf(saved); }
+	std::string str() const { return oss.str(); }
+};
+
 // --- temporary file helper ------------------------------------------------
 
 // Unique path under the system temp dir, removed on scope exit.
@@ -335,6 +343,61 @@ TEST_SUITE("file streams") {
 			CHECK(base.put("tpvalue", 3));
 		}
 		CHECK(read_lines(tf.path) == std::vector<std::string>{"tpvalue"});
+	}
+
+	// Regression guard for an ordinary NAMED output file: a fresh open must
+	// still start from a clean, truncated file -- this is the behaviour the
+	// /dev/stdout fix below deliberately leaves untouched (a fresh `run`
+	// should not accumulate a previous run's leftover content). Pinning it
+	// explicitly since the /dev/stdout fix lives in the very same
+	// constructor/put() this exercises.
+	TEST_CASE("a fresh open of an ordinary named file truncates prior content") {
+		temp_file tf("truncate");
+		{
+			file_output_stream out(tf.str());
+			CHECK(out.put("stale"));
+			CHECK(out.put("content"));
+		}
+		CHECK(read_lines(tf.path)
+			== std::vector<std::string>{"stale", "content"});
+		{
+			// Re-open the SAME path fresh (same as a new `run` would): the
+			// old two lines must be gone, not appended to.
+			file_output_stream out(tf.str());
+			CHECK(out.put("fresh"));
+		}
+		CHECK(read_lines(tf.path) == std::vector<std::string>{"fresh"});
+	}
+
+	// Defect A (private/2026-08-06-adt-demo-extension-report.md): opening
+	// "/dev/stdout" as an ordinary named file creates a SECOND, independent
+	// file description on the same underlying file std::cout already
+	// writes to (fd 1); the two descriptions' independently-tracked
+	// offsets, combined with the default open mode's truncation, produced
+	// NUL-byte holes once both were flushed to a regular (seekable) file
+	// (reproduced against the pre-fix binaries: 144 NUL bytes via the
+	// report's own repro; zero on a pipe, since a pipe has no offset
+	// concept to corrupt). The fix routes "/dev/stdout"/"/dev/stderr"
+	// through the process's own std::cout/std::cerr instead of opening a
+	// private ofstream on the same path, sidestepping the dual-description
+	// problem entirely rather than trying to make two independent
+	// descriptions agree on a shared offset. Directly testable via rdbuf
+	// redirection (the coordinator's suggested "temp regular file
+	// exercising the same write path" does not apply here: the fix does
+	// NOT touch how ordinary named files are opened at all, only these two
+	// specific paths -- see the truncation regression guard above for that
+	// unchanged path instead).
+	TEST_CASE("\"/dev/stdout\" writes through std::cout, not a private file") {
+		cout_capture out;
+		file_output_stream s("/dev/stdout");
+		CHECK(s.put("hello"));
+		CHECK(out.str() == "hello\n");
+	}
+	TEST_CASE("\"/dev/stderr\" writes through std::cerr, not a private file") {
+		cerr_capture err;
+		file_output_stream s("/dev/stderr");
+		CHECK(s.put("world"));
+		CHECK(err.str() == "world\n");
 	}
 }
 

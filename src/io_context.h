@@ -190,6 +190,21 @@ protected:
 
 /**
  * @brief Output stream that appends values line-by-line to a file.
+ *
+ * `filename == "/dev/stdout"` (or `"/dev/stderr"`) is special-cased to write
+ * through the process's own `std::cout`/`std::cerr` instead of opening a
+ * private `std::ofstream` on the same path. Opening `/dev/stdout` normally
+ * creates a SECOND, independent kernel file description on the SAME
+ * underlying file `std::cout` already writes to (fd 1), with its own
+ * separate offset; the default open mode (`ios::out`, i.e. `O_TRUNC`)
+ * truncates that shared file out from under `std::cout`, and the two
+ * descriptions' independently-tracked offsets then interleave incorrectly
+ * once both are eventually flushed to a regular (seekable) file, producing
+ * NUL-byte holes where one description's writes land past the other's
+ * already-advanced offset. Routing through the SAME `std::cout`/`std::cerr`
+ * object sidesteps this entirely (only one writer, one offset, one buffer)
+ * without touching the truncate-on-open semantics ordinary named output
+ * files still rely on (a fresh run should start with a fresh file).
  */
 struct file_output_stream : public serialized_constant_output_stream {
 	/** @brief Open the file at @p filename for writing. */
@@ -202,6 +217,9 @@ struct file_output_stream : public serialized_constant_output_stream {
 protected:
 	const std::string filename;
 	std::ofstream file;
+	/// Non-null (aliasing `std::cout`/`std::cerr`, never owned) when
+	/// `filename` is `/dev/stdout`/`/dev/stderr`; `file` stays closed then.
+	std::ostream* shared_stream = nullptr;
 };
 
 /**
