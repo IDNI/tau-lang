@@ -695,7 +695,7 @@ size_t tau_term_bdd<node>::bdd_and_many_iter(const refs& v,
 			if (hasbc(x, l[n], am_cmp)) l.erase(l.begin() + n);
 			else ++n;
 		h.shrink_to_fit(), l.shrink_to_fit(), x.shrink_to_fit();
-		ref r = bdd_and_many(move(x), o);
+		ref r = bdd_and_many(std::move(x), o);
 		if (r == F) return res = F, 1;
 		if (r != T) {
 			if (!hasbc(h, r, am_cmp)) h.push_back(r), am_sort(h);
@@ -754,8 +754,8 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o)
 	tref m = nullptr;
 	refs vh, vl;
 	switch (bdd_and_many_iter(v, vh, vl, res, m, o)) {
-		case 0: l = bdd_and_many(move(vl), o),
-			h = bdd_and_many(move(vh), o);
+		case 0: l = bdd_and_many(std::move(vl), o),
+			h = bdd_and_many(std::move(vh), o);
 			break;
 		case 1: {
 #ifdef TAU_CACHE
@@ -763,8 +763,8 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o)
 #endif
 			return res;
 		}
-		case 2: h = bdd_and_many(move(vh), o), l = F; break;
-		case 3: h = F, l = bdd_and_many(move(vl), o); break;
+		case 2: h = bdd_and_many(std::move(vh), o), l = F; break;
+		case 3: h = F, l = bdd_and_many(std::move(vl), o); break;
 		default: { DBG(assert(false)); return ref(); }
 	}
 #ifdef TAU_CACHE
@@ -881,8 +881,8 @@ template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 convert_to_handle(tref tau_node) {
 	auto it = U.find(tau_node);
-	DBG(assert(it != U.end));
-	if (it != U.end) return it->second;
+	DBG(assert(it != U.end()));
+	if (it != U.end()) return it->second;
 	else return term_handle(tbdd::T);
 }
 

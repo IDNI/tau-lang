@@ -13,6 +13,19 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
+	// cvc5 requires every Term to be destroyed before its process-wide node
+	// manager is torn down.  The pool's inline-static destructor does not have
+	// a reliable order relative to that manager across executables and shared
+	// libraries, so empty the pool through a late-registered exit handler first.
+	// The normal static destructors then only see empty containers.
+	static const bool cleanup_registered = [] {
+		if (std::atexit([] { ba_constants<node>::cleanup(); }) != 0)
+			throw std::runtime_error(
+				"ba_constants: unable to register process cleanup");
+		return true;
+	}();
+	(void)cleanup_registered;
+
 	LOG_TRACE << "-- get(constant, type_id): "
 		<< LOG_BA(constant) << ", " << LOG_BA_TYPE(type_id);
 	// LOG_TRACE << dump_to_str();
