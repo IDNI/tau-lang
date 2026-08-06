@@ -186,9 +186,12 @@ tref repl_evaluator<BAs...>::get_applied(tref arg) const {
 	auto& defs = definitions<node>::instance();
 	// type_defs first: the registry must see every type before rr_defs/
 	// io_defs are added, regardless of the order they were declared in.
-	for (tref d : type_defs) spec.add(d);
-	for (tref d : rr_defs) spec.add(d);
-	for (tref d : io_defs) {
+	// (->get(): type_defs/rr_defs/io_defs store htref, not tref -- see
+	// their declaration comment in repl_evaluator.h for why.)
+	for (const htref& hd : type_defs) spec.add(hd->get());
+	for (const htref& hd : rr_defs) spec.add(hd->get());
+	for (const htref& hd : io_defs) {
+		tref d = hd->get();
 		// A tuple-typed (ADT) io def's per-member registration and its
 		// ctx->adt_streams grouping layout were already fully built when
 		// it was first declared: adt_flatten_rewrite_io_def, called from
@@ -779,9 +782,9 @@ void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 			"f[n](x), or use a fixed offset";
 		return;
 	}
-	rr_defs.push_back(def);
+	rr_defs.push_back(tau::geth(def));
 	size_t idx = rr_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(rr_defs[idx]->get()).to_str() << "\n";
 }
 
 template <typename... BAs>
@@ -792,12 +795,12 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	else std::cout << "Definitions:\n";
 	for (size_t i = 0; i < rr_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< tau::get(rr_defs[i]).to_str() << "\n";
+			<< tau::get(rr_defs[i]->get()).to_str() << "\n";
 	if (io_defs.empty()) std::cout << "Streams: empty\n";
 	else std::cout << "Streams:\n";
 	for (size_t i = 0; i < io_defs.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
-			<< tau::get(io_defs[i]).to_str() << "\n";
+			<< tau::get(io_defs[i]->get()).to_str() << "\n";
 	std::cout << *defs.get_io_context();
 }
 
@@ -808,7 +811,7 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	if (!num) return;
 	auto i = num | tt::num;
 	if (i && i <= rr_defs.size()) {
-		std::cout << tau::get(rr_defs[i-1]).to_str() << "\n";
+		std::cout << tau::get(rr_defs[i-1]->get()).to_str() << "\n";
 		return;
 	}
 	TAU_LOG_ERROR << "Definition [" << i << "] does not exist\n";
@@ -818,26 +821,26 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& n) {
-	io_defs.push_back(n | tt::first | tt::ref);
+	io_defs.push_back(tau::geth(n | tt::first | tt::ref));
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_output_cmd(const tt& n) {
-	io_defs.push_back(n | tt::first | tt::ref);
+	io_defs.push_back(tau::geth(n | tt::first | tt::ref));
 	size_t idx = io_defs.size() - 1;
-	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]).to_str() << "\n";
+	std::cout << "[" << idx + 1 << "] " << tau::get(io_defs[idx]->get()).to_str() << "\n";
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_type_cmd(const tt& n) {
-	type_defs.push_back(n | tt::first | tt::ref);
+	type_defs.push_back(tau::geth(n | tt::first | tt::ref));
 	size_t idx = type_defs.size() - 1;
 	std::cout << "[" << idx + 1 << "] "
-		<< tau::get(type_defs[idx]).to_str() << "\n";
+		<< tau::get(type_defs[idx]->get()).to_str() << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.

@@ -177,3 +177,49 @@ add_test(NAME "test_repl-adt-run_retry_on_bad_tuple_value"
 	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\nnot a tuple literal\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
 set_tests_properties("test_repl-adt-run_retry_on_bad_tuple_value" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}")
+
+# Round 7: Critical demo-extension finding (private/2026-08-06-adt-demo-
+# extension-report.md, "Defect B") -- ANY get_applied()-driven REPL command
+# after an ADT-typed `run` in the same session used to crash: SIGABRT
+# (Debug, `tau_spec.tmpl.h:142`'s `DBG(assert(false))`) / SIGSEGV (Release).
+# Root cause (gdb-confirmed against build-Debug/tau, this file's own repro
+# below): repl_evaluator's `type_defs`/`rr_defs`/`io_defs` (repl_evaluator.h)
+# used to store plain `tref` -- a raw, non-owning pointer into
+# bintree<node>'s node storage -- and none of the three are walked by any
+# `collect_live_refs` implementation `interpreter::maybe_gc()` consults
+# (interpreter.tmpl.h), so a stored entry is unprotected from
+# `bintree<node>::gc()`, which `maybe_gc()` runs once accumulated tree size
+# crosses a threshold -- something only a `run`'s per-step tree churn
+# realistically reaches (normalize/sat/solve never step the interpreter at
+# all). Confirmed live: after a sweep, `type_defs[0]` pointed at memory
+# reused for an unrelated, tiny leaf node (gdb: the freed slot's node type
+# read back as `tau_parser_nonterminals::eof`, not `type_def` -- a classic
+# dangling-pointer/memory-reuse signature, not a logic bug in `tau_spec::
+# add`'s dispatch itself), so the NEXT get_applied() call (any later
+# normalize/sat/solve/run) iterated a corrupted entry and hit the
+# `default:` "unknown node" branch. Fixed by storing `htref` (an owning
+# `std::shared_ptr<htree>`) instead of `tref` in all three vectors --
+# exactly how `history`/`H` (repl_evaluator.h) already protects itself the
+# same way, and consistent with every comment in interpreter.tmpl.h
+# explaining that a live htref keeps its node reachable through
+# `bintree<node>::gc()` via M's own weak_ptr bookkeeping. `rr_defs`/
+# `io_defs` (not just `type_defs`) had the identical latent hazard --
+# fixed identically, not just the vector this specific demo repro happened
+# to hit first (type_defs is iterated first in get_applied(), so it always
+# surfaces before rr_defs/io_defs would even be reached).
+#
+# This is the requested regression test: `run` over an ADT stream, THEN a
+# plain `normalize`, THEN a second `run` over a (differently-named) ADT
+# stream, all in one session -- mirrors the report's exact crashing repro,
+# extended with the second `run` the coordinator asked for. Uses the raw
+# add_test form (interactive -X, like the other `run`-driving cases in this
+# file) but WITH FAIL_REGULAR_EXPRESSION "Error" (error-intolerant: nothing
+# here is expected to fail) -- only the final PASS_REGULAR_EXPRESSION (the
+# SECOND run's grouped output) is asserted, since reaching it at all proves
+# every earlier step (including the crash-prone normalize right after the
+# first run) already completed without crashing or being cut short.
+add_test(NAME "test_repl-adt-run_then_normalize_then_run"
+	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\n{ a: \"1\", b: \"0\" }\\nq\\ntype Point = {a: sbf, b: sbf}. n ex x:Point (x = 0)\\ntype Point = {a: sbf, b: sbf}. i2:Point := in console. o2:Point := out console. run o2[0] = i2[0].\\n{ a: \"0\", b: \"1\" }\\nq\\nquit\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-adt-run_then_normalize_then_run" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o2\\[0\\] := \\{ a: \"0\", b: \"1\" \\}"
+	FAIL_REGULAR_EXPRESSION "Error")
