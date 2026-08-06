@@ -451,7 +451,20 @@ bool api<node>::realizable(tref fm) {
 			"its satisfiability cannot be decided";
 		return false;
 	}
-	return is_tau_formula_sat<node>(nfm, 0, true);
+	// LT-7: the synthesis backend reports "no verdict" by throwing
+	// ltl_synthesis_error -- a timed-out, killed or misused ltlsynt is NOT an
+	// UNREALIZABLE answer.  Nothing below this layer catches it, so without a
+	// handler here a slow specification would terminate the process instead of
+	// answering.  Convert it into a logged error verdict, the same shape the
+	// normalize_formula null-gate above uses.  The verdict is `false`, but the
+	// log says UNKNOWN so it is not mistaken for a decided UNREALIZABLE.
+	try {
+		return is_tau_formula_sat<node>(nfm, 0, true);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
+			<< e.what() << "); realizability could not be decided";
+		return false;
+	}
 }
 
 template <NodeType node>
@@ -496,8 +509,15 @@ bool api<node>::valid_spec(tref fm) {
 			"its validity cannot be decided";
 		return false;
 	}
-	// Valid iff T (tautology) implies the normalized formula
-	return is_tau_impl<node>(tau::_T(), nfm);
+	// Valid iff T (tautology) implies the normalized formula.
+	// Same synthesis-failure gate as realizable() -- see the note there.
+	try {
+		return is_tau_impl<node>(tau::_T(), nfm);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
+			<< e.what() << "); validity could not be decided";
+		return false;
+	}
 }
 
 
@@ -603,7 +623,16 @@ std::optional<interpreter<node>> api<node>::get_interpreter(tref spec,
 	if (has_free_vars<node>(normalized)) return {};
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
-	return interpreter<node>::make_interpreter(normalized, ctx);
+	// LT-7: make_interpreter reaches ltlsynt through
+	// ltl_to_safety_formula_full; a backend failure must not terminate the
+	// caller.  No interpreter is the honest answer here.
+	try {
+		return interpreter<node>::make_interpreter(normalized, ctx);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
+			<< e.what() << "); the specification could not be compiled";
+		return {};
+	}
 }
 
 template <NodeType node>
@@ -634,7 +663,15 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 	if (has_free_vars<node>(normalized)) return {};
 	ctx.input_remaps = options.input_remaps;
 	ctx.output_remaps = options.output_remaps;
-	return interpreter<node>::make_interpreter(normalized, ctx);
+	// See the tref overload: synthesis-backend failures are answered, not
+	// propagated.
+	try {
+		return interpreter<node>::make_interpreter(normalized, ctx);
+	} catch (const ltl_synthesis_error& e) {
+		TAU_LOG_ERROR << "UNKNOWN: the synthesis backend failed or timed out ("
+			<< e.what() << "); the specification could not be compiled";
+		return {};
+	}
 }
 
 // private helper methods

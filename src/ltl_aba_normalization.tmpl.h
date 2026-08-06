@@ -953,7 +953,7 @@ static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
 }
 
 // Recursively rewrite all wff_S / wff_T nodes.
-// Appends G-invariants to `invariants`; uses `counter` for fresh names.
+// Uses `counter` for fresh auxiliary names.
 // `aux_pairs` collects (curr, prev) atom refs for each S operator, used
 // later to add temporal connection constraints G(X(p_prev) <-> p_curr)
 // to the ltlsynt skeleton.
@@ -985,7 +985,6 @@ static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
 template <NodeType node>
 static tref compile_since_trigger_rec(
     tref fm,
-    std::vector<tref>& invariants,
     int& counter,
     std::vector<std::pair<tref,tref>>& aux_pairs,
     std::vector<tref>& safety_invs,
@@ -1012,8 +1011,8 @@ static tref compile_since_trigger_rec(
 		// Compile nested S/T inside the operands first (always inner), so
 		// that the ψ used for the t=0 initial condition below is the
 		// compiled one, matching what goes into the rewritten S.
-		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
-		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
+		phi = compile_since_trigger_rec<node>(phi, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
+		psi = compile_since_trigger_rec<node>(psi, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
 
 		tref neg_phi = tau::build_wff_neg(phi);
 		tref neg_psi = tau::build_wff_neg(psi);
@@ -1026,7 +1025,7 @@ static tref compile_since_trigger_rec(
 		// With is_outer=false the S contributes only its tracking
 		// invariant G(curr ↔ rhs), and the obligation is encoded below
 		// from the negated compiled formula.
-		tref s_rewr  = compile_since_trigger_rec<node>(s_node, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
+		tref s_rewr  = compile_since_trigger_rec<node>(s_node, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
 		tref compiled = tau::build_wff_neg(s_rewr);
 
 		if (is_outer) {
@@ -1057,8 +1056,8 @@ static tref compile_since_trigger_rec(
 		// Any S inside phi or psi is by definition inner (nested), so
 		// pass is_outer=false to suppress the always-true requirement
 		// and the psi-at-0 initial condition for those sub-operators.
-		phi = compile_since_trigger_rec<node>(phi, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
-		psi = compile_since_trigger_rec<node>(psi, invariants, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
+		phi = compile_since_trigger_rec<node>(phi, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
+		psi = compile_since_trigger_rec<node>(psi, counter, aux_pairs, safety_invs, init_conds, /*spine_pol=*/0);
 
 		// Fresh auxiliary output variable name (o-prefix → controllable output).
 		std::string aux_name = "o__ltl_s" + std::to_string(counter++) + "__";
@@ -1067,17 +1066,30 @@ static tref compile_since_trigger_rec(
 		tref curr = build_bv_eq_aux<node>(aux_name, 0,  1);
 		tref prev = build_bv_eq_aux<node>(aux_name, -1, 1);
 
-		// Invariant: G(curr ↔ (ψ ∨ (φ ∧ prev)))
-		tref rhs  = tau::build_wff_or(psi, tau::build_wff_and(phi, prev));
-		tref inv  = tau::build_wff_always(tau::build_wff_equiv(curr, rhs));
-		invariants.push_back(inv);
+		// Tracking relation: G(curr ↔ (ψ ∨ (φ ∧ prev))).  It is pushed into
+		// `safety_invs` below (in one of two forms, depending on the spine
+		// polarity), which is what actually reaches the caller.
+		tref rhs = tau::build_wff_or(psi, tau::build_wff_and(phi, prev));
 
-		// Initial condition: aux[-1] must start as 0 (strong-past LTL semantics).
-		// Without this, the system could freely set aux[-1]=1 and trivially satisfy S
-		// at t=0 even when ψ never actually held.  As a non-G-wrapped formula this
-		// constrains ONLY position 0 of the run (LTL semantics evaluate at position 0).
-		tref init_cond = tau::build_wff_neg(prev); // !(aux[t-1]={1})
-		invariants.push_back(init_cond);
+		// KNOWN GAP — `aux[-1]` is unconstrained at t = 0.
+		//
+		// Strong-past semantics require aux[-1] = 0, otherwise the system can
+		// set it to 1 and claim `φ S ψ` at t=0 through the `φ ∧ prev` arm
+		// without ψ ever holding.  The natural statement, `¬prev` as a
+		// non-G-wrapped initial condition, was collected here into an
+		// `invariants` vector that NOTHING ever consumed — the vector was
+		// write-only, so the constraint has never been enforced on any path.
+		// It is not re-added blind: `prev` is `aux[t-1]`, and the S branch
+		// below deliberately shifts ψ to t=0 rather than referencing a
+		// negative time index, because the interpreter's fixpoint pipeline
+		// mis-treats one as a G-unrolled seed (see the outermost branch).
+		//
+		// The outermost S/T closes the gap by other means (`ψ@0` plus
+		// `G(curr && rhs)` pins the auxiliary); an off-spine S does not.
+		// Closing it needs a single-BA-type encoding of the t=0 condition —
+		// the cross-type form `curr@0 ↔ ψ@0` was tried and reverted, having
+		// made the interpreter reject a satisfiable spec in Debug and crash
+		// in Release.
 
 		if (is_outer) {
 			// For the outermost S only: at t=0, S semantics forces ψ to hold
@@ -1153,20 +1165,20 @@ static tref compile_since_trigger_rec(
 	else if (nt == tau::wff_or)  child_pol = (spine_pol < 0) ? -1 : 0;
 
 	if (nc == 1) {
-		tref new_c = compile_since_trigger_rec<node>(op.first(), invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
+		tref new_c = compile_since_trigger_rec<node>(op.first(), counter, aux_pairs, safety_invs, init_conds, child_pol);
 		if (new_c == op.first()) return fm;
 		return tau::get(tau::wff, tau::get(nt, new_c));
 	}
 	if (nc == 2) {
-		tref new_l = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
-		tref new_r = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
+		tref new_l = compile_since_trigger_rec<node>(op.first(),  counter, aux_pairs, safety_invs, init_conds, child_pol);
+		tref new_r = compile_since_trigger_rec<node>(op.second(), counter, aux_pairs, safety_invs, init_conds, child_pol);
 		if (new_l == op.first() && new_r == op.second()) return fm;
 		return tau::get(tau::wff, tau::get(nt, new_l, new_r));
 	}
 	if (nc == 3) {
-		tref new_a = compile_since_trigger_rec<node>(op.first(),  invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
-		tref new_b = compile_since_trigger_rec<node>(op.second(), invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
-		tref new_c = compile_since_trigger_rec<node>(op.third(),  invariants, counter, aux_pairs, safety_invs, init_conds, child_pol);
+		tref new_a = compile_since_trigger_rec<node>(op.first(),  counter, aux_pairs, safety_invs, init_conds, child_pol);
+		tref new_b = compile_since_trigger_rec<node>(op.second(), counter, aux_pairs, safety_invs, init_conds, child_pol);
+		tref new_c = compile_since_trigger_rec<node>(op.third(),  counter, aux_pairs, safety_invs, init_conds, child_pol);
 		if (new_a == op.first() && new_b == op.second() && new_c == op.third())
 			return fm;
 		// 3-child case: use build_wff_conditional for wff_conditional,
@@ -1176,28 +1188,43 @@ static tref compile_since_trigger_rec(
 		tref ch3[3] = { new_a, new_b, new_c };
 		return tau::get(tau::wff, tau::get(nt, ch3, 3));
 	}
-	return fm; // arity > 3: leave unchanged
+	// Arity > 3.  This used to `return fm` unchanged, silently leaving any
+	// S/T below a wider node uncompiled — the pure-past fast path then just
+	// declines itself (the S survives, so has_ltl_operators stays true and
+	// solve_ltl_aba's ppLTLTT encoding takes over), but a silent arity limit
+	// in a rewriting pass is a trap.  Handle it generically.
+	trefs kids;
+	kids.reserve(nc);
+	for (size_t i = 0; i < nc; ++i) kids.push_back(op.child(i));
+	trefs new_kids;
+	new_kids.reserve(nc);
+	bool changed = false;
+	for (tref c : kids) {
+		tref nc_ = compile_since_trigger_rec<node>(c, counter, aux_pairs, safety_invs, init_conds, child_pol);
+		if (nc_ != c) changed = true;
+		new_kids.push_back(nc_);
+	}
+	if (!changed) return fm;
+	return tau::get(tau::wff, tau::get(nt, new_kids.data(), new_kids.size()));
 }
 
 // Top-level S/T compilation pass.
 // Returns {compiled_formula, safety_formula, init_formula, aux_pairs}.
 //
 // compiled_formula is fm with every S/T node replaced by its auxiliary atom,
-// and fm unchanged when there are no S/T nodes.  It is the BARE compiled
-// formula: the `invariants` vector is deliberately NOT conjoined into it.
-// Those entries duplicate the biconditionals already in `safety_invs` and add
-// one position-0-only term (`¬aux[t-1]`) that must never be wrapped in G, so
-// mixing them into the returned formula would make the caller's obligation
-// `G(compiled)` unsound.  Callers that want the Boolean structure of the spec
-// take compiled_formula and wrap it themselves.
+// and fm unchanged when there are no S/T nodes.  It carries the spec's Boolean
+// structure and nothing else; the per-operator relations travel in
+// safety_formula.  Callers wrap it themselves — `ltl_to_safety_formula_full`
+// conjoins `G(compiled_formula)`.
 //
 // safety_formula: G(outermost_s && rhs) for a positively-asserted top-level S
 //   (always-true requirement), G(¬outermost_s) for a top-level T (which is
 //   ¬S), and G(inner_s ↔ rhs) for every other S (biconditional tracks the
 //   auxiliary without forcing it to 1 at t=0).
-// init_formula: psi_at_0 for an outermost S/T (t=0 condition; for T it is the
-//   un-negated psi, since φ T ψ requires ψ at position 0), and the strong-past
-//   anchor `curr@0 ↔ psi@0` for every off-spine S.
+// init_formula: psi_at_0 for an OUTERMOST S/T only (t=0 condition; for T it is
+//   the un-negated psi, since φ T ψ requires ψ at position 0).  An off-spine S
+//   contributes nothing here — see the KNOWN GAP note in the S branch for why
+//   its t=0 anchor is missing and what closing it would take.
 // aux_pairs: one entry per S operator: (curr_atom, prev_atom).
 // Callers use aux_pairs to add G(X(p_prev) <-> p_curr) to the ltlsynt skeleton.
 template <NodeType node>
@@ -1207,12 +1234,11 @@ compile_since_trigger(tref fm) {
 	if (!has_since_trigger<node>(fm))
 		return {fm, tau::_T(), tau::_T(), {}};
 
-	std::vector<tref> invariants;
 	std::vector<std::pair<tref,tref>> aux_pairs;
 	std::vector<tref> safety_invs;
 	std::vector<tref> init_conds;
 	int counter = 0;
-	tref compiled = compile_since_trigger_rec<node>(fm, invariants, counter, aux_pairs, safety_invs, init_conds);
+	tref compiled = compile_since_trigger_rec<node>(fm, counter, aux_pairs, safety_invs, init_conds);
 
 	tref safety_fm = tau::_T();
 	for (tref si : safety_invs)
@@ -1223,7 +1249,7 @@ compile_since_trigger(tref fm) {
 		init_fm = tau::build_wff_and(init_fm, ic);
 
 	LOG_DEBUG << "[ltl_aba] S/T compile-away: "
-	          << invariants.size() << " auxiliary variable(s) introduced";
+	          << counter << " auxiliary variable(s) introduced";
 	return {compiled, safety_fm, init_fm, std::move(aux_pairs)};
 }
 

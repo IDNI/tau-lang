@@ -4096,9 +4096,7 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		tref fm = spec("(o1[t]:qlt < o2[t]:qlt) && (o2[t]:qlt < o3[t]:qlt) "
 		               "&& !(o1[t]:qlt < o3[t]:qlt).");
 		REQUIRE(fm != nullptr);
-		MESSAGE("chain: " << tau::get(fm).to_str());
 		size_t ti = find_ba_type<node_t>(fm);
-		MESSAGE("find_ba_type(chain) = " << ti);
 		CHECK(ti != 0);
 		CHECK(is_omcat_type_family<node_t>(ti));
 		CHECK(qlt_order_conj_unsat<node_t>(fm));
@@ -4111,6 +4109,9 @@ TEST_SUITE("[LT-4] qlt existential feasibility is joint, not per-variable") {
 		REQUIRE(fm != nullptr);
 		CHECK_FALSE(qlt_order_conj_unsat<node_t>(fm));
 	}
+
+	// (There is no QJ-09: the case that would have carried it was folded into
+	// QJ-12, which pins the same property on the shape the oracle builds.)
 
 	// Guarding the unsound direction: the closing literal must genuinely
 	// involve the SAME terms.  `o4 >= o1` looks like the chain's closer but
@@ -4209,6 +4210,27 @@ TEST_SUITE("[LT-7] ltlsynt exit codes are not UNREALIZABLE verdicts") {
 
 	TEST_CASE("[LX-04] a failed spawn is a failure") {
 		CHECK(classify_spot_exit(-1, "") == spot_exit_kind::failed);
+	}
+
+	// The API boundary (api<node>::realizable / valid_spec / get_interpreter)
+	// converts this into a logged UNKNOWN verdict instead of letting it
+	// terminate the process.  That handler cannot be driven deterministically
+	// from a test — it needs ltlsynt to hang or misbehave on demand — so what
+	// is pinned here is the contract the handler depends on: the exception is
+	// catchable as a std::runtime_error and carries the failure text.  If
+	// someone re-bases it on something else, the catch clauses silently stop
+	// matching and a slow spec goes back to terminating the session.
+	TEST_CASE("[LX-06] ltl_synthesis_error is catchable at the API boundary") {
+		bool caught = false;
+		std::string what;
+		try {
+			throw ltl_synthesis_error("ltlsynt produced no verdict (exit 143)");
+		} catch (const std::runtime_error& e) {
+			caught = true;
+			what = e.what();
+		} catch (...) {}
+		CHECK(caught);
+		CHECK(what.find("exit 143") != std::string::npos);
 	}
 
 	TEST_CASE("[LX-05] a missing binary keeps its own classification") {

@@ -1141,8 +1141,13 @@ ltl_to_safety_formula_full(tref fm) {
 			// conjunct that is already an `always`, so `(φ S ψ) && G(χ)` gives
 			// `G(curr) && G(χ)` rather than the nested `G(curr && G(χ))` that
 			// the normalizer would then have to unpick.
+			//
+			// `wff_and` is N-ARY: `A && B && C` is ONE node with three
+			// children.  Reading only first()/second() dropped every conjunct
+			// past the second — silently, straight out of the executed safety
+			// formula.
 			std::function<tref(tref)> wrap_always = [&](tref n) -> tref {
-				tref lhs = nullptr, rhs = nullptr;
+				trefs kids;
 				{
 					// Read the children out BEFORE recursing: the
 					// recursive calls build nodes, and nothing here
@@ -1156,11 +1161,17 @@ ltl_to_safety_formula_full(tref fm) {
 					if (k == tau::wff_always) return n;
 					if (k != tau::wff_and)
 						return tau::build_wff_always(n);
-					lhs = nt_[0].first();
-					rhs = nt_[0].second();
+					const auto& op = nt_[0];
+					for (size_t i = 0; i < op.children_size(); ++i)
+						kids.push_back(op.child(i));
 				}
-				return tau::build_wff_and(wrap_always(lhs),
-				                          wrap_always(rhs));
+				if (kids.empty()) return tau::build_wff_always(n);
+				tref acc = nullptr;
+				for (tref k : kids) {
+					tref w = wrap_always(k);
+					acc = acc ? tau::build_wff_and(acc, w) : w;
+				}
+				return acc;
 			};
 			tref obligation = wrap_always(compiled_fast);
 			tref out = tau::build_wff_and(obligation,

@@ -748,18 +748,41 @@ TEST_SUITE("OCFuncs LG-22 - instantiation and V1 stub contract") {
 		CHECK(ocfuncs_compile<node_t>(fm, one_dynamic_decl()) == nullptr);
 	}
 
-	// Step 1 still rejects bad declarations before anything else runs.
-	TEST_CASE("[OCF-INST-10] ocfuncs_compile rejects invalid declarations") {
+	// Step 1 still runs, and still rejects, before anything else does.
+	//
+	// The previous version of this case asserted that a STATIC declaration
+	// without a support certificate is rejected — behind an `if` that never
+	// fired, so it asserted nothing.  `ocfuncs_check_modes` in fact ACCEPTS
+	// such a declaration and creates an empty support bound for it; what it
+	// rejects is a malformed declaration.  Both behaviours are pinned here
+	// unconditionally.
+	TEST_CASE("[OCF-INST-10] Step 1 rejects malformed declarations") {
 		tref fm = create_spec("o1[t] = 1.");
 		REQUIRE(fm != nullptr);
-		std::vector<FuncDecl> bad;
-		bad.emplace_back("g", FuncMode::STATIC,
-		                 std::vector<std::string>{"sbf"}, "sbf");
-		// A static function needs a finite support certificate; without one
-		// Step 1 fails and compile must return nullptr.
-		tref r = ocfuncs_compile<node_t>(fm, bad);
+
+		auto rejects = [&](const FuncDecl& d) {
+			OCFuncsContext ctx;
+			std::vector<FuncDecl> decls{d};
+			return !ocfuncs_check_modes(decls, ctx);
+		};
+		CHECK(rejects(FuncDecl("", FuncMode::DYNAMIC,
+		                       std::vector<std::string>{"sbf"}, "sbf")));
+		CHECK(rejects(FuncDecl("k", FuncMode::DYNAMIC,
+		                       std::vector<std::string>{}, "sbf")));
+		CHECK(rejects(FuncDecl("k", FuncMode::DYNAMIC,
+		                       std::vector<std::string>{"sbf"}, "")));
+
+		// A STATIC declaration is accepted and gets an empty support bound;
+		// the finite-support certificate is left to later analysis.
 		OCFuncsContext ctx;
-		if (!ocfuncs_check_modes(bad, ctx)) CHECK(r == nullptr);
+		std::vector<FuncDecl> st;
+		st.emplace_back("g", FuncMode::STATIC,
+		                std::vector<std::string>{"sbf"}, "sbf");
+		CHECK(ocfuncs_check_modes(st, ctx));
+		CHECK(ctx.support_bounds.count("g") == 1);
+
+		// Whatever Step 1 says, V1 compile refuses (see OCF-INST-08/09).
+		CHECK(ocfuncs_compile<node_t>(fm, st) == nullptr);
 	}
 
 }

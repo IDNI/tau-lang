@@ -852,15 +852,27 @@ TEST_SUITE("LTL correctness: S under negation / disjunction (LT-2)") {
 
 	// Regression guard for the half of the propagation that must NOT change:
 	// on a top-level conjunct spine the S keeps the outer treatment, so ψ is
-	// still required at every step.  The second conjunct carries its own
-	// temporal quantifier for the same `missing_temp_quants` reason.
+	// still required at every step.  The other conjuncts carry their own
+	// temporal quantifiers for the same `missing_temp_quants` reason.
+	//
+	// THREE conjuncts, not two: `A && B && C` is ONE n-ary wff_and node, and
+	// the obligation wrapper in `ltl_to_safety_formula_full` used to read only
+	// its first two children — so the third conjunct was dropped straight out
+	// of the executed safety formula.  The last conjunct here is the one that
+	// forbids 1/4, which is exactly what the S would otherwise be free to emit
+	// once ψ has held (the `φ ∧ prev` arm), so its loss is observable.
 	TEST_CASE("[LT2-EXEC-03] conjunct spine keeps the outer treatment") {
 		bdd_init<Bool>();
 		auto vals = run_qlt_no_input(
 		    "((o1[t]:qlt = {1/4}:qlt) S (o1[t]:qlt = {3/4}:qlt)) "
-		    "&& always (o1[t]:qlt != {1/2}:qlt).", 4);
+		    "&& always (o1[t]:qlt != {1/2}:qlt) "
+		    "&& always (o1[t]:qlt != {1/4}:qlt).", 4);
 		REQUIRE(vals.size() == 4);
-		for (auto& v : vals) CHECK(v == "3/4");
+		for (auto& v : vals) {
+			CHECK(v == "3/4");
+			CHECK(v != "1/2");   // second conjunct
+			CHECK(v != "1/4");   // third conjunct — dropped by the old wrapper
+		}
 	}
 
 	// Sat-path cross-check: the ppLTLTT tester encoding (independent of the

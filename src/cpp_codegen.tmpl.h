@@ -60,24 +60,6 @@ inline std::string guard_to_cpp(const std::string& g) {
 	return out;
 }
 
-// Identify which APs this guard MENTIONS (for input/output classification).
-inline std::vector<int> guard_aps(const std::string& g) {
-	std::vector<int> aps;
-	for (size_t i = 0; i < g.size(); ) {
-		if (std::isdigit((unsigned char)g[i])) {
-			size_t j = i;
-			int v = 0;
-			while (j < g.size() && std::isdigit((unsigned char)g[j])) {
-				v = v * 10 + (g[j] - '0');
-				++j;
-			}
-			aps.push_back(v);
-			i = j;
-		} else ++i;
-	}
-	return aps;
-}
-
 // Determine which AP indices are outputs (found only inside guards, never
 // free, and marked as such by the caller via output_props membership).
 // Returns a map: ap_index → "o_NAME" or "i_NAME".
@@ -217,8 +199,6 @@ inline void emit_cpp_program_prop(
     std::ostream& out,
     const std::string& class_name)
 {
-	using codegen_detail::guard_to_cpp;
-	using codegen_detail::guard_aps;
 	using codegen_detail::label_aps;
 	using codegen_detail::sanitize;
 

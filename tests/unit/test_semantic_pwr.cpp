@@ -523,12 +523,62 @@ TEST_SUITE("[LS-2/LS-16: semantic_pwr_optimal]") {
 	// or θ not realizable), but whatever comes back must be a sound revision.
 	TEST_CASE("[SPWR-O-01] qlt clause reaches optimal mode") {
 		bdd_init<Bool>();
+		// Optimal mode runs Algorithm D, which shells out to ltlsynt; without
+		// it every verdict below would be vacuous.  Skip explicitly rather
+		// than pass on a nullptr that means "no backend".
+		if (::system("which ltlsynt > /dev/null 2>&1") != 0) {
+			MESSAGE("ltlsynt not on PATH — optimal mode cannot run");
+			return;
+		}
 		tref c = spec("G (o1[t]:qlt < {1/2}:qlt).");
 		tref u = spec("G (o1[t]:qlt > {1/2}:qlt).");
 		REQUIRE(c != nullptr);
 		REQUIRE(u != nullptr);
 		tref theta = semantic_pwr_optimal<node_t>(c, u, 0);
-		if (theta) CHECK(is_realizable(theta));
+		// θ is allowed to be null (Algorithm D may report the clause
+		// unrealizable), but a returned θ must be a sound revision: realizable,
+		// and it must still carry the update it was built from — `theta` is
+		// `update ∧ G(Win)`, so dropping the update would be the failure mode
+		// that matters.
+		//
+		// Membership is checked STRUCTURALLY, via subtree_set.  tref equality
+		// is not structural equality in this tree — that is what the
+		// subtree_map / subtree_set family exists for (see extract_data_atoms'
+		// "structural equality (subtree_equals)" note) — and a raw `cj == u`
+		// comparison reported "update dropped" for a θ that carries it.
+		//
+		// Two shapes are accepted: the update as a top-level conjunct of θ,
+		// and — since both `update` and `G(Win)` are `always` formulas and
+		// this codebase merges those — the update's body among the conjuncts
+		// of a single enclosing G.
+		if (theta) {
+			INFO("theta:  " << tau::get(theta).to_str());
+			INFO("update: " << tau::get(u).to_str());
+			CHECK(is_realizable(theta));
+
+			auto is_always = [](tref n) {
+				const auto& t = tau::get(n);
+				return t.has_child() && t[0].value.nt == tau::wff_always;
+			};
+			std::vector<tref> top;
+			gather_top_conjuncts<node_t>(theta, top);
+			subtree_set<node_t> top_set(top.begin(), top.end());
+			bool keeps_update = top_set.contains(u);
+			if (!keeps_update && is_always(u)) {
+				tref ubody = tau::trim2(u);
+				for (tref cj : top) {
+					if (!is_always(cj)) continue;
+					std::vector<tref> inner;
+					gather_top_conjuncts<node_t>(tau::trim2(cj), inner);
+					subtree_set<node_t> inner_set(inner.begin(), inner.end());
+					if (inner_set.contains(ubody)) { keeps_update = true; break; }
+				}
+			}
+			CHECK(keeps_update);
+		} else {
+			MESSAGE("optimal mode returned nullptr (Algorithm D reported the "
+			        "clause unrealizable) — nothing to assert on theta");
+		}
 	}
 
 	// LS-2 (a): `{top}:qlt` gives qlt_atom_holds_in_type3 == nullopt for every
