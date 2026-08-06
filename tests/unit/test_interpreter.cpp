@@ -251,4 +251,83 @@ TEST_SUITE("adt interpreter") {
 		CHECK(!tau_api::step(i).has_value());
 		CHECK(out->get_values().empty());
 	}
+
+	TEST_CASE("REPL-style console input surfaces one awaiting tuple prompt "
+		  "per time point")
+	{
+		// Regression test for a Critical review finding: the REPL's
+		// continue_running (repl_evaluator.tmpl.h) used to find an
+		// awaiting console stream by dynamic_pointer_cast<
+		// repl_pending_input_stream> directly over interpreter::inputs'
+		// values. For a tuple-typed member that value is an
+		// adt_member_input_stream, never a repl_pending_input_stream --
+		// the cast always failed, so a `run` of any spec with a
+		// tuple-typed console input silently never prompted and fell
+		// straight into the continue-or-quit branch. Fixed by
+		// find_repl_pending_input<node> (interpreter.tmpl.h), which sees
+		// through the adapter chain; this test exercises that helper the
+		// same way continue_running now does, with a console_input_factory
+		// wired exactly like the REPL wires one (repl_evaluator.tmpl.h's
+		// constructor: a factory returning a fresh repl_pending_input_stream,
+		// so a step needing a value suspends instead of blocking on stdin).
+		auto& ctx = *definitions<node_t>::instance().get_io_context();
+		auto saved_factory = ctx.console_input_factory;
+		ctx.console_input_factory = [](const std::string&) {
+			return std::make_shared<repl_pending_input_stream>();
+		};
+		// Restore the global io_context's console_input_factory on scope
+		// exit, even if a REQUIRE below fails/throws -- it is a
+		// process-wide singleton every other test in this binary relies on
+		// staying unset (the default: blocking console_prompt_input_stream).
+		struct restore_factory {
+			io_context<node_t>& ctx;
+			std::function<std::shared_ptr<serialized_constant_input_stream>(
+				const std::string&)> saved;
+			~restore_factory() { ctx.console_input_factory = saved; }
+		} restore{ ctx, saved_factory };
+
+		auto out = std::make_shared<vector_output_stream>();
+		interpreter_options opts;
+		opts.output_remaps["o"] = out; // "i" deliberately unmapped: falls
+						// through to console_input_factory
+		auto maybe_i = tau_api::get_interpreter(
+			"type Point = {a: sbf, b: sbf}. "
+			"i:Point := in console. o:Point := out console. "
+			"o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+
+		// First step: no value available yet -- the non-blocking stream
+		// suspends the step (returns "") rather than blocking on stdin.
+		CHECK(!tau_api::step(i).has_value());
+
+		// Find the awaiting stream exactly as continue_running now does,
+		// for every member var registered for the tuple stream, and
+		// confirm every one resolves to the SAME shared instance: one
+		// physical stream (and therefore exactly one pending request) for
+		// the whole tuple, no matter how many flattened members
+		// interpreter::inputs lists separately.
+		REQUIRE(i.inputs.size() == 2); // i.a, i.b
+		std::shared_ptr<repl_pending_input_stream> found;
+		for (auto& [var, stream] : i.inputs) {
+			(void)var; // every entry checked below, name unused
+			auto rp = find_repl_pending_input<node_t>(stream);
+			REQUIRE(rp != nullptr);
+			CHECK(rp->awaiting());
+			CHECK(rp->awaiting_time_point() == 0);
+			if (!found) found = rp;
+			else CHECK(found == rp); // identical shared physical stream
+		}
+		REQUIRE(found != nullptr);
+
+		// set() the whole tuple literal (as the REPL would, once the user
+		// answers the prompt) and confirm it unblocks the step: the SAME
+		// repl_pending_input_stream backs every member, so one set() is
+		// enough for the group.
+		found->set("{ a: \"0\", b: \"1\" }");
+		auto maybe_out = tau_api::step(i);
+		REQUIRE(maybe_out.has_value());
+		REQUIRE(out->get_values().size() == 1);
+		CHECK(out->get_values()[0] == "{ a: \"0\", b: \"1\" }");
+	}
 }

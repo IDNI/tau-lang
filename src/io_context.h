@@ -432,6 +432,18 @@ struct adt_tuple_reader {
 	 */
 	std::optional<std::string> leaf(size_t time_point,
 		const std::vector<size_t>& path);
+	/**
+	 * @brief The group's single physical stream.
+	 *
+	 * For callers that need to see past this reader to introspect the
+	 * actual physical stream -- e.g. the REPL's `continue_running`
+	 * (`repl_evaluator.tmpl.h`), which scans `interpreter::inputs` for an
+	 * awaiting `repl_pending_input_stream` and must look through an
+	 * `adt_member_input_stream`'s shared reader to find it.
+	 */
+	std::shared_ptr<serialized_constant_input_stream> physical_stream() const {
+		return physical;
+	}
 private:
 	bool read_time_point(size_t time_point);
 
@@ -516,6 +528,32 @@ struct adt_member_output_stream : public serialized_constant_output_stream {
 private:
 	size_t next_time_point = 0;
 };
+
+/**
+ * @brief Find the `adt_stream_layout` that @p var is a flattened member of.
+ *
+ * Used by callers that need to go from a member io var (as stored in
+ * `interpreter::inputs`/`outputs`) back to its stream's root -- e.g. the
+ * REPL's `continue_running`, to label an awaiting console prompt with the
+ * tuple stream's own root name rather than one member's dotted name.
+ * @param ctx IO context whose `adt_streams` to search.
+ * @param var Canonized io var to look up.
+ * @return Pointer to the owning layout (borrowed; valid as long as @p ctx
+ * outlives it and isn't mutated), or `nullptr` if @p var isn't a member of
+ * any tuple-typed stream currently registered in @p ctx.
+ */
+template <NodeType node>
+const adt_stream_layout<node>* find_adt_stream_for_member(
+	const io_context<node>& ctx, tref var);
+
+/**
+ * @brief A wire-format-shaped hint for @p layout, with placeholder (empty)
+ * leaf values -- e.g. `{ a: "", b: "" }` -- for prompting a tuple-typed
+ * stream's whole literal at once (one physical stream, one wire literal per
+ * time point; see the design note above `adt_shape_node`).
+ */
+template <NodeType node>
+std::string adt_wire_hint(const adt_stream_layout<node>& layout);
 
 } // namespace idni::tau_lang
 

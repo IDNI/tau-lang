@@ -457,21 +457,50 @@ void repl_evaluator<BAs...>::continue_running(
 		if (!maybe_outputs) {
 			running->t.pause();
 			// a console input stream stopped the step needing a value:
-			// find it and prompt for that value (label/type are ours)
+			// find it and prompt for that value (label/type are ours).
+			// find_repl_pending_input sees through an ADT tuple member's
+			// adt_member_input_stream/adt_tuple_reader (and this library's
+			// own ownership-bridging physical-stream wrapper,
+			// interpreter.tmpl.h) to the actual repl_pending_input_stream,
+			// so a tuple-typed console input is found here exactly like a
+			// plain one -- it's the SAME shared stream regardless of which
+			// member var this loop iteration looks at (one physical stream
+			// per tuple root, interpreter.tmpl.h's rebuild_inputs), so only
+			// the first member reached here ever finds it still awaiting:
+			// read_time_point's memo (io_context.tmpl.h) makes every other
+			// member's leaf() reuse the SAME successful read once one
+			// member consumes the pending value, instead of re-querying
+			// the physical stream and re-flagging it awaiting.
 			for (auto& [var, stream] : running->interp.inputs) {
-				auto rp = std::dynamic_pointer_cast<
-					repl_pending_input_stream>(stream);
+				auto rp = find_repl_pending_input<node>(stream);
 				if (!rp || !rp->awaiting()) continue;
 				size_t tp = rp->awaiting_time_point();
-				size_t tid = running->interp.ctx.type_of(var);
-				std::string type_name = get_ba_type_name<node>(tid);
-				if (!type_name.empty() && type_name.front() == ':')
-					type_name.erase(0, 1);
 				std::stringstream lbl;
-				lbl << get_var_name<node>(var) << "[" << tp << "] : "
-					<< type_name << " := ";
+				tref type_tree = nullptr;
+				if (const adt_stream_layout<node>* layout =
+					find_adt_stream_for_member<node>(
+						running->interp.ctx, var); layout)
+				{
+					// One physical stream/prompt for the WHOLE tuple
+					// literal (design doc sec. 4) -- label with the
+					// stream's own root name, not this member's dotted
+					// name, plus a wire-shaped hint of what to type.
+					// type_tree stays null: a tuple literal isn't a single
+					// BA type, so stream_value_incomplete (below) skips
+					// its type-specific incomplete-value checks for it.
+					lbl << dict(layout->root_name_sid) << "[" << tp
+						<< "] := " << adt_wire_hint<node>(*layout) << " ";
+				} else {
+					size_t tid = running->interp.ctx.type_of(var);
+					std::string type_name = get_ba_type_name<node>(tid);
+					if (!type_name.empty() && type_name.front() == ':')
+						type_name.erase(0, 1);
+					lbl << get_var_name<node>(var) << "[" << tp << "] : "
+						<< type_name << " := ";
+					type_tree = get_ba_type_tree<node>(tid);
+				}
 				pending = { pending_request::stream_value, lbl.str(),
-					rp, tp, get_ba_type_tree<node>(tid) };
+					rp, tp, type_tree };
 				reprompt();
 				return; // suspend: wait for the answer
 			}
@@ -507,6 +536,14 @@ bool repl_evaluator<BAs...>::stream_value_incomplete(
 	auto is_unexpected_end = [](const std::string& msg) {
 		return msg.find("Unexpected end of file") != std::string::npos;
 	};
+	// A tuple-typed (ADT) stream's prompt has no single BA type_tree
+	// (continue_running leaves it null: see its own comment) -- a wire
+	// literal isn't type-checked line-by-line the way a single BA
+	// constant is, so there is no type-specific "still incomplete" check
+	// to run for it; treat every line as complete (no multiline
+	// continuation for a tuple literal -- type the whole thing on one
+	// line). Also guards against dereferencing a null type_tree below.
+	if (!type_tree) return false;
 	if (is_sbf_type<node>(type_tree)) {
 		auto result = sbf_parser::instance().parse(src.c_str(), src.size());
 		return !result.found && is_unexpected_end(result.parse_error

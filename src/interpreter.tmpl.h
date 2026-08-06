@@ -67,6 +67,28 @@ struct adt_shared_physical_output_stream : serialized_constant_output_stream {
 };
 
 template <NodeType node>
+std::shared_ptr<repl_pending_input_stream> find_repl_pending_input(
+	const std::shared_ptr<serialized_constant_input_stream>& stream)
+{
+	if (!stream) return nullptr;
+	if (auto rp = std::dynamic_pointer_cast<repl_pending_input_stream>(stream))
+		return rp;
+	// The ADT-group ownership bridge (above): unwrap to whatever it holds,
+	// which may itself be a repl_pending_input_stream (the REPL's own
+	// console_input_factory, repl_evaluator.tmpl.h) or something else.
+	if (auto wrapped = std::dynamic_pointer_cast<
+		adt_shared_physical_input_stream>(stream))
+			return find_repl_pending_input<node>(wrapped->inner);
+	// A flattened tuple member: drill through its shared reader to the
+	// group's one physical stream and try again.
+	if (auto member = std::dynamic_pointer_cast<
+		adt_member_input_stream<node>>(stream))
+			return find_repl_pending_input<node>(
+				member->reader->physical_stream());
+	return nullptr;
+}
+
+template <NodeType node>
 std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 	const trefs& in_vars, size_t time_step)
 {

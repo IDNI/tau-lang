@@ -723,16 +723,36 @@ adt_tuple_reader<node>::adt_tuple_reader(
 template <NodeType node>
 bool adt_tuple_reader<node>::read_time_point(size_t time_point) {
 	if (memo_time_point && *memo_time_point == time_point) return memo_ok;
-	memo_time_point = time_point;
-	memo_leaves.clear();
-	memo_ok = false;
 
 	auto line = physical->get(time_point);
 	if (!line) {
 		LOG_ERROR << "(Error) ADT: failed to read tuple stream at time point "
 			<< time_point << "\n";
+		memo_time_point = time_point;
+		memo_leaves.clear();
+		memo_ok = false;
 		return false;
 	}
+	if (line->empty()) {
+		// No value YET (a non-blocking console stream -- e.g. the REPL's
+		// repl_pending_input_stream -- flags itself "awaiting" and returns
+		// "" instead of blocking) or genuinely no more input (an exhausted
+		// vector_input_stream/file_input_stream signals end-of-input the
+		// same way; see those classes' own get()). Either way this is NOT a
+		// malformed-wire-literal parse failure, so -- unlike every other
+		// path below -- deliberately do NOT memoize it: a later call for
+		// the SAME time_point (the REPL resuming this reader's physical
+		// stream after the user answers) must re-consult the physical
+		// stream, not reuse a stale "no value yet" memo forever. Leaving
+		// memo_time_point untouched also means whatever time_point it
+		// already held (a prior successful or genuinely-failed read) stays
+		// validly memoized for ITS OWN time_point.
+		return false;
+	}
+
+	memo_time_point = time_point;
+	memo_leaves.clear();
+	memo_ok = false;
 	auto wv = adt_parse_wire(*line);
 	if (!wv) return false;
 	std::vector<size_t> path;
@@ -865,6 +885,31 @@ bool adt_member_output_stream<node>::put(const std::string& value, size_t time_p
 template <NodeType node>
 bool adt_member_output_stream<node>::put(const std::string& value) {
 	return put(value, next_time_point++);
+}
+
+// -----------------------------------------------------------------------------
+// ADT stream introspection helpers (member -> owning layout, wire-shaped hint)
+// -----------------------------------------------------------------------------
+
+template <NodeType node>
+const adt_stream_layout<node>* find_adt_stream_for_member(
+	const io_context<node>& ctx, tref var)
+{
+	using tau = tree<node>;
+	for (const auto& [root_sid, layout] : ctx.adt_streams) {
+		(void)root_sid;
+		for (const auto& c : layout.components)
+			if (tau::subtree_equals(c.io_var->get(), var)) return &layout;
+	}
+	return nullptr;
+}
+
+template <NodeType node>
+std::string adt_wire_hint(const adt_stream_layout<node>& layout) {
+	adt_fmt_node root;
+	for (const auto& c : layout.components)
+		adt_fmt_insert(root, c.path, 0, std::string{});
+	return adt_fmt_print(root);
 }
 
 } // namespace idni::tau_lang
