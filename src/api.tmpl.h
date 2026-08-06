@@ -5,6 +5,10 @@
 #include "sbf_parser.generated.h"
 #include "tau_tree_builders.h"
 
+#include <cstdlib>
+#include <functional>
+#include <map>
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "api"
 
@@ -404,9 +408,122 @@ tref api<node>::eliminate_quantifiers(tref fm) {
 	return nullptr;
 }
 
+// --- Connected-support-component factoring on the sat path (issue #72) ------
+// sat(always(C1 && ... && Cn)) over pairwise DISJOINT variable supports
+// factorizes: the whole is satisfiable iff every support component is.
+// Rationale: models over disjoint stream sets compose pointwise, and a
+// winning strategy for each component composes to one for the whole
+// (component decomposition: Bayardo/Pehoushek, AAAI 2000; additive
+// partitioned representations: Burch/Clarke/Long, 1991/94). Guarded to the
+// provably safe case only: the root is a conjunction (optionally under ONE
+// top-level `always`), and every conjunct is free of nested temporal
+// operators, definition references and non-bv BA constants (a tau-typed
+// constant embeds a formula and could couple components invisibly).
+// Everything else falls through to the stock path unchanged. Off by
+// default: opt in via api::set_component_factoring(true) or the
+// TAU_FACTOR_SAT environment variable (read once; CLI benchmarking).
+inline bool component_factoring = false;
+
+template <NodeType node>
+void api<node>::set_component_factoring(bool state) {
+	component_factoring = state;
+}
+
+template <NodeType node>
+bool tau_factor_components_sat(tref fm, bool& result) {
+	using tau = tree<node>;
+	static const bool env_enabled = std::getenv("TAU_FACTOR_SAT") != nullptr;
+	if ((!component_factoring && !env_enabled) || !fm) return false;
+	tref inner = fm;
+	bool wrapped = false;
+	if (tau::get(inner).child_is(tau::wff_always)) {
+		inner = tau::trim2(inner);
+		wrapped = true;
+	}
+	if (!tau::get(inner).child_is(tau::wff_and)) return false;
+	trefs conjs = get_cnf_wff_clauses<node>(inner);
+	if (conjs.size() < 2) return false;
+	// Unsafe inside a conjunct: nested temporal operators, definition
+	// references, and REAL non-bv BA constants (a {...}-constant embeds a
+	// formula that could couple components invisibly). Plain bf_t/bf_f
+	// literals (the 0/1 in `o10[t]=1`) carry a ba_type too but are pure
+	// logic - they must NOT trigger the bail-out.
+	auto unsafe = [](tref n) {
+		const tau& t = tau::get(n);
+		if (t.is(tau::wff_always) || t.is(tau::wff_sometimes)
+		 || t.is(tau::wff_ref) || t.is(tau::bf_ref)) return true;
+		if (t.is_ba_constant()) {
+			const size_t ty = t.get_ba_type();
+			return ty != 0 && !is_bv_type_family<node>(ty);
+		}
+		return false;
+	};
+	for (tref c : conjs)
+		if (tau::get(c).find_top(unsafe) != nullptr) return false;
+	// union-find over conjuncts, joined by shared variable NAMES.
+	// Mirrors get_free_vars' var_depth discipline: collect a variable
+	// node only at depth 0 and never descend into it - the offset
+	// variable `t` inside o1[t] is NOT part of the support (it is the
+	// shared timeline, present in every conjunct; counting it would
+	// merge everything into one component). get_var_name_sid unifies
+	// o1[t], o1[t-1] and o1[0] to the name "o1". Bound-variable names
+	// are included as an over-approximation - over-merging is sound
+	// (it only suppresses a split, never fabricates one).
+	bool support_ok = true;
+	auto support_of = [&support_ok](tref c, std::set<size_t>& out) {
+		size_t var_depth = 0;
+		auto visit = [&](tref m) -> bool {
+			if (is_var_or_capture<node>(m)) {
+				if (var_depth == 0) {
+					size_t sid = get_var_name_sid<node>(m);
+					if (sid) out.insert(sid);
+					else support_ok = false; // unbenennbar
+				}
+				++var_depth;
+			}
+			return true;
+		};
+		auto visit_subtree = [](tref) -> bool { return true; };
+		auto up = [&](tref m) {
+			if (is_var_or_capture<node>(m)) --var_depth;
+		};
+		pre_order<node>(c).search(visit, visit_subtree, up);
+	};
+	std::vector<size_t> parent(conjs.size());
+	for (size_t i = 0; i < parent.size(); ++i) parent[i] = i;
+	std::function<size_t(size_t)> find = [&](size_t x) {
+		return parent[x] == x ? x : parent[x] = find(parent[x]);
+	};
+	std::map<size_t, size_t> owner; // name-sid -> conjunct index
+	for (size_t i = 0; i < conjs.size(); ++i) {
+		std::set<size_t> sup;
+		support_of(conjs[i], sup);
+		if (!support_ok || sup.empty()) return false; // konservativ kein Split
+		for (size_t sid : sup) {
+			auto it = owner.find(sid);
+			if (it == owner.end()) owner[sid] = i;
+			else parent[find(i)] = find(it->second);
+		}
+	}
+	std::map<size_t, trefs> comps;
+	for (size_t i = 0; i < conjs.size(); ++i) comps[find(i)].push_back(conjs[i]);
+	if (comps.size() < 2) return false;
+	LOG_DEBUG << "component factoring: " << conjs.size() << " conjuncts -> "
+		<< comps.size() << " components";
+	result = true;
+	for (auto& [root, group] : comps) {
+		tref part = group.size() == 1 ? group[0]
+			: tau::build_wff_and(group);
+		if (wrapped) part = tau::build_wff_always(part);
+		if (!api<node>::realizable(part)) { result = false; break; }
+	}
+	return true;
+}
+
 template <NodeType node>
 bool api<node>::realizable(tref fm) {
 	fm = simplify(fm);
+	if (bool r; tau_factor_components_sat<node>(fm, r)) return r;
 	return fm && is_formula(fm)
 		&& is_tau_formula_sat<node>(normalize_formula(fm), 0, true);
 }

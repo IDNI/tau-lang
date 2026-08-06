@@ -130,6 +130,11 @@ struct api {
 	static void set_json(bool state);
 	/** @brief Set the active Boost.Log severity threshold. */
 	static void set_severity(severity_level level);
+	/** @brief Enable/disable connected-support-component factoring of
+	 *  top-level conjunctions on the sat path (issue #72). Off by default;
+	 *  the TAU_FACTOR_SAT environment variable also enables it (read once,
+	 *  for benchmarking from the CLI). */
+	static void set_component_factoring(bool state);
 
 	// -----------------------------------------------------------------------
 	// Parsing

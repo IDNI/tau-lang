@@ -17,6 +17,7 @@ set(TESTS
 	satisfiability4
 	satisfiability5
 	satisfiability6
+	satisfiability_factoring
 	normalizer_helpers
 	sbf1
 	sbf2
