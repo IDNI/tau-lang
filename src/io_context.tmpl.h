@@ -724,14 +724,37 @@ template <NodeType node>
 typename adt_tuple_reader<node>::read_status
 	adt_tuple_reader<node>::read_time_point(size_t time_point)
 {
-	if (memo_time_point && *memo_time_point == time_point)
-		return memo_ok ? read_status::ok : read_status::failed;
+	// A SUCCESSFULLY parsed time_point is reused without ever touching
+	// `physical` again: leaf() is called once per flat member, all sharing
+	// the SAME already-parsed line, and re-reading here would wrongly
+	// consume a fresh value from a sequential physical stream whose
+	// get(time_point) doesn't actually key off time_point (the default
+	// serialized_constant_input_stream::get(time_point) just delegates to
+	// get(), e.g. vector_input_stream/file_input_stream).
+	//
+	// A FAILED time_point is deliberately NOT short-circuited the same
+	// way: unlike the success case, always falling through to re-consult
+	// `physical` below is what lets a REPL retry's corrected resubmission
+	// (continue_running re-entering the SAME time_point after
+	// repl_pending_input_stream::set() hands out a new pending_value)
+	// actually be seen. The old code returned the memoized `failed`
+	// verdict here unconditionally, on EVERY call for an already-failed
+	// time_point, without ever calling physical->get() again -- so a
+	// corrected value the user submitted after a bad attempt was silently
+	// discarded and the stream stayed stuck failing forever, with no way
+	// out short of aborting the whole run. See the raw-line comparison
+	// below for how a genuinely repeated (still malformed) resubmission is
+	// still told apart from a corrected one, without re-reading twice for
+	// unrelated reasons.
+	if (memo_time_point && *memo_time_point == time_point && memo_ok)
+		return read_status::ok;
 
 	auto line = physical->get(time_point);
 	if (!line) {
 		LOG_ERROR << "(Error) ADT: failed to read tuple stream at time point "
 			<< time_point << "\n";
 		memo_time_point = time_point;
+		memo_raw_line.clear();
 		memo_leaves.clear();
 		memo_ok = false;
 		return read_status::failed;
@@ -755,7 +778,19 @@ typename adt_tuple_reader<node>::read_status
 		return read_status::empty;
 	}
 
+	// Already failed THIS time_point, and the physical stream just handed
+	// back the EXACT SAME raw line again (a genuinely repeated malformed
+	// resubmission, or simply a physical stream that keeps returning the
+	// same thing): reuse the memoized failure rather than re-parsing (and
+	// re-logging the same error) for text already known to fail the same
+	// way. Anything else here -- an empty memo_raw_line (first attempt) or
+	// a DIFFERENT raw line (a correction) -- falls through to parse fresh.
+	if (memo_time_point && *memo_time_point == time_point && !memo_ok
+		&& *line == memo_raw_line)
+		return read_status::failed;
+
 	memo_time_point = time_point;
+	memo_raw_line = *line;
 	memo_leaves.clear();
 	memo_ok = false;
 	auto wv = adt_parse_wire(*line);

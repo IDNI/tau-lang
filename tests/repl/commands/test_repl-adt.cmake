@@ -152,3 +152,28 @@ add_test(NAME "test_repl-adt-run"
 set_tests_properties("test_repl-adt-run" PROPERTIES
 	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}"
 	FAIL_REGULAR_EXPRESSION "Error")
+
+# Round 6: High review finding, reproduced live -- adt_tuple_reader's
+# read_time_point (src/io_context.h/.tmpl.h) used to latch a malformed-line
+# failure permanently for a time point: once one bad value was submitted,
+# EVERY later call short-circuited to the memoized failure WITHOUT ever
+# consulting the physical stream again, so a textually-valid correction
+# typed right after was silently discarded and the stream stayed stuck
+# ("Failed to read from input stream 'i.a'" forever, no q-escape before the
+# continue gate). Fixed to keep re-consulting the physical stream on retry,
+# comparing the RAW line against the one the memoized failure came from
+# (see tests/unit/test_io_context.cpp's new "a corrected line after a
+# failed one..."/"resubmitting the exact same malformed line..." cases and
+# task-9-report.md for the fix). This is the REPL-level regression test,
+# modeled on test_repl-run_cmd-retry_on_bad_value (repl_evaluator.tmpl.h's
+# own retry mechanism: continue_running re-enters the SAME time point when
+# a submitted value doesn't parse) -- a malformed wire literal is submitted
+# first (expected to log a "(Error) ADT wire: ..." parse error, same as
+# retry_on_bad_value's own "Failed to parse input value" expectation), so
+# this is the raw add_test form with a PASS regex pinning the CORRECTED o[0]
+# output rather than add_repl_test/FAIL_REGULAR_EXPRESSION "Error" (which
+# would wrongly fail on that expected mid-transcript error).
+add_test(NAME "test_repl-adt-run_retry_on_bad_tuple_value"
+	COMMAND bash -c "printf 'type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0].\\nnot a tuple literal\\n{ a: \"1\", b: \"0\" }\\nq\\n' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -X")
+set_tests_properties("test_repl-adt-run_retry_on_bad_tuple_value" PROPERTIES
+	PASS_REGULAR_EXPRESSION "o\\[0\\] := \\{ a: \"1\", b: \"0\" \\}")

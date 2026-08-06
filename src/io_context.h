@@ -460,7 +460,7 @@ private:
 	/// no value yet/EOF -- deliberately NOT memoized, so a later call for
 	/// the same @p time_point re-consults the physical stream once it has
 	/// something), or `failed` (a physical read/parse/validation error,
-	/// already `LOG_ERROR`'d and memoized).
+	/// already `LOG_ERROR`'d and memoized against `memo_raw_line`).
 	enum class read_status { ok, empty, failed };
 	read_status read_time_point(size_t time_point);
 
@@ -468,6 +468,19 @@ private:
 	adt_stream_layout<node> layout;
 	adt_shape_node shape; ///< Member-path shape derived from `layout`, built once.
 	std::optional<size_t> memo_time_point;
+	// The RAW line a memoized `ok`/`failed` result was parsed from. A
+	// SUCCESS (`memo_ok`) is reused without ever touching `physical` again
+	// (leaf() is called once per flat member of the SAME already-parsed
+	// line -- re-reading would wrongly consume a fresh value from a
+	// sequential, non-time-point-aware physical stream like
+	// vector_input_stream/file_input_stream). A FAILURE is different:
+	// read_time_point always re-consults `physical` on the next call (see
+	// its own comment) so a REPL retry's corrected resubmission is actually
+	// seen -- `memo_raw_line` is what lets it tell "the physical stream
+	// handed back a genuinely new line, go parse it" apart from "the exact
+	// same malformed text came back again, don't bother re-parsing/
+	// re-logging it".
+	std::string memo_raw_line;
 	bool memo_ok = false;
 	std::map<std::vector<size_t>, std::string> memo_leaves;
 };

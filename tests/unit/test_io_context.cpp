@@ -627,6 +627,55 @@ TEST_SUITE("adt tuple streams") {
 		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
 	}
 
+	// Regression test for a High review finding: read_time_point used to
+	// latch memo_ok=false permanently the first time a malformed line was
+	// read for a time point, short-circuiting on every later call WITHOUT
+	// ever consulting the physical stream again -- so a corrected value the
+	// REPL's user submitted after a bad attempt (continue_running
+	// re-entering the SAME time point via repl_pending_input_stream::set())
+	// was silently discarded and the stream stayed stuck failing that time
+	// point forever, with no escape short of aborting the whole run (a
+	// plain, non-tuple stream re-parses fresh on every retry and has no
+	// such trap). A vector_input_stream simulates the two successive user
+	// attempts as two queued lines: leaf() is called once per attempt here,
+	// exactly like continue_running calls it once per resumed step.
+	TEST_CASE("a corrected line after a failed one for the SAME time point "
+		  "succeeds")
+	{
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"not a tuple literal",             // attempt 1: malformed
+				"{ a: \"1\", p: { x: \"0\" } }"     // attempt 2: corrected
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		CHECK(reader.leaf(0, { dict("a") }) == std::optional<std::string>("1"));
+		CHECK(reader.leaf(0, { dict("p"), dict("x") })
+			== std::optional<std::string>("0"));
+	}
+
+	// Contrast case: the SAME malformed text resubmitted (not a
+	// correction -- e.g. the user retypes the identical mistake) must keep
+	// failing, not spuriously succeed from a stale memo. Queues the
+	// identical malformed line TWICE, so the second leaf() call's re-read
+	// of the physical stream (necessary to tell "same line" from "a
+	// correction arrived" apart in the first place) hands back the exact
+	// same text; the raw-line comparison then reuses the cached failure
+	// instead of re-parsing it. (An empty THIRD read here -- vector_input_
+	// stream's own exhaustion-yields-"" contract -- would take the
+	// unrelated `empty` path, not `failed`, which is why this only queues
+	// and calls leaf() exactly twice.)
+	TEST_CASE("resubmitting the exact same malformed line still fails") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"not a tuple literal",
+				"not a tuple literal"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+	}
+
 	TEST_CASE("writer formats when complete") {
 		auto layout = adt_test_layout();
 		auto values = std::make_shared<std::vector<std::string>>();
