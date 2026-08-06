@@ -45,6 +45,7 @@ adjust those paths.
 | `demo_3.1-interpreter_sbf.tau` | Executing specifications over `sbf` streams: console and file I/O |
 | `demo_3.2-interpreter_tau.tau` | Executing specifications whose streams carry Tau specifications |
 | `demo_3.3-interpreter_fpbf.tau` | Draft sketch of a programmable-Boolean-function machine (not yet runnable) |
+| `demo_4.1-abstract_data_types.tau` | Abstract data types: aliases, tuples, inheritance, member access, and tuple-typed streams |
 | `sample_demo.tau` | Minimal template for writing your own demo |
 
 Demos are numbered by section, so read them in order within a section.

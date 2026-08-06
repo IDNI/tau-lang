@@ -1,0 +1,73 @@
+# Abstract data types: aliases, tuples and inheritance.
+#
+# See demos/README.md for how to run this script.
+
+# A type declaration introduces a name for a Boolean algebra type or a tuple of
+# member types. The simplest form is an alias: a new name for an existing base
+# type, with an optional subtype. byte below is just another name for bv[8], so
+# any equation typed with one accepts the other:
+
+type byte = bv[8]. n x:byte = x:bv[8]
+
+# solve resolves the alias to its underlying type when it reports a value:
+
+type byte = bv[8]. solve x:byte = {5}:bv[8]
+
+# A tuple type collects several named members, each with its own type. Point is
+# a pair of sbf-typed coordinates:
+
+type Point = {a: sbf, b: sbf}
+
+# Equality between two values of a tuple type expands member-wise. Note that
+# this expansion happens at parse time, before any normalization -- x and y are
+# both flattened into their a/b components:
+
+type Point = {a: sbf, b: sbf}. x:Point = y:Point
+
+# normalize is free to reorder and simplify the expanded equation like any
+# other formula:
+
+type Point = {a: sbf, b: sbf}. n x:Point = y:Point
+
+# A tuple type may inherit from one or more other tuple types with "of (...)".
+# The parents' members come first, in declaration order, followed by the
+# type's own members -- so Line below flattens to tag, p.a, p.b, q.a, q.b:
+
+type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}
+
+# The same member-wise expansion applies to Line, and it shows the inherited
+# tag member leading the flattened list:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. l:Line = l
+
+# ...which normalizes to T, since every member equals itself:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. n l:Line = l
+
+# A single member is reached with the . operator, on either an inherited or an
+# own member. Annotating the quantified variable, then parenthesizing the body,
+# is what lets a member access see the annotation:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. n ex l:Line (l.tag = 0 && l.p.a = 0)
+
+# solve reports a solution per flattened member, not as a single tuple value --
+# x:Point = x fixes x's type via the equality (which keeps x free, unlike
+# ex x:Point ...) so the solver can solve for it:
+
+type Point = {a: sbf, b: sbf}. solve x:Point = x && x.a = 1 && x.b = 0
+
+# Finally, a tuple-typed stream reads and writes its members together as one
+# value, using a JSON-like wire format: { member: "value", ... }. The console
+# prompts for the whole tuple at once, and a period is never needed -- unlike a
+# tau-valued stream, the wire literal is complete on its own line.
+
+# The spec below is constrained at time points 0 and 1 only, so the run stops
+# needing input after two steps and reaches the continue-or-quit prompt, which
+# a plain q answers to end the run:
+
+type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run o[0] = i[0] && o[1] = i[1].
+{ a: "1", b: "0" }
+{ a: "0", b: "1" }
+q
+
+quit
