@@ -183,3 +183,72 @@ TEST_SUITE("interpreter: misbehaving streams") {
 		CHECK(!tau_api::step(i).has_value());
 	}
 }
+
+// Task 8: interpreter-side grouped stream construction for tuple-typed
+// (ADT) io streams (private/2026-08-05-adt-design.md, section 4). A
+// tuple-typed stream stays ONE physical stream: rebuild_inputs/
+// rebuild_outputs (interpreter.tmpl.h) group a stream's flattened members
+// by their ctx.adt_streams root (populated by the ADT flattener,
+// src/adt/adt_flatten.tmpl.h, Task 7's io_context.h) and route them through
+// one shared adt_tuple_reader/writer instead of giving each member its own
+// private stream. read()/write() themselves are untouched: they still just
+// look up each flattened member io var (`i.a`, `i.b`, ...) in inputs/
+// outputs, unaware the object behind it is a shared adapter.
+TEST_SUITE("adt interpreter") {
+
+	TEST_CASE("tuple input distributes and tuple output collects") {
+		auto in = std::make_shared<vector_input_stream>(
+			std::vector<std::string>{
+				"{ a: \"0\", b: \"1\" }",
+				"{ a: \"1\", b: \"0\" }"
+			});
+		auto out = std::make_shared<vector_output_stream>();
+		interpreter_options opts;
+		opts.input_remaps["i"] = in;
+		opts.output_remaps["o"] = out;
+		auto maybe_i = tau_api::get_interpreter(
+			"type Point = {a: sbf, b: sbf}. "
+			"i:Point := in console. o:Point := out console. "
+			"o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+
+		// Two steps, each consuming ONE tuple literal: the shared reader
+		// reads the physical stream once per time point (memoized across
+		// both i.a's and i.b's own adapter calls), matching the design's
+		// "one prompt/read per stream per step".
+		REQUIRE(tau_api::step(i).has_value());
+		REQUIRE(tau_api::step(i).has_value());
+
+		// The output stream received exactly the two formatted tuple
+		// literals -- one put() per step (both o.a and o.b collected
+		// through the shared writer before it writes), not four separate
+		// per-member writes.
+		auto values = out->get_values();
+		REQUIRE(values.size() == 2);
+		CHECK(values[0] == "{ a: \"0\", b: \"1\" }");
+		CHECK(values[1] == "{ a: \"1\", b: \"0\" }");
+	}
+
+	TEST_CASE("malformed tuple input aborts the step") {
+		// Missing member "b": adt_tuple_reader::leaf validates the parsed
+		// literal against the layout's shape and fails both i.a's and i.b's
+		// read, aborting the step exactly like today's unparsable console
+		// input (see "an unparseable input value makes the step fail" above).
+		auto in = std::make_shared<vector_input_stream>(
+			std::vector<std::string>{ "{ a: \"0\" }" });
+		auto out = std::make_shared<vector_output_stream>();
+		interpreter_options opts;
+		opts.input_remaps["i"] = in;
+		opts.output_remaps["o"] = out;
+		auto maybe_i = tau_api::get_interpreter(
+			"type Point = {a: sbf, b: sbf}. "
+			"i:Point := in console. o:Point := out console. "
+			"o[t] = i[t].", opts);
+		REQUIRE(maybe_i.has_value());
+		auto& i = maybe_i.value();
+
+		CHECK(!tau_api::step(i).has_value());
+		CHECK(out->get_values().empty());
+	}
+}

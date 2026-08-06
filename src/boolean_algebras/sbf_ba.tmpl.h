@@ -18,8 +18,21 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 	switch (nt) {
-	case type::zero: return bdd_handle<Bool>::hfalse;
-	case type::one:  return bdd_handle<Bool>::htrue;
+	// bdd_handle<Bool>::hfalse/htrue are only ever assigned inside bdd_init
+	// (bdds/bdd_handle.h); every OTHER path through this function reaches
+	// them only after a bdd_handle<Bool>::get(...)/bdd<Bool>::bit(...) call
+	// (the `variable`/binary-op cases below, and their own recursion), which
+	// transitively forces bdd<Bool,o>'s inline-static initializer (`I`) to
+	// run first. A bare "0"/"1" leaf -- the very first sbf value ever parsed
+	// in a process where nothing else has touched the bdd/sbf machinery yet
+	// (as narrow a case as one interpreter unit test's own fixture, with no
+	// other sbf-consuming test in the same binary before it) -- never goes
+	// through such a call, so hfalse/htrue could still be their default
+	// (empty/null) construction here. bdd_init is idempotent (guarded by its
+	// own `if (!V.empty()) return;`), so calling it defensively is a no-op
+	// on every other path.
+	case type::zero: bdd_init<Bool>(); return bdd_handle<Bool>::hfalse;
+	case type::one:  bdd_init<Bool>(); return bdd_handle<Bool>::htrue;
 	case type::negation: {
 		auto e = sbf_eval_node(n | tt::only_child);
 		LOG_TRACE << e << "' = " << ~e;

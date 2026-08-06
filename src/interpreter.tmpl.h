@@ -19,6 +19,53 @@ namespace idni::tau_lang {
 // interpreter IO (read/write and rebuild_inputs/rebuild_outputs)
 // -----------------------------------------------------------------------------
 
+// `adt_tuple_reader`/`adt_tuple_writer` (io_context.h, Task 7) take sole
+// ownership of their physical stream through a `unique_ptr` constructor
+// parameter, because they hold onto it for the whole group's lifetime and
+// nothing else may reach the same object through a second handle. Two of
+// rebuild_inputs'/rebuild_outputs' own physical-stream sources -- a
+// caller-supplied remap (`ctx.input_remaps`/`output_remaps`, always
+// `shared_ptr`-typed so a caller can keep its own handle to the object it
+// registered) and `ctx.console_input_factory` (`shared_ptr`-typed for the
+// same reason, and because e.g. the REPL's `repl_pending_input_stream` is
+// found again later by scanning for the awaiting stream through that same
+// shared_ptr) -- can only ever hand back a `shared_ptr`, never a
+// `unique_ptr`: the returned object may be a `make_shared` allocation (whose
+// storage cannot legally be released into a `delete`-based `unique_ptr`)
+// and/or may still be referenced elsewhere. These adapters bridge the two:
+// each is itself exclusively owned (handed to the reader/writer as a plain
+// `unique_ptr`) and simply forwards every call to the `shared_ptr` instance
+// it holds, so the underlying object's own sharing/lifetime semantics (e.g.
+// `vector_input_stream::rebuild()` sharing its values/cursor across
+// `rebuild_inputs` calls) are unaffected.
+struct adt_shared_physical_input_stream : serialized_constant_input_stream {
+	std::shared_ptr<serialized_constant_input_stream> inner;
+	explicit adt_shared_physical_input_stream(
+		std::shared_ptr<serialized_constant_input_stream> inner)
+		: inner(std::move(inner)) {}
+	std::shared_ptr<serialized_constant_input_stream> rebuild() override {
+		return inner->rebuild();
+	}
+	std::optional<std::string> get() override { return inner->get(); }
+	std::optional<std::string> get(size_t time_point) override {
+		return inner->get(time_point);
+	}
+};
+
+struct adt_shared_physical_output_stream : serialized_constant_output_stream {
+	std::shared_ptr<serialized_constant_output_stream> inner;
+	explicit adt_shared_physical_output_stream(
+		std::shared_ptr<serialized_constant_output_stream> inner)
+		: inner(std::move(inner)) {}
+	std::shared_ptr<serialized_constant_output_stream> rebuild() override {
+		return inner->rebuild();
+	}
+	bool put(const std::string& value) override { return inner->put(value); }
+	bool put(const std::string& value, size_t time_point) override {
+		return inner->put(value, time_point);
+	}
+};
+
 template <NodeType node>
 std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 	const trefs& in_vars, size_t time_step)
@@ -200,6 +247,25 @@ bool interpreter<node>::rebuild_inputs(
 {
 	// Close all input streams
 	inputs.clear();
+
+	// Reverse index from a flattened tuple member's own (canonized) io var
+	// to the adt_stream_layout root it belongs to (ctx.adt_streams, Task 7),
+	// so a member below is routed to its group instead of getting a private
+	// stream of its own. Rebuilt fresh each call -- cheap, a handful of
+	// layouts/components -- rather than cached, since ctx.adt_streams can
+	// change between calls to rebuild_inputs (e.g. across interpreter::update).
+	subtree_map<node, size_t> adt_member_root; // member io var -> root_name_sid
+	for (auto& [root_sid, layout] : ctx.adt_streams)
+		if (layout.is_input)
+			for (auto& c : layout.components)
+				adt_member_root[c.io_var->get()] = root_sid;
+	// One shared reader (and therefore one physical stream) per active
+	// root, built the first time one of its members is seen below -- this
+	// groups a root's members BEFORE its physical stream is instantiated,
+	// so the physical stream is built exactly once per root rather than
+	// once per member, regardless of current_inputs' iteration order.
+	std::map<size_t, std::shared_ptr<adt_tuple_reader<node>>> adt_readers;
+
 	// open the corresponding streams for input and store them in streams
 	for (auto& [current_var, stream_id] : current_inputs) {
 		DBG(LOG_TRACE << "rebuild_inputs[current_var]: " << LOG_FM_DUMP(current_var) << "\n";)
@@ -214,6 +280,55 @@ bool interpreter<node>::rebuild_inputs(
 			return false; // stop interpreting: failed to open an input stream
 		}
 		std::string vn = get_var_name<node>(var);
+
+		if (auto rit = adt_member_root.find(var);
+			rit != adt_member_root.end())
+		{
+			size_t root_sid = rit->second;
+			auto& layout = ctx.adt_streams.at(root_sid);
+			auto reader_it = adt_readers.find(root_sid);
+			if (reader_it == adt_readers.end()) {
+				// Build the group's ONE physical stream, exactly the object
+				// the non-ADT branch below would build for this stream_id/
+				// direction, keyed by the ROOT's own name (not a member's
+				// dotted name) so a caller-supplied remap addresses the
+				// whole tuple stream.
+				// Explicit if/else, not a ternary: the branches build
+				// DIFFERENT concrete unique_ptr specializations (sibling
+				// types with no common type of their own), so each must
+				// convert to the base-typed `physical` on its own
+				// assignment rather than needing a common type between them.
+				std::string root_name = dict(root_sid);
+				std::unique_ptr<serialized_constant_input_stream> physical;
+				if (auto remap = ctx.input_remaps.find(root_name);
+					remap != ctx.input_remaps.end())
+					physical = std::make_unique<
+						adt_shared_physical_input_stream>(
+							remap->second->rebuild());
+				else if (layout.stream_id != 0)
+					physical = std::make_unique<file_input_stream>(
+						dict(layout.stream_id));
+				else if (ctx.console_input_factory)
+					physical = std::make_unique<
+						adt_shared_physical_input_stream>(
+							ctx.console_input_factory(root_name));
+				else
+					physical = std::make_unique<console_prompt_input_stream>(
+						root_name);
+				reader_it = adt_readers.emplace(root_sid,
+					std::make_shared<adt_tuple_reader<node>>(
+						std::move(physical), layout)).first;
+			}
+			auto comp = std::ranges::find_if(layout.components,
+				[&](const auto& c) { return c.io_var->get() == var; });
+			DBG(assert(comp != layout.components.end());)
+			auto adapter = std::make_shared<adt_member_input_stream<node>>();
+			adapter->reader = reader_it->second;
+			adapter->path = comp->path;
+			inputs.emplace(var, std::move(adapter));
+			continue;
+		}
+
 		if (auto it = ctx.input_remaps.find(vn); it != ctx.input_remaps.end()) {
 			inputs.emplace(var, std::move(it->second->rebuild()));
 		} else {
@@ -234,6 +349,15 @@ bool interpreter<node>::rebuild_outputs(
 {
 	// Delete old streams
 	outputs.clear();
+
+	// Same grouping as rebuild_inputs above, mirrored for the output side.
+	subtree_map<node, size_t> adt_member_root; // member io var -> root_name_sid
+	for (auto& [root_sid, layout] : ctx.adt_streams)
+		if (!layout.is_input)
+			for (auto& c : layout.components)
+				adt_member_root[c.io_var->get()] = root_sid;
+	std::map<size_t, std::shared_ptr<adt_tuple_writer<node>>> adt_writers;
+
 	// open the corresponding streams for output and store them in streams
 	for (auto& [current_var, stream_id] : current_outputs) {
 		tref var = canonize<node>(current_var);
@@ -244,6 +368,40 @@ bool interpreter<node>::rebuild_outputs(
 			return false; // stop interpreting: failed to open an output stream
 		}
 		std::string vn = get_var_name<node>(var);
+
+		if (auto rit = adt_member_root.find(var);
+			rit != adt_member_root.end())
+		{
+			size_t root_sid = rit->second;
+			auto& layout = ctx.adt_streams.at(root_sid);
+			auto writer_it = adt_writers.find(root_sid);
+			if (writer_it == adt_writers.end()) {
+				std::string root_name = dict(root_sid);
+				std::unique_ptr<serialized_constant_output_stream> physical;
+				if (auto remap = ctx.output_remaps.find(root_name);
+					remap != ctx.output_remaps.end())
+					physical = std::make_unique<
+						adt_shared_physical_output_stream>(
+							remap->second->rebuild());
+				else if (layout.stream_id == 0)
+					physical = std::make_unique<
+						console_prompt_output_stream>(root_name);
+				else physical = std::make_unique<file_output_stream>(
+					dict(layout.stream_id));
+				writer_it = adt_writers.emplace(root_sid,
+					std::make_shared<adt_tuple_writer<node>>(
+						std::move(physical), layout)).first;
+			}
+			auto comp = std::ranges::find_if(layout.components,
+				[&](const auto& c) { return c.io_var->get() == var; });
+			DBG(assert(comp != layout.components.end());)
+			auto adapter = std::make_shared<adt_member_output_stream<node>>();
+			adapter->writer = writer_it->second;
+			adapter->path = comp->path;
+			outputs.emplace(var, std::move(adapter));
+			continue;
+		}
+
 		if (auto it = ctx.output_remaps.find(vn); it != ctx.output_remaps.end())
 			outputs.emplace(var, std::move(it->second->rebuild()));
 		else {
