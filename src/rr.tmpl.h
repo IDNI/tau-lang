@@ -82,7 +82,21 @@ constexpr auto rr<node>::operator!=(const rr<node>& that) const {
 template<idni::tau_lang::NodeType node>
 std::size_t std::hash<idni::tau_lang::rr<node>>::operator()(
 	const idni::tau_lang::rr<node>& rr) const noexcept {
-	size_t seed = 0;
-	idni::hash_combine(seed, rr.rec_relations, rr.main);
+	// `htref` is `std::shared_ptr<htree>`, so `std::hash<htref>` hashes the
+	// address of the handle rather than the tree it denotes, while
+	// `rr::operator==` compares tree content (see `compare_trees` above).
+	// Structurally equal trees then receive different hashes, hash consing
+	// stops merging them, and node identity - together with every decision
+	// taken on it - depends on the heap layout of the individual run.
+	// Both members are affected: `rec_relations` is a
+	// `vector<pair<htref, htref>>`. The tree nodes already carry a
+	// content-derived hash; use it.
+	auto h = [](const idni::htref& r) noexcept -> size_t {
+		return r ? idni::hash_tref<node>{}(r->get()) : 0;
+	};
+	size_t seed = rr.rec_relations.size();   // mirrors std::hash<vector<T>>
+	for (const auto& [head, body] : rr.rec_relations)
+		idni::hash_combine(seed, h(head), h(body));
+	idni::hash_combine(seed, h(rr.main));
 	return seed;
 }
