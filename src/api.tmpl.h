@@ -48,6 +48,11 @@ void api<node>::set_blasting(bool blasting) {
 }
 
 template <NodeType node>
+void api<node>::set_run_block_bailout(bool state) {
+	run_block_bailout = state;
+}
+
+template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
 	pretty_printer_indenting = indenting;
 }

@@ -7,6 +7,8 @@ set(TESTS
 	bv_hooks
 	bf_normalization
 	interpreter
+	interpreter_block_bailout
+	interpreter_block_bailout_tau
 	nso_rr_execution
 	nso_rr_fixed_point
 	nso_rr_partial_eval

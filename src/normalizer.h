@@ -431,6 +431,12 @@ tref normalizer(tref fm);
 template <NodeType node, bool normalize_scopes = true>
 tref normalize_temporal_quantifiers(tref fm);
 
+// The opt-in routing of quantifier blocks to the legacy anti-prenex path
+// is declared in antiprenexing/antiprenexing.h (`run_block_bailout`,
+// `interpreter_normalization_depth`, `interpreter_normalization_scope`):
+// it is applied per quantifier block, so `process_quantifier_block` has to
+// see those. The interpreter marks its normalization phases with the scope.
+
 } // namespace idni::tau_lang
 
 #include "normalizer.tmpl.h"

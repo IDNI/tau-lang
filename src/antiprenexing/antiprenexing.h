@@ -38,6 +38,23 @@
 
 namespace idni::tau_lang {
 
+// Step formulas normalized by the interpreter pay the block pipeline's
+// expansion: on recurrent shapes `anti_prenex_block` can hand its own
+// fallback a formula orders of magnitude larger than the block it was given,
+// and that formula is what does not come back. Routing each quantifier block
+// to the legacy path instead keeps the pieces small, which matters because
+// the Boole decomposition is exponential in the atom count. Applies ONLY
+// while the interpreter normalizes, so one-off queries keep the stock
+// pipeline and its blasting-residue protection. Off by default; enable via
+// `api::set_run_block_bailout` or TAU_RUN_BLOCK_BAILOUT.
+inline bool run_block_bailout = false;
+inline thread_local int interpreter_normalization_depth = 0;
+struct interpreter_normalization_scope {
+	interpreter_normalization_scope() { ++interpreter_normalization_depth; }
+	~interpreter_normalization_scope() { --interpreter_normalization_depth; }
+};
+
+
 /**
  * @brief Apply the legacy, per-quantifier anti-prenex transformation.
  *

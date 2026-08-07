@@ -131,6 +131,12 @@ template <NodeType node>
 tref eliminate_bv_and_quantifiers(tref form) {
 	using tau = tree<node>;
 
+	// Note: the opt-in bail-out is applied in
+	// `process_quantifier_block` (antiprenexing.tmpl.h), per quantifier
+	// block, not here over the whole formula. Per block the legacy algorithm
+	// sees many small inputs instead of a few large ones, and its Boole
+	// decomposition is exponential in the atom count.
+
 	// Before anything blasts or decomposes: a foreign-typed sibling conjunct
 	// inside a bitvector quantifier's scope makes the whole scope fail
 	// `is_bv_solvable_formula`, so the solver shortcut below is skipped and

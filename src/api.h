@@ -120,6 +120,12 @@ struct api {
 	// -----------------------------------------------------------------------
 	/** @brief Enable/disable character variable mode. */
 	static void set_charvar(bool state);
+	/** @brief Enable/disable routing quantifier blocks to the legacy
+	 *  anti-prenex path during interpreter normalization (run path only;
+	 *  one-off queries are unaffected). Applied per quantifier block.
+	 *  Off by default; the TAU_RUN_BLOCK_BAILOUT environment variable also
+	 *  enables it (read once). */
+	static void set_run_block_bailout(bool state);
 	/** @brief Enable/disable BV blasting. */
 	static void set_blasting(bool state);
 	/** @brief Enable/disable indenting in pretty-printed output. */

@@ -1247,6 +1247,28 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		return r;
 	};
 
+	// Hand exactly this block to the legacy anti-prenex rather than letting
+	// the decomposition pipeline work on it. Per block, not formula-wide -
+	// the legacy algorithm then sees many small formulas instead of a few
+	// large ones, and its Boole decomposition is exponential in the atom
+	// count. Interpreter-only: at depth 0 (one-off queries) the stock
+	// pipeline and its blasting-residue protection stay in charge.
+	{
+		static const bool env_enabled =
+			std::getenv("TAU_RUN_BLOCK_BAILOUT") != nullptr;
+		if ((run_block_bailout || env_enabled)
+			&& interpreter_normalization_depth > 0)
+		{
+			tref blk_fm = body;
+			for (auto it = block_vars.rbegin();
+				it != block_vars.rend(); ++it)
+				blk_fm = is_ex
+					? build_wff_ex<node>(*it, blk_fm, false)
+					: build_wff_all<node>(*it, blk_fm, false);
+			return wrap_skipped(anti_prenex<node>(blk_fm));
+		}
+	}
+
 	// Trivial Skolemization: if every variable in this block is trivially
 	// eliminable (see heuristics/trivial_skolem.h), skip BDD ordering,
 	// Boole decomposition, and predicate blasting below entirely. Only

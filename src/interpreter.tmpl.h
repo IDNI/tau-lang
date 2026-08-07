@@ -232,6 +232,9 @@ template<NodeType node>
 bool interpreter<node>::rebuild_outputs(
 	const subtree_map<node, size_t>& current_outputs)
 {
+	// Also interpreter normalization: without the scope these run at
+	// depth 0 and the interpreter-only routing above does not apply to them.
+	interpreter_normalization_scope _run_scope;
 	// Delete old streams
 	outputs.clear();
 	// open the corresponding streams for output and store them in streams
@@ -278,6 +281,7 @@ std::optional<interpreter<node>>
 		const io_context<node>& ctx)
 {
 	DBG(LOG_TRACE << "make_interpreter[spec]: " << LOG_FM_DUMP(spec) << "\n";)
+	interpreter_normalization_scope _run_scope;
 	// Find a satisfiable unbound continuation from spec
 	spec = normalizer<node>(spec);
 	// For each spec clause, we check if it is executable
@@ -653,6 +657,9 @@ void interpreter<node>::maybe_gc() {
 
 template <NodeType node>
 trefs interpreter<node>::get_ubt_ctn_at(int_t t) {
+	// Also interpreter normalization: without the scope these run at
+	// depth 0 and the interpreter-only routing above does not apply to them.
+	interpreter_normalization_scope _run_scope;
 	LOG_TRACE << "get_ubt_ctn_at begin \n";
 	LOG_TRACE << "get_ubt_ctn_at[t]: " << t << "\n";
 
@@ -844,6 +851,7 @@ tref interpreter<node>::get_executable_spec(
 
 template <NodeType node>
 void interpreter<node>::update(tref update) {
+	interpreter_normalization_scope _run_scope;
 	DBG(LOG_TRACE << "interpreter::update(update = \"" << LOG_FM(update) << "\")";)
 	// TODO: shift spec time according to new lookback from update
 	trefs io_vars = tau::get(update)
@@ -1026,6 +1034,7 @@ template <NodeType node>
 tref interpreter<node>::pointwise_revision(
 	tref spec, tref update, const int_t start_time)
 {
+	interpreter_normalization_scope _run_scope;
 	spec = normalizer<node>(spec);
 	update = normalizer<node>(update);
 	// If the update is T, nothing changes
