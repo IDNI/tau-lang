@@ -19,3 +19,11 @@ add_repl_test_fail(fragment_gate-normalize_blocks_A_by_default
 	"normalize A (o1[t] = 1)" "require the ctl_star")
 add_repl_test_fail(fragment_gate-run_blocks_A_by_default
 	"run A (o1[t] = 1)" "require the ctl_star")
+
+# AP2-21: the `ltl` command's pipeline print had zero direct coverage.
+# (fragment_cmd's unknown-name branch is grammar-unreachable: only
+# `ltl`/`ctl_star` parse as fragment names, so it cannot be black-box
+# tested.)
+add_repl_test(ltl_cmd-realizable "ltl always o1[t] = 1" "REALIZABLE")
+add_repl_test_fail(ltl_cmd-unrealizable
+	"ltl always (o1[t] = 1 && o1[t] != 1)" "UNREALIZABLE")

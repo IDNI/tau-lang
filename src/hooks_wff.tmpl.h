@@ -323,8 +323,8 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 		&& arg2(ch).is(tau::bf_t))
 	{
 		HOOK_LOGGING(applied("{c} = 1 ::= T or F");)
-		return tau::build_bf_eq_0(tau::build_bf_neg(
-			arg1_fm(ch).get()));
+		return tau::get(tau::build_bf_eq_0(tau::build_bf_neg(
+			arg1_fm(ch).get())), r); // AP1-9: thread r
 	}
 
 	// Rule {c} = {d} ::= {c} + {d} = 0
@@ -332,9 +332,9 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 		if (size_t t = arg1(ch).get_ba_type();
 			t > 0 && t == arg2(ch).get_ba_type()) {
 			HOOK_LOGGING(applied("{c} = {d} ::= {c} + {d} = 0");)
-			return tau::build_bf_eq_0(
+			return tau::get(tau::build_bf_eq_0(
 				build_bf_xor<node>(
-					arg1_fm(ch).get(), arg2_fm(ch).get()));
+					arg1_fm(ch).get(), arg2_fm(ch).get())), r); // AP1-9
 			}
 
 	// Rule X = X ::= T
@@ -359,8 +359,8 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 	//1/0 = X ::= X = 1/0
 	if (arg1(ch).is(tau::bf_t) || arg1(ch).is(tau::bf_f)) {
 		HOOK_LOGGING(applied("1/0 = X ::= X = 1/0");)
-		return tau::build_bf_eq(arg2_fm(ch).get(),
-			arg1_fm(ch).get());
+		return tau::get(tau::build_bf_eq(arg2_fm(ch).get(),
+			arg1_fm(ch).get()), r); // AP1-9
 	}
 
 	return tau::get_raw(v, ch, len, r);
@@ -413,8 +413,8 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 		&& arg2(ch).is(tau::bf_t))
 	{
 		HOOK_LOGGING(applied("{c} != 1 ::= T or F");)
-		return tau::build_bf_neq_0(tau::build_bf_neg(
-			arg1_fm(ch).get()));
+		return tau::get(tau::build_bf_neq_0(tau::build_bf_neg(
+			arg1_fm(ch).get())), r); // AP1-9
 	}
 
 	// Rule {c} != {d} ::= {c} + {d} != 0
@@ -422,9 +422,9 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 		if (size_t t = arg1(ch).get_ba_type();
 			t > 0 && t == arg2(ch).get_ba_type()) {
 			HOOK_LOGGING(applied("{c} != {d} ::= {c} + {d} != 0");)
-			return tau::build_bf_neq_0(
+			return tau::get(tau::build_bf_neq_0(
 				build_bf_xor<node>(
-					arg1_fm(ch).get(), arg2_fm(ch).get()));
+					arg1_fm(ch).get(), arg2_fm(ch).get())), r); // AP1-9
 		}
 
 	//Rule X != X ::= F
@@ -449,8 +449,8 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 	//1/0 != X ::= X != 1/0
 	if (arg1(ch).is(tau::bf_t) || arg1(ch).is(tau::bf_f)) {
 		HOOK_LOGGING(applied("1/0 != X ::= X != 1/0");)
-		return tau::build_bf_neq(arg2_fm(ch).get(),
-			arg1_fm(ch).get());
+		return tau::get(tau::build_bf_neq(arg2_fm(ch).get(),
+			arg1_fm(ch).get()), r); // AP1-9
 	}
 
 	return tau::get_raw(v, ch, len, r);

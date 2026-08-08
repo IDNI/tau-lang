@@ -117,23 +117,34 @@ tref api<node>::get_formula(const std::string& input, bool simplified) {
 
 template <NodeType node>
 tref api<node>::get_function_def(const std::string& function_def, [[maybe_unused]] bool simplified) {
-	tref def = get_definition(function_def, true); // Always simplify to resolve refs
+	// AP1-5: parse and validate BEFORE registering -- routing through
+	// get_definition registered unconditionally, so a rejected
+	// definition stayed in the global store and leaked into later
+	// apply_defs_to_spec calls.
+	tref def = tau::get(function_def,
+		get_options<node>(tau::rec_relation, true));
 	if (!def) return nullptr;
 	// The second child of a rec_relation is the body;
-	// accept only bf or ref (ref may resolve to a bf later)
+	// accept bf or ref (a ref body may resolve to a bf later --
+	// AP1-26: the code rejected refs while doc and the predicate
+	// sibling accepted them)
 	auto nt = tau::get(def)[1].get_type();
-	if (nt == tau::bf) return def;
-	return nullptr;
+	if (nt != tau::bf && nt != tau::ref) return nullptr;
+	add_definition(tau::get(def).first(), tau::get(def).second());
+	return def;
 }
 
 template <NodeType node>
 tref api<node>::get_predicate_def(const std::string& predicate_def, [[maybe_unused]] bool simplified) {
-	tref def = get_definition(predicate_def, true); // Always simplify to resolve refs
+	// AP1-5: parse and validate BEFORE registering (see get_function_def).
+	tref def = tau::get(predicate_def,
+		get_options<node>(tau::rec_relation, true));
 	if (!def) return nullptr;
 	// TODO we could pre resolve all refs to wff
 	auto nt = tau::get(def)[1].get_type();
-	if (nt == tau::wff || nt == tau::ref) return def;
-	return nullptr;
+	if (nt != tau::wff && nt != tau::ref) return nullptr;
+	add_definition(tau::get(def).first(), tau::get(def).second());
+	return def;
 }
 
 template <NodeType node>
@@ -169,7 +180,10 @@ size_t api<node>::add_definition(tref head, tref body) {
 	}
 	DBG(TAU_LOG_TRACE << "add_definition/adding head: " << LOG_FM_DUMP(head);)
 	DBG(TAU_LOG_TRACE << "add_definition/adding body: " << LOG_FM_DUMP(body);)
-	return definitions<node>::instance().add(tau::geth(head), tau::geth(body));
+	// AP1-6: 1-based -- the store's 0-based index made the very first
+	// definition return 0, the documented failure value.
+	return definitions<node>::instance().add(
+		tau::geth(head), tau::geth(body)) + 1;
 }
 
 template <NodeType node>
@@ -186,16 +200,30 @@ template <NodeType node>
 tref api<node>::get_spec_or_term(const std::string& expression, bool simplified) {
 	// Try parsing as a full spec first (which handles multiline and
 	// formula inputs); fall back to a bare bf term if that fails.
-	tref       expr = get_spec(expression);
+	// AP1-18: the spec attempt is quiet -- its parse errors are logged
+	// only when the term fallback ALSO fails, so a legitimate bare term
+	// no longer emits spurious ERROR lines on the successful path.
+	tau_spec<node> spec;
+	tref expr = spec.parse(expression) ? spec.get() : nullptr;
 	if (!expr) expr = get_term(expression, simplified);
+	if (!expr)
+		for (const auto& error : spec.errors())
+			TAU_LOG_ERROR << error;
 	return expr;
 }
 
 template <NodeType node>
 tref api<node>::get_formula_or_term(const std::string& expr, bool simplified) {
 	tref e = tau::get(expr, get_options<node>(tau::fm_or_term, simplified));
-	if (e) return tau::trim(e);
-	return nullptr;
+	if (!e) return nullptr;
+	e = tau::trim(e);
+	// AP1-32: classify io_vars like get_formula does, so the same text
+	// yields the same tree through either entry (downstream re-resolution
+	// hid the difference from sat machinery, but the trees differed).
+	if (tau::get(e).is(tau::wff))
+		e = resolve_io_vars<node>(
+			*definitions<node>::instance().get_io_context(), e);
+	return e;
 }
 
 // Querying
@@ -482,6 +510,10 @@ bool api<node>::realizable(tref fm) {
 
 template <NodeType node>
 bool api<node>::unrealizable(tref fm) {
+	// AP1-11: null input is invalid, not "unrealizable" -- match the
+	// htref overload's false (a bool API cannot express errors, and
+	// claiming a verdict for unparseable input is the worse lie).
+	if (!fm) return false;
 	return !realizable(fm);
 }
 
@@ -500,6 +532,9 @@ bool api<node>::sat(tref fm) {
 
 template <NodeType node>
 bool api<node>::unsat(tref fm) {
+	// AP1-11: null input is invalid, not "unsatisfiable" (see
+	// unrealizable above).
+	if (!fm) return false;
 	return !sat(fm);
 }
 
@@ -696,7 +731,9 @@ std::optional<interpreter<node>> api<node>::get_interpreter(
 template <NodeType node>
 std::optional<rr<node>> api<node>::get_nso_rr(tref expr) {
 	rr<node> nso_rr;
-	auto ctx = *definitions<node>::instance().get_io_context();
+	// AP1-16: by reference -- copying the io_context (three subtree maps
+	// + remaps + console factory) per call was pure waste; all uses read.
+	auto& ctx = *definitions<node>::instance().get_io_context();
 	if (contains(expr, tau::ref)) {
 		typename node::type type = tau::get(expr).get_type();
 		if (type == tau::spec) {

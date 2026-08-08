@@ -606,3 +606,23 @@ TEST_SUITE("Tau API - htref - null guards (AP-2)") {
 		CHECK(tau_api::substitute(x, x, htref{}) == nullptr);
 	}
 }
+
+// AP1-30 + AP1-31(a): direct add_definition and get_stream_def edge coverage.
+TEST_SUITE("Tau API - tref - definition/stream edges") {
+	TEST_CASE_FIXTURE(api_fixture, "add_definition: null args return 0, "
+			"first real id is 1-based") {
+		CHECK( tau_api::add_definition(nullptr, nullptr) == 0 );
+		tref def = tau_api::get_definition("ap130_f(x) := x'");
+		REQUIRE( def );
+		// AP1-6: a registered definition's id is always > 0
+		size_t id = tau_api::add_definition(
+			tau::get(def).first(), tau::get(def).second());
+		CHECK( id > 0 );
+	}
+
+	TEST_CASE_FIXTURE(api_fixture, "get_stream_def: malformed input "
+			"returns nullptr (AP1-2 pinned)") {
+		CHECK( tau_api::get_stream_def("not a stream def") == nullptr );
+		CHECK( tau_api::get_stream_def("") == nullptr );
+	}
+}

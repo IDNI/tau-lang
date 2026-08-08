@@ -64,7 +64,10 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 			DBG(LOG_TRACE << dump_to_str());
 			return {};
 		}
-		auto maybe_line = it->second->get(time_point); // get a value from input stream
+		// AP2-7: query with the parameter, not the member -- the only
+		// caller passes time_point today, but a future lookback pre-read
+		// with time_step != time_point would read the wrong step.
+		auto maybe_line = it->second->get(time_step); // get a value from input stream
 		if (!maybe_line.has_value()) {
 			LOG_ERROR
 				<< "Failed to read from input stream '"
@@ -439,13 +442,16 @@ post_normalization:
 			}
 		}
 
-		// rebuild io streams according to the spec
+		// rebuild io streams according to the SELECTED clause -- AP2-5:
+		// collecting from the whole spec opened (and truncated) file
+		// outputs and prompted console inputs referenced only in
+		// rejected clauses. update() already collects per chosen spec.
 		subtree_map<node, size_t> output_streams;
-		if (!i.collect_output_streams(spec, output_streams)) return {};
+		if (!i.collect_output_streams(clause, output_streams)) return {};
 		LOG_TRACE << "interpreter::make_interpreter/rebuild_outputs";
 		if (!i.rebuild_outputs(output_streams)) return {};
 		subtree_map<node, size_t> input_streams;
-		if (!i.collect_input_streams(spec, input_streams)) return {};
+		if (!i.collect_input_streams(clause, input_streams)) return {};
 		LOG_TRACE << "interpreter::make_interpreter/rebuild_inputs";
 		if (!i.rebuild_inputs(input_streams)) return {};
 
@@ -1173,6 +1179,27 @@ void interpreter<node>::update(tref update) {
 				[](const htref& h) { return h->get(); })));
 		LOG_INFO << "Updated specification: " << TAU_TO_STR(update) << "\n\n";
 
+		// AP2-10: collect the new spec's streams BEFORE committing --
+		// committing first left the interpreter half-updated (new spec
+		// active, stale stream maps) when a rebuild failed, and the
+		// next step() then died on missing streams with no indication
+		// the update itself was the cause.
+		subtree_map<node, size_t> output_streams, input_streams;
+		bool streams_ok = true;
+		for (const auto& [k, _] : current_spec)
+			if (!collect_output_streams(k->get(), output_streams)) {
+				streams_ok = false; break;
+			}
+		if (streams_ok) for (const auto& [k, _] : current_spec)
+			if (!collect_input_streams(k->get(), input_streams)) {
+				streams_ok = false; break;
+			}
+		if (!streams_ok) {
+			LOG_ERROR << "No update performed: failed to collect "
+				"the revised spec's streams; the previous "
+				"specification stays active\n";
+			return;
+		}
 		// Set new specification for interpreter
 		ubt_ctn = std::move(current_ubd_ctn);
 		original_spec = std::move(current_spec);
@@ -1180,20 +1207,18 @@ void interpreter<node>::update(tref update) {
 		// The systems for solver need to be recomputed at beginning of next step
 		final_system = false;
 		compute_lookback_and_initial();
-		subtree_map<node, size_t> output_streams;
-		for (const auto& [k, _] : original_spec) {
-			if (!collect_output_streams(k->get(), output_streams))
-				return;
-		}
 		LOG_TRACE << "interpreter::update/rebuild_outputs";
-		if (!rebuild_outputs(output_streams)) return;
-		subtree_map<node, size_t> input_streams;
-		for (const auto& [k, _] : original_spec) {
-			if (!collect_input_streams(k->get(), input_streams))
-				return;
+		if (!rebuild_outputs(output_streams)) {
+			LOG_ERROR << "interpreter::update: output stream "
+				"rebuild failed after commit\n";
+			return;
 		}
 		LOG_TRACE << "interpreter::update/rebuild_inputs";
-		if (!rebuild_inputs(input_streams)) return;
+		if (!rebuild_inputs(input_streams)) {
+			LOG_ERROR << "interpreter::update: input stream "
+				"rebuild failed after commit\n";
+			return;
+		}
 		return;
 	}
 	// No more clause left in update and all clauses are not realizable
@@ -1563,6 +1588,10 @@ interpreter<node>::boundary_traces(int n, int max_length) const {
 	std::vector<std::vector<int>> all_paths;
 	std::vector<int> stack;
 	std::vector<bool> on_stack(aut.num_states, false);
+	// AP2-9: initial_state is untrusted elsewhere (make_interpreter range
+	// checks it); an out-of-range value would overrun on_stack.
+	if (aut.initial_state < 0
+		|| aut.initial_state >= (int) aut.num_states) return {};
 
 	std::function<void(int, int)> dfs = [&](int u, int depth) {
 		stack.push_back(u);
@@ -1752,7 +1781,9 @@ bool interpreter<node>::can_extend(tref psi) {
 			tref revision = pointwise_revision_temporal<node>(
 				current_spec_copy[i].first->get(),
 				collected_updates[i], time_point);
-			if (tau::get(revision).equals_F()) {
+			// AP2-4: nullptr when the definitions in the clause do
+			// not settle -- update() guards this same call.
+			if (!revision || tau::get(revision).equals_F()) {
 				clause_valid = false; break;
 			}
 			if (tau::subtree_equals(current_spec_copy[i].first->get(), revision))

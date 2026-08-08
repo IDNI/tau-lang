@@ -181,7 +181,15 @@ inline std::shared_ptr<serialized_constant_input_stream>
 
 inline std::optional<std::string> file_input_stream::get() {
 	std::string line;
-	std::getline(file, line);
+	// AP2-6: honor the base-class contract -- nullopt at end-of-stream
+	// (and for a file that never opened), instead of returning an empty
+	// line forever, which made EOF indistinguishable from a blank line
+	// and a missing file behave as an instantly-exhausted stream.
+	if (!std::getline(file, line)) {
+		DBG(LOG_TRACE << "file_input_stream(\"" << filename
+			<< "\"): get() = EOF";)
+		return std::nullopt;
+	}
 	DBG(LOG_TRACE << "file_input_stream(\"" << filename << "\"): get() = \"" << line << "\"";)
 	return line;
 }

@@ -36,8 +36,8 @@
 //
 // Version: 1.0 (2026-04-21)
 
-#ifndef __IDNI__TAU__TAU_LTL_API_H__
-#define __IDNI__TAU__TAU_LTL_API_H__
+#ifndef __IDNI__TAU__TAU_LANG_API_H__
+#define __IDNI__TAU__TAU_LANG_API_H__
 
 // ── Core synthesis API ────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ namespace idni::tau_lang {
 //       bool r = is_tau_formula_sat<node_t>(nso.value().main->get());
 //   }
 //
-// Declared in: normalizer.h (included via tau.h)
+// Declared in: satisfiability.h (included via tau.h)
 // Template parameter: NodeType node — use node_t for the default BA pack.
 
 // ── get_nso_rr ────────────────────────────────────────────────────────────────
@@ -96,4 +96,4 @@ namespace idni::tau_lang {
 
 } // namespace idni::tau_lang
 
-#endif // __IDNI__TAU__TAU_LTL_API_H__
+#endif // __IDNI__TAU__TAU_LANG_API_H__

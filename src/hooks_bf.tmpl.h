@@ -394,6 +394,13 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 		HOOK_LOGGING(applied("$X'' :=  $X.");)
 		return tau::get(double_neg.value_tree().first(), r);
 	}
+	//RULE "{c}' := ~c" (AP1-10: cte_neg had zero callers, so the
+	// `{c} = 1 ::= T or F` wff rules actually produced an unfolded
+	// `{c}' = 0` -- constant negation now folds like or/and/xor do)
+	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0) {
+		HOOK_LOGGING(applied("{ $X }' := bf_neg_cb $X.");)
+		return cte_neg(v, ch, len, r);
+	}
 	return tau::get_raw(v, ch, len, r);
 }
 
@@ -569,7 +576,13 @@ tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
 	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
 	size_t type = arg1(ch).get_ba_type();
-	return build_bf_ba_constant<node>(~l, type, right);
+	// Normalize the bv alternative: ~l builds a symbolic bvnot Term that
+	// would intern separately from the equal VALUE (e.g. {5}' vs {250});
+	// the other algebras' complements are canonical by construction.
+	auto nl = ~l;
+	if (auto* t = std::get_if<cvc5::Term>(&nl))
+		*t = normalize_bv(*t);
+	return build_bf_ba_constant<node>(nl, type, right);
 }
 
 } // namespace idni::tau_lang

@@ -240,16 +240,18 @@ struct interpreter {
 	// ── Oracle-resolved output streams (declare_open) ────────────────────
 	//
 	//
-	// An OracleHandler is invoked at runtime when step() encounters an
-	// open output stream. It receives a serialized tau data formula F
-	// characterizing the admissible values for that stream at the
-	// current state, and must return a satisfying assignment serialized
-	// as "var := value" (one per free variable in F). The engine
-	// validates the returned assignment against F and commits it.
+	// DESIGN CONTRACT (target semantics): an OracleHandler is invoked
+	// when step() encounters an open output stream; it receives a
+	// serialized tau data formula F characterizing the admissible values
+	// and returns a satisfying assignment ("var := value" per free
+	// variable), which the engine validates against F and commits. F is
+	// guaranteed satisfiable by W-invariance.
 	//
-	// F is guaranteed satisfiable by W-invariance (the engine only
-	// dispatches from a winning sys-state in the parity game's winning
-	// region). The handler need not check satisfiability of F itself.
+	// V1 STATUS (AP2-11): step() does NOT yet dispatch to handlers --
+	// open-stream resolution stays host-side (see the V1 scaffolding
+	// note in interpreter.tmpl.h step()); consequently the
+	// in_oracle_handler_ re-entrance guard cannot fire yet.
+	// declare_open DOES validate stream_name (throws on unknown).
 	using OracleHandler = std::function<std::string(const std::string& formula)>;
 
 	// Declare `stream_name` as an open output stream filled by `handler`.

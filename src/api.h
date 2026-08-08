@@ -224,8 +224,9 @@ struct api {
 	/// Register a definition from pre-parsed head and body tree nodes.
 	/// Both are converted to htref internally and added to the global
 	/// definitions store.
-	/// @return The definition index (>0) on success, or 0 if either
-	///         argument is nullptr.
+	/// @return The 1-based definition id (>0) on success, or 0 if either
+	///         argument is nullptr (AP1-6: ids are 1-based precisely so
+	///         the first definition is distinguishable from failure).
 	static size_t add_definition(tref head, tref body);
 
 	// -----------------------------------------------------------------------

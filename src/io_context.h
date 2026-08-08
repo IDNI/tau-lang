@@ -222,7 +222,9 @@ struct vector_input_stream : public serialized_constant_input_stream {
 	vector_input_stream(std::shared_ptr<std::vector<std::string>> values,
 		std::shared_ptr<size_t> current);
 	virtual ~vector_input_stream() = default;
-	/** @brief Rebuild by resetting the cursor to the beginning. */
+	/** @brief Rebuild SHARING values and cursor -- the copy CONTINUES
+	 * where this stream left off (AP2-12: it does not rewind, despite the
+	 * base contract; tests pin this sharing behavior). */
 	virtual std::shared_ptr<serialized_constant_input_stream> rebuild() override;
 	/** @brief Return the next value, or `std::nullopt` when exhausted. */
 	virtual std::optional<std::string> get() override;
@@ -244,7 +246,8 @@ struct vector_output_stream : public serialized_constant_output_stream {
 	/** @brief Construct sharing @p values as the backing store. */
 	vector_output_stream(const std::shared_ptr<std::vector<std::string>>& values);
 	virtual ~vector_output_stream() = default;
-	/** @brief Rebuild by resetting the read cursor. */
+	/** @brief Rebuild SHARING the backing values (not empty, unlike the
+	 * base contract) with the read cursor reset (AP2-12). */
 	virtual std::shared_ptr<serialized_constant_output_stream> rebuild() override;
 	/** @brief Append @p value to the backing store. */
 	virtual bool put(const std::string& value) override;

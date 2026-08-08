@@ -304,7 +304,11 @@ tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 	}
 
 	// The definition for the operator for bitvectors is different
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+	// AP1-8: check both sides like the omcat block below -- an untyped
+	// LHS with a bv-typed RHS must still take the bv path, not the
+	// plain-BF expansion.
+	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())
+		|| is_bv_type_family<node>(arg2_fm(ch).get_ba_type())) {
 		if (tref bv_r = wff_bv_lt<node>(ch, r)) {
 			HOOK_LOGGING(applied("Using bitvector-specific definition for <.");)
 			return bv_r;
@@ -386,7 +390,11 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 	}
 
 	// The definition for the operator for bitvectors is different
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+	// AP1-8: check both sides like the omcat block below -- an untyped
+	// LHS with a bv-typed RHS must still take the bv path, not the
+	// plain-BF expansion.
+	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())
+		|| is_bv_type_family<node>(arg2_fm(ch).get_ba_type())) {
 		if (tref bv_r = wff_bv_nlt<node>(ch, r)) {
 			HOOK_LOGGING(applied("Using bitvector-specific definition for !<.");)
 			return bv_r;
@@ -469,7 +477,11 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 	}
 
 	// The definition for the operator for bitvectors is different
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+	// AP1-8: check both sides like the omcat block below -- an untyped
+	// LHS with a bv-typed RHS must still take the bv path, not the
+	// plain-BF expansion.
+	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())
+		|| is_bv_type_family<node>(arg2_fm(ch).get_ba_type())) {
 		if (tref bv_r = wff_bv_lteq<node>(ch, r)) {
 			HOOK_LOGGING(applied("Using bitvector-specific definition for <=.");)
 			return bv_r;
@@ -533,7 +545,11 @@ tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r
 	}
 
 	// The definition for the operator for bitvectors is different
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+	// AP1-8: check both sides like the omcat block below -- an untyped
+	// LHS with a bv-typed RHS must still take the bv path, not the
+	// plain-BF expansion.
+	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())
+		|| is_bv_type_family<node>(arg2_fm(ch).get_ba_type())) {
 		if (tref bv_r = wff_bv_nlteq<node>(ch, r)) {
 			HOOK_LOGGING(applied("Using bitvector-specific definition for !<=.");)
 			return bv_r;
@@ -597,7 +613,11 @@ tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 	}
 
 	// The definition for the operator for bitvectors is different
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+	// AP1-8: check both sides like the omcat block below -- an untyped
+	// LHS with a bv-typed RHS must still take the bv path, not the
+	// plain-BF expansion.
+	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())
+		|| is_bv_type_family<node>(arg2_fm(ch).get_ba_type())) {
 		if (tref bv_r = wff_bv_gt<node>(ch, r)) {
 			HOOK_LOGGING(applied("Using bitvector-specific definition for >.");)
 			return bv_r;
@@ -663,7 +683,11 @@ tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) 
 	}
 
 	// The definition for the operator for bitvectors is different
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+	// AP1-8: check both sides like the omcat block below -- an untyped
+	// LHS with a bv-typed RHS must still take the bv path, not the
+	// plain-BF expansion.
+	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())
+		|| is_bv_type_family<node>(arg2_fm(ch).get_ba_type())) {
 		if (tref bv_r = wff_bv_ngt<node>(ch, r)) {
 			HOOK_LOGGING(applied("Using bitvector-specific definition for !>.");)
 			return bv_r;
@@ -729,7 +753,11 @@ tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r)
 	}
 
 	// The definition for the operator for bitvectors is different
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+	// AP1-8: check both sides like the omcat block below -- an untyped
+	// LHS with a bv-typed RHS must still take the bv path, not the
+	// plain-BF expansion.
+	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())
+		|| is_bv_type_family<node>(arg2_fm(ch).get_ba_type())) {
 		if (tref bv_r = wff_bv_gteq<node>(ch, r)) {
 			HOOK_LOGGING(applied("Using bitvector-specific definition for >=.");)
 			return bv_r;
@@ -793,7 +821,11 @@ tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r
 	}
 
 	// The definition for the operator for bitvectors is different
-	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
+	// AP1-8: check both sides like the omcat block below -- an untyped
+	// LHS with a bv-typed RHS must still take the bv path, not the
+	// plain-BF expansion.
+	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())
+		|| is_bv_type_family<node>(arg2_fm(ch).get_ba_type())) {
 		if (tref bv_r = wff_bv_ngteq<node>(ch, r)) {
 			HOOK_LOGGING(applied("Using bitvector-specific definition for !>=.");)
 			return bv_r;
@@ -823,11 +855,11 @@ tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch
 
 	// The definition for the operator for bitvectors is different
 	if (is_bv_type_family<node>(arg1_fm(ch).get_ba_type())) {
-		return tau::build_wff_and(
+		return tau::get(tau::build_wff_and(
 			tau::build_bf_lteq(arg1_fm(ch).get(),
 				arg2_fm(ch).get()),
 			tau::build_bf_lteq(arg2_fm(ch).get(),
-				arg3_fm(ch).get()));
+				arg3_fm(ch).get())), r); // AP1-9: thread r
 	}
 	return tau::get(tau::build_bf_interval(
 		arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get()), r);

@@ -260,7 +260,7 @@ TEST_SUITE("file streams") {
 		CHECK(in.get() == std::optional<std::string>("line two"));
 	}
 
-	TEST_CASE("reading past the end yields an empty string") {
+	TEST_CASE("reading past the end yields nullopt (AP2-6)") {
 		temp_file tf("eof");
 		{
 			file_output_stream out(tf.str());
@@ -268,7 +268,10 @@ TEST_SUITE("file streams") {
 		}
 		file_input_stream in(tf.str());
 		CHECK(in.get() == std::optional<std::string>("only"));
-		CHECK(in.get() == std::optional<std::string>(std::string{}));
+		// AP2-6: EOF is nullopt per the base-class contract -- the old
+		// empty-string-forever behavior made EOF indistinguishable
+		// from a blank line.
+		CHECK(!in.get().has_value());
 	}
 
 	// The failure branch of the file_output_stream constructor: a path whose
@@ -285,8 +288,9 @@ TEST_SUITE("file streams") {
 		CHECK(!out.put("never written"));
 	}
 
-	// Opening a missing file logs an error rather than throwing; get() then
-	// yields an empty string. This is the failure branch of the constructor.
+	// Opening a missing file logs an error rather than throwing; get()
+	// then reports end-of-stream (AP2-6: previously an endless supply of
+	// empty strings). This is the failure branch of the constructor.
 	TEST_CASE("opening a missing file does not throw") {
 		const std::string missing =
 			(std::filesystem::temp_directory_path()
@@ -294,7 +298,7 @@ TEST_SUITE("file streams") {
 		std::error_code ec;
 		std::filesystem::remove(missing, ec);
 		file_input_stream in(missing);
-		CHECK(in.get() == std::optional<std::string>(std::string{}));
+		CHECK(!in.get().has_value());
 	}
 
 	TEST_CASE("file_input_stream rebuild rereads from the beginning") {

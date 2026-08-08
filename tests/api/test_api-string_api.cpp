@@ -87,10 +87,12 @@ TEST_SUITE("Tau API - string - malformed input") {
 			CHECK(!tau_api::valid(s));
 			CHECK(!tau_api::valid_spec(s));
 			CHECK(!tau_api::sat(s));
-			// unrealizable/unsat are defined as the negation of the
-			// above, so a malformed input reports true here.
-			CHECK(tau_api::unrealizable(s));
-			CHECK(tau_api::unsat(s));
+			// AP1-11: malformed input is INVALID, not
+			// "unsatisfiable" -- unrealizable/unsat now return
+			// false for it, matching the htref overloads, instead
+			// of claiming a verdict for garbage.
+			CHECK(!tau_api::unrealizable(s));
+			CHECK(!tau_api::unsat(s));
 		}
 	}
 
