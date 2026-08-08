@@ -1,5 +1,10 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+// SW-9: guard added -- every sibling helper has one, and a double include
+// redefines the inline helpers.
+#ifndef __IDNI__TAU__TESTS__TEST_HELPERS_H__
+#define __IDNI__TAU__TESTS__TEST_HELPERS_H__
+
 #ifdef DEBUG
 // including instead of #include "tau.h" to avoid errors pointing to the generated tau.h
 #	include "boolean_algebras/nso_ba.h"
@@ -186,3 +191,5 @@ struct TauTestGCListener : doctest::IReporter {
 REGISTER_LISTENER("tau_gc", 1, TauTestGCListener);
 
 #endif // IDNI_TAU_TESTS_GC_LISTENER_REGISTERED
+
+#endif // __IDNI__TAU__TESTS__TEST_HELPERS_H__

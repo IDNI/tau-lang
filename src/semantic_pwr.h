@@ -199,7 +199,17 @@ tref semantic_pwr_optimal(tref clause, tref update, const int_t start_time) {
 	auto T3 = omcat::enumerate_qlt_T3(constants);
 	int K = (int)atoms.size();
 	int T1_size = 2 * (int)constants.size() + 1;
-	if (T1_size <= 0 || K <= 0 || K > 20) return nullptr;
+	// LS-11: named cap + a log line when it trips (the silent gate hid
+	// why optimal mode never ran for >= 21 atoms). Promote to a runtime
+	// parameter when that mechanism lands (same family as issue #36).
+	constexpr int semantic_pwr_max_atoms = 20;
+	if (T1_size <= 0 || K <= 0 || K > semantic_pwr_max_atoms) {
+		if (K > semantic_pwr_max_atoms)
+			TAU_LOG_DEBUG << "[semantic_pwr] optimal mode skipped: "
+				<< K << " atoms exceed the cap ("
+				<< semantic_pwr_max_atoms << ")";
+		return nullptr;
+	}
 
 	// Compute D-bitmask for each T3 type.
 	std::vector<int> type_A(T3.size(), 0);

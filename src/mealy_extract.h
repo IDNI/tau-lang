@@ -34,7 +34,11 @@ struct Edge {
 };
 
 // Mealy machine: Q states, |T_2| inputs per state, |T_3| outputs per
-// edge.  The initial_state corresponds to (b_0, q_0).
+// edge.  INDEX SPACES (LG-13): `initial_state` is the RAW GAME VERTEX
+// (b_0, q_0), stored verbatim (the tests pin this), while edges'
+// from/to are DENSE state indices remapped via vertex_to_state -- do
+// not walk edges starting from initial_state without translating it
+// through the same map first.
 struct Mealy {
 	int num_states = 0;
 	int initial_state = 0;

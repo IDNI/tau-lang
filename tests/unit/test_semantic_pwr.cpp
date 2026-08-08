@@ -2,8 +2,12 @@
 
 // Tests for semantic PWR (Optimal Mode) — winning-region-based revision.
 //
-// Tests the Algorithm D-based fallback from pwr-ltl.tex §11:
-//   θ = ψ ∧ Win_0 ∧ G(Win → X Win)
+// Tests the Algorithm D-based fallback from pwr-ltl.tex §11.
+// LS-18: the production code builds θ = ψ ∧ G(Win) ONLY (see
+// semantic_pwr_optimal) -- Win_0 is not conjoined; build_win0_formula is
+// exercised by these tests but has no production caller, and nothing
+// verifies Win_0 ⊆ Win (realizability only guarantees SOME initial ρ
+// wins). Keep that in mind when reading the SPWR-O cases.
 //
 // Test categories:
 //   SPWR-S-*   Safety regression (optimal mode matches fast mode)

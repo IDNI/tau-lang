@@ -7,6 +7,24 @@ namespace idni::tau_lang {
 
 // ── Spot subprocess ───────────────────────────────────────────────────────────
 
+// LS-9: one parser for the TAU_LTL_TIMEOUT_SEC watchdog (default 60s;
+// explicit "0" disables). Garbage keeps the DEFAULT instead of atoi's 0
+// silently removing the wall-clock cap on external ltlsynt/ltl2tgba.
+inline int ltl_timeout_sec() {
+	int timeout_sec = 60;
+	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
+		char* end = nullptr;
+		long v = std::strtol(env_sec, &end, 10);
+		if (end != env_sec && *end == '\0' && v >= 0)
+			timeout_sec = (int) v;
+		else TAU_LOG_WARNING << "TAU_LTL_TIMEOUT_SEC='" << env_sec
+			<< "' is not a number; keeping the default "
+			<< timeout_sec << "s";
+	}
+	return timeout_sec;
+}
+
+
 // Spawn an external command directly via posix_spawnp (no shell), capture
 // its stdout, and return {captured-output, exit-code}.
 //
@@ -157,11 +175,7 @@ inline std::pair<bool, std::string> call_ltlsynt(
 	}
 
 	// Configurable timeout: TAU_LTL_TIMEOUT_SEC (default 60). 0 disables.
-	int timeout_sec = 60;
-	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
-		timeout_sec = std::atoi(env_sec);
-		if (timeout_sec < 0) timeout_sec = 0;
-	}
+	int timeout_sec = ltl_timeout_sec();
 
 	// Always write the formula to a temp file and use `-F path`.  The old
 	// inline `--formula="..."` path required shell-escaping every char and
@@ -311,11 +325,24 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 
 		if (!in_body) {
 			if (line.substr(0, 7) == "States:") {
-				aut.num_states = std::stoi(line.substr(7));
+				// LT-10: a partially-written HOA (timed-out
+				// ltlsynt) must not throw or OOB; malformed
+				// headers yield the empty automaton.
+				try {
+					aut.num_states =
+						std::stoi(line.substr(7));
+				} catch (const std::exception&) {
+					aut.num_states = 0;
+				}
 				aut.edges.resize(aut.num_states);
 				aut.state_accepting.resize(aut.num_states, false);
 			} else if (line.substr(0, 6) == "Start:") {
-				aut.initial_state = std::stoi(line.substr(6));
+				try {
+					aut.initial_state =
+						std::stoi(line.substr(6));
+				} catch (const std::exception&) {
+					aut.initial_state = 0;
+				}
 			} else if (line.substr(0, 3) == "AP:") {
 				std::istringstream apl(line.substr(3));
 				int n; apl >> n;
@@ -336,6 +363,12 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 			// e.g. "State: 0" or "State: 0 {0}"
 			std::istringstream sl(line.substr(6));
 			sl >> cur_state;
+			// LT-10: bound the state number before indexing
+			if (cur_state < 0
+				|| cur_state >= (int) aut.num_states) {
+				cur_state = -1;
+				continue;
+			}
 			// Check for state-based acceptance marks
 			if (line.find('{') != std::string::npos)
 				aut.state_accepting[cur_state] = true;
@@ -352,6 +385,8 @@ inline HoaAutomaton parse_hoa(const std::string& hoa_text) {
 		int dst;
 		if (!(tl >> dst)) continue;
 
+		// LT-10: an edge to an out-of-range destination is dropped
+		if (dst < 0 || dst >= (int) aut.num_states) continue;
 		HoaEdge e;
 		e.guard_label = guard;
 		e.dst = dst;
@@ -412,11 +447,7 @@ inline SynthGame call_ltlsynt_game(
 	if (auto it = cache.find(key); it != cache.end()) return it->second;
 
 	// Configurable timeout (same env var as call_ltlsynt).
-	int timeout_sec = 60;
-	if (const char* env_sec = std::getenv("TAU_LTL_TIMEOUT_SEC")) {
-		timeout_sec = std::atoi(env_sec);
-		if (timeout_sec < 0) timeout_sec = 0;
-	}
+	int timeout_sec = ltl_timeout_sec();
 
 	std::string tmpfile_path = write_tempfile("tau_lang_game", phi_prop + "\n");
 	if (tmpfile_path.empty()) {

@@ -542,6 +542,31 @@ inline ProductGame build_product_game(
 					int ep = G.edge_priority[q][j];
 					if (ep < 0) continue; // no edge color, skip
 					const auto& [guard, next_q, edge_col] = G.trans[q][j];
+					// LG-11: env stubs are independent of the
+					// assignment -- create them once from any
+					// satisfying assignment instead of
+					// re-testing the key 2^n_aps times.
+					if (G.player[q] != 1) {
+						bool reachable = false;
+						for (int a = 0;
+							a < (1 << n_aps)
+							&& !reachable; ++a)
+							reachable = eval_guard(
+								guard, a, n_aps);
+						if (!reachable) continue;
+						auto key = std::make_tuple(
+							q * T1_size + rho, j,
+							rho);
+						if (stub_map.find(key)
+							== stub_map.end()) {
+							stub_map[key] = stub_base
+								+ (int)stubs.size();
+							stubs.push_back({q, rho,
+								j, next_q, rho,
+								ep, 0});
+						}
+						continue;
+					}
 					// For each AP assignment satisfying guard → stub
 					for (int a = 0; a < (1 << n_aps); ++a) {
 						if (!eval_guard(guard, a, n_aps)) continue;
@@ -556,14 +581,8 @@ inline ProductGame build_product_game(
 									stubs.push_back({q, rho, j, next_q, rp, ep, 0});
 								}
 							}
-						} else {
-							// Env: rho unchanged
-							auto key = std::make_tuple(q * T1_size + rho, j, rho);
-							if (stub_map.find(key) == stub_map.end()) {
-								stub_map[key] = stub_base + (int)stubs.size();
-								stubs.push_back({q, rho, j, next_q, rho, ep, 0});
-							}
 						}
+						// (env handled above, LG-11)
 					}
 				}
 			}

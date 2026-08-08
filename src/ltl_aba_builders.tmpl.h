@@ -36,6 +36,15 @@ static bool is_algorithm_a_applicable(
 {
 	using tau = tree<node>;
 	if (atoms.empty()) return false;
+	// LG-9: bound K -- the A/B/D encodings compute 1 << K (signed-shift
+	// UB at K >= 31) and enumerate 2^K masks (exponential strings well
+	// before that). Mirrors semantic_pwr's cap.
+	if (atoms.size() > 20) {
+		LOG_WARNING << "[ltl_aba] " << atoms.size() << " data atoms "
+			"exceed the T3-encoding cap (20); falling back to the "
+			"default ABA-oracle path";
+		return false;
+	}
 	for (auto& [f, _] : atoms) {
 		if (!is_omcat_type_family<node>(find_ba_type<node>(f))) return false;
 		auto bad = tau::get(f).find_top([](tref n) {
@@ -354,14 +363,11 @@ static bool constant_output_realizable(
 			if (!maybe_taut) continue;
 		}
 
-		// Shell-escape for single-quoted arg.
-		std::string escaped;
-		for (char c : phi) {
-			if (c == '\'') escaped += "'\\''";
-			else escaped += c;
-		}
-		std::string cmd = "ltlfilt -f '" + escaped + "' 2>/dev/null";
-		auto [out, rc] = run_cmd(cmd);
+		// LT-21: exec directly (no shell, no escaping, no popen-throw)
+		// -- this fast path runs up to CAP times on the default
+		// Algorithm-B gate, and run_cmd threw uncaught on popen
+		// failure.
+		auto [out, rc] = spawn_capture({ "ltlfilt", "-f", phi });
 		while (!out.empty() && std::isspace((unsigned char)out.back())) out.pop_back();
 		if (rc == 0 && out == "1") {
 			LOG_DEBUG << "[ltl_aba] constant-output fast-path REALIZABLE "
@@ -683,6 +689,27 @@ solve_ltl_aba(tref fm)
 				// Propositional call disagrees — fall through to default path
 				LOG_DEBUG << "[ltl_aba:algD] ltlsynt disagreed; falling through";
 			} else {
+				// LT-8: rename atoms to the d_i names the
+				// automaton carries (Algorithm A does the same
+				// at its own site) -- without this the oracle
+				// matches nothing by name and vacuously passes,
+				// and the safety encoding maps every guard to
+				// TRUE.
+				// LT-8 (attempted + reverted): renaming
+				// sol.atoms to the automaton's d_i names (as
+				// Algorithm A does) un-vacuates the ABA oracle
+				// -- and the oracle then flips ALG-D-28
+				// ((o1>0) U (o1<0), realizable) to UNREAL,
+				// because a strategy edge whose OUTPUT guard is
+				// contradictory (d_0 & d_1) is scored as a
+				// required-infeasible edge instead of a
+				// never-taken one (the dead-edge skip only
+				// covers pure-input guards). Teaching the
+				// oracle to skip system-side contradictory
+				// edges must land first; until then the
+				// name mismatch keeps the oracle vacuous on
+				// this env-gated path, which at least matches
+				// ltlsynt's own verdict.
 				sol.aut = parse_hoa(hoa_text);
 				return sol;
 			}
@@ -1360,7 +1387,13 @@ bool ltl_explain(tref fm, std::ostream& out) {
 		for (int s = 0; s < aut.num_states; ++s) {
 			for (auto& e : aut.edges[s]) {
 				tref guard_fm = guard_to_aba<node>(e.guard_label, aut.aps, atoms);
-				bool feasible = aba_existential_feasible<node>(guard_fm);
+				// LT-20: use the SAME oracle as the real
+				// pipeline (dead-edge pure-input check +
+				// per-BA-type partition) -- the plain
+				// existential check printed the opposite
+				// verdict on dead catch-all edges.
+				bool feasible = guard_is_aba_feasible<node>(
+					e.guard_label, aut.aps, atoms);
 				out << "  state " << s << " --[" << e.guard_label
 				    << "]--> " << e.dst << " : ";
 				if (feasible) {
@@ -1546,7 +1579,7 @@ static tref translate_ctl_star(tref fm,
 		case tau::wff_sometimes:return tau::build_wff_sometimes(new_children[0]);
 		case tau::wff_always:   return tau::build_wff_always(new_children[0]);
 		case tau::wff_F:        return tau::build_wff_F(new_children[0]);
-		default:                return fm;
+		default:                break; // falls to the LT-13 LOG_ERROR
 		}
 	} else if (nch == 2) {
 		// Binary operators
@@ -1561,12 +1594,22 @@ static tref translate_ctl_star(tref fm,
 		case tau::wff_W:     return tau::build_wff_W(new_children[0], new_children[1]);
 		case tau::wff_S:     return tau::build_wff_S(new_children[0], new_children[1]);
 		case tau::wff_T:     return tau::build_wff_T(new_children[0], new_children[1]);
-		default:             return fm;
+		// LT-13: rimply was missing -- `phi <- E psi` kept its E
+		// untranslated and later collapsed to "1" in the skeleton
+		case tau::wff_rimply: return tau::build_wff_rimply(
+					new_children[0], new_children[1]);
+		default:             break;
 		}
 	} else if (nch == 3 && nt == tau::wff_conditional) {
 		return tau::build_wff_conditional(
 			new_children[0], new_children[1], new_children[2]);
 	}
+	// LT-13: a silent identity here left embedded A/E/- untranslated in
+	// any connective missing from the switches above; be loud so the
+	// wrong-verdict mode is diagnosable.
+	LOG_ERROR << "translate_ctl_star: unhandled connective "
+		<< node::name(nt) << " with CTL* content in its subtree; "
+		"returning it untranslated";
 	return fm;
 }
 

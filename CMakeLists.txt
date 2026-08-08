@@ -341,6 +341,7 @@ if(TAU_BUILD_BOOST)
 	execute_process(
 		COMMAND bash ./dev dep-boost.sh ${DEP_BOOST_ARGS}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMAND_ERROR_IS_FATAL ANY # SW-12: fail here, not at find_package
 	)
 endif()
 

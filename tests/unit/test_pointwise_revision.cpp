@@ -758,3 +758,59 @@ TEST_SUITE("Cleanup") {
 		ba_constants<node_t>::cleanup();
 	}
 }
+// LS-17: revise() Cases 4/5, S/T past-operator specs, and binary-lhs
+// and_distribute shapes had zero coverage.
+TEST_SUITE("[PWR-LS17: uncovered cases]") {
+
+	TEST_CASE("[PWR-LS17-01] Case 4: G spec vs R update") {
+		tref s = spec("G (o1[t] = 0).");
+		tref u = spec("(o1[t] = 1) R (o2[t] = 1).");
+		REQUIRE(s != nullptr);
+		REQUIRE(u != nullptr);
+		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		REQUIRE(result != nullptr);
+		CHECK(is_realizable(result));
+	}
+
+	TEST_CASE("[PWR-LS17-02] Case 5: F spec vs U update") {
+		tref s = spec("F (o1[t] = 0).");
+		tref u = spec("(o1[t] = 1) U (o2[t] = 1).");
+		REQUIRE(s != nullptr);
+		REQUIRE(u != nullptr);
+		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		REQUIRE(result != nullptr);
+		CHECK(is_realizable(result));
+	}
+
+	TEST_CASE("[PWR-LS17-03] F spec vs sometimes update revises "
+			"(LS-3: same eventually operator)") {
+		tref s = spec("F (o1[t] = 0).");
+		tref u = spec("sometimes (o1[t] = 1).");
+		REQUIRE(s != nullptr);
+		REQUIRE(u != nullptr);
+		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		REQUIRE(result != nullptr);
+		CHECK(is_realizable(result));
+	}
+
+	TEST_CASE("[PWR-LS17-04] S past-operator spec survives revision") {
+		tref s = spec("(o1[t] = 1) S (o1[t] = 0).");
+		tref u = spec("G (o2[t] = 1).");
+		REQUIRE(s != nullptr);
+		REQUIRE(u != nullptr);
+		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		REQUIRE(result != nullptr);
+		CHECK(is_realizable(result));
+	}
+
+	TEST_CASE("[PWR-LS17-05] binary-lhs conjunction distributes: "
+			"(a && b) U c") {
+		tref s = spec("((o1[t] = 1) && (o2[t] = 1)) U (o3[t] = 1).");
+		tref u = spec("G (o4[t] = 1).");
+		REQUIRE(s != nullptr);
+		REQUIRE(u != nullptr);
+		tref result = pointwise_revision_temporal<node_t>(s, u, 0);
+		REQUIRE(result != nullptr);
+		CHECK(is_realizable(result));
+	}
+}

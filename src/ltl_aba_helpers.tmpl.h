@@ -186,7 +186,7 @@ static std::string skeleton_wff(
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
-	if (!t.has_child()) return "t"; // terminal → treat as true
+	if (!t.has_child()) return "1"; // terminal → TRUE (LT-11: bare "t" is an AP to Spot)
 	auto nt = t[0].value.nt;
 	const auto& inner = t[0];
 
@@ -285,7 +285,7 @@ static std::string skeleton_str(
 	if (t.is(tau::wff)) return skeleton_wff<node>(n, atoms);
 	// bf/atom — treat as data prop
 	auto prop = find_prop<node>(n, atoms);
-	return prop.empty() ? "t" : prop;
+	return prop.empty() ? "1" : prop; // LT-11
 }
 
 template <NodeType node>
@@ -341,7 +341,7 @@ static std::string skeleton_str_with_testers(
 	const auto& t = tau::get(n);
 	if (t.is(tau::wff)) return skeleton_wff_with_testers<node>(n, atoms, testers);
 	auto prop = find_prop<node>(n, atoms);
-	return prop.empty() ? "t" : prop;
+	return prop.empty() ? "1" : prop; // LT-11
 }
 
 template <NodeType node>
@@ -352,7 +352,7 @@ static std::string skeleton_wff_with_testers(
 {
 	using tau = tree<node>;
 	const auto& t = tau::get(n);
-	if (!t.has_child()) return "t";
+	if (!t.has_child()) return "1"; // LT-11
 	auto nt = t[0].value.nt;
 	const auto& inner = t[0];
 

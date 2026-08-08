@@ -231,8 +231,15 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time) {
 		return rebuild_from_roles<node>(op_phi, r_inv, commit_psi);
 	}
 
-	// Case 2b: Same unary temporal operator (G/F/sometimes)
-	if (op_phi == op_psi && !is_binary_temporal(op_phi)
+	// Case 2b: Same unary temporal operator (G/F/sometimes).
+	// LS-3: F and sometimes are the same eventually operator under two
+	// node kinds -- match them as equal so `F(a)` vs `sometimes(b)` is
+	// revised instead of dropped through the operator-mismatch case.
+	auto eventually_normal = [](temporal_op op) {
+		return op == temporal_op::F ? temporal_op::SOMETIMES : op;
+	};
+	if (eventually_normal(op_phi) == eventually_normal(op_psi)
+	    && !is_binary_temporal(op_phi)
 	    && op_phi != temporal_op::NONE) {
 		tref inner_phi = tau::get(phi)[0].first();
 		tref inner_psi = tau::get(psi)[0].first();

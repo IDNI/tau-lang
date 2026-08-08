@@ -60,7 +60,9 @@ std::variant<size_t, inference_error> type_scoped_resolver<node>::assign(tref n,
 		type_ids.insert_or_assign(root, merged_tid.value());
 		return merged_tid.value();
 	}
-	type_ids.insert_or_assign(element, tid);
+	// LS-5: store under the ROOT -- type_id_of looks the root up, so a
+	// type attached to a non-root member would be silently invisible.
+	type_ids.insert_or_assign(root, tid);
 	return tid;
 }
 
@@ -235,11 +237,14 @@ std::variant<size_t, inference_error> open_same_type(type_scoped_resolver<node>&
 			auto unified = unify<node>(inferred_type, type);
 			if (!unified) return inference_error{t, type, inferred_type};
 			else inferred_type = unified.value();
-			scoped[t] = default_type;
+			// LS-4 (TY-4): store the INFERRED type like the map
+			// variant does -- default_type discarded the more
+			// specific unification result.
+			scoped[t] = inferred_type;
 		}
 	}
 	resolver.open(scoped);
-	return default_type;
+	return inferred_type;
 }
 
 template<NodeType node>

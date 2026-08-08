@@ -48,7 +48,16 @@ inline SkeletonBundle build_algorithm_c_skeleton(
     const std::string& phi_star_ltl)
 {
 	SkeletonBundle b;
-	const uint32_t total_J = (K >= 31) ? 0 : (1u << K);  // 0 treated as "all"
+	// LG-10: the loops treat total_J == 0 as NONE (empty middle, "G()"),
+	// not "all" as the old comment claimed; a K that large cannot be
+	// encoded here at all, so refuse it loudly instead of emitting
+	// invalid Spot syntax. T1_size < 1 likewise yields "G(())".
+	if (K >= 31 || T1_size < 1) {
+		TAU_LOG_ERROR << "[algorithm_c] skeleton not encodable (K=" << K
+			<< ", T1_size=" << T1_size << ")";
+		return b;
+	}
+	const uint32_t total_J = 1u << K;
 
 	// Enumerate A_{ρ,J} (env inputs) and R_ρ, D_i (system outputs).
 	for (int rho = 0; rho < T1_size; ++rho) {

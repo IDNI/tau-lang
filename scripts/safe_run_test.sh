@@ -24,7 +24,11 @@ kill_group() {
 
 while kill -0 "$PID" 2>/dev/null; do
     sleep 2; ELAPSED=$((ELAPSED + 2))
-    RSS=$(awk '/VmRSS/{print $2}' /proc/"$PID"/status 2>/dev/null || echo 0)
+    # SW-13: sum RSS over the whole process group (like bench.sh) -- the
+    # kill acts on the group, so metering only the leader let spawned
+    # tools (ltlsynt) blow past the limit unobserved.
+    RSS=$(ps -o rss= -g "$PGID" 2>/dev/null | awk '{s+=$1} END{print s+0}')
+    [ -z "$RSS" ] && RSS=0
     if [ "$RSS" -gt "$MEM_LIMIT_KB" ]; then
         kill_group "(RSS=${RSS}kB > ${MEM_LIMIT_KB}kB limit)"
         exit 2

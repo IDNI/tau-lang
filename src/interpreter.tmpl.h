@@ -1704,10 +1704,9 @@ bool interpreter<node>::can_extend(tref psi) {
 	// Returns true iff at least one clause path produces an entirely
 	// executable revised spec.
 	//
-	// Today PWR mode is syntactic-only (pwr-ltl.tex §3 algorithm via
-	// `pointwise_revision_temporal`). Semantic mode (pwr-ltl.tex §11) is
-	// deferred upstream — when it lands, this method will reflect whichever
-	// mode the interpreter selects internally.
+	// LS-7: both PWR modes are wired at HEAD -- the dry-run exercises the
+	// same pointwise_revision_temporal pipeline update() uses, whose
+	// fallback invokes semantic_pwr_optimal (pwr-ltl.tex §3 + §11).
 
 	if (psi == nullptr) return true;
 

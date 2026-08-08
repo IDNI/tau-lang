@@ -74,7 +74,13 @@ inline LivenessDecomp<node> decompose_liveness(tref fm) {
 		tref body = t[0].first();
 		const auto& bt = tau::get(body);
 		if (bt.has_child() && bt[0].value.nt == tau::wff_F) {
-			// GF: record the inner body.
+			// GF: record the inner body. LG-8: only when it is
+			// non-temporal, matching is_gr1_fragment -- G(F(G p))
+			// is NOT GR(1) and must not be classified as such.
+			if (!gr1_detect_internal::is_non_temporal<node>(
+					bt[0].first())) {
+				d.is_gr1 = false; return {};
+			}
 			d.liveness_parts.push_back(bt[0].first());
 			continue;
 		}

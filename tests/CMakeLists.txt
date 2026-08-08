@@ -17,7 +17,9 @@ endif ()
 
 add_library(doctest INTERFACE)
 target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
-set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
+# SW-11: this is a doctest PREPROCESSOR macro; a CMake variable had no
+# effect. Define it for real on the test compile.
+add_compile_definitions(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE)
 
 function(add test_name)
 	# message(STATUS "adding test: ${test_name}")
@@ -54,7 +56,7 @@ function(add test_name)
 	endif()
 	set_tests_properties(${N}
 		PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
-		ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$LD_LIBRARY_PATH"
+		ENVIRONMENT "LD_LIBRARY_PATH=${PROJECT_SOURCE_DIR}/external/cvc5/build/src:$ENV{LD_LIBRARY_PATH}"
 		TIMEOUT ${_TAU_TEST_TIMEOUT})
 endfunction()
 

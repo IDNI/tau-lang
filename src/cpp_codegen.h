@@ -76,6 +76,10 @@ void emit_cpp_program_prop(
 // the strategy table.  The state machine resets to the new initial state
 // (matching the interpreter's behaviour where a revised spec restarts
 // the unbound continuation from the current time point).
+// LG-21 CAVEAT: the generated validation is assert-based and disappears
+// under -DNDEBUG -- a malformed Strategy (out-of-range dst, wrong guard
+// sizes) is then UB. Build the generated code without -DNDEBUG, or add
+// your own checks before calling revise().
 void emit_cpp_program_pwr(
     const HoaAutomaton& aut,
     const std::vector<std::string>& input_props,

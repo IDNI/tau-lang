@@ -618,10 +618,35 @@ static void extend_consistency_positive_k_ary(
 	std::vector<std::vector<int>> existing_forbid_sets;
 	if (out_constraints) {
 		for (const auto& c : *out_constraints) {
-			// Parse "G(!(name1 && name2 && ...))" into a set of indices.
+			// Parse "G(!(name1 && name2 && ...))" into a set of
+			// indices. LT-9: token-boundary matching -- a raw
+			// substring find read `p1` inside `p10`/`p11`, so with
+			// >= 11 atoms a forbid was mis-parsed and a needed
+			// constraint wrongly skipped as subsumed.
+			auto contains_name = [&](const std::string& hay,
+					const std::string& name) {
+				size_t pos = 0;
+				auto is_word = [](char ch) {
+					return std::isalnum(
+						(unsigned char) ch)
+						|| ch == '_';
+				};
+				while ((pos = hay.find(name, pos))
+					!= std::string::npos) {
+					bool l_ok = pos == 0
+						|| !is_word(hay[pos - 1]);
+					size_t end = pos + name.size();
+					bool r_ok = end >= hay.size()
+						|| !is_word(hay[end]);
+					if (l_ok && r_ok) return true;
+					pos = end;
+				}
+				return false;
+			};
 			std::vector<int> idxs;
 			for (int i = 0; i < n; ++i) {
-				if (c.find(atoms[i].second) != std::string::npos) idxs.push_back(i);
+				if (contains_name(c, atoms[i].second))
+					idxs.push_back(i);
 			}
 			if (idxs.size() >= 2) existing_forbid_sets.push_back(std::move(idxs));
 		}
@@ -954,9 +979,12 @@ static tref build_bv_eq_aux(const std::string& name, int shift, int value) {
 
 // Recursively rewrite all wff_S / wff_T nodes.
 // Uses `counter` for fresh auxiliary names.
-// `aux_pairs` collects (curr, prev) atom refs for each S operator, used
-// later to add temporal connection constraints G(X(p_prev) <-> p_curr)
-// to the ltlsynt skeleton.
+// `aux_pairs` collects (curr, prev) atom refs for each S operator.
+// LT-14 STATUS: no caller consumes `aux_pairs` today -- the described
+// G(X(p_prev) <-> p_curr) ltlsynt-skeleton integration does not exist
+// (solve_ltl_aba never calls compile_since_trigger; the sole caller,
+// ltl_to_safety_formula_full, binds it unused). The output is kept for
+// that documented-but-unbuilt integration; treat it as inert until then.
 // `safety_invs` collects G(curr && rhs) for the outermost S, and
 // G(curr ↔ rhs) for inner (nested) S operators.  The biconditional form
 // for inner S lets the auxiliary variable be false at t=0 without forcing

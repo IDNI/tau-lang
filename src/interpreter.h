@@ -85,11 +85,11 @@ struct interpreter {
 	// commit — F6-compliant: never mid-token). Equivalent to calling
 	// `step(values)` then `update(u)` in sequence.
 	//
-	// PWR mode is interpreter-internal; today only syntactic fast mode is
-	// wired (pwr-ltl.tex §3 algorithm via `pointwise_revision_temporal`).
-	// Semantic / Zielonka winning-region mode (pwr-ltl.tex §11 "optimal
-	// mode") is a deferred design — the machinery (algorithm_d_game.h,
-	// mealy_extract.h) exists but is not yet wired into PWR.
+	// PWR mode is interpreter-internal. LS-7: BOTH modes are wired at
+	// HEAD -- syntactic fast mode (pwr-ltl.tex §3 via
+	// `pointwise_revision_temporal`) with `semantic_pwr_optimal`
+	// (pwr-ltl.tex §11) invoked as its fallback inside
+	// pointwise_revision.h.
 	std::pair<std::optional<assignment<node>>, bool> step(
 						const assignment<node>& values,
 						std::optional<tref> u);
@@ -146,8 +146,8 @@ struct interpreter {
 	// non-null gate), but don't mutate any state. Returns true iff the
 	// resulting merged spec would be executable.
 	//
-	// Today this uses syntactic fast-mode PWR (`pointwise_revision_temporal`).
-	// Semantic mode is deferred upstream (see pwr-ltl.tex §11).
+	// Uses the same PWR pipeline as update(): syntactic fast mode with
+	// the semantic-optimal fallback (LS-7: both wired at HEAD).
 	//
 	// Non-const because the dry-run needs to copy the output_partition
 	// union-find structure, which lacks a usable copy constructor;
