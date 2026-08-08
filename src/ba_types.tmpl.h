@@ -705,8 +705,9 @@ bool is_buildable(size_t op, tref n, tref m) {
 		case tau::bf_nor: {
 			return is_bv_type_family<node>(unified.value()) || is_untyped<node>(unified.value());
 		}
-		case tau::bf_or: case tau::bf_xor: case tau::bf_and:
-		case tau::bf_neg: {
+		// BA2-15: bf_neg dropped from this switch -- it is unary and a
+		// two-operand buildability answer for it was meaningless.
+		case tau::bf_or: case tau::bf_xor: case tau::bf_and: {
 			return true;
 		}
 		default:

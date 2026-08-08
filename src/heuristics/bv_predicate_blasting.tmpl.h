@@ -120,9 +120,13 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	};
 	auto f = [&](tref n) {
 		if (is<node, tau::variable>(n)) {
+			// HE-18: a user variable literally named e.g.
+			// 9999999999 must not throw out of the blasting pass;
+			// skip anything that does not fit.
 			if (const auto& name = get_var_name<node>(n);
-				is_number(name))
-				id = std::max(id, (int_t)std::stoi(name));
+				is_number(name)) try {
+				id = std::max(id, (int_t)std::stoll(name));
+			} catch (const std::out_of_range&) { /* skip */ }
 		}
 		return true;
 	};
@@ -695,10 +699,16 @@ static tref wff_predicate_blasting(tref term) {
 		// downstream state. Only dispatch to the bv blasters when at
 		// least one operand actually carries a bv BA-type.
 		auto is_bv_operands = [&]() {
+			// HE-10: the ordering blasters read the bitwidth from the
+			// LEFT operand, so the left one must actually carry the
+			// bv type -- an OR-gate admitted left-untyped/right-bv
+			// atoms whose width read 0 and underflowed bitwidth-1
+			// (the exact corruption the comment above describes).
+			// Declining such a half-typed atom to rebuild_default is
+			// conservative; type unification stamps both sides on
+			// every real path.
 			tref l = tau::get(t).child(0);
-			tref r = tau::get(t).child(1);
-			return is_bv_type_family<node>(tau::get(l).get_ba_type())
-				|| is_bv_type_family<node>(tau::get(r).get_ba_type());
+			return is_bv_type_family<node>(tau::get(l).get_ba_type());
 		};
 
 		switch (nt) {

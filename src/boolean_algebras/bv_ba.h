@@ -317,7 +317,13 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
 
-/** @brief Normalise a BV term via cvc5's simplifier. */
+/** @brief Normalise a BV term via cvc5's simplifier.
+ * NOTE (BA1-17, attempted + reverted): reusing one static Solver here
+ * SIGSEGVs Release LTL execution mid-run (test_ltl_correctness
+ * LT2-EXEC-03, test_ltl_qlt_bv) -- cvc5 solver reuse across the hook
+ * call pattern is not safe as-is. The per-call construction stays until
+ * the cvc5 lifecycle interaction is understood; treat this as the
+ * documented cost, not an oversight. */
 inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
 	cvc5::Solver solver(cvc5_term_manager);
 	config_cvc5_solver(solver);

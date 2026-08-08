@@ -67,7 +67,15 @@ bool syntactic_path_simplification_wff_comp(tref l, tref r) {
  * CHECK( tau::get(res).equals_F() );
  * @endcode
  * @endinternal
- */
+ PRECONDITION (HE-7): bound variables must be canonically renamed apart
+ * from free occurrences before calling (the normalizer's canonize pass
+ * guarantees this on every production path). The conjunct-assumption
+ * substitution below uses rewriter::replace over the WHOLE subtree with no
+ * quantifier-scope guard, so a sibling scope rebinding an assumption's
+ * variable name would have its bound occurrences wrongly replaced
+ * (`x = 0 && ex x (x != 0)` would collapse to F).
+ *
+ * */
 template <NodeType node>
 tref syntactic_path_simplification_simplify_wff(tref root) {
 	using tau = tree<node>;
@@ -143,7 +151,15 @@ tref syntactic_path_simplification_simplify_wff(tref root) {
  * CHECK( tau::get(res).equals_0() );
  * @endcode
  * @endinternal
- */
+ PRECONDITION (HE-7): bound variables must be canonically renamed apart
+ * from free occurrences before calling (the normalizer's canonize pass
+ * guarantees this on every production path). The conjunct-assumption
+ * substitution below uses rewriter::replace over the WHOLE subtree with no
+ * quantifier-scope guard, so a sibling scope rebinding an assumption's
+ * variable name would have its bound occurrences wrongly replaced
+ * (`x = 0 && ex x (x != 0)` would collapse to F).
+ *
+ * */
 template <NodeType node>
 tref syntactic_path_simplification_simplify_bf(tref root) {
 	using tau = tree<node>;

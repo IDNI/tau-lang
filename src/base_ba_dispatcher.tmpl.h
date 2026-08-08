@@ -118,8 +118,9 @@ inline tref base_ba_dispatcher<bv, Bool>::unpack_tau_ba(const std::variant<bv, B
 
 template<>
 inline std::variant<bv, Bool> base_ba_dispatcher<bv, Bool>::pack_tau_ba(tref) {
-	// There is no tau_ba
-	return {};
+	// BA2-13: there is no tau_ba in this pack -- a silent default bv
+	// pretended packing succeeded.
+	throw std::logic_error("pack_tau_ba: pack has no tau_ba");
 }
 
 template<>
@@ -305,8 +306,9 @@ inline tref base_ba_dispatcher<bv, sbf_ba>::unpack_tau_ba(const std::variant<bv,
 template<>
 inline std::variant<bv, sbf_ba> base_ba_dispatcher<bv, sbf_ba>::pack_tau_ba(
 	tref) {
-	// There is no tau_ba
-	return {};
+	// BA2-13: there is no tau_ba in this pack -- a silent default bv
+	// pretended packing succeeded.
+	throw std::logic_error("pack_tau_ba: pack has no tau_ba");
 }
 
 template<>
@@ -652,7 +654,9 @@ template<>
 inline std::variant<qint, qlt, nlang_ba, bv, sbf_ba, hsb>
 base_ba_dispatcher<qint, qlt, nlang_ba, bv, sbf_ba, hsb>::pack_tau_ba(tref)
 {
-	return {}; // no tau_ba in this pack
+	// BA2-13: no tau_ba in this pack -- a silent default bv pretended
+	// packing succeeded.
+	throw std::logic_error("pack_tau_ba: pack has no tau_ba");
 }
 
 template<>
@@ -870,6 +874,13 @@ template<>
 inline std::variant<tau_dqnbv, qint, qlt, nlang_ba, bv, sbf_ba, hsb>
 base_ba_dispatcher<tau_dqnbv, qint, qlt, nlang_ba, bv, sbf_ba, hsb>::pack_tau_ba(tref c)
 {
+	// BA2-13: same null/wff guard the tau_ba<bv,sbf_ba> sibling got in
+	// ebcd6313.
+	using node_t = node<tau_dqnbv, qint, qlt, nlang_ba, bv, sbf_ba, hsb>;
+	using tau = tree<node_t>;
+	DBG(assert(c != nullptr && tau::get(c).is(tau::wff));)
+	if (c == nullptr || !tau::get(c).is(tau::wff))
+		throw std::logic_error("pack_tau_ba expects a non-null wff");
 	tau_dqnbv t{c};
 	return {t};
 }

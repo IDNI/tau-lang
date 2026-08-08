@@ -317,3 +317,35 @@ TEST_SUITE("omcat: parse_rat_literal") {
 		CHECK(r.q == 0);
 	}
 }
+
+// BA2-12: the T3 layer (enumerate_qlt_T3, forced_rel_between,
+// rel3_consistent, QltType3::restrict_*) had no direct coverage -- its only
+// production caller is semantic_pwr, whose tests hand-build the vectors.
+TEST_SUITE("qlt T3 enumeration (BA2-12)") {
+
+	TEST_CASE("no constants: T3 over positions is transitively consistent") {
+		auto t3 = omcat::enumerate_qlt_T3({});
+		REQUIRE( !t3.empty() );
+		for (const auto& t : t3) {
+			// every member restricts to a valid T1
+			CHECK( t.restrict_m().pos == t.pos_m );
+			CHECK( t.restrict_x().pos == t.pos_x );
+			CHECK( t.restrict_y().pos == t.pos_y );
+			// the stored relations are mutually transitive
+			CHECK( omcat::rel3_consistent(
+				t.rel_mx, t.rel_xy, t.rel_my) );
+		}
+	}
+
+	TEST_CASE("one constant: forced relations are honored") {
+		auto t3 = omcat::enumerate_qlt_T3({ omcat::Rat(1, 2) });
+		REQUIRE( !t3.empty() );
+		for (const auto& t : t3) {
+			// a forced pair (-1 = free; else 0/1/2 = LT/EQ/GT)
+			// always stores exactly the forced relation
+			int f = omcat::forced_rel_between(
+				t.restrict_m(), t.restrict_x());
+			if (f >= 0) CHECK( (int) t.rel_mx == f );
+		}
+	}
+}

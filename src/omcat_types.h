@@ -35,9 +35,14 @@ struct Rat {
 	}
 };
 
+__extension__ typedef __int128 omcat_int128_;
+
 inline int cmp(const Rat& a, const Rat& b) {
-	// a.p/a.q  vs  b.p/b.q :  cross-multiply.
-	long long lhs = a.p * b.q, rhs = b.p * a.q;
+	// a.p/a.q  vs  b.p/b.q :  cross-multiply. BA2-24: widened to 128-bit
+	// -- long long products overflow for parse-reachable magnitudes and
+	// silently corrupt T1/T2/T3 orderings.
+	omcat_int128_ lhs = (omcat_int128_) a.p * b.q,
+		rhs = (omcat_int128_) b.p * a.q;
 	if (lhs < rhs) return -1;
 	if (lhs > rhs) return +1;
 	return 0;

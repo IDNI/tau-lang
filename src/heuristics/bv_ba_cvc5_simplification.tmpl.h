@@ -64,6 +64,12 @@ tref cvc5_tree_to_tau_tree(bv n,
 			return (var_list != nullptr && body != nullptr) ? build_wff_all<node>(var_list, body) : nullptr; // Unable to transform to tau (returning null)
 		}
 		case Kind::VARIABLE_LIST: {
+			// HE-8: a multi-variable binder list cannot be expressed
+			// as a single tau variable node -- translating only n[0]
+			// silently dropped every bound variable after the first.
+			// Refuse multi-variable lists instead (the caller treats
+			// nullptr as "unable to transform").
+			if (n.getNumChildren() != 1) return nullptr;
 			auto var_list = rec(n[0]);
 			return var_list != nullptr ? tau::trim(var_list) : nullptr; // Unable to transform to tau (returning null)
 		}

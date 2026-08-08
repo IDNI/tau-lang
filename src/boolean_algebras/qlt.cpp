@@ -4,6 +4,9 @@
 
 namespace idni::tau_lang {
 
+// BA1-4: pedantic-clean 128-bit alias for overflow-safe rational arithmetic.
+__extension__ typedef __int128 int128_t_;
+
 // --- internal helper ---
 
 #pragma GCC diagnostic push
@@ -42,13 +45,22 @@ bool qlt_rational::operator<(const qlt_rational& o) const {
 	if (neg_inf) return !o.neg_inf;
 	if (o.pos_inf) return !pos_inf;
 	if (pos_inf || o.neg_inf) return false;
-	return p * o.q < o.p * q;
+	// BA1-4: cross-multiplication overflows long long for parse-reachable
+	// magnitudes (~9.2e18); widen to __int128.
+	return (int128_t_) p * o.q < (int128_t_) o.p * q;
 }
 
 qlt_rational qlt_rational::midpoint(const qlt_rational& o) const {
-	long long num = p * o.q + o.p * q;
-	long long den = 2 * q * o.q;
-	return qlt_rational(num, den);
+	// BA1-4: compute wide, then reduce by gcd before narrowing -- the
+	// unreduced cross products overflow long long for large operands.
+	int128_t_ num = (int128_t_) p * o.q + (int128_t_) o.p * q;
+	int128_t_ den = (int128_t_) 2 * q * o.q;
+	int128_t_ a = num < 0 ? -num : num, b = den < 0 ? -den : den;
+	while (b) { int128_t_ t = a % b; a = b; b = t; }
+	if (a > 1) num /= a, den /= a;
+	// A gcd-irreducible result outside long long keeps the historical
+	// truncation (extreme parse-level literals only).
+	return qlt_rational((long long) num, (long long) den);
 }
 
 qlt_rational qlt_rational::operator+(const qlt_rational& o) const {
@@ -191,16 +203,8 @@ std::partial_ordering qlt_sem_cmp(const qlt_rational& a, const qlt_rational& b)
 
 // --- interval helpers ---
 
-// Compare: lo1 endpoint < lo2 endpoint (for sorting)
-bool qlt_lo_less(const qlt_piece& a, const qlt_piece& b) {
-	if (a.lo.val != b.lo.val) return a.lo.val < b.lo.val;
-	// -inf [closed/-inf open: treat equal; for finite: CLOSED < OPEN
-	if (a.lo.val.is_neg_inf()) return false;
-	return (int)a.lo.bound < (int)b.lo.bound; // OPEN(0) < CLOSED(1)? No: closed is lower
-	// Actually for a lower endpoint: CLOSED means includes the point (lower),
-	// OPEN means excludes it (so the interval starts just after).
-	// For sorting: CLOSED endpoint at x is to the "left" of OPEN endpoint at x.
-}
+// (BA1-3: qlt_lo_less deleted -- zero callers, and its tie-break was
+// inverted relative to its own comment and to normalise's live comparator.)
 
 // Does piece p contain point val (for overlap testing)?
 // Pieces are intervals, so we check lo <= x < hi (or lo < x <= hi, etc.)

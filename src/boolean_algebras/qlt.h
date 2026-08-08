@@ -126,8 +126,6 @@ struct qlt_piece {
 // rational, or against a differently-named constant -- is genuinely unknown
 // and is reported as `unordered`.
 std::partial_ordering qlt_sem_cmp(const qlt_rational& a, const qlt_rational& b);
-
-bool qlt_lo_less(const qlt_piece& a, const qlt_piece& b);
 bool qlt_above_lo(const qlt_endpoint& lo, const qlt_rational& x);
 bool qlt_below_hi(const qlt_endpoint& hi, const qlt_rational& x);
 bool qlt_hi_less(const qlt_endpoint& a, const qlt_endpoint& b);

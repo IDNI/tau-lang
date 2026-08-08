@@ -48,7 +48,7 @@ struct ba_constants {
 
 	/**
 	 * @brief Retrieve the raw constant value by its pool index @p constant_id.
-	 * @param constant_id Zero-based index into the constant pool.
+	 * @param constant_id One-based id into the constant pool (0 is invalid).
 	 * @return The constant variant value at that index.
 	 */
 	static constant get(size_t constant_id);
@@ -88,6 +88,9 @@ struct ba_constants {
 private:
 	inline static std::vector<std::pair<constant, size_t>> C;  // pool of constants
 	inline static htrefs T;                 // pool of constant tree nodes with type info (htref to survive gc)
+	// BA2-5: set by cleanup(); a get() afterwards would pair fresh
+	// constants with stale T entries (C restarts at 0, T keeps old ones).
+	inline static bool poisoned = false;
 };
 
 } // namespace idni::tau_lang

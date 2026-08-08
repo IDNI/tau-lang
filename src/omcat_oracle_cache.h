@@ -32,7 +32,13 @@ namespace idni::tau_lang::omcat {
 // result is the type index (int).
 struct OracleKey {
 	uint64_t hash;
-	bool operator==(const OracleKey& o) const { return hash == o.hash; }
+	// BA2-7: keep the queried batch and compare it too -- hash-only
+	// equality let FNV collisions alias distinct batches to one cached
+	// answer.
+	std::vector<int> atomic_results;
+	bool operator==(const OracleKey& o) const {
+		return hash == o.hash && atomic_results == o.atomic_results;
+	}
 };
 struct OracleKeyHash {
 	size_t operator()(const OracleKey& k) const noexcept {
@@ -87,7 +93,7 @@ inline OracleKey make_oracle_key(const std::vector<int>& atomic_results) {
 		h ^= static_cast<uint64_t>(r);
 		h *= 1099511628211ull; // FNV-1a prime
 	}
-	return OracleKey{h};
+	return OracleKey{h, atomic_results};
 }
 
 } // namespace idni::tau_lang::omcat

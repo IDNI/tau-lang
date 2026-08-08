@@ -410,27 +410,9 @@ bool using_default_type(tref n, const subtree_map<node, size_t>& types) {
 	return types.at(canonized) == untyped_type_id<node>();
 }
 
-template<NodeType node>
-tref update_ref(type_scoped_resolver<node>& resolver, tref n,
-		const subtree_map<node, size_t>& types,
-		const type_inference_options& options) {
-	// If we have no type information for the element we do nothing
-	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return n;
-	// If the variable is not typed
-	if (is_untyped_tref<node>(n)) {
-		// We type it according to the inferred type or default
-		size_t type = (types.at(canonized) == untyped_type_id<node>()) && options.use_defaults
-			? tau_type_id<node>()
-			: types.at(canonized);
-
-		if (auto assigned = resolver.assign(canonized, type);
-				std::holds_alternative<inference_error>(assigned))
-			return std::get<inference_error>(assigned);
-		return retype<node>(n, type);
-	}
-	return n;
-}
+// (BA2-4: update_ref deleted -- zero callers, and it returned an
+// inference_error from a tref function, a hard compile error on first
+// instantiation. Recover from git and fix the return type if needed.)
 
 template<NodeType node>
 std::variant<tref, inference_error, parse_error> update_functional_fallback(
@@ -450,7 +432,10 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	auto ref_args = tt(std::get<tref>(updated)) | tau::ref_args | tt::ref;
 	auto fallback = tt(std::get<tref>(updated)) | tau::fp_fallback | tt::first | tt::ref;
 	auto type = find_ba_type<node>(std::get<tref>(updated));
-	DBG(assert(!is_untyped<node>(type));)
+	// BA2-22: with use_defaults == false everything can legitimately stay
+	// untyped here; handle it gracefully like update_functional_rr's
+	// `if (is_untyped) return updated;` instead of aborting debug builds.
+	if (is_untyped<node>(type)) return updated;
 	// TI-2: a ref-shaped fallback gets wrapped in the reference's type
 	// below, but a plain term fallback was never checked against it, so
 	// `g(x) fallback x:sbf` with a bv[8] `g` sailed through inference --

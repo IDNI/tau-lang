@@ -13,11 +13,20 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref ba_constants<node>::get(const constant& constant, size_t type_id) {
+	// BA2-5: after cleanup() the C/T pools are out of sync by design
+	// (atexit ordering); interning then would alias fresh constants
+	// with stale trees. Fail loudly instead.
+	if (poisoned) throw std::logic_error(
+		"ba_constants::get called after cleanup()");
 	LOG_TRACE << "-- get(constant, type_id): "
 		<< LOG_BA(constant) << ", " << LOG_BA_TYPE(type_id);
 	// LOG_TRACE << dump_to_str();
 	// TODO optimize
-	const auto p = std::make_pair(constant, type_id);
+	// BA2-9: the pool index (a map beside C/T) stays DEFERRED -- the
+	// constant variant guarantees equality but not ordering/hashing across
+	// all pack types. Dropping the const at least makes the emplace_back
+	// below a real move instead of a silent copy.
+	auto p = std::make_pair(constant, type_id);
 	for (size_t i = 0; i < C.size(); ++i) if (C[i] == p) {
 		LOG_TRACE << "-- returning already pooled: "
 						<< i+1 << " " << LOG_FM(T[i]->get());
@@ -88,6 +97,7 @@ void ba_constants<node>::cleanup() {
 	// attempt to free it a second time, producing a "double free" abort.
 	C.clear();
 	// T is left for its own static destructor (safe; htrees hold no cvc5/bdd refs).
+	poisoned = true; // BA2-5: any later get() must fail loudly, see header
 }
 
 } // namespace idni::tau_lang

@@ -81,23 +81,19 @@ template <NodeType node>
 struct FormulaTypeSet {
 	using tau = tree<node>;
 
-	// Collect types from a formula's atoms
-	static FormulaTypeSet from_formula(tref fm) {
-		FormulaTypeSet fts;
-		tau::get(fm).find_top([&](tref n) {
-			size_t t = tree<node>::get(n).get_ba_type();
-			if (t != 0) fts.type_ids_.insert(t);
-			return false;
-		});
-		return fts;
-	}
+	// (BA2-11: from_formula deleted -- zero callers; from_atoms is the
+	// live entry. Recover from git if needed.)
+
 
 	// Collect types from a set of atoms
 	static FormulaTypeSet from_atoms(
 			const std::vector<std::pair<tref, std::string>>& atoms) {
 		FormulaTypeSet fts;
 		for (const auto& [f, _] : atoms)
-			fts.type_ids_.insert(find_ba_type<node>(f));
+			// BA2-19: skip untyped (0) like from_formula did --
+			// an untyped atom otherwise defeats single_type().
+			if (size_t tid = find_ba_type<node>(f); tid != 0)
+				fts.type_ids_.insert(tid);
 		return fts;
 	}
 
