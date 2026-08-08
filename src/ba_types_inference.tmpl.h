@@ -377,9 +377,13 @@ std::variant<tref, inference_error, parse_error> update_ba_constant(
 		const type_inference_options& options) {
 	using tau = tree<node>;
 
-	// If we have no type information for the element we do nothing
+	// If we have no type information for the element we do nothing.
+	// BA2-1: return n, not nullptr -- the caller stores the returned tref
+	// verbatim when it differs from n, and a nullptr child in the rebuilt
+	// tree is dereferenced by any later traversal (update_tref returns n
+	// for exactly this case).
 	tref canonized = canonize<node>(n);
-	if (!types.contains(canonized)) return nullptr;
+	if (!types.contains(canonized)) return n;
 	// If the tref is typed
 	if (auto type = get_inferred_type<node>(n, canonized, types, options); type && type.value()) {
 		if (auto assigned = resolver.assign(canonized, type.value());

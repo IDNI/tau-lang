@@ -421,35 +421,9 @@ post_normalization:
 					sv_names.push_back(
 						"o__ltl_ms" + std::to_string(j) + "__");
 
-				// (1) Memory pre-population: build BV constants for 1 and 0
-				// (same pattern used by complete_outputs: bf-wrap via
-				// tau::get(tau::bf, {...})).
-				const size_t bv_tid = get_ba_type_id<node>(bv_type<node>());
-				const size_t bv_sz  =
-					get_bv_size<node>(get_ba_type_tree<node>(bv_tid));
-				tref bv_one_val  = tau::get(tau::bf, {
-					tau::get_ba_constant(
-						make_bitvector_value(1, bv_sz), bv_tid)});
-				tref bv_zero_val = tau::get(tau::bf, {
-					tau::get_ba_constant(
-						make_bitvector_bottom_elem(bv_sz), bv_tid)});
-
-				for (int j = 0; j < k; ++j) {
-					// Parse sv_j[t-1]:bv = {0} to get the io_var
-					// structure for sv_j[t-1] (shift=1).
-					tref sv_tmpl = parse_sv_eq<node>(sv_names[j], -1, 0);
-					trefs sv_io  = tau::get(sv_tmpl)
-						.select_top(is_child<node, tau::io_var>);
-					if (sv_io.empty()) continue;
-					// transform_io_var(ms_j[t-1], formula_time_point)
-					// → ms_j[t = formula_time_point - 1]  (= ms_j[t=0])
-					// This is the exact key update_to_time_point produces
-					// for the lookback var when processing the G body.
-					tref mem_key = transform_io_var<node>(
-						sv_io[0], i.formula_time_point);
-					tref mem_val = (j == init_s) ? bv_one_val : bv_zero_val;
-					i.memory.emplace(mem_key, mem_val);
-				}
+				// (1) Memory pre-population — shared with
+				// reset(), which must re-seed the same values.
+				i.seed_mealy_initial_state();
 
 				// (2) Initial output constraint: encode_mealy_initial_conditions
 				// returns init_out = ∨_e (guard_e(t=0) ∧ ms_dst[t=1]=1).
@@ -1286,9 +1260,53 @@ void interpreter<node>::reset() {
 	formula_time_point = 0;
 	final_system = false;
 	step_spec.clear();
+	announced_step_ = -1;
 	// Recompute lookback from ubt_ctn (unchanged) so calculate_initial_spec
 	// will rebuild step_spec on the next step().
 	compute_lookback_and_initial();
+	// AP2-3: make_interpreter pre-populated `memory` with the multi-state
+	// Mealy initial one-hot state bits; a reset() that only cleared
+	// `memory` lost them, so the first steps after reset missed their
+	// state-bit lookback values.
+	seed_mealy_initial_state();
+}
+
+template <NodeType node>
+void interpreter<node>::seed_mealy_initial_state() {
+	using tau = tree<node>;
+	if (!(cached_solution && cached_solution->aut.num_states > 1
+			&& formula_time_point >= 1)) return;
+	const int k      = cached_solution->aut.num_states;
+	const int init_s = cached_solution->aut.initial_state;
+	if (init_s < 0 || init_s >= k) return;
+	// Build BV constants for 1 and 0 (same pattern used by
+	// complete_outputs: bf-wrap via tau::get(tau::bf, {...})).
+	const size_t bv_tid = get_ba_type_id<node>(bv_type<node>());
+	const size_t bv_sz  =
+		get_bv_size<node>(get_ba_type_tree<node>(bv_tid));
+	tref bv_one_val  = tau::get(tau::bf, {
+		tau::get_ba_constant(
+			make_bitvector_value(1, bv_sz), bv_tid)});
+	tref bv_zero_val = tau::get(tau::bf, {
+		tau::get_ba_constant(
+			make_bitvector_bottom_elem(bv_sz), bv_tid)});
+	for (int j = 0; j < k; ++j) {
+		// Parse sv_j[t-1]:bv = {0} to get the io_var structure for
+		// sv_j[t-1] (shift=1).
+		tref sv_tmpl = parse_sv_eq<node>(
+			"o__ltl_ms" + std::to_string(j) + "__", -1, 0);
+		trefs sv_io  = tau::get(sv_tmpl)
+			.select_top(is_child<node, tau::io_var>);
+		if (sv_io.empty()) continue;
+		// transform_io_var(ms_j[t-1], formula_time_point)
+		// → ms_j[t = formula_time_point - 1]  (= ms_j[t=0])
+		// This is the exact key update_to_time_point produces for the
+		// lookback var when processing the G body.
+		tref mem_key = transform_io_var<node>(
+			sv_io[0], formula_time_point);
+		tref mem_val = (j == init_s) ? bv_one_val : bv_zero_val;
+		memory.emplace(mem_key, mem_val);
+	}
 }
 
 // ── current_state ─────────────────────────────────────────────────────────────
@@ -1334,6 +1352,13 @@ int interpreter<node>::current_state() const {
 		for (const auto& [var, val] : memory) {
 			tref trimmed = tau::trim(var);
 			if (get_var_name<node>(trimmed) != aux_name) continue;
+			// IN-N12: not every memory entry matching the aux-name
+			// pattern is a position-carrying io_var --
+			// get_io_time_point indexes [1][0] unguarded and
+			// aborts on any other shape, so verify it first.
+			tref ivn = io_var_node<node>(trimmed);
+			if (!ivn || tau::get(ivn).children_size() < 2
+				|| !tau::get(ivn)[1].has_child()) continue;
 			if (get_io_time_point<node>(trimmed) != (int_t)lookup_t) continue;
 			std::stringstream ss;
 			size_t ctype = ctx.type_of(trimmed);
@@ -1596,6 +1621,18 @@ void interpreter<node>::declare_open(const std::string& stream_name,
 			"declare_open: re-entrance violation — cannot declare from "
 			"inside an OracleHandler invocation (stream: " + stream_name + ")");
 	}
+	// The declared contract: throw if stream_name is not an output stream
+	// of the current spec. Silently accepting a typo'd name would mean
+	// the handler simply never fires.
+	bool known = false;
+	for (const auto& [var, _] : outputs)
+		if (get_var_name<node>(var) == stream_name) {
+			known = true;
+			break;
+		}
+	if (!known) throw std::runtime_error(
+		"declare_open: '" + stream_name
+		+ "' is not an output stream of the current spec");
 	if (open_handlers_.find(stream_name) == open_handlers_.end()) {
 		open_streams_order_.push_back(stream_name);
 	}

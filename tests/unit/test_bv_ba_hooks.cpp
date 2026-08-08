@@ -288,9 +288,10 @@ TEST_SUITE("bv term_mod: top and bottom element operands") {
 		CHECK(bf("1:bv[8] % 1:bv[8]") == bf("0:bv[8]"));
 	}
 
-	// Note: this arm builds the bitvector *value* 1, not the top element.
-	TEST_CASE("1 % 0 is the value one") {
-		CHECK(bf("1:bv[8] % 0:bv[8]") == bf("{1}:bv[8]"));
+	// BA1-13: the bf term `1` is the BA top (all-ones), and SMT-LIB
+	// bvurem(x, 0) = x, so 1 % 0 is top -- consistent with X % 0 = X below.
+	TEST_CASE("1 % 0 is the top element") {
+		CHECK(bf("1:bv[8] % 0:bv[8]") == bf("1:bv[8]"));
 	}
 
 	TEST_CASE("X % 1") {                       // 10 % 255 = 10

@@ -139,6 +139,7 @@ tref api<node>::get_predicate_def(const std::string& predicate_def, [[maybe_unus
 template <NodeType node>
 tref api<node>::get_stream_def(const std::string& stream_def) {
 	tref def = tau::get(stream_def, get_options<node>(tau::stream_def, true));
+	if (!def) return nullptr;
 	return tau::trim(def);
 }
 
@@ -249,7 +250,19 @@ tref api<node>::apply_defs(subtree_set<node> defs, tref expr) {
 
 template <NodeType node>
 tref api<node>::apply_all_defs(tref expr) {
-	return apply_defs(subtree_set<node>{}, expr);
+	// AP1-4: this must apply the globally registered definitions --
+	// routing through apply_defs({}) applied nothing, so after
+	// get_definition() the dnf/cnf/nnf/solve/lgrs pipelines received
+	// refs unexpanded, contradicting the documented contract. Mirrors
+	// the normalizer's apply_defs_to_spec.
+	if (!expr) return nullptr;
+	auto maybe_nso_rr = get_nso_rr(expr);
+	if (!maybe_nso_rr) return nullptr;
+	auto& nso_rr = maybe_nso_rr.value();
+	const auto& defs = definitions<node>::instance().get_sym_defs();
+	nso_rr.rec_relations.insert(nso_rr.rec_relations.end(),
+		defs.begin(), defs.end());
+	return nso_rr_apply<node>(nso_rr);
 }
 
 

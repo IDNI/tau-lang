@@ -287,6 +287,23 @@ TEST_SUITE("Tau API - tref - using definitions") {
 		CHECK(tau_api::to_str(applied) == "z' = 0");
 		CHECK(!tau_api::contains(applied, tau::ref));
 	}
+	// AP1-4: apply_all_defs used to route through apply_defs({}), which
+	// never consulted the global definitions store -- a ref whose
+	// definition was registered via get_definition() survived unexpanded
+	// into every downstream pipeline (dnf/cnf/nnf/solve/lgrs).
+	TEST_CASE_FIXTURE(api_fixture,
+			"apply_all_defs expands globally registered defs") {
+		REQUIRE(tau_api::get_definition(
+			"apply_all_defs_glob(x) := x'"));
+		tref expr = tau_api::get_formula(
+			"apply_all_defs_glob(z) = 0");
+		REQUIRE(expr);
+		CHECK(tau_api::contains(expr, tau::ref));
+		tref applied = tau_api::apply_all_defs(expr);
+		REQUIRE(applied);
+		CHECK(!tau_api::contains(applied, tau::ref));
+		CHECK(tau_api::to_str(applied) == "z' = 0");
+	}
 }
 
 TEST_SUITE("Tau API - tref - printing") {

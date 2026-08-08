@@ -418,6 +418,7 @@ tref repl_evaluator<BAs...>::normalize_cmd(const tt& n) {
 	auto check = get_type_and_arg(arg);
 	if (!check) return nullptr;
 	auto [type, value] = check.value();
+	if (reject_ctl_star_if_disabled(value)) return nullptr;
 	measuring m;
 	tref r;
 	switch (type) {
@@ -474,6 +475,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 
 	tref value = get_any(n[1].get());
 	if (!value) return;
+	if (reject_ctl_star_if_disabled(value)) return;
 
 	DBG(TAU_LOG_TRACE << "run_cmd/value: " << TAU_LOG_FM(value);)
 
@@ -737,7 +739,8 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
+	if (tref value = get_any(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
 		r = tau_api::sat(m, value) ? tau::_T() : tau::_F();
 	return benchmarks(m), r;
 }
@@ -747,7 +750,8 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
 	measuring m;
 	tref r = nullptr;
-	if (tref value = get_any(n[1].get()); value)
+	if (tref value = get_any(n[1].get());
+		value && !reject_ctl_star_if_disabled(value))
 		r = tau_api::unsat(m, value) ? tau::_T() : tau::_F();
 	return benchmarks(m), r;
 }

@@ -160,12 +160,25 @@ struct nlang_ba {
 		return (*this | o) & ~(*this & o);
 	}
 
-	// Semantic equality: fast structural path first, then oracle
+	// Structural equality (BA1-8): operator== must be consistent with
+	// std::hash (which hashes to_string()) and with the string-based
+	// `<`/`<=>` below -- a semantic (oracle) == let two equal keys hash
+	// differently, breaking any unordered container keyed on nlang_ba,
+	// and fired blocking HTTP from the constant-pool dedup scan
+	// (ba_constants::get compares variants pairwise on every insertion).
 	bool operator==(const nlang_ba& o) const {
+		return fm->struct_eq(*o.fm);
+	}
+	bool operator!=(const nlang_ba& o) const { return !(*this == o); }
+
+	// Semantic equivalence via the DeepSeek oracle: structural fast path
+	// first, then the network check (blocking I/O, 15s timeout). For
+	// callers that genuinely want LLM-judged equivalence -- never for
+	// container keys or pooling identity.
+	bool semantically_equal(const nlang_ba& o) const {
 		if (fm->struct_eq(*o.fm)) return true;
 		return deepseek_equivalent(to_string(), o.to_string());
 	}
-	bool operator!=(const nlang_ba& o) const { return !(*this == o); }
 
 	// Fast structural check only (no oracle) — required by BA dispatcher
 	bool operator==(bool b) const {

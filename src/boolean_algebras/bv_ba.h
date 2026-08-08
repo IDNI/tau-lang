@@ -198,11 +198,12 @@ bool is_bv_formula_sat(tref form);
  * every variable must have an explicitly sized bitvector type. Mixed-type
  * formulas (e.g. with sbf or tau variables) cannot be translated to cvc5.
  *
- * @note It inspects variable and `ref` nodes only, so a formula whose
- * variables are all bitvectors but which carries a constant of another
- * Boolean algebra still passes -- `bv_eval_node` then fails on that constant
- * and returns `nullopt`. Use `has_foreign_ba_constant` when the distinction
- * matters.
+ * @note Also rejects `ref` nodes, formulas whose variables lack an explicit
+ * bitwidth, and formulas carrying a non-bv-typed ba_constant (e.g. a `qlt`
+ * constant like `{1/3}:qlt`): such a constant can appear in an otherwise
+ * bv-only clause once its variable has already been substituted by a
+ * concrete value (e.g. during interpretation), so checking only `variable`
+ * nodes is not enough to catch the mixed-type case.
  *
  * @param form The formula to check
  * @return true if all variables are explicitly sized bitvectors

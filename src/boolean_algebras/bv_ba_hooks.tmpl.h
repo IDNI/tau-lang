@@ -427,10 +427,11 @@ tref term_mod(tref symbol) {
 			if (c2.is(tau::bf_t)) {
 				return tau::_0(c2.get_ba_type());
 			}
-			// 1 % 0 is top
+			// 1 % 0 is top: SMT-LIB bvurem(x, 0) = x, and the bf
+			// term `1` is the BA top (all-ones), not the number 1
 			if (c2.is(tau::bf_f)) {
 				const size_t width = get_bv_width<node>(get_ba_type_tree<node>(c2.get_ba_type()));
-				return tau::build_bf_ba_constant(make_bitvector_value(width, 1), c2.get_ba_type());
+				return tau::build_bf_ba_constant(make_bitvector_top_elem(width), c2.get_ba_type());
 			}
 			break;
 		}

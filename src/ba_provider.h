@@ -138,7 +138,7 @@ struct DefaultBAProvider {
 		std::set<size_t> seen_sorts;
 		for (const auto& e : ctx.entries) seen_sorts.insert(e.sort_id);
 		size_t idx = 0;
-		for (size_t sid : seen_sorts)
+		for ([[maybe_unused]] size_t sid : seen_sorts)
 			result.push_back({idx++, ch});
 		return result;
 	}

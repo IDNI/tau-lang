@@ -90,6 +90,63 @@ TEST_SUITE("[IAX-INSP: Inspection]") {
 
 TEST_SUITE("[IAX-MEALY: Mealy strategy]") {
 
+	// AP2-20: declare_open/undeclare_open/open_streams had zero coverage.
+	TEST_CASE("[IAX-OPEN-01] declare/undeclare/open_streams round-trip") {
+		auto i = make("o1[t] = 1 && o2[t] = 0.");
+		REQUIRE(i.has_value());
+		REQUIRE(i->open_streams().empty());
+		auto handler = [](const std::string&) -> std::string {
+			return "";
+		};
+		i->declare_open("o1", handler);
+		i->declare_open("o2", handler);
+		auto streams = i->open_streams();
+		REQUIRE(streams.size() == 2);
+		// Iteration order matches insertion order.
+		REQUIRE(streams[0] == "o1");
+		REQUIRE(streams[1] == "o2");
+		// Re-declaring replaces, not duplicates.
+		i->declare_open("o1", handler);
+		REQUIRE(i->open_streams().size() == 2);
+		i->undeclare_open("o1");
+		streams = i->open_streams();
+		REQUIRE(streams.size() == 1);
+		REQUIRE(streams[0] == "o2");
+		i->undeclare_open("o2");
+		REQUIRE(i->open_streams().empty());
+	}
+
+	TEST_CASE("[IAX-OPEN-02] declare_open rejects a non-output stream") {
+		auto i = make("o1[t] = 1.");
+		REQUIRE(i.has_value());
+		REQUIRE_THROWS(i->declare_open("not_a_stream",
+			[](const std::string&) { return std::string(); }));
+	}
+
+	// AP2-3 + AP2-20: a multi-state Mealy strategy's initial state bits
+	// are pre-populated into memory by make_interpreter; reset() must
+	// re-seed them (it used to just clear memory, so "back to t=0" was
+	// not the real t=0 state), and current_state()'s aux-bit scan must
+	// survive stepping (IN-N12 guard). Requires ltlsynt on PATH, like
+	// every genuine-synthesis test in this repo.
+	TEST_CASE("[IAX-MEALY-06] reset re-seeds multi-state initial memory") {
+		auto i = make("(sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
+		if (!i.has_value()) return; // ltlsynt unavailable: nothing to pin
+		if (!i->cached_solution
+			|| i->cached_solution->aut.num_states <= 1)
+			return; // single-state strategy: pre-population n/a
+		REQUIRE_FALSE(i->memory.empty());
+		const size_t seeded = i->memory.size();
+		const int s0 = i->current_state();
+		(void)i->step();
+		i->reset();
+		REQUIRE(i->time_point == 0);
+		// The ms-bit pre-population survived the reset...
+		REQUIRE(i->memory.size() == seeded);
+		// ...and the reported state is the strategy's initial state again.
+		REQUIRE(i->current_state() == s0);
+	}
+
 	TEST_CASE("[IAX-MEALY-01] commit_realiser round-trip") {
 		auto i = make("o1[t] = 1.");
 		REQUIRE(i.has_value());

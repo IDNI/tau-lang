@@ -110,10 +110,21 @@ struct interpreter {
 	std::string current_spec() const;
 
 	// Reset the interpreter back to time t=0. Clears `memory`,
-	// `time_point`, `formula_time_point`; recomputes lookback. The spec
-	// (`original_spec`, `ubt_ctn`, `cached_solution`, IO streams) is
-	// preserved — only the execution snapshot is reset.
+	// `time_point`, `formula_time_point`; recomputes lookback and re-seeds
+	// the multi-state Mealy initial-state bits (see
+	// seed_mealy_initial_state). The spec (`original_spec`, `ubt_ctn`,
+	// `cached_solution`, IO streams) is preserved — only the execution
+	// snapshot is reset.
 	void reset();
+
+	// Pre-populate `memory` with the multi-state Mealy strategy's initial
+	// one-hot state-bit values ms_j[t = formula_time_point - 1], so the
+	// first non-auto-continued step sees correct lookback values. No-op
+	// unless `cached_solution` is a multi-state strategy and lookback is
+	// at least 1. Called by make_interpreter and by reset() (AP2-3: a
+	// reset() that only cleared `memory` lost this pre-population, so
+	// "back to t=0" was not the real t=0 state).
+	void seed_mealy_initial_state();
 
 	// Opaque identifier for the current Mealy state (or interpreter
 	// snapshot if the spec has no Mealy strategy). Two states with the

@@ -187,6 +187,7 @@ int main(int argc, char** argv) {
 			<< files.front();)
 		tau_api::set_severity(sev);
 		tau_api::set_charvar(charvar);
+		tau_api::set_blasting(blasting);
 		return run_tau_spec(files.front(), opts);
 	}
 
