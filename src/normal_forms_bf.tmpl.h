@@ -488,8 +488,12 @@ tref apply_assms(tref eq, const auto& assms, auto& joins, trefs& additions, bool
 					joined = true;
 					eq = tau::build_bf_neq_0(tau::build_bf_or(
 						tau::trim2(eq), assm));
-				}
-				eq = tau::build_bf_neq_0(tau::build_bf_and(
+				// NF-4: else, not fall-through -- the dual arm
+				// otherwise gets immediately AND-ed with the
+				// assumption's negation ((f|A) & A' == f & A'),
+				// contradicting the 3-arg overload and the
+				// documented rule table (f|A only).
+				} else eq = tau::build_bf_neq_0(tau::build_bf_and(
 					tau::trim2(eq), tau::build_bf_neg(assm)));
 			}
 		} else if (count == 1 && is_eq_pos) {

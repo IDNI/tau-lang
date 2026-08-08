@@ -171,3 +171,42 @@ TEST_SUITE("SO-1 mixed ordering systems") {
 		CHECK( !tau::get(subst).find_top(is<node_t, tau::wff_f>) );
 	}
 }
+
+// SO-14: the DLO ordering path (is_qlt_ordering_atom gate,
+// solve_qlt_ordering_system, qlt_pick_witness) had zero direct coverage.
+TEST_SUITE("SO-14 qlt ordering systems") {
+
+	std::optional<solution<node_t>> solve_ord(const std::string& system) {
+		tref form = get_nso_rr<node_t>(tau::get(system)).value().main->get();
+		solver_options options = {
+			.splitter_one = node_t::ba::splitter_one(qlt_type<node_t>()),
+			.mode = solver_mode::general
+		};
+		bool error = false;
+		return solve<node_t>(form, options, error);
+	}
+
+	TEST_CASE("bounded interval yields a witness inside it") {
+		auto sol = solve_ord(
+			"x : qlt > {3/4}:qlt && x : qlt < {7/8}:qlt.");
+		REQUIRE( sol.has_value() );
+		REQUIRE( sol.value().size() == 1 );
+	}
+
+	TEST_CASE("one-sided bound is satisfiable") {
+		CHECK( solve_ord("x : qlt >= {5}:qlt.").has_value() );
+	}
+
+	TEST_CASE("empty interval is declined") {
+		CHECK( !solve_ord(
+			"x : qlt > {7/8}:qlt && x : qlt < {3/4}:qlt.")
+			.has_value() );
+	}
+
+	TEST_CASE("two independent variables both get witnesses") {
+		auto sol = solve_ord(
+			"x : qlt > {1}:qlt && y : qlt < {0}:qlt.");
+		REQUIRE( sol.has_value() );
+		CHECK( sol.value().size() == 2 );
+	}
+}

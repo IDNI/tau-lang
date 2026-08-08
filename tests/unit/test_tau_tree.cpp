@@ -38,21 +38,8 @@ TEST_SUITE("tree::build_offsets") {
 	}
 }
 
-// ── node::extension(T) / extension() round-trip (TT-2) ───────────────────────
-
-TEST_SUITE("node::extension") {
-
-	TEST_CASE("round-trips nt, term and ext through raw storage, resets ba_type") {
-		node_t n(tau::bf_and, 42, true, 0, 1);
-		auto raw = n.extension();
-		node_t back = node_t::extension(raw);
-		CHECK(back.nt == n.nt);
-		CHECK(back.term == n.term);
-		CHECK(back.ext == n.ext);
-		CHECK(back.data == n.data);
-		CHECK(back.ba_type == 0);
-	}
-}
+// (TT1-11: the node::extension round-trip suite was deleted with the API --
+// the packing could not round-trip any nt >= 256 and had no callers.)
 
 // ── get_var_name/get_var_name_sid null-node safety (TT-17) ──────────────────
 
@@ -838,5 +825,121 @@ TEST_SUITE("get_free_vars edge inputs") {
 		const trefs& fv = get_free_vars<node_t>(tau::build_bf_fex(x, body));
 		REQUIRE(fv.size() == 1);
 		CHECK(get_var_name<node_t>(fv[0]) == "y");
+	}
+}
+
+// ── TT2-24: direct coverage for live extractor/builder functions ─────────────
+
+TEST_SUITE("extractor/builder direct coverage (TT2-24)") {
+
+	TEST_CASE("get_free_vars_appearance_order preserves appearance order") {
+		tau::get_options opts = { .parse = { .start = tau::bf } };
+		tref fm = tau::get("zy | ax", opts);
+		REQUIRE( fm != nullptr );
+		trefs vars = get_free_vars_appearance_order<node_t>(fm);
+		REQUIRE( vars.size() == 4 );
+		CHECK( get_var_name<node_t>(vars[0]) == "z" );
+		CHECK( get_var_name<node_t>(vars[1]) == "y" );
+		CHECK( get_var_name<node_t>(vars[2]) == "a" );
+		CHECK( get_var_name<node_t>(vars[3]) == "x" );
+	}
+
+	TEST_CASE("unnest_nested_always: G(A && G(B)) becomes G(A) && G(B)") {
+		tref a = x_eq_0("x");
+		tref b = x_eq_0("y");
+		tref nested = build_wff_always<node_t>(tau::build_wff_and(
+			a, build_wff_always<node_t>(b)));
+		tref res = unnest_nested_always<node_t>(nested);
+		// top must be a conjunction of two always blocks, none nested
+		REQUIRE( tau::get(res)[0].is(tau::wff_and) );
+		trefs gs = tau::get(res).select_all(is<node_t, tau::wff_always>);
+		CHECK( gs.size() == 2 );
+		for (tref g : gs)
+			CHECK( !tau::get(g).find_top(is<node_t, tau::wff_and>) );
+	}
+
+	TEST_CASE("get_rr_sig: name and arities, stable across argument names") {
+		tau::get_options opts = { .parse = { .start = tau::wff } };
+		tref px = tau::get("p(x)", opts);
+		tref py = tau::get("p(y)", opts);
+		tref qxy = tau::get("q[t](x, y)", opts);
+		REQUIRE( px != nullptr );
+		REQUIRE( py != nullptr );
+		REQUIRE( qxy != nullptr );
+		rr_sig sp = get_rr_sig<node_t>(
+			tau::get(px).find_top(is<node_t, tau::wff_ref>));
+		rr_sig sq = get_rr_sig<node_t>(
+			tau::get(qxy).find_top(is<node_t, tau::wff_ref>));
+		CHECK( sp == get_rr_sig<node_t>(
+			tau::get(py).find_top(is<node_t, tau::wff_ref>)) );
+		CHECK( sp.arg_arity == 1 );
+		CHECK( sp.offset_arity == 0 );
+		CHECK( sq.arg_arity == 2 );
+		CHECK( sq.offset_arity == 1 );
+		CHECK( sp != sq );
+	}
+
+	TEST_CASE("build_bf_cast wraps the operand in a typed cast node") {
+		tref x = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		tref cast = build_bf_cast<node_t>(x, tau_type_id<node_t>());
+		REQUIRE( cast != nullptr );
+		CHECK( tau::get(cast).find_top(is<node_t, tau::bf_cast>) );
+	}
+
+	TEST_CASE("build_bf_interval desugars to x <= y && y <= z") {
+		tref x = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		tref y = build_bf_variable<node_t>("y", tau_type_id<node_t>());
+		tref z = build_bf_variable<node_t>("z", tau_type_id<node_t>());
+		tref iv = build_bf_interval<node_t>(x, y, z);
+		REQUIRE( iv != nullptr );
+		// No bf_interval node survives: the builder desugars to a
+		// conjunction of the two bounds (whose lteq atoms the tau-type
+		// hooks may rewrite further into equational form).
+		CHECK( tau::get(iv)[0].is(tau::wff_and) );
+		CHECK( iv == build_wff_and<node_t>(
+			build_bf_lteq<node_t>(x, y),
+			build_bf_lteq<node_t>(y, z)) );
+	}
+}
+
+// NF-12: get_unbindable_relative_offset had a worked example in its own
+// header doc (normalizer.h) that existed nowhere as a test.
+TEST_SUITE("get_unbindable_relative_offset (NF-12)") {
+
+	// Built directly with the ref builders rather than parsing the header
+	// doc's spec: builder construction pins the function's own contract
+	// without depending on parser typing of an ill-formed definition.
+	TEST_CASE("unbound relative offset in a body is reported; bound is not") {
+		tref x = build_bf_variable<node_t>("x", tau_type_id<node_t>());
+		// body contains r[n](x) -- a ref carrying a variable offset `n`
+		tref body = tau::build_rr_ref(std::string("r"),
+			std::string("n"), trefs{ x });
+		// head `f(x)` declares no offset: the `n` in the body is unbound
+		tref f_head = tau::build_rr_ref(std::string("f"),
+			trefs{}, trefs{ x });
+		CHECK( get_unbindable_relative_offset<node_t>(f_head, body)
+			!= nullptr );
+		// head `r[n](x)` declares `[n]`, which binds the body's `n`
+		tref r_head = tau::build_rr_ref(std::string("r"),
+			std::string("n"), trefs{ x });
+		CHECK( get_unbindable_relative_offset<node_t>(r_head, body)
+			== nullptr );
+	}
+}
+
+// RR-12: rr_dict had zero direct coverage (incl. the invalid-id throw).
+TEST_SUITE("rr_dict (RR-12)") {
+
+	TEST_CASE("string ids round-trip and are stable") {
+		size_t a = rr_dict("rr_dict_test_a");
+		size_t b = rr_dict("rr_dict_test_b");
+		CHECK( a != b );
+		CHECK( rr_dict("rr_dict_test_a") == a );
+		CHECK( rr_dict(a) == "rr_dict_test_a" );
+		CHECK( rr_dict(b) == "rr_dict_test_b" );
+	}
+
+	TEST_CASE("invalid id throws instead of reading out of bounds") {
+		CHECK_THROWS_AS( rr_dict(size_t(-1)), std::logic_error );
 	}
 }

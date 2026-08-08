@@ -80,6 +80,10 @@ private:
 	std::vector<std::string> errors_{};
 	trefs defs_{};
 	tref main_ = nullptr;
+
+	// TT2-2: the streaming operator reads parts_/parsed_.
+	template <NodeType n>
+	friend std::ostream& operator<<(std::ostream&, const tau_spec<n>&);
 };
 
 /**

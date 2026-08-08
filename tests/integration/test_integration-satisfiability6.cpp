@@ -687,3 +687,29 @@ TEST_SUITE("satisfiability regression") {
 		CHECK( res == fm );
 	}
 }
+
+	// Closes: SO-16. `get_uninterpreted_constants_constraints` is a live
+	// interpreter dependency (model computation for uninterpreted guard
+	// constants during spec execution) with zero direct coverage.
+	TEST_CASE("get_uninterpreted_constants_constraints: guarded continuation") {
+		trefs with_inputs = spec_io_vars("always o1[t] = i1[t].");
+		REQUIRE( with_inputs.size() == 2 );
+		tref guard = create_guard<node_t>(with_inputs, 0);
+		REQUIRE( guard != nullptr );
+		REQUIRE( guard != tau::_T() );
+		// The guard alone is a valid unbound continuation: its io_vars
+		// sit at constant time positions, per the function's contract.
+		trefs io_vars = tau::get(guard)
+			.select_top(is_child<node_t, tau::io_var>);
+		REQUIRE( !io_vars.empty() );
+		tref ctns = get_uninterpreted_constants_constraints<node_t>(
+			guard, io_vars, 0);
+		REQUIRE( ctns != nullptr );
+		// The function computes a MODEL for the guard's uninterpreted
+		// constants: no uconst survives into the returned constraints.
+		CHECK( tau::get(ctns).find_top(
+			is_child<node_t, tau::uconst_name>) == nullptr );
+		// io_vars is rewritten to constant-time instances by contract
+		for (tref v : io_vars)
+			CHECK( is_io_initial<node_t>(v) );
+	}

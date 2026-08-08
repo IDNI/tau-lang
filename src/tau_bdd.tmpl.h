@@ -910,8 +910,8 @@ template<NodeType node>
 tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 convert_to_handle(tref tau_node) {
 	auto it = U.find(tau_node);
-	DBG(assert(it != U.end));
-	if (it != U.end) return it->second;
+	DBG(assert(it != U.end()));
+	if (it != U.end()) return it->second;
 	else return term_handle(tbdd::T);
 }
 
@@ -947,7 +947,7 @@ tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_and_many(const term_handles& bdds, const order& o) {
 	std::vector<ref> refs;
 	refs.reserve(bdds.size());
-	for (const term_handle b : bdds) refs.emplace_back(b.get());
+	for (const term_handle& b : bdds) refs.emplace_back(b.get());
 	return term_handle(tbdd::bdd_and_many(std::move(refs), o));
 }
 
@@ -957,7 +957,7 @@ tau_term_bdd_handle<node>::term_handle tau_term_bdd_handle<node>::
 bdd_or_many(const term_handles& bdds, const order& o) {
 	std::vector<ref> refs;
 	refs.reserve(bdds.size());
-	for (const term_handle b : bdds) refs.emplace_back(b.get());
+	for (const term_handle& b : bdds) refs.emplace_back(b.get());
 	return term_handle(tbdd::bdd_or_many(std::move(refs), o));
 }
 
@@ -1045,17 +1045,26 @@ template<NodeType node>
 void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	tref bdd_tref, subtree_set<node>& merged, bdd_fv_cache_t& cache) {
 	using tau = tree<node>;
-	if (!bdd_tref) return;
-	if (auto it = cache.find(bdd_tref); it != cache.end()) {
-		const trefs& cached = *it->second.sp;
-		merged.insert(cached.begin(), cached.end());
-		return;
+	// TT1-6: BDD nodes are hash-consed and heavily shared; an unguarded
+	// recursion revisits a node once per path (worst-case exponential).
+	// Iterate with a visited set instead.
+	std::vector<tref> stack{ bdd_tref };
+	std::unordered_set<tref> visited;
+	while (!stack.empty()) {
+		tref t = stack.back(); stack.pop_back();
+		if (!t || !visited.insert(t).second) continue;
+		if (auto it = cache.find(t); it != cache.end()) {
+			const trefs& cached = *it->second.sp;
+			merged.insert(cached.begin(), cached.end());
+			continue;
+		}
+		const auto& bn = bintree<tau_bdd_node<node>>::get(t);
+		const trefs& v_fvs = get_free_vars<node>(
+			tau::get(tau::bf, bn.value.v));
+		merged.insert(v_fvs.begin(), v_fvs.end());
+		stack.push_back(bn.l);
+		stack.push_back(bn.r);
 	}
-	const auto& bn = bintree<tau_bdd_node<node>>::get(bdd_tref);
-	const trefs& v_fvs = get_free_vars<node>(tau::get(tau::bf, bn.value.v));
-	merged.insert(v_fvs.begin(), v_fvs.end());
-	get_free_tau_vars_impl(bn.l, merged, cache);
-	get_free_tau_vars_impl(bn.r, merged, cache);
 }
 #else
 /** @internal @copydoc tau_term_bdd_handle::get_free_tau_vars_impl(tref, subtree_set<node>&) @endinternal */
@@ -1063,12 +1072,20 @@ template<NodeType node>
 void tau_term_bdd_handle<node>::get_free_tau_vars_impl(
 	tref bdd_tref, subtree_set<node>& merged) {
 	using tau = tree<node>;
-	if (!bdd_tref) return;
-	const auto& bn = bintree<tau_bdd_node<node>>::get(bdd_tref);
-	const trefs& v_fvs = get_free_vars<node>(tau::get(tau::bf, bn.value.v));
-	merged.insert(v_fvs.begin(), v_fvs.end());
-	get_free_tau_vars_impl(bn.l, merged);
-	get_free_tau_vars_impl(bn.r, merged);
+	// TT1-6: see the TAU_CACHE variant -- visited set prevents the
+	// exponential revisits of shared sub-DAGs.
+	std::vector<tref> stack{ bdd_tref };
+	std::unordered_set<tref> visited;
+	while (!stack.empty()) {
+		tref t = stack.back(); stack.pop_back();
+		if (!t || !visited.insert(t).second) continue;
+		const auto& bn = bintree<tau_bdd_node<node>>::get(t);
+		const trefs& v_fvs = get_free_vars<node>(
+			tau::get(tau::bf, bn.value.v));
+		merged.insert(v_fvs.begin(), v_fvs.end());
+		stack.push_back(bn.l);
+		stack.push_back(bn.r);
+	}
 }
 #endif
 

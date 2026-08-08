@@ -84,11 +84,16 @@ inline Spec<node> decompose_spec(tref main_fm) {
 			if (!has_ltl_operators<node>(body)) {
 				// Pure-safety G.  Also filter out G(F(...)) = GF pattern:
 				// F inside G is a reactive liveness, not invariant.
+				// RR-10: wff_sometimes is F's canonical spelling
+				// (the normalizer rewrites wff_F to it), so
+				// G(sometimes phi) is the same GF reactive shape.
 				bool has_F = false;
 				tau::get(body).find_top([&](tref n) {
 					const auto& nt_node = tree<node>::get(n);
 					if (nt_node.has_child()
-					    && nt_node[0].value.nt == tau::wff_F) {
+					    && (nt_node[0].value.nt == tau::wff_F
+					     || nt_node[0].value.nt
+							== tau::wff_sometimes)) {
 						has_F = true;
 					}
 					return false;
@@ -100,11 +105,15 @@ inline Spec<node> decompose_spec(tref main_fm) {
 			}
 			return;
 		}
-		if (nt == tau::wff_F || nt == tau::wff_U
+		if (nt == tau::wff_F || nt == tau::wff_sometimes
+		 || nt == tau::wff_U
 		 || nt == tau::wff_R || nt == tau::wff_W
 		 || nt == tau::wff_S || nt == tau::wff_T
 		 || nt == tau::wff_A || nt == tau::wff_E
 		 || nt == tau::wff_semantic_neg) {
+			// RR-10: wff_sometimes included -- a top-level
+			// `sometimes phi` is a liveness obligation, not
+			// transient.
 			append(s.reactive);
 			return;
 		}

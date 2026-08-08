@@ -2,6 +2,18 @@
 
 // normal_forms_dnf.tmpl.h - DNF/CNF core: reduce_paths, bf_reduced_dnf, reduce
 // Split from normal_forms.tmpl.h for readability.
+//
+// Path-vector encoding (NF-11), shared by reduce_paths, join_paths,
+// clause_to_vector, collect_paths, build_reduced_formula and
+// dnf_cnf_to_reduced: a clause is a std::vector<int_t> indexed by the
+// position of its BDD variable in `vars`, with
+//     1  = the variable occurs positively,
+//    -1  = negated,
+//     2  = irrelevant (eliminated / don't-care).
+// An EMPTY path denotes the constant clause (T in DNF, F in CNF); an EMPTY
+// paths-VECTOR denotes the constant formula (F in DNF, T in CNF).
+// dnf_cnf_to_reduced's {paths, vars} result flips both readings when
+// `is_cnf` is set. `reduce` special-cases both empties on exit.
 
 namespace idni::tau_lang {
 
@@ -334,7 +346,12 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	subtree_map<node, tref> changes = {};
 	for (tref bf : t.select_top(is<node, tau::bf>)) {
 		if (tau::get(bf).child_is(tau::bf_ref)) {
-			for (tref arg : t[0][0].select_top(is<node, tau::bf>)) {
+			// NF-2: reduce the matched bf's OWN ref arguments --
+			// t[0][0] was the whole input's grandchild, which only
+			// coincides with the ref when the input is the bf
+			// itself, never for wff callers.
+			for (tref arg : tau::get(bf)[0]
+					.select_top(is<node, tau::bf>)) {
 				tref dnf = bf_reduced_dnf<node>(arg);
 				if (tau::get(dnf) != tau::get(arg))
 					changes.emplace(arg, dnf);

@@ -70,7 +70,7 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 			|| nt == tau::fp_fallback
 			|| nt == tau::ref
 			|| nt == tau::bf_ref
-			|| nt == tau::ref
+			|| nt == tau::wff_ref
 			|| nt == tau::ref_args
 			|| nt == tau::ref_arg
 			|| nt == tau::offset;
@@ -326,7 +326,7 @@ int_t get_max_var_name_b_id(tref fm) {
 						std::stoll(name.substr(1))));
 				} catch (const std::out_of_range&) {
 					// Variable name exceeds range; use max id
-					id = std::numeric_limits<int_t>::max();
+					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1 (TT2-7)
 				}
 			}
 		}

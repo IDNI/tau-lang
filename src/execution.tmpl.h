@@ -50,6 +50,10 @@ template <NodeType node, typename step_t>
 tref repeat_each<node, step_t>::operator()(tref n) const {
 	auto nn = n;
 	for (auto& l: s.libraries) {
+		// RR-3: `visited` only catches cycles, not growth -- an
+		// ever-growing rewrite loops forever here. Test-only today
+		// (production uses repeat_all); give it the same runtime round
+		// cap as repeat_all when that parameter lands (issue #36).
 		std::unordered_set<tref> visited;
 		while (true) {
 			nn = l(nn);

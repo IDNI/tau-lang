@@ -1692,7 +1692,10 @@ tref push_ex_block_into_clause(tref clause, const trefs& block,
 		return false;
 	};
 	pre_order<node>(clause).visit(type_scan);
-	DBG(assert(types_homogeneous);)
+	// (AN-7: no DBG assert here -- it fired before the graceful decline
+	// below could run, making the promoted runtime guard untestable in
+	// Debug and an abort where Release correctly declines. The LOG_ERROR
+	// keeps the condition loud.)
 	if (!types_homogeneous) {
 		LOG_ERROR << "push_ex_block_into_clause: clause mixes BA types, "
 			"keeping the quantifier block: " << LOG_FM(clause);
@@ -1812,6 +1815,11 @@ tref anti_prenex(tref formula) {
 			// makes no progress while still reporting some.
 			//
 			// TODO (MEDIUM) this must be an option in the cli and/or the repl
+			// AN-6 (DEFERRED, issue #36): an unreachable valve means
+			// a non-converging step loop hangs. Per project policy
+			// the real cap belongs in a runtime parameter shared
+			// with repeat_all::max_rounds -- wire both when the
+			// runtime-option mechanism lands.
 			constexpr size_t max_steps = std::numeric_limits<size_t>::max();
 			size_t steps = 0;
 			while (tau::get(n).child_is(tau::wff_ex)) {
@@ -2243,6 +2251,25 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 			tref ex_fm = tau::build_wff_ex(var, scoped_fm, false);
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 					blasted && blasted != ex_fm) {
+				// AN-3: this is the same blast-then-re-enter hop
+				// blast_block bounds with blast_reentry_depth;
+				// without the accounting here the recursion
+				// treat -> blasting -> anti_prenex_block ->
+				// ... -> treat is bounded only by blasting's
+				// idempotence.
+				if (blast_reentry_depth<node>()
+					>= max_blast_reentry_depth)
+				{
+					LOG_ERROR << "treat_ex_quantified_clause"
+						": blast/re-enter depth "
+						<< max_blast_reentry_depth
+						<< " exceeded on "
+						<< LOG_FM(ex_fm)
+						<< "; keeping the quantifier.";
+					quant_eliminated = false;
+					return tau::build_wff_and(ex_fm, new_fm);
+				}
+				blast_reentry_guard<node> depth_guard;
 				tref cont = anti_prenex_block<node>(blasted,
 					is_tref_bv_type_family<node>);
 				return tau::build_wff_and(cont, new_fm);

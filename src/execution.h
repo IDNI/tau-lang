@@ -112,13 +112,15 @@ struct repeat_all {
 	 *
 	 * A rewriting system given by user definitions need not terminate, and a
 	 * non-terminating one typically *grows* the formula rather than revisiting
-	 * an earlier state, so the `visited` cycle check never fires. Each round
-	 * costs at least one full traversal of a formula that is itself growing,
-	 * so the cap has to be small enough that hitting it is reported in
-	 * seconds. Legitimate definition expansion needs far fewer rounds than
-	 * this: a round rewrites every match in the formula at once and applies
-	 * the whole rule set, so a call chain of depth k collapses in O(k) rounds
-	 * at worst and usually far fewer.
+	 * an earlier state, so the `visited` cycle check never fires.
+	 *
+	 * STATUS (RR-2, issue #36): the cap is currently UNREACHABLE
+	 * (size_t::max), so the non-termination report below is dead and a
+	 * growing rewrite hangs. Per project policy the effective cap belongs
+	 * in a runtime parameter, not a header constant; when that lands, pick
+	 * a value small enough that hitting it is reported in seconds
+	 * (legitimate expansion collapses a depth-k call chain in O(k) rounds),
+	 * and un-skip the regression test in tests/unit/test_execution.cpp.
 	 */
 	// TODO (HIGH) This should be a runtime parameter, not a compile-time constant.
 	static constexpr size_t max_rounds = std::numeric_limits<size_t>::max();

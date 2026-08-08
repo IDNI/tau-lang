@@ -72,9 +72,14 @@ bool is_temporal_quantifier(tref n) {
 
 template <NodeType node>
 bool is_child_temporal_quantifier(tref n) {
-	return tree<node>::get(n).child_is(node::type::wff_always)
-		|| tree<node>::get(n).child_is(node::type::wff_sometimes);
-
+	// TT1-13: keep in sync with is_temporal_quantifier above -- the LTL
+	// and CTL* operators are temporal too. Consumers (e.g. normalize's
+	// temporal-block detection) rely on this to avoid applying
+	// quantifier elimination across a temporal operator; on paths where
+	// the LTL ops are already compiled away this is a no-op.
+	const auto& t = tree<node>::get(n);
+	if (!t.has_child()) return false;
+	return is_temporal_quantifier<node>(t.first());
 }
 
 template <NodeType node>

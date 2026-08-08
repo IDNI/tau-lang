@@ -41,13 +41,12 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	// get tau tree node ref from parse tree node ref
 	auto m_ref = [&m](tref t) { return m.at(t); };
 	// get tau tree node instance from parse tree node ref
-	auto m_get = [&m](tref t) { return get(m.at(t)); };
+	// Explicit return type: deduction would decay the reference to a
+	// by-value tree copy, and `.get()` on a copy interns a pointer to a
+	// stack temporary (TT1-5).
+	auto m_get = [&m](tref t) -> const tree<node>& { return get(m.at(t)); };
 
 	bool error = false;
-
-	std::map<size_t, tref> named_constants; // dict named constant names
-	for (auto& [cn, c] : options.named_constants)
-		named_constants[dict(cn)] = c;
 
 	auto transformer = [&](tref t, [[maybe_unused]] tref parent) {
 		// DBG(LOG_TRACE << " -- transforming: "
@@ -322,9 +321,16 @@ tref tree<node>::get(const tau_parser::tree& ptr, get_options& options) {
 	if (options.reget_with_hooks) transformed = reget(transformed);
 
 #ifdef DEBUG
-	// Check that all term nodes have been typed
+	// Check that all term nodes have been typed. NOTE (TT1-18): unqualified
+	// lookup here resolves to the WIDE member tree::is_term_nt, not the
+	// narrow namespace-scope free function -- and that is load-bearing:
+	// qualifying the call to the narrow set makes the assert fire on
+	// ordinary qlt parses (e.g. `always o1[t] > {0}:qlt`), because atoms
+	// the narrow set classifies as terms are legitimately still untyped at
+	// this stage. The invariant actually enforced is the member set's.
 	auto check = [](tref n) {
-		if (is_term_nt(tau::get(n).value.nt) && !tau::get(n).is(tau::capture)) {
+		if (is_term_nt(tau::get(n).value.nt)
+			&& !tau::get(n).is(tau::capture)) {
 			if (tau::get(n).get_ba_type() == 0) {
 				LOG_DEBUG << "Untyped term node: " << tau::get(n).tree_to_str();
 				assert(false);

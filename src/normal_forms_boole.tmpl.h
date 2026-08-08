@@ -662,15 +662,21 @@ tref normalize_temporal_quantifiers(tref fm) {
 		if (st_aw(n)) return tau::trim2(n);
 		return n;
 	};
-	// Full LTL operators (F, U, R, W) manage their own temporal scope;
-	// do not wrap them in wff_always — pass through unchanged.
+	// Full LTL / CTL* operators manage their own temporal scope; do not
+	// wrap them in wff_always — pass through unchanged. NF-6: A/E and
+	// wff_semantic_neg belong here too (kept in sync with
+	// is_temporal_quantifier) — without them a formula whose only
+	// branching-time ops are A/E would fall into the always/sometimes
+	// machinery, where those atoms are not BDD vars and get dropped.
 	auto is_ltl_op_node = [](tref n) {
 		const auto& t = tree<node>::get(n);
 		if (!t.has_child()) return false;
 		auto nt = t[0].value.nt;
 		return nt == tree<node>::wff_F || nt == tree<node>::wff_U
 		    || nt == tree<node>::wff_R || nt == tree<node>::wff_W
-		    || nt == tree<node>::wff_S || nt == tree<node>::wff_T;
+		    || nt == tree<node>::wff_S || nt == tree<node>::wff_T
+		    || nt == tree<node>::wff_A || nt == tree<node>::wff_E
+		    || nt == tree<node>::wff_semantic_neg;
 	};
 	if (tau::get(fm).find_top(is_ltl_op_node)) return fm;
 	if (has_temp_var<node>(fm)) {

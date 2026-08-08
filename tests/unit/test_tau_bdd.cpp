@@ -826,6 +826,45 @@ TEST_SUITE("BDD ex/all quantification") {
 		CHECK((bdd::bdd_all(xy, v, o) == bdd::F));
 	}
 
+	// TT1-24: the handle wrappers below had zero coverage (which is how
+	// TT1-4's uncompilable convert_to_handle survived).
+	TEST_CASE("convert_to_tau_node registers a mapping convert_to_handle finds") {
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		hbdd::order o {{tx, 0}, {ty, 1}};
+		hbdd xy = hbdd::build(tau::get("xy", opts), o);
+		tref n = hbdd::convert_to_tau_node(xy, 0);
+		REQUIRE( n != nullptr );
+		CHECK((hbdd::convert_to_handle(n) == xy));
+	}
+
+	TEST_CASE("handle bdd_ite/bdd_and_many/bdd_or_many mirror tbdd semantics") {
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		hbdd::order o {{tx, 0}, {ty, 1}};
+		hbdd x  = hbdd::build(tau::get("x", opts), o);
+		hbdd y  = hbdd::build(tau::get("y", opts), o);
+		hbdd xy = hbdd::build(tau::get("xy", opts), o);
+		hbdd x_or_y = hbdd::build(tau::get("x|y", opts), o);
+		// ite(x, y, y) == y; ite(x, y, 0) == x & y
+		CHECK((x.bdd_ite(y, y, o) == y));
+		CHECK((x.bdd_ite(y, hbdd::build(tau::get("0", opts), o), o)
+			== xy));
+		CHECK((hbdd::bdd_and_many({x, y}, o) == xy));
+		CHECK((hbdd::bdd_or_many({x, y}, o) == x_or_y));
+		// compose: x[x := y] == y (single and simultaneous forms)
+		CHECK((x.bdd_compose(tx, y, o) == y));
+		CHECK((x.bdd_compose({{tx, y}}, o) == y));
+	}
+
 	TEST_CASE("handle bdd_ex/bdd_all accept a const trefs&") {
 		using hbdd = term_handle<node_t>;
 		tau::get_options opts = {

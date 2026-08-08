@@ -233,6 +233,10 @@ tref normalize(tref form) {
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
+	// NF-3: key the memo on the ORIGINAL input -- `form` is reassigned
+	// below, so caching under the intermediate never hits for a repeated
+	// input and fills the map with keys nobody looks up.
+	const tref cache_key = form;
 #endif // TAU_CACHE
 	// First resolve quantifiers in formulas below temporal quantifiers
 	trefs temps = tau::get(form).select_top(is_child_temporal_quantifier<node>);
@@ -256,7 +260,8 @@ tref normalize(tref form) {
 	// quantifiers to Boole normal form
 	tref result = normalize_temporal_quantifiers<node>(form);
 #ifdef TAU_CACHE
-	cache.emplace(form, result);
+	cache.emplace(cache_key, result);
+	cache.emplace(form, result); // the intermediate is a valid key too
 #endif // TAU_CACHE
 	return result;
 }
@@ -322,7 +327,12 @@ tref get_new_uninterpreted_constant(tref fm, const std::string& name, size_t typ
 		if (tmp.size() <= prefix.size()
 			|| tmp.compare(0, prefix.size(), prefix) != 0) continue;
 		std::string id = tmp.substr(prefix.size());
-		if (is_number(id)) ids.insert(std::stoi(id));
+		// NF-15: an over-long user-written digit suffix (e.g.
+		// :split99999999999999) must not throw out of the splitter;
+		// skip anything that does not fit.
+		if (is_number(id)) try {
+			ids.insert(std::stoi(id));
+		} catch (const std::out_of_range&) { /* skip */ }
 	}
 	std::string id = std::to_string(*ids.rbegin() + 1);
 	tref uninter_const = tau::build_bf_uconst("", name + id, type);
@@ -796,7 +806,11 @@ tref expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 	// unfolds every applicable definition at every position at once. The
 	// cap only has to be out of reach of those.
 	// TODO (HIGH) this should be a parameter, not a hardcoded constant.
-	constexpr size_t max_passes = std::numeric_limits<size_t>::max();;
+	// NF-8 (DEFERRED, issue #36): an unreachable cap means a definition
+	// that grows every pass loops forever. Per project policy the real cap
+	// belongs in a runtime parameter, not a header constant -- wire it up
+	// when the runtime-option mechanism for normalization rounds lands.
+	constexpr size_t max_passes = std::numeric_limits<size_t>::max();
 	std::unordered_set<tref> visited;
 	for (size_t pass = 0; pass != max_passes; ++pass) {
 		// Unresolved symbol is still present

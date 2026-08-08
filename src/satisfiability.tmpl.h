@@ -1608,30 +1608,12 @@ bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	if (has_ltl_operators<node>(fm)) {
 		return is_ltl_aba_realizable<node>(fm, start_time, output);
 	}
-	if (!has_no_boolean_combs_of_models<node>(fm)) {
-		// Check if the "boolean combination" is just G(...) && sometimes(...),
-		// which the safety pipeline handles via flag-based unrolling.
-		bool only_always_sometimes = true;
-		tau::get(fm).find_top([&](tref n) {
-			const auto& t = tau::get(n);
-			if (!t.has_child()) return false;
-			auto nt = t[0].value.nt;
-			if (nt == tau::wff_always || nt == tau::wff_sometimes)
-				return false;
-			if (nt == tau_parser::wff_F || nt == tau_parser::wff_U
-			    || nt == tau_parser::wff_R || nt == tau_parser::wff_W
-			    || nt == tau_parser::wff_S || nt == tau_parser::wff_T) {
-				only_always_sometimes = false;
-				return true;
-			}
-			return false;
-		});
-		if (!only_always_sometimes) {
-			return is_ltl_aba_realizable<node>(
-				fm, start_time, output);
-		}
-		// Fall through to the safety pipeline for always+sometimes.
-	}
+	// A "boolean combination of models" that reaches this point can only
+	// be G(...) && sometimes(...) shapes, which the safety pipeline
+	// handles via flag-based unrolling: any F/U/R/W/S/T content already
+	// returned through is_ltl_aba_realizable above (SO-5 deleted a scan
+	// re-testing exactly that operator set -- provably always true here).
+	// Fall through to the safety pipeline.
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
 	// Convert each disjunct to unbounded continuation
 	for (tref clause : expression_paths<node>(normalized_fm)) {

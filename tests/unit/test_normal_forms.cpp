@@ -939,3 +939,4 @@ TEST_SUITE("UseHooksGuard") {
 		CHECK( tau::use_hooks == before );
 	}
 }
+

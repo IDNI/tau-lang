@@ -1439,3 +1439,27 @@ TEST_SUITE("AN-2 finite BA quantifier elimination") {
 		CHECK( tau::get(res).equals_T() );
 	}
 }
+
+// AN-7: the heterogeneous-BA-type runtime guard in push_ex_block_into_clause
+// was promoted from DBG-only to a Release guard and had zero coverage.
+TEST_SUITE("AN-7 heterogeneous block guard") {
+
+	TEST_CASE("mixed-type clause keeps its quantifier block") {
+		// A block variable typed sbf over a clause whose content mixes
+		// in tau-typed atoms: the guard must decline elimination and
+		// re-wrap the block rather than build a wrongly-typed term.
+		tref x = tau::build_variable(std::string("x"),
+			sbf_type_id<node_t>());
+		tref clause = tau::build_wff_and(
+			tau::build_bf_eq_0(build_bf_variable<node_t>("x",
+				sbf_type_id<node_t>())),
+			tau::build_bf_eq_0(build_bf_variable<node_t>("y",
+				tau_type_id<node_t>())));
+		tref res = push_ex_block_into_clause<node_t>(clause,
+			trefs{ x }, {});
+		REQUIRE( res != nullptr );
+		// The quantifier survives (elimination declined).
+		CHECK( tau::get(res).find_top(is<node_t, tau::wff_ex>)
+			!= nullptr );
+	}
+}

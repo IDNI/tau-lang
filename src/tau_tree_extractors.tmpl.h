@@ -727,8 +727,10 @@ bool has_open_tau_fm_in_constant(tref fm) {
 	trefs consts = tau::get(fm).select_top(is_child<node, tau::ba_constant>);
 	for (tref c : consts) {
 		tref ba_const = tt(c) | tau::ba_constant | tt::ref;
-		// Special case if the ba_constant is not converted to constant yet
-		if (tau::get(ba_const).get_ba_constant_id() == 0) return false;
+		// Skip a ba_constant not converted to a constant yet -- aborting
+		// the whole scan here (TT2-6) let an open tau constant hide
+		// behind an earlier unparsed one.
+		if (tau::get(ba_const).get_ba_constant_id() == 0) continue;
 		if (!node::ba::is_closed(tt(ba_const) | tt::ba_constant)) {
 			LOG_ERROR << "A Tau formula constant must be closed: "
 							<< TAU_TO_STR(ba_const);

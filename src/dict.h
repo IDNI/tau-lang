@@ -41,7 +41,9 @@ inline size_t dict(const std::string& s) {
  */
 inline const std::string& dict(size_t id) {
 	DBG(assert(id < S().size());)
-	return S()[id];
+	// .at: a corrupted/stale sid throws loudly instead of silent
+	// out-of-bounds UB in Release (TT2-22).
+	return S().at(id);
 }
 
 } // namespace idni::tau_lang

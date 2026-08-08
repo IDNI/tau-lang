@@ -390,6 +390,13 @@ tref tau_splitter(tref fm, splitter_type st) {
 		bool good_splitter = false;
 		for (tref& spec : specs) {
 			bool is_aw = is_child<node>(spec, tau::wff_always);
+			// SO-4: only always/sometimes conjuncts carry an inner
+			// wff at [0].first(); a bare atomic conjunct (e.g.
+			// `x = 0` in a clause that has_temp_var through another
+			// conjunct) would have its left BF operand spliced back
+			// as a formula. Skip anything not temporal-wrapped.
+			if (!is_aw && !is_child<node>(spec, tau::wff_sometimes))
+				continue;
 			auto [splitter, type] = nso_tau_splitter<BAs...>(
 					tau::get(spec)[0].first(), st, clause);
 			if (type != splitter_type::bad) {

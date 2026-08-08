@@ -290,7 +290,7 @@ int_t find_biggest_quant_id(tref fm) {
 					id = std::max(id, static_cast<int_t>(std::stoll(name)));
 				} catch (const std::out_of_range&) {
 					// Variable name exceeds range; use max id
-					id = std::numeric_limits<int_t>::max();
+					id = std::numeric_limits<int_t>::max() - 1; // -1: callers compute id + 1 (TT2-7)
 				}
 				return false;
 			}
@@ -720,7 +720,6 @@ tref build_bf_neg(tref l) {
 	using tau = tree<node>;
 
 	DBG(assert(l != nullptr);)
-	using tau = tree<node>;
 	DBG(assert(tau::get(l).is(tau::bf));)
 	LOG_TRACE << "build_bf_neg";
 	DBG(LOG_TRACE << "l: " << LOG_FM_DUMP(l);)
