@@ -782,3 +782,66 @@ TEST_SUITE("BDD handle creation") {
 			"sv&(wx&(yz|y'z')|w'x'&(yz|y'z'))|s'v'&(wx&(yz|y'z')|w'x'&(yz|y'z'))");
 	}
 }
+
+// TT1-3: `bdd_ex` and `bdd_all` could not be instantiated at all.  Under
+// TAU_CACHE (ON in Release) the private recursion at tau_bdd.tmpl.h dropped the
+// `memo` argument, and `tau_term_bdd_handle::bdd_ex` bound its `const trefs&`
+// parameter to `tbdd::bdd_ex`'s `trefs&` -- an error in every config.  Nothing
+// in src/ or tests/ called them, so the breakage stayed latent; these cases
+// keep both entry points instantiated in both configs.
+TEST_SUITE("BDD ex/all quantification") {
+
+	TEST_CASE("bdd_ex removes the quantified variable") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
+		bdd::ref y  = bdd::build_bdd(tau::get("y", opts), o);
+		trefs v {tx};
+		// ex x (x & y) == y
+		CHECK((bdd::bdd_ex(xy, v, o) == y));
+	}
+
+	TEST_CASE("bdd_all over the only variable of a conjunct is F") {
+		using bdd = tau_term_bdd<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+#ifdef TAU_CACHE
+		bdd::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		bdd::order o {{tx, 0}, {ty, 1}};
+		bdd::ref xy = bdd::build_bdd(tau::get("xy", opts), o);
+		trefs v {tx};
+		// all x (x & y) == 0
+		CHECK((bdd::bdd_all(xy, v, o) == bdd::F));
+	}
+
+	TEST_CASE("handle bdd_ex/bdd_all accept a const trefs&") {
+		using hbdd = term_handle<node_t>;
+		tau::get_options opts = {
+			.parse = { .start = tau::bf },
+		};
+#ifdef TAU_CACHE
+		tau_term_bdd<node_t>::clear_caches();
+#endif
+		tref tx = tau::trim(tau::get("x", opts));
+		tref ty = tau::trim(tau::get("y", opts));
+		hbdd::order o {{tx, 0}, {ty, 1}};
+		const trefs v {tx};
+		hbdd xy = hbdd::build(tau::get("xy", opts), o);
+		hbdd y  = hbdd::build(tau::get("y", opts), o);
+		hbdd f  = hbdd::build(tau::get("0", opts), o);
+		CHECK((xy.bdd_ex(v, o) == y));
+		CHECK((xy.bdd_all(v, o) == f));
+	}
+}

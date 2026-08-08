@@ -1394,3 +1394,48 @@ TEST_SUITE("AntiPrenexBlastingCache") {
 	}
 }
 #endif // TAU_CACHE
+
+// AN-2: `bool` is the two-element Boolean algebra, which is *not* atomless, so
+// Corollary 2.3's construction in treat_ex_quantified_clause does not apply to
+// it.  With no positive atoms the construction takes the f_0 == f_1 branch for
+// each disequation and yields T, so `ex x:bool (x != 0 && x' != 0)` came back
+// as T -- while in a two-element algebra it is F (no x satisfies both).
+// block_atom_profile's finite_ba_content already guards paper step 2a for
+// exactly this class; the treat path was unguarded.
+TEST_SUITE("AN-2 finite BA quantifier elimination") {
+
+	TEST_CASE("ex x:bool (x != 0 && x' != 0) is F, not T") {
+		const char* sample = "ex x:bool (x != 0 && x' != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		bool quant_eliminated = true;
+		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		CHECK( tau::get(res).equals_F() );
+	}
+
+	TEST_CASE("ex x:bool (x != 0) is still T (AN-2 control)") {
+		const char* sample = "ex x:bool (x != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		bool quant_eliminated = true;
+		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		CHECK( tau::get(res).equals_T() );
+	}
+
+	// The same formula end-to-end: the normalizer routes it through
+	// push_ex_block_into_clause, whose negative-atom handling distributes
+	// the block over separately quantified conjuncts -- Corollary 2.3
+	// machinery, atomless-only -- so it needs its own finite-BA guard;
+	// fixing treat_ex_quantified_clause alone leaves this path answering T.
+	TEST_CASE("normalizer: ex x:bool (x != 0 && x' != 0) is F end-to-end") {
+		const char* sample = "ex x:bool (x != 0 && x' != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = normalizer<node_t>(fm);
+		CHECK( tau::get(res).equals_F() );
+	}
+
+	TEST_CASE("normalizer: ex x:bool (x != 0) is T end-to-end (control)") {
+		const char* sample = "ex x:bool (x != 0).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		tref res = normalizer<node_t>(fm);
+		CHECK( tau::get(res).equals_T() );
+	}
+}

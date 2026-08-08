@@ -164,8 +164,10 @@ struct tau_term_bdd : bintree<tau_bdd_node<node>> {
 	/** @brief NOT of @p x (flips the output inverter). */
 	static ref bdd_not(ref x);
 
-	/** @brief Existentially quantify variables @p v from @p x under @p o. */
-	static ref bdd_ex(ref x, trefs& v, const order& o);
+	/** @brief Existentially quantify variables @p v from @p x under @p o.
+	 *  @p v is taken by value: the implementation sorts it, and callers
+	 *  (including tau_term_bdd_handle::bdd_ex) hold it by const reference. */
+	static ref bdd_ex(ref x, trefs v, const order& o);
 	/** @brief Universally quantify variables @p v from @p x under @p o. */
 	static ref bdd_all(ref x, trefs v, const order& o);
 	/** @brief Apply a sequence of mixed quantifiers @p v to @p x under @p o. */

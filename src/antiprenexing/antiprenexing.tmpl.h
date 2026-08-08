@@ -1700,6 +1700,27 @@ tref push_ex_block_into_clause(tref clause, const trefs& block,
 			clause = build_wff_ex<node>(*v, clause, false);
 		return clause;
 	}
+	// AN-2: `bool` is the two-element Boolean algebra -- not atomless -- so
+	// the pos/neg squeeze below (Corollary 2.3 machinery) is invalid for
+	// it: the negative-atom handling distributes the block over separately
+	// quantified conjuncts, so `ex x:bool (x != 0 && x' != 0)` would come
+	// back T while in a two-element algebra it is F. In a two-element
+	// algebra the existential is the finite disjunction
+	// `phi[x/0] | phi[x/1]` instead, per variable of the block.
+	// (bv, the other finite family, never reaches this function -- it is
+	// diverted to the solver/blasting path by the callers' skip predicates;
+	// block_atom_profile's finite_ba_content guards paper step 2a the same
+	// way.)
+	if (is_bool_type<node>(clause_type)) {
+		tref expanded = clause;
+		for (auto v = block.rbegin(); v != block.rend(); ++v)
+			expanded = tau::build_wff_or(
+				rewriter::replace<node>(expanded, *v,
+					tau::_0_trimmed(clause_type)),
+				rewriter::replace<node>(expanded, *v,
+					tau::_1_trimmed(clause_type)));
+		return term_boole_normal_form<node>(expanded);
+	}
 	bool is_quant_removable_in_clause = true;
 	trefs conjs = get_cnf_wff_clauses<node>(clause);
 	trefs pos, neg;
@@ -1994,10 +2015,13 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 					excluded.insert(n);
 				} else excluded.insert(n);
 			}
-			// TODO (HIGH): restrict to atomless types --
-			// distribute_block_over_atoms and
-			// push_ex_block_into_clause's negative-atom handling are
-			// only valid in an atomless BA, and nothing checks that.
+			// Atomless-only laws are guarded at their sites (AN-2):
+			// distribute_block_over_atoms via block_atom_profile's
+			// finite_ba_content, push_ex_block_into_clause via its
+			// bool-type expansion. The single-atomic bdd_quant below
+			// needs no guard -- Boole's elimination (ex x f(x)=0 <=>
+			// f_0 f_1 = 0, all x f(x)=0 <=> f_0|f_1 = 0) holds in
+			// every Boolean algebra, atomless or not.
 			else if (!tau::get(n).find_top(is<node, tau::ref>)) {
 				using bdd = term_handle<node>::tbdd;
 				// Record quantifier block in quants
@@ -2238,9 +2262,43 @@ tref treat_ex_quantified_clause(tref ex_clause, bool& quant_eliminated) {
 	if (is_omcat_type_family<node>(tau::get(var).get_ba_type())) {
 		if (auto interval = qlt_dlo_qe<node>(var, scoped_fm); interval)
 			return !interval.value().is_empty() ? new_fm : tau::_F();
-		// qlt_dlo_qe undetermined: fall through to atomless-BA QE.
-		// (Quantifier-in-place fallback is NOT used: atomless-BA handles
-		//  non-ordering constraints like meet-equality correctly.)
+		// qlt_dlo_qe undetermined. Non-ordering constraints (e.g.
+		// meet-equality) fall through to atomless-BA QE, which handles
+		// them correctly -- but it cannot read an ordering atom and
+		// would resolve the scope to T, so if one is present the
+		// quantifier is kept instead (AN-1: qlt_dlo_qe now declines
+		// order-dependent symbolic-endpoint scopes such as
+		// `ex x (a < x && x < b)` rather than resolving them to T).
+		auto is_ordering_atom = [](tref m) {
+			const auto& t = tau::get(m);
+			return t.is(tau::bf_lt) || t.is(tau::bf_gt)
+			    || t.is(tau::bf_lteq) || t.is(tau::bf_gteq)
+			    || t.is(tau::bf_nlt) || t.is(tau::bf_ngt)
+			    || t.is(tau::bf_nlteq) || t.is(tau::bf_ngteq);
+		};
+		if (tau::get(scoped_fm).find_top(is_ordering_atom)) {
+			quant_eliminated = false;
+			return tau::build_wff_and(
+				tau::build_wff_ex(var, scoped_fm, false),
+				new_fm);
+		}
+	}
+	// AN-2: `bool` is the two-element Boolean algebra, which is *not*
+	// atomless, so Corollary 2.3's construction below does not apply: with
+	// no positive atoms it takes the f_0 == f_1 branch per disequation and
+	// yields T for `ex x:bool (x != 0 && x' != 0)`, whose truth is F. In a
+	// two-element algebra the existential is the finite disjunction
+	// `phi[x/0] | phi[x/1]` instead. bv, the other finite family, was
+	// diverted above; block_atom_profile's finite_ba_content guards the
+	// same law for paper step 2a.
+	if (is_bool_type<node>(tau::get(var).get_ba_type())) {
+		const size_t type_b = find_ba_type<node>(var);
+		new_fm = tau::build_wff_and(new_fm, tau::build_wff_or(
+			rewriter::replace<node>(scoped_fm, var,
+				tau::_0_trimmed(type_b)),
+			rewriter::replace<node>(scoped_fm, var,
+				tau::_1_trimmed(type_b))));
+		return term_boole_normal_form<node>(new_fm);
 	}
 	// Continue with quantifier elimination for atomless BA.
 	//

@@ -97,3 +97,6 @@ __pycache__/
 CLAUDE.local.md
 .venv/
 tests/benchmark_timing.json
+tests/unit/benchmark_timing.json
+tests/integration/benchmark_timing.json
+/benchmark_timing.json

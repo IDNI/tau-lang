@@ -225,6 +225,19 @@ TEST_SUITE("normal forms: onf") {
 		// a genuine onf transformation replaces the bare equation
 		CHECK(tau::get(result_rhs).to_str() != tau::get(fm_rhs).to_str());
 	}
+
+	// NF-5: onf_wff::operator() rewrote the body returned by
+	// get_inner_quantified_wff and returned *only* that body, dropping the
+	// binder and everything above it -- so `onf` on a quantified formula
+	// silently returned a formula with a different meaning.  The existing
+	// tests were all quantifier-free, so the branch was uncovered.
+	TEST_CASE("onf keeps the quantifier prefix") {
+		tref x = build_variable<node_t>("x", tau_type_id<node_t>());
+		tref fm = get_nso_rr("ex y (x = y).").value().main->get();
+		REQUIRE( tau::get(fm).find_top(is<node_t, tau::wff_ex>) != nullptr );
+		tref result = onf<node_t>(fm, x);
+		CHECK( tau::get(result).find_top(is<node_t, tau::wff_ex>) != nullptr );
+	}
 }
 
 TEST_SUITE("GetNewUninterpretedConstant") {

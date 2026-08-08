@@ -154,3 +154,30 @@ TEST_SUITE("AntiPrenexBlockPipeline") {
 			tau::wff_f) );
 	}
 }
+
+// AN-1: qlt_dlo_qe records free-variable (symbolic) endpoints only for
+// contradiction detection; absent a contradiction it still returns its `top`
+// accumulator as a *determined* interval.  treat_ex_quantified_clause accepted
+// that verdict unconditionally, so `ex x (a < x && x < b)` with free a, b was
+// rewritten to T -- but over Q the truth is `a < b`, false at a = b.
+// resolve_quantifiers' omcat branch already gates on a closed scope; the treat
+// call site did not.
+TEST_SUITE("AN-1 symbolic qlt bounds") {
+
+	TEST_CASE("ex x (a < x && x < b) with free a, b is not resolved to T") {
+		const char* sample = "ex x:qlt (a:qlt < x && x < b:qlt).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		bool quant_eliminated = true;
+		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		CHECK( !tau::get(res).equals_T() );
+		CHECK( !quant_eliminated );
+	}
+
+	TEST_CASE("closed qlt scope is still resolved (AN-1 control)") {
+		const char* sample = "ex x:qlt ({1/4}:qlt < x && x < {3/4}:qlt).";
+		tref fm = get_nso_rr(sample).value().main->get();
+		bool quant_eliminated = true;
+		tref res = treat_ex_quantified_clause<node_t>(fm, quant_eliminated);
+		CHECK( tau::get(res).equals_T() );
+	}
+}

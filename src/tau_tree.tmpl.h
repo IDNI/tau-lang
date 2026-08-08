@@ -270,11 +270,17 @@ tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 		[&hook](const node& v, const tref* ch, size_t len, tref r) {
 			return hook(v, ch, len, r);
 		});
-	// We only propagate the type information up
-	// Do not propagate bool type as it is reserved for predicate definitions
-	// Use literal 4 instead of bool_type_id<node>() to avoid infinite recursion
-	// (bool_type_id calls this get method, creating a circular dependency)
-	if (v.nt != wff && v.ba_type != 4 && v.nt != ref_args && v.nt != fp_fallback) {
+	// We only propagate the type information up.
+	// NOTE (TT1-2): an earlier guard here, `v.ba_type != 4`, claimed to stop
+	// bool-type propagation ("reserved for predicate definitions") but 4 is
+	// qint's pre-registered id, not bool's (bool is registered lazily and
+	// gets an id >= 7), and the clause was a provable no-op anyway: with
+	// v.ba_type nonzero, get_type returns it unchanged and ba_retype is the
+	// identity. It was removed rather than "fixed" because suppressing
+	// bool-child propagation would need bool_type_id here, which calls back
+	// into this get() — a circular dependency; if that intent is ever
+	// implemented it needs a lazily-cached id looked up outside this path.
+	if (v.nt != wff && v.nt != ref_args && v.nt != fp_fallback) {
 		size_t ba_type = get_type(v, ch, len);
 		return base_t::get(v.ba_retype(ba_type), ch, len, r);
 	}

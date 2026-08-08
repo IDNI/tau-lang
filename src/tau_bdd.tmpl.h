@@ -518,9 +518,9 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_compose_impl(ref x,
 	return memo.emplace(x, r).first->second;
 }
 
-/** @internal @copydoc tau_term_bdd::bdd_ex(ref, trefs&, const order&) @endinternal */
+/** @internal @copydoc tau_term_bdd::bdd_ex(ref, trefs, const order&) @endinternal */
 template<NodeType node>
-tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, trefs& v,
+tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, trefs v,
 	const order& o) {
 	// sort v, so the smallest variable is up front
 	auto cmp = [&o](tref e1, tref e2){return less_then(e1,e2, o);};
@@ -574,10 +574,11 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_ex(ref x, const trefs& v, size_t
 	while (i < v.size() && less_then(v[i], var, o)) ++i;
 	if (i >= v.size()) return x;
 	if (tau::subtree_equals(v[i], var))
-		return bdd_ex(bdd_or(get_high(x), get_low(x), o), v, ++i, o);
+		return bdd_ex(bdd_or(get_high(x), get_low(x), o), v, ++i, o,
+			memo);
 	return memo.emplace(x,
-		add(var, bdd_ex(get_high(x), v, i, o),
-			bdd_ex(get_low(x), v, i, o))).first->second;
+		add(var, bdd_ex(get_high(x), v, i, o, memo),
+			bdd_ex(get_low(x), v, i, o, memo))).first->second;
 }
 
 /** @internal @copydoc tau_term_bdd::bdd_quant(ref, const quants&, size_t, const order&, auto&) @endinternal */

@@ -1066,17 +1066,58 @@ std::optional<solution<node>> solve(const equations<node>& eqs,
 		}
 		else system.second.insert(eq);
 	}
-	// For qlt ordering inequality-only systems (no equality), use DLO QE to
+	// For qlt ordering inequality systems with no equality, use DLO QE to
 	// find a concrete witness rather than the BA-level solve_inequality_system
-	// which cannot handle bf_lt/bf_gt atoms.
-	if (!system.first.has_value() && !system.second.empty()
+	// which cannot handle bf_lt/bf_gt atoms. bf_neq atoms are DLO-compatible
+	// too: qlt_dlo_qe punctures the satisfying interval at the excluded
+	// point (the U/W execution encoding produces exactly this mix, e.g.
+	// `{0} < o1[t] && o1[t] != {1/2}`).
+	bool has_ordering = false;
+	for (tref neq : system.second)
+		if (is_qlt_ordering_atom<node>(neq)) { has_ordering = true; break; }
+	if (has_ordering && !system.first.has_value()
 	    && is_omcat_type_family<node>(ba_types<node>::type_tree(options.type_id)))
 	{
-		bool all_ordering = true;
+		bool dlo_compatible = true;
 		for (tref neq : system.second)
-			if (!is_qlt_ordering_atom<node>(neq)) { all_ordering = false; break; }
-		if (all_ordering)
-			return solve_qlt_ordering_system<node>(system.second, options);
+			if (!is_qlt_ordering_atom<node>(neq)
+				&& !tau::get(neq).child_is(tau::bf_neq))
+				{ dlo_compatible = false; break; }
+		// A failed DLO attempt (e.g. a bf_neq in XOR-encoded rather
+		// than comparison form, which qlt_dlo_qe cannot read) falls
+		// through to the solve-then-verify path below.
+		if (dlo_compatible)
+			if (auto s = solve_qlt_ordering_system<node>(
+					system.second, options); s)
+				return s;
+	}
+	// SO-1: a system that still contains an ordering atom cannot be handed
+	// to solve_system as-is: check_extreme_solution only rejects on
+	// equals_F() after bf_reduce_canonical, so an extreme solution violating
+	// the ordering atom passes silently -- and with no equality present,
+	// solve_inequality_system's minterm_inequality_system_iterator
+	// dereferences an empty traverser on the bf_gt node. Solve the system
+	// WITHOUT its ordering atoms, then verify them against the solution:
+	// substitution folds a ground qlt comparison to T/F at construction
+	// (wff_lt hooks via qlt_singleton_cmp), so anything not evaluating to T
+	// -- violated, undecided, or non-singleton -- declines. Callers treat
+	// "no solution found" as unsolved, not unsat.
+	if (has_ordering) {
+		equation_system<node> rest;
+		rest.first = system.first;
+		inequality_system<node> ords;
+		for (tref neq : system.second)
+			if (is_qlt_ordering_atom<node>(neq)) ords.insert(neq);
+			else rest.second.insert(neq);
+		auto sol = solve_system<node>(rest, options);
+		if (!sol) return {};
+		for (tref ord : ords) {
+			tref value = tt(rewriter::replace<node>(ord,
+					sol.value()))
+				| bf_reduce_canonical<node>() | tt::ref;
+			if (!tau::get(value).equals_T()) return {};
+		}
+		return sol;
 	}
 	return solve_system<node>(system, options);
 }

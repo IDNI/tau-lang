@@ -586,6 +586,46 @@ static std::optional<qlt> qlt_dlo_qe(tref var, tref body) {
 		// Two distinct equalities to different free vars → contradictory iff
 		// we can't prove they're equal. Stay undetermined in this case.
 		if (eq_free.size() > 1) undetermined = true;
+		// AN-1: symbolic endpoints are recorded above but never
+		// intersected into `acc`, so a non-empty verdict is sound only
+		// when they cannot shrink the interval to empty. A one-sided
+		// symbolic bound is harmless over (Q,<) iff `acc` is unbounded
+		// on that side (a point beyond any finite set of free endpoints
+		// always exists). Anything whose truth depends on the ORDER of
+		// free endpoints -- bounds on both sides, or an equality
+		// combined with any other constraint -- is undetermined, not T:
+		// `ex x (a < x && x < b)` is `a < b`, false at a = b.
+		if (!undetermined && !acc.is_empty()) {
+			const bool has_lower = !lower_strict.empty()
+						|| !lower_nonstrict.empty();
+			const bool has_upper = !upper_strict.empty()
+						|| !upper_nonstrict.empty();
+			if (!eq_free.empty()) {
+				if (has_lower || has_upper || !acc.is_full())
+					undetermined = true;
+			} else if (has_lower && has_upper) {
+				// Exception: a non-strict cycle through one
+				// shared endpoint (fv <= var && var <= fv) is
+				// satisfied by var := fv for ANY fv, provided
+				// nothing else restricts var. Any other
+				// two-sided combination depends on the free
+				// endpoints' order.
+				if (!(lower_strict.empty()
+					&& upper_strict.empty()
+					&& lower_nonstrict.size() == 1
+					&& upper_nonstrict.size() == 1
+					&& upper_nonstrict.contains(
+						*lower_nonstrict.begin())
+					&& acc.is_full()))
+					undetermined = true;
+			}
+			else if (has_lower && !acc.pieces.back()
+						.hi.val.is_pos_inf())
+				undetermined = true;
+			else if (has_upper && !acc.pieces.front()
+						.lo.val.is_neg_inf())
+				undetermined = true;
+		}
 		if (undetermined) {
 			// If we already derived an empty interval symbolically, prefer that
 			// (it is a definitive answer; the BA fallback would wrongly say SAT).

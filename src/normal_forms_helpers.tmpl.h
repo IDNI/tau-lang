@@ -407,7 +407,9 @@ tref onf_wff<node>::operator()(tref n) const {
 					onf_subformula(disjunct[1].first());
 	}
 	if (no_disjunction) changes[nn] = onf_subformula(nn);
-	return rewriter::replace<node>(nn, changes);
+	// nn is the innermost quantifier's body; rewriting must happen inside
+	// the original formula or every binder above nn is silently dropped
+	return rewriter::replace<node>(n, changes);
 }
 
 template <NodeType node>
