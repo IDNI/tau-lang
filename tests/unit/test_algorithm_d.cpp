@@ -203,7 +203,11 @@ State: 0 {0}
 		CHECK(g.edge_priority[0][0] == 2);
 	}
 
-	TEST_CASE("[ALG-D-35] general/parity acceptance: priority equals color directly") {
+	// LG-3: the solver is hardwired to max-odd, so every other parity
+	// flavor must be normalized on parse. For "min even 3": reflect
+	// (c' = 2 - c) then shift (+1, because reflecting around the even
+	// k-1 = 2 keeps the winning parity even) -- so p = 3 - c.
+	TEST_CASE("[ALG-D-35] parity min even is normalized to max odd") {
 		std::string hoa = R"(HOA: v1
 States: 2
 Start: 0
@@ -217,8 +221,47 @@ State: 1
 )";
 		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
 		REQUIRE(g.state_priority.size() == 2u);
-		CHECK(g.state_priority[0] == 2);
+		// color 2 (even, accepting under min-even since a run stuck on
+		// state 0 has min color 2) must land on an ODD max-odd priority
+		CHECK(g.state_priority[0] == 1);
+		// uncolored stays at the neutral lowest priority
 		CHECK(g.state_priority[1] == 0);
+	}
+
+	TEST_CASE("[ALG-D-35b] parity max even is shifted by one") {
+		std::string hoa = R"(HOA: v1
+States: 2
+Start: 0
+AP: 1 "p0"
+acc-name: parity max even 3
+Acceptance: 3 Inf(0)
+--BODY--
+State: 0 {2}
+State: 1 {1}
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.state_priority.size() == 2u);
+		CHECK(g.state_priority[0] == 3);  // even winner 2 -> odd 3
+		CHECK(g.state_priority[1] == 2);  // odd loser 1 -> even 2
+	}
+
+	TEST_CASE("[ALG-D-35c] parity max odd is the identity") {
+		std::string hoa = R"(HOA: v1
+States: 2
+Start: 0
+AP: 1 "p0"
+acc-name: parity max odd 3
+Acceptance: 3 Inf(0)
+--BODY--
+State: 0 {2}
+State: 1 {1}
+--END--
+)";
+		alg_d::SynthGame g = alg_d::parse_synth_game_hoa(hoa);
+		REQUIRE(g.state_priority.size() == 2u);
+		CHECK(g.state_priority[0] == 2);
+		CHECK(g.state_priority[1] == 1);
 	}
 
 	TEST_CASE("[ALG-D-36] controllable-AP with multiple indices") {

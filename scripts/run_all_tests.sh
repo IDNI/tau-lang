@@ -29,7 +29,7 @@ declare -a FAILURES
 
 # Heavy adversarial / fuzz suites, same set tests/CMakeLists.txt gives a longer
 # ctest TIMEOUT to.
-HEAVY_TESTS="test_ltl_adversarial test_ltl_adversarial2 test_ltl_aba test_ltl_fuzz100 test_ltl_soundness_regression"
+HEAVY_TESTS="test_ltl_aba test_ltl_soundness_regression"
 
 timeout_for() {
 	local t

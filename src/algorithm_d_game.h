@@ -292,6 +292,7 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 	bool in_body = false;
 	int cur_state = -1;
 	bool is_buchi = false, is_cobuchi = false, is_all = false;
+	bool is_parity = false, parity_min = false, parity_even = false;
 
 	auto parse_int_list = [](const std::string& s) {
 		std::vector<int> out;
@@ -347,7 +348,14 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 				else if (line.find("Buchi") != std::string::npos &&
 				         line.find("co-Buchi") == std::string::npos) is_buchi = true;
 				else if (line.find("co-Buchi") != std::string::npos) is_cobuchi = true;
-				// else: Streett or parity acceptance (handled via n_colors)
+				else if (line.find("parity") != std::string::npos) {
+					// LG-3: capture the flavor; normalized to
+					// max-odd (the solver's convention) below.
+					is_parity   = true;
+					parity_min  = line.find(" min")  != std::string::npos;
+					parity_even = line.find(" even") != std::string::npos;
+				}
+				// else: Streett acceptance (handled via n_colors)
 			} else if (line.substr(0,11) == "Acceptance:") {
 				std::istringstream al(line.substr(11));
 				al >> g.n_colors;
@@ -403,6 +411,20 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 	//     0 instead would let any run that also revisits an uncolored
 	//     state have max recurring priority 1 (odd) and be scored sys-win.
 	//   parity/Streett: color → priority directly
+	// LG-3: normalize any parity flavor to the solver's max-odd
+	// convention. min flavors reflect (c' = k-1-c, so the min color
+	// becomes the max priority); a flavor whose winning parity lands on
+	// even after that reflection shifts by one (parity of k-1 decides
+	// whether reflection flips it).
+	auto parity_prio = [&](int c) {
+		if (!is_parity) return c;             // no acc-name: raw color
+		const int k = g.n_colors;
+		int p = parity_min ? (k - 1 - c) : c;
+		const bool win_even_after = parity_min
+			? (((k - 1) % 2 == 0) ? parity_even : !parity_even)
+			: parity_even;
+		return win_even_after ? p + 1 : p;
+	};
 	for (int q = 0; q < g.num_states; ++q) {
 		int c = g.state_color[q];
 		if (is_all)
@@ -412,7 +434,7 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 		else if (is_cobuchi)
 			g.state_priority[q] = (c == 0) ? 2 : 1;
 		else
-			g.state_priority[q] = (c >= 0) ? c : 0;  // general parity
+			g.state_priority[q] = (c >= 0) ? parity_prio(c) : 0;
 	}
 	// Compute edge priorities similarly
 	g.edge_priority.resize(g.num_states);
@@ -431,7 +453,7 @@ inline SynthGame parse_synth_game_hoa(const std::string& hoa_text) {
 				// must map to a dominant EVEN priority
 				g.edge_priority[q][j] = (ec == 0) ? 2 : 1;
 			} else {
-				g.edge_priority[q][j] = ec;
+				g.edge_priority[q][j] = parity_prio(ec);
 			}
 		}
 	}

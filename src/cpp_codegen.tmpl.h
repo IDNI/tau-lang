@@ -504,8 +504,13 @@ void emit_cpp_program_data(
 				in_guard = any ? ig.str() : "true";
 			}
 
-			// For each positive output-qlt atom, group by variable.
-			std::map<std::string, std::vector<tref>> var_pos_atoms;
+			// For each output-qlt literal, group by variable. LG-6:
+			// negative literals are conjoined as wff negations -- the
+			// witness must satisfy the WHOLE edge guard, not only its
+			// positive atoms (o1>0 && !(o1<2) demands o1 >= 2, and a
+			// positive-only pick of 1.0 would leave the synthesized
+			// strategy while reporting ok=true).
+			std::map<std::string, std::vector<tref>> var_qlt_lits;
 			std::map<std::string, tref>               var_io_ref;
 			std::vector<std::pair<std::string, bool>> bool_asgns; // (prop, value)
 
@@ -518,13 +523,11 @@ void emit_cpp_program_data(
 
 				auto meta_it = ameta.find(prop);
 				if (meta_it != ameta.end() && meta_it->second.kind == AtomKind::OUTPUT_QLT) {
-					if (positive) {
-						var_pos_atoms[meta_it->second.var_name].push_back(prop_to_atom[prop]);
-						var_io_ref[meta_it->second.var_name] = meta_it->second.io_var_ref;
-					}
-					// Negative qlt atom: the witness must NOT satisfy it.
-					// For simplicity we only use positive atoms for witness selection;
-					// the ABA oracle has already verified feasibility.
+					tref atom = prop_to_atom[prop];
+					var_qlt_lits[meta_it->second.var_name].push_back(
+						positive ? atom
+							 : tau::build_wff_neg(atom));
+					var_io_ref[meta_it->second.var_name] = meta_it->second.io_var_ref;
 				} else {
 					bool_asgns.emplace_back(prop, positive);
 				}
@@ -533,7 +536,7 @@ void emit_cpp_program_data(
 			// Compute qlt witnesses at code-generation time.
 			std::map<std::string, double> witnesses;
 			if constexpr (ba_variant_includes_v<qlt, typename tau::constant>) {
-				for (auto& [var, atom_refs] : var_pos_atoms) {
+				for (auto& [var, atom_refs] : var_qlt_lits) {
 					tref conj = atom_refs[0];
 					for (size_t ai = 1; ai < atom_refs.size(); ++ai)
 						conj = tau::build_wff_and(conj, atom_refs[ai]);
@@ -552,7 +555,7 @@ void emit_cpp_program_data(
 				if (witnesses.count(var))
 					out << "\t\t\t\to." << sanitize(var) << " = "
 					    << double_to_cpp(witnesses[var]) << ";\n";
-				// If no positive atom for this var on this edge: leave default 0.0.
+				// If no qlt literal for this var on this edge: leave default 0.0.
 			}
 			for (auto& [prop, val] : bool_asgns)
 				out << "\t\t\t\to." << sanitize(prop) << " = " << (val ? "true" : "false") << ";\n";

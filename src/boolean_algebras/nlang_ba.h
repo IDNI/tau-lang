@@ -251,12 +251,58 @@ inline bool nlang_struct_is_one(const nlang_ba::fptr& f) {
 
 // --- free functions expected by the dispatcher ---
 
+// BA1-9: the dispatcher's is_syntactic_zero/one contract is a CHEAP check on
+// the normalization hot path, so these probes are oracle-free: atoms and
+// unresolved compounds answer false instead of costing an HTTPS round-trip
+// (with a 15s timeout) per uncached atom -- and offline they no longer
+// degrade to a silent false that LOOKS like a verdict. Oracle-backed
+// emptiness/universality stays in normalize_nlang below, which folds
+// contradictions/tautologies to bot/top so later syntactic probes see them
+// structurally.
+inline bool nlang_syntactic_is_one(const nlang_ba::fptr& f);
+
+inline bool nlang_syntactic_is_empty(const nlang_ba::fptr& f) {
+	using K = nlang_ba::formula::kind;
+	switch (f->k) {
+	case K::bot:  return true;
+	case K::top:  return false;
+	case K::atom: return false;
+	case K::not_: return nlang_syntactic_is_one(f->inner);
+	case K::and_:
+		if (nlang_syntactic_is_empty(f->lhs)
+			|| nlang_syntactic_is_empty(f->rhs)) return true;
+		return f->lhs->is_complement_of(*f->rhs);
+	case K::or_:
+		return nlang_syntactic_is_empty(f->lhs)
+			&& nlang_syntactic_is_empty(f->rhs);
+	}
+	return false;
+}
+
+inline bool nlang_syntactic_is_one(const nlang_ba::fptr& f) {
+	using K = nlang_ba::formula::kind;
+	switch (f->k) {
+	case K::top:  return true;
+	case K::bot:  return false;
+	case K::atom: return false;
+	case K::not_: return nlang_syntactic_is_empty(f->inner);
+	case K::or_:
+		if (nlang_syntactic_is_one(f->lhs)
+			|| nlang_syntactic_is_one(f->rhs)) return true;
+		return f->lhs->is_complement_of(*f->rhs);
+	case K::and_:
+		return nlang_syntactic_is_one(f->lhs)
+			&& nlang_syntactic_is_one(f->rhs);
+	}
+	return false;
+}
+
 inline bool is_nlang_zero(const nlang_ba& x) {
-	return nlang_struct_is_empty(x.fm);
+	return nlang_syntactic_is_empty(x.fm);
 }
 
 inline bool is_nlang_one(const nlang_ba& x) {
-	return nlang_struct_is_one(x.fm);
+	return nlang_syntactic_is_one(x.fm);
 }
 
 // Normalize: reduce contradictions to bottom, tautologies to top.

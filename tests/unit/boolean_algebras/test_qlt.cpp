@@ -1179,6 +1179,16 @@ TEST_CASE("splitter of (-inf,0) is non-empty and sub-element") {
 	CHECK((s & a) == s);
 }
 
+// BA1-2: splitter on a symbolic piece. The element is degenerate (a
+// singleton), so the BA1-5 contract allows returning it unchanged -- but
+// it must stay non-empty and contained.
+TEST_CASE("splitter of symbolic singleton [c,c] is non-empty and contained") {
+	auto a = sym_singleton("c");
+	auto s = qlt_splitter(a, splitter_type::upper);
+	CHECK(!s.is_empty());
+	CHECK((s | a) == a);
+}
+
 TEST_CASE("splitter of (0,+inf) is non-empty and sub-element") {
 	auto a = open_pos_inf(0);
 	auto s = qlt_splitter(a, splitter_type::upper);

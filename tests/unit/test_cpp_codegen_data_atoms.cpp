@@ -88,6 +88,32 @@ TEST_SUITE("cpp_codegen_data_atoms") {
 		CHECK(has(s, "Outputs step("));
 	}
 
+	// LG-6: a NEGATIVE output-qlt literal on an edge must constrain the
+	// embedded witness. G(o1>0 && !(o1<2)) forces o1 >= 2; the old
+	// positive-only witness computation picked 1.0 (satisfying o1>0 but
+	// violating !(o1<2)), so the generated program left the synthesized
+	// strategy while reporting ok=true.
+	TEST_CASE("G(o1>0 && !(o1<2)): negative literal constrains the witness") {
+		auto sol = synth(
+			"G(o1[t]:qlt > {0}:qlt && !(o1[t]:qlt < {2}:qlt))");
+		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }
+		std::ostringstream os;
+		emit_cpp_program<node_t>(*sol, os);
+		std::string s = os.str();
+		CHECK(has(s, "double o1"));
+		REQUIRE(has(s, "o.o1 ="));
+		// Every emitted witness for o1 must be >= 2.
+		size_t pos = 0; bool any = false;
+		while ((pos = s.find("o.o1 = ", pos)) != std::string::npos) {
+			pos += 7;
+			double w = std::strtod(s.c_str() + pos, nullptr);
+			INFO("witness: " << w);
+			CHECK(w >= 2.0);
+			any = true;
+		}
+		CHECK(any);
+	}
+
 	TEST_CASE("G(o1:qlt > 1/4): emits double witness > 0.25") {
 		auto sol = synth("G(o1[t]:qlt > {1/4}:qlt)");
 		if (!sol) { MESSAGE("UNREALIZABLE/parse; skip"); return; }

@@ -128,26 +128,6 @@ tref repeat_once<node, step_t>::operator()(tref n) const {
 // operator|
 
 template <NodeType node, typename step_t>
-steps<repeat_each<node, step_t>, node> operator|(
-	const repeat_each<node, step_t>& l,
-	const repeat_each<node, step_t>& r)
-{
-	auto s = steps<node, repeat_each<node, step_t>>(l);
-	s.libraries.push_back(r);
-	return s;
-}
-
-template <NodeType node, typename step_t>
-steps<repeat_all<node, step_t>, node> operator|(
-	const repeat_all<node, step_t>& l,
-	const repeat_all<node, step_t>& r)
-{
-	auto s = steps<repeat_all<node, step_t>, node>(l);
-	s.libraries.push_back(r);
-	return s;
-}
-
-template <NodeType node, typename step_t>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,
 	const step_t& l)
 {
@@ -180,15 +160,6 @@ typename tree<node>::traverser operator|(
 {
 	using tt = typename tree<node>::traverser;
 	return n | tt::f(step<node>(l));
-}
-
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n,
-	const steps<step_t, node>& s)
-{
-	using tt = typename tree<node>::traverser;
-	return n | tt::f(s);
 }
 
 template <NodeType node, typename step_t>

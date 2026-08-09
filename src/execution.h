@@ -152,15 +152,9 @@ struct repeat_once {
 
 // (RR-4: to_steps deleted -- zero callers.)
 
-/** @brief Compose two `repeat_each` objects into a `steps` sequence. */
-template <NodeType node, typename step_t>
-steps<repeat_each<node, step_t>, node> operator|(
-	const repeat_each<node, step_t>& l, const repeat_each<node, step_t>& r);
-
-/** @brief Compose two `repeat_all` objects into a `steps` sequence. */
-template <NodeType node, typename step_t>
-steps<repeat_all<node, step_t>, node> operator|(
-	const repeat_all<node, step_t>& l, const repeat_all<node, step_t>& r);
+// (RR-1: the repeat_each|repeat_each and repeat_all|repeat_all compose
+// overloads were deleted -- their template arguments were swapped, so any
+// instantiation failed to compile, and nothing ever called them.)
 
 /** @brief Append a step to an existing `steps` sequence. */
 template <NodeType node, typename step_t>
@@ -182,10 +176,8 @@ template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& n, const rewriter::library& l);
 
-/** @brief Apply a `steps` object to a `tree<node>::traverser`. */
-template <NodeType node, typename step_t>
-typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n, const steps<step_t, node>& s);
+// (RR-1: the traverser|steps overload was deleted -- it took the swapped
+// steps<step_t, node> form no live steps object can match.)
 
 /** @brief Apply a `repeat_once` to a `tree<node>::traverser`. */
 template <NodeType node, typename step_t>

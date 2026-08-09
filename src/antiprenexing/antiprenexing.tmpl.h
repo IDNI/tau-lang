@@ -545,6 +545,14 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				// BDD leaves. Keeping them skip-matched routes them back
 				// through this same solver-first/blast_block path (a no-op
 				// once nothing is left to blast) instead.
+				// AN-4: the re-entry hardcodes the bv family, so a
+				// caller's COMPOUND skip (bv || arith_skip ||
+				// ref_skip_2, see eliminate_bv_and_quantifiers) does
+				// NOT survive this hop -- arith/ref reservations are
+				// dropped. Accepted contract gap: threading skip is
+				// non-trivial (two meanings, memo keys; see the
+				// resolve_ex_block NOTE), and normalizer.tmpl.h
+				// measures ref_skip as currently a no-op.
 				return anti_prenex_block<node>(blasted,
 					is_tref_bv_type_family<node>);
 			}
