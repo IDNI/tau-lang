@@ -217,7 +217,13 @@ struct CtlStarWitness {
 
 // Reduce a CTL* formula containing A/E quantifiers to an equivalent LTL
 // synthesis problem. Returns the reduced formula (pure LTL) and the set of
-// witness variables that must be added to the output set.
+// LT-23: the witness variables are SELF-CLASSIFYING -- they are built with
+// node::output_variable() (direction bit = output), so extract_data_atoms /
+// is_pure_input_atom already treat them as outputs and the only caller
+// (is_tau_formula_sat) rightly uses ltl_formula alone. Do NOT additionally
+// add `witnesses` to an output set; the vector is informational. Note the
+// names (`w_<n>`) have no `o` prefix, so classification rests entirely on
+// the direction bit.
 template <NodeType node>
 struct CtlStarReduction {
     tref ltl_formula;                    // reduced LTL formula

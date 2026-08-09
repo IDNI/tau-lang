@@ -881,6 +881,10 @@ inline std::set<int> zielonka_win_player1(const ProductGame& pg) {
 
 // ── Main Algorithm D entry point ──────────────────────────────────────────
 
+// PRECONDITION (LG-30): output-only qlt atoms. Nothing below guards this --
+// input atoms would silently produce garbage (the env branch never models
+// input choice). Callers must check atom_has_any_input first, as both
+// current callers (solve_ltl_aba, semantic_pwr_optimal) do.
 // Returns true if the formula is REALIZABLE via Algorithm D.
 // phi_star: propositional LTL with D_0,...,D_{K-1} as output propositions.
 // T1_size: |T_1|.
@@ -932,6 +936,7 @@ struct AlgDResult {
 	int init_rho = -1;                // winning initial ρ₀ (-1 if unrealizable)
 };
 
+// PRECONDITION (LG-30): output-only qlt atoms; see solve_algorithm_d above.
 inline AlgDResult solve_algorithm_d_full(
 	const std::string& phi_star,
 	int T1_size,

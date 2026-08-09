@@ -2,6 +2,10 @@
 
 // Heuristic picker between Algorithms A, B, C, and D (#6).
 //
+// LG-18 status: NOT YET WIRED into production -- the solve_ltl_aba dispatch
+// only handles TAU_LTL_ALG in {A, B, D}; the only current consumers of this
+// header are unit tests. Staged work.
+//
 // Given the formula's structural parameters (|T_1|, |T_2|, |T_3|, K=|Δ|,
 // |Q| from the DPA for the φ* skeleton), estimate the skeleton size each
 // algorithm would produce and return the smallest.  The picker runs in

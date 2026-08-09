@@ -2,6 +2,10 @@
 
 // Opt-6: decomposition by liveness (prune-then-solve).
 //
+// LG-18 status: NOT YET WIRED into production -- the solve_ltl_aba dispatch
+// only handles TAU_LTL_ALG in {A, B, D}; the only current consumers of this
+// header are unit tests. Staged work.
+//
 // If φ = G(ψ_safe) ∧ ⋀_j GF(ψ_j), split into:
 //   - safety_part:    the G(ψ_safe) invariant — it restricts the arena
 //                     (prune types violating ψ_safe before solving liveness).

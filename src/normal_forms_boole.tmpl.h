@@ -255,8 +255,11 @@ tref boole_normal_form(tref formula) {
 	// Step 1: Syntactically simplify formula
 	tref bnf = syntactic_formula_simplification<node>(formula);
 	DBG(LOG_DEBUG << "After syntactic_formula_simplification: " << LOG_FM(bnf) << "\n";)
-	// Squeeze and absorb for additional simplifications during term normalization
-	// -> causes mayor blow ups
+	// Squeeze and absorb for additional simplifications during term
+	// normalization. NF-16: kept deliberately -- an older note warned of
+	// major blow-ups here, but the current gates (510 tests incl. the
+	// anti-prenex block work) pass with it unconditional; if a blow-up
+	// reappears, this call is the first suspect.
 	bnf = squeeze_absorb<node>(bnf);
 	// Step 2: Traverse formula, simplify all encountered equations
 	auto simp_eqs = [](tref n) {

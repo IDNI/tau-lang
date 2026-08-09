@@ -2,6 +2,10 @@
 
 // Algorithm C (oracle-assisted abstract game) skeleton builder.
 //
+// LG-18 status: NOT YET WIRED into production -- the solve_ltl_aba dispatch
+// only handles TAU_LTL_ALG in {A, B, D}; the only current consumers of this
+// header are unit tests. Staged work.
+//
 // Given:
 //   - |T_1|               number of memory 1-types
 //   - K = |Δ|             number of data subformulas (D-propositions)

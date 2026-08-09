@@ -313,7 +313,14 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::build_bdd(tref f, const order& o) {
 			return bdd_not(build_bdd(tf.first(), o));
 		}
 		case tau::BDD_ID: {
-			// Get the BDD corresponding to the ID
+			// Get the BDD corresponding to the ID.
+			// TT1-29 invariant: U's keys are TYPED bf nodes; this
+			// plain get(bf, ...) key only matches because the
+			// construction hook propagates the child's ba_type up.
+			// If build_bdd ever runs inside a hooks-off scope
+			// (use_hooks_guard(false)), this lookup misses and the
+			// DBG-assert below fires (Release would fall back to
+			// treating the BDD as one opaque atom).
 			const auto& m = term_handle<node>::U;
 			auto it = m.find(tau::get(tau::bf, tau::trim_right_sibling(f)));
 			if (it != m.end()) {

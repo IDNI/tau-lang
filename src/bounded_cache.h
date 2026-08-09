@@ -2,6 +2,11 @@
 
 // bounded_cache — std::map with a configurable max-size bound.
 //
+// STATUS (TT2-13): still unintegrated — the only user is
+// tests/unit/test_bounded_cache.cpp. The create_cache adoption described
+// below has not happened yet; the unbounded-growth issue it targets
+// remains open at the normal_forms/satisfiability cache sites.
+//
 // Drop-in replacement for `std::map<K, V, Cmp>` at every call site
 // where the existing tau-ltl convention is:
 //

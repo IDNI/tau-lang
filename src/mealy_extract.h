@@ -2,6 +2,10 @@
 
 // Mealy-machine extraction from an Algorithm D parity-game winning set (#7).
 //
+// LG-18 status: NOT YET WIRED into production -- the solve_ltl_aba dispatch
+// only handles TAU_LTL_ALG in {A, B, D}; the only current consumers of this
+// header are unit tests. Staged work.
+//
 // Given the winning region W ⊆ T_1 (or T_1 × Q for product games) and a
 // per-vertex witness map recording which τ witnessed the CPre inclusion at
 // each step, build the concrete Mealy machine:

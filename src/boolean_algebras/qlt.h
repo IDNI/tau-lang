@@ -198,6 +198,11 @@ bool is_qlt_one(const qlt& x);
 qlt normalize_qlt(const qlt& x);
 tref simplify_qlt_symbol(tref sym);
 tref simplify_qlt_term(tref t);
+/// BA1-5 contract note: unlike sbf_splitter (which honors every
+/// splitter_type and always makes progress), this splitter ignores @p st
+/// and MAY RETURN @p x UNCHANGED when the element is atomic/degenerate
+/// (e.g. a singleton piece). Callers looping "split until proper subset"
+/// must guard against a fixpoint.
 qlt qlt_splitter(const qlt& x, splitter_type st);
 qlt qlt_splitter_one();
 

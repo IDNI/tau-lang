@@ -2,6 +2,10 @@
 
 // Static classifier for the GR(1) fragment (Opt-3).
 //
+// LG-18 status: NOT YET WIRED into production -- the solve_ltl_aba dispatch
+// only handles TAU_LTL_ALG in {A, B, D}; the only current consumers of this
+// header are unit tests. Staged work.
+//
 // A formula is in the GR(1) fragment (here, "simple GR(1)") when it is a
 // conjunction of:
 //   - zero or more G(φ_safe)     — safety invariants
