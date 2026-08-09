@@ -27,6 +27,7 @@ set(TESTS
 	nso_rr
 	product_ba
 	ref_variables_resolver
+	fixpoint_conjunct_split
 	sbf_ba_parsing
 	sbf_ba_splitter
 	tau_ba

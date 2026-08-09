@@ -18,6 +18,13 @@
 
 namespace idni::tau_lang {
 
+/// Check the fixpoint condition per top-level conjunct instead of once over the
+/// whole right-hand side. Semantically neutral: implication distributes over a
+/// conjunction on the right. Off by default; `api::set_fixpoint_conjunct_split`
+/// or the TAU_QE_FIXSPLIT environment variable enable it.
+inline bool fixpoint_conjunct_split = false;
+
+
 /**
  * @brief Instantiate @p original_fm for IO variables at @p time_point.
  * @tparam node Tree node type.

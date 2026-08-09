@@ -572,6 +572,43 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars, const int_
 
 /**
  * @internal
+ * @brief Fixpoint test `prev |= next`, checked per top-level conjunct.
+ *
+ * Implication distributes over a conjunction on the right:
+ *     phi |= psi_1 & ... & psi_n   <=>   for all i. phi |= psi_i
+ * This is an elementary equivalence and assumes nothing about the conjuncts.
+ * It matters because `is_nso_impl` closes the implication over its free
+ * variables and normalizes it, so the whole right-hand side reaches the Boole
+ * decomposition in one piece -- and that step is exponential in the atom count.
+ * Splitting replaces one decomposition over all atoms by n decompositions over
+ * a fraction of them each. Returns at the first conjunct that is not implied.
+ *
+ * Opt-in via `api::set_fixpoint_conjunct_split` or TAU_QE_FIXSPLIT; with the
+ * switch off, or when the right-hand side
+ * is not a conjunction, this is exactly the original single call.
+ * @endinternal
+ */
+template <NodeType node>
+bool fixpoint_reached(tref prev, tref next) {
+	using tau = tree<node>;
+	static const bool env_enabled = std::getenv("TAU_QE_FIXSPLIT") != nullptr;
+	if (!(fixpoint_conjunct_split || env_enabled))
+		return is_nso_impl<node>(prev, next);
+	trefs cs;
+	std::function<void(tref)> collect = [&](tref n) {
+		if (tau::get(n).child_is(tau::wff_and)) {
+			collect(tau::get(n)[0].first());
+			collect(tau::get(n)[0].second());
+		} else cs.push_back(n);
+	};
+	collect(next);
+	if (cs.size() < 2) return is_nso_impl<node>(prev, next);
+	for (tref c : cs) if (!is_nso_impl<node>(prev, c)) return false;
+	return true;
+}
+
+/**
+ * @internal
  * @brief Compute the unbounded (infinite-horizon) continuation of an
  * `always`-part `base_fm` by repeatedly unrolling one more time step and
  * checking for a fixpoint (`is_nso_impl(phi_prev, phi)`), i.e. the point at
@@ -633,7 +670,7 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	// tests/integration/test_integration-solver.cpp reach single digits), so
 	// this leaves a very wide margin while remaining finite.
 	constexpr int_t max_fixpoint_steps = 500;
-	while (step_num < lookback || !is_nso_impl<node>(phi_prev, phi)){
+	while (step_num < lookback || !fixpoint_reached<node>(phi_prev, phi)){
 		if (step_num >= max_fixpoint_steps) {
 			LOG_ERROR << "find_fixpoint_phi: exceeded " << max_fixpoint_steps
 				<< " steps without reaching a fixpoint, giving up";
@@ -711,7 +748,7 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	// SO-1: same unbounded-search concern, and the same reachable cap, as
 	// find_fixpoint_phi above.
 	constexpr int_t max_fixpoint_steps = 500;
-	while (step_num < lookback || !is_nso_impl<node>(chi_prev_replc, chi_replc))
+	while (step_num < lookback || !fixpoint_reached<node>(chi_prev_replc, chi_replc))
 	{
 		if (step_num >= max_fixpoint_steps) {
 			LOG_ERROR << "find_fixpoint_chi: exceeded " << max_fixpoint_steps

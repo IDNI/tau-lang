@@ -48,6 +48,11 @@ void api<node>::set_blasting(bool blasting) {
 }
 
 template <NodeType node>
+void api<node>::set_fixpoint_conjunct_split(bool state) {
+	fixpoint_conjunct_split = state;
+}
+
+template <NodeType node>
 void api<node>::set_indenting(bool indenting) {
 	pretty_printer_indenting = indenting;
 }

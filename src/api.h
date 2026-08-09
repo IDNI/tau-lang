@@ -120,6 +120,11 @@ struct api {
 	// -----------------------------------------------------------------------
 	/** @brief Enable/disable character variable mode. */
 	static void set_charvar(bool state);
+	/** @brief Check the fixpoint condition per top-level conjunct.
+	 *  Semantically neutral (implication distributes over a conjunction on
+	 *  the right); off by default. The TAU_QE_FIXSPLIT environment variable
+	 *  also enables it (read once). */
+	static void set_fixpoint_conjunct_split(bool state);
 	/** @brief Enable/disable BV blasting. */
 	static void set_blasting(bool state);
 	/** @brief Enable/disable indenting in pretty-printed output. */
