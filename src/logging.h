@@ -423,11 +423,12 @@ struct logging {
 	{
 		using namespace boost::log;
 		static std::unordered_map<std::string, channel_logger_type> loggers;
-		if (loggers.find(channel_name) == loggers.end())
-			loggers.emplace(channel_name,
-				channel_logger_type(
-					keywords::channel = channel_name));
-		return loggers[channel_name];
+		// TT2-25: one lookup, not three (this runs on every DEBUG
+		// LOG_DEBUG/LOG_TRACE statement).
+		return loggers.try_emplace(channel_name,
+			channel_logger_type(
+				keywords::channel = channel_name))
+			.first->second;
 	}
 
 private:

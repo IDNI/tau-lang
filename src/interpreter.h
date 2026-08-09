@@ -375,6 +375,9 @@ private:
 	/// @brief Build the input variable assignments required for step @p t.
 	std::pair<trefs, bool> build_inputs_for_step(const size_t t);
 
+	/** @brief Return `true` if a tau-typed `this` input stream is registered. */
+	bool has_this_input_stream() const;
+
 	/// @brief Update formula @p f to reflect time point @p t.
 	tref update_to_time_point(tref f, const int_t t);
 
@@ -427,6 +430,19 @@ template <NodeType node>
 tref unpack_tau_constant(tref constant);
 
 /**
+ * @brief Return `true` if @p fm contains a variable that must be quantified
+ * but appears free (io_var streams must be declared inputs/outputs;
+ * uninterpreted-constant names are allowed free).
+ *
+ * @tparam node Tree node type.
+ * @param fm Formula to check.
+ * @param silent Suppress the LOG_ERROR diagnostics naming the offenders.
+ * @return `true` if a disallowed free variable (or undeclared stream) exists.
+ */
+template <NodeType node>
+bool has_free_vars(tref fm, bool silent = false);
+
+/**
  * @brief Run a Tau specification for at most @p steps time steps.
  *
  * Builds an interpreter, then calls `step()` repeatedly until the spec is
@@ -445,4 +461,4 @@ std::optional<interpreter<node>> run(tref form,
 
 #include "interpreter.tmpl.h"
 
-# endif //__IDNI__TAU__INTERPRETER_H__
+#endif //__IDNI__TAU__INTERPRETER_H__

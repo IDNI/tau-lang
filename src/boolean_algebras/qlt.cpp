@@ -1,5 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
+#include <cctype> // BA1-6: isalpha/isalnum used below
 #include "qlt.h"
 
 namespace idni::tau_lang {

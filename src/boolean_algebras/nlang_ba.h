@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "tau_tree.h"
+#include "ba_constants.h"
 #include "splitter_types.h"
 #include "../parser/nlang_parser.generated.h"
 
@@ -365,23 +366,7 @@ requires BAsPack<BAs...>
 std::optional<typename node<BAs...>::constant_with_type> parse_nlang(
 	const std::string& src)
 {
-	std::string s = src;
-	s.erase(0, s.find_first_not_of(" \t\n\r"));
-	auto last = s.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) s = s.substr(0, last + 1);
-
-	// Strip surrounding braces
-	if (!s.empty() && s.front() == '{' && s.back() == '}')
-		s = s.substr(1, s.size() - 2);
-	s.erase(0, s.find_first_not_of(" \t\n\r"));
-	last = s.find_last_not_of(" \t\n\r");
-	if (last != std::string::npos) s = s.substr(0, last + 1);
-
-	// Strip surrounding quotes
-	if (s.size() >= 2 && s.front() == '"' && s.back() == '"')
-		s = s.substr(1, s.size() - 2);
-	else if (s.size() >= 2 && s.front() == '\'' && s.back() == '\'')
-		s = s.substr(1, s.size() - 2);
+	std::string s = strip_ba_constant_source(src, /*strip_quotes=*/true);
 
 	if (s.empty()) return {};
 

@@ -15,6 +15,7 @@
 
 
 #include "tau_tree.h"
+#include "ba_constants.h"
 #include "splitter_types.h"
 #include "../parser/qlt_parser.generated.h"
 
@@ -232,4 +233,4 @@ struct std::hash<idni::tau_lang::qlt> {
 
 #include "boolean_algebras/qlt.tmpl.h"
 
-#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT_BA_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__QLT_H__

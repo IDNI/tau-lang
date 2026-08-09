@@ -250,7 +250,8 @@ tref revise(tref phi, tref psi, tref psi_f, const int_t start_time) {
 			return build_wff_sometimes<node>(r_inner);
 		if (op_phi == temporal_op::F)
 			return build_wff_F<node>(r_inner);
-		return psi;
+		// LS-14: unreachable -- the guard admits only ALWAYS/SOMETIMES/F,
+		// each handled above.
 	}
 
 	// Case 3: Atom vs binary temporal — lift atom
@@ -457,11 +458,10 @@ tref pointwise_revision_temporal(
 		// Step 3: Recursive revision against best-matching update clause
 		tref best = nullptr;
 		for (tref uc : update_clauses) {
-				// Step 4: Clause selection — try same-structure match first
+			// Step 4: Clause selection — try same-structure match first
 			temporal_op op_sc = get_temporal_op<node>(sc);
 			temporal_op op_uc = get_temporal_op<node>(uc);
-			if (op_sc == op_uc && (is_binary_temporal(op_sc)
-			    || op_sc != temporal_op::NONE)) {
+			if (op_sc == op_uc && op_sc != temporal_op::NONE) {
 				best = uc;
 				break;
 			}
@@ -490,6 +490,11 @@ tref pointwise_revision_temporal(
 
 	// Step 5: Assemble and verify
 	// assembly = (∧ revised_clauses) ∧ update
+	// LS-14: an optimal-mode clause is θ = update ∧ G(Win), so `update`
+	// appears twice in the assembly for those. Harmless (idempotent
+	// conjunct) and kept: fast-revised clauses do need the update here,
+	// and semantic_pwr_optimal's θ-carries-update contract is load-bearing
+	// (see test_semantic_pwr.cpp LS-2/LS-16 suite).
 	tref assembly = update;
 	for (tref r : revised)
 		assembly = build_wff_and<node>(assembly, r);

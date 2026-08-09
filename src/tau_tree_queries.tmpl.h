@@ -29,7 +29,11 @@ bool is(tref n, std::initializer_list<size_t> nts) {
 	return false;
 }
 
-// factory method for is predicate
+// factory method for is predicate.
+// WARNING (TT1-21): the returned closure captures the initializer_list BY
+// VALUE, which is a VIEW over the caller's temporary backing array -- valid
+// only within the creating full-expression. Do NOT store the result; for a
+// storable predicate build it from a std::vector instead.
 template <NodeType node>
 inline std::function<bool(tref)> is(std::initializer_list<size_t> nts) {
 	return [nts](tref n) { return is<node>(n, nts); };
@@ -219,7 +223,6 @@ bool is_cli_cmd(tref n) {
 		tau::def_list_cmd,
 		tau::def_print_cmd,
 		tau::def_rr_cmd,
-		tau::def_list_cmd,
 		tau::def_input_cmd,
 		tau::def_output_cmd,
 		tau::history_print_cmd,
@@ -322,10 +325,7 @@ bool while_is_boolean_operation(tref n) {
 	return false;
 }
 
-/** @brief Return `true` if @p n is a quantified formula. */
-template <NodeType node>
-bool until_is_quantified(tref n) {
-	return is_quantifier<node>(n);
-}
+// (TT1-23: until_is_quantified deleted -- zero callers, zero tests.)
+
 
 } // namespace idni::tau_lang

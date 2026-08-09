@@ -5,7 +5,7 @@
  * @brief Union-find with intrusive linked-list sets for Tau formula terms.
  *
  * `union_find_with_sets<comp, node>` tracks disjoint sets of `tref` tree nodes,
- * supports path-compressed find, rank-ordered merge, and O(n) iteration over
+ * supports path-compressed find, comparator-ordered merge (no rank bookkeeping; TT2-19), and O(n) iteration over
  * each set via a `next`-pointer ring — all keyed by structural identity.
  */
 

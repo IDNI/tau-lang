@@ -37,7 +37,6 @@ tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
 	case tau::bf_interval:      return wff_interval(v, ch, len, r);
 	default: return tau::get_raw(v, ch, len, r);
 	}
-	return nullptr;
 }
 
 template <NodeType node>
@@ -289,7 +288,6 @@ template <NodeType node>
 tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
@@ -379,7 +377,6 @@ template <NodeType node>
 tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neq", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) {
@@ -406,7 +403,7 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 		&& arg2(ch).is(tau::bf_f))
 	{
 		HOOK_LOGGING(applied("{c} != 0 ::= T or F");)
-		return tau::get(wff_neq_cte(v, ch, len, r), r);
+		return wff_neq_cte(v, ch, len, r);
 	}
 	//RULE(BF_DEF_SIMPLIFY_N, "{c} != 1 ::= T or F")
 	if (arg1(ch).is_ba_constant() && arg1(ch).get_ba_type() > 0

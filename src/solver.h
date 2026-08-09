@@ -62,7 +62,7 @@ using equations = subtree_set<node>;
 
 /**
  * @typedef equation_system
- * @brief Alias for a pair consisting of an optional equality and a set of inequalities.
+ * @brief Alias for a pair consisting of an optional equality and a system of minterm inequalities.
  */
 template<NodeType node>
 using equation_system = std::pair<std::optional<equality>,
@@ -70,14 +70,14 @@ using equation_system = std::pair<std::optional<equality>,
 
 /**
  * @typedef inequality_system
- * @brief Alias for a set of inequalities.
+ * @brief Alias for a system of minterm inequalities.
  */
 template<NodeType node>
 using inequality_system = subtree_set<node>;
 
 /**
  * @typedef minterm_system
- * @brief Alias for a set of inequalities.
+ * @brief Alias for a system of minterm inequalities.
  */
 template<NodeType node>
 using minterm_system = subtree_set<node>;
@@ -113,7 +113,7 @@ struct solver_options {
 /**
  * @brief Finds a solution for the given equality.
  *
- * @tparam BAs Variadic template parameters.
+ * @tparam node Tree node type.
  * @param eq The equality to solve.
  * @return An optional solution.
  */
@@ -123,7 +123,7 @@ std::optional<solution<node>> find_solution(equality eq);
 /**
  * @brief Solves the given equality using LGRS algorithm.
  *
- * @tparam BAs Variadic template parameters.
+ * @tparam node Tree node type.
  * @param equality The equality to solve.
  * @return An optional solution.
  */
@@ -133,7 +133,7 @@ std::optional<solution<node>> lgrs(equality equality);
 /**
  * @brief Solves the given minterm system.
  *
- * @tparam BAs Variadic template parameters.
+ * @tparam node Tree node type.
  * @param system The minterm system to solve.
  * @param options The solver options.
  * @return An optional solution.
@@ -145,7 +145,7 @@ std::optional<solution<node>> solve_minterm_system(
 /**
  * @brief Solves the given inequality system.
  *
- * @tparam BAs Variadic template parameters.
+ * @tparam node Tree node type.
  * @param system The inequality system to solve.
  * @param options The solver options.
  * @return An optional solution.
@@ -157,7 +157,7 @@ std::optional<solution<node>> solve_inequality_system(
 /**
  * @brief Solves the given equation system.
  *
- * @tparam BAs Variadic template parameters.
+ * @tparam node Tree node type.
  * @param system The equation system to solve.
  * @param options The solver options.
  * @return An optional solution.
@@ -169,7 +169,7 @@ std::optional<solution<node>> solve_system(
 /**
  * @brief Solves the given set of equations.
  *
- * @tparam BAs Variadic template parameters.
+ * @tparam node Tree node type.
  * @param eqs The set of equations to solve.
  * @param options The solver options.
  * @return An optional solution.
@@ -209,7 +209,7 @@ tref var, tref term);
 /**
  * @brief Solves the given tau form.
  *
- * @tparam BAs Variadic template parameters.
+ * @tparam node Tree node type.
  * @param form The tau form to solve.
  * @param options The solver options.
  * @param error Reports if a clause is found that is not supported within solving
@@ -218,17 +218,7 @@ tref var, tref term);
 template <NodeType node>
 std::optional<solution<node>> solve(tref form, solver_options options, bool& error);
 
-/**
- * @brief Solves the given tau forms.
- *
- * @tparam BAs Variadic template parameters.
- * @param forms The tau forms to solve.
- * @param options The solver options.
- * @param error Reports if a clause is found that is not supported within solving
- * @return An optional solution.
- */
-template <NodeType node>
-std::optional<solution<node>> solve(const trefs& forms, solver_options options, bool& error);
+// (SO-7: trefs overload deleted -- zero callers.)
 
 } // namespace idni::tau_lang
 

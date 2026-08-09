@@ -121,21 +121,8 @@ static std::pair<std::string, int> spawn_capture(
 	return {out, exit_code};
 }
 
-// Legacy shim kept for the few sites still passing a pre-built shell
-// command line (autfilt --dot, ltlfilt -f).  These paths will be migrated
-// in a follow-up; for now they incur the popen-shell cost only on rarely-
-// hit fallbacks.
-static std::pair<std::string, int> run_cmd(const std::string& cmd) {
-	std::array<char, 4096> buf;
-	std::string result;
-	FILE* raw = popen(cmd.c_str(), "r");
-	if (!raw) throw std::runtime_error("popen() failed for: " + cmd);
-	while (fgets(buf.data(), static_cast<int>(buf.size()), raw))
-		result += buf.data();
-	int status = pclose(raw);
-	int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-	return {result, exit_code};
-}
+// (LS-21: the legacy popen-shell `run_cmd` shim was removed once its last
+// caller, the strategy dot export, moved to write_tempfile + spawn_capture.)
 
 // Write `content` to a fresh /tmp/<prefix>_XXXXXX path.  Caller owns
 // removal.  Returns the absolute path on success, "" on failure.
@@ -276,11 +263,12 @@ inline std::pair<bool, std::string> call_ltlsynt(
 				std::fprintf(stderr, "=== STRATEGY HOA ===\n%s\n", hoa.c_str());
 			} else if (fmt == "dot") {
 				// Pipe HOA through autfilt --dot if available; else fall back to HOA.
-				std::string tmp = "/tmp/tau_strategy_" + std::to_string(::getpid()) + ".hoa";
-				if (FILE* f = std::fopen(tmp.c_str(), "w")) {
-					std::fwrite(hoa.data(), 1, hoa.size(), f);
-					std::fclose(f);
-					auto [dot, rc] = run_cmd("autfilt --dot " + tmp + " 2>/dev/null");
+				// LS-21: mkstemp-style tempfile + argv spawn (no
+				// predictable /tmp name, no shell string concat).
+				std::string tmp = write_tempfile("tau_strategy", hoa);
+				if (!tmp.empty()) {
+					auto [dot, rc] = spawn_capture(
+					    {"autfilt", "--dot", tmp}, timeout_sec);
 					std::remove(tmp.c_str());
 					if (rc == 0 && !dot.empty())
 						std::fprintf(stderr, "=== STRATEGY DOT ===\n%s\n", dot.c_str());

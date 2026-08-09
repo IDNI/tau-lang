@@ -275,6 +275,9 @@ inline std::optional<std::vector<cube>> to_dnf(
 
 } // namespace hoa_guard
 
+/// Evaluate a HOA guard label under an AP assignment. Bit `i` of
+/// @p bitmask is the truth value of AP index `i` (the convention used by
+/// build_product_game's 2^n_aps assignment loops and by the tests).
 inline bool eval_guard(const std::string& guard, int bitmask, int n_aps) {
 	size_t i = 0;
 	return hoa_guard::eval(guard, i, bitmask, n_aps);
@@ -467,6 +470,8 @@ struct ProductGame {
 	std::vector<std::vector<int>> succs;
 };
 
+/// Parse the disjunct index N from a `d_N` atomic-proposition name.
+/// Returns -1 if @p ap is not a `d_` AP.
 inline int d_index_from_ap_name(const std::string& ap) {
 	if (ap.size() <= 2 || ap[0] != 'd' || ap[1] != '_') return -1;
 	int idx = 0;
@@ -477,6 +482,9 @@ inline int d_index_from_ap_name(const std::string& ap) {
 	return idx;
 }
 
+/// Project an AP assignment (bit `i` = truth of AP index `i`) onto the
+/// controllable `d_N` APs: bit `N` of the result is set iff `d_N` is true
+/// in @p assignment. @p K bounds the accepted disjunct indices.
 inline int d_pattern_from_assignment(const SynthGame& G, int assignment, int K) {
 	int pat = 0;
 	for (int ap = 0; ap < (int)G.aps.size(); ++ap) {

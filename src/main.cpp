@@ -90,7 +90,7 @@ int run_tau_spec(string spec_file, cli::options& opts) {
 	} else {
 		DBG(TAU_LOG_TRACE << "open file: " << spec_file;)
 		std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
-		if (!ifs) return error("Cannot open file " + spec_file);
+		if (!ifs) return result(error("Cannot open file " + spec_file));
 		auto l = ifs.tellg();
 		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}

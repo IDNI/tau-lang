@@ -72,7 +72,7 @@ struct QltType1 {
 	bool greater_than(int j) const {
 		const int hp = pos >> 1;
 		// interval (c_{i-1}, c_i): x > c_j iff i-1 >= j, equivalently i > j.
-		return is_point() ? hp > j : hp > j;
+		return hp > j; // BA2-14: both ternary branches were identical
 	}
 
 	Rat realize() const {

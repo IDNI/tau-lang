@@ -303,12 +303,13 @@ std::ostream& tree<node>::dump(std::ostream& os, tref n, bool subtree) {
 //------------------------------------------------------------------------------
 // print
 
-// Find the smallest number n such that "bm" for all m > n does not occur
-// as a variable name
+// Return the largest n such that "bn" occurs as a variable name (0 when
+// none does); callers derive fresh names from id + 1 (TT2-17: the old
+// comment promised max+1 while the code returns max)
 template <NodeType node>
 int_t get_max_var_name_b_id(tref fm) {
 	// Find all occurrences of bn where n is some number in fm
-	// and return the maximal n + 1
+	// and return the maximal such n
 	using tau = tree<node>;
 	auto is_number = [](const std::string& s) {
 		if (s.empty()) return false;
@@ -713,7 +714,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 		switch (pnt) {
 			case bf_and:
-				if (type_printed || isdigit(last_written_char)
+				if (type_printed || isdigit(static_cast<unsigned char>(last_written_char))
 					|| t.child_is(tau::ba_constant)) {
 					out(" ");
 				}

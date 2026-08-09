@@ -669,8 +669,6 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	// Builder API (tau_tree_builders.tmpl.h)
 	// -----------------------------------------------------------------------
 
-	/** @brief Apply rewriter builder @p b to nodes @p n. */
-	static tref apply_builder(const rewriter::builder& b, trefs n);
 
 	/** @brief Return the BA zero constant for type @p type_id. */
 	static tref _0(size_t type_id);
@@ -711,16 +709,25 @@ struct tree : public lcrs_tree<node>, public tau_parser_nonterminals,
 	/** @brief Build `always n`. */
 	static tref build_wff_always(tref n);
 	// CTL* path quantifiers
+	/** @brief Build CTL* `A n` — n holds on ALL paths. */
 	static tref build_wff_A(tref n);
+	/** @brief Build CTL* `E n` — n holds on SOME path. */
 	static tref build_wff_E(tref n);
-	// semantic negation (strategy-level)
+	/** @brief Build `-n` — strategy-level semantic negation (role swap
+	 * at the synthesis layer, not Boolean negation). */
 	static tref build_wff_semantic_neg(tref n);
 	// LTL(ABA) operators
+	/** @brief Build `F n` — finally/eventually. */
 	static tref build_wff_F(tref n);
+	/** @brief Build `l U r` — strong until (r must eventually hold). */
 	static tref build_wff_U(tref l, tref r);
+	/** @brief Build `l R r` — release (r holds up to and incl. first l). */
 	static tref build_wff_R(tref l, tref r);
+	/** @brief Build `l W r` — weak until (like U, but r may never hold). */
 	static tref build_wff_W(tref l, tref r);
+	/** @brief Build `l S r` — since (past: r held once, l ever since). */
 	static tref build_wff_S(tref l, tref r);
+	/** @brief Build `l T r` — trigger (past dual of S). */
 	static tref build_wff_T(tref l, tref r);
 	/** @brief Build `x ? y : z` conditional. */
 	static tref build_wff_conditional(tref x, tref y, tref z);
@@ -1162,9 +1169,7 @@ bool while_is_boolean_operation(tref n);
 template <NodeType node>
 bool while_is_formula(tref n);
 
-/** @brief Return `true` if @p n is a quantified formula. */
-template <NodeType node>
-bool until_is_quantified(tref n);
+// (TT1-23: until_is_quantified deleted -- zero callers, zero tests.)
 
 /** @brief Return `true` if @p n is a non-boolean term. */
 template <NodeType node>

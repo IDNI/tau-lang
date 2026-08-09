@@ -28,6 +28,11 @@
 //                          default path, and is reported with a warning.
 //                          Pure-output qlt formulas take Algorithm A
 //                          unconditionally, whatever this is set to.
+//                          Note (LS-20): an EXPLICIT `B` is not a no-op
+//                          relative to unset -- it additionally enables the
+//                          polarity-complete pairwise constraint pass in
+//                          normalization (unset only defaults the gate in
+//                          the builders).
 //   TAU_LTL_TIMEOUT_SEC=N   Synthesis wall-clock timeout in seconds (default 60)
 //   TAU_LTL_EXPORT_STRATEGY=hoa|dot  Print synthesized strategy to stderr
 //   TAU_LTL_EXPORT_STRATEGY_FILE=<path>  Write strategy HOA to file

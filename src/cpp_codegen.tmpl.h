@@ -413,14 +413,16 @@ void emit_cpp_program_data(
 	}
 
 	// Inputs struct: input props remain bool (caller evaluates condition).
+	// LG-29: `i_`-prefixed like the prop emitter's label_aps naming, so a
+	// spec moving between the pure-prop and data paths keeps its ABI.
 	out << "\tstruct Inputs {\n";
 	for (auto& prop : sol.input_props) {
 		auto it = ameta.find(prop);
 		if (it != ameta.end() && it->second.kind == AtomKind::INPUT_QLT)
-			out << "\t\tbool " << sanitize(prop) << " = false;"
+			out << "\t\tbool i_" << sanitize(prop) << " = false;"
 			    << "  // qlt: evaluate '" << prop << "' condition on your input value\n";
 		else
-			out << "\t\tbool " << sanitize(prop) << " = false;\n";
+			out << "\t\tbool i_" << sanitize(prop) << " = false;\n";
 	}
 	out << "\t};\n\n";
 
@@ -496,7 +498,7 @@ void emit_cpp_program_data(
 					if (!is_in) continue;
 					if (any) ig << " && ";
 					if (!positive) ig << "!";
-					ig << "in." << sanitize(prop);
+					ig << "in.i_" << sanitize(prop);
 					any = true;
 				}
 				in_guard = any ? ig.str() : "true";
@@ -990,15 +992,11 @@ void emit_cpp_program_open(
 		if (m.kind != AtomKind::BOOL) has_data = true;
 	}
 
-	if (has_data) {
-		// V1 limitation: data-bearing emit_cpp_program_open routes
-		// through the prop emit. The chosen open-stream values are
-		// announced via registration but actual per-step dispatch
-		// is V2 work.
-		emit_cpp_program_open_prop(sol.aut, sol.input_props,
-			sol.output_props, open_streams, out, class_name);
-		return;
-	}
+	// V1 limitation (LG-17): data-bearing specs route through the
+	// prop-only emitter -- per-step data dispatch is V2 work. Emit the
+	// promised warning instead of a silent no-op branch.
+	if (has_data) TAU_LOG_WARNING << "[codegen] open-stream emitter: spec has "
+		"data atoms; V1 emits propositional dispatch only";
 
 	emit_cpp_program_open_prop(sol.aut, sol.input_props, sol.output_props,
 		open_streams, out, class_name);

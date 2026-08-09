@@ -26,6 +26,10 @@ rr_sig get_rr_sig(tref n) {
 
 template <NodeType node>
 tref resolve_io_vars(io_context<node>& ctx, tref fm) {
+	// Classification (TT2-21, public contract): a stream registered in
+	// ctx.inputs/outputs wins; otherwise the NAME HEURISTIC applies --
+	// first char 'i' or the name "this" -> input; first char 'o' or the
+	// name "u" -> output; anything else stays unresolved.
 	LOG_TRACE << "resolve_io_vars - fm: " << LOG_FM_DUMP(fm);
 	using tau = tree<node>;
 	auto resolve = [&ctx](tref n) {
@@ -687,28 +691,12 @@ trefs get_free_vars_appearance_order(tref expression) {
 	return free_vars;
 }
 
-// Collects all free appearances of variables that are in bound representation
-// This can happen for example in subformulas
-template <NodeType node>
-trefs get_free_bound_vars(tref expression) {
-	using tau = tree<node>;
-	auto is_number = [](const std::string& s) {
-		if (s.empty()) return false;
-		for (const unsigned char c : s) if (!std::isdigit(c)) return false;
-		return true;
-	};
-	const trefs& free_vars = get_free_vars<node>(expression);
-	trefs bound_vars;
-	for (tref fv : free_vars) {
-		const tau& fv_t = tau::get(fv);
-		if (fv_t[0].is(tau::var_name) && is_number(fv_t[0].get_string()))
-			bound_vars.push_back(fv);
-	}
-	return bound_vars;
-}
+// (TT2-10: get_free_bound_vars deleted -- zero callers, zero tests.)
 
-// A formula has a temporal variable if either it contains an io_var with a variable or capture
-// or it contains a flag
+
+// A formula "has a temporal variable" if it contains ANY io_var (including
+// constant positions -- TT2-18: the old comment claimed variable/capture
+// positions only) or, when no io_var exists, a constraint flag.
 template <NodeType node>
 bool has_temp_var(tref fm) {
 	using tau = tree<node>;

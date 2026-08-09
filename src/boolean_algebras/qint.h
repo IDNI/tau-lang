@@ -10,6 +10,7 @@
 #include <functional>
 
 #include "tau_tree.h"
+#include "ba_constants.h"
 #include "splitter_types.h"
 #include "../parser/qint_parser.generated.h"
 

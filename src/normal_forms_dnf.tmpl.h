@@ -205,8 +205,10 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 		}
 
 		auto it = dnf.find(fm_simp);
+		// NF-14: p != 0 always here (the p == 0 arm returned above), so
+		// the vector size is simply 1.
 		if (it == dnf.end()) return dnf.emplace(fm_simp,
-				std::vector(p == 0 ? 0 : 1, i)), report(false);
+				std::vector(1, i)), report(false);
 		else if (!reduce_paths(i, it->second, p)) {
 			// Place coefficient together with variable assignment if no reduction happend
 			it->second.push_back(i);
@@ -254,7 +256,8 @@ template <NodeType node>
 tref bf_reduced_dnf(tref fm, bool make_paths_disjoint) {
 	using tau = tree<node>;
 	LOG_TRACE << "bf_boole_normal_form: " << LOG_FM(fm);
-	static auto trace = [&](tref fm) {
+	// NF-13: not static -- a static [&] lambda dangles on later calls.
+	auto trace = [&](tref fm) {
 		LOG_TRACE << "bf_boole_normal_form result: " << LOG_FM(fm);
 		return fm;
 	};
@@ -378,42 +381,8 @@ typename tree<node>::traverser operator|(
 // 	return fm.has_value() ? r(fm.value()) : std::optional<tref>{};
 // }
 
-inline bool is_contained_in(const std::vector<int_t>& i, auto& paths) {
-	// Check if there is a containment of i in any path of paths
-	for (auto& path : paths) {
-		bool is_contained = true, is_i_smaller,
-			containment_dir_known = false;
-		for (int_t k = 0; k < (int_t)i.size(); ++k) {
-			if (i[k] == path[k]) continue;
-			else if (i[k] == 2) {
-				if (containment_dir_known) {
-					if (!is_i_smaller) {
-						is_contained = false; break; }
-				} else {
-					containment_dir_known = true;
-					is_i_smaller = true;
-				}
-			}
-			else if (path[k] == 2) {
-				if (containment_dir_known) {
-					if (is_i_smaller) {
-						is_contained = false; break; }
-				} else {
-					containment_dir_known = true;
-					is_i_smaller = false;
-				}
-			}
-			else if (i[k] != path[k]) {is_contained = false; break;}
-		}
-		if (is_contained) {
-			if (is_i_smaller) {
-				// keep i and delete current path
-				path = {};
-			} else return true;
-		}
-	}
-	return false;
-}
+// (NF-7: is_contained_in deleted -- zero callers.)
+
 
 template <NodeType node>
 std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
@@ -608,112 +577,8 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_reduced(tref fm,
 	return std::make_pair(std::move(paths), std::move(vars));
 }
 
-template <NodeType node>
-tref group_dnf_expression(tref fm) {
-	using tau = tree<node>;
-#ifdef TAU_CACHE
-	using cache_t = subtree_unordered_map<node, tref>;
-	static cache_t& cache = tau::template create_cache<cache_t>();
-	if (auto it = cache.find(fm); it != end(cache)) return it->second;
-#endif // TAU_CACHE
-	LOG_DEBUG << "Begin group_dnf_expression";
-	LOG_DEBUG << "Expression to factor:" << LOG_FM(fm);
-	auto count_common = [](const auto& v1, const auto& v2) {
-		int_t count = 0;
-		auto it1 = begin(v1);
-		auto it2 = begin(v2);
-		while (it1 != end(v1) && it2 != end(v2))
-        		if (*it1 < *it2) ++it1;
-        		else {
-				if (!(*it2 < *it1)) ++count, ++it1;
-                		++it2;
-			}
-		return count;
-	};
+// (NF-7: group_dnf_expression deleted -- zero callers.)
 
-	bool wff = tau::get(fm).is(tau::wff);
-	size_t type_id = wff ? 0 : find_ba_type<node>(fm);
-	auto clauses = wff ? get_dnf_wff_clauses<node>(fm)
-			   : get_dnf_bf_clauses<node>(fm);
-	if (clauses.size() < 2) {
-		LOG_TRACE << "group_dnf_expression result: " << LOG_FM(fm);
-#ifdef TAU_CACHE
-		return cache.emplace(fm, fm).first->second;
-#endif // TAU_CACHE
-		return fm;
-	}
-
-	std::vector<trefs> atoms_of_clauses;
-	for (tref clause : clauses) {
-		auto atoms = wff ? get_cnf_wff_clauses<node>(clause)
-				 : get_cnf_bf_clauses<node>(clause);
-		if(wff) std::ranges::sort(atoms);
-		else std::ranges::sort(atoms, lex_var_comp<node>);
-		atoms_of_clauses.emplace_back(std::move(atoms));
-	}
-	tref grouped_fm = wff ? tau::_F() : tau::_0(type_id);
-	for (int_t i = 0; i < (int_t) atoms_of_clauses.size(); ++i) {
-		std::pair max_common = { 0,0 };
-		for (size_t j = i + 1; j < atoms_of_clauses.size(); ++j) {
-			int_t count = count_common(atoms_of_clauses[i],
-							atoms_of_clauses[j]);
-			if (count > max_common.second) {
-				max_common.first = j;
-				max_common.second = count;
-			}
-		}
-		if (max_common.first == 0) {
-			auto atoms = wff
-				? tau::build_wff_and(atoms_of_clauses[i])
-				: tau::build_bf_and(atoms_of_clauses[i]);
-			grouped_fm = wff
-				? tau::build_wff_or(grouped_fm, atoms)
-				: tau::build_bf_or(grouped_fm, atoms);
-			continue;
-		}
-		trefs common;
-		std::ranges::set_intersection(atoms_of_clauses[i],
-					atoms_of_clauses[max_common.first],
-					back_inserter(common));
-
-		tref cl1 = wff ? tau::_T() : tau::_1(type_id);
-		tref cl2 = wff ? tau::_T() : tau::_1(type_id);
-		size_t p = 0;
-		for (tref atom : atoms_of_clauses[i]) {
-			if (p < common.size() && tau::get(common[p])
-							== tau::get(atom)) ++p;
-			else cl1 = wff ? tau::build_wff_and(cl1, atom)
-				       : tau::build_bf_and(cl1, atom);
-		}
-		p = 0;
-		for (tref atom : atoms_of_clauses[max_common.first]) {
-			if (p < common.size() && tau::get(common[p])
-							== tau::get(atom)) ++p;
-			else cl2 = wff ? tau::build_wff_and(cl2, atom)
-				       : tau::build_bf_and(cl2, atom);
-		}
-		// We need the canonical order for the reduction in "group_paths_and_simplify"
-		if (!lex_var_comp<node>(cl1, cl2)) std::swap(cl1, cl2);
-		tref grouped = wff ? tau::build_wff_or(cl1, cl2)
-				   : tau::build_bf_or(get_dnf_bf_clauses<node>(
-					to_dnf<node, false>(
-						tau::build_bf_or(cl1, cl2))));
-
-		common.emplace_back(std::move(grouped));
-		atoms_of_clauses[i] = std::move(common);
-		atoms_of_clauses.erase(atoms_of_clauses.begin()
-							+ max_common.first);
-		--i;
-	}
-	assert(grouped_fm != nullptr);
-#ifdef TAU_CACHE
-	cache.emplace(grouped_fm, grouped_fm);
-	return cache.emplace(fm, grouped_fm).first->second;
-#endif // TAU_CACHE
-	LOG_DEBUG << "End group_dnf_expression";
-	LOG_DEBUG << "Factored expression: " << LOG_FM(grouped_fm);
-	return grouped_fm;
-}
 
 // Assume that fm is in DNF (or CNF -> set is_cnf to true)
 template<NodeType node, bool is_cnf>

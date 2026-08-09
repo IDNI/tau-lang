@@ -265,7 +265,6 @@ template <NodeType node>
 tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_lt", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_LESS_SIMPLIFY_20, "0 < 1 ::= T.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
@@ -336,7 +335,6 @@ template <NodeType node>
 tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_nlt", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NLESS_SIMPLIFY_20, "0 !< 1 ::= F.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
@@ -422,7 +420,6 @@ template <NodeType node>
 tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_lteq", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_LESS_EQUAL_SIMPLIFY_2, "0 <= 1 ::= T.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
@@ -507,7 +504,6 @@ template <NodeType node>
 tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_nlteq", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NLEQ_SIMPLIFY_2, "0 !<= 1 ::= F.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) {
@@ -575,7 +571,6 @@ template <NodeType node>
 tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_gt", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_GREATER_SIMPLIFY_2, "1 > 0 ::= T.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
@@ -645,7 +640,6 @@ template <NodeType node>
 tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_ngt", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NGREATER_SIMPLIFY_2, "1 !> 0 ::= F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
@@ -715,7 +709,6 @@ template <NodeType node>
 tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_gteq", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_GREATER_EQUAL_SIMPLIFY_2, "1 >= 0 ::= T.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {
@@ -783,7 +776,6 @@ template <NodeType node>
 tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_ngteq", v, ch, len, r);)
 
-	// if (check_type_mismatch(ch)) return tau::get_raw(v, ch, len, r);
 
 	//RULE(BF_NGEQ_SIMPLIFY_2, "1 !>= 0 ::= F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) {

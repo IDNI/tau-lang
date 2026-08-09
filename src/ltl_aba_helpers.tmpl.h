@@ -37,22 +37,6 @@ static bool is_temporal_op(tref n) {
 	    || nt == tau::wff_E;
 }
 
-// Maximum temporal nesting depth of a formula (G/F/U/R/W/S count as one level each).
-// Used to guard against stack-overflow or runaway synthesis on deeply nested formulas.
-template <NodeType node>
-static int ltl_nesting_depth(tref n, int depth = 0) {
-	using tau = tree<node>;
-	const auto& t = tau::get(n);
-	if (!t.has_child()) return depth;
-	int this_depth = is_temporal_op<node>(n) ? depth + 1 : depth;
-	const auto& op = t[0];
-	int max_child = this_depth;
-	for (size_t i = 0; i < op.children_size(); ++i)
-		max_child = std::max(max_child,
-		                     ltl_nesting_depth<node>(op.child(i), this_depth));
-	return max_child;
-}
-
 // True if `n` is one of the ABA comparison predicates (bf_eq, bf_neq, …)
 template <NodeType node>
 static bool is_aba_comparison(tref n) {
@@ -231,11 +215,14 @@ static std::string skeleton_wff(
 		return "(" + skeleton_str<node>(inner.first(), atoms)
 		     + " W " + skeleton_str<node>(inner.second(), atoms) + ")";
 	case tau::wff_S:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " S " + skeleton_str<node>(inner.second(), atoms) + ")";
 	case tau::wff_T:
-		return "(" + skeleton_str<node>(inner.first(), atoms)
-		     + " T " + skeleton_str<node>(inner.second(), atoms) + ")";
+		// LT-12: past operators are not supported by ltlsynt; every
+		// ltl_skeleton call site is gated on !has_past, so this is
+		// unreachable. Fail loudly instead of emitting a formula
+		// ltlsynt would silently reject as UNREALIZABLE.
+		LOG_ERROR << "skeleton_str: past operator (S/T) reached the "
+			"non-tester LTL skeleton";
+		return "0";
 	case tau::wff_rimply:
 		return "(" + skeleton_str<node>(inner.second(), atoms)
 		     + " -> " + skeleton_str<node>(inner.first(), atoms) + ")";

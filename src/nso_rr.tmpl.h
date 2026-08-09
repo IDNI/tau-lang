@@ -117,14 +117,10 @@ struct fixed_point_transformer {
 			if (!fp) return nullptr;
 			return changes.emplace(n, fp).first->second;
 		}
-		bool changed = false;
-		trefs ch;
-		if (changes.contains(ref))
-			changed = true, ch.push_back(changes[ref]);
-		else ch.push_back(ref);
-		auto nn = tau::get(t.value, ch);
-		if (changed) changes[n] = nn;
-		return nn;
+		// RR-6: `changes` is only ever keyed by the parent nodes, so
+		// the old contains(ref) propagation branch here was dead --
+		// the rebuild always returned the identical canonical node.
+		return n;
 	}
 
 	tref get_fallback(type nt, tref ref) {

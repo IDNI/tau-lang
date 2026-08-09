@@ -211,38 +211,11 @@ tref semantic_pwr_optimal(tref clause, tref update, const int_t start_time) {
 		return nullptr;
 	}
 
-	// Compute D-bitmask for each T3 type.
-	std::vector<int> type_A(T3.size(), 0);
-	for (int i = 0; i < K; ++i) {
-		for (int t = 0; t < (int)T3.size(); ++t) {
-			auto h = qlt_atom_holds_in_type3<node>(
-				atoms[i].first, T3[t], constants);
-			if (h != false) type_A[t] |= (1 << i);
-		}
-	}
-
-	// Build propositional skeleton φ*(D_i).
-	std::string phi_star = ltl_skeleton<node>(clause_and_update, atoms);
-	for (int i = K; i-- > 0; ) {
-		std::string fp = "p" + std::to_string(i);
-		std::string td = "d_" + std::to_string(i);
-		size_t pos = 0;
-		while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
-			size_t end = pos + fp.size();
-			bool l_ok = pos == 0
-				|| (!std::isalnum((unsigned char)phi_star[pos-1])
-				    && phi_star[pos-1] != '_');
-			bool r_ok = end >= phi_star.size()
-				|| (!std::isalnum((unsigned char)phi_star[end])
-				    && phi_star[end] != '_');
-			if (l_ok && r_ok) {
-				phi_star.replace(pos, fp.size(), td);
-				pos += td.size();
-			} else {
-				pos = end;
-			}
-		}
-	}
+	// Compute D-bitmask for each T3 type and build the propositional
+	// skeleton φ*(D_i) (LS-12: shared helpers in ltl_aba_builders.tmpl.h).
+	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
+	std::string phi_star = rename_skeleton_props_to_d(
+		ltl_skeleton<node>(clause_and_update, atoms), K);
 
 	LOG_DEBUG << "[semantic_pwr] trying optimal mode: K=" << K
 	          << " T1=" << T1_size << " phi_star=" << phi_star;

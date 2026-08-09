@@ -83,11 +83,8 @@ struct bdd_handle {
 	inline static std::map<B, std::shared_ptr<bdd_handle>> Mb;
 	inline static hbdd<B, o> htrue, hfalse;
 
-	// nonworking hack to call init
-	template<typename T, T> struct dummy_type {};
-	typedef dummy_type<mn_type&, Mn> dummy_mn_type;
-	typedef dummy_type<mb_type&, Mb> dummy_mb_type;
-	static bool dummy;
+	// (BA1-25: never-defined `static bool dummy` init hack removed;
+	// initialization happens via bdd<B, o>::initializer.)
 
 //	bdd_handle();
 	auto operator<=>(const bdd_handle&) const = default;
@@ -300,11 +297,8 @@ struct bdd_handle<Bool, o> {
 	inline static std::map<Bool, std::shared_ptr<bdd_handle>> Mb;
 	inline static hbdd<Bool, o> htrue, hfalse;
 
-	// nonworking hack to call init
-	template<typename T, T> struct dummy_type {};
-	typedef dummy_type<mn_type&, Mn> dummy_mn_type;
-	typedef dummy_type<mb_type&, Mb> dummy_mb_type;
-	static bool dummy;
+	// (BA1-25: never-defined `static bool dummy` init hack removed;
+	// initialization happens via bdd<B, o>::initializer.)
 
 //	bdd_handle();
 	auto operator<=>(const bdd_handle&) const = default;
@@ -575,9 +569,9 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 		}
 		ss.insert(t.str());
 	}
-	bool first = true;
+	// BA1-24: separator count must come from the deduped set, not dnf.
+	n = ss.size();
 	for (auto& s : ss) {
-		if (!first) os << " ", first = false;
 		os << s;
 		if (--n) os << " | ";
 	}

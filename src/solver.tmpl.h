@@ -1451,12 +1451,8 @@ std::optional<solution<node>> solve(tref form, solver_options options, bool& err
 	return {};
 }
 
-template <NodeType node>
-std::optional<solution<node>> solve(const trefs& forms, solver_options options, bool& error) {
-	using tau = tree<node>;
+// (SO-7: the trefs overload of solve() was deleted -- zero callers.)
 
-	return solve<node>(tau::build_wff_and(forms), options, error);
-}
 
 
 } // namespace idni::tau_lang

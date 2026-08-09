@@ -10,15 +10,6 @@ namespace idni::tau_lang {
 // Helper functions
 // ------------------------------------------------------------
 
-/// Convert a subtree_map<node,tref> to a map<string,string> by
-/// serializing every key and value with to_str().  Null entries are skipped.
-template <NodeType node>
-std::map<std::string, std::string> to_str(const subtree_map<node, tref>& m) {
-	std::map<std::string, std::string> sm;
-	for (auto [k, v] : m) if (k && v) sm[to_str(k)] = to_str(v);
-	return sm;
-}
-
 // ------------------------------------------------------------
 // String API — convenience wrappers that accept/return std::string
 // ------------------------------------------------------------

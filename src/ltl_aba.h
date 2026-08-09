@@ -32,7 +32,9 @@ namespace idni::tau_lang {
 // ── Detection ────────────────────────────────────────────────────────────────
 
 // True iff the formula contains any full-LTL operator: wff_F, wff_U, wff_R,
-// wff_W.  wff_always (G) is already handled by the safety pipeline.
+// wff_W, and the past operators wff_S, wff_T (past formulas must route to
+// the LTL pipeline's temporal testers).  wff_always (G) is already handled
+// by the safety pipeline.
 template <NodeType node>
 bool has_ltl_operators(tref fm);
 
@@ -63,8 +65,14 @@ std::string ltl_skeleton(tref fm,
 // LTL constraints (G, X, propositional) that ltlsynt handles natively.
 struct PastTemporalTester {
 	std::string state_var;
+	/// Informational only (LT-15): always false ((φ S ψ)(−1) = false);
+	/// the encoding hard-codes !state_var at t=0. Kept for the
+	/// explain/debug output.
 	bool        initial_value;
 	std::string transition;
+	/// Informational only (LT-15): the negation is already inlined in the
+	/// expression returned by skeleton_str_with_testers; this flag merely
+	/// annotates the explain/debug output for T-testers.
 	bool        negate_output;
 };
 
@@ -83,8 +91,12 @@ void append_tester_constraints(
 
 // ── Input / output classification ────────────────────────────────────────────
 
-// True iff every io_var appearing in the atom is an INPUT variable
-// (by tau-lang convention: io_var name starts with 'i').
+// True iff every io_var appearing in the atom is an INPUT variable.
+// Primarily reads the resolved direction bit (data 1=input / 2=output);
+// only unresolved io_vars fall back to the name prefix ('o' = output).
+// Note the resolver additionally classifies `this` as input and `u` as
+// output (see tau_tree_extractors.tmpl.h); the prefix fallback here does
+// not replicate that.
 template <NodeType node>
 bool is_pure_input_atom(tref atom);
 

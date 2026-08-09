@@ -46,6 +46,11 @@ void default_typing_message(tref var, tref env, const bool bv = false) {
 	LOG_DEBUG << message << tau::get(var) << type_info << " in " << tau::get(env) << "\n";
 }
 
+// BA2-20: canonize is the type-inference KEY builder -- it untypes,
+// unwraps a `bf` wrapper, and rewrites any io_var to
+// variable(io_var(var_name)) DROPPING the offset/shift. That last part is
+// load-bearing: it is what makes typed history entries of one stream match
+// across time points, so scope maps stay per-stream, not per-instant.
 template<NodeType node>
 tref canonize(tref t) {
 	using tau = tree<node>;
@@ -288,7 +293,9 @@ std::variant<tref, inference_error, parse_error> update_bv_symbol(tref n,
 	if (is_bv_type_family<node>(t))
 		return update_ba_symbol<node>(n);
 	else if (!options.use_defaults) return n;
-	return inference_error{n, t, untyped_type_id<node>()};
+	// BA2-16: expected = a bv-family type (report as untyped-expected slot
+	// per the error's rendering order: found first), found = t.
+	return inference_error{n, untyped_type_id<node>(), t};
 }
 
 // type all symbols according to their children's types
@@ -421,7 +428,7 @@ std::variant<tref, inference_error, parse_error> update_functional_fallback(
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	// First we update the ba_constant, the ariables and bf_t/bf_f in the rr and
+	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable }, options);
 	if (std::holds_alternative<inference_error>(updated))
@@ -463,7 +470,7 @@ std::variant<tref, inference_error, parse_error> update_predicate_fallback(
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	// First we update the ba_constant, the ariables and bf_t/bf_f in the rr and
+	// First we update the ba_constant, the variables and bf_t/bf_f in the rr and
 	// close the body scope
 	auto updated = update<node>(resolver, n, { tau::ba_constant, tau::bf_t, tau::bf_f, tau::variable }, options);
 	if (std::holds_alternative<inference_error>(updated))
@@ -799,8 +806,9 @@ std::variant<tref, inference_error, parse_error> update(
 		else if (n_t.is(tau::rec_relation)) type_environment.push_back(n);
 		else if (n_t.is(tau::ref)) type_environment.push_back(n);
 		// Case of single bf
-		else if (type_environment.empty() && n_t.is(tau::bf))
-			type_environment.push_back(n);
+		// (BA2-17: an `else if (type_environment.empty() && ...)` push
+		// was deleted here -- the environment is seeded with {r} and
+		// pushes/pops are balanced, so it can never be empty.)
 		return true;
 	};
 	post_order<node>(r).search(f, update_type_env);

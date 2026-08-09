@@ -344,15 +344,20 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and(ref x, tref y) {
 	if (x == T) return add(y);
 	if (x == F) return F;
 #ifdef TAU_CACHE
-	if (auto it = and_memo.find({x, add(y)}); it != and_memo.end())
-		return it->second;
+	// TT1-12: canonicalize like the (ref, ref) variant, so entries from
+	// either variant hit the same memo slot.
+	ref yr = add(y);
+	{ ref xc = x, yc = yr; make_canonical(xc, yc);
+	  if (auto it = and_memo.find({xc, yc}); it != and_memo.end())
+		return it->second; }
 #endif
 	tref v = get_var(x);
 	if (leaf(x)) return add(tau::trim(tau::build_bf_and(
 		tau::get(tau::bf, v), tau::get(tau::bf, y))));
 	ref r = add(v, bdd_and(get_high(x), y), bdd_and(get_low(x), y));
 #ifdef TAU_CACHE
-	and_memo.emplace(std::array<ref, 2>{x, add(y)}, r);
+	{ ref xc = x, yc = yr; make_canonical(xc, yc);
+	  and_memo.emplace(std::array<ref, 2>{xc, yc}, r); }
 #endif
 	return r;
 }
@@ -758,7 +763,9 @@ tau_term_bdd<node>::ref tau_term_bdd<node>::bdd_and_many(refs v, const order& o)
 	if (v.size() == 1) return v[0];
 
 #ifdef TAU_CACHE
-	static refs v1;
+	// TT1-14: local, not function-static -- the static scratch was a
+	// reentrancy trap for one saved allocation.
+	refs v1;
 	do {
 		if (v1=v, am_simplify(v, and_many_memo), v.size()==1) return v[0];
 	} while (v1 != v);

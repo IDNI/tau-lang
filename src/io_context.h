@@ -1,4 +1,4 @@
-// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 /**
  * @file io_context.h
@@ -297,10 +297,6 @@ struct io_context {
 	tref add_input_console(const std::string& name, size_t type_id);
 	/** @brief Register a prompting console output stream for @p name with @p type_id. */
 	tref add_output_console(const std::string& name, size_t type_id);
-	/** @brief Register a non-prompting console input stream for @p name with @p type_id. */
-	tref add_input_console_no_prompt(const std::string& name, size_t type_id);
-	/** @brief Register a non-prompting console output stream for @p name with @p type_id. */
-	tref add_output_console_no_prompt(const std::string& name, size_t type_id);
 	/** @brief Register a file input stream reading from @p filename for @p name with @p type_id. */
 	tref add_input_file(const std::string& name, size_t type_id, const std::string& filename);
 	/** @brief Register a file output stream writing to @p filename for @p name with @p type_id. */

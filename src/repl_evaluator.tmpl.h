@@ -7,8 +7,6 @@
 
 namespace idni::tau_lang {
 
-using namespace cvc5;
-
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
 #define TC_STATUS_OUTPUT TC(term::color::GREEN, term::color::BG_LIGHT_CYAN, \
 							term::color::BRIGHT)
@@ -1226,8 +1224,6 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 {
 	TC.set(opt.colors);
 	logging::set_filter(opt.severity);
-	// Controls how fixpoint information in satisfiability.h should be printed
-	if (!opt.repl_running) use_debug_output_in_sat = true;
 	if (opt.experimental) std::cout << "\n!!! Experimental features "
 		"enabled (expect unstable behavior) !!!\n\n";
 	// Propagate the CLI-provided charvar/blasting values to the api's
@@ -1344,7 +1340,10 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  status                 show status                          on/off\n"
 		"  colors                 use term colors                      on/off\n"
 		"  highlighting           syntax highlighting of Tau formulas  on/off\n"
-		"  indenting              indenting of Tau formulas            on/off\n";
+		"  indenting              indenting of Tau formulas            on/off\n"
+		"  charvar (V)            character-variable notation          on/off\n"
+		"  blasting (B)           bitvector predicate blasting         on/off\n"
+		"  benchmarks (b)         print timing benchmarks              on/off\n";
 	static const std::string all_available_options = std::string{} +
 		"Available options and values:\n" + bool_options +
 		"  severity               severity                             error/info/debug/trace\n";

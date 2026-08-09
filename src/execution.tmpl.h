@@ -121,19 +121,8 @@ tref repeat_once<node, step_t>::operator()(tref n) const {
 // -----------------------------------------------------------------------------
 // to_steps
 
-template <NodeType node>
-steps<node, step<node>> to_steps(
-	const std::initializer_list<rewriter::library>& libs)
-{
-	std::vector<step<node>> s;
-	for (auto& l : libs) {
-		// LOG_TRACE << "to_steps library " << l.size() << " rules";
-		// for (auto& r : l)
-		// 	LOG_TRACE << "to_steps rule: " << to_str<node>(r);
-		s.emplace_back(l);
-	}
-	return steps<node, step<node>>(std::move(s));
-}
+// (RR-4: to_steps deleted -- zero callers.)
+
 
 // -----------------------------------------------------------------------------
 // operator|

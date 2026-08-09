@@ -5,6 +5,9 @@
 
 namespace idni::tau_lang {
 
+// (NF-7: the six squeeze/unsqueeze wff helpers were deleted -- zero
+// callers anywhere. Recover from git if the squeeze pipeline returns.)
+
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "normal_forms"
 
@@ -118,182 +121,11 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 	return result;
 }
 
-template <NodeType node>
-tref unsqueeze_wff(const tref& fm) {
-	// $X | $Y = 0 ::= $X = 0 && $Y = 0
-	// $X | $Y != 0 ::= $X != 0 || $Y != 0
-	using tau = tree<node>;
-	LOG_TRACE << "unsqueeze_wff: " << LOG_FM(fm);
-	auto f = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf_eq) && t[1].equals_0()) {
-			const auto& e = t[0][0];
-			if (e.is(tau::bf_or)) {
-				tref c1 = e.first();
-				tref c2 = e.second();
-				return tau::trim(tau::build_wff_and(
-					tau::build_bf_eq_0(c1),
-					tau::build_bf_eq_0(c2)));
-			}
-		}
-		else if (t.is(tau::bf_neq) && t[1].equals_0()) {
-			const auto& e = t[0][0];
-			if (e.is(tau::bf_or)) {
-				tref c1 = e.first();
-				tref c2 = e.second();
-				return tau::trim(tau::build_wff_or(
-					tau::build_bf_neq_0(c1),
-					tau::build_bf_neq_0(c2)));
-			}
-		}
-		return n;
-	};
-	tref result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
-	LOG_TRACE << "unsqueeze_wff result: " << LOG_FM(result);
-	return result;
-}
 
-template <NodeType node>
-tref squeeze_wff(const tref& fm) {
-	//$X = 0 && $Y = 0 ::= $X | $Y = 0
-	// $X != 0 || $Y != 0 ::= $X | $Y != 0
-	using tau = tree<node>;
-	LOG_TRACE << "squeeze_wff: " << LOG_FM(fm);
-	auto f = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::wff_and)) {
-			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_eq) && e1[0][1].equals_0()
-				&& e2.child_is(tau::bf_eq) && e2[0][1].equals_0()) {
-				size_t t_e1 = find_ba_type<node>(e1.get());
-				size_t t_e2 = find_ba_type<node>(e2.get());
-				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
-					return tau::trim(tau::build_bf_eq_0(
-						tau::build_bf_or(
-						e1[0].first(), e2[0].first())));
-				}
-			}
-		}
-		else if (t.is(tau::wff_or)) {
-			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_neq) && e1[0][1].equals_0()
-				&& e2.child_is(tau::bf_neq) && e2[0][1].equals_0())
-			{
-				size_t t_e1 = find_ba_type<node>(e1.get());
-				size_t t_e2 = find_ba_type<node>(e2.get());
-				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
-					return tau::trim(tau::build_bf_neq_0(
-						tau::build_bf_or(
-						e1[0].first(), e2[0].first())));
-				}
-			}
-		}
-		return n;
-	};
-	tref result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
-	LOG_TRACE << "squeeze_wff result: " << LOG_FM(result);
-	return result;
-}
 
-template <NodeType node>
-tref unsqueeze_wff_pos(tref fm) {
-	// $X | $Y = 0 ::= $X = 0 && $Y = 0
-	using tau = tree<node>;
-	LOG_TRACE << "unsqueeze_wff_pos: " << LOG_FM(fm);
-	auto f = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf_eq) && t[1].equals_0()) {
-			const auto& e = t[0][0];
-			if (e.is(tau::bf_or)) {
-				const auto& c1 = e.first(), c2 = e.second();
-				return tau::trim(tau::build_wff_and(
-					tau::build_bf_eq_0(c1),
-					tau::build_bf_eq_0(c2)));
-			}
-		}
-		return n;
-	};
-	auto result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
-	LOG_TRACE << "unsqueeze_wff_pos result: " << LOG_FM(result);
-	return result;
-}
 
-template <NodeType node>
-tref squeeze_wff_pos(tref fm) {
-	// $X = 0 && $Y = 0 ::= $X | $Y = 0
-	using tau = tree<node>;
-	LOG_TRACE << "squeeze_wff_pos: " << LOG_FM(fm);
-	auto f = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::wff_and)) {
-			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_eq) && e2.child_is(tau::bf_eq)
-				&& e1[0][1].equals_0() && e2[0][1].equals_0()) {
-				size_t t_e1 = find_ba_type<node>(e1.get());
-				size_t t_e2 = find_ba_type<node>(e2.get());
-				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
-					return tau::trim(tau::build_bf_eq_0(
-						tau::build_bf_or(e1[0].first(), e2[0].first())));
-				}
-			}
-		}
-		return n;
-	};
-	tref result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
-	LOG_TRACE << "squeeze_wff_pos result: " << LOG_FM(result);
-	return result;
-}
 
-template <NodeType node>
-tref unsqueeze_wff_neg(tref fm) {
-	// $X | $Y != 0 ::= $X != 0 || $Y != 0
-	using tau = tree<node>;
-	LOG_TRACE << "unsqueeze_wff_neg: " << LOG_FM(fm);
-	auto f = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf_neq) && t[1].equals_0()) {
-			const auto& e = t[0][0];
-			if (e.is(tau::bf_or)) {
-				const auto& c1 = e.first(), c2 = e.second();
-				return tau::trim(tau::build_wff_or(
-					tau::build_bf_neq_0(c1),
-					tau::build_bf_neq_0(c2)));
-			}
-		}
-		return n;
-	};
-	auto result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
-	LOG_TRACE << "unsqueeze_wff_neg result: " << LOG_FM(result);
-	return result;
-}
 
-template <NodeType node>
-tref squeeze_wff_neg(tref fm) {
-	// $X != 0 || $Y != 0 ::= $X | $Y != 0
-	using tau = tree<node>;
-	LOG_TRACE << "squeeze_wff_neg: " << LOG_FM(fm);
-	auto f = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::wff_or)) {
-			const auto& e1 = t[0], e2 = t[1];
-			if (e1.child_is(tau::bf_neq) && e2.child_is(tau::bf_neq)
-				&& e1[0][1].equals_0()
-				&& e2[0][1].equals_0()) {
-				size_t t_e1 = find_ba_type<node>(e1.get());
-				size_t t_e2 = find_ba_type<node>(e2.get());
-				if (t_e1 == 0 || t_e2 == 0 || t_e1 == t_e2) {
-					return tau::trim(tau::build_bf_neq_0(
-						tau::build_bf_or(
-							e1[0].first(), e2[0].first())));
-				}
-			}
-		}
-		return n;
-	};
-	auto result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
-	LOG_TRACE << "squeeze_wff_neg result: " << LOG_FM(result);
-	return result;
-}
 
 template <NodeType node>
 tref to_nnf(tref fm) {
@@ -326,7 +158,6 @@ template <NodeType node>
 tref normalize_ba(tref fm) {
 	using tau = tree<node>;
 	DBG(LOG_TRACE << "normalize_ba: " << LOG_FM(fm));
-	using tau = tree<node>;
 	DBG(assert(tau::get(fm).is(tau::bf));)
 	auto push_negation = [&](tref n) {
 		const tau& t = tau::get(n);

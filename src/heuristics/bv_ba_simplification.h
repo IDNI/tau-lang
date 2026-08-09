@@ -49,11 +49,17 @@ using namespace idni;
  * CHECK( tau::get(simplified) == tau::get(expected) );
  * @endcode
  */
-template <typename ... BAs> requires BAsPack<BAs...>
+// HE-11: declaration matches the definition (template<NodeType node>);
+// the old BAs-pack declaration was a dead, never-defined template.
+template <NodeType node>
 tref bv_ba_custom_simplification(tref term);
 
 /**
  * @brief Simplify BV term @p term by invoking the cvc5 `simplify` procedure.
+ *
+ * HE-17: returns nullptr whenever bv_eval_node or the back-translation
+ * fails -- simplify_bv_term depends on that to fall back to
+ * bv_ba_custom_simplification, which is fallback-only by contract.
  *
  * Evaluates @p term into a cvc5 bitvector object, runs cvc5's own
  * simplifier on it, and translates the result back into a tau tree via
@@ -76,7 +82,7 @@ tref bv_ba_custom_simplification(tref term);
  * CHECK( tau::get(simplified) == tau::get(expected) );
  * @endcode
  */
-template<typename ... BAs> requires BAsPack<BAs...>
+template <NodeType node> // HE-11: matches the definition
 tref bv_ba_cvc5_simplification(tref term);
 
 } // namespace idni::tau_lang

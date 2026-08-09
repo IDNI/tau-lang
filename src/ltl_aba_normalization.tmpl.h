@@ -742,10 +742,11 @@ static void add_consistency_constraints(
 				bool is_mixed = atom_has_any_input<node>(atoms[i].first);
 				bool pure_out_lookback = atom_has_lookback<node>(atoms[i].first)
 				    && !is_mixed;
-				bool pure_input = is_pure_input_atom<node>(atoms[i].first);
+				// LT-18: this block is only entered when the atom
+				// is NOT pure-input, so pass false directly.
 				bool feasible = pure_out_lookback
 				    || aba_feasible_dispatch<node>(atoms[i].first,
-				                                   pure_input, is_mixed);
+				                                   /*pure_input=*/false, is_mixed);
 				if (!feasible) {
 					std::string c = "G(!" + atoms[i].second + ")";
 					skeleton += " && " + c;

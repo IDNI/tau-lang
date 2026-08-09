@@ -33,8 +33,8 @@
  * @note Implementation details are provided in "bv_ba.tmpl.h".
  */
 
-#ifndef __IDNI__TAU__CVC5_H__
-#define __IDNI__TAU__CVC5_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BV_BA_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__BV_BA_H__
 
 #include <cvc5/cvc5.h>
 
@@ -250,19 +250,7 @@ bool is_bv_formula_valid(tref form);
 template <NodeType node>
 bool is_bv_formula_unsat(tref form);
 
-/**
- * @brief Solves a Boolean algebra problem over bit-vectors using the provided CVC5 solver.
- *
- * This function attempts to find a solution for the given Boolean formula represented by `form`.
- * It utilizes the specified CVC5 solver instance to perform the computation.
- *
- * @param form The Boolean formula to be solved, represented as a `tref`.
- * @param solver Reference to a CVC5 solver instance used for solving the formula.
- * @return An optional solution of type `solution<node>`. If a solution exists, it is returned;
- *         otherwise, `std::nullopt` is returned.
- */
-template <NodeType node>
-std::optional<solution<node>> solve_bv(tref form, cvc5::Solver& solver);
+// (BA1-16: never-defined solve_bv(tref, cvc5::Solver&) declaration removed.)
 
 /**
  * @brief Solves a boolean algebra problem over bit-vectors.
@@ -316,6 +304,9 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
+// (BA1-16: four never-defined declarations removed: solve_bv(tref,Solver&),
+// canonize_associative_commutative_symbol, is_associative_and_commutative,
+// get_inv_sym.)
 
 /** @brief Normalise a BV term via cvc5's simplifier.
  * NOTE (BA1-17, attempted + reverted): reusing one static Solver here
@@ -385,17 +376,9 @@ template<NodeType node> tref simplify_bv_symbol(tref symbol);
 /** @brief Apply all BV term-level simplifications to @p term. */
 template<NodeType node> tref simplify_bv_term(tref term);
 
-/** @brief Canonise an associative/commutative symbol node, excluding @p excluded nodes. */
-template <typename ...BAs> requires BAsPack<BAs...>
-tref canonize_associative_commutative_symbol(tref term_tree, auto& excluded);
-
-/** @brief Return `true` if @p symbol is an associative and commutative BV operator. */
-template <typename ...BAs> requires BAsPack<BAs...>
-bool is_associative_and_commutative(size_t symbol);
-
-/** @brief Return the inverse symbol id (e.g. nand → and) for @p symbol. */
-template <typename ...BAs> requires BAsPack<BAs...>
-size_t get_inv_sym(size_t symbol);
+// (BA1-16: three never-defined declarations removed here:
+// canonize_associative_commutative_symbol, is_associative_and_commutative,
+// get_inv_sym.)
 
 
 // -----------------------------------------------------------------------------
@@ -411,4 +394,4 @@ size_t get_inv_sym(size_t symbol);
 #include "boolean_algebras/bv_ba_solver.tmpl.h"
 #include "boolean_algebras/bv_ba_helpers.tmpl.h"
 
-#endif // __IDNI__TAU__CVC5_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BV_BA_H__

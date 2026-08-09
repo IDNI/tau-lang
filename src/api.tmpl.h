@@ -766,7 +766,7 @@ tref api<node>::infer(tref expr, bool use_defaults) {
 		return nullptr;
 	}
 	defs.get_io_context()->update_types(result.second);
-	defs.set_global_scope(result.second);
+	defs.set_global_scope(std::move(result.second));
 
 	// Rewrite G(A && G(B)) → G(A) && G(B) before the semantic error check.
 	// This arises because the CFG parser is ambiguous: G(X) && G(Y) can

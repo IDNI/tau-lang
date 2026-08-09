@@ -150,15 +150,7 @@ struct repeat_once {
 	steps<node, step_t> s; ///< Steps to apply.
 };
 
-/**
- * @brief Build a `steps` object from an initializer list of libraries.
- * @tparam node Tree node type.
- * @param libs Libraries to wrap.
- * @return `steps` object containing one `step<node>` per library.
- */
-template <NodeType node>
-steps<node, step<node>> to_steps(
-	const std::initializer_list<rewriter::library>& libs);
+// (RR-4: to_steps deleted -- zero callers.)
 
 /** @brief Compose two `repeat_each` objects into a `steps` sequence. */
 template <NodeType node, typename step_t>

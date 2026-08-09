@@ -378,6 +378,53 @@ static bool constant_output_realizable(
 	return false;
 }
 
+// LS-12: shared between solve_ltl_aba_algorithm_a and semantic_pwr_optimal
+// (semantic_pwr.h), which used to carry verbatim copies of both loops.
+//
+// Per-T3-type D-bitmask: bit i of type_A[t] is set iff atom i holds (true or
+// undetermined) in T3 type t.
+template <NodeType node>
+static std::vector<int> qlt_type_A_bitmasks(
+	const std::vector<std::pair<tref, std::string>>& atoms,
+	const std::vector<omcat::QltType3>& T3,
+	const std::vector<omcat::Rat>& constants)
+{
+	std::vector<int> type_A(T3.size(), 0);
+	for (int i = 0; i < (int)atoms.size(); ++i)
+		for (int t = 0; t < (int)T3.size(); ++t) {
+			auto h = qlt_atom_holds_in_type3<node>(
+				atoms[i].first, T3[t], constants);
+			if (h != false) type_A[t] |= (1 << i);
+		}
+	return type_A;
+}
+
+// Rename the skeleton's p_i propositions to d_i on word boundaries,
+// highest index first so p1 is not clobbered while renaming p10.
+static inline std::string rename_skeleton_props_to_d(std::string phi_star,
+	int K)
+{
+	for (int i = K; i-- > 0; ) {
+		std::string fp = "p" + std::to_string(i);
+		std::string td = "d_" + std::to_string(i);
+		size_t pos = 0;
+		while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
+			size_t end = pos + fp.size();
+			bool l_ok = pos == 0
+				|| (!std::isalnum((unsigned char)phi_star[pos-1])
+				    && phi_star[pos-1] != '_');
+			bool r_ok = end >= phi_star.size()
+				|| (!std::isalnum((unsigned char)phi_star[end])
+				    && phi_star[end] != '_');
+			if (l_ok && r_ok) {
+				phi_star.replace(pos, fp.size(), td);
+				pos += td.size();
+			} else pos = end;
+		}
+	}
+	return phi_star;
+}
+
 template <NodeType node>
 static std::optional<LtlAbaSolution<node>>
 solve_ltl_aba_algorithm_a(
@@ -392,19 +439,8 @@ solve_ltl_aba_algorithm_a(
 	if (n_types == 0) return std::nullopt;
 
 	int K = (int)atoms.size();
-	// atom_mask[i] = T₃ type indices where D_i holds (true or undetermined).
-	std::vector<std::vector<int>> atom_mask(K);
-	for (int i = 0; i < K; ++i)
-		for (int t = 0; t < n_types; ++t) {
-			auto h = qlt_atom_holds_in_type3<node>(atoms[i].first, T3[t], constants);
-			if (h != false) atom_mask[i].push_back(t); // true or undetermined: include
-		}
-
-	// Build per-T₃-type D-bitmask, then extract feasible (sigma, rho, A) triples.
-	std::vector<int> type_A(n_types, 0);
-	for (int i = 0; i < K; ++i)
-		for (int t : atom_mask[i])
-			type_A[t] |= (1 << i);
+	// Per-T₃-type D-bitmask, then extract feasible (sigma, rho, A) triples.
+	std::vector<int> type_A = qlt_type_A_bitmasks<node>(atoms, T3, constants);
 
 	int T1_size = 2 * (int)constants.size() + 1;
 	std::vector<std::tuple<int,int,int>> feasible_set;
@@ -412,23 +448,9 @@ solve_ltl_aba_algorithm_a(
 	for (int t = 0; t < n_types; ++t)
 		feasible_set.emplace_back(T3[t].pos_m, T3[t].pos_y, type_A[t]);
 
-	// Build phi* skeleton and rename p_i → D_i (highest index first).
-	std::string phi_star = ltl_skeleton<node>(fm, atoms);
-	for (int i = K; i-- > 0; ) {
-		std::string fp = "p" + std::to_string(i);
-		std::string td = "d_" + std::to_string(i);
-		size_t pos = 0;
-		while ((pos = phi_star.find(fp, pos)) != std::string::npos) {
-			size_t end = pos + fp.size();
-			bool l_ok = pos == 0 || (!std::isalnum((unsigned char)phi_star[pos-1])
-			                         && phi_star[pos-1] != '_');
-			bool r_ok = end >= phi_star.size()
-			         || (!std::isalnum((unsigned char)phi_star[end])
-			             && phi_star[end] != '_');
-			if (l_ok && r_ok) { phi_star.replace(pos, fp.size(), td); pos += td.size(); }
-			else pos = end;
-		}
-	}
+	// Build phi* skeleton and rename p_i → D_i.
+	std::string phi_star = rename_skeleton_props_to_d(
+		ltl_skeleton<node>(fm, atoms), K);
 
 	auto bundle = alg_a::build_algorithm_a_skeleton(T1_size, K, feasible_set, phi_star);
 	LOG_DEBUG << "[ltl_aba:algA] skeleton: " << bundle.formula;
@@ -1085,6 +1107,13 @@ static tref encode_mealy_as_safety(const LtlAbaSolution<node>& sol)
 			tref rule = tau::build_wff_or(
 			    tau::build_wff_neg(prev_s), edges_disj);
 			trans = tau::build_wff_and(trans, rule);
+		} else {
+			// LT-28: a state without outgoing edges (possible only
+			// from a truncated HOA -- ltlsynt Mealy machines are
+			// input-complete) must be forbidden as a predecessor,
+			// not left unconstrained.
+			trans = tau::build_wff_and(trans,
+			    tau::build_wff_neg(prev_s));
 		}
 	}
 

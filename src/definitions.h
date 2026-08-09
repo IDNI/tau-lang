@@ -95,7 +95,10 @@ struct definitions {
 	}
 
 	/** @brief Replace the global type scope with @p global_scope. */
-	void set_global_scope(subtree_map<node, size_t>& global_scope) {
+	// RR-14: by value -- the old non-const lvalue reference moved from
+	// the caller's map silently; now the transfer is visible at the call
+	// site (pass std::move(...) to avoid the copy).
+	void set_global_scope(subtree_map<node, size_t> global_scope) {
 		this->global_scope = std::move(global_scope);
 	}
 

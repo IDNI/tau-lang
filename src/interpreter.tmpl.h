@@ -53,7 +53,7 @@ std::pair<std::optional<assignment<node>>, bool> interpreter<node>::read(
 		if (get_io_time_point<node>(tau::trim(var)) > (int_t)time_step)
 			continue;
 
-		auto it = inputs.find(canonize<node>(var));
+		auto it = inputs.find(vn);
 		if (it == inputs.end())  {
 			LOG_ERROR
 				<< "Failed to find input stream for stream '"
@@ -179,7 +179,6 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		tref vn = canonize<node>(io_var);
 		assert(vn != nullptr);
 		DBG(LOG_TRACE << "write[canonized]: " << LOG_FM(vn));
-		auto value = tt(output_values.find(io_var)->second) | tau::ba_constant;
 		std::stringstream ss;
 		if (!serialize_constant(ss, output_values.find(io_var)->second,
 			ctx.type_of(vn)))
@@ -190,7 +189,11 @@ bool interpreter<node>::write(const assignment<node>& output_values) {
 		}
 		auto it = outputs.find(vn);
 		if (it == outputs.end()) {
-			if (is_excluded_output(vn)) continue;
+			// AP2-15: excluded outputs (_e*/_f*) were already filtered
+			// before the sort above. Other `_`-prefixed streams are
+			// still returned in step()'s assignment but have no
+			// registered output stream, so they are silently unwritten
+			// here by design.
 			if (auto name = get_var_name<node>(vn);
 				!name.empty() && name.front() == '_') continue;
 			LOG_ERROR << "Failed to find output stream for stream '"
@@ -597,16 +600,7 @@ std::pair<std::optional<assignment<node>>, bool>
 			<< open_handlers_.size() << " open stream(s); "
 			<< "host-side dispatch (A2) is authoritative\n";)
 	}
-	bool has_this_stream = false;
-	for (auto& [var, _] : inputs) {
-		if (get_var_name<node>(var) == "this"
-			&& ctx.type_of(var) == get_ba_type_id<node>(
-							tau_type<node>()))
-		{
-			has_this_stream = true;
-			break;
-		}
-	}
+	bool has_this_stream = has_this_input_stream();
 	DBG(LOG_TRACE << "step/has_this_stream: " << has_this_stream << "\n";)
 	// If the "this" input stream is present, write the current spec into it
 	if (has_this_stream) {
@@ -901,6 +895,16 @@ bool interpreter<node>::calculate_initial_spec() {
 	LOG_TRACE << "calculate_initial_systems[result]: true";
 	LOG_TRACE << "calculate_initial_systems end";
 	return true;
+}
+
+template <NodeType node>
+bool interpreter<node>::has_this_input_stream() const {
+	for (const auto& [var, _] : inputs)
+		if (get_var_name<node>(var) == "this"
+			&& ctx.type_of(var) == get_ba_type_id<node>(
+							tau_type<node>()))
+			return true;
+	return false;
 }
 
 template <NodeType node>
@@ -1264,7 +1268,7 @@ template <NodeType node>
 std::string interpreter<node>::current_spec() const {
 	// The running spec is the conjunction of all spec partition entries,
 	// re-wrapped in always() (the `unsqueeze_always` invariant). This
-	// matches what `update()` (interpreter.impl.h:962) produces when it
+	// matches what `update()` (update() below) produces when it
 	// reports the post-revision spec to the log, and what the routing-
 	// clause-driven `this` stream feeds back at line 503-505.
 	if (original_spec.empty()) return "T.";
@@ -1695,7 +1699,7 @@ std::vector<std::string> interpreter<node>::open_streams() const
 template <NodeType node>
 bool interpreter<node>::can_extend(tref psi) {
 	// Dry-run the validity check that `update()` performs, without mutating
-	// any state. Mirrors the loop at interpreter.impl.h:849-957:
+	// any state. Mirrors the loop in step():
 	//   - shift psi's constant time positions to current time_point,
 	//   - replace memory references,
 	//   - normalize,
@@ -1940,10 +1944,8 @@ tref unpack_tau_constant(tref constant) {
 	return main;
 }
 
-// returns true if there is a free variable in formula fm
-// prints error messages by default
 template <NodeType node>
-bool has_free_vars(tref fm, bool silent = false) {
+bool has_free_vars(tref fm, bool silent) {
 	using tau = tree<node>;
 	const trefs& free_vars = get_free_vars<node>(fm);
 	if (!free_vars.empty()) {

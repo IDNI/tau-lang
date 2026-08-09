@@ -743,22 +743,11 @@ tref normalize_temporal_quantifiers(tref fm) {
 }
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "to_snf"
+#define LOG_CHANNEL_NAME "normal_forms" // NF-14: "to_snf" was a stale channel name
 
 
-template <NodeType node>
-tref build_split_wff_using(typename node::type type, tref a, tref b) {
-	using tau = tree<node>;
-	// TODO (HIGH) check formulas, should depend on the type
-	if (type == tau::bf_eq)
-		return tau::build_wff_or(
-			tau::build_wff_and(a, b),
-			tau::build_wff_and(tau::build_wff_neg(a),
-					   tau::build_wff_neg(b)));
-	else return tau::build_wff_and(
-		tau::build_wff_or(a, tau::build_wff_neg(b)),
-		tau::build_wff_or(tau::build_wff_neg(a), b));
-}
+// (NF-7: build_split_wff_using deleted -- zero callers.)
+
 
 template <NodeType node, size_t type>
 tref anf(tref n) {

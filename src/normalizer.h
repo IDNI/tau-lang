@@ -297,6 +297,9 @@ bool is_nso_impl(tref n1, tref n2);
  * @brief Normalize a formula with temporal simplifications.
  *
  * Full normalization pipeline including:
+ *   0. `flatten_always_conjuncts` — merges top-level `(G A) && (G B)` into
+ *      `G(A && B)` first; load-bearing (NF-10: without it the second G is
+ *      silently dropped downstream, which can flip a satisfiable spec).
  *   1. `normalize` (with temporal quantifiers).
  *   2. `fold_trivial_quantifiers` (remove vacuous quantifiers after substitution).
  *   3. Late `resolve_quantifiers` for residual bitvector sub-formulas.

@@ -9,8 +9,8 @@
 // Usage: `tau_codegen spec.tau -o program.h`;
 // then links the resulting header in their C++ project.  The generated
 // program is pure-switch-case for propositional specs; for specs with
-// data atoms (qlt, bv, etc.) it emits runtime solver call stubs linked
-// against libtau at build time.
+// data atoms (qlt, bv, etc.) it embeds compile-time witness literals --
+// the generated header depends only on <cstdint>, not libtau.
 
 #ifdef DEBUG
 #include "boolean_algebras/bv_ba.h"

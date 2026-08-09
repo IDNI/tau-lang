@@ -18,7 +18,8 @@
  */
 
 // TODO (LOW) add non string api for execution?
-// TODO (HIGH) tests
+// TODO (HIGH) tests for the htref surface (the tref/string surfaces are
+//             covered by tests/api)
 // TODO (HIGH) error handling
 // TODO (HIGH) decide which parsing get_* methods or other methods will go private if any
 // TODO (MEDIUM) parsing with `bool simplify = true` argument
@@ -824,7 +825,9 @@ struct api {
 	static std::vector<stream_at> get_inputs_for_step(measuring& m, interpreter<node>& i);
 	/** @brief Advance interpreter one step with inputs and record timing. */
 	static std::optional<std::map<stream_at, std::string>> step(
-		measuring& m, interpreter<node>& i, std::map<stream_at, std::string> inputs);
+		measuring& m, interpreter<node>& i,
+		std::map<stream_at, std::string> inputs,
+		bool interactive = true);
 	/** @brief Advance interpreter one step and record timing. */
 	static std::optional<std::map<stream_at, std::string>> step(measuring& m, interpreter<node>& i);
 

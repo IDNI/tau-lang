@@ -177,6 +177,10 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<int_t> quantifiable_i_vars;
 	for (int_t i = 0; i < (int_t)io_vars.size(); ++i) {
+		// SO-10: fail loudly on an unclassified io_var, like the
+		// existential sibling does.
+		DBG(assert(tau::get(io_vars[i])[0].is_input_variable()
+			|| tau::get(io_vars[i])[0].is_output_variable());)
 		// Skip output streams
 		if (tau::get(io_vars[i])[0].is_output_variable()) continue;
 		// Skip initial conditions
@@ -327,7 +331,10 @@ std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 		auto new_io_var = transform_io_var<node>(io_vars[i],time_point);
 		changes[io_vars[i]] = new_io_var;
 	}
-	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point, 0);
+	// SO-9: same type as build_step_chi's placeholder -- each is only
+	// used as its own replace key, but the asymmetry invited bugs.
+	tref c_pholder = build_out_var_at_n<node>("_pholder", time_point,
+		sbf_type_id<node>());
 	c_pholder = tau::build_bf_eq_0(c_pholder);
 	pholder_to_st.emplace(c_pholder, rewriter::replace<node>(st, changes));
 	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes),
@@ -1046,7 +1053,6 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	}
 	auto result = normalize_non_temp<node>(
 		conjunct_with_run ? tau::build_wff_and(ubd_ctn, run) : ubd_ctn);
-	// The following is std::cout because it should always be printed
 	print_fixpoint_info(
 		"Temporal normalization of G specification reached fixpoint after "
 		+ std::to_string(steps) + " steps, yielding the result: ",

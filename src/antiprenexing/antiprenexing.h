@@ -88,7 +88,11 @@ tref anti_prenex(tref formula);
  * into those mentioning the bound variable and those that do not, the latter
  * being lifted out; a substitution-based witness is tried first
  * (`ex_subs_based_elimination`); bitvector content goes to the solver or to
- * predicate blasting; otherwise the positive equations are squeezed into a
+ * predicate blasting; a qlt/omcat-typed binder is decided by DLO interval
+ * computation (`qlt_dlo_qe` -- AN-10: this branch can settle the clause to
+ * T/F outright, or keep the binder for order-dependent symbolic bounds); a
+ * bool-typed binder expands as the finite disjunction phi[x/0]|phi[x/1]
+ * (AN-2); otherwise the positive equations are squeezed into a
  * single term `f` (`squeeze_positives`) and the binder removed via
  * `f[x<-0] & f[x<-1] = 0`, conjoined with the surviving disequations. The
  * repetition lives in `anti_prenex`'s own loop, not here.

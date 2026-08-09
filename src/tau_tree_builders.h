@@ -94,6 +94,22 @@ template <NodeType node> tref build_wff_and(tref l, tref r);
 template <NodeType node> tref build_wff_and(const auto& wffs);
 /** @brief Build `! n`. */
 template <NodeType node> tref build_wff_neg(tref n);
+// LTL(ABA) operator wrappers (TT2-16: previously defined in the tmpl with
+// no header declaration).
+/** @brief Build `F n` — finally/eventually. */
+template <NodeType node> tref build_wff_F(tref n);
+/** @brief Build `l U r` — strong until. */
+template <NodeType node> tref build_wff_U(tref l, tref r);
+/** @brief Build `l R r` — release. */
+template <NodeType node> tref build_wff_R(tref l, tref r);
+/** @brief Build `l W r` — weak until. */
+template <NodeType node> tref build_wff_W(tref l, tref r);
+/** @brief Build `l S r` — since (past). */
+template <NodeType node> tref build_wff_S(tref l, tref r);
+/** @brief Build `l T r` — trigger (past dual of S). */
+template <NodeType node> tref build_wff_T(tref l, tref r);
+/** @brief Largest canonical quantifier id in @p fm (0 when none). */
+template <NodeType node> int_t find_biggest_quant_id(tref fm);
 
 // ---------------------------------------------------------------------------
 // Constraint builders
@@ -204,8 +220,6 @@ template <NodeType node> tref build_bf_f_type(const std::string& type);
 template <NodeType node> tref build_ba_constant(const typename node::constant& constant, size_t ba_type_id);
 /** @brief Build a `bf` BA-constant node, optionally with right sibling @p right. */
 template <NodeType node> tref build_bf_ba_constant(const typename node::constant& constant, size_t ba_type_id, tref right = nullptr);
-/** @brief Build a bitvector BA-constant node. */
-template <NodeType node> tref build_bv_ba_constant(const typename node::constant& constant, size_t ba_type_id);
 /** @brief Build an uninterpreted constant node from names @p n1, @p n2. */
 template <NodeType node> tref build_bf_uconst(const std::string& n1, const std::string& n2, size_t type_id);
 /** @brief Build a variable-name node from string id @p sid. */
