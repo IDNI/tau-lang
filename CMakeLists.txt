@@ -67,11 +67,6 @@ option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
 option(TAU_USE_CCACHE              "Use ccache when building"              ON)
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
-# Load local cmake settings
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
-	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
-endif()
-
 set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
 if (TAU_BUILD_JOBS STREQUAL "")
 	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
@@ -141,6 +136,11 @@ if(TAU_BUILD_REPL_TESTS)
 	set(TAU_BUILD_EXECUTABLE ON)
 endif()
 
+# SW-20: the benchmark tests run the executable through valgrind.
+if(TAU_BUILD_BENCHMARK)
+	set(TAU_BUILD_EXECUTABLE ON)
+endif()
+
 if(TAU_BUILD_BINDING_PYTHON)
 	set(TAU_BUILD_STATIC_LIBRARY ON)
 	set(TAU_BUILD_PIC ON)
@@ -158,7 +158,7 @@ if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
 		set(TAU_BUILD_EXECUTABLE ON)
 endif()
 
-if(TAU_WINDOW_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
+if(TAU_WINDOWS_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
 	message(FATAL_ERROR "Cannot build both Windows and Windows zip packages at the same time")
 endif()
 

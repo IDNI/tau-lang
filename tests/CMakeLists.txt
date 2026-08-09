@@ -49,7 +49,7 @@ function(add test_name)
 	# Heavy adversarial / fuzz suites need more than the ctest default;
 	# their hundred-plus deep LTL+ABA-oracle cases routinely run >600s
 	# on the CI hardware.  Everything else gets the default.
-	if("${N}" MATCHES "^test_(ltl_adversarial|ltl_adversarial2|ltl_aba|ltl_fuzz100|ltl_soundness_regression)$")
+	if("${N}" MATCHES "^test_(ltl_aba|ltl_soundness_regression)$")
 		set(_TAU_TEST_TIMEOUT 1500)
 	else()
 		set(_TAU_TEST_TIMEOUT 600)
@@ -63,7 +63,6 @@ endfunction()
 #
 # Integration testing
 #
-set(TAU_BUILD_INTEGRATION ON CACHE STRING "build the tau-lang integration suite ON")
 set_property(CACHE TAU_BUILD_INTEGRATION PROPERTY STRINGS "OFF" "ON")
 
 if (TAU_BUILD_INTEGRATION)
@@ -74,7 +73,6 @@ endif ()
 #
 # Unit testing
 #
-set(TAU_BUILD_UNIT_TESTS ON CACHE STRING "build the tau-lang unit suite ON")
 set_property(CACHE TAU_BUILD_UNIT_TESTS PROPERTY STRINGS "OFF" "ON")
 
 if (TAU_BUILD_UNIT_TESTS)
@@ -85,7 +83,6 @@ endif ()
 #
 # API testing
 #
-set(TAU_BUILD_API_TESTS ON CACHE STRING "build the tau-lang api suite ON")
 set_property(CACHE TAU_BUILD_API_TESTS PROPERTY STRINGS "OFF" "ON")
 if (TAU_BUILD_API_TESTS)
 	enable_testing()
@@ -95,7 +92,6 @@ endif ()
 #
 # REPL testing
 #
-set(TAU_BUILD_REPL_TESTS ON CACHE STRING "build the tau-lang repl suite ON")
 set_property(CACHE TAU_BUILD_REPL_TESTS PROPERTY STRINGS "OFF" "ON")
 
 if (TAU_BUILD_REPL_TESTS)

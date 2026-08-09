@@ -4,7 +4,7 @@ string(REPLACE " " ";" TAU_HEADERS_LIST "${TAU_HEADERS}")
 
 # CONTENT
 foreach(header_file ${TAU_HEADERS_LIST})
-        file(READ "${TAU_SOURCE_DIR}/${header_file}" HEADER_CONTENT ENCODING UTF-8)
+        file(READ "${TAU_SOURCE_DIR}/${header_file}" HEADER_CONTENT)
         string(APPEND TAU_HEADER_CONTENT "\
 \n\
 // -----------------------------------------------------------------------------\n\
