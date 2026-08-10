@@ -1,11 +1,13 @@
 #!/bin/bash
 
-BUILD_TYPE=${1:-Release}
+source "$(dirname "${BASH_SOURCE[0]}")/env"
+
+normalize_args "$@"
 TESTS_DIR=../build-$BUILD_TYPE
 STATUS=0
 
 echo "Building $BUILD_TYPE exe files"
-./dev build "${BUILD_TYPE}" \
+./dev build \
 	-DCMAKE_TOOLCHAIN_FILE=external/parser/cmake/mingw-w64-x86_64.cmake \
 	-DTAU_BUILD_TESTS=ON "$@"
 
