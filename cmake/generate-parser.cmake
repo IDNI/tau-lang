@@ -17,9 +17,9 @@ function(generate_parser tgf_filename out_dir)
 	add_custom_command(
 		OUTPUT "${_header}" "${_source}"
 		COMMAND ${CMAKE_COMMAND} -E make_directory "${out_dir}"
-		COMMAND $<TARGET_FILE:tgf> "${tgf_filename}" gen
+		COMMAND ${TAU_TGF_EXECUTABLE} "${tgf_filename}" gen
 			--header-only false --output-dir "${out_dir}"
-		DEPENDS tgf "${tgf_filename}"
+		DEPENDS ${TAU_TGF_DEPEND} "${tgf_filename}"
 		COMMENT "Generating parser from ${_stem}.tgf"
 		VERBATIM)
 

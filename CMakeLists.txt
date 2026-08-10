@@ -385,6 +385,10 @@ message(STATUS "CMAKE_BUILD_WITH_RPATH: ${CMAKE_BUILD_WITH_RPATH}")
 # brings its grammar with it. Only the configured pack's BA grammars are
 # generated: nothing is committed any more, so a reduced pack costs less rather
 # than leaving stale files behind.
+#
+# Resolves the tgf binary this build runs: the in-tree target natively, a
+# side native build of external/parser under cross-compilation.
+include(host-tools)
 include(generate-parser)
 set(TAU_GENERATED_PARSER_HEADERS "")
 set(TAU_GENERATED_PARSER_SOURCES "")
