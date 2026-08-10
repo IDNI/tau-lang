@@ -1,3 +1,9 @@
 #!/bin/bash
 
-rm -rf ./build ./build-* ./tau-config.cmake ./Testing
+set -euo pipefail
+
+if [[ "${1:-}" = "all" ]]; then
+	rm -rf ./build ./build-*
+fi
+
+rm -rf ./tau-config.cmake ./Testing
