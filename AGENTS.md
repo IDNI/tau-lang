@@ -26,7 +26,7 @@ to `build/<preset>` (e.g. `build/debug`, `build/release`).
 ./dev preset relwithdebinfo            # → build/relwithdebinfo/
 ./dev preset debug-clang               # Clang build → build/debug-clang/
 ./dev preset debug-asan                # Debug + AddressSanitizer
-./dev clean [all]                      # Remove build dirs (all: also build/ preset trees)
+./dev clean [all]                      # Remove stray artifacts; `all` also removes build/ and build-*
 ./dev regen [build-dir]                # Build the parser generation target (default build/devel)
 ```
 

@@ -71,7 +71,9 @@ Legacy wrappers are unchanged. Prefer presets for new work.
 
 ## Cleaning
 
-- `clean [all]` — remove build artifacts; with `all`, also `build/` preset trees
+- `clean [all]` — remove stray artifacts (`tau-config.cmake`, `Testing`); with
+  `all`, also the build trees (`build/` and `build-*`). A bare `clean` never
+  destroys a build tree, matching `external/parser/scripts/clean.sh`.
 
 ## Regenerating parsers
 
