@@ -1,10 +1,6 @@
 #!/bin/bash
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PARSER_ROOT="${REPO_ROOT}/external/parser"
-DEV_ROOT="${PARSER_ROOT}"
-
-source "${PARSER_ROOT}/scripts/devrc"
+source "$(dirname "${BASH_SOURCE[0]}")/env"
 
 dev_pre_configure() {
 	local tau_shared_prefix="${HOME}/.tau" arg
