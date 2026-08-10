@@ -1,8 +1,6 @@
 #!/bin/bash
 
-./dev build Debug \
-		-DTAU_BUILD_TESTS=ON \
-		-DTAU_ADDRESS_SANITIZER=ON \
-		"$@" && \
-	cd tests && \
-	ctest -j 8 --test-dir ../build-Debug --output-on-failure
+source "$(dirname "${BASH_SOURCE[0]}")/env"
+
+cd "${REPO_ROOT}"
+test_entry Debug -DTAU_BUILD_TESTS=ON -DTAU_ADDRESS_SANITIZER=ON "$@"
