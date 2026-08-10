@@ -22,7 +22,7 @@ set -euo pipefail
 # Defaults
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "${SCRIPT_DIR}/env"
 
 TAU_BUILD_DIR="${TAU_BUILD_DIR:-$REPO_ROOT/build-Release}"
 FIXTURE_DIR="${FIXTURE_DIR:-$REPO_ROOT/tests/benchmark/fixtures}"
@@ -30,6 +30,7 @@ DATA_ROOT="${DATA_ROOT:-$REPO_ROOT/tests/benchmark/data}"
 PROFILE_NAME=""
 TIMEOUT_SECS=""  # empty = no limit
 MEMORY_MB=""    # empty = no limit
+DEP_ARGS=()
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -45,15 +46,20 @@ while [[ $# -gt 0 ]]; do
             sed -n '/^# Usage:/,/^$/p' "$0"
             exit 0
             ;;
+        -D*=*)           DEP_ARGS+=("$1");   shift ;;
         -*) echo "Unknown option: $1" >&2; exit 1 ;;
         *)  PROFILE_NAME="$1"; shift ;;
     esac
 done
 
+# dep_entry initializes DEP_VARS so dep_shared_prefix can resolve any
+# -DTAU_SHARED_PREFIX=... passed above; falls back to $TAU_SHARED_PREFIX / ~/.tau
+dep_entry "${DEP_ARGS[@]}"
+
 # ---------------------------------------------------------------------------
 # Profile name — resolve in order: argument > ~/.tau/profile > prompt
 # ---------------------------------------------------------------------------
-TAU_PROFILE_FILE="${HOME}/.tau/bench_profile"
+TAU_PROFILE_FILE="$(dep_shared_prefix)/bench_profile"
 
 if [[ -z "$PROFILE_NAME" ]]; then
     if [[ -f "$TAU_PROFILE_FILE" ]]; then
