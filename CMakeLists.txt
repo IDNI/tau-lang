@@ -64,33 +64,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 	include("${CMAKE_CURRENT_SOURCE_DIR}/CMakeLocalLists.txt")
 endif()
 
-set(TAU_SHARED_PREFIX "$ENV{HOME}/.tau" CACHE STRING "Install prefix for shared libraries")
-if (TAU_BUILD_JOBS STREQUAL "")
-	set(TAU_BUILD_JOBS 0 CACHE STRING "Number of jobs to use for the build (0 to auto-detect)")
-endif()
-
-if(TAU_BUILD_JOBS EQUAL 0 AND DEFINED ENV{TAU_BUILD_JOBS}
-		AND NOT "$ENV{TAU_BUILD_JOBS}" STREQUAL "")
-	set(TAU_BUILD_JOBS "$ENV{TAU_BUILD_JOBS}" CACHE STRING
-		"Number of jobs to use for the build (0 to auto-detect)" FORCE)
-	message(STATUS "TAU_BUILD_JOBS from environment: ${TAU_BUILD_JOBS}")
-endif()
-
-message(STATUS "TAU_BUILD_JOBS: ${TAU_BUILD_JOBS}")
-
-# Set the number of jobs to use for the build
-if (TAU_BUILD_JOBS EQUAL 0)
-	include(ProcessorCount)
-	ProcessorCount(TAU_BUILD_JOBS)
-	if(TAU_BUILD_JOBS EQUAL 0)
-		message(WARNING "Could not detect number of logical CPU cores, defaulting to 1")
-		set(TAU_BUILD_JOBS 1)
-	else()
-		math(EXPR TAU_BUILD_JOBS "( ${TAU_BUILD_JOBS} + 1 ) / 2")
-		message(STATUS "Auto setting TAU_BUILD_JOBS: ${TAU_BUILD_JOBS} (half of available cores)")
-	endif()
-endif()
-set(ENV{CMAKE_BUILD_PARALLEL_LEVEL} "${TAU_BUILD_JOBS}")
+# take TAU_SHARED_PREFIX from env and args
+include(tau-shared-prefix)
+# take TAU_BUILD_JOBS from env and args
+include(tau-build-jobs)
 
 set_property(CACHE PARSER_MEASURE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MEASURE                 PROPERTY STRINGS "OFF" "ON")

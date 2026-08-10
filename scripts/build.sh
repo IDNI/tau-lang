@@ -3,14 +3,8 @@
 source "$(dirname "${BASH_SOURCE[0]}")/env"
 
 dev_pre_configure() {
-	local tau_shared_prefix="${HOME}/.tau" arg
-	for arg in "${DEV_CMAKE[@]}"; do
-		if [[ $arg == -DTAU_SHARED_PREFIX=* ]]; then
-			tau_shared_prefix="${arg#-DTAU_SHARED_PREFIX=}"
-			break
-		fi
-	done
-	echo "TAU_SHARED_PREFIX: ${tau_shared_prefix}"
+	dep_entry "${DEV_CMAKE[@]}"
+	echo "TAU_SHARED_PREFIX: $(dep_shared_prefix)"
 
 	git submodule status | while read -r line; do
 		git_submod=$(echo "$line" | awk '{print $2}')
