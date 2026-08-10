@@ -39,7 +39,7 @@ fi
 
 if [ ! -f external/parser/scripts/devrc ]; then
 	echo "Initializing parser submodule..."
-	git submodule update --init --recursive
+	git submodule update --init external/parser
 fi
 source external/parser/scripts/devrc
 
