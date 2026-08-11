@@ -134,6 +134,13 @@
 			}
 		},
 		{
+			"name": "_build-binding-js",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_BINDING_JS": "ON"
+			}
+		},
+		{
 			"name": "_build-all",
 			"hidden": true,
 			"cacheVariables": {
@@ -364,7 +371,7 @@
 				"_generator-make",
 				"_toolchain-emscripten",
 				"_bas-sbf-tau",
-				"_build-executable",
+				"_build-binding-js",
 				"_build-type-release"
 			]
 		},
@@ -375,7 +382,7 @@
 				"_generator-make",
 				"_toolchain-emscripten",
 				"_bas-sbf-tau",
-				"_build-executable",
+				"_build-binding-js",
 				"_build-type-debug"
 			]
 		},

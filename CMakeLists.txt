@@ -63,6 +63,7 @@ option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
+option(TAU_BUILD_BINDING_JS        "Build JS/WebAssembly embind bindings"  OFF)
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
 # Load local cmake settings
@@ -101,6 +102,7 @@ set_property(CACHE TAU_WINDOWS_ZIP_PACKAGE     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MACOS_PACKAGE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BINDING_JS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_DONT_USE_FTXUI          PROPERTY STRINGS "OFF" "ON")
 
@@ -119,6 +121,10 @@ endif()
 if(TAU_BUILD_BINDING_PYTHON)
 	set(TAU_BUILD_STATIC_LIBRARY ON)
 	set(TAU_BUILD_PIC ON)
+endif()
+
+if(TAU_BUILD_BINDING_JS)
+	set(TAU_BUILD_STATIC_LIBRARY ON)
 endif()
 
 if(TAU_BUILD_SHARED_LIBRARY)
@@ -232,6 +238,7 @@ message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
 message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_MACOS_PACKAGE: ${TAU_MACOS_PACKAGE}")
 message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
+message(STATUS "TAU_BUILD_BINDING_JS: ${TAU_BUILD_BINDING_JS}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
 message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
@@ -492,6 +499,14 @@ endif ()
 if (TAU_BUILD_BINDING_PYTHON)
 	message(STATUS "Building Python bindings (nanobind + ctypes)")
 	add_subdirectory(bindings/python)
+endif()
+
+#
+# Building JS/WebAssembly embind bindings
+#
+if (TAU_BUILD_BINDING_JS)
+	message(STATUS "Building JS embind bindings")
+	add_subdirectory(bindings/js)
 endif()
 
 #
