@@ -109,10 +109,14 @@ function(target_setup target)
 	else()
 		target_compile_options(${target} PRIVATE /W4)
 	endif()
-	# emsdk ships a newer clang than the host one, which reports unused
-	# templates the rest of the toolchains accept
 	if(EMSCRIPTEN)
-		target_compile_options(${target} PRIVATE -Wno-unused-template)
+		target_compile_options(${target} PRIVATE
+			# emsdk ships a newer clang than the host one, which reports
+			# unused templates the rest of the toolchains accept
+			-Wno-unused-template
+			-fwasm-exceptions
+		)
+		target_link_options(${target} PRIVATE -fwasm-exceptions)
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")
