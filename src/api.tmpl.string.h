@@ -202,17 +202,17 @@ std::optional<std::string> api<node>::eliminate_quantifiers(
 
 template <NodeType node>
 bool api<node>::realizable(const std::string& expr) {
-	return realizable(get_spec_or_term(expr));
+	return realizable(get_formula_or_term(expr));
 }
 
 template <NodeType node>
 bool api<node>::unrealizable(const std::string& expr) {
-	return unrealizable(get_spec_or_term(expr));
+	return unrealizable(get_formula_or_term(expr));
 }
 
 template <NodeType node>
 bool api<node>::sat(const std::string& expr) {
-	return sat(get_spec_or_term(expr));
+	return sat(get_formula_or_term(expr));
 }
 
 template <NodeType node>
@@ -222,12 +222,12 @@ bool api<node>::unsat(const std::string& expr) {
 
 template <NodeType node>
 bool api<node>::valid(const std::string& expr) {
-	return valid(get_spec_or_term(expr));
+	return valid(get_formula_or_term(expr));
 }
 
 template <NodeType node>
 bool api<node>::valid_spec(const std::string& expr) {
-	return valid_spec(get_spec_or_term(expr));
+	return valid_spec(get_formula_or_term(expr));
 }
 
 

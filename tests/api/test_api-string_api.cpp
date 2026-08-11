@@ -18,6 +18,34 @@ TEST_SUITE("Tau API - string") {
 			CHECK(tau_api::is_formula(formula));
 		}
 	}
+
+	// AP-9: sat/realizable/unrealizable/valid/valid_spec routed a string
+	// through get_spec_or_term(), wrapping it in a `spec` node. The
+	// tref-level sat()/realizable() gate on is_formula() (a bare wff), so
+	// every well-formed formula silently reported unsat/unrealizable
+	// regardless of content; valid()/valid_spec() have no such gate, so
+	// instead the whole-query BA fast path fed the still-`spec`-wrapped
+	// tree to build_wff_neg(), which asserts on a bare wff and aborted.
+	// Fixed by routing through get_formula_or_term(), like the
+	// neighbouring string overloads (substitute, dnf, cnf, nnf, ...).
+	TEST_CASE_FIXTURE(api_fixture, "sat/unsat/realizable/unrealizable/valid on well-formed input") {
+		CHECK(tau_api::sat("x = 0"));
+		CHECK(tau_api::realizable("x = 0"));
+		CHECK(!tau_api::unsat("x = 0"));
+		CHECK(!tau_api::unrealizable("x = 0"));
+
+		// a genuine contradiction
+		CHECK(!tau_api::sat("x = 0 && x != 0"));
+		CHECK(tau_api::unsat("x = 0 && x != 0"));
+		CHECK(!tau_api::realizable("x = 0 && x != 0"));
+		CHECK(tau_api::unrealizable("x = 0 && x != 0"));
+
+		// a tautology
+		CHECK(tau_api::valid("x = x"));
+		CHECK(tau_api::valid_spec("x = x"));
+		CHECK(!tau_api::valid("x = 0"));
+		CHECK(!tau_api::valid_spec("x = 0"));
+	}
 }
 
 // AP-8: only get_interpreter (below) had negative/malformed-input tests;
