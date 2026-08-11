@@ -18,6 +18,9 @@ BOOST_SOURCE_DIR="${TAU_SHARED_PREFIX}/boost"
 if [[ $DEP_TARGET == w64 ]]; then
 	BOOST_BUILD_DIR="${BOOST_SOURCE_DIR}/build-w64"
 	BOOST_PREFIX="${TAU_SHARED_PREFIX}/boost/dist-w64"
+elif [[ $DEP_TARGET == emscripten ]]; then
+	BOOST_BUILD_DIR="${BOOST_SOURCE_DIR}/build-wasm"
+	BOOST_PREFIX="${TAU_SHARED_PREFIX}/boost/dist-wasm"
 else
 	BOOST_BUILD_DIR="${BOOST_SOURCE_DIR}/build"
 	BOOST_PREFIX="${TAU_SHARED_PREFIX}/boost/dist"
@@ -36,11 +39,15 @@ python3 tools/boostdep/depinst/depinst.py log
 mkdir -p "$BOOST_PREFIX"
 
 B2_ARGS=()
-B2_ARGS+=("address-model=64")
 B2_ARGS+=("variant=release")
+if [[ $DEP_TARGET == emscripten ]]; then
+	B2_ARGS+=("address-model=32")
+else
+	B2_ARGS+=("address-model=64")
 # if [ "$TAU_BUILD_PIC" = "ON" ]; then
 	B2_ARGS+=("cxxflags=-fPIC")
 # fi
+fi
 
 USER_CONFIG_ARG=""
 if [[ $DEP_TARGET == w64 ]]; then
@@ -54,8 +61,19 @@ using gcc : mingw64 : x86_64-w64-mingw32-g++
 EOF
 	USER_CONFIG_ARG="--user-config=./user-config.jam"
 	B2_ARGS+=("target-os=windows")
+elif [[ $DEP_TARGET == emscripten ]]; then
+	EMSCRIPTEN_DIR="${TAU_SHARED_PREFIX}/emsdk/upstream/emscripten"
+	cat > "$BOOST_SOURCE_DIR/user-config.jam" << EOF
+using emscripten : : ${EMSCRIPTEN_DIR}/em++ ;
+EOF
+	USER_CONFIG_ARG="--user-config=./user-config.jam"
+	B2_ARGS+=("toolset=emscripten")
+	B2_ARGS+=("link=static")
+	# pthreads would drag SharedArrayBuffer and COOP/COEP into the library
+	B2_ARGS+=("threading=single")
+	B2_ARGS+=("define=BOOST_LOG_WITHOUT_SYSLOG")
 else
-	# remove user-config.jam if it exists from previous Windows build
+	# remove user-config.jam if it exists from previous Windows/wasm build
 	rm -f "$BOOST_SOURCE_DIR/user-config.jam"
 	if [ "$(uname)" = "Darwin" ]; then
 		B2_ARGS+=("target-os=darwin")
