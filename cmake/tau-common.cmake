@@ -31,9 +31,12 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
-# LTO only pays off when something LTO-links it; test targets are all -fno-lto
-if (TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
+# LTO only pays off when something LTO-links it; test targets are all -fno-lto.
+# -ffat-lto-objects is what lets those -fno-lto targets link an LTO-built
+# library, and em++ has no equivalent, so wasm takes the LTO-off path whole.
+if ((TAU_BUILD_EXECUTABLE OR TAU_BUILD_SHARED_EXECUTABLE
 	OR TAU_BUILD_SHARED_LIBRARY OR TAU_BUILD_BINDING_PYTHON)
+	AND NOT EMSCRIPTEN)
 	set(TAU_LTO_COMPILE ";-flto=auto;-ffat-lto-objects")
 	set(TAU_LTO_LINK "-flto=auto")
 else()
@@ -105,6 +108,11 @@ function(target_setup target)
 		)
 	else()
 		target_compile_options(${target} PRIVATE /W4)
+	endif()
+	# emsdk ships a newer clang than the host one, which reports unused
+	# templates the rest of the toolchains accept
+	if(EMSCRIPTEN)
+		target_compile_options(${target} PRIVATE -Wno-unused-template)
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")
