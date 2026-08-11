@@ -1,0 +1,41 @@
+{
+	"name": "@idni/tau-lang",
+	"version": "@TAU_VERSION@",
+	"description": "Node.js and WebAssembly bindings for IDNI's Tau Language Framework.",
+	"license": "SEE LICENSE IN LICENSE.md",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/IDNI/tau-lang.git",
+		"directory": "bindings/js"
+	},
+	"type": "commonjs",
+	"engines": {
+		"node": ">=18"
+	},
+	"main": "./tau.js",
+	"module": "./tau.esm.mjs",
+	"exports": {
+		".": {
+			"import": "./tau.esm.mjs",
+			"require": "./tau.js",
+			"default": "./tau.js"
+		}
+	},
+	"files": [
+		"tau.js",
+		"tau.wasm",
+		"tau.esm.mjs",
+		"tau.esm.wasm",
+		"tau.node.js",
+		"tau.node.mjs",
+		"LICENSE.md",
+		"tests/parity.js",
+		"tests/native.js"
+	],
+	"scripts": {
+		"test:smoke": "node tau.node.js",
+		"test:smoke:esm": "node tau.node.mjs",
+		"test:parity": "node tests/parity.js",
+		"test": "npm run test:smoke && npm run test:smoke:esm && npm run test:parity"
+	}
+}
