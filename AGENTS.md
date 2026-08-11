@@ -235,3 +235,17 @@ The external C++ API. Template specializations live in `api.tmpl.h`, `api.tmpl.s
 - Task annotations: `TODO`, `DOING`, `IDEA`, `FIXME`, `REVIEW`, `DOCUMENTATION`, `MARK` with priority tags `(IMPORTANT)`, `(HIGH)`, `(MEDIUM)`, `(LOW)`, `(VERY LOW)`.
 - External dependencies (CVC5, Boost) are installed to `~/.tau/` by `./dev dep-cvc5.sh` and `./dev dep-boost.sh`.
 - The parser library is a git submodule at `external/parser/`.
+
+### Comments
+
+- Comment only what the code cannot state itself. If the line below already
+  says it, delete the comment. One line where one will do.
+- Describe the code as it stands — never what it replaced, which alternative
+  was rejected, or the debugging that led here.
+- Do prefer a comment where a reader could undo something by accident: a flag
+  that must not be removed, an ordering requirement, a non-obvious platform or
+  tool behaviour.
+- **Never cite an identifier that does not exist.** `[SHAPE-Q-NN]` (in
+  `tests/unit/parser/`), `AP-N` and `BA-N` are real test-case id conventions;
+  do not invent lookalikes for code that has no id. A reference that resolves
+  to nothing costs the next reader more than no reference at all.
