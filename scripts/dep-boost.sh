@@ -67,4 +67,4 @@ fi
 
 # build boost
 ./bootstrap.sh --with-libraries=log && \
-./b2 ${USER_CONFIG_ARG} --prefix=$BOOST_PREFIX "${B2_ARGS[@]}" install
+./b2 ${USER_CONFIG_ARG} --prefix=$BOOST_PREFIX --build-dir="$BOOST_BUILD_DIR" "${B2_ARGS[@]}" install
