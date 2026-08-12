@@ -120,7 +120,7 @@ static bool compile_and_run_ok_step(const std::string& header_src) {
 
 TEST_SUITE("cpp_codegen_pwr") {
 
-	TEST_CASE("safety PWR result can be synthesized and emitted") {
+	TEST_CASE("safety PWR result can be synthesized and emitted" * doctest::skip(!ltlsynt_available())) {
 		auto generated = emit_revised_cpp(
 			"G(o1[t] = 0).",
 			"G(o1[t] = 1).");
@@ -131,7 +131,7 @@ TEST_SUITE("cpp_codegen_pwr") {
 		CHECK(has(*generated, "ok = true"));
 	}
 
-	TEST_CASE("temporal PWR result can be synthesized and emitted") {
+	TEST_CASE("temporal PWR result can be synthesized and emitted" * doctest::skip(!ltlsynt_available())) {
 		auto generated = emit_revised_cpp(
 			"sometimes(o1[t] = 1).",
 			"G(o1[t] = 0).",
@@ -142,7 +142,7 @@ TEST_SUITE("cpp_codegen_pwr") {
 		CHECK(has(*generated, "Outputs step(const Inputs&"));
 	}
 
-	TEST_CASE("PWR-revised generated header compiles and steps") {
+	TEST_CASE("PWR-revised generated header compiles and steps" * doctest::skip(!ltlsynt_available())) {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		auto generated = emit_revised_cpp(
 			"G(o1[t] = 0).",
@@ -157,7 +157,7 @@ TEST_SUITE("cpp_codegen_pwr") {
 
 TEST_SUITE("cpp_codegen_pwr_table") {
 
-	TEST_CASE("PWR emitter produces table-driven class") {
+	TEST_CASE("PWR emitter produces table-driven class" * doctest::skip(!ltlsynt_available())) {
 		auto generated = emit_pwr_class("G(o1[t] = 0).", "PwrSafety");
 		REQUIRE(generated.has_value());
 		CHECK(has(*generated, "class PwrSafety {"));
@@ -168,7 +168,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		CHECK(has(*generated, "load_initial_strategy"));
 	}
 
-	TEST_CASE("PWR emitter includes step() and state()") {
+	TEST_CASE("PWR emitter includes step() and state()" * doctest::skip(!ltlsynt_available())) {
 		auto generated = emit_pwr_class("G(o1[t] = 0).", "PwrStep");
 		REQUIRE(generated.has_value());
 		CHECK(has(*generated, "Outputs step(const Inputs&"));
@@ -176,7 +176,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		CHECK(has(*generated, "const Strategy& strategy() const"));
 	}
 
-	TEST_CASE("strategy initializer produces valid C++ fragment") {
+	TEST_CASE("strategy initializer produces valid C++ fragment" * doctest::skip(!ltlsynt_available())) {
 		auto init = emit_strat_init("G(o1[t] = 0).");
 		REQUIRE(init.has_value());
 		CHECK(has(*init, "num_states"));
@@ -184,7 +184,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		CHECK(has(*init, "edges"));
 	}
 
-	TEST_CASE("PWR emitter handles input+output spec") {
+	TEST_CASE("PWR emitter handles input+output spec" * doctest::skip(!ltlsynt_available())) {
 		auto generated = emit_pwr_class(
 			"G(i1[t] = 0 -> o1[t] = 0).", "PwrIO");
 		REQUIRE(generated.has_value());
@@ -194,7 +194,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		CHECK(has(*generated, "o_"));
 	}
 
-	TEST_CASE("PWR emitter with different spec produces valid class") {
+	TEST_CASE("PWR emitter with different spec produces valid class" * doctest::skip(!ltlsynt_available())) {
 		// Synthesize two different specs and verify both emit valid PWR classes.
 		auto gen1 = emit_pwr_class("G(o1[t] = 0).", "PwrSpec1");
 		auto gen2 = emit_pwr_class("G(o1[t] = 1).", "PwrSpec2");
@@ -206,7 +206,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		CHECK(has(*gen2, "void revise("));
 	}
 
-	TEST_CASE("PWR table-driven class compiles and steps") {
+	TEST_CASE("PWR table-driven class compiles and steps" * doctest::skip(!ltlsynt_available())) {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		auto generated = emit_pwr_class("G(o1[t] = 0).", "PwrTblRun");
 		REQUIRE(generated.has_value());
@@ -245,7 +245,7 @@ TEST_SUITE("cpp_codegen_pwr_table") {
 		CHECK(line == "OK");
 	}
 
-	TEST_CASE("PWR revise() compiles and resets state") {
+	TEST_CASE("PWR revise() compiles and resets state" * doctest::skip(!ltlsynt_available())) {
 		if (!has_gpp()) { MESSAGE("g++ not available, skipping"); return; }
 		// Generate two strategies from different specs, then revise().
 		auto gen1 = emit_pwr_class("G(o1[t] = 0).", "PwrRevT");

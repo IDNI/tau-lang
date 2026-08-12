@@ -108,6 +108,19 @@ static std::pair<std::string, int> spawn_capture(
 #endif // __EMSCRIPTEN__
 }
 
+// Cached: computed once per process from the same spawn_capture() this file
+// uses to run ltlsynt itself, so this can't drift from call_ltlsynt's own
+// not-found detection. Under Emscripten, spawn_capture() unconditionally
+// returns exit code 127 (no process model), so this is false by construction.
+inline bool ltlsynt_available() {
+	static const bool available = [] {
+		auto [out, exit_code] = spawn_capture({"ltlsynt", "--version"});
+		(void)out;
+		return exit_code != 127;
+	}();
+	return available;
+}
+
 // Legacy shim kept for the few sites still passing a pre-built shell
 // command line (autfilt --dot, ltlfilt -f).  These paths will be migrated
 // in a follow-up; for now they incur the popen-shell cost only on rarely-
