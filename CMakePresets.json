@@ -80,6 +80,16 @@
 			"binaryDir": "${sourceDir}/build/debug-emscripten"
 		},
 		{
+			"name": "_build_dir-emscripten-tests",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/emscripten-tests"
+		},
+		{
+			"name": "_build_dir-debug-emscripten-tests",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-emscripten-tests"
+		},
+		{
 			"name": "_build_dir-coverage",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/coverage"
@@ -173,6 +183,15 @@
 			"name": "_build-api-tests",
 			"hidden": true,
 			"cacheVariables": {
+				"TAU_BUILD_API_TESTS": "ON"
+			}
+		},
+		{
+			"name": "_build-wasm-tests",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_UNIT_TESTS": "ON",
+				"TAU_BUILD_INTEGRATION": "ON",
 				"TAU_BUILD_API_TESTS": "ON"
 			}
 		},
@@ -383,6 +402,28 @@
 				"_toolchain-emscripten",
 				"_bas-sbf-tau",
 				"_build-binding-js",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "emscripten-tests",
+			"inherits": [
+				"_build_dir-emscripten-tests",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-sbf-tau",
+				"_build-wasm-tests",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-emscripten-tests",
+			"inherits": [
+				"_build_dir-debug-emscripten-tests",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-sbf-tau",
+				"_build-wasm-tests",
 				"_build-type-debug"
 			]
 		},
@@ -761,6 +802,14 @@
 			"configurePreset": "debug-emscripten"
 		},
 		{
+			"name": "emscripten-tests",
+			"configurePreset": "emscripten-tests"
+		},
+		{
+			"name": "debug-emscripten-tests",
+			"configurePreset": "debug-emscripten-tests"
+		},
+		{
 			"name": "relwithdebinfo",
 			"configurePreset": "relwithdebinfo"
 		},
@@ -877,6 +926,14 @@
 		{
 			"name": "release-api-tests",
 			"configurePreset": "release-api-tests"
+		},
+		{
+			"name": "emscripten-tests",
+			"configurePreset": "emscripten-tests"
+		},
+		{
+			"name": "debug-emscripten-tests",
+			"configurePreset": "debug-emscripten-tests"
 		},
 		{
 			"name": "release-all",
