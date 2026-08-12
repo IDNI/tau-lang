@@ -24,14 +24,14 @@ node<BAs...> node<BAs...>::ba_retype(size_t new_ba) const {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-node<BAs...> node<BAs...>::replace_data(size_t new_data) const {
+node<BAs...> node<BAs...>::replace_data(T new_data) const {
 	return node(nt, new_data, term, ba_type, ext);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_constant(
-	size_t constant_id, size_t ba_type_id)
+	T constant_id, size_t ba_type_id)
 {
 	// LOG_TRACE << " -- node::ba_constant: constant_id: "
 	// 	<< constant_id << " : " << LOG_BA_TYPE_DUMP(ba_type_id);
@@ -89,7 +89,7 @@ inline bool is_term_nt(size_t nt) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
+constexpr node<BAs...>::node(size_t nt, T data, size_t is_term,
 		size_t ba_type, size_t ext) noexcept
 	: nt(nt), term(is_term || is_term_nt(nt)), ext(ext), data(data), ba_type(ba_type),
 		hash(hashit())
