@@ -477,7 +477,21 @@ TEST_SUITE("simplify_using_equality") {
 		const char* s = "o1[t] = i1[t] && o2[t] = o1[t].";
 		tref fm = get_nso_rr(s).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
-		CHECK(tau::get(res).to_str() == "o1[t]:tau = i1[t]:tau && i1[t]:tau = o2[t]:tau");
+		// Operand orientation within each equality (output left, input
+		// right) is decided by term_comp's documented input/output
+		// priority, never reaching the subtree_less tie-break, so it is
+		// exact and hash-policy-independent here -- assert both conjuncts'
+		// strings precisely. Which conjunct comes first is AND
+		// commutativity, decided by a content hash, so that part is
+		// checked order-insensitively.
+		trefs conjs = get_cnf_wff_clauses<node_t>(res);
+		strings got;
+		for (tref c : conjs) got.push_back(tau::get(c).to_str());
+		std::ranges::sort(got);
+		strings expected = {
+			"o1[t]:tau = i1[t]:tau", "o2[t]:tau = i1[t]:tau" };
+		std::ranges::sort(expected);
+		CHECK(got == expected);
 	}
 
 	TEST_CASE("io_output_var_replaced_when_equality_added_later") {
