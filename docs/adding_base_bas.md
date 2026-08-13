@@ -30,7 +30,10 @@ listed ids, and generates `tau_pack.h` into the build tree:
 | `TAU_PACK_HAS_BA_<ID>` | one define per enabled BA |
 
 `tau` is a reserved id: the wrapper BA embedding a whole Tau spec. When listed,
-the resolver emits `node<tau_ba<base...>, base...>`.
+the resolver emits `node<tau_ba<base...>, base...>`. Only `tau_ba` implements
+`pack`/`unpack`, the tree/value bridge that lets core pull an embedded spec
+out of, and back into, a constant — that pair is not part of the generic
+descriptor contract below, since every other BA has nothing to bridge.
 
 At runtime the pack answers for itself: `node::ba::types()` returns the
 descriptors' `type_name`s in pack order, `type_names()` the same as a
@@ -72,7 +75,6 @@ against the line naming it:
 - **constants** — `is_one`, `is_zero`, `is_syntactic_one`, `is_syntactic_zero`,
   `is_closed`, `literal_one`, `literal_zero`
 - **normalization** — `normalize`, `splitter`, `splitter_one`
-- **tree bridge** — `pack`, `unpack` (only the wrapper BA does anything here)
 - **rewriting** — `simplify_symbol`, `simplify_term`
 - **parsing** — `parse`
 

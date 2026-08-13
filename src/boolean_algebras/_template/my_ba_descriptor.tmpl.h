@@ -87,10 +87,6 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 
 	static tref splitter_one(tref) { return nullptr; }
 
-	// ── tree/value bridge, for a BA that embeds Tau trees ───────────────
-	static tref unpack(const my_ba&) { return nullptr; }
-	static std::optional<my_ba> pack(tref) { return std::nullopt; }
-
 	// ── term rewriting owned by this BA ─────────────────────────────────
 	static tref simplify_symbol(tref sym) { return sym; }
 	static tref simplify_term(tref term) { return term; }

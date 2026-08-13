@@ -84,11 +84,6 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 
 	static tref splitter_one(tref) { return nullptr; }
 
-	/** @brief Bool holds no Tau spec, so there is nothing to unpack. */
-	static tref unpack(const Bool&) { return nullptr; }
-
-	static std::optional<Bool> pack(tref) { return std::nullopt; }
-
 	static tref simplify_symbol(tref sym) { return sym; }
 
 	static tref simplify_term(tref term) { return term; }

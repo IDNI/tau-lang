@@ -105,11 +105,6 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 	static tref splitter_one(tref) { return nullptr; }
 
-	/** @brief bv holds no Tau spec, so there is nothing to unpack. */
-	static tref unpack(const bv&) { return nullptr; }
-
-	static std::optional<bv> pack(tref) { return std::nullopt; }
-
 	static tref simplify_symbol(tref sym) {
 		return simplify_bv_symbol<node_t>(sym);
 	}

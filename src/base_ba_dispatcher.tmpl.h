@@ -219,7 +219,10 @@ tref base_ba_dispatcher<BAs...>::unpack_tau_ba(
 	const std::variant<BAs...>& elem)
 {
 	return std::visit([](const auto& x) -> tref {
-		return ba_descriptor<std::decay_t<decltype(x)>, node_t>::unpack(x);
+		using BA = std::decay_t<decltype(x)>;
+		if constexpr (is_tau_ba_v<BA>)
+			return ba_descriptor<BA, node_t>::unpack(x);
+		else return (tref)nullptr;
 	}, elem);
 }
 

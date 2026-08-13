@@ -113,9 +113,6 @@ struct ba_descriptor<ext_ba, node<PackBAs...>> {
 	static ext_ba splitter(const ext_ba& x, splitter_type) { return x; }
 	static tref splitter_one(tref) { return nullptr; }
 
-	static tref unpack(const ext_ba&) { return nullptr; }
-	static std::optional<ext_ba> pack(tref) { return std::nullopt; }
-
 	static tref simplify_symbol(tref sym) { return sym; }
 	static tref simplify_term(tref term) { return term; }
 

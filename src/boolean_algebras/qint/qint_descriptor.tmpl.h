@@ -79,11 +79,6 @@ struct ba_descriptor<qint, node<PackBAs...>> {
 			type_tree()));
 	}
 
-	/** @brief qint holds no Tau spec, so there is nothing to unpack. */
-	static tref unpack(const qint&) { return nullptr; }
-
-	static std::optional<qint> pack(tref) { return std::nullopt; }
-
 	static tref simplify_symbol(tref sym) { return simplify_qint_symbol(sym); }
 
 	static tref simplify_term(tref term) { return simplify_qint_term(term); }

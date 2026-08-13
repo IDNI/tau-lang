@@ -95,11 +95,6 @@ struct ba_descriptor<nlang_ba, node<PackBAs...>> {
 			type_tree()));
 	}
 
-	/** @brief nlang holds no Tau spec, so there is nothing to unpack. */
-	static tref unpack(const nlang_ba&) { return nullptr; }
-
-	static std::optional<nlang_ba> pack(tref) { return std::nullopt; }
-
 	static tref simplify_symbol(tref sym) {
 		return simplify_nlang_symbol(sym);
 	}

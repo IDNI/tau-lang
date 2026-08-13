@@ -102,11 +102,6 @@ struct ba_descriptor<qlt, node<PackBAs...>> {
 			type_tree()));
 	}
 
-	/** @brief qlt holds no Tau spec, so there is nothing to unpack. */
-	static tref unpack(const qlt&) { return nullptr; }
-
-	static std::optional<qlt> pack(tref) { return std::nullopt; }
-
 	static tref simplify_symbol(tref sym) { return simplify_qlt_symbol(sym); }
 
 	static tref simplify_term(tref term) { return simplify_qlt_term(term); }

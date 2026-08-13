@@ -90,11 +90,6 @@ struct ba_descriptor<sbf_ba, node<PackBAs...>> {
 			type_tree()));
 	}
 
-	/** @brief sbf holds no Tau spec, so there is nothing to unpack. */
-	static tref unpack(const sbf_ba&) { return nullptr; }
-
-	static std::optional<sbf_ba> pack(tref) { return std::nullopt; }
-
 	static tref simplify_symbol(tref sym) { return simplify_sbf_symbol(sym); }
 
 	static tref simplify_term(tref term) { return simplify_sbf_term(term); }

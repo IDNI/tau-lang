@@ -140,11 +140,6 @@ concept ba_descriptor_complete =
         ba_descriptor<BA, Node>::splitter(x, st);                    }
  && requires(tref t) {
         ba_descriptor<BA, Node>::splitter_one(t);                    }
-	// tree/value bridge
- && requires(const BA& x) {
-        ba_descriptor<BA, Node>::unpack(x);                          }
- && requires(tref t) {
-        ba_descriptor<BA, Node>::pack(t);                            }
 	// symbol and term simplification
  && requires(tref t) {
         ba_descriptor<BA, Node>::simplify_symbol(t);                 }

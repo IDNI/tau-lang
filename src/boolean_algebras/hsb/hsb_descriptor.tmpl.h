@@ -81,11 +81,6 @@ struct ba_descriptor<hsb, node<PackBAs...>> {
 			type_tree()));
 	}
 
-	/** @brief hsb holds no Tau spec, so there is nothing to unpack. */
-	static tref unpack(const hsb&) { return nullptr; }
-
-	static std::optional<hsb> pack(tref) { return std::nullopt; }
-
 	static tref simplify_symbol(tref sym) { return simplify_hsb_symbol(sym); }
 
 	static tref simplify_term(tref term) { return simplify_hsb_term(term); }
