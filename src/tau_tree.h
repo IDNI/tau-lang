@@ -148,7 +148,7 @@ struct node {
 	const T ext  : 1         = 0; ///< 1 = data stored in child (not yet used).
 	const T data : data_bits = 0; ///< Inline data (meaning depends on `nt`).
 	const unsigned short ba_type; ///< Boolean-algebra type id.
-	const size_t hash;            ///< Pre-computed hash for fast equality checks.
+	const uint64_t hash;          ///< Pre-computed hash for fast equality checks.
 
 	/**
 	 * @brief Generic constructor.
@@ -211,7 +211,7 @@ struct node {
 	constexpr auto     operator!= (const node& that) const;
 
 	/** @brief Return the pre-computed hash value for this node. */
-	constexpr size_t hashit() const;
+	constexpr uint64_t hashit() const;
 };
 
 /// @brief Placeholder for parser nonterminal grouping.

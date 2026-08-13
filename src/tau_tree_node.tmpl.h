@@ -199,8 +199,8 @@ constexpr auto node<BAs...>::operator!=(const node& that) const {
 }
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr size_t node<BAs...>::hashit() const {
-	std::size_t seed = 0;
+constexpr uint64_t node<BAs...>::hashit() const {
+	std::uint64_t seed = 0;
 	hash_combine(seed, static_cast<size_t>(nt));
 	// term bit is derived from nt via is_term_nt() and intentionally excluded
 	// hash_combine(seed, static_cast<bool>(term));
