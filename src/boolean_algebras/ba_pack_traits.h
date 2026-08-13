@@ -15,6 +15,7 @@
 #include <type_traits>
 
 #include "boolean_algebras/ba_descriptor.h"
+#include "utility/tree_types.h"
 
 namespace idni::tau_lang {
 
@@ -261,7 +262,7 @@ bool pack_type_has_arith_ops(size_t ba_type) {
 
 /** @brief `true` when the BA owning type tree @p type declares arith_ops. */
 template <typename Node>
-bool pack_type_has_arith_ops(const intptr_t* type) {
+bool pack_type_has_arith_ops(tref type) {
 	return pack_type_has_arith_ops_impl<Node>(type);
 }
 
@@ -278,12 +279,11 @@ concept ba_has_zero_constant = requires(size_t t) {
  * Returns nullptr when no BA in the pack owns the type or offers the
  * capability, so callers branch on the result rather than on a BA name. Unlike
  * pack_solve, reaching the empty case here is an ordinary runtime outcome, not
- * a sign that a gate has drifted. `tref` is spelled out as `const intptr_t*`,
- * as in ba_descriptor.h, to keep parser headers out of these traits.
+ * a sign that a gate has drifted.
  */
 template <typename Node>
-const intptr_t* pack_zero_constant(size_t ba_type) {
-	const intptr_t* out = nullptr;
+tref pack_zero_constant(size_t ba_type) {
+	tref out = nullptr;
 	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
 		([&] {
 			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
@@ -310,8 +310,8 @@ concept ba_has_value_constant = requires(size_t t, size_t v) {
  * the BA represents it.
  */
 template <typename Node>
-const intptr_t* pack_value_constant(size_t ba_type, size_t value) {
-	const intptr_t* out = nullptr;
+tref pack_value_constant(size_t ba_type, size_t value) {
+	tref out = nullptr;
 	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
 		([&] {
 			using BA = std::tuple_element_t<Is, typename Node::bas_tuple>;
@@ -363,7 +363,7 @@ bool pack_type_is_non_aba_omcat(size_t ba_type) {
 #define TAU_PACK_TRAITS_WFF_HOOK(mem) \
 	template <typename Node, typename BA> \
 	constexpr bool ba_has_##mem##_hook_v = requires( \
-		const intptr_t* const* ch, const intptr_t* r) { \
+		const tref* ch, tref r) { \
 		ba_wff_hooks<BA, Node>::mem(ch, r); \
 	}; \
 	template <typename Node, typename BA> \
@@ -431,7 +431,7 @@ constexpr int ba_carrier_rank(const char* order, const char* name) {
 
 /** @brief @p BA's carrier type, defaulting to its type_tree(). */
 template <typename Node, typename BA>
-const intptr_t* ba_bool_carrier_type() {
+tref ba_bool_carrier_type() {
 	if constexpr (requires { ba_descriptor<BA, Node>::bool_carrier_type(); })
 		return ba_descriptor<BA, Node>::bool_carrier_type();
 	else return ba_descriptor<BA, Node>::type_tree();
@@ -460,11 +460,11 @@ constexpr bool pack_can_host_bool() {
  * Never null: a pack with nothing to carry a bit fails the static_assert.
  */
 template <typename Node>
-const intptr_t* pack_bool_carrier_type() {
+tref pack_bool_carrier_type() {
 	static_assert(pack_can_host_bool<Node>(),
 		"no BA in this pack declares can_host_bool, so core has no type "
 		"to build a plain 0 or 1 in");
-	const intptr_t* out = nullptr;
+	tref out = nullptr;
 	int best = -1;
 	[&]<std::size_t... Is>(std::index_sequence<Is...>) {
 		([&] {
