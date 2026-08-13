@@ -162,6 +162,18 @@ std::weak_ordering node<BAs...>::operator<=>(const node& that) const {
 	//if (term != that.term) return NODE_CAST(term) <=> NODE_CAST(that.term);
 	if (ba_type   != that.ba_type)   return NODE_CAST(ba_type)   <=> NODE_CAST(that.ba_type);
 	if (ext  != that.ext)  return NODE_CAST(ext)  <=> NODE_CAST(that.ext);
+	// data is a pool index for string nts and ba_constant, not a value --
+	// comparing it raw orders by interning position, exactly the
+	// storage-position dependence this function's hash comparison above
+	// is meant to avoid. Dereference to the pooled value where possible.
+	// Strings are ordered, so this closes the gap for them; ba_constant's
+	// pooled type is a variant over the configured BA pack, and packs are
+	// only required to be equality_comparable (ba_descriptor_complete),
+	// not ordered -- bv, a default-pack BA, has no operator<=>, so an
+	// ordered variant comparison is ill-formed there. Raw data is the
+	// only option left for ba_constant. This is a determinism fix, not a
+	// hash-primitive choice, so it applies under every policy.
+	if (tree<node>::is_string_nt(nt)) return dict(data) <=> dict(that.data);
 	return NODE_CAST(data) <=> NODE_CAST(that.data);
 }
 #undef NODE_CAST
