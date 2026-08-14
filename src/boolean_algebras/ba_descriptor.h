@@ -136,10 +136,10 @@ concept ba_descriptor_complete =
 	// normalization and splitting
  && requires(const BA& x) {
         ba_descriptor<BA, Node>::normalize(x);                       }
- && requires(const BA& x, splitter_type st) {
-        ba_descriptor<BA, Node>::splitter(x, st);                    }
- && requires(tref t) {
-        ba_descriptor<BA, Node>::splitter_one(t);                    }
+ && (!ba_descriptor<BA, Node>::atomless || requires(const BA& x, splitter_type st) {
+        ba_descriptor<BA, Node>::splitter(x, st);                    })
+ && (!ba_descriptor<BA, Node>::atomless || requires(tref t) {
+        ba_descriptor<BA, Node>::splitter_one(t);                    })
 	// symbol and term simplification
  && requires(tref t) {
         ba_descriptor<BA, Node>::simplify_symbol(t);                 }

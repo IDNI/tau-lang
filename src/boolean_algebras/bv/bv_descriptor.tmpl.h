@@ -97,14 +97,6 @@ struct ba_descriptor<bv, node<PackBAs...>> {
 
 	static bv normalize(const bv& x) { return normalize_bv(x); }
 
-	/** @brief bv is atomic, so it has no splitter; the chains assert this. */
-	static bv splitter(const bv&, splitter_type) {
-		DBG(assert(false && "bv has no splitter");)
-		return {};
-	}
-
-	static tref splitter_one(tref) { return nullptr; }
-
 	static tref simplify_symbol(tref sym) {
 		return simplify_bv_symbol<node_t>(sym);
 	}

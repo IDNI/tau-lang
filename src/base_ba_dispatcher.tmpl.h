@@ -198,8 +198,10 @@ std::variant<BAs...> base_ba_dispatcher<BAs...>::splitter(
 {
 	return std::visit([&](const auto& x) -> std::variant<BAs...> {
 		using BA = std::decay_t<decltype(x)>;
-		return std::variant<BAs...>(
-			ba_descriptor<BA, node_t>::splitter(x, st));
+		if constexpr (requires { ba_descriptor<BA, node_t>::splitter(x, st); })
+			return std::variant<BAs...>(
+				ba_descriptor<BA, node_t>::splitter(x, st));
+		else return std::variant<BAs...>(x);
 	}, elem);
 }
 
@@ -207,8 +209,14 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref base_ba_dispatcher<BAs...>::splitter_one(tref type_tree) {
 	std::optional<tref> out;
+	auto try_splitter_one = [&]<typename BA>() -> tref {
+		if constexpr (requires {
+			ba_descriptor<BA, node_t>::splitter_one(type_tree); })
+			return ba_descriptor<BA, node_t>::splitter_one(type_tree);
+		else return nullptr;
+	};
 	(void)((ba_descriptor<BAs, node_t>::matches_type(type_tree)
-		? (out = ba_descriptor<BAs, node_t>::splitter_one(type_tree), true)
+		? (out = try_splitter_one.template operator()<BAs>(), true)
 		: false) || ...);
 	return out.value_or(nullptr);
 }

@@ -195,10 +195,8 @@ void check_splitter() {
 			CHECK(eq(y & one, y));
 		}
 
-		if constexpr (requires { desc::splitter_one(type); }) {
-			tref s = desc::splitter_one(type);
-			CHECK(s != nullptr);
-		}
+		tref s = desc::splitter_one(type);
+		CHECK(s != nullptr);
 	}
 }
 

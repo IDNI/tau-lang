@@ -79,11 +79,6 @@ struct ba_descriptor<Bool, node<PackBAs...>> {
 
 	static Bool normalize(const Bool& x) { return normalize_bool(x); }
 
-	/** @brief Plain Bool has no BDD-based splitter; the chain returned it as-is. */
-	static Bool splitter(const Bool& x, splitter_type) { return x; }
-
-	static tref splitter_one(tref) { return nullptr; }
-
 	static tref simplify_symbol(tref sym) { return sym; }
 
 	static tref simplify_term(tref term) { return term; }

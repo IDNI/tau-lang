@@ -82,11 +82,6 @@ struct ba_descriptor<my_ba, node<PackBAs...>> {
 	// ── normalization and splitting ─────────────────────────────────────
 	static my_ba normalize(const my_ba& x) { return x; }
 
-	/** @brief Atomless BAs split an element; a finite one cannot. */
-	static my_ba splitter(const my_ba& x, splitter_type) { return x; }
-
-	static tref splitter_one(tref) { return nullptr; }
-
 	// ── term rewriting owned by this BA ─────────────────────────────────
 	static tref simplify_symbol(tref sym) { return sym; }
 	static tref simplify_term(tref term) { return term; }
