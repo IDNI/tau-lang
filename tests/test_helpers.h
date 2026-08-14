@@ -211,6 +211,105 @@ inline bool values_matches_any_of_canonical_conjuncts(const strings& values,
 	return true;
 }
 
+// ── tree comparison modulo AND/OR commutativity ─────────────────────────────
+//
+// canonical_conjunct_order (above) sorts substrings of the *printed* form,
+// so it only sees a top-level " && " split and nothing where bf_and prints
+// as juxtaposition or "&" (tau_tree_printers.tmpl.h). The helpers below
+// compare the *tree* instead, so they reach commutativity nested at any
+// depth and printed forms with no delimiter at all.
+
+// True for the associative-commutative Boolean connectives only. Every
+// other operator -- crucially bf_eq, whose operand orientation is meant to
+// be canonical and must not be masked by a test that can't see it wrong
+// (.local/build-emscripten.md §4i) -- is left untouched by the functions
+// below.
+inline bool is_and_or_nt(size_t nt) {
+	return nt == tau::wff_and || nt == tau::wff_or
+		|| nt == tau::bf_and  || nt == tau::bf_or;
+}
+
+// The single-child nonterminal ("wff" or "bf") that wraps every operand of
+// nt, and therefore sits between one wff_and/bf_and (etc.) node and the
+// next link of the same chain -- see build_wff_and/build_bf_and in
+// tau_tree_builders.tmpl.h, which build exactly `get(wrapper, get(nt, l,
+// r))`.
+inline size_t and_or_wrapper_nt(size_t nt) {
+	return (nt == tau::wff_and || nt == tau::wff_or) ? tau::wff : tau::bf;
+}
+
+// Flattens the (possibly multi-level) chain of nt-typed operands reachable
+// from t through and_or_wrapper_nt(nt), appending each operand that is not
+// itself part of the chain to out.
+inline void flatten_and_or_chain(tref t, size_t nt, size_t wrapper_nt,
+	trefs& out)
+{
+	const auto& nd = tau::get(t);
+	if (nd.value.nt == nt) {
+		for (tref c : nd.get_children())
+			flatten_and_or_chain(c, nt, wrapper_nt, out);
+	} else if (nd.value.nt == wrapper_nt && nd.children_size() == 1) {
+		flatten_and_or_chain(nd.only_child(), nt, wrapper_nt, out);
+	} else out.push_back(t);
+}
+
+// Canonicalizes t into a structural key: every node is tagged with its
+// nonterminal id. At a wff_and/wff_or/bf_and/bf_or node, the chain of
+// same-connective operands is flattened, each operand canonicalized
+// recursively, and the results sorted -- so operand order stops mattering
+// at every nesting level, not just the top one. Every other node (again,
+// crucially bf_eq) recurses into its children preserving their order. A
+// childless node's own printed form is used as its content, since there is
+// no ordering left to canonicalize once recursion bottoms out.
+inline std::string canonicalize_tref(tref t) {
+	if (!t) return "-";
+	const auto& nd = tau::get(t);
+	const size_t nt = nd.value.nt;
+	const std::string tag = std::to_string(nt);
+	if (is_and_or_nt(nt)) {
+		trefs operands;
+		flatten_and_or_chain(t, nt, and_or_wrapper_nt(nt), operands);
+		strings parts;
+		for (tref op : operands) parts.push_back(canonicalize_tref(op));
+		std::sort(parts.begin(), parts.end());
+		std::string res = tag + "[";
+		for (size_t i = 0; i < parts.size(); i++) {
+			if (i) res += ",";
+			res += parts[i];
+		}
+		return res + "]";
+	}
+	trefs ch = nd.get_children();
+	if (ch.empty()) return tag + ":" + nd.to_str();
+	std::string res = tag + "(";
+	for (size_t i = 0; i < ch.size(); i++) {
+		if (i) res += ",";
+		res += canonicalize_tref(ch[i]);
+	}
+	return res + ")";
+}
+
+// Compares result against expected up to AND/OR commutativity at every
+// nesting level. Equality (and every other) operand orientation must match
+// exactly -- see canonicalize_tref.
+inline bool matches_tree_mod_and_or(tref result, tref expected) {
+	return canonicalize_tref(result) == canonicalize_tref(expected);
+}
+
+// Parses expected_bf with the bf grammar (as get_bf_nso_rr's sample
+// argument does) and compares under matches_tree_mod_and_or.
+inline bool matches_bf_mod_and_or(tref result, const char* expected_bf) {
+	tref expected = tau::get(expected_bf, parse_bf());
+	return expected && matches_tree_mod_and_or(result, expected);
+}
+
+// Parses expected_wff with the wff grammar and compares under
+// matches_tree_mod_and_or.
+inline bool matches_wff_mod_and_or(tref result, const char* expected_wff) {
+	tref expected = tau::get(expected_wff, parse_wff());
+	return expected && matches_tree_mod_and_or(result, expected);
+}
+
 inline bool normalize_and_check(const char* sample, const strings& expected) {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;

@@ -440,13 +440,17 @@ TEST_SUITE("simplify_using_equality") {
 		tref fm = get_nso_rr(sample).value().main->get();
 		tref res = simplify_using_equality<node_t>(fm);
 		// y=x and z=x stay in some orientation — they must NOT become y=0/z=0.
-		// Which side an atom's variable prints on is decided by
-		// simplify_using_equality_term_comp's tau::subtree_less fallback for
-		// two plain variables, a content-hash tie-break that is not a
-		// guaranteed canonical order (see tau_bdd.tmpl.h for the analogous
-		// issue), so accept either orientation for the "z = x" atom.
-		CHECK((tau::get(res).to_str() == "x = 0 || x = y || z = x"
-			|| tau::get(res).to_str() == "x = 0 || x = y || x = z"));
+		// Two axes, treated differently on purpose. Disjunct order is
+		// wff_or commutativity, absorbed by matches_wff_mod_and_or. The
+		// "z = x" atom's own operand orientation is not: for two plain
+		// variables term_comp falls through to tau::subtree_less, a
+		// content-hash tie-break, so both orientations are accepted here.
+		// This is the same-category case only -- an equality whose
+		// operands differ in term_comp's priority order does have a
+		// canonical orientation, and those expectations stay exact so a
+		// violation of it still fails (.local/build-emscripten.md §4i).
+		CHECK((matches_wff_mod_and_or(res, "x = 0 || x = y || x = z")
+			|| matches_wff_mod_and_or(res, "x = 0 || x = y || z = x")));
 	}
 
 	TEST_CASE("nested_or_3_distinct_branches_each_simplified") {
