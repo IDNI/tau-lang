@@ -883,13 +883,18 @@ quantifier_block<node> collect_quantifier_block(tref n,
  * @param ctx_bv_is_solver_owned Formula-wide input of the eliminability
  *        analysis: `false` when the formula holds a constant of a Boolean
  *        algebra cvc5 cannot translate, in which case no bitvector scope
- *        anywhere in it will ever be decided by the solver. **Currently
- *        unread here**: the block view is synthesized from `el`, which was
- *        already built with this input applied (`analyse_formula`'s
- *        `analysis_context`), so nothing in this function needs to re-apply
- *        it. Kept in the signature because it is the pipeline's carrier for
- *        the formula-wide context (`anti_prenex` -> `process_quantifier_blocks`
- *        -> here) and Task 9 replaces it with the full `analysis_context`.
+ *        anywhere in it will ever be decided by the solver. It scopes the
+ *        `blasteable` verdicts of the synthesized block view below, exactly as
+ *        `analyse_block`'s `analysis_context` scoped its own seeds. Not
+ *        redundant with `el`: the three `eliminability<node>::bv_only()` entry
+ *        points (the 1-argument `anti_prenex`, `blast_block`'s re-entry,
+ *        `eliminate_block_over_clause`'s re-entry) hand down a floor built
+ *        from no context at all, so without this the bv content of a formula
+ *        carrying a foreign BA constant would be marked `blasteable` and
+ *        stranded -- the issue #70 shape. `anti_prenex` computes the flag once
+ *        (`!has_foreign_ba_constant`) and passes it through
+ *        `process_quantifier_blocks` to here. Task 9 replaces it with the full
+ *        `analysis_context`.
  * @return Formula with the quantifier block eliminated or pushed inward.
  * @endinternal
  */
@@ -905,9 +910,6 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	bool ctx_bv_is_solver_owned = true)
 {
 	using tau = tree<node>;
-	// Carried, not consumed: see the @param note above. `el` was built with
-	// this input already applied.
-	(void) ctx_bv_is_solver_owned;
 	trefs block_vars = blk.vars;
 	tref body = blk.body;
 	const bool is_ex = blk.is_ex;
@@ -1000,7 +1002,23 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// This one -- (c) -- was taken.
 		block_eliminability<node> elim{};
 		for (tref v : block_vars) {
-			const elim_verdict vd = el.verdict_of(v);
+			elim_verdict vd = el.verdict_of(v);
+			// `blasteable` means "bv-typed, and cvc5 can be
+			// expected to translate this formula". The second half
+			// is a property of the whole formula, and `el` does not
+			// always carry it: the three
+			// `eliminability<node>::bv_only()` entry points hand
+			// down an unconditional bv floor built from no context
+			// at all. Applying it here is what keeps a formula
+			// holding a foreign BA constant out of a solver that
+			// cannot represent it -- Boole decomposition is then the
+			// only route left for that content, and marking it
+			// `blasteable` would strand the quantifier for good
+			// (the issue #70 shape). `arithmetic` and `frozen` are
+			// untouched: neither is about solver ownership.
+			if (!ctx_bv_is_solver_owned
+				&& vd == elim_verdict::blasteable)
+					vd = elim_verdict::eliminable;
 			elim.verdicts.emplace(v, vd);
 			elim.members[vd].insert(v);
 		}
