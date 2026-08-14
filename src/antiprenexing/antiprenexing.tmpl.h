@@ -972,10 +972,25 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		// below sees). Only a bound variable's own scope can constrain
 		// it, so the block body is as informative as the whole formula
 		// and strictly fresher.
+		// Skip-composition position (2026-08-05, UNCOMMITTED -- kept for
+		// experiments): the per-block eliminability analysis is bypassed.
+		// Eliminability is then carried entirely by the composed `skip`
+		// predicates (bv type / ref entanglement / arith taint, see
+		// eliminate_bv_and_quantifiers) plus eliminate_block_over_clause's
+		// shape-based reservation fixpoint, which freezes unsqueezable
+		// conjuncts (refs, kept binders, bf_lt) per component. Measured
+		// against analyse_block on this tree: identical correctness
+		// (330/330 both configs, #70 included), but satisfiability2 costs
+		// ~17% more in Release (46.3 s vs 38.6 s) and ~2x in Debug
+		// (566 s vs 275 s) -- the seeding spares eliminations that end in
+		// re-wraps. Restore the analyse_block call below to get the
+		// analysis back; `elim` flows unchanged either way.
 		analysis_context<node> actx;
 		actx.bv_is_solver_owned = ctx_bv_is_solver_owned;
-		const block_eliminability<node> elim = analyse_block<node>(
-			block_vars, get_cnf_wff_clauses<node>(b), actx);
+		(void) actx;
+		const block_eliminability<node> elim{};
+		// const block_eliminability<node> elim = analyse_block<node>(
+		//	block_vars, get_cnf_wff_clauses<node>(b), actx);
 		subtree_unordered_set<node> used_atms;
 		// One budget per block elimination, shared by its whole
 		// recursion.
