@@ -47,6 +47,23 @@ TEST_SUITE("Tau API - string") {
 		CHECK(!tau_api::valid_spec("x = 0"));
 	}
 
+	// boole_normal_form(const string&) routed through
+	// get_spec_or_term(), so a one-line formula parsed as a spec node
+	// (spec(main(wff(...)))) rather than a bare wff; that wrapped tree
+	// reached tau_lang::boole_normal_form() -> syntactic_formula_simplification()
+	// -> syntactic_path_simplification_dnf::on() -> build_wff_neg(), whose
+	// assertion requires a bare wff and aborted the process for ordinary
+	// well-formed input. Fixed by routing through get_formula_or_term(),
+	// like dnf/cnf/nnf.
+	// Only asserting a value here already proves the abort is gone (an
+	// abort would take the whole test binary down), but pin the content
+	// too, not merely that a value came back.
+	TEST_CASE_FIXTURE(api_fixture, "boole_normal_form on well-formed input") {
+		auto bnf = tau_api::boole_normal_form("x = 0 && y = 1");
+		REQUIRE(bnf.has_value());
+		CHECK(bnf.value() == "x = 0 && y' = 0");
+	}
+
 	// §4e item 8: api<node>::solve(const string&) rendered every solved
 	// value with the generic bf-constant spelling ("0"/"1"), unlike the
 	// REPL's solve/lgrs commands (print_solver_cmd_solution ->

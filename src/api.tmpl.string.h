@@ -113,9 +113,8 @@ std::optional<std::string> api<node>::substitute(
 template <NodeType node>
 std::optional<std::string> api<node>::boole_normal_form(const std::string& expr)
 {
-	if (tref a = apply_all_defs(get_spec_or_term(expr)); a)
-		if (tref b = tau_lang::boole_normal_form<node>(a); b)
-			return to_str(b);
+	if (tref b = boole_normal_form(get_formula_or_term(expr)); b)
+		return to_str(b);
 	return {};
 }
 
