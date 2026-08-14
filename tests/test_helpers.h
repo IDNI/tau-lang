@@ -132,6 +132,85 @@ inline bool values_matches_any_of(const strings& values,
 	return true;
 }
 
+inline strings split_str(const std::string& s, const std::string& sep) {
+	strings parts;
+	size_t pos = 0, next;
+	while ((next = s.find(sep, pos)) != std::string::npos) {
+		parts.push_back(s.substr(pos, next - pos));
+		pos = next + sep.size();
+	}
+	parts.push_back(s.substr(pos));
+	return parts;
+}
+
+// Sorts s's operands, split on sep, and rejoins them with sep. A no-op
+// when s does not contain sep.
+inline std::string sort_join(const std::string& s, const std::string& sep) {
+	strings parts = split_str(s, sep);
+	if (parts.size() < 2) return s;
+	std::sort(parts.begin(), parts.end());
+	std::string result;
+	for (size_t i = 0; i < parts.size(); i++) {
+		if (i) result += sep;
+		result += parts[i];
+	}
+	return result;
+}
+
+// Sorts fm_str's top-level " && " conjuncts, and within each conjunct the
+// space-joined operands of its bf "and" (printed with no operator) on
+// either side of its " = ", so two orderings of the same conjunction
+// compare equal regardless of which of its commutative operators reordered.
+// A leading "always " applies to the whole formula, not to the first
+// conjunct, so it is set aside and restored afterwards. A no-op when
+// fm_str has no " && ".
+inline std::string canonical_conjunct_order(const std::string& fm_str) {
+	static const std::string always_prefix = "always ";
+	static const std::string and_sep = " && ";
+	static const std::string eq_sep = " = ";
+	const bool has_always = fm_str.starts_with(always_prefix);
+	const std::string body = has_always
+		? fm_str.substr(always_prefix.size()) : fm_str;
+	strings conjuncts = split_str(body, and_sep);
+	if (conjuncts.size() < 2) return fm_str;
+	for (auto& conjunct : conjuncts) {
+		strings sides = split_str(conjunct, eq_sep);
+		for (auto& side : sides) side = sort_join(side, " ");
+		std::string rebuilt;
+		for (size_t i = 0; i < sides.size(); i++) {
+			if (i) rebuilt += eq_sep;
+			rebuilt += sides[i];
+		}
+		conjunct = rebuilt;
+	}
+	std::sort(conjuncts.begin(), conjuncts.end());
+	std::string result = has_always ? always_prefix : "";
+	for (size_t i = 0; i < conjuncts.size(); i++) {
+		if (i) result += and_sep;
+		result += conjuncts[i];
+	}
+	return result;
+}
+
+inline bool matches_to_any_of_canonical_conjuncts(const std::string& fm_str,
+	const strings& expected)
+{
+	const std::string canon = canonical_conjunct_order(fm_str);
+	for (const auto& e : expected)
+		if (canon == canonical_conjunct_order(e)) return true;
+	return false;
+}
+
+inline bool values_matches_any_of_canonical_conjuncts(const strings& values,
+	const std::vector<strings>& expected)
+{
+	if (values.size() != expected.size()) return false;
+	for (size_t i = 0; i < values.size(); i++)
+		if (!matches_to_any_of_canonical_conjuncts(values[i], expected[i]))
+			return false;
+	return true;
+}
+
 inline bool normalize_and_check(const char* sample, const strings& expected) {
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return false;
