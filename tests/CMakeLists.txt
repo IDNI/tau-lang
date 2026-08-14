@@ -352,3 +352,23 @@ if (TAU_BUILD_BENCHMARK)
 	enable_testing()
 	add_subdirectory(benchmark)
 endif ()
+
+#
+# The whole suite above, once more, inside headless Chrome
+# (TAU_BUILD_BROWSER_TESTS, see the top-level CMakeLists.txt for the
+# Chrome/puppeteer-core install this depends on). One ctest entry rather
+# than one per test: bindings/js/tests/run-suite-in-chrome.js discovers the
+# list itself via `ctest --show-only=json-v1` so it can share one browser
+# and one static server per directory across the batch, which per-test
+# registration could not give it.
+#
+if (EMSCRIPTEN AND TAU_BUILD_BROWSER_TESTS)
+	enable_testing()
+	add_test(NAME browser_suite
+		COMMAND "${NODE_EXECUTABLE}"
+			"${PROJECT_SOURCE_DIR}/bindings/js/tests/run-suite-in-chrome.js"
+			"${PROJECT_BINARY_DIR}")
+	# ~460s observed at the default concurrency (2); 1200s leaves headroom
+	# without masking a genuine hang.
+	set_tests_properties(browser_suite PROPERTIES TIMEOUT 1200)
+endif ()

@@ -64,6 +64,7 @@ option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
 option(TAU_BUILD_BINDING_JS        "Build JS/WebAssembly embind bindings"  OFF)
+option(TAU_BUILD_BROWSER_TESTS     "Run the wasm test suite in headless Chrome (Emscripten only)" OFF)
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
 # Hash policy, forwarded to the parser (external/parser/CMakeLists.txt,
@@ -114,6 +115,7 @@ set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_MACOS_PACKAGE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_JS        PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_BROWSER_TESTS     PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_DONT_USE_FTXUI          PROPERTY STRINGS "OFF" "ON")
 
@@ -152,6 +154,13 @@ endif()
 
 if(TAU_WINDOW_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
 	message(FATAL_ERROR "Cannot build both Windows and Windows zip packages at the same time")
+endif()
+
+if(TAU_BUILD_BROWSER_TESTS AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_BUILD_BROWSER_TESTS=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
 endif()
 
 #
@@ -250,6 +259,7 @@ message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 message(STATUS "TAU_MACOS_PACKAGE: ${TAU_MACOS_PACKAGE}")
 message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
 message(STATUS "TAU_BUILD_BINDING_JS: ${TAU_BUILD_BINDING_JS}")
+message(STATUS "TAU_BUILD_BROWSER_TESTS: ${TAU_BUILD_BROWSER_TESTS}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
 message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
@@ -390,6 +400,44 @@ if (Boost_FOUND)
 	message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
 else()
 	message(FATAL_ERROR "Boost not found")
+endif()
+
+#
+# Install Chrome and the JS browser-test-harness devDependencies, only when
+# the wasm suite is to be run in a real browser (TAU_BUILD_BROWSER_TESTS,
+# Emscripten-only -- checked above). dep-chrome.sh and dep-js-test-deps.sh
+# are each idempotent, the same way dep-boost.sh/dep-cvc5.sh are above: a
+# second configure with the dependency already in place returns in well
+# under a second.
+#
+if(TAU_BUILD_BROWSER_TESTS)
+	# emsdk bundles its own node/npm/npx (see external/parser/cmake/
+	# use-emscripten.cmake for where TAU_SHARED_PREFIX/emsdk comes from);
+	# putting its bin/ first on PATH means neither script below needs a
+	# system node install.
+	file(GLOB _tau_emsdk_node_bin "${TAU_SHARED_PREFIX}/emsdk/node/*/bin")
+	list(LENGTH _tau_emsdk_node_bin _tau_emsdk_node_bin_count)
+	if(_tau_emsdk_node_bin_count EQUAL 0)
+		message(FATAL_ERROR
+			"TAU_BUILD_BROWSER_TESTS=ON needs emsdk's bundled node, not found "
+			"under ${TAU_SHARED_PREFIX}/emsdk/node. Run './dev dep-emsdk.sh' "
+			"first (the Emscripten toolchain itself already requires it).")
+	endif()
+	list(GET _tau_emsdk_node_bin 0 _tau_emsdk_node_bin)
+	message(STATUS "Browser tests: using node from ${_tau_emsdk_node_bin}")
+
+	execute_process(
+		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
+			bash ./dev dep-chrome.sh
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMAND_ERROR_IS_FATAL ANY
+	)
+	execute_process(
+		COMMAND ${CMAKE_COMMAND} -E env "PATH=${_tau_emsdk_node_bin}:$ENV{PATH}"
+			bash ./dev dep-js-test-deps.sh
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMAND_ERROR_IS_FATAL ANY
+	)
 endif()
 
 # Set RPATH where to find dependencies
