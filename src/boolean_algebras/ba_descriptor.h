@@ -83,6 +83,15 @@ concept ba_descriptor_complete =
 	// core compares constants against plain truth values
  && requires(const BA& x, bool b) {
         { x == b } -> std::convertible_to<bool>;                     }
+	// binary/unary operators core dispatches directly on a BA's value type
+ && requires(const BA& x, const BA& y) {
+        { x & y } -> std::convertible_to<BA>;                        }
+ && requires(const BA& x, const BA& y) {
+        { x | y } -> std::convertible_to<BA>;                        }
+ && requires(const BA& x, const BA& y) {
+        { x ^ y } -> std::convertible_to<BA>;                        }
+ && requires(const BA& x) {
+        { ~x } -> std::convertible_to<BA>;                           }
 	// identity and classification
  && requires { { ba_descriptor<BA, Node>::type_name }
                    -> std::convertible_to<const char*>;              }
