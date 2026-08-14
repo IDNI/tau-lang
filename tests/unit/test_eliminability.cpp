@@ -283,12 +283,24 @@ TEST_SUITE("eliminability") {
 	}
 
 	TEST_CASE("analyse_formula: quantifier scoping does not cross-contaminate") {
-		// Two unrelated binders of the same name: only the ref-entangled one
-		// freezes (mirrors the scoped-UF behavior of both old collectors).
+		// Two unrelated binders of the same name: the union-find must not
+		// merge across their scopes (w, entangled only with the second
+		// binder's body, stays eliminable) -- but the two "y" occurrences
+		// are the SAME tref (structurally-identical variables hash-cons to
+		// one node regardless of which quantifier scope pushed them), so
+		// the flat per-node result conservatively conflates them, exactly
+		// as the old collectors' flat sets do: y is frozen because ONE of
+		// its two binders reaches a reference, even though the other does
+		// not.
 		tref fm = get_nso_rr("(ex y q(y)) && (ex y (y w = 0)).")
 			.value().main->get();
 		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
 		tref w = get_free_vars<node_t>(fm)[0]; // w is the only free var
 		CHECK(el.verdict_of(w) == elim_verdict::eliminable);
+		auto vars = tau::get(fm).select_all(
+			(bool(*)(tref)) is_var_or_capture<node_t>);
+		tref y = *std::find_if(vars.begin(), vars.end(),
+			[w](tref v) { return v != w; });
+		CHECK(el.verdict_of(y) == elim_verdict::frozen);
 	}
 }

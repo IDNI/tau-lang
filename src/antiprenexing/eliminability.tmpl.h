@@ -323,8 +323,26 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 			if (elem.first == s) seen.insert(elem.second);
 		for (tref n : seen) {
 			elim_verdict v = join(ref_res.kind_of(n), bv_res.kind_of(n));
-			res.verdicts.insert_or_assign(n, v);
-			res.members[v].insert(n);
+			// A tref that is the SAME node under two unrelated binders
+			// (structurally-identical variables hash-cons to one tref
+			// regardless of which quantifier scope pushed them) is seen
+			// here once per scope, each with its own scope-local verdict.
+			// Both old collectors accumulate into a flat SET -- once
+			// used/tainted in ANY scope, always so -- so recording must
+			// join with whatever this node already resolved to, never
+			// overwrite it; `members` is rebucketed alongside so it never
+			// disagrees with `verdicts`.
+			if (auto it = res.verdicts.find(n); it != res.verdicts.end()) {
+				elim_verdict joined = join(it->second, v);
+				if (joined != it->second) {
+					res.members[it->second].erase(n);
+					it->second = joined;
+				}
+				res.members[joined].insert(n);
+			} else {
+				res.verdicts.emplace(n, v);
+				res.members[v].insert(n);
+			}
 		}
 	};
 
