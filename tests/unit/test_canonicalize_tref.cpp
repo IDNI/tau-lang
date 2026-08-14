@@ -71,12 +71,30 @@ TEST_SUITE("matches_tree_mod_and_or") {
 			"x = 0 && (y = 0 || z = 0)"));
 	}
 
-	TEST_CASE("negative: equality operand orientation is not normalized") {
-		// bf_eq is deliberately excluded from the commutative set (see
-		// .local/build-emscripten.md §4i): "x = y" and "y = x" must stay
-		// distinct.
+	TEST_CASE("equality between two plain variables ignores orientation") {
+		// Both operands fall into term_comp's same, final category (a
+		// plain variable, neither io nor an uninterpreted constant), so
+		// their order is a content-hash tie-break (subtree_less), not
+		// canonical -- .local/build-emscripten.md §4i's residual
+		// paragraph. "x = y" and "y = x" are the same case, not two.
 		tref fm = tau::get("x = y", parse_wff());
-		CHECK_FALSE(matches_wff_mod_and_or(fm, "y = x"));
+		CHECK(matches_wff_mod_and_or(fm, "y = x"));
+	}
+
+	TEST_CASE("negative: equality across term_comp categories keeps"
+		" orientation")
+	{
+		// An output stream variable and an input stream variable are
+		// different term_comp categories with a documented priority
+		// order (§4i), so this orientation is meant to be canonical --
+		// swapping it is a real bug, not noise, and must still fail.
+		// Built through get_nso_rr rather than parse_wff() directly: a
+		// bare parse leaves io_var's data field (which is_input_variable/
+		// is_output_variable key off) unset, so both operands would read
+		// as plain variables and the test would pass vacuously.
+		tref fm = get_nso_rr("o1[t] = i1[t].").value().main->get();
+		tref exp = get_nso_rr("i1[t] = o1[t].").value().main->get();
+		CHECK_FALSE(matches_tree_mod_and_or(fm, exp));
 	}
 
 	TEST_CASE("negative: undelimited bf_and with a different operand"

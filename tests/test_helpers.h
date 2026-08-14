@@ -223,10 +223,29 @@ inline bool values_matches_any_of_canonical_conjuncts(const strings& values,
 // other operator -- crucially bf_eq, whose operand orientation is meant to
 // be canonical and must not be masked by a test that can't see it wrong
 // (.local/build-emscripten.md §4i) -- is left untouched by the functions
-// below.
+// below. bf_eq gets its own, narrower exception: see
+// is_bare_variable_operand.
 inline bool is_and_or_nt(size_t nt) {
 	return nt == tau::wff_and || nt == tau::wff_or
 		|| nt == tau::bf_and  || nt == tau::bf_or;
+}
+
+// True for a bf_eq operand that is a plain variable -- neither an
+// uninterpreted constant, nor an input or output stream variable.
+// simplify_using_equality_term_comp (src/heuristics/simplify_using_equality.tmpl.h)
+// gives every other category a canonical priority order; only this one
+// falls through to tau::subtree_less, a content-hash tie-break (§4i's
+// residual paragraph). simplify_using_equality_dnf::term_comp
+// (normal_forms_bf.tmpl.h) implements the same order on the DNF path. op
+// is a bf-typed bf_eq child, as build_bf_eq requires.
+inline bool is_bare_variable_operand(tref op) {
+	const auto& o = tau::get(op);
+	if (o.children_size() != 1) return false;
+	const auto& v = o[0];
+	if (!v.is(tau::variable)) return false;
+	if (v.is_input_variable() || v.is_output_variable()) return false;
+	if (v.children_size() && v[0].is(tau::uconst_name)) return false;
+	return true;
 }
 
 // The single-child nonterminal ("wff" or "bf") that wraps every operand of
@@ -257,10 +276,16 @@ inline void flatten_and_or_chain(tref t, size_t nt, size_t wrapper_nt,
 // nonterminal id. At a wff_and/wff_or/bf_and/bf_or node, the chain of
 // same-connective operands is flattened, each operand canonicalized
 // recursively, and the results sorted -- so operand order stops mattering
-// at every nesting level, not just the top one. Every other node (again,
-// crucially bf_eq) recurses into its children preserving their order. A
-// childless node's own printed form is used as its content, since there is
-// no ordering left to canonicalize once recursion bottoms out.
+// at every nesting level, not just the top one. A bf_eq node whose two
+// operands are both bare variables (is_bare_variable_operand) sorts them
+// the same way -- that pair's orientation is hash-dependent, not
+// meaningful, per §4i's residual paragraph. Every other node (crucially
+// bf_eq between operands of different term_comp categories, e.g. an io
+// variable against a plain one) recurses into its children preserving
+// their order, since there the orientation is canonical and a violation of
+// it must still fail. A childless node's own printed form is used as its
+// content, since there is no ordering left to canonicalize once recursion
+// bottoms out.
 inline std::string canonicalize_tref(tref t) {
 	if (!t) return "-";
 	const auto& nd = tau::get(t);
@@ -280,6 +305,12 @@ inline std::string canonicalize_tref(tref t) {
 		return res + "]";
 	}
 	trefs ch = nd.get_children();
+	if (nt == tau::bf_eq && ch.size() == 2
+	&& is_bare_variable_operand(ch[0]) && is_bare_variable_operand(ch[1])) {
+		strings parts{ canonicalize_tref(ch[0]), canonicalize_tref(ch[1]) };
+		std::sort(parts.begin(), parts.end());
+		return tag + "(" + parts[0] + "," + parts[1] + ")";
+	}
 	if (ch.empty()) return tag + ":" + nd.to_str();
 	std::string res = tag + "(";
 	for (size_t i = 0; i < ch.size(); i++) {
