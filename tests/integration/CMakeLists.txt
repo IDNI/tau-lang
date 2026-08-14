@@ -44,6 +44,7 @@ set(TESTS
 	blasting_correctness_check3
 	blasting_correctness_check4
 	blasting_correctness_check5
+	bv_stress_check
 )
 
 foreach(X IN LISTS TESTS)

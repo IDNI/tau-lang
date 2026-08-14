@@ -287,6 +287,70 @@ TEST_SUITE("bv_ba_custom_simplification loops to a fixpoint (HE-6)") {
 	}
 }
 
+// A non-block operator (`>>`, `<<`, `%`, `&`, `|`, `^`, ...) is not itself a
+// block operand: `simplify_blocks` skips over it and keeps whatever frames its
+// operands pushed on the block stack. An enclosing `+`/`-`/`*`/`/` then folded
+// those operand frames as if they were its own operands, which silently dropped
+// the other side of the block and turned the shift into an addition; with one
+// more level of nesting the stack was left empty and `apply_block_operation`
+// read past the end of it.
+TEST_SUITE("blocks around non-block operators") {
+
+	TEST_CASE("subtraction of a shift keeps both operands") {
+		tref src = parse_bf("X:bv[8] - (Y:bv[8] >> {1}:bv[8])");
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
+	}
+
+	TEST_CASE("addition of a shift keeps both operands") {
+		tref src = parse_bf("X:bv[8] + (Y:bv[8] >> {2}:bv[8])");
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
+	}
+
+	TEST_CASE("addition of a conjunction keeps both operands") {
+		tref src = parse_bf("X:bv[8] + (Y:bv[8] & Z:bv[8])");
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
+	}
+
+	TEST_CASE("shift of a block nested in a block") {
+		tref src = parse_bf("X:bv[8] - ((Y:bv[8] - Z:bv[8]) >> {1}:bv[8])");
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
+	}
+
+	TEST_CASE("block inside a shift is still simplified") {
+		tref src = parse_bf("X:bv[8] - ((Y:bv[8] + {1}:bv[8] + {2}:bv[8]) >> {1}:bv[8])");
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE(simplified != nullptr);
+		tref expected = parse_bf("X:bv[8] - ((Y:bv[8] + {3}:bv[8]) >> {1}:bv[8])");
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
+	}
+
+	TEST_CASE("a multiplicative block inside an additive one is preserved") {
+		tref src = parse_bf("Y:bv[8] * Z:bv[8] + W:bv[8]");
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE(simplified != nullptr);
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(src));
+	}
+
+	TEST_CASE("blocks on both sides of a shift are simplified") {
+		tref src = parse_bf(
+			"X:bv[8] + {1}:bv[8] + {2}:bv[8] - (Y:bv[8] >> {1}:bv[8])");
+		tref simplified = bv_ba_custom_simplification<node_t>(src);
+		REQUIRE(simplified != nullptr);
+		// the non-constant operands fold first, the constants after
+		tref expected = parse_bf(
+			"X:bv[8] - (Y:bv[8] >> {1}:bv[8]) + {3}:bv[8]");
+		CHECK(tree<node_t>::get(simplified) == tree<node_t>::get(expected));
+	}
+}
+
 TEST_SUITE("Cleanup") {
 
 	TEST_CASE("ba_constants cleanup") {

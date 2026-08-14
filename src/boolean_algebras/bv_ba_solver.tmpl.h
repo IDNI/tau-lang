@@ -361,6 +361,33 @@ bool has_foreign_ba_constant(tref form) {
 	return tau::get(form).find_top(foreign) != nullptr;
 }
 
+/** @copydoc has_blasting_residue */
+template <NodeType node>
+bool has_blasting_residue(tref form) {
+	using tau = tree<node>;
+
+	// `bit_mask_cte` wraps the mask constant in a bf node, but the pipeline
+	// trims such wrappers, so accept the constant at either depth.
+	auto is_one_hot_mask = [](tref operand) -> bool {
+		if (!operand) return false;
+		tref c = tau::get(operand).is(tau::bf)
+			? tau::trim(operand) : operand;
+		if (!c || !tau::get(c).is_ba_constant()) return false;
+		const auto& cte = tau::get(c).get_ba_constant();
+		if (!std::holds_alternative<bv>(cte)) return false;
+		const bv& term = std::get<bv>(cte);
+		if (!term.isBitVectorValue()) return false;
+		const std::string bits = term.getBitVectorValue();
+		return std::ranges::count(bits, '1') == 1;
+	};
+	auto masking_conjunction = [&is_one_hot_mask](tref n) {
+		if (!tau::get(n).is(tau::bf_and)) return false;
+		return is_one_hot_mask(tau::get(n).first())
+			|| is_one_hot_mask(tau::get(n).second());
+	};
+	return tau::get(form).find_top(masking_conjunction) != nullptr;
+}
+
 /**
  * @brief Does @p form contain a quantifier of one kind nested inside one of the
  * other kind?
