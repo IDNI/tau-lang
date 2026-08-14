@@ -134,8 +134,28 @@ TEST_SUITE("eliminability") {
 		CHECK(a.conjuncts_of(unanalysed).empty());
 	}
 
-	TEST_CASE("bv-typed atoms are blasteable when the solver owns bv") {
+	TEST_CASE("a pure-BA bv atom is eliminable even where the solver owns bv") {
+		// User directive 2026-08-14: "bv variables that appear only in atoms
+		// that are purely BA are also eliminable." `&` is not arithmetic, so
+		// this atom is decided by Boole's expansion -- valid in any Boolean
+		// algebra -- and shipping it to cvc5 is work Tau can do itself. The
+		// verdict is recorded EXPLICITLY, which is what lets it beat the
+		// bv floor downstream.
 		tref c = get_nso_rr("x:bv[4] & y:bv[4] = 0:bv[4].")
+			.value().main->get();
+		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
+		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
+		for (tref v : conj_vars(c)) {
+			REQUIRE(a.verdicts.contains(v));
+			CHECK(a.verdict_of(v) == elim_verdict::eliminable);
+		}
+	}
+
+	TEST_CASE("bv arithmetic is blasteable when the solver owns bv") {
+		// The other side of the directive: an atom carrying an arithmetic
+		// operator blasting supports still belongs to the solver / blasting,
+		// whatever its variables would be worth on their own.
+		tref c = get_nso_rr("x:bv[4] + y:bv[4] = { 0 }:bv[4].")
 			.value().main->get();
 		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
@@ -187,8 +207,12 @@ TEST_SUITE("eliminability") {
 		// the exact blow-up this task exists to prevent -- because the
 		// deliberately coarse per-conjunct union still ties b's verdict
 		// to the same component as the bv atom.
+		//
+		// The bv content is arithmetic (`+`), not `&`: since the 2026-08-14
+		// directive a purely Boolean bv atom seeds `eliminable` on purpose,
+		// so only an arithmetic one still exercises the gate this pins.
 		tref c = get_nso_rr(
-			"(b = 0) -> (x:bv[4] & y:bv[4] = 0:bv[4]).").value().main->get();
+			"(b = 0) -> (x:bv[4] + y:bv[4] = { 0 }:bv[4]).").value().main->get();
 		trefs fvs = conj_vars(c);
 		tref b = *std::find_if(fvs.begin(), fvs.end(),
 			[](tref v) { return !is_tref_bv_type_family<node_t>(v); });
@@ -230,6 +254,31 @@ TEST_SUITE("eliminability") {
 		// variables are eliminable) depends on this direction.
 		e.verdicts.insert_or_assign(v, elim_verdict::eliminable);
 		CHECK(e.verdict_of(v) == elim_verdict::eliminable);
+	}
+
+	TEST_CASE("has_skip_content stops at an atom whose bv variables are eliminable") {
+		// What `find_top(skip)` cannot express, and why the probe is a
+		// method: the atom is a `wff` whose own BA type id is 0, while its
+		// terms and constants are bv-typed and floor to blasteable. A plain
+		// find_top therefore reports skip content INSIDE an atom the
+		// analysis explicitly cleared, and every pure-BA bv clause would
+		// still divert to blasting.
+		tref fm = get_nso_rr("x:bv[4] & y:bv[4] = 0:bv[4].")
+			.value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		CHECK_FALSE(el.has_skip_content(fm));
+		// The floor is untouched where the analysis vouched for nothing:
+		// bv_only() has no explicit verdicts, so no atom is ever covered --
+		// which is what keeps blasting's re-entry behaving as before.
+		CHECK(eliminability<node_t>::bv_only().has_skip_content(fm));
+		CHECK_FALSE(eliminability<node_t>::none().has_skip_content(fm));
+	}
+
+	TEST_CASE("has_skip_content still reports bv arithmetic") {
+		tref fm = get_nso_rr("x:bv[4] + y:bv[4] = { 0 }:bv[4].")
+			.value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		CHECK(el.has_skip_content(fm));
 	}
 
 	// The two cases below were written as parity oracles against the

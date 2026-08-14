@@ -99,9 +99,12 @@ struct eliminability {
 	elim_verdict verdict_of(tref n) const {
 		// An explicit verdict beats the floor in BOTH directions: an
 		// analysed node recorded `eliminable` stays eliminable even if
-		// bv-typed. Task 11 (pure-BA bv variables are eliminable) relies
-		// on this; until its seed flip, analysed bv nodes are seeded
-		// blasteable anyway, so this is behavior-neutral through Task 5.
+		// bv-typed. This is the whole mechanism behind "bv variables that
+		// appear only in atoms that are purely BA are also eliminable"
+		// (user directive 2026-08-14): `detail::atom_arith_verdict` seeds
+		// such an atom `eliminable` and the analysis records it -- and its
+		// variables -- explicitly, while every bv node the analysis never
+		// keyed still floors to `blasteable`.
 		if (auto it = verdicts.find(n); it != verdicts.end())
 			return it->second;
 		if (bv_floor && is_tref_bv_type_family<node>(n))
@@ -112,10 +115,50 @@ struct eliminability {
 	bool skip(tref n) const {
 		return verdict_of(n) != elim_verdict::eliminable;
 	}
+	/**
+	 * @brief `true` if @p f holds any content this pass must not rewrite --
+	 * the subtree form of `skip`, and the only correct way to ask it.
+	 *
+	 * `find_top(skip)` is NOT that form. `skip` floors on a node's BA TYPE,
+	 * and inside a bv atom the terms, the constants and the `bf` wrappers are
+	 * all bv-typed, while the atom itself is a `wff` whose own type id is 0.
+	 * So a plain `find_top(skip)` reports skip content inside an atom this
+	 * analysis explicitly classified `eliminable`, and every pure-BA bv clause
+	 * would still be diverted to blasting -- the directive defeated by its own
+	 * probe.
+	 *
+	 * This walks the same subtree but stops at an atom the analysis covers:
+	 * one holding at least one bv-typed free variable, all of whose bv-typed
+	 * free variables carry an EXPLICIT `eliminable` verdict. Such an atom is
+	 * pure-BA by construction (the analyses union each atom with its bv
+	 * variables, so one arithmetic or frozen atom anywhere in a variable's
+	 * component lifts every variable of that component above `eliminable`),
+	 * and the floored nodes below it are exactly its own terms.
+	 *
+	 * Keyed on the VARIABLES rather than on the atom's own recorded verdict:
+	 * variable trefs survive the rewrites between analysis and use
+	 * (`to_nnf`, `normalize_atomic_formula_operators`, Boole splits), whereas
+	 * a rebuilt atom loses its entry and would silently fall back to the
+	 * floor.
+	 *
+	 * A no-op on `none()` (nothing is ever skipped) and on `bv_only()` (no
+	 * explicit verdicts exist, so no atom is ever covered) -- which is what
+	 * keeps blasting's re-entry behaving exactly as before.
+	 */
+	bool has_skip_content(tref f) const;
 	/// Everything-eliminable instance: skips nothing at all.
 	static eliminability none() { return {}; }
 	/// bv-type-only instance == the old `is_tref_bv_type_family` default skip.
 	static eliminability bv_only() { eliminability e; e.bv_floor = true; return e; }
+
+private:
+	/**
+	 * @internal
+	 * @brief `true` if @p n is an atom whose whole subtree `has_skip_content`
+	 * may stop at. See there for what it means and why it keys on variables.
+	 * @endinternal
+	 */
+	bool covers_atom(tref n) const;
 };
 
 /**

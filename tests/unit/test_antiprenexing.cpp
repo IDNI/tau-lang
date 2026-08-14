@@ -1218,3 +1218,42 @@ TEST_SUITE("Gamma1NegatedBranch") {
 		CHECK( !g1_holds_at(r1, a, true) );
 	}
 }
+
+// Task 11 (user directive 2026-08-14): "bv variables that appear only in atoms
+// that are purely BA are also eliminable." The pair below pins the two halves
+// of that -- what must now be eliminated in Tau, and what must NOT start being
+// distributed once it is.
+TEST_SUITE("PureBaBvEliminability") {
+
+	TEST_CASE("pure-BA bv scope is eliminated in Tau, no quantifier survives") {
+		// ex x (x|y = 0) over bv[2] == y = 0 by Boole's expansion, valid
+		// in any BA. Before this task the blanket bv skip kept the binder.
+		//
+		// The analysis has to be the one `normalize_non_temp` builds: the
+		// 1-argument `anti_prenex` hands down
+		// `eliminability<node_t>::bv_only()`, a blanket floor with no
+		// explicit verdicts at all, and it is exactly that floor the seed
+		// flip has to beat. Calling the 2-argument entry point with
+		// `analyse_formula`'s result is the same pairing
+		// `normalize_non_temp` performs, without the solver passes around
+		// it.
+		tref fm = get_nso_rr("ex x (x:bv[2] | y:bv[2] = { 0 }:bv[2]).")
+			.value().main->get();
+		tref r = anti_prenex<node_t>(fm,
+			analyse_formula<node_t>(fm, analysis_context<node_t>{}));
+		CHECK( tau::get(r).find_top(is_quantifier<node_t>) == nullptr );
+	}
+
+	TEST_CASE("atomic-BA counterexample: a bv[1] negated pair is not distributed") {
+		// `ex x (x != 0 && x != 1)` is UNSAT at bv[1] (a two-element BA);
+		// the atomless-only distribution of step 2a -- and the `!=`
+		// witness constructions of the squeeze -- would wrongly answer T.
+		// Spelled without a complement so the pair is plainly all-negated
+		// and plainly UNSAT. Accept any result that is not T: F, or a
+		// kept quantifier.
+		tref fm = get_nso_rr("ex x (x:bv[1] != { 0 }:bv[1] "
+			"&& x:bv[1] != { 1 }:bv[1]).").value().main->get();
+		tref r = normalize_non_temp<node_t>(fm);
+		CHECK_FALSE( tau::get(r).equals_T() );
+	}
+}

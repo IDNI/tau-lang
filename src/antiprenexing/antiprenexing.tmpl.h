@@ -209,21 +209,21 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	// this check -- not block membership -- is what decides whether that
 	// homogeneity assumption actually holds.
 	// Memoized for the duration of this invocation: has_skip_content is
-	// called at several sites below (including once per disjunct), and
-	// find_top is a full subtree walk. The memo is not shared across
-	// recursion levels -- each recursive call builds its own lambda -- which
-	// would need it threaded as a parameter.
+	// called at several sites below (including once per disjunct), and it is
+	// a full subtree walk. The memo is not shared across recursion levels --
+	// each recursive call builds its own lambda -- which would need it
+	// threaded as a parameter.
 	//
-	// One `skip_pred` per invocation, built here and not inside
-	// has_skip_content: find_top takes it by reference, and building a fresh
-	// closure per call would be a needless allocation on a hot path.
-	auto skip_pred = [&el](tref n) { return el.skip(n); };
+	// The walk itself belongs to the analysis (`eliminability::has_skip_content`),
+	// not to a `find_top(el.skip)` here: `skip` floors on a node's BA TYPE, so
+	// on the bv-typed terms inside an atom the analysis explicitly classified
+	// eliminable it answers yes, and every pure-BA bv clause would divert to
+	// blast_block however the atom itself was classified.
 	auto skip_content_memo = std::make_shared<subtree_unordered_map<node, bool>>();
-	auto has_skip_content = [&skip_pred, skip_content_memo](tref f) -> bool {
+	auto has_skip_content = [&el, skip_content_memo](tref f) -> bool {
 		auto& memo = *skip_content_memo;
 		if (auto it = memo.find(f); it != memo.end()) return it->second;
-		const bool r = tree<node>::get(f).find_top(skip_pred) != nullptr;
-		return memo.emplace(f, r).first->second;
+		return memo.emplace(f, el.has_skip_content(f)).first->second;
 	};
 
 	auto has_active_var = [&](tref f) {
@@ -1454,10 +1454,17 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 					excluded.insert(n);
 				} else excluded.insert(n);
 			}
-			// TODO (HIGH): restrict to atomless types --
-			// distribute_block_over_atoms and
-			// eliminate_block_over_clause's negative-atom handling are
-			// only valid in an atomless BA, and nothing checks that.
+			// No atomlessness restriction here, and none needed: the two
+			// laws this branch applies -- `ex x f = 0 <=> f_0 f_1 = 0` and
+			// `ex x f != 0 <=> f_0 | f_1 != 0` (Boole's consistency
+			// condition and its dual, one atom at a time) -- hold in ANY
+			// Boolean algebra. What does need atomlessness is the
+			// distribution of a block over SEVERAL atoms, and both places
+			// that do it now carry their own guard: step 2a via
+			// `block_atom_profile::all_negated`'s `finite_ba_content`, and
+			// `eliminate_block_over_clause`'s two negative-atom
+			// constructions via `is_bv_type_family` on the clause type.
+			// (The former TODO (HIGH) here named exactly those two.)
 			else if (!tau::get(n).find_top(is<node, tau::ref>)) {
 				using bdd = term_handle<node>::tbdd;
 				// Record quantifier block in quants

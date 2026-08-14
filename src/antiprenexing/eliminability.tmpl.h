@@ -10,6 +10,48 @@ bool eliminability_comp(tref l, tref r) {
 	return tree<node>::subtree_less(l, r);
 }
 
+template <NodeType node>
+bool eliminability<node>::covers_atom(tref n) const {
+	// Only an ATOM may stop the walk. A conjunct, a connective or a whole
+	// clause must not: `analyse_block` records those too, and a conjunct's
+	// component does not necessarily contain every atom below it (an atom with
+	// no free variable at all -- `{3}:bv[2] * {2}:bv[2] = {0}:bv[2]` -- merges
+	// with nothing and keeps its own root, so an `eliminable` conjunct can sit
+	// above `arithmetic` content). An atom has no atom below it, so the same
+	// hole cannot open here.
+	if (!is_atomic_fm<node>(n)) return false;
+	bool any_bv = false;
+	for (tref v : get_free_vars<node>(n)) {
+		if (!is_tref_bv_type_family<node>(v)) continue;
+		any_bv = true;
+		auto it = verdicts.find(v);
+		if (it == verdicts.end()
+			|| it->second != elim_verdict::eliminable) return false;
+	}
+	// `any_bv` is required, not incidental: without a bv-typed free variable
+	// there is nothing the analysis could have vouched for, and a variable-free
+	// bv atom would be covered vacuously. Such an atom keeps flooring, which is
+	// the conservative answer.
+	return any_bv;
+}
+
+template <NodeType node>
+bool eliminability<node>::has_skip_content(tref f) const {
+	bool found = false;
+	// Named, not a temporary: visit_unique takes `auto&`. Deduplicating on
+	// unique subtrees is safe here -- both predicates below are pure functions
+	// of the node they are handed.
+	auto visit = [&](tref n) -> bool {
+		if (found) return false;
+		if (skip(n)) { found = true; return false; }
+		// Covered atom: its own terms are the only floored nodes below it,
+		// and the analysis has already vouched for them.
+		return !covers_atom(n);
+	};
+	idni::pre_order<node>(f).visit_unique(visit);
+	return found;
+}
+
 namespace detail {
 
 /**
@@ -22,9 +64,27 @@ namespace detail {
  *   - `arithmetic` -- the atom holds an arithmetic operator `atomic_blasting`
  *     cannot express (`bv_predicate_blasting.tmpl.h`: mul needs a constant
  *     factor, shl/shr/div/mod a constant second argument);
- *   - `blasteable` -- the atom holds a (supported) arithmetic operator, or it
- *     has a bv-typed free variable and @p bv_is_solver_owned holds;
- *   - `eliminable` -- otherwise.
+ *   - `blasteable` -- the atom holds a (supported) arithmetic operator;
+ *   - `eliminable` -- otherwise, INCLUDING a bv-typed atom holding no
+ *     arithmetic at all.
+ *
+ * That last case is the 2026-08-14 user directive ("bv variables that appear
+ * only in atoms that are purely BA are also eliminable"). A purely Boolean
+ * bitvector atom -- `|`, `&`, `'`, constants, nothing else -- is decided by the
+ * very Boole-expansion laws the elimination core implements, which hold in ANY
+ * Boolean algebra, atomic or not (`f = 0` is solvable for `x` iff
+ * `f[x<-0] f[x<-1] = 0`; `f != 0` iff `f[x<-0] | f[x<-1] != 0`). Shipping it to
+ * cvc5 is work Tau can do itself. The verdict is returned for an ANALYSED atom,
+ * so the caller records it EXPLICITLY in `verdicts`/`members` and it beats
+ * `eliminability::bv_floor`; unanalysed bv content still floors to `blasteable`,
+ * which is what keeps blasting's per-bit residue (bv-typed, arithmetic-free,
+ * and re-entered under `eliminability::bv_only()` -- an analysis with no
+ * explicit entries at all) out of generic Boole decomposition.
+ *
+ * The laws that do NOT survive an atomic BA are the ones distributing a block
+ * over several atoms; those carry their own guards, at
+ * `block_atom_profile::all_negated` and in `eliminate_block_over_clause`'s two
+ * squeezes.
  *
  * An atom is a `wff` (a formula), not a term -- its own `get_ba_type()` is the
  * untyped/default id, so `is_tref_bv_type_family<node>(m)` is silently false
@@ -32,7 +92,13 @@ namespace detail {
  * VARIABLES.
  * @tparam node Tree node type.
  * @param m Atomic formula (`is_atomic_fm` must hold).
- * @param bv_is_solver_owned `analysis_context::bv_is_solver_owned`.
+ * @param bv_is_solver_owned `analysis_context::bv_is_solver_owned`. Unused
+ *        since the directive above: the two verdicts it used to scope are now
+ *        decided without it (arithmetic is classified before it was ever read;
+ *        a pure-BA atom is eliminable under both settings). Kept in the
+ *        signature because it remains the analysis's contract with its context
+ *        -- `process_quantifier_block` still demotes `blasteable` by it -- and
+ *        Task 9 threads the full `analysis_context` through here.
  * @endinternal
  */
 template <NodeType node>
@@ -64,10 +130,13 @@ elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
 	if (tau::get(m).find_top(is_arith_op))
 		return tau::get(m).find_top(blasting_unsupported)
 			? elim_verdict::arithmetic : elim_verdict::blasteable;
-	if (!bv_is_solver_owned) return elim_verdict::eliminable;
-	for (tref fv : get_free_vars<node>(m))
-		if (is_tref_bv_type_family<node>(fv))
-			return elim_verdict::blasteable;
+	// No arithmetic operator anywhere below `m`: purely Boolean-algebra
+	// content whatever its type, so this pass can eliminate it itself. The
+	// bv-typed-free-variable scan that used to answer `blasteable` here, and
+	// the `bv_is_solver_owned` early return that scoped it, both went with the
+	// directive documented above -- a pure-BA atom is eliminable under either
+	// setting, so neither branch had an answer left to give.
+	(void) bv_is_solver_owned;
 	return elim_verdict::eliminable;
 }
 

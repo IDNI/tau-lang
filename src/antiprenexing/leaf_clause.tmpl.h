@@ -358,12 +358,40 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		tref var = still_live.front();
 		scoped = to_nnf<node>(scoped);
 		const size_t type_v = find_ba_type<node>(var);
+		trefs neqs = tau::get(scoped).select_top(is<node, tau::bf_neq>);
+		// ---- Atomless-only: the mixed `= 0` / `!= 0` construction ----
+		//
+		// The `neqs` block below is Corollary 5.1 with J1 = {f = 0}: it
+		// answers `ex x (f = 0 && g != 0)` with the CONJUNCTION
+		// `f_0 f_1 = 0 && (f_1' g_1 | f_0' g_0) != 0`, which needs a witness
+		// strictly between the two cofactors and so holds only in an ATOMLESS
+		// Boolean algebra. bv is atomic: at bv[1], `ex x (x != 0 && x' != 0)`
+		// is F, while this construction (no positives, f_0 = f_1 = 0) builds
+		// `(g_0 | g_1) != 0` per disequation and answers T for both.
+		//
+		// `is_bv_type_family` on the variable's own type is the guard the
+		// whole task uses -- conservative, since bv is the only atomic family
+		// this pass meets. Where it declines, the existing decline path
+		// applies: re-wrap the binder, exactly as the heterogeneous-type and
+		// unrecognised-shape branches do. The positive-only construction
+		// underneath (`f_0 f_1 = 0`) is Boole's consistency condition and is
+		// valid in any Boolean algebra, so only the `neqs` case is guarded.
+		//
+		// normalize_atomic_formula_operators on the way out for the same
+		// reason the success path takes it: `to_nnf` above spelled the
+		// negatives `bf_neq`, and no caller may be able to tell which path ran.
+		if (!neqs.empty() && is_bv_type_family<node>(type_v)) {
+			DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA "
+				"with disequations, keeping the binder: "
+				<< LOG_FM(scoped) << "\n";)
+			return normalize_atomic_formula_operators<node>(
+				with_kept(tau::build_wff_ex(var, scoped, false)));
+		}
 		tref f = squeeze_positives<node>(scoped, type_v);
 		tref f_0 = f ? rewriter::replace<node>(f, var,
 			tau::_0_trimmed(type_v)) : tau::_0(type_v);
 		tref f_1 = f ? rewriter::replace<node>(f, var,
 			tau::_1_trimmed(type_v)) : tau::_0(type_v);
-		trefs neqs = tau::get(scoped).select_top(is<node, tau::bf_neq>);
 		tref out = _T<node>();
 		if (neqs.size()) {
 			tref nneqs = tau::_T();
@@ -442,6 +470,29 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 						false);
 				return with_kept(keep);
 			}
+	}
+	// ---- Atomless-only, the block-squeeze half of the same law -------------
+	//
+	// The negative adjustment below is Corollary 5.1 again, with
+	// J1 = {f = 0}: it distributes the block over the disequations, keeping
+	// `ex X (f = 0)` and one `ex X (f' g != 0)` per negative. Same atomless
+	// precondition as the single-variable `neqs` construction above, same
+	// bv[1] counterexample, same decline -- re-wrap the live block around the
+	// scoped part, the shape the unrecognised-conjunct branch above already
+	// uses. `scoped` is already in the `!(= 0)` spelling here, so unlike the
+	// single-variable path this needs no normalisation on the way out.
+	//
+	// The positive half needs no guard: `f1 = 0 && f2 = 0 <=> f1|f2 = 0` and
+	// the single-atom quantifier resolution that follows it hold in any
+	// Boolean algebra.
+	if (!neg.empty() && is_bv_type_family<node>(clause_type)) {
+		DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA with "
+			"negated conjuncts, keeping the block: "
+			<< LOG_FM(scoped) << "\n";)
+		tref keep = scoped;
+		for (auto v = still_live.rbegin(); v != still_live.rend(); ++v)
+			keep = build_wff_ex<node>(*v, keep, false);
+		return with_kept(keep);
 	}
 	// Squeeze positive atomic formulas together -> result is a lazy BDD.
 	// By assumption they all have the same type.

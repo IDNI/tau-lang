@@ -48,8 +48,11 @@ block_atom_profile<node> profile_block_atoms(tref formula,
 {
 	using tau = tree<node>;
 	block_atom_profile<node> p;
-	auto skip_pred = [&el](tref n) { return el.skip(n); };
-	p.skip_content = tau::get(formula).find_top(skip_pred) != nullptr;
+	// `el.has_skip_content`, not `find_top(el.skip)`: the latter reports the
+	// bv-typed TERMS inside an atom the analysis explicitly classified
+	// eliminable, which would keep every pure-BA bv matrix out of both fast
+	// paths. See `eliminability::has_skip_content`.
+	p.skip_content = el.has_skip_content(formula);
 	detail::profile_block_atoms_rec<node>(formula, p, guards_only);
 	// Costs an extra traversal, so it is only paid when the sign census leaves
 	// step 2a's guard otherwise satisfied -- `all_positive()` does not need it
