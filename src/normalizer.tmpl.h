@@ -3,7 +3,6 @@
 #include "normalizer.h"
 #include "normal_forms.h"
 #include "normalizer_uf_arithmetic.h"
-#include "ref_variables_resolver.h"
 #include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
@@ -180,26 +179,31 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// transparent, and what `blast_block` hands to the solver -- still read
 	// the `skip` predicate. Collapsing needs those rewired to the analysis
 	// first (the plan's own Task 9 step 2), not merely one call deleted.
-	auto ref_skip = make_ref_variables_skip<node>(form);
-	form = anti_prenex<node>(form, [ref_skip](tref n) {
-		return is_tref_bv_type_family<node>(n) || ref_skip(n);
-	});
+	{
+		analysis_context<node> ctx1;          // bv_is_solver_owned = true
+		auto el1 = std::make_shared<eliminability<node>>(
+			analyse_formula<node>(form, ctx1));
+		form = anti_prenex<node>(form,
+			[el1](tref n) { return el1->skip(n); });
+	}
 	form = resolve_quantifiers<node>(form);
-	auto arith_skip = make_bv_arithmetic_skip_uf<node>(form);
-	auto ref_skip_2 = make_ref_variables_skip<node>(form);
+	// Pass 2: bv floor only where the solver could own the content; the
+	// arithmetic/blasteable seeds still hold unconditionally.
+	//
 	// bv-typed content is skipped here as well, not just the arithmetic
-	// residue `arith_skip` marks. Blasting rewrites arithmetic into per-bit
-	// equality/comparison atoms that are still bv-typed but no longer
-	// arithmetic-tainted, so `arith_skip` stops matching them and they became
-	// eligible for generic Boole decomposition -- hundreds of atoms per
-	// blasted operation, each split copying the whole formula, and every BDD
-	// node operation on a bv leaf allocating cvc5 terms (bv BDD leaves are
-	// solver-term-backed, so this is never the cheap path atomless content
-	// enjoys). Skipping them leaves the quantifier in place instead, which is
-	// sound; whatever is closeable has already been decided by the solver via
-	// scope_out_independent_conjuncts and the resolve passes above, and a
-	// genuinely open bv scope (e.g. `ex x (x + y = 0)` with `y` free) could
-	// not be reduced by decomposing it anyway.
+	// residue the `arithmetic` verdict marks. Blasting rewrites arithmetic
+	// into per-bit equality/comparison atoms that are still bv-typed but no
+	// longer arithmetic-tainted, so that verdict stops applying to them and
+	// they became eligible for generic Boole decomposition -- hundreds of
+	// atoms per blasted operation, each split copying the whole formula, and
+	// every BDD node operation on a bv leaf allocating cvc5 terms (bv BDD
+	// leaves are solver-term-backed, so this is never the cheap path
+	// atomless content enjoys). Skipping them leaves the quantifier in place
+	// instead, which is sound; whatever is closeable has already been
+	// decided by the solver via scope_out_independent_conjuncts and the
+	// resolve passes above, and a genuinely open bv scope (e.g.
+	// `ex x (x + y = 0)` with `y` free) could not be reduced by decomposing
+	// it anyway.
 	//
 	// The completeness this gives up is bounded and pinned. "Already decided
 	// by the solver" holds only for a scope `is_bv_solvable_formula` accepts;
@@ -222,16 +226,15 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// and `:bv[N]` streams produces) is one cvc5 cannot translate at all, so
 	// neither the resolve passes nor blasting will ever decide its bv scopes;
 	// skipping them there strands the quantifier for good. Boole decomposition
-	// is the only route left, so let it have them -- `arith_skip` still keeps
-	// genuinely unsupported bv arithmetic out of it, and the atom counts in a
-	// mixed formula are the spec's own, not blasting's per-bit residue.
-	const bool bv_is_solver_owned = !has_foreign_ba_constant<node>(form);
-	form = anti_prenex<node>(form,
-		[arith_skip, ref_skip_2, bv_is_solver_owned](tref n)
-	{
-		return (bv_is_solver_owned && is_tref_bv_type_family<node>(n))
-			|| arith_skip(n) || ref_skip_2(n);
-	});
+	// is the only route left, so let it have them -- the `arithmetic` verdict
+	// still keeps genuinely unsupported bv arithmetic out of it, and the atom
+	// counts in a mixed formula are the spec's own, not blasting's per-bit
+	// residue.
+	analysis_context<node> ctx2;
+	ctx2.bv_is_solver_owned = !has_foreign_ba_constant<node>(form);
+	auto el2 = std::make_shared<eliminability<node>>(
+		analyse_formula<node>(form, ctx2));
+	form = anti_prenex<node>(form, [el2](tref n) { return el2->skip(n); });
 	form = resolve_quantifiers<node>(form);
 	if (get_free_vars<node>(form).empty() && is_bv_solvable_formula<node>(form)) {
 		// Only commit to T/F on a definite answer: cvc5
