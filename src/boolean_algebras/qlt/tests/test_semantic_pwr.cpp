@@ -16,6 +16,7 @@
 #include "test_tau_helpers.h"
 #include "pointwise_revision.h"
 #include "boolean_algebras/qlt/qlt.h"
+#include "ltl_aba.h"
 
 using namespace idni::tau_lang;
 
@@ -129,7 +130,7 @@ TEST_SUITE("[SPWR-I: Idempotence]") {
 		CHECK(is_realizable(result));
 	}
 
-	TEST_CASE("[SPWR-I-02] Eventually idempotence") {
+	TEST_CASE("[SPWR-I-02] Eventually idempotence" * doctest::skip(!ltlsynt_available())) {
 		tref s = spec("F (o1[t] = 1).");
 		REQUIRE(s != nullptr);
 		tref result = pointwise_revision_temporal<node_t>(s, s, 0);

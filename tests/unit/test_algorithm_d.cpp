@@ -300,7 +300,7 @@ not a transition line
 
 TEST_SUITE("[Algorithm D Phase 1: DPA extraction]") {
 
-	TEST_CASE("[ALG-D-11] G(F(p0)) produces a non-empty DPA") {
+	TEST_CASE("[ALG-D-11] G(F(p0)) produces a non-empty DPA" * doctest::skip(!ltlsynt_available())) {
 		std::string hoa = call_ltl2tgba_dpa("G(F(p0))");
 		REQUIRE(!hoa.empty());
 		DpaAutomaton dpa = parse_dpa_hoa(hoa);
@@ -308,7 +308,7 @@ TEST_SUITE("[Algorithm D Phase 1: DPA extraction]") {
 		CHECK(dpa.aps.size() == 1u);
 	}
 
-	TEST_CASE("[ALG-D-12] DPA for G(F(p0)) is deterministic") {
+	TEST_CASE("[ALG-D-12] DPA for G(F(p0)) is deterministic" * doctest::skip(!ltlsynt_available())) {
 		std::string hoa = call_ltl2tgba_dpa("G(F(p0))");
 		REQUIRE(!hoa.empty());
 		DpaAutomaton dpa = parse_dpa_hoa(hoa);
@@ -399,7 +399,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 		CHECK(alg_d_realizable("G (o1[t]:qlt > {0}:qlt)."));
 	}
 
-	TEST_CASE("[ALG-D-23] F(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
+	TEST_CASE("[ALG-D-23] F(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D" * doctest::skip(!ltlsynt_available())) {
 		// Eventually output > 0: trivially realizable
 		CHECK(alg_d_realizable("F (o1[t]:qlt > {0}:qlt)."));
 	}
@@ -409,7 +409,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 		CHECK(alg_d_realizable("G (o1[t]:qlt < {0}:qlt)."));
 	}
 
-	TEST_CASE("[ALG-D-25] GF(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D") {
+	TEST_CASE("[ALG-D-25] GF(o1[t]:qlt > {0}:qlt) REALIZABLE via Alg D" * doctest::skip(!ltlsynt_available())) {
 		// Always eventually output > 0: realizable (system sets y > 0 always)
 		CHECK(alg_d_realizable("G F (o1[t]:qlt > {0}:qlt)."));
 	}
@@ -425,7 +425,7 @@ TEST_SUITE("[Algorithm D: product game correctness]") {
 		CHECK(alg_d_realizable("G (o1[t]:qlt > o1[t-1]:qlt)."));
 	}
 
-	TEST_CASE("[ALG-D-28] G(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt < {0}:qlt) REALIZABLE") {
+	TEST_CASE("[ALG-D-28] G(o1[t]:qlt > {0}:qlt) U (o1[t]:qlt < {0}:qlt) REALIZABLE" * doctest::skip(!ltlsynt_available())) {
 		// G(y>0) U (y<0): the U releases when y<0; achievable since DLO has both
 		// positive and negative elements
 		CHECK(alg_d_realizable(
