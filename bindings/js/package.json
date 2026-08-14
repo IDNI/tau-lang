@@ -2,8 +2,10 @@
 	"name": "@idni/tau-lang-js-test-tooling",
 	"private": true,
 	"version": "0.0.0",
-	"description": "Dev-only tooling for bindings/js/tests (the headless-Chrome wasm test harness). Not the published package -- that manifest is bindings/js/package.json.in, configure_file'd into the build directory, which *is* the installable package.",
+	"description": "Dev-only tooling: the headless-Chrome wasm test harness (bindings/js/tests) and the terminal UI the browser REPL (js/repl) copies into its build output at configure time. Not the published package -- that manifest is bindings/js/package.json.in, configure_file'd into the build directory, which *is* the installable package.",
 	"devDependencies": {
-		"puppeteer-core": "25.7.0"
+		"puppeteer-core": "25.7.0",
+		"@xterm/xterm": "6.0.0",
+		"@xterm/addon-fit": "0.11.0"
 	}
 }

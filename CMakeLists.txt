@@ -65,6 +65,7 @@ option(TAU_MACOS_PACKAGE           "Build MacOS package"                   OFF)
 option(TAU_BUILD_BINDING_PYTHON    "Build Python bindings"                 OFF)
 option(TAU_BUILD_BINDING_JS        "Build JS/WebAssembly embind bindings"  OFF)
 option(TAU_BUILD_BROWSER_TESTS     "Run the wasm test suite in headless Chrome (Emscripten only)" OFF)
+option(TAU_BUILD_REPL_WASM         "Build the FTXUI REPL as a wasm executable, tau_repl.js (Emscripten only)" OFF)
 option(TAU_DONT_USE_FTXUI          "Disable FTXUI-based REPL (fall back to legacy terminal REPL)" OFF)
 
 # Hash policy, forwarded to the parser (external/parser/CMakeLists.txt,
@@ -116,6 +117,7 @@ set_property(CACHE TAU_MACOS_PACKAGE           PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_PYTHON    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BINDING_JS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BROWSER_TESTS     PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_BUILD_REPL_WASM         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_USE_CCACHE              PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_DONT_USE_FTXUI          PROPERTY STRINGS "OFF" "ON")
 
@@ -140,6 +142,10 @@ if(TAU_BUILD_BINDING_JS)
 	set(TAU_BUILD_STATIC_LIBRARY ON)
 endif()
 
+if(TAU_BUILD_REPL_WASM)
+	set(TAU_BUILD_STATIC_LIBRARY ON)
+endif()
+
 if(TAU_BUILD_SHARED_LIBRARY)
 	set(TAU_BUILD_PIC ON)
 endif()
@@ -161,6 +167,25 @@ if(TAU_BUILD_BROWSER_TESTS AND NOT EMSCRIPTEN)
 		"TAU_BUILD_BROWSER_TESTS=ON requires the Emscripten toolchain "
 		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
 		"a native build.")
+endif()
+
+if(TAU_BUILD_REPL_WASM AND NOT EMSCRIPTEN)
+	message(FATAL_ERROR
+		"TAU_BUILD_REPL_WASM=ON requires the Emscripten toolchain "
+		"(configure with -DTAU_BUILD_EMSCRIPTEN=ON); it has no meaning for "
+		"a native build.")
+endif()
+
+# emcc requires every linked object to agree on -pthread (shared vs
+# non-shared wasm memory), so this goes on the global flags -- ahead of
+# add_subdirectory(src) and js/repl's FetchContent_MakeAvailable(ftxui) --
+# rather than as a target_compile_options() on tau_repl alone. Boost is a
+# prebuilt dependency, so it gets its own pthread-enabled dist instead
+# (TAU_BOOST_PTHREAD below).
+if(TAU_BUILD_REPL_WASM)
+	string(APPEND CMAKE_C_FLAGS " -pthread")
+	string(APPEND CMAKE_CXX_FLAGS " -pthread")
+	string(APPEND CMAKE_EXE_LINKER_FLAGS " -pthread")
 endif()
 
 #
@@ -260,6 +285,7 @@ message(STATUS "TAU_MACOS_PACKAGE: ${TAU_MACOS_PACKAGE}")
 message(STATUS "TAU_BUILD_BINDING_PYTHON: ${TAU_BUILD_BINDING_PYTHON}")
 message(STATUS "TAU_BUILD_BINDING_JS: ${TAU_BUILD_BINDING_JS}")
 message(STATUS "TAU_BUILD_BROWSER_TESTS: ${TAU_BUILD_BROWSER_TESTS}")
+message(STATUS "TAU_BUILD_REPL_WASM: ${TAU_BUILD_REPL_WASM}")
 message(STATUS "TAU_SHARED_PREFIX: ${TAU_SHARED_PREFIX}")
 message(STATUS "TAU_USE_CCACHE: ${TAU_USE_CCACHE}")
 message(STATUS "TAU_DONT_USE_FTXUI: ${TAU_DONT_USE_FTXUI}")
@@ -360,7 +386,16 @@ if(APPLE)
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 	list(APPEND DEP_BOOST_ARGS --emscripten)
-	set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-wasm/${CMAKE_INSTALL_LIBDIR})
+	if(TAU_BUILD_REPL_WASM)
+		# tau_repl links -pthread (see above); Boost.Log must be built
+		# against the same threading model or wasm-ld's EH/thread ABI
+		# checks reject the link, the same way the exceptions mismatch
+		# did for the non-pthread dist.
+		list(APPEND DEP_BOOST_ARGS -DTAU_BOOST_PTHREAD=ON)
+		set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-wasm-pthread/${CMAKE_INSTALL_LIBDIR})
+	else()
+		set(BOOST_LIBDIR ${BOOST_SOURCE_DIR}/dist-wasm/${CMAKE_INSTALL_LIBDIR})
+	endif()
 endif()
 message(STATUS "DEP_BOOST_ARGS: ${DEP_BOOST_ARGS}")
 message(STATUS "BOOST_LIBDIR: ${BOOST_LIBDIR}")
@@ -567,6 +602,17 @@ endif()
 if (TAU_BUILD_BINDING_JS)
 	message(STATUS "Building JS embind bindings")
 	add_subdirectory(bindings/js)
+endif()
+
+#
+# Building the FTXUI REPL as a wasm executable (tau_repl.js/.wasm). A
+# separate target from bindings/js's tau.js: this one is built -pthread (see
+# the global flags above), so it does not reach the binding, which stays
+# pthread-free (D11, .local/build-emscripten.md).
+#
+if (TAU_BUILD_REPL_WASM)
+	message(STATUS "Building wasm REPL (FTXUI + pthreads)")
+	add_subdirectory(js/repl)
 endif()
 
 #

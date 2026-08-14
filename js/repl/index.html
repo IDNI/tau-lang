@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Tau REPL (browser)</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#964;</text></svg>">
+    <link rel="stylesheet" href="vendor/xterm.css">
+    <style>
+      body {
+        background: #1a1a2e;
+        color: #e0e0e0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        margin: 0;
+        padding: 16px;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .header a {
+        color: #7aa2f7;
+        text-decoration: none;
+        font-size: 12px;
+      }
+      #upload {
+        display: none;
+      }
+      .upload-label {
+        display: inline-block;
+        padding: 4px 12px;
+        background: #7aa2f7;
+        color: #1a1a2e;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        margin-left: auto;
+      }
+      .upload-label:hover {
+        background: #9ab8ff;
+      }
+      #status {
+        font-size: 11px;
+        color: #888;
+        margin-left: 8px;
+      }
+      #terminalContainer {
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      }
+      .fakeMenu {
+        background: #2d2d3f;
+        padding: 6px 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .fakeButtons {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      .fakeClose    { background: #ff5f56; }
+      .fakeMinimize { background: #ffbd2e; }
+      .fakeZoom     { background: #27c93f; }
+      .fakeMenu span {
+        font-size: 11px;
+        color: #888;
+        margin-left: 8px;
+      }
+      #terminal {
+        padding: 8px;
+      }
+    </style>
+    <!-- xterm.js + fit addon, npm-sourced (bindings/js/package.json), copied
+         here by js/repl/CMakeLists.txt -- not vendored, no CDN. -->
+  </head>
+  <body>
+    <div class="header">
+      <h1>Tau REPL</h1>
+      <a href="https://github.com/IDNI/tau-lang">github.com/IDNI/tau-lang</a>
+      <input type="file" id="upload" accept=".tau">
+      <label for="upload" class="upload-label">&#128193; Open spec</label>
+      <span id="status"></span>
+    </div>
+
+    <div id="terminalContainer">
+      <div class="fakeMenu">
+        <div class="fakeButtons fakeClose"></div>
+        <div class="fakeButtons fakeMinimize"></div>
+        <div class="fakeButtons fakeZoom"></div>
+        <span>tau repl</span>
+      </div>
+      <div id="terminal"></div>
+    </div>
+
+    <script src="vendor/xterm.js"></script>
+    <script src="vendor/addon-fit.js"></script>
+    <script src="index.mjs"></script>
+  </body>
+</html>

@@ -90,6 +90,16 @@
 			"binaryDir": "${sourceDir}/build/debug-emscripten-tests"
 		},
 		{
+			"name": "_build_dir-emscripten-pthread",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/emscripten-pthread"
+		},
+		{
+			"name": "_build_dir-debug-emscripten-pthread",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/debug-emscripten-pthread"
+		},
+		{
 			"name": "_build_dir-coverage",
 			"hidden": true,
 			"binaryDir": "${sourceDir}/build/coverage"
@@ -148,6 +158,13 @@
 			"hidden": true,
 			"cacheVariables": {
 				"TAU_BUILD_BINDING_JS": "ON"
+			}
+		},
+		{
+			"name": "_build-repl-wasm",
+			"hidden": true,
+			"cacheVariables": {
+				"TAU_BUILD_REPL_WASM": "ON"
 			}
 		},
 		{
@@ -424,6 +441,28 @@
 				"_toolchain-emscripten",
 				"_bas-wasm",
 				"_build-wasm-tests",
+				"_build-type-debug"
+			]
+		},
+		{
+			"name": "emscripten-pthread",
+			"inherits": [
+				"_build_dir-emscripten-pthread",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-wasm",
+				"_build-repl-wasm",
+				"_build-type-release"
+			]
+		},
+		{
+			"name": "debug-emscripten-pthread",
+			"inherits": [
+				"_build_dir-debug-emscripten-pthread",
+				"_generator-make",
+				"_toolchain-emscripten",
+				"_bas-wasm",
+				"_build-repl-wasm",
 				"_build-type-debug"
 			]
 		},
@@ -808,6 +847,14 @@
 		{
 			"name": "debug-emscripten-tests",
 			"configurePreset": "debug-emscripten-tests"
+		},
+		{
+			"name": "emscripten-pthread",
+			"configurePreset": "emscripten-pthread"
+		},
+		{
+			"name": "debug-emscripten-pthread",
+			"configurePreset": "debug-emscripten-pthread"
 		},
 		{
 			"name": "relwithdebinfo",

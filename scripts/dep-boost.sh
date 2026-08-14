@@ -10,6 +10,10 @@ BUILD_JOBS="$(dep_jobs)"
 TAU_SHARED_PREFIX="$(dep_shared_prefix)"
 BOOST_TAG="$(dep_var BOOST_TAG 65c1319)"   # Boost 1.86
 TAU_BUILD_PIC="$(dep_var TAU_BUILD_PIC OFF)"
+# ON builds the REPL's threaded dist (dist-wasm-pthread) instead of the
+# library's threading=single one (dist-wasm) -- emcc requires every linked
+# object to agree on -pthread, so tau_repl cannot link against the plain one.
+TAU_BOOST_PTHREAD="$(dep_var TAU_BOOST_PTHREAD OFF)"
 
 BUILD_IF_NOT_EXISTS="libboost_log.a"
 [[ $DEP_TARGET == darwin ]] && BUILD_IF_NOT_EXISTS="libboost_log.dylib"
@@ -18,6 +22,9 @@ BOOST_SOURCE_DIR="${TAU_SHARED_PREFIX}/boost"
 if [[ $DEP_TARGET == w64 ]]; then
 	BOOST_BUILD_DIR="${BOOST_SOURCE_DIR}/build-w64"
 	BOOST_PREFIX="${TAU_SHARED_PREFIX}/boost/dist-w64"
+elif [[ $DEP_TARGET == emscripten && $TAU_BOOST_PTHREAD == ON ]]; then
+	BOOST_BUILD_DIR="${BOOST_SOURCE_DIR}/build-wasm-pthread"
+	BOOST_PREFIX="${TAU_SHARED_PREFIX}/boost/dist-wasm-pthread"
 elif [[ $DEP_TARGET == emscripten ]]; then
 	BOOST_BUILD_DIR="${BOOST_SOURCE_DIR}/build-wasm"
 	BOOST_PREFIX="${TAU_SHARED_PREFIX}/boost/dist-wasm"
@@ -69,8 +76,19 @@ EOF
 	USER_CONFIG_ARG="--user-config=./user-config.jam"
 	B2_ARGS+=("toolset=emscripten")
 	B2_ARGS+=("link=static")
-	# pthreads would drag SharedArrayBuffer and COOP/COEP into the library
-	B2_ARGS+=("threading=single")
+	if [[ $TAU_BOOST_PTHREAD == ON ]]; then
+		# threading=multi selects Boost's mt code paths; emscripten.jam's
+		# target-os is "none" (toolset.add-defaults <toolset>emscripten:
+		# <target-os>none), which gcc.jam's threading-flags table does not
+		# cover, so -pthread is passed explicitly rather than relied on to
+		# be added automatically -- it must match tau_repl's own -pthread.
+		B2_ARGS+=("threading=multi")
+		B2_ARGS+=("cxxflags=-pthread")
+		B2_ARGS+=("linkflags=-pthread")
+	else
+		# pthreads would drag SharedArrayBuffer and COOP/COEP into the library
+		B2_ARGS+=("threading=single")
+	fi
 	B2_ARGS+=("define=BOOST_LOG_WITHOUT_SYSLOG")
 else
 	# remove user-config.jam if it exists from previous Windows/wasm build
