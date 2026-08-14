@@ -52,6 +52,21 @@ bool eliminability<node>::has_skip_content(tref f) const {
 	return found;
 }
 
+template <NodeType node>
+bool eliminability<node>::has_frozen(tref f) const {
+	using tau = tree<node>;
+	if (auto it = frozen_memo.find(f); it != frozen_memo.end())
+		return it->second;
+	// No covers_atom-style prune needed here -- see the doc comment: frozen
+	// is only ever an explicit entry, never the floor, so every node this
+	// walk could stop early on carries no information the plain hit test
+	// would miss.
+	const bool found = tau::get(f).find_top([this](tref n) {
+		return verdict_of(n) == elim_verdict::frozen;
+	}) != nullptr;
+	return frozen_memo.emplace(f, found).first->second;
+}
+
 namespace detail {
 
 /**

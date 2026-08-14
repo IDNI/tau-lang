@@ -1257,3 +1257,26 @@ TEST_SUITE("PureBaBvEliminability") {
 		CHECK_FALSE( tau::get(r).equals_T() );
 	}
 }
+
+TEST_SUITE("FrozenBlockNormalization") {
+
+	TEST_CASE("a block over only ref-entangled variables survives verbatim") {
+		// q(y) freezes y; the ex y binder and its scope must come back
+		// untouched (no decomposition, no blasting attempt).
+		const char* s = "ex y (q(y) && y != 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+		tref r = anti_prenex<node_t>(fm);
+		CHECK(tau::get(r).find_top(is_child_quantifier<node_t>) != nullptr);
+		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
+	}
+
+	TEST_CASE("an eliminable variable over a frozen scope still eliminates") {
+		// z = 0 is decomposable; q(y) freezes only y's component. The outer
+		// ex z must go, the inner ex y must stay.
+		const char* s = "ex z ex y (q(y) && z = 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+		tref r = anti_prenex<node_t>(fm);
+		trefs quants = tau::get(r).select_top(is_child_quantifier<node_t>);
+		CHECK(quants.size() == 1);   // only y's binder survives
+	}
+}

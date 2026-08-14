@@ -281,6 +281,35 @@ TEST_SUITE("eliminability") {
 		CHECK(el.has_skip_content(fm));
 	}
 
+	TEST_CASE("has_frozen finds a reference-frozen node, and nothing else") {
+		tref fm = get_nso_rr("ex y ex z (q(y) && z = 0).").value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		// Non-vacuity: an explicit frozen entry actually exists on this
+		// formula (pinned independently by "analyse_formula: a reference
+		// freezes what reaches it, only that" below) before trusting
+		// has_frozen's true.
+		REQUIRE(el.members.contains(elim_verdict::frozen));
+		REQUIRE_FALSE(el.members.at(elim_verdict::frozen).empty());
+		CHECK(el.has_frozen(fm));
+
+		// A fragment with no reference at all records no frozen entry, and
+		// has_frozen must agree.
+		tref eq_only = get_nso_rr("z = 0.").value().main->get();
+		auto el2 = analyse_formula<node_t>(eq_only, analysis_context<node_t>{});
+		REQUIRE_FALSE(el2.members.contains(elim_verdict::frozen));
+		CHECK_FALSE(el2.has_frozen(eq_only));
+	}
+
+	TEST_CASE("has_frozen is false under bv_only() and none()") {
+		// Neither instance ever records an explicit verdict: bv_only()'s
+		// floor only ever produces blasteable, and none() skips nothing at
+		// all -- so has_frozen must never fire on either, whatever the
+		// formula's own shape (this one does hold a reference).
+		tref fm = get_nso_rr("ex y (q(y) && y != 0).").value().main->get();
+		CHECK_FALSE(eliminability<node_t>::bv_only().has_frozen(fm));
+		CHECK_FALSE(eliminability<node_t>::none().has_frozen(fm));
+	}
+
 	// The two cases below were written as parity oracles against the
 	// reference-usage and arithmetic-taint collectors this analysis replaced.
 	// Those modules are gone (2026-08-14); the expectations they established

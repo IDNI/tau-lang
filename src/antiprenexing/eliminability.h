@@ -146,6 +146,23 @@ struct eliminability {
 	 * keeps blasting's re-entry behaving exactly as before.
 	 */
 	bool has_skip_content(tref f) const;
+	/**
+	 * @brief `true` if @p f holds any node carrying an explicit `frozen`
+	 * verdict -- a reference or a kept binder somewhere in its scope.
+	 *
+	 * Memoized per queried @p f (`frozen_memo`), because it is called at
+	 * several `blast_block` call sites during one `anti_prenex_block`
+	 * invocation and is a full subtree walk each time.
+	 *
+	 * Unlike `has_skip_content`, this needs no `covers_atom`-style prune:
+	 * `frozen` is only ever recorded as an EXPLICIT verdict (seeded at an
+	 * unresolved reference or a kept binder, `eliminability.tmpl.h`'s
+	 * `analyse_block`/`analyse_formula`) -- it is never produced by
+	 * `bv_floor`, which only ever floors to `blasteable`. So there is no
+	 * floor to distinguish from an analysed atom's own terms, and a plain
+	 * `verdict_of(n) == frozen` hit test is exact.
+	 */
+	bool has_frozen(tref f) const;
 	/// Everything-eliminable instance: skips nothing at all.
 	static eliminability none() { return {}; }
 	/// bv-type-only instance == the old `is_tref_bv_type_family` default skip.
@@ -159,6 +176,8 @@ private:
 	 * @endinternal
 	 */
 	bool covers_atom(tref n) const;
+	/// @internal Per-`f` memo backing `has_frozen`. @endinternal
+	mutable subtree_unordered_map<node, bool> frozen_memo;
 };
 
 /**

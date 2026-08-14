@@ -193,6 +193,19 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		return ex_fm;
 	};
 
+	// Frozen content must never reach blast_block: a reference or a kept
+	// binder makes it untouchable by any destination, blasting and the
+	// solver included -- the same reasoning `process_quantifier_block`'s
+	// own early-out applies before this recursion even starts. Every
+	// blast_block call site below checks `el.has_frozen` first and, on a
+	// hit, re-wraps the block around the argument instead: the same shape
+	// the budget-exhausted path further down already uses.
+	auto rewrap_block = [&](tref f) -> tref {
+		for (auto v = block.rbegin(); v != block.rend(); ++v)
+			f = build_wff_ex<node>(*v, f, false);
+		return f;
+	};
+
 	// A block variable this pass could still Boole-decompose (i.e. not
 	// skip-matched). Since a skip-matched variable's quantifier commutes
 	// with the rest and is left untouched either way, it must be ignored
@@ -430,8 +443,12 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// (not just among `block`'s own variables) must divert to
 		// blast_block instead.
 		if (!tau::get(formula).find_top(is<node, tau::wff_or>)) {
-			if (!has_active_var(formula) || has_skip_content(formula))
+			if (!has_active_var(formula) || has_skip_content(formula)) {
+				if (el.has_frozen(formula))
+					return tau::build_wff_and(indep,
+						rewrap_block(formula));
 				return tau::build_wff_and(indep, blast_block(formula));
+			}
 			return tau::build_wff_and(
 				indep,
 				resolve_quantifiers2<node>(
@@ -508,8 +525,12 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			DBG(if (splits_left == 0)
 				LOG_TRACE << "anti_prenex_block: Boole split"
 					" budget exhausted, re-wrapping block\n";)
-			if (!has_active_var(formula))
+			if (!has_active_var(formula)) {
+				if (el.has_frozen(formula))
+					return tau::build_wff_and(indep,
+						rewrap_block(formula));
 				return tau::build_wff_and(indep, blast_block(formula));
+			}
 			for (auto v = block.rbegin(); v != block.rend(); ++v)
 				formula = build_wff_ex<node>(*v, formula, false);
 			return tau::build_wff_and(indep, formula);
@@ -703,8 +724,10 @@ tref anti_prenex_block(tref formula, const trefs& block,
 
 	// Connective is not wff_and or wff_or (e.g. a single atom or a wff_ref)
 	// -> try blasting if the block needs it, else quantifiers stay with formula
-	if (!has_active_var(formula))
+	if (!has_active_var(formula)) {
+		if (el.has_frozen(formula)) return rewrap_block(formula);
 		return blast_block(formula);
+	}
 	for (auto v = block.rbegin(); v != block.rend(); ++v)
 		formula = build_wff_ex<node>(*v, formula, false);
 	return formula;
@@ -924,6 +947,24 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 				: build_wff_all<node>(it->first, r, false);
 		return r;
 	};
+
+	// A frozen variable's scope must not be normalized: re-wrap the whole
+	// block verbatim. Cheap and exact -- frozen means "no destination can
+	// take it", so every path below would only end in the same re-wrap.
+	if (!block_vars.empty()) {
+		bool all_frozen = true;
+		for (tref v : block_vars)
+			if (el.verdict_of(v) != elim_verdict::frozen)
+				{ all_frozen = false; break; }
+		if (all_frozen) {
+			tref kept = body;
+			for (auto v = block_vars.rbegin();
+				v != block_vars.rend(); ++v)
+				kept = is_ex ? build_wff_ex<node>(*v, kept, false)
+					: build_wff_all<node>(*v, kept, false);
+			return wrap_skipped(kept);
+		}
+	}
 
 	// Trivial Skolemization: if every variable in this block is trivially
 	// eliminable (see heuristics/trivial_skolem.h), skip BDD ordering,
