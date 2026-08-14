@@ -24,11 +24,9 @@ set(TESTS
 	io_context
 	leaf_clause
 	normal_forms
-	normalizer_uf_arithmetic
 	nso_ba
 	nso_rr
 	product_ba
-	ref_variables_resolver
 	sbf_ba_parsing
 	sbf_ba_splitter
 	tau_ba

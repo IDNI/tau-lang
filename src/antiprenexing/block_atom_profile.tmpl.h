@@ -44,11 +44,12 @@ void profile_block_atoms_rec(tref n, block_atom_profile<node>& p,
 
 template<NodeType node>
 block_atom_profile<node> profile_block_atoms(tref formula,
-	const std::function<bool(tref)>& skip, bool guards_only)
+	const eliminability<node>& el, bool guards_only)
 {
 	using tau = tree<node>;
 	block_atom_profile<node> p;
-	p.skip_content = tau::get(formula).find_top(skip) != nullptr;
+	auto skip_pred = [&el](tref n) { return el.skip(n); };
+	p.skip_content = tau::get(formula).find_top(skip_pred) != nullptr;
 	detail::profile_block_atoms_rec<node>(formula, p, guards_only);
 	// Costs an extra traversal, so it is only paid when the sign census leaves
 	// step 2a's guard otherwise satisfied -- `all_positive()` does not need it

@@ -342,7 +342,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 				blasted && blasted != ex_fm)
 				return with_kept(anti_prenex<node>(blasted,
-					is_tref_bv_type_family<node>));
+					eliminability<node>::bv_only()));
 		}
 		// Not resolvable: keep this binder around the scoped part.
 		return with_kept(tau::build_wff_ex(v, scoped, false));

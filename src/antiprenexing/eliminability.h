@@ -22,11 +22,12 @@
 
 #include <algorithm>
 #include <map>
+#include <optional>
 
 #include "tau_tree.h"
+#include "union_find.h"
 #include "union_find_with_sets.h"
 #include "ba_types.h"
-#include "normalizer_uf_arithmetic.h"
 
 namespace idni::tau_lang {
 
@@ -111,7 +112,7 @@ struct eliminability {
 	bool skip(tref n) const {
 		return verdict_of(n) != elim_verdict::eliminable;
 	}
-	/// Everything-eliminable instance == the old `no_skip`.
+	/// Everything-eliminable instance: skips nothing at all.
 	static eliminability none() { return {}; }
 	/// bv-type-only instance == the old `is_tref_bv_type_family` default skip.
 	static eliminability bv_only() { eliminability e; e.bv_floor = true; return e; }
@@ -171,9 +172,9 @@ bool eliminability_comp(tref l, tref r);
 /**
  * @brief Scope-aware resolver over the `elim_verdict` join semilattice.
  *
- * Same shape as `bv_arithmetic_resolver` (`normalizer_uf_arithmetic.h`) and
- * `ref_variables_resolver` (`ref_variables_resolver.h`), which this
- * generalises: both track a two-element lattice with a scope-tagged
+ * Generalises the two two-element-lattice resolvers this replaced (a
+ * reference-usage one and a bitvector-arithmetic-taint one, both deleted with
+ * their modules in 2026-08-14): each tracked its own kind with a scope-tagged
  * union-find and a root->kind map; here the lattice is `elim_verdict`
  * (`join`, not `unify`) so a single resolver type serves both roles inside
  * `analyse_formula`.
@@ -222,17 +223,17 @@ struct scoped_verdict_resolver {
  * @brief Analyse @p form as a whole, producing one verdict per variable and
  * atomic formula (and predicate reference) it contains.
  *
- * One `pre_order` traversal (the scope-opening shape of
- * `collect_bv_arithmetic_taint_uf`) drives TWO `scoped_verdict_resolver`s in
- * lockstep, because the two propagation domains must stay separate to
- * preserve the precision of the collectors this replaces:
- * - the *ref* resolver mirrors `collect_used_ref_variables`: it seeds
+ * One `pre_order` traversal (the scope-opening shape both deleted collectors
+ * used) drives TWO `scoped_verdict_resolver`s in lockstep, because the two
+ * propagation domains must stay separate to preserve the precision of the
+ * collectors this replaces:
+ * - the *ref* resolver takes over the reference-usage collector: it seeds
  *   `frozen` at every `wff_ref` and unions each `wff_ref`/atom with ALL its
  *   free variables;
- * - the *bv* resolver mirrors `collect_bv_arithmetic_taint_uf`, generalised
- *   from its two-element lattice to `elim_verdict`: it seeds `blasteable` or
- *   `arithmetic` at atoms carrying bitvector content and unions each atom
- *   with only its bv-typed free variables.
+ * - the *bv* resolver takes over the bitvector-arithmetic-taint collector,
+ *   generalised from its two-element lattice to `elim_verdict`: it seeds
+ *   `blasteable` or `arithmetic` at atoms carrying bitvector content and
+ *   unions each atom with only its bv-typed free variables.
  *
  * Both resolvers open/close a scope at every quantifier and insert its bound
  * variable into both, so two unrelated binders of the same name never

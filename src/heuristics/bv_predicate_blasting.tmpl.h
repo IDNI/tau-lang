@@ -152,7 +152,7 @@ static tref quantify_aux_vars(const trefs& vars, tref subformula) {
 	for (size_t i = 0; i < vars.size(); ++i)
 		ord.emplace(changes[vars[vars.size() - 1 - i]],
 			static_cast<int_t>(i));
-	return resolve_quantifiers2<node>(res, ord, [](tref) { return false; });
+	return resolve_quantifiers2<node>(res, ord, eliminability<node>::none());
 }
 
 /**

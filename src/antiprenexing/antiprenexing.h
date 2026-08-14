@@ -27,11 +27,7 @@
 #include <functional>
 
 #include "tau_tree.h"
-// For collect_used_ref_variables (historically used by the deleted
-// treat_ex_quantified_clause; still used by make_ref_variables_skip's
-// callers in the normalizer). Self-contained (tau_tree/union_find/ba_types
-// only), so it introduces no cycle with the block headers below.
-#include "ref_variables_resolver.h"
+#include "eliminability.h"
 #include "block_atom_profile.h"
 #include "block_squeeze.h"
 #include "boole_atom_analysis.h"
@@ -45,10 +41,10 @@ namespace idni::tau_lang {
  * NNF + syntactic simplification, substitution-based elimination, canonical
  * operator normalization, then maximal-block elimination
  * (`process_quantifier_blocks`), with quantifier ids canonicalised at entry
- * and exit. The two-argument overload takes a `skip` predicate marking
- * content this pass must not Boole-decompose (bitvector content headed for
- * the solver or blasting, reference-entangled variables); the one-argument
- * overload uses `is_tref_bv_type_family`.
+ * and exit. The two-argument overload takes an `eliminability` analysis
+ * marking content this pass must not Boole-decompose (bitvector content
+ * headed for the solver or blasting, reference-entangled variables); the
+ * one-argument overload uses `eliminability<node>::bv_only()`.
  *
  * Until 2026-08-04 this name belonged to a step-based, per-quantifier
  * algorithm, and the block pipeline lived at `anti_prenex_block`; the legacy
@@ -75,15 +71,15 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref anti_prenex(tref formula);
 
-/** @brief The pipeline with an explicit `skip` predicate; see above. */
-// Note: no default argument for `skip` here -- function templates cannot
+/** @brief The pipeline with an explicit eliminability analysis; see above. */
+// Note: no default argument for `el` here -- function templates cannot
 // gain a default argument in a later declaration once an earlier one (the
 // forward declaration in heuristics/bv_predicate_blasting.h, included before
 // this header via normal_forms_transformations.h) exists without one. The
 // one-argument overload above plays the role of the default, calling through
-// with is_tref_bv_type_family<node>.
+// with eliminability<node>::bv_only().
 template <NodeType node>
-tref anti_prenex(tref formula, const std::function<bool(tref)>& skip);
+tref anti_prenex(tref formula, const eliminability<node>& el);
 
 /**
  * @brief Decide or blast bitvector-typed quantifier scopes.
@@ -106,17 +102,6 @@ tref anti_prenex(tref formula, const std::function<bool(tref)>& skip);
  */
 template<NodeType node>
 tref resolve_quantifiers(tref formula);
-
-/**
- * @brief Skip predicate that skips nothing; suitable as a `skip` argument for
- * the block machinery when no content should be deferred to blasting.
- * @tparam node Tree node type.
- * @param t tref (unused).
- * @return Always `false`.
- */
-template <NodeType node>
-bool no_skip(tref t);
-
 
 } // namespace idni::tau_lang
 

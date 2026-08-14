@@ -10,6 +10,98 @@ bool eliminability_comp(tref l, tref r) {
 	return tree<node>::subtree_less(l, r);
 }
 
+namespace detail {
+
+/**
+ * @internal
+ * @brief Seed verdict of ONE atomic formula, from its bitvector content alone.
+ *
+ * The single place the arithmetic/blasteable/eliminable split is decided;
+ * `analyse_formula` and `analyse_block` both go through it, so the two can
+ * never drift apart:
+ *   - `arithmetic` -- the atom holds an arithmetic operator `atomic_blasting`
+ *     cannot express (`bv_predicate_blasting.tmpl.h`: mul needs a constant
+ *     factor, shl/shr/div/mod a constant second argument);
+ *   - `blasteable` -- the atom holds a (supported) arithmetic operator, or it
+ *     has a bv-typed free variable and @p bv_is_solver_owned holds;
+ *   - `eliminable` -- otherwise.
+ *
+ * An atom is a `wff` (a formula), not a term -- its own `get_ba_type()` is the
+ * untyped/default id, so `is_tref_bv_type_family<node>(m)` is silently false
+ * no matter what it compares. bv-ness is therefore read off the atom's
+ * VARIABLES.
+ * @tparam node Tree node type.
+ * @param m Atomic formula (`is_atomic_fm` must hold).
+ * @param bv_is_solver_owned `analysis_context::bv_is_solver_owned`.
+ * @endinternal
+ */
+template <NodeType node>
+elim_verdict atom_arith_verdict(tref m, bool bv_is_solver_owned) {
+	using tau = tree<node>;
+	// Arithmetic operators. Not is<node>({...}): that factory's returned
+	// closure captures a std::initializer_list by value, whose backing array
+	// is a temporary destroyed at the end of the factory call's full
+	// expression -- silently dangling afterward.
+	auto is_arith_op = [](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::bf_add) || t.is(tau::bf_sub)
+			|| t.is(tau::bf_mul) || t.is(tau::bf_div)
+			|| t.is(tau::bf_mod) || t.is(tau::bf_shl)
+			|| t.is(tau::bf_shr) || t.is(tau::bf_cast);
+	};
+	// Arithmetic operators atomic_blasting cannot express
+	// (bv_predicate_blasting.tmpl.h:206-290): mul needs a constant
+	// factor; shl/shr/div/mod need a constant second argument.
+	auto blasting_unsupported = [](tref n) {
+		const auto& t = tau::get(n);
+		if (t.is(tau::bf_mul))
+			return !get_bvmul_arguments<node>(n).second;
+		if (t.is(tau::bf_shl) || t.is(tau::bf_shr)
+			|| t.is(tau::bf_div) || t.is(tau::bf_mod))
+			return !get_arguments<node>(n).second;
+		return false;
+	};
+	if (tau::get(m).find_top(is_arith_op))
+		return tau::get(m).find_top(blasting_unsupported)
+			? elim_verdict::arithmetic : elim_verdict::blasteable;
+	if (!bv_is_solver_owned) return elim_verdict::eliminable;
+	for (tref fv : get_free_vars<node>(m))
+		if (is_tref_bv_type_family<node>(fv))
+			return elim_verdict::blasteable;
+	return elim_verdict::eliminable;
+}
+
+/**
+ * @internal
+ * @brief `atom_arith_verdict` for every atomic formula of one conjunct.
+ *
+ * `analyse_block`'s precompute: the conjunct is walked once and every atom it
+ * holds is classified, so the per-atom seeding below is a map lookup rather
+ * than a second, differently-written classification. Atoms are not descended
+ * into (`visit_unique` returns false at them), matching the seeding traversal
+ * that consumes the result.
+ * @tparam node Tree node type.
+ * @endinternal
+ */
+template <NodeType node>
+subtree_unordered_map<node, elim_verdict> collect_arith_verdicts(tref conj,
+	bool bv_is_solver_owned)
+{
+	subtree_unordered_map<node, elim_verdict> res;
+	// Named, not a temporary: visit_unique takes `auto&`.
+	auto visit = [&](tref m) -> bool {
+		if (!is_atomic_fm<node>(m)) return true;
+		if (elim_verdict v = atom_arith_verdict<node>(m,
+			bv_is_solver_owned); v != elim_verdict::eliminable)
+				res.emplace(m, v);
+		return false;
+	};
+	idni::pre_order<node>(conj).visit_unique(visit);
+	return res;
+}
+
+} // namespace detail
+
 template <NodeType node>
 block_eliminability<node> analyse_block(const trefs& block_vars,
 	const trefs& conjuncts, const analysis_context<node>& ctx)
@@ -18,7 +110,7 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 	block_eliminability<node> res;
 	if (block_vars.empty()) return res;
 
-	// Gates only the `arith_tainted` PRECOMPUTE below -- never the seeds
+	// Gates only the bv-verdict PRECOMPUTE below -- never the seeds
 	// themselves. Must be derived from the CONJUNCTS' own free variables,
 	// not the block variables': a block can bind only non-bv variables
 	// (e.g. `ex b ((b = 0) -> (x:bv[4] * y:bv[4] = 0:bv[4]))`) while its
@@ -34,11 +126,17 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 			}
 		if (any_bv_content) break;
 	}
-	subtree_unordered_set<node> arith_tainted;
+	// One classification of the bv content, shared with `analyse_formula`
+	// through `detail::atom_arith_verdict` -- see there for the split. Only
+	// non-eliminable entries are stored, so a map miss below means
+	// "eliminable", which is also what a conjunct-free block gets.
+	subtree_unordered_map<node, elim_verdict> bv_verdicts;
 	if (any_bv_content)
 		for (tref conj : conjuncts)
-			for (tref t : collect_bv_arithmetic_taint_uf<node>(conj))
-				arith_tainted.insert(t);
+			for (const auto& [m, v] :
+				detail::collect_arith_verdicts<node>(conj,
+					ctx.bv_is_solver_owned))
+						bv_verdicts.emplace(m, v);
 
 	union_find_with_sets<decltype(eliminability_comp<node>), node>
 		uf(eliminability_comp<node>);
@@ -142,10 +240,9 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 				// sets and `join` lifts the result.
 				//
 				// Seed order matters only through `join`, which
-				// is commutative -- but the *criterion* does not
-				// commute with itself. `blasteable` keys on
-				// bitvector TYPE, deliberately not on arithmetic
-				// taint: blasting rewrites arithmetic into
+				// is commutative. `blasteable` keys on bitvector
+				// TYPE, deliberately not on arithmetic taint
+				// alone: blasting rewrites arithmetic into
 				// per-bit atoms that are still bv-typed but no
 				// longer tainted, and if those fell back to
 				// `eliminable` they would reach generic Boole
@@ -154,24 +251,14 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 				// every BDD leaf allocating a cvc5 term. That is
 				// a blow-up, not a wrong answer, so it must be
 				// pinned by timing as well as by assertion.
-				// An atom is a `wff` (a formula), not a term -- its
-				// own `get_ba_type()` is the untyped/default id, so
-				// `is_tref_bv_type_family<node>(m)` is silently
-				// false no matter what it compares. bv-ness has to
-				// be read off the atom's VARIABLES instead, the same
-				// way collect_bv_arithmetic_taint_uf does it
-				// (normalizer_uf_arithmetic.tmpl.h:98-99).
+				// The verdict itself comes from the precomputed
+				// map above (a miss means `eliminable`), so this
+				// analysis and `analyse_formula` classify bv
+				// content one way, in one place.
 				const trefs& fvs = get_free_vars<node>(m);
-				bool atom_is_bv = false;
-				for (tref fv : fvs)
-					if (is_tref_bv_type_family<node>(fv)) {
-						atom_is_bv = true; break;
-					}
 				elim_verdict seed = elim_verdict::eliminable;
-				if (atom_is_bv && ctx.bv_is_solver_owned)
-					seed = elim_verdict::blasteable;
-				if (arith_tainted.contains(m))
-					seed = join(seed, elim_verdict::arithmetic);
+				if (auto it = bv_verdicts.find(m);
+					it != bv_verdicts.end()) seed = it->second;
 				assign(m, seed);
 				for (tref v : fvs) merge(m, v);
 				analysed.push_back(m);
@@ -275,8 +362,10 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 	using tau = tree<node>;
 	eliminability<node> res;
 
-	scoped_verdict_resolver<node> ref_res; // collect_used_ref_variables, generalised
-	scoped_verdict_resolver<node> bv_res;  // collect_bv_arithmetic_taint_uf, generalised
+	// The two deleted collectors, generalised: reference usage and bitvector
+	// arithmetic taint, each now over the full `elim_verdict` lattice.
+	scoped_verdict_resolver<node> ref_res;
+	scoped_verdict_resolver<node> bv_res;
 
 	// A wff wrapping an unresolved predicate reference. wff_ref is
 	// deliberately excluded from is_atomic_fm (tau_tree_queries.tmpl.h:155),
@@ -284,27 +373,6 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 	auto is_ref_fm = [](tref n) {
 		const auto& t = tau::get(n);
 		return t.is(tau::wff) && t.child_is(tau::wff_ref);
-	};
-
-	// Arithmetic operators, same list as the old taint collector.
-	auto is_arith_op = [](tref n) {
-		const auto& t = tau::get(n);
-		return t.is(tau::bf_add) || t.is(tau::bf_sub)
-			|| t.is(tau::bf_mul) || t.is(tau::bf_div)
-			|| t.is(tau::bf_mod) || t.is(tau::bf_shl)
-			|| t.is(tau::bf_shr) || t.is(tau::bf_cast);
-	};
-	// Arithmetic operators atomic_blasting cannot express
-	// (bv_predicate_blasting.tmpl.h:206-290): mul needs a constant
-	// factor; shl/shr/div/mod need a constant second argument.
-	auto blasting_unsupported = [](tref n) {
-		const auto& t = tau::get(n);
-		if (t.is(tau::bf_mul))
-			return !get_bvmul_arguments<node>(n).second;
-		if (t.is(tau::bf_shl) || t.is(tau::bf_shr)
-			|| t.is(tau::bf_div) || t.is(tau::bf_mod))
-			return !get_arguments<node>(n).second;
-		return false;
 	};
 
 	// Read every node registered in scope s (in EITHER resolver -- the ref
@@ -363,8 +431,8 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 			// Seed: every variable reachable from a predicate reference
 			// is frozen. No BA-type filter -- predicate arguments carry
 			// no restriction analogous to bitvector arithmetic's. The bv
-			// resolver does not process wff_ref at all, matching
-			// collect_bv_arithmetic_taint_uf (which has no branch for it
+			// resolver does not process wff_ref at all, matching the
+			// deleted taint collector (which had no branch for it
 			// either).
 			ref_res.assign(m, elim_verdict::frozen);
 			for (tref v : get_free_vars<node>(m)) ref_res.merge(m, v);
@@ -372,32 +440,18 @@ eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx
 		}
 		if (is_atomic_fm<node>(m)) {
 			// ref resolver: neutral seed, propagate through ALL free
-			// variables -- mirrors collect_used_ref_variables exactly.
+			// variables -- mirrors the deleted reference-usage
+			// collector exactly.
 			ref_res.assign(m, elim_verdict::eliminable);
 			for (tref v : get_free_vars<node>(m)) ref_res.merge(m, v);
 
-			// bv resolver: seed per the arithmetic/blasting table,
-			// propagate only through bv-typed free variables.
-			//   arithmetic  -> m contains a blasting-unsupported arith op
-			//   blasteable  -> m contains a (supported) arith op, OR
-			//                  (m has a bv-typed free var && bv_is_solver_owned)
-			//   eliminable  -> otherwise
+			// bv resolver: seed per the arithmetic/blasting table
+			// (detail::atom_arith_verdict, shared with
+			// `analyse_block`), propagate only through bv-typed free
+			// variables.
 			const trefs& fvs = get_free_vars<node>(m);
-			elim_verdict seed = elim_verdict::eliminable;
-			if (tau::get(m).find_top(is_arith_op)) {
-				seed = tau::get(m).find_top(blasting_unsupported)
-					? elim_verdict::arithmetic
-					: elim_verdict::blasteable;
-			} else {
-				bool atom_is_bv = false;
-				for (tref fv : fvs)
-					if (is_tref_bv_type_family<node>(fv)) {
-						atom_is_bv = true; break;
-					}
-				if (atom_is_bv && ctx.bv_is_solver_owned)
-					seed = elim_verdict::blasteable;
-			}
-			bv_res.assign(m, seed);
+			bv_res.assign(m, detail::atom_arith_verdict<node>(m,
+				ctx.bv_is_solver_owned));
 			for (tref fv : fvs)
 				if (is_tref_bv_type_family<node>(fv))
 					bv_res.merge(m, fv);

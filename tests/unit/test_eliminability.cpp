@@ -232,27 +232,91 @@ TEST_SUITE("eliminability") {
 		CHECK(e.verdict_of(v) == elim_verdict::eliminable);
 	}
 
-	TEST_CASE("analyse_formula: ref entanglement matches the old collector") {
+	// The two cases below were written as parity oracles against the
+	// reference-usage and arithmetic-taint collectors this analysis replaced.
+	// Those modules are gone (2026-08-14); the expectations they established
+	// are spelled out directly here.
+	//
+	// Every node checked is taken from the analysed formula itself, never from
+	// a second parse of a fragment: `analyse_formula` keys on the very trefs
+	// it walked, and a bound occurrence does not hash-cons to a standalone
+	// parse's free one -- `verdict_of` would then silently answer with its
+	// `eliminable` default, which is exactly what a check for `eliminable`
+	// cannot distinguish. The `verdicts.contains` REQUIREs below make that
+	// impossible: they establish the node was analysed at all.
+	TEST_CASE("analyse_formula: a reference freezes what reaches it, only that") {
 		tref fm = get_nso_rr("ex y ex z (q(y) && z = 0).").value().main->get();
 		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
-		auto old = collect_used_ref_variables<node_t>(fm);
-		for (tref n : old) CHECK(el.verdict_of(n) == elim_verdict::frozen);
-		// z is not entangled: not frozen.
-		for (const auto& [n, v] : el.verdicts)
-			if (v == elim_verdict::frozen) CHECK(old.contains(n));
+		// The wff wrapping the reference, as analyse_formula's own
+		// `is_ref_fm` recognises it, and the equation next to it.
+		auto is_ref_fm = [](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::wff) && t.child_is(tau::wff_ref);
+		};
+		auto is_eq_fm = [](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::wff) && t.child_is(tau::bf_eq);
+		};
+		tref ref_fm = tau::get(fm).find_top(is_ref_fm);
+		tref eq_fm = tau::get(fm).find_top(is_eq_fm);
+		REQUIRE(ref_fm != nullptr);
+		REQUIRE(eq_fm != nullptr);
+		// y is an argument of the unresolved reference; z shares nothing
+		// with it.
+		const trefs& yvars = get_free_vars<node_t>(ref_fm);
+		const trefs& zvars = get_free_vars<node_t>(eq_fm);
+		REQUIRE(yvars.size() == 1);
+		REQUIRE(zvars.size() == 1);
+		const tref y = yvars[0], z = zvars[0];
+		REQUIRE(el.verdicts.contains(y));
+		REQUIRE(el.verdicts.contains(z));
+		CHECK(el.verdict_of(y) == elim_verdict::frozen);
+		CHECK(el.verdict_of(z) == elim_verdict::eliminable);
+		CHECK(el.skip(y));
+		CHECK_FALSE(el.skip(z));
 	}
 
-	TEST_CASE("analyse_formula: arithmetic taint matches the old collector") {
+	TEST_CASE("analyse_formula: bv arithmetic taints its component, only it") {
 		tref fm = get_nso_rr(
 			"ex x (x:bv[4] + y:bv[4] = { 0 }:bv[4] && w = 0).")
 			.value().main->get();
 		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
-		auto old = collect_bv_arithmetic_taint_uf<node_t>(fm);
-		for (tref n : old) CHECK(el.skip(n));      // tainted => non-eliminable
+		// Both atoms of `fm`, split by whether they carry bv content. The
+		// variables have to be read off the atom WFF, never off the bare
+		// `bf_add` term: `get_free_vars` returns nothing for the latter,
+		// and that is also how the analysis itself calls it.
+		auto is_eq_fm = [](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::wff) && t.child_is(tau::bf_eq);
+		};
+		tref bv_atm = nullptr, ba_atm = nullptr;
+		for (tref a : tau::get(fm).select_all(is_eq_fm)) {
+			bool has_bv = false;
+			for (tref v : get_free_vars<node_t>(a))
+				if (is_tref_bv_type_family<node_t>(v)) {
+					has_bv = true; break;
+				}
+			(has_bv ? bv_atm : ba_atm) = a;
+		}
+		REQUIRE(bv_atm != nullptr);
+		REQUIRE(ba_atm != nullptr);
+		// Both variables of the arithmetic atom are non-eliminable. `+` is
+		// an operator blasting supports, so the verdict is blasteable
+		// rather than arithmetic.
+		const trefs& bvvars = get_free_vars<node_t>(bv_atm);
+		REQUIRE(bvvars.size() == 2);
+		for (tref v : bvvars) {
+			REQUIRE(el.verdicts.contains(v));
+			CHECK(el.skip(v));
+			CHECK(el.verdict_of(v) == elim_verdict::blasteable);
+		}
 		// The atomless conjunct's variable stays eliminable.
-		tref w = get_free_vars<node_t>(
-			get_nso_rr("w = 0.").value().main->get())[0];
+		const trefs& bavars = get_free_vars<node_t>(ba_atm);
+		REQUIRE(bavars.size() == 1);
+		const tref w = bavars[0];
+		REQUIRE(el.verdicts.contains(w));
 		CHECK(el.verdict_of(w) == elim_verdict::eliminable);
+		CHECK_FALSE(el.skip(w));
 	}
 
 	TEST_CASE("analyse_formula: supported arithmetic is blasteable, "

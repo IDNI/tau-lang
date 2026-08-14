@@ -30,7 +30,7 @@ TEST_SUITE("AntiPrenexBlock") {
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block,
-			used_atms, quant_pattern, order, is_tref_bv_type_family<node_t>);
+			used_atms, quant_pattern, order, eliminability<node_t>::bv_only());
 		return {res, used_atms.size()};
 	}
 
@@ -48,7 +48,7 @@ TEST_SUITE("AntiPrenexBlock") {
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block,
 			used_atms, quant_pattern, order,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 		return {res, used_atms.size()};
 	}
 
@@ -468,7 +468,7 @@ TEST_SUITE("BlockAtomProfile") {
 			fm = tau::get(fm)[0].second();
 		fm = normalize_atomic_formula_operators<node_t>(fm);
 		return profile_block_atoms<node_t>(fm,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 	}
 
 	TEST_CASE("all negated") {
@@ -582,7 +582,7 @@ TEST_SUITE("BlockSkipPaths") {
 	static quantifier_block<node_t> collect(const char* sample) {
 		tref fm = get_nso_rr(sample).value().main->get();
 		return collect_quantifier_block<node_t>(fm,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 	}
 
 	TEST_CASE("an opposite-kind skipped quantifier ends the run") {
@@ -861,7 +861,7 @@ TEST_SUITE("ResolveQuantifiers2Binders") {
 		term_handle<node_t>::order order;
 		order.emplace(outer, 0);
 		tref res = resolve_quantifiers2<node_t>(fm, order,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 		// Whatever was eliminated, no variable may have leaked free.
 		CHECK( get_free_vars<node_t>(res).size()
 			== get_free_vars<node_t>(fm).size() );
@@ -895,7 +895,7 @@ TEST_SUITE("ProcessQuantifierBlocks") {
 		tref fm = get_nso_rr("ex a all b (a b = 0).").value().main->get();
 		subtree_unordered_set<node_t> done;
 		std::vector<quantifier_block<node_t>> blocks;
-		select_innermost_blocks<node_t>(fm, is_tref_bv_type_family<node_t>,
+		select_innermost_blocks<node_t>(fm, eliminability<node_t>::bv_only(),
 			done, blocks);
 		REQUIRE( blocks.size() == 1 );
 		// The innermost run is the universal one.
@@ -907,12 +907,12 @@ TEST_SUITE("ProcessQuantifierBlocks") {
 		tref fm = get_nso_rr("ex a (a b = 0).").value().main->get();
 		subtree_unordered_set<node_t> done;
 		std::vector<quantifier_block<node_t>> blocks;
-		select_innermost_blocks<node_t>(fm, is_tref_bv_type_family<node_t>,
+		select_innermost_blocks<node_t>(fm, eliminability<node_t>::bv_only(),
 			done, blocks);
 		REQUIRE( blocks.size() == 1 );
 		done.insert(blocks[0].head);
 		blocks.clear();
-		select_innermost_blocks<node_t>(fm, is_tref_bv_type_family<node_t>,
+		select_innermost_blocks<node_t>(fm, eliminability<node_t>::bv_only(),
 			done, blocks);
 		CHECK( blocks.empty() );
 	}
@@ -923,14 +923,15 @@ TEST_SUITE("ProcessQuantifierBlocks") {
 		tref fm = get_nso_rr("ex a all b ex c (a b = 0 || c = 0).")
 			.value().main->get();
 		tref res = process_quantifier_blocks<node_t>(fm,
-			is_tref_bv_type_family<node_t>);
+			eliminability<node_t>::bv_only());
 		REQUIRE( res != nullptr );
 		CHECK( are_nso_equivalent<node_t>(res, fm) );
 	}
 
-	TEST_CASE("no_skip skips nothing") {
-		CHECK( !no_skip<node_t>(get_nso_rr("x = 0.").value().main->get()) );
-		CHECK( !no_skip<node_t>(nullptr) );
+	TEST_CASE("the empty analysis skips nothing") {
+		const auto none = eliminability<node_t>::none();
+		CHECK( !none.skip(get_nso_rr("x = 0.").value().main->get()) );
+		CHECK( !none.skip(nullptr) );
 	}
 }
 
@@ -957,7 +958,7 @@ TEST_SUITE("Gamma4Guard") {
 		for (size_t i = 0; i < block.size(); ++i)
 			quant_pattern.emplace(block[i], i + 1);
 		tref res = anti_prenex_block<node_t>(body, block, used_atms,
-			quant_pattern, order, is_tref_bv_type_family<node_t>);
+			quant_pattern, order, eliminability<node_t>::bv_only());
 		const trefs& fv = get_free_vars<node_t>(res);
 		for (tref v : block) {
 			tref tv = tau::trim_right_sibling(v);
@@ -1031,20 +1032,22 @@ TEST_SUITE("BlockAtomProfileAtomlessness") {
 	// an *atomless* Boolean algebra. Over bv[1], `ex x (x != 0 && x' != 0)` is
 	// F while the distributed `ex x (x != 0) && ex x (x' != 0)` is T. The guard
 	// used to encode sign uniformity plus !skip_content only, so atomlessness
-	// rode entirely on the caller's choice of `skip` -- and blast_block
-	// re-entering with no_skip is exactly how that failed. `no_skip` here
-	// reproduces that caller.
-	static block_atom_profile<node_t> profile_no_skip(const char* sample) {
+	// rode entirely on the caller's choice of analysis -- and blast_block
+	// re-entering with a skip-nothing one is exactly how that failed. The
+	// empty analysis here reproduces that caller.
+	static block_atom_profile<node_t> profile_skipping_nothing(const char* sample) {
 		tref fm = get_nso_rr(sample).value().main->get();
 		while (is_child_quantifier<node_t>(fm))
 			fm = tau::get(fm)[0].second();
 		fm = normalize_atomic_formula_operators<node_t>(fm);
-		return profile_block_atoms<node_t>(fm, no_skip<node_t>);
+		return profile_block_atoms<node_t>(fm,
+			eliminability<node_t>::none());
 	}
 
-	TEST_CASE("all_negated declines on bv content even under no_skip") {
-		auto p = profile_no_skip("ex x:bv[8] (x != { 0 }:bv[8]).");
-		// no_skip means the old guard saw uniform signs and nothing else.
+	TEST_CASE("all_negated declines on bv content even under the empty analysis") {
+		auto p = profile_skipping_nothing("ex x:bv[8] (x != { 0 }:bv[8]).");
+		// Skipping nothing means the old guard saw uniform signs and
+		// nothing else.
 		CHECK( !p.skip_content );
 		CHECK( p.negatives == 1 );
 		CHECK( p.others == 0 );
@@ -1055,7 +1058,7 @@ TEST_SUITE("BlockAtomProfileAtomlessness") {
 	TEST_CASE("atomless content still qualifies for step 2a") {
 		// Control: the same shape over the default (atomless) type must keep
 		// firing, so the new guard is not simply blocking everything.
-		auto p = profile_no_skip("ex x (x y != 0 && x z != 0).");
+		auto p = profile_skipping_nothing("ex x (x y != 0 && x z != 0).");
 		CHECK( !p.finite_ba_content );
 		CHECK( p.all_negated() );
 	}
@@ -1065,7 +1068,7 @@ TEST_SUITE("BlockAtomProfileAtomlessness") {
 		// `f1 = 0 && f2 = 0` into `f1|f2 = 0` and distributing `ex` over a
 		// disjunction are valid in any Boolean algebra. finite_ba_content is
 		// therefore not even computed for a positive census.
-		auto p = profile_no_skip("ex x (x y = 0 && x z = 0).");
+		auto p = profile_skipping_nothing("ex x (x y = 0 && x z = 0).");
 		CHECK( p.all_positive() );
 		CHECK( !p.finite_ba_content );
 	}
@@ -1152,7 +1155,7 @@ TEST_SUITE("Gamma1NegatedBranch") {
 		const block_eliminability<node_t> elim = analyse_block<node_t>(
 			block, get_cnf_wff_clauses<node_t>(body), ac);
 		return anti_prenex_block<node_t>(body, block, used_atms, qp,
-			order, is_tref_bv_type_family<node_t>, sl, elim);
+			order, eliminability<node_t>::bv_only(), sl, elim);
 	}
 
 	// The named free variable of @p fm -- the PARSED node, since a node

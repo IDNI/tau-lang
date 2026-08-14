@@ -34,9 +34,9 @@ namespace idni::tau_lang {
 // eliminate_block_over_clause calls back into the block driver, whose
 // definition lands later in normal_forms.h's include order. No default
 // argument here -- a default cannot be redeclared, and that call site always
-// passes an explicit predicate.
+// passes an explicit analysis.
 template<NodeType node>
-tref anti_prenex(tref formula, const std::function<bool(tref)>& skip);
+tref anti_prenex(tref formula, const eliminability<node>& el);
 
 /**
  * @brief Eliminate @p block over the single clause @p clause.

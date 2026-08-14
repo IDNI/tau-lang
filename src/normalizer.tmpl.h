@@ -2,7 +2,6 @@
 
 #include "normalizer.h"
 #include "normal_forms.h"
-#include "normalizer_uf_arithmetic.h"
 #include "definitions.h"
 
 #undef LOG_CHANNEL_NAME
@@ -169,7 +168,7 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// #70 regression test -- in both configurations: keeping the second
 	// pass's conditional bv skip reports "Tau specification is unsat", and
 	// keeping the first pass's unconditional one SIGSEGVs. What the second
-	// pass depends on is not the first pass's *predicate* but its having
+	// pass depends on is not the first pass's *verdicts* but its having
 	// already run: it works on a formula whose non-bv structure is resolved.
 	//
 	// The analysis cannot substitute for that today, and the plan's premise
@@ -177,14 +176,13 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// inside `eliminate_block_over_clause`, whereas the decisions that
 	// matter here -- which quantifiers `collect_quantifier_block` treats as
 	// transparent, and what `blast_block` hands to the solver -- still read
-	// the `skip` predicate. Collapsing needs those rewired to the analysis
-	// first (the plan's own Task 9 step 2), not merely one call deleted.
+	// only the boolean `el.skip(n)`, not the verdict behind it. Collapsing
+	// needs those rewired to the verdicts first (the plan's own Task 9
+	// step 2), not merely one call deleted.
 	{
 		analysis_context<node> ctx1;          // bv_is_solver_owned = true
-		auto el1 = std::make_shared<eliminability<node>>(
-			analyse_formula<node>(form, ctx1));
-		form = anti_prenex<node>(form,
-			[el1](tref n) { return el1->skip(n); });
+		const eliminability<node> el1 = analyse_formula<node>(form, ctx1);
+		form = anti_prenex<node>(form, el1);
 	}
 	form = resolve_quantifiers<node>(form);
 	// Pass 2: bv floor only where the solver could own the content; the
@@ -232,9 +230,8 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// residue.
 	analysis_context<node> ctx2;
 	ctx2.bv_is_solver_owned = !has_foreign_ba_constant<node>(form);
-	auto el2 = std::make_shared<eliminability<node>>(
-		analyse_formula<node>(form, ctx2));
-	form = anti_prenex<node>(form, [el2](tref n) { return el2->skip(n); });
+	const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
+	form = anti_prenex<node>(form, el2);
 	form = resolve_quantifiers<node>(form);
 	if (get_free_vars<node>(form).empty() && is_bv_solvable_formula<node>(form)) {
 		// Only commit to T/F on a definite answer: cvc5
