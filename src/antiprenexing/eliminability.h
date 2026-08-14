@@ -169,6 +169,88 @@ template <NodeType node>
 bool eliminability_comp(tref l, tref r);
 
 /**
+ * @brief Scope-aware resolver over the `elim_verdict` join semilattice.
+ *
+ * Same shape as `bv_arithmetic_resolver` (`normalizer_uf_arithmetic.h`) and
+ * `ref_variables_resolver` (`ref_variables_resolver.h`), which this
+ * generalises: both track a two-element lattice with a scope-tagged
+ * union-find and a root->kind map; here the lattice is `elim_verdict`
+ * (`join`, not `unify`) so a single resolver type serves both roles inside
+ * `analyse_formula`.
+ *
+ * `insert` delegates to the underlying union-find's `push`
+ * (current-scope-only, no search) -- the opposite of `type_scoped_resolver`'s
+ * `insert`, which searches enclosing scopes before falling back to global.
+ * @tparam node Tree node type satisfying `NodeType`.
+ */
+template<NodeType node>
+struct scoped_verdict_resolver {
+	using uf_t = scoped_union_find<tref, idni::subtree_less<node>>;
+	using element = typename uf_t::element;
+	using scope = typename uf_t::scope;
+
+	/** @brief Open a new nested scope. */
+	void open();
+	/** @brief Close the innermost scope. */
+	std::optional<typename uf_t::scope_error> close();
+	/**
+	 * @brief Declare @p n as new in the current (innermost) scope with initial kind @p k.
+	 * @return The scoped element for @p n.
+	 */
+	element insert(tref n, elim_verdict k);
+	/**
+	 * @brief Return the joined `elim_verdict` of @p n's root (unseen defaults to `eliminable`).
+	 * @param n Node to query; searched across enclosing scopes, falling back to global.
+	 */
+	elim_verdict kind_of(tref n);
+	/**
+	 * @brief Join @p k into @p n's root's kind.
+	 * @return @p n's root element.
+	 */
+	element assign(tref n, elim_verdict k);
+	/**
+	 * @brief Union the sets containing @p a and @p b, joining their kinds.
+	 * @return The merged set's root element.
+	 */
+	element merge(tref a, tref b);
+
+	uf_t scoped;
+	std::map<element, elim_verdict, scoped_less<tref, idni::subtree_less<node>>> kinds;
+};
+
+/**
+ * @brief Analyse @p form as a whole, producing one verdict per variable and
+ * atomic formula (and predicate reference) it contains.
+ *
+ * One `pre_order` traversal (the scope-opening shape of
+ * `collect_bv_arithmetic_taint_uf`) drives TWO `scoped_verdict_resolver`s in
+ * lockstep, because the two propagation domains must stay separate to
+ * preserve the precision of the collectors this replaces:
+ * - the *ref* resolver mirrors `collect_used_ref_variables`: it seeds
+ *   `frozen` at every `wff_ref` and unions each `wff_ref`/atom with ALL its
+ *   free variables;
+ * - the *bv* resolver mirrors `collect_bv_arithmetic_taint_uf`, generalised
+ *   from its two-element lattice to `elim_verdict`: it seeds `blasteable` or
+ *   `arithmetic` at atoms carrying bitvector content and unions each atom
+ *   with only its bv-typed free variables.
+ *
+ * Both resolvers open/close a scope at every quantifier and insert its bound
+ * variable into both, so two unrelated binders of the same name never
+ * cross-contaminate. Every node either resolver's scope registers is
+ * snapshotted -- on scope close, and once more for the global scope after the
+ * traversal -- with `verdict_of(n) = join(ref-resolver's kind_of(n),
+ * bv-resolver's kind_of(n))` (both resolvers hold `elim_verdict` directly, so
+ * this join subsumes the boolean "does the ref side say frozen" check).
+ *
+ * `res.bv_floor` is set from `ctx.bv_is_solver_owned` before returning.
+ * @tparam node Tree node type.
+ * @param form Formula to analyse.
+ * @param ctx Formula-wide inputs.
+ */
+template <NodeType node>
+eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx);
+
+/**
  * @brief Classify each of @p block_vars against the atoms of @p conjuncts.
  *
  * One pass: every atomic formula, and every conjunct itself, is unioned with

@@ -223,4 +223,184 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 	return res;
 }
 
+template<NodeType node>
+void scoped_verdict_resolver<node>::open() {
+	scoped.open();
+}
+
+template<NodeType node>
+std::optional<typename scoped_verdict_resolver<node>::uf_t::scope_error>
+scoped_verdict_resolver<node>::close() {
+	return scoped.close();
+}
+
+template<NodeType node>
+typename scoped_verdict_resolver<node>::element
+scoped_verdict_resolver<node>::insert(tref n, elim_verdict k) {
+	auto e = scoped.push(n);
+	kinds.emplace(e, k);
+	return e;
+}
+
+template<NodeType node>
+elim_verdict scoped_verdict_resolver<node>::kind_of(tref n) {
+	auto root = scoped.root(scoped.insert(n));
+	if (auto it = kinds.find(root); it != kinds.end()) return it->second;
+	return kinds.emplace(root, elim_verdict::eliminable).first->second;
+}
+
+template<NodeType node>
+typename scoped_verdict_resolver<node>::element
+scoped_verdict_resolver<node>::assign(tref n, elim_verdict k) {
+	auto e = scoped.insert(n);
+	auto root = scoped.root(e);
+	if (auto it = kinds.find(root); it != kinds.end())
+		kinds.insert_or_assign(root, join(it->second, k));
+	else kinds.insert_or_assign(root, k);
+	return root;
+}
+
+template<NodeType node>
+typename scoped_verdict_resolver<node>::element
+scoped_verdict_resolver<node>::merge(tref a, tref b) {
+	auto ka = kind_of(a);
+	auto kb = kind_of(b);
+	auto new_root = scoped.merge(a, b);
+	kinds.insert_or_assign(new_root, join(ka, kb));
+	return new_root;
+}
+
+template <NodeType node>
+eliminability<node> analyse_formula(tref form, const analysis_context<node>& ctx) {
+	using tau = tree<node>;
+	eliminability<node> res;
+
+	scoped_verdict_resolver<node> ref_res; // collect_used_ref_variables, generalised
+	scoped_verdict_resolver<node> bv_res;  // collect_bv_arithmetic_taint_uf, generalised
+
+	// A wff wrapping an unresolved predicate reference. wff_ref is
+	// deliberately excluded from is_atomic_fm (tau_tree_queries.tmpl.h:155),
+	// so it needs its own branch.
+	auto is_ref_fm = [](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::wff) && t.child_is(tau::wff_ref);
+	};
+
+	// Arithmetic operators, same list as the old taint collector.
+	auto is_arith_op = [](tref n) {
+		const auto& t = tau::get(n);
+		return t.is(tau::bf_add) || t.is(tau::bf_sub)
+			|| t.is(tau::bf_mul) || t.is(tau::bf_div)
+			|| t.is(tau::bf_mod) || t.is(tau::bf_shl)
+			|| t.is(tau::bf_shr) || t.is(tau::bf_cast);
+	};
+	// Arithmetic operators atomic_blasting cannot express
+	// (bv_predicate_blasting.tmpl.h:206-290): mul needs a constant
+	// factor; shl/shr/div/mod need a constant second argument.
+	auto blasting_unsupported = [](tref n) {
+		const auto& t = tau::get(n);
+		if (t.is(tau::bf_mul))
+			return !get_bvmul_arguments<node>(n).second;
+		if (t.is(tau::bf_shl) || t.is(tau::bf_shr)
+			|| t.is(tau::bf_div) || t.is(tau::bf_mod))
+			return !get_arguments<node>(n).second;
+		return false;
+	};
+
+	// Read every node registered in scope s (in EITHER resolver -- the ref
+	// resolver's scopes are a superset of the bv resolver's, since it alone
+	// registers wff_ref nodes) into the result maps. Two passes: the first
+	// only reads scoped_union_find's raw storage (never mutates it); the
+	// second calls kind_of, which -- for a node one resolver never saw --
+	// inserts a default `eliminable` entry as a side effect. Splitting the
+	// passes keeps that mutation from invalidating the iteration it would
+	// otherwise share.
+	auto snapshot_scope = [&](typename scoped_verdict_resolver<node>::scope s) {
+		subtree_unordered_set<node> seen;
+		for (auto [elem, _] : ref_res.scoped.uf)
+			if (elem.first == s) seen.insert(elem.second);
+		for (auto [elem, _] : bv_res.scoped.uf)
+			if (elem.first == s) seen.insert(elem.second);
+		for (tref n : seen) {
+			elim_verdict v = join(ref_res.kind_of(n), bv_res.kind_of(n));
+			res.verdicts.insert_or_assign(n, v);
+			res.members[v].insert(n);
+		}
+	};
+
+	auto visit_subtree = [](tref) -> bool { return true; };
+
+	auto visit = [&](tref m) -> bool {
+		if (is_quantifier<node>(m)) {
+			ref_res.open();
+			bv_res.open();
+			if (tref v = tau::get(m).find_top(
+				(bool(*)(tref)) is_var_or_capture<node>); v) {
+				ref_res.insert(v, elim_verdict::eliminable);
+				bv_res.insert(v, elim_verdict::eliminable);
+			}
+			return true;
+		}
+		if (is_ref_fm(m)) {
+			// Seed: every variable reachable from a predicate reference
+			// is frozen. No BA-type filter -- predicate arguments carry
+			// no restriction analogous to bitvector arithmetic's. The bv
+			// resolver does not process wff_ref at all, matching
+			// collect_bv_arithmetic_taint_uf (which has no branch for it
+			// either).
+			ref_res.assign(m, elim_verdict::frozen);
+			for (tref v : get_free_vars<node>(m)) ref_res.merge(m, v);
+			return false;
+		}
+		if (is_atomic_fm<node>(m)) {
+			// ref resolver: neutral seed, propagate through ALL free
+			// variables -- mirrors collect_used_ref_variables exactly.
+			ref_res.assign(m, elim_verdict::eliminable);
+			for (tref v : get_free_vars<node>(m)) ref_res.merge(m, v);
+
+			// bv resolver: seed per the arithmetic/blasting table,
+			// propagate only through bv-typed free variables.
+			//   arithmetic  -> m contains a blasting-unsupported arith op
+			//   blasteable  -> m contains a (supported) arith op, OR
+			//                  (m has a bv-typed free var && bv_is_solver_owned)
+			//   eliminable  -> otherwise
+			const trefs& fvs = get_free_vars<node>(m);
+			elim_verdict seed = elim_verdict::eliminable;
+			if (tau::get(m).find_top(is_arith_op)) {
+				seed = tau::get(m).find_top(blasting_unsupported)
+					? elim_verdict::arithmetic
+					: elim_verdict::blasteable;
+			} else {
+				bool atom_is_bv = false;
+				for (tref fv : fvs)
+					if (is_tref_bv_type_family<node>(fv)) {
+						atom_is_bv = true; break;
+					}
+				if (atom_is_bv && ctx.bv_is_solver_owned)
+					seed = elim_verdict::blasteable;
+			}
+			bv_res.assign(m, seed);
+			for (tref fv : fvs)
+				if (is_tref_bv_type_family<node>(fv))
+					bv_res.merge(m, fv);
+			return false;
+		}
+		return true;
+	};
+
+	auto up = [&](tref m) {
+		if (!is_quantifier<node>(m)) return;
+		auto s = ref_res.scoped.scopes.back();
+		snapshot_scope(s);
+		ref_res.close();
+		bv_res.close();
+	};
+
+	idni::pre_order<node>(form).visit(visit, visit_subtree, up);
+	snapshot_scope(ref_res.scoped.global);
+
+	res.bv_floor = ctx.bv_is_solver_owned;
+	return res;
+}
+
 } // namespace idni::tau_lang

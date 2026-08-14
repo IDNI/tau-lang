@@ -231,4 +231,64 @@ TEST_SUITE("eliminability") {
 		e.verdicts.insert_or_assign(v, elim_verdict::eliminable);
 		CHECK(e.verdict_of(v) == elim_verdict::eliminable);
 	}
+
+	TEST_CASE("analyse_formula: ref entanglement matches the old collector") {
+		tref fm = get_nso_rr("ex y ex z (q(y) && z = 0).").value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		auto old = collect_used_ref_variables<node_t>(fm);
+		for (tref n : old) CHECK(el.verdict_of(n) == elim_verdict::frozen);
+		// z is not entangled: not frozen.
+		for (const auto& [n, v] : el.verdicts)
+			if (v == elim_verdict::frozen) CHECK(old.contains(n));
+	}
+
+	TEST_CASE("analyse_formula: arithmetic taint matches the old collector") {
+		tref fm = get_nso_rr(
+			"ex x (x:bv[4] + y:bv[4] = { 0 }:bv[4] && w = 0).")
+			.value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		auto old = collect_bv_arithmetic_taint_uf<node_t>(fm);
+		for (tref n : old) CHECK(el.skip(n));      // tainted => non-eliminable
+		// The atomless conjunct's variable stays eliminable.
+		tref w = get_free_vars<node_t>(
+			get_nso_rr("w = 0.").value().main->get())[0];
+		CHECK(el.verdict_of(w) == elim_verdict::eliminable);
+	}
+
+	TEST_CASE("analyse_formula: supported arithmetic is blasteable, "
+		"unsupported is arithmetic") {
+		// x + 1 is blasteable; u * v (no constant factor) is not.
+		tref f1 = get_nso_rr("x:bv[4] + { 1 }:bv[4] = { 0 }:bv[4].")
+			.value().main->get();
+		tref f2 = get_nso_rr("u:bv[4] * v:bv[4] = { 0 }:bv[4].")
+			.value().main->get();
+		auto e1 = analyse_formula<node_t>(f1, analysis_context<node_t>{});
+		auto e2 = analyse_formula<node_t>(f2, analysis_context<node_t>{});
+		CHECK(e1.verdict_of(get_free_vars<node_t>(f1)[0])
+			== elim_verdict::blasteable);
+		CHECK(e2.verdict_of(get_free_vars<node_t>(f2)[0])
+			== elim_verdict::arithmetic);
+	}
+
+	TEST_CASE("analyse_formula: bv floor follows bv_is_solver_owned") {
+		tref fm = get_nso_rr("x:bv[4] = { 1 }:bv[4].").value().main->get();
+		analysis_context<node_t> owned{}, foreign{}; foreign.bv_is_solver_owned = false;
+		CHECK(analyse_formula<node_t>(fm, owned).bv_floor);
+		CHECK_FALSE(analyse_formula<node_t>(fm, foreign).bv_floor);
+		// Without the floor a plain bv equality is eliminable (Boole
+		// decomposition is its only route -- the issue #70 shape).
+		tref v = get_free_vars<node_t>(fm)[0];
+		CHECK(analyse_formula<node_t>(fm, foreign).verdict_of(v)
+			== elim_verdict::eliminable);
+	}
+
+	TEST_CASE("analyse_formula: quantifier scoping does not cross-contaminate") {
+		// Two unrelated binders of the same name: only the ref-entangled one
+		// freezes (mirrors the scoped-UF behavior of both old collectors).
+		tref fm = get_nso_rr("(ex y q(y)) && (ex y (y w = 0)).")
+			.value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		tref w = get_free_vars<node_t>(fm)[0]; // w is the only free var
+		CHECK(el.verdict_of(w) == elim_verdict::eliminable);
+	}
 }
