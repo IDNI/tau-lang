@@ -188,6 +188,21 @@ if(TAU_BUILD_REPL_WASM)
 	string(APPEND CMAKE_EXE_LINKER_FLAGS " -pthread")
 endif()
 
+# Every wasm-linked object must agree on the exception-encoding setting
+# (WASM_LEGACY_EXCEPTIONS; see cmake/tau-common.cmake's target_setup(), which
+# carries -fwasm-exceptions and this flag for tau's own targets). That alone
+# does not reach FTXUI's FetchContent build or libtauparser -- add_subdirectory
+# (external/parser) below defines its own target_setup(), of the same name but
+# a different signature, in external/parser/cmake/target_setup.cmake; it wins
+# for the parser's own targets since it is (re-)included after
+# tau-common.cmake's is defined. So this goes on the global flags too, ahead
+# of both, the same way -pthread does above.
+if(EMSCRIPTEN)
+	string(APPEND CMAKE_C_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
+	string(APPEND CMAKE_CXX_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
+	string(APPEND CMAKE_EXE_LINKER_FLAGS " -sWASM_LEGACY_EXCEPTIONS=0")
+endif()
+
 #
 # Fine tuning definitions according to build type and options
 #

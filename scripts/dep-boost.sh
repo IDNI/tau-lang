@@ -35,6 +35,30 @@ fi
 
 dep_git_source "$BOOST_REPO" "$BOOST_SOURCE_DIR" "$BOOST_TAG"
 
+# The wasm dist bakes in a wasm exception-handling encoding
+# (WASM_LEGACY_EXCEPTIONS, cmake/tau-common.cmake), and the two encodings are
+# link-incompatible -- a dist built under the other one fails wasm-ld with
+# undefined __cpp_exception / __wasm_lpad_context / __gxx_wasm_personality_v0,
+# the same 21 errors B6 first hit (.local/build-emscripten.md). The checks
+# below only look for the .a file, so a dist left over from a previous
+# encoding would otherwise be reused silently. A stamp file records which
+# encoding produced the current dist; wiping the prefix on a mismatch forces
+# the checks below to rebuild it instead of trusting a stale .a.
+#
+# The prefix alone is not enough: b2's own dependency tracking is mtime-based
+# (it does not hash toolset flags), so re-running b2 against an untouched
+# BOOST_BUILD_DIR relinks the *same* .o files -- still carrying whichever
+# encoding built them -- into a fresh-looking .a. Wipe the build dir too, or
+# the stamp mismatch triggers a rebuild in name only.
+EH_ABI="wasm-standard-exceptions"
+if [[ $DEP_TARGET == emscripten ]]; then
+	EH_ABI_STAMP="${BOOST_PREFIX}/.tau-eh-abi"
+	if [[ "$(cat "$EH_ABI_STAMP" 2>/dev/null)" != "$EH_ABI" ]]; then
+		echo "${BOOST_PREFIX}: missing or stale EH-ABI stamp, forcing a rebuild"
+		rm -rf "$BOOST_PREFIX" "$BOOST_BUILD_DIR"
+	fi
+fi
+
 dep_done_if_exists "${BOOST_PREFIX}/lib/${BUILD_IF_NOT_EXISTS}" "boost building"
 dep_done_if_exists "${BOOST_PREFIX}/lib64/${BUILD_IF_NOT_EXISTS}" "boost building"
 
@@ -90,6 +114,11 @@ EOF
 		B2_ARGS+=("threading=single")
 	fi
 	B2_ARGS+=("define=BOOST_LOG_WITHOUT_SYSLOG")
+	# Must agree with tau's own compile+link flags (cmake/tau-common.cmake) --
+	# the standardized wasm exception-handling encoding, not emsdk's
+	# legacy-by-default one (B6/D2).
+	B2_ARGS+=("cxxflags=-sWASM_LEGACY_EXCEPTIONS=0")
+	B2_ARGS+=("linkflags=-sWASM_LEGACY_EXCEPTIONS=0")
 else
 	# remove user-config.jam if it exists from previous Windows/wasm build
 	rm -f "$BOOST_SOURCE_DIR/user-config.jam"
@@ -103,4 +132,5 @@ fi
 
 # build boost
 ./bootstrap.sh --with-libraries=log && \
-./b2 ${USER_CONFIG_ARG} --prefix=$BOOST_PREFIX --build-dir="$BOOST_BUILD_DIR" "${B2_ARGS[@]}" install
+./b2 ${USER_CONFIG_ARG} --prefix=$BOOST_PREFIX --build-dir="$BOOST_BUILD_DIR" "${B2_ARGS[@]}" install && \
+{ [[ $DEP_TARGET != emscripten ]] || echo "$EH_ABI" > "$EH_ABI_STAMP"; }

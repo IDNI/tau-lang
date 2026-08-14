@@ -121,8 +121,16 @@ function(target_setup target)
 			# unused templates the rest of the toolchains accept
 			-Wno-unused-template
 			-fwasm-exceptions
+			# the standardized wasm-exceptions encoding, not emsdk's
+			# legacy-by-default one; compile+link, must match everywhere an
+			# object is linked into a wasm artifact (B6/D2,
+			# .local/build-emscripten.md)
+			-sWASM_LEGACY_EXCEPTIONS=0
 		)
-		target_link_options(${target} PRIVATE -fwasm-exceptions)
+		target_link_options(${target} PRIVATE
+			-fwasm-exceptions
+			-sWASM_LEGACY_EXCEPTIONS=0
+		)
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")
