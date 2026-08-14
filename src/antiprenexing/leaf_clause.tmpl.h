@@ -369,18 +369,24 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// is F, while this construction (no positives, f_0 = f_1 = 0) builds
 		// `(g_0 | g_1) != 0` per disequation and answers T for both.
 		//
-		// `is_bv_type_family` on the variable's own type is the guard the
-		// whole task uses -- conservative, since bv is the only atomic family
-		// this pass meets. Where it declines, the existing decline path
-		// applies: re-wrap the binder, exactly as the heterogeneous-type and
-		// unrecognised-shape branches do. The positive-only construction
-		// underneath (`f_0 f_1 = 0`) is Boole's consistency condition and is
-		// valid in any Boolean algebra, so only the `neqs` case is guarded.
+		// The guard names both atomic (finite) BA families -- bv and bool --
+		// spelled exactly as step 2a's own atomlessness guard spells it
+		// (`profile_block_atoms`, block_atom_profile.tmpl.h). `bool` is the
+		// two-element BA, so it is maximally atomic and breaks this law even
+		// harder than bv[1] does; nothing floors it, so a bool-typed block
+		// reaches this squeeze. Where the guard declines, the existing
+		// decline path applies: re-wrap the binder, exactly as the
+		// heterogeneous-type and unrecognised-shape branches do. The
+		// positive-only construction underneath (`f_0 f_1 = 0`) is Boole's
+		// consistency condition and is valid in any Boolean algebra, so only
+		// the `neqs` case is guarded.
 		//
 		// normalize_atomic_formula_operators on the way out for the same
 		// reason the success path takes it: `to_nnf` above spelled the
 		// negatives `bf_neq`, and no caller may be able to tell which path ran.
-		if (!neqs.empty() && is_bv_type_family<node>(type_v)) {
+		if (!neqs.empty() && type_v > 0
+			&& (is_bv_type_family<node>(type_v)
+				|| is_bool_type<node>(type_v))) {
 			DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA "
 				"with disequations, keeping the binder: "
 				<< LOG_FM(scoped) << "\n";)
@@ -477,15 +483,19 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// J1 = {f = 0}: it distributes the block over the disequations, keeping
 	// `ex X (f = 0)` and one `ex X (f' g != 0)` per negative. Same atomless
 	// precondition as the single-variable `neqs` construction above, same
-	// bv[1] counterexample, same decline -- re-wrap the live block around the
-	// scoped part, the shape the unrecognised-conjunct branch above already
-	// uses. `scoped` is already in the `!(= 0)` spelling here, so unlike the
-	// single-variable path this needs no normalisation on the way out.
+	// atomic (finite) BA families -- bv and bool, the same pair and the same
+	// spelling step 2a's guard uses -- same bv[1] counterexample, same decline:
+	// re-wrap the live block around the scoped part, the shape the
+	// unrecognised-conjunct branch above already uses. `scoped` is already in
+	// the `!(= 0)` spelling here, so unlike the single-variable path this needs
+	// no normalisation on the way out.
 	//
 	// The positive half needs no guard: `f1 = 0 && f2 = 0 <=> f1|f2 = 0` and
 	// the single-atom quantifier resolution that follows it hold in any
 	// Boolean algebra.
-	if (!neg.empty() && is_bv_type_family<node>(clause_type)) {
+	if (!neg.empty() && clause_type > 0
+		&& (is_bv_type_family<node>(clause_type)
+			|| is_bool_type<node>(clause_type))) {
 		DBG(LOG_TRACE << "eliminate_block_over_clause: atomic BA with "
 			"negated conjuncts, keeping the block: "
 			<< LOG_FM(scoped) << "\n";)
