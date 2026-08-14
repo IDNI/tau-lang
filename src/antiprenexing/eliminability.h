@@ -21,6 +21,7 @@
 #define __IDNI__TAU__ANTIPRENEXING_ELIMINABILITY_H__
 
 #include <algorithm>
+#include <map>
 
 #include "tau_tree.h"
 #include "union_find_with_sets.h"
@@ -80,18 +81,48 @@ struct analysis_context {
 };
 
 /**
+ * @brief Verdict-per-node analysis result; replaces the composed `skip`
+ * predicates (spec item 2). `verdicts` holds every var and atom analysed;
+ * `members` groups the same nodes by category (spec item 1's map of types to
+ * sets of trefs). `bv_floor`, when set, makes any node of the bv type family
+ * at least `blasteable` even if the analysis never keyed it -- this reproduces
+ * the blanket `is_tref_bv_type_family` skip exactly (find_top(skip) may probe
+ * arbitrary subtree nodes, not only analysed vars/atoms).
+ */
+template <NodeType node>
+struct eliminability {
+	subtree_unordered_map<node, elim_verdict> verdicts;
+	std::map<elim_verdict, subtree_unordered_set<node>> members;
+	bool bv_floor = false;
+
+	elim_verdict verdict_of(tref n) const {
+		// An explicit verdict beats the floor in BOTH directions: an
+		// analysed node recorded `eliminable` stays eliminable even if
+		// bv-typed. Task 11 (pure-BA bv variables are eliminable) relies
+		// on this; until its seed flip, analysed bv nodes are seeded
+		// blasteable anyway, so this is behavior-neutral through Task 5.
+		if (auto it = verdicts.find(n); it != verdicts.end())
+			return it->second;
+		if (bv_floor && is_tref_bv_type_family<node>(n))
+			return elim_verdict::blasteable;
+		return elim_verdict::eliminable;
+	}
+	/// Drop-in equivalent of the old `skip(n)`.
+	bool skip(tref n) const {
+		return verdict_of(n) != elim_verdict::eliminable;
+	}
+	/// Everything-eliminable instance == the old `no_skip`.
+	static eliminability none() { return {}; }
+	/// bv-type-only instance == the old `is_tref_bv_type_family` default skip.
+	static eliminability bv_only() { eliminability e; e.bv_floor = true; return e; }
+};
+
+/**
  * @brief Result of analysing one quantifier block over its own body.
  * @tparam node Tree node type.
  */
 template <NodeType node>
-struct block_eliminability {
-	/** @brief Verdict for @p var; `eliminable` if it was not analysed. */
-	elim_verdict verdict_of(tref var) const {
-		if (auto it = verdicts.find(var); it != verdicts.end())
-			return it->second;
-		return elim_verdict::eliminable;
-	}
-
+struct block_eliminability : eliminability<node> {
 	/** @brief Conjuncts in @p var's component; empty if it was not analysed. */
 	const trefs& conjuncts_of(tref var) const {
 		static const trefs none;
@@ -121,7 +152,6 @@ struct block_eliminability {
 	 */
 	bool has_reference() const { return has_ref; }
 
-	subtree_unordered_map<node, elim_verdict> verdicts;
 	subtree_unordered_map<node, trefs> components;
 	bool has_ref = false;
 };

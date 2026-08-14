@@ -196,4 +196,39 @@ TEST_SUITE("eliminability") {
 		auto a = analyse_block<node_t>({ b }, { c }, ctx);
 		CHECK(a.verdict_of(b) == elim_verdict::blasteable);
 	}
+
+	TEST_CASE("members maps every category to its vars and atoms") {
+		// x is entangled with a reference; the atom `x z = 0` and both its
+		// variables land in members[frozen]; nothing else is keyed.
+		tref c1 = get_nso_rr("f(x).").value().main->get();
+		tref c2 = get_nso_rr("x z = 0.").value().main->get();
+		trefs vars = get_free_vars<node_t>(c2);
+		auto a = analyse_block<node_t>(vars, { c1, c2 },
+			analysis_context<node_t>{});
+		const auto& fz = a.members.at(elim_verdict::frozen);
+		for (tref v : vars) CHECK(fz.contains(v));
+		CHECK(fz.contains(c2));           // the atom itself
+		CHECK(a.verdict_of(c2) == elim_verdict::frozen);
+	}
+
+	TEST_CASE("bv_floor makes bv-typed nodes blasteable without analysis") {
+		auto e = eliminability<node_t>::bv_only();
+		tref bv = get_nso_rr("x:bv[4] = { 1 }:bv[4].").value().main->get();
+		tref v = get_free_vars<node_t>(bv)[0];
+		CHECK(e.verdict_of(v) == elim_verdict::blasteable);
+		CHECK(e.skip(v));
+		CHECK_FALSE(eliminability<node_t>::none().skip(v));
+	}
+
+	TEST_CASE("an explicit verdict beats the bv floor in both directions") {
+		eliminability<node_t> e; e.bv_floor = true;
+		tref bv = get_nso_rr("x:bv[4] = { 1 }:bv[4].").value().main->get();
+		tref v = get_free_vars<node_t>(bv)[0];
+		e.verdicts.emplace(v, elim_verdict::arithmetic);
+		CHECK(e.verdict_of(v) == elim_verdict::arithmetic);
+		// Explicit eliminable wins over the floor too -- Task 11 (pure-BA bv
+		// variables are eliminable) depends on this direction.
+		e.verdicts.insert_or_assign(v, elim_verdict::eliminable);
+		CHECK(e.verdict_of(v) == elim_verdict::eliminable);
+	}
 }

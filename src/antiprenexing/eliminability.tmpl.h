@@ -88,6 +88,13 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 			|| t.child_is(tau::wff_parenthesis);
 	};
 
+	// Nodes seeded by visit's three branches, collected during traversal
+	// and read off AFTER the conjunct loop finishes -- verdicts of merged
+	// union-find components settle only once every conjunct has been
+	// visited, so recording inside visit itself could read a verdict that
+	// a later merge still changes.
+	trefs analysed;
+
 	for (tref conj : conjuncts) {
 		// The conjunct itself joins its variables' component.
 		// get_cnf_wff_clauses returns the leaves of the wff_and spine, and a
@@ -120,6 +127,7 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 				assign(m, elim_verdict::frozen);
 				for (tref v : get_free_vars<node>(m))
 					merge(m, v);
+				analysed.push_back(m);
 				return false;
 			}
 			if (is_atomic_fm<node>(m)) {
@@ -166,6 +174,7 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 					seed = join(seed, elim_verdict::arithmetic);
 				assign(m, seed);
 				for (tref v : fvs) merge(m, v);
+				analysed.push_back(m);
 				return false;
 			}
 			if (tau::get(m).is(tau::wff) && !is_transparent_connective(m)) {
@@ -179,6 +188,7 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 				assign(m, elim_verdict::frozen);
 				for (tref v : get_free_vars<node>(m))
 					merge(m, v);
+				analysed.push_back(m);
 				return false;
 			}
 			return true;
@@ -186,9 +196,21 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 		idni::pre_order<node>(conj).visit_unique(visit);
 	}
 
-	// Read verdicts and components off, keyed by block variable.
+	// Read every analysed node (vars AND atoms) into the flat maps. Verdicts
+	// of merged union-find components settle only once every conjunct has
+	// been visited, so this runs after the conjunct loop above, not inside
+	// `visit`.
+	auto record = [&](tref n) {
+		const elim_verdict v = verdict_of_root(n);
+		res.verdicts.insert_or_assign(n, v);
+		res.members[v].insert(n);
+	};
+	for (tref v : block_vars) record(v);
+	for (tref conj : conjuncts) record(conj);
+	for (tref m : analysed) record(m);
+
+	// Read components off, keyed by block variable.
 	for (tref v : block_vars) {
-		res.verdicts.insert_or_assign(v, verdict_of_root(v));
 		trefs comp;
 		for (tref conj : conjuncts)
 			if (uf.connected(v, conj))
