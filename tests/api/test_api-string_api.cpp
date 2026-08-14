@@ -46,6 +46,30 @@ TEST_SUITE("Tau API - string") {
 		CHECK(!tau_api::valid("x = 0"));
 		CHECK(!tau_api::valid_spec("x = 0"));
 	}
+
+	// §4e item 8: api<node>::solve(const string&) rendered every solved
+	// value with the generic bf-constant spelling ("0"/"1"), unlike the
+	// REPL's solve/lgrs commands (print_solver_cmd_solution ->
+	// serialize_constant), which use the declared type's own literal
+	// (tau's is "F"/"T"). Pin the actual formatted text here so a
+	// regression to "0"/"1" fails loudly -- the malformed-input tests
+	// above never exercised this positive case.
+	TEST_CASE_FIXTURE(api_fixture, "solve/lgrs render the declared type's own literal") {
+		auto zero = tau_api::solve("x = 0", solver_mode::general);
+		REQUIRE(zero.has_value());
+		CHECK(zero.value() == std::map<std::string, std::string>{
+			{ "x", "F" } });
+
+		auto nonzero = tau_api::solve("x != 0", solver_mode::general);
+		REQUIRE(nonzero.has_value());
+		CHECK(nonzero.value() == std::map<std::string, std::string>{
+			{ "x", "T" } });
+
+		auto lg = tau_api::lgrs("x = 0");
+		REQUIRE(lg.has_value());
+		CHECK(lg.value() == std::map<std::string, std::string>{
+			{ "x", "F" } });
+	}
 }
 
 // AP-8: only get_interpreter (below) had negative/malformed-input tests;

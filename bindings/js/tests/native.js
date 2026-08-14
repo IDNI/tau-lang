@@ -84,30 +84,20 @@ function nativeNormalize(formula) {
 	return lastResult(runRepl(`normalize ${formula}`));
 }
 
-// A solved variable's value is `var := ` followed by whatever
-// api<node>::solve(string)'s to_str(val) would print for that same tref --
-// verbatim, for any compound value (confirmed by reading both call paths).
-// The one exception is the atomic true/false constant: the
-// REPL's solution printer (print_solver_cmd_solution ->
-// serialize_constant, tau_tree_printers.tmpl.h) special-cases it to
-// `{<literal>}:<type>` using the BA's own zero/one spelling (tau's is
-// "F"/"T", from tau_descriptor's literal_zero/literal_one), where the
-// generic tree printer that to_str() uses instead emits the bare,
-// type-agnostic token "0"/"1" (tau_tree_printers.tmpl.h's `case bf_f:
-// out('0')`). Same value, so only this one wrapped form is unwrapped
-// for comparison; anything else is left untouched.
-const ATOMIC_LITERALS = {
-	tau: { F: '0', T: '1' },
-	sbf: { 0: '0', 1: '1' },
-};
-
-function normalizeSolveValue(raw) {
-	const m = raw.match(/^\{(\S+)\}:(\S+)$/);
-	if (!m) return raw;
-	const [, token, type] = m;
-	const table = ATOMIC_LITERALS[type];
-	return (table && Object.prototype.hasOwnProperty.call(table, token))
-		? table[token] : raw;
+// The REPL's solution printer (print_solver_cmd_solution,
+// repl_evaluator.tmpl.h) wraps the atomic true/false constant as
+// `{<literal>}:<type>` for console display -- console decoration only, added
+// on top of the literal after api<node>::solve(string) already agrees with
+// it (both give tau's "F"/"T", not the generic tree printer's "0"/"1"; see
+// api.tmpl.string.h's serialize_solution). The API's map has no type-name
+// slot to put that decoration in, so it is stripped here for comparison.
+// A compound value is never wrapped this way -- to_str()'s own ba_constant
+// case already renders `{ value }:type` as part of the value itself (with
+// a space, unlike the tight `{value}:type` above), so it never matches this
+// regex and is compared untouched.
+function stripAtomicWrap(raw) {
+	const m = raw.match(/^\{(\S+)\}:\S+$/);
+	return m ? m[1] : raw;
 }
 
 // Parses "solution: {\n\tx := VALUE\n...}" into { x: VALUE, ... }, or null
@@ -123,7 +113,7 @@ function nativeSolve(formula, mode) {
 	const result = {};
 	for (const line of block[1].split('\n')) {
 		const m = line.match(/(\S+)\s*:=\s*(.+?)\s*$/);
-		if (m) result[m[1]] = normalizeSolveValue(m[2]);
+		if (m) result[m[1]] = stripAtomicWrap(m[2]);
 	}
 	return result;
 }

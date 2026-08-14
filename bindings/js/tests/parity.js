@@ -37,14 +37,17 @@
 //    simplification, not a formatting quirk) and is exercised instead
 //    under normalize, whose own native command applies the same pass.
 //  - solve: native's "solution: { x := VALUE }" block is parsed into
-//    { x: VALUE }. VALUE matches api<node>::solve(string)'s to_str(val)
-//    output verbatim for any compound value; the one exception is the
-//    atomic true/false constant, which the REPL wraps as "{F}:tau"/
-//    "{T}:tau" (the BA's own zero/one literal) where to_str's generic tree
-//    printer instead gives the bare, type-agnostic "0"/"1" -- same
-//    underlying value (confirmed by reading both call paths), so only
-//    that wrapped form is unwrapped for comparison; see native.js's
-//    ATOMIC_LITERALS.
+//    { x: VALUE }. VALUE matches api<node>::solve(string)'s output verbatim
+//    -- both give the declared type's own literal (tau's "F"/"T"), from
+//    serialize_solution (api.tmpl.string.h) reusing the same find_ba_type /
+//    serialize_constant core helpers as the REPL's solution printer
+//    (print_solver_cmd_solution, repl_evaluator.tmpl.h). The one difference
+//    left is presentational: the REPL additionally wraps the atomic
+//    true/false constant as "{F}:tau"/"{T}:tau" for console display, a
+//    decoration the API's map has no type-name slot for, so native.js's
+//    stripAtomicWrap strips only that wrapper -- it never touches the
+//    literal spelling, so a regression back to the generic "0"/"1" would
+//    still fail here.
 //  - malformed input: only unambiguous syntax errors (e.g. an unbalanced
 //    paren) are cross-checked against native. A truncated-but-parseable
 //    fragment like "o[t] =" is NOT, because the interactive REPL's

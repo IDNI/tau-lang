@@ -234,17 +234,44 @@ bool api<node>::valid_spec(const std::string& expr) {
 // Solving
 // ------------------------------------------------------------
 
+// Render a solved variable's value the way the REPL does
+// (print_solver_cmd_solution, repl_evaluator.tmpl.h): a compound BA constant
+// already stringifies with its own type-tagged form (tau_tree_printers.tmpl.h's
+// `ba_constant` case), so it goes through the generic printer unchanged; the
+// atomic bf_t/bf_f nodes carry no BA type of their own, so serialize_constant
+// recovers the declared type's own literal instead of the generic "0"/"1".
+// fallback_type mirrors the REPL, resolving the variable's own type first and
+// falling back to the formula's type only for untyped variables.
+template <NodeType node>
+std::map<std::string, std::string> serialize_solution(
+	const solution<node>& sol, size_t fallback_type)
+{
+	using tau = tree<node>;
+	using tt = typename tau::traverser;
+	std::map<std::string, std::string> s;
+	for (auto& [var, val] : sol) {
+		if (tt(val) | tau::ba_constant) {
+			s.emplace(tau::get(var).to_str(), tau::get(val).to_str());
+			continue;
+		}
+		size_t t = find_ba_type<node>(var);
+		if (t == 0) t = fallback_type;
+		std::stringstream ss;
+		s.emplace(tau::get(var).to_str(), serialize_constant<node>(ss, val, t)
+			? ss.str() : tau::get(val).to_str());
+	}
+	return s;
+}
+
 template <NodeType node>
 std::optional<std::map<std::string, std::string>> api<node>::solve(
 	const std::string& formula,
 	solver_mode mode)
 {
-	if (auto solution = solve(get_formula(formula), mode); solution) {
-		std::map<std::string, std::string> s;
-		for (auto& [var, val] : solution.value())
-			s.emplace(to_str(var), to_str(val));
-		return s;
-	}
+	tref fm = get_formula(formula);
+	if (auto solution = solve(fm, mode); solution)
+		return serialize_solution<node>(solution.value(),
+			find_ba_type_or_default<node>(fm));
 	return {};
 }
 
@@ -252,12 +279,10 @@ template <NodeType node>
 std::optional<std::map<std::string, std::string>> api<node>::lgrs(
 	const std::string& equation)
 {
-	if (auto solution = lgrs(get_formula(equation)); solution) {
-		std::map<std::string, std::string> s;
-		for (auto& [var, val] : solution.value())
-			s.emplace(to_str(var), to_str(val));
-		return s;
-	}
+	tref eq = get_formula(equation);
+	if (auto solution = lgrs(eq); solution)
+		return serialize_solution<node>(solution.value(),
+			find_ba_type_or_default<node>(eq));
 	return {};
 }
 

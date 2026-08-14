@@ -477,6 +477,12 @@ tref find_ba_type_tree (tref term) {
 }
 
 template <NodeType node>
+size_t find_ba_type_or_default (tref term) {
+	size_t type = find_ba_type<node>(term);
+	return type > 0 ? type : get_ba_type_id<node>(node::ba::default_type());
+}
+
+template <NodeType node>
 std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id) {
 	return ba_types<node>::print(os, ba_type_id);
 }
