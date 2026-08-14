@@ -1279,4 +1279,88 @@ TEST_SUITE("FrozenBlockNormalization") {
 		trefs quants = tau::get(r).select_top(is_child_quantifier<node_t>);
 		CHECK(quants.size() == 1);   // only y's binder survives
 	}
+
+	// The two cases above go through the 1-arg anti_prenex(fm) entry point,
+	// which hands down eliminability<node_t>::bv_only() -- an instance with
+	// NO explicit verdicts at all, so el.verdict_of is never `frozen` there
+	// and neither this task's process_quantifier_block early-out nor its
+	// three blast_block gates (both keyed off an explicit frozen verdict)
+	// can ever fire for them: they pin the pre-existing
+	// eliminate_block_over_clause reserved-fixpoint path only. The two
+	// cases below are the SAME formulas through the 2-arg entry point with
+	// a real analyse_formula analysis (the PureBaBvEliminability "pure-BA
+	// bv scope" pattern) -- the only path that actually threads an explicit
+	// `frozen` verdict down to process_quantifier_block/anti_prenex_block,
+	// so this task's new code is reachable at all.
+	TEST_CASE("a block over only ref-entangled variables survives verbatim "
+		"(real analysis)") {
+		const char* s = "ex y (q(y) && y != 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		// Non-vacuity: y really is analysed frozen, so the assertions below
+		// exercise the early-out rather than passing on an unanalysed
+		// default. is_ref_fm matches the wff WRAPPING wff_ref -- that is
+		// the node get_free_vars/analyse_formula key on, not the bare
+		// wff_ref itself (mirrors test_eliminability.cpp's idiom).
+		auto is_ref_fm = [](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::wff) && t.child_is(tau::wff_ref);
+		};
+		tref ref_fm = tau::get(fm).find_top(is_ref_fm);
+		REQUIRE(ref_fm != nullptr);
+		tref y = get_free_vars<node_t>(ref_fm)[0];
+		REQUIRE(el.verdict_of(y) == elim_verdict::frozen);
+		tref r = anti_prenex<node_t>(fm, el);
+		CHECK(tau::get(r).find_top(is_child_quantifier<node_t>) != nullptr);
+		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
+	}
+
+	TEST_CASE("an eliminable variable over a frozen scope still eliminates "
+		"(real analysis)") {
+		const char* s = "ex z ex y (q(y) && z = 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+		// Non-vacuity: the input really is a 2-binder block before
+		// elimination. select_top does NOT descend into a match (it stops
+		// at the first quantifier along each path), so on the nested
+		// `ex z (ex y ...)` shape it reports only the outer binder -- 1,
+		// not 2. select_all does descend into matches and is the correct
+		// tool for counting a (possibly nested) quantifier chain; same
+		// reasoning applies to the post-elimination count below, where the
+		// FAILURE shape this test exists to catch (z's binder wrongly
+		// surviving alongside y's) is itself a 2-deep nested chain that
+		// select_top would silently misreport as "1".
+		REQUIRE(tau::get(fm).select_all(
+			is_child_quantifier<node_t>).size() == 2);
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		tref r = anti_prenex<node_t>(fm, el);
+		trefs quants = tau::get(r).select_all(is_child_quantifier<node_t>);
+		CHECK(quants.size() == 1);   // only y's binder survives
+		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
+	}
+
+	// Disjunctive variant of the "eliminates" case above (real analysis).
+	// Traced in the task-6 report: the wff_or case dispatches per-disjunct,
+	// and the frozen disjunct (q(y), no z) returns verbatim while the two
+	// z-disjuncts still squeeze via step 2b -- so this resolves the same
+	// way as the AND-only case, through the same non-gate machinery
+	// (dep/indep separation + eliminate_block_over_clause's reserved
+	// fixpoint / the wff_or per-disjunct dispatch), never through any
+	// blast_block gate. See "Gate reachability" in the task-6 report for
+	// why: a frozen verdict's ref union-find merges every atom with ALL its
+	// free variables, so anything sharing an atom with frozen content is
+	// itself frozen -- active and frozen variables are always
+	// variable-disjoint, and dep/indep separation detaches frozen content
+	// before any gate could see it.
+	TEST_CASE("an eliminable variable over a frozen scope still eliminates, "
+		"disjunctive form (real analysis)") {
+		const char* s = "ex z ex y ((z = 0 || z = 1) && q(y)).";
+		tref fm = get_nso_rr(s).value().main->get();
+		REQUIRE(tau::get(fm).select_all(
+			is_child_quantifier<node_t>).size() == 2);
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+		tref r = anti_prenex<node_t>(fm, el);
+		trefs quants = tau::get(r).select_all(is_child_quantifier<node_t>);
+		CHECK(quants.size() == 1);   // only y's binder survives
+		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
+	}
 }

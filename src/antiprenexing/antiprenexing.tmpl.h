@@ -444,6 +444,16 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// blast_block instead.
 		if (!tau::get(formula).find_top(is<node, tau::wff_or>)) {
 			if (!has_active_var(formula) || has_skip_content(formula)) {
+				// Defense-in-depth: unreachable as of 2026-08-15 through
+				// the 2-arg path -- formula-level frozen verdicts are
+				// always variable-disjoint from active variables (see
+				// task-6 report trace), so the dep/indep separation
+				// detaches frozen content first. Kept because
+				// reachability depends on upstream routing that the
+				// category-ordered wrapping and per-block blasting work
+				// (Tasks 7-8) changes, and because analyse_block-style
+				// seeding (kept binders, unrecognized shapes) would break
+				// the disjointness argument if it ever feeds el.
 				if (el.has_frozen(formula))
 					return tau::build_wff_and(indep,
 						rewrap_block(formula));
@@ -526,6 +536,16 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				LOG_TRACE << "anti_prenex_block: Boole split"
 					" budget exhausted, re-wrapping block\n";)
 			if (!has_active_var(formula)) {
+				// Defense-in-depth: unreachable as of 2026-08-15 through
+				// the 2-arg path -- formula-level frozen verdicts are
+				// always variable-disjoint from active variables (see
+				// task-6 report trace), so the dep/indep separation
+				// detaches frozen content first. Kept because
+				// reachability depends on upstream routing that the
+				// category-ordered wrapping and per-block blasting work
+				// (Tasks 7-8) changes, and because analyse_block-style
+				// seeding (kept binders, unrecognized shapes) would break
+				// the disjointness argument if it ever feeds el.
 				if (el.has_frozen(formula))
 					return tau::build_wff_and(indep,
 						rewrap_block(formula));
@@ -725,6 +745,15 @@ tref anti_prenex_block(tref formula, const trefs& block,
 	// Connective is not wff_and or wff_or (e.g. a single atom or a wff_ref)
 	// -> try blasting if the block needs it, else quantifiers stay with formula
 	if (!has_active_var(formula)) {
+		// Defense-in-depth: unreachable as of 2026-08-15 through the 2-arg
+		// path -- formula-level frozen verdicts are always
+		// variable-disjoint from active variables (see task-6 report
+		// trace), so the dep/indep separation detaches frozen content
+		// first. Kept because reachability depends on upstream routing
+		// that the category-ordered wrapping and per-block blasting work
+		// (Tasks 7-8) changes, and because analyse_block-style seeding
+		// (kept binders, unrecognized shapes) would break the
+		// disjointness argument if it ever feeds el.
 		if (el.has_frozen(formula)) return rewrap_block(formula);
 		return blast_block(formula);
 	}
