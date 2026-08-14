@@ -174,7 +174,7 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	// already run: it works on a formula whose non-bv structure is resolved.
 	//
 	// The analysis cannot substitute for that today, and the plan's premise
-	// that it could does not hold as built: `solver_owned` is consumed only
+	// that it could does not hold as built: `blasteable` is consumed only
 	// inside `eliminate_block_over_clause`, whereas the decisions that
 	// matter here -- which quantifiers `collect_quantifier_block` treats as
 	// transparent, and what `blast_block` hands to the solver -- still read

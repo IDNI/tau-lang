@@ -1288,7 +1288,7 @@ tref anti_prenex(tref formula, const std::function<bool(tref)>& skip) {
 	// once here at pipeline entry and carried down to every block. A
 	// constant of another Boolean algebra (a `:tau` spec constant, say) is
 	// one cvc5 cannot translate at all, so *no* bitvector scope anywhere in
-	// this formula will ever be decided by the solver, and `solver_owned`
+	// this formula will ever be decided by the solver, and `blasteable`
 	// must not be seeded. Read off the incoming formula: none of the steps
 	// below can introduce a foreign BA constant that is not already there.
 	const bool ctx_bv_is_solver_owned = !has_foreign_ba_constant<node>(formula);

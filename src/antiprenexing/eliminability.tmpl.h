@@ -135,7 +135,7 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 				//
 				// Seed order matters only through `join`, which
 				// is commutative -- but the *criterion* does not
-				// commute with itself. `solver_owned` keys on
+				// commute with itself. `blasteable` keys on
 				// bitvector TYPE, deliberately not on arithmetic
 				// taint: blasting rewrites arithmetic into
 				// per-bit atoms that are still bv-typed but no
@@ -161,9 +161,9 @@ block_eliminability<node> analyse_block(const trefs& block_vars,
 					}
 				elim_verdict seed = elim_verdict::eliminable;
 				if (atom_is_bv && ctx.bv_is_solver_owned)
-					seed = elim_verdict::solver_owned;
+					seed = elim_verdict::blasteable;
 				if (arith_tainted.contains(m))
-					seed = join(seed, elim_verdict::arith_residue);
+					seed = join(seed, elim_verdict::arithmetic);
 				assign(m, seed);
 				for (tref v : fvs) merge(m, v);
 				return false;

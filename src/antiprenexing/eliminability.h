@@ -34,27 +34,29 @@ namespace idni::tau_lang {
  *
  * The four meanings the single `skip` predicate used to conflate. The
  * distinction that matters most is `frozen` ("do not touch") versus
- * `solver_owned` ("this has a destination -- send it there"): honouring a
+ * `blasteable` ("this has a destination -- send it there"): honouring a
  * `frozen`-style skip on bitvector content would disable the very blasting the
  * pipeline relies on.
  *
  * The underlying values encode the join order and are relied on by `join`.
  */
 enum class elim_verdict {
-	eliminable    = 0, ///< Nothing blocks removing this variable.
-	solver_owned  = 1, ///< Bitvector content the solver/blasting should decide.
-	arith_residue = 2, ///< Bitvector arithmetic blasting cannot express.
-	frozen        = 3  ///< Entangled with an unresolved reference or a kept binder.
+	eliminable  = 0, ///< Nothing blocks removing this variable.
+	blasteable  = 1, ///< Bitvector content blasting could turn into a regular
+	                 ///< BA formula (the solver can also decide it).
+	arithmetic  = 2, ///< Bitvector arithmetic blasting cannot express —
+	                 ///< only cvc5 can decide it.
+	frozen      = 3  ///< Entangled with an unresolved reference or a kept binder.
 };
 
 /**
  * @brief Join two verdicts. Total, always succeeds, no error type.
  *
  * Order, bottom to top:
- * `eliminable < solver_owned < arith_residue < frozen`.
+ * `eliminable < blasteable < arithmetic < frozen`.
  *
  * `frozen` is top because a reference makes content untouchable by any
- * destination, the solver included. `arith_residue` sits above `solver_owned`
+ * destination, the solver included. `arithmetic` sits above `blasteable`
  * because arithmetic the solver cannot express must not be routed to it -- the
  * narrower verdict wins where both apply.
  */
@@ -151,7 +153,7 @@ bool eliminability_comp(tref l, tref r);
  * -- fail closed -- at every wff-level shape this analysis does not otherwise
  * recognise, so an unhandled shape cannot silently leave its variables
  * `eliminable`. @p ctx.bv_is_solver_owned is consulted when seeding a
- * bv-typed atom: `solver_owned` only applies while it holds.
+ * bv-typed atom: `blasteable` only applies while it holds.
  *
  * Only a *bound* variable's own scope can constrain it -- it cannot occur
  * outside it -- so analysing the block body is not merely cheaper than

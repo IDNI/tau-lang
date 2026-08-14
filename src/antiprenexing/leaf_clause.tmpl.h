@@ -303,7 +303,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// ---- Bitvector content: the solver, then blasting --------------------
 	//
 	// Absorbed from `treat_ex_quantified_clause`, and scoped by the analysis
-	// rather than by a bare type test: `solver_owned` is exactly "bv-typed
+	// rather than by a bare type test: `blasteable` is exactly "bv-typed
 	// and cvc5 can be expected to translate this formula", which is the
 	// question this branch needs answered. Gating on the verdict rather than
 	// on `is_bv_type_family` alone is what keeps a formula carrying a foreign
@@ -313,7 +313,7 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 	// skip-matched block to `blast_block` before a clause ever gets here; it
 	// becomes live when the legacy path is rewired through this module.
 	for (tref v : still_live) {
-		if (elim.verdict_of(v) != elim_verdict::solver_owned) continue;
+		if (elim.verdict_of(v) != elim_verdict::blasteable) continue;
 		if (!is_bv_type_family<node>(tau::get(v).get_ba_type())) continue;
 		const trefs& free_vars = get_free_vars<node>(scoped);
 		if ((free_vars.empty() || (free_vars.size() == 1

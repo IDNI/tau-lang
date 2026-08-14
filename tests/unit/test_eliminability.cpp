@@ -13,10 +13,10 @@ TEST_SUITE("eliminability") {
 	}
 
 	TEST_CASE("eliminable is the identity") {
-		CHECK(join(elim_verdict::eliminable, elim_verdict::solver_owned)
-			== elim_verdict::solver_owned);
-		CHECK(join(elim_verdict::arith_residue, elim_verdict::eliminable)
-			== elim_verdict::arith_residue);
+		CHECK(join(elim_verdict::eliminable, elim_verdict::blasteable)
+			== elim_verdict::blasteable);
+		CHECK(join(elim_verdict::arithmetic, elim_verdict::eliminable)
+			== elim_verdict::arithmetic);
 	}
 
 	TEST_CASE("frozen is the top element") {
@@ -24,24 +24,24 @@ TEST_SUITE("eliminability") {
 		// including the solver -- so nothing demotes frozen.
 		CHECK(join(elim_verdict::frozen, elim_verdict::eliminable)
 			== elim_verdict::frozen);
-		CHECK(join(elim_verdict::frozen, elim_verdict::solver_owned)
+		CHECK(join(elim_verdict::frozen, elim_verdict::blasteable)
 			== elim_verdict::frozen);
-		CHECK(join(elim_verdict::frozen, elim_verdict::arith_residue)
+		CHECK(join(elim_verdict::frozen, elim_verdict::arithmetic)
 			== elim_verdict::frozen);
 	}
 
-	TEST_CASE("arith_residue outranks solver_owned") {
+	TEST_CASE("arithmetic outranks blasteable") {
 		// Arithmetic cvc5 cannot express must not be routed to it: the
 		// narrower verdict wins where both apply.
-		CHECK(join(elim_verdict::solver_owned, elim_verdict::arith_residue)
-			== elim_verdict::arith_residue);
-		CHECK(join(elim_verdict::arith_residue, elim_verdict::solver_owned)
-			== elim_verdict::arith_residue);
+		CHECK(join(elim_verdict::blasteable, elim_verdict::arithmetic)
+			== elim_verdict::arithmetic);
+		CHECK(join(elim_verdict::arithmetic, elim_verdict::blasteable)
+			== elim_verdict::arithmetic);
 	}
 
 	TEST_CASE("join is commutative across every pair") {
 		const elim_verdict all[] = { elim_verdict::eliminable,
-			elim_verdict::solver_owned, elim_verdict::arith_residue,
+			elim_verdict::blasteable, elim_verdict::arithmetic,
 			elim_verdict::frozen };
 		for (elim_verdict a : all) for (elim_verdict b : all)
 			CHECK(join(a, b) == join(b, a));
@@ -134,13 +134,13 @@ TEST_SUITE("eliminability") {
 		CHECK(a.conjuncts_of(unanalysed).empty());
 	}
 
-	TEST_CASE("bv-typed atoms are solver_owned when the solver owns bv") {
+	TEST_CASE("bv-typed atoms are blasteable when the solver owns bv") {
 		tref c = get_nso_rr("x:bv[4] & y:bv[4] = 0:bv[4].")
 			.value().main->get();
 		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c))
-			CHECK(a.verdict_of(v) == elim_verdict::solver_owned);
+			CHECK(a.verdict_of(v) == elim_verdict::blasteable);
 	}
 
 	TEST_CASE("bv atoms are eliminable when the solver cannot own them") {
@@ -156,7 +156,7 @@ TEST_SUITE("eliminability") {
 			CHECK(a.verdict_of(v) == elim_verdict::eliminable);
 	}
 
-	TEST_CASE("arith_residue outranks solver_owned on the same atom") {
+	TEST_CASE("arithmetic outranks blasteable on the same atom") {
 		// Multiplication by a non-constant is arithmetic blasting cannot
 		// express, so it must not be routed to the solver even though the
 		// atom is bv-typed.
@@ -165,7 +165,7 @@ TEST_SUITE("eliminability") {
 		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
 		auto a = analyse_block<node_t>(conj_vars(c), { c }, ctx);
 		for (tref v : conj_vars(c))
-			CHECK(a.verdict_of(v) == elim_verdict::arith_residue);
+			CHECK(a.verdict_of(v) == elim_verdict::arithmetic);
 	}
 
 	TEST_CASE("a reference outranks every bv verdict") {
@@ -182,7 +182,7 @@ TEST_SUITE("eliminability") {
 		// block_vars' types -- and must never gate the seed itself. `b`
 		// is the block's only bound variable and is not bv-typed, but
 		// the conjunct's body still carries bv content (x, y) that must
-		// be seeded solver_owned. Gating on block_vars let this fall
+		// be seeded blasteable. Gating on block_vars let this fall
 		// through to eliminable and reach generic Boole decomposition --
 		// the exact blow-up this task exists to prevent -- because the
 		// deliberately coarse per-conjunct union still ties b's verdict
@@ -194,6 +194,6 @@ TEST_SUITE("eliminability") {
 			[](tref v) { return !is_tref_bv_type_family<node_t>(v); });
 		analysis_context<node_t> ctx; ctx.bv_is_solver_owned = true;
 		auto a = analyse_block<node_t>({ b }, { c }, ctx);
-		CHECK(a.verdict_of(b) == elim_verdict::solver_owned);
+		CHECK(a.verdict_of(b) == elim_verdict::blasteable);
 	}
 }
