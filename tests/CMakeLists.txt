@@ -10,6 +10,13 @@ else()
 	set(TEST_SUFFIX "")
 endif()
 
+# codegen is not supported under Emscripten yet
+set(TAU_TESTS_REQUIRE_CODEGEN
+	test_cpp_codegen_roundtrip
+	test_cpp_codegen_pwr
+	test_cpp_codegen_bench
+	test_cpp_codegen_data_atoms)
+
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
 	set(DOCTEST_VERSION "v2.4.11")
@@ -153,6 +160,10 @@ function(add test_name)
 	# message(STATUS "adding test: ${test_name}")
 	if(test_name IN_LIST TAU_SKIP_TESTS)
 		message(STATUS "Skipping C++ test ${test_name} (covered by REPL test)")
+		return()
+	endif()
+	if(EMSCRIPTEN AND test_name IN_LIST TAU_TESTS_REQUIRE_CODEGEN)
+		message(STATUS "Skipping ${test_name}: codegen not supported under Emscripten yet")
 		return()
 	endif()
 	set(N "${test_name}")
