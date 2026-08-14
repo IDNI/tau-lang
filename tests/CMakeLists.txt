@@ -74,6 +74,12 @@ set(TAU_SKIP_TESTS
 	test_ltl_strategy_exec
 	CACHE STRING "Test targets skipped because covered by REPL tests")
 
+# The REPL tests that cover these are not built for wasm, so nothing would
+# exercise them there.
+if(EMSCRIPTEN)
+	set(TAU_SKIP_TESTS "")
+endif()
+
 #
 # Which BAs a central suite needs.
 #
