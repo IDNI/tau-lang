@@ -126,4 +126,36 @@ q
 type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. si:Segment := in file("fixture/segment-length_2.in"). so:Segment := out console. run so[t] = si[t].
 q
 
+# A spec can also copy just PART of a tuple between streams -- a partial copy.
+# A member the spec does not copy is not left dangling: the emitted tuple
+# initializes it to the default value of that member's own Boolean algebra,
+# which is that algebra's 0. Below, time point 0 copies only member a, so
+# o[0] is emitted with b: "0" -- sbf's default -- even though the input
+# tuple's b member is "1" there; time point 1 copies the whole tuple for
+# comparison. The same defaulting also covers whole time points: step 2 lies
+# beyond every constraint, so o[2] comes out with every member defaulted.
+# (Parenthesizing the member equality is what lets the REPL read a member
+# access on an indexed stream variable -- the same parenthesize-to-see-it
+# pattern as the quantifier examples above. And a partial copy still needs
+# every member to appear at SOME time point of the spec: a member the spec
+# never mentions anywhere has no output stream at all, and the tuple, missing
+# one member, is then never written.)
+
+type Point = {a: sbf, b: sbf}. i:Point := in console. o:Point := out console. run (o[0].a = i[0].a) && o[1] = i[1].
+{ a: "1", b: "1" }
+{ a: "0", b: "1" }
+q
+
+# "The corresponding BA" is per member: each non-copied member defaults in
+# its own algebra. Partially copying a Segment's line sub-tuple -- one
+# equality that expands to all five of Line's flattened members -- leaves the
+# outer tag, a bv[8] member, non-copied at time point 0, so so[0] is emitted
+# with tag: "0", bv[8]'s default, while the file's first literal carries
+# tag "5". The copied line sub-tuple keeps every value it was read with,
+# its inherited tag "9" included; time point 1 again copies the whole
+# Segment, tag and all:
+
+type byte = bv[8]. type Point = {a: sbf, b: sbf}. type Tagged = {tag: byte}. type Line of (Tagged) is {p: Point, q: Point}. type Segment = {tag: byte, line: Line}. si:Segment := in file("fixture/segment-length_2.in"). so:Segment := out console. run (so[0].line = si[0].line) && so[1] = si[1].
+q
+
 quit
