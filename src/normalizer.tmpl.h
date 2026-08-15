@@ -265,6 +265,18 @@ tref eliminate_bv_and_quantifiers(tref form) {
 template <NodeType node>
 tref normalize(tref form) {
 	using tau = tree<node>;
+	// Caching architecture (see private/2026-08-15-normalizer-caching-plan.md,
+	// "Explicitly NOT cacheable as-is", for the full rationale):
+	// This entry cache (and normalize_non_temp's below) dedupes whole-formula
+	// calls -- measured 37/37 distinct on the probe case, i.e. no repetition
+	// at this level. The real repetition lives in the leaf passes: to_nnf
+	// (16x), normalize_atomic_formula_operators (16x),
+	// syntactic_path_simplification (66x) and ex_subs_based_elimination
+	// (44,795 calls on the probe case) -- those now carry their own
+	// TAU_CACHE-gated caches. anti_prenex_block / anti_prenex(el) /
+	// process_quantifier_blocks stay deliberately uncached: their key would
+	// have to include per-pass eliminability state and in/out recursion
+	// state, which would never hit.
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
@@ -303,6 +315,9 @@ tref normalize(tref form) {
 template <NodeType node>
 tref normalize_non_temp(tref fm) {
 	//	using tt = tau::traverser;
+	// See normalize's cache comment above for the caching architecture
+	// (entry vs. leaf-pass caches, and why anti_prenex_block/anti_prenex(el)
+	// stay uncached).
 	#ifdef TAU_CACHE
 	using tau = tree<node>;
 	using cache_t = subtree_unordered_map<node, tref>;
