@@ -1205,6 +1205,11 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	//
 	// Inert at the shipped defaults (`per_leaf` / `eager`): the guard below
 	// is false and `result` reaches wrap_skipped untouched.
+	//
+	// Not every block reaches this point: the all-frozen early-out and a
+	// full trivial-Skolem elimination both return through wrap_skipped
+	// above, before this hook ever runs -- so "per_block" means "per block
+	// that reaches the main pipeline", not literally every block collected.
 	bool blasteable_consumed = false;
 	if (solver_placement == solver_site::per_closed_block
 		|| blast_placement == blast_site::per_block)
@@ -1215,6 +1220,19 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 			it != blk.displaced.rend(); ++it) {
 			const auto& [var, is_ex_q, cat] = *it;
 			if (cat != elim_verdict::blasteable) continue;
+			// Same demotion resolve_ex_block applies to block_vars
+			// (see its comment, and the issue #70 rationale it
+			// cites): when the formula holds a foreign BA constant,
+			// no bitvector content in it is solver-owned, so a
+			// displaced `blasteable` binder must not be handed to
+			// either the solver arm or the blasting arm below --
+			// the solver arm is already protected by its own
+			// is_bv_solvable_formula check, but the blasting arm
+			// is not. Leaving it out of `sub`/`n_blasteable`
+			// entirely keeps it out of both, and it falls through
+			// to wrap_skipped's normal blasteable-group emission
+			// instead, exactly as it would without this hook.
+			if (!ctx_bv_is_solver_owned) continue;
 			sub = is_ex_q ? build_wff_ex<node>(var, sub, false)
 				: build_wff_all<node>(var, sub, false);
 			++n_blasteable;
@@ -1245,15 +1263,31 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 					// blast_reentry_depth); `defer` and an
 					// exhausted budget both keep the blasted
 					// formula with its quantifiers alive,
-					// which is sound.
+					// which is sound. `defer` is a deliberate
+					// choice and stays silent; an exhausted
+					// budget is logged the same way blast_block
+					// logs its own exhaustion, so the two causes
+					// remain distinguishable in the log.
 					if (blast_method
-						== blast_mode::anti_prenex_result
-						&& blast_reentry_depth<node>()
-							< max_blast_reentry_depth)
+						== blast_mode::anti_prenex_result)
 					{
-						blast_reentry_guard<node> guard;
-						result = anti_prenex<node>(bl,
-							eliminability<node>::bv_only());
+						if (blast_reentry_depth<node>()
+							< max_blast_reentry_depth)
+						{
+							blast_reentry_guard<node> guard;
+							result = anti_prenex<node>(bl,
+								eliminability<node>::bv_only());
+						} else {
+							LOG_ERROR << "per_block hook:"
+								" blast/re-enter depth "
+								<< max_blast_reentry_depth
+								<< " exceeded on "
+								<< LOG_FM(sub)
+								<< "; returning the"
+								" blasted formula without"
+								" re-entering.";
+							result = bl;
+						}
 					} else result = bl;
 					handled = true;
 				}
