@@ -66,8 +66,26 @@ std::optional<std::string> api<node>::apply_defs(
 		}
 		tdefs.insert(d);
 	}
-	if (tref a = apply_defs(tdefs, get_spec_or_term(expr)); a)
+	if (tref a = apply_defs(tdefs, get_spec_or_term(expr)); a) {
+		// get_spec_or_term() parses a bare formula as a one-line spec
+		// (spec(main(wff(...)))); get_nso_rr()'s no-ref branch keeps
+		// that shape rather than unwrapping it the way its ref branch
+		// does (via tau_lang::get_nso_rr's main -> wff/bf navigation),
+		// so content round-trips through nso_rr_apply but the shape
+		// stays spec-wrapped. Only to_str() sees the difference: a
+		// spec-shaped tree renders with the trailing '.' every other
+		// string overload's result lacks. Unwrap here, at the point
+		// content becomes a string, so the tref-level overloads --
+		// which other callers (e.g. get_interpreter) rely on staying
+		// spec-shaped -- are untouched.
+		using tt = typename tau::traverser;
+		if (tau::get(a).is(tau::spec)) {
+			tref main = tt(a) | tau::main | tau::wff | tt::ref;
+			if (!main) main = tt(a) | tau::main | tau::bf | tt::ref;
+			if (main) a = main;
+		}
 		return to_str(a);
+	}
 	return {};
 }
 

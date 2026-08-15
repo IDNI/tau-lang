@@ -19,6 +19,46 @@ TEST_SUITE("Tau API - string") {
 		}
 	}
 
+	// apply_defs()/apply_all_defs() parse via get_spec_or_term(), which
+	// tries get_spec() first; a bare formula like "x = 0" parses fine as
+	// a one-line spec (spec(main(wff(...)))). Because that tree contains
+	// no `ref`, api<node>::get_nso_rr's no-ref branch kept the whole
+	// spec-shaped tree as nso_rr.main instead of unwrapping it the way
+	// its ref branch does (via tau_lang::get_nso_rr's main -> wff/bf
+	// navigation), so nso_rr_apply carried the spec shape through and
+	// to_str() rendered it with spec grammar's trailing '.' -- unlike
+	// every neighbouring string overload (substitute, dnf, cnf, nnf, ...)
+	// which route through get_formula_or_term() and never carry the
+	// artifact. Fixed by unwrapping the spec shape in the string overload
+	// itself, right before to_str(); apply_def/apply_all_defs share the
+	// same underlying apply_defs(defs, string) so both are covered.
+	TEST_CASE_FIXTURE(api_fixture, "apply_defs/apply_all_defs on a bare formula") {
+		auto all = tau_api::apply_all_defs("x = 0");
+		REQUIRE(all.has_value());
+		CHECK(all.value() == "x = 0");
+
+		auto some = tau_api::apply_defs(std::set<std::string>{}, "x = 0");
+		REQUIRE(some.has_value());
+		CHECK(some.value() == "x = 0");
+	}
+
+	// Input that genuinely carries a spec's own inline definitions must
+	// still round-trip correctly: it reaches api<node>::get_nso_rr's ref
+	// branch (a `ref` to apply_all_defs_f is present), which already
+	// unwraps to the bare main formula via tau_lang::get_nso_rr, so this
+	// path was correct both before and after the fix above -- pinned here
+	// so the string-overload change above cannot regress it. Mirrors the
+	// tref-level "apply_all_defs" case in test_api-tref_api.cpp, whose
+	// spec (apply_all_defs_f(x) := x'.\napply_all_defs_f(z) = 0.) already
+	// established z' = 0 as the correct unwrapped result.
+	TEST_CASE_FIXTURE(api_fixture, "apply_all_defs on a spec with real definitions") {
+		auto applied = tau_api::apply_all_defs(
+			"str_apply_all_defs_f(x) := x'.\n"
+			"str_apply_all_defs_f(z) = 0.");
+		REQUIRE(applied.has_value());
+		CHECK(applied.value() == "z' = 0");
+	}
+
 	// AP-9: sat/realizable/unrealizable/valid/valid_spec routed a string
 	// through get_spec_or_term(), wrapping it in a `spec` node. The
 	// tref-level sat()/realizable() gate on is_formula() (a bare wff), so
@@ -63,6 +103,7 @@ TEST_SUITE("Tau API - string") {
 		REQUIRE(bnf.has_value());
 		CHECK(bnf.value() == "x = 0 && y' = 0");
 	}
+
 
 	// §4e item 8: api<node>::solve(const string&) rendered every solved
 	// value with the generic bf-constant spelling ("0"/"1"), unlike the
