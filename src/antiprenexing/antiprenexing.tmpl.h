@@ -830,15 +830,21 @@ struct quantifier_block {
 	// returned at the moment collection displaced it -- skip() and
 	// verdict_of() are consistent by construction, so a displaced var's
 	// category is never `eliminable`; eliminable vars join `vars` above
-	// instead). Re-wrapped by process_quantifier_block's wrap_skipped:
-	// frozen outermost, then arithmetic, then blasteable, innermost the
-	// eliminated body -- the spec's order, and sound because only
-	// same-kind binders are ever absorbed (same-kind quantifiers
-	// commute). The category is an ordering hint only, not a semantic
-	// invariant: it is read once at displacement time and never
-	// re-checked, which is fine because same-kind commutation makes the
-	// emission order sound regardless of whether the category could in
-	// principle have drifted.
+	// instead). NOT all same-kind: collection absorbs skip-matched
+	// binders of either kind while the block's own kind is still
+	// unfixed (see collect_quantifier_block), so a run of displaced
+	// binders can contain a mix of ∃ and ∀. Re-wrapped by
+	// process_quantifier_block's wrap_skipped, which reorders by
+	// category (frozen outermost, then arithmetic, then blasteable)
+	// ONLY WITHIN each maximal same-kind segment of this vector --
+	// same-kind quantifiers commute, so that much is sound; segment
+	// order itself (i.e. order across a kind change) is never touched,
+	// because opposite-kind quantifiers do not commute. The category is
+	// an ordering hint only, not a semantic invariant: it is read once
+	// at displacement time and never re-checked, which is fine because
+	// same-kind commutation makes the within-segment emission order
+	// sound regardless of whether the category could in principle have
+	// drifted.
 	std::vector<std::tuple<tref, bool, elim_verdict>> displaced;
 	// Kind of the block itself (true = ∃). Taken from the first active
 	// quantifier of the run, not from the first quantifier: a leading
@@ -887,17 +893,27 @@ quantifier_block<node> collect_quantifier_block(tref n,
 		if (el.skip(var)) {
 			// Transparent only while it genuinely commutes with the
 			// block. Same-kind quantifiers do; opposite-kind ones do
-			// not -- `ex a all x phi` is not `all x ex a phi`, and
-			// wrap_skipped re-emits everything in `displaced`
-			// by category, frozen outermost, so absorbing an
-			// opposite-kind quantifier here would hoist it out
-			// past the block. Disjoint BA types do not rescue it:
-			// with `a` atomless and `x` a bitvector,
-			// phi = (a = 0 <-> x = 0) makes
+			// not -- `ex a all x phi` is not `all x ex a phi`.
+			// wrap_skipped only reorders WITHIN a maximal same-kind
+			// segment of `displaced` (frozen outermost, arithmetic,
+			// then blasteable innermost, all within that segment);
+			// it never moves a binder past a kind change. Absorbing
+			// an opposite-kind quantifier here once the block's own
+			// kind is fixed would still leave it stranded inside a
+			// block whose active vars (`blk.vars`) are the OTHER
+			// kind, so it must end the run regardless -- that part
+			// is unrelated to wrap_skipped's re-emission order.
+			// Disjoint BA types do not rescue it: with `a` atomless
+			// and `x` a bitvector, phi = (a = 0 <-> x = 0) makes
 			// `all x ex a phi` true and `ex a all x phi` false.
 			//
 			// A skipped quantifier seen *before* any active one is
-			// always safe: it stays outermost either way.
+			// always safe: it stays outermost either way -- but a
+			// RUN of several such pre-kind-fixed skipped quantifiers
+			// of MIXED kinds is not thereby exempt from the
+			// same-kind-commutes rule; wrap_skipped's segmenting is
+			// what keeps that run's own internal order sound (see
+			// `quantifier_block::displaced`).
 			//
 			// Breaking is self-healing: blk.body then starts with
 			// that quantifier and select_innermost_blocks picks it
@@ -993,37 +1009,68 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	const bool is_ex = blk.is_ex;
 
 	// Re-wrap quantifiers displaced by the collection above around a
-	// result, grouped and ordered by category rather than by encounter
-	// order -- valid regardless of order since they commute with the
-	// rest (same-kind quantifiers commute). Determinism: for an
-	// unchanged block this always re-wraps to a structurally identical
-	// tref (same input `blk.displaced` -> same stable emission order),
-	// which is what lets process_quantifier_blocks' `done`-set
-	// termination retire it.
+	// result. `displaced` is not all one kind (see its doc comment):
+	// collection absorbs skip-matched binders of either kind while the
+	// block's own kind is still unfixed. So reordering is done ONLY
+	// WITHIN each maximal same-kind segment of `displaced` -- binders in
+	// one such segment commute freely with each other, which is what
+	// makes category order sound there; segment order itself (i.e.
+	// order across a kind change) is left exactly as encountered,
+	// because opposite-kind quantifiers never commute. Determinism: for
+	// an unchanged block this always re-wraps to a structurally
+	// identical tref (same input `blk.displaced` -> same segmentation ->
+	// same stable emission order), which is what lets
+	// process_quantifier_blocks' `done`-set termination retire it.
 	//
 	// `skip_blasteable` is the bookkeeping the `per_block` hook at the end
 	// of this function needs: that hook wraps the blasteable sub-run around
-	// `result` itself (Task 7 made that sub-run contiguous and innermost
-	// among the displaced binders, so wrapping it there and emitting only
-	// the arithmetic/frozen groups here reproduces exactly the same
-	// nesting). Passing a flag rather than handing this lambda a filtered
-	// copy of `blk.displaced` keeps the emission loop and its determinism
-	// argument untouched, and leaves all the other call sites unchanged.
+	// `result` itself, but ONLY from the TRAILING same-kind segment of
+	// `displaced` (the one adjacent to `result` -- see the hook's own
+	// comment), never reaching past a kind boundary. So `skip_blasteable`
+	// must likewise suppress blasteable emission ONLY in the first segment
+	// processed below (which is that same trailing segment, by
+	// construction): a blasteable binder sitting in an OUTER segment was
+	// never extracted by the hook and must still be emitted here, or it
+	// would be silently dropped rather than merely mis-ordered. Passing a
+	// flag rather than handing this lambda a filtered copy of
+	// `blk.displaced` keeps the emission loop and its determinism argument
+	// untouched, and leaves all the other call sites unchanged.
 	auto wrap_skipped = [&](tref r, bool skip_blasteable = false) -> tref {
-		// Emit by category, innermost group first: blasteable, then
-		// arithmetic, then frozen -- so frozen ends outermost. Stable
-		// within a category (original relative order preserved).
-		for (elim_verdict want : { elim_verdict::blasteable,
-			elim_verdict::arithmetic, elim_verdict::frozen }) {
-			if (skip_blasteable && want == elim_verdict::blasteable)
-				continue;
-			for (auto it = blk.displaced.rbegin();
-				it != blk.displaced.rend(); ++it) {
-				const auto& [var, is_ex_q, cat] = *it;
-				if (cat != want) continue;
-				r = is_ex_q ? build_wff_ex<node>(var, r, false)
-					: build_wff_all<node>(var, r, false);
+		// Walk `displaced` from its end, peeling off one maximal
+		// same-kind segment at a time (encounter order, so a segment
+		// closer to the front is closer to the OUTSIDE of the run).
+		// Processing segments innermost-first -- i.e. the one nearest
+		// `body`/`r` first -- means each subsequent (more-outer)
+		// segment's wraps land OUTSIDE what came before, exactly
+		// reproducing the original nesting across every kind boundary.
+		size_t seg_end = blk.displaced.size();
+		bool first_segment = true;
+		while (seg_end > 0) {
+			const bool seg_kind = std::get<1>(blk.displaced[seg_end - 1]);
+			size_t seg_begin = seg_end;
+			while (seg_begin > 0 && std::get<1>(
+				blk.displaced[seg_begin - 1]) == seg_kind)
+					--seg_begin;
+			// Within this one same-kind segment: emit by category,
+			// innermost group first (blasteable, then arithmetic,
+			// then frozen -- so frozen ends outermost WITHIN the
+			// segment). Stable within a category (original relative
+			// order preserved).
+			for (elim_verdict want : { elim_verdict::blasteable,
+				elim_verdict::arithmetic, elim_verdict::frozen }) {
+				if (first_segment && skip_blasteable
+					&& want == elim_verdict::blasteable)
+						continue;
+				for (size_t i = seg_end; i-- > seg_begin; ) {
+					const auto& [var, is_ex_q, cat] =
+						blk.displaced[i];
+					if (cat != want) continue;
+					r = is_ex_q ? build_wff_ex<node>(var, r, false)
+						: build_wff_all<node>(var, r, false);
+				}
 			}
+			seg_end = seg_begin;
+			first_segment = false;
 		}
 		return r;
 	};
@@ -1199,9 +1246,14 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	// first point at which the blasteable binders this block displaced can
 	// be handed to a destination as one sub-block instead of one leaf
 	// clause at a time. Task 7 made that sub-run contiguous and innermost
-	// among the displaced binders, so wrapping it here and telling
-	// wrap_skipped to skip the blasteable group reproduces the same nesting
-	// order it would have produced itself.
+	// WITHIN its own same-kind segment of `displaced` (see wrap_skipped's
+	// comment: category reordering, and this extraction, are sound only
+	// within one same-kind segment, never across a kind change), so
+	// wrapping it here and telling wrap_skipped to skip the blasteable
+	// group reproduces the same nesting order it would have produced
+	// itself. This hook therefore only ever looks at the TRAILING maximal
+	// same-kind segment -- the one adjacent to `result` -- never reaching
+	// past a kind boundary into an outer segment.
 	//
 	// Inert at the shipped defaults (`per_leaf` / `eager`): the guard below
 	// is false and `result` reaches wrap_skipped untouched.
@@ -1216,9 +1268,18 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	{
 		tref sub = result;
 		size_t n_blasteable = 0;
-		for (auto it = blk.displaced.rbegin();
-			it != blk.displaced.rend(); ++it) {
-			const auto& [var, is_ex_q, cat] = *it;
+		// The trailing same-kind segment of `displaced` -- see above.
+		size_t trailing_seg_begin = blk.displaced.size();
+		if (trailing_seg_begin > 0) {
+			const bool seg_kind = std::get<1>(
+				blk.displaced[trailing_seg_begin - 1]);
+			while (trailing_seg_begin > 0 && std::get<1>(
+				blk.displaced[trailing_seg_begin - 1]) == seg_kind)
+					--trailing_seg_begin;
+		}
+		for (size_t i = blk.displaced.size();
+			i-- > trailing_seg_begin; ) {
+			const auto& [var, is_ex_q, cat] = blk.displaced[i];
 			if (cat != elim_verdict::blasteable) continue;
 			// Same demotion resolve_ex_block applies to block_vars
 			// (see its comment, and the issue #70 rationale it

@@ -46,7 +46,7 @@ enum class elim_verdict {
 	eliminable  = 0, ///< Nothing blocks removing this variable.
 	blasteable  = 1, ///< Bitvector content blasting could turn into a regular
 	                 ///< BA formula (the solver can also decide it).
-	arithmetic  = 2, ///< Bitvector arithmetic blasting cannot express —
+	arithmetic  = 2, ///< Bitvector arithmetic blasting cannot express --
 	                 ///< only cvc5 can decide it.
 	frozen      = 3  ///< Entangled with an unresolved reference or a kept binder.
 };

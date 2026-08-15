@@ -1510,4 +1510,80 @@ TEST_SUITE("DisplacedBinderOrdering") {
 		// atom has its shape (plain, no arithmetic operator, no ref).
 		CHECK(tau::get(r).find_top(is_plain_atom) == nullptr);
 	}
+
+	TEST_CASE("displaced binders never reorder across a kind boundary") {
+		// Regression pin for the final-review Critical:
+		// `collect_quantifier_block` absorbs skip-matched binders of
+		// BOTH kinds into `displaced` while the block's own kind is
+		// still unfixed -- the `kind_fixed &&` guard only applies once
+		// an active quantifier has fixed the kind. `ex a all y ex z
+		// (...)` puts `a` (blasteable, ∃) and `y` (frozen, ∀) both
+		// ahead of the first active quantifier `z`, so both get
+		// absorbed before kind_fixed. A category-only re-wrap (ignoring
+		// kind) would then emit frozen outermost regardless of its
+		// original kind, turning `ex a all y ...` into `all y ex a
+		// ...` -- opposite-kind quantifiers do not commute, so that
+		// is strictly weaker than the input, a soundness hole. `z`
+		// stays eliminable and disappears entirely (unrelated to the
+		// kind-boundary bug; it just needs to be there to fix the
+		// block's own active kind at all, matching the reviewer's
+		// failure scenario exactly).
+		const char* s = "ex a all y ex z "
+			"(((a:bv[2] + { 1 }:bv[2] = { 0 }:bv[2]) <-> q(y)) "
+			"&& z = 0).";
+		tref fm = get_nso_rr(s).value().main->get();
+
+		// Non-vacuity: the input's own prefix really is ex-then-all,
+		// and the verdicts driving this scenario -- a blasteable,
+		// y frozen -- really hold, through the SAME analyse_formula the
+		// 2-arg anti_prenex call below uses.
+		std::vector<bool> input_kinds;
+		{
+			tref curr = fm;
+			while (is_child_quantifier<node_t>(curr)) {
+				input_kinds.push_back(
+					is_child<node_t>(curr, tau::wff_ex));
+				curr = tau::get(curr)[0].second();
+			}
+		}
+		REQUIRE(input_kinds == std::vector<bool>({ true, false, true }));
+
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+
+		auto is_ref_fm = [](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::wff) && t.child_is(tau::wff_ref);
+		};
+		tref ref_fm = tau::get(fm).find_top(is_ref_fm);
+		REQUIRE(ref_fm != nullptr);
+		trefs y_vars = get_free_vars<node_t>(ref_fm);
+		REQUIRE(y_vars.size() == 1);
+		REQUIRE(el.verdict_of(y_vars.front()) == elim_verdict::frozen);
+
+		auto is_add_atom = [](tref n) {
+			return is_atomic_fm<node_t>(n) && tau::get(n).find_top(
+				is<node_t, tau::bf_add>) != nullptr;
+		};
+		tref atom_a = tau::get(fm).find_top(is_add_atom);
+		REQUIRE(atom_a != nullptr);
+		trefs a_vars = get_free_vars<node_t>(atom_a);
+		REQUIRE(a_vars.size() == 1);
+		REQUIRE(el.verdict_of(a_vars.front()) == elim_verdict::blasteable);
+
+		tref r = anti_prenex<node_t>(fm, el);
+
+		// Whatever category-driven order the surviving binders take
+		// WITHIN a kind segment, the KIND SEQUENCE of the output prefix
+		// must still be ex-then-all, exactly as in the input --
+		// opposite-kind quantifiers never commute, so this is not
+		// negotiable regardless of category. (z is eliminable and
+		// disappears entirely, leaving exactly two binders.)
+		std::vector<bool> output_kinds;
+		tref n = tau::get(r).find_top(is_child_quantifier<node_t>);
+		while (n && is_child_quantifier<node_t>(n)) {
+			output_kinds.push_back(is_child<node_t>(n, tau::wff_ex));
+			n = tau::get(n)[0].second();
+		}
+		CHECK(output_kinds == std::vector<bool>({ true, false }));
+	}
 }
