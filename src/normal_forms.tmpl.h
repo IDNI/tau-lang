@@ -103,6 +103,11 @@ tref not_equal_to_unequal(tref fm) {
 template<NodeType node>
 tref normalize_atomic_formula_operators(tref fm) {
 	using tau = tree<node>;
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tau::template create_cache<cache_t>();
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
 	LOG_TRACE << "Begin normalize_atomic_formula_operators: " << LOG_FM(fm);
 	auto normalize_operators = [](tref n) {
 		if (!tau::get(n).is(tau::wff)) return n;
@@ -129,7 +134,18 @@ tref normalize_atomic_formula_operators(tref fm) {
 	tref result = pre_order<node>(fm)
 				.apply_unique(normalize_operators, while_is_formula<node>);
 	LOG_TRACE << "End normalize_atomic_formula_operators: " << LOG_FM(result);
-	return result;
+#ifdef TAU_CACHE
+	auto memo = [&](tref r) {
+#else
+	auto memo = [](tref r) {
+#endif // TAU_CACHE
+#ifdef TAU_CACHE
+		return cache.emplace(fm, r).first->second;
+#else
+		return r;
+#endif // TAU_CACHE
+	};
+	return memo(result);
 }
 
 /**
@@ -178,10 +194,26 @@ tref gt_gteq_to_lt_lteq(tref fm) {
 /** @internal @copydoc to_nnf @endinternal */
 template <NodeType node>
 tref to_nnf(tref fm) {
+#ifdef TAU_CACHE
+	using cache_t = subtree_unordered_map<node, tref>;
+	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
 	LOG_TRACE << "to_nnf: " << LOG_FM(fm);
 	auto result = push_negation_in<node>(fm);
 	LOG_TRACE << "to_nnf result: " << LOG_FM(result);
-	return result;
+#ifdef TAU_CACHE
+	auto memo = [&](tref r) {
+#else
+	auto memo = [](tref r) {
+#endif // TAU_CACHE
+#ifdef TAU_CACHE
+		return cache.emplace(fm, r).first->second;
+#else
+		return r;
+#endif // TAU_CACHE
+	};
+	return memo(result);
 }
 
 /**
