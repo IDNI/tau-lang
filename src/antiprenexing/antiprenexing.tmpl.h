@@ -814,10 +814,21 @@ struct quantifier_block {
 	// Active (non-skip-matched) bound variables, outermost first. All of
 	// one quantifier kind and one Boolean-algebra type.
 	trefs vars;
-	// skip-matched quantifiers displaced from within the run, outermost
-	// first, each paired with its own kind (true = ∃). Re-wrapped around
-	// the result by process_quantifier_block.
-	std::vector<std::pair<tref, bool>> skipped;
+	// Binders displaced from the run, outermost first, each with its own
+	// kind (true = ∃) and its category (the verdict `el.verdict_of(var)`
+	// returned at the moment collection displaced it -- skip() and
+	// verdict_of() are consistent by construction, so a displaced var's
+	// category is never `eliminable`; eliminable vars join `vars` above
+	// instead). Re-wrapped by process_quantifier_block's wrap_skipped:
+	// frozen outermost, then arithmetic, then blasteable, innermost the
+	// eliminated body -- the spec's order, and sound because only
+	// same-kind binders are ever absorbed (same-kind quantifiers
+	// commute). The category is an ordering hint only, not a semantic
+	// invariant: it is read once at displacement time and never
+	// re-checked, which is fine because same-kind commutation makes the
+	// emission order sound regardless of whether the category could in
+	// principle have drifted.
+	std::vector<std::tuple<tref, bool, elim_verdict>> displaced;
 	// Kind of the block itself (true = ∃). Taken from the first active
 	// quantifier of the run, not from the first quantifier: a leading
 	// skip-matched quantifier is transparent and must not decide the kind
@@ -835,9 +846,11 @@ struct quantifier_block {
  * quantifier), accumulating bound variables until the chain ends or reaches
  * a quantifier that cannot join the block (see `quantifier_block`).
  * `skip`-matched quantifiers are transparent: they neither end the block nor
- * join it. They are recorded in `skipped` and re-wrapped later, so that
- * active quantifiers sitting below them still join *this* block instead of
- * being stranded in a separate one of their own.
+ * join it. They are recorded in `displaced`, each with the verdict
+ * `el.verdict_of(var)` returned at the moment of displacement, and
+ * re-wrapped later by category, so that active quantifiers sitting below
+ * them still join *this* block instead of being stranded in a separate one
+ * of their own.
  * @tparam node Tree node type.
  * @param n Formula node whose direct child is a quantifier.
  * @param el Eliminability analysis marking variables this pass must not
@@ -864,11 +877,12 @@ quantifier_block<node> collect_quantifier_block(tref n,
 			// Transparent only while it genuinely commutes with the
 			// block. Same-kind quantifiers do; opposite-kind ones do
 			// not -- `ex a all x phi` is not `all x ex a phi`, and
-			// wrap_skipped re-emits everything in `skipped`
-			// outermost, so absorbing an opposite-kind quantifier
-			// here would hoist it out past the block. Disjoint BA
-			// types do not rescue it: with `a` atomless and `x` a
-			// bitvector, phi = (a = 0 <-> x = 0) makes
+			// wrap_skipped re-emits everything in `displaced`
+			// by category, frozen outermost, so absorbing an
+			// opposite-kind quantifier here would hoist it out
+			// past the block. Disjoint BA types do not rescue it:
+			// with `a` atomless and `x` a bitvector,
+			// phi = (a = 0 <-> x = 0) makes
 			// `all x ex a phi` true and `ex a all x phi` false.
 			//
 			// A skipped quantifier seen *before* any active one is
@@ -878,7 +892,8 @@ quantifier_block<node> collect_quantifier_block(tref n,
 			// that quantifier and select_innermost_blocks picks it
 			// up as an inner block on a later round.
 			if (kind_fixed && curr_is_ex != blk.is_ex) break;
-			blk.skipped.emplace_back(var, curr_is_ex);
+			blk.displaced.emplace_back(var, curr_is_ex,
+				el.verdict_of(var));
 			// Provisional only: a run of nothing but skip-matched
 			// quantifiers has no active kind of its own, and
 			// process_quantifier_block still needs one to pick a
@@ -967,13 +982,26 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	const bool is_ex = blk.is_ex;
 
 	// Re-wrap quantifiers displaced by the collection above around a
-	// result, innermost displaced quantifier first, so the
-	// outermost-encountered one ends up outermost again -- valid
-	// regardless of order since they commute with the rest.
+	// result, grouped and ordered by category rather than by encounter
+	// order -- valid regardless of order since they commute with the
+	// rest (same-kind quantifiers commute). Determinism: for an
+	// unchanged block this always re-wraps to a structurally identical
+	// tref (same input `blk.displaced` -> same stable emission order),
+	// which is what lets process_quantifier_blocks' `done`-set
+	// termination retire it.
 	auto wrap_skipped = [&](tref r) -> tref {
-		for (auto it = blk.skipped.rbegin(); it != blk.skipped.rend(); ++it)
-			r = it->second ? build_wff_ex<node>(it->first, r, false)
-				: build_wff_all<node>(it->first, r, false);
+		// Emit by category, innermost group first: blasteable, then
+		// arithmetic, then frozen -- so frozen ends outermost. Stable
+		// within a category (original relative order preserved).
+		for (elim_verdict want : { elim_verdict::blasteable,
+			elim_verdict::arithmetic, elim_verdict::frozen })
+			for (auto it = blk.displaced.rbegin();
+				it != blk.displaced.rend(); ++it) {
+				const auto& [var, is_ex_q, cat] = *it;
+				if (cat != want) continue;
+				r = is_ex_q ? build_wff_ex<node>(var, r, false)
+					: build_wff_all<node>(var, r, false);
+			}
 		return r;
 	};
 

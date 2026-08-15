@@ -588,14 +588,15 @@ TEST_SUITE("BlockSkipPaths") {
 	TEST_CASE("an opposite-kind skipped quantifier ends the run") {
 		// `ex a all x:bv[8] phi`. x is skip-matched, so this pass never
 		// eliminates it -- but wrap_skipped re-emits everything in
-		// blk.skipped *outermost*, so absorbing the `all` here would
-		// hoist it out past the `ex` and produce all x ex a phi, which
-		// is not equivalent (only the converse implication holds).
-		// The run must therefore stop at it.
+		// blk.displaced by category, frozen/arithmetic/blasteable
+		// outermost, so absorbing the `all` here would hoist it out
+		// past the `ex` and produce all x ex a phi, which is not
+		// equivalent (only the converse implication holds). The run
+		// must therefore stop at it.
 		auto blk = collect("ex a all x:bv[8] (a = 0 || x = 0).");
 		CHECK( blk.is_ex );
 		CHECK( blk.vars.size() == 1 );
-		CHECK( blk.skipped.empty() );
+		CHECK( blk.displaced.empty() );
 		// The `all x` is left at the head of the matrix, where a later
 		// round picks it up as an inner block.
 		CHECK( is_child_quantifier<node_t>(blk.body) );
@@ -607,8 +608,8 @@ TEST_SUITE("BlockSkipPaths") {
 		// to defer. The block's kind must come from the first *active*
 		// quantifier (ex), not from the leading skipped `all`.
 		auto blk = collect("all x:bv[8] ex a (a = 0 || x = 0).");
-		CHECK( blk.skipped.size() == 1 );
-		CHECK( blk.skipped.front().second == false );   // it was an `all`
+		CHECK( blk.displaced.size() == 1 );
+		CHECK( std::get<1>(blk.displaced.front()) == false ); // it was an `all`
 		CHECK( blk.is_ex );                             // kind from `ex a`
 		CHECK( blk.vars.size() == 1 );
 	}
@@ -619,8 +620,8 @@ TEST_SUITE("BlockSkipPaths") {
 		auto blk = collect("ex a ex x:bv[8] (a = 0 && x = 0).");
 		CHECK( blk.is_ex );
 		CHECK( blk.vars.size() == 1 );
-		CHECK( blk.skipped.size() == 1 );
-		CHECK( blk.skipped.front().second == true );    // it was an `ex`
+		CHECK( blk.displaced.size() == 1 );
+		CHECK( std::get<1>(blk.displaced.front()) == true );  // it was an `ex`
 	}
 
 	TEST_CASE("a run of only skipped quantifiers has no active variable") {
@@ -628,7 +629,7 @@ TEST_SUITE("BlockSkipPaths") {
 		// whole run is deferred.
 		auto blk = collect("ex x:bv[8] (x = 0).");
 		CHECK( blk.vars.empty() );
-		CHECK( blk.skipped.size() == 1 );
+		CHECK( blk.displaced.size() == 1 );
 	}
 }
 
@@ -1362,5 +1363,151 @@ TEST_SUITE("FrozenBlockNormalization") {
 		trefs quants = tau::get(r).select_all(is_child_quantifier<node_t>);
 		CHECK(quants.size() == 1);   // only y's binder survives
 		CHECK(tau::get(r).find_top(is<node_t, tau::wff_ref>) != nullptr);
+	}
+}
+
+TEST_SUITE("DisplacedBinderOrdering") {
+
+	TEST_CASE("displaced binders re-wrap ordered frozen, arithmetic, blasteable") {
+		// y frozen (entangled with the reference q(y)), a arithmetic (a
+		// non-constant bv multiplication -- blasting cannot express it),
+		// b blasteable (a bv addition -- blasting CAN express it; plain
+		// bv equality alone is `eliminable` per the pure-BA-bv directive,
+		// so this needs an actual supported arithmetic operator to land
+		// b as blasteable rather than eliminable), z eliminable (joins
+		// blk.vars, gets fully resolved, and is never displaced at all).
+		// All four variables are kept disjoint so no fixpoint's
+		// union-find absorbs one into a neighbor's category. b's atom
+		// is closed over constants only (no free `c`) to keep variable
+		// identification below unambiguous.
+		const char* s = "ex b ex z ex y ex a (q(y) && z = 0 && "
+			"(a:bv[2] * a = { 0 }:bv[2]) && "
+			"(b:bv[2] + { 1 }:bv[2] = { 0 }:bv[2])).";
+		tref fm = get_nso_rr(s).value().main->get();
+		auto el = analyse_formula<node_t>(fm, analysis_context<node_t>{});
+
+		// Locate each variable's tref the way the FrozenBlockNormalization
+		// tests do: from the specific subformula that carries it, via
+		// get_free_vars on a WFF-level atom -- not by re-deriving names
+		// from the binder prefix via to_str(), and not from a raw
+		// operator node directly (get_free_vars requires a `bf`- or
+		// `wff`-typed node, which a bare bf_mul/bf_add operator node is
+		// not guaranteed to be). All lookups stay within this one parsed
+		// `fm`, so identity is exact by hash-consing, no cross-parse
+		// assumption needed.
+		auto is_ref_fm = [](tref n) {
+			const auto& t = tau::get(n);
+			return t.is(tau::wff) && t.child_is(tau::wff_ref);
+		};
+		tref ref_fm = tau::get(fm).find_top(is_ref_fm);
+		REQUIRE(ref_fm != nullptr);
+		trefs y_vars = get_free_vars<node_t>(ref_fm);
+		REQUIRE(y_vars.size() == 1);
+		tref y = y_vars.front();
+
+		auto is_mul_atom = [](tref n) {
+			return is_atomic_fm<node_t>(n) && tau::get(n).find_top(
+				is<node_t, tau::bf_mul>) != nullptr;
+		};
+		tref atom_a = tau::get(fm).find_top(is_mul_atom);
+		REQUIRE(atom_a != nullptr);
+		trefs a_vars = get_free_vars<node_t>(atom_a);
+		REQUIRE(a_vars.size() == 1);
+		tref a = a_vars.front();
+
+		auto is_add_atom = [](tref n) {
+			return is_atomic_fm<node_t>(n) && tau::get(n).find_top(
+				is<node_t, tau::bf_add>) != nullptr;
+		};
+		tref atom_b = tau::get(fm).find_top(is_add_atom);
+		REQUIRE(atom_b != nullptr);
+		trefs b_vars = get_free_vars<node_t>(atom_b);
+		REQUIRE(b_vars.size() == 1);
+		tref b = b_vars.front();
+
+		// z: the only plain atom, carrying no arithmetic operator (and
+		// is_atomic_fm excludes wff_ref, so q(y) cannot match here).
+		auto is_plain_atom = [](tref n) {
+			return is_atomic_fm<node_t>(n)
+				&& tau::get(n).find_top(is<node_t, tau::bf_mul>) == nullptr
+				&& tau::get(n).find_top(is<node_t, tau::bf_add>) == nullptr;
+		};
+		tref atom_z = tau::get(fm).find_top(is_plain_atom);
+		REQUIRE(atom_z != nullptr);
+		trefs z_vars = get_free_vars<node_t>(atom_z);
+		REQUIRE(z_vars.size() == 1);
+		tref z = z_vars.front();
+
+		// Non-vacuity, per the lesson this refactor keeps re-learning:
+		// confirm each variable's verdict through the SAME analyse_formula
+		// the 2-arg anti_prenex call below actually uses, BEFORE running
+		// it.
+		REQUIRE(el.verdict_of(y) == elim_verdict::frozen);
+		REQUIRE(el.verdict_of(a) == elim_verdict::arithmetic);
+		REQUIRE(el.verdict_of(b) == elim_verdict::blasteable);
+		REQUIRE(el.verdict_of(z) == elim_verdict::eliminable);
+
+		tref r = anti_prenex<node_t>(fm, el);
+
+		// `anti_prenex` runs `canonize_quantifier_ids` on entry AND on
+		// exit (Step 0 / Step 5), which replaces every bound variable
+		// (and its free occurrences within scope) with a FRESH variable
+		// named after its quantifier depth. So `r`'s binders are NOT
+		// the same trefs as `y`/`a`/`b`/`z` above -- comparing them
+		// directly would silently compare against nodes that can never
+		// appear in `r`, making every `pos(...)` collapse to
+		// `order.end()` and every `<` a false negative that looks like
+		// failure without explaining why. Re-locate the (renamed)
+		// variables INSIDE `r` the same structural way they were found
+		// in `fm`: `bf_mul`/`bf_add`/`wff_ref` shape survives renaming
+		// even though variable identity does not.
+		tref ref_fm2 = tau::get(r).find_top(is_ref_fm);
+		REQUIRE(ref_fm2 != nullptr);
+		trefs y2_vars = get_free_vars<node_t>(ref_fm2);
+		REQUIRE(y2_vars.size() == 1);
+		tref y2 = y2_vars.front();
+
+		tref atom_a2 = tau::get(r).find_top(is_mul_atom);
+		REQUIRE(atom_a2 != nullptr);
+		trefs a2_vars = get_free_vars<node_t>(atom_a2);
+		REQUIRE(a2_vars.size() == 1);
+		tref a2 = a2_vars.front();
+
+		tref atom_b2 = tau::get(r).find_top(is_add_atom);
+		REQUIRE(atom_b2 != nullptr);
+		trefs b2_vars = get_free_vars<node_t>(atom_b2);
+		REQUIRE(b2_vars.size() == 1);
+		tref b2 = b2_vars.front();
+
+		// Walk the outermost quantifier chain and record the bound
+		// variable trefs. select_top does NOT descend into matches, so
+		// a chain-walk (mirroring FrozenBlockNormalization's
+		// binder-counting idiom) is the only correct way to read prefix
+		// order here.
+		trefs order;
+		tref n = tau::get(r).find_top(is_child_quantifier<node_t>);
+		while (n && is_child_quantifier<node_t>(n)) {
+			order.push_back(tau::trim2(n));
+			n = tau::get(n)[0].second();
+		}
+		// Exactly y, a, b survive as binders; z's binder (and, per
+		// is_plain_atom below, its atom) are both gone.
+		CHECK(order.size() == 3);
+		// Structural equality, not raw tref equality: in this LCRS
+		// tree the same variable at binder position and at atom
+		// position are different trefs (different right-sibling
+		// context) even though they denote the same variable --
+		// `tau::get(x) == tau::get(y)` is the idiom
+		// `has_block_var_other_than` already uses for exactly this.
+		auto pos = [&](tref v) {
+			return std::find_if(order.begin(), order.end(),
+				[&](tref x) { return tau::get(x) == tau::get(v); });
+		};
+		// frozen before arithmetic before blasteable.
+		CHECK(pos(y2) < pos(a2));
+		CHECK(pos(a2) < pos(b2));
+		// z is fully eliminated, not merely displaced: no surviving
+		// atom has its shape (plain, no arithmetic operator, no ref).
+		CHECK(tau::get(r).find_top(is_plain_atom) == nullptr);
 	}
 }
