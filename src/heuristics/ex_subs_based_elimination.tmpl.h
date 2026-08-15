@@ -87,6 +87,12 @@ tref ex_subs_based_elimination(tref var, tref ex_clause)
 	// witness loop, which re-asks for the same logical (var, ex_clause) pair
 	// across anti_prenex_block's branch recursion, actually land on the same
 	// entry instead of missing on an incidental right-sibling difference.
+	// Caveat: the capture-guard's `bound == var` check below is a raw tref
+	// (pointer) compare, not the content compare above, so it is sibling-
+	// sensitive in principle. It is inert today because `bound` (child 0 of
+	// a 2-child quantifier) always carries its own scope as right sibling,
+	// and a caller's `var` can never carry that same scope as its sibling --
+	// a scope cannot contain itself.
 	const std::pair<tref, tref> key { tau::trim_right_sibling(var),
 		tau::trim_right_sibling(ex_clause) };
 	if (auto it = cache.find(key); it != cache.end()) return it->second;

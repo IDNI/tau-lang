@@ -253,7 +253,10 @@ template <NodeType node>
 tref syntactic_path_simplification_unsat_on_unchanged_negations(tref fm) {
 	using tau = tree<node>;
 #ifdef TAU_CACHE
-	// -- provisional: kept only if the Task-4 differential measurement pays
+	// -- measured 2026-08-15, same-window A/B on satisfiability2's
+	// mixed_lookback cases: medians 11.23/12.88 s with the cache vs
+	// 11.51/16.09 s without (>=2% better on both) -> kept; details in
+	// private/eliminability-measurements.md, "Caching pass (2026-08-15)"
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;

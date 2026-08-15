@@ -106,6 +106,13 @@ tref normalize_atomic_formula_operators(tref fm) {
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tau::template create_cache<cache_t>();
+	// Unlike ex_subs_based_elimination's cache (ex_subs_based_elimination.tmpl.h),
+	// this stores the value untrimmed: apply_unique preserves the input
+	// root's right sibling in its result. That is deliberate parity with
+	// the core traversal slot memo (tree.h ~1055), which already stores
+	// sibling-carrying rebuilt nodes under sibling-insensitive keys; every
+	// consumer here compares content, not siblings, so an untrimmed value
+	// is safe. (Same note applies to to_nnf's cache below.)
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	LOG_TRACE << "Begin normalize_atomic_formula_operators: " << LOG_FM(fm);
@@ -197,6 +204,8 @@ tref to_nnf(tref fm) {
 #ifdef TAU_CACHE
 	using cache_t = subtree_unordered_map<node, tref>;
 	static cache_t& cache = tree<node>::template create_cache<cache_t>();
+	// Untrimmed value cache; see normalize_atomic_formula_operators above
+	// for why (sibling-hygiene parity with the tree.h ~1055 traversal memo).
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 #endif // TAU_CACHE
 	LOG_TRACE << "to_nnf: " << LOG_FM(fm);
