@@ -496,14 +496,13 @@ TEST_SUITE("bv stress check: single rule execution") {
 
 	// Template 5 declares four existential bv locals and binds two of them
 	// to large additive terms containing shifts and `!|`/`!^`. Normalizing
-	// one such rule did not terminate within 25 minutes, and it is the term
-	// size rather than the bitvector width that drives it: the same rule at
-	// bv[2] is no faster than at bv[8], while cutting either summand of the
-	// `s2` term down makes it return instantly. This is a normalization
-	// blowup, not a defect of the block simplification this suite otherwise
-	// covers -- it reproduced identically before that was fixed. Skipped so
-	// the suite stays runnable; unskip once the blowup is addressed.
-	TEST_CASE("template 5: network style locals" * doctest::skip()) {
+	// one such rule did not terminate within 25 minutes under the old
+	// bv_blasting=true default -- it is the term size rather than the
+	// bitvector width that drives it: the same rule at bv[2] is no faster
+	// than at bv[8], while cutting either summand of the `s2` term down
+	// makes it return instantly. Passes fast under the shipped defaults
+	// (bv_blasting=false, Task 9). Unskipped 2026-08-15.
+	TEST_CASE("template 5: network style locals") {
 		check_template(5);
 	}
 }
@@ -512,14 +511,16 @@ TEST_SUITE("bv stress check: single rule execution") {
 // interpreter, each one revising the spec the next one runs against, so the
 // spec the interpreter carries grows with every iteration.
 //
-// How far that can be pushed is bounded by the same normalization blowup that
-// makes template 5 unusable, and the bound is low. Measured on this generator:
-// bv[1] absorbs eight accumulated rules in about a second, bv[2] takes over a
-// minute for two and does not return for three, and at bv[4] and above two
-// accumulated rules already do not return -- even though each of those rules
-// on its own runs in well under a second (see the suite above). The cases
-// below stay inside what returns; the load tester's own default is kept as a
-// skipped case so the gap stays visible.
+// How far this could be pushed used to be bounded by the same normalization
+// blowup that made template 5 unusable, under the old bv_blasting=true
+// default. Measured on this generator back then: bv[1] absorbed eight
+// accumulated rules in about a second, bv[2] took over a minute for two and
+// did not return for three, and at bv[4] and above two accumulated rules
+// already did not return -- even though each of those rules on its own ran
+// in well under a second (see the suite above). Under the shipped defaults
+// (bv_blasting=false, Task 9) the bv[2]/bv[4] cases below now pass fast, and
+// the load tester's own default (bv[64], fourteen rules) now passes too --
+// see its own case below for why it still stays opt-in.
 TEST_SUITE("bv stress check: execution") {
 
 	TEST_CASE("8 iterations at bv[1]") {
@@ -535,27 +536,35 @@ TEST_SUITE("bv stress check: execution") {
 		CHECK( res.steps_executed == 8 );
 	}
 
-	// The widest accumulation that still returns, and the only case here that
-	// is expensive: about 85s in Release and around five minutes in Debug,
-	// which on its own made the whole ctest run several times longer. Skipped
-	// to keep the suite proportionate -- unskip it to exercise accumulation
-	// above bv[1], or once normalization gets cheaper.
-	TEST_CASE("2 iterations at bv[2]" * doctest::skip()) {
+	// Used to be the widest accumulation that still returned, and the only
+	// case here that was expensive: about 85s in Release and around five
+	// minutes in Debug under the old bv_blasting=true default, which on its
+	// own made the whole ctest run several times longer. Passes fast under
+	// the shipped defaults (bv_blasting=false, Task 9). Unskipped 2026-08-15.
+	TEST_CASE("2 iterations at bv[2]") {
 		auto res = run_stress({ .iterations = 2, .width = 2 });
 		REQUIRE( res.started );
 		CHECK( res.steps_executed == 2 );
 	}
 
-	// Two accumulated rules at bv[4]; does not return today.
-	TEST_CASE("2 iterations at bv[4]" * doctest::skip()) {
+	// Two accumulated rules at bv[4]; did not return under the old
+	// bv_blasting=true default. Passes fast under the shipped defaults
+	// (bv_blasting=false, Task 9). Unskipped 2026-08-15.
+	TEST_CASE("2 iterations at bv[4]") {
 		auto res = run_stress({ .iterations = 2, .width = 4 });
 		REQUIRE( res.started );
 		CHECK( res.steps_executed == 2 );
 	}
 
 	// The load tester's own default: fourteen rules, all seven templates, at
-	// the bv[64] it ships with. Skipped for the reason given above; unskip
-	// once the normalization blowup is addressed.
+	// the bv[64] it ships with. First-ever pass under the shipped defaults
+	// (bv_blasting=false, Task 9): ~99.1s in Release -- no longer "never
+	// returns", but still over the 60s default-suite bar, so it stays
+	// opt-in rather than joining the suite outright. Run it directly with
+	// `-tc="14 iterations*" -ns`: doctest's `-tc` splits its argument on
+	// comma into separate patterns, and this case's name itself contains
+	// one, so passing the full name verbatim (`-tc="14 iterations at
+	// bv[64], all templates"`) silently matches nothing -- we hit this.
 	TEST_CASE("14 iterations at bv[64], all templates" * doctest::skip()) {
 		auto res = run_stress({ .iterations = 14,
 			.width = default_bv_width,
