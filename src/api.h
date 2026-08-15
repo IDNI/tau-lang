@@ -123,6 +123,31 @@ struct api {
 	/** @brief Enable/disable BV blasting. */
 	static void set_blasting(bool state);
 	/**
+	 * @brief Select where predicate blasting may run (see `blast_site`).
+	 *
+	 * 0 = `per_leaf` (default, today's behaviour), 1 = `per_block`,
+	 * 2 = `per_formula`. An out-of-range value clamps to the default.
+	 */
+	static void set_blast_placement(int site);
+	/**
+	 * @brief Select what happens to a blasted formula (see `blast_mode`).
+	 *
+	 * 0 = `anti_prenex_result` (default, today's behaviour: re-enter
+	 * `anti_prenex` on the blasted formula), 1 = `defer` (rewrite only and
+	 * leave the introduced quantifiers to the next resolve pass). An
+	 * out-of-range value clamps to the default.
+	 */
+	static void set_blast_method(int mode);
+	/**
+	 * @brief Select where the cvc5 solver may be queried (see `solver_site`).
+	 *
+	 * 0 = `eager` (default, today's behaviour), 1 = `per_closed_block`,
+	 * 2 = `per_formula`. An out-of-range value clamps to the default. The
+	 * final closed-formula check of `eliminate_bv_and_quantifiers` runs
+	 * under every setting -- it is the "final" site the other two rely on.
+	 */
+	static void set_solver_placement(int site);
+	/**
 	 * @brief Set the per-block Boole-decomposition split budget.
 	 *
 	 * Bounds the Shannon splits ONE block elimination may charge, across its

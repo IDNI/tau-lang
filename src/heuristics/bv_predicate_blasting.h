@@ -17,6 +17,11 @@
 
 #include "tau_tree.h"
 #include "tau_bdd.h"
+// `bv_blasting` and the blasting/solver placement parameters. They belong
+// here, and used to be spelled out here, but live in their own dependency-free
+// header so tests/test_init.h can apply environment overrides without pulling
+// the whole tau tree into every test binary's main(). See there.
+#include "blast_placement.h"
 
 namespace idni::tau_lang {
 
@@ -43,11 +48,6 @@ tref anti_prenex(tref formula, const eliminability<node>& el);
 template<NodeType node>
 tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order& order,
 	const eliminability<node>& el);
-
-// NOT thread-safe: Controls whether bitvector blasting is enabled.
-// The tau library assumes single-threaded access.
-// Do not call set_blasting() concurrently from multiple threads.
-inline bool bv_blasting = true;
 
 /**
  * @brief Entry point for predicate blasting on bitvector formulas.

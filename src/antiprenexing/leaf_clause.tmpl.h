@@ -316,7 +316,15 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		if (elim.verdict_of(v) != elim_verdict::blasteable) continue;
 		if (!is_bv_type_family<node>(tau::get(v).get_ba_type())) continue;
 		const trefs& free_vars = get_free_vars<node>(scoped);
-		if ((free_vars.empty() || (free_vars.size() == 1
+		// Gated on `eager`, and the blasting attempt below on
+		// `per_leaf`, for consistency with the other leaf-level sites --
+		// this whole loop is documented unreachable through the block
+		// driver, so the gates cost nothing today either way. Off the
+		// respective setting each attempt is declined and the
+		// keep-this-binder fall-through at the end of the loop body
+		// takes over.
+		if (solver_placement == solver_site::eager
+			&& (free_vars.empty() || (free_vars.size() == 1
 			&& tau::get(free_vars[0]) == tau::get(v)))
 			&& is_bv_solvable_formula<node>(scoped))
 		{
@@ -337,12 +345,18 @@ tref eliminate_block_over_clause(tref clause, const trefs& block,
 		// to generic Boole decomposition would build BDD leaves backed by
 		// solver terms -- orders of magnitude costlier per node than
 		// atomless ones.
-		if (bv_blasting) {
+		if (bv_blasting && blast_placement == blast_site::per_leaf) {
 			tref ex_fm = tau::build_wff_ex(v, scoped, false);
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 				blasted && blasted != ex_fm)
-				return with_kept(anti_prenex<node>(blasted,
-					eliminability<node>::bv_only()));
+				// blast_mode::defer keeps the rewritten formula
+				// without re-entering, leaving the quantifiers
+				// blasting introduced to the next resolve pass.
+				return with_kept(
+					blast_method == blast_mode::defer
+					? blasted
+					: anti_prenex<node>(blasted,
+						eliminability<node>::bv_only()));
 		}
 		// Not resolvable: keep this binder around the scoped part.
 		return with_kept(tau::build_wff_ex(v, scoped, false));

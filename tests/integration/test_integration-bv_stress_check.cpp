@@ -19,6 +19,8 @@
  * is being exercised.
  */
 
+#include <cstdlib>
+#include <fstream>
 #include <random>
 #include <regex>
 #include <set>
@@ -318,6 +320,13 @@ struct stress_config {
 	/// all seven; template 5 is left out of the default because it does not
 	/// normalize in a bounded time (see the test suite below).
 	std::vector<size_t> templates = { 1, 2, 3, 4, 6, 7 };
+	/// Rules to feed instead of generating them. Empty (the default) keeps
+	/// the generator; non-empty replaces it entirely, and `templates`,
+	/// `max_lookback` and `seed` then only affect the random stream values.
+	/// Only the first `iterations` entries are fed; a shorter list is padded
+	/// with `T`, which leaves the running spec untouched. Declared last so
+	/// designated initialisers can name it after `iterations` and `width`.
+	strings rules = {};
 };
 
 struct stress_result {
@@ -339,11 +348,17 @@ stress_result run_stress(const stress_config& cfg) {
 	rng_t rng(cfg.seed);
 
 	stress_result res;
-	REQUIRE( !cfg.templates.empty() );
-	for (size_t idx = 1; idx <= cfg.iterations; ++idx)
-		res.rules.push_back(build_rule_for_iteration(rng, idx,
-			cfg.max_lookback, cfg.width,
-			cfg.templates[(idx - 1) % cfg.templates.size()]));
+	if (cfg.rules.empty()) {
+		REQUIRE( !cfg.templates.empty() );
+		for (size_t idx = 1; idx <= cfg.iterations; ++idx)
+			res.rules.push_back(build_rule_for_iteration(rng, idx,
+				cfg.max_lookback, cfg.width,
+				cfg.templates[(idx - 1) % cfg.templates.size()]));
+	} else {
+		res.rules = cfg.rules;
+		if (res.rules.size() > cfg.iterations)
+			res.rules.resize(cfg.iterations);
+	}
 
 	// the interpreter may read one value past the last executed step
 	const size_t values_n = cfg.iterations + 2;
@@ -547,5 +562,38 @@ TEST_SUITE("bv stress check: execution") {
 			.templates = { 1, 2, 3, 4, 5, 6, 7 } });
 		REQUIRE( res.started );
 		CHECK( res.steps_executed == 14 );
+	}
+
+	// The historical logged rules (private/bv_load_test.log, translated to
+	// current syntax -- see private/andrei-bv-stress.md A1), replayed at
+	// bv[16]. This is the workload the blasting/solver placement experiment
+	// exists to move: N=1 takes about a second, and N=2 has historically
+	// never returned.
+	//
+	// Env-gated because the rule file is not in the repository:
+	// TAU_STRESS_OLDRULES is the path to it (one rule per line, blank lines
+	// ignored) and TAU_STRESS_OLDRULES_N how many of them to accumulate
+	// (default 2). Unset, the case is skipped -- the decorator is evaluated
+	// during static initialisation, before main() runs, which is early
+	// enough for the environment to have been read.
+	TEST_CASE("historical logged rules at bv[16]"
+		* doctest::skip(std::getenv("TAU_STRESS_OLDRULES") == nullptr))
+	{
+		const char* path = std::getenv("TAU_STRESS_OLDRULES");
+		REQUIRE( path != nullptr );
+		std::ifstream in(path);
+		REQUIRE( in.good() );
+		strings rules;
+		std::string line;
+		while (std::getline(in, line))
+			if (!line.empty()) rules.push_back(line);
+		REQUIRE( !rules.empty() );
+		const char* n_env = std::getenv("TAU_STRESS_OLDRULES_N");
+		size_t n = n_env ? static_cast<size_t>(std::atoi(n_env)) : 2;
+		REQUIRE( n > 0 );
+		auto res = run_stress({ .iterations = n, .width = 16,
+			.rules = rules });
+		REQUIRE( res.started );
+		CHECK( res.steps_executed == n );
 	}
 }

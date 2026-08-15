@@ -48,6 +48,28 @@ void api<node>::set_blasting(bool blasting) {
 }
 
 template <NodeType node>
+void api<node>::set_blast_placement(int site) {
+	blast_placement = (site >= static_cast<int>(blast_site::per_leaf)
+		&& site <= static_cast<int>(blast_site::per_formula))
+			? static_cast<blast_site>(site) : blast_site::per_leaf;
+}
+
+template <NodeType node>
+void api<node>::set_blast_method(int mode) {
+	blast_method = (mode >= static_cast<int>(blast_mode::anti_prenex_result)
+		&& mode <= static_cast<int>(blast_mode::defer))
+			? static_cast<blast_mode>(mode)
+			: blast_mode::anti_prenex_result;
+}
+
+template <NodeType node>
+void api<node>::set_solver_placement(int site) {
+	solver_placement = (site >= static_cast<int>(solver_site::eager)
+		&& site <= static_cast<int>(solver_site::per_formula))
+			? static_cast<solver_site>(site) : solver_site::eager;
+}
+
+template <NodeType node>
 void api<node>::set_block_max_splits(size_t n) {
 	block_boole_max_splits = n;
 }

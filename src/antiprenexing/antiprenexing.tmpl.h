@@ -147,7 +147,11 @@ tref anti_prenex_block(tref formula, const trefs& block,
 		// that is not a block variable at all is never bound by this wrap.
 		// The explicit get_free_vars emptiness check on the next line is
 		// therefore the actual guard, not an optimization.
-		if (get_free_vars<node>(ex_fm).empty()
+		// `solver_placement` first: off `eager` this whole attempt is
+		// declined and the code below takes its existing fall-through
+		// (blast, or return the re-wrapped `ex_fm` untouched).
+		if (solver_placement == solver_site::eager
+				&& get_free_vars<node>(ex_fm).empty()
 				&& is_bv_solvable_formula<node>(ex_fm)) {
 			// Spelled out: bv_formula_sat_status returns an optional, and a
 			// nullopt (cvc5 answered unknown, or the translation failed)
@@ -157,9 +161,16 @@ tref anti_prenex_block(tref formula, const trefs& block,
 			if (status == bv_sat_status::unsat) return tau::_F();
 			DBG(if (!status) LOG_ERROR << "solver undecided on " << LOG_FM(ex_fm);)
 		}
-		if (bv_blasting)
+		if (bv_blasting && blast_placement == blast_site::per_leaf)
 			if (auto blasted = bv_predicate_blasting<node>(ex_fm);
 					blasted && blasted != ex_fm) {
+				// blast_mode::defer: hand back the rewritten formula
+				// and leave the quantifiers blasting introduced to
+				// the next resolve pass. Same shape as the
+				// depth-exceeded return just below, and sound for
+				// the same reason.
+				if (blast_method == blast_mode::defer)
+					return blasted;
 				// Bound the hop back into the pipeline; see
 				// blast_reentry_depth. Returning `blasted` rather
 				// than ex_fm keeps the blasting work done so far --
@@ -989,12 +1000,23 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 	// tref (same input `blk.displaced` -> same stable emission order),
 	// which is what lets process_quantifier_blocks' `done`-set
 	// termination retire it.
-	auto wrap_skipped = [&](tref r) -> tref {
+	//
+	// `skip_blasteable` is the bookkeeping the `per_block` hook at the end
+	// of this function needs: that hook wraps the blasteable sub-run around
+	// `result` itself (Task 7 made that sub-run contiguous and innermost
+	// among the displaced binders, so wrapping it there and emitting only
+	// the arithmetic/frozen groups here reproduces exactly the same
+	// nesting). Passing a flag rather than handing this lambda a filtered
+	// copy of `blk.displaced` keeps the emission loop and its determinism
+	// argument untouched, and leaves all the other call sites unchanged.
+	auto wrap_skipped = [&](tref r, bool skip_blasteable = false) -> tref {
 		// Emit by category, innermost group first: blasteable, then
 		// arithmetic, then frozen -- so frozen ends outermost. Stable
 		// within a category (original relative order preserved).
 		for (elim_verdict want : { elim_verdict::blasteable,
-			elim_verdict::arithmetic, elim_verdict::frozen })
+			elim_verdict::arithmetic, elim_verdict::frozen }) {
+			if (skip_blasteable && want == elim_verdict::blasteable)
+				continue;
 			for (auto it = blk.displaced.rbegin();
 				it != blk.displaced.rend(); ++it) {
 				const auto& [var, is_ex_q, cat] = *it;
@@ -1002,6 +1024,7 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 				r = is_ex_q ? build_wff_ex<node>(var, r, false)
 					: build_wff_all<node>(var, r, false);
 			}
+		}
 		return r;
 	};
 
@@ -1170,7 +1193,80 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 		result = normalize_atomic_formula_operators<node>(
 			to_nnf<node>(tau::build_wff_neg(pushed)));
 	}
-	return wrap_skipped(result);
+
+	// Options 5c / 7b -- the per-block destination. The block is fully
+	// processed here: every eliminable variable is gone, so this is the
+	// first point at which the blasteable binders this block displaced can
+	// be handed to a destination as one sub-block instead of one leaf
+	// clause at a time. Task 7 made that sub-run contiguous and innermost
+	// among the displaced binders, so wrapping it here and telling
+	// wrap_skipped to skip the blasteable group reproduces the same nesting
+	// order it would have produced itself.
+	//
+	// Inert at the shipped defaults (`per_leaf` / `eager`): the guard below
+	// is false and `result` reaches wrap_skipped untouched.
+	bool blasteable_consumed = false;
+	if (solver_placement == solver_site::per_closed_block
+		|| blast_placement == blast_site::per_block)
+	{
+		tref sub = result;
+		size_t n_blasteable = 0;
+		for (auto it = blk.displaced.rbegin();
+			it != blk.displaced.rend(); ++it) {
+			const auto& [var, is_ex_q, cat] = *it;
+			if (cat != elim_verdict::blasteable) continue;
+			sub = is_ex_q ? build_wff_ex<node>(var, sub, false)
+				: build_wff_all<node>(var, sub, false);
+			++n_blasteable;
+		}
+		if (n_blasteable) {
+			bool handled = false;
+			if (solver_placement == solver_site::per_closed_block
+				&& get_free_vars<node>(sub).empty()
+				&& is_bv_solvable_formula<node>(sub))
+			{
+				// Only commit to T/F on a definite answer --
+				// nullopt means undecided, not false. Same
+				// reasoning as in resolve_quantifiers.
+				std::optional<bv_sat_status> st =
+					bv_formula_sat_status<node>(sub);
+				if (st == bv_sat_status::sat)
+					{ result = tau::_T(); handled = true; }
+				else if (st == bv_sat_status::unsat)
+					{ result = tau::_F(); handled = true; }
+			}
+			if (!handled && bv_blasting
+				&& blast_placement == blast_site::per_block)
+				if (tref bl = bv_predicate_blasting<node>(sub);
+					bl && bl != sub)
+				{
+					// Same hop bound blast_block applies, for
+					// the same reason (see
+					// blast_reentry_depth); `defer` and an
+					// exhausted budget both keep the blasted
+					// formula with its quantifiers alive,
+					// which is sound.
+					if (blast_method
+						== blast_mode::anti_prenex_result
+						&& blast_reentry_depth<node>()
+							< max_blast_reentry_depth)
+					{
+						blast_reentry_guard<node> guard;
+						result = anti_prenex<node>(bl,
+							eliminability<node>::bv_only());
+					} else result = bl;
+					handled = true;
+				}
+			// Either way the blasteable binders are now around
+			// `result` already (or gone with the constant that
+			// replaced it), so wrap_skipped must not emit them a
+			// second time. `handled == false` keeps `sub`, which
+			// already carries them.
+			if (!handled) result = sub;
+			blasteable_consumed = true;
+		}
+	}
+	return wrap_skipped(result, blasteable_consumed);
 }
 
 /**
@@ -1539,18 +1635,27 @@ tref resolve_quantifiers2(tref formula, const typename term_handle<node>::order&
 			// Check if the formula is closed and proceed to eliminate
 			// the quantifier
 			if (el.skip(tau::trim2(n))) {
-				if (const trefs& free_vars = get_free_vars<node>(n);
-					free_vars.empty() && is_bv_solvable_formula<node>(n)) {
-					// Closed bv formula with explicit bitwidth: simplify to
-					// T/F, but only on a definite answer -- cvc5 returning
-					// unknown, or translation failing, means we cannot
-					// decide, not that the formula is false.
-					std::optional<bv_sat_status> status = bv_formula_sat_status<node>(n);
-					if (status == bv_sat_status::sat) return tau::_T();
-					if (status == bv_sat_status::unsat) return tau::_F();
-					DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
-					excluded.insert(n);
-				} else excluded.insert(n);
+				// Gated on `eager`: off it, the attempt is simply
+				// declined and the scope is excluded from the
+				// traversal -- which is exactly what both the
+				// not-solvable and the undecided paths below already
+				// do, so the two arms collapse into the single
+				// excluded.insert() after them.
+				if (solver_placement == solver_site::eager) {
+					if (const trefs& free_vars = get_free_vars<node>(n);
+						free_vars.empty() && is_bv_solvable_formula<node>(n))
+					{
+						// Closed bv formula with explicit bitwidth: simplify
+						// to T/F, but only on a definite answer -- cvc5
+						// returning unknown, or translation failing, means we
+						// cannot decide, not that the formula is false.
+						std::optional<bv_sat_status> status = bv_formula_sat_status<node>(n);
+						if (status == bv_sat_status::sat) return tau::_T();
+						if (status == bv_sat_status::unsat) return tau::_F();
+						DBG(if (!status) LOG_TRACE << "solver undecided on " << LOG_FM(n);)
+					}
+				}
+				excluded.insert(n);
 			}
 			// No atomlessness restriction here, and none needed: the two
 			// laws this branch applies -- `ex x f = 0 <=> f_0 f_1 = 0` and
@@ -1680,7 +1785,15 @@ using tau = tree<node>;
 				// only the first 6 predated any blasting, with 1530
 				// blasting rewrites in between. That is why the open
 				// branch below screens for blasting residue; see there.
-				if (is_bv_solvable_formula<node>(n)) {
+				//
+				// The whole solver branch below -- the closed check
+				// and the open-scope closing trick alike -- is gated
+				// on `solver_placement == eager`. Off it, the code
+				// falls through to the blasting attempt and the
+				// excluded.insert() below, which is the path an
+				// unsolvable scope already takes.
+				if (solver_placement == solver_site::eager
+					&& is_bv_solvable_formula<node>(n)) {
 					// Only commit to T/F on a definite answer: cvc5
 					// returning unknown, or translation failing, means
 					// we cannot decide, not that the formula is false.
@@ -1779,7 +1892,8 @@ using tau = tree<node>;
 							== bv_sat_status::unsat) return tau::_F();
 					}
 				}
-				if (bv_blasting)
+				if (bv_blasting
+					&& blast_placement == blast_site::per_leaf)
 					if (auto blasted = bv_predicate_blasting<node>(n);
 						blasted && blasted != n)
 						return blasted;

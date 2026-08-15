@@ -233,6 +233,22 @@ tref eliminate_bv_and_quantifiers(tref form) {
 	const eliminability<node> el2 = analyse_formula<node>(form, ctx2);
 	form = anti_prenex<node>(form, el2);
 	form = resolve_quantifiers<node>(form);
+	// Option 5a -- the per-formula blasting destination: one attempt on the
+	// whole formula, after the last anti-prenex/resolve pass and before the
+	// final closed-formula check below. Inert at the shipped default
+	// (`blast_placement == per_leaf`).
+	//
+	// The final check itself is deliberately NOT gated on
+	// `solver_placement`: it is the single "final" solver site that both
+	// `per_closed_block` and `per_formula` rely on, so it runs under every
+	// setting.
+	if (bv_blasting && blast_placement == blast_site::per_formula)
+		if (tref blasted = bv_predicate_blasting<node>(form);
+			blasted && blasted != form)
+			form = blast_method == blast_mode::anti_prenex_result
+				? anti_prenex<node>(blasted,
+					eliminability<node>::bv_only())
+				: blasted;
 	if (get_free_vars<node>(form).empty() && is_bv_solvable_formula<node>(form)) {
 		// Only commit to T/F on a definite answer: cvc5
 		// returning unknown, or translation failing, means
