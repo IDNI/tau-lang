@@ -1075,24 +1075,55 @@ tref interpreter<node>::pointwise_revision(
 						clause);
 				}
 				// Apply pointwise revision to always statements
-				// if simply conjunction failed
-				auto out_vars = [](tref n) {
-					return is_child<node, tau::io_var>(n) &&
-						tau::get(n).is_output_variable();
+				// if simply conjunction failed.
+				// B2a: align S and U to the common lookback
+				// frame ONCE and build every piece from the
+				// aligned pair -- independent always_conjunction
+				// calls re-derive shifts per call and can mix
+				// frames between the disjuncts.
+				tref s_body = tau::trim2(spec_always);
+				tref u_body = tau::trim2(upd_always);
+				trefs s_ios = tau::get(s_body).select_top(
+					is_child<node, tau::io_var>);
+				trefs u_ios = tau::get(u_body).select_top(
+					is_child<node, tau::io_var>);
+				const int_t lb_s = get_max_shift<node>(s_ios);
+				const int_t lb_u = get_max_shift<node>(u_ios);
+				if (lb_s < lb_u) s_body =
+					shift_io_vars_in_fm<node>(
+						s_body, s_ios, lb_u - lb_s);
+				else if (lb_u < lb_s) u_body =
+					shift_io_vars_in_fm<node>(
+						u_body, u_ios, lb_s - lb_u);
+				tref su = build_wff_and<node>(s_body, u_body);
+				// B2b: quantify only current-time (shift-0,
+				// non-initial) output instances -- past
+				// instances are already fixed by memory -- and
+				// never the update stream u the revision
+				// itself is driven by.
+				auto cur_out = [](tref n) {
+					if (!is_child<node, tau::io_var>(n))
+						return false;
+					const auto& v = tau::get(n);
+					if (!v.is_output_variable())
+						return false;
+					if (is_io_initial<node>(n))
+						return false;
+					if (get_io_var_shift<node>(n) != 0)
+						return false;
+					return get_var_name<node>(n) != "u";
 				};
-				tref aw = always_conjunction<node>(
-						spec_always, upd_always);
-				trefs aw_out_vars = tau::get(aw).select_top(
-					out_vars);
-				aw = tau::build_wff_ex_many(aw_out_vars, aw);
-				new_spec_pointwise = build_wff_or<node>(
-					always_conjunction<node>(
-						build_wff_neg<node>(aw),
-						upd_always),
-					always_conjunction<node>(
-						spec_always,
-						upd_always)
-				);
+				trefs cur_outs = tau::get(su).select_top(
+					cur_out);
+				// I2: factored form U ∧ (¬∃outs.(S∧U) ∨ S)
+				// -- one embedded copy of U instead of two.
+				new_spec_pointwise = build_wff_and<node>(
+					u_body,
+					build_wff_or<node>(
+						build_wff_neg<node>(
+							tau::build_wff_ex_many(
+								cur_outs, su)),
+						s_body));
 				new_spec_pointwise = build_wff_always<node>(
 					new_spec_pointwise);
 				new_spec_pointwise = build_wff_and<node>(

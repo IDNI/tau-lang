@@ -192,6 +192,42 @@ TEST_SUITE("Execution") {
 		CHECK( u_values == u_expected );
 	}
 
+	// A conflicting update against a lookback-carrying spec drives the
+	// ¬∃-fallback with a shifted output instance in scope; only the
+	// current-time o1[t] may be quantified there, never o1[t-1] or the u
+	// stream itself (review B2a/B2b/I2).
+	TEST_CASE("u[t] = i1[t]: lookback_fallback") {
+		bdd_init<Bool>();
+		auto spec = create_spec(
+			"u[t] = i1[t] && o1[t] = o1[t-1] && o1[0] = 0.");
+		strings i1_values = {
+			"F", "o1[t] = 1", "F", "F"
+		};
+		// The lookback delays outputs by one step, so the update fed
+		// at step 2 lands at print index 2 and o1 flips one step
+		// later; after the flip the surviving S-disjunct
+		// (o1[t] = o1[t-1]) holds it at T.
+		strings u_expected = {
+			"F", "F", "always o1[t]:tau' = 0", "F"
+		};
+		strings o1_expected = {
+			"F", "F", "F", "T",
+		};
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		CHECK( o1_values == o1_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected );
+	}
+
 	// An update with no always part: the running always-spec contradicts the
 	// sometimes clause, so revision discards the spec and keeps the clause
 	// (pointwise_revision's upd_always == nullptr arm, review B8).
