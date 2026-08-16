@@ -1063,7 +1063,16 @@ tref normalize_with_temp_simp(tref fm) {
 						r = normalize_non_temp<node>(
 							tau::build_wff_neg(nb));
 				}
-				if (r && r != b) changes.emplace(b, r);
+				// Adopt only a fully quantifier-free result: a
+				// partially processed block (anti-prenex
+				// distribution with the binders still in
+				// place) is typically LARGER than the
+				// original, and adopting it fattens the
+				// stored spec and multiplies its DNF paths on
+				// every later normalization.
+				if (r && r != b && !tau::get(r).find_top(
+					is_quantifier<node>))
+					changes.emplace(b, r);
 			}
 			if (!changes.empty())
 				fm = fold_trivial_quantifiers<node>(tau::reget(

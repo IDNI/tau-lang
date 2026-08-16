@@ -400,12 +400,35 @@ std::optional<typename node<BAs...>::constant_with_type> parse_bv(const std::str
 // -----------------------------------------------------------------------------
 // Basic Boolean algebra infrastructure
 
-/** @brief Normalise a BV term via cvc5's simplifier. */
+/** @brief Normalise a BV term via cvc5's simplifier.
+ *
+ * One long-lived solver plus a result cache: constructing a solver per
+ * call pays full engine initialization (theory stack + statistics
+ * registry) on its first simplify -- sampled as the dominant cost of a
+ * bv[64] interpreter step once the spec grows past a few thousand printed
+ * chars, since the constant-folding term hooks route every rebuilt bv
+ * operation through here. simplify() adds no assertions, so solver reuse
+ * is state-safe, and it is deterministic for a fixed option set (options
+ * are fixed before the first query, see cvc5_options.h), so the cache is
+ * sound. The solver is deliberately leaked: a static Solver object could
+ * destruct after the global cvc5_term_manager it references (see at_exit
+ * in main.cpp for the cleanup-order minefield). */
 inline cvc5::Term normalize_bv(const cvc5::Term& fm) {
-	cvc5::Solver solver(cvc5_term_manager);
-	config_cvc5_solver(solver);
+#ifdef TAU_CACHE
+	static std::unordered_map<cvc5::Term, cvc5::Term> cache;
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+#endif // TAU_CACHE
+	static cvc5::Solver* solver = [] {
+		auto* s = new cvc5::Solver(cvc5_term_manager);
+		config_cvc5_solver(*s);
+		return s;
+	}();
 	// Use general simplification procedure
-	return solver.simplify(fm);
+	cvc5::Term res = solver->simplify(fm);
+#ifdef TAU_CACHE
+	cache.emplace(fm, res);
+#endif // TAU_CACHE
+	return res;
 }
 
 /** @brief Return `true` if @p fm is the all-zeros bitvector constant. */
