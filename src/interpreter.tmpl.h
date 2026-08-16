@@ -1062,27 +1062,37 @@ tref interpreter<node>::pointwise_revision(
 				new_spec_pointwise,
 				build_wff_and<node>(upd_sometime));
 			if (!is_tau_formula_sat<node>(new_spec_pointwise, start_time)) {
+				// Without an always part in the update, the
+				// fallback below would rebuild the exact
+				// formula that just failed the sat check;
+				// discard the accumulated spec directly (B8).
+				if (!upd_always) {
+					LOG_WARNING << "Pointwise revision "
+						"failed; replacing the "
+						"accumulated specification with "
+						"the update clause\n";
+					return normalize_with_temp_simp<node>(
+						clause);
+				}
 				// Apply pointwise revision to always statements
 				// if simply conjunction failed
-				if (upd_always) {
-					auto out_vars = [](tref n) {
-						return is_child<node, tau::io_var>(n) &&
-							tau::get(n).is_output_variable();
-					};
-					tref aw = always_conjunction<node>(
-							spec_always, upd_always);
-					trefs aw_out_vars = tau::get(aw).select_top(
-						out_vars);
-					aw = tau::build_wff_ex_many(aw_out_vars, aw);
-					new_spec_pointwise = build_wff_or<node>(
-						always_conjunction<node>(
-							build_wff_neg<node>(aw),
-							upd_always),
-						always_conjunction<node>(
-							spec_always,
-							upd_always)
-					);
-				} else new_spec_pointwise = tau::trim2(spec_always);
+				auto out_vars = [](tref n) {
+					return is_child<node, tau::io_var>(n) &&
+						tau::get(n).is_output_variable();
+				};
+				tref aw = always_conjunction<node>(
+						spec_always, upd_always);
+				trefs aw_out_vars = tau::get(aw).select_top(
+					out_vars);
+				aw = tau::build_wff_ex_many(aw_out_vars, aw);
+				new_spec_pointwise = build_wff_or<node>(
+					always_conjunction<node>(
+						build_wff_neg<node>(aw),
+						upd_always),
+					always_conjunction<node>(
+						spec_always,
+						upd_always)
+				);
 				new_spec_pointwise = build_wff_always<node>(
 					new_spec_pointwise);
 				new_spec_pointwise = build_wff_and<node>(
@@ -1093,12 +1103,23 @@ tref interpreter<node>::pointwise_revision(
 				<< LOG_FM(new_spec_pointwise) << "\n";
 				if (!is_tau_formula_sat<node>(
 					new_spec_pointwise, start_time))
-					return clause;
+				{
+					// This is the "discard the whole
+					// accumulated spec" outcome; make it
+					// loud and return it normalized like
+					// every other success path (B7).
+					LOG_WARNING << "Pointwise revision "
+						"failed; replacing the "
+						"accumulated specification with "
+						"the update clause\n";
+					return normalize_with_temp_simp<node>(
+						clause);
+				}
 			}
 		} else new_spec_pointwise = clause;
 
 		if (spec_sometimes.empty())
-			return normalize<node>(new_spec_pointwise);
+			return normalize_with_temp_simp<node>(new_spec_pointwise);
 		// Now try to add sometimes part of old spec
 		tref new_spec_pointwise_sometimes =
 			build_wff_and<node>(new_spec_pointwise,
@@ -1107,7 +1128,7 @@ tref interpreter<node>::pointwise_revision(
 		LOG_TRACE << "pwr/new_spec_pointwise_sometimes: "
 			<< LOG_FM(new_spec_pointwise_sometimes) << "\n";
 		if (!is_tau_formula_sat<node>(new_spec_pointwise_sometimes, start_time))
-			return normalize<node>(new_spec_pointwise);
+			return normalize_with_temp_simp<node>(new_spec_pointwise);
 
 		return normalize_with_temp_simp<node>(new_spec_pointwise_sometimes);
 	}

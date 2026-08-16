@@ -192,6 +192,38 @@ TEST_SUITE("Execution") {
 		CHECK( u_values == u_expected );
 	}
 
+	// An update with no always part: the running always-spec contradicts the
+	// sometimes clause, so revision discards the spec and keeps the clause
+	// (pointwise_revision's upd_always == nullptr arm, review B8).
+	TEST_CASE("u[t] = i1[t]: sometimes_update") {
+		bdd_init<Bool>();
+		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+		strings i1_values = {
+			"F", "sometimes o1[t] = 1", "F", "F"
+		};
+		strings u_expected = {
+			"F", "sometimes o1[t]:tau' = 0", "F", "F"
+		};
+		// The sometimes clause is discharged at step 2 (o1 = T), after
+		// which o1 is unconstrained and solves to 0.
+		strings o1_expected = {
+			"F", "F", "T", "F",
+		};
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		CHECK( o1_values == o1_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected );
+	}
+
 	TEST_CASE("this_stream") {
 		bdd_init<Bool>();
 		auto spec = create_spec("u[t] = i1[t] && this[t] = o1[t].");
