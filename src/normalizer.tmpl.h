@@ -1026,6 +1026,49 @@ tref normalize_with_temp_simp(tref fm) {
 			resolved && resolved != fm)
 			fm = fold_trivial_quantifiers<node>(
 				tau::reget(resolved));
+		// A block that is eliminable in isolation can still be
+		// carrying its binder here: analyse_formula computes verdicts
+		// whole-formula with a flat cross-scope join, so an arithmetic
+		// atom in a SIBLING clause sharing free variables with the
+		// block's atoms lifts those variables above `eliminable` and
+		// the binder is kept (review-pointwise-revision §3, R6).
+		// Re-eliminate each surviving maximal block with block-local
+		// analysis, which sees no sibling content. Do not descend into
+		// terms: tau_ba constants carry their own wff_ex/wff_all over
+		// I/O variables, which must be left intact (the AP-7 guard).
+		if (trefs blocks = rewriter::select_top_until<node>(fm,
+			is_child_quantifier<node>, [](tref n) {
+				return tree<node>::get(n).is_term(); });
+			!blocks.empty())
+		{
+			subtree_map<node, tref> changes;
+			for (tref b : blocks) {
+				tref r = eliminate_bv_and_quantifiers<node>(b);
+				if (!r || r == b || tau::get(r).find_top(
+					is_quantifier<node>))
+				{
+					// Dual attempt: the substitution-based
+					// one-point pass inside anti_prenex only
+					// matches EXISTENTIAL scopes, so a
+					// universal block whose vars carry the
+					// `arithmetic` verdict (skipped by the
+					// block core, and blasting is off by
+					// default) never reaches it. Its negation
+					// is the ∃ form; eliminate that and negate
+					// back.
+					tref nb = eliminate_bv_and_quantifiers<
+						node>(tau::build_wff_neg(b));
+					if (nb && !tau::get(nb).find_top(
+						is_quantifier<node>))
+						r = normalize_non_temp<node>(
+							tau::build_wff_neg(nb));
+				}
+				if (r && r != b) changes.emplace(b, r);
+			}
+			if (!changes.empty())
+				fm = fold_trivial_quantifiers<node>(tau::reget(
+					rewriter::replace<node>(fm, changes)));
+		}
 	}
 	// Apply present function/predicate definitions
 	fm = expand_defs_until_settled<node>(fm, [](tref n) { return n; },
