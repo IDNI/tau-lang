@@ -420,11 +420,14 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// One cvc5::Solver construction plus one checkSat per call, and the callers
 	// ask repeatedly: resolve_quantifiers is a whole-tree pre_order run at
 	// least three times per eliminate_bv_and_quantifiers, and its open-scope
-	// branch asks twice per scope. The answer depends only on `form` --
-	// config_cvc5_solver and config_cvc5_solver_alternating_quantifiers read no
-	// mutable global, and the alternation test is a function of the formula --
-	// so the formula alone is a complete key. Unlike anti_prenex's memo (which
-	// had to be split per bv_blasting setting) there is nothing else to key on.
+	// branch asks twice per scope. The answer depends only on `form`: the one
+	// global config_cvc5_solver reads, `cvc5_options`, is fixed at process
+	// start before the first query (documented at its definition -- flipping
+	// it mid-process would serve verdicts computed under the previous option
+	// set), config_cvc5_solver_alternating_quantifiers reads no global at all,
+	// and the alternation test is a function of the formula -- so the formula
+	// alone is a complete key. Unlike anti_prenex's memo (which had to be
+	// split per bv_blasting setting) there is nothing else to key on.
 	// nullopt is cached too: a formula the translator rejects gets rejected the
 	// same way every time, and re-deriving that costs a full tree walk.
 	using cache_t = std::unordered_map<tref, std::optional<bv_sat_status>>;
@@ -453,7 +456,10 @@ std::optional<bv_sat_status> bv_formula_sat_status(tref form) {
 	// config_cvc5_solver_alternating_quantifiers) for no benefit.
 	if (has_alternating_quantifiers<node>(form))
 		config_cvc5_solver_alternating_quantifiers(solver);
-	config_cvc5_solver(solver);
+	// decision_only: this function only ever reads the checkSat verdict,
+	// never a model, so satisfiability-preserving preprocessing is admissible
+	// here (see cvc5_option_set::decision_no_models).
+	config_cvc5_solver(solver, true);
 
 	auto expr = bv_eval_node<node>(tt(form), vars, free_vars);
 	if (!expr) {

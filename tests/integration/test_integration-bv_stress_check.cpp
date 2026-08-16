@@ -560,7 +560,9 @@ TEST_SUITE("bv stress check: execution") {
 	// the bv[64] it ships with. First-ever pass under the shipped defaults
 	// (bv_blasting=false, Task 9): ~99.1s in Release -- no longer "never
 	// returns", but still over the 60s default-suite bar, so it stays
-	// opt-in rather than joining the suite outright. Run it directly with
+	// opt-in rather than joining the suite outright. The cvc5 option-set
+	// selection (boolean_algebras/cvc5/cvc5_options.h, 2026-08-16) brought
+	// it to ~74s and halved its peak RSS, still over the bar. Run it directly with
 	// `-tc="14 iterations*" -ns`: doctest's `-tc` splits its argument on
 	// comma into separate patterns, and this case's name itself contains
 	// one, so passing the full name verbatim (`-tc="14 iterations at

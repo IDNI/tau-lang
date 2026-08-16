@@ -7,11 +7,13 @@
 #include "doctest.h"
 #include "defs.h"
 #include "logging.h"
-// Only the blasting/solver placement parameters, not the machinery behind
-// them: this header defines main() and is included before any tau header in
-// every test TU, so it must not pull the tau tree in ahead of them. That is
-// exactly why heuristics/blast_placement.h is dependency-free.
+// Only the blasting/solver placement/cvc5-option parameters, not the
+// machinery behind them: this header defines main() and is included before
+// any tau header in every test TU, so it must not pull the tau tree in ahead
+// of them. That is exactly why heuristics/blast_placement.h and
+// boolean_algebras/cvc5/cvc5_options.h are dependency-free.
 #include "heuristics/blast_placement.h"
+#include "boolean_algebras/cvc5/cvc5_options.h"
 
 using namespace std;
 
@@ -50,6 +52,10 @@ inline void apply_tau_experiment_env() {
 	solver_placement = static_cast<solver_site>(
 		env_int("TAU_SOLVER_PLACEMENT", 0, 2,
 			static_cast<int>(solver_placement)));
+	cvc5_options = static_cast<cvc5_option_set>(
+		env_int("TAU_CVC5_OPTIONS", 0,
+			static_cast<int>(cvc5_option_set::combined_best),
+			static_cast<int>(cvc5_options)));
 }
 
 int main(int argc, char** argv) {

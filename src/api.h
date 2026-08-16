@@ -148,6 +148,16 @@ struct api {
 	 */
 	static void set_solver_placement(int site);
 	/**
+	 * @brief Select the cvc5 option set (see `cvc5_option_set`).
+	 *
+	 * Values follow the `cvc5_option_set` enumerators; an out-of-range
+	 * value clamps to the default. Must be set before the first solver
+	 * query: `bv_formula_sat_status` memoizes verdicts keyed on the
+	 * formula alone, so a mid-process flip would serve answers computed
+	 * under the previous option set.
+	 */
+	static void set_cvc5_options(int set);
+	/**
 	 * @brief Set the per-block Boole-decomposition split budget.
 	 *
 	 * Bounds the Shannon splits ONE block elimination may charge, across its

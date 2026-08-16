@@ -70,6 +70,14 @@ void api<node>::set_solver_placement(int site) {
 }
 
 template <NodeType node>
+void api<node>::set_cvc5_options(int set) {
+	cvc5_options = (set >= static_cast<int>(cvc5_option_set::baseline)
+		&& set <= static_cast<int>(cvc5_option_set::combined_best))
+			? static_cast<cvc5_option_set>(set)
+			: cvc5_option_set::ext_rewrite_no_models;
+}
+
+template <NodeType node>
 void api<node>::set_block_max_splits(size_t n) {
 	block_boole_max_splits = n;
 }

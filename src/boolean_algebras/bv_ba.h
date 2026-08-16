@@ -39,6 +39,7 @@
 #include <cvc5/cvc5.h>
 
 #include "boolean_algebras/cvc5/cvc5.h"
+#include "boolean_algebras/cvc5/cvc5_options.h"
 #include "tau_tree.h"
 #include "splitter_types.h"
 
@@ -69,14 +70,64 @@ size_t get_bv_size(const tref t);
 /**
  * @brief Configures the given cvc5 solver instance for bit-vector logic.
  *
- * Sets the solver options to produce models and configures the logic to "BV" (Bit-Vector).
- * This function prepares the solver for solving bit-vector problems.
+ * Applies the option set selected by `cvc5_options`
+ * (boolean_algebras/cvc5/cvc5_options.h -- the considered sets, the measured
+ * matrix and the selection rationale live there), then the base
+ * configuration: model production, no proofs, logic "BV". Options must be
+ * set before `setLogic`, which is where cvc5 resolves its module defaults.
  *
  * @param solver Reference to a cvc5::Solver instance to be configured.
+ * @param decision_only The caller will only read the checkSat verdict --
+ * never a model (`getValue`) and never a `simplify` result. This admits
+ * satisfiability-preserving-only preprocessing (see
+ * `cvc5_option_set::decision_no_models`); passing it from a call site that
+ * later extracts a model throws in cvc5, and from a `simplify` site would
+ * silently corrupt the rewritten term, so it defaults to false.
  */
-inline void config_cvc5_solver(cvc5::Solver& solver) {
-	// configure the solver
-	solver.setOption("produce-models", "true");
+inline void config_cvc5_solver(cvc5::Solver& solver, bool decision_only = false) {
+	switch (cvc5_options) {
+	case cvc5_option_set::baseline: break;
+	case cvc5_option_set::decision_no_models: break; // handled below
+	case cvc5_option_set::miniscope_agg:
+		solver.setOption("miniscope-quant", "agg"); break;
+	case cvc5_option_set::ext_rewrite_quant:
+		solver.setOption("ext-rewrite-quant", "true"); break;
+	case cvc5_option_set::pre_skolem_agg:
+		solver.setOption("pre-skolem-quant", "agg"); break;
+	case cvc5_option_set::sygus_inst:
+		// sygus-inst refuses incremental solving (cvc5's API default);
+		// single-checkSat usage makes non-incremental safe, see below
+		solver.setOption("incremental", "false");
+		solver.setOption("sygus-inst", "true"); break;
+	case cvc5_option_set::mbqi:
+		solver.setOption("mbqi", "true"); break;
+	case cvc5_option_set::enum_inst:
+		solver.setOption("enum-inst", "true"); break;
+	case cvc5_option_set::cegqi_bv_ineq_keep:
+		solver.setOption("cegqi-bv-ineq", "keep"); break;
+	case cvc5_option_set::non_incremental:
+		// every solver instance here performs exactly ONE checkSat and
+		// no push/pop, so cvc5's incremental API default buys nothing
+		solver.setOption("incremental", "false"); break;
+	case cvc5_option_set::ext_rewrite_no_models:
+		solver.setOption("incremental", "false");
+		solver.setOption("ext-rewrite-quant", "true"); break;
+	case cvc5_option_set::combined_best:
+		solver.setOption("incremental", "false");
+		solver.setOption("ext-rewrite-quant", "true");
+		solver.setOption("cegqi-bv-ineq", "keep"); break;
+	}
+	const bool drop_models = decision_only
+		&& (cvc5_options == cvc5_option_set::decision_no_models
+		|| cvc5_options == cvc5_option_set::ext_rewrite_no_models
+		|| cvc5_options == cvc5_option_set::combined_best);
+	solver.setOption("produce-models", drop_models ? "false" : "true");
+	// NOTE: unconstrained-simp looked like the natural companion here but
+	// cvc5 rejects it outright in any logic admitting quantifiers ("Cannot
+	// use unconstrained simplification in this logic"), and the
+	// decision-only path is exactly the quantified one -- so the no-models
+	// sets reduce to dropping models and incrementality.
+	if (drop_models) solver.setOption("incremental", "false");
 	solver.setOption("produce-proofs", "false");
 	//solver.setOption("incremental", "true");
 	solver.setLogic("BV");

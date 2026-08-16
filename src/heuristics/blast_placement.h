@@ -1,9 +1,9 @@
 /**
  * @file blast_placement.h
- * @brief Runtime parameters selecting WHERE predicate blasting and the cvc5
- * solver may run, and what to do with a blasted result.
+ * @brief Runtime parameters selecting WHERE predicate blasting may run and
+ * what to do with a blasted result.
  *
- * These four knobs conceptually belong next to `bv_predicate_blasting`, and
+ * These knobs conceptually belong next to `bv_predicate_blasting`, and
  * `bv_blasting` used to live there. They are split into this dependency-free
  * header purely so that they can be read and written without the tau tree
  * behind them: `tests/test_init.h` defines every test binary's `main()` and is
@@ -13,26 +13,35 @@
  * `bv_predicate_blasting.h` includes this file, so every existing user of
  * `bv_blasting` keeps seeing it unchanged.
  *
- * All four are plain runtime globals, per the project's runtime-parameter
+ * All three are plain runtime globals, per the project's runtime-parameter
  * policy (placement and resource limits belong in a runtime parameter, never in
  * a header constant). The api setters are `api::set_blasting`,
- * `api::set_blast_placement`, `api::set_blast_method` and
- * `api::set_solver_placement`.
+ * `api::set_blast_placement` and `api::set_blast_method`.
  *
- * All four defaults reproduced today's behaviour exactly at introduction;
+ * `solver_site`/`solver_placement` used to be the fourth knob here; they
+ * moved to `boolean_algebras/cvc5/cvc5_options.h` (included below, so every
+ * existing user keeps seeing them unchanged) next to the cvc5 option-set
+ * selection they belong with.
+ *
+ * All defaults reproduced today's behaviour exactly at introduction;
  * every call site gated on them wraps the pre-existing code, and the
  * non-default branches take the decline/fall-through path that site already
  * had. Task 9 (2026-08-15) measured the full matrix and flipped `bv_blasting`
  * to `false` -- see the measurement table above its definition below.
- * `blast_placement`/`blast_method`/`solver_placement` keep their original
- * defaults: `solver_placement=eager` because it measured best, the other two
- * as the best-measured fallback for a caller that re-enables `bv_blasting`.
+ * `blast_placement`/`blast_method` keep their original defaults as the
+ * best-measured fallback for a caller that re-enables `bv_blasting`
+ * (`solver_placement=eager`, the measured winner, is documented at its new
+ * home).
  */
 
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.md
 
 #ifndef __IDNI__TAU__BLAST_PLACEMENT_H__
 #define __IDNI__TAU__BLAST_PLACEMENT_H__
+
+// `solver_site`/`solver_placement` lived here until 2026-08-16; kept visible
+// through this include so existing users compile unchanged.
+#include "boolean_algebras/cvc5/cvc5_options.h"
 
 namespace idni::tau_lang {
 
@@ -144,35 +153,6 @@ enum class blast_mode {
 // NOT thread-safe, exactly like `bv_blasting` above: the tau library assumes
 // single-threaded access. Do not call set_blast_method() concurrently.
 inline blast_mode blast_method = blast_mode::anti_prenex_result;
-
-/**
- * @brief Where the cvc5 solver is allowed to be queried.
- *
- * The final closed-formula check at the end of `eliminate_bv_and_quantifiers`
- * is deliberately NOT gated: it is the single "final" solver site that both
- * `per_closed_block` and `per_formula` rely on.
- */
-enum class solver_site {
-	/// Today's behaviour: the resolve passes, `blast_block`'s solver-first
-	/// attempt, `leaf_clause`'s bv branch, and the final check.
-	eager = 0,
-	/// Only on a fully-processed, closed quantifier block (plus the final
-	/// check).
-	per_closed_block = 1,
-	/// Only the final closed-formula check.
-	per_formula = 2,
-};
-
-// `eager` is the measured winner, not just the pre-existing default: the
-// Task 9 matrix's Row A (`bv_blasting=false` crossed with
-// `solver_placement`, see the table above `bv_blasting`) found
-// `per_closed_block`/`per_formula` fail 2 wff_normalization cases outright
-// (Task 8 smoke), leaving `eager` the only cell standing -- and it already
-// wins W2/W3 among the three.
-//
-// NOT thread-safe, exactly like `bv_blasting` above: the tau library assumes
-// single-threaded access. Do not call set_solver_placement() concurrently.
-inline solver_site solver_placement = solver_site::eager;
 
 } // namespace idni::tau_lang
 
