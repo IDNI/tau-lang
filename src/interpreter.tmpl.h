@@ -1061,9 +1061,23 @@ tref interpreter<node>::pointwise_revision(
 			is_child<node, tau::wff_always>);
 		trefs upd_sometime = tau::get(clause).select_top(
 			is_child<node, tau::wff_sometimes>);
-		tref spec_always = tau::get(spec).find_top(
+		// B3: take the always and sometimes parts from the SAME
+		// temporal clause of the spec. find_top on the whole spec
+		// grabs the first disjunct's always while select_top collects
+		// sometimes across ALL disjuncts, silently mixing content of
+		// different disjuncts into one revision.
+		trefs spec_clauses;
+		for (tref sc : expression_paths<node>(spec))
+			spec_clauses.push_back(sc);
+		if (spec_clauses.size() > 1)
+			LOG_WARNING << "Pointwise revision on a temporally "
+				"disjunctive specification uses only its "
+				"first clause\n";
+		tref spec_clause = spec_clauses.empty() ? spec
+			: spec_clauses.front();
+		tref spec_always = tau::get(spec_clause).find_top(
 			is_child<node, tau::wff_always>);
-		trefs spec_sometimes = tau::get(spec).select_top(
+		trefs spec_sometimes = tau::get(spec_clause).select_top(
 			is_child<node, tau::wff_sometimes>);
 
 		// Check if the update by itself is sat from current time point onwards
