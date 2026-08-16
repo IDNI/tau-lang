@@ -867,21 +867,24 @@ void interpreter<node>::update(tref update) {
 	LOG_TRACE << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 	// std::cout << "update/shifted_update: " << LOG_FM(shifted_update) << "\n";
 
+	// The constant time positions in original_spec need to be replaced by
+	// present assignments from memory and already executed sometimes
+	// statements need to be removed. This working copy does not depend on
+	// the update clause, so compute it once for the whole clause loop (I6).
+	auto memory_spec = original_spec;
+	for (auto& [spec, rep] : memory_spec) {
+		// update current spec part with memory
+		// TODO: maybe update constant time positions to current time point in order to avoid loosing initial conditions on restarting updated specification
+		spec = tree<node>::geth(rewriter::replace<node>(spec->get(), memory));
+		LOG_DEBUG << "update/memory replaced spec: " << LOG_FM(spec->get()) << "\n";
+	}
+	// TODO: memory_spec = remove_happend_sometimes(memory_spec);
+
 	// For each clause of update, check if we can do pointwise revision
 	for (tref clause : expression_paths<node>(shifted_update)) {
-		// The constant time positions in original_spec need to be replaced
-		// by present assignments from memory and already executed sometimes statements need to be removed
-		auto current_spec = original_spec;
+		auto current_spec = memory_spec;
 		auto current_ubd_ctn = ubt_ctn;
 		DBG(assert(current_spec.size() == current_ubd_ctn.size()));
-		for (auto& [spec, rep] : current_spec) {
-			// update current spec part with memory
-			// TODO: maybe update constant time positions to current time point in order to avoid loosing initial conditions on restarting updated specification
-			spec = tree<node>::geth(rewriter::replace<node>(spec->get(), memory));
-			LOG_DEBUG << "update/memory replaced spec: " << LOG_FM(spec->get()) << "\n";
-			// std::cout << "update/memory replaced spec: " << LOG_FM(spec->get()) << "\n";
-		}
-		// TODO: current_spec = remove_happend_sometimes(current_spec);
 		union_find_with_sets<decltype(stream_comp), node> uf(stream_comp);
 		auto upd_partition = create_spec_partition(clause, uf);
 		// Merge current output_partition into uf
@@ -996,12 +999,37 @@ void interpreter<node>::update(tref update) {
 		if (!update_valid) continue;
 		// Here, all update parts were successful
 		// The unbound continuation from start_time is possible for all parts,
-		// so it is safe to swap the current spec by update_unbound
-		// Update interpreter and return
-		update = unsqueeze_always(tau::build_wff_and(current_spec | std::views::keys
+		// so it is safe to swap the current spec by update_unbound.
+		// B1: collect (and thereby validate) the stream maps BEFORE
+		// committing anything -- a failed collect used to leave the
+		// interpreter half-updated (new spec, cleared stream maps),
+		// making every subsequent step() fail on stream lookups. The
+		// collects auto-register unknown console streams and reject
+		// untyped ones, so a rebuild after successful collects cannot
+		// fail on a missing stream.
+		subtree_map<node, size_t> output_streams, input_streams;
+		bool streams_ok = true;
+		for (const auto& [k, _] : current_spec)
+			if (!collect_output_streams(k->get(), output_streams)) {
+				streams_ok = false;
+				break;
+			}
+		if (streams_ok) for (const auto& [k, _] : current_spec)
+			if (!collect_input_streams(k->get(), input_streams)) {
+				streams_ok = false;
+				break;
+			}
+		if (!streams_ok) {
+			LOG_WARNING << "No update performed: stream collection "
+				"failed for the revised specification\n";
+			continue;
+		}
+
+		tref updated_spec = unsqueeze_always(tau::build_wff_and(
+			current_spec | std::views::keys
 			| std::views::transform(
 				[](const htref& h) { return h->get(); })));
-		LOG_INFO << "Updated specification: " << TAU_TO_STR(update) << "\n\n";
+		LOG_INFO << "Updated specification: " << TAU_TO_STR(updated_spec) << "\n\n";
 
 		// Set new specification for interpreter
 		ubt_ctn = std::move(current_ubd_ctn);
@@ -1010,18 +1038,8 @@ void interpreter<node>::update(tref update) {
 		// The systems for solver need to be recomputed at beginning of next step
 		final_system = false;
 		compute_lookback_and_initial();
-		subtree_map<node, size_t> output_streams;
-		for (const auto& [k, _] : original_spec) {
-			if (!collect_output_streams(k->get(), output_streams))
-				return;
-		}
 		LOG_TRACE << "interpreter::update/rebuild_outputs";
 		if (!rebuild_outputs(output_streams)) return;
-		subtree_map<node, size_t> input_streams;
-		for (const auto& [k, _] : original_spec) {
-			if (!collect_input_streams(k->get(), input_streams))
-				return;
-		}
 		LOG_TRACE << "interpreter::update/rebuild_inputs";
 		if (!rebuild_inputs(input_streams)) return;
 		return;
