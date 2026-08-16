@@ -842,6 +842,18 @@ tref interpreter<node>::get_executable_spec(
 	return executable;
 }
 
+// The I3/B10 semantic no-op checks in update()/pointwise_revision are
+// optimizations -- skipping them is always sound. They are restricted to
+// bv-free formulas because is_tau_impl/are_tau_equivalent can hang even on
+// SMALL mixed lookback bv pairs (observed on bv_stress_check inputs of
+// ~100-200 chars; recorded as B11 in
+// private/review-pointwise-revision-2026-08-16.md).
+template <NodeType node>
+static bool pwr_contains_bv_content(tref f) {
+	return tree<node>::get(f).find_top(
+		is_tref_bv_type_family<node>) != nullptr;
+}
+
 template <NodeType node>
 void interpreter<node>::update(tref update) {
 	DBG(LOG_TRACE << "interpreter::update(update = \"" << LOG_FM(update) << "\")";)
@@ -960,13 +972,15 @@ void interpreter<node>::update(tref update) {
 					break;
 				} else if (!(tau::subtree_equals(current_spec[i].first->get(), revision)
 					// The syntactic check misses a semantically
-					// unchanged revision (differently-shaped but
-					// equivalent formula); storing it anyway
-					// recomputes the continuation and churns the
-					// stored spec (review B10).
-					|| are_tau_equivalent<node>(
+					// unchanged revision (differently-shaped
+					// but equivalent formula); storing it
+					// anyway churns the stored spec (review
+					// B10). Restricted to bv-free formulas --
+					// see pwr_contains_bv_content (B11).
+					|| (!pwr_contains_bv_content<node>(revision)
+						&& are_tau_equivalent<node>(
 						current_spec[i].first->get(),
-						revision)))
+						revision))))
 				{
 					current_spec[i].first =
 						tree<node>::geth(revision);
@@ -1092,7 +1106,9 @@ tref interpreter<node>::pointwise_revision(
 		// An update already implied by the running spec is a no-op;
 		// conjoining it anyway re-embeds it verbatim and feeds the
 		// per-update growth (review I3).
-		if (is_tau_impl<node>(spec, clause)) {
+		if (!pwr_contains_bv_content<node>(spec)
+			&& !pwr_contains_bv_content<node>(clause)
+			&& is_tau_impl<node>(spec, clause)) {
 			LOG_DEBUG << "pwr/update already implied by the "
 				"specification; keeping it unchanged\n";
 			return spec;
@@ -1332,8 +1348,16 @@ tref interpreter<node>::unsqueeze_always(tref cnf_expression) {
 			c = tau::_T();
 		}
 	}
+	// B6: fold via always_conjunction instead of a verbatim
+	// build_wff_and of the bodies -- clauses with different lookbacks
+	// must be shifted to a common frame before they share one always,
+	// exactly as always_conjunction (used by the normalizer and by
+	// pointwise_revision) does.
+	tref aw_body = nullptr;
+	for (tref b : aw_clauses)
+		aw_body = aw_body ? always_conjunction<node>(aw_body, b) : b;
 	return tau::build_wff_and(
-		tau::build_wff_always(tau::build_wff_and(aw_clauses)),
+		tau::build_wff_always(aw_body ? aw_body : tau::_T()),
 		tau::build_wff_and(clauses));
 }
 
