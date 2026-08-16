@@ -955,7 +955,15 @@ void interpreter<node>::update(tref update) {
 			if (tau::get(revision).equals_F()) {
 				update_valid = false;
 				break;
-			} else if (tau::subtree_equals(current_spec[i].first->get(), revision)) {
+			} else if (tau::subtree_equals(current_spec[i].first->get(), revision)
+				// The syntactic check misses a semantically
+				// unchanged revision (differently-shaped but
+				// equivalent formula); storing it anyway
+				// recomputes the continuation and churns the
+				// stored spec (review B10).
+				|| are_tau_equivalent<node>(
+					current_spec[i].first->get(), revision))
+			{
 				// Unbound continuation does not need to be updated
 				continue;
 			}
@@ -1045,6 +1053,15 @@ tref interpreter<node>::pointwise_revision(
 		LOG_TRACE << "pwr/clause: " << LOG_FM(clause) << "\n";
 		if (!is_tau_formula_sat<node>(clause, start_time))
 			continue;
+
+		// An update already implied by the running spec is a no-op;
+		// conjoining it anyway re-embeds it verbatim and feeds the
+		// per-update growth (review I3).
+		if (is_tau_impl<node>(spec, clause)) {
+			LOG_DEBUG << "pwr/update already implied by the "
+				"specification; keeping it unchanged\n";
+			return spec;
+		}
 
 		// TODO: call type inference algorithm in order to unify
 		// types between current spec and update

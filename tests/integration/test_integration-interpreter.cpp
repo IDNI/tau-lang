@@ -192,6 +192,35 @@ TEST_SUITE("Execution") {
 		CHECK( u_values == u_expected );
 	}
 
+	// An update already implied by the running spec must leave the spec
+	// unchanged (review I3/B10) and keep behaving identically afterwards.
+	TEST_CASE("u[t] = i1[t]: implied_update") {
+		bdd_init<Bool>();
+		auto spec = create_spec("u[t] = i1[t] && o1[t] = 0.");
+		strings i1_values = {
+			"F", "o1[t] = 0", "F", "F"
+		};
+		strings u_expected = {
+			"F", "always o1[t]:tau = 0", "F", "F"
+		};
+		strings o1_expected = {
+			"F", "F", "F", "F",
+		};
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto o1 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_output("o1", tau_type_id<node_t>(), o1);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		auto o1_values = o1->get_values();
+		CHECK( o1_values == o1_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected );
+	}
+
 	// A conflicting update against a lookback-carrying spec drives the
 	// ¬∃-fallback with a shifted output instance in scope; only the
 	// current-time o1[t] may be quantified there, never o1[t-1] or the u
