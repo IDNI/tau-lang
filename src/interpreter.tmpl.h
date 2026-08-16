@@ -890,20 +890,23 @@ void interpreter<node>::update(tref update) {
 		// Merge current output_partition into uf
 		uf.merge(output_partition);
 		// Merge now overlapping spec parts
+		// B4: the continuation of a conjunction is not the conjunction
+		// of continuations (sometimes-parts interact in
+		// transform_to_execution), so merged parts are marked here and
+		// their continuation recomputed below via get_executable_spec.
+		std::vector<bool> part_merged(current_spec.size(), false);
 		for (size_t i = 0; i < current_spec.size(); ++i) {
 			// If no output/uninterpreted constant present, skip
 			if (!current_spec[i].second) continue;
-			// std::cout << "spec part i: " << tau::get(current_spec[i].first) << "\n";
 			for (size_t j = i+1; j < current_spec.size(); ++j) {
 				// If no output/uninterpreted constant present, skip
 				if (!current_spec[j].second) continue;
-				// std::cout << "spec part j: " << tau::get(current_spec[j].first) << "\n";
 				if (uf.connected(current_spec[i].second->get(), current_spec[j].second->get())) {
-					// std::cout << "Merged.\n";
 					current_spec[i].first = tree<node>::geth(tau::build_wff_and(current_spec[i].first->get(), current_spec[j].first->get()));
-					current_ubd_ctn[i] = tree<node>::geth(tau::build_wff_and(current_ubd_ctn[i]->get(), current_ubd_ctn[j]->get()));
+					part_merged[i] = true;
 					current_spec.erase(current_spec.begin()+j);
 					current_ubd_ctn.erase(current_ubd_ctn.begin()+j);
+					part_merged.erase(part_merged.begin()+j);
 					--j;
 				}
 			}
@@ -942,35 +945,35 @@ void interpreter<node>::update(tref update) {
 		// Now do pointwise revision on each part of current spec with collected_updates
 		bool update_valid = true;
 		for (size_t i = 0; i < current_spec.size(); ++i) {
-			// If there is no update for the current partition,
-			// then the unbound continuation also does not need to
-			// be updated
-			if (tau::get(collected_updates[i]).equals_T()) {
-				continue;
+			// A part with no update keeps its spec; its continuation
+			// only needs recomputing when the part was merged (B4).
+			bool need_recompute = part_merged[i];
+			if (!tau::get(collected_updates[i]).equals_T()) {
+				tref revision = pointwise_revision(current_spec[i].first->get(), collected_updates[i], time_point);
+				// nullptr when the definitions in the clause do not
+				// settle; without a revised clause the update cannot
+				// be accepted.
+				if (!revision) { update_valid = false; break; }
+				LOG_DEBUG << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first->get()) << "\n";
+				if (tau::get(revision).equals_F()) {
+					update_valid = false;
+					break;
+				} else if (!(tau::subtree_equals(current_spec[i].first->get(), revision)
+					// The syntactic check misses a semantically
+					// unchanged revision (differently-shaped but
+					// equivalent formula); storing it anyway
+					// recomputes the continuation and churns the
+					// stored spec (review B10).
+					|| are_tau_equivalent<node>(
+						current_spec[i].first->get(),
+						revision)))
+				{
+					current_spec[i].first =
+						tree<node>::geth(revision);
+					need_recompute = true;
+				}
 			}
-			tref revision = pointwise_revision(current_spec[i].first->get(), collected_updates[i], time_point);
-			// nullptr when the definitions in the clause do not
-			// settle; without a revised clause the update cannot
-			// be accepted.
-			if (!revision) { update_valid = false; break; }
-			LOG_DEBUG << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first->get()) << "\n";
-			// std::cout << "update/pointwise revision on part: " << LOG_FM(current_spec[i].first->get()) << "\n";
-			if (tau::get(revision).equals_F()) {
-				update_valid = false;
-				break;
-			} else if (tau::subtree_equals(current_spec[i].first->get(), revision)
-				// The syntactic check misses a semantically
-				// unchanged revision (differently-shaped but
-				// equivalent formula); storing it anyway
-				// recomputes the continuation and churns the
-				// stored spec (review B10).
-				|| are_tau_equivalent<node>(
-					current_spec[i].first->get(), revision))
-			{
-				// Unbound continuation does not need to be updated
-				continue;
-			}
-			current_spec[i].first = tree<node>::geth(revision);
+			if (!need_recompute) continue;
 			tref clause_t = current_spec[i].first->get();
 			tref new_ubd_ctn_part = get_executable_spec(clause_t, time_point);
 			// get_executable_spec may rewrite its tref& clause arg.

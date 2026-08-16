@@ -192,6 +192,38 @@ TEST_SUITE("Execution") {
 		CHECK( u_values == u_expected );
 	}
 
+	// An update bridging two previously independent spec parts merges them;
+	// the merged part's continuation must be recomputed, not conjoined from
+	// the parts' continuations (review B4).
+	TEST_CASE("u[t] = i1[t]: merge_parts") {
+		bdd_init<Bool>();
+		auto spec = create_spec(
+			"u[t] = i1[t] && o2[t] = 0 && o3[t] = 0.");
+		strings i1_values = {
+			"F", "o2[t] = 0 && o3[t] = 0", "F", "F"
+		};
+		strings u_expected = {
+			"F", "always o2[t]:tau = 0 && o3[t]:tau = 0", "F", "F"
+		};
+		strings o2_expected = { "F", "F", "F", "F" };
+		strings o3_expected = { "F", "F", "F", "F" };
+		io_context<node_t> ctx;
+		auto i1 = std::make_shared<vector_input_stream>(i1_values);
+		auto o2 = std::make_shared<vector_output_stream>();
+		auto o3 = std::make_shared<vector_output_stream>();
+		auto u  = std::make_shared<vector_output_stream>();
+		ctx.add_input( "i1", tau_type_id<node_t>(), i1);
+		ctx.add_output("o2", tau_type_id<node_t>(), o2);
+		ctx.add_output("o3", tau_type_id<node_t>(), o3);
+		ctx.add_output("u",  tau_type_id<node_t>(), u);
+		auto maybe_i = run<node_t>(spec, ctx, 4);
+		CHECK( maybe_i.has_value() );
+		CHECK( o2->get_values() == o2_expected );
+		CHECK( o3->get_values() == o3_expected );
+		auto u_values = u->get_values();
+		CHECK( u_values == u_expected );
+	}
+
 	// An update already implied by the running spec must leave the spec
 	// unchanged (review I3/B10) and keep behaving identically afterwards.
 	TEST_CASE("u[t] = i1[t]: implied_update") {
