@@ -40,6 +40,16 @@ struct interpreter {
 	friend struct api<node>;
 
 	/**
+	 * @brief Runtime size guard for updated specifications (I7).
+	 *
+	 * When nonzero, update() logs a WARNING whenever the stored
+	 * specification exceeds this many printed characters. 0 disables the
+	 * check. Set from the `--spec-size-warn` CLI option; a runtime
+	 * parameter by policy, never a header constant.
+	 */
+	static inline size_t spec_size_warn_threshold = 0;
+
+	/**
 	 * @brief Construct with the given components (prefer `make_interpreter`).
 	 * @param ubt_ctn Unbounded continuation formulas.
 	 * @param original_spec Specification partition (formula, representative pairs).

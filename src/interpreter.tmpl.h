@@ -1046,7 +1046,17 @@ void interpreter<node>::update(tref update) {
 			current_spec | std::views::keys
 			| std::views::transform(
 				[](const htref& h) { return h->get(); })));
-		LOG_INFO << "Updated specification: " << TAU_TO_STR(updated_spec) << "\n\n";
+		// I7: growth telemetry -- the only prior symptom of the
+		// revision doubling was the interpreter getting slower.
+		const std::string spec_str = TAU_TO_STR(updated_spec);
+		LOG_INFO << "Updated specification (" << spec_str.size()
+			<< " chars): " << spec_str << "\n\n";
+		if (spec_size_warn_threshold
+			&& spec_str.size() > spec_size_warn_threshold)
+			LOG_WARNING << "Updated specification size "
+				<< spec_str.size() << " chars exceeds the "
+				"spec-size-warn threshold "
+				<< spec_size_warn_threshold << "\n";
 
 		// Set new specification for interpreter
 		ubt_ctn = std::move(current_ubd_ctn);
@@ -1370,6 +1380,46 @@ tref unpack_tau_constant(tref constant) {
 	return main;
 }
 
+// B5 diagnostic: a rule arriving on a tau-typed input stream while the
+// update stream u solves to 0 vanishes silently -- the update trigger never
+// fires (solution_with_max_update cannot always maximize u, e.g. during the
+// initial segment; old review §2.9). Warn so the drop is visible instead of
+// the caller believing the rule was applied.
+template <NodeType node>
+void warn_if_update_dropped(interpreter<node>& i,
+	const assignment<node>& output)
+{
+	using tau = tree<node>;
+	tref update_stream = build_out_var_at_n<node>("u", i.time_point - 1,
+		get_ba_type_id<node>(tau_type<node>()));
+	if (size_t t = i.ctx.type_of(update_stream);
+		t == 0 || t != get_ba_type_id<node>(tau_type<node>()))
+		return;
+	if (auto it = output.find(update_stream); it != output.end()
+		&& !tau::get(it->second).equals_0())
+		return; // the update fired; nothing was dropped
+	for (const auto& [var, val] : i.memory) {
+		if (!tau::get(var).is(tau::bf)) continue;
+		tref v = tau::trim(var);
+		const tau& tv = tau::get(v);
+		if (!tv.is(tau::variable) || !tv.child_is(tau::io_var)
+			|| !tv[0].is_input_variable()) continue;
+		if (!is_io_initial<node>(v) || get_io_time_point<node>(v)
+			!= (int_t)i.time_point - 1) continue;
+		if (i.ctx.type_of(var)
+			!= get_ba_type_id<node>(tau_type<node>())) continue;
+		tref rule = unpack_tau_constant<node>(val);
+		if (!rule || tau::get(rule).equals_F()) continue;
+		// A rule constrains streams; a plain value does not.
+		if (!tau::get(rule).find_top(is_child<node, tau::io_var>))
+			continue;
+		LOG_WARNING << "An update rule was provided on input stream "
+			<< get_var_name<node>(v) << " but the update stream u "
+			"solved to 0; the rule was not applied\n";
+		return;
+	}
+}
+
 // returns true if there is a free variable in formula fm
 // prints error messages by default
 template <NodeType node>
@@ -1473,6 +1523,7 @@ std::optional<interpreter<node>> run(tref form, const io_context<node>& ctx,
 				}
 			}
 		}
+		warn_if_update_dropped(intrprtr, output.value());
 		if (steps != 0 && intrprtr.time_point == steps) break;
 	}
 	DBG(LOG_TRACE << "run end\n";)

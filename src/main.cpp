@@ -65,6 +65,9 @@ cli::options tau_options() {
 		.set_description("debug mode");)
 	opts["experimental"] = cli::option("experimental", 'x', false)
 		.set_description("enables transitioning features");
+	opts["spec-size-warn"] = cli::option("spec-size-warn", 'w', "0")
+		.set_description("warn when an updated specification exceeds "
+			"this many characters (0 = off)");
 	return opts;
 }
 
@@ -177,6 +180,8 @@ int main(int argc, char** argv) {
 	bool charvar = opts["charvar"].get<bool>();
 	bool blasting = opts["blasting"].get<bool>();
 	bool exp = opts["experimental"].get<bool>();
+	interpreter<node_t>::spec_size_warn_threshold = (size_t)std::atoll(
+		opts["spec-size-warn"].get<string>().c_str());
 
 	if (files.size()) {
 		DBG(TAU_LOG_TRACE << "running specification file: "
