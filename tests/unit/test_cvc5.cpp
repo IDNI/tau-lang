@@ -3,10 +3,9 @@
 #include <cvc5/cvc5.h>
 
 #include "test_init.h"
+#include "boolean_algebras/bv_ba.h"
 
 using namespace cvc5;
-
-static TermManager cvc5_term_manager;
 
 TEST_SUITE("cvc5 solver") {
 
@@ -357,5 +356,95 @@ TEST_SUITE("bitwise operations with cvc5") {
 		cvc5_solver.assertFormula(neq_term);
 		auto result = cvc5_solver.checkSat();
 		CHECK(result.isUnsat());
+	}
+}
+
+TEST_SUITE("config_cvc5_solver option sets") {
+
+	// Configure a fresh solver under `set` and return the value of one
+	// cvc5 option. Restores the global before returning.
+	static std::string opt_under(cvc5_option_set set, const char* name,
+		bool decision_only = false)
+	{
+		const cvc5_option_set saved = cvc5_options;
+		cvc5_options = set;
+		cvc5::Solver s(cvc5_term_manager);
+		config_cvc5_solver(s, decision_only);
+		std::string v = s.getOption(name);
+		cvc5_options = saved;
+		return v;
+	}
+
+	TEST_CASE("baseline keeps models and proofs off") {
+		CHECK( opt_under(cvc5_option_set::baseline, "produce-models")
+			== "true" );
+		CHECK( opt_under(cvc5_option_set::baseline, "produce-proofs")
+			== "false" );
+	}
+	TEST_CASE("miniscope_agg") {
+		CHECK( opt_under(cvc5_option_set::miniscope_agg,
+			"miniscope-quant") == "agg" );
+	}
+	TEST_CASE("ext_rewrite_quant") {
+		CHECK( opt_under(cvc5_option_set::ext_rewrite_quant,
+			"ext-rewrite-quant") == "true" );
+	}
+	TEST_CASE("pre_skolem_agg") {
+		CHECK( opt_under(cvc5_option_set::pre_skolem_agg,
+			"pre-skolem-quant") == "agg" );
+	}
+	TEST_CASE("sygus_inst turns incremental off") {
+		CHECK( opt_under(cvc5_option_set::sygus_inst, "sygus-inst")
+			== "true" );
+		CHECK( opt_under(cvc5_option_set::sygus_inst, "incremental")
+			== "false" );
+	}
+	TEST_CASE("mbqi") {
+		CHECK( opt_under(cvc5_option_set::mbqi, "mbqi") == "true" );
+	}
+	TEST_CASE("enum_inst") {
+		CHECK( opt_under(cvc5_option_set::enum_inst, "enum-inst")
+			== "true" );
+	}
+	TEST_CASE("cegqi_bv_ineq_keep") {
+		CHECK( opt_under(cvc5_option_set::cegqi_bv_ineq_keep,
+			"cegqi-bv-ineq") == "keep" );
+	}
+	TEST_CASE("non_incremental") {
+		CHECK( opt_under(cvc5_option_set::non_incremental,
+			"incremental") == "false" );
+	}
+	TEST_CASE("ext_rewrite_no_models (the shipped default)") {
+		CHECK( opt_under(cvc5_option_set::ext_rewrite_no_models,
+			"ext-rewrite-quant") == "true" );
+		CHECK( opt_under(cvc5_option_set::ext_rewrite_no_models,
+			"incremental") == "false" );
+		// decision_only=false: models stay ON even in a no-models set.
+		CHECK( opt_under(cvc5_option_set::ext_rewrite_no_models,
+			"produce-models") == "true" );
+	}
+	TEST_CASE("combined_best") {
+		CHECK( opt_under(cvc5_option_set::combined_best,
+			"ext-rewrite-quant") == "true" );
+		CHECK( opt_under(cvc5_option_set::combined_best,
+			"cegqi-bv-ineq") == "keep" );
+	}
+
+	TEST_CASE("decision_only drops models exactly in the no-models sets") {
+		CHECK( opt_under(cvc5_option_set::decision_no_models,
+			"produce-models", true) == "false" );
+		CHECK( opt_under(cvc5_option_set::ext_rewrite_no_models,
+			"produce-models", true) == "false" );
+		CHECK( opt_under(cvc5_option_set::combined_best,
+			"produce-models", true) == "false" );
+		// And ONLY in those: any other set keeps models even when the
+		// caller flags decision-only.
+		CHECK( opt_under(cvc5_option_set::baseline,
+			"produce-models", true) == "true" );
+		CHECK( opt_under(cvc5_option_set::miniscope_agg,
+			"produce-models", true) == "true" );
+		// The no-models demotion also forces non-incremental.
+		CHECK( opt_under(cvc5_option_set::decision_no_models,
+			"incremental", true) == "false" );
 	}
 }
