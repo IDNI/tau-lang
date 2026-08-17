@@ -36,9 +36,13 @@ size_t& blast_reentry_depth() {
 	return depth;
 }
 
-/// Maximum nesting of `blast_block`'s blast-then-re-enter hop. Real formulas
-/// use one level: blast once, then the re-entry finds nothing left to blast.
-inline constexpr size_t max_blast_reentry_depth = 8;
+/// Maximum nesting of `blast_block`'s blast-then-re-enter hop; 0 = unlimited
+/// (the default). Real formulas use one level: blast once, then the re-entry
+/// finds nothing left to blast — bound it (`--max-blast-reentry-depth`, REPL
+/// `blastdepth`, `api::set_max_blast_reentry_depth`) if a blasting regression
+/// ever loops. Runtime-tunable per the runtime-parameter policy; like the
+/// other knobs here it is NOT thread-safe.
+inline size_t max_blast_reentry_depth = 0;
 
 /** @internal @brief RAII increment of `blast_reentry_depth`. @endinternal */
 template <NodeType node>
@@ -175,8 +179,9 @@ tref anti_prenex_block(tref formula, const trefs& block,
 				// blast_reentry_depth. Returning `blasted` rather
 				// than ex_fm keeps the blasting work done so far --
 				// its quantifiers simply survive, which is sound.
-				if (blast_reentry_depth<node>()
-					>= max_blast_reentry_depth)
+				if (max_blast_reentry_depth
+					&& blast_reentry_depth<node>()
+						>= max_blast_reentry_depth)
 				{
 					LOG_ERROR << "blast_block: blast/re-enter"
 						" depth " << max_blast_reentry_depth
@@ -1332,8 +1337,11 @@ tref process_quantifier_block(const quantifier_block<node>& blk,
 					if (blast_method
 						== blast_mode::anti_prenex_result)
 					{
-						if (blast_reentry_depth<node>()
-							< max_blast_reentry_depth)
+						const bool may_reenter =
+							!max_blast_reentry_depth
+							|| blast_reentry_depth<node>()
+								< max_blast_reentry_depth;
+						if (may_reenter)
 						{
 							blast_reentry_guard<node> guard;
 							result = anti_prenex<node>(bl,

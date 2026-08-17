@@ -738,7 +738,11 @@ TEST_SUITE("BlockSqueeze") {
 	TEST_CASE("2b: declines when the cross product exceeds the cap") {
 		// Four conjuncts of three disjuncts each: 3^4 = 81 > 64, so the
 		// multiplicative blow-up the cap exists to stop is refused and
-		// the general algorithm runs instead.
+		// the general algorithm runs instead. block_squeeze_cap defaults
+		// to 0 (unlimited) since it became a runtime parameter, so the
+		// cap under test is set explicitly for this case's duration.
+		const size_t saved_cap = block_squeeze_cap;
+		block_squeeze_cap = 64;
 		std::string sample = "ex x (";
 		const char* groups[] = {"abc", "def", "ghi", "jkl"};
 		for (size_t g = 0; g < 4; ++g) {
@@ -755,11 +759,15 @@ TEST_SUITE("BlockSqueeze") {
 		CHECK( !squeeze_positive_disjuncts<node_t>(
 			body_of(sample.c_str()),
 			ba_type_of(sample.c_str())).has_value() );
+		block_squeeze_cap = saved_cap;
 	}
 
 	TEST_CASE("2b: declines when a disjunction exceeds the cap") {
 		// 65 disjuncts: over the cap by addition rather than
-		// multiplication, which is a separate guard.
+		// multiplication, which is a separate guard. As above, the cap
+		// under test is set explicitly (the default is unlimited).
+		const size_t saved_cap = block_squeeze_cap;
+		block_squeeze_cap = 64;
 		std::string sample = "ex x (";
 		for (size_t i = 0; i < 65; ++i) {
 			if (i) sample += " || ";
@@ -771,6 +779,7 @@ TEST_SUITE("BlockSqueeze") {
 		CHECK( !squeeze_positive_disjuncts<node_t>(
 			body_of(sample.c_str()),
 			ba_type_of(sample.c_str())).has_value() );
+		block_squeeze_cap = saved_cap;
 	}
 
 	TEST_CASE("2b: just under the cap still squeezes") {
