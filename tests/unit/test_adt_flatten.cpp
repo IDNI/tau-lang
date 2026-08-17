@@ -444,25 +444,24 @@ TEST_SUITE("adt io defs") {
 			!= nullptr);
 		CHECK(!ctx.adt_streams.contains(dict("p"))); // stale layout retired
 	}
-	TEST_CASE("re-declaring a tuple root currently loses the file stream id (defect, pinned)") {
-		// NOTE the newlines between the two file() defs: `file_name` is
-		// `printable+` (parser/tau.tgf), so two quoted file names on ONE
-		// line of a spec-start parse let the capture span greedily from the
-		// first opening quote to the last closing one (pre-existing,
-		// non-ADT parser behavior -- the REPL never hits it because it
-		// splits commands at periods before parsing). Spec files put defs
-		// on separate lines, which is what this mirrors.
-		// FIXME (MEDIUM): this pins a DEFECT, found 2026-08-17 while writing
-		// this case. A plain stream re-declared in one spec is last-def-wins
-		// (process_io_def overwrites the root's entry during construction).
-		// A TUPLE root re-declared in one spec instead ends up on stream_id
-		// 0 (console): the FIRST def's adt_flatten_rewrite_io_def consumes
-		// the root's inputs entry (which construction had already set to the
-		// LAST def's file id) and erases it, so the SECOND def's rewrite
-		// finds no root entry and defaults to 0 -- silently rerouting a
-		// file-declared stream to the console. When fixed (last-def-wins,
-		// matching plain streams), flip the CHECKs below to
-		// `dict(it->second.stream_id) == "y.in"`.
+	TEST_CASE("re-declaring a tuple root is last-def-wins, like a plain stream") {
+		// NOTE the newlines between the two file() defs: two quoted file
+		// names on ONE line of a spec-start parse are a greedy-capture
+		// mis-parse (`file_name` is `printable+`, parser/tau.tgf), now
+		// rejected outright by adt_flatten's upfront scan -- see
+		// test_adt_parsing.cpp's "two file streams on one line" case.
+		//
+		// Regression test for a defect found 2026-08-17: a plain stream
+		// re-declared in one spec is last-def-wins (process_io_def
+		// overwrites the root's entry during construction), but a TUPLE
+		// root used to end up on stream_id 0 (console): the FIRST def's
+		// adt_flatten_rewrite_io_def consumed the root's inputs entry
+		// (already holding the LAST def's file id) and erased it, so the
+		// SECOND def's rewrite found no root entry and defaulted to 0 --
+		// silently rerouting a file-declared stream to the console. Fixed
+		// by falling back to the prior layout's own stream id when the
+		// root entry is already consumed (adt_flatten_rewrite_io_def,
+		// src/adt/adt_flatten.tmpl.h).
 		io_context<node_t> ctx;
 		REQUIRE(tau::get("type Point = {a: sbf}.\n"
 			"p:Point := in file(\"x.in\").\np:Point := in file(\"y.in\").\n"
@@ -470,7 +469,7 @@ TEST_SUITE("adt io defs") {
 			{ .infer_ba_types = false, .context = &ctx }) != nullptr);
 		auto it = ctx.adt_streams.find(dict("p"));
 		REQUIRE(it != ctx.adt_streams.end());
-		CHECK(it->second.stream_id == 0); // current (wrong) behavior: console
+		CHECK(dict(it->second.stream_id) == "y.in"); // last def wins
 	}
 	TEST_CASE("flattened members get their own inferred BA types") {
 		// Unlike the rest of this suite, inference is ON (default options):

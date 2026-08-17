@@ -843,6 +843,22 @@ std::optional<tref> adt_flatten_rewrite_io_def(tref n,
 	if (auto it = root_map.find(root_hvar); it != root_map.end()) {
 		stream_id = it->second;
 		root_map.erase(it);
+	} else if (auto prev = ctx->adt_streams.find(root_sid);
+		prev != ctx->adt_streams.end()
+			&& prev->second.is_input == is_input) {
+		// Re-declared tuple root within one parse: process_io_def
+		// registered the root once per def during construction,
+		// last-def-wins (each registration overwrites the same key), and
+		// the FIRST def's rewrite already consumed and erased that entry
+		// -- so a LATER def of the same root finds no root entry here.
+		// Reuse the id the prior rewrite claimed (the last def's, i.e.
+		// exactly the plain-stream last-def-wins outcome) instead of
+		// silently defaulting to 0/console. Same-direction only: an
+		// input layout's id says nothing about an output def's stream.
+		// (A later def with a DIFFERENT tuple type still leaves the
+		// earlier type's member entries in root_map; re-declaration with
+		// a changed type is not otherwise supported/defined.)
+		stream_id = prev->second.stream_id;
 	}
 	// C2: the root's own BA type entry -- if any (e.g. left behind by a
 	// PRIOR REPL line's own inference pass over this same root name, or by
