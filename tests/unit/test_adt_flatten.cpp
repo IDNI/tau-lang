@@ -110,6 +110,49 @@ TEST_SUITE("adt flatten") {
 		CHECK(flat("type Point = {a: sbf, b: sbf}. type Q = {c: sbf}. "
 			"f(x:Point) := x.a = 0. g(x:Q) := x.c = 0. y = 0.") != nullptr);
 	}
+	TEST_CASE("bf_fex expands the binder per flat member") {
+		check_flat(PT "(fex x:Point (x.a)) = 0.",
+			"(fex x.a:sbf, x.b:sbf (x.a)) = 0.");
+	}
+	TEST_CASE("bf_fall expands the binder per flat member") {
+		check_flat(PT "(fall x:Point (x.a)) = 0.",
+			"(fall x.a:sbf, x.b:sbf (x.a)) = 0.");
+	}
+	TEST_CASE("wff_all expands like wff_ex") {
+		check_flat(PT "all x:Point x = 0.",
+			"all x.a:sbf, x.b:sbf (x.a = 0 && x.b = 0).");
+	}
+	TEST_CASE("tuple equality broadcasts against constant 1") {
+		check_flat(PT "ex x:Point x = 1.",
+			"ex x.a:sbf, x.b:sbf (x.a = 1 && x.b = 1).");
+	}
+	TEST_CASE("constant on the left broadcasts too") {
+		// Parse hooks may canonicalize a constant-left equality before the
+		// flattener sees it; both src and expected go through the same
+		// hooks, so this pins the semantic outcome regardless of which of
+		// adt_flatten_rewrite_equality's two broadcast branches actually
+		// fires for the surface form.
+		check_flat(PT "ex x:Point 0 = x.",
+			"ex x.a:sbf, x.b:sbf (0 = x.a && 0 = x.b).");
+	}
+	TEST_CASE("two-sided tuple inequality expands to a disjunction") {
+		check_flat(PT "ex x:Point ex y:Point x != y.",
+			"ex x.a:sbf, x.b:sbf ex y.a:sbf, y.b:sbf "
+			"(x.a != y.a || x.b != y.b).");
+	}
+	TEST_CASE("tuple against a plain non-constant term fails") {
+		CHECK(flat(PT "ex x:Point x = z.") == nullptr);
+	}
+	TEST_CASE("member access through an alias type fails") {
+		CHECK(flat("type byte = bv[8]. ex x:byte x.a = 0.") == nullptr);
+	}
+	TEST_CASE("member path past a leaf fails") {
+		CHECK(flat(PT "ex x:Point x.a.b = 0.") == nullptr);
+	}
+	TEST_CASE("free tuple variable equality keeps annotations on every occurrence") {
+		check_flat(PT "x:Point = x && x.a = 1.",
+			"x.a:sbf = x.a:sbf && x.b:sbf = x.b:sbf && x.a:sbf = 1.");
+	}
 	TEST_CASE("type defs erased under spec_multiline") {
 		// spec_multiline (used e.g. for REPL scripting) inlines spec_part
 		// directly, so type_def sits as a direct child alongside
