@@ -653,7 +653,7 @@ void interpreter<node>::collect_live_refs(std::unordered_set<tref>& keep) const 
 
 template <NodeType node>
 void interpreter<node>::maybe_gc() {
-	if constexpr (gc_growth_factor <= 0.0) return;
+	if (gc_growth_factor <= 0.0) return;
 	const size_t m_pre = tau::m_size();
 	// Floor: don't sweep until M is non-trivially large. Bounds peak size
 	// for any workload (a sweep fires no later than M = gc_min_size + growth).

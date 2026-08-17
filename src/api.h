@@ -27,6 +27,7 @@
 #ifndef __IDNI__TAU__API_H__
 #define __IDNI__TAU__API_H__
 
+#include "heuristics/bv_simplify_options.h"
 #include "interpreter.h"
 #include "utility/measure.h"
 
@@ -163,7 +164,7 @@ struct api {
 	 * Bounds the Shannon splits ONE block elimination may charge, across its
 	 * whole recursion rather than along one path. Exhausting it costs
 	 * precision, not soundness: the elimination takes its graceful re-wrap
-	 * path and leaves the quantifier in place. Default 512.
+	 * path and leaves the quantifier in place. 0 = unlimited (the default).
 	 */
 	static void set_block_max_splits(size_t n);
 	/**
@@ -171,9 +172,82 @@ struct api {
 	 *
 	 * Bounds how many times the driver re-collects innermost blocks before
 	 * giving up and returning the formula unprocessed, with a log line.
-	 * Default 1000; convergence is normally reached in well under 20.
+	 * 0 = unlimited (the default); convergence is normally reached in well
+	 * under 20 rounds.
 	 */
 	static void set_block_max_rounds(size_t n);
+	/**
+	 * @brief Cap `blast_block`'s blast-then-re-enter nesting in
+	 * anti-prenexing; 0 = unlimited (default). Real formulas use one level.
+	 */
+	static void set_max_blast_reentry_depth(size_t n);
+	/**
+	 * @brief Operand-set size above which block squeezing declines and the
+	 * general Boole decomposition runs instead; 0 = unlimited (default:
+	 * always squeeze).
+	 */
+	static void set_block_squeeze_cap(size_t n);
+	/**
+	 * @brief Cap the temporal-normalization fixpoint searches
+	 * (`find_fixpoint_phi`/`find_fixpoint_chi`); 0 = unlimited (default).
+	 *
+	 * On overrun the search gives up with a log line and returns the
+	 * current (non-fixpoint) iterate.
+	 */
+	static void set_max_fixpoint_steps(size_t n);
+	/**
+	 * @brief Cap the eventual-flag search past the flag boundary in
+	 * `to_unbounded_continuation`; 0 = unlimited (default).
+	 *
+	 * A bounded give-up reports unsatisfiable — wrong but bounded and
+	 * loud (SO-1).
+	 */
+	static void set_max_flag_search_steps(size_t n);
+	/**
+	 * @brief Cap definition-expansion passes in
+	 * `expand_defs_until_settled`; 0 = unlimited (default). On overrun the
+	 * expansion reports failure (`nullptr`) with a log line.
+	 */
+	static void set_max_def_passes(size_t n);
+	/**
+	 * @brief Cap recurrence-relation enumeration steps in
+	 * `calculate_fixed_point`; 0 = unlimited (default). A bounded give-up
+	 * is a bound on the search, not a proof that no fixed point exists.
+	 */
+	static void set_max_enum_steps(size_t n);
+	/**
+	 * @brief Cap `repeat_all`'s rewrite-to-fixpoint rounds; 0 = unlimited
+	 * (default). Oscillation is detected regardless; this bounds only
+	 * ever-growing rewrites.
+	 */
+	static void set_max_rewrite_rounds(size_t n);
+	/**
+	 * @brief Cap `bv_ba_custom_simplification` rewrite rounds; 0 =
+	 * unlimited (default). Oscillation is detected regardless.
+	 */
+	static void set_max_simplify_rounds(size_t n);
+	/**
+	 * @brief Tree-node count floor before the interpreter's gc may
+	 * trigger. Default 256 (kept — a tuned value, not a cap).
+	 */
+	static void set_gc_min_size(size_t n);
+	/**
+	 * @brief Growth factor of the interpreter's adaptive gc trigger; a
+	 * sweep fires when the node count grew by this factor since the last
+	 * sweep. Default 1.5 (kept); <= 0 disables gc.
+	 */
+	static void set_gc_growth_factor(double f);
+	/**
+	 * @brief Warn when an updated specification exceeds this many printed
+	 * characters (the I7 size guard); 0 = off (default).
+	 */
+	static void set_spec_size_warn(size_t n);
+	/**
+	 * @brief Cap the revision alternatives kept per specification part,
+	 * dropping middle preference tiers with a warning; 0 = unlimited
+	 * (default).
+	 */
+	static void set_max_revision_alts(size_t n);
 	/** @brief Enable/disable indenting in pretty-printed output. */
 	static void set_indenting(bool state);
 	/** @brief Enable/disable ANSI colour highlighting in output. */

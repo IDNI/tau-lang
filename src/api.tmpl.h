@@ -77,14 +77,77 @@ void api<node>::set_cvc5_options(int set) {
 			: cvc5_option_set::ext_rewrite_no_models;
 }
 
+// The two block budgets keep SIZE_MAX as their internal "unlimited" sentinel
+// (their loops decrement them); the option surface says 0 = unlimited, so the
+// setters translate.
 template <NodeType node>
 void api<node>::set_block_max_splits(size_t n) {
-	block_boole_max_splits = n;
+	block_boole_max_splits = n ? n : std::numeric_limits<size_t>::max();
 }
 
 template <NodeType node>
 void api<node>::set_block_max_rounds(size_t n) {
-	block_max_rounds = n;
+	block_max_rounds = n ? n : std::numeric_limits<size_t>::max();
+}
+
+template <NodeType node>
+void api<node>::set_max_blast_reentry_depth(size_t n) {
+	max_blast_reentry_depth = n;
+}
+
+template <NodeType node>
+void api<node>::set_block_squeeze_cap(size_t n) {
+	block_squeeze_cap = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_fixpoint_steps(size_t n) {
+	max_fixpoint_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_flag_search_steps(size_t n) {
+	max_flag_search_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_def_passes(size_t n) {
+	max_def_passes = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_enum_steps(size_t n) {
+	max_enum_steps = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_rewrite_rounds(size_t n) {
+	max_rewrite_rounds = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_simplify_rounds(size_t n) {
+	max_simplify_rounds = n;
+}
+
+template <NodeType node>
+void api<node>::set_gc_min_size(size_t n) {
+	interpreter<node>::gc_min_size = n;
+}
+
+template <NodeType node>
+void api<node>::set_gc_growth_factor(double f) {
+	interpreter<node>::gc_growth_factor = f;
+}
+
+template <NodeType node>
+void api<node>::set_spec_size_warn(size_t n) {
+	interpreter<node>::spec_size_warn_threshold = n;
+}
+
+template <NodeType node>
+void api<node>::set_max_revision_alts(size_t n) {
+	interpreter<node>::max_revision_alts = n;
 }
 
 template <NodeType node>

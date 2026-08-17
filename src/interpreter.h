@@ -160,8 +160,11 @@ private:
 	/// gc_growth_factor since the last sweep. Set gc_growth_factor <= 0 to
 	/// disable. Self-tunes across workloads — fast-growing M triggers
 	/// frequent sweeps at small peak; slow-growing M sweeps rarely.
-	static constexpr size_t gc_min_size      = 256;
-	static constexpr double gc_growth_factor = 1.5;
+	/// Runtime parameters (defaults kept at the tuned 256 / 1.5): set via
+	/// `--gc-min-size`/`--gc-growth-factor`, REPL `gcminsize`/`gcgrowth`,
+	/// or `api::set_gc_min_size`/`api::set_gc_growth_factor`.
+	static inline size_t gc_min_size      = 256;
+	static inline double gc_growth_factor = 1.5;
 	size_t m_at_last_gc = 0;
 	/// @brief Run bintree<node>::gc(keep) if the trigger condition is met.
 	void maybe_gc();
