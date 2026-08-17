@@ -136,3 +136,47 @@ add_test(NAME "test_repl-cli-help_lists_limit_options"
 	COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --help")
 set_tests_properties("test_repl-cli-help_lists_limit_options" PROPERTIES
 	PASS_REGULAR_EXPRESSION "max-fixpoint-steps")
+
+# --- every limit flag, long AND short form (2026-08-17 coverage plan) --------
+# Each row: testname|longflag|shortflag|value|get-option|expected-value.
+# The round trip proves flag -> optnum() -> api setter -> library global -> get.
+# Values are distinct from the defaults so a silently-ignored flag fails.
+set(TAU_CLI_LIMIT_ROWS
+	"spec_size_warn|spec-size-warn|w|4096|specsizewarn|4096"
+	"max_revision_alts|max-revision-alts|a|4|revisionalts|4"
+	"block_max_splits|block-max-splits|p|512|maxsplits|512"
+	"block_max_rounds|block-max-rounds|r|33|maxrounds|33"
+	"max_fixpoint_steps|max-fixpoint-steps|f|9|fixpointsteps|9"
+	"max_flag_search_steps|max-flag-search-steps|F|12|flagsteps|12"
+	"max_blast_reentry_depth|max-blast-reentry-depth|D|8|blastdepth|8"
+	"block_squeeze_cap|block-squeeze-cap|z|64|squeezecap|64"
+	"max_simplify_rounds|max-simplify-rounds|m|1000|simplifyrounds|1000"
+	"max_def_passes|max-def-passes|P|40|defpasses|40"
+	"max_enum_steps|max-enum-steps|E|33|enumsteps|33"
+	"max_rewrite_rounds|max-rewrite-rounds|R|21|rewriterounds|21"
+	"gc_min_size|gc-min-size|G|512|gcminsize|512"
+	"gc_growth_factor|gc-growth-factor|W|2.5|gcgrowth|2.5"
+)
+foreach(row IN LISTS TAU_CLI_LIMIT_ROWS)
+	string(REPLACE "|" ";" f "${row}")
+	list(GET f 0 nm)
+	list(GET f 1 lflag)
+	list(GET f 2 sflag)
+	list(GET f 3 val)
+	list(GET f 4 opt)
+	list(GET f 5 expect)
+	add_test(NAME "test_repl-cli-limit_long-${nm}"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --${lflag} ${val} -e \"get ${opt}\"")
+	set_tests_properties("test_repl-cli-limit_long-${nm}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "${opt}: *${expect}"
+		FAIL_REGULAR_EXPRESSION "Error")
+	add_test(NAME "test_repl-cli-limit_short-${nm}"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> -${sflag} ${val} -e \"get ${opt}\"")
+	set_tests_properties("test_repl-cli-limit_short-${nm}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "${opt}: *${expect}"
+		FAIL_REGULAR_EXPRESSION "Error")
+	add_test(NAME "test_repl-cli-help_lists-${nm}"
+		COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> --help")
+	set_tests_properties("test_repl-cli-help_lists-${nm}" PROPERTIES
+		PASS_REGULAR_EXPRESSION "${lflag}")
+endforeach()
