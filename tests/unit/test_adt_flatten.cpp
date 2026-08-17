@@ -153,6 +153,18 @@ TEST_SUITE("adt flatten") {
 		check_flat(PT "x:Point = x && x.a = 1.",
 			"x.a:sbf = x.a:sbf && x.b:sbf = x.b:sbf && x.a:sbf = 1.");
 	}
+	TEST_CASE("same member path, different base types fails") {
+		// Reaches the "differ in member type" half of the C1 structural
+		// check -- the cross-name/cross-depth cases above only ever hit
+		// the path-mismatch half.
+		CHECK(flat("type A = {m: sbf}. type B = {m: bv[8]}. "
+			"ex x:A ex y:B x = y.") == nullptr);
+	}
+	TEST_CASE("same base BA, different subtypes fails too") {
+		// is_same_ba_type must distinguish bv[8] from bv[16].
+		CHECK(flat("type A = {m: bv[8]}. type B = {m: bv[16]}. "
+			"ex x:A ex y:B x = y.") == nullptr);
+	}
 	TEST_CASE("type defs erased under spec_multiline") {
 		// spec_multiline (used e.g. for REPL scripting) inlines spec_part
 		// directly, so type_def sits as a direct child alongside
@@ -369,6 +381,30 @@ TEST_SUITE("adt io defs") {
 	// -- all within this SAME parse -- so a later reference to the bare
 	// root name (e.g. a separate REPL line's `i[t]`) would pick up a
 	// phantom "Point" type.
+	TEST_CASE("flattened members get their own inferred BA types") {
+		// Unlike the rest of this suite, inference is ON (default options):
+		// the point is the SEAM -- the flattener's per-member annotations
+		// and registrations must come out of infer_ba_types/update_types as
+		// one correct ctx.types entry per member, each with its own type id.
+		io_context<node_t> ctx;
+		tref t = tau::get("type Rec = {tag: bv[8], a: sbf}. "
+			"r:Rec := in console. always r[t] = 0.", { .context = &ctx });
+		REQUIRE(t != nullptr);
+		tref tag_v = build_canonized_io_var<node_t>("r.tag");
+		tref a_v   = build_canonized_io_var<node_t>("r.a");
+		CHECK(ctx.type_of(tag_v) == bv_type_id<node_t>(8));
+		CHECK(ctx.type_of(a_v) == sbf_type_id<node_t>());
+	}
+	TEST_CASE("member used against the wrong BA type fails inference") {
+		// The flattener itself is fine with this spec (a is a full leaf);
+		// it is ordinary BA type inference, running AFTER flattening, that
+		// must reject the sbf-annotated member equated to a bv constant
+		// ("Incompatible type information in p.a", verified live).
+		io_context<node_t> ctx;
+		CHECK(tau::get("type Point = {a: sbf, b: sbf}. "
+			"p:Point := in console. always (p[t].a = { #b10101010 }:bv[8]).",
+			{ .context = &ctx }) == nullptr);
+	}
 	TEST_CASE("tuple io def root stays untyped through the REPL's cli grammar too") {
 		io_context<node_t> ctx;
 		// Mirrors repl_evaluator<BAs...>::make_cli's own options
@@ -409,5 +445,16 @@ TEST_SUITE("adt flatten hook") {
 	}
 	TEST_CASE("adt error fails the whole get") {
 		CHECK(tau::get("type Point = {a: sbf, b: sbf}. ex x:Point x.c = 0.") == nullptr);
+	}
+	TEST_CASE("alias-typed binder survives inference") {
+		// Full pipeline (flatten AND inference, default options): the
+		// alias rewrite must come out of infer_ba_types identical to the
+		// hand-written base annotation -- the alias flatten test above
+		// only compares trees with inference OFF.
+		tref t = tau::get("type byte = bv[8]. ex x:byte x = 0.");
+		REQUIRE(t != nullptr);
+		tref e = tau::get("ex x:bv[8] x = 0.");
+		REQUIRE(e != nullptr);
+		CHECK(tau::get(t).to_str() == tau::get(e).to_str());
 	}
 }

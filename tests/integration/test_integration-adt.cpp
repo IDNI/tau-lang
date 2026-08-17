@@ -125,6 +125,39 @@ TEST_SUITE("adt integration") {
 		CHECK( tau::get(itb->second).equals_0() );
 	}
 
+	TEST_CASE("interpreter: mixed-BA tuple round trip") {
+		// Every other automated ADT case is all-sbf; this is the automated
+		// stand-in for the demo's Segment (bv[8] tag + sbf member): two
+		// DIFFERENT algebras riding one physical stream, distributed to
+		// differently-typed member vars and collected back. Note the
+		// emitted bv leaves use bv's canonical DECIMAL print ("1", "254"),
+		// not the input's #b spelling (verified live against
+		// ./build-Debug/tau -X before pinning).
+		bdd_init<Bool>();
+		io_context<node_t> ctx;
+		tref parsed = tau::get(
+			"type Rec = {tag: bv[8], a: sbf}. "
+			"i:Rec := in console. o:Rec := out console. "
+			"o[t] = i[t].",
+			{ .context = &ctx });
+		REQUIRE( parsed != nullptr );
+		tref spec = get_nso_rr<node_t>(ctx, parsed).value().main->get();
+		strings i_values = {
+			"{ tag: \"#b00000001\", a: \"1\" }",
+			"{ tag: \"#b11111110\", a: \"0\" }"
+		};
+		ctx.add_input("i", tau_type_id<node_t>(),
+			std::make_shared<vector_input_stream>(i_values));
+		auto o = std::make_shared<vector_output_stream>();
+		ctx.add_output("o", tau_type_id<node_t>(), o);
+		auto maybe_i = run<node_t>(spec, ctx, 2);
+		CHECK( maybe_i.has_value() );
+		auto o_values = o->get_values();
+		REQUIRE( o_values.size() == 2 );
+		CHECK( o_values[0] == "{ tag: \"1\", a: \"1\" }" );
+		CHECK( o_values[1] == "{ tag: \"254\", a: \"0\" }" );
+	}
+
 	TEST_CASE("interpreter: tuple io round trip") {
 		// Task 8's own unit test spec ("tuple input distributes and tuple
 		// output collects", tests/unit/test_interpreter.cpp's "adt
