@@ -9,6 +9,22 @@
 
 namespace idni::tau_lang {
 
+/// Cap on `expand_defs_until_settled` passes; 0 = unlimited (the default).
+/// A real definition set settles in a handful of passes — each pass unfolds
+/// every applicable definition at every position at once — and oscillation is
+/// caught by a visited set regardless, so only an ever-growing expansion is
+/// unbounded when unlimited. Runtime parameter by policy: set via
+/// `--max-def-passes`, REPL `defpasses`, or `api::set_max_def_passes`.
+inline size_t max_def_passes = 0;
+
+/// Cap on recurrence-relation enumeration steps; 0 = unlimited (the default).
+/// A recurrence whose normalized steps are all distinct (e.g. one that keeps
+/// growing) iterates forever when unlimited, and each iteration runs a full
+/// normalization plus up to `previous.size()` equivalence proofs; real
+/// recurrences settle in single-digit steps. Set via `--max-enum-steps`,
+/// REPL `enumsteps`, or `api::set_max_enum_steps`.
+inline size_t max_enum_steps = 0;
+
 /**
  * @internal
  * @brief Descriptor of a single reference offset.
@@ -843,13 +859,10 @@ tref apply_defs_to_spec (tref spec) {
 template <NodeType node>
 tref expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 	using tau = tree<node>;
-	// A real definition set settles in a handful of passes: each pass
-	// unfolds every applicable definition at every position at once. The
-	// cap only has to be out of reach of those.
-	// TODO (HIGH) this should be a parameter, not a hardcoded constant.
-	constexpr size_t max_passes = std::numeric_limits<size_t>::max();;
+	// Pass cap: the global max_def_passes, 0 = unlimited (see its doc).
 	std::unordered_set<tref> visited;
-	for (size_t pass = 0; pass != max_passes; ++pass) {
+	for (size_t pass = 0; !max_def_passes || pass != max_def_passes;
+		++pass) {
 		// Unresolved symbol is still present
 		if (!tau::get(fm).find_top(is<node, tau::ref>)) return fm;
 		fm = pre(fm);
@@ -868,9 +881,10 @@ tref expand_defs_until_settled(tref fm, auto&& pre, auto&& post) {
 			return nullptr;
 		}
 	}
-	LOG_ERROR << "Definition expansion did not settle after " << max_passes
-		<< " passes; the definitions in use are most likely "
-		"non-terminating for this argument";
+	LOG_ERROR << "Definition expansion did not settle after "
+		<< max_def_passes << " passes (max-def-passes); the "
+		"definitions in use are most likely non-terminating for this "
+		"argument";
 	return nullptr;
 }
 
@@ -1527,15 +1541,8 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	subtree_unordered_set<node> seen;
 	tref current;
 
-	// Termination cap. Without one, a recurrence whose normalized steps are all
-	// distinct (e.g. one that keeps growing) iterates forever, and each
-	// iteration runs a full normalization plus up to `previous.size()`
-	// equivalence proofs. Same reasoning as satisfiability's
-	// `max_fixpoint_steps`: real recurrences settle in single-digit steps, so
-	// this is a very wide margin that still bounds the search.
-	//
-	// TODO (MEDIUM) this must be an option in the cli and/or the repl
-	constexpr size_t max_enumeration_steps = std::numeric_limits<size_t>::max();
+	// Termination cap: the global max_enum_steps, 0 = unlimited (see its
+	// doc for why an unlimited run on a growing recurrence never ends).
 	size_t steps = 0;
 
 	size_t max_lookback = 0;
@@ -1550,10 +1557,12 @@ tref calculate_fixed_point(const rr<node>& nso_rr,
 	LOG_DEBUG << "max lookback " << max_lookback;
 
 	for (size_t i = max_lookback; ; i++) {
-		if (++steps > max_enumeration_steps) {
+		++steps;
+		if (max_enum_steps && steps > max_enum_steps) {
 			LOG_ERROR << "calculate_fixed_point: no fixed point and no "
-				"loop after " << max_enumeration_steps
-				<< " enumeration steps for " << LOG_FM(form)
+				"loop after " << max_enum_steps
+				<< " enumeration steps (max-enum-steps) for "
+				<< LOG_FM(form)
 				<< "; giving up. This is a bound on the search, "
 				"not a proof that no fixed point exists.";
 			return nullptr;
