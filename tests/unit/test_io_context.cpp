@@ -786,6 +786,51 @@ TEST_SUITE("adt tuple streams") {
 		CHECK(writer.collect(0, { dict("p"), dict("x") }, "1"));
 		CHECK(values->empty());
 	}
+
+	TEST_CASE("reader routes an empty leaf value") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: \"\", p: { x: \"1\" } }"
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::optional<std::string>(""));
+		CHECK(reader.leaf(0, { dict("p"), dict("x") }) == std::optional<std::string>("1"));
+	}
+
+	TEST_CASE("reader rejects an unknown key at a nested level") {
+		auto layout = adt_test_layout();
+		adt_tuple_reader<node_t> reader(
+			std::make_unique<vector_input_stream>(std::vector<std::string>{
+				"{ a: \"0\", p: { y: \"1\" } }" // p.y unknown; p.x missing
+			}), layout);
+		CHECK(reader.leaf(0, { dict("a") }) == std::nullopt);
+	}
+
+	TEST_CASE("wire hint renders the layout's shape with empty leaves") {
+		// The whole-tuple prompt the REPL's continue_running shows for an
+		// awaiting tuple console stream (repl_evaluator.tmpl.h).
+		auto layout = adt_test_layout();
+		CHECK(adt_wire_hint<node_t>(layout) == "{ a: \"\", p: { x: \"\" } }");
+	}
+
+	TEST_CASE("find_adt_stream_for_member resolves members and rejects strangers") {
+		// Built through the real registration path (a tuple io def flattened
+		// into ctx), not a hand-rolled layout: the lookup compares against
+		// the CANONIZED member io vars the flattener registers.
+		io_context<node_t> ctx;
+		REQUIRE(tau::get("type Point = {a: sbf, b: sbf}. p:Point := in console. "
+			"always p[t] = 0.", { .infer_ba_types = false, .context = &ctx })
+			!= nullptr);
+		tref member = build_canonized_io_var<node_t>("p.a");
+		const adt_stream_layout<node_t>* l =
+			find_adt_stream_for_member<node_t>(ctx, member);
+		REQUIRE(l != nullptr);
+		CHECK(l->root_name_sid == dict("p"));
+		tref stranger = build_canonized_io_var<node_t>("q");
+		CHECK(find_adt_stream_for_member<node_t>(ctx, stranger) == nullptr);
+		ctx.clear();
+		CHECK(ctx.adt_streams.empty());
+	}
 }
 
 TEST_SUITE("console_prompt_output_stream") {
